@@ -1,0 +1,121 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    binutils \
+    build-essential \
+    ca-certificates \
+    cmake \
+    curl \
+    file \
+    gcc-aarch64-linux-gnu \
+    libc6-dev-arm64-cross \
+    gcc-arm-linux-gnueabihf \
+    libc6-dev-armhf-cross \
+    gcc-i686-linux-gnu \
+    libc6-dev-i386-cross \
+    gcc-mingw-w64-i686 \
+    gcc-mingw-w64-x86-64 \
+    git \
+    openjdk-17-jdk \
+    pkg-config \
+    protobuf-compiler \
+    unzip \
+    xz-utils \
+    zip && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+
+# Install modern Gradle
+ENV GRADLE_VERSION=8.12
+ENV GRADLE_HOME=/opt/gradle/gradle-${GRADLE_VERSION}
+ENV PATH=${GRADLE_HOME}/bin:${PATH}
+RUN mkdir -p /opt/gradle && \
+    curl -fsSL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o /tmp/gradle.zip && \
+    unzip -q /tmp/gradle.zip -d /opt/gradle && \
+    rm -f /tmp/gradle.zip
+
+# Install Zig (for macOS cross-compilation via zig cc)
+ENV ZIG_VERSION=0.13.0
+RUN curl -fsSL "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz" -o /tmp/zig.tar.xz && \
+    tar xf /tmp/zig.tar.xz -C /opt && \
+    ln -s /opt/zig-linux-x86_64-${ZIG_VERSION}/zig /usr/local/bin/zig && \
+    rm -f /tmp/zig.tar.xz
+
+# Rust stable + nightly
+ENV RUSTUP_HOME=/opt/rustup
+ENV CARGO_HOME=/opt/cargo
+ENV PATH=/opt/cargo/bin:${PATH}
+
+RUN curl -fsSL https://sh.rustup.rs -o /tmp/rustup-init.sh && \
+    sh /tmp/rustup-init.sh -y --profile minimal --default-toolchain stable && \
+    rm -f /tmp/rustup-init.sh
+
+RUN rustup toolchain install nightly --profile minimal
+
+# All Rust targets: Android, Desktop, iOS, WASM
+RUN rustup target add \
+    aarch64-linux-android \
+    armv7-linux-androideabi \
+    x86_64-unknown-linux-gnu \
+    i686-unknown-linux-gnu \
+    aarch64-unknown-linux-gnu \
+    armv7-unknown-linux-gnueabihf \
+    i686-pc-windows-gnu \
+    x86_64-pc-windows-gnu \
+    x86_64-apple-darwin \
+    aarch64-apple-darwin \
+    aarch64-apple-ios \
+    aarch64-apple-ios-sim \
+    x86_64-apple-ios \
+    wasm32-unknown-unknown && \
+    rustup target add --toolchain nightly wasm32-unknown-unknown
+
+# Cargo tools
+RUN cargo install --locked cargo-ndk && \
+    cargo install --locked wasm-pack
+
+# Android SDK + NDK
+ENV ANDROID_SDK_ROOT=/opt/android-sdk
+ENV ANDROID_HOME=/opt/android-sdk
+ENV PATH=${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin:${ANDROID_SDK_ROOT}/platform-tools:${PATH}
+
+RUN mkdir -p ${ANDROID_SDK_ROOT}/cmdline-tools && \
+    curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/cmdline-tools.zip && \
+    unzip -q /tmp/cmdline-tools.zip -d ${ANDROID_SDK_ROOT}/cmdline-tools && \
+    mv ${ANDROID_SDK_ROOT}/cmdline-tools/cmdline-tools ${ANDROID_SDK_ROOT}/cmdline-tools/latest && \
+    rm -f /tmp/cmdline-tools.zip
+
+RUN yes | sdkmanager --licenses >/dev/null && \
+    sdkmanager \
+      "build-tools;34.0.0" \
+      "cmake;3.22.1" \
+      "ndk;28.2.13676358" \
+      "platform-tools" \
+      "platforms;android-34"
+
+ENV ANDROID_NDK_HOME=/opt/android-sdk/ndk/28.2.13676358
+
+# Copy all build scripts + zig-cc wrappers
+COPY docker/zig-cc-wrapper.sh /opt/volvoxgrid/zig-cc-wrapper.sh
+RUN chmod +x /opt/volvoxgrid/zig-cc-wrapper.sh && \
+    ln -s /opt/volvoxgrid/zig-cc-wrapper.sh /opt/volvoxgrid/zig-cc-x86_64-macos.sh && \
+    ln -s /opt/volvoxgrid/zig-cc-wrapper.sh /opt/volvoxgrid/zig-cc-aarch64-macos.sh
+
+COPY docker/build_android_aar.sh /opt/volvoxgrid/build_android_aar.sh
+COPY docker/build_desktop_jar.sh /opt/volvoxgrid/build_desktop_jar.sh
+COPY docker/build_ios.sh /opt/volvoxgrid/build_ios.sh
+COPY docker/build_all.sh /opt/volvoxgrid/build_all.sh
+RUN chmod +x /opt/volvoxgrid/build_android_aar.sh \
+             /opt/volvoxgrid/build_desktop_jar.sh \
+             /opt/volvoxgrid/build_ios.sh \
+             /opt/volvoxgrid/build_all.sh
+
+# Allow non-root users (docker run -u) to write to caches
+RUN chmod -R a+w /opt/cargo /opt/rustup /opt/android-sdk
+
+WORKDIR /workspace/volvoxgrid
+ENTRYPOINT ["/opt/volvoxgrid/build_all.sh"]

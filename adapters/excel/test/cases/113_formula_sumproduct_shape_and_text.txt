@@ -1,0 +1,6 @@
+# SUMPRODUCT shape mismatch and text-as-zero
+setData [["1","2"],["x","3"],["9","4"]]
+setCellValue 0 2 "=SUMPRODUCT(A1:A2,B1:B2)"
+setCellValue 1 2 "=SUMPRODUCT(A1:A2,B1:B3)"
+assertCellValue 0 2 "2"
+assertCellValue 1 2 "#VALUE!"

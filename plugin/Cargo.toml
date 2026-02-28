@@ -1,0 +1,27 @@
+[package]
+name = "volvoxgrid-plugin"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/ivere27/volvoxgrid"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[features]
+default = ["demo"]
+demo = ["volvoxgrid-engine/demo"]
+gpu = ["volvoxgrid-engine/gpu", "dep:pollster"]
+
+[dependencies]
+prost = "0.12"
+volvoxgrid-engine = { path = "../engine", features = ["grpc"] }
+ctor = "0.2"
+lazy_static = "1.5"
+pollster = { version = "0.4", optional = true }
+
+[profile.release]
+lto = true
+strip = true
+opt-level = "z"
+codegen-units = 1

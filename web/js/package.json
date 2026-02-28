@@ -1,0 +1,21 @@
+{
+  "name": "volvoxgrid",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ivere27/volvoxgrid.git",
+    "directory": "web/js"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "build:wasm": "cd ../crate && rustup run nightly wasm-pack build . --target web --out-dir ../js/wasm",
+    "build:wasm:threaded": "cd ../crate && RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . --target web --out-dir ../js/wasm --features wasm-threads -Z build-std=std,panic_abort"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

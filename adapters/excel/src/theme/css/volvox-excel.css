@@ -1,0 +1,717 @@
+/* ── VolvoxExcel — Office 365 Style ─────────────────────── */
+
+/* ── Material Icons (bundled) ──────────────────────────── */
+@font-face {
+  font-family: 'Material Icons';
+  font-style: normal;
+  font-weight: 400;
+  src: url('../fonts/MaterialIcons-Regular.ttf') format('truetype');
+}
+
+.vx-icon {
+  font-family: 'Material Icons';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 18px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'liga';
+  user-select: none;
+  pointer-events: none;
+  vertical-align: middle;
+}
+
+/* ── Root ──────────────────────────────────────────────── */
+
+.vx-excel-root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+  font-size: 12px;
+  color: #323130;
+  background: #fff;
+  overflow: hidden;
+}
+
+.vx-canvas-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.vx-canvas-wrap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
+
+/* ── Toolbar ──────────────────────────────────────────── */
+
+.vx-toolbar {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 8px;
+  background: #ffffff;
+  border-bottom: 1px solid #d6d6d6;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.vx-tb-group {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.vx-tb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  color: #323130;
+  padding: 0;
+  transition: background 0.1s;
+}
+
+.vx-tb-btn:hover {
+  background: #e5e5e5;
+  border-color: transparent;
+}
+
+.vx-tb-btn:active {
+  background: #c7c7c7;
+}
+
+.vx-tb-btn:disabled {
+  color: #a19f9d;
+  cursor: default;
+}
+
+.vx-tb-btn:disabled:hover {
+  background: transparent;
+}
+
+.vx-tb-btn .vx-icon {
+  font-size: 18px;
+  color: inherit;
+}
+
+.vx-tb-bold { font-weight: 700; font-size: 13px; }
+.vx-tb-italic { font-style: italic; font-size: 13px; font-family: serif; }
+.vx-tb-underline { text-decoration: underline; font-size: 13px; }
+.vx-tb-strike { text-decoration: line-through; font-size: 13px; }
+.vx-tb-font-size-up,
+.vx-tb-font-size-down {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.15px;
+}
+
+.vx-tb-sep {
+  width: 1px;
+  height: 24px;
+  background: #d6d6d6;
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+/* ── Toolbar Dropdowns ─────────────────────────────────── */
+
+.vx-tb-dropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+.vx-tb-dropdown-btn {
+  min-width: 30px;
+  width: auto;
+  padding: 0 4px;
+  gap: 2px;
+}
+
+.vx-tb-dropdown-btn .vx-icon {
+  font-size: 18px;
+}
+
+.vx-tb-dropdown-arrow {
+  font-size: 8px;
+  color: #605e5c;
+  margin-left: 1px;
+}
+
+.vx-tb-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  z-index: 9999;
+  min-width: 180px;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.vx-tb-dropdown-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  gap: 8px;
+  border-radius: 0;
+  transition: background 0.1s;
+}
+
+.vx-tb-dropdown-item:hover {
+  background: #e5e5e5;
+}
+
+.vx-tb-dropdown-item .vx-icon {
+  font-size: 16px;
+  color: #605e5c;
+}
+
+/* ── Formula Bar ──────────────────────────────────────── */
+
+.vx-formula-bar {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0;
+  background: #fff;
+  border-bottom: 1px solid #d6d6d6;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.vx-name-box {
+  width: 80px;
+  height: 100%;
+  border: none;
+  border-right: 1px solid #d6d6d6;
+  padding: 0 6px;
+  font-size: 11px;
+  font-family: inherit;
+  text-align: center;
+  outline: none;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.vx-name-box:focus {
+  background: #e8f0fe;
+  border-color: #217346;
+}
+
+.vx-fx-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 100%;
+  border: none;
+  border-right: 1px solid #d6d6d6;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 600;
+  color: #217346;
+  font-family: inherit;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.vx-fx-btn:hover {
+  background: #e5e5e5;
+}
+
+/* Edit commit/cancel buttons (visible only during editing) */
+.vx-fx-edit-btns {
+  display: none;
+  align-items: center;
+  gap: 0;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.vx-fx-edit-btns.vx-visible {
+  display: flex;
+}
+
+.vx-fx-check,
+.vx-fx-cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.vx-fx-check .vx-icon {
+  font-size: 16px;
+  color: #217346;
+}
+
+.vx-fx-cancel .vx-icon {
+  font-size: 16px;
+  color: #d13438;
+}
+
+.vx-fx-check:hover { background: #e2efda; }
+.vx-fx-cancel:hover { background: #fde7e9; }
+
+.vx-formula-input {
+  flex: 1;
+  height: 100%;
+  border: none;
+  padding: 0 6px;
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+  min-width: 0;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.vx-formula-input:focus {
+  background: #fafafa;
+}
+
+.vx-fx-expand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 100%;
+  border: none;
+  border-left: 1px solid #d6d6d6;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  color: #605e5c;
+  flex-shrink: 0;
+}
+
+.vx-fx-expand:hover {
+  background: #e5e5e5;
+}
+
+.vx-fx-expand .vx-icon {
+  font-size: 14px;
+}
+
+/* Expanded formula bar */
+.vx-formula-bar.vx-expanded {
+  height: 60px;
+  align-items: flex-start;
+}
+
+.vx-formula-bar.vx-expanded .vx-name-box,
+.vx-formula-bar.vx-expanded .vx-fx-btn,
+.vx-formula-bar.vx-expanded .vx-fx-edit-btns,
+.vx-formula-bar.vx-expanded .vx-fx-expand {
+  height: 28px;
+}
+
+.vx-formula-bar.vx-expanded .vx-formula-input {
+  height: 100%;
+  white-space: pre-wrap;
+  overflow-y: auto;
+}
+
+/* ── Context Menu ─────────────────────────────────────── */
+
+.vx-context-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 220px;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.vx-cm-item {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px 0 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  gap: 8px;
+  transition: background 0.1s;
+}
+
+.vx-cm-item:hover {
+  background: #e5e5e5;
+}
+
+.vx-cm-icon {
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.vx-cm-icon .vx-icon {
+  font-size: 16px;
+  color: #605e5c;
+}
+
+.vx-cm-label {
+  flex: 1;
+}
+
+.vx-cm-shortcut {
+  margin-left: auto;
+  padding-left: 24px;
+  color: #605e5c;
+  font-size: 11px;
+}
+
+.vx-cm-sep {
+  height: 1px;
+  background: #e8e8e8;
+  margin: 4px 0;
+}
+
+/* ── Bottom Bar (Sheet Tabs + Status Bar) ──────────────── */
+
+.vx-bottom-bar {
+  display: flex;
+  flex-shrink: 0;
+  border-top: 1px solid #d6d6d6;
+}
+
+/* ── Sheet Tabs ───────────────────────────────────────── */
+
+.vx-sheet-tabs {
+  display: flex;
+  align-items: stretch;
+  height: 26px;
+  background: #e6e6e6;
+  gap: 0;
+  flex-shrink: 0;
+  min-width: 200px;
+  max-width: 50%;
+}
+
+.vx-tab-nav {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+  padding: 0 2px;
+}
+
+.vx-tab-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  color: #605e5c;
+}
+
+.vx-tab-nav-btn:hover {
+  background: #d0d0d0;
+}
+
+.vx-tab-nav-btn .vx-icon {
+  font-size: 16px;
+}
+
+.vx-tab-container {
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.vx-tab-container::-webkit-scrollbar {
+  display: none;
+}
+
+.vx-tab {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  white-space: nowrap;
+  user-select: none;
+  color: #323130;
+  transition: background 0.1s;
+  outline: none;
+  min-width: 0;
+}
+
+.vx-tab:hover {
+  background: #d0d0d0;
+}
+
+.vx-tab-active {
+  background: #ffffff;
+  border-bottom: 2px solid #217346;
+  font-weight: 600;
+}
+
+.vx-tab-active:hover {
+  background: #ffffff;
+}
+
+/* Inline rename state */
+.vx-tab[contenteditable="true"] {
+  cursor: text;
+  outline: 1px solid #217346;
+  outline-offset: -1px;
+  background: #ffffff;
+}
+
+.vx-tab-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  color: #605e5c;
+  flex-shrink: 0;
+}
+
+.vx-tab-add:hover {
+  background: #d0d0d0;
+}
+
+.vx-tab-add .vx-icon {
+  font-size: 16px;
+}
+
+/* ── Status Bar ───────────────────────────────────────── */
+
+.vx-status-bar {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 12px;
+  background: #217346;
+  color: #ffffff;
+  gap: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  user-select: none;
+}
+
+.vx-sb-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+}
+
+.vx-sb-mode {
+  white-space: nowrap;
+}
+
+.vx-sb-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  white-space: nowrap;
+}
+
+.vx-sb-item {
+  white-space: nowrap;
+}
+
+.vx-sb-zoom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 16px;
+  border-left: 1px solid rgba(255,255,255,0.3);
+  padding-left: 12px;
+}
+
+.vx-sb-zoom-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  color: #ffffff;
+}
+
+.vx-sb-zoom-btn:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+.vx-sb-zoom-btn .vx-icon {
+  font-size: 14px;
+}
+
+.vx-sb-zoom-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 80px;
+  height: 3px;
+  background: rgba(255,255,255,0.4);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.vx-sb-zoom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.vx-sb-zoom-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: none;
+  cursor: pointer;
+}
+
+.vx-sb-zoom-label {
+  min-width: 32px;
+  text-align: center;
+  font-size: 11px;
+}
+
+/* ── Find / Replace Bar ───────────────────────────────── */
+
+.vx-find-bar {
+  padding: 6px 12px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #d6d6d6;
+  flex-shrink: 0;
+}
+
+.vx-find-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.vx-find-row:last-child {
+  margin-bottom: 0;
+}
+
+.vx-find-input {
+  flex: 1;
+  height: 24px;
+  border: 1px solid #d6d6d6;
+  border-radius: 4px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  min-width: 120px;
+  max-width: 280px;
+  background: #ffffff;
+}
+
+.vx-find-input:focus {
+  border-color: #217346;
+  box-shadow: 0 0 0 1px #217346;
+}
+
+.vx-find-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: #323130;
+  padding: 0 6px;
+  white-space: nowrap;
+  transition: background 0.1s;
+}
+
+.vx-find-btn:hover {
+  background: #e5e5e5;
+}
+
+.vx-find-btn .vx-icon {
+  font-size: 16px;
+}
+
+.vx-find-count {
+  font-size: 11px;
+  color: #605e5c;
+  white-space: nowrap;
+  min-width: 60px;
+  text-align: center;
+}
+
+.vx-find-close {
+  color: #605e5c;
+}
+
+.vx-find-close:hover {
+  color: #323130;
+}

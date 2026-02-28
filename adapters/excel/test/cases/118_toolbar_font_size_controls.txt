@@ -1,0 +1,22 @@
+# Toolbar font size controls + selection style guard
+# 1) Default font size baseline is 11 with Excel-style stepping
+setSelection {"row1":0,"col1":0,"row2":0,"col2":0}
+assertCellStyle 0 0 fontBold false
+invokeToolbarAction "fontSizeIncrease"
+assertCellStyle 0 0 fontSize 12
+invokeToolbarAction "fontSizeIncrease"
+assertCellStyle 0 0 fontSize 14
+invokeToolbarAction "fontSizeDecrease"
+assertCellStyle 0 0 fontSize 12
+assertCellStyle 0 0 fontBold false
+undo
+assertCellStyle 0 0 fontSize 14
+
+# 2) Growing font from a short row auto-grows row height
+setRowHeight 1 15
+setSelection {"row1":1,"col1":0,"row2":1,"col2":0}
+assertColWidth 0 64
+invokeToolbarAction "fontSizeIncrease"
+assertCellStyle 1 0 fontSize 12
+assertRowHeight 1 22
+assertColWidth 0 64

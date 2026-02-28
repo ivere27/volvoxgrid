@@ -1,0 +1,13 @@
+# COUNTA over ranges and single refs (including error cells)
+setCellValue 0 0 "1"
+setCellValue 0 1 ""
+setCellValue 0 2 "x"
+setCellValue 1 0 "=1/0"
+setCellValue 1 1 ""
+setCellValue 1 2 "5"
+setCellValue 2 0 "=COUNTA(A1:C2)"
+setCellValue 2 1 "=COUNTA(B1,C1,B2,C2)"
+setCellValue 2 2 "=COUNTA(A2)"
+assertCellValue 2 0 "4"
+assertCellValue 2 1 "2"
+assertCellValue 2 2 "1"

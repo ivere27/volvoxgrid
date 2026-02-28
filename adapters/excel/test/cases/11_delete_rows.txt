@@ -1,0 +1,3 @@
+# Delete rows — delete row at index 1
+setData [["Name","Score"],["DELETE_ME","0"],["Alice","90"],["Bob","85"]]
+deleteRows 1 1

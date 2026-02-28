@@ -1,0 +1,6 @@
+# Function argument validation
+setCellValue 0 0 "abc"
+setCellValue 0 1 "=ABS(A1)"
+setCellValue 0 2 "=LEFT(A1,-1)"
+assertCellValue 0 1 "#VALUE!"
+assertCellValue 0 2 "#VALUE!"

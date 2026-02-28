@@ -1,0 +1,6 @@
+# IF with string branches and quoted literals
+setCellValue 0 0 "9"
+setCellValue 0 1 "=IF(A1>=10,\"big\",\"small\")"
+assertCellValue 0 1 "small"
+setCellValue 0 0 "12"
+assertCellValue 0 1 "big"

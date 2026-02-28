@@ -1,0 +1,9 @@
+# Style undo — single cell bold on/off
+setData [["A","B"],["1","2"]]
+setCellStyle 0 0 {"bold":true}
+assertCanUndo true
+assertCellStyle 0 0 fontBold true
+undo
+assertCellStyle 0 0 fontBold false
+redo
+assertCellStyle 0 0 fontBold true

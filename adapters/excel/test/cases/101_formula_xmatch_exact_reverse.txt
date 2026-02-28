@@ -1,0 +1,6 @@
+# XMATCH exact and reverse search
+setData [["A"],["B"],["B"],["C"]]
+setCellValue 0 1 "=XMATCH(\"B\",A1:A4)"
+setCellValue 1 1 "=XMATCH(\"B\",A1:A4,0,-1)"
+assertCellValue 0 1 "2"
+assertCellValue 1 1 "3"

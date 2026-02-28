@@ -1,0 +1,4 @@
+# SUMIFS with two criteria ranges
+setData [["Cat","Region","Amt"],["A","E","10"],["A","W","20"],["B","E","5"],["A","E","7"]]
+setCellValue 0 3 "=SUMIFS(C2:C5,A2:A5,\"A\",B2:B5,\"E\")"
+assertCellValue 0 3 "17"

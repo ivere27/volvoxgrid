@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>AG Grid vs VolvoxGrid — Capture Compare</title>
+<style>
+  :root {
+    --compare-grid-width: 960px;
+    --compare-grid-height: 720px;
+    --compare-grid-gap: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: sans-serif; background: #f0f0f0; padding: 20px; }
+  .grid-pair { display: flex; gap: var(--compare-grid-gap); margin-bottom: 16px; }
+  .grid-container { width: var(--compare-grid-width); height: var(--compare-grid-height); border: 1px solid #ccc; background: #fff; }
+  #status { font-size: 14px; color: #333; margin-bottom: 12px; }
+</style>
+<link rel="stylesheet" href="/node_modules/ag-grid-community/styles/ag-grid.css">
+<link rel="stylesheet" href="/node_modules/ag-grid-community/styles/ag-theme-alpine.css">
+</head>
+<body>
+
+<div id="status">Waiting for init...</div>
+
+<div class="grid-pair">
+  <div id="ref-grid" class="grid-container ag-theme-alpine"></div>
+  <div id="vv-grid" class="grid-container"></div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "ag-grid-community": "/node_modules/ag-grid-community/dist/package/main.esm.mjs",
+    "volvoxgrid": "/volvoxgrid_js/dist/index.js",
+    "volvoxgrid/dist/default-input.js": "/volvoxgrid_js/dist/default-input.js",
+    "./volvoxgrid.js": "/volvoxgrid_js/dist/volvoxgrid.js",
+    "./volvoxgrid-element.js": "/volvoxgrid_js/dist/volvoxgrid-element.js"
+  }
+}
+</script>
+
+<script type="module">
+import { compareCases } from "/adapter/test/compare_cases.mjs";
+import initWasm, * as wasmModule from "/wasm/volvoxgrid_wasm.js";
+
+// We load the adapter from the built dist/ directory.
+let AgGridVolvox;
+let agGridModule = null;
+const pageParams = new URLSearchParams(window.location.search);
+const captureFontFamily = (pageParams.get("vv-font-family") || "").trim();
+const settleMs = (() => {
+  const raw = Number.parseInt(pageParams.get("settle-ms") || "500", 10);
+  if (!Number.isFinite(raw)) {
+    return 500;
+  }
+  return Math.max(0, raw);
+})();
+const gridWidth = parseDimension(pageParams.get("grid-width"), 960);
+const gridHeight = parseDimension(pageParams.get("grid-height"), 720);
+
+document.documentElement.style.setProperty("--compare-grid-width", `${gridWidth}px`);
+document.documentElement.style.setProperty("--compare-grid-height", `${gridHeight}px`);
+
+window.__captureReady = false;
+window.__error = null;
+
+// Destroy handles for cleanup between cases.
+let refGridApi = null;
+let vvGridInstance = null;
+let captureFontLoaded = false;
+let captureFontLoadPromise = null;
+let wasmReadyPromise = null;
+
+function parseDimension(value, fallback) {
+  const parsed = Number.parseInt(value || "", 10);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.max(320, parsed);
+}
+
+function applyStyleRecord(el, styleRecord) {
+  if (!styleRecord || typeof styleRecord !== "object") {
+    return;
+  }
+  for (const [key, value] of Object.entries(styleRecord)) {
+    if (typeof value !== "string" && typeof value !== "number") {
+      continue;
+    }
+    el.style.setProperty(key, String(value));
+  }
+}
+
+function applyCaseContainerStyles(refEl, vvEl, tc) {
+  refEl.style.cssText = "";
+  vvEl.style.cssText = "";
+  applyStyleRecord(refEl, tc.containerStyle);
+  applyStyleRecord(vvEl, tc.containerStyle);
+  applyStyleRecord(refEl, tc.refContainerStyle);
+  applyStyleRecord(vvEl, tc.vvContainerStyle);
+}
+
+async function loadAdapter() {
+  if (AgGridVolvox) {
+    return;
+  }
+  const mod = await import("/adapter/dist/index.js");
+  AgGridVolvox = mod.AgGridVolvox;
+}
+
+async function loadAgGrid() {
+  if (agGridModule != null) {
+    return agGridModule;
+  }
+  // AG Grid community — use createGrid from the package
+  const ag = await import("ag-grid-community");
+  agGridModule = ag;
+  return agGridModule;
+}
+
+async function getWasmModule() {
+  if (!wasmReadyPromise) {
+    wasmReadyPromise = (async () => {
+      await initWasm({ module_or_path: "/wasm/volvoxgrid_wasm_bg.wasm" });
+      return wasmModule;
+    })();
+  }
+  return wasmReadyPromise;
+}
+
+async function ensureCaptureFontLoaded(wasm) {
+  if (captureFontLoaded) {
+    return true;
+  }
+  if (captureFontLoadPromise) {
+    return captureFontLoadPromise;
+  }
+  if (typeof wasm?.load_font !== "function") {
+    return false;
+  }
+
+  captureFontLoadPromise = (async () => {
+    try {
+      const resp = await fetch("/__volvox_font__.ttf", { cache: "no-store" });
+      if (!resp.ok) {
+        return false;
+      }
+      const fontData = new Uint8Array(await resp.arrayBuffer());
+      if (fontData.byteLength === 0) {
+        return false;
+      }
+      wasm.load_font(fontData);
+      captureFontLoaded = true;
+
+      // Load CJK fallback font (if available)
+      try {
+        const fbResp = await fetch("/__volvox_fallback_font__.ttf", { cache: "no-store" });
+        if (fbResp.ok) {
+          const fbData = new Uint8Array(await fbResp.arrayBuffer());
+          if (fbData.byteLength > 0) {
+            wasm.load_font(fbData);
+          }
+        }
+      } catch (_) { /* fallback is optional */ }
+
+      return true;
+    } catch (_) {
+      return false;
+    }
+  })();
+
+  return captureFontLoadPromise;
+}
+
+let glyphRasterizerSet = false;
+async function ensureGlyphRasterizer(wasm) {
+  if (glyphRasterizerSet) return;
+  if (typeof wasm?.set_glyph_rasterizer !== "function") return;
+  try {
+    const { createCanvas2DRasterizer } = await import("/volvoxgrid_js/dist/canvas2d-rasterizer.js");
+    wasm.set_glyph_rasterizer(createCanvas2DRasterizer());
+    glyphRasterizerSet = true;
+  } catch (_) { /* canvas2d rasterizer is optional */ }
+}
+
+function applyCaptureFontFamily(instance) {
+  if (!captureFontFamily || instance == null) {
+    return;
+  }
+  const innerGrid = instance.grid;
+  if (innerGrid && typeof innerGrid.setFontName === "function") {
+    innerGrid.setFontName(captureFontFamily);
+  }
+}
+
+window.__forceCaptureFont = function() {
+  applyCaptureFontFamily(vvGridInstance);
+};
+
+window.__initCase = async function(caseId) {
+  window.__captureReady = false;
+  window.__error = null;
+
+  try {
+    const tc = compareCases.find(c => c.id === caseId);
+    if (!tc) {
+      throw new Error(`Test case ${caseId} not found`);
+    }
+
+    const status = document.getElementById("status");
+    status.textContent = `[${String(caseId).padStart(2, "0")}] ${tc.name}`;
+
+    // Clean previous grids
+    const refEl = document.getElementById("ref-grid");
+    const vvEl = document.getElementById("vv-grid");
+
+    if (refGridApi) {
+      try { refGridApi.destroy(); } catch (_) {}
+      refGridApi = null;
+    }
+    if (vvGridInstance) {
+      try { vvGridInstance.destroy(); } catch (_) {}
+      vvGridInstance = null;
+    }
+    refEl.innerHTML = "";
+    vvEl.innerHTML = "";
+    applyCaseContainerStyles(refEl, vvEl, tc);
+
+    // ── Reference: AG Grid ──
+    const ag = await loadAgGrid();
+    const sharedGridOptions = {
+      columnDefs: tc.columnDefs,
+      defaultColDef: tc.defaultColDef,
+      rowData: tc.rowData,
+      pinnedTopRowData: tc.pinnedTopRowData,
+      pinnedBottomRowData: tc.pinnedBottomRowData,
+      rowSelection: tc.rowSelection,
+      rowHeight: tc.rowHeight,
+      headerHeight: tc.headerHeight,
+      animateRows: tc.animateRows === true,
+      icons: tc.icons,
+    };
+    const refGridOptions = {
+      ...sharedGridOptions,
+    };
+    refGridApi = ag.createGrid(refEl, refGridOptions);
+
+    // ── VolvoxGrid via adapter ──
+    const wasm = await getWasmModule();
+    await ensureCaptureFontLoaded(wasm);
+    await ensureGlyphRasterizer(wasm);
+    await loadAdapter();
+
+    vvGridInstance = new AgGridVolvox({
+      container: vvEl,
+      wasm,
+      gridOptions: {
+        ...sharedGridOptions,
+        fontSize: tc.fontSize,
+        theme: tc.theme,
+      },
+    });
+    applyCaptureFontFamily(vvGridInstance);
+
+    // Wait for render
+    await new Promise(r => setTimeout(r, settleMs));
+    window.__captureReady = true;
+  } catch (err) {
+    window.__error = String(err);
+    window.__captureReady = true;
+  }
+};
+</script>
+
+</body>
+</html>

@@ -1,0 +1,4 @@
+# SUMIF wildcard criteria
+setData [["Cat","Amt"],["apples","10"],["apricot","20"],["banana","30"]]
+setCellValue 0 2 "=SUMIF(A2:A4,\"ap*\",B2:B4)"
+assertCellValue 0 2 "30"

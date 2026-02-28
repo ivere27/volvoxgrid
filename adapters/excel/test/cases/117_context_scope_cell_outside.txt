@@ -1,0 +1,5 @@
+# Cell vs outside scope
+assertContextScopeAtGrid 2 3 "cell"
+invokeContextAtGrid 2 3
+assertSelection {"row1":1,"col1":2,"row2":1,"col2":2}
+assertContextScopeAtGrid -1 -1 "outside"

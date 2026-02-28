@@ -1,0 +1,645 @@
+export interface SelectionState {
+  row: number;
+  col: number;
+  rowEnd: number;
+  colEnd: number;
+  topRow: number;
+  leftCol: number;
+  bottomRow: number;
+  rightCol: number;
+  mouseRow: number;
+  mouseCol: number;
+}
+
+export interface AfterSortPayload {
+  col: number;
+}
+
+export interface AfterUserResizePayload {
+  row: number;
+  col: number;
+}
+
+export interface GridEventEnvelope {
+  eventField: number;
+  payload: Uint8Array;
+}
+
+function encodeVarintUnsigned(value: bigint): number[] {
+  const out: number[] = [];
+  let v = BigInt.asUintN(64, value);
+  while (v >= 0x80n) {
+    out.push(Number((v & 0x7fn) | 0x80n));
+    v >>= 7n;
+  }
+  out.push(Number(v));
+  return out;
+}
+
+function encodeTag(field: number, wireType: number): number[] {
+  return encodeVarintUnsigned(BigInt((field << 3) | wireType));
+}
+
+function encodeInt32(value: number): number[] {
+  const i32 = BigInt.asIntN(32, BigInt(Math.trunc(value)));
+  return encodeVarintUnsigned(BigInt.asUintN(64, i32));
+}
+
+function encodeInt64(value: number): number[] {
+  return encodeVarintUnsigned(BigInt(Math.trunc(value)));
+}
+
+function encodeBool(value: boolean): number[] {
+  return encodeVarintUnsigned(value ? 1n : 0n);
+}
+
+function encodeMessageField(field: number, payload: number[]): number[] {
+  return [
+    ...encodeTag(field, 2),
+    ...encodeVarintUnsigned(BigInt(payload.length)),
+    ...payload,
+  ];
+}
+
+function encodeCellRange(row1: number, col1: number, row2: number, col2: number): number[] {
+  const out: number[] = [];
+  out.push(...encodeTag(1, 0), ...encodeInt32(row1));
+  out.push(...encodeTag(2, 0), ...encodeInt32(col1));
+  out.push(...encodeTag(3, 0), ...encodeInt32(row2));
+  out.push(...encodeTag(4, 0), ...encodeInt32(col2));
+  return out;
+}
+
+export function encodeSelectRequest(args: {
+  gridId: number;
+  row: number;
+  col: number;
+  rowEnd?: number;
+  colEnd?: number;
+  show?: boolean;
+}): Uint8Array {
+  const out: number[] = [];
+  const rowEnd = args.rowEnd ?? args.row;
+  const colEnd = args.colEnd ?? args.col;
+  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
+  // SelectRequest.active_row = 2
+  out.push(...encodeTag(2, 0), ...encodeInt32(args.row));
+  // SelectRequest.active_col = 3
+  out.push(...encodeTag(3, 0), ...encodeInt32(args.col));
+  // SelectRequest.ranges = 4 (single-range compatibility)
+  out.push(...encodeMessageField(4, encodeCellRange(args.row, args.col, rowEnd, colEnd)));
+  if (args.show != null) {
+    // SelectRequest.show = 5
+    out.push(...encodeTag(5, 0), ...encodeBool(args.show));
+  }
+  return new Uint8Array(out);
+}
+
+export function encodeDefineBooleanColumnsRequest(args: {
+  gridId: number;
+  columnIndices: number[];
+}): Uint8Array {
+  const out: number[] = [];
+  // DefineColumnsRequest.grid_id = 1
+  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
+
+  for (const idx of args.columnIndices) {
+    const colDef: number[] = [];
+    // ColumnDef.index = 1
+    colDef.push(...encodeTag(1, 0), ...encodeInt32(idx));
+    // ColumnDef.data_type = 7 (COLUMN_DATA_BOOLEAN = 3)
+    colDef.push(...encodeTag(7, 0), ...encodeInt32(3));
+
+    // DefineColumnsRequest.columns = 2
+    out.push(...encodeTag(2, 2), ...encodeVarintUnsigned(BigInt(colDef.length)), ...colDef);
+  }
+
+  return new Uint8Array(out);
+}
+
+export function encodeDefineColumnAlignmentsRequest(args: {
+  gridId: number;
+  columnIndices: number[];
+  alignment: number;
+  fixedAlignment?: number;
+}): Uint8Array {
+  const out: number[] = [];
+  // DefineColumnsRequest.grid_id = 1
+  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
+
+  for (const idx of args.columnIndices) {
+    const colDef: number[] = [];
+    // ColumnDef.index = 1
+    colDef.push(...encodeTag(1, 0), ...encodeInt32(idx));
+    // ColumnDef.alignment = 5
+    colDef.push(...encodeTag(5, 0), ...encodeInt32(args.alignment));
+    if (typeof args.fixedAlignment === "number") {
+      // ColumnDef.fixed_alignment = 6
+      colDef.push(...encodeTag(6, 0), ...encodeInt32(args.fixedAlignment));
+    }
+
+    // DefineColumnsRequest.columns = 2
+    out.push(...encodeTag(2, 2), ...encodeVarintUnsigned(BigInt(colDef.length)), ...colDef);
+  }
+
+  return new Uint8Array(out);
+}
+
+export function encodeUpdateCheckedCellsRequest(args: {
+  gridId: number;
+  updates: Array<{ row: number; col: number; checked: number }>;
+}): Uint8Array {
+  const out: number[] = [];
+  // UpdateCellsRequest.grid_id = 1
+  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
+
+  for (const update of args.updates) {
+    const cellUpdate: number[] = [];
+    // CellUpdate.row = 1
+    cellUpdate.push(...encodeTag(1, 0), ...encodeInt32(update.row));
+    // CellUpdate.col = 2
+    cellUpdate.push(...encodeTag(2, 0), ...encodeInt32(update.col));
+    // CellUpdate.checked = 5 (CHECKED_UNCHECKED=0, CHECKED_CHECKED=1)
+    cellUpdate.push(...encodeTag(5, 0), ...encodeInt32(update.checked));
+
+    // UpdateCellsRequest.cells = 2
+    out.push(
+      ...encodeTag(2, 2),
+      ...encodeVarintUnsigned(BigInt(cellUpdate.length)),
+      ...cellUpdate,
+    );
+  }
+
+  return new Uint8Array(out);
+}
+
+export function encodeUpdateBoldCellsRequest(args: {
+  gridId: number;
+  updates: Array<{ row: number; col: number; bold: boolean }>;
+}): Uint8Array {
+  const out: number[] = [];
+  // UpdateCellsRequest.grid_id = 1
+  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
+
+  for (const update of args.updates) {
+    const style: number[] = [];
+    // CellStyleOverride.font_bold = 7
+    style.push(...encodeTag(7, 0), ...encodeBool(update.bold));
+
+    const cellUpdate: number[] = [];
+    // CellUpdate.row = 1
+    cellUpdate.push(...encodeTag(1, 0), ...encodeInt32(update.row));
+    // CellUpdate.col = 2
+    cellUpdate.push(...encodeTag(2, 0), ...encodeInt32(update.col));
+    // CellUpdate.style = 4
+    cellUpdate.push(...encodeTag(4, 2), ...encodeVarintUnsigned(BigInt(style.length)), ...style);
+
+    // UpdateCellsRequest.cells = 2
+    out.push(
+      ...encodeTag(2, 2),
+      ...encodeVarintUnsigned(BigInt(cellUpdate.length)),
+      ...cellUpdate,
+    );
+  }
+
+  return new Uint8Array(out);
+}
+
+export interface CellPaddingUpdate {
+  row: number;
+  col: number;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+export function encodeUpdateCellPaddingRequest(args: {
+  gridId: number;
+  updates: CellPaddingUpdate[];
+}): Uint8Array {
+  const out: number[] = [];
+  // UpdateCellsRequest.grid_id = 1
+  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
+
+  for (const update of args.updates) {
+    const padding: number[] = [];
+    // CellPadding fields (left=1, top=2, right=3, bottom=4)
+    padding.push(...encodeTag(1, 0), ...encodeInt32(update.left));
+    padding.push(...encodeTag(2, 0), ...encodeInt32(update.top));
+    padding.push(...encodeTag(3, 0), ...encodeInt32(update.right));
+    padding.push(...encodeTag(4, 0), ...encodeInt32(update.bottom));
+
+    const style: number[] = [];
+    // CellStyleOverride.padding = 16
+    style.push(...encodeTag(16, 2), ...encodeVarintUnsigned(BigInt(padding.length)), ...padding);
+
+    const cellUpdate: number[] = [];
+    // CellUpdate.row = 1
+    cellUpdate.push(...encodeTag(1, 0), ...encodeInt32(update.row));
+    // CellUpdate.col = 2
+    cellUpdate.push(...encodeTag(2, 0), ...encodeInt32(update.col));
+    // CellUpdate.style = 4
+    cellUpdate.push(...encodeTag(4, 2), ...encodeVarintUnsigned(BigInt(style.length)), ...style);
+
+    // UpdateCellsRequest.cells = 2
+    out.push(
+      ...encodeTag(2, 2),
+      ...encodeVarintUnsigned(BigInt(cellUpdate.length)),
+      ...cellUpdate,
+    );
+  }
+
+  return new Uint8Array(out);
+}
+
+export interface CellBorderUpdate {
+  row: number;
+  col: number;
+  left?: number;
+  top?: number;
+  right?: number;
+  bottom?: number;
+  border?: number;
+  borderColor?: number;
+  borderTop?: number;
+  borderRight?: number;
+  borderBottom?: number;
+  borderLeft?: number;
+  borderTopColor?: number;
+  borderRightColor?: number;
+  borderBottomColor?: number;
+  borderLeftColor?: number;
+}
+
+export function encodeUpdateCellBordersRequest(args: {
+  gridId: number;
+  updates: CellBorderUpdate[];
+}): Uint8Array {
+  const out: number[] = [];
+  // UpdateCellsRequest.grid_id = 1
+  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
+
+  for (const update of args.updates) {
+    const style: number[] = [];
+    if (
+      typeof update.left === "number"
+      || typeof update.top === "number"
+      || typeof update.right === "number"
+      || typeof update.bottom === "number"
+    ) {
+      const padding: number[] = [];
+      if (typeof update.left === "number") {
+        // CellPadding.left = 1
+        padding.push(...encodeTag(1, 0), ...encodeInt32(update.left));
+      }
+      if (typeof update.top === "number") {
+        // CellPadding.top = 2
+        padding.push(...encodeTag(2, 0), ...encodeInt32(update.top));
+      }
+      if (typeof update.right === "number") {
+        // CellPadding.right = 3
+        padding.push(...encodeTag(3, 0), ...encodeInt32(update.right));
+      }
+      if (typeof update.bottom === "number") {
+        // CellPadding.bottom = 4
+        padding.push(...encodeTag(4, 0), ...encodeInt32(update.bottom));
+      }
+      if (padding.length > 0) {
+        // CellStyleOverride.padding = 16
+        style.push(...encodeTag(16, 2), ...encodeVarintUnsigned(BigInt(padding.length)), ...padding);
+      }
+    }
+    if (typeof update.border === "number") {
+      // CellStyleOverride.border = 14
+      style.push(...encodeTag(14, 0), ...encodeInt32(update.border));
+    }
+    if (typeof update.borderColor === "number") {
+      // CellStyleOverride.border_color = 15
+      style.push(...encodeTag(15, 0), ...encodeVarintUnsigned(BigInt(update.borderColor >>> 0)));
+    }
+    if (typeof update.borderTop === "number") {
+      // CellStyleOverride.border_top = 17
+      style.push(...encodeTag(17, 0), ...encodeInt32(update.borderTop));
+    }
+    if (typeof update.borderRight === "number") {
+      // CellStyleOverride.border_right = 18
+      style.push(...encodeTag(18, 0), ...encodeInt32(update.borderRight));
+    }
+    if (typeof update.borderBottom === "number") {
+      // CellStyleOverride.border_bottom = 19
+      style.push(...encodeTag(19, 0), ...encodeInt32(update.borderBottom));
+    }
+    if (typeof update.borderLeft === "number") {
+      // CellStyleOverride.border_left = 20
+      style.push(...encodeTag(20, 0), ...encodeInt32(update.borderLeft));
+    }
+    if (typeof update.borderTopColor === "number") {
+      // CellStyleOverride.border_top_color = 21
+      style.push(
+        ...encodeTag(21, 0),
+        ...encodeVarintUnsigned(BigInt(update.borderTopColor >>> 0)),
+      );
+    }
+    if (typeof update.borderRightColor === "number") {
+      // CellStyleOverride.border_right_color = 22
+      style.push(
+        ...encodeTag(22, 0),
+        ...encodeVarintUnsigned(BigInt(update.borderRightColor >>> 0)),
+      );
+    }
+    if (typeof update.borderBottomColor === "number") {
+      // CellStyleOverride.border_bottom_color = 23
+      style.push(
+        ...encodeTag(23, 0),
+        ...encodeVarintUnsigned(BigInt(update.borderBottomColor >>> 0)),
+      );
+    }
+    if (typeof update.borderLeftColor === "number") {
+      // CellStyleOverride.border_left_color = 24
+      style.push(
+        ...encodeTag(24, 0),
+        ...encodeVarintUnsigned(BigInt(update.borderLeftColor >>> 0)),
+      );
+    }
+
+    if (style.length === 0) {
+      continue;
+    }
+
+    const cellUpdate: number[] = [];
+    // CellUpdate.row = 1
+    cellUpdate.push(...encodeTag(1, 0), ...encodeInt32(update.row));
+    // CellUpdate.col = 2
+    cellUpdate.push(...encodeTag(2, 0), ...encodeInt32(update.col));
+    // CellUpdate.style = 4
+    cellUpdate.push(...encodeTag(4, 2), ...encodeVarintUnsigned(BigInt(style.length)), ...style);
+
+    // UpdateCellsRequest.cells = 2
+    out.push(
+      ...encodeTag(2, 2),
+      ...encodeVarintUnsigned(BigInt(cellUpdate.length)),
+      ...cellUpdate,
+    );
+  }
+
+  return new Uint8Array(out);
+}
+
+function readVarint(data: Uint8Array, offset: number): { value: bigint; next: number } {
+  let out = 0n;
+  let shift = 0n;
+  let i = offset;
+  while (i < data.length) {
+    const b = data[i];
+    out |= BigInt(b & 0x7f) << shift;
+    i += 1;
+    if ((b & 0x80) === 0) {
+      return { value: out, next: i };
+    }
+    shift += 7n;
+    if (shift > 70n) {
+      break;
+    }
+  }
+  return { value: 0n, next: data.length };
+}
+
+function skipField(data: Uint8Array, offset: number, wireType: number): number {
+  if (wireType === 0) {
+    return readVarint(data, offset).next;
+  }
+  if (wireType === 1) {
+    return Math.min(data.length, offset + 8);
+  }
+  if (wireType === 2) {
+    const length = readVarint(data, offset);
+    const n = Number(length.value);
+    if (!Number.isFinite(n) || n < 0) {
+      return data.length;
+    }
+    return Math.min(data.length, length.next + n);
+  }
+  if (wireType === 5) {
+    return Math.min(data.length, offset + 4);
+  }
+  return data.length;
+}
+
+function asInt32(value: bigint): number {
+  return Number(BigInt.asIntN(32, value));
+}
+
+interface CellRangePayload {
+  row1: number;
+  col1: number;
+  row2: number;
+  col2: number;
+}
+
+function decodeCellRange(data: Uint8Array): CellRangePayload {
+  const out: CellRangePayload = { row1: -1, col1: -1, row2: -1, col2: -1 };
+  let offset = 0;
+  while (offset < data.length) {
+    const tag = readVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (wire === 0) {
+      const value = readVarint(data, offset);
+      offset = value.next;
+      const n = asInt32(value.value);
+      if (field === 1) out.row1 = n;
+      if (field === 2) out.col1 = n;
+      if (field === 3) out.row2 = n;
+      if (field === 4) out.col2 = n;
+      continue;
+    }
+    offset = skipField(data, offset, wire);
+  }
+  return out;
+}
+
+export function decodeSelectionState(data: Uint8Array): SelectionState {
+  const out: SelectionState = {
+    row: -1,
+    col: -1,
+    rowEnd: -1,
+    colEnd: -1,
+    topRow: 0,
+    leftCol: 0,
+    bottomRow: -1,
+    rightCol: -1,
+    mouseRow: -1,
+    mouseCol: -1,
+  };
+  let lastRange: CellRangePayload | null = null;
+  let hasRanges = false;
+  const scalarByField: Partial<Record<number, number>> = {};
+
+  let offset = 0;
+  while (offset < data.length) {
+    const tag = readVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+
+    if (field === 3 && wire === 2) {
+      const length = readVarint(data, offset);
+      const n = Number(length.value);
+      if (!Number.isFinite(n) || n < 0) {
+        break;
+      }
+      const start = length.next;
+      const end = Math.min(data.length, start + n);
+      lastRange = decodeCellRange(data.slice(start, end));
+      hasRanges = true;
+      offset = end;
+      continue;
+    }
+
+    if (wire === 0) {
+      const value = readVarint(data, offset);
+      offset = value.next;
+      const n = asInt32(value.value);
+      scalarByField[field] = n;
+      continue;
+    }
+
+    offset = skipField(data, offset, wire);
+  }
+
+  if (typeof scalarByField[1] === "number") out.row = scalarByField[1];
+  if (typeof scalarByField[2] === "number") out.col = scalarByField[2];
+
+  if (hasRanges) {
+    if (typeof scalarByField[4] === "number") out.topRow = scalarByField[4];
+    if (typeof scalarByField[5] === "number") out.leftCol = scalarByField[5];
+    if (typeof scalarByField[6] === "number") out.bottomRow = scalarByField[6];
+    if (typeof scalarByField[7] === "number") out.rightCol = scalarByField[7];
+    if (typeof scalarByField[8] === "number") out.mouseRow = scalarByField[8];
+    if (typeof scalarByField[9] === "number") out.mouseCol = scalarByField[9];
+  } else {
+    if (typeof scalarByField[3] === "number") out.rowEnd = scalarByField[3];
+    if (typeof scalarByField[4] === "number") out.colEnd = scalarByField[4];
+    if (typeof scalarByField[5] === "number") out.topRow = scalarByField[5];
+    if (typeof scalarByField[6] === "number") out.leftCol = scalarByField[6];
+    if (typeof scalarByField[7] === "number") out.bottomRow = scalarByField[7];
+    if (typeof scalarByField[8] === "number") out.rightCol = scalarByField[8];
+    if (typeof scalarByField[9] === "number") out.mouseRow = scalarByField[9];
+    if (typeof scalarByField[10] === "number") out.mouseCol = scalarByField[10];
+  }
+
+  if (out.rowEnd < 0) {
+    out.rowEnd = out.row;
+  }
+  if (out.colEnd < 0) {
+    out.colEnd = out.col;
+  }
+  if (lastRange != null) {
+    if (out.row === lastRange.row1 && out.col === lastRange.col1) {
+      out.rowEnd = lastRange.row2;
+      out.colEnd = lastRange.col2;
+    } else if (out.row === lastRange.row2 && out.col === lastRange.col2) {
+      out.rowEnd = lastRange.row1;
+      out.colEnd = lastRange.col1;
+    } else {
+      out.rowEnd = lastRange.row2;
+      out.colEnd = lastRange.col2;
+    }
+  }
+
+  return out;
+}
+
+export function decodeExportCsv(data: Uint8Array): string {
+  let offset = 0;
+  while (offset < data.length) {
+    const tag = readVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+
+    if (field === 1 && wire === 2) {
+      const length = readVarint(data, offset);
+      const n = Number(length.value);
+      if (!Number.isFinite(n) || n < 0) {
+        return "";
+      }
+      const start = length.next;
+      const end = Math.min(data.length, start + n);
+      return new TextDecoder().decode(data.slice(start, end));
+    }
+
+    offset = skipField(data, offset, wire);
+  }
+  return "";
+}
+
+export function decodeGridEventEnvelope(data: Uint8Array): GridEventEnvelope | null {
+  let offset = 0;
+  while (offset < data.length) {
+    const tag = readVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+
+    if (wire === 2 && field >= 2 && field <= 60) {
+      const length = readVarint(data, offset);
+      const n = Number(length.value);
+      if (!Number.isFinite(n) || n < 0) {
+        return null;
+      }
+      const start = length.next;
+      const end = Math.min(data.length, start + n);
+      return {
+        eventField: field,
+        payload: data.slice(start, end),
+      };
+    }
+
+    offset = skipField(data, offset, wire);
+  }
+  return null;
+}
+
+export function decodeAfterSortPayload(data: Uint8Array): AfterSortPayload {
+  let col = -1;
+  let offset = 0;
+  while (offset < data.length) {
+    const tag = readVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (field === 1 && wire === 0) {
+      const value = readVarint(data, offset);
+      col = asInt32(value.value);
+      offset = value.next;
+      continue;
+    }
+    offset = skipField(data, offset, wire);
+  }
+  return { col };
+}
+
+export function decodeAfterUserResizePayload(data: Uint8Array): AfterUserResizePayload {
+  let row = -1;
+  let col = -1;
+  let offset = 0;
+  while (offset < data.length) {
+    const tag = readVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (wire === 0) {
+      const value = readVarint(data, offset);
+      const n = asInt32(value.value);
+      offset = value.next;
+      if (field === 1) row = n;
+      if (field === 2) col = n;
+      continue;
+    }
+    offset = skipField(data, offset, wire);
+  }
+  return { row, col };
+}

@@ -1,0 +1,4 @@
+# HLOOKUP approximate mode (default TRUE)
+setData [["1","5","10"],["A","B","C"]]
+setCellValue 0 3 "=HLOOKUP(6,A1:C2,2)"
+assertCellValue 0 3 "B"

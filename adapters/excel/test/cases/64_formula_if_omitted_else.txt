@@ -1,0 +1,6 @@
+# IF with omitted else returns FALSE when condition is false
+setCellValue 0 0 "0"
+setCellValue 0 1 "=IF(A1,1)"
+assertCellValue 0 1 "FALSE"
+setCellValue 0 0 "2"
+assertCellValue 0 1 "1"

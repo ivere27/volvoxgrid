@@ -1,0 +1,11 @@
+# Structural undo — delete column then undo/redo
+setData [["A","B","C"],["1","2","3"]]
+deleteColumns 0 1
+assertCanUndo true
+assertCellValue 0 0 "B"
+undo
+assertCellValue 0 0 "A"
+assertCellValue 0 1 "B"
+assertCellValue 0 2 "C"
+redo
+assertCellValue 0 0 "B"

@@ -1,0 +1,7 @@
+# Insert rows — insert 2 rows at index 1
+setData [["Name","Score"],["Alice","90"],["Bob","85"],["Charlie","78"]]
+insertRows 1 2
+setCellValue 1 0 "NEW ROW 1"
+setCellValue 1 1 "100"
+setCellValue 2 0 "NEW ROW 2"
+setCellValue 2 1 "95"

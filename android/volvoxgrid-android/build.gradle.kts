@@ -1,0 +1,122 @@
+import com.google.protobuf.gradle.proto
+
+plugins {
+    id("com.android.library")
+    id("org.jetbrains.kotlin.android")
+    id("com.google.protobuf")
+}
+
+android {
+    namespace = "io.github.ivere27.volvoxgrid"
+    compileSdk = 34
+
+    defaultConfig {
+        minSdk = 24
+
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+
+        externalNativeBuild {
+            cmake {
+                // synurang_jni.so is provided by the synurang-android AAR dependency.
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+        }
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/jni/CMakeLists.txt")
+        }
+    }
+
+    sourceSets {
+        getByName("main") {
+            java.srcDir(layout.buildDirectory.dir("generated/source/volvoxgridFfi/main/java"))
+            proto {
+                srcDir(layout.buildDirectory.dir("proto-staging"))
+            }
+        }
+    }
+}
+
+val stageProto = tasks.register<Copy>("stageProto") {
+    from("../../proto/volvoxgrid.proto")
+    into(layout.buildDirectory.dir("proto-staging"))
+}
+
+tasks.matching { it.name.startsWith("extract") && it.name.contains("Proto") }.configureEach {
+    dependsOn(stageProto)
+}
+
+tasks.matching { it.name.startsWith("generate") && it.name.contains("Proto") }.configureEach {
+    dependsOn(stageProto)
+}
+
+val copyFfiJava = tasks.register<Copy>("copyFfiJava") {
+    from("../../codegen/volvoxgrid_ffi.java")
+    into(layout.buildDirectory.dir("generated/source/volvoxgridFfi/main/java/io/github/ivere27/volvoxgrid"))
+    rename { "VolvoxGridServiceFfi.java" }
+    // protoc-gen-synurang-ffi emits `package volvoxgrid.v1;` for Java FFI stubs.
+    // Android proto classes in this module use `option java_package = io.github.ivere27.volvoxgrid`,
+    // so we normalize the copied FFI stub package to keep types in one package.
+    filter { line: String ->
+        if (line == "package volvoxgrid.v1;") {
+            "package io.github.ivere27.volvoxgrid;"
+        } else {
+            line
+        }
+    }
+}
+
+tasks.named("preBuild") {
+    dependsOn(copyFfiJava)
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:3.25.1"
+    }
+    generateProtoTasks {
+        all().forEach { task ->
+            task.builtins {
+                create("java") {
+                    option("lite")
+                }
+            }
+        }
+    }
+}
+
+dependencies {
+    implementation("androidx.core:core-ktx:1.12.0")
+    api("io.github.ivere27:volvoxgrid-java-common:0.1.0-SNAPSHOT")
+
+    // Protobuf lite
+    implementation("com.google.protobuf:protobuf-javalite:3.25.1")
+
+    // Synurang runtime from Maven Central.
+    api("io.github.ivere27:synurang-android:0.5.2")
+
+}

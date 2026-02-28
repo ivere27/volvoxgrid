@@ -1,0 +1,12 @@
+# Text functions: TRIM/UPPER/LOWER/LEN/LEFT
+setCellValue 0 0 "  Ab c  "
+setCellValue 0 1 "=TRIM(A1)"
+setCellValue 0 2 "=UPPER(B1)"
+setCellValue 0 3 "=LOWER(C1)"
+setCellValue 0 4 "=LEN(B1)"
+setCellValue 0 5 "=LEFT(C1,2)"
+assertCellValue 0 1 "Ab c"
+assertCellValue 0 2 "AB C"
+assertCellValue 0 3 "ab c"
+assertCellValue 0 4 "4"
+assertCellValue 0 5 "AB"

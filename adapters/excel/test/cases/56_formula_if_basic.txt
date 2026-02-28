@@ -1,0 +1,6 @@
+# IF basic numeric condition
+setCellValue 0 0 "5"
+setCellValue 0 1 "=IF(A1>3,100,0)"
+assertCellValue 0 1 "100"
+setCellValue 0 0 "2"
+assertCellValue 0 1 "0"

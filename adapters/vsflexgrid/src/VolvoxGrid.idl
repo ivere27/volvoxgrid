@@ -1,0 +1,522 @@
+// VolvoxGrid.idl -- IDL source for Volvox VolvoxGrid ActiveX control
+//
+// This type library defines the IVolvoxGrid interface, _DVolvoxGridEvents
+// dispinterface, and the VolvoxGrid coclass for COM/ActiveX usage from
+// VBA (Excel) and VB6.
+
+import "oaidl.idl";
+import "ocidl.idl";
+
+// ═══════════════════════════════════════════════════════════════════
+// Enum Constants
+// ═══════════════════════════════════════════════════════════════════
+
+typedef [v1_enum] enum FlexSelectionMode {
+    flexSelectionFree     = 0,
+    flexSelectionByRow    = 1,
+    flexSelectionByColumn = 2,
+    flexSelectionListBox  = 3
+} FlexSelectionMode;
+
+typedef [v1_enum] enum FlexFocusRect {
+    flexFocusNone   = 0,
+    flexFocusLight  = 1,
+    flexFocusHeavy  = 2,
+    flexFocusInset  = 3,
+    flexFocusRaised = 4
+} FlexFocusRect;
+
+typedef [v1_enum] enum FlexHighLight {
+    flexHighlightNever     = 0,
+    flexHighlightAlways    = 1,
+    flexHighlightWithFocus = 2
+} FlexHighLight;
+
+typedef [v1_enum] enum FlexSortOrder {
+    flexSortNone               = 0,
+    flexSortGenericAscending   = 1,
+    flexSortGenericDescending  = 2,
+    flexSortNumericAscending   = 3,
+    flexSortNumericDescending  = 4,
+    flexSortStringNoCaseAsc    = 5,
+    flexSortStringNoCaseDesc   = 6,
+    flexSortStringAsc          = 7,
+    flexSortStringDesc         = 8,
+    flexSortCustom             = 9,
+    flexSortUseColSort         = 10
+} FlexSortOrder;
+
+typedef [v1_enum] enum FlexEditableMode {
+    flexEditNone     = 0,
+    flexEditKbd      = 1,
+    flexEditKbdMouse = 2
+} FlexEditableMode;
+
+typedef [v1_enum] enum FlexAggregateType {
+    flexAggNone    = 0,
+    flexAggClear   = 1,
+    flexAggSum     = 2,
+    flexAggPercent = 3,
+    flexAggCount   = 4,
+    flexAggAverage = 5,
+    flexAggMax     = 6,
+    flexAggMin     = 7,
+    flexAggStdDev  = 8,
+    flexAggVar     = 9
+} FlexAggregateType;
+
+typedef [v1_enum] enum FlexMergeCells {
+    flexMergeNever         = 0,
+    flexMergeFree          = 1,
+    flexMergeRestrictRows  = 2,
+    flexMergeRestrictCols  = 3,
+    flexMergeRestrictAll   = 4,
+    flexMergeFixedOnly     = 5,
+    flexMergeSpill         = 6,
+    flexMergeOutline       = 7
+} FlexMergeCells;
+
+typedef [v1_enum] enum VolvoxGridLines {
+    volvoxGridNone       = 0,
+    volvoxGridFlat       = 1,
+    volvoxGridInset      = 2,
+    volvoxGridRaised     = 3,
+    volvoxGridFlatHorz   = 4,
+    volvoxGridFlatVert   = 5,
+    volvoxGridInsetHorz  = 6,
+    volvoxGridInsetVert  = 7,
+    volvoxGridRaisedHorz = 8,
+    volvoxGridRaisedVert = 9
+} VolvoxGridLines;
+
+typedef [v1_enum] enum FlexAlign {
+    flexAlignLeftTop       = 0,
+    flexAlignLeftCenter    = 1,
+    flexAlignLeftBottom    = 2,
+    flexAlignCenterTop     = 3,
+    flexAlignCenterCenter  = 4,
+    flexAlignCenterBottom  = 5,
+    flexAlignRightTop      = 6,
+    flexAlignRightCenter   = 7,
+    flexAlignRightBottom   = 8,
+    flexAlignGeneral       = 9
+} FlexAlign;
+
+typedef [v1_enum] enum FlexAllowUserResizing {
+    flexResizeNone            = 0,
+    flexResizeColumns         = 1,
+    flexResizeRows            = 2,
+    flexResizeBoth            = 3,
+    flexResizeColumnsUniform  = 4,
+    flexResizeRowsUniform     = 5,
+    flexResizeBothUniform     = 6
+} FlexAllowUserResizing;
+
+typedef [v1_enum] enum FlexSaveFormat {
+    flexSaveBinary    = 0,
+    flexSaveTextTab   = 1,
+    flexSaveTextComma = 2,
+    flexSaveTextCustom = 3,
+    flexSaveExcel     = 4
+} FlexSaveFormat;
+
+typedef [v1_enum] enum FlexClearScope {
+    flexClearEverything  = 0,
+    flexClearFormatting  = 1,
+    flexClearData        = 2,
+    flexClearSelection   = 3
+} FlexClearScope;
+
+// ═══════════════════════════════════════════════════════════════════
+// IVolvoxGrid Interface (IDispatch-based for VBA/VB6 compatibility)
+// ═══════════════════════════════════════════════════════════════════
+
+[
+    object,
+    uuid(A7F3B4C1-8E2D-4F5A-9C6B-1D3E5F7A8B9C),
+    dual,
+    nonextensible,
+    pointer_default(unique),
+    helpstring("IVolvoxGrid Interface")
+]
+interface IVolvoxGrid : IDispatch
+{
+    // --- Grid Dimensions ---
+
+    [propget, id(1), helpstring("Number of rows")]
+    HRESULT Rows([out, retval] long* pVal);
+    [propput, id(1)]
+    HRESULT Rows([in] long newVal);
+
+    [propget, id(2), helpstring("Number of columns")]
+    HRESULT Cols([out, retval] long* pVal);
+    [propput, id(2)]
+    HRESULT Cols([in] long newVal);
+
+    [propget, id(3), helpstring("Number of fixed (header) rows")]
+    HRESULT FixedRows([out, retval] long* pVal);
+    [propput, id(3)]
+    HRESULT FixedRows([in] long newVal);
+
+    [propget, id(4), helpstring("Number of fixed (header) columns")]
+    HRESULT FixedCols([out, retval] long* pVal);
+    [propput, id(4)]
+    HRESULT FixedCols([in] long newVal);
+
+    // --- Cursor Position ---
+
+    [propget, id(5), helpstring("Current row")]
+    HRESULT Row([out, retval] long* pVal);
+    [propput, id(5)]
+    HRESULT Row([in] long newVal);
+
+    [propget, id(6), helpstring("Current column")]
+    HRESULT Col([out, retval] long* pVal);
+    [propput, id(6)]
+    HRESULT Col([in] long newVal);
+
+    [propget, id(7), helpstring("Selected row extent")]
+    HRESULT RowSel([out, retval] long* pVal);
+    [propput, id(7)]
+    HRESULT RowSel([in] long newVal);
+
+    [propget, id(8), helpstring("Selected column extent")]
+    HRESULT ColSel([out, retval] long* pVal);
+    [propput, id(8)]
+    HRESULT ColSel([in] long newVal);
+
+    // --- Selection & Appearance ---
+
+    [propget, id(10), helpstring("Selection mode")]
+    HRESULT SelectionMode([out, retval] FlexSelectionMode* pVal);
+    [propput, id(10)]
+    HRESULT SelectionMode([in] FlexSelectionMode newVal);
+
+    [propget, id(11), helpstring("Highlight style")]
+    HRESULT HighLight([out, retval] FlexHighLight* pVal);
+    [propput, id(11)]
+    HRESULT HighLight([in] FlexHighLight newVal);
+
+    [propget, id(12), helpstring("Focus rectangle style")]
+    HRESULT FocusRect([out, retval] FlexFocusRect* pVal);
+    [propput, id(12)]
+    HRESULT FocusRect([in] FlexFocusRect newVal);
+
+    // --- Colors ---
+
+    [propget, id(20), helpstring("Background color (OLE_COLOR)")]
+    HRESULT BackColor([out, retval] OLE_COLOR* pVal);
+    [propput, id(20)]
+    HRESULT BackColor([in] OLE_COLOR newVal);
+
+    [propget, id(21), helpstring("Foreground/text color")]
+    HRESULT ForeColor([out, retval] OLE_COLOR* pVal);
+    [propput, id(21)]
+    HRESULT ForeColor([in] OLE_COLOR newVal);
+
+    [propget, id(22), helpstring("Grid line color")]
+    HRESULT GridColor([out, retval] OLE_COLOR* pVal);
+    [propput, id(22)]
+    HRESULT GridColor([in] OLE_COLOR newVal);
+
+    [propget, id(23), helpstring("Fixed area background color")]
+    HRESULT BackColorFixed([out, retval] OLE_COLOR* pVal);
+    [propput, id(23)]
+    HRESULT BackColorFixed([in] OLE_COLOR newVal);
+
+    [propget, id(24), helpstring("Fixed area foreground color")]
+    HRESULT ForeColorFixed([out, retval] OLE_COLOR* pVal);
+    [propput, id(24)]
+    HRESULT ForeColorFixed([in] OLE_COLOR newVal);
+
+    [propget, id(25), helpstring("Selection background color")]
+    HRESULT BackColorSel([out, retval] OLE_COLOR* pVal);
+    [propput, id(25)]
+    HRESULT BackColorSel([in] OLE_COLOR newVal);
+
+    [propget, id(26), helpstring("Selection foreground color")]
+    HRESULT ForeColorSel([out, retval] OLE_COLOR* pVal);
+    [propput, id(26)]
+    HRESULT ForeColorSel([in] OLE_COLOR newVal);
+
+    // --- Grid Lines ---
+
+    [propget, id(30), helpstring("Grid line mode")]
+    HRESULT GridLines([out, retval] VolvoxGridLines* pVal);
+    [propput, id(30)]
+    HRESULT GridLines([in] VolvoxGridLines newVal);
+
+    // --- Editing ---
+
+    [propget, id(35), helpstring("Editing mode")]
+    HRESULT Editable([out, retval] FlexEditableMode* pVal);
+    [propput, id(35)]
+    HRESULT Editable([in] FlexEditableMode newVal);
+
+    // --- Cell Text (current cell) ---
+
+    [propget, id(40), helpstring("Text of the current cell")]
+    HRESULT Text([out, retval] BSTR* pVal);
+    [propput, id(40)]
+    HRESULT Text([in] BSTR newVal);
+
+    // --- Merge & Word Wrap ---
+
+    [propget, id(45), helpstring("Merge cells mode")]
+    HRESULT MergeCells([out, retval] FlexMergeCells* pVal);
+    [propput, id(45)]
+    HRESULT MergeCells([in] FlexMergeCells newVal);
+
+    [propget, id(46), helpstring("Enable word wrap")]
+    HRESULT WordWrap([out, retval] VARIANT_BOOL* pVal);
+    [propput, id(46)]
+    HRESULT WordWrap([in] VARIANT_BOOL newVal);
+
+    // --- Frozen Rows/Cols ---
+
+    [propget, id(50), helpstring("Number of frozen rows")]
+    HRESULT FrozenRows([out, retval] long* pVal);
+    [propput, id(50)]
+    HRESULT FrozenRows([in] long newVal);
+
+    [propget, id(51), helpstring("Number of frozen columns")]
+    HRESULT FrozenCols([out, retval] long* pVal);
+    [propput, id(51)]
+    HRESULT FrozenCols([in] long newVal);
+
+    // --- Allow User Resizing ---
+
+    [propget, id(55), helpstring("User resizing mode")]
+    HRESULT AllowUserResizing([out, retval] FlexAllowUserResizing* pVal);
+    [propput, id(55)]
+    HRESULT AllowUserResizing([in] FlexAllowUserResizing newVal);
+
+    // --- Clipboard ---
+
+    [propget, id(60), helpstring("Clipboard text of selected region")]
+    HRESULT Clip([out, retval] BSTR* pVal);
+    [propput, id(60)]
+    HRESULT Clip([in] BSTR newVal);
+
+    // --- Redraw Control ---
+
+    [propget, id(65), helpstring("Enable or suppress redraw")]
+    HRESULT Redraw([out, retval] VARIANT_BOOL* pVal);
+    [propput, id(65)]
+    HRESULT Redraw([in] VARIANT_BOOL newVal);
+
+    // ═══════════════════════════════════════════════════════
+    // Methods
+    // ═══════════════════════════════════════════════════════
+
+    [id(100), helpstring("Set text at row,col")]
+    HRESULT SetTextMatrix([in] long row, [in] long col, [in] BSTR text);
+
+    [id(101), helpstring("Get text at row,col")]
+    HRESULT GetTextMatrix([in] long row, [in] long col, [out, retval] BSTR* pText);
+
+    [id(102), helpstring("Sort the grid")]
+    HRESULT Sort([in] FlexSortOrder order);
+
+    [id(103), helpstring("Auto-size columns")]
+    HRESULT AutoSize([in] long colFrom, [in] long colTo);
+
+    [id(104), helpstring("Add subtotals")]
+    HRESULT Subtotal(
+        [in] FlexAggregateType aggType,
+        [in] long groupOnCol,
+        [in] long aggregateCol,
+        [in] BSTR caption);
+
+    [id(105), helpstring("Clear the grid")]
+    HRESULT Clear([in, defaultvalue(0)] FlexClearScope scope);
+
+    [id(106), helpstring("Save grid to file")]
+    HRESULT SaveGrid([in] BSTR path, [in, defaultvalue(0)] FlexSaveFormat fmt);
+
+    [id(107), helpstring("Load grid from file")]
+    HRESULT LoadGrid([in] BSTR path, [in, defaultvalue(0)] FlexSaveFormat fmt);
+
+    [id(108), helpstring("Add a row of tab-separated items")]
+    HRESULT AddItem([in] BSTR item, [in, defaultvalue(-1)] long index);
+
+    [id(109), helpstring("Remove a row")]
+    HRESULT RemoveItem([in] long index);
+
+    [id(110), helpstring("Select a range")]
+    HRESULT Select([in] long row1, [in] long col1,
+                   [in] long row2, [in] long col2);
+
+    [id(111), helpstring("Refresh the grid display")]
+    HRESULT Refresh();
+
+    // --- Column/Row Formatting (indexed properties via methods) ---
+
+    [propget, id(120), helpstring("Width of a column (twips)")]
+    HRESULT ColWidth([in] long col, [out, retval] long* pVal);
+    [propput, id(120)]
+    HRESULT ColWidth([in] long col, [in] long newVal);
+
+    [propget, id(121), helpstring("Height of a row (twips)")]
+    HRESULT RowHeight([in] long row, [out, retval] long* pVal);
+    [propput, id(121)]
+    HRESULT RowHeight([in] long row, [in] long newVal);
+
+    [propget, id(122), helpstring("Column alignment")]
+    HRESULT ColAlignment([in] long col, [out, retval] FlexAlign* pVal);
+    [propput, id(122)]
+    HRESULT ColAlignment([in] long col, [in] FlexAlign newVal);
+
+    [id(123), helpstring("Set column format string")]
+    HRESULT SetColFormat([in] long col, [in] BSTR format);
+
+    [id(124), helpstring("Set column sort order")]
+    HRESULT SetColSort([in] long col, [in] FlexSortOrder order);
+
+    // --- Data Binding ---
+
+    [propputref, id(130), helpstring("Bind an ADO/DAO Recordset")]
+    HRESULT DataSource([in] IDispatch* pDataSource);
+
+    // --- Mouse Info ---
+
+    [propget, id(140), helpstring("Row under the mouse")]
+    HRESULT MouseRow([out, retval] long* pVal);
+
+    [propget, id(141), helpstring("Column under the mouse")]
+    HRESULT MouseCol([out, retval] long* pVal);
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// _DVolvoxGridEvents -- event dispinterface
+// ═══════════════════════════════════════════════════════════════════
+
+[
+    uuid(B8F4C5D2-9E3F-4A6B-AD7C-2E4F6A8B9C0D),
+    helpstring("VolvoxGrid Events")
+]
+dispinterface _DVolvoxGridEvents
+{
+    properties:
+    methods:
+
+    [id(1), helpstring("Fired before the current cell changes")]
+    void BeforeRowColChange(
+        [in] long oldRow, [in] long oldCol,
+        [in] long newRow, [in] long newCol,
+        [in, out] VARIANT_BOOL* cancel);
+
+    [id(2), helpstring("Fired after the current cell changes")]
+    void AfterRowColChange();
+
+    [id(3), helpstring("Fired before a cell enters edit mode")]
+    void BeforeEdit(
+        [in] long row, [in] long col,
+        [in, out] VARIANT_BOOL* cancel);
+
+    [id(4), helpstring("Fired after a cell edit completes")]
+    void AfterEdit([in] long row, [in] long col);
+
+    [id(5), helpstring("Fired before sorting")]
+    void BeforeSort(
+        [in] long col,
+        [in, out] VARIANT_BOOL* cancel);
+
+    [id(6), helpstring("Fired after sorting")]
+    void AfterSort();
+
+    [id(7), helpstring("Click event")]
+    void Click();
+
+    [id(8), helpstring("Double-click event")]
+    void DblClick();
+
+    [id(9), helpstring("Key down event")]
+    void KeyDown([in] long keyCode, [in] long shift);
+
+    [id(10), helpstring("Key press event")]
+    void KeyPress([in] long keyAscii);
+
+    [id(11), helpstring("Key up event")]
+    void KeyUp([in] long keyCode, [in] long shift);
+
+    [id(12), helpstring("Mouse down event")]
+    void MouseDown([in] long button, [in] long shift,
+                   [in] float x, [in] float y);
+
+    [id(13), helpstring("Mouse up event")]
+    void MouseUp([in] long button, [in] long shift,
+                 [in] float x, [in] float y);
+
+    [id(14), helpstring("Mouse move event")]
+    void MouseMove([in] long button, [in] long shift,
+                   [in] float x, [in] float y);
+
+    [id(15), helpstring("Fired before selection changes")]
+    void BeforeSelChange(
+        [in] long oldRow, [in] long oldCol,
+        [in] long newRow, [in] long newCol,
+        [in, out] VARIANT_BOOL* cancel);
+
+    [id(16), helpstring("Fired after selection changes")]
+    void AfterSelChange();
+
+    [id(17), helpstring("Fired before a node is collapsed or expanded")]
+    void BeforeCollapse(
+        [in] long row, [in] VARIANT_BOOL collapse,
+        [in, out] VARIANT_BOOL* cancel);
+
+    [id(18), helpstring("Fired after a node is collapsed or expanded")]
+    void AfterCollapse([in] long row, [in] VARIANT_BOOL collapse);
+
+    [id(19), helpstring("Fired when a cell value changes")]
+    void CellChanged([in] long row, [in] long col);
+
+    [id(20), helpstring("Fired on scroll")]
+    void Scroll();
+
+    [id(21), helpstring("Fired after user resizes row/column")]
+    void AfterUserResize([in] long row, [in] long col);
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// Type Library
+// ═══════════════════════════════════════════════════════════════════
+
+[
+    uuid(C9A5D6E3-AF40-4B7C-BE8D-3F5A7B9C0D1E),
+    version(0.1),
+    helpstring("Volvox VolvoxGrid 0.1 Type Library")
+]
+library VolvoxGridLib
+{
+    importlib("stdole2.tlb");
+
+    // Forward-declare enums so VBA can see them
+    enum FlexSelectionMode;
+    enum FlexFocusRect;
+    enum FlexHighLight;
+    enum FlexSortOrder;
+    enum FlexEditableMode;
+    enum FlexAggregateType;
+    enum FlexMergeCells;
+    enum VolvoxGridLines;
+    enum FlexAlign;
+    enum FlexAllowUserResizing;
+    enum FlexSaveFormat;
+    enum FlexClearScope;
+
+    interface IVolvoxGrid;
+    dispinterface _DVolvoxGridEvents;
+
+    [
+        uuid(D0B6E7F4-BA51-4C8D-CF9E-4A6B8C0D1E2F),
+        helpstring("Volvox VolvoxGrid Control"),
+        control
+    ]
+    coclass VolvoxGrid
+    {
+        [default]        interface     IVolvoxGrid;
+        [default,source] dispinterface _DVolvoxGridEvents;
+    };
+};

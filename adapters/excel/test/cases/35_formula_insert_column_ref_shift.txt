@@ -1,0 +1,5 @@
+# Insert column rewrites formula references
+setData [["1","2","=A1+B1"]]
+insertColumns 1 1
+assertCellRawValue 0 3 "=A1+C1"
+assertCellValue 0 3 "3"

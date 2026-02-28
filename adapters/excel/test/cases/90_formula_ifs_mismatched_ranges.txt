@@ -1,0 +1,6 @@
+# COUNTIFS/SUMIFS mismatched range sizes
+setData [["Cat","Region","Amt"],["A","E","10"],["A","W","20"],["B","E","5"]]
+setCellValue 0 3 "=COUNTIFS(A2:A4,\"A\",B2:B3,\"E\")"
+setCellValue 1 3 "=SUMIFS(C2:C4,A2:A3,\"A\")"
+assertCellValue 0 3 "#VALUE!"
+assertCellValue 1 3 "#VALUE!"

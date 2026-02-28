@@ -1,0 +1,6 @@
+# Whole column/row ranges: A:A and 2:2
+setData [["1","2",""],["3","4",""],["5","6",""]]
+setCellValue 0 3 "=SUM(A:A)"
+setCellValue 0 4 "=SUM(2:2)"
+assertCellValue 0 3 "9"
+assertCellValue 0 4 "7"

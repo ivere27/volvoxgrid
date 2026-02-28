@@ -1,0 +1,8 @@
+# CONCAT alias and TEXTJOIN basics
+setData [["A"],[""],["B"]]
+setCellValue 0 1 "=CONCAT(\"a\",\"b\",1)"
+setCellValue 1 1 "=TEXTJOIN(\"-\",TRUE,A1:A3)"
+setCellValue 2 1 "=TEXTJOIN(\"-\",FALSE,A1:A3)"
+assertCellValue 0 1 "ab1"
+assertCellValue 1 1 "A-B"
+assertCellValue 2 1 "A--B"

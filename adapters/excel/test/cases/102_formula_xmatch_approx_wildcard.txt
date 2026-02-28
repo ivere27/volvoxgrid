@@ -1,0 +1,8 @@
+# XMATCH approximate and wildcard modes
+setData [["1","apple"],["5","apricot"],["10","banana"]]
+setCellValue 0 2 "=XMATCH(6,A1:A3,-1)"
+setCellValue 1 2 "=XMATCH(6,A1:A3,1)"
+setCellValue 2 2 "=XMATCH(\"ap*\",B1:B3,2)"
+assertCellValue 0 2 "2"
+assertCellValue 1 2 "3"
+assertCellValue 2 2 "1"

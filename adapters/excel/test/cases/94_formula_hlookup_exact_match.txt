@@ -1,0 +1,4 @@
+# HLOOKUP exact match
+setData [["A","B","C"],["10","20","30"]]
+setCellValue 0 3 "=HLOOKUP(\"B\",A1:C2,2,FALSE)"
+assertCellValue 0 3 "20"

@@ -1,0 +1,13 @@
+# Snapshot undo (setData) must preserve formulas, not rendered values
+setData [["1","2","=A1+B1"]]
+assertCellValue 0 2 "3"
+assertCellRawValue 0 2 "=A1+B1"
+setData [["9","9","9"]]
+assertCellValue 0 2 "9"
+undo
+assertCellValue 0 2 "3"
+assertCellRawValue 0 2 "=A1+B1"
+assertCellFormula 0 2 "=A1+B1"
+redo
+assertCellValue 0 2 "9"
+assertCellFormula 0 2 null

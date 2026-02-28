@@ -1,0 +1,855 @@
+/// Edit state machine for in-place cell editing.
+///
+/// Tracks whether editing is active, which cell is being edited,
+/// the original text (for cancel/undo), and the current edit text.
+#[derive(Clone, Debug)]
+struct ParsedDropdownItem {
+    display: String,
+    data: String,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct EditHighlightRegion {
+    pub row1: i32,
+    pub col1: i32,
+    pub row2: i32,
+    pub col2: i32,
+    pub color: u32,
+    pub show_corner_handles: bool,
+    pub ref_id: Option<i32>,
+    pub text_start: Option<i32>,
+    pub text_length: Option<i32>,
+}
+
+fn parse_dropdown_entries(list: &str) -> Vec<ParsedDropdownItem> {
+    if list.is_empty() {
+        return Vec::new();
+    }
+
+    // Leading pipe means editable dropdown.
+    let src = if list.starts_with('|') {
+        &list[1..]
+    } else {
+        list
+    };
+    let mut entries = Vec::new();
+
+    for raw_item in src.split('|') {
+        if raw_item.is_empty() {
+            continue;
+        }
+
+        let mut item_body = raw_item;
+        let mut data = String::new();
+        let mut display_col: Option<usize> = None;
+
+        // Optional metadata prefix before ';' (e.g. "#10*1;" or "*1#10;").
+        if let Some(semi) = raw_item.find(';') {
+            let meta = &raw_item[..semi];
+            if meta.starts_with('#') || meta.starts_with('*') {
+                let bytes = meta.as_bytes();
+                let mut i = 0usize;
+                while i < bytes.len() {
+                    match bytes[i] as char {
+                        '#' => {
+                            i += 1;
+                            let start = i;
+                            if i < bytes.len()
+                                && ((bytes[i] as char) == '-' || (bytes[i] as char) == '+')
+                            {
+                                i += 1;
+                            }
+                            let digit_start = i;
+                            while i < bytes.len() && (bytes[i] as char).is_ascii_digit() {
+                                i += 1;
+                            }
+                            if i > digit_start {
+                                data = meta[start..i].to_string();
+                            }
+                        }
+                        '*' => {
+                            i += 1;
+                            let start = i;
+                            while i < bytes.len() && (bytes[i] as char).is_ascii_digit() {
+                                i += 1;
+                            }
+                            if i > start {
+                                if let Ok(v) = meta[start..i].parse::<usize>() {
+                                    display_col = Some(v);
+                                }
+                            }
+                        }
+                        _ => break,
+                    }
+                }
+                item_body = &raw_item[semi + 1..];
+            }
+        }
+
+        let cols: Vec<&str> = item_body.split('\t').collect();
+        let display = if cols.is_empty() {
+            item_body.to_string()
+        } else {
+            let idx = display_col.unwrap_or(0);
+            cols.get(idx)
+                .or_else(|| cols.first())
+                .copied()
+                .unwrap_or("")
+                .to_string()
+        };
+
+        entries.push(ParsedDropdownItem { display, data });
+    }
+
+    entries
+}
+
+/// Resolve display text for a stored translated dropdown value.
+///
+/// Returns `Some(display_text)` if the dropdown list contains a translated entry
+/// with matching data id (e.g. `#23;Part Time` and stored value `"23"`).
+pub fn translate_dropdown_value_to_display(list: &str, stored_value: &str) -> Option<String> {
+    if stored_value.is_empty() {
+        return None;
+    }
+    for entry in parse_dropdown_entries(list) {
+        if !entry.data.is_empty() && entry.data == stored_value {
+            return Some(entry.display);
+        }
+    }
+    None
+}
+
+/// Resolve translated storage value for a display string.
+///
+/// Returns `Some(id)` when the dropdown list defines translated values (`#id;`)
+/// and the input matches the entry's display text.
+pub fn translate_dropdown_display_to_value(list: &str, display_value: &str) -> Option<String> {
+    if display_value.is_empty() {
+        return None;
+    }
+    for entry in parse_dropdown_entries(list) {
+        if !entry.data.is_empty() && entry.display == display_value {
+            return Some(entry.data);
+        }
+    }
+    None
+}
+
+#[derive(Clone, Debug)]
+pub struct EditState {
+    pub editing: bool,
+    pub edit_row: i32,
+    pub edit_col: i32,
+    pub edit_text: String,
+    pub original_text: String,
+    pub formula_mode: bool,
+    pub formula_highlights: Vec<EditHighlightRegion>,
+    /// Start position of selected text in editor (EditSelStart).
+    pub sel_start: i32,
+    /// Length of selected text in editor (EditSelLength).
+    pub sel_length: i32,
+    /// Currently selected dropdown item index (DropdownIndex).
+    pub dropdown_index: i32,
+    /// Parsed dropdown list display values for the current editing cell.
+    pub dropdown_items: Vec<String>,
+    /// Parsed dropdown list data values (`#id;`) for each dropdown item.
+    pub dropdown_data: Vec<String>,
+    /// Whether the current list is an editable dropdown (`|item1|item2`).
+    pub dropdown_editable: bool,
+}
+
+impl Default for EditState {
+    fn default() -> Self {
+        Self {
+            editing: false,
+            edit_row: -1,
+            edit_col: -1,
+            edit_text: String::new(),
+            original_text: String::new(),
+            formula_mode: false,
+            formula_highlights: Vec::new(),
+            sel_start: 0,
+            sel_length: 0,
+            dropdown_index: -1,
+            dropdown_items: Vec::new(),
+            dropdown_data: Vec::new(),
+            dropdown_editable: false,
+        }
+    }
+}
+
+impl EditState {
+    fn sync_formula_mode_from_text(&mut self) {
+        self.formula_mode = self.edit_text.trim_start().starts_with('=');
+        if !self.formula_mode {
+            self.formula_highlights.clear();
+        }
+    }
+
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn heap_size_bytes(&self) -> usize {
+        let mut bytes = 0usize;
+        bytes += self.edit_text.capacity();
+        bytes += self.original_text.capacity();
+        bytes += self.formula_highlights.capacity() * std::mem::size_of::<EditHighlightRegion>();
+
+        bytes += self.dropdown_items.capacity() * std::mem::size_of::<String>();
+        for item in &self.dropdown_items {
+            bytes += item.capacity();
+        }
+
+        bytes += self.dropdown_data.capacity() * std::mem::size_of::<String>();
+        for item in &self.dropdown_data {
+            bytes += item.capacity();
+        }
+
+        bytes
+    }
+
+    /// Returns true if an edit is currently in progress.
+    pub fn is_active(&self) -> bool {
+        self.editing
+    }
+
+    /// Begin editing the cell at (row, col) with the given current text.
+    ///
+    /// Sets `editing = true`, records the cell coordinates, and saves
+    /// both the original text (for cancel) and the current edit text.
+    pub fn start_edit(&mut self, row: i32, col: i32, current_text: &str) {
+        self.editing = true;
+        self.edit_row = row;
+        self.edit_col = col;
+        self.original_text = current_text.to_string();
+        self.edit_text = current_text.to_string();
+        self.formula_mode = self.edit_text.trim_start().starts_with('=');
+        self.formula_highlights.clear();
+        // Select all text when entering edit mode.
+        self.sel_start = 0;
+        self.sel_length = self.edit_text.chars().count() as i32;
+    }
+
+    /// Begin editing with extended options for host-driven key dispatch.
+    ///
+    /// - `seed_text` set → use seed as edit text, caret at end
+    /// - `caret_end` → keep current value, caret at end, no selection
+    /// - default / `select_all` → keep current value, select all text
+    pub fn start_edit_with_options(
+        &mut self,
+        row: i32,
+        col: i32,
+        current_text: &str,
+        select_all: Option<bool>,
+        caret_end: Option<bool>,
+        seed_text: Option<&str>,
+        formula_mode: Option<bool>,
+    ) {
+        self.editing = true;
+        self.edit_row = row;
+        self.edit_col = col;
+        self.original_text = current_text.to_string();
+
+        if let Some(seed) = seed_text {
+            // seed_text: replace cell text with seed, caret at end
+            self.edit_text = seed.to_string();
+            self.sel_start = self.edit_text.chars().count() as i32;
+            self.sel_length = 0;
+        } else if caret_end == Some(true) {
+            // caret_end: keep value, caret at end, no selection
+            self.edit_text = current_text.to_string();
+            self.sel_start = self.edit_text.chars().count() as i32;
+            self.sel_length = 0;
+        } else {
+            // default / select_all: keep value, select all
+            self.edit_text = current_text.to_string();
+            self.sel_start = 0;
+            self.sel_length = self.edit_text.chars().count() as i32;
+        }
+        self.formula_mode = formula_mode.unwrap_or_else(|| self.edit_text.trim_start().starts_with('='));
+        self.formula_highlights.clear();
+        let _ = select_all; // used implicitly as the default path
+    }
+
+    /// Select all text in the editor.
+    pub fn select_all(&mut self) {
+        self.sel_start = 0;
+        self.sel_length = self.edit_text.chars().count() as i32;
+    }
+
+    /// Commit the current edit, returning the cell coordinates and
+    /// both old and new text: `(row, col, original_text, edit_text)`.
+    ///
+    /// Returns `None` if no edit is active. Resets the edit state.
+    pub fn commit(&mut self) -> Option<(i32, i32, String, String)> {
+        if !self.editing {
+            return None;
+        }
+        self.editing = false;
+        let result = (
+            self.edit_row,
+            self.edit_col,
+            self.original_text.clone(),
+            self.edit_text.clone(),
+        );
+        self.edit_row = -1;
+        self.edit_col = -1;
+        self.formula_mode = false;
+        self.formula_highlights.clear();
+        Some(result)
+    }
+
+    /// Cancel the current edit, returning the cell coordinates `(row, col)`.
+    ///
+    /// Returns `None` if no edit is active. Resets the edit state.
+    pub fn cancel(&mut self) -> Option<(i32, i32)> {
+        if !self.editing {
+            return None;
+        }
+        self.editing = false;
+        let result = (self.edit_row, self.edit_col);
+        self.edit_row = -1;
+        self.edit_col = -1;
+        self.formula_mode = false;
+        self.formula_highlights.clear();
+        Some(result)
+    }
+
+    pub fn set_formula_mode(&mut self, enabled: bool) {
+        self.formula_mode = enabled;
+        if !enabled {
+            self.formula_highlights.clear();
+        }
+    }
+
+    pub fn set_highlights(&mut self, highlights: Vec<EditHighlightRegion>) {
+        self.formula_highlights = highlights;
+    }
+
+    pub fn clear_highlights(&mut self) {
+        self.formula_highlights.clear();
+    }
+
+    /// Update the in-progress edit text (e.g., as the user types).
+    pub fn update_text(&mut self, text: String) {
+        self.edit_text = text;
+        self.sync_formula_mode_from_text();
+    }
+
+    // ── Editor Selection (EditSelStart/Length/Text) ──────────────────
+
+    /// Set the start position of selected text in the editor.
+    pub fn set_sel_start(&mut self, pos: i32) {
+        let max = self.edit_text.len() as i32;
+        self.sel_start = pos.max(0).min(max);
+        // Clamp sel_length so it doesn't extend past end of text
+        if self.sel_start + self.sel_length > max {
+            self.sel_length = (max - self.sel_start).max(0);
+        }
+    }
+
+    /// Set the length of selected text in the editor.
+    pub fn set_sel_length(&mut self, len: i32) {
+        let max = self.edit_text.len() as i32;
+        self.sel_length = len.max(0).min(max - self.sel_start);
+    }
+
+    /// Get the currently selected text in the editor.
+    pub fn get_sel_text(&self) -> &str {
+        let start = self.sel_start.max(0) as usize;
+        let end = (self.sel_start + self.sel_length).max(0) as usize;
+        let len = self.edit_text.len();
+        if start >= len {
+            return "";
+        }
+        &self.edit_text[start..end.min(len)]
+    }
+
+    // ── Dropdown List Parsing (DropdownIndex/Count/Item) ──────────────────
+
+    /// Parse a pipe-delimited dropdown list string into items.
+    ///
+    /// Handles the dropdown list format:
+    /// - Items separated by `|` (pipe)
+    /// - Leading `|` indicates editable dropdown (just strip it)
+    /// - `#id;` optional translated data value
+    /// - `*n;` optional display column for tab-delimited multi-column items
+    pub fn parse_dropdown_items(&mut self, list: &str) {
+        self.dropdown_items.clear();
+        self.dropdown_data.clear();
+        self.dropdown_editable = list.starts_with('|');
+        if list.is_empty() {
+            self.dropdown_index = -1;
+            return;
+        }
+
+        for entry in parse_dropdown_entries(list) {
+            self.dropdown_items.push(entry.display);
+            self.dropdown_data.push(entry.data);
+        }
+        self.dropdown_index = -1;
+    }
+
+    /// Returns the number of items in the parsed dropdown list.
+    pub fn dropdown_count(&self) -> i32 {
+        self.dropdown_items.len() as i32
+    }
+
+    /// Get a dropdown item by index. Returns empty string if out of range.
+    pub fn get_dropdown_item(&self, idx: i32) -> &str {
+        if idx < 0 || (idx as usize) >= self.dropdown_items.len() {
+            return "";
+        }
+        // Return the display part (before any \t for multi-column)
+        let item = &self.dropdown_items[idx as usize];
+        match item.find('\t') {
+            Some(pos) => &item[..pos],
+            None => item,
+        }
+    }
+
+    /// Get dropdown item data (part after `\t`) by index.
+    /// Returns empty string if no data portion or out of range.
+    pub fn get_dropdown_data(&self, idx: i32) -> &str {
+        if idx < 0 || (idx as usize) >= self.dropdown_data.len() {
+            return "";
+        }
+        &self.dropdown_data[idx as usize]
+    }
+
+    /// Set the currently selected dropdown item index.
+    pub fn set_dropdown_index(&mut self, idx: i32) {
+        if idx < -1 || (idx as usize) >= self.dropdown_items.len() {
+            self.dropdown_index = -1;
+        } else {
+            self.dropdown_index = idx;
+            // Update edit text to match selected dropdown item
+            if idx >= 0 {
+                self.edit_text = self.get_dropdown_item(idx).to_string();
+                self.sync_formula_mode_from_text();
+            }
+        }
+    }
+
+    // ── Text Manipulation (character-level editing) ────────────────────
+
+    /// Insert a character at the current cursor position, replacing any selection.
+    pub fn insert_char(&mut self, ch: char) {
+        let chars: Vec<char> = self.edit_text.chars().collect();
+        let total = chars.len() as i32;
+        let sel_start = self.sel_start.clamp(0, total);
+        let sel_end = (self.sel_start + self.sel_length.max(0)).clamp(sel_start, total);
+
+        let mut result: Vec<char> = Vec::with_capacity(chars.len() + 1);
+        result.extend_from_slice(&chars[..sel_start as usize]);
+        result.push(ch);
+        result.extend_from_slice(&chars[sel_end as usize..]);
+
+        self.edit_text = result.into_iter().collect();
+        self.sel_start = sel_start + 1;
+        self.sel_length = 0;
+        self.sync_formula_mode_from_text();
+    }
+
+    /// Delete the character before the cursor (Backspace behavior).
+    pub fn delete_back(&mut self) {
+        let chars: Vec<char> = self.edit_text.chars().collect();
+        let total = chars.len() as i32;
+        let sel_start = self.sel_start.clamp(0, total);
+        let sel_end = (self.sel_start + self.sel_length.max(0)).clamp(sel_start, total);
+
+        if sel_end > sel_start {
+            // Delete selection
+            let mut result: Vec<char> = Vec::new();
+            result.extend_from_slice(&chars[..sel_start as usize]);
+            result.extend_from_slice(&chars[sel_end as usize..]);
+            self.edit_text = result.into_iter().collect();
+            self.sel_length = 0;
+            self.sync_formula_mode_from_text();
+        } else if sel_start > 0 {
+            // Delete char before cursor
+            let mut result: Vec<char> = Vec::new();
+            result.extend_from_slice(&chars[..(sel_start - 1) as usize]);
+            result.extend_from_slice(&chars[sel_start as usize..]);
+            self.edit_text = result.into_iter().collect();
+            self.sel_start = sel_start - 1;
+            self.sel_length = 0;
+            self.sync_formula_mode_from_text();
+        }
+    }
+
+    /// Delete the character at the cursor (Delete key behavior).
+    pub fn delete_forward(&mut self) {
+        let chars: Vec<char> = self.edit_text.chars().collect();
+        let total = chars.len() as i32;
+        let sel_start = self.sel_start.clamp(0, total);
+        let sel_end = (self.sel_start + self.sel_length.max(0)).clamp(sel_start, total);
+
+        if sel_end > sel_start {
+            // Delete selection
+            let mut result: Vec<char> = Vec::new();
+            result.extend_from_slice(&chars[..sel_start as usize]);
+            result.extend_from_slice(&chars[sel_end as usize..]);
+            self.edit_text = result.into_iter().collect();
+            self.sel_length = 0;
+            self.sync_formula_mode_from_text();
+        } else if (sel_start as usize) < chars.len() {
+            // Delete char at cursor
+            let mut result: Vec<char> = Vec::new();
+            result.extend_from_slice(&chars[..sel_start as usize]);
+            result.extend_from_slice(&chars[(sel_start + 1) as usize..]);
+            self.edit_text = result.into_iter().collect();
+            self.sel_length = 0;
+            self.sync_formula_mode_from_text();
+        }
+    }
+
+    /// Move cursor left by one character.
+    pub fn move_left(&mut self) {
+        if self.sel_length > 0 {
+            // Collapse selection to left edge
+            self.sel_length = 0;
+        } else if self.sel_start > 0 {
+            self.sel_start -= 1;
+        }
+    }
+
+    /// Move cursor right by one character.
+    pub fn move_right(&mut self) {
+        let total = self.edit_text.chars().count() as i32;
+        if self.sel_length > 0 {
+            // Collapse selection to right edge
+            self.sel_start = (self.sel_start + self.sel_length).min(total);
+            self.sel_length = 0;
+        } else if self.sel_start < total {
+            self.sel_start += 1;
+        }
+    }
+
+    /// Move cursor to the beginning of the text.
+    pub fn move_home(&mut self) {
+        self.sel_start = 0;
+        self.sel_length = 0;
+    }
+
+    /// Move cursor to the end of the text.
+    pub fn move_end(&mut self) {
+        self.sel_start = self.edit_text.chars().count() as i32;
+        self.sel_length = 0;
+    }
+
+    /// Search dropdown items for a prefix match, returning the index or -1.
+    pub fn search_dropdown(&self, prefix: &str) -> i32 {
+        if prefix.is_empty() {
+            return -1;
+        }
+        let lower = prefix.to_lowercase();
+        for (i, item) in self.dropdown_items.iter().enumerate() {
+            if item.to_lowercase().starts_with(&lower) {
+                return i as i32;
+            }
+        }
+        -1
+    }
+}
+
+/// Apply an edit mask to an input string.
+///
+/// Mask characters:
+/// - `#` or `9` = digit (0-9)
+/// - `?` = letter (a-z, A-Z)
+/// - `A` = alphanumeric (letter or digit)
+/// - Any other character = literal (passed through as-is)
+///
+/// Returns `(formatted_text, is_valid)` where `is_valid` is true if all
+/// required mask positions were filled.
+pub fn apply_edit_mask(input: &str, mask: &str) -> (String, bool) {
+    if mask.is_empty() {
+        return (input.to_string(), true);
+    }
+
+    let mask_chars: Vec<char> = mask.chars().collect();
+    let input_chars: Vec<char> = input.chars().collect();
+    let mut result = Vec::with_capacity(mask_chars.len());
+    let mut input_idx = 0usize;
+    let mut valid = true;
+
+    for &mc in &mask_chars {
+        match mc {
+            '#' | '9' => {
+                // Expect a digit
+                if input_idx < input_chars.len() && input_chars[input_idx].is_ascii_digit() {
+                    result.push(input_chars[input_idx]);
+                    input_idx += 1;
+                } else if input_idx < input_chars.len() {
+                    // Skip non-digit input chars until we find one
+                    while input_idx < input_chars.len() && !input_chars[input_idx].is_ascii_digit()
+                    {
+                        input_idx += 1;
+                    }
+                    if input_idx < input_chars.len() {
+                        result.push(input_chars[input_idx]);
+                        input_idx += 1;
+                    } else {
+                        result.push('_');
+                        valid = false;
+                    }
+                } else {
+                    result.push('_');
+                    valid = false;
+                }
+            }
+            '?' => {
+                // Expect a letter
+                if input_idx < input_chars.len() && input_chars[input_idx].is_alphabetic() {
+                    result.push(input_chars[input_idx]);
+                    input_idx += 1;
+                } else {
+                    result.push('_');
+                    if input_idx < input_chars.len() {
+                        input_idx += 1;
+                    }
+                    valid = false;
+                }
+            }
+            'A' => {
+                // Expect alphanumeric
+                if input_idx < input_chars.len() && input_chars[input_idx].is_alphanumeric() {
+                    result.push(input_chars[input_idx]);
+                    input_idx += 1;
+                } else {
+                    result.push('_');
+                    if input_idx < input_chars.len() {
+                        input_idx += 1;
+                    }
+                    valid = false;
+                }
+            }
+            _ => {
+                // Literal character — insert it directly
+                result.push(mc);
+                // If the input has this same literal, consume it
+                if input_idx < input_chars.len() && input_chars[input_idx] == mc {
+                    input_idx += 1;
+                }
+            }
+        }
+    }
+
+    (result.into_iter().collect(), valid)
+}
+
+/// Check if a character is valid at the given mask position.
+///
+/// Returns true if the character satisfies the mask at `pos`, or if `pos`
+/// is beyond the mask length.
+pub fn is_char_valid_for_mask(ch: char, mask: &str, pos: usize) -> bool {
+    let mask_chars: Vec<char> = mask.chars().collect();
+    if pos >= mask_chars.len() {
+        return false;
+    }
+    match mask_chars[pos] {
+        '#' | '9' => ch.is_ascii_digit(),
+        '?' => ch.is_alphabetic(),
+        'A' => ch.is_alphanumeric(),
+        literal => ch == literal,
+    }
+}
+
+/// Returns the next non-literal position in the mask at or after `pos`.
+pub fn next_input_position(mask: &str, pos: usize) -> usize {
+    let mask_chars: Vec<char> = mask.chars().collect();
+    let mut p = pos;
+    while p < mask_chars.len() {
+        match mask_chars[p] {
+            '#' | '9' | '?' | 'A' => return p,
+            _ => p += 1,
+        }
+    }
+    p
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        translate_dropdown_display_to_value, translate_dropdown_value_to_display,
+        EditHighlightRegion, EditState,
+    };
+
+    #[test]
+    fn parse_dropdown_items_with_data_and_display_column() {
+        let mut edit = EditState::default();
+        edit.parse_dropdown_items("|#10*1;Getz\tStan\t1 Sansome|#20;Mindelis\tNuno");
+
+        assert_eq!(edit.dropdown_count(), 2);
+        assert_eq!(edit.get_dropdown_item(0), "Stan");
+        assert_eq!(edit.get_dropdown_data(0), "10");
+        assert_eq!(edit.get_dropdown_item(1), "Mindelis");
+        assert_eq!(edit.get_dropdown_data(1), "20");
+    }
+
+    #[test]
+    fn insert_char_at_cursor() {
+        let mut edit = EditState::default();
+        edit.start_edit(1, 0, "hello");
+        edit.sel_start = 5;
+        edit.sel_length = 0;
+        edit.insert_char('!');
+        assert_eq!(edit.edit_text, "hello!");
+        assert_eq!(edit.sel_start, 6);
+    }
+
+    #[test]
+    fn insert_char_replaces_selection() {
+        let mut edit = EditState::default();
+        edit.start_edit(1, 0, "hello");
+        edit.sel_start = 0;
+        edit.sel_length = 5;
+        edit.insert_char('X');
+        assert_eq!(edit.edit_text, "X");
+        assert_eq!(edit.sel_start, 1);
+        assert_eq!(edit.sel_length, 0);
+    }
+
+    #[test]
+    fn delete_back_removes_char_before_cursor() {
+        let mut edit = EditState::default();
+        edit.start_edit(1, 0, "abc");
+        edit.sel_start = 2;
+        edit.sel_length = 0;
+        edit.delete_back();
+        assert_eq!(edit.edit_text, "ac");
+        assert_eq!(edit.sel_start, 1);
+    }
+
+    #[test]
+    fn delete_back_removes_selection() {
+        let mut edit = EditState::default();
+        edit.start_edit(1, 0, "abcdef");
+        edit.sel_start = 1;
+        edit.sel_length = 3;
+        edit.delete_back();
+        assert_eq!(edit.edit_text, "aef");
+        assert_eq!(edit.sel_start, 1);
+        assert_eq!(edit.sel_length, 0);
+    }
+
+    #[test]
+    fn delete_forward_removes_char_at_cursor() {
+        let mut edit = EditState::default();
+        edit.start_edit(1, 0, "abc");
+        edit.sel_start = 1;
+        edit.sel_length = 0;
+        edit.delete_forward();
+        assert_eq!(edit.edit_text, "ac");
+    }
+
+    #[test]
+    fn move_left_right() {
+        let mut edit = EditState::default();
+        edit.start_edit(1, 0, "abc");
+        edit.sel_start = 1;
+        edit.sel_length = 0;
+        edit.move_right();
+        assert_eq!(edit.sel_start, 2);
+        edit.move_left();
+        assert_eq!(edit.sel_start, 1);
+    }
+
+    #[test]
+    fn move_home_end() {
+        let mut edit = EditState::default();
+        edit.start_edit(1, 0, "abc");
+        edit.sel_start = 1;
+        edit.sel_length = 0;
+        edit.move_end();
+        assert_eq!(edit.sel_start, 3);
+        edit.move_home();
+        assert_eq!(edit.sel_start, 0);
+    }
+
+    #[test]
+    fn search_dropdown_prefix_match() {
+        let mut edit = EditState::default();
+        edit.parse_dropdown_items("Apple|Banana|Cherry");
+        let idx = edit.search_dropdown("ban");
+        assert_eq!(idx, 1);
+        let none = edit.search_dropdown("xyz");
+        assert_eq!(none, -1);
+    }
+
+    #[test]
+    fn edit_mask_phone_number() {
+        let (formatted, valid) = super::apply_edit_mask("5551234567", "(###) ###-####");
+        assert_eq!(formatted, "(555) 123-4567");
+        assert!(valid);
+    }
+
+    #[test]
+    fn edit_mask_incomplete() {
+        let (formatted, valid) = super::apply_edit_mask("555", "(###) ###-####");
+        assert_eq!(formatted, "(555) ___-____");
+        assert!(!valid);
+    }
+
+    #[test]
+    fn is_char_valid_for_mask_digits() {
+        assert!(super::is_char_valid_for_mask('5', "###", 0));
+        assert!(!super::is_char_valid_for_mask('a', "###", 0));
+    }
+
+    #[test]
+    fn translate_dropdown_round_trip() {
+        let list = "#1;Full time|#23;Part time|#65;Contractor";
+        assert_eq!(
+            translate_dropdown_display_to_value(list, "Part time").as_deref(),
+            Some("23")
+        );
+        assert_eq!(
+            translate_dropdown_value_to_display(list, "65").as_deref(),
+            Some("Contractor")
+        );
+    }
+
+    #[test]
+    fn formula_mode_tracks_text_and_clears_highlights() {
+        let mut edit = EditState::default();
+        edit.start_edit_with_options(1, 1, "", None, None, Some("=SUM("), Some(true));
+        assert!(edit.formula_mode);
+
+        edit.set_highlights(vec![EditHighlightRegion {
+            row1: 1,
+            col1: 1,
+            row2: 3,
+            col2: 3,
+            color: 0xFF00FF00,
+            show_corner_handles: true,
+            ref_id: Some(1),
+            text_start: Some(1),
+            text_length: Some(4),
+        }]);
+        assert_eq!(edit.formula_highlights.len(), 1);
+
+        edit.update_text("123".to_string());
+        assert!(!edit.formula_mode);
+        assert!(edit.formula_highlights.is_empty());
+    }
+
+    #[test]
+    fn commit_and_cancel_clear_formula_highlights() {
+        let mut edit = EditState::default();
+        edit.start_edit_with_options(1, 1, "=A1", None, None, None, Some(true));
+        edit.set_highlights(vec![EditHighlightRegion::default()]);
+        let _ = edit.commit();
+        assert!(!edit.formula_mode);
+        assert!(edit.formula_highlights.is_empty());
+
+        edit.start_edit_with_options(1, 1, "=A1", None, None, None, Some(true));
+        edit.set_highlights(vec![EditHighlightRegion::default()]);
+        let _ = edit.cancel();
+        assert!(!edit.formula_mode);
+        assert!(edit.formula_highlights.is_empty());
+    }
+}

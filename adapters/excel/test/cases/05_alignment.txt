@@ -1,0 +1,11 @@
+# Cell alignment — LEFT, CENTER, RIGHT (using ALIGN enum values)
+# ALIGN.LEFT_CENTER=1, ALIGN.CENTER_CENTER=4, ALIGN.RIGHT_CENTER=7
+setCellValue 0 0 "Left"
+setCellValue 0 1 "Center"
+setCellValue 0 2 "Right"
+setCellValue 1 0 "Left aligned text"
+setCellValue 1 1 "Center aligned"
+setCellValue 1 2 "Right aligned"
+setCellStyle 1 0 {"alignment":1}
+setCellStyle 1 1 {"alignment":4}
+setCellStyle 1 2 {"alignment":7}

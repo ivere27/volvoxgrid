@@ -1,0 +1,5 @@
+# Toolbar action guard — column-header selection must not delete rows
+setData [["A","B"],["LAST","2"],["3","4"]]
+setSelection {"row1":-1,"col1":0,"row2":-1,"col2":0}
+invokeToolbarAction "deleteRow"
+assertCellValue 1 0 "LAST"

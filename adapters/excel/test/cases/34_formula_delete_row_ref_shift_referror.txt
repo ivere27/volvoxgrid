@@ -1,0 +1,7 @@
+# Delete row rewrites references and invalidates deleted refs
+setData [["1"],["2"],["3"],["=A3"],["=A2"]]
+deleteRows 1 1
+assertCellRawValue 2 0 "=A2"
+assertCellValue 2 0 "3"
+assertCellRawValue 3 0 "=#REF!"
+assertCellValue 3 0 "#REF!"

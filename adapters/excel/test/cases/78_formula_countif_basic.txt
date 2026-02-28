@@ -1,0 +1,8 @@
+# COUNTIF with numeric/text criteria
+setData [["1"],["5"],["10"],["apple"]]
+setCellValue 0 1 "=COUNTIF(A1:A4,\">4\")"
+setCellValue 1 1 "=COUNTIF(A1:A4,\"apple\")"
+setCellValue 2 1 "=COUNTIF(A1:A4,\"<>apple\")"
+assertCellValue 0 1 "2"
+assertCellValue 1 1 "1"
+assertCellValue 2 1 "3"

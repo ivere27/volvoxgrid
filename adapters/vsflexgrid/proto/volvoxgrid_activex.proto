@@ -1,0 +1,2086 @@
+syntax = "proto3";
+package volvoxgrid.activex;
+
+option go_package = "github.com/ivere27/synurang/volvoxgrid/api";
+option java_package = "io.github.ivere27.volvoxgrid";
+option java_multiple_files = true;
+
+import "activex.proto";
+
+// ═══════════════════════════════════════════════════════════
+// Enums
+// ═══════════════════════════════════════════════════════════
+
+enum SelectionMode {
+  SELECTION_FREE       = 0;
+  SELECTION_BY_ROW     = 1;
+  SELECTION_BY_COLUMN  = 2;
+  SELECTION_LISTBOX    = 3;
+}
+
+enum FocusRectStyle {
+  FOCUS_NONE           = 0;
+  FOCUS_LIGHT          = 1;
+  FOCUS_HEAVY          = 2;
+  FOCUS_INSET          = 3;
+  FOCUS_RAISED         = 4;
+}
+
+enum HighLightStyle {
+  HIGHLIGHT_NEVER      = 0;
+  HIGHLIGHT_ALWAYS     = 1;
+  HIGHLIGHT_WITH_FOCUS = 2;
+}
+
+enum EditableMode {
+  EDITABLE_NONE        = 0;
+  EDITABLE_KBD         = 1;
+  EDITABLE_KBD_MOUSE   = 2;
+}
+
+enum ShowComboButtonMode {
+  COMBO_BUTTON_NEVER   = 0;
+  COMBO_BUTTON_ALWAYS  = 1;
+  COMBO_BUTTON_EDITING = 2;
+}
+
+enum TabBehavior {
+  TAB_CONTROLS         = 0;
+  TAB_CELLS            = 1;
+}
+
+enum SortOrder {
+  SORT_NONE                = 0;
+  SORT_GENERIC_ASCENDING   = 1;
+  SORT_GENERIC_DESCENDING  = 2;
+  SORT_NUMERIC_ASCENDING   = 3;
+  SORT_NUMERIC_DESCENDING  = 4;
+  SORT_STRING_NO_CASE_ASC  = 5;
+  SORT_STRING_NO_CASE_DESC = 6;
+  SORT_STRING_ASC          = 7;
+  SORT_STRING_DESC         = 8;
+  SORT_CUSTOM              = 9;
+  SORT_USE_COL_SORT        = 10;
+}
+
+enum ExplorerBarMode {
+  EXPLORER_NONE        = 0;
+  EXPLORER_SORT        = 1;
+  EXPLORER_MOVE        = 2;
+  EXPLORER_SORT_MOVE   = 3;
+  EXPLORER_SORT_SHOW   = 5;
+  EXPLORER_MOVE_SHOW   = 6;
+  EXPLORER_SORT_MOVE_SHOW = 7;
+}
+
+enum MergeCellsMode {
+  MERGE_NEVER              = 0;
+  MERGE_FREE               = 1;
+  MERGE_RESTRICT_ROWS      = 2;
+  MERGE_RESTRICT_COLS      = 3;
+  MERGE_RESTRICT_ALL       = 4;
+  MERGE_FIXED_ONLY         = 5;
+  MERGE_SPILL              = 6;
+  MERGE_OUTLINE            = 7;
+}
+
+enum OutlineBarStyle {
+  OUTLINE_NONE             = 0;
+  OUTLINE_SIMPLE           = 1;
+  OUTLINE_SIMPLE_LEAF      = 2;
+  OUTLINE_COMPLETE         = 3;
+  OUTLINE_COMPLETE_LEAF    = 4;
+}
+
+enum SubtotalPosition {
+  SUBTOTAL_ABOVE       = 0;
+  SUBTOTAL_BELOW       = 1;
+}
+
+enum AggregateType {
+  AGG_NONE             = 0;
+  AGG_CLEAR            = 1;
+  AGG_SUM              = 2;
+  AGG_PERCENT          = 3;
+  AGG_COUNT            = 4;
+  AGG_AVERAGE          = 5;
+  AGG_MAX              = 6;
+  AGG_MIN              = 7;
+  AGG_STD_DEV          = 8;
+  AGG_VAR              = 9;
+}
+
+enum GridLinesMode {
+  GRID_NONE            = 0;
+  GRID_FLAT            = 1;
+  GRID_INSET           = 2;
+  GRID_RAISED          = 3;
+  GRID_FLAT_HORZ       = 4;
+  GRID_FLAT_VERT       = 5;
+  GRID_INSET_HORZ      = 6;
+  GRID_INSET_VERT      = 7;
+  GRID_RAISED_HORZ     = 8;
+  GRID_RAISED_VERT     = 9;
+}
+
+enum TextStyleMode {
+  TEXT_FLAT             = 0;
+  TEXT_RAISED           = 1;
+  TEXT_INSET            = 2;
+  TEXT_RAISED_LIGHT     = 3;
+  TEXT_INSET_LIGHT      = 4;
+}
+
+// Text rasterization mode for cross-platform clarity control.
+//
+// NOTE:
+// - AUTO chooses the backend/platform default.
+// - GRAYSCALE uses standard anti-aliased glyphs.
+// - SUBPIXEL favors LCD-like subpixel rendering where supported.
+// - MONO favors pixel-sharp monochrome output (legacy/crisp look).
+enum TextRenderMode {
+  TEXT_RENDER_AUTO      = 0;
+  TEXT_RENDER_GRAYSCALE = 1;
+  TEXT_RENDER_SUBPIXEL  = 2;
+  TEXT_RENDER_MONO      = 3;
+}
+
+// Font hinting strategy for text rasterization.
+//
+// This is intentionally advisory: backends may approximate unsupported modes.
+enum TextHintingMode {
+  TEXT_HINT_AUTO        = 0;
+  TEXT_HINT_NONE        = 1;
+  TEXT_HINT_SLIGHT      = 2;
+  TEXT_HINT_FULL        = 3;
+}
+
+enum ColDataType {
+  COL_DATA_STRING      = 0;
+  COL_DATA_NUMBER      = 1;
+  COL_DATA_DATE        = 2;
+  COL_DATA_BOOLEAN     = 3;
+  COL_DATA_CURRENCY    = 4;
+}
+
+enum Align {
+  ALIGN_LEFT_TOP       = 0;
+  ALIGN_LEFT_CENTER    = 1;
+  ALIGN_LEFT_BOTTOM    = 2;
+  ALIGN_CENTER_TOP     = 3;
+  ALIGN_CENTER_CENTER  = 4;
+  ALIGN_CENTER_BOTTOM  = 5;
+  ALIGN_RIGHT_TOP      = 6;
+  ALIGN_RIGHT_CENTER   = 7;
+  ALIGN_RIGHT_BOTTOM   = 8;
+  ALIGN_GENERAL        = 9;
+}
+
+enum PictureAlignment {
+  PIC_ALIGN_LEFT_TOP       = 0;
+  PIC_ALIGN_LEFT_CENTER    = 1;
+  PIC_ALIGN_LEFT_BOTTOM    = 2;
+  PIC_ALIGN_CENTER_TOP     = 3;
+  PIC_ALIGN_CENTER_CENTER  = 4;
+  PIC_ALIGN_CENTER_BOTTOM  = 5;
+  PIC_ALIGN_RIGHT_TOP      = 6;
+  PIC_ALIGN_RIGHT_CENTER   = 7;
+  PIC_ALIGN_RIGHT_BOTTOM   = 8;
+  PIC_ALIGN_STRETCH        = 9;
+  PIC_ALIGN_TILE           = 10;
+}
+
+enum CellPropertyType {
+  CELL_TEXT             = 0;
+  CELL_TEXT_STYLE       = 1;
+  CELL_ALIGNMENT        = 2;
+  CELL_PICTURE          = 3;
+  CELL_PICTURE_ALIGNMENT = 4;
+  CELL_CHECKED          = 5;
+  CELL_BACK_COLOR       = 6;
+  CELL_FORE_COLOR       = 7;
+  CELL_FLOOD_COLOR      = 8;
+  CELL_FLOOD_PERCENT    = 9;
+  CELL_FONT_NAME        = 10;
+  CELL_FONT_SIZE        = 11;
+  CELL_FONT_BOLD        = 12;
+  CELL_FONT_ITALIC      = 13;
+  CELL_FONT_UNDERLINE   = 14;
+  CELL_FONT_STRIKETHROUGH = 15;
+  CELL_FONT_WIDTH       = 16;
+  CELL_VALUE            = 17;
+  CELL_DATA             = 18;
+  CELL_CUSTOM_FORMAT    = 19;
+  CELL_LEFT             = 20;
+  CELL_TOP              = 21;
+  CELL_WIDTH            = 22;
+  CELL_HEIGHT           = 23;
+  CELL_BUTTON_PICTURE   = 24;
+  CELL_COMBO_LIST       = 25;
+}
+
+enum AllowUserResizingMode {
+  RESIZE_NONE          = 0;
+  RESIZE_COLUMNS       = 1;
+  RESIZE_ROWS          = 2;
+  RESIZE_BOTH          = 3;
+  RESIZE_COLUMNS_UNIFORM = 4;
+  RESIZE_ROWS_UNIFORM  = 5;
+  RESIZE_BOTH_UNIFORM  = 6;
+}
+
+enum AllowUserFreezingMode {
+  FREEZE_NONE          = 0;
+  FREEZE_COLUMNS       = 1;
+  FREEZE_ROWS          = 2;
+  FREEZE_BOTH          = 3;
+}
+
+enum AutoSizeMode {
+  AUTOSIZE_BOTH_WAYS   = 0;
+  AUTOSIZE_COL_WIDTH   = 1;
+  AUTOSIZE_ROW_HEIGHT  = 2;
+}
+
+enum AutoSearchMode {
+  AUTOSEARCH_NONE      = 0;
+  AUTOSEARCH_FROM_TOP  = 1;
+  AUTOSEARCH_FROM_CURSOR = 2;
+}
+
+enum ScrollBarsMode {
+  SCROLLBAR_NONE       = 0;
+  SCROLLBAR_HORIZONTAL = 1;
+  SCROLLBAR_VERTICAL   = 2;
+  SCROLLBAR_BOTH       = 3;
+}
+
+enum SaveGridFormat {
+  SAVE_BINARY          = 0;
+  SAVE_TEXT_TAB        = 1;
+  SAVE_TEXT_COMMA      = 2;
+  SAVE_TEXT_CUSTOM     = 3;
+  SAVE_EXCEL           = 4;
+}
+
+enum SaveGridScope {
+  SAVE_ALL             = 0;
+  SAVE_DATA_ONLY       = 1;
+  SAVE_FORMAT_ONLY     = 2;
+}
+
+enum DragMode {
+  DRAG_NONE            = 0;
+  DRAG_MANUAL          = 1;
+  DRAG_AUTOMATIC       = 2;
+}
+
+enum DropMode {
+  DROP_NONE            = 0;
+  DROP_MANUAL          = 1;
+  DROP_AUTOMATIC       = 2;
+}
+
+enum PrintOrientation {
+  PRINT_PORTRAIT       = 0;
+  PRINT_LANDSCAPE      = 1;
+}
+
+enum OwnerDrawMode {
+  OWNERDRAW_NEVER      = 0;
+  OWNERDRAW_CELL       = 1;
+  OWNERDRAW_COMPLETE   = 2;
+}
+
+enum BorderStyle {
+  BORDER_NONE          = 0;
+  BORDER_THIN          = 1;
+  BORDER_THICK         = 2;
+  BORDER_DOTTED        = 3;
+  BORDER_DASHED        = 4;
+  BORDER_DOUBLE        = 5;
+  BORDER_RAISED        = 6;
+  BORDER_INSET         = 7;
+}
+
+enum FillStyle {
+  FILL_SINGLE          = 0;
+  FILL_REPEAT          = 1;
+}
+
+enum ClearScope {
+  CLEAR_EVERYTHING     = 0;
+  CLEAR_FORMATTING     = 1;
+  CLEAR_DATA           = 2;
+  CLEAR_SELECTION      = 3;
+}
+
+enum ClearRegion {
+  CLEAR_SCROLLABLE     = 0;
+  CLEAR_FIXED_ROWS     = 1;
+  CLEAR_FIXED_COLS     = 2;
+  CLEAR_FIXED_BOTH     = 3;
+  CLEAR_ALL_ROWS       = 4;
+  CLEAR_ALL_COLS       = 5;
+  CLEAR_ALL_BOTH       = 6;
+}
+
+enum AppearanceStyle {
+  APPEARANCE_FLAT      = 0;
+  APPEARANCE_3D        = 1;
+  APPEARANCE_3D_LIGHT  = 2;
+}
+
+enum CheckedState {
+  CHECKED_UNCHECKED    = 0;
+  CHECKED_CHECKED      = 1;
+  CHECKED_GRAYED       = 2;
+}
+
+enum RendererMode {
+  RENDERER_CPU  = 0; // Default CPU rendering (tiny-skia)
+  RENDERER_GPU  = 1; // GPU rendering (wgpu)
+  RENDERER_AUTO = 2; // Auto-detect: GPU if available, else CPU
+}
+
+// ═══════════════════════════════════════════════════════════
+// Common Messages
+// ═══════════════════════════════════════════════════════════
+
+message Empty {}
+message GridHandle { int64 id = 1; }
+message Int32Value { int64 grid_id = 1; int32 value = 2; }
+message DoubleValue { int64 grid_id = 1; double value = 2; }
+message BoolValue  { int64 grid_id = 1; bool value = 2; }
+message StringValue { int64 grid_id = 1; string value = 2; }
+message RowColIndex { int64 grid_id = 1; int32 index = 2; }
+
+message SetBoolProp  { int64 grid_id = 1; bool value = 2; }
+message SetAnimationEnabledRequest {
+  int64 grid_id = 1;
+  bool enabled = 2;
+  int32 duration_ms = 3;  // animation duration in milliseconds (0 = use default 200ms)
+}
+message SetInt32Prop { int64 grid_id = 1; int32 value = 2; }
+message SetFloatProp { int64 grid_id = 1; float value = 2; }
+message SetColorProp { int64 grid_id = 1; uint32 color = 2; }
+message SetImageProp  { int64 grid_id = 1; bytes image_data = 2; }
+message SetStringProp { int64 grid_id = 1; string value = 2; }
+
+message SetColInt32Prop {
+  int64 grid_id = 1;
+  int32 col     = 2;
+  int32 value   = 3;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Lifecycle & Layout Messages
+// ═══════════════════════════════════════════════════════════
+
+message CreateGridRequest {
+  int32 viewport_width  = 1;
+  int32 viewport_height = 2;
+  int32 rows            = 3;
+  int32 cols            = 4;
+  int32 fixed_rows      = 5;
+  int32 fixed_cols      = 6;
+  float scale           = 7;    // DPI scale factor (0 or 1 = no scaling)
+}
+
+message ResizeViewportRequest {
+  int64 grid_id = 1;
+  int32 width   = 2;
+  int32 height  = 3;
+}
+
+message SetRowsRequest      { int64 grid_id = 1; int32 rows = 2; }
+message SetColsRequest      { int64 grid_id = 1; int32 cols = 2; }
+message SetFixedRowsRequest { int64 grid_id = 1; int32 fixed_rows = 2; }
+message SetFixedColsRequest { int64 grid_id = 1; int32 fixed_cols = 2; }
+message SetFrozenRowsRequest { int64 grid_id = 1; int32 frozen_rows = 2; }
+message SetFrozenColsRequest { int64 grid_id = 1; int32 frozen_cols = 2; }
+
+message SetRowHeightRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+  int32 height  = 3;
+}
+
+message SetColWidthRequest {
+  int64 grid_id = 1;
+  int32 col     = 2;
+  int32 width   = 3;
+}
+
+message SetRowHiddenRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+  bool  hidden  = 3;
+}
+
+message SetColHiddenRequest {
+  int64 grid_id = 1;
+  int32 col     = 2;
+  bool  hidden  = 3;
+}
+
+message MoveColRequest {
+  int64 grid_id  = 1;
+  int32 col      = 2;
+  int32 position = 3;
+}
+
+message MoveRowRequest {
+  int64 grid_id  = 1;
+  int32 row      = 2;
+  int32 position = 3;
+}
+
+message AutoSizeRequest {
+  int64 grid_id   = 1;
+  int32 col_from  = 2;
+  int32 col_to    = 3;
+  bool  equal     = 4;
+  int32 max_width = 5;
+}
+
+message SetAutoSizeModeRequest {
+  int64 grid_id    = 1;
+  AutoSizeMode mode = 2;
+}
+
+message SetFormatStringRequest {
+  int64  grid_id       = 1;
+  string format_string = 2;
+}
+
+message SetScrollBarsRequest {
+  int64 grid_id    = 1;
+  ScrollBarsMode mode = 2;
+}
+
+message SetRendererModeRequest {
+  int64 grid_id      = 1;
+  RendererMode mode  = 2;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Cursor & Selection Messages
+// ═══════════════════════════════════════════════════════════
+
+message SetRowRequest    { int64 grid_id = 1; int32 row = 2; }
+message SetColRequest    { int64 grid_id = 1; int32 col = 2; }
+message SetRowSelRequest { int64 grid_id = 1; int32 row_sel = 2; }
+message SetColSelRequest { int64 grid_id = 1; int32 col_sel = 2; }
+
+message SelectRequest {
+  int64 grid_id  = 1;
+  int32 row1     = 2;
+  int32 col1     = 3;
+  int32 row2     = 4;
+  int32 col2     = 5;
+}
+
+message ShowCellRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+  int32 col     = 3;
+}
+
+message SelectionRange {
+  int64 grid_id  = 1;
+  int32 row1     = 2;
+  int32 col1     = 3;
+  int32 row2     = 4;
+  int32 col2     = 5;
+}
+
+message SetSelectionModeRequest {
+  int64 grid_id      = 1;
+  SelectionMode mode = 2;
+}
+
+message SetFocusRectRequest {
+  int64 grid_id       = 1;
+  FocusRectStyle style = 2;
+}
+
+message SetHighLightRequest {
+  int64 grid_id        = 1;
+  HighLightStyle style = 2;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Values & Data Messages
+// ═══════════════════════════════════════════════════════════
+
+message CellValue {
+  oneof value {
+    string text   = 1;
+    double number = 2;
+    bool   flag   = 3;
+    bytes  data   = 4;
+  }
+}
+
+message SetTextRequest {
+  int64  grid_id = 1;
+  string text    = 2;
+}
+
+message GetTextRequest { int64 grid_id = 1; }
+
+message SetTextMatrixRequest {
+  int64  grid_id = 1;
+  int32  row     = 2;
+  int32  col     = 3;
+  string text    = 4;
+}
+
+message GetTextMatrixRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+  int32 col     = 3;
+}
+
+message SetTextArrayRequest {
+  int64  grid_id = 1;
+  int32  index   = 2;
+  string text    = 3;
+}
+
+message GetTextArrayRequest {
+  int64 grid_id = 1;
+  int32 index   = 2;
+}
+
+message ArrayDataRequest {
+  int64           grid_id = 1;
+  int32           rows    = 2;
+  int32           cols    = 3;
+  repeated string values  = 4; // row-major: row * cols + col
+}
+
+message SetValueRequest {
+  int64     grid_id = 1;
+  CellValue value   = 2;
+}
+
+message GetValueRequest { int64 grid_id = 1; }
+
+message SetValueMatrixRequest {
+  int64     grid_id = 1;
+  int32     row     = 2;
+  int32     col     = 3;
+  CellValue value   = 4;
+}
+
+message GetValueMatrixRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+  int32 col     = 3;
+}
+
+message CellEntry {
+  int32     row   = 1;
+  int32     col   = 2;
+  CellValue value = 3;
+}
+
+message SetCellsRequest {
+  int64 grid_id            = 1;
+  repeated CellEntry cells = 2;
+}
+
+message GetCellsRequest {
+  int64 grid_id = 1;
+  int32 row1    = 2;
+  int32 col1    = 3;
+  int32 row2    = 4;
+  int32 col2    = 5;
+}
+
+message CellsData {
+  repeated CellEntry cells = 1;
+}
+
+message SetCellRequest {
+  int64 grid_id          = 1;
+  CellPropertyType prop  = 2;
+  int32 row1             = 3;
+  int32 col1             = 4;
+  int32 row2             = 5;
+  int32 col2             = 6;
+  CellValue value        = 7;
+}
+
+message GetCellRequest {
+  int64 grid_id          = 1;
+  CellPropertyType prop  = 2;
+  int32 row              = 3;
+  int32 col              = 4;
+}
+
+message SetClipRequest {
+  int64  grid_id = 1;
+  string clip    = 2;
+}
+
+message GetClipRequest {
+  int64 grid_id = 1;
+}
+
+message SetClipSeparatorsRequest {
+  int64  grid_id       = 1;
+  string col_separator = 2;
+  string row_separator = 3;
+}
+
+message SetFillStyleRequest {
+  int64     grid_id = 1;
+  FillStyle style   = 2;
+}
+
+message AddItemRequest {
+  int64  grid_id = 1;
+  string item    = 2;
+  int32  index   = 3;
+}
+
+message RemoveItemRequest {
+  int64 grid_id = 1;
+  int32 index   = 2;
+}
+
+message ClearRequest {
+  int64       grid_id = 1;
+  ClearScope  scope   = 2;
+  ClearRegion region  = 3;
+}
+
+message FindRowRequest {
+  int64  grid_id    = 1;
+  string text       = 2;
+  int32  start_row  = 3;
+  int32  col        = 4;
+  bool   case_sense = 5;
+  bool   full_match = 6;
+}
+
+message FindRowRegexRequest {
+  int64  grid_id   = 1;
+  string pattern   = 2;
+  int32  start_row = 3;
+  int32  col       = 4;
+}
+
+message AggregateRequest {
+  int64         grid_id   = 1;
+  AggregateType aggregate = 2;
+  int32         row1      = 3;
+  int32         col1      = 4;
+  int32         row2      = 5;
+  int32         col2      = 6;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Editing Messages
+// ═══════════════════════════════════════════════════════════
+
+message SetEditableRequest {
+  int64        grid_id = 1;
+  EditableMode mode    = 2;
+}
+
+message EditCellRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+  int32 col     = 3;
+}
+
+message SetEditMaskRequest {
+  int64  grid_id = 1;
+  string mask    = 2;
+}
+
+message SetColEditMaskRequest {
+  int64  grid_id = 1;
+  int32  col     = 2;
+  string mask    = 3;
+}
+
+message SetColComboListRequest {
+  int64  grid_id = 1;
+  int32  col     = 2;
+  string list    = 3;
+}
+
+message SetComboListRequest {
+  int64  grid_id = 1;
+  string list    = 2;
+}
+
+message BuildComboListRequest {
+  int64  grid_id = 1;
+  string query   = 2;
+}
+
+message SetShowComboButtonRequest {
+  int64                 grid_id = 1;
+  ShowComboButtonMode   mode    = 2;
+}
+
+message SetTabBehaviorRequest {
+  int64       grid_id = 1;
+  TabBehavior behavior = 2;
+}
+
+message CommitEditRequest {
+  int64  grid_id = 1;
+  string text    = 2;
+  bool   cancel  = 3;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Cell Formatting Messages
+// ═══════════════════════════════════════════════════════════
+
+message GridStyle {
+  AppearanceStyle appearance      = 1;
+  uint32 back_color               = 2;
+  uint32 fore_color               = 3;
+  uint32 back_color_fixed         = 4;
+  uint32 fore_color_fixed         = 5;
+  uint32 back_color_frozen        = 6;
+  uint32 fore_color_frozen        = 7;
+  uint32 back_color_sel           = 8;
+  uint32 fore_color_sel           = 9;
+  uint32 back_color_bkg           = 10;
+  uint32 back_color_alternate     = 11;
+  GridLinesMode grid_lines        = 12;
+  GridLinesMode grid_lines_fixed  = 13;
+  uint32 grid_color               = 14;
+  uint32 grid_color_fixed         = 15;
+  int32  grid_line_width          = 16;
+  TextStyleMode text_style        = 17;
+  TextStyleMode text_style_fixed  = 18;
+  string font_name                = 19;
+  float  font_size                = 20;
+  bool   font_bold                = 21;
+  bool   font_italic              = 22;
+  bool   font_underline           = 23;
+  bool   font_strikethrough       = 24;
+  float  font_width               = 25;
+  uint32 sheet_border             = 26;
+  uint32 flood_color              = 27;
+  bool   pictures_over            = 28;
+  bytes  wallpaper                = 29;
+  PictureAlignment wallpaper_alignment = 30;
+
+  // Text clarity controls (cross-platform, runtime configurable).
+  // These fields are optional tuning knobs. AUTO defaults preserve legacy behavior.
+  TextRenderMode text_render_mode = 31;
+  TextHintingMode text_hinting_mode = 32;
+
+  // Snap glyph placement to pixel boundaries for crisper small text.
+  // Useful for legacy-style screenshots/UI where smooth positioning looks blurry.
+  bool text_pixel_snap = 33;
+}
+
+message SetGridStyleRequest {
+  int64     grid_id = 1;
+  GridStyle style   = 2;
+}
+
+message CellStyle {
+  uint32 back_color       = 1;
+  uint32 fore_color       = 2;
+  Align  alignment        = 3;
+  TextStyleMode text_style = 4;
+  string font_name        = 5;
+  float  font_size        = 6;
+  bool   font_bold        = 7;
+  bool   font_italic      = 8;
+  bool   font_underline   = 9;
+  bool   font_strikethrough = 10;
+  float  font_width       = 11;
+  uint32 flood_color      = 12;
+  float  flood_percent    = 13;
+  BorderStyle border      = 14;
+}
+
+message SetCellStyleRequest {
+  int64     grid_id = 1;
+  CellStyle style   = 2;
+}
+
+message GetCellStyleRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+  int32 col     = 3;
+}
+
+message SetCellStyleRangeRequest {
+  int64     grid_id = 1;
+  int32     row1    = 2;
+  int32     col1    = 3;
+  int32     row2    = 4;
+  int32     col2    = 5;
+  CellStyle style   = 6;
+}
+
+message SetColAlignmentRequest {
+  int64 grid_id  = 1;
+  int32 col      = 2;
+  Align alignment = 3;
+}
+
+message SetColFormatRequest {
+  int64  grid_id = 1;
+  int32  col     = 2;
+  string format  = 3;
+}
+
+message SetColDataTypeRequest {
+  int64       grid_id   = 1;
+  int32       col       = 2;
+  ColDataType data_type = 3;
+}
+
+message SetColIndentRequest {
+  int64 grid_id = 1;
+  int32 col     = 2;
+  int32 indent  = 3;
+}
+
+message SetColKeyRequest {
+  int64  grid_id = 1;
+  int32  col     = 2;
+  string key     = 3;
+}
+
+message GetColIndexRequest {
+  int64  grid_id = 1;
+  string key     = 2;
+}
+
+message SetColSortRequest {
+  int64     grid_id = 1;
+  int32     col     = 2;
+  SortOrder order   = 3;
+}
+
+message ImageData {
+  bytes  data   = 1;
+  string format = 2;
+}
+
+message SetCellPictureRequest {
+  int64     grid_id = 1;
+  int32     row     = 2;
+  int32     col     = 3;
+  ImageData image   = 4;
+}
+
+message GetCellPictureRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+  int32 col     = 3;
+}
+
+message SetCellPictureAlignmentRequest {
+  int64            grid_id   = 1;
+  int32            row       = 2;
+  int32            col       = 3;
+  PictureAlignment alignment = 4;
+}
+
+message SetColImageListRequest {
+  int64              grid_id = 1;
+  int32              col     = 2;
+  repeated ImageData images  = 3;
+}
+
+message SetCellFloodRequest {
+  int64  grid_id      = 1;
+  int32  row          = 2;
+  int32  col          = 3;
+  uint32 color        = 4;
+  float  percent      = 5;
+}
+
+message SetCellCheckedRequest {
+  int64        grid_id = 1;
+  int32        row     = 2;
+  int32        col     = 3;
+  CheckedState state   = 4;
+}
+
+message GetCellCheckedRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+  int32 col     = 3;
+}
+
+message SetOwnerDrawRequest {
+  int64         grid_id = 1;
+  OwnerDrawMode mode    = 2;
+}
+
+message CellBorderRequest {
+  int64       grid_id = 1;
+  uint32      color   = 2;
+  BorderStyle style   = 3;
+}
+
+message CellBorderRangeRequest {
+  int64       grid_id = 1;
+  int32       row1    = 2;
+  int32       col1    = 3;
+  int32       row2    = 4;
+  int32       col2    = 5;
+  uint32      color   = 6;
+  BorderStyle style   = 7;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Sorting Messages
+// ═══════════════════════════════════════════════════════════
+
+message SortColumn {
+  int32     col   = 1;
+  SortOrder order = 2;
+}
+
+message SortRequest {
+  int64                grid_id      = 1;
+  repeated SortColumn  sort_columns = 2;
+}
+
+message SetExplorerBarRequest {
+  int64            grid_id = 1;
+  ExplorerBarMode  mode    = 2;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Merging Messages
+// ═══════════════════════════════════════════════════════════
+
+message SetMergeCellsRequest {
+  int64          grid_id = 1;
+  MergeCellsMode mode    = 2;
+}
+
+message SetMergeRowRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+  bool  merge   = 3;
+}
+
+message SetMergeColRequest {
+  int64 grid_id = 1;
+  int32 col     = 2;
+  bool  merge   = 3;
+}
+
+message SetMergeCompareRequest {
+  int64 grid_id = 1;
+  int32 value   = 2;
+}
+
+message GetMergedRangeRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+  int32 col     = 3;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Outlining & Subtotals Messages
+// ═══════════════════════════════════════════════════════════
+
+message SetOutlineBarRequest {
+  int64           grid_id = 1;
+  OutlineBarStyle style   = 2;
+}
+
+message SetOutlineColRequest {
+  int64 grid_id = 1;
+  int32 col     = 2;
+}
+
+message SetIsSubtotalRequest {
+  int64 grid_id    = 1;
+  int32 row        = 2;
+  bool  is_subtotal = 3;
+}
+
+message SetRowOutlineLevelRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+  int32 level   = 3;
+}
+
+message SetIsCollapsedRequest {
+  int64 grid_id    = 1;
+  int32 row        = 2;
+  bool  collapsed  = 3;
+}
+
+message SubtotalRequest {
+  int64         grid_id          = 1;
+  AggregateType aggregate        = 2;
+  int32         group_on_col     = 3;
+  int32         aggregate_col    = 4;
+  string        caption          = 5;
+  uint32        back_color       = 6;
+  uint32        fore_color       = 7;
+  bool          add_outline      = 8;
+}
+
+message SetSubtotalPositionRequest {
+  int64            grid_id  = 1;
+  SubtotalPosition position = 2;
+}
+
+message OutlineRequest {
+  int64 grid_id = 1;
+  int32 level   = 2;
+}
+
+message GetNodeRowRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+  enum NodeRelation {
+    PARENT      = 0;
+    FIRST_CHILD = 1;
+    LAST_CHILD  = 2;
+    NEXT_SIBLING = 3;
+    PREV_SIBLING = 4;
+  }
+  NodeRelation relation = 3;
+}
+
+message GetNodeRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+}
+
+message NodeInfo {
+  int32 row          = 1;
+  int32 level        = 2;
+  bool  is_expanded  = 3;
+  int32 child_count  = 4;
+  int32 parent_row   = 5;
+  int32 first_child  = 6;
+  int32 last_child   = 7;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Save, Load, Print Messages
+// ═══════════════════════════════════════════════════════════
+
+message SaveGridRequest {
+  int64          grid_id = 1;
+  SaveGridFormat format  = 2;
+  SaveGridScope  scope   = 3;
+}
+
+message GridData {
+  bytes          data   = 1;
+  SaveGridFormat format = 2;
+}
+
+message LoadGridRequest {
+  int64          grid_id = 1;
+  bytes          data    = 2;
+  SaveGridFormat format  = 3;
+  SaveGridScope  scope   = 4;
+}
+
+message PrintGridRequest {
+  int64            grid_id      = 1;
+  PrintOrientation orientation  = 2;
+  int32            margin_left  = 3;
+  int32            margin_top   = 4;
+  int32            margin_right = 5;
+  int32            margin_bottom = 6;
+  string           header       = 7;
+  string           footer       = 8;
+  bool             show_page_numbers = 9;
+}
+
+message PrintOutput {
+  repeated PrintPage pages = 1;
+}
+
+message PrintPage {
+  int32  page_number = 1;
+  bytes  image_data  = 2;
+  int32  width       = 3;
+  int32  height      = 4;
+}
+
+message ArchiveRequest {
+  int64  grid_id = 1;
+  string name    = 2;
+  enum ArchiveAction {
+    SAVE   = 0;
+    LOAD   = 1;
+    DELETE = 2;
+    LIST   = 3;
+  }
+  ArchiveAction action = 3;
+  bytes data           = 4;
+}
+
+message ArchiveResponse {
+  bytes            data  = 1;
+  repeated string  names = 2;
+}
+
+message GetArchiveInfoRequest {
+  int64 grid_id = 1;
+  bytes data    = 2;
+}
+
+message ArchiveInfo {
+  repeated string names = 1;
+  repeated int32  sizes = 2;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Clipboard Messages
+// ═══════════════════════════════════════════════════════════
+
+message ClipboardData {
+  string text      = 1;
+  bytes  rich_data = 2;
+}
+
+message PasteRequest {
+  int64         grid_id = 1;
+  ClipboardData data    = 2;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Drag & Drop Messages
+// ═══════════════════════════════════════════════════════════
+
+message SetDragModeRequest {
+  int64    grid_id = 1;
+  DragMode mode    = 2;
+}
+
+message SetDropModeRequest {
+  int64    grid_id = 1;
+  DropMode mode    = 2;
+}
+
+message DragRowRequest {
+  int64 grid_id  = 1;
+  int32 row      = 2;
+  int32 position = 3;
+}
+
+// ═══════════════════════════════════════════════════════════
+// User Interaction Messages
+// ═══════════════════════════════════════════════════════════
+
+message SetAllowUserResizingRequest {
+  int64                    grid_id = 1;
+  AllowUserResizingMode    mode    = 2;
+}
+
+message SetAllowUserFreezingRequest {
+  int64                    grid_id = 1;
+  AllowUserFreezingMode    mode    = 2;
+}
+
+message SetAutoSearchRequest {
+  int64          grid_id = 1;
+  AutoSearchMode mode    = 2;
+}
+
+// Common interaction/UX controls.
+message InteractionConfig {
+  bool  fling_enabled      = 1;
+  float fling_impulse_gain = 2;
+  float fling_friction     = 3;
+  bool  pinch_zoom_enabled = 4;
+  bool  scroll_track       = 5;
+  bool  scroll_tips        = 6;
+  bool  auto_size_mouse    = 7;
+}
+
+message SetInteractionConfigRequest {
+  int64             grid_id = 1;
+  InteractionConfig config  = 2;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Render Session Messages (Zero-Copy Bidi Stream)
+// ═══════════════════════════════════════════════════════════
+
+message RenderInput {
+  int64 grid_id = 1;
+  oneof input {
+    ViewportState   viewport    = 2;
+    PointerEvent    pointer     = 3;
+    KeyEvent        key         = 4;
+    BufferReady     buffer      = 5;
+    ScrollEvent     scroll      = 6;
+    EventDecision   event_decision = 7;
+    ZoomEvent       zoom        = 8;
+    GpuSurfaceReady gpu_surface = 9;
+  }
+}
+
+message ViewportState {
+  float scroll_x = 1;
+  float scroll_y = 2;
+  int32 width    = 3;
+  int32 height   = 4;
+}
+
+message PointerEvent {
+  enum Type { DOWN = 0; UP = 1; MOVE = 2; }
+  Type  type      = 1;
+  float x         = 2;
+  float y         = 3;
+  int32 modifier  = 4;
+  int32 button    = 5;
+  bool  dbl_click = 6;
+}
+
+message ScrollEvent {
+  float delta_x = 1;
+  float delta_y = 2;
+}
+
+message ZoomEvent {
+  enum Phase {
+    ZOOM_BEGIN  = 0;
+    ZOOM_UPDATE = 1;
+    ZOOM_END    = 2;
+  }
+  Phase phase      = 1;
+  float scale      = 2; // scale delta (1.0 = no-op)
+  float focal_x_px = 3;
+  float focal_y_px = 4;
+}
+
+message KeyEvent {
+  enum Type { KEY_DOWN = 0; KEY_UP = 1; KEY_PRESS = 2; }
+  Type   type      = 1;
+  int32  key_code  = 2;
+  int32  modifier  = 3;
+  string character = 4;
+}
+
+message BufferReady {
+  int64 handle = 1;
+  int32 stride = 2;
+  int32 width  = 3;
+  int32 height = 4;
+}
+
+message GpuSurfaceReady {
+  int64 surface_handle = 1; // Platform-specific surface handle (ANativeWindow*, HWND, etc.)
+  int32 width          = 2;
+  int32 height         = 3;
+}
+
+// Client decision for a previously emitted cancelable GridEvent.
+// `event_id` matches GridEvent.event_id.
+message EventDecision {
+  int64 grid_id  = 1;
+  int64 event_id = 2;
+  bool  cancel   = 3;
+}
+
+message RenderOutput {
+  bool rendered = 1;
+  oneof event {
+    FrameDone       frame_done      = 2;
+    SelectionUpdate selection       = 3;
+    CursorChange    cursor          = 4;
+    EditRequest     edit_request    = 5;
+    ComboRequest    combo_request   = 6;
+    TooltipRequest  tooltip_request = 7;
+    GpuFrameDone    gpu_frame_done  = 8;
+  }
+}
+
+message GpuFrameDone {
+  int32 dirty_x = 1;
+  int32 dirty_y = 2;
+  int32 dirty_w = 3;
+  int32 dirty_h = 4;
+}
+
+message FrameDone {
+  int64 handle  = 1;
+  int32 dirty_x = 2;
+  int32 dirty_y = 3;
+  int32 dirty_w = 4;
+  int32 dirty_h = 5;
+}
+
+message SelectionUpdate {
+  int32 row     = 1;
+  int32 col     = 2;
+  int32 row_sel = 3;
+  int32 col_sel = 4;
+}
+
+message CursorChange {
+  enum CursorType {
+    DEFAULT   = 0;
+    RESIZE_COL = 1;
+    RESIZE_ROW = 2;
+    MOVE_COL  = 3;
+    TEXT      = 4;
+    HAND      = 5;
+  }
+  CursorType cursor = 1;
+}
+
+message EditRequest {
+  int32  row           = 1;
+  int32  col           = 2;
+  float  x             = 3;
+  float  y             = 4;
+  float  width         = 5;
+  float  height        = 6;
+  string current_value = 7;
+  string edit_mask     = 8;
+  int32  max_length    = 9;
+}
+
+message ComboRequest {
+  int32           row       = 1;
+  int32           col       = 2;
+  float           x         = 3;
+  float           y         = 4;
+  float           width     = 5;
+  float           height    = 6;
+  repeated string items     = 7;
+  int32           selected  = 8;
+  bool            editable  = 9;
+}
+
+message TooltipRequest {
+  float  x    = 1;
+  float  y    = 2;
+  string text = 3;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Event Stream Messages
+// ═══════════════════════════════════════════════════════════
+
+message GridEvent {
+  int64 grid_id = 1;
+  int64 event_id = 100;
+  oneof event {
+    BeforeRowColChangeEvent before_row_col_change = 2;
+    AfterRowColChangeEvent  after_row_col_change  = 3;
+    BeforeSelChangeEvent    before_sel_change      = 4;
+    AfterSelChangeEvent     after_sel_change       = 5;
+    // Legacy aliases kept for host parity. Prefer these first in new integrations.
+    AfterRowColChangeEvent  row_col_change         = 61;
+    AfterSelChangeEvent     sel_change             = 62;
+    EnterCellEvent          enter_cell             = 6;
+    LeaveCellEvent          leave_cell             = 7;
+    BeforeEditEvent         before_edit            = 8;
+    StartEditEvent          start_edit             = 9;
+    AfterEditEvent          after_edit             = 10;
+    ValidateEditEvent       validate_edit          = 11;
+    ChangeEditEvent         change_edit            = 12;
+    CellButtonClickEvent    cell_button_click      = 13;
+    KeyDownEditEvent        key_down_edit          = 14;
+    KeyPressEditEvent       key_press_edit         = 15;
+    KeyUpEditEvent          key_up_edit            = 16;
+    SetupEditStyleEvent     setup_edit_style       = 17;
+    SetupEditWindowEvent    setup_edit_window      = 18;
+    ComboCloseUpEvent       combo_close_up         = 19;
+    ComboDropDownEvent      combo_drop_down        = 20;
+    CellChangedEvent        cell_changed           = 21;
+    RowStatusChangeEvent    row_status_change      = 22;
+    BeforeSortEvent         before_sort            = 23;
+    AfterSortEvent          after_sort             = 24;
+    CompareEvent            compare                = 25;
+    BeforeCollapseEvent     before_collapse        = 26;
+    AfterCollapseEvent      after_collapse         = 27;
+    BeforeScrollEvent       before_scroll          = 28;
+    AfterScrollEvent        after_scroll           = 29;
+    BeforeScrollTipEvent    before_scroll_tip      = 30;
+    BeforeUserResizeEvent   before_user_resize     = 31;
+    AfterUserResizeEvent    after_user_resize      = 32;
+    AfterUserFreezeEvent    after_user_freeze      = 33;
+    BeforeMoveColumnEvent   before_move_column     = 34;
+    AfterMoveColumnEvent    after_move_column      = 35;
+    BeforeMoveRowEvent      before_move_row        = 36;
+    AfterMoveRowEvent       after_move_row         = 37;
+    BeforeMouseDownEvent    before_mouse_down      = 38;
+    MouseDownEvent          mouse_down_event       = 39;
+    MouseUpEvent            mouse_up_event         = 40;
+    MouseMoveEvent          mouse_move_event       = 41;
+    ClickEvent              click_event            = 42;
+    DblClickEvent           dbl_click_event        = 43;
+    KeyDownEvent            key_down               = 44;
+    KeyPressEvent           key_press              = 45;
+    KeyUpEvent              key_up                 = 46;
+    DrawCellEvent           draw_cell              = 47;
+    DragStartEvent          drag_start             = 48;
+    DragOverEvent           drag_over              = 49;
+    DragDropEvent           drag_drop              = 50;
+    DragCompleteEvent       drag_complete          = 51;
+    StartAutoSearchEvent    start_auto_search      = 52;
+    EndAutoSearchEvent      end_auto_search        = 53;
+    BeforeDataRefreshEvent  before_data_refresh    = 54;
+    AfterDataRefreshEvent   after_data_refresh     = 55;
+    FilterDataEvent         filter_data            = 56;
+    ErrorEvent              error                  = 57;
+    BeforePageBreakEvent    before_page_break      = 58;
+    StartPageEvent          start_page             = 59;
+    GetHeaderRowEvent       get_header_row         = 60;
+  }
+}
+
+message BeforeRowColChangeEvent {
+  int32 old_row = 1;
+  int32 old_col = 2;
+  int32 new_row = 3;
+  int32 new_col = 4;
+  bool  cancel  = 5;
+}
+
+message AfterRowColChangeEvent {
+  int32 old_row = 1;
+  int32 old_col = 2;
+  int32 new_row = 3;
+  int32 new_col = 4;
+}
+
+message BeforeSelChangeEvent {
+  int32 old_row_sel = 1;
+  int32 old_col_sel = 2;
+  int32 new_row_sel = 3;
+  int32 new_col_sel = 4;
+  bool  cancel      = 5;
+}
+
+message AfterSelChangeEvent {
+  int32 old_row_sel = 1;
+  int32 old_col_sel = 2;
+  int32 new_row_sel = 3;
+  int32 new_col_sel = 4;
+}
+
+message EnterCellEvent { int32 row = 1; int32 col = 2; }
+message LeaveCellEvent { int32 row = 1; int32 col = 2; }
+
+message BeforeEditEvent {
+  int32  row    = 1;
+  int32  col    = 2;
+  bool   cancel = 3;
+}
+
+message StartEditEvent { int32 row = 1; int32 col = 2; }
+
+message AfterEditEvent {
+  int32  row      = 1;
+  int32  col      = 2;
+  string old_text = 3;
+  string new_text = 4;
+}
+
+message ValidateEditEvent {
+  int32  row       = 1;
+  int32  col       = 2;
+  string edit_text = 3;
+  bool   cancel    = 4;
+}
+
+message ChangeEditEvent { string text = 1; }
+message CellButtonClickEvent { int32 row = 1; int32 col = 2; }
+
+message KeyDownEditEvent  { int32 key_code = 1; int32 shift = 2; }
+message KeyPressEditEvent { int32 key_ascii = 1; }
+message KeyUpEditEvent    { int32 key_code = 1; int32 shift = 2; }
+
+message SetupEditStyleEvent  { int32 row = 1; int32 col = 2; }
+message SetupEditWindowEvent { int32 row = 1; int32 col = 2; }
+
+message ComboCloseUpEvent  {}
+message ComboDropDownEvent {}
+
+message CellChangedEvent {
+  int32  row      = 1;
+  int32  col      = 2;
+  string old_text = 3;
+  string new_text = 4;
+}
+
+message RowStatusChangeEvent {
+  int32 row    = 1;
+  int32 status = 2;
+}
+
+message BeforeSortEvent {
+  int32 col    = 1;
+  bool  cancel = 2;
+}
+
+message AfterSortEvent  { int32 col = 1; }
+
+message CompareEvent {
+  int32 row1   = 1;
+  int32 row2   = 2;
+  int32 col    = 3;
+  int32 result = 4;
+}
+
+message BeforeCollapseEvent {
+  int32 row      = 1;
+  bool  collapse = 2;
+  bool  cancel   = 3;
+}
+
+message AfterCollapseEvent {
+  int32 row      = 1;
+  bool  collapse = 2;
+}
+
+message BeforeScrollEvent {
+  bool  cancel       = 1;
+  int32 old_top_row  = 2;
+  int32 old_left_col = 3;
+  int32 new_top_row  = 4;
+  int32 new_left_col = 5;
+}
+
+message AfterScrollEvent {
+  int32 old_top_row  = 1;
+  int32 old_left_col = 2;
+  int32 new_top_row  = 3;
+  int32 new_left_col = 4;
+}
+message BeforeScrollTipEvent { string text = 1; }
+
+message BeforeUserResizeEvent {
+  int32 row    = 1;
+  int32 col    = 2;
+  bool  cancel = 3;
+}
+
+message AfterUserResizeEvent {
+  int32 row = 1;
+  int32 col = 2;
+}
+
+message AfterUserFreezeEvent {
+  int32 frozen_rows = 1;
+  int32 frozen_cols = 2;
+}
+
+message BeforeMoveColumnEvent {
+  int32 col          = 1;
+  int32 new_position = 2;
+  bool  cancel       = 3;
+}
+
+message AfterMoveColumnEvent {
+  int32 col          = 1;
+  int32 old_position = 2;
+}
+
+message BeforeMoveRowEvent {
+  int32 row          = 1;
+  int32 new_position = 2;
+  bool  cancel       = 3;
+}
+
+message AfterMoveRowEvent {
+  int32 row          = 1;
+  int32 old_position = 2;
+}
+
+message BeforeMouseDownEvent {
+  int32 row    = 1;
+  int32 col    = 2;
+  bool  cancel = 3;
+}
+
+message MouseDownEvent  { int32 button = 1; int32 shift = 2; float x = 3; float y = 4; }
+message MouseUpEvent    { int32 button = 1; int32 shift = 2; float x = 3; float y = 4; }
+message MouseMoveEvent  { int32 button = 1; int32 shift = 2; float x = 3; float y = 4; }
+message ClickEvent      {}
+message DblClickEvent   {}
+
+message KeyDownEvent  { int32 key_code = 1; int32 shift = 2; }
+message KeyPressEvent { int32 key_ascii = 1; }
+message KeyUpEvent    { int32 key_code = 1; int32 shift = 2; }
+
+message DrawCellEvent {
+  int32 row     = 1;
+  int32 col     = 2;
+  float x       = 3;
+  float y       = 4;
+  float width   = 5;
+  float height  = 6;
+  string text   = 7;
+  CellStyle style = 8;
+  bool  done    = 9;
+}
+
+message DragStartEvent  { int32 row = 1; int32 col = 2; }
+message DragOverEvent   { int32 row = 1; int32 col = 2; float x = 3; float y = 4; }
+message DragDropEvent   { int32 row = 1; int32 col = 2; }
+message DragCompleteEvent { bool success = 1; }
+
+message StartAutoSearchEvent { int32 col = 1; string text = 2; }
+message EndAutoSearchEvent   {}
+
+message BeforeDataRefreshEvent { bool cancel = 1; }
+message AfterDataRefreshEvent  {}
+message FilterDataEvent {
+  int32  row  = 1;
+  int32  col  = 2;
+  string text = 3;
+}
+message ErrorEvent { int32 code = 1; string message = 2; }
+
+message BeforePageBreakEvent {
+  int32 row    = 1;
+  bool  cancel = 2;
+}
+message StartPageEvent      { int32 page = 1; }
+message GetHeaderRowEvent   { int32 page = 1; }
+
+// ═══════════════════════════════════════════════════════════
+// LegacyGrid Parity Messages
+// ═══════════════════════════════════════════════════════════
+
+message SetColDataRequest {
+  int64 grid_id = 1;
+  int32 col     = 2;
+  bytes data    = 3;
+}
+
+message GetColDataRequest {
+  int64 grid_id = 1;
+  int32 col     = 2;
+}
+
+message ColDataValue {
+  int64 grid_id = 1;
+  bytes data    = 2;
+}
+
+message SetCellButtonPictureRequest {
+  int64     grid_id = 1;
+  int32     row     = 2;
+  int32     col     = 3;
+  ImageData image   = 4;
+}
+
+message GetCellButtonPictureRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+  int32 col     = 3;
+}
+
+message ComboInfoRequest {
+  int64 grid_id = 1;
+  int32 index   = 2;
+}
+
+message EditSelRequest {
+  int64 grid_id = 1;
+  int32 value   = 2;
+}
+
+message LoadGridUrlRequest {
+  int64          grid_id = 1;
+  string         url     = 2;
+  bytes          data    = 3;
+  SaveGridFormat format  = 4;
+  SaveGridScope  scope   = 5;
+}
+
+message LoadDemoRequest {
+  int64  grid_id = 1;
+  string demo    = 2;    // "sales", "hierarchy", "stress"
+  reserved 3;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Service
+// ═══════════════════════════════════════════════════════════
+
+service VolvoxGridService {
+  option (synurang.v1.activex_service) = {
+    prefix: "VG"
+    // ── Basic grid structure ──
+    properties: { dispid: 1   name: "Rows" }
+    properties: { dispid: 2   name: "Cols" }
+    properties: { dispid: 3   name: "FixedRows"      custom: true }
+    properties: { dispid: 4   name: "FixedCols"       custom: true }
+    properties: { dispid: 5   name: "TextMatrix"      custom: true }
+    properties: { dispid: 6   name: "Text"             custom: true }
+    properties: { dispid: 7   name: "Row" }
+    properties: { dispid: 8   name: "Col" }
+    properties: { dispid: 9   name: "RowHeight"       custom: true }
+    properties: { dispid: 10  name: "ColWidth"         custom: true }
+    properties: { dispid: 11  name: "FrozenRows"      set_method: "SetFrozenRows" }
+    properties: { dispid: 12  name: "FrozenCols"      set_method: "SetFrozenCols" }
+    properties: { dispid: 13  name: "ScrollBars" }
+    properties: { dispid: 14  name: "TopRow" }
+    properties: { dispid: 15  name: "LeftCol" }
+    properties: { dispid: 16  name: "FocusRect" }
+    properties: { dispid: 17  name: "HighLight" }
+    properties: { dispid: 18  name: "Redraw" }
+    properties: { dispid: 19  name: "Picture"          custom: true }
+    properties: { dispid: 20  name: "TextArray"        custom: true }
+    properties: { dispid: 21  name: "Editable" }
+    properties: { dispid: 22  name: "RowSel" }
+    properties: { dispid: 23  name: "ColSel" }
+    properties: { dispid: 24  name: "FillStyle" }
+    properties: { dispid: 25  name: "WordWrap" }
+    properties: { dispid: 26  name: "GridStyle"        custom: true }
+    // ── Selection & appearance ──
+    properties: { dispid: 27  name: "SelectionMode" }
+    properties: { dispid: 28  name: "AllowSelection" }
+    properties: { dispid: 29  name: "AllowBigSelection" }
+    properties: { dispid: 30  name: "AllowUserResizing" }
+    properties: { dispid: 31  name: "Ellipsis" }
+    properties: { dispid: 32  name: "ExtendLastCol" }
+    properties: { dispid: 33  name: "SubtotalPosition"  custom: true }
+    // ── Colors (extra native API, not standard RPC) ──
+    properties: { dispid: 40  name: "BackColor"         custom: true }
+    properties: { dispid: 41  name: "ForeColor"         custom: true }
+    properties: { dispid: 42  name: "GridColor"         custom: true }
+    properties: { dispid: 43  name: "BackColorFixed"    custom: true }
+    properties: { dispid: 44  name: "ForeColorFixed"    custom: true }
+    properties: { dispid: 45  name: "BackColorSel"      custom: true }
+    properties: { dispid: 46  name: "ForeColorSel"      custom: true }
+    properties: { dispid: 47  name: "BackColorAlternate" custom: true }
+    properties: { dispid: 48  name: "GridLines"         custom: true }
+    properties: { dispid: 49  name: "GridLinesFixed"    custom: true }
+    properties: { dispid: 50  name: "TreeColor"         custom: true }
+    // ── Merge ──
+    properties: { dispid: 51  name: "MergeCells" }
+    properties: { dispid: 52  name: "MergeRow" }
+    properties: { dispid: 53  name: "MergeCol" }
+    // ── Outline / subtotals ──
+    properties: { dispid: 54  name: "OutlineBar" }
+    properties: { dispid: 55  name: "OutlineCol" }
+    properties: { dispid: 56  name: "IsSubtotal"       custom: true }
+    properties: { dispid: 57  name: "IsCollapsed"      custom: true }
+    properties: { dispid: 58  name: "RowOutlineLevel" }
+    properties: { dispid: 59  name: "Cell"              custom: true }
+    // ── Indexed row/col properties ──
+    properties: { dispid: 60  name: "ColAlignment" }
+    properties: { dispid: 61  name: "FixedAlignment" }
+    properties: { dispid: 62  name: "RowHidden"        custom: true }
+    properties: { dispid: 63  name: "ColHidden"        custom: true }
+    properties: { dispid: 64  name: "CellChecked"      custom: true }
+    properties: { dispid: 65  name: "CellFlood"        custom: true }
+    properties: { dispid: 66  name: "ColDataType"      custom: true }
+    properties: { dispid: 67  name: "CellFloodPercent" custom: true }
+    properties: { dispid: 68  name: "CellFloodColor"   custom: true }
+    properties: { dispid: 69  name: "RowData"          custom: true }
+    // ── Methods ──
+    properties: { dispid: 70  name: "Sort"             custom: true }
+    properties: { dispid: 71  name: "Subtotal"         custom: true }
+    properties: { dispid: 72  name: "AutoSize"         custom: true }
+    properties: { dispid: 73  name: "AddItem"          custom: true }
+    properties: { dispid: 74  name: "RemoveItem"       custom: true }
+    properties: { dispid: 75  name: "Clear"            custom: true }
+    properties: { dispid: 76  name: "Select"           custom: true }
+    properties: { dispid: 77  name: "Refresh"          custom: true }
+    properties: { dispid: 78  name: "FontSize"         custom: true }
+    properties: { dispid: 79  name: "FontName"         custom: true }
+    properties: { dispid: 80  name: "ColComboList"     custom: true }
+    properties: { dispid: 81  name: "ShowComboButton"  custom: true }
+    properties: { dispid: 82  name: "EditCell"         custom: true }
+  };
+
+  // Lifecycle
+  rpc CreateGrid(CreateGridRequest)         returns (GridHandle);
+  rpc DestroyGrid(GridHandle)               returns (Empty);
+
+  // Grid Layout
+  rpc SetRows(SetRowsRequest)               returns (Empty);
+  rpc SetCols(SetColsRequest)               returns (Empty);
+  rpc GetRows(GridHandle)                   returns (Int32Value);
+  rpc GetCols(GridHandle)                   returns (Int32Value);
+  rpc SetFixedRows(SetFixedRowsRequest)     returns (Empty);
+  rpc SetFixedCols(SetFixedColsRequest)     returns (Empty);
+  rpc SetFrozenRows(SetFrozenRowsRequest)   returns (Empty);
+  rpc SetFrozenCols(SetFrozenColsRequest)   returns (Empty);
+  rpc SetRowHeight(SetRowHeightRequest)     returns (Empty);
+  rpc SetColWidth(SetColWidthRequest)       returns (Empty);
+  rpc GetRowHeight(RowColIndex)             returns (Int32Value);
+  rpc GetColWidth(RowColIndex)              returns (Int32Value);
+  rpc SetRowHeightMin(SetInt32Prop)         returns (Empty);
+  rpc SetRowHeightMax(SetInt32Prop)         returns (Empty);
+  rpc SetColWidthMin(SetColInt32Prop)       returns (Empty);
+  rpc SetColWidthMax(SetColInt32Prop)       returns (Empty);
+  rpc SetRowHidden(SetRowHiddenRequest)     returns (Empty);
+  rpc SetColHidden(SetColHiddenRequest)     returns (Empty);
+  rpc GetRowIsVisible(RowColIndex)          returns (BoolValue);
+  rpc GetColIsVisible(RowColIndex)          returns (BoolValue);
+  rpc SetColPosition(MoveColRequest)        returns (Empty);
+  rpc SetRowPosition(MoveRowRequest)        returns (Empty);
+  rpc AutoSize(AutoSizeRequest)             returns (Empty);
+  rpc SetAutoSizeMode(SetAutoSizeModeRequest) returns (Empty);
+  rpc SetFormatString(SetFormatStringRequest) returns (Empty);
+  rpc SetRightToLeft(SetBoolProp)           returns (Empty);
+  rpc SetExtendLastCol(SetBoolProp)         returns (Empty);
+  rpc SetScrollBars(SetScrollBarsRequest)   returns (Empty);
+  rpc SetScrollTrack(SetBoolProp)           returns (Empty);
+  rpc SetFlingEnabled(SetBoolProp)          returns (Empty);
+  rpc SetFlingImpulseGain(SetFloatProp)     returns (Empty);
+  rpc SetFlingFriction(SetFloatProp)        returns (Empty);
+  rpc ResizeViewport(ResizeViewportRequest) returns (Empty);
+  // Legacy scroll position parity.
+  rpc SetTopRow(SetRowRequest)              returns (Empty);
+  rpc GetTopRow(GridHandle)                 returns (Int32Value);
+  rpc SetLeftCol(SetColRequest)             returns (Empty);
+  rpc GetLeftCol(GridHandle)                returns (Int32Value);
+  rpc GetBottomRow(GridHandle)              returns (Int32Value);
+  rpc GetRightCol(GridHandle)               returns (Int32Value);
+  rpc GetRowPos(RowColIndex)                returns (Int32Value);
+  rpc GetColPos(RowColIndex)                returns (Int32Value);
+
+  // Cursor and Selection
+  rpc SetRow(SetRowRequest)                 returns (Empty);
+  rpc SetCol(SetColRequest)                 returns (Empty);
+  rpc GetRow(GridHandle)                    returns (Int32Value);
+  rpc GetCol(GridHandle)                    returns (Int32Value);
+  rpc SetRowSel(SetRowSelRequest)           returns (Empty);
+  rpc SetColSel(SetColSelRequest)           returns (Empty);
+  rpc Select(SelectRequest)                 returns (Empty);
+  rpc GetSelection(GridHandle)              returns (SelectionRange);
+  rpc ShowCell(ShowCellRequest)             returns (Empty);
+  rpc SetAllowSelection(SetBoolProp)        returns (Empty);
+  rpc SetAllowBigSelection(SetBoolProp)     returns (Empty);
+  rpc SetSelectionMode(SetSelectionModeRequest) returns (Empty);
+  rpc SetFocusRect(SetFocusRectRequest)     returns (Empty);
+  rpc SetHighLight(SetHighLightRequest)     returns (Empty);
+  rpc GetIsSelected(RowColIndex)            returns (BoolValue);
+  rpc GetSelectedRow(RowColIndex)           returns (Int32Value);
+  rpc GetSelectedRows(GridHandle)           returns (Int32Value);
+  rpc GetMouseRow(GridHandle)               returns (Int32Value);
+  rpc GetMouseCol(GridHandle)               returns (Int32Value);
+
+  // Getting and Setting Values
+  rpc SetText(SetTextRequest)               returns (Empty);
+  rpc GetText(GetTextRequest)               returns (StringValue);
+  rpc SetTextMatrix(SetTextMatrixRequest)   returns (Empty);
+  rpc GetTextMatrix(GetTextMatrixRequest)   returns (StringValue);
+  rpc SetTextArray(SetTextArrayRequest)     returns (Empty);
+  rpc GetTextArray(GetTextArrayRequest)     returns (StringValue);
+  rpc LoadArray(ArrayDataRequest)           returns (Empty);
+  rpc BindToArray(ArrayDataRequest)         returns (Empty);
+  rpc SetValue(SetValueRequest)             returns (Empty);
+  rpc GetValue(GetValueRequest)             returns (CellValue);
+  rpc SetValueMatrix(SetValueMatrixRequest) returns (Empty);
+  rpc GetValueMatrix(GetValueMatrixRequest) returns (CellValue);
+  rpc SetCells(SetCellsRequest)             returns (Empty);
+  rpc GetCells(GetCellsRequest)             returns (CellsData);
+  rpc SetCell(SetCellRequest)               returns (Empty);
+  rpc GetCell(GetCellRequest)               returns (CellValue);
+  rpc SetClip(SetClipRequest)               returns (Empty);
+  rpc GetClip(GetClipRequest)               returns (StringValue);
+  rpc SetClipSeparators(SetClipSeparatorsRequest) returns (Empty);
+  rpc SetFillStyle(SetFillStyleRequest)     returns (Empty);
+  rpc AddItem(AddItemRequest)               returns (Empty);
+  rpc RemoveItem(RemoveItemRequest)         returns (Empty);
+  rpc Clear(ClearRequest)                   returns (Empty);
+  rpc FindRow(FindRowRequest)               returns (Int32Value);
+  rpc FindRowRegex(FindRowRegexRequest)     returns (Int32Value);
+  rpc Aggregate(AggregateRequest)           returns (DoubleValue);
+
+  // Editing
+  rpc SetEditable(SetEditableRequest)       returns (Empty);
+  rpc EditCell(EditCellRequest)             returns (Empty);
+  rpc FinishEditing(GridHandle)             returns (Empty);
+  rpc SetEditMask(SetEditMaskRequest)       returns (Empty);
+  rpc SetColEditMask(SetColEditMaskRequest) returns (Empty);
+  rpc SetColComboList(SetColComboListRequest) returns (Empty);
+  rpc SetComboList(SetComboListRequest)     returns (Empty);
+  rpc SetComboSearch(SetBoolProp)           returns (Empty);
+  rpc SetShowComboButton(SetShowComboButtonRequest) returns (Empty);
+  rpc BuildComboList(BuildComboListRequest) returns (StringValue);
+  rpc SetTabBehavior(SetTabBehaviorRequest) returns (Empty);
+  rpc CommitEdit(CommitEditRequest)         returns (Empty);
+  rpc CancelEdit(GridHandle)               returns (Empty);
+  rpc SetEditText(SetStringProp)            returns (Empty);
+  rpc GetEditText(GridHandle)               returns (StringValue);
+  rpc SetEditMaxLength(SetInt32Prop)        returns (Empty);
+  rpc GetEditMaxLength(GridHandle)          returns (Int32Value);
+
+  // Formatting Cells
+  rpc SetGridStyle(SetGridStyleRequest)     returns (Empty);
+  rpc GetGridStyle(GridHandle)              returns (GridStyle);
+  rpc SetCellStyle(SetCellStyleRequest)     returns (Empty);
+  rpc GetCellStyle(GetCellStyleRequest)     returns (CellStyle);
+  rpc SetCellStyleRange(SetCellStyleRangeRequest) returns (Empty);
+  rpc SetColAlignment(SetColAlignmentRequest) returns (Empty);
+  rpc SetColFormat(SetColFormatRequest)     returns (Empty);
+  rpc SetColDataType(SetColDataTypeRequest) returns (Empty);
+  rpc SetColIndent(SetColIndentRequest)     returns (Empty);
+  rpc SetColKey(SetColKeyRequest)           returns (Empty);
+  rpc SetColSort(SetColSortRequest)         returns (Empty);
+  rpc SetFixedAlignment(SetColAlignmentRequest) returns (Empty);
+  rpc GetColIndex(GetColIndexRequest)       returns (Int32Value);
+  rpc SetCellPicture(SetCellPictureRequest) returns (Empty);
+  rpc GetCellPicture(GetCellPictureRequest) returns (ImageData);
+  rpc SetCellPictureAlignment(SetCellPictureAlignmentRequest) returns (Empty);
+  rpc SetColImageList(SetColImageListRequest) returns (Empty);
+  rpc SetCellFlood(SetCellFloodRequest)     returns (Empty);
+  rpc SetCellChecked(SetCellCheckedRequest) returns (Empty);
+  rpc GetCellChecked(GetCellCheckedRequest) returns (Int32Value);
+  rpc SetOwnerDraw(SetOwnerDrawRequest)     returns (Empty);
+  rpc CellBorder(CellBorderRequest)         returns (Empty);
+  rpc CellBorderRange(CellBorderRangeRequest) returns (Empty);
+  rpc SetWordWrap(SetBoolProp)              returns (Empty);
+  rpc SetEllipsis(SetInt32Prop)             returns (Empty);
+
+  // Sorting
+  rpc Sort(SortRequest)                     returns (Empty);
+  rpc SetExplorerBar(SetExplorerBarRequest) returns (Empty);
+  rpc SetGroupCompare(SetMergeCompareRequest) returns (Empty);
+  rpc GetGroupCompare(GridHandle)           returns (Int32Value);
+  rpc SetSortAscendingPicture(SetImageProp) returns (Empty);
+  rpc GetSortAscendingPicture(GridHandle)   returns (ImageData);
+  rpc SetSortDescendingPicture(SetImageProp) returns (Empty);
+  rpc GetSortDescendingPicture(GridHandle)  returns (ImageData);
+
+  // Merging
+  rpc SetMergeCells(SetMergeCellsRequest)   returns (Empty);
+  rpc SetMergeCellsFixed(SetMergeCellsRequest) returns (Empty);
+  rpc SetMergeRow(SetMergeRowRequest)       returns (Empty);
+  rpc SetMergeCol(SetMergeColRequest)       returns (Empty);
+  rpc SetMergeCompare(SetMergeCompareRequest) returns (Empty);
+  rpc GetMergedRange(GetMergedRangeRequest) returns (SelectionRange);
+
+  // Outlining and Summarizing
+  rpc SetOutlineBar(SetOutlineBarRequest)   returns (Empty);
+  rpc SetOutlineCol(SetOutlineColRequest)   returns (Empty);
+  rpc SetTreeColor(SetColorProp)            returns (Empty);
+  rpc SetIsSubtotal(SetIsSubtotalRequest)   returns (Empty);
+  rpc GetIsSubtotal(RowColIndex)            returns (BoolValue);
+  rpc SetRowOutlineLevel(SetRowOutlineLevelRequest) returns (Empty);
+  rpc GetRowOutlineLevel(RowColIndex)       returns (Int32Value);
+  rpc SetIsCollapsed(SetIsCollapsedRequest) returns (Empty);
+  rpc GetIsCollapsed(RowColIndex)           returns (BoolValue);
+  rpc Subtotal(SubtotalRequest)             returns (Empty);
+  rpc SetSubtotalPosition(SetSubtotalPositionRequest) returns (Empty);
+  rpc SetMultiTotals(SetBoolProp)           returns (Empty);
+  rpc Outline(OutlineRequest)               returns (Empty);
+  rpc GetNodeRow(GetNodeRowRequest)         returns (Int32Value);
+  rpc GetNode(GetNodeRequest)               returns (NodeInfo);
+  rpc SetNodeOpenPicture(SetImageProp)      returns (Empty);
+  rpc SetNodeClosedPicture(SetImageProp)    returns (Empty);
+
+  // Save, Load, Print
+  rpc SaveGrid(SaveGridRequest)             returns (GridData);
+  rpc LoadGrid(LoadGridRequest)             returns (Empty);
+  rpc PrintGrid(PrintGridRequest)           returns (PrintOutput);
+  rpc Archive(ArchiveRequest)               returns (ArchiveResponse);
+  rpc GetArchiveInfo(GetArchiveInfoRequest) returns (ArchiveInfo);
+
+  // Clipboard
+  rpc Copy(GridHandle)                      returns (ClipboardData);
+  rpc Cut(GridHandle)                       returns (ClipboardData);
+  rpc Paste(PasteRequest)                   returns (Empty);
+  rpc Delete(GridHandle)                    returns (Empty);
+
+  // Drag and Drop
+  rpc SetDragMode(SetDragModeRequest)       returns (Empty);
+  rpc SetDropMode(SetDropModeRequest)       returns (Empty);
+  rpc DragRow(DragRowRequest)               returns (Empty);
+
+  // User Interaction
+  rpc SetAllowUserResizing(SetAllowUserResizingRequest) returns (Empty);
+  rpc SetAllowUserFreezing(SetAllowUserFreezingRequest) returns (Empty);
+  rpc SetAutoSearch(SetAutoSearchRequest)   returns (Empty);
+  rpc SetAutoSearchDelay(SetInt32Prop)      returns (Empty);
+  rpc SetAutoSizeMouse(SetBoolProp)         returns (Empty);
+  rpc SetScrollTips(SetBoolProp)            returns (Empty);
+  rpc SetInteractionConfig(SetInteractionConfigRequest) returns (Empty);
+  rpc GetInteractionConfig(GridHandle)      returns (InteractionConfig);
+
+  // Renderer Mode (CPU / GPU)
+  rpc SetRendererMode(SetRendererModeRequest)  returns (Empty);
+  rpc GetRendererMode(GridHandle)              returns (Int32Value);
+
+  // Debug Overlay
+  rpc SetDebugOverlay(SetBoolProp)             returns (Empty);
+  rpc GetDebugOverlay(GridHandle)              returns (BoolValue);
+
+  // Animation
+  rpc SetAnimationEnabled(SetAnimationEnabledRequest) returns (Empty);
+  rpc GetAnimationEnabled(GridHandle)                 returns (BoolValue);
+
+  // Render Loop (zero-copy bidi stream)
+  rpc RenderSession(stream RenderInput)     returns (stream RenderOutput);
+
+  // Event Stream
+  rpc EventStream(GridHandle)               returns (stream GridEvent);
+
+  // Redraw Control
+  rpc SetRedraw(SetBoolProp)                returns (Empty);
+  rpc Refresh(GridHandle)                   returns (Empty);
+
+  // LegacyGrid Parity
+  rpc SetAutoResize(SetBoolProp)            returns (Empty);
+  rpc GetAutoResize(GridHandle)             returns (BoolValue);
+  rpc SetScrollTipText(SetStringProp)       returns (Empty);
+  rpc GetScrollTipText(GridHandle)          returns (StringValue);
+  rpc SetFlags(SetInt32Prop)                returns (Empty);
+  rpc GetFlags(GridHandle)                  returns (Int32Value);
+  rpc GetVersion(GridHandle)                returns (StringValue);
+  rpc GetClientWidth(GridHandle)            returns (Int32Value);
+  rpc GetClientHeight(GridHandle)           returns (Int32Value);
+  rpc GetIsSearching(GridHandle)            returns (BoolValue);
+  rpc GetPicture(GridHandle)                returns (ImageData);
+  rpc SetPictureType(SetInt32Prop)          returns (Empty);
+  rpc GetPictureType(GridHandle)            returns (Int32Value);
+  rpc SetDataMode(SetInt32Prop)             returns (Empty);
+  rpc GetDataMode(GridHandle)               returns (Int32Value);
+  rpc SetVirtualData(SetBoolProp)           returns (Empty);
+  rpc GetVirtualData(GridHandle)            returns (BoolValue);
+  rpc SetColData(SetColDataRequest)         returns (Empty);
+  rpc GetColData(GetColDataRequest)         returns (ColDataValue);
+  // RowData uses the same payload shape as ColData:
+  // request.col represents row index.
+  rpc SetRowData(SetColDataRequest)         returns (Empty);
+  rpc GetRowData(GetColDataRequest)         returns (ColDataValue);
+  // RowStatus uses SetColInt32Prop.col as the row index.
+  rpc SetRowStatus(SetColInt32Prop)         returns (Empty);
+  rpc GetRowStatus(RowColIndex)             returns (Int32Value);
+  rpc SetCellButtonPicture(SetCellButtonPictureRequest) returns (Empty);
+  rpc GetCellButtonPicture(GetCellButtonPictureRequest) returns (ImageData);
+  rpc GetEditSelStart(GridHandle)           returns (Int32Value);
+  rpc SetEditSelStart(EditSelRequest)       returns (Empty);
+  rpc GetEditSelLength(GridHandle)          returns (Int32Value);
+  rpc SetEditSelLength(EditSelRequest)      returns (Empty);
+  rpc GetEditSelText(GridHandle)            returns (StringValue);
+  rpc GetComboCount(GridHandle)             returns (Int32Value);
+  rpc GetComboIndex(GridHandle)             returns (Int32Value);
+  rpc SetComboIndex(SetInt32Prop)           returns (Empty);
+  rpc GetComboItem(ComboInfoRequest)        returns (StringValue);
+  rpc GetComboData(ComboInfoRequest)        returns (StringValue);
+  rpc DataRefresh(GridHandle)               returns (Empty);
+  rpc LoadGridUrl(LoadGridUrlRequest)       returns (BoolValue);
+  rpc AutoSearch(SetAutoSearchRequest)      returns (Int32Value);
+
+  // Demo (feature-gated — omitted in production builds)
+  rpc LoadDemo(LoadDemoRequest)             returns (Empty);
+}

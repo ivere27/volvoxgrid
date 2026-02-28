@@ -1,0 +1,5 @@
+# Delete row invalidates absolute row reference when target row is removed
+setData [["1"],["2"],["=$A$2"]]
+deleteRows 1 1
+assertCellRawValue 1 0 "=#REF!"
+assertCellValue 1 0 "#REF!"

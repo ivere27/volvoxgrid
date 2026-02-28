@@ -1,0 +1,6 @@
+# Bounds guard — invalid negative delete index must no-op
+setData [["A","B","C"],["1","2","3"]]
+deleteColumns -1 1
+assertCellValue 0 0 "A"
+assertCellValue 0 1 "B"
+assertCellValue 0 2 "C"

@@ -1,0 +1,30 @@
+[package]
+name = "volvoxgrid-wasm"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/ivere27/volvoxgrid"
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["regex"]
+wasm-threads = ["dep:wasm-bindgen-rayon"]
+cosmic-text = ["volvoxgrid-engine/cosmic-text"]
+gpu = ["volvoxgrid-engine/gpu", "cosmic-text"]
+rayon = ["volvoxgrid-engine/rayon"]
+regex = ["volvoxgrid-engine/regex"]
+
+[dependencies]
+volvoxgrid-engine = { path = "../../engine", default-features = false, features = ["demo", "proto"] }
+prost = "0.12"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+wasm-bindgen-rayon = { version = "1.2", optional = true }
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["console", "ImageData", "HtmlCanvasElement"] }
+getrandom = { version = "0.2", features = ["js"] }

@@ -1,0 +1,7 @@
+# Delete column rewrites references and invalidates deleted refs
+setData [["1","2","3","=C1","=B1+C1"]]
+deleteColumns 1 1
+assertCellRawValue 0 2 "=B1"
+assertCellValue 0 2 "3"
+assertCellRawValue 0 3 "=#REF!+B1"
+assertCellValue 0 3 "#REF!"

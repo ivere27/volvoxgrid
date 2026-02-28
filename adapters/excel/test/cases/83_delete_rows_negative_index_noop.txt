@@ -1,0 +1,4 @@
+# Bounds guard — invalid negative delete row index must no-op
+setData [["A","B"],["1","2"],["LAST","3"]]
+deleteRows -1 1
+assertCellValue 2 0 "LAST"

@@ -1,0 +1,8 @@
+# IFNA catches only #N/A
+setData [["Key","Val"],["A","10"]]
+setCellValue 0 2 "=VLOOKUP(\"Z\",A2:B2,2,FALSE)"
+setCellValue 1 2 "=IFNA(C1,\"MISS\")"
+setCellValue 2 2 "=IFNA(1/0,\"MISS\")"
+assertCellValue 0 2 "#N/A"
+assertCellValue 1 2 "MISS"
+assertCellValue 2 2 "#DIV/0!"

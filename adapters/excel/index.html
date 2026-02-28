@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VolvoxExcel</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+    #app {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    import init from "./wasm/volvoxgrid_wasm.js";
+    import * as wasm from "./wasm/volvoxgrid_wasm.js";
+    import { VolvoxExcel } from "./src/index.ts";
+
+    async function main() {
+      await init();
+      // Register the v1 protobuf service plugin (required for styles, configure, etc.)
+      if (typeof wasm.init_v1_plugin === "function") {
+        wasm.init_v1_plugin();
+      }
+
+      const excel = new VolvoxExcel({
+        container: document.getElementById("app"),
+        wasm,
+        rows: 100,
+        cols: 26,
+        data: [
+          ["Name", "Age", "City", "Department", "Salary"],
+          ["Alice", "30", "New York", "Engineering", "95000"],
+          ["Bob", "25", "London", "Marketing", "72000"],
+          ["Charlie", "35", "Tokyo", "Engineering", "105000"],
+          ["Diana", "28", "Berlin", "Design", "85000"],
+          ["Eve", "32", "Paris", "Marketing", "78000"],
+        ],
+      });
+
+      // Expose for console debugging
+      window.excel = excel;
+    }
+
+    main().catch(console.error);
+  </script>
+</body>
+</html>

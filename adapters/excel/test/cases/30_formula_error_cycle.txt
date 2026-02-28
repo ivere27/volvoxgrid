@@ -1,0 +1,11 @@
+# Formula errors: cycle, div0, bad name, bad ref
+setCellValue 0 0 "=B1"
+setCellValue 0 1 "=A1"
+assertCellValue 0 0 "#REF!"
+assertCellValue 0 1 "#REF!"
+setCellValue 1 0 "=1/0"
+assertCellValue 1 0 "#DIV/0!"
+setCellValue 1 1 "=NOFUNC(1)"
+assertCellValue 1 1 "#NAME?"
+setCellValue 1 2 "=A1000"
+assertCellValue 1 2 "#REF!"

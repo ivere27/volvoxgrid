@@ -1,0 +1,4 @@
+# Right-click corner: corner scope + full-sheet selection
+assertContextScopeAtGrid 0 0 "corner"
+invokeContextAtGrid 0 0
+assertSelection {"row1":0,"col1":0,"row2":"maxRow","col2":"maxCol"}

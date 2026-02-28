@@ -1,0 +1,11 @@
+# Cell colors — foreColor and backColor (ARGB uint32)
+setCellValue 0 0 "Red text"
+setCellValue 0 1 "Blue bg"
+setCellValue 0 2 "Green text + Yellow bg"
+setCellValue 1 0 "White on Black"
+setCellValue 1 1 "Orange"
+setCellStyle 0 0 {"foreColor":4294901760}
+setCellStyle 0 1 {"backColor":4289003775}
+setCellStyle 0 2 {"foreColor":4278233600,"backColor":4294967040}
+setCellStyle 1 0 {"foreColor":4294967295,"backColor":4278190080}
+setCellStyle 1 1 {"foreColor":4294944000}

@@ -1,0 +1,32 @@
+HKCR
+{
+    Volvox.VolvoxGrid.1 = s 'Volvox VolvoxGrid Control'
+    {
+        CLSID = s '{D0B6E7F4-BA51-4C8D-CF9E-4A6B8C0D1E2F}'
+    }
+    Volvox.VolvoxGrid = s 'Volvox VolvoxGrid Control'
+    {
+        CLSID = s '{D0B6E7F4-BA51-4C8D-CF9E-4A6B8C0D1E2F}'
+        CurVer = s 'Volvox.VolvoxGrid.1'
+    }
+    NoRemove CLSID
+    {
+        ForceRemove {D0B6E7F4-BA51-4C8D-CF9E-4A6B8C0D1E2F} = s 'Volvox VolvoxGrid Control'
+        {
+            ProgID = s 'Volvox.VolvoxGrid.1'
+            VersionIndependentProgID = s 'Volvox.VolvoxGrid'
+            ForceRemove Programmable
+            InprocServer32 = s '%MODULE%'
+            {
+                val ThreadingModel = s 'Apartment'
+            }
+            TypeLib = s '{C9A5D6E3-AF40-4B7C-BE8D-3F5A7B9C0D1E}'
+            Version = s '0.1'
+            ForceRemove Control
+            ForceRemove MiscStatus = s '0'
+            {
+                val '0' = s '131473'
+            }
+        }
+    }
+}

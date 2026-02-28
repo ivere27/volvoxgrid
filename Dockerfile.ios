@@ -1,0 +1,36 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    binutils \
+    build-essential \
+    ca-certificates \
+    curl \
+    file \
+    zip && \
+    rm -rf /var/lib/apt/lists/*
+
+# Rust stable + iOS targets
+ENV RUSTUP_HOME=/opt/rustup
+ENV CARGO_HOME=/opt/cargo
+ENV PATH=/opt/cargo/bin:${PATH}
+
+RUN curl -fsSL https://sh.rustup.rs -o /tmp/rustup-init.sh && \
+    sh /tmp/rustup-init.sh -y --profile minimal --default-toolchain stable && \
+    rm -f /tmp/rustup-init.sh
+
+RUN rustup target add \
+    aarch64-apple-ios \
+    aarch64-apple-ios-sim \
+    x86_64-apple-ios
+
+COPY docker/build_ios.sh /opt/volvoxgrid/build_ios.sh
+RUN chmod +x /opt/volvoxgrid/build_ios.sh
+
+# Allow non-root users (docker run -u) to write to cargo/rustup caches
+RUN chmod -R a+w /opt/cargo /opt/rustup
+
+WORKDIR /workspace/volvoxgrid
+ENTRYPOINT ["/opt/volvoxgrid/build_ios.sh"]

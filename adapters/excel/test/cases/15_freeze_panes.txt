@@ -1,0 +1,5 @@
+# Freeze panes — freeze first row and first column
+setData [["Header A","Header B","Header C"],["1","2","3"],["4","5","6"],["7","8","9"]]
+setRangeStyle {"row1":0,"col1":0,"row2":0,"col2":2} {"bold":true,"backColor":4284900966}
+freezeRows 1
+freezeColumns 1

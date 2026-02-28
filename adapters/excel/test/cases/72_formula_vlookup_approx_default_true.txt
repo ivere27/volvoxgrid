@@ -1,0 +1,6 @@
+# VLOOKUP approximate mode (default TRUE)
+setData [["1","A"],["5","B"],["10","C"]]
+setCellValue 0 2 "=VLOOKUP(6,A1:B3,2)"
+setCellValue 1 2 "=VLOOKUP(10,A1:B3,2,TRUE)"
+assertCellValue 0 2 "B"
+assertCellValue 1 2 "C"

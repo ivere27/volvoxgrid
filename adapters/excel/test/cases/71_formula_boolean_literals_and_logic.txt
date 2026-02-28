@@ -1,0 +1,13 @@
+# Boolean literals + AND/OR/NOT
+setCellValue 0 0 "=TRUE"
+setCellValue 0 1 "=false"
+setCellValue 0 2 "=AND(TRUE,1,NOT(FALSE))"
+setCellValue 0 3 "=OR(FALSE,0,A1)"
+setCellValue 0 4 "=NOT(B1)"
+setCellValue 0 5 "=AND(\"x\",TRUE)"
+assertCellValue 0 0 "TRUE"
+assertCellValue 0 1 "FALSE"
+assertCellValue 0 2 "TRUE"
+assertCellValue 0 3 "TRUE"
+assertCellValue 0 4 "TRUE"
+assertCellValue 0 5 "#VALUE!"

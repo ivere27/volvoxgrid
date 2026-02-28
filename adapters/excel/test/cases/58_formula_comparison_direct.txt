@@ -1,0 +1,10 @@
+# Top-level comparison formulas
+setData [["7","5","","","",""]]
+setCellValue 0 2 "=A1>B1"
+setCellValue 0 3 "=A1<=B1"
+setCellValue 0 4 "=A1=B1"
+setCellValue 0 5 "=A1<>B1"
+assertCellValue 0 2 "TRUE"
+assertCellValue 0 3 "FALSE"
+assertCellValue 0 4 "FALSE"
+assertCellValue 0 5 "TRUE"

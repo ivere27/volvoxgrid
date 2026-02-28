@@ -1,0 +1,4 @@
+# SUMIF mismatched sum_range size
+setData [["Key","Val"],["A","10"],["A","20"]]
+setCellValue 0 2 "=SUMIF(A2:A3,\"A\",B2:B2)"
+assertCellValue 0 2 "#VALUE!"

@@ -1,0 +1,10 @@
+# Structural undo — delete row then undo/redo
+setData [["Header"],["row1"],["row2"]]
+deleteRows 1 1
+assertCanUndo true
+assertCellValue 1 0 "row2"
+undo
+assertCellValue 1 0 "row1"
+assertCellValue 2 0 "row2"
+redo
+assertCellValue 1 0 "row2"

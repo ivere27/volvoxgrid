@@ -1,0 +1,3294 @@
+use std::collections::{HashMap, HashSet};
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
+
+use crate::animation::AnimationState;
+use crate::cell::CellStore;
+use crate::column::ColumnProps;
+use crate::drag::DragState;
+use crate::edit::EditState;
+use crate::event::EventQueue;
+use crate::layout::LayoutCache;
+use crate::span::SpanState;
+use crate::outline::OutlineState;
+use crate::proto::volvoxgrid::v1 as pb;
+use crate::row::RowProps;
+use crate::scroll::ScrollState;
+use crate::selection::SelectionState;
+use crate::sort::SortState;
+use crate::style::{CellPadding, CellStyleOverride, GridStyleState};
+use crate::text::{TextEngine, DEFAULT_LAYOUT_CACHE_CAP};
+
+/// Default row height in pixels.
+pub const DEFAULT_ROW_HEIGHT: i32 = 20;
+
+/// Default column width in pixels.
+pub const DEFAULT_COL_WIDTH: i32 = 68;
+
+/// Minimum allowed row count (must have at least one row for the header).
+const MIN_ROWS: i32 = 1;
+
+/// Minimum allowed column count.
+const MIN_COLS: i32 = 1;
+
+#[inline]
+fn heap_hash_map_bytes<K, V>(map: &HashMap<K, V>) -> usize {
+    map.capacity() * (std::mem::size_of::<K>() + std::mem::size_of::<V>() + 8)
+}
+
+#[inline]
+fn heap_hash_set_bytes<T>(set: &HashSet<T>) -> usize {
+    set.capacity() * (std::mem::size_of::<T>() + 8)
+}
+
+#[inline]
+fn heap_vec_bytes<T>(vec: &Vec<T>) -> usize {
+    vec.capacity() * std::mem::size_of::<T>()
+}
+
+#[inline]
+fn usize_to_i64_saturating(value: usize) -> i64 {
+    if value > i64::MAX as usize {
+        i64::MAX
+    } else {
+        value as i64
+    }
+}
+
+#[inline]
+fn usize_to_i32_saturating(value: usize) -> i32 {
+    if value > i32::MAX as usize {
+        i32::MAX
+    } else {
+        value as i32
+    }
+}
+
+/// The main VolvoxGrid struct holding all grid state for a single grid instance.
+///
+/// This is the central data structure of the pixel-rendering datagrid engine.
+/// It owns all cell data, layout state, style information, selection tracking,
+/// scroll position, edit state, merge/outline/sort configuration, drag state,
+/// the event queue, and layout caches. A `TextEngine` is stored as an `Option`
+/// and initialized lazily on first render.
+pub struct VolvoxGrid {
+    // ── Identity ──────────────────────────────────────────────────────────
+    /// Unique identifier assigned by `GridManager`.
+    pub id: i64,
+
+    // ── Grid Dimensions ───────────────────────────────────────────────────
+    /// Total number of rows (including fixed rows).
+    pub rows: i32,
+    /// Total number of columns (including fixed columns).
+    pub cols: i32,
+    /// Number of non-scrollable header rows at the top.
+    pub fixed_rows: i32,
+    /// Number of non-scrollable header columns on the left.
+    pub fixed_cols: i32,
+    /// Number of frozen (non-scrollable data) rows below the fixed rows.
+    pub frozen_rows: i32,
+    /// Number of frozen (non-scrollable data) columns to the right of fixed columns.
+    pub frozen_cols: i32,
+
+    // ── Viewport ──────────────────────────────────────────────────────────
+    /// Width of the visible viewport in pixels.
+    pub viewport_width: i32,
+    /// Height of the visible viewport in pixels.
+    pub viewport_height: i32,
+
+    // ── Default Sizes ─────────────────────────────────────────────────────
+    /// Default height for rows that have no per-row override (pixels).
+    pub default_row_height: i32,
+    /// Default width for columns that have no per-column override (pixels).
+    pub default_col_width: i32,
+
+    // ── Per-Row/Col Sizes ─────────────────────────────────────────────────
+    /// Custom row heights. Only rows with non-default heights are stored.
+    pub row_heights: HashMap<i32, i32>,
+    /// Custom column widths. Only columns with non-default widths are stored.
+    pub col_widths: HashMap<i32, i32>,
+
+    // ── Row/Col Min/Max ───────────────────────────────────────────────────
+    /// Global minimum row height in pixels. 0 means no minimum enforced.
+    pub row_height_min: i32,
+    /// Global maximum row height in pixels. 0 means no maximum enforced.
+    pub row_height_max: i32,
+    /// Per-column minimum widths. Only columns with explicit minimums are stored.
+    pub col_width_min: HashMap<i32, i32>,
+    /// Per-column maximum widths. Only columns with explicit maximums are stored.
+    pub col_width_max: HashMap<i32, i32>,
+
+    // ── Hidden Rows/Cols ──────────────────────────────────────────────────
+    /// Set of row indices that are hidden (zero visual height).
+    pub rows_hidden: HashSet<i32>,
+    /// Set of column indices that are hidden (zero visual width).
+    pub cols_hidden: HashSet<i32>,
+
+    // ── Position Mapping (logical → physical) ─────────────────────────────
+    /// Maps display position to logical row index. `row_positions[display_pos] = logical_row`.
+    pub row_positions: Vec<i32>,
+    /// Maps display position to logical column index. `col_positions[display_pos] = logical_col`.
+    pub col_positions: Vec<i32>,
+
+    // ── Cell Storage ──────────────────────────────────────────────────────
+    /// Sparse cell data store holding text, values, and per-cell properties.
+    pub cells: CellStore,
+
+    // ── Column Properties ─────────────────────────────────────────────────
+    /// Per-column properties (alignment, format, data type, key, dropdown list, etc.).
+    pub columns: Vec<ColumnProps>,
+
+    // ── Row Properties ────────────────────────────────────────────────────
+    /// Per-row properties (subtotal flag, outline level, collapsed state, etc.).
+    /// Only rows with non-default properties are stored.
+    pub row_props: HashMap<i32, RowProps>,
+
+    // ── Styling ───────────────────────────────────────────────────────────
+    /// Grid-level style (colors, grid lines, fonts, appearance, background image).
+    pub style: GridStyleState,
+    /// Per-cell style overrides keyed by `(row, col)`.
+    pub cell_styles: HashMap<(i32, i32), CellStyleOverride>,
+
+    // ── Selection ─────────────────────────────────────────────────────────
+    /// Current cursor position, selection extent, selection mode, focus border, and selection visibility.
+    pub selection: SelectionState,
+
+    // ── Scroll ────────────────────────────────────────────────────────────
+    /// Current scroll offsets (pixel-level sub-row/col precision).
+    pub scroll: ScrollState,
+
+    // ── Edit ──────────────────────────────────────────────────────────────
+    /// Active cell-edit state (editing flag, row/col being edited, original text).
+    pub edit: EditState,
+
+    // ── Span ──────────────────────────────────────────────────────────────
+    /// Span mode, per-row/col span flags, fixed-area span mode.
+    pub span: SpanState,
+
+    // ── Explicit Merge ───────────────────────────────────────────────────
+    /// Registry of explicit user-initiated merge ranges (spreadsheet-style).
+    pub merged_regions: crate::merge_registry::MergeRegistry,
+
+    // ── Outline ───────────────────────────────────────────────────────────
+    /// Outline bar style, outline column, tree color, node pictures.
+    pub outline: OutlineState,
+
+    // ── Sort ──────────────────────────────────────────────────────────────
+    /// Current sort column, sort order, explorer bar mode.
+    pub sort_state: SortState,
+
+    // ── Drag ──────────────────────────────────────────────────────────────
+    /// Drag mode, drop mode, and in-progress drag tracking.
+    pub drag: DragState,
+
+    // ── Animation ────────────────────────────────────────────────────────
+    /// Layout animation state: smooth position transitions on structural changes.
+    pub animation: AnimationState,
+
+    // ── Events ────────────────────────────────────────────────────────────
+    /// Queue of pending grid events to be delivered via `EventStream`.
+    pub events: EventQueue,
+
+    // ── Layout Cache ──────────────────────────────────────────────────────
+    /// Cached cumulative row/col pixel offsets for fast hit-testing and rendering.
+    pub layout: LayoutCache,
+
+    // ── Text Engine ───────────────────────────────────────────────────────
+    /// Text shaping and measurement engine, lazily initialized on first render.
+    pub text_engine: Option<TextEngine>,
+    /// Configured text layout cache capacity, applied to `text_engine` on init.
+    pub text_layout_cache_cap: usize,
+
+    // ── Compatibility Properties ────────────────────────────────────
+    /// Whether rows/cols auto-resize when data changes.
+    pub auto_resize: bool,
+    /// Whether type-ahead is currently active.
+    pub is_type_ahead_active: bool,
+    /// Keystroke buffer for type-ahead buffering across multiple keystrokes.
+    pub type_ahead_buffer: String,
+    /// Timestamp of the last type-ahead keystroke.
+    pub type_ahead_last_input: Option<Instant>,
+    /// Custom text for scroll tips (overrides default row number).
+    pub scroll_tooltip_text: String,
+    /// Consolidated bitfield for minor boolean options (Flags property).
+    pub flags: u32,
+    /// Host-managed `DataMode` compatibility flag (host-managed mode integer).
+    pub data_source_mode: i32,
+    /// `VirtualData` compatibility flag.
+    pub virtual_mode: bool,
+
+    // ── Misc Properties ───────────────────────────────────────────────────
+    /// Edit trigger mode: 0 = none, 1 = keyboard, 2 = keyboard+mouse.
+    pub edit_trigger_mode: i32,
+    /// Apply scope: 0 = single cell, 1 = repeat across selection.
+    pub apply_scope: i32,
+    /// Whether cell selection is allowed.
+    pub allow_selection: bool,
+    /// Whether selecting entire rows/columns by clicking headers is allowed.
+    pub header_click_select: bool,
+    /// User resizing mode: 0=none, 1=cols, 2=rows, 3=both, 4-6=uniform variants.
+    pub allow_user_resizing: i32,
+    /// User freezing mode: 0=none, 1=cols, 2=rows, 3=both.
+    pub allow_user_freezing: i32,
+    /// Type-ahead mode: 0=none, 1=from top, 2=from cursor.
+    pub type_ahead_mode: i32,
+    /// Delay in milliseconds before type-ahead kicks in.
+    pub type_ahead_delay: i32,
+    /// Auto-size mode: 0=both, 1=col width only, 2=row height only.
+    pub auto_size_mode: i32,
+    /// Whether double-clicking a column border auto-sizes the column.
+    pub auto_size_mouse: bool,
+    /// Scroll bar visibility: 0=none, 1=horizontal, 2=vertical, 3=both.
+    pub scroll_bars: i32,
+    /// Whether scroll position updates live while dragging the thumb.
+    pub scroll_track: bool,
+    /// Whether scroll tips are shown while dragging the scroll thumb.
+    pub scroll_tips: bool,
+    /// Whether wheel/touch scroll can continue with inertial fling physics.
+    pub fling_enabled: bool,
+    /// Whether pinch zoom gestures are accepted by the engine/plugin.
+    pub pinch_zoom_enabled: bool,
+    /// Multiplier used to convert wheel/touch delta into fling velocity.
+    pub fling_impulse_gain: f32,
+    /// Exponential damping coefficient used by fling physics (higher = stops faster).
+    pub fling_friction: f32,
+    /// Tab key behavior: 0=move to next control, 1=move to next cell.
+    pub tab_behavior: i32,
+    /// Header features mode: controls sort glyphs and column drag in headers.
+    pub header_features: i32,
+    /// Custom render mode: 0=never, 1=cell level, 2=complete.
+    pub custom_render: i32,
+    /// Whether cell text wraps within the cell boundaries.
+    pub word_wrap: bool,
+    /// Ellipsis mode: 0 = none, 1 = end, 2 = path/middle.
+    pub ellipsis_mode: i32,
+    /// Whether cell text spills into empty adjacent cells.
+    pub text_overflow: bool,
+    /// Whether the grid layout is right-to-left.
+    pub right_to_left: bool,
+    /// Whether the last column extends to fill the remaining viewport width.
+    pub extend_last_col: bool,
+    /// Whether the grid should repaint on data changes. Set to false to batch updates.
+    pub redraw: bool,
+    /// Whether typing in a dropdown cell searches the dropdown list.
+    pub dropdown_search: bool,
+    /// When to show dropdown button: 0=never, 1=always, 2=when editing.
+    pub dropdown_trigger: i32,
+    /// Host integration provides dropdown UI; renderer suppresses built-in popup list.
+    pub host_dropdown_overlay: bool,
+    /// Global edit mask string (e.g. "(999) 999-9999").
+    pub edit_mask: String,
+    /// Maximum number of characters allowed in an edit cell. 0 = unlimited.
+    pub edit_max_length: i32,
+    /// When true, the engine stops handling edit-action keys (Enter, Escape, F2,
+    /// typing-to-start-edit) — the host adapter dispatches those via Edit RPC.
+    /// In-edit text manipulation (character insert, backspace, delete, cursor,
+    /// dropdown nav) remains engine-handled.
+    pub host_key_dispatch: bool,
+    /// When true, the engine stops handling pointer-driven selection changes
+    /// and edit triggers — the host adapter drives those via Select / Edit RPC.
+    /// Engine-rendered UI (resize, scrollbar, fast-scroll, freeze drag) remains
+    /// engine-handled.
+    pub host_pointer_dispatch: bool,
+    /// Column separator for clipboard operations (default: "\t").
+    pub clip_col_separator: String,
+    /// Row separator for clipboard operations (default: "\n").
+    pub clip_row_separator: String,
+    /// Pipe-delimited format string for quick column setup.
+    pub format_string: String,
+    /// Output mode used by `Picture` property.
+    /// 0=color, 1=monochrome, 2=enhanced metafile (compatibility maps to PNG).
+    pub picture_type: i32,
+
+    // ── Renderer Mode ──────────────────────────────────────────────────
+    /// 0 = CPU (default), 1 = GPU, 2 = AUTO.
+    pub renderer_mode: i32,
+
+    // ── Debug Overlay ────────────────────────────────────────────────
+    /// Whether the debug overlay is visible.
+    pub debug_overlay: bool,
+    /// Last frame render time in milliseconds (set by plugin/wasm before render).
+    pub debug_frame_time_ms: f32,
+    /// Smoothed FPS (exponential moving average).
+    pub debug_fps: f32,
+    /// Current zoom level (1.0 = 100%), synced from plugin zoom_levels.
+    pub debug_zoom_level: f64,
+    /// Actual renderer in use: 0 = CPU, 1 = GPU (set by plugin at render time).
+    pub debug_renderer_actual: i32,
+
+    // ── Dirty Flag ────────────────────────────────────────────────────────
+    /// Whether the grid has pending changes that require a re-render.
+    pub dirty: bool,
+
+    // ── Mouse Tracking ────────────────────────────────────────────────────
+    /// Row index currently under the mouse pointer (-1 if none).
+    pub mouse_row: i32,
+    /// Column index currently under the mouse pointer (-1 if none).
+    pub mouse_col: i32,
+    /// Cursor style the host should display.
+    /// 0 = default, 1 = col-resize, 2 = row-resize, 3 = move/grab
+    pub cursor_style: i32,
+
+    // ── Resize Tracking ──────────────────────────────────────────────────
+    /// Whether a column/row resize drag is in progress.
+    pub resize_active: bool,
+    /// True = resizing a column, false = resizing a row.
+    pub resize_is_col: bool,
+    /// Index of the column or row being resized.
+    pub resize_index: i32,
+    /// Mouse position (X for col, Y for row) at drag start.
+    pub resize_start_pos: f32,
+    /// Original column width or row height at drag start.
+    pub resize_start_size: i32,
+
+    // ── Column Drag/Reorder Tracking ─────────────────────────────────────
+    /// Whether a column drag/reorder is in progress.
+    pub col_drag_active: bool,
+    /// Source column index being dragged.
+    pub col_drag_source: i32,
+    /// Logical column key currently hovered while dragging.
+    pub col_drag_target: i32,
+    /// Insertion gap index while dragging (0..=cols), `-1` when invalid/canceled.
+    ///
+    /// Value means "insert before display position N"; `cols` means append to end.
+    pub col_drag_insert_pos: i32,
+    /// True once the drag changed insertion target at least once.
+    /// Used to avoid treating a canceled drag as a sort click.
+    pub col_drag_moved: bool,
+    /// True while waiting for a long-press before activating column drag.
+    pub col_drag_pending: bool,
+    /// Source column index held for pending long-press drag.
+    pub col_drag_pending_source: i32,
+    /// Whether short release should sort for this pending header interaction.
+    pub col_drag_pending_can_sort: bool,
+    /// Timestamp when pending header long-press started.
+    pub col_drag_pending_since: Option<Instant>,
+
+    // ── User Freeze Tracking ─────────────────────────────────────────────
+    /// Whether a freeze drag is in progress.
+    pub freeze_drag_active: bool,
+    /// True = freezing rows, false = freezing cols.
+    pub freeze_drag_is_row: bool,
+
+    // ── Outline Button Click ─────────────────────────────────────────────
+    /// Set during an outline +/- button click to suppress selection extension.
+    pub outline_click_active: bool,
+
+    // ── Fast Scroll Tracking ──────────────────────────────────────────────
+    /// Whether the fast-scroll touch overlay is enabled (mobile).
+    pub fast_scroll_enabled: bool,
+    /// Whether a fast-scroll gesture is currently active.
+    pub fast_scroll_active: bool,
+    /// Current target row during a fast-scroll gesture (-1 = none).
+    pub fast_scroll_target_row: i32,
+    /// Column preserved during fast-scroll (anchor from selection).
+    pub fast_scroll_anchor_col: i32,
+
+    // ── Scrollbar Drag Tracking ─────────────────────────────────────────
+    /// Whether a scrollbar thumb drag is in progress.
+    pub scrollbar_drag_active: bool,
+    /// True = dragging horizontal scrollbar, false = vertical.
+    pub scrollbar_drag_horizontal: bool,
+    /// Mouse pixel position at drag start.
+    pub scrollbar_drag_start_pos: f32,
+    /// scroll_x or scroll_y value at drag start.
+    pub scrollbar_drag_start_scroll: f32,
+
+    // ── Scrollbar Auto-Repeat ────────────────────────────────────────────
+    /// Whether a scrollbar arrow/track auto-repeat is active.
+    pub scrollbar_repeat_active: bool,
+    /// True = repeating horizontal scroll, false = vertical.
+    pub scrollbar_repeat_horizontal: bool,
+    /// Signed scroll delta applied per repeat tick.
+    pub scrollbar_repeat_delta: f32,
+    /// Countdown timer: initial delay before repeating starts, then interval between repeats.
+    pub scrollbar_repeat_delay: f32,
+    /// True when the repeat originated from a track click (should stop when thumb reaches mouse).
+    pub scrollbar_repeat_is_track: bool,
+    /// Mouse pixel position of the track click (x for horizontal, y for vertical).
+    pub scrollbar_repeat_mouse_pos: f32,
+
+    // ── Virtual Data Generation ─────────────────────────────────────────
+    /// Optional function to generate cell text for rows that haven't been
+    /// materialized (e.g. stress test with lazy loading).
+    /// Used by the sort system to compare unmaterialized rows.
+    /// Signature: fn(source_row: i32, col: i32) -> String
+    pub sort_value_generator: Option<fn(i32, i32) -> String>,
+
+    // ── Focus State ──────────────────────────────────────────────────────
+    /// Whether the grid currently has keyboard/input focus.
+    /// Used by "selection visible when focused" mode to decide whether to draw selection highlight.
+    pub has_focus: bool,
+
+    // ── DPI Scale ────────────────────────────────────────────────────────
+    /// DPI scale factor set at grid creation. 1.0 = no scaling.
+    pub scale: f32,
+
+    // ── Background Loading ───────────────────────────────────────────────
+    /// True while a background thread is generating data (e.g. stress demo).
+    pub background_loading: bool,
+    /// Monotonically increasing counter for cancelling superseded background tasks.
+    pub background_generation: u64,
+
+    // ── Pin & Sticky ────────────────────────────────────────────────────
+    /// Sorted row indices pinned to the top (below fixed/frozen rows).
+    pub pinned_rows_top: Vec<i32>,
+    /// Sorted row indices pinned to the bottom (footer area).
+    pub pinned_rows_bottom: Vec<i32>,
+    /// Sorted column indices pinned to the left (after fixed/frozen columns).
+    pub pinned_cols_left: Vec<i32>,
+    /// Sorted column indices pinned to the right (right-edge section).
+    pub pinned_cols_right: Vec<i32>,
+    /// Row-level sticky edges: row → StickyEdge (TOP or BOTTOM).
+    pub sticky_rows: HashMap<i32, i32>,
+    /// Column-level sticky edges: col → StickyEdge (LEFT or RIGHT).
+    pub sticky_cols: HashMap<i32, i32>,
+    /// Cell-level sticky overrides: (row, col) → (sticky_row_edge, sticky_col_edge).
+    pub sticky_cells: HashMap<(i32, i32), (i32, i32)>,
+}
+
+impl VolvoxGrid {
+    /// Creates a new `VolvoxGrid` with the given dimensions and sensible defaults.
+    ///
+    /// - `fixed_rows` is clamped to at least 1 (header row).
+    /// - `fixed_cols` is passed through as-is (0 is a common default).
+    /// - Row and column position mappings are initialized as identity (0..n).
+    /// - Column properties are initialized with default `ColumnProps` for each column.
+    pub fn new(
+        id: i64,
+        viewport_width: i32,
+        viewport_height: i32,
+        rows: i32,
+        cols: i32,
+        fixed_rows: i32,
+        fixed_cols: i32,
+    ) -> Self {
+        let rows = rows.max(MIN_ROWS);
+        let cols = cols.max(MIN_COLS);
+        let fixed_rows = fixed_rows.max(1).min(rows);
+        let fixed_cols = fixed_cols.max(0).min(cols);
+
+        let row_positions: Vec<i32> = (0..rows).collect();
+        let col_positions: Vec<i32> = (0..cols).collect();
+        let columns: Vec<ColumnProps> = (0..cols).map(|_| ColumnProps::default()).collect();
+
+        VolvoxGrid {
+            id,
+
+            // Grid dimensions
+            rows,
+            cols,
+            fixed_rows,
+            fixed_cols,
+            frozen_rows: 0,
+            frozen_cols: 0,
+
+            // Viewport
+            viewport_width,
+            viewport_height,
+
+            // Default sizes
+            default_row_height: DEFAULT_ROW_HEIGHT,
+            default_col_width: DEFAULT_COL_WIDTH,
+
+            // Per-row/col sizes
+            row_heights: HashMap::new(),
+            col_widths: HashMap::new(),
+
+            // Min/max
+            row_height_min: 0,
+            row_height_max: 0,
+            col_width_min: HashMap::new(),
+            col_width_max: HashMap::new(),
+
+            // Hidden
+            rows_hidden: HashSet::new(),
+            cols_hidden: HashSet::new(),
+
+            // Position mapping
+            row_positions,
+            col_positions,
+
+            // Cell storage
+            cells: CellStore::new(),
+
+            // Column and row properties
+            columns,
+            row_props: HashMap::new(),
+
+            // Styling
+            style: GridStyleState::default(),
+            cell_styles: HashMap::new(),
+
+            // Selection
+            selection: SelectionState::with_initial(fixed_rows, fixed_cols),
+
+            // Scroll
+            scroll: ScrollState::default(),
+
+            // Edit
+            edit: EditState::default(),
+
+            // Span
+            span: SpanState::default(),
+
+            // Explicit merge
+            merged_regions: crate::merge_registry::MergeRegistry::new(),
+
+            // Outline
+            outline: OutlineState::default(),
+
+            // Sort
+            sort_state: SortState::default(),
+
+            // Drag
+            drag: DragState::default(),
+
+            // Animation
+            animation: AnimationState::new(),
+
+            // Events
+            events: EventQueue::new(),
+
+            // Layout cache
+            layout: LayoutCache::new(),
+
+            // Text engine (lazily initialized)
+            text_engine: None,
+            text_layout_cache_cap: DEFAULT_LAYOUT_CACHE_CAP,
+
+            // Compatibility defaults
+            auto_resize: true,
+            is_type_ahead_active: false,
+            type_ahead_buffer: String::new(),
+            type_ahead_last_input: None,
+            scroll_tooltip_text: String::new(),
+            flags: 0,
+            data_source_mode: 0,
+            virtual_mode: false,
+
+            // Misc properties
+            edit_trigger_mode: 0,
+            apply_scope: 0,
+            allow_selection: true,
+            header_click_select: true,
+            allow_user_resizing: 0,
+            allow_user_freezing: 0,
+            type_ahead_mode: 0,
+            type_ahead_delay: 2000,
+            auto_size_mode: 0,
+            auto_size_mouse: false,
+            scroll_bars: 0, // none
+            scroll_track: true,
+            scroll_tips: false,
+            fling_enabled: true,
+            pinch_zoom_enabled: true,
+            fling_impulse_gain: 30.0,
+            fling_friction: 2.0,
+            tab_behavior: 0,
+            header_features: 0,
+            custom_render: 0,
+            word_wrap: false,
+            ellipsis_mode: 0,
+            text_overflow: false,
+            right_to_left: false,
+            extend_last_col: false,
+            redraw: true,
+            dropdown_search: false,
+            dropdown_trigger: 0,
+            host_dropdown_overlay: false,
+            edit_mask: String::new(),
+            edit_max_length: 0,
+            host_key_dispatch: false,
+            host_pointer_dispatch: false,
+            clip_col_separator: "\t".to_string(),
+            clip_row_separator: "\n".to_string(),
+            format_string: String::new(),
+            picture_type: 0,
+
+            // Renderer mode (0=CPU, 1=GPU, 2=AUTO)
+            renderer_mode: 0,
+
+            // Debug overlay
+            debug_overlay: false,
+            debug_frame_time_ms: 0.0,
+            debug_fps: 0.0,
+            debug_zoom_level: 1.0,
+            debug_renderer_actual: 0,
+
+            // Dirty
+            dirty: true,
+
+            // Mouse tracking
+            mouse_row: -1,
+            mouse_col: -1,
+            cursor_style: 0,
+
+            // Resize tracking
+            resize_active: false,
+            resize_is_col: true,
+            resize_index: -1,
+            resize_start_pos: 0.0,
+            resize_start_size: 0,
+
+            // Column drag/reorder tracking
+            col_drag_active: false,
+            col_drag_source: -1,
+            col_drag_target: -1,
+            col_drag_insert_pos: -1,
+            col_drag_moved: false,
+            col_drag_pending: false,
+            col_drag_pending_source: -1,
+            col_drag_pending_can_sort: false,
+            col_drag_pending_since: None,
+
+            // User freeze tracking
+            freeze_drag_active: false,
+            freeze_drag_is_row: true,
+
+            // Outline button click
+            outline_click_active: false,
+
+            // Fast scroll tracking
+            fast_scroll_enabled: false,
+            fast_scroll_active: false,
+            fast_scroll_target_row: -1,
+            fast_scroll_anchor_col: 0,
+
+            // Scrollbar drag tracking
+            scrollbar_drag_active: false,
+            scrollbar_drag_horizontal: false,
+            scrollbar_drag_start_pos: 0.0,
+            scrollbar_drag_start_scroll: 0.0,
+
+            // Scrollbar auto-repeat
+            scrollbar_repeat_active: false,
+            scrollbar_repeat_horizontal: false,
+            scrollbar_repeat_delta: 0.0,
+            scrollbar_repeat_delay: 0.0,
+            scrollbar_repeat_is_track: false,
+            scrollbar_repeat_mouse_pos: 0.0,
+
+            // Virtual data generation
+            sort_value_generator: None,
+
+            // Focus state
+            has_focus: false,
+
+            // DPI scale
+            scale: 1.0,
+
+            // Background loading
+            background_loading: false,
+            background_generation: 0,
+
+            // Pin & sticky
+            pinned_rows_top: Vec::new(),
+            pinned_rows_bottom: Vec::new(),
+            pinned_cols_left: Vec::new(),
+            pinned_cols_right: Vec::new(),
+            sticky_rows: HashMap::new(),
+            sticky_cols: HashMap::new(),
+            sticky_cells: HashMap::new(),
+        }
+    }
+
+    fn style_heap_size_bytes(&self) -> usize {
+        let mut bytes = 0usize;
+        bytes += self.style.heap_size_bytes();
+        bytes += heap_hash_map_bytes(&self.cell_styles);
+        for style in self.cell_styles.values() {
+            bytes += style.heap_size_bytes();
+        }
+        bytes
+    }
+
+    fn column_heap_size_bytes(&self) -> usize {
+        let mut bytes = 0usize;
+        bytes += heap_vec_bytes(&self.columns);
+        for col in &self.columns {
+            bytes += col.heap_size_bytes();
+        }
+        bytes
+    }
+
+    fn row_heap_size_bytes(&self) -> usize {
+        let mut bytes = 0usize;
+        bytes += heap_hash_map_bytes(&self.row_heights);
+        bytes += heap_hash_map_bytes(&self.row_props);
+        for props in self.row_props.values() {
+            bytes += props.heap_size_bytes();
+        }
+        bytes += heap_hash_set_bytes(&self.rows_hidden);
+        bytes += heap_hash_set_bytes(&self.cols_hidden);
+        bytes
+    }
+
+    fn misc_heap_size_bytes(&self) -> usize {
+        let mut bytes = 0usize;
+        bytes += heap_hash_map_bytes(&self.col_widths);
+        bytes += heap_hash_map_bytes(&self.col_width_min);
+        bytes += heap_hash_map_bytes(&self.col_width_max);
+
+        bytes += heap_vec_bytes(&self.row_positions);
+        bytes += heap_vec_bytes(&self.col_positions);
+
+        bytes += heap_vec_bytes(&self.pinned_rows_top);
+        bytes += heap_vec_bytes(&self.pinned_rows_bottom);
+        bytes += heap_vec_bytes(&self.pinned_cols_left);
+        bytes += heap_vec_bytes(&self.pinned_cols_right);
+        bytes += heap_hash_map_bytes(&self.sticky_rows);
+        bytes += heap_hash_map_bytes(&self.sticky_cols);
+        bytes += heap_hash_map_bytes(&self.sticky_cells);
+
+        bytes += self.span.heap_size_bytes();
+        bytes += self.merged_regions.heap_size_bytes();
+        bytes += self.edit.heap_size_bytes();
+        bytes += self.outline.heap_size_bytes();
+        bytes += self.sort_state.heap_size_bytes();
+
+        bytes += self.type_ahead_buffer.capacity();
+        bytes += self.scroll_tooltip_text.capacity();
+        bytes += self.edit_mask.capacity();
+        bytes += self.clip_col_separator.capacity();
+        bytes += self.clip_row_separator.capacity();
+        bytes += self.format_string.capacity();
+
+        bytes
+    }
+
+    pub fn heap_size_bytes(&self) -> usize {
+        let cell_data_bytes = self.cells.heap_size_bytes();
+        let style_bytes = self.style_heap_size_bytes();
+        let layout_bytes = self.layout.heap_size_bytes();
+        let column_bytes = self.column_heap_size_bytes();
+        let row_bytes = self.row_heap_size_bytes();
+        let selection_bytes = self.selection.heap_size_bytes();
+        let animation_bytes = self.animation.heap_size_bytes();
+        let text_engine_bytes = self
+            .text_engine
+            .as_ref()
+            .map_or(0, TextEngine::heap_size_bytes);
+        let event_bytes = self.events.heap_size_bytes();
+        let misc_bytes = self.misc_heap_size_bytes();
+
+        cell_data_bytes
+            + style_bytes
+            + layout_bytes
+            + column_bytes
+            + row_bytes
+            + selection_bytes
+            + animation_bytes
+            + text_engine_bytes
+            + event_bytes
+            + misc_bytes
+    }
+
+    pub fn memory_usage(&self) -> pb::MemoryUsageResponse {
+        let cell_data_bytes = self.cells.heap_size_bytes();
+        let style_bytes = self.style_heap_size_bytes();
+        let layout_bytes = self.layout.heap_size_bytes();
+        let column_bytes = self.column_heap_size_bytes();
+        let row_bytes = self.row_heap_size_bytes();
+        let selection_bytes = self.selection.heap_size_bytes();
+        let animation_bytes = self.animation.heap_size_bytes();
+        let text_engine_bytes = self
+            .text_engine
+            .as_ref()
+            .map_or(0, TextEngine::heap_size_bytes);
+        let event_bytes = self.events.heap_size_bytes();
+        let misc_bytes = self.misc_heap_size_bytes();
+        let total_bytes = cell_data_bytes
+            + style_bytes
+            + layout_bytes
+            + column_bytes
+            + row_bytes
+            + selection_bytes
+            + animation_bytes
+            + text_engine_bytes
+            + event_bytes
+            + misc_bytes;
+
+        pb::MemoryUsageResponse {
+            total_bytes: usize_to_i64_saturating(total_bytes),
+            cell_data_bytes: usize_to_i64_saturating(cell_data_bytes),
+            style_bytes: usize_to_i64_saturating(style_bytes),
+            layout_bytes: usize_to_i64_saturating(layout_bytes),
+            column_bytes: usize_to_i64_saturating(column_bytes),
+            row_bytes: usize_to_i64_saturating(row_bytes),
+            selection_bytes: usize_to_i64_saturating(selection_bytes),
+            animation_bytes: usize_to_i64_saturating(animation_bytes),
+            text_engine_bytes: usize_to_i64_saturating(text_engine_bytes),
+            event_bytes: usize_to_i64_saturating(event_bytes),
+            misc_bytes: usize_to_i64_saturating(misc_bytes),
+            cell_count: usize_to_i32_saturating(self.cells.len()),
+            rows: self.rows,
+            cols: self.cols,
+        }
+    }
+
+    // ── Row/Col Count ─────────────────────────────────────────────────────
+
+    /// Sets the total number of rows. Adjusts the position mapping to match.
+    ///
+    /// If the new row count is larger, new rows are appended to the position
+    /// mapping with identity indices. If smaller, excess entries are removed
+    /// and any custom row heights, hidden flags, row props, and cell data for
+    /// removed rows remain in their maps (they become orphaned but harmless).
+    /// Fixed rows are clamped if they would exceed the new count.
+    pub fn set_rows(&mut self, rows: i32) {
+        let rows = rows.max(MIN_ROWS);
+        let old_rows = self.rows;
+        if rows == old_rows {
+            return;
+        }
+
+        // Notify animation before changing state
+        let h = self.default_row_height;
+        if rows > old_rows {
+            self.animation
+                .notify_rows_inserted(old_rows, rows - old_rows, h);
+        } else {
+            self.animation.notify_rows_removed(rows, old_rows - rows, h);
+        }
+
+        self.rows = rows;
+
+        // Clamp fixed/frozen rows to not exceed total
+        if self.fixed_rows > self.rows {
+            self.fixed_rows = self.rows;
+        }
+        if self.fixed_rows + self.frozen_rows > self.rows {
+            self.frozen_rows = (self.rows - self.fixed_rows).max(0);
+        }
+
+        // Adjust position mapping
+        if rows > old_rows {
+            // Append new rows with identity mapping
+            for i in old_rows..rows {
+                self.row_positions.push(i);
+            }
+        } else if rows < old_rows {
+            // Truncate position mapping. Remove entries that reference rows >= new count,
+            // and also trim to length.
+            self.row_positions.retain(|&r| r < rows);
+            // Ensure we have exactly `rows` entries; pad if retain removed too many
+            while (self.row_positions.len() as i32) < rows {
+                // Find an index not yet in the vec
+                let existing: HashSet<i32> = self.row_positions.iter().cloned().collect();
+                for i in 0..rows {
+                    if !existing.contains(&i) {
+                        self.row_positions.push(i);
+                        break;
+                    }
+                }
+            }
+            self.row_positions.truncate(rows as usize);
+        }
+
+        // Clamp selection
+        self.selection
+            .clamp(self.rows, self.cols, self.fixed_rows, self.fixed_cols);
+
+        // Remove pinned columns that are no longer in range.
+        self.pinned_cols_left.retain(|&c| c >= 0 && c < self.cols);
+        self.pinned_cols_right.retain(|&c| c >= 0 && c < self.cols);
+
+        self.scroll.stop_fling();
+        self.layout.invalidate();
+        self.dirty = true;
+    }
+
+    /// Sets the total number of columns. Adjusts the position mapping and
+    /// column properties vec to match.
+    ///
+    /// If the new column count is larger, new columns are appended with identity
+    /// position indices and default `ColumnProps`. If smaller, excess entries
+    /// are removed.
+    pub fn set_cols(&mut self, cols: i32) {
+        let cols = cols.max(MIN_COLS);
+        let old_cols = self.cols;
+        if cols == old_cols {
+            return;
+        }
+
+        // Notify animation before changing state
+        let w = self.default_col_width;
+        if cols > old_cols {
+            self.animation
+                .notify_cols_inserted(old_cols, cols - old_cols, w);
+        } else {
+            self.animation.notify_cols_removed(cols, old_cols - cols, w);
+        }
+
+        self.cols = cols;
+
+        // Clamp fixed/frozen cols
+        if self.fixed_cols > self.cols {
+            self.fixed_cols = self.cols;
+        }
+        if self.fixed_cols + self.frozen_cols > self.cols {
+            self.frozen_cols = (self.cols - self.fixed_cols).max(0);
+        }
+
+        // Adjust position mapping
+        if cols > old_cols {
+            for i in old_cols..cols {
+                self.col_positions.push(i);
+            }
+        } else if cols < old_cols {
+            self.col_positions.retain(|&c| c < cols);
+            while (self.col_positions.len() as i32) < cols {
+                let existing: HashSet<i32> = self.col_positions.iter().cloned().collect();
+                for i in 0..cols {
+                    if !existing.contains(&i) {
+                        self.col_positions.push(i);
+                        break;
+                    }
+                }
+            }
+            self.col_positions.truncate(cols as usize);
+        }
+
+        // Adjust columns vec
+        if cols > old_cols {
+            for _ in old_cols..cols {
+                self.columns.push(ColumnProps::default());
+            }
+        } else if cols < old_cols {
+            self.columns.truncate(cols as usize);
+        }
+
+        // Clamp selection
+        self.selection
+            .clamp(self.rows, self.cols, self.fixed_rows, self.fixed_cols);
+
+        self.scroll.stop_fling();
+        self.layout.invalidate();
+        self.dirty = true;
+    }
+
+    // ── Row Height ────────────────────────────────────────────────────────
+
+    /// Returns the height of the given row in pixels.
+    ///
+    /// If the row is hidden, returns 0. If the row has a custom height, returns
+    /// that. Otherwise returns `default_row_height`.
+    pub fn get_row_height(&self, row: i32) -> i32 {
+        if row < 0 || row >= self.rows {
+            return 0;
+        }
+        if self.rows_hidden.contains(&row) {
+            return 0;
+        }
+        match self.row_heights.get(&row) {
+            Some(&h) => self.clamp_row_height(h),
+            None => self.clamp_row_height(self.default_row_height),
+        }
+    }
+
+    /// Sets the height of a row in pixels.
+    ///
+    /// - `row = -1`: sets all rows to the given height.
+    /// - `height = -1`: resets the row to the default height (removes custom override).
+    /// - Otherwise stores a custom height for the given row.
+    pub fn set_row_height(&mut self, row: i32, height: i32) {
+        if row == -1 {
+            // Set all rows
+            if height == -1 {
+                // Reset all to default
+                self.row_heights.clear();
+            } else {
+                let h = self.clamp_row_height(height);
+                for r in 0..self.rows {
+                    self.row_heights.insert(r, h);
+                }
+            }
+        } else if row >= 0 && row < self.rows {
+            if height == -1 {
+                // Reset to default
+                self.row_heights.remove(&row);
+            } else {
+                let h = self.clamp_row_height(height);
+                self.row_heights.insert(row, h);
+            }
+        }
+        self.layout.invalidate();
+        self.dirty = true;
+    }
+
+    /// Clamps a row height to the configured min/max range.
+    fn clamp_row_height(&self, height: i32) -> i32 {
+        let mut h = height;
+        if self.row_height_min > 0 && h < self.row_height_min {
+            h = self.row_height_min;
+        }
+        if self.row_height_max > 0 && h > self.row_height_max {
+            h = self.row_height_max;
+        }
+        h.max(0)
+    }
+
+    // ── Col Width ─────────────────────────────────────────────────────────
+
+    /// Returns the width of the given column in pixels.
+    ///
+    /// If the column is hidden, returns 0. If the column has a custom width,
+    /// returns that. Otherwise returns `default_col_width`.
+    pub fn get_col_width(&self, col: i32) -> i32 {
+        if col < 0 || col >= self.cols {
+            return 0;
+        }
+        if self.cols_hidden.contains(&col) {
+            return 0;
+        }
+        match self.col_widths.get(&col) {
+            Some(&w) => self.clamp_col_width(col, w),
+            None => self.clamp_col_width(col, self.default_col_width),
+        }
+    }
+
+    /// Sets the width of a column in pixels.
+    ///
+    /// - `col = -1`: sets all columns to the given width.
+    /// - `width = -1`: resets the column to the default width (removes custom override).
+    /// - Otherwise stores a custom width for the given column.
+    pub fn set_col_width(&mut self, col: i32, width: i32) {
+        if col == -1 {
+            // Set all columns
+            if width == -1 {
+                // Reset all to default
+                self.col_widths.clear();
+            } else {
+                for c in 0..self.cols {
+                    let w = self.clamp_col_width(c, width);
+                    self.col_widths.insert(c, w);
+                }
+            }
+        } else if col >= 0 && col < self.cols {
+            if width == -1 {
+                // Reset to default
+                self.col_widths.remove(&col);
+            } else {
+                let w = self.clamp_col_width(col, width);
+                self.col_widths.insert(col, w);
+            }
+        }
+        self.layout.invalidate();
+        self.dirty = true;
+    }
+
+    /// Clamps a column width to the configured per-column min/max range.
+    pub fn clamp_col_width(&self, col: i32, width: i32) -> i32 {
+        let mut w = width;
+        if let Some(&min_w) = self.col_width_min.get(&col) {
+            if min_w > 0 && w < min_w {
+                w = min_w;
+            }
+        }
+        if let Some(&max_w) = self.col_width_max.get(&col) {
+            if max_w > 0 && w > max_w {
+                w = max_w;
+            }
+        }
+        w.max(0)
+    }
+
+    // ── Visibility ────────────────────────────────────────────────────────
+
+    /// Returns `true` if the given row is visible (not hidden).
+    pub fn is_row_visible(&self, row: i32) -> bool {
+        if row < 0 || row >= self.rows {
+            return false;
+        }
+        !self.rows_hidden.contains(&row)
+    }
+
+    /// Returns `true` if the given column is visible (not hidden).
+    pub fn is_col_visible(&self, col: i32) -> bool {
+        if col < 0 || col >= self.cols {
+            return false;
+        }
+        !self.cols_hidden.contains(&col)
+    }
+
+    // ── Dirty / Redraw ────────────────────────────────────────────────────
+
+    /// Marks the grid as dirty, requiring a re-render on the next frame.
+    pub fn mark_dirty(&mut self) {
+        self.dirty = true;
+    }
+
+    /// Clear the dirty flag after rendering.
+    /// Keeps dirty=true if animation is still in-flight so the host
+    /// continues to re-render until the animation settles.
+    pub fn clear_dirty(&mut self) {
+        if self.animation.active || self.background_loading {
+            self.dirty = true;
+        } else {
+            self.dirty = false;
+        }
+    }
+
+    // ── Viewport ──────────────────────────────────────────────────────────
+
+    /// Resizes the viewport to the given pixel dimensions and invalidates
+    /// the layout cache.
+    pub fn resize_viewport(&mut self, width: i32, height: i32) {
+        self.viewport_width = width.max(0);
+        self.viewport_height = height.max(0);
+        // No layout.invalidate() — row/col positions haven't changed.
+        // Only scroll bounds depend on viewport size; they are recomputed
+        // on the next ensure_layout call (which is cheap when layout is
+        // already valid — it just calls update_bounds).
+        self.dirty = true;
+    }
+
+    // ── Computed Helpers ──────────────────────────────────────────────────
+
+    /// Returns the total content height in pixels (sum of all visible row heights).
+    pub fn total_height(&self) -> i32 {
+        let mut h = 0i32;
+        for r in 0..self.rows {
+            h = h.saturating_add(self.get_row_height(r));
+        }
+        h
+    }
+
+    /// Returns the total content width in pixels (sum of all visible column widths).
+    pub fn total_width(&self) -> i32 {
+        let mut w = 0i32;
+        for c in 0..self.cols {
+            w = w.saturating_add(self.get_col_width(c));
+        }
+        w
+    }
+
+    /// Returns the combined pixel height of all fixed rows.
+    pub fn fixed_height(&self) -> i32 {
+        let mut h = 0i32;
+        for r in 0..self.fixed_rows {
+            h = h.saturating_add(self.get_row_height(r));
+        }
+        h
+    }
+
+    /// Returns the combined pixel width of all fixed columns.
+    pub fn fixed_width(&self) -> i32 {
+        let mut w = 0i32;
+        for c in 0..self.fixed_cols {
+            w = w.saturating_add(self.get_col_width(c));
+        }
+        w
+    }
+
+    /// Returns the combined pixel height of all frozen rows (below fixed rows).
+    pub fn frozen_height(&self) -> i32 {
+        let mut h = 0i32;
+        for r in self.fixed_rows..(self.fixed_rows + self.frozen_rows).min(self.rows) {
+            h = h.saturating_add(self.get_row_height(r));
+        }
+        h
+    }
+
+    /// Returns the combined pixel width of all frozen columns (right of fixed columns).
+    pub fn frozen_width(&self) -> i32 {
+        let mut w = 0i32;
+        for c in self.fixed_cols..(self.fixed_cols + self.frozen_cols).min(self.cols) {
+            w = w.saturating_add(self.get_col_width(c));
+        }
+        w
+    }
+
+    /// Returns the logical row index at the given display position.
+    /// Returns -1 if the position is out of range.
+    pub fn row_at_position(&self, display_pos: i32) -> i32 {
+        if display_pos < 0 || display_pos >= self.rows {
+            return -1;
+        }
+        self.row_positions
+            .get(display_pos as usize)
+            .copied()
+            .unwrap_or(-1)
+    }
+
+    /// Returns the logical column index at the given display position.
+    /// Returns -1 if the position is out of range.
+    pub fn col_at_position(&self, display_pos: i32) -> i32 {
+        if display_pos < 0 || display_pos >= self.cols {
+            return -1;
+        }
+        self.col_positions
+            .get(display_pos as usize)
+            .copied()
+            .unwrap_or(-1)
+    }
+
+    /// Returns the display position for the given logical row index.
+    /// Returns -1 if the row is not found in the position mapping.
+    pub fn row_display_position(&self, logical_row: i32) -> i32 {
+        self.row_positions
+            .iter()
+            .position(|&r| r == logical_row)
+            .map(|p| p as i32)
+            .unwrap_or(-1)
+    }
+
+    /// Returns the display position for the given logical column index.
+    /// Returns -1 if the column is not found in the position mapping.
+    pub fn col_display_position(&self, logical_col: i32) -> i32 {
+        self.col_positions
+            .iter()
+            .position(|&c| c == logical_col)
+            .map(|p| p as i32)
+            .unwrap_or(-1)
+    }
+
+    /// Remap a display-position indexed column key after a remove+insert move.
+    ///
+    /// `source_pos` and `insert_pos` are display positions in the same index
+    /// space used by `Vec::remove` + `Vec::insert`.
+    pub fn remap_col_index_for_move(index: i32, source_pos: i32, insert_pos: i32) -> i32 {
+        if index < 0 || source_pos == insert_pos {
+            return index;
+        }
+        if index == source_pos {
+            return insert_pos;
+        }
+        if source_pos < insert_pos {
+            if index > source_pos && index <= insert_pos {
+                return index - 1;
+            }
+            return index;
+        }
+        if index >= insert_pos && index < source_pos {
+            return index + 1;
+        }
+        index
+    }
+
+    /// Re-map span column flags after a display-position column move.
+    ///
+    /// This keeps `span.span_cols` aligned with user-visible column order,
+    /// so merged ranges are recalculated against the moved layout.
+    pub fn remap_span_cols_after_move(&mut self, source_pos: i32, insert_pos: i32) {
+        if source_pos == insert_pos {
+            return;
+        }
+        let old = std::mem::take(&mut self.span.span_cols);
+        let mut remapped = std::collections::HashMap::new();
+        for (col, enabled) in old {
+            if col < 0 {
+                remapped.insert(col, enabled);
+            } else {
+                let mapped = Self::remap_col_index_for_move(col, source_pos, insert_pos);
+                remapped.insert(mapped, enabled);
+            }
+        }
+        self.span.span_cols = remapped;
+    }
+
+    fn remap_i32_key_map_after_col_move<V>(
+        map: &mut std::collections::HashMap<i32, V>,
+        source_pos: i32,
+        insert_pos: i32,
+    ) {
+        if source_pos == insert_pos {
+            return;
+        }
+        let old = std::mem::take(map);
+        let mut remapped = std::collections::HashMap::with_capacity(old.len());
+        for (k, v) in old {
+            remapped.insert(Self::remap_col_index_for_move(k, source_pos, insert_pos), v);
+        }
+        *map = remapped;
+    }
+
+    fn remap_i32_key_set_after_col_move(
+        set: &mut std::collections::HashSet<i32>,
+        source_pos: i32,
+        insert_pos: i32,
+    ) {
+        if source_pos == insert_pos {
+            return;
+        }
+        let old = std::mem::take(set);
+        let mut remapped = std::collections::HashSet::with_capacity(old.len());
+        for k in old {
+            remapped.insert(Self::remap_col_index_for_move(k, source_pos, insert_pos));
+        }
+        *set = remapped;
+    }
+
+    /// Apply a visual column move by physically reordering column-indexed state.
+    ///
+    /// `source_pos` and `insert_pos` are display positions in the same index
+    /// space used by `Vec::remove` + `Vec::insert`.
+    pub fn move_col_by_positions(&mut self, source_pos: i32, insert_pos: i32) -> bool {
+        if self.cols <= 0 || source_pos < 0 || source_pos >= self.cols {
+            return false;
+        }
+        if insert_pos < 0 || insert_pos >= self.cols {
+            return false;
+        }
+        if source_pos == insert_pos {
+            return false;
+        }
+
+        let sp = source_pos as usize;
+        let ip = insert_pos as usize;
+
+        // Column metadata vec.
+        if sp < self.columns.len() && ip <= self.columns.len() {
+            let col_meta = self.columns.remove(sp);
+            self.columns.insert(ip, col_meta);
+        }
+
+        // O(cols) col_map update instead of O(cells) physical remap.
+        let num_cols = self.cols.max(0) as usize;
+        if self.cells.col_map_is_empty() {
+            self.cells.set_col_map((0..num_cols as i32).collect());
+        }
+        let val = self.cells.col_map_remove(sp);
+        self.cells.col_map_insert(ip, val);
+        Self::remap_i32_key_map_after_col_move(&mut self.col_widths, source_pos, insert_pos);
+        Self::remap_i32_key_map_after_col_move(&mut self.col_width_min, source_pos, insert_pos);
+        Self::remap_i32_key_map_after_col_move(&mut self.col_width_max, source_pos, insert_pos);
+        Self::remap_i32_key_set_after_col_move(&mut self.cols_hidden, source_pos, insert_pos);
+        self.remap_span_cols_after_move(source_pos, insert_pos);
+
+        let old_styles = std::mem::take(&mut self.cell_styles);
+        let mut remapped_styles = std::collections::HashMap::with_capacity(old_styles.len());
+        for ((row, col), style) in old_styles {
+            let mapped_col = Self::remap_col_index_for_move(col, source_pos, insert_pos);
+            remapped_styles.insert((row, mapped_col), style);
+        }
+        self.cell_styles = remapped_styles;
+
+        // Remap active cursor/editor/sort references.
+        self.selection.col =
+            Self::remap_col_index_for_move(self.selection.col, source_pos, insert_pos);
+        self.selection.col_end =
+            Self::remap_col_index_for_move(self.selection.col_end, source_pos, insert_pos);
+        self.mouse_col = Self::remap_col_index_for_move(self.mouse_col, source_pos, insert_pos);
+        if self.resize_active && self.resize_is_col {
+            self.resize_index =
+                Self::remap_col_index_for_move(self.resize_index, source_pos, insert_pos);
+        }
+        if self.edit.is_active() {
+            self.edit.edit_col =
+                Self::remap_col_index_for_move(self.edit.edit_col, source_pos, insert_pos);
+        }
+        for key in self.sort_state.sort_keys.iter_mut() {
+            key.0 = Self::remap_col_index_for_move(key.0, source_pos, insert_pos);
+        }
+
+        // Keep display mapping canonical after physical reorder.
+        self.col_positions.clear();
+        self.col_positions.extend(0..self.cols);
+
+        self.layout.invalidate();
+        self.mark_dirty();
+        true
+    }
+
+    /// Returns the pixel Y-offset of the top edge of the given row,
+    /// computed by summing the heights of all preceding rows in display order.
+    pub fn row_pixel_offset(&self, row: i32) -> i32 {
+        let mut y = 0i32;
+        for pos in 0..row.min(self.rows) {
+            let logical = self.row_at_position(pos);
+            if logical >= 0 {
+                y = y.saturating_add(self.get_row_height(logical));
+            }
+        }
+        y
+    }
+
+    /// Returns the pixel X-offset of the left edge of the given column,
+    /// computed by summing the widths of all preceding columns in display order.
+    pub fn col_pixel_offset(&self, col: i32) -> i32 {
+        let mut x = 0i32;
+        for pos in 0..col.min(self.cols) {
+            let logical = self.col_at_position(pos);
+            if logical >= 0 {
+                x = x.saturating_add(self.get_col_width(logical));
+            }
+        }
+        x
+    }
+
+    /// Returns the first scrollable row index (fixed_rows + frozen_rows).
+    pub fn first_scrollable_row(&self) -> i32 {
+        (self.fixed_rows + self.frozen_rows).min(self.rows)
+    }
+
+    /// Returns the first scrollable column index (fixed_cols + frozen_cols).
+    pub fn first_scrollable_col(&self) -> i32 {
+        (self.fixed_cols + self.frozen_cols).min(self.cols)
+    }
+
+    /// Returns true if the grid is currently being edited.
+    pub fn is_editing(&self) -> bool {
+        self.edit.is_active()
+    }
+
+    /// Returns true when editing may begin at the given cell.
+    ///
+    /// Header rows and subtotal/grandtotal rows are always read-only.
+    /// `force=true` bypasses only the global `edit_trigger_mode` gate.
+    pub fn can_begin_edit(&self, row: i32, col: i32, force: bool) -> bool {
+        if row < 0 || row >= self.rows || col < 0 || col >= self.cols {
+            return false;
+        }
+        if row < self.fixed_rows {
+            return false;
+        }
+        if self.row_props.get(&row).map_or(false, |rp| rp.is_subtotal) {
+            return false;
+        }
+        if !force && self.edit_trigger_mode <= 0 {
+            return false;
+        }
+        true
+    }
+
+    /// Ensures the text engine is initialized and returns a mutable reference to it.
+    pub fn ensure_text_engine(&mut self) -> &mut TextEngine {
+        if self.text_engine.is_none() {
+            let mut te = TextEngine::new();
+            te.set_layout_cache_cap(self.text_layout_cache_cap);
+            self.text_engine = Some(te);
+        }
+        self.text_engine.as_mut().unwrap()
+    }
+
+    pub fn set_text_layout_cache_cap(&mut self, cap: i32) {
+        let cap = cap.max(0) as usize;
+        self.text_layout_cache_cap = cap;
+        if let Some(te) = &mut self.text_engine {
+            te.set_layout_cache_cap(cap);
+        }
+    }
+
+    // ── Convenience Accessors (used by render, input, etc.) ─────────────
+
+    /// Pixel Y-offset of a row from the layout cache.
+    pub fn row_pos(&self, row: i32) -> i32 {
+        self.layout.row_pos(row)
+    }
+
+    /// Pixel X-offset of a column from the layout cache.
+    pub fn col_pos(&self, col: i32) -> i32 {
+        self.layout.col_pos(col)
+    }
+
+    /// Alias for `get_row_height` — used extensively by the renderer.
+    pub fn row_height(&self, row: i32) -> i32 {
+        self.get_row_height(row)
+    }
+
+    /// Alias for `get_col_width` — used extensively by the renderer.
+    pub fn col_width(&self, col: i32) -> i32 {
+        self.get_col_width(col)
+    }
+
+    /// Returns true if the row is hidden.
+    pub fn is_row_hidden(&self, row: i32) -> bool {
+        self.rows_hidden.contains(&row)
+    }
+
+    /// Returns true if the column is hidden.
+    pub fn is_col_hidden(&self, col: i32) -> bool {
+        self.cols_hidden.contains(&col)
+    }
+
+    /// Returns the column properties for a column, if it exists.
+    pub fn get_col_props(&self, col: i32) -> Option<&ColumnProps> {
+        if col < 0 || col >= self.cols {
+            return None;
+        }
+        self.columns.get(col as usize)
+    }
+
+    /// Returns the row properties for a row, if it exists.
+    pub fn get_row_props(&self, row: i32) -> Option<&RowProps> {
+        self.row_props.get(&row)
+    }
+
+    /// Returns mutable row properties for a row, creating defaults as needed.
+    pub fn row_props_mut(&mut self, row: i32) -> Option<&mut RowProps> {
+        if row < 0 || row >= self.rows {
+            return None;
+        }
+        Some(self.row_props.entry(row).or_default())
+    }
+
+    /// Returns user-defined row data (`RowData`), if present.
+    pub fn get_row_data(&self, row: i32) -> Option<Vec<u8>> {
+        self.get_row_props(row).and_then(|rp| rp.user_data.clone())
+    }
+
+    /// Sets user-defined row data (`RowData`).
+    ///
+    /// Passing `None` clears the row data.
+    pub fn set_row_data(&mut self, row: i32, data: Option<Vec<u8>>) {
+        let Some(props) = self.row_props_mut(row) else {
+            return;
+        };
+        props.user_data = data;
+    }
+
+    /// Returns row status (`RowStatus`), defaulting to 0.
+    pub fn get_row_status(&self, row: i32) -> i32 {
+        self.get_row_props(row).map_or(0, |rp| rp.status)
+    }
+
+    /// Sets row status (`RowStatus`).
+    pub fn set_row_status(&mut self, row: i32, status: i32) {
+        let Some(props) = self.row_props_mut(row) else {
+            return;
+        };
+        props.status = status;
+    }
+
+    // ── Pin & Sticky Helpers ─────────────────────────────────────────────
+
+    /// Pin a row to the top or bottom section, or unpin it.
+    ///
+    /// Pinned rows are removed from the scrollable area and always visible.
+    /// `pin` values: 0=none, 1=top, 2=bottom (matches PinPosition enum).
+    pub fn pin_row(&mut self, row: i32, pin: i32) {
+        if row < 0 || row >= self.rows {
+            return;
+        }
+        // Remove from both lists first
+        self.pinned_rows_top.retain(|&r| r != row);
+        self.pinned_rows_bottom.retain(|&r| r != row);
+        // Insert into appropriate sorted list
+        match pin {
+            1 => {
+                let pos = self.pinned_rows_top.partition_point(|&r| r < row);
+                self.pinned_rows_top.insert(pos, row);
+            }
+            2 => {
+                let pos = self.pinned_rows_bottom.partition_point(|&r| r < row);
+                self.pinned_rows_bottom.insert(pos, row);
+            }
+            _ => {} // 0 = unpin, already removed
+        }
+        // Persist in row props
+        let rp = self.row_props.entry(row).or_default();
+        rp.pin = pin;
+        self.layout.invalidate();
+        self.mark_dirty();
+    }
+
+    /// Check if a row is pinned and return its position.
+    pub fn is_row_pinned(&self, row: i32) -> i32 {
+        self.get_row_props(row).map_or(0, |rp| rp.pin)
+    }
+
+    /// Pin a column to the left or right section, or unpin it.
+    ///
+    /// Pinned columns are removed from the horizontal scrollable layout and
+    /// always rendered in edge sections.
+    /// `pin` values: 0=none, 1=left, 2=right.
+    pub fn pin_col(&mut self, col: i32, pin: i32) {
+        if col < 0 || col >= self.cols {
+            return;
+        }
+        self.pinned_cols_left.retain(|&c| c != col);
+        self.pinned_cols_right.retain(|&c| c != col);
+        match pin {
+            1 => {
+                let pos = self.pinned_cols_left.partition_point(|&c| c < col);
+                self.pinned_cols_left.insert(pos, col);
+            }
+            2 => {
+                let pos = self.pinned_cols_right.partition_point(|&c| c < col);
+                self.pinned_cols_right.insert(pos, col);
+            }
+            _ => {}
+        }
+        self.layout.invalidate();
+        self.mark_dirty();
+    }
+
+    /// Check if a column is pinned and return its position.
+    pub fn is_col_pinned(&self, col: i32) -> i32 {
+        if self.pinned_cols_left.binary_search(&col).is_ok() {
+            1
+        } else if self.pinned_cols_right.binary_search(&col).is_ok() {
+            2
+        } else {
+            0
+        }
+    }
+
+    /// Set the sticky edge for a row (0=none, 1=TOP, 2=BOTTOM, 5=BOTH).
+    pub fn set_row_sticky(&mut self, row: i32, edge: i32) {
+        if edge == 0 {
+            self.sticky_rows.remove(&row);
+        } else {
+            self.sticky_rows.insert(row, edge);
+        }
+        self.mark_dirty();
+    }
+
+    /// Set the sticky edge for a column (0=none, 3=LEFT, 4=RIGHT, 5=BOTH).
+    pub fn set_col_sticky(&mut self, col: i32, edge: i32) {
+        if edge == 0 {
+            self.sticky_cols.remove(&col);
+        } else {
+            self.sticky_cols.insert(col, edge);
+        }
+        self.mark_dirty();
+    }
+
+    /// Set cell-level sticky overrides. Both edges 0 removes the override.
+    pub fn set_cell_sticky(&mut self, row: i32, col: i32, sticky_row: i32, sticky_col: i32) {
+        if sticky_row == 0 && sticky_col == 0 {
+            self.sticky_cells.remove(&(row, col));
+        } else {
+            self.sticky_cells
+                .insert((row, col), (sticky_row, sticky_col));
+        }
+        self.mark_dirty();
+    }
+
+    /// Effective sticky edge for a row at a given column.
+    /// Cell override → row default → 0 (none).
+    pub fn effective_sticky_row(&self, row: i32, col: i32) -> i32 {
+        if let Some(&(sr, _)) = self.sticky_cells.get(&(row, col)) {
+            if sr != 0 {
+                return sr;
+            }
+        }
+        self.sticky_rows.get(&row).copied().unwrap_or(0)
+    }
+
+    /// Effective sticky edge for a column at a given row.
+    /// Cell override → column default → 0 (none).
+    pub fn effective_sticky_col(&self, row: i32, col: i32) -> i32 {
+        if let Some(&(_, sc)) = self.sticky_cells.get(&(row, col)) {
+            if sc != 0 {
+                return sc;
+            }
+        }
+        self.sticky_cols.get(&col).copied().unwrap_or(0)
+    }
+
+    /// Total pixel height of top-pinned rows.
+    pub fn pinned_top_height(&self) -> i32 {
+        self.pinned_rows_top
+            .iter()
+            .map(|&r| self.row_height(r))
+            .sum()
+    }
+
+    /// Total pixel height of bottom-pinned rows.
+    pub fn pinned_bottom_height(&self) -> i32 {
+        self.pinned_rows_bottom
+            .iter()
+            .map(|&r| self.row_height(r))
+            .sum()
+    }
+
+    /// Total pixel width of left-pinned columns.
+    pub fn pinned_left_width(&self) -> i32 {
+        self.pinned_cols_left
+            .iter()
+            .map(|&c| self.col_width(c))
+            .sum()
+    }
+
+    /// Total pixel width of right-pinned columns.
+    pub fn pinned_right_width(&self) -> i32 {
+        self.pinned_cols_right
+            .iter()
+            .map(|&c| self.col_width(c))
+            .sum()
+    }
+
+    /// Resolve `TextArray` linear index into `(row, col)`.
+    pub fn text_array_index_to_row_col(&self, index: i32) -> Option<(i32, i32)> {
+        if index < 0 || self.cols <= 0 {
+            return None;
+        }
+        let row = index / self.cols;
+        let col = index % self.cols;
+        if row < 0 || row >= self.rows || col < 0 || col >= self.cols {
+            None
+        } else {
+            Some((row, col))
+        }
+    }
+
+    /// Returns cell text via `TextArray` linear index.
+    pub fn get_text_array(&self, index: i32) -> String {
+        self.text_array_index_to_row_col(index)
+            .map(|(row, col)| self.cells.get_text(row, col).to_string())
+            .unwrap_or_default()
+    }
+
+    /// Sets cell text via `TextArray` linear index.
+    pub fn set_text_array(&mut self, index: i32, text: String) {
+        let Some((row, col)) = self.text_array_index_to_row_col(index) else {
+            return;
+        };
+        self.cells.set_text(row, col, text);
+        self.mark_dirty();
+    }
+
+    /// Returns the cell style override for a cell, or a default if none.
+    pub fn get_cell_style(&self, row: i32, col: i32) -> CellStyleOverride {
+        self.cell_styles
+            .get(&(row, col))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// Resolve effective insets for a cell.
+    ///
+    /// Priority: cell style override > column override > grid style default.
+    pub fn resolve_cell_padding(
+        &self,
+        row: i32,
+        col: i32,
+        style_override: &CellStyleOverride,
+    ) -> CellPadding {
+        if let Some(p) = style_override.padding {
+            return p.clamped_non_negative();
+        }
+        let is_fixed = row < self.fixed_rows || col < self.fixed_cols;
+        self.resolve_column_padding(col, is_fixed)
+    }
+
+    /// Resolve column/grid padding defaults, without per-cell overrides.
+    pub fn resolve_column_padding(&self, col: i32, is_fixed: bool) -> CellPadding {
+        let mut padding = if is_fixed {
+            self.style.fixed_cell_padding
+        } else {
+            self.style.cell_padding
+        };
+        if col >= 0 && (col as usize) < self.columns.len() {
+            let cp = &self.columns[col as usize];
+            if is_fixed {
+                if let Some(v) = cp.fixed_cell_padding {
+                    padding = v;
+                } else if let Some(v) = cp.cell_padding {
+                    padding = v;
+                }
+            } else if let Some(v) = cp.cell_padding {
+                padding = v;
+            }
+        }
+        padding.clamped_non_negative()
+    }
+
+    /// Resolve the active dropdown list for a cell.
+    ///
+    /// Cell-level dropdown list has priority over the column-level list.
+    pub fn active_dropdown_list(&self, row: i32, col: i32) -> String {
+        // Dropdown behavior follows the same row-level editability rule.
+        if !self.can_begin_edit(row, col, true) {
+            return String::new();
+        }
+        if let Some(cell) = self.cells.get(row, col) {
+            let cl = cell.dropdown_items();
+            if !cl.is_empty() {
+                return cl.to_string();
+            }
+        }
+        if col >= 0 && (col as usize) < self.columns.len() {
+            return self.columns[col as usize].dropdown_items.clone();
+        }
+        String::new()
+    }
+
+    /// Returns display text for a cell, applying dropdown list value translation
+    /// and column format strings.
+    ///
+    /// The grid stores translated IDs for `dropdown_items` entries (`#id;text`)
+    /// and displays the associated text.
+    pub fn get_display_text(&self, row: i32, col: i32) -> String {
+        let raw = self.cells.get_text(row, col);
+        if raw.is_empty() {
+            return String::new();
+        }
+
+        // Dropdown list translation
+        if col >= 0 && (col as usize) < self.columns.len() {
+            let list = &self.columns[col as usize].dropdown_items;
+            if !list.is_empty() {
+                if let Some(display) = crate::edit::translate_dropdown_value_to_display(list, raw) {
+                    return display;
+                }
+            }
+        }
+
+        // Column format application
+        if col >= 0 && (col as usize) < self.columns.len() {
+            let fmt = &self.columns[col as usize].format;
+            if !fmt.is_empty() {
+                if let Some(formatted) = apply_col_format(raw, fmt) {
+                    return formatted;
+                }
+            }
+        }
+
+        // Cell-level custom format
+        if let Some(cell) = self.cells.get(row, col) {
+            let cf = cell.custom_format();
+            if !cf.is_empty() {
+                if let Some(formatted) = apply_col_format(raw, cf) {
+                    return formatted;
+                }
+            }
+        }
+
+        raw.to_string()
+    }
+
+    /// Returns true if the cell is within the current selection.
+    pub fn is_cell_selected(&self, row: i32, col: i32) -> bool {
+        self.selection.is_selected(row, col, self.cols)
+    }
+
+    /// Returns the merged range for a cell as `Some((r1, c1, r2, c2))`,
+    /// or `None` if the cell is not merged (range equals the cell itself).
+    ///
+    /// Explicit merges (from `merged_regions`) take priority over
+    /// content-based spans (from `span`).
+    pub fn get_merged_range(&self, row: i32, col: i32) -> Option<(i32, i32, i32, i32)> {
+        // Explicit merges take priority.
+        if let Some(range) = self.merged_regions.find_merge(row, col) {
+            return Some(range);
+        }
+        // Fall back to content-based span.
+        let (r1, c1, r2, c2) = self.span.get_merged_range(self, row, col);
+        if r1 == row && c1 == col && r2 == row && c2 == col {
+            None
+        } else {
+            Some((r1, c1, r2, c2))
+        }
+    }
+
+    // ── Auto-Resize ─────────────────────────
+
+    /// Auto-resize a column width to fit its content.
+    ///
+    /// Measures text in all rows for the given column using the text engine
+    /// and sets the column width to accommodate the widest cell plus padding.
+    pub fn auto_resize_col(&mut self, col: i32) {
+        if col < 0 || col >= self.cols {
+            return;
+        }
+        let font_name = self.style.font_name.clone();
+        let font_size = if self.style.font_size > 0.0 {
+            self.style.font_size
+        } else {
+            13.0
+        };
+        let bold = self.style.font_bold;
+        let italic = self.style.font_italic;
+        let body_padding = self.resolve_column_padding(col, false).horizontal();
+        let fixed_padding = self.resolve_column_padding(col, true).horizontal();
+        let padding = body_padding.max(fixed_padding);
+
+        let mut max_w: f32 = 0.0;
+        // Collect texts first to avoid borrow conflicts with ensure_text_engine
+        let texts: Vec<String> = (0..self.rows)
+            .map(|r| self.get_display_text(r, col))
+            .collect();
+
+        let te = self.ensure_text_engine();
+        for text in &texts {
+            if !text.is_empty() {
+                let (w, _) = te.measure_text(text, &font_name, font_size, bold, italic, None);
+                max_w = max_w.max(w);
+            }
+        }
+
+        let new_width = (max_w.ceil() as i32 + padding).max(self.default_col_width.min(20));
+        self.set_col_width(col, new_width);
+    }
+
+    /// Auto-resize a row height to fit its content.
+    ///
+    /// Measures text in all columns for the given row using the text engine
+    /// and sets the row height to accommodate the tallest cell plus padding.
+    pub fn auto_resize_row(&mut self, row: i32) {
+        if row < 0 || row >= self.rows {
+            return;
+        }
+        let font_name = self.style.font_name.clone();
+        let font_size = if self.style.font_size > 0.0 {
+            self.style.font_size
+        } else {
+            13.0
+        };
+        let bold = self.style.font_bold;
+        let italic = self.style.font_italic;
+        let word_wrap = self.word_wrap;
+        let body_padding = self.style.cell_padding.vertical();
+        let fixed_padding = self.style.fixed_cell_padding.vertical();
+        let padding = body_padding.max(fixed_padding);
+
+        let texts_and_widths: Vec<(String, i32)> = (0..self.cols)
+            .map(|c| {
+                let text = self.get_display_text(row, c);
+                let w = self.get_col_width(c);
+                (text, w)
+            })
+            .collect();
+
+        let te = self.ensure_text_engine();
+        let mut max_h: f32 = 0.0;
+        for (text, col_w) in &texts_and_widths {
+            if !text.is_empty() {
+                let max_width = if word_wrap { Some(*col_w as f32) } else { None };
+                let (_, h) = te.measure_text(text, &font_name, font_size, bold, italic, max_width);
+                max_h = max_h.max(h);
+            }
+        }
+
+        let new_height = (max_h.ceil() as i32 + padding).max(self.default_row_height.min(10));
+        self.set_row_height(row, new_height);
+    }
+
+    /// Trigger auto-resize for the given cell's row and column if `auto_resize` is enabled.
+    pub fn auto_resize_cell(&mut self, row: i32, col: i32) {
+        if !self.auto_resize {
+            return;
+        }
+        self.auto_resize_col(col);
+        self.auto_resize_row(row);
+    }
+
+    // ── Data Refresh ───────────────────────
+
+    /// Trigger a data refresh cycle.
+    ///
+    /// Fires `DataRefreshing` and `DataRefreshed` events, invalidates
+    /// layout, and marks the grid dirty for re-render.
+    pub fn data_refresh(&mut self) {
+        self.events
+            .push(crate::event::GridEventData::DataRefreshing);
+        self.layout.invalidate();
+        self.dirty = true;
+        self.events.push(crate::event::GridEventData::DataRefreshed);
+    }
+
+    // ── FormatString ─────────────────────
+
+    /// Apply the `format_string` property to configure columns.
+    ///
+    /// The format string is pipe-delimited: `"<Name|>Amount|^Status"`.
+    /// - Prefix `<` = left align, `>` = right align, `^` = center align.
+    /// - Suffix `;width` sets column width in pixels.
+    /// - The number of segments sets `cols`, and header text is placed in
+    ///   fixed row 0 for each column.
+    pub fn apply_format_string(&mut self) {
+        if self.format_string.is_empty() {
+            return;
+        }
+
+        // Clone to avoid borrow conflict with &mut self
+        let fmt = self.format_string.clone();
+        let segments: Vec<&str> = fmt.split('|').collect();
+        if segments.is_empty() {
+            return;
+        }
+
+        let new_cols = segments.len() as i32;
+        self.set_cols(new_cols);
+
+        for (i, segment) in segments.iter().enumerate() {
+            let col = i as i32;
+            let mut s = *segment;
+            let mut alignment = pb::Align::General as i32;
+
+            // Parse alignment prefix
+            if s.starts_with('<') {
+                alignment = pb::Align::LeftCenter as i32;
+                s = &s[1..];
+            } else if s.starts_with('>') {
+                alignment = pb::Align::RightCenter as i32;
+                s = &s[1..];
+            } else if s.starts_with('^') {
+                alignment = pb::Align::CenterCenter as i32;
+                s = &s[1..];
+            }
+
+            // Parse width suffix
+            let (header_text, width) = if let Some(semi_pos) = s.rfind(';') {
+                let width_str = &s[semi_pos + 1..];
+                let w = width_str.trim().parse::<i32>().unwrap_or(-1);
+                (&s[..semi_pos], w)
+            } else {
+                (s, -1)
+            };
+
+            // Apply alignment
+            if col < self.cols && (col as usize) < self.columns.len() {
+                self.columns[col as usize].alignment = alignment;
+            }
+
+            // Apply width
+            if width > 0 {
+                let w = self.clamp_col_width(col, width);
+                self.col_widths.insert(col, w);
+            }
+
+            // Set header text in fixed row 0
+            if self.fixed_rows > 0 {
+                self.cells.set_text(0, col, header_text.to_string());
+            }
+        }
+
+        self.layout.invalidate();
+        self.dirty = true;
+    }
+
+    // ── Version ────────────────────────────────
+
+    /// Returns the engine version string.
+    pub fn version() -> &'static str {
+        "1.0.0"
+    }
+
+    // ── Client dimensions (ClientWidth/ClientHeight) ─────
+
+    /// Returns the usable client width (viewport minus fixed column area).
+    pub fn client_width(&self) -> i32 {
+        (self.viewport_width - self.fixed_width()).max(0)
+    }
+
+    /// Returns the usable client height (viewport minus fixed row area).
+    pub fn client_height(&self) -> i32 {
+        (self.viewport_height - self.fixed_height()).max(0)
+    }
+
+    // ── AddItem / RemoveItem ──────────────────────────────────────────
+
+    /// Insert a new row at `at_row` with tab-delimited text spread across columns.
+    ///
+    /// If `at_row < 0` or `at_row >= rows`, the row is appended at the end.
+    pub fn add_item(&mut self, text: &str, at_row: i32) {
+        let insert_at = if at_row < 0 || at_row >= self.rows {
+            self.rows
+        } else {
+            at_row
+        };
+
+        // Shift existing cell data down
+        self.cells.insert_row(insert_at);
+
+        // Increment row count
+        self.rows += 1;
+
+        // Preserve existing display-to-logical mapping:
+        // 1. Bump all logical indices >= insert_at by 1
+        for pos in self.row_positions.iter_mut() {
+            if *pos >= insert_at {
+                *pos += 1;
+            }
+        }
+        // 2. Insert the new row's logical index at the appropriate display position.
+        //    Find the display position where insert_at was (or would be) shown.
+        let display_pos = self
+            .row_positions
+            .iter()
+            .position(|&r| r == insert_at + 1) // the row that was at insert_at (now bumped to insert_at+1)
+            .unwrap_or(self.row_positions.len());
+        self.row_positions.insert(display_pos, insert_at);
+
+        // Shift row heights, row_props, cell_styles for rows >= insert_at
+        let old_heights = std::mem::take(&mut self.row_heights);
+        for (r, h) in old_heights {
+            if r >= insert_at {
+                self.row_heights.insert(r + 1, h);
+            } else {
+                self.row_heights.insert(r, h);
+            }
+        }
+
+        let old_props = std::mem::take(&mut self.row_props);
+        for (r, props) in old_props {
+            if r >= insert_at {
+                self.row_props.insert(r + 1, props);
+            } else {
+                self.row_props.insert(r, props);
+            }
+        }
+
+        let old_styles = std::mem::take(&mut self.cell_styles);
+        for ((r, c), style) in old_styles {
+            if r >= insert_at {
+                self.cell_styles.insert((r + 1, c), style);
+            } else {
+                self.cell_styles.insert((r, c), style);
+            }
+        }
+
+        // Set tab-delimited text across columns
+        let parts: Vec<&str> = text.split('\t').collect();
+        for (i, part) in parts.iter().enumerate() {
+            let col = i as i32;
+            if col < self.cols {
+                self.cells.set_text(insert_at, col, part.to_string());
+            }
+        }
+
+        let h = self.get_row_height(insert_at);
+        self.animation.notify_rows_inserted(insert_at, 1, h);
+        self.layout.invalidate();
+        self.dirty = true;
+    }
+
+    /// Remove the row at `row`, shifting subsequent rows up.
+    ///
+    /// Does nothing if `row` is out of range or is a fixed row.
+    pub fn remove_item(&mut self, row: i32) {
+        if row < self.fixed_rows || row >= self.rows {
+            return;
+        }
+
+        let h = self.get_row_height(row);
+        self.animation.notify_rows_removed(row, 1, h);
+        self.cells.remove_row(row);
+        self.rows -= 1;
+
+        // Preserve existing display-to-logical mapping:
+        // 1. Remove the entry for this logical row from position mapping
+        self.row_positions.retain(|&r| r != row);
+        // 2. Decrement all logical indices > row by 1
+        for pos in self.row_positions.iter_mut() {
+            if *pos > row {
+                *pos -= 1;
+            }
+        }
+
+        // Shift row heights and row_props for rows > row
+        let old_heights = std::mem::take(&mut self.row_heights);
+        for (r, h) in old_heights {
+            if r == row {
+                continue; // remove the deleted row's height
+            } else if r > row {
+                self.row_heights.insert(r - 1, h);
+            } else {
+                self.row_heights.insert(r, h);
+            }
+        }
+
+        let old_props = std::mem::take(&mut self.row_props);
+        for (r, props) in old_props {
+            if r == row {
+                continue;
+            } else if r > row {
+                self.row_props.insert(r - 1, props);
+            } else {
+                self.row_props.insert(r, props);
+            }
+        }
+
+        let old_styles = std::mem::take(&mut self.cell_styles);
+        for ((r, c), style) in old_styles {
+            if r == row {
+                continue;
+            } else if r > row {
+                self.cell_styles.insert((r - 1, c), style);
+            } else {
+                self.cell_styles.insert((r, c), style);
+            }
+        }
+
+        // Clamp frozen rows, selection
+        if self.fixed_rows + self.frozen_rows > self.rows {
+            self.frozen_rows = (self.rows - self.fixed_rows).max(0);
+        }
+        self.selection
+            .clamp(self.rows, self.cols, self.fixed_rows, self.fixed_cols);
+
+        self.layout.invalidate();
+        self.dirty = true;
+    }
+}
+
+/// Public wrapper for `apply_col_format` used by other modules (e.g. outline subtotals).
+pub fn apply_col_format_public(raw: &str, fmt: &str) -> Option<String> {
+    apply_col_format(raw, fmt)
+}
+
+/// Apply a column format string to a raw cell value.
+///
+/// Supports common spreadsheet-style format codes:
+/// - `#,##0` / `#,##0.00` — thousands separator, fixed decimals
+/// - `$#,##0.00` — currency prefix
+/// - `0.0%` / `0%` — percentage (multiplies by 100)
+/// - Fixed decimal: `0.0`, `0.00`, `0.000` etc.
+/// - Literal prefix/suffix around `#` or `0` patterns
+fn apply_col_format(raw: &str, fmt: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    // Handle named formats
+    let fmt_lower = fmt.to_lowercase();
+    match fmt_lower.as_str() {
+        "currency" => return apply_col_format(raw, "$#,##0.00"),
+        "fixed" => return apply_col_format(raw, "0.00"),
+        "standard" => return apply_col_format(raw, "#,##0.00"),
+        "percent" => return apply_col_format(raw, "0.00%"),
+        "scientific" => {
+            let cleaned = trimmed.replace([',', '$', ' '], "");
+            if let Ok(val) = cleaned.parse::<f64>() {
+                return Some(format!("{:.2E}", val));
+            }
+            return None;
+        }
+        "short date" => {
+            // Format as MM/DD/YYYY if parseable
+            if let Some(formatted) = format_as_short_date(trimmed) {
+                return Some(formatted);
+            }
+            return None;
+        }
+        "long date" => {
+            if let Some(formatted) = format_as_long_date(trimmed) {
+                return Some(formatted);
+            }
+            return None;
+        }
+        "true/false" => {
+            return Some(format_bool_string(trimmed, "True", "False"));
+        }
+        "yes/no" => {
+            return Some(format_bool_string(trimmed, "Yes", "No"));
+        }
+        "on/off" => {
+            return Some(format_bool_string(trimmed, "On", "Off"));
+        }
+        _ => {}
+    }
+
+    // Try to parse as a number for numeric formats
+    let cleaned = trimmed.replace([',', '$', ' '], "");
+    let num = cleaned.parse::<f64>().ok();
+
+    if let Some(val) = num {
+        let is_percent = fmt.contains('%');
+        let display_val = if is_percent { val * 100.0 } else { val };
+
+        // Count decimal places from format
+        let decimals = if let Some(dot_pos) = fmt.rfind('.') {
+            let after_dot: usize = fmt[dot_pos + 1..]
+                .chars()
+                .take_while(|c| *c == '0' || *c == '#')
+                .count();
+            after_dot
+        } else {
+            0
+        };
+
+        // Format the number
+        let formatted_num = format!("{:.prec$}", display_val, prec = decimals);
+
+        // Add thousands separator if format contains ','
+        let with_sep = if fmt.contains(',') {
+            add_thousands_separator(&formatted_num)
+        } else {
+            formatted_num
+        };
+
+        // Build final string with prefix/suffix from format
+        let mut prefix = String::new();
+        let mut suffix = String::new();
+
+        // Extract prefix (chars before first # or 0)
+        for ch in fmt.chars() {
+            if ch == '#' || ch == '0' || ch == '.' || ch == ',' {
+                break;
+            }
+            prefix.push(ch);
+        }
+
+        // Extract suffix (chars after last # or 0 or %)
+        let last_fmt_char = fmt
+            .rfind(|c: char| c == '#' || c == '0' || c == '%')
+            .unwrap_or(0);
+        if last_fmt_char + 1 < fmt.len() {
+            let remaining = &fmt[last_fmt_char + 1..];
+            // Skip the first char if it was already consumed
+            for ch in remaining.chars() {
+                if ch != '#' && ch != '0' && ch != '.' && ch != ',' {
+                    suffix.push(ch);
+                }
+            }
+        }
+
+        let pct_suffix = if is_percent { "%" } else { "" };
+
+        Some(format!("{}{}{}{}", prefix, with_sep, pct_suffix, suffix))
+    } else {
+        // Not a number; return raw text unchanged
+        None
+    }
+}
+
+/// Map a cell value to a boolean display string.
+///
+/// Treats "0", "false", "no", "off", and empty as the false value;
+/// everything else (including any non-zero number) as the true value.
+fn format_bool_string(raw: &str, true_str: &str, false_str: &str) -> String {
+    let lower = raw.trim().to_lowercase();
+    if lower.is_empty()
+        || lower == "0"
+        || lower == "false"
+        || lower == "no"
+        || lower == "off"
+        || lower == "0.0"
+    {
+        false_str.to_string()
+    } else {
+        true_str.to_string()
+    }
+}
+
+/// Format a date string as MM/DD/YYYY (Short Date).
+fn format_as_short_date(raw: &str) -> Option<String> {
+    let (y, m, d) = parse_date_parts(raw)?;
+    Some(format!("{:02}/{:02}/{:04}", m, d, y))
+}
+
+/// Format a date string as "Month DD, YYYY" (Long Date).
+fn format_as_long_date(raw: &str) -> Option<String> {
+    let (y, m, d) = parse_date_parts(raw)?;
+    let month_name = match m {
+        1 => "January",
+        2 => "February",
+        3 => "March",
+        4 => "April",
+        5 => "May",
+        6 => "June",
+        7 => "July",
+        8 => "August",
+        9 => "September",
+        10 => "October",
+        11 => "November",
+        12 => "December",
+        _ => return None,
+    };
+    Some(format!("{} {:02}, {:04}", month_name, d, y))
+}
+
+/// Parse common date formats into (year, month, day).
+/// Supports: YYYY-MM-DD, YYYY/MM/DD, MM/DD/YYYY, MM-DD-YYYY.
+fn parse_date_parts(s: &str) -> Option<(i32, i32, i32)> {
+    let s = s.trim();
+    if s.is_empty() {
+        return None;
+    }
+    let parts: Vec<&str> = s
+        .split(|ch: char| !ch.is_ascii_digit())
+        .filter(|p| !p.is_empty())
+        .collect();
+    if parts.len() < 3 {
+        return None;
+    }
+    let p0 = parts[0].parse::<i32>().ok()?;
+    let p1 = parts[1].parse::<i32>().ok()?;
+    let p2 = parts[2].parse::<i32>().ok()?;
+
+    let (y, m, d) = if parts[0].len() == 4 {
+        (p0, p1, p2) // YYYY-MM-DD
+    } else if parts[2].len() == 4 {
+        (p2, p0, p1) // MM/DD/YYYY
+    } else {
+        return None;
+    };
+    if !(1..=12).contains(&m) || !(1..=31).contains(&d) {
+        return None;
+    }
+    Some((y, m, d))
+}
+
+/// Insert thousands separators into a formatted number string.
+fn add_thousands_separator(s: &str) -> String {
+    let (integer_part, decimal_part) = match s.find('.') {
+        Some(dot) => (&s[..dot], Some(&s[dot..])),
+        None => (s, None),
+    };
+
+    let negative = integer_part.starts_with('-');
+    let digits = if negative {
+        &integer_part[1..]
+    } else {
+        integer_part
+    };
+
+    let mut result = String::new();
+    let len = digits.len();
+    for (i, ch) in digits.chars().enumerate() {
+        if i > 0 && (len - i) % 3 == 0 {
+            result.push(',');
+        }
+        result.push(ch);
+    }
+
+    let mut final_str = String::new();
+    if negative {
+        final_str.push('-');
+    }
+    final_str.push_str(&result);
+    if let Some(dec) = decimal_part {
+        final_str.push_str(dec);
+    }
+    final_str
+}
+
+// =========================================================================
+// Public utility functions that hosts previously had to duplicate.
+// =========================================================================
+
+impl VolvoxGrid {
+    /// Rebuild the layout cache from grid dimensions.
+    ///
+    /// This is the canonical entry point that avoids the self-referential
+    /// borrow problem of calling `self.layout.rebuild(self)`.
+    pub fn ensure_layout(&mut self) {
+        if !self.layout.valid {
+            // Snapshot previous positions for animation diffing
+            self.animation.save_prev(&self.layout);
+
+            let rows = self.rows;
+            let cols = self.cols;
+            self.layout.rows = rows;
+            self.layout.cols = cols;
+
+            self.layout.uniform_rows = self.row_heights.is_empty()
+                && self.rows_hidden.is_empty()
+                && self.pinned_rows_top.is_empty()
+                && self.pinned_rows_bottom.is_empty();
+            if self.layout.uniform_rows {
+                self.layout.uniform_row_height = self.clamp_row_height(self.default_row_height);
+                self.layout.row_positions.clear();
+                self.layout.total_height = self
+                    .layout
+                    .uniform_row_height
+                    .max(0)
+                    .saturating_mul(rows.max(0));
+            } else {
+                self.layout.uniform_row_height = 0;
+                self.layout.row_positions.clear();
+                self.layout.row_positions.reserve((rows + 1) as usize);
+                self.layout.row_positions.push(0);
+                for r in 0..rows {
+                    let prev = *self.layout.row_positions.last().unwrap();
+                    // Pinned rows get 0 height in layout so they disappear
+                    // from the scrollable area. Their actual height is still
+                    // returned by row_height() for pinned-section rendering.
+                    let h = if self.is_row_pinned(r) != 0 {
+                        0
+                    } else {
+                        self.row_height(r)
+                    };
+                    self.layout.row_positions.push(prev + h);
+                }
+                self.layout.total_height = *self.layout.row_positions.last().unwrap_or(&0);
+            }
+
+            self.layout.uniform_cols = self.col_widths.is_empty()
+                && self.cols_hidden.is_empty()
+                && self.col_width_min.is_empty()
+                && self.col_width_max.is_empty()
+                && self.pinned_cols_left.is_empty()
+                && self.pinned_cols_right.is_empty();
+            if self.layout.uniform_cols {
+                self.layout.uniform_col_width = self.clamp_col_width(0, self.default_col_width);
+                self.layout.col_positions.clear();
+                self.layout.total_width = self
+                    .layout
+                    .uniform_col_width
+                    .max(0)
+                    .saturating_mul(cols.max(0));
+            } else {
+                self.layout.uniform_col_width = 0;
+                self.layout.col_positions.clear();
+                self.layout.col_positions.reserve((cols + 1) as usize);
+                self.layout.col_positions.push(0);
+                for c in 0..cols {
+                    let prev = *self.layout.col_positions.last().unwrap();
+                    // Pinned columns get 0 width in layout so they disappear
+                    // from the horizontal scrollable area.
+                    let w = if self.is_col_pinned(c) != 0 {
+                        0
+                    } else {
+                        self.col_width(c)
+                    };
+                    self.layout.col_positions.push(prev + w);
+                }
+                self.layout.total_width = *self.layout.col_positions.last().unwrap_or(&0);
+            }
+
+            self.layout.valid = true;
+
+            // Compute animation offsets from layout diff
+            self.animation.compute_offsets(&self.layout);
+        }
+        let pinned_h = self.pinned_top_height() + self.pinned_bottom_height();
+        let pinned_w = self.pinned_left_width() + self.pinned_right_width();
+        self.scroll.update_bounds(
+            &self.layout,
+            self.viewport_width,
+            self.viewport_height,
+            self.fixed_rows,
+            self.fixed_cols,
+            pinned_h,
+            pinned_w,
+        );
+
+        // Tick animation offsets and keep dirty while animating
+        if self.animation.tick() {
+            self.dirty = true;
+        }
+    }
+
+    /// Returns the topmost visible scrollable row (`TopRow`).
+    pub fn top_row(&mut self) -> i32 {
+        self.ensure_layout();
+        let first_scrollable = self.first_scrollable_row().clamp(0, self.rows);
+        if first_scrollable >= self.rows {
+            return first_scrollable.saturating_sub(1).max(0);
+        }
+        let (first, _) =
+            self.layout
+                .visible_rows(self.scroll.scroll_y, self.viewport_height, first_scrollable);
+        first.clamp(first_scrollable, self.rows - 1)
+    }
+
+    /// Sets the topmost visible scrollable row (`TopRow`).
+    pub fn set_top_row(&mut self, row: i32) {
+        self.ensure_layout();
+        let first_scrollable = self.first_scrollable_row().clamp(0, self.rows);
+        if first_scrollable >= self.rows {
+            return;
+        }
+        let target_row = row.clamp(first_scrollable, self.rows - 1);
+        let fixed_h = self.layout.row_pos(first_scrollable);
+        let row_top = self.layout.row_pos(target_row);
+        let target_scroll_y = (row_top - fixed_h).max(0) as f32;
+        // Programmatic jumps (e.g. host fast scroller) should cancel inertia so
+        // the requested row stays stable instead of being overridden by fling.
+        self.scroll.stop_fling();
+        // Set scroll_y directly (not via scroll_to which would clamp to the
+        // current max).  update_bounds will raise max_scroll_y to accommodate.
+        self.scroll.scroll_y = target_scroll_y;
+        self.mark_dirty();
+    }
+
+    /// Returns the bottommost visible scrollable row (`BottomRow`).
+    pub fn bottom_row(&mut self) -> i32 {
+        self.ensure_layout();
+        let first_scrollable = self.first_scrollable_row().clamp(0, self.rows);
+        if first_scrollable >= self.rows {
+            return first_scrollable.saturating_sub(1).max(0);
+        }
+        let (_, last) =
+            self.layout
+                .visible_rows(self.scroll.scroll_y, self.viewport_height, first_scrollable);
+        last.clamp(first_scrollable, self.rows - 1)
+    }
+
+    /// Returns the leftmost visible scrollable column (`LeftCol`).
+    pub fn left_col(&mut self) -> i32 {
+        self.ensure_layout();
+        let first_scrollable = self.first_scrollable_col().clamp(0, self.cols);
+        if first_scrollable >= self.cols {
+            return first_scrollable.saturating_sub(1).max(0);
+        }
+        let (first, _) =
+            self.layout
+                .visible_cols(self.scroll.scroll_x, self.viewport_width, first_scrollable);
+        first.clamp(first_scrollable, self.cols - 1)
+    }
+
+    /// Sets the leftmost visible scrollable column (`LeftCol`).
+    pub fn set_left_col(&mut self, col: i32) {
+        self.ensure_layout();
+        let first_scrollable = self.first_scrollable_col().clamp(0, self.cols);
+        if first_scrollable >= self.cols {
+            return;
+        }
+        let target_col = col.clamp(first_scrollable, self.cols - 1);
+        let fixed_w = self.layout.col_pos(first_scrollable);
+        let col_left = self.layout.col_pos(target_col);
+        let target_scroll_x = (col_left - fixed_w).max(0) as f32;
+        // Set scroll_x directly (not via scroll_to which would clamp to the
+        // current max).  update_bounds will raise max_scroll_x to accommodate.
+        self.scroll.scroll_x = target_scroll_x;
+        self.mark_dirty();
+    }
+
+    /// Returns the rightmost visible scrollable column (`RightCol`).
+    pub fn right_col(&mut self) -> i32 {
+        self.ensure_layout();
+        let first_scrollable = self.first_scrollable_col().clamp(0, self.cols);
+        if first_scrollable >= self.cols {
+            return first_scrollable.saturating_sub(1).max(0);
+        }
+        let (_, last) =
+            self.layout
+                .visible_cols(self.scroll.scroll_x, self.viewport_width, first_scrollable);
+        last.clamp(first_scrollable, self.cols - 1)
+    }
+
+    /// Commit the active edit, applying dropdown translation, text truncation,
+    /// and emitting all required events (CellEditValidate, AfterEdit, CellChanged,
+    /// DropdownClosed).  Returns true if an edit was committed.
+    pub fn commit_edit(&mut self) -> bool {
+        let Some((row, col, old_text, new_text)) = self.edit.commit() else {
+            return false;
+        };
+
+        // Normalize: truncate, translate dropdown display→value.
+        let mut committed = truncate_chars(&new_text, self.edit_max_length);
+        let cell_dropdown = self
+            .cells
+            .get(row, col)
+            .map(|c| c.dropdown_items().to_string())
+            .unwrap_or_default();
+        if cell_dropdown.is_empty() && col >= 0 && (col as usize) < self.columns.len() {
+            let col_list = &self.columns[col as usize].dropdown_items;
+            if !col_list.is_empty() {
+                if let Some(mapped) =
+                    crate::edit::translate_dropdown_display_to_value(col_list, &committed)
+                {
+                    committed = mapped;
+                }
+            }
+        }
+
+        // Emit events and apply.
+        self.events
+            .push(crate::event::GridEventData::CellEditValidate {
+                row,
+                col,
+                edit_text: committed.clone(),
+            });
+        self.cells.set_text(row, col, committed.clone());
+        if old_text != committed {
+            self.events.push(crate::event::GridEventData::AfterEdit {
+                row,
+                col,
+                old_text: old_text.clone(),
+                new_text: committed.clone(),
+            });
+            self.events.push(crate::event::GridEventData::CellChanged {
+                row,
+                col,
+                old_text,
+                new_text: committed,
+            });
+        }
+        let active_dropdown = self.active_dropdown_list(row, col);
+        if !active_dropdown.is_empty() && active_dropdown.trim() != "..." {
+            self.events
+                .push(crate::event::GridEventData::DropdownClosed);
+        }
+        self.mark_dirty();
+        true
+    }
+
+    /// Cancel the active edit and emit DropdownClosed if applicable.
+    /// Returns true if an edit was cancelled.
+    pub fn cancel_edit(&mut self) -> bool {
+        let Some((row, col)) = self.edit.cancel() else {
+            return false;
+        };
+        let active_dropdown = self.active_dropdown_list(row, col);
+        if !active_dropdown.is_empty() && active_dropdown.trim() != "..." {
+            self.events
+                .push(crate::event::GridEventData::DropdownClosed);
+        }
+        self.mark_dirty();
+        true
+    }
+
+    /// Begin editing a cell, handling dropdown list parsing, button cells ("..."),
+    /// and event emission.
+    pub fn begin_edit(&mut self, row: i32, col: i32) {
+        if !self.can_begin_edit(row, col, false) {
+            return;
+        }
+
+        let dropdown_list = self.active_dropdown_list(row, col);
+        self.events
+            .push(crate::event::GridEventData::BeforeEdit { row, col });
+
+        if dropdown_list.trim() == "..." {
+            self.events
+                .push(crate::event::GridEventData::CellButtonClick { row, col });
+            self.mark_dirty();
+            return;
+        }
+
+        let stored_text = self.cells.get_text(row, col).to_string();
+        let display_text = self.get_display_text(row, col);
+        self.edit.start_edit(row, col, &display_text);
+        self.edit.parse_dropdown_items(&dropdown_list);
+
+        if !dropdown_list.is_empty() {
+            for i in 0..self.edit.dropdown_count() {
+                if (!stored_text.is_empty() && self.edit.get_dropdown_data(i) == stored_text)
+                    || self.edit.get_dropdown_item(i) == display_text
+                {
+                    self.edit.set_dropdown_index(i);
+                    break;
+                }
+            }
+            self.events
+                .push(crate::event::GridEventData::DropdownOpened);
+        }
+
+        self.events
+            .push(crate::event::GridEventData::StartEdit { row, col });
+        self.mark_dirty();
+    }
+
+    /// Get the screen-space rectangle for a cell, accounting for scroll
+    /// offset, frozen rows/cols, and merged ranges.
+    /// Returns `None` if the cell is hidden or off-screen.
+    pub fn cell_screen_rect(&self, row: i32, col: i32) -> Option<(i32, i32, i32, i32)> {
+        if row < 0 || row >= self.rows || col < 0 || col >= self.cols {
+            return None;
+        }
+        if !self.layout.valid {
+            return None;
+        }
+        if self.is_row_hidden(row) || self.is_col_hidden(col) {
+            return None;
+        }
+
+        let mut x = self.col_pos(col);
+        let mut y = self.row_pos(row);
+        let mut w = self.col_width(col);
+        let mut h = self.row_height(row);
+        if w <= 0 || h <= 0 {
+            return None;
+        }
+
+        let row_scrollable = row >= self.fixed_rows + self.frozen_rows;
+        let col_scrollable = col >= self.fixed_cols + self.frozen_cols;
+        if row_scrollable {
+            y -= self.scroll.scroll_y as i32;
+        }
+        if col_scrollable {
+            x -= self.scroll.scroll_x as i32;
+        }
+
+        if let Some((mr1, mc1, mr2, mc2)) = self.get_merged_range(row, col) {
+            if mr1 != mr2 || mc1 != mc2 {
+                x = self.col_pos(mc1);
+                y = self.row_pos(mr1);
+                if col_scrollable {
+                    x -= self.scroll.scroll_x as i32;
+                }
+                if row_scrollable {
+                    y -= self.scroll.scroll_y as i32;
+                }
+                w = 0;
+                for c in mc1..=mc2 {
+                    w += self.col_width(c);
+                }
+                h = 0;
+                for r in mr1..=mr2 {
+                    h += self.row_height(r);
+                }
+            }
+        }
+
+        if self.extend_last_col && col == self.cols - 1 && x < self.viewport_width {
+            w = w.max(self.viewport_width - x);
+        }
+
+        if self.right_to_left {
+            x = self.viewport_width - (x + w);
+        }
+
+        if x + w <= 0 || y + h <= 0 || x >= self.viewport_width || y >= self.viewport_height {
+            return None;
+        }
+
+        Some((x, y, w, h))
+    }
+
+    /// Get the screen-space rectangle for an edit input box, extending into
+    /// empty neighbor cells only when the edit text actually overflows the
+    /// cell width.  Matches spreadsheet behavior: short text → normal cell
+    /// rect, long text → extended rect (right border disappears visually).
+    pub fn edit_cell_rect(&mut self, row: i32, col: i32) -> Option<(i32, i32, i32, i32)> {
+        let (mut x, y, mut w, h) = self.cell_screen_rect(row, col)?;
+
+        // Only extend for data rows, non-merged cells, when text_overflow is on.
+        let is_merged = self
+            .get_merged_range(row, col)
+            .map_or(false, |(r1, c1, r2, c2)| r1 != r2 || c1 != c2);
+        if !self.text_overflow || row < self.fixed_rows || is_merged {
+            return Some((x, y, w, h));
+        }
+
+        // Use the current edit text if this cell is being edited, otherwise
+        // the display text.
+        let text = if self.edit.is_active()
+            && self.edit.edit_row == row
+            && self.edit.edit_col == col
+        {
+            self.edit.edit_text.clone()
+        } else {
+            self.get_display_text(row, col)
+        };
+        if text.is_empty() {
+            return Some((x, y, w, h));
+        }
+
+        // Resolve font for measurement.
+        let style_override = self.get_cell_style(row, col);
+        let font_name = style_override
+            .font_name
+            .clone()
+            .unwrap_or_else(|| self.style.font_name.clone());
+        let font_size = style_override.font_size.unwrap_or(self.style.font_size);
+        let font_bold = style_override.font_bold.unwrap_or(self.style.font_bold);
+        let font_italic = style_override.font_italic.unwrap_or(self.style.font_italic);
+
+        // Account for cell padding.
+        let cell_padding = self.resolve_cell_padding(row, col, &style_override);
+        let inner_w = (w - cell_padding.left - cell_padding.right).max(1);
+
+        // Measure text width.  When the text engine has fonts we get an
+        // accurate measurement; otherwise fall back to a character-count
+        // heuristic (~0.6 × font_size per character for proportional fonts).
+        let te = self.ensure_text_engine();
+        let tw = if te.has_fonts() {
+            te.measure_text(&text, &font_name, font_size, font_bold, font_italic, None)
+                .0
+        } else {
+            text.chars().count() as f32 * font_size * 0.6
+        };
+
+        // Text fits within the cell — no extension needed.
+        if tw <= inner_w as f32 {
+            return Some((x, y, w, h));
+        }
+
+        // Resolve horizontal alignment to decide scan direction.
+        let alignment =
+            crate::canvas::resolve_alignment(self, row, col, &style_override, &text);
+        let (halign, _) = crate::canvas::alignment_components(alignment);
+
+        // Determine scan directions (flip for RTL).
+        let scan_right = if self.right_to_left {
+            halign == 2
+        } else {
+            halign == 0 || halign == 1
+        };
+        let scan_left = if self.right_to_left {
+            halign == 0 || halign == 1
+        } else {
+            halign == 2 || halign == 1
+        };
+
+        let mut right_ext: i32 = 0;
+        let mut left_ext: i32 = 0;
+
+        // Scan rightward into empty neighbors.
+        if scan_right {
+            let mut c = col + 1;
+            while c < self.cols {
+                if self.is_col_hidden(c) {
+                    c += 1;
+                    continue;
+                }
+                if self
+                    .get_merged_range(row, c)
+                    .map_or(false, |(r1, c1, r2, c2)| r1 != r2 || c1 != c2)
+                {
+                    break;
+                }
+                if !self.get_display_text(row, c).is_empty() {
+                    break;
+                }
+                right_ext += self.get_col_width(c);
+                if (inner_w + left_ext + right_ext) as f32 >= tw {
+                    break;
+                }
+                c += 1;
+            }
+        }
+
+        // Scan leftward into empty neighbors.
+        if scan_left {
+            let mut c = col - 1;
+            while c >= self.fixed_cols {
+                if self.is_col_hidden(c) {
+                    c -= 1;
+                    continue;
+                }
+                if self
+                    .get_merged_range(row, c)
+                    .map_or(false, |(r1, c1, r2, c2)| r1 != r2 || c1 != c2)
+                {
+                    break;
+                }
+                if !self.get_display_text(row, c).is_empty() {
+                    break;
+                }
+                left_ext += self.get_col_width(c);
+                if (inner_w + left_ext + right_ext) as f32 >= tw {
+                    break;
+                }
+                c -= 1;
+            }
+        }
+
+        // cell_screen_rect() already applied the RTL x-flip, so we adjust
+        // in screen coordinates: left_ext shrinks x, right_ext grows w.
+        if self.right_to_left {
+            x -= right_ext;
+            w += left_ext + right_ext;
+        } else {
+            x -= left_ext;
+            w += left_ext + right_ext;
+        }
+
+        Some((x, y, w, h))
+    }
+
+    /// Hit-test a pixel coordinate against the active dropdown.
+    /// Returns the dropdown item index if the point is inside the dropdown,
+    /// or `None` if outside or no dropdown is active.
+    pub fn dropdown_hit_index(&self, px: f32, py: f32) -> Option<i32> {
+        if !self.edit.is_active() {
+            return None;
+        }
+        let row = self.edit.edit_row;
+        let col = self.edit.edit_col;
+        if row < 0 || row >= self.rows || col < 0 || col >= self.cols {
+            return None;
+        }
+
+        let list = self.active_dropdown_list(row, col);
+        if list.is_empty() || list.trim() == "..." {
+            return None;
+        }
+
+        let count = self.edit.dropdown_count();
+        if count <= 0 {
+            return None;
+        }
+
+        let mut cell_x = self.col_pos(col);
+        let mut cell_y = self.row_pos(row);
+        let cell_w = self.col_width(col);
+        let cell_h = self.row_height(row);
+        if row >= self.fixed_rows + self.frozen_rows {
+            cell_y -= self.scroll.scroll_y as i32;
+        }
+        if col >= self.fixed_cols + self.frozen_cols {
+            cell_x -= self.scroll.scroll_x as i32;
+        }
+
+        let visible_count = count.min(8).max(1);
+        let item_h = cell_h.max(18);
+        let drop_h = item_h * visible_count;
+        let drop_w = cell_w.max(90);
+        let mut drop_x = cell_x;
+        let mut drop_y = cell_y + cell_h - 1;
+
+        if drop_x + drop_w > self.viewport_width {
+            drop_x = (self.viewport_width - drop_w).max(0);
+        }
+        if drop_y + drop_h > self.viewport_height {
+            drop_y = cell_y - drop_h + 1;
+        }
+        if drop_y < 0 {
+            drop_y = 0;
+        }
+        if drop_y + drop_h > self.viewport_height {
+            drop_y = (self.viewport_height - drop_h).max(0);
+        }
+
+        let mx = px as i32;
+        let my = py as i32;
+        if mx < drop_x || mx >= drop_x + drop_w || my < drop_y || my >= drop_y + drop_h {
+            return None;
+        }
+
+        let mut start = 0;
+        let sel = self.edit.dropdown_index;
+        if sel >= 0 && sel >= visible_count {
+            start = sel - visible_count + 1;
+        }
+        let max_start = (count - visible_count).max(0);
+        if start > max_start {
+            start = max_start;
+        }
+
+        let slot = ((my - drop_y) / item_h).clamp(0, visible_count - 1);
+        let idx = start + slot;
+        if idx >= 0 && idx < count {
+            Some(idx)
+        } else {
+            None
+        }
+    }
+}
+
+/// Truncate a string to at most `max_chars` characters.
+fn truncate_chars(input: &str, max_chars: i32) -> String {
+    if max_chars <= 0 {
+        return input.to_string();
+    }
+    input.chars().take(max_chars as usize).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_string_sets_columns() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 5, 1, 1, 0);
+        grid.format_string = "<Name|>Amount;120|^Status".to_string();
+        grid.apply_format_string();
+
+        assert_eq!(grid.cols, 3);
+        assert_eq!(grid.cells.get_text(0, 0), "Name");
+        assert_eq!(grid.cells.get_text(0, 1), "Amount");
+        assert_eq!(grid.cells.get_text(0, 2), "Status");
+        assert_eq!(grid.columns[0].alignment, 1); // LEFT_CENTER
+        assert_eq!(grid.columns[1].alignment, 7); // RIGHT_CENTER
+        assert_eq!(grid.columns[2].alignment, 4); // CENTER_CENTER
+        assert_eq!(grid.get_col_width(1), 120);
+    }
+
+    #[test]
+    fn col_format_currency() {
+        let result = apply_col_format("1234567.89", "$#,##0.00");
+        assert_eq!(result, Some("$1,234,567.89".to_string()));
+    }
+
+    #[test]
+    fn col_format_percentage() {
+        let result = apply_col_format("0.75", "0.0%");
+        assert_eq!(result, Some("75.0%".to_string()));
+    }
+
+    #[test]
+    fn col_format_thousands() {
+        let result = apply_col_format("1234", "#,##0");
+        assert_eq!(result, Some("1,234".to_string()));
+    }
+
+    #[test]
+    fn col_format_non_numeric_returns_none() {
+        let result = apply_col_format("hello", "#,##0.00");
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn col_format_display_text() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.columns[1].format = "$#,##0.00".to_string();
+        grid.cells.set_text(1, 1, "1234.5".to_string());
+        let display = grid.get_display_text(1, 1);
+        assert_eq!(display, "$1,234.50");
+    }
+
+    #[test]
+    fn add_item_inserts_row() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 2, 3, 1, 0);
+        grid.cells.set_text(1, 0, "original".to_string());
+        grid.add_item("A\tB\tC", 1);
+
+        assert_eq!(grid.rows, 3);
+        assert_eq!(grid.cells.get_text(1, 0), "A");
+        assert_eq!(grid.cells.get_text(1, 1), "B");
+        assert_eq!(grid.cells.get_text(1, 2), "C");
+        assert_eq!(grid.cells.get_text(2, 0), "original");
+    }
+
+    #[test]
+    fn add_item_shifts_cell_styles() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 2, 3, 1, 0);
+        grid.cell_styles.insert(
+            (1, 1),
+            crate::style::CellStyleOverride {
+                font_bold: Some(true),
+                ..Default::default()
+            },
+        );
+
+        grid.add_item("A\tB\tC", 1);
+        assert!(grid.cell_styles.contains_key(&(2, 1)));
+        assert!(!grid.cell_styles.contains_key(&(1, 1)));
+    }
+
+    #[test]
+    fn remove_item_shifts_rows() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 2, 1, 0);
+        grid.cells.set_text(1, 0, "row1".to_string());
+        grid.cells.set_text(2, 0, "row2".to_string());
+        grid.cells.set_text(3, 0, "row3".to_string());
+        grid.remove_item(2);
+
+        assert_eq!(grid.rows, 3);
+        assert_eq!(grid.cells.get_text(1, 0), "row1");
+        assert_eq!(grid.cells.get_text(2, 0), "row3");
+    }
+
+    #[test]
+    fn remove_item_shifts_cell_styles() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 2, 1, 0);
+        grid.cell_styles.insert(
+            (3, 1),
+            crate::style::CellStyleOverride {
+                font_italic: Some(true),
+                ..Default::default()
+            },
+        );
+
+        grid.remove_item(2);
+        assert!(grid.cell_styles.contains_key(&(2, 1)));
+        assert!(!grid.cell_styles.contains_key(&(3, 1)));
+    }
+
+    #[test]
+    fn remove_item_rejects_fixed_row() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.remove_item(0); // fixed row
+        assert_eq!(grid.rows, 3); // unchanged
+    }
+
+    #[test]
+    fn active_dropdown_list_hidden_for_header_and_subtotal_rows() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 2, 1, 0);
+        grid.columns[1].dropdown_items = "A|B|C".to_string();
+        grid.row_props.entry(2).or_default().is_subtotal = true;
+
+        // Header row: dropdown disabled.
+        assert_eq!(grid.active_dropdown_list(0, 1), "");
+        // Normal data row: dropdown enabled.
+        assert_eq!(grid.active_dropdown_list(1, 1), "A|B|C");
+        // Subtotal row: dropdown disabled.
+        assert_eq!(grid.active_dropdown_list(2, 1), "");
+    }
+
+    #[test]
+    fn begin_edit_blocked_for_header_and_subtotal_rows() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 2, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.row_props.entry(2).or_default().is_subtotal = true;
+
+        // Header row: must stay read-only.
+        grid.begin_edit(0, 1);
+        assert!(!grid.is_editing());
+
+        // Subtotal/grandtotal row: must stay read-only.
+        grid.begin_edit(2, 1);
+        assert!(!grid.is_editing());
+
+        // Normal data row: editable.
+        grid.begin_edit(1, 1);
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.edit_row, 1);
+        assert_eq!(grid.edit.edit_col, 1);
+    }
+
+    #[test]
+    fn can_begin_edit_force_does_not_override_header_or_subtotal_lock() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 2, 1, 0);
+        grid.edit_trigger_mode = 0;
+        grid.row_props.entry(2).or_default().is_subtotal = true;
+
+        // Force bypasses edit_trigger_mode for normal data rows.
+        assert!(grid.can_begin_edit(1, 1, true));
+        assert!(!grid.can_begin_edit(1, 1, false));
+
+        // But force must not bypass row-level read-only constraints.
+        assert!(!grid.can_begin_edit(0, 1, true)); // header
+        assert!(!grid.can_begin_edit(2, 1, true)); // subtotal/grandtotal
+    }
+
+    #[test]
+    fn remap_col_index_for_move_handles_both_directions() {
+        // Move source=1 to insert=3: [0,1,2,3] -> [0,2,3,1]
+        assert_eq!(VolvoxGrid::remap_col_index_for_move(1, 1, 3), 3);
+        assert_eq!(VolvoxGrid::remap_col_index_for_move(2, 1, 3), 1);
+        assert_eq!(VolvoxGrid::remap_col_index_for_move(3, 1, 3), 2);
+        assert_eq!(VolvoxGrid::remap_col_index_for_move(0, 1, 3), 0);
+
+        // Move source=3 to insert=1: [0,1,2,3] -> [0,3,1,2]
+        assert_eq!(VolvoxGrid::remap_col_index_for_move(3, 3, 1), 1);
+        assert_eq!(VolvoxGrid::remap_col_index_for_move(1, 3, 1), 2);
+        assert_eq!(VolvoxGrid::remap_col_index_for_move(2, 3, 1), 3);
+        assert_eq!(VolvoxGrid::remap_col_index_for_move(0, 3, 1), 0);
+    }
+
+    #[test]
+    fn remap_span_cols_after_move_follows_moved_column() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 4, 1, 0);
+        grid.span.span_cols.insert(1, true);
+        grid.span.span_cols.insert(-1, true); // keep "all cols" sentinel untouched
+
+        grid.remap_span_cols_after_move(1, 3);
+        assert_eq!(grid.span.span_cols.get(&3), Some(&true));
+        assert_eq!(grid.span.span_cols.get(&1), None);
+        assert_eq!(grid.span.span_cols.get(&-1), Some(&true));
+    }
+
+    #[test]
+    fn move_col_by_positions_reorders_physical_column_state() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 2, 4, 1, 0);
+        grid.cells.set_text(0, 0, "A".to_string());
+        grid.cells.set_text(0, 1, "B".to_string());
+        grid.cells.set_text(0, 2, "C".to_string());
+        grid.cells.set_text(0, 3, "D".to_string());
+        grid.col_widths.insert(1, 99);
+        grid.col_width_min.insert(2, 40);
+        grid.cols_hidden.insert(3);
+
+        assert!(grid.move_col_by_positions(1, 3)); // [A,B,C,D] -> [A,C,D,B]
+
+        assert_eq!(grid.cells.get_text(0, 0), "A");
+        assert_eq!(grid.cells.get_text(0, 1), "C");
+        assert_eq!(grid.cells.get_text(0, 2), "D");
+        assert_eq!(grid.cells.get_text(0, 3), "B");
+        assert_eq!(grid.col_widths.get(&3), Some(&99));
+        assert_eq!(grid.col_width_min.get(&1), Some(&40));
+        assert!(grid.cols_hidden.contains(&2));
+        assert_eq!(grid.col_positions, vec![0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn heap_size_bytes_tracks_cell_data_growth_and_clear() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 4, 1, 0);
+        let base = grid.heap_size_bytes();
+        assert!(base > 0);
+
+        grid.cells.set_text(1, 1, "x".repeat(2048));
+        grid.cells.set_text(2, 2, "y".repeat(4096));
+        let grown = grid.heap_size_bytes();
+        assert!(grown > base);
+
+        grid.cells = CellStore::new();
+        let reduced = grid.heap_size_bytes();
+        assert!(reduced < grown);
+    }
+}

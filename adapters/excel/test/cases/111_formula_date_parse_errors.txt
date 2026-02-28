@@ -1,0 +1,8 @@
+# Date-part parse behavior and errors
+setCellValue 0 0 "not-date"
+setCellValue 0 1 "=YEAR(A1)"
+setCellValue 0 2 "=MONTH(\"2024-12-15\")"
+setCellValue 0 3 "=DAY(\"2024-12-15 01:02:03\")"
+assertCellValue 0 1 "#VALUE!"
+assertCellValue 0 2 "12"
+assertCellValue 0 3 "15"

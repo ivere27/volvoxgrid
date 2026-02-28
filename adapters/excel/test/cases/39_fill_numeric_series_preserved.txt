@@ -1,0 +1,6 @@
+# Fill down preserves numeric arithmetic series behavior
+setData [["1"],["2"],[""],[""]]
+setSelection {"row1":0,"col1":0,"row2":1,"col2":0}
+invokeFillTo 3 0
+assertCellValue 2 0 "3"
+assertCellValue 3 0 "4"

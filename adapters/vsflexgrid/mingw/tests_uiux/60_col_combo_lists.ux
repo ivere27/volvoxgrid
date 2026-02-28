@@ -1,0 +1,8 @@
+# UI+UX interaction script for test 60.
+# Opens the Region combo dropdown on row 3 using real mouse clicks.
+set_cell 3 1
+sleep 80
+click_cell 3 1
+sleep 80
+click_combo 3 1
+sleep 180

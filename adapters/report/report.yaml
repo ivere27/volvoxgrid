@@ -1,0 +1,45 @@
+# VolvoxReport v1
+name: "Monthly Sales Report"
+page:
+  size: "A4"
+  orientation: "portrait"
+  margins: [20, 40, 20, 40] # top, right, bottom, left (pixels @ 96 DPI)
+  header: "Global Sales Summary - &P/&N"
+  footer: "Confidential - Printed on &D"
+
+# Data Source (Mock)
+data:
+  - { product: "Volvox Engine Pro", qty: 12, price: 499.00, region: "NA" }
+  - { product: "Synurang SDK", qty: 45, price: 150.00, region: "EU" }
+  - { product: "Grid Adapter Pack", qty: 8, price: 2999.00, region: "AS" }
+
+# Report Bands (Sections)
+bands:
+  - type: "title"
+    height: 60
+    cells:
+      - { text: "VOLVOX SALES CORP", col_span: 3, style: { font_size: 24, bold: true, back_color: "#2c3e50", fore_color: "#ffffff", align: "center" } }
+
+  - type: "header"
+    height: 30
+    style: { back_color: "#ecf0f1", bold: true, border_bottom: "2px solid #000000" }
+    fields:
+      - { name: "product", label: "Product Name", width: 300 }
+      - { name: "qty", label: "Quantity", width: 100, align: "right" }
+      - { name: "price", label: "Unit Price", width: 120, align: "right", format: "$#,##0.00" }
+      - { name: "total", label: "Line Total", width: 150, align: "right", formula: "=qty*price", format: "$#,##0.00" }
+
+  - type: "detail"
+    height: 25
+    fields:
+      - { field: "product" }
+      - { field: "qty", align: "right" }
+      - { field: "price", align: "right", format: "$#,##0.00" }
+      - { field: "total", align: "right", format: "$#,##0.00" }
+
+  - type: "summary"
+    height: 40
+    style: { bold: true, back_color: "#f9f9f9", border_top: "1px solid #bdc3c7" }
+    cells:
+      - { text: "GRAND TOTAL:", col_span: 3, align: "right" }
+      - { aggregate: "sum", field: "total", format: "$#,##0.00" }

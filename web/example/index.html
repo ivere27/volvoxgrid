@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VolvoxGrid Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    :root {
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --surface-alt: #f1f4fa;
+      --line: #d9deea;
+      --line-strong: #b9c2d8;
+      --text: #1f2533;
+      --muted: #667089;
+      --accent: #3159e6;
+      --accent-soft: #e4ebff;
+      --radius: 10px;
+    }
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+    }
+    body {
+      font-family: "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    .app {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      min-height: 100%;
+    }
+    .top-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+    }
+    .top-row select {
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      padding: 3px 6px;
+      background: #fff;
+      color: var(--text);
+      font-size: 12px;
+    }
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .icon-btn:hover {
+      background: var(--surface-alt);
+    }
+    .meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      user-select: none;
+      cursor: pointer;
+    }
+    .toggle input { display: none; }
+    .toggle-track {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      background: var(--line-strong);
+      border-radius: 10px;
+      transition: background 0.2s;
+    }
+    .toggle-track::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked + .toggle-track {
+      background: var(--accent);
+    }
+    .toggle input:checked + .toggle-track::after {
+      transform: translateX(16px);
+    }
+    .toggle input:disabled + .toggle-track {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .demo-row {
+      display: flex;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--surface-alt);
+      border-bottom: 1px solid var(--line);
+    }
+    .doom-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      background: #eef3ff;
+      border-bottom: 1px solid var(--line);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .doom-row.hidden {
+      display: none;
+    }
+    .doom-row select {
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      padding: 3px 6px;
+      background: #fff;
+      color: var(--text);
+      font-size: 12px;
+    }
+    .doom-row .label {
+      font-weight: 600;
+      color: var(--text);
+    }
+    .segment {
+      flex: 1 1 0;
+      height: 34px;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .segment:hover {
+      background: #f7f9ff;
+    }
+    .segment.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+    #doom-warning {
+      display: none;
+      padding: 7px 12px;
+      border-bottom: 1px solid #f1d59f;
+      background: #fff4d8;
+      color: #6f4e13;
+      font-size: 12px;
+    }
+    #doom-warning.show {
+      display: block;
+    }
+    #doom-remote-modal,
+    #stress-confirm-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(15, 23, 42, 0.5);
+    }
+    #doom-remote-modal.show,
+    #stress-confirm-modal.show {
+      display: flex;
+    }
+    #doom-remote-panel,
+    #stress-confirm-panel {
+      width: min(560px, 100%);
+      border: 1px solid var(--line-strong);
+      border-radius: 12px;
+      background: var(--surface);
+      box-shadow: 0 24px 56px rgba(15, 23, 42, 0.26);
+      padding: 16px;
+    }
+    #doom-remote-panel h2,
+    #stress-confirm-panel h2 {
+      font-size: 17px;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+    #doom-remote-panel p,
+    #stress-confirm-panel p {
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .doom-remote-links a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .doom-remote-links a:hover {
+      text-decoration: underline;
+    }
+    .doom-remote-remember {
+      margin-top: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text);
+    }
+    #doom-remote-actions,
+    #stress-confirm-actions {
+      margin-top: 14px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .modal-btn {
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--line-strong);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0 14px;
+    }
+    .modal-btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+    }
+    .modal-btn-secondary:hover {
+      background: var(--surface-alt);
+    }
+    .modal-btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .modal-btn-primary:hover {
+      filter: brightness(0.94);
+    }
+    #grid-container {
+      flex: 1 1 auto;
+      min-height: 0;
+      padding: 10px 12px;
+      overflow: hidden;
+    }
+    #grid-canvas {
+      width: 100%;
+      height: 100%;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: #ffffff;
+      outline: none;
+    }
+    #status-bar {
+      flex: 0 0 auto;
+      border-top: 1px solid var(--line);
+      background: var(--surface);
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #legacy-actions {
+      display: none;
+    }
+    @media (max-width: 720px) {
+      .meta,
+      .switch {
+        font-size: 11px;
+      }
+      .segment {
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="top-row">
+      <div class="meta">
+        <select id="sel-canvas-res" aria-label="Canvas Resolution">
+          <option value="auto" selected>AUTO</option>
+        </select>
+        <label for="sel-text-cache" style="margin-left: 8px;">Cache</label>
+        <select id="sel-text-cache" aria-label="Text Cache Cap" style="margin-left: 8px;">
+          <option value="8192" selected>8192</option>
+          <option value="4096">4096</option>
+          <option value="1024">1024</option>
+          <option value="256">256</option>
+          <option value="0">0</option>
+        </select>
+      </div>
+      <div style="flex:1"></div>
+      <button id="btn-sort-asc" class="icon-btn" aria-label="Sort Ascending">↑</button>
+      <button id="btn-sort-desc" class="icon-btn" aria-label="Sort Descending">↓</button>
+      <label class="toggle">
+        <span>GPU</span>
+        <input type="checkbox" id="chk-gpu">
+        <span class="toggle-track"></span>
+      </label>
+      <label class="toggle">
+        <span>Anim</span>
+        <input type="checkbox" id="chk-anim">
+        <span class="toggle-track"></span>
+      </label>
+      <label class="toggle">
+        <span>Debug</span>
+        <input type="checkbox" id="chk-debug">
+        <span class="toggle-track"></span>
+      </label>
+    </div>
+
+    <div class="demo-row">
+      <button id="btn-demo-sales" class="segment active">Sales</button>
+      <button id="btn-demo-hierarchy" class="segment">Hierarchy</button>
+      <button id="btn-demo-stress" class="segment">Stress</button>
+      <button id="btn-demo-doom" class="segment">DOOM</button>
+    </div>
+
+    <div id="doom-row" class="doom-row hidden">
+      <span class="label">DOOM Grid</span>
+      <select id="sel-doom-res">
+        <option value="50x80">50 × 80</option>
+        <option value="70x112" selected>70 × 112</option>
+        <option value="100x160">100 × 160</option>
+        <option value="200x320">200 × 320</option>
+      </select>
+      <label class="toggle">
+        <span>Border</span>
+        <input type="checkbox" id="chk-doom-border" checked>
+        <span class="toggle-track"></span>
+      </label>
+      <span>Arrows=move · Ctrl=fire · Space=use</span>
+    </div>
+
+    <div id="doom-warning">DOOM mode requires optional assets. Run <code>make doom-deps</code> or use online fallback (dev server).</div>
+
+    <div id="grid-container">
+      <canvas id="grid-canvas" tabindex="0"></canvas>
+    </div>
+
+    <div id="status-bar">
+      <span id="status">Loading WASM...</span>
+    </div>
+
+    <div id="doom-remote-modal" aria-hidden="true">
+      <div id="doom-remote-panel" role="dialog" aria-modal="true" aria-labelledby="doom-remote-title">
+        <h2 id="doom-remote-title">Download Remote DOOM Assets?</h2>
+        <p>
+          Local DOOM assets were not found. The demo can download optional DOOM runtime files from third-party CDNs.
+        </p>
+        <p class="doom-remote-links">
+          Sources:
+          <a href="https://cdn.dos.zone/" target="_blank" rel="noopener noreferrer">cdn.dos.zone</a>
+          and
+          <a href="https://www.jsdelivr.com/package/npm/emulators" target="_blank" rel="noopener noreferrer">jsDelivr (emulators)</a>.
+        </p>
+        <p>
+          Benchmark note: this DOOM mode applies per-cell background color updates for each changed cell.
+          Updates are sent in a batched UpdateCells request; there is no dedicated color-only bulk API yet.
+        </p>
+        <label class="doom-remote-remember">
+          <input type="checkbox" id="chk-doom-remote-remember">
+          <span>Remember my choice in this browser</span>
+        </label>
+        <div id="doom-remote-actions">
+          <button id="btn-doom-remote-cancel" class="modal-btn modal-btn-secondary" type="button">Cancel</button>
+          <button id="btn-doom-remote-continue" class="modal-btn modal-btn-primary" type="button">Continue</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="stress-confirm-modal" aria-hidden="true">
+      <div id="stress-confirm-panel" role="dialog" aria-modal="true" aria-labelledby="stress-confirm-title">
+        <h2 id="stress-confirm-title">Start Stress Mode?</h2>
+        <p>
+          This mode loads 1,000,000 rows (12,000,000 cells) into memory.
+        </p>
+        <p>
+          Initial random data generation can take time and memory usage may approach almost 1 GB on some environments.
+          Continue?
+        </p>
+        <div id="stress-confirm-actions">
+          <button id="btn-stress-cancel" class="modal-btn modal-btn-secondary" type="button">No</button>
+          <button id="btn-stress-continue" class="modal-btn modal-btn-primary" type="button">Yes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden controls kept for optional handlers in main.ts -->
+    <div id="legacy-actions" aria-hidden="true">
+      <button id="btn-sort-none">Unsort</button>
+      <button id="btn-add-rows">+100k Rows</button>
+      <button id="btn-add-item">+Row</button>
+      <button id="btn-del-item">-Row</button>
+      <button id="btn-col-fmt">ColFmt</button>
+      <button id="btn-expl-bar">ExplBar:3</button>
+      <button id="btn-autosize">AutoSize</button>
+    </div>
+  </div>
+
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+# Arithmetic on text references should return #VALUE!
+setCellValue 0 0 "abc"
+setCellValue 1 0 "=A1+1"
+assertCellValue 1 0 "#VALUE!"

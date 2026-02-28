@@ -1,0 +1,6 @@
+# XLOOKUP with omitted optional arg placeholders
+setData [["Key","Val"],["A","10"],["B","20"],["B","99"]]
+setCellValue 0 2 "=XLOOKUP(\"B\",A2:A4,B2:B4,,0,-1)"
+setCellValue 1 2 "=XLOOKUP(\"Z\",A2:A4,B2:B4,,0,-1)"
+assertCellValue 0 2 "99"
+assertCellValue 1 2 "#N/A"

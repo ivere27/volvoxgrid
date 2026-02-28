@@ -1,0 +1,5 @@
+# Function args with commas inside quoted strings
+setCellValue 0 0 "=CONCATENATE(\"a,b\",\"c\")"
+setCellValue 0 1 "=IF(TRUE,\"x,y\",\"n\")"
+assertCellValue 0 0 "a,bc"
+assertCellValue 0 1 "x,y"

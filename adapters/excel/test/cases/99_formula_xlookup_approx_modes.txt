@@ -1,0 +1,10 @@
+# XLOOKUP approximate modes
+setData [["1","A"],["5","B"],["10","C"]]
+setCellValue 0 2 "=XLOOKUP(6,A1:A3,B1:B3,\"NF\",-1)"
+setCellValue 1 2 "=XLOOKUP(6,A1:A3,B1:B3,\"NF\",1)"
+setCellValue 2 2 "=XLOOKUP(0,A1:A3,B1:B3,\"NF\",-1)"
+setCellValue 3 2 "=XLOOKUP(99,A1:A3,B1:B3,\"NF\",1)"
+assertCellValue 0 2 "B"
+assertCellValue 1 2 "C"
+assertCellValue 2 2 "NF"
+assertCellValue 3 2 "NF"

@@ -1,0 +1,9 @@
+# Delete columns — delete column at index 1
+setData [["Keep","Remove","Also Keep"],["1","X","2"],["3","Y","4"]]
+deleteColumns 1 1
+assertCellValue 0 0 "Keep"
+assertCellValue 0 1 "Also Keep"
+assertCellValue 1 0 "1"
+assertCellValue 1 1 "2"
+assertCellValue 2 0 "3"
+assertCellValue 2 1 "4"

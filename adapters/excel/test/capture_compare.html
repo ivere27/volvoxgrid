@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>VolvoxExcel — Capture Compare</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: sans-serif; background: #f0f0f0; padding: 20px; }
+  #status { font-size: 14px; color: #333; margin-bottom: 12px; }
+  #vx-grid {
+    width: var(--grid-width, 820px);
+    height: var(--grid-height, 560px);
+    border: 1px solid #ccc;
+    background: #fff;
+  }
+</style>
+</head>
+<body>
+
+<div id="status">Waiting for init...</div>
+<div id="vx-grid"></div>
+
+<script type="module">
+import init from "../wasm/volvoxgrid_wasm.js";
+import * as wasmModule from "../wasm/volvoxgrid_wasm.js";
+import { VolvoxExcel } from "../src/index.ts";
+
+const pageParams = new URLSearchParams(window.location.search);
+const captureFontFamily = (pageParams.get("vv-font-family") || "").trim();
+const settleMs = (() => {
+  const raw = Number.parseInt(pageParams.get("settle-ms") || "500", 10);
+  return Number.isFinite(raw) ? Math.max(0, raw) : 500;
+})();
+const gridWidth = parseDimension(pageParams.get("grid-width"), 820);
+const gridHeight = parseDimension(pageParams.get("grid-height"), 560);
+
+document.documentElement.style.setProperty("--grid-width", `${gridWidth}px`);
+document.documentElement.style.setProperty("--grid-height", `${gridHeight}px`);
+
+window.__captureReady = false;
+window.__error = null;
+
+let excelInstance = null;
+let wasmReady = false;
+let wasm = null;
+
+function parseDimension(value, fallback) {
+  const parsed = Number.parseInt(value || "", 10);
+  return Number.isFinite(parsed) ? Math.max(320, parsed) : fallback;
+}
+
+// Initialize WASM once
+async function initWasm() {
+  if (wasmReady) return wasm;
+  await init();
+  wasm = wasmModule;
+  // Register v1 protobuf service plugin
+  if (typeof wasm.init_v1_plugin === "function") {
+    try { wasm.init_v1_plugin(); } catch { /* already registered */ }
+  }
+  wasmReady = true;
+
+  // Load capture font if served
+  if (typeof wasm.load_font === "function") {
+    try {
+      const resp = await fetch("/__volvox_font__.ttf", { cache: "no-store" });
+      if (resp.ok) {
+        const fontData = new Uint8Array(await resp.arrayBuffer());
+        if (fontData.byteLength > 0) wasm.load_font(fontData);
+      }
+    } catch (_) { /* font is optional */ }
+  }
+
+  // Set up canvas2d glyph rasterizer
+  if (typeof wasm.set_glyph_rasterizer === "function") {
+    try {
+      // volvoxgrid package doesn't have exports map, use direct path
+      const mod = await import("volvoxgrid/dist/canvas2d-rasterizer.js");
+      wasm.set_glyph_rasterizer(mod.createCanvas2DRasterizer());
+    } catch (_) { /* canvas2d rasterizer is optional */ }
+  }
+
+  return wasm;
+}
+
+/**
+ * Parse a script line into {method, args}.
+ */
+function parseLine(line) {
+  line = line.trim();
+  if (!line || line.startsWith("#")) return null;
+
+  const spaceIdx = line.indexOf(" ");
+  if (spaceIdx === -1) {
+    return { method: line, args: [] };
+  }
+
+  const method = line.substring(0, spaceIdx);
+  const rest = line.substring(spaceIdx + 1).trim();
+
+  const args = [];
+  let i = 0;
+  while (i < rest.length) {
+    const ch = rest[i];
+
+    if (ch === '"') {
+      // Quoted string
+      let j = i + 1;
+      let str = "";
+      while (j < rest.length) {
+        if (rest[j] === '\\' && j + 1 < rest.length) {
+          str += rest[j + 1];
+          j += 2;
+        } else if (rest[j] === '"') {
+          break;
+        } else {
+          str += rest[j];
+          j++;
+        }
+      }
+      args.push(str);
+      i = j + 1;
+    } else if (ch === '{' || ch === '[') {
+      // JSON object or array
+      let depth = 0;
+      let j = i;
+      while (j < rest.length) {
+        if (rest[j] === '{' || rest[j] === '[') depth++;
+        else if (rest[j] === '}' || rest[j] === ']') depth--;
+        if (depth === 0) break;
+        j++;
+      }
+      const jsonStr = rest.substring(i, j + 1);
+      try {
+        args.push(JSON.parse(jsonStr));
+      } catch (e) {
+        args.push(jsonStr);
+      }
+      i = j + 1;
+    } else if (ch === ' ') {
+      i++;
+    } else {
+      // Unquoted token (number or identifier)
+      let j = i;
+      while (j < rest.length && rest[j] !== ' ') j++;
+      const token = rest.substring(i, j);
+      const num = Number(token);
+      args.push(Number.isFinite(num) ? num : token);
+      i = j;
+    }
+  }
+
+  return { method, args };
+}
+
+/**
+ * Execute a parsed command against a VolvoxExcel instance.
+ */
+async function executeCommand(excel, cmd) {
+  const { method, args } = cmd;
+
+  function parseExpectedValue(raw) {
+    if (raw === true || raw === false) return raw;
+    if (typeof raw === "number") return raw;
+    const s = String(raw);
+    if (s === "true") return true;
+    if (s === "false") return false;
+    if (s === "null") return null;
+    if (s === "undefined") return undefined;
+    const n = Number(s);
+    if (Number.isFinite(n)) return n;
+    return s;
+  }
+
+  switch (method) {
+    case "setCellValue":
+      excel.setCellValue(args[0], args[1], String(args[2]));
+      break;
+    case "getCellValue":
+      return excel.getCellValue(args[0], args[1]);
+    case "getCellRawValue":
+      return excel.getCellRawValue(args[0], args[1]);
+    case "getCellFormula":
+      return excel.getCellFormula(args[0], args[1]);
+    case "assertCellValue": {
+      const row = Number(args[0]);
+      const col = Number(args[1]);
+      const expected = String(args[2] ?? "");
+      const actual = excel.getCellValue(row, col);
+      if (actual !== expected) {
+        throw new Error(
+          `assertCellValue failed at (${row},${col}): expected "${expected}", got "${actual}"`,
+        );
+      }
+      break;
+    }
+    case "assertCellRawValue": {
+      const row = Number(args[0]);
+      const col = Number(args[1]);
+      const expected = String(args[2] ?? "");
+      const actual = excel.getCellRawValue(row, col);
+      if (actual !== expected) {
+        throw new Error(
+          `assertCellRawValue failed at (${row},${col}): expected "${expected}", got "${actual}"`,
+        );
+      }
+      break;
+    }
+    case "assertCellFormula": {
+      const row = Number(args[0]);
+      const col = Number(args[1]);
+      const expected = parseExpectedValue(args[2]);
+      const actual = excel.getCellFormula(row, col);
+      if (actual !== expected) {
+        throw new Error(
+          `assertCellFormula failed at (${row},${col}): expected ${String(expected)}, got ${String(actual)}`,
+        );
+      }
+      break;
+    }
+    case "assertCellMatches": {
+      const row = Number(args[0]);
+      const col = Number(args[1]);
+      const pattern = String(args[2] ?? "");
+      const actual = excel.getCellValue(row, col);
+      const re = new RegExp(pattern);
+      if (!re.test(actual)) {
+        throw new Error(
+          `assertCellMatches failed at (${row},${col}): pattern "${pattern}", got "${actual}"`,
+        );
+      }
+      break;
+    }
+    case "assertCanUndo": {
+      const raw = args[0];
+      const expected = raw === true || raw === 1 || String(raw).toLowerCase() === "true";
+      const actual = Boolean(excel.undoStack && excel.undoStack.canUndo);
+      if (actual !== expected) {
+        throw new Error(`assertCanUndo failed: expected ${expected}, got ${actual}`);
+      }
+      break;
+    }
+    case "assertCanRedo": {
+      const raw = args[0];
+      const expected = raw === true || raw === 1 || String(raw).toLowerCase() === "true";
+      const actual = Boolean(excel.undoStack && excel.undoStack.canRedo);
+      if (actual !== expected) {
+        throw new Error(`assertCanRedo failed: expected ${expected}, got ${actual}`);
+      }
+      break;
+    }
+    case "assertCellStyle": {
+      const dataRow = Number(args[0]);
+      const dataCol = Number(args[1]);
+      const prop = String(args[2]);
+      const expected = parseExpectedValue(args[3]);
+      const gridRow = dataRow + excel.grid.fixedRows;
+      const gridCol = dataCol + excel.grid.fixedCols;
+      const key = `${gridRow}:${gridCol}`;
+      const style = excel.cellStyleCache?.get?.(key) || {};
+      const actual = style[prop];
+      if (actual !== expected) {
+        throw new Error(
+          `assertCellStyle failed at (${dataRow},${dataCol}) prop=${prop}: expected ${String(expected)}, got ${String(actual)}`,
+        );
+      }
+      break;
+    }
+    case "assertSelection": {
+      const expected = args[0] || {};
+      const actual = excel.getSelection();
+      const maxRow = excel.grid.rows - excel.grid.fixedRows - 1;
+      const maxCol = excel.grid.cols - excel.grid.fixedCols - 1;
+      for (const key of ["row1", "col1", "row2", "col2"]) {
+        if (expected[key] == null) continue;
+        const rawWant = expected[key];
+        let want;
+        if (rawWant === "maxRow") want = maxRow;
+        else if (rawWant === "maxCol") want = maxCol;
+        else want = Number(rawWant);
+        if (actual[key] !== want) {
+          throw new Error(
+            `assertSelection failed for ${key}: expected ${want}, got ${actual[key]} (actual=${JSON.stringify(actual)})`,
+          );
+        }
+      }
+      break;
+    }
+    case "assertRowHeight": {
+      const dataRow = Number(args[0]);
+      const expected = Number(args[1]);
+      const gridRow = dataRow + excel.grid.fixedRows;
+      const actual = excel.grid.getRowHeight(gridRow);
+      if (actual !== expected) {
+        throw new Error(
+          `assertRowHeight failed at dataRow=${dataRow}: expected ${expected}, got ${actual}`,
+        );
+      }
+      break;
+    }
+    case "assertColWidth": {
+      const dataCol = Number(args[0]);
+      const expected = Number(args[1]);
+      const gridCol = dataCol + excel.grid.fixedCols;
+      const actual = excel.grid.getColWidth(gridCol);
+      if (actual !== expected) {
+        throw new Error(
+          `assertColWidth failed at dataCol=${dataCol}: expected ${expected}, got ${actual}`,
+        );
+      }
+      break;
+    }
+    case "setData":
+      excel.setData(args[0]);
+      break;
+    case "clearRange":
+      excel.clearRange(args[0]);
+      break;
+    case "setSelection":
+      excel.setSelection(args[0]);
+      break;
+    case "setCellStyle":
+      excel.setCellStyle(args[0], args[1], args[2]);
+      break;
+    case "setRangeStyle":
+      excel.setRangeStyle(args[0], args[1]);
+      break;
+    case "insertRows":
+      excel.insertRows(args[0], args[1] ?? 1);
+      break;
+    case "deleteRows":
+      excel.deleteRows(args[0], args[1] ?? 1);
+      break;
+    case "insertColumns":
+      excel.insertColumns(args[0], args[1] ?? 1);
+      break;
+    case "deleteColumns":
+      excel.deleteColumns(args[0], args[1] ?? 1);
+      break;
+    case "setColumnWidth":
+      excel.setColumnWidth(args[0], args[1]);
+      break;
+    case "setRowHeight":
+      excel.setRowHeight(args[0], args[1]);
+      break;
+    case "mergeCells":
+      excel.mergeCells(args[0]);
+      break;
+    case "unmergeCells":
+      excel.unmergeCells(args[0]);
+      break;
+    case "freezeRows":
+      excel.freezeRows(args[0]);
+      break;
+    case "freezeColumns":
+      excel.freezeColumns(args[0]);
+      break;
+    case "setColumnFormat":
+      excel.setColumnFormat(args[0], String(args[1]));
+      break;
+    case "undo":
+      excel.undo();
+      break;
+    case "redo":
+      excel.redo();
+      break;
+    case "copy":
+      await excel.copy();
+      break;
+    case "cut":
+      await excel.cut();
+      break;
+    case "paste":
+      await excel.paste(args[0]);
+      break;
+    case "invokeContextAction":
+      if (typeof excel.handleContextMenuAction === "function") {
+        excel.handleContextMenuAction(String(args[0]));
+      } else {
+        throw new Error("invokeContextAction not supported by this build");
+      }
+      break;
+    case "invokeToolbarAction":
+      if (typeof excel.handleToolbarAction === "function") {
+        excel.handleToolbarAction(String(args[0]));
+      } else {
+        throw new Error("invokeToolbarAction not supported by this build");
+      }
+      break;
+    case "invokeFillTo": {
+      const fh = excel.fillHandle;
+      if (!fh || typeof fh.executeFill !== "function") {
+        throw new Error("invokeFillTo not supported by this build");
+      }
+      fh.dragEndRow = Number(args[0]);
+      fh.dragEndCol = Number(args[1]);
+      fh.executeFill();
+      break;
+    }
+    case "invokeContextAtGrid": {
+      const row = Number(args[0]);
+      const col = Number(args[1]);
+      if (typeof excel.resolveContextMenuScope !== "function"
+        || typeof excel.applyContextMenuSelection !== "function") {
+        throw new Error("invokeContextAtGrid not supported by this build");
+      }
+      const scope = excel.resolveContextMenuScope(row, col);
+      excel.contextMenuScope = scope;
+      excel.applyContextMenuSelection(row, col, scope);
+      break;
+    }
+    case "assertContextScopeAtGrid": {
+      const row = Number(args[0]);
+      const col = Number(args[1]);
+      const expected = String(args[2] ?? "");
+      if (typeof excel.resolveContextMenuScope !== "function") {
+        throw new Error("assertContextScopeAtGrid not supported by this build");
+      }
+      const actual = excel.resolveContextMenuScope(row, col);
+      if (actual !== expected) {
+        throw new Error(
+          `assertContextScopeAtGrid failed at (${row},${col}): expected "${expected}", got "${actual}"`,
+        );
+      }
+      break;
+    }
+    default:
+      console.warn(`Unknown command: ${method}`);
+  }
+}
+
+/**
+ * Run a full script against a fresh VolvoxExcel instance.
+ */
+window.__runScript = async function(scriptText, options = {}) {
+  window.__captureReady = false;
+  window.__error = null;
+
+  try {
+    const status = document.getElementById("status");
+    status.textContent = options.label || "Running script...";
+
+    const container = document.getElementById("vx-grid");
+
+    // Destroy previous instance
+    if (excelInstance) {
+      try { excelInstance.destroy(); } catch (_) {}
+      excelInstance = null;
+    }
+    container.innerHTML = "";
+
+    // Init WASM
+    const w = await initWasm();
+
+    // Create VolvoxExcel
+    excelInstance = new VolvoxExcel({
+      container,
+      wasm: w,
+      rows: options.rows || 50,
+      cols: options.cols || 26,
+    });
+
+    if (captureFontFamily && excelInstance.grid && typeof excelInstance.grid.setFontName === "function") {
+      excelInstance.grid.setFontName(captureFontFamily);
+    }
+
+    window.excel = excelInstance;
+
+    // Parse and execute
+    const lines = scriptText.split("\n");
+    for (const line of lines) {
+      const cmd = parseLine(line);
+      if (cmd) {
+        await executeCommand(excelInstance, cmd);
+      }
+    }
+
+    // Let grid render
+    await new Promise(r => setTimeout(r, settleMs));
+    excelInstance.grid.invalidate();
+    await new Promise(r => setTimeout(r, 100));
+
+    window.__captureReady = true;
+  } catch (err) {
+    console.error(err);
+    window.__error = String(err?.stack || err);
+    window.__captureReady = true;
+  }
+};
+
+// Signal ready
+window.__pageReady = true;
+document.getElementById("status").textContent = "Page ready.";
+</script>
+
+</body>
+</html>

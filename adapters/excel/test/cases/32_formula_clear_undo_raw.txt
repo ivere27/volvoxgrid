@@ -1,0 +1,8 @@
+# Clear range undo must restore formula raw text
+setData [["1","2","=A1+B1"]]
+assertCellValue 0 2 "3"
+clearRange {"row1":0,"col1":2,"row2":0,"col2":2}
+assertCellValue 0 2 ""
+undo
+assertCellValue 0 2 "3"
+assertCellRawValue 0 2 "=A1+B1"

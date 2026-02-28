@@ -1,0 +1,5 @@
+# Range styling — apply style to a block of cells
+setData [["H1","H2","H3","H4"],["A","B","C","D"],["E","F","G","H"],["I","J","K","L"]]
+setRangeStyle {"row1":0,"col1":0,"row2":0,"col2":3} {"bold":true,"backColor":4282532418}
+setRangeStyle {"row1":1,"col1":0,"row2":3,"col2":0} {"italic":true,"backColor":4294961892}
+setRangeStyle {"row1":1,"col1":1,"row2":2,"col2":2} {"foreColor":4278190335,"backColor":4293980400}

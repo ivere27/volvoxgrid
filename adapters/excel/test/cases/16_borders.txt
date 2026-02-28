@@ -1,0 +1,6 @@
+# Borders — apply various border styles to selection
+setData [["A","B","C","D"],["1","2","3","4"],["5","6","7","8"],["9","10","11","12"]]
+setSelection {"row1":0,"col1":0,"row2":2,"col2":2}
+# Note: setBorders is private, so we use setRangeStyle with border fields
+# borderTop/Right/Bottom/Left: 1 = thin, 2 = medium, 3 = thick
+setRangeStyle {"row1":0,"col1":0,"row2":2,"col2":2} {"borderTop":1,"borderRight":1,"borderBottom":1,"borderLeft":1,"borderColor":4278190080}

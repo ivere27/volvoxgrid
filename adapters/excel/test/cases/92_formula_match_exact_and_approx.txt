@@ -1,0 +1,10 @@
+# MATCH exact and ascending approximate modes
+setData [["1"],["5"],["9"]]
+setCellValue 0 1 "=MATCH(5,A1:A3,0)"
+setCellValue 1 1 "=MATCH(6,A1:A3,1)"
+setCellValue 2 1 "=MATCH(4,A1:A3)"
+setCellValue 3 1 "=MATCH(0,A1:A3,1)"
+assertCellValue 0 1 "2"
+assertCellValue 1 1 "2"
+assertCellValue 2 1 "1"
+assertCellValue 3 1 "#N/A"

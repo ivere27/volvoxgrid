@@ -1,0 +1,6 @@
+# Whole row/column ranges with MIN/MAX
+setData [["1","9","3"]]
+setCellValue 1 0 "=MAX(1:1)"
+setCellValue 1 1 "=MIN(A:A)"
+assertCellValue 1 0 "9"
+assertCellValue 1 1 "1"

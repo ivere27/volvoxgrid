@@ -1,0 +1,142 @@
+group = "io.github.ivere27.volvoxgrid"
+version = "1.0"
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath("com.android.tools.build:gradle:8.9.1")
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: "com.android.library"
+
+// ── Native plugin source mode ──────────────────────────────────────────────
+// Set -PvolvoxgridNativeSource=local to fall back to local .so file search.
+// Default: "maven" — pull native plugin via the volvoxgrid-android AAR from Maven Central.
+def nativeSource = project.findProperty("volvoxgridNativeSource") ?: "maven"
+
+def repoRoot = new File(projectDir, "../..").canonicalFile
+def generatedJniLibsDir = new File(buildDir, "generated/jniLibs")
+def supportedAndroidAbis = ["arm64-v8a", "armeabi-v7a", "x86_64"]
+def abiToRustTarget = [
+    "arm64-v8a"   : "aarch64-linux-android",
+    "armeabi-v7a" : "armv7-linux-androideabi",
+    "x86_64"      : "x86_64-linux-android",
+]
+def pluginSoNames = ["libvolvoxgrid_plugin.so"]
+
+def resolvePluginSoForAbi = { String abi ->
+    String rustTarget = abiToRustTarget[abi]
+    List<File> candidates = []
+
+    for (String soName : pluginSoNames) {
+        candidates.add(new File(projectDir, "src/main/jniLibs/${abi}/${soName}"))
+        candidates.add(new File(repoRoot, "android/volvoxgrid-android/src/main/jniLibs/${abi}/${soName}"))
+        candidates.add(new File(repoRoot, "android/example/src/main/jniLibs/${abi}/${soName}"))
+        if (rustTarget != null) {
+            candidates.add(new File(repoRoot, "target/${rustTarget}/release/${soName}"))
+            candidates.add(new File(repoRoot, "target/${rustTarget}/debug/${soName}"))
+        }
+    }
+
+    for (File candidate : candidates) {
+        if (candidate.exists()) {
+            return candidate
+        }
+    }
+
+    return null
+}
+
+if (nativeSource == "local") {
+    tasks.register("prepareVolvoxGridJniLibs") {
+        List<File> inputDirs = [
+            new File(projectDir, "src/main/jniLibs"),
+            new File(repoRoot, "android/volvoxgrid-android/src/main/jniLibs"),
+            new File(repoRoot, "android/example/src/main/jniLibs"),
+            new File(repoRoot, "target"),
+        ]
+        for (File inputDir : inputDirs) {
+            if (inputDir.exists()) {
+                inputs.dir(inputDir)
+            }
+        }
+        outputs.dir(generatedJniLibsDir)
+        doLast {
+            delete(generatedJniLibsDir)
+            List<String> copiedAbis = []
+
+            for (String abi : supportedAndroidAbis) {
+                File sourceSo = resolvePluginSoForAbi(abi)
+                if (sourceSo == null) {
+                    continue
+                }
+
+                File outDir = new File(generatedJniLibsDir, abi)
+                outDir.mkdirs()
+                copy {
+                    from sourceSo
+                    into outDir
+                    rename { "libvolvoxgrid_plugin.so" }
+                }
+                copiedAbis.add(abi)
+            }
+
+            if (copiedAbis.isEmpty()) {
+                throw new GradleException(
+                    "Unable to find libvolvoxgrid_plugin.so for any Android ABI. " +
+                    "Run `make android-plugin` (or `make android-plugin-release`) from the repo root " +
+                    "before building Flutter."
+                )
+            }
+
+            logger.lifecycle("Prepared VolvoxGrid native plugin for ABIs: ${copiedAbis.join(', ')}")
+        }
+    }
+}
+
+android {
+    namespace = "io.github.ivere27.volvoxgrid"
+    compileSdk = 36
+
+    defaultConfig {
+        minSdk = 21
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    if (nativeSource == "local") {
+        sourceSets {
+            main {
+                jniLibs.srcDirs = [generatedJniLibsDir]
+            }
+        }
+    }
+}
+
+if (nativeSource == "local") {
+    tasks.named("preBuild") {
+        dependsOn("prepareVolvoxGridJniLibs")
+    }
+}
+
+dependencies {
+    if (nativeSource == "maven") {
+        // Pull native .so files + Kotlin/Java classes from the published AAR.
+        implementation 'io.github.ivere27:volvoxgrid-android:0.1.0'
+    }
+}

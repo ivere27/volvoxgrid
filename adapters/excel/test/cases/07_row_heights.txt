@@ -1,0 +1,13 @@
+# Row heights — short and tall rows
+setCellValue 0 0 "Short"
+setCellValue 1 0 "Normal"
+setCellValue 2 0 "Tall"
+setCellValue 3 0 "Extra tall"
+setRowHeight 0 20
+setRowHeight 1 30
+setRowHeight 2 50
+setRowHeight 3 80
+setCellValue 0 1 "20px"
+setCellValue 1 1 "30px"
+setCellValue 2 1 "50px"
+setCellValue 3 1 "80px"

@@ -1,0 +1,5 @@
+# Context action guard — row-header selection must not delete columns
+setData [["A","B","LAST"],["1","2","3"]]
+setSelection {"row1":0,"col1":-1,"row2":0,"col2":-1}
+invokeContextAction "deleteColumn"
+assertCellValue 0 2 "LAST"

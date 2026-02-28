@@ -1,0 +1,11 @@
+.git
+target
+android/.gradle
+android/build
+android/volvoxgrid-android/build
+flutter/.dart_tool
+flutter/example/.dart_tool
+flutter/example/build
+web/**/node_modules
+web/**/dist
+web/example/wasm

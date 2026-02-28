@@ -1,0 +1,5 @@
+# Arithmetic should propagate referenced #DIV/0! errors
+setCellValue 0 0 "=1/0"
+setCellValue 1 0 "=A1+1"
+assertCellValue 0 0 "#DIV/0!"
+assertCellValue 1 0 "#DIV/0!"

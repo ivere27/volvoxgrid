@@ -1,0 +1,13 @@
+# Undo/Redo — set values then undo some
+setCellValue 0 0 "Step 1"
+setCellValue 0 1 "Step 2"
+setCellValue 0 2 "Step 3"
+setCellValue 1 0 "A"
+setCellValue 1 1 "B"
+setCellValue 1 2 "C"
+# Undo last 2 operations
+undo
+undo
+# Cell (1,2) and (1,1) should now be empty
+assertCellValue 1 1 ""
+assertCellValue 1 2 ""

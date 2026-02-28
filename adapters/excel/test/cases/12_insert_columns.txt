@@ -1,0 +1,6 @@
+# Insert columns — insert 1 column at index 1
+setData [["A","B","C"],["1","2","3"],["4","5","6"]]
+insertColumns 1 1
+setCellValue 0 1 "NEW"
+setCellValue 1 1 "X"
+setCellValue 2 1 "Y"

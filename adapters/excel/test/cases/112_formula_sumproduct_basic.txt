@@ -1,0 +1,6 @@
+# SUMPRODUCT basic behavior
+setData [["1","2"],["3","4"]]
+setCellValue 0 2 "=SUMPRODUCT(A1:A2,B1:B2)"
+setCellValue 1 2 "=SUMPRODUCT(A1:B2,A1:B2)"
+assertCellValue 0 2 "14"
+assertCellValue 1 2 "30"

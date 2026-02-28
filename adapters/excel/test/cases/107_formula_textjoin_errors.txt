@@ -1,0 +1,6 @@
+# TEXTJOIN error and arg validation
+setCellValue 0 0 "=1/0"
+setCellValue 0 1 "=TEXTJOIN(\"-\",TRUE,A1:A1)"
+setCellValue 1 1 "=TEXTJOIN(\"-\",\"x\",\"a\")"
+assertCellValue 0 1 "#DIV/0!"
+assertCellValue 1 1 "#VALUE!"

@@ -1,0 +1,6 @@
+# SUMIF with explicit and implicit sum range
+setData [["Cat","Amt"],["A","10"],["B","20"],["A","5"]]
+setCellValue 0 2 "=SUMIF(A2:A4,\"A\",B2:B4)"
+setCellValue 1 2 "=SUMIF(B2:B4,\">10\")"
+assertCellValue 0 2 "15"
+assertCellValue 1 2 "20"

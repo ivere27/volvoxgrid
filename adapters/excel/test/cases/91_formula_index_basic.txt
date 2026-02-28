@@ -1,0 +1,8 @@
+# INDEX basic behavior
+setData [["A","B"],["10","20"],["30","40"]]
+setCellValue 0 2 "=INDEX(A2:B3,2,1)"
+setCellValue 0 3 "=INDEX(A2:A3,2)"
+setCellValue 0 4 "=INDEX(A2:B3,3,1)"
+assertCellValue 0 2 "30"
+assertCellValue 0 3 "30"
+assertCellValue 0 4 "#REF!"

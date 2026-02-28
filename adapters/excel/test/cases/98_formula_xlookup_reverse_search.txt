@@ -1,0 +1,6 @@
+# XLOOKUP reverse search over duplicates
+setData [["Key","Val"],["A","10"],["B","20"],["B","99"]]
+setCellValue 0 2 "=XLOOKUP(\"B\",A2:A4,B2:B4,\"NF\",0,1)"
+setCellValue 1 2 "=XLOOKUP(\"B\",A2:A4,B2:B4,\"NF\",0,-1)"
+assertCellValue 0 2 "20"
+assertCellValue 1 2 "99"

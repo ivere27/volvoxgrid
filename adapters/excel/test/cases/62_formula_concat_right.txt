@@ -1,0 +1,6 @@
+# CONCATENATE and RIGHT
+setData [["hello","world"]]
+setCellValue 0 2 "=CONCATENATE(A1,\" \",B1)"
+setCellValue 0 3 "=RIGHT(C1,5)"
+assertCellValue 0 2 "hello world"
+assertCellValue 0 3 "world"

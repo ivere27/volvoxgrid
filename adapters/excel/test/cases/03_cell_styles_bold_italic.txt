@@ -1,0 +1,13 @@
+# Cell styling — bold, italic, underline
+setCellValue 0 0 "Bold"
+setCellValue 0 1 "Italic"
+setCellValue 0 2 "Underline"
+setCellValue 0 3 "B+I+U"
+setCellValue 1 0 "Regular"
+setCellValue 1 1 "Regular"
+setCellValue 1 2 "Regular"
+setCellValue 1 3 "Regular"
+setCellStyle 0 0 {"bold":true}
+setCellStyle 0 1 {"italic":true}
+setCellStyle 0 2 {"underline":true}
+setCellStyle 0 3 {"bold":true,"italic":true,"underline":true}

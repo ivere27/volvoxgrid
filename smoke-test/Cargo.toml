@@ -1,0 +1,15 @@
+[package]
+name = "volvoxgrid-smoke"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/ivere27/volvoxgrid"
+
+[features]
+default = []
+gpu = ["volvoxgrid-engine/gpu"]
+
+[dependencies]
+synurang-host = { git = "https://github.com/ivere27/synurang", tag = "v0.5.0", package = "synurang-host" }
+prost = "0.12"
+volvoxgrid-engine = { path = "../engine", features = ["grpc"] }

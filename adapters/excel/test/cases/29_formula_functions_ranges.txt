@@ -1,0 +1,11 @@
+# Formula functions/ranges recalc on dependency change
+setData [["1","2","3"],["4","5","6"],["","",""]]
+setCellValue 2 0 "=SUM(A1:C2)"
+assertCellValue 2 0 "21"
+assertCellRawValue 2 0 "=SUM(A1:C2)"
+setCellValue 1 2 "10"
+assertCellValue 2 0 "25"
+setCellValue 2 1 "=AVERAGE(A1:C2)"
+assertCellValue 2 1 "4.166666666666667"
+setCellValue 2 2 "=COUNT(A1:C2)"
+assertCellValue 2 2 "6"

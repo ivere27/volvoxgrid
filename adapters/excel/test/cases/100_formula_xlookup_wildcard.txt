@@ -1,0 +1,6 @@
+# XLOOKUP wildcard mode
+setData [["apple","10"],["apricot","20"],["banana","30"]]
+setCellValue 0 2 "=XLOOKUP(\"ap*\",A1:A3,B1:B3,\"NF\",2,1)"
+setCellValue 1 2 "=XLOOKUP(\"ap*\",A1:A3,B1:B3,\"NF\",2,-1)"
+assertCellValue 0 2 "10"
+assertCellValue 1 2 "20"

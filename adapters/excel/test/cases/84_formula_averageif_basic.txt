@@ -1,0 +1,6 @@
+# AVERAGEIF basic behavior
+setData [["Cat","Amt"],["A","10"],["B","20"],["A","5"],["A","x"]]
+setCellValue 0 2 "=AVERAGEIF(A2:A5,\"A\",B2:B5)"
+setCellValue 1 2 "=AVERAGEIF(B2:B5,\">100\")"
+assertCellValue 0 2 "7.5"
+assertCellValue 1 2 "#DIV/0!"

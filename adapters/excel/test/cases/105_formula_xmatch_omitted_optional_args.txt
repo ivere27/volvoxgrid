@@ -1,0 +1,4 @@
+# XMATCH with omitted match_mode placeholder
+setData [["A"],["B"],["B"],["C"]]
+setCellValue 0 1 "=XMATCH(\"B\",A1:A4,,-1)"
+assertCellValue 0 1 "3"

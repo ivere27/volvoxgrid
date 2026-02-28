@@ -1,0 +1,4 @@
+# HLOOKUP invalid row index
+setData [["A","B"],["10","20"]]
+setCellValue 0 2 "=HLOOKUP(\"A\",A1:B2,3,FALSE)"
+assertCellValue 0 2 "#REF!"

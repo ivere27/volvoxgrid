@@ -1,0 +1,2 @@
+# Bulk data population via setData
+setData [["Product","Price","Qty","Total"],["Widget","9.99","100","999.00"],["Gadget","24.50","50","1225.00"],["Doohickey","4.75","200","950.00"],["Thingamajig","15.00","75","1125.00"]]

@@ -1,0 +1,8 @@
+# Fill right shifts formula references relatively
+setData [["10","20","30",""],["=A1+B1","","",""]]
+setSelection {"row1":1,"col1":0,"row2":1,"col2":0}
+invokeFillTo 1 2
+assertCellRawValue 1 1 "=B1+C1"
+assertCellRawValue 1 2 "=C1+D1"
+assertCellValue 1 1 "50"
+assertCellValue 1 2 "30"

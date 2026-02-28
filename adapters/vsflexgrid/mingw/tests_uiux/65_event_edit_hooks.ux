@@ -1,0 +1,18 @@
+# UI+UX interaction script for test 65.
+# Drives row/col movement plus edit enter/leave actions.
+click_cell 2 1
+sleep 80
+click_cell 3 1
+sleep 80
+dblclick_cell 3 1
+sleep 80
+key F2
+sleep 60
+key ENTER
+sleep 120
+click_cell 4 2
+sleep 100
+dblclick_cell 4 2
+sleep 80
+key ENTER
+sleep 120

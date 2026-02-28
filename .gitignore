@@ -1,0 +1,76 @@
+# Rust
+target/
+**/*.rs.bk
+
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+flutter/build/
+flutter/example/build/
+flutter/linux/flutter/ephemeral/
+flutter/android/src/main/jniLibs/
+
+# Android
+.gradle/
+local.properties
+android/build/
+android/example/build/
+android/volvoxgrid-android/.cxx/
+android/volvoxgrid-android/build/
+java/common/bin/
+java/desktop/bin/
+
+# Web / Node
+node_modules/
+web/js/dist/
+web/js/package-lock.json
+web/example/dist/
+web/crate/pkg/
+npm-debug.log
+yarn-error.log
+web/example/public/
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# OS
+.DS_Store
+.thumbs.db
+
+# Generated Files
+codegen/
+dist/
+
+# Native Build Artifacts (C++/ActiveX)
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.a
+*.lib
+*.exp
+*.tlb
+*.idb
+*.pdb
+adapters/vsflexgrid/Debug/
+adapters/vsflexgrid/Release/
+adapters/vsflexgrid/x64/
+adapters/vsflexgrid/build/
+adapters/sfdatagrid/build/
+adapters/sfdatagrid/pubspec.lock
+adapters/excel/package-lock.json
+adapters/excel/wasm/
+adapters/report/package-lock.json
+adapters/report/wasm/
+
+# Temporary
+tmp/
+*.log
+.maven-settings.xml
+legacy/

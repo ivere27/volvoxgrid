@@ -1,0 +1,8 @@
+# Fill down with mixed absolute/relative references
+setData [["10","=A1+$A1+A$1+$A$1"],["20",""],["30",""]]
+setSelection {"row1":0,"col1":1,"row2":0,"col2":1}
+invokeFillTo 2 1
+assertCellRawValue 1 1 "=A2+$A2+A$1+$A$1"
+assertCellRawValue 2 1 "=A3+$A3+A$1+$A$1"
+assertCellValue 1 1 "60"
+assertCellValue 2 1 "80"

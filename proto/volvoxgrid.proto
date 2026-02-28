@@ -1,0 +1,1598 @@
+syntax = "proto3";
+package volvoxgrid.v1;
+
+option go_package = "github.com/ivere27/synurang/volvoxgrid/api/v1";
+option java_package = "io.github.ivere27.volvoxgrid";
+option java_multiple_files = true;
+
+// ═══════════════════════════════════════════════════════════
+// Enums
+// ═══════════════════════════════════════════════════════════
+
+enum SelectionMode {
+  SELECTION_FREE        = 0;
+  SELECTION_BY_ROW      = 1;
+  SELECTION_BY_COLUMN   = 2;
+  SELECTION_LISTBOX     = 3;
+  SELECTION_MULTI_RANGE = 4;
+}
+
+enum FocusBorderStyle {
+  FOCUS_BORDER_NONE    = 0;
+  FOCUS_BORDER_THIN    = 1;
+  FOCUS_BORDER_THICK   = 2;
+  FOCUS_BORDER_INSET   = 3;
+  FOCUS_BORDER_RAISED  = 4;
+}
+
+enum SelectionVisibility {
+  SELECTION_VIS_NONE         = 0;
+  SELECTION_VIS_ALWAYS       = 1;
+  SELECTION_VIS_WHEN_FOCUSED = 2;
+}
+
+enum EditTrigger {
+  EDIT_TRIGGER_NONE      = 0;
+  EDIT_TRIGGER_KEY       = 1;
+  EDIT_TRIGGER_KEY_CLICK = 2;
+}
+
+enum DropdownTrigger {
+  DROPDOWN_NEVER   = 0;
+  DROPDOWN_ALWAYS  = 1;
+  DROPDOWN_ON_EDIT = 2;
+}
+
+enum TabBehavior {
+  TAB_CONTROLS         = 0;
+  TAB_CELLS            = 1;
+}
+
+enum SortOrder {
+  SORT_NONE                = 0;
+  SORT_GENERIC_ASCENDING   = 1;
+  SORT_GENERIC_DESCENDING  = 2;
+  SORT_NUMERIC_ASCENDING   = 3;
+  SORT_NUMERIC_DESCENDING  = 4;
+  SORT_STRING_NO_CASE_ASC  = 5;
+  SORT_STRING_NO_CASE_DESC = 6;
+  SORT_STRING_ASC          = 7;
+  SORT_STRING_DESC         = 8;
+  SORT_CUSTOM              = 9;
+  SORT_USE_COL_SORT        = 10;
+}
+
+enum HeaderFeatures {
+  HEADER_NONE                    = 0;
+  HEADER_SORT                    = 1;
+  HEADER_REORDER                 = 2;
+  HEADER_SORT_REORDER            = 3;
+  HEADER_SORT_CHOOSER            = 5;
+  HEADER_REORDER_CHOOSER         = 6;
+  HEADER_SORT_REORDER_CHOOSER    = 7;
+}
+
+enum CellSpanMode {
+  CELL_SPAN_NONE        = 0;
+  CELL_SPAN_FREE        = 1;
+  CELL_SPAN_BY_ROW      = 2;
+  CELL_SPAN_BY_COLUMN   = 3;
+  CELL_SPAN_ADJACENT    = 4;
+  CELL_SPAN_HEADER_ONLY = 5;
+  CELL_SPAN_SPILL       = 6;
+  CELL_SPAN_GROUP       = 7;
+}
+
+enum TreeIndicatorStyle {
+  TREE_INDICATOR_NONE            = 0;
+  TREE_INDICATOR_ARROWS          = 1;
+  TREE_INDICATOR_ARROWS_LEAF     = 2;
+  TREE_INDICATOR_CONNECTORS      = 3;
+  TREE_INDICATOR_CONNECTORS_LEAF = 4;
+}
+
+enum GroupTotalPosition {
+  GROUP_TOTAL_ABOVE    = 0;
+  GROUP_TOTAL_BELOW    = 1;
+}
+
+enum AggregateType {
+  AGG_NONE             = 0;
+  AGG_CLEAR            = 1;
+  AGG_SUM              = 2;
+  AGG_PERCENT          = 3;
+  AGG_COUNT            = 4;
+  AGG_AVERAGE          = 5;
+  AGG_MAX              = 6;
+  AGG_MIN              = 7;
+  AGG_STD_DEV          = 8;
+  AGG_VAR              = 9;
+}
+
+enum GridLineStyle {
+  GRIDLINE_NONE               = 0;
+  GRIDLINE_SOLID              = 1;
+  GRIDLINE_INSET              = 2;
+  GRIDLINE_RAISED             = 3;
+  GRIDLINE_SOLID_HORIZONTAL   = 4;
+  GRIDLINE_SOLID_VERTICAL     = 5;
+  GRIDLINE_INSET_HORIZONTAL   = 6;
+  GRIDLINE_INSET_VERTICAL     = 7;
+  GRIDLINE_RAISED_HORIZONTAL  = 8;
+  GRIDLINE_RAISED_VERTICAL    = 9;
+}
+
+enum TextEffect {
+  TEXT_EFFECT_NONE         = 0;
+  TEXT_EFFECT_EMBOSS       = 1;
+  TEXT_EFFECT_ENGRAVE      = 2;
+  TEXT_EFFECT_EMBOSS_LIGHT = 3;
+  TEXT_EFFECT_ENGRAVE_LIGHT = 4;
+}
+
+enum TextRenderMode {
+  TEXT_RENDER_AUTO      = 0;
+  TEXT_RENDER_GRAYSCALE = 1;
+  TEXT_RENDER_SUBPIXEL  = 2;
+  TEXT_RENDER_MONO      = 3;
+}
+
+enum TextHintingMode {
+  TEXT_HINT_AUTO        = 0;
+  TEXT_HINT_NONE        = 1;
+  TEXT_HINT_SLIGHT      = 2;
+  TEXT_HINT_FULL        = 3;
+}
+
+enum ColumnDataType {
+  COLUMN_DATA_STRING   = 0;
+  COLUMN_DATA_NUMBER   = 1;
+  COLUMN_DATA_DATE     = 2;
+  COLUMN_DATA_BOOLEAN  = 3;
+  COLUMN_DATA_CURRENCY = 4;
+}
+
+enum Align {
+  ALIGN_LEFT_TOP       = 0;
+  ALIGN_LEFT_CENTER    = 1;
+  ALIGN_LEFT_BOTTOM    = 2;
+  ALIGN_CENTER_TOP     = 3;
+  ALIGN_CENTER_CENTER  = 4;
+  ALIGN_CENTER_BOTTOM  = 5;
+  ALIGN_RIGHT_TOP      = 6;
+  ALIGN_RIGHT_CENTER   = 7;
+  ALIGN_RIGHT_BOTTOM   = 8;
+  ALIGN_GENERAL        = 9;
+}
+
+enum ImageAlignment {
+  IMG_ALIGN_LEFT_TOP       = 0;
+  IMG_ALIGN_LEFT_CENTER    = 1;
+  IMG_ALIGN_LEFT_BOTTOM    = 2;
+  IMG_ALIGN_CENTER_TOP     = 3;
+  IMG_ALIGN_CENTER_CENTER  = 4;
+  IMG_ALIGN_CENTER_BOTTOM  = 5;
+  IMG_ALIGN_RIGHT_TOP      = 6;
+  IMG_ALIGN_RIGHT_CENTER   = 7;
+  IMG_ALIGN_RIGHT_BOTTOM   = 8;
+  IMG_ALIGN_STRETCH        = 9;
+  IMG_ALIGN_TILE           = 10;
+}
+
+enum AllowUserResizingMode {
+  RESIZE_NONE              = 0;
+  RESIZE_COLUMNS           = 1;
+  RESIZE_ROWS              = 2;
+  RESIZE_BOTH              = 3;
+  RESIZE_COLUMNS_UNIFORM   = 4;
+  RESIZE_ROWS_UNIFORM      = 5;
+  RESIZE_BOTH_UNIFORM      = 6;
+}
+
+enum UserFreezeMode {
+  USER_FREEZE_NONE     = 0;
+  USER_FREEZE_COLUMNS  = 1;
+  USER_FREEZE_ROWS     = 2;
+  USER_FREEZE_BOTH     = 3;
+}
+
+enum AutoSizeMode {
+  AUTOSIZE_BOTH_WAYS   = 0;
+  AUTOSIZE_COL_WIDTH   = 1;
+  AUTOSIZE_ROW_HEIGHT  = 2;
+}
+
+enum TypeAheadMode {
+  TYPE_AHEAD_NONE        = 0;
+  TYPE_AHEAD_FROM_START  = 1;
+  TYPE_AHEAD_FROM_CURSOR = 2;
+}
+
+enum ScrollBarsMode {
+  SCROLLBAR_NONE       = 0;
+  SCROLLBAR_HORIZONTAL = 1;
+  SCROLLBAR_VERTICAL   = 2;
+  SCROLLBAR_BOTH       = 3;
+}
+
+enum BorderAppearance {
+  BORDER_APPEARANCE_FLAT    = 0;
+  BORDER_APPEARANCE_RAISED  = 1;
+  BORDER_APPEARANCE_SUBTLE  = 2;
+}
+
+enum CheckedState {
+  CHECKED_UNCHECKED    = 0;
+  CHECKED_CHECKED      = 1;
+  CHECKED_GRAYED       = 2;
+}
+
+enum RendererMode {
+  RENDERER_CPU  = 0;
+  RENDERER_GPU  = 1;
+  RENDERER_AUTO = 2;
+}
+
+// Structural pin — row moves to pinned section
+enum PinPosition {
+  PIN_NONE   = 0;  // Not pinned (default)
+  PIN_TOP    = 1;  // Move to top pinned section (below header/fixed rows)
+  PIN_BOTTOM = 2;  // Move to bottom pinned section (acts as footer)
+}
+
+// Visual sticky overlay — element sticks to edge when scrolled out
+enum StickyEdge {
+  STICKY_NONE   = 0;
+  STICKY_TOP    = 1;  // Row: stick to top when scrolled up
+  STICKY_BOTTOM = 2;  // Row: stick to bottom when scrolled down
+  STICKY_LEFT   = 3;  // Column: stick to left when scrolled right
+  STICKY_RIGHT  = 4;  // Column: stick to right when scrolled left
+  STICKY_BOTH   = 5;  // Row: top when scrolled up, bottom when scrolled down
+                       // Column: left when scrolled right, right when scrolled left
+}
+
+enum BorderStyle {
+  BORDER_NONE          = 0;
+  BORDER_THIN          = 1;
+  BORDER_THICK         = 2;
+  BORDER_DOTTED        = 3;
+  BORDER_DASHED        = 4;
+  BORDER_DOUBLE        = 5;
+  BORDER_RAISED        = 6;
+  BORDER_INSET         = 7;
+}
+
+enum ApplyScope {
+  APPLY_SINGLE         = 0;
+  APPLY_SELECTION      = 1;
+}
+
+enum ClearScope {
+  CLEAR_EVERYTHING     = 0;
+  CLEAR_FORMATTING     = 1;
+  CLEAR_DATA           = 2;
+  CLEAR_SELECTION      = 3;
+}
+
+enum ClearRegion {
+  CLEAR_SCROLLABLE     = 0;
+  CLEAR_FIXED_ROWS     = 1;
+  CLEAR_FIXED_COLS     = 2;
+  CLEAR_FIXED_BOTH     = 3;
+  CLEAR_ALL_ROWS       = 4;
+  CLEAR_ALL_COLS       = 5;
+  CLEAR_ALL_BOTH       = 6;
+}
+
+enum DragMode {
+  DRAG_NONE            = 0;
+  DRAG_MANUAL          = 1;
+  DRAG_AUTOMATIC       = 2;
+}
+
+enum DropMode {
+  DROP_NONE            = 0;
+  DROP_MANUAL          = 1;
+  DROP_AUTOMATIC       = 2;
+}
+
+enum CustomRenderMode {
+  CUSTOM_RENDER_NONE   = 0;
+  CUSTOM_RENDER_CELL   = 1;
+  CUSTOM_RENDER_ROW    = 2;
+}
+
+enum PrintOrientation {
+  PRINT_PORTRAIT       = 0;
+  PRINT_LANDSCAPE      = 1;
+}
+
+enum ExportFormat {
+  EXPORT_BINARY        = 0;
+  EXPORT_TSV           = 1;
+  EXPORT_CSV           = 2;
+  EXPORT_DELIMITED     = 3;
+  EXPORT_XLSX          = 4;
+}
+
+enum ExportScope {
+  EXPORT_ALL           = 0;
+  EXPORT_DATA_ONLY     = 1;
+  EXPORT_FORMAT_ONLY   = 2;
+}
+
+enum NodeRelation {
+  NODE_PARENT          = 0;
+  NODE_FIRST_CHILD     = 1;
+  NODE_LAST_CHILD      = 2;
+  NODE_NEXT_SIBLING    = 3;
+  NODE_PREV_SIBLING    = 4;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Common Messages
+// ═══════════════════════════════════════════════════════════
+
+message Empty {}
+message GridHandle { int64 id = 1; }
+
+message ImageData {
+  bytes  data   = 1;
+  string format = 2;  // "png", "bmp", etc.
+}
+
+message CellValue {
+  oneof value {
+    string text   = 1;
+    double number = 2;
+    bool   flag   = 3;
+    bytes  data   = 4;
+  }
+}
+
+message CellRange {
+  int32 row1 = 1;
+  int32 col1 = 2;
+  int32 row2 = 3;
+  int32 col2 = 4;
+}
+
+message CellPadding {
+  // Pixel insets applied inside cell content bounds.
+  optional int32 left   = 1;
+  optional int32 top    = 2;
+  optional int32 right  = 3;
+  optional int32 bottom = 4;
+}
+
+message HeaderMarkSize {
+  oneof value {
+    float ratio = 1;  // 0.0..1.0 of header row height
+    int32 px    = 2;  // absolute pixels
+  }
+}
+
+message HeaderSeparatorStyle {
+  optional bool     enabled      = 1;
+  optional uint32   color        = 2;
+  optional int32    width_px     = 3;
+  HeaderMarkSize    height       = 4;
+  optional bool     skip_merged  = 5;
+}
+
+message HeaderResizeHandleStyle {
+  optional bool     enabled                    = 1;
+  optional uint32   color                      = 2;
+  optional int32    width_px                   = 3;
+  HeaderMarkSize    height                     = 4;
+  optional int32    hit_width_px               = 5;
+  optional bool     show_only_when_resizable   = 6;
+}
+
+message IconThemeSlots {
+  // Sort header icons.
+  optional string sort_ascending        = 1;
+  optional string sort_descending       = 2;
+  optional string sort_none             = 3;
+  // Tree/group expand-collapse icons.
+  optional string tree_expanded         = 4;
+  optional string tree_collapsed        = 5;
+  // Common datagrid header/action icons.
+  optional string menu                  = 6;
+  optional string filter                = 7;
+  optional string filter_active         = 8;
+  optional string columns               = 9;
+  optional string drag_handle           = 10;
+  // Selection icons.
+  optional string checkbox_checked      = 11;
+  optional string checkbox_unchecked    = 12;
+  optional string checkbox_indeterminate = 13;
+}
+
+enum IconAlign {
+  ICON_ALIGN_INLINE_END   = 0;
+  ICON_ALIGN_INLINE_START = 1;
+  ICON_ALIGN_START        = 2;
+  ICON_ALIGN_END          = 3;
+  ICON_ALIGN_CENTER       = 4;
+}
+
+message IconTextStyle {
+  optional string font_name   = 1;
+  // Preferred family order for icon text rendering (CSS font-family style).
+  // When set, this takes precedence over `font_name`.
+  repeated string font_names   = 6;
+  optional float  font_size   = 2;
+  optional bool   font_bold   = 3;
+  optional bool   font_italic = 4;
+  optional uint32 color       = 5;
+}
+
+message IconLayoutStyle {
+  optional IconAlign align  = 1;
+  optional int32     gap_px = 2;
+}
+
+message IconThemeDefaults {
+  IconTextStyle   text_style = 1;
+  IconLayoutStyle layout     = 2;
+}
+
+message IconThemeSlotStyle {
+  IconTextStyle   text_style = 1;
+  IconLayoutStyle layout     = 2;
+}
+
+message IconThemeSlotStyles {
+  IconThemeSlotStyle sort_ascending         = 1;
+  IconThemeSlotStyle sort_descending        = 2;
+  IconThemeSlotStyle sort_none              = 3;
+  IconThemeSlotStyle tree_expanded          = 4;
+  IconThemeSlotStyle tree_collapsed         = 5;
+  IconThemeSlotStyle menu                   = 6;
+  IconThemeSlotStyle filter                 = 7;
+  IconThemeSlotStyle filter_active          = 8;
+  IconThemeSlotStyle columns                = 9;
+  IconThemeSlotStyle drag_handle            = 10;
+  IconThemeSlotStyle checkbox_checked       = 11;
+  IconThemeSlotStyle checkbox_unchecked     = 12;
+  IconThemeSlotStyle checkbox_indeterminate = 13;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Grid Configuration
+//
+// All scalar fields are optional — set fields are applied,
+// unset fields are left unchanged (partial-update semantics).
+// Sub-messages use presence: if a sub-message is set, its
+// fields are applied; if absent, that section is untouched.
+// ═══════════════════════════════════════════════════════════
+
+message GridConfig {
+  LayoutConfig      layout      = 1;
+  StyleConfig       style       = 2;
+  SelectionConfig   selection   = 3;
+  EditConfig        editing     = 4;
+  ScrollConfig      scrolling   = 5;
+  OutlineConfig     outline     = 6;
+  SpanConfig        span        = 7;
+  InteractionConfig interaction = 8;
+  RenderConfig      rendering   = 9;
+  string            version     = 10;  // read-only, returned by GetConfig
+}
+
+message LayoutConfig {
+  optional int32  rows              = 1;
+  optional int32  cols              = 2;
+  optional int32  fixed_rows        = 3;
+  optional int32  fixed_cols        = 4;
+  optional int32  frozen_rows       = 5;
+  optional int32  frozen_cols       = 6;
+  optional int32  default_row_height = 7;
+  optional int32  default_col_width = 8;
+  optional bool   right_to_left     = 9;
+  optional bool   extend_last_col   = 10;
+  optional string format_string     = 11;
+  optional bool   word_wrap         = 12;
+  optional int32  ellipsis          = 13;
+  optional bool   text_overflow     = 14;
+}
+
+message StyleConfig {
+  optional BorderAppearance appearance           = 1;
+  optional uint32           back_color           = 2;
+  optional uint32           fore_color           = 3;
+  optional uint32           back_color_fixed     = 4;
+  optional uint32           fore_color_fixed     = 5;
+  optional uint32           back_color_frozen    = 6;
+  optional uint32           fore_color_frozen    = 7;
+  optional uint32           back_color_sel       = 8;
+  optional uint32           fore_color_sel       = 9;
+  optional uint32           back_color_bkg       = 10;
+  optional uint32           back_color_alternate = 11;
+  optional GridLineStyle    grid_lines           = 12;
+  optional GridLineStyle    grid_lines_fixed     = 13;
+  optional uint32           grid_color           = 14;
+  optional uint32           grid_color_fixed     = 15;
+  optional int32            grid_line_width      = 16;
+  optional TextEffect       text_effect          = 17;
+  optional TextEffect       text_effect_fixed    = 18;
+  optional string           font_name            = 19;
+  optional float            font_size            = 20;
+  optional bool             font_bold            = 21;
+  optional bool             font_italic          = 22;
+  optional bool             font_underline       = 23;
+  optional bool             font_strikethrough   = 24;
+  optional float            font_width           = 25;
+  optional uint32           sheet_border         = 26;
+  optional uint32           progress_color       = 27;
+  optional bool             image_over_text      = 28;
+  optional bytes            background_image     = 29;
+  optional ImageAlignment   background_image_alignment = 30;
+  optional TextRenderMode   text_render_mode     = 31;
+  optional TextHintingMode  text_hinting_mode    = 32;
+  optional bool             text_pixel_snap      = 33;
+  optional ApplyScope       apply_scope          = 34;
+  optional CustomRenderMode custom_render        = 35;
+  ImageData                 sort_ascending_picture  = 36;
+  ImageData                 sort_descending_picture = 37;
+  ImageData                 node_open_picture       = 38;
+  ImageData                 node_closed_picture     = 39;
+  // Default insets for non-fixed cells.
+  CellPadding               cell_padding            = 40;
+  // Default insets for fixed/header cells.
+  CellPadding               fixed_cell_padding      = 41;
+  // Short per-column divider marks in fixed/header rows.
+  HeaderSeparatorStyle      header_separator        = 42;
+  // Header resize handle appearance + hit region tuning.
+  HeaderResizeHandleStyle   header_resize_handle    = 43;
+  // String-based icon slots for themed UI glyphs.
+  IconThemeSlots            icon_theme_slots        = 44;
+  // PNG icon pictures for checkbox states.
+  ImageData                 checkbox_checked_picture = 45;
+  ImageData                 checkbox_unchecked_picture = 46;
+  ImageData                 checkbox_indeterminate_picture = 47;
+  // Default text/layout style for icon slots.
+  IconThemeDefaults         icon_theme_defaults      = 48;
+  // Per-slot icon text/layout style overrides.
+  IconThemeSlotStyles       icon_theme_slot_styles   = 49;
+  // Show sort priority numbers (1, 2, 3…) next to sort indicators in multi-sort.
+  optional bool             show_sort_numbers        = 50;
+  // Fill handle color (ARGB), default 0xFF217346 (Excel green).
+  optional uint32           fill_handle_color        = 51;
+}
+
+message SelectionConfig {
+  optional SelectionMode       mode                 = 1;
+  optional FocusBorderStyle    focus_border          = 2;
+  optional SelectionVisibility selection_visibility  = 3;
+  optional bool                allow_selection       = 4;
+  optional bool                header_click_select   = 5;
+  optional bool                show_fill_handle      = 6;  // default false (opt-in)
+}
+
+message EditConfig {
+  optional EditTrigger      edit_trigger       = 1;
+  optional TabBehavior      tab_behavior       = 2;
+  optional DropdownTrigger  dropdown_trigger   = 3;
+  optional bool             dropdown_search    = 4;
+  optional int32            edit_max_length    = 5;
+  optional string           edit_mask          = 6;
+  optional bool             host_key_dispatch      = 7;
+  optional bool             host_pointer_dispatch  = 8;
+}
+
+message ScrollConfig {
+  optional ScrollBarsMode scrollbars        = 1;
+  optional bool           scroll_track      = 2;
+  optional bool           scroll_tips       = 3;
+  optional bool           fling_enabled     = 4;
+  optional float          fling_impulse_gain = 5;
+  optional float          fling_friction    = 6;
+  optional bool           pinch_zoom_enabled = 7;
+  optional bool           fast_scroll        = 8;
+}
+
+message OutlineConfig {
+  optional TreeIndicatorStyle  tree_indicator        = 1;
+  optional int32               tree_column           = 2;
+  optional uint32              tree_color            = 3;
+  optional GroupTotalPosition  group_total_position  = 4;
+  optional bool                multi_totals          = 5;
+}
+
+message SpanConfig {
+  optional CellSpanMode cell_span             = 1;
+  optional CellSpanMode cell_span_fixed       = 2;
+  optional int32        cell_span_compare     = 3;
+  optional int32        group_span_compare    = 4;
+}
+
+message InteractionConfig {
+  optional AllowUserResizingMode  allow_user_resizing = 1;
+  optional UserFreezeMode         allow_user_freezing = 2;
+  optional TypeAheadMode          type_ahead          = 3;
+  optional int32                  type_ahead_delay    = 4;
+  optional bool                   auto_size_mouse     = 5;
+  optional AutoSizeMode           auto_size_mode      = 6;
+  optional bool                   auto_resize         = 7;
+  optional DragMode               drag_mode           = 8;
+  optional DropMode               drop_mode           = 9;
+  optional HeaderFeatures         header_features     = 10;
+}
+
+message RenderConfig {
+  optional RendererMode renderer_mode       = 1;
+  optional bool         debug_overlay       = 2;
+  optional bool         animation_enabled   = 3;
+  optional int32        animation_duration_ms = 4;
+  optional int32        text_layout_cache_cap = 5;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Column & Row Definitions
+//
+// Batch-define column/row properties in one call.
+// Only set fields are applied per entry.
+// ═══════════════════════════════════════════════════════════
+
+message ColumnDef {
+  int32                   index            = 1;
+  optional int32          width            = 2;
+  optional int32          min_width        = 3;
+  optional int32          max_width        = 4;
+  optional Align          alignment        = 5;
+  optional Align          fixed_alignment  = 6;
+  optional ColumnDataType data_type        = 7;
+  optional string         format           = 8;
+  optional string         key              = 9;
+  optional SortOrder      sort             = 10;
+  optional string         dropdown_items   = 11;
+  optional string         edit_mask        = 12;
+  optional int32          indent           = 13;
+  optional bool           hidden           = 14;
+  optional bool           span             = 15;
+  repeated ImageData      image_list       = 16;
+  optional bytes          data             = 17;
+  optional StickyEdge     sticky           = 18;  // Visual sticky overlay (LEFT or RIGHT)
+  // Per-column insets for non-fixed cells.
+  CellPadding             cell_padding     = 19;
+  // Per-column insets for fixed/header cells.
+  CellPadding             fixed_cell_padding = 20;
+}
+
+message DefineColumnsRequest {
+  int64               grid_id = 1;
+  repeated ColumnDef  columns = 2;
+}
+
+message RowDef {
+  int32                index         = 1;
+  optional int32       height        = 2;
+  optional bool        hidden        = 3;
+  optional bool        is_subtotal   = 4;
+  optional int32       outline_level = 5;
+  optional bool        is_collapsed  = 6;
+  optional bytes       data          = 7;
+  optional int32       status        = 8;
+  optional bool        span          = 9;
+  optional PinPosition pin           = 10;  // Structural pin (move to top/bottom)
+  optional StickyEdge  sticky        = 11;  // Visual sticky overlay (TOP or BOTTOM)
+}
+
+message DefineRowsRequest {
+  int64            grid_id = 1;
+  repeated RowDef  rows    = 2;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Cell Data
+//
+// Batch read/write cell values, styles, and properties.
+// ═══════════════════════════════════════════════════════════
+
+message CellStyleOverride {
+  optional uint32      back_color       = 1;
+  optional uint32      fore_color       = 2;
+  optional Align       alignment        = 3;
+  optional TextEffect  text_effect      = 4;
+  optional string      font_name        = 5;
+  optional float       font_size        = 6;
+  optional bool        font_bold        = 7;
+  optional bool        font_italic      = 8;
+  optional bool        font_underline   = 9;
+  optional bool        font_strikethrough = 10;
+  optional float       font_width       = 11;
+  optional uint32      progress_color   = 12;
+  optional float       progress_percent = 13;
+  optional BorderStyle border           = 14;
+  optional uint32      border_color     = 15;
+  // Per-cell insets (highest priority).
+  CellPadding          padding          = 16;
+  // Per-edge border style overrides. If set, each edge can differ.
+  optional BorderStyle border_top       = 17;
+  optional BorderStyle border_right     = 18;
+  optional BorderStyle border_bottom    = 19;
+  optional BorderStyle border_left      = 20;
+  // Per-edge border colors (fallback to border_color when unset).
+  optional uint32      border_top_color    = 21;
+  optional uint32      border_right_color  = 22;
+  optional uint32      border_bottom_color = 23;
+  optional uint32      border_left_color   = 24;
+  optional bool        shrink_to_fit       = 25;
+}
+
+message CellUpdate {
+  int32 row = 1;
+  int32 col = 2;
+  // Only set fields are applied.
+  CellValue              value             = 3;
+  CellStyleOverride      style             = 4;
+  optional CheckedState  checked           = 5;
+  ImageData              picture           = 6;
+  optional ImageAlignment picture_alignment = 7;
+  ImageData              button_picture    = 8;
+  optional string        dropdown_items    = 9;
+  optional StickyEdge    sticky_row        = 10;  // Cell sticks vertically (TOP or BOTTOM)
+  optional StickyEdge    sticky_col        = 11;  // Cell sticks horizontally (LEFT or RIGHT)
+}
+
+message UpdateCellsRequest {
+  int64                grid_id = 1;
+  repeated CellUpdate  cells   = 2;
+}
+
+message GetCellsRequest {
+  int64 grid_id = 1;
+  int32 row1    = 2;
+  int32 col1    = 3;
+  int32 row2    = 4;
+  int32 col2    = 5;
+  // Control what to include in the response.
+  bool include_style   = 6;
+  bool include_checked = 7;
+}
+
+message CellData {
+  int32              row              = 1;
+  int32              col              = 2;
+  CellValue          value            = 3;
+  CellStyleOverride  style            = 4;
+  CheckedState       checked          = 5;
+}
+
+message CellsResponse {
+  repeated CellData cells = 1;
+}
+
+message LoadArrayRequest {
+  int64           grid_id = 1;
+  int32           rows    = 2;
+  int32           cols    = 3;
+  repeated string values  = 4;  // row-major: values[row * cols + col]
+  bool            bind    = 5;  // true = BindToArray semantics
+}
+
+message ClearRequest {
+  int64       grid_id = 1;
+  ClearScope  scope   = 2;
+  ClearRegion region  = 3;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Row Manipulation
+// ═══════════════════════════════════════════════════════════
+
+message InsertRowsRequest {
+  int64           grid_id = 1;
+  int32           index   = 2;  // insert before this index (-1 = append)
+  int32           count   = 3;  // number of rows to insert (default 1)
+  repeated string text    = 4;  // optional tab-separated text per inserted row
+}
+
+message RemoveRowsRequest {
+  int64 grid_id = 1;
+  int32 index   = 2;
+  int32 count   = 3;  // number of rows to remove (default 1)
+}
+
+message MoveColumnRequest {
+  int64 grid_id  = 1;
+  int32 col      = 2;
+  int32 position = 3;
+}
+
+message MoveRowRequest {
+  int64 grid_id  = 1;
+  int32 row      = 2;
+  int32 position = 3;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Selection & Navigation
+// ═══════════════════════════════════════════════════════════
+
+message SelectRequest {
+  int64              grid_id    = 1;
+  int32              active_row = 2;
+  int32              active_col = 3;
+  repeated CellRange ranges     = 4;
+  optional bool      show       = 5;  // scroll to make active cell visible
+}
+
+message SelectionState {
+  int32              active_row = 1;
+  int32              active_col = 2;
+  repeated CellRange ranges     = 3;
+  int32              top_row    = 4;
+  int32              left_col   = 5;
+  int32              bottom_row = 6;
+  int32              right_col  = 7;
+  int32              mouse_row  = 8;
+  int32              mouse_col  = 9;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Editing
+//
+// Single RPC with command variants instead of 10+ RPCs.
+// ═══════════════════════════════════════════════════════════
+
+message HighlightRegion {
+  CellRange range               = 1;
+  uint32    color               = 2;
+  bool      show_corner_handles = 3; // true for 4-corner resize handles (like Excel formula references)
+  // Stable id for one formula reference token (keeps color/handle mapping stable
+  // while users edit text and reorder references).
+  optional int32 ref_id         = 4;
+  // Optional source span in the formula text, for adapters that highlight the
+  // matching token in editor/formula-bar UI.
+  optional int32 text_start     = 5;
+  optional int32 text_length    = 6;
+}
+
+message EditSetHighlights {
+  repeated HighlightRegion regions = 1;
+}
+
+message EditCommand {
+  int64 grid_id = 1;
+  oneof command {
+    EditStart         start          = 2;
+    EditCommit        commit         = 3;
+    EditCancel        cancel         = 4;
+    EditSetText       set_text       = 5;
+    EditSetSelection  set_selection  = 6;
+    EditFinish        finish         = 7;
+    EditSetHighlights set_highlights = 8;
+  }
+}
+
+message EditStart {
+  int32 row = 1;
+  int32 col = 2;
+  optional bool   select_all   = 3;  // true = select all text (default behavior)
+  optional bool   caret_end    = 4;  // true = caret at end, no selection
+  optional string seed_text    = 5;  // replace cell text with this value
+  optional bool   formula_mode = 6;  // true = clicking away creates selections instead of committing
+}
+
+message EditCommit {
+  optional string text = 1;  // if set, commit with this text
+}
+
+message EditCancel {}
+
+message EditSetText {
+  string text = 1;
+}
+
+message EditSetSelection {
+  int32 start  = 1;
+  int32 length = 2;
+}
+
+message EditFinish {}  // accept current edit, close editor
+
+message EditState {
+  bool   active     = 1;
+  int32  row        = 2;
+  int32  col        = 3;
+  string text       = 4;
+  int32  sel_start  = 5;
+  int32  sel_length = 6;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Actions
+// ═══════════════════════════════════════════════════════════
+
+message SortColumn {
+  int32     col   = 1;
+  SortOrder order = 2;
+}
+
+message SortRequest {
+  int64                grid_id      = 1;
+  repeated SortColumn  sort_columns = 2;
+}
+
+message SubtotalRequest {
+  int64         grid_id       = 1;
+  AggregateType aggregate     = 2;
+  int32         group_on_col  = 3;
+  int32         aggregate_col = 4;
+  string        caption       = 5;
+  uint32        back_color    = 6;
+  uint32        fore_color    = 7;
+  bool          add_outline   = 8;
+}
+
+message AutoSizeRequest {
+  int64 grid_id   = 1;
+  int32 col_from  = 2;
+  int32 col_to    = 3;
+  bool  equal     = 4;
+  int32 max_width = 5;
+}
+
+message OutlineRequest {
+  int64 grid_id = 1;
+  int32 level   = 2;
+}
+
+message GetNodeRequest {
+  int64                 grid_id  = 1;
+  int32                 row      = 2;
+  optional NodeRelation relation = 3;  // if set, return related node instead
+}
+
+message NodeInfo {
+  int32 row         = 1;
+  int32 level       = 2;
+  bool  is_expanded = 3;
+  int32 child_count = 4;
+  int32 parent_row  = 5;
+  int32 first_child = 6;
+  int32 last_child  = 7;
+}
+
+message FindRequest {
+  int64 grid_id   = 1;
+  int32 col       = 2;
+  int32 start_row = 3;
+  oneof query {
+    TextQuery  text_query  = 4;
+    RegexQuery regex_query = 5;
+  }
+}
+
+message TextQuery {
+  string text           = 1;
+  bool   case_sensitive = 2;
+  bool   full_match     = 3;
+}
+
+message RegexQuery {
+  string pattern = 1;
+}
+
+message FindResponse {
+  int32 row = 1;  // -1 if not found
+}
+
+message AggregateRequest {
+  int64         grid_id   = 1;
+  AggregateType aggregate = 2;
+  int32         row1      = 3;
+  int32         col1      = 4;
+  int32         row2      = 5;
+  int32         col2      = 6;
+}
+
+message AggregateResponse {
+  double value = 1;
+}
+
+message GetMergedRangeRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+  int32 col     = 3;
+}
+
+message MergeCellsRequest {
+  int64     grid_id = 1;
+  CellRange range   = 2;
+}
+
+message UnmergeCellsRequest {
+  int64     grid_id = 1;
+  CellRange range   = 2;
+}
+
+message MergedRegionsResponse {
+  repeated CellRange ranges = 1;
+}
+
+message MemoryUsageResponse {
+  int64 total_bytes       = 1;
+  int64 cell_data_bytes   = 2;  // CellStore (texts, extras, pictures)
+  int64 style_bytes       = 3;  // GridStyleState + cell_styles map
+  int64 layout_bytes      = 4;  // LayoutCache position arrays
+  int64 column_bytes      = 5;  // columns Vec<ColumnProps>
+  int64 row_bytes         = 6;  // row_props + row_heights + hidden sets
+  int64 selection_bytes   = 7;  // SelectionState (selected_rows set)
+  int64 animation_bytes   = 8;  // AnimationState offset vecs + prev snapshots
+  int64 text_engine_bytes = 9;  // TextEngine measure cache
+  int64 event_bytes       = 10; // EventQueue
+  int64 misc_bytes        = 11; // Everything else (strings, maps, vecs)
+  int32 cell_count        = 12; // Number of stored cells
+  int32 rows              = 13;
+  int32 cols              = 14;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Clipboard
+// ═══════════════════════════════════════════════════════════
+
+message ClipboardCommand {
+  int64 grid_id = 1;
+  oneof command {
+    ClipboardCopy   copy   = 2;
+    ClipboardCut    cut    = 3;
+    ClipboardPaste  paste  = 4;
+    ClipboardDelete delete = 5;
+  }
+}
+
+message ClipboardCopy {}
+message ClipboardCut {}
+message ClipboardPaste {
+  string text      = 1;
+  bytes  rich_data = 2;
+}
+message ClipboardDelete {}
+
+message ClipboardResponse {
+  string text      = 1;
+  bytes  rich_data = 2;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Import / Export / Print
+// ═══════════════════════════════════════════════════════════
+
+message ExportRequest {
+  int64        grid_id = 1;
+  ExportFormat format  = 2;
+  ExportScope  scope   = 3;
+}
+
+message ExportResponse {
+  bytes        data   = 1;
+  ExportFormat format = 2;
+}
+
+message ImportRequest {
+  int64           grid_id = 1;
+  bytes           data    = 2;
+  ExportFormat    format  = 3;
+  ExportScope     scope   = 4;
+  optional string url     = 5;  // alternative: load from URL
+}
+
+message PrintRequest {
+  int64                    grid_id     = 1;
+  optional PrintOrientation orientation = 2;
+  optional int32           margin_left   = 3;
+  optional int32           margin_top    = 4;
+  optional int32           margin_right  = 5;
+  optional int32           margin_bottom = 6;
+  optional string          header        = 7;
+  optional string          footer        = 8;
+  optional bool            show_page_numbers = 9;
+}
+
+message PrintResponse {
+  repeated PrintPage pages = 1;
+}
+
+message PrintPage {
+  int32 page_number = 1;
+  bytes image_data  = 2;
+  int32 width       = 3;
+  int32 height      = 4;
+}
+
+message ArchiveRequest {
+  int64 grid_id = 1;
+  string name   = 2;
+  enum Action {
+    SAVE   = 0;
+    LOAD   = 1;
+    DELETE = 2;
+    LIST   = 3;
+  }
+  Action action = 3;
+  bytes  data   = 4;
+}
+
+message ArchiveResponse {
+  bytes           data  = 1;
+  repeated string names = 2;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Lifecycle & Viewport
+// ═══════════════════════════════════════════════════════════
+
+message CreateRequest {
+  int32      viewport_width  = 1;
+  int32      viewport_height = 2;
+  float      scale           = 3;  // DPI scale factor (0 or 1 = no scaling)
+  GridConfig config          = 4;  // optional initial configuration
+}
+
+message ResizeViewportRequest {
+  int64 grid_id = 1;
+  int32 width   = 2;
+  int32 height  = 3;
+}
+
+message SetRedrawRequest {
+  int64 grid_id = 1;
+  bool  enabled = 2;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Render Session (bidirectional stream)
+// ═══════════════════════════════════════════════════════════
+
+message RenderInput {
+  int64 grid_id = 1;
+  oneof input {
+    ViewportState   viewport       = 2;
+    PointerEvent    pointer        = 3;
+    KeyEvent        key            = 4;
+    BufferReady     buffer         = 5;
+    ScrollEvent     scroll         = 6;
+    EventDecision   event_decision = 7;
+    ZoomEvent       zoom           = 8;
+    GpuSurfaceReady gpu_surface    = 9;
+  }
+}
+
+message ViewportState {
+  float scroll_x = 1;
+  float scroll_y = 2;
+  int32 width    = 3;
+  int32 height   = 4;
+}
+
+message PointerEvent {
+  enum Type { DOWN = 0; UP = 1; MOVE = 2; }
+  Type  type      = 1;
+  float x         = 2;
+  float y         = 3;
+  int32 modifier  = 4;
+  int32 button    = 5;
+  bool  dbl_click = 6;
+}
+
+message ScrollEvent {
+  float delta_x = 1;
+  float delta_y = 2;
+}
+
+message ZoomEvent {
+  enum Phase { ZOOM_BEGIN = 0; ZOOM_UPDATE = 1; ZOOM_END = 2; }
+  Phase phase      = 1;
+  float scale      = 2;
+  float focal_x_px = 3;
+  float focal_y_px = 4;
+}
+
+message KeyEvent {
+  enum Type { KEY_DOWN = 0; KEY_UP = 1; KEY_PRESS = 2; }
+  Type   type      = 1;
+  int32  key_code  = 2;
+  int32  modifier  = 3;
+  string character = 4;
+}
+
+message BufferReady {
+  int64 handle = 1;
+  int32 stride = 2;
+  int32 width  = 3;
+  int32 height = 4;
+}
+
+message GpuSurfaceReady {
+  int64 surface_handle = 1;
+  int32 width          = 2;
+  int32 height         = 3;
+}
+
+message EventDecision {
+  int64 grid_id  = 1;
+  int64 event_id = 2;
+  bool  cancel   = 3;
+}
+
+message RenderOutput {
+  bool rendered = 1;
+  oneof event {
+    FrameDone        frame_done       = 2;
+    SelectionUpdate  selection        = 3;
+    CursorChange     cursor           = 4;
+    EditRequest      edit_request     = 5;
+    DropdownRequest  dropdown_request = 6;
+    TooltipRequest   tooltip_request  = 7;
+    GpuFrameDone     gpu_frame_done   = 8;
+  }
+}
+
+message FrameDone {
+  int64 handle  = 1;
+  int32 dirty_x = 2;
+  int32 dirty_y = 3;
+  int32 dirty_w = 4;
+  int32 dirty_h = 5;
+}
+
+message GpuFrameDone {
+  int32 dirty_x = 1;
+  int32 dirty_y = 2;
+  int32 dirty_w = 3;
+  int32 dirty_h = 4;
+}
+
+message SelectionUpdate {
+  int32              active_row = 1;
+  int32              active_col = 2;
+  repeated CellRange ranges     = 3;
+}
+
+message CursorChange {
+  enum CursorType {
+    DEFAULT    = 0;
+    RESIZE_COL = 1;
+    RESIZE_ROW = 2;
+    MOVE_COL   = 3;
+    TEXT       = 4;
+    HAND       = 5;
+  }
+  CursorType cursor = 1;
+}
+
+message EditRequest {
+  int32  row           = 1;
+  int32  col           = 2;
+  float  x             = 3;
+  float  y             = 4;
+  float  width         = 5;
+  float  height        = 6;
+  string current_value = 7;
+  string edit_mask     = 8;
+  int32  max_length    = 9;
+}
+
+message DropdownRequest {
+  int32           row      = 1;
+  int32           col      = 2;
+  float           x        = 3;
+  float           y        = 4;
+  float           width    = 5;
+  float           height   = 6;
+  repeated string items    = 7;
+  int32           selected = 8;
+  bool            editable = 9;
+}
+
+message TooltipRequest {
+  float  x    = 1;
+  float  y    = 2;
+  string text = 3;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Event Stream
+// ═══════════════════════════════════════════════════════════
+
+message GridEvent {
+  int64 grid_id  = 1;
+  int64 event_id = 100;  // for cancelable events — matches EventDecision.event_id
+  oneof event {
+    // Navigation
+    CellFocusChangingEvent  cell_focus_changing       = 2;
+    CellFocusChangedEvent   cell_focus_changed        = 3;
+    SelectionChangingEvent  selection_changing         = 4;
+    SelectionChangedEvent   selection_changed          = 5;
+    EnterCellEvent          enter_cell                 = 6;
+    LeaveCellEvent          leave_cell                 = 7;
+    // Editing
+    BeforeEditEvent         before_edit                = 8;
+    StartEditEvent          start_edit                 = 9;
+    AfterEditEvent          after_edit                 = 10;
+    CellEditValidateEvent   cell_edit_validate         = 11;
+    CellEditChangeEvent     cell_edit_change           = 12;
+    CellButtonClickEvent    cell_button_click          = 13;
+    KeyDownEditEvent        key_down_edit              = 14;
+    KeyPressEditEvent       key_press_edit             = 15;
+    KeyUpEditEvent          key_up_edit                = 16;
+    CellEditConfigureStyleEvent  cell_edit_configure_style  = 17;
+    CellEditConfigureWindowEvent cell_edit_configure_window = 18;
+    DropdownClosedEvent     dropdown_closed            = 19;
+    DropdownOpenedEvent     dropdown_opened            = 20;
+    // Data
+    CellChangedEvent        cell_changed               = 21;
+    RowStatusChangeEvent    row_status_change           = 22;
+    // Sort
+    BeforeSortEvent         before_sort                = 23;
+    AfterSortEvent          after_sort                 = 24;
+    CompareEvent            compare                    = 25;
+    // Outline
+    BeforeNodeToggleEvent   before_node_toggle         = 26;
+    AfterNodeToggleEvent    after_node_toggle          = 27;
+    // Scroll
+    BeforeScrollEvent       before_scroll              = 28;
+    AfterScrollEvent        after_scroll               = 29;
+    ScrollTooltipEvent      scroll_tooltip             = 30;
+    // Resize & Freeze
+    BeforeUserResizeEvent   before_user_resize         = 31;
+    AfterUserResizeEvent    after_user_resize          = 32;
+    AfterUserFreezeEvent    after_user_freeze          = 33;
+    // Column/Row move
+    BeforeMoveColumnEvent   before_move_column         = 34;
+    AfterMoveColumnEvent    after_move_column          = 35;
+    BeforeMoveRowEvent      before_move_row            = 36;
+    AfterMoveRowEvent       after_move_row             = 37;
+    // Mouse
+    BeforeMouseDownEvent    before_mouse_down          = 38;
+    MouseDownEvent          mouse_down                 = 39;
+    MouseUpEvent            mouse_up                   = 40;
+    MouseMoveEvent          mouse_move                 = 41;
+    ClickEvent              click                      = 42;
+    DblClickEvent           dbl_click                  = 43;
+    // Keyboard
+    KeyDownEvent            key_down                   = 44;
+    KeyPressEvent           key_press                  = 45;
+    KeyUpEvent              key_up                     = 46;
+    // Drawing
+    CustomRenderCellEvent   custom_render_cell         = 47;
+    // Drag & Drop
+    DragStartEvent          drag_start                 = 48;
+    DragOverEvent           drag_over                  = 49;
+    DragDropEvent           drag_drop                  = 50;
+    DragCompleteEvent       drag_complete              = 51;
+    // Search
+    TypeAheadStartedEvent   type_ahead_started         = 52;
+    TypeAheadEndedEvent     type_ahead_ended           = 53;
+    // Data refresh
+    DataRefreshingEvent     data_refreshing            = 54;
+    DataRefreshedEvent      data_refreshed             = 55;
+    FilterDataEvent         filter_data                = 56;
+    // Error
+    ErrorEvent              error                      = 57;
+    // Print
+    BeforePageBreakEvent    before_page_break          = 58;
+    StartPageEvent          start_page                 = 59;
+    GetHeaderRowEvent       get_header_row             = 60;
+  }
+}
+
+// ── Navigation Events ──
+message CellFocusChangingEvent {
+  int32 old_row = 1; int32 old_col = 2;
+  int32 new_row = 3; int32 new_col = 4;
+  bool  cancel  = 5;
+}
+message CellFocusChangedEvent {
+  int32 old_row = 1; int32 old_col = 2;
+  int32 new_row = 3; int32 new_col = 4;
+}
+message SelectionChangingEvent {
+  repeated CellRange old_ranges = 1;
+  repeated CellRange new_ranges = 2;
+  int32              active_row = 3;
+  int32              active_col = 4;
+  bool               cancel     = 5;
+}
+message SelectionChangedEvent {
+  repeated CellRange old_ranges = 1;
+  repeated CellRange new_ranges = 2;
+  int32              active_row = 3;
+  int32              active_col = 4;
+}
+message EnterCellEvent { int32 row = 1; int32 col = 2; }
+message LeaveCellEvent { int32 row = 1; int32 col = 2; }
+
+// ── Edit Events ──
+message BeforeEditEvent   { int32 row = 1; int32 col = 2; bool cancel = 3; }
+message StartEditEvent    { int32 row = 1; int32 col = 2; }
+message AfterEditEvent    { int32 row = 1; int32 col = 2; string old_text = 3; string new_text = 4; }
+message CellEditValidateEvent { int32 row = 1; int32 col = 2; string edit_text = 3; bool cancel = 4; }
+message CellEditChangeEvent   { string text = 1; }
+message CellButtonClickEvent { int32 row = 1; int32 col = 2; }
+message KeyDownEditEvent  { int32 key_code = 1; int32 shift = 2; }
+message KeyPressEditEvent { int32 key_ascii = 1; }
+message KeyUpEditEvent    { int32 key_code = 1; int32 shift = 2; }
+message CellEditConfigureStyleEvent  { int32 row = 1; int32 col = 2; }
+message CellEditConfigureWindowEvent { int32 row = 1; int32 col = 2; }
+message DropdownClosedEvent  {}
+message DropdownOpenedEvent {}
+
+// ── Data Events ──
+message CellChangedEvent     { int32 row = 1; int32 col = 2; string old_text = 3; string new_text = 4; }
+message RowStatusChangeEvent { int32 row = 1; int32 status = 2; }
+
+// ── Sort Events ──
+message BeforeSortEvent { int32 col = 1; bool cancel = 2; }
+message AfterSortEvent  { int32 col = 1; }
+message CompareEvent    { int32 row1 = 1; int32 row2 = 2; int32 col = 3; int32 result = 4; }
+
+// ── Outline Events ──
+message BeforeNodeToggleEvent { int32 row = 1; bool collapse = 2; bool cancel = 3; }
+message AfterNodeToggleEvent  { int32 row = 1; bool collapse = 2; }
+
+// ── Scroll Events ──
+message BeforeScrollEvent {
+  bool  cancel       = 1;
+  int32 old_top_row  = 2; int32 old_left_col = 3;
+  int32 new_top_row  = 4; int32 new_left_col = 5;
+}
+message AfterScrollEvent {
+  int32 old_top_row  = 1; int32 old_left_col = 2;
+  int32 new_top_row  = 3; int32 new_left_col = 4;
+}
+message ScrollTooltipEvent { string text = 1; }
+
+// ── Resize & Freeze Events ──
+message BeforeUserResizeEvent { int32 row = 1; int32 col = 2; bool cancel = 3; }
+message AfterUserResizeEvent  { int32 row = 1; int32 col = 2; }
+message AfterUserFreezeEvent  { int32 frozen_rows = 1; int32 frozen_cols = 2; }
+
+// ── Move Events ──
+message BeforeMoveColumnEvent { int32 col = 1; int32 new_position = 2; bool cancel = 3; }
+message AfterMoveColumnEvent  { int32 col = 1; int32 old_position = 2; }
+message BeforeMoveRowEvent    { int32 row = 1; int32 new_position = 2; bool cancel = 3; }
+message AfterMoveRowEvent     { int32 row = 1; int32 old_position = 2; }
+
+// ── Mouse Events ──
+message BeforeMouseDownEvent { int32 row = 1; int32 col = 2; bool cancel = 3; }
+message MouseDownEvent  { int32 button = 1; int32 shift = 2; float x = 3; float y = 4; }
+message MouseUpEvent    { int32 button = 1; int32 shift = 2; float x = 3; float y = 4; }
+message MouseMoveEvent  { int32 button = 1; int32 shift = 2; float x = 3; float y = 4; }
+message ClickEvent      {}
+message DblClickEvent   {}
+
+// ── Keyboard Events ──
+message KeyDownEvent  { int32 key_code = 1; int32 shift = 2; }
+message KeyPressEvent { int32 key_ascii = 1; }
+message KeyUpEvent    { int32 key_code = 1; int32 shift = 2; }
+
+// ── Draw Events ──
+message CustomRenderCellEvent {
+  int32            row    = 1;
+  int32            col    = 2;
+  float            x      = 3;
+  float            y      = 4;
+  float            width  = 5;
+  float            height = 6;
+  string           text   = 7;
+  CellStyleOverride style = 8;
+  bool             done   = 9;
+}
+
+// ── Drag & Drop Events ──
+message DragStartEvent    { int32 row = 1; int32 col = 2; }
+message DragOverEvent     { int32 row = 1; int32 col = 2; float x = 3; float y = 4; }
+message DragDropEvent     { int32 row = 1; int32 col = 2; }
+message DragCompleteEvent { bool success = 1; }
+
+// ── Search Events ──
+message TypeAheadStartedEvent { int32 col = 1; string text = 2; }
+message TypeAheadEndedEvent   {}
+
+// ── Data Refresh Events ──
+message DataRefreshingEvent { bool cancel = 1; }
+message DataRefreshedEvent  {}
+message FilterDataEvent { int32 row = 1; int32 col = 2; string text = 3; }
+
+// ── Error Events ──
+message ErrorEvent { int32 code = 1; string message = 2; }
+
+// ── Print Events ──
+message BeforePageBreakEvent { int32 row = 1; bool cancel = 2; }
+message StartPageEvent       { int32 page = 1; }
+message GetHeaderRowEvent    { int32 page = 1; }
+
+// ═══════════════════════════════════════════════════════════
+// Service
+// ═══════════════════════════════════════════════════════════
+
+service VolvoxGridService {
+  // ── Lifecycle ──
+  rpc Create(CreateRequest)                returns (GridHandle);
+  rpc Destroy(GridHandle)                  returns (Empty);
+
+  // ── Configuration ──
+  // Apply partial config — only set fields are updated.
+  rpc Configure(ConfigureRequest)          returns (Empty);
+  // Return the full current configuration.
+  rpc GetConfig(GridHandle)                returns (GridConfig);
+  // Register a runtime font (TTF/OTF/TTC bytes) for text/icon rendering.
+  rpc LoadFontData(LoadFontDataRequest)    returns (Empty);
+
+  // ── Structure ──
+  rpc DefineColumns(DefineColumnsRequest)  returns (Empty);
+  rpc DefineRows(DefineRowsRequest)        returns (Empty);
+  rpc InsertRows(InsertRowsRequest)        returns (Empty);
+  rpc RemoveRows(RemoveRowsRequest)        returns (Empty);
+  rpc MoveColumn(MoveColumnRequest)        returns (Empty);
+  rpc MoveRow(MoveRowRequest)              returns (Empty);
+
+  // ── Data ──
+  rpc UpdateCells(UpdateCellsRequest)      returns (Empty);
+  rpc GetCells(GetCellsRequest)            returns (CellsResponse);
+  rpc LoadArray(LoadArrayRequest)          returns (Empty);
+  rpc Clear(ClearRequest)                  returns (Empty);
+
+  // ── Selection ──
+  rpc Select(SelectRequest)                returns (Empty);
+  rpc GetSelection(GridHandle)             returns (SelectionState);
+
+  // ── Editing ──
+  rpc Edit(EditCommand)                    returns (EditState);
+
+  // ── Actions ──
+  rpc Sort(SortRequest)                    returns (Empty);
+  rpc Subtotal(SubtotalRequest)            returns (Empty);
+  rpc AutoSize(AutoSizeRequest)            returns (Empty);
+  rpc Outline(OutlineRequest)              returns (Empty);
+  rpc GetNode(GetNodeRequest)              returns (NodeInfo);
+  rpc Find(FindRequest)                    returns (FindResponse);
+  rpc Aggregate(AggregateRequest)          returns (AggregateResponse);
+  rpc GetMergedRange(GetMergedRangeRequest) returns (CellRange);
+  rpc MergeCells(MergeCellsRequest)        returns (Empty);
+  rpc UnmergeCells(UnmergeCellsRequest)    returns (Empty);
+  rpc GetMergedRegions(GridHandle)         returns (MergedRegionsResponse);
+  rpc GetMemoryUsage(GridHandle)           returns (MemoryUsageResponse);
+
+  // ── Clipboard ──
+  rpc Clipboard(ClipboardCommand)          returns (ClipboardResponse);
+
+  // ── Import / Export ──
+  rpc Export(ExportRequest)                returns (ExportResponse);
+  rpc Import(ImportRequest)                returns (Empty);
+  rpc Print(PrintRequest)                  returns (PrintResponse);
+  rpc Archive(ArchiveRequest)              returns (ArchiveResponse);
+
+  // ── Render Control ──
+  rpc ResizeViewport(ResizeViewportRequest) returns (Empty);
+  rpc SetRedraw(SetRedrawRequest)          returns (Empty);
+  rpc Refresh(GridHandle)                  returns (Empty);
+
+  // ── Demo ──
+  rpc LoadDemo(LoadDemoRequest)            returns (Empty);
+
+  // ── Streaming ──
+  rpc RenderSession(stream RenderInput)    returns (stream RenderOutput);
+  rpc EventStream(GridHandle)              returns (stream GridEvent);
+}
+
+message ConfigureRequest {
+  int64      grid_id = 1;
+  GridConfig config  = 2;
+}
+
+message LoadDemoRequest {
+  int64  grid_id = 1;
+  string demo    = 2;
+}
+
+message LoadFontDataRequest {
+  bytes data               = 1;
+  string font_name         = 2;
+  repeated string font_names = 3;
+}

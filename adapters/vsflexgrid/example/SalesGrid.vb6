@@ -1,0 +1,200 @@
+' SalesGrid.vb6 -- VB6 Form demo for the Volvox VolvoxGrid ActiveX control
+'
+' Usage:
+'   1. Register VolvoxGrid.dll:   regsvr32 VolvoxGrid.dll
+'   2. In VB6, go to Project > Components and check "Volvox VolvoxGrid 0.1"
+'   3. Draw a VolvoxGrid control on the form (named VolvoxGrid1)
+'   4. Add a StatusBar control (named StatusBar1) and a CommandButton (cmdSort)
+'   5. Paste this code into the form module
+'
+' The VolvoxGrid control renders via a Rust engine through the Synurang FFI
+' layer, providing full grid functionality (sorting, grouping, cell editing,
+' merge, outlining) to classic VB6 applications.
+
+Option Explicit
+
+' ---------------------------------------------------------------------------
+' Form_Load -- initialize the grid with sample data
+' ---------------------------------------------------------------------------
+Private Sub Form_Load()
+    ' Configure grid dimensions
+    VolvoxGrid1.Rows = 101
+    VolvoxGrid1.Cols = 5
+    VolvoxGrid1.FixedRows = 1
+    VolvoxGrid1.FixedCols = 0
+
+    ' Suppress redraw during bulk population
+    VolvoxGrid1.Redraw = False
+
+    ' Column headers
+    VolvoxGrid1.SetTextMatrix 0, 0, "Product"
+    VolvoxGrid1.SetTextMatrix 0, 1, "Category"
+    VolvoxGrid1.SetTextMatrix 0, 2, "Sales"
+    VolvoxGrid1.SetTextMatrix 0, 3, "Quarter"
+    VolvoxGrid1.SetTextMatrix 0, 4, "Region"
+
+    ' Populate sample data
+    Dim products As Variant
+    products = Array("Widget A", "Widget B", "Gadget X", "Gadget Y", "Tool Z")
+    Dim categories As Variant
+    categories = Array("Electronics", "Electronics", "Hardware", "Hardware", "Tools")
+
+    Randomize
+
+    Dim i As Long
+    For i = 1 To 100
+        VolvoxGrid1.SetTextMatrix i, 0, products((i - 1) Mod 5)
+        VolvoxGrid1.SetTextMatrix i, 1, categories((i - 1) Mod 5)
+        VolvoxGrid1.SetTextMatrix i, 2, CStr(Int(Rnd * 10000))
+        VolvoxGrid1.SetTextMatrix i, 3, "Q" & CStr((i Mod 4) + 1)
+        VolvoxGrid1.SetTextMatrix i, 4, Choose((i Mod 4) + 1, "North", "South", "East", "West")
+    Next i
+
+    ' Column widths (in twips)
+    VolvoxGrid1.ColWidth(0) = 2000
+    VolvoxGrid1.ColWidth(1) = 2000
+    VolvoxGrid1.ColWidth(2) = 1500
+    VolvoxGrid1.ColWidth(3) = 1000
+    VolvoxGrid1.ColWidth(4) = 1500
+
+    ' Appearance
+    VolvoxGrid1.SelectionMode = flexSelectionByRow
+    VolvoxGrid1.HighLight = flexHighlightAlways
+    VolvoxGrid1.FocusRect = flexFocusLight
+    VolvoxGrid1.AllowUserResizing = flexResizeColumns
+    VolvoxGrid1.Editable = flexEditKbdMouse
+
+    ' Re-enable redraw
+    VolvoxGrid1.Redraw = True
+
+    StatusBar1.SimpleText = "Ready - " & (VolvoxGrid1.Rows - 1) & " records loaded"
+End Sub
+
+' ---------------------------------------------------------------------------
+' Event: BeforeRowColChange -- fires when the user navigates to a new cell
+' ---------------------------------------------------------------------------
+Private Sub VolvoxGrid1_BeforeRowColChange(ByVal OldRow As Long, ByVal OldCol As Long, _
+    ByVal NewRow As Long, ByVal NewCol As Long, Cancel As Boolean)
+
+    ' Display current position in status bar
+    StatusBar1.SimpleText = "Row: " & NewRow & ", Col: " & NewCol & _
+        " - " & VolvoxGrid1.GetTextMatrix(0, NewCol)
+
+    ' Example: prevent navigation to hidden column
+    ' If NewCol = 3 Then Cancel = True
+End Sub
+
+' ---------------------------------------------------------------------------
+' Event: AfterRowColChange -- fires after navigation completes
+' ---------------------------------------------------------------------------
+Private Sub VolvoxGrid1_AfterRowColChange()
+    ' Update any dependent controls here
+End Sub
+
+' ---------------------------------------------------------------------------
+' Event: BeforeEdit -- fires before the user starts editing a cell
+' ---------------------------------------------------------------------------
+Private Sub VolvoxGrid1_BeforeEdit(ByVal Row As Long, ByVal Col As Long, _
+    Cancel As Boolean)
+
+    ' Example: make "Category" column read-only
+    If Col = 1 Then
+        Cancel = True
+        StatusBar1.SimpleText = "Category column is read-only"
+    End If
+End Sub
+
+' ---------------------------------------------------------------------------
+' Event: AfterEdit -- fires after a cell edit is committed
+' ---------------------------------------------------------------------------
+Private Sub VolvoxGrid1_AfterEdit(ByVal Row As Long, ByVal Col As Long)
+    StatusBar1.SimpleText = "Cell(" & Row & "," & Col & ") updated: " & _
+        VolvoxGrid1.GetTextMatrix(Row, Col)
+End Sub
+
+' ---------------------------------------------------------------------------
+' Event: DblClick -- fires on double-click
+' ---------------------------------------------------------------------------
+Private Sub VolvoxGrid1_DblClick()
+    Dim r As Long, c As Long
+    r = VolvoxGrid1.MouseRow
+    c = VolvoxGrid1.MouseCol
+    If r > 0 Then
+        MsgBox "Double-clicked: " & VolvoxGrid1.GetTextMatrix(r, 0) & _
+               " / " & VolvoxGrid1.GetTextMatrix(r, 2), vbInformation, "Cell Detail"
+    End If
+End Sub
+
+' ---------------------------------------------------------------------------
+' Event: KeyDown -- handle keyboard shortcuts
+' ---------------------------------------------------------------------------
+Private Sub VolvoxGrid1_KeyDown(ByVal KeyCode As Long, ByVal Shift As Long)
+    ' Ctrl+C = Copy
+    If KeyCode = vbKeyC And (Shift And vbCtrlMask) Then
+        Clipboard.Clear
+        Clipboard.SetText VolvoxGrid1.Clip
+        StatusBar1.SimpleText = "Copied to clipboard"
+    End If
+
+    ' Delete key = clear selected cells
+    If KeyCode = vbKeyDelete Then
+        VolvoxGrid1.Clear flexClearSelection
+        StatusBar1.SimpleText = "Selection cleared"
+    End If
+End Sub
+
+' ---------------------------------------------------------------------------
+' cmdSort_Click -- sort the grid
+' ---------------------------------------------------------------------------
+Private Sub cmdSort_Click()
+    VolvoxGrid1.Sort flexSortGenericAscending
+    StatusBar1.SimpleText = "Grid sorted (ascending)"
+End Sub
+
+' ---------------------------------------------------------------------------
+' cmdSubtotal_Click -- add subtotals grouped by Category
+' ---------------------------------------------------------------------------
+Private Sub cmdSubtotal_Click()
+    ' First sort by category
+    VolvoxGrid1.Sort flexSortGenericAscending
+
+    ' Add sum subtotals for the Sales column, grouped by Category
+    VolvoxGrid1.Subtotal flexAggSum, 1, 2, "Total {0}"
+
+    StatusBar1.SimpleText = "Subtotals added"
+End Sub
+
+' ---------------------------------------------------------------------------
+' cmdSave_Click -- save grid to file
+' ---------------------------------------------------------------------------
+Private Sub cmdSave_Click()
+    Dim dlg As CommonDialog
+    Set dlg = CommonDialog1
+    dlg.Filter = "VolvoxGrid Binary (*.fgd)|*.fgd|Tab-Separated (*.txt)|*.txt"
+    dlg.ShowSave
+
+    If dlg.FileName <> "" Then
+        If dlg.FilterIndex = 1 Then
+            VolvoxGrid1.SaveGrid dlg.FileName, flexSaveBinary
+        Else
+            VolvoxGrid1.SaveGrid dlg.FileName, flexSaveTextTab
+        End If
+        StatusBar1.SimpleText = "Grid saved to " & dlg.FileName
+    End If
+End Sub
+
+' ---------------------------------------------------------------------------
+' cmdAutoSize_Click -- auto-fit all columns
+' ---------------------------------------------------------------------------
+Private Sub cmdAutoSize_Click()
+    VolvoxGrid1.AutoSize 0, VolvoxGrid1.Cols - 1
+    StatusBar1.SimpleText = "Columns auto-sized"
+End Sub
+
+' ---------------------------------------------------------------------------
+' Form_Resize -- resize the grid to fill the form
+' ---------------------------------------------------------------------------
+Private Sub Form_Resize()
+    On Error Resume Next
+    VolvoxGrid1.Move 0, 0, Me.ScaleWidth, Me.ScaleHeight - StatusBar1.Height - 400
+End Sub

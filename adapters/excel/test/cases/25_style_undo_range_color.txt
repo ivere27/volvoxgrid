@@ -1,0 +1,11 @@
+# Style undo — range background color
+setData [["A","B"],["1","2"]]
+setRangeStyle {"row1":0,"col1":0,"row2":1,"col2":1} {"backColor":4294967040}
+assertCanUndo true
+assertCellStyle 0 0 backColor 4294967040
+assertCellStyle 1 1 backColor 4294967040
+undo
+assertCellStyle 0 0 backColor 4294967295
+assertCellStyle 1 1 backColor 4294967295
+redo
+assertCellStyle 0 0 backColor 4294967040

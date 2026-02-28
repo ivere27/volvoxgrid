@@ -1,0 +1,4 @@
+# VLOOKUP invalid range_lookup argument
+setData [["1","A"],["5","B"],["10","C"]]
+setCellValue 0 2 "=VLOOKUP(5,A1:B3,2,\"bad\")"
+assertCellValue 0 2 "#VALUE!"

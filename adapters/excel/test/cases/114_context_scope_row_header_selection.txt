@@ -1,0 +1,4 @@
+# Right-click row header: row scope + full-row selection
+assertContextScopeAtGrid 2 0 "rowHeader"
+invokeContextAtGrid 2 0
+assertSelection {"row1":1,"col1":0,"row2":1,"col2":"maxCol"}

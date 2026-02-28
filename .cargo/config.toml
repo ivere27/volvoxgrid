@@ -1,0 +1,14 @@
+[build]
+target-dir = "target"
+
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"
+
+[target.x86_64-pc-windows-gnu]
+linker = "x86_64-w64-mingw32-gcc"
+
+[target.x86_64-apple-darwin]
+linker = "/opt/volvoxgrid/zig-cc-x86_64-macos.sh"
+
+[target.aarch64-apple-darwin]
+linker = "/opt/volvoxgrid/zig-cc-aarch64-macos.sh"

@@ -1,0 +1,8 @@
+# COUNTIF wildcard criteria
+setData [["apple"],["apricot"],["banana"],["app"]]
+setCellValue 0 1 "=COUNTIF(A1:A4,\"ap*\")"
+setCellValue 1 1 "=COUNTIF(A1:A4,\"a?ple\")"
+setCellValue 2 1 "=COUNTIF(A1:A4,\"<>ap*\")"
+assertCellValue 0 1 "3"
+assertCellValue 1 1 "1"
+assertCellValue 2 1 "1"

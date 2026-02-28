@@ -1,0 +1,6 @@
+# Fill up shifts formula references relatively
+setData [["10",""],["20","=A2"],["30",""]]
+setSelection {"row1":1,"col1":1,"row2":1,"col2":1}
+invokeFillTo 0 1
+assertCellRawValue 0 1 "=A1"
+assertCellValue 0 1 "10"

@@ -1,0 +1,36 @@
+[package]
+name = "volvoxgrid-engine"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/ivere27/volvoxgrid"
+
+[features]
+default = ["cosmic-text", "rayon", "regex"]
+proto = []
+grpc = ["dep:tonic", "dep:tonic-build", "proto"]
+cosmic-text = ["dep:cosmic-text"]
+rayon = ["dep:rayon"]
+regex = ["dep:regex"]
+demo = []
+gpu = ["dep:wgpu", "dep:bytemuck", "dep:web-sys", "dep:raw-window-handle", "cosmic-text"]
+
+[dependencies]
+prost = "0.12"
+prost-types = "0.12"
+tonic = { version = "0.11", optional = true }
+tiny-skia = "0.11"
+cosmic-text = { version = "0.12", optional = true }
+regex = { version = "1.10", optional = true }
+rayon = { version = "1.10", optional = true }
+wgpu = { version = "24", optional = true }
+bytemuck = { version = "1", features = ["derive"], optional = true }
+raw-window-handle = { version = "0.6", optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { version = "0.3", optional = true, features = ["HtmlCanvasElement"] }
+web-time = "1"
+
+[build-dependencies]
+prost-build = "0.12"
+tonic-build = { version = "0.11", optional = true }

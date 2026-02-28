@@ -1,0 +1,11 @@
+# DATE / YEAR / MONTH / DAY basics
+setCellValue 0 0 "=DATE(2024,2,29)"
+setCellValue 0 1 "=YEAR(A1)"
+setCellValue 0 2 "=MONTH(A1)"
+setCellValue 0 3 "=DAY(A1)"
+setCellValue 1 0 "=DATE(2024,13,1)"
+assertCellValue 0 0 "2024-02-29"
+assertCellValue 0 1 "2024"
+assertCellValue 0 2 "2"
+assertCellValue 0 3 "29"
+assertCellValue 1 0 "2025-01-01"

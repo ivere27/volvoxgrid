@@ -1,0 +1,9 @@
+; VolvoxGrid.def -- Module definition file for COM DLL exports
+
+LIBRARY "VolvoxGrid"
+
+EXPORTS
+    DllCanUnloadNow     PRIVATE
+    DllGetClassObject   PRIVATE
+    DllRegisterServer   PRIVATE
+    DllUnregisterServer PRIVATE

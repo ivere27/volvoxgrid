@@ -1,0 +1,13 @@
+# Basic data population — setCellValue + verify grid renders text
+setCellValue 0 0 "Name"
+setCellValue 0 1 "Age"
+setCellValue 0 2 "City"
+setCellValue 1 0 "Alice"
+setCellValue 1 1 "30"
+setCellValue 1 2 "New York"
+setCellValue 2 0 "Bob"
+setCellValue 2 1 "25"
+setCellValue 2 2 "London"
+setCellValue 3 0 "Charlie"
+setCellValue 3 1 "35"
+setCellValue 3 2 "Tokyo"

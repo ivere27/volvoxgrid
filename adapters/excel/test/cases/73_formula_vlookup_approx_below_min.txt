@@ -1,0 +1,4 @@
+# VLOOKUP approximate mode: lookup below minimum key
+setData [["2","A"],["5","B"],["10","C"]]
+setCellValue 0 2 "=VLOOKUP(1,A1:B3,2,TRUE)"
+assertCellValue 0 2 "#N/A"
