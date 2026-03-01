@@ -1,6 +1,6 @@
 rootProject.name = "volvoxgrid-desktop"
 val volvoxgridDesktopSource = providers.gradleProperty("volvoxgridDesktopSource")
-    .orElse(System.getenv("VOLVOXGRID_DESKTOP_SOURCE") ?: "local")
+    .orElse(System.getenv("VOLVOXGRID_SOURCE") ?: "local")
     .get()
     .trim()
     .lowercase()

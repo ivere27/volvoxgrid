@@ -55,20 +55,33 @@ JAVA_DESKTOP_PLUGIN_BASENAME := libvolvoxgrid_plugin.so
 endif
 JAVA_DESKTOP_PLUGIN ?= $(abspath target/debug/$(JAVA_DESKTOP_PLUGIN_BASENAME))
 JAVA_DESKTOP_PLUGIN_RELEASE ?= $(abspath target/release/$(JAVA_DESKTOP_PLUGIN_BASENAME))
-VOLVOXGRID_VERSION ?= 0.1.0
-VOLVOXGRID_ANDROID_SOURCE ?= local
+VOLVOXGRID_VERSION ?= 0.1.3
+VOLVOXGRID_SOURCE ?= local
+VOLVOXGRID_SOURCE := $(strip $(VOLVOXGRID_SOURCE))
+ifeq ($(filter $(VOLVOXGRID_SOURCE),local maven),)
+$(error Invalid VOLVOXGRID_SOURCE='$(VOLVOXGRID_SOURCE)'. Expected 'local' or 'maven')
+endif
+VOLVOXGRID_VARIANT ?=
 VOLVOXGRID_ANDROID_GROUP ?= io.github.ivere27
-VOLVOXGRID_ANDROID_ARTIFACT ?= volvoxgrid-android
-VOLVOXGRID_JAVA_SOURCE ?= local
+VOLVOXGRID_ANDROID_ARTIFACT ?=
+ifeq ($(strip $(VOLVOXGRID_VARIANT)),lite)
+VOLVOXGRID_ANDROID_ARTIFACT_DEFAULT := volvoxgrid-android-lite
+else
+VOLVOXGRID_ANDROID_ARTIFACT_DEFAULT := volvoxgrid-android
+endif
+ifeq ($(strip $(VOLVOXGRID_ANDROID_ARTIFACT)),)
+VOLVOXGRID_ANDROID_ARTIFACT := $(VOLVOXGRID_ANDROID_ARTIFACT_DEFAULT)
+endif
 VOLVOXGRID_JAVA_GROUP ?= io.github.ivere27
 VOLVOXGRID_JAVA_ARTIFACT ?= volvoxgrid-desktop
 ANDROID_EXAMPLE_GRADLE_PROPS := \
-	-PvolvoxgridAndroidSource=$(VOLVOXGRID_ANDROID_SOURCE) \
+	-PvolvoxgridAndroidSource=$(VOLVOXGRID_SOURCE) \
+	-PvolvoxgridAndroidVariant=$(VOLVOXGRID_VARIANT) \
 	-PvolvoxgridAndroidGroup=$(VOLVOXGRID_ANDROID_GROUP) \
 	-PvolvoxgridAndroidArtifact=$(VOLVOXGRID_ANDROID_ARTIFACT) \
 	-PvolvoxgridVersion=$(VOLVOXGRID_VERSION)
 JAVA_DESKTOP_GRADLE_PROPS := \
-	-PvolvoxgridDesktopSource=$(VOLVOXGRID_JAVA_SOURCE) \
+	-PvolvoxgridDesktopSource=$(VOLVOXGRID_SOURCE) \
 	-PvolvoxgridDesktopGroup=$(VOLVOXGRID_JAVA_GROUP) \
 	-PvolvoxgridDesktopArtifact=$(VOLVOXGRID_JAVA_ARTIFACT) \
 	-PvolvoxgridVersion=$(VOLVOXGRID_VERSION)
@@ -96,8 +109,9 @@ IOS_DOCKER_IMAGE ?= volvoxgrid-ios:latest
 ALL_DOCKER_IMAGE ?= volvoxgrid-all:latest
 MAVEN_SETTINGS ?= $(CURRENT_DIR)/.maven-settings.xml
 MAVEN_REPO_URL ?= https://central.sonatype.com/api/v1/publisher/upload
+MAVEN_LOCAL_REPO ?= $(HOME)/.m2/repository
 
-ifeq ($(VOLVOXGRID_ANDROID_SOURCE),maven)
+ifeq ($(VOLVOXGRID_SOURCE),maven)
 ANDROID_INSTALL_PREREQ :=
 ANDROID_INSTALL_RELEASE_PREREQ :=
 else
@@ -105,7 +119,7 @@ ANDROID_INSTALL_PREREQ := android-plugin
 ANDROID_INSTALL_RELEASE_PREREQ := android-plugin-release
 endif
 
-ifeq ($(VOLVOXGRID_JAVA_SOURCE),maven)
+ifeq ($(VOLVOXGRID_SOURCE),maven)
 JAVA_DESKTOP_RUN_PREREQ :=
 JAVA_DESKTOP_RUN_RELEASE_PREREQ :=
 JAVA_DESKTOP_RUN_SIMPLE_PREREQ :=
@@ -135,6 +149,7 @@ endif
         vsflexgrid vsflexgrid-release \
         docker_android_aar_image docker_android_aar docker_desktop_jar_image docker_desktop_jar \
         docker_ios_image docker_ios docker_all_image docker_all publish_maven \
+        publish_local \
         gtk-test clean clean-all help
 
 # =============================================================================
@@ -187,19 +202,22 @@ help:
 	@echo ""
 	@echo "Docker + Maven:"
 	@echo "  docker_android_aar_image  Build Docker image for Android AAR"
-	@echo "  docker_android_aar        Build Android AAR + Android lite AAR + Maven artifacts via Docker"
+	@echo "  docker_android_aar        Build Android AAR + Android lite AAR via Docker, auto-install SNAPSHOT to mavenLocal"
 	@echo "  docker_desktop_jar_image  Build Docker image for desktop JAR"
-	@echo "  docker_desktop_jar        Build desktop JAR + Maven artifacts via Docker"
+	@echo "  docker_desktop_jar        Build desktop JAR via Docker, auto-install SNAPSHOT to mavenLocal"
 	@echo "  docker_ios_image          Build Docker image for iOS"
 	@echo "  docker_ios                Build iOS XCFramework via Docker"
 	@echo "  docker_all_image          Build unified Docker image (all toolchains)"
 	@echo "  docker_all                Build all platform artifacts via unified Docker image"
 	@echo "  publish_maven             Upload Android AAR + Android lite AAR + desktop JAR to Maven Central"
+	@echo "  publish_local             Install built SNAPSHOT artifacts from dist/maven into ~/.m2/repository"
 	@echo ""
 	@echo "Example dependency source flags (default is local):"
-	@echo "  make android-run VOLVOXGRID_ANDROID_SOURCE=maven VOLVOXGRID_VERSION=0.1.0"
-	@echo "  make java-desktop-run VOLVOXGRID_JAVA_SOURCE=maven VOLVOXGRID_VERSION=0.1.0"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.3"
+	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.3"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.1.3"
 	@echo "  (maven mode skips local plugin build for the example targets)"
+	@echo "  Android variant: set VOLVOXGRID_VARIANT=lite for lite; any other value uses normal"
 	@echo "  Optional override: VOLVOXGRID_*_GROUP and VOLVOXGRID_*_ARTIFACT"
 	@echo ""
 	@echo "  clean          Remove build artifacts"
@@ -523,10 +541,29 @@ android-plugin:
 		echo "Note: Rust target x86_64-linux-android is not installed; skipping x86_64 plugin binary."; \
 		echo "      Install with: rustup target add x86_64-linux-android"; \
 	fi; \
+	PLUGIN_FEATURE_ARGS="--features gpu"; \
+	PLUGIN_SO_NAME="libvolvoxgrid_plugin.so"; \
+	if [ "$(strip $(VOLVOXGRID_VARIANT))" = "lite" ]; then \
+		echo "Using Android plugin variant: lite (--no-default-features --features demo)"; \
+		PLUGIN_FEATURE_ARGS="--no-default-features --features demo"; \
+		PLUGIN_SO_NAME="libvolvoxgrid_plugin_lite.so"; \
+	elif [ -n "$(strip $(VOLVOXGRID_VARIANT))" ]; then \
+		echo "Note: unknown VOLVOXGRID_VARIANT='$(VOLVOXGRID_VARIANT)', falling back to normal."; \
+	fi; \
+	rm -rf "$(ANDROID_PLUGIN_OUTPUT_DIR)"; \
 	rm -rf "$(ANDROID_APP_PLUGIN_DIR)"; \
 	rm -rf "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)"; \
 	rm -rf "$(ANDROID_PROJECT_DIR)/example/build"; \
-	cd plugin && ANDROID_NDK_HOME="$$NDK_DIR" cargo ndk $$NDK_TARGETS -o "$(ANDROID_PLUGIN_OUTPUT_DIR)" build --features gpu; \
+	cd plugin && ANDROID_NDK_HOME="$$NDK_DIR" cargo ndk $$NDK_TARGETS -o "$(ANDROID_PLUGIN_OUTPUT_DIR)" build $$PLUGIN_FEATURE_ARGS; \
+	if [ "$$PLUGIN_SO_NAME" != "libvolvoxgrid_plugin.so" ]; then \
+		for ABI in arm64-v8a armeabi-v7a x86_64; do \
+			SRC_SO="$(ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI/libvolvoxgrid_plugin.so"; \
+			DST_SO="$(ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI/$$PLUGIN_SO_NAME"; \
+			if [ -f "$$SRC_SO" ]; then \
+				mv "$$SRC_SO" "$$DST_SO"; \
+			fi; \
+		done; \
+	fi; \
 	mkdir -p "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)"; \
 	cp -a "$(ANDROID_PLUGIN_OUTPUT_DIR)/." "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/"
 	@echo "Android plugin build complete."
@@ -565,10 +602,29 @@ android-plugin-release:
 		echo "Note: Rust target x86_64-linux-android is not installed; skipping x86_64 plugin binary."; \
 		echo "      Install with: rustup target add x86_64-linux-android"; \
 	fi; \
+	PLUGIN_FEATURE_ARGS="--features gpu"; \
+	PLUGIN_SO_NAME="libvolvoxgrid_plugin.so"; \
+	if [ "$(strip $(VOLVOXGRID_VARIANT))" = "lite" ]; then \
+		echo "Using Android plugin variant: lite (--no-default-features --features demo)"; \
+		PLUGIN_FEATURE_ARGS="--no-default-features --features demo"; \
+		PLUGIN_SO_NAME="libvolvoxgrid_plugin_lite.so"; \
+	elif [ -n "$(strip $(VOLVOXGRID_VARIANT))" ]; then \
+		echo "Note: unknown VOLVOXGRID_VARIANT='$(VOLVOXGRID_VARIANT)', falling back to normal."; \
+	fi; \
+	rm -rf "$(ANDROID_PLUGIN_OUTPUT_DIR)"; \
 	rm -rf "$(ANDROID_APP_PLUGIN_DIR)"; \
 	rm -rf "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)"; \
 	rm -rf "$(ANDROID_PROJECT_DIR)/example/build"; \
-	cd plugin && ANDROID_NDK_HOME="$$NDK_DIR" cargo ndk $$NDK_TARGETS -o "$(ANDROID_PLUGIN_OUTPUT_DIR)" build --release --features gpu; \
+	cd plugin && ANDROID_NDK_HOME="$$NDK_DIR" cargo ndk $$NDK_TARGETS -o "$(ANDROID_PLUGIN_OUTPUT_DIR)" build --release $$PLUGIN_FEATURE_ARGS; \
+	if [ "$$PLUGIN_SO_NAME" != "libvolvoxgrid_plugin.so" ]; then \
+		for ABI in arm64-v8a armeabi-v7a x86_64; do \
+			SRC_SO="$(ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI/libvolvoxgrid_plugin.so"; \
+			DST_SO="$(ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI/$$PLUGIN_SO_NAME"; \
+			if [ -f "$$SRC_SO" ]; then \
+				mv "$$SRC_SO" "$$DST_SO"; \
+			fi; \
+		done; \
+	fi; \
 	mkdir -p "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)"; \
 	cp -a "$(ANDROID_PLUGIN_OUTPUT_DIR)/." "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/"
 	@echo "Android release plugin build complete."
@@ -713,6 +769,11 @@ docker_android_aar: docker_android_aar_image
 		-e PLUGIN_BUILD_MODE=lite \
 		"$(AAR_DOCKER_IMAGE)"
 	@echo "Android AAR artifacts (default + lite): dist/maven/"
+	@if echo "$(AAR_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
+		$(MAKE) publish_local; \
+	else \
+		echo "Skip publish_local: AAR_VERSION=$(AAR_VERSION) is not a SNAPSHOT."; \
+	fi
 
 docker_desktop_jar_image:
 	@echo "Building Docker image for desktop JAR packaging..."
@@ -740,6 +801,11 @@ docker_desktop_jar: docker_desktop_jar_image
 		-e ARTIFACT_ID="$(DESKTOP_ARTIFACT_ID)" \
 		"$(DESKTOP_DOCKER_IMAGE)"
 	@echo "Desktop JAR artifacts: dist/maven/"
+	@if echo "$(DESKTOP_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
+		$(MAKE) publish_local; \
+	else \
+		echo "Skip publish_local: DESKTOP_VERSION=$(DESKTOP_VERSION) is not a SNAPSHOT."; \
+	fi
 
 docker_ios_image:
 	@echo "Building Docker image for iOS build..."
@@ -860,6 +926,63 @@ publish_maven:
 	upload_bundle "$(AAR_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_GROUP_ID)"; \
 	upload_bundle "$(AAR_LITE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_LITE_GROUP_ID)"; \
 	upload_bundle "$(DESKTOP_ARTIFACT_ID)" "$(DESKTOP_VERSION)" "jar" "$(DESKTOP_GROUP_ID)"
+
+publish_local:
+	@DIST="$(CURRENT_DIR)/dist/maven"; \
+	LOCAL_REPO="$(MAVEN_LOCAL_REPO)"; \
+	if [ ! -d "$$DIST" ]; then \
+		echo "Error: dist/maven not found at $$DIST"; \
+		echo "Run 'make docker_android_aar docker_desktop_jar VOLVOXGRID_VERSION=...'" ; \
+		exit 1; \
+	fi; \
+	mkdir -p "$$LOCAL_REPO"; \
+	is_snapshot() { \
+		case "$$1" in \
+			*-SNAPSHOT) return 0 ;; \
+			*) return 1 ;; \
+		esac; \
+	}; \
+	install_artifact() { \
+		local ARTIFACT="$$1" VERSION="$$2" EXT="$$3" GROUP="$$4"; \
+		if ! is_snapshot "$$VERSION"; then \
+			echo "Skip: $$GROUP:$$ARTIFACT:$$VERSION is not a SNAPSHOT."; \
+			return 2; \
+		fi; \
+		local FILE="$$DIST/$$ARTIFACT-$$VERSION.$$EXT"; \
+		local POM="$$DIST/$$ARTIFACT-$$VERSION.pom"; \
+		if [ ! -f "$$FILE" ] || [ ! -f "$$POM" ]; then \
+			echo "Skip: missing $$ARTIFACT-$$VERSION.$$EXT or .pom in $$DIST"; \
+			return 1; \
+		fi; \
+		local GROUP_PATH=$$(echo "$$GROUP" | tr '.' '/'); \
+		local TARGET_DIR="$$LOCAL_REPO/$$GROUP_PATH/$$ARTIFACT/$$VERSION"; \
+		mkdir -p "$$TARGET_DIR"; \
+		cp -f "$$FILE" "$$TARGET_DIR/"; \
+		cp -f "$$POM" "$$TARGET_DIR/"; \
+		for CLASSIFIER in sources javadoc; do \
+			local CFILE="$$DIST/$$ARTIFACT-$$VERSION-$$CLASSIFIER.jar"; \
+			if [ -f "$$CFILE" ]; then cp -f "$$CFILE" "$$TARGET_DIR/"; fi; \
+		done; \
+		echo "Installed $$GROUP:$$ARTIFACT:$$VERSION -> $$TARGET_DIR"; \
+		return 0; \
+	}; \
+	SNAPSHOT_REQUESTED=0; \
+	INSTALLED=0; \
+	if is_snapshot "$(AAR_VERSION)"; then SNAPSHOT_REQUESTED=$$((SNAPSHOT_REQUESTED+1)); fi; \
+	if is_snapshot "$(DESKTOP_VERSION)"; then SNAPSHOT_REQUESTED=$$((SNAPSHOT_REQUESTED+1)); fi; \
+	if install_artifact "$(AAR_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_GROUP_ID)"; then INSTALLED=$$((INSTALLED+1)); fi; \
+	if install_artifact "$(AAR_LITE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_LITE_GROUP_ID)"; then INSTALLED=$$((INSTALLED+1)); fi; \
+	if install_artifact "$(DESKTOP_ARTIFACT_ID)" "$(DESKTOP_VERSION)" "jar" "$(DESKTOP_GROUP_ID)"; then INSTALLED=$$((INSTALLED+1)); fi; \
+	if [ "$$INSTALLED" -eq 0 ]; then \
+		if [ "$$SNAPSHOT_REQUESTED" -eq 0 ]; then \
+			echo "Skip: no SNAPSHOT versions requested; nothing installed to mavenLocal."; \
+			exit 0; \
+		fi; \
+		echo "Error: no SNAPSHOT artifacts were installed."; \
+		echo "Build at least one SNAPSHOT artifact first (docker_android_aar or docker_desktop_jar)."; \
+		exit 1; \
+	fi; \
+	echo "Installed $$INSTALLED SNAPSHOT artifact bundle(s) into $$LOCAL_REPO"
 
 # =============================================================================
 # Flutter

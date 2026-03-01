@@ -502,13 +502,16 @@ const RendererMode$json = {
     {'1': 'RENDERER_CPU', '2': 0},
     {'1': 'RENDERER_GPU', '2': 1},
     {'1': 'RENDERER_AUTO', '2': 2},
+    {'1': 'RENDERER_GPU_VULKAN', '2': 3},
+    {'1': 'RENDERER_GPU_GLES', '2': 4},
   ],
 };
 
 /// Descriptor for `RendererMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List rendererModeDescriptor = $convert.base64Decode(
     'CgxSZW5kZXJlck1vZGUSEAoMUkVOREVSRVJfQ1BVEAASEAoMUkVOREVSRVJfR1BVEAESEQoNUk'
-    'VOREVSRVJfQVVUTxAC');
+    'VOREVSRVJfQVVUTxACEhcKE1JFTkRFUkVSX0dQVV9WVUxLQU4QAxIVChFSRU5ERVJFUl9HUFVf'
+    'R0xFUxAE');
 
 @$core.Deprecated('Use pinPositionDescriptor instead')
 const PinPosition$json = {

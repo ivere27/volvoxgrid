@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 
 #[cfg(feature = "cosmic-text")]
-use cosmic_text::{Attrs, Buffer, CacheKey, Family, FontSystem, Metrics, Shaping, SwashCache};
+use cosmic_text::{CacheKey, FontSystem, SwashCache};
 #[cfg(not(feature = "cosmic-text"))]
 type CacheKey = ();
 #[cfg(not(feature = "cosmic-text"))]

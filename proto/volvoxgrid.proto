@@ -229,8 +229,10 @@ enum CheckedState {
 
 enum RendererMode {
   RENDERER_CPU  = 0;
-  RENDERER_GPU  = 1;
+  RENDERER_GPU  = 1; // Default GPU (GLES on Android, All on others)
   RENDERER_AUTO = 2;
+  RENDERER_GPU_VULKAN = 3;
+  RENDERER_GPU_GLES   = 4;
 }
 
 // Structural pin — row moves to pinned section

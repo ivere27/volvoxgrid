@@ -19,7 +19,8 @@ struct TexturedInstance {
     @location(1) uv_rect: vec4<f32>,
     // Tint color (premultiplied alpha for text; white for images).
     @location(2) color: vec4<f32>,
-    // Flags: x = mode (0=alpha-only/glyph, 1=full RGBA/image).
+    // Flags: x = mode (0=alpha-only/glyph, 1=full RGBA/image),
+    //        y = atlas page index (CPU-side batching hint; not read here).
     @location(3) flags: vec2<f32>,
 }
 

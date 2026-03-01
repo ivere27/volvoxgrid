@@ -36,14 +36,14 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
-            android:text="GPU"
+            android:text="Mode"
             android:textSize="12sp" />
 
-        <Switch
-            android:id="@+id/swGpu"
-            android:layout_width="wrap_content"
+        <Spinner
+            android:id="@+id/spRendererMode"
+            android:layout_width="92dp"
             android:layout_height="wrap_content"
-            android:text="" />
+            android:layout_marginStart="2dp" />
 
         <TextView
             android:layout_width="wrap_content"

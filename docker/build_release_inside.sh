@@ -69,6 +69,12 @@ build_one_mode() {
   cp -a "${android_jni_dist}/." "${mode_dist_root}/flutter/android/jniLibs/"
 
   echo "Building Android AAR (${mode}, release)..."
+  # AGP caches absolute CMake source paths in .cxx metadata. Clear stale
+  # native intermediates so host-path caches do not break Docker builds.
+  rm -rf \
+    "${REPO_ROOT}/android/volvoxgrid-android/.cxx" \
+    "${REPO_ROOT}/android/volvoxgrid-android/build/intermediates/cxx" \
+    "${REPO_ROOT}/android/volvoxgrid-android/build/.cxx"
   "${REPO_ROOT}/android/gradlew" -p "${REPO_ROOT}/android" --no-daemon :volvoxgrid-android:assembleRelease
 
   local aar_src="${REPO_ROOT}/android/volvoxgrid-android/build/outputs/aar/volvoxgrid-android-release.aar"

@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.RectF
 import android.text.InputType
@@ -24,6 +25,7 @@ import io.github.ivere27.volvoxgrid.common.VolvoxGridHost
 import io.github.ivere27.synurang.BidiStream
 import io.github.ivere27.synurang.PluginError
 import io.github.ivere27.synurang.PluginHost
+import java.io.File
 import java.nio.ByteBuffer
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
@@ -50,12 +52,15 @@ class VolvoxGridView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : FrameLayout(context, attrs, defStyleAttr), VolvoxGridHost<VolvoxGridController> {
 
-    private val surfaceView = SurfaceView(context)
+    private var surfaceView = SurfaceView(context)
     private var editOverlay: EditText? = null
 
     private var plugin: PluginHost? = null
     private var ffiClient: VolvoxGridServiceFfi? = null
     private var gridId: Long = 0
+    private var usingExternalTextRenderer = false
+    private val androidTextRenderer = AndroidCanvasTextRenderer()
+    private var pendingAndroidTextCacheSize: Int? = null
 
     @Volatile
     private var renderStream: BidiStream<RenderInput, RenderOutput>? = null
@@ -263,18 +268,28 @@ class VolvoxGridView @JvmOverloads constructor(
     }
 
     init {
-        addView(surfaceView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         isFocusable = true
         isFocusableInTouchMode = true
         if (useHostFling) {
             flingScroller.setFriction(flingFriction)
         }
 
+        setupSurfaceView()
+    }
+
+    private fun setupSurfaceView() {
+        // wgpu creates its own GLES (or Vulkan) swapchain and negotiates format directly with the ANativeWindow.
+        // On Android, we prefer OpenGL ES to avoid common Adreno driver bugs during Vulkan capability probing.
+        // Explicitly setting PixelFormat.RGBA_8888 here can still cause allocation failures on some drivers.
+        addView(surfaceView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
         surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
             override fun surfaceCreated(holder: SurfaceHolder) {
                 surfaceReady.set(true)
                 // If a frame arrived before surface creation, the bitmap is ready. Draw it now.
                 drawBitmapToSurface()
+                if (gridId != 0L) {
+                    requestRenderFrame()
+                }
             }
 
             override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
@@ -296,14 +311,54 @@ class VolvoxGridView @JvmOverloads constructor(
         })
     }
 
+    private fun recreateSurfaceView() {
+        surfaceReady.set(false)
+        removeView(surfaceView)
+        surfaceView = SurfaceView(context)
+        setupSurfaceView()
+    }
+
     // =========================================================================
     // Public API
     // =========================================================================
 
     /**
+     * Updates the host-side (Android callback) text rendering cache size.
+     *
+     * This affects lite mode immediately and is safe to call at runtime.
+     * For full mode with built-in text engine, this setting is simply unused.
+     */
+    fun setAndroidTextCacheSize(size: Int) {
+        pendingAndroidTextCacheSize = size
+        androidTextRenderer.setCacheSize(size)
+        val p = plugin
+        val id = gridId
+        if (p != null && id != 0L) {
+            NativeTextRendererBridge.setCacheCap(p, id, size)
+        }
+    }
+
+    /**
+     * Initialize the grid view with the plugin bundled in the app/AAR and grid dimensions.
+     *
+     * This auto-detects either `libvolvoxgrid_plugin.so` (standard) or
+     * `libvolvoxgrid_plugin_lite.so` (lite) from `nativeLibraryDir`.
+     */
+    @JvmOverloads
+    fun initialize(
+        rows: Int,
+        cols: Int,
+        fixedRows: Int = 1,
+        fixedCols: Int = 0
+    ) {
+        initialize(resolveBundledPluginPath(context), rows, cols, fixedRows, fixedCols)
+    }
+
+    /**
      * Initialize the grid view with a plugin path and grid dimensions.
      *
-     * @param pluginPath absolute path to libvolvoxgrid_plugin.so
+     * @param pluginPath absolute path to `libvolvoxgrid_plugin.so` or
+     * `libvolvoxgrid_plugin_lite.so`
      * @param rows initial number of rows
      * @param cols initial number of columns
      * @param fixedRows number of fixed header rows (default 1)
@@ -345,6 +400,7 @@ class VolvoxGridView @JvmOverloads constructor(
         )
         gridId = handle.id
 
+        maybeRegisterExternalTextRenderer()
         applyAndroidScrollDefaults()
         updateTouchScrollUnitFromGrid()
         syncViewportSizeOnAttach(w, h)
@@ -367,6 +423,7 @@ class VolvoxGridView @JvmOverloads constructor(
 
         val w = resolveViewportWidth()
         val h = resolveViewportHeight()
+        maybeRegisterExternalTextRenderer()
         applyAndroidScrollDefaults()
         updateTouchScrollUnitFromGrid()
         syncViewportSizeOnAttach(w, h)
@@ -415,13 +472,13 @@ class VolvoxGridView @JvmOverloads constructor(
         }
 
         eventIterator = null
-        
+
+        clearExternalTextRenderer(gridId)
+        usingExternalTextRenderer = false
+
         // Don't destroy gridId or plugin
         ffiClient = null
-        // gridId = 0 // Keep gridId so we know what we were attached to? 
-        // No, initialize overwrites it. But if we want to query it...
-        // Let's reset it to 0 to indicate "detached".
-        gridId = 0 
+        gridId = 0
     }
 
     /** Get the underlying FFI client for direct API calls. */
@@ -473,8 +530,35 @@ class VolvoxGridView @JvmOverloads constructor(
      * can switch between buffer-based and GPU surface rendering paths.
      */
     fun setRendererMode(mode: Int) {
+        if (android.os.Looper.myLooper() != android.os.Looper.getMainLooper()) {
+            post { setRendererMode(mode) }
+            return
+        }
+        val prevMode = currentRendererMode
+        if (prevMode == mode) return
         currentRendererMode = mode
-        if (gridId != 0L) {
+
+        // Reset flow control state for the new mode
+        pendingFrame.set(false)
+        needsFollowupRender.set(false)
+
+        if (prevMode >= 1 && mode < 1) {
+            // Switching GPU -> CPU
+            gpuSurfaceActive = false
+            sendGpuSurfaceInvalidated()
+            val ptr = nativeWindowPtr
+            nativeWindowPtr = 0
+            if (ptr != 0L) {
+                NativeWindowHelper.releaseNativeWindow(ptr)
+            }
+            // Recreate SurfaceView to avoid CPU canvas contention after GPU usage.
+            recreateSurfaceView()
+        } else if (mode >= 1 && prevMode < 1) {
+            // Switching CPU -> GPU
+            recreateSurfaceView()
+        }
+
+        if (gridId != 0L && surfaceReady.get()) {
             requestRenderFrame()
         }
     }
@@ -519,6 +603,8 @@ class VolvoxGridView @JvmOverloads constructor(
         renderStream = null
 
         if (gridId != 0L) {
+            clearExternalTextRenderer(gridId)
+            usingExternalTextRenderer = false
             try {
                 ffiClient?.Destroy(GridHandle.newBuilder().setId(gridId).build())
             } catch (_: Exception) {}
@@ -1086,6 +1172,40 @@ class VolvoxGridView @JvmOverloads constructor(
         }
     }
 
+    private fun maybeRegisterExternalTextRenderer() {
+        val host = plugin ?: return
+        val id = gridId
+        if (id == 0L) return
+
+        val hasBuiltin = NativeTextRendererBridge.hasBuiltinTextEngine(host)
+        usingExternalTextRenderer = false
+        if (hasBuiltin) {
+            return
+        }
+
+        val registered = NativeTextRendererBridge.registerTextRenderer(
+            host = host,
+            gridId = id,
+            callback = androidTextRenderer
+        )
+        usingExternalTextRenderer = registered
+        if (registered) {
+            android.util.Log.i(TAG, "Registered Android text renderer callback for grid=$id")
+            pendingAndroidTextCacheSize?.let {
+                NativeTextRendererBridge.setCacheCap(host, id, it)
+            }
+        } else {
+            android.util.Log.w(TAG, "Failed to register Android text renderer callback for grid=$id")
+        }
+    }
+
+    private fun clearExternalTextRenderer(id: Long) {
+        if (id == 0L) return
+        val host = plugin ?: return
+        if (!usingExternalTextRenderer) return
+        NativeTextRendererBridge.clearTextRenderer(host, id)
+    }
+
     private fun stopEngineFlingForCurrentGrid() {
         val client = ffiClient ?: return
         if (gridId == 0L) return
@@ -1282,11 +1402,16 @@ class VolvoxGridView @JvmOverloads constructor(
     }
 
     private fun dispatchRenderFrame() {
-        if (currentRendererMode >= 1 && surfaceReady.get()) {
-            val ptr = acquireNativeWindow()
-            if (ptr != 0L) {
-                gpuSurfaceActive = true
-                sendGpuSurfaceReady(ptr, bufferWidth, bufferHeight)
+        if (currentRendererMode >= 1) {
+            if (surfaceReady.get()) {
+                val ptr = acquireNativeWindow()
+                if (ptr != 0L) {
+                    gpuSurfaceActive = true
+                    sendGpuSurfaceReady(ptr, bufferWidth, bufferHeight)
+                    return
+                }
+            } else {
+                // Surface not ready for GPU yet; surfaceCreated will trigger it.
                 return
             }
         }
@@ -1399,11 +1524,14 @@ class VolvoxGridView @JvmOverloads constructor(
     // =========================================================================
 
     private fun allocateBuffer(width: Int, height: Int) {
-        bufferWidth = width
-        bufferHeight = height
-        val size = width * height * 4 // ARGB_8888 = 4 bytes per pixel
-        pixelBuffer = ByteBuffer.allocateDirect(size)
-        bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        synchronized(bitmapLock) {
+            bitmap?.recycle()
+            bufferWidth = width
+            bufferHeight = height
+            val size = width * height * 4 // ARGB_8888 = 4 bytes per pixel
+            pixelBuffer = ByteBuffer.allocateDirect(size)
+            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        }
     }
 
     private fun resolveViewportWidth(): Int {
@@ -1443,8 +1571,8 @@ class VolvoxGridView @JvmOverloads constructor(
             )
         } catch (_: PluginError) {}
 
-        // Send new buffer info to the render session
-        sendBufferReady()
+        // Dispatch a new frame (GPU or CPU) with updated size
+        requestRenderFrame()
     }
 
     private fun sendBufferReady() {
@@ -1589,7 +1717,13 @@ class VolvoxGridView @JvmOverloads constructor(
                 val responses = stream.responses()
                 while (running.get() && responses.hasNext()) {
                     val output = responses.next()
-                    handleRenderOutput(output)
+                    try {
+                        handleRenderOutput(output)
+                    } catch (e: Exception) {
+                        android.util.Log.e(TAG, "Error handling render output", e)
+                        // Recover flow control so we don't hang if an error occurred after pendingFrame.set(true)
+                        pendingFrame.set(false)
+                    }
                 }
             } catch (e: Exception) {
                 if (running.get()) {
@@ -1657,6 +1791,7 @@ class VolvoxGridView @JvmOverloads constructor(
 
         // Always update the bitmap with the latest engine output
         synchronized(bitmapLock) {
+            if (bmp.isRecycled) return
             buf.rewind()
             bmp.copyPixelsFromBuffer(buf)
         }
@@ -1666,6 +1801,9 @@ class VolvoxGridView @JvmOverloads constructor(
     }
 
     private fun drawBitmapToSurface() {
+        // In GPU mode, the plugin renders directly to the SurfaceView's native
+        // surface. Avoid lockCanvas() here to prevent CPU canvas contention.
+        if (currentRendererMode >= 1) return
         if (!surfaceReady.get()) return
         val bmp = bitmap ?: return
         val holder = surfaceView.holder
@@ -1979,6 +2117,30 @@ class VolvoxGridView @JvmOverloads constructor(
         private const val ZOOM_STEP_MIN_SCALE = 1f / 32f
         private const val ZOOM_STEP_MAX_SCALE = 32f
         private val pluginLoadBannerPrinted = AtomicBoolean(false)
+
+        /**
+         * Resolve the bundled VolvoxGrid plugin path for this app process.
+         *
+         * Checks standard first, then lite. Throws if neither is present.
+         */
+        @JvmStatic
+        fun resolveBundledPluginPath(context: Context): String {
+            val nativeLibDir = context.applicationInfo.nativeLibraryDir
+            val candidates = arrayOf(
+                "libvolvoxgrid_plugin.so",
+                "libvolvoxgrid_plugin_lite.so",
+            )
+            for (name in candidates) {
+                val file = File(nativeLibDir, name)
+                if (file.exists()) {
+                    return file.absolutePath
+                }
+            }
+            throw IllegalStateException(
+                "VolvoxGrid plugin not found in nativeLibraryDir=$nativeLibDir " +
+                    "(expected libvolvoxgrid_plugin.so or libvolvoxgrid_plugin_lite.so)"
+            )
+        }
 
         private fun logPluginLoadBannerOnce(pluginPath: String) {
             if (!pluginLoadBannerPrinted.compareAndSet(false, true)) {

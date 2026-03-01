@@ -1,6 +1,6 @@
 [package]
 name = "volvoxgrid-plugin"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/ivere27/volvoxgrid"
@@ -16,7 +16,7 @@ standard = [
     "volvoxgrid-engine/regex",
 ]
 demo = ["volvoxgrid-engine/demo"]
-gpu = ["volvoxgrid-engine/gpu", "dep:pollster"]
+gpu = ["volvoxgrid-engine/gpu", "dep:pollster", "dep:wgpu"]
 
 [dependencies]
 prost = "0.12"
@@ -24,6 +24,7 @@ volvoxgrid-engine = { path = "../engine", default-features = false, features = [
 ctor = "0.2"
 lazy_static = "1.5"
 pollster = { version = "0.4", optional = true }
+wgpu = { version = "24", optional = true }
 
 [profile.release]
 lto = true

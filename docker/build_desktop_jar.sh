@@ -8,11 +8,11 @@ set -euo pipefail
 # then packages a fat JAR
 # with classes from volvoxgrid-java-common + embedded native/ libraries.
 #
-# Usage (inside Docker): VERSION=0.1.0 /opt/volvoxgrid/build_desktop_jar.sh
+# Usage (inside Docker): VERSION=0.1.2 /opt/volvoxgrid/build_desktop_jar.sh
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}"
-VERSION="${VERSION:-0.1.0}"
+VERSION="${VERSION:-0.1.2}"
 GROUP_ID="${GROUP_ID:-io.github.ivere27}"
 ARTIFACT_ID="${ARTIFACT_ID:-volvoxgrid-desktop}"
 GIT_COMMIT="${GIT_COMMIT:-$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)}"
@@ -30,39 +30,14 @@ if [[ ! -f "${PLUGIN_CRATE}/Cargo.toml" ]]; then
   exit 1
 fi
 
-# ── Generate .cargo/config.toml for cross-compilation linkers ───────────────
-CARGO_CONFIG_DIR="${REPO_ROOT}/.cargo"
-CARGO_CONFIG="${CARGO_CONFIG_DIR}/config.toml"
-# Back up existing config if present
-if [[ -f "${CARGO_CONFIG}" ]]; then
-  cp "${CARGO_CONFIG}" "${CARGO_CONFIG}.bak"
-fi
-
-cat > "${CARGO_CONFIG}" <<CARGO
-[build]
-target-dir = "${CARGO_TARGET_DIR}"
-
-[target.i686-unknown-linux-gnu]
-linker = "i686-linux-gnu-gcc"
-
-[target.aarch64-unknown-linux-gnu]
-linker = "aarch64-linux-gnu-gcc"
-
-[target.armv7-unknown-linux-gnueabihf]
-linker = "arm-linux-gnueabihf-gcc"
-
-[target.i686-pc-windows-gnu]
-linker = "i686-w64-mingw32-gcc"
-
-[target.x86_64-pc-windows-gnu]
-linker = "x86_64-w64-mingw32-gcc"
-
-[target.x86_64-apple-darwin]
-linker = "/opt/volvoxgrid/zig-cc-x86_64-macos.sh"
-
-[target.aarch64-apple-darwin]
-linker = "/opt/volvoxgrid/zig-cc-aarch64-macos.sh"
-CARGO
+# ── Configure Cargo cross-linkers via env (no repo file mutation) ───────────
+export CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER="i686-linux-gnu-gcc"
+export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER="aarch64-linux-gnu-gcc"
+export CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER="arm-linux-gnueabihf-gcc"
+export CARGO_TARGET_I686_PC_WINDOWS_GNU_LINKER="i686-w64-mingw32-gcc"
+export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER="x86_64-w64-mingw32-gcc"
+export CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER="/opt/volvoxgrid/zig-cc-x86_64-macos.sh"
+export CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER="/opt/volvoxgrid/zig-cc-aarch64-macos.sh"
 
 # ── Cross-compile Rust plugin for each platform ────────────────────────────
 
@@ -135,17 +110,6 @@ if command -v zig >/dev/null 2>&1; then
   cp "${CARGO_TARGET_DIR}/aarch64-apple-darwin/release/libvolvoxgrid_plugin.dylib" "${NATIVES_DIR}/macos-aarch64/"
 else
   echo "SKIP: macos-x86_64, macos-aarch64 (zig not found)"
-fi
-
-# ── Restore .cargo/config.toml ──────────────────────────────────────────────
-if [[ -f "${CARGO_CONFIG}.bak" ]]; then
-  mv "${CARGO_CONFIG}.bak" "${CARGO_CONFIG}"
-else
-  # Restore minimal config
-  cat > "${CARGO_CONFIG}" <<'CARGO'
-[build]
-target-dir = "target"
-CARGO
 fi
 
 # ── Build Java classes via Gradle ───────────────────────────────────────────
@@ -255,7 +219,7 @@ cat > "${POM_OUT}" <<POM
     <dependency>
       <groupId>io.github.ivere27</groupId>
       <artifactId>synurang-desktop</artifactId>
-      <version>0.5.2</version>
+      <version>0.5.3</version>
     </dependency>
   </dependencies>
 </project>

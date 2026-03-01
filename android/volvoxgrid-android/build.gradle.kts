@@ -37,13 +37,14 @@ plugins {
 android {
     namespace = "io.github.ivere27.volvoxgrid"
     compileSdk = 34
+    ndkVersion = "28.2.13676358"
 
     buildFeatures {
         buildConfig = true
     }
 
     defaultConfig {
-        minSdk = 24
+        minSdk = 21
         buildConfigField("String", "VOLVOXGRID_VERSION", quoteForBuildConfig(volvoxgridVersion))
         buildConfigField("String", "VOLVOXGRID_GIT_COMMIT", quoteForBuildConfig(volvoxgridGitCommit))
         buildConfigField("String", "VOLVOXGRID_BUILD_DATE", quoteForBuildConfig(volvoxgridBuildDate))
@@ -152,6 +153,6 @@ dependencies {
     implementation("com.google.protobuf:protobuf-javalite:3.25.1")
 
     // Synurang runtime from Maven Central.
-    api("io.github.ivere27:synurang-android:0.5.2")
+    api("io.github.ivere27:synurang-android:0.5.3")
 
 }

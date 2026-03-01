@@ -170,16 +170,6 @@ fn pollster_block<F: std::future::Future>(f: F) -> F::Output {
     pollster::block_on(f)
 }
 
-/// Convert RGBA pixel buffer to BGRA byte order.
-fn rgba_to_bgra(buf: &mut [u8]) {
-    let mut i = 0;
-    let len = buf.len();
-    while i + 3 < len {
-        buf.swap(i, i + 2);
-        i += 4;
-    }
-}
-
 fn apply_array_data_to_grid(
     grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
     rows: i32,
@@ -1125,6 +1115,7 @@ impl VolvoxGridPlugin {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .remove(&grid_id);
+        clear_registered_text_renderer(grid_id);
     }
 
     fn current_zoom_scale(&self, grid_id: i64) -> f64 {
@@ -2220,6 +2211,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
     ) -> Result<(), String> {
         let mut renderer: Option<volvoxgrid_engine::render::Renderer> = None;
+        let mut renderer_text_registration: Option<TextRendererRegistration> = None;
         let mut cpu_font_count_applied: usize = 0;
         #[cfg(feature = "gpu")]
         let mut gpu_renderer: Option<volvoxgrid_engine::gpu_render::GpuRenderer> = None;
@@ -2303,9 +2295,29 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                         #[cfg(feature = "gpu")]
                         if grid.renderer_mode >= 1 {
+                            let preferred_backends = match grid.renderer_mode {
+                                3 => Some(wgpu::Backends::VULKAN),
+                                4 => Some(wgpu::Backends::GL),
+                                _ => None,
+                            };
+
+                            // Detect backend mismatch and force recreation
+                            if let Some(gr) = gpu_renderer.as_ref() {
+                                let current_type = gr.backend_type();
+                                let mismatch = match grid.renderer_mode {
+                                    3 => current_type != wgpu::Backend::Vulkan,
+                                    4 => current_type != wgpu::Backend::Gl,
+                                    _ => false,
+                                };
+                                if mismatch {
+                                    gpu_renderer = None;
+                                    gpu_font_count_applied = 0;
+                                }
+                            }
+
                             if gpu_renderer.is_none() {
                                 match pollster_block(
-                                    volvoxgrid_engine::gpu_render::GpuRenderer::new(),
+                                    volvoxgrid_engine::gpu_render::GpuRenderer::new(preferred_backends),
                                 ) {
                                     Ok(gr) => {
                                         gpu_renderer = Some(gr);
@@ -2318,6 +2330,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             if let Some(gr) = gpu_renderer.as_mut() {
                                 self.sync_fonts_into_gpu_renderer(gr, &mut gpu_font_count_applied);
                                 grid.debug_renderer_actual = 1;
+                                grid.debug_gpu_backend = gr.backend_name();
                                 let (dx, dy, dw, dh) =
                                     gr.render_to_buffer(grid, buffer, width, height, stride);
                                 let elapsed = frame_start.elapsed().as_secs_f32() * 1000.0;
@@ -2332,9 +2345,26 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         grid.debug_renderer_actual = 0;
                         let r =
                             renderer.get_or_insert_with(volvoxgrid_engine::render::Renderer::new);
+                        let desired_text_registration =
+                            get_registered_text_renderer(grid_id);
+                        if !same_text_renderer_registration(
+                            renderer_text_registration,
+                            desired_text_registration,
+                        ) {
+                            match desired_text_registration {
+                                Some(registration) => {
+                                    r.set_custom_text_renderer(Some(Box::new(
+                                        ffi_text_renderer_from_registration(registration),
+                                    )));
+                                }
+                                None => {
+                                    r.set_custom_text_renderer(None);
+                                }
+                            }
+                            renderer_text_registration = desired_text_registration;
+                        }
                         self.sync_fonts_into_renderer(r, &mut cpu_font_count_applied);
                         let (dx, dy, dw, dh) = r.render(grid, buffer, width, height, stride);
-                        rgba_to_bgra(buffer);
                         let elapsed = frame_start.elapsed().as_secs_f32() * 1000.0;
                         grid.debug_frame_time_ms = elapsed;
                         grid.debug_fps = grid.debug_fps * 0.9 + (1000.0 / elapsed.max(0.1)) * 0.1;
@@ -2413,8 +2443,31 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                     }
 
                     // Lazy-init GpuRenderer on first GpuSurfaceReady
+                    if gpu_renderer.is_some() {
+                        let requested_mode = self.manager().with_grid(grid_id, |grid| grid.renderer_mode).unwrap_or(0);
+                        let current_type = gpu_renderer.as_ref().unwrap().backend_type();
+                        let mismatch = match requested_mode {
+                            3 => current_type != wgpu::Backend::Vulkan,
+                            4 => current_type != wgpu::Backend::Gl,
+                            _ => false,
+                        };
+                        if mismatch {
+                            gpu_renderer = None;
+                            gpu_font_count_applied = 0;
+                            last_surface_handle = 0;
+                        }
+                    }
+
                     if gpu_renderer.is_none() {
-                        match pollster_block(volvoxgrid_engine::gpu_render::GpuRenderer::new()) {
+                        let preferred_backends = self.manager().with_grid(grid_id, |grid| {
+                            match grid.renderer_mode {
+                                3 => Some(wgpu::Backends::VULKAN),
+                                4 => Some(wgpu::Backends::GL),
+                                _ => None,
+                            }
+                        }).ok().flatten();
+
+                        match pollster_block(volvoxgrid_engine::gpu_render::GpuRenderer::new(preferred_backends)) {
                             Ok(gr) => {
                                 gpu_renderer = Some(gr);
                             }
@@ -2502,7 +2555,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         let frame_start = std::time::Instant::now();
 
                         grid.debug_renderer_actual = 1;
-                        let (dx, dy, dw, dh) = gr.render_to_surface(grid, width, height);
+                        grid.debug_gpu_backend = gr.backend_name();
+                        let (dx, dy, dw, dh) =
+                            gr.render_to_surface(grid, width, height);
                         let elapsed = frame_start.elapsed().as_secs_f32() * 1000.0;
                         grid.debug_frame_time_ms = elapsed;
                         grid.debug_fps = grid.debug_fps * 0.9 + (1000.0 / elapsed.max(0.1)) * 0.1;
@@ -3113,6 +3168,259 @@ pub(crate) fn create_plugin() -> Box<dyn VolvoxGridServicePlugin + 'static> {
 #[no_mangle]
 pub extern "C" fn VolvoxGrid_Init() {
     register_volvox_grid_service_plugin(VolvoxGridPlugin::new());
+}
+
+// ---------------------------------------------------------------------------
+// Extra C ABI exports: external text renderer callbacks
+// ---------------------------------------------------------------------------
+
+/// C callback type for measuring text.
+///
+/// `text_ptr` / `font_name_ptr` are UTF-8 byte slices (not null-terminated).
+/// `max_width == -1.0` means unconstrained.
+/// Width/height must be written to `out_width` / `out_height`.
+type VvMeasureTextFn = unsafe extern "C" fn(
+    text_ptr: *const u8,
+    text_len: i32,
+    font_name_ptr: *const u8,
+    font_name_len: i32,
+    font_size: f32,
+    bold: i32,
+    italic: i32,
+    max_width: f32,
+    out_width: *mut f32,
+    out_height: *mut f32,
+    user_data: *mut std::ffi::c_void,
+);
+
+/// C callback type for rendering text into an RGBA pixel buffer.
+///
+/// `max_width == -1.0` means unconstrained.
+/// Returns rendered text width.
+type VvRenderTextFn = unsafe extern "C" fn(
+    buffer: *mut u8,
+    buf_width: i32,
+    buf_height: i32,
+    stride: i32,
+    x: i32,
+    y: i32,
+    clip_x: i32,
+    clip_y: i32,
+    clip_w: i32,
+    clip_h: i32,
+    text_ptr: *const u8,
+    text_len: i32,
+    font_name_ptr: *const u8,
+    font_name_len: i32,
+    font_size: f32,
+    bold: i32,
+    italic: i32,
+    color: u32,
+    max_width: f32,
+    user_data: *mut std::ffi::c_void,
+) -> f32;
+
+#[derive(Clone, Copy, Debug)]
+struct TextRendererRegistration {
+    measure_fn: VvMeasureTextFn,
+    render_fn: VvRenderTextFn,
+    user_data: usize,
+}
+
+impl TextRendererRegistration {
+    fn identity_key(self) -> (usize, usize, usize) {
+        (self.measure_fn as usize, self.render_fn as usize, self.user_data)
+    }
+}
+
+/// Wraps C function-pointer callbacks as a `TextRenderer`.
+struct FfiTextRenderer {
+    measure_fn: VvMeasureTextFn,
+    render_fn: VvRenderTextFn,
+    user_data: *mut std::ffi::c_void,
+}
+
+// The host side owns `user_data` synchronization guarantees.
+unsafe impl Send for FfiTextRenderer {}
+
+impl volvoxgrid_engine::text::TextRenderer for FfiTextRenderer {
+    fn measure_text(
+        &mut self,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        max_width: Option<f32>,
+    ) -> (f32, f32) {
+        let mut out_w: f32 = 0.0;
+        let mut out_h: f32 = 0.0;
+        let mw = max_width.unwrap_or(-1.0);
+        unsafe {
+            (self.measure_fn)(
+                text.as_ptr(),
+                text.len() as i32,
+                font_name.as_ptr(),
+                font_name.len() as i32,
+                font_size,
+                bold as i32,
+                italic as i32,
+                mw,
+                &mut out_w,
+                &mut out_h,
+                self.user_data,
+            );
+        }
+        (out_w, out_h)
+    }
+
+    fn render_text(
+        &mut self,
+        buffer_pixels: &mut [u8],
+        buf_width: i32,
+        buf_height: i32,
+        stride: i32,
+        x: i32,
+        y: i32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        color: u32,
+        max_width: Option<f32>,
+    ) -> f32 {
+        let mw = max_width.unwrap_or(-1.0);
+        unsafe {
+            (self.render_fn)(
+                buffer_pixels.as_mut_ptr(),
+                buf_width,
+                buf_height,
+                stride,
+                x,
+                y,
+                clip_x,
+                clip_y,
+                clip_w,
+                clip_h,
+                text.as_ptr(),
+                text.len() as i32,
+                font_name.as_ptr(),
+                font_name.len() as i32,
+                font_size,
+                bold as i32,
+                italic as i32,
+                color,
+                mw,
+                self.user_data,
+            )
+        }
+    }
+}
+
+lazy_static::lazy_static! {
+    static ref CUSTOM_TEXT_RENDERERS: Mutex<HashMap<i64, TextRendererRegistration>> =
+        Mutex::new(HashMap::new());
+}
+
+fn ffi_text_renderer_from_registration(registration: TextRendererRegistration) -> FfiTextRenderer {
+    FfiTextRenderer {
+        measure_fn: registration.measure_fn,
+        render_fn: registration.render_fn,
+        user_data: registration.user_data as *mut std::ffi::c_void,
+    }
+}
+
+fn get_registered_text_renderer(grid_id: i64) -> Option<TextRendererRegistration> {
+    CUSTOM_TEXT_RENDERERS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(&grid_id)
+        .copied()
+}
+
+fn same_text_renderer_registration(
+    left: Option<TextRendererRegistration>,
+    right: Option<TextRendererRegistration>,
+) -> bool {
+    match (left, right) {
+        (Some(a), Some(b)) => a.identity_key() == b.identity_key(),
+        (None, None) => true,
+        _ => false,
+    }
+}
+
+fn set_grid_external_text_renderer(
+    grid_id: i64,
+    registration: Option<TextRendererRegistration>,
+) {
+    let _ = SHARED_GRID_MANAGER.with_grid(grid_id, |grid| match registration {
+        Some(reg) => {
+            grid.ensure_text_engine().set_external_renderer(Some(Box::new(
+                ffi_text_renderer_from_registration(reg),
+            )));
+        }
+        None => {
+            if let Some(text_engine) = &mut grid.text_engine {
+                text_engine.set_external_renderer(None);
+            }
+        }
+    });
+}
+
+fn clear_registered_text_renderer(grid_id: i64) {
+    CUSTOM_TEXT_RENDERERS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .remove(&grid_id);
+    set_grid_external_text_renderer(grid_id, None);
+}
+
+/// Register or clear a custom text renderer for a grid.
+///
+/// Pass non-null `measure_fn` + `render_fn` to enable; pass null for both to clear.
+/// Returns 0 on success, -1 for invalid callback combinations.
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_text_renderer(
+    grid_id: i64,
+    measure_fn: Option<VvMeasureTextFn>,
+    render_fn: Option<VvRenderTextFn>,
+    user_data: *mut std::ffi::c_void,
+) -> i32 {
+    match (measure_fn, render_fn) {
+        (Some(measure), Some(render)) => {
+            let registration = TextRendererRegistration {
+                measure_fn: measure,
+                render_fn: render,
+                user_data: user_data as usize,
+            };
+            CUSTOM_TEXT_RENDERERS
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .insert(grid_id, registration);
+            set_grid_external_text_renderer(grid_id, Some(registration));
+            0
+        }
+        (None, None) => {
+            clear_registered_text_renderer(grid_id);
+            0
+        }
+        _ => -1,
+    }
+}
+
+/// Returns 1 when built with the built-in `cosmic-text` engine, 0 otherwise.
+#[no_mangle]
+pub extern "C" fn volvox_grid_has_builtin_text_engine() -> i32 {
+    if cfg!(feature = "standard") {
+        1
+    } else {
+        0
+    }
 }
 
 // ---------------------------------------------------------------------------

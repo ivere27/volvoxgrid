@@ -317,6 +317,8 @@ pub struct VolvoxGrid {
     pub debug_zoom_level: f64,
     /// Actual renderer in use: 0 = CPU, 1 = GPU (set by plugin at render time).
     pub debug_renderer_actual: i32,
+    /// Name of the GPU backend in use (e.g. "Vulkan", "OpenGL", "WebGPU").
+    pub debug_gpu_backend: String,
 
     // ── Dirty Flag ────────────────────────────────────────────────────────
     /// Whether the grid has pending changes that require a re-render.
@@ -617,6 +619,7 @@ impl VolvoxGrid {
             debug_fps: 0.0,
             debug_zoom_level: 1.0,
             debug_renderer_actual: 0,
+            debug_gpu_backend: String::new(),
 
             // Dirty
             dirty: true,

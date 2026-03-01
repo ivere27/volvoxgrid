@@ -559,7 +559,7 @@ fn build_ui(app: &Application) {
     ensure_layout(&mut grid);
 
     #[cfg(feature = "gpu")]
-    let gpu_renderer = match pollster::block_on(GpuRenderer::new()) {
+    let gpu_renderer = match pollster::block_on(GpuRenderer::new(None)) {
         Ok(gr) => {
             eprintln!("GPU renderer initialized successfully");
             Some(gr)

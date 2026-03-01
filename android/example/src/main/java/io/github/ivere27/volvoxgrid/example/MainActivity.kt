@@ -34,13 +34,19 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnDemoHierarchy: Button
     private lateinit var btnDemoStress: Button
     
-    private lateinit var swGpu: Switch
+    private lateinit var spRendererMode: Spinner
     private lateinit var swDebug: Switch
     private lateinit var spTextCache: Spinner
-    private var gpuEnabled = false
+    private var rendererMode = 0 // 0=CPU, 1=GPU(Auto), 3=GPU(Vulkan), 4=GPU(GLES)
+    private var litePluginLoaded = false
     private var debugOverlayEnabled = false
     private var textLayoutCacheCap = 8192
+    // Keep enabled by default. VolvoxGridView now falls back automatically to
+    // CPU present path if runtime surface producer switching fails on device.
+    private val useGpuSurfacePath = true
     private val textCacheCapOptions = intArrayOf(8192, 4096, 1024, 256, 0)
+    private val rendererModeOptions = arrayOf("CPU", "GPU (Auto)", "GPU (Vulk)", "GPU (GLES)")
+    private val rendererModeValues = intArrayOf(0, 1, 3, 4)
 
     @Volatile private var controller: VolvoxGridController? = null
     @Volatile private var currentDemo: String = ""
@@ -62,9 +68,36 @@ class MainActivity : AppCompatActivity() {
         btnDemoSales = findViewById(R.id.btnDemoSales)
         btnDemoHierarchy = findViewById(R.id.btnDemoHierarchy)
         btnDemoStress = findViewById(R.id.btnDemoStress)
-        swGpu = findViewById(R.id.swGpu)
+        spRendererMode = findViewById(R.id.spRendererMode)
         swDebug = findViewById(R.id.swDebug)
         spTextCache = findViewById(R.id.spTextCache)
+
+        val modeAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, rendererModeOptions)
+        modeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spRendererMode.adapter = modeAdapter
+        spRendererMode.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (litePluginLoaded && position > 0) {
+                    spRendererMode.setSelection(0)
+                    return
+                }
+                val selected = rendererModeValues[position]
+                if (selected == rendererMode) return
+                rendererMode = selected
+                thread {
+                    try {
+                        controller?.setRendererMode(selected)
+                        controller?.refresh()
+                        runOnUiThread {
+                            val viewMode = if (useGpuSurfacePath) selected else 0
+                            gridView.setRendererMode(viewMode)
+                            gridView.requestFrame()
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
 
         val cacheLabels = textCacheCapOptions.map { it.toString() }
         val cacheAdapter = ArrayAdapter(
@@ -75,6 +108,7 @@ class MainActivity : AppCompatActivity() {
         cacheAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spTextCache.adapter = cacheAdapter
         spTextCache.setSelection(textCacheCapOptions.indexOf(textLayoutCacheCap).coerceAtLeast(0))
+        gridView.setAndroidTextCacheSize(textLayoutCacheCap)
         spTextCache.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 if (position < 0 || position >= textCacheCapOptions.size) return
@@ -83,6 +117,7 @@ class MainActivity : AppCompatActivity() {
                 textLayoutCacheCap = selected
                 thread {
                     try {
+                        gridView.setAndroidTextCacheSize(selected)
                         controller?.setTextLayoutCacheCap(selected)
                         controller?.refresh()
                         gridView.requestFrame()
@@ -91,18 +126,6 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
-
-        // GPU toggle handler
-        swGpu.setOnCheckedChangeListener { _, isChecked ->
-            thread {
-                try {
-                    gpuEnabled = isChecked
-                    controller?.setRendererMode(if (gpuEnabled) 1 else 0)
-                    controller?.refresh()
-                    gridView.requestFrame()
-                } catch (_: Exception) {}
-            }
         }
 
         // Sort handlers
@@ -180,21 +203,43 @@ class MainActivity : AppCompatActivity() {
 
     private fun initializePlugin(): Boolean {
         val libDir = applicationInfo.nativeLibraryDir
-        val pluginPath = "$libDir/libvolvoxgrid_plugin.so"
+        val pluginPath = resolvePluginPath(libDir)
 
-        if (!File(pluginPath).exists()) {
-            updateStatus("Plugin not found: $pluginPath")
+        if (pluginPath == null) {
+            updateStatus("Plugin not found: $libDir/libvolvoxgrid_plugin.so or $libDir/libvolvoxgrid_plugin_lite.so")
             return false
         }
 
         try {
             pluginHost = PluginHost.load(pluginPath)
+            litePluginLoaded = pluginPath.endsWith("libvolvoxgrid_plugin_lite.so")
+            if (litePluginLoaded) {
+                rendererMode = 0
+                runOnUiThread {
+                    spRendererMode.setSelection(0)
+                    spRendererMode.isEnabled = false
+                }
+            }
             return true
         } catch (e: Exception) {
             updateStatus("Plugin load failed: ${e.message}")
             android.util.Log.e("VolvoxGridDemo", "Plugin load failed", e)
             return false
         }
+    }
+
+    private fun resolvePluginPath(libDir: String): String? {
+        val candidates = listOf(
+            "libvolvoxgrid_plugin.so",
+            "libvolvoxgrid_plugin_lite.so",
+        )
+        for (name in candidates) {
+            val path = "$libDir/$name"
+            if (File(path).exists()) {
+                return path
+            }
+        }
+        return null
     }
 
     private fun switchDemo(demo: String) {
@@ -306,7 +351,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyDisplayToggles(ctrl: VolvoxGridController) {
         try {
-            ctrl.setRendererMode(if (gpuEnabled) 1 else 0)
+            gridView.setAndroidTextCacheSize(textLayoutCacheCap)
+            val mode = rendererMode
+            ctrl.setRendererMode(mode)
+            val viewMode = if (useGpuSurfacePath) mode else 0
+            gridView.setRendererMode(viewMode)
             ctrl.setDebugOverlay(debugOverlayEnabled)
             ctrl.setTextLayoutCacheCap(textLayoutCacheCap)
         } catch (_: Exception) {}
@@ -345,7 +394,7 @@ class MainActivity : AppCompatActivity() {
             btnDemoSales.isEnabled = enabled
             btnDemoHierarchy.isEnabled = enabled
             btnDemoStress.isEnabled = enabled
-            swGpu.isEnabled = enabled
+            spRendererMode.isEnabled = enabled && !litePluginLoaded
             swDebug.isEnabled = enabled
             spTextCache.isEnabled = enabled
         }

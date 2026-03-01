@@ -5,20 +5,32 @@ plugins {
 }
 
 val volvoxgridAndroidSource = providers.gradleProperty("volvoxgridAndroidSource")
-    .orElse(System.getenv("VOLVOXGRID_ANDROID_SOURCE") ?: "local")
+    .orElse(System.getenv("VOLVOXGRID_SOURCE") ?: "local")
     .get()
     .trim()
     .lowercase()
+val volvoxgridAndroidVariant = providers.gradleProperty("volvoxgridAndroidVariant")
+    .orElse(System.getenv("VOLVOXGRID_VARIANT") ?: "")
+    .get()
+    .trim()
+    .lowercase()
+val isVolvoxgridAndroidLite = volvoxgridAndroidVariant == "lite"
+val defaultVolvoxgridAndroidArtifact = if (isVolvoxgridAndroidLite) {
+    "volvoxgrid-android-lite"
+} else {
+    "volvoxgrid-android"
+}
 val volvoxgridAndroidGroup = providers.gradleProperty("volvoxgridAndroidGroup")
     .orElse("io.github.ivere27")
     .get()
 val volvoxgridAndroidArtifact = providers.gradleProperty("volvoxgridAndroidArtifact")
-    .orElse("volvoxgrid-android")
+    .orElse(defaultVolvoxgridAndroidArtifact)
     .get()
 val volvoxgridVersion = providers.gradleProperty("volvoxgridVersion")
     .orElse(providers.gradleProperty("volvoxgridAndroidVersion"))
-    .orElse("0.1.0")
+    .orElse("0.1.3")
     .get()
+val isVolvoxgridSnapshot = volvoxgridVersion.endsWith("-SNAPSHOT")
 
 android {
     namespace = "io.github.ivere27.volvoxgrid.example"
@@ -26,7 +38,7 @@ android {
 
     defaultConfig {
         applicationId = "io.github.ivere27.volvoxgrid.example"
-        minSdk = 24
+        minSdk = 21
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -58,10 +70,18 @@ android {
     }
 }
 
+configurations.configureEach {
+    if (isVolvoxgridSnapshot) {
+        resolutionStrategy.cacheChangingModulesFor(0, "seconds")
+    }
+}
+
 dependencies {
     when (volvoxgridAndroidSource) {
         "local" -> implementation(project(":volvoxgrid-android"))
-        "maven" -> implementation("$volvoxgridAndroidGroup:$volvoxgridAndroidArtifact:$volvoxgridVersion")
+        "maven" -> implementation("$volvoxgridAndroidGroup:$volvoxgridAndroidArtifact:$volvoxgridVersion") {
+            isChanging = isVolvoxgridSnapshot
+        }
         else -> throw GradleException(
             "Invalid volvoxgridAndroidSource='$volvoxgridAndroidSource'. Expected 'local' or 'maven'."
         )

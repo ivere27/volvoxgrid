@@ -59,6 +59,7 @@
 
 ## Android
 
+- [ ] **Workaround for Adreno driver Vulkan probing** (`engine/src/gpu_render.rs`): Current Vulkan backend on some Android devices (Adreno) fails during internal capability probing for formats 56/59 (4x4 allocation failure), even when unused. Fixed by pinning to OpenGL ES by default. Investigate if `InstanceFlags` or newer `wgpu` versions allow safe Vulkan initialization. **Needs more testing for stability across different devices.**
 - [ ] **Silenced Exceptions (Kotlin)** (`android/volvoxgrid-android/src/.../VolvoxGridView.kt`, `MainActivity.kt`): Empty `catch (_: Exception) {}` blocks hide critical runtime failures. Fix: Log the exception or handle it appropriately.
 
 ## Build / Portability

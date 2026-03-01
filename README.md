@@ -77,7 +77,7 @@ Platform-specific:
 | Flutter | Flutter SDK |
 | Android | Android SDK + NDK, `cargo-ndk` |
 | Web | `wasm-pack`, Node.js/npm, Rust nightly |
-| Java Desktop | JDK 11+, Gradle |
+| Java Desktop | JDK 8+, Gradle |
 | GTK4 | GTK4 development libraries |
 | ActiveX | MinGW-w64 cross-compiler |
 
@@ -143,7 +143,7 @@ make android
 make android-run-release
 
 # Use published Maven AAR in the example app (default is local project module)
-make android-run VOLVOXGRID_ANDROID_SOURCE=maven VOLVOXGRID_VERSION=0.1.0
+make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.2
 ```
 
 ### Java Desktop
@@ -156,7 +156,7 @@ make java-desktop-run
 make java-desktop-run-simple
 
 # Use published Maven JAR in the desktop example (default is local)
-make java-desktop-run VOLVOXGRID_JAVA_SOURCE=maven VOLVOXGRID_VERSION=0.1.0
+make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.2
 ```
 
 ### GTK4
@@ -280,6 +280,10 @@ make docker_ios
 make docker_all
 ```
 
+`make docker_android_aar` and `make docker_desktop_jar` automatically run
+`make publish_local` only for `*-SNAPSHOT` versions, installing generated
+snapshot artifacts into `~/.m2/repository`.
+
 ### Publishing to Maven Central
 
 ```bash
@@ -291,6 +295,14 @@ make publish_maven
 ```
 
 Requires `.maven-settings.xml` with Sonatype Central credentials and GPG signing keys.
+
+### Installing to Maven Local (Snapshots)
+
+```bash
+# Build snapshot artifacts
+# (automatically installs to mavenLocal: ~/.m2/repository)
+make docker_android_aar docker_desktop_jar VOLVOXGRID_VERSION=0.1.2-SNAPSHOT
+```
 
 ### Optional Features and Binary Size
 
@@ -642,7 +654,9 @@ system fonts so every character renders natively — no fallback needed.
         └─ GetDIBits() → alpha blit
 ```
 
-**Use case 2: WASM Lite (Browser Canvas2D).** When VolvoxGrid is compiled for WASM without the `cosmic-text` feature (to minimize binary size), the JavaScript wrapper registers a Canvas2D-based `TextRenderer` (`web/js/src/canvas2d-text-renderer.ts`). It uses the browser's `CanvasRenderingContext2D.measureText()` and `fillText()` APIs to handle text measurement and pixel rendering, extracting the alpha channel and blitting it into the engine's shared pixel buffer.
+**Use case 2: WASM Lite (Browser Canvas2D) & Android Lite.** When VolvoxGrid is compiled without the `cosmic-text` feature (to minimize binary size):
+- On Web, the JavaScript wrapper registers a Canvas2D-based `TextRenderer` (`web/js/src/canvas2d-text-renderer.ts`). It uses the browser's `CanvasRenderingContext2D.measureText()` and `fillText()` APIs to handle text measurement and pixel rendering, extracting the alpha channel and blitting it into the engine's shared pixel buffer.
+- On Android (`volvoxgrid-android-lite`), the Kotlin wrapper registers an Android Canvas-based `TextRenderer` (`android/volvoxgrid-android/src/main/java/io/github/ivere27/volvoxgrid/AndroidCanvasTextRenderer.kt`) via JNI. It leverages `StaticLayout` for accurate multi-line measurement and Android `Canvas`/`Bitmap` for alpha mask rasterization. To avoid JNI crossing overhead, it maintains an LRU mask cache on the C-side bridge.
 
 Registration: `Renderer.set_custom_text_renderer(Some(box))` or
 `volvox_grid_set_text_renderer()` via FFI.

@@ -2485,7 +2485,7 @@ pub fn set_text_layout_cache_cap(id: i32, cap: i32) {
 #[wasm_bindgen]
 pub fn init_gpu() -> js_sys::Promise {
     future_to_promise(async {
-        let gpu = match volvoxgrid_engine::gpu_render::GpuRenderer::new().await {
+        let gpu = match volvoxgrid_engine::gpu_render::GpuRenderer::new(None).await {
             Ok(g) => g,
             Err(e) => {
                 web_sys::console::warn_1(&format!("GPU init failed: {}", e).into());

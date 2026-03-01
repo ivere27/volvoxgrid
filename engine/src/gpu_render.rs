@@ -40,7 +40,7 @@ pub struct TexturedInstance {
     pub rect: [f32; 4],    // x, y, w, h (dest pixels)
     pub uv_rect: [f32; 4], // u_min, v_min, u_max, v_max
     pub color: [f32; 4],   // tint RGBA
-    pub flags: [f32; 2],   // mode (0=glyph, 1=image), unused
+    pub flags: [f32; 2],   // x: mode (0=glyph, 1=image), y: atlas page index
 }
 
 // ---------------------------------------------------------------------------
@@ -49,6 +49,7 @@ pub struct TexturedInstance {
 
 /// GPU renderer for VolvoxGrid.
 pub struct GpuRenderer {
+    #[allow(dead_code)]
     instance: wgpu::Instance,
     adapter: wgpu::Adapter,
     device: wgpu::Device,
@@ -106,17 +107,28 @@ impl GpuRenderer {
     /// Create a new GPU renderer.
     ///
     /// This is async because wgpu adapter/device creation is async.
-    pub async fn new() -> Result<Self, String> {
-        // On wasm, use only the WebGPU browser backend.  Backends::all()
-        // includes the GL/WebGL2 backend which may be selected instead,
-        // causing device/surface mismatches.
+    /// `preferred_backends` allows overriding the default backend selection.
+    pub async fn new(preferred_backends: Option<wgpu::Backends>) -> Result<Self, String> {
+        // On wasm, use only the WebGPU browser backend.
         #[cfg(target_arch = "wasm32")]
         let backends = wgpu::Backends::BROWSER_WEBGPU;
+
         #[cfg(not(target_arch = "wasm32"))]
-        let backends = wgpu::Backends::all();
+        let backends = if let Some(b) = preferred_backends {
+            b
+        } else {
+            // On Android, prefer GL over Vulkan to avoid Adreno driver bugs where
+            // internal capability probing of high-precision formats (like 56/59)
+            // fails during instance/device creation even if they aren't used.
+            #[cfg(target_os = "android")]
+            { wgpu::Backends::GL }
+            #[cfg(not(target_os = "android"))]
+            { wgpu::Backends::all() }
+        };
 
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends,
+            flags: wgpu::InstanceFlags::default() | wgpu::InstanceFlags::DISCARD_HAL_LABELS,
             ..Default::default()
         });
 
@@ -134,7 +146,7 @@ impl GpuRenderer {
                 &wgpu::DeviceDescriptor {
                     label: Some("VolvoxGrid GPU"),
                     required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
+                    required_limits: wgpu::Limits::downlevel_defaults(),
                     memory_hints: wgpu::MemoryHints::Performance,
                 },
                 None,
@@ -148,7 +160,7 @@ impl GpuRenderer {
                 label: Some("uniform_bgl"),
                 entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
+                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -200,7 +212,7 @@ impl GpuRenderer {
                 ],
             });
 
-        let default_format = wgpu::TextureFormat::Bgra8Unorm;
+        let default_format = wgpu::TextureFormat::Rgba8Unorm;
         let (rect_pipeline, textured_pipeline) = Self::create_pipelines(
             &device,
             &uniform_bind_group_layout,
@@ -486,7 +498,7 @@ impl GpuRenderer {
                         &wgpu::DeviceDescriptor {
                             label: Some("VolvoxGrid GPU"),
                             required_features: wgpu::Features::empty(),
-                            required_limits: wgpu::Limits::downlevel_webgl2_defaults(),
+                            required_limits: wgpu::Limits::downlevel_defaults(),
                             memory_hints: wgpu::MemoryHints::Performance,
                         },
                         None,
@@ -558,6 +570,23 @@ impl GpuRenderer {
         self.surface.is_some()
     }
 
+    /// Returns the name of the underlying graphics API backend.
+    pub fn backend_name(&self) -> String {
+        match self.adapter.get_info().backend {
+            wgpu::Backend::Vulkan => "Vulkan".to_string(),
+            wgpu::Backend::Metal => "Metal".to_string(),
+            wgpu::Backend::Dx12 => "DX12".to_string(),
+            wgpu::Backend::Gl => "OpenGL".to_string(),
+            wgpu::Backend::BrowserWebGpu => "WebGPU".to_string(),
+            _ => format!("{:?}", self.adapter.get_info().backend),
+        }
+    }
+
+    /// Returns the underlying graphics API backend type.
+    pub fn backend_type(&self) -> wgpu::Backend {
+        self.adapter.get_info().backend
+    }
+
     /// Create a surface from an HTML canvas element (wasm32 only) and configure it.
     #[cfg(target_arch = "wasm32")]
     pub fn configure_surface_from_canvas(
@@ -580,11 +609,30 @@ impl GpuRenderer {
     /// format and recreates pipelines if it differs from the current one.
     pub fn configure_surface(&mut self, surface: wgpu::Surface<'static>, w: u32, h: u32) {
         let caps = surface.get_capabilities(&self.adapter);
-        let format = caps
-            .formats
-            .first()
-            .copied()
-            .unwrap_or(wgpu::TextureFormat::Bgra8Unorm);
+
+        // Prioritize standard 8-bit formats to match CPU blit and ensure wide compatibility.
+        // This naturally avoids problematic high-precision formats (like Rgba16Float or Rgb10a2Unorm)
+        // that cause Adreno driver failures, as they are not in our priority list.
+        let format = [
+            wgpu::TextureFormat::Rgba8Unorm,
+            wgpu::TextureFormat::Bgra8Unorm,
+            wgpu::TextureFormat::Rgba8UnormSrgb,
+            wgpu::TextureFormat::Bgra8UnormSrgb,
+        ]
+        .into_iter()
+        .find(|f| caps.formats.contains(f))
+        .unwrap_or_else(|| {
+            caps.formats
+                .iter()
+                .find(|f| !f.is_srgb())
+                .copied()
+                .unwrap_or_else(|| {
+                    caps.formats
+                        .first()
+                        .copied()
+                        .unwrap_or(wgpu::TextureFormat::Rgba8Unorm)
+                })
+        });
 
         // Recreate pipelines if the surface prefers a different format.
         if format != self.pipeline_format {
@@ -742,6 +790,11 @@ impl GpuRenderer {
 
         self.queue.submit(std::iter::once(encoder.finish()));
 
+        let is_bgra = matches!(
+            self.pipeline_format,
+            wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb
+        );
+
         // Map and copy
         let buffer_slice = readback_buf.slice(..);
         let (tx, rx) = std::sync::mpsc::channel();
@@ -758,6 +811,15 @@ impl GpuRenderer {
                 if src_off + row_bytes <= data.len() && dst_off + row_bytes <= buf.len() {
                     buf[dst_off..dst_off + row_bytes]
                         .copy_from_slice(&data[src_off..src_off + row_bytes]);
+
+                    if is_bgra {
+                        let mut i = dst_off;
+                        let end = dst_off + row_bytes;
+                        while i + 3 < end {
+                            buf.swap(i, i + 2);
+                            i += 4;
+                        }
+                    }
                 }
             }
         }
@@ -769,7 +831,13 @@ impl GpuRenderer {
     // Internal: render to a wgpu TextureView
     // -----------------------------------------------------------------------
 
-    fn render_to_view(&mut self, grid: &VolvoxGrid, view: &wgpu::TextureView, w: i32, h: i32) {
+    fn render_to_view(
+        &mut self,
+        grid: &VolvoxGrid,
+        view: &wgpu::TextureView,
+        w: i32,
+        h: i32,
+    ) {
         // Keep renderer-owned text cache policy in sync with runtime grid config.
         if self.text_engine.layout_cache_cap != grid.text_layout_cache_cap {
             self.text_engine
@@ -883,14 +951,14 @@ impl GpuRenderer {
 
             if has_tex {
                 let buf = self.persistent_tex_buf.as_ref().unwrap();
-                let count = self.textured_instances.len() as u32;
                 pass.set_pipeline(&self.textured_pipeline);
                 pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-                if !self.atlas_bind_groups.is_empty() {
-                    pass.set_bind_group(1, &self.atlas_bind_groups[0], &[]);
-                }
                 pass.set_vertex_buffer(0, buf.slice(..));
-                pass.draw(0..6, 0..count);
+                draw_textured_batches(
+                    &mut pass,
+                    &self.textured_instances,
+                    &self.atlas_bind_groups,
+                );
             }
 
             // --- Overlay layer (editor + dropdown): rects then textured ---
@@ -906,14 +974,14 @@ impl GpuRenderer {
 
             if has_overlay_tex {
                 let buf = self.persistent_overlay_tex_buf.as_ref().unwrap();
-                let count = self.overlay_textured_instances.len() as u32;
                 pass.set_pipeline(&self.textured_pipeline);
                 pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-                if !self.atlas_bind_groups.is_empty() {
-                    pass.set_bind_group(1, &self.atlas_bind_groups[0], &[]);
-                }
                 pass.set_vertex_buffer(0, buf.slice(..));
-                pass.draw(0..6, 0..count);
+                draw_textured_batches(
+                    &mut pass,
+                    &self.overlay_textured_instances,
+                    &self.atlas_bind_groups,
+                );
             }
         }
 
@@ -1017,6 +1085,53 @@ fn ensure_buffer(
     }
     queue.write_buffer(existing.as_ref().unwrap(), 0, data);
     true
+}
+
+/// Draw textured instances in stable order while switching atlas pages as needed.
+fn draw_textured_batches(
+    pass: &mut wgpu::RenderPass<'_>,
+    instances: &[TexturedInstance],
+    atlas_bind_groups: &[wgpu::BindGroup],
+) {
+    if instances.is_empty() {
+        return;
+    }
+
+    // Fallback: draw everything with whatever texture is currently bound.
+    if atlas_bind_groups.is_empty() {
+        pass.draw(0..6, 0..instances.len() as u32);
+        return;
+    }
+
+    let page_of = |inst: &TexturedInstance| -> usize {
+        let raw = inst.flags[1];
+        if raw.is_finite() && raw >= 0.0 {
+            raw as usize
+        } else {
+            0
+        }
+    };
+
+    // Keep original draw order by batching only contiguous page runs.
+    let mut run_start = 0usize;
+    let mut run_page = page_of(&instances[0]);
+    let len = instances.len();
+
+    for idx in 1..=len {
+        let boundary = idx == len || page_of(&instances[idx]) != run_page;
+        if !boundary {
+            continue;
+        }
+
+        let page_index = run_page.min(atlas_bind_groups.len().saturating_sub(1));
+        pass.set_bind_group(1, &atlas_bind_groups[page_index], &[]);
+        pass.draw(0..6, run_start as u32..idx as u32);
+
+        if idx < len {
+            run_start = idx;
+            run_page = page_of(&instances[idx]);
+        }
+    }
 }
 
 /// Convert a packed 0xAARRGGBB color to normalized `[r, g, b, a]`.

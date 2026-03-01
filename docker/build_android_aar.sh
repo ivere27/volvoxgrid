@@ -8,12 +8,12 @@ set -euo pipefail
 # then merges volvoxgrid-java-common classes into classes.jar (fat AAR).
 # Outputs Maven-ready artifacts: AAR, POM, sources.jar, javadoc.jar.
 #
-# Usage (inside Docker): VERSION=0.1.0 /opt/volvoxgrid/build_android_aar.sh
+# Usage (inside Docker): VERSION=0.1.2 /opt/volvoxgrid/build_android_aar.sh
 # Optional: PLUGIN_BUILD_MODE=lite (default: full)
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}"
-VERSION="${VERSION:-0.1.0}"
+VERSION="${VERSION:-0.1.2}"
 GROUP_ID="${GROUP_ID:-io.github.ivere27}"
 ARTIFACT_ID="${ARTIFACT_ID:-volvoxgrid-android}"
 GIT_COMMIT="${GIT_COMMIT:-$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)}"
@@ -45,14 +45,25 @@ for required in \
 done
 
 IFS=',' read -r -a ABI_LIST <<< "${ANDROID_ABIS}"
-ANDROID_JNI_DIR="${REPO_ROOT}/android/volvoxgrid-android/src/main/jniLibs"
-PLUGIN_FEATURE_ARGS=(--release)
+NORMALIZED_ABIS=()
+for ABI in "${ABI_LIST[@]}"; do
+  ABI="${ABI//[[:space:]]/}"
+  [[ -n "${ABI}" ]] || continue
+  NORMALIZED_ABIS+=("${ABI}")
+done
+ABI_LIST=("${NORMALIZED_ABIS[@]}")
+
+JNI_STAGE_DIR="$(mktemp -d /tmp/volvoxgrid-android-jni-XXXXXX)"
+ANDROID_JNI_DIR="${JNI_STAGE_DIR}/jniLibs"
+# Full Android AAR should include GPU backend support.
+PLUGIN_FEATURE_ARGS=(--release --features gpu)
+AAR_PLUGIN_SO_NAME="libvolvoxgrid_plugin.so"
 if [[ "${PLUGIN_BUILD_MODE}" == "lite" ]]; then
-  PLUGIN_FEATURE_ARGS=(--release --no-default-features)
+  PLUGIN_FEATURE_ARGS=(--release --no-default-features --features demo)
+  AAR_PLUGIN_SO_NAME="libvolvoxgrid_plugin_lite.so"
 fi
 
 # ── Build Rust plugin .so for each ABI ──────────────────────────────────────
-rm -rf "${ANDROID_JNI_DIR}"
 echo "Building Rust plugin for Android ABIs: ${ANDROID_ABIS} (mode=${PLUGIN_BUILD_MODE})..."
 
 NDK_TARGETS=""
@@ -79,6 +90,13 @@ done
 
 # ── Build AAR via Gradle ────────────────────────────────────────────────────
 echo "Building Android AAR (release)..."
+# Gradle/AGP stores absolute source paths in native build metadata under
+# .cxx and build/intermediates/cxx. When reusing a workspace across host and
+# Docker, those cached paths can become invalid and break configureCMake.
+rm -rf \
+  "${REPO_ROOT}/android/volvoxgrid-android/.cxx" \
+  "${REPO_ROOT}/android/volvoxgrid-android/build/intermediates/cxx" \
+  "${REPO_ROOT}/android/volvoxgrid-android/build/.cxx"
 "${REPO_ROOT}/android/gradlew" -p "${REPO_ROOT}/android" --no-daemon \
   -PvolvoxgridVersion="${VERSION}" \
   -PvolvoxgridGitCommit="${GIT_COMMIT}" \
@@ -118,6 +136,39 @@ if [[ ! -f "${AAR_UNPACKED_DIR}/classes.jar" ]]; then
   exit 1
 fi
 
+# Keep only requested ABIs in the output AAR JNI folder.
+if [[ -d "${AAR_UNPACKED_DIR}/jni" ]]; then
+  for ABI_DIR in "${AAR_UNPACKED_DIR}/jni"/*; do
+    [[ -d "${ABI_DIR}" ]] || continue
+    ABI_NAME="$(basename "${ABI_DIR}")"
+    KEEP_ABI=0
+    for ABI in "${ABI_LIST[@]}"; do
+      if [[ "${ABI}" == "${ABI_NAME}" ]]; then
+        KEEP_ABI=1
+        break
+      fi
+    done
+    if [[ "${KEEP_ABI}" -eq 0 ]]; then
+      rm -rf "${ABI_DIR}"
+    fi
+  done
+fi
+
+# Inject plugin native libs from temp staging dir into AAR jni/ layout.
+for ABI in "${ABI_LIST[@]}"; do
+  SRC_SO="${ANDROID_JNI_DIR}/${ABI}/libvolvoxgrid_plugin.so"
+  if [[ ! -f "${SRC_SO}" ]]; then
+    echo "Error: expected staged .so not found: ${SRC_SO}" >&2
+    exit 1
+  fi
+  mkdir -p "${AAR_UNPACKED_DIR}/jni/${ABI}"
+  # Ensure the packed AAR contains only the selected plugin variant.
+  rm -f \
+    "${AAR_UNPACKED_DIR}/jni/${ABI}/libvolvoxgrid_plugin.so" \
+    "${AAR_UNPACKED_DIR}/jni/${ABI}/libvolvoxgrid_plugin_lite.so"
+  cp -f "${SRC_SO}" "${AAR_UNPACKED_DIR}/jni/${ABI}/${AAR_PLUGIN_SO_NAME}"
+done
+
 (cd "${CLASSES_WORK_DIR}" && jar xf "${AAR_UNPACKED_DIR}/classes.jar")
 (cd "${CLASSES_WORK_DIR}" && jar xf "${COMMON_JAR}")
 rm -rf "${CLASSES_WORK_DIR}/META-INF"
@@ -126,8 +177,12 @@ rm -rf "${CLASSES_WORK_DIR}/META-INF"
 # ── Copy artifacts to dist/maven/ ───────────────────────────────────────────
 mkdir -p "${DIST_DIR}"
 AAR_OUT="${DIST_DIR}/${ARTIFACT_ID}-${VERSION}.aar"
+# `zip -r` updates existing archives and keeps entries not present in source.
+# Remove any prior output first to avoid stale JNI libs from previous builds.
+rm -f "${AAR_OUT}"
 (cd "${AAR_UNPACKED_DIR}" && zip -qr "${AAR_OUT}" .)
 rm -rf "${MERGE_WORK_DIR}"
+rm -rf "${JNI_STAGE_DIR}"
 
 # ── Generate POM ────────────────────────────────────────────────────────────
 POM_OUT="${DIST_DIR}/${ARTIFACT_ID}-${VERSION}.pom"
@@ -165,7 +220,7 @@ cat > "${POM_OUT}" <<POM
     <dependency>
       <groupId>io.github.ivere27</groupId>
       <artifactId>synurang-android</artifactId>
-      <version>0.5.2</version>
+      <version>0.5.3</version>
     </dependency>
     <dependency>
       <groupId>com.google.protobuf</groupId>

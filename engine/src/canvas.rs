@@ -4509,13 +4509,23 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
     let mode_str = match grid.renderer_mode {
         m if m == pb::RendererMode::RendererAuto as i32 => {
             if grid.debug_renderer_actual == pb::RendererMode::RendererGpu as i32 {
-                "AUTO(GPU)"
+                if !grid.debug_gpu_backend.is_empty() {
+                    format!("AUTO(GPU-{})", grid.debug_gpu_backend)
+                } else {
+                    "AUTO(GPU)".to_string()
+                }
             } else {
-                "AUTO(CPU)"
+                "AUTO(CPU)".to_string()
             }
         }
-        m if m == pb::RendererMode::RendererGpu as i32 => "GPU",
-        _ => "CPU",
+        m if m >= 1 => {
+            if !grid.debug_gpu_backend.is_empty() {
+                format!("GPU({})", grid.debug_gpu_backend)
+            } else {
+                "GPU".to_string()
+            }
+        }
+        _ => "CPU".to_string(),
     };
     lines.push(format!(
         "Mode: {} | {} x {}",

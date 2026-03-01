@@ -785,15 +785,21 @@ class RendererMode extends $pb.ProtobufEnum {
       RendererMode._(1, _omitEnumNames ? '' : 'RENDERER_GPU');
   static const RendererMode RENDERER_AUTO =
       RendererMode._(2, _omitEnumNames ? '' : 'RENDERER_AUTO');
+  static const RendererMode RENDERER_GPU_VULKAN =
+      RendererMode._(3, _omitEnumNames ? '' : 'RENDERER_GPU_VULKAN');
+  static const RendererMode RENDERER_GPU_GLES =
+      RendererMode._(4, _omitEnumNames ? '' : 'RENDERER_GPU_GLES');
 
   static const $core.List<RendererMode> values = <RendererMode>[
     RENDERER_CPU,
     RENDERER_GPU,
     RENDERER_AUTO,
+    RENDERER_GPU_VULKAN,
+    RENDERER_GPU_GLES,
   ];
 
   static final $core.List<RendererMode?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
   static RendererMode? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

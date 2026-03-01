@@ -24,12 +24,15 @@ plugins {
     id("com.google.protobuf") version "0.9.4"
 }
 
-group = "io.github.ivere27"
-version = "0.1.0-SNAPSHOT"
+// Keep this demo/application module coordinates distinct from the published
+// library coordinates (io.github.ivere27:volvoxgrid-desktop) to avoid
+// self-resolution in maven mode.
+group = "io.github.ivere27.examples"
+version = "0.1.3-SNAPSHOT"
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
 }
 
 repositories {
@@ -38,10 +41,11 @@ repositories {
 }
 
 val synurangDesktopVersion = providers.gradleProperty("synurangDesktopVersion")
-    .orElse("0.5.2")
+    .orElse("0.5.3")
     .get()
+val isSynurangDesktopSnapshot = synurangDesktopVersion.endsWith("-SNAPSHOT")
 val volvoxgridDesktopSource = providers.gradleProperty("volvoxgridDesktopSource")
-    .orElse(System.getenv("VOLVOXGRID_DESKTOP_SOURCE") ?: "local")
+    .orElse(System.getenv("VOLVOXGRID_SOURCE") ?: "local")
     .get()
     .trim()
     .lowercase()
@@ -53,8 +57,9 @@ val volvoxgridDesktopArtifact = providers.gradleProperty("volvoxgridDesktopArtif
     .get()
 val volvoxgridVersion = providers.gradleProperty("volvoxgridVersion")
     .orElse(providers.gradleProperty("volvoxgridDesktopVersion"))
-    .orElse("0.1.0")
+    .orElse("0.1.3")
     .get()
+val isVolvoxgridSnapshot = volvoxgridVersion.endsWith("-SNAPSHOT")
 val volvoxgridGitCommit = providers.gradleProperty("volvoxgridGitCommit")
     .orElse(captureCommandOutput(rootDir, "git", "rev-parse", "--short=12", "HEAD") ?: "unknown")
     .get()
@@ -81,18 +86,30 @@ val synurangDesktopJars = fileTree(synurangMavenDir) {
     include("classes.jar")
 }
 
+configurations.configureEach {
+    if (isVolvoxgridSnapshot || isSynurangDesktopSnapshot) {
+        resolutionStrategy.cacheChangingModulesFor(0, "seconds")
+    }
+}
+
 dependencies {
     when (volvoxgridDesktopSource) {
         "local" -> implementation("io.github.ivere27:volvoxgrid-java-common:$volvoxgridVersion")
-        "maven" -> implementation("$volvoxgridDesktopGroup:$volvoxgridDesktopArtifact:$volvoxgridVersion")
+        "maven" -> implementation("$volvoxgridDesktopGroup:$volvoxgridDesktopArtifact:$volvoxgridVersion") {
+            isChanging = isVolvoxgridSnapshot
+        }
         else -> throw GradleException(
             "Invalid volvoxgridDesktopSource='$volvoxgridDesktopSource'. Expected 'local' or 'maven'."
         )
     }
     implementation("com.google.protobuf:protobuf-java:3.25.1")
     if (synurangDesktopSource == "maven") {
-        implementation("io.github.ivere27:synurang-desktop:$synurangDesktopVersion")
-        implementation("io.github.ivere27:synurang-desktop-grpc:$synurangDesktopVersion")
+        implementation("io.github.ivere27:synurang-desktop:$synurangDesktopVersion") {
+            isChanging = isSynurangDesktopSnapshot
+        }
+        implementation("io.github.ivere27:synurang-desktop-grpc:$synurangDesktopVersion") {
+            isChanging = isSynurangDesktopSnapshot
+        }
         implementation("io.grpc:grpc-api:1.60.0")
     } else {
         implementation(synurangDesktopJars)

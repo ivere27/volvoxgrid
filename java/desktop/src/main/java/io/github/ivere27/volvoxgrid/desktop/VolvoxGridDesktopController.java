@@ -153,7 +153,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
 
     @Override
     public String getTextMatrix(int row, int col) throws SynurangDesktopBridge.SynurangBridgeException {
-        var response = client.getCells(
+        CellsResponse response = client.getCells(
             GetCellsRequest.newBuilder()
                 .setGridId(gridId)
                 .setRow1(row)

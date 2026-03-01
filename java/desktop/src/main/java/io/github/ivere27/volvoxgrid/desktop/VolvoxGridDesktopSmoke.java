@@ -2,6 +2,7 @@ package io.github.ivere27.volvoxgrid.desktop;
 
 import io.github.ivere27.volvoxgrid.CellUpdate;
 import io.github.ivere27.volvoxgrid.CellValue;
+import io.github.ivere27.volvoxgrid.CellsResponse;
 import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.GetCellsRequest;
 import io.github.ivere27.volvoxgrid.GridConfig;
@@ -65,7 +66,7 @@ public final class VolvoxGridDesktopSmoke {
                     .build()
             );
 
-            var cells = client.getCells(
+            CellsResponse cells = client.getCells(
                 GetCellsRequest.newBuilder()
                     .setGridId(gridId)
                     .setRow1(0)

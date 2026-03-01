@@ -22,7 +22,7 @@ final class NativePluginPathResolver {
         }
 
         String fromEnv = System.getenv("VOLVOXGRID_PLUGIN_PATH");
-        if (fromEnv != null && !fromEnv.isBlank()) {
+        if (!isBlank(fromEnv)) {
             return toAbsolutePath(fromEnv);
         }
 
@@ -50,10 +50,22 @@ final class NativePluginPathResolver {
         if (args == null || args.length == 0) {
             return null;
         }
-        if (args[0] == null || args[0].isBlank()) {
+        if (isBlank(args[0])) {
             return null;
         }
         return args[0];
+    }
+
+    private static boolean isBlank(String value) {
+        if (value == null) {
+            return true;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            if (!Character.isWhitespace(value.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static String toAbsolutePath(String rawPath) {

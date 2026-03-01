@@ -173,11 +173,11 @@ public final class VolvoxGridDesktopExample {
 
         gridPanel.setGridEventListener(event -> {
             if (event.hasCellFocusChanged()) {
-                var e = event.getCellFocusChanged();
-                updateStatus("Cell: R" + e.getNewRow() + " C" + e.getNewCol());
+                final io.github.ivere27.volvoxgrid.CellFocusChangedEvent focusChanged = event.getCellFocusChanged();
+                updateStatus("Cell: R" + focusChanged.getNewRow() + " C" + focusChanged.getNewCol());
             } else if (event.hasAfterEdit()) {
-                var e = event.getAfterEdit();
-                updateStatus("Edited R" + e.getRow() + " C" + e.getCol());
+                final io.github.ivere27.volvoxgrid.AfterEditEvent afterEdit = event.getAfterEdit();
+                updateStatus("Edited R" + afterEdit.getRow() + " C" + afterEdit.getCol());
             } else if (event.hasAfterSort()) {
                 updateStatus("Sorted col: " + event.getAfterSort().getCol());
             }

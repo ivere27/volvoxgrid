@@ -227,7 +227,7 @@ impl<'a> Canvas for GpuCanvas<'a> {
                 rect: [left, top, right - left, bottom - top],
                 uv_rect: [new_u_min, new_v_min, new_u_max, new_v_max],
                 color: color_f32,
-                flags: [0.0, 0.0], // glyph mode
+                flags: [0.0, entry.page as f32], // glyph mode + atlas page
             };
             self.texts().push(inst);
         }
