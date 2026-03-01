@@ -29,6 +29,7 @@ cd /path/to/volvoxgrid
 Plugin path resolution order:
 - first arg
 - `VOLVOXGRID_PLUGIN_PATH`
+- embedded native from classpath (`volvoxgrid-desktop` Maven jar)
 - auto-detect under `target/debug` or `target/release`
   (`libvolvoxgrid_plugin.so` / `libvolvoxgrid_plugin.dylib` / `volvoxgrid_plugin.dll`)
 
@@ -38,7 +39,20 @@ Run the older minimal demo with:
 ./android/gradlew -p java/desktop runSimpleDemo
 ```
 
-By default the build uses Maven artifacts:
+By default the build uses local VolvoxGrid classes from `../common`:
+- `-PvolvoxgridDesktopSource=local`
+
+To use the published VolvoxGrid Maven jar instead:
+
+```bash
+./android/gradlew -p java/desktop run \
+  -PvolvoxgridDesktopSource=maven \
+  -PvolvoxgridDesktopGroup=io.github.ivere27 \
+  -PvolvoxgridDesktopArtifact=volvoxgrid-desktop \
+  -PvolvoxgridVersion=0.1.0
+```
+
+Synurang runtime defaults to Maven artifacts:
 - `io.github.ivere27:synurang-desktop:0.5.2`
 - `io.github.ivere27:synurang-desktop-grpc:0.5.2`
 

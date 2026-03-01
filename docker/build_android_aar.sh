@@ -4,18 +4,31 @@ set -euo pipefail
 # Android AAR packaging script — runs inside Docker (Dockerfile.android).
 #
 # Builds the Rust volvoxgrid plugin for Android ABIs via cargo-ndk,
-# then assembles a release AAR via Gradle with all JNI .so files included.
+# assembles a release AAR via Gradle with all JNI .so files included,
+# then merges volvoxgrid-java-common classes into classes.jar (fat AAR).
 # Outputs Maven-ready artifacts: AAR, POM, sources.jar, javadoc.jar.
 #
 # Usage (inside Docker): VERSION=0.1.0 /opt/volvoxgrid/build_android_aar.sh
+# Optional: PLUGIN_BUILD_MODE=lite (default: full)
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}"
 VERSION="${VERSION:-0.1.0}"
 GROUP_ID="${GROUP_ID:-io.github.ivere27}"
 ARTIFACT_ID="${ARTIFACT_ID:-volvoxgrid-android}"
+GIT_COMMIT="${GIT_COMMIT:-$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)}"
+BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+PLUGIN_BUILD_MODE="${PLUGIN_BUILD_MODE:-full}"
 ANDROID_ABIS="${ANDROID_ABIS:-arm64-v8a,armeabi-v7a}"
 DIST_DIR="${DIST_DIR:-${REPO_ROOT}/dist/maven}"
+
+case "${PLUGIN_BUILD_MODE}" in
+  full|lite) ;;
+  *)
+    echo "Error: PLUGIN_BUILD_MODE must be 'full' or 'lite', got '${PLUGIN_BUILD_MODE}'." >&2
+    exit 1
+    ;;
+esac
 
 export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-/opt/android-sdk}"
 export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"
@@ -33,10 +46,14 @@ done
 
 IFS=',' read -r -a ABI_LIST <<< "${ANDROID_ABIS}"
 ANDROID_JNI_DIR="${REPO_ROOT}/android/volvoxgrid-android/src/main/jniLibs"
+PLUGIN_FEATURE_ARGS=(--release)
+if [[ "${PLUGIN_BUILD_MODE}" == "lite" ]]; then
+  PLUGIN_FEATURE_ARGS=(--release --no-default-features)
+fi
 
 # ── Build Rust plugin .so for each ABI ──────────────────────────────────────
 rm -rf "${ANDROID_JNI_DIR}"
-echo "Building Rust plugin for Android ABIs: ${ANDROID_ABIS}..."
+echo "Building Rust plugin for Android ABIs: ${ANDROID_ABIS} (mode=${PLUGIN_BUILD_MODE})..."
 
 NDK_TARGETS=""
 for ABI in "${ABI_LIST[@]}"; do
@@ -47,7 +64,7 @@ done
 
 (
   cd "${REPO_ROOT}/plugin"
-  cargo ndk ${NDK_TARGETS} -o "${ANDROID_JNI_DIR}" build --release
+  cargo ndk ${NDK_TARGETS} -o "${ANDROID_JNI_DIR}" build "${PLUGIN_FEATURE_ARGS[@]}"
 )
 
 for ABI in "${ABI_LIST[@]}"; do
@@ -62,7 +79,11 @@ done
 
 # ── Build AAR via Gradle ────────────────────────────────────────────────────
 echo "Building Android AAR (release)..."
-"${REPO_ROOT}/android/gradlew" -p "${REPO_ROOT}/android" --no-daemon :volvoxgrid-android:assembleRelease
+"${REPO_ROOT}/android/gradlew" -p "${REPO_ROOT}/android" --no-daemon \
+  -PvolvoxgridVersion="${VERSION}" \
+  -PvolvoxgridGitCommit="${GIT_COMMIT}" \
+  -PvolvoxgridBuildDate="${BUILD_DATE}" \
+  :volvoxgrid-android:assembleRelease
 
 AAR_SRC="${REPO_ROOT}/android/volvoxgrid-android/build/outputs/aar/volvoxgrid-android-release.aar"
 if [[ ! -f "${AAR_SRC}" ]]; then
@@ -70,11 +91,43 @@ if [[ ! -f "${AAR_SRC}" ]]; then
   exit 1
 fi
 
+# ── Build java-common and merge into AAR (fat AAR) ──────────────────────────
+JAVA_COMMON_DIR="${REPO_ROOT}/java/common"
+if [[ ! -d "${JAVA_COMMON_DIR}" ]]; then
+  echo "Error: java/common not found at ${JAVA_COMMON_DIR}" >&2
+  exit 1
+fi
+
+echo "Building volvoxgrid-java-common JAR for fat AAR..."
+"${REPO_ROOT}/android/gradlew" -p "${JAVA_COMMON_DIR}" --no-daemon clean jar
+COMMON_JAR="$(find "${JAVA_COMMON_DIR}/build/libs" -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
+if [[ -z "${COMMON_JAR}" || ! -f "${COMMON_JAR}" ]]; then
+  echo "Error: volvoxgrid-java-common jar build failed." >&2
+  exit 1
+fi
+
+MERGE_WORK_DIR="$(mktemp -d /tmp/volvoxgrid-aar-merge-XXXXXX)"
+
+AAR_UNPACKED_DIR="${MERGE_WORK_DIR}/aar"
+CLASSES_WORK_DIR="${MERGE_WORK_DIR}/classes"
+mkdir -p "${AAR_UNPACKED_DIR}" "${CLASSES_WORK_DIR}"
+
+unzip -q "${AAR_SRC}" -d "${AAR_UNPACKED_DIR}"
+if [[ ! -f "${AAR_UNPACKED_DIR}/classes.jar" ]]; then
+  echo "Error: classes.jar not found inside ${AAR_SRC}" >&2
+  exit 1
+fi
+
+(cd "${CLASSES_WORK_DIR}" && jar xf "${AAR_UNPACKED_DIR}/classes.jar")
+(cd "${CLASSES_WORK_DIR}" && jar xf "${COMMON_JAR}")
+rm -rf "${CLASSES_WORK_DIR}/META-INF"
+(cd "${CLASSES_WORK_DIR}" && jar cf "${AAR_UNPACKED_DIR}/classes.jar" .)
+
 # ── Copy artifacts to dist/maven/ ───────────────────────────────────────────
 mkdir -p "${DIST_DIR}"
-
 AAR_OUT="${DIST_DIR}/${ARTIFACT_ID}-${VERSION}.aar"
-cp -f "${AAR_SRC}" "${AAR_OUT}"
+(cd "${AAR_UNPACKED_DIR}" && zip -qr "${AAR_OUT}" .)
+rm -rf "${MERGE_WORK_DIR}"
 
 # ── Generate POM ────────────────────────────────────────────────────────────
 POM_OUT="${DIST_DIR}/${ARTIFACT_ID}-${VERSION}.pom"

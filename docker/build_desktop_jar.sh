@@ -15,6 +15,8 @@ export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}"
 VERSION="${VERSION:-0.1.0}"
 GROUP_ID="${GROUP_ID:-io.github.ivere27}"
 ARTIFACT_ID="${ARTIFACT_ID:-volvoxgrid-desktop}"
+GIT_COMMIT="${GIT_COMMIT:-$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)}"
+BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 DIST_DIR="${DIST_DIR:-${REPO_ROOT}/dist/maven}"
 
 WORK_DIR="$(mktemp -d /tmp/volvoxgrid-desktop-XXXXXX)"
@@ -199,7 +201,22 @@ fi
 
 mkdir -p "${DIST_DIR}"
 JAR_OUT="${DIST_DIR}/${ARTIFACT_ID}-${VERSION}.jar"
-(cd "${JAR_DIR}" && jar cf "${JAR_OUT}" .)
+mkdir -p "${JAR_DIR}/META-INF/volvoxgrid"
+cat > "${JAR_DIR}/META-INF/volvoxgrid/build-info.properties" <<META
+volvoxgrid.version=${VERSION}
+volvoxgrid.git_commit=${GIT_COMMIT}
+volvoxgrid.build_date=${BUILD_DATE}
+META
+MANIFEST_FILE="${WORK_DIR}/MANIFEST.MF"
+cat > "${MANIFEST_FILE}" <<MANIFEST
+Manifest-Version: 1.0
+Implementation-Title: ${ARTIFACT_ID}
+Implementation-Version: ${VERSION}
+VolvoxGrid-Git-Commit: ${GIT_COMMIT}
+VolvoxGrid-Build-Date: ${BUILD_DATE}
+
+MANIFEST
+(cd "${JAR_DIR}" && jar cfm "${JAR_OUT}" "${MANIFEST_FILE}" .)
 echo "Built: ${JAR_OUT} (${NATIVE_COUNT} native libs embedded)"
 
 # ── Generate POM ────────────────────────────────────────────────────────────

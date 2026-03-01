@@ -20,6 +20,7 @@ public final class VolvoxGridDesktopSmoke {
         if (pluginPath == null) {
             System.err.println("Plugin path not found.");
             System.err.println("Provide first arg, or set VOLVOXGRID_PLUGIN_PATH,");
+            System.err.println("or use the volvoxgrid-desktop Maven artifact with embedded native libs,");
             System.err.println("or place " + NativePluginPathResolver.expectedPluginFileHint() + " under target/debug.");
             System.exit(2);
             return;

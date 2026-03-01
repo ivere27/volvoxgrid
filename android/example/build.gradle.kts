@@ -4,6 +4,22 @@ plugins {
     id("com.google.protobuf")
 }
 
+val volvoxgridAndroidSource = providers.gradleProperty("volvoxgridAndroidSource")
+    .orElse(System.getenv("VOLVOXGRID_ANDROID_SOURCE") ?: "local")
+    .get()
+    .trim()
+    .lowercase()
+val volvoxgridAndroidGroup = providers.gradleProperty("volvoxgridAndroidGroup")
+    .orElse("io.github.ivere27")
+    .get()
+val volvoxgridAndroidArtifact = providers.gradleProperty("volvoxgridAndroidArtifact")
+    .orElse("volvoxgrid-android")
+    .get()
+val volvoxgridVersion = providers.gradleProperty("volvoxgridVersion")
+    .orElse(providers.gradleProperty("volvoxgridAndroidVersion"))
+    .orElse("0.1.0")
+    .get()
+
 android {
     namespace = "io.github.ivere27.volvoxgrid.example"
     compileSdk = 34
@@ -43,7 +59,13 @@ android {
 }
 
 dependencies {
-    implementation(project(":volvoxgrid-android"))
+    when (volvoxgridAndroidSource) {
+        "local" -> implementation(project(":volvoxgrid-android"))
+        "maven" -> implementation("$volvoxgridAndroidGroup:$volvoxgridAndroidArtifact:$volvoxgridVersion")
+        else -> throw GradleException(
+            "Invalid volvoxgridAndroidSource='$volvoxgridAndroidSource'. Expected 'local' or 'maven'."
+        )
+    }
 
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")

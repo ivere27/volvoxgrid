@@ -1,2 +1,10 @@
 rootProject.name = "volvoxgrid-desktop"
-includeBuild("../common")
+val volvoxgridDesktopSource = providers.gradleProperty("volvoxgridDesktopSource")
+    .orElse(System.getenv("VOLVOXGRID_DESKTOP_SOURCE") ?: "local")
+    .get()
+    .trim()
+    .lowercase()
+
+if (volvoxgridDesktopSource == "local") {
+    includeBuild("../common")
+}

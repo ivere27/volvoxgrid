@@ -55,6 +55,7 @@ public final class SynurangDesktopBridge implements AutoCloseable {
             Class<?> hostClass = Class.forName(PLUGIN_HOST_CLASS);
             Method loadMethod = hostClass.getMethod("load", String.class);
             Object host = loadMethod.invoke(null, pluginPath);
+            VolvoxGridBuildInfo.logDesktopPluginLoadOnce(pluginPath);
             return new SynurangDesktopBridge(host, hostClass);
         } catch (ClassNotFoundException e) {
             throw new SynurangBridgeException(

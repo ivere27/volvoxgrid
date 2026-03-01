@@ -141,6 +141,9 @@ make android
 
 # Build release plugin + install
 make android-run-release
+
+# Use published Maven AAR in the example app (default is local project module)
+make android-run VOLVOXGRID_ANDROID_SOURCE=maven VOLVOXGRID_VERSION=0.1.0
 ```
 
 ### Java Desktop
@@ -151,6 +154,9 @@ make java-desktop-run
 
 # Run minimal demo
 make java-desktop-run-simple
+
+# Use published Maven JAR in the desktop example (default is local)
+make java-desktop-run VOLVOXGRID_JAVA_SOURCE=maven VOLVOXGRID_VERSION=0.1.0
 ```
 
 ### GTK4
@@ -261,7 +267,7 @@ This produces bindings in `codegen/`, `plugin/src/`, `web/crate/src/`, and `adap
 Build platform artifacts in reproducible Docker containers:
 
 ```bash
-# Android AAR
+# Android AAR + Android lite AAR
 make docker_android_aar
 
 # Desktop JAR (Linux/macOS/Windows native libs)
@@ -277,6 +283,10 @@ make docker_all
 ### Publishing to Maven Central
 
 ```bash
+# Build Maven bundles first
+make docker_android_aar docker_desktop_jar
+
+# Publish: android, android-lite, desktop
 make publish_maven
 ```
 

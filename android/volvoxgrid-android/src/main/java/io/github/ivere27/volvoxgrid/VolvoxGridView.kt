@@ -318,6 +318,7 @@ class VolvoxGridView @JvmOverloads constructor(
     ) {
         released.set(false)
         val p = PluginHost.load(pluginPath)
+        logPluginLoadBannerOnce(pluginPath)
         plugin = p
         val client = VolvoxGridServiceFfi(p)
         ffiClient = client
@@ -359,6 +360,7 @@ class VolvoxGridView @JvmOverloads constructor(
     fun initialize(host: PluginHost, existingGridId: Long) {
         detachGrid() // Ensure previous session is stopped
         released.set(false)
+        logPluginLoadBannerOnce("<preloaded>")
         plugin = host
         ffiClient = VolvoxGridServiceFfi(host)
         gridId = existingGridId
@@ -1976,5 +1978,20 @@ class VolvoxGridView @JvmOverloads constructor(
         private const val ZOOM_RAW_SCALE_MAX = 1e12f
         private const val ZOOM_STEP_MIN_SCALE = 1f / 32f
         private const val ZOOM_STEP_MAX_SCALE = 32f
+        private val pluginLoadBannerPrinted = AtomicBoolean(false)
+
+        private fun logPluginLoadBannerOnce(pluginPath: String) {
+            if (!pluginLoadBannerPrinted.compareAndSet(false, true)) {
+                return
+            }
+            android.util.Log.i(
+                TAG,
+                "Loaded VolvoxGrid plugin " +
+                    "version=${BuildConfig.VOLVOXGRID_VERSION} " +
+                    "commit=${BuildConfig.VOLVOXGRID_GIT_COMMIT} " +
+                    "buildDate=${BuildConfig.VOLVOXGRID_BUILD_DATE} " +
+                    "path=$pluginPath"
+            )
+        }
     }
 }

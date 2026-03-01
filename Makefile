@@ -55,28 +55,71 @@ JAVA_DESKTOP_PLUGIN_BASENAME := libvolvoxgrid_plugin.so
 endif
 JAVA_DESKTOP_PLUGIN ?= $(abspath target/debug/$(JAVA_DESKTOP_PLUGIN_BASENAME))
 JAVA_DESKTOP_PLUGIN_RELEASE ?= $(abspath target/release/$(JAVA_DESKTOP_PLUGIN_BASENAME))
+VOLVOXGRID_VERSION ?= 0.1.0
+VOLVOXGRID_ANDROID_SOURCE ?= local
+VOLVOXGRID_ANDROID_GROUP ?= io.github.ivere27
+VOLVOXGRID_ANDROID_ARTIFACT ?= volvoxgrid-android
+VOLVOXGRID_JAVA_SOURCE ?= local
+VOLVOXGRID_JAVA_GROUP ?= io.github.ivere27
+VOLVOXGRID_JAVA_ARTIFACT ?= volvoxgrid-desktop
+ANDROID_EXAMPLE_GRADLE_PROPS := \
+	-PvolvoxgridAndroidSource=$(VOLVOXGRID_ANDROID_SOURCE) \
+	-PvolvoxgridAndroidGroup=$(VOLVOXGRID_ANDROID_GROUP) \
+	-PvolvoxgridAndroidArtifact=$(VOLVOXGRID_ANDROID_ARTIFACT) \
+	-PvolvoxgridVersion=$(VOLVOXGRID_VERSION)
+JAVA_DESKTOP_GRADLE_PROPS := \
+	-PvolvoxgridDesktopSource=$(VOLVOXGRID_JAVA_SOURCE) \
+	-PvolvoxgridDesktopGroup=$(VOLVOXGRID_JAVA_GROUP) \
+	-PvolvoxgridDesktopArtifact=$(VOLVOXGRID_JAVA_ARTIFACT) \
+	-PvolvoxgridVersion=$(VOLVOXGRID_VERSION)
 
 # Docker + Maven publishing
 # Resolve to the Makefile directory so docker mounts stay correct even when
 # invoking `make -f /path/to/Makefile` or running from subdirectories.
 CURRENT_DIR := $(patsubst %/,%,$(abspath $(dir $(lastword $(MAKEFILE_LIST)))))
 AAR_DOCKER_IMAGE ?= volvoxgrid-android-aar:latest
-AAR_VERSION ?= 0.1.0
+AAR_VERSION ?= $(VOLVOXGRID_VERSION)
 AAR_GROUP_ID ?= io.github.ivere27
 AAR_ARTIFACT_ID ?= volvoxgrid-android
+AAR_LITE_GROUP_ID ?= $(AAR_GROUP_ID)
+AAR_LITE_ARTIFACT_ID ?= volvoxgrid-android-lite
 AAR_ANDROID_ABIS ?= arm64-v8a,armeabi-v7a
 DOCKER_GO_BUILD_CACHE_VOLUME ?= go-build-cache
 DOCKER_GRADLE_BUILD_CACHE_VOLUME ?= gradle-build-cache
 DOCKER_GO_BUILD_CACHE_DIR ?= /cache/go-build
 DOCKER_GRADLE_CACHE_DIR ?= /cache/gradle
 DESKTOP_DOCKER_IMAGE ?= volvoxgrid-desktop-jar:latest
-DESKTOP_VERSION ?= 0.1.0
+DESKTOP_VERSION ?= $(VOLVOXGRID_VERSION)
 DESKTOP_GROUP_ID ?= io.github.ivere27
 DESKTOP_ARTIFACT_ID ?= volvoxgrid-desktop
 IOS_DOCKER_IMAGE ?= volvoxgrid-ios:latest
 ALL_DOCKER_IMAGE ?= volvoxgrid-all:latest
 MAVEN_SETTINGS ?= $(CURRENT_DIR)/.maven-settings.xml
 MAVEN_REPO_URL ?= https://central.sonatype.com/api/v1/publisher/upload
+
+ifeq ($(VOLVOXGRID_ANDROID_SOURCE),maven)
+ANDROID_INSTALL_PREREQ :=
+ANDROID_INSTALL_RELEASE_PREREQ :=
+else
+ANDROID_INSTALL_PREREQ := android-plugin
+ANDROID_INSTALL_RELEASE_PREREQ := android-plugin-release
+endif
+
+ifeq ($(VOLVOXGRID_JAVA_SOURCE),maven)
+JAVA_DESKTOP_RUN_PREREQ :=
+JAVA_DESKTOP_RUN_RELEASE_PREREQ :=
+JAVA_DESKTOP_RUN_SIMPLE_PREREQ :=
+JAVA_DESKTOP_SMOKE_PREREQ :=
+JAVA_DESKTOP_PLUGIN_ARG :=
+JAVA_DESKTOP_PLUGIN_RELEASE_ARG :=
+else
+JAVA_DESKTOP_RUN_PREREQ := java-host-plugin
+JAVA_DESKTOP_RUN_RELEASE_PREREQ := java-host-plugin-release
+JAVA_DESKTOP_RUN_SIMPLE_PREREQ := java-host-plugin
+JAVA_DESKTOP_SMOKE_PREREQ := java-host-plugin
+JAVA_DESKTOP_PLUGIN_ARG := --args="$(JAVA_DESKTOP_PLUGIN)"
+JAVA_DESKTOP_PLUGIN_RELEASE_ARG := --args="$(JAVA_DESKTOP_PLUGIN_RELEASE)"
+endif
 
 .PHONY: all build engine host-plugin java-host-plugin plugin engine-release host-plugin-release java-host-plugin-release release \
                 build_plugin run run-release test wasm wasm-lite wasm-threaded web web-lite doom-deps \
@@ -144,14 +187,20 @@ help:
 	@echo ""
 	@echo "Docker + Maven:"
 	@echo "  docker_android_aar_image  Build Docker image for Android AAR"
-	@echo "  docker_android_aar        Build Android AAR + Maven artifacts via Docker"
+	@echo "  docker_android_aar        Build Android AAR + Android lite AAR + Maven artifacts via Docker"
 	@echo "  docker_desktop_jar_image  Build Docker image for desktop JAR"
 	@echo "  docker_desktop_jar        Build desktop JAR + Maven artifacts via Docker"
 	@echo "  docker_ios_image          Build Docker image for iOS"
 	@echo "  docker_ios                Build iOS XCFramework via Docker"
 	@echo "  docker_all_image          Build unified Docker image (all toolchains)"
 	@echo "  docker_all                Build all platform artifacts via unified Docker image"
-	@echo "  publish_maven             Upload AAR + desktop JAR to Maven Central"
+	@echo "  publish_maven             Upload Android AAR + Android lite AAR + desktop JAR to Maven Central"
+	@echo ""
+	@echo "Example dependency source flags (default is local):"
+	@echo "  make android-run VOLVOXGRID_ANDROID_SOURCE=maven VOLVOXGRID_VERSION=0.1.0"
+	@echo "  make java-desktop-run VOLVOXGRID_JAVA_SOURCE=maven VOLVOXGRID_VERSION=0.1.0"
+	@echo "  (maven mode skips local plugin build for the example targets)"
+	@echo "  Optional override: VOLVOXGRID_*_GROUP and VOLVOXGRID_*_ARTIFACT"
 	@echo ""
 	@echo "  clean          Remove build artifacts"
 	@echo "  clean-all      Remove all artifacts including WASM/node_modules"
@@ -221,24 +270,24 @@ run-release: host-plugin-release
 	./target/release/volvoxgrid-smoke target/release/libvolvoxgrid_plugin.so
 	@echo ""
 
-java-desktop-run: java-host-plugin
+java-desktop-run: $(JAVA_DESKTOP_RUN_PREREQ)
 	@echo "Running Java desktop Android-style example..."
-	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" run --args="$(JAVA_DESKTOP_PLUGIN)" --no-daemon
+	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) run $(JAVA_DESKTOP_PLUGIN_ARG) --no-daemon
 	@echo ""
 
-java-desktop-run-release: java-host-plugin-release
+java-desktop-run-release: $(JAVA_DESKTOP_RUN_RELEASE_PREREQ)
 	@echo "Running Java desktop Android-style example (release plugin)..."
-	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" run --args="$(JAVA_DESKTOP_PLUGIN_RELEASE)" --no-daemon
+	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) run $(JAVA_DESKTOP_PLUGIN_RELEASE_ARG) --no-daemon
 	@echo ""
 
-java-desktop-run-simple: java-host-plugin
+java-desktop-run-simple: $(JAVA_DESKTOP_RUN_SIMPLE_PREREQ)
 	@echo "Running Java desktop minimal demo..."
-	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" runSimpleDemo --args="$(JAVA_DESKTOP_PLUGIN)" --no-daemon
+	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) runSimpleDemo $(JAVA_DESKTOP_PLUGIN_ARG) --no-daemon
 	@echo ""
 
-java-desktop-smoke: java-host-plugin
+java-desktop-smoke: $(JAVA_DESKTOP_SMOKE_PREREQ)
 	@echo "Running Java desktop smoke test..."
-	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" runSmoke --args="$(JAVA_DESKTOP_PLUGIN)" --no-daemon
+	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) runSmoke $(JAVA_DESKTOP_PLUGIN_ARG) --no-daemon
 	@echo ""
 
 # =============================================================================
@@ -426,13 +475,13 @@ android-build:
 	fi; \
 	if [ -x "$(ANDROID_GRADLEW)" ]; then \
 		echo "Using project Gradle wrapper: $(ANDROID_GRADLEW)"; \
-		"$(ANDROID_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" "$(ANDROID_GRADLE_TASK)"; \
+		"$(ANDROID_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_GRADLE_TASK)"; \
 	elif [ -x "$(SHARED_GRADLEW)" ]; then \
 		echo "Using shared Gradle wrapper: $(SHARED_GRADLEW)"; \
-		"$(SHARED_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" "$(ANDROID_GRADLE_TASK)"; \
+		"$(SHARED_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_GRADLE_TASK)"; \
 	elif command -v gradle >/dev/null 2>&1; then \
 		echo "Using system Gradle: $$(command -v gradle)"; \
-		gradle -p "$(ANDROID_PROJECT_DIR)" "$(ANDROID_GRADLE_TASK)"; \
+		gradle -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_GRADLE_TASK)"; \
 	else \
 		echo "Error: no Gradle wrapper found."; \
 		echo "Expected $(ANDROID_GRADLEW) or $(SHARED_GRADLEW), or install gradle."; \
@@ -524,7 +573,7 @@ android-plugin-release:
 	cp -a "$(ANDROID_PLUGIN_OUTPUT_DIR)/." "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/"
 	@echo "Android release plugin build complete."
 
-android-install: android-plugin
+android-install: $(ANDROID_INSTALL_PREREQ)
 	@echo "Installing Android example app..."
 	@SDK_DIR=""; \
 	if [ -n "$$ANDROID_HOME" ]; then \
@@ -543,13 +592,13 @@ android-install: android-plugin
 	fi; \
 	if [ -x "$(ANDROID_GRADLEW)" ]; then \
 		echo "Using project Gradle wrapper: $(ANDROID_GRADLEW)"; \
-		"$(ANDROID_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" "$(ANDROID_INSTALL_TASK)"; \
+		"$(ANDROID_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
 	elif [ -x "$(SHARED_GRADLEW)" ]; then \
 		echo "Using shared Gradle wrapper: $(SHARED_GRADLEW)"; \
-		"$(SHARED_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" "$(ANDROID_INSTALL_TASK)"; \
+		"$(SHARED_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
 	elif command -v gradle >/dev/null 2>&1; then \
 		echo "Using system Gradle: $$(command -v gradle)"; \
-		gradle -p "$(ANDROID_PROJECT_DIR)" "$(ANDROID_INSTALL_TASK)"; \
+		gradle -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
 	else \
 		echo "Error: no Gradle wrapper found."; \
 		echo "Expected $(ANDROID_GRADLEW) or $(SHARED_GRADLEW), or install gradle."; \
@@ -557,7 +606,7 @@ android-install: android-plugin
 	fi
 	@echo "Android install complete."
 
-android-install-release: android-plugin-release
+android-install-release: $(ANDROID_INSTALL_RELEASE_PREREQ)
 	@echo "Installing Android example app (with release plugin libs)..."
 	@SDK_DIR=""; \
 	if [ -n "$$ANDROID_HOME" ]; then \
@@ -576,13 +625,13 @@ android-install-release: android-plugin-release
 	fi; \
 	if [ -x "$(ANDROID_GRADLEW)" ]; then \
 		echo "Using project Gradle wrapper: $(ANDROID_GRADLEW)"; \
-		"$(ANDROID_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" "$(ANDROID_INSTALL_TASK)"; \
+		"$(ANDROID_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
 	elif [ -x "$(SHARED_GRADLEW)" ]; then \
 		echo "Using shared Gradle wrapper: $(SHARED_GRADLEW)"; \
-		"$(SHARED_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" "$(ANDROID_INSTALL_TASK)"; \
+		"$(SHARED_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
 	elif command -v gradle >/dev/null 2>&1; then \
 		echo "Using system Gradle: $$(command -v gradle)"; \
-		gradle -p "$(ANDROID_PROJECT_DIR)" "$(ANDROID_INSTALL_TASK)"; \
+		gradle -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
 	else \
 		echo "Error: no Gradle wrapper found."; \
 		echo "Expected $(ANDROID_GRADLEW) or $(SHARED_GRADLEW), or install gradle."; \
@@ -628,7 +677,7 @@ docker_android_aar_image:
 	docker build -t "$(AAR_DOCKER_IMAGE)" -f Dockerfile.android .
 
 docker_android_aar: docker_android_aar_image
-	@echo "Packaging Android AAR (version $(AAR_VERSION), ABIs $(AAR_ANDROID_ABIS))..."
+	@echo "Packaging Android AAR + Android lite AAR (version $(AAR_VERSION), ABIs $(AAR_ANDROID_ABIS))..."
 	@mkdir -p dist/maven
 	docker run --rm \
 		--entrypoint /bin/bash \
@@ -649,7 +698,21 @@ docker_android_aar: docker_android_aar_image
 		-e ARTIFACT_ID="$(AAR_ARTIFACT_ID)" \
 		-e ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
 		"$(AAR_DOCKER_IMAGE)"
-	@echo "AAR artifacts: dist/maven/"
+	docker run --rm \
+		-u "$$(id -u):$$(id -g)" \
+		-v "$(CURRENT_DIR):/workspace/volvoxgrid" \
+		-v "$(DOCKER_GO_BUILD_CACHE_VOLUME):$(DOCKER_GO_BUILD_CACHE_DIR)" \
+		-v "$(DOCKER_GRADLE_BUILD_CACHE_VOLUME):$(DOCKER_GRADLE_CACHE_DIR)" \
+		-w /workspace/volvoxgrid \
+		-e CARGO_TARGET_DIR="$(DOCKER_GO_BUILD_CACHE_DIR)/volvoxgrid-cargo-target" \
+		-e GRADLE_USER_HOME="$(DOCKER_GRADLE_CACHE_DIR)" \
+		-e VERSION="$(AAR_VERSION)" \
+		-e GROUP_ID="$(AAR_LITE_GROUP_ID)" \
+		-e ARTIFACT_ID="$(AAR_LITE_ARTIFACT_ID)" \
+		-e ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
+		-e PLUGIN_BUILD_MODE=lite \
+		"$(AAR_DOCKER_IMAGE)"
+	@echo "Android AAR artifacts (default + lite): dist/maven/"
 
 docker_desktop_jar_image:
 	@echo "Building Docker image for desktop JAR packaging..."
@@ -795,6 +858,7 @@ publish_maven:
 		fi; \
 	}; \
 	upload_bundle "$(AAR_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_GROUP_ID)"; \
+	upload_bundle "$(AAR_LITE_ARTIFACT_ID)" "$(AAR_VERSION)" "aar" "$(AAR_LITE_GROUP_ID)"; \
 	upload_bundle "$(DESKTOP_ARTIFACT_ID)" "$(DESKTOP_VERSION)" "jar" "$(DESKTOP_GROUP_ID)"
 
 # =============================================================================

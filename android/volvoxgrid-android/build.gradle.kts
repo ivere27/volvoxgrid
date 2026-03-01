@@ -1,4 +1,32 @@
 import com.google.protobuf.gradle.proto
+import java.io.File
+import java.time.Instant
+
+fun captureCommandOutput(workDir: File, vararg command: String): String? {
+    return try {
+        val process = ProcessBuilder(*command)
+            .directory(workDir)
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().use { it.readText().trim() }
+        if (process.waitFor() == 0) output.takeIf { it.isNotEmpty() } else null
+    } catch (_: Exception) {
+        null
+    }
+}
+
+fun quoteForBuildConfig(value: String): String =
+    "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+val volvoxgridVersion = providers.gradleProperty("volvoxgridVersion")
+    .orElse(System.getenv("VOLVOXGRID_VERSION") ?: System.getenv("VERSION") ?: "dev")
+    .get()
+val volvoxgridGitCommit = providers.gradleProperty("volvoxgridGitCommit")
+    .orElse(captureCommandOutput(rootDir, "git", "rev-parse", "--short=12", "HEAD") ?: "unknown")
+    .get()
+val volvoxgridBuildDate = providers.gradleProperty("volvoxgridBuildDate")
+    .orElse(Instant.now().toString())
+    .get()
 
 plugins {
     id("com.android.library")
@@ -10,8 +38,15 @@ android {
     namespace = "io.github.ivere27.volvoxgrid"
     compileSdk = 34
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         minSdk = 24
+        buildConfigField("String", "VOLVOXGRID_VERSION", quoteForBuildConfig(volvoxgridVersion))
+        buildConfigField("String", "VOLVOXGRID_GIT_COMMIT", quoteForBuildConfig(volvoxgridGitCommit))
+        buildConfigField("String", "VOLVOXGRID_BUILD_DATE", quoteForBuildConfig(volvoxgridBuildDate))
 
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
@@ -111,7 +146,7 @@ protobuf {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
-    api("io.github.ivere27:volvoxgrid-java-common:0.1.0-SNAPSHOT")
+    api("io.github.ivere27:volvoxgrid-java-common:$volvoxgridVersion")
 
     // Protobuf lite
     implementation("com.google.protobuf:protobuf-javalite:3.25.1")
