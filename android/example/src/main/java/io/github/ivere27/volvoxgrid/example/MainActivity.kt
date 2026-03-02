@@ -37,7 +37,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var spRendererMode: Spinner
     private lateinit var swDebug: Switch
     private lateinit var spTextCache: Spinner
-    private var rendererMode = 0 // 0=CPU, 1=GPU(Auto), 3=GPU(Vulkan), 4=GPU(GLES)
+    private var rendererMode = 0 // 0=AUTO, 1=CPU, 2=GPU, 3=GPU(Vulkan), 4=GPU(GLES)
     private var litePluginLoaded = false
     private var debugOverlayEnabled = false
     private var textLayoutCacheCap = 8192
@@ -45,8 +45,8 @@ class MainActivity : AppCompatActivity() {
     // CPU present path if runtime surface producer switching fails on device.
     private val useGpuSurfacePath = true
     private val textCacheCapOptions = intArrayOf(8192, 4096, 1024, 256, 0)
-    private val rendererModeOptions = arrayOf("CPU", "GPU (Auto)", "GPU (Vulk)", "GPU (GLES)")
-    private val rendererModeValues = intArrayOf(0, 1, 3, 4)
+    private val rendererModeOptions = arrayOf("AUTO", "CPU", "GPU", "GPU (Vulk)", "GPU (GLES)")
+    private val rendererModeValues = intArrayOf(0, 1, 2, 3, 4)
 
     @Volatile private var controller: VolvoxGridController? = null
     @Volatile private var currentDemo: String = ""

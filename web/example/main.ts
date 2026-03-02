@@ -229,9 +229,9 @@ async function main() {
     grid.invalidate();
   });
 
-  grid.setRendererMode(2); // AUTO - let tryInitGpu proceed
+  grid.setRendererMode(2); // GPU — let tryInitGpu proceed
   const gpuOk = await grid.tryInitGpu();
-  grid.setRendererMode(0); // default CPU
+  grid.setRendererMode(1); // default CPU
 
   let currentDemo: DemoMode | null = null;
   let dataRows = 0;
@@ -239,7 +239,7 @@ async function main() {
     sales: grid.id,
   };
   const demoInitialized: Partial<Record<StandardDemoMode, boolean>> = {};
-  let activeRendererMode = 0;
+  let activeRendererMode = 1; // CPU
   let doomGridId: number | null = null;
   const doomRuntime = new DoomRuntime();
   let switchToken = 0;
@@ -1140,7 +1140,7 @@ async function main() {
   chkGpu.disabled = !gpuOk;
   chkGpu.checked = false;
   chkGpu.addEventListener("change", () => {
-    activeRendererMode = chkGpu.checked ? 1 : 0;
+    activeRendererMode = chkGpu.checked ? 2 : 1;
     applyActiveRenderSettings();
     grid.invalidate();
   });

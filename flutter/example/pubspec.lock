@@ -139,14 +139,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.1.2"
-  intl:
-    dependency: transitive
-    description:
-      name: intl
-      sha256: "3df61194eb431efc39c4ceba583b95633a403f46c9fd341e550ce0bfa50e9aa5"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.20.2"
   leak_tracker:
     dependency: transitive
     description:
@@ -248,30 +240,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
-  syncfusion_flutter_core:
-    dependency: transitive
-    description:
-      name: syncfusion_flutter_core
-      sha256: bfd026c0f9822b49ff26fed11cd3334519acb6a6ad4b0c81d9cd18df6af1c4c0
-      url: "https://pub.dev"
-    source: hosted
-    version: "30.2.7"
-  syncfusion_flutter_datagrid:
-    dependency: "direct main"
-    description:
-      name: syncfusion_flutter_datagrid
-      sha256: "1f0bd700b880efe2749c39636812f9188a103ec478d47f8b84e9915cb442511f"
-      url: "https://pub.dev"
-    source: hosted
-    version: "30.2.7"
   synurang:
     dependency: transitive
     description:
       name: synurang
-      sha256: e118e1a20419aca7ea19d55e17b94db792bf57e793a89bbddfa52ae710c02462
+      sha256: "5cf89ab63a25aa4dded726e33306144cd10e82a846c806dfe8eaa9a786e655b3"
       url: "https://pub.dev"
     source: hosted
-    version: "0.5.0"
+    version: "0.5.3"
   term_glyph:
     dependency: transitive
     description:
@@ -318,14 +294,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.1.0"
-  volvoxgrid_sfdatagrid:
-    dependency: "direct main"
-    description:
-      path: "../../adapters/sfdatagrid"
-      relative: true
-    source: path
-    version: "0.1.0"
+    version: "0.1.4"
   web:
     dependency: transitive
     description:
@@ -336,4 +305,4 @@ packages:
     version: "1.1.1"
 sdks:
   dart: ">=3.8.0 <4.0.0"
-  flutter: ">=3.29.0"
+  flutter: ">=3.18.0-18.0.pre.54"

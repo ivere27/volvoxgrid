@@ -3449,6 +3449,7 @@ class RenderConfig extends $pb.GeneratedMessage {
     $core.bool? animationEnabled,
     $core.int? animationDurationMs,
     $core.int? textLayoutCacheCap,
+    PresentMode? presentMode,
   }) {
     final result = create();
     if (rendererMode != null) result.rendererMode = rendererMode;
@@ -3458,6 +3459,7 @@ class RenderConfig extends $pb.GeneratedMessage {
       result.animationDurationMs = animationDurationMs;
     if (textLayoutCacheCap != null)
       result.textLayoutCacheCap = textLayoutCacheCap;
+    if (presentMode != null) result.presentMode = presentMode;
     return result;
   }
 
@@ -3480,6 +3482,8 @@ class RenderConfig extends $pb.GeneratedMessage {
     ..aOB(3, _omitFieldNames ? '' : 'animationEnabled')
     ..aI(4, _omitFieldNames ? '' : 'animationDurationMs')
     ..aI(5, _omitFieldNames ? '' : 'textLayoutCacheCap')
+    ..aE<PresentMode>(6, _omitFieldNames ? '' : 'presentMode',
+        enumValues: PresentMode.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3545,6 +3549,15 @@ class RenderConfig extends $pb.GeneratedMessage {
   $core.bool hasTextLayoutCacheCap() => $_has(4);
   @$pb.TagNumber(5)
   void clearTextLayoutCacheCap() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  PresentMode get presentMode => $_getN(5);
+  @$pb.TagNumber(6)
+  set presentMode(PresentMode value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasPresentMode() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearPresentMode() => $_clearField(6);
 }
 
 class ColumnDef extends $pb.GeneratedMessage {

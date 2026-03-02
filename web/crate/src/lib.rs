@@ -2390,7 +2390,7 @@ pub fn render(id: i32, width: i32, height: i32) -> i32 {
     let renderer = renderer.as_mut().unwrap();
 
     let stride = width * 4;
-    grid.debug_renderer_actual = 0; // CPU (WASM always uses CPU renderer)
+    grid.debug_renderer_actual = 1; // CPU=1 (WASM always uses CPU renderer)
     let t0 = js_sys::Date::now();
     let (dirty_x, dirty_y, dirty_w, dirty_h) =
         renderer.render(&grid, &mut buf, width, height, stride);
@@ -2409,7 +2409,7 @@ pub fn render(id: i32, width: i32, height: i32) -> i32 {
 // GPU Renderer (opt-in via `gpu` feature)
 // ---------------------------------------------------------------------------
 
-/// Set the renderer mode for a grid: 0=CPU, 1=GPU, 2=AUTO.
+/// Set the renderer mode for a grid: 0=AUTO, 1=CPU, 2=GPU.
 #[wasm_bindgen]
 pub fn set_renderer_mode(id: i32, mode: i32) {
     with_grid(id, |grid| {
@@ -2520,10 +2520,10 @@ pub fn init_gpu() -> js_sys::Promise {
 /// Returns true on success.
 #[cfg(feature = "gpu")]
 #[wasm_bindgen]
-pub fn gpu_configure_surface(canvas: web_sys::HtmlCanvasElement, w: u32, h: u32) -> bool {
+pub fn gpu_configure_surface(canvas: web_sys::HtmlCanvasElement, w: u32, h: u32, present_mode: i32) -> bool {
     let mut gr = GPU_RENDERER.lock().unwrap();
     if let Some(gpu) = gr.0.as_mut() {
-        match gpu.configure_surface_from_canvas(canvas, w, h) {
+        match gpu.configure_surface_from_canvas(canvas, w, h, present_mode) {
             Ok(()) => true,
             Err(e) => {
                 web_sys::console::warn_1(&format!("gpu_configure_surface failed: {}", e).into());
@@ -2537,7 +2537,7 @@ pub fn gpu_configure_surface(canvas: web_sys::HtmlCanvasElement, w: u32, h: u32)
 
 #[cfg(not(feature = "gpu"))]
 #[wasm_bindgen]
-pub fn gpu_configure_surface(_canvas: web_sys::HtmlCanvasElement, _w: u32, _h: u32) -> bool {
+pub fn gpu_configure_surface(_canvas: web_sys::HtmlCanvasElement, _w: u32, _h: u32, _present_mode: i32) -> bool {
     false
 }
 
@@ -2604,7 +2604,7 @@ pub fn render_gpu(id: i32, w: i32, h: i32) -> i32 {
         None => return 0,
     };
 
-    grid.debug_renderer_actual = 1; // GPU
+    grid.debug_renderer_actual = 2; // GPU=2
     let t0 = js_sys::Date::now();
     gpu.render_to_surface(&grid, w, h);
     let elapsed = (js_sys::Date::now() - t0) as f32;

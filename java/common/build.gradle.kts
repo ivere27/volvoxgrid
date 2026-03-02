@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "io.github.ivere27"
-version = "0.1.3-SNAPSHOT"
+version = "0.1.4-SNAPSHOT"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_1_8

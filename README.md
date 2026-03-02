@@ -809,6 +809,18 @@ Practical tuning:
 
 To observe memory impact, check `MemoryUsageResponse.text_engine_bytes` before/after cap changes.
 
+### Debug Overlay
+
+The engine includes a high-performance, backend-agnostic debug overlay for real-time performance monitoring and state inspection. It can be toggled via `RenderConfig.debug_overlay`.
+
+| Line | Example | Description |
+|---|---|---|
+| **Line 1** | `FPS: 60.0 \| 1.2ms \| Q: 1242 \| ID: 1001 \| Z: 100% \| Res: 1080x2240` | FPS, Frame Time, Instance Count (Quads), Grid ID, Zoom level, Render Resolution. |
+| **Line 2** | `Mode: GPU(Vulkan-Mailbox) \| Grid: 1,000,000x20 \| DIRTY` | Render Backend, Logical Grid Dimensions (Rows x Cols), Engine Status. |
+| **Line 3** | `Vis: 42x8(336) \| P: 0,15420 \| M: 12.4MB \| C: 842/8192` | Visible Viewport Dimensions & Total Cells, Scroll Position, Estimated Heap Memory, Text Cache Usage. |
+
+*Note: The displayed `FPS` is not a raw frame counter, but an **Exponential Moving Average (EMA)** of the time taken to render and present a frame.*
+
 ## Trademarks
 
 AG Grid is a trademark of AG Grid Ltd. Syncfusion and SfDataGrid are trademarks of Syncfusion, Inc. VSFlexGrid and FlexGrid are trademarks of GrapeCity, Inc. (formerly ComponentOne). All other trademarks are the property of their respective owners. VolvoxGrid is not affiliated with or endorsed by any of these companies. Third-party names are used solely to describe API-level interoperability. All adapter code is an independent, clean-room implementation -- no source code, binaries, or proprietary assets from the original frameworks are included.

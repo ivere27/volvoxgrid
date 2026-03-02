@@ -461,6 +461,12 @@ class VolvoxGridView @JvmOverloads constructor(
         renderRequestPending.set(false)
         dismissEditOverlay()
 
+        // Release GPU native window to avoid resource leak across grid switches.
+        gpuSurfaceActive = false
+        val ptr = nativeWindowPtr
+        nativeWindowPtr = 0
+        if (ptr != 0L) NativeWindowHelper.releaseNativeWindow(ptr)
+
         val streamToClose = synchronized(sendLock) {
             val stream = renderStream
             renderStream = null
@@ -524,7 +530,7 @@ class VolvoxGridView @JvmOverloads constructor(
     fun getFlingFriction(): Float = flingFriction
 
     /**
-     * Notify the view of a renderer mode change (CPU=0, GPU=1+).
+     * Notify the view of a renderer mode change (AUTO=0, CPU=1, GPU=2+).
      *
      * Call this after [VolvoxGridController.setRendererMode] so the view
      * can switch between buffer-based and GPU surface rendering paths.
@@ -542,7 +548,7 @@ class VolvoxGridView @JvmOverloads constructor(
         pendingFrame.set(false)
         needsFollowupRender.set(false)
 
-        if (prevMode >= 1 && mode < 1) {
+        if (prevMode >= 2 && mode < 2) {
             // Switching GPU -> CPU
             gpuSurfaceActive = false
             sendGpuSurfaceInvalidated()
@@ -553,7 +559,7 @@ class VolvoxGridView @JvmOverloads constructor(
             }
             // Recreate SurfaceView to avoid CPU canvas contention after GPU usage.
             recreateSurfaceView()
-        } else if (mode >= 1 && prevMode < 1) {
+        } else if (mode >= 2 && prevMode < 2) {
             // Switching CPU -> GPU
             recreateSurfaceView()
         }
@@ -1402,7 +1408,7 @@ class VolvoxGridView @JvmOverloads constructor(
     }
 
     private fun dispatchRenderFrame() {
-        if (currentRendererMode >= 1) {
+        if (currentRendererMode >= 2) {
             if (surfaceReady.get()) {
                 val ptr = acquireNativeWindow()
                 if (ptr != 0L) {
@@ -1803,7 +1809,7 @@ class VolvoxGridView @JvmOverloads constructor(
     private fun drawBitmapToSurface() {
         // In GPU mode, the plugin renders directly to the SurfaceView's native
         // surface. Avoid lockCanvas() here to prevent CPU canvas contention.
-        if (currentRendererMode >= 1) return
+        if (currentRendererMode >= 2) return
         if (!surfaceReady.get()) return
         val bmp = bitmap ?: return
         val holder = surfaceView.holder

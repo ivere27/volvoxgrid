@@ -444,6 +444,7 @@ impl GpuRenderer {
         native_window_ptr: *mut std::ffi::c_void,
         w: u32,
         h: u32,
+        requested_present_mode: i32,
     ) -> Result<(), String> {
         if native_window_ptr.is_null() {
             self.drop_surface();
@@ -554,7 +555,7 @@ impl GpuRenderer {
                 // Pipelines will be recreated in configure_surface if format differs
             }
 
-            self.configure_surface(surface, w, h);
+            self.configure_surface(surface, w, h, requested_present_mode);
             Ok(())
         }
     }
@@ -587,6 +588,30 @@ impl GpuRenderer {
         self.adapter.get_info().backend
     }
 
+    /// Returns the name of the active presentation mode.
+    pub fn present_mode_name(&self) -> String {
+        match self.surface_config.as_ref().map(|c| c.present_mode) {
+            Some(wgpu::PresentMode::Fifo) => "Fifo".to_string(),
+            Some(wgpu::PresentMode::Mailbox) => "Mailbox".to_string(),
+            Some(wgpu::PresentMode::Immediate) => "Immediate".to_string(),
+            Some(wgpu::PresentMode::FifoRelaxed) => "FifoRelaxed".to_string(),
+            _ => "Unknown".to_string(),
+        }
+    }
+
+    /// Returns the total number of instances (rects + text) produced in the last render pass.
+    pub fn instance_count(&self) -> usize {
+        self.rect_instances.len()
+            + self.textured_instances.len()
+            + self.overlay_rect_instances.len()
+            + self.overlay_textured_instances.len()
+    }
+
+    /// Returns the number of entries currently in the text layout cache.
+    pub fn text_cache_len(&self) -> usize {
+        self.text_engine.layout_cache.len()
+    }
+
     /// Create a surface from an HTML canvas element (wasm32 only) and configure it.
     #[cfg(target_arch = "wasm32")]
     pub fn configure_surface_from_canvas(
@@ -594,12 +619,13 @@ impl GpuRenderer {
         canvas: web_sys::HtmlCanvasElement,
         w: u32,
         h: u32,
+        requested_present_mode: i32,
     ) -> Result<(), String> {
         let surface = self
             .instance
             .create_surface(wgpu::SurfaceTarget::Canvas(canvas))
             .map_err(|e| format!("Failed to create surface from canvas: {}", e))?;
-        self.configure_surface(surface, w, h);
+        self.configure_surface(surface, w, h, requested_present_mode);
         Ok(())
     }
 
@@ -607,7 +633,7 @@ impl GpuRenderer {
     ///
     /// Queries the surface capabilities to determine the preferred texture
     /// format and recreates pipelines if it differs from the current one.
-    pub fn configure_surface(&mut self, surface: wgpu::Surface<'static>, w: u32, h: u32) {
+    pub fn configure_surface(&mut self, surface: wgpu::Surface<'static>, w: u32, h: u32, requested_present_mode: i32) {
         let caps = surface.get_capabilities(&self.adapter);
 
         // Prioritize standard 8-bit formats to match CPU blit and ensure wide compatibility.
@@ -647,15 +673,22 @@ impl GpuRenderer {
             self.pipeline_format = format;
         }
 
+        let present_mode = match requested_present_mode {
+            1 => wgpu::PresentMode::Fifo,
+            2 if caps.present_modes.contains(&wgpu::PresentMode::Mailbox) => wgpu::PresentMode::Mailbox,
+            3 if caps.present_modes.contains(&wgpu::PresentMode::Immediate) => wgpu::PresentMode::Immediate,
+            _ => wgpu::PresentMode::Fifo,  // Auto defaults to Fifo (vsync)
+        };
+
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format,
             width: w.max(1),
             height: h.max(1),
-            present_mode: wgpu::PresentMode::Fifo,
+            present_mode,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![],
-            desired_maximum_frame_latency: 2,
+            desired_maximum_frame_latency: if present_mode == wgpu::PresentMode::Mailbox { 2 } else { 1 },
         };
         surface.configure(&self.device, &config);
         self.surface_config = Some(config);

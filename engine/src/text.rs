@@ -189,6 +189,17 @@ impl TextEngine {
         }
     }
 
+    pub fn layout_cache_len(&self) -> usize {
+        #[cfg(feature = "cosmic-text")]
+        {
+            self.layout_cache.len()
+        }
+        #[cfg(not(feature = "cosmic-text"))]
+        {
+            0
+        }
+    }
+
     pub fn set_layout_cache_cap(&mut self, cap: usize) {
         self.layout_cache_cap = cap;
         #[cfg(feature = "cosmic-text")]

@@ -499,9 +499,9 @@ final $typed_data.Uint8List checkedStateDescriptor = $convert.base64Decode(
 const RendererMode$json = {
   '1': 'RendererMode',
   '2': [
-    {'1': 'RENDERER_CPU', '2': 0},
-    {'1': 'RENDERER_GPU', '2': 1},
-    {'1': 'RENDERER_AUTO', '2': 2},
+    {'1': 'RENDERER_AUTO', '2': 0},
+    {'1': 'RENDERER_CPU', '2': 1},
+    {'1': 'RENDERER_GPU', '2': 2},
     {'1': 'RENDERER_GPU_VULKAN', '2': 3},
     {'1': 'RENDERER_GPU_GLES', '2': 4},
   ],
@@ -509,9 +509,25 @@ const RendererMode$json = {
 
 /// Descriptor for `RendererMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List rendererModeDescriptor = $convert.base64Decode(
-    'CgxSZW5kZXJlck1vZGUSEAoMUkVOREVSRVJfQ1BVEAASEAoMUkVOREVSRVJfR1BVEAESEQoNUk'
-    'VOREVSRVJfQVVUTxACEhcKE1JFTkRFUkVSX0dQVV9WVUxLQU4QAxIVChFSRU5ERVJFUl9HUFVf'
+    'CgxSZW5kZXJlck1vZGUSEQoNUkVOREVSRVJfQVVUTxAAEhAKDFJFTkRFUkVSX0NQVRABEhAKDF'
+    'JFTkRFUkVSX0dQVRACEhcKE1JFTkRFUkVSX0dQVV9WVUxLQU4QAxIVChFSRU5ERVJFUl9HUFVf'
     'R0xFUxAE');
+
+@$core.Deprecated('Use presentModeDescriptor instead')
+const PresentMode$json = {
+  '1': 'PresentMode',
+  '2': [
+    {'1': 'PRESENT_AUTO', '2': 0},
+    {'1': 'PRESENT_FIFO', '2': 1},
+    {'1': 'PRESENT_MAILBOX', '2': 2},
+    {'1': 'PRESENT_IMMEDIATE', '2': 3},
+  ],
+};
+
+/// Descriptor for `PresentMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List presentModeDescriptor = $convert.base64Decode(
+    'CgtQcmVzZW50TW9kZRIQCgxQUkVTRU5UX0FVVE8QABIQCgxQUkVTRU5UX0ZJRk8QARITCg9QUk'
+    'VTRU5UX01BSUxCT1gQAhIVChFQUkVTRU5UX0lNTUVESUFURRAD');
 
 @$core.Deprecated('Use pinPositionDescriptor instead')
 const PinPosition$json = {
@@ -2828,6 +2844,16 @@ const RenderConfig$json = {
       '10': 'textLayoutCacheCap',
       '17': true
     },
+    {
+      '1': 'present_mode',
+      '3': 6,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.PresentMode',
+      '9': 5,
+      '10': 'presentMode',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_renderer_mode'},
@@ -2835,6 +2861,7 @@ const RenderConfig$json = {
     {'1': '_animation_enabled'},
     {'1': '_animation_duration_ms'},
     {'1': '_text_layout_cache_cap'},
+    {'1': '_present_mode'},
   ],
 };
 
@@ -2845,9 +2872,10 @@ final $typed_data.Uint8List renderConfigDescriptor = $convert.base64Decode(
     'DGRlYnVnT3ZlcmxheYgBARIwChFhbmltYXRpb25fZW5hYmxlZBgDIAEoCEgCUhBhbmltYXRpb2'
     '5FbmFibGVkiAEBEjcKFWFuaW1hdGlvbl9kdXJhdGlvbl9tcxgEIAEoBUgDUhNhbmltYXRpb25E'
     'dXJhdGlvbk1ziAEBEjYKFXRleHRfbGF5b3V0X2NhY2hlX2NhcBgFIAEoBUgEUhJ0ZXh0TGF5b3'
-    'V0Q2FjaGVDYXCIAQFCEAoOX3JlbmRlcmVyX21vZGVCEAoOX2RlYnVnX292ZXJsYXlCFAoSX2Fu'
-    'aW1hdGlvbl9lbmFibGVkQhgKFl9hbmltYXRpb25fZHVyYXRpb25fbXNCGAoWX3RleHRfbGF5b3'
-    'V0X2NhY2hlX2NhcA==');
+    'V0Q2FjaGVDYXCIAQESQgoMcHJlc2VudF9tb2RlGAYgASgOMhoudm9sdm94Z3JpZC52MS5QcmVz'
+    'ZW50TW9kZUgFUgtwcmVzZW50TW9kZYgBAUIQCg5fcmVuZGVyZXJfbW9kZUIQCg5fZGVidWdfb3'
+    'ZlcmxheUIUChJfYW5pbWF0aW9uX2VuYWJsZWRCGAoWX2FuaW1hdGlvbl9kdXJhdGlvbl9tc0IY'
+    'ChZfdGV4dF9sYXlvdXRfY2FjaGVfY2FwQg8KDV9wcmVzZW50X21vZGU=');
 
 @$core.Deprecated('Use columnDefDescriptor instead')
 const ColumnDef$json = {

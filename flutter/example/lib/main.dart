@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide Align;
+import 'package:flutter/services.dart';
 import 'package:volvoxgrid/volvoxgrid.dart';
 
 const bool _forceFlingForDesktop = bool.fromEnvironment(
@@ -10,6 +11,16 @@ const bool _forceFlingForDesktop = bool.fromEnvironment(
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initVolvoxGrid();
+
+  // Verify plugin connectivity
+  try {
+    const channel = MethodChannel('io.github.ivere27.volvoxgrid');
+    final version = await channel.invokeMethod('getPlatformVersion');
+    debugPrint('VolvoxGrid Plugin active: $version');
+  } catch (e) {
+    debugPrint('VolvoxGrid Plugin error: $e');
+  }
+
   runApp(const VolvoxGridDemoApp());
 }
 
@@ -49,11 +60,12 @@ class _DemoPageState extends State<DemoPage> {
   String _statusText = 'Initializing...';
   bool _switching = false;
   int _switchToken = 0;
+  int _rendererSwitchToken = 0;
   DemoMode _currentDemo = DemoMode.sales;
   double _dpr = 1.0;
   bool _started = false;
   bool _showDebugOverlay = false;
-  bool _useGpu = false;
+  RendererBackend _rendererBackend = RendererBackend.cpu;
   int _textLayoutCacheCap = 8192;
 
   @override
@@ -90,7 +102,7 @@ class _DemoPageState extends State<DemoPage> {
       await controller.setFlingImpulseGain(220.0);
       await controller.setFlingFriction(0.9);
     }
-    await controller.setRendererMode(_useGpu ? 1 : 0);
+    await controller.setRendererBackend(_rendererBackend);
     await controller.setDebugOverlay(_showDebugOverlay);
     await controller.setTextLayoutCacheCap(_textLayoutCacheCap);
     final style = await controller.getGridStyle();
@@ -113,7 +125,10 @@ class _DemoPageState extends State<DemoPage> {
   }
 
   Future<void> _applyDisplayToggles(VolvoxGridController controller) async {
-    await controller.setRendererMode(_useGpu ? 1 : 0);
+    final backend = await controller.getRendererBackend();
+    if (backend != _rendererBackend) {
+      await controller.setRendererBackend(_rendererBackend);
+    }
     await controller.setDebugOverlay(_showDebugOverlay);
     await controller.setTextLayoutCacheCap(_textLayoutCacheCap);
   }
@@ -138,10 +153,11 @@ class _DemoPageState extends State<DemoPage> {
       return;
     }
     final token = ++_switchToken;
+    final needsInitialization = !_initializedModes.contains(mode);
     try {
       setState(() {
         _currentDemo = mode;
-        _switching = true;
+        _switching = needsInitialization;
         _statusText = 'Loading ${mode.name} demo...';
       });
       await _ensureInitialized(mode);
@@ -170,7 +186,8 @@ class _DemoPageState extends State<DemoPage> {
 
   void _onSelectionChanged(SelectionUpdate sel) {
     setState(() {
-      _statusText = 'Row: ${sel.activeRow}  Col: ${sel.activeCol}  |  ${_currentDemo.name}';
+      _statusText =
+          'Row: ${sel.activeRow}  Col: ${sel.activeCol}  |  ${_currentDemo.name}';
     });
   }
 
@@ -184,6 +201,42 @@ class _DemoPageState extends State<DemoPage> {
     if (_loading) return;
     final col = await _activeController.getCol();
     await _activeController.sort(SortOrder.SORT_GENERIC_DESCENDING, col: col);
+  }
+
+  Future<void> _switchRendererBackend(RendererBackend backend) async {
+    if (_loading || backend == _rendererBackend) {
+      return;
+    }
+    final token = ++_rendererSwitchToken;
+    final controller = _activeController;
+    setState(() {
+      _rendererBackend = backend;
+      _switching = true;
+      _statusText = 'Switching renderer to ${backend.name.toUpperCase()}...';
+    });
+
+    try {
+      // Let the grid widget unmount so its render session is fully disposed
+      // before we change backend mode.
+      await Future<void>.delayed(Duration.zero);
+      await controller.setRendererBackend(backend);
+      await controller.refresh();
+      if (!mounted || token != _rendererSwitchToken) {
+        return;
+      }
+      setState(() {
+        _switching = false;
+        _statusText = 'Loaded ${_currentDemo.name} demo';
+      });
+    } catch (e) {
+      if (!mounted || token != _rendererSwitchToken) {
+        return;
+      }
+      setState(() {
+        _switching = false;
+        _statusText = 'Renderer switch error: $e';
+      });
+    }
   }
 
   @override
@@ -213,16 +266,28 @@ class _DemoPageState extends State<DemoPage> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('GPU', style: TextStyle(fontSize: 12)),
-              Switch(
-                value: _useGpu,
-                onChanged: _loading
-                    ? null
-                    : (value) async {
-                        setState(() => _useGpu = value);
-                        await _activeController.setRendererMode(value ? 1 : 0);
-                        await _activeController.refresh();
-                      },
+              const Text('Mode', style: TextStyle(fontSize: 12)),
+              const SizedBox(width: 6),
+              DropdownButtonHideUnderline(
+                child: DropdownButton<RendererBackend>(
+                  value: _rendererBackend,
+                  isDense: true,
+                  onChanged: _loading
+                      ? null
+                      : (value) async {
+                          if (value == null) return;
+                          await _switchRendererBackend(value);
+                        },
+                  items: RendererBackend.values
+                      .map((mode) => DropdownMenuItem<RendererBackend>(
+                            value: mode,
+                            child: Text(
+                              mode.name.toUpperCase(),
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ))
+                      .toList(),
+                ),
               ),
             ],
           ),
@@ -258,7 +323,8 @@ class _DemoPageState extends State<DemoPage> {
                         : (value) async {
                             if (value == null) return;
                             setState(() => _textLayoutCacheCap = value);
-                            await _activeController.setTextLayoutCacheCap(value);
+                            await _activeController
+                                .setTextLayoutCacheCap(value);
                             await _activeController.refresh();
                           },
                     items: _textCacheCapOptions
@@ -301,7 +367,6 @@ class _DemoPageState extends State<DemoPage> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : VolvoxGridWidget(
-                    key: ValueKey<DemoMode>(_currentDemo),
                     controller: _activeController,
                     onSelectionChanged: _onSelectionChanged,
                   ),

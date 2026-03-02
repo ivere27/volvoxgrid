@@ -243,6 +243,49 @@ class VolvoxGridController(
         )
     }
 
+    /**
+     * Fill a 2D matrix into the grid starting at [startRow]/[startCol].
+     *
+     * When [resizeGrid] is true (the default), the grid is enlarged if the
+     * data exceeds the current row/column count.  Redraw is suspended for
+     * the duration so only a single repaint occurs at the end.
+     */
+    override fun setTableData(
+        data: List<List<String>>,
+        startRow: Int,
+        startCol: Int,
+        resizeGrid: Boolean
+    ) {
+        if (data.isEmpty()) return
+        val maxCols = data.maxOf { it.size }
+        if (maxCols <= 0) return
+
+        withRedrawSuspended {
+            if (resizeGrid) {
+                val neededRows = startRow + data.size
+                val neededCols = startCol + maxCols
+                val currentRows = rows
+                val currentCols = cols
+                if (neededRows > currentRows) rows = neededRows
+                if (neededCols > currentCols) cols = neededCols
+            }
+
+            val builder = UpdateCellsRequest.newBuilder().setGridId(gridId)
+            for ((r, row) in data.withIndex()) {
+                for ((c, text) in row.withIndex()) {
+                    builder.addCells(
+                        CellUpdate.newBuilder()
+                            .setRow(startRow + r)
+                            .setCol(startCol + c)
+                            .setValue(CellValue.newBuilder().setText(text).build())
+                            .build()
+                    )
+                }
+            }
+            service.UpdateCells(builder.build())
+        }
+    }
+
     fun getText(): String {
         val sel = service.GetSelection(handle())
         return getTextMatrix(sel.activeRow, sel.activeCol)
@@ -808,6 +851,32 @@ class VolvoxGridController(
         )
     }
 
+    /**
+     * Run [action] while redraw is suspended, then re-enable and refresh.
+     *
+     * This avoids per-call repaints when making many changes in a batch,
+     * resulting in a single repaint at the end.
+     *
+     * ```kotlin
+     * ctrl.withRedrawSuspended {
+     *     ctrl.setTextMatrix(0, 0, "A")
+     *     ctrl.setTextMatrix(0, 1, "B")
+     *     ctrl.setTextMatrix(1, 0, "C")
+     * }
+     * ```
+     */
+    inline fun <T> withRedrawSuspended(refreshAfter: Boolean = true, action: () -> T): T {
+        setRedraw(false)
+        try {
+            return action()
+        } finally {
+            setRedraw(true)
+            if (refreshAfter) {
+                refresh()
+            }
+        }
+    }
+
     fun setDebugOverlay(enabled: Boolean) {
         configure(GridConfig.newBuilder()
             .setRendering(RenderConfig.newBuilder().setDebugOverlay(enabled).build())
@@ -854,17 +923,17 @@ class VolvoxGridController(
 
     override fun setRendererBackend(backend: RendererBackend) {
         when (backend) {
-            RendererBackend.CPU -> setRendererMode(0)
-            RendererBackend.GPU -> setRendererMode(1)
-            RendererBackend.AUTO -> setRendererMode(2)
+            RendererBackend.AUTO -> setRendererMode(0)
+            RendererBackend.CPU -> setRendererMode(1)
+            RendererBackend.GPU -> setRendererMode(2)
         }
     }
 
     override fun getRendererBackend(): RendererBackend {
         return when (getRendererMode()) {
-            0 -> RendererBackend.CPU
-            1 -> RendererBackend.GPU
-            else -> RendererBackend.AUTO
+            0 -> RendererBackend.AUTO
+            1 -> RendererBackend.CPU
+            else -> RendererBackend.GPU
         }
     }
 

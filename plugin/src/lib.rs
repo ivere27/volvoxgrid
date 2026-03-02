@@ -2219,7 +2219,10 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         let mut gpu_font_count_applied: usize = 0;
         #[cfg(feature = "gpu")]
         let mut last_surface_handle: i64 = 0;
+        #[cfg(feature = "gpu")]
+        let mut last_present_mode: i32 = -1;
         let mut last_fling_tick: Option<std::time::Instant> = None;
+        let mut last_mem_calc: HashMap<i64, Instant> = HashMap::new();
         let mut zoom_sessions: HashMap<i64, ZoomGestureState> = HashMap::new();
 
         while let Some(input) = stream.recv() {
@@ -2291,10 +2294,19 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                         grid.debug_zoom_level = self.current_zoom_scale(grid_id);
 
+                        if grid.debug_overlay
+                            && last_mem_calc
+                                .get(&grid_id)
+                                .map_or(true, |t| now.duration_since(*t) >= Duration::from_secs(10))
+                        {
+                            grid.debug_total_mem_bytes = grid.heap_size_bytes() as i64;
+                            last_mem_calc.insert(grid_id, now);
+                        }
+
                         let frame_start = std::time::Instant::now();
 
                         #[cfg(feature = "gpu")]
-                        if grid.renderer_mode >= 1 {
+                        if grid.renderer_mode >= 2 {
                             let preferred_backends = match grid.renderer_mode {
                                 3 => Some(wgpu::Backends::VULKAN),
                                 4 => Some(wgpu::Backends::GL),
@@ -2323,16 +2335,19 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                         gpu_renderer = Some(gr);
                                     }
                                     Err(_e) => {
-                                        grid.renderer_mode = 0;
+                                        grid.renderer_mode = 1;
                                     }
                                 }
                             }
                             if let Some(gr) = gpu_renderer.as_mut() {
                                 self.sync_fonts_into_gpu_renderer(gr, &mut gpu_font_count_applied);
-                                grid.debug_renderer_actual = 1;
+                                grid.debug_renderer_actual = RendererMode::RendererGpu as i32;
                                 grid.debug_gpu_backend = gr.backend_name();
+                                grid.debug_gpu_present_mode = gr.present_mode_name();
+                                grid.debug_text_cache_len = gr.text_cache_len() as i32;
                                 let (dx, dy, dw, dh) =
                                     gr.render_to_buffer(grid, buffer, width, height, stride);
+                                grid.debug_instance_count = gr.instance_count() as i32;
                                 let elapsed = frame_start.elapsed().as_secs_f32() * 1000.0;
                                 grid.debug_frame_time_ms = elapsed;
                                 grid.debug_fps =
@@ -2342,7 +2357,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             }
                         }
 
-                        grid.debug_renderer_actual = 0;
+                        grid.debug_renderer_actual = RendererMode::RendererCpu as i32;
+                        grid.debug_text_cache_len = grid.text_engine.as_ref().map_or(0, |te| te.layout_cache_len() as i32);
                         let r =
                             renderer.get_or_insert_with(volvoxgrid_engine::render::Renderer::new);
                         let desired_text_registration =
@@ -2365,6 +2381,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         }
                         self.sync_fonts_into_renderer(r, &mut cpu_font_count_applied);
                         let (dx, dy, dw, dh) = r.render(grid, buffer, width, height, stride);
+                        grid.debug_text_cache_len = r.text_cache_len() as i32;
                         let elapsed = frame_start.elapsed().as_secs_f32() * 1000.0;
                         grid.debug_frame_time_ms = elapsed;
                         grid.debug_fps = grid.debug_fps * 0.9 + (1000.0 / elapsed.max(0.1)) * 0.1;
@@ -2473,7 +2490,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             }
                             Err(_e) => {
                                 let _ = self.manager().with_grid(grid_id, |grid| {
-                                    grid.renderer_mode = 0;
+                                    grid.renderer_mode = 1; // CPU fallback
                                 });
                                 stream.send(RenderOutput {
                                     rendered: false,
@@ -2491,20 +2508,23 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                     let gr = gpu_renderer.as_mut().unwrap();
 
-                    // Configure surface if handle changed or surface not yet set up
-                    if handle != last_surface_handle || !gr.has_surface() {
+                    // Configure surface if handle changed, present mode changed, or surface not yet set up
+                    let requested_pm = self.manager().with_grid(grid_id, |grid| grid.present_mode).unwrap_or(0);
+                    if handle != last_surface_handle || !gr.has_surface() || requested_pm != last_present_mode {
                         let configure_result = pollster_block(unsafe {
                             gr.configure_surface_from_raw_handle(
                                 handle as *mut std::ffi::c_void,
                                 width as u32,
                                 height as u32,
+                                requested_pm,
                             )
                         });
                         if let Err(_e) = configure_result {
                             let _ = self.manager().with_grid(grid_id, |grid| {
-                                grid.renderer_mode = 0;
+                                grid.renderer_mode = 1; // CPU fallback
                             });
                             last_surface_handle = 0;
+                            last_present_mode = -1;
                             stream.send(RenderOutput {
                                 rendered: false,
                                 event: Some(render_output::Event::GpuFrameDone(GpuFrameDone {
@@ -2517,12 +2537,17 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             continue;
                         }
                         last_surface_handle = handle;
+                        last_present_mode = requested_pm;
                     } else {
-                        // Same handle, just resize if needed
+                        // Same handle and present mode, just resize if needed
                         gr.resize_surface(width as u32, height as u32);
                     }
 
                     self.sync_fonts_into_gpu_renderer(gr, &mut gpu_font_count_applied);
+
+                    let gr_backend_name = gr.backend_name();
+                    let gr_present_mode_name = gr.present_mode_name();
+                    let gr_text_cache_len = gr.text_cache_len() as i32;
 
                     let result = self.manager().with_grid(grid_id, |grid| {
                         if !grid.layout.valid {
@@ -2552,12 +2577,25 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                         grid.debug_zoom_level = self.current_zoom_scale(grid_id);
 
+                        if grid.debug_overlay
+                            && last_mem_calc
+                                .get(&grid_id)
+                                .map_or(true, |t| now.duration_since(*t) >= Duration::from_secs(10))
+                        {
+                            grid.debug_total_mem_bytes = grid.heap_size_bytes() as i64;
+                            last_mem_calc.insert(grid_id, now);
+                        }
+
+                        grid.debug_text_cache_len = gr_text_cache_len;
+
                         let frame_start = std::time::Instant::now();
 
-                        grid.debug_renderer_actual = 1;
-                        grid.debug_gpu_backend = gr.backend_name();
+                        grid.debug_renderer_actual = RendererMode::RendererGpu as i32;
+                        grid.debug_gpu_backend = gr_backend_name;
+                        grid.debug_gpu_present_mode = gr_present_mode_name;
                         let (dx, dy, dw, dh) =
                             gr.render_to_surface(grid, width, height);
+                        grid.debug_instance_count = gr.instance_count() as i32;
                         let elapsed = frame_start.elapsed().as_secs_f32() * 1000.0;
                         grid.debug_frame_time_ms = elapsed;
                         grid.debug_fps = grid.debug_fps * 0.9 + (1000.0 / elapsed.max(0.1)) * 0.1;

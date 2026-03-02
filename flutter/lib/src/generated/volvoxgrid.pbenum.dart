@@ -779,21 +779,21 @@ class CheckedState extends $pb.ProtobufEnum {
 }
 
 class RendererMode extends $pb.ProtobufEnum {
-  static const RendererMode RENDERER_CPU =
-      RendererMode._(0, _omitEnumNames ? '' : 'RENDERER_CPU');
-  static const RendererMode RENDERER_GPU =
-      RendererMode._(1, _omitEnumNames ? '' : 'RENDERER_GPU');
   static const RendererMode RENDERER_AUTO =
-      RendererMode._(2, _omitEnumNames ? '' : 'RENDERER_AUTO');
+      RendererMode._(0, _omitEnumNames ? '' : 'RENDERER_AUTO');
+  static const RendererMode RENDERER_CPU =
+      RendererMode._(1, _omitEnumNames ? '' : 'RENDERER_CPU');
+  static const RendererMode RENDERER_GPU =
+      RendererMode._(2, _omitEnumNames ? '' : 'RENDERER_GPU');
   static const RendererMode RENDERER_GPU_VULKAN =
       RendererMode._(3, _omitEnumNames ? '' : 'RENDERER_GPU_VULKAN');
   static const RendererMode RENDERER_GPU_GLES =
       RendererMode._(4, _omitEnumNames ? '' : 'RENDERER_GPU_GLES');
 
   static const $core.List<RendererMode> values = <RendererMode>[
+    RENDERER_AUTO,
     RENDERER_CPU,
     RENDERER_GPU,
-    RENDERER_AUTO,
     RENDERER_GPU_VULKAN,
     RENDERER_GPU_GLES,
   ];
@@ -804,6 +804,31 @@ class RendererMode extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const RendererMode._(super.value, super.name);
+}
+
+class PresentMode extends $pb.ProtobufEnum {
+  static const PresentMode PRESENT_AUTO =
+      PresentMode._(0, _omitEnumNames ? '' : 'PRESENT_AUTO');
+  static const PresentMode PRESENT_FIFO =
+      PresentMode._(1, _omitEnumNames ? '' : 'PRESENT_FIFO');
+  static const PresentMode PRESENT_MAILBOX =
+      PresentMode._(2, _omitEnumNames ? '' : 'PRESENT_MAILBOX');
+  static const PresentMode PRESENT_IMMEDIATE =
+      PresentMode._(3, _omitEnumNames ? '' : 'PRESENT_IMMEDIATE');
+
+  static const $core.List<PresentMode> values = <PresentMode>[
+    PRESENT_AUTO,
+    PRESENT_FIFO,
+    PRESENT_MAILBOX,
+    PRESENT_IMMEDIATE,
+  ];
+
+  static final $core.List<PresentMode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static PresentMode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const PresentMode._(super.value, super.name);
 }
 
 /// Structural pin — row moves to pinned section

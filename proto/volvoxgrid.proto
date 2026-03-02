@@ -228,11 +228,18 @@ enum CheckedState {
 }
 
 enum RendererMode {
-  RENDERER_CPU  = 0;
-  RENDERER_GPU  = 1; // Default GPU (GLES on Android, All on others)
-  RENDERER_AUTO = 2;
+  RENDERER_AUTO       = 0;  // Engine picks (CPU fallback if GPU unavailable)
+  RENDERER_CPU        = 1;
+  RENDERER_GPU        = 2;  // Default GPU (GLES on Android, All on others)
   RENDERER_GPU_VULKAN = 3;
   RENDERER_GPU_GLES   = 4;
+}
+
+enum PresentMode {
+  PRESENT_AUTO      = 0;  // Engine picks (Fifo by default)
+  PRESENT_FIFO      = 1;  // VSync — power-efficient, capped at refresh rate
+  PRESENT_MAILBOX   = 2;  // Low-latency — uncapped, drops stale frames
+  PRESENT_IMMEDIATE = 3;  // No VSync — lowest latency, tearing possible
 }
 
 // Structural pin — row moves to pinned section
@@ -624,11 +631,12 @@ message InteractionConfig {
 }
 
 message RenderConfig {
-  optional RendererMode renderer_mode       = 1;
-  optional bool         debug_overlay       = 2;
-  optional bool         animation_enabled   = 3;
+  optional RendererMode renderer_mode         = 1;
+  optional bool         debug_overlay         = 2;
+  optional bool         animation_enabled     = 3;
   optional int32        animation_duration_ms = 4;
   optional int32        text_layout_cache_cap = 5;
+  optional PresentMode  present_mode          = 6;
 }
 
 // ═══════════════════════════════════════════════════════════

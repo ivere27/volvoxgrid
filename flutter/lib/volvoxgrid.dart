@@ -143,9 +143,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   /// Focus node for keyboard events on the grid itself.
   final FocusNode _gridFocusNode = FocusNode();
+  int? _lastGpuTextureId;
 
   /// Touch-scroll gesture tracking.
-  static const double _touchScrollLinePx = 24.0;
+  static const double _defaultTouchScrollUnitPx = 24.0;
   static const double _touchScrollGain = 1.0;
   static const int _largeGridGesturePreviewRows = 0x7fffffff;
   static const double _zoomStepNoiseEpsilon = 0.001;
@@ -187,6 +188,9 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   /// Current selection row/col for context menu.
   int _selRow = -1;
   int _selCol = -1;
+  int _selRangesHash = -1;
+
+  double _touchScrollUnitPx = _defaultTouchScrollUnitPx;
 
   /// Long-press context menu timer (for touch devices).
   Timer? _longPressTimer;
@@ -233,6 +237,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       oldWidget.controller.removeListener(_onControllerChanged);
       widget.controller.addListener(_onControllerChanged);
       _closeEventStream();
+      _lastGpuTextureId = null;
       _knownRowsGridId = Int64.ZERO;
       _knownRows = 0;
       _gesturePreviewActive = false;
@@ -240,6 +245,13 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       _gesturePreviewPan = Offset.zero;
       _gesturePreviewFocal = Offset.zero;
       _clearGesturePreviewOnNextFrame = false;
+      _syncEventStreamSubscription();
+      if (widget.controller.isCreated &&
+          _viewportWidth > 0 &&
+          _viewportHeight > 0) {
+        _ensureRenderSession();
+        _requestRender();
+      }
     }
     if (oldWidget.onGridEvent != widget.onGridEvent ||
         oldWidget.onCustomRenderCell != widget.onCustomRenderCell ||
@@ -253,8 +265,29 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     if (!mounted) {
       return;
     }
+    final gpuTextureId = widget.controller.gpuTextureId;
+    if (gpuTextureId != _lastGpuTextureId) {
+      _lastGpuTextureId = gpuTextureId;
+      // Backend/texture transitions can invalidate a pending frame signal.
+      // Reset gating so the new surface receives a fresh render request.
+      _pendingFrame = false;
+      _needsFollowupRender = false;
+      if (gpuTextureId != null && _viewportWidth > 0 && _viewportHeight > 0) {
+        unawaited(
+          widget.controller
+              .setGpuTextureSize(_viewportWidth, _viewportHeight)
+              .then((_) {
+            if (!mounted) {
+              return;
+            }
+            _requestRender();
+          }),
+        );
+      }
+    }
     _syncEventStreamSubscription();
     if (widget.controller.isCreated) {
+      _syncTouchScrollUnitBestEffort();
       _scheduleKnownRowsRefresh(force: true);
       _requestRender();
     }
@@ -560,6 +593,9 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     _viewportWidth = width;
     _viewportHeight = height;
     _ensureRenderSession();
+    if (widget.controller.gpuTextureId != null) {
+      unawaited(widget.controller.setGpuTextureSize(width, height));
+    }
     _resizeRenderBuffer(width, height);
     _sendViewport();
     _sendBufferReady();
@@ -567,6 +603,14 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   void _resizeRenderBuffer(int width, int height) {
     if (width <= 0 || height <= 0) {
+      return;
+    }
+    if (widget.controller.gpuTextureId != null) {
+      _bufferWidth = width;
+      _bufferHeight = height;
+      if (!_pendingFrame) {
+        _releaseCpuRenderBuffersForGpuMode();
+      }
       return;
     }
     if (_pixelBuffer != null &&
@@ -596,6 +640,21 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     _pixelBuffer = malloc<ffi.Uint8>(_bufferSize);
   }
 
+  void _releaseCpuRenderBuffersForGpuMode() {
+    final buffer = _pixelBuffer;
+    if (buffer != null) {
+      malloc.free(buffer);
+      _pixelBuffer = null;
+    }
+    for (final stale in _stalePixelBuffers) {
+      malloc.free(stale);
+    }
+    _stalePixelBuffers.clear();
+    _decodeScratch = null;
+    _bufferStride = 0;
+    _bufferSize = 0;
+  }
+
   void _freeRenderBuffer() {
     final buffer = _pixelBuffer;
     if (buffer != null) {
@@ -614,6 +673,27 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   }
 
   void _sendBufferReady() {
+    final textureId = widget.controller.gpuTextureId;
+    final surfaceHandle = widget.controller.gpuSurfaceHandle;
+
+    if (textureId != null && surfaceHandle != null) {
+      if (_pendingFrame) {
+        _needsFollowupRender = true;
+        return;
+      }
+      _releaseCpuRenderBuffersForGpuMode();
+      _pendingFrame = true;
+      _sendInput(
+        pb.RenderInput()
+          ..gpuSurface = (pb.GpuSurfaceReady()
+            ..surfaceHandle = Int64(surfaceHandle)
+            ..width = _bufferWidth
+            ..height = _bufferHeight),
+        tracksBufferReady: true,
+      );
+      return;
+    }
+
     final buffer = _pixelBuffer;
     if (buffer == null || _inputController == null) {
       return;
@@ -648,18 +728,32 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     _sendBufferReady();
   }
 
-  void _queueScrollDelta(double deltaX, double deltaY) {
-    _queueScrollDeltaInternal(deltaX, deltaY, requestRender: true);
+  void _queueScrollDelta(
+    double deltaX,
+    double deltaY, {
+    bool immediate = false,
+  }) {
+    _queueScrollDeltaInternal(
+      deltaX,
+      deltaY,
+      requestRender: true,
+      immediate: immediate,
+    );
   }
 
   void _queueScrollDeltaInternal(
     double deltaX,
     double deltaY, {
     required bool requestRender,
+    bool immediate = false,
   }) {
     _pendingScrollDeltaX += deltaX;
     _pendingScrollDeltaY += deltaY;
     _pendingScrollNeedsRender = _pendingScrollNeedsRender || requestRender;
+    if (immediate) {
+      _flushQueuedScroll();
+      return;
+    }
     if (_scrollDispatchScheduled) {
       return;
     }
@@ -786,7 +880,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   // ── Render output handling ────────────────────────────────────────────────
 
   void _handleRenderOutput(pb.RenderOutput output) {
-    if (output.hasFrameDone()) {
+    if (output.hasFrameDone() || output.hasGpuFrameDone()) {
       _pendingFrame = false;
       // Free stale pixel buffers now that the in-flight render has completed
       // and the native thread is no longer writing to them.
@@ -806,14 +900,35 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
         output.hasFrameDone() &&
         output.frameDone.dirtyW > 0) {
       _decodeFrame(output.frameDone);
-    } else if (output.rendered && _clearGesturePreviewOnNextFrame) {
+    } else if (output.rendered &&
+        (output.hasFrameDone() || output.hasGpuFrameDone()) &&
+        _clearGesturePreviewOnNextFrame) {
       _clearGesturePreviewOnNextFrame = false;
       _stopGesturePreview();
     }
     if (output.hasSelection()) {
-      _selRow = output.selection.activeRow;
-      _selCol = output.selection.activeCol;
-      widget.onSelectionChanged?.call(output.selection);
+      final selection = output.selection;
+      final ranges = selection.ranges;
+      final rangeCount = ranges.length;
+      // Hash all ranges to detect changes in any range, not just the first.
+      var rangesHash = rangeCount;
+      for (final r in ranges) {
+        rangesHash = rangesHash * 31 + r.row1;
+        rangesHash = rangesHash * 31 + r.col1;
+        rangesHash = rangesHash * 31 + r.row2;
+        rangesHash = rangesHash * 31 + r.col2;
+      }
+      final changed = _selRow != selection.activeRow ||
+          _selCol != selection.activeCol ||
+          _selRangesHash != rangesHash;
+
+      _selRow = selection.activeRow;
+      _selCol = selection.activeCol;
+      _selRangesHash = rangesHash;
+
+      if (changed) {
+        widget.onSelectionChanged?.call(selection);
+      }
     }
     if (output.hasEditRequest() && output.editRequest.width > 0) {
       _showEditOverlay(output.editRequest);
@@ -925,6 +1040,11 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   }
 
   Widget _buildSurface(BoxConstraints constraints) {
+    final textureId = widget.controller.gpuTextureId;
+    if (textureId != null) {
+      return Texture(textureId: textureId);
+    }
+
     if (_currentImage != null) {
       return RawImage(
         image: _currentImage,
@@ -932,10 +1052,6 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
         scale: _devicePixelRatio,
         filterQuality: FilterQuality.none,
       );
-    }
-
-    if (_fallbackCells.isNotEmpty) {
-      return _FallbackGridTable(cells: _fallbackCells);
     }
 
     return Stack(
@@ -1004,6 +1120,9 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   void _onPointerDown(PointerDownEvent event) {
     _gridFocusNode.requestFocus();
+    if (event.kind == PointerDeviceKind.touch) {
+      _syncTouchScrollUnitBestEffort();
+    }
 
     // Right-click detection (mouse button 2) -- show context menu.
     if (event.kind != PointerDeviceKind.touch && (event.buttons & 0x02) != 0) {
@@ -1143,8 +1262,9 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
               ..modifier = _modifiers()),
         );
         _queueScrollDelta(
-          (-dx / _touchScrollLinePx) * _touchScrollGain,
-          (-dy / _touchScrollLinePx) * _touchScrollGain,
+          (-dx / _touchScrollUnitPx) * _touchScrollGain,
+          (-dy / _touchScrollUnitPx) * _touchScrollGain,
+          immediate: true,
         );
       } else {
         final dpr = _devicePixelRatio <= 0 ? 1.0 : _devicePixelRatio;
@@ -1218,8 +1338,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   void _onPointerSignal(PointerSignalEvent event) {
     if (event is PointerScrollEvent) {
       _queueScrollDelta(
-        (event.scrollDelta.dx / _touchScrollLinePx) * _touchScrollGain,
-        (event.scrollDelta.dy / _touchScrollLinePx) * _touchScrollGain,
+        (event.scrollDelta.dx / _touchScrollUnitPx) * _touchScrollGain,
+        (event.scrollDelta.dy / _touchScrollUnitPx) * _touchScrollGain,
       );
     }
   }
@@ -1303,9 +1423,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     final panDy = metrics.center.dy - _pinchLastCenter.dy;
     if (panDx != 0 || panDy != 0) {
       _queueScrollDeltaInternal(
-        (-panDx / _touchScrollLinePx) * _touchScrollGain,
-        (-panDy / _touchScrollLinePx) * _touchScrollGain,
+        (-panDx / _touchScrollUnitPx) * _touchScrollGain,
+        (-panDy / _touchScrollUnitPx) * _touchScrollGain,
         requestRender: !_gesturePreviewActive,
+        immediate: true,
       );
     }
     var scaleDeltaForPreview = 1.0;
@@ -1362,9 +1483,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   void _onPointerPanZoomUpdate(PointerPanZoomUpdateEvent event) {
     _queueScrollDeltaInternal(
-      (-event.panDelta.dx / _touchScrollLinePx) * _touchScrollGain,
-      (-event.panDelta.dy / _touchScrollLinePx) * _touchScrollGain,
+      (-event.panDelta.dx / _touchScrollUnitPx) * _touchScrollGain,
+      (-event.panDelta.dy / _touchScrollUnitPx) * _touchScrollGain,
       requestRender: !_gesturePreviewActive,
+      immediate: true,
     );
     final nextScale = event.scale;
     if (nextScale.isFinite && nextScale > 0) {
@@ -1580,6 +1702,27 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     }
     return defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS;
+  }
+
+  void _syncTouchScrollUnitBestEffort() {
+    unawaited(_loadTouchScrollUnit());
+  }
+
+  Future<void> _loadTouchScrollUnit() async {
+    if (!widget.controller.isCreated) {
+      return;
+    }
+    try {
+      final rowHeight = await widget.controller.getRowHeight(0);
+      if (!mounted) {
+        return;
+      }
+      if (rowHeight > 0) {
+        _touchScrollUnitPx = rowHeight.toDouble();
+      }
+    } catch (_) {
+      // Keep the current/default touch scroll unit on lookup failures.
+    }
   }
 
   void _startGesturePreview(Offset focal) {
