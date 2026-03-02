@@ -11,6 +11,7 @@ flutter/example/build/
 flutter/example/android/build/
 flutter/linux/flutter/ephemeral/
 flutter/android/src/main/jniLibs/
+flutter/ios/Frameworks/
 flutter/macos/build/
 flutter/windows/build/
 flutter/macos/x64/

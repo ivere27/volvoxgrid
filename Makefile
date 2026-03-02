@@ -112,6 +112,11 @@ MAVEN_SETTINGS ?= $(CURRENT_DIR)/.maven-settings.xml
 MAVEN_REPO_URL ?= https://central.sonatype.com/api/v1/publisher/upload
 MAVEN_LOCAL_REPO ?= $(HOME)/.m2/repository
 
+# iOS SPM publishing
+IOS_XCFRAMEWORK_DIR := dist/ios/VolvoxGridPlugin.xcframework
+IOS_XCFRAMEWORK_ZIP := dist/ios/VolvoxGridPlugin.xcframework.zip
+IOS_GITHUB_REPO ?= ivere27/volvoxgrid
+
 ifeq ($(VOLVOXGRID_SOURCE_RESOLVED),maven)
 ANDROID_INSTALL_PREREQ :=
 ANDROID_INSTALL_RELEASE_PREREQ :=
@@ -158,7 +163,7 @@ endif
         vsflexgrid vsflexgrid-release \
         docker_android_aar_image docker_android_aar docker_desktop_jar_image docker_desktop_jar \
         docker_ios_image docker_ios docker_all_image docker_all publish_maven \
-        publish_local \
+        publish_local publish_github \
         gtk-test clean clean-all help
 
 # =============================================================================
@@ -219,6 +224,7 @@ help:
 	@echo "  docker_all_image          Build unified Docker image (all toolchains)"
 	@echo "  docker_all                Build all platform artifacts via unified Docker image"
 	@echo "  publish_maven             Upload Android AAR + Android lite AAR + desktop JAR to Maven Central"
+	@echo "  publish_github            Upload all artifacts (xcframework, AAR, JAR) to GitHub release"
 	@echo "  publish_local             Install built SNAPSHOT artifacts from dist/maven into ~/.m2/repository"
 	@echo ""
 	@echo "Example dependency source flags (default is local):"
@@ -1001,6 +1007,40 @@ publish_local:
 		exit 1; \
 	fi; \
 	echo "Installed $$INSTALLED SNAPSHOT artifact bundle(s) into $$LOCAL_REPO"
+
+publish_github:
+	@command -v gh >/dev/null 2>&1 || { echo "Error: gh (GitHub CLI) not found in PATH."; exit 1; }
+	@TAG="v$(VOLVOXGRID_VERSION)"; \
+	echo "Creating/updating GitHub release $$TAG..."; \
+	gh release view "$$TAG" --repo "$(IOS_GITHUB_REPO)" >/dev/null 2>&1 || \
+		gh release create "$$TAG" --repo "$(IOS_GITHUB_REPO)" --title "$$TAG" --notes "Release $$TAG"; \
+	if [ -d "$(IOS_XCFRAMEWORK_DIR)" ]; then \
+		echo "Zipping XCFramework..."; \
+		cd dist/ios && rm -f VolvoxGridPlugin.xcframework.zip && \
+			zip -r VolvoxGridPlugin.xcframework.zip VolvoxGridPlugin.xcframework/; \
+		cd "$(CURRENT_DIR)"; \
+		CHECKSUM=$$(swift package compute-checksum "$(IOS_XCFRAMEWORK_ZIP)" 2>/dev/null || shasum -a 256 "$(IOS_XCFRAMEWORK_ZIP)" | cut -d' ' -f1); \
+		echo "Checksum: $$CHECKSUM"; \
+		gh release upload "$$TAG" "$(IOS_XCFRAMEWORK_ZIP)" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+		echo "Updating Package.swift..."; \
+		URL="https://github.com/$(IOS_GITHUB_REPO)/releases/download/$$TAG/VolvoxGridPlugin.xcframework.zip"; \
+		printf '// swift-tools-version:5.9\nimport PackageDescription\n\nlet package = Package(\n    name: "VolvoxGrid",\n    products: [\n        .library(name: "VolvoxGrid", targets: ["VolvoxGridPlugin"]),\n    ],\n    targets: [\n        .binaryTarget(\n            name: "VolvoxGridPlugin",\n            url: "%s",\n            checksum: "%s"\n        ),\n    ]\n)\n' "$$URL" "$$CHECKSUM" > Package.swift; \
+		echo "XCFramework uploaded, Package.swift updated."; \
+	else \
+		echo "Skip iOS: $(IOS_XCFRAMEWORK_DIR) not found."; \
+	fi; \
+	DIST="$(CURRENT_DIR)/dist/maven"; \
+	for f in \
+	  "$$DIST/$(AAR_ARTIFACT_ID)-$(AAR_VERSION).aar" \
+	  "$$DIST/$(AAR_LITE_ARTIFACT_ID)-$(AAR_VERSION).aar" \
+	  "$$DIST/$(DESKTOP_ARTIFACT_ID)-$(DESKTOP_VERSION).jar"; \
+	do \
+	  if [ -f "$$f" ]; then \
+	    echo "Uploading $$(basename $$f) to $$TAG..."; \
+	    gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+	  fi; \
+	done; \
+	echo "All artifacts uploaded to $$TAG"
 
 # =============================================================================
 # Flutter
