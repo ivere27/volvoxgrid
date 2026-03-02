@@ -22,6 +22,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ADAPTER_DIR="$SCRIPT_DIR"
 OUT_DIR="$ROOT_DIR/target/sfdatagrid/compare"
 COMPARE_LOG="$OUT_DIR/compare_output.log"
+PUBSPEC_OVERRIDES_FILE="$ADAPTER_DIR/pubspec_overrides.yaml"
 
 NO_HTML=0
 NO_DIFF=0
@@ -37,6 +38,38 @@ FFI_STYLE_CYCLES="${VOLVOXGRID_COMPARE_FFI_STYLE_CYCLES:-10}"
 FFI_HOOK_CYCLES="${VOLVOXGRID_COMPARE_FFI_HOOK_CYCLES:-8}"
 FFI_CLEANUP_CYCLES="${VOLVOXGRID_COMPARE_FFI_CLEANUP_CYCLES:-6}"
 FFI_FINAL_CYCLES="${VOLVOXGRID_COMPARE_FFI_FINAL_CYCLES:-4}"
+TEMP_OVERRIDES_CREATED=0
+CASES_DEST=""
+GENERATED_TEST=""
+
+cleanup_generated() {
+    if [ -n "$CASES_DEST" ]; then
+        rm -rf "$CASES_DEST"
+    fi
+    if [ -n "$GENERATED_TEST" ]; then
+        rm -f "$GENERATED_TEST"
+    fi
+    if [ "$TEMP_OVERRIDES_CREATED" -eq 1 ]; then
+        rm -f "$PUBSPEC_OVERRIDES_FILE"
+    fi
+}
+trap cleanup_generated EXIT
+
+ensure_local_pubspec_override() {
+    if [ -f "$PUBSPEC_OVERRIDES_FILE" ]; then
+        return
+    fi
+    if [ ! -f "$ROOT_DIR/flutter/pubspec.yaml" ]; then
+        return
+    fi
+    cat > "$PUBSPEC_OVERRIDES_FILE" << 'EOF'
+dependency_overrides:
+  volvoxgrid:
+    path: ../../flutter
+EOF
+    TEMP_OVERRIDES_CREATED=1
+    echo "  Added temporary local override (volvoxgrid -> ../../flutter)."
+}
 
 parse_non_negative_int() {
     local value="$1"
@@ -175,6 +208,7 @@ fi
 
 # ── Resolve dependencies ───────────────────────────────────────────
 echo "[2/6] Resolving adapter dependencies..."
+ensure_local_pubspec_override
 if [ "$SKIP_PUB_GET" -eq 1 ]; then
     echo "  Skipped (--skip-pub-get)."
 else
@@ -184,10 +218,14 @@ else
     fi
 
     if [ "$SHOULD_PUB_GET" -eq 1 ]; then
-        (
+        if ! (
           cd "$ADAPTER_DIR"
           flutter pub get >/dev/null 2>&1
-        )
+        ); then
+          echo "ERROR: flutter pub get failed in $ADAPTER_DIR"
+          echo "  Try: (cd $ADAPTER_DIR && flutter pub get)"
+          exit 1
+        fi
         echo "  Done."
     else
         echo "  Skipped (pubspec.lock is up to date)."
@@ -199,11 +237,6 @@ echo "[3/6] Generating test runner..."
 CASES_DEST="$ADAPTER_DIR/test/sfdatagrid_cases"
 GENERATED_TEST="$ADAPTER_DIR/test/sfdatagrid_compare_test.dart"
 SCRIPTS_JSON="$OUT_DIR/scripts.json"
-
-cleanup_generated() {
-    rm -rf "$CASES_DEST" "$GENERATED_TEST"
-}
-trap cleanup_generated EXIT
 
 mkdir -p "$CASES_DEST/cases"
 cp "$SCRIPT_DIR/test/common.dart" "$CASES_DEST/"

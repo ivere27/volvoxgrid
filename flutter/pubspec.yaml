@@ -28,6 +28,8 @@ flutter:
         package: io.github.ivere27.volvoxgrid
         ffiPlugin: true
         pluginClass: VolvoxGridPlugin
+      ios:
+        ffiPlugin: true
       linux:
         ffiPlugin: true
       macos:
