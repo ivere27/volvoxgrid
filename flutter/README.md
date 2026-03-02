@@ -1,31 +1,41 @@
-# volvoxgrid
+# VolvoxGrid for Flutter
 
-VolvoxGrid is a high-performance, pixel-rendered data grid for Flutter.
+A high-performance, pixel-rendered data grid widget for Flutter. The native Rust engine renders directly to pixel buffers via FFI, supporting touch gestures, cell editing, sorting, merged cells, and more.
 
-This package provides:
+## Supported Platforms
 
-- `VolvoxGridWidget`: renders the native grid surface
-- `VolvoxGridController`: high-level async grid API
-- `volvoxgrid_ffi.dart`: full generated FFI/protobuf API surface
+| Platform | Native Library | Source |
+|---|---|---|
+| Android | `libvolvoxgrid_plugin.so` (AAR) | Maven (`volvoxgrid-android`) |
+| Linux | `libvolvoxgrid_plugin.so` (JAR) | Maven (`volvoxgrid-desktop`) |
+| macOS | `libvolvoxgrid_plugin.dylib` (JAR) | Maven (`volvoxgrid-desktop`) |
+| Windows | `volvoxgrid_plugin.dll` (JAR) | Maven (`volvoxgrid-desktop`) |
 
-## Supported platforms
-
-- Android
-- Linux
+**Requirements:** Flutter 3.10+, Dart SDK 3.0+, Android API 21+ (for Android)
 
 ## Installation
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.1.0
+  volvoxgrid: ^0.1.4
 ```
 
-## Quick start
+Native binaries are resolved automatically from Maven Central at build time. No manual downloads required.
+
+### Native Library Resolution
+
+By default, `VOLVOXGRID_SOURCE=maven` pulls pre-built binaries from Maven Central. For local development builds, set `VOLVOXGRID_SOURCE=local` and ensure the native library is available in `target/release/`.
+
+| Variable | Default | Description |
+|---|---|---|
+| `VOLVOXGRID_SOURCE` | `maven` | `maven` or `local` |
+| `VOLVOXGRID_VERSION` | `0.1.4` | Maven artifact version |
+
+## Quick Start
 
 ```dart
 import 'package:flutter/material.dart';
 import 'package:volvoxgrid/volvoxgrid.dart';
-import 'package:volvoxgrid/volvoxgrid_ffi.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,11 +60,17 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _initGrid() async {
-    await controller.create(rows: 50, cols: 5, fixedRows: 1);
+    await controller.create(rows: 100, cols: 5, fixedRows: 1);
+
+    // Set headers
     await controller.setTextMatrix(0, 0, 'Name');
-    await controller.setTextMatrix(0, 1, 'Role');
-    await controller.setTextMatrix(1, 0, 'Alice');
-    await controller.setTextMatrix(1, 1, 'Engineer');
+    await controller.setTextMatrix(0, 1, 'Price');
+    await controller.setTextMatrix(0, 2, 'Qty');
+
+    // Set data
+    await controller.setTextMatrix(1, 0, 'Widget A');
+    await controller.setTextMatrix(1, 1, '29.99');
+    await controller.setTextMatrix(1, 2, '150');
   }
 
   @override
@@ -75,11 +91,351 @@ class _MyAppState extends State<MyApp> {
 }
 ```
 
-## Full API access
+## API Reference
 
-`VolvoxGridController` wraps common operations.
+### VolvoxGridWidget
 
-For the complete proto API, use generated classes in:
+The main Flutter widget. Renders the native grid surface and handles all input forwarding (touch, mouse, keyboard).
 
-- `package:volvoxgrid/volvoxgrid_ffi.dart`
+```dart
+VolvoxGridWidget(
+  controller: controller,
+  onSelectionChanged: (sel) {
+    print('Row: ${sel.activeRow}, Col: ${sel.activeCol}');
+  },
+  onGridEvent: (event) {
+    if (event.hasAfterSort()) { /* sort completed */ }
+    if (event.hasAfterEdit()) { /* cell edited */ }
+  },
+  onCancelableEvent: (event) {
+    // Return true to cancel BeforeEdit, ValidateEdit, or BeforeSort
+    return false;
+  },
+)
+```
 
+### VolvoxGridController
+
+High-level async API for grid operations. All calls cross an FFI boundary and return `Future`.
+
+#### Lifecycle
+
+```dart
+final controller = VolvoxGridController();
+
+// Create a grid
+await controller.create(
+  rows: 100,       // total rows (including fixed)
+  cols: 10,        // total columns (including fixed)
+  fixedRows: 1,    // frozen header rows
+  fixedCols: 0,    // frozen left columns
+);
+
+// Dispose when done
+controller.dispose();
+```
+
+#### Grid Dimensions
+
+```dart
+await controller.setRows(1000);
+await controller.setCols(20);
+await controller.setFixedRows(1);
+await controller.setFixedCols(2);
+await controller.setFrozenRows(3);
+await controller.setFrozenCols(1);
+
+int rows = await controller.getRows();
+int cols = await controller.getCols();
+```
+
+#### Cell Data
+
+```dart
+// Single cell
+await controller.setTextMatrix(row, col, 'text');
+String text = await controller.getTextMatrix(row, col);
+
+// Batch update
+await controller.setCells([
+  CellTextEntry(row: 0, col: 0, text: 'A'),
+  CellTextEntry(row: 0, col: 1, text: 'B'),
+  CellTextEntry(row: 1, col: 0, text: 'C'),
+]);
+
+// Fill a 2D matrix (auto-resizes grid if needed)
+await controller.setTableData([
+  ['Name', 'Price', 'Qty'],
+  ['Widget A', '29.99', '150'],
+  ['Widget B', '49.99', '200'],
+]);
+
+// Bulk load a row-major array
+await controller.loadArray(3, 2, ['a', 'b', 'c', 'd', 'e', 'f']);
+```
+
+#### Row & Column Sizing
+
+```dart
+await controller.setRowHeight(0, 40);
+await controller.setColWidth(0, 200);
+
+// Auto-fit column widths to content
+await controller.autoSize(colFrom: 0, colTo: 4, equal: false, maxWidth: 500);
+```
+
+#### Row & Column Operations
+
+```dart
+await controller.insertRows(5, count: 3);   // insert 3 rows at index 5
+await controller.removeRows(5, count: 3);    // remove 3 rows at index 5
+await controller.moveColumn(2, 0);           // move column 2 to position 0
+await controller.moveRow(10, 0);             // move row 10 to position 0
+```
+
+#### Sorting
+
+```dart
+// Single-column sort
+await controller.sort(SortOrder.SORT_GENERIC_ASCENDING, col: 0);
+
+// Multi-column sort
+await controller.sortMulti([
+  (0, SortOrder.SORT_STRING_ASC),
+  (1, SortOrder.SORT_NUMERIC_DESCENDING),
+]);
+
+// Show sort indicator on header
+await controller.setHeaderFeatures(HeaderFeatures.HEADER_SORT);
+```
+
+**SortOrder values:** `SORT_NONE`, `SORT_GENERIC_ASCENDING`, `SORT_GENERIC_DESCENDING`, `SORT_NUMERIC_ASCENDING`, `SORT_NUMERIC_DESCENDING`, `SORT_STRING_ASC`, `SORT_STRING_DESC`, `SORT_STRING_NO_CASE_ASC`, `SORT_STRING_NO_CASE_DESC`, `SORT_CUSTOM`
+
+#### Selection
+
+```dart
+// Set active cell
+await controller.setRow(5);
+await controller.setCol(2);
+
+// Select a range
+await controller.selectRange(1, 0, 5, 3);  // rowStart, colStart, rowEnd, colEnd
+
+// Get current selection
+SelectionState sel = await controller.getSelection();
+int row = sel.activeRow;
+int col = sel.activeCol;
+
+// Selection mode
+await controller.setSelectionMode(SelectionMode.BY_ROW);
+// Modes: FREE, BY_ROW, BY_COLUMN, LISTBOX, MULTI_RANGE
+
+// Scroll to make a cell visible
+await controller.showCell(10, 3);
+```
+
+#### Cell Merging
+
+```dart
+await controller.mergeCells(0, 0, 0, 3);     // merge row 0, cols 0-3
+await controller.unmergeCells(0, 0, 0, 3);
+CellRange range = await controller.getMergedRange(0, 0);
+MergedRegionsResponse regions = await controller.getMergedRegions();
+```
+
+#### Cell Spanning
+
+```dart
+await controller.setCellSpanMode(CellSpanMode.CELL_SPAN_BY_ROW);
+// Modes: CELL_SPAN_NONE, CELL_SPAN_FREE, CELL_SPAN_BY_ROW, CELL_SPAN_BY_COLUMN,
+//        CELL_SPAN_ADJACENT, CELL_SPAN_HEADER_ONLY, CELL_SPAN_SPILL, CELL_SPAN_GROUP
+
+// Enable spanning for specific columns/rows
+await controller.setSpanCol(0, true);
+await controller.setSpanRow(0, true);
+```
+
+#### Editing
+
+```dart
+await controller.setEditTrigger(EditTrigger.EDIT_TRIGGER_KEY_CLICK);
+// Modes: EDIT_TRIGGER_NONE, EDIT_TRIGGER_KEY, EDIT_TRIGGER_KEY_CLICK
+
+// Programmatic edit control
+await controller.commitEdit('new value');
+await controller.cancelEdit();
+
+// Column dropdown lists (pipe-delimited)
+await controller.setColDropdownItems(2, 'Option A|Option B|Option C');
+
+// Per-cell dropdown
+await controller.setCellDropdownItems(1, 2, 'Yes|No');
+```
+
+#### Styling
+
+```dart
+// Column alignment
+await controller.setColAlignment(1, Align.ALIGN_RIGHT_CENTER);
+// Values: ALIGN_LEFT_TOP, ALIGN_LEFT_CENTER, ALIGN_LEFT_BOTTOM,
+//         ALIGN_CENTER_TOP, ALIGN_CENTER_CENTER, ALIGN_CENTER_BOTTOM,
+//         ALIGN_RIGHT_TOP, ALIGN_RIGHT_CENTER, ALIGN_RIGHT_BOTTOM, ALIGN_GENERAL
+
+// Column data type and format
+await controller.setColDataType(1, ColumnDataType.NUMBER);
+await controller.setColFormat(1, '#,##0.00');
+
+// Apply style to a range
+await controller.setCellStyleRange(row1, col1, row2, col2, cellStyleOverride);
+
+// Global grid style
+StyleConfig style = await controller.getGridStyle();
+style
+  ..foreColor = 0xFF000000
+  ..fontSize = 14.0;
+await controller.setGridStyle(style);
+```
+
+#### Subtotals & Outlining
+
+```dart
+// Add subtotal rows grouped by column 0, aggregating column 2
+await controller.subtotal(
+  AggregateType.AGG_SUM,
+  groupOnCol: 0,
+  aggregateCol: 2,
+);
+// Aggregate types: AGG_SUM, AGG_COUNT, AGG_AVERAGE, AGG_MAX, AGG_MIN,
+//                  AGG_STD_DEV, AGG_VAR, AGG_PERCENT, AGG_CLEAR
+
+// Outline levels for tree-style grouping
+await controller.setRowOutlineLevel(5, 1);
+await controller.outline(2);                 // collapse to level 2
+await controller.setTreeIndicator(TreeIndicatorStyle.CONNECTORS);
+// Styles: TREE_INDICATOR_NONE, ARROWS, ARROWS_LEAF, CONNECTORS, CONNECTORS_LEAF
+```
+
+#### Clipboard
+
+```dart
+ClipboardResponse copied = await controller.copy();
+ClipboardResponse cut = await controller.cut();
+await controller.paste('tab\tseparated\nrows');
+await controller.deleteSelection();
+```
+
+#### Scrolling & Scrollbars
+
+```dart
+await controller.setTopRow(50);
+int top = await controller.getTopRow();
+await controller.setScrollBars(ScrollBarsMode.SCROLLBAR_BOTH);
+await controller.setFlingEnabled(true);      // momentum scrolling
+await controller.setFlingImpulseGain(80.0);
+await controller.setFlingFriction(0.9);
+await controller.setFastScrollEnabled(true); // fast scroll thumb
+```
+
+#### Pin & Sticky
+
+```dart
+await controller.pinRow(0, PinPosition.PIN_TOP);
+// Positions: PIN_NONE, PIN_TOP, PIN_BOTTOM
+
+await controller.setRowSticky(5, StickyEdge.STICKY_TOP);
+await controller.setColSticky(0, StickyEdge.STICKY_LEFT);
+// Edges: STICKY_NONE, STICKY_TOP, STICKY_BOTTOM, STICKY_LEFT, STICKY_RIGHT, STICKY_BOTH
+```
+
+#### Search
+
+```dart
+int row = await controller.findRowByText(
+  'Widget A',
+  col: 0,
+  startRow: 0,
+  caseSensitive: false,
+);
+
+int row2 = await controller.findRowByRegex(
+  r'^Widget.*',
+  col: 0,
+  startRow: 0,
+);
+```
+
+#### Aggregates
+
+```dart
+double sum = await controller.aggregate(
+  AggregateType.AGG_SUM, 1, 1, 100, 1,  // type, row1, col1, row2, col2
+);
+```
+
+#### Save & Load
+
+```dart
+ExportResponse exported = await controller.saveGrid(
+  format: ExportFormat.EXPORT_BINARY,
+);
+await controller.loadGrid(
+  exported.data,
+  format: ExportFormat.EXPORT_BINARY,
+);
+// Formats: EXPORT_BINARY, EXPORT_TSV, EXPORT_CSV, EXPORT_SPREADSHEET_ML
+```
+
+#### Rendering
+
+```dart
+// Renderer backend (Android GPU support)
+await controller.setRendererBackend(RendererBackend.cpu);
+// Backends: auto, cpu, gpu, vulkan, gles
+
+await controller.setDebugOverlay(true);
+await controller.setAnimationEnabled(true, durationMs: 250);
+await controller.setTextLayoutCacheCap(4096);
+
+// Batch updates: suspend redraw for performance
+await controller.withRedrawSuspended(() async {
+  // ... make many changes ...
+});
+
+await controller.refresh();   // force full repaint
+```
+
+**CPU mode (default):** The native engine renders into a shared RGBA pixel buffer. The Flutter widget copies this buffer and decodes it with `decodeImageFromPixels`, displaying the result via `RawImage`. This works on all platforms with no platform-specific setup.
+
+**GPU mode (Android only):** The engine renders directly into a Flutter platform texture, eliminating the pixel-copy step. `VolvoxGridController.setRendererBackend()` manages the texture lifecycle automatically.
+
+| Backend | Flutter Texture API | How it works |
+|---|---|---|
+| `RendererBackend.vulkan` | `createSurfaceProducer()` | SurfaceProducer is backed by `ImageReader` + `HardwareBuffer` under Flutter Impeller. wgpu's Vulkan backend renders into the `ANativeWindow`, and Impeller composites the `HardwareBuffer` via Vulkan -- both sides speak Vulkan natively. |
+| `RendererBackend.gles` | `createSurfaceTexture()` | `SurfaceTexture` is EGL-native. wgpu's GLES backend renders via an EGL window surface bound to the `SurfaceTexture`, and Flutter composites via the GL texture ID. |
+
+**GLES renders black screen on Impeller (Vulkan):** When Flutter's Impeller renderer uses Vulkan internally, `createSurfaceProducer()` is backed by `ImageReader`. wgpu's GLES backend renders via EGL to this surface, but the GLES-to-ImageReader-to-Vulkan cross-API composite fails silently, producing a black screen. This is why the plugin uses `createSurfaceTexture()` (the legacy API) for GLES -- `SurfaceTexture` is EGL-native and avoids the cross-API path. Vulkan mode works because both wgpu and Impeller speak Vulkan + `HardwareBuffer` natively.
+
+**Desktop (Linux/macOS/Windows):** GPU rendering is not yet available through Flutter's texture registry. CPU mode is used on all desktop platforms.
+
+#### Built-in Demos
+
+```dart
+await controller.loadDemo('sales');       // ~1000 rows with subtotals, merging, formats
+await controller.loadDemo('hierarchy');   // ~200 rows with tree outline
+await controller.loadDemo('stress');      // 1,000,000 rows for performance testing
+```
+
+## Full Proto API Access
+
+`VolvoxGridController` wraps common operations. For the complete proto API surface, use the generated FFI client directly:
+
+```dart
+import 'package:volvoxgrid/volvoxgrid_ffi.dart';
+
+// All generated protobuf messages and VolvoxGridServiceFfi are available.
+final resp = await VolvoxGridServiceFfi.GetConfig(handle);
+```
+
+## License
+
+[Apache License 2.0](../LICENSE)

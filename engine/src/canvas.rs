@@ -1685,7 +1685,7 @@ pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> (i32, i32, i
     canvas.end_overlay();
     render_scroll_bars(grid, canvas);
     render_fast_scroll(grid, canvas);
-    render_debug_overlay(grid, canvas);
+    render_debug_overlay(grid, canvas, &vp);
 
     (0, 0, w, h)
 }
@@ -4479,7 +4479,7 @@ fn render_fast_scroll<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
 // Layer 14 -- Debug overlay
 // ===========================================================================
 
-fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
+fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRange) {
     if !grid.debug_overlay {
         return;
     }
@@ -4497,20 +4497,16 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
 
     let mut lines: Vec<String> = Vec::new();
 
-    lines.push(format!(
-        "FPS: {:.1}  Frame: {:.1}ms  Zoom: {:.0}%  Render: {} x {}",
-        grid.debug_fps,
-        grid.debug_frame_time_ms,
-        grid.debug_zoom_level * 100.0,
-        buf_w,
-        buf_h,
-    ));
-
     let mode_str = match grid.renderer_mode {
         m if m == pb::RendererMode::RendererAuto as i32 => {
             if grid.debug_renderer_actual == pb::RendererMode::RendererGpu as i32 {
                 if !grid.debug_gpu_backend.is_empty() {
-                    format!("AUTO(GPU-{})", grid.debug_gpu_backend)
+                    let pm = if !grid.debug_gpu_present_mode.is_empty() {
+                        format!("-{}", grid.debug_gpu_present_mode)
+                    } else {
+                        "".to_string()
+                    };
+                    format!("AUTO(GPU-{}{})", grid.debug_gpu_backend, pm)
                 } else {
                     "AUTO(GPU)".to_string()
                 }
@@ -4518,28 +4514,70 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
                 "AUTO(CPU)".to_string()
             }
         }
-        m if m >= 1 => {
+        m if m >= pb::RendererMode::RendererGpu as i32 => {
             if !grid.debug_gpu_backend.is_empty() {
-                format!("GPU({})", grid.debug_gpu_backend)
+                let pm = if !grid.debug_gpu_present_mode.is_empty() {
+                    format!("-{}", grid.debug_gpu_present_mode)
+                } else {
+                    "".to_string()
+                };
+                format!("GPU({}{})", grid.debug_gpu_backend, pm)
             } else {
                 "GPU".to_string()
             }
         }
         _ => "CPU".to_string(),
     };
+
     lines.push(format!(
-        "Mode: {} | {} x {}",
+        "FPS: {:.1} | {:.1}ms | Q: {} | ID: {} | Z: {:.0}% | Res: {}x{}",
+        grid.debug_fps, grid.debug_frame_time_ms, grid.debug_instance_count, grid.id, grid.debug_zoom_level * 100.0, buf_w, buf_h,
+    ));
+
+    let status_str = if grid.dirty {
+        let mut reasons = Vec::new();
+        if grid.animation.active { reasons.push("ANIM".to_string()); }
+        if grid.background_loading { reasons.push("LOAD".to_string()); }
+        if grid.scroll.fling_active {
+            let vel = (grid.scroll.fling_vx.powi(2) + grid.scroll.fling_vy.powi(2)).sqrt();
+            reasons.push(format!("V:{:.0}", vel));
+        }
+        if reasons.is_empty() {
+            "DIRTY".to_string()
+        } else {
+            format!("DIRTY({})", reasons.join("+"))
+        }
+    } else {
+        "CLEAN".to_string()
+    };
+
+    lines.push(format!(
+        "Mode: {} | Grid: {}x{} | {}",
         mode_str,
         format_number(grid.rows),
         grid.cols,
+        status_str
     ));
 
-    let vp = VisibleRange::compute(grid, buf_w, buf_h);
     let visible_rows = vp.scroll_row_end - vp.scroll_row_start + grid.fixed_rows + grid.frozen_rows;
     let visible_cols = vp.scroll_col_end - vp.scroll_col_start + grid.fixed_cols + grid.frozen_cols;
+    let mem_mb = grid.debug_total_mem_bytes as f64 / 1024.0 / 1024.0;
+    let mem_str = if mem_mb >= 1.0 {
+        format!("{:.1}MB", mem_mb)
+    } else {
+        format!("{:.0}KB", grid.debug_total_mem_bytes as f64 / 1024.0)
+    };
+
     lines.push(format!(
-        "Visible: {} x {} | Scroll: ({}, {})",
-        visible_rows, visible_cols, grid.scroll.scroll_x as i32, grid.scroll.scroll_y as i32,
+        "Vis: {}x{}({}) | P: {},{} | M: {} | C: {}/{}",
+        visible_rows,
+        visible_cols,
+        visible_rows * visible_cols,
+        grid.scroll.scroll_x as i32,
+        grid.scroll.scroll_y as i32,
+        mem_str,
+        grid.debug_text_cache_len,
+        grid.text_layout_cache_cap,
     ));
 
     if !grid.sort_state.sort_keys.is_empty() {

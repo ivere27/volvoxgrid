@@ -9,6 +9,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 EXAMPLE_DIR="$ROOT_DIR/flutter/example"
+COMPARE_TARGET="$ROOT_DIR/adapters/sfdatagrid/tool/compare_sfdatagrid_linux.dart"
 OUT_DIR="$ROOT_DIR/target/sfdatagrid/compare"
 OUT_PNG="$OUT_DIR/linux_sfdatagrid_vs_volvoxgrid.png"
 RUN_LOG="$OUT_DIR/linux_capture_run.log"
@@ -24,6 +25,7 @@ command -v flutter >/dev/null 2>&1 || { echo "ERROR: flutter not found"; exit 1;
 command -v xvfb-run >/dev/null 2>&1 || { echo "ERROR: xvfb-run not found"; exit 1; }
 command -v import >/dev/null 2>&1 || { echo "ERROR: import (ImageMagick) not found"; exit 1; }
 command -v xwininfo >/dev/null 2>&1 || { echo "ERROR: xwininfo not found"; exit 1; }
+[ -f "$COMPARE_TARGET" ] || { echo "ERROR: compare target not found: $COMPARE_TARGET"; exit 1; }
 
 echo "[1/4] Resolving example dependencies..."
 (
@@ -36,7 +38,7 @@ echo "[2/4] Launching Linux compare window under Xvfb..."
 xvfb-run -a -s "-screen 0 ${XVFB_SCREEN}" bash -lc "
 set -euo pipefail
 cd '$EXAMPLE_DIR'
-flutter run -d linux -t lib/compare_sfdatagrid_linux.dart > '$RUN_LOG' 2>&1 &
+flutter run -d linux -t '$COMPARE_TARGET' > '$RUN_LOG' 2>&1 &
 APP_PID=\$!
 cleanup() {
   kill \$APP_PID >/dev/null 2>&1 || true

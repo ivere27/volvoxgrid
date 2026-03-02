@@ -1,7 +1,6 @@
 name: volvoxgrid_sfdatagrid
 description: SfDataGrid-compatible VIEW adapter for VolvoxGrid
 version: 0.1.0
-publish_to: none
 homepage: https://github.com/ivere27/volvoxgrid
 repository: https://github.com/ivere27/volvoxgrid/tree/main/adapters/sfdatagrid
 
@@ -12,11 +11,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  volvoxgrid:
-    path: ../../flutter
+  volvoxgrid: ^0.1.4
+  # Local monorepo override:
+  # volvoxgrid:
+  #   path: ../../flutter
+  syncfusion_flutter_datagrid: ^30.2.7 # Proprietary license — see https://www.syncfusion.com/products/communitylicense
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
 flutter:
+  uses-material-design: true

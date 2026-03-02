@@ -45,6 +45,7 @@ android {
 
     defaultConfig {
         minSdk = 21
+        consumerProguardFiles("consumer-rules.pro")
         buildConfigField("String", "VOLVOXGRID_VERSION", quoteForBuildConfig(volvoxgridVersion))
         buildConfigField("String", "VOLVOXGRID_GIT_COMMIT", quoteForBuildConfig(volvoxgridGitCommit))
         buildConfigField("String", "VOLVOXGRID_BUILD_DATE", quoteForBuildConfig(volvoxgridBuildDate))

@@ -19,7 +19,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-EXAMPLE_DIR="$ROOT_DIR/flutter/example"
+ADAPTER_DIR="$SCRIPT_DIR"
 OUT_DIR="$ROOT_DIR/target/sfdatagrid/compare"
 COMPARE_LOG="$OUT_DIR/compare_output.log"
 
@@ -174,18 +174,18 @@ if [ ! -f "$NATIVE_LIB_PATH" ]; then
 fi
 
 # ── Resolve dependencies ───────────────────────────────────────────
-echo "[2/6] Resolving example dependencies..."
+echo "[2/6] Resolving adapter dependencies..."
 if [ "$SKIP_PUB_GET" -eq 1 ]; then
     echo "  Skipped (--skip-pub-get)."
 else
     SHOULD_PUB_GET=0
-    if [ ! -f "$EXAMPLE_DIR/.dart_tool/package_config.json" ] || [ ! -f "$EXAMPLE_DIR/pubspec.lock" ] || [ "$EXAMPLE_DIR/pubspec.yaml" -nt "$EXAMPLE_DIR/pubspec.lock" ]; then
+    if [ ! -f "$ADAPTER_DIR/.dart_tool/package_config.json" ] || [ ! -f "$ADAPTER_DIR/pubspec.lock" ] || [ "$ADAPTER_DIR/pubspec.yaml" -nt "$ADAPTER_DIR/pubspec.lock" ]; then
         SHOULD_PUB_GET=1
     fi
 
     if [ "$SHOULD_PUB_GET" -eq 1 ]; then
         (
-          cd "$EXAMPLE_DIR"
+          cd "$ADAPTER_DIR"
           flutter pub get >/dev/null 2>&1
         )
         echo "  Done."
@@ -196,8 +196,8 @@ fi
 
 # ── Generate Test Runner ───────────────────────────────────────────
 echo "[3/6] Generating test runner..."
-CASES_DEST="$EXAMPLE_DIR/test/sfdatagrid_cases"
-GENERATED_TEST="$EXAMPLE_DIR/test/sfdatagrid_compare_test.dart"
+CASES_DEST="$ADAPTER_DIR/test/sfdatagrid_cases"
+GENERATED_TEST="$ADAPTER_DIR/test/sfdatagrid_compare_test.dart"
 SCRIPTS_JSON="$OUT_DIR/scripts.json"
 
 cleanup_generated() {
@@ -216,7 +216,7 @@ echo "  Done."
 echo "[4/6] Running capture test..."
 echo "  FFI speed config: sleep=${FFI_PUMP_SLEEP_MS}ms init/style/hook/cleanup/final=${FFI_INIT_CYCLES}/${FFI_STYLE_CYCLES}/${FFI_HOOK_CYCLES}/${FFI_CLEANUP_CYCLES}/${FFI_FINAL_CYCLES}"
 
-pushd "$EXAMPLE_DIR" >/dev/null
+pushd "$ADAPTER_DIR" >/dev/null
 set +e
 LD_LIBRARY_PATH="$NATIVE_LIB_DIR" \
   CAPTURE_COMPARE_OUT="$OUT_DIR" \
@@ -249,6 +249,7 @@ fi
 DIFF_COUNT=0
 AVG_SIM=""
 declare -A DIFF_SIM_MAP
+DIFF_SIM_COUNT=0
 if [ "$HAS_IMAGEMAGICK" -eq 1 ]; then
     for ref_png in "$OUT_DIR"/test_*_ref.png; do
         [ -f "$ref_png" ] || continue
@@ -273,18 +274,19 @@ if [ "$HAS_IMAGEMAGICK" -eq 1 ]; then
             if [ -n "$DIFF_NUM" ]; then
                 SIM=$(awk "BEGIN { printf \"%.1f\", (1 - $DIFF_NUM / $TOTAL_PIXELS) * 100 }")
                 DIFF_SIM_MAP["$num_int"]="$SIM"
+                DIFF_SIM_COUNT=$((DIFF_SIM_COUNT + 1))
                 echo "  [$num_int] Similarity: ${SIM}%"
             fi
         fi
     done
     echo "  Generated $DIFF_COUNT diff images."
 
-    if [ "${#DIFF_SIM_MAP[@]}" -gt 0 ]; then
+    if [ "$DIFF_SIM_COUNT" -gt 0 ]; then
         SUM=0
         for v in "${DIFF_SIM_MAP[@]}"; do
             SUM=$(awk "BEGIN { printf \"%.1f\", $SUM + $v }")
         done
-        AVG_SIM=$(awk "BEGIN { printf \"%.1f\", $SUM / ${#DIFF_SIM_MAP[@]} }")
+        AVG_SIM=$(awk "BEGIN { printf \"%.1f\", $SUM / $DIFF_SIM_COUNT }")
         echo "  AVG similarity: ${AVG_SIM}%"
     fi
 else
@@ -309,7 +311,7 @@ if [ "$NO_HTML" -eq 0 ]; then
     NUM_TESTS=${#TESTS[@]}
 
     declare -A SIM_MAP
-    if [ "${#DIFF_SIM_MAP[@]}" -gt 0 ]; then
+    if [ "$DIFF_SIM_COUNT" -gt 0 ]; then
         for key in "${!DIFF_SIM_MAP[@]}"; do
             SIM_MAP["$key"]="${DIFF_SIM_MAP[$key]}"
         done
@@ -322,7 +324,7 @@ if [ "$NO_HTML" -eq 0 ]; then
     fi
 
     DIFF_SUMMARY_HTML=""
-    if [ -f "$PREV_SIM_FILE" ] && [ "${#SIM_MAP[@]}" -gt 0 ]; then
+    if [ -f "$PREV_SIM_FILE" ] && [ "$DIFF_SIM_COUNT" -gt 0 ]; then
         declare -A PREV_SIM_MAP
         while read -r p_num p_sim; do
             if [ -n "$p_num" ]; then

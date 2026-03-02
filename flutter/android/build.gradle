@@ -9,24 +9,35 @@ buildscript {
 
     dependencies {
         classpath("com.android.tools.build:gradle:8.9.1")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22")
     }
 }
 
 rootProject.allprojects {
     repositories {
         google()
+        mavenLocal()
         mavenCentral()
     }
 }
 
 apply plugin: "com.android.library"
+apply plugin: "kotlin-android"
 
-// ── Native plugin source mode ──────────────────────────────────────────────
-// Set -PvolvoxgridNativeSource=local to fall back to local .so file search.
-// Default: "maven" — pull native plugin via the volvoxgrid-android AAR from Maven Central.
-def nativeSource = project.findProperty("volvoxgridNativeSource") ?: "maven"
-
+// ── VolvoxGrid Source Configuration ────────────────────────────────────────
 def repoRoot = new File(projectDir, "../..").canonicalFile
+def defaultSource = "maven"
+def rawVolvoxgridSource = project.findProperty("volvoxgridSource") ?: System.getenv("VOLVOXGRID_SOURCE") ?: defaultSource
+def volvoxgridSource = rawVolvoxgridSource
+if (!(volvoxgridSource in ["local", "maven"])) {
+    throw new GradleException(
+        "Invalid volvoxgridSource='${rawVolvoxgridSource}'. Expected 'maven' or 'local'."
+    )
+}
+def volvoxgridVersion = project.findProperty("volvoxgridVersion") ?: System.getenv("VOLVOXGRID_VERSION") ?: "0.1.4"
+
+def artifactName = "volvoxgrid-android"
+def isSnapshot = volvoxgridVersion.endsWith("-SNAPSHOT")
 def generatedJniLibsDir = new File(buildDir, "generated/jniLibs")
 def supportedAndroidAbis = ["arm64-v8a", "armeabi-v7a", "x86_64"]
 def abiToRustTarget = [
@@ -59,7 +70,7 @@ def resolvePluginSoForAbi = { String abi ->
     return null
 }
 
-if (nativeSource == "local") {
+if (volvoxgridSource == "local") {
     tasks.register("prepareVolvoxGridJniLibs") {
         List<File> inputDirs = [
             new File(projectDir, "src/main/jniLibs"),
@@ -119,24 +130,49 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    if (nativeSource == "local") {
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+
+    if (volvoxgridSource == "local") {
         sourceSets {
             main {
+                java.srcDirs += "src/main/kotlin"
                 jniLibs.srcDirs = [generatedJniLibsDir]
+            }
+        }
+    } else {
+        sourceSets {
+            main {
+                java.srcDirs += "src/main/kotlin"
+                // In Maven mode, native libs must come from the AAR dependency.
+                // Avoid packaging checked-in/local jniLibs from this plugin module.
+                jniLibs.srcDirs = []
             }
         }
     }
 }
 
-if (nativeSource == "local") {
+if (volvoxgridSource == "local") {
     tasks.named("preBuild") {
         dependsOn("prepareVolvoxGridJniLibs")
     }
 }
 
+configurations.configureEach {
+    if (isSnapshot) {
+        resolutionStrategy.cacheChangingModulesFor(0, "seconds")
+    }
+}
+
 dependencies {
-    if (nativeSource == "maven") {
+    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22")
+    implementation("androidx.annotation:annotation:1.7.0")
+
+    if (volvoxgridSource == "maven") {
         // Pull native .so files + Kotlin/Java classes from the published AAR.
-        implementation 'io.github.ivere27:volvoxgrid-android:0.1.0'
+        implementation("io.github.ivere27:${artifactName}:${volvoxgridVersion}") {
+            changing = isSnapshot
+        }
     }
 }

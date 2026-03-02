@@ -8,8 +8,15 @@ target/
 .flutter-plugins-dependencies
 flutter/build/
 flutter/example/build/
+flutter/example/android/build/
 flutter/linux/flutter/ephemeral/
 flutter/android/src/main/jniLibs/
+flutter/macos/build/
+flutter/windows/build/
+flutter/macos/x64/
+flutter/windows/x64/
+adapters/sfdatagrid/test/sfdatagrid_cases/
+adapters/sfdatagrid/test/sfdatagrid_compare_test.dart
 
 # Android
 .gradle/

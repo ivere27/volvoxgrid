@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::collections::HashMap;
 
 /// Value stored in a cell
@@ -170,6 +171,10 @@ pub struct CellStore {
     row_map: Vec<i32>,
     /// Display-col → logical-col mapping.  Empty = identity (no translation).
     col_map: Vec<i32>,
+    /// Cached heap size estimate for this store (bytes).
+    heap_size_cache: Cell<usize>,
+    /// True when `heap_size_cache` reflects current state.
+    heap_size_cache_valid: Cell<bool>,
 }
 
 impl CellStore {
@@ -178,10 +183,16 @@ impl CellStore {
             cells: HashMap::new(),
             row_map: Vec::new(),
             col_map: Vec::new(),
+            heap_size_cache: Cell::new(0),
+            heap_size_cache_valid: Cell::new(false),
         }
     }
 
     pub fn heap_size_bytes(&self) -> usize {
+        if self.heap_size_cache_valid.get() {
+            return self.heap_size_cache.get();
+        }
+
         let mut bytes = 0usize;
         bytes += self.cells.capacity()
             * (std::mem::size_of::<(i32, i32)>() + std::mem::size_of::<CellData>() + 8);
@@ -190,6 +201,8 @@ impl CellStore {
         }
         bytes += self.row_map.capacity() * std::mem::size_of::<i32>();
         bytes += self.col_map.capacity() * std::mem::size_of::<i32>();
+        self.heap_size_cache.set(bytes);
+        self.heap_size_cache_valid.set(true);
         bytes
     }
 
@@ -198,6 +211,15 @@ impl CellStore {
             cells: HashMap::with_capacity(cap),
             row_map: Vec::new(),
             col_map: Vec::new(),
+            heap_size_cache: Cell::new(0),
+            heap_size_cache_valid: Cell::new(false),
+        }
+    }
+
+    #[inline]
+    fn invalidate_heap_size_cache(&self) {
+        if self.heap_size_cache_valid.get() {
+            self.heap_size_cache_valid.set(false);
         }
     }
 
@@ -215,11 +237,13 @@ impl CellStore {
 
     /// Install a display-row → logical-row mapping (set after sort).
     pub fn set_row_map(&mut self, map: Vec<i32>) {
+        self.invalidate_heap_size_cache();
         self.row_map = map;
     }
 
     /// Clear the row mapping (back to identity).
     pub fn clear_row_map(&mut self) {
+        self.invalidate_heap_size_cache();
         self.row_map.clear();
     }
 
@@ -230,6 +254,7 @@ impl CellStore {
         if self.row_map.is_empty() {
             return;
         }
+        self.invalidate_heap_size_cache();
         // Build inverse: logical_row → display_row
         let mut inverse: HashMap<i32, i32> = HashMap::with_capacity(self.row_map.len());
         for (display, &logical) in self.row_map.iter().enumerate() {
@@ -258,11 +283,13 @@ impl CellStore {
 
     /// Install a display-col → logical-col mapping.
     pub fn set_col_map(&mut self, map: Vec<i32>) {
+        self.invalidate_heap_size_cache();
         self.col_map = map;
     }
 
     /// Clear the col mapping (back to identity).
     pub fn clear_col_map(&mut self) {
+        self.invalidate_heap_size_cache();
         self.col_map.clear();
     }
 
@@ -273,11 +300,13 @@ impl CellStore {
 
     /// Remove an entry from the col_map at the given position.
     pub fn col_map_remove(&mut self, pos: usize) -> i32 {
+        self.invalidate_heap_size_cache();
         self.col_map.remove(pos)
     }
 
     /// Insert a value into the col_map at the given position.
     pub fn col_map_insert(&mut self, pos: usize, val: i32) {
+        self.invalidate_heap_size_cache();
         self.col_map.insert(pos, val);
     }
 
@@ -287,6 +316,7 @@ impl CellStore {
         if self.col_map.is_empty() {
             return;
         }
+        self.invalidate_heap_size_cache();
         let mut inverse: HashMap<i32, i32> = HashMap::with_capacity(self.col_map.len());
         for (display, &logical) in self.col_map.iter().enumerate() {
             inverse.insert(logical, display as i32);
@@ -307,17 +337,20 @@ impl CellStore {
     }
 
     pub fn get_mut(&mut self, row: i32, col: i32) -> &mut CellData {
+        self.invalidate_heap_size_cache();
         let r = self.map_row(row);
         let c = self.map_col(col);
         self.cells.entry((r, c)).or_insert_with(CellData::default)
     }
 
     pub fn set(&mut self, row: i32, col: i32, data: CellData) {
+        self.invalidate_heap_size_cache();
         self.cells
             .insert((self.map_row(row), self.map_col(col)), data);
     }
 
     pub fn remove(&mut self, row: i32, col: i32) {
+        self.invalidate_heap_size_cache();
         self.cells.remove(&(self.map_row(row), self.map_col(col)));
     }
 
@@ -348,6 +381,7 @@ impl CellStore {
     // ── Structural operations (materialize row_map first) ───────────────
 
     pub fn clear_range(&mut self, row1: i32, col1: i32, row2: i32, col2: i32) {
+        self.invalidate_heap_size_cache();
         self.materialize_row_map();
         self.materialize_col_map();
         let r_lo = row1.min(row2);
@@ -359,12 +393,14 @@ impl CellStore {
     }
 
     pub fn clear_all(&mut self) {
+        self.invalidate_heap_size_cache();
         self.cells.clear();
         self.row_map.clear();
         self.col_map.clear();
     }
 
     pub fn insert_row(&mut self, at: i32) {
+        self.invalidate_heap_size_cache();
         self.materialize_row_map();
         self.materialize_col_map();
         let mut shifted: Vec<((i32, i32), CellData)> = Vec::new();
@@ -385,6 +421,7 @@ impl CellStore {
     }
 
     pub fn remove_row(&mut self, at: i32) {
+        self.invalidate_heap_size_cache();
         self.materialize_row_map();
         self.materialize_col_map();
         let keys_at: Vec<(i32, i32)> = self
@@ -422,6 +459,7 @@ impl CellStore {
         if source_pos == insert_pos {
             return;
         }
+        self.invalidate_heap_size_cache();
         self.materialize_row_map();
         self.materialize_col_map();
         let old = std::mem::take(&mut self.cells);
@@ -446,6 +484,7 @@ impl CellStore {
 
     /// Drain all entries, yielding ownership without cloning.
     pub fn drain(&mut self) -> impl Iterator<Item = ((i32, i32), CellData)> + '_ {
+        self.invalidate_heap_size_cache();
         self.cells.drain()
     }
 

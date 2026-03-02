@@ -28,7 +28,7 @@ val volvoxgridAndroidArtifact = providers.gradleProperty("volvoxgridAndroidArtif
     .get()
 val volvoxgridVersion = providers.gradleProperty("volvoxgridVersion")
     .orElse(providers.gradleProperty("volvoxgridAndroidVersion"))
-    .orElse("0.1.3")
+    .orElse("0.1.4")
     .get()
 val isVolvoxgridSnapshot = volvoxgridVersion.endsWith("-SNAPSHOT")
 

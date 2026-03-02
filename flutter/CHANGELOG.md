@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.4
+
+- Added Flutter plugin platform declarations for `macos` and `windows`.
+- Added desktop native resolution from Maven for Linux, macOS, and Windows.
+- Added support for `VOLVOXGRID_SOURCE` and `VOLVOXGRID_VERSION` across desktop plugin builds.
+- Added `-SNAPSHOT` refresh handling for desktop native resolution.
+
+## 0.1.3
+
+- Support `VOLVOXGRID_SOURCE`, `VOLVOXGRID_VERSION`, and `VOLVOXGRID_VARIANT` environment variables.
+- Support resolving native dependencies from Maven (Local or Central) for Android and Linux.
+
 ## 0.1.0
 
 - Initial public release of `volvoxgrid` Flutter package.

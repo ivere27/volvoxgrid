@@ -8,9 +8,9 @@ Add the Maven dependency to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-android:0.1.3")
+    implementation("io.github.ivere27:volvoxgrid-android:0.1.4")
     // or lite variant:
-    // implementation("io.github.ivere27:volvoxgrid-android-lite:0.1.3")
+    // implementation("io.github.ivere27:volvoxgrid-android-lite:0.1.4")
 }
 ```
 
@@ -18,9 +18,9 @@ Or `build.gradle`:
 
 ```groovy
 dependencies {
-    implementation 'io.github.ivere27:volvoxgrid-android:0.1.3'
+    implementation 'io.github.ivere27:volvoxgrid-android:0.1.4'
     // or lite variant:
-    // implementation 'io.github.ivere27:volvoxgrid-android-lite:0.1.3'
+    // implementation 'io.github.ivere27:volvoxgrid-android-lite:0.1.4'
 }
 ```
 
@@ -52,7 +52,7 @@ For the Android example app (`make android-run`), use:
 
 - Normal (default): `make android-run`
 - Lite (local build): `make android-run VOLVOXGRID_VARIANT=lite`
-- Lite (Maven): `make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.1.3`
+- Lite (Maven): `make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.1.4`
 
 `VOLVOXGRID_VARIANT` only treats `lite` as special. Any other value falls back to normal.
 
@@ -213,6 +213,13 @@ ctrl.setCellTexts(Arrays.asList(
 
 // Bulk load a 2D array (row-major order)
 ctrl.loadArray(3, 2, Arrays.asList("a", "b", "c", "d", "e", "f"), false);
+
+// Fill a 2D matrix (auto-resizes grid if needed)
+ctrl.setTableData(Arrays.asList(
+    Arrays.asList("Name", "Price", "Qty"),
+    Arrays.asList("Widget A", "29.99", "150"),
+    Arrays.asList("Widget B", "49.99", "200")
+));
 ```
 
 #### Row & Column Sizing
@@ -429,6 +436,13 @@ ctrl.setRedraw(false);            // batch: disable rendering
 // ... make many changes ...
 ctrl.setRedraw(true);             // re-enable and repaint
 ctrl.refresh();                   // force full repaint
+
+// Or use withRedrawSuspended for automatic suspend/resume:
+ctrl.withRedrawSuspended(() -> {
+    ctrl.setTextMatrix(0, 0, "A");
+    ctrl.setTextMatrix(0, 1, "B");
+    ctrl.setTextMatrix(1, 0, "C");
+});
 ```
 
 #### Built-in Demos
@@ -479,6 +493,20 @@ ctrl.setCellTexts(listOf(
     GridCellText(0, 1, "B"),
 ))
 ctrl.loadArray(rows = 3, cols = 2, values = listOf("a", "b", "c", "d", "e", "f"))
+
+// Fill a 2D matrix (auto-resizes grid)
+ctrl.setTableData(listOf(
+    listOf("Name", "Price", "Qty"),
+    listOf("Widget A", "29.99", "150"),
+    listOf("Widget B", "49.99", "200"),
+))
+
+// Batch updates with suspended redraw
+ctrl.withRedrawSuspended {
+    ctrl.setTextMatrix(0, 0, "A")
+    ctrl.setTextMatrix(0, 1, "B")
+    ctrl.setTextMatrix(1, 0, "C")
+}
 
 // Sorting
 ctrl.sortByColumn(col = 1, ascending = true)

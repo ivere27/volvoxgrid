@@ -303,8 +303,10 @@ pub struct VolvoxGrid {
     pub picture_type: i32,
 
     // ── Renderer Mode ──────────────────────────────────────────────────
-    /// 0 = CPU (default), 1 = GPU, 2 = AUTO.
+    /// 0 = AUTO, 1 = CPU, 2 = GPU, 3 = Vulkan, 4 = GLES.
     pub renderer_mode: i32,
+    /// 0 = Auto (Fifo), 1 = Fifo, 2 = Mailbox, 3 = Immediate.
+    pub present_mode: i32,
 
     // ── Debug Overlay ────────────────────────────────────────────────
     /// Whether the debug overlay is visible.
@@ -319,6 +321,14 @@ pub struct VolvoxGrid {
     pub debug_renderer_actual: i32,
     /// Name of the GPU backend in use (e.g. "Vulkan", "OpenGL", "WebGPU").
     pub debug_gpu_backend: String,
+    /// Name of the active GPU present mode (e.g. "Fifo", "Mailbox").
+    pub debug_gpu_present_mode: String,
+    /// Total number of draw calls/instances in the last frame.
+    pub debug_instance_count: i32,
+    /// Current number of entries in the text layout cache.
+    pub debug_text_cache_len: i32,
+    /// Estimated total heap memory usage of the grid in bytes.
+    pub debug_total_mem_bytes: i64,
 
     // ── Dirty Flag ────────────────────────────────────────────────────────
     /// Whether the grid has pending changes that require a re-render.
@@ -610,8 +620,10 @@ impl VolvoxGrid {
             format_string: String::new(),
             picture_type: 0,
 
-            // Renderer mode (0=CPU, 1=GPU, 2=AUTO)
+            // Renderer mode (0=AUTO, 1=CPU, 2=GPU, 3=Vulkan, 4=GLES)
             renderer_mode: 0,
+            // Present mode (0=Auto, 1=Fifo, 2=Mailbox, 3=Immediate)
+            present_mode: 0,
 
             // Debug overlay
             debug_overlay: false,
@@ -620,6 +632,10 @@ impl VolvoxGrid {
             debug_zoom_level: 1.0,
             debug_renderer_actual: 0,
             debug_gpu_backend: String::new(),
+            debug_gpu_present_mode: String::new(),
+            debug_instance_count: 0,
+            debug_text_cache_len: 0,
+            debug_total_mem_bytes: 0,
 
             // Dirty
             dirty: true,

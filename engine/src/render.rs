@@ -69,6 +69,18 @@ impl Renderer {
         self.text_engine.set_external_rasterizer(r);
     }
 
+    /// Returns the number of entries currently in the text layout cache.
+    pub fn text_cache_len(&self) -> usize {
+        #[cfg(feature = "cosmic-text")]
+        {
+            self.text_engine.layout_cache.len()
+        }
+        #[cfg(not(feature = "cosmic-text"))]
+        {
+            0
+        }
+    }
+
     /// Main entry point: render the entire grid into the supplied RGBA buffer.
     ///
     /// `buffer` must be at least `stride * height` bytes.  `stride` is the

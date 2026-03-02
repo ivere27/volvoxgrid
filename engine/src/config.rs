@@ -788,6 +788,9 @@ impl VolvoxGrid {
         if let Some(v) = rc.text_layout_cache_cap {
             self.set_text_layout_cache_cap(v);
         }
+        if let Some(v) = rc.present_mode {
+            self.present_mode = v;
+        }
         self.mark_dirty();
     }
 
@@ -1057,6 +1060,7 @@ impl VolvoxGrid {
             animation_enabled: Some(self.animation.enabled),
             animation_duration_ms: Some(self.animation.duration_ms),
             text_layout_cache_cap: Some(self.text_layout_cache_cap.min(i32::MAX as usize) as i32),
+            present_mode: Some(self.present_mode),
         }
     }
 

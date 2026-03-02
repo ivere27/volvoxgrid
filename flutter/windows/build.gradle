@@ -1,0 +1,51 @@
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+configurations {
+    volvoxgrid
+}
+
+def vGroup = System.getenv("VOLVOXGRID_GROUP") ?: "io.github.ivere27"
+def vArtifact = System.getenv("VOLVOXGRID_ARTIFACT") ?: "volvoxgrid-desktop"
+def vVersion = project.findProperty("volvoxgridVersion") ?: System.getenv("VOLVOXGRID_VERSION") ?: "0.1.4"
+def isSnapshot = vVersion.endsWith("-SNAPSHOT")
+def hostArch = (System.getProperty("os.arch") ?: "").toLowerCase(Locale.ROOT)
+def windowsArchDir = null
+if (hostArch.contains("x86_64") || hostArch.contains("amd64")) {
+    windowsArchDir = "windows-x86_64"
+} else if (hostArch == "x86" || hostArch == "i386" || hostArch == "i686") {
+    windowsArchDir = "windows-x86"
+}
+if (windowsArchDir == null) {
+    throw new GradleException("Unsupported Windows architecture for VolvoxGrid native extraction: ${hostArch}")
+}
+
+configurations.configureEach {
+    if (isSnapshot) {
+        resolutionStrategy.cacheChangingModulesFor(0, "seconds")
+    }
+}
+
+dependencies {
+    volvoxgrid("${vGroup}:${vArtifact}:${vVersion}") {
+        changing = isSnapshot
+    }
+}
+
+task copyNative(type: Copy) {
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    doFirst {
+        def files = configurations.volvoxgrid.resolve().collect { it.absolutePath }
+        logger.lifecycle("VolvoxGrid copyNative: ${vGroup}:${vArtifact}:${vVersion} arch=${windowsArchDir}")
+        files.each { logger.lifecycle("VolvoxGrid copyNative source: ${it}") }
+    }
+    from configurations.volvoxgrid.collect { zipTree(it) }
+    include "native/${windowsArchDir}/*.dll"
+    eachFile { fcd ->
+        fcd.path = fcd.name
+    }
+    includeEmptyDirs = false
+    into "x64"
+}

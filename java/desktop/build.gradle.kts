@@ -28,7 +28,7 @@ plugins {
 // library coordinates (io.github.ivere27:volvoxgrid-desktop) to avoid
 // self-resolution in maven mode.
 group = "io.github.ivere27.examples"
-version = "0.1.3-SNAPSHOT"
+version = "0.1.4-SNAPSHOT"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_1_8
@@ -57,7 +57,7 @@ val volvoxgridDesktopArtifact = providers.gradleProperty("volvoxgridDesktopArtif
     .get()
 val volvoxgridVersion = providers.gradleProperty("volvoxgridVersion")
     .orElse(providers.gradleProperty("volvoxgridDesktopVersion"))
-    .orElse("0.1.3")
+    .orElse("0.1.4")
     .get()
 val isVolvoxgridSnapshot = volvoxgridVersion.endsWith("-SNAPSHOT")
 val volvoxgridGitCommit = providers.gradleProperty("volvoxgridGitCommit")

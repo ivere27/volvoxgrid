@@ -13,6 +13,7 @@ import 'dart:async';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import 'src/generated/volvoxgrid.pb.dart';
 import 'src/generated/volvoxgrid_ffi.pb.dart';
@@ -30,6 +31,24 @@ class CellTextEntry {
   });
 }
 
+/// Supported rendering backends.
+enum RendererBackend {
+  /// Automatic selection (prefers GPU if available).
+  auto,
+
+  /// Software rendering to a pixel buffer.
+  cpu,
+
+  /// Hardware-accelerated rendering.
+  gpu,
+
+  /// Explicit Vulkan hardware rendering (Android only).
+  vulkan,
+
+  /// Explicit OpenGL ES hardware rendering (Android only).
+  gles,
+}
+
 /// Controller for a single VolvoxGrid instance.
 ///
 /// Usage:
@@ -39,14 +58,26 @@ class CellTextEntry {
 /// await controller.setTextMatrix(0, 0, 'Header');
 /// ```
 class VolvoxGridController extends ChangeNotifier {
+  static const MethodChannel _channel =
+      MethodChannel('io.github.ivere27.volvoxgrid');
+
   Int64 _gridId = Int64.ZERO;
   bool _disposed = false;
+
+  int? _gpuTextureId;
+  int? _gpuSurfaceHandle;
 
   /// The native grid handle. Zero until [create] completes.
   Int64 get gridId => _gridId;
 
   /// Whether the grid has been created successfully.
   bool get isCreated => _gridId != Int64.ZERO;
+
+  /// Active GPU texture ID (if created via [createGpuTexture]).
+  int? get gpuTextureId => _gpuTextureId;
+
+  /// Active GPU native surface handle (if created via [createGpuTexture]).
+  int? get gpuSurfaceHandle => _gpuSurfaceHandle;
 
   GridHandle get _handle => GridHandle()..id = _gridId;
 
@@ -93,7 +124,7 @@ class VolvoxGridController extends ChangeNotifier {
   void dispose() {
     if (!_disposed) {
       _disposed = true;
-      destroyGrid();
+      releaseGpuTexture(graceful: true).whenComplete(() => destroyGrid());
     }
     super.dispose();
   }
@@ -432,8 +463,8 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the selection visibility style.
   Future<void> setSelectionVisibility(SelectionVisibility style) async {
-    await _configure(
-        GridConfig()..selection = (SelectionConfig()..selectionVisibility = style));
+    await _configure(GridConfig()
+      ..selection = (SelectionConfig()..selectionVisibility = style));
   }
 
   /// Legacy alias for [setSelectionVisibility].
@@ -455,7 +486,8 @@ class VolvoxGridController extends ChangeNotifier {
     var targetCol = col;
     if (targetCol == null || targetCol < 0) {
       try {
-        targetCol = (await VolvoxGridServiceFfi.GetSelection(_handle)).activeCol;
+        targetCol =
+            (await VolvoxGridServiceFfi.GetSelection(_handle)).activeCol;
       } catch (_) {
         targetCol = 0;
       }
@@ -501,8 +533,8 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Configure header features (sort/reorder/chooser behavior).
   Future<void> setHeaderFeatures(HeaderFeatures mode) async {
-    await _configure(
-        GridConfig()..interaction = (InteractionConfig()..headerFeatures = mode));
+    await _configure(GridConfig()
+      ..interaction = (InteractionConfig()..headerFeatures = mode));
   }
 
   /// Legacy alias for [setHeaderFeatures].
@@ -648,7 +680,8 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the edit trigger mode for the grid.
   Future<void> setEditTrigger(EditTrigger mode) async {
-    await _configure(GridConfig()..editing = (EditConfig()..editTrigger = mode));
+    await _configure(
+        GridConfig()..editing = (EditConfig()..editTrigger = mode));
   }
 
   /// Legacy alias for [setEditTrigger].
@@ -709,7 +742,8 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Enable native custom-render mode.
   Future<void> setCustomRender(CustomRenderMode mode) async {
-    await _configure(GridConfig()..style = (StyleConfig()..customRender = mode));
+    await _configure(
+        GridConfig()..style = (StyleConfig()..customRender = mode));
   }
 
   /// Legacy alias for [setCustomRender].
@@ -1099,8 +1133,8 @@ class VolvoxGridController extends ChangeNotifier {
   /// Set the text layout cache capacity (0 = disabled).
   Future<void> setTextLayoutCacheCap(int cap) async {
     final safeCap = cap < 0 ? 0 : cap;
-    await _configure(
-        GridConfig()..rendering = (RenderConfig()..textLayoutCacheCap = safeCap));
+    await _configure(GridConfig()
+      ..rendering = (RenderConfig()..textLayoutCacheCap = safeCap));
   }
 
   /// Get whether layout animation is enabled.
@@ -1115,18 +1149,83 @@ class VolvoxGridController extends ChangeNotifier {
     return config.rendering.textLayoutCacheCap;
   }
 
-  /// Set renderer mode: 0=CPU, 1=GPU, 2=AUTO.
+  /// Set renderer mode: 0=AUTO, 1=CPU, 2=GPU, 3=Vulkan, 4=GLES.
   Future<void> setRendererMode(int mode) async {
     await _configure(GridConfig()
       ..rendering = (RenderConfig()
         ..rendererMode =
-            (RendererMode.valueOf(mode) ?? RendererMode.RENDERER_CPU)));
+            (RendererMode.valueOf(mode) ?? RendererMode.RENDERER_AUTO)));
   }
 
-  /// Get the current renderer mode (0=CPU, 1=GPU, 2=AUTO).
+  /// Get the current renderer mode (0=AUTO, 1=CPU, 2=GPU).
   Future<int> getRendererMode() async {
     final config = await _getConfig();
     return config.rendering.rendererMode.value;
+  }
+
+  /// Set the presentation mode: 0=Auto, 1=Fifo (vsync), 2=Mailbox, 3=Immediate.
+  Future<void> setPresentMode(int mode) async {
+    await _configure(GridConfig()
+      ..rendering = (RenderConfig()
+        ..presentMode =
+            (PresentMode.valueOf(mode) ?? PresentMode.PRESENT_AUTO)));
+  }
+
+  /// Get the current presentation mode (0=Auto, 1=Fifo, 2=Mailbox, 3=Immediate).
+  Future<int> getPresentMode() async {
+    final config = await _getConfig();
+    return config.rendering.presentMode.value;
+  }
+
+  /// Set the preferred renderer backend.
+  ///
+  /// On Android, this automatically manages the native GPU texture surface
+  /// when switching between CPU and hardware-accelerated modes.
+  Future<void> setRendererBackend(RendererBackend backend) async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      if (backend == RendererBackend.cpu) {
+        // Move engine to CPU mode before releasing the native GPU surface.
+        // This avoids a transition window where pending GPU work can touch
+        // an already-released ANativeWindow.
+        await setRendererMode(backend.index);
+        await releaseGpuTexture(graceful: true);
+        return;
+      }
+
+      // For any GPU mode transition, drop the old surface first so no frame is
+      // rendered against an incompatible surface/backend pair during the switch.
+      await releaseGpuTexture(graceful: true);
+
+      if (backend == RendererBackend.vulkan) {
+        await setRendererMode(RendererBackend.vulkan.index);
+        await createGpuTexture(backend: 'vulkan');
+      } else {
+        // Bootstrap through explicit GLES so AUTO/GPU never inherit a stale
+        // Vulkan renderer after a mode transition.
+        await setRendererMode(RendererBackend.gles.index);
+        await createGpuTexture(backend: 'gles');
+        if (backend != RendererBackend.gles) {
+          await setRendererMode(backend.index);
+        }
+      }
+
+      // Ensure the newly attached GPU surface gets a fresh frame even when the
+      // grid was previously clean (not dirty).
+      if (isCreated) {
+        await refresh();
+      }
+      return;
+    }
+    await setRendererMode(backend.index);
+  }
+
+  /// Get the current renderer backend.
+  Future<RendererBackend> getRendererBackend() async {
+    final modeValue = await getRendererMode();
+    if (modeValue >= 0 && modeValue < RendererBackend.values.length) {
+      return RendererBackend.values[modeValue];
+    }
+    return RendererBackend.auto; // AUTO = 0
   }
 
   /// Run [action] while redraw is disabled, then restore and refresh.
@@ -1149,5 +1248,66 @@ class VolvoxGridController extends ChangeNotifier {
   Future<void> refresh() async {
     await VolvoxGridServiceFfi.Refresh(_handle);
     notifyListeners();
+  }
+
+  /// (Android only) Create a native GPU texture for zero-copy rendering.
+  Future<int?> createGpuTexture({
+    String backend = 'gles',
+    int width = 1,
+    int height = 1,
+  }) async {
+    if (defaultTargetPlatform != TargetPlatform.android) return null;
+    await releaseGpuTexture(graceful: true);
+    final Map<dynamic, dynamic>? res = await _channel.invokeMethod(
+      'createTexture',
+      <String, Object>{
+        'backend': backend,
+        'width': width < 1 ? 1 : width,
+        'height': height < 1 ? 1 : height,
+      },
+    );
+    if (res != null) {
+      _gpuTextureId = res['textureId'] as int?;
+      _gpuSurfaceHandle = res['surfaceHandle'] as int?;
+      notifyListeners();
+    }
+    return _gpuTextureId;
+  }
+
+  /// (Android only) Update the GPU texture size.
+  Future<void> setGpuTextureSize(int width, int height) async {
+    if (_gpuTextureId != null) {
+      await _channel.invokeMethod('setTextureSize', {
+        'textureId': _gpuTextureId,
+        'width': width,
+        'height': height,
+      });
+    }
+  }
+
+  /// (Android only) Release the native GPU texture.
+  Future<void> releaseGpuTexture({bool graceful = false}) async {
+    final textureId = _gpuTextureId;
+    if (textureId == null) {
+      return;
+    }
+
+    if (graceful && _gpuSurfaceHandle != null && _gpuSurfaceHandle != 0) {
+      // Ask the render stream to drop the current GPU surface before we tear
+      // down the platform texture to avoid transient BufferQueue/Vulkan errors.
+      _gpuSurfaceHandle = 0;
+      notifyListeners();
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+    }
+
+    _gpuTextureId = null;
+    _gpuSurfaceHandle = null;
+    notifyListeners();
+
+    try {
+      await _channel.invokeMethod('releaseTexture', {'textureId': textureId});
+    } catch (_) {
+      // Best effort; local controller state is already detached.
+    }
   }
 }

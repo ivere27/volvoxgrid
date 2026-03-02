@@ -2335,14 +2335,14 @@ export class VolvoxGrid {
 
   // ── Renderer Mode ─────────────────────────────────────────────────────
 
-  /** Set renderer mode: 0=CPU, 1=GPU, 2=AUTO */
+  /** Set renderer mode: 0=AUTO, 1=CPU, 2=GPU */
   setRendererMode(mode: number): void {
     if (typeof this.wasm.set_renderer_mode === "function") {
       this.wasm.set_renderer_mode(this.gridId, mode);
     }
-    if (mode === 1 && this.gpuCanvas) {
+    if (mode >= 2 && this.gpuCanvas) {
       this.useGpu = true;
-    } else if (mode === 0) {
+    } else if (mode === 1) {
       this.useGpu = false;
     }
     this.dirty = true;
@@ -2378,7 +2378,7 @@ export class VolvoxGrid {
         console.info("VolvoxGrid: GPU feature not compiled in");
         return false;
       }
-      if (this.getRendererMode() === 0) return false; // CPU-only by user choice
+      if (this.getRendererMode() === 1) return false; // CPU-only by user choice
 
       if (typeof navigator === "undefined" || !("gpu" in navigator)) {
         console.warn(
@@ -2416,7 +2416,7 @@ export class VolvoxGrid {
       }
       this.matchGpuCanvasPosition(gpuCanvas);
 
-      const configured = this.wasm.gpu_configure_surface(gpuCanvas, w, h);
+      const configured = this.wasm.gpu_configure_surface(gpuCanvas, w, h, 0);
       if (!configured) {
         gpuCanvas.remove();
         this.useGpu = false;

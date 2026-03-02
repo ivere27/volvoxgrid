@@ -55,11 +55,12 @@ JAVA_DESKTOP_PLUGIN_BASENAME := libvolvoxgrid_plugin.so
 endif
 JAVA_DESKTOP_PLUGIN ?= $(abspath target/debug/$(JAVA_DESKTOP_PLUGIN_BASENAME))
 JAVA_DESKTOP_PLUGIN_RELEASE ?= $(abspath target/release/$(JAVA_DESKTOP_PLUGIN_BASENAME))
-VOLVOXGRID_VERSION ?= 0.1.3
+VOLVOXGRID_VERSION ?= 0.1.4
 VOLVOXGRID_SOURCE ?= local
-VOLVOXGRID_SOURCE := $(strip $(VOLVOXGRID_SOURCE))
-ifeq ($(filter $(VOLVOXGRID_SOURCE),local maven),)
-$(error Invalid VOLVOXGRID_SOURCE='$(VOLVOXGRID_SOURCE)'. Expected 'local' or 'maven')
+VOLVOXGRID_SOURCE_RAW := $(strip $(VOLVOXGRID_SOURCE))
+VOLVOXGRID_SOURCE_RESOLVED := $(VOLVOXGRID_SOURCE_RAW)
+ifeq ($(filter $(VOLVOXGRID_SOURCE_RESOLVED),local maven),)
+$(error Invalid VOLVOXGRID_SOURCE='$(VOLVOXGRID_SOURCE_RAW)'. Expected 'local' or 'maven')
 endif
 VOLVOXGRID_VARIANT ?=
 VOLVOXGRID_ANDROID_GROUP ?= io.github.ivere27
@@ -75,13 +76,13 @@ endif
 VOLVOXGRID_JAVA_GROUP ?= io.github.ivere27
 VOLVOXGRID_JAVA_ARTIFACT ?= volvoxgrid-desktop
 ANDROID_EXAMPLE_GRADLE_PROPS := \
-	-PvolvoxgridAndroidSource=$(VOLVOXGRID_SOURCE) \
+	-PvolvoxgridAndroidSource=$(VOLVOXGRID_SOURCE_RESOLVED) \
 	-PvolvoxgridAndroidVariant=$(VOLVOXGRID_VARIANT) \
 	-PvolvoxgridAndroidGroup=$(VOLVOXGRID_ANDROID_GROUP) \
 	-PvolvoxgridAndroidArtifact=$(VOLVOXGRID_ANDROID_ARTIFACT) \
 	-PvolvoxgridVersion=$(VOLVOXGRID_VERSION)
 JAVA_DESKTOP_GRADLE_PROPS := \
-	-PvolvoxgridDesktopSource=$(VOLVOXGRID_SOURCE) \
+	-PvolvoxgridDesktopSource=$(VOLVOXGRID_SOURCE_RESOLVED) \
 	-PvolvoxgridDesktopGroup=$(VOLVOXGRID_JAVA_GROUP) \
 	-PvolvoxgridDesktopArtifact=$(VOLVOXGRID_JAVA_ARTIFACT) \
 	-PvolvoxgridVersion=$(VOLVOXGRID_VERSION)
@@ -111,7 +112,7 @@ MAVEN_SETTINGS ?= $(CURRENT_DIR)/.maven-settings.xml
 MAVEN_REPO_URL ?= https://central.sonatype.com/api/v1/publisher/upload
 MAVEN_LOCAL_REPO ?= $(HOME)/.m2/repository
 
-ifeq ($(VOLVOXGRID_SOURCE),maven)
+ifeq ($(VOLVOXGRID_SOURCE_RESOLVED),maven)
 ANDROID_INSTALL_PREREQ :=
 ANDROID_INSTALL_RELEASE_PREREQ :=
 else
@@ -119,7 +120,15 @@ ANDROID_INSTALL_PREREQ := android-plugin
 ANDROID_INSTALL_RELEASE_PREREQ := android-plugin-release
 endif
 
-ifeq ($(VOLVOXGRID_SOURCE),maven)
+ifeq ($(VOLVOXGRID_SOURCE_RESOLVED),maven)
+FLUTTER_RUN_PREREQ := flutter-setup
+FLUTTER_RUN_RELEASE_PREREQ := flutter-setup
+else
+FLUTTER_RUN_PREREQ := flutter-setup android-plugin
+FLUTTER_RUN_RELEASE_PREREQ := flutter-setup android-plugin-release
+endif
+
+ifeq ($(VOLVOXGRID_SOURCE_RESOLVED),maven)
 JAVA_DESKTOP_RUN_PREREQ :=
 JAVA_DESKTOP_RUN_RELEASE_PREREQ :=
 JAVA_DESKTOP_RUN_SIMPLE_PREREQ :=
@@ -213,10 +222,12 @@ help:
 	@echo "  publish_local             Install built SNAPSHOT artifacts from dist/maven into ~/.m2/repository"
 	@echo ""
 	@echo "Example dependency source flags (default is local):"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.3"
-	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.3"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.1.3"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.4"
+	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.4"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.1.4"
 	@echo "  (maven mode skips local plugin build for the example targets)"
+	@echo "  Flutter defaults to maven when VOLVOXGRID_SOURCE is omitted."
+	@echo "  VOLVOXGRID_SOURCE=local builds from source."
 	@echo "  Android variant: set VOLVOXGRID_VARIANT=lite for lite; any other value uses normal"
 	@echo "  Optional override: VOLVOXGRID_*_GROUP and VOLVOXGRID_*_ARTIFACT"
 	@echo ""
@@ -349,8 +360,11 @@ web-lite: wasm-lite
 # =============================================================================
 EXCEL_DIR := adapters/excel
 EXCEL_WASM_DIR := $(EXCEL_DIR)/wasm
+WEB_JS_DIR := web/js
 
 excel: wasm
+	@echo "Building VolvoxGrid JS package for Excel adapter..."
+	cd "$(WEB_JS_DIR)" && npm install && npm run build
 	@echo "Linking WASM output into Excel adapter..."
 	@mkdir -p "$(EXCEL_WASM_DIR)"
 	@ln -sf "$(abspath web/example/wasm)"/* "$(EXCEL_WASM_DIR)/"
@@ -358,6 +372,8 @@ excel: wasm
 	cd "$(EXCEL_DIR)" && npm install && npx vite --host "$(WEB_HOST)"
 
 excel-lite: wasm-lite
+	@echo "Building VolvoxGrid JS package for Excel adapter..."
+	cd "$(WEB_JS_DIR)" && npm install && npm run build
 	@echo "Linking WASM lite output into Excel adapter..."
 	@mkdir -p "$(EXCEL_WASM_DIR)"
 	@ln -sf "$(abspath web/example/wasm)"/* "$(EXCEL_WASM_DIR)/"
@@ -365,6 +381,8 @@ excel-lite: wasm-lite
 	cd "$(EXCEL_DIR)" && npm install && npx vite --host "$(WEB_HOST)"
 
 excel-build:
+	@echo "Building VolvoxGrid JS package for Excel adapter..."
+	cd "$(WEB_JS_DIR)" && npm install && npm run build
 	@echo "Building Excel adapter npm package..."
 	cd "$(EXCEL_DIR)" && npm install && npm run build
 	@echo "Excel adapter build complete: $(EXCEL_DIR)/dist/"
@@ -995,12 +1013,12 @@ flutter-setup:
 	fi
 	@cd "$(FLUTTER_EXAMPLE_DIR)" && flutter pub get
 
-flutter: flutter-setup android-plugin
+flutter: $(FLUTTER_RUN_PREREQ)
 	@echo "Building Flutter example..."
 	cd "$(FLUTTER_EXAMPLE_DIR)" && flutter build apk --debug
 	@echo "Flutter build complete."
 
-flutter-run: flutter-setup android-plugin
+flutter-run: $(FLUTTER_RUN_PREREQ)
 	@command -v adb >/dev/null 2>&1 || { echo "Error: adb not found in PATH."; exit 1; }
 	@DEVICE_ID=$$(adb devices | awk 'NR>1 && $$2=="device"{print $$1; exit}'); \
 	if [ -z "$$DEVICE_ID" ]; then \
@@ -1010,13 +1028,13 @@ flutter-run: flutter-setup android-plugin
 	echo "Using Android device: $$DEVICE_ID"; \
 	adb -s "$$DEVICE_ID" shell am force-stop "$(FLUTTER_EXAMPLE_PACKAGE)" >/dev/null 2>&1 || true; \
 	cd "$(FLUTTER_EXAMPLE_DIR)" && \
-	  GRADLE_PROPS="android/gradle.properties"; \
-	  grep -q 'volvoxgridNativeSource' "$$GRADLE_PROPS" 2>/dev/null && \
-	    $(SED_I) 's/volvoxgridNativeSource=.*/volvoxgridNativeSource=local/' "$$GRADLE_PROPS" || \
-	    echo 'volvoxgridNativeSource=local' >> "$$GRADLE_PROPS"; \
-	  flutter run -d "$$DEVICE_ID"
+	  VOLVOXGRID_SOURCE=$(VOLVOXGRID_SOURCE_RESOLVED) VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION) \
+	  ORG_GRADLE_PROJECT_volvoxgridSource=$(VOLVOXGRID_SOURCE_RESOLVED) ORG_GRADLE_PROJECT_volvoxgridVersion=$(VOLVOXGRID_VERSION) \
+	  flutter run -d "$$DEVICE_ID" \
+	    --dart-define=VOLVOXGRID_SOURCE=$(VOLVOXGRID_SOURCE_RESOLVED) \
+	    --dart-define=VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION)
 
-flutter-run-release: flutter-setup android-plugin-release
+flutter-run-release: $(FLUTTER_RUN_RELEASE_PREREQ)
 	@command -v adb >/dev/null 2>&1 || { echo "Error: adb not found in PATH."; exit 1; }
 	@DEVICE_ID=$$(adb devices | awk 'NR>1 && $$2=="device"{print $$1; exit}'); \
 	if [ -z "$$DEVICE_ID" ]; then \
@@ -1026,14 +1044,29 @@ flutter-run-release: flutter-setup android-plugin-release
 	echo "Using Android device: $$DEVICE_ID"; \
 	adb -s "$$DEVICE_ID" shell am force-stop "$(FLUTTER_EXAMPLE_PACKAGE)" >/dev/null 2>&1 || true; \
 	cd "$(FLUTTER_EXAMPLE_DIR)" && \
-	  GRADLE_PROPS="android/gradle.properties"; \
-	  grep -q 'volvoxgridNativeSource' "$$GRADLE_PROPS" 2>/dev/null && \
-	    $(SED_I) 's/volvoxgridNativeSource=.*/volvoxgridNativeSource=local/' "$$GRADLE_PROPS" || \
-	    echo 'volvoxgridNativeSource=local' >> "$$GRADLE_PROPS"; \
-	  flutter run --release -d "$$DEVICE_ID"
+	  VOLVOXGRID_SOURCE=$(VOLVOXGRID_SOURCE_RESOLVED) VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION) \
+	  ORG_GRADLE_PROJECT_volvoxgridSource=$(VOLVOXGRID_SOURCE_RESOLVED) ORG_GRADLE_PROJECT_volvoxgridVersion=$(VOLVOXGRID_VERSION) \
+	  flutter run --release -d "$$DEVICE_ID" \
+	    --dart-define=VOLVOXGRID_SOURCE=$(VOLVOXGRID_SOURCE_RESOLVED) \
+	    --dart-define=VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION)
 
-flutter-linux: host-plugin flutter-setup
-	cd "$(FLUTTER_EXAMPLE_DIR)" && LD_LIBRARY_PATH="$(VOLVOXGRID_PLUGIN_DEBUG_DIR):$${LD_LIBRARY_PATH}" flutter run -d linux --dart-define=VG_ENABLE_FLING=true
+flutter-linux: flutter-setup
+	@if [ "$(VOLVOXGRID_SOURCE_RESOLVED)" != "maven" ]; then \
+		$(MAKE) host-plugin; \
+	fi
+	cd "$(FLUTTER_EXAMPLE_DIR)" && \
+	  if [ "$(VOLVOXGRID_SOURCE_RESOLVED)" = "maven" ]; then \
+	    VOLVOXGRID_SOURCE=$(VOLVOXGRID_SOURCE_RESOLVED) VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION) \
+	    flutter run -d linux --dart-define=VG_ENABLE_FLING=true \
+	      --dart-define=VOLVOXGRID_SOURCE=$(VOLVOXGRID_SOURCE_RESOLVED) \
+	      --dart-define=VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION); \
+	  else \
+	    VOLVOXGRID_SOURCE=$(VOLVOXGRID_SOURCE_RESOLVED) VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION) \
+	    LD_LIBRARY_PATH="$(VOLVOXGRID_PLUGIN_DEBUG_DIR):$${LD_LIBRARY_PATH}" \
+	    flutter run -d linux --dart-define=VG_ENABLE_FLING=true \
+	      --dart-define=VOLVOXGRID_SOURCE=$(VOLVOXGRID_SOURCE_RESOLVED) \
+	      --dart-define=VOLVOXGRID_VERSION=$(VOLVOXGRID_VERSION); \
+	  fi
 
 # =============================================================================
 # GTK4 Visual Test — Direct engine embedding, no plugin

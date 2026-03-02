@@ -12,7 +12,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.1.3")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.1.4")
 }
 ```
 

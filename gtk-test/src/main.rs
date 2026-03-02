@@ -683,7 +683,7 @@ fn build_ui(app: &Application) {
 
                 // Decide whether to use GPU path.
                 #[cfg(feature = "gpu")]
-                let use_gpu = gpu_renderer.is_some() && grid.renderer_mode >= 1;
+                let use_gpu = gpu_renderer.is_some() && grid.renderer_mode >= 2;
                 #[cfg(not(feature = "gpu"))]
                 let use_gpu = false;
 
@@ -697,14 +697,14 @@ fn build_ui(app: &Application) {
                             #[cfg(feature = "gpu")]
                             if use_gpu {
                                 if let Some(gr) = gpu_renderer.as_mut() {
-                                    grid.debug_renderer_actual = 1; // GPU
+                                    grid.debug_renderer_actual = 2; // GPU=2
                                     gr.render_to_buffer(grid, &mut data, w, h, stride);
                                     // GPU renders Bgra8Unorm which matches Cairo ARgb32 — no swap needed.
                                 }
                             }
 
                             if !use_gpu {
-                                grid.debug_renderer_actual = 0; // CPU
+                                grid.debug_renderer_actual = 1; // CPU=1
                                 renderer.render(grid, &mut data, w, h, stride);
                                 // Engine renders RGBA; cairo ARgb32 expects BGRA byte order on LE.
                                 rgba_to_bgra(&mut data);
@@ -2061,9 +2061,9 @@ fn build_ui(app: &Application) {
         let gpu_btn = btn_gpu.clone();
         btn_gpu.connect_clicked(move |_| {
             let mut st = state.borrow_mut();
-            let new_mode = if st.grid.renderer_mode == 0 { 1 } else { 0 };
+            let new_mode = if st.grid.renderer_mode == 1 { 2 } else { 1 };
             st.grid.renderer_mode = new_mode;
-            gpu_btn.set_label(if new_mode == 1 { "GPU" } else { "CPU" });
+            gpu_btn.set_label(if new_mode >= 2 { "GPU" } else { "CPU" });
             st.grid.mark_dirty();
             drop(st);
             area.queue_draw();
