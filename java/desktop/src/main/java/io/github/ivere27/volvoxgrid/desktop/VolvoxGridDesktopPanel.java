@@ -817,6 +817,11 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             IntBuffer intView = view.asIntBuffer();
             int pixelCount = Math.min(intView.remaining(), argbPixels.length);
             intView.get(argbPixels, 0, pixelCount);
+            for (int i = 0; i < pixelCount; i++) {
+                int px = argbPixels[i];
+                // Engine writes RGBA bytes; Swing setRGB expects packed ARGB.
+                argbPixels[i] = (px & 0xFF00FF00) | ((px & 0x00FF0000) >>> 16) | ((px & 0x000000FF) << 16);
+            }
             img.setRGB(0, 0, bufferWidth, bufferHeight, argbPixels, 0, bufferWidth);
         }
 
