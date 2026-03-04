@@ -330,6 +330,40 @@ final $typed_data.Uint8List columnDataTypeDescriptor = $convert.base64Decode(
     '9OVU1CRVIQARIUChBDT0xVTU5fREFUQV9EQVRFEAISFwoTQ09MVU1OX0RBVEFfQk9PTEVBThAD'
     'EhgKFENPTFVNTl9EQVRBX0NVUlJFTkNZEAQ=');
 
+@$core.Deprecated('Use coercionModeDescriptor instead')
+const CoercionMode$json = {
+  '1': 'CoercionMode',
+  '2': [
+    {'1': 'COERCION_MODE_UNSPECIFIED', '2': 0},
+    {'1': 'COERCION_MODE_STRICT', '2': 1},
+    {'1': 'COERCION_MODE_FLEXIBLE', '2': 2},
+    {'1': 'COERCION_MODE_PARSE_ONLY', '2': 3},
+  ],
+};
+
+/// Descriptor for `CoercionMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List coercionModeDescriptor = $convert.base64Decode(
+    'CgxDb2VyY2lvbk1vZGUSHQoZQ09FUkNJT05fTU9ERV9VTlNQRUNJRklFRBAAEhgKFENPRVJDSU'
+    '9OX01PREVfU1RSSUNUEAESGgoWQ09FUkNJT05fTU9ERV9GTEVYSUJMRRACEhwKGENPRVJDSU9O'
+    'X01PREVfUEFSU0VfT05MWRAD');
+
+@$core.Deprecated('Use writeErrorModeDescriptor instead')
+const WriteErrorMode$json = {
+  '1': 'WriteErrorMode',
+  '2': [
+    {'1': 'WRITE_ERROR_MODE_UNSPECIFIED', '2': 0},
+    {'1': 'WRITE_ERROR_MODE_REJECT', '2': 1},
+    {'1': 'WRITE_ERROR_MODE_SET_NULL', '2': 2},
+    {'1': 'WRITE_ERROR_MODE_SKIP', '2': 3},
+  ],
+};
+
+/// Descriptor for `WriteErrorMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List writeErrorModeDescriptor = $convert.base64Decode(
+    'Cg5Xcml0ZUVycm9yTW9kZRIgChxXUklURV9FUlJPUl9NT0RFX1VOU1BFQ0lGSUVEEAASGwoXV1'
+    'JJVEVfRVJST1JfTU9ERV9SRUpFQ1QQARIdChlXUklURV9FUlJPUl9NT0RFX1NFVF9OVUxMEAIS'
+    'GQoVV1JJVEVfRVJST1JfTU9ERV9TS0lQEAM=');
+
 @$core.Deprecated('Use alignDescriptor instead')
 const Align$json = {
   '1': 'Align',
@@ -584,6 +618,42 @@ final $typed_data.Uint8List borderStyleDescriptor = $convert.base64Decode(
     'VSX1RISUNLEAISEQoNQk9SREVSX0RPVFRFRBADEhEKDUJPUkRFUl9EQVNIRUQQBBIRCg1CT1JE'
     'RVJfRE9VQkxFEAUSEQoNQk9SREVSX1JBSVNFRBAGEhAKDEJPUkRFUl9JTlNFVBAH');
 
+@$core.Deprecated('Use hoverModeDescriptor instead')
+const HoverMode$json = {
+  '1': 'HoverMode',
+  '2': [
+    {'1': 'HOVER_NONE', '2': 0},
+    {'1': 'HOVER_ROW', '2': 1},
+    {'1': 'HOVER_COLUMN', '2': 2},
+    {'1': 'HOVER_CELL', '2': 4},
+  ],
+};
+
+/// Descriptor for `HoverMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List hoverModeDescriptor = $convert.base64Decode(
+    'CglIb3Zlck1vZGUSDgoKSE9WRVJfTk9ORRAAEg0KCUhPVkVSX1JPVxABEhAKDEhPVkVSX0NPTF'
+    'VNThACEg4KCkhPVkVSX0NFTEwQBA==');
+
+@$core.Deprecated('Use fillHandlePositionDescriptor instead')
+const FillHandlePosition$json = {
+  '1': 'FillHandlePosition',
+  '2': [
+    {'1': 'FILL_HANDLE_NONE', '2': 0},
+    {'1': 'FILL_HANDLE_BOTTOM_RIGHT', '2': 1},
+    {'1': 'FILL_HANDLE_BOTTOM_LEFT', '2': 2},
+    {'1': 'FILL_HANDLE_TOP_RIGHT', '2': 3},
+    {'1': 'FILL_HANDLE_TOP_LEFT', '2': 4},
+    {'1': 'FILL_HANDLE_ALL_CORNERS', '2': 5},
+  ],
+};
+
+/// Descriptor for `FillHandlePosition`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List fillHandlePositionDescriptor = $convert.base64Decode(
+    'ChJGaWxsSGFuZGxlUG9zaXRpb24SFAoQRklMTF9IQU5ETEVfTk9ORRAAEhwKGEZJTExfSEFORE'
+    'xFX0JPVFRPTV9SSUdIVBABEhsKF0ZJTExfSEFORExFX0JPVFRPTV9MRUZUEAISGQoVRklMTF9I'
+    'QU5ETEVfVE9QX1JJR0hUEAMSGAoURklMTF9IQU5ETEVfVE9QX0xFRlQQBBIbChdGSUxMX0hBTk'
+    'RMRV9BTExfQ09STkVSUxAF');
+
 @$core.Deprecated('Use applyScopeDescriptor instead')
 const ApplyScope$json = {
   '1': 'ApplyScope',
@@ -803,6 +873,7 @@ const CellValue$json = {
     {'1': 'number', '3': 2, '4': 1, '5': 1, '9': 0, '10': 'number'},
     {'1': 'flag', '3': 3, '4': 1, '5': 8, '9': 0, '10': 'flag'},
     {'1': 'data', '3': 4, '4': 1, '5': 12, '9': 0, '10': 'data'},
+    {'1': 'timestamp', '3': 5, '4': 1, '5': 3, '9': 0, '10': 'timestamp'},
   ],
   '8': [
     {'1': 'value'},
@@ -812,8 +883,8 @@ const CellValue$json = {
 /// Descriptor for `CellValue`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List cellValueDescriptor = $convert.base64Decode(
     'CglDZWxsVmFsdWUSFAoEdGV4dBgBIAEoCUgAUgR0ZXh0EhgKBm51bWJlchgCIAEoAUgAUgZudW'
-    '1iZXISFAoEZmxhZxgDIAEoCEgAUgRmbGFnEhQKBGRhdGEYBCABKAxIAFIEZGF0YUIHCgV2YWx1'
-    'ZQ==');
+    '1iZXISFAoEZmxhZxgDIAEoCEgAUgRmbGFnEhQKBGRhdGEYBCABKAxIAFIEZGF0YRIeCgl0aW1l'
+    'c3RhbXAYBSABKANIAFIJdGltZXN0YW1wQgcKBXZhbHVl');
 
 @$core.Deprecated('Use cellRangeDescriptor instead')
 const CellRange$json = {
@@ -853,6 +924,183 @@ final $typed_data.Uint8List cellPaddingDescriptor = $convert.base64Decode(
     'CgtDZWxsUGFkZGluZxIXCgRsZWZ0GAEgASgFSABSBGxlZnSIAQESFQoDdG9wGAIgASgFSAFSA3'
     'RvcIgBARIZCgVyaWdodBgDIAEoBUgCUgVyaWdodIgBARIbCgZib3R0b20YBCABKAVIA1IGYm90'
     'dG9tiAEBQgcKBV9sZWZ0QgYKBF90b3BCCAoGX3JpZ2h0QgkKB19ib3R0b20=');
+
+@$core.Deprecated('Use highlightStyleDescriptor instead')
+const HighlightStyle$json = {
+  '1': 'HighlightStyle',
+  '2': [
+    {
+      '1': 'back_color',
+      '3': 1,
+      '4': 1,
+      '5': 13,
+      '9': 0,
+      '10': 'backColor',
+      '17': true
+    },
+    {
+      '1': 'fore_color',
+      '3': 2,
+      '4': 1,
+      '5': 13,
+      '9': 1,
+      '10': 'foreColor',
+      '17': true
+    },
+    {
+      '1': 'border',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.BorderStyle',
+      '9': 2,
+      '10': 'border',
+      '17': true
+    },
+    {
+      '1': 'border_color',
+      '3': 4,
+      '4': 1,
+      '5': 13,
+      '9': 3,
+      '10': 'borderColor',
+      '17': true
+    },
+    {
+      '1': 'border_top',
+      '3': 5,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.BorderStyle',
+      '9': 4,
+      '10': 'borderTop',
+      '17': true
+    },
+    {
+      '1': 'border_right',
+      '3': 6,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.BorderStyle',
+      '9': 5,
+      '10': 'borderRight',
+      '17': true
+    },
+    {
+      '1': 'border_bottom',
+      '3': 7,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.BorderStyle',
+      '9': 6,
+      '10': 'borderBottom',
+      '17': true
+    },
+    {
+      '1': 'border_left',
+      '3': 8,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.BorderStyle',
+      '9': 7,
+      '10': 'borderLeft',
+      '17': true
+    },
+    {
+      '1': 'border_top_color',
+      '3': 9,
+      '4': 1,
+      '5': 13,
+      '9': 8,
+      '10': 'borderTopColor',
+      '17': true
+    },
+    {
+      '1': 'border_right_color',
+      '3': 10,
+      '4': 1,
+      '5': 13,
+      '9': 9,
+      '10': 'borderRightColor',
+      '17': true
+    },
+    {
+      '1': 'border_bottom_color',
+      '3': 11,
+      '4': 1,
+      '5': 13,
+      '9': 10,
+      '10': 'borderBottomColor',
+      '17': true
+    },
+    {
+      '1': 'border_left_color',
+      '3': 12,
+      '4': 1,
+      '5': 13,
+      '9': 11,
+      '10': 'borderLeftColor',
+      '17': true
+    },
+    {
+      '1': 'fill_handle',
+      '3': 13,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.FillHandlePosition',
+      '9': 12,
+      '10': 'fillHandle',
+      '17': true
+    },
+    {
+      '1': 'fill_handle_color',
+      '3': 14,
+      '4': 1,
+      '5': 13,
+      '9': 13,
+      '10': 'fillHandleColor',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_back_color'},
+    {'1': '_fore_color'},
+    {'1': '_border'},
+    {'1': '_border_color'},
+    {'1': '_border_top'},
+    {'1': '_border_right'},
+    {'1': '_border_bottom'},
+    {'1': '_border_left'},
+    {'1': '_border_top_color'},
+    {'1': '_border_right_color'},
+    {'1': '_border_bottom_color'},
+    {'1': '_border_left_color'},
+    {'1': '_fill_handle'},
+    {'1': '_fill_handle_color'},
+  ],
+};
+
+/// Descriptor for `HighlightStyle`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List highlightStyleDescriptor = $convert.base64Decode(
+    'Cg5IaWdobGlnaHRTdHlsZRIiCgpiYWNrX2NvbG9yGAEgASgNSABSCWJhY2tDb2xvcogBARIiCg'
+    'pmb3JlX2NvbG9yGAIgASgNSAFSCWZvcmVDb2xvcogBARI3CgZib3JkZXIYAyABKA4yGi52b2x2'
+    'b3hncmlkLnYxLkJvcmRlclN0eWxlSAJSBmJvcmRlcogBARImCgxib3JkZXJfY29sb3IYBCABKA'
+    '1IA1ILYm9yZGVyQ29sb3KIAQESPgoKYm9yZGVyX3RvcBgFIAEoDjIaLnZvbHZveGdyaWQudjEu'
+    'Qm9yZGVyU3R5bGVIBFIJYm9yZGVyVG9wiAEBEkIKDGJvcmRlcl9yaWdodBgGIAEoDjIaLnZvbH'
+    'ZveGdyaWQudjEuQm9yZGVyU3R5bGVIBVILYm9yZGVyUmlnaHSIAQESRAoNYm9yZGVyX2JvdHRv'
+    'bRgHIAEoDjIaLnZvbHZveGdyaWQudjEuQm9yZGVyU3R5bGVIBlIMYm9yZGVyQm90dG9tiAEBEk'
+    'AKC2JvcmRlcl9sZWZ0GAggASgOMhoudm9sdm94Z3JpZC52MS5Cb3JkZXJTdHlsZUgHUgpib3Jk'
+    'ZXJMZWZ0iAEBEi0KEGJvcmRlcl90b3BfY29sb3IYCSABKA1ICFIOYm9yZGVyVG9wQ29sb3KIAQ'
+    'ESMQoSYm9yZGVyX3JpZ2h0X2NvbG9yGAogASgNSAlSEGJvcmRlclJpZ2h0Q29sb3KIAQESMwoT'
+    'Ym9yZGVyX2JvdHRvbV9jb2xvchgLIAEoDUgKUhFib3JkZXJCb3R0b21Db2xvcogBARIvChFib3'
+    'JkZXJfbGVmdF9jb2xvchgMIAEoDUgLUg9ib3JkZXJMZWZ0Q29sb3KIAQESRwoLZmlsbF9oYW5k'
+    'bGUYDSABKA4yIS52b2x2b3hncmlkLnYxLkZpbGxIYW5kbGVQb3NpdGlvbkgMUgpmaWxsSGFuZG'
+    'xliAEBEi8KEWZpbGxfaGFuZGxlX2NvbG9yGA4gASgNSA1SD2ZpbGxIYW5kbGVDb2xvcogBAUIN'
+    'CgtfYmFja19jb2xvckINCgtfZm9yZV9jb2xvckIJCgdfYm9yZGVyQg8KDV9ib3JkZXJfY29sb3'
+    'JCDQoLX2JvcmRlcl90b3BCDwoNX2JvcmRlcl9yaWdodEIQCg5fYm9yZGVyX2JvdHRvbUIOCgxf'
+    'Ym9yZGVyX2xlZnRCEwoRX2JvcmRlcl90b3BfY29sb3JCFQoTX2JvcmRlcl9yaWdodF9jb2xvck'
+    'IWChRfYm9yZGVyX2JvdHRvbV9jb2xvckIUChJfYm9yZGVyX2xlZnRfY29sb3JCDgoMX2ZpbGxf'
+    'aGFuZGxlQhQKEl9maWxsX2hhbmRsZV9jb2xvcg==');
 
 @$core.Deprecated('Use headerMarkSizeDescriptor instead')
 const HeaderMarkSize$json = {
@@ -1729,29 +1977,11 @@ const StyleConfig$json = {
       '17': true
     },
     {
-      '1': 'back_color_sel',
-      '3': 8,
-      '4': 1,
-      '5': 13,
-      '9': 7,
-      '10': 'backColorSel',
-      '17': true
-    },
-    {
-      '1': 'fore_color_sel',
-      '3': 9,
-      '4': 1,
-      '5': 13,
-      '9': 8,
-      '10': 'foreColorSel',
-      '17': true
-    },
-    {
       '1': 'back_color_bkg',
       '3': 10,
       '4': 1,
       '5': 13,
-      '9': 9,
+      '9': 7,
       '10': 'backColorBkg',
       '17': true
     },
@@ -1760,7 +1990,7 @@ const StyleConfig$json = {
       '3': 11,
       '4': 1,
       '5': 13,
-      '9': 10,
+      '9': 8,
       '10': 'backColorAlternate',
       '17': true
     },
@@ -1770,7 +2000,7 @@ const StyleConfig$json = {
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.GridLineStyle',
-      '9': 11,
+      '9': 9,
       '10': 'gridLines',
       '17': true
     },
@@ -1780,7 +2010,7 @@ const StyleConfig$json = {
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.GridLineStyle',
-      '9': 12,
+      '9': 10,
       '10': 'gridLinesFixed',
       '17': true
     },
@@ -1789,7 +2019,7 @@ const StyleConfig$json = {
       '3': 14,
       '4': 1,
       '5': 13,
-      '9': 13,
+      '9': 11,
       '10': 'gridColor',
       '17': true
     },
@@ -1798,7 +2028,7 @@ const StyleConfig$json = {
       '3': 15,
       '4': 1,
       '5': 13,
-      '9': 14,
+      '9': 12,
       '10': 'gridColorFixed',
       '17': true
     },
@@ -1807,7 +2037,7 @@ const StyleConfig$json = {
       '3': 16,
       '4': 1,
       '5': 5,
-      '9': 15,
+      '9': 13,
       '10': 'gridLineWidth',
       '17': true
     },
@@ -1817,7 +2047,7 @@ const StyleConfig$json = {
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.TextEffect',
-      '9': 16,
+      '9': 14,
       '10': 'textEffect',
       '17': true
     },
@@ -1827,7 +2057,7 @@ const StyleConfig$json = {
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.TextEffect',
-      '9': 17,
+      '9': 15,
       '10': 'textEffectFixed',
       '17': true
     },
@@ -1836,7 +2066,7 @@ const StyleConfig$json = {
       '3': 19,
       '4': 1,
       '5': 9,
-      '9': 18,
+      '9': 16,
       '10': 'fontName',
       '17': true
     },
@@ -1845,7 +2075,7 @@ const StyleConfig$json = {
       '3': 20,
       '4': 1,
       '5': 2,
-      '9': 19,
+      '9': 17,
       '10': 'fontSize',
       '17': true
     },
@@ -1854,7 +2084,7 @@ const StyleConfig$json = {
       '3': 21,
       '4': 1,
       '5': 8,
-      '9': 20,
+      '9': 18,
       '10': 'fontBold',
       '17': true
     },
@@ -1863,7 +2093,7 @@ const StyleConfig$json = {
       '3': 22,
       '4': 1,
       '5': 8,
-      '9': 21,
+      '9': 19,
       '10': 'fontItalic',
       '17': true
     },
@@ -1872,7 +2102,7 @@ const StyleConfig$json = {
       '3': 23,
       '4': 1,
       '5': 8,
-      '9': 22,
+      '9': 20,
       '10': 'fontUnderline',
       '17': true
     },
@@ -1881,7 +2111,7 @@ const StyleConfig$json = {
       '3': 24,
       '4': 1,
       '5': 8,
-      '9': 23,
+      '9': 21,
       '10': 'fontStrikethrough',
       '17': true
     },
@@ -1890,7 +2120,7 @@ const StyleConfig$json = {
       '3': 25,
       '4': 1,
       '5': 2,
-      '9': 24,
+      '9': 22,
       '10': 'fontWidth',
       '17': true
     },
@@ -1899,7 +2129,7 @@ const StyleConfig$json = {
       '3': 26,
       '4': 1,
       '5': 13,
-      '9': 25,
+      '9': 23,
       '10': 'sheetBorder',
       '17': true
     },
@@ -1908,7 +2138,7 @@ const StyleConfig$json = {
       '3': 27,
       '4': 1,
       '5': 13,
-      '9': 26,
+      '9': 24,
       '10': 'progressColor',
       '17': true
     },
@@ -1917,7 +2147,7 @@ const StyleConfig$json = {
       '3': 28,
       '4': 1,
       '5': 8,
-      '9': 27,
+      '9': 25,
       '10': 'imageOverText',
       '17': true
     },
@@ -1926,7 +2156,7 @@ const StyleConfig$json = {
       '3': 29,
       '4': 1,
       '5': 12,
-      '9': 28,
+      '9': 26,
       '10': 'backgroundImage',
       '17': true
     },
@@ -1936,7 +2166,7 @@ const StyleConfig$json = {
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.ImageAlignment',
-      '9': 29,
+      '9': 27,
       '10': 'backgroundImageAlignment',
       '17': true
     },
@@ -1946,7 +2176,7 @@ const StyleConfig$json = {
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.TextRenderMode',
-      '9': 30,
+      '9': 28,
       '10': 'textRenderMode',
       '17': true
     },
@@ -1956,7 +2186,7 @@ const StyleConfig$json = {
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.TextHintingMode',
-      '9': 31,
+      '9': 29,
       '10': 'textHintingMode',
       '17': true
     },
@@ -1965,7 +2195,7 @@ const StyleConfig$json = {
       '3': 33,
       '4': 1,
       '5': 8,
-      '9': 32,
+      '9': 30,
       '10': 'textPixelSnap',
       '17': true
     },
@@ -1975,7 +2205,7 @@ const StyleConfig$json = {
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.ApplyScope',
-      '9': 33,
+      '9': 31,
       '10': 'applyScope',
       '17': true
     },
@@ -1985,7 +2215,7 @@ const StyleConfig$json = {
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.CustomRenderMode',
-      '9': 34,
+      '9': 32,
       '10': 'customRender',
       '17': true
     },
@@ -2106,17 +2336,8 @@ const StyleConfig$json = {
       '3': 50,
       '4': 1,
       '5': 8,
-      '9': 35,
+      '9': 33,
       '10': 'showSortNumbers',
-      '17': true
-    },
-    {
-      '1': 'fill_handle_color',
-      '3': 51,
-      '4': 1,
-      '5': 13,
-      '9': 36,
-      '10': 'fillHandleColor',
       '17': true
     },
   ],
@@ -2128,8 +2349,6 @@ const StyleConfig$json = {
     {'1': '_fore_color_fixed'},
     {'1': '_back_color_frozen'},
     {'1': '_fore_color_frozen'},
-    {'1': '_back_color_sel'},
-    {'1': '_fore_color_sel'},
     {'1': '_back_color_bkg'},
     {'1': '_back_color_alternate'},
     {'1': '_grid_lines'},
@@ -2157,7 +2376,6 @@ const StyleConfig$json = {
     {'1': '_apply_scope'},
     {'1': '_custom_render'},
     {'1': '_show_sort_numbers'},
-    {'1': '_fill_handle_color'},
   ],
 };
 
@@ -2169,68 +2387,65 @@ final $typed_data.Uint8List styleConfigDescriptor = $convert.base64Decode(
     'xvcl9maXhlZBgEIAEoDUgDUg5iYWNrQ29sb3JGaXhlZIgBARItChBmb3JlX2NvbG9yX2ZpeGVk'
     'GAUgASgNSARSDmZvcmVDb2xvckZpeGVkiAEBEi8KEWJhY2tfY29sb3JfZnJvemVuGAYgASgNSA'
     'VSD2JhY2tDb2xvckZyb3plbogBARIvChFmb3JlX2NvbG9yX2Zyb3plbhgHIAEoDUgGUg9mb3Jl'
-    'Q29sb3JGcm96ZW6IAQESKQoOYmFja19jb2xvcl9zZWwYCCABKA1IB1IMYmFja0NvbG9yU2VsiA'
-    'EBEikKDmZvcmVfY29sb3Jfc2VsGAkgASgNSAhSDGZvcmVDb2xvclNlbIgBARIpCg5iYWNrX2Nv'
-    'bG9yX2JrZxgKIAEoDUgJUgxiYWNrQ29sb3JCa2eIAQESNQoUYmFja19jb2xvcl9hbHRlcm5hdG'
-    'UYCyABKA1IClISYmFja0NvbG9yQWx0ZXJuYXRliAEBEkAKCmdyaWRfbGluZXMYDCABKA4yHC52'
-    'b2x2b3hncmlkLnYxLkdyaWRMaW5lU3R5bGVIC1IJZ3JpZExpbmVziAEBEksKEGdyaWRfbGluZX'
-    'NfZml4ZWQYDSABKA4yHC52b2x2b3hncmlkLnYxLkdyaWRMaW5lU3R5bGVIDFIOZ3JpZExpbmVz'
-    'Rml4ZWSIAQESIgoKZ3JpZF9jb2xvchgOIAEoDUgNUglncmlkQ29sb3KIAQESLQoQZ3JpZF9jb2'
-    'xvcl9maXhlZBgPIAEoDUgOUg5ncmlkQ29sb3JGaXhlZIgBARIrCg9ncmlkX2xpbmVfd2lkdGgY'
-    'ECABKAVID1INZ3JpZExpbmVXaWR0aIgBARI/Cgt0ZXh0X2VmZmVjdBgRIAEoDjIZLnZvbHZveG'
-    'dyaWQudjEuVGV4dEVmZmVjdEgQUgp0ZXh0RWZmZWN0iAEBEkoKEXRleHRfZWZmZWN0X2ZpeGVk'
-    'GBIgASgOMhkudm9sdm94Z3JpZC52MS5UZXh0RWZmZWN0SBFSD3RleHRFZmZlY3RGaXhlZIgBAR'
-    'IgCglmb250X25hbWUYEyABKAlIElIIZm9udE5hbWWIAQESIAoJZm9udF9zaXplGBQgASgCSBNS'
-    'CGZvbnRTaXpliAEBEiAKCWZvbnRfYm9sZBgVIAEoCEgUUghmb250Qm9sZIgBARIkCgtmb250X2'
-    'l0YWxpYxgWIAEoCEgVUgpmb250SXRhbGljiAEBEioKDmZvbnRfdW5kZXJsaW5lGBcgASgISBZS'
-    'DWZvbnRVbmRlcmxpbmWIAQESMgoSZm9udF9zdHJpa2V0aHJvdWdoGBggASgISBdSEWZvbnRTdH'
-    'Jpa2V0aHJvdWdoiAEBEiIKCmZvbnRfd2lkdGgYGSABKAJIGFIJZm9udFdpZHRoiAEBEiYKDHNo'
-    'ZWV0X2JvcmRlchgaIAEoDUgZUgtzaGVldEJvcmRlcogBARIqCg5wcm9ncmVzc19jb2xvchgbIA'
-    'EoDUgaUg1wcm9ncmVzc0NvbG9yiAEBEisKD2ltYWdlX292ZXJfdGV4dBgcIAEoCEgbUg1pbWFn'
-    'ZU92ZXJUZXh0iAEBEi4KEGJhY2tncm91bmRfaW1hZ2UYHSABKAxIHFIPYmFja2dyb3VuZEltYW'
-    'dliAEBEmAKGmJhY2tncm91bmRfaW1hZ2VfYWxpZ25tZW50GB4gASgOMh0udm9sdm94Z3JpZC52'
-    'MS5JbWFnZUFsaWdubWVudEgdUhhiYWNrZ3JvdW5kSW1hZ2VBbGlnbm1lbnSIAQESTAoQdGV4dF'
-    '9yZW5kZXJfbW9kZRgfIAEoDjIdLnZvbHZveGdyaWQudjEuVGV4dFJlbmRlck1vZGVIHlIOdGV4'
-    'dFJlbmRlck1vZGWIAQESTwoRdGV4dF9oaW50aW5nX21vZGUYICABKA4yHi52b2x2b3hncmlkLn'
-    'YxLlRleHRIaW50aW5nTW9kZUgfUg90ZXh0SGludGluZ01vZGWIAQESKwoPdGV4dF9waXhlbF9z'
-    'bmFwGCEgASgISCBSDXRleHRQaXhlbFNuYXCIAQESPwoLYXBwbHlfc2NvcGUYIiABKA4yGS52b2'
-    'x2b3hncmlkLnYxLkFwcGx5U2NvcGVIIVIKYXBwbHlTY29wZYgBARJJCg1jdXN0b21fcmVuZGVy'
-    'GCMgASgOMh8udm9sdm94Z3JpZC52MS5DdXN0b21SZW5kZXJNb2RlSCJSDGN1c3RvbVJlbmRlco'
-    'gBARJOChZzb3J0X2FzY2VuZGluZ19waWN0dXJlGCQgASgLMhgudm9sdm94Z3JpZC52MS5JbWFn'
-    'ZURhdGFSFHNvcnRBc2NlbmRpbmdQaWN0dXJlElAKF3NvcnRfZGVzY2VuZGluZ19waWN0dXJlGC'
-    'UgASgLMhgudm9sdm94Z3JpZC52MS5JbWFnZURhdGFSFXNvcnREZXNjZW5kaW5nUGljdHVyZRJE'
-    'ChFub2RlX29wZW5fcGljdHVyZRgmIAEoCzIYLnZvbHZveGdyaWQudjEuSW1hZ2VEYXRhUg9ub2'
-    'RlT3BlblBpY3R1cmUSSAoTbm9kZV9jbG9zZWRfcGljdHVyZRgnIAEoCzIYLnZvbHZveGdyaWQu'
-    'djEuSW1hZ2VEYXRhUhFub2RlQ2xvc2VkUGljdHVyZRI9CgxjZWxsX3BhZGRpbmcYKCABKAsyGi'
-    '52b2x2b3hncmlkLnYxLkNlbGxQYWRkaW5nUgtjZWxsUGFkZGluZxJIChJmaXhlZF9jZWxsX3Bh'
-    'ZGRpbmcYKSABKAsyGi52b2x2b3hncmlkLnYxLkNlbGxQYWRkaW5nUhBmaXhlZENlbGxQYWRkaW'
-    '5nEk4KEGhlYWRlcl9zZXBhcmF0b3IYKiABKAsyIy52b2x2b3hncmlkLnYxLkhlYWRlclNlcGFy'
-    'YXRvclN0eWxlUg9oZWFkZXJTZXBhcmF0b3ISWAoUaGVhZGVyX3Jlc2l6ZV9oYW5kbGUYKyABKA'
-    'syJi52b2x2b3hncmlkLnYxLkhlYWRlclJlc2l6ZUhhbmRsZVN0eWxlUhJoZWFkZXJSZXNpemVI'
-    'YW5kbGUSRwoQaWNvbl90aGVtZV9zbG90cxgsIAEoCzIdLnZvbHZveGdyaWQudjEuSWNvblRoZW'
-    '1lU2xvdHNSDmljb25UaGVtZVNsb3RzElIKGGNoZWNrYm94X2NoZWNrZWRfcGljdHVyZRgtIAEo'
-    'CzIYLnZvbHZveGdyaWQudjEuSW1hZ2VEYXRhUhZjaGVja2JveENoZWNrZWRQaWN0dXJlElYKGm'
-    'NoZWNrYm94X3VuY2hlY2tlZF9waWN0dXJlGC4gASgLMhgudm9sdm94Z3JpZC52MS5JbWFnZURh'
-    'dGFSGGNoZWNrYm94VW5jaGVja2VkUGljdHVyZRJeCh5jaGVja2JveF9pbmRldGVybWluYXRlX3'
-    'BpY3R1cmUYLyABKAsyGC52b2x2b3hncmlkLnYxLkltYWdlRGF0YVIcY2hlY2tib3hJbmRldGVy'
-    'bWluYXRlUGljdHVyZRJQChNpY29uX3RoZW1lX2RlZmF1bHRzGDAgASgLMiAudm9sdm94Z3JpZC'
-    '52MS5JY29uVGhlbWVEZWZhdWx0c1IRaWNvblRoZW1lRGVmYXVsdHMSVwoWaWNvbl90aGVtZV9z'
-    'bG90X3N0eWxlcxgxIAEoCzIiLnZvbHZveGdyaWQudjEuSWNvblRoZW1lU2xvdFN0eWxlc1ITaW'
-    'NvblRoZW1lU2xvdFN0eWxlcxIvChFzaG93X3NvcnRfbnVtYmVycxgyIAEoCEgjUg9zaG93U29y'
-    'dE51bWJlcnOIAQESLwoRZmlsbF9oYW5kbGVfY29sb3IYMyABKA1IJFIPZmlsbEhhbmRsZUNvbG'
-    '9yiAEBQg0KC19hcHBlYXJhbmNlQg0KC19iYWNrX2NvbG9yQg0KC19mb3JlX2NvbG9yQhMKEV9i'
-    'YWNrX2NvbG9yX2ZpeGVkQhMKEV9mb3JlX2NvbG9yX2ZpeGVkQhQKEl9iYWNrX2NvbG9yX2Zyb3'
-    'plbkIUChJfZm9yZV9jb2xvcl9mcm96ZW5CEQoPX2JhY2tfY29sb3Jfc2VsQhEKD19mb3JlX2Nv'
-    'bG9yX3NlbEIRCg9fYmFja19jb2xvcl9ia2dCFwoVX2JhY2tfY29sb3JfYWx0ZXJuYXRlQg0KC1'
-    '9ncmlkX2xpbmVzQhMKEV9ncmlkX2xpbmVzX2ZpeGVkQg0KC19ncmlkX2NvbG9yQhMKEV9ncmlk'
-    'X2NvbG9yX2ZpeGVkQhIKEF9ncmlkX2xpbmVfd2lkdGhCDgoMX3RleHRfZWZmZWN0QhQKEl90ZX'
-    'h0X2VmZmVjdF9maXhlZEIMCgpfZm9udF9uYW1lQgwKCl9mb250X3NpemVCDAoKX2ZvbnRfYm9s'
-    'ZEIOCgxfZm9udF9pdGFsaWNCEQoPX2ZvbnRfdW5kZXJsaW5lQhUKE19mb250X3N0cmlrZXRocm'
-    '91Z2hCDQoLX2ZvbnRfd2lkdGhCDwoNX3NoZWV0X2JvcmRlckIRCg9fcHJvZ3Jlc3NfY29sb3JC'
-    'EgoQX2ltYWdlX292ZXJfdGV4dEITChFfYmFja2dyb3VuZF9pbWFnZUIdChtfYmFja2dyb3VuZF'
-    '9pbWFnZV9hbGlnbm1lbnRCEwoRX3RleHRfcmVuZGVyX21vZGVCFAoSX3RleHRfaGludGluZ19t'
-    'b2RlQhIKEF90ZXh0X3BpeGVsX3NuYXBCDgoMX2FwcGx5X3Njb3BlQhAKDl9jdXN0b21fcmVuZG'
-    'VyQhQKEl9zaG93X3NvcnRfbnVtYmVyc0IUChJfZmlsbF9oYW5kbGVfY29sb3I=');
+    'Q29sb3JGcm96ZW6IAQESKQoOYmFja19jb2xvcl9ia2cYCiABKA1IB1IMYmFja0NvbG9yQmtniA'
+    'EBEjUKFGJhY2tfY29sb3JfYWx0ZXJuYXRlGAsgASgNSAhSEmJhY2tDb2xvckFsdGVybmF0ZYgB'
+    'ARJACgpncmlkX2xpbmVzGAwgASgOMhwudm9sdm94Z3JpZC52MS5HcmlkTGluZVN0eWxlSAlSCW'
+    'dyaWRMaW5lc4gBARJLChBncmlkX2xpbmVzX2ZpeGVkGA0gASgOMhwudm9sdm94Z3JpZC52MS5H'
+    'cmlkTGluZVN0eWxlSApSDmdyaWRMaW5lc0ZpeGVkiAEBEiIKCmdyaWRfY29sb3IYDiABKA1IC1'
+    'IJZ3JpZENvbG9yiAEBEi0KEGdyaWRfY29sb3JfZml4ZWQYDyABKA1IDFIOZ3JpZENvbG9yRml4'
+    'ZWSIAQESKwoPZ3JpZF9saW5lX3dpZHRoGBAgASgFSA1SDWdyaWRMaW5lV2lkdGiIAQESPwoLdG'
+    'V4dF9lZmZlY3QYESABKA4yGS52b2x2b3hncmlkLnYxLlRleHRFZmZlY3RIDlIKdGV4dEVmZmVj'
+    'dIgBARJKChF0ZXh0X2VmZmVjdF9maXhlZBgSIAEoDjIZLnZvbHZveGdyaWQudjEuVGV4dEVmZm'
+    'VjdEgPUg90ZXh0RWZmZWN0Rml4ZWSIAQESIAoJZm9udF9uYW1lGBMgASgJSBBSCGZvbnROYW1l'
+    'iAEBEiAKCWZvbnRfc2l6ZRgUIAEoAkgRUghmb250U2l6ZYgBARIgCglmb250X2JvbGQYFSABKA'
+    'hIElIIZm9udEJvbGSIAQESJAoLZm9udF9pdGFsaWMYFiABKAhIE1IKZm9udEl0YWxpY4gBARIq'
+    'Cg5mb250X3VuZGVybGluZRgXIAEoCEgUUg1mb250VW5kZXJsaW5liAEBEjIKEmZvbnRfc3RyaW'
+    'tldGhyb3VnaBgYIAEoCEgVUhFmb250U3RyaWtldGhyb3VnaIgBARIiCgpmb250X3dpZHRoGBkg'
+    'ASgCSBZSCWZvbnRXaWR0aIgBARImCgxzaGVldF9ib3JkZXIYGiABKA1IF1ILc2hlZXRCb3JkZX'
+    'KIAQESKgoOcHJvZ3Jlc3NfY29sb3IYGyABKA1IGFINcHJvZ3Jlc3NDb2xvcogBARIrCg9pbWFn'
+    'ZV9vdmVyX3RleHQYHCABKAhIGVINaW1hZ2VPdmVyVGV4dIgBARIuChBiYWNrZ3JvdW5kX2ltYW'
+    'dlGB0gASgMSBpSD2JhY2tncm91bmRJbWFnZYgBARJgChpiYWNrZ3JvdW5kX2ltYWdlX2FsaWdu'
+    'bWVudBgeIAEoDjIdLnZvbHZveGdyaWQudjEuSW1hZ2VBbGlnbm1lbnRIG1IYYmFja2dyb3VuZE'
+    'ltYWdlQWxpZ25tZW50iAEBEkwKEHRleHRfcmVuZGVyX21vZGUYHyABKA4yHS52b2x2b3hncmlk'
+    'LnYxLlRleHRSZW5kZXJNb2RlSBxSDnRleHRSZW5kZXJNb2RliAEBEk8KEXRleHRfaGludGluZ1'
+    '9tb2RlGCAgASgOMh4udm9sdm94Z3JpZC52MS5UZXh0SGludGluZ01vZGVIHVIPdGV4dEhpbnRp'
+    'bmdNb2RliAEBEisKD3RleHRfcGl4ZWxfc25hcBghIAEoCEgeUg10ZXh0UGl4ZWxTbmFwiAEBEj'
+    '8KC2FwcGx5X3Njb3BlGCIgASgOMhkudm9sdm94Z3JpZC52MS5BcHBseVNjb3BlSB9SCmFwcGx5'
+    'U2NvcGWIAQESSQoNY3VzdG9tX3JlbmRlchgjIAEoDjIfLnZvbHZveGdyaWQudjEuQ3VzdG9tUm'
+    'VuZGVyTW9kZUggUgxjdXN0b21SZW5kZXKIAQESTgoWc29ydF9hc2NlbmRpbmdfcGljdHVyZRgk'
+    'IAEoCzIYLnZvbHZveGdyaWQudjEuSW1hZ2VEYXRhUhRzb3J0QXNjZW5kaW5nUGljdHVyZRJQCh'
+    'dzb3J0X2Rlc2NlbmRpbmdfcGljdHVyZRglIAEoCzIYLnZvbHZveGdyaWQudjEuSW1hZ2VEYXRh'
+    'UhVzb3J0RGVzY2VuZGluZ1BpY3R1cmUSRAoRbm9kZV9vcGVuX3BpY3R1cmUYJiABKAsyGC52b2'
+    'x2b3hncmlkLnYxLkltYWdlRGF0YVIPbm9kZU9wZW5QaWN0dXJlEkgKE25vZGVfY2xvc2VkX3Bp'
+    'Y3R1cmUYJyABKAsyGC52b2x2b3hncmlkLnYxLkltYWdlRGF0YVIRbm9kZUNsb3NlZFBpY3R1cm'
+    'USPQoMY2VsbF9wYWRkaW5nGCggASgLMhoudm9sdm94Z3JpZC52MS5DZWxsUGFkZGluZ1ILY2Vs'
+    'bFBhZGRpbmcSSAoSZml4ZWRfY2VsbF9wYWRkaW5nGCkgASgLMhoudm9sdm94Z3JpZC52MS5DZW'
+    'xsUGFkZGluZ1IQZml4ZWRDZWxsUGFkZGluZxJOChBoZWFkZXJfc2VwYXJhdG9yGCogASgLMiMu'
+    'dm9sdm94Z3JpZC52MS5IZWFkZXJTZXBhcmF0b3JTdHlsZVIPaGVhZGVyU2VwYXJhdG9yElgKFG'
+    'hlYWRlcl9yZXNpemVfaGFuZGxlGCsgASgLMiYudm9sdm94Z3JpZC52MS5IZWFkZXJSZXNpemVI'
+    'YW5kbGVTdHlsZVISaGVhZGVyUmVzaXplSGFuZGxlEkcKEGljb25fdGhlbWVfc2xvdHMYLCABKA'
+    'syHS52b2x2b3hncmlkLnYxLkljb25UaGVtZVNsb3RzUg5pY29uVGhlbWVTbG90cxJSChhjaGVj'
+    'a2JveF9jaGVja2VkX3BpY3R1cmUYLSABKAsyGC52b2x2b3hncmlkLnYxLkltYWdlRGF0YVIWY2'
+    'hlY2tib3hDaGVja2VkUGljdHVyZRJWChpjaGVja2JveF91bmNoZWNrZWRfcGljdHVyZRguIAEo'
+    'CzIYLnZvbHZveGdyaWQudjEuSW1hZ2VEYXRhUhhjaGVja2JveFVuY2hlY2tlZFBpY3R1cmUSXg'
+    'oeY2hlY2tib3hfaW5kZXRlcm1pbmF0ZV9waWN0dXJlGC8gASgLMhgudm9sdm94Z3JpZC52MS5J'
+    'bWFnZURhdGFSHGNoZWNrYm94SW5kZXRlcm1pbmF0ZVBpY3R1cmUSUAoTaWNvbl90aGVtZV9kZW'
+    'ZhdWx0cxgwIAEoCzIgLnZvbHZveGdyaWQudjEuSWNvblRoZW1lRGVmYXVsdHNSEWljb25UaGVt'
+    'ZURlZmF1bHRzElcKFmljb25fdGhlbWVfc2xvdF9zdHlsZXMYMSABKAsyIi52b2x2b3hncmlkLn'
+    'YxLkljb25UaGVtZVNsb3RTdHlsZXNSE2ljb25UaGVtZVNsb3RTdHlsZXMSLwoRc2hvd19zb3J0'
+    'X251bWJlcnMYMiABKAhIIVIPc2hvd1NvcnROdW1iZXJziAEBQg0KC19hcHBlYXJhbmNlQg0KC1'
+    '9iYWNrX2NvbG9yQg0KC19mb3JlX2NvbG9yQhMKEV9iYWNrX2NvbG9yX2ZpeGVkQhMKEV9mb3Jl'
+    'X2NvbG9yX2ZpeGVkQhQKEl9iYWNrX2NvbG9yX2Zyb3plbkIUChJfZm9yZV9jb2xvcl9mcm96ZW'
+    '5CEQoPX2JhY2tfY29sb3JfYmtnQhcKFV9iYWNrX2NvbG9yX2FsdGVybmF0ZUINCgtfZ3JpZF9s'
+    'aW5lc0ITChFfZ3JpZF9saW5lc19maXhlZEINCgtfZ3JpZF9jb2xvckITChFfZ3JpZF9jb2xvcl'
+    '9maXhlZEISChBfZ3JpZF9saW5lX3dpZHRoQg4KDF90ZXh0X2VmZmVjdEIUChJfdGV4dF9lZmZl'
+    'Y3RfZml4ZWRCDAoKX2ZvbnRfbmFtZUIMCgpfZm9udF9zaXplQgwKCl9mb250X2JvbGRCDgoMX2'
+    'ZvbnRfaXRhbGljQhEKD19mb250X3VuZGVybGluZUIVChNfZm9udF9zdHJpa2V0aHJvdWdoQg0K'
+    'C19mb250X3dpZHRoQg8KDV9zaGVldF9ib3JkZXJCEQoPX3Byb2dyZXNzX2NvbG9yQhIKEF9pbW'
+    'FnZV9vdmVyX3RleHRCEwoRX2JhY2tncm91bmRfaW1hZ2VCHQobX2JhY2tncm91bmRfaW1hZ2Vf'
+    'YWxpZ25tZW50QhMKEV90ZXh0X3JlbmRlcl9tb2RlQhQKEl90ZXh0X2hpbnRpbmdfbW9kZUISCh'
+    'BfdGV4dF9waXhlbF9zbmFwQg4KDF9hcHBseV9zY29wZUIQCg5fY3VzdG9tX3JlbmRlckIUChJf'
+    'c2hvd19zb3J0X251bWJlcnM=');
 
 @$core.Deprecated('Use selectionConfigDescriptor instead')
 const SelectionConfig$json = {
@@ -2285,13 +2500,45 @@ const SelectionConfig$json = {
       '17': true
     },
     {
-      '1': 'show_fill_handle',
+      '1': 'selection_style',
       '3': 6,
       '4': 1,
-      '5': 8,
+      '5': 11,
+      '6': '.volvoxgrid.v1.HighlightStyle',
+      '10': 'selectionStyle'
+    },
+    {
+      '1': 'hover_mode',
+      '3': 7,
+      '4': 1,
+      '5': 13,
       '9': 5,
-      '10': 'showFillHandle',
+      '10': 'hoverMode',
       '17': true
+    },
+    {
+      '1': 'hover_row_style',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.HighlightStyle',
+      '10': 'hoverRowStyle'
+    },
+    {
+      '1': 'hover_column_style',
+      '3': 9,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.HighlightStyle',
+      '10': 'hoverColumnStyle'
+    },
+    {
+      '1': 'hover_cell_style',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.HighlightStyle',
+      '10': 'hoverCellStyle'
     },
   ],
   '8': [
@@ -2300,7 +2547,7 @@ const SelectionConfig$json = {
     {'1': '_selection_visibility'},
     {'1': '_allow_selection'},
     {'1': '_header_click_select'},
-    {'1': '_show_fill_handle'},
+    {'1': '_hover_mode'},
   ],
 };
 
@@ -2312,10 +2559,14 @@ final $typed_data.Uint8List selectionConfigDescriptor = $convert.base64Decode(
     'l0eRgDIAEoDjIiLnZvbHZveGdyaWQudjEuU2VsZWN0aW9uVmlzaWJpbGl0eUgCUhNzZWxlY3Rp'
     'b25WaXNpYmlsaXR5iAEBEiwKD2FsbG93X3NlbGVjdGlvbhgEIAEoCEgDUg5hbGxvd1NlbGVjdG'
     'lvbogBARIzChNoZWFkZXJfY2xpY2tfc2VsZWN0GAUgASgISARSEWhlYWRlckNsaWNrU2VsZWN0'
-    'iAEBEi0KEHNob3dfZmlsbF9oYW5kbGUYBiABKAhIBVIOc2hvd0ZpbGxIYW5kbGWIAQFCBwoFX2'
-    '1vZGVCDwoNX2ZvY3VzX2JvcmRlckIXChVfc2VsZWN0aW9uX3Zpc2liaWxpdHlCEgoQX2FsbG93'
-    'X3NlbGVjdGlvbkIWChRfaGVhZGVyX2NsaWNrX3NlbGVjdEITChFfc2hvd19maWxsX2hhbmRsZQ'
-    '==');
+    'iAEBEkYKD3NlbGVjdGlvbl9zdHlsZRgGIAEoCzIdLnZvbHZveGdyaWQudjEuSGlnaGxpZ2h0U3'
+    'R5bGVSDnNlbGVjdGlvblN0eWxlEiIKCmhvdmVyX21vZGUYByABKA1IBVIJaG92ZXJNb2RliAEB'
+    'EkUKD2hvdmVyX3Jvd19zdHlsZRgIIAEoCzIdLnZvbHZveGdyaWQudjEuSGlnaGxpZ2h0U3R5bG'
+    'VSDWhvdmVyUm93U3R5bGUSSwoSaG92ZXJfY29sdW1uX3N0eWxlGAkgASgLMh0udm9sdm94Z3Jp'
+    'ZC52MS5IaWdobGlnaHRTdHlsZVIQaG92ZXJDb2x1bW5TdHlsZRJHChBob3Zlcl9jZWxsX3N0eW'
+    'xlGAogASgLMh0udm9sdm94Z3JpZC52MS5IaWdobGlnaHRTdHlsZVIOaG92ZXJDZWxsU3R5bGVC'
+    'BwoFX21vZGVCDwoNX2ZvY3VzX2JvcmRlckIXChVfc2VsZWN0aW9uX3Zpc2liaWxpdHlCEgoQX2'
+    'FsbG93X3NlbGVjdGlvbkIWChRfaGVhZGVyX2NsaWNrX3NlbGVjdEINCgtfaG92ZXJfbW9kZQ==');
 
 @$core.Deprecated('Use editConfigDescriptor instead')
 const EditConfig$json = {
@@ -3015,6 +3266,35 @@ const ColumnDef$json = {
       '6': '.volvoxgrid.v1.CellPadding',
       '10': 'fixedCellPadding'
     },
+    {
+      '1': 'nullable',
+      '3': 21,
+      '4': 1,
+      '5': 8,
+      '9': 16,
+      '10': 'nullable',
+      '17': true
+    },
+    {
+      '1': 'coercion_mode',
+      '3': 22,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.CoercionMode',
+      '9': 17,
+      '10': 'coercionMode',
+      '17': true
+    },
+    {
+      '1': 'error_mode',
+      '3': 23,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.WriteErrorMode',
+      '9': 18,
+      '10': 'errorMode',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_width'},
@@ -3033,6 +3313,9 @@ const ColumnDef$json = {
     {'1': '_span'},
     {'1': '_data'},
     {'1': '_sticky'},
+    {'1': '_nullable'},
+    {'1': '_coercion_mode'},
+    {'1': '_error_mode'},
   ],
 };
 
@@ -3053,11 +3336,14 @@ final $typed_data.Uint8List columnDefDescriptor = $convert.base64Decode(
     'CgZzdGlja3kYEiABKA4yGS52b2x2b3hncmlkLnYxLlN0aWNreUVkZ2VID1IGc3RpY2t5iAEBEj'
     '0KDGNlbGxfcGFkZGluZxgTIAEoCzIaLnZvbHZveGdyaWQudjEuQ2VsbFBhZGRpbmdSC2NlbGxQ'
     'YWRkaW5nEkgKEmZpeGVkX2NlbGxfcGFkZGluZxgUIAEoCzIaLnZvbHZveGdyaWQudjEuQ2VsbF'
-    'BhZGRpbmdSEGZpeGVkQ2VsbFBhZGRpbmdCCAoGX3dpZHRoQgwKCl9taW5fd2lkdGhCDAoKX21h'
-    'eF93aWR0aEIMCgpfYWxpZ25tZW50QhIKEF9maXhlZF9hbGlnbm1lbnRCDAoKX2RhdGFfdHlwZU'
-    'IJCgdfZm9ybWF0QgYKBF9rZXlCBwoFX3NvcnRCEQoPX2Ryb3Bkb3duX2l0ZW1zQgwKCl9lZGl0'
-    'X21hc2tCCQoHX2luZGVudEIJCgdfaGlkZGVuQgcKBV9zcGFuQgcKBV9kYXRhQgkKB19zdGlja3'
-    'k=');
+    'BhZGRpbmdSEGZpeGVkQ2VsbFBhZGRpbmcSHwoIbnVsbGFibGUYFSABKAhIEFIIbnVsbGFibGWI'
+    'AQESRQoNY29lcmNpb25fbW9kZRgWIAEoDjIbLnZvbHZveGdyaWQudjEuQ29lcmNpb25Nb2RlSB'
+    'FSDGNvZXJjaW9uTW9kZYgBARJBCgplcnJvcl9tb2RlGBcgASgOMh0udm9sdm94Z3JpZC52MS5X'
+    'cml0ZUVycm9yTW9kZUgSUgllcnJvck1vZGWIAQFCCAoGX3dpZHRoQgwKCl9taW5fd2lkdGhCDA'
+    'oKX21heF93aWR0aEIMCgpfYWxpZ25tZW50QhIKEF9maXhlZF9hbGlnbm1lbnRCDAoKX2RhdGFf'
+    'dHlwZUIJCgdfZm9ybWF0QgYKBF9rZXlCBwoFX3NvcnRCEQoPX2Ryb3Bkb3duX2l0ZW1zQgwKCl'
+    '9lZGl0X21hc2tCCQoHX2luZGVudEIJCgdfaGlkZGVuQgcKBV9zcGFuQgcKBV9kYXRhQgkKB19z'
+    'dGlja3lCCwoJX251bGxhYmxlQhAKDl9jb2VyY2lvbl9tb2RlQg0KC19lcnJvcl9tb2Rl');
 
 @$core.Deprecated('Use defineColumnsRequestDescriptor instead')
 const DefineColumnsRequest$json = {
@@ -3608,13 +3894,15 @@ const UpdateCellsRequest$json = {
       '6': '.volvoxgrid.v1.CellUpdate',
       '10': 'cells'
     },
+    {'1': 'atomic', '3': 3, '4': 1, '5': 8, '10': 'atomic'},
   ],
 };
 
 /// Descriptor for `UpdateCellsRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List updateCellsRequestDescriptor = $convert.base64Decode(
     'ChJVcGRhdGVDZWxsc1JlcXVlc3QSFwoHZ3JpZF9pZBgBIAEoA1IGZ3JpZElkEi8KBWNlbGxzGA'
-    'IgAygLMhkudm9sdm94Z3JpZC52MS5DZWxsVXBkYXRlUgVjZWxscw==');
+    'IgAygLMhkudm9sdm94Z3JpZC52MS5DZWxsVXBkYXRlUgVjZWxscxIWCgZhdG9taWMYAyABKAhS'
+    'BmF0b21pYw==');
 
 @$core.Deprecated('Use getCellsRequestDescriptor instead')
 const GetCellsRequest$json = {
@@ -3627,6 +3915,7 @@ const GetCellsRequest$json = {
     {'1': 'col2', '3': 5, '4': 1, '5': 5, '10': 'col2'},
     {'1': 'include_style', '3': 6, '4': 1, '5': 8, '10': 'includeStyle'},
     {'1': 'include_checked', '3': 7, '4': 1, '5': 8, '10': 'includeChecked'},
+    {'1': 'include_typed', '3': 8, '4': 1, '5': 8, '10': 'includeTyped'},
   ],
 };
 
@@ -3635,7 +3924,8 @@ final $typed_data.Uint8List getCellsRequestDescriptor = $convert.base64Decode(
     'Cg9HZXRDZWxsc1JlcXVlc3QSFwoHZ3JpZF9pZBgBIAEoA1IGZ3JpZElkEhIKBHJvdzEYAiABKA'
     'VSBHJvdzESEgoEY29sMRgDIAEoBVIEY29sMRISCgRyb3cyGAQgASgFUgRyb3cyEhIKBGNvbDIY'
     'BSABKAVSBGNvbDISIwoNaW5jbHVkZV9zdHlsZRgGIAEoCFIMaW5jbHVkZVN0eWxlEicKD2luY2'
-    'x1ZGVfY2hlY2tlZBgHIAEoCFIOaW5jbHVkZUNoZWNrZWQ=');
+    'x1ZGVfY2hlY2tlZBgHIAEoCFIOaW5jbHVkZUNoZWNrZWQSIwoNaW5jbHVkZV90eXBlZBgIIAEo'
+    'CFIMaW5jbHVkZVR5cGVk');
 
 @$core.Deprecated('Use cellDataDescriptor instead')
 const CellData$json = {
@@ -3697,23 +3987,86 @@ final $typed_data.Uint8List cellsResponseDescriptor = $convert.base64Decode(
     'Cg1DZWxsc1Jlc3BvbnNlEi0KBWNlbGxzGAEgAygLMhcudm9sdm94Z3JpZC52MS5DZWxsRGF0YV'
     'IFY2VsbHM=');
 
-@$core.Deprecated('Use loadArrayRequestDescriptor instead')
-const LoadArrayRequest$json = {
-  '1': 'LoadArrayRequest',
+@$core.Deprecated('Use typeViolationDescriptor instead')
+const TypeViolation$json = {
+  '1': 'TypeViolation',
+  '2': [
+    {'1': 'row', '3': 1, '4': 1, '5': 5, '10': 'row'},
+    {'1': 'col', '3': 2, '4': 1, '5': 5, '10': 'col'},
+    {
+      '1': 'expected',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.ColumnDataType',
+      '10': 'expected'
+    },
+    {
+      '1': 'actual',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.CellValue',
+      '10': 'actual'
+    },
+    {'1': 'reason', '3': 5, '4': 1, '5': 9, '10': 'reason'},
+  ],
+};
+
+/// Descriptor for `TypeViolation`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List typeViolationDescriptor = $convert.base64Decode(
+    'Cg1UeXBlVmlvbGF0aW9uEhAKA3JvdxgBIAEoBVIDcm93EhAKA2NvbBgCIAEoBVIDY29sEjkKCG'
+    'V4cGVjdGVkGAMgASgOMh0udm9sdm94Z3JpZC52MS5Db2x1bW5EYXRhVHlwZVIIZXhwZWN0ZWQS'
+    'MAoGYWN0dWFsGAQgASgLMhgudm9sdm94Z3JpZC52MS5DZWxsVmFsdWVSBmFjdHVhbBIWCgZyZW'
+    'Fzb24YBSABKAlSBnJlYXNvbg==');
+
+@$core.Deprecated('Use writeResultDescriptor instead')
+const WriteResult$json = {
+  '1': 'WriteResult',
+  '2': [
+    {'1': 'written_count', '3': 1, '4': 1, '5': 5, '10': 'writtenCount'},
+    {'1': 'rejected_count', '3': 2, '4': 1, '5': 5, '10': 'rejectedCount'},
+    {
+      '1': 'violations',
+      '3': 3,
+      '4': 3,
+      '5': 11,
+      '6': '.volvoxgrid.v1.TypeViolation',
+      '10': 'violations'
+    },
+  ],
+};
+
+/// Descriptor for `WriteResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List writeResultDescriptor = $convert.base64Decode(
+    'CgtXcml0ZVJlc3VsdBIjCg13cml0dGVuX2NvdW50GAEgASgFUgx3cml0dGVuQ291bnQSJQoOcm'
+    'VqZWN0ZWRfY291bnQYAiABKAVSDXJlamVjdGVkQ291bnQSPAoKdmlvbGF0aW9ucxgDIAMoCzIc'
+    'LnZvbHZveGdyaWQudjEuVHlwZVZpb2xhdGlvblIKdmlvbGF0aW9ucw==');
+
+@$core.Deprecated('Use loadTableRequestDescriptor instead')
+const LoadTableRequest$json = {
+  '1': 'LoadTableRequest',
   '2': [
     {'1': 'grid_id', '3': 1, '4': 1, '5': 3, '10': 'gridId'},
     {'1': 'rows', '3': 2, '4': 1, '5': 5, '10': 'rows'},
     {'1': 'cols', '3': 3, '4': 1, '5': 5, '10': 'cols'},
-    {'1': 'values', '3': 4, '4': 3, '5': 9, '10': 'values'},
-    {'1': 'bind', '3': 5, '4': 1, '5': 8, '10': 'bind'},
+    {
+      '1': 'values',
+      '3': 4,
+      '4': 3,
+      '5': 11,
+      '6': '.volvoxgrid.v1.CellValue',
+      '10': 'values'
+    },
+    {'1': 'atomic', '3': 5, '4': 1, '5': 8, '10': 'atomic'},
   ],
 };
 
-/// Descriptor for `LoadArrayRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List loadArrayRequestDescriptor = $convert.base64Decode(
-    'ChBMb2FkQXJyYXlSZXF1ZXN0EhcKB2dyaWRfaWQYASABKANSBmdyaWRJZBISCgRyb3dzGAIgAS'
-    'gFUgRyb3dzEhIKBGNvbHMYAyABKAVSBGNvbHMSFgoGdmFsdWVzGAQgAygJUgZ2YWx1ZXMSEgoE'
-    'YmluZBgFIAEoCFIEYmluZA==');
+/// Descriptor for `LoadTableRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List loadTableRequestDescriptor = $convert.base64Decode(
+    'ChBMb2FkVGFibGVSZXF1ZXN0EhcKB2dyaWRfaWQYASABKANSBmdyaWRJZBISCgRyb3dzGAIgAS'
+    'gFUgRyb3dzEhIKBGNvbHMYAyABKAVSBGNvbHMSMAoGdmFsdWVzGAQgAygLMhgudm9sdm94Z3Jp'
+    'ZC52MS5DZWxsVmFsdWVSBnZhbHVlcxIWCgZhdG9taWMYBSABKAhSBmF0b21pYw==');
 
 @$core.Deprecated('Use clearRequestDescriptor instead')
 const ClearRequest$json = {
@@ -3879,18 +4232,18 @@ const HighlightRegion$json = {
       '6': '.volvoxgrid.v1.CellRange',
       '10': 'range'
     },
-    {'1': 'color', '3': 2, '4': 1, '5': 13, '10': 'color'},
     {
-      '1': 'show_corner_handles',
-      '3': 3,
+      '1': 'style',
+      '3': 2,
       '4': 1,
-      '5': 8,
-      '10': 'showCornerHandles'
+      '5': 11,
+      '6': '.volvoxgrid.v1.HighlightStyle',
+      '10': 'style'
     },
-    {'1': 'ref_id', '3': 4, '4': 1, '5': 5, '9': 0, '10': 'refId', '17': true},
+    {'1': 'ref_id', '3': 3, '4': 1, '5': 5, '9': 0, '10': 'refId', '17': true},
     {
       '1': 'text_start',
-      '3': 5,
+      '3': 4,
       '4': 1,
       '5': 5,
       '9': 1,
@@ -3899,7 +4252,7 @@ const HighlightRegion$json = {
     },
     {
       '1': 'text_length',
-      '3': 6,
+      '3': 5,
       '4': 1,
       '5': 5,
       '9': 2,
@@ -3917,11 +4270,10 @@ const HighlightRegion$json = {
 /// Descriptor for `HighlightRegion`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List highlightRegionDescriptor = $convert.base64Decode(
     'Cg9IaWdobGlnaHRSZWdpb24SLgoFcmFuZ2UYASABKAsyGC52b2x2b3hncmlkLnYxLkNlbGxSYW'
-    '5nZVIFcmFuZ2USFAoFY29sb3IYAiABKA1SBWNvbG9yEi4KE3Nob3dfY29ybmVyX2hhbmRsZXMY'
-    'AyABKAhSEXNob3dDb3JuZXJIYW5kbGVzEhoKBnJlZl9pZBgEIAEoBUgAUgVyZWZJZIgBARIiCg'
-    'p0ZXh0X3N0YXJ0GAUgASgFSAFSCXRleHRTdGFydIgBARIkCgt0ZXh0X2xlbmd0aBgGIAEoBUgC'
-    'Ugp0ZXh0TGVuZ3RoiAEBQgkKB19yZWZfaWRCDQoLX3RleHRfc3RhcnRCDgoMX3RleHRfbGVuZ3'
-    'Ro');
+    '5nZVIFcmFuZ2USMwoFc3R5bGUYAiABKAsyHS52b2x2b3hncmlkLnYxLkhpZ2hsaWdodFN0eWxl'
+    'UgVzdHlsZRIaCgZyZWZfaWQYAyABKAVIAFIFcmVmSWSIAQESIgoKdGV4dF9zdGFydBgEIAEoBU'
+    'gBUgl0ZXh0U3RhcnSIAQESJAoLdGV4dF9sZW5ndGgYBSABKAVIAlIKdGV4dExlbmd0aIgBAUIJ'
+    'CgdfcmVmX2lkQg0KC190ZXh0X3N0YXJ0Qg4KDF90ZXh0X2xlbmd0aA==');
 
 @$core.Deprecated('Use editSetHighlightsDescriptor instead')
 const EditSetHighlights$json = {
@@ -7078,6 +7430,11 @@ const $core.Map<$core.String, $core.dynamic> VolvoxGridServiceBase$json = {
       '3': '.volvoxgrid.v1.Empty'
     },
     {
+      '1': 'GetSchema',
+      '2': '.volvoxgrid.v1.GridHandle',
+      '3': '.volvoxgrid.v1.DefineColumnsRequest'
+    },
+    {
       '1': 'DefineRows',
       '2': '.volvoxgrid.v1.DefineRowsRequest',
       '3': '.volvoxgrid.v1.Empty'
@@ -7105,7 +7462,7 @@ const $core.Map<$core.String, $core.dynamic> VolvoxGridServiceBase$json = {
     {
       '1': 'UpdateCells',
       '2': '.volvoxgrid.v1.UpdateCellsRequest',
-      '3': '.volvoxgrid.v1.Empty'
+      '3': '.volvoxgrid.v1.WriteResult'
     },
     {
       '1': 'GetCells',
@@ -7113,9 +7470,9 @@ const $core.Map<$core.String, $core.dynamic> VolvoxGridServiceBase$json = {
       '3': '.volvoxgrid.v1.CellsResponse'
     },
     {
-      '1': 'LoadArray',
-      '2': '.volvoxgrid.v1.LoadArrayRequest',
-      '3': '.volvoxgrid.v1.Empty'
+      '1': 'LoadTable',
+      '2': '.volvoxgrid.v1.LoadTableRequest',
+      '3': '.volvoxgrid.v1.WriteResult'
     },
     {
       '1': 'Clear',
@@ -7277,6 +7634,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.IconThemeSlotStyles': IconThemeSlotStyles$json,
   '.volvoxgrid.v1.IconThemeSlotStyle': IconThemeSlotStyle$json,
   '.volvoxgrid.v1.SelectionConfig': SelectionConfig$json,
+  '.volvoxgrid.v1.HighlightStyle': HighlightStyle$json,
   '.volvoxgrid.v1.EditConfig': EditConfig$json,
   '.volvoxgrid.v1.ScrollConfig': ScrollConfig$json,
   '.volvoxgrid.v1.OutlineConfig': OutlineConfig$json,
@@ -7299,10 +7657,12 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.CellUpdate': CellUpdate$json,
   '.volvoxgrid.v1.CellValue': CellValue$json,
   '.volvoxgrid.v1.CellStyleOverride': CellStyleOverride$json,
+  '.volvoxgrid.v1.WriteResult': WriteResult$json,
+  '.volvoxgrid.v1.TypeViolation': TypeViolation$json,
   '.volvoxgrid.v1.GetCellsRequest': GetCellsRequest$json,
   '.volvoxgrid.v1.CellsResponse': CellsResponse$json,
   '.volvoxgrid.v1.CellData': CellData$json,
-  '.volvoxgrid.v1.LoadArrayRequest': LoadArrayRequest$json,
+  '.volvoxgrid.v1.LoadTableRequest': LoadTableRequest$json,
   '.volvoxgrid.v1.ClearRequest': ClearRequest$json,
   '.volvoxgrid.v1.SelectRequest': SelectRequest$json,
   '.volvoxgrid.v1.CellRange': CellRange$json,
@@ -7442,48 +7802,50 @@ final $typed_data.Uint8List volvoxGridServiceDescriptor = $convert.base64Decode(
     'b25maWcSGS52b2x2b3hncmlkLnYxLkdyaWRIYW5kbGUaGS52b2x2b3hncmlkLnYxLkdyaWRDb2'
     '5maWcSSAoMTG9hZEZvbnREYXRhEiIudm9sdm94Z3JpZC52MS5Mb2FkRm9udERhdGFSZXF1ZXN0'
     'GhQudm9sdm94Z3JpZC52MS5FbXB0eRJKCg1EZWZpbmVDb2x1bW5zEiMudm9sdm94Z3JpZC52MS'
-    '5EZWZpbmVDb2x1bW5zUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSRAoKRGVmaW5lUm93'
-    'cxIgLnZvbHZveGdyaWQudjEuRGVmaW5lUm93c1JlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcH'
-    'R5EkQKCkluc2VydFJvd3MSIC52b2x2b3hncmlkLnYxLkluc2VydFJvd3NSZXF1ZXN0GhQudm9s'
-    'dm94Z3JpZC52MS5FbXB0eRJECgpSZW1vdmVSb3dzEiAudm9sdm94Z3JpZC52MS5SZW1vdmVSb3'
-    'dzUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSRAoKTW92ZUNvbHVtbhIgLnZvbHZveGdy'
-    'aWQudjEuTW92ZUNvbHVtblJlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5Ej4KB01vdmVSb3'
-    'cSHS52b2x2b3hncmlkLnYxLk1vdmVSb3dSZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0eRJG'
-    'CgtVcGRhdGVDZWxscxIhLnZvbHZveGdyaWQudjEuVXBkYXRlQ2VsbHNSZXF1ZXN0GhQudm9sdm'
-    '94Z3JpZC52MS5FbXB0eRJICghHZXRDZWxscxIeLnZvbHZveGdyaWQudjEuR2V0Q2VsbHNSZXF1'
-    'ZXN0Ghwudm9sdm94Z3JpZC52MS5DZWxsc1Jlc3BvbnNlEkIKCUxvYWRBcnJheRIfLnZvbHZveG'
-    'dyaWQudjEuTG9hZEFycmF5UmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSOgoFQ2xlYXIS'
-    'Gy52b2x2b3hncmlkLnYxLkNsZWFyUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSPAoGU2'
-    'VsZWN0Ehwudm9sdm94Z3JpZC52MS5TZWxlY3RSZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0'
-    'eRJICgxHZXRTZWxlY3Rpb24SGS52b2x2b3hncmlkLnYxLkdyaWRIYW5kbGUaHS52b2x2b3hncm'
-    'lkLnYxLlNlbGVjdGlvblN0YXRlEjwKBEVkaXQSGi52b2x2b3hncmlkLnYxLkVkaXRDb21tYW5k'
-    'Ghgudm9sdm94Z3JpZC52MS5FZGl0U3RhdGUSOAoEU29ydBIaLnZvbHZveGdyaWQudjEuU29ydF'
-    'JlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5EkAKCFN1YnRvdGFsEh4udm9sdm94Z3JpZC52'
-    'MS5TdWJ0b3RhbFJlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5EkAKCEF1dG9TaXplEh4udm'
-    '9sdm94Z3JpZC52MS5BdXRvU2l6ZVJlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5Ej4KB091'
-    'dGxpbmUSHS52b2x2b3hncmlkLnYxLk91dGxpbmVSZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbX'
-    'B0eRJBCgdHZXROb2RlEh0udm9sdm94Z3JpZC52MS5HZXROb2RlUmVxdWVzdBoXLnZvbHZveGdy'
-    'aWQudjEuTm9kZUluZm8SPwoERmluZBIaLnZvbHZveGdyaWQudjEuRmluZFJlcXVlc3QaGy52b2'
-    'x2b3hncmlkLnYxLkZpbmRSZXNwb25zZRJOCglBZ2dyZWdhdGUSHy52b2x2b3hncmlkLnYxLkFn'
-    'Z3JlZ2F0ZVJlcXVlc3QaIC52b2x2b3hncmlkLnYxLkFnZ3JlZ2F0ZVJlc3BvbnNlElAKDkdldE'
-    '1lcmdlZFJhbmdlEiQudm9sdm94Z3JpZC52MS5HZXRNZXJnZWRSYW5nZVJlcXVlc3QaGC52b2x2'
-    'b3hncmlkLnYxLkNlbGxSYW5nZRJECgpNZXJnZUNlbGxzEiAudm9sdm94Z3JpZC52MS5NZXJnZU'
-    'NlbGxzUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSSAoMVW5tZXJnZUNlbGxzEiIudm9s'
-    'dm94Z3JpZC52MS5Vbm1lcmdlQ2VsbHNSZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0eRJTCh'
-    'BHZXRNZXJnZWRSZWdpb25zEhkudm9sdm94Z3JpZC52MS5HcmlkSGFuZGxlGiQudm9sdm94Z3Jp'
-    'ZC52MS5NZXJnZWRSZWdpb25zUmVzcG9uc2USTwoOR2V0TWVtb3J5VXNhZ2USGS52b2x2b3hncm'
-    'lkLnYxLkdyaWRIYW5kbGUaIi52b2x2b3hncmlkLnYxLk1lbW9yeVVzYWdlUmVzcG9uc2USTgoJ'
-    'Q2xpcGJvYXJkEh8udm9sdm94Z3JpZC52MS5DbGlwYm9hcmRDb21tYW5kGiAudm9sdm94Z3JpZC'
-    '52MS5DbGlwYm9hcmRSZXNwb25zZRJFCgZFeHBvcnQSHC52b2x2b3hncmlkLnYxLkV4cG9ydFJl'
-    'cXVlc3QaHS52b2x2b3hncmlkLnYxLkV4cG9ydFJlc3BvbnNlEjwKBkltcG9ydBIcLnZvbHZveG'
-    'dyaWQudjEuSW1wb3J0UmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSQgoFUHJpbnQSGy52'
-    'b2x2b3hncmlkLnYxLlByaW50UmVxdWVzdBocLnZvbHZveGdyaWQudjEuUHJpbnRSZXNwb25zZR'
-    'JICgdBcmNoaXZlEh0udm9sdm94Z3JpZC52MS5BcmNoaXZlUmVxdWVzdBoeLnZvbHZveGdyaWQu'
-    'djEuQXJjaGl2ZVJlc3BvbnNlEkwKDlJlc2l6ZVZpZXdwb3J0EiQudm9sdm94Z3JpZC52MS5SZX'
-    'NpemVWaWV3cG9ydFJlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5EkIKCVNldFJlZHJhdxIf'
-    'LnZvbHZveGdyaWQudjEuU2V0UmVkcmF3UmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSOg'
-    'oHUmVmcmVzaBIZLnZvbHZveGdyaWQudjEuR3JpZEhhbmRsZRoULnZvbHZveGdyaWQudjEuRW1w'
-    'dHkSQAoITG9hZERlbW8SHi52b2x2b3hncmlkLnYxLkxvYWREZW1vUmVxdWVzdBoULnZvbHZveG'
-    'dyaWQudjEuRW1wdHkSTAoNUmVuZGVyU2Vzc2lvbhIaLnZvbHZveGdyaWQudjEuUmVuZGVySW5w'
-    'dXQaGy52b2x2b3hncmlkLnYxLlJlbmRlck91dHB1dCgBMAESRAoLRXZlbnRTdHJlYW0SGS52b2'
-    'x2b3hncmlkLnYxLkdyaWRIYW5kbGUaGC52b2x2b3hncmlkLnYxLkdyaWRFdmVudDAB');
+    '5EZWZpbmVDb2x1bW5zUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSSwoJR2V0U2NoZW1h'
+    'Ehkudm9sdm94Z3JpZC52MS5HcmlkSGFuZGxlGiMudm9sdm94Z3JpZC52MS5EZWZpbmVDb2x1bW'
+    '5zUmVxdWVzdBJECgpEZWZpbmVSb3dzEiAudm9sdm94Z3JpZC52MS5EZWZpbmVSb3dzUmVxdWVz'
+    'dBoULnZvbHZveGdyaWQudjEuRW1wdHkSRAoKSW5zZXJ0Um93cxIgLnZvbHZveGdyaWQudjEuSW'
+    '5zZXJ0Um93c1JlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5EkQKClJlbW92ZVJvd3MSIC52'
+    'b2x2b3hncmlkLnYxLlJlbW92ZVJvd3NSZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0eRJECg'
+    'pNb3ZlQ29sdW1uEiAudm9sdm94Z3JpZC52MS5Nb3ZlQ29sdW1uUmVxdWVzdBoULnZvbHZveGdy'
+    'aWQudjEuRW1wdHkSPgoHTW92ZVJvdxIdLnZvbHZveGdyaWQudjEuTW92ZVJvd1JlcXVlc3QaFC'
+    '52b2x2b3hncmlkLnYxLkVtcHR5EkwKC1VwZGF0ZUNlbGxzEiEudm9sdm94Z3JpZC52MS5VcGRh'
+    'dGVDZWxsc1JlcXVlc3QaGi52b2x2b3hncmlkLnYxLldyaXRlUmVzdWx0EkgKCEdldENlbGxzEh'
+    '4udm9sdm94Z3JpZC52MS5HZXRDZWxsc1JlcXVlc3QaHC52b2x2b3hncmlkLnYxLkNlbGxzUmVz'
+    'cG9uc2USSAoJTG9hZFRhYmxlEh8udm9sdm94Z3JpZC52MS5Mb2FkVGFibGVSZXF1ZXN0Ghoudm'
+    '9sdm94Z3JpZC52MS5Xcml0ZVJlc3VsdBI6CgVDbGVhchIbLnZvbHZveGdyaWQudjEuQ2xlYXJS'
+    'ZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0eRI8CgZTZWxlY3QSHC52b2x2b3hncmlkLnYxLl'
+    'NlbGVjdFJlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5EkgKDEdldFNlbGVjdGlvbhIZLnZv'
+    'bHZveGdyaWQudjEuR3JpZEhhbmRsZRodLnZvbHZveGdyaWQudjEuU2VsZWN0aW9uU3RhdGUSPA'
+    'oERWRpdBIaLnZvbHZveGdyaWQudjEuRWRpdENvbW1hbmQaGC52b2x2b3hncmlkLnYxLkVkaXRT'
+    'dGF0ZRI4CgRTb3J0Ehoudm9sdm94Z3JpZC52MS5Tb3J0UmVxdWVzdBoULnZvbHZveGdyaWQudj'
+    'EuRW1wdHkSQAoIU3VidG90YWwSHi52b2x2b3hncmlkLnYxLlN1YnRvdGFsUmVxdWVzdBoULnZv'
+    'bHZveGdyaWQudjEuRW1wdHkSQAoIQXV0b1NpemUSHi52b2x2b3hncmlkLnYxLkF1dG9TaXplUm'
+    'VxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSPgoHT3V0bGluZRIdLnZvbHZveGdyaWQudjEu'
+    'T3V0bGluZVJlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5EkEKB0dldE5vZGUSHS52b2x2b3'
+    'hncmlkLnYxLkdldE5vZGVSZXF1ZXN0Ghcudm9sdm94Z3JpZC52MS5Ob2RlSW5mbxI/CgRGaW5k'
+    'Ehoudm9sdm94Z3JpZC52MS5GaW5kUmVxdWVzdBobLnZvbHZveGdyaWQudjEuRmluZFJlc3Bvbn'
+    'NlEk4KCUFnZ3JlZ2F0ZRIfLnZvbHZveGdyaWQudjEuQWdncmVnYXRlUmVxdWVzdBogLnZvbHZv'
+    'eGdyaWQudjEuQWdncmVnYXRlUmVzcG9uc2USUAoOR2V0TWVyZ2VkUmFuZ2USJC52b2x2b3hncm'
+    'lkLnYxLkdldE1lcmdlZFJhbmdlUmVxdWVzdBoYLnZvbHZveGdyaWQudjEuQ2VsbFJhbmdlEkQK'
+    'Ck1lcmdlQ2VsbHMSIC52b2x2b3hncmlkLnYxLk1lcmdlQ2VsbHNSZXF1ZXN0GhQudm9sdm94Z3'
+    'JpZC52MS5FbXB0eRJICgxVbm1lcmdlQ2VsbHMSIi52b2x2b3hncmlkLnYxLlVubWVyZ2VDZWxs'
+    'c1JlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5ElMKEEdldE1lcmdlZFJlZ2lvbnMSGS52b2'
+    'x2b3hncmlkLnYxLkdyaWRIYW5kbGUaJC52b2x2b3hncmlkLnYxLk1lcmdlZFJlZ2lvbnNSZXNw'
+    'b25zZRJPCg5HZXRNZW1vcnlVc2FnZRIZLnZvbHZveGdyaWQudjEuR3JpZEhhbmRsZRoiLnZvbH'
+    'ZveGdyaWQudjEuTWVtb3J5VXNhZ2VSZXNwb25zZRJOCglDbGlwYm9hcmQSHy52b2x2b3hncmlk'
+    'LnYxLkNsaXBib2FyZENvbW1hbmQaIC52b2x2b3hncmlkLnYxLkNsaXBib2FyZFJlc3BvbnNlEk'
+    'UKBkV4cG9ydBIcLnZvbHZveGdyaWQudjEuRXhwb3J0UmVxdWVzdBodLnZvbHZveGdyaWQudjEu'
+    'RXhwb3J0UmVzcG9uc2USPAoGSW1wb3J0Ehwudm9sdm94Z3JpZC52MS5JbXBvcnRSZXF1ZXN0Gh'
+    'Qudm9sdm94Z3JpZC52MS5FbXB0eRJCCgVQcmludBIbLnZvbHZveGdyaWQudjEuUHJpbnRSZXF1'
+    'ZXN0Ghwudm9sdm94Z3JpZC52MS5QcmludFJlc3BvbnNlEkgKB0FyY2hpdmUSHS52b2x2b3hncm'
+    'lkLnYxLkFyY2hpdmVSZXF1ZXN0Gh4udm9sdm94Z3JpZC52MS5BcmNoaXZlUmVzcG9uc2USTAoO'
+    'UmVzaXplVmlld3BvcnQSJC52b2x2b3hncmlkLnYxLlJlc2l6ZVZpZXdwb3J0UmVxdWVzdBoULn'
+    'ZvbHZveGdyaWQudjEuRW1wdHkSQgoJU2V0UmVkcmF3Eh8udm9sdm94Z3JpZC52MS5TZXRSZWRy'
+    'YXdSZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0eRI6CgdSZWZyZXNoEhkudm9sdm94Z3JpZC'
+    '52MS5HcmlkSGFuZGxlGhQudm9sdm94Z3JpZC52MS5FbXB0eRJACghMb2FkRGVtbxIeLnZvbHZv'
+    'eGdyaWQudjEuTG9hZERlbW9SZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0eRJMCg1SZW5kZX'
+    'JTZXNzaW9uEhoudm9sdm94Z3JpZC52MS5SZW5kZXJJbnB1dBobLnZvbHZveGdyaWQudjEuUmVu'
+    'ZGVyT3V0cHV0KAEwARJECgtFdmVudFN0cmVhbRIZLnZvbHZveGdyaWQudjEuR3JpZEhhbmRsZR'
+    'oYLnZvbHZveGdyaWQudjEuR3JpZEV2ZW50MAE=');

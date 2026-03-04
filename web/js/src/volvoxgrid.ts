@@ -453,6 +453,17 @@ function pbEncodeGridHandleRequest(gridId: number): Uint8Array {
   return new Uint8Array(out);
 }
 
+function pbEncodeRenderPresentModeConfig(presentMode: number): Uint8Array {
+  const renderConfig: number[] = [];
+  // RenderConfig.present_mode = 6
+  renderConfig.push(...pbEncodeTag(6, 0), ...pbEncodeInt32(Math.trunc(presentMode)));
+
+  const gridConfig: number[] = [];
+  // GridConfig.rendering = 9
+  gridConfig.push(...pbEncodeMessageField(9, new Uint8Array(renderConfig)));
+  return new Uint8Array(gridConfig);
+}
+
 function pbEncodeRenderBufferInput(
   gridId: number,
   width: number,
@@ -914,6 +925,7 @@ export class VolvoxGrid {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D | null = null;
   private useGpu: boolean = false;
+  private presentMode: number = 0; // proto PresentMode (0=AUTO,1=FIFO,2=MAILBOX,3=IMMEDIATE)
   private animFrame: number = 0;
   private dirty: boolean = true;
   private destroyed: boolean = false;
@@ -2335,6 +2347,37 @@ export class VolvoxGrid {
 
   // ── Renderer Mode ─────────────────────────────────────────────────────
 
+  /**
+   * Set GPU present mode using proto RenderConfig.present_mode.
+   *
+   * 0=AUTO, 1=FIFO, 2=MAILBOX, 3=IMMEDIATE
+   */
+  setPresentMode(mode: number): void {
+    const next = Number.isFinite(mode) ? Math.max(0, Math.trunc(mode)) : 0;
+    this.presentMode = next;
+
+    if (typeof this.wasm.volvox_grid_configure === "function") {
+      try {
+        const cfg = pbEncodeRenderPresentModeConfig(next);
+        this.wasm.volvox_grid_configure(BigInt(this.gridId), cfg);
+      } catch (e) {
+        console.warn("VolvoxGrid: failed to apply PresentMode via proto config", e);
+      }
+    }
+
+    if (this.gpuCanvas && typeof this.wasm.gpu_configure_surface === "function") {
+      const w = Math.max(1, this.gpuCanvas.width || this.canvas.width || 1);
+      const h = Math.max(1, this.gpuCanvas.height || this.canvas.height || 1);
+      this.wasm.gpu_configure_surface(this.gpuCanvas, w, h, this.presentMode);
+    }
+
+    this.dirty = true;
+  }
+
+  getPresentMode(): number {
+    return this.presentMode;
+  }
+
   /** Set renderer mode: 0=AUTO, 1=CPU, 2=GPU */
   setRendererMode(mode: number): void {
     if (typeof this.wasm.set_renderer_mode === "function") {
@@ -2416,7 +2459,7 @@ export class VolvoxGrid {
       }
       this.matchGpuCanvasPosition(gpuCanvas);
 
-      const configured = this.wasm.gpu_configure_surface(gpuCanvas, w, h, 0);
+      const configured = this.wasm.gpu_configure_surface(gpuCanvas, w, h, this.presentMode);
       if (!configured) {
         gpuCanvas.remove();
         this.useGpu = false;
@@ -3021,6 +3064,9 @@ export class VolvoxGrid {
     }
     this.hideHostEditors(false);
     this.gridId = nextId;
+    if (this.presentMode !== 0) {
+      this.setPresentMode(this.presentMode);
+    }
     // Re-enable fling on the new grid
     if (typeof this.wasm.set_fling_enabled === "function") {
       this.wasm.set_fling_enabled(this.gridId, 1);

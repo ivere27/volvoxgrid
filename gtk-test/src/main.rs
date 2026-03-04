@@ -17,11 +17,11 @@ use volvoxgrid_engine::drag;
 use volvoxgrid_engine::grid::VolvoxGrid;
 use volvoxgrid_engine::input;
 
+#[cfg(feature = "gpu")]
+use volvoxgrid_engine::gpu_render::GpuRenderer;
 use volvoxgrid_engine::outline;
 use volvoxgrid_engine::print;
 use volvoxgrid_engine::render::Renderer;
-#[cfg(feature = "gpu")]
-use volvoxgrid_engine::gpu_render::GpuRenderer;
 use volvoxgrid_engine::save;
 use volvoxgrid_engine::search;
 use volvoxgrid_engine::sort;
@@ -712,7 +712,8 @@ fn build_ui(app: &Application) {
 
                             let elapsed = frame_start.elapsed().as_secs_f32() * 1000.0;
                             grid.debug_frame_time_ms = elapsed;
-                            grid.debug_fps = grid.debug_fps * 0.9 + (1000.0 / elapsed.max(0.1)) * 0.1;
+                            grid.debug_fps =
+                                grid.debug_fps * 0.9 + (1000.0 / elapsed.max(0.1)) * 0.1;
                             grid.clear_dirty();
                             have_data = true;
                         }
@@ -908,7 +909,11 @@ fn build_ui(app: &Application) {
                 let frozen_cols = st.grid.frozen_cols;
                 let is_data_row = row >= fixed_rows + frozen_rows;
                 let is_data_col = col >= fixed_cols + frozen_cols;
-                let pin_state = if is_data_row { st.grid.is_row_pinned(row) } else { 0 };
+                let pin_state = if is_data_row {
+                    st.grid.is_row_pinned(row)
+                } else {
+                    0
+                };
                 let row_sticky = if is_data_row {
                     st.grid.sticky_rows.get(&row).copied().unwrap_or(0)
                 } else {
@@ -953,19 +958,31 @@ fn build_ui(app: &Application) {
                 if is_data_row {
                     menu_item!(
                         &format!("Pin Row {} to Top", row),
-                        state, area, popover,
-                        |st: &mut State| { st.grid.pin_row(row, 1); }
+                        state,
+                        area,
+                        popover,
+                        |st: &mut State| {
+                            st.grid.pin_row(row, 1);
+                        }
                     );
                     menu_item!(
                         &format!("Pin Row {} to Bottom", row),
-                        state, area, popover,
-                        |st: &mut State| { st.grid.pin_row(row, 2); }
+                        state,
+                        area,
+                        popover,
+                        |st: &mut State| {
+                            st.grid.pin_row(row, 2);
+                        }
                     );
                     if pin_state != 0 {
                         menu_item!(
                             &format!("Unpin Row {}", row),
-                            state, area, popover,
-                            |st: &mut State| { st.grid.pin_row(row, 0); }
+                            state,
+                            area,
+                            popover,
+                            |st: &mut State| {
+                                st.grid.pin_row(row, 0);
+                            }
                         );
                     }
 
@@ -973,24 +990,40 @@ fn build_ui(app: &Application) {
 
                     menu_item!(
                         &format!("Sticky Row {} to Top", row),
-                        state, area, popover,
-                        |st: &mut State| { st.grid.set_row_sticky(row, 1); }
+                        state,
+                        area,
+                        popover,
+                        |st: &mut State| {
+                            st.grid.set_row_sticky(row, 1);
+                        }
                     );
                     menu_item!(
                         &format!("Sticky Row {} to Bottom", row),
-                        state, area, popover,
-                        |st: &mut State| { st.grid.set_row_sticky(row, 2); }
+                        state,
+                        area,
+                        popover,
+                        |st: &mut State| {
+                            st.grid.set_row_sticky(row, 2);
+                        }
                     );
                     menu_item!(
                         &format!("Sticky Row {} Both", row),
-                        state, area, popover,
-                        |st: &mut State| { st.grid.set_row_sticky(row, 5); }
+                        state,
+                        area,
+                        popover,
+                        |st: &mut State| {
+                            st.grid.set_row_sticky(row, 5);
+                        }
                     );
                     if row_sticky != 0 {
                         menu_item!(
                             &format!("Unsticky Row {}", row),
-                            state, area, popover,
-                            |st: &mut State| { st.grid.set_row_sticky(row, 0); }
+                            state,
+                            area,
+                            popover,
+                            |st: &mut State| {
+                                st.grid.set_row_sticky(row, 0);
+                            }
                         );
                     }
                 }
@@ -1001,44 +1034,54 @@ fn build_ui(app: &Application) {
 
                     menu_item!(
                         &format!("Sticky Col {} to Left", col),
-                        state, area, popover,
-                        |st: &mut State| { st.grid.set_col_sticky(col, 3); }
+                        state,
+                        area,
+                        popover,
+                        |st: &mut State| {
+                            st.grid.set_col_sticky(col, 3);
+                        }
                     );
                     menu_item!(
                         &format!("Sticky Col {} to Right", col),
-                        state, area, popover,
-                        |st: &mut State| { st.grid.set_col_sticky(col, 4); }
+                        state,
+                        area,
+                        popover,
+                        |st: &mut State| {
+                            st.grid.set_col_sticky(col, 4);
+                        }
                     );
                     menu_item!(
                         &format!("Sticky Col {} Both", col),
-                        state, area, popover,
-                        |st: &mut State| { st.grid.set_col_sticky(col, 5); }
+                        state,
+                        area,
+                        popover,
+                        |st: &mut State| {
+                            st.grid.set_col_sticky(col, 5);
+                        }
                     );
                     if col_sticky != 0 {
                         menu_item!(
                             &format!("Unsticky Col {}", col),
-                            state, area, popover,
-                            |st: &mut State| { st.grid.set_col_sticky(col, 0); }
+                            state,
+                            area,
+                            popover,
+                            |st: &mut State| {
+                                st.grid.set_col_sticky(col, 0);
+                            }
                         );
                     }
                 }
 
                 // Always: Copy
                 menu_box.append(&Separator::new(Orientation::Horizontal));
-                menu_item!(
-                    "Copy",
-                    state, area, popover,
-                    |st: &mut State| {
-                        let (text, _) = clipboard::copy(&st.grid);
-                        st.clipboard_text = text;
-                    }
-                );
+                menu_item!("Copy", state, area, popover, |st: &mut State| {
+                    let (text, _) = clipboard::copy(&st.grid);
+                    st.clipboard_text = text;
+                });
 
                 // Position and show the popover
                 popover.set_child(Some(&menu_box));
-                popover.set_pointing_to(Some(&gdk::Rectangle::new(
-                    x as i32, y as i32, 1, 1,
-                )));
+                popover.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
                 popover.popup();
                 return;
             }
@@ -1132,7 +1175,10 @@ fn build_ui(app: &Application) {
                 && modifier == 0
                 && hit.row >= st.grid.fixed_rows
                 && hit.col >= st.grid.fixed_cols
-                && matches!(hit.area, input::HitArea::Cell | input::HitArea::DropdownButton)
+                && matches!(
+                    hit.area,
+                    input::HitArea::Cell | input::HitArea::DropdownButton
+                )
             {
                 let list = st.grid.active_dropdown_list(hit.row, hit.col);
                 if !list.is_empty() && list.trim() != "..." {
@@ -1226,9 +1272,9 @@ fn build_ui(app: &Application) {
                             st.grid.edit.edit_text = text.clone();
                             st.grid.edit.sel_start = 1;
                             st.grid.edit.sel_length = 0;
-                            st.grid
-                                .events
-                                .push(volvoxgrid_engine::event::GridEventData::CellEditChange { text });
+                            st.grid.events.push(
+                                volvoxgrid_engine::event::GridEventData::CellEditChange { text },
+                            );
                             st.grid.mark_dirty();
                         }
                         let s = drain_events(&mut st);
@@ -2047,7 +2093,11 @@ fn build_ui(app: &Application) {
             let mut st = state.borrow_mut();
             st.debug_overlay = !st.debug_overlay;
             st.grid.debug_overlay = st.debug_overlay;
-            dbg_btn.set_label(if st.debug_overlay { "Debug: ON" } else { "Debug: OFF" });
+            dbg_btn.set_label(if st.debug_overlay {
+                "Debug: ON"
+            } else {
+                "Debug: OFF"
+            });
             st.grid.mark_dirty();
             drop(st);
             area.queue_draw();

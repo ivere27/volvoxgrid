@@ -16,6 +16,18 @@ CARGO_FLAGS=""
 IS_LITE=0
 IS_GPU=0
 
+detect_cpu_count() {
+    if command -v nproc >/dev/null 2>&1; then
+        nproc
+        return
+    fi
+    if command -v getconf >/dev/null 2>&1; then
+        getconf _NPROCESSORS_ONLN
+        return
+    fi
+    echo 1
+}
+
 for arg in "$@"; do
     case "$arg" in
         release|--release) PROFILE="release" ;;
@@ -30,6 +42,15 @@ if [ "$PROFILE" = "release" ]; then
 else
     TARGET_DIR="debug"
 fi
+
+CPU_COUNT="$(detect_cpu_count)"
+DEFAULT_BUILD_JOBS=$(( CPU_COUNT > 2 ? CPU_COUNT - 2 : 1 ))
+BUILD_JOBS="${BUILD_JOBS:-${DEFAULT_BUILD_JOBS}}"
+if ! [[ "${BUILD_JOBS}" =~ ^[0-9]+$ ]] || [ "${BUILD_JOBS}" -lt 1 ]; then
+    echo "Error: BUILD_JOBS must be a positive integer, got '${BUILD_JOBS}'." >&2
+    exit 1
+fi
+export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${BUILD_JOBS}}"
 
 if [ $IS_LITE -eq 1 ]; then
     echo "--- LITE build enabled (rayon/regex disabled) ---"
@@ -49,6 +70,7 @@ CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$(cargo metadata --format-version 1 --no-d
 mkdir -p "$OUT_DIR"
 
 echo "=== Building VolvoxGrid.ocx ($PROFILE) ==="
+echo "Using BUILD_JOBS=${BUILD_JOBS} (cpu=${CPU_COUNT}, cargo=${CARGO_BUILD_JOBS})"
 
 # ── x86 (32-bit) ──────────────────────────────────────────────
 build_arch() {
@@ -64,7 +86,7 @@ build_arch() {
     # 1) Build Rust staticlib
     echo "  Cargo build (${TRIPLE})..."
     cd "$CRATE_DIR"
-    cargo build --target "$TRIPLE" $CARGO_FLAGS
+    cargo build -j "${CARGO_BUILD_JOBS}" --target "$TRIPLE" $CARGO_FLAGS
     cd - > /dev/null
 
     if [ ! -f "$STATIC_LIB" ]; then
@@ -75,10 +97,18 @@ build_arch() {
     # 2) Compile C sources
     echo "  Compile C sources..."
     local CFLAGS="-O2 -Wall -I${INCLUDE_DIR}"
-    $CC $CFLAGS -c dllexports.c -o "${OUT_DIR}/dllexports_${ARCH}.o"
-    $CC $CFLAGS -c volvoxgrid_ocx.c -o "${OUT_DIR}/volvoxgrid_ocx_${ARCH}.o"
-    $CC $CFLAGS -c compat_shims.c -o "${OUT_DIR}/compat_shims_${ARCH}.o"
-    $CC $CFLAGS -c xp_compat.c -o "${OUT_DIR}/xp_compat_${ARCH}.o"
+    local -a PIDS=()
+    $CC $CFLAGS -c dllexports.c -o "${OUT_DIR}/dllexports_${ARCH}.o" &
+    PIDS+=($!)
+    $CC $CFLAGS -c volvoxgrid_ocx.c -o "${OUT_DIR}/volvoxgrid_ocx_${ARCH}.o" &
+    PIDS+=($!)
+    $CC $CFLAGS -c compat_shims.c -o "${OUT_DIR}/compat_shims_${ARCH}.o" &
+    PIDS+=($!)
+    $CC $CFLAGS -c xp_compat.c -o "${OUT_DIR}/xp_compat_${ARCH}.o" &
+    PIDS+=($!)
+    for pid in "${PIDS[@]}"; do
+        wait "$pid"
+    done
 
     # 3) Link into OCX (DLL)
     #    xp_compat.o MUST come before $STATIC_LIB so its symbols override

@@ -15,6 +15,23 @@ use crate::glyph_atlas::GlyphAtlas;
 use crate::grid::VolvoxGrid;
 use crate::text::TextEngine;
 
+/// Minimal block_on for futures that resolve immediately (e.g. wgpu error scopes).
+/// Avoids pulling in an async runtime dependency.
+/// Only used on native targets; WASM surfaces don't suffer from native window
+/// lifecycle issues and pop_error_scope requires the browser event loop.
+#[cfg(not(target_arch = "wasm32"))]
+fn block_on_immediate<F: std::future::Future>(f: F) -> F::Output {
+    let mut f = std::pin::pin!(f);
+    let waker = std::task::Waker::noop();
+    let mut cx = std::task::Context::from_waker(&waker);
+    loop {
+        match f.as_mut().poll(&mut cx) {
+            std::task::Poll::Ready(v) => return v,
+            std::task::Poll::Pending => std::hint::spin_loop(),
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // GPU instance data structures
 // ---------------------------------------------------------------------------
@@ -47,6 +64,13 @@ pub struct TexturedInstance {
 // GpuRenderer
 // ---------------------------------------------------------------------------
 
+#[cfg(target_os = "android")]
+#[link(name = "android")]
+extern "C" {
+    fn ANativeWindow_acquire(window: *mut std::ffi::c_void);
+    fn ANativeWindow_release(window: *mut std::ffi::c_void);
+}
+
 /// GPU renderer for VolvoxGrid.
 pub struct GpuRenderer {
     #[allow(dead_code)]
@@ -71,6 +95,8 @@ pub struct GpuRenderer {
     // Surface for zero-copy rendering
     surface: Option<wgpu::Surface<'static>>,
     surface_config: Option<wgpu::SurfaceConfiguration>,
+    #[cfg(target_os = "android")]
+    active_native_window: Option<*mut std::ffi::c_void>,
 
     // Glyph atlas
     glyph_atlas: GlyphAtlas,
@@ -121,9 +147,13 @@ impl GpuRenderer {
             // internal capability probing of high-precision formats (like 56/59)
             // fails during instance/device creation even if they aren't used.
             #[cfg(target_os = "android")]
-            { wgpu::Backends::GL }
+            {
+                wgpu::Backends::GL
+            }
             #[cfg(not(target_os = "android"))]
-            { wgpu::Backends::all() }
+            {
+                wgpu::Backends::all()
+            }
         };
 
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
@@ -243,6 +273,8 @@ impl GpuRenderer {
             textured_bind_group_layout,
             surface: None,
             surface_config: None,
+            #[cfg(target_os = "android")]
+            active_native_window: None,
             glyph_atlas: GlyphAtlas::new(),
             atlas_textures: Vec::new(),
             atlas_bind_groups: Vec::new(),
@@ -436,7 +468,8 @@ impl GpuRenderer {
     ///
     /// # Safety
     /// The caller must ensure `native_window_ptr` is a valid ANativeWindow* that
-    /// outlives the surface, and that `w`/`h` match the window dimensions.
+    /// remains valid for the duration of this call, and that `w`/`h` match the
+    /// window dimensions.
     #[cfg(not(target_arch = "wasm32"))]
     #[allow(unused_variables)]
     pub async unsafe fn configure_surface_from_raw_handle(
@@ -451,9 +484,17 @@ impl GpuRenderer {
             return Ok(());
         }
 
+        // Drop existing surface before creating a new one to ensure old handles are released.
+        self.drop_surface();
+
         // Build platform-specific raw handles
         #[cfg(target_os = "android")]
         let (raw_window, raw_display) = {
+            // Take an owned native window reference for this configured surface.
+            // We release it from drop_surface() when the surface is replaced/dropped.
+            ANativeWindow_acquire(native_window_ptr);
+            self.active_native_window = Some(native_window_ptr);
+
             let wh = raw_window_handle::AndroidNdkWindowHandle::new(
                 std::ptr::NonNull::new(native_window_ptr)
                     .ok_or_else(|| "null ANativeWindow pointer".to_string())?,
@@ -511,7 +552,22 @@ impl GpuRenderer {
                 self.device = new_device;
                 self.queue = new_queue;
 
-                // Rebuild uniform buffer and bind group
+                // Rebuild uniform bind group layout and buffer
+                self.uniform_bind_group_layout =
+                    self.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                        label: Some("uniform_bgl"),
+                        entries: &[wgpu::BindGroupLayoutEntry {
+                            binding: 0,
+                            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
+                        }],
+                    });
+
                 self.uniform_buf =
                     self.device
                         .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -522,6 +578,7 @@ impl GpuRenderer {
                             }),
                             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
                         });
+
                 self.uniform_bind_group =
                     self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                         label: Some("uniform_bg"),
@@ -530,6 +587,30 @@ impl GpuRenderer {
                             binding: 0,
                             resource: self.uniform_buf.as_entire_binding(),
                         }],
+                    });
+
+                // Rebuild textured bind group layout
+                self.textured_bind_group_layout =
+                    self.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                        label: Some("textured_bgl"),
+                        entries: &[
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 0,
+                                visibility: wgpu::ShaderStages::FRAGMENT,
+                                ty: wgpu::BindingType::Texture {
+                                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                                    view_dimension: wgpu::TextureViewDimension::D2,
+                                    multisampled: false,
+                                },
+                                count: None,
+                            },
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 1,
+                                visibility: wgpu::ShaderStages::FRAGMENT,
+                                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                                count: None,
+                            },
+                        ],
                     });
 
                 self.atlas_sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
@@ -552,10 +633,13 @@ impl GpuRenderer {
                 self.persistent_overlay_tex_buf = None;
                 self.persistent_overlay_tex_cap = 0;
 
-                // Pipelines will be recreated in configure_surface if format differs
+                // Reset pipeline format to force recreation of pipelines with the new device
+                self.pipeline_format = wgpu::TextureFormat::Rgba8Uint;
             }
 
-            self.configure_surface(surface, w, h, requested_present_mode);
+            if !self.configure_surface(surface, w, h, requested_present_mode) {
+                return Err("Surface configuration failed (incompatible surface)".to_string());
+            }
             Ok(())
         }
     }
@@ -564,6 +648,12 @@ impl GpuRenderer {
     pub fn drop_surface(&mut self) {
         self.surface = None;
         self.surface_config = None;
+        #[cfg(target_os = "android")]
+        if let Some(window) = self.active_native_window.take() {
+            unsafe {
+                ANativeWindow_release(window);
+            }
+        }
     }
 
     /// Returns true if a surface is currently configured for zero-copy rendering.
@@ -611,7 +701,15 @@ impl GpuRenderer {
     pub fn text_cache_len(&self) -> usize {
         self.text_engine.layout_cache.len()
     }
+}
 
+impl Drop for GpuRenderer {
+    fn drop(&mut self) {
+        self.drop_surface();
+    }
+}
+
+impl GpuRenderer {
     /// Create a surface from an HTML canvas element (wasm32 only) and configure it.
     #[cfg(target_arch = "wasm32")]
     pub fn configure_surface_from_canvas(
@@ -625,7 +723,9 @@ impl GpuRenderer {
             .instance
             .create_surface(wgpu::SurfaceTarget::Canvas(canvas))
             .map_err(|e| format!("Failed to create surface from canvas: {}", e))?;
-        self.configure_surface(surface, w, h, requested_present_mode);
+        if !self.configure_surface(surface, w, h, requested_present_mode) {
+            return Err("Surface configuration failed (incompatible surface)".to_string());
+        }
         Ok(())
     }
 
@@ -633,8 +733,20 @@ impl GpuRenderer {
     ///
     /// Queries the surface capabilities to determine the preferred texture
     /// format and recreates pipelines if it differs from the current one.
-    pub fn configure_surface(&mut self, surface: wgpu::Surface<'static>, w: u32, h: u32, requested_present_mode: i32) {
+    /// Returns `false` if configuration failed (surface dropped).
+    pub fn configure_surface(
+        &mut self,
+        surface: wgpu::Surface<'static>,
+        w: u32,
+        h: u32,
+        requested_present_mode: i32,
+    ) -> bool {
         let caps = surface.get_capabilities(&self.adapter);
+        if caps.formats.is_empty() {
+            // Surface is invalid or incompatible. Drop it to avoid crash in configure.
+            self.drop_surface();
+            return false;
+        }
 
         // Prioritize standard 8-bit formats to match CPU blit and ensure wide compatibility.
         // This naturally avoids problematic high-precision formats (like Rgba16Float or Rgb10a2Unorm)
@@ -675,9 +787,13 @@ impl GpuRenderer {
 
         let present_mode = match requested_present_mode {
             1 => wgpu::PresentMode::Fifo,
-            2 if caps.present_modes.contains(&wgpu::PresentMode::Mailbox) => wgpu::PresentMode::Mailbox,
-            3 if caps.present_modes.contains(&wgpu::PresentMode::Immediate) => wgpu::PresentMode::Immediate,
-            _ => wgpu::PresentMode::Fifo,  // Auto defaults to Fifo (vsync)
+            2 if caps.present_modes.contains(&wgpu::PresentMode::Mailbox) => {
+                wgpu::PresentMode::Mailbox
+            }
+            3 if caps.present_modes.contains(&wgpu::PresentMode::Immediate) => {
+                wgpu::PresentMode::Immediate
+            }
+            _ => wgpu::PresentMode::Fifo, // Auto defaults to Fifo (vsync)
         };
 
         let config = wgpu::SurfaceConfiguration {
@@ -688,21 +804,76 @@ impl GpuRenderer {
             present_mode,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![],
-            desired_maximum_frame_latency: if present_mode == wgpu::PresentMode::Mailbox { 2 } else { 1 },
+            desired_maximum_frame_latency: if present_mode == wgpu::PresentMode::Mailbox {
+                2
+            } else {
+                1
+            },
         };
-        surface.configure(&self.device, &config);
+
+        // On native targets, use error scopes to catch validation errors
+        // (e.g. "Invalid surface", "queue family incompatible") instead of
+        // letting wgpu abort the process. On WASM, pop_error_scope is truly
+        // async and requires the browser event loop, but WASM surfaces don't
+        // suffer from native window lifecycle issues.
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.device.push_error_scope(wgpu::ErrorFilter::Validation);
+            surface.configure(&self.device, &config);
+            let error = block_on_immediate(self.device.pop_error_scope());
+            if error.is_some() {
+                self.drop_surface();
+                return false;
+            }
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            surface.configure(&self.device, &config);
+        }
+
         self.surface_config = Some(config);
         self.surface = Some(surface);
+        true
     }
 
     /// Resize an already-configured surface.
     pub fn resize_surface(&mut self, w: u32, h: u32) {
-        if let Some(ref mut config) = self.surface_config {
-            config.width = w.max(1);
-            config.height = h.max(1);
-            if let Some(ref surface) = self.surface {
-                surface.configure(&self.device, config);
+        let (new_w, new_h) = (w.max(1), h.max(1));
+
+        // Fast-path: check if the surface is still backed by a live native window.
+        if let Some(ref surface) = self.surface {
+            let caps = surface.get_capabilities(&self.adapter);
+            if caps.formats.is_empty() {
+                self.drop_surface();
+                return;
             }
+        }
+
+        if let Some(ref mut config) = self.surface_config {
+            config.width = new_w;
+            config.height = new_h;
+            if let Some(ref surface) = self.surface {
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    self.device.push_error_scope(wgpu::ErrorFilter::Validation);
+                    surface.configure(&self.device, config);
+                    let error = block_on_immediate(self.device.pop_error_scope());
+                    if error.is_some() {
+                        self.surface = None;
+                        #[cfg(target_os = "android")]
+                        if let Some(window) = self.active_native_window.take() {
+                            unsafe { ANativeWindow_release(window); }
+                        }
+                    }
+                }
+                #[cfg(target_arch = "wasm32")]
+                {
+                    surface.configure(&self.device, config);
+                }
+            }
+        }
+        if self.surface.is_none() {
+            self.surface_config = None;
         }
     }
 
@@ -724,15 +895,15 @@ impl GpuRenderer {
     /// Render directly to the configured GPU surface (zero-copy).
     ///
     /// Returns the dirty rect `(x, y, w, h)`.
-    pub fn render_to_surface(&mut self, grid: &VolvoxGrid, w: i32, h: i32) -> (i32, i32, i32, i32) {
+    pub fn render_to_surface(&mut self, grid: &VolvoxGrid, w: i32, h: i32) -> Result<(i32, i32, i32, i32), wgpu::SurfaceError> {
         let surface = match self.surface.as_ref() {
             Some(s) => s,
-            None => return (0, 0, 0, 0),
+            None => return Err(wgpu::SurfaceError::Lost),
         };
 
         let frame = match surface.get_current_texture() {
             Ok(f) => f,
-            Err(_) => return (0, 0, 0, 0),
+            Err(e) => return Err(e),
         };
 
         let view = frame
@@ -742,7 +913,7 @@ impl GpuRenderer {
         self.render_to_view(grid, &view, w, h);
 
         frame.present();
-        (0, 0, w, h)
+        Ok((0, 0, w, h))
     }
 
     /// Render to a CPU buffer (readback mode / fallback).
@@ -864,13 +1035,7 @@ impl GpuRenderer {
     // Internal: render to a wgpu TextureView
     // -----------------------------------------------------------------------
 
-    fn render_to_view(
-        &mut self,
-        grid: &VolvoxGrid,
-        view: &wgpu::TextureView,
-        w: i32,
-        h: i32,
-    ) {
+    fn render_to_view(&mut self, grid: &VolvoxGrid, view: &wgpu::TextureView, w: i32, h: i32) {
         // Keep renderer-owned text cache policy in sync with runtime grid config.
         if self.text_engine.layout_cache_cap != grid.text_layout_cache_cap {
             self.text_engine
@@ -987,11 +1152,7 @@ impl GpuRenderer {
                 pass.set_pipeline(&self.textured_pipeline);
                 pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                 pass.set_vertex_buffer(0, buf.slice(..));
-                draw_textured_batches(
-                    &mut pass,
-                    &self.textured_instances,
-                    &self.atlas_bind_groups,
-                );
+                draw_textured_batches(&mut pass, &self.textured_instances, &self.atlas_bind_groups);
             }
 
             // --- Overlay layer (editor + dropdown): rects then textured ---

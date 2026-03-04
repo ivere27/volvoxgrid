@@ -1,7 +1,7 @@
-use crate::event::GridEventData;
-use crate::grid::VolvoxGrid;
 use crate::canvas::render_grid;
 use crate::canvas_cpu::CpuCanvas;
+use crate::event::GridEventData;
+use crate::grid::VolvoxGrid;
 use crate::text::TextEngine;
 
 /// A single rendered page produced by `print_grid`.

@@ -125,81 +125,31 @@ class VolvoxGridPlugin: FlutterPlugin, MethodCallHandler {
 }
 
 private object NativeWindowCompat {
-    private const val TAG = "NativeWindowCompat"
-    private const val HELPER_CLASS = "io.github.ivere27.volvoxgrid.NativeWindowHelper"
-    private val reflectionBridge = ReflectionBridge.createOrNull()
+    private val helperClass: Class<*> by lazy {
+        Class.forName("io.github.ivere27.volvoxgrid.NativeWindowHelper")
+    }
+
+    private val helperInstance: Any by lazy {
+        helperClass.getField("INSTANCE").get(null)
+            ?: error("NativeWindowHelper.INSTANCE is null")
+    }
+
+    private val getNativeWindowMethod by lazy {
+        helperClass.getDeclaredMethod("getNativeWindow", Surface::class.java)
+    }
+
+    private val releaseNativeWindowMethod by lazy {
+        helperClass.getDeclaredMethod("releaseNativeWindow", Long::class.javaPrimitiveType)
+    }
 
     fun getNativeWindow(surface: Surface): Long {
-        reflectionBridge?.let {
-            try {
-                return it.getNativeWindow(surface)
-            } catch (t: Throwable) {
-                android.util.Log.w(TAG, "Reflection bridge getNativeWindow failed; trying JNI fallback", t)
-            }
-        }
-        return EmbeddedNativeWindowHelper.getNativeWindow(surface)
+        val value = getNativeWindowMethod.invoke(helperInstance, surface) as? Number
+        return value?.toLong() ?: 0L
     }
 
     fun releaseNativeWindow(ptr: Long) {
-        if (ptr == 0L) return
-        reflectionBridge?.let {
-            try {
-                it.releaseNativeWindow(ptr)
-                return
-            } catch (t: Throwable) {
-                android.util.Log.w(TAG, "Reflection bridge releaseNativeWindow failed; trying JNI fallback", t)
-            }
+        if (ptr != 0L) {
+            releaseNativeWindowMethod.invoke(helperInstance, ptr)
         }
-        try {
-            EmbeddedNativeWindowHelper.releaseNativeWindow(ptr)
-        } catch (t: Throwable) {
-            android.util.Log.w(TAG, "Failed to release native window handle", t)
-        }
-    }
-
-    private class ReflectionBridge private constructor(
-        private val instance: Any,
-        private val getNativeWindowMethod: java.lang.reflect.Method,
-        private val releaseNativeWindowMethod: java.lang.reflect.Method,
-    ) {
-        fun getNativeWindow(surface: Surface): Long {
-            return (getNativeWindowMethod.invoke(instance, surface) as Number).toLong()
-        }
-
-        fun releaseNativeWindow(ptr: Long) {
-            releaseNativeWindowMethod.invoke(instance, ptr)
-        }
-
-        companion object {
-            fun createOrNull(): ReflectionBridge? {
-                return try {
-                    val helperClass = Class.forName(HELPER_CLASS)
-                    val instance = helperClass.getField("INSTANCE").get(null)
-                    val getMethod = helperClass.getMethod("getNativeWindow", Surface::class.java)
-                    val releaseMethod = helperClass.getMethod("releaseNativeWindow", Long::class.javaPrimitiveType)
-                    ReflectionBridge(instance, getMethod, releaseMethod)
-                } catch (t: Throwable) {
-                    android.util.Log.i(TAG, "NativeWindowHelper reflection bridge unavailable; using JNI fallback")
-                    null
-                }
-            }
-        }
-    }
-
-    private object EmbeddedNativeWindowHelper {
-        init {
-            System.loadLibrary("volvoxgrid_jni")
-        }
-
-        fun getNativeWindow(surface: Surface): Long {
-            return nativeGetNativeWindow(surface)
-        }
-
-        fun releaseNativeWindow(ptr: Long) {
-            nativeReleaseNativeWindow(ptr)
-        }
-
-        private external fun nativeGetNativeWindow(surface: Any): Long
-        private external fun nativeReleaseNativeWindow(ptr: Long)
     }
 }

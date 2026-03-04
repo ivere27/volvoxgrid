@@ -616,9 +616,11 @@ impl TextEngine {
                     if is_notdef && has_external {
                         let character = text.get(glyph.start..).and_then(|s| s.chars().next());
                         if let Some(ch) = character {
-                            if let Some(bitmap) = self.external_rasterizer.as_mut().and_then(|rast| {
-                                rast.rasterize_glyph(ch, font_name, font_size, bold, italic)
-                            }) {
+                            if let Some(bitmap) =
+                                self.external_rasterizer.as_mut().and_then(|rast| {
+                                    rast.rasterize_glyph(ch, font_name, font_size, bold, italic)
+                                })
+                            {
                                 if bitmap.width > 0 && bitmap.height > 0 {
                                     let gx = physical.x + bitmap.offset_x + x_off;
                                     let gy = physical.y - bitmap.offset_y;
@@ -642,7 +644,8 @@ impl TextEngine {
                                     );
                                 }
                                 // Adjust cumulative offset: actual advance vs cosmic-text's advance.
-                                let actual_advance = bitmap.advance_width.unwrap_or(bitmap.width as f32);
+                                let actual_advance =
+                                    bitmap.advance_width.unwrap_or(bitmap.width as f32);
                                 x_adjust += actual_advance - glyph.w;
                                 continue;
                             }
@@ -702,9 +705,11 @@ impl TextEngine {
                         // get_image returned None — try external rasterizer.
                         let character = text.get(glyph.start..).and_then(|s| s.chars().next());
                         if let Some(ch) = character {
-                            if let Some(bitmap) = self.external_rasterizer.as_mut().and_then(|rast| {
-                                rast.rasterize_glyph(ch, font_name, font_size, bold, italic)
-                            }) {
+                            if let Some(bitmap) =
+                                self.external_rasterizer.as_mut().and_then(|rast| {
+                                    rast.rasterize_glyph(ch, font_name, font_size, bold, italic)
+                                })
+                            {
                                 if bitmap.width > 0 && bitmap.height > 0 {
                                     let gx = physical.x + bitmap.offset_x + x_off;
                                     let gy = physical.y - bitmap.offset_y;
@@ -727,7 +732,8 @@ impl TextEngine {
                                         hinting_mode,
                                     );
                                 }
-                                let actual_advance = bitmap.advance_width.unwrap_or(bitmap.width as f32);
+                                let actual_advance =
+                                    bitmap.advance_width.unwrap_or(bitmap.width as f32);
                                 x_adjust += actual_advance - glyph.w;
                             }
                         }

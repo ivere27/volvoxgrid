@@ -26,6 +26,14 @@ apply plugin: "kotlin-android"
 
 // ── VolvoxGrid Source Configuration ────────────────────────────────────────
 def repoRoot = new File(projectDir, "../..").canonicalFile
+def versionFile = new File(repoRoot, "VERSION")
+if (!versionFile.isFile()) {
+    throw new GradleException("VERSION file not found at ${versionFile}")
+}
+def defaultVolvoxgridVersion = versionFile.getText("UTF-8").trim()
+if (defaultVolvoxgridVersion.isEmpty()) {
+    throw new GradleException("VERSION file is empty: ${versionFile}")
+}
 def defaultSource = "maven"
 def rawVolvoxgridSource = project.findProperty("volvoxgridSource") ?: System.getenv("VOLVOXGRID_SOURCE") ?: defaultSource
 def volvoxgridSource = rawVolvoxgridSource
@@ -34,31 +42,33 @@ if (!(volvoxgridSource in ["local", "maven"])) {
         "Invalid volvoxgridSource='${rawVolvoxgridSource}'. Expected 'maven' or 'local'."
     )
 }
-def volvoxgridVersion = project.findProperty("volvoxgridVersion") ?: System.getenv("VOLVOXGRID_VERSION") ?: "0.1.4"
+def volvoxgridVersion = System.getenv("VOLVOXGRID_VERSION") ?: project.findProperty("volvoxgridVersion") ?: defaultVolvoxgridVersion
 
 def artifactName = "volvoxgrid-android"
 def isSnapshot = volvoxgridVersion.endsWith("-SNAPSHOT")
 def generatedJniLibsDir = new File(buildDir, "generated/jniLibs")
+def generatedLocalSourcesDir = new File(buildDir, "generated/source/volvoxgridLocal/main/kotlin")
+def androidNativeWindowHelperSource = new File(
+    repoRoot,
+    "android/volvoxgrid-android/src/main/java/io/github/ivere27/volvoxgrid/NativeWindowHelper.kt"
+)
+def localNativeHelperCmakePath = new File(repoRoot, "android/volvoxgrid-android/src/main/jni/CMakeLists.txt")
 def supportedAndroidAbis = ["arm64-v8a", "armeabi-v7a", "x86_64"]
 def abiToRustTarget = [
     "arm64-v8a"   : "aarch64-linux-android",
     "armeabi-v7a" : "armv7-linux-androideabi",
     "x86_64"      : "x86_64-linux-android",
 ]
-def pluginSoNames = ["libvolvoxgrid_plugin.so"]
-
-def resolvePluginSoForAbi = { String abi ->
+def resolveSoForAbi = { String abi, String soName ->
     String rustTarget = abiToRustTarget[abi]
     List<File> candidates = []
 
-    for (String soName : pluginSoNames) {
-        candidates.add(new File(projectDir, "src/main/jniLibs/${abi}/${soName}"))
-        candidates.add(new File(repoRoot, "android/volvoxgrid-android/src/main/jniLibs/${abi}/${soName}"))
-        candidates.add(new File(repoRoot, "android/example/src/main/jniLibs/${abi}/${soName}"))
-        if (rustTarget != null) {
-            candidates.add(new File(repoRoot, "target/${rustTarget}/release/${soName}"))
-            candidates.add(new File(repoRoot, "target/${rustTarget}/debug/${soName}"))
-        }
+    candidates.add(new File(projectDir, "src/main/jniLibs/${abi}/${soName}"))
+    candidates.add(new File(repoRoot, "android/volvoxgrid-android/src/main/jniLibs/${abi}/${soName}"))
+    candidates.add(new File(repoRoot, "android/example/src/main/jniLibs/${abi}/${soName}"))
+    if (rustTarget != null) {
+        candidates.add(new File(repoRoot, "target/${rustTarget}/release/${soName}"))
+        candidates.add(new File(repoRoot, "target/${rustTarget}/debug/${soName}"))
     }
 
     for (File candidate : candidates) {
@@ -89,15 +99,16 @@ if (volvoxgridSource == "local") {
             List<String> copiedAbis = []
 
             for (String abi : supportedAndroidAbis) {
-                File sourceSo = resolvePluginSoForAbi(abi)
-                if (sourceSo == null) {
+                File pluginSo = resolveSoForAbi(abi, "libvolvoxgrid_plugin.so")
+
+                if (pluginSo == null) {
                     continue
                 }
 
                 File outDir = new File(generatedJniLibsDir, abi)
                 outDir.mkdirs()
                 copy {
-                    from sourceSo
+                    from pluginSo
                     into outDir
                     rename { "libvolvoxgrid_plugin.so" }
                 }
@@ -115,6 +126,27 @@ if (volvoxgridSource == "local") {
             logger.lifecycle("Prepared VolvoxGrid native plugin for ABIs: ${copiedAbis.join(', ')}")
         }
     }
+
+    tasks.register("prepareVolvoxGridLocalKotlin") {
+        inputs.file(androidNativeWindowHelperSource)
+        outputs.dir(generatedLocalSourcesDir)
+        doLast {
+            if (!androidNativeWindowHelperSource.exists()) {
+                throw new GradleException(
+                    "NativeWindowHelper.kt not found at ${androidNativeWindowHelperSource}. " +
+                    "Expected Android local source tree to be present."
+                )
+            }
+
+            delete(generatedLocalSourcesDir)
+            File outDir = new File(generatedLocalSourcesDir, "io/github/ivere27/volvoxgrid")
+            outDir.mkdirs()
+            copy {
+                from androidNativeWindowHelperSource
+                into outDir
+            }
+        }
+    }
 }
 
 android {
@@ -123,6 +155,11 @@ android {
 
     defaultConfig {
         minSdk = 21
+        if (volvoxgridSource == "local") {
+            ndk {
+                abiFilters += supportedAndroidAbis
+            }
+        }
     }
 
     compileOptions {
@@ -135,9 +172,15 @@ android {
     }
 
     if (volvoxgridSource == "local") {
+        externalNativeBuild {
+            cmake {
+                path = localNativeHelperCmakePath
+            }
+        }
         sourceSets {
             main {
                 java.srcDirs += "src/main/kotlin"
+                java.srcDirs += generatedLocalSourcesDir
                 jniLibs.srcDirs = [generatedJniLibsDir]
             }
         }
@@ -156,6 +199,7 @@ android {
 if (volvoxgridSource == "local") {
     tasks.named("preBuild") {
         dependsOn("prepareVolvoxGridJniLibs")
+        dependsOn("prepareVolvoxGridLocalKotlin")
     }
 }
 

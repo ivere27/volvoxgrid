@@ -1,4 +1,5 @@
 use crate::proto::volvoxgrid::v1 as pb;
+use crate::style::HighlightStyle;
 
 /// Selection state
 #[derive(Clone, Debug)]
@@ -12,7 +13,11 @@ pub struct SelectionState {
     pub selection_visibility: i32, // SelectionVisibility enum
     pub allow_selection: bool,
     pub header_click_select: bool,
-    pub show_fill_handle: bool,
+    pub selection_style: HighlightStyle,
+    pub hover_mode: u32,
+    pub hover_row_style: HighlightStyle,
+    pub hover_column_style: HighlightStyle,
+    pub hover_cell_style: HighlightStyle,
     // For listbox mode - track individually selected rows
     pub selected_rows: std::collections::HashSet<i32>,
 }
@@ -29,7 +34,30 @@ impl Default for SelectionState {
             selection_visibility: pb::SelectionVisibility::SelectionVisAlways as i32,
             allow_selection: true,
             header_click_select: true,
-            show_fill_handle: false,
+            selection_style: HighlightStyle {
+                back_color: Some(0xFF000080),
+                fore_color: Some(0xFFFFFFFF),
+                fill_handle: Some(pb::FillHandlePosition::FillHandleNone as i32),
+                fill_handle_color: Some(0xFF217346),
+                ..HighlightStyle::default()
+            },
+            hover_mode: pb::HoverMode::HoverNone as u32,
+            // ROW/COLUMN are intentionally subtle to provide axis context.
+            hover_row_style: HighlightStyle {
+                back_color: Some(0x10000000),
+                ..HighlightStyle::default()
+            },
+            hover_column_style: HighlightStyle {
+                back_color: Some(0x10000000),
+                ..HighlightStyle::default()
+            },
+            // CELL is stronger so ROW+COL+CELL still clearly points to one target.
+            hover_cell_style: HighlightStyle {
+                back_color: Some(0x22000000),
+                border: Some(pb::BorderStyle::BorderThin as i32),
+                border_color: Some(0xFF1A73E8),
+                ..HighlightStyle::default()
+            },
             selected_rows: std::collections::HashSet::new(),
         }
     }

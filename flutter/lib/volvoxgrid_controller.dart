@@ -66,6 +66,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   int? _gpuTextureId;
   int? _gpuSurfaceHandle;
+  String? _gpuBackend;
 
   /// The native grid handle. Zero until [create] completes.
   Int64 get gridId => _gridId;
@@ -78,6 +79,9 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Active GPU native surface handle (if created via [createGpuTexture]).
   int? get gpuSurfaceHandle => _gpuSurfaceHandle;
+
+  /// The backend string used for the active GPU texture ('gles' or 'vulkan').
+  String? get gpuBackend => _gpuBackend;
 
   GridHandle get _handle => GridHandle()..id = _gridId;
 
@@ -377,21 +381,21 @@ class VolvoxGridController extends ChangeNotifier {
     });
   }
 
-  /// Load a row-major string matrix in one RPC.
+  /// Load a row-major typed matrix in one RPC.
   ///
-  /// [values] must be `rows * cols` long in row-major order.
-  Future<void> loadArray(
+  /// [values] should be `rows * cols` long in row-major order.
+  Future<void> loadTable(
     int rows,
     int cols,
-    List<String> values, {
-    bool bind = false,
+    List<CellValue> values, {
+    bool atomic = false,
   }) async {
-    await VolvoxGridServiceFfi.LoadArray(LoadArrayRequest()
+    await VolvoxGridServiceFfi.LoadTable(LoadTableRequest()
       ..gridId = _gridId
       ..rows = rows
       ..cols = cols
       ..values.addAll(values)
-      ..bind = bind);
+      ..atomic = atomic);
     notifyListeners();
   }
 
@@ -1269,6 +1273,7 @@ class VolvoxGridController extends ChangeNotifier {
     if (res != null) {
       _gpuTextureId = res['textureId'] as int?;
       _gpuSurfaceHandle = res['surfaceHandle'] as int?;
+      _gpuBackend = backend;
       notifyListeners();
     }
     return _gpuTextureId;
@@ -1302,6 +1307,7 @@ class VolvoxGridController extends ChangeNotifier {
 
     _gpuTextureId = null;
     _gpuSurfaceHandle = null;
+    // Do not clear _gpuBackend so _onResume can know what backend to restore.
     notifyListeners();
 
     try {

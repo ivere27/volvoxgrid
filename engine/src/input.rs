@@ -73,6 +73,11 @@ fn type_ahead_delay_ms(grid: &VolvoxGrid) -> u128 {
     }
 }
 
+#[inline]
+fn hover_mode_has(mode: u32, flag: pb::HoverMode) -> bool {
+    mode & (flag as u32) != 0
+}
+
 fn clear_type_ahead_buffer(grid: &mut VolvoxGrid, emit_end_event: bool) {
     let had_buffer = !grid.type_ahead_buffer.is_empty();
     if had_buffer && emit_end_event {
@@ -1562,9 +1567,25 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, _
         return;
     }
 
+    let prev_mouse_row = grid.mouse_row;
+    let prev_mouse_col = grid.mouse_col;
     let hit = hit_test(grid, x, y);
     grid.mouse_row = hit.row;
     grid.mouse_col = hit.col;
+    let hover_mode = grid.selection.hover_mode;
+    if hover_mode != pb::HoverMode::HoverNone as u32 {
+        let row_changed = grid.mouse_row != prev_mouse_row;
+        let col_changed = grid.mouse_col != prev_mouse_col;
+        // Invalidate only for axes actually used by hover mode.
+        // ROW should ignore pure column motion, COLUMN should ignore pure row motion.
+        let row_relevant = hover_mode_has(hover_mode, pb::HoverMode::HoverRow)
+            || hover_mode_has(hover_mode, pb::HoverMode::HoverCell);
+        let col_relevant = hover_mode_has(hover_mode, pb::HoverMode::HoverColumn)
+            || hover_mode_has(hover_mode, pb::HoverMode::HoverCell);
+        if (row_relevant && row_changed) || (col_relevant && col_changed) {
+            grid.mark_dirty();
+        }
+    }
 
     // Update cursor style based on hit area
     grid.cursor_style = match hit.area {
@@ -2176,7 +2197,11 @@ pub fn handle_key_press_with_behavior(
     } else if grid.type_ahead_mode != pb::TypeAheadMode::TypeAheadNone as i32 {
         // Type-ahead takes precedence over typing edits. In editable mode,
         // SPACE starts editing while other printable keys search.
-        if ch == ' ' && !grid.host_key_dispatch && behavior.allow_begin_edit && grid.edit_trigger_mode >= 1 {
+        if ch == ' '
+            && !grid.host_key_dispatch
+            && behavior.allow_begin_edit
+            && grid.edit_trigger_mode >= 1
+        {
             begin_edit_from_input(grid, grid.selection.row, grid.selection.col);
             if grid.is_editing() {
                 grid.edit.update_text(String::new());
@@ -2315,6 +2340,14 @@ pub fn handle_scroll(grid: &mut VolvoxGrid, delta_x: f32, delta_y: f32) {
     }
 
     if scrolled {
+        if grid.selection.hover_mode != pb::HoverMode::HoverNone as u32
+            && (grid.mouse_row != -1 || grid.mouse_col != -1)
+        {
+            // Hover hit target is pointer-position based. After scroll, clear stale
+            // hover until the next pointer move updates hit-test coordinates.
+            grid.mouse_row = -1;
+            grid.mouse_col = -1;
+        }
         grid.events.push(GridEventData::AfterScroll {
             old_top_row: old_top_left.0,
             old_left_col: old_top_left.1,
@@ -2513,7 +2546,10 @@ mod tests {
 
         handle_key_down(&mut grid, 13, 0);
         assert!(grid.is_editing());
-        assert_eq!(grid.cells.get_text(grid.selection.row, grid.selection.col), "");
+        assert_eq!(
+            grid.cells.get_text(grid.selection.row, grid.selection.col),
+            ""
+        );
 
         handle_key_down(&mut grid, 27, 0);
         assert!(grid.is_editing());
@@ -2802,5 +2838,55 @@ mod tests {
         assert_eq!(grid.scroll.scroll_x, before_x);
         assert_eq!(grid.scroll.scroll_y, before_y);
         assert!(grid.events.drain().is_empty());
+    }
+
+    #[test]
+    fn hover_row_mode_ignores_column_only_pointer_motion() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 100, 8, 1, 0);
+        prime_layout(&mut grid);
+        grid.selection.hover_mode = pb::HoverMode::HoverRow as u32;
+
+        let y = (grid.row_pos(1) + 2) as f32;
+        let x1 = (grid.col_pos(1) + 2) as f32;
+        let x2 = (grid.col_pos(4) + 2) as f32;
+
+        handle_pointer_move(&mut grid, x1, y, 0, 0);
+        assert!(grid.dirty);
+        grid.clear_dirty();
+
+        handle_pointer_move(&mut grid, x2, y, 0, 0);
+        assert!(!grid.dirty);
+    }
+
+    #[test]
+    fn hover_column_mode_ignores_row_only_pointer_motion() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 100, 8, 1, 0);
+        prime_layout(&mut grid);
+        grid.selection.hover_mode = pb::HoverMode::HoverColumn as u32;
+
+        let x = (grid.col_pos(2) + 2) as f32;
+        let y1 = (grid.row_pos(1) + 2) as f32;
+        let y2 = (grid.row_pos(7) + 2) as f32;
+
+        handle_pointer_move(&mut grid, x, y1, 0, 0);
+        assert!(grid.dirty);
+        grid.clear_dirty();
+
+        handle_pointer_move(&mut grid, x, y2, 0, 0);
+        assert!(!grid.dirty);
+    }
+
+    #[test]
+    fn hover_none_pointer_move_does_not_dirty_grid() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 100, 8, 1, 0);
+        prime_layout(&mut grid);
+        grid.selection.hover_mode = pb::HoverMode::HoverNone as u32;
+
+        let x = (grid.col_pos(2) + 2) as f32;
+        let y = (grid.row_pos(3) + 2) as f32;
+
+        grid.clear_dirty();
+        handle_pointer_move(&mut grid, x, y, 0, 0);
+        assert!(!grid.dirty);
     }
 }

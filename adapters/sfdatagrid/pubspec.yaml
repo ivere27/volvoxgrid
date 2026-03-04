@@ -11,7 +11,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  volvoxgrid: ^0.1.4
+  volvoxgrid: ^0.1.5
   # Local monorepo override:
   # volvoxgrid:
   #   path: ../../flutter

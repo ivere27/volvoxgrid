@@ -1,6 +1,7 @@
 import com.google.protobuf.gradle.proto
 import java.io.File
 import java.time.Instant
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 fun captureCommandOutput(workDir: File, vararg command: String): String? {
     return try {
@@ -18,9 +19,29 @@ fun captureCommandOutput(workDir: File, vararg command: String): String? {
 fun quoteForBuildConfig(value: String): String =
     "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
-val volvoxgridVersion = providers.gradleProperty("volvoxgridVersion")
-    .orElse(System.getenv("VOLVOXGRID_VERSION") ?: System.getenv("VERSION") ?: "dev")
-    .get()
+fun findVolvoxgridVersionFile(startDir: File): File? {
+    var current: File? = startDir.canonicalFile
+    while (current != null) {
+        val candidate = current.resolve("VERSION")
+        if (candidate.isFile) {
+            return candidate
+        }
+        current = current.parentFile
+    }
+    return null
+}
+
+val versionFile = findVolvoxgridVersionFile(projectDir)
+    ?: throw org.gradle.api.GradleException("VERSION file not found from $projectDir")
+val defaultVolvoxgridVersion = versionFile.readText().trim()
+if (defaultVolvoxgridVersion.isEmpty()) {
+    throw org.gradle.api.GradleException("VERSION file is empty: $versionFile")
+}
+
+val volvoxgridVersion = System.getenv("VOLVOXGRID_VERSION")
+    ?: providers.gradleProperty("volvoxgridVersion")
+        .orElse(System.getenv("VERSION") ?: defaultVolvoxgridVersion)
+        .get()
 val volvoxgridGitCommit = providers.gradleProperty("volvoxgridGitCommit")
     .orElse(captureCommandOutput(rootDir, "git", "rev-parse", "--short=12", "HEAD") ?: "unknown")
     .get()
@@ -129,6 +150,12 @@ val copyFfiJava = tasks.register<Copy>("copyFfiJava") {
 
 tasks.named("preBuild") {
     dependsOn(copyFfiJava)
+}
+
+tasks.withType<KotlinCompile>().configureEach {
+    // Protobuf-generated Java types change frequently and have caused flaky
+    // incremental Kotlin classpath state (e.g. missing *OrBuilder supertypes).
+    incremental = false
 }
 
 protobuf {

@@ -1,0 +1,41 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    build-essential \
+    ca-certificates \
+    curl \
+    git \
+    make \
+    nodejs \
+    npm \
+    pkg-config \
+    protobuf-compiler \
+    python3 \
+    zip \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV RUSTUP_HOME=/opt/rustup
+ENV CARGO_HOME=/opt/cargo
+ENV PATH=/opt/cargo/bin:${PATH}
+
+RUN curl -fsSL https://sh.rustup.rs -o /tmp/rustup-init.sh && \
+    sh /tmp/rustup-init.sh -y --profile minimal --default-toolchain stable && \
+    rm -f /tmp/rustup-init.sh
+
+RUN rustup toolchain install nightly --profile minimal && \
+    rustup target add wasm32-unknown-unknown && \
+    rustup target add --toolchain nightly wasm32-unknown-unknown
+
+RUN cargo install --locked wasm-pack
+
+COPY docker/build_web.sh /opt/volvoxgrid/build_web.sh
+RUN chmod +x /opt/volvoxgrid/build_web.sh
+
+# Allow non-root users (docker run -u) to write to cargo/rustup caches.
+RUN chmod -R a+w /opt/cargo /opt/rustup
+
+WORKDIR /workspace/volvoxgrid
+ENTRYPOINT ["/opt/volvoxgrid/build_web.sh"]

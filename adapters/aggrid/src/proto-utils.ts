@@ -25,6 +25,8 @@ export interface GridEventEnvelope {
   payload: Uint8Array;
 }
 
+const TEXT_ENCODER = new TextEncoder();
+
 function encodeVarintUnsigned(value: bigint): number[] {
   const out: number[] = [];
   let v = BigInt.asUintN(64, value);
@@ -53,12 +55,102 @@ function encodeBool(value: boolean): number[] {
   return encodeVarintUnsigned(value ? 1n : 0n);
 }
 
+function encodeString(value: string): number[] {
+  return Array.from(TEXT_ENCODER.encode(value));
+}
+
+function encodeBytes(value: Uint8Array): number[] {
+  return Array.from(value);
+}
+
+function encodeDouble(value: number): number[] {
+  const buf = new ArrayBuffer(8);
+  const view = new DataView(buf);
+  view.setFloat64(0, value, true);
+  return Array.from(new Uint8Array(buf));
+}
+
 function encodeMessageField(field: number, payload: number[]): number[] {
   return [
     ...encodeTag(field, 2),
     ...encodeVarintUnsigned(BigInt(payload.length)),
     ...payload,
   ];
+}
+
+function encodeCellValue(value: unknown): number[] {
+  if (value == null) {
+    return [];
+  }
+  if (typeof value === "string") {
+    const text = encodeString(value);
+    return [
+      ...encodeTag(1, 2),
+      ...encodeVarintUnsigned(BigInt(text.length)),
+      ...text,
+    ];
+  }
+  if (typeof value === "number") {
+    return [
+      ...encodeTag(2, 1),
+      ...encodeDouble(value),
+    ];
+  }
+  if (typeof value === "boolean") {
+    return [
+      ...encodeTag(3, 0),
+      ...encodeBool(value),
+    ];
+  }
+  if (value instanceof Uint8Array) {
+    const bytes = encodeBytes(value);
+    return [
+      ...encodeTag(4, 2),
+      ...encodeVarintUnsigned(BigInt(bytes.length)),
+      ...bytes,
+    ];
+  }
+  if (value instanceof Date) {
+    return [
+      ...encodeTag(5, 0),
+      ...encodeInt64(value.getTime()),
+    ];
+  }
+  return encodeCellValue(String(value));
+}
+
+export function encodeLoadTableRequest(args: {
+  gridId: number;
+  rows: number;
+  cols: number;
+  values: unknown[];
+  atomic?: boolean;
+}): Uint8Array {
+  const out: number[] = [];
+  const total = Math.max(0, args.rows) * Math.max(0, args.cols);
+
+  // LoadTableRequest.grid_id = 1
+  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
+  // LoadTableRequest.rows = 2
+  out.push(...encodeTag(2, 0), ...encodeInt32(args.rows));
+  // LoadTableRequest.cols = 3
+  out.push(...encodeTag(3, 0), ...encodeInt32(args.cols));
+
+  for (let i = 0; i < total; i += 1) {
+    const cell = encodeCellValue(args.values[i]);
+    out.push(
+      ...encodeTag(4, 2),
+      ...encodeVarintUnsigned(BigInt(cell.length)),
+      ...cell,
+    );
+  }
+
+  if (args.atomic) {
+    // LoadTableRequest.atomic = 5
+    out.push(...encodeTag(5, 0), ...encodeBool(true));
+  }
+
+  return new Uint8Array(out);
 }
 
 function encodeCellRange(row1: number, col1: number, row2: number, col2: number): number[] {

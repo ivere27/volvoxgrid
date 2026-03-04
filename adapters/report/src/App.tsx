@@ -108,7 +108,9 @@ export default function App() {
   const [lastExport, setLastExport] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const setExportImage = (imageData: Uint8Array) => {
-    const blob = new Blob([imageData], { type: 'image/png' });
+    const bytes = new Uint8Array(imageData.byteLength);
+    bytes.set(imageData);
+    const blob = new Blob([bytes], { type: 'image/png' });
     const nextUrl = URL.createObjectURL(blob);
     setLastExport((prev) => {
       if (prev) URL.revokeObjectURL(prev);

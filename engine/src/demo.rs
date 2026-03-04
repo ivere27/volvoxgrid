@@ -22,7 +22,7 @@
 use crate::grid::VolvoxGrid;
 use crate::outline::{subtotal, subtotal_ex};
 use crate::proto::volvoxgrid::v1 as pb;
-use crate::style::CellStyleOverride;
+use crate::style::{CellStyleOverride, HighlightStyle};
 
 // ── Shared helpers ──────────────────────────────────────────────────
 
@@ -234,6 +234,23 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
     grid.header_features = 3;
     grid.auto_size_mouse = true;
     grid.allow_user_freezing = 3;
+    grid.selection.hover_mode = (pb::HoverMode::HoverRow as u32)
+        | (pb::HoverMode::HoverColumn as u32)
+        | (pb::HoverMode::HoverCell as u32);
+    grid.selection.hover_row_style = HighlightStyle {
+        back_color: Some(0x0A1A73E8),
+        ..HighlightStyle::default()
+    };
+    grid.selection.hover_column_style = HighlightStyle {
+        back_color: Some(0x0A1A73E8),
+        ..HighlightStyle::default()
+    };
+    grid.selection.hover_cell_style = HighlightStyle {
+        back_color: Some(0x241A73E8),
+        border: Some(pb::BorderStyle::BorderThin as i32),
+        border_color: Some(0xFF1A73E8),
+        ..HighlightStyle::default()
+    };
 
     // ── Write flat data rows ─────────────────────────────────────────
     for (idx, e) in entries.iter().enumerate() {
@@ -413,6 +430,15 @@ pub fn setup_hierarchy_demo(grid: &mut VolvoxGrid) {
     grid.fling_friction = 0.9;
     grid.header_features = 0; // disabled — flat sort is incompatible with tree hierarchy
     grid.auto_size_mouse = true;
+    grid.selection.hover_mode = pb::HoverMode::HoverCell as u32;
+    grid.selection.hover_row_style = HighlightStyle::default();
+    grid.selection.hover_column_style = HighlightStyle::default();
+    grid.selection.hover_cell_style = HighlightStyle {
+        back_color: Some(0x1A2E7D32),
+        border: Some(pb::BorderStyle::BorderThin as i32),
+        border_color: Some(0xFF2E7D32),
+        ..HighlightStyle::default()
+    };
 
     // Populate data rows
     for (i, entry) in entries.iter().enumerate() {
@@ -814,6 +840,13 @@ fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize
     grid.header_features = 3;
     grid.auto_size_mouse = true;
     grid.allow_user_freezing = 3;
+    grid.selection.hover_mode = pb::HoverMode::HoverRow as u32;
+    grid.selection.hover_row_style = HighlightStyle {
+        back_color: Some(0x12000000),
+        ..HighlightStyle::default()
+    };
+    grid.selection.hover_column_style = HighlightStyle::default();
+    grid.selection.hover_cell_style = HighlightStyle::default();
 }
 
 /// Compute the cell text for a given source row and column (stress test).

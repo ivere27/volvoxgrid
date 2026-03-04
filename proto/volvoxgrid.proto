@@ -152,6 +152,29 @@ enum ColumnDataType {
   COLUMN_DATA_CURRENCY = 4;
 }
 
+// Defines how the grid handles incoming data that does not match
+// the configured column type.
+enum CoercionMode {
+  COERCION_MODE_UNSPECIFIED = 0;
+  // Types must match exactly.
+  COERCION_MODE_STRICT      = 1;
+  // Attempt standard type conversions.
+  COERCION_MODE_FLEXIBLE    = 2;
+  // Only allow parsing from string input.
+  COERCION_MODE_PARSE_ONLY  = 3;
+}
+
+// Defines what happens when type validation/coercion fails.
+enum WriteErrorMode {
+  WRITE_ERROR_MODE_UNSPECIFIED = 0;
+  // Reject the write for the cell.
+  WRITE_ERROR_MODE_REJECT      = 1;
+  // Write null/empty instead.
+  WRITE_ERROR_MODE_SET_NULL    = 2;
+  // Skip this cell write and keep previous value.
+  WRITE_ERROR_MODE_SKIP        = 3;
+}
+
 enum Align {
   ALIGN_LEFT_TOP       = 0;
   ALIGN_LEFT_CENTER    = 1;
@@ -271,6 +294,26 @@ enum BorderStyle {
   BORDER_INSET         = 7;
 }
 
+// Hover bitmask flags. Combine with OR:
+// - row+col: 3
+// - row+cell: 5
+// - row+col+cell: 7
+enum HoverMode {
+  HOVER_NONE   = 0;
+  HOVER_ROW    = 1;
+  HOVER_COLUMN = 2;
+  HOVER_CELL   = 4;
+}
+
+enum FillHandlePosition {
+  FILL_HANDLE_NONE         = 0;
+  FILL_HANDLE_BOTTOM_RIGHT = 1;
+  FILL_HANDLE_BOTTOM_LEFT  = 2;
+  FILL_HANDLE_TOP_RIGHT    = 3;
+  FILL_HANDLE_TOP_LEFT     = 4;
+  FILL_HANDLE_ALL_CORNERS  = 5;
+}
+
 enum ApplyScope {
   APPLY_SINGLE         = 0;
   APPLY_SELECTION      = 1;
@@ -356,6 +399,7 @@ message CellValue {
     double number = 2;
     bool   flag   = 3;
     bytes  data   = 4;
+    int64  timestamp = 5;  // epoch-ms (DATE)
   }
 }
 
@@ -372,6 +416,23 @@ message CellPadding {
   optional int32 top    = 2;
   optional int32 right  = 3;
   optional int32 bottom = 4;
+}
+
+message HighlightStyle {
+  optional uint32             back_color          = 1;
+  optional uint32             fore_color          = 2;
+  optional BorderStyle        border              = 3;
+  optional uint32             border_color        = 4;
+  optional BorderStyle        border_top          = 5;
+  optional BorderStyle        border_right        = 6;
+  optional BorderStyle        border_bottom       = 7;
+  optional BorderStyle        border_left         = 8;
+  optional uint32             border_top_color    = 9;
+  optional uint32             border_right_color  = 10;
+  optional uint32             border_bottom_color = 11;
+  optional uint32             border_left_color   = 12;
+  optional FillHandlePosition fill_handle         = 13;
+  optional uint32             fill_handle_color   = 14;
 }
 
 message HeaderMarkSize {
@@ -515,8 +576,6 @@ message StyleConfig {
   optional uint32           fore_color_fixed     = 5;
   optional uint32           back_color_frozen    = 6;
   optional uint32           fore_color_frozen    = 7;
-  optional uint32           back_color_sel       = 8;
-  optional uint32           fore_color_sel       = 9;
   optional uint32           back_color_bkg       = 10;
   optional uint32           back_color_alternate = 11;
   optional GridLineStyle    grid_lines           = 12;
@@ -567,8 +626,6 @@ message StyleConfig {
   IconThemeSlotStyles       icon_theme_slot_styles   = 49;
   // Show sort priority numbers (1, 2, 3…) next to sort indicators in multi-sort.
   optional bool             show_sort_numbers        = 50;
-  // Fill handle color (ARGB), default 0xFF217346 (Excel green).
-  optional uint32           fill_handle_color        = 51;
 }
 
 message SelectionConfig {
@@ -577,7 +634,11 @@ message SelectionConfig {
   optional SelectionVisibility selection_visibility  = 3;
   optional bool                allow_selection       = 4;
   optional bool                header_click_select   = 5;
-  optional bool                show_fill_handle      = 6;  // default false (opt-in)
+  HighlightStyle               selection_style       = 6;
+  optional uint32              hover_mode            = 7;
+  HighlightStyle               hover_row_style       = 8;
+  HighlightStyle               hover_column_style    = 9;
+  HighlightStyle               hover_cell_style      = 10;
 }
 
 message EditConfig {
@@ -669,6 +730,12 @@ message ColumnDef {
   CellPadding             cell_padding     = 19;
   // Per-column insets for fixed/header cells.
   CellPadding             fixed_cell_padding = 20;
+  // Strict typing: true allows null/empty cell values.
+  optional bool           nullable         = 21;
+  // Strict typing: controls inbound coercion behavior.
+  optional CoercionMode   coercion_mode    = 22;
+  // Strict typing: controls write behavior on validation failure.
+  optional WriteErrorMode error_mode       = 23;
 }
 
 message DefineColumnsRequest {
@@ -750,6 +817,8 @@ message CellUpdate {
 message UpdateCellsRequest {
   int64                grid_id = 1;
   repeated CellUpdate  cells   = 2;
+  // true = all-or-nothing write.
+  bool                 atomic  = 3;
 }
 
 message GetCellsRequest {
@@ -761,6 +830,8 @@ message GetCellsRequest {
   // Control what to include in the response.
   bool include_style   = 6;
   bool include_checked = 7;
+  // When true, return typed values instead of text-only values.
+  bool include_typed   = 8;
 }
 
 message CellData {
@@ -775,12 +846,29 @@ message CellsResponse {
   repeated CellData cells = 1;
 }
 
-message LoadArrayRequest {
-  int64           grid_id = 1;
-  int32           rows    = 2;
-  int32           cols    = 3;
-  repeated string values  = 4;  // row-major: values[row * cols + col]
-  bool            bind    = 5;  // true = BindToArray semantics
+message TypeViolation {
+  int32          row      = 1;
+  int32          col      = 2;
+  ColumnDataType expected = 3;
+  // The rejected inbound value.
+  CellValue      actual   = 4;
+  // Human-readable reason.
+  string         reason   = 5;
+}
+
+message WriteResult {
+  int32                  written_count  = 1;
+  int32                  rejected_count = 2;
+  repeated TypeViolation violations     = 3;
+}
+
+message LoadTableRequest {
+  int64              grid_id = 1;
+  int32              rows    = 2;
+  int32              cols    = 3;
+  // Dense row-major array, length should be rows * cols.
+  repeated CellValue values  = 4;
+  bool               atomic  = 5;
 }
 
 message ClearRequest {
@@ -849,16 +937,15 @@ message SelectionState {
 // ═══════════════════════════════════════════════════════════
 
 message HighlightRegion {
-  CellRange range               = 1;
-  uint32    color               = 2;
-  bool      show_corner_handles = 3; // true for 4-corner resize handles (like Excel formula references)
+  CellRange       range       = 1;
+  HighlightStyle  style       = 2;
   // Stable id for one formula reference token (keeps color/handle mapping stable
   // while users edit text and reorder references).
-  optional int32 ref_id         = 4;
+  optional int32  ref_id      = 3;
   // Optional source span in the formula text, for adapters that highlight the
   // matching token in editor/formula-bar UI.
-  optional int32 text_start     = 5;
-  optional int32 text_length    = 6;
+  optional int32  text_start  = 4;
+  optional int32  text_length = 5;
 }
 
 message EditSetHighlights {
@@ -1536,6 +1623,7 @@ service VolvoxGridService {
 
   // ── Structure ──
   rpc DefineColumns(DefineColumnsRequest)  returns (Empty);
+  rpc GetSchema(GridHandle)                returns (DefineColumnsRequest);
   rpc DefineRows(DefineRowsRequest)        returns (Empty);
   rpc InsertRows(InsertRowsRequest)        returns (Empty);
   rpc RemoveRows(RemoveRowsRequest)        returns (Empty);
@@ -1543,9 +1631,9 @@ service VolvoxGridService {
   rpc MoveRow(MoveRowRequest)              returns (Empty);
 
   // ── Data ──
-  rpc UpdateCells(UpdateCellsRequest)      returns (Empty);
+  rpc UpdateCells(UpdateCellsRequest)      returns (WriteResult);
   rpc GetCells(GetCellsRequest)            returns (CellsResponse);
-  rpc LoadArray(LoadArrayRequest)          returns (Empty);
+  rpc LoadTable(LoadTableRequest)          returns (WriteResult);
   rpc Clear(ClearRequest)                  returns (Empty);
 
   // ── Selection ──

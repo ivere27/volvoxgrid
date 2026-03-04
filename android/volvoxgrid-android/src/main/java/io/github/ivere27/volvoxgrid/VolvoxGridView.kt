@@ -16,6 +16,7 @@ import android.view.ScaleGestureDetector
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.VelocityTracker
+import android.view.View
 import android.view.ViewConfiguration
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
@@ -289,6 +290,9 @@ class VolvoxGridView @JvmOverloads constructor(
                 drawBitmapToSurface()
                 if (gridId != 0L) {
                     requestRenderFrame()
+                    // Force a follow-up render in case the Rust side needs to drop 
+                    // a stale surface handle and reconfigure on the next frame.
+                    needsFollowupRender.set(true)
                 }
             }
 
@@ -302,8 +306,11 @@ class VolvoxGridView @JvmOverloads constructor(
                 surfaceReady.set(false)
                 val ptr = nativeWindowPtr
                 nativeWindowPtr = 0
-                if (gpuSurfaceActive) {
-                    gpuSurfaceActive = false
+                gpuSurfaceActive = false
+                // Always notify invalidation on surface teardown in GPU mode.
+                // A stale native handle can be pointer-reused by the platform;
+                // forcing drop avoids rendering to an invalid old swapchain.
+                if (currentRendererMode >= 2 && gridId != 0L) {
                     sendGpuSurfaceInvalidated()
                 }
                 if (ptr != 0L) NativeWindowHelper.releaseNativeWindow(ptr)
@@ -1408,20 +1415,31 @@ class VolvoxGridView @JvmOverloads constructor(
     }
 
     private fun dispatchRenderFrame() {
+        if (windowVisibility != View.VISIBLE) {
+            return
+        }
         if (currentRendererMode >= 2) {
-            if (surfaceReady.get()) {
-                val ptr = acquireNativeWindow()
-                if (ptr != 0L) {
-                    gpuSurfaceActive = true
-                    sendGpuSurfaceReady(ptr, bufferWidth, bufferHeight)
-                    return
-                }
-            } else {
+            if (!surfaceReady.get()) {
                 // Surface not ready for GPU yet; surfaceCreated will trigger it.
                 return
             }
+
+            val ptr = acquireNativeWindow()
+            if (ptr == 0L) {
+                // Do not fall back to CPU path while in GPU mode: CPU frames are
+                // not blitted in GPU mode and can consume the dirty state,
+                // resulting in a black surface after resume.
+                gpuSurfaceActive = false
+                requestRenderFrame()
+                return
+            }
+
+            gpuSurfaceActive = true
+            sendGpuSurfaceReady(ptr, bufferWidth, bufferHeight)
+            return
         }
-        // Fallback: CPU buffer path
+
+        // CPU buffer path
         gpuSurfaceActive = false
         sendBufferReady()
     }
@@ -1637,7 +1655,9 @@ class VolvoxGridView @JvmOverloads constructor(
         val surface = surfaceView.holder.surface ?: return 0
         if (!surface.isValid) return 0
         val ptr = NativeWindowHelper.getNativeWindow(surface)
-        nativeWindowPtr = ptr
+        if (ptr != 0L) {
+            nativeWindowPtr = ptr
+        }
         return ptr
     }
 
@@ -2005,6 +2025,35 @@ class VolvoxGridView @JvmOverloads constructor(
 
         // Forward all events to the listener
         eventListener?.onGridEvent(event)
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        if (visibility == View.VISIBLE) {
+            if (gridId != 0L && surfaceReady.get()) {
+                requestRenderFrame()
+            }
+            return
+        }
+
+        if (useHostFling) {
+            stopFling()
+        }
+        stopEngineMomentumPump()
+        pendingScrollNeedsRender = false
+        pendingZoomNeedsRender = false
+        renderRequestPending.set(false)
+        needsFollowupRender.set(false)
+
+        if (currentRendererMode >= 2 && gridId != 0L) {
+            sendGpuSurfaceInvalidated()
+        }
+        gpuSurfaceActive = false
+        val ptr = nativeWindowPtr
+        nativeWindowPtr = 0
+        if (ptr != 0L) {
+            NativeWindowHelper.releaseNativeWindow(ptr)
+        }
     }
 
     override fun onDetachedFromWindow() {

@@ -316,11 +316,15 @@ class MainActivity : AppCompatActivity() {
                     .setForeColor(0xFF000000.toInt())
                     .setForeColorFixed(0xFF000000.toInt())
                     .setForeColorFrozen(0xFF000000.toInt())
-                    .setForeColorSel(0xFFFFFFFF.toInt())
                     .setFontName("")
                     .setFontSize(spToPx(14f).toFloat())
                     .build()
                 ctrl.setGridStyle(style)
+                ctrl.setSelectionStyle(
+                    HighlightStyle.newBuilder()
+                        .setForeColor(0xFFFFFFFF.toInt())
+                        .build()
+                )
                 applyDisplayToggles(ctrl)
 
                 // Store state

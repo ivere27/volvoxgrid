@@ -32,6 +32,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $0.LoadFontDataRequest request);
   $async.Future<$0.Empty> defineColumns(
       $pb.ServerContext ctx, $0.DefineColumnsRequest request);
+  $async.Future<$0.DefineColumnsRequest> getSchema(
+      $pb.ServerContext ctx, $0.GridHandle request);
   $async.Future<$0.Empty> defineRows(
       $pb.ServerContext ctx, $0.DefineRowsRequest request);
   $async.Future<$0.Empty> insertRows(
@@ -42,12 +44,12 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $0.MoveColumnRequest request);
   $async.Future<$0.Empty> moveRow(
       $pb.ServerContext ctx, $0.MoveRowRequest request);
-  $async.Future<$0.Empty> updateCells(
+  $async.Future<$0.WriteResult> updateCells(
       $pb.ServerContext ctx, $0.UpdateCellsRequest request);
   $async.Future<$0.CellsResponse> getCells(
       $pb.ServerContext ctx, $0.GetCellsRequest request);
-  $async.Future<$0.Empty> loadArray(
-      $pb.ServerContext ctx, $0.LoadArrayRequest request);
+  $async.Future<$0.WriteResult> loadTable(
+      $pb.ServerContext ctx, $0.LoadTableRequest request);
   $async.Future<$0.Empty> clear($pb.ServerContext ctx, $0.ClearRequest request);
   $async.Future<$0.Empty> select(
       $pb.ServerContext ctx, $0.SelectRequest request);
@@ -114,6 +116,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
         return $0.LoadFontDataRequest();
       case 'DefineColumns':
         return $0.DefineColumnsRequest();
+      case 'GetSchema':
+        return $0.GridHandle();
       case 'DefineRows':
         return $0.DefineRowsRequest();
       case 'InsertRows':
@@ -128,8 +132,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
         return $0.UpdateCellsRequest();
       case 'GetCells':
         return $0.GetCellsRequest();
-      case 'LoadArray':
-        return $0.LoadArrayRequest();
+      case 'LoadTable':
+        return $0.LoadTableRequest();
       case 'Clear':
         return $0.ClearRequest();
       case 'Select':
@@ -204,6 +208,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
         return loadFontData(ctx, request as $0.LoadFontDataRequest);
       case 'DefineColumns':
         return defineColumns(ctx, request as $0.DefineColumnsRequest);
+      case 'GetSchema':
+        return getSchema(ctx, request as $0.GridHandle);
       case 'DefineRows':
         return defineRows(ctx, request as $0.DefineRowsRequest);
       case 'InsertRows':
@@ -218,8 +224,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
         return updateCells(ctx, request as $0.UpdateCellsRequest);
       case 'GetCells':
         return getCells(ctx, request as $0.GetCellsRequest);
-      case 'LoadArray':
-        return loadArray(ctx, request as $0.LoadArrayRequest);
+      case 'LoadTable':
+        return loadTable(ctx, request as $0.LoadTableRequest);
       case 'Clear':
         return clear(ctx, request as $0.ClearRequest);
       case 'Select':

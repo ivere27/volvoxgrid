@@ -6,6 +6,7 @@ import { VolvoxGridEventMapper } from "./event-mapper.js";
 import { VolvoxGridApi } from "./grid-api.js";
 import { applyGridOptionsToVolvox } from "./grid-options-mapper.js";
 import {
+  encodeLoadTableRequest,
   encodeDefineColumnAlignmentsRequest,
   encodeDefineBooleanColumnsRequest,
   encodeUpdateCellBordersRequest,
@@ -937,7 +938,7 @@ export class AgGridVolvox<TData extends RowData = RowData> {
       }
     }
 
-    this.grid.loadArray(totalRows, totalCols, values);
+    this.loadTableValues(totalRows, totalCols, values);
     this.applyDefaultColumnAlignment();
     this.applyBooleanColumnCheckboxes();
     this.applyCellBorderStyles(matrix.shadowRows, themePreset.cellPadding);
@@ -949,6 +950,34 @@ export class AgGridVolvox<TData extends RowData = RowData> {
     this.applyInitialSorts();
     this.applyHeaderBold();
     this.applyHeaderMarkStyles();
+  }
+
+  private loadTableValues(rows: number, cols: number, values: unknown[]): void {
+    const rawWasm = this.wasm as {
+      volvox_grid_load_table_pb?: (data: Uint8Array) => Uint8Array;
+      volvox_grid_last_error?: () => string;
+    };
+    if (typeof rawWasm.volvox_grid_load_table_pb === "function") {
+      const request = encodeLoadTableRequest({
+        gridId: this.grid.id,
+        rows,
+        cols,
+        values,
+      });
+      rawWasm.volvox_grid_load_table_pb(request);
+      this.logPbError(rawWasm, "table load");
+      return;
+    }
+
+    this.grid.rows = rows;
+    this.grid.cols = cols;
+    const safeCols = Math.max(1, cols);
+    for (let i = 0; i < values.length; i += 1) {
+      const row = Math.floor(i / safeCols);
+      const col = i % safeCols;
+      const value = values[i];
+      this.grid.setTextMatrix(row, col, value == null ? "" : String(value));
+    }
   }
 
   private evaluateRawValue(

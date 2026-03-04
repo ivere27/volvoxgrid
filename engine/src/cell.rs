@@ -8,6 +8,7 @@ pub enum CellValueData {
     Number(f64),
     Bool(bool),
     Bytes(Vec<u8>),
+    Timestamp(i64),
     Empty,
 }
 
@@ -16,7 +17,10 @@ impl CellValueData {
         match self {
             CellValueData::Text(v) => v.capacity(),
             CellValueData::Bytes(v) => v.capacity(),
-            CellValueData::Number(_) | CellValueData::Bool(_) | CellValueData::Empty => 0,
+            CellValueData::Number(_)
+            | CellValueData::Bool(_)
+            | CellValueData::Timestamp(_)
+            | CellValueData::Empty => 0,
         }
     }
 }

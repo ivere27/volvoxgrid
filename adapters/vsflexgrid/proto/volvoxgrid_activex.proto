@@ -753,8 +753,6 @@ message GridStyle {
   uint32 fore_color_fixed         = 5;
   uint32 back_color_frozen        = 6;
   uint32 fore_color_frozen        = 7;
-  uint32 back_color_sel           = 8;
-  uint32 fore_color_sel           = 9;
   uint32 back_color_bkg           = 10;
   uint32 back_color_alternate     = 11;
   GridLinesMode grid_lines        = 12;

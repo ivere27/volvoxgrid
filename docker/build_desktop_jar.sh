@@ -18,6 +18,37 @@ ARTIFACT_ID="${ARTIFACT_ID:-volvoxgrid-desktop}"
 GIT_COMMIT="${GIT_COMMIT:-$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)}"
 BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 DIST_DIR="${DIST_DIR:-${REPO_ROOT}/dist/maven}"
+BUILD_OCX="${BUILD_OCX:-1}"
+OCX_DIST_DIR="${OCX_DIST_DIR:-${REPO_ROOT}/dist/desktop/ocx}"
+
+detect_cpu_count() {
+  if command -v nproc >/dev/null 2>&1; then
+    nproc
+    return
+  fi
+  if command -v getconf >/dev/null 2>&1; then
+    getconf _NPROCESSORS_ONLN
+    return
+  fi
+  echo 1
+}
+
+CPU_COUNT="$(detect_cpu_count)"
+DEFAULT_BUILD_JOBS=$(( CPU_COUNT > 2 ? CPU_COUNT - 2 : 1 ))
+BUILD_JOBS="${BUILD_JOBS:-${DEFAULT_BUILD_JOBS}}"
+if ! [[ "${BUILD_JOBS}" =~ ^[0-9]+$ ]] || [[ "${BUILD_JOBS}" -lt 1 ]]; then
+  echo "Error: BUILD_JOBS must be a positive integer, got '${BUILD_JOBS}'." >&2
+  exit 1
+fi
+export BUILD_JOBS
+export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${BUILD_JOBS}}"
+GRADLE_MAX_WORKERS="${GRADLE_MAX_WORKERS:-${BUILD_JOBS}}"
+echo "Using BUILD_JOBS=${BUILD_JOBS} (cpu=${CPU_COUNT}, cargo=${CARGO_BUILD_JOBS}, gradle=${GRADLE_MAX_WORKERS})"
+
+# Metadata consumed by engine/build.rs for embedding into binaries.
+export VOLVOXGRID_VERSION="${VOLVOXGRID_VERSION:-${VERSION}}"
+export VOLVOXGRID_GIT_COMMIT="${VOLVOXGRID_GIT_COMMIT:-${GIT_COMMIT}}"
+export VOLVOXGRID_BUILD_DATE="${VOLVOXGRID_BUILD_DATE:-${BUILD_DATE}}"
 
 WORK_DIR="$(mktemp -d /tmp/volvoxgrid-desktop-XXXXXX)"
 NATIVES_DIR="${WORK_DIR}/natives"
@@ -29,6 +60,8 @@ if [[ ! -f "${PLUGIN_CRATE}/Cargo.toml" ]]; then
   echo "Error: plugin crate not found at ${PLUGIN_CRATE}" >&2
   exit 1
 fi
+
+VSFLEXGRID_MINGW_DIR="${REPO_ROOT}/adapters/vsflexgrid/mingw"
 
 # ── Configure Cargo cross-linkers via env (no repo file mutation) ───────────
 export CARGO_TARGET_I686_UNKNOWN_LINUX_GNU_LINKER="i686-linux-gnu-gcc"
@@ -43,14 +76,14 @@ export CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER="/opt/volvoxgrid/zig-cc-aarch64-
 
 # linux-x86_64 (native)
 echo "Building plugin: linux-x86_64..."
-(cd "${PLUGIN_CRATE}" && cargo build --release --target x86_64-unknown-linux-gnu)
+(cd "${PLUGIN_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-unknown-linux-gnu)
 mkdir -p "${NATIVES_DIR}/linux-x86_64"
 cp "${CARGO_TARGET_DIR}/x86_64-unknown-linux-gnu/release/libvolvoxgrid_plugin.so" "${NATIVES_DIR}/linux-x86_64/"
 
 # linux-x86 (cross-compile)
 if command -v i686-linux-gnu-gcc >/dev/null 2>&1; then
   echo "Building plugin: linux-x86..."
-  (cd "${PLUGIN_CRATE}" && cargo build --release --target i686-unknown-linux-gnu)
+  (cd "${PLUGIN_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target i686-unknown-linux-gnu)
   mkdir -p "${NATIVES_DIR}/linux-x86"
   cp "${CARGO_TARGET_DIR}/i686-unknown-linux-gnu/release/libvolvoxgrid_plugin.so" "${NATIVES_DIR}/linux-x86/"
 else
@@ -60,7 +93,7 @@ fi
 # linux-aarch64 (cross-compile)
 if command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then
   echo "Building plugin: linux-aarch64..."
-  (cd "${PLUGIN_CRATE}" && cargo build --release --target aarch64-unknown-linux-gnu)
+  (cd "${PLUGIN_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target aarch64-unknown-linux-gnu)
   mkdir -p "${NATIVES_DIR}/linux-aarch64"
   cp "${CARGO_TARGET_DIR}/aarch64-unknown-linux-gnu/release/libvolvoxgrid_plugin.so" "${NATIVES_DIR}/linux-aarch64/"
 else
@@ -70,7 +103,7 @@ fi
 # linux-armv7 (cross-compile)
 if command -v arm-linux-gnueabihf-gcc >/dev/null 2>&1; then
   echo "Building plugin: linux-armv7..."
-  (cd "${PLUGIN_CRATE}" && cargo build --release --target armv7-unknown-linux-gnueabihf)
+  (cd "${PLUGIN_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target armv7-unknown-linux-gnueabihf)
   mkdir -p "${NATIVES_DIR}/linux-armv7"
   cp "${CARGO_TARGET_DIR}/armv7-unknown-linux-gnueabihf/release/libvolvoxgrid_plugin.so" "${NATIVES_DIR}/linux-armv7/"
 else
@@ -80,7 +113,7 @@ fi
 # windows-x86 (MinGW cross-compile)
 if command -v i686-w64-mingw32-gcc >/dev/null 2>&1; then
   echo "Building plugin: windows-x86..."
-  (cd "${PLUGIN_CRATE}" && cargo build --release --target i686-pc-windows-gnu)
+  (cd "${PLUGIN_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target i686-pc-windows-gnu)
   mkdir -p "${NATIVES_DIR}/windows-x86"
   cp "${CARGO_TARGET_DIR}/i686-pc-windows-gnu/release/volvoxgrid_plugin.dll" "${NATIVES_DIR}/windows-x86/"
 else
@@ -90,22 +123,62 @@ fi
 # windows-x86_64 (MinGW cross-compile)
 if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
   echo "Building plugin: windows-x86_64..."
-  (cd "${PLUGIN_CRATE}" && cargo build --release --target x86_64-pc-windows-gnu)
+  (cd "${PLUGIN_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-pc-windows-gnu)
   mkdir -p "${NATIVES_DIR}/windows-x86_64"
   cp "${CARGO_TARGET_DIR}/x86_64-pc-windows-gnu/release/volvoxgrid_plugin.dll" "${NATIVES_DIR}/windows-x86_64/"
 else
   echo "SKIP: windows-x86_64 (x86_64-w64-mingw32-gcc not found)"
 fi
 
+# ActiveX OCX artifacts (release + release lite)
+if [[ "${BUILD_OCX}" == "0" ]]; then
+  echo "SKIP: ActiveX OCX build (BUILD_OCX=0)"
+elif [[ ! -d "${VSFLEXGRID_MINGW_DIR}" ]]; then
+  echo "SKIP: ActiveX OCX build (missing ${VSFLEXGRID_MINGW_DIR})"
+elif ! command -v i686-w64-mingw32-gcc >/dev/null 2>&1 || ! command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
+  echo "SKIP: ActiveX OCX build (MinGW cross-compilers not found)"
+else
+  build_ocx_variant() {
+    local flavor="$1"      # release or release-lite
+    local output_suffix="$2" # "" or "lite"
+    shift 2
+    local -a extra_args=("$@")
+
+    echo "Building ActiveX OCX: ${flavor}..."
+    (
+      cd "${VSFLEXGRID_MINGW_DIR}"
+      ./build_ocx.sh release "${extra_args[@]}"
+    )
+
+    mkdir -p "${OCX_DIST_DIR}"
+    for arch in i686 x86_64; do
+      local src="${REPO_ROOT}/target/ocx/VolvoxGrid_${arch}.ocx"
+      local dst="${OCX_DIST_DIR}/VolvoxGrid_${arch}.ocx"
+      if [[ -n "${output_suffix}" ]]; then
+        dst="${OCX_DIST_DIR}/VolvoxGrid_${arch}.${output_suffix}.ocx"
+      fi
+      if [[ ! -f "${src}" ]]; then
+        echo "Error: expected OCX not found at ${src}" >&2
+        exit 1
+      fi
+      cp -f "${src}" "${dst}"
+    done
+  }
+
+  build_ocx_variant "release" ""
+  build_ocx_variant "release-lite" "lite" lite
+  echo "Built ActiveX OCX artifacts: ${OCX_DIST_DIR}"
+fi
+
 # macos-x86_64 (zig cross-compile)
 if command -v zig >/dev/null 2>&1; then
   echo "Building plugin: macos-x86_64..."
-  (cd "${PLUGIN_CRATE}" && cargo build --release --target x86_64-apple-darwin)
+  (cd "${PLUGIN_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-apple-darwin)
   mkdir -p "${NATIVES_DIR}/macos-x86_64"
   cp "${CARGO_TARGET_DIR}/x86_64-apple-darwin/release/libvolvoxgrid_plugin.dylib" "${NATIVES_DIR}/macos-x86_64/"
 
   echo "Building plugin: macos-aarch64..."
-  (cd "${PLUGIN_CRATE}" && cargo build --release --target aarch64-apple-darwin)
+  (cd "${PLUGIN_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target aarch64-apple-darwin)
   mkdir -p "${NATIVES_DIR}/macos-aarch64"
   cp "${CARGO_TARGET_DIR}/aarch64-apple-darwin/release/libvolvoxgrid_plugin.dylib" "${NATIVES_DIR}/macos-aarch64/"
 else
@@ -130,7 +203,7 @@ if [[ ! -d "${JAVA_COMMON_DIR}" ]]; then
 fi
 
 echo "Building volvoxgrid-java-common JAR..."
-gradle -p "${JAVA_COMMON_DIR}" --no-daemon -I "${GRADLE_REPO_INIT}" clean jar
+gradle -p "${JAVA_COMMON_DIR}" --no-daemon --max-workers="${GRADLE_MAX_WORKERS}" -I "${GRADLE_REPO_INIT}" clean jar
 
 COMMON_JAR="$(find "${JAVA_COMMON_DIR}/build/libs" -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
 if [[ -z "${COMMON_JAR}" || ! -f "${COMMON_JAR}" ]]; then

@@ -22,16 +22,15 @@ pub mod drag;
 pub mod edit;
 pub mod event;
 pub mod font_fallbacks;
-pub mod glyph_rasterizer;
 #[cfg(feature = "gpu")]
 pub mod glyph_atlas;
+pub mod glyph_rasterizer;
 #[cfg(feature = "gpu")]
 pub mod gpu_render;
 pub mod grid;
 pub mod input;
 pub mod layout;
 pub mod merge_registry;
-pub mod span;
 pub mod outline;
 pub mod print;
 pub mod render;
@@ -41,6 +40,7 @@ pub mod scroll;
 pub mod search;
 pub mod selection;
 pub mod sort;
+pub mod span;
 pub mod style;
 pub mod text;
 

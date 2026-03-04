@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "postbuild": "cp ./doom-remote-proxy-sw.js ./dist/doom-remote-proxy-sw.js",
     "preview": "vite preview",
     "build:wasm": "cd ../crate && rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features gpu",
     "build:wasm:threaded": "cd ../crate && RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features wasm-threads,gpu -Z build-std=std,panic_abort"

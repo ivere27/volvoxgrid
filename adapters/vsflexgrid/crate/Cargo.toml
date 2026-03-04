@@ -1,9 +1,9 @@
 [package]
 name = "volvoxgrid-activex"
-version = "0.1.0"
-edition = "2021"
-license = "Apache-2.0"
-repository = "https://github.com/ivere27/volvoxgrid"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [lib]
 crate-type = ["staticlib"]
@@ -20,10 +20,3 @@ lite = []
 prost = "0.12"
 volvoxgrid-engine = { path = "../../../engine", default-features = false, features = ["proto"] }
 lazy_static = "1.5"
-
-[profile.release]
-lto = true
-strip = true
-opt-level = "z"
-codegen-units = 1
-panic = "abort"

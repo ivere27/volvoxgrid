@@ -22,6 +22,34 @@ PLUGIN_BUILD_MODE="${PLUGIN_BUILD_MODE:-full}"
 ANDROID_ABIS="${ANDROID_ABIS:-arm64-v8a,armeabi-v7a}"
 DIST_DIR="${DIST_DIR:-${REPO_ROOT}/dist/maven}"
 
+detect_cpu_count() {
+  if command -v nproc >/dev/null 2>&1; then
+    nproc
+    return
+  fi
+  if command -v getconf >/dev/null 2>&1; then
+    getconf _NPROCESSORS_ONLN
+    return
+  fi
+  echo 1
+}
+
+CPU_COUNT="$(detect_cpu_count)"
+DEFAULT_BUILD_JOBS=$(( CPU_COUNT > 2 ? CPU_COUNT - 2 : 1 ))
+BUILD_JOBS="${BUILD_JOBS:-${DEFAULT_BUILD_JOBS}}"
+if ! [[ "${BUILD_JOBS}" =~ ^[0-9]+$ ]] || [[ "${BUILD_JOBS}" -lt 1 ]]; then
+  echo "Error: BUILD_JOBS must be a positive integer, got '${BUILD_JOBS}'." >&2
+  exit 1
+fi
+export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${BUILD_JOBS}}"
+GRADLE_MAX_WORKERS="${GRADLE_MAX_WORKERS:-${BUILD_JOBS}}"
+echo "Using BUILD_JOBS=${BUILD_JOBS} (cpu=${CPU_COUNT}, cargo=${CARGO_BUILD_JOBS}, gradle=${GRADLE_MAX_WORKERS})"
+
+# Metadata consumed by engine/build.rs for embedding into binaries.
+export VOLVOXGRID_VERSION="${VOLVOXGRID_VERSION:-${VERSION}}"
+export VOLVOXGRID_GIT_COMMIT="${VOLVOXGRID_GIT_COMMIT:-${GIT_COMMIT}}"
+export VOLVOXGRID_BUILD_DATE="${VOLVOXGRID_BUILD_DATE:-${BUILD_DATE}}"
+
 case "${PLUGIN_BUILD_MODE}" in
   full|lite) ;;
   *)
@@ -75,7 +103,7 @@ done
 
 (
   cd "${REPO_ROOT}/plugin"
-  cargo ndk ${NDK_TARGETS} -o "${ANDROID_JNI_DIR}" build "${PLUGIN_FEATURE_ARGS[@]}"
+  cargo ndk ${NDK_TARGETS} -o "${ANDROID_JNI_DIR}" build -j "${CARGO_BUILD_JOBS}" "${PLUGIN_FEATURE_ARGS[@]}"
 )
 
 for ABI in "${ABI_LIST[@]}"; do
@@ -98,6 +126,7 @@ rm -rf \
   "${REPO_ROOT}/android/volvoxgrid-android/build/intermediates/cxx" \
   "${REPO_ROOT}/android/volvoxgrid-android/build/.cxx"
 "${REPO_ROOT}/android/gradlew" -p "${REPO_ROOT}/android" --no-daemon \
+  --max-workers="${GRADLE_MAX_WORKERS}" \
   -PvolvoxgridVersion="${VERSION}" \
   -PvolvoxgridGitCommit="${GIT_COMMIT}" \
   -PvolvoxgridBuildDate="${BUILD_DATE}" \
@@ -117,7 +146,7 @@ if [[ ! -d "${JAVA_COMMON_DIR}" ]]; then
 fi
 
 echo "Building volvoxgrid-java-common JAR for fat AAR..."
-"${REPO_ROOT}/android/gradlew" -p "${JAVA_COMMON_DIR}" --no-daemon clean jar
+"${REPO_ROOT}/android/gradlew" -p "${JAVA_COMMON_DIR}" --no-daemon --max-workers="${GRADLE_MAX_WORKERS}" clean jar
 COMMON_JAR="$(find "${JAVA_COMMON_DIR}/build/libs" -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
 if [[ -z "${COMMON_JAR}" || ! -f "${COMMON_JAR}" ]]; then
   echo "Error: volvoxgrid-java-common jar build failed." >&2

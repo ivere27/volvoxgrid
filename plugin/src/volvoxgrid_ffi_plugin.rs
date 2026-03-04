@@ -97,14 +97,15 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn get_config(&self, request: GridHandle) -> Result<GridConfig, String>;
     fn load_font_data(&self, request: LoadFontDataRequest) -> Result<Empty, String>;
     fn define_columns(&self, request: DefineColumnsRequest) -> Result<Empty, String>;
+    fn get_schema(&self, request: GridHandle) -> Result<DefineColumnsRequest, String>;
     fn define_rows(&self, request: DefineRowsRequest) -> Result<Empty, String>;
     fn insert_rows(&self, request: InsertRowsRequest) -> Result<Empty, String>;
     fn remove_rows(&self, request: RemoveRowsRequest) -> Result<Empty, String>;
     fn move_column(&self, request: MoveColumnRequest) -> Result<Empty, String>;
     fn move_row(&self, request: MoveRowRequest) -> Result<Empty, String>;
-    fn update_cells(&self, request: UpdateCellsRequest) -> Result<Empty, String>;
+    fn update_cells(&self, request: UpdateCellsRequest) -> Result<WriteResult, String>;
     fn get_cells(&self, request: GetCellsRequest) -> Result<CellsResponse, String>;
-    fn load_array(&self, request: LoadArrayRequest) -> Result<Empty, String>;
+    fn load_table(&self, request: LoadTableRequest) -> Result<WriteResult, String>;
     fn clear(&self, request: ClearRequest) -> Result<Empty, String>;
     fn select(&self, request: SelectRequest) -> Result<Empty, String>;
     fn get_selection(&self, request: GridHandle) -> Result<SelectionState, String>;
@@ -382,6 +383,22 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
                 Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
             }
         }
+        "/volvoxgrid.v1.VolvoxGridService/GetSchema" => {
+            match GridHandle::decode(input.as_slice()) {
+                Ok(req) => match plugin.get_schema(req) {
+                    Ok(resp) => {
+                        let mut buf = Vec::new();
+                        if resp.encode(&mut buf).is_ok() {
+                            success_response(resp_len, &buf)
+                        } else {
+                            error_response(resp_len, "encode failed")
+                        }
+                    }
+                    Err(e) => error_response(resp_len, &e),
+                },
+                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+            }
+        }
         "/volvoxgrid.v1.VolvoxGridService/DefineRows" => {
             match DefineRowsRequest::decode(input.as_slice()) {
                 Ok(req) => match plugin.define_rows(req) {
@@ -494,9 +511,9 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
                 Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
             }
         }
-        "/volvoxgrid.v1.VolvoxGridService/LoadArray" => {
-            match LoadArrayRequest::decode(input.as_slice()) {
-                Ok(req) => match plugin.load_array(req) {
+        "/volvoxgrid.v1.VolvoxGridService/LoadTable" => {
+            match LoadTableRequest::decode(input.as_slice()) {
+                Ok(req) => match plugin.load_table(req) {
                     Ok(resp) => {
                         let mut buf = Vec::new();
                         if resp.encode(&mut buf).is_ok() {

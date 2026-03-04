@@ -132,6 +132,7 @@ fn proto_value_to_engine(cv: &Option<CellValue>) -> CellValueData {
             Some(cell_value::Value::Number(n)) => CellValueData::Number(*n),
             Some(cell_value::Value::Flag(b)) => CellValueData::Bool(*b),
             Some(cell_value::Value::Data(d)) => CellValueData::Bytes(d.clone()),
+            Some(cell_value::Value::Timestamp(ts)) => CellValueData::Timestamp(*ts),
             None => CellValueData::Empty,
         },
         None => CellValueData::Empty,
@@ -154,6 +155,9 @@ fn engine_value_to_proto(v: &CellValueData) -> CellValue {
         },
         CellValueData::Bytes(d) => CellValue {
             value: Some(cell_value::Value::Data(d.clone())),
+        },
+        CellValueData::Timestamp(ts) => CellValue {
+            value: Some(cell_value::Value::Timestamp(*ts)),
         },
         CellValueData::Empty => CellValue { value: None },
     }
@@ -482,8 +486,18 @@ fn engine_event_to_proto(
             new_col_end,
         } => Some(grid_event::Event::SelectionChanging(
             SelectionChangingEvent {
-                old_ranges: vec![normalize_range(old_row_end, old_col_end, old_row_end, old_col_end)],
-                new_ranges: vec![normalize_range(new_row_end, new_col_end, new_row_end, new_col_end)],
+                old_ranges: vec![normalize_range(
+                    old_row_end,
+                    old_col_end,
+                    old_row_end,
+                    old_col_end,
+                )],
+                new_ranges: vec![normalize_range(
+                    new_row_end,
+                    new_col_end,
+                    new_row_end,
+                    new_col_end,
+                )],
                 active_row: new_row_end,
                 active_col: new_col_end,
                 cancel: false,
@@ -495,8 +509,18 @@ fn engine_event_to_proto(
             new_row_end,
             new_col_end,
         } => Some(grid_event::Event::SelectionChanged(SelectionChangedEvent {
-            old_ranges: vec![normalize_range(old_row_end, old_col_end, old_row_end, old_col_end)],
-            new_ranges: vec![normalize_range(new_row_end, new_col_end, new_row_end, new_col_end)],
+            old_ranges: vec![normalize_range(
+                old_row_end,
+                old_col_end,
+                old_row_end,
+                old_col_end,
+            )],
+            new_ranges: vec![normalize_range(
+                new_row_end,
+                new_col_end,
+                new_row_end,
+                new_col_end,
+            )],
             active_row: new_row_end,
             active_col: new_col_end,
         })),
@@ -1119,10 +1143,7 @@ impl VolvoxGridPlugin {
     }
 
     fn current_zoom_scale(&self, grid_id: i64) -> f64 {
-        let mut levels = self
-            .zoom_levels
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+        let mut levels = self.zoom_levels.lock().unwrap_or_else(|e| e.into_inner());
         *levels.entry(grid_id).or_insert(1.0)
     }
 
@@ -1168,17 +1189,17 @@ impl VolvoxGridPlugin {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .insert(
-            (grid_id, event_id),
-            PendingActionEntry {
-                created_at: Instant::now(),
-                action: PendingAction::BeginEdit {
-                    row,
-                    col,
-                    force,
-                    prefer_combo,
-                    seed_text,
+                (grid_id, event_id),
+                PendingActionEntry {
+                    created_at: Instant::now(),
+                    action: PendingAction::BeginEdit {
+                        row,
+                        col,
+                        force,
+                        prefer_combo,
+                        seed_text,
+                    },
                 },
-            },
             );
         grid.events.push_with_id(
             event_id,
@@ -1214,16 +1235,16 @@ impl VolvoxGridPlugin {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .insert(
-            (grid_id, event_id),
-            PendingActionEntry {
-                created_at: Instant::now(),
-                action: PendingAction::ValidateEdit {
-                    row,
-                    col,
-                    old_text,
-                    committed_text: committed_text.clone(),
+                (grid_id, event_id),
+                PendingActionEntry {
+                    created_at: Instant::now(),
+                    action: PendingAction::ValidateEdit {
+                        row,
+                        col,
+                        old_text,
+                        committed_text: committed_text.clone(),
+                    },
                 },
-            },
             );
         grid.events.push_with_id(
             event_id,
@@ -1253,11 +1274,11 @@ impl VolvoxGridPlugin {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .insert(
-            (grid_id, event_id),
-            PendingActionEntry {
-                created_at: Instant::now(),
-                action: PendingAction::BeforeSort { col },
-            },
+                (grid_id, event_id),
+                PendingActionEntry {
+                    created_at: Instant::now(),
+                    action: PendingAction::BeforeSort { col },
+                },
             );
         grid.events.push_with_id(
             event_id,
@@ -1480,6 +1501,11 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(Empty {})
     }
 
+    fn get_schema(&self, request: GridHandle) -> Result<DefineColumnsRequest, String> {
+        self.manager()
+            .with_grid(request.id, |grid| grid.get_schema(request.id))
+    }
+
     fn define_rows(&self, request: DefineRowsRequest) -> Result<Empty, String> {
         self.manager().with_grid(request.grid_id, |grid| {
             grid.define_rows(&request.rows);
@@ -1553,11 +1579,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
     // ── Data ──
 
-    fn update_cells(&self, request: UpdateCellsRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
-            grid.update_cells(&request.cells);
-        })?;
-        Ok(Empty {})
+    fn update_cells(&self, request: UpdateCellsRequest) -> Result<WriteResult, String> {
+        self.manager()
+            .with_grid(request.grid_id, |grid| grid.write_cells(&request.cells, request.atomic))
     }
 
     fn get_cells(&self, request: GetCellsRequest) -> Result<CellsResponse, String> {
@@ -1569,19 +1593,16 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 request.col2,
                 request.include_style,
                 request.include_checked,
+                request.include_typed,
             )
         })?;
         Ok(CellsResponse { cells })
     }
 
-    fn load_array(&self, request: LoadArrayRequest) -> Result<Empty, String> {
+    fn load_table(&self, request: LoadTableRequest) -> Result<WriteResult, String> {
         self.manager().with_grid(request.grid_id, |grid| {
-            apply_array_data_to_grid(grid, request.rows, request.cols, &request.values);
-            if request.bind {
-                grid.data_source_mode = 1;
-            }
-        })?;
-        Ok(Empty {})
+            grid.load_table(request.rows, request.cols, &request.values, request.atomic)
+        })
     }
 
     fn clear(&self, request: ClearRequest) -> Result<Empty, String> {
@@ -1670,12 +1691,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 .map(|r| end_from_range(r, active_row, active_col))
                 .unwrap_or((active_row, active_col));
             grid.selection.select(
-                active_row,
-                active_col,
-                row_end,
-                col_end,
-                grid.rows,
-                grid.cols,
+                active_row, active_col, row_end, col_end, grid.rows, grid.cols,
             );
             if request.show.unwrap_or(false) {
                 ensure_layout(grid);
@@ -1796,8 +1812,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                 col1: range.col1,
                                 row2: range.row2,
                                 col2: range.col2,
-                                color: region.color,
-                                show_corner_handles: region.show_corner_handles,
+                                style: volvoxgrid_engine::style::HighlightStyle::from_proto(
+                                    region.style.as_ref(),
+                                ),
                                 ref_id: region.ref_id,
                                 text_start: region.text_start,
                                 text_length: region.text_length,
@@ -1987,7 +2004,12 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
     fn get_merged_range(&self, request: GetMergedRangeRequest) -> Result<CellRange, String> {
         self.manager().with_grid(request.grid_id, |grid| {
             if let Some((r1, c1, r2, c2)) = grid.get_merged_range(request.row, request.col) {
-                CellRange { row1: r1, col1: c1, row2: r2, col2: c2 }
+                CellRange {
+                    row1: r1,
+                    col1: c1,
+                    row2: r2,
+                    col2: c2,
+                }
             } else {
                 CellRange {
                     row1: request.row,
@@ -2002,7 +2024,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
     fn merge_cells(&self, request: MergeCellsRequest) -> Result<Empty, String> {
         let range = request.range.unwrap_or_default();
         self.manager().with_grid(request.grid_id, |grid| {
-            grid.merged_regions.add_merge(range.row1, range.col1, range.row2, range.col2);
+            grid.merged_regions
+                .add_merge(range.row1, range.col1, range.row2, range.col2);
             grid.layout.invalidate();
             grid.mark_dirty();
         })?;
@@ -2012,7 +2035,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
     fn unmerge_cells(&self, request: UnmergeCellsRequest) -> Result<Empty, String> {
         let range = request.range.unwrap_or_default();
         self.manager().with_grid(request.grid_id, |grid| {
-            grid.merged_regions.remove_overlapping(range.row1, range.col1, range.row2, range.col2);
+            grid.merged_regions
+                .remove_overlapping(range.row1, range.col1, range.row2, range.col2);
             grid.layout.invalidate();
             grid.mark_dirty();
         })?;
@@ -2020,13 +2044,20 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
     }
 
     fn get_merged_regions(&self, request: GridHandle) -> Result<MergedRegionsResponse, String> {
-        self.manager().with_grid(request.id, |grid| {
-            MergedRegionsResponse {
-                ranges: grid.merged_regions.all_ranges().iter().map(|&(r1, c1, r2, c2)| {
-                    CellRange { row1: r1, col1: c1, row2: r2, col2: c2 }
-                }).collect(),
-            }
-        })
+        self.manager()
+            .with_grid(request.id, |grid| MergedRegionsResponse {
+                ranges: grid
+                    .merged_regions
+                    .all_ranges()
+                    .iter()
+                    .map(|&(r1, c1, r2, c2)| CellRange {
+                        row1: r1,
+                        col1: c1,
+                        row2: r2,
+                        col2: c2,
+                    })
+                    .collect(),
+            })
     }
 
     fn get_memory_usage(&self, request: GridHandle) -> Result<MemoryUsageResponse, String> {
@@ -2254,6 +2285,11 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                     last_fling_tick = Some(now);
 
                     let result = self.manager().with_grid(grid_id, |grid| {
+                        let needs_fling_tick = grid.fling_enabled && grid.scroll.fling_active;
+                        if !grid.dirty && !needs_fling_tick {
+                            return (false, 0, 0, 0, 0);
+                        }
+
                         if !grid.layout.valid {
                             ensure_layout(grid);
                         }
@@ -2269,7 +2305,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             pinned_w,
                         );
 
-                        if grid.fling_enabled && grid.scroll.fling_active {
+                        if needs_fling_tick {
                             if grid.scroll.tick_fling(dt_seconds, grid.fling_friction) {
                                 grid.mark_dirty();
                             }
@@ -2329,7 +2365,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                             if gpu_renderer.is_none() {
                                 match pollster_block(
-                                    volvoxgrid_engine::gpu_render::GpuRenderer::new(preferred_backends),
+                                    volvoxgrid_engine::gpu_render::GpuRenderer::new(
+                                        preferred_backends,
+                                    ),
                                 ) {
                                     Ok(gr) => {
                                         gpu_renderer = Some(gr);
@@ -2358,11 +2396,13 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         }
 
                         grid.debug_renderer_actual = RendererMode::RendererCpu as i32;
-                        grid.debug_text_cache_len = grid.text_engine.as_ref().map_or(0, |te| te.layout_cache_len() as i32);
+                        grid.debug_text_cache_len = grid
+                            .text_engine
+                            .as_ref()
+                            .map_or(0, |te| te.layout_cache_len() as i32);
                         let r =
                             renderer.get_or_insert_with(volvoxgrid_engine::render::Renderer::new);
-                        let desired_text_registration =
-                            get_registered_text_renderer(grid_id);
+                        let desired_text_registration = get_registered_text_renderer(grid_id);
                         if !same_text_renderer_registration(
                             renderer_text_registration,
                             desired_text_registration,
@@ -2447,6 +2487,10 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             gr.drop_surface();
                         }
                         last_surface_handle = 0;
+                        // Stop engine-side fling so it doesn't resume after suspend.
+                        let _ = self.manager().with_grid(grid_id, |grid| {
+                            grid.scroll.stop_fling();
+                        });
                         stream.send(RenderOutput {
                             rendered: false,
                             event: Some(render_output::Event::GpuFrameDone(GpuFrameDone {
@@ -2461,7 +2505,10 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                     // Lazy-init GpuRenderer on first GpuSurfaceReady
                     if gpu_renderer.is_some() {
-                        let requested_mode = self.manager().with_grid(grid_id, |grid| grid.renderer_mode).unwrap_or(0);
+                        let requested_mode = self
+                            .manager()
+                            .with_grid(grid_id, |grid| grid.renderer_mode)
+                            .unwrap_or(0);
                         let current_type = gpu_renderer.as_ref().unwrap().backend_type();
                         let mismatch = match requested_mode {
                             3 => current_type != wgpu::Backend::Vulkan,
@@ -2476,15 +2523,19 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                     }
 
                     if gpu_renderer.is_none() {
-                        let preferred_backends = self.manager().with_grid(grid_id, |grid| {
-                            match grid.renderer_mode {
+                        let preferred_backends = self
+                            .manager()
+                            .with_grid(grid_id, |grid| match grid.renderer_mode {
                                 3 => Some(wgpu::Backends::VULKAN),
                                 4 => Some(wgpu::Backends::GL),
                                 _ => None,
-                            }
-                        }).ok().flatten();
+                            })
+                            .ok()
+                            .flatten();
 
-                        match pollster_block(volvoxgrid_engine::gpu_render::GpuRenderer::new(preferred_backends)) {
+                        match pollster_block(volvoxgrid_engine::gpu_render::GpuRenderer::new(
+                            preferred_backends,
+                        )) {
                             Ok(gr) => {
                                 gpu_renderer = Some(gr);
                             }
@@ -2509,8 +2560,14 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                     let gr = gpu_renderer.as_mut().unwrap();
 
                     // Configure surface if handle changed, present mode changed, or surface not yet set up
-                    let requested_pm = self.manager().with_grid(grid_id, |grid| grid.present_mode).unwrap_or(0);
-                    if handle != last_surface_handle || !gr.has_surface() || requested_pm != last_present_mode {
+                    let requested_pm = self
+                        .manager()
+                        .with_grid(grid_id, |grid| grid.present_mode)
+                        .unwrap_or(0);
+                    if handle != last_surface_handle
+                        || !gr.has_surface()
+                        || requested_pm != last_present_mode
+                    {
                         let configure_result = pollster_block(unsafe {
                             gr.configure_surface_from_raw_handle(
                                 handle as *mut std::ffi::c_void,
@@ -2538,9 +2595,31 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         }
                         last_surface_handle = handle;
                         last_present_mode = requested_pm;
+                        // Surface reconfiguration can happen after Android HOME/resume
+                        // with no data mutation. Force one redraw so the newly bound
+                        // surface is populated instead of staying black.
+                        let _ = self.manager().with_grid(grid_id, |grid| {
+                            grid.mark_dirty();
+                        });
                     } else {
                         // Same handle and present mode, just resize if needed
                         gr.resize_surface(width as u32, height as u32);
+                        if !gr.has_surface() {
+                            // resize_surface detected an invalid surface and dropped it.
+                            // Reset handle tracking so the next frame triggers reconfiguration.
+                            last_surface_handle = 0;
+                            last_present_mode = -1;
+                            stream.send(RenderOutput {
+                                rendered: false,
+                                event: Some(render_output::Event::GpuFrameDone(GpuFrameDone {
+                                    dirty_x: 0,
+                                    dirty_y: 0,
+                                    dirty_w: 0,
+                                    dirty_h: 0,
+                                })),
+                            });
+                            continue;
+                        }
                     }
 
                     self.sync_fonts_into_gpu_renderer(gr, &mut gpu_font_count_applied);
@@ -2550,6 +2629,11 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                     let gr_text_cache_len = gr.text_cache_len() as i32;
 
                     let result = self.manager().with_grid(grid_id, |grid| {
+                        let needs_fling_tick = grid.fling_enabled && grid.scroll.fling_active;
+                        if !grid.dirty && !needs_fling_tick {
+                            return Ok((false, 0, 0, 0, 0));
+                        }
+
                         if !grid.layout.valid {
                             ensure_layout(grid);
                         }
@@ -2565,14 +2649,14 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             pinned_w,
                         );
 
-                        if grid.fling_enabled && grid.scroll.fling_active {
+                        if needs_fling_tick {
                             if grid.scroll.tick_fling(dt_seconds, grid.fling_friction) {
                                 grid.mark_dirty();
                             }
                         }
 
                         if !grid.dirty {
-                            return (false, 0, 0, 0, 0);
+                            return Ok((false, 0, 0, 0, 0));
                         }
 
                         grid.debug_zoom_level = self.current_zoom_scale(grid_id);
@@ -2593,18 +2677,22 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         grid.debug_renderer_actual = RendererMode::RendererGpu as i32;
                         grid.debug_gpu_backend = gr_backend_name;
                         grid.debug_gpu_present_mode = gr_present_mode_name;
-                        let (dx, dy, dw, dh) =
-                            gr.render_to_surface(grid, width, height);
-                        grid.debug_instance_count = gr.instance_count() as i32;
-                        let elapsed = frame_start.elapsed().as_secs_f32() * 1000.0;
-                        grid.debug_frame_time_ms = elapsed;
-                        grid.debug_fps = grid.debug_fps * 0.9 + (1000.0 / elapsed.max(0.1)) * 0.1;
-                        grid.clear_dirty();
-                        (true, dx, dy, dw, dh)
+                        
+                        match gr.render_to_surface(grid, width, height) {
+                            Ok((dx, dy, dw, dh)) => {
+                                grid.debug_instance_count = gr.instance_count() as i32;
+                                let elapsed = frame_start.elapsed().as_secs_f32() * 1000.0;
+                                grid.debug_frame_time_ms = elapsed;
+                                grid.debug_fps = grid.debug_fps * 0.9 + (1000.0 / elapsed.max(0.1)) * 0.1;
+                                grid.clear_dirty();
+                                Ok((true, dx, dy, dw, dh))
+                            }
+                            Err(e) => Err(e),
+                        }
                     });
 
                     match result {
-                        Ok((rendered, dx, dy, dw, dh)) => {
+                        Ok(Ok((rendered, dx, dy, dw, dh))) => {
                             stream.send(RenderOutput {
                                 rendered,
                                 event: Some(render_output::Event::GpuFrameDone(GpuFrameDone {
@@ -2612,6 +2700,24 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     dirty_y: dy,
                                     dirty_w: dw,
                                     dirty_h: dh,
+                                })),
+                            });
+                        }
+                        Ok(Err(_)) => {
+                            // Surface error (e.g. Lost, Outdated). Drop the surface immediately
+                            // and force reconfiguration on next frame.
+                            if let Some(gr) = gpu_renderer.as_mut() {
+                                gr.drop_surface();
+                            }
+                            last_surface_handle = 0;
+                            last_present_mode = -1;
+                            stream.send(RenderOutput {
+                                rendered: false,
+                                event: Some(render_output::Event::GpuFrameDone(GpuFrameDone {
+                                    dirty_x: 0,
+                                    dirty_y: 0,
+                                    dirty_w: 0,
+                                    dirty_h: 0,
                                 })),
                             });
                         }
@@ -2639,6 +2745,12 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         let was_editing = grid.edit.is_active();
                         let prev_edit_row = grid.edit.edit_row;
                         let prev_edit_col = grid.edit.edit_col;
+                        let prev_sel = (
+                            grid.selection.row,
+                            grid.selection.col,
+                            grid.selection.row_end,
+                            grid.selection.col_end,
+                        );
                         let hit = if pe.r#type == 0 {
                             Some(volvoxgrid_engine::input::hit_test(grid, pe.x, pe.y))
                         } else {
@@ -2763,7 +2875,16 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             }
                         }
 
+                        let next_sel = (
+                            grid.selection.row,
+                            grid.selection.col,
+                            grid.selection.row_end,
+                            grid.selection.col_end,
+                        );
+                        let selection_changed = next_sel != prev_sel;
+
                         (
+                            selection_changed,
                             grid.selection.row,
                             grid.selection.col,
                             grid.selection.row_end,
@@ -2771,20 +2892,24 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             editor_output,
                         )
                     });
-                    if let Ok((row, col, row_end, col_end, editor_output)) = sel_and_editor {
-                        stream.send(RenderOutput {
-                            rendered: false,
-                            event: Some(render_output::Event::Selection(SelectionUpdate {
-                                active_row: row,
-                                active_col: col,
-                                ranges: vec![CellRange {
-                                    row1: row.min(row_end),
-                                    col1: col.min(col_end),
-                                    row2: row.max(row_end),
-                                    col2: col.max(col_end),
-                                }],
-                            })),
-                        });
+                    if let Ok((selection_changed, row, col, row_end, col_end, editor_output)) =
+                        sel_and_editor
+                    {
+                        if pe.r#type != 2 || selection_changed {
+                            stream.send(RenderOutput {
+                                rendered: false,
+                                event: Some(render_output::Event::Selection(SelectionUpdate {
+                                    active_row: row,
+                                    active_col: col,
+                                    ranges: vec![CellRange {
+                                        row1: row.min(row_end),
+                                        col1: col.min(col_end),
+                                        row2: row.max(row_end),
+                                        col2: col.max(col_end),
+                                    }],
+                                })),
+                            });
+                        }
                         if let Some(output) = editor_output {
                             stream.send(output);
                         }
@@ -3267,7 +3392,11 @@ struct TextRendererRegistration {
 
 impl TextRendererRegistration {
     fn identity_key(self) -> (usize, usize, usize) {
-        (self.measure_fn as usize, self.render_fn as usize, self.user_data)
+        (
+            self.measure_fn as usize,
+            self.render_fn as usize,
+            self.user_data,
+        )
     }
 }
 
@@ -3392,15 +3521,11 @@ fn same_text_renderer_registration(
     }
 }
 
-fn set_grid_external_text_renderer(
-    grid_id: i64,
-    registration: Option<TextRendererRegistration>,
-) {
+fn set_grid_external_text_renderer(grid_id: i64, registration: Option<TextRendererRegistration>) {
     let _ = SHARED_GRID_MANAGER.with_grid(grid_id, |grid| match registration {
         Some(reg) => {
-            grid.ensure_text_engine().set_external_renderer(Some(Box::new(
-                ffi_text_renderer_from_registration(reg),
-            )));
+            grid.ensure_text_engine()
+                .set_external_renderer(Some(Box::new(ffi_text_renderer_from_registration(reg))));
         }
         None => {
             if let Some(text_engine) = &mut grid.text_engine {

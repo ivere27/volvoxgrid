@@ -11,7 +11,37 @@ set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}"
+VERSION="${VERSION:-0.1.2}"
+GIT_COMMIT="${GIT_COMMIT:-$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)}"
+BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 DIST_DIR="${DIST_DIR:-${REPO_ROOT}/dist/ios}"
+
+detect_cpu_count() {
+  if command -v nproc >/dev/null 2>&1; then
+    nproc
+    return
+  fi
+  if command -v getconf >/dev/null 2>&1; then
+    getconf _NPROCESSORS_ONLN
+    return
+  fi
+  echo 1
+}
+
+CPU_COUNT="$(detect_cpu_count)"
+DEFAULT_BUILD_JOBS=$(( CPU_COUNT > 2 ? CPU_COUNT - 2 : 1 ))
+BUILD_JOBS="${BUILD_JOBS:-${DEFAULT_BUILD_JOBS}}"
+if ! [[ "${BUILD_JOBS}" =~ ^[0-9]+$ ]] || [[ "${BUILD_JOBS}" -lt 1 ]]; then
+  echo "Error: BUILD_JOBS must be a positive integer, got '${BUILD_JOBS}'." >&2
+  exit 1
+fi
+export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-${BUILD_JOBS}}"
+echo "Using BUILD_JOBS=${BUILD_JOBS} (cpu=${CPU_COUNT}, cargo=${CARGO_BUILD_JOBS})"
+
+# Metadata consumed by engine/build.rs for embedding into binaries.
+export VOLVOXGRID_VERSION="${VOLVOXGRID_VERSION:-${VERSION}}"
+export VOLVOXGRID_GIT_COMMIT="${VOLVOXGRID_GIT_COMMIT:-${GIT_COMMIT}}"
+export VOLVOXGRID_BUILD_DATE="${VOLVOXGRID_BUILD_DATE:-${BUILD_DATE}}"
 
 PLUGIN_CRATE="${REPO_ROOT}/plugin"
 if [[ ! -f "${PLUGIN_CRATE}/Cargo.toml" ]]; then
@@ -26,7 +56,7 @@ trap cleanup EXIT
 # ── Build static libraries for each iOS target ─────────────────────────────
 
 echo "Building plugin: aarch64-apple-ios (device, staticlib)..."
-(cd "${PLUGIN_CRATE}" && cargo rustc --release --lib --target aarch64-apple-ios --crate-type staticlib)
+(cd "${PLUGIN_CRATE}" && cargo rustc -j "${CARGO_BUILD_JOBS}" --release --lib --target aarch64-apple-ios --crate-type staticlib)
 DEVICE_LIB="${CARGO_TARGET_DIR}/aarch64-apple-ios/release/libvolvoxgrid_plugin.a"
 if [[ ! -f "${DEVICE_LIB}" ]]; then
   echo "Error: device static lib not found: ${DEVICE_LIB}" >&2
@@ -34,7 +64,7 @@ if [[ ! -f "${DEVICE_LIB}" ]]; then
 fi
 
 echo "Building plugin: aarch64-apple-ios-sim (simulator arm64, staticlib)..."
-(cd "${PLUGIN_CRATE}" && cargo rustc --release --lib --target aarch64-apple-ios-sim --crate-type staticlib)
+(cd "${PLUGIN_CRATE}" && cargo rustc -j "${CARGO_BUILD_JOBS}" --release --lib --target aarch64-apple-ios-sim --crate-type staticlib)
 SIM_ARM64_LIB="${CARGO_TARGET_DIR}/aarch64-apple-ios-sim/release/libvolvoxgrid_plugin.a"
 if [[ ! -f "${SIM_ARM64_LIB}" ]]; then
   echo "Error: simulator arm64 static lib not found: ${SIM_ARM64_LIB}" >&2
@@ -42,7 +72,7 @@ if [[ ! -f "${SIM_ARM64_LIB}" ]]; then
 fi
 
 echo "Building plugin: x86_64-apple-ios (simulator x86_64, staticlib)..."
-(cd "${PLUGIN_CRATE}" && cargo rustc --release --lib --target x86_64-apple-ios --crate-type staticlib)
+(cd "${PLUGIN_CRATE}" && cargo rustc -j "${CARGO_BUILD_JOBS}" --release --lib --target x86_64-apple-ios --crate-type staticlib)
 SIM_X64_LIB="${CARGO_TARGET_DIR}/x86_64-apple-ios/release/libvolvoxgrid_plugin.a"
 if [[ ! -f "${SIM_X64_LIB}" ]]; then
   echo "Error: simulator x86_64 static lib not found: ${SIM_X64_LIB}" >&2

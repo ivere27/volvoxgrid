@@ -226,6 +226,113 @@ impl IconThemeSlotStyles {
     }
 }
 
+/// Shared highlight visual style used by selection, hover and edit references.
+#[derive(Clone, Debug, Default)]
+pub struct HighlightStyle {
+    pub back_color: Option<u32>,
+    pub fore_color: Option<u32>,
+    pub border: Option<i32>,
+    pub border_color: Option<u32>,
+    pub border_top: Option<i32>,
+    pub border_right: Option<i32>,
+    pub border_bottom: Option<i32>,
+    pub border_left: Option<i32>,
+    pub border_top_color: Option<u32>,
+    pub border_right_color: Option<u32>,
+    pub border_bottom_color: Option<u32>,
+    pub border_left_color: Option<u32>,
+    pub fill_handle: Option<i32>,
+    pub fill_handle_color: Option<u32>,
+}
+
+impl HighlightStyle {
+    pub fn from_proto(src: Option<&pb::HighlightStyle>) -> Self {
+        let Some(src) = src else {
+            return Self::default();
+        };
+        Self {
+            back_color: src.back_color,
+            fore_color: src.fore_color,
+            border: src.border,
+            border_color: src.border_color,
+            border_top: src.border_top,
+            border_right: src.border_right,
+            border_bottom: src.border_bottom,
+            border_left: src.border_left,
+            border_top_color: src.border_top_color,
+            border_right_color: src.border_right_color,
+            border_bottom_color: src.border_bottom_color,
+            border_left_color: src.border_left_color,
+            fill_handle: src.fill_handle,
+            fill_handle_color: src.fill_handle_color,
+        }
+    }
+
+    pub fn to_proto(&self) -> pb::HighlightStyle {
+        pb::HighlightStyle {
+            back_color: self.back_color,
+            fore_color: self.fore_color,
+            border: self.border,
+            border_color: self.border_color,
+            border_top: self.border_top,
+            border_right: self.border_right,
+            border_bottom: self.border_bottom,
+            border_left: self.border_left,
+            border_top_color: self.border_top_color,
+            border_right_color: self.border_right_color,
+            border_bottom_color: self.border_bottom_color,
+            border_left_color: self.border_left_color,
+            fill_handle: self.fill_handle,
+            fill_handle_color: self.fill_handle_color,
+        }
+    }
+
+    pub fn merge_from(&mut self, other: &HighlightStyle) {
+        if other.back_color.is_some() {
+            self.back_color = other.back_color;
+        }
+        if other.fore_color.is_some() {
+            self.fore_color = other.fore_color;
+        }
+        if other.border.is_some() {
+            self.border = other.border;
+        }
+        if other.border_color.is_some() {
+            self.border_color = other.border_color;
+        }
+        if other.border_top.is_some() {
+            self.border_top = other.border_top;
+        }
+        if other.border_right.is_some() {
+            self.border_right = other.border_right;
+        }
+        if other.border_bottom.is_some() {
+            self.border_bottom = other.border_bottom;
+        }
+        if other.border_left.is_some() {
+            self.border_left = other.border_left;
+        }
+        if other.border_top_color.is_some() {
+            self.border_top_color = other.border_top_color;
+        }
+        if other.border_right_color.is_some() {
+            self.border_right_color = other.border_right_color;
+        }
+        if other.border_bottom_color.is_some() {
+            self.border_bottom_color = other.border_bottom_color;
+        }
+        if other.border_left_color.is_some() {
+            self.border_left_color = other.border_left_color;
+        }
+        if other.fill_handle.is_some() {
+            self.fill_handle = other.fill_handle;
+        }
+        if other.fill_handle_color.is_some() {
+            self.fill_handle_color = other.fill_handle_color;
+        }
+    }
+}
+
 /// Grid-level style state (maps to GridStyle proto message)
 #[derive(Clone, Debug)]
 pub struct GridStyleState {
@@ -236,8 +343,6 @@ pub struct GridStyleState {
     pub fore_color_fixed: u32,
     pub back_color_frozen: u32,
     pub fore_color_frozen: u32,
-    pub back_color_sel: u32,
-    pub fore_color_sel: u32,
     pub back_color_bkg: u32,
     pub back_color_alternate: u32,
     pub grid_lines: i32,
@@ -276,8 +381,6 @@ pub struct GridStyleState {
     /// When true and multiple sort keys are active, draw priority numbers (1,2,3…)
     /// next to sort indicators in column headers.
     pub show_sort_numbers: bool,
-    /// Fill handle square color (ARGB). Default: Excel green 0xFF217346.
-    pub fill_handle_color: u32,
 }
 
 impl Default for GridStyleState {
@@ -290,8 +393,6 @@ impl Default for GridStyleState {
             fore_color_fixed: 0xFF000000,     // black
             back_color_frozen: 0xFFFFFFFF,    // white
             fore_color_frozen: 0xFF000000,    // black
-            back_color_sel: 0xFF000080,       // dark blue
-            fore_color_sel: 0xFFFFFFFF,       // white
             back_color_bkg: 0xFFFFFFFF,       // white
             back_color_alternate: 0x00000000, // transparent (disabled)
             grid_lines: pb::GridLineStyle::GridlineSolid as i32,
@@ -331,7 +432,6 @@ impl Default for GridStyleState {
             checkbox_unchecked_picture: None,
             checkbox_indeterminate_picture: None,
             show_sort_numbers: false,
-            fill_handle_color: 0xFF217346, // Excel green
         }
     }
 }
@@ -347,8 +447,14 @@ impl GridStyleState {
             + self.icon_theme_slots.heap_size_bytes()
             + self.icon_theme_defaults.text_style.heap_size_bytes()
             + self.icon_theme_slot_styles.heap_size_bytes()
-            + self.checkbox_checked_picture.as_ref().map_or(0, Vec::capacity)
-            + self.checkbox_unchecked_picture.as_ref().map_or(0, Vec::capacity)
+            + self
+                .checkbox_checked_picture
+                .as_ref()
+                .map_or(0, Vec::capacity)
+            + self
+                .checkbox_unchecked_picture
+                .as_ref()
+                .map_or(0, Vec::capacity)
             + self
                 .checkbox_indeterminate_picture
                 .as_ref()
@@ -422,29 +528,75 @@ impl CellStyleOverride {
     /// Merge `other` into `self`: any `Some` field in `other` overwrites `self`.
     /// Fields that are `None` in `other` are left unchanged in `self`.
     pub fn merge_from(&mut self, other: &CellStyleOverride) {
-        if other.back_color.is_some() { self.back_color = other.back_color; }
-        if other.fore_color.is_some() { self.fore_color = other.fore_color; }
-        if other.alignment.is_some() { self.alignment = other.alignment; }
-        if other.text_effect.is_some() { self.text_effect = other.text_effect; }
-        if other.font_name.is_some() { self.font_name = other.font_name.clone(); }
-        if other.font_size.is_some() { self.font_size = other.font_size; }
-        if other.font_bold.is_some() { self.font_bold = other.font_bold; }
-        if other.font_italic.is_some() { self.font_italic = other.font_italic; }
-        if other.font_underline.is_some() { self.font_underline = other.font_underline; }
-        if other.font_strikethrough.is_some() { self.font_strikethrough = other.font_strikethrough; }
-        if other.font_width.is_some() { self.font_width = other.font_width; }
-        if other.border.is_some() { self.border = other.border; }
-        if other.border_color.is_some() { self.border_color = other.border_color; }
-        if other.border_top.is_some() { self.border_top = other.border_top; }
-        if other.border_right.is_some() { self.border_right = other.border_right; }
-        if other.border_bottom.is_some() { self.border_bottom = other.border_bottom; }
-        if other.border_left.is_some() { self.border_left = other.border_left; }
-        if other.border_top_color.is_some() { self.border_top_color = other.border_top_color; }
-        if other.border_right_color.is_some() { self.border_right_color = other.border_right_color; }
-        if other.border_bottom_color.is_some() { self.border_bottom_color = other.border_bottom_color; }
-        if other.border_left_color.is_some() { self.border_left_color = other.border_left_color; }
-        if other.padding.is_some() { self.padding = other.padding; }
-        if other.shrink_to_fit.is_some() { self.shrink_to_fit = other.shrink_to_fit; }
+        if other.back_color.is_some() {
+            self.back_color = other.back_color;
+        }
+        if other.fore_color.is_some() {
+            self.fore_color = other.fore_color;
+        }
+        if other.alignment.is_some() {
+            self.alignment = other.alignment;
+        }
+        if other.text_effect.is_some() {
+            self.text_effect = other.text_effect;
+        }
+        if other.font_name.is_some() {
+            self.font_name = other.font_name.clone();
+        }
+        if other.font_size.is_some() {
+            self.font_size = other.font_size;
+        }
+        if other.font_bold.is_some() {
+            self.font_bold = other.font_bold;
+        }
+        if other.font_italic.is_some() {
+            self.font_italic = other.font_italic;
+        }
+        if other.font_underline.is_some() {
+            self.font_underline = other.font_underline;
+        }
+        if other.font_strikethrough.is_some() {
+            self.font_strikethrough = other.font_strikethrough;
+        }
+        if other.font_width.is_some() {
+            self.font_width = other.font_width;
+        }
+        if other.border.is_some() {
+            self.border = other.border;
+        }
+        if other.border_color.is_some() {
+            self.border_color = other.border_color;
+        }
+        if other.border_top.is_some() {
+            self.border_top = other.border_top;
+        }
+        if other.border_right.is_some() {
+            self.border_right = other.border_right;
+        }
+        if other.border_bottom.is_some() {
+            self.border_bottom = other.border_bottom;
+        }
+        if other.border_left.is_some() {
+            self.border_left = other.border_left;
+        }
+        if other.border_top_color.is_some() {
+            self.border_top_color = other.border_top_color;
+        }
+        if other.border_right_color.is_some() {
+            self.border_right_color = other.border_right_color;
+        }
+        if other.border_bottom_color.is_some() {
+            self.border_bottom_color = other.border_bottom_color;
+        }
+        if other.border_left_color.is_some() {
+            self.border_left_color = other.border_left_color;
+        }
+        if other.padding.is_some() {
+            self.padding = other.padding;
+        }
+        if other.shrink_to_fit.is_some() {
+            self.shrink_to_fit = other.shrink_to_fit;
+        }
     }
 
     /// Resolve this override against the grid-level style to get final back color.
@@ -456,12 +608,13 @@ impl CellStyleOverride {
         is_frozen: bool,
         is_selected: bool,
         is_alternate: bool,
+        selected_back_color: u32,
     ) -> u32 {
         if let Some(color) = self.back_color {
             return color;
         }
         if is_selected {
-            return grid_style.back_color_sel;
+            return selected_back_color;
         }
         if is_alternate && grid_style.back_color_alternate != 0x00000000 {
             return grid_style.back_color_alternate;
@@ -483,12 +636,13 @@ impl CellStyleOverride {
         is_fixed: bool,
         is_frozen: bool,
         is_selected: bool,
+        selected_fore_color: u32,
     ) -> u32 {
         if let Some(color) = self.fore_color {
             return color;
         }
         if is_selected {
-            return grid_style.fore_color_sel;
+            return selected_fore_color;
         }
         if is_frozen {
             return grid_style.fore_color_frozen;

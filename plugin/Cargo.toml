@@ -1,9 +1,9 @@
 [package]
 name = "volvoxgrid-plugin"
-version = "0.1.2"
-edition = "2021"
-license = "Apache-2.0"
-repository = "https://github.com/ivere27/volvoxgrid"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [lib]
 crate-type = ["cdylib", "staticlib"]
@@ -25,9 +25,3 @@ ctor = "0.2"
 lazy_static = "1.5"
 pollster = { version = "0.4", optional = true }
 wgpu = { version = "24", optional = true }
-
-[profile.release]
-lto = true
-strip = true
-opt-level = "z"
-codegen-units = 1

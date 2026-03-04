@@ -37,14 +37,15 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn get_config(&self, request: GridHandle) -> Result<GridConfig, String>;
     fn load_font_data(&self, request: LoadFontDataRequest) -> Result<Empty, String>;
     fn define_columns(&self, request: DefineColumnsRequest) -> Result<Empty, String>;
+    fn get_schema(&self, request: GridHandle) -> Result<DefineColumnsRequest, String>;
     fn define_rows(&self, request: DefineRowsRequest) -> Result<Empty, String>;
     fn insert_rows(&self, request: InsertRowsRequest) -> Result<Empty, String>;
     fn remove_rows(&self, request: RemoveRowsRequest) -> Result<Empty, String>;
     fn move_column(&self, request: MoveColumnRequest) -> Result<Empty, String>;
     fn move_row(&self, request: MoveRowRequest) -> Result<Empty, String>;
-    fn update_cells(&self, request: UpdateCellsRequest) -> Result<Empty, String>;
+    fn update_cells(&self, request: UpdateCellsRequest) -> Result<WriteResult, String>;
     fn get_cells(&self, request: GetCellsRequest) -> Result<CellsResponse, String>;
-    fn load_array(&self, request: LoadArrayRequest) -> Result<Empty, String>;
+    fn load_table(&self, request: LoadTableRequest) -> Result<WriteResult, String>;
     fn clear(&self, request: ClearRequest) -> Result<Empty, String>;
     fn select(&self, request: SelectRequest) -> Result<Empty, String>;
     fn get_selection(&self, request: GridHandle) -> Result<SelectionState, String>;
@@ -325,6 +326,36 @@ pub unsafe extern "C" fn volvox_grid_define_columns_pb(
     }
 }
 
+/// GetSchema
+#[no_mangle]
+pub unsafe extern "C" fn volvox_grid_get_schema(
+    id: i64,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let plugin = match get_volvox_grid_service_plugin() {
+        Some(p) => p,
+        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+    };
+    let req = GridHandle {
+        id,
+        ..Default::default()
+    };
+    match plugin.get_schema(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            if r.encode(&mut buf).is_ok() {
+                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                alloc_payload_with_header(buf)
+            } else {
+                if !out_len.is_null() { *out_len = 0; }
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+    }
+}
+
 /// DefineRows (protobuf input — has repeated/oneof fields)
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_define_rows_pb(
@@ -542,6 +573,7 @@ pub unsafe extern "C" fn volvox_grid_get_cells(
     col2: i32,
     include_style: i32,
     include_checked: i32,
+    include_typed: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
@@ -556,6 +588,7 @@ pub unsafe extern "C" fn volvox_grid_get_cells(
         col2,
         include_style: include_style != 0,
         include_checked: include_checked != 0,
+        include_typed: include_typed != 0,
         ..Default::default()
     };
     match plugin.get_cells(req) {
@@ -574,9 +607,9 @@ pub unsafe extern "C" fn volvox_grid_get_cells(
     }
 }
 
-/// LoadArray (protobuf input — has repeated/oneof fields)
+/// LoadTable (protobuf input — has repeated/oneof fields)
 #[no_mangle]
-pub unsafe extern "C" fn volvox_grid_load_array_pb(
+pub unsafe extern "C" fn volvox_grid_load_table_pb(
     data: *const u8, data_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
@@ -589,11 +622,11 @@ pub unsafe extern "C" fn volvox_grid_load_array_pb(
     } else {
         std::slice::from_raw_parts(data, data_len as usize).to_vec()
     };
-    let req = match LoadArrayRequest::decode(input.as_slice()) {
+    let req = match LoadTableRequest::decode(input.as_slice()) {
         Ok(r) => r,
         Err(e) => { set_last_error(format!("decode: {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
     };
-    match plugin.load_array(req) {
+    match plugin.load_table(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();

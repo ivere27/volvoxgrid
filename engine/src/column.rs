@@ -31,6 +31,12 @@ pub struct ColumnProps {
     pub cell_padding: Option<CellPadding>,
     /// Optional per-column text insets for fixed/header cells.
     pub fixed_cell_padding: Option<CellPadding>,
+    /// Whether null/empty writes are allowed for this column.
+    pub nullable: bool,
+    /// Inbound coercion behavior (`v1::CoercionMode` value).
+    pub coercion_mode: i32,
+    /// Error handling behavior (`v1::WriteErrorMode` value).
+    pub error_mode: i32,
 }
 
 impl Default for ColumnProps {
@@ -56,6 +62,9 @@ impl Default for ColumnProps {
             sticky: 0,
             cell_padding: None,
             fixed_cell_padding: None,
+            nullable: true,
+            coercion_mode: 0,
+            error_mode: 0,
         }
     }
 }

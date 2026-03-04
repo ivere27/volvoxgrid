@@ -334,9 +334,9 @@ impl GlyphAtlas {
         // external rasterizer when available.
         let is_notdef = cache_key.glyph_id == 0;
         if is_notdef {
-            if let Some(entry) = self.try_external_rasterize(
-                cache_key, character, font_name, font_size, bold, italic,
-            ) {
+            if let Some(entry) = self
+                .try_external_rasterize(cache_key, character, font_name, font_size, bold, italic)
+            {
                 return Some(entry);
             }
             // External rasterizer unavailable or returned None — fall through

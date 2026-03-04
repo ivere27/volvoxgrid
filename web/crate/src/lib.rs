@@ -8,7 +8,8 @@ use volvoxgrid_engine::render::Renderer;
 use volvoxgrid_engine::sort;
 use volvoxgrid_engine::GridManager;
 
-use std::sync::Mutex;
+use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex};
 
 // v1 proto types (re-exported for generated WASM bindings)
 pub use volvoxgrid_engine::proto::volvoxgrid::v1::*;
@@ -24,6 +25,8 @@ static MANAGER: Mutex<Option<GridManager>> = Mutex::new(None);
 static RENDERER: Mutex<Option<Renderer>> = Mutex::new(None);
 static RENDER_BUF: Mutex<Vec<u8>> = Mutex::new(Vec::new());
 static RENDER_DIRTY_RECT: Mutex<(i32, i32, i32, i32)> = Mutex::new((0, 0, 0, 0));
+static LAST_MEM_CALC_MS: LazyLock<Mutex<HashMap<i64, f64>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 // GPU renderer globals (opt-in via `gpu` feature).
 // On wasm32 the wgpu WebGPU backend types contain JsValue which is !Send/!Sync.
@@ -42,6 +45,8 @@ static GPU_AVAILABLE: Mutex<bool> = Mutex::new(false);
 
 // Font data cache — replayed into GPU renderer at init time
 static LOADED_FONTS: Mutex<Vec<Vec<u8>>> = Mutex::new(Vec::new());
+
+const DEBUG_MEM_SAMPLE_MS: f64 = 10_000.0;
 
 fn ensure_manager() {
     let mut m = MANAGER.lock().unwrap();
@@ -63,6 +68,25 @@ fn ensure_renderer() {
 
 fn ensure_layout(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
     grid.ensure_layout();
+}
+
+fn maybe_update_debug_memory(
+    grid_id: i64,
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    now_ms: f64,
+) {
+    if !grid.debug_overlay {
+        return;
+    }
+
+    let mut samples = LAST_MEM_CALC_MS.lock().unwrap();
+    let should_update = samples.get(&grid_id).map_or(true, |last_ms| {
+        now_ms >= *last_ms && (now_ms - *last_ms) >= DEBUG_MEM_SAMPLE_MS
+    });
+    if should_update {
+        grid.debug_total_mem_bytes = grid.heap_size_bytes() as i64;
+        samples.insert(grid_id, now_ms);
+    }
 }
 
 fn replay_loaded_fonts_into_grid(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
@@ -354,9 +378,7 @@ impl volvoxgrid_engine::text::TextRenderer for JsTextRenderer {
         }
 
         let result = self.render_callback.apply(&JsValue::NULL, &args).ok();
-        result
-            .and_then(|v| v.as_f64())
-            .unwrap_or(0.0) as f32
+        result.and_then(|v| v.as_f64()).unwrap_or(0.0) as f32
     }
 }
 
@@ -380,7 +402,11 @@ pub fn set_text_renderer(measure_callback: js_sys::Function, render_callback: js
 /// Register JS callbacks as the external text renderer for a specific grid.
 /// This is used for measurement (auto-size) when the built-in engine is disabled.
 #[wasm_bindgen]
-pub fn set_grid_text_renderer(id: i32, measure_callback: js_sys::Function, render_callback: js_sys::Function) {
+pub fn set_grid_text_renderer(
+    id: i32,
+    measure_callback: js_sys::Function,
+    render_callback: js_sys::Function,
+) {
     let _ = with_grid(id, |grid| {
         let te = grid.ensure_text_engine();
         let renderer = Box::new(JsTextRenderer {
@@ -470,7 +496,9 @@ pub fn set_glyph_rasterizer(callback: js_sys::Function) {
     // CPU renderer (always)
     {
         ensure_renderer();
-        let rasterizer = Box::new(JsGlyphRasterizer { callback: callback.clone() });
+        let rasterizer = Box::new(JsGlyphRasterizer {
+            callback: callback.clone(),
+        });
         let mut renderer = RENDERER.lock().unwrap();
         if let Some(r) = renderer.as_mut() {
             r.set_external_glyph_rasterizer(rasterizer);
@@ -535,6 +563,7 @@ pub fn destroy_grid(id: i32) {
     if let Some(mgr) = mgr.as_ref() {
         mgr.destroy_grid(id as i64);
     }
+    LAST_MEM_CALC_MS.lock().unwrap().remove(&(id as i64));
 }
 
 // ---------------------------------------------------------------------------
@@ -2149,10 +2178,13 @@ pub fn unmerge_cells(id: i32, r1: i32, c1: i32, r2: i32, c2: i32) {
 #[wasm_bindgen]
 pub fn get_merged_regions(id: i32) -> Vec<i32> {
     with_grid(id, |grid| {
-        grid.merged_regions.all_ranges().iter().flat_map(|&(r1, c1, r2, c2)| {
-            [r1, c1, r2, c2]
-        }).collect()
-    }).unwrap_or_default()
+        grid.merged_regions
+            .all_ranges()
+            .iter()
+            .flat_map(|&(r1, c1, r2, c2)| [r1, c1, r2, c2])
+            .collect()
+    })
+    .unwrap_or_default()
 }
 
 /// Set the explorer bar mode for sort-glyph headers: 0=none, 1=sort,
@@ -2286,7 +2318,11 @@ pub fn sort_multi(id: i32, cols: &[i32], orders: &[i32]) {
             grid.mark_dirty();
             return;
         }
-        let sort_keys: Vec<(i32, i32)> = cols.iter().zip(orders.iter()).map(|(&c, &o)| (c, o)).collect();
+        let sort_keys: Vec<(i32, i32)> = cols
+            .iter()
+            .zip(orders.iter())
+            .map(|(&c, &o)| (c, o))
+            .collect();
         grid.sort_state.sort_keys = sort_keys;
         sort::sort_grid_all_multi(grid);
     });
@@ -2391,12 +2427,18 @@ pub fn render(id: i32, width: i32, height: i32) -> i32 {
 
     let stride = width * 4;
     grid.debug_renderer_actual = 1; // CPU=1 (WASM always uses CPU renderer)
+    grid.debug_gpu_backend.clear();
+    grid.debug_gpu_present_mode.clear();
+    let now_ms = js_sys::Date::now();
+    maybe_update_debug_memory(id, &mut grid, now_ms);
     let t0 = js_sys::Date::now();
     let (dirty_x, dirty_y, dirty_w, dirty_h) =
         renderer.render(&grid, &mut buf, width, height, stride);
     let elapsed = (js_sys::Date::now() - t0) as f32;
     grid.debug_frame_time_ms = elapsed;
     grid.debug_fps = grid.debug_fps * 0.9 + (1000.0 / elapsed.max(0.1)) * 0.1;
+    grid.debug_instance_count = 0;
+    grid.debug_text_cache_len = renderer.text_cache_len() as i32;
 
     let mut dirty_rect = RENDER_DIRTY_RECT.lock().unwrap();
     *dirty_rect = (dirty_x, dirty_y, dirty_w, dirty_h);
@@ -2520,7 +2562,12 @@ pub fn init_gpu() -> js_sys::Promise {
 /// Returns true on success.
 #[cfg(feature = "gpu")]
 #[wasm_bindgen]
-pub fn gpu_configure_surface(canvas: web_sys::HtmlCanvasElement, w: u32, h: u32, present_mode: i32) -> bool {
+pub fn gpu_configure_surface(
+    canvas: web_sys::HtmlCanvasElement,
+    w: u32,
+    h: u32,
+    present_mode: i32,
+) -> bool {
     let mut gr = GPU_RENDERER.lock().unwrap();
     if let Some(gpu) = gr.0.as_mut() {
         match gpu.configure_surface_from_canvas(canvas, w, h, present_mode) {
@@ -2537,7 +2584,12 @@ pub fn gpu_configure_surface(canvas: web_sys::HtmlCanvasElement, w: u32, h: u32,
 
 #[cfg(not(feature = "gpu"))]
 #[wasm_bindgen]
-pub fn gpu_configure_surface(_canvas: web_sys::HtmlCanvasElement, _w: u32, _h: u32, _present_mode: i32) -> bool {
+pub fn gpu_configure_surface(
+    _canvas: web_sys::HtmlCanvasElement,
+    _w: u32,
+    _h: u32,
+    _present_mode: i32,
+) -> bool {
     false
 }
 
@@ -2605,11 +2657,17 @@ pub fn render_gpu(id: i32, w: i32, h: i32) -> i32 {
     };
 
     grid.debug_renderer_actual = 2; // GPU=2
+    grid.debug_gpu_backend = gpu.backend_name();
+    grid.debug_gpu_present_mode = gpu.present_mode_name();
+    let now_ms = js_sys::Date::now();
+    maybe_update_debug_memory(id64, &mut grid, now_ms);
     let t0 = js_sys::Date::now();
     gpu.render_to_surface(&grid, w, h);
     let elapsed = (js_sys::Date::now() - t0) as f32;
     grid.debug_frame_time_ms = elapsed;
     grid.debug_fps = grid.debug_fps * 0.9 + (1000.0 / elapsed.max(0.1)) * 0.1;
+    grid.debug_instance_count = gpu.instance_count() as i32;
+    grid.debug_text_cache_len = gpu.text_cache_len() as i32;
 
     grid.clear_dirty();
     1
@@ -3092,8 +3150,18 @@ fn engine_event_to_proto(
             new_col_end,
         } => Some(grid_event::Event::SelectionChanging(
             SelectionChangingEvent {
-                old_ranges: vec![normalize_range(old_row_end, old_col_end, old_row_end, old_col_end)],
-                new_ranges: vec![normalize_range(new_row_end, new_col_end, new_row_end, new_col_end)],
+                old_ranges: vec![normalize_range(
+                    old_row_end,
+                    old_col_end,
+                    old_row_end,
+                    old_col_end,
+                )],
+                new_ranges: vec![normalize_range(
+                    new_row_end,
+                    new_col_end,
+                    new_row_end,
+                    new_col_end,
+                )],
                 active_row: new_row_end,
                 active_col: new_col_end,
                 cancel: false,
@@ -3105,8 +3173,18 @@ fn engine_event_to_proto(
             new_row_end,
             new_col_end,
         } => Some(grid_event::Event::SelectionChanged(SelectionChangedEvent {
-            old_ranges: vec![normalize_range(old_row_end, old_col_end, old_row_end, old_col_end)],
-            new_ranges: vec![normalize_range(new_row_end, new_col_end, new_row_end, new_col_end)],
+            old_ranges: vec![normalize_range(
+                old_row_end,
+                old_col_end,
+                old_row_end,
+                old_col_end,
+            )],
+            new_ranges: vec![normalize_range(
+                new_row_end,
+                new_col_end,
+                new_row_end,
+                new_col_end,
+            )],
             active_row: new_row_end,
             active_col: new_col_end,
         })),
@@ -3467,6 +3545,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         if let Some(mgr) = mgr.as_ref() {
             mgr.destroy_grid(request.id);
         }
+        LAST_MEM_CALC_MS.lock().unwrap().remove(&request.id);
         Ok(Empty {})
     }
 
@@ -3505,6 +3584,10 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
             grid.define_columns(&request.columns);
         })?;
         Ok(Empty {})
+    }
+
+    fn get_schema(&self, request: GridHandle) -> Result<DefineColumnsRequest, String> {
+        wasm_with_grid(request.id, |grid| grid.get_schema(request.id))
     }
 
     fn define_rows(&self, request: DefineRowsRequest) -> Result<Empty, String> {
@@ -3549,11 +3632,10 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         Ok(Empty {})
     }
 
-    fn update_cells(&self, request: UpdateCellsRequest) -> Result<Empty, String> {
+    fn update_cells(&self, request: UpdateCellsRequest) -> Result<WriteResult, String> {
         wasm_with_grid(request.grid_id, |grid| {
-            grid.update_cells(&request.cells);
-        })?;
-        Ok(Empty {})
+            grid.write_cells(&request.cells, request.atomic)
+        })
     }
 
     fn get_cells(&self, request: GetCellsRequest) -> Result<CellsResponse, String> {
@@ -3565,26 +3647,15 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 request.col2,
                 request.include_style,
                 request.include_checked,
+                request.include_typed,
             ),
         })
     }
 
-    fn load_array(&self, request: LoadArrayRequest) -> Result<Empty, String> {
+    fn load_table(&self, request: LoadTableRequest) -> Result<WriteResult, String> {
         wasm_with_grid(request.grid_id, |grid| {
-            let rows = request.rows.max(0);
-            let cols = request.cols.max(0);
-            if rows > 0 && cols > 0 {
-                grid.set_rows(rows + grid.fixed_rows);
-                grid.set_cols(cols + grid.fixed_cols);
-            }
-            for (i, v) in request.values.iter().enumerate() {
-                let r = (i as i32 / cols) + grid.fixed_rows;
-                let c = (i as i32 % cols) + grid.fixed_cols;
-                grid.cells.set_text(r, c, v.clone());
-            }
-            grid.mark_dirty();
-        })?;
-        Ok(Empty {})
+            grid.load_table(request.rows, request.cols, &request.values, request.atomic)
+        })
     }
 
     fn clear(&self, request: ClearRequest) -> Result<Empty, String> {
@@ -3650,12 +3721,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 .map(|r| end_from_range(r, active_row, active_col))
                 .unwrap_or((active_row, active_col));
             grid.selection.select(
-                active_row,
-                active_col,
-                row_end,
-                col_end,
-                grid.rows,
-                grid.cols,
+                active_row, active_col, row_end, col_end, grid.rows, grid.cols,
             );
             grid.mark_dirty();
         })?;
@@ -3737,8 +3803,9 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                                 col1: range.col1,
                                 row2: range.row2,
                                 col2: range.col2,
-                                color: region.color,
-                                show_corner_handles: region.show_corner_handles,
+                                style: volvoxgrid_engine::style::HighlightStyle::from_proto(
+                                    region.style.as_ref(),
+                                ),
                                 ref_id: region.ref_id,
                                 text_start: region.text_start,
                                 text_length: region.text_length,
@@ -3897,7 +3964,12 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
     fn get_merged_range(&self, request: GetMergedRangeRequest) -> Result<CellRange, String> {
         wasm_with_grid(request.grid_id, |grid| {
             if let Some((r1, c1, r2, c2)) = grid.get_merged_range(request.row, request.col) {
-                CellRange { row1: r1, col1: c1, row2: r2, col2: c2 }
+                CellRange {
+                    row1: r1,
+                    col1: c1,
+                    row2: r2,
+                    col2: c2,
+                }
             } else {
                 CellRange {
                     row1: request.row,
@@ -3912,7 +3984,8 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
     fn merge_cells(&self, request: MergeCellsRequest) -> Result<Empty, String> {
         let range = request.range.unwrap_or_default();
         wasm_with_grid(request.grid_id, |grid| {
-            grid.merged_regions.add_merge(range.row1, range.col1, range.row2, range.col2);
+            grid.merged_regions
+                .add_merge(range.row1, range.col1, range.row2, range.col2);
             grid.layout.invalidate();
             grid.mark_dirty();
         })?;
@@ -3922,7 +3995,8 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
     fn unmerge_cells(&self, request: UnmergeCellsRequest) -> Result<Empty, String> {
         let range = request.range.unwrap_or_default();
         wasm_with_grid(request.grid_id, |grid| {
-            grid.merged_regions.remove_overlapping(range.row1, range.col1, range.row2, range.col2);
+            grid.merged_regions
+                .remove_overlapping(range.row1, range.col1, range.row2, range.col2);
             grid.layout.invalidate();
             grid.mark_dirty();
         })?;
@@ -3930,12 +4004,18 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
     }
 
     fn get_merged_regions(&self, request: GridHandle) -> Result<MergedRegionsResponse, String> {
-        wasm_with_grid(request.id, |grid| {
-            MergedRegionsResponse {
-                ranges: grid.merged_regions.all_ranges().iter().map(|&(r1, c1, r2, c2)| {
-                    CellRange { row1: r1, col1: c1, row2: r2, col2: c2 }
-                }).collect(),
-            }
+        wasm_with_grid(request.id, |grid| MergedRegionsResponse {
+            ranges: grid
+                .merged_regions
+                .all_ranges()
+                .iter()
+                .map(|&(r1, c1, r2, c2)| CellRange {
+                    row1: r1,
+                    col1: c1,
+                    row2: r2,
+                    col2: c2,
+                })
+                .collect(),
         })
     }
 

@@ -197,7 +197,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         client.updateCells(builder.build());
     }
 
-    public Empty updateCells(UpdateCellsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+    public WriteResult updateCells(UpdateCellsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(request, "request");
         return client.updateCells(request.toBuilder().setGridId(gridId).build());
     }
@@ -207,21 +207,25 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         return client.getCells(request.toBuilder().setGridId(gridId).build());
     }
 
-    public Empty loadArray(LoadArrayRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        Objects.requireNonNull(request, "request");
-        return client.loadArray(request.toBuilder().setGridId(gridId).build());
+    public DefineColumnsRequest getSchema() throws SynurangDesktopBridge.SynurangBridgeException {
+        return client.getSchema(handle());
     }
 
-    public void loadArray(int rows, int cols, List<String> values, boolean bind) throws SynurangDesktopBridge.SynurangBridgeException {
-        LoadArrayRequest.Builder builder = LoadArrayRequest.newBuilder()
+    public WriteResult loadTable(LoadTableRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        Objects.requireNonNull(request, "request");
+        return client.loadTable(request.toBuilder().setGridId(gridId).build());
+    }
+
+    public void loadTable(int rows, int cols, List<CellValue> values, boolean atomic) throws SynurangDesktopBridge.SynurangBridgeException {
+        LoadTableRequest.Builder builder = LoadTableRequest.newBuilder()
             .setGridId(gridId)
             .setRows(rows)
             .setCols(cols)
-            .setBind(bind);
+            .setAtomic(atomic);
         if (values != null && !values.isEmpty()) {
             builder.addAllValues(values);
         }
-        client.loadArray(builder.build());
+        client.loadTable(builder.build());
     }
 
     /**
