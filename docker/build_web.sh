@@ -148,7 +148,7 @@ build_web_dist() {
   copy_dir_clean "${REPO_ROOT}/web/example/dist" "${WEB_DIST_ROOT}/demos/web"
   copy_dir_clean "${REPO_ROOT}/web/example/wasm" "${WEB_DIST_ROOT}/demos/web/wasm"
   if [[ -d "${REPO_ROOT}/web/example/public/doom" ]]; then
-    copy_dir_clean "${REPO_ROOT}/web/example/public/doom" "${WEB_DIST_ROOT}/doom"
+    copy_dir_clean "${REPO_ROOT}/web/example/public/doom" "${WEB_DIST_ROOT}/demos/web/doom"
   fi
   echo "Built web dist: ${WEB_DIST_ROOT}/demos/web"
 }

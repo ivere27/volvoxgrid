@@ -38,7 +38,8 @@ verify_binary_file() {
     echo "Error: binary file not found: ${file}" >&2
     return 1
   fi
-  if ! strings -a "${file}" | grep -Fq -- "${EXPECTED_VERSION}"; then
+  # Avoid grep -q in a pipe under pipefail: early grep exit can trip false negatives.
+  if ! strings -a "${file}" | grep -F -- "${EXPECTED_VERSION}" >/dev/null; then
     echo "Error: version '${EXPECTED_VERSION}' not found in binary: ${file}" >&2
     return 1
   fi
@@ -63,7 +64,8 @@ verify_zip_members() {
 
   local member
   for member in "${members[@]}"; do
-    if ! unzip -p "${archive}" "${member}" | strings -a | grep -Fq -- "${EXPECTED_VERSION}"; then
+    # Avoid grep -q in a pipe under pipefail: early grep exit can trip false negatives.
+    if ! unzip -p "${archive}" "${member}" | strings -a | grep -F -- "${EXPECTED_VERSION}" >/dev/null; then
       echo "Error: version '${EXPECTED_VERSION}' not found in ${archive}:${member}" >&2
       return 1
     fi

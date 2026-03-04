@@ -14,16 +14,27 @@ export interface DoomAssetSource {
   emulatorsPrefix: string;
 }
 
-const DOOM_REMOTE_PROXY_BUNDLE_PATH = "/doom/remote/vendor/doom.jsdos";
-const DOOM_REMOTE_PROXY_EMULATORS_BASE_PATH = "/doom/remote/emulators";
+function normalizeBasePath(baseUrl: string | undefined): string {
+  const raw = (baseUrl ?? "/").trim();
+  if (raw === "" || raw === "/") {
+    return "";
+  }
+  const withLeading = raw.startsWith("/") ? raw : `/${raw}`;
+  return withLeading.endsWith("/") ? withLeading.slice(0, -1) : withLeading;
+}
+
+const doomEnv = (import.meta as any).env as Record<string, string | undefined>;
+const DOOM_BASE_PATH = normalizeBasePath(doomEnv.BASE_URL);
+const DOOM_REMOTE_PROXY_BUNDLE_PATH = `${DOOM_BASE_PATH}/doom/remote/vendor/doom.jsdos`;
+const DOOM_REMOTE_PROXY_EMULATORS_BASE_PATH = `${DOOM_BASE_PATH}/doom/remote/emulators`;
 const DOOM_REMOTE_CDN_BUNDLE_URL = "https://cdn.jsdelivr.net/gh/linuxfandudeguy/doomonline@master/bundle.jsdos";
 const DOOM_REMOTE_CDN_EMULATORS_BASE_URL = "https://cdn.jsdelivr.net/npm/emulators@8.3.9/dist";
 
 export const DOOM_LOCAL_SOURCE: DoomAssetSource = {
   id: "local",
-  bundlePath: "/doom/vendor/doom.jsdos",
-  emulatorsScriptPath: "/doom/emulators/emulators.js",
-  emulatorsPrefix: "/doom/emulators/",
+  bundlePath: `${DOOM_BASE_PATH}/doom/vendor/doom.jsdos`,
+  emulatorsScriptPath: `${DOOM_BASE_PATH}/doom/emulators/emulators.js`,
+  emulatorsPrefix: `${DOOM_BASE_PATH}/doom/emulators/`,
 };
 
 const DOOM_REMOTE_PROXY_SOURCE: DoomAssetSource = {

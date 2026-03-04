@@ -54,6 +54,8 @@ web/example/public/
 # Generated Files
 codegen/
 dist/
+public/
+.firebase/
 
 # Native Build Artifacts (C++/ActiveX)
 *.o

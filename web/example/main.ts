@@ -126,6 +126,55 @@ function parseEnvBool(value: string | undefined, fallback = false): boolean {
   return fallback;
 }
 
+function normalizeBaseUrl(baseUrl: string | undefined): string {
+  const raw = (baseUrl ?? "/").trim();
+  if (raw === "" || raw === "/") {
+    return "/";
+  }
+  const withLeading = raw.startsWith("/") ? raw : `/${raw}`;
+  return withLeading.endsWith("/") ? withLeading : `${withLeading}/`;
+}
+
+async function ensureDoomRemoteProxyWorker(baseUrl: string, isDev: boolean): Promise<void> {
+  if (isDev) {
+    return;
+  }
+  if (!("serviceWorker" in navigator)) {
+    return;
+  }
+  if (!window.isSecureContext) {
+    return;
+  }
+
+  try {
+    await navigator.serviceWorker.register(`${baseUrl}doom-remote-proxy-sw.js`, {
+      scope: baseUrl,
+    });
+    await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 2000);
+      }),
+    ]);
+
+    if (!navigator.serviceWorker.controller) {
+      await new Promise<void>((resolve) => {
+        const onChange = () => {
+          navigator.serviceWorker.removeEventListener("controllerchange", onChange);
+          resolve();
+        };
+        navigator.serviceWorker.addEventListener("controllerchange", onChange, { once: true });
+        window.setTimeout(() => {
+          navigator.serviceWorker.removeEventListener("controllerchange", onChange);
+          resolve();
+        }, 2000);
+      });
+    }
+  } catch (err) {
+    console.warn("DOOM remote proxy worker registration failed:", err);
+  }
+}
+
 function pbEncodeVarint(value: bigint): number[] {
   if (value < 0n) {
     throw new RangeError("varint must be unsigned");
@@ -181,6 +230,9 @@ async function main() {
   const selDoomRes = document.getElementById("sel-doom-res") as HTMLSelectElement;
   const chkDoomBorder = document.getElementById("chk-doom-border") as HTMLInputElement;
   const env = (import.meta as any).env as Record<string, string | undefined>;
+  const isDev = Boolean((import.meta as any).env?.DEV);
+  const baseUrl = normalizeBaseUrl(env.BASE_URL);
+  const doomProxyWorkerReady = ensureDoomRemoteProxyWorker(baseUrl, isDev);
 
   installAtomicsWaitAsyncGuard();
 
@@ -655,9 +707,10 @@ async function main() {
     source?: DoomAssetSource;
     message?: string;
   }> {
+    await doomProxyWorkerReady;
     const res = await doomRuntime.resolveAssetSource();
     if (res.ok && res.source?.id === "remote") {
-      const viaProxy = res.source.bundlePath.startsWith("/doom/remote/");
+      const viaProxy = res.source.bundlePath.includes("/doom/remote/");
       console.info(viaProxy
         ? "DOOM mode: using remote fallback assets via dev proxy."
         : "DOOM mode: using remote fallback assets from CDN.");

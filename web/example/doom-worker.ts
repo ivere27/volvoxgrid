@@ -105,8 +105,37 @@ function flushPendingKeyEvents(): void {
   pendingKeyEvents.length = 0;
 }
 
+async function loadScript(url: string): Promise<void> {
+  try {
+    // Fast path: same-origin scripts can use importScripts directly.
+    scope.importScripts(url);
+    return;
+  } catch {
+    // importScripts fails for cross-origin URLs — fall through to fetch+blob.
+  }
+
+  const resp = await fetch(url, { mode: "cors", credentials: "omit" });
+  if (!resp.ok) {
+    throw new Error(`Failed to fetch script (${url}): ${resp.status}`);
+  }
+  const text = await resp.text();
+  const blob = new Blob([text], { type: "application/javascript" });
+  const blobUrl = URL.createObjectURL(blob);
+  try {
+    scope.importScripts(blobUrl);
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
+}
+
 async function initEmulator(msg: DoomWorkerInitMessage): Promise<void> {
-  scope.importScripts(msg.emulatorsScriptPath);
+  // The emulators CDN script references `window` which does not exist in a
+  // Worker scope.  Alias the worker global so the library can initialise.
+  if (typeof (globalThis as any).window === "undefined") {
+    (globalThis as any).window = self;
+  }
+
+  await loadScript(msg.emulatorsScriptPath);
 
   const emu = scope.emulators;
   if (!emu || typeof emu.dosboxWorker !== "function") {
@@ -146,7 +175,10 @@ async function initEmulator(msg: DoomWorkerInitMessage): Promise<void> {
   postMessageToMain(ready);
 }
 
-scope.onmessage = (event: MessageEvent<DoomWorkerInputMessage>) => {
+// Use addEventListener instead of setting onmessage directly, because the
+// emulators library's Emscripten module (wdosbox.js) may overwrite
+// self.onmessage when eval'd in this scope.
+scope.addEventListener("message", (event: MessageEvent<DoomWorkerInputMessage>) => {
   const msg = event.data;
   if (!msg || typeof msg !== "object") return;
 
@@ -166,4 +198,4 @@ scope.onmessage = (event: MessageEvent<DoomWorkerInputMessage>) => {
     }
     doomCi.sendKeyEvent(msg.code, msg.pressed);
   }
-};
+});

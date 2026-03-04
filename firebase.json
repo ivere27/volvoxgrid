@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": "dist/web",
+    "public": "public",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -8,19 +8,6 @@
     ],
     "headers": [
       {
-        "source": "/demos/web",
-        "headers": [
-          {
-            "key": "Cross-Origin-Opener-Policy",
-            "value": "same-origin"
-          },
-          {
-            "key": "Cross-Origin-Embedder-Policy",
-            "value": "require-corp"
-          }
-        ]
-      },
-      {
         "source": "/demos/web/**",
         "headers": [
           {
@@ -34,46 +21,19 @@
         ]
       },
       {
-        "source": "**/*.wasm",
+        "source": "/demos/web/doom-remote-proxy-sw.js",
         "headers": [
           {
-            "key": "Content-Type",
-            "value": "application/wasm"
+            "key": "Cache-Control",
+            "value": "no-store"
           }
         ]
-      }
-    ],
-    "redirects": [
-      {
-        "source": "/",
-        "destination": "/demos/web",
-        "type": 302
       }
     ],
     "rewrites": [
       {
-        "source": "/demos/web",
-        "destination": "/demos/web/index.html"
-      },
-      {
-        "source": "/demos/web/**",
-        "destination": "/demos/web/index.html"
-      },
-      {
-        "source": "/demos/excel",
-        "destination": "/demos/excel/index.html"
-      },
-      {
-        "source": "/demos/excel/**",
-        "destination": "/demos/excel/index.html"
-      },
-      {
-        "source": "/demos/excel-lite",
-        "destination": "/demos/excel-lite/index.html"
-      },
-      {
-        "source": "/demos/excel-lite/**",
-        "destination": "/demos/excel-lite/index.html"
+        "source": "**",
+        "destination": "/index.html"
       }
     ]
   }

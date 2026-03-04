@@ -10,6 +10,7 @@
 #   make excel        — build WASM + start Excel adapter dev server
 #   make excel-lite   — build WASM lite + start Excel adapter dev server
 #   make doom-deps    — download optional DOOM assets for web demo mode
+#   make publish_web  — copy dist/web into public and deploy to Firebase
 #   make clean        — remove build artifacts
 
 # =============================================================================
@@ -156,6 +157,7 @@ IOS_GITHUB_REPO ?= ivere27/volvoxgrid
 WEB_BUNDLE_DIR := dist/web
 WEB_BUNDLE_ZIP := $(WEB_BUNDLE_DIR)/volvoxgrid-web-$(VOLVOXGRID_VERSION).zip
 WEB_BUNDLE_LITE_ZIP := $(WEB_BUNDLE_DIR)/volvoxgrid-web-lite-$(VOLVOXGRID_VERSION).zip
+FIREBASE_PUBLIC_DIR ?= public
 
 ifeq ($(VOLVOXGRID_SOURCE_RESOLVED),maven)
 ANDROID_INSTALL_PREREQ :=
@@ -204,7 +206,7 @@ endif
         docker_android_aar_image docker_android docker_desktop_image docker_desktop \
         docker_web_image docker_web \
         docker_ios_image docker_ios docker_all_image docker_all publish_maven \
-        publish_local publish_github \
+        publish_local publish_github publish_web \
         gtk-test clean clean-all help
 
 # =============================================================================
@@ -270,6 +272,7 @@ help:
 	@echo "  publish_maven             Upload Android AAR + Android lite AAR + desktop JAR to Maven Central"
 	@echo "  publish_github            Upload all artifacts (xcframework, AAR, JAR, web zips) to GitHub release"
 	@echo "  publish_local             Install built SNAPSHOT artifacts from dist/maven into ~/.m2/repository"
+	@echo "  publish_web               Copy dist/web -> public (clean), then run firebase deploy"
 	@echo ""
 	@echo "Example dependency source flags (default is local):"
 	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.5"
@@ -1126,7 +1129,7 @@ publish_maven:
 			exit 1; \
 		fi; \
 		echo "Verifying embedded version for $$ARTIFACT-$$VERSION..."; \
-		bash "$$VERIFY_SCRIPT" "$$VERSION" "$$FILE"; \
+		bash "$$VERIFY_SCRIPT" "$$VERSION" "$$FILE" || exit 1; \
 		echo "Creating bundle for $$ARTIFACT-$$VERSION..."; \
 		BUNDLE_DIR=$$(mktemp -d); \
 		BUNDLE_ZIP="/tmp/volvoxgrid-bundle-$$$$.zip"; \
@@ -1144,7 +1147,7 @@ publish_maven:
 			sha1sum "$$f" | cut -d' ' -f1 > "$$f.sha1"; \
 			gpg -ab "$$f"; \
 		done; \
-		cd "$$BUNDLE_DIR" && zip -qr "$$BUNDLE_ZIP" "$$TOP_DIR" || { echo "zip failed"; exit 1; }; \
+		( cd "$$BUNDLE_DIR" && zip -qr "$$BUNDLE_ZIP" "$$TOP_DIR" ) || { echo "zip failed"; rm -rf "$$BUNDLE_DIR"; exit 1; }; \
 		rm -rf "$$BUNDLE_DIR"; \
 		echo "Uploading $$ARTIFACT-$$VERSION to Maven Central..."; \
 		RESPONSE=$$(curl -s -w "\n%{http_code}" \
@@ -1241,10 +1244,10 @@ publish_github:
 	echo "Creating/updating GitHub release $$TAG..."; \
 	gh release view "$$TAG" --repo "$(IOS_GITHUB_REPO)" >/dev/null 2>&1 || \
 		gh release create "$$TAG" $$PRERELEASE_FLAG --repo "$(IOS_GITHUB_REPO)" --title "$$TAG" --notes "Release $$TAG"; \
-	if [ -d "$(IOS_XCFRAMEWORK_DIR)" ]; then \
-		echo "Verifying embedded version for XCFramework (expected $(IOS_VERSION))..."; \
-		bash "$$VERIFY_SCRIPT" "$(IOS_VERSION)" "$(IOS_XCFRAMEWORK_DIR)"; \
-		echo "Zipping XCFramework..."; \
+		if [ -d "$(IOS_XCFRAMEWORK_DIR)" ]; then \
+			echo "Verifying embedded version for XCFramework (expected $(IOS_VERSION))..."; \
+			bash "$$VERIFY_SCRIPT" "$(IOS_VERSION)" "$(IOS_XCFRAMEWORK_DIR)" || exit 1; \
+			echo "Zipping XCFramework..."; \
 		cd dist/ios && rm -f VolvoxGridPlugin.xcframework.zip && \
 			zip -r VolvoxGridPlugin.xcframework.zip VolvoxGridPlugin.xcframework/; \
 		cd "$(CURRENT_DIR)"; \
@@ -1266,10 +1269,10 @@ publish_github:
 	do \
 	  expected="$${entry%%:*}"; \
 	  f="$${entry#*:}"; \
-	  if [ -f "$$f" ]; then \
-	    echo "Verifying embedded version for $$(basename "$$f") (expected $$expected)..."; \
-	    bash "$$VERIFY_SCRIPT" "$$expected" "$$f"; \
-	    echo "Uploading $$(basename $$f) to $$TAG..."; \
+		  if [ -f "$$f" ]; then \
+		    echo "Verifying embedded version for $$(basename "$$f") (expected $$expected)..."; \
+		    bash "$$VERIFY_SCRIPT" "$$expected" "$$f" || exit 1; \
+		    echo "Uploading $$(basename $$f) to $$TAG..."; \
 	    gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber; \
 	  fi; \
 	done; \
@@ -1283,6 +1286,20 @@ publish_github:
 	  fi; \
 	done; \
 	echo "All artifacts uploaded to $$TAG"
+
+publish_web:
+	@command -v firebase >/dev/null 2>&1 || { echo "Error: firebase CLI not found in PATH."; echo "Install with: npm install -g firebase-tools"; exit 1; }
+	@if [ ! -d "$(WEB_BUNDLE_DIR)" ]; then \
+		echo "Error: $(WEB_BUNDLE_DIR) not found."; \
+		echo "Build web artifacts first (for example: make docker_web WEB_DOCKER_TARGET=web)."; \
+		exit 1; \
+	fi
+	@echo "Syncing $(WEB_BUNDLE_DIR) -> $(FIREBASE_PUBLIC_DIR) (clean copy, keeping index.html)..."
+	@mkdir -p "$(FIREBASE_PUBLIC_DIR)"
+	@find "$(FIREBASE_PUBLIC_DIR)" -mindepth 1 -maxdepth 1 ! -name 'index.html' -exec rm -rf {} +
+	@cp -a "$(WEB_BUNDLE_DIR)/." "$(FIREBASE_PUBLIC_DIR)/"
+	@echo "Running Firebase deploy..."
+	firebase deploy
 
 # =============================================================================
 # Flutter
