@@ -11,13 +11,13 @@ use crate::drag::DragState;
 use crate::edit::EditState;
 use crate::event::EventQueue;
 use crate::layout::LayoutCache;
-use crate::span::SpanState;
 use crate::outline::OutlineState;
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::row::RowProps;
 use crate::scroll::ScrollState;
 use crate::selection::SelectionState;
 use crate::sort::SortState;
+use crate::span::SpanState;
 use crate::style::{CellPadding, CellStyleOverride, GridStyleState};
 use crate::text::{TextEngine, DEFAULT_LAYOUT_CACHE_CAP};
 
@@ -32,6 +32,17 @@ const MIN_ROWS: i32 = 1;
 
 /// Minimum allowed column count.
 const MIN_COLS: i32 = 1;
+
+// Keep build metadata in the final binary even when version APIs are not called.
+#[used]
+static VOLVOXGRID_BUILD_METADATA: &str = concat!(
+    "VOLVOXGRID_VERSION=",
+    env!("VOLVOXGRID_VERSION"),
+    ";VOLVOXGRID_GIT_COMMIT=",
+    env!("VOLVOXGRID_GIT_COMMIT"),
+    ";VOLVOXGRID_BUILD_DATE=",
+    env!("VOLVOXGRID_BUILD_DATE")
+);
 
 #[inline]
 fn heap_hash_map_bytes<K, V>(map: &HashMap<K, V>) -> usize {
@@ -2077,7 +2088,17 @@ impl VolvoxGrid {
 
     /// Returns the engine version string.
     pub fn version() -> &'static str {
-        "1.0.0"
+        env!("VOLVOXGRID_VERSION")
+    }
+
+    /// Returns the build git commit.
+    pub fn git_commit() -> &'static str {
+        env!("VOLVOXGRID_GIT_COMMIT")
+    }
+
+    /// Returns the build timestamp string.
+    pub fn build_date() -> &'static str {
+        env!("VOLVOXGRID_BUILD_DATE")
     }
 
     // ── Client dimensions (ClientWidth/ClientHeight) ─────
@@ -2864,14 +2885,12 @@ impl VolvoxGrid {
 
         // Use the current edit text if this cell is being edited, otherwise
         // the display text.
-        let text = if self.edit.is_active()
-            && self.edit.edit_row == row
-            && self.edit.edit_col == col
-        {
-            self.edit.edit_text.clone()
-        } else {
-            self.get_display_text(row, col)
-        };
+        let text =
+            if self.edit.is_active() && self.edit.edit_row == row && self.edit.edit_col == col {
+                self.edit.edit_text.clone()
+            } else {
+                self.get_display_text(row, col)
+            };
         if text.is_empty() {
             return Some((x, y, w, h));
         }
@@ -2907,8 +2926,7 @@ impl VolvoxGrid {
         }
 
         // Resolve horizontal alignment to decide scan direction.
-        let alignment =
-            crate::canvas::resolve_alignment(self, row, col, &style_override, &text);
+        let alignment = crate::canvas::resolve_alignment(self, row, col, &style_override, &text);
         let (halign, _) = crate::canvas::alignment_components(alignment);
 
         // Determine scan directions (flip for RTL).

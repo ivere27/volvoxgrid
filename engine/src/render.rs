@@ -139,7 +139,10 @@ mod tests {
         grid.text_layout_cache_cap = 256;
 
         let mut renderer = Renderer::new();
-        assert_ne!(renderer.text_engine.layout_cache_cap, grid.text_layout_cache_cap);
+        assert_ne!(
+            renderer.text_engine.layout_cache_cap,
+            grid.text_layout_cache_cap
+        );
 
         let mut buffer = vec![0u8; 4];
         renderer.render(&grid, &mut buffer, 1, 1, 4);

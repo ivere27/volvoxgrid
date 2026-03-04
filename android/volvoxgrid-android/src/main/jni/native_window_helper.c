@@ -19,3 +19,12 @@ Java_io_github_ivere27_volvoxgrid_NativeWindowHelper_nativeReleaseNativeWindow(
         ANativeWindow_release((ANativeWindow*)(uintptr_t)ptr);
     }
 }
+
+JNIEXPORT void JNICALL
+Java_io_github_ivere27_volvoxgrid_NativeWindowHelper_nativeAcquireNativeWindow(
+    JNIEnv *env, jclass clazz, jlong ptr
+) {
+    if (ptr != 0) {
+        ANativeWindow_acquire((ANativeWindow*)(uintptr_t)ptr);
+    }
+}

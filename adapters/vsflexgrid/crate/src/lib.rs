@@ -32,6 +32,7 @@ fn proto_value_to_engine(cv: &Option<CellValue>) -> CellValueData {
             Some(cell_value::Value::Number(n)) => CellValueData::Number(*n),
             Some(cell_value::Value::Flag(b)) => CellValueData::Bool(*b),
             Some(cell_value::Value::Data(d)) => CellValueData::Bytes(d.clone()),
+            Some(cell_value::Value::Timestamp(ts)) => CellValueData::Timestamp(*ts),
             None => CellValueData::Empty,
         },
         None => CellValueData::Empty,
@@ -40,10 +41,21 @@ fn proto_value_to_engine(cv: &Option<CellValue>) -> CellValueData {
 
 fn engine_value_to_proto(v: &CellValueData) -> CellValue {
     match v {
-        CellValueData::Text(t) => CellValue { value: Some(cell_value::Value::Text(t.clone())) },
-        CellValueData::Number(n) => CellValue { value: Some(cell_value::Value::Number(*n)) },
-        CellValueData::Bool(b) => CellValue { value: Some(cell_value::Value::Flag(*b)) },
-        CellValueData::Bytes(d) => CellValue { value: Some(cell_value::Value::Data(d.clone())) },
+        CellValueData::Text(t) => CellValue {
+            value: Some(cell_value::Value::Text(t.clone())),
+        },
+        CellValueData::Number(n) => CellValue {
+            value: Some(cell_value::Value::Number(*n)),
+        },
+        CellValueData::Bool(b) => CellValue {
+            value: Some(cell_value::Value::Flag(*b)),
+        },
+        CellValueData::Bytes(d) => CellValue {
+            value: Some(cell_value::Value::Data(d.clone())),
+        },
+        CellValueData::Timestamp(ts) => CellValue {
+            value: Some(cell_value::Value::Timestamp(*ts)),
+        },
         CellValueData::Empty => CellValue { value: None },
     }
 }
@@ -74,14 +86,18 @@ fn apply_array_data_to_grid(
 }
 
 fn apply_picture_type_to_rgba(buf: &mut [u8], picture_type: i32) {
-    if picture_type != 1 { return; }
+    if picture_type != 1 {
+        return;
+    }
     for px in buf.chunks_exact_mut(4) {
         let r = px[0] as u16;
         let g = px[1] as u16;
         let b = px[2] as u16;
         let y = ((r * 77 + g * 150 + b * 29) >> 8) as u8;
         let bw = if y >= 128 { 255 } else { 0 };
-        px[0] = bw; px[1] = bw; px[2] = bw;
+        px[0] = bw;
+        px[1] = bw;
+        px[2] = bw;
     }
 }
 
@@ -95,7 +111,10 @@ fn capture_grid_picture(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) -> Image
     renderer.render(grid, &mut buffer, width, height, stride);
     apply_picture_type_to_rgba(&mut buffer, grid.picture_type);
     let data = volvoxgrid_engine::print::encode_rgba_png(&buffer, width as u32, height as u32);
-    ImageData { data, format: "png".to_string() }
+    ImageData {
+        data,
+        format: "png".to_string(),
+    }
 }
 
 #[cfg(any())]
@@ -180,17 +199,37 @@ fn engine_style_to_proto(s: &volvoxgrid_engine::style::GridStyleState) -> GridSt
 #[cfg(any())]
 fn proto_cell_style_to_override(cs: &CellStyle) -> CellStyleOverride {
     CellStyleOverride {
-        back_color: if cs.back_color != 0 { Some(cs.back_color) } else { None },
-        fore_color: if cs.fore_color != 0 { Some(cs.fore_color) } else { None },
+        back_color: if cs.back_color != 0 {
+            Some(cs.back_color)
+        } else {
+            None
+        },
+        fore_color: if cs.fore_color != 0 {
+            Some(cs.fore_color)
+        } else {
+            None
+        },
         alignment: Some(cs.alignment),
         text_style: Some(cs.text_effect),
-        font_name: if cs.font_name.is_empty() { None } else { Some(cs.font_name.clone()) },
-        font_size: if cs.font_size > 0.0 { Some(cs.font_size) } else { None },
+        font_name: if cs.font_name.is_empty() {
+            None
+        } else {
+            Some(cs.font_name.clone())
+        },
+        font_size: if cs.font_size > 0.0 {
+            Some(cs.font_size)
+        } else {
+            None
+        },
         font_bold: Some(cs.font_bold),
         font_italic: Some(cs.font_italic),
         font_underline: Some(cs.font_underline),
         font_strikethrough: Some(cs.font_strikethrough),
-        font_width: if cs.font_width > 0.0 { Some(cs.font_width) } else { None },
+        font_width: if cs.font_width > 0.0 {
+            Some(cs.font_width)
+        } else {
+            None
+        },
         border: Some(cs.border),
         border_color: None,
     }
@@ -218,8 +257,12 @@ fn engine_override_to_proto(so: &CellStyleOverride) -> CellStyle {
 
 fn set_cell_property(
     grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row1: i32, col1: i32, row2: i32, col2: i32,
-    prop: i32, value: &Option<CellValue>,
+    row1: i32,
+    col1: i32,
+    row2: i32,
+    col2: i32,
+    prop: i32,
+    value: &Option<CellValue>,
 ) {
     let r_lo = row1.min(row2).max(0);
     let r_hi = row1.max(row2).min(grid.rows - 1);
@@ -228,28 +271,164 @@ fn set_cell_property(
     for r in r_lo..=r_hi {
         for c in c_lo..=c_hi {
             match prop {
-                0 => { if let Some(cv) = value { if let Some(cell_value::Value::Text(t)) = &cv.value { grid.cells.set_text(r, c, t.clone()); } } }
-                1 => { if let Some(cv) = value { if let Some(cell_value::Value::Number(n)) = &cv.value { grid.cell_styles.entry((r, c)).or_default().text_effect = Some(*n as i32); } } }
-                2 => { if let Some(cv) = value { if let Some(cell_value::Value::Number(n)) = &cv.value { grid.cell_styles.entry((r, c)).or_default().alignment = Some(*n as i32); } } }
-                3 => { if let Some(cv) = value { if let Some(cell_value::Value::Data(d)) = &cv.value { grid.cells.get_mut(r, c).extra_mut().picture = Some(d.clone()); } } }
-                4 => { if let Some(cv) = value { if let Some(cell_value::Value::Number(n)) = &cv.value { grid.cells.get_mut(r, c).extra_mut().picture_alignment = *n as i32; } } }
-                5 => { if let Some(cv) = value { if let Some(cell_value::Value::Number(n)) = &cv.value { grid.cells.get_mut(r, c).extra_mut().checked = *n as i32; } } }
-                6 => { if let Some(cv) = value { if let Some(cell_value::Value::Number(n)) = &cv.value { grid.cell_styles.entry((r, c)).or_default().back_color = Some(*n as u32); } } }
-                7 => { if let Some(cv) = value { if let Some(cell_value::Value::Number(n)) = &cv.value { grid.cell_styles.entry((r, c)).or_default().fore_color = Some(*n as u32); } } }
-                8 => { if let Some(cv) = value { if let Some(cell_value::Value::Number(n)) = &cv.value { grid.cells.get_mut(r, c).extra_mut().progress_color = *n as u32; } } }
-                9 => { if let Some(cv) = value { if let Some(cell_value::Value::Number(n)) = &cv.value { grid.cells.get_mut(r, c).extra_mut().progress_percent = *n as f32; } } }
-                10 => { if let Some(cv) = value { if let Some(cell_value::Value::Text(t)) = &cv.value { grid.cell_styles.entry((r, c)).or_default().font_name = Some(t.clone()); } } }
-                11 => { if let Some(cv) = value { if let Some(cell_value::Value::Number(n)) = &cv.value { grid.cell_styles.entry((r, c)).or_default().font_size = Some(*n as f32); } } }
-                12 => { if let Some(cv) = value { if let Some(cell_value::Value::Flag(b)) = &cv.value { grid.cell_styles.entry((r, c)).or_default().font_bold = Some(*b); } } }
-                13 => { if let Some(cv) = value { if let Some(cell_value::Value::Flag(b)) = &cv.value { grid.cell_styles.entry((r, c)).or_default().font_italic = Some(*b); } } }
-                14 => { if let Some(cv) = value { if let Some(cell_value::Value::Flag(b)) = &cv.value { grid.cell_styles.entry((r, c)).or_default().font_underline = Some(*b); } } }
-                15 => { if let Some(cv) = value { if let Some(cell_value::Value::Flag(b)) = &cv.value { grid.cell_styles.entry((r, c)).or_default().font_strikethrough = Some(*b); } } }
-                16 => { if let Some(cv) = value { if let Some(cell_value::Value::Number(n)) = &cv.value { grid.cell_styles.entry((r, c)).or_default().font_width = Some(*n as f32); } } }
-                17 => { let ev = proto_value_to_engine(value); grid.cells.set_value(r, c, ev); }
-                18 => { if let Some(cv) = value { if let Some(cell_value::Value::Data(d)) = &cv.value { grid.cells.get_mut(r, c).extra_mut().user_data = Some(d.clone()); } } }
-                19 => { if let Some(cv) = value { if let Some(cell_value::Value::Text(t)) = &cv.value { grid.cells.get_mut(r, c).extra_mut().custom_format = t.clone(); } } }
-                24 => { if let Some(cv) = value { if let Some(cell_value::Value::Data(d)) = &cv.value { grid.cells.get_mut(r, c).extra_mut().button_picture = Some(d.clone()); } } }
-                25 => { if let Some(cv) = value { if let Some(cell_value::Value::Text(t)) = &cv.value { grid.cells.get_mut(r, c).extra_mut().dropdown_items = t.clone(); } } }
+                0 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Text(t)) = &cv.value {
+                            grid.cells.set_text(r, c, t.clone());
+                        }
+                    }
+                }
+                1 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Number(n)) = &cv.value {
+                            grid.cell_styles.entry((r, c)).or_default().text_effect =
+                                Some(*n as i32);
+                        }
+                    }
+                }
+                2 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Number(n)) = &cv.value {
+                            grid.cell_styles.entry((r, c)).or_default().alignment = Some(*n as i32);
+                        }
+                    }
+                }
+                3 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Data(d)) = &cv.value {
+                            grid.cells.get_mut(r, c).extra_mut().picture = Some(d.clone());
+                        }
+                    }
+                }
+                4 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Number(n)) = &cv.value {
+                            grid.cells.get_mut(r, c).extra_mut().picture_alignment = *n as i32;
+                        }
+                    }
+                }
+                5 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Number(n)) = &cv.value {
+                            grid.cells.get_mut(r, c).extra_mut().checked = *n as i32;
+                        }
+                    }
+                }
+                6 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Number(n)) = &cv.value {
+                            grid.cell_styles.entry((r, c)).or_default().back_color =
+                                Some(*n as u32);
+                        }
+                    }
+                }
+                7 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Number(n)) = &cv.value {
+                            grid.cell_styles.entry((r, c)).or_default().fore_color =
+                                Some(*n as u32);
+                        }
+                    }
+                }
+                8 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Number(n)) = &cv.value {
+                            grid.cells.get_mut(r, c).extra_mut().progress_color = *n as u32;
+                        }
+                    }
+                }
+                9 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Number(n)) = &cv.value {
+                            grid.cells.get_mut(r, c).extra_mut().progress_percent = *n as f32;
+                        }
+                    }
+                }
+                10 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Text(t)) = &cv.value {
+                            grid.cell_styles.entry((r, c)).or_default().font_name = Some(t.clone());
+                        }
+                    }
+                }
+                11 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Number(n)) = &cv.value {
+                            grid.cell_styles.entry((r, c)).or_default().font_size = Some(*n as f32);
+                        }
+                    }
+                }
+                12 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Flag(b)) = &cv.value {
+                            grid.cell_styles.entry((r, c)).or_default().font_bold = Some(*b);
+                        }
+                    }
+                }
+                13 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Flag(b)) = &cv.value {
+                            grid.cell_styles.entry((r, c)).or_default().font_italic = Some(*b);
+                        }
+                    }
+                }
+                14 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Flag(b)) = &cv.value {
+                            grid.cell_styles.entry((r, c)).or_default().font_underline = Some(*b);
+                        }
+                    }
+                }
+                15 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Flag(b)) = &cv.value {
+                            grid.cell_styles
+                                .entry((r, c))
+                                .or_default()
+                                .font_strikethrough = Some(*b);
+                        }
+                    }
+                }
+                16 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Number(n)) = &cv.value {
+                            grid.cell_styles.entry((r, c)).or_default().font_width =
+                                Some(*n as f32);
+                        }
+                    }
+                }
+                17 => {
+                    let ev = proto_value_to_engine(value);
+                    grid.cells.set_value(r, c, ev);
+                }
+                18 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Data(d)) = &cv.value {
+                            grid.cells.get_mut(r, c).extra_mut().user_data = Some(d.clone());
+                        }
+                    }
+                }
+                19 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Text(t)) = &cv.value {
+                            grid.cells.get_mut(r, c).extra_mut().custom_format = t.clone();
+                        }
+                    }
+                }
+                24 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Data(d)) = &cv.value {
+                            grid.cells.get_mut(r, c).extra_mut().button_picture = Some(d.clone());
+                        }
+                    }
+                }
+                25 => {
+                    if let Some(cv) = value {
+                        if let Some(cell_value::Value::Text(t)) = &cv.value {
+                            grid.cells.get_mut(r, c).extra_mut().dropdown_items = t.clone();
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -257,50 +436,206 @@ fn set_cell_property(
     grid.mark_dirty();
 }
 
-fn get_cell_property(grid: &volvoxgrid_engine::grid::VolvoxGrid, row: i32, col: i32, prop: i32) -> CellValue {
+fn get_cell_property(
+    grid: &volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    prop: i32,
+) -> CellValue {
     match prop {
-        0 => CellValue { value: Some(cell_value::Value::Text(grid.cells.get_text(row, col).to_string())) },
-        1 => { let so = grid.get_cell_style(row, col); CellValue { value: Some(cell_value::Value::Number(so.text_effect.unwrap_or(0) as f64)) } }
-        2 => { let so = grid.get_cell_style(row, col); CellValue { value: Some(cell_value::Value::Number(so.alignment.unwrap_or(9) as f64)) } }
-        3 => { let data = grid.cells.get(row, col).and_then(|c| c.picture().map(|d| d.to_vec())).unwrap_or_default(); CellValue { value: Some(cell_value::Value::Data(data)) } }
-        4 => { let pa = grid.cells.get(row, col).map_or(0, |c| c.picture_alignment()); CellValue { value: Some(cell_value::Value::Number(pa as f64)) } }
-        5 => { let checked = grid.cells.get(row, col).map_or(0, |c| c.checked()); CellValue { value: Some(cell_value::Value::Number(checked as f64)) } }
-        6 => { let so = grid.get_cell_style(row, col); CellValue { value: Some(cell_value::Value::Number(so.back_color.unwrap_or(0) as f64)) } }
-        7 => { let so = grid.get_cell_style(row, col); CellValue { value: Some(cell_value::Value::Number(so.fore_color.unwrap_or(0) as f64)) } }
-        8 => { let fc = grid.cells.get(row, col).map_or(0, |c| c.progress_color()); CellValue { value: Some(cell_value::Value::Number(fc as f64)) } }
-        9 => { let fp = grid.cells.get(row, col).map_or(0.0, |c| c.progress_percent()); CellValue { value: Some(cell_value::Value::Number(fp as f64)) } }
-        10 => { let so = grid.get_cell_style(row, col); CellValue { value: Some(cell_value::Value::Text(so.font_name.unwrap_or_default())) } }
-        11 => { let so = grid.get_cell_style(row, col); CellValue { value: Some(cell_value::Value::Number(so.font_size.unwrap_or(0.0) as f64)) } }
-        12 => { let so = grid.get_cell_style(row, col); CellValue { value: Some(cell_value::Value::Flag(so.font_bold.unwrap_or(false))) } }
-        13 => { let so = grid.get_cell_style(row, col); CellValue { value: Some(cell_value::Value::Flag(so.font_italic.unwrap_or(false))) } }
-        14 => { let so = grid.get_cell_style(row, col); CellValue { value: Some(cell_value::Value::Flag(so.font_underline.unwrap_or(false))) } }
-        15 => { let so = grid.get_cell_style(row, col); CellValue { value: Some(cell_value::Value::Flag(so.font_strikethrough.unwrap_or(false))) } }
-        16 => { let so = grid.get_cell_style(row, col); CellValue { value: Some(cell_value::Value::Number(so.font_width.unwrap_or(0.0) as f64)) } }
+        0 => CellValue {
+            value: Some(cell_value::Value::Text(
+                grid.cells.get_text(row, col).to_string(),
+            )),
+        },
+        1 => {
+            let so = grid.get_cell_style(row, col);
+            CellValue {
+                value: Some(cell_value::Value::Number(so.text_effect.unwrap_or(0) as f64)),
+            }
+        }
+        2 => {
+            let so = grid.get_cell_style(row, col);
+            CellValue {
+                value: Some(cell_value::Value::Number(so.alignment.unwrap_or(9) as f64)),
+            }
+        }
+        3 => {
+            let data = grid
+                .cells
+                .get(row, col)
+                .and_then(|c| c.picture().map(|d| d.to_vec()))
+                .unwrap_or_default();
+            CellValue {
+                value: Some(cell_value::Value::Data(data)),
+            }
+        }
+        4 => {
+            let pa = grid
+                .cells
+                .get(row, col)
+                .map_or(0, |c| c.picture_alignment());
+            CellValue {
+                value: Some(cell_value::Value::Number(pa as f64)),
+            }
+        }
+        5 => {
+            let checked = grid.cells.get(row, col).map_or(0, |c| c.checked());
+            CellValue {
+                value: Some(cell_value::Value::Number(checked as f64)),
+            }
+        }
+        6 => {
+            let so = grid.get_cell_style(row, col);
+            CellValue {
+                value: Some(cell_value::Value::Number(so.back_color.unwrap_or(0) as f64)),
+            }
+        }
+        7 => {
+            let so = grid.get_cell_style(row, col);
+            CellValue {
+                value: Some(cell_value::Value::Number(so.fore_color.unwrap_or(0) as f64)),
+            }
+        }
+        8 => {
+            let fc = grid.cells.get(row, col).map_or(0, |c| c.progress_color());
+            CellValue {
+                value: Some(cell_value::Value::Number(fc as f64)),
+            }
+        }
+        9 => {
+            let fp = grid
+                .cells
+                .get(row, col)
+                .map_or(0.0, |c| c.progress_percent());
+            CellValue {
+                value: Some(cell_value::Value::Number(fp as f64)),
+            }
+        }
+        10 => {
+            let so = grid.get_cell_style(row, col);
+            CellValue {
+                value: Some(cell_value::Value::Text(so.font_name.unwrap_or_default())),
+            }
+        }
+        11 => {
+            let so = grid.get_cell_style(row, col);
+            CellValue {
+                value: Some(cell_value::Value::Number(so.font_size.unwrap_or(0.0) as f64)),
+            }
+        }
+        12 => {
+            let so = grid.get_cell_style(row, col);
+            CellValue {
+                value: Some(cell_value::Value::Flag(so.font_bold.unwrap_or(false))),
+            }
+        }
+        13 => {
+            let so = grid.get_cell_style(row, col);
+            CellValue {
+                value: Some(cell_value::Value::Flag(so.font_italic.unwrap_or(false))),
+            }
+        }
+        14 => {
+            let so = grid.get_cell_style(row, col);
+            CellValue {
+                value: Some(cell_value::Value::Flag(so.font_underline.unwrap_or(false))),
+            }
+        }
+        15 => {
+            let so = grid.get_cell_style(row, col);
+            CellValue {
+                value: Some(cell_value::Value::Flag(
+                    so.font_strikethrough.unwrap_or(false),
+                )),
+            }
+        }
+        16 => {
+            let so = grid.get_cell_style(row, col);
+            CellValue {
+                value: Some(cell_value::Value::Number(
+                    so.font_width.unwrap_or(0.0) as f64
+                )),
+            }
+        }
         17 => engine_value_to_proto(grid.cells.get_value(row, col)),
-        18 => { let data = grid.cells.get(row, col).and_then(|c| c.extra.as_ref().and_then(|e| e.user_data.clone())).unwrap_or_default(); CellValue { value: Some(cell_value::Value::Data(data)) } }
-        19 => { let cf = grid.cells.get(row, col).map_or(String::new(), |c| c.custom_format().to_string()); CellValue { value: Some(cell_value::Value::Text(cf)) } }
-        20 => CellValue { value: Some(cell_value::Value::Number(grid.col_pos(col) as f64)) },
-        21 => CellValue { value: Some(cell_value::Value::Number(grid.row_pos(row) as f64)) },
-        22 => CellValue { value: Some(cell_value::Value::Number(grid.get_col_width(col) as f64)) },
-        23 => CellValue { value: Some(cell_value::Value::Number(grid.get_row_height(row) as f64)) },
-        24 => { let data = grid.cells.get(row, col).and_then(|c| c.extra.as_ref().and_then(|e| e.button_picture.clone())).unwrap_or_default(); CellValue { value: Some(cell_value::Value::Data(data)) } }
-        25 => { let cl = grid.cells.get(row, col).map_or(String::new(), |c| c.dropdown_items().to_string()); CellValue { value: Some(cell_value::Value::Text(cl)) } }
+        18 => {
+            let data = grid
+                .cells
+                .get(row, col)
+                .and_then(|c| c.extra.as_ref().and_then(|e| e.user_data.clone()))
+                .unwrap_or_default();
+            CellValue {
+                value: Some(cell_value::Value::Data(data)),
+            }
+        }
+        19 => {
+            let cf = grid
+                .cells
+                .get(row, col)
+                .map_or(String::new(), |c| c.custom_format().to_string());
+            CellValue {
+                value: Some(cell_value::Value::Text(cf)),
+            }
+        }
+        20 => CellValue {
+            value: Some(cell_value::Value::Number(grid.col_pos(col) as f64)),
+        },
+        21 => CellValue {
+            value: Some(cell_value::Value::Number(grid.row_pos(row) as f64)),
+        },
+        22 => CellValue {
+            value: Some(cell_value::Value::Number(grid.get_col_width(col) as f64)),
+        },
+        23 => CellValue {
+            value: Some(cell_value::Value::Number(grid.get_row_height(row) as f64)),
+        },
+        24 => {
+            let data = grid
+                .cells
+                .get(row, col)
+                .and_then(|c| c.extra.as_ref().and_then(|e| e.button_picture.clone()))
+                .unwrap_or_default();
+            CellValue {
+                value: Some(cell_value::Value::Data(data)),
+            }
+        }
+        25 => {
+            let cl = grid
+                .cells
+                .get(row, col)
+                .map_or(String::new(), |c| c.dropdown_items().to_string());
+            CellValue {
+                value: Some(cell_value::Value::Text(cl)),
+            }
+        }
         _ => CellValue { value: None },
     }
 }
 
 fn truncate_to_char_count(s: &str, max_chars: i32) -> String {
-    if max_chars <= 0 { return s.to_string(); }
+    if max_chars <= 0 {
+        return s.to_string();
+    }
     let max = max_chars as usize;
     s.chars().take(max).collect()
 }
 
-fn begin_edit_session(grid: &mut volvoxgrid_engine::grid::VolvoxGrid, row: i32, col: i32, force: bool) {
-    if !grid.can_begin_edit(row, col, force) { return; }
+fn begin_edit_session(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    force: bool,
+) {
+    if !grid.can_begin_edit(row, col, force) {
+        return;
+    }
     let combo_list = grid.active_dropdown_list(row, col);
-    grid.events.push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
+    grid.events
+        .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
     if combo_list.trim() == "..." {
-        grid.events.push(volvoxgrid_engine::event::GridEventData::CellButtonClick { row, col });
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::CellButtonClick { row, col });
         grid.mark_dirty();
         return;
     }
@@ -317,22 +652,32 @@ fn begin_edit_session(grid: &mut volvoxgrid_engine::grid::VolvoxGrid, row: i32, 
                 break;
             }
         }
-        grid.events.push(volvoxgrid_engine::event::GridEventData::DropdownOpened);
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::DropdownOpened);
     }
-    grid.events.push(volvoxgrid_engine::event::GridEventData::StartEdit { row, col });
+    grid.events
+        .push(volvoxgrid_engine::event::GridEventData::StartEdit { row, col });
     grid.mark_dirty();
 }
 
 fn normalize_committed_edit_text(
     grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32, col: i32, new_text: &str,
+    row: i32,
+    col: i32,
+    new_text: &str,
 ) -> String {
     let mut committed = truncate_to_char_count(new_text, grid.edit_max_length);
-    let cell_combo = grid.cells.get(row, col).map(|c| c.dropdown_items().to_string()).unwrap_or_default();
+    let cell_combo = grid
+        .cells
+        .get(row, col)
+        .map(|c| c.dropdown_items().to_string())
+        .unwrap_or_default();
     if cell_combo.is_empty() && col >= 0 && (col as usize) < grid.columns.len() {
         let col_list = &grid.columns[col as usize].dropdown_items;
         if !col_list.is_empty() {
-            if let Some(mapped) = volvoxgrid_engine::edit::translate_dropdown_display_to_value(col_list, &committed) {
+            if let Some(mapped) =
+                volvoxgrid_engine::edit::translate_dropdown_display_to_value(col_list, &committed)
+            {
                 committed = mapped;
             }
         }
@@ -342,12 +687,19 @@ fn normalize_committed_edit_text(
 
 fn apply_committed_edit_text(
     grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32, col: i32, old_text: String, committed: String,
+    row: i32,
+    col: i32,
+    old_text: String,
+    committed: String,
 ) {
     grid.cells.set_text(row, col, committed.clone());
-    grid.events.push(volvoxgrid_engine::event::GridEventData::AfterEdit {
-        row, col, old_text, new_text: committed,
-    });
+    grid.events
+        .push(volvoxgrid_engine::event::GridEventData::AfterEdit {
+            row,
+            col,
+            old_text,
+            new_text: committed,
+        });
 }
 
 // ---------------------------------------------------------------------------
@@ -359,44 +711,67 @@ struct ActiveXPlugin;
 #[cfg(any())]
 impl VolvoxGridServicePlugin for ActiveXPlugin {
     fn create_grid(&self, r: CreateGridRequest) -> Result<GridHandle, String> {
-        let id = GRID_MANAGER.create_grid(r.viewport_width, r.viewport_height, r.rows, r.cols, r.fixed_rows, r.fixed_cols, r.scale);
+        let id = GRID_MANAGER.create_grid(
+            r.viewport_width,
+            r.viewport_height,
+            r.rows,
+            r.cols,
+            r.fixed_rows,
+            r.fixed_cols,
+            r.scale,
+        );
         // Set Windows-specific defaults for the ActiveX control
-        GRID_MANAGER.with_grid(id, |g| {
-            g.style.font_name = "MS Sans Serif".to_string();
-            g.style.font_size = 10.0 * 96.0 / 72.0; // 10pt at 96 DPI ≈ 13.3px
-            g.style.back_color_bkg = 0xFF808080; // gray (AppWorkspace)
-            g.style.back_color_fixed = 0xFFD4D0C8; // ButtonFace RGB(212,208,200)
-            g.default_row_height = 17; // default row height at 96 DPI
-            g.selection.selection_visibility = 1; // HighlightAlways — default
-            g.has_focus = true; // OCX control always considered focused for rendering
-        }).ok();
+        GRID_MANAGER
+            .with_grid(id, |g| {
+                g.style.font_name = "MS Sans Serif".to_string();
+                g.style.font_size = 10.0 * 96.0 / 72.0; // 10pt at 96 DPI ≈ 13.3px
+                g.style.back_color_bkg = 0xFF808080; // gray (AppWorkspace)
+                g.style.back_color_fixed = 0xFFD4D0C8; // ButtonFace RGB(212,208,200)
+                g.default_row_height = 17; // default row height at 96 DPI
+                g.selection.selection_visibility = 1; // HighlightAlways — default
+                g.has_focus = true; // OCX control always considered focused for rendering
+            })
+            .ok();
         Ok(GridHandle { id })
     }
     fn destroy_grid(&self, r: GridHandle) -> Result<Empty, String> {
-        RENDERERS.with(|rc| { rc.borrow_mut().remove(&r.id); });
+        RENDERERS.with(|rc| {
+            rc.borrow_mut().remove(&r.id);
+        });
         GRID_MANAGER.destroy_grid(r.id);
         Ok(Empty {})
     }
     fn set_rows(&self, r: SetRowsRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.set_rows(r.rows); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.set_rows(r.rows);
+        })?;
         Ok(Empty {})
     }
     fn set_cols(&self, r: SetColsRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.set_cols(r.cols); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.set_cols(r.cols);
+        })?;
         Ok(Empty {})
     }
     fn get_rows(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.rows)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn get_cols(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.cols)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_fixed_rows(&self, r: SetFixedRowsRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             g.fixed_rows = r.fixed_rows.max(1).min(g.rows);
-            g.selection.clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
+            g.selection
+                .clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
             g.layout.invalidate();
             g.mark_dirty();
         })?;
@@ -405,7 +780,8 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     fn set_fixed_cols(&self, r: SetFixedColsRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             g.fixed_cols = r.fixed_cols.max(0).min(g.cols);
-            g.selection.clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
+            g.selection
+                .clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
             g.layout.invalidate();
             g.mark_dirty();
         })?;
@@ -428,20 +804,32 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
     fn set_row_height(&self, r: SetRowHeightRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.set_row_height(r.row, r.height); g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.set_row_height(r.row, r.height);
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn set_col_width(&self, r: SetColWidthRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.set_col_width(r.col, r.width); g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.set_col_width(r.col, r.width);
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn get_row_height(&self, r: RowColIndex) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.grid_id, |g| g.get_row_height(r.index))?;
-        Ok(Int32Value { grid_id: r.grid_id, value: v })
+        Ok(Int32Value {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn get_col_width(&self, r: RowColIndex) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.grid_id, |g| g.get_col_width(r.index))?;
-        Ok(Int32Value { grid_id: r.grid_id, value: v })
+        Ok(Int32Value {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn set_row_height_min(&self, r: SetInt32Prop) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.row_height_min = r.value)?;
@@ -453,19 +841,27 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn set_col_width_min(&self, r: SetColInt32Prop) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if r.col >= 0 && (r.col as usize) < g.columns.len() { g.col_width_min.insert(r.col, r.value); }
+            if r.col >= 0 && (r.col as usize) < g.columns.len() {
+                g.col_width_min.insert(r.col, r.value);
+            }
         })?;
         Ok(Empty {})
     }
     fn set_col_width_max(&self, r: SetColInt32Prop) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if r.col >= 0 && (r.col as usize) < g.columns.len() { g.col_width_max.insert(r.col, r.value); }
+            if r.col >= 0 && (r.col as usize) < g.columns.len() {
+                g.col_width_max.insert(r.col, r.value);
+            }
         })?;
         Ok(Empty {})
     }
     fn set_row_hidden(&self, r: SetRowHiddenRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if r.hidden { g.rows_hidden.insert(r.row); } else { g.rows_hidden.remove(&r.row); }
+            if r.hidden {
+                g.rows_hidden.insert(r.row);
+            } else {
+                g.rows_hidden.remove(&r.row);
+            }
             g.layout.invalidate();
             g.mark_dirty();
         })?;
@@ -473,7 +869,11 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn set_col_hidden(&self, r: SetColHiddenRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if r.hidden { g.cols_hidden.insert(r.col); } else { g.cols_hidden.remove(&r.col); }
+            if r.hidden {
+                g.cols_hidden.insert(r.col);
+            } else {
+                g.cols_hidden.remove(&r.col);
+            }
             g.layout.invalidate();
             g.mark_dirty();
         })?;
@@ -481,11 +881,17 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn get_row_is_visible(&self, r: RowColIndex) -> Result<BoolValue, String> {
         let v = GRID_MANAGER.with_grid(r.grid_id, |g| g.is_row_visible(r.index))?;
-        Ok(BoolValue { grid_id: r.grid_id, value: v })
+        Ok(BoolValue {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn get_col_is_visible(&self, r: RowColIndex) -> Result<BoolValue, String> {
         let v = GRID_MANAGER.with_grid(r.grid_id, |g| g.is_col_visible(r.index))?;
-        Ok(BoolValue { grid_id: r.grid_id, value: v })
+        Ok(BoolValue {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn set_col_position(&self, r: MoveColRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
@@ -531,30 +937,49 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                             let text = g.cells.get_text(row, c);
                             if !text.is_empty() {
                                 let te = g.text_engine.as_mut().unwrap();
-                                let (tw, _) = te.measure_text(text, &font_name, font_size, font_bold, font_italic, None);
+                                let (tw, _) = te.measure_text(
+                                    text,
+                                    &font_name,
+                                    font_size,
+                                    font_bold,
+                                    font_italic,
+                                    None,
+                                );
                                 let needed = (tw.ceil() as i32) + 8;
                                 let idx = (c - c_from) as usize;
-                                if needed > max_widths[idx] { max_widths[idx] = needed; }
+                                if needed > max_widths[idx] {
+                                    max_widths[idx] = needed;
+                                }
                             }
                         }
                     }
                     if r.equal {
                         let uniform = *max_widths.iter().max().unwrap_or(&0);
                         for c in c_from..=c_to {
-                            let w = if r.max_width > 0 { uniform.min(r.max_width) } else { uniform };
+                            let w = if r.max_width > 0 {
+                                uniform.min(r.max_width)
+                            } else {
+                                uniform
+                            };
                             g.set_col_width(c, w);
                         }
                     } else {
                         for c in c_from..=c_to {
                             let w = max_widths[(c - c_from) as usize];
-                            let w = if r.max_width > 0 { w.min(r.max_width) } else { w };
+                            let w = if r.max_width > 0 {
+                                w.min(r.max_width)
+                            } else {
+                                w
+                            };
                             g.set_col_width(c, w);
                         }
                     }
                 }
             }
             if mode == 0 || mode == 2 {
-                for row in 0..g.rows { g.auto_resize_row(row); }
+                for row in 0..g.rows {
+                    g.auto_resize_row(row);
+                }
             }
         })?;
         Ok(Empty {})
@@ -564,19 +989,31 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
     fn set_format_string(&self, r: SetFormatStringRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.format_string = r.format_string.clone(); g.apply_format_string(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.format_string = r.format_string.clone();
+            g.apply_format_string();
+        })?;
         Ok(Empty {})
     }
     fn set_right_to_left(&self, r: SetBoolProp) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.right_to_left = r.value; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.right_to_left = r.value;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn set_extend_last_col(&self, r: SetBoolProp) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.extend_last_col = r.value; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.extend_last_col = r.value;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn set_scroll_bars(&self, r: SetScrollBarsRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.scroll_bars = r.mode; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.scroll_bars = r.mode;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn set_scroll_track(&self, r: SetBoolProp) -> Result<Empty, String> {
@@ -584,74 +1021,145 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
     fn set_fling_enabled(&self, r: SetBoolProp) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.fling_enabled = r.value; if !r.value { g.scroll.stop_fling(); } })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.fling_enabled = r.value;
+            if !r.value {
+                g.scroll.stop_fling();
+            }
+        })?;
         Ok(Empty {})
     }
     fn set_fling_impulse_gain(&self, r: SetFloatProp) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| if r.value.is_finite() { g.fling_impulse_gain = r.value.max(0.0); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            if r.value.is_finite() {
+                g.fling_impulse_gain = r.value.max(0.0);
+            }
+        })?;
         Ok(Empty {})
     }
     fn set_fling_friction(&self, r: SetFloatProp) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| if r.value.is_finite() { g.fling_friction = r.value.clamp(0.1, 20.0); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            if r.value.is_finite() {
+                g.fling_friction = r.value.clamp(0.1, 20.0);
+            }
+        })?;
         Ok(Empty {})
     }
     fn resize_viewport(&self, r: ResizeViewportRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.resize_viewport(r.width, r.height); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.resize_viewport(r.width, r.height);
+        })?;
         Ok(Empty {})
     }
     fn set_top_row(&self, r: SetRowRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.set_top_row(r.row); g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.set_top_row(r.row);
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn get_top_row(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.top_row())?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_left_col(&self, r: SetColRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.set_left_col(r.col); g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.set_left_col(r.col);
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn get_left_col(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.left_col())?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn get_bottom_row(&self, r: GridHandle) -> Result<Int32Value, String> {
-        let v = GRID_MANAGER.with_grid(r.id, |g| { ensure_layout(g); g.bottom_row() })?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        let v = GRID_MANAGER.with_grid(r.id, |g| {
+            ensure_layout(g);
+            g.bottom_row()
+        })?;
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn get_right_col(&self, r: GridHandle) -> Result<Int32Value, String> {
-        let v = GRID_MANAGER.with_grid(r.id, |g| { ensure_layout(g); g.right_col() })?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        let v = GRID_MANAGER.with_grid(r.id, |g| {
+            ensure_layout(g);
+            g.right_col()
+        })?;
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn get_row_pos(&self, r: RowColIndex) -> Result<Int32Value, String> {
-        let v = GRID_MANAGER.with_grid(r.grid_id, |g| { ensure_layout(g); g.row_pos(r.index) })?;
-        Ok(Int32Value { grid_id: r.grid_id, value: v })
+        let v = GRID_MANAGER.with_grid(r.grid_id, |g| {
+            ensure_layout(g);
+            g.row_pos(r.index)
+        })?;
+        Ok(Int32Value {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn get_col_pos(&self, r: RowColIndex) -> Result<Int32Value, String> {
-        let v = GRID_MANAGER.with_grid(r.grid_id, |g| { ensure_layout(g); g.col_pos(r.index) })?;
-        Ok(Int32Value { grid_id: r.grid_id, value: v })
+        let v = GRID_MANAGER.with_grid(r.grid_id, |g| {
+            ensure_layout(g);
+            g.col_pos(r.index)
+        })?;
+        Ok(Int32Value {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn set_row(&self, r: SetRowRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            g.selection.set_cursor(r.row, g.selection.col, g.rows, g.cols, g.fixed_rows, g.fixed_cols);
+            g.selection.set_cursor(
+                r.row,
+                g.selection.col,
+                g.rows,
+                g.cols,
+                g.fixed_rows,
+                g.fixed_cols,
+            );
             g.mark_dirty();
         })?;
         Ok(Empty {})
     }
     fn set_col(&self, r: SetColRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            g.selection.set_cursor(g.selection.row, r.col, g.rows, g.cols, g.fixed_rows, g.fixed_cols);
+            g.selection.set_cursor(
+                g.selection.row,
+                r.col,
+                g.rows,
+                g.cols,
+                g.fixed_rows,
+                g.fixed_cols,
+            );
             g.mark_dirty();
         })?;
         Ok(Empty {})
     }
     fn get_row(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.selection.row)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn get_col(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.selection.col)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_row_sel(&self, r: SetRowSelRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
@@ -669,67 +1177,116 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn select(&self, r: SelectRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            g.selection.select(r.row1, r.col1, r.row2, r.col2, g.rows, g.cols);
+            g.selection
+                .select(r.row1, r.col1, r.row2, r.col2, g.rows, g.cols);
             g.mark_dirty();
         })?;
         Ok(Empty {})
     }
     fn get_selection(&self, r: GridHandle) -> Result<SelectionRange, String> {
         GRID_MANAGER.with_grid(r.id, |g| SelectionRange {
-            grid_id: r.id, row1: g.selection.row, col1: g.selection.col,
-            row2: g.selection.row_end, col2: g.selection.col_end,
+            grid_id: r.id,
+            row1: g.selection.row,
+            col1: g.selection.col,
+            row2: g.selection.row_end,
+            col2: g.selection.col_end,
         })
     }
     fn show_cell(&self, r: ShowCellRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             let ph = g.pinned_top_height() + g.pinned_bottom_height();
             let pw = g.pinned_left_width() + g.pinned_right_width();
-            g.scroll.show_cell(r.row, r.col, &g.layout, g.viewport_width, g.viewport_height, g.fixed_rows, g.fixed_cols, ph, pw);
+            g.scroll.show_cell(
+                r.row,
+                r.col,
+                &g.layout,
+                g.viewport_width,
+                g.viewport_height,
+                g.fixed_rows,
+                g.fixed_cols,
+                ph,
+                pw,
+            );
             g.mark_dirty();
         })?;
         Ok(Empty {})
     }
     fn set_allow_selection(&self, r: SetBoolProp) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.allow_selection = r.value; g.selection.allow_selection = r.value; })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.allow_selection = r.value;
+            g.selection.allow_selection = r.value;
+        })?;
         Ok(Empty {})
     }
     fn set_allow_big_selection(&self, r: SetBoolProp) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.header_click_select = r.value; g.selection.header_click_select = r.value; })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.header_click_select = r.value;
+            g.selection.header_click_select = r.value;
+        })?;
         Ok(Empty {})
     }
     fn set_selection_mode(&self, r: SetSelectionModeRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.selection.mode = r.mode; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.selection.mode = r.mode;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn set_focus_rect(&self, r: SetFocusRectRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.selection.focus_border = r.style; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.selection.focus_border = r.style;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn set_high_light(&self, r: SetHighLightRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.selection.selection_visibility = r.style; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.selection.selection_visibility = r.style;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn get_is_selected(&self, r: RowColIndex) -> Result<BoolValue, String> {
-        let v = GRID_MANAGER.with_grid(r.grid_id, |g| g.is_cell_selected(r.index, g.selection.col))?;
-        Ok(BoolValue { grid_id: r.grid_id, value: v })
+        let v =
+            GRID_MANAGER.with_grid(r.grid_id, |g| g.is_cell_selected(r.index, g.selection.col))?;
+        Ok(BoolValue {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn get_selected_row(&self, r: RowColIndex) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if g.selection.is_selected(r.index, g.fixed_cols, g.cols) { 1 } else { 0 }
+            if g.selection.is_selected(r.index, g.fixed_cols, g.cols) {
+                1
+            } else {
+                0
+            }
         })?;
-        Ok(Int32Value { grid_id: r.grid_id, value: v })
+        Ok(Int32Value {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn get_selected_rows(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.selection.selected_row_count())?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn get_mouse_row(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.mouse_row)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn get_mouse_col(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.mouse_col)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_text(&self, r: SetTextRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
@@ -746,30 +1303,49 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             let col = g.selection.col;
             g.cells.get_text(row, col).to_string()
         })?;
-        Ok(StringValue { grid_id: r.grid_id, value: v })
+        Ok(StringValue {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn set_text_matrix(&self, r: SetTextMatrixRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.cells.set_text(r.row, r.col, r.text.clone()); g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.cells.set_text(r.row, r.col, r.text.clone());
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn get_text_matrix(&self, r: GetTextMatrixRequest) -> Result<StringValue, String> {
-        let v = GRID_MANAGER.with_grid(r.grid_id, |g| g.cells.get_text(r.row, r.col).to_string())?;
-        Ok(StringValue { grid_id: r.grid_id, value: v })
+        let v =
+            GRID_MANAGER.with_grid(r.grid_id, |g| g.cells.get_text(r.row, r.col).to_string())?;
+        Ok(StringValue {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn set_text_array(&self, r: SetTextArrayRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.set_text_array(r.index, r.text.clone()); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.set_text_array(r.index, r.text.clone());
+        })?;
         Ok(Empty {})
     }
     fn get_text_array(&self, r: GetTextArrayRequest) -> Result<StringValue, String> {
         let v = GRID_MANAGER.with_grid(r.grid_id, |g| g.get_text_array(r.index))?;
-        Ok(StringValue { grid_id: r.grid_id, value: v })
+        Ok(StringValue {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn load_array(&self, r: ArrayDataRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| apply_array_data_to_grid(g, r.rows, r.cols, &r.values))?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            apply_array_data_to_grid(g, r.rows, r.cols, &r.values)
+        })?;
         Ok(Empty {})
     }
     fn bind_to_array(&self, r: ArrayDataRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| apply_array_data_to_grid(g, r.rows, r.cols, &r.values))?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            apply_array_data_to_grid(g, r.rows, r.cols, &r.values)
+        })?;
         Ok(Empty {})
     }
     fn set_value(&self, r: SetValueRequest) -> Result<Empty, String> {
@@ -804,7 +1380,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
     fn get_value_matrix(&self, r: GetValueMatrixRequest) -> Result<CellValue, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| engine_value_to_proto(g.cells.get_value(r.row, r.col)))
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            engine_value_to_proto(g.cells.get_value(r.row, r.col))
+        })
     }
     fn set_cells(&self, r: SetCellsRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
@@ -812,7 +1390,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 let ev = proto_value_to_engine(&entry.value);
                 match &ev {
                     CellValueData::Text(t) => g.cells.set_text(entry.row, entry.col, t.clone()),
-                    CellValueData::Number(n) => g.cells.set_text(entry.row, entry.col, n.to_string()),
+                    CellValueData::Number(n) => {
+                        g.cells.set_text(entry.row, entry.col, n.to_string())
+                    }
                     CellValueData::Bool(b) => g.cells.set_text(entry.row, entry.col, b.to_string()),
                     _ => {}
                 }
@@ -832,7 +1412,11 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             for row in r_lo..=r_hi {
                 for col in c_lo..=c_hi {
                     let v = engine_value_to_proto(g.cells.get_value(row, col));
-                    entries.push(CellEntry { row, col, value: Some(v) });
+                    entries.push(CellEntry {
+                        row,
+                        col,
+                        value: Some(v),
+                    });
                 }
             }
             entries
@@ -859,7 +1443,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             let (text, _) = volvoxgrid_engine::clipboard::copy(g);
             text
         })?;
-        Ok(StringValue { grid_id: r.grid_id, value: v })
+        Ok(StringValue {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn set_clip_separators(&self, r: SetClipSeparatorsRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
@@ -874,14 +1461,20 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn add_item(&self, r: AddItemRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            let insert_at = if r.index < 0 || r.index >= g.rows { g.rows } else { r.index };
+            let insert_at = if r.index < 0 || r.index >= g.rows {
+                g.rows
+            } else {
+                r.index
+            };
             let h = g.get_row_height(insert_at.min(g.rows.saturating_sub(1)).max(0));
             g.animation.notify_rows_inserted(insert_at, 1, h);
             g.cells.insert_row(insert_at);
             g.rows += 1;
             g.row_positions.insert(insert_at as usize, insert_at);
             for (c, val) in r.item.split('\t').enumerate() {
-                if (c as i32) < g.cols { g.cells.set_text(insert_at, c as i32, val.to_string()); }
+                if (c as i32) < g.cols {
+                    g.cells.set_text(insert_at, c as i32, val.to_string());
+                }
             }
             g.layout.invalidate();
             g.mark_dirty();
@@ -896,7 +1489,8 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 g.cells.remove_row(r.index);
                 g.rows -= 1;
                 g.row_positions = (0..g.rows).collect();
-                g.selection.clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
+                g.selection
+                    .clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
                 g.layout.invalidate();
                 g.mark_dirty();
             }
@@ -914,10 +1508,29 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 _ => (g.fixed_rows, g.fixed_cols, g.rows - 1, g.cols - 1),
             };
             match r.scope {
-                0 => { g.cells.clear_range(r1, c1, r2, c2); for row in r1..=r2 { for col in c1..=c2 { g.cell_styles.remove(&(row, col)); } } }
-                1 => { for row in r1..=r2 { for col in c1..=c2 { g.cell_styles.remove(&(row, col)); } } }
-                2 => { g.cells.clear_range(r1, c1, r2, c2); }
-                3 => { g.selection.row_end = g.selection.row; g.selection.col_end = g.selection.col; g.selection.selected_rows.clear(); }
+                0 => {
+                    g.cells.clear_range(r1, c1, r2, c2);
+                    for row in r1..=r2 {
+                        for col in c1..=c2 {
+                            g.cell_styles.remove(&(row, col));
+                        }
+                    }
+                }
+                1 => {
+                    for row in r1..=r2 {
+                        for col in c1..=c2 {
+                            g.cell_styles.remove(&(row, col));
+                        }
+                    }
+                }
+                2 => {
+                    g.cells.clear_range(r1, c1, r2, c2);
+                }
+                3 => {
+                    g.selection.row_end = g.selection.row;
+                    g.selection.col_end = g.selection.col;
+                    g.selection.selected_rows.clear();
+                }
                 _ => {}
             }
             g.mark_dirty();
@@ -926,21 +1539,37 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn find_row(&self, r: FindRowRequest) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.grid_id, |g| {
-            volvoxgrid_engine::search::find_row(g, &r.text, r.start_row, r.col, r.case_sense, r.full_match)
+            volvoxgrid_engine::search::find_row(
+                g,
+                &r.text,
+                r.start_row,
+                r.col,
+                r.case_sense,
+                r.full_match,
+            )
         })?;
-        Ok(Int32Value { grid_id: r.grid_id, value: v })
+        Ok(Int32Value {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn find_row_regex(&self, r: FindRowRegexRequest) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.grid_id, |g| {
             volvoxgrid_engine::search::find_row_regex(g, &r.pattern, r.start_row, r.col)
         })?;
-        Ok(Int32Value { grid_id: r.grid_id, value: v })
+        Ok(Int32Value {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn aggregate(&self, r: AggregateRequest) -> Result<DoubleValue, String> {
         let v = GRID_MANAGER.with_grid(r.grid_id, |g| {
             volvoxgrid_engine::search::aggregate(g, r.aggregate, r.row1, r.col1, r.row2, r.col2)
         })?;
-        Ok(DoubleValue { grid_id: r.grid_id, value: v })
+        Ok(DoubleValue {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn set_editable(&self, r: SetEditableRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.edit_trigger_mode = r.mode)?;
@@ -968,7 +1597,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     fn set_col_edit_mask(&self, r: SetColEditMaskRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             if r.col == -1 {
-                for col in &mut g.columns { col.edit_mask = r.mask.clone(); }
+                for col in &mut g.columns {
+                    col.edit_mask = r.mask.clone();
+                }
             } else if r.col >= 0 && (r.col as usize) < g.columns.len() {
                 g.columns[r.col as usize].edit_mask = r.mask.clone();
             }
@@ -978,7 +1609,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     fn set_col_combo_list(&self, r: SetColComboListRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             if r.col == -1 {
-                for col in &mut g.columns { col.dropdown_items = r.list.clone(); }
+                for col in &mut g.columns {
+                    col.dropdown_items = r.list.clone();
+                }
             } else if r.col >= 0 && (r.col as usize) < g.columns.len() {
                 g.columns[r.col as usize].dropdown_items = r.list.clone();
             }
@@ -1016,7 +1649,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             }
             items.into_iter().collect::<Vec<_>>().join("|")
         })?;
-        Ok(StringValue { grid_id: r.grid_id, value: v })
+        Ok(StringValue {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn set_tab_behavior(&self, r: SetTabBehaviorRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.tab_behavior = r.behavior)?;
@@ -1039,27 +1675,42 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
     fn cancel_edit(&self, r: GridHandle) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.id, |g| { g.edit.cancel(); g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.id, |g| {
+            g.edit.cancel();
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn set_edit_text(&self, r: SetStringProp) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if !g.edit.is_active() { return; }
+            if !g.edit.is_active() {
+                return;
+            }
             let next = truncate_to_char_count(&r.value, g.edit_max_length);
-            if next == g.edit.edit_text { return; }
+            if next == g.edit.edit_text {
+                return;
+            }
             g.edit.edit_text = next.clone();
             g.edit.sel_start = next.chars().count() as i32;
             g.edit.sel_length = 0;
-            g.events.push(volvoxgrid_engine::event::GridEventData::CellEditChange { text: next });
+            g.events
+                .push(volvoxgrid_engine::event::GridEventData::CellEditChange { text: next });
             g.mark_dirty();
         })?;
         Ok(Empty {})
     }
     fn get_edit_text(&self, r: GridHandle) -> Result<StringValue, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| {
-            if g.edit.is_active() { g.edit.edit_text.clone() } else { String::new() }
+            if g.edit.is_active() {
+                g.edit.edit_text.clone()
+            } else {
+                String::new()
+            }
         })?;
-        Ok(StringValue { grid_id: r.id, value: v })
+        Ok(StringValue {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_edit_max_length(&self, r: SetInt32Prop) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.edit_max_length = r.value)?;
@@ -1067,11 +1718,16 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn get_edit_max_length(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.edit_max_length)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_grid_style(&self, r: SetGridStyleRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if let Some(style) = &r.style { g.style = proto_style_to_engine(style); }
+            if let Some(style) = &r.style {
+                g.style = proto_style_to_engine(style);
+            }
             g.mark_dirty();
         })?;
         Ok(Empty {})
@@ -1084,7 +1740,8 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             if let Some(style) = &r.style {
                 let row = g.selection.row;
                 let col = g.selection.col;
-                g.cell_styles.insert((row, col), proto_cell_style_to_override(style));
+                g.cell_styles
+                    .insert((row, col), proto_cell_style_to_override(style));
                 g.mark_dirty();
             }
         })?;
@@ -1116,57 +1773,85 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn set_col_alignment(&self, r: SetColAlignmentRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if r.col >= 0 && (r.col as usize) < g.columns.len() { g.columns[r.col as usize].alignment = r.alignment; g.mark_dirty(); }
+            if r.col >= 0 && (r.col as usize) < g.columns.len() {
+                g.columns[r.col as usize].alignment = r.alignment;
+                g.mark_dirty();
+            }
         })?;
         Ok(Empty {})
     }
     fn set_col_format(&self, r: SetColFormatRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if r.col >= 0 && (r.col as usize) < g.columns.len() { g.columns[r.col as usize].format = r.format.clone(); }
+            if r.col >= 0 && (r.col as usize) < g.columns.len() {
+                g.columns[r.col as usize].format = r.format.clone();
+            }
         })?;
         Ok(Empty {})
     }
     fn set_col_data_type(&self, r: SetColDataTypeRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if r.col >= 0 && (r.col as usize) < g.columns.len() { g.columns[r.col as usize].data_type = r.data_type; }
+            if r.col >= 0 && (r.col as usize) < g.columns.len() {
+                g.columns[r.col as usize].data_type = r.data_type;
+            }
         })?;
         Ok(Empty {})
     }
     fn set_col_indent(&self, r: SetColIndentRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if r.col >= 0 && (r.col as usize) < g.columns.len() { g.columns[r.col as usize].indent = r.indent; g.mark_dirty(); }
+            if r.col >= 0 && (r.col as usize) < g.columns.len() {
+                g.columns[r.col as usize].indent = r.indent;
+                g.mark_dirty();
+            }
         })?;
         Ok(Empty {})
     }
     fn set_col_key(&self, r: SetColKeyRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if r.col >= 0 && (r.col as usize) < g.columns.len() { g.columns[r.col as usize].key = r.key.clone(); }
+            if r.col >= 0 && (r.col as usize) < g.columns.len() {
+                g.columns[r.col as usize].key = r.key.clone();
+            }
         })?;
         Ok(Empty {})
     }
     fn set_col_sort(&self, r: SetColSortRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if r.col >= 0 && (r.col as usize) < g.columns.len() { g.columns[r.col as usize].sort_order = r.order; }
+            if r.col >= 0 && (r.col as usize) < g.columns.len() {
+                g.columns[r.col as usize].sort_order = r.order;
+            }
         })?;
         Ok(Empty {})
     }
     fn set_fixed_alignment(&self, r: SetColAlignmentRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if r.col >= 0 && (r.col as usize) < g.columns.len() { g.columns[r.col as usize].fixed_alignment = r.alignment; g.mark_dirty(); }
+            if r.col >= 0 && (r.col as usize) < g.columns.len() {
+                g.columns[r.col as usize].fixed_alignment = r.alignment;
+                g.mark_dirty();
+            }
         })?;
         Ok(Empty {})
     }
     fn get_col_index(&self, r: GetColIndexRequest) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.grid_id, |g| {
-            g.columns.iter().position(|cp| cp.key == r.key).map(|i| i as i32).unwrap_or(-1)
+            g.columns
+                .iter()
+                .position(|cp| cp.key == r.key)
+                .map(|i| i as i32)
+                .unwrap_or(-1)
         })?;
-        Ok(Int32Value { grid_id: r.grid_id, value: v })
+        Ok(Int32Value {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn set_cell_picture(&self, r: SetCellPictureRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             let cell = g.cells.get_mut(r.row, r.col);
             if let Some(img) = &r.image {
-                cell.extra_mut().picture = if img.data.is_empty() { None } else { Some(img.data.clone()) };
+                cell.extra_mut().picture = if img.data.is_empty() {
+                    None
+                } else {
+                    Some(img.data.clone())
+                };
             } else {
                 cell.extra_mut().picture = None;
             }
@@ -1176,11 +1861,20 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn get_cell_picture(&self, r: GetCellPictureRequest) -> Result<ImageData, String> {
         let data = GRID_MANAGER.with_grid(r.grid_id, |g| {
-            g.cells.get(r.row, r.col).and_then(|c| c.picture().map(|d| d.to_vec())).unwrap_or_default()
+            g.cells
+                .get(r.row, r.col)
+                .and_then(|c| c.picture().map(|d| d.to_vec()))
+                .unwrap_or_default()
         })?;
-        Ok(ImageData { data, format: "png".to_string() })
+        Ok(ImageData {
+            data,
+            format: "png".to_string(),
+        })
     }
-    fn set_cell_picture_alignment(&self, r: SetCellPictureAlignmentRequest) -> Result<Empty, String> {
+    fn set_cell_picture_alignment(
+        &self,
+        r: SetCellPictureAlignmentRequest,
+    ) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             g.cells.get_mut(r.row, r.col).extra_mut().picture_alignment = r.alignment;
             g.mark_dirty();
@@ -1190,7 +1884,8 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     fn set_col_image_list(&self, r: SetColImageListRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             if r.col >= 0 && (r.col as usize) < g.columns.len() {
-                g.columns[r.col as usize].image_list = r.images.iter().map(|img| img.data.clone()).collect();
+                g.columns[r.col as usize].image_list =
+                    r.images.iter().map(|img| img.data.clone()).collect();
                 g.mark_dirty();
             }
         })?;
@@ -1214,11 +1909,19 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
     fn get_cell_checked(&self, r: GetCellCheckedRequest) -> Result<Int32Value, String> {
-        let v = GRID_MANAGER.with_grid(r.grid_id, |g| g.cells.get(r.row, r.col).map_or(0, |c| c.checked()))?;
-        Ok(Int32Value { grid_id: r.grid_id, value: v })
+        let v = GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.cells.get(r.row, r.col).map_or(0, |c| c.checked())
+        })?;
+        Ok(Int32Value {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn set_owner_draw(&self, r: SetOwnerDrawRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.custom_render = r.mode; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.custom_render = r.mode;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn cell_border(&self, r: CellBorderRequest) -> Result<Empty, String> {
@@ -1250,11 +1953,17 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
     fn set_word_wrap(&self, r: SetBoolProp) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.word_wrap = r.value; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.word_wrap = r.value;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn set_ellipsis(&self, r: SetInt32Prop) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.ellipsis_mode = r.value.clamp(0, 2); g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.ellipsis_mode = r.value.clamp(0, 2);
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn sort(&self, r: SortRequest) -> Result<Empty, String> {
@@ -1264,11 +1973,8 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 g.layout.invalidate();
                 g.mark_dirty();
             } else {
-                let sort_keys: Vec<(i32, i32)> = r
-                    .sort_columns
-                    .iter()
-                    .map(|sc| (sc.col, sc.order))
-                    .collect();
+                let sort_keys: Vec<(i32, i32)> =
+                    r.sort_columns.iter().map(|sc| (sc.col, sc.order)).collect();
                 g.sort_state.sort_keys = sort_keys;
                 volvoxgrid_engine::sort::sort_grid_all_multi(g);
             }
@@ -1276,38 +1982,79 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
     fn set_explorer_bar(&self, r: SetExplorerBarRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.header_features = r.mode; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.header_features = r.mode;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn set_group_compare(&self, r: SetMergeCompareRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.span.span_compare = r.value; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.span.span_compare = r.value;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn get_group_compare(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.span.span_compare)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_sort_ascending_picture(&self, r: SetImageProp) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            g.sort_state.sort_ascending_picture = if r.image_data.is_empty() { None } else { Some(r.image_data.clone()) };
+            g.sort_state.sort_ascending_picture = if r.image_data.is_empty() {
+                None
+            } else {
+                Some(r.image_data.clone())
+            };
             g.mark_dirty();
         })?;
         Ok(Empty {})
     }
     fn get_sort_ascending_picture(&self, r: GridHandle) -> Result<ImageData, String> {
-        let data = GRID_MANAGER.with_grid(r.id, |g| g.sort_state.sort_ascending_picture.clone().unwrap_or_default())?;
-        Ok(ImageData { format: if data.is_empty() { String::new() } else { "png".to_string() }, data })
+        let data = GRID_MANAGER.with_grid(r.id, |g| {
+            g.sort_state
+                .sort_ascending_picture
+                .clone()
+                .unwrap_or_default()
+        })?;
+        Ok(ImageData {
+            format: if data.is_empty() {
+                String::new()
+            } else {
+                "png".to_string()
+            },
+            data,
+        })
     }
     fn set_sort_descending_picture(&self, r: SetImageProp) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            g.sort_state.sort_descending_picture = if r.image_data.is_empty() { None } else { Some(r.image_data.clone()) };
+            g.sort_state.sort_descending_picture = if r.image_data.is_empty() {
+                None
+            } else {
+                Some(r.image_data.clone())
+            };
             g.mark_dirty();
         })?;
         Ok(Empty {})
     }
     fn get_sort_descending_picture(&self, r: GridHandle) -> Result<ImageData, String> {
-        let data = GRID_MANAGER.with_grid(r.id, |g| g.sort_state.sort_descending_picture.clone().unwrap_or_default())?;
-        Ok(ImageData { format: if data.is_empty() { String::new() } else { "png".to_string() }, data })
+        let data = GRID_MANAGER.with_grid(r.id, |g| {
+            g.sort_state
+                .sort_descending_picture
+                .clone()
+                .unwrap_or_default()
+        })?;
+        Ok(ImageData {
+            format: if data.is_empty() {
+                String::new()
+            } else {
+                "png".to_string()
+            },
+            data,
+        })
     }
     fn set_merge_cells(&self, r: SetMergeCellsRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
@@ -1328,7 +2075,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             if r.row == -1 {
                 g.span.span_rows.insert(-1, r.merge);
-                for row in 0..g.rows { g.row_props.entry(row).or_default().span = r.merge; }
+                for row in 0..g.rows {
+                    g.row_props.entry(row).or_default().span = r.merge;
+                }
             } else if r.row >= 0 && r.row < g.rows {
                 g.span.span_rows.insert(r.row, r.merge);
                 g.row_props.entry(r.row).or_default().span = r.merge;
@@ -1341,7 +2090,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             if r.col == -1 {
                 g.span.span_cols.insert(-1, r.merge);
-                for col in &mut g.columns { col.span = r.merge; }
+                for col in &mut g.columns {
+                    col.span = r.merge;
+                }
             } else if r.col >= 0 && (r.col as usize) < g.columns.len() {
                 g.span.span_cols.insert(r.col, r.merge);
                 g.columns[r.col as usize].span = r.merge;
@@ -1351,7 +2102,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
     fn set_merge_compare(&self, r: SetMergeCompareRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.span.span_compare = r.value; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.span.span_compare = r.value;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn get_merged_range(&self, r: GetMergedRangeRequest) -> Result<SelectionRange, String> {
@@ -1362,35 +2116,66 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 (r.row, r.col, r.row, r.col)
             }
         })?;
-        Ok(SelectionRange { grid_id: r.grid_id, row1: r1, col1: c1, row2: r2, col2: c2 })
+        Ok(SelectionRange {
+            grid_id: r.grid_id,
+            row1: r1,
+            col1: c1,
+            row2: r2,
+            col2: c2,
+        })
     }
     fn set_outline_bar(&self, r: SetOutlineBarRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.outline.tree_indicator = r.style; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.outline.tree_indicator = r.style;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn set_outline_col(&self, r: SetOutlineColRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.outline.tree_column = r.col; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.outline.tree_column = r.col;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn set_tree_color(&self, r: SetColorProp) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.style.tree_color = r.color; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.style.tree_color = r.color;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn set_is_subtotal(&self, r: SetIsSubtotalRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.row_props.entry(r.row).or_default().is_subtotal = r.is_subtotal; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.row_props.entry(r.row).or_default().is_subtotal = r.is_subtotal;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn get_is_subtotal(&self, r: RowColIndex) -> Result<BoolValue, String> {
-        let v = GRID_MANAGER.with_grid(r.grid_id, |g| g.row_props.get(&r.index).map_or(false, |p| p.is_subtotal))?;
-        Ok(BoolValue { grid_id: r.grid_id, value: v })
+        let v = GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.row_props.get(&r.index).map_or(false, |p| p.is_subtotal)
+        })?;
+        Ok(BoolValue {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn set_row_outline_level(&self, r: SetRowOutlineLevelRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.row_props.entry(r.row).or_default().outline_level = r.level; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.row_props.entry(r.row).or_default().outline_level = r.level;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn get_row_outline_level(&self, r: RowColIndex) -> Result<Int32Value, String> {
-        let v = GRID_MANAGER.with_grid(r.grid_id, |g| g.row_props.get(&r.index).map_or(0, |p| p.outline_level))?;
-        Ok(Int32Value { grid_id: r.grid_id, value: v })
+        let v = GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.row_props.get(&r.index).map_or(0, |p| p.outline_level)
+        })?;
+        Ok(Int32Value {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn set_is_collapsed(&self, r: SetIsCollapsedRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
@@ -1400,12 +2185,26 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
     fn get_is_collapsed(&self, r: RowColIndex) -> Result<BoolValue, String> {
-        let v = GRID_MANAGER.with_grid(r.grid_id, |g| g.row_props.get(&r.index).map_or(false, |p| p.is_collapsed))?;
-        Ok(BoolValue { grid_id: r.grid_id, value: v })
+        let v = GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.row_props.get(&r.index).map_or(false, |p| p.is_collapsed)
+        })?;
+        Ok(BoolValue {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn subtotal(&self, r: SubtotalRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            volvoxgrid_engine::outline::subtotal(g, r.aggregate, r.group_on_col, r.aggregate_col, &r.caption, r.back_color, r.fore_color, r.add_outline);
+            volvoxgrid_engine::outline::subtotal(
+                g,
+                r.aggregate,
+                r.group_on_col,
+                r.aggregate_col,
+                &r.caption,
+                r.back_color,
+                r.fore_color,
+                r.add_outline,
+            );
         })?;
         Ok(Empty {})
     }
@@ -1418,61 +2217,126 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
     fn outline(&self, r: OutlineRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| volvoxgrid_engine::outline::outline(g, r.level))?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            volvoxgrid_engine::outline::outline(g, r.level)
+        })?;
         Ok(Empty {})
     }
     fn get_node_row(&self, r: GetNodeRowRequest) -> Result<Int32Value, String> {
-        let v = GRID_MANAGER.with_grid(r.grid_id, |g| volvoxgrid_engine::outline::get_node_row(g, r.row, r.relation))?;
-        Ok(Int32Value { grid_id: r.grid_id, value: v })
+        let v = GRID_MANAGER.with_grid(r.grid_id, |g| {
+            volvoxgrid_engine::outline::get_node_row(g, r.row, r.relation)
+        })?;
+        Ok(Int32Value {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn get_node(&self, r: GetNodeRequest) -> Result<NodeInfo, String> {
-        let (row, level, is_expanded, child_count, parent_row, first_child, last_child) = GRID_MANAGER.with_grid(r.grid_id, |g| volvoxgrid_engine::outline::get_node(g, r.row))?;
-        Ok(NodeInfo { row, level, is_expanded, child_count, parent_row, first_child, last_child })
+        let (row, level, is_expanded, child_count, parent_row, first_child, last_child) =
+            GRID_MANAGER.with_grid(r.grid_id, |g| {
+                volvoxgrid_engine::outline::get_node(g, r.row)
+            })?;
+        Ok(NodeInfo {
+            row,
+            level,
+            is_expanded,
+            child_count,
+            parent_row,
+            first_child,
+            last_child,
+        })
     }
     fn set_node_open_picture(&self, r: SetImageProp) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| g.outline.node_open_picture = if r.image_data.is_empty() { None } else { Some(r.image_data.clone()) })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.outline.node_open_picture = if r.image_data.is_empty() {
+                None
+            } else {
+                Some(r.image_data.clone())
+            }
+        })?;
         Ok(Empty {})
     }
     fn set_node_closed_picture(&self, r: SetImageProp) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| g.outline.node_closed_picture = if r.image_data.is_empty() { None } else { Some(r.image_data.clone()) })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.outline.node_closed_picture = if r.image_data.is_empty() {
+                None
+            } else {
+                Some(r.image_data.clone())
+            }
+        })?;
         Ok(Empty {})
     }
     fn save_grid(&self, r: SaveGridRequest) -> Result<GridData, String> {
-        let data = GRID_MANAGER.with_grid(r.grid_id, |g| volvoxgrid_engine::save::save_grid(g, r.format, r.scope))?;
-        Ok(GridData { data, format: r.format })
+        let data = GRID_MANAGER.with_grid(r.grid_id, |g| {
+            volvoxgrid_engine::save::save_grid(g, r.format, r.scope)
+        })?;
+        Ok(GridData {
+            data,
+            format: r.format,
+        })
     }
     fn load_grid(&self, r: LoadGridRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| volvoxgrid_engine::save::load_grid(g, &r.data, r.format, r.scope))?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            volvoxgrid_engine::save::load_grid(g, &r.data, r.format, r.scope)
+        })?;
         Ok(Empty {})
     }
     fn print_grid(&self, r: PrintGridRequest) -> Result<PrintOutput, String> {
         let pages = GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if !g.layout.valid { ensure_layout(g); }
-            volvoxgrid_engine::print::print_grid(g, r.orientation, r.margin_left, r.margin_top, r.margin_right, r.margin_bottom, &r.header, &r.footer, r.show_page_numbers)
+            if !g.layout.valid {
+                ensure_layout(g);
+            }
+            volvoxgrid_engine::print::print_grid(
+                g,
+                r.orientation,
+                r.margin_left,
+                r.margin_top,
+                r.margin_right,
+                r.margin_bottom,
+                &r.header,
+                &r.footer,
+                r.show_page_numbers,
+            )
         })?;
         Ok(PrintOutput {
-            pages: pages.into_iter().map(|p| PrintPage { page_number: p.page_number, image_data: p.image_data, width: p.width, height: p.height }).collect()
+            pages: pages
+                .into_iter()
+                .map(|p| PrintPage {
+                    page_number: p.page_number,
+                    image_data: p.image_data,
+                    width: p.width,
+                    height: p.height,
+                })
+                .collect(),
         })
     }
     fn archive(&self, r: ArchiveRequest) -> Result<ArchiveResponse, String> {
-        let (data, names) = GRID_MANAGER.with_grid(r.grid_id, |g| volvoxgrid_engine::save::archive(g, &r.name, r.action, &r.data))?;
+        let (data, names) = GRID_MANAGER.with_grid(r.grid_id, |g| {
+            volvoxgrid_engine::save::archive(g, &r.name, r.action, &r.data)
+        })?;
         Ok(ArchiveResponse { data, names })
     }
     fn get_archive_info(&self, r: GetArchiveInfoRequest) -> Result<ArchiveInfo, String> {
-        let (names, sizes) = GRID_MANAGER.with_grid(r.grid_id, |_g| volvoxgrid_engine::save::archive_info(&r.data))?;
+        let (names, sizes) = GRID_MANAGER.with_grid(r.grid_id, |_g| {
+            volvoxgrid_engine::save::archive_info(&r.data)
+        })?;
         Ok(ArchiveInfo { names, sizes })
     }
     fn copy(&self, r: GridHandle) -> Result<ClipboardData, String> {
-        let (text, rich_data) = GRID_MANAGER.with_grid(r.id, |g| volvoxgrid_engine::clipboard::copy(g))?;
+        let (text, rich_data) =
+            GRID_MANAGER.with_grid(r.id, |g| volvoxgrid_engine::clipboard::copy(g))?;
         Ok(ClipboardData { text, rich_data })
     }
     fn cut(&self, r: GridHandle) -> Result<ClipboardData, String> {
-        let (text, rich_data) = GRID_MANAGER.with_grid(r.id, |g| volvoxgrid_engine::clipboard::cut(g))?;
+        let (text, rich_data) =
+            GRID_MANAGER.with_grid(r.id, |g| volvoxgrid_engine::clipboard::cut(g))?;
         Ok(ClipboardData { text, rich_data })
     }
     fn paste(&self, r: PasteRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if let Some(data) = &r.data { volvoxgrid_engine::clipboard::paste(g, &data.text); }
+            if let Some(data) = &r.data {
+                volvoxgrid_engine::clipboard::paste(g, &data.text);
+            }
         })?;
         Ok(Empty {})
     }
@@ -1489,7 +2353,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
     fn drag_row(&self, r: DragRowRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| volvoxgrid_engine::drag::drag_row(g, r.row, r.position))?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            volvoxgrid_engine::drag::drag_row(g, r.row, r.position)
+        })?;
         Ok(Empty {})
     }
     fn set_allow_user_resizing(&self, r: SetAllowUserResizingRequest) -> Result<Empty, String> {
@@ -1506,7 +2372,11 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn set_auto_search_delay(&self, r: SetInt32Prop) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            let value = if r.value <= 10 && r.value > 0 { r.value * 1000 } else { r.value };
+            let value = if r.value <= 10 && r.value > 0 {
+                r.value * 1000
+            } else {
+                r.value
+            };
             g.type_ahead_delay = value;
         })?;
         Ok(Empty {})
@@ -1523,9 +2393,15 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             if let Some(config) = r.config {
                 g.fling_enabled = config.fling_enabled;
-                if !g.fling_enabled { g.scroll.stop_fling(); }
-                if config.fling_impulse_gain.is_finite() { g.fling_impulse_gain = config.fling_impulse_gain.max(0.0); }
-                if config.fling_friction.is_finite() { g.fling_friction = config.fling_friction.clamp(0.1, 20.0); }
+                if !g.fling_enabled {
+                    g.scroll.stop_fling();
+                }
+                if config.fling_impulse_gain.is_finite() {
+                    g.fling_impulse_gain = config.fling_impulse_gain.max(0.0);
+                }
+                if config.fling_friction.is_finite() {
+                    g.fling_friction = config.fling_friction.clamp(0.1, 20.0);
+                }
                 g.pinch_zoom_enabled = config.pinch_zoom_enabled;
                 g.scroll_track = config.scroll_track;
                 g.scroll_tips = config.scroll_tips;
@@ -1546,20 +2422,32 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         })
     }
     fn set_renderer_mode(&self, r: SetRendererModeRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.renderer_mode = r.mode; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.renderer_mode = r.mode;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn get_renderer_mode(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.renderer_mode)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_debug_overlay(&self, r: SetBoolProp) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.debug_overlay = r.value; g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.debug_overlay = r.value;
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn get_debug_overlay(&self, r: GridHandle) -> Result<BoolValue, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.debug_overlay)?;
-        Ok(BoolValue { grid_id: r.id, value: v })
+        Ok(BoolValue {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_animation_enabled(&self, r: SetAnimationEnabledRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
@@ -1575,7 +2463,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn get_animation_enabled(&self, r: GridHandle) -> Result<BoolValue, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.animation.enabled)?;
-        Ok(BoolValue { grid_id: r.id, value: v })
+        Ok(BoolValue {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_redraw(&self, r: SetBoolProp) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
@@ -1592,7 +2483,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
     fn refresh(&self, r: GridHandle) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.id, |g| { g.layout.invalidate(); g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.id, |g| {
+            g.layout.invalidate();
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn set_auto_resize(&self, r: SetBoolProp) -> Result<Empty, String> {
@@ -1601,7 +2495,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn get_auto_resize(&self, r: GridHandle) -> Result<BoolValue, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.auto_resize)?;
-        Ok(BoolValue { grid_id: r.id, value: v })
+        Ok(BoolValue {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_scroll_tip_text(&self, r: SetStringProp) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.scroll_tooltip_text = r.value.clone())?;
@@ -1609,7 +2506,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn get_scroll_tip_text(&self, r: GridHandle) -> Result<StringValue, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.scroll_tooltip_text.clone())?;
-        Ok(StringValue { grid_id: r.id, value: v })
+        Ok(StringValue {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_flags(&self, r: SetInt32Prop) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.flags = r.value as u32)?;
@@ -1617,32 +2517,53 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn get_flags(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.flags as i32)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn get_version(&self, _r: GridHandle) -> Result<StringValue, String> {
-        Ok(StringValue { grid_id: 0, value: "1.0.0".to_string() })
+        Ok(StringValue {
+            grid_id: 0,
+            value: "1.0.0".to_string(),
+        })
     }
     fn get_client_width(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.viewport_width)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn get_client_height(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.viewport_height)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn get_is_searching(&self, r: GridHandle) -> Result<BoolValue, String> {
-        Ok(BoolValue { grid_id: r.id, value: false })
+        Ok(BoolValue {
+            grid_id: r.id,
+            value: false,
+        })
     }
     fn get_picture(&self, r: GridHandle) -> Result<ImageData, String> {
         GRID_MANAGER.with_grid(r.id, |g| capture_grid_picture(g))
     }
     fn set_picture_type(&self, r: SetInt32Prop) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| { g.picture_type = r.value.clamp(0, 2); g.mark_dirty(); })?;
+        GRID_MANAGER.with_grid(r.grid_id, |g| {
+            g.picture_type = r.value.clamp(0, 2);
+            g.mark_dirty();
+        })?;
         Ok(Empty {})
     }
     fn get_picture_type(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.picture_type)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_data_mode(&self, r: SetInt32Prop) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.data_source_mode = r.value.max(0))?;
@@ -1650,7 +2571,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn get_data_mode(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.data_source_mode)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_virtual_data(&self, r: SetBoolProp) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.virtual_mode = r.value)?;
@@ -1658,28 +2582,48 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn get_virtual_data(&self, r: GridHandle) -> Result<BoolValue, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.virtual_mode)?;
-        Ok(BoolValue { grid_id: r.id, value: v })
+        Ok(BoolValue {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_col_data(&self, r: SetColDataRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             if r.col >= 0 && (r.col as usize) < g.columns.len() {
-                g.columns[r.col as usize].user_data = if r.data.is_empty() { None } else { Some(r.data.clone()) };
+                g.columns[r.col as usize].user_data = if r.data.is_empty() {
+                    None
+                } else {
+                    Some(r.data.clone())
+                };
             }
         })?;
         Ok(Empty {})
     }
     fn get_col_data(&self, r: GetColDataRequest) -> Result<ColDataValue, String> {
         let data = GRID_MANAGER.with_grid(r.grid_id, |g| {
-            if r.col >= 0 && (r.col as usize) < g.columns.len() { g.columns[r.col as usize].user_data.clone().unwrap_or_default() }
-            else { Vec::new() }
+            if r.col >= 0 && (r.col as usize) < g.columns.len() {
+                g.columns[r.col as usize]
+                    .user_data
+                    .clone()
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            }
         })?;
-        Ok(ColDataValue { grid_id: r.grid_id, data })
+        Ok(ColDataValue {
+            grid_id: r.grid_id,
+            data,
+        })
     }
     fn set_row_data(&self, r: SetColDataRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             let row = r.col;
             if row >= 0 && row < g.rows {
-                if r.data.is_empty() { g.set_row_data(row, None); } else { g.set_row_data(row, Some(r.data.clone())); }
+                if r.data.is_empty() {
+                    g.set_row_data(row, None);
+                } else {
+                    g.set_row_data(row, Some(r.data.clone()));
+                }
             }
         })?;
         Ok(Empty {})
@@ -1687,28 +2631,49 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     fn get_row_data(&self, r: GetColDataRequest) -> Result<ColDataValue, String> {
         let data = GRID_MANAGER.with_grid(r.grid_id, |g| {
             let row = r.col;
-            if row >= 0 && row < g.rows { g.get_row_data(row).unwrap_or_default() }
-            else { Vec::new() }
+            if row >= 0 && row < g.rows {
+                g.get_row_data(row).unwrap_or_default()
+            } else {
+                Vec::new()
+            }
         })?;
-        Ok(ColDataValue { grid_id: r.grid_id, data })
+        Ok(ColDataValue {
+            grid_id: r.grid_id,
+            data,
+        })
     }
     fn set_row_status(&self, r: SetColInt32Prop) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             let row = r.col;
-            if row >= 0 && row < g.rows { g.set_row_status(row, r.value); }
+            if row >= 0 && row < g.rows {
+                g.set_row_status(row, r.value);
+            }
         })?;
         Ok(Empty {})
     }
     fn get_row_status(&self, r: RowColIndex) -> Result<Int32Value, String> {
-        let v = GRID_MANAGER.with_grid(r.grid_id, |g| if r.index >= 0 && r.index < g.rows { g.get_row_status(r.index) } else { 0 })?;
-        Ok(Int32Value { grid_id: r.grid_id, value: v })
+        let v = GRID_MANAGER.with_grid(r.grid_id, |g| {
+            if r.index >= 0 && r.index < g.rows {
+                g.get_row_status(r.index)
+            } else {
+                0
+            }
+        })?;
+        Ok(Int32Value {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn set_cell_button_picture(&self, r: SetCellButtonPictureRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             let cell = g.cells.get_mut(r.row, r.col);
             if let Some(img) = &r.image {
                 let extra = cell.extra_mut();
-                extra.button_picture = if img.data.is_empty() { None } else { Some(img.data.clone()) };
+                extra.button_picture = if img.data.is_empty() {
+                    None
+                } else {
+                    Some(img.data.clone())
+                };
                 extra.button_picture_format = img.format.clone();
             } else {
                 let extra = cell.extra_mut();
@@ -1720,20 +2685,28 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
     fn get_cell_button_picture(&self, r: GetCellButtonPictureRequest) -> Result<ImageData, String> {
-        let (data, format) = GRID_MANAGER.with_grid(r.grid_id, |g| {
-            match g.cells.get(r.row, r.col) {
+        let (data, format) =
+            GRID_MANAGER.with_grid(r.grid_id, |g| match g.cells.get(r.row, r.col) {
                 Some(cell) => (
-                    cell.extra.as_ref().and_then(|e| e.button_picture.clone()).unwrap_or_default(),
-                    cell.extra.as_ref().map(|e| e.button_picture_format.clone()).unwrap_or_default(),
+                    cell.extra
+                        .as_ref()
+                        .and_then(|e| e.button_picture.clone())
+                        .unwrap_or_default(),
+                    cell.extra
+                        .as_ref()
+                        .map(|e| e.button_picture_format.clone())
+                        .unwrap_or_default(),
                 ),
                 None => (Vec::new(), String::new()),
-            }
-        })?;
+            })?;
         Ok(ImageData { data, format })
     }
     fn get_edit_sel_start(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.edit.sel_start)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_edit_sel_start(&self, r: EditSelRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.edit.set_sel_start(r.value))?;
@@ -1741,7 +2714,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn get_edit_sel_length(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.edit.sel_length)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_edit_sel_length(&self, r: EditSelRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.edit.set_sel_length(r.value))?;
@@ -1749,39 +2725,64 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn get_edit_sel_text(&self, r: GridHandle) -> Result<StringValue, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.edit.get_sel_text().to_string())?;
-        Ok(StringValue { grid_id: r.id, value: v })
+        Ok(StringValue {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn get_combo_count(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.edit.dropdown_count())?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn get_combo_index(&self, r: GridHandle) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.id, |g| g.edit.dropdown_index)?;
-        Ok(Int32Value { grid_id: r.id, value: v })
+        Ok(Int32Value {
+            grid_id: r.id,
+            value: v,
+        })
     }
     fn set_combo_index(&self, r: SetInt32Prop) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.edit.set_dropdown_index(r.value))?;
         Ok(Empty {})
     }
     fn get_combo_item(&self, r: ComboInfoRequest) -> Result<StringValue, String> {
-        let v = GRID_MANAGER.with_grid(r.grid_id, |g| g.edit.get_dropdown_item(r.index).to_string())?;
-        Ok(StringValue { grid_id: r.grid_id, value: v })
+        let v =
+            GRID_MANAGER.with_grid(r.grid_id, |g| g.edit.get_dropdown_item(r.index).to_string())?;
+        Ok(StringValue {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn get_combo_data(&self, r: ComboInfoRequest) -> Result<StringValue, String> {
-        let v = GRID_MANAGER.with_grid(r.grid_id, |g| g.edit.get_dropdown_data(r.index).to_string())?;
-        Ok(StringValue { grid_id: r.grid_id, value: v })
+        let v =
+            GRID_MANAGER.with_grid(r.grid_id, |g| g.edit.get_dropdown_data(r.index).to_string())?;
+        Ok(StringValue {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn data_refresh(&self, r: GridHandle) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.id, |g| g.data_refresh())?;
         Ok(Empty {})
     }
     fn load_grid_url(&self, r: LoadGridUrlRequest) -> Result<BoolValue, String> {
-        let v = GRID_MANAGER.with_grid(r.grid_id, |g| volvoxgrid_engine::save::load_grid_url(g, &r.url, &r.data, r.format, r.scope))?;
-        Ok(BoolValue { grid_id: r.grid_id, value: v })
+        let v = GRID_MANAGER.with_grid(r.grid_id, |g| {
+            volvoxgrid_engine::save::load_grid_url(g, &r.url, &r.data, r.format, r.scope)
+        })?;
+        Ok(BoolValue {
+            grid_id: r.grid_id,
+            value: v,
+        })
     }
     fn auto_search(&self, r: SetAutoSearchRequest) -> Result<Int32Value, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.type_ahead_mode = r.mode)?;
-        Ok(Int32Value { grid_id: r.grid_id, value: 0 })
+        Ok(Int32Value {
+            grid_id: r.grid_id,
+            value: 0,
+        })
     }
     fn load_demo(&self, r: LoadDemoRequest) -> Result<Empty, String> {
         #[cfg(feature = "demo")]
@@ -1799,12 +2800,18 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                     _ => {}
                 }
                 if (scale - 1.0).abs() > 0.01 {
-                    let custom_row_heights: Vec<(i32, i32)> = g.row_heights.iter().map(|(r, h)| (*r, *h)).collect();
-                    let custom_col_widths: Vec<(i32, i32)> = g.col_widths.iter().map(|(c, w)| (*c, *w)).collect();
+                    let custom_row_heights: Vec<(i32, i32)> =
+                        g.row_heights.iter().map(|(r, h)| (*r, *h)).collect();
+                    let custom_col_widths: Vec<(i32, i32)> =
+                        g.col_widths.iter().map(|(c, w)| (*c, *w)).collect();
                     g.default_row_height = (g.default_row_height as f32 * scale).round() as i32;
-                    for (r, h) in custom_row_heights { g.set_row_height(r, (h as f32 * scale).round() as i32); }
+                    for (r, h) in custom_row_heights {
+                        g.set_row_height(r, (h as f32 * scale).round() as i32);
+                    }
                     g.default_col_width = (g.default_col_width as f32 * scale).round() as i32;
-                    for (c, w) in custom_col_widths { g.set_col_width(c, (w as f32 * scale).round() as i32); }
+                    for (c, w) in custom_col_widths {
+                        g.set_col_width(c, (w as f32 * scale).round() as i32);
+                    }
                 }
             })?;
             return Ok(Empty {});
@@ -1828,7 +2835,11 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         let cols = layout.and_then(|l| l.cols).unwrap_or(5);
         let fixed_rows = layout.and_then(|l| l.fixed_rows).unwrap_or(1);
         let fixed_cols = layout.and_then(|l| l.fixed_cols).unwrap_or(0);
-        let scale = if request.scale > 0.01 { request.scale } else { 1.0 };
+        let scale = if request.scale > 0.01 {
+            request.scale
+        } else {
+            1.0
+        };
 
         let id = self.manager().create_grid(
             request.viewport_width,
@@ -1878,7 +2889,8 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
 
     fn get_config(&self, request: GridHandle) -> Result<GridConfig, String> {
-        self.manager().with_grid(request.id, |grid| grid.get_config())
+        self.manager()
+            .with_grid(request.id, |grid| grid.get_config())
     }
 
     fn load_font_data(&self, _request: LoadFontDataRequest) -> Result<Empty, String> {
@@ -1893,6 +2905,11 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
 
+    fn get_schema(&self, request: GridHandle) -> Result<DefineColumnsRequest, String> {
+        self.manager()
+            .with_grid(request.id, |grid| grid.get_schema(request.id))
+    }
+
     fn define_rows(&self, request: DefineRowsRequest) -> Result<Empty, String> {
         self.manager().with_grid(request.grid_id, |grid| {
             grid.define_rows(&request.rows);
@@ -1905,7 +2922,11 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             let count = request.count.max(1);
             let index = if request.index < 0 { -1 } else { request.index };
             for i in 0..count {
-                let text = request.text.get(i as usize).map(|s| s.as_str()).unwrap_or("");
+                let text = request
+                    .text
+                    .get(i as usize)
+                    .map(|s| s.as_str())
+                    .unwrap_or("");
                 let at_row = if index < 0 { -1 } else { index + i };
                 grid.add_item(text, at_row);
             }
@@ -1960,11 +2981,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
 
-    fn update_cells(&self, request: UpdateCellsRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
-            grid.update_cells(&request.cells);
-        })?;
-        Ok(Empty {})
+    fn update_cells(&self, request: UpdateCellsRequest) -> Result<WriteResult, String> {
+        self.manager()
+            .with_grid(request.grid_id, |grid| grid.write_cells(&request.cells, request.atomic))
     }
 
     fn get_cells(&self, request: GetCellsRequest) -> Result<CellsResponse, String> {
@@ -1976,32 +2995,39 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 request.col2,
                 request.include_style,
                 request.include_checked,
+                request.include_typed,
             )
         })?;
         Ok(CellsResponse { cells })
     }
 
-    fn load_array(&self, request: LoadArrayRequest) -> Result<Empty, String> {
+    fn load_table(&self, request: LoadTableRequest) -> Result<WriteResult, String> {
         self.manager().with_grid(request.grid_id, |grid| {
-            apply_array_data_to_grid(grid, request.rows, request.cols, &request.values);
-            if request.bind {
-                grid.data_source_mode = 1;
-            }
-        })?;
-        Ok(Empty {})
+            grid.load_table(request.rows, request.cols, &request.values, request.atomic)
+        })
     }
 
     fn clear(&self, request: ClearRequest) -> Result<Empty, String> {
         self.manager().with_grid(request.grid_id, |grid| {
             let (r1, c1, r2, c2) = match request.region {
-                0 => (grid.fixed_rows, grid.fixed_cols, grid.rows - 1, grid.cols - 1),
+                0 => (
+                    grid.fixed_rows,
+                    grid.fixed_cols,
+                    grid.rows - 1,
+                    grid.cols - 1,
+                ),
                 1 => (0, 0, grid.fixed_rows - 1, grid.cols - 1),
                 2 => (0, 0, grid.rows - 1, grid.fixed_cols - 1),
                 3 => (0, 0, grid.fixed_rows - 1, grid.fixed_cols - 1),
                 4 => (0, 0, grid.rows - 1, grid.cols - 1),
                 5 => (0, 0, grid.rows - 1, grid.cols - 1),
                 6 => (0, 0, grid.rows - 1, grid.cols - 1),
-                _ => (grid.fixed_rows, grid.fixed_cols, grid.rows - 1, grid.cols - 1),
+                _ => (
+                    grid.fixed_rows,
+                    grid.fixed_cols,
+                    grid.rows - 1,
+                    grid.cols - 1,
+                ),
             };
             match request.scope {
                 0 => {
@@ -2060,8 +3086,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 .first()
                 .map(|r| end_from_range(r, active_row, active_col))
                 .unwrap_or((active_row, active_col));
-            grid.selection
-                .select(active_row, active_col, row_sel, col_sel, grid.rows, grid.cols);
+            grid.selection.select(
+                active_row, active_col, row_sel, col_sel, grid.rows, grid.cols,
+            );
             if request.show.unwrap_or(false) {
                 ensure_layout(grid);
                 grid.scroll.show_cell(
@@ -2118,12 +3145,13 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                         let new_text = commit.text.unwrap_or_else(|| grid.edit.edit_text.clone());
                         let committed = normalize_committed_edit_text(grid, row, col, &new_text);
                         grid.edit.cancel();
-                        grid.events
-                            .push(volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                        grid.events.push(
+                            volvoxgrid_engine::event::GridEventData::CellEditValidate {
                                 row,
                                 col,
                                 edit_text: committed.clone(),
-                            });
+                            },
+                        );
                         apply_committed_edit_text(grid, row, col, old_text, committed);
                     }
                 }
@@ -2146,7 +3174,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                         grid.edit.sel_start = t.chars().count() as i32;
                         grid.edit.sel_length = 0;
                         grid.events
-                            .push(volvoxgrid_engine::event::GridEventData::CellEditChange { text: t });
+                            .push(volvoxgrid_engine::event::GridEventData::CellEditChange {
+                                text: t,
+                            });
                     }
                 }
                 Some(edit_command::Command::SetSelection(sel)) => {
@@ -2164,12 +3194,13 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                         let new_text = grid.edit.edit_text.clone();
                         let committed = normalize_committed_edit_text(grid, row, col, &new_text);
                         grid.edit.cancel();
-                        grid.events
-                            .push(volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                        grid.events.push(
+                            volvoxgrid_engine::event::GridEventData::CellEditValidate {
                                 row,
                                 col,
                                 edit_text: committed.clone(),
-                            });
+                            },
+                        );
                         apply_committed_edit_text(grid, row, col, old_text, committed);
                     }
                 }
@@ -2267,8 +3298,15 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             } else {
                 request.row
             };
-            let (level, outline_level, is_expanded, child_count, parent_row, first_child, last_child) =
-                volvoxgrid_engine::outline::get_node(grid, row);
+            let (
+                level,
+                outline_level,
+                is_expanded,
+                child_count,
+                parent_row,
+                first_child,
+                last_child,
+            ) = volvoxgrid_engine::outline::get_node(grid, row);
             let _ = level;
             NodeInfo {
                 row,
@@ -2283,25 +3321,27 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
 
     fn find(&self, request: FindRequest) -> Result<FindResponse, String> {
-        let row = self.manager().with_grid(request.grid_id, |grid| match request.query {
-            Some(find_request::Query::TextQuery(tq)) => volvoxgrid_engine::search::find_row(
-                grid,
-                &tq.text,
-                request.start_row,
-                request.col,
-                tq.case_sensitive,
-                tq.full_match,
-            ),
-            Some(find_request::Query::RegexQuery(rq)) => {
-                volvoxgrid_engine::search::find_row_regex(
+        let row = self
+            .manager()
+            .with_grid(request.grid_id, |grid| match request.query {
+                Some(find_request::Query::TextQuery(tq)) => volvoxgrid_engine::search::find_row(
                     grid,
-                    &rq.pattern,
+                    &tq.text,
                     request.start_row,
                     request.col,
-                )
-            }
-            None => -1,
-        })?;
+                    tq.case_sensitive,
+                    tq.full_match,
+                ),
+                Some(find_request::Query::RegexQuery(rq)) => {
+                    volvoxgrid_engine::search::find_row_regex(
+                        grid,
+                        &rq.pattern,
+                        request.start_row,
+                        request.col,
+                    )
+                }
+                None => -1,
+            })?;
         Ok(FindResponse { row })
     }
 
@@ -2322,7 +3362,12 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     fn get_merged_range(&self, request: GetMergedRangeRequest) -> Result<CellRange, String> {
         self.manager().with_grid(request.grid_id, |grid| {
             if let Some((r1, c1, r2, c2)) = grid.get_merged_range(request.row, request.col) {
-                CellRange { row1: r1, col1: c1, row2: r2, col2: c2 }
+                CellRange {
+                    row1: r1,
+                    col1: c1,
+                    row2: r2,
+                    col2: c2,
+                }
             } else {
                 CellRange {
                     row1: request.row,
@@ -2337,7 +3382,8 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     fn merge_cells(&self, request: MergeCellsRequest) -> Result<Empty, String> {
         let range = request.range.unwrap_or_default();
         self.manager().with_grid(request.grid_id, |grid| {
-            grid.merged_regions.add_merge(range.row1, range.col1, range.row2, range.col2);
+            grid.merged_regions
+                .add_merge(range.row1, range.col1, range.row2, range.col2);
             grid.layout.invalidate();
             grid.mark_dirty();
         })?;
@@ -2347,7 +3393,8 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     fn unmerge_cells(&self, request: UnmergeCellsRequest) -> Result<Empty, String> {
         let range = request.range.unwrap_or_default();
         self.manager().with_grid(request.grid_id, |grid| {
-            grid.merged_regions.remove_overlapping(range.row1, range.col1, range.row2, range.col2);
+            grid.merged_regions
+                .remove_overlapping(range.row1, range.col1, range.row2, range.col2);
             grid.layout.invalidate();
             grid.mark_dirty();
         })?;
@@ -2355,52 +3402,59 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
 
     fn get_merged_regions(&self, request: GridHandle) -> Result<MergedRegionsResponse, String> {
-        self.manager().with_grid(request.id, |grid| {
-            MergedRegionsResponse {
-                ranges: grid.merged_regions.all_ranges().iter().map(|&(r1, c1, r2, c2)| {
-                    CellRange { row1: r1, col1: c1, row2: r2, col2: c2 }
-                }).collect(),
-            }
-        })
+        self.manager()
+            .with_grid(request.id, |grid| MergedRegionsResponse {
+                ranges: grid
+                    .merged_regions
+                    .all_ranges()
+                    .iter()
+                    .map(|&(r1, c1, r2, c2)| CellRange {
+                        row1: r1,
+                        col1: c1,
+                        row2: r2,
+                        col2: c2,
+                    })
+                    .collect(),
+            })
     }
 
     fn get_memory_usage(&self, request: GridHandle) -> Result<MemoryUsageResponse, String> {
-        self.manager().with_grid(request.id, |grid| {
-            grid.memory_usage()
-        })
+        self.manager()
+            .with_grid(request.id, |grid| grid.memory_usage())
     }
 
     fn clipboard(&self, request: ClipboardCommand) -> Result<ClipboardResponse, String> {
-        self.manager().with_grid(request.grid_id, |grid| match request.command {
-            Some(clipboard_command::Command::Copy(_)) => {
-                let (text, rich_data) = volvoxgrid_engine::clipboard::copy(grid);
-                ClipboardResponse { text, rich_data }
-            }
-            Some(clipboard_command::Command::Cut(_)) => {
-                let (text, rich_data) = volvoxgrid_engine::clipboard::cut(grid);
-                ClipboardResponse { text, rich_data }
-            }
-            Some(clipboard_command::Command::Paste(paste)) => {
-                if !paste.text.is_empty() {
-                    volvoxgrid_engine::clipboard::paste(grid, &paste.text);
+        self.manager()
+            .with_grid(request.grid_id, |grid| match request.command {
+                Some(clipboard_command::Command::Copy(_)) => {
+                    let (text, rich_data) = volvoxgrid_engine::clipboard::copy(grid);
+                    ClipboardResponse { text, rich_data }
                 }
-                ClipboardResponse {
+                Some(clipboard_command::Command::Cut(_)) => {
+                    let (text, rich_data) = volvoxgrid_engine::clipboard::cut(grid);
+                    ClipboardResponse { text, rich_data }
+                }
+                Some(clipboard_command::Command::Paste(paste)) => {
+                    if !paste.text.is_empty() {
+                        volvoxgrid_engine::clipboard::paste(grid, &paste.text);
+                    }
+                    ClipboardResponse {
+                        text: String::new(),
+                        rich_data: Vec::new(),
+                    }
+                }
+                Some(clipboard_command::Command::Delete(_)) => {
+                    volvoxgrid_engine::clipboard::delete_selection(grid);
+                    ClipboardResponse {
+                        text: String::new(),
+                        rich_data: Vec::new(),
+                    }
+                }
+                None => ClipboardResponse {
                     text: String::new(),
                     rich_data: Vec::new(),
-                }
-            }
-            Some(clipboard_command::Command::Delete(_)) => {
-                volvoxgrid_engine::clipboard::delete_selection(grid);
-                ClipboardResponse {
-                    text: String::new(),
-                    rich_data: Vec::new(),
-                }
-            }
-            None => ClipboardResponse {
-                text: String::new(),
-                rich_data: Vec::new(),
-            },
-        })
+                },
+            })
     }
 
     fn export(&self, request: ExportRequest) -> Result<ExportResponse, String> {
@@ -2469,8 +3523,12 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
 
     fn archive(&self, request: ArchiveRequest) -> Result<ArchiveResponse, String> {
         self.manager().with_grid(request.grid_id, |grid| {
-            let (data, names) =
-                volvoxgrid_engine::save::archive(grid, &request.name, request.action, &request.data);
+            let (data, names) = volvoxgrid_engine::save::archive(
+                grid,
+                &request.name,
+                request.action,
+                &request.data,
+            );
             ArchiveResponse { data, names }
         })
     }
@@ -2686,7 +3744,8 @@ pub extern "C" fn volvox_grid_set_fixed_rows(
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
             g.fixed_rows = fixed_rows.max(1).min(g.rows);
-            g.selection.clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
+            g.selection
+                .clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
             g.layout.invalidate();
             g.mark_dirty();
         }),
@@ -2703,7 +3762,8 @@ pub extern "C" fn volvox_grid_set_fixed_cols(
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
             g.fixed_cols = fixed_cols.max(0).min(g.cols);
-            g.selection.clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
+            g.selection
+                .clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
             g.layout.invalidate();
             g.mark_dirty();
         }),
@@ -2781,7 +3841,10 @@ pub extern "C" fn volvox_grid_get_row_height(
     index: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
-    compat_i32(GRID_MANAGER.with_grid(grid_id, |g| g.get_row_height(index)), out_len)
+    compat_i32(
+        GRID_MANAGER.with_grid(grid_id, |g| g.get_row_height(index)),
+        out_len,
+    )
 }
 
 #[no_mangle]
@@ -2790,7 +3853,10 @@ pub extern "C" fn volvox_grid_get_col_width(
     index: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
-    compat_i32(GRID_MANAGER.with_grid(grid_id, |g| g.get_col_width(index)), out_len)
+    compat_i32(
+        GRID_MANAGER.with_grid(grid_id, |g| g.get_col_width(index)),
+        out_len,
+    )
 }
 
 #[no_mangle]
@@ -2875,11 +3941,7 @@ pub extern "C" fn volvox_grid_set_scroll_bars(
 }
 
 #[no_mangle]
-pub extern "C" fn volvox_grid_set_top_row(
-    grid_id: i64,
-    row: i32,
-    out_len: *mut i32,
-) -> *mut u8 {
+pub extern "C" fn volvox_grid_set_top_row(grid_id: i64, row: i32, out_len: *mut i32) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
             g.set_top_row(row);
@@ -2895,11 +3957,7 @@ pub extern "C" fn volvox_grid_get_top_row(id: i64, out_len: *mut i32) -> *mut u8
 }
 
 #[no_mangle]
-pub extern "C" fn volvox_grid_set_left_col(
-    grid_id: i64,
-    col: i32,
-    out_len: *mut i32,
-) -> *mut u8 {
+pub extern "C" fn volvox_grid_set_left_col(grid_id: i64, col: i32, out_len: *mut i32) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
             g.set_left_col(col);
@@ -2918,8 +3976,14 @@ pub extern "C" fn volvox_grid_get_left_col(id: i64, out_len: *mut i32) -> *mut u
 pub extern "C" fn volvox_grid_set_row(grid_id: i64, row: i32, out_len: *mut i32) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
-            g.selection
-                .set_cursor(row, g.selection.col, g.rows, g.cols, g.fixed_rows, g.fixed_cols);
+            g.selection.set_cursor(
+                row,
+                g.selection.col,
+                g.rows,
+                g.cols,
+                g.fixed_rows,
+                g.fixed_cols,
+            );
             g.mark_dirty();
         }),
         out_len,
@@ -2935,8 +3999,14 @@ pub extern "C" fn volvox_grid_get_row(id: i64, out_len: *mut i32) -> *mut u8 {
 pub extern "C" fn volvox_grid_set_col(grid_id: i64, col: i32, out_len: *mut i32) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
-            g.selection
-                .set_cursor(g.selection.row, col, g.rows, g.cols, g.fixed_rows, g.fixed_cols);
+            g.selection.set_cursor(
+                g.selection.row,
+                col,
+                g.rows,
+                g.cols,
+                g.fixed_rows,
+                g.fixed_cols,
+            );
             g.mark_dirty();
         }),
         out_len,
@@ -3084,7 +4154,10 @@ pub extern "C" fn volvox_grid_set_fill_style(
     style: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
-    compat_status(GRID_MANAGER.with_grid(grid_id, |g| g.apply_scope = style), out_len)
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| g.apply_scope = style),
+        out_len,
+    )
 }
 
 #[no_mangle]
@@ -3105,11 +4178,7 @@ pub extern "C" fn volvox_grid_add_item(
 }
 
 #[no_mangle]
-pub extern "C" fn volvox_grid_remove_item(
-    grid_id: i64,
-    index: i32,
-    out_len: *mut i32,
-) -> *mut u8 {
+pub extern "C" fn volvox_grid_remove_item(grid_id: i64, index: i32, out_len: *mut i32) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
             g.remove_item(index);
@@ -3164,12 +4233,11 @@ pub extern "C" fn volvox_grid_find_row_regex(
 }
 
 #[no_mangle]
-pub extern "C" fn volvox_grid_set_editable(
-    grid_id: i64,
-    mode: i32,
-    out_len: *mut i32,
-) -> *mut u8 {
-    compat_status(GRID_MANAGER.with_grid(grid_id, |g| g.edit_trigger_mode = mode), out_len)
+pub extern "C" fn volvox_grid_set_editable(grid_id: i64, mode: i32, out_len: *mut i32) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| g.edit_trigger_mode = mode),
+        out_len,
+    )
 }
 
 #[no_mangle]
@@ -3216,7 +4284,10 @@ pub extern "C" fn volvox_grid_set_show_combo_button(
     mode: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
-    compat_status(GRID_MANAGER.with_grid(grid_id, |g| g.dropdown_trigger = mode), out_len)
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| g.dropdown_trigger = mode),
+        out_len,
+    )
 }
 
 #[no_mangle]
@@ -3318,7 +4389,9 @@ pub extern "C" fn volvox_grid_get_cell_checked(
     out_len: *mut i32,
 ) -> *mut u8 {
     compat_i32(
-        GRID_MANAGER.with_grid(grid_id, |g| g.cells.get(row, col).map_or(0, |c| c.checked())),
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            g.cells.get(row, col).map_or(0, |c| c.checked())
+        }),
         out_len,
     )
 }
@@ -3339,11 +4412,7 @@ pub extern "C" fn volvox_grid_set_word_wrap(
 }
 
 #[no_mangle]
-pub extern "C" fn volvox_grid_set_ellipsis(
-    grid_id: i64,
-    value: i32,
-    out_len: *mut i32,
-) -> *mut u8 {
+pub extern "C" fn volvox_grid_set_ellipsis(grid_id: i64, value: i32, out_len: *mut i32) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
             g.ellipsis_mode = value.clamp(0, 2);
@@ -3614,11 +4683,7 @@ pub extern "C" fn volvox_grid_set_row_data(
 }
 
 #[no_mangle]
-pub extern "C" fn volvox_grid_get_row_data(
-    grid_id: i64,
-    row: i32,
-    out_len: *mut i32,
-) -> *mut u8 {
+pub extern "C" fn volvox_grid_get_row_data(grid_id: i64, row: i32, out_len: *mut i32) -> *mut u8 {
     match GRID_MANAGER.with_grid(grid_id, |g| {
         if row >= 0 && row < g.rows {
             g.get_row_data(row).unwrap_or_default()
@@ -3638,7 +4703,7 @@ pub extern "C" fn volvox_grid_get_row_data(
 pub extern "C" fn volvox_grid_set_row_sel(
     grid_id: i64,
     row_end: i32,
-        out_len: *mut i32,
+    out_len: *mut i32,
 ) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
@@ -3653,7 +4718,7 @@ pub extern "C" fn volvox_grid_set_row_sel(
 pub extern "C" fn volvox_grid_set_col_sel(
     grid_id: i64,
     col_end: i32,
-        out_len: *mut i32,
+    out_len: *mut i32,
 ) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
@@ -3680,10 +4745,10 @@ pub extern "C" fn volvox_grid_shutdown() {}
 /// The caller provides the buffer; returns 0 on success, -1 on error.
 /// Buffer must be at least w * h * 4 bytes, laid out top-to-bottom in BGRA order.
 #[no_mangle]
-pub extern "C" fn volvox_grid_render_bgra(
-    id: i64, buf: *mut u8, w: i32, h: i32,
-) -> i32 {
-    if buf.is_null() || w <= 0 || h <= 0 { return -1; }
+pub extern "C" fn volvox_grid_render_bgra(id: i64, buf: *mut u8, w: i32, h: i32) -> i32 {
+    if buf.is_null() || w <= 0 || h <= 0 {
+        return -1;
+    }
     let result = GRID_MANAGER.with_grid(id, |g| {
         // Resize viewport to match
         g.resize_viewport(w, h);
@@ -3694,7 +4759,8 @@ pub extern "C" fn volvox_grid_render_bgra(
         // Use per-grid renderer (no lock — thread-local).
         RENDERERS.with(|r| {
             let mut map = r.borrow_mut();
-            let renderer = map.entry(id)
+            let renderer = map
+                .entry(id)
                 .or_insert_with(volvoxgrid_engine::render::Renderer::new);
             renderer.render(g, slice, w, h, stride);
         });
@@ -3722,7 +4788,10 @@ macro_rules! style_color_accessors {
     ($set_name:ident, $get_name:ident, $field:ident) => {
         #[no_mangle]
         pub extern "C" fn $set_name(id: i64, color: u32) -> i32 {
-            match GRID_MANAGER.with_grid(id, |g| { g.style.$field = color; g.mark_dirty(); }) {
+            match GRID_MANAGER.with_grid(id, |g| {
+                g.style.$field = color;
+                g.mark_dirty();
+            }) {
                 Ok(()) => 0,
                 Err(_) => -1,
             }
@@ -3734,21 +4803,86 @@ macro_rules! style_color_accessors {
     };
 }
 
-style_color_accessors!(volvox_grid_set_back_color, volvox_grid_get_back_color, back_color);
-style_color_accessors!(volvox_grid_set_fore_color, volvox_grid_get_fore_color, fore_color);
-style_color_accessors!(volvox_grid_set_grid_color, volvox_grid_get_grid_color, grid_color);
-style_color_accessors!(volvox_grid_set_back_color_fixed, volvox_grid_get_back_color_fixed, back_color_fixed);
-style_color_accessors!(volvox_grid_set_fore_color_fixed, volvox_grid_get_fore_color_fixed, fore_color_fixed);
-style_color_accessors!(volvox_grid_set_back_color_sel, volvox_grid_get_back_color_sel, back_color_sel);
-style_color_accessors!(volvox_grid_set_fore_color_sel, volvox_grid_get_fore_color_sel, fore_color_sel);
-style_color_accessors!(volvox_grid_set_back_color_alternate, volvox_grid_get_back_color_alternate, back_color_alternate);
-style_color_accessors!(volvox_grid_set_tree_color_native, volvox_grid_get_tree_color, tree_color);
+style_color_accessors!(
+    volvox_grid_set_back_color,
+    volvox_grid_get_back_color,
+    back_color
+);
+style_color_accessors!(
+    volvox_grid_set_fore_color,
+    volvox_grid_get_fore_color,
+    fore_color
+);
+style_color_accessors!(
+    volvox_grid_set_grid_color,
+    volvox_grid_get_grid_color,
+    grid_color
+);
+style_color_accessors!(
+    volvox_grid_set_back_color_fixed,
+    volvox_grid_get_back_color_fixed,
+    back_color_fixed
+);
+style_color_accessors!(
+    volvox_grid_set_fore_color_fixed,
+    volvox_grid_get_fore_color_fixed,
+    fore_color_fixed
+);
+style_color_accessors!(
+    volvox_grid_set_back_color_alternate,
+    volvox_grid_get_back_color_alternate,
+    back_color_alternate
+);
+style_color_accessors!(
+    volvox_grid_set_tree_color_native,
+    volvox_grid_get_tree_color,
+    tree_color
+);
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_back_color_sel(id: i64, color: u32) -> i32 {
+    match GRID_MANAGER.with_grid(id, |g| {
+        g.selection.selection_style.back_color = Some(color);
+        g.mark_dirty();
+    }) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_back_color_sel(id: i64) -> u32 {
+    GRID_MANAGER
+        .with_grid(id, |g| g.selection.selection_style.back_color.unwrap_or(0))
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_fore_color_sel(id: i64, color: u32) -> i32 {
+    match GRID_MANAGER.with_grid(id, |g| {
+        g.selection.selection_style.fore_color = Some(color);
+        g.mark_dirty();
+    }) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_fore_color_sel(id: i64) -> u32 {
+    GRID_MANAGER
+        .with_grid(id, |g| g.selection.selection_style.fore_color.unwrap_or(0))
+        .unwrap_or(0)
+}
 
 macro_rules! style_i32_accessors {
     ($set_name:ident, $get_name:ident, $field:ident) => {
         #[no_mangle]
         pub extern "C" fn $set_name(id: i64, value: i32) -> i32 {
-            match GRID_MANAGER.with_grid(id, |g| { g.style.$field = value; g.mark_dirty(); }) {
+            match GRID_MANAGER.with_grid(id, |g| {
+                g.style.$field = value;
+                g.mark_dirty();
+            }) {
                 Ok(()) => 0,
                 Err(_) => -1,
             }
@@ -3760,30 +4894,48 @@ macro_rules! style_i32_accessors {
     };
 }
 
-style_i32_accessors!(volvox_grid_set_grid_lines_native, volvox_grid_get_grid_lines, grid_lines);
-style_i32_accessors!(volvox_grid_set_grid_lines_fixed_native, volvox_grid_get_grid_lines_fixed, grid_lines_fixed);
+style_i32_accessors!(
+    volvox_grid_set_grid_lines_native,
+    volvox_grid_get_grid_lines,
+    grid_lines
+);
+style_i32_accessors!(
+    volvox_grid_set_grid_lines_fixed_native,
+    volvox_grid_get_grid_lines_fixed,
+    grid_lines_fixed
+);
 
 #[no_mangle]
 pub extern "C" fn volvox_grid_set_font_size(id: i64, size: f32) -> i32 {
-    match GRID_MANAGER.with_grid(id, |g| { g.style.font_size = size; g.mark_dirty(); }) {
+    match GRID_MANAGER.with_grid(id, |g| {
+        g.style.font_size = size;
+        g.mark_dirty();
+    }) {
         Ok(()) => 0,
         Err(_) => -1,
     }
 }
 #[no_mangle]
 pub extern "C" fn volvox_grid_get_font_size(id: i64) -> f32 {
-    GRID_MANAGER.with_grid(id, |g| g.style.font_size).unwrap_or(0.0)
+    GRID_MANAGER
+        .with_grid(id, |g| g.style.font_size)
+        .unwrap_or(0.0)
 }
 
 #[no_mangle]
 pub extern "C" fn volvox_grid_set_font_name(id: i64, ptr: *const u8, len: i32) -> i32 {
-    if ptr.is_null() || len < 0 { return -1; }
+    if ptr.is_null() || len < 0 {
+        return -1;
+    }
     let bytes = unsafe { std::slice::from_raw_parts(ptr, len as usize) };
     let name = match std::str::from_utf8(bytes) {
         Ok(v) => v,
         Err(_) => return -1,
     };
-    match GRID_MANAGER.with_grid(id, |g| { g.style.font_name = name.to_string(); g.mark_dirty(); }) {
+    match GRID_MANAGER.with_grid(id, |g| {
+        g.style.font_name = name.to_string();
+        g.mark_dirty();
+    }) {
         Ok(()) => 0,
         Err(_) => -1,
     }
@@ -3791,10 +4943,14 @@ pub extern "C" fn volvox_grid_set_font_name(id: i64, ptr: *const u8, len: i32) -
 
 #[no_mangle]
 pub extern "C" fn volvox_grid_get_font_name(id: i64, out_len: *mut i32) -> *mut u8 {
-    let name = GRID_MANAGER.with_grid(id, |g| g.style.font_name.clone()).unwrap_or_default();
+    let name = GRID_MANAGER
+        .with_grid(id, |g| g.style.font_name.clone())
+        .unwrap_or_default();
     let bytes = name.into_bytes();
     if !out_len.is_null() {
-        unsafe { *out_len = bytes.len() as i32; }
+        unsafe {
+            *out_len = bytes.len() as i32;
+        }
     }
     alloc_payload_with_header(bytes)
 }
@@ -3815,12 +4971,16 @@ pub extern "C" fn volvox_grid_get_font_name(id: i64, out_len: *mut i32) -> *mut 
 ///   out_width, out_height   — output pointers
 ///   user_data               — opaque pointer passed through from registration
 type VvMeasureTextFn = unsafe extern "C" fn(
-    text_ptr: *const u8, text_len: i32,
-    font_name_ptr: *const u8, font_name_len: i32,
+    text_ptr: *const u8,
+    text_len: i32,
+    font_name_ptr: *const u8,
+    font_name_len: i32,
     font_size: f32,
-    bold: i32, italic: i32,
+    bold: i32,
+    italic: i32,
     max_width: f32,
-    out_width: *mut f32, out_height: *mut f32,
+    out_width: *mut f32,
+    out_height: *mut f32,
     user_data: *mut std::ffi::c_void,
 );
 
@@ -3839,12 +4999,21 @@ type VvMeasureTextFn = unsafe extern "C" fn(
 ///   max_width               — wrapping constraint, -1.0 means no constraint
 ///   user_data               — opaque pointer
 type VvRenderTextFn = unsafe extern "C" fn(
-    buffer: *mut u8, buf_width: i32, buf_height: i32, stride: i32,
-    x: i32, y: i32, clip_w: i32, clip_h: i32,
-    text_ptr: *const u8, text_len: i32,
-    font_name_ptr: *const u8, font_name_len: i32,
+    buffer: *mut u8,
+    buf_width: i32,
+    buf_height: i32,
+    stride: i32,
+    x: i32,
+    y: i32,
+    clip_w: i32,
+    clip_h: i32,
+    text_ptr: *const u8,
+    text_len: i32,
+    font_name_ptr: *const u8,
+    font_name_len: i32,
     font_size: f32,
-    bold: i32, italic: i32,
+    bold: i32,
+    italic: i32,
     color: u32,
     max_width: f32,
     user_data: *mut std::ffi::c_void,
@@ -3875,12 +5044,16 @@ impl volvoxgrid_engine::text::TextRenderer for FfiTextRenderer {
         let mw = max_width.unwrap_or(-1.0);
         unsafe {
             (self.measure_fn)(
-                text.as_ptr(), text.len() as i32,
-                font_name.as_ptr(), font_name.len() as i32,
+                text.as_ptr(),
+                text.len() as i32,
+                font_name.as_ptr(),
+                font_name.len() as i32,
                 font_size,
-                bold as i32, italic as i32,
+                bold as i32,
+                italic as i32,
                 mw,
-                &mut out_w, &mut out_h,
+                &mut out_w,
+                &mut out_h,
                 self.user_data,
             );
         }
@@ -3910,12 +5083,21 @@ impl volvoxgrid_engine::text::TextRenderer for FfiTextRenderer {
         let mw = max_width.unwrap_or(-1.0);
         unsafe {
             (self.render_fn)(
-                buffer_pixels.as_mut_ptr(), buf_width, buf_height, stride,
-                x, y, clip_w, clip_h,
-                text.as_ptr(), text.len() as i32,
-                font_name.as_ptr(), font_name.len() as i32,
+                buffer_pixels.as_mut_ptr(),
+                buf_width,
+                buf_height,
+                stride,
+                x,
+                y,
+                clip_w,
+                clip_h,
+                text.as_ptr(),
+                text.len() as i32,
+                font_name.as_ptr(),
+                font_name.len() as i32,
                 font_size,
-                bold as i32, italic as i32,
+                bold as i32,
+                italic as i32,
                 color,
                 mw,
                 self.user_data,
@@ -3952,7 +5134,8 @@ pub extern "C" fn volvox_grid_set_text_renderer(
 ) -> i32 {
     RENDERERS.with(|r| {
         let mut map = r.borrow_mut();
-        let renderer = map.entry(grid_id)
+        let renderer = map
+            .entry(grid_id)
             .or_insert_with(volvoxgrid_engine::render::Renderer::new);
         match (measure_fn, render_fn) {
             (Some(mf), Some(rf)) => {
@@ -3970,7 +5153,8 @@ pub extern "C" fn volvox_grid_set_text_renderer(
                     user_data,
                 };
                 let _ = GRID_MANAGER.with_grid(grid_id, |grid| {
-                    grid.ensure_text_engine().set_external_renderer(Some(Box::new(ffi_for_grid)));
+                    grid.ensure_text_engine()
+                        .set_external_renderer(Some(Box::new(ffi_for_grid)));
                 });
             }
             _ => {

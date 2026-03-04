@@ -35,7 +35,7 @@ import io.github.ivere27.volvoxgrid.GridEvent;
 import io.github.ivere27.volvoxgrid.GridHandle;
 import io.github.ivere27.volvoxgrid.ImportRequest;
 import io.github.ivere27.volvoxgrid.InsertRowsRequest;
-import io.github.ivere27.volvoxgrid.LoadArrayRequest;
+import io.github.ivere27.volvoxgrid.LoadTableRequest;
 import io.github.ivere27.volvoxgrid.LoadDemoRequest;
 import io.github.ivere27.volvoxgrid.MoveColumnRequest;
 import io.github.ivere27.volvoxgrid.MoveRowRequest;
@@ -52,6 +52,7 @@ import io.github.ivere27.volvoxgrid.SetRedrawRequest;
 import io.github.ivere27.volvoxgrid.SortRequest;
 import io.github.ivere27.volvoxgrid.SubtotalRequest;
 import io.github.ivere27.volvoxgrid.UpdateCellsRequest;
+import io.github.ivere27.volvoxgrid.WriteResult;
 import java.util.Objects;
 
 /**
@@ -65,6 +66,7 @@ public final class VolvoxGridDesktopClient {
     private static final String CONFIGURE = "/volvoxgrid.v1.VolvoxGridService/Configure";
     private static final String GET_CONFIG = "/volvoxgrid.v1.VolvoxGridService/GetConfig";
     private static final String DEFINE_COLUMNS = "/volvoxgrid.v1.VolvoxGridService/DefineColumns";
+    private static final String GET_SCHEMA = "/volvoxgrid.v1.VolvoxGridService/GetSchema";
     private static final String DEFINE_ROWS = "/volvoxgrid.v1.VolvoxGridService/DefineRows";
     private static final String INSERT_ROWS = "/volvoxgrid.v1.VolvoxGridService/InsertRows";
     private static final String REMOVE_ROWS = "/volvoxgrid.v1.VolvoxGridService/RemoveRows";
@@ -72,7 +74,7 @@ public final class VolvoxGridDesktopClient {
     private static final String MOVE_ROW = "/volvoxgrid.v1.VolvoxGridService/MoveRow";
     private static final String UPDATE_CELLS = "/volvoxgrid.v1.VolvoxGridService/UpdateCells";
     private static final String GET_CELLS = "/volvoxgrid.v1.VolvoxGridService/GetCells";
-    private static final String LOAD_ARRAY = "/volvoxgrid.v1.VolvoxGridService/LoadArray";
+    private static final String LOAD_TABLE = "/volvoxgrid.v1.VolvoxGridService/LoadTable";
     private static final String CLEAR = "/volvoxgrid.v1.VolvoxGridService/Clear";
     private static final String SELECT = "/volvoxgrid.v1.VolvoxGridService/Select";
     private static final String GET_SELECTION = "/volvoxgrid.v1.VolvoxGridService/GetSelection";
@@ -147,16 +149,20 @@ public final class VolvoxGridDesktopClient {
         return unary(MOVE_ROW, request, Empty.parser());
     }
 
-    public Empty updateCells(UpdateCellsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(UPDATE_CELLS, request, Empty.parser());
+    public WriteResult updateCells(UpdateCellsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(UPDATE_CELLS, request, WriteResult.parser());
+    }
+
+    public DefineColumnsRequest getSchema(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(GET_SCHEMA, request, DefineColumnsRequest.parser());
     }
 
     public CellsResponse getCells(GetCellsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         return unary(GET_CELLS, request, CellsResponse.parser());
     }
 
-    public Empty loadArray(LoadArrayRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(LOAD_ARRAY, request, Empty.parser());
+    public WriteResult loadTable(LoadTableRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(LOAD_TABLE, request, WriteResult.parser());
     }
 
     public Empty clear(ClearRequest request) throws SynurangDesktopBridge.SynurangBridgeException {

@@ -4,7 +4,7 @@ pub struct RowProps {
     pub outline_level: i32,
     pub is_subtotal: bool,
     pub is_collapsed: bool,
-    pub span: bool, // span enabled for this row
+    pub span: bool,  // span enabled for this row
     pub status: i32, // 0=unchanged, 1=added, 2=modified, 3=deleted
     /// Arbitrary user data per row (RowData property).
     pub user_data: Option<Vec<u8>>,

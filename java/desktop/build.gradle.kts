@@ -18,6 +18,25 @@ fun captureCommandOutput(workDir: File, vararg command: String): String? {
 fun escapeJavaString(value: String): String =
     value.replace("\\", "\\\\").replace("\"", "\\\"")
 
+fun findVolvoxgridVersionFile(startDir: File): File? {
+    var current: File? = startDir.canonicalFile
+    while (current != null) {
+        val candidate = current.resolve("VERSION")
+        if (candidate.isFile) {
+            return candidate
+        }
+        current = current.parentFile
+    }
+    return null
+}
+
+val versionFile = findVolvoxgridVersionFile(projectDir)
+    ?: throw org.gradle.api.GradleException("VERSION file not found from $projectDir")
+val defaultVolvoxgridVersion = versionFile.readText().trim()
+if (defaultVolvoxgridVersion.isEmpty()) {
+    throw org.gradle.api.GradleException("VERSION file is empty: $versionFile")
+}
+
 plugins {
     java
     application
@@ -28,7 +47,7 @@ plugins {
 // library coordinates (io.github.ivere27:volvoxgrid-desktop) to avoid
 // self-resolution in maven mode.
 group = "io.github.ivere27.examples"
-version = "0.1.4-SNAPSHOT"
+version = "$defaultVolvoxgridVersion-SNAPSHOT"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_1_8
@@ -55,10 +74,11 @@ val volvoxgridDesktopGroup = providers.gradleProperty("volvoxgridDesktopGroup")
 val volvoxgridDesktopArtifact = providers.gradleProperty("volvoxgridDesktopArtifact")
     .orElse("volvoxgrid-desktop")
     .get()
-val volvoxgridVersion = providers.gradleProperty("volvoxgridVersion")
-    .orElse(providers.gradleProperty("volvoxgridDesktopVersion"))
-    .orElse("0.1.4")
-    .get()
+val volvoxgridVersion = System.getenv("VOLVOXGRID_VERSION")
+    ?: providers.gradleProperty("volvoxgridVersion")
+        .orElse(providers.gradleProperty("volvoxgridDesktopVersion"))
+        .orElse(defaultVolvoxgridVersion)
+        .get()
 val isVolvoxgridSnapshot = volvoxgridVersion.endsWith("-SNAPSHOT")
 val volvoxgridGitCommit = providers.gradleProperty("volvoxgridGitCommit")
     .orElse(captureCommandOutput(rootDir, "git", "rev-parse", "--short=12", "HEAD") ?: "unknown")

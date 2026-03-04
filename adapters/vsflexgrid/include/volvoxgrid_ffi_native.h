@@ -55,6 +55,12 @@ uint8_t* volvox_grid_define_columns_pb(
     int32_t* out_len
 );
 
+/* GetSchema */
+uint8_t* volvox_grid_get_schema(
+    int64_t id,
+    int32_t* out_len
+);
+
 /* DefineRows (protobuf input — has repeated/oneof fields) */
 uint8_t* volvox_grid_define_rows_pb(
     const uint8_t* data, int32_t data_len,
@@ -106,11 +112,12 @@ uint8_t* volvox_grid_get_cells(
     int32_t col2,
     int32_t include_style,
     int32_t include_checked,
+    int32_t include_typed,
     int32_t* out_len
 );
 
-/* LoadArray (protobuf input — has repeated/oneof fields) */
-uint8_t* volvox_grid_load_array_pb(
+/* LoadTable (protobuf input — has repeated/oneof fields) */
+uint8_t* volvox_grid_load_table_pb(
     const uint8_t* data, int32_t data_len,
     int32_t* out_len
 );

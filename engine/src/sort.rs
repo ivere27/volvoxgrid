@@ -129,7 +129,14 @@ pub fn sort_grid_all_multi(grid: &mut VolvoxGrid) {
     let key_cols: Vec<i32> = sort_keys.iter().map(|&(col, _)| col).collect();
     // Use the first key's order as the nominal sort_order (for single-key fast path compat).
     let sort_order = sort_keys[0].1;
-    sort_range_impl(grid, sort_order, &key_cols, row_lo, row_hi, Some(&sort_keys));
+    sort_range_impl(
+        grid,
+        sort_order,
+        &key_cols,
+        row_lo,
+        row_hi,
+        Some(&sort_keys),
+    );
 }
 
 /// Core sort implementation operating on an explicit row range.
@@ -728,9 +735,7 @@ pub fn handle_header_click(grid: &mut VolvoxGrid, col: i32) {
             o if o == pb::SortOrder::SortGenericAscending as i32 => {
                 pb::SortOrder::SortGenericDescending as i32
             }
-            o if o == pb::SortOrder::SortGenericDescending as i32 => {
-                pb::SortOrder::SortNone as i32
-            }
+            o if o == pb::SortOrder::SortGenericDescending as i32 => pb::SortOrder::SortNone as i32,
             _ => pb::SortOrder::SortGenericAscending as i32,
         };
 
@@ -958,7 +963,13 @@ mod tests {
         sort_grid_all_multi(&mut grid);
 
         let got: Vec<String> = (1..=4)
-            .map(|r| format!("{}-{}", grid.cells.get_text(r, 0), grid.cells.get_text(r, 1)))
+            .map(|r| {
+                format!(
+                    "{}-{}",
+                    grid.cells.get_text(r, 0),
+                    grid.cells.get_text(r, 1)
+                )
+            })
             .collect();
         assert_eq!(
             got,

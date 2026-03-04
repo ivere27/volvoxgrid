@@ -35,6 +35,11 @@ fn engine_padding_to_v1(p: style::CellPadding) -> v1::CellPadding {
     }
 }
 
+fn apply_highlight_style_patch(target: &mut style::HighlightStyle, patch: &v1::HighlightStyle) {
+    let patch_style = style::HighlightStyle::from_proto(Some(patch));
+    target.merge_from(&patch_style);
+}
+
 fn apply_icon_slot_patch(slot: &mut Option<String>, patch: &Option<String>) {
     if let Some(v) = patch {
         if v.trim().is_empty() {
@@ -181,6 +186,170 @@ fn engine_header_mark_to_v1(height: style::HeaderMarkHeight) -> v1::HeaderMarkSi
     v1::HeaderMarkSize { value }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum EffectiveCoercionMode {
+    Strict,
+    Flexible,
+    ParseOnly,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum EffectiveWriteErrorMode {
+    Reject,
+    SetNull,
+    Skip,
+}
+
+#[derive(Clone, Debug)]
+enum PlannedCellValueWrite {
+    None,
+    Write { value: CellValueData, text: String },
+    SetNull,
+    Skip,
+}
+
+#[derive(Clone, Debug)]
+struct PlannedCellUpdate {
+    update: v1::CellUpdate,
+    value_plan: PlannedCellValueWrite,
+    in_bounds: bool,
+}
+
+#[derive(Clone, Debug)]
+struct PlannedBatchWrite {
+    entries: Vec<PlannedCellUpdate>,
+    violations: Vec<v1::TypeViolation>,
+    written_count: i32,
+    rejected_count: i32,
+    has_hard_reject: bool,
+}
+
+#[derive(Clone, Debug)]
+struct ValueDecision {
+    plan: PlannedCellValueWrite,
+    violation: Option<v1::TypeViolation>,
+    hard_reject: bool,
+}
+
+fn normalize_column_data_type(data_type: i32) -> i32 {
+    match data_type {
+        v if v == v1::ColumnDataType::ColumnDataString as i32 => v,
+        v if v == v1::ColumnDataType::ColumnDataNumber as i32 => v,
+        v if v == v1::ColumnDataType::ColumnDataDate as i32 => v,
+        v if v == v1::ColumnDataType::ColumnDataBoolean as i32 => v,
+        v if v == v1::ColumnDataType::ColumnDataCurrency as i32 => v,
+        _ => v1::ColumnDataType::ColumnDataString as i32,
+    }
+}
+
+fn effective_coercion_mode(mode: i32) -> EffectiveCoercionMode {
+    match mode {
+        v if v == v1::CoercionMode::Strict as i32 => EffectiveCoercionMode::Strict,
+        v if v == v1::CoercionMode::ParseOnly as i32 => EffectiveCoercionMode::ParseOnly,
+        _ => EffectiveCoercionMode::Flexible,
+    }
+}
+
+fn effective_error_mode(mode: i32) -> EffectiveWriteErrorMode {
+    match mode {
+        v if v == v1::WriteErrorMode::SetNull as i32 => EffectiveWriteErrorMode::SetNull,
+        v if v == v1::WriteErrorMode::Skip as i32 => EffectiveWriteErrorMode::Skip,
+        _ => EffectiveWriteErrorMode::Reject,
+    }
+}
+
+fn parse_bool_text(raw: &str) -> Option<bool> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "true" | "1" | "yes" | "y" | "on" => Some(true),
+        "false" | "0" | "no" | "n" | "off" => Some(false),
+        _ => None,
+    }
+}
+
+fn parse_date_parts(raw: &str) -> Option<(i32, i32, i32, i32, i32, i32)> {
+    let s = raw.trim();
+    if s.is_empty() {
+        return None;
+    }
+    let parts: Vec<&str> = s
+        .split(|ch: char| !ch.is_ascii_digit())
+        .filter(|p| !p.is_empty())
+        .collect();
+    if parts.len() < 3 {
+        return None;
+    }
+    let p0 = parts[0].parse::<i32>().ok()?;
+    let p1 = parts[1].parse::<i32>().ok()?;
+    let p2 = parts[2].parse::<i32>().ok()?;
+    let (y, m, d) = if parts[0].len() == 4 {
+        (p0, p1, p2)
+    } else if parts[2].len() == 4 {
+        (p2, p0, p1)
+    } else {
+        return None;
+    };
+    if !(1..=12).contains(&m) || !(1..=31).contains(&d) {
+        return None;
+    }
+    let hh = parts
+        .get(3)
+        .and_then(|v| v.parse::<i32>().ok())
+        .unwrap_or(0);
+    let mm = parts
+        .get(4)
+        .and_then(|v| v.parse::<i32>().ok())
+        .unwrap_or(0);
+    let ss = parts
+        .get(5)
+        .and_then(|v| v.parse::<i32>().ok())
+        .unwrap_or(0);
+    if !(0..=23).contains(&hh) || !(0..=59).contains(&mm) || !(0..=59).contains(&ss) {
+        return None;
+    }
+    Some((y, m, d, hh, mm, ss))
+}
+
+fn days_from_civil(y: i32, m: i32, d: i32) -> i64 {
+    let y = y as i64 - if m <= 2 { 1 } else { 0 };
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = y - era * 400;
+    let mp = m as i64 + if m > 2 { -3 } else { 9 };
+    let doy = (153 * mp + 2) / 5 + d as i64 - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
+}
+
+fn parse_timestamp_text(raw: &str) -> Option<i64> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if let Ok(ms) = trimmed.parse::<i64>() {
+        return Some(ms);
+    }
+    let (y, m, d, hh, mm, ss) = parse_date_parts(trimmed)?;
+    let days = days_from_civil(y, m, d);
+    let secs = hh as i64 * 3_600 + mm as i64 * 60 + ss as i64;
+    Some(days * 86_400_000 + secs * 1_000)
+}
+
+fn cell_value_to_text(value: &CellValueData) -> String {
+    match value {
+        CellValueData::Text(v) => v.clone(),
+        CellValueData::Number(v) => v.to_string(),
+        CellValueData::Bool(v) => {
+            if *v {
+                "TRUE".to_string()
+            } else {
+                "FALSE".to_string()
+            }
+        }
+        CellValueData::Bytes(_) => String::new(),
+        CellValueData::Timestamp(v) => v.to_string(),
+        CellValueData::Empty => String::new(),
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // apply_config / get_config
 // ═══════════════════════════════════════════════════════════════════════════
@@ -229,7 +398,7 @@ impl VolvoxGrid {
             span: Some(self.get_span_config()),
             interaction: Some(self.get_interaction_config()),
             rendering: Some(self.get_render_config()),
-            version: env!("CARGO_PKG_VERSION").to_string(),
+            version: Self::version().to_string(),
         }
     }
 
@@ -312,12 +481,6 @@ impl VolvoxGrid {
         }
         if let Some(v) = sc.fore_color_frozen {
             self.style.fore_color_frozen = v;
-        }
-        if let Some(v) = sc.back_color_sel {
-            self.style.back_color_sel = v;
-        }
-        if let Some(v) = sc.fore_color_sel {
-            self.style.fore_color_sel = v;
         }
         if let Some(v) = sc.back_color_bkg {
             self.style.back_color_bkg = v;
@@ -578,9 +741,6 @@ impl VolvoxGrid {
         if let Some(v) = sc.show_sort_numbers {
             self.style.show_sort_numbers = v;
         }
-        if let Some(v) = sc.fill_handle_color {
-            self.style.fill_handle_color = v;
-        }
         if let Some(v) = sc.apply_scope {
             self.apply_scope = v;
         }
@@ -636,8 +796,20 @@ impl VolvoxGrid {
         if let Some(v) = sel.header_click_select {
             self.header_click_select = v;
         }
-        if let Some(v) = sel.show_fill_handle {
-            self.selection.show_fill_handle = v;
+        if let Some(v) = &sel.selection_style {
+            apply_highlight_style_patch(&mut self.selection.selection_style, v);
+        }
+        if let Some(v) = sel.hover_mode {
+            self.selection.hover_mode = v;
+        }
+        if let Some(v) = &sel.hover_row_style {
+            apply_highlight_style_patch(&mut self.selection.hover_row_style, v);
+        }
+        if let Some(v) = &sel.hover_column_style {
+            apply_highlight_style_patch(&mut self.selection.hover_column_style, v);
+        }
+        if let Some(v) = &sel.hover_cell_style {
+            apply_highlight_style_patch(&mut self.selection.hover_cell_style, v);
         }
         self.mark_dirty();
     }
@@ -826,8 +998,6 @@ impl VolvoxGrid {
             fore_color_fixed: Some(self.style.fore_color_fixed),
             back_color_frozen: Some(self.style.back_color_frozen),
             fore_color_frozen: Some(self.style.fore_color_frozen),
-            back_color_sel: Some(self.style.back_color_sel),
-            fore_color_sel: Some(self.style.fore_color_sel),
             back_color_bkg: Some(self.style.back_color_bkg),
             back_color_alternate: Some(self.style.back_color_alternate),
             grid_lines: Some(self.style.grid_lines),
@@ -948,7 +1118,6 @@ impl VolvoxGrid {
                 ),
             }),
             show_sort_numbers: Some(self.style.show_sort_numbers),
-            fill_handle_color: Some(self.style.fill_handle_color),
             apply_scope: Some(self.apply_scope),
             custom_render: Some(self.custom_render),
             sort_ascending_picture: self.sort_state.sort_ascending_picture.as_ref().map(|d| {
@@ -989,7 +1158,11 @@ impl VolvoxGrid {
             selection_visibility: Some(self.selection.selection_visibility),
             allow_selection: Some(self.allow_selection),
             header_click_select: Some(self.header_click_select),
-            show_fill_handle: Some(self.selection.show_fill_handle),
+            selection_style: Some(self.selection.selection_style.to_proto()),
+            hover_mode: Some(self.selection.hover_mode),
+            hover_row_style: Some(self.selection.hover_row_style.to_proto()),
+            hover_column_style: Some(self.selection.hover_column_style.to_proto()),
+            hover_cell_style: Some(self.selection.hover_cell_style.to_proto()),
         }
     }
 
@@ -1160,6 +1333,15 @@ impl VolvoxGrid {
                         .unwrap_or(grid_fixed_padding);
                     cp.fixed_cell_padding = Some(apply_padding_patch(base, v));
                 }
+                if let Some(v) = def.nullable {
+                    cp.nullable = v;
+                }
+                if let Some(v) = def.coercion_mode {
+                    cp.coercion_mode = v;
+                }
+                if let Some(v) = def.error_mode {
+                    cp.error_mode = v;
+                }
                 if let Some(v) = sticky_to_apply {
                     self.set_col_sticky(idx, v);
                 }
@@ -1235,102 +1417,556 @@ impl VolvoxGrid {
     // Batch cell updates / reads
     // ═══════════════════════════════════════════════════════════════════════
 
-    /// Batch-set cell values, styles, checked state, and pictures.
-    pub fn update_cells(&mut self, updates: &[v1::CellUpdate]) {
-        for u in updates {
-            let row = u.row;
-            let col = u.col;
-            if row < 0 || row >= self.rows || col < 0 || col >= self.cols {
-                continue;
-            }
+    fn column_write_policy(
+        &self,
+        col: i32,
+    ) -> (
+        i32,
+        bool,
+        EffectiveCoercionMode,
+        EffectiveWriteErrorMode,
+    ) {
+        let cp = self.columns.get(col as usize);
+        let data_type = cp.map_or(v1::ColumnDataType::ColumnDataString as i32, |c| c.data_type);
+        let nullable = cp.map_or(true, |c| c.nullable);
+        let coercion_mode = cp.map_or(0, |c| c.coercion_mode);
+        let error_mode = cp.map_or(0, |c| c.error_mode);
+        (
+            normalize_column_data_type(data_type),
+            nullable,
+            effective_coercion_mode(coercion_mode),
+            effective_error_mode(error_mode),
+        )
+    }
 
-            // Value
-            if let Some(cv) = &u.value {
-                if let Some(val) = &cv.value {
-                    match val {
-                        v1::cell_value::Value::Text(t) => {
-                            self.cells.set_text(row, col, t.clone());
-                        }
-                        v1::cell_value::Value::Number(n) => {
-                            self.cells.set_value(row, col, CellValueData::Number(*n));
-                            self.cells.set_text(row, col, n.to_string());
-                        }
+    fn coerce_value_for_column(
+        &self,
+        expected: i32,
+        mode: EffectiveCoercionMode,
+        inbound: &v1::cell_value::Value,
+    ) -> Result<CellValueData, String> {
+        let parse_number = |raw: &str| {
+            raw.trim()
+                .parse::<f64>()
+                .map_err(|_| format!("Could not parse '{}' as Number", raw))
+        };
+        let parse_bool = |raw: &str| {
+            parse_bool_text(raw).ok_or_else(|| format!("Could not parse '{}' as Boolean", raw))
+        };
+        let parse_date = |raw: &str| {
+            parse_timestamp_text(raw).ok_or_else(|| format!("Could not parse '{}' as Date", raw))
+        };
+
+        match expected {
+            v if v == v1::ColumnDataType::ColumnDataString as i32 => match mode {
+                EffectiveCoercionMode::Strict | EffectiveCoercionMode::ParseOnly => match inbound {
+                    v1::cell_value::Value::Text(t) => Ok(CellValueData::Text(t.clone())),
+                    _ => Err("Expected Text value".to_string()),
+                },
+                EffectiveCoercionMode::Flexible => match inbound {
+                    v1::cell_value::Value::Text(t) => Ok(CellValueData::Text(t.clone())),
+                    v1::cell_value::Value::Number(n) => Ok(CellValueData::Text(n.to_string())),
+                    v1::cell_value::Value::Flag(b) => {
+                        Ok(CellValueData::Text(if *b { "true" } else { "false" }.to_string()))
+                    }
+                    v1::cell_value::Value::Data(d) => {
+                        Ok(CellValueData::Text(String::from_utf8_lossy(d).to_string()))
+                    }
+                    v1::cell_value::Value::Timestamp(ts) => Ok(CellValueData::Text(ts.to_string())),
+                },
+            },
+            v if v == v1::ColumnDataType::ColumnDataNumber as i32
+                || v == v1::ColumnDataType::ColumnDataCurrency as i32 =>
+            {
+                match mode {
+                    EffectiveCoercionMode::Strict => match inbound {
+                        v1::cell_value::Value::Number(n) => Ok(CellValueData::Number(*n)),
+                        _ => Err("Expected Number value".to_string()),
+                    },
+                    EffectiveCoercionMode::ParseOnly => match inbound {
+                        v1::cell_value::Value::Text(t) => parse_number(t).map(CellValueData::Number),
+                        _ => Err("ParseOnly accepts only Text input".to_string()),
+                    },
+                    EffectiveCoercionMode::Flexible => match inbound {
+                        v1::cell_value::Value::Number(n) => Ok(CellValueData::Number(*n)),
+                        v1::cell_value::Value::Text(t) => parse_number(t).map(CellValueData::Number),
                         v1::cell_value::Value::Flag(b) => {
-                            self.cells.set_value(row, col, CellValueData::Bool(*b));
+                            Ok(CellValueData::Number(if *b { 1.0 } else { 0.0 }))
                         }
-                        v1::cell_value::Value::Data(d) => {
-                            self.cells
-                                .set_value(row, col, CellValueData::Bytes(d.clone()));
+                        v1::cell_value::Value::Timestamp(ts) => Ok(CellValueData::Number(*ts as f64)),
+                        v1::cell_value::Value::Data(_) => Err("Cannot coerce Bytes to Number".to_string()),
+                    },
+                }
+            }
+            v if v == v1::ColumnDataType::ColumnDataDate as i32 => match mode {
+                EffectiveCoercionMode::Strict => match inbound {
+                    v1::cell_value::Value::Timestamp(ts) => Ok(CellValueData::Timestamp(*ts)),
+                    _ => Err("Expected Timestamp value".to_string()),
+                },
+                EffectiveCoercionMode::ParseOnly => match inbound {
+                    v1::cell_value::Value::Text(t) => parse_date(t).map(CellValueData::Timestamp),
+                    _ => Err("ParseOnly accepts only Text input".to_string()),
+                },
+                EffectiveCoercionMode::Flexible => match inbound {
+                    v1::cell_value::Value::Timestamp(ts) => Ok(CellValueData::Timestamp(*ts)),
+                    v1::cell_value::Value::Number(n) if n.is_finite() => {
+                        Ok(CellValueData::Timestamp(*n as i64))
+                    }
+                    v1::cell_value::Value::Text(t) => parse_date(t).map(CellValueData::Timestamp),
+                    v1::cell_value::Value::Flag(_) => Err("Cannot coerce Boolean to Date".to_string()),
+                    v1::cell_value::Value::Data(_) => Err("Cannot coerce Bytes to Date".to_string()),
+                    v1::cell_value::Value::Number(_) => {
+                        Err("Cannot coerce non-finite Number to Date".to_string())
+                    }
+                },
+            },
+            v if v == v1::ColumnDataType::ColumnDataBoolean as i32 => match mode {
+                EffectiveCoercionMode::Strict => match inbound {
+                    v1::cell_value::Value::Flag(b) => Ok(CellValueData::Bool(*b)),
+                    _ => Err("Expected Boolean value".to_string()),
+                },
+                EffectiveCoercionMode::ParseOnly => match inbound {
+                    v1::cell_value::Value::Text(t) => parse_bool(t).map(CellValueData::Bool),
+                    _ => Err("ParseOnly accepts only Text input".to_string()),
+                },
+                EffectiveCoercionMode::Flexible => match inbound {
+                    v1::cell_value::Value::Flag(b) => Ok(CellValueData::Bool(*b)),
+                    v1::cell_value::Value::Text(t) => parse_bool(t).map(CellValueData::Bool),
+                    v1::cell_value::Value::Number(n) => Ok(CellValueData::Bool(*n != 0.0)),
+                    v1::cell_value::Value::Timestamp(ts) => Ok(CellValueData::Bool(*ts != 0)),
+                    v1::cell_value::Value::Data(_) => Err("Cannot coerce Bytes to Boolean".to_string()),
+                },
+            },
+            _ => Err("Unsupported column data type".to_string()),
+        }
+    }
+
+    fn build_violation(
+        &self,
+        row: i32,
+        col: i32,
+        expected: i32,
+        actual: &v1::CellValue,
+        reason: String,
+    ) -> v1::TypeViolation {
+        v1::TypeViolation {
+            row,
+            col,
+            expected,
+            actual: Some(actual.clone()),
+            reason,
+        }
+    }
+
+    fn plan_value_write(
+        &self,
+        row: i32,
+        col: i32,
+        incoming: &v1::CellValue,
+    ) -> ValueDecision {
+        let (expected, nullable, coercion_mode, error_mode) = self.column_write_policy(col);
+
+        let apply_error_policy =
+            |reason: String, nullable: bool, error_mode: EffectiveWriteErrorMode| -> ValueDecision {
+                let violation = self.build_violation(row, col, expected, incoming, reason);
+                match error_mode {
+                    EffectiveWriteErrorMode::Reject => ValueDecision {
+                        plan: PlannedCellValueWrite::Skip,
+                        violation: Some(violation),
+                        hard_reject: true,
+                    },
+                    EffectiveWriteErrorMode::SetNull => {
+                        if nullable {
+                            ValueDecision {
+                                plan: PlannedCellValueWrite::SetNull,
+                                violation: Some(violation),
+                                hard_reject: false,
+                            }
+                        } else {
+                            ValueDecision {
+                                plan: PlannedCellValueWrite::Skip,
+                                violation: Some(self.build_violation(
+                                    row,
+                                    col,
+                                    expected,
+                                    incoming,
+                                    "WriteErrorMode=SET_NULL is invalid when nullable=false"
+                                        .to_string(),
+                                )),
+                                hard_reject: true,
+                            }
                         }
                     }
+                    EffectiveWriteErrorMode::Skip => ValueDecision {
+                        plan: PlannedCellValueWrite::Skip,
+                        violation: Some(violation),
+                        hard_reject: false,
+                    },
                 }
-            }
+            };
 
-            // Style — merge incoming fields into existing override
-            if let Some(s) = &u.style {
-                let patch = v2_cell_style_to_engine(s);
-                if patch.is_empty() {
-                    self.cell_styles.remove(&(row, col));
+        match incoming.value.as_ref() {
+            None => {
+                if nullable {
+                    ValueDecision {
+                        plan: PlannedCellValueWrite::SetNull,
+                        violation: None,
+                        hard_reject: false,
+                    }
                 } else {
-                    self.cell_styles
-                        .entry((row, col))
-                        .and_modify(|existing| existing.merge_from(&patch))
-                        .or_insert(patch);
+                    apply_error_policy(
+                        "Null is not allowed for this column".to_string(),
+                        nullable,
+                        error_mode,
+                    )
                 }
             }
+            Some(value) => match self.coerce_value_for_column(expected, coercion_mode, value) {
+                Ok(v) => ValueDecision {
+                    plan: PlannedCellValueWrite::Write {
+                        text: cell_value_to_text(&v),
+                        value: v,
+                    },
+                    violation: None,
+                    hard_reject: false,
+                },
+                Err(reason) => apply_error_policy(reason, nullable, error_mode),
+            },
+        }
+    }
 
-            // Checked
-            if let Some(c) = u.checked {
-                let cell = self.cells.get_mut(row, col);
-                cell.extra_mut().checked = c;
-            }
+    fn plan_batch_write(
+        &self,
+        updates: &[v1::CellUpdate],
+        row_limit: i32,
+        col_limit: i32,
+    ) -> PlannedBatchWrite {
+        let mut entries = Vec::with_capacity(updates.len());
+        let mut violations = Vec::new();
+        let mut written_count = 0i32;
+        let mut rejected_count = 0i32;
+        let mut has_hard_reject = false;
 
-            // Picture
-            if let Some(img) = &u.picture {
-                let cell = self.cells.get_mut(row, col);
-                let extra = cell.extra_mut();
-                if img.data.is_empty() {
-                    extra.picture = None;
-                    extra.picture_format = String::new();
+        for update in updates {
+            let row = update.row;
+            let col = update.col;
+            let in_bounds = row >= 0 && row < row_limit && col >= 0 && col < col_limit;
+            let value_plan = if let Some(incoming) = &update.value {
+                let decision = if in_bounds {
+                    self.plan_value_write(row, col, incoming)
                 } else {
-                    extra.picture = Some(img.data.clone());
-                    extra.picture_format = img.format.clone();
+                    ValueDecision {
+                        plan: PlannedCellValueWrite::Skip,
+                        violation: Some(self.build_violation(
+                            row,
+                            col,
+                            v1::ColumnDataType::ColumnDataString as i32,
+                            incoming,
+                            "Cell out of bounds".to_string(),
+                        )),
+                        hard_reject: true,
+                    }
+                };
+                if let Some(v) = decision.violation {
+                    violations.push(v);
                 }
-            }
-
-            // Picture alignment
-            if let Some(pa) = u.picture_alignment {
-                let cell = self.cells.get_mut(row, col);
-                cell.extra_mut().picture_alignment = pa;
-            }
-
-            // Button picture
-            if let Some(img) = &u.button_picture {
-                let cell = self.cells.get_mut(row, col);
-                let extra = cell.extra_mut();
-                if img.data.is_empty() {
-                    extra.button_picture = None;
-                    extra.button_picture_format = String::new();
-                } else {
-                    extra.button_picture = Some(img.data.clone());
-                    extra.button_picture_format = img.format.clone();
+                if decision.hard_reject {
+                    has_hard_reject = true;
                 }
-            }
+                match decision.plan {
+                    PlannedCellValueWrite::Write { .. } | PlannedCellValueWrite::SetNull => {
+                        written_count += 1
+                    }
+                    PlannedCellValueWrite::Skip => rejected_count += 1,
+                    PlannedCellValueWrite::None => {}
+                }
+                decision.plan
+            } else {
+                PlannedCellValueWrite::None
+            };
+            entries.push(PlannedCellUpdate {
+                update: update.clone(),
+                value_plan,
+                in_bounds,
+            });
+        }
 
-            // Dropdown items
-            if let Some(cl) = &u.dropdown_items {
-                let cell = self.cells.get_mut(row, col);
-                cell.extra_mut().dropdown_items = cl.clone();
-            }
+        PlannedBatchWrite {
+            entries,
+            violations,
+            written_count,
+            rejected_count,
+            has_hard_reject,
+        }
+    }
 
-            // Cell-level sticky overrides
-            if u.sticky_row.is_some() || u.sticky_col.is_some() {
-                let sr = u.sticky_row.unwrap_or(0);
-                let sc = u.sticky_col.unwrap_or(0);
-                self.set_cell_sticky(row, col, sr, sc);
+    fn apply_value_plan(&mut self, row: i32, col: i32, plan: &PlannedCellValueWrite) {
+        match plan {
+            PlannedCellValueWrite::None | PlannedCellValueWrite::Skip => {}
+            PlannedCellValueWrite::SetNull => {
+                self.cells.set_value(row, col, CellValueData::Empty);
+                self.cells.set_text(row, col, String::new());
+            }
+            PlannedCellValueWrite::Write { value, text } => {
+                self.cells.set_value(row, col, value.clone());
+                self.cells.set_text(row, col, text.clone());
+            }
+        }
+    }
+
+    fn apply_non_value_update(&mut self, u: &v1::CellUpdate) {
+        let row = u.row;
+        let col = u.col;
+
+        if let Some(s) = &u.style {
+            let patch = v2_cell_style_to_engine(s);
+            if patch.is_empty() {
+                self.cell_styles.remove(&(row, col));
+            } else {
+                self.cell_styles
+                    .entry((row, col))
+                    .and_modify(|existing| existing.merge_from(&patch))
+                    .or_insert(patch);
+            }
+        }
+
+        if let Some(c) = u.checked {
+            let cell = self.cells.get_mut(row, col);
+            cell.extra_mut().checked = c;
+        }
+
+        if let Some(img) = &u.picture {
+            let cell = self.cells.get_mut(row, col);
+            let extra = cell.extra_mut();
+            if img.data.is_empty() {
+                extra.picture = None;
+                extra.picture_format = String::new();
+            } else {
+                extra.picture = Some(img.data.clone());
+                extra.picture_format = img.format.clone();
+            }
+        }
+
+        if let Some(pa) = u.picture_alignment {
+            let cell = self.cells.get_mut(row, col);
+            cell.extra_mut().picture_alignment = pa;
+        }
+
+        if let Some(img) = &u.button_picture {
+            let cell = self.cells.get_mut(row, col);
+            let extra = cell.extra_mut();
+            if img.data.is_empty() {
+                extra.button_picture = None;
+                extra.button_picture_format = String::new();
+            } else {
+                extra.button_picture = Some(img.data.clone());
+                extra.button_picture_format = img.format.clone();
+            }
+        }
+
+        if let Some(cl) = &u.dropdown_items {
+            let cell = self.cells.get_mut(row, col);
+            cell.extra_mut().dropdown_items = cl.clone();
+        }
+
+        if u.sticky_row.is_some() || u.sticky_col.is_some() {
+            let sr = u.sticky_row.unwrap_or(0);
+            let sc = u.sticky_col.unwrap_or(0);
+            self.set_cell_sticky(row, col, sr, sc);
+        }
+    }
+
+    /// Batch-set cell values, styles, checked state, and pictures with
+    /// strict typing + per-cell write feedback.
+    pub fn write_cells(&mut self, updates: &[v1::CellUpdate], atomic: bool) -> v1::WriteResult {
+        let plan = self.plan_batch_write(updates, self.rows, self.cols);
+        if atomic && plan.has_hard_reject {
+            return v1::WriteResult {
+                written_count: 0,
+                rejected_count: plan.rejected_count,
+                violations: plan.violations,
+            };
+        }
+
+        let mut applied_any = false;
+        for entry in &plan.entries {
+            if !entry.in_bounds {
+                continue;
+            }
+            self.apply_value_plan(entry.update.row, entry.update.col, &entry.value_plan);
+            if matches!(
+                entry.value_plan,
+                PlannedCellValueWrite::Write { .. } | PlannedCellValueWrite::SetNull
+            ) {
+                applied_any = true;
+            }
+            self.apply_non_value_update(&entry.update);
+            if entry.update.style.is_some()
+                || entry.update.checked.is_some()
+                || entry.update.picture.is_some()
+                || entry.update.picture_alignment.is_some()
+                || entry.update.button_picture.is_some()
+                || entry.update.dropdown_items.is_some()
+                || entry.update.sticky_row.is_some()
+                || entry.update.sticky_col.is_some()
+            {
+                applied_any = true;
+            }
+        }
+        if applied_any {
+            self.mark_dirty();
+        }
+
+        v1::WriteResult {
+            written_count: plan.written_count,
+            rejected_count: plan.rejected_count,
+            violations: plan.violations,
+        }
+    }
+
+    /// Legacy compatibility wrapper for callers that ignore write feedback.
+    pub fn update_cells(&mut self, updates: &[v1::CellUpdate]) {
+        let _ = self.write_cells(updates, false);
+    }
+
+    /// Typed bulk ingestion path used by `LoadTable`.
+    pub fn load_table(
+        &mut self,
+        rows: i32,
+        cols: i32,
+        values: &[v1::CellValue],
+        atomic: bool,
+    ) -> v1::WriteResult {
+        let rows = rows.max(1);
+        let cols = cols.max(1);
+        let max = (rows as usize).saturating_mul(cols as usize);
+        let updates: Vec<v1::CellUpdate> = values
+            .iter()
+            .take(max)
+            .enumerate()
+            .map(|(idx, value)| {
+                let idx = idx as i32;
+                v1::CellUpdate {
+                    row: idx / cols,
+                    col: idx % cols,
+                    value: Some(value.clone()),
+                    style: None,
+                    checked: None,
+                    picture: None,
+                    picture_alignment: None,
+                    button_picture: None,
+                    dropdown_items: None,
+                    sticky_row: None,
+                    sticky_col: None,
+                }
+            })
+            .collect();
+
+        let plan = self.plan_batch_write(&updates, rows, cols);
+        if atomic && plan.has_hard_reject {
+            return v1::WriteResult {
+                written_count: 0,
+                rejected_count: plan.rejected_count,
+                violations: plan.violations,
+            };
+        }
+
+        self.set_rows(rows);
+        self.set_cols(cols);
+        self.cells.clear_all();
+        for entry in &plan.entries {
+            if entry.in_bounds {
+                self.apply_value_plan(entry.update.row, entry.update.col, &entry.value_plan);
             }
         }
         self.mark_dirty();
+
+        v1::WriteResult {
+            written_count: plan.written_count,
+            rejected_count: plan.rejected_count,
+            violations: plan.violations,
+        }
+    }
+
+    /// Export effective column definitions as schema.
+    pub fn get_schema(&self, grid_id: i64) -> v1::DefineColumnsRequest {
+        let mut columns = Vec::with_capacity(self.cols.max(0) as usize);
+        for col in 0..self.cols {
+            let cp = self
+                .columns
+                .get(col as usize)
+                .cloned()
+                .unwrap_or_else(crate::column::ColumnProps::default);
+            columns.push(v1::ColumnDef {
+                index: col,
+                width: Some(self.get_col_width(col)),
+                min_width: if cp.width_min != 0 {
+                    Some(cp.width_min)
+                } else {
+                    None
+                },
+                max_width: if cp.width_max != 0 {
+                    Some(cp.width_max)
+                } else {
+                    None
+                },
+                alignment: Some(cp.alignment),
+                fixed_alignment: Some(cp.fixed_alignment),
+                data_type: Some(normalize_column_data_type(cp.data_type)),
+                format: if cp.format.is_empty() {
+                    None
+                } else {
+                    Some(cp.format)
+                },
+                key: if cp.key.is_empty() { None } else { Some(cp.key) },
+                sort: if cp.sort_defined {
+                    Some(cp.sort_order)
+                } else {
+                    None
+                },
+                dropdown_items: if cp.dropdown_items.is_empty() {
+                    None
+                } else {
+                    Some(cp.dropdown_items)
+                },
+                edit_mask: if cp.edit_mask.is_empty() {
+                    None
+                } else {
+                    Some(cp.edit_mask)
+                },
+                indent: if cp.indent != 0 { Some(cp.indent) } else { None },
+                hidden: Some(cp.hidden),
+                span: Some(cp.span),
+                image_list: cp
+                    .image_list
+                    .into_iter()
+                    .map(|data| v1::ImageData {
+                        data,
+                        format: String::new(),
+                    })
+                    .collect(),
+                data: cp.user_data,
+                sticky: if cp.sticky != 0 {
+                    Some(cp.sticky)
+                } else {
+                    None
+                },
+                cell_padding: cp.cell_padding.map(engine_padding_to_v1),
+                fixed_cell_padding: cp.fixed_cell_padding.map(engine_padding_to_v1),
+                nullable: Some(cp.nullable),
+                coercion_mode: if cp.coercion_mode != 0 {
+                    Some(cp.coercion_mode)
+                } else {
+                    None
+                },
+                error_mode: if cp.error_mode != 0 {
+                    Some(cp.error_mode)
+                } else {
+                    None
+                },
+            });
+        }
+        v1::DefineColumnsRequest { grid_id, columns }
     }
 
     /// Read cell data for a range.
@@ -1342,6 +1978,7 @@ impl VolvoxGrid {
         col2: i32,
         include_style: bool,
         include_checked: bool,
+        include_typed: bool,
     ) -> Vec<v1::CellData> {
         let r1 = row1.max(0).min(self.rows - 1);
         let r2 = row2.max(0).min(self.rows - 1);
@@ -1351,12 +1988,39 @@ impl VolvoxGrid {
         let mut result = Vec::new();
         for row in r1..=r2 {
             for col in c1..=c2 {
-                let text = self.cells.get_text(row, col);
-                let value = if text.is_empty() {
+                let text = self.cells.get_text(row, col).to_string();
+                let typed_value = if include_typed {
+                    match self.cells.get_value(row, col) {
+                        CellValueData::Text(v) => Some(v1::CellValue {
+                            value: Some(v1::cell_value::Value::Text(v.clone())),
+                        }),
+                        CellValueData::Number(v) => Some(v1::CellValue {
+                            value: Some(v1::cell_value::Value::Number(*v)),
+                        }),
+                        CellValueData::Bool(v) => Some(v1::CellValue {
+                            value: Some(v1::cell_value::Value::Flag(*v)),
+                        }),
+                        CellValueData::Bytes(v) => Some(v1::CellValue {
+                            value: Some(v1::cell_value::Value::Data(v.clone())),
+                        }),
+                        CellValueData::Timestamp(v) => Some(v1::CellValue {
+                            value: Some(v1::cell_value::Value::Timestamp(*v)),
+                        }),
+                        CellValueData::Empty => {
+                            if text.is_empty() {
+                                None
+                            } else {
+                                Some(v1::CellValue {
+                                    value: Some(v1::cell_value::Value::Text(text.clone())),
+                                })
+                            }
+                        }
+                    }
+                } else if text.is_empty() {
                     None
                 } else {
                     Some(v1::CellValue {
-                        value: Some(v1::cell_value::Value::Text(text.to_string())),
+                        value: Some(v1::cell_value::Value::Text(text.clone())),
                     })
                 };
 
@@ -1377,7 +2041,7 @@ impl VolvoxGrid {
                 result.push(v1::CellData {
                     row,
                     col,
-                    value,
+                    value: typed_value,
                     style,
                     checked,
                 });
@@ -1676,13 +2340,112 @@ mod tests {
     }
 
     #[test]
+    fn write_cells_strict_rejects_type_mismatch() {
+        let mut grid = test_grid();
+        grid.define_columns(&[v1::ColumnDef {
+            index: 0,
+            data_type: Some(v1::ColumnDataType::ColumnDataNumber as i32),
+            coercion_mode: Some(v1::CoercionMode::Strict as i32),
+            error_mode: Some(v1::WriteErrorMode::Reject as i32),
+            ..Default::default()
+        }]);
+
+        let result = grid.write_cells(
+            &[v1::CellUpdate {
+                row: 1,
+                col: 0,
+                value: Some(v1::CellValue {
+                    value: Some(v1::cell_value::Value::Text("abc".to_string())),
+                }),
+                ..Default::default()
+            }],
+            false,
+        );
+
+        assert_eq!(result.written_count, 0);
+        assert_eq!(result.rejected_count, 1);
+        assert_eq!(result.violations.len(), 1);
+        assert_eq!(grid.cells.get_text(1, 0), "");
+    }
+
+    #[test]
+    fn write_cells_atomic_rejects_all_on_hard_error() {
+        let mut grid = test_grid();
+        grid.define_columns(&[v1::ColumnDef {
+            index: 0,
+            data_type: Some(v1::ColumnDataType::ColumnDataNumber as i32),
+            coercion_mode: Some(v1::CoercionMode::Strict as i32),
+            error_mode: Some(v1::WriteErrorMode::Reject as i32),
+            ..Default::default()
+        }]);
+        grid.cells.set_text(1, 0, "old".to_string());
+
+        let result = grid.write_cells(
+            &[
+                v1::CellUpdate {
+                    row: 1,
+                    col: 0,
+                    value: Some(v1::CellValue {
+                        value: Some(v1::cell_value::Value::Number(42.0)),
+                    }),
+                    ..Default::default()
+                },
+                v1::CellUpdate {
+                    row: 2,
+                    col: 0,
+                    value: Some(v1::CellValue {
+                        value: Some(v1::cell_value::Value::Text("bad".to_string())),
+                    }),
+                    ..Default::default()
+                },
+            ],
+            true,
+        );
+
+        assert_eq!(result.written_count, 0);
+        assert_eq!(result.rejected_count, 1);
+        assert_eq!(grid.cells.get_text(1, 0), "old");
+    }
+
+    #[test]
+    fn load_table_supports_timestamp_values() {
+        let mut grid = test_grid();
+        grid.define_columns(&[v1::ColumnDef {
+            index: 0,
+            data_type: Some(v1::ColumnDataType::ColumnDataDate as i32),
+            coercion_mode: Some(v1::CoercionMode::Strict as i32),
+            ..Default::default()
+        }]);
+
+        let ts = 1_700_000_000_000i64;
+        let result = grid.load_table(
+            1,
+            1,
+            &[v1::CellValue {
+                value: Some(v1::cell_value::Value::Timestamp(ts)),
+            }],
+            true,
+        );
+        assert_eq!(result.written_count, 1);
+        assert_eq!(result.rejected_count, 0);
+
+        let cells = grid.get_cells(0, 0, 0, 0, false, false, true);
+        assert!(matches!(
+            cells.first().and_then(|c| c.value.clone()),
+            Some(v1::CellValue {
+                value: Some(v1::cell_value::Value::Timestamp(v))
+            }) if v == ts
+        ));
+    }
+
+    #[test]
     fn get_cells_range() {
         let mut grid = test_grid();
         grid.cells.set_text(1, 1, "A".to_string());
         grid.cells.set_text(1, 2, "B".to_string());
         grid.cells.set_text(2, 1, "C".to_string());
 
-        let cells = grid.get_cells(1, 1, 2, 2, false, false);
+        let cells = grid.get_cells(1, 1, 2, 2, false, false, false);
         assert_eq!(cells.len(), 4); // 2x2 range
 
         let a = cells.iter().find(|c| c.row == 1 && c.col == 1).unwrap();
@@ -1761,10 +2524,7 @@ mod tests {
         let mut grid = test_grid();
         grid.text_overflow = true;
         let config = grid.get_config();
-        assert_eq!(
-            config.layout.as_ref().unwrap().text_overflow,
-            Some(true)
-        );
+        assert_eq!(config.layout.as_ref().unwrap().text_overflow, Some(true));
     }
 
     #[test]

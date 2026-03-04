@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'volvoxgrid'
-  s.version          = '0.1.4'
+  s.version          = '0.1.5'
   s.summary          = 'VolvoxGrid pixel-rendering grid engine for Flutter'
   s.homepage         = 'https://github.com/ivere27/volvoxgrid'
   s.license          = { :type => 'Apache-2.0' }

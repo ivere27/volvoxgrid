@@ -1208,8 +1208,10 @@ export class VolvoxExcel implements VolvoxExcelApi {
       col1: ref.col1 + fixedCols,
       row2: ref.row2 + fixedRows,
       col2: ref.col2 + fixedCols,
-      color: VolvoxExcel.FORMULA_REF_COLORS[idx % VolvoxExcel.FORMULA_REF_COLORS.length],
-      showCornerHandles: true,
+      style: {
+        borderColor: VolvoxExcel.FORMULA_REF_COLORS[idx % VolvoxExcel.FORMULA_REF_COLORS.length],
+        fillHandle: 5, // FILL_HANDLE_ALL_CORNERS
+      },
       refId: idx + 1,
       textStart: ref.start,
       textLength: ref.length,

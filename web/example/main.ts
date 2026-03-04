@@ -29,6 +29,15 @@ const STRESS_COLS = 12;
 const SALES_COLS = 10;
 const HIERARCHY_COLS = 5;
 const FONT_FETCH_TIMEOUT_MS = 3000;
+const HOVER_NONE = 0;
+const HOVER_ROW = 1;
+const HOVER_COLUMN = 2;
+const HOVER_CELL = 4;
+const DEMO_DEFAULT_HOVER_MODE: Record<StandardDemoMode, number> = {
+  stress: HOVER_ROW,
+  sales: HOVER_ROW | HOVER_COLUMN | HOVER_CELL,
+  hierarchy: HOVER_CELL,
+};
 type WasmModule = typeof import("./wasm/volvoxgrid_wasm.js");
 
 async function fetchFontWithTimeout(url: string): Promise<Uint8Array | null> {
@@ -100,6 +109,61 @@ function installAtomicsWaitAsyncGuard(): void {
   atomics.__volvoxgridWaitAsyncGuarded = true;
 }
 
+function parseEnvBool(value: string | undefined, fallback = false): boolean {
+  if (value == null) {
+    return fallback;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "") {
+    return fallback;
+  }
+  if (normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on") {
+    return true;
+  }
+  if (normalized === "0" || normalized === "false" || normalized === "no" || normalized === "off") {
+    return false;
+  }
+  return fallback;
+}
+
+function pbEncodeVarint(value: bigint): number[] {
+  if (value < 0n) {
+    throw new RangeError("varint must be unsigned");
+  }
+  const out: number[] = [];
+  let v = value;
+  while (v >= 0x80n) {
+    out.push(Number((v & 0x7fn) | 0x80n));
+    v >>= 7n;
+  }
+  out.push(Number(v));
+  return out;
+}
+
+function pbEncodeTag(field: number, wireType: number): number[] {
+  return pbEncodeVarint(BigInt((field << 3) | wireType));
+}
+
+function pbEncodeMessageField(field: number, payload: Uint8Array): number[] {
+  return [
+    ...pbEncodeTag(field, 2),
+    ...pbEncodeVarint(BigInt(payload.length)),
+    ...payload,
+  ];
+}
+
+function pbEncodeSelectionHoverModeConfig(mode: number): Uint8Array {
+  const nextMode = Number.isFinite(mode) ? (Math.max(0, Math.trunc(mode)) >>> 0) : 0;
+  const selectionConfig: number[] = [];
+  // SelectionConfig.hover_mode = 7
+  selectionConfig.push(...pbEncodeTag(7, 0), ...pbEncodeVarint(BigInt(nextMode)));
+
+  const gridConfig: number[] = [];
+  // GridConfig.selection = 3
+  gridConfig.push(...pbEncodeMessageField(3, new Uint8Array(selectionConfig)));
+  return new Uint8Array(gridConfig);
+}
+
 async function main() {
   const status = document.getElementById("status")!;
   const canvas = document.getElementById("grid-canvas") as HTMLCanvasElement;
@@ -116,6 +180,7 @@ async function main() {
   const selTextCache = document.getElementById("sel-text-cache") as HTMLSelectElement;
   const selDoomRes = document.getElementById("sel-doom-res") as HTMLSelectElement;
   const chkDoomBorder = document.getElementById("chk-doom-border") as HTMLInputElement;
+  const env = (import.meta as any).env as Record<string, string | undefined>;
 
   installAtomicsWaitAsyncGuard();
 
@@ -229,6 +294,9 @@ async function main() {
     grid.invalidate();
   });
 
+  // PresentMode (proto): 0=AUTO, 1=FIFO, 2=MAILBOX, 3=IMMEDIATE.
+  // Prefer MAILBOX for lower-latency GPU presentation when available.
+  grid.setPresentMode(2);
   grid.setRendererMode(2); // GPU — let tryInitGpu proceed
   const gpuOk = await grid.tryInitGpu();
   grid.setRendererMode(1); // default CPU
@@ -349,6 +417,40 @@ async function main() {
   const chkDebug = document.getElementById("chk-debug") as HTMLInputElement;
   const chkGpu = document.getElementById("chk-gpu") as HTMLInputElement;
   const chkAnim = document.getElementById("chk-anim") as HTMLInputElement;
+  const chkHover = document.getElementById("chk-hover") as HTMLInputElement;
+  chkHover.checked = parseEnvBool(env?.VITE_VG_ENABLE_HOVER, false);
+
+  function hoverModeForDemo(mode: StandardDemoMode): number {
+    return DEMO_DEFAULT_HOVER_MODE[mode] ?? HOVER_NONE;
+  }
+
+  function setGridHoverMode(id: number, mode: number): void {
+    const configure = (wasmModule as any).volvox_grid_configure as
+      | ((gridId: bigint, config: Uint8Array) => Uint8Array)
+      | undefined;
+    if (typeof configure !== "function") {
+      return;
+    }
+    try {
+      configure(BigInt(Math.trunc(id)), pbEncodeSelectionHoverModeConfig(mode));
+    } catch (err) {
+      console.warn("VolvoxGrid: failed to update hover mode", err);
+    }
+  }
+
+  function applyHoverToggleToKnownGrids(): void {
+    for (const mode of Object.keys(demoGridIds) as StandardDemoMode[]) {
+      const id = demoGridIds[mode];
+      if (typeof id !== "number" || id <= 0) {
+        continue;
+      }
+      setGridHoverMode(id, chkHover.checked ? hoverModeForDemo(mode) : HOVER_NONE);
+    }
+    if (doomGridId != null && doomGridId > 0) {
+      setGridHoverMode(doomGridId, HOVER_NONE);
+    }
+    grid.invalidate();
+  }
 
   function selectedTextLayoutCacheCap(): number {
     const parsed = Number.parseInt(selTextCache.value, 10);
@@ -555,7 +657,10 @@ async function main() {
   }> {
     const res = await doomRuntime.resolveAssetSource();
     if (res.ok && res.source?.id === "remote") {
-      console.info("DOOM mode: using remote fallback assets through Vite proxy.");
+      const viaProxy = res.source.bundlePath.startsWith("/doom/remote/");
+      console.info(viaProxy
+        ? "DOOM mode: using remote fallback assets via dev proxy."
+        : "DOOM mode: using remote fallback assets from CDN.");
     }
     return res;
   }
@@ -799,6 +904,7 @@ async function main() {
         break;
     }
 
+    setGridHoverMode(id, chkHover.checked ? hoverModeForDemo(mode) : HOVER_NONE);
     wasmModule.set_fast_scroll_enabled(id, true);
     applyDemoViewDefaults(mode);
     grid.invalidate();
@@ -813,6 +919,7 @@ async function main() {
   function ensureDoomGridId(): number {
     if (doomGridId == null) {
       doomGridId = createScaledGrid(doomRuntime.getRows(), doomRuntime.getCols());
+      setGridHoverMode(doomGridId, HOVER_NONE);
     }
     return doomGridId;
   }
@@ -847,6 +954,9 @@ async function main() {
         : "Starting DOOM emulator...";
       try {
         await doomRuntime.ensureEmulator(source);
+        status.textContent = doomRuntime.isWorkerMode()
+          ? "DOOM emulator started (worker mode)."
+          : "DOOM emulator started (main-thread fallback mode).";
       } catch (err) {
         const raw = String(err);
         const hint = source.id === "remote"
@@ -1151,6 +1261,11 @@ async function main() {
     grid.invalidate();
   });
 
+  // Hover highlight toggle.
+  chkHover.addEventListener("change", () => {
+    applyHoverToggleToKnownGrids();
+  });
+
   // Debug overlay toggle.
   chkDebug.addEventListener("change", () => {
     applyActiveRenderSettings();
@@ -1167,8 +1282,8 @@ async function main() {
     grid.invalidate();
   });
 
-  // Initial scale can be configured from `make web WEB_SCALE=<value>`.
-  const env = (import.meta as any).env as Record<string, string | undefined>;
+  // Initial options can be configured from:
+  // `make web WEB_SCALE=<value> WEB_HOVER=<true|false>`
   const envZoom = Number(env?.VITE_VG_INITIAL_SCALE ?? "");
   const ZOOM_MIN = 0.3;
   const ZOOM_MAX = 3.0;

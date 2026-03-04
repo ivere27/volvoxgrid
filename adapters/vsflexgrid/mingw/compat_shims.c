@@ -1,7 +1,7 @@
 /* compat_shims.c — shims for functions missing from MinGW import libs */
 
-#include <windows.h>
 #include <winsock2.h>
+#include <windows.h>
 
 /* MinGW's libws2_32.a doesn't export GetHostNameW (added in Win8 SDK).
    Rust std uses it for sys::net::hostname on Windows.  Provide a shim

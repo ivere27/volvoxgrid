@@ -42,6 +42,12 @@ class VolvoxGridServiceFfi {
     return Empty.fromBuffer(resultBytes);
   }
 
+  static Future<DefineColumnsRequest> GetSchema(GridHandle request) async {
+    final bytes = request.writeToBuffer();
+    final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/GetSchema', bytes);
+    return DefineColumnsRequest.fromBuffer(resultBytes);
+  }
+
   static Future<Empty> DefineRows(DefineRowsRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/DefineRows', bytes);
@@ -72,10 +78,10 @@ class VolvoxGridServiceFfi {
     return Empty.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> UpdateCells(UpdateCellsRequest request) async {
+  static Future<WriteResult> UpdateCells(UpdateCellsRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/UpdateCells', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return WriteResult.fromBuffer(resultBytes);
   }
 
   static Future<CellsResponse> GetCells(GetCellsRequest request) async {
@@ -84,10 +90,10 @@ class VolvoxGridServiceFfi {
     return CellsResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> LoadArray(LoadArrayRequest request) async {
+  static Future<WriteResult> LoadTable(LoadTableRequest request) async {
     final bytes = request.writeToBuffer();
-    final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/LoadArray', bytes);
-    return Empty.fromBuffer(resultBytes);
+    final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/LoadTable', bytes);
+    return WriteResult.fromBuffer(resultBytes);
   }
 
   static Future<Empty> Clear(ClearRequest request) async {

@@ -7,7 +7,8 @@
 
 import {
   encodeTag, encodeInt32, encodeBool,
-  encodeVarintUnsigned, encodeMessageField, encodeStringField,
+  encodeVarintUnsigned, encodeMessageField, encodeStringField, encodeHighlightStyle,
+  type HighlightStyleArg,
 } from "./proto-utils.js";
 
 export interface ExcelGridConfig {
@@ -33,11 +34,14 @@ export interface ExcelGridConfig {
   fontName?: string;
   fontSize?: number;
   fontBold?: boolean;
-  backColorSel?: number;
-  foreColorSel?: number;
   // Selection
   selectionMode?: number;
   focusBorder?: number;
+  selectionStyle?: HighlightStyleArg;
+  hoverMode?: number;
+  hoverRowStyle?: HighlightStyleArg;
+  hoverColumnStyle?: HighlightStyleArg;
+  hoverCellStyle?: HighlightStyleArg;
   // Edit
   editTrigger?: number;
   tabBehavior?: number;
@@ -50,9 +54,6 @@ export interface ExcelGridConfig {
   cellSpanFixed?: number;
   // Text overflow
   textOverflow?: boolean;
-  // Fill handle
-  showFillHandle?: boolean;
-  fillHandleColor?: number;
 }
 
 export function encodeGridConfig(config: ExcelGridConfig): Uint8Array {
@@ -85,12 +86,6 @@ export function encodeGridConfig(config: ExcelGridConfig): Uint8Array {
   if (config.foreColorFixed != null) {
     style.push(...encodeTag(5, 0), ...encodeVarintUnsigned(BigInt(config.foreColorFixed >>> 0)));
   }
-  if (config.backColorSel != null) {
-    style.push(...encodeTag(8, 0), ...encodeVarintUnsigned(BigInt(config.backColorSel >>> 0)));
-  }
-  if (config.foreColorSel != null) {
-    style.push(...encodeTag(9, 0), ...encodeVarintUnsigned(BigInt(config.foreColorSel >>> 0)));
-  }
   if (config.gridLines != null) {
     style.push(...encodeTag(12, 0), ...encodeInt32(config.gridLines));
   }
@@ -119,9 +114,6 @@ export function encodeGridConfig(config: ExcelGridConfig): Uint8Array {
   if (config.fontBold != null) {
     style.push(...encodeTag(21, 0), ...encodeBool(config.fontBold));
   }
-  if (config.fillHandleColor != null) {
-    style.push(...encodeTag(51, 0), ...encodeVarintUnsigned(BigInt(config.fillHandleColor >>> 0)));
-  }
   if (style.length > 0) gridConfig.push(...encodeMessageField(2, style));
 
   // ── SelectionConfig (field 3) ──
@@ -132,8 +124,20 @@ export function encodeGridConfig(config: ExcelGridConfig): Uint8Array {
   if (config.focusBorder != null) {
     selection.push(...encodeTag(2, 0), ...encodeInt32(config.focusBorder));
   }
-  if (config.showFillHandle != null) {
-    selection.push(...encodeTag(6, 0), ...encodeBool(config.showFillHandle));
+  if (config.selectionStyle != null) {
+    selection.push(...encodeMessageField(6, encodeHighlightStyle(config.selectionStyle)));
+  }
+  if (config.hoverMode != null) {
+    selection.push(...encodeTag(7, 0), ...encodeVarintUnsigned(BigInt(config.hoverMode >>> 0)));
+  }
+  if (config.hoverRowStyle != null) {
+    selection.push(...encodeMessageField(8, encodeHighlightStyle(config.hoverRowStyle)));
+  }
+  if (config.hoverColumnStyle != null) {
+    selection.push(...encodeMessageField(9, encodeHighlightStyle(config.hoverColumnStyle)));
+  }
+  if (config.hoverCellStyle != null) {
+    selection.push(...encodeMessageField(10, encodeHighlightStyle(config.hoverCellStyle)));
   }
   if (selection.length > 0) gridConfig.push(...encodeMessageField(3, selection));
 

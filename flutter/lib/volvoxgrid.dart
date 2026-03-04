@@ -85,6 +85,8 @@ class VolvoxGridWidget extends StatefulWidget {
 }
 
 class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
+  late final AppLifecycleListener _lifecycleListener;
+
   static const bool _flingOverrideEnabled = bool.fromEnvironment(
     'VG_ENABLE_FLING',
     defaultValue: false,
@@ -197,15 +199,111 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   Offset _longPressPosition = Offset.zero;
   static const Duration _longPressDuration = Duration(milliseconds: 500);
 
+  bool _wasUsingGpuTexture = false;
+
   @override
   void initState() {
     super.initState();
+    _lifecycleListener = AppLifecycleListener(
+      onPause: _onPause,
+      onResume: _onResume,
+    );
     widget.controller.addListener(_onControllerChanged);
     _syncEventStreamSubscription();
   }
 
+  void _onPause() {
+    unawaited(_setFlingEnabledBestEffort(widget.controller, false));
+
+    // Reset render gating so resume can always submit a fresh frame.
+    _pendingFrame = false;
+    _needsFollowupRender = false;
+
+    // Tear down the bidi render session while backgrounded. This guarantees
+    // native GPU surface/swapchain state is dropped, avoiding stale-surface
+    // reuse races when Android recreates compositor surfaces on resume.
+    _closeRenderSession(controller: widget.controller);
+
+    if (defaultTargetPlatform == TargetPlatform.android &&
+        widget.controller.gpuTextureId != null) {
+      _wasUsingGpuTexture = true;
+      // Render session is already closed, so a graceful invalidate frame is not
+      // required here.
+      unawaited(widget.controller.releaseGpuTexture(graceful: false));
+    } else {
+      _wasUsingGpuTexture = false;
+    }
+  }
+
+  void _onResume() {
+    unawaited(_setFlingEnabledBestEffort(
+        widget.controller, _isMobilePlatform || _flingOverrideEnabled));
+
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      _ensureRenderSession();
+      _requestRender();
+      return;
+    }
+    if (!_wasUsingGpuTexture && widget.controller.gpuTextureId == null) {
+      _ensureRenderSession();
+      _requestRender();
+      return;
+    }
+
+    _wasUsingGpuTexture = false;
+    final backendToRestore = widget.controller.gpuBackend ?? 'gles';
+    // Backgrounding invalidates the native texture/surface on many devices.
+    // Recreate the texture and force a guaranteed redraw into the new surface.
+    unawaited(() async {
+      try {
+        await widget.controller.releaseGpuTexture(graceful: true);
+        if (!mounted) {
+          return;
+        }
+        await widget.controller.createGpuTexture(
+          backend: backendToRestore,
+          width: _viewportWidth > 0 ? _viewportWidth : 1,
+          height: _viewportHeight > 0 ? _viewportHeight : 1,
+        );
+        if (!mounted) {
+          return;
+        }
+        _pendingFrame = false;
+        _needsFollowupRender = false;
+        if (_viewportWidth > 0 && _viewportHeight > 0) {
+          await widget.controller
+              .setGpuTextureSize(_viewportWidth, _viewportHeight);
+        }
+        // Force a fresh frame for the newly attached surface even if the grid
+        // was previously clean.
+        if (widget.controller.gpuTextureId != null &&
+            widget.controller.isCreated) {
+          await widget.controller.refresh();
+        }
+        if (!mounted) {
+          return;
+        }
+        _requestRender();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+          _pendingFrame = false;
+          _needsFollowupRender = false;
+          _requestRender();
+        });
+      } finally {
+        if (mounted) {
+          _ensureRenderSession();
+          setState(() {});
+        }
+      }
+    }());
+  }
+
   @override
   void dispose() {
+    _lifecycleListener.dispose();
     _longPressTimer?.cancel();
     _closeRenderSession(controller: widget.controller);
     _closeEventStream();
@@ -1297,6 +1395,22 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     _requestRender();
   }
 
+  void _onPointerHover(PointerHoverEvent event) {
+    // Mouse hover (no button pressed) is delivered as PointerHoverEvent,
+    // not PointerMoveEvent. Forward it as MOVE so engine hover highlight updates.
+    final dpr = _devicePixelRatio <= 0 ? 1.0 : _devicePixelRatio;
+    _sendInput(
+      pb.RenderInput()
+        ..pointer = (pb.PointerEvent()
+          ..type = pb.PointerEvent_Type.MOVE
+          ..x = event.localPosition.dx * dpr
+          ..y = event.localPosition.dy * dpr
+          ..button = 0
+          ..modifier = _modifiers()),
+    );
+    _requestRender();
+  }
+
   void _onPointerCancel(PointerCancelEvent event) {
     _longPressTimer?.cancel();
     if (event.kind == PointerDeviceKind.touch) {
@@ -1806,6 +1920,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
             onPointerDown: _onPointerDown,
             onPointerUp: _onPointerUp,
             onPointerMove: _onPointerMove,
+            onPointerHover: _onPointerHover,
             onPointerCancel: _onPointerCancel,
             onPointerSignal: _onPointerSignal,
             onPointerPanZoomStart: _onPointerPanZoomStart,

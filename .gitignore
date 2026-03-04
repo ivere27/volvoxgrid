@@ -16,6 +16,7 @@ flutter/macos/build/
 flutter/windows/build/
 flutter/macos/x64/
 flutter/windows/x64/
+flutter/android/.cxx/
 adapters/sfdatagrid/test/sfdatagrid_cases/
 adapters/sfdatagrid/test/sfdatagrid_compare_test.dart
 

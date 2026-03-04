@@ -14,22 +14,38 @@ export interface DoomAssetSource {
   emulatorsPrefix: string;
 }
 
+const DOOM_REMOTE_PROXY_BUNDLE_PATH = "/doom/remote/vendor/doom.jsdos";
+const DOOM_REMOTE_PROXY_EMULATORS_BASE_PATH = "/doom/remote/emulators";
+const DOOM_REMOTE_CDN_BUNDLE_URL = "https://cdn.jsdelivr.net/gh/linuxfandudeguy/doomonline@master/bundle.jsdos";
+const DOOM_REMOTE_CDN_EMULATORS_BASE_URL = "https://cdn.jsdelivr.net/npm/emulators@8.3.9/dist";
+
+export const DOOM_LOCAL_SOURCE: DoomAssetSource = {
+  id: "local",
+  bundlePath: "/doom/vendor/doom.jsdos",
+  emulatorsScriptPath: "/doom/emulators/emulators.js",
+  emulatorsPrefix: "/doom/emulators/",
+};
+
+const DOOM_REMOTE_PROXY_SOURCE: DoomAssetSource = {
+  id: "remote",
+  bundlePath: DOOM_REMOTE_PROXY_BUNDLE_PATH,
+  emulatorsScriptPath: `${DOOM_REMOTE_PROXY_EMULATORS_BASE_PATH}/emulators.js`,
+  emulatorsPrefix: `${DOOM_REMOTE_PROXY_EMULATORS_BASE_PATH}/`,
+};
+
+const DOOM_REMOTE_CDN_SOURCE: DoomAssetSource = {
+  id: "remote",
+  bundlePath: DOOM_REMOTE_CDN_BUNDLE_URL,
+  emulatorsScriptPath: `${DOOM_REMOTE_CDN_EMULATORS_BASE_URL}/emulators.js`,
+  emulatorsPrefix: `${DOOM_REMOTE_CDN_EMULATORS_BASE_URL}/`,
+};
+
 const DOOM_ASSET_SOURCES: DoomAssetSource[] = [
-  {
-    id: "local",
-    bundlePath: "/doom/vendor/doom.jsdos",
-    emulatorsScriptPath: "/doom/emulators/emulators.js",
-    emulatorsPrefix: "/doom/emulators/",
-  },
-  {
-    id: "remote",
-    bundlePath: "/doom/remote/vendor/doom.jsdos",
-    emulatorsScriptPath: "/doom/remote/emulators/emulators.js",
-    emulatorsPrefix: "/doom/remote/emulators/",
-  },
+  DOOM_LOCAL_SOURCE,
+  DOOM_REMOTE_PROXY_SOURCE,
+  DOOM_REMOTE_CDN_SOURCE,
 ];
 
-export const DOOM_LOCAL_SOURCE = DOOM_ASSET_SOURCES[0];
 const DOOM_EMULATORS_SCRIPT_ID = "volvoxgrid-doom-emulators-script";
 export const DOOM_REMOTE_CONSENT_KEY = "volvoxgrid:doom-remote-consent-v1";
 
@@ -46,6 +62,55 @@ interface DoomCommandInterface {
 interface DoomEmulatorsGlobal {
   pathPrefix: string;
   dosboxWorker(payload: Array<Uint8Array | { path: string; contents: Uint8Array }>): Promise<DoomCommandInterface>;
+}
+
+interface DoomWorkerInitMessage {
+  type: "init";
+  bundlePath: string;
+  emulatorsScriptPath: string;
+  emulatorsPrefix: string;
+  defaultCfg: string;
+}
+
+interface DoomWorkerKeyMessage {
+  type: "key";
+  code: number;
+  pressed: boolean;
+}
+
+type DoomWorkerInputMessage = DoomWorkerInitMessage | DoomWorkerKeyMessage;
+
+interface DoomWorkerReadyMessage {
+  type: "ready";
+}
+
+interface DoomWorkerErrorMessage {
+  type: "error";
+  message: string;
+}
+
+interface DoomWorkerFrameSizeMessage {
+  type: "frame-size";
+  width: number;
+  height: number;
+}
+
+interface DoomWorkerFrameMessage {
+  type: "frame";
+  data: ArrayBuffer;
+  width: number;
+  height: number;
+}
+
+type DoomWorkerOutputMessage =
+  | DoomWorkerReadyMessage
+  | DoomWorkerErrorMessage
+  | DoomWorkerFrameSizeMessage
+  | DoomWorkerFrameMessage;
+
+interface DoomWorkerSession {
+  ci: DoomCommandInterface;
+  worker: Worker;
 }
 
 type MarkedScript = HTMLScriptElement & { __volvoxgridLoaded?: boolean };
@@ -214,6 +279,11 @@ function waitForDoomScript(script: MarkedScript, scriptPath: string): Promise<vo
   });
 }
 
+function toErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
 async function ensureDoomEmulatorsScriptLoaded(source: DoomAssetSource): Promise<void> {
   if ((globalThis as { emulators?: unknown }).emulators) {
     return;
@@ -257,7 +327,12 @@ async function initDoomEmulator(
 
   emu.pathPrefix = source.emulatorsPrefix;
 
-  const resp = await fetch(source.bundlePath);
+  let resp: Response;
+  try {
+    resp = await fetch(source.bundlePath);
+  } catch (err) {
+    throw new Error(`Failed to fetch DOOM bundle (${source.bundlePath}): ${String(err)}`);
+  }
   if (!resp.ok) {
     throw new Error(`Failed to fetch DOOM bundle (${source.bundlePath}): ${resp.status}`);
   }
@@ -273,6 +348,119 @@ async function initDoomEmulator(
   ci.events().onFrame((rgb, rgba) => onFrame(rgba ?? rgb));
 
   return ci;
+}
+
+function createDoomWorker(): Worker {
+  return new Worker(new URL("./doom-worker.ts", import.meta.url), {
+    name: "volvoxgrid-doom-worker",
+  });
+}
+
+async function initDoomWorkerEmulator(
+  source: DoomAssetSource,
+  onFrameSize: (w: number, h: number) => void,
+  onFrame: (frame: Uint8Array) => void,
+): Promise<DoomWorkerSession> {
+  if (!window.isSecureContext) {
+    throw new Error("DOOM worker mode requires a secure context");
+  }
+  if (typeof Worker !== "function") {
+    throw new Error("DOOM worker mode is unavailable in this browser");
+  }
+
+  const worker = createDoomWorker();
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+
+    const failInit = (err: unknown) => {
+      if (settled) return;
+      settled = true;
+      worker.terminate();
+      reject(err instanceof Error ? err : new Error(String(err)));
+    };
+
+    const onMessage: NonNullable<Worker["onmessage"]> = (event) => {
+      const msg = event.data as DoomWorkerOutputMessage;
+      if (!msg || typeof msg !== "object") return;
+
+      switch (msg.type) {
+        case "ready": {
+          if (settled) return;
+          settled = true;
+          const ci: DoomCommandInterface = {
+            sendKeyEvent(code: number, pressed: boolean) {
+              const payload: DoomWorkerKeyMessage = { type: "key", code, pressed };
+              worker.postMessage(payload);
+            },
+            events(): DoomEvents {
+              return {
+                onFrameSize() {
+                  // No-op in worker mode: frame callbacks are wired above.
+                },
+                onFrame() {
+                  // No-op in worker mode: frame callbacks are wired above.
+                },
+              };
+            },
+          };
+          resolve({ ci, worker });
+          return;
+        }
+        case "frame-size": {
+          onFrameSize(msg.width, msg.height);
+          return;
+        }
+        case "frame": {
+          onFrameSize(msg.width, msg.height);
+          onFrame(new Uint8Array(msg.data));
+          return;
+        }
+        case "error": {
+          const message = `DOOM worker error: ${msg.message}`;
+          if (settled) {
+            console.error(message);
+            return;
+          }
+          failInit(new Error(message));
+          return;
+        }
+      }
+    };
+
+    const onError = (event: ErrorEvent) => {
+      const detail = event.message || "unknown worker error";
+      const message = `DOOM worker crashed: ${detail}`;
+      if (settled) {
+        console.error(message);
+        return;
+      }
+      failInit(new Error(message));
+    };
+
+    const onMessageError: NonNullable<Worker["onmessageerror"]> = () => {
+      const message = "DOOM worker message could not be deserialized";
+      if (settled) {
+        console.error(message);
+        return;
+      }
+      failInit(new Error(message));
+    };
+
+    worker.onmessage = onMessage;
+    worker.onerror = onError;
+    worker.onmessageerror = onMessageError;
+
+    const initPayload: DoomWorkerInitMessage = {
+      type: "init",
+      bundlePath: source.bundlePath,
+      emulatorsScriptPath: source.emulatorsScriptPath,
+      emulatorsPrefix: source.emulatorsPrefix,
+      defaultCfg: DOOM_DEFAULT_CFG,
+    };
+    const payload: DoomWorkerInputMessage = initPayload;
+    worker.postMessage(payload);
+  });
 }
 
 async function probeAsset(path: string): Promise<Response | null> {
@@ -311,6 +499,10 @@ export class DoomRuntime {
   private rows = 70;
 
   private doomCi: DoomCommandInterface | null = null;
+
+  private doomWorker: Worker | null = null;
+
+  private workerMode = false;
 
   private doomSourceInUse: DoomAssetSource | null = null;
 
@@ -358,59 +550,117 @@ export class DoomRuntime {
     return this.doomCi != null;
   }
 
+  isWorkerMode(): boolean {
+    return this.workerMode;
+  }
+
   getSourceInUse(): DoomAssetSource | null {
     return this.doomSourceInUse;
   }
 
+  private installSession(
+    ci: DoomCommandInterface,
+    source: DoomAssetSource,
+    worker: Worker | null,
+  ): void {
+    if (this.doomWorker && this.doomWorker !== worker) {
+      this.doomWorker.terminate();
+    }
+    this.doomCi = ci;
+    this.doomWorker = worker;
+    this.workerMode = worker != null;
+    this.doomSourceInUse = source;
+    this.prevDoomColors = null;
+    this.pressedDosKeys.clear();
+  }
+
   async ensureEmulator(source: DoomAssetSource): Promise<void> {
-    if (this.doomCi && this.doomSourceInUse?.id === source.id) {
+    if (this.doomCi
+      && this.doomSourceInUse?.bundlePath === source.bundlePath
+      && this.doomSourceInUse.emulatorsScriptPath === source.emulatorsScriptPath) {
       return;
     }
 
-    this.doomCi = await initDoomEmulator(
-      source,
-      (w, h) => {
-        this.doomFrameWidth = w;
-        this.doomFrameHeight = h;
-      },
-      (frame) => {
-        this.doomFrameData = frame;
-      },
-    );
-    this.doomSourceInUse = source;
-    this.prevDoomColors = null;
-  }
+    const candidates = source.id === "remote"
+      ? [
+          source,
+          ...DOOM_ASSET_SOURCES.filter((entry) =>
+            entry.id === "remote"
+            && (entry.bundlePath !== source.bundlePath
+              || entry.emulatorsScriptPath !== source.emulatorsScriptPath)),
+        ]
+      : [source];
 
-  async resolveAssetSource(): Promise<DoomAssetResolveResult> {
-    const checks = await Promise.all(
-      DOOM_ASSET_SOURCES.map(async (source) => {
-        const [bundleReady, emulatorsReady] = await Promise.all([
-          fileExists(source.bundlePath),
-          fileExists(source.emulatorsScriptPath),
-        ]);
-        return { source, bundleReady, emulatorsReady };
-      }),
-    );
+    let lastError: unknown = null;
+    for (const candidate of candidates) {
+      try {
+        const workerSession = await initDoomWorkerEmulator(
+          candidate,
+          (w, h) => {
+            this.doomFrameWidth = w;
+            this.doomFrameHeight = h;
+          },
+          (frame) => {
+            this.doomFrameData = frame;
+          },
+        );
+        this.installSession(workerSession.ci, candidate, workerSession.worker);
+        return;
+      } catch (workerErr) {
+        const hint = candidate.id === "remote"
+          ? "falling back to same-thread mode for remote source"
+          : "falling back to same-thread mode";
+        console.warn(`DOOM worker init failed (${hint}): ${toErrorMessage(workerErr)}`);
+      }
 
-    for (const source of DOOM_ASSET_SOURCES) {
-      const check = checks.find((entry) => entry.source.id === source.id);
-      if (check && check.bundleReady && check.emulatorsReady) {
-        return { ok: true, source };
+      try {
+        const ci = await initDoomEmulator(
+          candidate,
+          (w, h) => {
+            this.doomFrameWidth = w;
+            this.doomFrameHeight = h;
+          },
+          (frame) => {
+            this.doomFrameData = frame;
+          },
+        );
+        this.installSession(ci, candidate, null);
+        return;
+      } catch (err) {
+        lastError = err;
       }
     }
 
-    const localCheck = checks.find((entry) => entry.source.id === DOOM_LOCAL_SOURCE.id);
-    const localMissing: string[] = [];
-    if (!localCheck?.bundleReady) localMissing.push("doom.jsdos bundle");
-    if (!localCheck?.emulatorsReady) localMissing.push("emulators runtime");
-    const localMissingText = localMissing.length > 0
-      ? `missing ${localMissing.join(" and ")}`
-      : "assets unavailable";
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("Failed to initialize DOOM emulator");
+  }
 
-    return {
-      ok: false,
-      message: `DOOM mode is not ready: local ${localMissingText}. Remote fallback is unavailable. Run 'make doom-deps' or check network access, then reload.`,
-    };
+  async resolveAssetSource(): Promise<DoomAssetResolveResult> {
+    const localSource = DOOM_LOCAL_SOURCE;
+    const remoteProxySource = DOOM_REMOTE_PROXY_SOURCE;
+
+    const [localBundleReady, localEmulatorsReady] = await Promise.all([
+      fileExists(localSource.bundlePath),
+      fileExists(localSource.emulatorsScriptPath),
+    ]);
+
+    if (localBundleReady && localEmulatorsReady) {
+      return { ok: true, source: localSource };
+    }
+
+    const [remoteProxyBundleReady, remoteProxyEmulatorsReady] = await Promise.all([
+      fileExists(remoteProxySource.bundlePath),
+      fileExists(remoteProxySource.emulatorsScriptPath),
+    ]);
+
+    if (remoteProxyBundleReady && remoteProxyEmulatorsReady) {
+      return { ok: true, source: remoteProxySource };
+    }
+
+    // CDN probing can fail by CORS policy even when loading via script tags is
+    // still possible. Use CDN source as remote fallback when proxy is missing.
+    return { ok: true, source: DOOM_REMOTE_CDN_SOURCE };
   }
 
   startRenderLoop(grid: VolvoxGrid, status: HTMLElement): void {
@@ -493,7 +743,8 @@ export class DoomRuntime {
             : 0;
           cellUpdatesWindowCount = 0;
           cellUpdatesWindowStartMs = frameNow;
-          status.textContent = `DOOM ${this.cols}x${this.rows} (${total.toLocaleString("en-US")} cells) wall ${this.wallFpsValue} fps | JS update-loop rate ${this.jsUpdateFpsValue} fps | cell updates ${cellUpdatesPerSecValue.toLocaleString("en-US")}/s - Arrows=move Ctrl=fire Space=use`;
+          const runtime = this.workerMode ? "worker" : "main-thread";
+          status.textContent = `DOOM ${this.cols}x${this.rows} (${total.toLocaleString("en-US")} cells) ${runtime} | wall ${this.wallFpsValue} fps | JS update-loop rate ${this.jsUpdateFpsValue} fps | cell updates ${cellUpdatesPerSecValue.toLocaleString("en-US")}/s - Arrows=move Ctrl=fire Space=use`;
           lastStatusUpdateMs = frameNow;
         }
       }

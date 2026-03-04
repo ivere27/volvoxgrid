@@ -125,7 +125,7 @@ declare module "volvoxgrid" {
     destroy(): void;
     setTextMatrix(row: number, col: number, text: string): void;
     getTextMatrix(row: number, col: number): string;
-    loadArray(rows: number, cols: number, values: string[]): void;
+    loadTable(rows: number, cols: number, values: unknown[], atomic?: boolean): void;
     clear(scope?: number, region?: number): void;
 
     setColWidth(col: number, width: number): void;

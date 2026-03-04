@@ -3,7 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:volvoxgrid_example/main.dart';
 
 void main() {
-  testWidgets('VolvoxGrid demo app renders core chrome', (WidgetTester tester) async {
+  testWidgets('VolvoxGrid demo app renders core chrome',
+      (WidgetTester tester) async {
     await tester.pumpWidget(const VolvoxGridDemoApp());
     await tester.pump();
 

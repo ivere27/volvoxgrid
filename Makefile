@@ -39,13 +39,22 @@ DOOM_BUNDLE_URL := https://cdn.dos.zone/custom/dos/doom.jsdos?anonymous=1
 DOOM_EMULATORS_VERSION ?= 8.3.9
 WEB_HOST ?= 0.0.0.0
 WEB_SCALE ?= 1.0
+WEB_HOVER ?= false
 JAVA_DESKTOP_PROJECT_DIR := java/desktop
+ROOT_DIR := $(patsubst %/,%,$(abspath $(dir $(lastword $(MAKEFILE_LIST)))))
 UNAME_S := $(shell uname -s 2>/dev/null)
 ifeq ($(UNAME_S),Darwin)
 SED_I := sed -i ''
 else
 SED_I := sed -i
 endif
+HOST_CPU_COUNT ?= $(shell nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+BUILD_JOBS_DEFAULT := $(shell c=$$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1); if [ "$$c" -gt 2 ] 2>/dev/null; then echo $$((c-2)); else echo 1; fi)
+BUILD_JOBS ?= $(BUILD_JOBS_DEFAULT)
+CARGO_BUILD_JOBS ?= $(BUILD_JOBS)
+GRADLE_MAX_WORKERS ?= $(BUILD_JOBS)
+CARGO_JOBS_FLAG := -j $(CARGO_BUILD_JOBS)
+GRADLE_JOBS_FLAG := --max-workers=$(GRADLE_MAX_WORKERS)
 ifeq ($(OS),Windows_NT)
 JAVA_DESKTOP_PLUGIN_BASENAME := volvoxgrid_plugin.dll
 else ifeq ($(UNAME_S),Darwin)
@@ -55,7 +64,12 @@ JAVA_DESKTOP_PLUGIN_BASENAME := libvolvoxgrid_plugin.so
 endif
 JAVA_DESKTOP_PLUGIN ?= $(abspath target/debug/$(JAVA_DESKTOP_PLUGIN_BASENAME))
 JAVA_DESKTOP_PLUGIN_RELEASE ?= $(abspath target/release/$(JAVA_DESKTOP_PLUGIN_BASENAME))
-VOLVOXGRID_VERSION ?= 0.1.4
+VERSION_FILE ?= $(ROOT_DIR)/VERSION
+VERSION_FILE_VALUE := $(strip $(shell [ -f "$(VERSION_FILE)" ] && cat "$(VERSION_FILE)" 2>/dev/null))
+VOLVOXGRID_VERSION ?= $(VERSION_FILE_VALUE)
+ifeq ($(strip $(VOLVOXGRID_VERSION)),)
+$(error VOLVOXGRID_VERSION is empty. Set VOLVOXGRID_VERSION or populate $(VERSION_FILE))
+endif
 VOLVOXGRID_SOURCE ?= local
 VOLVOXGRID_SOURCE_RAW := $(strip $(VOLVOXGRID_SOURCE))
 VOLVOXGRID_SOURCE_RESOLVED := $(VOLVOXGRID_SOURCE_RAW)
@@ -90,13 +104,15 @@ JAVA_DESKTOP_GRADLE_PROPS := \
 # Docker + Maven publishing
 # Resolve to the Makefile directory so docker mounts stay correct even when
 # invoking `make -f /path/to/Makefile` or running from subdirectories.
-CURRENT_DIR := $(patsubst %/,%,$(abspath $(dir $(lastword $(MAKEFILE_LIST)))))
+CURRENT_DIR := $(ROOT_DIR)
 AAR_DOCKER_IMAGE ?= volvoxgrid-android-aar:latest
 AAR_VERSION ?= $(VOLVOXGRID_VERSION)
 AAR_GROUP_ID ?= io.github.ivere27
 AAR_ARTIFACT_ID ?= volvoxgrid-android
 AAR_LITE_GROUP_ID ?= $(AAR_GROUP_ID)
 AAR_LITE_ARTIFACT_ID ?= volvoxgrid-android-lite
+AAR_GIT_COMMIT ?= $(shell git -C "$(CURRENT_DIR)" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
+AAR_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 AAR_ANDROID_ABIS ?= arm64-v8a,armeabi-v7a
 DOCKER_GO_BUILD_CACHE_VOLUME ?= go-build-cache
 DOCKER_GRADLE_BUILD_CACHE_VOLUME ?= gradle-build-cache
@@ -106,8 +122,29 @@ DESKTOP_DOCKER_IMAGE ?= volvoxgrid-desktop-jar:latest
 DESKTOP_VERSION ?= $(VOLVOXGRID_VERSION)
 DESKTOP_GROUP_ID ?= io.github.ivere27
 DESKTOP_ARTIFACT_ID ?= volvoxgrid-desktop
+DESKTOP_BUILD_OCX ?= 1
+DESKTOP_GIT_COMMIT ?= $(shell git -C "$(CURRENT_DIR)" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
+DESKTOP_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+WEB_DOCKER_IMAGE ?= volvoxgrid-web:latest
+WEB_DOCKER_TARGET ?= all
+WEB_DOCKER_PORT ?= 5173
+WEB_GIT_COMMIT ?= $(AAR_GIT_COMMIT)
+WEB_BUILD_DATE ?= $(AAR_BUILD_DATE)
 IOS_DOCKER_IMAGE ?= volvoxgrid-ios:latest
+IOS_VERSION ?= $(VOLVOXGRID_VERSION)
+IOS_GIT_COMMIT ?= $(shell git -C "$(CURRENT_DIR)" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
+IOS_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 ALL_DOCKER_IMAGE ?= volvoxgrid-all:latest
+ALL_GIT_COMMIT ?= $(AAR_GIT_COMMIT)
+ALL_BUILD_DATE ?= $(AAR_BUILD_DATE)
+ALL_BUILD_OCX ?= $(DESKTOP_BUILD_OCX)
+FIXED_DATE ?=
+ifneq ($(strip $(FIXED_DATE)),)
+AAR_BUILD_DATE := $(FIXED_DATE)
+DESKTOP_BUILD_DATE := $(FIXED_DATE)
+IOS_BUILD_DATE := $(FIXED_DATE)
+ALL_BUILD_DATE := $(FIXED_DATE)
+endif
 MAVEN_SETTINGS ?= $(CURRENT_DIR)/.maven-settings.xml
 MAVEN_REPO_URL ?= https://central.sonatype.com/api/v1/publisher/upload
 MAVEN_LOCAL_REPO ?= $(HOME)/.m2/repository
@@ -116,6 +153,9 @@ MAVEN_LOCAL_REPO ?= $(HOME)/.m2/repository
 IOS_XCFRAMEWORK_DIR := dist/ios/VolvoxGridPlugin.xcframework
 IOS_XCFRAMEWORK_ZIP := dist/ios/VolvoxGridPlugin.xcframework.zip
 IOS_GITHUB_REPO ?= ivere27/volvoxgrid
+WEB_BUNDLE_DIR := dist/web
+WEB_BUNDLE_ZIP := $(WEB_BUNDLE_DIR)/volvoxgrid-web-$(VOLVOXGRID_VERSION).zip
+WEB_BUNDLE_LITE_ZIP := $(WEB_BUNDLE_DIR)/volvoxgrid-web-lite-$(VOLVOXGRID_VERSION).zip
 
 ifeq ($(VOLVOXGRID_SOURCE_RESOLVED),maven)
 ANDROID_INSTALL_PREREQ :=
@@ -161,7 +201,8 @@ endif
         activex activex-release activex-lite activex-lite-release \
         activex-gpu activex-gpu-release \
         vsflexgrid vsflexgrid-release \
-        docker_android_aar_image docker_android_aar docker_desktop_jar_image docker_desktop_jar \
+        docker_android_aar_image docker_android docker_desktop_image docker_desktop \
+        docker_web_image docker_web \
         docker_ios_image docker_ios docker_all_image docker_all publish_maven \
         publish_local publish_github \
         gtk-test clean clean-all help
@@ -190,6 +231,7 @@ help:
 	@echo "  wasm-threaded  Build WASM crate with threads/atomics (requires COOP+COEP at runtime)"
 	@echo "  web            Build WASM + start Vite dev server (Sales/Hierarchy/Stress/DOOM selector)"
 	@echo "  web-lite       Build WASM lite + start Vite dev server"
+	@echo "    web options: WEB_SCALE=<value>, WEB_HOVER={true|false} (default false)"
 	@echo "  codegen        Regenerate all FFI bindings"
 	@echo "  activex        Build ActiveX OCX (debug)"
 	@echo "  activex-lite   Build ActiveX OCX without rayon/regex (debug)"
@@ -216,26 +258,29 @@ help:
 	@echo ""
 	@echo "Docker + Maven:"
 	@echo "  docker_android_aar_image  Build Docker image for Android AAR"
-	@echo "  docker_android_aar        Build Android AAR + Android lite AAR via Docker, auto-install SNAPSHOT to mavenLocal"
-	@echo "  docker_desktop_jar_image  Build Docker image for desktop JAR"
-	@echo "  docker_desktop_jar        Build desktop JAR via Docker, auto-install SNAPSHOT to mavenLocal"
+	@echo "  docker_android            Build Android AAR + Android lite AAR via Docker, auto-install SNAPSHOT to mavenLocal"
+	@echo "  docker_desktop_image      Build Docker image for desktop JAR"
+	@echo "  docker_desktop            Build desktop JAR via Docker (+ ActiveX OCX release/release-lite), auto-install SNAPSHOT to mavenLocal"
+	@echo "  docker_web_image          Build Docker image for web dist/bundle tasks"
+	@echo "  docker_web                Build in Docker: WEB_DOCKER_TARGET={all|bundle|web|excel|excel-lite|report|wasm|wasm-lite|wasm-threaded}"
 	@echo "  docker_ios_image          Build Docker image for iOS"
 	@echo "  docker_ios                Build iOS XCFramework via Docker"
 	@echo "  docker_all_image          Build unified Docker image (all toolchains)"
-	@echo "  docker_all                Build all platform artifacts via unified Docker image"
+	@echo "  docker_all                Build all platform artifacts via unified Docker image (Android full+lite), auto-install SNAPSHOT to mavenLocal"
 	@echo "  publish_maven             Upload Android AAR + Android lite AAR + desktop JAR to Maven Central"
-	@echo "  publish_github            Upload all artifacts (xcframework, AAR, JAR) to GitHub release"
+	@echo "  publish_github            Upload all artifacts (xcframework, AAR, JAR, web zips) to GitHub release"
 	@echo "  publish_local             Install built SNAPSHOT artifacts from dist/maven into ~/.m2/repository"
 	@echo ""
 	@echo "Example dependency source flags (default is local):"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.4"
-	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.4"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.1.4"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.5"
+	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.5"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.1.5"
 	@echo "  (maven mode skips local plugin build for the example targets)"
 	@echo "  Flutter defaults to maven when VOLVOXGRID_SOURCE is omitted."
 	@echo "  VOLVOXGRID_SOURCE=local builds from source."
 	@echo "  Android variant: set VOLVOXGRID_VARIANT=lite for lite; any other value uses normal"
 	@echo "  Optional override: VOLVOXGRID_*_GROUP and VOLVOXGRID_*_ARTIFACT"
+	@echo "  Build parallelism: BUILD_JOBS defaults to max(CPU-2,1); override with BUILD_JOBS=N"
 	@echo ""
 	@echo "  clean          Remove build artifacts"
 	@echo "  clean-all      Remove all artifacts including WASM/node_modules"
@@ -258,22 +303,22 @@ release: engine-release host-plugin-release
 
 engine:
 	@echo "Building engine crate (debug)..."
-	cd engine && cargo build --features gpu
+	cd engine && cargo build $(CARGO_JOBS_FLAG) --features gpu
 	@echo "Engine build complete."
 
 engine-release:
 	@echo "Building engine crate (release)..."
-	cd engine && cargo build --release --features gpu
+	cd engine && cargo build $(CARGO_JOBS_FLAG) --release --features gpu
 	@echo "Engine release build complete."
 
 host-plugin: engine
 	@echo "Building plugin crate (debug)..."
-	cd plugin && cargo build --features gpu
+	cd plugin && cargo build $(CARGO_JOBS_FLAG) --features gpu
 	@echo "Plugin build complete: target/debug/libvolvoxgrid_plugin.so"
 
 host-plugin-release: engine-release
 	@echo "Building plugin crate (release)..."
-	cd plugin && cargo build --release --features gpu
+	cd plugin && cargo build $(CARGO_JOBS_FLAG) --release --features gpu
 	@echo "Plugin release build complete: target/release/libvolvoxgrid_plugin.so"
 
 java-host-plugin: host-plugin
@@ -285,7 +330,7 @@ java-host-plugin-release: host-plugin-release
 # =============================================================================
 test:
 	@echo "Running engine tests..."
-	cd engine && cargo test --features gpu
+	cd engine && cargo test $(CARGO_JOBS_FLAG) --features gpu
 	@echo "Tests complete."
 
 # =============================================================================
@@ -293,36 +338,36 @@ test:
 # =============================================================================
 run: host-plugin
 	@echo "Building smoke test..."
-	cd smoke-test && cargo build --features gpu
+	cd smoke-test && cargo build $(CARGO_JOBS_FLAG) --features gpu
 	@echo "Running smoke test..."
 	./target/debug/volvoxgrid-smoke
 	@echo ""
 
 run-release: host-plugin-release
 	@echo "Building smoke test (release)..."
-	cd smoke-test && cargo build --release --features gpu
+	cd smoke-test && cargo build $(CARGO_JOBS_FLAG) --release --features gpu
 	@echo "Running smoke test..."
 	./target/release/volvoxgrid-smoke target/release/libvolvoxgrid_plugin.so
 	@echo ""
 
 java-desktop-run: $(JAVA_DESKTOP_RUN_PREREQ)
 	@echo "Running Java desktop Android-style example..."
-	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) run $(JAVA_DESKTOP_PLUGIN_ARG) --no-daemon
+	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) run $(JAVA_DESKTOP_PLUGIN_ARG)
 	@echo ""
 
 java-desktop-run-release: $(JAVA_DESKTOP_RUN_RELEASE_PREREQ)
 	@echo "Running Java desktop Android-style example (release plugin)..."
-	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) run $(JAVA_DESKTOP_PLUGIN_RELEASE_ARG) --no-daemon
+	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) run $(JAVA_DESKTOP_PLUGIN_RELEASE_ARG)
 	@echo ""
 
 java-desktop-run-simple: $(JAVA_DESKTOP_RUN_SIMPLE_PREREQ)
 	@echo "Running Java desktop minimal demo..."
-	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) runSimpleDemo $(JAVA_DESKTOP_PLUGIN_ARG) --no-daemon
+	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) runSimpleDemo $(JAVA_DESKTOP_PLUGIN_ARG)
 	@echo ""
 
 java-desktop-smoke: $(JAVA_DESKTOP_SMOKE_PREREQ)
 	@echo "Running Java desktop smoke test..."
-	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) runSmoke $(JAVA_DESKTOP_PLUGIN_ARG) --no-daemon
+	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) runSmoke $(JAVA_DESKTOP_PLUGIN_ARG)
 	@echo ""
 
 # =============================================================================
@@ -331,19 +376,19 @@ java-desktop-smoke: $(JAVA_DESKTOP_SMOKE_PREREQ)
 wasm:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
 	@echo "Building WASM crate..."
-	cd web/crate && rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features gpu
+	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features gpu
 	@echo "WASM build complete: web/example/wasm/"
 
 wasm-lite:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
 	@echo "Building WASM crate (lite)..."
-	cd web/crate && rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --no-default-features
+	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --no-default-features
 	@echo "WASM lite build complete: web/example/wasm/"
 
 wasm-threaded:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
 	@echo "Building WASM crate (threaded)..."
-	cd web/crate && RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features wasm-threads,gpu -Z build-std=std,panic_abort
+	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features wasm-threads,gpu -Z build-std=std,panic_abort
 	@echo "WASM threaded build complete: web/example/wasm/"
 
 # =============================================================================
@@ -354,12 +399,12 @@ web: wasm
 		echo "Warning: DOOM mode assets are missing."; \
 		echo "         Run 'make doom-deps' to enable DOOM in the web demo."; \
 	fi
-	@echo "Starting web dev server (host=$(WEB_HOST), scale=$(WEB_SCALE))..."
-	cd web/example && npm install && VITE_VG_INITIAL_SCALE="$(WEB_SCALE)" npm run dev -- --host "$(WEB_HOST)"
+	@echo "Starting web dev server (host=$(WEB_HOST), scale=$(WEB_SCALE), hover=$(WEB_HOVER))..."
+	cd web/example && npm install && VITE_VG_INITIAL_SCALE="$(WEB_SCALE)" VITE_VG_ENABLE_HOVER="$(WEB_HOVER)" npm run dev -- --host "$(WEB_HOST)"
 
 web-lite: wasm-lite
-	@echo "Starting web dev server (lite mode)..."
-	cd web/example && npm install && VITE_VG_INITIAL_SCALE="$(WEB_SCALE)" npm run dev -- --host "$(WEB_HOST)"
+	@echo "Starting web dev server (lite mode, hover=$(WEB_HOVER))..."
+	cd web/example && npm install && VITE_VG_INITIAL_SCALE="$(WEB_SCALE)" VITE_VG_ENABLE_HOVER="$(WEB_HOVER)" npm run dev -- --host "$(WEB_HOST)"
 
 # =============================================================================
 # Excel Adapter — Spreadsheet UX on top of VolvoxGrid WASM
@@ -500,6 +545,7 @@ android: android-build android-run
 
 android-build:
 	@echo "Building Android AAR..."
+	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS))"
 	@SDK_DIR=""; \
 	if [ -n "$$ANDROID_HOME" ]; then \
 		SDK_DIR="$$ANDROID_HOME"; \
@@ -517,13 +563,13 @@ android-build:
 	fi; \
 	if [ -x "$(ANDROID_GRADLEW)" ]; then \
 		echo "Using project Gradle wrapper: $(ANDROID_GRADLEW)"; \
-		"$(ANDROID_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_GRADLE_TASK)"; \
+		"$(ANDROID_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(GRADLE_JOBS_FLAG) $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_GRADLE_TASK)"; \
 	elif [ -x "$(SHARED_GRADLEW)" ]; then \
 		echo "Using shared Gradle wrapper: $(SHARED_GRADLEW)"; \
-		"$(SHARED_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_GRADLE_TASK)"; \
+		"$(SHARED_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(GRADLE_JOBS_FLAG) $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_GRADLE_TASK)"; \
 	elif command -v gradle >/dev/null 2>&1; then \
 		echo "Using system Gradle: $$(command -v gradle)"; \
-		gradle -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_GRADLE_TASK)"; \
+		gradle -p "$(ANDROID_PROJECT_DIR)" $(GRADLE_JOBS_FLAG) $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_GRADLE_TASK)"; \
 	else \
 		echo "Error: no Gradle wrapper found."; \
 		echo "Expected $(ANDROID_GRADLEW) or $(SHARED_GRADLEW), or install gradle."; \
@@ -558,6 +604,7 @@ android-plugin:
 	echo "Using Android NDK: $$NDK_DIR"; \
 	command -v cargo >/dev/null 2>&1 || { echo "Error: cargo not found in PATH."; exit 1; }; \
 	cargo ndk --version >/dev/null 2>&1 || { echo "Error: cargo-ndk not found. Install with: cargo install cargo-ndk"; exit 1; }; \
+	echo "Using CARGO_BUILD_JOBS=$(CARGO_BUILD_JOBS)"; \
 	NDK_TARGETS="-t arm64-v8a -t armeabi-v7a"; \
 	if command -v rustup >/dev/null 2>&1 && rustup target list --installed 2>/dev/null | grep -qx "x86_64-linux-android"; then \
 		NDK_TARGETS="$$NDK_TARGETS -t x86_64"; \
@@ -578,7 +625,7 @@ android-plugin:
 	rm -rf "$(ANDROID_APP_PLUGIN_DIR)"; \
 	rm -rf "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)"; \
 	rm -rf "$(ANDROID_PROJECT_DIR)/example/build"; \
-	cd plugin && ANDROID_NDK_HOME="$$NDK_DIR" cargo ndk $$NDK_TARGETS -o "$(ANDROID_PLUGIN_OUTPUT_DIR)" build $$PLUGIN_FEATURE_ARGS; \
+	cd plugin && ANDROID_NDK_HOME="$$NDK_DIR" cargo ndk $$NDK_TARGETS -o "$(ANDROID_PLUGIN_OUTPUT_DIR)" build -j "$(CARGO_BUILD_JOBS)" $$PLUGIN_FEATURE_ARGS; \
 	if [ "$$PLUGIN_SO_NAME" != "libvolvoxgrid_plugin.so" ]; then \
 		for ABI in arm64-v8a armeabi-v7a x86_64; do \
 			SRC_SO="$(ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI/libvolvoxgrid_plugin.so"; \
@@ -587,9 +634,45 @@ android-plugin:
 				mv "$$SRC_SO" "$$DST_SO"; \
 			fi; \
 		done; \
-	fi; \
-	mkdir -p "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)"; \
-	cp -a "$(ANDROID_PLUGIN_OUTPUT_DIR)/." "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/"
+		fi; \
+		mkdir -p "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)"; \
+		cp -a "$(ANDROID_PLUGIN_OUTPUT_DIR)/." "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/"; \
+		if [ -n "$$SDK_DIR" ]; then \
+			export ANDROID_HOME="$$SDK_DIR"; \
+			export ANDROID_SDK_ROOT="$$SDK_DIR"; \
+		fi; \
+		cd "$(CURRENT_DIR)"; \
+		rm -rf "$(ANDROID_PROJECT_DIR)/volvoxgrid-android/.cxx"; \
+		echo "Building Android JNI bridge (debug) for Flutter local mode..."; \
+		if [ -x "$(ANDROID_GRADLEW)" ]; then \
+			"$(ANDROID_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(GRADLE_JOBS_FLAG) :volvoxgrid-android:externalNativeBuildDebug >/dev/null; \
+		elif [ -x "$(SHARED_GRADLEW)" ]; then \
+			"$(SHARED_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(GRADLE_JOBS_FLAG) :volvoxgrid-android:externalNativeBuildDebug >/dev/null; \
+		elif command -v gradle >/dev/null 2>&1; then \
+			gradle -p "$(ANDROID_PROJECT_DIR)" $(GRADLE_JOBS_FLAG) :volvoxgrid-android:externalNativeBuildDebug >/dev/null; \
+		else \
+			echo "Error: no Gradle wrapper found for building libvolvoxgrid_jni.so."; \
+			exit 1; \
+		fi; \
+		JNI_COPIED=0; \
+		for ABI in arm64-v8a armeabi-v7a x86_64; do \
+			for ROOT in \
+				"$(ANDROID_PROJECT_DIR)/volvoxgrid-android/build/intermediates/library_and_local_jars_jni/debug/jni" \
+				"$(ANDROID_PROJECT_DIR)/volvoxgrid-android/build/intermediates/merged_native_libs/debug/out/lib" \
+				"$(ANDROID_PROJECT_DIR)/volvoxgrid-android/build/intermediates/stripped_native_libs/debug/out/lib"; do \
+				SRC_JNI="$$ROOT/$$ABI/libvolvoxgrid_jni.so"; \
+				if [ -f "$$SRC_JNI" ]; then \
+					mkdir -p "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI"; \
+					cp -f "$$SRC_JNI" "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI/libvolvoxgrid_jni.so"; \
+					JNI_COPIED=1; \
+					break; \
+				fi; \
+			done; \
+		done; \
+		if [ "$$JNI_COPIED" -eq 0 ]; then \
+			echo "Error: libvolvoxgrid_jni.so not found after Gradle build."; \
+			exit 1; \
+		fi
 	@echo "Android plugin build complete."
 
 android-plugin-release:
@@ -619,6 +702,7 @@ android-plugin-release:
 	echo "Using Android NDK: $$NDK_DIR"; \
 	command -v cargo >/dev/null 2>&1 || { echo "Error: cargo not found in PATH."; exit 1; }; \
 	cargo ndk --version >/dev/null 2>&1 || { echo "Error: cargo-ndk not found. Install with: cargo install cargo-ndk"; exit 1; }; \
+	echo "Using CARGO_BUILD_JOBS=$(CARGO_BUILD_JOBS)"; \
 	NDK_TARGETS="-t arm64-v8a -t armeabi-v7a"; \
 	if command -v rustup >/dev/null 2>&1 && rustup target list --installed 2>/dev/null | grep -qx "x86_64-linux-android"; then \
 		NDK_TARGETS="$$NDK_TARGETS -t x86_64"; \
@@ -639,7 +723,7 @@ android-plugin-release:
 	rm -rf "$(ANDROID_APP_PLUGIN_DIR)"; \
 	rm -rf "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)"; \
 	rm -rf "$(ANDROID_PROJECT_DIR)/example/build"; \
-	cd plugin && ANDROID_NDK_HOME="$$NDK_DIR" cargo ndk $$NDK_TARGETS -o "$(ANDROID_PLUGIN_OUTPUT_DIR)" build --release $$PLUGIN_FEATURE_ARGS; \
+	cd plugin && ANDROID_NDK_HOME="$$NDK_DIR" cargo ndk $$NDK_TARGETS -o "$(ANDROID_PLUGIN_OUTPUT_DIR)" build -j "$(CARGO_BUILD_JOBS)" --release $$PLUGIN_FEATURE_ARGS; \
 	if [ "$$PLUGIN_SO_NAME" != "libvolvoxgrid_plugin.so" ]; then \
 		for ABI in arm64-v8a armeabi-v7a x86_64; do \
 			SRC_SO="$(ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI/libvolvoxgrid_plugin.so"; \
@@ -648,13 +732,50 @@ android-plugin-release:
 				mv "$$SRC_SO" "$$DST_SO"; \
 			fi; \
 		done; \
-	fi; \
-	mkdir -p "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)"; \
-	cp -a "$(ANDROID_PLUGIN_OUTPUT_DIR)/." "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/"
+		fi; \
+		mkdir -p "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)"; \
+		cp -a "$(ANDROID_PLUGIN_OUTPUT_DIR)/." "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/"; \
+		if [ -n "$$SDK_DIR" ]; then \
+			export ANDROID_HOME="$$SDK_DIR"; \
+			export ANDROID_SDK_ROOT="$$SDK_DIR"; \
+		fi; \
+		cd "$(CURRENT_DIR)"; \
+		rm -rf "$(ANDROID_PROJECT_DIR)/volvoxgrid-android/.cxx"; \
+		echo "Building Android JNI bridge (release) for Flutter local mode..."; \
+		if [ -x "$(ANDROID_GRADLEW)" ]; then \
+			"$(ANDROID_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(GRADLE_JOBS_FLAG) :volvoxgrid-android:externalNativeBuildRelease >/dev/null; \
+		elif [ -x "$(SHARED_GRADLEW)" ]; then \
+			"$(SHARED_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(GRADLE_JOBS_FLAG) :volvoxgrid-android:externalNativeBuildRelease >/dev/null; \
+		elif command -v gradle >/dev/null 2>&1; then \
+			gradle -p "$(ANDROID_PROJECT_DIR)" $(GRADLE_JOBS_FLAG) :volvoxgrid-android:externalNativeBuildRelease >/dev/null; \
+		else \
+			echo "Error: no Gradle wrapper found for building libvolvoxgrid_jni.so."; \
+			exit 1; \
+		fi; \
+		JNI_COPIED=0; \
+		for ABI in arm64-v8a armeabi-v7a x86_64; do \
+			for ROOT in \
+				"$(ANDROID_PROJECT_DIR)/volvoxgrid-android/build/intermediates/library_and_local_jars_jni/release/jni" \
+				"$(ANDROID_PROJECT_DIR)/volvoxgrid-android/build/intermediates/merged_native_libs/release/out/lib" \
+				"$(ANDROID_PROJECT_DIR)/volvoxgrid-android/build/intermediates/stripped_native_libs/release/out/lib"; do \
+				SRC_JNI="$$ROOT/$$ABI/libvolvoxgrid_jni.so"; \
+				if [ -f "$$SRC_JNI" ]; then \
+					mkdir -p "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI"; \
+					cp -f "$$SRC_JNI" "$(FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR)/$$ABI/libvolvoxgrid_jni.so"; \
+					JNI_COPIED=1; \
+					break; \
+				fi; \
+			done; \
+		done; \
+		if [ "$$JNI_COPIED" -eq 0 ]; then \
+			echo "Error: libvolvoxgrid_jni.so not found after Gradle build."; \
+			exit 1; \
+		fi
 	@echo "Android release plugin build complete."
 
 android-install: $(ANDROID_INSTALL_PREREQ)
 	@echo "Installing Android example app..."
+	@echo "Using GRADLE_MAX_WORKERS=$(GRADLE_MAX_WORKERS)"
 	@SDK_DIR=""; \
 	if [ -n "$$ANDROID_HOME" ]; then \
 		SDK_DIR="$$ANDROID_HOME"; \
@@ -672,13 +793,13 @@ android-install: $(ANDROID_INSTALL_PREREQ)
 	fi; \
 	if [ -x "$(ANDROID_GRADLEW)" ]; then \
 		echo "Using project Gradle wrapper: $(ANDROID_GRADLEW)"; \
-		"$(ANDROID_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
+		"$(ANDROID_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(GRADLE_JOBS_FLAG) $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
 	elif [ -x "$(SHARED_GRADLEW)" ]; then \
 		echo "Using shared Gradle wrapper: $(SHARED_GRADLEW)"; \
-		"$(SHARED_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
+		"$(SHARED_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(GRADLE_JOBS_FLAG) $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
 	elif command -v gradle >/dev/null 2>&1; then \
 		echo "Using system Gradle: $$(command -v gradle)"; \
-		gradle -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
+		gradle -p "$(ANDROID_PROJECT_DIR)" $(GRADLE_JOBS_FLAG) $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
 	else \
 		echo "Error: no Gradle wrapper found."; \
 		echo "Expected $(ANDROID_GRADLEW) or $(SHARED_GRADLEW), or install gradle."; \
@@ -688,6 +809,7 @@ android-install: $(ANDROID_INSTALL_PREREQ)
 
 android-install-release: $(ANDROID_INSTALL_RELEASE_PREREQ)
 	@echo "Installing Android example app (with release plugin libs)..."
+	@echo "Using GRADLE_MAX_WORKERS=$(GRADLE_MAX_WORKERS)"
 	@SDK_DIR=""; \
 	if [ -n "$$ANDROID_HOME" ]; then \
 		SDK_DIR="$$ANDROID_HOME"; \
@@ -705,13 +827,13 @@ android-install-release: $(ANDROID_INSTALL_RELEASE_PREREQ)
 	fi; \
 	if [ -x "$(ANDROID_GRADLEW)" ]; then \
 		echo "Using project Gradle wrapper: $(ANDROID_GRADLEW)"; \
-		"$(ANDROID_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
+		"$(ANDROID_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(GRADLE_JOBS_FLAG) $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
 	elif [ -x "$(SHARED_GRADLEW)" ]; then \
 		echo "Using shared Gradle wrapper: $(SHARED_GRADLEW)"; \
-		"$(SHARED_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
+		"$(SHARED_GRADLEW)" -p "$(ANDROID_PROJECT_DIR)" $(GRADLE_JOBS_FLAG) $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
 	elif command -v gradle >/dev/null 2>&1; then \
 		echo "Using system Gradle: $$(command -v gradle)"; \
-		gradle -p "$(ANDROID_PROJECT_DIR)" $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
+		gradle -p "$(ANDROID_PROJECT_DIR)" $(GRADLE_JOBS_FLAG) $(ANDROID_EXAMPLE_GRADLE_PROPS) "$(ANDROID_INSTALL_TASK)"; \
 	else \
 		echo "Error: no Gradle wrapper found."; \
 		echo "Expected $(ANDROID_GRADLEW) or $(SHARED_GRADLEW), or install gradle."; \
@@ -732,7 +854,15 @@ android-run: android-install
 		-a android.intent.action.MAIN \
 		-c android.intent.category.LAUNCHER \
 		-n "$(ANDROID_EXAMPLE_PACKAGE)/$(ANDROID_EXAMPLE_ACTIVITY)"; \
-	echo "Launched $(ANDROID_EXAMPLE_PACKAGE) on $$DEVICE_ID."
+	echo "Launched $(ANDROID_EXAMPLE_PACKAGE) on $$DEVICE_ID."; \
+	sleep 1; \
+	APP_PID=$$(adb -s "$$DEVICE_ID" shell pidof -s "$(ANDROID_EXAMPLE_PACKAGE)"); \
+	if [ -n "$$APP_PID" ]; then \
+		echo "App PID: $$APP_PID. Starting logcat (Ctrl+C to stop)..."; \
+		adb -s "$$DEVICE_ID" logcat --pid="$$APP_PID"; \
+	else \
+		echo "Warning: could not find PID for $(ANDROID_EXAMPLE_PACKAGE); skipping logcat."; \
+	fi
 
 android-run-release: android-install-release
 	@command -v adb >/dev/null 2>&1 || { echo "Error: adb not found in PATH."; exit 1; }
@@ -747,7 +877,15 @@ android-run-release: android-install-release
 		-a android.intent.action.MAIN \
 		-c android.intent.category.LAUNCHER \
 		-n "$(ANDROID_EXAMPLE_PACKAGE)/$(ANDROID_EXAMPLE_ACTIVITY)"; \
-	echo "Launched $(ANDROID_EXAMPLE_PACKAGE) on $$DEVICE_ID."
+	echo "Launched $(ANDROID_EXAMPLE_PACKAGE) on $$DEVICE_ID."; \
+	sleep 1; \
+	APP_PID=$$(adb -s "$$DEVICE_ID" shell pidof -s "$(ANDROID_EXAMPLE_PACKAGE)"); \
+	if [ -n "$$APP_PID" ]; then \
+		echo "App PID: $$APP_PID. Starting logcat (Ctrl+C to stop)..."; \
+		adb -s "$$DEVICE_ID" logcat --pid="$$APP_PID"; \
+	else \
+		echo "Warning: could not find PID for $(ANDROID_EXAMPLE_PACKAGE); skipping logcat."; \
+	fi
 
 # =============================================================================
 # Docker Builds + Maven Publishing
@@ -756,8 +894,9 @@ docker_android_aar_image:
 	@echo "Building Docker image for Android AAR packaging..."
 	docker build -t "$(AAR_DOCKER_IMAGE)" -f Dockerfile.android .
 
-docker_android_aar: docker_android_aar_image
+docker_android: docker_android_aar_image
 	@echo "Packaging Android AAR + Android lite AAR (version $(AAR_VERSION), ABIs $(AAR_ANDROID_ABIS))..."
+	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS))"
 	@mkdir -p dist/maven
 	docker run --rm \
 		--entrypoint /bin/bash \
@@ -772,10 +911,15 @@ docker_android_aar: docker_android_aar_image
 		-v "$(DOCKER_GRADLE_BUILD_CACHE_VOLUME):$(DOCKER_GRADLE_CACHE_DIR)" \
 		-w /workspace/volvoxgrid \
 		-e CARGO_TARGET_DIR="$(DOCKER_GO_BUILD_CACHE_DIR)/volvoxgrid-cargo-target" \
+		-e BUILD_JOBS="$(BUILD_JOBS)" \
+		-e CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" \
+		-e GRADLE_MAX_WORKERS="$(GRADLE_MAX_WORKERS)" \
 		-e GRADLE_USER_HOME="$(DOCKER_GRADLE_CACHE_DIR)" \
 		-e VERSION="$(AAR_VERSION)" \
 		-e GROUP_ID="$(AAR_GROUP_ID)" \
 		-e ARTIFACT_ID="$(AAR_ARTIFACT_ID)" \
+		-e GIT_COMMIT="$(AAR_GIT_COMMIT)" \
+		-e BUILD_DATE="$(AAR_BUILD_DATE)" \
 		-e ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
 		"$(AAR_DOCKER_IMAGE)"
 	docker run --rm \
@@ -785,10 +929,15 @@ docker_android_aar: docker_android_aar_image
 		-v "$(DOCKER_GRADLE_BUILD_CACHE_VOLUME):$(DOCKER_GRADLE_CACHE_DIR)" \
 		-w /workspace/volvoxgrid \
 		-e CARGO_TARGET_DIR="$(DOCKER_GO_BUILD_CACHE_DIR)/volvoxgrid-cargo-target" \
+		-e BUILD_JOBS="$(BUILD_JOBS)" \
+		-e CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" \
+		-e GRADLE_MAX_WORKERS="$(GRADLE_MAX_WORKERS)" \
 		-e GRADLE_USER_HOME="$(DOCKER_GRADLE_CACHE_DIR)" \
 		-e VERSION="$(AAR_VERSION)" \
 		-e GROUP_ID="$(AAR_LITE_GROUP_ID)" \
 		-e ARTIFACT_ID="$(AAR_LITE_ARTIFACT_ID)" \
+		-e GIT_COMMIT="$(AAR_GIT_COMMIT)" \
+		-e BUILD_DATE="$(AAR_BUILD_DATE)" \
 		-e ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
 		-e PLUGIN_BUILD_MODE=lite \
 		"$(AAR_DOCKER_IMAGE)"
@@ -799,12 +948,13 @@ docker_android_aar: docker_android_aar_image
 		echo "Skip publish_local: AAR_VERSION=$(AAR_VERSION) is not a SNAPSHOT."; \
 	fi
 
-docker_desktop_jar_image:
+docker_desktop_image:
 	@echo "Building Docker image for desktop JAR packaging..."
 	docker build -t "$(DESKTOP_DOCKER_IMAGE)" -f Dockerfile.desktop .
 
-docker_desktop_jar: docker_desktop_jar_image
+docker_desktop: docker_desktop_image
 	@echo "Packaging desktop JAR (version $(DESKTOP_VERSION))..."
+	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS))"
 	@mkdir -p dist/maven
 	docker run --rm \
 		--entrypoint /bin/bash \
@@ -819,17 +969,51 @@ docker_desktop_jar: docker_desktop_jar_image
 		-v "$(DOCKER_GRADLE_BUILD_CACHE_VOLUME):$(DOCKER_GRADLE_CACHE_DIR)" \
 		-w /workspace/volvoxgrid \
 		-e CARGO_TARGET_DIR="$(DOCKER_GO_BUILD_CACHE_DIR)/volvoxgrid-cargo-target" \
+		-e BUILD_JOBS="$(BUILD_JOBS)" \
+		-e CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" \
+		-e GRADLE_MAX_WORKERS="$(GRADLE_MAX_WORKERS)" \
 		-e GRADLE_USER_HOME="$(DOCKER_GRADLE_CACHE_DIR)" \
 		-e VERSION="$(DESKTOP_VERSION)" \
 		-e GROUP_ID="$(DESKTOP_GROUP_ID)" \
 		-e ARTIFACT_ID="$(DESKTOP_ARTIFACT_ID)" \
+		-e GIT_COMMIT="$(DESKTOP_GIT_COMMIT)" \
+		-e BUILD_DATE="$(DESKTOP_BUILD_DATE)" \
+		-e BUILD_OCX="$(DESKTOP_BUILD_OCX)" \
 		"$(DESKTOP_DOCKER_IMAGE)"
 	@echo "Desktop JAR artifacts: dist/maven/"
+	@echo "ActiveX OCX artifacts: dist/desktop/ocx/ (set DESKTOP_BUILD_OCX=0 to skip)"
 	@if echo "$(DESKTOP_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
 		$(MAKE) publish_local; \
 	else \
 		echo "Skip publish_local: DESKTOP_VERSION=$(DESKTOP_VERSION) is not a SNAPSHOT."; \
 	fi
+
+docker_web_image:
+	@echo "Building Docker image for web dist/bundle tasks..."
+	docker build -t "$(WEB_DOCKER_IMAGE)" -f Dockerfile.web .
+
+docker_web: docker_web_image
+	@echo "Running Docker web build target: $(WEB_DOCKER_TARGET)"
+	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), version=$(VOLVOXGRID_VERSION), git=$(WEB_GIT_COMMIT), date=$(WEB_BUILD_DATE))"
+	docker run --rm \
+		--entrypoint /bin/bash \
+		-v "$(DOCKER_GO_BUILD_CACHE_VOLUME):$(DOCKER_GO_BUILD_CACHE_DIR)" \
+		"$(WEB_DOCKER_IMAGE)" \
+		-lc 'mkdir -p /cache/go-build && chmod -R a+rwx /cache/go-build || true'
+	docker run --rm \
+		-u "$$(id -u):$$(id -g)" \
+		-v "$(CURRENT_DIR):/workspace/volvoxgrid" \
+		-v "$(DOCKER_GO_BUILD_CACHE_VOLUME):$(DOCKER_GO_BUILD_CACHE_DIR)" \
+		-w /workspace/volvoxgrid \
+		-e CARGO_TARGET_DIR="$(DOCKER_GO_BUILD_CACHE_DIR)/volvoxgrid-cargo-target" \
+		-e BUILD_JOBS="$(BUILD_JOBS)" \
+		-e CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" \
+		-e VOLVOXGRID_VERSION="$(VOLVOXGRID_VERSION)" \
+		-e VOLVOXGRID_GIT_COMMIT="$(WEB_GIT_COMMIT)" \
+		-e VOLVOXGRID_BUILD_DATE="$(WEB_BUILD_DATE)" \
+		-e WEB_SCALE="$(WEB_SCALE)" \
+		-e WEB_DOCKER_TARGET="$(WEB_DOCKER_TARGET)" \
+		"$(WEB_DOCKER_IMAGE)"
 
 docker_ios_image:
 	@echo "Building Docker image for iOS build..."
@@ -837,6 +1021,7 @@ docker_ios_image:
 
 docker_ios: docker_ios_image
 	@echo "Building iOS XCFramework..."
+	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS))"
 	@mkdir -p dist/ios
 	docker run --rm \
 		--entrypoint /bin/bash \
@@ -851,7 +1036,12 @@ docker_ios: docker_ios_image
 		-v "$(DOCKER_GRADLE_BUILD_CACHE_VOLUME):$(DOCKER_GRADLE_CACHE_DIR)" \
 		-w /workspace/volvoxgrid \
 		-e CARGO_TARGET_DIR="$(DOCKER_GO_BUILD_CACHE_DIR)/volvoxgrid-cargo-target" \
+		-e BUILD_JOBS="$(BUILD_JOBS)" \
+		-e CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" \
 		-e GRADLE_USER_HOME="$(DOCKER_GRADLE_CACHE_DIR)" \
+		-e VERSION="$(IOS_VERSION)" \
+		-e GIT_COMMIT="$(IOS_GIT_COMMIT)" \
+		-e BUILD_DATE="$(IOS_BUILD_DATE)" \
 		"$(IOS_DOCKER_IMAGE)"
 	@echo "iOS artifacts: dist/ios/"
 
@@ -862,7 +1052,8 @@ docker_all_image:
 
 docker_all: docker_all_image
 	@echo "Building all platform artifacts via unified image..."
-	@mkdir -p dist/maven dist/ios dist/wasm
+	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS), build_date=$(ALL_BUILD_DATE), desktop_ocx=$(ALL_BUILD_OCX))"
+	@mkdir -p dist/maven dist/ios dist/wasm dist/wasm-lite dist/web
 	docker run --rm \
 		--entrypoint /bin/bash \
 		-v "$(DOCKER_GO_BUILD_CACHE_VOLUME):$(DOCKER_GO_BUILD_CACHE_DIR)" \
@@ -876,14 +1067,34 @@ docker_all: docker_all_image
 		-v "$(DOCKER_GRADLE_BUILD_CACHE_VOLUME):$(DOCKER_GRADLE_CACHE_DIR)" \
 		-w /workspace/volvoxgrid \
 		-e CARGO_TARGET_DIR="$(DOCKER_GO_BUILD_CACHE_DIR)/volvoxgrid-cargo-target" \
+		-e BUILD_JOBS="$(BUILD_JOBS)" \
+		-e CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" \
+		-e GRADLE_MAX_WORKERS="$(GRADLE_MAX_WORKERS)" \
 		-e GRADLE_USER_HOME="$(DOCKER_GRADLE_CACHE_DIR)" \
 		-e BUILD_TARGET=all \
 		-e VERSION="$(AAR_VERSION)" \
+		-e GIT_COMMIT="$(ALL_GIT_COMMIT)" \
+		-e BUILD_DATE="$(ALL_BUILD_DATE)" \
+		-e WEB_BUNDLE_VERSION="$(VOLVOXGRID_VERSION)" \
+		-e BUILD_OCX="$(ALL_BUILD_OCX)" \
+		-e BUILD_ANDROID_INCLUDE_LITE=1 \
 		-e GROUP_ID="$(AAR_GROUP_ID)" \
 		-e ARTIFACT_ID="$(AAR_ARTIFACT_ID)" \
+		-e AAR_LITE_GROUP_ID="$(AAR_LITE_GROUP_ID)" \
+		-e AAR_LITE_ARTIFACT_ID="$(AAR_LITE_ARTIFACT_ID)" \
+		-e DESKTOP_GROUP_ID="$(DESKTOP_GROUP_ID)" \
+		-e DESKTOP_ARTIFACT_ID="$(DESKTOP_ARTIFACT_ID)" \
+		-e DESKTOP_VERSION="$(DESKTOP_VERSION)" \
+		-e DESKTOP_GIT_COMMIT="$(DESKTOP_GIT_COMMIT)" \
+		-e DESKTOP_BUILD_DATE="$(DESKTOP_BUILD_DATE)" \
 		-e ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
 		"$(ALL_DOCKER_IMAGE)"
 	@echo "All platform artifacts built."
+	@if echo "$(AAR_VERSION)" | grep -q -- '-SNAPSHOT$$' || echo "$(DESKTOP_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
+		$(MAKE) publish_local; \
+	else \
+		echo "Skip publish_local: AAR_VERSION=$(AAR_VERSION), DESKTOP_VERSION=$(DESKTOP_VERSION) are not SNAPSHOT."; \
+	fi
 
 publish_maven:
 	@if [ ! -f "$(MAVEN_SETTINGS)" ]; then \
@@ -898,6 +1109,11 @@ publish_maven:
 	@MAVEN_USER=$$(sed -n 's|.*<username>\(.*\)</username>.*|\1|p' "$(MAVEN_SETTINGS)" | head -1); \
 	MAVEN_PASS=$$(sed -n 's|.*<password>\(.*\)</password>.*|\1|p' "$(MAVEN_SETTINGS)" | head -1); \
 	DIST="$(CURRENT_DIR)/dist/maven"; \
+	VERIFY_SCRIPT="$(CURRENT_DIR)/scripts/verify_embedded_version.sh"; \
+	if [ ! -f "$$VERIFY_SCRIPT" ]; then \
+		echo "Error: version verification script not found: $$VERIFY_SCRIPT"; \
+		exit 1; \
+	fi; \
 	upload_bundle() { \
 		local ARTIFACT="$$1" VERSION="$$2" EXT="$$3" GROUP="$$4"; \
 		local FILE="$$DIST/$$ARTIFACT-$$VERSION.$$EXT"; \
@@ -906,9 +1122,11 @@ publish_maven:
 		local TOP_DIR=$$(echo "$$GROUP" | cut -d. -f1); \
 		if [ ! -f "$$FILE" ] || [ ! -f "$$POM" ]; then \
 			echo "Error: $$ARTIFACT-$$VERSION not found in $$DIST"; \
-			echo "Run 'make docker_android_aar docker_desktop_jar' first."; \
+			echo "Run 'make docker_android docker_desktop' first."; \
 			exit 1; \
 		fi; \
+		echo "Verifying embedded version for $$ARTIFACT-$$VERSION..."; \
+		bash "$$VERIFY_SCRIPT" "$$VERSION" "$$FILE"; \
 		echo "Creating bundle for $$ARTIFACT-$$VERSION..."; \
 		BUNDLE_DIR=$$(mktemp -d); \
 		BUNDLE_ZIP="/tmp/volvoxgrid-bundle-$$$$.zip"; \
@@ -956,7 +1174,7 @@ publish_local:
 	LOCAL_REPO="$(MAVEN_LOCAL_REPO)"; \
 	if [ ! -d "$$DIST" ]; then \
 		echo "Error: dist/maven not found at $$DIST"; \
-		echo "Run 'make docker_android_aar docker_desktop_jar VOLVOXGRID_VERSION=...'" ; \
+		echo "Run 'make docker_android docker_desktop VOLVOXGRID_VERSION=...'" ; \
 		exit 1; \
 	fi; \
 	mkdir -p "$$LOCAL_REPO"; \
@@ -1003,7 +1221,7 @@ publish_local:
 			exit 0; \
 		fi; \
 		echo "Error: no SNAPSHOT artifacts were installed."; \
-		echo "Build at least one SNAPSHOT artifact first (docker_android_aar or docker_desktop_jar)."; \
+		echo "Build at least one SNAPSHOT artifact first (docker_android or docker_desktop)."; \
 		exit 1; \
 	fi; \
 	echo "Installed $$INSTALLED SNAPSHOT artifact bundle(s) into $$LOCAL_REPO"
@@ -1011,10 +1229,21 @@ publish_local:
 publish_github:
 	@command -v gh >/dev/null 2>&1 || { echo "Error: gh (GitHub CLI) not found in PATH."; exit 1; }
 	@TAG="v$(VOLVOXGRID_VERSION)"; \
+	VERIFY_SCRIPT="$(CURRENT_DIR)/scripts/verify_embedded_version.sh"; \
+	PRERELEASE_FLAG=""; \
+	case "$(VOLVOXGRID_VERSION)" in \
+		*-SNAPSHOT) PRERELEASE_FLAG="--prerelease" ;; \
+	esac; \
+	if [ ! -f "$$VERIFY_SCRIPT" ]; then \
+		echo "Error: version verification script not found: $$VERIFY_SCRIPT"; \
+		exit 1; \
+	fi; \
 	echo "Creating/updating GitHub release $$TAG..."; \
 	gh release view "$$TAG" --repo "$(IOS_GITHUB_REPO)" >/dev/null 2>&1 || \
-		gh release create "$$TAG" --repo "$(IOS_GITHUB_REPO)" --title "$$TAG" --notes "Release $$TAG"; \
+		gh release create "$$TAG" $$PRERELEASE_FLAG --repo "$(IOS_GITHUB_REPO)" --title "$$TAG" --notes "Release $$TAG"; \
 	if [ -d "$(IOS_XCFRAMEWORK_DIR)" ]; then \
+		echo "Verifying embedded version for XCFramework (expected $(IOS_VERSION))..."; \
+		bash "$$VERIFY_SCRIPT" "$(IOS_VERSION)" "$(IOS_XCFRAMEWORK_DIR)"; \
 		echo "Zipping XCFramework..."; \
 		cd dist/ios && rm -f VolvoxGridPlugin.xcframework.zip && \
 			zip -r VolvoxGridPlugin.xcframework.zip VolvoxGridPlugin.xcframework/; \
@@ -1030,14 +1259,27 @@ publish_github:
 		echo "Skip iOS: $(IOS_XCFRAMEWORK_DIR) not found."; \
 	fi; \
 	DIST="$(CURRENT_DIR)/dist/maven"; \
-	for f in \
-	  "$$DIST/$(AAR_ARTIFACT_ID)-$(AAR_VERSION).aar" \
-	  "$$DIST/$(AAR_LITE_ARTIFACT_ID)-$(AAR_VERSION).aar" \
-	  "$$DIST/$(DESKTOP_ARTIFACT_ID)-$(DESKTOP_VERSION).jar"; \
+	for entry in \
+	  "$(AAR_VERSION):$$DIST/$(AAR_ARTIFACT_ID)-$(AAR_VERSION).aar" \
+	  "$(AAR_VERSION):$$DIST/$(AAR_LITE_ARTIFACT_ID)-$(AAR_VERSION).aar" \
+	  "$(DESKTOP_VERSION):$$DIST/$(DESKTOP_ARTIFACT_ID)-$(DESKTOP_VERSION).jar"; \
 	do \
+	  expected="$${entry%%:*}"; \
+	  f="$${entry#*:}"; \
 	  if [ -f "$$f" ]; then \
+	    echo "Verifying embedded version for $$(basename "$$f") (expected $$expected)..."; \
+	    bash "$$VERIFY_SCRIPT" "$$expected" "$$f"; \
 	    echo "Uploading $$(basename $$f) to $$TAG..."; \
 	    gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+	  fi; \
+	done; \
+	for f in "$(WEB_BUNDLE_ZIP)" "$(WEB_BUNDLE_LITE_ZIP)"; \
+	do \
+	  if [ -f "$$f" ]; then \
+	    echo "Uploading $$(basename "$$f") to $$TAG..."; \
+	    gh release upload "$$TAG" "$$f" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+	  else \
+	    echo "Skip web bundle: $$f not found."; \
 	  fi; \
 	done; \
 	echo "All artifacts uploaded to $$TAG"
@@ -1113,7 +1355,7 @@ flutter-linux: flutter-setup
 # =============================================================================
 gtk-test: engine
 	@echo "Building GTK4 test..."
-	cd gtk-test && cargo build --features gpu
+	cd gtk-test && cargo build $(CARGO_JOBS_FLAG) --features gpu
 	@echo "Launching GTK4 test..."
 	./target/debug/volvoxgrid-gtk-test
 
@@ -1122,27 +1364,27 @@ gtk-test: engine
 # =============================================================================
 activex:
 	@echo "Building ActiveX OCX (debug)..."
-	cd $(VSFLEXGRID_DIR)/mingw && ./build_ocx.sh
+	cd $(VSFLEXGRID_DIR)/mingw && BUILD_JOBS="$(BUILD_JOBS)" CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" ./build_ocx.sh
 
 activex-release:
 	@echo "Building ActiveX OCX (release)..."
-	cd $(VSFLEXGRID_DIR)/mingw && ./build_ocx.sh release
+	cd $(VSFLEXGRID_DIR)/mingw && BUILD_JOBS="$(BUILD_JOBS)" CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" ./build_ocx.sh release
 
 activex-lite:
 	@echo "Building ActiveX OCX (debug lite)..."
-	cd $(VSFLEXGRID_DIR)/mingw && ./build_ocx.sh lite
+	cd $(VSFLEXGRID_DIR)/mingw && BUILD_JOBS="$(BUILD_JOBS)" CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" ./build_ocx.sh lite
 
 activex-lite-release:
 	@echo "Building ActiveX OCX (release lite)..."
-	cd $(VSFLEXGRID_DIR)/mingw && ./build_ocx.sh release lite
+	cd $(VSFLEXGRID_DIR)/mingw && BUILD_JOBS="$(BUILD_JOBS)" CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" ./build_ocx.sh release lite
 
 activex-gpu:
 	@echo "Building ActiveX OCX (debug gpu)..."
-	cd $(VSFLEXGRID_DIR)/mingw && ./build_ocx.sh gpu
+	cd $(VSFLEXGRID_DIR)/mingw && BUILD_JOBS="$(BUILD_JOBS)" CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" ./build_ocx.sh gpu
 
 activex-gpu-release:
 	@echo "Building ActiveX OCX (release gpu)..."
-	cd $(VSFLEXGRID_DIR)/mingw && ./build_ocx.sh release gpu
+	cd $(VSFLEXGRID_DIR)/mingw && BUILD_JOBS="$(BUILD_JOBS)" CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" ./build_ocx.sh release gpu
 
 vsflexgrid: activex
 

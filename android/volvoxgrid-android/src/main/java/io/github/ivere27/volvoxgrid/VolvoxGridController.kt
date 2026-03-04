@@ -231,14 +231,14 @@ class VolvoxGridController(
         setTextMatrix(sel.activeRow, sel.activeCol, text)
     }
 
-    fun loadArray(rows: Int, cols: Int, values: List<String>, bind: Boolean = false) {
-        service.LoadArray(
-            LoadArrayRequest.newBuilder()
+    fun loadTable(rows: Int, cols: Int, values: List<CellValue>, atomic: Boolean = false) {
+        service.LoadTable(
+            LoadTableRequest.newBuilder()
                 .setGridId(gridId)
                 .setRows(rows)
                 .setCols(cols)
                 .addAllValues(values)
-                .setBind(bind)
+                .setAtomic(atomic)
                 .build()
         )
     }
@@ -411,6 +411,12 @@ class VolvoxGridController(
     fun setSelectionVisibility(style: SelectionVisibility) {
         configure(GridConfig.newBuilder()
             .setSelection(SelectionConfig.newBuilder().setSelectionVisibility(style).build())
+            .build())
+    }
+
+    fun setSelectionStyle(style: HighlightStyle) {
+        configure(GridConfig.newBuilder()
+            .setSelection(SelectionConfig.newBuilder().setSelectionStyle(style).build())
             .build())
     }
 

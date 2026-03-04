@@ -1,3 +1,6 @@
+use crate::proto::volvoxgrid::v1 as pb;
+use crate::style::HighlightStyle;
+
 /// Edit state machine for in-place cell editing.
 ///
 /// Tracks whether editing is active, which cell is being edited,
@@ -14,11 +17,24 @@ pub struct EditHighlightRegion {
     pub col1: i32,
     pub row2: i32,
     pub col2: i32,
-    pub color: u32,
-    pub show_corner_handles: bool,
+    pub style: HighlightStyle,
     pub ref_id: Option<i32>,
     pub text_start: Option<i32>,
     pub text_length: Option<i32>,
+}
+
+impl EditHighlightRegion {
+    pub fn color(&self) -> u32 {
+        self.style
+            .border_color
+            .or(self.style.back_color)
+            .or(self.style.fore_color)
+            .unwrap_or(0xFF1A73E8)
+    }
+
+    pub fn show_corner_handles(&self) -> bool {
+        self.style.fill_handle == Some(pb::FillHandlePosition::FillHandleAllCorners as i32)
+    }
 }
 
 fn parse_dropdown_entries(list: &str) -> Vec<ParsedDropdownItem> {
@@ -268,7 +284,8 @@ impl EditState {
             self.sel_start = 0;
             self.sel_length = self.edit_text.chars().count() as i32;
         }
-        self.formula_mode = formula_mode.unwrap_or_else(|| self.edit_text.trim_start().starts_with('='));
+        self.formula_mode =
+            formula_mode.unwrap_or_else(|| self.edit_text.trim_start().starts_with('='));
         self.formula_highlights.clear();
         let _ = select_all; // used implicitly as the default path
     }
@@ -673,6 +690,9 @@ pub fn next_input_position(mask: &str, pos: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
+    use crate::proto::volvoxgrid::v1 as pb;
+    use crate::style::HighlightStyle;
+
     use super::{
         translate_dropdown_display_to_value, translate_dropdown_value_to_display,
         EditHighlightRegion, EditState,
@@ -824,8 +844,11 @@ mod tests {
             col1: 1,
             row2: 3,
             col2: 3,
-            color: 0xFF00FF00,
-            show_corner_handles: true,
+            style: HighlightStyle {
+                border_color: Some(0xFF00FF00),
+                fill_handle: Some(pb::FillHandlePosition::FillHandleAllCorners as i32),
+                ..HighlightStyle::default()
+            },
             ref_id: Some(1),
             text_start: Some(1),
             text_length: Some(4),

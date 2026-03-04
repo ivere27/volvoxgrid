@@ -271,7 +271,7 @@ Build platform artifacts in reproducible Docker containers:
 make docker_android_aar
 
 # Desktop JAR (Linux/macOS/Windows native libs)
-make docker_desktop_jar
+make docker_desktop
 
 # iOS XCFramework
 make docker_ios
@@ -280,7 +280,12 @@ make docker_ios
 make docker_all
 ```
 
-`make docker_android_aar` and `make docker_desktop_jar` automatically run
+`make docker_desktop` also builds ActiveX OCX binaries (`release` and `release-lite`)
+and writes them to `dist/desktop/ocx/`.
+Output names are `VolvoxGrid_<arch>.ocx` and `VolvoxGrid_<arch>.lite.ocx`.
+Use `make docker_desktop DESKTOP_BUILD_OCX=0` to skip OCX build.
+
+`make docker_android_aar` and `make docker_desktop` automatically run
 `make publish_local` only for `*-SNAPSHOT` versions, installing generated
 snapshot artifacts into `~/.m2/repository`.
 
@@ -288,7 +293,7 @@ snapshot artifacts into `~/.m2/repository`.
 
 ```bash
 # Build Maven bundles first
-make docker_android_aar docker_desktop_jar
+make docker_android_aar docker_desktop
 
 # Publish: android, android-lite, desktop
 make publish_maven
@@ -301,7 +306,7 @@ Requires `.maven-settings.xml` with Sonatype Central credentials and GPG signing
 ```bash
 # Build snapshot artifacts
 # (automatically installs to mavenLocal: ~/.m2/repository)
-make docker_android_aar docker_desktop_jar VOLVOXGRID_VERSION=0.1.2-SNAPSHOT
+make docker_android_aar docker_desktop VOLVOXGRID_VERSION=0.1.2-SNAPSHOT
 ```
 
 ### Optional Features and Binary Size
@@ -815,9 +820,10 @@ The engine includes a high-performance, backend-agnostic debug overlay for real-
 
 | Line | Example | Description |
 |---|---|---|
-| **Line 1** | `FPS: 60.0 \| 1.2ms \| Q: 1242 \| ID: 1001 \| Z: 100% \| Res: 1080x2240` | FPS, Frame Time, Instance Count (Quads), Grid ID, Zoom level, Render Resolution. |
-| **Line 2** | `Mode: GPU(Vulkan-Mailbox) \| Grid: 1,000,000x20 \| DIRTY` | Render Backend, Logical Grid Dimensions (Rows x Cols), Engine Status. |
-| **Line 3** | `Vis: 42x8(336) \| P: 0,15420 \| M: 12.4MB \| C: 842/8192` | Visible Viewport Dimensions & Total Cells, Scroll Position, Estimated Heap Memory, Text Cache Usage. |
+| **Line 1** | `Engine v0.1.5-SNAPSHOT · 59ccdeb · 2026-03-02 14:46 UTC` | Engine version, short git commit, and UTC build date. |
+| **Line 2** | `FPS: 60.0 \| 1.2ms \| Q: 1242 \| ID: 1001 \| Z: 100% \| Res: 1080x2240` | FPS, Frame Time, Instance Count (Quads), Grid ID, Zoom level, Render Resolution. |
+| **Line 3** | `Mode: GPU(Vulkan-Mailbox) \| Grid: 1,000,000x20 \| DIRTY` | Render Backend, Logical Grid Dimensions (Rows x Cols), Engine Status. |
+| **Line 4** | `Vis: 42x8(336) \| P: 0,15420 \| M: 12.4MB \| C: 842/8192` | Visible Viewport Dimensions & Total Cells, Scroll Position, Estimated Heap Memory, Text Cache Usage. |
 
 *Note: The displayed `FPS` is not a raw frame counter, but an **Exponential Moving Average (EMA)** of the time taken to render and present a frame.*
 

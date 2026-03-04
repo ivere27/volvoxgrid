@@ -10,6 +10,7 @@ import type { ExcelGridConfig } from "../proto/config-encoder.js";
 const GRIDLINE_SOLID = 1;
 const FOCUS_BORDER_THICK = 2;
 const SELECTION_FREE = 0;
+const FILL_HANDLE_BOTTOM_RIGHT = 1;
 const EDIT_TRIGGER_KEY_CLICK = 2; // Engine allows editing; host_key_dispatch controls keyboard triggers
 const TAB_CELLS = 1;
 const RESIZE_BOTH = 3;
@@ -67,13 +68,16 @@ export function buildExcelConfig(opts?: {
     fontName: opts?.fontName ?? "Calibri",
     fontSize: resolvedFontSize,
     fontBold: false,
-    backColorSel: EXCEL_COLORS.selectionBg,
-    foreColorSel: EXCEL_COLORS.selectionFg,
 
     // Selection
     selectionMode: SELECTION_FREE,
     focusBorder: FOCUS_BORDER_THICK,
-    showFillHandle: true,
+    selectionStyle: {
+      backColor: EXCEL_COLORS.selectionBg,
+      foreColor: EXCEL_COLORS.selectionFg,
+      fillHandle: FILL_HANDLE_BOTTOM_RIGHT,
+      fillHandleColor: 0xff217346,
+    },
 
     // Editing: host_key_dispatch = true so we control key→edit mapping
     editTrigger: EDIT_TRIGGER_KEY_CLICK,

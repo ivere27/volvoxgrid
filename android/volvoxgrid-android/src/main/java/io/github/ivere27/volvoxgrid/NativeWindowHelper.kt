@@ -25,6 +25,12 @@ internal object NativeWindowHelper {
         nativeReleaseNativeWindow(ptr)
     }
 
+    /** Increment the reference count of an ANativeWindow*. */
+    fun acquireNativeWindow(ptr: Long) {
+        nativeAcquireNativeWindow(ptr)
+    }
+
     private external fun nativeGetNativeWindow(surface: Any): Long
     private external fun nativeReleaseNativeWindow(ptr: Long)
+    private external fun nativeAcquireNativeWindow(ptr: Long)
 }

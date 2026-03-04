@@ -515,6 +515,71 @@ class ColumnDataType extends $pb.ProtobufEnum {
   const ColumnDataType._(super.value, super.name);
 }
 
+/// Defines how the grid handles incoming data that does not match
+/// the configured column type.
+class CoercionMode extends $pb.ProtobufEnum {
+  static const CoercionMode COERCION_MODE_UNSPECIFIED =
+      CoercionMode._(0, _omitEnumNames ? '' : 'COERCION_MODE_UNSPECIFIED');
+
+  /// Types must match exactly.
+  static const CoercionMode COERCION_MODE_STRICT =
+      CoercionMode._(1, _omitEnumNames ? '' : 'COERCION_MODE_STRICT');
+
+  /// Attempt standard type conversions.
+  static const CoercionMode COERCION_MODE_FLEXIBLE =
+      CoercionMode._(2, _omitEnumNames ? '' : 'COERCION_MODE_FLEXIBLE');
+
+  /// Only allow parsing from string input.
+  static const CoercionMode COERCION_MODE_PARSE_ONLY =
+      CoercionMode._(3, _omitEnumNames ? '' : 'COERCION_MODE_PARSE_ONLY');
+
+  static const $core.List<CoercionMode> values = <CoercionMode>[
+    COERCION_MODE_UNSPECIFIED,
+    COERCION_MODE_STRICT,
+    COERCION_MODE_FLEXIBLE,
+    COERCION_MODE_PARSE_ONLY,
+  ];
+
+  static final $core.List<CoercionMode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static CoercionMode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const CoercionMode._(super.value, super.name);
+}
+
+/// Defines what happens when type validation/coercion fails.
+class WriteErrorMode extends $pb.ProtobufEnum {
+  static const WriteErrorMode WRITE_ERROR_MODE_UNSPECIFIED =
+      WriteErrorMode._(0, _omitEnumNames ? '' : 'WRITE_ERROR_MODE_UNSPECIFIED');
+
+  /// Reject the write for the cell.
+  static const WriteErrorMode WRITE_ERROR_MODE_REJECT =
+      WriteErrorMode._(1, _omitEnumNames ? '' : 'WRITE_ERROR_MODE_REJECT');
+
+  /// Write null/empty instead.
+  static const WriteErrorMode WRITE_ERROR_MODE_SET_NULL =
+      WriteErrorMode._(2, _omitEnumNames ? '' : 'WRITE_ERROR_MODE_SET_NULL');
+
+  /// Skip this cell write and keep previous value.
+  static const WriteErrorMode WRITE_ERROR_MODE_SKIP =
+      WriteErrorMode._(3, _omitEnumNames ? '' : 'WRITE_ERROR_MODE_SKIP');
+
+  static const $core.List<WriteErrorMode> values = <WriteErrorMode>[
+    WRITE_ERROR_MODE_UNSPECIFIED,
+    WRITE_ERROR_MODE_REJECT,
+    WRITE_ERROR_MODE_SET_NULL,
+    WRITE_ERROR_MODE_SKIP,
+  ];
+
+  static final $core.List<WriteErrorMode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static WriteErrorMode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const WriteErrorMode._(super.value, super.name);
+}
+
 class Align extends $pb.ProtobufEnum {
   static const Align ALIGN_LEFT_TOP =
       Align._(0, _omitEnumNames ? '' : 'ALIGN_LEFT_TOP');
@@ -921,6 +986,66 @@ class BorderStyle extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const BorderStyle._(super.value, super.name);
+}
+
+/// Hover bitmask flags. Combine with OR:
+/// - row+col: 3
+/// - row+cell: 5
+/// - row+col+cell: 7
+class HoverMode extends $pb.ProtobufEnum {
+  static const HoverMode HOVER_NONE =
+      HoverMode._(0, _omitEnumNames ? '' : 'HOVER_NONE');
+  static const HoverMode HOVER_ROW =
+      HoverMode._(1, _omitEnumNames ? '' : 'HOVER_ROW');
+  static const HoverMode HOVER_COLUMN =
+      HoverMode._(2, _omitEnumNames ? '' : 'HOVER_COLUMN');
+  static const HoverMode HOVER_CELL =
+      HoverMode._(4, _omitEnumNames ? '' : 'HOVER_CELL');
+
+  static const $core.List<HoverMode> values = <HoverMode>[
+    HOVER_NONE,
+    HOVER_ROW,
+    HOVER_COLUMN,
+    HOVER_CELL,
+  ];
+
+  static final $core.List<HoverMode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
+  static HoverMode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const HoverMode._(super.value, super.name);
+}
+
+class FillHandlePosition extends $pb.ProtobufEnum {
+  static const FillHandlePosition FILL_HANDLE_NONE =
+      FillHandlePosition._(0, _omitEnumNames ? '' : 'FILL_HANDLE_NONE');
+  static const FillHandlePosition FILL_HANDLE_BOTTOM_RIGHT =
+      FillHandlePosition._(1, _omitEnumNames ? '' : 'FILL_HANDLE_BOTTOM_RIGHT');
+  static const FillHandlePosition FILL_HANDLE_BOTTOM_LEFT =
+      FillHandlePosition._(2, _omitEnumNames ? '' : 'FILL_HANDLE_BOTTOM_LEFT');
+  static const FillHandlePosition FILL_HANDLE_TOP_RIGHT =
+      FillHandlePosition._(3, _omitEnumNames ? '' : 'FILL_HANDLE_TOP_RIGHT');
+  static const FillHandlePosition FILL_HANDLE_TOP_LEFT =
+      FillHandlePosition._(4, _omitEnumNames ? '' : 'FILL_HANDLE_TOP_LEFT');
+  static const FillHandlePosition FILL_HANDLE_ALL_CORNERS =
+      FillHandlePosition._(5, _omitEnumNames ? '' : 'FILL_HANDLE_ALL_CORNERS');
+
+  static const $core.List<FillHandlePosition> values = <FillHandlePosition>[
+    FILL_HANDLE_NONE,
+    FILL_HANDLE_BOTTOM_RIGHT,
+    FILL_HANDLE_BOTTOM_LEFT,
+    FILL_HANDLE_TOP_RIGHT,
+    FILL_HANDLE_TOP_LEFT,
+    FILL_HANDLE_ALL_CORNERS,
+  ];
+
+  static final $core.List<FillHandlePosition?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
+  static FillHandlePosition? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const FillHandlePosition._(super.value, super.name);
 }
 
 class ApplyScope extends $pb.ProtobufEnum {

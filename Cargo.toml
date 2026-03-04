@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = [
+    "engine",
+    "plugin",
+    "smoke-test",
+    "web/crate",
+    "gtk-test",
+    "adapters/vsflexgrid/crate",
+]
+
+[workspace.package]
+version = "0.1.5"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/ivere27/volvoxgrid"
+
+[profile.release]
+lto = true
+strip = true
+opt-level = "z"
+codegen-units = 1
+panic = "abort"

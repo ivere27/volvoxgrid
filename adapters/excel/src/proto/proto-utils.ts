@@ -67,6 +67,70 @@ function encodeCellRange(row1: number, col1: number, row2: number, col2: number)
   return out;
 }
 
+export interface HighlightStyleArg {
+  backColor?: number;
+  foreColor?: number;
+  border?: number;
+  borderColor?: number;
+  borderTop?: number;
+  borderRight?: number;
+  borderBottom?: number;
+  borderLeft?: number;
+  borderTopColor?: number;
+  borderRightColor?: number;
+  borderBottomColor?: number;
+  borderLeftColor?: number;
+  fillHandle?: number;
+  fillHandleColor?: number;
+}
+
+export function encodeHighlightStyle(style: HighlightStyleArg): number[] {
+  const out: number[] = [];
+  if (style.backColor != null) {
+    out.push(...encodeTag(1, 0), ...encodeVarintUnsigned(BigInt(style.backColor >>> 0)));
+  }
+  if (style.foreColor != null) {
+    out.push(...encodeTag(2, 0), ...encodeVarintUnsigned(BigInt(style.foreColor >>> 0)));
+  }
+  if (style.border != null) {
+    out.push(...encodeTag(3, 0), ...encodeInt32(style.border));
+  }
+  if (style.borderColor != null) {
+    out.push(...encodeTag(4, 0), ...encodeVarintUnsigned(BigInt(style.borderColor >>> 0)));
+  }
+  if (style.borderTop != null) {
+    out.push(...encodeTag(5, 0), ...encodeInt32(style.borderTop));
+  }
+  if (style.borderRight != null) {
+    out.push(...encodeTag(6, 0), ...encodeInt32(style.borderRight));
+  }
+  if (style.borderBottom != null) {
+    out.push(...encodeTag(7, 0), ...encodeInt32(style.borderBottom));
+  }
+  if (style.borderLeft != null) {
+    out.push(...encodeTag(8, 0), ...encodeInt32(style.borderLeft));
+  }
+  if (style.borderTopColor != null) {
+    out.push(...encodeTag(9, 0), ...encodeVarintUnsigned(BigInt(style.borderTopColor >>> 0)));
+  }
+  if (style.borderRightColor != null) {
+    out.push(...encodeTag(10, 0), ...encodeVarintUnsigned(BigInt(style.borderRightColor >>> 0)));
+  }
+  if (style.borderBottomColor != null) {
+    out.push(...encodeTag(11, 0), ...encodeVarintUnsigned(BigInt(style.borderBottomColor >>> 0)));
+  }
+  if (style.borderLeftColor != null) {
+    out.push(...encodeTag(12, 0), ...encodeVarintUnsigned(BigInt(style.borderLeftColor >>> 0)));
+  }
+  if (style.fillHandle != null) {
+    out.push(...encodeTag(13, 0), ...encodeInt32(style.fillHandle));
+  }
+  if (style.fillHandleColor != null) {
+    out.push(...encodeTag(14, 0), ...encodeVarintUnsigned(BigInt(style.fillHandleColor >>> 0)));
+  }
+  return out;
+}
+
 // ── Decoding primitives ────────────────────────────────────
 
 export function readVarint(data: Uint8Array, offset: number): { value: bigint; next: number } {
@@ -209,8 +273,7 @@ export interface HighlightRegionArg {
   col1: number;
   row2: number;
   col2: number;
-  color: number;
-  showCornerHandles?: boolean;
+  style: HighlightStyleArg;
   refId?: number;
   textStart?: number;
   textLength?: number;
@@ -226,19 +289,15 @@ export function encodeEditSetHighlights(args: {
     regionMsg.push(
       ...encodeMessageField(1, encodeCellRange(region.row1, region.col1, region.row2, region.col2)),
     );
-    regionMsg.push(
-      ...encodeTag(2, 0),
-      ...encodeVarintUnsigned(BigInt(region.color >>> 0)),
-    );
-    regionMsg.push(...encodeTag(3, 0), ...encodeBool(Boolean(region.showCornerHandles)));
+    regionMsg.push(...encodeMessageField(2, encodeHighlightStyle(region.style)));
     if (region.refId != null) {
-      regionMsg.push(...encodeTag(4, 0), ...encodeInt32(region.refId));
+      regionMsg.push(...encodeTag(3, 0), ...encodeInt32(region.refId));
     }
     if (region.textStart != null) {
-      regionMsg.push(...encodeTag(5, 0), ...encodeInt32(region.textStart));
+      regionMsg.push(...encodeTag(4, 0), ...encodeInt32(region.textStart));
     }
     if (region.textLength != null) {
-      regionMsg.push(...encodeTag(6, 0), ...encodeInt32(region.textLength));
+      regionMsg.push(...encodeTag(5, 0), ...encodeInt32(region.textLength));
     }
     setHighlights.push(...encodeMessageField(1, regionMsg));
   }

@@ -7,9 +7,29 @@ configurations {
     volvoxgrid
 }
 
+def findVolvoxgridVersionFile = { File startDir ->
+    File current = startDir.canonicalFile
+    while (current != null) {
+        File candidate = new File(current, "VERSION")
+        if (candidate.isFile()) {
+            return candidate
+        }
+        current = current.parentFile
+    }
+    return null
+}
+def versionFile = findVolvoxgridVersionFile(projectDir)
+if (versionFile == null) {
+    throw new GradleException("VERSION file not found from ${projectDir}")
+}
+def defaultVolvoxgridVersion = versionFile.getText("UTF-8").trim()
+if (defaultVolvoxgridVersion.isEmpty()) {
+    throw new GradleException("VERSION file is empty: ${versionFile}")
+}
+
 def vGroup = System.getenv("VOLVOXGRID_GROUP") ?: "io.github.ivere27"
 def vArtifact = System.getenv("VOLVOXGRID_ARTIFACT") ?: "volvoxgrid-desktop"
-def vVersion = project.findProperty("volvoxgridVersion") ?: System.getenv("VOLVOXGRID_VERSION") ?: "0.1.4"
+def vVersion = System.getenv("VOLVOXGRID_VERSION") ?: project.findProperty("volvoxgridVersion") ?: defaultVolvoxgridVersion
 def isSnapshot = vVersion.endsWith("-SNAPSHOT")
 def hostArch = (System.getProperty("os.arch") ?: "").toLowerCase(Locale.ROOT)
 def macosArchDir = null

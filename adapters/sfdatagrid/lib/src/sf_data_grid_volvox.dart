@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show FlutterError, kIsWeb;
 import 'package:flutter/material.dart' hide SelectionChangedCallback;
-import 'package:flutter/services.dart' show FlutterError, rootBundle;
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:fixnum/fixnum.dart' show Int64;
 import 'package:volvoxgrid/volvoxgrid.dart' show VolvoxGridWidget;
 import 'package:volvoxgrid/volvoxgrid_controller.dart';
 import 'package:volvoxgrid/volvoxgrid_ffi.dart' as vg;
@@ -302,21 +304,24 @@ class _SfDataGridVolvoxState extends State<SfDataGridVolvox> {
       sortedColumns: widget.source.sortedColumns,
     );
 
-    final values = List<String>.filled(totalRows * totalCols, '');
+    final values = List<vg.CellValue>.generate(
+      totalRows * totalCols,
+      (_) => vg.CellValue(),
+    );
 
     for (final mapped in _columnMapping.columns) {
-      values[mapped.index] = mapped.headerText;
+      values[mapped.index] = vg.CellValue()..text = mapped.headerText;
     }
 
     for (var row = 0; row < matrix.rows; row += 1) {
       for (var col = 0; col < matrix.cols; col += 1) {
         final from = row * matrix.cols + col;
         final to = (1 + row) * totalCols + col;
-        values[to] = matrix.values[from];
+        values[to] = _toCellValue(matrix.values[from]);
       }
     }
 
-    await _controller.loadArray(totalRows, totalCols, values);
+    await _controller.loadTable(totalRows, totalCols, values);
 
     await _applyFooterFrozenRows();
     await _applySourceSort();
@@ -329,6 +334,35 @@ class _SfDataGridVolvoxState extends State<SfDataGridVolvox> {
     setState(() {
       _ready = true;
     });
+  }
+
+  vg.CellValue _toCellValue(Object? value) {
+    final cell = vg.CellValue();
+    if (value == null) {
+      return cell;
+    }
+    if (value is String) {
+      cell.text = value;
+      return cell;
+    }
+    if (value is bool) {
+      cell.flag = value;
+      return cell;
+    }
+    if (value is num) {
+      cell.number = value.toDouble();
+      return cell;
+    }
+    if (value is DateTime) {
+      cell.timestamp = Int64(value.millisecondsSinceEpoch);
+      return cell;
+    }
+    if (value is Uint8List) {
+      cell.data = value;
+      return cell;
+    }
+    cell.text = value.toString();
+    return cell;
   }
 
   Future<void> _applyFooterFrozenRows() async {

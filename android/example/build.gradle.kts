@@ -4,6 +4,25 @@ plugins {
     id("com.google.protobuf")
 }
 
+fun findVolvoxgridVersionFile(startDir: java.io.File): java.io.File? {
+    var current: java.io.File? = startDir.canonicalFile
+    while (current != null) {
+        val candidate = current.resolve("VERSION")
+        if (candidate.isFile) {
+            return candidate
+        }
+        current = current.parentFile
+    }
+    return null
+}
+
+val versionFile = findVolvoxgridVersionFile(projectDir)
+    ?: throw org.gradle.api.GradleException("VERSION file not found from $projectDir")
+val defaultVolvoxgridVersion = versionFile.readText().trim()
+if (defaultVolvoxgridVersion.isEmpty()) {
+    throw org.gradle.api.GradleException("VERSION file is empty: $versionFile")
+}
+
 val volvoxgridAndroidSource = providers.gradleProperty("volvoxgridAndroidSource")
     .orElse(System.getenv("VOLVOXGRID_SOURCE") ?: "local")
     .get()
@@ -26,10 +45,11 @@ val volvoxgridAndroidGroup = providers.gradleProperty("volvoxgridAndroidGroup")
 val volvoxgridAndroidArtifact = providers.gradleProperty("volvoxgridAndroidArtifact")
     .orElse(defaultVolvoxgridAndroidArtifact)
     .get()
-val volvoxgridVersion = providers.gradleProperty("volvoxgridVersion")
-    .orElse(providers.gradleProperty("volvoxgridAndroidVersion"))
-    .orElse("0.1.4")
-    .get()
+val volvoxgridVersion = System.getenv("VOLVOXGRID_VERSION")
+    ?: providers.gradleProperty("volvoxgridVersion")
+        .orElse(providers.gradleProperty("volvoxgridAndroidVersion"))
+        .orElse(defaultVolvoxgridVersion)
+        .get()
 val isVolvoxgridSnapshot = volvoxgridVersion.endsWith("-SNAPSHOT")
 
 android {

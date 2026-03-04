@@ -4,8 +4,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 pub struct SpanState {
-    pub mode: i32,                                        // CellSpanMode enum
-    pub mode_fixed: i32,                                  // CellSpanMode for fixed cells
+    pub mode: i32,                                       // CellSpanMode enum
+    pub mode_fixed: i32,                                 // CellSpanMode for fixed cells
     pub span_compare: i32,                               // comparison type
     pub span_rows: std::collections::HashMap<i32, bool>, // per-row span enable
     pub span_cols: std::collections::HashMap<i32, bool>, // per-col span enable

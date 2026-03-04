@@ -9,7 +9,7 @@
 
 use crate::grid::VolvoxGrid;
 use crate::proto::volvoxgrid::v1 as pb;
-use crate::style::{CellStyleOverride, HeaderMarkHeight, IconThemeSlotStyle};
+use crate::style::{CellStyleOverride, HeaderMarkHeight, HighlightStyle, IconThemeSlotStyle};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BorderEdge {
@@ -614,8 +614,16 @@ impl VisibleRange {
             show_h = next_h;
             show_v = next_v;
         }
-        let vp_w = if show_v { (vp_w - SB_SIZE).max(1) } else { vp_w };
-        let vp_h = if show_h { (vp_h - SB_SIZE).max(1) } else { vp_h };
+        let vp_w = if show_v {
+            (vp_w - SB_SIZE).max(1)
+        } else {
+            vp_w
+        };
+        let vp_h = if show_h {
+            (vp_h - SB_SIZE).max(1)
+        } else {
+            vp_h
+        };
 
         // Pinned rows — computed first so we can adjust visible_rows scroll
         let pinned_top_rows = grid.pinned_rows_top.clone();
@@ -982,8 +990,7 @@ pub(crate) fn cell_rect(
             x = vp.viewport_w - w;
         } else if is_col_scrollable {
             // Clip scrollable cols against sticky area for pinned rows
-            let clip_left = grid.col_pos(grid.fixed_cols + grid.frozen_cols)
-                + vp.sticky_left_width;
+            let clip_left = grid.col_pos(grid.fixed_cols + grid.frozen_cols) + vp.sticky_left_width;
             if x < clip_left {
                 let clip = clip_left - x;
                 w -= clip;
@@ -1193,10 +1200,8 @@ fn original_cell_bounds(
     let is_row_scrollable = row >= grid.fixed_rows + grid.frozen_rows;
     let is_col_scrollable = col >= grid.fixed_cols + grid.frozen_cols;
     let is_pinned = grid.is_row_pinned(row) != 0;
-    let is_sticky_row = vp.sticky_top_rows.contains(&row)
-        || vp.sticky_bottom_rows.contains(&row);
-    let is_sticky_col = vp.sticky_left_cols.contains(&col)
-        || vp.sticky_right_cols.contains(&col);
+    let is_sticky_row = vp.sticky_top_rows.contains(&row) || vp.sticky_bottom_rows.contains(&row);
+    let is_sticky_col = vp.sticky_left_cols.contains(&col) || vp.sticky_right_cols.contains(&col);
 
     // cell_rect clips X when: is_col_scrollable && !is_sticky_col
     // cell_rect clips Y when: is_row_scrollable && !is_sticky_row
@@ -1219,8 +1224,7 @@ fn original_cell_bounds(
                 (cx, cw)
             };
             let (oy, oh) = if need_orig_y {
-                let oy = grid.row_pos(mr1) - grid.scroll.scroll_y as i32
-                    + vp.pinned_top_height;
+                let oy = grid.row_pos(mr1) - grid.scroll.scroll_y as i32 + vp.pinned_top_height;
                 let oh: i32 = (mr1..=mr2).map(|r| grid.row_height(r)).sum();
                 (oy, oh)
             } else {
@@ -1237,8 +1241,7 @@ fn original_cell_bounds(
         (cx, cw)
     };
     let (oy, oh) = if need_orig_y {
-        let oy = grid.row_pos(row) - grid.scroll.scroll_y as i32
-            + vp.pinned_top_height;
+        let oy = grid.row_pos(row) - grid.scroll.scroll_y as i32 + vp.pinned_top_height;
         (oy, grid.row_height(row))
     } else {
         (cy, ch)
@@ -1603,9 +1606,7 @@ pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> (i32, i32, i
     render_overlay_bands(grid, canvas, &vp);
     render_backgrounds(grid, canvas, &vis_cells);
 
-    if grid.style.progress_color != 0
-        || grid.columns.iter().any(|c| c.progress_color != 0)
-    {
+    if grid.style.progress_color != 0 || grid.columns.iter().any(|c| c.progress_color != 0) {
         render_progress_bars(grid, canvas, &vis_cells);
     }
 
@@ -1667,13 +1668,12 @@ pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> (i32, i32, i
         render_checkboxes(grid, canvas, &vp, &vis_cells);
     }
 
-    if grid.dropdown_trigger != 0
-        && grid.columns.iter().any(|c| !c.dropdown_items.is_empty())
-    {
+    if grid.dropdown_trigger != 0 && grid.columns.iter().any(|c| !c.dropdown_items.is_empty()) {
         render_dropdown_buttons(grid, canvas, &vp, &vis_cells);
     }
 
     render_selection(grid, canvas, &vis_cells);
+    render_hover_highlight(grid, canvas, &vis_cells);
     render_edit_highlights(grid, canvas, &vp);
     render_focus_rect(grid, canvas, &vp);
     render_fill_handle(grid, canvas, &vp);
@@ -1705,8 +1705,8 @@ fn is_highlight_active(grid: &VolvoxGrid) -> bool {
     }
 }
 
-/// Whether a cell should be rendered with selection highlight (back_color_sel /
-/// fore_color_sel).  In listbox mode the current cursor row is always
+/// Whether a cell should be rendered with selection highlight (selection_style
+/// back/fore colors). In listbox mode the current cursor row is always
 /// highlighted regardless of the selection visibility setting.  In other modes the cursor
 /// cell itself is excluded — the focus rect (Layer 8) handles it instead.
 fn should_highlight_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
@@ -1731,6 +1731,62 @@ fn should_highlight_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
         return false;
     }
     is_highlight_active(grid) && grid.is_cell_selected(row, col)
+}
+
+fn selection_back_color(grid: &VolvoxGrid) -> u32 {
+    grid.selection
+        .selection_style
+        .back_color
+        .unwrap_or(0xFF000080)
+}
+
+fn selection_fore_color(grid: &VolvoxGrid) -> u32 {
+    grid.selection
+        .selection_style
+        .fore_color
+        .unwrap_or(0xFFFFFFFF)
+}
+
+fn hover_mode_has(mode: u32, flag: pb::HoverMode) -> bool {
+    (mode & (flag as u32)) != 0
+}
+
+fn hover_matches_row(grid: &VolvoxGrid, row: i32) -> bool {
+    hover_mode_has(grid.selection.hover_mode, pb::HoverMode::HoverRow)
+        && grid.mouse_row >= 0
+        && row == grid.mouse_row
+}
+
+fn hover_matches_column(grid: &VolvoxGrid, col: i32) -> bool {
+    hover_mode_has(grid.selection.hover_mode, pb::HoverMode::HoverColumn)
+        && grid.mouse_col >= 0
+        && col == grid.mouse_col
+}
+
+fn hover_matches_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
+    hover_mode_has(grid.selection.hover_mode, pb::HoverMode::HoverCell)
+        && grid.mouse_row >= 0
+        && grid.mouse_col >= 0
+        && row == grid.mouse_row
+        && col == grid.mouse_col
+}
+
+fn draw_highlight_fill<C: Canvas>(
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    style: &HighlightStyle,
+) {
+    let Some(color) = style.back_color else {
+        return;
+    };
+    if ((color >> 24) & 0xFF) == 0xFF {
+        canvas.fill_rect(x, y, w, h, color);
+    } else {
+        canvas.blend_rect(x, y, w, h, color);
+    }
 }
 
 // ===========================================================================
@@ -1823,11 +1879,10 @@ fn render_backgrounds<C: Canvas>(
         // merged cell spans both sticky and non-sticky columns: without
         // this, the last-drawn column's style wins, and the winner changes
         // depending on whether the sticky threshold is crossed.
-        let (style_row, style_col) =
-            match grid.get_merged_range(row, col) {
-                Some((mr1, mc1, mr2, mc2)) if mr1 != mr2 || mc1 != mc2 => (mr1, mc1),
-                _ => (row, col),
-            };
+        let (style_row, style_col) = match grid.get_merged_range(row, col) {
+            Some((mr1, mc1, mr2, mc2)) if mr1 != mr2 || mc1 != mc2 => (mr1, mc1),
+            _ => (row, col),
+        };
 
         let is_fixed = style_row < grid.fixed_rows || style_col < grid.fixed_cols;
         let is_frozen = !is_fixed
@@ -1847,6 +1902,7 @@ fn render_backgrounds<C: Canvas>(
             is_frozen,
             is_selected,
             is_alternate,
+            selection_back_color(grid),
         );
 
         // Pinned/sticky cells overlay scrolled content, so they MUST always
@@ -1857,6 +1913,20 @@ fn render_backgrounds<C: Canvas>(
             || grid.is_col_pinned(col) != 0;
         if bg != grid.style.back_color_bkg || is_overlay {
             canvas.fill_rect(cx, cy, cw, ch, bg);
+        }
+
+        // Hover overlays are layered after base/selection backgrounds so row/column/cell
+        // hover emphasis can stack (row -> column -> cell). Keep selected cells stable.
+        if !is_selected && style_row >= grid.fixed_rows && style_col >= grid.fixed_cols {
+            if hover_matches_row(grid, style_row) {
+                draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.hover_row_style);
+            }
+            if hover_matches_column(grid, style_col) {
+                draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.hover_column_style);
+            }
+            if hover_matches_cell(grid, style_row, style_col) {
+                draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.hover_cell_style);
+            }
         }
     }
 }
@@ -2202,12 +2272,13 @@ fn render_cell_text<C: Canvas>(
         let is_row_scrollable = text_row >= grid.fixed_rows + grid.frozen_rows;
         let is_col_scrollable = text_col >= grid.fixed_cols + grid.frozen_cols;
         let is_pinned = grid.is_row_pinned(text_row) != 0;
-        let is_sticky_row = vp.sticky_top_rows.contains(&text_row)
-            || vp.sticky_bottom_rows.contains(&text_row);
-        let is_sticky_col = vp.sticky_left_cols.contains(&text_col)
-            || vp.sticky_right_cols.contains(&text_col);
+        let is_sticky_row =
+            vp.sticky_top_rows.contains(&text_row) || vp.sticky_bottom_rows.contains(&text_row);
+        let is_sticky_col =
+            vp.sticky_left_cols.contains(&text_col) || vp.sticky_right_cols.contains(&text_col);
 
-        let is_merged = grid.get_merged_range(text_row, text_col)
+        let is_merged = grid
+            .get_merged_range(text_row, text_col)
             .map_or(false, |(r1, c1, r2, c2)| r1 != r2 || c1 != c2);
 
         let (orig_x, orig_y, orig_w, orig_h) = if is_merged {
@@ -2227,8 +2298,8 @@ fn render_cell_text<C: Canvas>(
                     (vis_x, vis_w)
                 };
                 let (oy, oh) = if need_orig_y {
-                    let oy = grid.row_pos(text_row) - grid.scroll.scroll_y as i32
-                        + vp.pinned_top_height;
+                    let oy =
+                        grid.row_pos(text_row) - grid.scroll.scroll_y as i32 + vp.pinned_top_height;
                     (oy, grid.row_height(text_row))
                 } else {
                     (vis_y, vis_h)
@@ -2259,7 +2330,13 @@ fn render_cell_text<C: Canvas>(
         let is_selected = should_highlight_cell(grid, text_row, text_col);
 
         let style_override = grid.get_cell_style(text_row, text_col);
-        let fore = style_override.resolve_fore_color(&grid.style, is_fixed, is_frozen, is_selected);
+        let fore = style_override.resolve_fore_color(
+            &grid.style,
+            is_fixed,
+            is_frozen,
+            is_selected,
+            selection_fore_color(grid),
+        );
 
         let font_name = style_override
             .font_name
@@ -2348,7 +2425,8 @@ fn render_cell_text<C: Canvas>(
         };
 
         let shrink_to_fit = style_override.shrink_to_fit.unwrap_or(false);
-        let is_merged_cell = grid.get_merged_range(text_row, text_col)
+        let is_merged_cell = grid
+            .get_merged_range(text_row, text_col)
             .map_or(false, |(r1, c1, r2, c2)| r1 != r2 || c1 != c2);
 
         let needs_measure = grid.word_wrap
@@ -2371,91 +2449,103 @@ fn render_cell_text<C: Canvas>(
         };
 
         // ── Shrink-to-fit: reduce font size so text fits cell width ──
-        let (effective_font_size, tw, th) = if shrink_to_fit
-            && !grid.word_wrap
-            && tw > inner_w as f32
-            && inner_w > 0
-        {
-            let scale = inner_w as f32 / tw;
-            let shrunk = (font_size * scale).floor().max(6.0);
-            let (stw, sth) = canvas.measure_text(
-                &display_text,
-                font_name,
-                shrunk,
-                font_bold,
-                font_italic,
-                None,
-            );
-            (shrunk, stw, sth)
-        } else {
-            (font_size, tw, th)
-        };
+        let (effective_font_size, tw, th) =
+            if shrink_to_fit && !grid.word_wrap && tw > inner_w as f32 && inner_w > 0 {
+                let scale = inner_w as f32 / tw;
+                let shrunk = (font_size * scale).floor().max(6.0);
+                let (stw, sth) = canvas.measure_text(
+                    &display_text,
+                    font_name,
+                    shrunk,
+                    font_bold,
+                    font_italic,
+                    None,
+                );
+                (shrunk, stw, sth)
+            } else {
+                (font_size, tw, th)
+            };
 
         // ── Text overflow: extend into empty neighbor cells ──
-        let (inner_left, inner_right, inner_w, clip_x_ov, _clip_w_ov) =
-            if grid.text_overflow
-                && !grid.word_wrap
-                && !shrink_to_fit
-                && !is_merged_cell
-                && tw > inner_w as f32
-                && text_row >= grid.fixed_rows
-            {
-                let scan_right = if grid.right_to_left {
-                    halign == 2 // left-aligned in RTL scans right
-                } else {
-                    halign == 0 || halign == 1 // left or center aligned scans right
-                };
-                let scan_left = if grid.right_to_left {
-                    halign == 0 || halign == 1
-                } else {
-                    halign == 2 || halign == 1 // right or center aligned scans left
-                };
-                let mut left_ext: i32 = 0;
-                let mut right_ext: i32 = 0;
-
-                // Scan rightward
-                if scan_right {
-                    let mut c = text_col + 1;
-                    while c < grid.cols {
-                        if grid.is_col_hidden(c) { c += 1; continue; }
-                        if grid.get_merged_range(text_row, c)
-                            .map_or(false, |(r1, c1, r2, c2)| r1 != r2 || c1 != c2)
-                        {
-                            break;
-                        }
-                        let neighbor_text = grid.get_display_text(text_row, c);
-                        if !neighbor_text.is_empty() { break; }
-                        right_ext += grid.get_col_width(c);
-                        if (inner_w + left_ext + right_ext) as f32 >= tw { break; }
-                        c += 1;
-                    }
-                }
-
-                // Scan leftward
-                if scan_left {
-                    let mut c = text_col - 1;
-                    while c >= grid.fixed_cols {
-                        if grid.is_col_hidden(c) { c -= 1; continue; }
-                        if grid.get_merged_range(text_row, c)
-                            .map_or(false, |(r1, c1, r2, c2)| r1 != r2 || c1 != c2)
-                        {
-                            break;
-                        }
-                        let neighbor_text = grid.get_display_text(text_row, c);
-                        if !neighbor_text.is_empty() { break; }
-                        left_ext += grid.get_col_width(c);
-                        if (inner_w + left_ext + right_ext) as f32 >= tw { break; }
-                        c -= 1;
-                    }
-                }
-
-                let ext_left = inner_left - left_ext;
-                let ext_right = inner_right + right_ext;
-                let ext_w = (ext_right - ext_left).max(1);
-                (ext_left, ext_right, ext_w, ext_left, ext_w)
+        let (inner_left, inner_right, inner_w, clip_x_ov, _clip_w_ov) = if grid.text_overflow
+            && !grid.word_wrap
+            && !shrink_to_fit
+            && !is_merged_cell
+            && tw > inner_w as f32
+            && text_row >= grid.fixed_rows
+        {
+            let scan_right = if grid.right_to_left {
+                halign == 2 // left-aligned in RTL scans right
             } else {
-                (inner_left, inner_right, inner_w, inner_left, inner_w)
+                halign == 0 || halign == 1 // left or center aligned scans right
             };
+            let scan_left = if grid.right_to_left {
+                halign == 0 || halign == 1
+            } else {
+                halign == 2 || halign == 1 // right or center aligned scans left
+            };
+            let mut left_ext: i32 = 0;
+            let mut right_ext: i32 = 0;
+
+            // Scan rightward
+            if scan_right {
+                let mut c = text_col + 1;
+                while c < grid.cols {
+                    if grid.is_col_hidden(c) {
+                        c += 1;
+                        continue;
+                    }
+                    if grid
+                        .get_merged_range(text_row, c)
+                        .map_or(false, |(r1, c1, r2, c2)| r1 != r2 || c1 != c2)
+                    {
+                        break;
+                    }
+                    let neighbor_text = grid.get_display_text(text_row, c);
+                    if !neighbor_text.is_empty() {
+                        break;
+                    }
+                    right_ext += grid.get_col_width(c);
+                    if (inner_w + left_ext + right_ext) as f32 >= tw {
+                        break;
+                    }
+                    c += 1;
+                }
+            }
+
+            // Scan leftward
+            if scan_left {
+                let mut c = text_col - 1;
+                while c >= grid.fixed_cols {
+                    if grid.is_col_hidden(c) {
+                        c -= 1;
+                        continue;
+                    }
+                    if grid
+                        .get_merged_range(text_row, c)
+                        .map_or(false, |(r1, c1, r2, c2)| r1 != r2 || c1 != c2)
+                    {
+                        break;
+                    }
+                    let neighbor_text = grid.get_display_text(text_row, c);
+                    if !neighbor_text.is_empty() {
+                        break;
+                    }
+                    left_ext += grid.get_col_width(c);
+                    if (inner_w + left_ext + right_ext) as f32 >= tw {
+                        break;
+                    }
+                    c -= 1;
+                }
+            }
+
+            let ext_left = inner_left - left_ext;
+            let ext_right = inner_right + right_ext;
+            let ext_w = (ext_right - ext_left).max(1);
+            (ext_left, ext_right, ext_w, ext_left, ext_w)
+        } else {
+            (inner_left, inner_right, inner_w, inner_left, inner_w)
+        };
 
         let text_x = match halign {
             0 => inner_left,
@@ -2890,9 +2980,15 @@ fn render_sort_glyphs<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visible
                             }
                             if show_sort_numbers {
                                 draw_sort_priority_number(
-                                    canvas, grid, sort_idx,
-                                    draw_x + draw_w + 1, inner_top, inner_h, inner_bottom,
-                                    inner_left, inner_w,
+                                    canvas,
+                                    grid,
+                                    sort_idx,
+                                    draw_x + draw_w + 1,
+                                    inner_top,
+                                    inner_h,
+                                    inner_bottom,
+                                    inner_left,
+                                    inner_w,
                                 );
                             }
                             continue;
@@ -2950,9 +3046,15 @@ fn render_sort_glyphs<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visible
                         );
                         if show_sort_numbers {
                             draw_sort_priority_number(
-                                canvas, grid, sort_idx,
-                                glyph_x + text_w + 1, inner_top, inner_h, inner_bottom,
-                                inner_left, inner_w,
+                                canvas,
+                                grid,
+                                sort_idx,
+                                glyph_x + text_w + 1,
+                                inner_top,
+                                inner_h,
+                                inner_bottom,
+                                inner_left,
+                                inner_w,
                             );
                         }
                         continue;
@@ -3026,9 +3128,15 @@ fn render_sort_glyphs<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visible
                 );
                 if show_sort_numbers {
                     draw_sort_priority_number(
-                        canvas, grid, sort_idx,
-                        glyph_x + text_w + 1, inner_top, inner_h, inner_bottom,
-                        inner_left, inner_w,
+                        canvas,
+                        grid,
+                        sort_idx,
+                        glyph_x + text_w + 1,
+                        inner_top,
+                        inner_h,
+                        inner_bottom,
+                        inner_left,
+                        inner_w,
                     );
                 }
             }
@@ -3055,9 +3163,20 @@ fn draw_sort_priority_number<C: Canvas>(
     let num_y = inner_top + ((inner_h - th.ceil() as i32).max(0) / 2);
     let clip_h = (inner_bottom - num_y).max(1);
     canvas.draw_text_styled(
-        x, num_y, &label,
-        &grid.style.font_name, num_size, false, false, color,
-        clip_x, 0, clip_w, clip_h, 0, None,
+        x,
+        num_y,
+        &label,
+        &grid.style.font_name,
+        num_size,
+        false,
+        false,
+        color,
+        clip_x,
+        0,
+        clip_w,
+        clip_h,
+        0,
+        None,
     );
 }
 
@@ -3513,9 +3632,110 @@ fn render_selection<C: Canvas>(
     _canvas: &mut C,
     _vis_cells: &[(i32, i32, i32, i32, i32, i32)],
 ) {
-    // Selection background is now fully handled by Layer 1 (render_backgrounds)
-    // via should_highlight_cell() → back_color_sel.  No additional overlay needed.
+    // Selection background is fully handled by Layer 1 (render_backgrounds)
+    // via should_highlight_cell() and selection_style back/fore colors.
     let _ = grid;
+}
+
+fn has_highlight_border(style: &HighlightStyle) -> bool {
+    style.border.is_some()
+        || style.border_top.is_some()
+        || style.border_right.is_some()
+        || style.border_bottom.is_some()
+        || style.border_left.is_some()
+}
+
+fn draw_highlight_border<C: Canvas>(
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    style: &HighlightStyle,
+    default_color: u32,
+) {
+    let base_style = style.border.unwrap_or(pb::BorderStyle::BorderNone as i32);
+    let base_color = style.border_color.unwrap_or(default_color);
+
+    let top_style = style.border_top.unwrap_or(base_style);
+    let right_style = style.border_right.unwrap_or(base_style);
+    let bottom_style = style.border_bottom.unwrap_or(base_style);
+    let left_style = style.border_left.unwrap_or(base_style);
+
+    let top_color = style.border_top_color.unwrap_or(base_color);
+    let right_color = style.border_right_color.unwrap_or(base_color);
+    let bottom_color = style.border_bottom_color.unwrap_or(base_color);
+    let left_color = style.border_left_color.unwrap_or(base_color);
+
+    canvas.cell_border_edge_style(x, y, w, h, BorderEdge::Top, top_style, top_color);
+    canvas.cell_border_edge_style(x, y, w, h, BorderEdge::Right, right_style, right_color);
+    canvas.cell_border_edge_style(x, y, w, h, BorderEdge::Bottom, bottom_style, bottom_color);
+    canvas.cell_border_edge_style(x, y, w, h, BorderEdge::Left, left_style, left_color);
+}
+
+fn render_hover_highlight<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    vis_cells: &[(i32, i32, i32, i32, i32, i32)],
+) {
+    if grid.selection.hover_mode == pb::HoverMode::HoverNone as u32 {
+        return;
+    }
+
+    let row_border = has_highlight_border(&grid.selection.hover_row_style);
+    let col_border = has_highlight_border(&grid.selection.hover_column_style);
+    let cell_border = has_highlight_border(&grid.selection.hover_cell_style);
+    if !row_border && !col_border && !cell_border {
+        return;
+    }
+
+    for &(row, col, cx, cy, cw, ch) in vis_cells {
+        let (style_row, style_col) = match grid.get_merged_range(row, col) {
+            Some((mr1, mc1, mr2, mc2)) if mr1 != mr2 || mc1 != mc2 => (mr1, mc1),
+            _ => (row, col),
+        };
+
+        if style_row < grid.fixed_rows || style_col < grid.fixed_cols {
+            continue;
+        }
+        if should_highlight_cell(grid, style_row, style_col) {
+            continue;
+        }
+
+        if row_border && hover_matches_row(grid, style_row) {
+            draw_highlight_border(
+                canvas,
+                cx,
+                cy,
+                cw,
+                ch,
+                &grid.selection.hover_row_style,
+                0xFF1A73E8,
+            );
+        }
+        if col_border && hover_matches_column(grid, style_col) {
+            draw_highlight_border(
+                canvas,
+                cx,
+                cy,
+                cw,
+                ch,
+                &grid.selection.hover_column_style,
+                0xFF1A73E8,
+            );
+        }
+        if cell_border && hover_matches_cell(grid, style_row, style_col) {
+            draw_highlight_border(
+                canvas,
+                cx,
+                cy,
+                cw,
+                ch,
+                &grid.selection.hover_cell_style,
+                0xFF1A73E8,
+            );
+        }
+    }
 }
 
 // ===========================================================================
@@ -3588,6 +3808,15 @@ fn draw_corner_handles<C: Canvas>(canvas: &mut C, x: i32, y: i32, w: i32, h: i32
     }
 }
 
+fn draw_fill_handle_square<C: Canvas>(canvas: &mut C, anchor_x: i32, anchor_y: i32, color: u32) {
+    let size = 7i32;
+    let half = size / 2;
+    let sx = anchor_x - half;
+    let sy = anchor_y - half;
+    canvas.fill_rect(sx, sy, size, size, 0xFFFFFFFF);
+    canvas.fill_rect(sx + 1, sy + 1, size - 2, size - 2, color);
+}
+
 fn render_edit_highlights<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRange) {
     if !grid.edit.is_active() || grid.edit.formula_highlights.is_empty() {
         return;
@@ -3599,9 +3828,13 @@ fn render_edit_highlights<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Vis
         else {
             continue;
         };
-        let color = region.color;
-        canvas.rect_outline_thick(x, y, w, h, 2, color);
-        if region.show_corner_handles {
+        let color = region.color();
+        if has_highlight_border(&region.style) {
+            draw_highlight_border(canvas, x, y, w, h, &region.style, color);
+        } else {
+            canvas.rect_outline_thick(x, y, w, h, 2, color);
+        }
+        if region.show_corner_handles() {
             draw_corner_handles(canvas, x, y, w, h, color);
         }
     }
@@ -3644,35 +3877,60 @@ fn render_focus_rect<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleR
 // ===========================================================================
 
 fn render_fill_handle<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRange) {
-    if !grid.selection.show_fill_handle {
-        return;
-    }
     if !is_highlight_active(grid) {
         return;
     }
 
-    // Get the bottom-right cell of the selection range
-    let (_, _, r2, c2) = grid.selection.get_range();
-    let r2 = r2.min(grid.rows - 1);
-    let c2 = c2.min(grid.cols - 1);
+    let handle_pos = grid
+        .selection
+        .selection_style
+        .fill_handle
+        .unwrap_or(pb::FillHandlePosition::FillHandleNone as i32);
+    if handle_pos == pb::FillHandlePosition::FillHandleNone as i32 {
+        return;
+    }
+    let handle_color = grid
+        .selection
+        .selection_style
+        .fill_handle_color
+        .unwrap_or(0xFF217346);
 
-    let (cx, cy, cw, ch) = match cell_rect(grid, r2, c2, vp) {
-        Some(r) => r,
-        None => return,
+    let (r1, c1, r2, c2) = grid.selection.get_range();
+    let r1 = r1.clamp(0, grid.rows - 1);
+    let c1 = c1.clamp(0, grid.cols - 1);
+    let r2 = r2.clamp(0, grid.rows - 1);
+    let c2 = c2.clamp(0, grid.cols - 1);
+
+    let draw_at = |canvas: &mut C, row: i32, col: i32, at_right: bool, at_bottom: bool| {
+        let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) else {
+            return;
+        };
+        let anchor_x = if at_right { cx + cw - 1 } else { cx };
+        let anchor_y = if at_bottom { cy + ch - 1 } else { cy };
+        draw_fill_handle_square(canvas, anchor_x, anchor_y, handle_color);
     };
 
-    // 7-device-pixel square centered on the cell's bottom-right corner
-    let size = 7i32;
-    let half = size / 2; // 3
-    let anchor_x = cx + cw - 1;
-    let anchor_y = cy + ch - 1;
-    let sx = anchor_x - half;
-    let sy = anchor_y - half;
-
-    // White border (7×7)
-    canvas.fill_rect(sx, sy, size, size, 0xFFFFFFFF);
-    // Colored interior (5×5)
-    canvas.fill_rect(sx + 1, sy + 1, size - 2, size - 2, grid.style.fill_handle_color);
+    match handle_pos {
+        p if p == pb::FillHandlePosition::FillHandleBottomRight as i32 => {
+            draw_at(canvas, r2, c2, true, true);
+        }
+        p if p == pb::FillHandlePosition::FillHandleBottomLeft as i32 => {
+            draw_at(canvas, r2, c1, false, true);
+        }
+        p if p == pb::FillHandlePosition::FillHandleTopRight as i32 => {
+            draw_at(canvas, r1, c2, true, false);
+        }
+        p if p == pb::FillHandlePosition::FillHandleTopLeft as i32 => {
+            draw_at(canvas, r1, c1, false, false);
+        }
+        p if p == pb::FillHandlePosition::FillHandleAllCorners as i32 => {
+            draw_at(canvas, r1, c1, false, false);
+            draw_at(canvas, r1, c2, true, false);
+            draw_at(canvas, r2, c1, false, true);
+            draw_at(canvas, r2, c2, true, true);
+        }
+        _ => {}
+    }
 }
 
 // ===========================================================================
@@ -3727,8 +3985,7 @@ fn render_outline<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRang
 
             // Use original (pre-clip) bounds so tree elements don't
             // shift during smooth scrolling.
-            let (ox, oy, _ow, oh) =
-                original_cell_bounds(grid, row, tree_col, cx, cy, cw, ch, vp);
+            let (ox, oy, _ow, oh) = original_cell_bounds(grid, row, tree_col, cx, cy, cw, ch, vp);
 
             let indent = tg.indent(visual_level);
             let line_x = ox + tg.line_x(visual_level);
@@ -3965,7 +4222,13 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visib
     let is_fixed = row < grid.fixed_rows || col < grid.fixed_cols;
     let is_frozen = !is_fixed
         && (row < grid.fixed_rows + grid.frozen_rows || col < grid.fixed_cols + grid.frozen_cols);
-    let fore = style_override.resolve_fore_color(&grid.style, is_fixed, is_frozen, false);
+    let fore = style_override.resolve_fore_color(
+        &grid.style,
+        is_fixed,
+        is_frozen,
+        false,
+        selection_fore_color(grid),
+    );
     let font_name = style_override
         .font_name
         .as_deref()
@@ -4173,7 +4436,7 @@ fn render_active_dropdown<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Vis
         let selected = idx == sel;
 
         let row_bg = if selected {
-            grid.style.back_color_sel
+            selection_back_color(grid)
         } else {
             0xFFFFFFFF
         };
@@ -4186,7 +4449,7 @@ fn render_active_dropdown<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Vis
         );
 
         let text_color = if selected {
-            grid.style.fore_color_sel
+            selection_fore_color(grid)
         } else {
             grid.style.fore_color
         };
@@ -4479,6 +4742,44 @@ fn render_fast_scroll<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
 // Layer 14 -- Debug overlay
 // ===========================================================================
 
+fn short_commit(commit: &str) -> String {
+    let trimmed = commit.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("unknown") {
+        "unknown".to_string()
+    } else {
+        trimmed.chars().take(7).collect()
+    }
+}
+
+fn format_build_date_utc(date: &str) -> String {
+    let trimmed = date.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("unknown") {
+        return "unknown".to_string();
+    }
+
+    let Some((ymd, rest)) = trimmed.split_once('T') else {
+        return trimmed.to_string();
+    };
+
+    if ymd.len() != 10 {
+        return trimmed.to_string();
+    }
+
+    let mut parts = rest.split(':');
+    let (Some(hour), Some(minute)) = (parts.next(), parts.next()) else {
+        return trimmed.to_string();
+    };
+    if hour.len() != 2 || minute.len() != 2 {
+        return trimmed.to_string();
+    }
+
+    if !hour.chars().all(|c| c.is_ascii_digit()) || !minute.chars().all(|c| c.is_ascii_digit()) {
+        return trimmed.to_string();
+    }
+
+    format!("{ymd} {hour}:{minute} UTC")
+}
+
 fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRange) {
     if !grid.debug_overlay {
         return;
@@ -4496,6 +4797,13 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visib
     let bg_color: u32 = 0xC0000000;
 
     let mut lines: Vec<String> = Vec::new();
+
+    lines.push(format!(
+        "Engine v{} · {} · {}",
+        VolvoxGrid::version(),
+        short_commit(VolvoxGrid::git_commit()),
+        format_build_date_utc(VolvoxGrid::build_date())
+    ));
 
     let mode_str = match grid.renderer_mode {
         m if m == pb::RendererMode::RendererAuto as i32 => {
@@ -4531,13 +4839,23 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visib
 
     lines.push(format!(
         "FPS: {:.1} | {:.1}ms | Q: {} | ID: {} | Z: {:.0}% | Res: {}x{}",
-        grid.debug_fps, grid.debug_frame_time_ms, grid.debug_instance_count, grid.id, grid.debug_zoom_level * 100.0, buf_w, buf_h,
+        grid.debug_fps,
+        grid.debug_frame_time_ms,
+        grid.debug_instance_count,
+        grid.id,
+        grid.debug_zoom_level * 100.0,
+        buf_w,
+        buf_h,
     ));
 
     let status_str = if grid.dirty {
         let mut reasons = Vec::new();
-        if grid.animation.active { reasons.push("ANIM".to_string()); }
-        if grid.background_loading { reasons.push("LOAD".to_string()); }
+        if grid.animation.active {
+            reasons.push("ANIM".to_string());
+        }
+        if grid.background_loading {
+            reasons.push("LOAD".to_string());
+        }
         if grid.scroll.fling_active {
             let vel = (grid.scroll.fling_vx.powi(2) + grid.scroll.fling_vy.powi(2)).sqrt();
             reasons.push(format!("V:{:.0}", vel));
@@ -4603,7 +4921,13 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visib
 
     let num_lines = lines.len() as i32;
     let overlay_h = num_lines * line_height + padding * 2;
-    let overlay_w = ((320.0 * scale) as i32).min(buf_w);
+    let mut max_text_w: i32 = 0;
+    for line in &lines {
+        let (line_w, _) = canvas.measure_text(line, font_name, font_size, false, false, None);
+        max_text_w = max_text_w.max(line_w.ceil() as i32);
+    }
+    let min_overlay_w = (320.0 * scale) as i32;
+    let overlay_w = (max_text_w + padding * 2).max(min_overlay_w).min(buf_w);
     let overlay_x = 0;
     let overlay_y = buf_h - overlay_h;
 

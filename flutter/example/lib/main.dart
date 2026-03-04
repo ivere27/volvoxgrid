@@ -110,7 +110,6 @@ class _DemoPageState extends State<DemoPage> {
       ..foreColor = 0xFF000000
       ..foreColorFixed = 0xFF000000
       ..foreColorFrozen = 0xFF000000
-      ..foreColorSel = 0xFFFFFFFF
       ..fontName = ''
       ..fontSize = 14.0 * dpr;
     await controller.setGridStyle(style);

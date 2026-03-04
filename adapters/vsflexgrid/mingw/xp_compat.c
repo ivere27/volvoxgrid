@@ -12,6 +12,25 @@
 #include <windows.h>
 #include <string.h>
 
+/* These APIs are Vista+ and their public types are gated by _WIN32_WINNT. */
+#if defined(_WIN32_WINNT) && (_WIN32_WINNT >= 0x0600)
+#define VX_HAS_VISTA_API_TYPES 1
+#else
+#define VX_HAS_VISTA_API_TYPES 0
+#endif
+
+#if VX_HAS_VISTA_API_TYPES
+typedef LPINIT_ONCE VX_LPINIT_ONCE;
+typedef FILE_INFO_BY_HANDLE_CLASS VX_FILE_INFO_BY_HANDLE_CLASS;
+typedef PZZWSTR VX_PZZWSTR;
+typedef LPPROC_THREAD_ATTRIBUTE_LIST VX_LPPROC_THREAD_ATTRIBUTE_LIST;
+#else
+typedef PVOID VX_LPINIT_ONCE;
+typedef int VX_FILE_INFO_BY_HANDLE_CLASS;
+typedef WCHAR *VX_PZZWSTR;
+typedef PVOID VX_LPPROC_THREAD_ATTRIBUTE_LIST;
+#endif
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * INIT_ONCE constants (not defined on XP headers)
  * ═══════════════════════════════════════════════════════════════════════════ */
@@ -139,7 +158,7 @@ int WINAPI CompareStringOrdinal(LPCWCH lpString1, int cchCount1,
  *    INIT_ONCE is a pointer-sized union. We treat it as a volatile LONG:
  *      0 = not started, 1 = in progress, 2 = complete
  * ═══════════════════════════════════════════════════════════════════════════ */
-BOOL WINAPI InitOnceBeginInitialize(PVOID lpInitOnce, DWORD dwFlags,
+BOOL WINAPI InitOnceBeginInitialize(VX_LPINIT_ONCE lpInitOnce, DWORD dwFlags,
                                     PBOOL fPending, LPVOID *lpContext) {
     volatile LONG *state = (volatile LONG *)lpInitOnce;
 
@@ -172,7 +191,7 @@ BOOL WINAPI InitOnceBeginInitialize(PVOID lpInitOnce, DWORD dwFlags,
     }
 }
 
-BOOL WINAPI InitOnceComplete(PVOID lpInitOnce, DWORD dwFlags, LPVOID lpContext) {
+BOOL WINAPI InitOnceComplete(VX_LPINIT_ONCE lpInitOnce, DWORD dwFlags, LPVOID lpContext) {
     volatile LONG *state = (volatile LONG *)lpInitOnce;
     (void)lpContext;
 
@@ -222,7 +241,7 @@ DWORD WINAPI GetFinalPathNameByHandleW(HANDLE hFile, LPWSTR lpszFilePath,
  * 9. GetFileInformationByHandleEx  (KERNEL32 — Vista+)
  *    Stub: return error (our OCX doesn't do file I/O)
  * ═══════════════════════════════════════════════════════════════════════════ */
-BOOL WINAPI GetFileInformationByHandleEx(HANDLE hFile, int FileInformationClass,
+BOOL WINAPI GetFileInformationByHandleEx(HANDLE hFile, VX_FILE_INFO_BY_HANDLE_CLASS FileInformationClass,
                                          LPVOID lpFileInformation,
                                          DWORD dwBufferSize) {
     (void)hFile; (void)FileInformationClass;
@@ -235,7 +254,7 @@ BOOL WINAPI GetFileInformationByHandleEx(HANDLE hFile, int FileInformationClass,
  * 10. SetFileInformationByHandle  (KERNEL32 — Vista+)
  *     Stub: return error (our OCX doesn't do file I/O)
  * ═══════════════════════════════════════════════════════════════════════════ */
-BOOL WINAPI SetFileInformationByHandle(HANDLE hFile, int FileInformationClass,
+BOOL WINAPI SetFileInformationByHandle(HANDLE hFile, VX_FILE_INFO_BY_HANDLE_CLASS FileInformationClass,
                                        LPVOID lpFileInformation,
                                        DWORD dwBufferSize) {
     (void)hFile; (void)FileInformationClass;
@@ -249,7 +268,7 @@ BOOL WINAPI SetFileInformationByHandle(HANDLE hFile, int FileInformationClass,
  *     Fallback: return "en-US\0\0" (our OCX doesn't need locale info)
  * ═══════════════════════════════════════════════════════════════════════════ */
 BOOL WINAPI GetUserPreferredUILanguages(DWORD dwFlags, PULONG pulNumLanguages,
-                                        PVOID pwszLanguagesBuffer,
+                                        VX_PZZWSTR pwszLanguagesBuffer,
                                         PULONG pcchLanguagesBuffer) {
     (void)dwFlags;
     static const WCHAR lang[] = L"en-US\0";
@@ -269,7 +288,7 @@ BOOL WINAPI GetUserPreferredUILanguages(DWORD dwFlags, PULONG pulNumLanguages,
     }
 
     memcpy(pwszLanguagesBuffer, lang, sizeof(lang));
-    ((WCHAR *)pwszLanguagesBuffer)[needed - 1] = L'\0';  /* double-null */
+    pwszLanguagesBuffer[needed - 1] = L'\0';  /* double-null */
     if (pcchLanguagesBuffer) *pcchLanguagesBuffer = needed;
     return TRUE;
 }
@@ -278,7 +297,7 @@ BOOL WINAPI GetUserPreferredUILanguages(DWORD dwFlags, PULONG pulNumLanguages,
  * 12-14. ProcThreadAttributeList functions  (KERNEL32 — Vista+)
  *        Stub: not supported (our OCX doesn't spawn processes)
  * ═══════════════════════════════════════════════════════════════════════════ */
-BOOL WINAPI InitializeProcThreadAttributeList(PVOID lpAttributeList,
+BOOL WINAPI InitializeProcThreadAttributeList(VX_LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList,
                                               DWORD dwAttributeCount,
                                               DWORD dwFlags, PSIZE_T lpSize) {
     (void)lpAttributeList; (void)dwAttributeCount; (void)dwFlags;
@@ -287,11 +306,11 @@ BOOL WINAPI InitializeProcThreadAttributeList(PVOID lpAttributeList,
     return FALSE;
 }
 
-void WINAPI DeleteProcThreadAttributeList(PVOID lpAttributeList) {
+void WINAPI DeleteProcThreadAttributeList(VX_LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList) {
     (void)lpAttributeList;
 }
 
-BOOL WINAPI UpdateProcThreadAttribute(PVOID lpAttributeList, DWORD dwFlags,
+BOOL WINAPI UpdateProcThreadAttribute(VX_LPPROC_THREAD_ATTRIBUTE_LIST lpAttributeList, DWORD dwFlags,
                                       DWORD_PTR Attribute, PVOID lpValue,
                                       SIZE_T cbSize, PVOID lpPreviousValue,
                                       PSIZE_T lpReturnSize) {
