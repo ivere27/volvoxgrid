@@ -150,14 +150,6 @@ build_arch() {
         -static-libgcc
     echo "  Done: ${OUT_DIR}/grid_compare_test_${ARCH}.exe"
 
-    # 6) Build Wine stub DLLs (Win8+ APIs missing in older Wine)
-    echo "  Build Wine stub DLLs..."
-    $CC -shared -o "${OUT_DIR}/bcryptprimitives.dll" stub_bcryptprimitives.c \
-        bcryptprimitives.def \
-        -ladvapi32 -static-libgcc -Wl,--enable-stdcall-fixup,--kill-at
-    $CC -shared -o "${OUT_DIR}/api-ms-win-core-synch-l1-2-0.dll" stub_synch.c \
-        -static-libgcc -Wl,--enable-stdcall-fixup,--kill-at
-    echo "  Done: Wine stub DLLs"
 }
 
 # Build both architectures (skip if toolchain not available)

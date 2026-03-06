@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <VolvoxGridArtifactsRoot Condition="'$(VolvoxGridArtifactsRoot)' == ''">$(MSBuildThisFileDirectory)../target/dotnet/msbuild/</VolvoxGridArtifactsRoot>
+    <VolvoxGridArtifactsArch Condition="'$(VolvoxGridArtifactsArch)' == '' and '$(PlatformTarget)' != ''">$(PlatformTarget)</VolvoxGridArtifactsArch>
+    <VolvoxGridArtifactsArch Condition="'$(VolvoxGridArtifactsArch)' == ''">default</VolvoxGridArtifactsArch>
+    <BaseOutputPath Condition="'$(BaseOutputPath)' == ''">$(VolvoxGridArtifactsRoot)bin/$(VolvoxGridArtifactsArch)/$(MSBuildProjectName)/</BaseOutputPath>
+    <BaseIntermediateOutputPath Condition="'$(BaseIntermediateOutputPath)' == ''">$(VolvoxGridArtifactsRoot)obj/$(VolvoxGridArtifactsArch)/$(MSBuildProjectName)/</BaseIntermediateOutputPath>
+    <PackageOutputPath Condition="'$(PackageOutputPath)' == ''">$(VolvoxGridArtifactsRoot)packages/</PackageOutputPath>
+  </PropertyGroup>
+</Project>

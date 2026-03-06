@@ -30,6 +30,15 @@ android/volvoxgrid-android/build/
 java/common/bin/
 java/desktop/bin/
 
+# .NET adapter build artifacts and local IDE state
+dotnet/**/bin/
+dotnet/**/obj/
+.vs/
+*.suo
+*.user
+*.csproj.user
+*.vcxproj.user
+
 # Web / Node
 node_modules/
 web/js/dist/

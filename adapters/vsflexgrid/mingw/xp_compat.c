@@ -68,6 +68,11 @@ BOOL __stdcall impl_ProcessPrng(PBYTE pbData, SIZE_T cbData) {
     return fn ? fn(pbData, (ULONG)cbData) : FALSE;
 }
 
+/* Export direct symbols so x86_64 links resolve without bcryptprimitives imports. */
+BOOL __stdcall ProcessPrng(PBYTE pbData, SIZE_T cbData) {
+    return impl_ProcessPrng(pbData, cbData);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * 2. WaitOnAddress / WakeByAddress*  (api-ms-win-core-synch — Win8+)
  *    Fallback: spin-wait with Sleep(0)/Sleep(1)
@@ -86,6 +91,20 @@ BOOL __stdcall impl_WaitOnAddress(volatile VOID *Address, PVOID CompareAddress,
 
 void __stdcall impl_WakeByAddressAll(PVOID Address)   { (void)Address; }
 void __stdcall impl_WakeByAddressSingle(PVOID Address) { (void)Address; }
+
+/* Export direct symbols so x86_64 links resolve without api-ms synch imports. */
+BOOL __stdcall WaitOnAddress(volatile VOID *Address, PVOID CompareAddress,
+                             SIZE_T AddressSize, DWORD dwMilliseconds) {
+    return impl_WaitOnAddress(Address, CompareAddress, AddressSize, dwMilliseconds);
+}
+
+void __stdcall WakeByAddressAll(PVOID Address) {
+    impl_WakeByAddressAll(Address);
+}
+
+void __stdcall WakeByAddressSingle(PVOID Address) {
+    impl_WakeByAddressSingle(Address);
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * __imp_ pointers for raw-dylib imports (ProcessPrng, WaitOnAddress, etc.)
