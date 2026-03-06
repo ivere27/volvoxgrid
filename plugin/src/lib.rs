@@ -1420,7 +1420,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         let layout = config.and_then(|c| c.layout.as_ref());
         let rows = layout.and_then(|l| l.rows).unwrap_or(10);
         let cols = layout.and_then(|l| l.cols).unwrap_or(5);
-        let fixed_rows = layout.and_then(|l| l.fixed_rows).unwrap_or(1);
+        let fixed_rows = layout.and_then(|l| l.fixed_rows).unwrap_or(0);
         let fixed_cols = layout.and_then(|l| l.fixed_cols).unwrap_or(0);
         let scale = if request.scale > 0.01 {
             request.scale
@@ -1704,8 +1704,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                     active_row,
                     active_col,
                     &grid.layout,
-                    grid.viewport_width,
-                    grid.viewport_height,
+                    grid.data_viewport_width(),
+                    grid.data_viewport_height(),
                     grid.fixed_rows,
                     grid.fixed_cols,
                     grid.pinned_top_height() + grid.pinned_bottom_height(),
@@ -2302,8 +2302,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         let pinned_w = grid.pinned_left_width() + grid.pinned_right_width();
                         grid.scroll.update_bounds(
                             &grid.layout,
-                            grid.viewport_width,
-                            grid.viewport_height,
+                            grid.data_viewport_width(),
+                            grid.data_viewport_height(),
                             grid.fixed_rows,
                             grid.fixed_cols,
                             pinned_h,
@@ -2646,8 +2646,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         let pinned_w = grid.pinned_left_width() + grid.pinned_right_width();
                         grid.scroll.update_bounds(
                             &grid.layout,
-                            grid.viewport_width,
-                            grid.viewport_height,
+                            grid.data_viewport_width(),
+                            grid.data_viewport_height(),
                             grid.fixed_rows,
                             grid.fixed_cols,
                             pinned_h,

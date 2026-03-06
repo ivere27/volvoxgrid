@@ -31,6 +31,44 @@ class CellTextEntry {
   });
 }
 
+int _rowIndicatorModeBits(Iterable<RowIndicatorMode> modes) =>
+    modes.fold<int>(0, (bits, mode) => bits | mode.value);
+
+int _colIndicatorModeBits(Iterable<ColIndicatorCellMode> modes) =>
+    modes.fold<int>(0, (bits, mode) => bits | mode.value);
+
+IndicatorBandsConfig _defaultIndicatorBandsConfig() => IndicatorBandsConfig()
+  ..rowIndicatorStart = (RowIndicatorConfig()
+    ..visible = false
+    ..widthPx = 35
+    ..modeBits = _rowIndicatorModeBits([
+      RowIndicatorMode.ROW_INDICATOR_CURRENT,
+      RowIndicatorMode.ROW_INDICATOR_SELECTION,
+    ]))
+  ..colIndicatorTop = (ColIndicatorConfig()
+    ..visible = true
+    ..bandRows = 1
+    ..modeBits = _colIndicatorModeBits([
+      ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
+      ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
+    ]));
+
+ColIndicatorConfig _defaultColIndicatorTopConfig() => ColIndicatorConfig()
+  ..visible = true
+  ..bandRows = 1
+  ..modeBits = _colIndicatorModeBits([
+    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
+    ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
+  ]);
+
+RowIndicatorConfig _defaultRowIndicatorStartConfig() => RowIndicatorConfig()
+  ..visible = false
+  ..widthPx = 35
+  ..modeBits = _rowIndicatorModeBits([
+    RowIndicatorMode.ROW_INDICATOR_CURRENT,
+    RowIndicatorMode.ROW_INDICATOR_SELECTION,
+  ]);
+
 /// Supported rendering backends.
 enum RendererBackend {
   /// Automatic selection (prefers GPU if available).
@@ -89,15 +127,12 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Create a new native grid instance.
   ///
-  /// [rows] and [cols] include any fixed header rows/cols.
-  /// [fixedRows] defaults to 1 (one header row).
-  /// [fixedCols] defaults to 0.
+  /// [rows] and [cols] include the data body plus any true frozen panes.
+  /// Column headers live in the top column-indicator band by default.
   /// [viewportWidth] and [viewportHeight] set the initial pixel dimensions.
   Future<void> create({
     int rows = 50,
     int cols = 10,
-    int fixedRows = 1,
-    int fixedCols = 0,
     int viewportWidth = 800,
     int viewportHeight = 600,
     double scale = 1.0,
@@ -109,9 +144,8 @@ class VolvoxGridController extends ChangeNotifier {
       ..config = (GridConfig()
         ..layout = (LayoutConfig()
           ..rows = rows
-          ..cols = cols
-          ..fixedRows = fixedRows
-          ..fixedCols = fixedCols));
+          ..cols = cols)
+        ..indicatorBands = _defaultIndicatorBandsConfig());
     final handle = await VolvoxGridServiceFfi.Create(req);
     _gridId = handle.id;
     notifyListeners();
@@ -176,7 +210,7 @@ class VolvoxGridController extends ChangeNotifier {
     return config.layout.rows;
   }
 
-  /// Set the total number of rows (including fixed rows).
+  /// Set the total number of rows.
   Future<void> setRows(int n) async {
     await _configure(GridConfig()..layout = (LayoutConfig()..rows = n));
   }
@@ -187,19 +221,75 @@ class VolvoxGridController extends ChangeNotifier {
     return config.layout.cols;
   }
 
-  /// Set the total number of columns (including fixed cols).
+  /// Set the total number of columns.
   Future<void> setCols(int n) async {
     await _configure(GridConfig()..layout = (LayoutConfig()..cols = n));
   }
 
-  /// Set the number of non-scrollable header rows.
-  Future<void> setFixedRows(int n) async {
-    await _configure(GridConfig()..layout = (LayoutConfig()..fixedRows = n));
+  /// Show or hide the top column-indicator band used for headers.
+  Future<void> setShowColumnHeaders(bool visible) async {
+    final top = _defaultColIndicatorTopConfig()..visible = visible;
+    await _configure(
+      GridConfig()
+        ..indicatorBands = (IndicatorBandsConfig()..colIndicatorTop = top),
+    );
   }
 
-  /// Set the number of non-scrollable header columns.
-  Future<void> setFixedCols(int n) async {
-    await _configure(GridConfig()..layout = (LayoutConfig()..fixedCols = n));
+  /// Set the top column-indicator content bitmask.
+  Future<void> setColumnIndicatorTopModeBits(int modeBits) async {
+    final top = ColIndicatorConfig()
+      ..modeBits = modeBits
+      ..visible = modeBits != 0;
+    await _configure(
+      GridConfig()
+        ..indicatorBands = (IndicatorBandsConfig()..colIndicatorTop = top),
+    );
+  }
+
+  /// Set the number of rows in the top column-indicator band.
+  Future<void> setColumnIndicatorTopRowCount(int rows) async {
+    final top = ColIndicatorConfig()
+      ..bandRows = rows < 0 ? 0 : rows
+      ..visible = rows != 0;
+    await _configure(
+      GridConfig()
+        ..indicatorBands = (IndicatorBandsConfig()..colIndicatorTop = top),
+    );
+  }
+
+  /// Alias for [setShowRowIndicator].
+  Future<void> setShowIndicator(bool visible) async {
+    await setShowRowIndicator(visible);
+  }
+
+  /// Show or hide the start-side row-indicator band.
+  Future<void> setShowRowIndicator(bool visible) async {
+    final row = _defaultRowIndicatorStartConfig()..visible = visible;
+    await _configure(
+      GridConfig()
+        ..indicatorBands = (IndicatorBandsConfig()..rowIndicatorStart = row),
+    );
+  }
+
+  /// Set the start-side row-indicator content bitmask.
+  Future<void> setRowIndicatorStartModeBits(int modeBits) async {
+    final row = RowIndicatorConfig()
+      ..modeBits = modeBits
+      ..visible = modeBits != 0;
+    await _configure(
+      GridConfig()
+        ..indicatorBands = (IndicatorBandsConfig()..rowIndicatorStart = row),
+    );
+  }
+
+  /// Set the start-side row-indicator width.
+  Future<void> setRowIndicatorStartWidth(int width) async {
+    await _configure(
+      GridConfig()
+        ..indicatorBands = (IndicatorBandsConfig()
+          ..rowIndicatorStart =
+              (RowIndicatorConfig()..widthPx = width < 1 ? 1 : width)),
+    );
   }
 
   /// Set frozen (non-scrollable data) rows below the fixed rows.
@@ -231,6 +321,16 @@ class VolvoxGridController extends ChangeNotifier {
       ..columns.add(ColumnDef()
         ..index = col
         ..width = width));
+    notifyListeners();
+  }
+
+  /// Set the caption shown in the top column-indicator band for a column.
+  Future<void> setColumnCaption(int col, String caption) async {
+    await VolvoxGridServiceFfi.DefineColumns(DefineColumnsRequest()
+      ..gridId = _gridId
+      ..columns.add(ColumnDef()
+        ..index = col
+        ..caption = caption));
     notifyListeners();
   }
 

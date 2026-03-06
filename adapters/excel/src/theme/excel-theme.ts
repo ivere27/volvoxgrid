@@ -47,10 +47,8 @@ export function buildExcelConfig(opts?: {
       : 11;
   return {
     // Layout
-    rows: opts?.rows ?? 101,         // 1 header + 100 data rows
-    cols: opts?.cols ?? 27,          // 1 row-number col + 26 data cols
-    fixedRows: 1,
-    fixedCols: 1,
+    rows: opts?.rows ?? 100,
+    cols: opts?.cols ?? 26,
     defaultRowHeight: opts?.defaultRowHeight ?? 21,
     defaultColWidth: opts?.defaultColWidth ?? 64,
     textOverflow: true,

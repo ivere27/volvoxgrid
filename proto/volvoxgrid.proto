@@ -549,6 +549,7 @@ message GridConfig {
   InteractionConfig interaction = 8;
   RenderConfig      rendering   = 9;
   string            version     = 10;  // read-only, returned by GetConfig
+  IndicatorBandsConfig indicator_bands = 11;
 }
 
 message LayoutConfig {
@@ -701,6 +702,144 @@ message RenderConfig {
 }
 
 // ═══════════════════════════════════════════════════════════
+// Indicator Bands
+//
+// First-class UI surfaces around the data viewport.
+// `start/end` are logical edges for RTL support.
+// `mode_bits` are coarse capability/default-composition flags.
+// Use explicit `slots` / `cells` for deterministic layout.
+// ═══════════════════════════════════════════════════════════
+
+enum RowIndicatorSlotKind {
+  ROW_INDICATOR_SLOT_NONE        = 0;
+  ROW_INDICATOR_SLOT_NUMBERS     = 1;
+  ROW_INDICATOR_SLOT_CURRENT     = 2;
+  ROW_INDICATOR_SLOT_SELECTION   = 3;
+  ROW_INDICATOR_SLOT_CHECKBOX    = 4;
+  ROW_INDICATOR_SLOT_HANDLE      = 5;
+  ROW_INDICATOR_SLOT_EDITING     = 6;
+  ROW_INDICATOR_SLOT_MODIFIED    = 7;
+  ROW_INDICATOR_SLOT_ERROR       = 8;
+  ROW_INDICATOR_SLOT_NEW_ROW     = 9;
+  ROW_INDICATOR_SLOT_EXPANDER    = 10;
+  ROW_INDICATOR_SLOT_RESIZE      = 11;
+  ROW_INDICATOR_SLOT_ACTION      = 12;
+  ROW_INDICATOR_SLOT_STATUS_ICON = 13;
+  ROW_INDICATOR_SLOT_CUSTOM      = 14;
+}
+
+enum RowIndicatorMode {
+  ROW_INDICATOR_NONE        = 0;
+  ROW_INDICATOR_NUMBERS     = 1;
+  ROW_INDICATOR_CURRENT     = 2;
+  ROW_INDICATOR_SELECTION   = 4;
+  ROW_INDICATOR_CHECKBOX    = 8;
+  ROW_INDICATOR_HANDLE      = 16;
+  ROW_INDICATOR_EDITING     = 32;
+  ROW_INDICATOR_MODIFIED    = 64;
+  ROW_INDICATOR_ERROR       = 128;
+  ROW_INDICATOR_NEW_ROW     = 256;
+  ROW_INDICATOR_EXPANDER    = 512;
+  ROW_INDICATOR_RESIZE      = 1024;
+  ROW_INDICATOR_ACTION      = 2048;
+  ROW_INDICATOR_STATUS_ICON = 4096;
+  ROW_INDICATOR_CUSTOM      = 8192;
+}
+
+enum ColIndicatorCellMode {
+  COL_INDICATOR_CELL_NONE           = 0;
+  COL_INDICATOR_CELL_HEADER_TEXT    = 1;
+  COL_INDICATOR_CELL_SORT_GLYPH     = 2;
+  COL_INDICATOR_CELL_SORT_PRIORITY  = 4;
+  COL_INDICATOR_CELL_FILTER_BUTTON  = 8;
+  COL_INDICATOR_CELL_FILTER_STATE   = 16;
+  COL_INDICATOR_CELL_MENU_BUTTON    = 32;
+  COL_INDICATOR_CELL_CHOOSER        = 64;
+  COL_INDICATOR_CELL_DRAG_REORDER   = 128;
+  COL_INDICATOR_CELL_HIDDEN_MARKER  = 256;
+  COL_INDICATOR_CELL_RESIZE_HANDLE  = 512;
+  COL_INDICATOR_CELL_SELECT_ALL     = 1024;
+  COL_INDICATOR_CELL_STATUS_ICON    = 2048;
+  COL_INDICATOR_CELL_CUSTOM         = 4096;
+}
+
+message RowIndicatorSlot {
+  optional RowIndicatorSlotKind kind       = 1;
+  optional int32                width_px   = 2;
+  optional bool                 visible    = 3;
+  optional string               custom_key = 4;
+  optional bytes                data       = 5;
+}
+
+message RowIndicatorConfig {
+  optional bool                 visible       = 1;
+  optional int32                width_px      = 2;
+  optional uint32               mode_bits     = 3;
+  optional uint32               back_color    = 4;
+  optional uint32               fore_color    = 5;
+  optional GridLineStyle        grid_lines    = 6;
+  optional uint32               grid_color    = 7;
+  optional bool                 auto_size     = 8;
+  optional bool                 allow_resize  = 9;
+  optional bool                 allow_select  = 10;
+  optional bool                 allow_reorder = 11;
+  repeated RowIndicatorSlot     slots         = 12;
+}
+
+message ColIndicatorRowDef {
+  optional int32                index       = 1;
+  optional int32                height_px   = 2;
+}
+
+message ColIndicatorCell {
+  optional int32                row1        = 1;
+  optional int32                row2        = 2;
+  optional int32                col1        = 3;
+  optional int32                col2        = 4;
+  optional string               text        = 5;
+  optional uint32               mode_bits   = 6;
+  optional string               custom_key  = 7;
+  optional bytes                data        = 8;
+}
+
+message ColIndicatorConfig {
+  optional bool                 visible               = 1;
+  optional int32                default_row_height_px = 2;
+  optional int32                band_rows             = 3;
+  optional uint32               mode_bits             = 4;
+  optional uint32               back_color            = 5;
+  optional uint32               fore_color            = 6;
+  optional GridLineStyle        grid_lines            = 7;
+  optional uint32               grid_color            = 8;
+  optional bool                 auto_size             = 9;
+  optional bool                 allow_resize          = 10;
+  optional bool                 allow_reorder         = 11;
+  optional bool                 allow_menu            = 12;
+  repeated ColIndicatorRowDef   row_defs              = 13;
+  repeated ColIndicatorCell     cells                 = 14;
+}
+
+message CornerIndicatorConfig {
+  optional bool                 visible      = 1;
+  optional uint32               mode_bits    = 2;
+  optional uint32               back_color   = 3;
+  optional uint32               fore_color   = 4;
+  optional string               custom_key   = 5;
+  optional bytes                data         = 6;
+}
+
+message IndicatorBandsConfig {
+  RowIndicatorConfig    row_indicator_start   = 1;
+  RowIndicatorConfig    row_indicator_end     = 2;
+  ColIndicatorConfig    col_indicator_top     = 3;
+  ColIndicatorConfig    col_indicator_bottom  = 4;
+  CornerIndicatorConfig corner_top_start      = 5;
+  CornerIndicatorConfig corner_top_end        = 6;
+  CornerIndicatorConfig corner_bottom_start   = 7;
+  CornerIndicatorConfig corner_bottom_end     = 8;
+}
+
+// ═══════════════════════════════════════════════════════════
 // Column & Row Definitions
 //
 // Batch-define column/row properties in one call.
@@ -712,30 +851,31 @@ message ColumnDef {
   optional int32          width            = 2;
   optional int32          min_width        = 3;
   optional int32          max_width        = 4;
-  optional Align          alignment        = 5;
-  optional Align          fixed_alignment  = 6;
-  optional ColumnDataType data_type        = 7;
-  optional string         format           = 8;
-  optional string         key              = 9;
-  optional SortOrder      sort             = 10;
-  optional string         dropdown_items   = 11;
-  optional string         edit_mask        = 12;
-  optional int32          indent           = 13;
-  optional bool           hidden           = 14;
-  optional bool           span             = 15;
-  repeated ImageData      image_list       = 16;
-  optional bytes          data             = 17;
-  optional StickyEdge     sticky           = 18;  // Visual sticky overlay (LEFT or RIGHT)
+  optional string         caption          = 5;
+  optional Align          alignment        = 6;
+  optional Align          fixed_alignment  = 7;
+  optional ColumnDataType data_type        = 8;
+  optional string         format           = 9;
+  optional string         key              = 10;
+  optional SortOrder      sort             = 11;
+  optional string         dropdown_items   = 12;
+  optional string         edit_mask        = 13;
+  optional int32          indent           = 14;
+  optional bool           hidden           = 15;
+  optional bool           span             = 16;
+  repeated ImageData      image_list       = 17;
+  optional bytes          data             = 18;
+  optional StickyEdge     sticky           = 19;  // Visual sticky overlay (LEFT or RIGHT)
   // Per-column insets for non-fixed cells.
-  CellPadding             cell_padding     = 19;
+  CellPadding             cell_padding     = 20;
   // Per-column insets for fixed/header cells.
-  CellPadding             fixed_cell_padding = 20;
+  CellPadding             fixed_cell_padding = 21;
   // Strict typing: true allows null/empty cell values.
-  optional bool           nullable         = 21;
+  optional bool           nullable         = 22;
   // Strict typing: controls inbound coercion behavior.
-  optional CoercionMode   coercion_mode    = 22;
+  optional CoercionMode   coercion_mode    = 23;
   // Strict typing: controls write behavior on validation failure.
-  optional WriteErrorMode error_mode       = 23;
+  optional WriteErrorMode error_mode       = 24;
 }
 
 message DefineColumnsRequest {

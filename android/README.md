@@ -92,21 +92,21 @@ public class MainActivity extends AppCompatActivity {
         gridView = findViewById(R.id.gridView);
 
         // Initialize: auto-detects bundled native plugin (standard or lite)
-        gridView.initialize(100, 5, 1, 0);
-        //                  rows cols fixedRows fixedCols
+        gridView.initialize(100, 5);
+        //                  rows cols
 
         // Get a controller for grid operations
         VolvoxGridController ctrl = gridView.createController();
 
-        // Set header text
-        ctrl.setTextMatrix(0, 0, "Name");
-        ctrl.setTextMatrix(0, 1, "Price");
-        ctrl.setTextMatrix(0, 2, "Qty");
+        // Set column headers in the top indicator band
+        ctrl.setColumnCaption(0, "Name");
+        ctrl.setColumnCaption(1, "Price");
+        ctrl.setColumnCaption(2, "Qty");
 
         // Set data
-        ctrl.setTextMatrix(1, 0, "Widget A");
-        ctrl.setTextMatrix(1, 1, "29.99");
-        ctrl.setTextMatrix(1, 2, "150");
+        ctrl.setTextMatrix(0, 0, "Widget A");
+        ctrl.setTextMatrix(0, 1, "29.99");
+        ctrl.setTextMatrix(0, 2, "150");
     }
 
     @Override
@@ -127,10 +127,10 @@ The main Android `View` (extends `FrameLayout`). Handles rendering, touch input,
 
 ```java
 // Option A (recommended): Auto-detect bundled plugin and create a new grid
-gridView.initialize(rows, cols, fixedRows, fixedCols);
+gridView.initialize(rows, cols);
 
 // Option B: Explicit plugin path (advanced/manual host loading flows)
-gridView.initialize(pluginPath, rows, cols, fixedRows, fixedCols);
+gridView.initialize(pluginPath, rows, cols);
 
 // Option C: Reuse an existing plugin host and grid (for multi-grid apps)
 gridView.initialize(pluginHost, existingGridId);
@@ -190,8 +190,6 @@ High-level API for grid operations. Obtained via `gridView.createController()`.
 ```java
 ctrl.setRowCount(1000);       // set row count
 ctrl.setColCount(10);         // set column count
-ctrl.setFixedRowCount(1);     // frozen header rows
-ctrl.setFixedColCount(2);     // frozen left columns
 
 int rows = ctrl.rowCount();
 int cols = ctrl.colCount();
@@ -474,15 +472,13 @@ The API is identical from Kotlin, with the addition of property-style access for
 
 ```kotlin
 val gridView: VolvoxGridView = findViewById(R.id.gridView)
-gridView.initialize(rows = 100, cols = 5, fixedRows = 1, fixedCols = 0)
+gridView.initialize(rows = 100, cols = 5)
 
 val ctrl = gridView.createController()
 
 // Property-style access (Kotlin only)
 ctrl.rows = 1000
 ctrl.cols = 10
-ctrl.fixedRows = 1
-ctrl.fixedCols = 2
 ctrl.row = 5                     // active row
 ctrl.col = 2                     // active column
 

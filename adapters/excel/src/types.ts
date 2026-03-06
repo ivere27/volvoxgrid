@@ -1,5 +1,16 @@
 import type { VolvoxGrid } from "volvoxgrid";
 
+export type VolvoxExcelGrid = VolvoxGrid & {
+  showColumnHeaders: boolean;
+  columnIndicatorTopRowCount: number;
+  showIndicator: boolean;
+  rowIndicatorStartModeBits: number;
+  rowIndicatorStartWidth: number;
+  frozenRows: number;
+  frozenCols: number;
+  setColumnCaption(col: number, caption: string): void;
+};
+
 // ── Cell References ────────────────────────────────────────
 
 export interface CellRef {
@@ -98,7 +109,7 @@ export interface VolvoxExcelOptions {
 // ── Public API ─────────────────────────────────────────────
 
 export interface VolvoxExcelApi {
-  readonly grid: VolvoxGrid;
+  readonly grid: VolvoxExcelGrid;
 
   // Data
   getCellValue(row: number, col: number): string;

@@ -108,21 +108,21 @@ public final class VolvoxGridDesktopDemo {
 
         new Thread(() -> {
             try {
-                gridPanel.initialize(pluginPath, 40, 8, 1, 0);
+                gridPanel.initialize(pluginPath, 40, 8);
                 VolvoxGridDesktopController ctrl = gridPanel.createController();
                 ctrl.setRendererModeCpu();
                 ctrl.setRedraw(false);
 
-                ctrl.setTextMatrix(0, 0, "ID");
-                ctrl.setTextMatrix(0, 1, "Name");
-                ctrl.setTextMatrix(0, 2, "Country");
-                ctrl.setTextMatrix(0, 3, "Amount");
+                ctrl.setColumnCaption(0, "ID");
+                ctrl.setColumnCaption(1, "Name");
+                ctrl.setColumnCaption(2, "Country");
+                ctrl.setColumnCaption(3, "Amount");
 
-                for (int r = 1; r < 40; r++) {
-                    ctrl.setTextMatrix(r, 0, Integer.toString(r));
-                    ctrl.setTextMatrix(r, 1, "Item " + r);
+                for (int r = 0; r < 40; r++) {
+                    ctrl.setTextMatrix(r, 0, Integer.toString(r + 1));
+                    ctrl.setTextMatrix(r, 1, "Item " + (r + 1));
                     ctrl.setTextMatrix(r, 2, (r % 2 == 0) ? "US" : "KR");
-                    ctrl.setTextMatrix(r, 3, String.format("%.2f", r * 10.5));
+                    ctrl.setTextMatrix(r, 3, String.format("%.2f", (r + 1) * 10.5));
                 }
 
                 ctrl.setColWidth(0, 60);

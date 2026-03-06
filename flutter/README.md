@@ -60,17 +60,17 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _initGrid() async {
-    await controller.create(rows: 100, cols: 5, fixedRows: 1);
+    await controller.create(rows: 100, cols: 5);
 
-    // Set headers
-    await controller.setTextMatrix(0, 0, 'Name');
-    await controller.setTextMatrix(0, 1, 'Price');
-    await controller.setTextMatrix(0, 2, 'Qty');
+    // Set column headers in the top indicator band.
+    await controller.setColumnCaption(0, 'Name');
+    await controller.setColumnCaption(1, 'Price');
+    await controller.setColumnCaption(2, 'Qty');
 
     // Set data
-    await controller.setTextMatrix(1, 0, 'Widget A');
-    await controller.setTextMatrix(1, 1, '29.99');
-    await controller.setTextMatrix(1, 2, '150');
+    await controller.setTextMatrix(0, 0, 'Widget A');
+    await controller.setTextMatrix(0, 1, '29.99');
+    await controller.setTextMatrix(0, 2, '150');
   }
 
   @override
@@ -125,10 +125,8 @@ final controller = VolvoxGridController();
 
 // Create a grid
 await controller.create(
-  rows: 100,       // total rows (including fixed)
-  cols: 10,        // total columns (including fixed)
-  fixedRows: 1,    // frozen header rows
-  fixedCols: 0,    // frozen left columns
+  rows: 100,       // total rows
+  cols: 10,        // total columns
 );
 
 // Dispose when done
@@ -140,8 +138,6 @@ controller.dispose();
 ```dart
 await controller.setRows(1000);
 await controller.setCols(20);
-await controller.setFixedRows(1);
-await controller.setFixedCols(2);
 await controller.setFrozenRows(3);
 await controller.setFrozenCols(1);
 

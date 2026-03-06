@@ -91,7 +91,6 @@ export class VolvoxGridApi<TData extends RowData> implements GridApiLike<TData> 
     const wasm = this.delegate.getWasm();
     const selection = readSelectionState(grid, wasm);
     const rows = this.delegate.getShadowRows();
-    const headerRows = this.delegate.getHeaderRows();
 
     let start = grid.selectionRow;
     let end = grid.selectionRow;
@@ -101,8 +100,8 @@ export class VolvoxGridApi<TData extends RowData> implements GridApiLike<TData> 
       end = Math.max(selection.row, selection.rowEnd);
     }
 
-    const startBody = Math.max(0, start - headerRows);
-    const endBody = Math.min(rows.length - 1, end - headerRows);
+    const startBody = Math.max(0, start);
+    const endBody = Math.min(rows.length - 1, end);
     if (rows.length === 0 || endBody < startBody) {
       return [];
     }
@@ -120,15 +119,14 @@ export class VolvoxGridApi<TData extends RowData> implements GridApiLike<TData> 
   selectAll(): void {
     const grid = this.delegate.getGrid();
     const wasm = this.delegate.getWasm();
-    const headerRows = this.delegate.getHeaderRows();
     const rowCount = this.delegate.getShadowRows().length;
     const colCount = this.delegate.getColumns().length;
     if (rowCount <= 0 || colCount <= 0) {
       return;
     }
 
-    const rowStart = headerRows;
-    const rowEnd = headerRows + rowCount - 1;
+    const rowStart = 0;
+    const rowEnd = rowCount - 1;
     const colStart = 0;
     const colEnd = colCount - 1;
     applySelection(grid, wasm, rowStart, colStart, rowEnd, colEnd);
@@ -137,7 +135,7 @@ export class VolvoxGridApi<TData extends RowData> implements GridApiLike<TData> 
   deselectAll(): void {
     const grid = this.delegate.getGrid();
     const wasm = this.delegate.getWasm();
-    const row = Math.max(this.delegate.getHeaderRows(), 0);
+    const row = 0;
     applySelection(grid, wasm, row, 0, row, 0);
   }
 

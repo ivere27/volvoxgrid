@@ -1,3 +1,4 @@
+use crate::canvas::VisibleRange;
 use crate::event::GridEventData;
 use crate::grid::VolvoxGrid;
 use crate::proto::volvoxgrid::v1 as pb;
@@ -18,20 +19,38 @@ pub struct HitTestResult {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum HitArea {
-    Cell,           // regular cell content
-    FixedRow,       // fixed row header
-    FixedCol,       // fixed col header
-    FixedCorner,    // top-left fixed corner
-    ColBorder,      // between column headers (resize)
-    RowBorder,      // between row headers (resize)
-    OutlineButton,  // outline +/- button
-    CheckBox,       // checkbox in cell
-    DropdownButton, // dropdown button
-    DropdownList,   // dropdown list
-    HScrollBar,     // horizontal scrollbar area (track, thumb, arrows)
-    VScrollBar,     // vertical scrollbar area (track, thumb, arrows)
-    FastScroll,     // fast scroll touch zone (right edge)
-    Background,     // empty area beyond grid
+    Cell,                    // regular cell content
+    FixedRow,                // fixed row header
+    FixedCol,                // fixed col header
+    FixedCorner,             // top-left fixed corner
+    IndicatorColTop,         // top column indicator band
+    IndicatorRowStart,       // start row indicator band
+    IndicatorCornerTopStart, // top-start indicator corner
+    ColBorder,               // between column headers (resize)
+    RowBorder,               // between row headers (resize)
+    OutlineButton,           // outline +/- button
+    CheckBox,                // checkbox in cell
+    DropdownButton,          // dropdown button
+    DropdownList,            // dropdown list
+    HScrollBar,              // horizontal scrollbar area (track, thumb, arrows)
+    VScrollBar,              // vertical scrollbar area (track, thumb, arrows)
+    FastScroll,              // fast scroll touch zone (right edge)
+    Background,              // empty area beyond grid
+}
+
+#[derive(Clone, Copy, Debug)]
+struct LocalRowHit {
+    row: i32,
+    effective_y: i32,
+    in_fixed_row_area: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct LocalColHit {
+    col: i32,
+    effective_x: i32,
+    in_fixed_col_area: bool,
+    hit_pinned_col: bool,
 }
 
 /// Optional behavior switches used by host integrations that need to intercept
@@ -96,7 +115,7 @@ fn visible_top_left_for_scroll(grid: &mut VolvoxGrid, scroll_x: f32, scroll_y: f
     } else {
         let (first, _) =
             grid.layout
-                .visible_rows(scroll_y, grid.viewport_height, first_scrollable_row);
+                .visible_rows(scroll_y, grid.data_viewport_height(), first_scrollable_row);
         first.clamp(first_scrollable_row, grid.rows - 1)
     };
 
@@ -106,7 +125,7 @@ fn visible_top_left_for_scroll(grid: &mut VolvoxGrid, scroll_x: f32, scroll_y: f
     } else {
         let (first, _) =
             grid.layout
-                .visible_cols(scroll_x, grid.viewport_width, first_scrollable_col);
+                .visible_cols(scroll_x, grid.data_viewport_width(), first_scrollable_col);
         first.clamp(first_scrollable_col, grid.cols - 1)
     };
 
@@ -559,6 +578,207 @@ fn compute_scrollbar_geometry(grid: &VolvoxGrid) -> ScrollBarGeometry {
     }
 }
 
+fn resolve_row_hit(
+    grid: &VolvoxGrid,
+    layout: &crate::layout::LayoutCache,
+    local_y: i32,
+    viewport_h: i32,
+) -> LocalRowHit {
+    let scroll_y = grid.scroll.scroll_y;
+    let fixed_row_height = layout.row_pos(grid.fixed_rows);
+    let frozen_bottom = layout.row_pos(grid.fixed_rows + grid.frozen_rows);
+    let pinned_top_h = grid.pinned_top_height();
+    let pinned_bottom_h = grid.pinned_bottom_height();
+    let in_fixed_row_area = local_y < fixed_row_height;
+    let pin_top_start = frozen_bottom;
+    let pin_top_end = frozen_bottom + pinned_top_h;
+    let pin_bot_start = viewport_h - pinned_bottom_h;
+
+    let mut row;
+    let mut effective_y;
+    let mut hit_pinned = false;
+
+    if in_fixed_row_area {
+        effective_y = local_y;
+        row = layout.row_at_y(effective_y);
+    } else if pinned_top_h > 0 && local_y >= pin_top_start && local_y < pin_top_end {
+        let mut y = pin_top_start;
+        row = -1;
+        for &r in &grid.pinned_rows_top {
+            let rh = grid.row_height(r);
+            if local_y >= y && local_y < y + rh {
+                row = r;
+                break;
+            }
+            y += rh;
+        }
+        effective_y = local_y;
+        hit_pinned = true;
+    } else if pinned_bottom_h > 0 && local_y >= pin_bot_start && local_y < viewport_h {
+        let mut y = pin_bot_start;
+        row = -1;
+        for &r in &grid.pinned_rows_bottom {
+            let rh = grid.row_height(r);
+            if local_y >= y && local_y < y + rh {
+                row = r;
+                break;
+            }
+            y += rh;
+        }
+        effective_y = local_y;
+        hit_pinned = true;
+    } else {
+        effective_y = local_y + scroll_y as i32 - pinned_top_h;
+        row = layout.row_at_y(effective_y);
+        if grid.is_row_pinned(row) != 0 {
+            row = -1;
+        }
+    }
+
+    if !hit_pinned && !in_fixed_row_area {
+        let fixed_row_end = grid.fixed_rows + grid.frozen_rows;
+        let scrollable_top = frozen_bottom + pinned_top_h;
+        let scrollable_bottom = viewport_h - pinned_bottom_h;
+
+        let mut top_cands: Vec<i32> = grid
+            .sticky_rows
+            .iter()
+            .filter(|(&r, &e)| {
+                let both = e == pb::StickyEdge::StickyBoth as i32;
+                (both || e == pb::StickyEdge::StickyTop as i32)
+                    && grid.is_row_pinned(r) == 0
+                    && r >= fixed_row_end
+            })
+            .map(|(&r, _)| r)
+            .collect();
+        top_cands.sort_unstable();
+
+        let mut sticky_y = pin_top_end;
+        let mut threshold_top = scrollable_top;
+        for sr in top_cands {
+            let screen_y = layout.row_pos(sr) - scroll_y as i32 + pinned_top_h;
+            let rh = grid.row_height(sr);
+            if screen_y < threshold_top {
+                if local_y >= sticky_y && local_y < sticky_y + rh {
+                    row = sr;
+                    effective_y = local_y;
+                    break;
+                }
+                sticky_y += rh;
+                threshold_top += rh;
+            }
+        }
+
+        let mut bot_cands: Vec<i32> = grid
+            .sticky_rows
+            .iter()
+            .filter(|(&r, &e)| {
+                let both = e == pb::StickyEdge::StickyBoth as i32;
+                (both || e == pb::StickyEdge::StickyBottom as i32)
+                    && grid.is_row_pinned(r) == 0
+                    && r >= fixed_row_end
+            })
+            .map(|(&r, _)| r)
+            .collect();
+        bot_cands.sort_unstable_by(|a, b| b.cmp(a));
+
+        let mut sticky_y = pin_bot_start;
+        let mut threshold_bottom = scrollable_bottom;
+        for sr in bot_cands {
+            let screen_y = layout.row_pos(sr) - scroll_y as i32 + pinned_top_h;
+            let rh = grid.row_height(sr);
+            if screen_y + rh > threshold_bottom {
+                sticky_y -= rh;
+                if local_y >= sticky_y && local_y < sticky_y + rh {
+                    row = sr;
+                    effective_y = local_y;
+                    break;
+                }
+                threshold_bottom -= rh;
+            }
+        }
+    }
+
+    LocalRowHit {
+        row,
+        effective_y,
+        in_fixed_row_area,
+    }
+}
+
+fn resolve_col_hit(
+    grid: &VolvoxGrid,
+    layout: &crate::layout::LayoutCache,
+    local_x: i32,
+    viewport_w: i32,
+) -> LocalColHit {
+    let scroll_x = grid.scroll.scroll_x;
+    let fixed_col_end = grid.fixed_cols + grid.frozen_cols;
+    let fixed_col_right = layout.col_pos(fixed_col_end);
+    let fixed_col_width = layout.col_pos(grid.fixed_cols);
+    let pinned_left_w = grid.pinned_left_width();
+    let pinned_right_w = grid.pinned_right_width();
+    let in_fixed_col_area = local_x < fixed_col_width;
+    let pin_left_start = fixed_col_right;
+    let pin_left_end = fixed_col_right + pinned_left_w;
+    let pin_right_start = viewport_w - pinned_right_w;
+
+    let mut hit_pinned_col = false;
+    let mut effective_x = if in_fixed_col_area {
+        local_x
+    } else {
+        local_x + scroll_x as i32
+    };
+    let mut col = -1;
+
+    if in_fixed_col_area {
+        col = layout.col_at_x(effective_x);
+    } else if pinned_left_w > 0 && local_x >= pin_left_start && local_x < pin_left_end {
+        hit_pinned_col = true;
+        effective_x = local_x;
+        let mut x = pin_left_start;
+        for &pc in &grid.pinned_cols_left {
+            let cw = grid.col_width(pc);
+            if cw <= 0 {
+                continue;
+            }
+            if local_x >= x && local_x < x + cw {
+                col = pc;
+                break;
+            }
+            x += cw;
+        }
+    } else if pinned_right_w > 0 && local_x >= pin_right_start && local_x < viewport_w {
+        hit_pinned_col = true;
+        effective_x = local_x;
+        let mut x = pin_right_start;
+        for &pc in &grid.pinned_cols_right {
+            let cw = grid.col_width(pc);
+            if cw <= 0 {
+                continue;
+            }
+            if local_x >= x && local_x < x + cw {
+                col = pc;
+                break;
+            }
+            x += cw;
+        }
+    } else {
+        effective_x = local_x + scroll_x as i32 - pinned_left_w;
+        col = layout.col_at_x(effective_x);
+        if grid.is_col_pinned(col) != 0 {
+            col = -1;
+        }
+    }
+
+    LocalColHit {
+        col,
+        effective_x,
+        in_fixed_col_area,
+        hit_pinned_col,
+    }
+}
+
 /// Perform hit testing: pixel coordinates -> grid cell + area
 pub fn hit_test(grid: &VolvoxGrid, px: f32, py: f32) -> HitTestResult {
     let px = if grid.right_to_left {
@@ -653,207 +873,112 @@ pub fn hit_test(grid: &VolvoxGrid, px: f32, py: f32) -> HitTestResult {
         }
     }
 
-    let scroll_x = grid.scroll.scroll_x;
-    let scroll_y = grid.scroll.scroll_y;
-
-    // Determine if click is in fixed area
-    let fixed_row_height = layout.row_pos(grid.fixed_rows);
-    let frozen_bottom = layout.row_pos(grid.fixed_rows + grid.frozen_rows);
-    let fixed_col_end = grid.fixed_cols + grid.frozen_cols;
-    let fixed_col_right = layout.col_pos(fixed_col_end);
-    let fixed_col_width = layout.col_pos(grid.fixed_cols);
-    let pinned_left_w = grid.pinned_left_width();
-    let pinned_right_w = grid.pinned_right_width();
-    let vp_w = grid.viewport_width;
-    let pinned_top_h = grid.pinned_top_height();
-    let pinned_bottom_h = grid.pinned_bottom_height();
-    let vp_h = grid.viewport_height;
-
-    let in_fixed_row_area = py < fixed_row_height as f32;
-    let in_fixed_col_area = px < fixed_col_width as f32;
-
+    let vp = VisibleRange::compute(grid, grid.viewport_width, grid.viewport_height);
     let px_i = px as i32;
     let py_i = py as i32;
 
-    // Viewport row zones (top to bottom):
-    //   0..frozen_bottom            → fixed/frozen rows (no scroll)
-    //   frozen_bottom..+pinned_top  → pinned-top rows
-    //   ..vp_h - pinned_bottom      → scrollable area
-    //   vp_h - pinned_bottom..vp_h  → pinned-bottom rows
-    let pin_top_start = frozen_bottom;
-    let pin_top_end = frozen_bottom + pinned_top_h;
-    let pin_bot_start = vp_h - pinned_bottom_h;
-
-    // Find row — check pinned areas first, then scrollable with offset
-    let mut row;
-    let mut effective_y;
-    let mut hit_pinned = false;
-
-    if in_fixed_row_area {
-        effective_y = py_i;
-        row = layout.row_at_y(effective_y);
-    } else if pinned_top_h > 0 && py_i >= pin_top_start && py_i < pin_top_end {
-        // Hit a top-pinned row
-        let mut y = pin_top_start;
-        row = -1;
-        for &r in &grid.pinned_rows_top {
-            let rh = grid.row_height(r);
-            if py_i >= y && py_i < y + rh {
-                row = r;
-                break;
-            }
-            y += rh;
-        }
-        effective_y = py_i; // not used for layout lookups in pinned area
-        hit_pinned = true;
-    } else if pinned_bottom_h > 0 && py_i >= pin_bot_start && py_i < vp_h {
-        // Hit a bottom-pinned row
-        let mut y = pin_bot_start;
-        row = -1;
-        for &r in &grid.pinned_rows_bottom {
-            let rh = grid.row_height(r);
-            if py_i >= y && py_i < y + rh {
-                row = r;
-                break;
-            }
-            y += rh;
-        }
-        effective_y = py_i;
-        hit_pinned = true;
-    } else {
-        // Scrollable area: renderer places cells at row_pos - scroll_y + pinned_top_h,
-        // so the inverse is content_y = screen_y + scroll_y - pinned_top_h.
-        effective_y = py_i + scroll_y as i32 - pinned_top_h;
-        row = layout.row_at_y(effective_y);
-        // Skip pinned rows — they've been removed from the scrollable layout
-        // (0 height), so row_at_y won't land on them, but just in case:
-        if grid.is_row_pinned(row) != 0 {
-            row = -1;
-        }
+    if grid.indicator_bands.row_start.visible
+        && grid.indicator_bands.col_top.visible
+        && px_i >= 0
+        && px_i < vp.data_x
+        && py_i >= 0
+        && py_i < vp.data_y
+    {
+        return HitTestResult {
+            row: -1,
+            col: -1,
+            area: HitArea::IndicatorCornerTopStart,
+            x_in_cell: px,
+            y_in_cell: py,
+        };
     }
 
-    // Sticky row override: check if py falls within a sticky overlay row.
-    // Uses cascading thresholds matching VisibleRange::compute logic.
-    if !hit_pinned && !in_fixed_row_area {
-        // pb already imported at file top as v1
-        let fixed_row_end = grid.fixed_rows + grid.frozen_rows;
-        let scrollable_top = frozen_bottom + pinned_top_h;
-        let scrollable_bottom = vp_h - pinned_bottom_h;
-
-        // Collect and sort sticky-top candidates (ascending)
-        let mut top_cands: Vec<i32> = grid
-            .sticky_rows
-            .iter()
-            .filter(|(&r, &e)| {
-                let both = e == pb::StickyEdge::StickyBoth as i32;
-                (both || e == pb::StickyEdge::StickyTop as i32)
-                    && grid.is_row_pinned(r) == 0
-                    && r >= fixed_row_end
-            })
-            .map(|(&r, _)| r)
-            .collect();
-        top_cands.sort_unstable();
-
-        let mut sticky_y = pin_top_end;
-        let mut threshold_top = scrollable_top;
-        for sr in top_cands {
-            let screen_y = layout.row_pos(sr) - scroll_y as i32 + pinned_top_h;
-            let rh = grid.row_height(sr);
-            if screen_y < threshold_top {
-                // This row is stuck at the top
-                if py_i >= sticky_y && py_i < sticky_y + rh {
-                    row = sr;
-                    effective_y = py_i;
-                    break;
+    if grid.indicator_bands.col_top.visible
+        && py_i >= 0
+        && py_i < vp.data_y
+        && px_i >= vp.data_x
+        && px_i < vp.data_x + vp.data_w
+    {
+        let local_x = px_i - vp.data_x;
+        let col_hit = resolve_col_hit(grid, layout, local_x, vp.data_w);
+        if col_hit.col >= 0 && col_hit.col < grid.cols {
+            let mut area = HitArea::IndicatorColTop;
+            let mut hit_col = col_hit.col;
+            if !col_hit.hit_pinned_col {
+                let (cx, _, cw, _) = layout.cell_rect(0, hit_col);
+                let col_left = cx;
+                let col_right = cx + cw;
+                let hit_half = header_resize_hit_half_width(grid);
+                if (col_hit.effective_x - col_right).abs() <= hit_half {
+                    area = HitArea::ColBorder;
+                } else if hit_col > 0 && (col_hit.effective_x - col_left).abs() <= hit_half {
+                    hit_col -= 1;
+                    area = HitArea::ColBorder;
                 }
-                sticky_y += rh;
-                threshold_top += rh;
             }
-        }
-
-        // Collect and sort sticky-bottom candidates (descending)
-        let mut bot_cands: Vec<i32> = grid
-            .sticky_rows
-            .iter()
-            .filter(|(&r, &e)| {
-                let both = e == pb::StickyEdge::StickyBoth as i32;
-                (both || e == pb::StickyEdge::StickyBottom as i32)
-                    && grid.is_row_pinned(r) == 0
-                    && r >= fixed_row_end
-            })
-            .map(|(&r, _)| r)
-            .collect();
-        bot_cands.sort_unstable_by(|a, b| b.cmp(a));
-
-        let mut sticky_y = pin_bot_start;
-        let mut threshold_bottom = scrollable_bottom;
-        for sr in bot_cands {
-            let screen_y = layout.row_pos(sr) - scroll_y as i32 + pinned_top_h;
-            let rh = grid.row_height(sr);
-            if screen_y + rh > threshold_bottom {
-                sticky_y -= rh;
-                if py_i >= sticky_y && py_i < sticky_y + rh {
-                    row = sr;
-                    effective_y = py_i;
-                    break;
-                }
-                threshold_bottom -= rh;
-            }
+            return HitTestResult {
+                row: -1,
+                col: hit_col,
+                area,
+                x_in_cell: {
+                    let (cx, _, _, _) = layout.cell_rect(0, hit_col.max(0));
+                    local_x as f32 - cx as f32
+                },
+                y_in_cell: py,
+            };
         }
     }
 
-    // Find col — handle pinned zones first, then scrollable area.
-    let pin_left_start = fixed_col_right;
-    let pin_left_end = fixed_col_right + pinned_left_w;
-    let pin_right_start = vp_w - pinned_right_w;
-    let mut hit_pinned_col = false;
-    let mut effective_x = if in_fixed_col_area {
-        px_i
-    } else {
-        px_i + scroll_x as i32
-    };
-    let mut col = -1;
-
-    if in_fixed_col_area {
-        col = layout.col_at_x(effective_x);
-    } else if pinned_left_w > 0 && px_i >= pin_left_start && px_i < pin_left_end {
-        hit_pinned_col = true;
-        effective_x = px_i;
-        let mut x = pin_left_start;
-        for &pc in &grid.pinned_cols_left {
-            let cw = grid.col_width(pc);
-            if cw <= 0 {
-                continue;
+    if grid.indicator_bands.row_start.visible
+        && px_i >= 0
+        && px_i < vp.data_x
+        && py_i >= vp.data_y
+        && py_i < vp.data_y + vp.data_h
+    {
+        let local_y = py_i - vp.data_y;
+        let row_hit = resolve_row_hit(grid, layout, local_y, vp.data_h);
+        if row_hit.row >= 0 && row_hit.row < grid.rows {
+            let mut area = HitArea::IndicatorRowStart;
+            let mut hit_row = row_hit.row;
+            let (_, row_top, _, row_h) = layout.cell_rect(hit_row, 0);
+            if (row_hit.effective_y - (row_top + row_h)).abs() <= 3 {
+                area = HitArea::RowBorder;
+            } else if hit_row > 0 && (row_hit.effective_y - row_top).abs() <= 3 {
+                hit_row -= 1;
+                area = HitArea::RowBorder;
             }
-            if px_i >= x && px_i < x + cw {
-                col = pc;
-                break;
-            }
-            x += cw;
-        }
-    } else if pinned_right_w > 0 && px_i >= pin_right_start && px_i < vp_w {
-        hit_pinned_col = true;
-        effective_x = px_i;
-        let mut x = pin_right_start;
-        for &pc in &grid.pinned_cols_right {
-            let cw = grid.col_width(pc);
-            if cw <= 0 {
-                continue;
-            }
-            if px_i >= x && px_i < x + cw {
-                col = pc;
-                break;
-            }
-            x += cw;
-        }
-    } else {
-        // Scrollable columns are clipped after the pinned-left area.
-        effective_x = px_i + scroll_x as i32 - pinned_left_w;
-        col = layout.col_at_x(effective_x);
-        if grid.is_col_pinned(col) != 0 {
-            col = -1;
+            return HitTestResult {
+                row: hit_row,
+                col: -1,
+                area,
+                x_in_cell: px,
+                y_in_cell: local_y as f32,
+            };
         }
     }
+
+    if px_i < vp.data_x
+        || py_i < vp.data_y
+        || px_i >= vp.data_x + vp.data_w
+        || py_i >= vp.data_y + vp.data_h
+    {
+        return HitTestResult {
+            row: -1,
+            col: -1,
+            area: HitArea::Background,
+            x_in_cell: 0.0,
+            y_in_cell: 0.0,
+        };
+    }
+
+    let local_x = px_i - vp.data_x;
+    let local_y = py_i - vp.data_y;
+    let row_hit = resolve_row_hit(grid, layout, local_y, vp.data_h);
+    let col_hit = resolve_col_hit(grid, layout, local_x, vp.data_w);
+    let mut row = row_hit.row;
+    let mut col = col_hit.col;
+    let effective_x = col_hit.effective_x;
+    let effective_y = row_hit.effective_y;
 
     if row < 0 || col < 0 || row >= grid.rows || col >= grid.cols {
         return HitTestResult {
@@ -865,14 +990,12 @@ pub fn hit_test(grid: &VolvoxGrid, px: f32, py: f32) -> HitTestResult {
         };
     }
 
-    // Determine area
-    let mut area = if in_fixed_row_area && in_fixed_col_area {
+    let mut area = if row_hit.in_fixed_row_area && col_hit.in_fixed_col_area {
         HitArea::FixedCorner
-    } else if in_fixed_row_area {
-        if hit_pinned_col {
+    } else if row_hit.in_fixed_row_area {
+        if col_hit.hit_pinned_col {
             HitArea::FixedRow
         } else {
-            // Check if near column border for resize
             let (cx, _, cw, _) = layout.cell_rect(row, col);
             let col_left = cx;
             let col_right = cx + cw;
@@ -880,23 +1003,20 @@ pub fn hit_test(grid: &VolvoxGrid, px: f32, py: f32) -> HitTestResult {
             if (effective_x - col_right).abs() <= hit_half {
                 HitArea::ColBorder
             } else if col > 0 && (effective_x - col_left).abs() <= hit_half {
-                // Near left edge = right edge of previous column
-                // Adjust hit col to the previous column for resize
-                col = col - 1;
+                col -= 1;
                 HitArea::ColBorder
             } else {
                 HitArea::FixedRow
             }
         }
-    } else if in_fixed_col_area {
+    } else if col_hit.in_fixed_col_area {
         let (_, cy, _, ch) = layout.cell_rect(row, col);
         let row_top = cy;
         let row_bottom = cy + ch;
         if (effective_y - row_bottom).abs() <= 3 {
             HitArea::RowBorder
         } else if row > 0 && (effective_y - row_top).abs() <= 3 {
-            // Near top edge = bottom edge of previous row
-            row = row - 1;
+            row -= 1;
             HitArea::RowBorder
         } else {
             HitArea::FixedCol
@@ -1094,6 +1214,79 @@ pub fn handle_pointer_down_with_behavior(
                 grid.mark_dirty();
             }
         }
+        HitArea::IndicatorColTop => {
+            if hit.col >= 0 && hit.col < grid.cols {
+                if grid.host_pointer_dispatch {
+                    return;
+                }
+
+                if grid.header_click_select && grid.header_features == 0 {
+                    let anchor_row = grid.fixed_rows.min(grid.rows - 1);
+                    let target_col = hit.col.clamp(0, grid.cols - 1);
+                    grid.selection.select(
+                        anchor_row,
+                        target_col,
+                        grid.rows - 1,
+                        target_col,
+                        grid.rows,
+                        grid.cols,
+                    );
+                    grid.mark_dirty();
+                    return;
+                }
+
+                if grid.header_features > 0 && behavior.allow_header_sort {
+                    let can_move = grid.header_features & 2 != 0;
+                    let can_sort = grid.header_features & 1 != 0;
+                    if can_move && !dbl_click {
+                        grid.col_drag_pending = true;
+                        grid.col_drag_pending_source = hit.col;
+                        grid.col_drag_pending_can_sort = can_sort;
+                        grid.col_drag_pending_since = Some(Instant::now());
+                    } else if can_sort {
+                        grid.events.push(GridEventData::BeforeSort { col: hit.col });
+                        let old_sort_keys = grid.sort_state.sort_keys.clone();
+                        crate::sort::handle_header_click(grid, hit.col);
+                        if grid.sort_state.sort_keys != old_sort_keys {
+                            grid.events.push(GridEventData::AfterSort { col: hit.col });
+                        }
+                    }
+                    grid.mark_dirty();
+                }
+            }
+        }
+        HitArea::IndicatorRowStart => {
+            if hit.row >= 0 && hit.row < grid.rows {
+                if grid.host_pointer_dispatch {
+                    return;
+                }
+
+                if grid.header_click_select {
+                    let anchor_col = grid.selection.col.clamp(grid.fixed_cols, grid.cols - 1);
+                    grid.selection.select(
+                        hit.row,
+                        anchor_col,
+                        hit.row,
+                        grid.cols - 1,
+                        grid.rows,
+                        grid.cols,
+                    );
+                } else {
+                    let target_col = grid.selection.col.clamp(grid.fixed_cols, grid.cols - 1);
+                    grid.selection.set_cursor(
+                        hit.row,
+                        target_col,
+                        grid.rows,
+                        grid.cols,
+                        grid.fixed_rows,
+                        grid.fixed_cols,
+                    );
+                    grid.selection.row_end = hit.row;
+                    grid.selection.col_end = target_col;
+                }
+                grid.mark_dirty();
+            }
+        }
         HitArea::Cell | HitArea::FixedRow | HitArea::FixedCol => {
             if hit.row >= 0 && hit.col >= 0 {
                 // Allow freeze/thaw by dragging the frozen pane separator line.
@@ -1267,6 +1460,27 @@ pub fn handle_pointer_down_with_behavior(
                 }
 
                 grid.mark_dirty();
+            }
+        }
+        HitArea::IndicatorCornerTopStart => {
+            if !grid.indicator_bands.corner_top_start.visible {
+                return;
+            }
+            if grid.selection.allow_selection && grid.rows > 0 && grid.cols > 0 {
+                let anchor_row = grid.fixed_rows.min(grid.rows - 1);
+                let anchor_col = grid.fixed_cols.min(grid.cols - 1);
+                grid.selection.select(
+                    anchor_row,
+                    anchor_col,
+                    grid.rows - 1,
+                    grid.cols - 1,
+                    grid.rows,
+                    grid.cols,
+                );
+                grid.mark_dirty();
+            } else if grid.allow_user_freezing > 0 {
+                grid.freeze_drag_active = true;
+                grid.freeze_drag_is_row = grid.allow_user_freezing != 1;
             }
         }
         HitArea::ColBorder => {
@@ -1806,7 +2020,6 @@ pub fn handle_key_down_with_behavior(
                         old_text,
                         new_text,
                     });
-                    grid.auto_resize_cell(row, col);
                     grid.mark_dirty();
                 }
             }
@@ -2116,8 +2329,8 @@ pub fn handle_key_down_with_behavior(
             grid.selection.row,
             grid.selection.col,
             &grid.layout,
-            grid.viewport_width,
-            grid.viewport_height,
+            grid.data_viewport_width(),
+            grid.data_viewport_height(),
             grid.fixed_rows,
             grid.fixed_cols,
             grid.pinned_top_height() + grid.pinned_bottom_height(),
@@ -2250,8 +2463,8 @@ pub fn handle_key_press_with_behavior(
                     grid.selection.row,
                     grid.selection.col,
                     &grid.layout,
-                    grid.viewport_width,
-                    grid.viewport_height,
+                    grid.data_viewport_width(),
+                    grid.data_viewport_height(),
                     grid.fixed_rows,
                     grid.fixed_cols,
                     grid.pinned_top_height() + grid.pinned_bottom_height(),
@@ -2517,6 +2730,30 @@ mod tests {
             grid.cells.get_text(grid.selection.row, grid.selection.col),
             "X"
         );
+    }
+
+    #[test]
+    fn dropdown_keyboard_commit_does_not_shrink_row_height() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.columns[0].dropdown_items = "Very long display item|x".to_string();
+        grid.set_row_height(1, 52);
+        grid.selection.row = 1;
+        grid.selection.col = 0;
+        prime_layout(&mut grid);
+
+        begin_edit_from_input(&mut grid, 1, 0);
+        assert!(grid.is_editing());
+        assert_eq!(grid.get_row_height(1), 52);
+
+        handle_key_down(&mut grid, 40, 0);
+        assert_eq!(grid.edit.dropdown_index, 0);
+        assert_eq!(grid.edit.edit_text, "Very long display item");
+
+        handle_key_down(&mut grid, 13, 0);
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "Very long display item");
+        assert_eq!(grid.get_row_height(1), 52);
     }
 
     #[test]
@@ -2874,6 +3111,25 @@ mod tests {
 
         handle_pointer_move(&mut grid, x, y2, 0, 0);
         assert!(!grid.dirty);
+    }
+
+    #[test]
+    fn column_header_hover_does_not_assign_first_data_row() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 100, 8, 1, 0);
+        prime_layout(&mut grid);
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        grid.selection.hover_mode = (pb::HoverMode::HoverRow as u32)
+            | (pb::HoverMode::HoverColumn as u32)
+            | (pb::HoverMode::HoverCell as u32);
+
+        let x = (grid.col_pos(2) + grid.col_width(2) / 2) as f32;
+        let y = 10.0;
+        handle_pointer_move(&mut grid, x, y, 0, 0);
+
+        assert_eq!(grid.mouse_row, -1);
+        assert_eq!(grid.mouse_col, 2);
     }
 
     #[test]

@@ -995,7 +995,7 @@ export class VolvoxGrid {
    * @param canvas  The canvas element to render into.
    * @param wasm    The initialised wasm-bindgen module (the default export
    *                from the wasm-pack generated JS glue).
-   * @param rows    Initial row count (including the fixed header row).
+   * @param rows    Initial row count for the grid body and any true fixed panes.
    * @param cols    Initial column count.
    */
   constructor(
@@ -1106,20 +1106,125 @@ export class VolvoxGrid {
     this.dirty = true;
   }
 
+  get frozenRows(): number {
+    return this.wasm.get_frozen_rows(this.gridId);
+  }
+  set frozenRows(n: number) {
+    this.wasm.set_frozen_rows(this.gridId, n);
+    this.dirty = true;
+  }
+
+  get frozenCols(): number {
+    return this.wasm.get_frozen_cols(this.gridId);
+  }
+  set frozenCols(n: number) {
+    this.wasm.set_frozen_cols(this.gridId, n);
+    this.dirty = true;
+  }
+
+  /** @deprecated Use frozenRows for public freeze-pane APIs. */
   get fixedRows(): number {
     return this.wasm.get_fixed_rows(this.gridId);
   }
+  /** @deprecated Use frozenRows for public freeze-pane APIs. */
   set fixedRows(n: number) {
     this.wasm.set_fixed_rows(this.gridId, n);
     this.dirty = true;
   }
 
+  /** @deprecated Use frozenCols for public freeze-pane APIs. */
   get fixedCols(): number {
     return this.wasm.get_fixed_cols(this.gridId);
   }
+  /** @deprecated Use frozenCols for public freeze-pane APIs. */
   set fixedCols(n: number) {
     this.wasm.set_fixed_cols(this.gridId, n);
     this.dirty = true;
+  }
+
+  get showColumnHeaders(): boolean {
+    if (typeof this.wasm.get_show_column_headers === "function") {
+      return Boolean(this.wasm.get_show_column_headers(this.gridId));
+    }
+    return false;
+  }
+  set showColumnHeaders(value: boolean) {
+    if (typeof this.wasm.set_show_column_headers === "function") {
+      this.wasm.set_show_column_headers(this.gridId, value);
+      this.dirty = true;
+    }
+  }
+
+  get columnIndicatorTopModeBits(): number {
+    if (typeof this.wasm.get_col_indicator_top_mode_bits === "function") {
+      return Number(this.wasm.get_col_indicator_top_mode_bits(this.gridId));
+    }
+    return 0;
+  }
+  set columnIndicatorTopModeBits(value: number) {
+    if (typeof this.wasm.set_col_indicator_top_mode_bits === "function") {
+      this.wasm.set_col_indicator_top_mode_bits(this.gridId, Math.max(0, Math.trunc(value)));
+      this.dirty = true;
+    }
+  }
+
+  get columnIndicatorTopRowCount(): number {
+    if (typeof this.wasm.get_col_indicator_top_band_rows === "function") {
+      return Number(this.wasm.get_col_indicator_top_band_rows(this.gridId));
+    }
+    return 0;
+  }
+  set columnIndicatorTopRowCount(value: number) {
+    if (typeof this.wasm.set_col_indicator_top_band_rows === "function") {
+      this.wasm.set_col_indicator_top_band_rows(this.gridId, Math.max(0, Math.trunc(value)));
+      this.dirty = true;
+    }
+  }
+
+  get showIndicator(): boolean {
+    return this.showRowIndicator;
+  }
+  set showIndicator(value: boolean) {
+    this.showRowIndicator = value;
+  }
+
+  get showRowIndicator(): boolean {
+    if (typeof this.wasm.get_show_row_indicator === "function") {
+      return Boolean(this.wasm.get_show_row_indicator(this.gridId));
+    }
+    return false;
+  }
+  set showRowIndicator(value: boolean) {
+    if (typeof this.wasm.set_show_row_indicator === "function") {
+      this.wasm.set_show_row_indicator(this.gridId, value);
+      this.dirty = true;
+    }
+  }
+
+  get rowIndicatorStartModeBits(): number {
+    if (typeof this.wasm.get_row_indicator_start_mode_bits === "function") {
+      return Number(this.wasm.get_row_indicator_start_mode_bits(this.gridId));
+    }
+    return 0;
+  }
+  set rowIndicatorStartModeBits(value: number) {
+    if (typeof this.wasm.set_row_indicator_start_mode_bits === "function") {
+      this.wasm.set_row_indicator_start_mode_bits(this.gridId, Math.max(0, Math.trunc(value)));
+      this.dirty = true;
+    }
+  }
+
+  get rowIndicatorStartWidth(): number {
+    if (typeof this.wasm.get_row_indicator_start_width === "function") {
+      return Number(this.wasm.get_row_indicator_start_width(this.gridId));
+    }
+    return 35;
+  }
+  set rowIndicatorStartWidth(value: number) {
+    if (typeof this.wasm.set_row_indicator_start_width === "function") {
+      this.wasm.set_row_indicator_start_width(this.gridId, Math.max(1, Math.trunc(value)));
+      this.dirty = true;
+    }
   }
 
   get selectionRow(): number {
@@ -1283,6 +1388,13 @@ export class VolvoxGrid {
     this.dirty = true;
   }
 
+  setColumnCaption(col: number, caption: string): void {
+    if (typeof this.wasm.set_col_caption === "function") {
+      this.wasm.set_col_caption(this.gridId, col, caption);
+      this.dirty = true;
+    }
+  }
+
   getColWidth(col: number): number {
     return this.wasm.get_col_width(this.gridId, col);
   }
@@ -1326,7 +1438,7 @@ export class VolvoxGrid {
     if (typeof this.wasm.get_default_row_height === "function") {
       return Number(this.wasm.get_default_row_height(this.gridId));
     }
-    const fixedRows = Number(this.wasm.get_fixed_rows?.(this.gridId) ?? 1);
+    const fixedRows = Number(this.wasm.get_fixed_rows?.(this.gridId) ?? 0);
     const probeRow = Math.min(
       Math.max(0, fixedRows),
       Math.max(0, this.rows - 1),
@@ -2871,7 +2983,7 @@ export class VolvoxGrid {
     this.dirty = true;
   }
 
-  /** Remove a data row (must be >= fixedRows). */
+  /** Remove a row by grid row index. */
   removeItem(row: number): void {
     this.wasm.remove_item(this.gridId, row);
     this.dirty = true;

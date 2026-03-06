@@ -64,6 +64,29 @@ fn ensure_layout(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
     grid.ensure_layout();
 }
 
+fn apply_default_indicator_bands(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
+    grid.indicator_bands.row_start.visible = false;
+    grid.indicator_bands.row_start.width_px =
+        volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
+    grid.indicator_bands.row_start.mode_bits =
+        (RowIndicatorMode::RowIndicatorCurrent as u32)
+            | (RowIndicatorMode::RowIndicatorSelection as u32);
+
+    grid.indicator_bands.col_top.visible = true;
+    if grid.indicator_bands.col_top.band_rows <= 0 {
+        grid.indicator_bands.col_top.band_rows = 1;
+    }
+    if grid.indicator_bands.col_top.default_row_height_px <= 0 {
+        grid.indicator_bands.col_top.default_row_height_px =
+            volvoxgrid_engine::indicator::DEFAULT_COL_INDICATOR_ROW_HEIGHT;
+    }
+    grid.indicator_bands.col_top.mode_bits =
+        (ColIndicatorCellMode::ColIndicatorCellHeaderText as u32)
+            | (ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32);
+    grid.layout.invalidate();
+    grid.mark_dirty();
+}
+
 fn apply_array_data_to_grid(
     grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
     rows: i32,
@@ -769,7 +792,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn set_fixed_rows(&self, r: SetFixedRowsRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            g.fixed_rows = r.fixed_rows.max(1).min(g.rows);
+            g.fixed_rows = r.fixed_rows.max(0).min(g.rows);
+            if g.fixed_rows == 0 && !g.indicator_bands.col_top.visible {
+                apply_default_indicator_bands(g);
+            }
             g.selection
                 .clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
             g.layout.invalidate();
@@ -2860,6 +2886,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             g.default_row_height = 17;
             g.selection.selection_visibility = 1;
             g.has_focus = true;
+            if fixed_rows == 0 {
+                apply_default_indicator_bands(g);
+            }
         });
 
         if let Some(config) = config {
@@ -3743,7 +3772,10 @@ pub extern "C" fn volvox_grid_set_fixed_rows(
 ) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
-            g.fixed_rows = fixed_rows.max(1).min(g.rows);
+            g.fixed_rows = fixed_rows.max(0).min(g.rows);
+            if g.fixed_rows == 0 && !g.indicator_bands.col_top.visible {
+                apply_default_indicator_bands(g);
+            }
             g.selection
                 .clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
             g.layout.invalidate();

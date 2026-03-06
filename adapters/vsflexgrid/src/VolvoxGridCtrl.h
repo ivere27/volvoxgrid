@@ -325,6 +325,7 @@ private:
     // Cached grid style for color properties
     volvoxgrid::legacy::GridStyle                            m_cachedStyle;
     bool                                               m_styleDirty = true;
+    long                                               m_fixedRows = 1;
 
     // ADO data source binding (see ADOAdapter.cpp)
     CComPtr<IDispatch>                                 m_dataSource;

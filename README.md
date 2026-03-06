@@ -33,6 +33,40 @@ VolvoxGrid renders grids directly to RGBA pixel buffers, giving you full control
 - **Codegen** -- Auto-generated FFI bindings for Rust, Dart, Java, C/C++ from `.proto` definitions
 - **Docker builds** -- Reproducible packaging for Android AAR, Desktop JAR, iOS XCFramework, and WASM
 
+## Layout Terminology
+
+VolvoxGrid separates header chrome from data panes. The important terms are:
+
+- **Indicator bands** -- Non-data UI bands outside the scrollable data viewport. `col_indicator_top` is the column header band. `row_indicator_start` is the row header / row number / row status band.
+- **Corner intersections** -- The small corner surfaces where indicator bands meet. `corner_top_start` is the top-left intersection between the left row indicator and the top column indicator.
+- **Fixed rows / cols** -- App-defined leading data panes that are always kept visible. These are structural panes, not header bands.
+- **Frozen rows / cols** -- Additional leading data panes kept visible at runtime, typically from user freeze actions. In layout, they extend the same leading pane as fixed rows / cols.
+- **Pin** -- Arbitrary rows or columns moved into pinned sections such as top, bottom, left, or right. Unlike fixed/frozen panes, pinning is not limited to the first contiguous rows or columns.
+- **Sticky** -- Rows or columns that visually stick to an edge while scrolling past. Sticky is an overlay behavior, not a permanent relocation of the underlying row or column.
+
+These features are related, but they are not the same:
+
+| Concept | What it is | Typical use |
+|---|---|---|
+| Indicator band | Header chrome outside data space | Column headers, row numbers, row state |
+| Corner intersection | Intersection of indicator bands | Blank corner, select-all, custom marker |
+| Fixed | App-owned leading non-scrollable data pane | Template/default locked panes |
+| Frozen | User/runtime-added leading non-scrollable data pane | Freeze panes |
+| Pin | Arbitrary edge section | Pinned summary row, pinned action column |
+| Sticky | Edge-following overlay while scrolling | Keep a row/col visible after it scrolls away |
+
+The visual layering is:
+
+`corner intersections` -> `indicator bands` -> `fixed + frozen panes` -> `pinned sections` -> `scrollable data` -> `sticky overlays`
+
+This means:
+
+- Column headers belong in the top indicator band, not in `fixedRows`.
+- Row headers / row numbers belong in the left row indicator band, not in `fixedCols`.
+- `fixed` and `frozen` affect the leading data panes.
+- `pin` creates separate edge sections.
+- `sticky` keeps rows or columns visible temporarily during scroll.
+
 ## Project Structure
 
 ```

@@ -741,8 +741,9 @@ async function main() {
   }
 
   function applyDemoViewDefaults(mode: StandardDemoMode) {
-    grid.fixedRows = 1;
-    grid.fixedCols = mode === "hierarchy" ? 0 : 1;
+    grid.frozenRows = 0;
+    grid.frozenCols = mode === "hierarchy" ? 0 : 1;
+    grid.showColumnHeaders = true;
     grid.setHighlight(1);
     grid.setFocusRect(2);
     grid.setSelectionMode(0);
@@ -753,8 +754,8 @@ async function main() {
   function applyDoomGridLayout() {
     const doomCols = doomRuntime.getCols();
     const doomRows = doomRuntime.getRows();
-    grid.fixedRows = 0;
-    grid.fixedCols = 0;
+    grid.frozenRows = 0;
+    grid.frozenCols = 0;
     grid.setHighlight(0);
     grid.setFocusRect(0);
     grid.setSelectionMode(0);
@@ -1250,7 +1251,7 @@ async function main() {
   document.getElementById("btn-del-item")!.addEventListener("click", () => {
     if (currentDemo === "doom") return;
     const row = grid.selectionRow;
-    if (row >= grid.fixedRows && dataRows > 1) {
+    if (row >= 0 && dataRows > 1) {
       grid.removeItem(row);
       dataRows -= 1;
       grid.invalidate();

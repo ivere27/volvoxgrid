@@ -6,7 +6,7 @@ use gtk4::gdk;
 use gtk4::glib;
 use gtk4::prelude::*;
 use gtk4::{
-    Align, Application, ApplicationWindow, Box as GtkBox, Button, DrawingArea, Entry,
+    Align, Application, ApplicationWindow, Box as GtkBox, Button, CssProvider, DrawingArea, Entry,
     EventControllerKey, EventControllerMotion, EventControllerScroll, GestureClick, Label,
     Orientation, Overlay, Popover, Separator,
 };
@@ -29,6 +29,34 @@ use volvoxgrid_engine::style::CellStyleOverride;
 
 const APP_ID: &str = "io.github.ivere27.volvoxgrid.GtkTest";
 const GTK_TEST_SCROLL_DELTA_SCALE: f32 = 1.0;
+const INLINE_EDITOR_CSS_CLASS: &str = "volvox-inline-editor";
+const INLINE_EDITOR_CSS: &str = r#"
+entry.volvox-inline-editor,
+entry.volvox-inline-editor text {
+  background-color: #ffffff;
+  color: #000000;
+  caret-color: #000000;
+  min-height: 0;
+  min-width: 0;
+  margin: 0;
+  box-shadow: none;
+}
+
+entry.volvox-inline-editor {
+  border: 1px solid #2d6cdf;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  min-height: 0;
+  min-width: 0;
+}
+
+entry.volvox-inline-editor text {
+  padding: 0 4px;
+  border-radius: 0;
+}
+"#;
 
 fn main() {
     let app = Application::builder().application_id(APP_ID).build();
@@ -86,6 +114,18 @@ fn ensure_visible_rows_materialized(grid: &mut VolvoxGrid, _demo_mode: i32) {
     // Stress demo is now eager (load_demo("stress") semantics), so no per-frame
     // row materialization is required here.
     grid.ensure_layout();
+}
+
+fn install_inline_editor_css() {
+    let provider = CssProvider::new();
+    provider.load_from_data(INLINE_EDITOR_CSS);
+    if let Some(display) = gdk::Display::default() {
+        gtk4::style_context_add_provider_for_display(
+            &display,
+            &provider,
+            gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
+    }
 }
 
 /// Create a grid for the given demo mode.
@@ -160,7 +200,7 @@ fn sync_native_entry_overlay(state: &mut State, entry: &Entry, area: &DrawingAre
                     }
                     return;
                 }
-                let inset = 1;
+                let inset = 0;
                 let ex = cx0 + inset;
                 let ey = cy0 + inset;
                 let ew = (cw - inset * 2).max(1);
@@ -168,6 +208,8 @@ fn sync_native_entry_overlay(state: &mut State, entry: &Entry, area: &DrawingAre
 
                 entry.set_margin_start(ex.max(0));
                 entry.set_margin_top(ey.max(0));
+                entry.set_width_request(ew);
+                entry.set_height_request(eh);
                 entry.set_size_request(ew, eh);
 
                 let changed_cell = !gtk4::prelude::WidgetExt::is_visible(entry)
@@ -550,6 +592,8 @@ fn create_grid(width: i32, height: i32) -> VolvoxGrid {
 }
 
 fn build_ui(app: &Application) {
+    install_inline_editor_css();
+
     let width = 1100i32;
     let height = 700i32;
 
@@ -622,8 +666,8 @@ fn build_ui(app: &Application) {
     edit_entry.set_visible(false);
     edit_entry.set_halign(Align::Start);
     edit_entry.set_valign(Align::Start);
-    // Frame-less entry fits inside the rendered cell border.
     edit_entry.set_has_frame(false);
+    edit_entry.add_css_class(INLINE_EDITOR_CSS_CLASS);
     gtk4::prelude::EntryExt::set_alignment(&edit_entry, 0.0);
     edit_entry.set_width_chars(1);
     edit_entry.set_can_focus(true);

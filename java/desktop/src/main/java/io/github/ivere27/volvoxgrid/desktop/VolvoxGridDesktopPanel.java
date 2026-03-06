@@ -114,9 +114,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     public synchronized void initialize(
         String pluginPath,
         int rows,
-        int cols,
-        int fixedRows,
-        int fixedCols
+        int cols
     ) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(pluginPath, "pluginPath");
 
@@ -135,10 +133,9 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                 LayoutConfig.newBuilder()
                     .setRows(rows)
                     .setCols(cols)
-                    .setFixedRows(fixedRows)
-                    .setFixedCols(fixedCols)
                     .build()
             )
+            .setIndicatorBands(VolvoxGridDesktopController.defaultIndicatorBandsConfig())
             .setRendering(RenderConfig.newBuilder().setRendererMode(RendererMode.RENDERER_CPU).build())
             .build();
 

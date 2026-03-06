@@ -354,11 +354,9 @@ class VolvoxGridView @JvmOverloads constructor(
     @JvmOverloads
     fun initialize(
         rows: Int,
-        cols: Int,
-        fixedRows: Int = 1,
-        fixedCols: Int = 0
+        cols: Int
     ) {
-        initialize(resolveBundledPluginPath(context), rows, cols, fixedRows, fixedCols)
+        initialize(resolveBundledPluginPath(context), rows, cols)
     }
 
     /**
@@ -368,15 +366,11 @@ class VolvoxGridView @JvmOverloads constructor(
      * `libvolvoxgrid_plugin_lite.so`
      * @param rows initial number of rows
      * @param cols initial number of columns
-     * @param fixedRows number of fixed header rows (default 1)
-     * @param fixedCols number of fixed header columns (default 0)
      */
     fun initialize(
         pluginPath: String,
         rows: Int,
-        cols: Int,
-        fixedRows: Int = 1,
-        fixedCols: Int = 0
+        cols: Int
     ) {
         released.set(false)
         val p = PluginHost.load(pluginPath)
@@ -399,9 +393,8 @@ class VolvoxGridView @JvmOverloads constructor(
                     .setLayout(LayoutConfig.newBuilder()
                         .setRows(rows)
                         .setCols(cols)
-                        .setFixedRows(fixedRows)
-                        .setFixedCols(fixedCols)
                         .build())
+                    .setIndicatorBands(defaultIndicatorBandsConfig())
                     .build())
                 .build()
         )

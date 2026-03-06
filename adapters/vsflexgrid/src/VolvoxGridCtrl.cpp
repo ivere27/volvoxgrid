@@ -655,11 +655,8 @@ STDMETHODIMP CVolvoxGridCtrl::put_Cols(long newVal)
 
 STDMETHODIMP CVolvoxGridCtrl::get_FixedRows(long* pVal)
 {
-    // FixedRows is not directly a "get" RPC -- infer from cached style or
-    // we treat it as a local cache. For simplicity we use CreateGrid's params.
-    // In a full implementation, this would query the engine state.
     if (!pVal) return E_POINTER;
-    *pVal = 1;  // default, should be cached
+    *pVal = m_fixedRows;
     return S_OK;
 }
 
@@ -671,6 +668,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_FixedRows(long newVal)
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
     InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetFixedRows", data);
+    m_fixedRows = std::max<long>(0, newVal);
     RequestFrame();
     return S_OK;
 }

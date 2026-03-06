@@ -10,6 +10,7 @@ use crate::column::ColumnProps;
 use crate::drag::DragState;
 use crate::edit::EditState;
 use crate::event::EventQueue;
+use crate::indicator::IndicatorBandsState;
 use crate::layout::LayoutCache;
 use crate::outline::OutlineState;
 use crate::proto::volvoxgrid::v1 as pb;
@@ -27,7 +28,7 @@ pub const DEFAULT_ROW_HEIGHT: i32 = 20;
 /// Default column width in pixels.
 pub const DEFAULT_COL_WIDTH: i32 = 68;
 
-/// Minimum allowed row count (must have at least one row for the header).
+/// Minimum allowed row count.
 const MIN_ROWS: i32 = 1;
 
 /// Minimum allowed column count.
@@ -161,6 +162,8 @@ pub struct VolvoxGrid {
     pub style: GridStyleState,
     /// Per-cell style overrides keyed by `(row, col)`.
     pub cell_styles: HashMap<(i32, i32), CellStyleOverride>,
+    /// Indicator bands around the data viewport.
+    pub indicator_bands: IndicatorBandsState,
 
     // ── Selection ─────────────────────────────────────────────────────────
     /// Current cursor position, selection extent, selection mode, focus border, and selection visibility.
@@ -475,7 +478,7 @@ pub struct VolvoxGrid {
 impl VolvoxGrid {
     /// Creates a new `VolvoxGrid` with the given dimensions and sensible defaults.
     ///
-    /// - `fixed_rows` is clamped to at least 1 (header row).
+    /// - `fixed_rows` is clamped to at least 0.
     /// - `fixed_cols` is passed through as-is (0 is a common default).
     /// - Row and column position mappings are initialized as identity (0..n).
     /// - Column properties are initialized with default `ColumnProps` for each column.
@@ -490,7 +493,7 @@ impl VolvoxGrid {
     ) -> Self {
         let rows = rows.max(MIN_ROWS);
         let cols = cols.max(MIN_COLS);
-        let fixed_rows = fixed_rows.max(1).min(rows);
+        let fixed_rows = fixed_rows.max(0).min(rows);
         let fixed_cols = fixed_cols.max(0).min(cols);
 
         let row_positions: Vec<i32> = (0..rows).collect();
@@ -544,6 +547,7 @@ impl VolvoxGrid {
             // Styling
             style: GridStyleState::default(),
             cell_styles: HashMap::new(),
+            indicator_bands: IndicatorBandsState::default(),
 
             // Selection
             selection: SelectionState::with_initial(fixed_rows, fixed_cols),
@@ -1525,6 +1529,30 @@ impl VolvoxGrid {
         self.get_col_width(col)
     }
 
+    pub fn indicator_start_width(&self) -> i32 {
+        self.indicator_bands.start_width()
+    }
+
+    pub fn indicator_end_width(&self) -> i32 {
+        self.indicator_bands.end_width()
+    }
+
+    pub fn indicator_top_height(&self) -> i32 {
+        self.indicator_bands.top_height()
+    }
+
+    pub fn indicator_bottom_height(&self) -> i32 {
+        self.indicator_bands.bottom_height()
+    }
+
+    pub fn data_viewport_width(&self) -> i32 {
+        (self.viewport_width - self.indicator_start_width() - self.indicator_end_width()).max(1)
+    }
+
+    pub fn data_viewport_height(&self) -> i32 {
+        (self.viewport_height - self.indicator_top_height() - self.indicator_bottom_height()).max(1)
+    }
+
     /// Returns true if the row is hidden.
     pub fn is_row_hidden(&self, row: i32) -> bool {
         self.rows_hidden.contains(&row)
@@ -2063,8 +2091,9 @@ impl VolvoxGrid {
                 (s, -1)
             };
 
-            // Apply alignment
+            // Apply caption/alignment
             if col < self.cols && (col as usize) < self.columns.len() {
+                self.columns[col as usize].caption = header_text.to_string();
                 self.columns[col as usize].alignment = alignment;
             }
 
@@ -2074,7 +2103,7 @@ impl VolvoxGrid {
                 self.col_widths.insert(col, w);
             }
 
-            // Set header text in fixed row 0
+            // Preserve legacy fixed-row header text when fixed rows are in use.
             if self.fixed_rows > 0 {
                 self.cells.set_text(0, col, header_text.to_string());
             }
@@ -2105,12 +2134,12 @@ impl VolvoxGrid {
 
     /// Returns the usable client width (viewport minus fixed column area).
     pub fn client_width(&self) -> i32 {
-        (self.viewport_width - self.fixed_width()).max(0)
+        (self.data_viewport_width() - self.fixed_width()).max(0)
     }
 
     /// Returns the usable client height (viewport minus fixed row area).
     pub fn client_height(&self) -> i32 {
-        (self.viewport_height - self.fixed_height()).max(0)
+        (self.data_viewport_height() - self.fixed_height()).max(0)
     }
 
     // ── AddItem / RemoveItem ──────────────────────────────────────────
@@ -2585,8 +2614,8 @@ impl VolvoxGrid {
         let pinned_w = self.pinned_left_width() + self.pinned_right_width();
         self.scroll.update_bounds(
             &self.layout,
-            self.viewport_width,
-            self.viewport_height,
+            self.data_viewport_width(),
+            self.data_viewport_height(),
             self.fixed_rows,
             self.fixed_cols,
             pinned_h,
@@ -2606,9 +2635,11 @@ impl VolvoxGrid {
         if first_scrollable >= self.rows {
             return first_scrollable.saturating_sub(1).max(0);
         }
-        let (first, _) =
-            self.layout
-                .visible_rows(self.scroll.scroll_y, self.viewport_height, first_scrollable);
+        let (first, _) = self.layout.visible_rows(
+            self.scroll.scroll_y,
+            self.data_viewport_height(),
+            first_scrollable,
+        );
         first.clamp(first_scrollable, self.rows - 1)
     }
 
@@ -2639,9 +2670,11 @@ impl VolvoxGrid {
         if first_scrollable >= self.rows {
             return first_scrollable.saturating_sub(1).max(0);
         }
-        let (_, last) =
-            self.layout
-                .visible_rows(self.scroll.scroll_y, self.viewport_height, first_scrollable);
+        let (_, last) = self.layout.visible_rows(
+            self.scroll.scroll_y,
+            self.data_viewport_height(),
+            first_scrollable,
+        );
         last.clamp(first_scrollable, self.rows - 1)
     }
 
@@ -2652,9 +2685,11 @@ impl VolvoxGrid {
         if first_scrollable >= self.cols {
             return first_scrollable.saturating_sub(1).max(0);
         }
-        let (first, _) =
-            self.layout
-                .visible_cols(self.scroll.scroll_x, self.viewport_width, first_scrollable);
+        let (first, _) = self.layout.visible_cols(
+            self.scroll.scroll_x,
+            self.data_viewport_width(),
+            first_scrollable,
+        );
         first.clamp(first_scrollable, self.cols - 1)
     }
 
@@ -2682,9 +2717,11 @@ impl VolvoxGrid {
         if first_scrollable >= self.cols {
             return first_scrollable.saturating_sub(1).max(0);
         }
-        let (_, last) =
-            self.layout
-                .visible_cols(self.scroll.scroll_x, self.viewport_width, first_scrollable);
+        let (_, last) = self.layout.visible_cols(
+            self.scroll.scroll_x,
+            self.data_viewport_width(),
+            first_scrollable,
+        );
         last.clamp(first_scrollable, self.cols - 1)
     }
 
@@ -2814,58 +2851,9 @@ impl VolvoxGrid {
         if self.is_row_hidden(row) || self.is_col_hidden(col) {
             return None;
         }
-
-        let mut x = self.col_pos(col);
-        let mut y = self.row_pos(row);
-        let mut w = self.col_width(col);
-        let mut h = self.row_height(row);
-        if w <= 0 || h <= 0 {
-            return None;
-        }
-
-        let row_scrollable = row >= self.fixed_rows + self.frozen_rows;
-        let col_scrollable = col >= self.fixed_cols + self.frozen_cols;
-        if row_scrollable {
-            y -= self.scroll.scroll_y as i32;
-        }
-        if col_scrollable {
-            x -= self.scroll.scroll_x as i32;
-        }
-
-        if let Some((mr1, mc1, mr2, mc2)) = self.get_merged_range(row, col) {
-            if mr1 != mr2 || mc1 != mc2 {
-                x = self.col_pos(mc1);
-                y = self.row_pos(mr1);
-                if col_scrollable {
-                    x -= self.scroll.scroll_x as i32;
-                }
-                if row_scrollable {
-                    y -= self.scroll.scroll_y as i32;
-                }
-                w = 0;
-                for c in mc1..=mc2 {
-                    w += self.col_width(c);
-                }
-                h = 0;
-                for r in mr1..=mr2 {
-                    h += self.row_height(r);
-                }
-            }
-        }
-
-        if self.extend_last_col && col == self.cols - 1 && x < self.viewport_width {
-            w = w.max(self.viewport_width - x);
-        }
-
-        if self.right_to_left {
-            x = self.viewport_width - (x + w);
-        }
-
-        if x + w <= 0 || y + h <= 0 || x >= self.viewport_width || y >= self.viewport_height {
-            return None;
-        }
-
-        Some((x, y, w, h))
+        let vp =
+            crate::canvas::VisibleRange::compute(self, self.viewport_width, self.viewport_height);
+        crate::canvas::cell_rect(self, row, col, &vp)
     }
 
     /// Get the screen-space rectangle for an edit input box, extending into
@@ -3327,5 +3315,24 @@ mod tests {
         grid.cells = CellStore::new();
         let reduced = grid.heap_size_bytes();
         assert!(reduced < grown);
+    }
+
+    #[test]
+    fn cell_and_edit_rect_include_indicator_band_offsets() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 4, 4, 0, 0);
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.width_px = 35;
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        grid.ensure_layout();
+
+        let cell = grid.cell_screen_rect(1, 1).expect("cell rect");
+        assert_eq!(cell.0, grid.indicator_start_width() + grid.col_pos(1));
+        assert_eq!(cell.1, grid.indicator_top_height() + grid.row_pos(1));
+
+        let edit = grid.edit_cell_rect(1, 1).expect("edit rect");
+        assert_eq!(edit.0, cell.0);
+        assert_eq!(edit.1, cell.1);
     }
 }

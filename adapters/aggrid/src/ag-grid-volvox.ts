@@ -1,16 +1,23 @@
 import { VolvoxGrid } from "volvoxgrid";
 import { setupDefaultInput } from "volvoxgrid/dist/default-input.js";
-import { normalizeColumnDefs, type NormalizedColDef } from "./col-def-mapper.js";
+import {
+  normalizeColumnDefs,
+  type ColumnLayout,
+  type NormalizedColDef,
+} from "./col-def-mapper.js";
 import { mapCellStyles, mapRowDataToMatrix, type RowKind } from "./data-mapper.js";
 import { VolvoxGridEventMapper } from "./event-mapper.js";
 import { VolvoxGridApi } from "./grid-api.js";
-import { applyGridOptionsToVolvox } from "./grid-options-mapper.js";
+import {
+  applyColumnIndicatorTopConfig,
+  applyGridOptionsToVolvox,
+  type ColumnIndicatorCellConfig,
+} from "./grid-options-mapper.js";
 import {
   encodeLoadTableRequest,
   encodeDefineColumnAlignmentsRequest,
   encodeDefineBooleanColumnsRequest,
   encodeUpdateCellBordersRequest,
-  encodeUpdateBoldCellsRequest,
   encodeUpdateCheckedCellsRequest,
   type CellBorderUpdate,
 } from "./proto-utils.js";
@@ -917,28 +924,20 @@ export class AgGridVolvox<TData extends RowData = RowData> {
     this.shadowRows = matrix.shadowRows;
     this.rowKinds = matrix.rowKinds;
 
-    const totalRows = this.headerRows + matrix.rows;
+    const totalRows = matrix.rows;
     const totalCols = Math.max(1, matrix.cols);
     const values = new Array<string>(totalRows * totalCols).fill("");
-
-    for (const col of this.columns) {
-      if (layout.hasColumnGroups) {
-        values[col.index] = layout.topHeaderTexts[col.index] ?? "";
-        values[totalCols + col.index] = layout.leafHeaderTexts[col.index] ?? "";
-      } else {
-        values[col.index] = layout.leafHeaderTexts[col.index] ?? "";
-      }
-    }
 
     for (let r = 0; r < matrix.rows; r += 1) {
       for (let c = 0; c < matrix.cols; c += 1) {
         const from = r * matrix.cols + c;
-        const to = (this.headerRows + r) * totalCols + c;
+        const to = r * totalCols + c;
         values[to] = matrix.values[from];
       }
     }
 
     this.loadTableValues(totalRows, totalCols, values);
+    this.applyColumnHeaderLayout(layout, themePreset.headerHeight);
     this.applyDefaultColumnAlignment();
     this.applyBooleanColumnCheckboxes();
     this.applyCellBorderStyles(matrix.shadowRows, themePreset.cellPadding);
@@ -1037,7 +1036,6 @@ export class AgGridVolvox<TData extends RowData = RowData> {
 
     const checkedUpdates: Array<{ row: number; col: number; checked: number }> = [];
     for (let rowIndex = 0; rowIndex < this.shadowRows.length; rowIndex += 1) {
-      const absoluteRow = this.headerRows + rowIndex;
       const row = this.shadowRows[rowIndex];
       for (const colIndex of booleanColumns) {
         const col = this.columns[colIndex];
@@ -1049,7 +1047,7 @@ export class AgGridVolvox<TData extends RowData = RowData> {
           continue;
         }
         checkedUpdates.push({
-          row: absoluteRow,
+          row: rowIndex,
           col: col.index,
           checked: raw ? CHECKED_CHECKED : CHECKED_UNCHECKED,
         });
@@ -1090,35 +1088,8 @@ export class AgGridVolvox<TData extends RowData = RowData> {
   }
 
   private applyHeaderBold(): void {
-    if (this.headerRows <= 0 || this.columns.length <= 0) {
-      return;
-    }
-
-    const rawWasm = this.wasm as {
-      volvox_grid_update_cells_pb?: (data: Uint8Array) => Uint8Array;
-      volvox_grid_last_error?: () => string;
-    };
-    if (typeof rawWasm.volvox_grid_update_cells_pb !== "function") {
-      return;
-    }
-
-    const updates: Array<{ row: number; col: number; bold: boolean }> = [];
-    for (let row = 0; row < this.headerRows; row += 1) {
-      for (const col of this.columns) {
-        updates.push({ row, col: col.index, bold: true });
-      }
-    }
-
-    if (updates.length === 0) {
-      return;
-    }
-
-    const req = encodeUpdateBoldCellsRequest({
-      gridId: this.grid.id,
-      updates,
-    });
-    rawWasm.volvox_grid_update_cells_pb(req);
-    this.logPbError(rawWasm, "header bold update");
+    // Indicator-band headers are no longer represented as grid cells, so the
+    // old cell-space bold override path does not apply here.
   }
 
   private installHeaderStyleHooks(): void {
@@ -1176,7 +1147,7 @@ export class AgGridVolvox<TData extends RowData = RowData> {
         continue;
       }
       updates.push({
-        row: this.headerRows + cell.rowIndex,
+        row: cell.rowIndex,
         col: col.index,
         left: padding?.left,
         top: padding?.top,
@@ -1245,7 +1216,7 @@ export class AgGridVolvox<TData extends RowData = RowData> {
 
   private applyPinnedRows(): void {
     for (let i = 0; i < this.rowKinds.length; i += 1) {
-      const row = i + this.headerRows;
+      const row = i;
       const kind = this.rowKinds[i];
       if (kind === "pinnedTop") {
         this.grid.pinRow(row, VolvoxGrid.PIN_TOP);
@@ -1387,6 +1358,92 @@ export class AgGridVolvox<TData extends RowData = RowData> {
       hitWidthPx: resizeHandle != null ? Math.max(6, resizeHandle.widthPx) : 6,
       showOnlyWhenResizable: true,
     });
+  }
+
+  private applyColumnHeaderLayout(
+    layout: ColumnLayout<TData>,
+    defaultHeaderHeight: number,
+  ): void {
+    for (const col of this.columns) {
+      this.grid.setColumnCaption(col.index, layout.leafHeaderTexts[col.index] ?? "");
+    }
+
+    const cells = this.buildColumnIndicatorCells(layout);
+    applyColumnIndicatorTopConfig(this.grid, {
+      visible: this.headerRows > 0,
+      rowCount: this.headerRows,
+      defaultRowHeight: defaultHeaderHeight,
+      cells,
+    });
+  }
+
+  private buildColumnIndicatorCells(
+    layout: ColumnLayout<TData>,
+  ): ColumnIndicatorCellConfig[] {
+    if (this.headerRows <= 1 || !layout.hasColumnGroups) {
+      return this.columns.map((col) => ({
+        row1: 0,
+        row2: 0,
+        col1: col.index,
+        col2: col.index,
+        text: layout.leafHeaderTexts[col.index] ?? "",
+      }));
+    }
+
+    const cells: ColumnIndicatorCellConfig[] = [];
+    let groupStart = -1;
+    let groupLabel = "";
+
+    const flushGroup = (groupEnd: number): void => {
+      if (groupStart < 0 || groupLabel.length === 0 || groupEnd < groupStart) {
+        return;
+      }
+      cells.push({
+        row1: 0,
+        row2: 0,
+        col1: groupStart,
+        col2: groupEnd,
+        text: groupLabel,
+      });
+    };
+
+    for (const col of this.columns) {
+      const leafText = layout.leafHeaderTexts[col.index] ?? "";
+      const parent = col.parentHeader?.trim() ?? "";
+      if (parent.length === 0) {
+        flushGroup(col.index - 1);
+        groupStart = -1;
+        groupLabel = "";
+        cells.push({
+          row1: 0,
+          row2: 1,
+          col1: col.index,
+          col2: col.index,
+          text: leafText,
+        });
+        continue;
+      }
+
+      if (groupStart < 0) {
+        groupStart = col.index;
+        groupLabel = parent;
+      } else if (groupLabel !== parent) {
+        flushGroup(col.index - 1);
+        groupStart = col.index;
+        groupLabel = parent;
+      }
+
+      cells.push({
+        row1: 1,
+        row2: 1,
+        col1: col.index,
+        col2: col.index,
+        text: leafText,
+      });
+    }
+
+    flushGroup(this.columns.length - 1);
+    return cells;
   }
 
   private installResizeObserver(): void {

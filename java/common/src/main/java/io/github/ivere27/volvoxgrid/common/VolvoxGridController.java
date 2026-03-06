@@ -12,11 +12,11 @@ public interface VolvoxGridController {
     int colCount();
     void setColCount(int value);
 
-    int fixedRowCount();
-    void setFixedRowCount(int value);
+    int frozenRowCount();
+    void setFrozenRowCount(int value);
 
-    int fixedColCount();
-    void setFixedColCount(int value);
+    int frozenColCount();
+    void setFrozenColCount(int value);
 
     void setTextMatrix(int row, int col, String text);
     String getTextMatrix(int row, int col);

@@ -20,6 +20,7 @@
 //!    lazy variant is available via `create_stress_grid`.
 
 use crate::grid::VolvoxGrid;
+use crate::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
 use crate::outline::{subtotal, subtotal_ex};
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::style::{CellStyleOverride, HighlightStyle};
@@ -33,6 +34,38 @@ fn sp(grid: &VolvoxGrid, px: i32) -> i32 {
     } else {
         (px as f32 * grid.scale).round() as i32
     }
+}
+
+fn apply_demo_column_headers(grid: &mut VolvoxGrid, headers: &[&str], band_row_height_px: i32) {
+    for (col, &header) in headers.iter().enumerate() {
+        if let Some(cp) = grid.columns.get_mut(col) {
+            cp.caption = header.to_string();
+        }
+    }
+
+    grid.indicator_bands.col_top.visible = true;
+    grid.indicator_bands.col_top.band_rows = 1;
+    grid.indicator_bands.col_top.default_row_height_px = sp(grid, band_row_height_px);
+    grid.indicator_bands.col_top.mode_bits = (pb::ColIndicatorCellMode::ColIndicatorCellHeaderText
+        as u32)
+        | (pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32);
+    grid.indicator_bands.col_top.back_color = Some(0xFF2244AA);
+    grid.indicator_bands.col_top.fore_color = Some(0xFFFFFFFF);
+    grid.indicator_bands.col_top.allow_resize = true;
+    grid.indicator_bands.corner_top_start.visible = false;
+    grid.indicator_bands.corner_top_start.mode_bits = 0;
+    grid.indicator_bands.corner_top_start.custom_key.clear();
+    grid.indicator_bands.corner_top_start.data.clear();
+}
+
+fn apply_demo_row_indicator(grid: &mut VolvoxGrid, width_px: i32) {
+    grid.indicator_bands.row_start.visible = true;
+    grid.indicator_bands.row_start.width_px = sp(grid, width_px.max(DEFAULT_ROW_INDICATOR_WIDTH));
+    grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+    grid.indicator_bands.row_start.back_color = Some(grid.style.back_color_bkg);
+    grid.indicator_bands.row_start.fore_color = Some(grid.style.fore_color);
+    grid.indicator_bands.row_start.grid_color = Some(grid.style.grid_color);
+    grid.indicator_bands.row_start.allow_resize = true;
 }
 
 fn reset_grid(grid: &mut VolvoxGrid) {
@@ -57,9 +90,10 @@ fn reset_grid(grid: &mut VolvoxGrid) {
     grid.outline = Default::default();
     grid.sort_state = Default::default();
     grid.sort_value_generator = None;
+    grid.indicator_bands = Default::default();
 
     // Reset properties to defaults
-    grid.fixed_rows = 1;
+    grid.fixed_rows = 0;
     grid.fixed_cols = 0;
     grid.frozen_rows = 0;
     grid.frozen_cols = 0;
@@ -125,10 +159,10 @@ const SALES_REGIONS: [&str; 4] = ["North", "South", "East", "West"];
 const SALES_QUARTERS: [&str; 4] = ["Q1", "Q2", "Q3", "Q4"];
 const SALES_STATUSES: [&str; 5] = ["Active", "Pending", "Shipped", "Returned", "Cancelled"];
 
-const SALES_HEADERS: [&str; 10] = [
-    "#", "Q", "Region", "Category", "Product", "Sales", "Cost", "Margin%", "Status", "Notes",
+const SALES_HEADERS: [&str; 9] = [
+    "Q", "Region", "Category", "Product", "Sales", "Cost", "Margin%", "Status", "Notes",
 ];
-const SALES_COL_WIDTHS: [i32; 10] = [40, 40, 80, 100, 120, 90, 90, 70, 80, 140];
+const SALES_COL_WIDTHS: [i32; 9] = [40, 80, 100, 120, 90, 90, 70, 80, 140];
 const SALES_DATA_ROWS: i32 = 1000;
 
 /// Configure and populate a grid as the Sales Showcase demo.
@@ -200,28 +234,25 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
     entries.sort_by(|a, b| a.quarter.cmp(b.quarter).then(a.region.cmp(b.region)));
 
     // ── Configure grid ───────────────────────────────────────────────
-    grid.set_rows(entries.len() as i32 + 1); // +1 for header
-    grid.set_cols(10);
+    grid.set_rows(entries.len() as i32);
+    grid.set_cols(9);
 
     for (c, &w) in SALES_COL_WIDTHS.iter().enumerate() {
         grid.set_col_width(c as i32, sp(grid, w));
     }
     grid.default_row_height = sp(grid, crate::grid::DEFAULT_ROW_HEIGHT);
-    grid.set_row_height(0, sp(grid, 28));
-    for (c, &h) in SALES_HEADERS.iter().enumerate() {
-        grid.cells.set_text(0, c as i32, h.to_string());
-    }
+    apply_demo_column_headers(grid, &SALES_HEADERS, 28);
+    apply_demo_row_indicator(grid, 40);
 
     grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+    grid.columns[4].alignment = pb::Align::RightCenter as i32;
     grid.columns[5].alignment = pb::Align::RightCenter as i32;
-    grid.columns[6].alignment = pb::Align::RightCenter as i32;
-    grid.columns[7].alignment = pb::Align::CenterCenter as i32;
+    grid.columns[6].alignment = pb::Align::CenterCenter as i32;
+    grid.columns[4].format = "$#,##0".to_string();
     grid.columns[5].format = "$#,##0".to_string();
-    grid.columns[6].format = "$#,##0".to_string();
-    grid.columns[8].dropdown_items = "Active|Pending|Shipped|Returned|Cancelled".to_string();
-    grid.columns[7].progress_color = 0xFF4488CC;
+    grid.columns[7].dropdown_items = "Active|Pending|Shipped|Returned|Cancelled".to_string();
+    grid.columns[6].progress_color = 0xFF4488CC;
     grid.style.back_color_alternate = 0xFFF0F5FF;
-    grid.fixed_cols = 1;
 
     grid.allow_user_resizing = 3;
     grid.tab_behavior = 1;
@@ -254,20 +285,19 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
 
     // ── Write flat data rows ─────────────────────────────────────────
     for (idx, e) in entries.iter().enumerate() {
-        let r = idx as i32 + 1;
-        grid.cells.set_text(r, 0, format!("{}", idx + 1));
-        grid.cells.set_text(r, 1, e.quarter.to_string());
-        grid.cells.set_text(r, 2, e.region.to_string());
-        grid.cells.set_text(r, 3, e.category.to_string());
-        grid.cells.set_text(r, 4, e.product.to_string());
-        grid.cells.set_text(r, 5, format!("{}", e.sales));
-        grid.cells.set_text(r, 6, format!("{}", e.cost));
-        grid.cells.set_text(r, 7, format!("{:.0}", e.margin_pct));
-        grid.cells.set_text(r, 8, e.status.to_string());
-        grid.cells.set_text(r, 9, e.note.clone());
+        let r = idx as i32;
+        grid.cells.set_text(r, 0, e.quarter.to_string());
+        grid.cells.set_text(r, 1, e.region.to_string());
+        grid.cells.set_text(r, 2, e.category.to_string());
+        grid.cells.set_text(r, 3, e.product.to_string());
+        grid.cells.set_text(r, 4, format!("{}", e.sales));
+        grid.cells.set_text(r, 5, format!("{}", e.cost));
+        grid.cells.set_text(r, 6, format!("{:.0}", e.margin_pct));
+        grid.cells.set_text(r, 7, e.status.to_string());
+        grid.cells.set_text(r, 8, e.note.clone());
         if e.margin_pct < 0.0 {
             grid.cell_styles.insert(
-                (r, 7),
+                (r, 6),
                 CellStyleOverride {
                     fore_color: Some(0xFFCC0000),
                     font_bold: Some(true),
@@ -280,14 +310,14 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
     // ── Subtotals: Q → Region → Grand Total (below) ────────────────
     grid.outline.group_total_position = 1; // below
     subtotal(grid, 1, 0, 0, "", 0, 0, false); // clear existing
-    subtotal(grid, 2, -1, 5, "Grand Total", 0xFFC0C0C0, 0xFF000000, true);
-    // Group by Q (col 1), match_from=1
+    subtotal(grid, 2, -1, 4, "Grand Total", 0xFFC0C0C0, 0xFF000000, true);
+    // Group by Q (col 0), match_from=1
     subtotal_ex(
-        grid, 2, 1, 5, "", 0xFFD0D0D0, 0xFF000000, true, "", false, 1, false,
+        grid, 2, 0, 4, "", 0xFFD0D0D0, 0xFF000000, true, "", false, 1, false,
     );
-    // Group by Region (col 2), match_from=1 so Q+Region both participate
+    // Group by Region (col 1), match_from=1 so Q+Region both participate
     subtotal_ex(
-        grid, 2, 2, 5, "", 0xFFE8E8E8, 0xFF000000, true, "", false, 1, false,
+        grid, 2, 1, 4, "", 0xFFE8E8E8, 0xFF000000, true, "", false, 1, false,
     );
 
     // Fill cost and margin for subtotal rows from their data rows above.
@@ -322,35 +352,22 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
                 break;
             }
             if !is_sub {
-                sales_sum += parse_i64(grid.cells.get_text(r, 5));
-                cost_sum += parse_i64(grid.cells.get_text(r, 6));
+                sales_sum += parse_i64(grid.cells.get_text(r, 4));
+                cost_sum += parse_i64(grid.cells.get_text(r, 5));
             }
             r -= 1;
         }
-        grid.cells.set_text(row, 6, format!("{}", cost_sum));
+        grid.cells.set_text(row, 5, format!("{}", cost_sum));
         grid.cells
-            .set_text(row, 7, format!("{:.1}", margin_f(sales_sum, cost_sum)));
-    }
-
-    // Header style
-    for c in 0..10 {
-        grid.cell_styles.insert(
-            (0, c),
-            CellStyleOverride {
-                font_bold: Some(true),
-                back_color: Some(0xFF2244AA),
-                fore_color: Some(0xFFFFFFFF),
-                ..Default::default()
-            },
-        );
+            .set_text(row, 6, format!("{:.1}", margin_f(sales_sum, cost_sum)));
     }
 
     // Span on Q and Region columns
     grid.span.mode = 4;
     grid.span.mode_fixed = 0;
     grid.span.span_cols.clear();
+    grid.span.span_cols.insert(0, true);
     grid.span.span_cols.insert(1, true);
-    grid.span.span_cols.insert(2, true);
     grid.span.span_compare = 1;
 
     // Outline bar
@@ -386,7 +403,7 @@ pub fn setup_hierarchy_demo(grid: &mut VolvoxGrid) {
     let entries = build_hierarchy_entries();
     let data_rows = entries.len() as i32;
 
-    grid.set_rows(data_rows + 1); // +1 for header
+    grid.set_rows(data_rows);
     grid.set_cols(5);
 
     // Column widths
@@ -394,29 +411,12 @@ pub fn setup_hierarchy_demo(grid: &mut VolvoxGrid) {
         grid.set_col_width(c as i32, sp(grid, w));
     }
 
-    // Header row
     grid.default_row_height = sp(grid, crate::grid::DEFAULT_ROW_HEIGHT);
-    grid.set_row_height(0, sp(grid, 28));
-    for (c, &h) in HIERARCHY_HEADERS.iter().enumerate() {
-        grid.cells.set_text(0, c as i32, h.to_string());
-    }
+    apply_demo_column_headers(grid, &HIERARCHY_HEADERS, 28);
 
     // Column alignments
     grid.columns[2].alignment = pb::Align::RightCenter as i32;
     grid.columns[4].alignment = pb::Align::CenterCenter as i32;
-
-    // Style header
-    for c in 0..5 {
-        grid.cell_styles.insert(
-            (0, c),
-            CellStyleOverride {
-                font_bold: Some(true),
-                back_color: Some(0xFF2244AA),
-                fore_color: Some(0xFFFFFFFF),
-                ..Default::default()
-            },
-        );
-    }
 
     // Alternating row color
     grid.style.back_color_alternate = 0xFFF5F5F5;
@@ -442,7 +442,7 @@ pub fn setup_hierarchy_demo(grid: &mut VolvoxGrid) {
 
     // Populate data rows
     for (i, entry) in entries.iter().enumerate() {
-        let r = (i as i32) + 1;
+        let r = i as i32;
 
         // Plain name — visual indent is handled by the outline tree renderer
         grid.cells.set_text(r, 0, entry.name.to_string());
@@ -668,8 +668,7 @@ pub const STRESS_PRELOAD_ROWS: i32 = 2_000;
 /// Padding rows to materialize around the visible window.
 pub const STRESS_MATERIALIZE_PADDING: i32 = 48;
 
-const STRESS_HEADERS: [&str; 12] = [
-    "#",
+const STRESS_HEADERS: [&str; 11] = [
     "Text",
     "Number",
     "Currency",
@@ -682,7 +681,7 @@ const STRESS_HEADERS: [&str; 12] = [
     "Rating",
     "Code",
 ];
-const STRESS_COL_WIDTHS: [i32; 12] = [50, 110, 80, 90, 60, 100, 50, 90, 160, 90, 60, 100];
+const STRESS_COL_WIDTHS: [i32; 11] = [110, 80, 90, 60, 100, 50, 90, 160, 90, 60, 100];
 
 const STRESS_TEXT_POOL: [&str; 10] = [
     "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliet",
@@ -721,7 +720,7 @@ pub fn setup_stress_demo(grid: &mut VolvoxGrid) {
     #[cfg(feature = "rayon")]
     let all_texts: Vec<(i32, Vec<String>)> = {
         use rayon::prelude::*;
-        (1..=STRESS_DATA_ROWS)
+        (0..STRESS_DATA_ROWS)
             .into_par_iter()
             .map(|r| {
                 let texts: Vec<String> = (0..12).map(|c| stress_cell_text(r, c as i32)).collect();
@@ -731,7 +730,7 @@ pub fn setup_stress_demo(grid: &mut VolvoxGrid) {
     };
 
     #[cfg(not(feature = "rayon"))]
-    let all_texts: Vec<(i32, Vec<String>)> = (1..=STRESS_DATA_ROWS)
+    let all_texts: Vec<(i32, Vec<String>)> = (0..STRESS_DATA_ROWS)
         .map(|r| {
             let texts: Vec<String> = (0..12).map(|c| stress_cell_text(r, c as i32)).collect();
             (r, texts)
@@ -747,7 +746,7 @@ pub fn setup_stress_demo(grid: &mut VolvoxGrid) {
 
 /// Create a fully configured stress demo grid with lazy row materialization.
 ///
-/// Only `preload_rows` are generated at startup (plus header row); remaining
+/// Only `preload_rows` are generated at startup; remaining
 /// rows are materialized on demand by `stress_materialize_visible_rows`.
 pub fn create_stress_grid(
     id: i64,
@@ -760,7 +759,7 @@ pub fn create_stress_grid(
     let preload_rows = preload_rows.clamp(0, data_rows);
     let reserve_rows = (preload_rows + STRESS_MATERIALIZE_PADDING * 4).clamp(0, data_rows);
 
-    let mut grid = VolvoxGrid::new(id, width, height, data_rows + 1, 12, 1, 1);
+    let mut grid = VolvoxGrid::new(id, width, height, data_rows, 12, 0, 1);
     setup_stress_grid(
         &mut grid,
         data_rows,
@@ -773,7 +772,7 @@ pub fn create_stress_grid(
     }
 
     // Materialize only a small startup window.
-    for r in 1..=preload_rows {
+    for r in 0..preload_rows {
         stress_materialize_row(&mut grid, r);
     }
 
@@ -785,7 +784,7 @@ pub fn create_stress_grid(
 }
 
 fn stress_cell_capacity_for_rows(data_rows: i32) -> usize {
-    (data_rows.max(0) as usize + 1).saturating_mul(12)
+    (data_rows.max(0) as usize).saturating_mul(12)
 }
 
 fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize) {
@@ -793,37 +792,33 @@ fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize
     // Capacity is caller-defined: eager path uses full dataset; lazy path
     // keeps startup memory/time low and grows on demand.
     grid.cells = crate::cell::CellStore::with_capacity(cell_capacity.max(12));
-    grid.set_rows(data_rows.max(0) + 1);
-    grid.set_cols(12);
+    grid.set_rows(data_rows.max(0));
+    grid.set_cols(11);
 
     // Column widths
     for (c, &w) in STRESS_COL_WIDTHS.iter().enumerate() {
         grid.set_col_width(c as i32, sp(grid, w));
     }
 
-    // Header row
     grid.default_row_height = sp(grid, crate::grid::DEFAULT_ROW_HEIGHT);
-    grid.set_row_height(0, sp(grid, 28));
-    for (c, &h) in STRESS_HEADERS.iter().enumerate() {
-        grid.cells.set_text(0, c as i32, h.to_string());
-    }
+    apply_demo_column_headers(grid, &STRESS_HEADERS, 28);
+    apply_demo_row_indicator(grid, 40);
 
     // Column alignments
-    grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+    grid.columns[1].alignment = pb::Align::RightCenter as i32;
     grid.columns[2].alignment = pb::Align::RightCenter as i32;
-    grid.columns[3].alignment = pb::Align::RightCenter as i32;
-    grid.columns[4].alignment = pb::Align::CenterCenter as i32;
-    grid.columns[6].alignment = pb::Align::CenterCenter as i32;
-    grid.columns[10].alignment = pb::Align::CenterCenter as i32;
+    grid.columns[3].alignment = pb::Align::CenterCenter as i32;
+    grid.columns[5].alignment = pb::Align::CenterCenter as i32;
+    grid.columns[9].alignment = pb::Align::CenterCenter as i32;
 
     // Column display formats
-    grid.columns[3].format = "$#,##0".to_string(); // Currency
+    grid.columns[2].format = "$#,##0".to_string(); // Currency
 
     // Dropdown list
-    grid.columns[7].dropdown_items = "Option A|Option B|Option C|Option D|Option E".to_string();
+    grid.columns[6].dropdown_items = "Option A|Option B|Option C|Option D|Option E".to_string();
 
     // Rating progress (data-bar)
-    grid.columns[10].progress_color = 0xFF44AA88;
+    grid.columns[9].progress_color = 0xFF44AA88;
 
     // Alternating row color
     grid.style.back_color_alternate = 0xFFF0F5FF;
@@ -855,47 +850,47 @@ fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize
 /// returns the same string.  Used by `stress_materialize_row` and by the
 /// sort system (via `sort_value_generator`) to compare unmaterialized rows.
 pub fn stress_cell_text(source_row: i32, col: i32) -> String {
+    let logical_row = source_row.max(0) + 1;
     match col {
-        0 => format!("{}", source_row),
-        1 => STRESS_TEXT_POOL[rand_idx(source_row, 0xA1, STRESS_TEXT_POOL.len())].to_string(),
-        2 => {
-            let number = (splitmix64((source_row as u64) ^ 0x1234) % 100_000) as i32 - 50_000;
+        0 => STRESS_TEXT_POOL[rand_idx(logical_row, 0xA1, STRESS_TEXT_POOL.len())].to_string(),
+        1 => {
+            let number = (splitmix64((logical_row as u64) ^ 0x1234) % 100_000) as i32 - 50_000;
             format!("{}", number)
         }
-        3 => {
-            let currency = 100 + (splitmix64((source_row as u64) ^ 0x5678) % 999_900) as i32;
+        2 => {
+            let currency = 100 + (splitmix64((logical_row as u64) ^ 0x5678) % 999_900) as i32;
             format!("{}", currency)
         }
-        4 => {
-            let pct = (splitmix64((source_row as u64) ^ 0x9ABC) % 101) as f32;
+        3 => {
+            let pct = (splitmix64((logical_row as u64) ^ 0x9ABC) % 101) as f32;
             format!("{:.0}", pct)
         }
-        5 => {
-            let day_offset = (splitmix64((source_row as u64) ^ 0xAABB) % 2190) as i32;
+        4 => {
+            let day_offset = (splitmix64((logical_row as u64) ^ 0xAABB) % 2190) as i32;
             let year = 2020 + day_offset / 365;
             let day_in_year = day_offset % 365;
             let month = (day_in_year / 30).min(11) + 1;
             let day = (day_in_year % 30) + 1;
             format!("{:04}-{:02}-{:02}", year, month, day)
         }
-        6 => {
-            let bool_val = (splitmix64((source_row as u64) ^ 0xDEF0) % 2) != 0;
+        5 => {
+            let bool_val = (splitmix64((logical_row as u64) ^ 0xDEF0) % 2) != 0;
             if bool_val { "Yes" } else { "No" }.to_string()
         }
-        7 => {
-            STRESS_COMBO_OPTIONS[rand_idx(source_row, 0xB2, STRESS_COMBO_OPTIONS.len())].to_string()
-        }
-        8 => STRESS_LONG_TEXT[rand_idx(source_row, 0xC3, STRESS_LONG_TEXT.len())].to_string(),
-        9 => {
-            let formatted = (splitmix64((source_row as u64) ^ 0xEEFF) % 10_000_000) as f64 / 1000.0;
+        6 => STRESS_COMBO_OPTIONS[rand_idx(logical_row, 0xB2, STRESS_COMBO_OPTIONS.len())]
+            .to_string(),
+        7 => STRESS_LONG_TEXT[rand_idx(logical_row, 0xC3, STRESS_LONG_TEXT.len())].to_string(),
+        8 => {
+            let formatted =
+                (splitmix64((logical_row as u64) ^ 0xEEFF) % 10_000_000) as f64 / 1000.0;
             format!("{:.3}", formatted)
         }
-        10 => {
-            let rating = (splitmix64((source_row as u64) ^ 0x3355) % 100) as f32;
+        9 => {
+            let rating = (splitmix64((logical_row as u64) ^ 0x3355) % 100) as f32;
             format!("{:.0}", rating)
         }
-        11 => {
-            let code_val = splitmix64((source_row as u64) ^ 0xCCDD);
+        10 => {
+            let code_val = splitmix64((logical_row as u64) ^ 0xCCDD);
             format!("{:016X}", code_val)
         }
         _ => String::new(),
@@ -908,7 +903,7 @@ pub fn stress_cell_text(source_row: i32, col: i32) -> String {
 /// preserved across trim/re-materialize cycles.
 /// Does nothing if `row` is out of range or already has data in col 0.
 pub fn stress_materialize_row(grid: &mut VolvoxGrid, row: i32) {
-    if row <= 0 || row >= grid.rows {
+    if row < 0 || row >= grid.rows {
         return;
     }
     if grid.cells.contains(row, 0) {
@@ -917,7 +912,7 @@ pub fn stress_materialize_row(grid: &mut VolvoxGrid, row: i32) {
 
     let source_row = grid.row_positions.get(row as usize).copied().unwrap_or(row);
 
-    for col in 0..12 {
+    for col in 0..11 {
         grid.cells
             .set_text(row, col, stress_cell_text(source_row, col));
     }
@@ -989,4 +984,62 @@ pub fn materialize_row(grid: &mut VolvoxGrid, row: i32) {
 /// Alias: materialize visible rows for stress test.
 pub fn materialize_visible_rows(grid: &mut VolvoxGrid, padding: i32) {
     stress_materialize_visible_rows(grid, padding);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sales_demo_uses_indicator_headers() {
+        let mut grid = VolvoxGrid::new(1, 960, 540, 1, 1, 0, 0);
+        setup_sales_demo(&mut grid);
+
+        assert_eq!(grid.fixed_rows, 0);
+        assert_eq!(grid.fixed_cols, 0);
+        assert_eq!(grid.columns[0].caption, "Q");
+        assert_eq!(grid.columns[4].caption, "Sales");
+        assert!(grid.indicator_bands.col_top.visible);
+        assert!(grid.indicator_bands.row_start.visible);
+        assert_eq!(grid.indicator_bands.col_top.row_count(), 1);
+        assert_eq!(
+            grid.indicator_bands.row_start.mode_bits,
+            pb::RowIndicatorMode::RowIndicatorNumbers as u32
+        );
+        assert_ne!(grid.cells.get_text(0, 0), "Q");
+        assert_ne!(grid.cells.get_text(0, 4), "Sales");
+    }
+
+    #[test]
+    fn hierarchy_demo_hides_row_indicator() {
+        let mut grid = VolvoxGrid::new(1, 960, 540, 1, 1, 0, 0);
+        setup_hierarchy_demo(&mut grid);
+
+        assert_eq!(grid.fixed_rows, 0);
+        assert_eq!(grid.columns[0].caption, "Name");
+        assert_eq!(grid.columns[4].caption, "Permissions");
+        assert!(grid.indicator_bands.col_top.visible);
+        assert!(!grid.indicator_bands.row_start.visible);
+        assert_eq!(grid.indicator_bands.col_top.row_count(), 1);
+        assert_eq!(grid.cells.get_text(0, 0), "Documents");
+        assert_ne!(grid.cells.get_text(0, 0), "Name");
+    }
+
+    #[test]
+    fn create_stress_grid_uses_zero_based_rows_with_indicator_headers() {
+        let mut grid = create_stress_grid(1, 0, 0, 8, 3);
+
+        assert_eq!(grid.fixed_rows, 0);
+        assert_eq!(grid.fixed_cols, 0);
+        assert_eq!(grid.columns[0].caption, "Text");
+        assert_eq!(grid.columns[10].caption, "Code");
+        assert!(grid.indicator_bands.col_top.visible);
+        assert!(grid.indicator_bands.row_start.visible);
+        assert_eq!(grid.cells.get_text(0, 0), stress_cell_text(0, 0));
+        assert_eq!(grid.cells.get_text(2, 0), stress_cell_text(2, 0));
+        assert_eq!(grid.cells.get_text(3, 0), "");
+
+        stress_materialize_row(&mut grid, 3);
+        assert_eq!(grid.cells.get_text(3, 0), stress_cell_text(3, 0));
+    }
 }

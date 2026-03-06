@@ -42,23 +42,21 @@ public class MyApp {
             gridPanel.initialize(
                 null,  // auto-detect plugin path from JAR
                 100,   // rows
-                5,     // cols
-                1,     // fixedRows (header)
-                0      // fixedCols
+                5      // cols
             );
 
             // Get a controller for grid operations
             VolvoxGridDesktopController ctrl = gridPanel.createController();
 
-            // Set header text
-            ctrl.setTextMatrix(0, 0, "Name");
-            ctrl.setTextMatrix(0, 1, "Price");
-            ctrl.setTextMatrix(0, 2, "Qty");
+            // Set column headers in the top indicator band
+            ctrl.setColumnCaption(0, "Name");
+            ctrl.setColumnCaption(1, "Price");
+            ctrl.setColumnCaption(2, "Qty");
 
             // Set data
-            ctrl.setTextMatrix(1, 0, "Widget A");
-            ctrl.setTextMatrix(1, 1, "29.99");
-            ctrl.setTextMatrix(1, 2, "150");
+            ctrl.setTextMatrix(0, 0, "Widget A");
+            ctrl.setTextMatrix(0, 1, "29.99");
+            ctrl.setTextMatrix(0, 2, "150");
 
             // Clean up on close
             frame.addWindowListener(new java.awt.event.WindowAdapter() {
@@ -91,7 +89,7 @@ A Swing `JPanel` that hosts the grid. Handles rendering, mouse/keyboard input, a
 
 ```java
 // Option A: Auto-detect or specify plugin path
-gridPanel.initialize(pluginPath, rows, cols, fixedRows, fixedCols);
+gridPanel.initialize(pluginPath, rows, cols);
 
 // Option B: Reuse an existing bridge and grid (for multi-grid apps)
 gridPanel.initialize(bridge, existingGridId);
@@ -140,8 +138,6 @@ High-level API for grid operations. Obtained via `gridPanel.createController()`.
 ```java
 ctrl.setRowCount(1000);
 ctrl.setColCount(10);
-ctrl.setFixedRowCount(1);    // frozen header rows
-ctrl.setFixedColCount(2);    // frozen left columns
 ```
 
 #### Cell Data

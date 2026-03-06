@@ -100,6 +100,32 @@ fn replay_loaded_fonts_into_grid(grid: &mut volvoxgrid_engine::grid::VolvoxGrid)
     }
 }
 
+const DEFAULT_ROW_INDICATOR_MODE_BITS: u32 =
+    RowIndicatorMode::RowIndicatorCurrent as u32
+        | RowIndicatorMode::RowIndicatorSelection as u32;
+const DEFAULT_COL_INDICATOR_MODE_BITS: u32 =
+    ColIndicatorCellMode::ColIndicatorCellHeaderText as u32
+        | ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32;
+
+fn apply_default_indicator_bands(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
+    grid.indicator_bands.row_start.visible = false;
+    grid.indicator_bands.row_start.width_px =
+        volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
+    grid.indicator_bands.row_start.mode_bits = DEFAULT_ROW_INDICATOR_MODE_BITS;
+
+    grid.indicator_bands.col_top.visible = true;
+    if grid.indicator_bands.col_top.band_rows <= 0 {
+        grid.indicator_bands.col_top.band_rows = 1;
+    }
+    if grid.indicator_bands.col_top.default_row_height_px <= 0 {
+        grid.indicator_bands.col_top.default_row_height_px =
+            volvoxgrid_engine::indicator::DEFAULT_COL_INDICATOR_ROW_HEIGHT;
+    }
+    grid.indicator_bands.col_top.mode_bits = DEFAULT_COL_INDICATOR_MODE_BITS;
+    grid.layout.invalidate();
+    grid.dirty = true;
+}
+
 fn truncate_to_char_count(input: &str, max_chars: i32) -> String {
     if max_chars <= 0 {
         return input.to_string();
@@ -537,7 +563,8 @@ pub fn create_grid_scaled(rows: i32, cols: i32, scale: f32) -> i32 {
     } else {
         1.0
     };
-    let id = mgr.create_grid(0, 0, rows, cols, 1, 0, safe_scale);
+    let id = mgr.create_grid(0, 0, rows, cols, 0, 0, safe_scale);
+    let _ = mgr.with_grid(id, apply_default_indicator_bands);
     let _ = mgr.with_grid(id, replay_loaded_fonts_into_grid);
     id as i32
 }
@@ -597,7 +624,7 @@ pub fn get_cols(id: i32) -> i32 {
 #[wasm_bindgen]
 pub fn set_fixed_rows(id: i32, n: i32) {
     with_grid(id, |grid| {
-        grid.fixed_rows = n.max(1).min(grid.rows);
+        grid.fixed_rows = n.max(0).min(grid.rows);
         grid.selection
             .clamp(grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
         grid.layout.invalidate();
@@ -624,6 +651,143 @@ pub fn get_fixed_rows(id: i32) -> i32 {
 #[wasm_bindgen]
 pub fn get_fixed_cols(id: i32) -> i32 {
     with_grid(id, |grid| grid.fixed_cols).unwrap_or(0)
+}
+
+#[wasm_bindgen]
+pub fn set_frozen_rows(id: i32, n: i32) {
+    with_grid(id, |grid| {
+        grid.frozen_rows = n.max(0).min((grid.rows - grid.fixed_rows).max(0));
+        grid.layout.invalidate();
+        grid.dirty = true;
+    });
+}
+
+#[wasm_bindgen]
+pub fn set_frozen_cols(id: i32, n: i32) {
+    with_grid(id, |grid| {
+        grid.frozen_cols = n.max(0).min((grid.cols - grid.fixed_cols).max(0));
+        grid.layout.invalidate();
+        grid.dirty = true;
+    });
+}
+
+#[wasm_bindgen]
+pub fn get_frozen_rows(id: i32) -> i32 {
+    with_grid(id, |grid| grid.frozen_rows).unwrap_or(0)
+}
+
+#[wasm_bindgen]
+pub fn get_frozen_cols(id: i32) -> i32 {
+    with_grid(id, |grid| grid.frozen_cols).unwrap_or(0)
+}
+
+#[wasm_bindgen]
+pub fn set_show_column_headers(id: i32, visible: bool) {
+    with_grid(id, |grid| {
+        grid.indicator_bands.col_top.visible = visible;
+        if visible {
+            if grid.indicator_bands.col_top.band_rows <= 0 {
+                grid.indicator_bands.col_top.band_rows = 1;
+            }
+            if grid.indicator_bands.col_top.mode_bits == 0 {
+                grid.indicator_bands.col_top.mode_bits = DEFAULT_COL_INDICATOR_MODE_BITS;
+            }
+        }
+        grid.layout.invalidate();
+        grid.dirty = true;
+    });
+}
+
+#[wasm_bindgen]
+pub fn get_show_column_headers(id: i32) -> bool {
+    with_grid(id, |grid| grid.indicator_bands.col_top.visible).unwrap_or(false)
+}
+
+#[wasm_bindgen]
+pub fn set_col_indicator_top_mode_bits(id: i32, mode_bits: u32) {
+    with_grid(id, |grid| {
+        grid.indicator_bands.col_top.mode_bits = mode_bits;
+        grid.indicator_bands.col_top.visible = mode_bits != 0;
+        if grid.indicator_bands.col_top.visible && grid.indicator_bands.col_top.band_rows <= 0 {
+            grid.indicator_bands.col_top.band_rows = 1;
+        }
+        grid.layout.invalidate();
+        grid.dirty = true;
+    });
+}
+
+#[wasm_bindgen]
+pub fn get_col_indicator_top_mode_bits(id: i32) -> u32 {
+    with_grid(id, |grid| grid.indicator_bands.col_top.mode_bits).unwrap_or(0)
+}
+
+#[wasm_bindgen]
+pub fn set_col_indicator_top_band_rows(id: i32, band_rows: i32) {
+    with_grid(id, |grid| {
+        let normalized = band_rows.max(0);
+        grid.indicator_bands.col_top.band_rows = normalized;
+        grid.indicator_bands.col_top.visible = normalized != 0;
+        grid.layout.invalidate();
+        grid.dirty = true;
+    });
+}
+
+#[wasm_bindgen]
+pub fn get_col_indicator_top_band_rows(id: i32) -> i32 {
+    with_grid(id, |grid| grid.indicator_bands.col_top.band_rows).unwrap_or(0)
+}
+
+#[wasm_bindgen]
+pub fn set_show_row_indicator(id: i32, visible: bool) {
+    with_grid(id, |grid| {
+        grid.indicator_bands.row_start.visible = visible;
+        if visible {
+            if grid.indicator_bands.row_start.width_px <= 0 {
+                grid.indicator_bands.row_start.width_px =
+                    volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
+            }
+            if grid.indicator_bands.row_start.mode_bits == 0 {
+                grid.indicator_bands.row_start.mode_bits = DEFAULT_ROW_INDICATOR_MODE_BITS;
+            }
+        }
+        grid.layout.invalidate();
+        grid.dirty = true;
+    });
+}
+
+#[wasm_bindgen]
+pub fn get_show_row_indicator(id: i32) -> bool {
+    with_grid(id, |grid| grid.indicator_bands.row_start.visible).unwrap_or(false)
+}
+
+#[wasm_bindgen]
+pub fn set_row_indicator_start_mode_bits(id: i32, mode_bits: u32) {
+    with_grid(id, |grid| {
+        grid.indicator_bands.row_start.mode_bits = mode_bits;
+        grid.indicator_bands.row_start.visible = mode_bits != 0;
+        grid.layout.invalidate();
+        grid.dirty = true;
+    });
+}
+
+#[wasm_bindgen]
+pub fn get_row_indicator_start_mode_bits(id: i32) -> u32 {
+    with_grid(id, |grid| grid.indicator_bands.row_start.mode_bits).unwrap_or(0)
+}
+
+#[wasm_bindgen]
+pub fn set_row_indicator_start_width(id: i32, width_px: i32) {
+    with_grid(id, |grid| {
+        grid.indicator_bands.row_start.width_px = width_px.max(1);
+        grid.layout.invalidate();
+        grid.dirty = true;
+    });
+}
+
+#[wasm_bindgen]
+pub fn get_row_indicator_start_width(id: i32) -> i32 {
+    with_grid(id, |grid| grid.indicator_bands.row_start.width_px)
+        .unwrap_or(volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH)
 }
 
 #[wasm_bindgen]
@@ -1946,6 +2110,20 @@ pub fn set_cell_flood(id: i32, row: i32, col: i32, percent: f32, color: u32) {
 pub fn set_col_width(id: i32, col: i32, w: i32) {
     with_grid(id, |grid| {
         grid.set_col_width(col, w);
+    });
+}
+
+#[wasm_bindgen]
+pub fn set_col_caption(id: i32, col: i32, caption: &str) {
+    with_grid(id, |grid| {
+        if col < 0 || col >= grid.cols {
+            return;
+        }
+        while grid.columns.len() <= col as usize {
+            grid.columns.push(Default::default());
+        }
+        grid.columns[col as usize].caption = caption.to_string();
+        grid.mark_dirty();
     });
 }
 
@@ -3511,7 +3689,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
             .as_ref()
             .and_then(|c| c.layout.as_ref())
             .and_then(|l| l.fixed_rows)
-            .unwrap_or(1);
+            .unwrap_or(0);
         let fixed_cols = request
             .config
             .as_ref()
@@ -3533,8 +3711,16 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 1.0
             },
         );
+        let apply_default_bands = request
+            .config
+            .as_ref()
+            .and_then(|c| c.indicator_bands.as_ref())
+            .is_none();
         if let Some(config) = &request.config {
             let _ = mgr.with_grid(id, |grid| grid.apply_config(config));
+        }
+        if apply_default_bands {
+            let _ = mgr.with_grid(id, apply_default_indicator_bands);
         }
         let _ = mgr.with_grid(id, replay_loaded_fonts_into_grid);
         Ok(GridHandle { id })

@@ -554,19 +554,20 @@ impl GpuRenderer {
 
                 // Rebuild uniform bind group layout and buffer
                 self.uniform_bind_group_layout =
-                    self.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                        label: Some("uniform_bgl"),
-                        entries: &[wgpu::BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                            ty: wgpu::BindingType::Buffer {
-                                ty: wgpu::BufferBindingType::Uniform,
-                                has_dynamic_offset: false,
-                                min_binding_size: None,
-                            },
-                            count: None,
-                        }],
-                    });
+                    self.device
+                        .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                            label: Some("uniform_bgl"),
+                            entries: &[wgpu::BindGroupLayoutEntry {
+                                binding: 0,
+                                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Uniform,
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            }],
+                        });
 
                 self.uniform_buf =
                     self.device
@@ -591,27 +592,32 @@ impl GpuRenderer {
 
                 // Rebuild textured bind group layout
                 self.textured_bind_group_layout =
-                    self.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                        label: Some("textured_bgl"),
-                        entries: &[
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Texture {
-                                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                                    view_dimension: wgpu::TextureViewDimension::D2,
-                                    multisampled: false,
+                    self.device
+                        .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                            label: Some("textured_bgl"),
+                            entries: &[
+                                wgpu::BindGroupLayoutEntry {
+                                    binding: 0,
+                                    visibility: wgpu::ShaderStages::FRAGMENT,
+                                    ty: wgpu::BindingType::Texture {
+                                        sample_type: wgpu::TextureSampleType::Float {
+                                            filterable: true,
+                                        },
+                                        view_dimension: wgpu::TextureViewDimension::D2,
+                                        multisampled: false,
+                                    },
+                                    count: None,
                                 },
-                                count: None,
-                            },
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 1,
-                                visibility: wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                                count: None,
-                            },
-                        ],
-                    });
+                                wgpu::BindGroupLayoutEntry {
+                                    binding: 1,
+                                    visibility: wgpu::ShaderStages::FRAGMENT,
+                                    ty: wgpu::BindingType::Sampler(
+                                        wgpu::SamplerBindingType::Filtering,
+                                    ),
+                                    count: None,
+                                },
+                            ],
+                        });
 
                 self.atlas_sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
                     label: Some("atlas_sampler"),
@@ -862,7 +868,9 @@ impl GpuRenderer {
                         self.surface = None;
                         #[cfg(target_os = "android")]
                         if let Some(window) = self.active_native_window.take() {
-                            unsafe { ANativeWindow_release(window); }
+                            unsafe {
+                                ANativeWindow_release(window);
+                            }
                         }
                     }
                 }
@@ -895,7 +903,12 @@ impl GpuRenderer {
     /// Render directly to the configured GPU surface (zero-copy).
     ///
     /// Returns the dirty rect `(x, y, w, h)`.
-    pub fn render_to_surface(&mut self, grid: &VolvoxGrid, w: i32, h: i32) -> Result<(i32, i32, i32, i32), wgpu::SurfaceError> {
+    pub fn render_to_surface(
+        &mut self,
+        grid: &VolvoxGrid,
+        w: i32,
+        h: i32,
+    ) -> Result<(i32, i32, i32, i32), wgpu::SurfaceError> {
         let surface = match self.surface.as_ref() {
             Some(s) => s,
             None => return Err(wgpu::SurfaceError::Lost),

@@ -6,6 +6,9 @@
 
 use crate::cell::CellValueData;
 use crate::grid::VolvoxGrid;
+use crate::indicator::{
+    ColIndicatorCellState, ColIndicatorRowDefState, CornerIndicatorState, RowIndicatorSlotState,
+};
 use crate::proto::volvoxgrid::v1;
 use crate::style;
 
@@ -38,6 +41,229 @@ fn engine_padding_to_v1(p: style::CellPadding) -> v1::CellPadding {
 fn apply_highlight_style_patch(target: &mut style::HighlightStyle, patch: &v1::HighlightStyle) {
     let patch_style = style::HighlightStyle::from_proto(Some(patch));
     target.merge_from(&patch_style);
+}
+
+fn apply_row_indicator_config(
+    target: &mut crate::indicator::RowIndicatorState,
+    cfg: &v1::RowIndicatorConfig,
+) {
+    if let Some(v) = cfg.visible {
+        target.visible = v;
+    }
+    if let Some(v) = cfg.width_px {
+        target.width_px = v.max(1);
+    }
+    if let Some(v) = cfg.mode_bits {
+        target.mode_bits = v;
+    }
+    if let Some(v) = cfg.back_color {
+        target.back_color = Some(v);
+    }
+    if let Some(v) = cfg.fore_color {
+        target.fore_color = Some(v);
+    }
+    if let Some(v) = cfg.grid_lines {
+        target.grid_lines = Some(v);
+    }
+    if let Some(v) = cfg.grid_color {
+        target.grid_color = Some(v);
+    }
+    if let Some(v) = cfg.auto_size {
+        target.auto_size = v;
+    }
+    if let Some(v) = cfg.allow_resize {
+        target.allow_resize = v;
+    }
+    if let Some(v) = cfg.allow_select {
+        target.allow_select = v;
+    }
+    if let Some(v) = cfg.allow_reorder {
+        target.allow_reorder = v;
+    }
+    if !cfg.slots.is_empty() {
+        target.slots = cfg
+            .slots
+            .iter()
+            .map(|slot| RowIndicatorSlotState {
+                kind: slot
+                    .kind
+                    .unwrap_or(v1::RowIndicatorSlotKind::RowIndicatorSlotNone as i32),
+                width_px: slot.width_px.unwrap_or(0).max(0),
+                visible: slot.visible.unwrap_or(true),
+                custom_key: slot.custom_key.clone().unwrap_or_default(),
+                data: slot.data.clone().unwrap_or_default(),
+            })
+            .collect();
+    }
+}
+
+fn row_indicator_to_proto(src: &crate::indicator::RowIndicatorState) -> v1::RowIndicatorConfig {
+    v1::RowIndicatorConfig {
+        visible: Some(src.visible),
+        width_px: Some(src.width_px.max(1)),
+        mode_bits: Some(src.mode_bits),
+        back_color: src.back_color,
+        fore_color: src.fore_color,
+        grid_lines: src.grid_lines,
+        grid_color: src.grid_color,
+        auto_size: Some(src.auto_size),
+        allow_resize: Some(src.allow_resize),
+        allow_select: Some(src.allow_select),
+        allow_reorder: Some(src.allow_reorder),
+        slots: src
+            .slots
+            .iter()
+            .map(|slot| v1::RowIndicatorSlot {
+                kind: Some(slot.kind),
+                width_px: Some(slot.width_px.max(0)),
+                visible: Some(slot.visible),
+                custom_key: Some(slot.custom_key.clone()),
+                data: Some(slot.data.clone()),
+            })
+            .collect(),
+    }
+}
+
+fn apply_col_indicator_config(
+    target: &mut crate::indicator::ColIndicatorState,
+    cfg: &v1::ColIndicatorConfig,
+) {
+    if let Some(v) = cfg.visible {
+        target.visible = v;
+    }
+    if let Some(v) = cfg.default_row_height_px {
+        target.default_row_height_px = v.max(1);
+    }
+    if let Some(v) = cfg.band_rows {
+        target.band_rows = v.max(0);
+    }
+    if let Some(v) = cfg.mode_bits {
+        target.mode_bits = v;
+    }
+    if let Some(v) = cfg.back_color {
+        target.back_color = Some(v);
+    }
+    if let Some(v) = cfg.fore_color {
+        target.fore_color = Some(v);
+    }
+    if let Some(v) = cfg.grid_lines {
+        target.grid_lines = Some(v);
+    }
+    if let Some(v) = cfg.grid_color {
+        target.grid_color = Some(v);
+    }
+    if let Some(v) = cfg.auto_size {
+        target.auto_size = v;
+    }
+    if let Some(v) = cfg.allow_resize {
+        target.allow_resize = v;
+    }
+    if let Some(v) = cfg.allow_reorder {
+        target.allow_reorder = v;
+    }
+    if let Some(v) = cfg.allow_menu {
+        target.allow_menu = v;
+    }
+    if !cfg.row_defs.is_empty() {
+        target.row_defs = cfg
+            .row_defs
+            .iter()
+            .map(|row| ColIndicatorRowDefState {
+                index: row.index.unwrap_or(0).max(0),
+                height_px: row.height_px.unwrap_or(0).max(1),
+            })
+            .collect();
+    }
+    if !cfg.cells.is_empty() {
+        target.cells = cfg
+            .cells
+            .iter()
+            .map(|cell| ColIndicatorCellState {
+                row1: cell.row1.unwrap_or(0).max(0),
+                row2: cell.row2.unwrap_or(0).max(0),
+                col1: cell.col1.unwrap_or(0).max(0),
+                col2: cell.col2.unwrap_or(0).max(0),
+                text: cell.text.clone().unwrap_or_default(),
+                mode_bits: cell.mode_bits.unwrap_or(0),
+                custom_key: cell.custom_key.clone().unwrap_or_default(),
+                data: cell.data.clone().unwrap_or_default(),
+            })
+            .collect();
+    }
+}
+
+fn col_indicator_to_proto(src: &crate::indicator::ColIndicatorState) -> v1::ColIndicatorConfig {
+    v1::ColIndicatorConfig {
+        visible: Some(src.visible),
+        default_row_height_px: Some(src.default_row_height_px.max(1)),
+        band_rows: Some(src.band_rows.max(0)),
+        mode_bits: Some(src.mode_bits),
+        back_color: src.back_color,
+        fore_color: src.fore_color,
+        grid_lines: src.grid_lines,
+        grid_color: src.grid_color,
+        auto_size: Some(src.auto_size),
+        allow_resize: Some(src.allow_resize),
+        allow_reorder: Some(src.allow_reorder),
+        allow_menu: Some(src.allow_menu),
+        row_defs: src
+            .row_defs
+            .iter()
+            .map(|row| v1::ColIndicatorRowDef {
+                index: Some(row.index.max(0)),
+                height_px: Some(row.height_px.max(1)),
+            })
+            .collect(),
+        cells: src
+            .cells
+            .iter()
+            .map(|cell| v1::ColIndicatorCell {
+                row1: Some(cell.row1.max(0)),
+                row2: Some(cell.row2.max(0)),
+                col1: Some(cell.col1.max(0)),
+                col2: Some(cell.col2.max(0)),
+                text: Some(cell.text.clone()),
+                mode_bits: Some(cell.mode_bits),
+                custom_key: Some(cell.custom_key.clone()),
+                data: Some(cell.data.clone()),
+            })
+            .collect(),
+    }
+}
+
+fn apply_corner_indicator_config(
+    target: &mut crate::indicator::CornerIndicatorState,
+    cfg: &v1::CornerIndicatorConfig,
+) {
+    if let Some(v) = cfg.visible {
+        target.visible = v;
+    }
+    if let Some(v) = cfg.mode_bits {
+        target.mode_bits = v;
+    }
+    if let Some(v) = cfg.back_color {
+        target.back_color = Some(v);
+    }
+    if let Some(v) = cfg.fore_color {
+        target.fore_color = Some(v);
+    }
+    if let Some(v) = &cfg.custom_key {
+        target.custom_key = v.clone();
+    }
+    if let Some(v) = &cfg.data {
+        target.data = v.clone();
+    }
+}
+
+fn corner_indicator_to_proto(src: &CornerIndicatorState) -> v1::CornerIndicatorConfig {
+    v1::CornerIndicatorConfig {
+        visible: Some(src.visible),
+        mode_bits: Some(src.mode_bits),
+        back_color: src.back_color,
+        fore_color: src.fore_color,
+        custom_key: Some(src.custom_key.clone()),
+        data: Some(src.data.clone()),
+    }
 }
 
 fn apply_icon_slot_patch(slot: &mut Option<String>, patch: &Option<String>) {
@@ -384,6 +610,9 @@ impl VolvoxGrid {
         if let Some(rc) = &config.rendering {
             self.apply_render_config(rc);
         }
+        if let Some(ic) = &config.indicator_bands {
+            self.apply_indicator_bands_config(ic);
+        }
     }
 
     /// Snapshot the full current state as a `GridConfig`.
@@ -398,6 +627,7 @@ impl VolvoxGrid {
             span: Some(self.get_span_config()),
             interaction: Some(self.get_interaction_config()),
             rendering: Some(self.get_render_config()),
+            indicator_bands: Some(self.get_indicator_bands_config()),
             version: Self::version().to_string(),
         }
     }
@@ -415,7 +645,7 @@ impl VolvoxGrid {
             self.set_cols(cols);
         }
         if let Some(fr) = lc.fixed_rows {
-            self.fixed_rows = fr.max(1).min(self.rows);
+            self.fixed_rows = fr.max(0).min(self.rows);
             self.selection
                 .clamp(self.rows, self.cols, self.fixed_rows, self.fixed_cols);
         }
@@ -456,6 +686,34 @@ impl VolvoxGrid {
         }
         if let Some(to) = lc.text_overflow {
             self.text_overflow = to;
+        }
+        self.mark_dirty();
+    }
+
+    fn apply_indicator_bands_config(&mut self, bands: &v1::IndicatorBandsConfig) {
+        if let Some(cfg) = &bands.row_indicator_start {
+            apply_row_indicator_config(&mut self.indicator_bands.row_start, cfg);
+        }
+        if let Some(cfg) = &bands.row_indicator_end {
+            apply_row_indicator_config(&mut self.indicator_bands.row_end, cfg);
+        }
+        if let Some(cfg) = &bands.col_indicator_top {
+            apply_col_indicator_config(&mut self.indicator_bands.col_top, cfg);
+        }
+        if let Some(cfg) = &bands.col_indicator_bottom {
+            apply_col_indicator_config(&mut self.indicator_bands.col_bottom, cfg);
+        }
+        if let Some(cfg) = &bands.corner_top_start {
+            apply_corner_indicator_config(&mut self.indicator_bands.corner_top_start, cfg);
+        }
+        if let Some(cfg) = &bands.corner_top_end {
+            apply_corner_indicator_config(&mut self.indicator_bands.corner_top_end, cfg);
+        }
+        if let Some(cfg) = &bands.corner_bottom_start {
+            apply_corner_indicator_config(&mut self.indicator_bands.corner_bottom_start, cfg);
+        }
+        if let Some(cfg) = &bands.corner_bottom_end {
+            apply_corner_indicator_config(&mut self.indicator_bands.corner_bottom_end, cfg);
         }
         self.mark_dirty();
     }
@@ -1237,6 +1495,27 @@ impl VolvoxGrid {
         }
     }
 
+    fn get_indicator_bands_config(&self) -> v1::IndicatorBandsConfig {
+        v1::IndicatorBandsConfig {
+            row_indicator_start: Some(row_indicator_to_proto(&self.indicator_bands.row_start)),
+            row_indicator_end: Some(row_indicator_to_proto(&self.indicator_bands.row_end)),
+            col_indicator_top: Some(col_indicator_to_proto(&self.indicator_bands.col_top)),
+            col_indicator_bottom: Some(col_indicator_to_proto(&self.indicator_bands.col_bottom)),
+            corner_top_start: Some(corner_indicator_to_proto(
+                &self.indicator_bands.corner_top_start,
+            )),
+            corner_top_end: Some(corner_indicator_to_proto(
+                &self.indicator_bands.corner_top_end,
+            )),
+            corner_bottom_start: Some(corner_indicator_to_proto(
+                &self.indicator_bands.corner_bottom_start,
+            )),
+            corner_bottom_end: Some(corner_indicator_to_proto(
+                &self.indicator_bands.corner_bottom_end,
+            )),
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // Batch column/row definitions
     // ═══════════════════════════════════════════════════════════════════════
@@ -1272,6 +1551,9 @@ impl VolvoxGrid {
                 let grid_fixed_padding = self.style.fixed_cell_padding;
                 let mut sticky_to_apply: Option<i32> = None;
                 let cp = &mut self.columns[col];
+                if let Some(v) = &def.caption {
+                    cp.caption = v.clone();
+                }
                 if let Some(v) = def.alignment {
                     cp.alignment = v;
                 }
@@ -1420,12 +1702,7 @@ impl VolvoxGrid {
     fn column_write_policy(
         &self,
         col: i32,
-    ) -> (
-        i32,
-        bool,
-        EffectiveCoercionMode,
-        EffectiveWriteErrorMode,
-    ) {
+    ) -> (i32, bool, EffectiveCoercionMode, EffectiveWriteErrorMode) {
         let cp = self.columns.get(col as usize);
         let data_type = cp.map_or(v1::ColumnDataType::ColumnDataString as i32, |c| c.data_type);
         let nullable = cp.map_or(true, |c| c.nullable);
@@ -1466,9 +1743,9 @@ impl VolvoxGrid {
                 EffectiveCoercionMode::Flexible => match inbound {
                     v1::cell_value::Value::Text(t) => Ok(CellValueData::Text(t.clone())),
                     v1::cell_value::Value::Number(n) => Ok(CellValueData::Text(n.to_string())),
-                    v1::cell_value::Value::Flag(b) => {
-                        Ok(CellValueData::Text(if *b { "true" } else { "false" }.to_string()))
-                    }
+                    v1::cell_value::Value::Flag(b) => Ok(CellValueData::Text(
+                        if *b { "true" } else { "false" }.to_string(),
+                    )),
                     v1::cell_value::Value::Data(d) => {
                         Ok(CellValueData::Text(String::from_utf8_lossy(d).to_string()))
                     }
@@ -1484,17 +1761,25 @@ impl VolvoxGrid {
                         _ => Err("Expected Number value".to_string()),
                     },
                     EffectiveCoercionMode::ParseOnly => match inbound {
-                        v1::cell_value::Value::Text(t) => parse_number(t).map(CellValueData::Number),
+                        v1::cell_value::Value::Text(t) => {
+                            parse_number(t).map(CellValueData::Number)
+                        }
                         _ => Err("ParseOnly accepts only Text input".to_string()),
                     },
                     EffectiveCoercionMode::Flexible => match inbound {
                         v1::cell_value::Value::Number(n) => Ok(CellValueData::Number(*n)),
-                        v1::cell_value::Value::Text(t) => parse_number(t).map(CellValueData::Number),
+                        v1::cell_value::Value::Text(t) => {
+                            parse_number(t).map(CellValueData::Number)
+                        }
                         v1::cell_value::Value::Flag(b) => {
                             Ok(CellValueData::Number(if *b { 1.0 } else { 0.0 }))
                         }
-                        v1::cell_value::Value::Timestamp(ts) => Ok(CellValueData::Number(*ts as f64)),
-                        v1::cell_value::Value::Data(_) => Err("Cannot coerce Bytes to Number".to_string()),
+                        v1::cell_value::Value::Timestamp(ts) => {
+                            Ok(CellValueData::Number(*ts as f64))
+                        }
+                        v1::cell_value::Value::Data(_) => {
+                            Err("Cannot coerce Bytes to Number".to_string())
+                        }
                     },
                 }
             }
@@ -1513,8 +1798,12 @@ impl VolvoxGrid {
                         Ok(CellValueData::Timestamp(*n as i64))
                     }
                     v1::cell_value::Value::Text(t) => parse_date(t).map(CellValueData::Timestamp),
-                    v1::cell_value::Value::Flag(_) => Err("Cannot coerce Boolean to Date".to_string()),
-                    v1::cell_value::Value::Data(_) => Err("Cannot coerce Bytes to Date".to_string()),
+                    v1::cell_value::Value::Flag(_) => {
+                        Err("Cannot coerce Boolean to Date".to_string())
+                    }
+                    v1::cell_value::Value::Data(_) => {
+                        Err("Cannot coerce Bytes to Date".to_string())
+                    }
                     v1::cell_value::Value::Number(_) => {
                         Err("Cannot coerce non-finite Number to Date".to_string())
                     }
@@ -1534,7 +1823,9 @@ impl VolvoxGrid {
                     v1::cell_value::Value::Text(t) => parse_bool(t).map(CellValueData::Bool),
                     v1::cell_value::Value::Number(n) => Ok(CellValueData::Bool(*n != 0.0)),
                     v1::cell_value::Value::Timestamp(ts) => Ok(CellValueData::Bool(*ts != 0)),
-                    v1::cell_value::Value::Data(_) => Err("Cannot coerce Bytes to Boolean".to_string()),
+                    v1::cell_value::Value::Data(_) => {
+                        Err("Cannot coerce Bytes to Boolean".to_string())
+                    }
                 },
             },
             _ => Err("Unsupported column data type".to_string()),
@@ -1558,52 +1849,51 @@ impl VolvoxGrid {
         }
     }
 
-    fn plan_value_write(
-        &self,
-        row: i32,
-        col: i32,
-        incoming: &v1::CellValue,
-    ) -> ValueDecision {
+    fn plan_value_write(&self, row: i32, col: i32, incoming: &v1::CellValue) -> ValueDecision {
         let (expected, nullable, coercion_mode, error_mode) = self.column_write_policy(col);
 
-        let apply_error_policy =
-            |reason: String, nullable: bool, error_mode: EffectiveWriteErrorMode| -> ValueDecision {
-                let violation = self.build_violation(row, col, expected, incoming, reason);
-                match error_mode {
-                    EffectiveWriteErrorMode::Reject => ValueDecision {
-                        plan: PlannedCellValueWrite::Skip,
-                        violation: Some(violation),
-                        hard_reject: true,
-                    },
-                    EffectiveWriteErrorMode::SetNull => {
-                        if nullable {
-                            ValueDecision {
-                                plan: PlannedCellValueWrite::SetNull,
-                                violation: Some(violation),
-                                hard_reject: false,
-                            }
-                        } else {
-                            ValueDecision {
-                                plan: PlannedCellValueWrite::Skip,
-                                violation: Some(self.build_violation(
+        let apply_error_policy = |reason: String,
+                                  nullable: bool,
+                                  error_mode: EffectiveWriteErrorMode|
+         -> ValueDecision {
+            let violation = self.build_violation(row, col, expected, incoming, reason);
+            match error_mode {
+                EffectiveWriteErrorMode::Reject => ValueDecision {
+                    plan: PlannedCellValueWrite::Skip,
+                    violation: Some(violation),
+                    hard_reject: true,
+                },
+                EffectiveWriteErrorMode::SetNull => {
+                    if nullable {
+                        ValueDecision {
+                            plan: PlannedCellValueWrite::SetNull,
+                            violation: Some(violation),
+                            hard_reject: false,
+                        }
+                    } else {
+                        ValueDecision {
+                            plan: PlannedCellValueWrite::Skip,
+                            violation: Some(
+                                self.build_violation(
                                     row,
                                     col,
                                     expected,
                                     incoming,
                                     "WriteErrorMode=SET_NULL is invalid when nullable=false"
                                         .to_string(),
-                                )),
-                                hard_reject: true,
-                            }
+                                ),
+                            ),
+                            hard_reject: true,
                         }
                     }
-                    EffectiveWriteErrorMode::Skip => ValueDecision {
-                        plan: PlannedCellValueWrite::Skip,
-                        violation: Some(violation),
-                        hard_reject: false,
-                    },
                 }
-            };
+                EffectiveWriteErrorMode::Skip => ValueDecision {
+                    plan: PlannedCellValueWrite::Skip,
+                    violation: Some(violation),
+                    hard_reject: false,
+                },
+            }
+        };
 
         match incoming.value.as_ref() {
             None => {
@@ -1910,6 +2200,11 @@ impl VolvoxGrid {
                 } else {
                     None
                 },
+                caption: if cp.caption.is_empty() {
+                    None
+                } else {
+                    Some(cp.caption)
+                },
                 alignment: Some(cp.alignment),
                 fixed_alignment: Some(cp.fixed_alignment),
                 data_type: Some(normalize_column_data_type(cp.data_type)),
@@ -1918,7 +2213,11 @@ impl VolvoxGrid {
                 } else {
                     Some(cp.format)
                 },
-                key: if cp.key.is_empty() { None } else { Some(cp.key) },
+                key: if cp.key.is_empty() {
+                    None
+                } else {
+                    Some(cp.key)
+                },
                 sort: if cp.sort_defined {
                     Some(cp.sort_order)
                 } else {
@@ -1934,7 +2233,11 @@ impl VolvoxGrid {
                 } else {
                     Some(cp.edit_mask)
                 },
-                indent: if cp.indent != 0 { Some(cp.indent) } else { None },
+                indent: if cp.indent != 0 {
+                    Some(cp.indent)
+                } else {
+                    None
+                },
                 hidden: Some(cp.hidden),
                 span: Some(cp.span),
                 image_list: cp

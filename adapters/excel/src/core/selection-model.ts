@@ -2,27 +2,26 @@
  * Spreadsheet selection model.
  *
  * Tracks the current selection and provides methods for navigation.
- * Coordinates are in grid space (row 0 = header, col 0 = row-number column).
+ * Coordinates are in grid/data space.
  */
 
-import type { VolvoxGrid } from "volvoxgrid";
-import type { CellRef, CellRange } from "../types.js";
+import type { CellRef, CellRange, VolvoxExcelGrid } from "../types.js";
 import { encodeSelectRequest } from "../proto/proto-utils.js";
 import { toA1, colToLetter } from "./cell-reference.js";
 
 export class SelectionModel {
   private wasm: any;
   private gridId: number;
-  private _grid: VolvoxGrid;
+  private _grid: VolvoxExcelGrid;
 
   /** Current active cell in grid space. */
-  private _row: number = 1;
-  private _col: number = 1;
+  private _row: number = 0;
+  private _col: number = 0;
   /** Range end (for multi-cell selection). */
-  private _rowEnd: number = 1;
-  private _colEnd: number = 1;
+  private _rowEnd: number = 0;
+  private _colEnd: number = 0;
 
-  constructor(wasm: any, gridId: number, grid: VolvoxGrid) {
+  constructor(wasm: any, gridId: number, grid: VolvoxExcelGrid) {
     this.wasm = wasm;
     this.gridId = gridId;
     this._grid = grid;
@@ -33,32 +32,28 @@ export class SelectionModel {
   get rowEnd(): number { return this._rowEnd; }
   get colEnd(): number { return this._colEnd; }
 
-  /** Active cell in data space (0-based, excluding headers). */
-  get dataRow(): number { return this._row - this._grid.fixedRows; }
-  get dataCol(): number { return this._col - this._grid.fixedCols; }
+  /** Active cell in data space (0-based). */
+  get dataRow(): number { return this._row; }
+  get dataCol(): number { return this._col; }
 
   /** A1 reference of the active cell or range (e.g. "A1" or "A1:C3"). */
   get a1Ref(): string {
     if (this._row === this._rowEnd && this._col === this._colEnd) {
       return toA1(this.dataRow, this.dataCol);
     }
-    const fixedRows = this._grid.fixedRows;
-    const fixedCols = this._grid.fixedCols;
-    const r1 = Math.min(this._row, this._rowEnd) - fixedRows;
-    const c1 = Math.min(this._col, this._colEnd) - fixedCols;
-    const r2 = Math.max(this._row, this._rowEnd) - fixedRows;
-    const c2 = Math.max(this._col, this._colEnd) - fixedCols;
+    const r1 = Math.min(this._row, this._rowEnd);
+    const c1 = Math.min(this._col, this._colEnd);
+    const r2 = Math.max(this._row, this._rowEnd);
+    const c2 = Math.max(this._col, this._colEnd);
     return `${colToLetter(c1)}${r1 + 1}:${colToLetter(c2)}${r2 + 1}`;
   }
 
   /** Get selection as a CellRange in data space. */
   getRange(): CellRange {
-    const fixedRows = this._grid.fixedRows;
-    const fixedCols = this._grid.fixedCols;
-    const r1 = Math.min(this._row, this._rowEnd) - fixedRows;
-    const c1 = Math.min(this._col, this._colEnd) - fixedCols;
-    const r2 = Math.max(this._row, this._rowEnd) - fixedRows;
-    const c2 = Math.max(this._col, this._colEnd) - fixedCols;
+    const r1 = Math.min(this._row, this._rowEnd);
+    const c1 = Math.min(this._col, this._colEnd);
+    const r2 = Math.max(this._row, this._rowEnd);
+    const c2 = Math.max(this._col, this._colEnd);
     return { row1: r1, col1: c1, row2: r2, col2: c2 };
   }
 
@@ -89,20 +84,18 @@ export class SelectionModel {
 
   /** Move active cell by delta, clamped to grid bounds. */
   move(dRow: number, dCol: number): void {
-    const newRow = Math.max(this._grid.fixedRows, Math.min(this._grid.rows - 1, this._row + dRow));
-    const newCol = Math.max(this._grid.fixedCols, Math.min(this._grid.cols - 1, this._col + dCol));
+    const newRow = Math.max(0, Math.min(this._grid.rows - 1, this._row + dRow));
+    const newCol = Math.max(0, Math.min(this._grid.cols - 1, this._col + dCol));
     this.select(newRow, newCol);
   }
 
   /** Set selection from a data-space CellRange. */
   setFromDataRange(range: CellRange): void {
-    const fixedRows = this._grid.fixedRows;
-    const fixedCols = this._grid.fixedCols;
     this.select(
-      range.row1 + fixedRows,
-      range.col1 + fixedCols,
-      range.row2 + fixedRows,
-      range.col2 + fixedCols,
+      range.row1,
+      range.col1,
+      range.row2,
+      range.col2,
     );
   }
 

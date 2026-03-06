@@ -5,6 +5,37 @@ import io.github.ivere27.volvoxgrid.common.GridCellText
 import io.github.ivere27.volvoxgrid.common.GridSelection
 import io.github.ivere27.volvoxgrid.common.RendererBackend
 
+private const val DEFAULT_ROW_INDICATOR_WIDTH_PX = 35
+private const val DEFAULT_COL_INDICATOR_BAND_ROWS = 1
+
+private val DEFAULT_ROW_INDICATOR_MODE_BITS =
+    RowIndicatorMode.ROW_INDICATOR_CURRENT.number or
+        RowIndicatorMode.ROW_INDICATOR_SELECTION.number
+
+private val DEFAULT_COL_INDICATOR_MODE_BITS =
+    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.number or
+        ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH.number
+
+private fun defaultRowIndicatorStartConfig(): RowIndicatorConfig =
+    RowIndicatorConfig.newBuilder()
+        .setVisible(false)
+        .setWidthPx(DEFAULT_ROW_INDICATOR_WIDTH_PX)
+        .setModeBits(DEFAULT_ROW_INDICATOR_MODE_BITS)
+        .build()
+
+private fun defaultColIndicatorTopConfig(): ColIndicatorConfig =
+    ColIndicatorConfig.newBuilder()
+        .setVisible(true)
+        .setBandRows(DEFAULT_COL_INDICATOR_BAND_ROWS)
+        .setModeBits(DEFAULT_COL_INDICATOR_MODE_BITS)
+        .build()
+
+internal fun defaultIndicatorBandsConfig(): IndicatorBandsConfig =
+    IndicatorBandsConfig.newBuilder()
+        .setRowIndicatorStart(defaultRowIndicatorStartConfig())
+        .setColIndicatorTop(defaultColIndicatorTopConfig())
+        .build()
+
 /**
  * High-level Kotlin API wrapping the VolvoxGrid FFI calls.
  *
@@ -29,8 +60,6 @@ class VolvoxGridController(
             service: VolvoxGridServiceFfi,
             rows: Int = 50,
             cols: Int = 10,
-            fixedRows: Int = 1,
-            fixedCols: Int = 0,
             viewportWidth: Int = 800,
             viewportHeight: Int = 600,
             scale: Float = 1f
@@ -45,10 +74,9 @@ class VolvoxGridController(
                             LayoutConfig.newBuilder()
                                 .setRows(rows)
                                 .setCols(cols)
-                                .setFixedRows(fixedRows)
-                                .setFixedCols(fixedCols)
                                 .build()
                         )
+                        .setIndicatorBands(defaultIndicatorBandsConfig())
                         .build()
                 )
                 .build()
@@ -130,19 +158,161 @@ class VolvoxGridController(
                 .build())
         }
 
-    var fixedRows: Int
-        get() = getConfig().layout.fixedRows
+    var frozenRows: Int
+        get() = getConfig().layout.frozenRows
         set(value) {
             configure(GridConfig.newBuilder()
-                .setLayout(LayoutConfig.newBuilder().setFixedRows(value).build())
+                .setLayout(LayoutConfig.newBuilder().setFrozenRows(value).build())
                 .build())
         }
 
-    var fixedCols: Int
-        get() = getConfig().layout.fixedCols
+    var frozenCols: Int
+        get() = getConfig().layout.frozenCols
         set(value) {
             configure(GridConfig.newBuilder()
-                .setLayout(LayoutConfig.newBuilder().setFixedCols(value).build())
+                .setLayout(LayoutConfig.newBuilder().setFrozenCols(value).build())
+                .build())
+        }
+
+    var showColumnHeaders: Boolean
+        get() {
+            val config = getConfig()
+            if (!config.hasIndicatorBands() || !config.indicatorBands.hasColIndicatorTop()) {
+                return false
+            }
+            return config.indicatorBands.colIndicatorTop.visible
+        }
+        set(value) {
+            configure(GridConfig.newBuilder()
+                .setIndicatorBands(
+                    IndicatorBandsConfig.newBuilder()
+                        .setColIndicatorTop(
+                            defaultColIndicatorTopConfig().toBuilder()
+                                .setVisible(value)
+                                .build()
+                        )
+                        .build()
+                )
+                .build())
+        }
+
+    var columnIndicatorTopModeBits: Int
+        get() {
+            val config = getConfig()
+            if (!config.hasIndicatorBands() || !config.indicatorBands.hasColIndicatorTop()) {
+                return 0
+            }
+            return config.indicatorBands.colIndicatorTop.modeBits
+        }
+        set(value) {
+            configure(GridConfig.newBuilder()
+                .setIndicatorBands(
+                    IndicatorBandsConfig.newBuilder()
+                        .setColIndicatorTop(
+                            ColIndicatorConfig.newBuilder()
+                                .setVisible(value != 0)
+                                .setModeBits(value)
+                                .build()
+                        )
+                        .build()
+                )
+                .build())
+        }
+
+    var columnIndicatorTopRowCount: Int
+        get() {
+            val config = getConfig()
+            if (!config.hasIndicatorBands() || !config.indicatorBands.hasColIndicatorTop()) {
+                return 0
+            }
+            return config.indicatorBands.colIndicatorTop.bandRows
+        }
+        set(value) {
+            val normalized = value.coerceAtLeast(0)
+            configure(GridConfig.newBuilder()
+                .setIndicatorBands(
+                    IndicatorBandsConfig.newBuilder()
+                        .setColIndicatorTop(
+                            ColIndicatorConfig.newBuilder()
+                                .setVisible(normalized != 0)
+                                .setBandRows(normalized)
+                                .build()
+                        )
+                        .build()
+                )
+                .build())
+        }
+
+    var showIndicator: Boolean
+        get() = showRowIndicator
+        set(value) {
+            showRowIndicator = value
+        }
+
+    var showRowIndicator: Boolean
+        get() {
+            val config = getConfig()
+            if (!config.hasIndicatorBands() || !config.indicatorBands.hasRowIndicatorStart()) {
+                return false
+            }
+            return config.indicatorBands.rowIndicatorStart.visible
+        }
+        set(value) {
+            configure(GridConfig.newBuilder()
+                .setIndicatorBands(
+                    IndicatorBandsConfig.newBuilder()
+                        .setRowIndicatorStart(
+                            defaultRowIndicatorStartConfig().toBuilder()
+                                .setVisible(value)
+                                .build()
+                        )
+                        .build()
+                )
+                .build())
+        }
+
+    var rowIndicatorStartModeBits: Int
+        get() {
+            val config = getConfig()
+            if (!config.hasIndicatorBands() || !config.indicatorBands.hasRowIndicatorStart()) {
+                return 0
+            }
+            return config.indicatorBands.rowIndicatorStart.modeBits
+        }
+        set(value) {
+            configure(GridConfig.newBuilder()
+                .setIndicatorBands(
+                    IndicatorBandsConfig.newBuilder()
+                        .setRowIndicatorStart(
+                            RowIndicatorConfig.newBuilder()
+                                .setVisible(value != 0)
+                                .setModeBits(value)
+                                .build()
+                        )
+                        .build()
+                )
+                .build())
+        }
+
+    var rowIndicatorStartWidth: Int
+        get() {
+            val config = getConfig()
+            if (!config.hasIndicatorBands() || !config.indicatorBands.hasRowIndicatorStart()) {
+                return DEFAULT_ROW_INDICATOR_WIDTH_PX
+            }
+            return config.indicatorBands.rowIndicatorStart.widthPx
+        }
+        set(value) {
+            configure(GridConfig.newBuilder()
+                .setIndicatorBands(
+                    IndicatorBandsConfig.newBuilder()
+                        .setRowIndicatorStart(
+                            RowIndicatorConfig.newBuilder()
+                                .setWidthPx(value.coerceAtLeast(1))
+                                .build()
+                        )
+                        .build()
+                )
                 .build())
         }
 
@@ -158,16 +328,16 @@ class VolvoxGridController(
         cols = value
     }
 
-    override fun fixedRowCount(): Int = fixedRows
+    override fun frozenRowCount(): Int = frozenRows
 
-    override fun setFixedRowCount(value: Int) {
-        fixedRows = value
+    override fun setFrozenRowCount(value: Int) {
+        frozenRows = value
     }
 
-    override fun fixedColCount(): Int = fixedCols
+    override fun frozenColCount(): Int = frozenCols
 
-    override fun setFixedColCount(value: Int) {
-        fixedCols = value
+    override fun setFrozenColCount(value: Int) {
+        frozenCols = value
     }
 
     // =========================================================================
@@ -314,6 +484,18 @@ class VolvoxGridController(
                 .addColumns(ColumnDef.newBuilder()
                     .setIndex(col)
                     .setWidth(width)
+                    .build())
+                .build()
+        )
+    }
+
+    fun setColumnCaption(col: Int, caption: String) {
+        service.DefineColumns(
+            DefineColumnsRequest.newBuilder()
+                .setGridId(gridId)
+                .addColumns(ColumnDef.newBuilder()
+                    .setIndex(col)
+                    .setCaption(caption)
                     .build())
                 .build()
         )

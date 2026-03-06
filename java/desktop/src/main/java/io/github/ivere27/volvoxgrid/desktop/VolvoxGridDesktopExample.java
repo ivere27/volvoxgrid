@@ -259,10 +259,9 @@ public final class VolvoxGridDesktopExample {
                 LayoutConfig.newBuilder()
                     .setRows(2)
                     .setCols(2)
-                    .setFixedRows(1)
-                    .setFixedCols(0)
                     .build()
             )
+            .setIndicatorBands(VolvoxGridDesktopController.defaultIndicatorBandsConfig())
             .setRendering(RenderConfig.newBuilder().setRendererMode(RendererMode.RENDERER_CPU).build())
             .build();
 

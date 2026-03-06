@@ -13,8 +13,40 @@ import java.util.Objects;
  * High-level convenience controller for desktop Java.
  */
 public final class VolvoxGridDesktopController implements VolvoxGridController {
+    private static final int DEFAULT_ROW_INDICATOR_WIDTH_PX = 35;
+    private static final int DEFAULT_COL_INDICATOR_BAND_ROWS = 1;
+    private static final int DEFAULT_ROW_INDICATOR_MODE_BITS =
+        RowIndicatorMode.ROW_INDICATOR_CURRENT.getNumber()
+            | RowIndicatorMode.ROW_INDICATOR_SELECTION.getNumber();
+    private static final int DEFAULT_COL_INDICATOR_MODE_BITS =
+        ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.getNumber()
+            | ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH.getNumber();
+
     private final VolvoxGridDesktopClient client;
     private final long gridId;
+
+    private static RowIndicatorConfig defaultRowIndicatorStartConfig() {
+        return RowIndicatorConfig.newBuilder()
+            .setVisible(false)
+            .setWidthPx(DEFAULT_ROW_INDICATOR_WIDTH_PX)
+            .setModeBits(DEFAULT_ROW_INDICATOR_MODE_BITS)
+            .build();
+    }
+
+    private static ColIndicatorConfig defaultColIndicatorTopConfig() {
+        return ColIndicatorConfig.newBuilder()
+            .setVisible(true)
+            .setBandRows(DEFAULT_COL_INDICATOR_BAND_ROWS)
+            .setModeBits(DEFAULT_COL_INDICATOR_MODE_BITS)
+            .build();
+    }
+
+    public static IndicatorBandsConfig defaultIndicatorBandsConfig() {
+        return IndicatorBandsConfig.newBuilder()
+            .setRowIndicatorStart(defaultRowIndicatorStartConfig())
+            .setColIndicatorTop(defaultColIndicatorTopConfig())
+            .build();
+    }
 
     public static VolvoxGridDesktopController create(
         VolvoxGridDesktopClient client,
@@ -63,26 +95,180 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         );
     }
 
-    public int getFixedRows() throws SynurangDesktopBridge.SynurangBridgeException {
-        return getConfig().getLayout().getFixedRows();
+    public int getFrozenRows() throws SynurangDesktopBridge.SynurangBridgeException {
+        return getConfig().getLayout().getFrozenRows();
     }
 
-    public void setFixedRows(int value) throws SynurangDesktopBridge.SynurangBridgeException {
+    public void setFrozenRows(int value) throws SynurangDesktopBridge.SynurangBridgeException {
         configure(
             GridConfig.newBuilder()
-                .setLayout(LayoutConfig.newBuilder().setFixedRows(value).build())
+                .setLayout(LayoutConfig.newBuilder().setFrozenRows(value).build())
                 .build()
         );
     }
 
-    public int getFixedCols() throws SynurangDesktopBridge.SynurangBridgeException {
-        return getConfig().getLayout().getFixedCols();
+    public int getFrozenCols() throws SynurangDesktopBridge.SynurangBridgeException {
+        return getConfig().getLayout().getFrozenCols();
     }
 
-    public void setFixedCols(int value) throws SynurangDesktopBridge.SynurangBridgeException {
+    public void setFrozenCols(int value) throws SynurangDesktopBridge.SynurangBridgeException {
         configure(
             GridConfig.newBuilder()
-                .setLayout(LayoutConfig.newBuilder().setFixedCols(value).build())
+                .setLayout(LayoutConfig.newBuilder().setFrozenCols(value).build())
+                .build()
+        );
+    }
+
+    public boolean isShowColumnHeaders() throws SynurangDesktopBridge.SynurangBridgeException {
+        GridConfig config = getConfig();
+        return config.hasIndicatorBands()
+            && config.getIndicatorBands().hasColIndicatorTop()
+            && config.getIndicatorBands().getColIndicatorTop().getVisible();
+    }
+
+    public void setShowColumnHeaders(boolean value) throws SynurangDesktopBridge.SynurangBridgeException {
+        configure(
+            GridConfig.newBuilder()
+                .setIndicatorBands(
+                    IndicatorBandsConfig.newBuilder()
+                        .setColIndicatorTop(
+                            defaultColIndicatorTopConfig().toBuilder()
+                                .setVisible(value)
+                                .build()
+                        )
+                        .build()
+                )
+                .build()
+        );
+    }
+
+    public int getColumnIndicatorTopModeBits() throws SynurangDesktopBridge.SynurangBridgeException {
+        GridConfig config = getConfig();
+        if (!config.hasIndicatorBands() || !config.getIndicatorBands().hasColIndicatorTop()) {
+            return 0;
+        }
+        return config.getIndicatorBands().getColIndicatorTop().getModeBits();
+    }
+
+    public void setColumnIndicatorTopModeBits(int value) throws SynurangDesktopBridge.SynurangBridgeException {
+        configure(
+            GridConfig.newBuilder()
+                .setIndicatorBands(
+                    IndicatorBandsConfig.newBuilder()
+                        .setColIndicatorTop(
+                            ColIndicatorConfig.newBuilder()
+                                .setVisible(value != 0)
+                                .setModeBits(value)
+                                .build()
+                        )
+                        .build()
+                )
+                .build()
+        );
+    }
+
+    public int getColumnIndicatorTopRowCount() throws SynurangDesktopBridge.SynurangBridgeException {
+        GridConfig config = getConfig();
+        if (!config.hasIndicatorBands() || !config.getIndicatorBands().hasColIndicatorTop()) {
+            return 0;
+        }
+        return config.getIndicatorBands().getColIndicatorTop().getBandRows();
+    }
+
+    public void setColumnIndicatorTopRowCount(int value) throws SynurangDesktopBridge.SynurangBridgeException {
+        int normalized = Math.max(0, value);
+        configure(
+            GridConfig.newBuilder()
+                .setIndicatorBands(
+                    IndicatorBandsConfig.newBuilder()
+                        .setColIndicatorTop(
+                            ColIndicatorConfig.newBuilder()
+                                .setVisible(normalized != 0)
+                                .setBandRows(normalized)
+                                .build()
+                        )
+                        .build()
+                )
+                .build()
+        );
+    }
+
+    public boolean isShowIndicator() throws SynurangDesktopBridge.SynurangBridgeException {
+        return isShowRowIndicator();
+    }
+
+    public void setShowIndicator(boolean value) throws SynurangDesktopBridge.SynurangBridgeException {
+        setShowRowIndicator(value);
+    }
+
+    public boolean isShowRowIndicator() throws SynurangDesktopBridge.SynurangBridgeException {
+        GridConfig config = getConfig();
+        return config.hasIndicatorBands()
+            && config.getIndicatorBands().hasRowIndicatorStart()
+            && config.getIndicatorBands().getRowIndicatorStart().getVisible();
+    }
+
+    public void setShowRowIndicator(boolean value) throws SynurangDesktopBridge.SynurangBridgeException {
+        configure(
+            GridConfig.newBuilder()
+                .setIndicatorBands(
+                    IndicatorBandsConfig.newBuilder()
+                        .setRowIndicatorStart(
+                            defaultRowIndicatorStartConfig().toBuilder()
+                                .setVisible(value)
+                                .build()
+                        )
+                        .build()
+                )
+                .build()
+        );
+    }
+
+    public int getRowIndicatorStartModeBits() throws SynurangDesktopBridge.SynurangBridgeException {
+        GridConfig config = getConfig();
+        if (!config.hasIndicatorBands() || !config.getIndicatorBands().hasRowIndicatorStart()) {
+            return 0;
+        }
+        return config.getIndicatorBands().getRowIndicatorStart().getModeBits();
+    }
+
+    public void setRowIndicatorStartModeBits(int value) throws SynurangDesktopBridge.SynurangBridgeException {
+        configure(
+            GridConfig.newBuilder()
+                .setIndicatorBands(
+                    IndicatorBandsConfig.newBuilder()
+                        .setRowIndicatorStart(
+                            RowIndicatorConfig.newBuilder()
+                                .setVisible(value != 0)
+                                .setModeBits(value)
+                                .build()
+                        )
+                        .build()
+                )
+                .build()
+        );
+    }
+
+    public int getRowIndicatorStartWidth() throws SynurangDesktopBridge.SynurangBridgeException {
+        GridConfig config = getConfig();
+        if (!config.hasIndicatorBands() || !config.getIndicatorBands().hasRowIndicatorStart()) {
+            return DEFAULT_ROW_INDICATOR_WIDTH_PX;
+        }
+        return config.getIndicatorBands().getRowIndicatorStart().getWidthPx();
+    }
+
+    public void setRowIndicatorStartWidth(int value) throws SynurangDesktopBridge.SynurangBridgeException {
+        configure(
+            GridConfig.newBuilder()
+                .setIndicatorBands(
+                    IndicatorBandsConfig.newBuilder()
+                        .setRowIndicatorStart(
+                            RowIndicatorConfig.newBuilder()
+                                .setWidthPx(Math.max(1, value))
+                                .build()
+                        )
+                        .build()
+                )
                 .build()
         );
     }
@@ -108,23 +294,23 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     @Override
-    public int fixedRowCount() {
-        return getFixedRows();
+    public int frozenRowCount() {
+        return getFrozenRows();
     }
 
     @Override
-    public void setFixedRowCount(int value) {
-        setFixedRows(value);
+    public void setFrozenRowCount(int value) {
+        setFrozenRows(value);
     }
 
     @Override
-    public int fixedColCount() {
-        return getFixedCols();
+    public int frozenColCount() {
+        return getFrozenCols();
     }
 
     @Override
-    public void setFixedColCount(int value) {
-        setFixedCols(value);
+    public void setFrozenColCount(int value) {
+        setFrozenCols(value);
     }
 
     public void setEditable(boolean editable) throws SynurangDesktopBridge.SynurangBridgeException {
@@ -292,6 +478,20 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
             DefineColumnsRequest.newBuilder()
                 .setGridId(gridId)
                 .addColumns(ColumnDef.newBuilder().setIndex(col).setWidth(width).build())
+                .build()
+        );
+    }
+
+    public void setColumnCaption(int col, String caption) throws SynurangDesktopBridge.SynurangBridgeException {
+        client.defineColumns(
+            DefineColumnsRequest.newBuilder()
+                .setGridId(gridId)
+                .addColumns(
+                    ColumnDef.newBuilder()
+                        .setIndex(col)
+                        .setCaption(caption == null ? "" : caption)
+                        .build()
+                )
                 .build()
         );
     }

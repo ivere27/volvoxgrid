@@ -89,8 +89,6 @@ class _DemoPageState extends State<DemoPage> {
     await controller.create(
       rows: 2,
       cols: 2,
-      fixedRows: 1,
-      fixedCols: 0,
       viewportWidth: 800,
       viewportHeight: 600,
       scale: dpr,

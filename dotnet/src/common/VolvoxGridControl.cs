@@ -57,6 +57,12 @@ namespace VolvoxGrid.DotNet
             _config.Scrolling.FlingEnabled = true;
             _config.Scrolling.FastScroll = true;
             _config.Rendering.RendererMode = VolvoxGridRendererMode.Auto;
+            _config.IndicatorBands.ColIndicatorTop.Visible = true;
+            _config.IndicatorBands.ColIndicatorTop.BandRows = 1;
+            _config.IndicatorBands.ColIndicatorTop.ModeBits = VolvoxColIndicatorCellMode.HeaderText | VolvoxColIndicatorCellMode.SortGlyph;
+            _config.IndicatorBands.RowIndicatorStart.Visible = false;
+            _config.IndicatorBands.RowIndicatorStart.WidthPx = 35;
+            _config.IndicatorBands.RowIndicatorStart.ModeBits = VolvoxRowIndicatorMode.Current | VolvoxRowIndicatorMode.Selection;
 
             _renderHost = new RenderHostCpu
             {
@@ -188,6 +194,110 @@ namespace VolvoxGrid.DotNet
             set { var mapped = (VolvoxHeaderFeatures)value; if (_config.Interaction.HeaderFeatures != mapped) { _config.Interaction.HeaderFeatures = mapped; ApplyEngineConfig(); } }
         }
 
+        public bool ShowColumnHeaders
+        {
+            get { return EnsureColIndicatorTopConfig().Visible ?? true; }
+            set
+            {
+                var cfg = EnsureColIndicatorTopConfig();
+                if (cfg.Visible != value)
+                {
+                    cfg.Visible = value;
+                    if (value && !cfg.ModeBits.HasValue)
+                    {
+                        cfg.ModeBits = VolvoxColIndicatorCellMode.HeaderText | VolvoxColIndicatorCellMode.SortGlyph;
+                    }
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public VolvoxGridColumnIndicatorMode ColumnIndicatorTopMode
+        {
+            get { return (VolvoxGridColumnIndicatorMode)(EnsureColIndicatorTopConfig().ModeBits ?? VolvoxColIndicatorCellMode.None); }
+            set
+            {
+                var cfg = EnsureColIndicatorTopConfig();
+                var mapped = (VolvoxColIndicatorCellMode)value;
+                if (cfg.ModeBits != mapped)
+                {
+                    cfg.ModeBits = mapped;
+                    if (mapped != VolvoxColIndicatorCellMode.None) cfg.Visible = true;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public int ColumnIndicatorTopRowCount
+        {
+            get { return EnsureColIndicatorTopConfig().BandRows ?? 1; }
+            set
+            {
+                int normalized = Math.Max(0, value);
+                var cfg = EnsureColIndicatorTopConfig();
+                if (cfg.BandRows != normalized)
+                {
+                    cfg.BandRows = normalized;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public bool ShowIndicator
+        {
+            get { return ShowRowIndicator; }
+            set { ShowRowIndicator = value; }
+        }
+
+        public bool ShowRowIndicator
+        {
+            get { return EnsureRowIndicatorStartConfig().Visible ?? false; }
+            set
+            {
+                var cfg = EnsureRowIndicatorStartConfig();
+                if (cfg.Visible != value)
+                {
+                    cfg.Visible = value;
+                    if (value && !cfg.ModeBits.HasValue)
+                    {
+                        cfg.ModeBits = VolvoxRowIndicatorMode.Current | VolvoxRowIndicatorMode.Selection;
+                    }
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public VolvoxGridRowIndicatorMode RowIndicatorStartMode
+        {
+            get { return (VolvoxGridRowIndicatorMode)(EnsureRowIndicatorStartConfig().ModeBits ?? VolvoxRowIndicatorMode.None); }
+            set
+            {
+                var cfg = EnsureRowIndicatorStartConfig();
+                var mapped = (VolvoxRowIndicatorMode)value;
+                if (cfg.ModeBits != mapped)
+                {
+                    cfg.ModeBits = mapped;
+                    if (mapped != VolvoxRowIndicatorMode.None) cfg.Visible = true;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public int RowIndicatorStartWidth
+        {
+            get { return EnsureRowIndicatorStartConfig().WidthPx ?? 35; }
+            set
+            {
+                int normalized = Math.Max(1, value);
+                var cfg = EnsureRowIndicatorStartConfig();
+                if (cfg.WidthPx != normalized)
+                {
+                    cfg.WidthPx = normalized;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
         public VolvoxGridTreeIndicatorStyle TreeIndicator
         {
             get { return (VolvoxGridTreeIndicatorStyle)(_config.Outline.TreeIndicator ?? VolvoxTreeIndicatorStyle.None); }
@@ -274,6 +384,20 @@ namespace VolvoxGrid.DotNet
 
         public string LastError { get { return _lastError ?? string.Empty; } }
         public long CurrentGridId { get { return _gridId; } }
+
+        private VolvoxRowIndicatorConfigData EnsureRowIndicatorStartConfig()
+        {
+            if (_config.IndicatorBands == null) _config.IndicatorBands = new VolvoxIndicatorBandsConfigData();
+            if (_config.IndicatorBands.RowIndicatorStart == null) _config.IndicatorBands.RowIndicatorStart = new VolvoxRowIndicatorConfigData();
+            return _config.IndicatorBands.RowIndicatorStart;
+        }
+
+        private VolvoxColIndicatorConfigData EnsureColIndicatorTopConfig()
+        {
+            if (_config.IndicatorBands == null) _config.IndicatorBands = new VolvoxIndicatorBandsConfigData();
+            if (_config.IndicatorBands.ColIndicatorTop == null) _config.IndicatorBands.ColIndicatorTop = new VolvoxColIndicatorConfigData();
+            return _config.IndicatorBands.ColIndicatorTop;
+        }
 
         #endregion
 

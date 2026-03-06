@@ -28,6 +28,7 @@ pub mod glyph_rasterizer;
 #[cfg(feature = "gpu")]
 pub mod gpu_render;
 pub mod grid;
+pub mod indicator;
 pub mod input;
 pub mod layout;
 pub mod merge_registry;

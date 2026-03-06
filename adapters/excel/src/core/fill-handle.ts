@@ -6,17 +6,17 @@
  * and the drag/fill business logic.
  */
 
-import type { VolvoxGrid } from "volvoxgrid";
 import type { DataStore } from "./data-store.js";
 import type { SelectionModel } from "./selection-model.js";
 import type { UndoRedoStack } from "./undo-redo.js";
+import type { VolvoxExcelGrid } from "../types.js";
 import { CellValueChange, BatchCommand } from "./undo-redo.js";
 import { FormulaEngine } from "./formula-engine.js";
 
 export class FillHandle {
   private canvas: HTMLCanvasElement;
   private wasm: any;
-  private grid: VolvoxGrid;
+  private grid: VolvoxExcelGrid;
   private store: DataStore;
   private selection: SelectionModel;
   private undoStack: UndoRedoStack;
@@ -28,7 +28,7 @@ export class FillHandle {
   constructor(
     canvas: HTMLCanvasElement,
     wasm: any,
-    grid: VolvoxGrid,
+    grid: VolvoxExcelGrid,
     store: DataStore,
     selection: SelectionModel,
     undoStack: UndoRedoStack,
@@ -49,8 +49,8 @@ export class FillHandle {
   hitTestFillHandle(px: number, py: number): boolean {
     try {
       const range = this.selection.getRange();
-      const gridRow = range.row2 + this.grid.fixedRows;
-      const gridCol = range.col2 + this.grid.fixedCols;
+      const gridRow = range.row2;
+      const gridCol = range.col2;
       const gridId = this.grid.id;
 
       const cx = Number(this.wasm.get_cell_screen_x(gridId, gridRow, gridCol));
@@ -98,12 +98,10 @@ export class FillHandle {
     const px = (e.clientX - rect.left) * dpr;
     const py = (e.clientY - rect.top) * dpr;
     const gridId = this.grid.id;
-    const fixedRows = this.grid.fixedRows;
-    const fixedCols = this.grid.fixedCols;
     const gridRow = Number(this.wasm.hit_test_row(gridId, px, py));
     const gridCol = Number(this.wasm.hit_test_col(gridId, px, py));
-    const dataRow = gridRow - fixedRows;
-    const dataCol = gridCol - fixedCols;
+    const dataRow = gridRow;
+    const dataCol = gridCol;
     if (dataRow >= 0) this.dragEndRow = dataRow;
     if (dataCol >= 0) this.dragEndCol = dataCol;
   };

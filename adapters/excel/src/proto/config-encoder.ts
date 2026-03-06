@@ -15,8 +15,6 @@ export interface ExcelGridConfig {
   // Layout
   rows?: number;
   cols?: number;
-  fixedRows?: number;
-  fixedCols?: number;
   frozenRows?: number;
   frozenCols?: number;
   defaultRowHeight?: number;
@@ -63,8 +61,6 @@ export function encodeGridConfig(config: ExcelGridConfig): Uint8Array {
   const layout: number[] = [];
   if (config.rows != null) layout.push(...encodeTag(1, 0), ...encodeInt32(config.rows));
   if (config.cols != null) layout.push(...encodeTag(2, 0), ...encodeInt32(config.cols));
-  if (config.fixedRows != null) layout.push(...encodeTag(3, 0), ...encodeInt32(config.fixedRows));
-  if (config.fixedCols != null) layout.push(...encodeTag(4, 0), ...encodeInt32(config.fixedCols));
   if (config.frozenRows != null) layout.push(...encodeTag(5, 0), ...encodeInt32(config.frozenRows));
   if (config.frozenCols != null) layout.push(...encodeTag(6, 0), ...encodeInt32(config.frozenCols));
   if (config.defaultRowHeight != null) layout.push(...encodeTag(7, 0), ...encodeInt32(config.defaultRowHeight));

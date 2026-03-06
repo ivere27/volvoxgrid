@@ -116,8 +116,14 @@ declare module "volvoxgrid" {
     set rows(value: number);
     get cols(): number;
     set cols(value: number);
+    frozenRows: number;
+    frozenCols: number;
+    /** @deprecated Use frozenRows. */
     fixedRows: number;
+    /** @deprecated Use frozenCols. */
     fixedCols: number;
+    showColumnHeaders: boolean;
+    columnIndicatorTopRowCount: number;
 
     get selectionRow(): number;
     get selectionCol(): number;
@@ -131,6 +137,7 @@ declare module "volvoxgrid" {
     setColWidth(col: number, width: number): void;
     setRowHeight(row: number, height: number): void;
     setDefaultRowHeight(height: number): void;
+    setColumnCaption(col: number, caption: string): void;
 
     setSelectionMode(mode: number): void;
     setSelectionVisibility(mode: number): void;

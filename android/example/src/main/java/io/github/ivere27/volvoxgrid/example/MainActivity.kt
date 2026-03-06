@@ -298,8 +298,24 @@ class MainActivity : AppCompatActivity() {
                         .setLayout(LayoutConfig.newBuilder()
                             .setRows(rows)
                             .setCols(cols)
-                            .setFixedRows(1)
-                            .setFixedCols(0)
+                            .build())
+                        .setIndicatorBands(IndicatorBandsConfig.newBuilder()
+                            .setRowIndicatorStart(RowIndicatorConfig.newBuilder()
+                                .setVisible(false)
+                                .setWidthPx(35)
+                                .setModeBits(
+                                    RowIndicatorMode.ROW_INDICATOR_CURRENT.number or
+                                        RowIndicatorMode.ROW_INDICATOR_SELECTION.number
+                                )
+                                .build())
+                            .setColIndicatorTop(ColIndicatorConfig.newBuilder()
+                                .setVisible(true)
+                                .setBandRows(1)
+                                .setModeBits(
+                                    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.number or
+                                        ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH.number
+                                )
+                                .build())
                             .build())
                         .build())
                     .build()
@@ -311,6 +327,13 @@ class MainActivity : AppCompatActivity() {
                 gridView.initialize(host, id)
                 val ctrl = gridView.createController()
                 
+                ctrl.setColumnCaption(0, "Name")
+                ctrl.setColumnCaption(1, "Price")
+                ctrl.setColumnCaption(2, "Qty")
+                ctrl.setTextMatrix(0, 0, "Widget A")
+                ctrl.setTextMatrix(0, 1, "29.99")
+                ctrl.setTextMatrix(0, 2, "150")
+
                 // Setup styling
                 val style = ctrl.getGridStyle().toBuilder()
                     .setForeColor(0xFF000000.toInt())
