@@ -48,6 +48,7 @@ volvoxgrid/
 ├── java/
 │   ├── common/       # Shared Java controller + proto bindings
 │   └── desktop/      # Java Desktop host (Swing panel) + demos
+├── dotnet/           # .NET WinForms wrapper library + sample
 ├── adapters/
 │   ├── aggrid/       # AG Grid-compatible adapter (TypeScript, npm: @volvoxgrid/ag-grid)
 │   ├── excel/        # Excel/Sheets spreadsheet UI (TypeScript, npm: @volvoxgrid/excel)
@@ -78,6 +79,7 @@ Platform-specific:
 | Android | Android SDK + NDK, `cargo-ndk` |
 | Web | `wasm-pack`, Node.js/npm, Rust nightly |
 | Java Desktop | JDK 8+, Gradle |
+| .NET WinForms | .NET SDK, Wine (for Linux execution), MinGW-w64 (for Windows shim build) |
 | GTK4 | GTK4 development libraries |
 | ActiveX | MinGW-w64 cross-compiler |
 
@@ -157,6 +159,23 @@ make java-desktop-run-simple
 
 # Use published Maven JAR in the desktop example (default is local)
 make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.2
+```
+
+### .NET WinForms
+
+```bash
+# Build .NET wrapper + sample + staged Windows plugin artifacts
+make dotnet-build
+
+# Run the sample under Wine
+make dotnet-run
+```
+
+Direct scripts:
+
+```bash
+./dotnet/build_dotnet.sh
+./dotnet/run_sample.sh
 ```
 
 ### GTK4
@@ -260,7 +279,7 @@ Regenerate FFI bindings for all languages from the proto definitions:
 make codegen
 ```
 
-This produces bindings in `codegen/`, `plugin/src/`, `web/crate/src/`, and `adapters/vsflexgrid/`.
+This produces bindings in `codegen/`, `dotnet/src/net8/Generated/`, `plugin/src/`, `web/crate/src/`, and `adapters/vsflexgrid/`.
 
 ## Docker Builds
 

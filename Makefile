@@ -41,6 +41,8 @@ DOOM_EMULATORS_VERSION ?= 8.3.9
 WEB_HOST ?= 0.0.0.0
 WEB_SCALE ?= 1.0
 WEB_HOVER ?= false
+DOTNET_TFM ?= net40
+DOTNET_ARCH ?= x64
 JAVA_DESKTOP_PROJECT_DIR := java/desktop
 ROOT_DIR := $(patsubst %/,%,$(abspath $(dir $(lastword $(MAKEFILE_LIST)))))
 UNAME_S := $(shell uname -s 2>/dev/null)
@@ -124,6 +126,7 @@ DESKTOP_VERSION ?= $(VOLVOXGRID_VERSION)
 DESKTOP_GROUP_ID ?= io.github.ivere27
 DESKTOP_ARTIFACT_ID ?= volvoxgrid-desktop
 DESKTOP_BUILD_OCX ?= 1
+DESKTOP_BUILD_DOTNET ?= 1
 DESKTOP_GIT_COMMIT ?= $(shell git -C "$(CURRENT_DIR)" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 DESKTOP_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 WEB_DOCKER_IMAGE ?= volvoxgrid-web:latest
@@ -198,6 +201,7 @@ endif
         android-plugin android-plugin-release android-install android-install-release android-run android-run-release flutter flutter-setup \
         flutter-run flutter-run-release flutter-linux \
         java-desktop-run java-desktop-run-release java-desktop-run-simple java-desktop-smoke \
+        dotnet-build dotnet-build-release dotnet-run dotnet-run-release dotnet-smoke dotnet-smoke-release \
         excel excel-lite excel-build \
         report report-build \
         activex activex-release activex-lite activex-lite-release \
@@ -252,6 +256,14 @@ help:
 	@echo "  java-desktop-run-release  Run Java desktop Android-style example with release plugin"
 	@echo "  java-desktop-run-simple  Run Java desktop minimal demo"
 	@echo "  java-desktop-smoke  Run headless Java desktop smoke test with local synurang-desktop jars"
+	@echo "  dotnet-build  Build VolvoxGrid .NET wrapper + sample (debug)"
+	@echo "  dotnet-build-release  Build VolvoxGrid .NET wrapper + sample (release)"
+	@echo "  dotnet-run    Run .NET sample (debug)"
+	@echo "  dotnet-run-release  Run .NET sample (release)"
+	@echo "  dotnet-smoke  Run automated .NET controller smoke checks (debug)"
+	@echo "  dotnet-smoke-release  Run automated .NET controller smoke checks (release)"
+	@echo "    (set DOTNET_TFM=net8.0-windows to switch target; default: net40)"
+	@echo "    (set DOTNET_ARCH=x86 to build 32-bit; default: x64)"
 	@echo "  excel          Build WASM + start Excel adapter Vite dev server"
 	@echo "  excel-lite     Build WASM lite + start Excel adapter Vite dev server"
 	@echo "  excel-build    Build Excel adapter npm package only"
@@ -262,7 +274,7 @@ help:
 	@echo "  docker_android_aar_image  Build Docker image for Android AAR"
 	@echo "  docker_android            Build Android AAR + Android lite AAR via Docker, auto-install SNAPSHOT to mavenLocal"
 	@echo "  docker_desktop_image      Build Docker image for desktop JAR"
-	@echo "  docker_desktop            Build desktop JAR via Docker (+ ActiveX OCX release/release-lite), auto-install SNAPSHOT to mavenLocal"
+	@echo "  docker_desktop            Build desktop JAR + .NET artifacts via Docker (+ ActiveX OCX release/release-lite), auto-install SNAPSHOT to mavenLocal"
 	@echo "  docker_web_image          Build Docker image for web dist/bundle tasks"
 	@echo "  docker_web                Build in Docker: WEB_DOCKER_TARGET={all|bundle|web|excel|excel-lite|report|wasm|wasm-lite|wasm-threaded}"
 	@echo "  docker_ios_image          Build Docker image for iOS"
@@ -373,6 +385,36 @@ java-desktop-smoke: $(JAVA_DESKTOP_SMOKE_PREREQ)
 	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) runSmoke $(JAVA_DESKTOP_PLUGIN_ARG)
 	@echo ""
 
+dotnet-build:
+	@echo "Building VolvoxGrid .NET wrapper + sample (debug, $(DOTNET_TFM), $(DOTNET_ARCH))..."
+	DOTNET_TFM="$(DOTNET_TFM)" DOTNET_ARCH="$(DOTNET_ARCH)" ./dotnet/build_dotnet.sh
+	@echo ""
+
+dotnet-build-release:
+	@echo "Building VolvoxGrid .NET wrapper + sample (release, $(DOTNET_TFM), $(DOTNET_ARCH))..."
+	DOTNET_TFM="$(DOTNET_TFM)" DOTNET_ARCH="$(DOTNET_ARCH)" ./dotnet/build_dotnet.sh release
+	@echo ""
+
+dotnet-run: dotnet-build
+	@echo "Running .NET sample (debug, $(DOTNET_TFM), $(DOTNET_ARCH))..."
+	DOTNET_TFM="$(DOTNET_TFM)" DOTNET_ARCH="$(DOTNET_ARCH)" ./dotnet/run_sample.sh
+	@echo ""
+
+dotnet-run-release: dotnet-build-release
+	@echo "Running .NET sample (release, $(DOTNET_TFM), $(DOTNET_ARCH))..."
+	DOTNET_TFM="$(DOTNET_TFM)" DOTNET_ARCH="$(DOTNET_ARCH)" ./dotnet/run_sample.sh release
+	@echo ""
+
+dotnet-smoke: dotnet-build
+	@echo "Running .NET controller smoke checks (debug, $(DOTNET_TFM), $(DOTNET_ARCH))..."
+	VOLVOXGRID_SMOKE_MODE=1 VOLVOXGRID_SMOKE_EXIT=1 DOTNET_TFM="$(DOTNET_TFM)" DOTNET_ARCH="$(DOTNET_ARCH)" ./dotnet/run_sample.sh
+	@echo ""
+
+dotnet-smoke-release: dotnet-build-release
+	@echo "Running .NET controller smoke checks (release, $(DOTNET_TFM), $(DOTNET_ARCH))..."
+	VOLVOXGRID_SMOKE_MODE=1 VOLVOXGRID_SMOKE_EXIT=1 DOTNET_TFM="$(DOTNET_TFM)" DOTNET_ARCH="$(DOTNET_ARCH)" ./dotnet/run_sample.sh release
+	@echo ""
+
 # =============================================================================
 # WASM
 # =============================================================================
@@ -481,6 +523,7 @@ doom-deps:
 # Codegen — Regenerate FFI bindings
 # =============================================================================
 VSFLEXGRID_DIR := adapters/vsflexgrid
+DOTNET_CODEGEN_DIR := dotnet/src/net8/Generated
 PROTO_INCLUDES := -Iproto -I$(VSFLEXGRID_DIR)/proto
 PROTO3_OPT := --experimental_allow_proto3_optional
 
@@ -489,6 +532,7 @@ codegen: build_plugin
 	@command -v protoc-gen-dart >/dev/null 2>&1 || { echo "Error: protoc-gen-dart not found in PATH."; exit 1; }
 	@echo "Generating v1 runtime FFI bindings..."
 	@mkdir -p codegen
+	@mkdir -p $(DOTNET_CODEGEN_DIR)
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_PLUGIN_FLAG) \
 		--synurang-ffi_out=codegen --synurang-ffi_opt=lang=java \
@@ -509,6 +553,14 @@ codegen: build_plugin
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_PLUGIN_FLAG) \
 		--synurang-ffi_out=codegen --synurang-ffi_opt=lang=rust \
+		proto/volvoxgrid.proto
+	# .NET protobuf + Synurang FFI stubs
+	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
+		--csharp_out=$(DOTNET_CODEGEN_DIR) \
+		proto/volvoxgrid.proto
+	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
+		$(PROTOC_PLUGIN_FLAG) \
+		--synurang-ffi_out=$(DOTNET_CODEGEN_DIR) --synurang-ffi_opt=lang=csharp \
 		proto/volvoxgrid.proto
 	# Plugin server trait + dispatcher
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
@@ -539,7 +591,7 @@ codegen: build_plugin
 		--synurang-ffi_out=$(VSFLEXGRID_DIR)/include --synurang-ffi_opt=lang=c,mode=activex \
 		$(VSFLEXGRID_DIR)/proto/volvoxgrid_activex.proto
 	@cp $(VSFLEXGRID_DIR)/include/volvoxgrid_activex_activex.h $(VSFLEXGRID_DIR)/include/volvoxgrid_activex.h
-	@echo "Codegen complete: codegen/ + plugin/ + web/ + $(VSFLEXGRID_DIR)/"
+	@echo "Codegen complete: codegen/ + $(DOTNET_CODEGEN_DIR)/ + plugin/ + web/ + $(VSFLEXGRID_DIR)/"
 
 # =============================================================================
 # Android
@@ -957,7 +1009,7 @@ docker_desktop_image:
 
 docker_desktop: docker_desktop_image
 	@echo "Packaging desktop JAR (version $(DESKTOP_VERSION))..."
-	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS))"
+	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS), dotnet=$(DESKTOP_BUILD_DOTNET))"
 	@mkdir -p dist/maven
 	docker run --rm \
 		--entrypoint /bin/bash \
@@ -982,9 +1034,15 @@ docker_desktop: docker_desktop_image
 		-e GIT_COMMIT="$(DESKTOP_GIT_COMMIT)" \
 		-e BUILD_DATE="$(DESKTOP_BUILD_DATE)" \
 		-e BUILD_OCX="$(DESKTOP_BUILD_OCX)" \
+		-e BUILD_DOTNET="$(DESKTOP_BUILD_DOTNET)" \
 		"$(DESKTOP_DOCKER_IMAGE)"
 	@echo "Desktop JAR artifacts: dist/maven/"
 	@echo "ActiveX OCX artifacts: dist/desktop/ocx/ (set DESKTOP_BUILD_OCX=0 to skip)"
+	@if [ "$(DESKTOP_BUILD_DOTNET)" = "0" ]; then \
+		echo ".NET artifacts: skipped (set DESKTOP_BUILD_DOTNET=1 to enable)"; \
+	else \
+		echo ".NET artifacts: dist/dotnet/winforms_release/ (set DESKTOP_BUILD_DOTNET=0 to skip)"; \
+	fi
 	@if echo "$(DESKTOP_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
 		$(MAKE) publish_local; \
 	else \

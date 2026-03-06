@@ -203,14 +203,6 @@ echo "  Done: $TARGET_DIR/grid_compare_ux_test.exe"
 # ── Register OCXs ─────────────────────────────────────────
 echo "[2/5] Registering OCXs in Wine..."
 
-# Copy stub DLLs if they exist (for older Wine)
-STUB_DIR="../../../target/ocx"
-if [ -f "$STUB_DIR/bcryptprimitives.dll" ]; then
-    WINSYS="$HOME/.wine/drive_c/windows/system32"
-    cp -f "$STUB_DIR/bcryptprimitives.dll" "$WINSYS/" 2>/dev/null || true
-    cp -f "$STUB_DIR/api-ms-win-core-synch-l1-2-0.dll" "$WINSYS/" 2>/dev/null || true
-fi
-
 WINEDEBUG=-all wine regsvr32 "$(realpath "$VOLVOX_OCX")" 2>/dev/null || true
 echo "  VolvoxGrid: registered"
 

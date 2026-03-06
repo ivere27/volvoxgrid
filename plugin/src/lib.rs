@@ -13,6 +13,11 @@ use volvoxgrid_engine::GridManager;
 mod ffi_impl;
 use ffi_impl::*;
 
+#[cfg(all(target_os = "windows", target_env = "gnu"))]
+unsafe extern "C" {
+    fn volvoxgrid_windows_mingw_compat_force_link();
+}
+
 // Shared GridManager accessible by both the plugin and demo FFI exports.
 lazy_static::lazy_static! {
     static ref SHARED_GRID_MANAGER: GridManager = GridManager::new();
@@ -3330,6 +3335,10 @@ pub(crate) fn create_plugin() -> Box<dyn VolvoxGridServicePlugin + 'static> {
 #[allow(non_snake_case)]
 #[no_mangle]
 pub extern "C" fn VolvoxGrid_Init() {
+    #[cfg(all(target_os = "windows", target_env = "gnu"))]
+    unsafe {
+        volvoxgrid_windows_mingw_compat_force_link();
+    }
     register_volvox_grid_service_plugin(VolvoxGridPlugin::new());
 }
 

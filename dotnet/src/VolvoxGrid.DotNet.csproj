@@ -1,0 +1,65 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks Condition="'$(VolvoxGridLegacyOnly)' != 'true'">net8.0-windows;net40</TargetFrameworks>
+    <TargetFrameworks Condition="'$(VolvoxGridLegacyOnly)' == 'true'">net40</TargetFrameworks>
+    <EnableWindowsTargeting Condition="'$(OS)' != 'Windows_NT'">true</EnableWindowsTargeting>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <AssemblyName>VolvoxGrid.DotNet</AssemblyName>
+    <RootNamespace>VolvoxGrid.DotNet</RootNamespace>
+    <NoWarn>1591</NoWarn>
+    <PackageId>VolvoxGrid.DotNet</PackageId>
+    <Description>WinForms wrapper for VolvoxGrid.</Description>
+    <PackageTags>volvoxgrid;datagrid;winforms;dotnet</PackageTags>
+    <RepositoryUrl>https://github.com/ivere27/volvoxgrid</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/ivere27/volvoxgrid</PackageProjectUrl>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' != 'net40'">
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net40'">
+    <NuGetPackageRoot Condition="'$(NuGetPackageRoot)' == '' and '$(NUGET_PACKAGES)' != ''">$(NUGET_PACKAGES)</NuGetPackageRoot>
+    <NuGetPackageRoot Condition="'$(NuGetPackageRoot)' == '' and '$(HOME)' != ''">$(HOME)/.nuget/packages/</NuGetPackageRoot>
+    <NuGetPackageRoot Condition="'$(NuGetPackageRoot)' == '' and '$(USERPROFILE)' != ''">$(USERPROFILE)\\.nuget\\packages\\</NuGetPackageRoot>
+    <FrameworkPathOverride>$(NuGetPackageRoot)microsoft.netframework.referenceassemblies.net40/1.0.3/build/.NETFramework/v4.0/</FrameworkPathOverride>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net40'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net40" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Data" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="common/**" />
+    <Compile Remove="net40/**" />
+    <Compile Remove="net8/**" />
+    <EmbeddedResource Remove="common/**" />
+    <EmbeddedResource Remove="net40/**" />
+    <EmbeddedResource Remove="net8/**" />
+    <None Remove="common/**" />
+    <None Remove="net40/**" />
+    <None Remove="net8/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="common/**/*.cs" Exclude="common/obj/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net40'">
+    <Compile Include="net40/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' != 'net40'">
+    <Compile Include="net8/Volvox/**/*.cs" />
+    <Compile Include="net8/Generated/Volvoxgrid.cs" />
+    <PackageReference Include="Google.Protobuf" Version="3.25.1" />
+  </ItemGroup>
+</Project>

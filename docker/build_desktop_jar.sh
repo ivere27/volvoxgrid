@@ -20,6 +20,8 @@ BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 DIST_DIR="${DIST_DIR:-${REPO_ROOT}/dist/maven}"
 BUILD_OCX="${BUILD_OCX:-1}"
 OCX_DIST_DIR="${OCX_DIST_DIR:-${REPO_ROOT}/dist/desktop/ocx}"
+BUILD_DOTNET="${BUILD_DOTNET:-0}"
+DOTNET_DIST_DIR="${DOTNET_DIST_DIR:-${REPO_ROOT}/dist/dotnet}"
 
 detect_cpu_count() {
   if command -v nproc >/dev/null 2>&1; then
@@ -54,6 +56,15 @@ WORK_DIR="$(mktemp -d /tmp/volvoxgrid-desktop-XXXXXX)"
 NATIVES_DIR="${WORK_DIR}/natives"
 cleanup() { rm -rf "${WORK_DIR}"; }
 trap cleanup EXIT
+
+should_build_dotnet() {
+  case "${BUILD_DOTNET}" in
+    1|true|TRUE|yes|YES|on|ON)
+      return 0
+      ;;
+  esac
+  return 1
+}
 
 PLUGIN_CRATE="${REPO_ROOT}/plugin"
 if [[ ! -f "${PLUGIN_CRATE}/Cargo.toml" ]]; then
@@ -314,9 +325,57 @@ JAVADOC_DIR="${WORK_DIR}/javadoc"
 mkdir -p "${JAVADOC_DIR}"
 (cd "${JAVADOC_DIR}" && jar cf "${JAVADOC_OUT}" .)
 
+DOTNET_STAGE_OUT_X64=""
+DOTNET_STAGE_OUT_X86=""
+if should_build_dotnet; then
+  echo ""
+  echo "Building .NET WinForms artifacts (release, net40, x64+x86)..."
+  if ! command -v dotnet >/dev/null 2>&1; then
+    echo "Error: dotnet CLI not found in Docker image." >&2
+    exit 1
+  fi
+
+  if [[ ! -f "${REPO_ROOT}/dotnet/build_dotnet.sh" ]]; then
+    echo "Error: dotnet/build_dotnet.sh not found in repository." >&2
+    exit 1
+  fi
+
+  (
+    cd "${REPO_ROOT}"
+    DOTNET_TFM=net40 DOTNET_ARCH=x64 bash "${REPO_ROOT}/dotnet/build_dotnet.sh" release
+    DOTNET_TFM=net40 DOTNET_ARCH=x86 bash "${REPO_ROOT}/dotnet/build_dotnet.sh" release
+  )
+
+  DOTNET_STAGE_DIR_X64="${REPO_ROOT}/target/dotnet/winforms_release"
+  DOTNET_STAGE_DIR_X86="${REPO_ROOT}/target/dotnet/winforms_release_x86"
+  if [[ ! -d "${DOTNET_STAGE_DIR_X64}" ]]; then
+    echo "Error: expected .NET stage directory not found: ${DOTNET_STAGE_DIR_X64}" >&2
+    exit 1
+  fi
+  if [[ ! -d "${DOTNET_STAGE_DIR_X86}" ]]; then
+    echo "Error: expected .NET stage directory not found: ${DOTNET_STAGE_DIR_X86}" >&2
+    exit 1
+  fi
+
+  DOTNET_STAGE_OUT_X64="${DOTNET_DIST_DIR}/winforms_release"
+  DOTNET_STAGE_OUT_X86="${DOTNET_DIST_DIR}/winforms_release_x86"
+  mkdir -p "${DOTNET_STAGE_OUT_X64}" "${DOTNET_STAGE_OUT_X86}"
+  cp -a "${DOTNET_STAGE_DIR_X64}/." "${DOTNET_STAGE_OUT_X64}/"
+  cp -a "${DOTNET_STAGE_DIR_X86}/." "${DOTNET_STAGE_OUT_X86}/"
+fi
+
 echo ""
 echo "Built desktop JAR artifacts:"
 echo "  ${JAR_OUT}"
 echo "  ${POM_OUT}"
 echo "  ${SOURCES_OUT}"
 echo "  ${JAVADOC_OUT}"
+if [[ -n "${DOTNET_STAGE_OUT_X64}" || -n "${DOTNET_STAGE_OUT_X86}" ]]; then
+  echo "Built .NET artifacts:"
+  if [[ -n "${DOTNET_STAGE_OUT_X64}" ]]; then
+    echo "  ${DOTNET_STAGE_OUT_X64}"
+  fi
+  if [[ -n "${DOTNET_STAGE_OUT_X86}" ]]; then
+    echo "  ${DOTNET_STAGE_OUT_X86}"
+  fi
+fi
