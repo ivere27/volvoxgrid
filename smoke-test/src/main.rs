@@ -55,10 +55,31 @@ fn main() {
         scale: 0.0,
         config: Some(GridConfig {
             layout: Some(LayoutConfig {
-                rows: Some(51),
+                rows: Some(50),
                 cols: Some(5),
-                fixed_rows: Some(1),
+                fixed_rows: Some(0),
                 fixed_cols: Some(0),
+                ..Default::default()
+            }),
+            indicator_bands: Some(IndicatorBandsConfig {
+                col_indicator_top: Some(ColIndicatorConfig {
+                    visible: Some(true),
+                    band_rows: Some(1),
+                    mode_bits: Some(
+                        (ColIndicatorCellMode::ColIndicatorCellHeaderText as u32)
+                            | (ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32),
+                    ),
+                    ..Default::default()
+                }),
+                row_indicator_start: Some(RowIndicatorConfig {
+                    visible: Some(false),
+                    width_px: Some(35),
+                    mode_bits: Some(
+                        (RowIndicatorMode::RowIndicatorCurrent as u32)
+                            | (RowIndicatorMode::RowIndicatorSelection as u32),
+                    ),
+                    ..Default::default()
+                }),
                 ..Default::default()
             }),
             ..Default::default()
@@ -82,7 +103,7 @@ fn main() {
     );
     let config = GridConfig::decode(resp_bytes.as_slice()).unwrap();
     let layout = config.layout.expect("layout should be present");
-    assert_eq!(layout.rows.unwrap(), 51, "Expected 51 rows");
+    assert_eq!(layout.rows.unwrap(), 50, "Expected 50 rows");
     assert_eq!(layout.cols.unwrap(), 5, "Expected 5 cols");
     println!(
         "Grid dimensions: {}x{}",
@@ -90,31 +111,28 @@ fn main() {
         layout.cols.unwrap()
     );
 
-    // 3. UpdateCells — set headers
+    // 3. DefineColumns — set captions for the top column-indicator band
     let headers = ["Product", "Category", "Sales", "Quarter", "Region"];
-    let header_cells: Vec<CellUpdate> = headers
+    let columns: Vec<ColumnDef> = headers
         .iter()
         .enumerate()
-        .map(|(c, h)| CellUpdate {
-            row: 0,
-            col: c as i32,
-            value: Some(CellValue {
-                value: Some(cell_value::Value::Text(h.to_string())),
-            }),
+        .map(|(c, h)| ColumnDef {
+            index: c as i32,
+            key: Some(h.to_lowercase()),
+            caption: Some(h.to_string()),
             ..Default::default()
         })
         .collect();
-    let req = UpdateCellsRequest {
+    let req = DefineColumnsRequest {
         grid_id,
-        cells: header_cells,
-        atomic: false,
+        columns,
     };
     invoke(
         &plugin,
-        "/volvoxgrid.v1.VolvoxGridService/UpdateCells",
+        "/volvoxgrid.v1.VolvoxGridService/DefineColumns",
         &req.encode_to_vec(),
     );
-    println!("Set {} headers.", headers.len());
+    println!("Defined {} column captions.", headers.len());
 
     // 4. UpdateCells — data rows (batch all 250 cells in one call)
     let products = ["Widget A", "Widget B", "Gadget X", "Gadget Y", "Tool Z"];
@@ -127,14 +145,14 @@ fn main() {
     ];
     let regions = ["North", "South", "East", "West"];
     let mut data_cells = Vec::with_capacity(250);
-    for r in 1..=50i32 {
+    for r in 0..50i32 {
         for c in 0..5i32 {
             let text = match c {
-                0 => products[((r - 1) % 5) as usize].to_string(),
-                1 => categories[((r - 1) % 5) as usize].to_string(),
-                2 => format!("{}", r * 123 + 456),
-                3 => format!("Q{}", (r % 4) + 1),
-                4 => regions[((r - 1) % 4) as usize].to_string(),
+                0 => products[(r % 5) as usize].to_string(),
+                1 => categories[(r % 5) as usize].to_string(),
+                2 => format!("{}", (r + 1) * 123 + 456),
+                3 => format!("Q{}", ((r + 1) % 4) + 1),
+                4 => regions[(r % 4) as usize].to_string(),
                 _ => unreachable!(),
             };
             data_cells.push(CellUpdate {
@@ -159,7 +177,7 @@ fn main() {
     );
     println!("Populated 50 data rows.");
 
-    // 5. GetCells — verify header and first data row
+    // 5. GetCells — verify the first data row
     let req = GetCellsRequest {
         grid_id,
         row1: 0,
@@ -181,33 +199,7 @@ fn main() {
         value: Some(cell_value::Value::Text(ref t)),
     }) = cell.value
     {
-        assert_eq!(t, "Product", "Header mismatch: got '{}'", t);
-    } else {
-        panic!("Expected text value for header cell");
-    }
-
-    let req = GetCellsRequest {
-        grid_id,
-        row1: 1,
-        col1: 0,
-        row2: 1,
-        col2: 0,
-        include_style: false,
-        include_checked: false,
-        include_typed: false,
-    };
-    let resp_bytes = invoke(
-        &plugin,
-        "/volvoxgrid.v1.VolvoxGridService/GetCells",
-        &req.encode_to_vec(),
-    );
-    let cells_resp = CellsResponse::decode(resp_bytes.as_slice()).unwrap();
-    let cell = &cells_resp.cells[0];
-    if let Some(CellValue {
-        value: Some(cell_value::Value::Text(ref t)),
-    }) = cell.value
-    {
-        assert_eq!(t, "Widget A", "Cell(1,0) mismatch: got '{}'", t);
+        assert_eq!(t, "Widget A", "Cell(0,0) mismatch: got '{}'", t);
     } else {
         panic!("Expected text value for data cell");
     }
@@ -231,9 +223,9 @@ fn main() {
     // 7. GetCells after sort
     let req = GetCellsRequest {
         grid_id,
-        row1: 1,
+        row1: 0,
         col1: 0,
-        row2: 1,
+        row2: 0,
         col2: 0,
         include_style: false,
         include_checked: false,

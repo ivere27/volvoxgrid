@@ -1062,7 +1062,7 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             int32_t rows = volvox_grid_get_rows(gid);
             int32_t v = obj->fixed_rows_cached;
             if (rows > 0) {
-                if (v < 1) v = 1;
+                if (v < 0) v = 0;
                 if (v > rows) v = rows;
             } else {
                 v = 0;
@@ -1080,7 +1080,7 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
                 int32_t rows = volvox_grid_get_rows(gid);
                 int32_t v = val;
                 if (rows > 0) {
-                    if (v < 1) v = 1;
+                    if (v < 0) v = 0;
                     if (v > rows) v = rows;
                 } else {
                     v = 0;

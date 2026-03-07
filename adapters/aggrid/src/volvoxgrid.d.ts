@@ -95,6 +95,20 @@ declare module "volvoxgrid" {
     slots: Partial<Record<VolvoxGridIconSlotName, VolvoxGridIconSpec>>;
   }
 
+  export interface VolvoxGridSelection {
+    row: number;
+    col: number;
+    rowEnd: number;
+    colEnd: number;
+    topRow: number;
+    leftCol: number;
+    bottomRow: number;
+    rightCol: number;
+    mouseRow: number;
+    mouseCol: number;
+    ranges: VolvoxGridCellRange[];
+  }
+
   export class VolvoxGrid {
     static readonly PIN_NONE: number;
     static readonly PIN_TOP: number;
@@ -112,33 +126,63 @@ declare module "volvoxgrid" {
     constructor(canvas: HTMLCanvasElement, wasm: unknown, rows?: number, cols?: number);
 
     get id(): number;
-    get rows(): number;
-    set rows(value: number);
-    get cols(): number;
-    set cols(value: number);
-    fixedRows: number;
-    fixedCols: number;
+    get rowCount(): number;
+    set rowCount(value: number);
+    get colCount(): number;
+    set colCount(value: number);
+    frozenRowCount: number;
+    frozenColCount: number;
+    showColumnHeaders: boolean;
+    showRowIndicator: boolean;
+    columnIndicatorTopRowCount: number;
 
-    get selectionRow(): number;
-    get selectionCol(): number;
+    get cursorRow(): number;
+    set cursorRow(value: number);
+    get cursorCol(): number;
+    set cursorCol(value: number);
+    getSelection(): VolvoxGridSelection;
+    selectRange(row1: number, col1: number, row2?: number, col2?: number, show?: boolean): void;
+    selectRanges(ranges: ReadonlyArray<VolvoxGridCellRange>, activeRow?: number, activeCol?: number, show?: boolean): void;
+    showCell(row: number, col: number): void;
+    clearSelection(): void;
+    topRow: number;
+    leftCol: number;
+    getBottomRow(): number;
+    getRightCol(): number;
 
     destroy(): void;
-    setTextMatrix(row: number, col: number, text: string): void;
-    getTextMatrix(row: number, col: number): string;
-    loadTable(rows: number, cols: number, values: unknown[], atomic?: boolean): void;
+    setCellText(row: number, col: number, text: string): void;
+    getCellText(row: number, col: number): string;
+    loadTable(rows: number, cols: number, values: unknown[]): void;
     clear(scope?: number, region?: number): void;
 
     setColWidth(col: number, width: number): void;
     setRowHeight(row: number, height: number): void;
-    setDefaultRowHeight(height: number): void;
+    defaultColWidth: number;
+    defaultRowHeight: number;
+    setColumnCaption(col: number, caption: string): void;
 
-    setSelectionMode(mode: number): void;
-    setSelectionVisibility(mode: number): void;
-    setFocusBorder(style: number): void;
-    setHeaderFeatures(mode: number): void;
-    setAllowUserResizing(mode: number): void;
-    setAnimationEnabled(enabled: boolean, durationMs?: number): void;
-    setSpanMode(mode: number): void;
+    selectionMode: number;
+    selectionVisibility: number;
+    focusBorder: number;
+    headerFeatures: number;
+    allowUserResizing: number;
+    allowUserFreezing: number;
+    editTrigger: number;
+    editable: boolean;
+    dropdownTrigger: number;
+    dropdownSearch: boolean;
+    editMaxLength: number;
+    editText: string;
+    rendererMode: number;
+    rendererBackend: number;
+    presentMode: number;
+    debugOverlay: boolean;
+    animationEnabled: boolean;
+    animationDurationMs: number;
+    textLayoutCacheCap: number;
+    cellSpanMode: number;
+    scrollBars: number;
     mergeCells(r1: number, c1: number, r2: number, c2: number): void;
     unmergeCells(r1: number, c1: number, r2: number, c2: number): void;
     getMergedRegions(): { row1: number; col1: number; row2: number; col2: number }[];

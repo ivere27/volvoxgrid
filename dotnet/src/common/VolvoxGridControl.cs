@@ -57,11 +57,18 @@ namespace VolvoxGrid.DotNet
             _config.Scrolling.FlingEnabled = true;
             _config.Scrolling.FastScroll = true;
             _config.Rendering.RendererMode = VolvoxGridRendererMode.Auto;
+            _config.IndicatorBands.ColIndicatorTop.Visible = true;
+            _config.IndicatorBands.ColIndicatorTop.BandRows = 1;
+            _config.IndicatorBands.ColIndicatorTop.ModeBits = VolvoxColIndicatorCellMode.HeaderText | VolvoxColIndicatorCellMode.SortGlyph;
+            _config.IndicatorBands.RowIndicatorStart.Visible = false;
+            _config.IndicatorBands.RowIndicatorStart.WidthPx = 35;
+            _config.IndicatorBands.RowIndicatorStart.ModeBits = VolvoxRowIndicatorMode.Current | VolvoxRowIndicatorMode.Selection;
 
             _renderHost = new RenderHostCpu
             {
                 Dock = DockStyle.Fill,
             };
+            SyncRenderHostSelectionMode();
             Controls.Add(_renderHost);
         }
 
@@ -110,13 +117,30 @@ namespace VolvoxGrid.DotNet
         public VolvoxGridSelectionMode SelectionMode
         {
             get { return (VolvoxGridSelectionMode)(_config.Selection.Mode ?? VolvoxSelectionMode.Free); }
-            set { if (_config.Selection.Mode != (VolvoxSelectionMode)value) { _config.Selection.Mode = (VolvoxSelectionMode)value; ApplyEngineConfig(); } }
+            set
+            {
+                if (_config.Selection.Mode != (VolvoxSelectionMode)value)
+                {
+                    _config.Selection.Mode = (VolvoxSelectionMode)value;
+                    SyncRenderHostSelectionMode();
+                    ApplyEngineConfig();
+                }
+            }
         }
 
         public bool MultiSelect
         {
-            get { return _config.Selection.Mode == VolvoxSelectionMode.Listbox || _config.Selection.Mode == VolvoxSelectionMode.MultiRange; }
-            set { var mode = value ? VolvoxSelectionMode.Listbox : VolvoxSelectionMode.Free; if (_config.Selection.Mode != mode) { _config.Selection.Mode = mode; ApplyEngineConfig(); } }
+            get { return _config.Selection.Mode == VolvoxSelectionMode.MultiRange; }
+            set
+            {
+                var mode = value ? VolvoxSelectionMode.MultiRange : VolvoxSelectionMode.Free;
+                if (_config.Selection.Mode != mode)
+                {
+                    _config.Selection.Mode = mode;
+                    SyncRenderHostSelectionMode();
+                    ApplyEngineConfig();
+                }
+            }
         }
 
         public VolvoxGridSelectionVisibility SelectionVisibility
@@ -161,8 +185,11 @@ namespace VolvoxGrid.DotNet
             set { if (_config.Rendering.RendererMode != value) { _config.Rendering.RendererMode = value; ApplyEngineConfig(); } }
         }
 
-        public void SetRendererBackend(VolvoxGridRendererMode mode) { RendererMode = mode; }
-        public VolvoxGridRendererMode GetRendererBackend() { return RendererMode; }
+        public VolvoxGridRendererMode RendererBackend
+        {
+            get { return RendererMode; }
+            set { RendererMode = value; }
+        }
 
         public VolvoxGridScrollBarsMode ScrollBars
         {
@@ -186,6 +213,104 @@ namespace VolvoxGrid.DotNet
         {
             get { return (VolvoxGridHeaderFeatures)(_config.Interaction.HeaderFeatures ?? VolvoxHeaderFeatures.SortReorderChooser); }
             set { var mapped = (VolvoxHeaderFeatures)value; if (_config.Interaction.HeaderFeatures != mapped) { _config.Interaction.HeaderFeatures = mapped; ApplyEngineConfig(); } }
+        }
+
+        public bool ShowColumnHeaders
+        {
+            get { return EnsureColIndicatorTopConfig().Visible ?? true; }
+            set
+            {
+                var cfg = EnsureColIndicatorTopConfig();
+                if (cfg.Visible != value)
+                {
+                    cfg.Visible = value;
+                    if (value && !cfg.ModeBits.HasValue)
+                    {
+                        cfg.ModeBits = VolvoxColIndicatorCellMode.HeaderText | VolvoxColIndicatorCellMode.SortGlyph;
+                    }
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public VolvoxGridColumnIndicatorMode ColumnIndicatorTopModeBits
+        {
+            get { return (VolvoxGridColumnIndicatorMode)(EnsureColIndicatorTopConfig().ModeBits ?? VolvoxColIndicatorCellMode.None); }
+            set
+            {
+                var cfg = EnsureColIndicatorTopConfig();
+                var mapped = (VolvoxColIndicatorCellMode)value;
+                if (cfg.ModeBits != mapped)
+                {
+                    cfg.ModeBits = mapped;
+                    if (mapped != VolvoxColIndicatorCellMode.None) cfg.Visible = true;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public int ColumnIndicatorTopRowCount
+        {
+            get { return EnsureColIndicatorTopConfig().BandRows ?? 1; }
+            set
+            {
+                int normalized = Math.Max(0, value);
+                var cfg = EnsureColIndicatorTopConfig();
+                if (cfg.BandRows != normalized)
+                {
+                    cfg.BandRows = normalized;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public bool ShowRowIndicator
+        {
+            get { return EnsureRowIndicatorStartConfig().Visible ?? false; }
+            set
+            {
+                var cfg = EnsureRowIndicatorStartConfig();
+                if (cfg.Visible != value)
+                {
+                    cfg.Visible = value;
+                    if (value && !cfg.ModeBits.HasValue)
+                    {
+                        cfg.ModeBits = VolvoxRowIndicatorMode.Current | VolvoxRowIndicatorMode.Selection;
+                    }
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public VolvoxGridRowIndicatorMode RowIndicatorStartModeBits
+        {
+            get { return (VolvoxGridRowIndicatorMode)(EnsureRowIndicatorStartConfig().ModeBits ?? VolvoxRowIndicatorMode.None); }
+            set
+            {
+                var cfg = EnsureRowIndicatorStartConfig();
+                var mapped = (VolvoxRowIndicatorMode)value;
+                if (cfg.ModeBits != mapped)
+                {
+                    cfg.ModeBits = mapped;
+                    if (mapped != VolvoxRowIndicatorMode.None) cfg.Visible = true;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public int RowIndicatorStartWidth
+        {
+            get { return EnsureRowIndicatorStartConfig().WidthPx ?? 35; }
+            set
+            {
+                int normalized = Math.Max(1, value);
+                var cfg = EnsureRowIndicatorStartConfig();
+                if (cfg.WidthPx != normalized)
+                {
+                    cfg.WidthPx = normalized;
+                    ApplyEngineConfig();
+                }
+            }
         }
 
         public VolvoxGridTreeIndicatorStyle TreeIndicator
@@ -230,28 +355,62 @@ namespace VolvoxGrid.DotNet
             set { if (_engineManagedData) { if (_client != null && _gridId != 0) { _client.ConfigureGrid(_gridId, new VolvoxGridConfigData { Layout = new VolvoxLayoutConfigData { Cols = value } }); } } }
         }
 
-        public int FixedRows
-        {
-            get { return _config.Layout.FixedRows ?? 0; }
-            set { if (_config.Layout.FixedRows != value) { _config.Layout.FixedRows = value; ApplyEngineConfig(); } }
-        }
-
-        public int FixedCols
-        {
-            get { return _config.Layout.FixedCols ?? 0; }
-            set { if (_config.Layout.FixedCols != value) { _config.Layout.FixedCols = value; ApplyEngineConfig(); } }
-        }
-
-        public int FrozenRows
+        public int FrozenRowCount
         {
             get { return _config.Layout.FrozenRows ?? 0; }
             set { if (_config.Layout.FrozenRows != value) { _config.Layout.FrozenRows = value; ApplyEngineConfig(); } }
         }
 
-        public int FrozenCols
+        public int FrozenColCount
         {
             get { return _config.Layout.FrozenCols ?? 0; }
             set { if (_config.Layout.FrozenCols != value) { _config.Layout.FrozenCols = value; ApplyEngineConfig(); } }
+        }
+
+        public int CursorRow
+        {
+            get
+            {
+                if (_client == null || _gridId == 0) return _focusedRowIndex;
+                try { return _client.GetSelection(_gridId).ActiveRow; }
+                catch (Exception ex) { _lastError = ex.Message; return _focusedRowIndex; }
+            }
+            set
+            {
+                if (value < 0 || !EnsureEngine()) return;
+                try
+                {
+                    int col = _focusedColIndex >= 0 ? _focusedColIndex : 0;
+                    var ranges = new[] { new VolvoxCellRangeData { Row1 = value, Col1 = col, Row2 = value, Col2 = col } };
+                    _client.Select(_gridId, value, col, ranges, false);
+                    _renderHost.RequestFrame();
+                    UpdateSelectionFromEngine();
+                }
+                catch (Exception ex) { _lastError = ex.Message; }
+            }
+        }
+
+        public int CursorCol
+        {
+            get
+            {
+                if (_client == null || _gridId == 0) return _focusedColIndex;
+                try { return _client.GetSelection(_gridId).ActiveCol; }
+                catch (Exception ex) { _lastError = ex.Message; return _focusedColIndex; }
+            }
+            set
+            {
+                if (value < 0 || !EnsureEngine()) return;
+                try
+                {
+                    int row = _focusedRowIndex >= 0 ? _focusedRowIndex : 0;
+                    var ranges = new[] { new VolvoxCellRangeData { Row1 = row, Col1 = value, Row2 = row, Col2 = value } };
+                    _client.Select(_gridId, row, value, ranges, false);
+                    _renderHost.RequestFrame();
+                    UpdateSelectionFromEngine();
+                }
+                catch (Exception ex) { _lastError = ex.Message; }
+            }
         }
 
         public int FocusedRowIndex
@@ -274,6 +433,20 @@ namespace VolvoxGrid.DotNet
 
         public string LastError { get { return _lastError ?? string.Empty; } }
         public long CurrentGridId { get { return _gridId; } }
+
+        private VolvoxRowIndicatorConfigData EnsureRowIndicatorStartConfig()
+        {
+            if (_config.IndicatorBands == null) _config.IndicatorBands = new VolvoxIndicatorBandsConfigData();
+            if (_config.IndicatorBands.RowIndicatorStart == null) _config.IndicatorBands.RowIndicatorStart = new VolvoxRowIndicatorConfigData();
+            return _config.IndicatorBands.RowIndicatorStart;
+        }
+
+        private VolvoxColIndicatorConfigData EnsureColIndicatorTopConfig()
+        {
+            if (_config.IndicatorBands == null) _config.IndicatorBands = new VolvoxIndicatorBandsConfigData();
+            if (_config.IndicatorBands.ColIndicatorTop == null) _config.IndicatorBands.ColIndicatorTop = new VolvoxColIndicatorConfigData();
+            return _config.IndicatorBands.ColIndicatorTop;
+        }
 
         #endregion
 
@@ -418,17 +591,6 @@ namespace VolvoxGrid.DotNet
             }
             catch (Exception ex) { _lastError = ex.Message; }
         }
-
-        public int GetRows() { return RowCount; }
-        public int GetCols() { return ColCount; }
-        public int GetFixedRows() { return FixedRows; }
-        public int GetFixedCols() { return FixedCols; }
-        public void SetRows(int value) { SetRowCount(value); }
-        public void SetCols(int value) { SetColCount(value); }
-        public void SetFixedRows(int value) { FixedRows = value; }
-        public void SetFixedCols(int value) { FixedCols = value; }
-        public void SetFixedRowCount(int value) { FixedRows = value; }
-        public void SetFixedColCount(int value) { FixedCols = value; }
 
         public void DefineColumns(
             int index,
@@ -606,7 +768,7 @@ namespace VolvoxGrid.DotNet
             catch (Exception ex) { _lastError = ex.Message; }
         }
 
-        public void SetTextMatrix(int row, int col, string text)
+        public void SetCellText(int row, int col, string text)
         {
             if (row < 0 || col < 0 || !EnsureEngine()) return;
             try
@@ -630,7 +792,7 @@ namespace VolvoxGrid.DotNet
             catch (Exception ex) { _lastError = ex.Message; }
         }
 
-        public string GetTextMatrix(int row, int col)
+        public string GetCellText(int row, int col)
         {
             if (_client == null || _gridId == 0 || row < 0 || col < 0) return string.Empty;
             try
@@ -641,18 +803,7 @@ namespace VolvoxGrid.DotNet
             catch (Exception ex) { _lastError = ex.Message; return string.Empty; }
         }
 
-        public string GetText()
-        {
-            if (_client == null || _gridId == 0) return string.Empty;
-            try
-            {
-                var sel = _client.GetSelection(_gridId);
-                return GetTextMatrix(sel.ActiveRow, sel.ActiveCol);
-            }
-            catch (Exception ex) { _lastError = ex.Message; return string.Empty; }
-        }
-
-        public void SetCellTexts(IEnumerable<VolvoxGridCellText> cells)
+        public void SetCells(IEnumerable<VolvoxGridCellText> cells)
         {
             if (cells == null || !EnsureEngine()) return;
             var updates = new List<VolvoxCellUpdateData>();
@@ -675,8 +826,6 @@ namespace VolvoxGrid.DotNet
             }
             catch (Exception ex) { _lastError = ex.Message; }
         }
-
-        public void SetCells(IEnumerable<VolvoxGridCellText> cells) { SetCellTexts(cells); }
 
         public void LoadTable(int rows, int cols, IEnumerable<object> values, bool atomic = false)
         {
@@ -758,20 +907,6 @@ namespace VolvoxGrid.DotNet
 
         public int[] GetSelectedRows() => (int[])_selectedRows.Clone();
 
-        public void SelectRow(int row) => SelectRows(row);
-
-        public void SelectRows(params int[] indices)
-        {
-            if (!EnsureEngine() || indices == null || indices.Length == 0) return;
-            var rows = indices.Where(r => r >= 0).Distinct().OrderBy(r => r).ToList();
-            if (rows.Count == 0) return;
-            if (!MultiSelect) rows = new List<int> { rows[rows.Count - 1] };
-            int active = rows[rows.Count - 1];
-            var ranges = BuildRangesFromRows(rows, Math.Max(0, _focusedColIndex));
-            try { _client.Select(_gridId, active, Math.Max(0, _focusedColIndex), ranges, false); _renderHost.RequestFrame(); UpdateSelectionFromEngine(); }
-            catch (Exception ex) { _lastError = ex.Message; }
-        }
-
         public void SelectRange(int row1, int col1, int row2, int col2)
         {
             if (!EnsureEngine()) return;
@@ -780,75 +915,86 @@ namespace VolvoxGrid.DotNet
             catch (Exception ex) { _lastError = ex.Message; }
         }
 
-        public void Select(int row1, int col1, int row2, int col2) { SelectRange(row1, col1, row2, col2); }
-
-        public void SetRow(int row)
+        public void SelectRanges(params VolvoxGridCellRange[] ranges)
         {
-            if (row < 0 || !EnsureEngine()) return;
+            if (ranges == null || ranges.Length == 0) return;
+            SelectRanges(ranges[0].Row1, ranges[0].Col1, ranges);
+        }
+
+        public void SelectRanges(int activeRow, int activeCol, params VolvoxGridCellRange[] ranges)
+        {
+            if (!EnsureEngine() || ranges == null || ranges.Length == 0) return;
+            var payload = ranges.Select(r => new VolvoxCellRangeData
+            {
+                Row1 = r.Row1,
+                Col1 = r.Col1,
+                Row2 = r.Row2,
+                Col2 = r.Col2,
+            }).ToArray();
             try
             {
-                int col = _focusedColIndex >= 0 ? _focusedColIndex : 0;
-                var ranges = new[] { new VolvoxCellRangeData { Row1 = row, Col1 = col, Row2 = row, Col2 = col } };
-                _client.Select(_gridId, row, col, ranges, false);
+                _client.Select(_gridId, activeRow, activeCol, payload, false);
                 _renderHost.RequestFrame();
                 UpdateSelectionFromEngine();
             }
             catch (Exception ex) { _lastError = ex.Message; }
         }
 
-        public void SetCol(int col)
+        public int TopRow
         {
-            if (col < 0 || !EnsureEngine()) return;
-            try
+            get
             {
-                int row = _focusedRowIndex >= 0 ? _focusedRowIndex : 0;
-                var ranges = new[] { new VolvoxCellRangeData { Row1 = row, Col1 = col, Row2 = row, Col2 = col } };
-                _client.Select(_gridId, row, col, ranges, false);
-                _renderHost.RequestFrame();
-                UpdateSelectionFromEngine();
+                if (_client == null || _gridId == 0) return 0;
+                try { return _client.GetSelection(_gridId).TopRow; }
+                catch (Exception ex) { _lastError = ex.Message; return 0; }
             }
-            catch (Exception ex) { _lastError = ex.Message; }
-        }
-
-        public int GetRow()
-        {
-            if (_client == null || _gridId == 0) return _focusedRowIndex;
-            try { return _client.GetSelection(_gridId).ActiveRow; }
-            catch (Exception ex) { _lastError = ex.Message; return _focusedRowIndex; }
-        }
-
-        public int GetCol()
-        {
-            if (_client == null || _gridId == 0) return _focusedColIndex;
-            try { return _client.GetSelection(_gridId).ActiveCol; }
-            catch (Exception ex) { _lastError = ex.Message; return _focusedColIndex; }
-        }
-
-        public int GetTopRow()
-        {
-            if (_client == null || _gridId == 0) return 0;
-            try { return _client.GetSelection(_gridId).TopRow; }
-            catch (Exception ex) { _lastError = ex.Message; return 0; }
-        }
-
-        public void SetTopRow(int row, int? col = null)
-        {
-            if (row < 0 || !EnsureEngine()) return;
-            try
+            set
             {
-                int activeCol = col ?? _focusedColIndex;
-                if (activeCol < 0) activeCol = 0;
-                var ranges = new[] { new VolvoxCellRangeData { Row1 = row, Col1 = activeCol, Row2 = row, Col2 = activeCol } };
-                _client.Select(_gridId, row, activeCol, ranges, true);
-                _renderHost.RequestFrame();
-                UpdateSelectionFromEngine();
+                if (value < 0 || !EnsureEngine()) return;
+                try
+                {
+                    _client.SetTopRow(_gridId, value);
+                    _renderHost.RequestFrame();
+                }
+                catch (Exception ex) { _lastError = ex.Message; }
             }
-            catch (Exception ex) { _lastError = ex.Message; }
         }
 
-        public VolvoxGridSelectionState GetSelectionState()
+        public int LeftCol
         {
-            var state = new VolvoxGridSelectionState { ActiveRow = _focusedRowIndex, ActiveCol = _focusedColIndex, RowEnd = _focusedRowIndex, ColEnd = _focusedColIndex, TopRow = 0 };
+            get
+            {
+                if (_client == null || _gridId == 0) return 0;
+                try { return _client.GetSelection(_gridId).LeftCol; }
+                catch (Exception ex) { _lastError = ex.Message; return 0; }
+            }
+            set
+            {
+                if (value < 0 || !EnsureEngine()) return;
+                try
+                {
+                    _client.SetLeftCol(_gridId, value);
+                    _renderHost.RequestFrame();
+                }
+                catch (Exception ex) { _lastError = ex.Message; }
+            }
+        }
+
+        public VolvoxGridSelectionState GetSelection()
+        {
+            var state = new VolvoxGridSelectionState
+            {
+                ActiveRow = _focusedRowIndex,
+                ActiveCol = _focusedColIndex,
+                RowEnd = _focusedRowIndex,
+                ColEnd = _focusedColIndex,
+                TopRow = 0,
+                LeftCol = 0,
+                BottomRow = 0,
+                RightCol = 0,
+                MouseRow = 0,
+                MouseCol = 0,
+            };
             if (_client == null || _gridId == 0) return state;
             try
             {
@@ -857,7 +1003,10 @@ namespace VolvoxGrid.DotNet
                 int colEnd = sel.ActiveCol;
                 if (sel.Ranges != null && sel.Ranges.Count > 0)
                 {
-                    var r = sel.Ranges[0];
+                    var r = sel.Ranges.FirstOrDefault(range =>
+                        (range.Row1 == sel.ActiveRow && range.Col1 == sel.ActiveCol)
+                        || (range.Row2 == sel.ActiveRow && range.Col2 == sel.ActiveCol))
+                        ?? sel.Ranges[0];
                     if (r.Row1 == sel.ActiveRow && r.Col1 == sel.ActiveCol) { rowEnd = r.Row2; colEnd = r.Col2; }
                     else if (r.Row2 == sel.ActiveRow && r.Col2 == sel.ActiveCol) { rowEnd = r.Row1; colEnd = r.Col1; }
                     else { rowEnd = r.Row2; colEnd = r.Col2; }
@@ -868,6 +1017,11 @@ namespace VolvoxGrid.DotNet
                 state.RowEnd = rowEnd;
                 state.ColEnd = colEnd;
                 state.TopRow = sel.TopRow;
+                state.LeftCol = sel.LeftCol;
+                state.BottomRow = sel.BottomRow;
+                state.RightCol = sel.RightCol;
+                state.MouseRow = sel.MouseRow;
+                state.MouseCol = sel.MouseCol;
                 state.Ranges = sel.Ranges.Select(r => new VolvoxGridCellRange(r.Row1, r.Col1, r.Row2, r.Col2)).ToArray();
                 return state;
             }
@@ -877,14 +1031,23 @@ namespace VolvoxGrid.DotNet
         public void ClearSelection()
         {
             if (!EnsureEngine()) return;
-            try { _client.Clear(_gridId, VolvoxClearScope.Selection, VolvoxClearRegion.Scrollable); _selectedRows = new int[0]; _renderHost.RequestFrame(); SelectionChanged?.Invoke(this, new VolvoxGridSelectionChangedEventArgs(_selectedRows)); }
+            try
+            {
+                var sel = _client.GetSelection(_gridId);
+                var row = sel.ActiveRow;
+                var col = sel.ActiveCol;
+                var ranges = new[] { new VolvoxCellRangeData { Row1 = row, Col1 = col, Row2 = row, Col2 = col } };
+                _client.Select(_gridId, row, col, ranges, false);
+                _renderHost.RequestFrame();
+                UpdateSelectionFromEngine();
+            }
             catch (Exception ex) { _lastError = ex.Message; }
         }
 
         public void ShowCell(int row, int col)
         {
             if (_client == null || _gridId == 0) return;
-            _client.Select(_gridId, row, col, new VolvoxCellRangeData[0], true);
+            _client.ShowCell(_gridId, row, col);
             _renderHost.RequestFrame();
         }
 
@@ -892,7 +1055,7 @@ namespace VolvoxGrid.DotNet
 
         #region Public Methods - Actions (Sort, Subtotal, Outline, etc.)
 
-        public bool ApplySort(string fieldName, VolvoxGridSortDirection direction)
+        public bool Sort(string fieldName, VolvoxGridSortDirection direction)
         {
             int col = GetColumnIndex(fieldName);
             if (col < 0 || !EnsureEngine()) return false;
@@ -903,7 +1066,7 @@ namespace VolvoxGrid.DotNet
             catch (Exception ex) { _lastError = ex.Message; return false; }
         }
 
-        public void SortByColumn(int col, bool ascending)
+        public void Sort(int col, bool ascending)
         {
             if (col < 0 || !EnsureEngine()) return;
             try
@@ -928,7 +1091,7 @@ namespace VolvoxGrid.DotNet
             _renderHost.RequestFrame();
         }
 
-        public void AutoSizeColumns(int colFrom = 0, int colTo = -1, bool equal = false, int maxWidth = 0)
+        public new void AutoSize(int colFrom = 0, int colTo = -1, bool equal = false, int maxWidth = 0)
         {
             if (_client == null || _gridId == 0) return;
             _client.AutoSize(_gridId, colFrom, colTo, equal, maxWidth);
@@ -953,20 +1116,17 @@ namespace VolvoxGrid.DotNet
 
         #region Public Methods - Find & Aggregate
 
-        public int FindRow(string text, int col, int startRow = 0, bool caseSensitive = false, bool fullMatch = false)
+        public int FindRowByText(string text, int col, int startRow = 0, bool caseSensitive = false, bool fullMatch = false)
         {
             if (_client == null || _gridId == 0) return -1;
             return _client.Find(_gridId, col, startRow, text, caseSensitive, fullMatch, null);
         }
 
-        public int FindRowRegex(string pattern, int col, int startRow = 0)
+        public int FindRowByRegex(string pattern, int col, int startRow = 0)
         {
             if (_client == null || _gridId == 0) return -1;
             return _client.Find(_gridId, col, startRow, null, false, false, pattern);
         }
-
-        public int FindRowByRegex(string pattern, int col, int startRow = 0) { return FindRowRegex(pattern, col, startRow); }
-        public int FindRowByText(string text, int col, int startRow = 0, bool caseSensitive = false, bool fullMatch = false) { return FindRow(text, col, startRow, caseSensitive, fullMatch); }
 
         public double Aggregate(VolvoxGridAggregateType agg, int row1, int col1, int row2, int col2)
         {
@@ -1022,10 +1182,8 @@ namespace VolvoxGrid.DotNet
 
         #region Public Methods - Clipboard
 
-        public VolvoxGridClipboardData CopyClipboard() { return Clipboard("copy", null, false); }
-        public VolvoxGridClipboardData CutClipboard() { return Clipboard("cut", null, true); }
-        public void Copy() { CopyClipboard(); }
-        public void Cut() { CutClipboard(); }
+        public VolvoxGridClipboardData Copy() { return Clipboard("copy", null, false); }
+        public VolvoxGridClipboardData Cut() { return Clipboard("cut", null, true); }
         public void Paste(string text = null) { Clipboard("paste", text, true); }
         public void DeleteSelection() { Clipboard("delete", null, true); }
 
@@ -1046,15 +1204,19 @@ namespace VolvoxGrid.DotNet
                 _engineManagedData = true;
                 _engineRowCountHint = ResolveDemoRowCountHint(demo);
                 _tableModel = null;
-                PushColumnsForEngineData();
                 _client.LoadDemo(_gridId, demo);
+                PopulateColumnsFromDemoMetadata(demo);
+                SyncConfigFromEngine();
+                _engineRowCountHint = _config.Layout != null && _config.Layout.Rows.HasValue
+                    ? _config.Layout.Rows.Value
+                    : ResolveDemoRowCountHint(demo);
                 _client.Refresh(_gridId); _renderHost.RequestFrame();
                 _lastError = null; return true;
             }
             catch (Exception ex) { _lastError = ex.Message; return false; }
         }
 
-        public void EditCell(int row, int col, bool? selectAll = null, bool? caretEnd = null, string seedText = null)
+        public void BeginEdit(int row, int col, bool? selectAll = null, bool? caretEnd = null, string seedText = null)
         {
             if (row < 0 || col < 0 || !EnsureEngine()) return;
             try { _client.EditStart(_gridId, row, col, selectAll, caretEnd, seedText); _renderHost.RequestFrame(); }
@@ -1151,7 +1313,7 @@ namespace VolvoxGrid.DotNet
             finally
             {
                 SetRedraw(true);
-                if (refreshAfter) RefreshGrid();
+                if (refreshAfter) Refresh();
             }
         }
 
@@ -1179,8 +1341,9 @@ namespace VolvoxGrid.DotNet
             catch (Exception ex) { _lastError = ex.Message; }
         }
 
-        public void RefreshGrid()
+        public override void Refresh()
         {
+            base.Refresh();
             if (_client == null || _gridId == 0) return;
             try { _client.Refresh(_gridId); _renderHost.RequestFrame(); }
             catch (Exception ex) { _lastError = ex.Message; }
@@ -1235,6 +1398,7 @@ namespace VolvoxGrid.DotNet
 
         private void ApplyEngineConfig()
         {
+            SyncRenderHostSelectionMode();
             if (_client != null && _gridId != 0) { _client.ConfigureGrid(_gridId, _config); _renderHost.RequestFrame(); }
         }
 
@@ -1357,6 +1521,78 @@ namespace VolvoxGrid.DotNet
         {
             _columns.Clear();
             foreach (var s in modelCols) _columns.Add(new VolvoxGridColumn { FieldName = s.Key, Caption = string.IsNullOrEmpty(s.Caption) ? s.Key : s.Caption, Width = s.Width ?? 120, Visible = !s.Hidden, SortDirection = (VolvoxGridSortDirection)s.SortOrder, Alignment = (VolvoxGridAlign)(s.Alignment ?? VolvoxAlign.General), DataType = (VolvoxGridColumnDataType)(s.DataType ?? VolvoxColumnDataType.String), Format = s.Format });
+        }
+
+        private void PopulateColumnsFromDemoMetadata(string demo)
+        {
+            string key = (demo ?? string.Empty).Trim().ToLowerInvariant();
+            _columns.Clear();
+
+            switch (key)
+            {
+                case "sales":
+                    AddDemoColumns(
+                        new[] { "Q", "Region", "Category", "Product", "Sales", "Cost", "Margin%", "Status", "Notes" },
+                        new[] { 40, 80, 100, 120, 90, 90, 70, 80, 140 });
+                    break;
+                case "hierarchy":
+                    AddDemoColumns(
+                        new[] { "Name", "Type", "Size", "Modified", "Permissions" },
+                        new[] { 260, 80, 80, 120, 100 });
+                    break;
+                case "stress":
+                    AddDemoColumns(
+                        new[] { "Text", "Number", "Currency", "Pct", "Date", "Bool", "Combo", "Long Text", "Formatted", "Rating", "Code" },
+                        new[] { 110, 80, 90, 60, 100, 50, 90, 160, 90, 60, 100 });
+                    break;
+            }
+        }
+
+        private void AddDemoColumns(string[] captions, int[] widths)
+        {
+            if (captions == null || widths == null) return;
+            int count = Math.Min(captions.Length, widths.Length);
+            for (int i = 0; i < count; i++)
+            {
+                _columns.Add(new VolvoxGridColumn
+                {
+                    FieldName = "c" + i,
+                    Caption = captions[i],
+                    Width = widths[i],
+                });
+            }
+        }
+
+        private void SyncConfigFromEngine()
+        {
+            if (_client == null || _gridId == 0) return;
+            try
+            {
+                var config = _client.GetConfig(_gridId);
+                if (config == null) return;
+                _config.Layout = config.Layout ?? new VolvoxLayoutConfigData();
+                _config.Selection = config.Selection ?? new VolvoxSelectionConfigData();
+                _config.Editing = config.Editing ?? new VolvoxEditConfigData();
+                _config.Scrolling = config.Scrolling ?? new VolvoxScrollConfigData();
+                _config.Outline = config.Outline ?? new VolvoxOutlineConfigData();
+                _config.Span = config.Span ?? new VolvoxSpanConfigData();
+                _config.Interaction = config.Interaction ?? new VolvoxInteractionConfigData();
+                _config.Rendering = config.Rendering ?? new VolvoxRenderConfigData();
+                _config.IndicatorBands = config.IndicatorBands ?? new VolvoxIndicatorBandsConfigData();
+                SyncRenderHostSelectionMode();
+            }
+            catch (Exception ex)
+            {
+                _lastError = ex.Message;
+            }
+        }
+
+        private void SyncRenderHostSelectionMode()
+        {
+            if (_renderHost != null)
+            {
+                _renderHost.SelectionMode = _config.Selection.Mode ?? VolvoxSelectionMode.Free;
+            }
         }
 
         private int GetColumnIndex(string name) => string.IsNullOrEmpty(name) ? -1 : _columns.FindIndex(c => string.Equals(c.FieldName, name, StringComparison.OrdinalIgnoreCase));

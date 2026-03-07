@@ -9,7 +9,7 @@ import type { ExcelGridConfig } from "../proto/config-encoder.js";
 
 const GRIDLINE_SOLID = 1;
 const FOCUS_BORDER_THICK = 2;
-const SELECTION_FREE = 0;
+const SELECTION_MULTI_RANGE = 4;
 const FILL_HANDLE_BOTTOM_RIGHT = 1;
 const EDIT_TRIGGER_KEY_CLICK = 2; // Engine allows editing; host_key_dispatch controls keyboard triggers
 const TAB_CELLS = 1;
@@ -47,10 +47,8 @@ export function buildExcelConfig(opts?: {
       : 11;
   return {
     // Layout
-    rows: opts?.rows ?? 101,         // 1 header + 100 data rows
-    cols: opts?.cols ?? 27,          // 1 row-number col + 26 data cols
-    fixedRows: 1,
-    fixedCols: 1,
+    rows: opts?.rows ?? 100,
+    cols: opts?.cols ?? 26,
     defaultRowHeight: opts?.defaultRowHeight ?? 21,
     defaultColWidth: opts?.defaultColWidth ?? 64,
     textOverflow: true,
@@ -70,7 +68,7 @@ export function buildExcelConfig(opts?: {
     fontBold: false,
 
     // Selection
-    selectionMode: SELECTION_FREE,
+    selectionMode: SELECTION_MULTI_RANGE,
     focusBorder: FOCUS_BORDER_THICK,
     selectionStyle: {
       backColor: EXCEL_COLORS.selectionBg,

@@ -11,8 +11,9 @@ import { FormulaEngine } from "./formula-engine.js";
 export class ClipboardManager {
   private store: DataStore;
   private undoStack: UndoRedoStack;
-  private cutRange: CellRange | null = null;
-  private lastCopiedRange: CellRange | null = null;
+  private cutRanges: CellRange[] | null = null;
+  private lastCopiedRanges: CellRange[] | null = null;
+  private lastCopiedBoundingRange: CellRange | null = null;
   private lastCopiedData: string[][] | null = null;
   private lastCopiedTsv: string | null = null;
 
@@ -21,13 +22,18 @@ export class ClipboardManager {
     this.undoStack = undoStack;
   }
 
-  /** Copy selected range to clipboard as TSV. */
-  async copy(range: CellRange): Promise<void> {
-    this.cutRange = null;
-    const copiedData = this.captureRangeRaw(range);
+  /** Copy selected ranges to clipboard as TSV/HTML. */
+  async copy(ranges: ReadonlyArray<CellRange>): Promise<void> {
+    const normalizedRanges = this.normalizeRanges(ranges);
+    if (normalizedRanges.length === 0) return;
+
+    this.cutRanges = null;
+    const boundingRange = this.getBoundingRange(normalizedRanges);
+    const copiedData = this.captureRangesRaw(normalizedRanges, boundingRange);
     const tsv = this.rowsToTsv(copiedData);
-    const html = this.rangeToHtml(range);
-    this.lastCopiedRange = { ...range };
+    const html = this.rowsToHtml(copiedData);
+    this.lastCopiedRanges = normalizedRanges.map((range) => ({ ...range }));
+    this.lastCopiedBoundingRange = { ...boundingRange };
     this.lastCopiedData = copiedData.map((row) => [...row]);
     this.lastCopiedTsv = tsv;
 
@@ -50,9 +56,11 @@ export class ClipboardManager {
   }
 
   /** Cut selected range (copy + mark for clear on paste). */
-  async cut(range: CellRange): Promise<void> {
-    await this.copy(range);
-    this.cutRange = { ...range };
+  async cut(ranges: ReadonlyArray<CellRange>): Promise<void> {
+    const normalizedRanges = this.normalizeRanges(ranges);
+    if (normalizedRanges.length === 0) return;
+    await this.copy(normalizedRanges);
+    this.cutRanges = normalizedRanges.map((range) => ({ ...range }));
   }
 
   /** Paste from clipboard text at the given cell position. */
@@ -74,7 +82,7 @@ export class ClipboardManager {
     const internalCopyMatch =
       text == null
       && this.lastCopiedTsv != null
-      && this.lastCopiedRange != null
+      && this.lastCopiedBoundingRange != null
       && this.lastCopiedData != null
       && pasteText === this.lastCopiedTsv;
 
@@ -89,9 +97,9 @@ export class ClipboardManager {
         const targetCol = dataCol + c;
         const oldValue = this.store.getCellRawValue(targetRow, targetCol);
         let newValue = rows[r][c];
-        if (internalCopyMatch && this.lastCopiedRange) {
-          const sourceRow = this.lastCopiedRange.row1 + r;
-          const sourceCol = this.lastCopiedRange.col1 + c;
+        if (internalCopyMatch && this.lastCopiedBoundingRange) {
+          const sourceRow = this.lastCopiedBoundingRange.row1 + r;
+          const sourceCol = this.lastCopiedBoundingRange.col1 + c;
           if (FormulaEngine.isFormula(newValue)) {
             newValue = FormulaEngine.rewriteReferencesByOffset(
               newValue,
@@ -106,17 +114,19 @@ export class ClipboardManager {
       }
     }
 
-    // If this was a cut, clear the original range
-    if (this.cutRange) {
-      for (let r = this.cutRange.row1; r <= this.cutRange.row2; r++) {
-        for (let c = this.cutRange.col1; c <= this.cutRange.col2; c++) {
-          const oldValue = this.store.getCellRawValue(r, c);
-          if (oldValue !== "") {
-            commands.push(new CellValueChange(this.store, r, c, oldValue, ""));
+    // If this was a cut, clear the original selected cells.
+    if (this.cutRanges) {
+      for (const range of this.cutRanges) {
+        for (let r = range.row1; r <= range.row2; r++) {
+          for (let c = range.col1; c <= range.col2; c++) {
+            const oldValue = this.store.getCellRawValue(r, c);
+            if (oldValue !== "") {
+              commands.push(new CellValueChange(this.store, r, c, oldValue, ""));
+            }
           }
         }
       }
-      this.cutRange = null;
+      this.cutRanges = null;
     }
 
     if (commands.length > 0) {
@@ -124,16 +134,15 @@ export class ClipboardManager {
     }
   }
 
-  private rangeToTsv(range: CellRange): string {
-    return this.rowsToTsv(this.captureRangeRaw(range));
-  }
-
-  private captureRangeRaw(range: CellRange): string[][] {
+  private captureRangesRaw(ranges: ReadonlyArray<CellRange>, boundingRange: CellRange): string[][] {
     const rows: string[][] = [];
-    for (let r = range.row1; r <= range.row2; r++) {
+    for (let r = boundingRange.row1; r <= boundingRange.row2; r++) {
       const cells: string[] = [];
-      for (let c = range.col1; c <= range.col2; c++) {
-        cells.push(this.store.getCellRawValue(r, c));
+      for (let c = boundingRange.col1; c <= boundingRange.col2; c++) {
+        const included = ranges.some((range) =>
+          r >= range.row1 && r <= range.row2 && c >= range.col1 && c <= range.col2,
+        );
+        cells.push(included ? this.store.getCellRawValue(r, c) : "");
       }
       rows.push(cells);
     }
@@ -148,12 +157,11 @@ export class ClipboardManager {
     return lines.join("\n");
   }
 
-  private rangeToHtml(range: CellRange): string {
+  private rowsToHtml(rows: string[][]): string {
     let html = "<table>";
-    for (let r = range.row1; r <= range.row2; r++) {
+    for (const row of rows) {
       html += "<tr>";
-      for (let c = range.col1; c <= range.col2; c++) {
-        const value = this.store.getCellRawValue(r, c);
+      for (const value of row) {
         html += `<td>${this.escapeHtml(value)}</td>`;
       }
       html += "</tr>";
@@ -172,5 +180,28 @@ export class ClipboardManager {
 
   private parseTsv(text: string): string[][] {
     return text.split(/\r?\n/).map(line => line.split("\t"));
+  }
+
+  private normalizeRanges(ranges: ReadonlyArray<CellRange>): CellRange[] {
+    return ranges.map((range) => ({
+      row1: Math.min(range.row1, range.row2),
+      col1: Math.min(range.col1, range.col2),
+      row2: Math.max(range.row1, range.row2),
+      col2: Math.max(range.col1, range.col2),
+    }));
+  }
+
+  private getBoundingRange(ranges: ReadonlyArray<CellRange>): CellRange {
+    let row1 = ranges[0].row1;
+    let col1 = ranges[0].col1;
+    let row2 = ranges[0].row2;
+    let col2 = ranges[0].col2;
+    for (const range of ranges) {
+      row1 = Math.min(row1, range.row1);
+      col1 = Math.min(col1, range.col1);
+      row2 = Math.max(row2, range.row2);
+      col2 = Math.max(col2, range.col2);
+    }
+    return { row1, col1, row2, col2 };
   }
 }

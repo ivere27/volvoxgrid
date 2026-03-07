@@ -812,6 +812,30 @@ final $typed_data.Uint8List nodeRelationDescriptor = $convert.base64Decode(
     'oPTk9ERV9MQVNUX0NISUxEEAISFQoRTk9ERV9ORVhUX1NJQkxJTkcQAxIVChFOT0RFX1BSRVZf'
     'U0lCTElORxAE');
 
+@$core.Deprecated('Use errorCodeDescriptor instead')
+const ErrorCode$json = {
+  '1': 'ErrorCode',
+  '2': [
+    {'1': 'ERROR_UNKNOWN', '2': 0},
+    {'1': 'ERROR_INVALID_ARGUMENT', '2': 1},
+    {'1': 'ERROR_NOT_FOUND', '2': 2},
+    {'1': 'ERROR_INVALID_STATE', '2': 3},
+    {'1': 'ERROR_TYPE_VIOLATION', '2': 4},
+    {'1': 'ERROR_DECODE_FAILED', '2': 5},
+    {'1': 'ERROR_ENCODE_FAILED', '2': 6},
+    {'1': 'ERROR_NOT_IMPLEMENTED', '2': 7},
+    {'1': 'ERROR_INTERNAL', '2': 8},
+  ],
+};
+
+/// Descriptor for `ErrorCode`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List errorCodeDescriptor = $convert.base64Decode(
+    'CglFcnJvckNvZGUSEQoNRVJST1JfVU5LTk9XThAAEhoKFkVSUk9SX0lOVkFMSURfQVJHVU1FTl'
+    'QQARITCg9FUlJPUl9OT1RfRk9VTkQQAhIXChNFUlJPUl9JTlZBTElEX1NUQVRFEAMSGAoURVJS'
+    'T1JfVFlQRV9WSU9MQVRJT04QBBIXChNFUlJPUl9ERUNPREVfRkFJTEVEEAUSFwoTRVJST1JfRU'
+    '5DT0RFX0ZBSUxFRBAGEhkKFUVSUk9SX05PVF9JTVBMRU1FTlRFRBAHEhIKDkVSUk9SX0lOVEVS'
+    'TkFMEAg=');
+
 @$core.Deprecated('Use iconAlignDescriptor instead')
 const IconAlign$json = {
   '1': 'IconAlign',
@@ -829,6 +853,108 @@ final $typed_data.Uint8List iconAlignDescriptor = $convert.base64Decode(
     'CglJY29uQWxpZ24SGQoVSUNPTl9BTElHTl9JTkxJTkVfRU5EEAASGwoXSUNPTl9BTElHTl9JTk'
     'xJTkVfU1RBUlQQARIUChBJQ09OX0FMSUdOX1NUQVJUEAISEgoOSUNPTl9BTElHTl9FTkQQAxIV'
     'ChFJQ09OX0FMSUdOX0NFTlRFUhAE');
+
+@$core.Deprecated('Use rowIndicatorSlotKindDescriptor instead')
+const RowIndicatorSlotKind$json = {
+  '1': 'RowIndicatorSlotKind',
+  '2': [
+    {'1': 'ROW_INDICATOR_SLOT_NONE', '2': 0},
+    {'1': 'ROW_INDICATOR_SLOT_NUMBERS', '2': 1},
+    {'1': 'ROW_INDICATOR_SLOT_CURRENT', '2': 2},
+    {'1': 'ROW_INDICATOR_SLOT_SELECTION', '2': 3},
+    {'1': 'ROW_INDICATOR_SLOT_CHECKBOX', '2': 4},
+    {'1': 'ROW_INDICATOR_SLOT_HANDLE', '2': 5},
+    {'1': 'ROW_INDICATOR_SLOT_EDITING', '2': 6},
+    {'1': 'ROW_INDICATOR_SLOT_MODIFIED', '2': 7},
+    {'1': 'ROW_INDICATOR_SLOT_ERROR', '2': 8},
+    {'1': 'ROW_INDICATOR_SLOT_NEW_ROW', '2': 9},
+    {'1': 'ROW_INDICATOR_SLOT_EXPANDER', '2': 10},
+    {'1': 'ROW_INDICATOR_SLOT_RESIZE', '2': 11},
+    {'1': 'ROW_INDICATOR_SLOT_ACTION', '2': 12},
+    {'1': 'ROW_INDICATOR_SLOT_STATUS_ICON', '2': 13},
+    {'1': 'ROW_INDICATOR_SLOT_CUSTOM', '2': 14},
+  ],
+};
+
+/// Descriptor for `RowIndicatorSlotKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List rowIndicatorSlotKindDescriptor = $convert.base64Decode(
+    'ChRSb3dJbmRpY2F0b3JTbG90S2luZBIbChdST1dfSU5ESUNBVE9SX1NMT1RfTk9ORRAAEh4KGl'
+    'JPV19JTkRJQ0FUT1JfU0xPVF9OVU1CRVJTEAESHgoaUk9XX0lORElDQVRPUl9TTE9UX0NVUlJF'
+    'TlQQAhIgChxST1dfSU5ESUNBVE9SX1NMT1RfU0VMRUNUSU9OEAMSHwobUk9XX0lORElDQVRPUl'
+    '9TTE9UX0NIRUNLQk9YEAQSHQoZUk9XX0lORElDQVRPUl9TTE9UX0hBTkRMRRAFEh4KGlJPV19J'
+    'TkRJQ0FUT1JfU0xPVF9FRElUSU5HEAYSHwobUk9XX0lORElDQVRPUl9TTE9UX01PRElGSUVEEA'
+    'cSHAoYUk9XX0lORElDQVRPUl9TTE9UX0VSUk9SEAgSHgoaUk9XX0lORElDQVRPUl9TTE9UX05F'
+    'V19ST1cQCRIfChtST1dfSU5ESUNBVE9SX1NMT1RfRVhQQU5ERVIQChIdChlST1dfSU5ESUNBVE'
+    '9SX1NMT1RfUkVTSVpFEAsSHQoZUk9XX0lORElDQVRPUl9TTE9UX0FDVElPThAMEiIKHlJPV19J'
+    'TkRJQ0FUT1JfU0xPVF9TVEFUVVNfSUNPThANEh0KGVJPV19JTkRJQ0FUT1JfU0xPVF9DVVNUT0'
+    '0QDg==');
+
+@$core.Deprecated('Use rowIndicatorModeDescriptor instead')
+const RowIndicatorMode$json = {
+  '1': 'RowIndicatorMode',
+  '2': [
+    {'1': 'ROW_INDICATOR_NONE', '2': 0},
+    {'1': 'ROW_INDICATOR_NUMBERS', '2': 1},
+    {'1': 'ROW_INDICATOR_CURRENT', '2': 2},
+    {'1': 'ROW_INDICATOR_SELECTION', '2': 4},
+    {'1': 'ROW_INDICATOR_CHECKBOX', '2': 8},
+    {'1': 'ROW_INDICATOR_HANDLE', '2': 16},
+    {'1': 'ROW_INDICATOR_EDITING', '2': 32},
+    {'1': 'ROW_INDICATOR_MODIFIED', '2': 64},
+    {'1': 'ROW_INDICATOR_ERROR', '2': 128},
+    {'1': 'ROW_INDICATOR_NEW_ROW', '2': 256},
+    {'1': 'ROW_INDICATOR_EXPANDER', '2': 512},
+    {'1': 'ROW_INDICATOR_RESIZE', '2': 1024},
+    {'1': 'ROW_INDICATOR_ACTION', '2': 2048},
+    {'1': 'ROW_INDICATOR_STATUS_ICON', '2': 4096},
+    {'1': 'ROW_INDICATOR_CUSTOM', '2': 8192},
+  ],
+};
+
+/// Descriptor for `RowIndicatorMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List rowIndicatorModeDescriptor = $convert.base64Decode(
+    'ChBSb3dJbmRpY2F0b3JNb2RlEhYKElJPV19JTkRJQ0FUT1JfTk9ORRAAEhkKFVJPV19JTkRJQ0'
+    'FUT1JfTlVNQkVSUxABEhkKFVJPV19JTkRJQ0FUT1JfQ1VSUkVOVBACEhsKF1JPV19JTkRJQ0FU'
+    'T1JfU0VMRUNUSU9OEAQSGgoWUk9XX0lORElDQVRPUl9DSEVDS0JPWBAIEhgKFFJPV19JTkRJQ0'
+    'FUT1JfSEFORExFEBASGQoVUk9XX0lORElDQVRPUl9FRElUSU5HECASGgoWUk9XX0lORElDQVRP'
+    'Ul9NT0RJRklFRBBAEhgKE1JPV19JTkRJQ0FUT1JfRVJST1IQgAESGgoVUk9XX0lORElDQVRPUl'
+    '9ORVdfUk9XEIACEhsKFlJPV19JTkRJQ0FUT1JfRVhQQU5ERVIQgAQSGQoUUk9XX0lORElDQVRP'
+    'Ul9SRVNJWkUQgAgSGQoUUk9XX0lORElDQVRPUl9BQ1RJT04QgBASHgoZUk9XX0lORElDQVRPUl'
+    '9TVEFUVVNfSUNPThCAIBIZChRST1dfSU5ESUNBVE9SX0NVU1RPTRCAQA==');
+
+@$core.Deprecated('Use colIndicatorCellModeDescriptor instead')
+const ColIndicatorCellMode$json = {
+  '1': 'ColIndicatorCellMode',
+  '2': [
+    {'1': 'COL_INDICATOR_CELL_NONE', '2': 0},
+    {'1': 'COL_INDICATOR_CELL_HEADER_TEXT', '2': 1},
+    {'1': 'COL_INDICATOR_CELL_SORT_GLYPH', '2': 2},
+    {'1': 'COL_INDICATOR_CELL_SORT_PRIORITY', '2': 4},
+    {'1': 'COL_INDICATOR_CELL_FILTER_BUTTON', '2': 8},
+    {'1': 'COL_INDICATOR_CELL_FILTER_STATE', '2': 16},
+    {'1': 'COL_INDICATOR_CELL_MENU_BUTTON', '2': 32},
+    {'1': 'COL_INDICATOR_CELL_CHOOSER', '2': 64},
+    {'1': 'COL_INDICATOR_CELL_DRAG_REORDER', '2': 128},
+    {'1': 'COL_INDICATOR_CELL_HIDDEN_MARKER', '2': 256},
+    {'1': 'COL_INDICATOR_CELL_RESIZE_HANDLE', '2': 512},
+    {'1': 'COL_INDICATOR_CELL_SELECT_ALL', '2': 1024},
+    {'1': 'COL_INDICATOR_CELL_STATUS_ICON', '2': 2048},
+    {'1': 'COL_INDICATOR_CELL_CUSTOM', '2': 4096},
+  ],
+};
+
+/// Descriptor for `ColIndicatorCellMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List colIndicatorCellModeDescriptor = $convert.base64Decode(
+    'ChRDb2xJbmRpY2F0b3JDZWxsTW9kZRIbChdDT0xfSU5ESUNBVE9SX0NFTExfTk9ORRAAEiIKHk'
+    'NPTF9JTkRJQ0FUT1JfQ0VMTF9IRUFERVJfVEVYVBABEiEKHUNPTF9JTkRJQ0FUT1JfQ0VMTF9T'
+    'T1JUX0dMWVBIEAISJAogQ09MX0lORElDQVRPUl9DRUxMX1NPUlRfUFJJT1JJVFkQBBIkCiBDT0'
+    'xfSU5ESUNBVE9SX0NFTExfRklMVEVSX0JVVFRPThAIEiMKH0NPTF9JTkRJQ0FUT1JfQ0VMTF9G'
+    'SUxURVJfU1RBVEUQEBIiCh5DT0xfSU5ESUNBVE9SX0NFTExfTUVOVV9CVVRUT04QIBIeChpDT0'
+    'xfSU5ESUNBVE9SX0NFTExfQ0hPT1NFUhBAEiQKH0NPTF9JTkRJQ0FUT1JfQ0VMTF9EUkFHX1JF'
+    'T1JERVIQgAESJQogQ09MX0lORElDQVRPUl9DRUxMX0hJRERFTl9NQVJLRVIQgAISJQogQ09MX0'
+    'lORElDQVRPUl9DRUxMX1JFU0laRV9IQU5ETEUQgAQSIgodQ09MX0lORElDQVRPUl9DRUxMX1NF'
+    'TEVDVF9BTEwQgAgSIwoeQ09MX0lORElDQVRPUl9DRUxMX1NUQVRVU19JQ09OEIAQEh4KGUNPTF'
+    '9JTkRJQ0FUT1JfQ0VMTF9DVVNUT00QgCA=');
 
 @$core.Deprecated('Use emptyDescriptor instead')
 const Empty$json = {
@@ -850,6 +976,27 @@ const GridHandle$json = {
 /// Descriptor for `GridHandle`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List gridHandleDescriptor =
     $convert.base64Decode('CgpHcmlkSGFuZGxlEg4KAmlkGAEgASgDUgJpZA==');
+
+@$core.Deprecated('Use rpcErrorDescriptor instead')
+const RpcError$json = {
+  '1': 'RpcError',
+  '2': [
+    {
+      '1': 'code',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.ErrorCode',
+      '10': 'code'
+    },
+    {'1': 'message', '3': 2, '4': 1, '5': 9, '10': 'message'},
+  ],
+};
+
+/// Descriptor for `RpcError`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List rpcErrorDescriptor = $convert.base64Decode(
+    'CghScGNFcnJvchIsCgRjb2RlGAEgASgOMhgudm9sdm94Z3JpZC52MS5FcnJvckNvZGVSBGNvZG'
+    'USGAoHbWVzc2FnZRgCIAEoCVIHbWVzc2FnZQ==');
 
 @$core.Deprecated('Use imageDataDescriptor instead')
 const ImageData$json = {
@@ -1742,6 +1889,14 @@ const GridConfig$json = {
       '10': 'rendering'
     },
     {'1': 'version', '3': 10, '4': 1, '5': 9, '10': 'version'},
+    {
+      '1': 'indicator_bands',
+      '3': 11,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.IndicatorBandsConfig',
+      '10': 'indicatorBands'
+    },
   ],
 };
 
@@ -1756,7 +1911,9 @@ final $typed_data.Uint8List gridConfigDescriptor = $convert.base64Decode(
     'ZmlnUgdvdXRsaW5lEi0KBHNwYW4YByABKAsyGS52b2x2b3hncmlkLnYxLlNwYW5Db25maWdSBH'
     'NwYW4SQgoLaW50ZXJhY3Rpb24YCCABKAsyIC52b2x2b3hncmlkLnYxLkludGVyYWN0aW9uQ29u'
     'ZmlnUgtpbnRlcmFjdGlvbhI5CglyZW5kZXJpbmcYCSABKAsyGy52b2x2b3hncmlkLnYxLlJlbm'
-    'RlckNvbmZpZ1IJcmVuZGVyaW5nEhgKB3ZlcnNpb24YCiABKAlSB3ZlcnNpb24=');
+    'RlckNvbmZpZ1IJcmVuZGVyaW5nEhgKB3ZlcnNpb24YCiABKAlSB3ZlcnNpb24STAoPaW5kaWNh'
+    'dG9yX2JhbmRzGAsgASgLMiMudm9sdm94Z3JpZC52MS5JbmRpY2F0b3JCYW5kc0NvbmZpZ1IOaW'
+    '5kaWNhdG9yQmFuZHM=');
 
 @$core.Deprecated('Use layoutConfigDescriptor instead')
 const LayoutConfig$json = {
@@ -3128,6 +3285,607 @@ final $typed_data.Uint8List renderConfigDescriptor = $convert.base64Decode(
     'ZlcmxheUIUChJfYW5pbWF0aW9uX2VuYWJsZWRCGAoWX2FuaW1hdGlvbl9kdXJhdGlvbl9tc0IY'
     'ChZfdGV4dF9sYXlvdXRfY2FjaGVfY2FwQg8KDV9wcmVzZW50X21vZGU=');
 
+@$core.Deprecated('Use rowIndicatorSlotDescriptor instead')
+const RowIndicatorSlot$json = {
+  '1': 'RowIndicatorSlot',
+  '2': [
+    {
+      '1': 'kind',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.RowIndicatorSlotKind',
+      '9': 0,
+      '10': 'kind',
+      '17': true
+    },
+    {
+      '1': 'width_px',
+      '3': 2,
+      '4': 1,
+      '5': 5,
+      '9': 1,
+      '10': 'widthPx',
+      '17': true
+    },
+    {
+      '1': 'visible',
+      '3': 3,
+      '4': 1,
+      '5': 8,
+      '9': 2,
+      '10': 'visible',
+      '17': true
+    },
+    {
+      '1': 'custom_key',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 3,
+      '10': 'customKey',
+      '17': true
+    },
+    {'1': 'data', '3': 5, '4': 1, '5': 12, '9': 4, '10': 'data', '17': true},
+  ],
+  '8': [
+    {'1': '_kind'},
+    {'1': '_width_px'},
+    {'1': '_visible'},
+    {'1': '_custom_key'},
+    {'1': '_data'},
+  ],
+};
+
+/// Descriptor for `RowIndicatorSlot`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List rowIndicatorSlotDescriptor = $convert.base64Decode(
+    'ChBSb3dJbmRpY2F0b3JTbG90EjwKBGtpbmQYASABKA4yIy52b2x2b3hncmlkLnYxLlJvd0luZG'
+    'ljYXRvclNsb3RLaW5kSABSBGtpbmSIAQESHgoId2lkdGhfcHgYAiABKAVIAVIHd2lkdGhQeIgB'
+    'ARIdCgd2aXNpYmxlGAMgASgISAJSB3Zpc2libGWIAQESIgoKY3VzdG9tX2tleRgEIAEoCUgDUg'
+    'ljdXN0b21LZXmIAQESFwoEZGF0YRgFIAEoDEgEUgRkYXRhiAEBQgcKBV9raW5kQgsKCV93aWR0'
+    'aF9weEIKCghfdmlzaWJsZUINCgtfY3VzdG9tX2tleUIHCgVfZGF0YQ==');
+
+@$core.Deprecated('Use rowIndicatorConfigDescriptor instead')
+const RowIndicatorConfig$json = {
+  '1': 'RowIndicatorConfig',
+  '2': [
+    {
+      '1': 'visible',
+      '3': 1,
+      '4': 1,
+      '5': 8,
+      '9': 0,
+      '10': 'visible',
+      '17': true
+    },
+    {
+      '1': 'width_px',
+      '3': 2,
+      '4': 1,
+      '5': 5,
+      '9': 1,
+      '10': 'widthPx',
+      '17': true
+    },
+    {
+      '1': 'mode_bits',
+      '3': 3,
+      '4': 1,
+      '5': 13,
+      '9': 2,
+      '10': 'modeBits',
+      '17': true
+    },
+    {
+      '1': 'back_color',
+      '3': 4,
+      '4': 1,
+      '5': 13,
+      '9': 3,
+      '10': 'backColor',
+      '17': true
+    },
+    {
+      '1': 'fore_color',
+      '3': 5,
+      '4': 1,
+      '5': 13,
+      '9': 4,
+      '10': 'foreColor',
+      '17': true
+    },
+    {
+      '1': 'grid_lines',
+      '3': 6,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.GridLineStyle',
+      '9': 5,
+      '10': 'gridLines',
+      '17': true
+    },
+    {
+      '1': 'grid_color',
+      '3': 7,
+      '4': 1,
+      '5': 13,
+      '9': 6,
+      '10': 'gridColor',
+      '17': true
+    },
+    {
+      '1': 'auto_size',
+      '3': 8,
+      '4': 1,
+      '5': 8,
+      '9': 7,
+      '10': 'autoSize',
+      '17': true
+    },
+    {
+      '1': 'allow_resize',
+      '3': 9,
+      '4': 1,
+      '5': 8,
+      '9': 8,
+      '10': 'allowResize',
+      '17': true
+    },
+    {
+      '1': 'allow_select',
+      '3': 10,
+      '4': 1,
+      '5': 8,
+      '9': 9,
+      '10': 'allowSelect',
+      '17': true
+    },
+    {
+      '1': 'allow_reorder',
+      '3': 11,
+      '4': 1,
+      '5': 8,
+      '9': 10,
+      '10': 'allowReorder',
+      '17': true
+    },
+    {
+      '1': 'slots',
+      '3': 12,
+      '4': 3,
+      '5': 11,
+      '6': '.volvoxgrid.v1.RowIndicatorSlot',
+      '10': 'slots'
+    },
+  ],
+  '8': [
+    {'1': '_visible'},
+    {'1': '_width_px'},
+    {'1': '_mode_bits'},
+    {'1': '_back_color'},
+    {'1': '_fore_color'},
+    {'1': '_grid_lines'},
+    {'1': '_grid_color'},
+    {'1': '_auto_size'},
+    {'1': '_allow_resize'},
+    {'1': '_allow_select'},
+    {'1': '_allow_reorder'},
+  ],
+};
+
+/// Descriptor for `RowIndicatorConfig`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List rowIndicatorConfigDescriptor = $convert.base64Decode(
+    'ChJSb3dJbmRpY2F0b3JDb25maWcSHQoHdmlzaWJsZRgBIAEoCEgAUgd2aXNpYmxliAEBEh4KCH'
+    'dpZHRoX3B4GAIgASgFSAFSB3dpZHRoUHiIAQESIAoJbW9kZV9iaXRzGAMgASgNSAJSCG1vZGVC'
+    'aXRziAEBEiIKCmJhY2tfY29sb3IYBCABKA1IA1IJYmFja0NvbG9yiAEBEiIKCmZvcmVfY29sb3'
+    'IYBSABKA1IBFIJZm9yZUNvbG9yiAEBEkAKCmdyaWRfbGluZXMYBiABKA4yHC52b2x2b3hncmlk'
+    'LnYxLkdyaWRMaW5lU3R5bGVIBVIJZ3JpZExpbmVziAEBEiIKCmdyaWRfY29sb3IYByABKA1IBl'
+    'IJZ3JpZENvbG9yiAEBEiAKCWF1dG9fc2l6ZRgIIAEoCEgHUghhdXRvU2l6ZYgBARImCgxhbGxv'
+    'd19yZXNpemUYCSABKAhICFILYWxsb3dSZXNpemWIAQESJgoMYWxsb3dfc2VsZWN0GAogASgISA'
+    'lSC2FsbG93U2VsZWN0iAEBEigKDWFsbG93X3Jlb3JkZXIYCyABKAhIClIMYWxsb3dSZW9yZGVy'
+    'iAEBEjUKBXNsb3RzGAwgAygLMh8udm9sdm94Z3JpZC52MS5Sb3dJbmRpY2F0b3JTbG90UgVzbG'
+    '90c0IKCghfdmlzaWJsZUILCglfd2lkdGhfcHhCDAoKX21vZGVfYml0c0INCgtfYmFja19jb2xv'
+    'ckINCgtfZm9yZV9jb2xvckINCgtfZ3JpZF9saW5lc0INCgtfZ3JpZF9jb2xvckIMCgpfYXV0b1'
+    '9zaXplQg8KDV9hbGxvd19yZXNpemVCDwoNX2FsbG93X3NlbGVjdEIQCg5fYWxsb3dfcmVvcmRl'
+    'cg==');
+
+@$core.Deprecated('Use colIndicatorRowDefDescriptor instead')
+const ColIndicatorRowDef$json = {
+  '1': 'ColIndicatorRowDef',
+  '2': [
+    {'1': 'index', '3': 1, '4': 1, '5': 5, '9': 0, '10': 'index', '17': true},
+    {
+      '1': 'height_px',
+      '3': 2,
+      '4': 1,
+      '5': 5,
+      '9': 1,
+      '10': 'heightPx',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_index'},
+    {'1': '_height_px'},
+  ],
+};
+
+/// Descriptor for `ColIndicatorRowDef`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List colIndicatorRowDefDescriptor = $convert.base64Decode(
+    'ChJDb2xJbmRpY2F0b3JSb3dEZWYSGQoFaW5kZXgYASABKAVIAFIFaW5kZXiIAQESIAoJaGVpZ2'
+    'h0X3B4GAIgASgFSAFSCGhlaWdodFB4iAEBQggKBl9pbmRleEIMCgpfaGVpZ2h0X3B4');
+
+@$core.Deprecated('Use colIndicatorCellDescriptor instead')
+const ColIndicatorCell$json = {
+  '1': 'ColIndicatorCell',
+  '2': [
+    {'1': 'row1', '3': 1, '4': 1, '5': 5, '9': 0, '10': 'row1', '17': true},
+    {'1': 'row2', '3': 2, '4': 1, '5': 5, '9': 1, '10': 'row2', '17': true},
+    {'1': 'col1', '3': 3, '4': 1, '5': 5, '9': 2, '10': 'col1', '17': true},
+    {'1': 'col2', '3': 4, '4': 1, '5': 5, '9': 3, '10': 'col2', '17': true},
+    {'1': 'text', '3': 5, '4': 1, '5': 9, '9': 4, '10': 'text', '17': true},
+    {
+      '1': 'mode_bits',
+      '3': 6,
+      '4': 1,
+      '5': 13,
+      '9': 5,
+      '10': 'modeBits',
+      '17': true
+    },
+    {
+      '1': 'custom_key',
+      '3': 7,
+      '4': 1,
+      '5': 9,
+      '9': 6,
+      '10': 'customKey',
+      '17': true
+    },
+    {'1': 'data', '3': 8, '4': 1, '5': 12, '9': 7, '10': 'data', '17': true},
+  ],
+  '8': [
+    {'1': '_row1'},
+    {'1': '_row2'},
+    {'1': '_col1'},
+    {'1': '_col2'},
+    {'1': '_text'},
+    {'1': '_mode_bits'},
+    {'1': '_custom_key'},
+    {'1': '_data'},
+  ],
+};
+
+/// Descriptor for `ColIndicatorCell`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List colIndicatorCellDescriptor = $convert.base64Decode(
+    'ChBDb2xJbmRpY2F0b3JDZWxsEhcKBHJvdzEYASABKAVIAFIEcm93MYgBARIXCgRyb3cyGAIgAS'
+    'gFSAFSBHJvdzKIAQESFwoEY29sMRgDIAEoBUgCUgRjb2wxiAEBEhcKBGNvbDIYBCABKAVIA1IE'
+    'Y29sMogBARIXCgR0ZXh0GAUgASgJSARSBHRleHSIAQESIAoJbW9kZV9iaXRzGAYgASgNSAVSCG'
+    '1vZGVCaXRziAEBEiIKCmN1c3RvbV9rZXkYByABKAlIBlIJY3VzdG9tS2V5iAEBEhcKBGRhdGEY'
+    'CCABKAxIB1IEZGF0YYgBAUIHCgVfcm93MUIHCgVfcm93MkIHCgVfY29sMUIHCgVfY29sMkIHCg'
+    'VfdGV4dEIMCgpfbW9kZV9iaXRzQg0KC19jdXN0b21fa2V5QgcKBV9kYXRh');
+
+@$core.Deprecated('Use colIndicatorConfigDescriptor instead')
+const ColIndicatorConfig$json = {
+  '1': 'ColIndicatorConfig',
+  '2': [
+    {
+      '1': 'visible',
+      '3': 1,
+      '4': 1,
+      '5': 8,
+      '9': 0,
+      '10': 'visible',
+      '17': true
+    },
+    {
+      '1': 'default_row_height_px',
+      '3': 2,
+      '4': 1,
+      '5': 5,
+      '9': 1,
+      '10': 'defaultRowHeightPx',
+      '17': true
+    },
+    {
+      '1': 'band_rows',
+      '3': 3,
+      '4': 1,
+      '5': 5,
+      '9': 2,
+      '10': 'bandRows',
+      '17': true
+    },
+    {
+      '1': 'mode_bits',
+      '3': 4,
+      '4': 1,
+      '5': 13,
+      '9': 3,
+      '10': 'modeBits',
+      '17': true
+    },
+    {
+      '1': 'back_color',
+      '3': 5,
+      '4': 1,
+      '5': 13,
+      '9': 4,
+      '10': 'backColor',
+      '17': true
+    },
+    {
+      '1': 'fore_color',
+      '3': 6,
+      '4': 1,
+      '5': 13,
+      '9': 5,
+      '10': 'foreColor',
+      '17': true
+    },
+    {
+      '1': 'grid_lines',
+      '3': 7,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.GridLineStyle',
+      '9': 6,
+      '10': 'gridLines',
+      '17': true
+    },
+    {
+      '1': 'grid_color',
+      '3': 8,
+      '4': 1,
+      '5': 13,
+      '9': 7,
+      '10': 'gridColor',
+      '17': true
+    },
+    {
+      '1': 'auto_size',
+      '3': 9,
+      '4': 1,
+      '5': 8,
+      '9': 8,
+      '10': 'autoSize',
+      '17': true
+    },
+    {
+      '1': 'allow_resize',
+      '3': 10,
+      '4': 1,
+      '5': 8,
+      '9': 9,
+      '10': 'allowResize',
+      '17': true
+    },
+    {
+      '1': 'allow_reorder',
+      '3': 11,
+      '4': 1,
+      '5': 8,
+      '9': 10,
+      '10': 'allowReorder',
+      '17': true
+    },
+    {
+      '1': 'allow_menu',
+      '3': 12,
+      '4': 1,
+      '5': 8,
+      '9': 11,
+      '10': 'allowMenu',
+      '17': true
+    },
+    {
+      '1': 'row_defs',
+      '3': 13,
+      '4': 3,
+      '5': 11,
+      '6': '.volvoxgrid.v1.ColIndicatorRowDef',
+      '10': 'rowDefs'
+    },
+    {
+      '1': 'cells',
+      '3': 14,
+      '4': 3,
+      '5': 11,
+      '6': '.volvoxgrid.v1.ColIndicatorCell',
+      '10': 'cells'
+    },
+  ],
+  '8': [
+    {'1': '_visible'},
+    {'1': '_default_row_height_px'},
+    {'1': '_band_rows'},
+    {'1': '_mode_bits'},
+    {'1': '_back_color'},
+    {'1': '_fore_color'},
+    {'1': '_grid_lines'},
+    {'1': '_grid_color'},
+    {'1': '_auto_size'},
+    {'1': '_allow_resize'},
+    {'1': '_allow_reorder'},
+    {'1': '_allow_menu'},
+  ],
+};
+
+/// Descriptor for `ColIndicatorConfig`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List colIndicatorConfigDescriptor = $convert.base64Decode(
+    'ChJDb2xJbmRpY2F0b3JDb25maWcSHQoHdmlzaWJsZRgBIAEoCEgAUgd2aXNpYmxliAEBEjYKFW'
+    'RlZmF1bHRfcm93X2hlaWdodF9weBgCIAEoBUgBUhJkZWZhdWx0Um93SGVpZ2h0UHiIAQESIAoJ'
+    'YmFuZF9yb3dzGAMgASgFSAJSCGJhbmRSb3dziAEBEiAKCW1vZGVfYml0cxgEIAEoDUgDUghtb2'
+    'RlQml0c4gBARIiCgpiYWNrX2NvbG9yGAUgASgNSARSCWJhY2tDb2xvcogBARIiCgpmb3JlX2Nv'
+    'bG9yGAYgASgNSAVSCWZvcmVDb2xvcogBARJACgpncmlkX2xpbmVzGAcgASgOMhwudm9sdm94Z3'
+    'JpZC52MS5HcmlkTGluZVN0eWxlSAZSCWdyaWRMaW5lc4gBARIiCgpncmlkX2NvbG9yGAggASgN'
+    'SAdSCWdyaWRDb2xvcogBARIgCglhdXRvX3NpemUYCSABKAhICFIIYXV0b1NpemWIAQESJgoMYW'
+    'xsb3dfcmVzaXplGAogASgISAlSC2FsbG93UmVzaXpliAEBEigKDWFsbG93X3Jlb3JkZXIYCyAB'
+    'KAhIClIMYWxsb3dSZW9yZGVyiAEBEiIKCmFsbG93X21lbnUYDCABKAhIC1IJYWxsb3dNZW51iA'
+    'EBEjwKCHJvd19kZWZzGA0gAygLMiEudm9sdm94Z3JpZC52MS5Db2xJbmRpY2F0b3JSb3dEZWZS'
+    'B3Jvd0RlZnMSNQoFY2VsbHMYDiADKAsyHy52b2x2b3hncmlkLnYxLkNvbEluZGljYXRvckNlbG'
+    'xSBWNlbGxzQgoKCF92aXNpYmxlQhgKFl9kZWZhdWx0X3Jvd19oZWlnaHRfcHhCDAoKX2JhbmRf'
+    'cm93c0IMCgpfbW9kZV9iaXRzQg0KC19iYWNrX2NvbG9yQg0KC19mb3JlX2NvbG9yQg0KC19ncm'
+    'lkX2xpbmVzQg0KC19ncmlkX2NvbG9yQgwKCl9hdXRvX3NpemVCDwoNX2FsbG93X3Jlc2l6ZUIQ'
+    'Cg5fYWxsb3dfcmVvcmRlckINCgtfYWxsb3dfbWVudQ==');
+
+@$core.Deprecated('Use cornerIndicatorConfigDescriptor instead')
+const CornerIndicatorConfig$json = {
+  '1': 'CornerIndicatorConfig',
+  '2': [
+    {
+      '1': 'visible',
+      '3': 1,
+      '4': 1,
+      '5': 8,
+      '9': 0,
+      '10': 'visible',
+      '17': true
+    },
+    {
+      '1': 'mode_bits',
+      '3': 2,
+      '4': 1,
+      '5': 13,
+      '9': 1,
+      '10': 'modeBits',
+      '17': true
+    },
+    {
+      '1': 'back_color',
+      '3': 3,
+      '4': 1,
+      '5': 13,
+      '9': 2,
+      '10': 'backColor',
+      '17': true
+    },
+    {
+      '1': 'fore_color',
+      '3': 4,
+      '4': 1,
+      '5': 13,
+      '9': 3,
+      '10': 'foreColor',
+      '17': true
+    },
+    {
+      '1': 'custom_key',
+      '3': 5,
+      '4': 1,
+      '5': 9,
+      '9': 4,
+      '10': 'customKey',
+      '17': true
+    },
+    {'1': 'data', '3': 6, '4': 1, '5': 12, '9': 5, '10': 'data', '17': true},
+  ],
+  '8': [
+    {'1': '_visible'},
+    {'1': '_mode_bits'},
+    {'1': '_back_color'},
+    {'1': '_fore_color'},
+    {'1': '_custom_key'},
+    {'1': '_data'},
+  ],
+};
+
+/// Descriptor for `CornerIndicatorConfig`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List cornerIndicatorConfigDescriptor = $convert.base64Decode(
+    'ChVDb3JuZXJJbmRpY2F0b3JDb25maWcSHQoHdmlzaWJsZRgBIAEoCEgAUgd2aXNpYmxliAEBEi'
+    'AKCW1vZGVfYml0cxgCIAEoDUgBUghtb2RlQml0c4gBARIiCgpiYWNrX2NvbG9yGAMgASgNSAJS'
+    'CWJhY2tDb2xvcogBARIiCgpmb3JlX2NvbG9yGAQgASgNSANSCWZvcmVDb2xvcogBARIiCgpjdX'
+    'N0b21fa2V5GAUgASgJSARSCWN1c3RvbUtleYgBARIXCgRkYXRhGAYgASgMSAVSBGRhdGGIAQFC'
+    'CgoIX3Zpc2libGVCDAoKX21vZGVfYml0c0INCgtfYmFja19jb2xvckINCgtfZm9yZV9jb2xvck'
+    'INCgtfY3VzdG9tX2tleUIHCgVfZGF0YQ==');
+
+@$core.Deprecated('Use indicatorBandsConfigDescriptor instead')
+const IndicatorBandsConfig$json = {
+  '1': 'IndicatorBandsConfig',
+  '2': [
+    {
+      '1': 'row_indicator_start',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.RowIndicatorConfig',
+      '10': 'rowIndicatorStart'
+    },
+    {
+      '1': 'row_indicator_end',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.RowIndicatorConfig',
+      '10': 'rowIndicatorEnd'
+    },
+    {
+      '1': 'col_indicator_top',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.ColIndicatorConfig',
+      '10': 'colIndicatorTop'
+    },
+    {
+      '1': 'col_indicator_bottom',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.ColIndicatorConfig',
+      '10': 'colIndicatorBottom'
+    },
+    {
+      '1': 'corner_top_start',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.CornerIndicatorConfig',
+      '10': 'cornerTopStart'
+    },
+    {
+      '1': 'corner_top_end',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.CornerIndicatorConfig',
+      '10': 'cornerTopEnd'
+    },
+    {
+      '1': 'corner_bottom_start',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.CornerIndicatorConfig',
+      '10': 'cornerBottomStart'
+    },
+    {
+      '1': 'corner_bottom_end',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.CornerIndicatorConfig',
+      '10': 'cornerBottomEnd'
+    },
+  ],
+};
+
+/// Descriptor for `IndicatorBandsConfig`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List indicatorBandsConfigDescriptor = $convert.base64Decode(
+    'ChRJbmRpY2F0b3JCYW5kc0NvbmZpZxJRChNyb3dfaW5kaWNhdG9yX3N0YXJ0GAEgASgLMiEudm'
+    '9sdm94Z3JpZC52MS5Sb3dJbmRpY2F0b3JDb25maWdSEXJvd0luZGljYXRvclN0YXJ0Ek0KEXJv'
+    'd19pbmRpY2F0b3JfZW5kGAIgASgLMiEudm9sdm94Z3JpZC52MS5Sb3dJbmRpY2F0b3JDb25maW'
+    'dSD3Jvd0luZGljYXRvckVuZBJNChFjb2xfaW5kaWNhdG9yX3RvcBgDIAEoCzIhLnZvbHZveGdy'
+    'aWQudjEuQ29sSW5kaWNhdG9yQ29uZmlnUg9jb2xJbmRpY2F0b3JUb3ASUwoUY29sX2luZGljYX'
+    'Rvcl9ib3R0b20YBCABKAsyIS52b2x2b3hncmlkLnYxLkNvbEluZGljYXRvckNvbmZpZ1ISY29s'
+    'SW5kaWNhdG9yQm90dG9tEk4KEGNvcm5lcl90b3Bfc3RhcnQYBSABKAsyJC52b2x2b3hncmlkLn'
+    'YxLkNvcm5lckluZGljYXRvckNvbmZpZ1IOY29ybmVyVG9wU3RhcnQSSgoOY29ybmVyX3RvcF9l'
+    'bmQYBiABKAsyJC52b2x2b3hncmlkLnYxLkNvcm5lckluZGljYXRvckNvbmZpZ1IMY29ybmVyVG'
+    '9wRW5kElQKE2Nvcm5lcl9ib3R0b21fc3RhcnQYByABKAsyJC52b2x2b3hncmlkLnYxLkNvcm5l'
+    'ckluZGljYXRvckNvbmZpZ1IRY29ybmVyQm90dG9tU3RhcnQSUAoRY29ybmVyX2JvdHRvbV9lbm'
+    'QYCCABKAsyJC52b2x2b3hncmlkLnYxLkNvcm5lckluZGljYXRvckNvbmZpZ1IPY29ybmVyQm90'
+    'dG9tRW5k');
+
 @$core.Deprecated('Use columnDefDescriptor instead')
 const ColumnDef$json = {
   '1': 'ColumnDef',
@@ -3153,106 +3911,115 @@ const ColumnDef$json = {
       '17': true
     },
     {
-      '1': 'alignment',
+      '1': 'caption',
       '3': 5,
       '4': 1,
-      '5': 14,
-      '6': '.volvoxgrid.v1.Align',
+      '5': 9,
       '9': 3,
-      '10': 'alignment',
+      '10': 'caption',
       '17': true
     },
     {
-      '1': 'fixed_alignment',
+      '1': 'alignment',
       '3': 6,
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.Align',
       '9': 4,
+      '10': 'alignment',
+      '17': true
+    },
+    {
+      '1': 'fixed_alignment',
+      '3': 7,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.Align',
+      '9': 5,
       '10': 'fixedAlignment',
       '17': true
     },
     {
       '1': 'data_type',
-      '3': 7,
+      '3': 8,
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.ColumnDataType',
-      '9': 5,
+      '9': 6,
       '10': 'dataType',
       '17': true
     },
-    {'1': 'format', '3': 8, '4': 1, '5': 9, '9': 6, '10': 'format', '17': true},
-    {'1': 'key', '3': 9, '4': 1, '5': 9, '9': 7, '10': 'key', '17': true},
+    {'1': 'format', '3': 9, '4': 1, '5': 9, '9': 7, '10': 'format', '17': true},
+    {'1': 'key', '3': 10, '4': 1, '5': 9, '9': 8, '10': 'key', '17': true},
     {
       '1': 'sort',
-      '3': 10,
+      '3': 11,
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.SortOrder',
-      '9': 8,
+      '9': 9,
       '10': 'sort',
       '17': true
     },
     {
       '1': 'dropdown_items',
-      '3': 11,
+      '3': 12,
       '4': 1,
       '5': 9,
-      '9': 9,
+      '9': 10,
       '10': 'dropdownItems',
       '17': true
     },
     {
       '1': 'edit_mask',
-      '3': 12,
+      '3': 13,
       '4': 1,
       '5': 9,
-      '9': 10,
+      '9': 11,
       '10': 'editMask',
       '17': true
     },
     {
       '1': 'indent',
-      '3': 13,
+      '3': 14,
       '4': 1,
       '5': 5,
-      '9': 11,
+      '9': 12,
       '10': 'indent',
       '17': true
     },
     {
       '1': 'hidden',
-      '3': 14,
+      '3': 15,
       '4': 1,
       '5': 8,
-      '9': 12,
+      '9': 13,
       '10': 'hidden',
       '17': true
     },
-    {'1': 'span', '3': 15, '4': 1, '5': 8, '9': 13, '10': 'span', '17': true},
+    {'1': 'span', '3': 16, '4': 1, '5': 8, '9': 14, '10': 'span', '17': true},
     {
       '1': 'image_list',
-      '3': 16,
+      '3': 17,
       '4': 3,
       '5': 11,
       '6': '.volvoxgrid.v1.ImageData',
       '10': 'imageList'
     },
-    {'1': 'data', '3': 17, '4': 1, '5': 12, '9': 14, '10': 'data', '17': true},
+    {'1': 'data', '3': 18, '4': 1, '5': 12, '9': 15, '10': 'data', '17': true},
     {
       '1': 'sticky',
-      '3': 18,
+      '3': 19,
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.StickyEdge',
-      '9': 15,
+      '9': 16,
       '10': 'sticky',
       '17': true
     },
     {
       '1': 'cell_padding',
-      '3': 19,
+      '3': 20,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.CellPadding',
@@ -3260,7 +4027,7 @@ const ColumnDef$json = {
     },
     {
       '1': 'fixed_cell_padding',
-      '3': 20,
+      '3': 21,
       '4': 1,
       '5': 11,
       '6': '.volvoxgrid.v1.CellPadding',
@@ -3268,30 +4035,30 @@ const ColumnDef$json = {
     },
     {
       '1': 'nullable',
-      '3': 21,
+      '3': 22,
       '4': 1,
       '5': 8,
-      '9': 16,
+      '9': 17,
       '10': 'nullable',
       '17': true
     },
     {
       '1': 'coercion_mode',
-      '3': 22,
+      '3': 23,
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.CoercionMode',
-      '9': 17,
+      '9': 18,
       '10': 'coercionMode',
       '17': true
     },
     {
       '1': 'error_mode',
-      '3': 23,
+      '3': 24,
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.WriteErrorMode',
-      '9': 18,
+      '9': 19,
       '10': 'errorMode',
       '17': true
     },
@@ -3300,6 +4067,7 @@ const ColumnDef$json = {
     {'1': '_width'},
     {'1': '_min_width'},
     {'1': '_max_width'},
+    {'1': '_caption'},
     {'1': '_alignment'},
     {'1': '_fixed_alignment'},
     {'1': '_data_type'},
@@ -3323,27 +4091,28 @@ const ColumnDef$json = {
 final $typed_data.Uint8List columnDefDescriptor = $convert.base64Decode(
     'CglDb2x1bW5EZWYSFAoFaW5kZXgYASABKAVSBWluZGV4EhkKBXdpZHRoGAIgASgFSABSBXdpZH'
     'RoiAEBEiAKCW1pbl93aWR0aBgDIAEoBUgBUghtaW5XaWR0aIgBARIgCgltYXhfd2lkdGgYBCAB'
-    'KAVIAlIIbWF4V2lkdGiIAQESNwoJYWxpZ25tZW50GAUgASgOMhQudm9sdm94Z3JpZC52MS5BbG'
-    'lnbkgDUglhbGlnbm1lbnSIAQESQgoPZml4ZWRfYWxpZ25tZW50GAYgASgOMhQudm9sdm94Z3Jp'
-    'ZC52MS5BbGlnbkgEUg5maXhlZEFsaWdubWVudIgBARI/CglkYXRhX3R5cGUYByABKA4yHS52b2'
-    'x2b3hncmlkLnYxLkNvbHVtbkRhdGFUeXBlSAVSCGRhdGFUeXBliAEBEhsKBmZvcm1hdBgIIAEo'
-    'CUgGUgZmb3JtYXSIAQESFQoDa2V5GAkgASgJSAdSA2tleYgBARIxCgRzb3J0GAogASgOMhgudm'
-    '9sdm94Z3JpZC52MS5Tb3J0T3JkZXJICFIEc29ydIgBARIqCg5kcm9wZG93bl9pdGVtcxgLIAEo'
-    'CUgJUg1kcm9wZG93bkl0ZW1ziAEBEiAKCWVkaXRfbWFzaxgMIAEoCUgKUghlZGl0TWFza4gBAR'
-    'IbCgZpbmRlbnQYDSABKAVIC1IGaW5kZW50iAEBEhsKBmhpZGRlbhgOIAEoCEgMUgZoaWRkZW6I'
-    'AQESFwoEc3BhbhgPIAEoCEgNUgRzcGFuiAEBEjcKCmltYWdlX2xpc3QYECADKAsyGC52b2x2b3'
-    'hncmlkLnYxLkltYWdlRGF0YVIJaW1hZ2VMaXN0EhcKBGRhdGEYESABKAxIDlIEZGF0YYgBARI2'
-    'CgZzdGlja3kYEiABKA4yGS52b2x2b3hncmlkLnYxLlN0aWNreUVkZ2VID1IGc3RpY2t5iAEBEj'
-    '0KDGNlbGxfcGFkZGluZxgTIAEoCzIaLnZvbHZveGdyaWQudjEuQ2VsbFBhZGRpbmdSC2NlbGxQ'
-    'YWRkaW5nEkgKEmZpeGVkX2NlbGxfcGFkZGluZxgUIAEoCzIaLnZvbHZveGdyaWQudjEuQ2VsbF'
-    'BhZGRpbmdSEGZpeGVkQ2VsbFBhZGRpbmcSHwoIbnVsbGFibGUYFSABKAhIEFIIbnVsbGFibGWI'
-    'AQESRQoNY29lcmNpb25fbW9kZRgWIAEoDjIbLnZvbHZveGdyaWQudjEuQ29lcmNpb25Nb2RlSB'
-    'FSDGNvZXJjaW9uTW9kZYgBARJBCgplcnJvcl9tb2RlGBcgASgOMh0udm9sdm94Z3JpZC52MS5X'
-    'cml0ZUVycm9yTW9kZUgSUgllcnJvck1vZGWIAQFCCAoGX3dpZHRoQgwKCl9taW5fd2lkdGhCDA'
-    'oKX21heF93aWR0aEIMCgpfYWxpZ25tZW50QhIKEF9maXhlZF9hbGlnbm1lbnRCDAoKX2RhdGFf'
-    'dHlwZUIJCgdfZm9ybWF0QgYKBF9rZXlCBwoFX3NvcnRCEQoPX2Ryb3Bkb3duX2l0ZW1zQgwKCl'
-    '9lZGl0X21hc2tCCQoHX2luZGVudEIJCgdfaGlkZGVuQgcKBV9zcGFuQgcKBV9kYXRhQgkKB19z'
-    'dGlja3lCCwoJX251bGxhYmxlQhAKDl9jb2VyY2lvbl9tb2RlQg0KC19lcnJvcl9tb2Rl');
+    'KAVIAlIIbWF4V2lkdGiIAQESHQoHY2FwdGlvbhgFIAEoCUgDUgdjYXB0aW9uiAEBEjcKCWFsaW'
+    'dubWVudBgGIAEoDjIULnZvbHZveGdyaWQudjEuQWxpZ25IBFIJYWxpZ25tZW50iAEBEkIKD2Zp'
+    'eGVkX2FsaWdubWVudBgHIAEoDjIULnZvbHZveGdyaWQudjEuQWxpZ25IBVIOZml4ZWRBbGlnbm'
+    '1lbnSIAQESPwoJZGF0YV90eXBlGAggASgOMh0udm9sdm94Z3JpZC52MS5Db2x1bW5EYXRhVHlw'
+    'ZUgGUghkYXRhVHlwZYgBARIbCgZmb3JtYXQYCSABKAlIB1IGZm9ybWF0iAEBEhUKA2tleRgKIA'
+    'EoCUgIUgNrZXmIAQESMQoEc29ydBgLIAEoDjIYLnZvbHZveGdyaWQudjEuU29ydE9yZGVySAlS'
+    'BHNvcnSIAQESKgoOZHJvcGRvd25faXRlbXMYDCABKAlIClINZHJvcGRvd25JdGVtc4gBARIgCg'
+    'llZGl0X21hc2sYDSABKAlIC1IIZWRpdE1hc2uIAQESGwoGaW5kZW50GA4gASgFSAxSBmluZGVu'
+    'dIgBARIbCgZoaWRkZW4YDyABKAhIDVIGaGlkZGVuiAEBEhcKBHNwYW4YECABKAhIDlIEc3Bhbo'
+    'gBARI3CgppbWFnZV9saXN0GBEgAygLMhgudm9sdm94Z3JpZC52MS5JbWFnZURhdGFSCWltYWdl'
+    'TGlzdBIXCgRkYXRhGBIgASgMSA9SBGRhdGGIAQESNgoGc3RpY2t5GBMgASgOMhkudm9sdm94Z3'
+    'JpZC52MS5TdGlja3lFZGdlSBBSBnN0aWNreYgBARI9CgxjZWxsX3BhZGRpbmcYFCABKAsyGi52'
+    'b2x2b3hncmlkLnYxLkNlbGxQYWRkaW5nUgtjZWxsUGFkZGluZxJIChJmaXhlZF9jZWxsX3BhZG'
+    'RpbmcYFSABKAsyGi52b2x2b3hncmlkLnYxLkNlbGxQYWRkaW5nUhBmaXhlZENlbGxQYWRkaW5n'
+    'Eh8KCG51bGxhYmxlGBYgASgISBFSCG51bGxhYmxliAEBEkUKDWNvZXJjaW9uX21vZGUYFyABKA'
+    '4yGy52b2x2b3hncmlkLnYxLkNvZXJjaW9uTW9kZUgSUgxjb2VyY2lvbk1vZGWIAQESQQoKZXJy'
+    'b3JfbW9kZRgYIAEoDjIdLnZvbHZveGdyaWQudjEuV3JpdGVFcnJvck1vZGVIE1IJZXJyb3JNb2'
+    'RliAEBQggKBl93aWR0aEIMCgpfbWluX3dpZHRoQgwKCl9tYXhfd2lkdGhCCgoIX2NhcHRpb25C'
+    'DAoKX2FsaWdubWVudEISChBfZml4ZWRfYWxpZ25tZW50QgwKCl9kYXRhX3R5cGVCCQoHX2Zvcm'
+    '1hdEIGCgRfa2V5QgcKBV9zb3J0QhEKD19kcm9wZG93bl9pdGVtc0IMCgpfZWRpdF9tYXNrQgkK'
+    'B19pbmRlbnRCCQoHX2hpZGRlbkIHCgVfc3BhbkIHCgVfZGF0YUIJCgdfc3RpY2t5QgsKCV9udW'
+    'xsYWJsZUIQCg5fY29lcmNpb25fbW9kZUINCgtfZXJyb3JfbW9kZQ==');
 
 @$core.Deprecated('Use defineColumnsRequestDescriptor instead')
 const DefineColumnsRequest$json = {
@@ -5296,6 +6065,27 @@ final $typed_data.Uint8List createRequestDescriptor = $convert.base64Decode(
     'BXNjYWxlEjEKBmNvbmZpZxgEIAEoCzIZLnZvbHZveGdyaWQudjEuR3JpZENvbmZpZ1IGY29uZm'
     'ln');
 
+@$core.Deprecated('Use createResponseDescriptor instead')
+const CreateResponse$json = {
+  '1': 'CreateResponse',
+  '2': [
+    {
+      '1': 'handle',
+      '3': 1,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.GridHandle',
+      '10': 'handle'
+    },
+    {'1': 'warnings', '3': 2, '4': 3, '5': 9, '10': 'warnings'},
+  ],
+};
+
+/// Descriptor for `CreateResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List createResponseDescriptor = $convert.base64Decode(
+    'Cg5DcmVhdGVSZXNwb25zZRIxCgZoYW5kbGUYASABKAsyGS52b2x2b3hncmlkLnYxLkdyaWRIYW'
+    '5kbGVSBmhhbmRsZRIaCgh3YXJuaW5ncxgCIAMoCVIId2FybmluZ3M=');
+
 @$core.Deprecated('Use resizeViewportRequestDescriptor instead')
 const ResizeViewportRequest$json = {
   '1': 'ResizeViewportRequest',
@@ -5311,6 +6101,49 @@ final $typed_data.Uint8List resizeViewportRequestDescriptor = $convert.base64Dec
     'ChVSZXNpemVWaWV3cG9ydFJlcXVlc3QSFwoHZ3JpZF9pZBgBIAEoA1IGZ3JpZElkEhQKBXdpZH'
     'RoGAIgASgFUgV3aWR0aBIWCgZoZWlnaHQYAyABKAVSBmhlaWdodA==');
 
+@$core.Deprecated('Use showCellRequestDescriptor instead')
+const ShowCellRequest$json = {
+  '1': 'ShowCellRequest',
+  '2': [
+    {'1': 'grid_id', '3': 1, '4': 1, '5': 3, '10': 'gridId'},
+    {'1': 'row', '3': 2, '4': 1, '5': 5, '10': 'row'},
+    {'1': 'col', '3': 3, '4': 1, '5': 5, '10': 'col'},
+  ],
+};
+
+/// Descriptor for `ShowCellRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List showCellRequestDescriptor = $convert.base64Decode(
+    'Cg9TaG93Q2VsbFJlcXVlc3QSFwoHZ3JpZF9pZBgBIAEoA1IGZ3JpZElkEhAKA3JvdxgCIAEoBV'
+    'IDcm93EhAKA2NvbBgDIAEoBVIDY29s');
+
+@$core.Deprecated('Use setRowRequestDescriptor instead')
+const SetRowRequest$json = {
+  '1': 'SetRowRequest',
+  '2': [
+    {'1': 'grid_id', '3': 1, '4': 1, '5': 3, '10': 'gridId'},
+    {'1': 'row', '3': 2, '4': 1, '5': 5, '10': 'row'},
+  ],
+};
+
+/// Descriptor for `SetRowRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List setRowRequestDescriptor = $convert.base64Decode(
+    'Cg1TZXRSb3dSZXF1ZXN0EhcKB2dyaWRfaWQYASABKANSBmdyaWRJZBIQCgNyb3cYAiABKAVSA3'
+    'Jvdw==');
+
+@$core.Deprecated('Use setColRequestDescriptor instead')
+const SetColRequest$json = {
+  '1': 'SetColRequest',
+  '2': [
+    {'1': 'grid_id', '3': 1, '4': 1, '5': 3, '10': 'gridId'},
+    {'1': 'col', '3': 2, '4': 1, '5': 5, '10': 'col'},
+  ],
+};
+
+/// Descriptor for `SetColRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List setColRequestDescriptor = $convert.base64Decode(
+    'Cg1TZXRDb2xSZXF1ZXN0EhcKB2dyaWRfaWQYASABKANSBmdyaWRJZBIQCgNjb2wYAiABKAVSA2'
+    'NvbA==');
+
 @$core.Deprecated('Use setRedrawRequestDescriptor instead')
 const SetRedrawRequest$json = {
   '1': 'SetRedrawRequest',
@@ -5324,6 +6157,56 @@ const SetRedrawRequest$json = {
 final $typed_data.Uint8List setRedrawRequestDescriptor = $convert.base64Decode(
     'ChBTZXRSZWRyYXdSZXF1ZXN0EhcKB2dyaWRfaWQYASABKANSBmdyaWRJZBIYCgdlbmFibGVkGA'
     'IgASgIUgdlbmFibGVk');
+
+@$core.Deprecated('Use configureRequestDescriptor instead')
+const ConfigureRequest$json = {
+  '1': 'ConfigureRequest',
+  '2': [
+    {'1': 'grid_id', '3': 1, '4': 1, '5': 3, '10': 'gridId'},
+    {
+      '1': 'config',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.GridConfig',
+      '10': 'config'
+    },
+  ],
+};
+
+/// Descriptor for `ConfigureRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List configureRequestDescriptor = $convert.base64Decode(
+    'ChBDb25maWd1cmVSZXF1ZXN0EhcKB2dyaWRfaWQYASABKANSBmdyaWRJZBIxCgZjb25maWcYAi'
+    'ABKAsyGS52b2x2b3hncmlkLnYxLkdyaWRDb25maWdSBmNvbmZpZw==');
+
+@$core.Deprecated('Use loadFontDataRequestDescriptor instead')
+const LoadFontDataRequest$json = {
+  '1': 'LoadFontDataRequest',
+  '2': [
+    {'1': 'data', '3': 1, '4': 1, '5': 12, '10': 'data'},
+    {'1': 'font_name', '3': 2, '4': 1, '5': 9, '10': 'fontName'},
+    {'1': 'font_names', '3': 3, '4': 3, '5': 9, '10': 'fontNames'},
+  ],
+};
+
+/// Descriptor for `LoadFontDataRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List loadFontDataRequestDescriptor = $convert.base64Decode(
+    'ChNMb2FkRm9udERhdGFSZXF1ZXN0EhIKBGRhdGEYASABKAxSBGRhdGESGwoJZm9udF9uYW1lGA'
+    'IgASgJUghmb250TmFtZRIdCgpmb250X25hbWVzGAMgAygJUglmb250TmFtZXM=');
+
+@$core.Deprecated('Use loadDemoRequestDescriptor instead')
+const LoadDemoRequest$json = {
+  '1': 'LoadDemoRequest',
+  '2': [
+    {'1': 'grid_id', '3': 1, '4': 1, '5': 3, '10': 'gridId'},
+    {'1': 'demo', '3': 2, '4': 1, '5': 9, '10': 'demo'},
+  ],
+};
+
+/// Descriptor for `LoadDemoRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List loadDemoRequestDescriptor = $convert.base64Decode(
+    'Cg9Mb2FkRGVtb1JlcXVlc3QSFwoHZ3JpZF9pZBgBIAEoA1IGZ3JpZElkEhIKBGRlbW8YAiABKA'
+    'lSBGRlbW8=');
 
 @$core.Deprecated('Use renderInputDescriptor instead')
 const RenderInput$json = {
@@ -7346,63 +8229,13 @@ const GetHeaderRowEvent$json = {
 final $typed_data.Uint8List getHeaderRowEventDescriptor = $convert
     .base64Decode('ChFHZXRIZWFkZXJSb3dFdmVudBISCgRwYWdlGAEgASgFUgRwYWdl');
 
-@$core.Deprecated('Use configureRequestDescriptor instead')
-const ConfigureRequest$json = {
-  '1': 'ConfigureRequest',
-  '2': [
-    {'1': 'grid_id', '3': 1, '4': 1, '5': 3, '10': 'gridId'},
-    {
-      '1': 'config',
-      '3': 2,
-      '4': 1,
-      '5': 11,
-      '6': '.volvoxgrid.v1.GridConfig',
-      '10': 'config'
-    },
-  ],
-};
-
-/// Descriptor for `ConfigureRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List configureRequestDescriptor = $convert.base64Decode(
-    'ChBDb25maWd1cmVSZXF1ZXN0EhcKB2dyaWRfaWQYASABKANSBmdyaWRJZBIxCgZjb25maWcYAi'
-    'ABKAsyGS52b2x2b3hncmlkLnYxLkdyaWRDb25maWdSBmNvbmZpZw==');
-
-@$core.Deprecated('Use loadDemoRequestDescriptor instead')
-const LoadDemoRequest$json = {
-  '1': 'LoadDemoRequest',
-  '2': [
-    {'1': 'grid_id', '3': 1, '4': 1, '5': 3, '10': 'gridId'},
-    {'1': 'demo', '3': 2, '4': 1, '5': 9, '10': 'demo'},
-  ],
-};
-
-/// Descriptor for `LoadDemoRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List loadDemoRequestDescriptor = $convert.base64Decode(
-    'Cg9Mb2FkRGVtb1JlcXVlc3QSFwoHZ3JpZF9pZBgBIAEoA1IGZ3JpZElkEhIKBGRlbW8YAiABKA'
-    'lSBGRlbW8=');
-
-@$core.Deprecated('Use loadFontDataRequestDescriptor instead')
-const LoadFontDataRequest$json = {
-  '1': 'LoadFontDataRequest',
-  '2': [
-    {'1': 'data', '3': 1, '4': 1, '5': 12, '10': 'data'},
-    {'1': 'font_name', '3': 2, '4': 1, '5': 9, '10': 'fontName'},
-    {'1': 'font_names', '3': 3, '4': 3, '5': 9, '10': 'fontNames'},
-  ],
-};
-
-/// Descriptor for `LoadFontDataRequest`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List loadFontDataRequestDescriptor = $convert.base64Decode(
-    'ChNMb2FkRm9udERhdGFSZXF1ZXN0EhIKBGRhdGEYASABKAxSBGRhdGESGwoJZm9udF9uYW1lGA'
-    'IgASgJUghmb250TmFtZRIdCgpmb250X25hbWVzGAMgAygJUglmb250TmFtZXM=');
-
 const $core.Map<$core.String, $core.dynamic> VolvoxGridServiceBase$json = {
   '1': 'VolvoxGridService',
   '2': [
     {
       '1': 'Create',
       '2': '.volvoxgrid.v1.CreateRequest',
-      '3': '.volvoxgrid.v1.GridHandle'
+      '3': '.volvoxgrid.v1.CreateResponse'
     },
     {
       '1': 'Destroy',
@@ -7488,6 +8321,21 @@ const $core.Map<$core.String, $core.dynamic> VolvoxGridServiceBase$json = {
       '1': 'GetSelection',
       '2': '.volvoxgrid.v1.GridHandle',
       '3': '.volvoxgrid.v1.SelectionState'
+    },
+    {
+      '1': 'ShowCell',
+      '2': '.volvoxgrid.v1.ShowCellRequest',
+      '3': '.volvoxgrid.v1.Empty'
+    },
+    {
+      '1': 'SetTopRow',
+      '2': '.volvoxgrid.v1.SetRowRequest',
+      '3': '.volvoxgrid.v1.Empty'
+    },
+    {
+      '1': 'SetLeftCol',
+      '2': '.volvoxgrid.v1.SetColRequest',
+      '3': '.volvoxgrid.v1.Empty'
     },
     {
       '1': 'Edit',
@@ -7641,6 +8489,14 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.SpanConfig': SpanConfig$json,
   '.volvoxgrid.v1.InteractionConfig': InteractionConfig$json,
   '.volvoxgrid.v1.RenderConfig': RenderConfig$json,
+  '.volvoxgrid.v1.IndicatorBandsConfig': IndicatorBandsConfig$json,
+  '.volvoxgrid.v1.RowIndicatorConfig': RowIndicatorConfig$json,
+  '.volvoxgrid.v1.RowIndicatorSlot': RowIndicatorSlot$json,
+  '.volvoxgrid.v1.ColIndicatorConfig': ColIndicatorConfig$json,
+  '.volvoxgrid.v1.ColIndicatorRowDef': ColIndicatorRowDef$json,
+  '.volvoxgrid.v1.ColIndicatorCell': ColIndicatorCell$json,
+  '.volvoxgrid.v1.CornerIndicatorConfig': CornerIndicatorConfig$json,
+  '.volvoxgrid.v1.CreateResponse': CreateResponse$json,
   '.volvoxgrid.v1.GridHandle': GridHandle$json,
   '.volvoxgrid.v1.Empty': Empty$json,
   '.volvoxgrid.v1.ConfigureRequest': ConfigureRequest$json,
@@ -7667,6 +8523,9 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.SelectRequest': SelectRequest$json,
   '.volvoxgrid.v1.CellRange': CellRange$json,
   '.volvoxgrid.v1.SelectionState': SelectionState$json,
+  '.volvoxgrid.v1.ShowCellRequest': ShowCellRequest$json,
+  '.volvoxgrid.v1.SetRowRequest': SetRowRequest$json,
+  '.volvoxgrid.v1.SetColRequest': SetColRequest$json,
   '.volvoxgrid.v1.EditCommand': EditCommand$json,
   '.volvoxgrid.v1.EditStart': EditStart$json,
   '.volvoxgrid.v1.EditCommit': EditCommit$json,
@@ -7795,57 +8654,61 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
 
 /// Descriptor for `VolvoxGridService`. Decode as a `google.protobuf.ServiceDescriptorProto`.
 final $typed_data.Uint8List volvoxGridServiceDescriptor = $convert.base64Decode(
-    'ChFWb2x2b3hHcmlkU2VydmljZRJBCgZDcmVhdGUSHC52b2x2b3hncmlkLnYxLkNyZWF0ZVJlcX'
-    'Vlc3QaGS52b2x2b3hncmlkLnYxLkdyaWRIYW5kbGUSOgoHRGVzdHJveRIZLnZvbHZveGdyaWQu'
-    'djEuR3JpZEhhbmRsZRoULnZvbHZveGdyaWQudjEuRW1wdHkSQgoJQ29uZmlndXJlEh8udm9sdm'
-    '94Z3JpZC52MS5Db25maWd1cmVSZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0eRJBCglHZXRD'
-    'b25maWcSGS52b2x2b3hncmlkLnYxLkdyaWRIYW5kbGUaGS52b2x2b3hncmlkLnYxLkdyaWRDb2'
-    '5maWcSSAoMTG9hZEZvbnREYXRhEiIudm9sdm94Z3JpZC52MS5Mb2FkRm9udERhdGFSZXF1ZXN0'
-    'GhQudm9sdm94Z3JpZC52MS5FbXB0eRJKCg1EZWZpbmVDb2x1bW5zEiMudm9sdm94Z3JpZC52MS'
-    '5EZWZpbmVDb2x1bW5zUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSSwoJR2V0U2NoZW1h'
-    'Ehkudm9sdm94Z3JpZC52MS5HcmlkSGFuZGxlGiMudm9sdm94Z3JpZC52MS5EZWZpbmVDb2x1bW'
-    '5zUmVxdWVzdBJECgpEZWZpbmVSb3dzEiAudm9sdm94Z3JpZC52MS5EZWZpbmVSb3dzUmVxdWVz'
-    'dBoULnZvbHZveGdyaWQudjEuRW1wdHkSRAoKSW5zZXJ0Um93cxIgLnZvbHZveGdyaWQudjEuSW'
-    '5zZXJ0Um93c1JlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5EkQKClJlbW92ZVJvd3MSIC52'
-    'b2x2b3hncmlkLnYxLlJlbW92ZVJvd3NSZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0eRJECg'
-    'pNb3ZlQ29sdW1uEiAudm9sdm94Z3JpZC52MS5Nb3ZlQ29sdW1uUmVxdWVzdBoULnZvbHZveGdy'
-    'aWQudjEuRW1wdHkSPgoHTW92ZVJvdxIdLnZvbHZveGdyaWQudjEuTW92ZVJvd1JlcXVlc3QaFC'
-    '52b2x2b3hncmlkLnYxLkVtcHR5EkwKC1VwZGF0ZUNlbGxzEiEudm9sdm94Z3JpZC52MS5VcGRh'
-    'dGVDZWxsc1JlcXVlc3QaGi52b2x2b3hncmlkLnYxLldyaXRlUmVzdWx0EkgKCEdldENlbGxzEh'
-    '4udm9sdm94Z3JpZC52MS5HZXRDZWxsc1JlcXVlc3QaHC52b2x2b3hncmlkLnYxLkNlbGxzUmVz'
-    'cG9uc2USSAoJTG9hZFRhYmxlEh8udm9sdm94Z3JpZC52MS5Mb2FkVGFibGVSZXF1ZXN0Ghoudm'
-    '9sdm94Z3JpZC52MS5Xcml0ZVJlc3VsdBI6CgVDbGVhchIbLnZvbHZveGdyaWQudjEuQ2xlYXJS'
-    'ZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0eRI8CgZTZWxlY3QSHC52b2x2b3hncmlkLnYxLl'
-    'NlbGVjdFJlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5EkgKDEdldFNlbGVjdGlvbhIZLnZv'
-    'bHZveGdyaWQudjEuR3JpZEhhbmRsZRodLnZvbHZveGdyaWQudjEuU2VsZWN0aW9uU3RhdGUSPA'
-    'oERWRpdBIaLnZvbHZveGdyaWQudjEuRWRpdENvbW1hbmQaGC52b2x2b3hncmlkLnYxLkVkaXRT'
-    'dGF0ZRI4CgRTb3J0Ehoudm9sdm94Z3JpZC52MS5Tb3J0UmVxdWVzdBoULnZvbHZveGdyaWQudj'
-    'EuRW1wdHkSQAoIU3VidG90YWwSHi52b2x2b3hncmlkLnYxLlN1YnRvdGFsUmVxdWVzdBoULnZv'
-    'bHZveGdyaWQudjEuRW1wdHkSQAoIQXV0b1NpemUSHi52b2x2b3hncmlkLnYxLkF1dG9TaXplUm'
-    'VxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSPgoHT3V0bGluZRIdLnZvbHZveGdyaWQudjEu'
-    'T3V0bGluZVJlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5EkEKB0dldE5vZGUSHS52b2x2b3'
-    'hncmlkLnYxLkdldE5vZGVSZXF1ZXN0Ghcudm9sdm94Z3JpZC52MS5Ob2RlSW5mbxI/CgRGaW5k'
-    'Ehoudm9sdm94Z3JpZC52MS5GaW5kUmVxdWVzdBobLnZvbHZveGdyaWQudjEuRmluZFJlc3Bvbn'
-    'NlEk4KCUFnZ3JlZ2F0ZRIfLnZvbHZveGdyaWQudjEuQWdncmVnYXRlUmVxdWVzdBogLnZvbHZv'
-    'eGdyaWQudjEuQWdncmVnYXRlUmVzcG9uc2USUAoOR2V0TWVyZ2VkUmFuZ2USJC52b2x2b3hncm'
-    'lkLnYxLkdldE1lcmdlZFJhbmdlUmVxdWVzdBoYLnZvbHZveGdyaWQudjEuQ2VsbFJhbmdlEkQK'
-    'Ck1lcmdlQ2VsbHMSIC52b2x2b3hncmlkLnYxLk1lcmdlQ2VsbHNSZXF1ZXN0GhQudm9sdm94Z3'
-    'JpZC52MS5FbXB0eRJICgxVbm1lcmdlQ2VsbHMSIi52b2x2b3hncmlkLnYxLlVubWVyZ2VDZWxs'
-    'c1JlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5ElMKEEdldE1lcmdlZFJlZ2lvbnMSGS52b2'
-    'x2b3hncmlkLnYxLkdyaWRIYW5kbGUaJC52b2x2b3hncmlkLnYxLk1lcmdlZFJlZ2lvbnNSZXNw'
-    'b25zZRJPCg5HZXRNZW1vcnlVc2FnZRIZLnZvbHZveGdyaWQudjEuR3JpZEhhbmRsZRoiLnZvbH'
-    'ZveGdyaWQudjEuTWVtb3J5VXNhZ2VSZXNwb25zZRJOCglDbGlwYm9hcmQSHy52b2x2b3hncmlk'
-    'LnYxLkNsaXBib2FyZENvbW1hbmQaIC52b2x2b3hncmlkLnYxLkNsaXBib2FyZFJlc3BvbnNlEk'
-    'UKBkV4cG9ydBIcLnZvbHZveGdyaWQudjEuRXhwb3J0UmVxdWVzdBodLnZvbHZveGdyaWQudjEu'
-    'RXhwb3J0UmVzcG9uc2USPAoGSW1wb3J0Ehwudm9sdm94Z3JpZC52MS5JbXBvcnRSZXF1ZXN0Gh'
-    'Qudm9sdm94Z3JpZC52MS5FbXB0eRJCCgVQcmludBIbLnZvbHZveGdyaWQudjEuUHJpbnRSZXF1'
-    'ZXN0Ghwudm9sdm94Z3JpZC52MS5QcmludFJlc3BvbnNlEkgKB0FyY2hpdmUSHS52b2x2b3hncm'
-    'lkLnYxLkFyY2hpdmVSZXF1ZXN0Gh4udm9sdm94Z3JpZC52MS5BcmNoaXZlUmVzcG9uc2USTAoO'
-    'UmVzaXplVmlld3BvcnQSJC52b2x2b3hncmlkLnYxLlJlc2l6ZVZpZXdwb3J0UmVxdWVzdBoULn'
-    'ZvbHZveGdyaWQudjEuRW1wdHkSQgoJU2V0UmVkcmF3Eh8udm9sdm94Z3JpZC52MS5TZXRSZWRy'
-    'YXdSZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0eRI6CgdSZWZyZXNoEhkudm9sdm94Z3JpZC'
-    '52MS5HcmlkSGFuZGxlGhQudm9sdm94Z3JpZC52MS5FbXB0eRJACghMb2FkRGVtbxIeLnZvbHZv'
-    'eGdyaWQudjEuTG9hZERlbW9SZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0eRJMCg1SZW5kZX'
-    'JTZXNzaW9uEhoudm9sdm94Z3JpZC52MS5SZW5kZXJJbnB1dBobLnZvbHZveGdyaWQudjEuUmVu'
-    'ZGVyT3V0cHV0KAEwARJECgtFdmVudFN0cmVhbRIZLnZvbHZveGdyaWQudjEuR3JpZEhhbmRsZR'
-    'oYLnZvbHZveGdyaWQudjEuR3JpZEV2ZW50MAE=');
+    'ChFWb2x2b3hHcmlkU2VydmljZRJFCgZDcmVhdGUSHC52b2x2b3hncmlkLnYxLkNyZWF0ZVJlcX'
+    'Vlc3QaHS52b2x2b3hncmlkLnYxLkNyZWF0ZVJlc3BvbnNlEjoKB0Rlc3Ryb3kSGS52b2x2b3hn'
+    'cmlkLnYxLkdyaWRIYW5kbGUaFC52b2x2b3hncmlkLnYxLkVtcHR5EkIKCUNvbmZpZ3VyZRIfLn'
+    'ZvbHZveGdyaWQudjEuQ29uZmlndXJlUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSQQoJ'
+    'R2V0Q29uZmlnEhkudm9sdm94Z3JpZC52MS5HcmlkSGFuZGxlGhkudm9sdm94Z3JpZC52MS5Hcm'
+    'lkQ29uZmlnEkgKDExvYWRGb250RGF0YRIiLnZvbHZveGdyaWQudjEuTG9hZEZvbnREYXRhUmVx'
+    'dWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSSgoNRGVmaW5lQ29sdW1ucxIjLnZvbHZveGdyaW'
+    'QudjEuRGVmaW5lQ29sdW1uc1JlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5EksKCUdldFNj'
+    'aGVtYRIZLnZvbHZveGdyaWQudjEuR3JpZEhhbmRsZRojLnZvbHZveGdyaWQudjEuRGVmaW5lQ2'
+    '9sdW1uc1JlcXVlc3QSRAoKRGVmaW5lUm93cxIgLnZvbHZveGdyaWQudjEuRGVmaW5lUm93c1Jl'
+    'cXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5EkQKCkluc2VydFJvd3MSIC52b2x2b3hncmlkLn'
+    'YxLkluc2VydFJvd3NSZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0eRJECgpSZW1vdmVSb3dz'
+    'EiAudm9sdm94Z3JpZC52MS5SZW1vdmVSb3dzUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdH'
+    'kSRAoKTW92ZUNvbHVtbhIgLnZvbHZveGdyaWQudjEuTW92ZUNvbHVtblJlcXVlc3QaFC52b2x2'
+    'b3hncmlkLnYxLkVtcHR5Ej4KB01vdmVSb3cSHS52b2x2b3hncmlkLnYxLk1vdmVSb3dSZXF1ZX'
+    'N0GhQudm9sdm94Z3JpZC52MS5FbXB0eRJMCgtVcGRhdGVDZWxscxIhLnZvbHZveGdyaWQudjEu'
+    'VXBkYXRlQ2VsbHNSZXF1ZXN0Ghoudm9sdm94Z3JpZC52MS5Xcml0ZVJlc3VsdBJICghHZXRDZW'
+    'xscxIeLnZvbHZveGdyaWQudjEuR2V0Q2VsbHNSZXF1ZXN0Ghwudm9sdm94Z3JpZC52MS5DZWxs'
+    'c1Jlc3BvbnNlEkgKCUxvYWRUYWJsZRIfLnZvbHZveGdyaWQudjEuTG9hZFRhYmxlUmVxdWVzdB'
+    'oaLnZvbHZveGdyaWQudjEuV3JpdGVSZXN1bHQSOgoFQ2xlYXISGy52b2x2b3hncmlkLnYxLkNs'
+    'ZWFyUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSPAoGU2VsZWN0Ehwudm9sdm94Z3JpZC'
+    '52MS5TZWxlY3RSZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0eRJICgxHZXRTZWxlY3Rpb24S'
+    'GS52b2x2b3hncmlkLnYxLkdyaWRIYW5kbGUaHS52b2x2b3hncmlkLnYxLlNlbGVjdGlvblN0YX'
+    'RlEkAKCFNob3dDZWxsEh4udm9sdm94Z3JpZC52MS5TaG93Q2VsbFJlcXVlc3QaFC52b2x2b3hn'
+    'cmlkLnYxLkVtcHR5Ej8KCVNldFRvcFJvdxIcLnZvbHZveGdyaWQudjEuU2V0Um93UmVxdWVzdB'
+    'oULnZvbHZveGdyaWQudjEuRW1wdHkSQAoKU2V0TGVmdENvbBIcLnZvbHZveGdyaWQudjEuU2V0'
+    'Q29sUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSPAoERWRpdBIaLnZvbHZveGdyaWQudj'
+    'EuRWRpdENvbW1hbmQaGC52b2x2b3hncmlkLnYxLkVkaXRTdGF0ZRI4CgRTb3J0Ehoudm9sdm94'
+    'Z3JpZC52MS5Tb3J0UmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSQAoIU3VidG90YWwSHi'
+    '52b2x2b3hncmlkLnYxLlN1YnRvdGFsUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSQAoI'
+    'QXV0b1NpemUSHi52b2x2b3hncmlkLnYxLkF1dG9TaXplUmVxdWVzdBoULnZvbHZveGdyaWQudj'
+    'EuRW1wdHkSPgoHT3V0bGluZRIdLnZvbHZveGdyaWQudjEuT3V0bGluZVJlcXVlc3QaFC52b2x2'
+    'b3hncmlkLnYxLkVtcHR5EkEKB0dldE5vZGUSHS52b2x2b3hncmlkLnYxLkdldE5vZGVSZXF1ZX'
+    'N0Ghcudm9sdm94Z3JpZC52MS5Ob2RlSW5mbxI/CgRGaW5kEhoudm9sdm94Z3JpZC52MS5GaW5k'
+    'UmVxdWVzdBobLnZvbHZveGdyaWQudjEuRmluZFJlc3BvbnNlEk4KCUFnZ3JlZ2F0ZRIfLnZvbH'
+    'ZveGdyaWQudjEuQWdncmVnYXRlUmVxdWVzdBogLnZvbHZveGdyaWQudjEuQWdncmVnYXRlUmVz'
+    'cG9uc2USUAoOR2V0TWVyZ2VkUmFuZ2USJC52b2x2b3hncmlkLnYxLkdldE1lcmdlZFJhbmdlUm'
+    'VxdWVzdBoYLnZvbHZveGdyaWQudjEuQ2VsbFJhbmdlEkQKCk1lcmdlQ2VsbHMSIC52b2x2b3hn'
+    'cmlkLnYxLk1lcmdlQ2VsbHNSZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0eRJICgxVbm1lcm'
+    'dlQ2VsbHMSIi52b2x2b3hncmlkLnYxLlVubWVyZ2VDZWxsc1JlcXVlc3QaFC52b2x2b3hncmlk'
+    'LnYxLkVtcHR5ElMKEEdldE1lcmdlZFJlZ2lvbnMSGS52b2x2b3hncmlkLnYxLkdyaWRIYW5kbG'
+    'UaJC52b2x2b3hncmlkLnYxLk1lcmdlZFJlZ2lvbnNSZXNwb25zZRJPCg5HZXRNZW1vcnlVc2Fn'
+    'ZRIZLnZvbHZveGdyaWQudjEuR3JpZEhhbmRsZRoiLnZvbHZveGdyaWQudjEuTWVtb3J5VXNhZ2'
+    'VSZXNwb25zZRJOCglDbGlwYm9hcmQSHy52b2x2b3hncmlkLnYxLkNsaXBib2FyZENvbW1hbmQa'
+    'IC52b2x2b3hncmlkLnYxLkNsaXBib2FyZFJlc3BvbnNlEkUKBkV4cG9ydBIcLnZvbHZveGdyaW'
+    'QudjEuRXhwb3J0UmVxdWVzdBodLnZvbHZveGdyaWQudjEuRXhwb3J0UmVzcG9uc2USPAoGSW1w'
+    'b3J0Ehwudm9sdm94Z3JpZC52MS5JbXBvcnRSZXF1ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0eR'
+    'JCCgVQcmludBIbLnZvbHZveGdyaWQudjEuUHJpbnRSZXF1ZXN0Ghwudm9sdm94Z3JpZC52MS5Q'
+    'cmludFJlc3BvbnNlEkgKB0FyY2hpdmUSHS52b2x2b3hncmlkLnYxLkFyY2hpdmVSZXF1ZXN0Gh'
+    '4udm9sdm94Z3JpZC52MS5BcmNoaXZlUmVzcG9uc2USTAoOUmVzaXplVmlld3BvcnQSJC52b2x2'
+    'b3hncmlkLnYxLlJlc2l6ZVZpZXdwb3J0UmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSQg'
+    'oJU2V0UmVkcmF3Eh8udm9sdm94Z3JpZC52MS5TZXRSZWRyYXdSZXF1ZXN0GhQudm9sdm94Z3Jp'
+    'ZC52MS5FbXB0eRI6CgdSZWZyZXNoEhkudm9sdm94Z3JpZC52MS5HcmlkSGFuZGxlGhQudm9sdm'
+    '94Z3JpZC52MS5FbXB0eRJACghMb2FkRGVtbxIeLnZvbHZveGdyaWQudjEuTG9hZERlbW9SZXF1'
+    'ZXN0GhQudm9sdm94Z3JpZC52MS5FbXB0eRJMCg1SZW5kZXJTZXNzaW9uEhoudm9sdm94Z3JpZC'
+    '52MS5SZW5kZXJJbnB1dBobLnZvbHZveGdyaWQudjEuUmVuZGVyT3V0cHV0KAEwARJECgtFdmVu'
+    'dFN0cmVhbRIZLnZvbHZveGdyaWQudjEuR3JpZEhhbmRsZRoYLnZvbHZveGdyaWQudjEuR3JpZE'
+    'V2ZW50MAE=');

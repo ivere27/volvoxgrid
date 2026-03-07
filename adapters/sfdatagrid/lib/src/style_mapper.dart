@@ -60,6 +60,15 @@ Future<void> applyStyleConfig(
   }
 
   if (headerRowHeight.isFinite && headerRowHeight > 0) {
-    await controller.setRowHeight(0, headerRowHeight.round());
+    await vg.VolvoxGridServiceFfi.Configure(
+      vg.ConfigureRequest()
+        ..gridId = controller.gridId
+        ..config = (vg.GridConfig()
+          ..indicatorBands = (vg.IndicatorBandsConfig()
+            ..colIndicatorTop = (vg.ColIndicatorConfig()
+              ..visible = true
+              ..bandRows = 1
+              ..defaultRowHeightPx = headerRowHeight.round()))),
+    );
   }
 }

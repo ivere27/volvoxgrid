@@ -26,6 +26,9 @@ namespace VolvoxGrid.DotNet.Internal
         byte[] EncodeClearRequest(long gridId, VolvoxClearScope scope, VolvoxClearRegion region);
 
         byte[] EncodeSelectRequest(long gridId, int activeRow, int activeCol, IList<VolvoxCellRangeData> ranges, bool? show);
+        byte[] EncodeShowCellRequest(long gridId, int row, int col);
+        byte[] EncodeSetTopRowRequest(long gridId, int row);
+        byte[] EncodeSetLeftColRequest(long gridId, int col);
         VolvoxSelectionStateData DecodeSelectionState(byte[] payload);
 
         byte[] EncodeSortRequest(long gridId, IList<VolvoxSortColumn> sorts);
@@ -72,4 +75,3 @@ namespace VolvoxGrid.DotNet.Internal
         VolvoxGridEventData DecodeGridEvent(byte[] payload);
     }
 }
-

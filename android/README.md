@@ -92,21 +92,21 @@ public class MainActivity extends AppCompatActivity {
         gridView = findViewById(R.id.gridView);
 
         // Initialize: auto-detects bundled native plugin (standard or lite)
-        gridView.initialize(100, 5, 1, 0);
-        //                  rows cols fixedRows fixedCols
+        gridView.initialize(100, 5);
+        //                  rows cols
 
         // Get a controller for grid operations
         VolvoxGridController ctrl = gridView.createController();
 
-        // Set header text
-        ctrl.setTextMatrix(0, 0, "Name");
-        ctrl.setTextMatrix(0, 1, "Price");
-        ctrl.setTextMatrix(0, 2, "Qty");
+        // Set column headers in the top indicator band
+        ctrl.setColumnCaption(0, "Name");
+        ctrl.setColumnCaption(1, "Price");
+        ctrl.setColumnCaption(2, "Qty");
 
         // Set data
-        ctrl.setTextMatrix(1, 0, "Widget A");
-        ctrl.setTextMatrix(1, 1, "29.99");
-        ctrl.setTextMatrix(1, 2, "150");
+        ctrl.setCellText(0, 0, "Widget A");
+        ctrl.setCellText(0, 1, "29.99");
+        ctrl.setCellText(0, 2, "150");
     }
 
     @Override
@@ -127,10 +127,10 @@ The main Android `View` (extends `FrameLayout`). Handles rendering, touch input,
 
 ```java
 // Option A (recommended): Auto-detect bundled plugin and create a new grid
-gridView.initialize(rows, cols, fixedRows, fixedCols);
+gridView.initialize(rows, cols);
 
 // Option B: Explicit plugin path (advanced/manual host loading flows)
-gridView.initialize(pluginPath, rows, cols, fixedRows, fixedCols);
+gridView.initialize(pluginPath, rows, cols);
 
 // Option C: Reuse an existing plugin host and grid (for multi-grid apps)
 gridView.initialize(pluginHost, existingGridId);
@@ -190,8 +190,6 @@ High-level API for grid operations. Obtained via `gridView.createController()`.
 ```java
 ctrl.setRowCount(1000);       // set row count
 ctrl.setColCount(10);         // set column count
-ctrl.setFixedRowCount(1);     // frozen header rows
-ctrl.setFixedColCount(2);     // frozen left columns
 
 int rows = ctrl.rowCount();
 int cols = ctrl.colCount();
@@ -201,11 +199,11 @@ int cols = ctrl.colCount();
 
 ```java
 // Single cell
-ctrl.setTextMatrix(row, col, "text");
-String text = ctrl.getTextMatrix(row, col);
+ctrl.setCellText(row, col, "text");
+String text = ctrl.getCellText(row, col);
 
 // Batch update
-ctrl.setCellTexts(Arrays.asList(
+ctrl.setCells(Arrays.asList(
     new GridCellText(0, 0, "A"),
     new GridCellText(0, 1, "B"),
     new GridCellText(1, 0, "C")
@@ -246,7 +244,7 @@ ctrl.moveRow(10, 0);             // move row 10 to position 0
 
 ```java
 // Simple sort
-ctrl.sortByColumn(1, true);      // col 1, ascending
+ctrl.sort(1, true);              // col 1, ascending
 
 // With sort order enum
 ctrl.sort(SortOrder.SORT_NUMERIC_ASCENDING, 1);
@@ -267,18 +265,35 @@ ctrl.setHeaderFeatures(HeaderFeatures.HEADER_SORT);
 
 ```java
 // Set active cell
-ctrl.setRow(5);
-ctrl.setCol(2);
+ctrl.setCursorRow(5);
+ctrl.setCursorCol(2);
 
 // Select a range
-ctrl.select(1, 0, 5, 3);         // row1, col1, row2, col2
+ctrl.selectRange(1, 0, 5, 3);    // row1, col1, row2, col2
+
+// Select multiple ranges
+ctrl.selectRanges(Arrays.asList(
+    new GridCellRange(1, 0, 2, 1),
+    new GridCellRange(4, 3, 6, 4)
+));
+
+// Select multiple ranges with an explicit active cell
+ctrl.selectRanges(
+    Arrays.asList(
+        new GridCellRange(1, 0, 2, 1),
+        new GridCellRange(4, 3, 6, 4)
+    ),
+    6,
+    4
+);
 
 // Get current selection
-GridSelection sel = ctrl.getSelectionState();
+GridSelection sel = ctrl.getSelection();
 int row = sel.getRow();
 int col = sel.getCol();
 int rowEnd = sel.getRowEnd();
 int colEnd = sel.getColEnd();
+GridCellRange[] ranges = sel.getRanges();
 
 // Selection mode
 ctrl.setSelectionMode(SelectionMode.BY_ROW);
@@ -308,8 +323,8 @@ ctrl.setCellSpan(CellSpanMode.CELL_SPAN_BY_ROW);
 ctrl.setEditTrigger(EditTrigger.EDIT_TRIGGER_KEY_CLICK);
 // Modes: EDIT_TRIGGER_NONE, EDIT_TRIGGER_KEY, EDIT_TRIGGER_KEY_CLICK
 
-ctrl.editCell(1, 0);             // programmatically start editing
-ctrl.finishEditing();
+ctrl.beginEdit(1, 0);            // programmatically start editing
+ctrl.commitEdit();
 ```
 
 #### Styling
@@ -365,7 +380,7 @@ ctrl.delete();                   // delete selection content
 
 ```java
 ctrl.setTopRow(50);              // scroll to row 50
-int top = ctrl.getTopRow();
+int top = ctrl.topRow();
 ctrl.setScrollBars(ScrollBarsMode.SCROLL_BARS_BOTH);
 ctrl.setFlingEnabled(true);      // momentum scrolling
 ctrl.setFlingImpulseGain(80f);
@@ -439,9 +454,9 @@ ctrl.refresh();                   // force full repaint
 
 // Or use withRedrawSuspended for automatic suspend/resume:
 ctrl.withRedrawSuspended(() -> {
-    ctrl.setTextMatrix(0, 0, "A");
-    ctrl.setTextMatrix(0, 1, "B");
-    ctrl.setTextMatrix(1, 0, "C");
+    ctrl.setCellText(0, 0, "A");
+    ctrl.setCellText(0, 1, "B");
+    ctrl.setCellText(1, 0, "C");
 });
 ```
 
@@ -470,25 +485,22 @@ gridView2.initialize(pluginHost, gridId2);
 
 ## Kotlin
 
-The API is identical from Kotlin, with the addition of property-style access for grid dimensions and active cell:
+The API is identical from Kotlin, using the same method names:
 
 ```kotlin
 val gridView: VolvoxGridView = findViewById(R.id.gridView)
-gridView.initialize(rows = 100, cols = 5, fixedRows = 1, fixedCols = 0)
+gridView.initialize(rows = 100, cols = 5)
 
 val ctrl = gridView.createController()
 
-// Property-style access (Kotlin only)
-ctrl.rows = 1000
-ctrl.cols = 10
-ctrl.fixedRows = 1
-ctrl.fixedCols = 2
-ctrl.row = 5                     // active row
-ctrl.col = 2                     // active column
+ctrl.setRowCount(1000)
+ctrl.setColCount(10)
+ctrl.setCursorRow(5)
+ctrl.setCursorCol(2)
 
 // Cell data
-ctrl.setTextMatrix(0, 0, "Name")
-ctrl.setCellTexts(listOf(
+ctrl.setCellText(0, 0, "Name")
+ctrl.setCells(listOf(
     GridCellText(0, 0, "A"),
     GridCellText(0, 1, "B"),
 ))
@@ -503,13 +515,13 @@ ctrl.setTableData(listOf(
 
 // Batch updates with suspended redraw
 ctrl.withRedrawSuspended {
-    ctrl.setTextMatrix(0, 0, "A")
-    ctrl.setTextMatrix(0, 1, "B")
-    ctrl.setTextMatrix(1, 0, "C")
+    ctrl.setCellText(0, 0, "A")
+    ctrl.setCellText(0, 1, "B")
+    ctrl.setCellText(1, 0, "C")
 }
 
 // Sorting
-ctrl.sortByColumn(col = 1, ascending = true)
+ctrl.sort(col = 1, ascending = true)
 ctrl.sort(SortOrder.SORT_NUMERIC_ASCENDING, col = 1)
 ctrl.sortMulti(listOf(
     Pair(0, SortOrder.SORT_STRING_ASC),
@@ -517,8 +529,16 @@ ctrl.sortMulti(listOf(
 ))
 
 // Selection
-ctrl.select(row1 = 1, col1 = 0, row2 = 5, col2 = 3)
-val sel = ctrl.getSelectionState()
+ctrl.selectRange(row1 = 1, col1 = 0, row2 = 5, col2 = 3)
+ctrl.selectRanges(
+    ranges = listOf(
+        GridCellRange(1, 0, 2, 1),
+        GridCellRange(4, 3, 6, 4),
+    ),
+    activeRow = 6,
+    activeCol = 4,
+)
+val sel = ctrl.getSelection()
 
 // Events
 gridView.eventListener = object : VolvoxGridView.GridEventListener {

@@ -1105,15 +1105,15 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     _fallbackLoading = true;
 
     try {
-      final rows = await widget.controller.getRows();
-      final cols = await widget.controller.getCols();
+      final rows = await widget.controller.rowCount();
+      final cols = await widget.controller.colCount();
       final maxRows = math.max(0, math.min(rows, 200));
       final maxCols = math.max(0, math.min(cols, 16));
       final snapshot = <List<String>>[];
 
       for (var r = 0; r < maxRows; r++) {
         final rowValues = await Future.wait(
-          List.generate(maxCols, (c) => widget.controller.getTextMatrix(r, c)),
+          List.generate(maxCols, (c) => widget.controller.getCellText(r, c)),
         );
         snapshot.add(rowValues);
       }
@@ -1793,7 +1793,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     }
     _knownRowsGridId = gridId;
     try {
-      final rows = await widget.controller.getRows();
+      final rows = await widget.controller.rowCount();
       if (!mounted || widget.controller.gridId != gridId) {
         return;
       }

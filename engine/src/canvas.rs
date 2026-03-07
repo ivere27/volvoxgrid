@@ -10,6 +10,7 @@
 use crate::grid::VolvoxGrid;
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::style::{CellStyleOverride, HeaderMarkHeight, HighlightStyle, IconThemeSlotStyle};
+use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BorderEdge {
@@ -550,10 +551,14 @@ pub(crate) struct VisibleRange {
     pub scroll_col_start: i32,
     /// Scrollable visible col window end (exclusive).
     pub scroll_col_end: i32,
-    /// Viewport width in pixels.
-    pub viewport_w: i32,
-    /// Viewport height in pixels.
-    pub viewport_h: i32,
+    /// Data viewport origin X in canvas coordinates.
+    pub data_x: i32,
+    /// Data viewport origin Y in canvas coordinates.
+    pub data_y: i32,
+    /// Data viewport width in pixels.
+    pub data_w: i32,
+    /// Data viewport height in pixels.
+    pub data_h: i32,
     /// Rows pinned to top (below fixed/frozen rows).
     pub pinned_top_rows: Vec<i32>,
     /// Rows pinned to bottom (footer).
@@ -585,6 +590,10 @@ impl VisibleRange {
     pub fn compute(grid: &VolvoxGrid, vp_w: i32, vp_h: i32) -> Self {
         let fixed_row_end = (grid.fixed_rows + grid.frozen_rows).clamp(0, grid.rows);
         let fixed_col_end = (grid.fixed_cols + grid.frozen_cols).clamp(0, grid.cols);
+        let indicator_start_w = grid.indicator_start_width().max(0);
+        let indicator_end_w = grid.indicator_end_width().max(0);
+        let indicator_top_h = grid.indicator_top_height().max(0);
+        let indicator_bottom_h = grid.indicator_bottom_height().max(0);
 
         // Shrink the effective viewport when scrollbars are visible so that
         // pinned-bottom / sticky-bottom rows are placed above the horizontal
@@ -604,8 +613,11 @@ impl VisibleRange {
         for _ in 0..3 {
             let vw = (vp_w - if show_v { SB_SIZE } else { 0 }).max(1);
             let vh = (vp_h - if show_h { SB_SIZE } else { 0 }).max(1);
-            let mx = (grid.layout.total_width - vw + fixed_width + pinned_width_total).max(0);
-            let my = (grid.layout.total_height - vh + fixed_height + pinned_height_total).max(0);
+            let data_vw = (vw - indicator_start_w - indicator_end_w).max(1);
+            let data_vh = (vh - indicator_top_h - indicator_bottom_h).max(1);
+            let mx = (grid.layout.total_width - data_vw + fixed_width + pinned_width_total).max(0);
+            let my =
+                (grid.layout.total_height - data_vh + fixed_height + pinned_height_total).max(0);
             let next_h = allow_h && mx > 0;
             let next_v = allow_v && my > 0;
             if next_h == show_h && next_v == show_v {
@@ -624,6 +636,10 @@ impl VisibleRange {
         } else {
             vp_h
         };
+        let data_x = indicator_start_w;
+        let data_y = indicator_top_h;
+        let data_w = (vp_w - indicator_start_w - indicator_end_w).max(1);
+        let data_h = (vp_h - indicator_top_h - indicator_bottom_h).max(1);
 
         // Pinned rows — computed first so we can adjust visible_rows scroll
         let pinned_top_rows = grid.pinned_rows_top.clone();
@@ -640,7 +656,7 @@ impl VisibleRange {
             // (pushed down to make room for pinned-top rows), so adjust the
             // scroll position used for visible_rows accordingly.
             let adj_scroll = (grid.scroll.scroll_y - pinned_top_height as f32).max(0.0);
-            let (first, last) = grid.layout.visible_rows(adj_scroll, vp_h, fixed_row_end);
+            let (first, last) = grid.layout.visible_rows(adj_scroll, data_h, fixed_row_end);
             if first <= last && first < grid.rows {
                 scroll_row_start = (first - 1).max(fixed_row_end);
                 scroll_row_end = (last + 2).min(grid.rows);
@@ -650,7 +666,7 @@ impl VisibleRange {
         let mut scroll_col_start = fixed_col_end;
         let mut scroll_col_end = fixed_col_end;
         if fixed_col_end < grid.cols && vp_w > 0 {
-            let scrollable_w = (vp_w - pinned_left_width - pinned_right_width).max(0);
+            let scrollable_w = (data_w - pinned_left_width - pinned_right_width).max(0);
             let (first, last) =
                 grid.layout
                     .visible_cols(grid.scroll.scroll_x, scrollable_w, fixed_col_end);
@@ -667,8 +683,8 @@ impl VisibleRange {
         let mut sticky_top_candidates = Vec::new();
         let mut sticky_bottom_candidates = Vec::new();
         let fixed_bottom = grid.layout.row_pos(fixed_row_end);
-        let scrollable_top = fixed_bottom + pinned_top_height;
-        let scrollable_bottom = vp_h - pinned_bottom_height;
+        let scrollable_top = data_y + fixed_bottom + pinned_top_height;
+        let scrollable_bottom = data_y + data_h - pinned_bottom_height;
         for (&row, &edge) in &grid.sticky_rows {
             if grid.is_row_pinned(row) != 0 || row < fixed_row_end {
                 continue;
@@ -730,9 +746,9 @@ impl VisibleRange {
         }
         sticky_left_candidates.sort_unstable();
         let mut sticky_left_cols = Vec::new();
-        let mut threshold_left = fixed_right;
+        let mut threshold_left = data_x + fixed_right;
         for col in sticky_left_candidates {
-            let screen_x = grid.layout.col_pos(col) - grid.scroll.scroll_x as i32;
+            let screen_x = data_x + grid.layout.col_pos(col) - grid.scroll.scroll_x as i32;
             if screen_x < threshold_left {
                 sticky_left_cols.push(col);
                 threshold_left += grid.col_width(col);
@@ -740,9 +756,9 @@ impl VisibleRange {
         }
         sticky_right_candidates.sort_unstable_by(|a, b| b.cmp(a));
         let mut sticky_right_cols = Vec::new();
-        let mut threshold_right = vp_w;
+        let mut threshold_right = data_x + data_w;
         for col in sticky_right_candidates {
-            let screen_x = grid.layout.col_pos(col) - grid.scroll.scroll_x as i32;
+            let screen_x = data_x + grid.layout.col_pos(col) - grid.scroll.scroll_x as i32;
             let col_w = grid.col_width(col);
             if screen_x + col_w > threshold_right {
                 sticky_right_cols.push(col);
@@ -782,8 +798,10 @@ impl VisibleRange {
             scroll_row_end,
             scroll_col_start,
             scroll_col_end,
-            viewport_w: vp_w,
-            viewport_h: vp_h,
+            data_x,
+            data_y,
+            data_w,
+            data_h,
             pinned_top_rows,
             pinned_bottom_rows,
             pinned_top_height,
@@ -958,7 +976,7 @@ pub(crate) fn cell_rect(
         let fixed_bottom = grid.row_pos(grid.fixed_rows + grid.frozen_rows);
         if pin == 1 {
             // Top-pinned: stack below fixed/frozen area
-            let mut pin_y = fixed_bottom;
+            let mut pin_y = vp.data_y + fixed_bottom;
             for &r in &vp.pinned_top_rows {
                 if r == row {
                     break;
@@ -968,7 +986,7 @@ pub(crate) fn cell_rect(
             y = pin_y;
         } else {
             // Bottom-pinned: stack from bottom of viewport upward
-            let mut pin_y = vp.viewport_h - vp.pinned_bottom_height;
+            let mut pin_y = vp.data_y + vp.data_h - vp.pinned_bottom_height;
             for &r in &vp.pinned_bottom_rows {
                 if r == row {
                     break;
@@ -982,15 +1000,17 @@ pub(crate) fn cell_rect(
         if is_col_scrollable {
             x -= grid.scroll.scroll_x as i32;
         }
+        x += vp.data_x;
         // Handle sticky cols for pinned rows
         if vp.sticky_left_cols.contains(&col) {
-            let fixed_right = grid.col_pos(grid.fixed_cols + grid.frozen_cols);
+            let fixed_right = vp.data_x + grid.col_pos(grid.fixed_cols + grid.frozen_cols);
             x = fixed_right;
         } else if vp.sticky_right_cols.contains(&col) {
-            x = vp.viewport_w - w;
+            x = vp.data_x + vp.data_w - w;
         } else if is_col_scrollable {
             // Clip scrollable cols against sticky area for pinned rows
-            let clip_left = grid.col_pos(grid.fixed_cols + grid.frozen_cols) + vp.sticky_left_width;
+            let clip_left =
+                vp.data_x + grid.col_pos(grid.fixed_cols + grid.frozen_cols) + vp.sticky_left_width;
             if x < clip_left {
                 let clip = clip_left - x;
                 w -= clip;
@@ -999,7 +1019,7 @@ pub(crate) fn cell_rect(
                     return None;
                 }
             }
-            let clip_right = vp.viewport_w - vp.sticky_right_width;
+            let clip_right = vp.data_x + vp.data_w - vp.sticky_right_width;
             if x + w > clip_right {
                 w = clip_right - x;
                 if w <= 0 {
@@ -1008,9 +1028,13 @@ pub(crate) fn cell_rect(
             }
         }
         if grid.right_to_left {
-            x = vp.viewport_w - (x + w);
+            x = vp.data_x + vp.data_w - ((x - vp.data_x) + w);
         }
-        if x + w <= 0 || y + h <= 0 || x >= vp.viewport_w || y >= vp.viewport_h {
+        if x + w <= vp.data_x
+            || y + h <= vp.data_y
+            || x >= vp.data_x + vp.data_w
+            || y >= vp.data_y + vp.data_h
+        {
             return None;
         }
         return Some((x, y, w, h));
@@ -1041,6 +1065,8 @@ pub(crate) fn cell_rect(
     if is_col_scrollable {
         x -= grid.scroll.scroll_x as i32;
     }
+    x += vp.data_x;
+    y += vp.data_y;
 
     // Handle merged cells
     if let Some((mr1, mc1, mr2, mc2)) = grid.get_merged_range(row, col) {
@@ -1054,6 +1080,8 @@ pub(crate) fn cell_rect(
                 y -= grid.scroll.scroll_y as i32;
                 y += vp.pinned_top_height;
             }
+            x += vp.data_x;
+            y += vp.data_y;
 
             w = 0;
             for c in mc1..=mc2 {
@@ -1072,7 +1100,7 @@ pub(crate) fn cell_rect(
     // row at its original (scrolled-out) position gets rejected.
     if is_sticky_top_row {
         let fixed_bottom = grid.row_pos(grid.fixed_rows + grid.frozen_rows);
-        let mut sticky_y = fixed_bottom + vp.pinned_top_height;
+        let mut sticky_y = vp.data_y + fixed_bottom + vp.pinned_top_height;
         for &sr in &vp.sticky_top_rows {
             if sr == row {
                 break;
@@ -1082,7 +1110,7 @@ pub(crate) fn cell_rect(
         y = sticky_y;
         h = grid.row_height(row); // reset h (merge may have changed it)
     } else if is_sticky_bottom_row {
-        let mut sticky_y = vp.viewport_h - vp.pinned_bottom_height;
+        let mut sticky_y = vp.data_y + vp.data_h - vp.pinned_bottom_height;
         for &sr in vp.sticky_bottom_rows.iter().rev() {
             sticky_y -= grid.row_height(sr);
             if sr == row {
@@ -1094,7 +1122,7 @@ pub(crate) fn cell_rect(
     }
 
     if is_sticky_left_col {
-        let fixed_right = grid.col_pos(grid.fixed_cols + grid.frozen_cols);
+        let fixed_right = vp.data_x + grid.col_pos(grid.fixed_cols + grid.frozen_cols);
         x = fixed_right;
         for &sc in &vp.sticky_left_cols {
             if sc == col {
@@ -1104,7 +1132,7 @@ pub(crate) fn cell_rect(
         }
         w = grid.col_width(col);
     } else if is_sticky_right_col {
-        x = vp.viewport_w - w;
+        x = vp.data_x + vp.data_w - w;
         for &sc in vp.sticky_right_cols.iter().rev() {
             if sc == col {
                 break;
@@ -1117,7 +1145,8 @@ pub(crate) fn cell_rect(
     // ── Clip scrollable cells to fixed/pinned/sticky area ──
     // Sticky-positioned cells bypass clipping (they're already placed correctly).
     if is_row_scrollable && !is_sticky_row {
-        let clip_top = grid.row_pos(grid.fixed_rows + grid.frozen_rows)
+        let clip_top = vp.data_y
+            + grid.row_pos(grid.fixed_rows + grid.frozen_rows)
             + vp.pinned_top_height
             + vp.sticky_top_height;
         if y < clip_top {
@@ -1128,7 +1157,7 @@ pub(crate) fn cell_rect(
                 return None;
             }
         }
-        let clip_bottom = vp.viewport_h - vp.pinned_bottom_height - vp.sticky_bottom_height;
+        let clip_bottom = vp.data_y + vp.data_h - vp.pinned_bottom_height - vp.sticky_bottom_height;
         if y + h > clip_bottom {
             h = clip_bottom - y;
             if h <= 0 {
@@ -1137,7 +1166,8 @@ pub(crate) fn cell_rect(
         }
     }
     if is_col_scrollable && !is_sticky_col {
-        let fixed_right = grid.col_pos(grid.fixed_cols + grid.frozen_cols) + vp.sticky_left_width;
+        let fixed_right =
+            vp.data_x + grid.col_pos(grid.fixed_cols + grid.frozen_cols) + vp.sticky_left_width;
         if x < fixed_right {
             let clip = fixed_right - x;
             w -= clip;
@@ -1146,7 +1176,7 @@ pub(crate) fn cell_rect(
                 return None;
             }
         }
-        let clip_right = vp.viewport_w - vp.sticky_right_width;
+        let clip_right = vp.data_x + vp.data_w - vp.sticky_right_width;
         if x + w > clip_right {
             w = clip_right - x;
             if w <= 0 {
@@ -1155,16 +1185,20 @@ pub(crate) fn cell_rect(
         }
     }
 
-    if grid.extend_last_col && col == grid.cols - 1 && x < vp.viewport_w {
-        w = w.max(vp.viewport_w - x);
+    if grid.extend_last_col && col == grid.cols - 1 && x < vp.data_x + vp.data_w {
+        w = w.max(vp.data_x + vp.data_w - x);
     }
 
     if grid.right_to_left {
-        x = vp.viewport_w - (x + w);
+        x = vp.data_x + vp.data_w - ((x - vp.data_x) + w);
     }
 
     // Clip to viewport
-    if x + w <= 0 || y + h <= 0 || x >= vp.viewport_w || y >= vp.viewport_h {
+    if x + w <= vp.data_x
+        || y + h <= vp.data_y
+        || x >= vp.data_x + vp.data_w
+        || y >= vp.data_y + vp.data_h
+    {
         return None;
     }
 
@@ -1217,14 +1251,16 @@ fn original_cell_bounds(
     if let Some((mr1, mc1, mr2, mc2)) = grid.get_merged_range(row, col) {
         if mr1 != mr2 || mc1 != mc2 {
             let (ox, ow) = if need_orig_x {
-                let ox = grid.col_pos(mc1) - grid.scroll.scroll_x as i32;
+                let ox = grid.col_pos(mc1) - grid.scroll.scroll_x as i32 + vp.data_x;
                 let ow: i32 = (mc1..=mc2).map(|c| grid.col_width(c)).sum();
                 (ox, ow)
             } else {
                 (cx, cw)
             };
             let (oy, oh) = if need_orig_y {
-                let oy = grid.row_pos(mr1) - grid.scroll.scroll_y as i32 + vp.pinned_top_height;
+                let oy = grid.row_pos(mr1) - grid.scroll.scroll_y as i32
+                    + vp.pinned_top_height
+                    + vp.data_y;
                 let oh: i32 = (mr1..=mr2).map(|r| grid.row_height(r)).sum();
                 (oy, oh)
             } else {
@@ -1235,13 +1271,13 @@ fn original_cell_bounds(
     }
 
     let (ox, ow) = if need_orig_x {
-        let ox = grid.col_pos(col) - grid.scroll.scroll_x as i32;
+        let ox = grid.col_pos(col) - grid.scroll.scroll_x as i32 + vp.data_x;
         (ox, grid.col_width(col))
     } else {
         (cx, cw)
     };
     let (oy, oh) = if need_orig_y {
-        let oy = grid.row_pos(row) - grid.scroll.scroll_y as i32 + vp.pinned_top_height;
+        let oy = grid.row_pos(row) - grid.scroll.scroll_y as i32 + vp.pinned_top_height + vp.data_y;
         (oy, grid.row_height(row))
     } else {
         (cy, ch)
@@ -1604,10 +1640,11 @@ pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> (i32, i32, i
     });
 
     render_overlay_bands(grid, canvas, &vp);
+    render_indicator_surfaces(grid, canvas, &vp, &vis_cells);
     render_backgrounds(grid, canvas, &vis_cells);
 
     if grid.style.progress_color != 0 || grid.columns.iter().any(|c| c.progress_color != 0) {
-        render_progress_bars(grid, canvas, &vis_cells);
+        render_progress_bars(grid, canvas, &vp, &vis_cells);
     }
 
     if grid.style.grid_lines != pb::GridLineStyle::GridlineNone as i32
@@ -1733,6 +1770,49 @@ fn should_highlight_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
     is_highlight_active(grid) && grid.is_cell_selected(row, col)
 }
 
+fn should_highlight_row_indicator(grid: &VolvoxGrid, row: i32) -> bool {
+    if grid.selection.mode == pb::SelectionMode::SelectionListbox as i32 {
+        if row == grid.selection.row {
+            return true;
+        }
+        return is_highlight_active(grid) && grid.selection.selected_rows.contains(&row);
+    }
+    if !is_highlight_active(grid) {
+        return false;
+    }
+    if grid.selection.mode == pb::SelectionMode::SelectionByColumn as i32 {
+        return false;
+    }
+    grid.selection
+        .all_ranges(grid.rows, grid.cols)
+        .iter()
+        .any(|&(row_lo, _, row_hi, _)| row >= row_lo && row <= row_hi)
+}
+
+fn should_highlight_col_indicator(grid: &VolvoxGrid, col: i32) -> bool {
+    if !is_highlight_active(grid) {
+        return false;
+    }
+    if grid.selection.mode == pb::SelectionMode::SelectionByRow as i32
+        || grid.selection.mode == pb::SelectionMode::SelectionListbox as i32
+    {
+        return false;
+    }
+    grid.selection
+        .all_ranges(grid.rows, grid.cols)
+        .iter()
+        .any(|&(_, col_lo, _, col_hi)| col >= col_lo && col <= col_hi)
+}
+
+fn span_has_highlighted_col(grid: &VolvoxGrid, col1: i32, col2: i32) -> bool {
+    let start = col1.max(0);
+    let end = col2.max(col1).min(grid.cols - 1);
+    if start > end {
+        return false;
+    }
+    (start..=end).any(|col| should_highlight_col_indicator(grid, col))
+}
+
 fn selection_back_color(grid: &VolvoxGrid) -> u32 {
     grid.selection
         .selection_style
@@ -1798,29 +1878,31 @@ fn draw_highlight_fill<C: Canvas>(
 /// through between cell gaps.
 fn render_overlay_bands<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRange) {
     let bg = grid.style.back_color_bkg;
-    let w = vp.viewport_w;
-    let h = vp.viewport_h;
+    let x0 = vp.data_x;
+    let y0 = vp.data_y;
+    let w = vp.data_w;
+    let h = vp.data_h;
 
     // Pinned-top band
     if vp.pinned_top_height > 0 {
         let fixed_bottom = grid.row_pos(grid.fixed_rows + grid.frozen_rows);
-        canvas.fill_rect(0, fixed_bottom, w, vp.pinned_top_height, bg);
+        canvas.fill_rect(x0, y0 + fixed_bottom, w, vp.pinned_top_height, bg);
     }
 
     // Pinned-bottom band
     if vp.pinned_bottom_height > 0 {
-        let y = vp.viewport_h - vp.pinned_bottom_height;
-        canvas.fill_rect(0, y, w, vp.pinned_bottom_height, bg);
+        let y = y0 + h - vp.pinned_bottom_height;
+        canvas.fill_rect(x0, y, w, vp.pinned_bottom_height, bg);
     }
 
     // Sticky-top row bands
     {
         let fixed_bottom = grid.row_pos(grid.fixed_rows + grid.frozen_rows);
-        let mut y = fixed_bottom + vp.pinned_top_height;
+        let mut y = y0 + fixed_bottom + vp.pinned_top_height;
         for &row in &vp.sticky_top_rows {
             let rh = grid.row_height(row);
             if rh > 0 {
-                canvas.fill_rect(0, y, w, rh, bg);
+                canvas.fill_rect(x0, y, w, rh, bg);
             }
             y += rh;
         }
@@ -1828,24 +1910,24 @@ fn render_overlay_bands<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visib
 
     // Sticky-bottom row bands
     {
-        let mut y = vp.viewport_h - vp.pinned_bottom_height;
+        let mut y = y0 + h - vp.pinned_bottom_height;
         for &row in vp.sticky_bottom_rows.iter().rev() {
             let rh = grid.row_height(row);
             y -= rh;
             if rh > 0 {
-                canvas.fill_rect(0, y, w, rh, bg);
+                canvas.fill_rect(x0, y, w, rh, bg);
             }
         }
     }
 
     // Sticky-left column bands
     {
-        let fixed_right = grid.col_pos(grid.fixed_cols + grid.frozen_cols);
+        let fixed_right = x0 + grid.col_pos(grid.fixed_cols + grid.frozen_cols);
         let mut x = fixed_right;
         for &col in &vp.sticky_left_cols {
             let cw = grid.col_width(col);
             if cw > 0 {
-                canvas.fill_rect(x, 0, cw, h, bg);
+                canvas.fill_rect(x, y0, cw, h, bg);
             }
             x += cw;
         }
@@ -1853,15 +1935,815 @@ fn render_overlay_bands<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visib
 
     // Sticky-right column bands
     {
-        let mut x = vp.viewport_w;
+        let mut x = x0 + w;
         for &col in vp.sticky_right_cols.iter().rev() {
             let cw = grid.col_width(col);
             x -= cw;
             if cw > 0 {
-                canvas.fill_rect(x, 0, cw, h, bg);
+                canvas.fill_rect(x, y0, cw, h, bg);
             }
         }
     }
+}
+
+fn insert_visible_row_rect(
+    rows: &mut BTreeMap<i32, (i32, i32)>,
+    row: i32,
+    mut y: i32,
+    mut h: i32,
+    clip_top: i32,
+    clip_bottom: i32,
+) {
+    if h <= 0 {
+        return;
+    }
+    if y < clip_top {
+        let clip = clip_top - y;
+        y = clip_top;
+        h -= clip;
+    }
+    if y + h > clip_bottom {
+        h = clip_bottom - y;
+    }
+    if h > 0 {
+        rows.insert(row, (y, h));
+    }
+}
+
+fn build_visible_row_rects(grid: &VolvoxGrid, vp: &VisibleRange) -> BTreeMap<i32, (i32, i32)> {
+    let mut rows = BTreeMap::new();
+    let band_top = vp.data_y;
+    let band_bottom = vp.data_y + vp.data_h;
+    let fixed_bottom = grid.row_pos(vp.fixed_row_end);
+
+    for row in 0..vp.fixed_row_end {
+        if grid.is_row_hidden(row) {
+            continue;
+        }
+        insert_visible_row_rect(
+            &mut rows,
+            row,
+            vp.data_y + grid.row_pos(row),
+            grid.row_height(row),
+            band_top,
+            band_bottom,
+        );
+    }
+
+    let mut pinned_top_y = vp.data_y + fixed_bottom;
+    for &row in &vp.pinned_top_rows {
+        if grid.is_row_hidden(row) {
+            continue;
+        }
+        let row_h = grid.row_height(row);
+        insert_visible_row_rect(&mut rows, row, pinned_top_y, row_h, band_top, band_bottom);
+        pinned_top_y += row_h;
+    }
+
+    let scroll_clip_top = vp.data_y + fixed_bottom + vp.pinned_top_height + vp.sticky_top_height;
+    let scroll_clip_bottom =
+        vp.data_y + vp.data_h - vp.pinned_bottom_height - vp.sticky_bottom_height;
+    for row in vp.scroll_row_start..vp.scroll_row_end {
+        if grid.is_row_hidden(row)
+            || grid.is_row_pinned(row) != 0
+            || vp.sticky_top_rows.contains(&row)
+            || vp.sticky_bottom_rows.contains(&row)
+        {
+            continue;
+        }
+        insert_visible_row_rect(
+            &mut rows,
+            row,
+            vp.data_y + grid.row_pos(row) - grid.scroll.scroll_y as i32 + vp.pinned_top_height,
+            grid.row_height(row),
+            scroll_clip_top,
+            scroll_clip_bottom,
+        );
+    }
+
+    let mut sticky_top_y = vp.data_y + fixed_bottom + vp.pinned_top_height;
+    for &row in &vp.sticky_top_rows {
+        if grid.is_row_hidden(row) {
+            continue;
+        }
+        let row_h = grid.row_height(row);
+        insert_visible_row_rect(&mut rows, row, sticky_top_y, row_h, band_top, band_bottom);
+        sticky_top_y += row_h;
+    }
+
+    let mut sticky_bottom_y = vp.data_y + vp.data_h - vp.pinned_bottom_height;
+    for &row in vp.sticky_bottom_rows.iter().rev() {
+        if grid.is_row_hidden(row) {
+            continue;
+        }
+        let row_h = grid.row_height(row);
+        sticky_bottom_y -= row_h;
+        insert_visible_row_rect(
+            &mut rows,
+            row,
+            sticky_bottom_y,
+            row_h,
+            band_top,
+            band_bottom,
+        );
+    }
+
+    let mut pinned_bottom_y = vp.data_y + vp.data_h - vp.pinned_bottom_height;
+    for &row in &vp.pinned_bottom_rows {
+        if grid.is_row_hidden(row) {
+            continue;
+        }
+        let row_h = grid.row_height(row);
+        insert_visible_row_rect(
+            &mut rows,
+            row,
+            pinned_bottom_y,
+            row_h,
+            band_top,
+            band_bottom,
+        );
+        pinned_bottom_y += row_h;
+    }
+
+    rows
+}
+
+fn build_visible_col_rects(
+    vis_cells: &[(i32, i32, i32, i32, i32, i32)],
+) -> BTreeMap<i32, (i32, i32)> {
+    let mut cols = BTreeMap::new();
+    for &(_row, col, cx, _cy, cw, _ch) in vis_cells {
+        cols.entry(col).or_insert((cx, cw));
+    }
+    cols
+}
+
+fn build_indicator_row_offsets(
+    band: &crate::indicator::ColIndicatorState,
+    band_y: i32,
+) -> Vec<(i32, i32, i32)> {
+    let row_count = band.row_count().max(1);
+    let mut row_offsets = Vec::new();
+    let mut y = band_y;
+    for row in 0..row_count {
+        let h = band.row_height_px(row).max(1);
+        row_offsets.push((row, y, h));
+        y += h;
+    }
+    row_offsets
+}
+
+fn indicator_span_x(cols: &BTreeMap<i32, (i32, i32)>, col1: i32, col2: i32) -> Option<(i32, i32)> {
+    let mut left = i32::MAX;
+    let mut right = i32::MIN;
+    for col in col1.min(col2)..=col1.max(col2) {
+        if let Some(&(x, w)) = cols.get(&col) {
+            left = left.min(x);
+            right = right.max(x + w);
+        }
+    }
+    if left == i32::MAX || right <= left {
+        None
+    } else {
+        Some((left, right - left))
+    }
+}
+
+fn indicator_cell_range(
+    band: &crate::indicator::ColIndicatorState,
+    row: i32,
+    col: i32,
+) -> (i32, i32, i32, i32) {
+    for cell in &band.cells {
+        let row1 = cell.row1.min(cell.row2).max(0);
+        let row2 = cell.row1.max(cell.row2).max(0);
+        let col1 = cell.col1.min(cell.col2).max(0);
+        let col2 = cell.col1.max(cell.col2).max(0);
+        if row >= row1 && row <= row2 && col >= col1 && col <= col2 {
+            return (row1, col1, row2, col2);
+        }
+    }
+    (row, col, row, col)
+}
+
+fn indicator_slots_share_cell(
+    band: &crate::indicator::ColIndicatorState,
+    row_a: i32,
+    col_a: i32,
+    row_b: i32,
+    col_b: i32,
+) -> bool {
+    indicator_cell_range(band, row_a, col_a) == indicator_cell_range(band, row_b, col_b)
+}
+
+fn indicator_draws_vertical_grid_lines(band: &crate::indicator::ColIndicatorState) -> bool {
+    let mode = band
+        .grid_lines
+        .unwrap_or(pb::GridLineStyle::GridlineNone as i32);
+    mode == pb::GridLineStyle::GridlineSolid as i32
+        || mode == pb::GridLineStyle::GridlineInset as i32
+        || mode == pb::GridLineStyle::GridlineRaised as i32
+        || mode == pb::GridLineStyle::GridlineSolidVertical as i32
+        || mode == pb::GridLineStyle::GridlineInsetVertical as i32
+        || mode == pb::GridLineStyle::GridlineRaisedVertical as i32
+}
+
+fn indicator_cell_rect_for_col(
+    band: &crate::indicator::ColIndicatorState,
+    row_offsets: &[(i32, i32, i32)],
+    col_rects: &BTreeMap<i32, (i32, i32)>,
+    col: i32,
+) -> Option<(i32, i32, i32, i32)> {
+    let mut best: Option<(i32, i32, i32, i32, i32, i32)> = None;
+    for cell in &band.cells {
+        let col1 = cell.col1.min(cell.col2).max(0);
+        let col2 = cell.col1.max(cell.col2).max(0);
+        if col < col1 || col > col2 {
+            continue;
+        }
+        let row1 = cell.row1.min(cell.row2).max(0);
+        let row2 = cell.row1.max(cell.row2).max(0);
+        let col_span = col2 - col1;
+        let row_span = row2 - row1;
+        match best {
+            None => best = Some((row1, row2, col1, col2, col_span, row_span)),
+            Some((best_row1, best_row2, best_col1, best_col2, best_col_span, best_row_span)) => {
+                let replace = col_span < best_col_span
+                    || (col_span == best_col_span && row_span < best_row_span)
+                    || (col_span == best_col_span && row_span == best_row_span && row2 > best_row2)
+                    || (col_span == best_col_span
+                        && row_span == best_row_span
+                        && row2 == best_row2
+                        && col1 == col2
+                        && best_col1 != best_col2)
+                    || (col_span == best_col_span
+                        && row_span == best_row_span
+                        && row2 == best_row2
+                        && row1 > best_row1);
+                if replace {
+                    best = Some((row1, row2, col1, col2, col_span, row_span));
+                }
+            }
+        }
+    }
+
+    if let Some((row1, row2, col1, col2, _, _)) = best {
+        let (cx, cw) = indicator_span_x(col_rects, col1, col2)?;
+        let start = row1 as usize;
+        let end = row2 as usize;
+        if start >= row_offsets.len() || end >= row_offsets.len() {
+            return None;
+        }
+        let cy = row_offsets[start].1;
+        let ch = row_offsets[start..=end].iter().map(|(_, _, h)| *h).sum();
+        return Some((cx, cy, cw, ch));
+    }
+
+    let (cx, cw) = col_rects.get(&col).copied()?;
+    let (_row_idx, row_y, row_h) = *row_offsets.last()?;
+    Some((cx, row_y, cw, row_h))
+}
+
+fn column_header_text(grid: &VolvoxGrid, col: i32) -> String {
+    if col < 0 || (col as usize) >= grid.columns.len() {
+        return String::new();
+    }
+    let cp = &grid.columns[col as usize];
+    if !cp.caption.trim().is_empty() {
+        return cp.caption.clone();
+    }
+    if !cp.key.trim().is_empty() {
+        return cp.key.clone();
+    }
+    if grid.fixed_rows > 0 {
+        let legacy = grid.get_display_text(0, col);
+        if !legacy.trim().is_empty() {
+            return legacy;
+        }
+    }
+    String::new()
+}
+
+fn indicator_fore_color(color: Option<u32>, fallback: u32) -> u32 {
+    color.unwrap_or(fallback)
+}
+
+fn indicator_back_color(color: Option<u32>, fallback: u32) -> u32 {
+    color.unwrap_or(fallback)
+}
+
+fn draw_indicator_text<C: Canvas>(
+    canvas: &mut C,
+    grid: &VolvoxGrid,
+    text: &str,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    halign: i32,
+    color: u32,
+) {
+    if text.trim().is_empty() || w <= 2 || h <= 2 {
+        return;
+    }
+    let font_size = grid.style.font_size;
+    let font_name = &grid.style.font_name;
+    let (tw, th) = canvas.measure_text(text, font_name, font_size, false, false, None);
+    let text_w = tw.ceil() as i32;
+    let text_h = th.ceil() as i32;
+    let tx = match halign {
+        1 => x + (w - text_w) / 2,
+        2 => x + w - text_w - 4,
+        _ => x + 4,
+    }
+    .clamp(x + 1, (x + w - text_w - 1).max(x + 1));
+    let ty = (y + (h - text_h) / 2).clamp(y + 1, (y + h - text_h - 1).max(y + 1));
+    canvas.draw_text_styled(
+        tx, ty, text, font_name, font_size, false, false, color, x, y, w, h, 0, None,
+    );
+}
+
+fn sort_arrow_box_size(cell_h: i32) -> i32 {
+    cell_h.saturating_sub(6).clamp(8, 16)
+}
+
+fn draw_sort_direction_arrow<C: Canvas>(
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    size: i32,
+    ascending: bool,
+    color: u32,
+) {
+    if size < 6 {
+        return;
+    }
+    if ascending {
+        canvas.draw_scroll_arrow_up(x, y, size, size, color);
+    } else {
+        canvas.draw_scroll_arrow_down(x, y, size, size, color);
+    }
+}
+
+fn draw_indicator_checkbox<C: Canvas>(
+    canvas: &mut C,
+    rect: (i32, i32, i32, i32),
+    checked: bool,
+    fore_color: u32,
+) {
+    let (x, y, w, h) = rect;
+    let box_size = 13.min((w - 4).max(0)).min((h - 4).max(0));
+    if box_size <= 4 {
+        return;
+    }
+    let bx = x + (w - box_size) / 2;
+    let by = y + (h - box_size) / 2;
+    canvas.rect_outline(bx, by, box_size, box_size, 0xFF707070);
+    canvas.fill_rect(bx + 1, by + 1, box_size - 2, box_size - 2, 0xFFFFFFFF);
+    if checked {
+        let mark_y = by + box_size / 2;
+        canvas.hline(bx + 3, mark_y, (box_size - 6).max(2), fore_color);
+    }
+}
+
+fn render_row_indicator_slot<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    row: i32,
+    rect: (i32, i32, i32, i32),
+    kind: i32,
+    fore_color: u32,
+) {
+    let slot_kind = kind;
+    if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32 {
+        let label = (row - grid.fixed_rows + 1).max(1).to_string();
+        draw_indicator_text(
+            canvas, grid, &label, rect.0, rect.1, rect.2, rect.3, 1, fore_color,
+        );
+        return;
+    }
+    if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotCurrent as i32 {
+        if row == grid.selection.row {
+            draw_indicator_text(
+                canvas, grid, "▶", rect.0, rect.1, rect.2, rect.3, 1, fore_color,
+            );
+        }
+        return;
+    }
+    if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotSelection as i32 {
+        let selected = grid
+            .selection
+            .all_ranges(grid.rows, grid.cols)
+            .iter()
+            .any(|&(row_lo, _, row_hi, _)| row >= row_lo && row <= row_hi);
+        if selected {
+            draw_indicator_text(
+                canvas, grid, "•", rect.0, rect.1, rect.2, rect.3, 1, fore_color,
+            );
+        }
+        return;
+    }
+    if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotCheckbox as i32 {
+        let checked = grid
+            .selection
+            .all_ranges(grid.rows, grid.cols)
+            .iter()
+            .any(|&(row_lo, _, row_hi, _)| row >= row_lo && row <= row_hi);
+        draw_indicator_checkbox(canvas, rect, checked, fore_color);
+        return;
+    }
+    if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotHandle as i32 {
+        draw_indicator_text(
+            canvas, grid, "≡", rect.0, rect.1, rect.2, rect.3, 1, fore_color,
+        );
+        return;
+    }
+    if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotEditing as i32 {
+        if grid.edit.is_active() && grid.edit.edit_row == row {
+            draw_indicator_text(
+                canvas, grid, "✎", rect.0, rect.1, rect.2, rect.3, 1, fore_color,
+            );
+        }
+        return;
+    }
+    if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32 {
+        if let Some(rp) = grid.get_row_props(row) {
+            let glyph = if rp.is_collapsed { "+" } else { "-" };
+            draw_indicator_text(
+                canvas, grid, glyph, rect.0, rect.1, rect.2, rect.3, 1, fore_color,
+            );
+        }
+        return;
+    }
+}
+
+fn render_row_indicator_start<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    vp: &VisibleRange,
+    _vis_cells: &[(i32, i32, i32, i32, i32, i32)],
+) {
+    let band = &grid.indicator_bands.row_start;
+    if !band.visible || vp.data_x <= 0 || vp.data_h <= 0 {
+        return;
+    }
+
+    let back_color = indicator_back_color(band.back_color, grid.style.back_color_fixed);
+    let fore_color = indicator_fore_color(band.fore_color, grid.style.fore_color_fixed);
+    let grid_color = band.grid_color.unwrap_or(grid.style.grid_color_fixed);
+    let band_x = 0;
+    let band_y = vp.data_y;
+    let band_w = vp.data_x;
+    let band_h = vp.data_h;
+    canvas.fill_rect(band_x, band_y, band_w, band_h, back_color);
+
+    let row_rects = build_visible_row_rects(grid, vp);
+    for (&row, &(cy, ch)) in &row_rects {
+        let is_selected = should_highlight_row_indicator(grid, row);
+        if is_selected {
+            canvas.fill_rect(band_x, cy, band_w, ch, selection_back_color(grid));
+        } else if hover_matches_row(grid, row) {
+            draw_highlight_fill(
+                canvas,
+                band_x,
+                cy,
+                band_w,
+                ch,
+                &grid.selection.hover_row_style,
+            );
+        }
+        let row_fore_color = if is_selected {
+            selection_fore_color(grid)
+        } else {
+            fore_color
+        };
+        if !band.slots.is_empty() {
+            let mut slot_x = band_x;
+            for slot in band.slots.iter().filter(|slot| slot.visible) {
+                let remaining = (band_x + band_w - slot_x).max(0);
+                if remaining <= 0 {
+                    break;
+                }
+                let slot_w = slot.width_px.max(1).min(remaining);
+                render_row_indicator_slot(
+                    grid,
+                    canvas,
+                    row,
+                    (slot_x, cy, slot_w, ch),
+                    slot.kind,
+                    row_fore_color,
+                );
+                slot_x += slot_w;
+            }
+        } else {
+            let composite_rect = (band_x, cy, band_w, ch);
+            if band.has_mode(pb::RowIndicatorMode::RowIndicatorNumbers) {
+                render_row_indicator_slot(
+                    grid,
+                    canvas,
+                    row,
+                    composite_rect,
+                    pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32,
+                    row_fore_color,
+                );
+            } else if band.has_mode(pb::RowIndicatorMode::RowIndicatorCurrent)
+                && row == grid.selection.row
+            {
+                render_row_indicator_slot(
+                    grid,
+                    canvas,
+                    row,
+                    composite_rect,
+                    pb::RowIndicatorSlotKind::RowIndicatorSlotCurrent as i32,
+                    row_fore_color,
+                );
+            } else if band.has_mode(pb::RowIndicatorMode::RowIndicatorSelection) {
+                render_row_indicator_slot(
+                    grid,
+                    canvas,
+                    row,
+                    composite_rect,
+                    pb::RowIndicatorSlotKind::RowIndicatorSlotSelection as i32,
+                    row_fore_color,
+                );
+            }
+            if band.has_mode(pb::RowIndicatorMode::RowIndicatorCheckbox) {
+                render_row_indicator_slot(
+                    grid,
+                    canvas,
+                    row,
+                    composite_rect,
+                    pb::RowIndicatorSlotKind::RowIndicatorSlotCheckbox as i32,
+                    row_fore_color,
+                );
+            }
+            if band.has_mode(pb::RowIndicatorMode::RowIndicatorEditing) {
+                render_row_indicator_slot(
+                    grid,
+                    canvas,
+                    row,
+                    composite_rect,
+                    pb::RowIndicatorSlotKind::RowIndicatorSlotEditing as i32,
+                    row_fore_color,
+                );
+            }
+        }
+    }
+    for &(cy, ch) in row_rects.values() {
+        canvas.hline(band_x, cy + ch, band_w, grid_color);
+    }
+    canvas.vline(band_x + band_w - 1, band_y, band_h, grid_color);
+}
+
+fn render_col_indicator_top<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    vp: &VisibleRange,
+    vis_cells: &[(i32, i32, i32, i32, i32, i32)],
+) {
+    let band = &grid.indicator_bands.col_top;
+    if !band.visible || vp.data_y <= 0 || vp.data_w <= 0 {
+        return;
+    }
+
+    let back_color = indicator_back_color(band.back_color, grid.style.back_color_fixed);
+    let fore_color = indicator_fore_color(band.fore_color, grid.style.fore_color_fixed);
+    let grid_color = band.grid_color.unwrap_or(grid.style.grid_color_fixed);
+    let band_x = vp.data_x;
+    let band_y = 0;
+    let band_w = vp.data_w;
+    let band_h = vp.data_y;
+    canvas.fill_rect(band_x, band_y, band_w, band_h, back_color);
+
+    let col_rects = build_visible_col_rects(vis_cells);
+    for (&col, &(cx, cw)) in &col_rects {
+        if should_highlight_col_indicator(grid, col) {
+            canvas.fill_rect(cx, band_y, cw, band_h, selection_back_color(grid));
+        } else if hover_matches_column(grid, col) {
+            draw_highlight_fill(
+                canvas,
+                cx,
+                band_y,
+                cw,
+                band_h,
+                &grid.selection.hover_column_style,
+            );
+        }
+    }
+    let row_offsets = build_indicator_row_offsets(band, band_y);
+
+    let auto_headers = band.cells.is_empty()
+        && band.has_mode(pb::ColIndicatorCellMode::ColIndicatorCellHeaderText);
+    if auto_headers {
+        for col in 0..grid.cols {
+            let Some((cx, cw)) = col_rects.get(&col).copied() else {
+                continue;
+            };
+            let text = column_header_text(grid, col);
+            if text.is_empty() {
+                continue;
+            }
+            let (_row_idx, row_y, row_h) = row_offsets[0];
+            let text_color = if should_highlight_col_indicator(grid, col) {
+                selection_fore_color(grid)
+            } else {
+                fore_color
+            };
+            draw_indicator_text(canvas, grid, &text, cx, row_y, cw, row_h, 1, text_color);
+        }
+    }
+
+    for cell in &band.cells {
+        let Some((cx, cw)) = indicator_span_x(&col_rects, cell.col1, cell.col2) else {
+            continue;
+        };
+        let row1 = cell.row1.max(0) as usize;
+        let row2 = cell.row2.max(cell.row1).max(0) as usize;
+        if row1 >= row_offsets.len() || row2 >= row_offsets.len() {
+            continue;
+        }
+        let cy = row_offsets[row1].1;
+        let ch = row_offsets[row1..=row2].iter().map(|(_, _, h)| *h).sum();
+        let mode_bits = if cell.mode_bits != 0 {
+            cell.mode_bits
+        } else {
+            band.mode_bits
+        };
+        let text = if !cell.text.trim().is_empty() {
+            cell.text.clone()
+        } else if cell.col1 == cell.col2
+            && (mode_bits & (pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32) != 0)
+        {
+            column_header_text(grid, cell.col1)
+        } else {
+            String::new()
+        };
+        if !text.is_empty() {
+            let text_color = if span_has_highlighted_col(grid, cell.col1, cell.col2) {
+                selection_fore_color(grid)
+            } else {
+                fore_color
+            };
+            draw_indicator_text(canvas, grid, &text, cx, cy, cw, ch, 1, text_color);
+        }
+    }
+
+    if band.has_mode(pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph)
+        && grid.header_features & 1 != 0
+    {
+        let sort_targets = if grid.sort_state.sort_keys.is_empty() {
+            (0..grid.cols)
+                .filter_map(|col| {
+                    grid.get_col_props(col).and_then(|cp| {
+                        if cp.sort_defined {
+                            Some((col, cp.sort_order))
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .collect::<Vec<_>>()
+        } else {
+            grid.sort_state.sort_keys.clone()
+        };
+        for (sort_idx, (sort_col, sort_order)) in sort_targets.iter().enumerate() {
+            let Some((cx, cy, cw, ch)) =
+                indicator_cell_rect_for_col(band, &row_offsets, &col_rects, *sort_col)
+            else {
+                continue;
+            };
+            let sort_fore_color = if should_highlight_col_indicator(grid, *sort_col) {
+                selection_fore_color(grid)
+            } else {
+                fore_color
+            };
+            let glyph = if *sort_order == pb::SortOrder::SortNone as i32 {
+                continue;
+            } else if sort_order_is_ascending(*sort_order) {
+                true
+            } else {
+                false
+            };
+            let glyph_box = sort_arrow_box_size(ch).min((cw - 4).max(0));
+            if glyph_box < 6 {
+                continue;
+            }
+            let glyph_x = (cx + cw - glyph_box - 4).max(cx + 2);
+            let glyph_y = cy + ((ch - glyph_box).max(0) / 2);
+            draw_sort_direction_arrow(canvas, glyph_x, glyph_y, glyph_box, glyph, sort_fore_color);
+            if grid.style.show_sort_numbers && sort_targets.len() > 1 {
+                let label = format!("{}", sort_idx + 1);
+                let num_font_size = ((grid.style.font_size - 1.0).max(8.0) * 0.8).max(7.0);
+                let (nw, nh) = canvas.measure_text(
+                    &label,
+                    &grid.style.font_name,
+                    num_font_size,
+                    false,
+                    false,
+                    None,
+                );
+                let num_w = nw.ceil() as i32;
+                let num_h = nh.ceil() as i32;
+                let num_x = (glyph_x - num_w - 2).max(cx + 2);
+                let num_y = cy + (ch - num_h) / 2;
+                canvas.draw_text_styled(
+                    num_x,
+                    num_y,
+                    &label,
+                    &grid.style.font_name,
+                    num_font_size,
+                    false,
+                    false,
+                    sort_fore_color,
+                    cx,
+                    cy,
+                    cw,
+                    ch,
+                    0,
+                    None,
+                );
+            }
+        }
+    }
+
+    for row_idx in 0..row_offsets.len().saturating_sub(1) {
+        let row = row_offsets[row_idx].0;
+        let next_row = row_offsets[row_idx + 1].0;
+        let boundary_y = row_offsets[row_idx].1 + row_offsets[row_idx].2;
+        for (&col, &(cx, cw)) in &col_rects {
+            if indicator_slots_share_cell(band, row, col, next_row, col) {
+                continue;
+            }
+            canvas.hline(cx, boundary_y, cw, grid_color);
+        }
+    }
+    if let Some((_row, cy, ch)) = row_offsets.last() {
+        canvas.hline(band_x, *cy + *ch, band_w, grid_color);
+    }
+
+    if indicator_draws_vertical_grid_lines(band) {
+        let visible_cols = col_rects
+            .iter()
+            .map(|(&col, &(cx, cw))| (col, cx, cw))
+            .collect::<Vec<_>>();
+        for pair in visible_cols.windows(2) {
+            let (left_col, left_x, left_w) = pair[0];
+            let (right_col, _right_x, _right_w) = pair[1];
+            let boundary_x = left_x + left_w;
+            for (row, cy, ch) in &row_offsets {
+                if indicator_slots_share_cell(band, *row, left_col, *row, right_col) {
+                    continue;
+                }
+                canvas.vline(boundary_x, *cy, *ch, grid_color);
+            }
+        }
+        if let Some((_, cx, cw)) = visible_cols.last() {
+            canvas.vline(*cx + *cw, band_y, band_h, grid_color);
+        }
+    }
+}
+
+fn render_corner_top_start<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRange) {
+    if vp.data_x <= 0 || vp.data_y <= 0 {
+        return;
+    }
+    let corner = &grid.indicator_bands.corner_top_start;
+    let col_top = &grid.indicator_bands.col_top;
+    let back_color = indicator_back_color(
+        corner.back_color,
+        indicator_back_color(col_top.back_color, grid.style.back_color_fixed),
+    );
+    let fore_color = indicator_fore_color(corner.fore_color, grid.style.fore_color_fixed);
+    let grid_color = col_top
+        .grid_color
+        .or(grid.indicator_bands.row_start.grid_color)
+        .unwrap_or(grid.style.grid_color_fixed);
+    canvas.fill_rect(0, 0, vp.data_x, vp.data_y, back_color);
+    if corner.visible && grid.selection.allow_selection {
+        draw_indicator_text(canvas, grid, "▣", 0, 0, vp.data_x, vp.data_y, 1, fore_color);
+    }
+
+    let row_count = col_top.row_count().max(1);
+    let mut y = 0;
+    for row in 0..row_count {
+        y += col_top.row_height_px(row).max(1);
+        if y > vp.data_y {
+            break;
+        }
+        canvas.hline(0, y, vp.data_x, grid_color);
+    }
+    canvas.vline(vp.data_x - 1, 0, vp.data_y, grid_color);
+}
+
+fn render_indicator_surfaces<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    vp: &VisibleRange,
+    vis_cells: &[(i32, i32, i32, i32, i32, i32)],
+) {
+    render_col_indicator_top(grid, canvas, vp, vis_cells);
+    render_row_indicator_start(grid, canvas, vp, vis_cells);
+    render_corner_top_start(grid, canvas, vp);
 }
 
 // ===========================================================================
@@ -1938,6 +2820,7 @@ fn render_backgrounds<C: Canvas>(
 fn render_progress_bars<C: Canvas>(
     grid: &VolvoxGrid,
     canvas: &mut C,
+    vp: &VisibleRange,
     vis_cells: &[(i32, i32, i32, i32, i32, i32)],
 ) {
     for &(row, col, cx, cy, cw, ch) in vis_cells {
@@ -1971,17 +2854,8 @@ fn render_progress_bars<C: Canvas>(
         if pct > 0.0 && color != 0 {
             // Use original cell width so the progress bar doesn't resize
             // when the cell is partially scrolled off-screen.
-            let is_col_scrollable = col >= grid.fixed_cols + grid.frozen_cols;
-            let orig_x = if is_col_scrollable {
-                grid.layout.col_pos(col) - grid.scroll.scroll_x as i32
-            } else {
-                cx
-            };
-            let orig_w = if is_col_scrollable {
-                grid.col_width(col)
-            } else {
-                cw
-            };
+            let (orig_x, _orig_y, orig_w, _orig_h) =
+                original_cell_bounds(grid, row, col, cx, cy, cw, ch, vp);
             let fill_w = ((orig_w as f32) * pct.clamp(0.0, 1.0)) as i32;
             if fill_w > 0 {
                 // Clip the fill to the visible (clipped) cell area
@@ -2248,10 +3122,10 @@ fn render_cell_text<C: Canvas>(
                     // merged range and are clipped against fixed/frozen.
                     // Further clip to the viewport so text centers in the
                     // visible portion only.
-                    let vx = cx.max(0);
-                    let vy = cy.max(0);
-                    let vw = ((cx + cw).min(vp.viewport_w) - vx).max(1);
-                    let vh = ((cy + ch).min(vp.viewport_h) - vy).max(1);
+                    let vx = cx.max(vp.data_x);
+                    let vy = cy.max(vp.data_y);
+                    let vw = ((cx + cw).min(vp.data_x + vp.data_w) - vx).max(1);
+                    let vh = ((cy + ch).min(vp.data_y + vp.data_h) - vy).max(1);
                     (mr1, mc1, vx, vy, vw, vh)
                 } else {
                     (row, col, cx, cy, cw, ch)
@@ -2266,17 +3140,6 @@ fn render_cell_text<C: Canvas>(
         // readable as the merge scrolls.  Single cells: position text at
         // the original (pre-clip) location so content pans naturally.
         //
-        // Per-axis logic: cell_rect clips X when the column is scrollable
-        // and not sticky, clips Y when the row is scrollable and not
-        // sticky.  Pinned rows return before clipping — no fix needed.
-        let is_row_scrollable = text_row >= grid.fixed_rows + grid.frozen_rows;
-        let is_col_scrollable = text_col >= grid.fixed_cols + grid.frozen_cols;
-        let is_pinned = grid.is_row_pinned(text_row) != 0;
-        let is_sticky_row =
-            vp.sticky_top_rows.contains(&text_row) || vp.sticky_bottom_rows.contains(&text_row);
-        let is_sticky_col =
-            vp.sticky_left_cols.contains(&text_col) || vp.sticky_right_cols.contains(&text_col);
-
         let is_merged = grid
             .get_merged_range(text_row, text_col)
             .map_or(false, |(r1, c1, r2, c2)| r1 != r2 || c1 != c2);
@@ -2285,27 +3148,7 @@ fn render_cell_text<C: Canvas>(
             // Merged cells: keep text centered in the visible portion.
             (vis_x, vis_y, vis_w, vis_h)
         } else {
-            let need_orig_x = is_col_scrollable && !is_sticky_col && !is_pinned;
-            let need_orig_y = is_row_scrollable && !is_sticky_row && !is_pinned;
-
-            if !need_orig_x && !need_orig_y {
-                (vis_x, vis_y, vis_w, vis_h)
-            } else {
-                let (ox, ow) = if need_orig_x {
-                    let ox = grid.col_pos(text_col) - grid.scroll.scroll_x as i32;
-                    (ox, grid.col_width(text_col))
-                } else {
-                    (vis_x, vis_w)
-                };
-                let (oy, oh) = if need_orig_y {
-                    let oy =
-                        grid.row_pos(text_row) - grid.scroll.scroll_y as i32 + vp.pinned_top_height;
-                    (oy, grid.row_height(text_row))
-                } else {
-                    (vis_y, vis_h)
-                };
-                (ox, oy, ow, oh)
-            }
+            original_cell_bounds(grid, text_row, text_col, vis_x, vis_y, vis_w, vis_h, vp)
         };
 
         // Boolean columns render checkboxes in data rows (handled in layer 5)
@@ -2865,6 +3708,9 @@ fn sort_order_is_ascending(sort_order: i32) -> bool {
 }
 
 fn render_sort_glyphs<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRange) {
+    if grid.indicator_bands.col_top.visible && vp.data_y > 0 {
+        return;
+    }
     if grid.header_features & 1 == 0 {
         return; // HEADER_SORT not enabled
     }
@@ -3067,13 +3913,9 @@ fn render_sort_glyphs<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visible
                     continue;
                 }
 
-                // Default fallback: text arrows.
-                let mut fallback_icon = if sort_order_is_ascending(sort_order) {
-                    "↑"
-                } else {
-                    "↓"
-                };
-                let (icon_font_name, font_size, font_bold, font_italic, color) =
+                // Default fallback: draw a vector arrow so it does not depend
+                // on the active font containing arrow glyphs.
+                let (_icon_font_name, _font_size, _font_bold, _font_italic, color) =
                     resolve_icon_text_style(
                         grid,
                         slot_style,
@@ -3082,56 +3924,26 @@ fn render_sort_glyphs<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visible
                         false,
                         grid.style.fore_color_fixed,
                     );
-                let mut measured = canvas.measure_text(
-                    fallback_icon,
-                    &icon_font_name,
-                    font_size,
-                    font_bold,
-                    font_italic,
-                    None,
-                );
-                if measured.0 <= 0.1 {
-                    fallback_icon = if sort_order_is_ascending(sort_order) {
-                        "^"
-                    } else {
-                        "v"
-                    };
-                    measured = canvas.measure_text(
-                        fallback_icon,
-                        &icon_font_name,
-                        font_size,
-                        font_bold,
-                        font_italic,
-                        None,
-                    );
+                let glyph_box = sort_arrow_box_size(inner_h).min(inner_w.max(0));
+                if glyph_box < 6 {
+                    continue;
                 }
-                let text_w = measured.0.ceil() as i32;
-                let text_h = measured.1.ceil() as i32;
-                let glyph_x = place_sort_icon_x(text_w);
-                let glyph_y = inner_top + ((inner_h - text_h).max(0) / 2);
-                let clip_h = (inner_bottom - glyph_y).max(1);
-                canvas.draw_text_styled(
+                let glyph_x = place_sort_icon_x(glyph_box);
+                let glyph_y = inner_top + ((inner_h - glyph_box).max(0) / 2);
+                draw_sort_direction_arrow(
+                    canvas,
                     glyph_x,
                     glyph_y,
-                    fallback_icon,
-                    &icon_font_name,
-                    font_size,
-                    font_bold,
-                    font_italic,
+                    glyph_box,
+                    sort_order_is_ascending(sort_order),
                     color,
-                    inner_left,
-                    0,
-                    inner_w,
-                    clip_h,
-                    0,
-                    None,
                 );
                 if show_sort_numbers {
                     draw_sort_priority_number(
                         canvas,
                         grid,
                         sort_idx,
-                        glyph_x + text_w + 1,
+                        glyph_x + glyph_box + 1,
                         inner_top,
                         inner_h,
                         inner_bottom,
@@ -3185,39 +3997,49 @@ fn draw_sort_priority_number<C: Canvas>(
 // ===========================================================================
 
 fn render_col_drag_marker<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRange) {
-    if !grid.col_drag_active || grid.col_drag_insert_pos < 0 || grid.fixed_rows <= 0 {
+    if !grid.col_drag_active || grid.col_drag_insert_pos < 0 {
         return;
     }
 
     let buf_w = canvas.width();
-    let buf_h = canvas.height();
-
-    let header_bottom = grid.layout.row_pos(grid.fixed_rows).clamp(0, buf_h);
-    if header_bottom <= 0 {
+    let (header_top, header_bottom) = if grid.indicator_bands.col_top.visible && vp.data_y > 0 {
+        (0, vp.data_y.clamp(0, canvas.height()))
+    } else if grid.fixed_rows > 0 {
+        (
+            0,
+            grid.layout
+                .row_pos(grid.fixed_rows)
+                .clamp(0, canvas.height()),
+        )
+    } else {
+        (0, 0)
+    };
+    if header_bottom <= header_top {
         return;
     }
 
     let insert_before = grid.col_drag_insert_pos.clamp(0, grid.cols);
     let mut marker_x: Option<i32> = None;
-    for row in 0..grid.fixed_rows {
-        if grid.is_row_hidden(row) {
-            continue;
-        }
+    let probe_row = if grid.fixed_rows > 0 {
+        0
+    } else if vp.scroll_row_start < grid.rows {
+        vp.scroll_row_start
+    } else {
+        0
+    };
+    if probe_row < grid.rows {
         if insert_before < grid.cols {
-            if let Some((cx, _cy, _cw, _ch)) = cell_rect(grid, row, insert_before, vp) {
+            if let Some((cx, _cy, _cw, _ch)) = cell_rect(grid, probe_row, insert_before, vp) {
                 marker_x = Some(cx);
-                break;
             }
         } else if grid.cols > 0 {
             let last_col = grid.cols - 1;
-            if let Some((cx, _cy, cw, _ch)) = cell_rect(grid, row, last_col, vp) {
+            if let Some((cx, _cy, cw, _ch)) = cell_rect(grid, probe_row, last_col, vp) {
                 marker_x = Some(cx + cw);
-                break;
             }
-        } else {
-            marker_x = Some(0);
-            break;
         }
+    } else if grid.cols == 0 {
+        marker_x = Some(vp.data_x);
     }
 
     let Some(x) = marker_x else {
@@ -3229,11 +4051,11 @@ fn render_col_drag_marker<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Vis
 
     let rail_color = 0xFF101010_u32;
     let center_color = 0xFFF5F5F5_u32;
-    let h = header_bottom;
-    canvas.vline(x - 1, 0, h, rail_color);
-    canvas.vline(x, 0, h, center_color);
-    canvas.vline(x + 1, 0, h, rail_color);
-    canvas.fill_rect(x - 3, 0, 7, 2, rail_color);
+    let h = header_bottom - header_top;
+    canvas.vline(x - 1, header_top, h, rail_color);
+    canvas.vline(x, header_top, h, center_color);
+    canvas.vline(x + 1, header_top, h, rail_color);
+    canvas.fill_rect(x - 3, header_top, 7, 2, rail_color);
     canvas.fill_rect(x - 3, (header_bottom - 2).max(0), 7, 2, rail_color);
 }
 
@@ -3259,7 +4081,7 @@ fn resolve_header_mark_height_px(height: HeaderMarkHeight, row_height: i32) -> i
 // ===========================================================================
 
 fn render_header_marks<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRange) {
-    if grid.fixed_rows <= 0 || grid.cols <= 1 {
+    if grid.cols <= 1 {
         return;
     }
 
@@ -3284,6 +4106,50 @@ fn render_header_marks<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visibl
     };
 
     let max_col = grid.cols - 1;
+    if grid.indicator_bands.col_top.visible && vp.data_y > 0 {
+        let band = &grid.indicator_bands.col_top;
+        let row_offsets = build_indicator_row_offsets(band, 0);
+        let probe_row = if vp.scroll_row_start < grid.rows {
+            vp.scroll_row_start
+        } else {
+            0
+        };
+        for col in 0..max_col {
+            if grid.is_col_hidden(col) || grid.is_col_hidden(col + 1) {
+                continue;
+            }
+            let Some((lx, _ly, lw, _lh)) = cell_rect(grid, probe_row, col, vp) else {
+                continue;
+            };
+            let Some((_rx, _ry, rw, _rh)) = cell_rect(grid, probe_row, col + 1, vp) else {
+                continue;
+            };
+            if lw <= 0 || rw <= 0 {
+                continue;
+            }
+            let center_x = lx + lw;
+            let draw_x = center_x - (width_px / 2);
+            for (row, row_y, row_h) in &row_offsets {
+                if skip_merged && indicator_slots_share_cell(band, *row, col, *row, col + 1) {
+                    continue;
+                }
+                let mark_height = resolve_header_mark_height_px(height_spec, (*row_h).max(1));
+                if mark_height <= 0 {
+                    continue;
+                }
+                let draw_y = *row_y + (((*row_h).max(1) - mark_height) / 2);
+                for dx in 0..width_px {
+                    canvas.vline(draw_x + dx, draw_y, mark_height, color);
+                }
+            }
+        }
+        return;
+    }
+
+    if grid.fixed_rows <= 0 {
+        return;
+    }
+
     for row in 0..grid.fixed_rows {
         if grid.is_row_hidden(row) {
             continue;

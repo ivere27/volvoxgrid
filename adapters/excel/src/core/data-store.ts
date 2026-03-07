@@ -2,12 +2,11 @@
  * Parallel data model + header generation for the spreadsheet.
  *
  * Maintains a shadow copy of cell values for undo/redo and clipboard
- * operations. Generates A/B/C column headers and 1/2/3 row numbers.
+ * operations. Generates A/B/C column captions for the indicator band.
  */
 
-import type { VolvoxGrid } from "volvoxgrid";
-import type { CellRange } from "../types.js";
-import { generateColumnHeaders, generateRowNumbers } from "./cell-reference.js";
+import type { CellRange, VolvoxExcelGrid } from "../types.js";
+import { generateColumnHeaders } from "./cell-reference.js";
 import { FormulaEngine, type FormulaRefShift } from "./formula-engine.js";
 import {
   encodeUpdateCellsRequest,
@@ -17,23 +16,23 @@ import {
 export class DataStore {
   private wasm: any;
   private gridId: number;
-  private _grid: VolvoxGrid;
+  private _grid: VolvoxExcelGrid;
 
-  /** Display data: dataRows × dataCols (0-based, excluding headers). */
+  /** Display data: dataRows × dataCols (0-based). */
   private data: string[][] = [];
   /** Raw user-entered values (formula text kept as-is). */
   private rawData: string[][] = [];
 
-  constructor(wasm: any, gridId: number, grid: VolvoxGrid) {
+  constructor(wasm: any, gridId: number, grid: VolvoxExcelGrid) {
     this.wasm = wasm;
     this.gridId = gridId;
     this._grid = grid;
   }
 
-  get dataRows(): number { return this._grid.rows - this._grid.fixedRows; }
-  get dataCols(): number { return this._grid.cols - this._grid.fixedCols; }
+  get dataRows(): number { return this._grid.rowCount; }
+  get dataCols(): number { return this._grid.colCount; }
 
-  /** Initialize headers and populate grid with data. */
+  /** Initialize captions and populate grid with data. */
   init(initialData?: string[][]): void {
     this.populateHeaders();
     if (initialData) {
@@ -43,26 +42,11 @@ export class DataStore {
     }
   }
 
-  /** Populate column headers (A, B, C...) and row numbers (1, 2, 3...). */
+  /** Populate column captions (A, B, C...) in the top indicator band. */
   populateHeaders(): void {
-    const fixedRows = this._grid.fixedRows;
-    const fixedCols = this._grid.fixedCols;
-
-    // Column headers in row 0
-    if (fixedRows > 0) {
-      const headers = generateColumnHeaders(this.dataCols);
-      for (let c = 0; c < headers.length; c++) {
-        this._grid.setTextMatrix(0, c + fixedCols, headers[c]);
-      }
-      // Corner cell (row 0, col 0) left blank
-    }
-
-    // Row numbers in col 0
-    if (fixedCols > 0) {
-      const rowNums = generateRowNumbers(this.dataRows);
-      for (let r = 0; r < rowNums.length; r++) {
-        this._grid.setTextMatrix(r + fixedRows, 0, rowNums[r]);
-      }
+    const headers = generateColumnHeaders(this.dataCols);
+    for (let c = 0; c < headers.length; c++) {
+      this._grid.setColumnCaption(c, headers[c]);
     }
   }
 
@@ -209,24 +193,16 @@ export class DataStore {
 
   /** Re-push all shadow data to the grid (after structural column changes). */
   private repopulateGrid(): void {
-    const fixedRows = this._grid.fixedRows;
-    const fixedCols = this._grid.fixedCols;
     const cols = this.dataCols;
     for (let r = 0; r < this.data.length; r++) {
       for (let c = 0; c < cols; c++) {
-        this._grid.setTextMatrix(r + fixedRows, c + fixedCols, this.data[r]?.[c] ?? "");
+        this._grid.setCellText(r, c, this.data[r]?.[c] ?? "");
       }
     }
   }
 
   private refreshRowNumbers(): void {
-    const fixedRows = this._grid.fixedRows;
-    const fixedCols = this._grid.fixedCols;
-    if (fixedCols > 0) {
-      for (let r = 0; r < this.dataRows; r++) {
-        this._grid.setTextMatrix(r + fixedRows, 0, String(r + 1));
-      }
-    }
+    // Row numbers live in the row-indicator band and update automatically.
   }
 
   private ensureShadowSize(): void {
@@ -282,9 +258,6 @@ export class DataStore {
     const memo = new Map<string, string>();
     const visiting = new Set<string>();
     const updates: CellUpdateEntry[] = [];
-    const fixedRows = this._grid.fixedRows;
-    const fixedCols = this._grid.fixedCols;
-
     const evalCell = (dataRow: number, dataCol: number): string => {
       if (dataRow < 0 || dataCol < 0 || dataRow >= this.dataRows || dataCol >= this.dataCols) {
         return "#REF!";
@@ -317,8 +290,8 @@ export class DataStore {
         if (forceAll || this.data[r][c] !== nextDisplay) {
           this.data[r][c] = nextDisplay;
           updates.push({
-            row: r + fixedRows,
-            col: c + fixedCols,
+            row: r,
+            col: c,
             text: nextDisplay,
           });
         }
@@ -337,7 +310,7 @@ export class DataStore {
     }
 
     for (const u of updates) {
-      this._grid.setTextMatrix(u.row, u.col, u.text ?? "");
+      this._grid.setCellText(u.row, u.col, u.text ?? "");
     }
   }
 }

@@ -64,6 +64,29 @@ fn ensure_layout(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
     grid.ensure_layout();
 }
 
+fn apply_default_indicator_bands(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
+    grid.indicator_bands.row_start.visible = false;
+    grid.indicator_bands.row_start.width_px =
+        volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
+    grid.indicator_bands.row_start.mode_bits =
+        (RowIndicatorMode::RowIndicatorCurrent as u32)
+            | (RowIndicatorMode::RowIndicatorSelection as u32);
+
+    grid.indicator_bands.col_top.visible = true;
+    if grid.indicator_bands.col_top.band_rows <= 0 {
+        grid.indicator_bands.col_top.band_rows = 1;
+    }
+    if grid.indicator_bands.col_top.default_row_height_px <= 0 {
+        grid.indicator_bands.col_top.default_row_height_px =
+            volvoxgrid_engine::indicator::DEFAULT_COL_INDICATOR_ROW_HEIGHT;
+    }
+    grid.indicator_bands.col_top.mode_bits =
+        (ColIndicatorCellMode::ColIndicatorCellHeaderText as u32)
+            | (ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32);
+    grid.layout.invalidate();
+    grid.mark_dirty();
+}
+
 fn apply_array_data_to_grid(
     grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
     rows: i32,
@@ -115,6 +138,22 @@ fn capture_grid_picture(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) -> Image
         data,
         format: "png".to_string(),
     }
+}
+
+fn selection_range_tuples(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Vec<(i32, i32, i32, i32)> {
+    grid.selection.all_ranges(grid.rows, grid.cols)
+}
+
+fn selection_ranges_proto(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Vec<CellRange> {
+    selection_range_tuples(grid)
+        .into_iter()
+        .map(|(row1, col1, row2, col2)| CellRange {
+            row1,
+            col1,
+            row2,
+            col2,
+        })
+        .collect()
 }
 
 #[cfg(any())]
@@ -769,7 +808,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn set_fixed_rows(&self, r: SetFixedRowsRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            g.fixed_rows = r.fixed_rows.max(1).min(g.rows);
+            g.fixed_rows = r.fixed_rows.max(0).min(g.rows);
+            if g.fixed_rows == 0 && !g.indicator_bands.col_top.visible {
+                apply_default_indicator_bands(g);
+            }
             g.selection
                 .clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
             g.layout.invalidate();
@@ -2828,7 +2870,7 @@ impl ActiveXPlugin {
 }
 
 impl VolvoxGridServicePlugin for ActiveXPlugin {
-    fn create(&self, request: CreateRequest) -> Result<GridHandle, String> {
+    fn create(&self, request: CreateRequest) -> Result<CreateResponse, String> {
         let config = request.config.as_ref();
         let layout = config.and_then(|c| c.layout.as_ref());
         let rows = layout.and_then(|l| l.rows).unwrap_or(10);
@@ -2860,6 +2902,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             g.default_row_height = 17;
             g.selection.selection_visibility = 1;
             g.has_focus = true;
+            if fixed_rows == 0 {
+                apply_default_indicator_bands(g);
+            }
         });
 
         if let Some(config) = config {
@@ -2868,7 +2913,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             });
         }
 
-        Ok(GridHandle { id })
+        Ok(CreateResponse {
+            handle: Some(GridHandle { id }),
+            warnings: Vec::new(),
+        })
     }
 
     fn destroy(&self, request: GridHandle) -> Result<Empty, String> {
@@ -3068,27 +3116,16 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
 
     fn select(&self, request: SelectRequest) -> Result<Empty, String> {
-        fn end_from_range(range: &CellRange, active_row: i32, active_col: i32) -> (i32, i32) {
-            if range.row1 == active_row && range.col1 == active_col {
-                (range.row2, range.col2)
-            } else if range.row2 == active_row && range.col2 == active_col {
-                (range.row1, range.col1)
-            } else {
-                (range.row2, range.col2)
-            }
-        }
-
         self.manager().with_grid(request.grid_id, |grid| {
             let active_row = request.active_row;
             let active_col = request.active_col;
-            let (row_sel, col_sel) = request
+            let ranges: Vec<(i32, i32, i32, i32)> = request
                 .ranges
-                .first()
-                .map(|r| end_from_range(r, active_row, active_col))
-                .unwrap_or((active_row, active_col));
-            grid.selection.select(
-                active_row, active_col, row_sel, col_sel, grid.rows, grid.cols,
-            );
+                .iter()
+                .map(|r| (r.row1, r.col1, r.row2, r.col2))
+                .collect();
+            grid.selection
+                .select_ranges(active_row, active_col, &ranges, grid.rows, grid.cols);
             if request.show.unwrap_or(false) {
                 ensure_layout(grid);
                 grid.scroll.show_cell(
@@ -3114,12 +3151,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             SelectionState {
                 active_row: grid.selection.row,
                 active_col: grid.selection.col,
-                ranges: vec![CellRange {
-                    row1: grid.selection.row.min(grid.selection.row_end),
-                    col1: grid.selection.col.min(grid.selection.col_end),
-                    row2: grid.selection.row.max(grid.selection.row_end),
-                    col2: grid.selection.col.max(grid.selection.col_end),
-                }],
+                ranges: selection_ranges_proto(grid),
                 top_row: grid.top_row(),
                 left_col: grid.left_col(),
                 bottom_row: grid.bottom_row(),
@@ -3128,6 +3160,41 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 mouse_col: grid.mouse_col,
             }
         })
+    }
+
+    fn show_cell(&self, request: ShowCellRequest) -> Result<Empty, String> {
+        self.manager().with_grid(request.grid_id, |grid| {
+            ensure_layout(grid);
+            grid.scroll.show_cell(
+                request.row,
+                request.col,
+                &grid.layout,
+                grid.viewport_width,
+                grid.viewport_height,
+                grid.fixed_rows,
+                grid.fixed_cols,
+                grid.pinned_top_height() + grid.pinned_bottom_height(),
+                grid.pinned_left_width() + grid.pinned_right_width(),
+            );
+            grid.mark_dirty();
+        })?;
+        Ok(Empty {})
+    }
+
+    fn set_top_row(&self, request: SetRowRequest) -> Result<Empty, String> {
+        self.manager().with_grid(request.grid_id, |grid| {
+            grid.set_top_row(request.row);
+            grid.mark_dirty();
+        })?;
+        Ok(Empty {})
+    }
+
+    fn set_left_col(&self, request: SetColRequest) -> Result<Empty, String> {
+        self.manager().with_grid(request.grid_id, |grid| {
+            grid.set_left_col(request.col);
+            grid.mark_dirty();
+        })?;
+        Ok(Empty {})
     }
 
     fn edit(&self, request: EditCommand) -> Result<EditState, String> {
@@ -3743,7 +3810,10 @@ pub extern "C" fn volvox_grid_set_fixed_rows(
 ) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
-            g.fixed_rows = fixed_rows.max(1).min(g.rows);
+            g.fixed_rows = fixed_rows.max(0).min(g.rows);
+            if g.fixed_rows == 0 && !g.indicator_bands.col_top.visible {
+                apply_default_indicator_bands(g);
+            }
             g.selection
                 .clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
             g.layout.invalidate();
@@ -3941,30 +4011,8 @@ pub extern "C" fn volvox_grid_set_scroll_bars(
 }
 
 #[no_mangle]
-pub extern "C" fn volvox_grid_set_top_row(grid_id: i64, row: i32, out_len: *mut i32) -> *mut u8 {
-    compat_status(
-        GRID_MANAGER.with_grid(grid_id, |g| {
-            g.set_top_row(row);
-            g.mark_dirty();
-        }),
-        out_len,
-    )
-}
-
-#[no_mangle]
 pub extern "C" fn volvox_grid_get_top_row(id: i64, out_len: *mut i32) -> *mut u8 {
     compat_i32(GRID_MANAGER.with_grid(id, |g| g.top_row()), out_len)
-}
-
-#[no_mangle]
-pub extern "C" fn volvox_grid_set_left_col(grid_id: i64, col: i32, out_len: *mut i32) -> *mut u8 {
-    compat_status(
-        GRID_MANAGER.with_grid(grid_id, |g| {
-            g.set_left_col(col);
-            g.mark_dirty();
-        }),
-        out_len,
-    )
 }
 
 #[no_mangle]

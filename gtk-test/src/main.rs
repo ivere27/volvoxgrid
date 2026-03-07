@@ -6,9 +6,9 @@ use gtk4::gdk;
 use gtk4::glib;
 use gtk4::prelude::*;
 use gtk4::{
-    Align, Application, ApplicationWindow, Box as GtkBox, Button, DrawingArea, Entry,
-    EventControllerKey, EventControllerMotion, EventControllerScroll, GestureClick, Label,
-    Orientation, Overlay, Popover, Separator,
+    Align, Application, ApplicationWindow, Box as GtkBox, Button, CssProvider, DrawingArea,
+    DropDown, Entry, EventControllerKey, EventControllerMotion, EventControllerScroll,
+    GestureClick, Label, Orientation, Overlay, Popover, Separator,
 };
 
 use volvoxgrid_engine::clipboard;
@@ -21,6 +21,7 @@ use volvoxgrid_engine::input;
 use volvoxgrid_engine::gpu_render::GpuRenderer;
 use volvoxgrid_engine::outline;
 use volvoxgrid_engine::print;
+use volvoxgrid_engine::proto::volvoxgrid::v1 as pb;
 use volvoxgrid_engine::render::Renderer;
 use volvoxgrid_engine::save;
 use volvoxgrid_engine::search;
@@ -29,6 +30,34 @@ use volvoxgrid_engine::style::CellStyleOverride;
 
 const APP_ID: &str = "io.github.ivere27.volvoxgrid.GtkTest";
 const GTK_TEST_SCROLL_DELTA_SCALE: f32 = 1.0;
+const INLINE_EDITOR_CSS_CLASS: &str = "volvox-inline-editor";
+const INLINE_EDITOR_CSS: &str = r#"
+entry.volvox-inline-editor,
+entry.volvox-inline-editor text {
+  background-color: #ffffff;
+  color: #000000;
+  caret-color: #000000;
+  min-height: 0;
+  min-width: 0;
+  margin: 0;
+  box-shadow: none;
+}
+
+entry.volvox-inline-editor {
+  border: 1px solid #2d6cdf;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  min-height: 0;
+  min-width: 0;
+}
+
+entry.volvox-inline-editor text {
+  padding: 0 4px;
+  border-radius: 0;
+}
+"#;
 
 fn main() {
     let app = Application::builder().application_id(APP_ID).build();
@@ -40,6 +69,27 @@ fn main() {
 const DEMO_STRESS: i32 = 0;
 const DEMO_SALES: i32 = 1;
 const DEMO_HIERARCHY: i32 = 2;
+const SELECTION_MODE_LABELS: [&str; 5] = ["Free", "ByRow", "ByCol", "Listbox", "MultiRange"];
+
+fn selection_mode_index(mode: i32) -> u32 {
+    match mode {
+        x if x == pb::SelectionMode::SelectionByRow as i32 => 1,
+        x if x == pb::SelectionMode::SelectionByColumn as i32 => 2,
+        x if x == pb::SelectionMode::SelectionListbox as i32 => 3,
+        x if x == pb::SelectionMode::SelectionMultiRange as i32 => 4,
+        _ => 0,
+    }
+}
+
+fn selection_mode_value(index: u32) -> i32 {
+    match index {
+        1 => pb::SelectionMode::SelectionByRow as i32,
+        2 => pb::SelectionMode::SelectionByColumn as i32,
+        3 => pb::SelectionMode::SelectionListbox as i32,
+        4 => pb::SelectionMode::SelectionMultiRange as i32,
+        _ => pb::SelectionMode::SelectionFree as i32,
+    }
+}
 
 /// Shared state wrapped for GTK closures.
 struct State {
@@ -50,11 +100,17 @@ struct State {
     frame_surface: Option<cairo::ImageSurface>,
     draw_queued: bool,
     mouse_pressed: bool,
+    multirange_drag_active: bool,
+    multirange_base_ranges: Vec<(i32, i32, i32, i32)>,
+    multirange_anchor_row: i32,
+    multirange_anchor_col: i32,
+    multirange_drag_row: i32,
+    multirange_drag_col: i32,
     saved_data: Option<Vec<u8>>,
     clipboard_text: String,
     event_count: u64,
     last_event: String,
-    selection_mode_idx: usize,
+    selection_mode_idx: u32,
     span_on: bool,
     outline_on: bool,
     frozen: bool,
@@ -74,6 +130,21 @@ fn ensure_layout(grid: &mut VolvoxGrid) {
     grid.ensure_layout();
 }
 
+fn clear_multirange_drag(state: &mut State) {
+    state.multirange_drag_active = false;
+    state.multirange_base_ranges.clear();
+    state.multirange_anchor_row = -1;
+    state.multirange_anchor_col = -1;
+    state.multirange_drag_row = -1;
+    state.multirange_drag_col = -1;
+}
+
+fn set_system_clipboard_text(text: &str) {
+    if let Some(display) = gdk::Display::default() {
+        display.clipboard().set_text(text);
+    }
+}
+
 fn queue_draw_if_needed(state: &mut State, area: &DrawingArea) {
     if !state.draw_queued {
         state.draw_queued = true;
@@ -86,6 +157,18 @@ fn ensure_visible_rows_materialized(grid: &mut VolvoxGrid, _demo_mode: i32) {
     // Stress demo is now eager (load_demo("stress") semantics), so no per-frame
     // row materialization is required here.
     grid.ensure_layout();
+}
+
+fn install_inline_editor_css() {
+    let provider = CssProvider::new();
+    provider.load_from_data(INLINE_EDITOR_CSS);
+    if let Some(display) = gdk::Display::default() {
+        gtk4::style_context_add_provider_for_display(
+            &display,
+            &provider,
+            gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
+    }
 }
 
 /// Create a grid for the given demo mode.
@@ -105,6 +188,52 @@ fn create_demo_grid(mode: i32, width: i32, height: i32) -> VolvoxGrid {
     };
     grid.fling_enabled = false;
     grid
+}
+
+fn is_multirange_selectable_hit(hit: &input::HitTestResult) -> bool {
+    hit.row >= 0
+        && hit.col >= 0
+        && matches!(
+            hit.area,
+            input::HitArea::Cell | input::HitArea::DropdownButton | input::HitArea::CheckBox
+        )
+}
+
+fn snapshot_multirange_base_ranges(
+    grid: &VolvoxGrid,
+    anchor_row: i32,
+    anchor_col: i32,
+) -> Vec<(i32, i32, i32, i32)> {
+    grid.selection
+        .all_ranges(grid.rows, grid.cols)
+        .into_iter()
+        .filter(|&(row1, col1, row2, col2)| {
+            !(row1 == anchor_row && col1 == anchor_col && row2 == anchor_row && col2 == anchor_col)
+        })
+        .collect()
+}
+
+fn apply_multirange_drag_selection(
+    grid: &mut VolvoxGrid,
+    base_ranges: &[(i32, i32, i32, i32)],
+    anchor_row: i32,
+    anchor_col: i32,
+    target_row: i32,
+    target_col: i32,
+) {
+    let next_range = (
+        anchor_row.min(target_row),
+        anchor_col.min(target_col),
+        anchor_row.max(target_row),
+        anchor_col.max(target_col),
+    );
+    let mut ranges = base_ranges.to_vec();
+    if !ranges.contains(&next_range) {
+        ranges.push(next_range);
+    }
+    grid.selection
+        .select_ranges(target_row, target_col, &ranges, grid.rows, grid.cols);
+    grid.mark_dirty();
 }
 
 /// Move cursor to (row, col) and scroll to show it — avoids borrow conflicts.
@@ -160,7 +289,7 @@ fn sync_native_entry_overlay(state: &mut State, entry: &Entry, area: &DrawingAre
                     }
                     return;
                 }
-                let inset = 1;
+                let inset = 0;
                 let ex = cx0 + inset;
                 let ey = cy0 + inset;
                 let ew = (cw - inset * 2).max(1);
@@ -168,6 +297,8 @@ fn sync_native_entry_overlay(state: &mut State, entry: &Entry, area: &DrawingAre
 
                 entry.set_margin_start(ex.max(0));
                 entry.set_margin_top(ey.max(0));
+                entry.set_width_request(ew);
+                entry.set_height_request(eh);
                 entry.set_size_request(ew, eh);
 
                 let changed_cell = !gtk4::prelude::WidgetExt::is_visible(entry)
@@ -550,10 +681,13 @@ fn create_grid(width: i32, height: i32) -> VolvoxGrid {
 }
 
 fn build_ui(app: &Application) {
+    install_inline_editor_css();
+
     let width = 1100i32;
     let height = 700i32;
 
     let mut grid = create_demo_grid(DEMO_SALES, width, height);
+    let initial_selection_mode_idx = selection_mode_index(grid.selection.mode);
 
     // Build layout
     ensure_layout(&mut grid);
@@ -578,11 +712,17 @@ fn build_ui(app: &Application) {
         frame_surface: None,
         draw_queued: false,
         mouse_pressed: false,
+        multirange_drag_active: false,
+        multirange_base_ranges: Vec::new(),
+        multirange_anchor_row: -1,
+        multirange_anchor_col: -1,
+        multirange_drag_row: -1,
+        multirange_drag_col: -1,
         saved_data: None,
         clipboard_text: String::new(),
         event_count: 0,
         last_event: "(none)".to_string(),
-        selection_mode_idx: 0,
+        selection_mode_idx: initial_selection_mode_idx,
         span_on: false,
         outline_on: false,
         frozen: false,
@@ -622,8 +762,8 @@ fn build_ui(app: &Application) {
     edit_entry.set_visible(false);
     edit_entry.set_halign(Align::Start);
     edit_entry.set_valign(Align::Start);
-    // Frame-less entry fits inside the rendered cell border.
     edit_entry.set_has_frame(false);
+    edit_entry.add_css_class(INLINE_EDITOR_CSS_CLASS);
     gtk4::prelude::EntryExt::set_alignment(&edit_entry, 0.0);
     edit_entry.set_width_chars(1);
     edit_entry.set_can_focus(true);
@@ -1076,6 +1216,7 @@ fn build_ui(app: &Application) {
                 menu_box.append(&Separator::new(Orientation::Horizontal));
                 menu_item!("Copy", state, area, popover, |st: &mut State| {
                     let (text, _) = clipboard::copy(&st.grid);
+                    set_system_clipboard_text(&text);
                     st.clipboard_text = text;
                 });
 
@@ -1156,6 +1297,34 @@ fn build_ui(app: &Application) {
                 }
             }
 
+            if button == 1
+                && (modifier & 2) != 0
+                && st.grid.selection.mode == pb::SelectionMode::SelectionMultiRange as i32
+                && is_multirange_selectable_hit(&hit)
+            {
+                let base_ranges = snapshot_multirange_base_ranges(&st.grid, hit.row, hit.col);
+                st.last_click_at = None;
+                st.multirange_drag_active = true;
+                st.multirange_base_ranges = base_ranges.clone();
+                st.multirange_anchor_row = hit.row;
+                st.multirange_anchor_col = hit.col;
+                st.multirange_drag_row = hit.row;
+                st.multirange_drag_col = hit.col;
+                apply_multirange_drag_selection(
+                    &mut st.grid,
+                    &base_ranges,
+                    hit.row,
+                    hit.col,
+                    hit.row,
+                    hit.col,
+                );
+                let s = drain_events(&mut st);
+                status.set_text(&s);
+                drop(st);
+                area.queue_draw();
+                return;
+            }
+
             input::handle_pointer_down(&mut st.grid, x as f32, y as f32, button, modifier, dbl);
 
             // Double-click edit fallback for hosts that stay in keyboard edit mode.
@@ -1199,6 +1368,36 @@ fn build_ui(app: &Application) {
         gesture_click.connect_released(move |gesture, _n_press, x, y| {
             let mut st = state.borrow_mut();
             st.mouse_pressed = false;
+            if st.multirange_drag_active {
+                let hit = input::hit_test(&st.grid, x as f32, y as f32);
+                let end_row = if is_multirange_selectable_hit(&hit) {
+                    hit.row
+                } else {
+                    st.multirange_drag_row
+                };
+                let end_col = if is_multirange_selectable_hit(&hit) {
+                    hit.col
+                } else {
+                    st.multirange_drag_col
+                };
+                let base_ranges = st.multirange_base_ranges.clone();
+                let anchor_row = st.multirange_anchor_row;
+                let anchor_col = st.multirange_anchor_col;
+                apply_multirange_drag_selection(
+                    &mut st.grid,
+                    &base_ranges,
+                    anchor_row,
+                    anchor_col,
+                    end_row,
+                    end_col,
+                );
+                clear_multirange_drag(&mut st);
+                let s = drain_events(&mut st);
+                status.set_text(&s);
+                drop(st);
+                area.queue_draw();
+                return;
+            }
             let button = gesture.current_button() as i32;
             input::handle_pointer_up(&mut st.grid, x as f32, y as f32, button, 0);
             let s = drain_events(&mut st);
@@ -1218,6 +1417,34 @@ fn build_ui(app: &Application) {
         let lcs = Rc::clone(&last_cursor_style);
         motion_controller.connect_motion(move |_ctrl, x, y| {
             let mut st = state.borrow_mut();
+            if st.multirange_drag_active {
+                let hit = input::hit_test(&st.grid, x as f32, y as f32);
+                if is_multirange_selectable_hit(&hit)
+                    && (hit.row != st.multirange_drag_row || hit.col != st.multirange_drag_col)
+                {
+                    st.multirange_drag_row = hit.row;
+                    st.multirange_drag_col = hit.col;
+                    let base_ranges = st.multirange_base_ranges.clone();
+                    let anchor_row = st.multirange_anchor_row;
+                    let anchor_col = st.multirange_anchor_col;
+                    apply_multirange_drag_selection(
+                        &mut st.grid,
+                        &base_ranges,
+                        anchor_row,
+                        anchor_col,
+                        hit.row,
+                        hit.col,
+                    );
+                }
+                if lcs.get() != 0 {
+                    lcs.set(0);
+                    area.set_cursor_from_name(Some("default"));
+                }
+                if st.grid.dirty {
+                    queue_draw_if_needed(&mut st, &area);
+                }
+                return;
+            }
             let button = if st.mouse_pressed { 1 } else { 0 };
             input::handle_pointer_move(&mut st.grid, x as f32, y as f32, button, 0);
 
@@ -1347,7 +1574,9 @@ fn build_ui(app: &Application) {
 
     // Row 1: Style, Selection mode, Sort, Span, Outline, Edit, Find
     let btn_style = btn!("Style");
-    let btn_sel_mode = btn!("Free");
+    let selection_mode = DropDown::from_strings(&SELECTION_MODE_LABELS);
+    selection_mode.set_focusable(false);
+    selection_mode.set_selected(state.borrow().selection_mode_idx);
     let btn_sort_asc = btn!("Sort Asc");
     let btn_sort_desc = btn!("Sort Desc");
     let btn_span = btn!("Span");
@@ -1356,7 +1585,7 @@ fn build_ui(app: &Application) {
     let btn_find = btn!("Find");
 
     toolbar_row1.append(&btn_style);
-    toolbar_row1.append(&btn_sel_mode);
+    toolbar_row1.append(&selection_mode);
     toolbar_row1.append(&btn_sort_asc);
     toolbar_row1.append(&btn_sort_desc);
     toolbar_row1.append(&btn_span);
@@ -1446,8 +1675,10 @@ fn build_ui(app: &Application) {
                 st.grid = create_demo_grid($mode, w, h);
                 st.grid.renderer_mode = renderer_mode;
                 st.grid.debug_overlay = debug_overlay;
+                st.grid.selection.mode = selection_mode_value(st.selection_mode_idx);
                 st.demo_mode = $mode;
                 st.frame_surface = None;
+                clear_multirange_drag(&mut st);
                 st.span_on = false;
                 st.outline_on = false;
                 st.frozen = false;
@@ -1533,24 +1764,16 @@ fn build_ui(app: &Application) {
         });
     }
 
-    // Selection mode cycle: Free -> ByRow -> ByCol -> Listbox -> Free
+    // Selection mode dropdown: Free / ByRow / ByCol / Listbox / MultiRange
     {
         let state = Rc::clone(&state);
         let area = drawing_area.clone();
         let status = status_label.clone();
-        let sel_btn = btn_sel_mode.clone();
-        btn_sel_mode.connect_clicked(move |_| {
+        selection_mode.connect_selected_notify(move |dropdown| {
             let mut st = state.borrow_mut();
-            st.selection_mode_idx = (st.selection_mode_idx + 1) % 4;
-            st.grid.selection.mode = st.selection_mode_idx as i32;
-            let label = match st.selection_mode_idx {
-                0 => "Free",
-                1 => "ByRow",
-                2 => "ByCol",
-                3 => "Listbox",
-                _ => "Free",
-            };
-            sel_btn.set_label(label);
+            st.selection_mode_idx = dropdown.selected();
+            st.grid.selection.mode = selection_mode_value(st.selection_mode_idx);
+            clear_multirange_drag(&mut st);
             let s = drain_events(&mut st);
             status.set_text(&s);
             drop(st);
@@ -1761,6 +1984,7 @@ fn build_ui(app: &Application) {
             let mut st = state.borrow_mut();
             let (text, _) = clipboard::copy(&st.grid);
             let len = text.len();
+            set_system_clipboard_text(&text);
             st.clipboard_text = text;
             let s = drain_events(&mut st);
             status.set_text(&format!("Copied {} chars | {}", len, s));

@@ -20,7 +20,7 @@ namespace VolvoxGrid.DotNet.Internal
 
         public long DecodeGridHandle(byte[] payload)
         {
-            return GridHandle.Parser.ParseFrom(payload).Id;
+            return CreateResponse.Parser.ParseFrom(payload).Handle?.Id ?? 0L;
         }
 
         public byte[] EncodeGridHandle(long gridId)
@@ -57,6 +57,7 @@ namespace VolvoxGrid.DotNet.Internal
                 var def = new ColumnDef
                 {
                     Index = col.Index,
+                    Caption = col.Caption ?? string.Empty,
                     Key = col.Key ?? string.Empty,
                     Hidden = col.Hidden,
                     Span = col.Span,
@@ -217,6 +218,21 @@ namespace VolvoxGrid.DotNet.Internal
             return req.ToByteArray();
         }
 
+        public byte[] EncodeShowCellRequest(long gridId, int row, int col)
+        {
+            return new ShowCellRequest { GridId = gridId, Row = row, Col = col }.ToByteArray();
+        }
+
+        public byte[] EncodeSetTopRowRequest(long gridId, int row)
+        {
+            return new SetRowRequest { GridId = gridId, Row = row }.ToByteArray();
+        }
+
+        public byte[] EncodeSetLeftColRequest(long gridId, int col)
+        {
+            return new SetColRequest { GridId = gridId, Col = col }.ToByteArray();
+        }
+
         public VolvoxSelectionStateData DecodeSelectionState(byte[] payload)
         {
             var state = SelectionState.Parser.ParseFrom(payload);
@@ -228,6 +244,8 @@ namespace VolvoxGrid.DotNet.Internal
                 LeftCol = state.LeftCol,
                 BottomRow = state.BottomRow,
                 RightCol = state.RightCol,
+                MouseRow = state.MouseRow,
+                MouseCol = state.MouseCol,
             };
             foreach (var r in state.Ranges)
             {
@@ -610,6 +628,10 @@ namespace VolvoxGrid.DotNet.Internal
                 if (config.Rendering.AnimationDurationMs.HasValue) res.Rendering.AnimationDurationMs = config.Rendering.AnimationDurationMs.Value;
                 if (config.Rendering.TextLayoutCacheCap.HasValue) res.Rendering.TextLayoutCacheCap = config.Rendering.TextLayoutCacheCap.Value;
             }
+            if (config.IndicatorBands != null)
+            {
+                res.IndicatorBands = MapIndicatorBands(config.IndicatorBands);
+            }
             return res;
         }
 
@@ -658,7 +680,214 @@ namespace VolvoxGrid.DotNet.Internal
                 res.Rendering.AnimationDurationMs = c.Rendering.AnimationDurationMs;
                 res.Rendering.TextLayoutCacheCap = c.Rendering.TextLayoutCacheCap;
             }
+            if (c.IndicatorBands != null)
+            {
+                res.IndicatorBands = UnmapIndicatorBands(c.IndicatorBands);
+            }
             return res;
+        }
+
+        private static IndicatorBandsConfig MapIndicatorBands(VolvoxIndicatorBandsConfigData data)
+        {
+            if (data == null) return null;
+            return new IndicatorBandsConfig
+            {
+                RowIndicatorStart = MapRowIndicator(data.RowIndicatorStart),
+                RowIndicatorEnd = MapRowIndicator(data.RowIndicatorEnd),
+                ColIndicatorTop = MapColIndicator(data.ColIndicatorTop),
+                ColIndicatorBottom = MapColIndicator(data.ColIndicatorBottom),
+                CornerTopStart = MapCornerIndicator(data.CornerTopStart),
+                CornerTopEnd = MapCornerIndicator(data.CornerTopEnd),
+                CornerBottomStart = MapCornerIndicator(data.CornerBottomStart),
+                CornerBottomEnd = MapCornerIndicator(data.CornerBottomEnd),
+            };
+        }
+
+        private static VolvoxIndicatorBandsConfigData UnmapIndicatorBands(IndicatorBandsConfig data)
+        {
+            if (data == null) return null;
+            return new VolvoxIndicatorBandsConfigData
+            {
+                RowIndicatorStart = UnmapRowIndicator(data.RowIndicatorStart),
+                RowIndicatorEnd = UnmapRowIndicator(data.RowIndicatorEnd),
+                ColIndicatorTop = UnmapColIndicator(data.ColIndicatorTop),
+                ColIndicatorBottom = UnmapColIndicator(data.ColIndicatorBottom),
+                CornerTopStart = UnmapCornerIndicator(data.CornerTopStart),
+                CornerTopEnd = UnmapCornerIndicator(data.CornerTopEnd),
+                CornerBottomStart = UnmapCornerIndicator(data.CornerBottomStart),
+                CornerBottomEnd = UnmapCornerIndicator(data.CornerBottomEnd),
+            };
+        }
+
+        private static RowIndicatorConfig MapRowIndicator(VolvoxRowIndicatorConfigData data)
+        {
+            if (data == null) return null;
+            var res = new RowIndicatorConfig();
+            if (data.Visible.HasValue) res.Visible = data.Visible.Value;
+            if (data.WidthPx.HasValue) res.WidthPx = data.WidthPx.Value;
+            if (data.ModeBits.HasValue) res.ModeBits = (uint)data.ModeBits.Value;
+            if (data.BackColor.HasValue) res.BackColor = data.BackColor.Value;
+            if (data.ForeColor.HasValue) res.ForeColor = data.ForeColor.Value;
+            if (data.GridLines.HasValue) res.GridLines = (GridLineStyle)data.GridLines.Value;
+            if (data.GridColor.HasValue) res.GridColor = data.GridColor.Value;
+            if (data.AutoSize.HasValue) res.AutoSize = data.AutoSize.Value;
+            if (data.AllowResize.HasValue) res.AllowResize = data.AllowResize.Value;
+            if (data.AllowSelect.HasValue) res.AllowSelect = data.AllowSelect.Value;
+            if (data.AllowReorder.HasValue) res.AllowReorder = data.AllowReorder.Value;
+            foreach (var slot in data.Slots)
+            {
+                if (slot == null) continue;
+                var mapped = new RowIndicatorSlot();
+                if (slot.Kind.HasValue) mapped.Kind = (RowIndicatorSlotKind)slot.Kind.Value;
+                if (slot.WidthPx.HasValue) mapped.WidthPx = slot.WidthPx.Value;
+                if (slot.Visible.HasValue) mapped.Visible = slot.Visible.Value;
+                if (slot.CustomKey != null) mapped.CustomKey = slot.CustomKey;
+                if (slot.Data != null) mapped.Data = Google.Protobuf.ByteString.CopyFrom(slot.Data);
+                res.Slots.Add(mapped);
+            }
+            return res;
+        }
+
+        private static VolvoxRowIndicatorConfigData UnmapRowIndicator(RowIndicatorConfig data)
+        {
+            if (data == null) return null;
+            var res = new VolvoxRowIndicatorConfigData
+            {
+                Visible = data.HasVisible ? (bool?)data.Visible : null,
+                WidthPx = data.HasWidthPx ? (int?)data.WidthPx : null,
+                ModeBits = data.HasModeBits ? (VolvoxRowIndicatorMode?)(int)data.ModeBits : null,
+                BackColor = data.HasBackColor ? (uint?)data.BackColor : null,
+                ForeColor = data.HasForeColor ? (uint?)data.ForeColor : null,
+                GridLines = data.HasGridLines ? (int?)data.GridLines : null,
+                GridColor = data.HasGridColor ? (uint?)data.GridColor : null,
+                AutoSize = data.HasAutoSize ? (bool?)data.AutoSize : null,
+                AllowResize = data.HasAllowResize ? (bool?)data.AllowResize : null,
+                AllowSelect = data.HasAllowSelect ? (bool?)data.AllowSelect : null,
+                AllowReorder = data.HasAllowReorder ? (bool?)data.AllowReorder : null,
+            };
+            foreach (var slot in data.Slots)
+            {
+                res.Slots.Add(new VolvoxRowIndicatorSlotData
+                {
+                    Kind = slot.HasKind ? (VolvoxRowIndicatorSlotKind?)(int)slot.Kind : null,
+                    WidthPx = slot.HasWidthPx ? (int?)slot.WidthPx : null,
+                    Visible = slot.HasVisible ? (bool?)slot.Visible : null,
+                    CustomKey = slot.CustomKey,
+                    Data = slot.Data.IsEmpty ? null : slot.Data.ToByteArray(),
+                });
+            }
+            return res;
+        }
+
+        private static ColIndicatorConfig MapColIndicator(VolvoxColIndicatorConfigData data)
+        {
+            if (data == null) return null;
+            var res = new ColIndicatorConfig();
+            if (data.Visible.HasValue) res.Visible = data.Visible.Value;
+            if (data.DefaultRowHeightPx.HasValue) res.DefaultRowHeightPx = data.DefaultRowHeightPx.Value;
+            if (data.BandRows.HasValue) res.BandRows = data.BandRows.Value;
+            if (data.ModeBits.HasValue) res.ModeBits = (uint)data.ModeBits.Value;
+            if (data.BackColor.HasValue) res.BackColor = data.BackColor.Value;
+            if (data.ForeColor.HasValue) res.ForeColor = data.ForeColor.Value;
+            if (data.GridLines.HasValue) res.GridLines = (GridLineStyle)data.GridLines.Value;
+            if (data.GridColor.HasValue) res.GridColor = data.GridColor.Value;
+            if (data.AutoSize.HasValue) res.AutoSize = data.AutoSize.Value;
+            if (data.AllowResize.HasValue) res.AllowResize = data.AllowResize.Value;
+            if (data.AllowReorder.HasValue) res.AllowReorder = data.AllowReorder.Value;
+            if (data.AllowMenu.HasValue) res.AllowMenu = data.AllowMenu.Value;
+            foreach (var row in data.RowDefs)
+            {
+                if (row == null) continue;
+                var mapped = new ColIndicatorRowDef();
+                if (row.Index.HasValue) mapped.Index = row.Index.Value;
+                if (row.HeightPx.HasValue) mapped.HeightPx = row.HeightPx.Value;
+                res.RowDefs.Add(mapped);
+            }
+            foreach (var cell in data.Cells)
+            {
+                if (cell == null) continue;
+                var mapped = new ColIndicatorCell();
+                if (cell.Row1.HasValue) mapped.Row1 = cell.Row1.Value;
+                if (cell.Row2.HasValue) mapped.Row2 = cell.Row2.Value;
+                if (cell.Col1.HasValue) mapped.Col1 = cell.Col1.Value;
+                if (cell.Col2.HasValue) mapped.Col2 = cell.Col2.Value;
+                if (cell.Text != null) mapped.Text = cell.Text;
+                if (cell.ModeBits.HasValue) mapped.ModeBits = (uint)cell.ModeBits.Value;
+                if (cell.CustomKey != null) mapped.CustomKey = cell.CustomKey;
+                if (cell.Data != null) mapped.Data = Google.Protobuf.ByteString.CopyFrom(cell.Data);
+                res.Cells.Add(mapped);
+            }
+            return res;
+        }
+
+        private static VolvoxColIndicatorConfigData UnmapColIndicator(ColIndicatorConfig data)
+        {
+            if (data == null) return null;
+            var res = new VolvoxColIndicatorConfigData
+            {
+                Visible = data.HasVisible ? (bool?)data.Visible : null,
+                DefaultRowHeightPx = data.HasDefaultRowHeightPx ? (int?)data.DefaultRowHeightPx : null,
+                BandRows = data.HasBandRows ? (int?)data.BandRows : null,
+                ModeBits = data.HasModeBits ? (VolvoxColIndicatorCellMode?)(int)data.ModeBits : null,
+                BackColor = data.HasBackColor ? (uint?)data.BackColor : null,
+                ForeColor = data.HasForeColor ? (uint?)data.ForeColor : null,
+                GridLines = data.HasGridLines ? (int?)data.GridLines : null,
+                GridColor = data.HasGridColor ? (uint?)data.GridColor : null,
+                AutoSize = data.HasAutoSize ? (bool?)data.AutoSize : null,
+                AllowResize = data.HasAllowResize ? (bool?)data.AllowResize : null,
+                AllowReorder = data.HasAllowReorder ? (bool?)data.AllowReorder : null,
+                AllowMenu = data.HasAllowMenu ? (bool?)data.AllowMenu : null,
+            };
+            foreach (var row in data.RowDefs)
+            {
+                res.RowDefs.Add(new VolvoxColIndicatorRowDefData
+                {
+                    Index = row.HasIndex ? (int?)row.Index : null,
+                    HeightPx = row.HasHeightPx ? (int?)row.HeightPx : null,
+                });
+            }
+            foreach (var cell in data.Cells)
+            {
+                res.Cells.Add(new VolvoxColIndicatorCellData
+                {
+                    Row1 = cell.HasRow1 ? (int?)cell.Row1 : null,
+                    Row2 = cell.HasRow2 ? (int?)cell.Row2 : null,
+                    Col1 = cell.HasCol1 ? (int?)cell.Col1 : null,
+                    Col2 = cell.HasCol2 ? (int?)cell.Col2 : null,
+                    Text = cell.Text,
+                    ModeBits = cell.HasModeBits ? (VolvoxColIndicatorCellMode?)(int)cell.ModeBits : null,
+                    CustomKey = cell.CustomKey,
+                    Data = cell.Data.IsEmpty ? null : cell.Data.ToByteArray(),
+                });
+            }
+            return res;
+        }
+
+        private static CornerIndicatorConfig MapCornerIndicator(VolvoxCornerIndicatorConfigData data)
+        {
+            if (data == null) return null;
+            var res = new CornerIndicatorConfig();
+            if (data.Visible.HasValue) res.Visible = data.Visible.Value;
+            if (data.ModeBits.HasValue) res.ModeBits = data.ModeBits.Value;
+            if (data.BackColor.HasValue) res.BackColor = data.BackColor.Value;
+            if (data.ForeColor.HasValue) res.ForeColor = data.ForeColor.Value;
+            if (data.CustomKey != null) res.CustomKey = data.CustomKey;
+            if (data.Data != null) res.Data = Google.Protobuf.ByteString.CopyFrom(data.Data);
+            return res;
+        }
+
+        private static VolvoxCornerIndicatorConfigData UnmapCornerIndicator(CornerIndicatorConfig data)
+        {
+            if (data == null) return null;
+            return new VolvoxCornerIndicatorConfigData
+            {
+                Visible = data.HasVisible ? (bool?)data.Visible : null,
+                ModeBits = data.HasModeBits ? (uint?)data.ModeBits : null,
+                BackColor = data.HasBackColor ? (uint?)data.BackColor : null,
+                ForeColor = data.HasForeColor ? (uint?)data.ForeColor : null,
+                CustomKey = data.CustomKey,
+                Data = data.Data.IsEmpty ? null : data.Data.ToByteArray(),
+            };
         }
 
         private CellStyleOverride MapCellStyle(VolvoxCellStyleOverride s)

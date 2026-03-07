@@ -17,11 +17,11 @@ public class VolvoxGridServiceFfi
         _host = host;
     }
 
-    public GridHandle Create(CreateRequest request)
+    public CreateResponse Create(CreateRequest request)
     {
         byte[] data = request.ToByteArray();
         byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/Create", data);
-        return GridHandle.Parser.ParseFrom(result);
+        return CreateResponse.Parser.ParseFrom(result);
     }
 
     public Empty Destroy(GridHandle request)
@@ -141,6 +141,27 @@ public class VolvoxGridServiceFfi
         byte[] data = request.ToByteArray();
         byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/GetSelection", data);
         return SelectionState.Parser.ParseFrom(result);
+    }
+
+    public Empty ShowCell(ShowCellRequest request)
+    {
+        byte[] data = request.ToByteArray();
+        byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/ShowCell", data);
+        return Empty.Parser.ParseFrom(result);
+    }
+
+    public Empty SetTopRow(SetRowRequest request)
+    {
+        byte[] data = request.ToByteArray();
+        byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/SetTopRow", data);
+        return Empty.Parser.ParseFrom(result);
+    }
+
+    public Empty SetLeftCol(SetColRequest request)
+    {
+        byte[] data = request.ToByteArray();
+        byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/SetLeftCol", data);
+        return Empty.Parser.ParseFrom(result);
     }
 
     public EditState Edit(EditCommand request)

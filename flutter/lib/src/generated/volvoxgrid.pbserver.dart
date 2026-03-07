@@ -21,7 +21,7 @@ import 'volvoxgrid.pbjson.dart';
 export 'volvoxgrid.pb.dart';
 
 abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
-  $async.Future<$0.GridHandle> create(
+  $async.Future<$0.CreateResponse> create(
       $pb.ServerContext ctx, $0.CreateRequest request);
   $async.Future<$0.Empty> destroy($pb.ServerContext ctx, $0.GridHandle request);
   $async.Future<$0.Empty> configure(
@@ -55,6 +55,12 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $0.SelectRequest request);
   $async.Future<$0.SelectionState> getSelection(
       $pb.ServerContext ctx, $0.GridHandle request);
+  $async.Future<$0.Empty> showCell(
+      $pb.ServerContext ctx, $0.ShowCellRequest request);
+  $async.Future<$0.Empty> setTopRow(
+      $pb.ServerContext ctx, $0.SetRowRequest request);
+  $async.Future<$0.Empty> setLeftCol(
+      $pb.ServerContext ctx, $0.SetColRequest request);
   $async.Future<$0.EditState> edit(
       $pb.ServerContext ctx, $0.EditCommand request);
   $async.Future<$0.Empty> sort($pb.ServerContext ctx, $0.SortRequest request);
@@ -140,6 +146,12 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
         return $0.SelectRequest();
       case 'GetSelection':
         return $0.GridHandle();
+      case 'ShowCell':
+        return $0.ShowCellRequest();
+      case 'SetTopRow':
+        return $0.SetRowRequest();
+      case 'SetLeftCol':
+        return $0.SetColRequest();
       case 'Edit':
         return $0.EditCommand();
       case 'Sort':
@@ -232,6 +244,12 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
         return select(ctx, request as $0.SelectRequest);
       case 'GetSelection':
         return getSelection(ctx, request as $0.GridHandle);
+      case 'ShowCell':
+        return showCell(ctx, request as $0.ShowCellRequest);
+      case 'SetTopRow':
+        return setTopRow(ctx, request as $0.SetRowRequest);
+      case 'SetLeftCol':
+        return setLeftCol(ctx, request as $0.SetColRequest);
       case 'Edit':
         return edit(ctx, request as $0.EditCommand);
       case 'Sort':

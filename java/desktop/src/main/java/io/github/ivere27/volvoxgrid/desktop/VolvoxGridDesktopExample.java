@@ -1,12 +1,14 @@
 package io.github.ivere27.volvoxgrid.desktop;
 
 import io.github.ivere27.volvoxgrid.CreateRequest;
+import io.github.ivere27.volvoxgrid.CreateResponse;
 import io.github.ivere27.volvoxgrid.GridConfig;
 import io.github.ivere27.volvoxgrid.GridHandle;
 import io.github.ivere27.volvoxgrid.LayoutConfig;
 import io.github.ivere27.volvoxgrid.RenderConfig;
 import io.github.ivere27.volvoxgrid.RendererMode;
 import io.github.ivere27.volvoxgrid.ScrollBarsMode;
+import io.github.ivere27.volvoxgrid.SelectionMode;
 import io.github.ivere27.volvoxgrid.SortOrder;
 import io.github.ivere27.volvoxgrid.common.RendererBackend;
 import java.awt.BorderLayout;
@@ -23,6 +25,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -45,6 +48,7 @@ public final class VolvoxGridDesktopExample {
     private volatile boolean debugOverlayEnabled = false;
     private volatile boolean scrollbarsEnabled = true;
     private volatile boolean flingEnabled = true;
+    private volatile SelectionMode selectionMode = SelectionMode.SELECTION_FREE;
 
     private JFrame frame;
     private VolvoxGridDesktopPanel gridPanel;
@@ -58,6 +62,7 @@ public final class VolvoxGridDesktopExample {
     private JCheckBox cbDebug;
     private JCheckBox cbScrollbars;
     private JCheckBox cbFling;
+    private JComboBox<SelectionMode> selectionModeBox;
 
     private VolvoxGridDesktopExample() {}
 
@@ -100,6 +105,7 @@ public final class VolvoxGridDesktopExample {
         frame.setLayout(new BorderLayout());
 
         gridPanel = new VolvoxGridDesktopPanel();
+        gridPanel.setSelectionModeValue(selectionMode.getNumber());
         statusLabel = new JLabel("Ready");
         statusLabel.setOpaque(true);
         statusLabel.setBackground(Color.WHITE);
@@ -113,11 +119,23 @@ public final class VolvoxGridDesktopExample {
         cbDebug = new JCheckBox("Debug");
         cbScrollbars = new JCheckBox("Scrollbars", scrollbarsEnabled);
         cbFling = new JCheckBox("Fling", flingEnabled);
+        selectionModeBox = new JComboBox<>(
+            new SelectionMode[] {
+                SelectionMode.SELECTION_FREE,
+                SelectionMode.SELECTION_BY_ROW,
+                SelectionMode.SELECTION_BY_COLUMN,
+                SelectionMode.SELECTION_LISTBOX,
+                SelectionMode.SELECTION_MULTI_RANGE,
+            }
+        );
+        selectionModeBox.setSelectedItem(selectionMode);
 
         JPanel row1 = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
         row1.add(btnSales);
         row1.add(btnHierarchy);
         row1.add(btnStress);
+        row1.add(new JLabel("Selection"));
+        row1.add(selectionModeBox);
         row1.add(cbGpu);
         row1.add(cbDebug);
         row1.add(cbScrollbars);
@@ -168,6 +186,14 @@ public final class VolvoxGridDesktopExample {
             submit(() -> {
                 flingEnabled = selected;
                 applyDisplayToggles();
+            });
+        });
+        selectionModeBox.addActionListener(e -> {
+            SelectionMode selected = (SelectionMode) selectionModeBox.getSelectedItem();
+            submit(() -> {
+                selectionMode = selected != null ? selected : SelectionMode.SELECTION_FREE;
+                applySelectionMode();
+                updateStatus("Selection mode: " + selectionMode.name());
             });
         });
 
@@ -238,6 +264,7 @@ public final class VolvoxGridDesktopExample {
             }
 
             applyDisplayToggles();
+            applySelectionMode();
             ctrl.refresh();
             gridPanel.requestFrame();
 
@@ -259,14 +286,13 @@ public final class VolvoxGridDesktopExample {
                 LayoutConfig.newBuilder()
                     .setRows(2)
                     .setCols(2)
-                    .setFixedRows(1)
-                    .setFixedCols(0)
                     .build()
             )
+            .setIndicatorBands(VolvoxGridDesktopController.defaultIndicatorBandsConfig())
             .setRendering(RenderConfig.newBuilder().setRendererMode(RendererMode.RENDERER_CPU).build())
             .build();
 
-        GridHandle handle = svc.create(
+        CreateResponse response = svc.create(
             CreateRequest.newBuilder()
                 .setViewportWidth(width)
                 .setViewportHeight(height)
@@ -274,7 +300,7 @@ public final class VolvoxGridDesktopExample {
                 .setConfig(config)
                 .build()
         );
-        return handle.getId();
+        return response.getHandle().getId();
     }
 
     private void applyDisplayToggles() {
@@ -339,6 +365,19 @@ public final class VolvoxGridDesktopExample {
         }
     }
 
+    private void applySelectionMode() {
+        gridPanel.setSelectionModeValue(selectionMode.getNumber());
+        VolvoxGridDesktopController ctrl = controller;
+        if (ctrl == null) {
+            return;
+        }
+        try {
+            ctrl.setSelectionMode(selectionMode);
+        } catch (Exception e) {
+            updateStatus("Selection mode failed: " + e.getMessage());
+        }
+    }
+
     private void sortCurrent(boolean ascending) {
         VolvoxGridDesktopController ctrl = controller;
         if (ctrl == null) {
@@ -347,7 +386,7 @@ public final class VolvoxGridDesktopExample {
         }
 
         try {
-            int col = Math.max(ctrl.getSelection().getActiveCol(), 0);
+            int col = Math.max(ctrl.getSelection().getCol(), 0);
             ctrl.sort(
                 ascending ? SortOrder.SORT_GENERIC_ASCENDING : SortOrder.SORT_GENERIC_DESCENDING,
                 col

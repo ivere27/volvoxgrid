@@ -42,23 +42,21 @@ public class MyApp {
             gridPanel.initialize(
                 null,  // auto-detect plugin path from JAR
                 100,   // rows
-                5,     // cols
-                1,     // fixedRows (header)
-                0      // fixedCols
+                5      // cols
             );
 
             // Get a controller for grid operations
             VolvoxGridDesktopController ctrl = gridPanel.createController();
 
-            // Set header text
-            ctrl.setTextMatrix(0, 0, "Name");
-            ctrl.setTextMatrix(0, 1, "Price");
-            ctrl.setTextMatrix(0, 2, "Qty");
+            // Set column headers in the top indicator band
+            ctrl.setColumnCaption(0, "Name");
+            ctrl.setColumnCaption(1, "Price");
+            ctrl.setColumnCaption(2, "Qty");
 
             // Set data
-            ctrl.setTextMatrix(1, 0, "Widget A");
-            ctrl.setTextMatrix(1, 1, "29.99");
-            ctrl.setTextMatrix(1, 2, "150");
+            ctrl.setCellText(0, 0, "Widget A");
+            ctrl.setCellText(0, 1, "29.99");
+            ctrl.setCellText(0, 2, "150");
 
             // Clean up on close
             frame.addWindowListener(new java.awt.event.WindowAdapter() {
@@ -91,7 +89,7 @@ A Swing `JPanel` that hosts the grid. Handles rendering, mouse/keyboard input, a
 
 ```java
 // Option A: Auto-detect or specify plugin path
-gridPanel.initialize(pluginPath, rows, cols, fixedRows, fixedCols);
+gridPanel.initialize(pluginPath, rows, cols);
 
 // Option B: Reuse an existing bridge and grid (for multi-grid apps)
 gridPanel.initialize(bridge, existingGridId);
@@ -140,19 +138,17 @@ High-level API for grid operations. Obtained via `gridPanel.createController()`.
 ```java
 ctrl.setRowCount(1000);
 ctrl.setColCount(10);
-ctrl.setFixedRowCount(1);    // frozen header rows
-ctrl.setFixedColCount(2);    // frozen left columns
 ```
 
 #### Cell Data
 
 ```java
 // Single cell
-ctrl.setTextMatrix(row, col, "text");
-String text = ctrl.getTextMatrix(row, col);
+ctrl.setCellText(row, col, "text");
+String text = ctrl.getCellText(row, col);
 
 // Batch update
-ctrl.setCellTexts(List.of(
+ctrl.setCells(List.of(
     new GridCellText(0, 0, "A"),
     new GridCellText(0, 1, "B"),
     new GridCellText(1, 0, "C")
@@ -170,7 +166,7 @@ ctrl.setColWidth(0, 200);
 
 ```java
 // Simple sort
-ctrl.sortByColumn(1, true);  // col 1, ascending
+ctrl.sort(1, true);  // col 1, ascending
 
 // With sort order enum
 ctrl.sort(SortOrder.SORT_NUMERIC_ASCENDING, 1);
@@ -182,11 +178,27 @@ ctrl.sort(SortOrder.SORT_NUMERIC_ASCENDING, 1);
 
 ```java
 // Select a range
-ctrl.select(1, 0, 5, 3);  // row1, col1, row2, col2
+ctrl.selectRange(1, 0, 5, 3);  // row1, col1, row2, col2
+
+// Select multiple ranges
+ctrl.selectRanges(List.of(
+    new GridCellRange(1, 0, 2, 1),
+    new GridCellRange(4, 3, 6, 4)
+));
+
+// Select multiple ranges with an explicit active cell
+ctrl.selectRanges(
+    List.of(
+        new GridCellRange(1, 0, 2, 1),
+        new GridCellRange(4, 3, 6, 4)
+    ),
+    6,
+    4
+);
 
 // Get current selection
-GridSelection sel = ctrl.getSelectionState();
-// sel.getRow(), sel.getCol(), sel.getRowEnd(), sel.getColEnd(), sel.getTopRow()
+GridSelection sel = ctrl.getSelection();
+// sel.getRow(), sel.getCol(), sel.getRowEnd(), sel.getColEnd(), sel.getTopRow(), sel.getLeftCol(), sel.getRanges()
 ```
 
 #### Cell Merging

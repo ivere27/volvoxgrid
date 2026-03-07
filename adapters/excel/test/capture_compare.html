@@ -254,8 +254,8 @@ async function executeCommand(excel, cmd) {
       const dataCol = Number(args[1]);
       const prop = String(args[2]);
       const expected = parseExpectedValue(args[3]);
-      const gridRow = dataRow + excel.grid.fixedRows;
-      const gridCol = dataCol + excel.grid.fixedCols;
+      const gridRow = dataRow;
+      const gridCol = dataCol;
       const key = `${gridRow}:${gridCol}`;
       const style = excel.cellStyleCache?.get?.(key) || {};
       const actual = style[prop];
@@ -269,8 +269,8 @@ async function executeCommand(excel, cmd) {
     case "assertSelection": {
       const expected = args[0] || {};
       const actual = excel.getSelection();
-      const maxRow = excel.grid.rows - excel.grid.fixedRows - 1;
-      const maxCol = excel.grid.cols - excel.grid.fixedCols - 1;
+      const maxRow = excel.grid.rowCount - 1;
+      const maxCol = excel.grid.colCount - 1;
       for (const key of ["row1", "col1", "row2", "col2"]) {
         if (expected[key] == null) continue;
         const rawWant = expected[key];
@@ -289,7 +289,7 @@ async function executeCommand(excel, cmd) {
     case "assertRowHeight": {
       const dataRow = Number(args[0]);
       const expected = Number(args[1]);
-      const gridRow = dataRow + excel.grid.fixedRows;
+      const gridRow = dataRow;
       const actual = excel.grid.getRowHeight(gridRow);
       if (actual !== expected) {
         throw new Error(
@@ -301,7 +301,7 @@ async function executeCommand(excel, cmd) {
     case "assertColWidth": {
       const dataCol = Number(args[0]);
       const expected = Number(args[1]);
-      const gridCol = dataCol + excel.grid.fixedCols;
+      const gridCol = dataCol;
       const actual = excel.grid.getColWidth(gridCol);
       if (actual !== expected) {
         throw new Error(

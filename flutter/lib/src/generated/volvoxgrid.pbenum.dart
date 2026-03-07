@@ -1289,6 +1289,46 @@ class NodeRelation extends $pb.ProtobufEnum {
   const NodeRelation._(super.value, super.name);
 }
 
+class ErrorCode extends $pb.ProtobufEnum {
+  static const ErrorCode ERROR_UNKNOWN =
+      ErrorCode._(0, _omitEnumNames ? '' : 'ERROR_UNKNOWN');
+  static const ErrorCode ERROR_INVALID_ARGUMENT =
+      ErrorCode._(1, _omitEnumNames ? '' : 'ERROR_INVALID_ARGUMENT');
+  static const ErrorCode ERROR_NOT_FOUND =
+      ErrorCode._(2, _omitEnumNames ? '' : 'ERROR_NOT_FOUND');
+  static const ErrorCode ERROR_INVALID_STATE =
+      ErrorCode._(3, _omitEnumNames ? '' : 'ERROR_INVALID_STATE');
+  static const ErrorCode ERROR_TYPE_VIOLATION =
+      ErrorCode._(4, _omitEnumNames ? '' : 'ERROR_TYPE_VIOLATION');
+  static const ErrorCode ERROR_DECODE_FAILED =
+      ErrorCode._(5, _omitEnumNames ? '' : 'ERROR_DECODE_FAILED');
+  static const ErrorCode ERROR_ENCODE_FAILED =
+      ErrorCode._(6, _omitEnumNames ? '' : 'ERROR_ENCODE_FAILED');
+  static const ErrorCode ERROR_NOT_IMPLEMENTED =
+      ErrorCode._(7, _omitEnumNames ? '' : 'ERROR_NOT_IMPLEMENTED');
+  static const ErrorCode ERROR_INTERNAL =
+      ErrorCode._(8, _omitEnumNames ? '' : 'ERROR_INTERNAL');
+
+  static const $core.List<ErrorCode> values = <ErrorCode>[
+    ERROR_UNKNOWN,
+    ERROR_INVALID_ARGUMENT,
+    ERROR_NOT_FOUND,
+    ERROR_INVALID_STATE,
+    ERROR_TYPE_VIOLATION,
+    ERROR_DECODE_FAILED,
+    ERROR_ENCODE_FAILED,
+    ERROR_NOT_IMPLEMENTED,
+    ERROR_INTERNAL,
+  ];
+
+  static final $core.List<ErrorCode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 8);
+  static ErrorCode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ErrorCode._(super.value, super.name);
+}
+
 class IconAlign extends $pb.ProtobufEnum {
   static const IconAlign ICON_ALIGN_INLINE_END =
       IconAlign._(0, _omitEnumNames ? '' : 'ICON_ALIGN_INLINE_END');
@@ -1315,6 +1355,204 @@ class IconAlign extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const IconAlign._(super.value, super.name);
+}
+
+class RowIndicatorSlotKind extends $pb.ProtobufEnum {
+  static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_NONE =
+      RowIndicatorSlotKind._(
+          0, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_NONE');
+  static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_NUMBERS =
+      RowIndicatorSlotKind._(
+          1, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_NUMBERS');
+  static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_CURRENT =
+      RowIndicatorSlotKind._(
+          2, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_CURRENT');
+  static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_SELECTION =
+      RowIndicatorSlotKind._(
+          3, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_SELECTION');
+  static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_CHECKBOX =
+      RowIndicatorSlotKind._(
+          4, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_CHECKBOX');
+  static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_HANDLE =
+      RowIndicatorSlotKind._(
+          5, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_HANDLE');
+  static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_EDITING =
+      RowIndicatorSlotKind._(
+          6, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_EDITING');
+  static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_MODIFIED =
+      RowIndicatorSlotKind._(
+          7, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_MODIFIED');
+  static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_ERROR =
+      RowIndicatorSlotKind._(
+          8, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_ERROR');
+  static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_NEW_ROW =
+      RowIndicatorSlotKind._(
+          9, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_NEW_ROW');
+  static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_EXPANDER =
+      RowIndicatorSlotKind._(
+          10, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_EXPANDER');
+  static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_RESIZE =
+      RowIndicatorSlotKind._(
+          11, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_RESIZE');
+  static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_ACTION =
+      RowIndicatorSlotKind._(
+          12, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_ACTION');
+  static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_STATUS_ICON =
+      RowIndicatorSlotKind._(
+          13, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_STATUS_ICON');
+  static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_CUSTOM =
+      RowIndicatorSlotKind._(
+          14, _omitEnumNames ? '' : 'ROW_INDICATOR_SLOT_CUSTOM');
+
+  static const $core.List<RowIndicatorSlotKind> values = <RowIndicatorSlotKind>[
+    ROW_INDICATOR_SLOT_NONE,
+    ROW_INDICATOR_SLOT_NUMBERS,
+    ROW_INDICATOR_SLOT_CURRENT,
+    ROW_INDICATOR_SLOT_SELECTION,
+    ROW_INDICATOR_SLOT_CHECKBOX,
+    ROW_INDICATOR_SLOT_HANDLE,
+    ROW_INDICATOR_SLOT_EDITING,
+    ROW_INDICATOR_SLOT_MODIFIED,
+    ROW_INDICATOR_SLOT_ERROR,
+    ROW_INDICATOR_SLOT_NEW_ROW,
+    ROW_INDICATOR_SLOT_EXPANDER,
+    ROW_INDICATOR_SLOT_RESIZE,
+    ROW_INDICATOR_SLOT_ACTION,
+    ROW_INDICATOR_SLOT_STATUS_ICON,
+    ROW_INDICATOR_SLOT_CUSTOM,
+  ];
+
+  static final $core.List<RowIndicatorSlotKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 14);
+  static RowIndicatorSlotKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const RowIndicatorSlotKind._(super.value, super.name);
+}
+
+class RowIndicatorMode extends $pb.ProtobufEnum {
+  static const RowIndicatorMode ROW_INDICATOR_NONE =
+      RowIndicatorMode._(0, _omitEnumNames ? '' : 'ROW_INDICATOR_NONE');
+  static const RowIndicatorMode ROW_INDICATOR_NUMBERS =
+      RowIndicatorMode._(1, _omitEnumNames ? '' : 'ROW_INDICATOR_NUMBERS');
+  static const RowIndicatorMode ROW_INDICATOR_CURRENT =
+      RowIndicatorMode._(2, _omitEnumNames ? '' : 'ROW_INDICATOR_CURRENT');
+  static const RowIndicatorMode ROW_INDICATOR_SELECTION =
+      RowIndicatorMode._(4, _omitEnumNames ? '' : 'ROW_INDICATOR_SELECTION');
+  static const RowIndicatorMode ROW_INDICATOR_CHECKBOX =
+      RowIndicatorMode._(8, _omitEnumNames ? '' : 'ROW_INDICATOR_CHECKBOX');
+  static const RowIndicatorMode ROW_INDICATOR_HANDLE =
+      RowIndicatorMode._(16, _omitEnumNames ? '' : 'ROW_INDICATOR_HANDLE');
+  static const RowIndicatorMode ROW_INDICATOR_EDITING =
+      RowIndicatorMode._(32, _omitEnumNames ? '' : 'ROW_INDICATOR_EDITING');
+  static const RowIndicatorMode ROW_INDICATOR_MODIFIED =
+      RowIndicatorMode._(64, _omitEnumNames ? '' : 'ROW_INDICATOR_MODIFIED');
+  static const RowIndicatorMode ROW_INDICATOR_ERROR =
+      RowIndicatorMode._(128, _omitEnumNames ? '' : 'ROW_INDICATOR_ERROR');
+  static const RowIndicatorMode ROW_INDICATOR_NEW_ROW =
+      RowIndicatorMode._(256, _omitEnumNames ? '' : 'ROW_INDICATOR_NEW_ROW');
+  static const RowIndicatorMode ROW_INDICATOR_EXPANDER =
+      RowIndicatorMode._(512, _omitEnumNames ? '' : 'ROW_INDICATOR_EXPANDER');
+  static const RowIndicatorMode ROW_INDICATOR_RESIZE =
+      RowIndicatorMode._(1024, _omitEnumNames ? '' : 'ROW_INDICATOR_RESIZE');
+  static const RowIndicatorMode ROW_INDICATOR_ACTION =
+      RowIndicatorMode._(2048, _omitEnumNames ? '' : 'ROW_INDICATOR_ACTION');
+  static const RowIndicatorMode ROW_INDICATOR_STATUS_ICON = RowIndicatorMode._(
+      4096, _omitEnumNames ? '' : 'ROW_INDICATOR_STATUS_ICON');
+  static const RowIndicatorMode ROW_INDICATOR_CUSTOM =
+      RowIndicatorMode._(8192, _omitEnumNames ? '' : 'ROW_INDICATOR_CUSTOM');
+
+  static const $core.List<RowIndicatorMode> values = <RowIndicatorMode>[
+    ROW_INDICATOR_NONE,
+    ROW_INDICATOR_NUMBERS,
+    ROW_INDICATOR_CURRENT,
+    ROW_INDICATOR_SELECTION,
+    ROW_INDICATOR_CHECKBOX,
+    ROW_INDICATOR_HANDLE,
+    ROW_INDICATOR_EDITING,
+    ROW_INDICATOR_MODIFIED,
+    ROW_INDICATOR_ERROR,
+    ROW_INDICATOR_NEW_ROW,
+    ROW_INDICATOR_EXPANDER,
+    ROW_INDICATOR_RESIZE,
+    ROW_INDICATOR_ACTION,
+    ROW_INDICATOR_STATUS_ICON,
+    ROW_INDICATOR_CUSTOM,
+  ];
+
+  static final $core.Map<$core.int, RowIndicatorMode> _byValue =
+      $pb.ProtobufEnum.initByValue(values);
+  static RowIndicatorMode? valueOf($core.int value) => _byValue[value];
+
+  const RowIndicatorMode._(super.value, super.name);
+}
+
+class ColIndicatorCellMode extends $pb.ProtobufEnum {
+  static const ColIndicatorCellMode COL_INDICATOR_CELL_NONE =
+      ColIndicatorCellMode._(
+          0, _omitEnumNames ? '' : 'COL_INDICATOR_CELL_NONE');
+  static const ColIndicatorCellMode COL_INDICATOR_CELL_HEADER_TEXT =
+      ColIndicatorCellMode._(
+          1, _omitEnumNames ? '' : 'COL_INDICATOR_CELL_HEADER_TEXT');
+  static const ColIndicatorCellMode COL_INDICATOR_CELL_SORT_GLYPH =
+      ColIndicatorCellMode._(
+          2, _omitEnumNames ? '' : 'COL_INDICATOR_CELL_SORT_GLYPH');
+  static const ColIndicatorCellMode COL_INDICATOR_CELL_SORT_PRIORITY =
+      ColIndicatorCellMode._(
+          4, _omitEnumNames ? '' : 'COL_INDICATOR_CELL_SORT_PRIORITY');
+  static const ColIndicatorCellMode COL_INDICATOR_CELL_FILTER_BUTTON =
+      ColIndicatorCellMode._(
+          8, _omitEnumNames ? '' : 'COL_INDICATOR_CELL_FILTER_BUTTON');
+  static const ColIndicatorCellMode COL_INDICATOR_CELL_FILTER_STATE =
+      ColIndicatorCellMode._(
+          16, _omitEnumNames ? '' : 'COL_INDICATOR_CELL_FILTER_STATE');
+  static const ColIndicatorCellMode COL_INDICATOR_CELL_MENU_BUTTON =
+      ColIndicatorCellMode._(
+          32, _omitEnumNames ? '' : 'COL_INDICATOR_CELL_MENU_BUTTON');
+  static const ColIndicatorCellMode COL_INDICATOR_CELL_CHOOSER =
+      ColIndicatorCellMode._(
+          64, _omitEnumNames ? '' : 'COL_INDICATOR_CELL_CHOOSER');
+  static const ColIndicatorCellMode COL_INDICATOR_CELL_DRAG_REORDER =
+      ColIndicatorCellMode._(
+          128, _omitEnumNames ? '' : 'COL_INDICATOR_CELL_DRAG_REORDER');
+  static const ColIndicatorCellMode COL_INDICATOR_CELL_HIDDEN_MARKER =
+      ColIndicatorCellMode._(
+          256, _omitEnumNames ? '' : 'COL_INDICATOR_CELL_HIDDEN_MARKER');
+  static const ColIndicatorCellMode COL_INDICATOR_CELL_RESIZE_HANDLE =
+      ColIndicatorCellMode._(
+          512, _omitEnumNames ? '' : 'COL_INDICATOR_CELL_RESIZE_HANDLE');
+  static const ColIndicatorCellMode COL_INDICATOR_CELL_SELECT_ALL =
+      ColIndicatorCellMode._(
+          1024, _omitEnumNames ? '' : 'COL_INDICATOR_CELL_SELECT_ALL');
+  static const ColIndicatorCellMode COL_INDICATOR_CELL_STATUS_ICON =
+      ColIndicatorCellMode._(
+          2048, _omitEnumNames ? '' : 'COL_INDICATOR_CELL_STATUS_ICON');
+  static const ColIndicatorCellMode COL_INDICATOR_CELL_CUSTOM =
+      ColIndicatorCellMode._(
+          4096, _omitEnumNames ? '' : 'COL_INDICATOR_CELL_CUSTOM');
+
+  static const $core.List<ColIndicatorCellMode> values = <ColIndicatorCellMode>[
+    COL_INDICATOR_CELL_NONE,
+    COL_INDICATOR_CELL_HEADER_TEXT,
+    COL_INDICATOR_CELL_SORT_GLYPH,
+    COL_INDICATOR_CELL_SORT_PRIORITY,
+    COL_INDICATOR_CELL_FILTER_BUTTON,
+    COL_INDICATOR_CELL_FILTER_STATE,
+    COL_INDICATOR_CELL_MENU_BUTTON,
+    COL_INDICATOR_CELL_CHOOSER,
+    COL_INDICATOR_CELL_DRAG_REORDER,
+    COL_INDICATOR_CELL_HIDDEN_MARKER,
+    COL_INDICATOR_CELL_RESIZE_HANDLE,
+    COL_INDICATOR_CELL_SELECT_ALL,
+    COL_INDICATOR_CELL_STATUS_ICON,
+    COL_INDICATOR_CELL_CUSTOM,
+  ];
+
+  static final $core.Map<$core.int, ColIndicatorCellMode> _byValue =
+      $pb.ProtobufEnum.initByValue(values);
+  static ColIndicatorCellMode? valueOf($core.int value) => _byValue[value];
+
+  const ColIndicatorCellMode._(super.value, super.name);
 }
 
 class ArchiveRequest_Action extends $pb.ProtobufEnum {

@@ -354,11 +354,9 @@ class VolvoxGridView @JvmOverloads constructor(
     @JvmOverloads
     fun initialize(
         rows: Int,
-        cols: Int,
-        fixedRows: Int = 1,
-        fixedCols: Int = 0
+        cols: Int
     ) {
-        initialize(resolveBundledPluginPath(context), rows, cols, fixedRows, fixedCols)
+        initialize(resolveBundledPluginPath(context), rows, cols)
     }
 
     /**
@@ -368,15 +366,11 @@ class VolvoxGridView @JvmOverloads constructor(
      * `libvolvoxgrid_plugin_lite.so`
      * @param rows initial number of rows
      * @param cols initial number of columns
-     * @param fixedRows number of fixed header rows (default 1)
-     * @param fixedCols number of fixed header columns (default 0)
      */
     fun initialize(
         pluginPath: String,
         rows: Int,
-        cols: Int,
-        fixedRows: Int = 1,
-        fixedCols: Int = 0
+        cols: Int
     ) {
         released.set(false)
         val p = PluginHost.load(pluginPath)
@@ -390,7 +384,7 @@ class VolvoxGridView @JvmOverloads constructor(
         val density = resources.displayMetrics.density
         val scale = if (density > 0f) density else 1f
 
-        val handle = client.Create(
+        val response = client.Create(
             CreateRequest.newBuilder()
                 .setViewportWidth(w)
                 .setViewportHeight(h)
@@ -399,13 +393,12 @@ class VolvoxGridView @JvmOverloads constructor(
                     .setLayout(LayoutConfig.newBuilder()
                         .setRows(rows)
                         .setCols(cols)
-                        .setFixedRows(fixedRows)
-                        .setFixedCols(fixedCols)
                         .build())
+                    .setIndicatorBands(defaultIndicatorBandsConfig())
                     .build())
                 .build()
         )
-        gridId = handle.id
+        gridId = response.handle.id
 
         maybeRegisterExternalTextRenderer()
         applyAndroidScrollDefaults()
@@ -509,7 +502,7 @@ class VolvoxGridView @JvmOverloads constructor(
     /**
      * Request a render frame on the next VSync.
      *
-     * Useful after out-of-band controller mutations (e.g. setTextMatrix/refresh)
+     * Useful after out-of-band controller mutations (e.g. setCellText/refresh)
      * that do not flow through the render input stream.
      */
     override fun requestFrame() {
@@ -2068,8 +2061,8 @@ class VolvoxGridView @JvmOverloads constructor(
     private fun showGridContextMenu(x: Float, y: Float) {
         val client = ffiClient ?: return
         val ctrl = VolvoxGridController(client, gridId)
-        val row = ctrl.row
-        val col = ctrl.col
+        val row = ctrl.cursorRow()
+        val col = ctrl.cursorCol()
         if (row < 0 || col < 0) return
 
         // Create an invisible anchor view at the touch position so PopupMenu

@@ -9,6 +9,7 @@ import io.github.ivere27.volvoxgrid.ClipboardCommand;
 import io.github.ivere27.volvoxgrid.ClipboardResponse;
 import io.github.ivere27.volvoxgrid.ConfigureRequest;
 import io.github.ivere27.volvoxgrid.CreateRequest;
+import io.github.ivere27.volvoxgrid.CreateResponse;
 import io.github.ivere27.volvoxgrid.DefineColumnsRequest;
 import io.github.ivere27.volvoxgrid.DefineRowsRequest;
 import io.github.ivere27.volvoxgrid.EditCommand;
@@ -48,7 +49,10 @@ import io.github.ivere27.volvoxgrid.RenderOutput;
 import io.github.ivere27.volvoxgrid.RemoveRowsRequest;
 import io.github.ivere27.volvoxgrid.ResizeViewportRequest;
 import io.github.ivere27.volvoxgrid.SelectionState;
+import io.github.ivere27.volvoxgrid.SetColRequest;
 import io.github.ivere27.volvoxgrid.SetRedrawRequest;
+import io.github.ivere27.volvoxgrid.SetRowRequest;
+import io.github.ivere27.volvoxgrid.ShowCellRequest;
 import io.github.ivere27.volvoxgrid.SortRequest;
 import io.github.ivere27.volvoxgrid.SubtotalRequest;
 import io.github.ivere27.volvoxgrid.UpdateCellsRequest;
@@ -78,6 +82,9 @@ public final class VolvoxGridDesktopClient {
     private static final String CLEAR = "/volvoxgrid.v1.VolvoxGridService/Clear";
     private static final String SELECT = "/volvoxgrid.v1.VolvoxGridService/Select";
     private static final String GET_SELECTION = "/volvoxgrid.v1.VolvoxGridService/GetSelection";
+    private static final String SHOW_CELL = "/volvoxgrid.v1.VolvoxGridService/ShowCell";
+    private static final String SET_TOP_ROW = "/volvoxgrid.v1.VolvoxGridService/SetTopRow";
+    private static final String SET_LEFT_COL = "/volvoxgrid.v1.VolvoxGridService/SetLeftCol";
     private static final String EDIT = "/volvoxgrid.v1.VolvoxGridService/Edit";
     private static final String SORT = "/volvoxgrid.v1.VolvoxGridService/Sort";
     private static final String SUBTOTAL = "/volvoxgrid.v1.VolvoxGridService/Subtotal";
@@ -109,8 +116,8 @@ public final class VolvoxGridDesktopClient {
         this.bridge = Objects.requireNonNull(bridge, "bridge");
     }
 
-    public GridHandle create(CreateRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(CREATE, request, GridHandle.parser());
+    public CreateResponse create(CreateRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(CREATE, request, CreateResponse.parser());
     }
 
     public Empty destroy(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
@@ -175,6 +182,18 @@ public final class VolvoxGridDesktopClient {
 
     public SelectionState getSelection(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
         return unary(GET_SELECTION, request, SelectionState.parser());
+    }
+
+    public Empty showCell(ShowCellRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(SHOW_CELL, request, Empty.parser());
+    }
+
+    public Empty setTopRow(SetRowRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(SET_TOP_ROW, request, Empty.parser());
+    }
+
+    public Empty setLeftCol(SetColRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(SET_LEFT_COL, request, Empty.parser());
     }
 
     public EditState edit(EditCommand request) throws SynurangDesktopBridge.SynurangBridgeException {

@@ -289,7 +289,7 @@ class MainActivity : AppCompatActivity() {
             val density = resources.displayMetrics.density
             val scale = if (density > 0f) density else 1f
             
-            val handle = client.Create(
+            val response = client.Create(
                 CreateRequest.newBuilder()
                     .setViewportWidth(w)
                     .setViewportHeight(h)
@@ -298,19 +298,42 @@ class MainActivity : AppCompatActivity() {
                         .setLayout(LayoutConfig.newBuilder()
                             .setRows(rows)
                             .setCols(cols)
-                            .setFixedRows(1)
-                            .setFixedCols(0)
+                            .build())
+                        .setIndicatorBands(IndicatorBandsConfig.newBuilder()
+                            .setRowIndicatorStart(RowIndicatorConfig.newBuilder()
+                                .setVisible(false)
+                                .setWidthPx(35)
+                                .setModeBits(
+                                    RowIndicatorMode.ROW_INDICATOR_CURRENT.number or
+                                        RowIndicatorMode.ROW_INDICATOR_SELECTION.number
+                                )
+                                .build())
+                            .setColIndicatorTop(ColIndicatorConfig.newBuilder()
+                                .setVisible(true)
+                                .setBandRows(1)
+                                .setModeBits(
+                                    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.number or
+                                        ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH.number
+                                )
+                                .build())
                             .build())
                         .build())
                     .build()
             )
-            val id = handle.id
+            val id = response.handle.id
             
             // Attach view to this new grid
             runOnUiThread {
                 gridView.initialize(host, id)
                 val ctrl = gridView.createController()
                 
+                ctrl.setColumnCaption(0, "Name")
+                ctrl.setColumnCaption(1, "Price")
+                ctrl.setColumnCaption(2, "Qty")
+                ctrl.setCellText(0, 0, "Widget A")
+                ctrl.setCellText(0, 1, "29.99")
+                ctrl.setCellText(0, 2, "150")
+
                 // Setup styling
                 val style = ctrl.getGridStyle().toBuilder()
                     .setForeColor(0xFF000000.toInt())
@@ -373,7 +396,7 @@ class MainActivity : AppCompatActivity() {
                     SortOrder.SORT_GENERIC_ASCENDING
                 else
                     SortOrder.SORT_GENERIC_DESCENDING
-                ctrl.sort(order, col = ctrl.col)
+                ctrl.sort(order, col = ctrl.cursorCol())
                 ctrl.refresh()
                 gridView.requestFrame()
                 updateStatus("Sorted ${if (ascending) "ascending" else "descending"}")

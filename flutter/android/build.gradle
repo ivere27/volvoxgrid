@@ -59,7 +59,7 @@ def abiToRustTarget = [
     "armeabi-v7a" : "armv7-linux-androideabi",
     "x86_64"      : "x86_64-linux-android",
 ]
-def resolveSoForAbi = { String abi, String soName ->
+def soCandidatesForAbi = { String abi, String soName ->
     String rustTarget = abiToRustTarget[abi]
     List<File> candidates = []
 
@@ -71,8 +71,12 @@ def resolveSoForAbi = { String abi, String soName ->
         candidates.add(new File(repoRoot, "target/${rustTarget}/debug/${soName}"))
     }
 
-    for (File candidate : candidates) {
-        if (candidate.exists()) {
+    return candidates
+}
+
+def resolveSoForAbi = { String abi, String soName ->
+    for (File candidate : soCandidatesForAbi(abi, soName)) {
+        if (candidate.isFile()) {
             return candidate
         }
     }
@@ -82,17 +86,12 @@ def resolveSoForAbi = { String abi, String soName ->
 
 if (volvoxgridSource == "local") {
     tasks.register("prepareVolvoxGridJniLibs") {
-        List<File> inputDirs = [
-            new File(projectDir, "src/main/jniLibs"),
-            new File(repoRoot, "android/volvoxgrid-android/src/main/jniLibs"),
-            new File(repoRoot, "android/example/src/main/jniLibs"),
-            new File(repoRoot, "target"),
-        ]
-        for (File inputDir : inputDirs) {
-            if (inputDir.exists()) {
-                inputs.dir(inputDir)
+        def soInputs = project.provider {
+            supportedAndroidAbis.collectMany { abi ->
+                soCandidatesForAbi(abi, "libvolvoxgrid_plugin.so").findAll { it.isFile() }
             }
         }
+        inputs.files(soInputs).withPropertyName("volvoxgridPluginSoInputs")
         outputs.dir(generatedJniLibsDir)
         doLast {
             delete(generatedJniLibsDir)

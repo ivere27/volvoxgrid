@@ -3,6 +3,8 @@ package io.github.ivere27.volvoxgrid.desktop;
 import io.github.ivere27.volvoxgrid.BufferReady;
 import io.github.ivere27.volvoxgrid.ConfigureRequest;
 import io.github.ivere27.volvoxgrid.CreateRequest;
+import io.github.ivere27.volvoxgrid.CreateResponse;
+import io.github.ivere27.volvoxgrid.CellRange;
 import io.github.ivere27.volvoxgrid.EditRequest;
 import io.github.ivere27.volvoxgrid.FrameDone;
 import io.github.ivere27.volvoxgrid.GridConfig;
@@ -16,6 +18,9 @@ import io.github.ivere27.volvoxgrid.RenderOutput;
 import io.github.ivere27.volvoxgrid.RendererMode;
 import io.github.ivere27.volvoxgrid.ResizeViewportRequest;
 import io.github.ivere27.volvoxgrid.ScrollEvent;
+import io.github.ivere27.volvoxgrid.SelectRequest;
+import io.github.ivere27.volvoxgrid.SelectionMode;
+import io.github.ivere27.volvoxgrid.SelectionState;
 import io.github.ivere27.volvoxgrid.common.VolvoxGridHost;
 import io.github.ivere27.volvoxgrid.common.RendererBackend;
 import java.awt.Color;
@@ -35,6 +40,8 @@ import java.awt.image.BufferedImage;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -95,6 +102,13 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private volatile Thread flingThread;
     private volatile boolean flingActive = false;
     private volatile float flingVelocityY = 0f;
+    private volatile int selectionModeValue = SelectionMode.SELECTION_FREE_VALUE;
+    private volatile boolean multiRangeDragActive = false;
+    private volatile List<CellRange> multiRangeBaseRanges = new ArrayList<CellRange>();
+    private volatile int multiRangeAnchorRow = -1;
+    private volatile int multiRangeAnchorCol = -1;
+    private volatile int multiRangeDragRow = -1;
+    private volatile int multiRangeDragCol = -1;
 
     public VolvoxGridDesktopPanel() {
         setBackground(Color.WHITE);
@@ -114,9 +128,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     public synchronized void initialize(
         String pluginPath,
         int rows,
-        int cols,
-        int fixedRows,
-        int fixedCols
+        int cols
     ) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(pluginPath, "pluginPath");
 
@@ -135,14 +147,13 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                 LayoutConfig.newBuilder()
                     .setRows(rows)
                     .setCols(cols)
-                    .setFixedRows(fixedRows)
-                    .setFixedCols(fixedCols)
                     .build()
             )
+            .setIndicatorBands(VolvoxGridDesktopController.defaultIndicatorBandsConfig())
             .setRendering(RenderConfig.newBuilder().setRendererMode(RendererMode.RENDERER_CPU).build())
             .build();
 
-        GridHandle handle = client.create(
+        CreateResponse response = client.create(
             CreateRequest.newBuilder()
                 .setViewportWidth(w)
                 .setViewportHeight(h)
@@ -150,7 +161,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                 .setConfig(config)
                 .build()
         );
-        this.gridId = handle.getId();
+        this.gridId = response.getHandle().getId();
 
         allocateBuffer(w, h);
         safeResizeViewport(w, h);
@@ -183,6 +194,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     public synchronized void detachGrid() {
         shutdownStreams(false);
         this.gridId = 0L;
+        clearMultiRangeDrag();
         clearImage();
     }
 
@@ -205,6 +217,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         client = null;
         ownsPlugin = false;
         gridId = 0L;
+        clearMultiRangeDrag();
         clearImage();
     }
 
@@ -234,6 +247,13 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         this.editRequestListener = listener;
     }
 
+    public void setSelectionModeValue(int value) {
+        this.selectionModeValue = value;
+        if (value != SelectionMode.SELECTION_MULTI_RANGE_VALUE) {
+            clearMultiRangeDrag();
+        }
+    }
+
     /**
      * CPU-only for now.
      */
@@ -261,7 +281,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         }
     }
 
-    public RendererBackend getRendererBackend() {
+    public RendererBackend rendererBackend() {
         return rendererBackend;
     }
 
@@ -351,12 +371,22 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             public void mousePressed(MouseEvent e) {
                 stopHostFling();
                 requestFocusInWindow();
+                if (tryBeginMultiRangeSelection(e)) {
+                    requestFrame();
+                    return;
+                }
                 sendPointer(PointerEvent.Type.DOWN, e, e.getClickCount() >= 2);
                 requestFrame();
             }
 
             @Override
             public void mouseReleased(MouseEvent e) {
+                if (multiRangeDragActive) {
+                    tryUpdateMultiRangeSelection(e);
+                    clearMultiRangeDrag();
+                    requestFrame();
+                    return;
+                }
                 sendPointer(PointerEvent.Type.UP, e, false);
                 requestFrame();
             }
@@ -366,6 +396,12 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             @Override
             public void mouseDragged(MouseEvent e) {
                 stopHostFling();
+                if (multiRangeDragActive) {
+                    if (tryUpdateMultiRangeSelection(e)) {
+                        requestFrame();
+                    }
+                    return;
+                }
                 sendPointer(PointerEvent.Type.MOVE, e, false);
                 requestFrame();
             }
@@ -417,16 +453,20 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     }
 
     private void sendPointer(PointerEvent.Type type, MouseEvent e, boolean dblClick) {
+        sendPointer(type, e.getX(), e.getY(), e.getModifiersEx(), mapMouseButton(e), dblClick);
+    }
+
+    private void sendPointer(PointerEvent.Type type, int x, int y, int modifier, int button, boolean dblClick) {
         try {
             RenderInput input = RenderInput.newBuilder()
                 .setGridId(gridId)
                 .setPointer(
                     PointerEvent.newBuilder()
                         .setType(type)
-                        .setX((float) e.getX())
-                        .setY((float) e.getY())
-                        .setModifier(e.getModifiersEx())
-                        .setButton(mapMouseButton(e))
+                        .setX((float) x)
+                        .setY((float) y)
+                        .setModifier(modifier)
+                        .setButton(button)
                         .setDblClick(dblClick)
                         .build()
                 )
@@ -449,6 +489,130 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             return MouseEvent.BUTTON3;
         }
         return button;
+    }
+
+    private boolean tryBeginMultiRangeSelection(MouseEvent e) {
+        if (!isAdditiveMultiRangeGesture(e) || client == null || gridId == 0L) {
+            return false;
+        }
+        try {
+            SelectionState state = updateMouseSelectionState(e);
+            if (!hasValidMouseCell(state)) {
+                return false;
+            }
+            multiRangeBaseRanges = snapshotMultiRangeBaseRanges(state, state.getMouseRow(), state.getMouseCol());
+            multiRangeAnchorRow = state.getMouseRow();
+            multiRangeAnchorCol = state.getMouseCol();
+            multiRangeDragRow = state.getMouseRow();
+            multiRangeDragCol = state.getMouseCol();
+            multiRangeDragActive = true;
+            applyMultiRangeSelection(multiRangeDragRow, multiRangeDragCol);
+            return true;
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "Multi-range press failed", ex);
+            clearMultiRangeDrag();
+            return false;
+        }
+    }
+
+    private boolean tryUpdateMultiRangeSelection(MouseEvent e) {
+        if (!multiRangeDragActive || client == null || gridId == 0L) {
+            return false;
+        }
+        try {
+            SelectionState state = updateMouseSelectionState(e);
+            if (hasValidMouseCell(state)) {
+                multiRangeDragRow = state.getMouseRow();
+                multiRangeDragCol = state.getMouseCol();
+            }
+            applyMultiRangeSelection(multiRangeDragRow, multiRangeDragCol);
+            return true;
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "Multi-range drag failed", ex);
+            return false;
+        }
+    }
+
+    private boolean isAdditiveMultiRangeGesture(MouseEvent e) {
+        return selectionModeValue == SelectionMode.SELECTION_MULTI_RANGE_VALUE
+            && SwingUtilities.isLeftMouseButton(e)
+            && (e.getModifiersEx() & InputEvent.CTRL_DOWN_MASK) != 0;
+    }
+
+    private SelectionState updateMouseSelectionState(MouseEvent e) throws SynurangDesktopBridge.SynurangBridgeException {
+        sendPointer(PointerEvent.Type.MOVE, e.getX(), e.getY(), e.getModifiersEx(), 0, false);
+        return client.getSelection(GridHandle.newBuilder().setId(gridId).build());
+    }
+
+    private boolean hasValidMouseCell(SelectionState state) {
+        return state.getMouseRow() >= 0 && state.getMouseCol() >= 0;
+    }
+
+    private List<CellRange> snapshotMultiRangeBaseRanges(SelectionState state, int anchorRow, int anchorCol) {
+        List<CellRange> ranges = new ArrayList<CellRange>();
+        List<CellRange> stateRanges = state.getRangesList();
+        if (stateRanges.isEmpty()) {
+            ranges.add(
+                CellRange.newBuilder()
+                    .setRow1(state.getActiveRow())
+                    .setCol1(state.getActiveCol())
+                    .setRow2(state.getActiveRow())
+                    .setCol2(state.getActiveCol())
+                    .build()
+            );
+        } else {
+            for (CellRange range : stateRanges) {
+                if (range.getRow1() == anchorRow
+                    && range.getCol1() == anchorCol
+                    && range.getRow2() == anchorRow
+                    && range.getCol2() == anchorCol) {
+                    continue;
+                }
+                ranges.add(range);
+            }
+        }
+        return ranges;
+    }
+
+    private void applyMultiRangeSelection(int targetRow, int targetCol) throws SynurangDesktopBridge.SynurangBridgeException {
+        List<CellRange> ranges = new ArrayList<CellRange>(multiRangeBaseRanges);
+        CellRange nextRange = CellRange.newBuilder()
+            .setRow1(Math.min(multiRangeAnchorRow, targetRow))
+            .setCol1(Math.min(multiRangeAnchorCol, targetCol))
+            .setRow2(Math.max(multiRangeAnchorRow, targetRow))
+            .setCol2(Math.max(multiRangeAnchorCol, targetCol))
+            .build();
+        boolean exists = false;
+        for (CellRange range : ranges) {
+            if (range.getRow1() == nextRange.getRow1()
+                && range.getCol1() == nextRange.getCol1()
+                && range.getRow2() == nextRange.getRow2()
+                && range.getCol2() == nextRange.getCol2()) {
+                exists = true;
+                break;
+            }
+        }
+        if (!exists) {
+            ranges.add(nextRange);
+        }
+        client.select(
+            SelectRequest.newBuilder()
+                .setGridId(gridId)
+                .setActiveRow(targetRow)
+                .setActiveCol(targetCol)
+                .addAllRanges(ranges)
+                .setShow(true)
+                .build()
+        );
+    }
+
+    private void clearMultiRangeDrag() {
+        multiRangeDragActive = false;
+        multiRangeBaseRanges = new ArrayList<CellRange>();
+        multiRangeAnchorRow = -1;
+        multiRangeAnchorCol = -1;
+        multiRangeDragRow = -1;
+        multiRangeDragCol = -1;
     }
 
     private void sendScroll(MouseWheelEvent e) {

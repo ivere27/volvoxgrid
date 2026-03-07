@@ -31,6 +31,14 @@ type CellPaddingConfig = {
   bottom: number;
 };
 
+export type ColumnIndicatorCellConfig = {
+  row1: number;
+  row2: number;
+  col1: number;
+  col2: number;
+  text: string;
+};
+
 function encodeVarintUnsigned(value: bigint): number[] {
   const out: number[] = [];
   let v = BigInt.asUintN(64, value);
@@ -49,6 +57,19 @@ function encodeTag(field: number, wireType: number): number[] {
 function encodeInt32(value: number): number[] {
   const i32 = BigInt.asIntN(32, BigInt(Math.trunc(value)));
   return encodeVarintUnsigned(BigInt.asUintN(64, i32));
+}
+
+function encodeBool(value: boolean): number[] {
+  return encodeVarintUnsigned(value ? 1n : 0n);
+}
+
+function encodeStringField(field: number, value: string): number[] {
+  const bytes = Array.from(new TextEncoder().encode(value));
+  return [
+    ...encodeTag(field, 2),
+    ...encodeVarintUnsigned(BigInt(bytes.length)),
+    ...bytes,
+  ];
 }
 
 function clampPadding(value: number): number {
@@ -118,6 +139,53 @@ function encodeSpanFixedModeConfig(mode: number): Uint8Array {
   return new Uint8Array(configPayload);
 }
 
+function encodeColIndicatorTopConfig(args: {
+  visible: boolean;
+  rowCount: number;
+  defaultRowHeight: number;
+  cells: ColumnIndicatorCellConfig[];
+}): Uint8Array {
+  const colTopPayload: number[] = [];
+  colTopPayload.push(...encodeTag(1, 0), ...encodeBool(args.visible));
+  colTopPayload.push(
+    ...encodeTag(2, 0),
+    ...encodeInt32(Math.max(1, Math.round(args.defaultRowHeight))),
+  );
+  colTopPayload.push(
+    ...encodeTag(3, 0),
+    ...encodeInt32(Math.max(0, Math.trunc(args.rowCount))),
+  );
+
+  for (const cell of args.cells) {
+    const cellPayload: number[] = [];
+    cellPayload.push(...encodeTag(1, 0), ...encodeInt32(cell.row1));
+    cellPayload.push(...encodeTag(2, 0), ...encodeInt32(cell.row2));
+    cellPayload.push(...encodeTag(3, 0), ...encodeInt32(cell.col1));
+    cellPayload.push(...encodeTag(4, 0), ...encodeInt32(cell.col2));
+    cellPayload.push(...encodeStringField(5, cell.text));
+    colTopPayload.push(
+      ...encodeTag(14, 2),
+      ...encodeVarintUnsigned(BigInt(cellPayload.length)),
+      ...cellPayload,
+    );
+  }
+
+  const indicatorBandsPayload: number[] = [];
+  indicatorBandsPayload.push(
+    ...encodeTag(3, 2),
+    ...encodeVarintUnsigned(BigInt(colTopPayload.length)),
+    ...colTopPayload,
+  );
+
+  const gridConfig: number[] = [];
+  gridConfig.push(
+    ...encodeTag(11, 2),
+    ...encodeVarintUnsigned(BigInt(indicatorBandsPayload.length)),
+    ...indicatorBandsPayload,
+  );
+  return new Uint8Array(gridConfig);
+}
+
 function ensureV1PluginInitialized(wasm: unknown): void {
   if (v1PluginInitAttempted) {
     return;
@@ -182,6 +250,19 @@ function applyFixedHeaderSpanMode(grid: VolvoxGrid, enabled: boolean): void {
   applyGridConfig(grid, encodeSpanFixedModeConfig(mode), "fixed header span config");
 }
 
+export function applyColumnIndicatorTopConfig(grid: VolvoxGrid, args: {
+  visible: boolean;
+  rowCount: number;
+  defaultRowHeight: number;
+  cells: ColumnIndicatorCellConfig[];
+}): void {
+  applyGridConfig(
+    grid,
+    encodeColIndicatorTopConfig(args),
+    "column indicator top config",
+  );
+}
+
 function hasColumnGroups<TData extends RowData>(columnDefs: ColDef<TData>[]): boolean {
   return columnDefs.some((c) => c.children != null && c.children.length > 0);
 }
@@ -232,62 +313,49 @@ export function applyGridOptionsToVolvox<TData extends RowData>(
 ): void {
   const themePreset = resolvedThemePreset ?? resolveTheme(theme);
 
-  grid.fixedRows = Math.max(1, headerRows);
-  grid.fixedCols = 0;
-
   const colDefs = gridOptions.columnDefs ?? [];
   const sortable = hasAnySortable(colDefs, gridOptions.defaultColDef);
   const reorder = hasAnyReorder(colDefs);
 
   if (sortable && reorder) {
-    grid.setHeaderFeatures(HEADER_SORT_REORDER);
+    grid.headerFeatures = HEADER_SORT_REORDER;
   } else if (sortable) {
-    grid.setHeaderFeatures(HEADER_SORT);
+    grid.headerFeatures = HEADER_SORT;
   } else if (reorder) {
-    grid.setHeaderFeatures(HEADER_REORDER);
+    grid.headerFeatures = HEADER_REORDER;
   } else {
-    grid.setHeaderFeatures(HEADER_NONE);
+    grid.headerFeatures = HEADER_NONE;
   }
 
   const rowSelectionEnabled =
     gridOptions.rowSelection === "single" || gridOptions.rowSelection === "multiple";
-  grid.setSelectionMode(rowSelectionEnabled ? SELECTION_BY_ROW : SELECTION_FREE);
-  if (typeof grid.setSelectionVisibility === "function") {
-    grid.setSelectionVisibility(rowSelectionEnabled ? HIGHLIGHT_WITH_FOCUS : HIGHLIGHT_NEVER);
-  }
-  if (typeof grid.setFocusBorder === "function") {
-    grid.setFocusBorder(0);
-  }
+  grid.selectionMode = rowSelectionEnabled ? SELECTION_BY_ROW : SELECTION_FREE;
+  grid.selectionVisibility = rowSelectionEnabled ? HIGHLIGHT_WITH_FOCUS : HIGHLIGHT_NEVER;
+  grid.focusBorder = 0;
 
   const resizable = hasAnyResizable(colDefs, gridOptions.defaultColDef);
-  grid.setAllowUserResizing(resizable ? RESIZE_BOTH : RESIZE_NONE);
+  grid.allowUserResizing = resizable ? RESIZE_BOTH : RESIZE_NONE;
 
   const rowHeight =
     typeof gridOptions.rowHeight === "number" && gridOptions.rowHeight > 0
       ? Math.round(gridOptions.rowHeight)
       : themePreset.rowHeight;
-  grid.setDefaultRowHeight(rowHeight);
+  grid.defaultRowHeight = rowHeight;
 
   const headerHeight =
     typeof gridOptions.headerHeight === "number" && gridOptions.headerHeight > 0
       ? Math.round(gridOptions.headerHeight)
       : themePreset.headerHeight;
-  for (let r = 0; r < headerRows; r += 1) {
-    grid.setRowHeight(r, headerHeight);
-  }
   applyHeaderBackgroundWhite(grid);
   applyThemePadding(grid, {
     cellPadding: themePreset.cellPadding,
     fixedCellPadding: themePreset.fixedCellPadding,
   });
 
-  grid.setAnimationEnabled(gridOptions.animateRows === true);
+  grid.animationEnabled = gridOptions.animateRows === true;
 
-  if (hasColumnGroups(colDefs)) {
-    grid.setSpanMode(CELL_SPAN_HEADER_ONLY);
-    applyFixedHeaderSpanMode(grid, true);
-  } else {
-    grid.setSpanMode(CELL_SPAN_NONE);
-    applyFixedHeaderSpanMode(grid, false);
-  }
+  grid.showColumnHeaders = headerRows > 0;
+  grid.columnIndicatorTopRowCount = Math.max(0, headerRows);
+  grid.cellSpanMode = CELL_SPAN_NONE;
+  applyFixedHeaderSpanMode(grid, false);
 }

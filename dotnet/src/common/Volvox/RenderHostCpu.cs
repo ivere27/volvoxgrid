@@ -36,12 +36,32 @@ namespace VolvoxGrid.DotNet.Internal
         private int _bufferWidth;
         private int _bufferHeight;
         private readonly List<RetiredBuffers> _retiredBuffers = new List<RetiredBuffers>();
+        private VolvoxSelectionMode _selectionMode = VolvoxSelectionMode.Free;
+        private bool _multiRangeDragActive;
+        private readonly List<VolvoxCellRangeData> _multiRangeBaseRanges = new List<VolvoxCellRangeData>();
+        private int _multiRangeAnchorRow = -1;
+        private int _multiRangeAnchorCol = -1;
+        private int _multiRangeDragRow = -1;
+        private int _multiRangeDragCol = -1;
 
         public RenderHostCpu()
         {
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
             TabStop = true;
             BackColor = Color.White;
+        }
+
+        public VolvoxSelectionMode SelectionMode
+        {
+            get { return _selectionMode; }
+            set
+            {
+                _selectionMode = value;
+                if (value != VolvoxSelectionMode.MultiRange)
+                {
+                    ClearMultiRangeDrag();
+                }
+            }
         }
 
         public void Attach(VolvoxClient client, long gridId, Func<VolvoxGridEventData, bool?> eventHandler)
@@ -73,6 +93,7 @@ namespace VolvoxGrid.DotNet.Internal
             _running = false;
             _pendingFrame = false;
             _followupFrame = false;
+            ClearMultiRangeDrag();
 
             var renderStream = _renderStream;
             var eventStream = _eventStream;
@@ -199,6 +220,11 @@ namespace VolvoxGrid.DotNet.Internal
         {
             base.OnMouseDown(e);
             Focus();
+            if (TryBeginMultiRangeSelection(e))
+            {
+                RequestFrame();
+                return;
+            }
             SendPointer(VolvoxPointerType.Down, e, e.Clicks >= 2);
             RequestFrame();
         }
@@ -206,6 +232,13 @@ namespace VolvoxGrid.DotNet.Internal
         protected override void OnMouseUp(MouseEventArgs e)
         {
             base.OnMouseUp(e);
+            if (_multiRangeDragActive)
+            {
+                TryUpdateMultiRangeSelection(e);
+                ClearMultiRangeDrag();
+                RequestFrame();
+                return;
+            }
             SendPointer(VolvoxPointerType.Up, e, false);
             RequestFrame();
         }
@@ -213,6 +246,14 @@ namespace VolvoxGrid.DotNet.Internal
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
+            if (_multiRangeDragActive)
+            {
+                if (TryUpdateMultiRangeSelection(e))
+                {
+                    RequestFrame();
+                }
+                return;
+            }
             SendPointer(VolvoxPointerType.Move, e, false);
             RequestFrame();
         }
@@ -481,27 +522,220 @@ namespace VolvoxGrid.DotNet.Internal
 
         private void SendPointer(VolvoxPointerType type, MouseEventArgs e, bool dblClick)
         {
+            SendPointer(type, e.X, e.Y, GetModifiers(), MapMouseButton(e), dblClick);
+        }
+
+        private void SendPointer(VolvoxPointerType type, int x, int y, int modifier, int button, bool dblClick)
+        {
             if (_client == null || _gridId == 0)
             {
                 return;
             }
 
-            int button = 0;
-            if ((e.Button & MouseButtons.Left) == MouseButtons.Left)
+            var payload = _client.EncodeRenderInputPointer(_gridId, type, x, y, modifier, button, dblClick);
+            SendRenderInput(payload);
+        }
+
+        private static int MapMouseButton(MouseEventArgs e)
+        {
+            MouseButtons button = e.Button != MouseButtons.None ? e.Button : Control.MouseButtons;
+            if ((button & MouseButtons.Left) == MouseButtons.Left)
             {
-                button = 1;
-            }
-            else if ((e.Button & MouseButtons.Middle) == MouseButtons.Middle)
-            {
-                button = 2;
-            }
-            else if ((e.Button & MouseButtons.Right) == MouseButtons.Right)
-            {
-                button = 3;
+                return 1;
             }
 
-            var payload = _client.EncodeRenderInputPointer(_gridId, type, e.X, e.Y, GetModifiers(), button, dblClick);
-            SendRenderInput(payload);
+            if ((button & MouseButtons.Middle) == MouseButtons.Middle)
+            {
+                return 2;
+            }
+
+            if ((button & MouseButtons.Right) == MouseButtons.Right)
+            {
+                return 3;
+            }
+
+            return 0;
+        }
+
+        private bool TryBeginMultiRangeSelection(MouseEventArgs e)
+        {
+            if (!IsAdditiveMultiRangeGesture(e) || _client == null || _gridId == 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                VolvoxSelectionStateData state = UpdateMouseSelectionState(e);
+                if (!HasValidMouseCell(state))
+                {
+                    return false;
+                }
+
+                _multiRangeBaseRanges.Clear();
+                _multiRangeBaseRanges.AddRange(SnapshotMultiRangeBaseRanges(state, state.MouseRow, state.MouseCol));
+                _multiRangeAnchorRow = state.MouseRow;
+                _multiRangeAnchorCol = state.MouseCol;
+                _multiRangeDragRow = state.MouseRow;
+                _multiRangeDragCol = state.MouseCol;
+                _multiRangeDragActive = true;
+                ApplyMultiRangeSelection(_multiRangeDragRow, _multiRangeDragCol);
+                return true;
+            }
+            catch
+            {
+                ClearMultiRangeDrag();
+                return false;
+            }
+        }
+
+        private bool TryUpdateMultiRangeSelection(MouseEventArgs e)
+        {
+            if (!_multiRangeDragActive || _client == null || _gridId == 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                VolvoxSelectionStateData state = UpdateMouseSelectionState(e);
+                if (HasValidMouseCell(state))
+                {
+                    _multiRangeDragRow = state.MouseRow;
+                    _multiRangeDragCol = state.MouseCol;
+                }
+
+                ApplyMultiRangeSelection(_multiRangeDragRow, _multiRangeDragCol);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool IsAdditiveMultiRangeGesture(MouseEventArgs e)
+        {
+            return _selectionMode == VolvoxSelectionMode.MultiRange
+                && (e.Button & MouseButtons.Left) == MouseButtons.Left
+                && (Control.ModifierKeys & Keys.Control) == Keys.Control;
+        }
+
+        private VolvoxSelectionStateData UpdateMouseSelectionState(MouseEventArgs e)
+        {
+            SendPointer(VolvoxPointerType.Move, e.X, e.Y, GetModifiers(), 0, false);
+            return _client.GetSelection(_gridId);
+        }
+
+        private static bool HasValidMouseCell(VolvoxSelectionStateData state)
+        {
+            return state != null && state.MouseRow >= 0 && state.MouseCol >= 0;
+        }
+
+        private static List<VolvoxCellRangeData> SnapshotMultiRangeBaseRanges(VolvoxSelectionStateData state, int anchorRow, int anchorCol)
+        {
+            var ranges = new List<VolvoxCellRangeData>();
+            if (state == null)
+            {
+                return ranges;
+            }
+
+            if (state.Ranges == null || state.Ranges.Count == 0)
+            {
+                if (state.ActiveRow >= 0 && state.ActiveCol >= 0)
+                {
+                    ranges.Add(new VolvoxCellRangeData
+                    {
+                        Row1 = state.ActiveRow,
+                        Col1 = state.ActiveCol,
+                        Row2 = state.ActiveRow,
+                        Col2 = state.ActiveCol,
+                    });
+                }
+                return ranges;
+            }
+
+            for (int i = 0; i < state.Ranges.Count; i++)
+            {
+                VolvoxCellRangeData range = state.Ranges[i];
+                if (range.Row1 == anchorRow
+                    && range.Col1 == anchorCol
+                    && range.Row2 == anchorRow
+                    && range.Col2 == anchorCol)
+                {
+                    continue;
+                }
+
+                ranges.Add(new VolvoxCellRangeData
+                {
+                    Row1 = range.Row1,
+                    Col1 = range.Col1,
+                    Row2 = range.Row2,
+                    Col2 = range.Col2,
+                });
+            }
+
+            return ranges;
+        }
+
+        private void ApplyMultiRangeSelection(int targetRow, int targetCol)
+        {
+            if (_client == null || _gridId == 0 || _multiRangeAnchorRow < 0 || _multiRangeAnchorCol < 0)
+            {
+                return;
+            }
+
+            var ranges = new List<VolvoxCellRangeData>(_multiRangeBaseRanges.Count + 1);
+            for (int i = 0; i < _multiRangeBaseRanges.Count; i++)
+            {
+                VolvoxCellRangeData range = _multiRangeBaseRanges[i];
+                ranges.Add(new VolvoxCellRangeData
+                {
+                    Row1 = range.Row1,
+                    Col1 = range.Col1,
+                    Row2 = range.Row2,
+                    Col2 = range.Col2,
+                });
+            }
+
+            var nextRange = new VolvoxCellRangeData
+            {
+                Row1 = Math.Min(_multiRangeAnchorRow, targetRow),
+                Col1 = Math.Min(_multiRangeAnchorCol, targetCol),
+                Row2 = Math.Max(_multiRangeAnchorRow, targetRow),
+                Col2 = Math.Max(_multiRangeAnchorCol, targetCol),
+            };
+
+            bool exists = false;
+            for (int i = 0; i < ranges.Count; i++)
+            {
+                VolvoxCellRangeData range = ranges[i];
+                if (range.Row1 == nextRange.Row1
+                    && range.Col1 == nextRange.Col1
+                    && range.Row2 == nextRange.Row2
+                    && range.Col2 == nextRange.Col2)
+                {
+                    exists = true;
+                    break;
+                }
+            }
+
+            if (!exists)
+            {
+                ranges.Add(nextRange);
+            }
+
+            _client.Select(_gridId, targetRow, targetCol, ranges, true);
+        }
+
+        private void ClearMultiRangeDrag()
+        {
+            _multiRangeDragActive = false;
+            _multiRangeBaseRanges.Clear();
+            _multiRangeAnchorRow = -1;
+            _multiRangeAnchorCol = -1;
+            _multiRangeDragRow = -1;
+            _multiRangeDragCol = -1;
         }
 
         private void SendRenderInput(byte[] payload)

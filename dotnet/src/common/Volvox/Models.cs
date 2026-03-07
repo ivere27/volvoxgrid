@@ -187,6 +187,8 @@ namespace VolvoxGrid.DotNet.Internal
         public int LeftCol { get; set; }
         public int BottomRow { get; set; }
         public int RightCol { get; set; }
+        public int MouseRow { get; set; }
+        public int MouseCol { get; set; }
 
         public VolvoxSelectionStateData()
         {
@@ -301,6 +303,64 @@ namespace VolvoxGrid.DotNet.Internal
         SortChooser = 5,
         ReorderChooser = 6,
         SortReorderChooser = 7,
+    }
+
+    [Flags]
+    internal enum VolvoxRowIndicatorMode
+    {
+        None = 0,
+        Numbers = 1,
+        Current = 2,
+        Selection = 4,
+        Checkbox = 8,
+        Handle = 16,
+        Editing = 32,
+        Modified = 64,
+        Error = 128,
+        NewRow = 256,
+        Expander = 512,
+        Resize = 1024,
+        Action = 2048,
+        StatusIcon = 4096,
+        Custom = 8192,
+    }
+
+    internal enum VolvoxRowIndicatorSlotKind
+    {
+        None = 0,
+        Numbers = 1,
+        Current = 2,
+        Selection = 3,
+        Checkbox = 4,
+        Handle = 5,
+        Editing = 6,
+        Modified = 7,
+        Error = 8,
+        NewRow = 9,
+        Expander = 10,
+        Resize = 11,
+        Action = 12,
+        StatusIcon = 13,
+        Custom = 14,
+    }
+
+    [Flags]
+    internal enum VolvoxColIndicatorCellMode
+    {
+        None = 0,
+        HeaderText = 1,
+        SortGlyph = 2,
+        SortPriority = 4,
+        FilterButton = 8,
+        FilterState = 16,
+        MenuButton = 32,
+        Chooser = 64,
+        DragReorder = 128,
+        HiddenMarker = 256,
+        ResizeHandle = 512,
+        SelectAll = 1024,
+        StatusIcon = 2048,
+        Custom = 4096,
     }
 
     internal enum VolvoxCellSpanMode
@@ -487,6 +547,7 @@ namespace VolvoxGrid.DotNet.Internal
         public VolvoxSpanConfigData Span { get; set; } = new VolvoxSpanConfigData();
         public VolvoxInteractionConfigData Interaction { get; set; } = new VolvoxInteractionConfigData();
         public VolvoxRenderConfigData Rendering { get; set; } = new VolvoxRenderConfigData();
+        public VolvoxIndicatorBandsConfigData IndicatorBands { get; set; } = new VolvoxIndicatorBandsConfigData();
     }
 
     internal sealed class VolvoxLayoutConfigData
@@ -547,6 +608,89 @@ namespace VolvoxGrid.DotNet.Internal
         public bool? AnimationEnabled { get; set; }
         public int? AnimationDurationMs { get; set; }
         public int? TextLayoutCacheCap { get; set; }
+    }
+
+    internal sealed class VolvoxRowIndicatorSlotData
+    {
+        public VolvoxRowIndicatorSlotKind? Kind { get; set; }
+        public int? WidthPx { get; set; }
+        public bool? Visible { get; set; }
+        public string CustomKey { get; set; }
+        public byte[] Data { get; set; }
+    }
+
+    internal sealed class VolvoxRowIndicatorConfigData
+    {
+        public bool? Visible { get; set; }
+        public int? WidthPx { get; set; }
+        public VolvoxRowIndicatorMode? ModeBits { get; set; }
+        public uint? BackColor { get; set; }
+        public uint? ForeColor { get; set; }
+        public int? GridLines { get; set; }
+        public uint? GridColor { get; set; }
+        public bool? AutoSize { get; set; }
+        public bool? AllowResize { get; set; }
+        public bool? AllowSelect { get; set; }
+        public bool? AllowReorder { get; set; }
+        public List<VolvoxRowIndicatorSlotData> Slots { get; } = new List<VolvoxRowIndicatorSlotData>();
+    }
+
+    internal sealed class VolvoxColIndicatorRowDefData
+    {
+        public int? Index { get; set; }
+        public int? HeightPx { get; set; }
+    }
+
+    internal sealed class VolvoxColIndicatorCellData
+    {
+        public int? Row1 { get; set; }
+        public int? Row2 { get; set; }
+        public int? Col1 { get; set; }
+        public int? Col2 { get; set; }
+        public string Text { get; set; }
+        public VolvoxColIndicatorCellMode? ModeBits { get; set; }
+        public string CustomKey { get; set; }
+        public byte[] Data { get; set; }
+    }
+
+    internal sealed class VolvoxColIndicatorConfigData
+    {
+        public bool? Visible { get; set; }
+        public int? DefaultRowHeightPx { get; set; }
+        public int? BandRows { get; set; }
+        public VolvoxColIndicatorCellMode? ModeBits { get; set; }
+        public uint? BackColor { get; set; }
+        public uint? ForeColor { get; set; }
+        public int? GridLines { get; set; }
+        public uint? GridColor { get; set; }
+        public bool? AutoSize { get; set; }
+        public bool? AllowResize { get; set; }
+        public bool? AllowReorder { get; set; }
+        public bool? AllowMenu { get; set; }
+        public List<VolvoxColIndicatorRowDefData> RowDefs { get; } = new List<VolvoxColIndicatorRowDefData>();
+        public List<VolvoxColIndicatorCellData> Cells { get; } = new List<VolvoxColIndicatorCellData>();
+    }
+
+    internal sealed class VolvoxCornerIndicatorConfigData
+    {
+        public bool? Visible { get; set; }
+        public uint? ModeBits { get; set; }
+        public uint? BackColor { get; set; }
+        public uint? ForeColor { get; set; }
+        public string CustomKey { get; set; }
+        public byte[] Data { get; set; }
+    }
+
+    internal sealed class VolvoxIndicatorBandsConfigData
+    {
+        public VolvoxRowIndicatorConfigData RowIndicatorStart { get; set; } = new VolvoxRowIndicatorConfigData();
+        public VolvoxRowIndicatorConfigData RowIndicatorEnd { get; set; } = new VolvoxRowIndicatorConfigData();
+        public VolvoxColIndicatorConfigData ColIndicatorTop { get; set; } = new VolvoxColIndicatorConfigData();
+        public VolvoxColIndicatorConfigData ColIndicatorBottom { get; set; } = new VolvoxColIndicatorConfigData();
+        public VolvoxCornerIndicatorConfigData CornerTopStart { get; set; } = new VolvoxCornerIndicatorConfigData();
+        public VolvoxCornerIndicatorConfigData CornerTopEnd { get; set; } = new VolvoxCornerIndicatorConfigData();
+        public VolvoxCornerIndicatorConfigData CornerBottomStart { get; set; } = new VolvoxCornerIndicatorConfigData();
+        public VolvoxCornerIndicatorConfigData CornerBottomEnd { get; set; } = new VolvoxCornerIndicatorConfigData();
     }
 
     internal sealed class VolvoxNodeInfoData

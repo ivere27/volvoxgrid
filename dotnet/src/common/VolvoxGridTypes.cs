@@ -52,6 +52,45 @@ namespace VolvoxGrid.DotNet
         SortReorderChooser = 7,
     }
 
+    [Flags]
+    public enum VolvoxGridRowIndicatorMode
+    {
+        None = 0,
+        Numbers = 1,
+        Current = 2,
+        Selection = 4,
+        Checkbox = 8,
+        Handle = 16,
+        Editing = 32,
+        Modified = 64,
+        Error = 128,
+        NewRow = 256,
+        Expander = 512,
+        Resize = 1024,
+        Action = 2048,
+        StatusIcon = 4096,
+        Custom = 8192,
+    }
+
+    [Flags]
+    public enum VolvoxGridColumnIndicatorMode
+    {
+        None = 0,
+        HeaderText = 1,
+        SortGlyph = 2,
+        SortPriority = 4,
+        FilterButton = 8,
+        FilterState = 16,
+        MenuButton = 32,
+        Chooser = 64,
+        DragReorder = 128,
+        HiddenMarker = 256,
+        ResizeHandle = 512,
+        SelectAll = 1024,
+        StatusIcon = 2048,
+        Custom = 4096,
+    }
+
     public enum VolvoxGridCellSpanMode
     {
         None = 0,
@@ -350,6 +389,11 @@ namespace VolvoxGrid.DotNet
         public int RowEnd { get; set; }
         public int ColEnd { get; set; }
         public int TopRow { get; set; }
+        public int LeftCol { get; set; }
+        public int BottomRow { get; set; }
+        public int RightCol { get; set; }
+        public int MouseRow { get; set; }
+        public int MouseCol { get; set; }
         public VolvoxGridCellRange[] Ranges { get; set; }
 
         public VolvoxGridSelectionState()

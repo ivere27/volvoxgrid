@@ -14,7 +14,7 @@ VolvoxGrid renders grids directly to RGBA pixel buffers, giving you full control
   - Multi-mode selection (free, row, column, listbox)
   - Multi-column sorting (generic, numeric, string, case-insensitive, custom)
   - Merged cells with configurable span modes (free, row, column, adjacent, spill, group)
-  - Fixed, frozen, sticky, and pinned rows/columns
+  - Indicator bands, frozen, sticky, and pinned rows/columns
   - Column drag-and-drop reordering
   - Outline/tree node grouping with collapse/expand
   - Subtotals and aggregates (sum, count, average, min, max, std dev, variance)
@@ -32,6 +32,40 @@ VolvoxGrid renders grids directly to RGBA pixel buffers, giving you full control
   - VSFlexGrid ActiveX (Windows COM/OCX)
 - **Codegen** -- Auto-generated FFI bindings for Rust, Dart, Java, C/C++ from `.proto` definitions
 - **Docker builds** -- Reproducible packaging for Android AAR, Desktop JAR, iOS XCFramework, and WASM
+
+## Layout Terminology
+
+VolvoxGrid separates header chrome from data panes. The important terms are:
+
+- **Indicator bands** -- Non-data UI bands outside the scrollable data viewport. `col_indicator_top` is the column header band. `row_indicator_start` is the row header / row number / row status band.
+- **Corner intersections** -- The small corner surfaces where indicator bands meet. `corner_top_start` is the top-left intersection between the left row indicator and the top column indicator.
+- **Fixed rows / cols** -- Internal layout panes used by the engine. Public wrappers normalize header chrome through indicator bands instead of exposing fixed-row / fixed-col APIs directly.
+- **Frozen rows / cols** -- Leading data panes kept visible at runtime, typically from user freeze actions.
+- **Pin** -- Arbitrary rows or columns moved into pinned sections such as top, bottom, left, or right. Unlike fixed/frozen panes, pinning is not limited to the first contiguous rows or columns.
+- **Sticky** -- Rows or columns that visually stick to an edge while scrolling past. Sticky is an overlay behavior, not a permanent relocation of the underlying row or column.
+
+These features are related, but they are not the same:
+
+| Concept | What it is | Typical use |
+|---|---|---|
+| Indicator band | Header chrome outside data space | Column headers, row numbers, row state |
+| Corner intersection | Intersection of indicator bands | Blank corner, select-all, custom marker |
+| Fixed | App-owned leading non-scrollable data pane | Template/default locked panes |
+| Frozen | User/runtime-added leading non-scrollable data pane | Freeze panes |
+| Pin | Arbitrary edge section | Pinned summary row, pinned action column |
+| Sticky | Edge-following overlay while scrolling | Keep a row/col visible after it scrolls away |
+
+The visual layering is:
+
+`corner intersections` -> `indicator bands` -> `fixed + frozen panes` -> `pinned sections` -> `scrollable data` -> `sticky overlays`
+
+This means:
+
+- Column headers belong in the top indicator band, not in `fixedRows`.
+- Row headers / row numbers belong in the left row indicator band, not in `fixedCols`.
+- `fixed` and `frozen` affect the leading data panes.
+- `pin` creates separate edge sections.
+- `sticky` keeps rows or columns visible temporarily during scroll.
 
 ## Project Structure
 
@@ -129,8 +163,8 @@ import 'package:volvoxgrid/volvoxgrid.dart';
 
 final controller = VolvoxGridController();
 await controller.create(rows: 100, cols: 5);
-await controller.setTextMatrix(0, 0, 'Name');
-await controller.setTextMatrix(0, 1, 'Value');
+await controller.setCellText(0, 0, 'Name');
+await controller.setCellText(0, 1, 'Value');
 
 VolvoxGridWidget(controller: controller);
 ```

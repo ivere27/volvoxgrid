@@ -89,8 +89,8 @@ export class VolvoxGridEventMapper<TData extends RowData> {
   }
 
   private emitClickEvents(): void {
-    const rowIndex = this.context.grid.selectionRow - this.context.getHeaderRows();
-    const colIndex = this.context.grid.selectionCol;
+    const rowIndex = this.context.grid.cursorRow;
+    const colIndex = this.context.grid.cursorCol;
 
     const row = rowIndex >= 0 ? this.context.getShadowRows()[rowIndex] : undefined;
     const colDef = this.context.getColumns()[colIndex];

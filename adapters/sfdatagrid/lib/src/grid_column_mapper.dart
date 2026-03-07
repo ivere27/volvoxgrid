@@ -61,7 +61,6 @@ GridColumnMapping mapGridColumns(List<GridColumn> columns) {
 Future<void> applyGridColumns(
   VolvoxGridController controller,
   GridColumnMapping mapping, {
-  required int headerRow,
   required int footerFrozenColumnsCount,
   required bool allowSorting,
   required List<SortColumnDetails> sortedColumns,
@@ -112,6 +111,6 @@ Future<void> applyGridColumns(
   await vg.VolvoxGridServiceFfi.DefineColumns(defineReq);
 
   for (final mapped in mapping.columns) {
-    await controller.setTextMatrix(headerRow, mapped.index, mapped.headerText);
+    await controller.setColumnCaption(mapped.index, mapped.headerText);
   }
 }

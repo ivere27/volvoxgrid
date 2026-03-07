@@ -3,6 +3,7 @@ use crate::style::CellPadding;
 /// Per-column properties
 #[derive(Clone, Debug)]
 pub struct ColumnProps {
+    pub caption: String,
     pub alignment: i32,
     pub fixed_alignment: i32,
     pub format: String,
@@ -42,6 +43,7 @@ pub struct ColumnProps {
 impl Default for ColumnProps {
     fn default() -> Self {
         Self {
+            caption: String::new(),
             alignment: 9,
             fixed_alignment: 1, // left-center
             format: String::new(),
@@ -76,6 +78,7 @@ impl ColumnProps {
 
     pub fn heap_size_bytes(&self) -> usize {
         let mut bytes = 0usize;
+        bytes += self.caption.capacity();
         bytes += self.format.capacity();
         bytes += self.key.capacity();
         bytes += self.edit_mask.capacity();

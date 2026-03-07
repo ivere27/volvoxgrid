@@ -91,7 +91,7 @@ fn get_stream(handle: u64) -> Option<Arc<StreamContext>> {
 
 
 pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
-    fn create(&self, request: CreateRequest) -> Result<GridHandle, String>;
+    fn create(&self, request: CreateRequest) -> Result<CreateResponse, String>;
     fn destroy(&self, request: GridHandle) -> Result<Empty, String>;
     fn configure(&self, request: ConfigureRequest) -> Result<Empty, String>;
     fn get_config(&self, request: GridHandle) -> Result<GridConfig, String>;
@@ -109,6 +109,9 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn clear(&self, request: ClearRequest) -> Result<Empty, String>;
     fn select(&self, request: SelectRequest) -> Result<Empty, String>;
     fn get_selection(&self, request: GridHandle) -> Result<SelectionState, String>;
+    fn show_cell(&self, request: ShowCellRequest) -> Result<Empty, String>;
+    fn set_top_row(&self, request: SetRowRequest) -> Result<Empty, String>;
+    fn set_left_col(&self, request: SetColRequest) -> Result<Empty, String>;
     fn edit(&self, request: EditCommand) -> Result<EditState, String>;
     fn sort(&self, request: SortRequest) -> Result<Empty, String>;
     fn subtotal(&self, request: SubtotalRequest) -> Result<Empty, String>;
@@ -562,6 +565,54 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
         "/volvoxgrid.v1.VolvoxGridService/GetSelection" => {
             match GridHandle::decode(input.as_slice()) {
                 Ok(req) => match plugin.get_selection(req) {
+                    Ok(resp) => {
+                        let mut buf = Vec::new();
+                        if resp.encode(&mut buf).is_ok() {
+                            success_response(resp_len, &buf)
+                        } else {
+                            error_response(resp_len, "encode failed")
+                        }
+                    }
+                    Err(e) => error_response(resp_len, &e),
+                },
+                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+            }
+        }
+        "/volvoxgrid.v1.VolvoxGridService/ShowCell" => {
+            match ShowCellRequest::decode(input.as_slice()) {
+                Ok(req) => match plugin.show_cell(req) {
+                    Ok(resp) => {
+                        let mut buf = Vec::new();
+                        if resp.encode(&mut buf).is_ok() {
+                            success_response(resp_len, &buf)
+                        } else {
+                            error_response(resp_len, "encode failed")
+                        }
+                    }
+                    Err(e) => error_response(resp_len, &e),
+                },
+                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+            }
+        }
+        "/volvoxgrid.v1.VolvoxGridService/SetTopRow" => {
+            match SetRowRequest::decode(input.as_slice()) {
+                Ok(req) => match plugin.set_top_row(req) {
+                    Ok(resp) => {
+                        let mut buf = Vec::new();
+                        if resp.encode(&mut buf).is_ok() {
+                            success_response(resp_len, &buf)
+                        } else {
+                            error_response(resp_len, "encode failed")
+                        }
+                    }
+                    Err(e) => error_response(resp_len, &e),
+                },
+                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+            }
+        }
+        "/volvoxgrid.v1.VolvoxGridService/SetLeftCol" => {
+            match SetColRequest::decode(input.as_slice()) {
+                Ok(req) => match plugin.set_left_col(req) {
                     Ok(resp) => {
                         let mut buf = Vec::new();
                         if resp.encode(&mut buf).is_ok() {

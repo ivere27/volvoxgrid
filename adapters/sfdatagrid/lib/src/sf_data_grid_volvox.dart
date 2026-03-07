@@ -176,7 +176,7 @@ class _SfDataGridVolvoxState extends State<SfDataGridVolvox> {
       controller: _controller,
       getColumns: () => _columnMapping,
       getShadowRows: () => _shadowRows,
-      getHeaderRows: () => 1,
+      getHeaderRows: () => 0,
       onSelectionChanging: widget.onSelectionChanging,
       onSelectionChanged: widget.onSelectionChanged,
       onCellTap: widget.onCellTap,
@@ -224,7 +224,7 @@ class _SfDataGridVolvoxState extends State<SfDataGridVolvox> {
   Future<void> _ensureReady() async {
     if (!_controller.isCreated) {
       final cols = math.max(1, widget.columns.length);
-      await _controller.create(rows: 2, cols: cols, fixedRows: 1, fixedCols: 0);
+      await _controller.create(rows: 1, cols: cols);
     }
     await _reloadAll();
   }
@@ -249,15 +249,15 @@ class _SfDataGridVolvoxState extends State<SfDataGridVolvox> {
     _shadowRows = matrix.shadowRows;
 
     final totalCols = math.max(1, matrix.cols);
-    final totalRows = math.max(2, 1 + matrix.rows);
+    final totalRows = math.max(1, matrix.rows);
 
-    await _controller.setCols(totalCols);
-    await _controller.setRows(totalRows);
-    await _controller.setFixedRows(1);
-    await _controller.setFixedCols(0);
+    await _controller.setColCount(totalCols);
+    await _controller.setRowCount(totalRows);
+    await _controller.setShowColumnHeaders(true);
+    await _controller.setColumnIndicatorTopRowCount(1);
 
-    await _controller.setFrozenCols(math.max(0, widget.frozenColumnsCount));
-    await _controller.setFrozenRows(math.max(0, widget.frozenRowsCount));
+    await _controller.setFrozenColCount(math.max(0, widget.frozenColumnsCount));
+    await _controller.setFrozenRowCount(math.max(0, widget.frozenRowsCount));
 
     await _controller.setSelectionMode(mapSelectionMode(widget.selectionMode));
     await _controller.setSelectionVisibility(
@@ -298,25 +298,19 @@ class _SfDataGridVolvoxState extends State<SfDataGridVolvox> {
     await applyGridColumns(
       _controller,
       _columnMapping,
-      headerRow: 0,
       footerFrozenColumnsCount: math.max(0, widget.footerFrozenColumnsCount),
       allowSorting: widget.allowSorting,
       sortedColumns: widget.source.sortedColumns,
     );
 
-    final values = List<vg.CellValue>.generate(
-      totalRows * totalCols,
-      (_) => vg.CellValue(),
-    );
-
-    for (final mapped in _columnMapping.columns) {
-      values[mapped.index] = vg.CellValue()..text = mapped.headerText;
-    }
+    final values = List<vg.CellValue>.generate(totalRows * totalCols, (_) {
+      return vg.CellValue();
+    });
 
     for (var row = 0; row < matrix.rows; row += 1) {
       for (var col = 0; col < matrix.cols; col += 1) {
         final from = row * matrix.cols + col;
-        final to = (1 + row) * totalCols + col;
+        final to = row * totalCols + col;
         values[to] = _toCellValue(matrix.values[from]);
       }
     }
