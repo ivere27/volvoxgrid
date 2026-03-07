@@ -2957,16 +2957,17 @@ export class VolvoxGrid {
       if (parent) {
         parent.appendChild(gpuCanvas);
       }
+      this.gpuCanvas = gpuCanvas;
       this.syncPresentCanvasPosition();
 
       const configured = this.wasm.gpu_configure_surface(gpuCanvas, w, h, this._presentMode);
       if (!configured) {
         gpuCanvas.remove();
+        this.gpuCanvas = null;
         this.useGpu = false;
         return false;
       }
 
-      this.gpuCanvas = gpuCanvas;
       this.useGpu = true;
       this.dirty = true;
       return true;
