@@ -2,6 +2,7 @@ package io.github.ivere27.volvoxgrid
 
 import io.github.ivere27.volvoxgrid.common.VolvoxGridController as VolvoxGridControllerContract
 import io.github.ivere27.volvoxgrid.common.GridCellText
+import io.github.ivere27.volvoxgrid.common.GridCellRange
 import io.github.ivere27.volvoxgrid.common.GridSelection
 import io.github.ivere27.volvoxgrid.common.RendererBackend
 
@@ -45,9 +46,9 @@ internal fun defaultIndicatorBandsConfig(): IndicatorBandsConfig =
  * Usage:
  * ```kotlin
  * val controller = view.createController()
- * controller.rows = 100
- * controller.cols = 5
- * controller.setTextMatrix(0, 0, "Header")
+ * controller.rowCount = 100
+ * controller.colCount = 5
+ * controller.setCellText(0, 0, "Header")
  * controller.sort(SortOrder.SORT_GENERIC_ASCENDING, col = 2)
  * ```
  */
@@ -80,8 +81,8 @@ class VolvoxGridController(
                         .build()
                 )
                 .build()
-            val handle = service.Create(req)
-            return VolvoxGridController(service, handle.id)
+            val response = service.Create(req)
+            return VolvoxGridController(service, response.handle.id)
         }
     }
 
@@ -94,24 +95,42 @@ class VolvoxGridController(
         colEnd: Int = activeCol,
         show: Boolean = false,
     ): SelectRequest {
-        val range = CellRange.newBuilder()
-            .setRow1(minOf(activeRow, rowEnd))
-            .setCol1(minOf(activeCol, colEnd))
-            .setRow2(maxOf(activeRow, rowEnd))
-            .setCol2(maxOf(activeCol, colEnd))
-            .build()
+        return buildSelectRequest(
+            activeRow,
+            activeCol,
+            listOf(
+                CellRange.newBuilder()
+                    .setRow1(minOf(activeRow, rowEnd))
+                    .setCol1(minOf(activeCol, colEnd))
+                    .setRow2(maxOf(activeRow, rowEnd))
+                    .setCol2(maxOf(activeCol, colEnd))
+                    .build()
+            ),
+            show,
+        )
+    }
+
+    private fun buildSelectRequest(
+        activeRow: Int,
+        activeCol: Int,
+        ranges: Iterable<CellRange>,
+        show: Boolean = false,
+    ): SelectRequest {
         return SelectRequest.newBuilder()
             .setGridId(gridId)
             .setActiveRow(activeRow)
             .setActiveCol(activeCol)
-            .addRanges(range)
+            .addAllRanges(ranges)
             .setShow(show)
             .build()
     }
 
     private fun selectionEnd(sel: SelectionState): Pair<Int, Int> {
         if (sel.rangesCount <= 0) return Pair(sel.activeRow, sel.activeCol)
-        val r = sel.getRanges(0)
+        val r = sel.rangesList.firstOrNull {
+            (it.row1 == sel.activeRow && it.col1 == sel.activeCol)
+                || (it.row2 == sel.activeRow && it.col2 == sel.activeCol)
+        } ?: sel.getRanges(0)
         return if (r.row1 == sel.activeRow && r.col1 == sel.activeCol) {
             Pair(r.row2, r.col2)
         } else if (r.row2 == sel.activeRow && r.col2 == sel.activeCol) {
@@ -120,6 +139,9 @@ class VolvoxGridController(
             Pair(r.row2, r.col2)
         }
     }
+
+    private fun selectionRanges(sel: SelectionState): Array<GridCellRange> =
+        sel.rangesList.map { GridCellRange(it.row1, it.col1, it.row2, it.col2) }.toTypedArray()
 
     private fun configure(config: GridConfig) {
         service.Configure(
@@ -142,7 +164,7 @@ class VolvoxGridController(
     // Grid Dimensions
     // =========================================================================
 
-    var rows: Int
+    private var layoutRowCount: Int
         get() = getConfig().layout.rows
         set(value) {
             configure(GridConfig.newBuilder()
@@ -150,7 +172,7 @@ class VolvoxGridController(
                 .build())
         }
 
-    var cols: Int
+    private var layoutColCount: Int
         get() = getConfig().layout.cols
         set(value) {
             configure(GridConfig.newBuilder()
@@ -158,7 +180,7 @@ class VolvoxGridController(
                 .build())
         }
 
-    var frozenRows: Int
+    private var layoutFrozenRowCount: Int
         get() = getConfig().layout.frozenRows
         set(value) {
             configure(GridConfig.newBuilder()
@@ -166,7 +188,7 @@ class VolvoxGridController(
                 .build())
         }
 
-    var frozenCols: Int
+    private var layoutFrozenColCount: Int
         get() = getConfig().layout.frozenCols
         set(value) {
             configure(GridConfig.newBuilder()
@@ -174,177 +196,168 @@ class VolvoxGridController(
                 .build())
         }
 
-    var showColumnHeaders: Boolean
-        get() {
-            val config = getConfig()
-            if (!config.hasIndicatorBands() || !config.indicatorBands.hasColIndicatorTop()) {
-                return false
-            }
-            return config.indicatorBands.colIndicatorTop.visible
+    override fun getShowColumnHeaders(): Boolean {
+        val config = getConfig()
+        if (!config.hasIndicatorBands() || !config.indicatorBands.hasColIndicatorTop()) {
+            return false
         }
-        set(value) {
-            configure(GridConfig.newBuilder()
-                .setIndicatorBands(
-                    IndicatorBandsConfig.newBuilder()
-                        .setColIndicatorTop(
-                            defaultColIndicatorTopConfig().toBuilder()
-                                .setVisible(value)
-                                .build()
-                        )
-                        .build()
-                )
-                .build())
-        }
+        return config.indicatorBands.colIndicatorTop.visible
+    }
 
-    var columnIndicatorTopModeBits: Int
-        get() {
-            val config = getConfig()
-            if (!config.hasIndicatorBands() || !config.indicatorBands.hasColIndicatorTop()) {
-                return 0
-            }
-            return config.indicatorBands.colIndicatorTop.modeBits
-        }
-        set(value) {
-            configure(GridConfig.newBuilder()
-                .setIndicatorBands(
-                    IndicatorBandsConfig.newBuilder()
-                        .setColIndicatorTop(
-                            ColIndicatorConfig.newBuilder()
-                                .setVisible(value != 0)
-                                .setModeBits(value)
-                                .build()
-                        )
-                        .build()
-                )
-                .build())
-        }
+    override fun setShowColumnHeaders(value: Boolean) {
+        configure(GridConfig.newBuilder()
+            .setIndicatorBands(
+                IndicatorBandsConfig.newBuilder()
+                    .setColIndicatorTop(
+                        ColIndicatorConfig.newBuilder()
+                            .setVisible(value)
+                            .build()
+                    )
+                    .build()
+            )
+            .build())
+    }
 
-    var columnIndicatorTopRowCount: Int
-        get() {
-            val config = getConfig()
-            if (!config.hasIndicatorBands() || !config.indicatorBands.hasColIndicatorTop()) {
-                return 0
-            }
-            return config.indicatorBands.colIndicatorTop.bandRows
+    override fun getColumnIndicatorTopModeBits(): Int {
+        val config = getConfig()
+        if (!config.hasIndicatorBands() || !config.indicatorBands.hasColIndicatorTop()) {
+            return 0
         }
-        set(value) {
-            val normalized = value.coerceAtLeast(0)
-            configure(GridConfig.newBuilder()
-                .setIndicatorBands(
-                    IndicatorBandsConfig.newBuilder()
-                        .setColIndicatorTop(
-                            ColIndicatorConfig.newBuilder()
-                                .setVisible(normalized != 0)
-                                .setBandRows(normalized)
-                                .build()
-                        )
-                        .build()
-                )
-                .build())
-        }
+        return config.indicatorBands.colIndicatorTop.modeBits
+    }
 
-    var showIndicator: Boolean
-        get() = showRowIndicator
-        set(value) {
-            showRowIndicator = value
-        }
+    override fun setColumnIndicatorTopModeBits(value: Int) {
+        configure(GridConfig.newBuilder()
+            .setIndicatorBands(
+                IndicatorBandsConfig.newBuilder()
+                    .setColIndicatorTop(
+                        ColIndicatorConfig.newBuilder()
+                            .setModeBits(value)
+                            .build()
+                    )
+                    .build()
+            )
+            .build())
+    }
 
-    var showRowIndicator: Boolean
-        get() {
-            val config = getConfig()
-            if (!config.hasIndicatorBands() || !config.indicatorBands.hasRowIndicatorStart()) {
-                return false
-            }
-            return config.indicatorBands.rowIndicatorStart.visible
+    override fun getColumnIndicatorTopRowCount(): Int {
+        val config = getConfig()
+        if (!config.hasIndicatorBands() || !config.indicatorBands.hasColIndicatorTop()) {
+            return 0
         }
-        set(value) {
-            configure(GridConfig.newBuilder()
-                .setIndicatorBands(
-                    IndicatorBandsConfig.newBuilder()
-                        .setRowIndicatorStart(
-                            defaultRowIndicatorStartConfig().toBuilder()
-                                .setVisible(value)
-                                .build()
-                        )
-                        .build()
-                )
-                .build())
-        }
+        return config.indicatorBands.colIndicatorTop.bandRows
+    }
 
-    var rowIndicatorStartModeBits: Int
-        get() {
-            val config = getConfig()
-            if (!config.hasIndicatorBands() || !config.indicatorBands.hasRowIndicatorStart()) {
-                return 0
-            }
-            return config.indicatorBands.rowIndicatorStart.modeBits
-        }
-        set(value) {
-            configure(GridConfig.newBuilder()
-                .setIndicatorBands(
-                    IndicatorBandsConfig.newBuilder()
-                        .setRowIndicatorStart(
-                            RowIndicatorConfig.newBuilder()
-                                .setVisible(value != 0)
-                                .setModeBits(value)
-                                .build()
-                        )
-                        .build()
-                )
-                .build())
-        }
+    override fun setColumnIndicatorTopRowCount(value: Int) {
+        val normalized = value.coerceAtLeast(0)
+        configure(GridConfig.newBuilder()
+            .setIndicatorBands(
+                IndicatorBandsConfig.newBuilder()
+                    .setColIndicatorTop(
+                        ColIndicatorConfig.newBuilder()
+                            .setBandRows(normalized)
+                            .build()
+                    )
+                    .build()
+            )
+            .build())
+    }
 
-    var rowIndicatorStartWidth: Int
-        get() {
-            val config = getConfig()
-            if (!config.hasIndicatorBands() || !config.indicatorBands.hasRowIndicatorStart()) {
-                return DEFAULT_ROW_INDICATOR_WIDTH_PX
-            }
-            return config.indicatorBands.rowIndicatorStart.widthPx
+    override fun getShowRowIndicator(): Boolean {
+        val config = getConfig()
+        if (!config.hasIndicatorBands() || !config.indicatorBands.hasRowIndicatorStart()) {
+            return false
         }
-        set(value) {
-            configure(GridConfig.newBuilder()
-                .setIndicatorBands(
-                    IndicatorBandsConfig.newBuilder()
-                        .setRowIndicatorStart(
-                            RowIndicatorConfig.newBuilder()
-                                .setWidthPx(value.coerceAtLeast(1))
-                                .build()
-                        )
-                        .build()
-                )
-                .build())
-        }
+        return config.indicatorBands.rowIndicatorStart.visible
+    }
 
-    override fun rowCount(): Int = rows
+    override fun setShowRowIndicator(value: Boolean) {
+        configure(GridConfig.newBuilder()
+            .setIndicatorBands(
+                IndicatorBandsConfig.newBuilder()
+                    .setRowIndicatorStart(
+                        RowIndicatorConfig.newBuilder()
+                            .setVisible(value)
+                            .build()
+                    )
+                    .build()
+            )
+            .build())
+    }
+
+    override fun getRowIndicatorStartModeBits(): Int {
+        val config = getConfig()
+        if (!config.hasIndicatorBands() || !config.indicatorBands.hasRowIndicatorStart()) {
+            return 0
+        }
+        return config.indicatorBands.rowIndicatorStart.modeBits
+    }
+
+    override fun setRowIndicatorStartModeBits(value: Int) {
+        configure(GridConfig.newBuilder()
+            .setIndicatorBands(
+                IndicatorBandsConfig.newBuilder()
+                    .setRowIndicatorStart(
+                        RowIndicatorConfig.newBuilder()
+                            .setModeBits(value)
+                            .build()
+                    )
+                    .build()
+            )
+            .build())
+    }
+
+    override fun getRowIndicatorStartWidth(): Int {
+        val config = getConfig()
+        if (!config.hasIndicatorBands() || !config.indicatorBands.hasRowIndicatorStart()) {
+            return DEFAULT_ROW_INDICATOR_WIDTH_PX
+        }
+        return config.indicatorBands.rowIndicatorStart.widthPx
+    }
+
+    override fun setRowIndicatorStartWidth(value: Int) {
+        configure(GridConfig.newBuilder()
+            .setIndicatorBands(
+                IndicatorBandsConfig.newBuilder()
+                    .setRowIndicatorStart(
+                        RowIndicatorConfig.newBuilder()
+                            .setWidthPx(value.coerceAtLeast(1))
+                            .build()
+                    )
+                    .build()
+            )
+            .build())
+    }
+
+    override fun rowCount(): Int = layoutRowCount
 
     override fun setRowCount(value: Int) {
-        rows = value
+        layoutRowCount = value
     }
 
-    override fun colCount(): Int = cols
+    override fun colCount(): Int = layoutColCount
 
     override fun setColCount(value: Int) {
-        cols = value
+        layoutColCount = value
     }
 
-    override fun frozenRowCount(): Int = frozenRows
+    override fun frozenRowCount(): Int = layoutFrozenRowCount
 
     override fun setFrozenRowCount(value: Int) {
-        frozenRows = value
+        layoutFrozenRowCount = value
     }
 
-    override fun frozenColCount(): Int = frozenCols
+    override fun frozenColCount(): Int = layoutFrozenColCount
 
     override fun setFrozenColCount(value: Int) {
-        frozenCols = value
+        layoutFrozenColCount = value
     }
 
     // =========================================================================
     // Cell Data
     // =========================================================================
 
-    override fun setTextMatrix(row: Int, col: Int, text: String) {
+    override fun setCellText(row: Int, col: Int, text: String) {
         service.UpdateCells(
             UpdateCellsRequest.newBuilder()
                 .setGridId(gridId)
@@ -357,7 +370,7 @@ class VolvoxGridController(
         )
     }
 
-    override fun getTextMatrix(row: Int, col: Int): String {
+    override fun getCellText(row: Int, col: Int): String {
         val resp = service.GetCells(
             GetCellsRequest.newBuilder()
                 .setGridId(gridId)
@@ -372,7 +385,7 @@ class VolvoxGridController(
         } else ""
     }
 
-    fun setCells(cells: List<Triple<Int, Int, String>>) {
+    fun setCellTextEntries(cells: List<Triple<Int, Int, String>>) {
         val builder = UpdateCellsRequest.newBuilder().setGridId(gridId)
         for ((row, col, text) in cells) {
             builder.addCells(CellUpdate.newBuilder()
@@ -384,7 +397,7 @@ class VolvoxGridController(
         service.UpdateCells(builder.build())
     }
 
-    override fun setCellTexts(cells: List<GridCellText>) {
+    override fun setCells(cells: List<GridCellText>) {
         val builder = UpdateCellsRequest.newBuilder().setGridId(gridId)
         for (cell in cells) {
             builder.addCells(CellUpdate.newBuilder()
@@ -398,7 +411,7 @@ class VolvoxGridController(
 
     fun setText(text: String) {
         val sel = service.GetSelection(handle())
-        setTextMatrix(sel.activeRow, sel.activeCol, text)
+        setCellText(sel.activeRow, sel.activeCol, text)
     }
 
     fun loadTable(rows: Int, cols: Int, values: List<CellValue>, atomic: Boolean = false) {
@@ -434,10 +447,10 @@ class VolvoxGridController(
             if (resizeGrid) {
                 val neededRows = startRow + data.size
                 val neededCols = startCol + maxCols
-                val currentRows = rows
-                val currentCols = cols
-                if (neededRows > currentRows) rows = neededRows
-                if (neededCols > currentCols) cols = neededCols
+                val currentRows = layoutRowCount
+                val currentCols = layoutColCount
+                if (neededRows > currentRows) layoutRowCount = neededRows
+                if (neededCols > currentCols) layoutColCount = neededCols
             }
 
             val builder = UpdateCellsRequest.newBuilder().setGridId(gridId)
@@ -458,7 +471,7 @@ class VolvoxGridController(
 
     fun getText(): String {
         val sel = service.GetSelection(handle())
-        return getTextMatrix(sel.activeRow, sel.activeCol)
+        return getCellText(sel.activeRow, sel.activeCol)
     }
 
     // =========================================================================
@@ -558,30 +571,96 @@ class VolvoxGridController(
     // Selection
     // =========================================================================
 
-    var row: Int
-        get() = service.GetSelection(handle()).activeRow
-        set(value) {
-            service.Select(buildSingleRangeSelectRequest(value, -1))
-        }
+    override fun cursorRow(): Int = service.GetSelection(handle()).activeRow
 
-    var col: Int
-        get() = service.GetSelection(handle()).activeCol
-        set(value) {
-            service.Select(buildSingleRangeSelectRequest(-1, value))
+    override fun setCursorRow(value: Int) {
+        val currentCol = try {
+            service.GetSelection(handle()).activeCol
+        } catch (_: Exception) {
+            0
         }
+        service.Select(buildSingleRangeSelectRequest(value, currentCol, value, currentCol))
+    }
 
-    override fun select(row1: Int, col1: Int, row2: Int, col2: Int) {
+    override fun cursorCol(): Int = service.GetSelection(handle()).activeCol
+
+    override fun setCursorCol(value: Int) {
+        val currentRow = try {
+            service.GetSelection(handle()).activeRow
+        } catch (_: Exception) {
+            0
+        }
+        service.Select(buildSingleRangeSelectRequest(currentRow, value, currentRow, value))
+    }
+
+    override fun selectRange(row1: Int, col1: Int, row2: Int, col2: Int) {
         service.Select(buildSingleRangeSelectRequest(row1, col1, row2, col2))
     }
 
-    fun getSelection(): SelectionState {
+    override fun selectRanges(ranges: List<GridCellRange>) {
+        if (ranges.isEmpty()) return
+        val active = ranges[0]
+        selectRanges(ranges, active.row1, active.col1)
+    }
+
+    override fun selectRanges(ranges: List<GridCellRange>, activeRow: Int, activeCol: Int) {
+        if (ranges.isEmpty()) return
+        service.Select(buildSelectRequest(
+            activeRow,
+            activeCol,
+            ranges.map {
+                CellRange.newBuilder()
+                    .setRow1(minOf(it.row1, it.row2))
+                    .setCol1(minOf(it.col1, it.col2))
+                    .setRow2(maxOf(it.row1, it.row2))
+                    .setCol2(maxOf(it.col1, it.col2))
+                    .build()
+            },
+        ))
+    }
+
+    fun selectionState(): SelectionState {
         return service.GetSelection(handle())
     }
 
-    override fun getSelectionState(): GridSelection {
-        val sel = getSelection()
+    override fun getSelection(): GridSelection {
+        val sel = selectionState()
         val (rowEnd, colEnd) = selectionEnd(sel)
-        return GridSelection(sel.activeRow, sel.activeCol, rowEnd, colEnd, sel.topRow)
+        return GridSelection(
+            sel.activeRow,
+            sel.activeCol,
+            rowEnd,
+            colEnd,
+            sel.topRow,
+            sel.leftCol,
+            sel.bottomRow,
+            sel.rightCol,
+            sel.mouseRow,
+            sel.mouseCol,
+            selectionRanges(sel)
+        )
+    }
+
+    override fun clearSelection() {
+        val sel = selectionState()
+        service.Select(
+            buildSingleRangeSelectRequest(
+                sel.activeRow,
+                sel.activeCol,
+                sel.activeRow,
+                sel.activeCol
+            )
+        )
+    }
+
+    override fun showCell(row: Int, col: Int) {
+        service.ShowCell(
+            ShowCellRequest.newBuilder()
+                .setGridId(gridId)
+                .setRow(row)
+                .setCol(col)
+                .build()
+        )
     }
 
     fun setSelectionMode(mode: SelectionMode) {
@@ -602,31 +681,36 @@ class VolvoxGridController(
             .build())
     }
 
-    fun setHighLight(style: SelectionVisibility) {
-        setSelectionVisibility(style)
-    }
-
     fun setFocusBorder(style: FocusBorderStyle) {
         configure(GridConfig.newBuilder()
             .setSelection(SelectionConfig.newBuilder().setFocusBorder(style).build())
             .build())
     }
 
-    fun setFocusRect(style: FocusBorderStyle) {
-        setFocusBorder(style)
+    override fun setTopRow(value: Int) {
+        service.SetTopRow(
+            SetRowRequest.newBuilder()
+                .setGridId(gridId)
+                .setRow(value)
+                .build()
+        )
     }
 
-    fun setTopRow(row: Int) {
-        val currentCol = try {
-            service.GetSelection(handle()).activeCol
-        } catch (_: Exception) {
-            0
-        }
-        service.Select(buildSingleRangeSelectRequest(row, currentCol, show = true))
-    }
-
-    fun getTopRow(): Int {
+    override fun topRow(): Int {
         return service.GetSelection(handle()).topRow
+    }
+
+    override fun setLeftCol(value: Int) {
+        service.SetLeftCol(
+            SetColRequest.newBuilder()
+                .setGridId(gridId)
+                .setCol(value)
+                .build()
+        )
+    }
+
+    override fun leftCol(): Int {
+        return service.GetSelection(handle()).leftCol
     }
 
     // =========================================================================
@@ -651,7 +735,7 @@ class VolvoxGridController(
         service.Sort(req.build())
     }
 
-    override fun sortByColumn(col: Int, ascending: Boolean) {
+    override fun sort(col: Int, ascending: Boolean) {
         sort(
             if (ascending) SortOrder.SORT_GENERIC_ASCENDING else SortOrder.SORT_GENERIC_DESCENDING,
             col
@@ -662,10 +746,6 @@ class VolvoxGridController(
         configure(GridConfig.newBuilder()
             .setInteraction(InteractionConfig.newBuilder().setHeaderFeatures(mode).build())
             .build())
-    }
-
-    fun setExplorerBar(mode: HeaderFeatures) {
-        setHeaderFeatures(mode)
     }
 
     fun setColSort(col: Int, order: SortOrder) {
@@ -684,14 +764,10 @@ class VolvoxGridController(
     // Spanning
     // =========================================================================
 
-    fun setCellSpan(mode: CellSpanMode) {
+    fun setCellSpanMode(mode: CellSpanMode) {
         configure(GridConfig.newBuilder()
             .setSpan(SpanConfig.newBuilder().setCellSpan(mode).build())
             .build())
-    }
-
-    fun setSpanCells(mode: CellSpanMode) {
-        setCellSpan(mode)
     }
 
     fun setSpanCol(col: Int, span: Boolean) {
@@ -791,10 +867,6 @@ class VolvoxGridController(
             .build())
     }
 
-    fun setOutlineBar(style: TreeIndicatorStyle) {
-        setTreeIndicator(style)
-    }
-
     fun outline(level: Int) {
         service.Outline(
             OutlineRequest.newBuilder()
@@ -840,13 +912,33 @@ class VolvoxGridController(
         )
     }
 
-    fun setColComboList(col: Int, list: String) {
-        setColDropdownItems(col, list)
-    }
-
     // =========================================================================
     // Editing
     // =========================================================================
+
+    fun editable(): Boolean = editTrigger() != EditTrigger.EDIT_TRIGGER_NONE
+
+    fun setEditable(value: Boolean) {
+        val current = editTrigger()
+        val target = if (value) {
+            if (current == EditTrigger.EDIT_TRIGGER_NONE) {
+                EditTrigger.EDIT_TRIGGER_KEY_CLICK
+            } else {
+                current
+            }
+        } else {
+            EditTrigger.EDIT_TRIGGER_NONE
+        }
+        setEditTrigger(target)
+    }
+
+    fun editTrigger(): EditTrigger {
+        val config = getConfig()
+        if (!config.hasEditing()) {
+            return EditTrigger.EDIT_TRIGGER_NONE
+        }
+        return config.editing.editTrigger
+    }
 
     fun setEditTrigger(mode: EditTrigger) {
         configure(GridConfig.newBuilder()
@@ -854,11 +946,7 @@ class VolvoxGridController(
             .build())
     }
 
-    fun setEditable(mode: EditTrigger) {
-        setEditTrigger(mode)
-    }
-
-    fun editCell(row: Int, col: Int) {
+    fun beginEdit(row: Int, col: Int) {
         service.Edit(
             EditCommand.newBuilder()
                 .setGridId(gridId)
@@ -867,11 +955,24 @@ class VolvoxGridController(
         )
     }
 
-    fun finishEditing() {
+    fun commitEdit(text: String? = null) {
+        val commit = EditCommit.newBuilder()
+        if (text != null) {
+            commit.setText(text)
+        }
         service.Edit(
             EditCommand.newBuilder()
                 .setGridId(gridId)
-                .setFinish(EditFinish.newBuilder().build())
+                .setCommit(commit.build())
+                .build()
+        )
+    }
+
+    fun cancelEdit() {
+        service.Edit(
+            EditCommand.newBuilder()
+                .setGridId(gridId)
+                .setCancel(EditCancel.newBuilder().build())
                 .build()
         )
     }
@@ -1047,9 +1148,9 @@ class VolvoxGridController(
      *
      * ```kotlin
      * ctrl.withRedrawSuspended {
-     *     ctrl.setTextMatrix(0, 0, "A")
-     *     ctrl.setTextMatrix(0, 1, "B")
-     *     ctrl.setTextMatrix(1, 0, "C")
+     *     ctrl.setCellText(0, 0, "A")
+     *     ctrl.setCellText(0, 1, "B")
+     *     ctrl.setCellText(1, 0, "C")
      * }
      * ```
      */
@@ -1089,11 +1190,11 @@ class VolvoxGridController(
             .build())
     }
 
-    fun getAnimationEnabled(): Boolean {
+    fun animationEnabled(): Boolean {
         return getConfig().rendering.animationEnabled
     }
 
-    fun getTextLayoutCacheCap(): Int {
+    fun textLayoutCacheCap(): Int {
         return getConfig().rendering.textLayoutCacheCap
     }
 
@@ -1105,7 +1206,7 @@ class VolvoxGridController(
             .build())
     }
 
-    fun getRendererMode(): Int {
+    fun rendererMode(): Int {
         return getConfig().rendering.rendererModeValue
     }
 
@@ -1117,8 +1218,8 @@ class VolvoxGridController(
         }
     }
 
-    override fun getRendererBackend(): RendererBackend {
-        return when (getRendererMode()) {
+    override fun rendererBackend(): RendererBackend {
+        return when (rendererMode()) {
             0 -> RendererBackend.AUTO
             1 -> RendererBackend.CPU
             else -> RendererBackend.GPU

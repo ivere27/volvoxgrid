@@ -1289,6 +1289,46 @@ class NodeRelation extends $pb.ProtobufEnum {
   const NodeRelation._(super.value, super.name);
 }
 
+class ErrorCode extends $pb.ProtobufEnum {
+  static const ErrorCode ERROR_UNKNOWN =
+      ErrorCode._(0, _omitEnumNames ? '' : 'ERROR_UNKNOWN');
+  static const ErrorCode ERROR_INVALID_ARGUMENT =
+      ErrorCode._(1, _omitEnumNames ? '' : 'ERROR_INVALID_ARGUMENT');
+  static const ErrorCode ERROR_NOT_FOUND =
+      ErrorCode._(2, _omitEnumNames ? '' : 'ERROR_NOT_FOUND');
+  static const ErrorCode ERROR_INVALID_STATE =
+      ErrorCode._(3, _omitEnumNames ? '' : 'ERROR_INVALID_STATE');
+  static const ErrorCode ERROR_TYPE_VIOLATION =
+      ErrorCode._(4, _omitEnumNames ? '' : 'ERROR_TYPE_VIOLATION');
+  static const ErrorCode ERROR_DECODE_FAILED =
+      ErrorCode._(5, _omitEnumNames ? '' : 'ERROR_DECODE_FAILED');
+  static const ErrorCode ERROR_ENCODE_FAILED =
+      ErrorCode._(6, _omitEnumNames ? '' : 'ERROR_ENCODE_FAILED');
+  static const ErrorCode ERROR_NOT_IMPLEMENTED =
+      ErrorCode._(7, _omitEnumNames ? '' : 'ERROR_NOT_IMPLEMENTED');
+  static const ErrorCode ERROR_INTERNAL =
+      ErrorCode._(8, _omitEnumNames ? '' : 'ERROR_INTERNAL');
+
+  static const $core.List<ErrorCode> values = <ErrorCode>[
+    ERROR_UNKNOWN,
+    ERROR_INVALID_ARGUMENT,
+    ERROR_NOT_FOUND,
+    ERROR_INVALID_STATE,
+    ERROR_TYPE_VIOLATION,
+    ERROR_DECODE_FAILED,
+    ERROR_ENCODE_FAILED,
+    ERROR_NOT_IMPLEMENTED,
+    ERROR_INTERNAL,
+  ];
+
+  static final $core.List<ErrorCode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 8);
+  static ErrorCode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ErrorCode._(super.value, super.name);
+}
+
 class IconAlign extends $pb.ProtobufEnum {
   static const IconAlign ICON_ALIGN_INLINE_END =
       IconAlign._(0, _omitEnumNames ? '' : 'ICON_ALIGN_INLINE_END');

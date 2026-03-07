@@ -968,14 +968,14 @@ export class AgGridVolvox<TData extends RowData = RowData> {
       return;
     }
 
-    this.grid.rows = rows;
-    this.grid.cols = cols;
+    this.grid.rowCount = rows;
+    this.grid.colCount = cols;
     const safeCols = Math.max(1, cols);
     for (let i = 0; i < values.length; i += 1) {
       const row = Math.floor(i / safeCols);
       const col = i % safeCols;
       const value = values[i];
-      this.grid.setTextMatrix(row, col, value == null ? "" : String(value));
+      this.grid.setCellText(row, col, value == null ? "" : String(value));
     }
   }
 

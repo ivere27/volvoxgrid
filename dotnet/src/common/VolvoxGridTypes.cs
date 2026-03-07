@@ -389,6 +389,11 @@ namespace VolvoxGrid.DotNet
         public int RowEnd { get; set; }
         public int ColEnd { get; set; }
         public int TopRow { get; set; }
+        public int LeftCol { get; set; }
+        public int BottomRow { get; set; }
+        public int RightCol { get; set; }
+        public int MouseRow { get; set; }
+        public int MouseCol { get; set; }
         public VolvoxGridCellRange[] Ranges { get; set; }
 
         public VolvoxGridSelectionState()

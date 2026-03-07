@@ -485,49 +485,41 @@ fn engine_event_to_proto(
             new_col,
         })),
         E::SelectionChanging {
-            old_row_end,
-            old_col_end,
-            new_row_end,
-            new_col_end,
+            old_ranges,
+            new_ranges,
+            active_row,
+            active_col,
         } => Some(grid_event::Event::SelectionChanging(
             SelectionChangingEvent {
-                old_ranges: vec![normalize_range(
-                    old_row_end,
-                    old_col_end,
-                    old_row_end,
-                    old_col_end,
-                )],
-                new_ranges: vec![normalize_range(
-                    new_row_end,
-                    new_col_end,
-                    new_row_end,
-                    new_col_end,
-                )],
-                active_row: new_row_end,
-                active_col: new_col_end,
+                old_ranges: old_ranges
+                    .into_iter()
+                    .map(|(row1, col1, row2, col2)| normalize_range(row1, col1, row2, col2))
+                    .collect(),
+                new_ranges: new_ranges
+                    .into_iter()
+                    .map(|(row1, col1, row2, col2)| normalize_range(row1, col1, row2, col2))
+                    .collect(),
+                active_row,
+                active_col,
                 cancel: false,
             },
         )),
         E::SelectionChanged {
-            old_row_end,
-            old_col_end,
-            new_row_end,
-            new_col_end,
+            old_ranges,
+            new_ranges,
+            active_row,
+            active_col,
         } => Some(grid_event::Event::SelectionChanged(SelectionChangedEvent {
-            old_ranges: vec![normalize_range(
-                old_row_end,
-                old_col_end,
-                old_row_end,
-                old_col_end,
-            )],
-            new_ranges: vec![normalize_range(
-                new_row_end,
-                new_col_end,
-                new_row_end,
-                new_col_end,
-            )],
-            active_row: new_row_end,
-            active_col: new_col_end,
+            old_ranges: old_ranges
+                .into_iter()
+                .map(|(row1, col1, row2, col2)| normalize_range(row1, col1, row2, col2))
+                .collect(),
+            new_ranges: new_ranges
+                .into_iter()
+                .map(|(row1, col1, row2, col2)| normalize_range(row1, col1, row2, col2))
+                .collect(),
+            active_row,
+            active_col,
         })),
         E::EnterCell { row, col } => {
             Some(grid_event::Event::EnterCell(EnterCellEvent { row, col }))
@@ -830,6 +822,27 @@ fn engine_event_to_proto(
         event_id,
         event,
     }
+}
+
+fn selection_range_tuples(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Vec<(i32, i32, i32, i32)> {
+    grid.selection.all_ranges(grid.rows, grid.cols)
+}
+
+fn proto_ranges_from_tuples(ranges: &[(i32, i32, i32, i32)]) -> Vec<CellRange> {
+    ranges
+        .iter()
+        .map(|&(row1, col1, row2, col2)| CellRange {
+            row1,
+            col1,
+            row2,
+            col2,
+        })
+        .collect()
+}
+
+fn selection_ranges_proto(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Vec<CellRange> {
+    let ranges = selection_range_tuples(grid);
+    proto_ranges_from_tuples(&ranges)
 }
 
 // ---------------------------------------------------------------------------
@@ -1415,7 +1428,7 @@ impl VolvoxGridPlugin {
 impl VolvoxGridServicePlugin for VolvoxGridPlugin {
     // ── Lifecycle ──
 
-    fn create(&self, request: CreateRequest) -> Result<GridHandle, String> {
+    fn create(&self, request: CreateRequest) -> Result<CreateResponse, String> {
         let config = request.config.as_ref();
         let layout = config.and_then(|c| c.layout.as_ref());
         let rows = layout.and_then(|l| l.rows).unwrap_or(10);
@@ -1445,7 +1458,10 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
             });
         }
 
-        Ok(GridHandle { id })
+        Ok(CreateResponse {
+            handle: Some(GridHandle { id }),
+            warnings: Vec::new(),
+        })
     }
 
     fn destroy(&self, request: GridHandle) -> Result<Empty, String> {
@@ -1656,14 +1672,12 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 }
                 3 => {
                     // CLEAR_SELECTION
-                    let sr1 = grid.selection.row.min(grid.selection.row_end);
-                    let sr2 = grid.selection.row.max(grid.selection.row_end);
-                    let sc1 = grid.selection.col.min(grid.selection.col_end);
-                    let sc2 = grid.selection.col.max(grid.selection.col_end);
-                    grid.cells.clear_range(sr1, sc1, sr2, sc2);
-                    for r in sr1..=sr2 {
-                        for c in sc1..=sc2 {
-                            grid.cell_styles.remove(&(r, c));
+                    for (sr1, sc1, sr2, sc2) in selection_range_tuples(grid) {
+                        grid.cells.clear_range(sr1, sc1, sr2, sc2);
+                        for r in sr1..=sr2 {
+                            for c in sc1..=sc2 {
+                                grid.cell_styles.remove(&(r, c));
+                            }
                         }
                     }
                 }
@@ -1677,27 +1691,32 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
     // ── Selection ──
 
     fn select(&self, request: SelectRequest) -> Result<Empty, String> {
-        fn end_from_range(range: &CellRange, active_row: i32, active_col: i32) -> (i32, i32) {
-            if range.row1 == active_row && range.col1 == active_col {
-                (range.row2, range.col2)
-            } else if range.row2 == active_row && range.col2 == active_col {
-                (range.row1, range.col1)
-            } else {
-                (range.row2, range.col2)
-            }
-        }
-
         self.manager().with_grid(request.grid_id, |grid| {
             let active_row = request.active_row;
             let active_col = request.active_col;
-            let (row_end, col_end) = request
+            let ranges: Vec<(i32, i32, i32, i32)> = request
                 .ranges
-                .first()
-                .map(|r| end_from_range(r, active_row, active_col))
-                .unwrap_or((active_row, active_col));
-            grid.selection.select(
-                active_row, active_col, row_end, col_end, grid.rows, grid.cols,
-            );
+                .iter()
+                .map(|r| (r.row1, r.col1, r.row2, r.col2))
+                .collect();
+            let old_ranges = selection_range_tuples(grid);
+            grid.selection
+                .select_ranges(active_row, active_col, &ranges, grid.rows, grid.cols);
+            let new_ranges = selection_range_tuples(grid);
+            grid.events
+                .push(volvoxgrid_engine::event::GridEventData::SelectionChanging {
+                    old_ranges: old_ranges.clone(),
+                    new_ranges: new_ranges.clone(),
+                    active_row: grid.selection.row,
+                    active_col: grid.selection.col,
+                });
+            grid.events
+                .push(volvoxgrid_engine::event::GridEventData::SelectionChanged {
+                    old_ranges,
+                    new_ranges,
+                    active_row: grid.selection.row,
+                    active_col: grid.selection.col,
+                });
             if request.show.unwrap_or(false) {
                 ensure_layout(grid);
                 grid.scroll.show_cell(
@@ -1723,12 +1742,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
             SelectionState {
                 active_row: grid.selection.row,
                 active_col: grid.selection.col,
-                ranges: vec![CellRange {
-                    row1: grid.selection.row.min(grid.selection.row_end),
-                    col1: grid.selection.col.min(grid.selection.col_end),
-                    row2: grid.selection.row.max(grid.selection.row_end),
-                    col2: grid.selection.col.max(grid.selection.col_end),
-                }],
+                ranges: selection_ranges_proto(grid),
                 top_row: grid.top_row(),
                 left_col: grid.left_col(),
                 bottom_row: grid.bottom_row(),
@@ -1737,6 +1751,39 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 mouse_col: grid.mouse_col,
             }
         })
+    }
+
+    fn show_cell(&self, request: ShowCellRequest) -> Result<Empty, String> {
+        self.manager().with_grid(request.grid_id, |grid| {
+            ensure_layout(grid);
+            grid.scroll.show_cell(
+                request.row,
+                request.col,
+                &grid.layout,
+                grid.data_viewport_width(),
+                grid.data_viewport_height(),
+                grid.fixed_rows,
+                grid.fixed_cols,
+                grid.pinned_top_height() + grid.pinned_bottom_height(),
+                grid.pinned_left_width() + grid.pinned_right_width(),
+            );
+            grid.mark_dirty();
+        })?;
+        Ok(Empty {})
+    }
+
+    fn set_top_row(&self, request: SetRowRequest) -> Result<Empty, String> {
+        self.manager().with_grid(request.grid_id, |grid| {
+            grid.set_top_row(request.row);
+        })?;
+        Ok(Empty {})
+    }
+
+    fn set_left_col(&self, request: SetColRequest) -> Result<Empty, String> {
+        self.manager().with_grid(request.grid_id, |grid| {
+            grid.set_left_col(request.col);
+        })?;
+        Ok(Empty {})
     }
 
     // ── Editing ──
@@ -2753,8 +2800,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         let prev_sel = (
                             grid.selection.row,
                             grid.selection.col,
-                            grid.selection.row_end,
-                            grid.selection.col_end,
+                            selection_range_tuples(grid),
                         );
                         let hit = if pe.r#type == 0 {
                             Some(volvoxgrid_engine::input::hit_test(grid, pe.x, pe.y))
@@ -2883,8 +2929,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         let next_sel = (
                             grid.selection.row,
                             grid.selection.col,
-                            grid.selection.row_end,
-                            grid.selection.col_end,
+                            selection_range_tuples(grid),
                         );
                         let selection_changed = next_sel != prev_sel;
 
@@ -2892,12 +2937,11 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             selection_changed,
                             grid.selection.row,
                             grid.selection.col,
-                            grid.selection.row_end,
-                            grid.selection.col_end,
+                            selection_ranges_proto(grid),
                             editor_output,
                         )
                     });
-                    if let Ok((selection_changed, row, col, row_end, col_end, editor_output)) =
+                    if let Ok((selection_changed, row, col, ranges, editor_output)) =
                         sel_and_editor
                     {
                         if pe.r#type != 2 || selection_changed {
@@ -2906,12 +2950,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                 event: Some(render_output::Event::Selection(SelectionUpdate {
                                     active_row: row,
                                     active_col: col,
-                                    ranges: vec![CellRange {
-                                        row1: row.min(row_end),
-                                        col1: col.min(col_end),
-                                        row2: row.max(row_end),
-                                        col2: col.max(col_end),
-                                    }],
+                                    ranges,
                                 })),
                             });
                         }
@@ -3030,23 +3069,17 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         (
                             grid.selection.row,
                             grid.selection.col,
-                            grid.selection.row_end,
-                            grid.selection.col_end,
+                            selection_ranges_proto(grid),
                             editor_output,
                         )
                     });
-                    if let Ok((row, col, row_end, col_end, editor_output)) = sel_and_editor {
+                    if let Ok((row, col, ranges, editor_output)) = sel_and_editor {
                         stream.send(RenderOutput {
                             rendered: false,
                             event: Some(render_output::Event::Selection(SelectionUpdate {
                                 active_row: row,
                                 active_col: col,
-                                ranges: vec![CellRange {
-                                    row1: row.min(row_end),
-                                    col1: col.min(col_end),
-                                    row2: row.max(row_end),
-                                    col2: col.max(col_end),
-                                }],
+                                ranges,
                             })),
                         });
                         if let Some(output) = editor_output {

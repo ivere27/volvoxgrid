@@ -251,13 +251,13 @@ class _SfDataGridVolvoxState extends State<SfDataGridVolvox> {
     final totalCols = math.max(1, matrix.cols);
     final totalRows = math.max(1, matrix.rows);
 
-    await _controller.setCols(totalCols);
-    await _controller.setRows(totalRows);
+    await _controller.setColCount(totalCols);
+    await _controller.setRowCount(totalRows);
     await _controller.setShowColumnHeaders(true);
     await _controller.setColumnIndicatorTopRowCount(1);
 
-    await _controller.setFrozenCols(math.max(0, widget.frozenColumnsCount));
-    await _controller.setFrozenRows(math.max(0, widget.frozenRowsCount));
+    await _controller.setFrozenColCount(math.max(0, widget.frozenColumnsCount));
+    await _controller.setFrozenRowCount(math.max(0, widget.frozenRowsCount));
 
     await _controller.setSelectionMode(mapSelectionMode(widget.selectionMode));
     await _controller.setSelectionVisibility(

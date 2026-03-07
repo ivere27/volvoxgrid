@@ -29,8 +29,8 @@ export class DataStore {
     this._grid = grid;
   }
 
-  get dataRows(): number { return this._grid.rows; }
-  get dataCols(): number { return this._grid.cols; }
+  get dataRows(): number { return this._grid.rowCount; }
+  get dataCols(): number { return this._grid.colCount; }
 
   /** Initialize captions and populate grid with data. */
   init(initialData?: string[][]): void {
@@ -196,7 +196,7 @@ export class DataStore {
     const cols = this.dataCols;
     for (let r = 0; r < this.data.length; r++) {
       for (let c = 0; c < cols; c++) {
-        this._grid.setTextMatrix(r, c, this.data[r]?.[c] ?? "");
+        this._grid.setCellText(r, c, this.data[r]?.[c] ?? "");
       }
     }
   }
@@ -310,7 +310,7 @@ export class DataStore {
     }
 
     for (const u of updates) {
-      this._grid.setTextMatrix(u.row, u.col, u.text ?? "");
+      this._grid.setCellText(u.row, u.col, u.text ?? "");
     }
   }
 }

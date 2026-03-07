@@ -318,33 +318,29 @@ export function applyGridOptionsToVolvox<TData extends RowData>(
   const reorder = hasAnyReorder(colDefs);
 
   if (sortable && reorder) {
-    grid.setHeaderFeatures(HEADER_SORT_REORDER);
+    grid.headerFeatures = HEADER_SORT_REORDER;
   } else if (sortable) {
-    grid.setHeaderFeatures(HEADER_SORT);
+    grid.headerFeatures = HEADER_SORT;
   } else if (reorder) {
-    grid.setHeaderFeatures(HEADER_REORDER);
+    grid.headerFeatures = HEADER_REORDER;
   } else {
-    grid.setHeaderFeatures(HEADER_NONE);
+    grid.headerFeatures = HEADER_NONE;
   }
 
   const rowSelectionEnabled =
     gridOptions.rowSelection === "single" || gridOptions.rowSelection === "multiple";
-  grid.setSelectionMode(rowSelectionEnabled ? SELECTION_BY_ROW : SELECTION_FREE);
-  if (typeof grid.setSelectionVisibility === "function") {
-    grid.setSelectionVisibility(rowSelectionEnabled ? HIGHLIGHT_WITH_FOCUS : HIGHLIGHT_NEVER);
-  }
-  if (typeof grid.setFocusBorder === "function") {
-    grid.setFocusBorder(0);
-  }
+  grid.selectionMode = rowSelectionEnabled ? SELECTION_BY_ROW : SELECTION_FREE;
+  grid.selectionVisibility = rowSelectionEnabled ? HIGHLIGHT_WITH_FOCUS : HIGHLIGHT_NEVER;
+  grid.focusBorder = 0;
 
   const resizable = hasAnyResizable(colDefs, gridOptions.defaultColDef);
-  grid.setAllowUserResizing(resizable ? RESIZE_BOTH : RESIZE_NONE);
+  grid.allowUserResizing = resizable ? RESIZE_BOTH : RESIZE_NONE;
 
   const rowHeight =
     typeof gridOptions.rowHeight === "number" && gridOptions.rowHeight > 0
       ? Math.round(gridOptions.rowHeight)
       : themePreset.rowHeight;
-  grid.setDefaultRowHeight(rowHeight);
+  grid.defaultRowHeight = rowHeight;
 
   const headerHeight =
     typeof gridOptions.headerHeight === "number" && gridOptions.headerHeight > 0
@@ -356,10 +352,10 @@ export function applyGridOptionsToVolvox<TData extends RowData>(
     fixedCellPadding: themePreset.fixedCellPadding,
   });
 
-  grid.setAnimationEnabled(gridOptions.animateRows === true);
+  grid.animationEnabled = gridOptions.animateRows === true;
 
   grid.showColumnHeaders = headerRows > 0;
   grid.columnIndicatorTopRowCount = Math.max(0, headerRows);
-  grid.setSpanMode(CELL_SPAN_NONE);
+  grid.cellSpanMode = CELL_SPAN_NONE;
   applyFixedHeaderSpanMode(grid, false);
 }

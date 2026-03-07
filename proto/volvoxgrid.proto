@@ -388,6 +388,23 @@ enum NodeRelation {
 message Empty {}
 message GridHandle { int64 id = 1; }
 
+enum ErrorCode {
+  ERROR_UNKNOWN          = 0;
+  ERROR_INVALID_ARGUMENT = 1;
+  ERROR_NOT_FOUND        = 2;
+  ERROR_INVALID_STATE    = 3;
+  ERROR_TYPE_VIOLATION   = 4;
+  ERROR_DECODE_FAILED    = 5;
+  ERROR_ENCODE_FAILED    = 6;
+  ERROR_NOT_IMPLEMENTED  = 7;
+  ERROR_INTERNAL         = 8;
+}
+
+message RpcError {
+  ErrorCode code    = 1;
+  string    message = 2;
+}
+
 message ImageData {
   bytes  data   = 1;
   string format = 2;  // "png", "bmp", etc.
@@ -1370,15 +1387,52 @@ message CreateRequest {
   GridConfig config          = 4;  // optional initial configuration
 }
 
+message CreateResponse {
+  GridHandle       handle   = 1;
+  repeated string  warnings = 2;
+}
+
 message ResizeViewportRequest {
   int64 grid_id = 1;
   int32 width   = 2;
   int32 height  = 3;
 }
 
+message ShowCellRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+  int32 col     = 3;
+}
+
+message SetRowRequest {
+  int64 grid_id = 1;
+  int32 row     = 2;
+}
+
+message SetColRequest {
+  int64 grid_id = 1;
+  int32 col     = 2;
+}
+
 message SetRedrawRequest {
   int64 grid_id = 1;
   bool  enabled = 2;
+}
+
+message ConfigureRequest {
+  int64      grid_id = 1;
+  GridConfig config  = 2;
+}
+
+message LoadFontDataRequest {
+  bytes           data       = 1;
+  string          font_name  = 2;
+  repeated string font_names = 3;
+}
+
+message LoadDemoRequest {
+  int64  grid_id = 1;
+  string demo    = 2;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1750,7 +1804,7 @@ message GetHeaderRowEvent    { int32 page = 1; }
 
 service VolvoxGridService {
   // ── Lifecycle ──
-  rpc Create(CreateRequest)                returns (GridHandle);
+  rpc Create(CreateRequest)                returns (CreateResponse);
   rpc Destroy(GridHandle)                  returns (Empty);
 
   // ── Configuration ──
@@ -1779,6 +1833,9 @@ service VolvoxGridService {
   // ── Selection ──
   rpc Select(SelectRequest)                returns (Empty);
   rpc GetSelection(GridHandle)             returns (SelectionState);
+  rpc ShowCell(ShowCellRequest)            returns (Empty);
+  rpc SetTopRow(SetRowRequest)             returns (Empty);
+  rpc SetLeftCol(SetColRequest)            returns (Empty);
 
   // ── Editing ──
   rpc Edit(EditCommand)                    returns (EditState);
@@ -1817,20 +1874,4 @@ service VolvoxGridService {
   // ── Streaming ──
   rpc RenderSession(stream RenderInput)    returns (stream RenderOutput);
   rpc EventStream(GridHandle)              returns (stream GridEvent);
-}
-
-message ConfigureRequest {
-  int64      grid_id = 1;
-  GridConfig config  = 2;
-}
-
-message LoadDemoRequest {
-  int64  grid_id = 1;
-  string demo    = 2;
-}
-
-message LoadFontDataRequest {
-  bytes data               = 1;
-  string font_name         = 2;
-  repeated string font_names = 3;
 }

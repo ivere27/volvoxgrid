@@ -60,7 +60,7 @@ public final class VolvoxGridDesktopDemo {
         sortAsc.addActionListener(e -> {
             try {
                 VolvoxGridDesktopController ctrl = gridPanel.createController();
-                int col = ctrl.getSelection().getActiveCol();
+                int col = ctrl.getSelection().getCol();
                 ctrl.sort(SortOrder.SORT_GENERIC_ASCENDING, Math.max(col, 0));
                 ctrl.refresh();
                 gridPanel.requestFrame();
@@ -73,7 +73,7 @@ public final class VolvoxGridDesktopDemo {
         sortDesc.addActionListener(e -> {
             try {
                 VolvoxGridDesktopController ctrl = gridPanel.createController();
-                int col = ctrl.getSelection().getActiveCol();
+                int col = ctrl.getSelection().getCol();
                 ctrl.sort(SortOrder.SORT_GENERIC_DESCENDING, Math.max(col, 0));
                 ctrl.refresh();
                 gridPanel.requestFrame();
@@ -119,10 +119,10 @@ public final class VolvoxGridDesktopDemo {
                 ctrl.setColumnCaption(3, "Amount");
 
                 for (int r = 0; r < 40; r++) {
-                    ctrl.setTextMatrix(r, 0, Integer.toString(r + 1));
-                    ctrl.setTextMatrix(r, 1, "Item " + (r + 1));
-                    ctrl.setTextMatrix(r, 2, (r % 2 == 0) ? "US" : "KR");
-                    ctrl.setTextMatrix(r, 3, String.format("%.2f", (r + 1) * 10.5));
+                    ctrl.setCellText(r, 0, Integer.toString(r + 1));
+                    ctrl.setCellText(r, 1, "Item " + (r + 1));
+                    ctrl.setCellText(r, 2, (r % 2 == 0) ? "US" : "KR");
+                    ctrl.setCellText(r, 3, String.format("%.2f", (r + 1) * 10.5));
                 }
 
                 ctrl.setColWidth(0, 60);

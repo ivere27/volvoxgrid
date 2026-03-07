@@ -289,7 +289,7 @@ class MainActivity : AppCompatActivity() {
             val density = resources.displayMetrics.density
             val scale = if (density > 0f) density else 1f
             
-            val handle = client.Create(
+            val response = client.Create(
                 CreateRequest.newBuilder()
                     .setViewportWidth(w)
                     .setViewportHeight(h)
@@ -320,7 +320,7 @@ class MainActivity : AppCompatActivity() {
                         .build())
                     .build()
             )
-            val id = handle.id
+            val id = response.handle.id
             
             // Attach view to this new grid
             runOnUiThread {
@@ -330,9 +330,9 @@ class MainActivity : AppCompatActivity() {
                 ctrl.setColumnCaption(0, "Name")
                 ctrl.setColumnCaption(1, "Price")
                 ctrl.setColumnCaption(2, "Qty")
-                ctrl.setTextMatrix(0, 0, "Widget A")
-                ctrl.setTextMatrix(0, 1, "29.99")
-                ctrl.setTextMatrix(0, 2, "150")
+                ctrl.setCellText(0, 0, "Widget A")
+                ctrl.setCellText(0, 1, "29.99")
+                ctrl.setCellText(0, 2, "150")
 
                 // Setup styling
                 val style = ctrl.getGridStyle().toBuilder()
@@ -396,7 +396,7 @@ class MainActivity : AppCompatActivity() {
                     SortOrder.SORT_GENERIC_ASCENDING
                 else
                     SortOrder.SORT_GENERIC_DESCENDING
-                ctrl.sort(order, col = ctrl.col)
+                ctrl.sort(order, col = ctrl.cursorCol())
                 ctrl.refresh()
                 gridView.requestFrame()
                 updateStatus("Sorted ${if (ascending) "ascending" else "descending"}")

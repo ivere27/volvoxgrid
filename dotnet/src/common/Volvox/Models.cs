@@ -187,6 +187,8 @@ namespace VolvoxGrid.DotNet.Internal
         public int LeftCol { get; set; }
         public int BottomRow { get; set; }
         public int RightCol { get; set; }
+        public int MouseRow { get; set; }
+        public int MouseCol { get; set; }
 
         public VolvoxSelectionStateData()
         {

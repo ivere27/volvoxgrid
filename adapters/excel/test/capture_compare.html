@@ -269,8 +269,8 @@ async function executeCommand(excel, cmd) {
     case "assertSelection": {
       const expected = args[0] || {};
       const actual = excel.getSelection();
-      const maxRow = excel.grid.rows - 1;
-      const maxCol = excel.grid.cols - 1;
+      const maxRow = excel.grid.rowCount - 1;
+      const maxCol = excel.grid.colCount - 1;
       for (const key of ["row1", "col1", "row2", "col2"]) {
         if (expected[key] == null) continue;
         const rawWant = expected[key];

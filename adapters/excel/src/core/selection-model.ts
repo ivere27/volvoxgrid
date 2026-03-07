@@ -20,6 +20,7 @@ export class SelectionModel {
   /** Range end (for multi-cell selection). */
   private _rowEnd: number = 0;
   private _colEnd: number = 0;
+  private _ranges: CellRange[] = [{ row1: 0, col1: 0, row2: 0, col2: 0 }];
 
   constructor(wasm: any, gridId: number, grid: VolvoxExcelGrid) {
     this.wasm = wasm;
@@ -62,41 +63,65 @@ export class SelectionModel {
     return { row: this.dataRow, col: this.dataCol };
   }
 
+  getRanges(): CellRange[] {
+    return this._ranges.map((range) => ({ ...range }));
+  }
+
   /** Navigate selection via WASM. */
   select(row: number, col: number, rowEnd?: number, colEnd?: number, show: boolean = true): void {
-    this._row = row;
-    this._col = col;
-    this._rowEnd = rowEnd ?? row;
-    this._colEnd = colEnd ?? col;
+    this.selectRanges(
+      [{
+        row1: row,
+        col1: col,
+        row2: rowEnd ?? row,
+        col2: colEnd ?? col,
+      }],
+      row,
+      col,
+      show,
+    );
+  }
+
+  selectRanges(
+    ranges: ReadonlyArray<CellRange>,
+    activeRow: number = this._row,
+    activeCol: number = this._col,
+    show: boolean = true,
+  ): void {
+    const normalized = ranges.length > 0
+      ? ranges.map((range) => this.normalizeRange(range))
+      : [this.normalizeRange({ row1: activeRow, col1: activeCol, row2: activeRow, col2: activeCol })];
+
+    if (typeof this._grid.selectRanges === "function") {
+      this._grid.selectRanges(normalized, activeRow, activeCol, show);
+      this.syncFromSnapshot(this._grid.getSelection());
+      return;
+    }
 
     if (typeof this.wasm.volvox_grid_select_pb === "function") {
       const req = encodeSelectRequest({
         gridId: this.gridId,
-        row,
-        col,
-        rowEnd,
-        colEnd,
+        row: activeRow,
+        col: activeCol,
+        ranges: normalized,
         show,
       });
       this.wasm.volvox_grid_select_pb(req);
     }
+
+    this.syncFromRanges(activeRow, activeCol, normalized);
   }
 
   /** Move active cell by delta, clamped to grid bounds. */
   move(dRow: number, dCol: number): void {
-    const newRow = Math.max(0, Math.min(this._grid.rows - 1, this._row + dRow));
-    const newCol = Math.max(0, Math.min(this._grid.cols - 1, this._col + dCol));
+    const newRow = Math.max(0, Math.min(this._grid.rowCount - 1, this._row + dRow));
+    const newCol = Math.max(0, Math.min(this._grid.colCount - 1, this._col + dCol));
     this.select(newRow, newCol);
   }
 
   /** Set selection from a data-space CellRange. */
   setFromDataRange(range: CellRange): void {
-    this.select(
-      range.row1,
-      range.col1,
-      range.row2,
-      range.col2,
-    );
+    this.select(range.row1, range.col1, range.row2, range.col2);
   }
 
   /** Update cursor position from engine CellFocusChanged events. */
@@ -105,11 +130,129 @@ export class SelectionModel {
     this._col = col;
     this._rowEnd = row;
     this._colEnd = col;
+    this.refreshActiveRange();
   }
 
   /** Update range end from engine SelectionChanged events (cursor stays). */
   onSelectionEndChanged(rowEnd: number, colEnd: number): void {
     this._rowEnd = rowEnd;
     this._colEnd = colEnd;
+    this.refreshActiveRange();
+  }
+
+  syncFromSnapshot(snapshot: {
+    row: number;
+    col: number;
+    rowEnd: number;
+    colEnd: number;
+    ranges?: ReadonlyArray<CellRange>;
+  }): void {
+    const ranges = snapshot.ranges && snapshot.ranges.length > 0
+      ? snapshot.ranges
+      : [{
+        row1: snapshot.row,
+        col1: snapshot.col,
+        row2: snapshot.rowEnd,
+        col2: snapshot.colEnd,
+      }];
+    this.syncFromRanges(snapshot.row, snapshot.col, ranges);
+  }
+
+  matchesSnapshot(snapshot: {
+    row: number;
+    col: number;
+    rowEnd: number;
+    colEnd: number;
+    ranges?: ReadonlyArray<CellRange>;
+  }): boolean {
+    if (
+      snapshot.row !== this._row
+      || snapshot.col !== this._col
+      || snapshot.rowEnd !== this._rowEnd
+      || snapshot.colEnd !== this._colEnd
+    ) {
+      return false;
+    }
+    const ranges = snapshot.ranges && snapshot.ranges.length > 0
+      ? snapshot.ranges.map((range) => this.normalizeRange(range))
+      : [this.normalizeRange({
+        row1: snapshot.row,
+        col1: snapshot.col,
+        row2: snapshot.rowEnd,
+        col2: snapshot.colEnd,
+      })];
+    if (ranges.length !== this._ranges.length) {
+      return false;
+    }
+    return ranges.every((range, index) => {
+      const current = this._ranges[index];
+      return current.row1 === range.row1
+        && current.col1 === range.col1
+        && current.row2 === range.row2
+        && current.col2 === range.col2;
+    });
+  }
+
+  private syncFromRanges(
+    activeRow: number,
+    activeCol: number,
+    ranges: ReadonlyArray<CellRange>,
+  ): void {
+    const normalized = ranges.length > 0
+      ? ranges.map((range) => this.normalizeRange(range))
+      : [this.normalizeRange({ row1: activeRow, col1: activeCol, row2: activeRow, col2: activeCol })];
+    const clampedActiveRow = Math.max(0, Math.min(this._grid.rowCount - 1, activeRow));
+    const clampedActiveCol = Math.max(0, Math.min(this._grid.colCount - 1, activeCol));
+    let activeIndex = normalized.findIndex((range) =>
+      (range.row1 === clampedActiveRow && range.col1 === clampedActiveCol)
+      || (range.row2 === clampedActiveRow && range.col2 === clampedActiveCol),
+    );
+    if (activeIndex < 0) {
+      activeIndex = 0;
+    }
+    const activeRange = normalized[activeIndex];
+    if (activeRange.row1 === clampedActiveRow && activeRange.col1 === clampedActiveCol) {
+      this._row = activeRange.row1;
+      this._col = activeRange.col1;
+      this._rowEnd = activeRange.row2;
+      this._colEnd = activeRange.col2;
+    } else if (activeRange.row2 === clampedActiveRow && activeRange.col2 === clampedActiveCol) {
+      this._row = activeRange.row2;
+      this._col = activeRange.col2;
+      this._rowEnd = activeRange.row1;
+      this._colEnd = activeRange.col1;
+    } else {
+      this._row = activeRange.row1;
+      this._col = activeRange.col1;
+      this._rowEnd = activeRange.row2;
+      this._colEnd = activeRange.col2;
+    }
+    this._ranges = [
+      activeRange,
+      ...normalized.filter((_, index) => index !== activeIndex),
+    ];
+  }
+
+  private refreshActiveRange(): void {
+    const activeRange = this.normalizeRange({
+      row1: this._row,
+      col1: this._col,
+      row2: this._rowEnd,
+      col2: this._colEnd,
+    });
+    if (this._ranges.length === 0) {
+      this._ranges = [activeRange];
+      return;
+    }
+    this._ranges = [activeRange, ...this._ranges.slice(1)];
+  }
+
+  private normalizeRange(range: CellRange): CellRange {
+    return {
+      row1: Math.min(range.row1, range.row2),
+      col1: Math.min(range.col1, range.col2),
+      row2: Math.max(range.row1, range.row2),
+      col2: Math.max(range.col1, range.col2),
+    };
   }
 }

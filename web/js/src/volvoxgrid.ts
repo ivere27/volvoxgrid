@@ -12,6 +12,26 @@ export interface VolvoxGridCellRange {
   col2: number;
 }
 
+export interface VolvoxGridCellTextEntry {
+  row: number;
+  col: number;
+  text: string;
+}
+
+export interface VolvoxGridSelection {
+  row: number;
+  col: number;
+  rowEnd: number;
+  colEnd: number;
+  topRow: number;
+  leftCol: number;
+  bottomRow: number;
+  rightCol: number;
+  mouseRow: number;
+  mouseCol: number;
+  ranges: VolvoxGridCellRange[];
+}
+
 export interface VolvoxGridNodeInfo {
   row: number;
   level: number;
@@ -437,6 +457,57 @@ function pbEncodeInsertRowsRequest(
   return new Uint8Array(out);
 }
 
+function pbEncodeCellRange(
+  row1: number,
+  col1: number,
+  row2: number,
+  col2: number,
+): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeTag(1, 0), ...pbEncodeInt32(row1));
+  out.push(...pbEncodeTag(2, 0), ...pbEncodeInt32(col1));
+  out.push(...pbEncodeTag(3, 0), ...pbEncodeInt32(row2));
+  out.push(...pbEncodeTag(4, 0), ...pbEncodeInt32(col2));
+  return new Uint8Array(out);
+}
+
+function pbEncodeSelectRequest(args: {
+  gridId: number;
+  row?: number;
+  col?: number;
+  rowEnd?: number;
+  colEnd?: number;
+  ranges?: ReadonlyArray<VolvoxGridCellRange>;
+  show?: boolean;
+}): Uint8Array {
+  const out: number[] = [];
+  const ranges = args.ranges && args.ranges.length > 0
+    ? args.ranges
+    : [{
+      row1: args.row ?? 0,
+      col1: args.col ?? 0,
+      row2: args.rowEnd ?? args.row ?? 0,
+      col2: args.colEnd ?? args.col ?? 0,
+    }];
+  const activeRow = args.row ?? ranges[0].row1;
+  const activeCol = args.col ?? ranges[0].col1;
+  out.push(...pbEncodeTag(1, 0), ...pbEncodeInt64(BigInt(Math.trunc(args.gridId))));
+  out.push(...pbEncodeTag(2, 0), ...pbEncodeInt32(activeRow));
+  out.push(...pbEncodeTag(3, 0), ...pbEncodeInt32(activeCol));
+  for (const range of ranges) {
+    out.push(...pbEncodeMessageField(4, pbEncodeCellRange(
+      range.row1,
+      range.col1,
+      range.row2,
+      range.col2,
+    )));
+  }
+  if (args.show != null) {
+    out.push(...pbEncodeTag(5, 0), ...pbEncodeBool(args.show));
+  }
+  return new Uint8Array(out);
+}
+
 function pbEncodeGetNodeRequest(gridId: number, row: number, relation?: number): Uint8Array {
   const out: number[] = [];
   out.push(...pbEncodeTag(1, 0), ...pbEncodeInt64(BigInt(Math.trunc(gridId))));
@@ -738,6 +809,85 @@ function pbDecodeCellRange(data: Uint8Array): VolvoxGridCellRange | null {
   return range;
 }
 
+function pbDecodeSelectionState(data: Uint8Array): VolvoxGridSelection | null {
+  let offset = 0;
+  let row = -1;
+  let col = -1;
+  let topRow = 0;
+  let leftCol = 0;
+  let bottomRow = 0;
+  let rightCol = 0;
+  let mouseRow = 0;
+  let mouseCol = 0;
+  const ranges: VolvoxGridCellRange[] = [];
+
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (field === 3 && wire === 2) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      if (Number.isFinite(n) && n >= 0) {
+        const end = Math.min(data.length, len.next + n);
+        const range = pbDecodeCellRange(data.slice(len.next, end));
+        if (range != null) ranges.push(range);
+      }
+      offset = pbSkipField(data, offset, wire);
+      continue;
+    }
+    if (wire === 0) {
+      const value = pbReadVarint(data, offset);
+      offset = value.next;
+      const n = pbAsInt32(value.value);
+      if (field === 1) row = n;
+      if (field === 2) col = n;
+      if (field === 4) topRow = n;
+      if (field === 5) leftCol = n;
+      if (field === 6) bottomRow = n;
+      if (field === 7) rightCol = n;
+      if (field === 8) mouseRow = n;
+      if (field === 9) mouseCol = n;
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+
+  if (data.length === 0) return null;
+  const activeRange = ranges.find((range) =>
+    (range.row1 === row && range.col1 === col)
+      || (range.row2 === row && range.col2 === col))
+    ?? ranges[0];
+  let rowEnd = row;
+  let colEnd = col;
+  if (activeRange != null) {
+    if (activeRange.row1 === row && activeRange.col1 === col) {
+      rowEnd = activeRange.row2;
+      colEnd = activeRange.col2;
+    } else if (activeRange.row2 === row && activeRange.col2 === col) {
+      rowEnd = activeRange.row1;
+      colEnd = activeRange.col1;
+    } else {
+      rowEnd = activeRange.row2;
+      colEnd = activeRange.col2;
+    }
+  }
+  return {
+    row,
+    col,
+    rowEnd,
+    colEnd,
+    topRow,
+    leftCol,
+    bottomRow,
+    rightCol,
+    mouseRow,
+    mouseCol,
+    ranges,
+  };
+}
+
 function pbDecodeNodeInfo(data: Uint8Array): VolvoxGridNodeInfo | null {
   let offset = 0;
   const node: VolvoxGridNodeInfo = {
@@ -925,7 +1075,7 @@ export class VolvoxGrid {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D | null = null;
   private useGpu: boolean = false;
-  private presentMode: number = 0; // proto PresentMode (0=AUTO,1=FIFO,2=MAILBOX,3=IMMEDIATE)
+  private _presentMode: number = 0; // proto PresentMode (0=AUTO,1=FIFO,2=MAILBOX,3=IMMEDIATE)
   private animFrame: number = 0;
   private dirty: boolean = true;
   private destroyed: boolean = false;
@@ -988,6 +1138,19 @@ export class VolvoxGrid {
     defaults?: VolvoxGridIconThemeDefaults;
     slots: Partial<Record<VolvoxGridIconSlotName, Pick<VolvoxGridIconSpec, "textStyle" | "layout">>>;
   } = { slots: {} };
+  private selectionModeValue: number = 0;
+  private selectionVisibilityValue: number = 1;
+  private focusBorderValue: number = 0;
+  private cellSpanModeValue: number = 0;
+  private headerFeaturesValue: number = 0;
+  private editTriggerValue: number = 2;
+  private tabBehaviorValue: number = 1;
+  private dropdownTriggerValue: number = 1;
+  private dropdownSearchValue: boolean = true;
+  private scrollBarsValue: number = 3;
+  private animationEnabledValue: boolean = false;
+  private animationDurationMsValue: number = 0;
+  private textLayoutCacheCapValue: number = 0;
 
   /**
    * Create a VolvoxGrid instance.
@@ -1090,55 +1253,35 @@ export class VolvoxGrid {
     return this.gridId;
   }
 
-  get rows(): number {
+  get rowCount(): number {
     return this.wasm.get_rows(this.gridId);
   }
-  set rows(n: number) {
+  set rowCount(n: number) {
     this.wasm.set_rows(this.gridId, n);
     this.dirty = true;
   }
 
-  get cols(): number {
+  get colCount(): number {
     return this.wasm.get_cols(this.gridId);
   }
-  set cols(n: number) {
+  set colCount(n: number) {
     this.wasm.set_cols(this.gridId, n);
     this.dirty = true;
   }
 
-  get frozenRows(): number {
+  get frozenRowCount(): number {
     return this.wasm.get_frozen_rows(this.gridId);
   }
-  set frozenRows(n: number) {
+  set frozenRowCount(n: number) {
     this.wasm.set_frozen_rows(this.gridId, n);
     this.dirty = true;
   }
 
-  get frozenCols(): number {
+  get frozenColCount(): number {
     return this.wasm.get_frozen_cols(this.gridId);
   }
-  set frozenCols(n: number) {
+  set frozenColCount(n: number) {
     this.wasm.set_frozen_cols(this.gridId, n);
-    this.dirty = true;
-  }
-
-  /** @deprecated Use frozenRows for public freeze-pane APIs. */
-  get fixedRows(): number {
-    return this.wasm.get_fixed_rows(this.gridId);
-  }
-  /** @deprecated Use frozenRows for public freeze-pane APIs. */
-  set fixedRows(n: number) {
-    this.wasm.set_fixed_rows(this.gridId, n);
-    this.dirty = true;
-  }
-
-  /** @deprecated Use frozenCols for public freeze-pane APIs. */
-  get fixedCols(): number {
-    return this.wasm.get_fixed_cols(this.gridId);
-  }
-  /** @deprecated Use frozenCols for public freeze-pane APIs. */
-  set fixedCols(n: number) {
-    this.wasm.set_fixed_cols(this.gridId, n);
     this.dirty = true;
   }
 
@@ -1181,13 +1324,6 @@ export class VolvoxGrid {
     }
   }
 
-  get showIndicator(): boolean {
-    return this.showRowIndicator;
-  }
-  set showIndicator(value: boolean) {
-    this.showRowIndicator = value;
-  }
-
   get showRowIndicator(): boolean {
     if (typeof this.wasm.get_show_row_indicator === "function") {
       return Boolean(this.wasm.get_show_row_indicator(this.gridId));
@@ -1227,17 +1363,101 @@ export class VolvoxGrid {
     }
   }
 
-  get selectionRow(): number {
+  get cursorRow(): number {
     return this.wasm.get_selection_row(this.gridId);
   }
-  get selectionCol(): number {
+  set cursorRow(row: number) {
+    this.selectRange(row, this.cursorCol, row, this.cursorCol);
+  }
+
+  get cursorCol(): number {
     return this.wasm.get_selection_col(this.gridId);
   }
-  get selectionRowEnd(): number {
+  set cursorCol(col: number) {
+    this.selectRange(this.cursorRow, col, this.cursorRow, col);
+  }
+
+  private get selectionRowEndValue(): number {
     return this.wasm.get_selection_row_end(this.gridId);
   }
-  get selectionColEnd(): number {
+
+  private get selectionColEndValue(): number {
     return this.wasm.get_selection_col_end(this.gridId);
+  }
+
+  selectRange(
+    row1: number,
+    col1: number,
+    row2: number = row1,
+    col2: number = col1,
+    show: boolean = false,
+  ): void {
+    this.selectRanges([{ row1, col1, row2, col2 }], row1, col1, show);
+  }
+
+  selectRanges(
+    ranges: ReadonlyArray<VolvoxGridCellRange>,
+    activeRow?: number,
+    activeCol?: number,
+    show: boolean = false,
+  ): void {
+    if (ranges.length === 0) return;
+    if (typeof this.wasm.volvox_grid_select_pb === "function") {
+      const request = pbEncodeSelectRequest({
+        gridId: this.gridId,
+        row: activeRow ?? ranges[0].row1,
+        col: activeCol ?? ranges[0].col1,
+        ranges,
+        show,
+      });
+      this.wasm.volvox_grid_select_pb(request);
+      this.dirty = true;
+    }
+  }
+
+  getSelection(): VolvoxGridSelection {
+    if (typeof this.wasm.volvox_grid_get_selection === "function") {
+      const response = this.wasm.volvox_grid_get_selection(BigInt(this.gridId));
+      const decoded = pbDecodeSelectionState(response);
+      if (decoded != null) {
+        return decoded;
+      }
+    }
+    return {
+      row: this.cursorRow,
+      col: this.cursorCol,
+      rowEnd: this.selectionRowEndValue,
+      colEnd: this.selectionColEndValue,
+      topRow: this.topRow,
+      leftCol: this.leftCol,
+      bottomRow: this.getBottomRow(),
+      rightCol: this.getRightCol(),
+      mouseRow: typeof this.wasm.get_mouse_row === "function"
+        ? Number(this.wasm.get_mouse_row(this.gridId))
+        : -1,
+      mouseCol: typeof this.wasm.get_mouse_col === "function"
+        ? Number(this.wasm.get_mouse_col(this.gridId))
+        : -1,
+      ranges: [{
+        row1: Math.min(this.cursorRow, this.selectionRowEndValue),
+        col1: Math.min(this.cursorCol, this.selectionColEndValue),
+        row2: Math.max(this.cursorRow, this.selectionRowEndValue),
+        col2: Math.max(this.cursorCol, this.selectionColEndValue),
+      }],
+    };
+  }
+
+  showCell(row: number, col: number): void {
+    if (typeof this.wasm.volvox_grid_show_cell === "function") {
+      this.wasm.volvox_grid_show_cell(BigInt(this.gridId), row, col);
+      this.dirty = true;
+      return;
+    }
+    this.selectRange(row, col, row, col, true);
+  }
+
+  clearSelection(): void {
+    this.selectRange(this.cursorRow, this.cursorCol, this.cursorRow, this.cursorCol, false);
   }
 
   get zoomScale(): number {
@@ -1255,54 +1475,69 @@ export class VolvoxGrid {
 
   // ── Cell data ────────────────────────────────────────────────────────
 
-  setTextMatrix(row: number, col: number, text: string): void {
+  setCellText(row: number, col: number, text: string): void {
     this.wasm.set_text_matrix(this.gridId, row, col, text);
     this.dirty = true;
   }
 
-  getTextMatrix(row: number, col: number): string {
+  getCellText(row: number, col: number): string {
     return this.wasm.get_text_matrix(this.gridId, row, col);
   }
 
-  setTextArray(index: number, text: string): void {
+  private setTextArray(index: number, text: string): void {
     if (typeof this.wasm.set_text_array === "function") {
       this.wasm.set_text_array(this.gridId, index, text);
       this.dirty = true;
     }
   }
 
-  getTextArray(index: number): string {
+  private getTextArray(index: number): string {
     if (typeof this.wasm.get_text_array === "function") {
       return this.wasm.get_text_array(this.gridId, index);
     }
-    const cols = Math.max(1, this.cols);
+    const cols = Math.max(1, this.colCount);
     const row = Math.floor(index / cols);
     const col = index % cols;
-    return this.getTextMatrix(row, col);
+    return this.getCellText(row, col);
   }
 
-  loadArray(rows: number, cols: number, values: string[]): void {
+  setCells(cells: ReadonlyArray<VolvoxGridCellTextEntry>): void {
+    if (cells.length === 0) {
+      return;
+    }
+    if (typeof this.wasm.volvox_grid_update_cells_pb === "function") {
+      const request: number[] = [];
+      request.push(...pbEncodeTag(1, 0), ...pbEncodeInt64(BigInt(this.gridId)));
+      for (const cell of cells) {
+        const value: number[] = [];
+        value.push(...pbEncodeStringField(1, cell.text));
+
+        const update: number[] = [];
+        update.push(...pbEncodeTag(1, 0), ...pbEncodeInt32(cell.row));
+        update.push(...pbEncodeTag(2, 0), ...pbEncodeInt32(cell.col));
+        update.push(...pbEncodeMessageField(3, new Uint8Array(value)));
+        request.push(...pbEncodeMessageField(2, new Uint8Array(update)));
+      }
+      this.wasm.volvox_grid_update_cells_pb(new Uint8Array(request));
+      this.dirty = true;
+      return;
+    }
+    for (const cell of cells) {
+      this.setCellText(cell.row, cell.col, cell.text);
+    }
+  }
+
+  loadTable(rows: number, cols: number, values: unknown[]): void {
     if (typeof this.wasm.load_array === "function") {
       this.wasm.load_array(this.gridId, rows, cols, values);
     } else {
-      this.rows = rows;
-      this.cols = cols;
+      this.rowCount = rows;
+      this.colCount = cols;
       const max = Math.max(1, rows) * Math.max(1, cols);
       for (let i = 0; i < values.length && i < max; i += 1) {
-        this.setTextArray(i, values[i]);
+        this.setTextArray(i, values[i] == null ? "" : String(values[i]));
       }
     }
-    this.dirty = true;
-  }
-
-  bindToArray(rows: number, cols: number, values: string[]): void {
-    if (typeof this.wasm.bind_to_array === "function") {
-      this.wasm.bind_to_array(this.gridId, rows, cols, values);
-    } else {
-      this.loadArray(rows, cols, values);
-    }
-    this.setDataMode(1);
-    this.setVirtualData(false);
     this.dirty = true;
   }
 
@@ -1399,21 +1634,21 @@ export class VolvoxGrid {
     return this.wasm.get_col_width(this.gridId, col);
   }
 
-  setDefaultColWidth(w: number): void {
+  get defaultColWidth(): number {
+    if (typeof this.wasm.get_default_col_width === "function") {
+      return Number(this.wasm.get_default_col_width(this.gridId));
+    }
+    const fixedCols = Number(this.wasm.get_fixed_cols?.(this.gridId) ?? 0);
+    return this.getColWidth(Math.max(0, fixedCols));
+  }
+
+  set defaultColWidth(w: number) {
     if (typeof this.wasm.set_default_col_width === "function") {
       this.wasm.set_default_col_width(this.gridId, w);
     } else {
       this.wasm.set_col_width(this.gridId, -1, w);
     }
     this.dirty = true;
-  }
-
-  getDefaultColWidth(): number {
-    if (typeof this.wasm.get_default_col_width === "function") {
-      return Number(this.wasm.get_default_col_width(this.gridId));
-    }
-    const fixedCols = Number(this.wasm.get_fixed_cols?.(this.gridId) ?? 0);
-    return this.getColWidth(Math.max(0, fixedCols));
   }
 
   setRowHeight(row: number, h: number): void {
@@ -1425,25 +1660,25 @@ export class VolvoxGrid {
     return this.wasm.get_row_height(this.gridId, row);
   }
 
-  setDefaultRowHeight(h: number): void {
-    if (typeof this.wasm.set_default_row_height === "function") {
-      this.wasm.set_default_row_height(this.gridId, h);
-    } else {
-      this.wasm.set_row_height(this.gridId, -1, h);
-    }
-    this.dirty = true;
-  }
-
-  getDefaultRowHeight(): number {
+  get defaultRowHeight(): number {
     if (typeof this.wasm.get_default_row_height === "function") {
       return Number(this.wasm.get_default_row_height(this.gridId));
     }
     const fixedRows = Number(this.wasm.get_fixed_rows?.(this.gridId) ?? 0);
     const probeRow = Math.min(
       Math.max(0, fixedRows),
-      Math.max(0, this.rows - 1),
+      Math.max(0, this.rowCount - 1),
     );
     return this.getRowHeight(probeRow);
+  }
+
+  set defaultRowHeight(h: number) {
+    if (typeof this.wasm.set_default_row_height === "function") {
+      this.wasm.set_default_row_height(this.gridId, h);
+    } else {
+      this.wasm.set_row_height(this.gridId, -1, h);
+    }
+    this.dirty = true;
   }
 
   /**
@@ -1495,35 +1730,55 @@ export class VolvoxGrid {
 
   // ── Appearance ───────────────────────────────────────────────────────
 
-  setSelectionMode(mode: number): void {
-    this.wasm.set_selection_mode(this.gridId, mode);
+  get selectionMode(): number {
+    if (typeof this.wasm.get_selection_mode === "function") {
+      this.selectionModeValue = Number(this.wasm.get_selection_mode(this.gridId));
+    }
+    return this.selectionModeValue;
+  }
+
+  set selectionMode(mode: number) {
+    this.selectionModeValue = Math.trunc(mode);
+    this.wasm.set_selection_mode(this.gridId, this.selectionModeValue);
     this.dirty = true;
   }
 
-  setSelectionVisibility(mode: number): void {
+  get selectionVisibility(): number {
+    if (typeof this.wasm.get_selection_visibility === "function") {
+      this.selectionVisibilityValue = Number(this.wasm.get_selection_visibility(this.gridId));
+    } else if (typeof this.wasm.get_highlight === "function") {
+      this.selectionVisibilityValue = Number(this.wasm.get_highlight(this.gridId));
+    }
+    return this.selectionVisibilityValue;
+  }
+
+  set selectionVisibility(mode: number) {
+    this.selectionVisibilityValue = Math.trunc(mode);
     if (typeof this.wasm.set_selection_visibility === "function") {
-      this.wasm.set_selection_visibility(this.gridId, mode);
+      this.wasm.set_selection_visibility(this.gridId, this.selectionVisibilityValue);
     } else {
-      this.wasm.set_highlight(this.gridId, mode);
+      this.wasm.set_highlight(this.gridId, this.selectionVisibilityValue);
     }
     this.dirty = true;
   }
 
-  setHighlight(hl: number): void {
-    this.setSelectionVisibility(hl);
+  get focusBorder(): number {
+    if (typeof this.wasm.get_focus_border === "function") {
+      this.focusBorderValue = Number(this.wasm.get_focus_border(this.gridId));
+    } else if (typeof this.wasm.get_focus_rect === "function") {
+      this.focusBorderValue = Number(this.wasm.get_focus_rect(this.gridId));
+    }
+    return this.focusBorderValue;
   }
 
-  setFocusBorder(style: number): void {
+  set focusBorder(style: number) {
+    this.focusBorderValue = Math.trunc(style);
     if (typeof this.wasm.set_focus_border === "function") {
-      this.wasm.set_focus_border(this.gridId, style);
+      this.wasm.set_focus_border(this.gridId, this.focusBorderValue);
     } else {
-      this.wasm.set_focus_rect(this.gridId, style);
+      this.wasm.set_focus_rect(this.gridId, this.focusBorderValue);
     }
     this.dirty = true;
-  }
-
-  setFocusRect(fr: number): void {
-    this.setFocusBorder(fr);
   }
 
   setFontName(name: string): void {
@@ -1540,8 +1795,16 @@ export class VolvoxGrid {
     }
   }
 
-  setSpanMode(mode: number): void {
-    this.wasm.set_span_mode(this.gridId, mode);
+  get cellSpanMode(): number {
+    if (typeof this.wasm.get_span_mode === "function") {
+      this.cellSpanModeValue = Number(this.wasm.get_span_mode(this.gridId));
+    }
+    return this.cellSpanModeValue;
+  }
+
+  set cellSpanMode(mode: number) {
+    this.cellSpanModeValue = Math.trunc(mode);
+    this.wasm.set_span_mode(this.gridId, this.cellSpanModeValue);
     this.dirty = true;
   }
 
@@ -1564,17 +1827,23 @@ export class VolvoxGrid {
     return result;
   }
 
-  setHeaderFeatures(mode: number): void {
-    if (typeof this.wasm.set_header_features === "function") {
-      this.wasm.set_header_features(this.gridId, mode);
-    } else {
-      this.wasm.set_explorer_bar(this.gridId, mode);
+  get headerFeatures(): number {
+    if (typeof this.wasm.get_header_features === "function") {
+      this.headerFeaturesValue = Number(this.wasm.get_header_features(this.gridId));
+    } else if (typeof this.wasm.get_explorer_bar === "function") {
+      this.headerFeaturesValue = Number(this.wasm.get_explorer_bar(this.gridId));
     }
-    this.dirty = true;
+    return this.headerFeaturesValue;
   }
 
-  setExplorerBar(mode: number): void {
-    this.setHeaderFeatures(mode);
+  set headerFeatures(mode: number) {
+    this.headerFeaturesValue = Math.trunc(mode);
+    if (typeof this.wasm.set_header_features === "function") {
+      this.wasm.set_header_features(this.gridId, this.headerFeaturesValue);
+    } else {
+      this.wasm.set_explorer_bar(this.gridId, this.headerFeaturesValue);
+    }
+    this.dirty = true;
   }
 
   /** Set grid lines mode: 0=none, 1=flat, 2=inset, 3=raised, 4=dashes, 5=dots */
@@ -1718,98 +1987,136 @@ export class VolvoxGrid {
     return 0;
   }
 
-  setEditTrigger(mode: number): void {
+  get editTrigger(): number {
+    if (typeof this.wasm.get_edit_trigger === "function") {
+      this.editTriggerValue = Number(this.wasm.get_edit_trigger(this.gridId));
+    } else if (typeof this.wasm.get_editable_mode === "function") {
+      this.editTriggerValue = Number(this.wasm.get_editable_mode(this.gridId));
+    }
+    return this.editTriggerValue;
+  }
+
+  set editTrigger(mode: number) {
+    this.editTriggerValue = Math.trunc(mode);
     if (typeof this.wasm.set_edit_trigger === "function") {
-      this.wasm.set_edit_trigger(this.gridId, mode);
+      this.wasm.set_edit_trigger(this.gridId, this.editTriggerValue);
     } else {
-      this.wasm.set_editable_mode(this.gridId, mode);
+      this.wasm.set_editable_mode(this.gridId, this.editTriggerValue);
     }
     this.dirty = true;
   }
 
-  setEditableMode(mode: number): void {
-    this.setEditTrigger(mode);
+  get editable(): boolean {
+    return this.editTrigger !== 0;
   }
 
-  setTabBehavior(mode: number): void {
-    this.wasm.set_tab_behavior(this.gridId, mode);
+  set editable(enabled: boolean) {
+    const current = this.editTrigger;
+    const next = enabled
+      ? (current === 0 ? 2 : current)
+      : 0;
+    this.editTrigger = next;
+  }
+
+  get tabBehavior(): number {
+    if (typeof this.wasm.get_tab_behavior === "function") {
+      this.tabBehaviorValue = Number(this.wasm.get_tab_behavior(this.gridId));
+    }
+    return this.tabBehaviorValue;
+  }
+
+  set tabBehavior(mode: number) {
+    this.tabBehaviorValue = Math.trunc(mode);
+    this.wasm.set_tab_behavior(this.gridId, this.tabBehaviorValue);
     this.dirty = true;
   }
 
-  setDropdownTrigger(mode: number): void {
+  get dropdownTrigger(): number {
+    if (typeof this.wasm.get_dropdown_trigger === "function") {
+      this.dropdownTriggerValue = Number(this.wasm.get_dropdown_trigger(this.gridId));
+    } else if (typeof this.wasm.get_show_combo_button === "function") {
+      this.dropdownTriggerValue = Number(this.wasm.get_show_combo_button(this.gridId));
+    }
+    return this.dropdownTriggerValue;
+  }
+
+  set dropdownTrigger(mode: number) {
+    this.dropdownTriggerValue = Math.trunc(mode);
     if (typeof this.wasm.set_dropdown_trigger === "function") {
-      this.wasm.set_dropdown_trigger(this.gridId, mode);
+      this.wasm.set_dropdown_trigger(this.gridId, this.dropdownTriggerValue);
     } else {
-      this.wasm.set_show_combo_button(this.gridId, mode);
+      this.wasm.set_show_combo_button(this.gridId, this.dropdownTriggerValue);
     }
     this.dirty = true;
   }
 
-  setShowComboButton(mode: number): void {
-    this.setDropdownTrigger(mode);
+  get dropdownSearch(): boolean {
+    if (typeof this.wasm.get_dropdown_search === "function") {
+      this.dropdownSearchValue = Boolean(this.wasm.get_dropdown_search(this.gridId));
+    } else if (typeof this.wasm.get_combo_search === "function") {
+      this.dropdownSearchValue = Boolean(this.wasm.get_combo_search(this.gridId));
+    }
+    return this.dropdownSearchValue;
   }
 
-  setDropdownSearch(enabled: boolean): void {
+  set dropdownSearch(enabled: boolean) {
+    this.dropdownSearchValue = Boolean(enabled);
     if (typeof this.wasm.set_dropdown_search === "function") {
-      this.wasm.set_dropdown_search(this.gridId, enabled ? 1 : 0);
+      this.wasm.set_dropdown_search(this.gridId, this.dropdownSearchValue ? 1 : 0);
     } else {
-      this.wasm.set_combo_search(this.gridId, enabled ? 1 : 0);
+      this.wasm.set_combo_search(this.gridId, this.dropdownSearchValue ? 1 : 0);
     }
     this.dirty = true;
   }
 
-  setComboSearch(enabled: boolean): void {
-    this.setDropdownSearch(enabled);
-  }
-
-  setEditMaxLength(maxChars: number): void {
-    this.wasm.set_edit_max_length(this.gridId, maxChars);
-    this.dirty = true;
-  }
-
-  getEditMaxLength(): number {
+  get editMaxLength(): number {
     if (typeof this.wasm.get_edit_max_length === "function") {
       return Number(this.wasm.get_edit_max_length(this.gridId));
     }
     return 0;
   }
 
-  setEditText(text: string): void {
-    if (typeof this.wasm.set_edit_text === "function") {
-      this.wasm.set_edit_text(this.gridId, text);
-      this.dirty = true;
-    }
+  set editMaxLength(maxChars: number) {
+    this.wasm.set_edit_max_length(this.gridId, Math.trunc(maxChars));
+    this.dirty = true;
   }
 
-  getEditText(): string {
+  get editText(): string {
     if (typeof this.wasm.get_edit_text === "function") {
       return String(this.wasm.get_edit_text(this.gridId) ?? "");
     }
     return "";
   }
 
-  setTopRow(row: number): void {
+  set editText(text: string) {
+    if (typeof this.wasm.set_edit_text === "function") {
+      this.wasm.set_edit_text(this.gridId, text);
+      this.dirty = true;
+    }
+  }
+
+  set topRow(row: number) {
     if (typeof this.wasm.set_top_row === "function") {
       this.wasm.set_top_row(this.gridId, row);
       this.dirty = true;
     }
   }
 
-  getTopRow(): number {
+  get topRow(): number {
     if (typeof this.wasm.get_top_row === "function") {
       return Number(this.wasm.get_top_row(this.gridId));
     }
     return this.getVisibleRowRange().first;
   }
 
-  setLeftCol(col: number): void {
+  set leftCol(col: number) {
     if (typeof this.wasm.set_left_col === "function") {
       this.wasm.set_left_col(this.gridId, col);
       this.dirty = true;
     }
   }
 
-  getLeftCol(): number {
+  get leftCol(): number {
     if (typeof this.wasm.get_left_col === "function") {
       return Number(this.wasm.get_left_col(this.gridId));
     }
@@ -2445,13 +2752,13 @@ export class VolvoxGrid {
     this.setCellDropdownItems(row, col, list);
   }
 
-  setFlingImpulseGain(gain: number): void {
+  set flingImpulseGain(gain: number) {
     if (typeof this.wasm.set_fling_impulse_gain === "function") {
       this.wasm.set_fling_impulse_gain(this.gridId, gain);
     }
   }
 
-  setFlingFriction(friction: number): void {
+  set flingFriction(friction: number) {
     if (typeof this.wasm.set_fling_friction === "function") {
       this.wasm.set_fling_friction(this.gridId, friction);
     }
@@ -2464,9 +2771,13 @@ export class VolvoxGrid {
    *
    * 0=AUTO, 1=FIFO, 2=MAILBOX, 3=IMMEDIATE
    */
-  setPresentMode(mode: number): void {
+  get presentMode(): number {
+    return this._presentMode;
+  }
+
+  set presentMode(mode: number) {
     const next = Number.isFinite(mode) ? Math.max(0, Math.trunc(mode)) : 0;
-    this.presentMode = next;
+    this._presentMode = next;
 
     if (typeof this.wasm.volvox_grid_configure === "function") {
       try {
@@ -2480,18 +2791,21 @@ export class VolvoxGrid {
     if (this.gpuCanvas && typeof this.wasm.gpu_configure_surface === "function") {
       const w = Math.max(1, this.gpuCanvas.width || this.canvas.width || 1);
       const h = Math.max(1, this.gpuCanvas.height || this.canvas.height || 1);
-      this.wasm.gpu_configure_surface(this.gpuCanvas, w, h, this.presentMode);
+      this.wasm.gpu_configure_surface(this.gpuCanvas, w, h, this._presentMode);
     }
 
     this.dirty = true;
   }
 
-  getPresentMode(): number {
-    return this.presentMode;
+  /** Set renderer mode: 0=AUTO, 1=CPU, 2=GPU */
+  get rendererMode(): number {
+    if (typeof this.wasm.get_renderer_mode === "function") {
+      return Number(this.wasm.get_renderer_mode(this.gridId));
+    }
+    return 0;
   }
 
-  /** Set renderer mode: 0=AUTO, 1=CPU, 2=GPU */
-  setRendererMode(mode: number): void {
+  set rendererMode(mode: number) {
     if (typeof this.wasm.set_renderer_mode === "function") {
       this.wasm.set_renderer_mode(this.gridId, mode);
     }
@@ -2503,11 +2817,12 @@ export class VolvoxGrid {
     this.dirty = true;
   }
 
-  getRendererMode(): number {
-    if (typeof this.wasm.get_renderer_mode === "function") {
-      return Number(this.wasm.get_renderer_mode(this.gridId));
-    }
-    return 0;
+  get rendererBackend(): number {
+    return this.rendererMode;
+  }
+
+  set rendererBackend(mode: number) {
+    this.rendererMode = mode;
   }
 
   /** Check if GPU renderer is available in this build. */
@@ -2523,7 +2838,7 @@ export class VolvoxGrid {
    *
    * Creates a second (overlay) canvas for the WebGPU surface so that the
    * original canvas keeps its 2D context and CPU<->GPU toggling works at
-   * runtime via `setRendererMode()`.
+   * runtime via the `rendererMode` property.
    *
    * On failure the grid falls back to the CPU path transparently.
    */
@@ -2533,7 +2848,7 @@ export class VolvoxGrid {
         console.info("VolvoxGrid: GPU feature not compiled in");
         return false;
       }
-      if (this.getRendererMode() === 1) return false; // CPU-only by user choice
+      if (this.rendererMode === 1) return false; // CPU-only by user choice
 
       if (typeof navigator === "undefined" || !("gpu" in navigator)) {
         console.warn(
@@ -2571,7 +2886,7 @@ export class VolvoxGrid {
       }
       this.matchGpuCanvasPosition(gpuCanvas);
 
-      const configured = this.wasm.gpu_configure_surface(gpuCanvas, w, h, this.presentMode);
+      const configured = this.wasm.gpu_configure_surface(gpuCanvas, w, h, this._presentMode);
       if (!configured) {
         gpuCanvas.remove();
         this.useGpu = false;
@@ -2602,45 +2917,70 @@ export class VolvoxGrid {
   }
 
   /** Enable or disable the debug overlay. */
-  setDebugOverlay(enabled: boolean): void {
-    if (typeof this.wasm.set_debug_overlay === "function") {
-      this.wasm.set_debug_overlay(this.gridId, enabled);
-      this.dirty = true;
-    }
-  }
-
-  /** Get the current debug overlay state. */
-  getDebugOverlay(): boolean {
+  get debugOverlay(): boolean {
     if (typeof this.wasm.get_debug_overlay === "function") {
       return Boolean(this.wasm.get_debug_overlay(this.gridId));
     }
     return false;
   }
 
-  /** Enable or disable layout animation.
-   *  @param enabled Whether animation is on.
-   *  @param durationMs Animation duration in ms (0 = default 200ms). */
-  setAnimationEnabled(enabled: boolean, durationMs: number = 0): void {
-    if (typeof this.wasm.set_animation_enabled === "function") {
-      this.wasm.set_animation_enabled(this.gridId, enabled, Math.trunc(durationMs));
+  set debugOverlay(enabled: boolean) {
+    if (typeof this.wasm.set_debug_overlay === "function") {
+      this.wasm.set_debug_overlay(this.gridId, enabled);
       this.dirty = true;
     }
+  }
+
+  get animationEnabled(): boolean {
+    if (typeof this.wasm.get_animation_enabled === "function") {
+      this.animationEnabledValue = Boolean(this.wasm.get_animation_enabled(this.gridId));
+    }
+    return this.animationEnabledValue;
+  }
+
+  /** Enable or disable layout animation. */
+  set animationEnabled(enabled: boolean) {
+    this.animationEnabledValue = Boolean(enabled);
+    if (typeof this.wasm.set_animation_enabled === "function") {
+      this.wasm.set_animation_enabled(
+        this.gridId,
+        this.animationEnabledValue,
+        this.animationDurationMsValue,
+      );
+      this.dirty = true;
+    }
+  }
+
+  get animationDurationMs(): number {
+    return this.animationDurationMsValue;
+  }
+
+  set animationDurationMs(durationMs: number) {
+    this.animationDurationMsValue = Math.max(0, Math.trunc(durationMs));
+    if (typeof this.wasm.set_animation_enabled === "function") {
+      this.wasm.set_animation_enabled(
+        this.gridId,
+        this.animationEnabled,
+        this.animationDurationMsValue,
+      );
+      this.dirty = true;
+    }
+  }
+
+  get textLayoutCacheCap(): number {
+    if (typeof this.wasm.get_text_layout_cache_cap === "function") {
+      this.textLayoutCacheCapValue = Number(this.wasm.get_text_layout_cache_cap(this.gridId));
+    }
+    return this.textLayoutCacheCapValue;
   }
 
   /** Set the text layout cache capacity. */
-  setTextLayoutCacheCap(cap: number): void {
+  set textLayoutCacheCap(cap: number) {
+    this.textLayoutCacheCapValue = Math.max(0, Math.trunc(cap));
     if (typeof this.wasm.set_text_layout_cache_cap === "function") {
-      this.wasm.set_text_layout_cache_cap(this.gridId, Math.trunc(cap));
+      this.wasm.set_text_layout_cache_cap(this.gridId, this.textLayoutCacheCapValue);
       this.dirty = true;
     }
-  }
-
-  /** Get whether layout animation is enabled. */
-  getAnimationEnabled(): boolean {
-    if (typeof this.wasm.get_animation_enabled === "function") {
-      return Boolean(this.wasm.get_animation_enabled(this.gridId));
-    }
-    return false;
   }
 
   getVisibleRowRange(): { first: number; last: number } {
@@ -2650,7 +2990,7 @@ export class VolvoxGrid {
       const last = Number(this.wasm.get_visible_row_end(this.gridId));
       return { first, last };
     }
-    const row = this.selectionRow;
+    const row = this.cursorRow;
     return { first: row, last: row };
   }
 
@@ -2658,7 +2998,7 @@ export class VolvoxGrid {
     if (typeof this.wasm.has_cell === "function") {
       return Number(this.wasm.has_cell(this.gridId, row, col)) !== 0;
     }
-    return this.getTextMatrix(row, col).length > 0;
+    return this.getCellText(row, col).length > 0;
   }
 
   clearCellRange(row1: number, col1: number, row2: number, col2: number): void {
@@ -2729,7 +3069,7 @@ export class VolvoxGrid {
       this.dirty = true;
       return;
     }
-    this.clearCellRange(0, 0, Math.max(0, this.rows - 1), Math.max(0, this.cols - 1));
+    this.clearCellRange(0, 0, Math.max(0, this.rowCount - 1), Math.max(0, this.colCount - 1));
   }
 
   // ── Sort ─────────────────────────────────────────────────────────────
@@ -2761,7 +3101,7 @@ export class VolvoxGrid {
     }
 
     const first = Math.max(0, Math.trunc(colFrom));
-    const last = colTo < 0 ? this.cols - 1 : Math.min(this.cols - 1, Math.trunc(colTo));
+    const last = colTo < 0 ? this.colCount - 1 : Math.min(this.colCount - 1, Math.trunc(colTo));
     if (last < first) return;
     for (let c = first; c <= last; c += 1) {
       this.autoResizeCol(c);
@@ -2791,8 +3131,8 @@ export class VolvoxGrid {
     }
 
     const needle = caseSensitive ? text : text.toLowerCase();
-    for (let r = Math.max(0, startRow); r < this.rows; r += 1) {
-      const cell = this.getTextMatrix(r, options.col);
+    for (let r = Math.max(0, startRow); r < this.rowCount; r += 1) {
+      const cell = this.getCellText(r, options.col);
       const value = caseSensitive ? cell : cell.toLowerCase();
       if (fullMatch ? value === needle : value.includes(needle)) {
         return r;
@@ -2817,8 +3157,8 @@ export class VolvoxGrid {
     } catch {
       return -1;
     }
-    for (let r = Math.max(0, startRow); r < this.rows; r += 1) {
-      if (rx.test(this.getTextMatrix(r, options.col))) {
+    for (let r = Math.max(0, startRow); r < this.rowCount; r += 1) {
+      if (rx.test(this.getCellText(r, options.col))) {
         return r;
       }
     }
@@ -2855,7 +3195,7 @@ export class VolvoxGrid {
     let max = Number.NEGATIVE_INFINITY;
     for (let r = row1; r <= row2; r += 1) {
       for (let c = col1; c <= col2; c += 1) {
-        const n = Number(this.getTextMatrix(r, c));
+        const n = Number(this.getCellText(r, c));
         if (!Number.isFinite(n)) continue;
         count += 1;
         sum += n;
@@ -2887,21 +3227,21 @@ export class VolvoxGrid {
   // ── User resizing / freezing ────────────────────────────────────────
 
   /** 0=none, 1=cols, 2=rows, 3=both, 4=uniform cols, 5=uniform rows, 6=uniform both */
-  setAllowUserResizing(mode: number): void {
-    this.wasm.set_allow_user_resizing(this.gridId, mode);
-  }
-
-  getAllowUserResizing(): number {
+  get allowUserResizing(): number {
     return this.wasm.get_allow_user_resizing(this.gridId);
   }
 
-  /** 0=none, 1=cols, 2=rows, 3=both */
-  setAllowUserFreezing(mode: number): void {
-    this.wasm.set_allow_user_freezing(this.gridId, mode);
+  set allowUserResizing(mode: number) {
+    this.wasm.set_allow_user_resizing(this.gridId, Math.trunc(mode));
   }
 
-  getAllowUserFreezing(): number {
+  /** 0=none, 1=cols, 2=rows, 3=both */
+  get allowUserFreezing(): number {
     return this.wasm.get_allow_user_freezing(this.gridId);
+  }
+
+  set allowUserFreezing(mode: number) {
+    this.wasm.set_allow_user_freezing(this.gridId, Math.trunc(mode));
   }
 
   setAutoSizeMouse(enabled: boolean): void {
@@ -3015,10 +3355,18 @@ export class VolvoxGrid {
     }
   }
 
+  get scrollBars(): number {
+    if (typeof this.wasm.get_scroll_bars === "function") {
+      this.scrollBarsValue = Number(this.wasm.get_scroll_bars(this.gridId));
+    }
+    return this.scrollBarsValue;
+  }
+
   /** Set scrollbar visibility: 0=none, 1=horizontal, 2=vertical, 3=both */
-  setScrollBars(mode: number): void {
+  set scrollBars(mode: number) {
+    this.scrollBarsValue = Math.trunc(mode);
     if (typeof this.wasm.set_scroll_bars === "function") {
-      this.wasm.set_scroll_bars(this.gridId, mode);
+      this.wasm.set_scroll_bars(this.gridId, this.scrollBarsValue);
     }
   }
 
@@ -3176,8 +3524,8 @@ export class VolvoxGrid {
     }
     this.hideHostEditors(false);
     this.gridId = nextId;
-    if (this.presentMode !== 0) {
-      this.setPresentMode(this.presentMode);
+    if (this._presentMode !== 0) {
+      this.presentMode = this._presentMode;
     }
     // Re-enable fling on the new grid
     if (typeof this.wasm.set_fling_enabled === "function") {

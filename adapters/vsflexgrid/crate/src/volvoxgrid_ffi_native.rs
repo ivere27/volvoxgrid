@@ -31,7 +31,7 @@ fn clear_last_error() {
 // =============================================================================
 
 pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
-    fn create(&self, request: CreateRequest) -> Result<GridHandle, String>;
+    fn create(&self, request: CreateRequest) -> Result<CreateResponse, String>;
     fn destroy(&self, request: GridHandle) -> Result<Empty, String>;
     fn configure(&self, request: ConfigureRequest) -> Result<Empty, String>;
     fn get_config(&self, request: GridHandle) -> Result<GridConfig, String>;
@@ -49,6 +49,9 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn clear(&self, request: ClearRequest) -> Result<Empty, String>;
     fn select(&self, request: SelectRequest) -> Result<Empty, String>;
     fn get_selection(&self, request: GridHandle) -> Result<SelectionState, String>;
+    fn show_cell(&self, request: ShowCellRequest) -> Result<Empty, String>;
+    fn set_top_row(&self, request: SetRowRequest) -> Result<Empty, String>;
+    fn set_left_col(&self, request: SetColRequest) -> Result<Empty, String>;
     fn edit(&self, request: EditCommand) -> Result<EditState, String>;
     fn sort(&self, request: SortRequest) -> Result<Empty, String>;
     fn subtotal(&self, request: SubtotalRequest) -> Result<Empty, String>;
@@ -136,10 +139,11 @@ pub unsafe extern "C" fn volvox_grid_create(
     viewport_height: i32,
     scale: f32,
     config: *const u8, config_len: i32,
-) -> i64 {
+    out_len: *mut i32,
+) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return -1; },
+        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
     };
     let req = CreateRequest {
         viewport_width,
@@ -148,14 +152,24 @@ pub unsafe extern "C" fn volvox_grid_create(
         config: if !config.is_null() && config_len > 0 {
             match GridConfig::decode(std::slice::from_raw_parts(config, config_len as usize)) {
                 Ok(m) => Some(m),
-                Err(e) => { set_last_error(format!("decode 'config': {}", e)); return -1; }
+                Err(e) => { set_last_error(format!("decode 'config': {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); }
             }
         } else { None },
         ..Default::default()
     };
     match plugin.create(req) {
-        Ok(r) => { clear_last_error(); r.id },
-        Err(e) => { set_last_error(e); return -1; },
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            if r.encode(&mut buf).is_ok() {
+                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                alloc_payload_with_header(buf)
+            } else {
+                if !out_len.is_null() { *out_len = 0; }
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
     }
 }
 
@@ -726,6 +740,104 @@ pub unsafe extern "C" fn volvox_grid_get_selection(
         ..Default::default()
     };
     match plugin.get_selection(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            if r.encode(&mut buf).is_ok() {
+                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                alloc_payload_with_header(buf)
+            } else {
+                if !out_len.is_null() { *out_len = 0; }
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+    }
+}
+
+/// ShowCell
+#[no_mangle]
+pub unsafe extern "C" fn volvox_grid_show_cell(
+    grid_id: i64,
+    row: i32,
+    col: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let plugin = match get_volvox_grid_service_plugin() {
+        Some(p) => p,
+        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+    };
+    let req = ShowCellRequest {
+        grid_id,
+        row,
+        col,
+        ..Default::default()
+    };
+    match plugin.show_cell(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            if r.encode(&mut buf).is_ok() {
+                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                alloc_payload_with_header(buf)
+            } else {
+                if !out_len.is_null() { *out_len = 0; }
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+    }
+}
+
+/// SetTopRow
+#[no_mangle]
+pub unsafe extern "C" fn volvox_grid_set_top_row(
+    grid_id: i64,
+    row: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let plugin = match get_volvox_grid_service_plugin() {
+        Some(p) => p,
+        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+    };
+    let req = SetRowRequest {
+        grid_id,
+        row,
+        ..Default::default()
+    };
+    match plugin.set_top_row(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            if r.encode(&mut buf).is_ok() {
+                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                alloc_payload_with_header(buf)
+            } else {
+                if !out_len.is_null() { *out_len = 0; }
+                std::ptr::null_mut()
+            }
+        },
+        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+    }
+}
+
+/// SetLeftCol
+#[no_mangle]
+pub unsafe extern "C" fn volvox_grid_set_left_col(
+    grid_id: i64,
+    col: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let plugin = match get_volvox_grid_service_plugin() {
+        Some(p) => p,
+        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+    };
+    let req = SetColRequest {
+        grid_id,
+        col,
+        ..Default::default()
+    };
+    match plugin.set_left_col(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();

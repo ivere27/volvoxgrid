@@ -68,9 +68,9 @@ class _MyAppState extends State<MyApp> {
     await controller.setColumnCaption(2, 'Qty');
 
     // Set data
-    await controller.setTextMatrix(0, 0, 'Widget A');
-    await controller.setTextMatrix(0, 1, '29.99');
-    await controller.setTextMatrix(0, 2, '150');
+    await controller.setCellText(0, 0, 'Widget A');
+    await controller.setCellText(0, 1, '29.99');
+    await controller.setCellText(0, 2, '150');
   }
 
   @override
@@ -136,21 +136,21 @@ controller.dispose();
 #### Grid Dimensions
 
 ```dart
-await controller.setRows(1000);
-await controller.setCols(20);
-await controller.setFrozenRows(3);
-await controller.setFrozenCols(1);
+await controller.setRowCount(1000);
+await controller.setColCount(20);
+await controller.setFrozenRowCount(3);
+await controller.setFrozenColCount(1);
 
-int rows = await controller.getRows();
-int cols = await controller.getCols();
+int rows = await controller.rowCount();
+int cols = await controller.colCount();
 ```
 
 #### Cell Data
 
 ```dart
 // Single cell
-await controller.setTextMatrix(row, col, 'text');
-String text = await controller.getTextMatrix(row, col);
+await controller.setCellText(row, col, 'text');
+String text = await controller.getCellText(row, col);
 
 // Batch update
 await controller.setCells([
@@ -218,16 +218,31 @@ await controller.setHeaderFeatures(HeaderFeatures.HEADER_SORT);
 
 ```dart
 // Set active cell
-await controller.setRow(5);
-await controller.setCol(2);
+await controller.setCursorRow(5);
+await controller.setCursorCol(2);
 
 // Select a range
 await controller.selectRange(1, 0, 5, 3);  // rowStart, colStart, rowEnd, colEnd
+
+// Select multiple ranges
+await controller.selectRanges([
+  (CellRange()
+    ..row1 = 1
+    ..col1 = 0
+    ..row2 = 2
+    ..col2 = 1),
+  (CellRange()
+    ..row1 = 4
+    ..col1 = 3
+    ..row2 = 6
+    ..col2 = 4),
+]);
 
 // Get current selection
 SelectionState sel = await controller.getSelection();
 int row = sel.activeRow;
 int col = sel.activeCol;
+List<CellRange> ranges = sel.ranges;
 
 // Selection mode
 await controller.setSelectionMode(SelectionMode.BY_ROW);
@@ -331,7 +346,7 @@ await controller.deleteSelection();
 
 ```dart
 await controller.setTopRow(50);
-int top = await controller.getTopRow();
+int top = await controller.topRow();
 await controller.setScrollBars(ScrollBarsMode.SCROLLBAR_BOTH);
 await controller.setFlingEnabled(true);      // momentum scrolling
 await controller.setFlingImpulseGain(80.0);

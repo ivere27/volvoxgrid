@@ -53,22 +53,6 @@ IndicatorBandsConfig _defaultIndicatorBandsConfig() => IndicatorBandsConfig()
       ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
     ]));
 
-ColIndicatorConfig _defaultColIndicatorTopConfig() => ColIndicatorConfig()
-  ..visible = true
-  ..bandRows = 1
-  ..modeBits = _colIndicatorModeBits([
-    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
-    ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
-  ]);
-
-RowIndicatorConfig _defaultRowIndicatorStartConfig() => RowIndicatorConfig()
-  ..visible = false
-  ..widthPx = 35
-  ..modeBits = _rowIndicatorModeBits([
-    RowIndicatorMode.ROW_INDICATOR_CURRENT,
-    RowIndicatorMode.ROW_INDICATOR_SELECTION,
-  ]);
-
 /// Supported rendering backends.
 enum RendererBackend {
   /// Automatic selection (prefers GPU if available).
@@ -93,7 +77,7 @@ enum RendererBackend {
 /// ```dart
 /// final controller = VolvoxGridController();
 /// await controller.create(rows: 101, cols: 6);
-/// await controller.setTextMatrix(0, 0, 'Header');
+/// await controller.setCellText(0, 0, 'Header');
 /// ```
 class VolvoxGridController extends ChangeNotifier {
   static const MethodChannel _channel =
@@ -146,8 +130,8 @@ class VolvoxGridController extends ChangeNotifier {
           ..rows = rows
           ..cols = cols)
         ..indicatorBands = _defaultIndicatorBandsConfig());
-    final handle = await VolvoxGridServiceFfi.Create(req);
-    _gridId = handle.id;
+    final response = await VolvoxGridServiceFfi.Create(req);
+    _gridId = response.handle.id;
     notifyListeners();
   }
 
@@ -180,6 +164,20 @@ class VolvoxGridController extends ChangeNotifier {
     return VolvoxGridServiceFfi.GetConfig(_handle);
   }
 
+  SelectRequest _buildSelectRequest(
+    int activeRow,
+    int activeCol,
+    Iterable<CellRange> ranges, {
+    bool show = false,
+  }) {
+    return SelectRequest()
+      ..gridId = _gridId
+      ..activeRow = activeRow
+      ..activeCol = activeCol
+      ..ranges.addAll(ranges)
+      ..show = show;
+  }
+
   SelectRequest _buildSingleRangeSelectRequest(
     int activeRow,
     int activeCol, {
@@ -194,41 +192,36 @@ class VolvoxGridController extends ChangeNotifier {
       ..col1 = activeCol < endCol ? activeCol : endCol
       ..row2 = activeRow > endRow ? activeRow : endRow
       ..col2 = activeCol > endCol ? activeCol : endCol;
-    return SelectRequest()
-      ..gridId = _gridId
-      ..activeRow = activeRow
-      ..activeCol = activeCol
-      ..ranges.add(range)
-      ..show = show;
+    return _buildSelectRequest(activeRow, activeCol, [range], show: show);
   }
 
   // ── Grid Dimensions ───────────────────────────────────────────────────────
 
   /// Get the total number of rows.
-  Future<int> getRows() async {
+  Future<int> rowCount() async {
     final config = await _getConfig();
     return config.layout.rows;
   }
 
   /// Set the total number of rows.
-  Future<void> setRows(int n) async {
+  Future<void> setRowCount(int n) async {
     await _configure(GridConfig()..layout = (LayoutConfig()..rows = n));
   }
 
   /// Get the total number of columns.
-  Future<int> getCols() async {
+  Future<int> colCount() async {
     final config = await _getConfig();
     return config.layout.cols;
   }
 
   /// Set the total number of columns.
-  Future<void> setCols(int n) async {
+  Future<void> setColCount(int n) async {
     await _configure(GridConfig()..layout = (LayoutConfig()..cols = n));
   }
 
   /// Show or hide the top column-indicator band used for headers.
   Future<void> setShowColumnHeaders(bool visible) async {
-    final top = _defaultColIndicatorTopConfig()..visible = visible;
+    final top = ColIndicatorConfig()..visible = visible;
     await _configure(
       GridConfig()
         ..indicatorBands = (IndicatorBandsConfig()..colIndicatorTop = top),
@@ -237,9 +230,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the top column-indicator content bitmask.
   Future<void> setColumnIndicatorTopModeBits(int modeBits) async {
-    final top = ColIndicatorConfig()
-      ..modeBits = modeBits
-      ..visible = modeBits != 0;
+    final top = ColIndicatorConfig()..modeBits = modeBits;
     await _configure(
       GridConfig()
         ..indicatorBands = (IndicatorBandsConfig()..colIndicatorTop = top),
@@ -248,23 +239,16 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the number of rows in the top column-indicator band.
   Future<void> setColumnIndicatorTopRowCount(int rows) async {
-    final top = ColIndicatorConfig()
-      ..bandRows = rows < 0 ? 0 : rows
-      ..visible = rows != 0;
+    final top = ColIndicatorConfig()..bandRows = rows < 0 ? 0 : rows;
     await _configure(
       GridConfig()
         ..indicatorBands = (IndicatorBandsConfig()..colIndicatorTop = top),
     );
   }
 
-  /// Alias for [setShowRowIndicator].
-  Future<void> setShowIndicator(bool visible) async {
-    await setShowRowIndicator(visible);
-  }
-
   /// Show or hide the start-side row-indicator band.
   Future<void> setShowRowIndicator(bool visible) async {
-    final row = _defaultRowIndicatorStartConfig()..visible = visible;
+    final row = RowIndicatorConfig()..visible = visible;
     await _configure(
       GridConfig()
         ..indicatorBands = (IndicatorBandsConfig()..rowIndicatorStart = row),
@@ -273,9 +257,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the start-side row-indicator content bitmask.
   Future<void> setRowIndicatorStartModeBits(int modeBits) async {
-    final row = RowIndicatorConfig()
-      ..modeBits = modeBits
-      ..visible = modeBits != 0;
+    final row = RowIndicatorConfig()..modeBits = modeBits;
     await _configure(
       GridConfig()
         ..indicatorBands = (IndicatorBandsConfig()..rowIndicatorStart = row),
@@ -292,13 +274,25 @@ class VolvoxGridController extends ChangeNotifier {
     );
   }
 
-  /// Set frozen (non-scrollable data) rows below the fixed rows.
-  Future<void> setFrozenRows(int n) async {
+  /// Get the number of frozen (non-scrollable data) rows below the header band.
+  Future<int> frozenRowCount() async {
+    final config = await _getConfig();
+    return config.layout.frozenRows;
+  }
+
+  /// Set frozen (non-scrollable data) rows below the header band.
+  Future<void> setFrozenRowCount(int n) async {
     await _configure(GridConfig()..layout = (LayoutConfig()..frozenRows = n));
   }
 
+  /// Get the number of frozen (non-scrollable data) columns.
+  Future<int> frozenColCount() async {
+    final config = await _getConfig();
+    return config.layout.frozenCols;
+  }
+
   /// Set frozen (non-scrollable data) columns.
-  Future<void> setFrozenCols(int n) async {
+  Future<void> setFrozenColCount(int n) async {
     await _configure(GridConfig()..layout = (LayoutConfig()..frozenCols = n));
   }
 
@@ -399,7 +393,7 @@ class VolvoxGridController extends ChangeNotifier {
   // ── Cell Text ─────────────────────────────────────────────────────────────
 
   /// Set the text of a cell at the given [row] and [col].
-  Future<void> setTextMatrix(int row, int col, String text) async {
+  Future<void> setCellText(int row, int col, String text) async {
     await VolvoxGridServiceFfi.UpdateCells(UpdateCellsRequest()
       ..gridId = _gridId
       ..cells.add(CellUpdate()
@@ -410,7 +404,7 @@ class VolvoxGridController extends ChangeNotifier {
   }
 
   /// Get the text of a cell at the given [row] and [col].
-  Future<String> getTextMatrix(int row, int col) async {
+  Future<String> getCellText(int row, int col) async {
     final resp = await VolvoxGridServiceFfi.GetCells(GetCellsRequest()
       ..gridId = _gridId
       ..row1 = row
@@ -456,8 +450,8 @@ class VolvoxGridController extends ChangeNotifier {
       if (resizeGrid) {
         final neededRows = startRow + rows.length;
         final neededCols = startCol + maxCols;
-        final currentRows = await getRows();
-        final currentCols = await getCols();
+        final currentRows = await rowCount();
+        final currentCols = await colCount();
         if (neededRows > currentRows || neededCols > currentCols) {
           final layout = LayoutConfig();
           if (neededRows > currentRows) layout.rows = neededRows;
@@ -514,25 +508,41 @@ class VolvoxGridController extends ChangeNotifier {
   // ── Cursor & Selection ────────────────────────────────────────────────────
 
   /// Move the active cursor to the given row.
-  Future<void> setRow(int row) async {
-    await VolvoxGridServiceFfi.Select(_buildSingleRangeSelectRequest(row, -1));
+  Future<void> setCursorRow(int row) async {
+    int targetCol;
+    try {
+      targetCol = (await VolvoxGridServiceFfi.GetSelection(_handle)).activeCol;
+    } catch (_) {
+      targetCol = 0;
+    }
+    await VolvoxGridServiceFfi.Select(
+      _buildSingleRangeSelectRequest(row, targetCol, rowEnd: row, colEnd: targetCol),
+    );
     notifyListeners();
   }
 
   /// Move the active cursor to the given column.
-  Future<void> setCol(int col) async {
-    await VolvoxGridServiceFfi.Select(_buildSingleRangeSelectRequest(-1, col));
+  Future<void> setCursorCol(int col) async {
+    int targetRow;
+    try {
+      targetRow = (await VolvoxGridServiceFfi.GetSelection(_handle)).activeRow;
+    } catch (_) {
+      targetRow = 0;
+    }
+    await VolvoxGridServiceFfi.Select(
+      _buildSingleRangeSelectRequest(targetRow, col, rowEnd: targetRow, colEnd: col),
+    );
     notifyListeners();
   }
 
   /// Get the current cursor row.
-  Future<int> getRow() async {
+  Future<int> cursorRow() async {
     final sel = await VolvoxGridServiceFfi.GetSelection(_handle);
     return sel.activeRow;
   }
 
   /// Get the current cursor column.
-  Future<int> getCol() async {
+  Future<int> cursorCol() async {
     final sel = await VolvoxGridServiceFfi.GetSelection(_handle);
     return sel.activeCol;
   }
@@ -549,14 +559,45 @@ class VolvoxGridController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Legacy alias for [selectRange].
-  Future<void> select(int row1, int col1, int row2, int col2) async {
-    await selectRange(row1, col1, row2, col2);
+  /// Select multiple rectangular ranges.
+  Future<void> selectRanges(
+    Iterable<CellRange> ranges, {
+    int? activeRow,
+    int? activeCol,
+    bool show = false,
+  }) async {
+    final normalized = ranges
+        .map((range) => CellRange()
+          ..row1 = range.row1 < range.row2 ? range.row1 : range.row2
+          ..col1 = range.col1 < range.col2 ? range.col1 : range.col2
+          ..row2 = range.row1 > range.row2 ? range.row1 : range.row2
+          ..col2 = range.col1 > range.col2 ? range.col1 : range.col2)
+        .toList(growable: false);
+    if (normalized.isEmpty) return;
+    await VolvoxGridServiceFfi.Select(_buildSelectRequest(
+      activeRow ?? normalized.first.row1,
+      activeCol ?? normalized.first.col1,
+      normalized,
+      show: show,
+    ));
+    notifyListeners();
   }
 
-  /// Get the current selection state.
+  /// Get the current selection state, including all returned ranges.
   Future<SelectionState> getSelection() async {
     return VolvoxGridServiceFfi.GetSelection(_handle);
+  }
+
+  /// Clear the current selection.
+  Future<void> clearSelection() async {
+    final sel = await VolvoxGridServiceFfi.GetSelection(_handle);
+    await VolvoxGridServiceFfi.Select(_buildSingleRangeSelectRequest(
+      sel.activeRow,
+      sel.activeCol,
+      rowEnd: sel.activeRow,
+      colEnd: sel.activeCol,
+    ));
+    notifyListeners();
   }
 
   /// Set the selection mode (free, by-row, by-column, listbox).
@@ -571,41 +612,44 @@ class VolvoxGridController extends ChangeNotifier {
       ..selection = (SelectionConfig()..selectionVisibility = style));
   }
 
-  /// Legacy alias for [setSelectionVisibility].
-  Future<void> setHighLight(SelectionVisibility style) async {
-    await setSelectionVisibility(style);
-  }
-
   /// Scroll the grid so that the specified cell is visible.
   Future<void> showCell(int row, int col) async {
-    await VolvoxGridServiceFfi.Select(
-      _buildSingleRangeSelectRequest(row, col, show: true),
+    await VolvoxGridServiceFfi.ShowCell(
+      ShowCellRequest()
+        ..gridId = _gridId
+        ..row = row
+        ..col = col,
     );
   }
 
   /// Set the topmost visible scrollable row.
-  ///
-  /// If [col] is omitted, the current selected column is preserved.
-  Future<void> setTopRow(int row, {int? col}) async {
-    var targetCol = col;
-    if (targetCol == null || targetCol < 0) {
-      try {
-        targetCol =
-            (await VolvoxGridServiceFfi.GetSelection(_handle)).activeCol;
-      } catch (_) {
-        targetCol = 0;
-      }
-    }
-    // Select with show=true scrolls to the cell.
-    await VolvoxGridServiceFfi.Select(
-      _buildSingleRangeSelectRequest(row, targetCol, show: true),
+  Future<void> setTopRow(int row) async {
+    await VolvoxGridServiceFfi.SetTopRow(
+      SetRowRequest()
+        ..gridId = _gridId
+        ..row = row,
     );
   }
 
   /// Get the topmost visible scrollable row.
-  Future<int> getTopRow() async {
+  Future<int> topRow() async {
     final sel = await VolvoxGridServiceFfi.GetSelection(_handle);
     return sel.topRow;
+  }
+
+  /// Set the leftmost visible scrollable column.
+  Future<void> setLeftCol(int col) async {
+    await VolvoxGridServiceFfi.SetLeftCol(
+      SetColRequest()
+        ..gridId = _gridId
+        ..col = col,
+    );
+  }
+
+  /// Get the leftmost visible scrollable column.
+  Future<int> leftCol() async {
+    final sel = await VolvoxGridServiceFfi.GetSelection(_handle);
+    return sel.leftCol;
   }
 
   // ── Sorting ───────────────────────────────────────────────────────────────
@@ -641,11 +685,6 @@ class VolvoxGridController extends ChangeNotifier {
       ..interaction = (InteractionConfig()..headerFeatures = mode));
   }
 
-  /// Legacy alias for [setHeaderFeatures].
-  Future<void> setExplorerBar(HeaderFeatures mode) async {
-    await setHeaderFeatures(mode);
-  }
-
   // ── Subtotals ─────────────────────────────────────────────────────────────
 
   /// Insert subtotal rows grouping on [groupOnCol] and aggregating
@@ -677,11 +716,6 @@ class VolvoxGridController extends ChangeNotifier {
   Future<void> setTreeIndicator(TreeIndicatorStyle style) async {
     await _configure(
         GridConfig()..outline = (OutlineConfig()..treeIndicator = style));
-  }
-
-  /// Legacy alias for [setTreeIndicator].
-  Future<void> setOutlineBar(TreeIndicatorStyle style) async {
-    await setTreeIndicator(style);
   }
 
   /// Set the outline level for a specific row.
@@ -728,11 +762,6 @@ class VolvoxGridController extends ChangeNotifier {
     await _configure(GridConfig()..span = (SpanConfig()..cellSpan = mode));
   }
 
-  /// Legacy alias for [setCellSpanMode].
-  Future<void> setSpanCells(CellSpanMode mode) async {
-    await setCellSpanMode(mode);
-  }
-
   /// Enable or disable spanning for a specific column.
   Future<void> setSpanCol(int col, bool span) async {
     await VolvoxGridServiceFfi.DefineColumns(DefineColumnsRequest()
@@ -764,11 +793,6 @@ class VolvoxGridController extends ChangeNotifier {
         ..dropdownItems = items));
   }
 
-  /// Legacy alias for [setColDropdownItems].
-  Future<void> setColComboList(int col, String list) async {
-    await setColDropdownItems(col, list);
-  }
-
   /// Set dropdown items for an individual cell.
   Future<void> setCellDropdownItems(int row, int col, String items) async {
     await VolvoxGridServiceFfi.UpdateCells(UpdateCellsRequest()
@@ -782,15 +806,65 @@ class VolvoxGridController extends ChangeNotifier {
 
   // ── Editing ───────────────────────────────────────────────────────────────
 
+  /// Get whether editing is enabled.
+  Future<bool> editable() async {
+    return await editTrigger() != EditTrigger.EDIT_TRIGGER_NONE;
+  }
+
+  /// Enable or disable editing.
+  Future<void> setEditable(bool enabled) async {
+    final current = await editTrigger();
+    final target = enabled
+        ? (current == EditTrigger.EDIT_TRIGGER_NONE
+            ? EditTrigger.EDIT_TRIGGER_KEY_CLICK
+            : current)
+        : EditTrigger.EDIT_TRIGGER_NONE;
+    await setEditTrigger(target);
+  }
+
+  /// Get the edit trigger mode for the grid.
+  Future<EditTrigger> editTrigger() async {
+    final config = await _getConfig();
+    if (!config.hasEditing()) {
+      return EditTrigger.EDIT_TRIGGER_NONE;
+    }
+    return config.editing.editTrigger;
+  }
+
   /// Set the edit trigger mode for the grid.
   Future<void> setEditTrigger(EditTrigger mode) async {
     await _configure(
         GridConfig()..editing = (EditConfig()..editTrigger = mode));
   }
 
-  /// Legacy alias for [setEditTrigger].
-  Future<void> setEditable(EditTrigger mode) async {
-    await setEditTrigger(mode);
+  /// Begin editing the given cell.
+  Future<void> beginEdit(
+    int row,
+    int col, {
+    bool? selectAll,
+    bool? caretEnd,
+    String? seedText,
+    bool? formulaMode,
+  }) async {
+    final start = EditStart()
+      ..row = row
+      ..col = col;
+    if (selectAll != null) {
+      start.selectAll = selectAll;
+    }
+    if (caretEnd != null) {
+      start.caretEnd = caretEnd;
+    }
+    if (seedText != null) {
+      start.seedText = seedText;
+    }
+    if (formulaMode != null) {
+      start.formulaMode = formulaMode;
+    }
+    await VolvoxGridServiceFfi.Edit(EditCommand()
+      ..gridId = _gridId
+      ..start = start);
+    notifyListeners();
   }
 
   /// Commit or cancel the current cell edit.
@@ -844,15 +918,16 @@ class VolvoxGridController extends ChangeNotifier {
         ..format = format));
   }
 
-  /// Enable native custom-render mode.
-  Future<void> setCustomRender(CustomRenderMode mode) async {
-    await _configure(
-        GridConfig()..style = (StyleConfig()..customRender = mode));
+  /// Get the active custom render mode.
+  Future<CustomRenderMode> customRenderMode() async {
+    final config = await _getConfig();
+    return config.style.customRender;
   }
 
-  /// Legacy alias for [setCustomRender].
-  Future<void> setOwnerDraw(CustomRenderMode mode) async {
-    await setCustomRender(mode);
+  /// Enable native custom-render mode.
+  Future<void> setCustomRenderMode(CustomRenderMode mode) async {
+    await _configure(
+        GridConfig()..style = (StyleConfig()..customRender = mode));
   }
 
   /// Apply grid-level style defaults (font, colors, lines, etc.).
@@ -1242,13 +1317,13 @@ class VolvoxGridController extends ChangeNotifier {
   }
 
   /// Get whether layout animation is enabled.
-  Future<bool> getAnimationEnabled() async {
+  Future<bool> animationEnabled() async {
     final config = await _getConfig();
     return config.rendering.animationEnabled;
   }
 
   /// Get text layout cache capacity.
-  Future<int> getTextLayoutCacheCap() async {
+  Future<int> textLayoutCacheCap() async {
     final config = await _getConfig();
     return config.rendering.textLayoutCacheCap;
   }
@@ -1262,7 +1337,7 @@ class VolvoxGridController extends ChangeNotifier {
   }
 
   /// Get the current renderer mode (0=AUTO, 1=CPU, 2=GPU).
-  Future<int> getRendererMode() async {
+  Future<int> rendererMode() async {
     final config = await _getConfig();
     return config.rendering.rendererMode.value;
   }
@@ -1276,7 +1351,7 @@ class VolvoxGridController extends ChangeNotifier {
   }
 
   /// Get the current presentation mode (0=Auto, 1=Fifo, 2=Mailbox, 3=Immediate).
-  Future<int> getPresentMode() async {
+  Future<int> presentMode() async {
     final config = await _getConfig();
     return config.rendering.presentMode.value;
   }
@@ -1324,8 +1399,8 @@ class VolvoxGridController extends ChangeNotifier {
   }
 
   /// Get the current renderer backend.
-  Future<RendererBackend> getRendererBackend() async {
-    final modeValue = await getRendererMode();
+  Future<RendererBackend> rendererBackend() async {
+    final modeValue = await rendererMode();
     if (modeValue >= 0 && modeValue < RendererBackend.values.length) {
       return RendererBackend.values[modeValue];
     }

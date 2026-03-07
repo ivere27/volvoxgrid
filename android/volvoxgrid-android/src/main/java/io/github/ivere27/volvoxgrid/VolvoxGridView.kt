@@ -384,7 +384,7 @@ class VolvoxGridView @JvmOverloads constructor(
         val density = resources.displayMetrics.density
         val scale = if (density > 0f) density else 1f
 
-        val handle = client.Create(
+        val response = client.Create(
             CreateRequest.newBuilder()
                 .setViewportWidth(w)
                 .setViewportHeight(h)
@@ -398,7 +398,7 @@ class VolvoxGridView @JvmOverloads constructor(
                     .build())
                 .build()
         )
-        gridId = handle.id
+        gridId = response.handle.id
 
         maybeRegisterExternalTextRenderer()
         applyAndroidScrollDefaults()
@@ -502,7 +502,7 @@ class VolvoxGridView @JvmOverloads constructor(
     /**
      * Request a render frame on the next VSync.
      *
-     * Useful after out-of-band controller mutations (e.g. setTextMatrix/refresh)
+     * Useful after out-of-band controller mutations (e.g. setCellText/refresh)
      * that do not flow through the render input stream.
      */
     override fun requestFrame() {
@@ -2061,8 +2061,8 @@ class VolvoxGridView @JvmOverloads constructor(
     private fun showGridContextMenu(x: Float, y: Float) {
         val client = ffiClient ?: return
         val ctrl = VolvoxGridController(client, gridId)
-        val row = ctrl.row
-        val col = ctrl.col
+        val row = ctrl.cursorRow()
+        val col = ctrl.cursorCol()
         if (row < 0 || col < 0) return
 
         // Create an invisible anchor view at the touch position so PopupMenu

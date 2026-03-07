@@ -216,9 +216,9 @@ grid.LoadTable(3, 2, new object[]
 You can also update individual cells or batches later:
 
 ```csharp
-grid.SetTextMatrix(0, 0, "Updated name");
+grid.SetCellText(0, 0, "Updated name");
 grid.SetCellValue(1, "c1", 99.95);
-grid.SetCellTexts(new[]
+grid.SetCells(new[]
 {
     new VolvoxGridCellText(2, 0, "Widget Z"),
     new VolvoxGridCellText(2, 1, "199.00"),
@@ -270,15 +270,17 @@ grid.DebugOverlay = false;
 
 Layout-related properties:
 
-- `FixedRows`
-- `FixedCols`
-- `FrozenRows`
-- `FrozenCols`
+- `ShowColumnHeaders`
+- `ShowRowIndicator`
+- `FrozenRowCount`
+- `FrozenColCount`
 - `RowCount`
 - `ColCount`
 
 Scrolling and rendering properties:
 
+- `TopRow`
+- `LeftCol`
 - `RendererMode`
 - `ScrollBars`
 - `FastScrollEnabled`
@@ -295,30 +297,41 @@ Scrolling and rendering properties:
 |---|---|
 | Configure columns | `SetColumns`, `GetColumns`, `ClearColumns` |
 | Bind data | `SetDataBinding`, `DataSource`, `DataMember`, `RefreshData` |
-| Manual data load | `LoadTable`, `SetTableData`, `SetTextMatrix`, `GetTextMatrix`, `SetCellTexts` |
+| Manual data load | `LoadTable`, `SetTableData`, `SetCellText`, `GetCellText`, `SetCells` |
 | Access by field name | `GetCellValue`, `SetCellValue` |
-| Selection | `SelectRow`, `SelectRows`, `SelectRange`, `ClearSelection`, `GetSelectionState`, `ShowCell` |
-| Sorting | `ApplySort`, `SortByColumn` |
-| Resizing | `SetRowHeight`, `SetColWidth`, `AutoSizeColumns` |
+| Selection | `SelectRange`, `SelectRanges`, `ClearSelection`, `GetSelection`, `ShowCell` |
+| Sorting | `Sort` |
+| Resizing | `SetRowHeight`, `SetColWidth`, `AutoSize` |
 | Row and column structure | `InsertRows`, `RemoveRows`, `MoveRow`, `MoveColumn`, `DefineRows`, `DefineColumns` |
 | Merged cells | `MergeCells`, `UnmergeCells`, `GetMergedRange`, `GetMergedRegions` |
 | Outline and subtotals | `Outline`, `Subtotal`, `GetNode` |
-| Search | `FindRow`, `FindRowRegex` |
-| Clipboard | `Copy`, `Cut`, `Paste`, `DeleteSelection`, `CopyClipboard`, `CutClipboard` |
-| Editing | `EditCell`, `CommitEdit`, `CancelEdit` |
+| Search | `FindRowByText`, `FindRowByRegex` |
+| Clipboard | `Copy`, `Cut`, `Paste`, `DeleteSelection` |
+| Editing | `BeginEdit`, `CommitEdit`, `CancelEdit` |
 | Import and export | `SaveGrid`, `LoadGrid`, `PrintGrid`, `Archive` |
-| Repaint control | `SetRedraw`, `WithRedrawSuspended`, `RefreshGrid`, `ResizeViewport` |
+| Repaint control | `SetRedraw`, `WithRedrawSuspended`, `Refresh`, `ResizeViewport` |
 
 Batch update tip:
 
 ```csharp
 grid.WithRedrawSuspended(() =>
 {
-    grid.SetTextMatrix(0, 0, "A");
-    grid.SetTextMatrix(0, 1, "B");
-    grid.SetTextMatrix(1, 0, "C");
-    grid.SetTextMatrix(1, 1, "D");
+    grid.SetCellText(0, 0, "A");
+    grid.SetCellText(0, 1, "B");
+    grid.SetCellText(1, 0, "C");
+    grid.SetCellText(1, 1, "D");
 });
+```
+
+Selection tip:
+
+```csharp
+grid.SelectRanges(
+    6,
+    4,
+    new VolvoxGridCellRange(1, 0, 2, 1),
+    new VolvoxGridCellRange(4, 3, 6, 4)
+);
 ```
 
 ## Events

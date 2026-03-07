@@ -24,9 +24,23 @@ namespace VolvoxGrid.DotNet.Internal
             ProtoWireType wire;
             while (reader.TryReadTag(out field, out wire))
             {
-                if (field == 1 && wire == ProtoWireType.Varint)
+                if (field == 1 && wire == ProtoWireType.LengthDelimited)
                 {
-                    id = reader.ReadInt64();
+                    byte[] handlePayload = reader.ReadLengthDelimited();
+                    var handleReader = new ProtoReader(handlePayload);
+                    int handleField;
+                    ProtoWireType handleWire;
+                    while (handleReader.TryReadTag(out handleField, out handleWire))
+                    {
+                        if (handleField == 1 && handleWire == ProtoWireType.Varint)
+                        {
+                            id = handleReader.ReadInt64();
+                        }
+                        else
+                        {
+                            handleReader.SkipField(handleWire);
+                        }
+                    }
                 }
                 else
                 {
@@ -531,6 +545,31 @@ namespace VolvoxGrid.DotNet.Internal
             return writer.ToArray();
         }
 
+        public byte[] EncodeShowCellRequest(long gridId, int row, int col)
+        {
+            var writer = new ProtoWriter();
+            writer.WriteInt64(1, gridId);
+            writer.WriteInt32(2, row);
+            writer.WriteInt32(3, col);
+            return writer.ToArray();
+        }
+
+        public byte[] EncodeSetTopRowRequest(long gridId, int row)
+        {
+            var writer = new ProtoWriter();
+            writer.WriteInt64(1, gridId);
+            writer.WriteInt32(2, row);
+            return writer.ToArray();
+        }
+
+        public byte[] EncodeSetLeftColRequest(long gridId, int col)
+        {
+            var writer = new ProtoWriter();
+            writer.WriteInt64(1, gridId);
+            writer.WriteInt32(2, col);
+            return writer.ToArray();
+        }
+
         public byte[] EncodeClearSelectionRequest(long gridId)
         {
             var writer = new ProtoWriter();
@@ -616,6 +655,26 @@ namespace VolvoxGrid.DotNet.Internal
                         if (wire == ProtoWireType.Varint)
                         {
                             result.RightCol = reader.ReadInt32();
+                        }
+                        else
+                        {
+                            reader.SkipField(wire);
+                        }
+                        break;
+                    case 8:
+                        if (wire == ProtoWireType.Varint)
+                        {
+                            result.MouseRow = reader.ReadInt32();
+                        }
+                        else
+                        {
+                            reader.SkipField(wire);
+                        }
+                        break;
+                    case 9:
+                        if (wire == ProtoWireType.Varint)
+                        {
+                            result.MouseCol = reader.ReadInt32();
                         }
                         else
                         {

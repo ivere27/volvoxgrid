@@ -1174,8 +1174,8 @@ pub fn handle_pointer_down_with_behavior(
                     grid.fixed_cols,
                 );
                 if !shift {
-                    grid.selection.row_end = grid.selection.row;
-                    grid.selection.col_end = grid.selection.col;
+                    grid.selection
+                        .set_extent(grid.selection.row, grid.selection.col, grid.rows, grid.cols);
                 }
                 grid.events.push(GridEventData::CellFocusChanged {
                     old_row,
@@ -1281,8 +1281,8 @@ pub fn handle_pointer_down_with_behavior(
                         grid.fixed_rows,
                         grid.fixed_cols,
                     );
-                    grid.selection.row_end = hit.row;
-                    grid.selection.col_end = target_col;
+                    grid.selection
+                        .set_extent(hit.row, target_col, grid.rows, grid.cols);
                 }
                 grid.mark_dirty();
             }
@@ -1338,8 +1338,8 @@ pub fn handle_pointer_down_with_behavior(
                         grid.fixed_rows,
                         grid.fixed_cols,
                     );
-                    grid.selection.row_end = grid.selection.row;
-                    grid.selection.col_end = grid.selection.col;
+                    grid.selection
+                        .set_extent(grid.selection.row, grid.selection.col, grid.rows, grid.cols);
                     grid.mark_dirty();
                     return;
                 }
@@ -1377,8 +1377,9 @@ pub fn handle_pointer_down_with_behavior(
                 }
 
                 // Fire CellFocusChanging event
-                let old_row = grid.selection.row;
-                let old_col = grid.selection.col;
+                let old_selection = grid.selection.clone();
+                let old_row = old_selection.row;
+                let old_col = old_selection.col;
                 grid.events.push(GridEventData::CellFocusChanging {
                     old_row,
                     old_col,
@@ -1399,8 +1400,8 @@ pub fn handle_pointer_down_with_behavior(
                 // Plain click resets selection to single cell;
                 // shift-click keeps the extent for range selection.
                 if !shift {
-                    grid.selection.row_end = grid.selection.row;
-                    grid.selection.col_end = grid.selection.col;
+                    grid.selection
+                        .set_extent(grid.selection.row, grid.selection.col, grid.rows, grid.cols);
                 }
 
                 // Fire CellFocusChanged
@@ -1453,10 +1454,7 @@ pub fn handle_pointer_down_with_behavior(
                     }
 
                     // Restore selection — header clicks should not move the cursor.
-                    grid.selection.row = old_row;
-                    grid.selection.col = old_col;
-                    grid.selection.row_end = old_row;
-                    grid.selection.col_end = old_col;
+                    grid.selection = old_selection;
                 }
 
                 grid.mark_dirty();
@@ -1826,8 +1824,12 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, _
     // Right-button (bit 1) and modifier-only moves must not alter selection.
     // Skipped entirely when host_pointer_dispatch — host adapter owns selection.
     if !grid.host_pointer_dispatch && button & 1 != 0 && hit.row >= 0 && hit.col >= 0 {
-        grid.selection.row_end = hit.row.clamp(grid.fixed_rows, grid.rows - 1);
-        grid.selection.col_end = hit.col.clamp(grid.fixed_cols, grid.cols - 1);
+        grid.selection.set_extent(
+            hit.row.clamp(grid.fixed_rows, grid.rows - 1),
+            hit.col.clamp(grid.fixed_cols, grid.cols - 1),
+            grid.rows,
+            grid.cols,
+        );
         grid.mark_dirty();
     }
 }
@@ -2099,7 +2101,8 @@ pub fn handle_key_down_with_behavior(
             // Left
             if shift {
                 let new_col = (grid.selection.col_end - 1).max(grid.fixed_cols);
-                grid.selection.col_end = new_col;
+                grid.selection
+                    .set_extent(grid.selection.row_end, new_col, grid.rows, grid.cols);
             } else {
                 let new_col = (grid.selection.col - 1).max(grid.fixed_cols);
                 grid.selection.set_cursor(
@@ -2116,7 +2119,8 @@ pub fn handle_key_down_with_behavior(
             // Up
             if shift {
                 let new_row = (grid.selection.row_end - 1).max(grid.fixed_rows);
-                grid.selection.row_end = new_row;
+                grid.selection
+                    .set_extent(new_row, grid.selection.col_end, grid.rows, grid.cols);
             } else {
                 let new_row = (grid.selection.row - 1).max(grid.fixed_rows);
                 grid.selection.set_cursor(
@@ -2133,7 +2137,8 @@ pub fn handle_key_down_with_behavior(
             // Right
             if shift {
                 let new_col = (grid.selection.col_end + 1).min(grid.cols - 1);
-                grid.selection.col_end = new_col;
+                grid.selection
+                    .set_extent(grid.selection.row_end, new_col, grid.rows, grid.cols);
             } else {
                 let new_col = (grid.selection.col + 1).min(grid.cols - 1);
                 grid.selection.set_cursor(
@@ -2150,7 +2155,8 @@ pub fn handle_key_down_with_behavior(
             // Down
             if shift {
                 let new_row = (grid.selection.row_end + 1).min(grid.rows - 1);
-                grid.selection.row_end = new_row;
+                grid.selection
+                    .set_extent(new_row, grid.selection.col_end, grid.rows, grid.cols);
             } else {
                 let new_row = (grid.selection.row + 1).min(grid.rows - 1);
                 grid.selection.set_cursor(
@@ -2451,8 +2457,8 @@ pub fn handle_key_press_with_behavior(
                     grid.fixed_rows,
                     grid.fixed_cols,
                 );
-                grid.selection.row_end = grid.selection.row;
-                grid.selection.col_end = grid.selection.col;
+                grid.selection
+                    .set_extent(grid.selection.row, grid.selection.col, grid.rows, grid.cols);
                 grid.events.push(GridEventData::CellFocusChanged {
                     old_row,
                     old_col,

@@ -317,18 +317,23 @@ export function encodeSelectRequest(args: {
   col: number;
   rowEnd?: number;
   colEnd?: number;
+  ranges?: ReadonlyArray<{ row1: number; col1: number; row2: number; col2: number }>;
   show?: boolean;
 }): Uint8Array {
   const out: number[] = [];
   const rowEnd = args.rowEnd ?? args.row;
   const colEnd = args.colEnd ?? args.col;
+  const ranges = args.ranges && args.ranges.length > 0
+    ? args.ranges
+    : [{ row1: args.row, col1: args.col, row2: rowEnd, col2: colEnd }];
   out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
   // SelectRequest.active_row = 2
   out.push(...encodeTag(2, 0), ...encodeInt32(args.row));
   // SelectRequest.active_col = 3
   out.push(...encodeTag(3, 0), ...encodeInt32(args.col));
-  // SelectRequest.ranges = 4 (single range compatibility)
-  out.push(...encodeMessageField(4, encodeCellRange(args.row, args.col, rowEnd, colEnd)));
+  for (const range of ranges) {
+    out.push(...encodeMessageField(4, encodeCellRange(range.row1, range.col1, range.row2, range.col2)));
+  }
   if (args.show != null) {
     // SelectRequest.show = 5
     out.push(...encodeTag(5, 0), ...encodeBool(args.show));

@@ -1406,6 +1406,13 @@ impl VolvoxGrid {
             Self::remap_col_index_for_move(self.selection.col, source_pos, insert_pos);
         self.selection.col_end =
             Self::remap_col_index_for_move(self.selection.col_end, source_pos, insert_pos);
+        for range in &mut self.selection.extra_ranges {
+            range.1 = Self::remap_col_index_for_move(range.1, source_pos, insert_pos);
+            range.3 = Self::remap_col_index_for_move(range.3, source_pos, insert_pos);
+            if range.1 > range.3 {
+                std::mem::swap(&mut range.1, &mut range.3);
+            }
+        }
         self.mouse_col = Self::remap_col_index_for_move(self.mouse_col, source_pos, insert_pos);
         if self.resize_active && self.resize_is_col {
             self.resize_index =

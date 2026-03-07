@@ -5,9 +5,33 @@ use crate::grid::VolvoxGrid;
 /// Returns `(text, rich_data)` where `text` is the tab/newline-delimited
 /// string of cell contents and `rich_data` is reserved for future use.
 pub fn copy(grid: &VolvoxGrid) -> (String, Vec<u8>) {
-    let (r1, c1, r2, c2) = grid.selection.get_range();
-    let r2 = r2.min(grid.rows - 1);
-    let c2 = c2.min(grid.cols - 1);
+    let ranges: Vec<(i32, i32, i32, i32)> = grid
+        .selection
+        .all_ranges(grid.rows, grid.cols)
+        .into_iter()
+        .map(|(r1, c1, r2, c2)| {
+            (
+                r1.max(0).min(grid.rows - 1),
+                c1.max(0).min(grid.cols - 1),
+                r2.max(0).min(grid.rows - 1),
+                c2.max(0).min(grid.cols - 1),
+            )
+        })
+        .collect();
+    if ranges.is_empty() {
+        return (String::new(), Vec::new());
+    }
+
+    let mut r1 = grid.rows - 1;
+    let mut c1 = grid.cols - 1;
+    let mut r2 = 0;
+    let mut c2 = 0;
+    for &(range_r1, range_c1, range_r2, range_c2) in &ranges {
+        r1 = r1.min(range_r1);
+        c1 = c1.min(range_c1);
+        r2 = r2.max(range_r2);
+        c2 = c2.max(range_c2);
+    }
 
     let col_sep = if grid.clip_col_separator.is_empty() {
         "\t"
@@ -29,7 +53,11 @@ pub fn copy(grid: &VolvoxGrid) -> (String, Vec<u8>) {
             if c > c1 {
                 text.push_str(col_sep);
             }
-            text.push_str(grid.cells.get_text(r, c));
+            if ranges.iter().any(|&(sr1, sc1, sr2, sc2)| {
+                r >= sr1 && r <= sr2 && c >= sc1 && c <= sc2
+            }) {
+                text.push_str(grid.cells.get_text(r, c));
+            }
         }
     }
 
@@ -83,9 +111,54 @@ pub fn paste(grid: &mut VolvoxGrid, text: &str) {
 
 /// Delete (clear) all cells within the current selection.
 pub fn delete_selection(grid: &mut VolvoxGrid) {
-    let (r1, c1, r2, c2) = grid.selection.get_range();
-    let r2 = r2.min(grid.rows - 1);
-    let c2 = c2.min(grid.cols - 1);
-    grid.cells.clear_range(r1, c1, r2, c2);
+    let ranges = grid.selection.all_ranges(grid.rows, grid.cols);
+    for (r1, c1, r2, c2) in ranges {
+        let r1 = r1.max(0).min(grid.rows - 1);
+        let c1 = c1.max(0).min(grid.cols - 1);
+        let r2 = r2.max(0).min(grid.rows - 1);
+        let c2 = c2.max(0).min(grid.cols - 1);
+        grid.cells.clear_range(r1, c1, r2, c2);
+    }
     grid.mark_dirty();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{copy, delete_selection};
+    use crate::grid::VolvoxGrid;
+
+    fn sample_grid() -> VolvoxGrid {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 4, 0, 0);
+        grid.cells.set_text(0, 0, "A".to_string());
+        grid.cells.set_text(0, 1, "B".to_string());
+        grid.cells.set_text(0, 2, "C".to_string());
+        grid.cells.set_text(1, 0, "D".to_string());
+        grid.cells.set_text(1, 1, "E".to_string());
+        grid.cells.set_text(1, 2, "F".to_string());
+        grid
+    }
+
+    #[test]
+    fn copy_uses_bounding_box_for_multi_ranges() {
+        let mut grid = sample_grid();
+        grid.selection
+            .select_ranges(0, 0, &[(0, 0, 1, 0), (0, 2, 1, 2)], grid.rows, grid.cols);
+
+        let (text, _) = copy(&grid);
+
+        assert_eq!(text, "A\t\tC\nD\t\tF");
+    }
+
+    #[test]
+    fn delete_selection_clears_all_selected_ranges() {
+        let mut grid = sample_grid();
+        grid.selection
+            .select_ranges(0, 0, &[(0, 0, 0, 0), (1, 2, 1, 2)], grid.rows, grid.cols);
+
+        delete_selection(&mut grid);
+
+        assert_eq!(grid.cells.get_text(0, 0), "");
+        assert_eq!(grid.cells.get_text(1, 2), "");
+        assert_eq!(grid.cells.get_text(0, 1), "B");
+    }
 }

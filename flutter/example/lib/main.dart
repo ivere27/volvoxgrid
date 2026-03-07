@@ -122,7 +122,7 @@ class _DemoPageState extends State<DemoPage> {
   }
 
   Future<void> _applyDisplayToggles(VolvoxGridController controller) async {
-    final backend = await controller.getRendererBackend();
+    final backend = await controller.rendererBackend();
     if (backend != _rendererBackend) {
       await controller.setRendererBackend(_rendererBackend);
     }
@@ -190,13 +190,13 @@ class _DemoPageState extends State<DemoPage> {
 
   Future<void> _onSortAscending() async {
     if (_loading) return;
-    final col = await _activeController.getCol();
+    final col = await _activeController.cursorCol();
     await _activeController.sort(SortOrder.SORT_GENERIC_ASCENDING, col: col);
   }
 
   Future<void> _onSortDescending() async {
     if (_loading) return;
-    final col = await _activeController.getCol();
+    final col = await _activeController.cursorCol();
     await _activeController.sort(SortOrder.SORT_GENERIC_DESCENDING, col: col);
   }
 

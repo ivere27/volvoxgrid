@@ -24,6 +24,9 @@ namespace VolvoxGrid.DotNet.Internal
         private const string ClearMethod = "/volvoxgrid.v1.VolvoxGridService/Clear";
         private const string SelectMethod = "/volvoxgrid.v1.VolvoxGridService/Select";
         private const string GetSelectionMethod = "/volvoxgrid.v1.VolvoxGridService/GetSelection";
+        private const string ShowCellMethod = "/volvoxgrid.v1.VolvoxGridService/ShowCell";
+        private const string SetTopRowMethod = "/volvoxgrid.v1.VolvoxGridService/SetTopRow";
+        private const string SetLeftColMethod = "/volvoxgrid.v1.VolvoxGridService/SetLeftCol";
         private const string SortMethod = "/volvoxgrid.v1.VolvoxGridService/Sort";
         private const string SubtotalMethod = "/volvoxgrid.v1.VolvoxGridService/Subtotal";
         private const string AutoSizeMethod = "/volvoxgrid.v1.VolvoxGridService/AutoSize";
@@ -143,6 +146,21 @@ namespace VolvoxGrid.DotNet.Internal
         {
             byte[] response = InvokeUnary(GetSelectionMethod, _codec.EncodeGridHandle(gridId));
             return _codec.DecodeSelectionState(response);
+        }
+
+        public void ShowCell(long gridId, int row, int col)
+        {
+            InvokeUnary(ShowCellMethod, _codec.EncodeShowCellRequest(gridId, row, col));
+        }
+
+        public void SetTopRow(long gridId, int row)
+        {
+            InvokeUnary(SetTopRowMethod, _codec.EncodeSetTopRowRequest(gridId, row));
+        }
+
+        public void SetLeftCol(long gridId, int col)
+        {
+            InvokeUnary(SetLeftColMethod, _codec.EncodeSetLeftColRequest(gridId, col));
         }
 
         public void Sort(long gridId, IList<VolvoxSortColumn> sorts)

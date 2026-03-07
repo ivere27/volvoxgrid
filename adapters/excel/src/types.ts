@@ -1,13 +1,29 @@
 import type { VolvoxGrid } from "volvoxgrid";
 
 export type VolvoxExcelGrid = VolvoxGrid & {
+  rowCount: number;
+  colCount: number;
+  selectionMode: number;
+  defaultRowHeight: number;
+  defaultColWidth: number;
   showColumnHeaders: boolean;
   columnIndicatorTopRowCount: number;
-  showIndicator: boolean;
+  showRowIndicator: boolean;
   rowIndicatorStartModeBits: number;
   rowIndicatorStartWidth: number;
-  frozenRows: number;
-  frozenCols: number;
+  frozenRowCount: number;
+  frozenColCount: number;
+  allowUserResizing: number;
+  editTrigger: number;
+  setCellText(row: number, col: number, text: string): void;
+  getSelection(): {
+    row: number;
+    col: number;
+    rowEnd: number;
+    colEnd: number;
+    ranges: CellRange[];
+  };
+  selectRanges(ranges: ReadonlyArray<CellRange>, activeRow?: number, activeCol?: number, show?: boolean): void;
   setColumnCaption(col: number, caption: string): void;
 };
 

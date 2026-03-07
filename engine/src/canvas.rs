@@ -1783,9 +1783,10 @@ fn should_highlight_row_indicator(grid: &VolvoxGrid, row: i32) -> bool {
     if grid.selection.mode == pb::SelectionMode::SelectionByColumn as i32 {
         return false;
     }
-    let row_lo = grid.selection.row.min(grid.selection.row_end);
-    let row_hi = grid.selection.row.max(grid.selection.row_end);
-    row >= row_lo && row <= row_hi
+    grid.selection
+        .all_ranges(grid.rows, grid.cols)
+        .iter()
+        .any(|&(row_lo, _, row_hi, _)| row >= row_lo && row <= row_hi)
 }
 
 fn should_highlight_col_indicator(grid: &VolvoxGrid, col: i32) -> bool {
@@ -1797,9 +1798,10 @@ fn should_highlight_col_indicator(grid: &VolvoxGrid, col: i32) -> bool {
     {
         return false;
     }
-    let col_lo = grid.selection.col.min(grid.selection.col_end);
-    let col_hi = grid.selection.col.max(grid.selection.col_end);
-    col >= col_lo && col <= col_hi
+    grid.selection
+        .all_ranges(grid.rows, grid.cols)
+        .iter()
+        .any(|&(_, col_lo, _, col_hi)| col >= col_lo && col <= col_hi)
 }
 
 fn span_has_highlighted_col(grid: &VolvoxGrid, col1: i32, col2: i32) -> bool {
@@ -2329,11 +2331,11 @@ fn render_row_indicator_slot<C: Canvas>(
         return;
     }
     if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotSelection as i32 {
-        let selected = row == grid.selection.row
-            || grid.selection.selected_rows.contains(&row)
-            || (grid.selection.mode == pb::SelectionMode::SelectionByRow as i32
-                && row >= grid.selection.row.min(grid.selection.row_end)
-                && row <= grid.selection.row.max(grid.selection.row_end));
+        let selected = grid
+            .selection
+            .all_ranges(grid.rows, grid.cols)
+            .iter()
+            .any(|&(row_lo, _, row_hi, _)| row >= row_lo && row <= row_hi);
         if selected {
             draw_indicator_text(
                 canvas, grid, "•", rect.0, rect.1, rect.2, rect.3, 1, fore_color,
@@ -2342,7 +2344,11 @@ fn render_row_indicator_slot<C: Canvas>(
         return;
     }
     if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotCheckbox as i32 {
-        let checked = row == grid.selection.row || grid.selection.selected_rows.contains(&row);
+        let checked = grid
+            .selection
+            .all_ranges(grid.rows, grid.cols)
+            .iter()
+            .any(|&(row_lo, _, row_hi, _)| row >= row_lo && row <= row_hi);
         draw_indicator_checkbox(canvas, rect, checked, fore_color);
         return;
     }

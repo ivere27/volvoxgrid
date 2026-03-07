@@ -4,6 +4,7 @@ import io.github.ivere27.volvoxgrid.CellUpdate;
 import io.github.ivere27.volvoxgrid.CellValue;
 import io.github.ivere27.volvoxgrid.CellsResponse;
 import io.github.ivere27.volvoxgrid.CreateRequest;
+import io.github.ivere27.volvoxgrid.CreateResponse;
 import io.github.ivere27.volvoxgrid.GetCellsRequest;
 import io.github.ivere27.volvoxgrid.GridConfig;
 import io.github.ivere27.volvoxgrid.GridHandle;
@@ -44,7 +45,7 @@ public final class VolvoxGridDesktopSmoke {
                 .setIndicatorBands(VolvoxGridDesktopController.defaultIndicatorBandsConfig())
                 .build();
 
-            GridHandle handle = client.create(
+            CreateResponse response = client.create(
                 CreateRequest.newBuilder()
                     .setViewportWidth(320)
                     .setViewportHeight(200)
@@ -52,7 +53,7 @@ public final class VolvoxGridDesktopSmoke {
                     .setConfig(config)
                     .build()
             );
-            gridId = handle.getId();
+            gridId = response.getHandle().getId();
 
             client.updateCells(
                 UpdateCellsRequest.newBuilder()

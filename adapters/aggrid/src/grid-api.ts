@@ -92,8 +92,8 @@ export class VolvoxGridApi<TData extends RowData> implements GridApiLike<TData> 
     const selection = readSelectionState(grid, wasm);
     const rows = this.delegate.getShadowRows();
 
-    let start = grid.selectionRow;
-    let end = grid.selectionRow;
+    let start = grid.cursorRow;
+    let end = grid.cursorRow;
 
     if (selection != null) {
       start = Math.min(selection.row, selection.rowEnd);

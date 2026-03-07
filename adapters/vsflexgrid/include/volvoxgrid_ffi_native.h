@@ -17,11 +17,12 @@ extern "C" {
 
 
 /* Create */
-int64_t volvox_grid_create(
+uint8_t* volvox_grid_create(
     int32_t viewport_width,
     int32_t viewport_height,
     float scale,
-    const uint8_t* config, int32_t config_len
+    const uint8_t* config, int32_t config_len,
+    int32_t* out_len
 );
 
 /* Destroy */
@@ -139,6 +140,28 @@ uint8_t* volvox_grid_select_pb(
 /* GetSelection */
 uint8_t* volvox_grid_get_selection(
     int64_t id,
+    int32_t* out_len
+);
+
+/* ShowCell */
+uint8_t* volvox_grid_show_cell(
+    int64_t grid_id,
+    int32_t row,
+    int32_t col,
+    int32_t* out_len
+);
+
+/* SetTopRow */
+uint8_t* volvox_grid_set_top_row(
+    int64_t grid_id,
+    int32_t row,
+    int32_t* out_len
+);
+
+/* SetLeftCol */
+uint8_t* volvox_grid_set_left_col(
+    int64_t grid_id,
+    int32_t col,
     int32_t* out_len
 );
 

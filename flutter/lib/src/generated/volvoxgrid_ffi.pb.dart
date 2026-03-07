@@ -6,10 +6,10 @@ import 'package:synurang/synurang.dart' as synurang;
 import 'volvoxgrid.pb.dart';
 
 class VolvoxGridServiceFfi {
-  static Future<GridHandle> Create(CreateRequest request) async {
+  static Future<CreateResponse> Create(CreateRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/Create', bytes);
-    return GridHandle.fromBuffer(resultBytes);
+    return CreateResponse.fromBuffer(resultBytes);
   }
 
   static Future<Empty> Destroy(GridHandle request) async {
@@ -112,6 +112,24 @@ class VolvoxGridServiceFfi {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/GetSelection', bytes);
     return SelectionState.fromBuffer(resultBytes);
+  }
+
+  static Future<Empty> ShowCell(ShowCellRequest request) async {
+    final bytes = request.writeToBuffer();
+    final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/ShowCell', bytes);
+    return Empty.fromBuffer(resultBytes);
+  }
+
+  static Future<Empty> SetTopRow(SetRowRequest request) async {
+    final bytes = request.writeToBuffer();
+    final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/SetTopRow', bytes);
+    return Empty.fromBuffer(resultBytes);
+  }
+
+  static Future<Empty> SetLeftCol(SetColRequest request) async {
+    final bytes = request.writeToBuffer();
+    final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/SetLeftCol', bytes);
+    return Empty.fromBuffer(resultBytes);
   }
 
   static Future<EditState> Edit(EditCommand request) async {

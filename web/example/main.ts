@@ -348,10 +348,10 @@ async function main() {
 
   // PresentMode (proto): 0=AUTO, 1=FIFO, 2=MAILBOX, 3=IMMEDIATE.
   // Prefer MAILBOX for lower-latency GPU presentation when available.
-  grid.setPresentMode(2);
-  grid.setRendererMode(2); // GPU — let tryInitGpu proceed
+  grid.presentMode = 2;
+  grid.rendererMode = 2; // GPU — let tryInitGpu proceed
   const gpuOk = await grid.tryInitGpu();
-  grid.setRendererMode(1); // default CPU
+  grid.rendererMode = 1; // default CPU
 
   let currentDemo: DemoMode | null = null;
   let dataRows = 0;
@@ -513,10 +513,10 @@ async function main() {
   }
 
   function applyActiveRenderSettings(): void {
-    grid.setRendererMode(activeRendererMode);
-    grid.setDebugOverlay(chkDebug.checked);
-    grid.setAnimationEnabled(chkAnim.checked);
-    grid.setTextLayoutCacheCap(selectedTextLayoutCacheCap());
+    grid.rendererMode = activeRendererMode;
+    grid.debugOverlay = chkDebug.checked;
+    grid.animationEnabled = chkAnim.checked;
+    grid.textLayoutCacheCap = selectedTextLayoutCacheCap();
   }
 
   const fmt = (n: number) => n.toLocaleString("en-US");
@@ -741,26 +741,26 @@ async function main() {
   }
 
   function applyDemoViewDefaults(mode: StandardDemoMode) {
-    grid.frozenRows = 0;
-    grid.frozenCols = mode === "hierarchy" ? 0 : 1;
+    grid.frozenRowCount = 0;
+    grid.frozenColCount = mode === "hierarchy" ? 0 : 1;
     grid.showColumnHeaders = true;
-    grid.setHighlight(1);
-    grid.setFocusRect(2);
-    grid.setSelectionMode(0);
-    grid.setExplorerBar(3);
-    grid.setScrollBars(3);
+    grid.selectionVisibility = 1;
+    grid.focusBorder = 2;
+    grid.selectionMode = 0;
+    grid.headerFeatures = 3;
+    grid.scrollBars = 3;
   }
 
   function applyDoomGridLayout() {
     const doomCols = doomRuntime.getCols();
     const doomRows = doomRuntime.getRows();
-    grid.frozenRows = 0;
-    grid.frozenCols = 0;
-    grid.setHighlight(0);
-    grid.setFocusRect(0);
-    grid.setSelectionMode(0);
-    grid.setExplorerBar(0);
-    grid.setScrollBars(0);
+    grid.frozenRowCount = 0;
+    grid.frozenColCount = 0;
+    grid.selectionVisibility = 0;
+    grid.focusBorder = 0;
+    grid.selectionMode = 0;
+    grid.headerFeatures = 0;
+    grid.scrollBars = 0;
     grid.setGridLines(chkDoomBorder.checked ? 1 : 0);
 
     // Compute cell sizes to fill the rendered canvas area.
@@ -1082,7 +1082,7 @@ async function main() {
 
     currentDemo = mode;
     highlightDemoBtn(mode);
-    dataRows = Math.max(0, grid.rows - 1);
+    dataRows = Math.max(0, grid.rowCount - 1);
 
     switch (mode) {
       case "stress": {
@@ -1198,7 +1198,7 @@ async function main() {
 
   // Toolbar handlers.
   document.getElementById("btn-sort-asc")!.addEventListener("click", () => {
-    const col = grid.selectionCol >= 0 ? grid.selectionCol : 0;
+    const col = grid.cursorCol >= 0 ? grid.cursorCol : 0;
     const t0 = performance.now();
     grid.sort(1, col);
     const ms = (performance.now() - t0).toFixed(1);
@@ -1207,7 +1207,7 @@ async function main() {
   });
 
   document.getElementById("btn-sort-desc")!.addEventListener("click", () => {
-    const col = grid.selectionCol >= 0 ? grid.selectionCol : 0;
+    const col = grid.cursorCol >= 0 ? grid.cursorCol : 0;
     const t0 = performance.now();
     grid.sort(2, col);
     const ms = (performance.now() - t0).toFixed(1);
@@ -1216,7 +1216,7 @@ async function main() {
   });
 
   document.getElementById("btn-sort-none")!.addEventListener("click", () => {
-    const col = grid.selectionCol >= 0 ? grid.selectionCol : 0;
+    const col = grid.cursorCol >= 0 ? grid.cursorCol : 0;
     grid.sort(0, col);
     grid.invalidate();
     lastSortInfo = "";
@@ -1226,7 +1226,7 @@ async function main() {
   document.getElementById("btn-add-rows")!.addEventListener("click", () => {
     if (currentDemo !== "stress") return;
     dataRows += 100_000;
-    grid.rows = dataRows + 1;
+    grid.rowCount = dataRows + 1;
     wasmModule.demo_materialize_visible_rows(grid.id, 48);
     grid.invalidate();
     updateStatus();
@@ -1235,7 +1235,7 @@ async function main() {
   // AddItem: insert 5 rows at current selection.
   document.getElementById("btn-add-item")!.addEventListener("click", () => {
     if (currentDemo === "doom") return;
-    const row = grid.selectionRow;
+    const row = grid.cursorRow;
     const insertAt = row >= 1 ? row + 1 : 1;
     for (let i = 0; i < 5; i += 1) {
       const r = insertAt + i;
@@ -1250,7 +1250,7 @@ async function main() {
   // RemoveItem: delete current row.
   document.getElementById("btn-del-item")!.addEventListener("click", () => {
     if (currentDemo === "doom") return;
-    const row = grid.selectionRow;
+    const row = grid.cursorRow;
     if (row >= 0 && dataRows > 1) {
       grid.removeItem(row);
       dataRows -= 1;
@@ -1283,7 +1283,7 @@ async function main() {
   document.getElementById("btn-expl-bar")!.addEventListener("click", () => {
     if (currentDemo === "doom") return;
     explorerBar = (explorerBar + 1) % 4;
-    grid.setExplorerBar(explorerBar);
+    grid.headerFeatures = explorerBar;
     const labels = ["ExplBar:Off", "ExplBar:Sort", "ExplBar:Move", "ExplBar:3"];
     document.getElementById("btn-expl-bar")!.textContent = labels[explorerBar];
     grid.invalidate();
@@ -1292,7 +1292,7 @@ async function main() {
   // AutoSize all columns.
   document.getElementById("btn-autosize")!.addEventListener("click", () => {
     if (currentDemo === "doom") return;
-    const cols = grid.cols;
+    const cols = grid.colCount;
     for (let c = 0; c < cols; c += 1) {
       grid.autoResizeCol(c);
     }
@@ -1329,7 +1329,7 @@ async function main() {
   // Text layout cache cap.
   selTextCache.addEventListener("change", () => {
     const cap = selectedTextLayoutCacheCap();
-    grid.setTextLayoutCacheCap(cap);
+    grid.textLayoutCacheCap = cap;
     if (canvas2DRenderer) {
       canvas2DRenderer.setCacheSize(cap);
     }

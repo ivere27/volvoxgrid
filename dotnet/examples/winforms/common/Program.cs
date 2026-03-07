@@ -107,13 +107,32 @@ namespace VolvoxGrid.DotNet.Sample
 
     internal sealed class DemoForm : Form
     {
+        private sealed class SelectionModeOption
+        {
+            public SelectionModeOption(string label, VolvoxGridSelectionMode mode)
+            {
+                Label = label ?? string.Empty;
+                Mode = mode;
+            }
+
+            public string Label { get; private set; }
+            public VolvoxGridSelectionMode Mode { get; private set; }
+
+            public override string ToString()
+            {
+                return Label;
+            }
+        }
+
         private readonly VolvoxGridControl _grid;
         private readonly Label _status;
         private readonly Button _btnSales;
         private readonly Button _btnHierarchy;
         private readonly Button _btnStress;
+        private readonly Button _selectionModeButton;
+        private readonly ContextMenuStrip _selectionModeMenu;
+        private readonly SelectionModeOption[] _selectionModeOptions;
         private readonly Dictionary<DemoMode, long> _demoGridIds;
-        private readonly Dictionary<DemoMode, VolvoxGridColumn[]> _demoColumns;
         private readonly bool _smokeMode;
         private DemoMode _currentDemo;
         private bool _demoLoaded;
@@ -141,8 +160,15 @@ namespace VolvoxGrid.DotNet.Sample
             _btnHierarchy.Click += delegate { SwitchDemo(DemoMode.Hierarchy); };
             _btnStress.Click += delegate { SwitchDemo(DemoMode.Stress); };
             _demoGridIds = new Dictionary<DemoMode, long>();
-            _demoColumns = new Dictionary<DemoMode, VolvoxGridColumn[]>();
             _smokeMode = ReadBoolEnv("VOLVOXGRID_SMOKE_MODE", false);
+            _selectionModeOptions = new[]
+            {
+                new SelectionModeOption("Free", VolvoxGridSelectionMode.Free),
+                new SelectionModeOption("By Row", VolvoxGridSelectionMode.ByRow),
+                new SelectionModeOption("By Column", VolvoxGridSelectionMode.ByColumn),
+                new SelectionModeOption("Listbox", VolvoxGridSelectionMode.Listbox),
+                new SelectionModeOption("MultiRange", VolvoxGridSelectionMode.MultiRange),
+            };
 
             var btnSortUp = new Button
             {
@@ -205,6 +231,13 @@ namespace VolvoxGrid.DotNet.Sample
                 SetStatus(_grid.HoverEnabled ? "Hover enabled." : "Hover disabled.");
             };
 
+            var selectionLabel = new Label
+            {
+                Text = "Selection",
+                AutoSize = true,
+                Margin = new Padding(16, 8, 0, 0),
+            };
+
             topBar.Controls.Add(_btnSales);
             topBar.Controls.Add(_btnHierarchy);
             topBar.Controls.Add(_btnStress);
@@ -218,13 +251,57 @@ namespace VolvoxGrid.DotNet.Sample
             {
                 Dock = DockStyle.Fill,
                 Editable = true,
-                MultiSelect = false,
+                SelectionMode = VolvoxGridSelectionMode.Free,
                 HoverEnabled = true,
                 RendererMode = VolvoxGridRendererMode.Cpu,
             };
             _grid.FocusedCellChanged += OnFocusedCellChanged;
             _grid.CellValueChanged += OnCellValueChanged;
             _grid.SelectionChanged += OnSelectionChanged;
+
+            _selectionModeButton = new Button
+            {
+                Width = 120,
+                Height = 28,
+                Margin = new Padding(8, 0, 0, 0),
+                TextAlign = ContentAlignment.MiddleLeft,
+                UseVisualStyleBackColor = true,
+            };
+            _selectionModeMenu = new ContextMenuStrip();
+            for (int i = 0; i < _selectionModeOptions.Length; i++)
+            {
+                SelectionModeOption option = _selectionModeOptions[i];
+                var item = new ToolStripMenuItem(option.Label)
+                {
+                    Tag = option,
+                };
+                item.Click += delegate(object sender, EventArgs e)
+                {
+                    var clicked = sender as ToolStripMenuItem;
+                    var selected = clicked != null ? clicked.Tag as SelectionModeOption : null;
+                    if (selected != null)
+                    {
+                        ApplySelectionModeOption(selected);
+                    }
+                };
+                _selectionModeMenu.Items.Add(item);
+            }
+            SelectSelectionModeOption(_grid.SelectionMode);
+            _selectionModeButton.Click += delegate
+            {
+                OpenSelectionModeMenu();
+            };
+            _selectionModeButton.KeyDown += delegate(object sender, KeyEventArgs e)
+            {
+                if (e.KeyCode == Keys.Down || e.KeyCode == Keys.Space || e.KeyCode == Keys.Enter)
+                {
+                    OpenSelectionModeMenu();
+                    e.Handled = true;
+                }
+            };
+
+            topBar.Controls.Add(selectionLabel);
+            topBar.Controls.Add(_selectionModeButton);
 
             _status = new Label
             {
@@ -304,12 +381,12 @@ namespace VolvoxGrid.DotNet.Sample
             AppLog.Info("SMOKE: controller-api checks begin");
             SmokeAssert(_grid.CurrentGridId != 0, "Grid session is active");
 
-            _grid.RefreshGrid();
+            _grid.Refresh();
             _grid.CancelFling();
             _grid.ResizeViewport(960, 600);
 
-            _grid.SetRendererBackend(VolvoxGridRendererMode.Cpu);
-            SmokeAssert(_grid.GetRendererBackend() == VolvoxGridRendererMode.Cpu, "SetRendererBackend/GetRendererBackend");
+            _grid.RendererBackend = VolvoxGridRendererMode.Cpu;
+            SmokeAssert(_grid.RendererBackend == VolvoxGridRendererMode.Cpu, "RendererBackend");
 
             _grid.SelectionVisibility = VolvoxGridSelectionVisibility.Always;
             _grid.AllowSelection = true;
@@ -331,27 +408,27 @@ namespace VolvoxGrid.DotNet.Sample
                 new VolvoxGridColumn { FieldName = "c2", Caption = "Qty", Width = 110, DataType = VolvoxGridColumnDataType.Number, Alignment = VolvoxGridAlign.RightCenter },
                 new VolvoxGridColumn { FieldName = "c3", Caption = "Flag", Width = 100, DataType = VolvoxGridColumnDataType.Boolean },
             });
-            _grid.SetRows(6);
-            _grid.SetCols(4);
-            _grid.SetFixedRows(1);
-            _grid.SetFixedCols(1);
-            SmokeAssert(_grid.GetFixedRows() == 1 && _grid.GetFixedCols() == 1, "Set/Get fixed rows/cols");
+            _grid.RowCount = 6;
+            _grid.ColCount = 4;
+            _grid.ShowColumnHeaders = true;
+            _grid.ShowRowIndicator = true;
+            SmokeAssert(_grid.ShowColumnHeaders && _grid.ShowRowIndicator, "Indicator band properties");
 
             _grid.LoadTable(6, 4, BuildSmokeTable(), true);
-            SmokeAssert(_grid.GetRows() >= 6 && _grid.GetCols() >= 4, "LoadTable");
+            SmokeAssert(_grid.RowCount >= 6 && _grid.ColCount >= 4, "LoadTable");
 
-            _grid.SetTextMatrix(2, 1, "Beta*");
-            SmokeAssert(WaitForTextMatrix(2, 1, "Beta*"), "SetTextMatrix/GetTextMatrix");
+            _grid.SetCellText(2, 1, "Beta*");
+            SmokeAssert(WaitForCellText(2, 1, "Beta*"), "SetCellText/GetCellText");
 
-            _grid.SetCellTexts(new[]
+            _grid.SetCells(new[]
             {
                 new VolvoxGridCellText(3, 1, "Gamma*"),
                 new VolvoxGridCellText(4, 1, "Delta*"),
             });
-            SmokeAssert(WaitForTextMatrix(3, 1, "Gamma*"), "SetCellTexts");
+            SmokeAssert(WaitForCellText(3, 1, "Gamma*"), "SetCells");
 
             _grid.SetCellValue(4, "c1", "Delta**");
-            SmokeAssert(WaitForTextMatrix(4, 1, "Delta**"), "SetCellValue/GetCellValue");
+            SmokeAssert(WaitForCellText(4, 1, "Delta**"), "SetCellValue/GetCellValue");
 
             _grid.DefineColumns(2, dataType: VolvoxGridColumnDataType.Number, alignment: VolvoxGridAlign.RightCenter, format: "N0");
             _grid.SetColWidth(1, 170);
@@ -381,15 +458,18 @@ namespace VolvoxGrid.DotNet.Sample
             });
 
             _grid.SelectRange(1, 0, 2, 1);
-            var state = _grid.GetSelectionState();
-            SmokeAssert(state != null && state.Ranges != null && state.Ranges.Length > 0, "SelectRange/GetSelectionState");
+            var state = _grid.GetSelection();
+            SmokeAssert(state != null && state.Ranges != null && state.Ranges.Length > 0, "SelectRange/GetSelection");
 
-            _grid.SetRow(3);
-            _grid.SetCol(1);
-            SmokeAssert(_grid.GetRow() == 3 && _grid.GetCol() == 1, "SetRow/SetCol");
+            _grid.CursorRow = 3;
+            _grid.CursorCol = 1;
+            SmokeAssert(_grid.CursorRow == 3 && _grid.CursorCol == 1, "CursorRow/CursorCol");
 
-            _grid.SetTopRow(1);
-            SmokeAssert(_grid.GetTopRow() >= 0, "SetTopRow/GetTopRow");
+            _grid.TopRow = 1;
+            SmokeAssert(_grid.TopRow >= 0, "TopRow");
+
+            _grid.LeftCol = 1;
+            SmokeAssert(_grid.LeftCol >= 0, "LeftCol");
 
             _grid.MergeCells(1, 0, 1, 1);
             var merged = _grid.GetMergedRange(1, 0);
@@ -397,16 +477,16 @@ namespace VolvoxGrid.DotNet.Sample
             SmokeAssert(_grid.GetMergedRegions() != null, "GetMergedRegions");
             _grid.UnmergeCells(1, 0, 1, 1);
 
-            var clipboard = _grid.CopyClipboard();
-            SmokeAssert(clipboard != null, "CopyClipboard");
+            var clipboard = _grid.Copy();
+            SmokeAssert(clipboard != null, "Copy");
             _grid.Paste("101\tPasted\t99\ttrue");
 
-            RunOptionalSmokeStep("EditCell/CommitEdit/CancelEdit", delegate
+            RunOptionalSmokeStep("BeginEdit/CommitEdit/CancelEdit", delegate
             {
-                _grid.EditCell(2, 1, true, true, null);
+                _grid.BeginEdit(2, 1, true, true, null);
                 _grid.CommitEdit("EditedViaSmoke");
-                SmokeAssert(WaitForTextMatrix(2, 1, "EditedViaSmoke"), "CommitEdit result");
-                _grid.EditCell(2, 1);
+                SmokeAssert(WaitForCellText(2, 1, "EditedViaSmoke"), "CommitEdit result");
+                _grid.BeginEdit(2, 1);
                 _grid.CancelEdit();
             });
 
@@ -426,24 +506,24 @@ namespace VolvoxGrid.DotNet.Sample
 
             RunOptionalSmokeStep("AutoSize/Outline/GetNode/Subtotal", delegate
             {
-                _grid.AutoSizeColumns(0, 3, false, 220);
+                _grid.AutoSize(0, 3, false, 220);
                 _grid.Outline(1);
                 _grid.GetNode(1);
                 _grid.Subtotal(VolvoxGridAggregateType.Sum, 0, 2, "Subtotal", addOutline: false);
             });
 
-            _grid.WithRedrawSuspended(delegate { _grid.SetTextMatrix(1, 1, "Alpha!"); }, true);
-            SmokeAssert(WaitForTextMatrix(1, 1, "Alpha!"), "WithRedrawSuspended");
+            _grid.WithRedrawSuspended(delegate { _grid.SetCellText(1, 1, "Alpha!"); }, true);
+            SmokeAssert(WaitForCellText(1, 1, "Alpha!"), "WithRedrawSuspended");
             _grid.ClearSelection();
-            _grid.RefreshGrid();
+            _grid.Refresh();
             AppLog.Info("SMOKE: controller-api checks complete");
         }
 
-        private bool WaitForTextMatrix(int row, int col, string expected)
+        private bool WaitForCellText(int row, int col, string expected)
         {
             for (int i = 0; i < 20; i++)
             {
-                string actual = _grid.GetTextMatrix(row, col);
+                string actual = _grid.GetCellText(row, col);
                 if (string.Equals(actual ?? string.Empty, expected ?? string.Empty, StringComparison.Ordinal))
                 {
                     return true;
@@ -529,13 +609,6 @@ namespace VolvoxGrid.DotNet.Sample
                 if (_demoLoaded)
                 {
                     _grid.CancelFling();
-                    _demoColumns[_currentDemo] = _grid.GetColumns();
-                }
-
-                VolvoxGridColumn[] columnsForMode;
-                if (!_demoColumns.TryGetValue(mode, out columnsForMode) || columnsForMode == null || columnsForMode.Length == 0)
-                {
-                    columnsForMode = BuildColumns(mode);
                 }
 
                 long cachedGridId;
@@ -551,11 +624,17 @@ namespace VolvoxGrid.DotNet.Sample
                     }
 
                     _grid.CancelFling();
-                    _grid.SetColumns(columnsForMode);
+                    if (!_grid.LoadDemo(ToEngineDemoName(mode)))
+                    {
+                        string details = _grid.LastError;
+                        SetStatus("Engine demo load failed" + (string.IsNullOrEmpty(details) ? "." : ": " + details));
+                        return;
+                    }
+
                     _currentDemo = mode;
                     _demoLoaded = true;
                     HighlightDemoButton(mode);
-                    SetStatus("Switched to cached demo: " + ToEngineDemoName(mode) + " (gridId=" + cachedGridId + ").");
+                    SetStatus("Loaded raw engine demo: " + ToEngineDemoName(mode) + " (gridId=" + cachedGridId + ").");
                     return;
                 }
 
@@ -577,16 +656,13 @@ namespace VolvoxGrid.DotNet.Sample
                     }
                 }
 
-                _grid.SetColumns(columnsForMode);
                 if (_grid.LoadDemo(ToEngineDemoName(mode)))
                 {
                     _demoGridIds[mode] = _grid.CurrentGridId != 0 ? _grid.CurrentGridId : newGridId;
                     _currentDemo = mode;
                     _demoLoaded = true;
                     HighlightDemoButton(mode);
-                    ApplyDefaultSort(mode);
-                    _demoColumns[mode] = _grid.GetColumns();
-                    SetStatus("Loaded engine demo: " + ToEngineDemoName(mode) + " (gridId=" + _demoGridIds[mode] + ").");
+                    SetStatus("Loaded raw engine demo: " + ToEngineDemoName(mode) + " (gridId=" + _demoGridIds[mode] + ").");
                 }
                 else
                 {
@@ -601,107 +677,17 @@ namespace VolvoxGrid.DotNet.Sample
             }
         }
 
-        private VolvoxGridColumn[] BuildColumns(DemoMode mode)
-        {
-            switch (mode)
-            {
-                case DemoMode.Hierarchy:
-                    return new[]
-                    {
-                        new VolvoxGridColumn { FieldName = "c0", Caption = "Name", Width = 260 },
-                        new VolvoxGridColumn { FieldName = "c1", Caption = "Type", Width = 80 },
-                        new VolvoxGridColumn { FieldName = "c2", Caption = "Size", Width = 80 },
-                        new VolvoxGridColumn { FieldName = "c3", Caption = "Modified", Width = 120 },
-                        new VolvoxGridColumn { FieldName = "c4", Caption = "Permissions", Width = 100 },
-                    };
-                case DemoMode.Stress:
-                    return new[]
-                    {
-                        new VolvoxGridColumn { FieldName = "c0", Caption = "#", Width = 50 },
-                        new VolvoxGridColumn { FieldName = "c1", Caption = "Text", Width = 110 },
-                        new VolvoxGridColumn { FieldName = "c2", Caption = "Number", Width = 80 },
-                        new VolvoxGridColumn { FieldName = "c3", Caption = "Currency", Width = 90 },
-                        new VolvoxGridColumn { FieldName = "c4", Caption = "Pct", Width = 60 },
-                        new VolvoxGridColumn { FieldName = "c5", Caption = "Date", Width = 100 },
-                        new VolvoxGridColumn { FieldName = "c6", Caption = "Bool", Width = 50 },
-                        new VolvoxGridColumn { FieldName = "c7", Caption = "Combo", Width = 90 },
-                        new VolvoxGridColumn { FieldName = "c8", Caption = "Long Text", Width = 160 },
-                        new VolvoxGridColumn { FieldName = "c9", Caption = "Formatted", Width = 90 },
-                        new VolvoxGridColumn { FieldName = "c10", Caption = "Rating", Width = 60 },
-                        new VolvoxGridColumn { FieldName = "c11", Caption = "Code", Width = 100 },
-                    };
-                case DemoMode.Sales:
-                default:
-                    return new[]
-                    {
-                        new VolvoxGridColumn { FieldName = "c0", Caption = "#", Width = 40 },
-                        new VolvoxGridColumn { FieldName = "c1", Caption = "Q", Width = 40 },
-                        new VolvoxGridColumn { FieldName = "c2", Caption = "Region", Width = 80 },
-                        new VolvoxGridColumn { FieldName = "c3", Caption = "Category", Width = 100 },
-                        new VolvoxGridColumn { FieldName = "c4", Caption = "Product", Width = 120 },
-                        new VolvoxGridColumn { FieldName = "c5", Caption = "Sales", Width = 90 },
-                        new VolvoxGridColumn { FieldName = "c6", Caption = "Cost", Width = 90 },
-                        new VolvoxGridColumn { FieldName = "c7", Caption = "Margin%", Width = 70 },
-                        new VolvoxGridColumn { FieldName = "c8", Caption = "Status", Width = 80 },
-                        new VolvoxGridColumn { FieldName = "c9", Caption = "Notes", Width = 140 },
-                    };
-            }
-        }
-
-        private void ApplyDefaultSort(DemoMode mode)
-        {
-            switch (mode)
-            {
-                case DemoMode.Sales:
-                    break;
-                case DemoMode.Stress:
-                    ApplySortForDemo(mode, VolvoxGridSortDirection.Ascending, false);
-                    break;
-                case DemoMode.Hierarchy:
-                    break;
-            }
-        }
-
-        private void ApplySortForDemo(DemoMode mode, VolvoxGridSortDirection direction, bool reportStatus)
-        {
-            string fieldName;
-            switch (mode)
-            {
-                case DemoMode.Sales:
-                    fieldName = "c5";
-                    break;
-                case DemoMode.Hierarchy:
-                    fieldName = "c0";
-                    break;
-                case DemoMode.Stress:
-                default:
-                    fieldName = "c0";
-                    break;
-            }
-
-            if (_grid.ApplySort(fieldName, direction) && reportStatus)
-            {
-                SetStatus("Applied sort: " + fieldName + " " + (direction == VolvoxGridSortDirection.Ascending ? "ascending." : "descending."));
-            }
-        }
-
         private void SortFocusedColumn(VolvoxGridSortDirection direction)
         {
-            string fieldName = _grid.FocusedColumnFieldName;
-            if (string.IsNullOrEmpty(fieldName))
+            int col = _grid.FocusedColIndex;
+            if (col < 0)
             {
                 SetStatus("Select a cell first to sort its column.");
                 return;
             }
 
-            if (_grid.ApplySort(fieldName, direction))
-            {
-                SetStatus("Applied sort: " + fieldName + " " + (direction == VolvoxGridSortDirection.Ascending ? "ascending." : "descending."));
-                return;
-            }
-
-            string details = _grid.LastError;
-            SetStatus("Sort failed" + (string.IsNullOrEmpty(details) ? "." : ": " + details));
+            _grid.Sort(col, direction == VolvoxGridSortDirection.Ascending);
+            SetStatus("Applied sort: " + GetColumnLabel(col) + " " + (direction == VolvoxGridSortDirection.Ascending ? "ascending." : "descending."));
         }
 
         private void HighlightDemoButton(DemoMode mode)
@@ -773,18 +759,84 @@ namespace VolvoxGrid.DotNet.Sample
             return string.Empty;
         }
 
+        private void SelectSelectionModeOption(VolvoxGridSelectionMode mode)
+        {
+            for (int i = 0; i < _selectionModeOptions.Length; i++)
+            {
+                if (_selectionModeOptions[i].Mode == mode)
+                {
+                    UpdateSelectionModeUi(_selectionModeOptions[i]);
+                    return;
+                }
+            }
+
+            if (_selectionModeOptions.Length > 0)
+            {
+                UpdateSelectionModeUi(_selectionModeOptions[0]);
+            }
+        }
+
+        private void ApplySelectionModeOption(SelectionModeOption option)
+        {
+            if (option == null)
+            {
+                return;
+            }
+
+            _grid.SelectionMode = option.Mode;
+            UpdateSelectionModeUi(option);
+            SetStatus("Selection mode: " + option.Label + ".");
+        }
+
+        private void UpdateSelectionModeUi(SelectionModeOption selected)
+        {
+            if (_selectionModeButton == null || _selectionModeButton.IsDisposed || selected == null)
+            {
+                return;
+            }
+
+            _selectionModeButton.Text = selected.Label + " v";
+
+            for (int i = 0; i < _selectionModeMenu.Items.Count; i++)
+            {
+                var item = _selectionModeMenu.Items[i] as ToolStripMenuItem;
+                if (item == null)
+                {
+                    continue;
+                }
+
+                var option = item.Tag as SelectionModeOption;
+                item.Checked = option != null && option.Mode == selected.Mode;
+            }
+        }
+
+        private void OpenSelectionModeMenu()
+        {
+            if (_selectionModeButton == null || _selectionModeButton.IsDisposed)
+            {
+                return;
+            }
+
+            if (!_selectionModeButton.Focused)
+            {
+                _selectionModeButton.Focus();
+            }
+
+            _selectionModeMenu.Show(_selectionModeButton, 0, _selectionModeButton.Height);
+        }
+
         private void OnFocusedCellChanged(object sender, VolvoxGridFocusedCellChangedEventArgs args)
         {
             SetStatus(
                 "Focus row=" + args.CurrentRowIndex
-                + ", column='" + args.CurrentColumnFieldName + "'.");
+                + ", column='" + GetColumnLabel(_grid.FocusedColIndex, args.CurrentColumnFieldName) + "'.");
         }
 
         private void OnCellValueChanged(object sender, VolvoxGridCellValueChangedEventArgs args)
         {
             SetStatus(
                 "Edited row=" + args.RowIndex
-                + ", column='" + args.FieldName + "', value='" + Convert.ToString(args.Value) + "'.");
+                + ", column='" + GetColumnLabel(_grid.FocusedColIndex, args.FieldName) + "', value='" + Convert.ToString(args.Value) + "'.");
         }
 
         private void OnSelectionChanged(object sender, VolvoxGridSelectionChangedEventArgs args)
@@ -806,6 +858,24 @@ namespace VolvoxGrid.DotNet.Sample
         private void SetStatus(string message)
         {
             SetStatus(message, append: false);
+        }
+
+        private string GetColumnLabel(int col)
+        {
+            return GetColumnLabel(col, null);
+        }
+
+        private string GetColumnLabel(int col, string fallback)
+        {
+            var columns = _grid.GetColumns();
+            if (col >= 0 && col < columns.Length)
+            {
+                return string.IsNullOrEmpty(columns[col].Caption)
+                    ? (string.IsNullOrEmpty(columns[col].FieldName) ? "C" + col : columns[col].FieldName)
+                    : columns[col].Caption;
+            }
+
+            return string.IsNullOrEmpty(fallback) ? "C" + Math.Max(col, 0) : fallback;
         }
     }
 }

@@ -68,6 +68,21 @@ fn apply_demo_row_indicator(grid: &mut VolvoxGrid, width_px: i32) {
     grid.indicator_bands.row_start.allow_resize = true;
 }
 
+fn apply_sales_subtotal_merges(grid: &mut VolvoxGrid) {
+    if grid.cols < 2 {
+        return;
+    }
+
+    for row in grid.fixed_rows..grid.rows {
+        let Some(props) = grid.row_props.get(&row) else {
+            continue;
+        };
+        if props.is_subtotal && props.outline_level <= 0 {
+            grid.merged_regions.add_merge(row, 0, row, 1);
+        }
+    }
+}
+
 fn reset_grid(grid: &mut VolvoxGrid) {
     // Clear all data
     grid.cells.clear_all();
@@ -369,6 +384,7 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
     grid.span.span_cols.insert(0, true);
     grid.span.span_cols.insert(1, true);
     grid.span.span_compare = 1;
+    apply_sales_subtotal_merges(grid);
 
     // Outline bar
     grid.outline.tree_indicator = 0;
@@ -1008,6 +1024,36 @@ mod tests {
         );
         assert_ne!(grid.cells.get_text(0, 0), "Q");
         assert_ne!(grid.cells.get_text(0, 4), "Sales");
+    }
+
+    #[test]
+    fn sales_demo_merges_q_and_region_for_q_subtotals_and_grand_total() {
+        let mut grid = VolvoxGrid::new(1, 960, 540, 1, 1, 0, 0);
+        setup_sales_demo(&mut grid);
+
+        let mut merged_subtotal_rows = 0;
+        let mut region_subtotal_rows = 0;
+        for row in grid.fixed_rows..grid.rows {
+            let Some(props) = grid.row_props.get(&row) else {
+                continue;
+            };
+            if !props.is_subtotal {
+                continue;
+            }
+
+            if props.outline_level <= 0 {
+                merged_subtotal_rows += 1;
+                assert_eq!(grid.get_merged_range(row, 0), Some((row, 0, row, 1)));
+                assert_eq!(grid.get_merged_range(row, 1), Some((row, 0, row, 1)));
+            } else {
+                region_subtotal_rows += 1;
+                assert_eq!(grid.get_merged_range(row, 0), None);
+                assert_eq!(grid.get_merged_range(row, 1), None);
+            }
+        }
+
+        assert!(merged_subtotal_rows > 0, "expected Q subtotal and grand-total merges");
+        assert!(region_subtotal_rows > 0, "expected region subtotal rows to remain unmerged");
     }
 
     #[test]

@@ -4,6 +4,14 @@ import jsYaml from 'js-yaml';
 import { VolvoxGrid } from 'volvoxgrid';
 import { FileText, Download, Layers } from 'lucide-react';
 
+type CanonicalVolvoxGrid = VolvoxGrid & {
+  rowCount: number;
+  colCount: number;
+  frozenRowCount: number;
+  frozenColCount: number;
+  setCellText(row: number, col: number, text: string): void;
+};
+
 const FONT_FETCH_TIMEOUT_MS = 3000;
 const FONT_URL_CANDIDATES = [
   "https://cdn.jsdelivr.net/gh/googlefonts/roboto-2@main/src/hinted/Roboto-Regular.ttf",
@@ -102,7 +110,7 @@ const HIDDEN_CANVAS_STYLE: React.CSSProperties = {
 
 export default function App() {
   const [yaml, setYaml] = useState(INITIAL_YAML);
-  const gridRef = useRef<VolvoxGrid | null>(null);
+  const gridRef = useRef<CanonicalVolvoxGrid | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastExport, setLastExport] = useState<string | null>(null);
@@ -154,7 +162,7 @@ export default function App() {
           wasmModule.init_v1_plugin();
         }
 
-        const grid = new VolvoxGrid(canvasRef.current, wasmModule, 100, 10);
+        const grid = new VolvoxGrid(canvasRef.current, wasmModule, 100, 10) as CanonicalVolvoxGrid;
         if (fontLoaded && typeof (grid as any).setFontName === "function") {
           (grid as any).setFontName("Roboto");
         }
@@ -193,8 +201,8 @@ export default function App() {
       setError(null);
 
       grid.setRedraw(false);
-      grid.rows = 0;
-      grid.rows = 100;
+      grid.rowCount = 0;
+      grid.rowCount = 100;
       
       let currentRow = 0;
       for (const band of config.bands || []) {
@@ -205,7 +213,7 @@ export default function App() {
           let currentCol = 0;
           for (const cell of band.cells || []) {
             let text = (cell.text || "").replace("{i}", (i + 1).toString());
-            grid.setTextMatrix(currentRow, currentCol, text);
+            grid.setCellText(currentRow, currentCol, text);
             if (cell.width) grid.setColWidth(currentCol, cell.width);
             
             if (band.style || cell.style) {
@@ -227,10 +235,10 @@ export default function App() {
       (grid as any).ensureLayout();
 
       console.log("Grid state for print:", {
-        rows: grid.rows,
-        cols: grid.cols,
-        fixedRows: grid.fixedRows,
-        fixedCols: grid.fixedCols,
+        rowCount: grid.rowCount,
+        colCount: grid.colCount,
+        frozenRowCount: grid.frozenRowCount,
+        frozenColCount: grid.frozenColCount,
       });
 
       // AUTO-EXPORT (prefer print pipeline; fallback to viewport capture)

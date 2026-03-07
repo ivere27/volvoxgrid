@@ -54,9 +54,9 @@ public class MyApp {
             ctrl.setColumnCaption(2, "Qty");
 
             // Set data
-            ctrl.setTextMatrix(0, 0, "Widget A");
-            ctrl.setTextMatrix(0, 1, "29.99");
-            ctrl.setTextMatrix(0, 2, "150");
+            ctrl.setCellText(0, 0, "Widget A");
+            ctrl.setCellText(0, 1, "29.99");
+            ctrl.setCellText(0, 2, "150");
 
             // Clean up on close
             frame.addWindowListener(new java.awt.event.WindowAdapter() {
@@ -144,11 +144,11 @@ ctrl.setColCount(10);
 
 ```java
 // Single cell
-ctrl.setTextMatrix(row, col, "text");
-String text = ctrl.getTextMatrix(row, col);
+ctrl.setCellText(row, col, "text");
+String text = ctrl.getCellText(row, col);
 
 // Batch update
-ctrl.setCellTexts(List.of(
+ctrl.setCells(List.of(
     new GridCellText(0, 0, "A"),
     new GridCellText(0, 1, "B"),
     new GridCellText(1, 0, "C")
@@ -166,7 +166,7 @@ ctrl.setColWidth(0, 200);
 
 ```java
 // Simple sort
-ctrl.sortByColumn(1, true);  // col 1, ascending
+ctrl.sort(1, true);  // col 1, ascending
 
 // With sort order enum
 ctrl.sort(SortOrder.SORT_NUMERIC_ASCENDING, 1);
@@ -178,11 +178,27 @@ ctrl.sort(SortOrder.SORT_NUMERIC_ASCENDING, 1);
 
 ```java
 // Select a range
-ctrl.select(1, 0, 5, 3);  // row1, col1, row2, col2
+ctrl.selectRange(1, 0, 5, 3);  // row1, col1, row2, col2
+
+// Select multiple ranges
+ctrl.selectRanges(List.of(
+    new GridCellRange(1, 0, 2, 1),
+    new GridCellRange(4, 3, 6, 4)
+));
+
+// Select multiple ranges with an explicit active cell
+ctrl.selectRanges(
+    List.of(
+        new GridCellRange(1, 0, 2, 1),
+        new GridCellRange(4, 3, 6, 4)
+    ),
+    6,
+    4
+);
 
 // Get current selection
-GridSelection sel = ctrl.getSelectionState();
-// sel.getRow(), sel.getCol(), sel.getRowEnd(), sel.getColEnd(), sel.getTopRow()
+GridSelection sel = ctrl.getSelection();
+// sel.getRow(), sel.getCol(), sel.getRowEnd(), sel.getColEnd(), sel.getTopRow(), sel.getLeftCol(), sel.getRanges()
 ```
 
 #### Cell Merging

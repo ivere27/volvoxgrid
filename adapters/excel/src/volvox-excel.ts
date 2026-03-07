@@ -111,6 +111,10 @@ export class VolvoxExcel implements VolvoxExcelApi {
 
   // Pointer-driven selection drag state
   private _pointerDrag = false;
+  private _multiRangePointerDrag = false;
+  private _multiRangeBaseRanges: CellRange[] = [];
+  private _multiRangeAnchor: CellRef | null = null;
+  private _multiRangeEnd: CellRef | null = null;
   // Active inserted formula token span while dragging a formula range pick.
   private _formulaDragRefSpan: { start: number; length: number } | null = null;
 
@@ -203,22 +207,21 @@ export class VolvoxExcel implements VolvoxExcelApi {
     // Keep an explicit default size baseline even on builds where config
     // application is partial/older.
     this.grid.setFontSize(this.toEngineFontSize(this.defaultFontSize));
+    this.grid.selectionMode = excelConfig.selectionMode ?? 4;
     this.grid.showColumnHeaders = true;
     this.grid.columnIndicatorTopRowCount = 1;
-    this.grid.showIndicator = true;
+    this.grid.showRowIndicator = true;
     this.grid.rowIndicatorStartModeBits = EXCEL_ROW_INDICATOR_MODE;
     this.grid.rowIndicatorStartWidth = 40;
 
     // Enable column/row resize via direct API (bypasses protobuf config path)
-    this.grid.setAllowUserResizing(3); // RESIZE_BOTH
+    this.grid.allowUserResizing = 3; // RESIZE_BOTH
     this.grid.setHeaderResizeHandleStyle({ enabled: true });
 
-    // Enable double-click editing via direct WASM call (bypass protobuf config)
+    // Enable double-click editing via the direct wrapper property (bypasses protobuf config)
     // 2 = EDIT_TRIGGER_KEY_CLICK: allows editing from RPC and dblclick.
     // host_key_dispatch=true still prevents engine from auto-starting on keypress.
-    if (typeof this.wasm.set_edit_trigger === "function") {
-      this.wasm.set_edit_trigger(this.grid.id, 2);
-    }
+    this.grid.editTrigger = 2;
 
     // Enable double-click-to-auto-size on column header borders
     if (typeof this.wasm.set_auto_size_mouse === "function") {
@@ -578,18 +581,18 @@ export class VolvoxExcel implements VolvoxExcelApi {
   ): ContextMenuScope {
     const { x, y } = this.pointerToGridPixels(e);
     const indicatorTopHeight = this.grid.showColumnHeaders
-      ? this.grid.getDefaultRowHeight() * Math.max(0, this.grid.columnIndicatorTopRowCount)
+      ? this.grid.defaultRowHeight * Math.max(0, this.grid.columnIndicatorTopRowCount)
       : 0;
-    const indicatorStartWidth = this.grid.showIndicator
+    const indicatorStartWidth = this.grid.showRowIndicator
       ? this.grid.rowIndicatorStartWidth
       : 0;
     const inTop = y >= 0 && y < indicatorTopHeight;
     const inStart = x >= 0 && x < indicatorStartWidth;
 
     if (inTop && inStart) return "corner";
-    if (inTop && col >= 0 && col < this.grid.cols) return "colHeader";
-    if (inStart && row >= 0 && row < this.grid.rows) return "rowHeader";
-    if (row >= 0 && col >= 0 && row < this.grid.rows && col < this.grid.cols) return "cell";
+    if (inTop && col >= 0 && col < this.grid.colCount) return "colHeader";
+    if (inStart && row >= 0 && row < this.grid.rowCount) return "rowHeader";
+    if (row >= 0 && col >= 0 && row < this.grid.rowCount && col < this.grid.colCount) return "cell";
     return "outside";
   }
 
@@ -604,6 +607,57 @@ export class VolvoxExcel implements VolvoxExcelApi {
       ? Number(this.wasm.get_mouse_col(this.grid.id))
       : this.selection.col;
     return { row, col };
+  }
+
+  private isAdditiveMultiRangePointer(e: PointerEvent): boolean {
+    return this.grid.selectionMode === 4 && !e.shiftKey && (e.ctrlKey || e.metaKey);
+  }
+
+  private snapshotAdditiveRanges(anchorRow: number, anchorCol: number): CellRange[] {
+    return this.selection.getRanges().filter((range) =>
+      !(range.row1 === anchorRow
+        && range.col1 === anchorCol
+        && range.row2 === anchorRow
+        && range.col2 === anchorCol),
+    );
+  }
+
+  private buildAdditiveRanges(baseRanges: ReadonlyArray<CellRange>, targetRow: number, targetCol: number): CellRange[] {
+    if (!this._multiRangeAnchor) {
+      return [...baseRanges];
+    }
+    const nextRange: CellRange = {
+      row1: Math.min(this._multiRangeAnchor.row, targetRow),
+      col1: Math.min(this._multiRangeAnchor.col, targetCol),
+      row2: Math.max(this._multiRangeAnchor.row, targetRow),
+      col2: Math.max(this._multiRangeAnchor.col, targetCol),
+    };
+    const ranges = baseRanges.map((range) => ({ ...range }));
+    const exists = ranges.some((range) =>
+      range.row1 === nextRange.row1
+      && range.col1 === nextRange.col1
+      && range.row2 === nextRange.row2
+      && range.col2 === nextRange.col2,
+    );
+    if (!exists) {
+      ranges.push(nextRange);
+    }
+    return ranges;
+  }
+
+  private applyAdditiveSelection(targetRow: number, targetCol: number): void {
+    const ranges = this.buildAdditiveRanges(this._multiRangeBaseRanges, targetRow, targetCol);
+    this.selection.selectRanges(ranges, targetRow, targetCol);
+    this._preMergeRow = targetRow;
+    this._preMergeCol = targetCol;
+    this.onSelectionUpdated();
+  }
+
+  private clearAdditivePointerSelection(): void {
+    this._multiRangePointerDrag = false;
+    this._multiRangeBaseRanges = [];
+    this._multiRangeAnchor = null;
+    this._multiRangeEnd = null;
   }
 
   private onPointerDown = (e: PointerEvent): void => {
@@ -672,8 +726,17 @@ export class VolvoxExcel implements VolvoxExcelApi {
     if (scope === "cell") {
       const prevKey = `${this.selection.row}:${this.selection.col}`;
       const cellKey = `${row}:${col}`;
+      const additiveMultiRange = this.isAdditiveMultiRangePointer(e);
 
-      if (e.shiftKey) {
+      if (additiveMultiRange) {
+        clearTimeout(this.singleClickTimer);
+        this.lastClickedCell = "";
+        this._multiRangeBaseRanges = this.snapshotAdditiveRanges(row, col);
+        this._multiRangeAnchor = { row, col };
+        this._multiRangeEnd = { row, col };
+        this._multiRangePointerDrag = true;
+        this.applyAdditiveSelection(row, col);
+      } else if (e.shiftKey) {
         // Shift-click: extend selection from anchor
         this.selection.select(
           this.selection.row, this.selection.col,
@@ -684,10 +747,12 @@ export class VolvoxExcel implements VolvoxExcelApi {
       }
       this._preMergeRow = row;
       this._preMergeCol = col;
-      this.onSelectionUpdated();
+      if (!additiveMultiRange) {
+        this.onSelectionUpdated();
+      }
 
       // Single-click-to-edit: if clicking the same already-selected cell
-      if (!e.shiftKey && cellKey === this.lastClickedCell && cellKey === prevKey) {
+      if (!additiveMultiRange && !e.shiftKey && cellKey === this.lastClickedCell && cellKey === prevKey) {
         clearTimeout(this.singleClickTimer);
         this.singleClickTimer = window.setTimeout(() => {
           if (this.destroyed || this.editState.isEditing) return;
@@ -707,22 +772,25 @@ export class VolvoxExcel implements VolvoxExcelApi {
       } else {
         clearTimeout(this.singleClickTimer);
       }
-      this.lastClickedCell = cellKey;
+      this.lastClickedCell = additiveMultiRange ? "" : cellKey;
 
       // Start drag-select tracking
-      if (!e.shiftKey) {
+      if (additiveMultiRange) {
+        this._pointerDrag = false;
+      } else if (!e.shiftKey) {
         this._pointerDrag = true;
       }
     } else {
       clearTimeout(this.singleClickTimer);
+      this.clearAdditivePointerSelection();
       if (scope === "rowHeader") {
-        this.selection.select(row, 0, row, this.grid.cols - 1);
+        this.selection.select(row, 0, row, this.grid.colCount - 1);
         this.onSelectionUpdated();
       } else if (scope === "colHeader") {
-        this.selection.select(0, col, this.grid.rows - 1, col);
+        this.selection.select(0, col, this.grid.rowCount - 1, col);
         this.onSelectionUpdated();
       } else if (scope === "corner") {
-        this.selection.select(0, 0, this.grid.rows - 1, this.grid.cols - 1);
+        this.selection.select(0, 0, this.grid.rowCount - 1, this.grid.colCount - 1);
         this.onSelectionUpdated();
       }
     }
@@ -730,6 +798,22 @@ export class VolvoxExcel implements VolvoxExcelApi {
 
   private onPointerMove = (e: PointerEvent): void => {
     if (this.destroyed) return;
+    if (this._multiRangePointerDrag) {
+      if (!(e.buttons & 1)) {
+        this.clearAdditivePointerSelection();
+        return;
+      }
+      const { row, col } = this.getMouseCell();
+      if (row >= 0 && col >= 0) {
+        if (!this._multiRangeEnd
+          || row !== this._multiRangeEnd.row
+          || col !== this._multiRangeEnd.col) {
+          this._multiRangeEnd = { row, col };
+          this.applyAdditiveSelection(row, col);
+        }
+      }
+      return;
+    }
     if (!this._pointerDrag) return;
     if (!(e.buttons & 1)) { this._pointerDrag = false; return; }
 
@@ -763,6 +847,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
 
   private onPointerUp = (_e: PointerEvent): void => {
     this._pointerDrag = false;
+    this.clearAdditivePointerSelection();
     this._formulaDragRefSpan = null;
   };
 
@@ -1141,8 +1226,8 @@ export class VolvoxExcel implements VolvoxExcelApi {
     if (!text.trimStart().startsWith("=")) {
       return [];
     }
-    const maxRow = this.grid.rows - 0 - 1;
-    const maxCol = this.grid.cols - 0 - 1;
+    const maxRow = this.grid.rowCount - 0 - 1;
+    const maxCol = this.grid.colCount - 0 - 1;
     if (maxRow < 0 || maxCol < 0) {
       return [];
     }
@@ -1361,7 +1446,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
       case "selectAll":
         this.selection.select(
           0, 0,
-          this.grid.rows - 1, this.grid.cols - 1,
+          this.grid.rowCount - 1, this.grid.colCount - 1,
         );
         this.onSelectionUpdated();
         break;
@@ -1467,8 +1552,8 @@ export class VolvoxExcel implements VolvoxExcelApi {
 
   private clearSelectedCells(): void {
     const sel = this.selection.getRange();
-    const maxRow = this.grid.rows - 0 - 1;
-    const maxCol = this.grid.cols - 0 - 1;
+    const maxRow = this.grid.rowCount - 0 - 1;
+    const maxCol = this.grid.colCount - 0 - 1;
     if (maxRow < 0 || maxCol < 0) return;
     const range = {
       row1: Math.max(0, sel.row1),
@@ -1675,8 +1760,8 @@ export class VolvoxExcel implements VolvoxExcelApi {
   }
 
   private clampDataRange(range: CellRange): CellRange | null {
-    const maxRow = this.grid.rows - 0 - 1;
-    const maxCol = this.grid.cols - 0 - 1;
+    const maxRow = this.grid.rowCount - 0 - 1;
+    const maxCol = this.grid.colCount - 0 - 1;
     if (maxRow < 0 || maxCol < 0) return null;
 
     const row1 = Math.max(0, Math.min(range.row1, range.row2));
@@ -1858,8 +1943,8 @@ export class VolvoxExcel implements VolvoxExcelApi {
     }
 
     // Clamp to grid bounds (data area)
-    targetRow = Math.max(rowOffset, Math.min(this.grid.rows - 1, targetRow));
-    targetCol = Math.max(colOffset, Math.min(this.grid.cols - 1, targetCol));
+    targetRow = Math.max(rowOffset, Math.min(this.grid.rowCount - 1, targetRow));
+    targetCol = Math.max(colOffset, Math.min(this.grid.colCount - 1, targetCol));
 
     // Always save the unresolved target as the pre-merge position.
     // This tracks where the user "would be" without merges.
@@ -1876,8 +1961,8 @@ export class VolvoxExcel implements VolvoxExcelApi {
   private navigateToDataCell(dataRow: number, dataCol: number): void {
     const gridRow = dataRow + 0;
     const gridCol = dataCol + 0;
-    if (gridRow >= 0 && gridRow < this.grid.rows
-      && gridCol >= 0 && gridCol < this.grid.cols) {
+    if (gridRow >= 0 && gridRow < this.grid.rowCount
+      && gridCol >= 0 && gridCol < this.grid.colCount) {
       this.selection.select(gridRow, gridCol);
       this.onSelectionUpdated();
       this.canvas.focus();
@@ -1964,7 +2049,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
   private applyHeaderStyles(): void {
     this.grid.showColumnHeaders = true;
     this.grid.columnIndicatorTopRowCount = 1;
-    this.grid.showIndicator = true;
+    this.grid.showRowIndicator = true;
     this.grid.rowIndicatorStartModeBits = EXCEL_ROW_INDICATOR_MODE;
     this.grid.rowIndicatorStartWidth = 40;
     this.grid.invalidate();
@@ -2007,23 +2092,14 @@ export class VolvoxExcel implements VolvoxExcelApi {
 
   /** Read the engine's authoritative selection and sync the JS model. */
   private syncSelectionFromEngine(): void {
-    const row = this.grid.selectionRow;
-    const col = this.grid.selectionCol;
-    // selectionRowEnd/ColEnd may be undefined if the compiled JS is stale
-    const rawRowEnd = (this.grid as any).selectionRowEnd;
-    const rawColEnd = (this.grid as any).selectionColEnd;
-    const rowEnd = typeof rawRowEnd === "number" && rawRowEnd >= 0 ? rawRowEnd : row;
-    const colEnd = typeof rawColEnd === "number" && rawColEnd >= 0 ? rawColEnd : col;
-
-    if (row !== this.selection.row || col !== this.selection.col
-        || rowEnd !== this.selection.rowEnd || colEnd !== this.selection.colEnd) {
+    const selection = this.grid.getSelection();
+    if (!this.selection.matchesSnapshot(selection)) {
       // Selection changed outside moveSelectionMergeAware (e.g. mouse click).
       // Update pre-merge tracking so header highlights and future arrow
       // navigation use the correct position.
-      this._preMergeRow = row;
-      this._preMergeCol = col;
-      this.selection.onSelectionChanged(row, col);
-      this.selection.onSelectionEndChanged(rowEnd, colEnd);
+      this._preMergeRow = selection.row;
+      this._preMergeCol = selection.col;
+      this.selection.syncFromSnapshot(selection);
       this.onSelectionUpdated();
     }
   }
@@ -2125,8 +2201,8 @@ export class VolvoxExcel implements VolvoxExcelApi {
   }
 
   private applyContextMenuSelection(row: number, col: number, scope: ContextMenuScope): void {
-    const maxGridRow = this.grid.rows - 1;
-    const maxGridCol = this.grid.cols - 1;
+    const maxGridRow = this.grid.rowCount - 1;
+    const maxGridCol = this.grid.colCount - 1;
     const firstDataRow = 0;
     const firstDataCol = 0;
     if (maxGridRow < firstDataRow || maxGridCol < firstDataCol) return;
@@ -2394,8 +2470,8 @@ export class VolvoxExcel implements VolvoxExcelApi {
   }
 
   clearRange(range: CellRange): void {
-    const maxRow = this.grid.rows - 0 - 1;
-    const maxCol = this.grid.cols - 0 - 1;
+    const maxRow = this.grid.rowCount - 0 - 1;
+    const maxCol = this.grid.colCount - 0 - 1;
     if (maxRow < 0 || maxCol < 0) return;
 
     const row1 = Math.max(0, Math.min(range.row1, range.row2));
@@ -2434,8 +2510,8 @@ export class VolvoxExcel implements VolvoxExcelApi {
   }
 
   setCellStyle(row: number, col: number, style: CellStyleUpdate): void {
-    const maxRow = this.grid.rows - 0 - 1;
-    const maxCol = this.grid.cols - 0 - 1;
+    const maxRow = this.grid.rowCount - 0 - 1;
+    const maxCol = this.grid.colCount - 0 - 1;
     if (row < 0 || col < 0 || row > maxRow || col > maxCol) return;
 
     const gridRow = row + 0;
@@ -2525,7 +2601,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
 
   private applyDataSnapshot(data: string[][]): void {
     const targetRows = Math.max(0, data.length);
-    const currentRows = this.grid.rows - 0;
+    const currentRows = this.grid.rowCount - 0;
     if (targetRows > currentRows) {
       this.grid.insertRows(0 + currentRows, targetRows - currentRows);
     } else if (targetRows < currentRows) {
@@ -2541,8 +2617,8 @@ export class VolvoxExcel implements VolvoxExcelApi {
     this.store.populateHeaders();
     this.applyHeaderStyles();
 
-    const row = Math.max(0, Math.min(this.selection.row, this.grid.rows - 1));
-    const col = Math.max(0, Math.min(this.selection.col, this.grid.cols - 1));
+    const row = Math.max(0, Math.min(this.selection.row, this.grid.rowCount - 1));
+    const col = Math.max(0, Math.min(this.selection.col, this.grid.colCount - 1));
     this.selection.select(row, col);
     this.onSelectionUpdated();
   }
@@ -2550,7 +2626,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
   insertRows(index: number, count: number = 1): void {
     const safeCount = Math.max(0, Math.trunc(count));
     if (safeCount <= 0) return;
-    const dataRows = this.grid.rows - 0;
+    const dataRows = this.grid.rowCount - 0;
     const safeIndex = Math.max(0, Math.min(Math.trunc(index), dataRows));
 
     const before = this.store.getData();
@@ -2569,7 +2645,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
   }
 
   deleteRows(index: number, count: number = 1): void {
-    const dataRows = this.grid.rows - 0;
+    const dataRows = this.grid.rowCount - 0;
     if (dataRows <= 0) return;
     const safeIndex = Math.trunc(index);
     if (safeIndex < 0 || safeIndex >= dataRows) return;
@@ -2594,7 +2670,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
   insertColumns(index: number, count: number = 1): void {
     const safeCount = Math.max(0, Math.trunc(count));
     if (safeCount <= 0) return;
-    const dataCols = this.grid.cols - 0;
+    const dataCols = this.grid.colCount - 0;
     const safeIndex = Math.max(0, Math.min(Math.trunc(index), dataCols));
 
     const before = this.store.getData();
@@ -2613,7 +2689,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
   }
 
   deleteColumns(index: number, count: number = 1): void {
-    const dataCols = this.grid.cols - 0;
+    const dataCols = this.grid.colCount - 0;
     if (dataCols <= 0) return;
     const safeIndex = Math.trunc(index);
     if (safeIndex < 0 || safeIndex >= dataCols) return;
@@ -2715,7 +2791,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
 
   private setSelectionFormat(format: string): void {
     const range = this.selection.getRange();
-    const maxCol = this.grid.cols - 0 - 1;
+    const maxCol = this.grid.colCount - 0 - 1;
     const start = Math.max(0, Math.min(range.col1, range.col2));
     const end = Math.min(maxCol, Math.max(range.col1, range.col2));
     if (start > end) return;
@@ -2725,14 +2801,14 @@ export class VolvoxExcel implements VolvoxExcelApi {
   }
 
   freezeRows(count: number): void {
-    this.grid.frozenRows = Math.max(0, Math.trunc(count));
+    this.grid.frozenRowCount = Math.max(0, Math.trunc(count));
     if (typeof this.wasm.set_allow_user_freezing === "function") {
       this.wasm.set_allow_user_freezing(this.grid.id, count > 0 ? 3 : 0);
     }
   }
 
   freezeColumns(count: number): void {
-    this.grid.frozenCols = Math.max(0, Math.trunc(count));
+    this.grid.frozenColCount = Math.max(0, Math.trunc(count));
     if (typeof this.wasm.set_allow_user_freezing === "function") {
       this.wasm.set_allow_user_freezing(this.grid.id, count > 0 ? 3 : 0);
     }
@@ -2749,13 +2825,11 @@ export class VolvoxExcel implements VolvoxExcelApi {
   }
 
   async copy(): Promise<void> {
-    const range = this.selection.getRange();
-    await this.clipboard.copy(range);
+    await this.clipboard.copy(this.selection.getRanges());
   }
 
   async cut(): Promise<void> {
-    const range = this.selection.getRange();
-    await this.clipboard.cut(range);
+    await this.clipboard.cut(this.selection.getRanges());
   }
 
   async paste(text?: string): Promise<void> {

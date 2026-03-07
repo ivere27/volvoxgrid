@@ -20,7 +20,7 @@ namespace VolvoxGrid.DotNet.Internal
 
         public long DecodeGridHandle(byte[] payload)
         {
-            return GridHandle.Parser.ParseFrom(payload).Id;
+            return CreateResponse.Parser.ParseFrom(payload).Handle?.Id ?? 0L;
         }
 
         public byte[] EncodeGridHandle(long gridId)
@@ -218,6 +218,21 @@ namespace VolvoxGrid.DotNet.Internal
             return req.ToByteArray();
         }
 
+        public byte[] EncodeShowCellRequest(long gridId, int row, int col)
+        {
+            return new ShowCellRequest { GridId = gridId, Row = row, Col = col }.ToByteArray();
+        }
+
+        public byte[] EncodeSetTopRowRequest(long gridId, int row)
+        {
+            return new SetRowRequest { GridId = gridId, Row = row }.ToByteArray();
+        }
+
+        public byte[] EncodeSetLeftColRequest(long gridId, int col)
+        {
+            return new SetColRequest { GridId = gridId, Col = col }.ToByteArray();
+        }
+
         public VolvoxSelectionStateData DecodeSelectionState(byte[] payload)
         {
             var state = SelectionState.Parser.ParseFrom(payload);
@@ -229,6 +244,8 @@ namespace VolvoxGrid.DotNet.Internal
                 LeftCol = state.LeftCol,
                 BottomRow = state.BottomRow,
                 RightCol = state.RightCol,
+                MouseRow = state.MouseRow,
+                MouseCol = state.MouseCol,
             };
             foreach (var r in state.Ranges)
             {
