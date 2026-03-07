@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0
+
+- canonical APIs 
+
 ## 0.1.4
 
 - Added Flutter plugin platform declarations for `macos` and `windows`.
