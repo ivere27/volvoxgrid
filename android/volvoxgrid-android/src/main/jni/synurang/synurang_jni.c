@@ -12,11 +12,14 @@
 //            void close_send(uint64_t handle)
 //            void close(uint64_t handle)
 //
-// Response format: [status:1byte][payload...]
-//   status=0: success, payload is protobuf
-//   status=1: error, payload is error string
+// Unary invoke:
+//   resp_len >= 0 -> raw protobuf payload
+//   resp_len < 0  -> serialized core.v1.Error payload
 //
-// Stream recv status: 0=data, 1=EOF, 2+=error
+// Stream recv:
+//   status == 0 -> raw protobuf payload
+//   status == 1 -> EOF
+//   status < 0  -> serialized core.v1.Error payload
 
 #include <jni.h>
 #include <stdlib.h>
@@ -24,18 +27,22 @@
 #include <stdint.h>
 #include <errno.h>
 
-#ifndef _WIN32
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <dlfcn.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <signal.h>
 #include <sys/time.h>
-#include <sys/syscall.h>
 
+#ifdef __linux__
+#include <sys/syscall.h>
 // close_range() syscall (Linux 5.9+, glibc 2.34+)
 #ifndef __NR_close_range
 #define __NR_close_range 436
+#endif
 #endif
 #endif
 
@@ -48,11 +55,43 @@ typedef char* (*synurang_stream_recv_func)(uint64_t handle, int* resp_len, int* 
 typedef void (*synurang_stream_close_send_func)(uint64_t handle);
 typedef void (*synurang_stream_close_func)(uint64_t handle);
 
-// Helper: throw a Java PluginError exception
-static void throw_plugin_error(JNIEnv *env, const char *msg) {
-    jclass cls = (*env)->FindClass(env, "io/github/ivere27/synurang/PluginError");
+// Helper: throw a Java FfiError exception
+static void throw_ffi_error(JNIEnv *env, const char *msg) {
+    jclass cls = (*env)->FindClass(env, "io/github/ivere27/synurang/FfiError");
     if (cls != NULL) {
         (*env)->ThrowNew(env, cls, msg);
+    }
+}
+
+static void throw_ffi_error_payload(JNIEnv *env, const char *payload, jint payload_len) {
+    jclass cls = (*env)->FindClass(env, "io/github/ivere27/synurang/FfiError");
+    if (cls == NULL) return;
+
+    jmethodID from_payload = (*env)->GetStaticMethodID(
+        env,
+        cls,
+        "fromPayload",
+        "([B)Lio/github/ivere27/synurang/FfiError;"
+    );
+    if (from_payload == NULL) {
+        throw_ffi_error(env, "failed to decode ffi error payload");
+        return;
+    }
+
+    jbyteArray array = (*env)->NewByteArray(env, payload_len);
+    if (array == NULL) {
+        return;
+    }
+    if (payload_len > 0 && payload != NULL) {
+        (*env)->SetByteArrayRegion(env, array, 0, payload_len, (const jbyte *)payload);
+    }
+
+    jobject error = (*env)->CallStaticObjectMethod(env, cls, from_payload, array);
+    if ((*env)->ExceptionCheck(env)) {
+        return;
+    }
+    if (error != NULL) {
+        (*env)->Throw(env, error);
     }
 }
 
@@ -63,8 +102,20 @@ static void throw_plugin_error(JNIEnv *env, const char *msg) {
 JNIEXPORT jlong JNICALL
 Java_io_github_ivere27_synurang_SynurangJni_nativeOpen(JNIEnv *env, jclass clazz, jstring path) {
 #ifdef _WIN32
-    throw_plugin_error(env, "Windows not supported in JNI layer");
-    return 0;
+    const char *c_path = (*env)->GetStringUTFChars(env, path, NULL);
+    if (c_path == NULL) return 0;
+
+    HMODULE handle = LoadLibraryA(c_path);
+    (*env)->ReleaseStringUTFChars(env, path, c_path);
+
+    if (handle == NULL) {
+        char buf[256];
+        DWORD err = GetLastError();
+        snprintf(buf, sizeof(buf), "LoadLibrary failed (error %lu)", (unsigned long)err);
+        throw_ffi_error(env, buf);
+        return 0;
+    }
+    return (jlong)(uintptr_t)handle;
 #else
     const char *c_path = (*env)->GetStringUTFChars(env, path, NULL);
     if (c_path == NULL) return 0;
@@ -73,7 +124,7 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeOpen(JNIEnv *env, jclass clazz
     (*env)->ReleaseStringUTFChars(env, path, c_path);
 
     if (handle == NULL) {
-        throw_plugin_error(env, dlerror());
+        throw_ffi_error(env, dlerror());
         return 0;
     }
     return (jlong)(uintptr_t)handle;
@@ -82,7 +133,11 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeOpen(JNIEnv *env, jclass clazz
 
 JNIEXPORT void JNICALL
 Java_io_github_ivere27_synurang_SynurangJni_nativeClose(JNIEnv *env, jclass clazz, jlong handle) {
-#ifndef _WIN32
+#ifdef _WIN32
+    if (handle != 0) {
+        FreeLibrary((HMODULE)(uintptr_t)handle);
+    }
+#else
     if (handle != 0) {
         dlclose((void *)(uintptr_t)handle);
     }
@@ -92,7 +147,13 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeClose(JNIEnv *env, jclass claz
 JNIEXPORT jlong JNICALL
 Java_io_github_ivere27_synurang_SynurangJni_nativeLookupSymbol(JNIEnv *env, jclass clazz, jlong handle, jstring name) {
 #ifdef _WIN32
-    return 0;
+    const char *c_name = (*env)->GetStringUTFChars(env, name, NULL);
+    if (c_name == NULL) return 0;
+
+    FARPROC sym = GetProcAddress((HMODULE)(uintptr_t)handle, c_name);
+    (*env)->ReleaseStringUTFChars(env, name, c_name);
+
+    return (jlong)(uintptr_t)sym;
 #else
     const char *c_name = (*env)->GetStringUTFChars(env, name, NULL);
     if (c_name == NULL) return 0;
@@ -130,7 +191,7 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeInvoke(
             c_data = (char *)malloc(data_len);
             if (c_data == NULL) {
                 (*env)->ReleaseStringUTFChars(env, method, c_method);
-                throw_plugin_error(env, "malloc failed");
+                throw_ffi_error(env, "malloc failed");
                 return NULL;
             }
             (*env)->GetByteArrayRegion(env, data, 0, data_len, (jbyte *)c_data);
@@ -145,14 +206,24 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeInvoke(
     free(c_data);
 
     if (resp == NULL) {
-        throw_plugin_error(env, "plugin returned null");
+        if (resp_len == 0) {
+            return (*env)->NewByteArray(env, 0);
+        }
+        throw_ffi_error(env, "plugin returned null");
+        return NULL;
+    }
+
+    int copy_len = resp_len < 0 ? -resp_len : resp_len;
+    if (resp_len < 0) {
+        throw_ffi_error_payload(env, resp, copy_len);
+        free_fn(resp);
         return NULL;
     }
 
     // Copy response to Java byte array
-    jbyteArray result = (*env)->NewByteArray(env, resp_len);
-    if (result != NULL && resp_len > 0) {
-        (*env)->SetByteArrayRegion(env, result, 0, resp_len, (jbyte *)resp);
+    jbyteArray result = (*env)->NewByteArray(env, copy_len);
+    if (result != NULL && copy_len > 0) {
+        (*env)->SetByteArrayRegion(env, result, 0, copy_len, (jbyte *)resp);
     }
 
     free_fn(resp);
@@ -193,7 +264,7 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeStreamSend(
         if (data_len > 0) {
             c_data = (char *)malloc(data_len);
             if (c_data == NULL) {
-                throw_plugin_error(env, "malloc failed");
+                throw_ffi_error(env, "malloc failed");
                 return -1;
             }
             (*env)->GetByteArrayRegion(env, data, 0, data_len, (jbyte *)c_data);
@@ -218,33 +289,33 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeStreamRecv(
     int status = 0;
     char *resp = recv_fn((uint64_t)handle, &resp_len, &status);
 
-    // status=1 means EOF -> return null
     if (status == 1) {
         if (resp != NULL) free_fn(resp);
         return NULL;
     }
 
-    // status >= 2 means error
-    if (status >= 2) {
+    if (status < 0) {
         if (resp != NULL && resp_len > 0) {
-            // Error message is in resp
-            char *msg = (char *)malloc(resp_len + 1);
-            if (msg != NULL) {
-                memcpy(msg, resp, resp_len);
-                msg[resp_len] = '\0';
-                throw_plugin_error(env, msg);
-                free(msg);
-            }
+            throw_ffi_error_payload(env, resp, resp_len);
             free_fn(resp);
         } else {
-            throw_plugin_error(env, "stream error");
+            if (resp != NULL) free_fn(resp);
+            throw_ffi_error(env, "stream error");
         }
         return NULL;
     }
 
-    // status=0 means data
-    if (resp == NULL || resp_len == 0) {
-        throw_plugin_error(env, "empty stream response");
+    if (status != 0) {
+        if (resp != NULL) free_fn(resp);
+        throw_ffi_error(env, "stream error");
+        return NULL;
+    }
+
+    if (resp == NULL) {
+        if (resp_len == 0) {
+            return (*env)->NewByteArray(env, 0);
+        }
+        throw_ffi_error(env, "plugin returned null");
         return NULL;
     }
 
@@ -276,16 +347,136 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeStreamClose(
 }
 
 // =============================================================================
-// Process Host — socketpair + fork/exec
+// Process Host — socketpair + fork/exec (Unix only)
 // =============================================================================
 
-#ifndef _WIN32
+#ifdef _WIN32
+
+JNIEXPORT jintArray JNICALL
+Java_io_github_ivere27_synurang_SynurangJni_nativeSocketpair(JNIEnv *env, jclass clazz) {
+    throw_ffi_error(env, "Process host not supported on Windows");
+    return NULL;
+}
+
+JNIEXPORT jint JNICALL
+Java_io_github_ivere27_synurang_SynurangJni_nativeForkExec(
+    JNIEnv *env, jclass clazz,
+    jstring executable, jobjectArray args, jint childFd
+) {
+    throw_ffi_error(env, "Process host not supported on Windows");
+    return -1;
+}
+
+JNIEXPORT void JNICALL
+Java_io_github_ivere27_synurang_SynurangJni_nativeKill(
+    JNIEnv *env, jclass clazz, jint pid, jint sig
+) {
+    throw_ffi_error(env, "Process host not supported on Windows");
+}
+
+JNIEXPORT jint JNICALL
+Java_io_github_ivere27_synurang_SynurangJni_nativeWaitPid(
+    JNIEnv *env, jclass clazz, jint pid
+) {
+    throw_ffi_error(env, "Process host not supported on Windows");
+    return -1;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_io_github_ivere27_synurang_SynurangJni_nativeIsAlive(
+    JNIEnv *env, jclass clazz, jint pid
+) {
+    throw_ffi_error(env, "Process host not supported on Windows");
+    return JNI_FALSE;
+}
+
+// =============================================================================
+// Raw fd I/O stubs (Windows)
+// =============================================================================
+
+JNIEXPORT jint JNICALL
+Java_io_github_ivere27_synurang_SynurangJni_nativeReadFd(
+    JNIEnv *env, jclass clazz,
+    jint fd, jbyteArray buf, jint offset, jint len
+) {
+    throw_ffi_error(env, "fd I/O not supported on Windows");
+    return -1;
+}
+
+JNIEXPORT void JNICALL
+Java_io_github_ivere27_synurang_SynurangJni_nativeWriteFd(
+    JNIEnv *env, jclass clazz,
+    jint fd, jbyteArray buf, jint offset, jint len
+) {
+    throw_ffi_error(env, "fd I/O not supported on Windows");
+}
+
+JNIEXPORT void JNICALL
+Java_io_github_ivere27_synurang_SynurangJni_nativeCloseFd(
+    JNIEnv *env, jclass clazz, jint fd
+) {
+    throw_ffi_error(env, "fd I/O not supported on Windows");
+}
+
+JNIEXPORT void JNICALL
+Java_io_github_ivere27_synurang_SynurangJni_nativeShutdownFd(
+    JNIEnv *env, jclass clazz, jint fd, jint how
+) {
+    throw_ffi_error(env, "fd I/O not supported on Windows");
+}
+
+JNIEXPORT void JNICALL
+Java_io_github_ivere27_synurang_SynurangJni_nativeSetSoTimeout(
+    JNIEnv *env, jclass clazz, jint fd, jint timeoutMs
+) {
+    throw_ffi_error(env, "fd I/O not supported on Windows");
+}
+
+JNIEXPORT jint JNICALL
+Java_io_github_ivere27_synurang_SynurangJni_nativeGetSoTimeout(
+    JNIEnv *env, jclass clazz, jint fd
+) {
+    throw_ffi_error(env, "fd I/O not supported on Windows");
+    return 0;
+}
+
+JNIEXPORT jint JNICALL
+Java_io_github_ivere27_synurang_SynurangJni_nativeGetRecvBufSize(
+    JNIEnv *env, jclass clazz, jint fd
+) {
+    throw_ffi_error(env, "fd I/O not supported on Windows");
+    return 0;
+}
+
+JNIEXPORT jint JNICALL
+Java_io_github_ivere27_synurang_SynurangJni_nativeGetSendBufSize(
+    JNIEnv *env, jclass clazz, jint fd
+) {
+    throw_ffi_error(env, "fd I/O not supported on Windows");
+    return 0;
+}
+
+JNIEXPORT void JNICALL
+Java_io_github_ivere27_synurang_SynurangJni_nativeSetRecvBufSize(
+    JNIEnv *env, jclass clazz, jint fd, jint size
+) {
+    throw_ffi_error(env, "fd I/O not supported on Windows");
+}
+
+JNIEXPORT void JNICALL
+Java_io_github_ivere27_synurang_SynurangJni_nativeSetSendBufSize(
+    JNIEnv *env, jclass clazz, jint fd, jint size
+) {
+    throw_ffi_error(env, "fd I/O not supported on Windows");
+}
+
+#else // !_WIN32
 
 JNIEXPORT jintArray JNICALL
 Java_io_github_ivere27_synurang_SynurangJni_nativeSocketpair(JNIEnv *env, jclass clazz) {
     int fds[2];
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) < 0) {
-        throw_plugin_error(env, strerror(errno));
+        throw_ffi_error(env, strerror(errno));
         return NULL;
     }
     jint jfds[2] = { fds[0], fds[1] };
@@ -310,7 +501,7 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeForkExec(
     const char **argv = (const char **)malloc(sizeof(char *) * (argc + 2));
     if (argv == NULL) {
         (*env)->ReleaseStringUTFChars(env, executable, c_exec);
-        throw_plugin_error(env, "malloc failed");
+        throw_ffi_error(env, "malloc failed");
         return -1;
     }
     argv[0] = c_exec;
@@ -333,7 +524,7 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeForkExec(
         }
         (*env)->ReleaseStringUTFChars(env, executable, c_exec);
         free(argv);
-        throw_plugin_error(env, "malloc failed");
+        throw_ffi_error(env, "malloc failed");
         return -1;
     }
     int j = 0;
@@ -355,7 +546,7 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeForkExec(
         (*env)->ReleaseStringUTFChars(env, executable, c_exec);
         free(argv);
         free(envp);
-        throw_plugin_error(env, strerror(err));
+        throw_ffi_error(env, strerror(err));
         return -1;
     }
 
@@ -369,8 +560,11 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeForkExec(
         }
 
         // Close all fds > 3 to prevent leaking parent's fds.
+#ifdef __linux__
         // Try close_range() syscall first (Linux 5.9+), fall back to loop.
-        if (syscall(__NR_close_range, 4, ~0U, 0) != 0) {
+        if (syscall(__NR_close_range, 4, ~0U, 0) != 0)
+#endif
+        {
             long maxfd = sysconf(_SC_OPEN_MAX);
             if (maxfd < 0) maxfd = 1024;
             for (int fd = 4; fd < maxfd; fd++) {
@@ -434,7 +628,7 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeReadFd(
 ) {
     char *c_buf = (char *)malloc(len);
     if (c_buf == NULL) {
-        throw_plugin_error(env, "malloc failed");
+        throw_ffi_error(env, "malloc failed");
         return -1;
     }
 
@@ -451,7 +645,7 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeReadFd(
             if (cls != NULL) (*env)->ThrowNew(env, cls, "Read timed out");
             return -1;
         }
-        throw_plugin_error(env, strerror(errno));
+        throw_ffi_error(env, strerror(errno));
         return -1;
     }
     return (jint)n;  // 0 = EOF
@@ -464,7 +658,7 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeWriteFd(
 ) {
     char *c_buf = (char *)malloc(len);
     if (c_buf == NULL) {
-        throw_plugin_error(env, "malloc failed");
+        throw_ffi_error(env, "malloc failed");
         return;
     }
     (*env)->GetByteArrayRegion(env, buf, offset, len, (jbyte *)c_buf);
@@ -474,7 +668,7 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeWriteFd(
         ssize_t n = write(fd, c_buf + written, len - written);
         if (n < 0) {
             free(c_buf);
-            throw_plugin_error(env, strerror(errno));
+            throw_ffi_error(env, strerror(errno));
             return;
         }
         written += n;
@@ -550,6 +744,8 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeSetSendBufSize(
     setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size));
 }
 
+#endif // !_WIN32
+
 // =============================================================================
 // Direct buffer address — for zero-copy native pointer access
 // =============================================================================
@@ -560,10 +756,8 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeGetDirectBufferAddress(
 ) {
     void *addr = (*env)->GetDirectBufferAddress(env, buffer);
     if (addr == NULL) {
-        throw_plugin_error(env, "Not a direct buffer or buffer is invalid");
+        throw_ffi_error(env, "Not a direct buffer or buffer is invalid");
         return 0;
     }
     return (jlong)(uintptr_t)addr;
 }
-
-#endif // !_WIN32

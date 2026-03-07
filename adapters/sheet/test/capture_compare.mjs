@@ -1,5 +1,5 @@
 /**
- * capture_compare.mjs — Puppeteer-based capture of VolvoxExcel test cases.
+ * capture_compare.mjs — Puppeteer-based capture of VolvoxSheet test cases.
  *
  * Each test case is a .txt script in test/cases/. Each line is an API call.
  * Uses Vite dev server to serve the capture HTML (handles TS transpilation).
@@ -24,7 +24,7 @@ const CASES_DIR = resolve(__dirname, "cases");
 
 // ── CLI args ──
 
-let outDir = resolve(ROOT_DIR, "target/excel/compare");
+let outDir = resolve(ROOT_DIR, "target/sheet/compare");
 let testFilter = null;
 let captureFontPath = null;
 let captureFontFamily = "";

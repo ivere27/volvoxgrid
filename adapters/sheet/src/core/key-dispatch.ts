@@ -48,7 +48,7 @@ const DEFAULT_BINDINGS: Array<{ key: string; context: KeyContext; action: Spread
   { key: "Tab", context: "editing", action: "commitMoveRight" },
   { key: "Shift+Tab", context: "editing", action: "commitMoveLeft" },
   { key: "Escape", context: "editing", action: "cancelEdit" },
-  // Arrow keys in editing context are handled conditionally by volvox-excel
+  // Arrow keys in editing context are handled conditionally by volvox-sheet
   // ("enter" mode → commit+move, "edit" mode → pass to input for caret movement)
 
   // ── Common (both contexts) ──

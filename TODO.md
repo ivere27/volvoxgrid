@@ -33,10 +33,10 @@
 ## Adapter/Excel
 
 - [ ] Formula multi-selection mode like Excel: while editing formulas (e.g. `=SUM(`), allow selecting multiple ranges/cells and keep all referenced ranges visibly highlighted at the same time.
-- [ ] **`clearRange` triggers O(n*m) recalculations** (`adapters/excel/src/core/data-store.ts:147-153`): Each `setCellValue` recalculates entire sheet. Fix: batch-set values, then recalculate once.
-- [ ] **`console.log` in production code** (`adapters/excel/src/core/data-store.ts:109`): Logs every batch cell update. Remove or guard behind debug flag.
-- [ ] **Leftover Debug Logging (HTML)** (`adapters/excel/index.html`): Stray `console.log` statements left from testing (e.g., `console.log("[test] editInput keydown...");`).
-- [ ] **Hand-rolled protobuf encoder in JS** (`adapters/excel/src/proto/proto-utils.ts`): Manual varint/zigzag/tag encoding. Correct but high maintenance burden on proto schema changes.
+- [ ] **`clearRange` triggers O(n*m) recalculations** (`adapters/sheet/src/core/data-store.ts:147-153`): Each `setCellValue` recalculates entire sheet. Fix: batch-set values, then recalculate once.
+- [ ] **`console.log` in production code** (`adapters/sheet/src/core/data-store.ts:109`): Logs every batch cell update. Remove or guard behind debug flag.
+- [ ] **Leftover Debug Logging (HTML)** (`adapters/sheet/index.html`): Stray `console.log` statements left from testing (e.g., `console.log("[test] editInput keydown...");`).
+- [ ] **Hand-rolled protobuf encoder in JS** (`adapters/sheet/src/proto/proto-utils.ts`): Manual varint/zigzag/tag encoding. Correct but high maintenance burden on proto schema changes.
 
 ## Adapter/AG Grid
 

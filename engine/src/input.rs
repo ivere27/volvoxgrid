@@ -1174,8 +1174,12 @@ pub fn handle_pointer_down_with_behavior(
                     grid.fixed_cols,
                 );
                 if !shift {
-                    grid.selection
-                        .set_extent(grid.selection.row, grid.selection.col, grid.rows, grid.cols);
+                    grid.selection.set_extent(
+                        grid.selection.row,
+                        grid.selection.col,
+                        grid.rows,
+                        grid.cols,
+                    );
                 }
                 grid.events.push(GridEventData::CellFocusChanged {
                     old_row,
@@ -1338,8 +1342,12 @@ pub fn handle_pointer_down_with_behavior(
                         grid.fixed_rows,
                         grid.fixed_cols,
                     );
-                    grid.selection
-                        .set_extent(grid.selection.row, grid.selection.col, grid.rows, grid.cols);
+                    grid.selection.set_extent(
+                        grid.selection.row,
+                        grid.selection.col,
+                        grid.rows,
+                        grid.cols,
+                    );
                     grid.mark_dirty();
                     return;
                 }
@@ -1400,8 +1408,12 @@ pub fn handle_pointer_down_with_behavior(
                 // Plain click resets selection to single cell;
                 // shift-click keeps the extent for range selection.
                 if !shift {
-                    grid.selection
-                        .set_extent(grid.selection.row, grid.selection.col, grid.rows, grid.cols);
+                    grid.selection.set_extent(
+                        grid.selection.row,
+                        grid.selection.col,
+                        grid.rows,
+                        grid.cols,
+                    );
                 }
 
                 // Fire CellFocusChanged
@@ -2457,8 +2469,12 @@ pub fn handle_key_press_with_behavior(
                     grid.fixed_rows,
                     grid.fixed_cols,
                 );
-                grid.selection
-                    .set_extent(grid.selection.row, grid.selection.col, grid.rows, grid.cols);
+                grid.selection.set_extent(
+                    grid.selection.row,
+                    grid.selection.col,
+                    grid.rows,
+                    grid.cols,
+                );
                 grid.events.push(GridEventData::CellFocusChanged {
                     old_row,
                     old_col,

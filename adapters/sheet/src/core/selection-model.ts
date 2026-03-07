@@ -5,14 +5,14 @@
  * Coordinates are in grid/data space.
  */
 
-import type { CellRef, CellRange, VolvoxExcelGrid } from "../types.js";
+import type { CellRef, CellRange, VolvoxSheetGrid } from "../types.js";
 import { encodeSelectRequest } from "../proto/proto-utils.js";
 import { toA1, colToLetter } from "./cell-reference.js";
 
 export class SelectionModel {
   private wasm: any;
   private gridId: number;
-  private _grid: VolvoxExcelGrid;
+  private _grid: VolvoxSheetGrid;
 
   /** Current active cell in grid space. */
   private _row: number = 0;
@@ -22,7 +22,7 @@ export class SelectionModel {
   private _colEnd: number = 0;
   private _ranges: CellRange[] = [{ row1: 0, col1: 0, row2: 0, col2: 0 }];
 
-  constructor(wasm: any, gridId: number, grid: VolvoxExcelGrid) {
+  constructor(wasm: any, gridId: number, grid: VolvoxSheetGrid) {
     this.wasm = wasm;
     this.gridId = gridId;
     this._grid = grid;

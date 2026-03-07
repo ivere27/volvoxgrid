@@ -65,8 +65,8 @@ export class StatusBar {
     this.zoomSlider = document.createElement("input");
     this.zoomSlider.type = "range";
     this.zoomSlider.className = "vx-sb-zoom-slider";
-    this.zoomSlider.min = "50";
-    this.zoomSlider.max = "200";
+    this.zoomSlider.min = "25";
+    this.zoomSlider.max = "400";
     this.zoomSlider.value = "100";
     this.zoomSlider.addEventListener("input", () => {
       const val = parseInt(this.zoomSlider.value, 10);
@@ -100,7 +100,7 @@ export class StatusBar {
 
   private adjustZoom(delta: number): void {
     let val = parseInt(this.zoomSlider.value, 10) + delta;
-    val = Math.max(50, Math.min(200, val));
+    val = Math.max(25, Math.min(400, val));
     this.zoomSlider.value = String(val);
     this.zoomLabel.textContent = `${val}%`;
     if (this.onZoomChange) this.onZoomChange(val);
@@ -113,7 +113,7 @@ export class StatusBar {
 
   /** Set zoom level programmatically. */
   setZoom(percent: number): void {
-    const val = Math.max(50, Math.min(200, Math.round(percent)));
+    const val = Math.max(25, Math.min(400, Math.round(percent)));
     this.zoomSlider.value = String(val);
     this.zoomLabel.textContent = `${val}%`;
   }

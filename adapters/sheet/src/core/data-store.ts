@@ -5,7 +5,7 @@
  * operations. Generates A/B/C column captions for the indicator band.
  */
 
-import type { CellRange, VolvoxExcelGrid } from "../types.js";
+import type { CellRange, VolvoxSheetGrid } from "../types.js";
 import { generateColumnHeaders } from "./cell-reference.js";
 import { FormulaEngine, type FormulaRefShift } from "./formula-engine.js";
 import {
@@ -16,14 +16,14 @@ import {
 export class DataStore {
   private wasm: any;
   private gridId: number;
-  private _grid: VolvoxExcelGrid;
+  private _grid: VolvoxSheetGrid;
 
   /** Display data: dataRows × dataCols (0-based). */
   private data: string[][] = [];
   /** Raw user-entered values (formula text kept as-is). */
   private rawData: string[][] = [];
 
-  constructor(wasm: any, gridId: number, grid: VolvoxExcelGrid) {
+  constructor(wasm: any, gridId: number, grid: VolvoxSheetGrid) {
     this.wasm = wasm;
     this.gridId = gridId;
     this._grid = grid;

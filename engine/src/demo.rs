@@ -68,6 +68,28 @@ fn apply_demo_row_indicator(grid: &mut VolvoxGrid, width_px: i32) {
     grid.indicator_bands.row_start.allow_resize = true;
 }
 
+fn stress_row_indicator_width_px(grid: &mut VolvoxGrid, data_rows: i32) -> i32 {
+    let label = data_rows.max(1).to_string();
+    let font_name = grid.style.font_name.clone();
+    let font_size = if grid.style.font_size > 0.0 {
+        grid.style.font_size
+    } else {
+        13.0
+    };
+    let text_w = {
+        let te = grid.ensure_text_engine();
+        if te.has_fonts() {
+            te.measure_text(&label, &font_name, font_size, false, false, None)
+                .0
+                .ceil() as i32
+        } else {
+            (label.chars().count() as f32 * font_size * 0.6).ceil() as i32
+        }
+    };
+
+    (text_w + 8).max(DEFAULT_ROW_INDICATOR_WIDTH)
+}
+
 fn apply_sales_subtotal_merges(grid: &mut VolvoxGrid) {
     if grid.cols < 2 {
         return;
@@ -818,7 +840,8 @@ fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize
 
     grid.default_row_height = sp(grid, crate::grid::DEFAULT_ROW_HEIGHT);
     apply_demo_column_headers(grid, &STRESS_HEADERS, 28);
-    apply_demo_row_indicator(grid, 40);
+    let row_indicator_width = stress_row_indicator_width_px(grid, data_rows);
+    apply_demo_row_indicator(grid, row_indicator_width);
 
     // Column alignments
     grid.columns[1].alignment = pb::Align::RightCenter as i32;
@@ -1052,8 +1075,14 @@ mod tests {
             }
         }
 
-        assert!(merged_subtotal_rows > 0, "expected Q subtotal and grand-total merges");
-        assert!(region_subtotal_rows > 0, "expected region subtotal rows to remain unmerged");
+        assert!(
+            merged_subtotal_rows > 0,
+            "expected Q subtotal and grand-total merges"
+        );
+        assert!(
+            region_subtotal_rows > 0,
+            "expected region subtotal rows to remain unmerged"
+        );
     }
 
     #[test]
@@ -1087,5 +1116,19 @@ mod tests {
 
         stress_materialize_row(&mut grid, 3);
         assert_eq!(grid.cells.get_text(3, 0), stress_cell_text(3, 0));
+    }
+
+    #[test]
+    fn create_stress_grid_expands_row_indicator_for_large_row_counts() {
+        let grid = create_stress_grid(1, 0, 0, STRESS_DATA_ROWS, 0);
+
+        assert_eq!(
+            grid.indicator_bands.row_start.width_px,
+            stress_row_indicator_width_px(
+                &mut VolvoxGrid::new(1, 0, 0, 1, 1, 0, 0),
+                STRESS_DATA_ROWS
+            )
+        );
+        assert!(grid.indicator_bands.row_start.width_px > 40);
     }
 }

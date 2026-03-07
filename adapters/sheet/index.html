@@ -2,14 +2,29 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VolvoxExcel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>VolvoxSheet</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; }
+    :root {
+      --app-height: 100vh;
+    }
+    @supports (height: 100svh) {
+      :root {
+        --app-height: 100svh;
+      }
+    }
+    html, body {
+      width: 100%;
+      height: var(--app-height);
+      overflow: hidden;
+      overscroll-behavior: none;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
     #app {
       width: 100%;
-      height: 100%;
+      height: var(--app-height);
     }
   </style>
 </head>
@@ -19,7 +34,7 @@
   <script type="module">
     import init from "./wasm/volvoxgrid_wasm.js";
     import * as wasm from "./wasm/volvoxgrid_wasm.js";
-    import { VolvoxExcel } from "./src/index.ts";
+    import { VolvoxSheet } from "./src/index.ts";
 
     async function main() {
       await init();
@@ -28,7 +43,7 @@
         wasm.init_v1_plugin();
       }
 
-      const excel = new VolvoxExcel({
+      const sheet = new VolvoxSheet({
         container: document.getElementById("app"),
         wasm,
         rows: 100,
@@ -44,7 +59,7 @@
       });
 
       // Expose for console debugging
-      window.excel = excel;
+      window.sheet = sheet;
     }
 
     main().catch(console.error);

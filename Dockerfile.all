@@ -116,8 +116,10 @@ RUN chmod +x /opt/volvoxgrid/build_android_aar.sh \
              /opt/volvoxgrid/build_ios.sh \
              /opt/volvoxgrid/build_all.sh
 
-# Allow non-root users (docker run -u) to write to caches
-RUN chmod -R a+w /opt/cargo /opt/rustup /opt/android-sdk
+# Allow non-root users (docker run -u) to write to Rust tool caches. The
+# Android SDK/NDK is read-only during builds and is already installed with
+# usable read/execute permissions, so avoid an expensive recursive chmod.
+RUN chmod -R a+w /opt/cargo /opt/rustup
 
 WORKDIR /workspace/volvoxgrid
 ENTRYPOINT ["/opt/volvoxgrid/build_all.sh"]

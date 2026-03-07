@@ -1,19 +1,19 @@
 {
-  "name": "@volvoxgrid/excel",
+  "name": "@volvoxgrid/sheet",
   "version": "0.1.0",
   "license": "Apache-2.0",
-  "description": "Excel/Sheets-like spreadsheet adapter for VolvoxGrid",
+  "description": "Spreadsheet-style sheet adapter for VolvoxGrid",
   "type": "module",
-  "main": "dist/volvox-excel.umd.js",
-  "module": "dist/volvox-excel.js",
+  "main": "dist/volvox-sheet.umd.js",
+  "module": "dist/volvox-sheet.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/volvox-excel.js",
-      "require": "./dist/volvox-excel.umd.js"
+      "import": "./dist/volvox-sheet.js",
+      "require": "./dist/volvox-sheet.umd.js"
     },
-    "./style.css": "./dist/excel.css"
+    "./style.css": "./dist/sheet.css"
   },
   "files": [
     "dist"

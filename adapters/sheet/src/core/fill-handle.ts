@@ -9,14 +9,14 @@
 import type { DataStore } from "./data-store.js";
 import type { SelectionModel } from "./selection-model.js";
 import type { UndoRedoStack } from "./undo-redo.js";
-import type { VolvoxExcelGrid } from "../types.js";
+import type { VolvoxSheetGrid } from "../types.js";
 import { CellValueChange, BatchCommand } from "./undo-redo.js";
 import { FormulaEngine } from "./formula-engine.js";
 
 export class FillHandle {
   private canvas: HTMLCanvasElement;
   private wasm: any;
-  private grid: VolvoxExcelGrid;
+  private grid: VolvoxSheetGrid;
   private store: DataStore;
   private selection: SelectionModel;
   private undoStack: UndoRedoStack;
@@ -28,7 +28,7 @@ export class FillHandle {
   constructor(
     canvas: HTMLCanvasElement,
     wasm: any,
-    grid: VolvoxExcelGrid,
+    grid: VolvoxSheetGrid,
     store: DataStore,
     selection: SelectionModel,
     undoStack: UndoRedoStack,

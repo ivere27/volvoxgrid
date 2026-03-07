@@ -23,6 +23,8 @@ import {
 
 type DemoMode = "stress" | "sales" | "hierarchy" | "doom";
 type StandardDemoMode = Exclude<DemoMode, "doom">;
+type DoomDirectionCode = "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight";
+type DoomTouchActionCode = "ControlLeft" | "Space" | "Enter";
 
 const STRESS_ROWS = 1_000_000;
 const STRESS_COLS = 12;
@@ -218,6 +220,12 @@ async function main() {
   const canvas = document.getElementById("grid-canvas") as HTMLCanvasElement;
   const doomRow = document.getElementById("doom-row")!;
   const doomWarning = document.getElementById("doom-warning")!;
+  const doomTouchControls = document.getElementById("doom-touch-controls") as HTMLDivElement;
+  const doomJoystick = document.getElementById("doom-joystick") as HTMLDivElement;
+  const doomJoystickThumb = document.getElementById("doom-joystick-thumb") as HTMLDivElement;
+  const btnDoomSelect = document.getElementById("btn-doom-select") as HTMLButtonElement;
+  const btnDoomFire = document.getElementById("btn-doom-fire") as HTMLButtonElement;
+  const btnDoomUse = document.getElementById("btn-doom-use") as HTMLButtonElement;
   const doomRemoteModal = document.getElementById("doom-remote-modal") as HTMLDivElement;
   const chkDoomRemoteRemember = document.getElementById("chk-doom-remote-remember") as HTMLInputElement;
   const btnDoomRemoteCancel = document.getElementById("btn-doom-remote-cancel") as HTMLButtonElement;
@@ -355,6 +363,7 @@ async function main() {
 
   let currentDemo: DemoMode | null = null;
   let dataRows = 0;
+  const doomTouchControlsQuery = window.matchMedia("(max-width: 900px), (pointer: coarse), (hover: none)");
   const demoGridIds: Partial<Record<StandardDemoMode, number>> = {
     sales: grid.id,
   };
@@ -362,6 +371,9 @@ async function main() {
   let activeRendererMode = 1; // CPU
   let doomGridId: number | null = null;
   const doomRuntime = new DoomRuntime();
+  let doomJoystickPointerId: number | null = null;
+  let doomJoystickDirection: DoomDirectionCode | null = null;
+  const resetDoomActionButtons: Array<() => void> = [];
   let switchToken = 0;
 
   function knownGridIds(): number[] {
@@ -561,6 +573,129 @@ async function main() {
     doomRow.classList.toggle("hidden", !visible);
   }
 
+  function shouldShowDoomTouchControls(): boolean {
+    return currentDemo === "doom" && doomTouchControlsQuery.matches;
+  }
+
+  function setDoomJoystickDirection(nextDirection: DoomDirectionCode | null): void {
+    if (doomJoystickDirection === nextDirection) {
+      return;
+    }
+    if (doomJoystickDirection) {
+      doomRuntime.handleKeyUp(doomJoystickDirection);
+    }
+    doomJoystickDirection = nextDirection;
+    if (nextDirection) {
+      doomRuntime.handleKeyDown(nextDirection, false);
+    }
+  }
+
+  function resetDoomJoystick(): void {
+    doomJoystickPointerId = null;
+    setDoomJoystickDirection(null);
+    doomJoystickThumb.style.transform = "translate(0px, 0px)";
+    doomJoystick.classList.remove("active");
+    delete doomJoystick.dataset.direction;
+  }
+
+  function resetDoomTouchControls(): void {
+    resetDoomJoystick();
+    for (const resetButton of resetDoomActionButtons) {
+      resetButton();
+    }
+  }
+
+  function updateDoomTouchControlsVisibility(): void {
+    const visible = shouldShowDoomTouchControls();
+    doomTouchControls.classList.toggle("show", visible);
+    doomTouchControls.setAttribute("aria-hidden", visible ? "false" : "true");
+    if (!visible) {
+      resetDoomTouchControls();
+    }
+  }
+
+  function updateDoomJoystickFromPoint(clientX: number, clientY: number): void {
+    const rect = doomJoystick.getBoundingClientRect();
+    const centerX = rect.left + rect.width * 0.5;
+    const centerY = rect.top + rect.height * 0.5;
+    const dx = clientX - centerX;
+    const dy = clientY - centerY;
+    const distance = Math.hypot(dx, dy);
+    const deadZone = Math.max(16, rect.width * 0.14);
+    const maxOffset = rect.width * 0.24;
+
+    let thumbX = 0;
+    let thumbY = 0;
+    if (distance > 0) {
+      const scale = Math.min(distance, maxOffset) / distance;
+      thumbX = dx * scale;
+      thumbY = dy * scale;
+    }
+
+    doomJoystickThumb.style.transform = `translate(${thumbX}px, ${thumbY}px)`;
+    doomJoystick.classList.toggle("active", distance >= deadZone);
+
+    if (distance < deadZone) {
+      delete doomJoystick.dataset.direction;
+      setDoomJoystickDirection(null);
+      return;
+    }
+
+    const nextDirection: DoomDirectionCode = Math.abs(dx) >= Math.abs(dy)
+      ? (dx >= 0 ? "ArrowRight" : "ArrowLeft")
+      : (dy >= 0 ? "ArrowDown" : "ArrowUp");
+    doomJoystick.dataset.direction = nextDirection;
+    setDoomJoystickDirection(nextDirection);
+  }
+
+  function bindDoomActionButton(button: HTMLButtonElement, code: DoomTouchActionCode): void {
+    let activePointerId: number | null = null;
+
+    const release = (event: PointerEvent | null) => {
+      if (activePointerId == null) {
+        return;
+      }
+      if (event && event.pointerId !== activePointerId) {
+        return;
+      }
+      const pointerId = activePointerId;
+      activePointerId = null;
+      button.classList.remove("active");
+      doomRuntime.handleKeyUp(code);
+      if (pointerId != null && button.hasPointerCapture(pointerId)) {
+        try {
+          button.releasePointerCapture(pointerId);
+        } catch {
+          // Ignore invalid capture transitions.
+        }
+      }
+    };
+    resetDoomActionButtons.push(() => {
+      release(null);
+    });
+
+    button.addEventListener("pointerdown", (event) => {
+      if (currentDemo !== "doom" || activePointerId != null) {
+        return;
+      }
+      activePointerId = event.pointerId;
+      button.classList.add("active");
+      button.setPointerCapture(event.pointerId);
+      doomRuntime.handleKeyDown(code, false);
+      event.preventDefault();
+    });
+    button.addEventListener("pointerup", (event) => {
+      release(event);
+      event.preventDefault();
+    });
+    button.addEventListener("pointercancel", (event) => {
+      release(event);
+    });
+    button.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+    });
+  }
+
   function setDoomWarning(message: string | null): void {
     if (!message) {
       doomWarning.classList.remove("show");
@@ -744,6 +879,7 @@ async function main() {
     grid.frozenRowCount = 0;
     grid.frozenColCount = mode === "hierarchy" ? 0 : 1;
     grid.showColumnHeaders = true;
+    grid.columnIndicatorTopRowCount = 1;
     grid.selectionVisibility = 1;
     grid.focusBorder = 2;
     grid.selectionMode = 0;
@@ -756,6 +892,10 @@ async function main() {
     const doomRows = doomRuntime.getRows();
     grid.frozenRowCount = 0;
     grid.frozenColCount = 0;
+    grid.showColumnHeaders = false;
+    grid.columnIndicatorTopRowCount = 0;
+    grid.showRowIndicator = false;
+    grid.rowIndicatorStartWidth = 0;
     grid.selectionVisibility = 0;
     grid.focusBorder = 0;
     grid.selectionMode = 0;
@@ -1057,6 +1197,7 @@ async function main() {
     if (currentDemo === "doom" && mode !== "doom") {
       doomRuntime.stopRenderLoop();
       doomRuntime.releaseAllDosKeys();
+      resetDoomTouchControls();
     }
 
     if (mode === "doom") {
@@ -1066,11 +1207,13 @@ async function main() {
       }
       currentDemo = "doom";
       setDoomOptionsVisible(true);
+      updateDoomTouchControlsVisibility();
       highlightDemoBtn("doom");
       return;
     }
 
     setDoomOptionsVisible(false);
+    updateDoomTouchControlsVisibility();
 
     const demoId = ensureDemoGrid(mode);
     if (token !== switchToken) {
@@ -1108,6 +1251,7 @@ async function main() {
   }
 
   setDoomOptionsVisible(false);
+  updateDoomTouchControlsVisibility();
 
   rebuildCanvasResolutionOptions(false);
   selCanvasRes.addEventListener("change", () => {
@@ -1141,6 +1285,7 @@ async function main() {
 
     if (currentDemo === "doom") {
       doomRuntime.releaseAllDosKeys();
+      resetDoomTouchControls();
       const token = ++switchToken;
       void activateDoomDemo(token).then((ok) => {
         if (!ok || token !== switchToken) {
@@ -1148,6 +1293,7 @@ async function main() {
         }
         currentDemo = "doom";
         setDoomOptionsVisible(true);
+        updateDoomTouchControlsVisibility();
         highlightDemoBtn("doom");
       });
     }
@@ -1157,6 +1303,59 @@ async function main() {
     if (currentDemo !== "doom") return;
     applyDoomGridLayout();
   });
+
+  doomJoystick.addEventListener("pointerdown", (event) => {
+    if (currentDemo !== "doom" || doomJoystickPointerId != null) {
+      return;
+    }
+    doomJoystickPointerId = event.pointerId;
+    doomJoystick.setPointerCapture(event.pointerId);
+    updateDoomJoystickFromPoint(event.clientX, event.clientY);
+    event.preventDefault();
+  });
+
+  doomJoystick.addEventListener("pointermove", (event) => {
+    if (event.pointerId !== doomJoystickPointerId) {
+      return;
+    }
+    updateDoomJoystickFromPoint(event.clientX, event.clientY);
+    event.preventDefault();
+  });
+
+  const releaseDoomJoystickPointer = (event: PointerEvent) => {
+    if (event.pointerId !== doomJoystickPointerId) {
+      return;
+    }
+    const pointerId = doomJoystickPointerId;
+    resetDoomJoystick();
+    if (pointerId != null && doomJoystick.hasPointerCapture(pointerId)) {
+      try {
+        doomJoystick.releasePointerCapture(pointerId);
+      } catch {
+        // Ignore invalid capture transitions.
+      }
+    }
+    event.preventDefault();
+  };
+
+  doomJoystick.addEventListener("pointerup", releaseDoomJoystickPointer);
+  doomJoystick.addEventListener("pointercancel", releaseDoomJoystickPointer);
+  doomJoystick.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+  });
+
+  bindDoomActionButton(btnDoomFire, "ControlLeft");
+  bindDoomActionButton(btnDoomUse, "Space");
+  bindDoomActionButton(btnDoomSelect, "Enter");
+
+  const handleDoomTouchEnvironmentChange = () => {
+    updateDoomTouchControlsVisibility();
+  };
+  if (typeof doomTouchControlsQuery.addEventListener === "function") {
+    doomTouchControlsQuery.addEventListener("change", handleDoomTouchEnvironmentChange);
+  } else {
+    doomTouchControlsQuery.addListener(handleDoomTouchEnvironmentChange);
+  }
 
   // Keyboard forwarding for DOOM only.
   document.addEventListener("keydown", (e) => {
@@ -1180,6 +1379,7 @@ async function main() {
   window.addEventListener("blur", () => {
     if (currentDemo === "doom") {
       doomRuntime.releaseAllDosKeys();
+      resetDoomTouchControls();
     }
   });
 
@@ -1190,6 +1390,7 @@ async function main() {
     resizeTimer = window.setTimeout(() => {
       rebuildCanvasResolutionOptions(true);
       applyCanvasResolutionPreset(selCanvasRes.value);
+      updateDoomTouchControlsVisibility();
       if (currentDemo === "doom") {
         applyDoomGridLayout();
       }

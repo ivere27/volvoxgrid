@@ -4,13 +4,13 @@ use crate::style::HighlightStyle;
 /// Selection state
 #[derive(Clone, Debug)]
 pub struct SelectionState {
-    pub row: i32,                  // current cursor row
-    pub col: i32,                  // current cursor col
-    pub row_end: i32,              // selection extent row
-    pub col_end: i32,              // selection extent col
+    pub row: i32,                                // current cursor row
+    pub col: i32,                                // current cursor col
+    pub row_end: i32,                            // selection extent row
+    pub col_end: i32,                            // selection extent col
     pub extra_ranges: Vec<(i32, i32, i32, i32)>, // additional normalized ranges beyond the active one
-    pub mode: i32,                 // SelectionMode enum (0=free, 1=by_row, 2=by_col, 3=listbox)
-    pub focus_border: i32,         // FocusBorderStyle enum
+    pub mode: i32,         // SelectionMode enum (0=free, 1=by_row, 2=by_col, 3=listbox)
+    pub focus_border: i32, // FocusBorderStyle enum
     pub selection_visibility: i32, // SelectionVisibility enum
     pub allow_selection: bool,
     pub header_click_select: bool,
@@ -154,7 +154,9 @@ impl SelectionState {
 
         let normalized: Vec<(i32, i32, i32, i32)> = ranges
             .iter()
-            .map(|&(row1, col1, row2, col2)| Self::normalize_range(row1, col1, row2, col2, rows, cols))
+            .map(|&(row1, col1, row2, col2)| {
+                Self::normalize_range(row1, col1, row2, col2, rows, cols)
+            })
             .collect();
 
         let mut active_index = 0usize;
@@ -188,7 +190,13 @@ impl SelectionState {
         self.extra_ranges = normalized
             .into_iter()
             .enumerate()
-            .filter_map(|(index, range)| if index == active_index { None } else { Some(range) })
+            .filter_map(|(index, range)| {
+                if index == active_index {
+                    None
+                } else {
+                    Some(range)
+                }
+            })
             .collect();
         self.selected_rows.clear();
     }
@@ -284,7 +292,9 @@ impl SelectionState {
     ) -> (i32, i32, i32, i32) {
         match self.mode {
             m if m == pb::SelectionMode::SelectionByRow as i32 => (range.0, 0, range.2, cols - 1),
-            m if m == pb::SelectionMode::SelectionByColumn as i32 => (0, range.1, rows - 1, range.3),
+            m if m == pb::SelectionMode::SelectionByColumn as i32 => {
+                (0, range.1, rows - 1, range.3)
+            }
             _ => range,
         }
     }
@@ -294,11 +304,19 @@ impl SelectionState {
         total_cols: i32,
     ) -> impl Iterator<Item = (i32, i32, i32, i32)> + '_ {
         let active = std::iter::once(self.get_range());
-        let extras = self.extra_ranges.iter().copied().map(move |range| match self.mode {
-            m if m == pb::SelectionMode::SelectionByRow as i32 => (range.0, 0, range.2, total_cols - 1),
-            m if m == pb::SelectionMode::SelectionByColumn as i32 => (0, range.1, i32::MAX, range.3),
-            _ => range,
-        });
+        let extras = self
+            .extra_ranges
+            .iter()
+            .copied()
+            .map(move |range| match self.mode {
+                m if m == pb::SelectionMode::SelectionByRow as i32 => {
+                    (range.0, 0, range.2, total_cols - 1)
+                }
+                m if m == pb::SelectionMode::SelectionByColumn as i32 => {
+                    (0, range.1, i32::MAX, range.3)
+                }
+                _ => range,
+            });
         active.chain(extras)
     }
 
@@ -335,7 +353,10 @@ mod tests {
         assert_eq!(selection.row_end, 7);
         assert_eq!(selection.col_end, 8);
         assert_eq!(selection.extra_ranges, vec![(1, 1, 2, 2)]);
-        assert_eq!(selection.all_ranges(10, 10), vec![(5, 6, 7, 8), (1, 1, 2, 2)]);
+        assert_eq!(
+            selection.all_ranges(10, 10),
+            vec![(5, 6, 7, 8), (1, 1, 2, 2)]
+        );
     }
 
     #[test]
@@ -349,6 +370,9 @@ mod tests {
 
         assert!(selection.selected_rows.contains(&1));
         assert!(selection.selected_rows.contains(&4));
-        assert_eq!(selection.all_ranges(10, 10), vec![(4, 2, 4, 2), (1, 0, 1, 9)]);
+        assert_eq!(
+            selection.all_ranges(10, 10),
+            vec![(4, 2, 4, 2), (1, 0, 1, 9)]
+        );
     }
 }

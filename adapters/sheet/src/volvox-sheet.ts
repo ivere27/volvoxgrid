@@ -1,16 +1,16 @@
 /**
- * VolvoxExcel — Main orchestrator.
+ * VolvoxSheet — Main orchestrator.
  *
  * Wires together VolvoxGrid WASM, key dispatch, edit state machine,
  * selection model, data store, undo/redo, clipboard, formula bar,
- * toolbar, context menu, and the Excel theme.
+ * toolbar, context menu, and the spreadsheet theme.
  */
 
 import { VolvoxGrid } from "volvoxgrid";
 import * as volvoxgrid from "volvoxgrid";
 import type {
-  VolvoxExcelOptions, VolvoxExcelApi, CellRef, CellRange,
-  CellStyleUpdate, SpreadsheetAction, VolvoxExcelGrid,
+  VolvoxSheetOptions, VolvoxSheetApi, CellRef, CellRange,
+  CellStyleUpdate, SpreadsheetAction, VolvoxSheetGrid,
 } from "./types.js";
 import { encodeGridConfig } from "./proto/config-encoder.js";
 import {
@@ -34,7 +34,7 @@ import {
   EVENT_AFTER_EDIT,
   EVENT_CELL_EDIT_CHANGE,
 } from "./proto/event-decoder.js";
-import { buildExcelConfig, ALIGN, EXCEL_COLORS } from "./theme/excel-theme.js";
+import { buildSheetConfig, ALIGN, SHEET_COLORS } from "./theme/sheet-theme.js";
 import { KeyDispatch } from "./core/key-dispatch.js";
 import { EditStateMachine } from "./core/edit-state-machine.js";
 import { SelectionModel } from "./core/selection-model.js";
@@ -49,11 +49,11 @@ import { SheetTabs, type SheetSnapshot } from "./ui/sheet-tabs.js";
 import { FindReplaceBar } from "./ui/find-replace.js";
 import { FillHandle } from "./core/fill-handle.js";
 import { letterToCol, toA1 } from "./core/cell-reference.js";
-import "./theme/css/volvox-excel.css";
+import "./theme/css/volvox-sheet.css";
 
 const DEFAULT_FONT_URL =
   "https://cdn.jsdelivr.net/gh/googlefonts/roboto-2@main/src/hinted/Roboto-Regular.ttf";
-const EXCEL_ROW_INDICATOR_MODE = 1; // numbers
+const SHEET_ROW_INDICATOR_MODE = 1; // numbers
 
 const createCanvas2DTextRendererMaybe =
   (volvoxgrid as { createCanvas2DTextRenderer?: (wasm: any) => { measureText: Function; renderText: Function } })
@@ -68,8 +68,8 @@ interface FormulaRefToken {
   col2: number;
 }
 
-export class VolvoxExcel implements VolvoxExcelApi {
-  readonly grid: VolvoxExcelGrid;
+export class VolvoxSheet implements VolvoxSheetApi {
+  readonly grid: VolvoxSheetGrid;
   private wasm: any;
   private container: HTMLElement;
   private rootEl: HTMLDivElement;
@@ -128,14 +128,29 @@ export class VolvoxExcel implements VolvoxExcelApi {
   private eventPollTimer: number = 0;
   private defaultFontName: string = "Calibri";
   private defaultFontSize: number = 11;
-  private static readonly EXCEL_FONT_SIZE_STEPS = [
+  private baseDefaultRowHeight: number = 21;
+  private baseDefaultColWidth: number = 64;
+  private baseColumnHeaderHeight: number = 24;
+  private baseRowIndicatorStartWidth: number = 40;
+  private currentColumnHeaderHeight: number = 24;
+  private responsiveScale: number = 1;
+  private userZoomScale: number = 1;
+  private pinchBaseZoomScale: number | null = null;
+  private activeTouchPointers = new Set<number>();
+  private layoutPixelScale: number = 0;
+  private layoutResizeObserver: ResizeObserver | null = null;
+  private static readonly SHEET_FONT_SIZE_STEPS = [
     6, 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72,
   ] as const;
-  private static readonly EXCEL_PT_TO_CSS_PX = 96 / 72;
+  private static readonly MIN_ZOOM_SCALE = 0.25;
+  private static readonly MAX_ZOOM_SCALE = 4.0;
+  private static readonly ZOOM_SCALE_EPSILON = 0.001;
+  private static readonly PINCH_SNAP_TO_ONE_EPSILON = 0.03;
+  private static readonly SHEET_PT_TO_CSS_PX = 96 / 72;
   private static readonly FONT_LINE_HEIGHT_MULTIPLIER = 1.2;
   private static readonly FONT_ROW_PADDING_PX = 2;
 
-  constructor(options: VolvoxExcelOptions) {
+  constructor(options: VolvoxSheetOptions) {
     this.container = options.container;
     this.wasm = options.wasm;
 
@@ -158,13 +173,13 @@ export class VolvoxExcel implements VolvoxExcelApi {
 
     // Build DOM structure
     this.rootEl = document.createElement("div");
-    this.rootEl.className = "vx-excel-root";
+    this.rootEl.className = "vx-sheet-root";
 
     this.canvas = document.createElement("canvas");
     this.canvas.tabIndex = 0;
 
     // Configure grid dimensions
-    const excelConfig = buildExcelConfig({
+    const sheetConfig = buildSheetConfig({
       rows: options.rows,
       cols: options.cols,
       fontName: options.fontName,
@@ -172,16 +187,20 @@ export class VolvoxExcel implements VolvoxExcelApi {
       defaultRowHeight: options.defaultRowHeight,
       defaultColWidth: options.defaultColWidth,
     });
-    this.defaultFontName = excelConfig.fontName ?? "Calibri";
-    this.defaultFontSize = excelConfig.fontSize ?? 11;
+    this.defaultFontName = sheetConfig.fontName ?? "Calibri";
+    this.defaultFontSize = sheetConfig.fontSize ?? 11;
+    this.baseDefaultRowHeight = sheetConfig.defaultRowHeight ?? 21;
+    this.baseDefaultColWidth = sheetConfig.defaultColWidth ?? 64;
+    this.baseColumnHeaderHeight = Math.max(24, this.baseDefaultRowHeight);
+    this.currentColumnHeaderHeight = this.toLayoutPixels(this.baseColumnHeaderHeight);
 
     // Create VolvoxGrid
     this.grid = new VolvoxGrid(
       this.canvas,
       this.wasm,
-      excelConfig.rows,
-      excelConfig.cols,
-    ) as VolvoxExcelGrid;
+      sheetConfig.rows,
+      sheetConfig.cols,
+    ) as VolvoxSheetGrid;
     if (!hasBuiltinTextEngine
       && typeof this.wasm.set_grid_text_renderer === "function"
       && typeof createCanvas2DTextRendererMaybe === "function") {
@@ -193,26 +212,26 @@ export class VolvoxExcel implements VolvoxExcelApi {
       );
     }
 
-    // Apply Excel theme via configure — WASM takes (grid_id, config_bytes) separately
+    // Apply the spreadsheet theme via configure — WASM takes (grid_id, config_bytes) separately
     if (typeof this.wasm.volvox_grid_configure === "function") {
-      const configBytes = encodeGridConfig(excelConfig);
+      const configBytes = encodeGridConfig(sheetConfig);
       const configResp = this.wasm.volvox_grid_configure(BigInt(this.grid.id), configBytes);
       if (configResp instanceof Uint8Array && configResp.length === 0) {
         if (typeof this.wasm.volvox_grid_last_error === "function") {
           const err = this.wasm.volvox_grid_last_error();
-          if (err) console.warn("[VolvoxExcel] configure error:", err);
+          if (err) console.warn("[VolvoxSheet] configure error:", err);
         }
       }
     }
     // Keep an explicit default size baseline even on builds where config
     // application is partial/older.
     this.grid.setFontSize(this.toEngineFontSize(this.defaultFontSize));
-    this.grid.selectionMode = excelConfig.selectionMode ?? 4;
+    this.grid.selectionMode = sheetConfig.selectionMode ?? 4;
     this.grid.showColumnHeaders = true;
     this.grid.columnIndicatorTopRowCount = 1;
     this.grid.showRowIndicator = true;
-    this.grid.rowIndicatorStartModeBits = EXCEL_ROW_INDICATOR_MODE;
-    this.grid.rowIndicatorStartWidth = 40;
+    this.grid.rowIndicatorStartModeBits = SHEET_ROW_INDICATOR_MODE;
+    this.grid.rowIndicatorStartWidth = this.baseRowIndicatorStartWidth;
 
     // Enable column/row resize via direct API (bypasses protobuf config path)
     this.grid.allowUserResizing = 3; // RESIZE_BOTH
@@ -228,7 +247,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
       this.wasm.set_auto_size_mouse(this.grid.id, 1);
     }
 
-    // Host pointer dispatch: Excel adapter owns all pointer-driven selection
+    // Host pointer dispatch: Sheet adapter owns all pointer-driven selection
     // and edit triggers.  Engine still handles resize, scrollbar, fast-scroll.
     if (typeof this.wasm.set_host_pointer_dispatch === "function") {
       this.wasm.set_host_pointer_dispatch(this.grid.id, 1);
@@ -314,13 +333,30 @@ export class VolvoxExcel implements VolvoxExcelApi {
 
     this.statusBar = new StatusBar();
     this.statusBar.onZoomChange = (percent) => {
-      this.grid.zoomScale = percent / 100;
+      this.applyUserZoomScale(percent / 100);
     };
+    this.statusBar.setZoom(this.userZoomScale * 100);
     bottomBar.appendChild(this.statusBar.element);
 
     this.rootEl.appendChild(bottomBar);
 
     this.container.appendChild(this.rootEl);
+    this.grid.onZoomChange = (scale) => {
+      const pinchBaseZoomScale = this.pinchBaseZoomScale ?? 1;
+      const absoluteZoomScale = pinchBaseZoomScale * scale;
+      const snappedZoomScale = this.snapPinchZoomScale(absoluteZoomScale);
+      this.applyUserZoomScale(snappedZoomScale, {
+        skipOverrideRescale: true,
+        force: true,
+      });
+    };
+    this.applyResponsiveLayout(true);
+    if (typeof ResizeObserver !== "undefined") {
+      this.layoutResizeObserver = new ResizeObserver(() => {
+        this.applyResponsiveLayout();
+      });
+      this.layoutResizeObserver.observe(this.rootEl);
+    }
 
     // Fill handle overlay on canvas
     this.fillHandle = new FillHandle(
@@ -336,6 +372,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
     this.canvas.addEventListener("pointerdown", this.onPointerDown);
     this.canvas.addEventListener("pointermove", this.onPointerMove);
     this.canvas.addEventListener("pointerup", this.onPointerUp);
+    this.canvas.addEventListener("pointercancel", this.onPointerCancel);
     this.canvas.addEventListener("dblclick", this.onDblClick);
     this.canvas.addEventListener("contextmenu", this.onContextMenu);
 
@@ -367,7 +404,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
     try {
       const response = await fetch(url);
       if (!response.ok) {
-        console.warn(`VolvoxExcel: failed to fetch font from ${url}`);
+        console.warn(`VolvoxSheet: failed to fetch font from ${url}`);
         return;
       }
       const data = new Uint8Array(await response.arrayBuffer());
@@ -377,7 +414,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
         this.grid.invalidate();
       }
     } catch (err) {
-      console.warn("VolvoxExcel: font load error", err);
+      console.warn("VolvoxSheet: font load error", err);
     }
   }
 
@@ -423,7 +460,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
     }
 
     // No matched action — forward to engine for navigation / scroll
-    if (VolvoxExcel.NAV_KEYS.has(e.key)) {
+    if (VolvoxSheet.NAV_KEYS.has(e.key)) {
       e.preventDefault();
     }
     const modifier = (e.shiftKey ? 1 : 0) | ((e.ctrlKey || e.metaKey) ? 2 : 0) | (e.altKey ? 4 : 0);
@@ -581,7 +618,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
   ): ContextMenuScope {
     const { x, y } = this.pointerToGridPixels(e);
     const indicatorTopHeight = this.grid.showColumnHeaders
-      ? this.grid.defaultRowHeight * Math.max(0, this.grid.columnIndicatorTopRowCount)
+      ? this.currentColumnHeaderHeight * Math.max(0, this.grid.columnIndicatorTopRowCount)
       : 0;
     const indicatorStartWidth = this.grid.showRowIndicator
       ? this.grid.rowIndicatorStartWidth
@@ -660,8 +697,36 @@ export class VolvoxExcel implements VolvoxExcelApi {
     this._multiRangeEnd = null;
   }
 
+  private trackTouchPointerStart(e: PointerEvent): boolean {
+    if (e.pointerType !== "touch") {
+      return false;
+    }
+    this.activeTouchPointers.add(e.pointerId);
+    if (this.activeTouchPointers.size >= 2) {
+      if (this.pinchBaseZoomScale == null) {
+        this.pinchBaseZoomScale = this.userZoomScale;
+      }
+      this._pointerDrag = false;
+      this.clearAdditivePointerSelection();
+      this._formulaDragRefSpan = null;
+      return true;
+    }
+    return false;
+  }
+
+  private trackTouchPointerEnd(e: PointerEvent): void {
+    if (e.pointerType !== "touch") {
+      return;
+    }
+    this.activeTouchPointers.delete(e.pointerId);
+    if (this.activeTouchPointers.size < 2) {
+      this.pinchBaseZoomScale = null;
+    }
+  }
+
   private onPointerDown = (e: PointerEvent): void => {
     if (this.destroyed) return;
+    if (this.trackTouchPointerStart(e)) return;
 
     // Right-click: don't change selection (context menu handles it)
     if (e.button === 2) return;
@@ -669,7 +734,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
 
     // If editing (non-formula), commit on click-away.
     // Formula mode keeps the edit session alive and repurposes selection to
-    // insert/update references (Excel-style point mode).
+    // insert/update references (Sheet-style point mode).
     if (this.editState.isEditing && !formulaPickMode) {
       if (typeof this.wasm.commit_edit === "function" &&
           this.wasm.is_editing(this.grid.id) !== 0) {
@@ -798,6 +863,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
 
   private onPointerMove = (e: PointerEvent): void => {
     if (this.destroyed) return;
+    if (e.pointerType === "touch" && this.activeTouchPointers.size >= 2) return;
     if (this._multiRangePointerDrag) {
       if (!(e.buttons & 1)) {
         this.clearAdditivePointerSelection();
@@ -845,7 +911,15 @@ export class VolvoxExcel implements VolvoxExcelApi {
     }
   };
 
-  private onPointerUp = (_e: PointerEvent): void => {
+  private onPointerUp = (e: PointerEvent): void => {
+    this.trackTouchPointerEnd(e);
+    this._pointerDrag = false;
+    this.clearAdditivePointerSelection();
+    this._formulaDragRefSpan = null;
+  };
+
+  private onPointerCancel = (e: PointerEvent): void => {
+    this.trackTouchPointerEnd(e);
     this._pointerDrag = false;
     this.clearAdditivePointerSelection();
     this._formulaDragRefSpan = null;
@@ -1329,7 +1403,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
       row2: ref.row2 + rowOffset,
       col2: ref.col2 + colOffset,
       style: {
-        borderColor: VolvoxExcel.FORMULA_REF_COLORS[idx % VolvoxExcel.FORMULA_REF_COLORS.length],
+        borderColor: VolvoxSheet.FORMULA_REF_COLORS[idx % VolvoxSheet.FORMULA_REF_COLORS.length],
         fillHandle: 5, // FILL_HANDLE_ALL_CORNERS
       },
       refId: idx + 1,
@@ -1588,7 +1662,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
     const gridCol = dataCol + 0;
     const key = `${gridRow}:${gridCol}`;
 
-    if (VolvoxExcel.NUMERIC_RE.test(text.trim())) {
+    if (VolvoxSheet.NUMERIC_RE.test(text.trim())) {
       this.store.batchUpdateCells([{ row: gridRow, col: gridCol, style: { alignment: ALIGN.RIGHT_CENTER } }]);
       this.cacheAlignment(gridRow, gridCol, ALIGN.RIGHT_CENTER);
       this.cacheCellStyle(gridRow, gridCol, { alignment: ALIGN.RIGHT_CENTER });
@@ -1644,16 +1718,16 @@ export class VolvoxExcel implements VolvoxExcelApi {
 
   private defaultForeColorForCell(gridRow: number, gridCol: number): number {
     if (gridRow < 0 || gridCol < 0) {
-      return EXCEL_COLORS.headerFg;
+      return SHEET_COLORS.headerFg;
     }
-    return EXCEL_COLORS.black;
+    return SHEET_COLORS.black;
   }
 
   private defaultBackColorForCell(gridRow: number, gridCol: number): number {
     if (gridRow < 0 || gridCol < 0) {
-      return EXCEL_COLORS.headerBg;
+      return SHEET_COLORS.headerBg;
     }
-    return EXCEL_COLORS.white;
+    return SHEET_COLORS.white;
   }
 
   private resolveOldStyleForPatch(gridRow: number, gridCol: number, patch: CellStyleFields): CellStyleFields {
@@ -1682,7 +1756,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
     ];
     for (const key of borderColorKeys) {
       if (patch[key] != null && old[key] == null) {
-        (old as any)[key] = EXCEL_COLORS.black;
+        (old as any)[key] = SHEET_COLORS.black;
       }
     }
 
@@ -1803,6 +1877,114 @@ export class VolvoxExcel implements VolvoxExcelApi {
     this.executeStylePatches(patches);
   }
 
+  private resolveResponsiveScale(width: number): number {
+    const coarsePointer = typeof window.matchMedia === "function"
+      && (window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(hover: none)").matches);
+    if (width <= 480) {
+      return coarsePointer ? 1.22 : 1.12;
+    }
+    if (width <= 768) {
+      return coarsePointer ? 1.16 : 1.08;
+    }
+    if (coarsePointer && width <= 920) {
+      return 1.08;
+    }
+    return 1;
+  }
+
+  private applyResponsiveLayout(
+    force = false,
+    options: { skipOverrideRescale?: boolean } = {},
+  ): void {
+    const width = Math.max(
+      1,
+      Math.round(this.rootEl.clientWidth || this.container.clientWidth || window.innerWidth || 1),
+    );
+    const nextScale = this.resolveResponsiveScale(width);
+    const combinedScale = nextScale * this.userZoomScale;
+    const nextLayoutPixelScale = combinedScale * this.currentDeviceScale();
+    if (
+      !force
+      && Math.abs(nextScale - this.responsiveScale) < 0.01
+      && Math.abs(nextLayoutPixelScale - this.layoutPixelScale) < 0.01
+    ) {
+      return;
+    }
+
+    const previousLayoutPixelScale = this.layoutPixelScale > 0 ? this.layoutPixelScale : 1;
+    const relativeLayoutScale = nextLayoutPixelScale / previousLayoutPixelScale;
+    this.responsiveScale = nextScale;
+    this.layoutPixelScale = nextLayoutPixelScale;
+    this.rootEl.classList.toggle("vx-compact", nextScale > 1.01);
+
+    const scaledFontSize = Math.round(this.defaultFontSize * combinedScale * 10) / 10;
+    const scaledRowHeightCss = Math.max(
+      this.baseDefaultRowHeight * combinedScale,
+      this.minimumRowHeightForFont(scaledFontSize) + 4,
+    );
+    const scaledColumnHeaderHeightCss = Math.max(
+      scaledRowHeightCss,
+      this.baseColumnHeaderHeight * combinedScale,
+    );
+    const scaledColWidthCss = Math.max(1, this.baseDefaultColWidth * combinedScale);
+    const scaledRowIndicatorWidthCss = Math.max(24, this.baseRowIndicatorStartWidth * combinedScale);
+
+    this.grid.setFontSize(this.toEngineFontSize(scaledFontSize));
+    this.grid.defaultRowHeight = this.toLayoutPixels(scaledRowHeightCss);
+    this.grid.defaultColWidth = this.toLayoutPixels(scaledColWidthCss);
+    this.setColumnHeaderHeight(this.toLayoutPixels(scaledColumnHeaderHeightCss));
+    this.grid.rowIndicatorStartWidth = this.toLayoutPixels(scaledRowIndicatorWidthCss);
+    if (!options.skipOverrideRescale
+      && typeof this.wasm.scale_row_height_overrides === "function"
+      && Number.isFinite(relativeLayoutScale)
+      && relativeLayoutScale > 0
+      && Math.abs(relativeLayoutScale - 1.0) > 0.01) {
+      this.wasm.scale_row_height_overrides(this.grid.id, relativeLayoutScale);
+    }
+    if (!options.skipOverrideRescale
+      && typeof this.wasm.scale_col_width_overrides === "function"
+      && Number.isFinite(relativeLayoutScale)
+      && relativeLayoutScale > 0
+      && Math.abs(relativeLayoutScale - 1.0) > 0.01) {
+      this.wasm.scale_col_width_overrides(this.grid.id, relativeLayoutScale);
+    }
+    this.grid.invalidate();
+  }
+
+  private clampZoomScale(scale: number): number {
+    if (!Number.isFinite(scale) || scale <= 0) {
+      return 1;
+    }
+    return Math.max(
+      VolvoxSheet.MIN_ZOOM_SCALE,
+      Math.min(VolvoxSheet.MAX_ZOOM_SCALE, scale),
+    );
+  }
+
+  private applyUserZoomScale(
+    scale: number,
+    options: { skipOverrideRescale?: boolean; force?: boolean } = {},
+  ): void {
+    const nextZoomScale = this.clampZoomScale(scale);
+    const hitZoomLimit = Math.abs(nextZoomScale - scale) > VolvoxSheet.ZOOM_SCALE_EPSILON;
+    this.statusBar?.setZoom(nextZoomScale * 100);
+    if (!options.force
+      && !hitZoomLimit
+      && Math.abs(nextZoomScale - this.userZoomScale) <= VolvoxSheet.ZOOM_SCALE_EPSILON) {
+      return;
+    }
+    this.userZoomScale = nextZoomScale;
+    this.applyResponsiveLayout(true, options);
+  }
+
+  private snapPinchZoomScale(scale: number): number {
+    const clampedScale = this.clampZoomScale(scale);
+    if (Math.abs(clampedScale - 1) <= VolvoxSheet.PINCH_SNAP_TO_ONE_EPSILON) {
+      return 1;
+    }
+    return clampedScale;
+  }
+
   private getEffectiveFontSize(gridRow: number, gridCol: number): number {
     const fontSize = this.getCachedCellStyle(gridRow, gridCol).fontSize;
     if (typeof fontSize === "number" && Number.isFinite(fontSize) && fontSize > 0) {
@@ -1814,19 +1996,35 @@ export class VolvoxExcel implements VolvoxExcelApi {
   private minimumRowHeightForFont(fontSize: number): number {
     const cssPx = this.toCssFontSizePx(fontSize);
     return Math.ceil(
-      cssPx * VolvoxExcel.FONT_LINE_HEIGHT_MULTIPLIER + VolvoxExcel.FONT_ROW_PADDING_PX,
+      cssPx * VolvoxSheet.FONT_LINE_HEIGHT_MULTIPLIER + VolvoxSheet.FONT_ROW_PADDING_PX,
     );
   }
 
-  private toCssFontSizePx(excelPt: number): number {
-    return excelPt * VolvoxExcel.EXCEL_PT_TO_CSS_PX;
-  }
-
-  private toEngineFontSize(excelPt: number): number {
-    const dpr = Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0
+  private currentDeviceScale(): number {
+    return Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0
       ? window.devicePixelRatio
       : 1;
-    return this.toCssFontSizePx(excelPt) * dpr;
+  }
+
+  private toLayoutPixels(cssPx: number): number {
+    return Math.max(1, Math.round(cssPx * this.currentDeviceScale()));
+  }
+
+  private setColumnHeaderHeight(heightPx: number): void {
+    const normalizedHeight = Math.max(1, Math.round(heightPx));
+    this.currentColumnHeaderHeight = normalizedHeight;
+    if (typeof this.wasm.set_col_indicator_top_default_row_height === "function") {
+      this.wasm.set_col_indicator_top_default_row_height(this.grid.id, normalizedHeight);
+    }
+  }
+
+  private toCssFontSizePx(pointSizePt: number): number {
+    return pointSizePt * VolvoxSheet.SHEET_PT_TO_CSS_PX;
+  }
+
+  private toEngineFontSize(pointSizePt: number): number {
+    const dpr = this.currentDeviceScale();
+    return this.toCssFontSizePx(pointSizePt) * dpr;
   }
 
   private toEngineStyle(style: CellStyleFields): CellStyleFields {
@@ -1837,7 +2035,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
   }
 
   private stepFontSize(current: number, direction: 1 | -1): number {
-    const steps = VolvoxExcel.EXCEL_FONT_SIZE_STEPS;
+    const steps = VolvoxSheet.SHEET_FONT_SIZE_STEPS;
     if (direction > 0) {
       for (const step of steps) {
         if (step > current) return step;
@@ -1882,7 +2080,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
     if (patches.length === 0) return;
     this.executeStylePatches(patches);
 
-    // Match Excel behavior: increasing font can auto-grow row height,
+    // Match Sheet behavior: increasing font can auto-grow row height,
     // but does not auto-grow column width.
     for (const [gridRow, required] of rowMinHeights) {
       const currentHeight = this.grid.getRowHeight(gridRow);
@@ -2017,7 +2215,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
     const isSingle = range.row1 === range.row2 && range.col1 === range.col2;
     if (isSingle) {
       const val = this.store.getCellValue(range.row1, range.col1);
-      if (!val || !VolvoxExcel.NUMERIC_RE.test(val.trim())) {
+      if (!val || !VolvoxSheet.NUMERIC_RE.test(val.trim())) {
         this.statusBar.clear();
         return;
       }
@@ -2049,9 +2247,12 @@ export class VolvoxExcel implements VolvoxExcelApi {
   private applyHeaderStyles(): void {
     this.grid.showColumnHeaders = true;
     this.grid.columnIndicatorTopRowCount = 1;
+    this.setColumnHeaderHeight(this.currentColumnHeaderHeight);
     this.grid.showRowIndicator = true;
-    this.grid.rowIndicatorStartModeBits = EXCEL_ROW_INDICATOR_MODE;
-    this.grid.rowIndicatorStartWidth = 40;
+    this.grid.rowIndicatorStartModeBits = SHEET_ROW_INDICATOR_MODE;
+    this.grid.rowIndicatorStartWidth = this.toLayoutPixels(
+      Math.max(24, this.baseRowIndicatorStartWidth * this.responsiveScale * this.userZoomScale),
+    );
     this.grid.invalidate();
   }
 
@@ -2426,7 +2627,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
   }
 
   // ══════════════════════════════════════════════════════════
-  // Public API (VolvoxExcelApi)
+  // Public API (VolvoxSheetApi)
   // ══════════════════════════════════════════════════════════
 
   getCellValue(row: number, col: number): string {
@@ -2724,7 +2925,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
   mergeCells(range: CellRange): void {
     const rowOffset = 0;
     const colOffset = 0;
-    // Clear slave cells (Excel default: only master keeps its value).
+    // Clear slave cells (Sheet default: only master keeps its value).
     for (let r = range.row1; r <= range.row2; r++) {
       for (let c = range.col1; c <= range.col2; c++) {
         if (r === range.row1 && c === range.col1) continue;
@@ -2839,7 +3040,8 @@ export class VolvoxExcel implements VolvoxExcelApi {
   }
 
   resize(): void {
-
+    this.applyResponsiveLayout(true);
+    this.grid.invalidate();
   }
 
   // ── Sheet tab helpers ───────────────────────────────────
@@ -2871,6 +3073,7 @@ export class VolvoxExcel implements VolvoxExcelApi {
     this.canvas.removeEventListener("pointerdown", this.onPointerDown);
     this.canvas.removeEventListener("pointermove", this.onPointerMove);
     this.canvas.removeEventListener("pointerup", this.onPointerUp);
+    this.canvas.removeEventListener("pointercancel", this.onPointerCancel);
     this.canvas.removeEventListener("dblclick", this.onDblClick);
     this.gridEditInput?.removeEventListener("keydown", this.onEditInputKeyDown, true);
     this.gridEditInput?.removeEventListener("focus", this.onEditInputFocus);
@@ -2887,6 +3090,11 @@ export class VolvoxExcel implements VolvoxExcelApi {
 
     this.editState.reset();
     this.undoStack.clear();
+    this.layoutResizeObserver?.disconnect();
+    this.layoutResizeObserver = null;
+    this.activeTouchPointers.clear();
+    this.pinchBaseZoomScale = null;
+    this.grid.onZoomChange = null;
 
     this.grid.destroy();
     this.rootEl.remove();

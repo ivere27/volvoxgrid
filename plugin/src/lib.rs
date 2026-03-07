@@ -23,6 +23,91 @@ lazy_static::lazy_static! {
     static ref SHARED_GRID_MANAGER: GridManager = GridManager::new();
 }
 
+type PluginResult<T> = Result<T, FfiError>;
+
+const ERROR_UNKNOWN: i32 = 0;
+const ERROR_INVALID_ARGUMENT: i32 = 1;
+const ERROR_NOT_FOUND: i32 = 2;
+const ERROR_INVALID_STATE: i32 = 3;
+const ERROR_TYPE_VIOLATION: i32 = 4;
+const ERROR_DECODE_FAILED: i32 = 5;
+const ERROR_ENCODE_FAILED: i32 = 6;
+const ERROR_NOT_IMPLEMENTED: i32 = 7;
+const ERROR_INTERNAL: i32 = 8;
+
+const GRPC_INVALID_ARGUMENT: i32 = 3;
+const GRPC_NOT_FOUND: i32 = 5;
+const GRPC_FAILED_PRECONDITION: i32 = 9;
+const GRPC_UNIMPLEMENTED: i32 = 12;
+const GRPC_INTERNAL: i32 = 13;
+
+fn ffi_error(message: impl Into<String>, code: i32, grpc_code: i32) -> FfiError {
+    FfiError::new(message.into(), code, grpc_code)
+}
+
+fn invalid_argument(message: impl Into<String>) -> FfiError {
+    ffi_error(message, ERROR_INVALID_ARGUMENT, GRPC_INVALID_ARGUMENT)
+}
+
+fn not_found(message: impl Into<String>) -> FfiError {
+    ffi_error(message, ERROR_NOT_FOUND, GRPC_NOT_FOUND)
+}
+
+fn invalid_state(message: impl Into<String>) -> FfiError {
+    ffi_error(message, ERROR_INVALID_STATE, GRPC_FAILED_PRECONDITION)
+}
+
+fn type_violation(message: impl Into<String>) -> FfiError {
+    ffi_error(message, ERROR_TYPE_VIOLATION, GRPC_INVALID_ARGUMENT)
+}
+
+fn decode_failed(message: impl Into<String>) -> FfiError {
+    ffi_error(message, ERROR_DECODE_FAILED, GRPC_INVALID_ARGUMENT)
+}
+
+fn encode_failed(message: impl Into<String>) -> FfiError {
+    ffi_error(message, ERROR_ENCODE_FAILED, GRPC_INTERNAL)
+}
+
+fn not_implemented(message: impl Into<String>) -> FfiError {
+    ffi_error(message, ERROR_NOT_IMPLEMENTED, GRPC_UNIMPLEMENTED)
+}
+
+fn internal_error(message: impl Into<String>) -> FfiError {
+    ffi_error(message, ERROR_INTERNAL, GRPC_INTERNAL)
+}
+
+fn map_plugin_error(message: impl Into<String>) -> FfiError {
+    let message = message.into();
+    let lower = message.to_ascii_lowercase();
+
+    if lower.contains("not found") {
+        return not_found(message);
+    }
+    if lower.contains("type violation")
+        || lower.contains("type mismatch")
+        || lower.contains("invalid type")
+    {
+        return type_violation(message);
+    }
+    if lower.contains("invalid argument")
+        || lower.contains("invalid utf-8")
+        || lower.contains("decode")
+        || lower.contains("encode")
+        || lower.contains("empty")
+        || lower.contains("unknown demo")
+    {
+        return invalid_argument(message);
+    }
+    if lower.contains("not enabled") || lower.contains("not implemented") {
+        return not_implemented(message);
+    }
+    if lower.contains("closed") || lower.contains("active edit") {
+        return invalid_state(message);
+    }
+    internal_error(message)
+}
+
 struct VolvoxGridPlugin {
     next_event_id: AtomicI64,
     decision_enabled: Mutex<HashSet<i64>>,
@@ -87,6 +172,25 @@ impl VolvoxGridPlugin {
 
     fn manager(&self) -> &'static GridManager {
         &SHARED_GRID_MANAGER
+    }
+
+    fn with_grid<T>(
+        &self,
+        id: i64,
+        f: impl FnOnce(&mut volvoxgrid_engine::grid::VolvoxGrid) -> T,
+    ) -> PluginResult<T> {
+        self.manager().with_grid(id, f).map_err(map_plugin_error)
+    }
+
+    fn with_grid_result<T>(
+        &self,
+        id: i64,
+        f: impl FnOnce(&mut volvoxgrid_engine::grid::VolvoxGrid) -> Result<T, String>,
+    ) -> PluginResult<T> {
+        self.manager()
+            .with_grid(id, f)
+            .map_err(map_plugin_error)?
+            .map_err(map_plugin_error)
     }
 
     fn sync_fonts_into_renderer(
@@ -1428,7 +1532,7 @@ impl VolvoxGridPlugin {
 impl VolvoxGridServicePlugin for VolvoxGridPlugin {
     // ── Lifecycle ──
 
-    fn create(&self, request: CreateRequest) -> Result<CreateResponse, String> {
+    fn create(&self, request: CreateRequest) -> PluginResult<CreateResponse> {
         let config = request.config.as_ref();
         let layout = config.and_then(|c| c.layout.as_ref());
         let rows = layout.and_then(|l| l.rows).unwrap_or(10);
@@ -1453,7 +1557,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         self.set_current_zoom_scale(id, 1.0);
 
         if let Some(config) = config {
-            let _ = self.manager().with_grid(id, |grid| {
+            let _ = self.with_grid(id, |grid| {
                 grid.apply_config(config);
             });
         }
@@ -1464,7 +1568,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         })
     }
 
-    fn destroy(&self, request: GridHandle) -> Result<Empty, String> {
+    fn destroy(&self, request: GridHandle) -> PluginResult<Empty> {
         self.clear_grid_state(request.id);
         self.manager().destroy_grid(request.id);
         Ok(Empty {})
@@ -1472,23 +1576,22 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
     // ── Configuration ──
 
-    fn configure(&self, request: ConfigureRequest) -> Result<Empty, String> {
+    fn configure(&self, request: ConfigureRequest) -> PluginResult<Empty> {
         if let Some(config) = &request.config {
-            self.manager().with_grid(request.grid_id, |grid| {
+            self.with_grid(request.grid_id, |grid| {
                 grid.apply_config(config);
             })?;
         }
         Ok(Empty {})
     }
 
-    fn get_config(&self, request: GridHandle) -> Result<GridConfig, String> {
-        self.manager()
-            .with_grid(request.id, |grid| grid.get_config())
+    fn get_config(&self, request: GridHandle) -> PluginResult<GridConfig> {
+        self.with_grid(request.id, |grid| grid.get_config())
     }
 
-    fn load_font_data(&self, request: LoadFontDataRequest) -> Result<Empty, String> {
+    fn load_font_data(&self, request: LoadFontDataRequest) -> PluginResult<Empty> {
         if request.data.is_empty() {
-            return Err("font data is empty".to_string());
+            return Err(invalid_argument("font data is empty"));
         }
 
         let _primary_font_name = request.font_name.trim();
@@ -1515,27 +1618,26 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
     // ── Structure ──
 
-    fn define_columns(&self, request: DefineColumnsRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn define_columns(&self, request: DefineColumnsRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             grid.define_columns(&request.columns);
         })?;
         Ok(Empty {})
     }
 
-    fn get_schema(&self, request: GridHandle) -> Result<DefineColumnsRequest, String> {
-        self.manager()
-            .with_grid(request.id, |grid| grid.get_schema(request.id))
+    fn get_schema(&self, request: GridHandle) -> PluginResult<DefineColumnsRequest> {
+        self.with_grid(request.id, |grid| grid.get_schema(request.id))
     }
 
-    fn define_rows(&self, request: DefineRowsRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn define_rows(&self, request: DefineRowsRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             grid.define_rows(&request.rows);
         })?;
         Ok(Empty {})
     }
 
-    fn insert_rows(&self, request: InsertRowsRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn insert_rows(&self, request: InsertRowsRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             let count = request.count.max(1);
             let index = if request.index < 0 { -1 } else { request.index };
             for i in 0..count {
@@ -1551,8 +1653,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(Empty {})
     }
 
-    fn remove_rows(&self, request: RemoveRowsRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn remove_rows(&self, request: RemoveRowsRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             let count = request.count.max(1);
             for _ in 0..count {
                 let row = request.index;
@@ -1565,8 +1667,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(Empty {})
     }
 
-    fn move_column(&self, request: MoveColumnRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn move_column(&self, request: MoveColumnRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             if request.col >= 0
                 && request.col < grid.cols
                 && request.position >= 0
@@ -1578,8 +1680,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(Empty {})
     }
 
-    fn move_row(&self, request: MoveRowRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn move_row(&self, request: MoveRowRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             if request.row >= grid.fixed_rows
                 && request.row < grid.rows
                 && request.position >= grid.fixed_rows
@@ -1600,13 +1702,14 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
     // ── Data ──
 
-    fn update_cells(&self, request: UpdateCellsRequest) -> Result<WriteResult, String> {
-        self.manager()
-            .with_grid(request.grid_id, |grid| grid.write_cells(&request.cells, request.atomic))
+    fn update_cells(&self, request: UpdateCellsRequest) -> PluginResult<WriteResult> {
+        self.with_grid(request.grid_id, |grid| {
+            grid.write_cells(&request.cells, request.atomic)
+        })
     }
 
-    fn get_cells(&self, request: GetCellsRequest) -> Result<CellsResponse, String> {
-        let cells = self.manager().with_grid(request.grid_id, |grid| {
+    fn get_cells(&self, request: GetCellsRequest) -> PluginResult<CellsResponse> {
+        let cells = self.with_grid(request.grid_id, |grid| {
             grid.get_cells(
                 request.row1,
                 request.col1,
@@ -1620,14 +1723,14 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(CellsResponse { cells })
     }
 
-    fn load_table(&self, request: LoadTableRequest) -> Result<WriteResult, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn load_table(&self, request: LoadTableRequest) -> PluginResult<WriteResult> {
+        self.with_grid(request.grid_id, |grid| {
             grid.load_table(request.rows, request.cols, &request.values, request.atomic)
         })
     }
 
-    fn clear(&self, request: ClearRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn clear(&self, request: ClearRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             let (r1, c1, r2, c2) = match request.region {
                 0 => (
                     grid.fixed_rows,
@@ -1690,8 +1793,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
     // ── Selection ──
 
-    fn select(&self, request: SelectRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn select(&self, request: SelectRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             let active_row = request.active_row;
             let active_col = request.active_col;
             let ranges: Vec<(i32, i32, i32, i32)> = request
@@ -1736,8 +1839,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(Empty {})
     }
 
-    fn get_selection(&self, request: GridHandle) -> Result<SelectionState, String> {
-        self.manager().with_grid(request.id, |grid| {
+    fn get_selection(&self, request: GridHandle) -> PluginResult<SelectionState> {
+        self.with_grid(request.id, |grid| {
             ensure_layout(grid);
             SelectionState {
                 active_row: grid.selection.row,
@@ -1753,8 +1856,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         })
     }
 
-    fn show_cell(&self, request: ShowCellRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn show_cell(&self, request: ShowCellRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             ensure_layout(grid);
             grid.scroll.show_cell(
                 request.row,
@@ -1772,15 +1875,15 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(Empty {})
     }
 
-    fn set_top_row(&self, request: SetRowRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn set_top_row(&self, request: SetRowRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             grid.set_top_row(request.row);
         })?;
         Ok(Empty {})
     }
 
-    fn set_left_col(&self, request: SetColRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn set_left_col(&self, request: SetColRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             grid.set_left_col(request.col);
         })?;
         Ok(Empty {})
@@ -1788,9 +1891,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
     // ── Editing ──
 
-    fn edit(&self, request: EditCommand) -> Result<EditState, String> {
+    fn edit(&self, request: EditCommand) -> PluginResult<EditState> {
         let grid_id = request.grid_id;
-        let state = self.manager().with_grid(grid_id, |grid| {
+        let state = self.with_grid(grid_id, |grid| {
             match request.command {
                 Some(edit_command::Command::Start(start)) => {
                     begin_edit_session_core_opts(
@@ -1911,8 +2014,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
     // ── Actions ──
 
-    fn sort(&self, request: SortRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn sort(&self, request: SortRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             if request.sort_columns.is_empty() {
                 // No columns — clear sort state
                 grid.sort_state.clear();
@@ -1931,8 +2034,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(Empty {})
     }
 
-    fn subtotal(&self, request: SubtotalRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn subtotal(&self, request: SubtotalRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             volvoxgrid_engine::outline::subtotal(
                 grid,
                 request.aggregate,
@@ -1947,8 +2050,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(Empty {})
     }
 
-    fn auto_size(&self, request: AutoSizeRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn auto_size(&self, request: AutoSizeRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             ensure_layout(grid);
             let c1 = request.col_from.max(0).min(grid.cols - 1);
             let c2 = request.col_to.max(c1).min(grid.cols - 1);
@@ -1978,15 +2081,15 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(Empty {})
     }
 
-    fn outline(&self, request: OutlineRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn outline(&self, request: OutlineRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             volvoxgrid_engine::outline::outline(grid, request.level);
         })?;
         Ok(Empty {})
     }
 
-    fn get_node(&self, request: GetNodeRequest) -> Result<NodeInfo, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn get_node(&self, request: GetNodeRequest) -> PluginResult<NodeInfo> {
+        self.with_grid(request.grid_id, |grid| {
             let row = if let Some(relation) = request.relation {
                 volvoxgrid_engine::outline::get_node_row(grid, request.row, relation)
             } else {
@@ -2014,33 +2117,29 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         })
     }
 
-    fn find(&self, request: FindRequest) -> Result<FindResponse, String> {
-        let row = self
-            .manager()
-            .with_grid(request.grid_id, |grid| match request.query {
-                Some(find_request::Query::TextQuery(tq)) => volvoxgrid_engine::search::find_row(
-                    grid,
-                    &tq.text,
-                    request.start_row,
-                    request.col,
-                    tq.case_sensitive,
-                    tq.full_match,
-                ),
-                Some(find_request::Query::RegexQuery(rq)) => {
-                    volvoxgrid_engine::search::find_row_regex(
-                        grid,
-                        &rq.pattern,
-                        request.start_row,
-                        request.col,
-                    )
-                }
-                None => -1,
-            })?;
+    fn find(&self, request: FindRequest) -> PluginResult<FindResponse> {
+        let row = self.with_grid(request.grid_id, |grid| match request.query {
+            Some(find_request::Query::TextQuery(tq)) => volvoxgrid_engine::search::find_row(
+                grid,
+                &tq.text,
+                request.start_row,
+                request.col,
+                tq.case_sensitive,
+                tq.full_match,
+            ),
+            Some(find_request::Query::RegexQuery(rq)) => volvoxgrid_engine::search::find_row_regex(
+                grid,
+                &rq.pattern,
+                request.start_row,
+                request.col,
+            ),
+            None => -1,
+        })?;
         Ok(FindResponse { row })
     }
 
-    fn aggregate(&self, request: AggregateRequest) -> Result<AggregateResponse, String> {
-        let value = self.manager().with_grid(request.grid_id, |grid| {
+    fn aggregate(&self, request: AggregateRequest) -> PluginResult<AggregateResponse> {
+        let value = self.with_grid(request.grid_id, |grid| {
             volvoxgrid_engine::search::aggregate(
                 grid,
                 request.aggregate,
@@ -2053,8 +2152,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(AggregateResponse { value })
     }
 
-    fn get_merged_range(&self, request: GetMergedRangeRequest) -> Result<CellRange, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn get_merged_range(&self, request: GetMergedRangeRequest) -> PluginResult<CellRange> {
+        self.with_grid(request.grid_id, |grid| {
             if let Some((r1, c1, r2, c2)) = grid.get_merged_range(request.row, request.col) {
                 CellRange {
                     row1: r1,
@@ -2073,9 +2172,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         })
     }
 
-    fn merge_cells(&self, request: MergeCellsRequest) -> Result<Empty, String> {
+    fn merge_cells(&self, request: MergeCellsRequest) -> PluginResult<Empty> {
         let range = request.range.unwrap_or_default();
-        self.manager().with_grid(request.grid_id, |grid| {
+        self.with_grid(request.grid_id, |grid| {
             grid.merged_regions
                 .add_merge(range.row1, range.col1, range.row2, range.col2);
             grid.layout.invalidate();
@@ -2084,9 +2183,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(Empty {})
     }
 
-    fn unmerge_cells(&self, request: UnmergeCellsRequest) -> Result<Empty, String> {
+    fn unmerge_cells(&self, request: UnmergeCellsRequest) -> PluginResult<Empty> {
         let range = request.range.unwrap_or_default();
-        self.manager().with_grid(request.grid_id, |grid| {
+        self.with_grid(request.grid_id, |grid| {
             grid.merged_regions
                 .remove_overlapping(range.row1, range.col1, range.row2, range.col2);
             grid.layout.invalidate();
@@ -2095,69 +2194,66 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(Empty {})
     }
 
-    fn get_merged_regions(&self, request: GridHandle) -> Result<MergedRegionsResponse, String> {
-        self.manager()
-            .with_grid(request.id, |grid| MergedRegionsResponse {
-                ranges: grid
-                    .merged_regions
-                    .all_ranges()
-                    .iter()
-                    .map(|&(r1, c1, r2, c2)| CellRange {
-                        row1: r1,
-                        col1: c1,
-                        row2: r2,
-                        col2: c2,
-                    })
-                    .collect(),
-            })
+    fn get_merged_regions(&self, request: GridHandle) -> PluginResult<MergedRegionsResponse> {
+        self.with_grid(request.id, |grid| MergedRegionsResponse {
+            ranges: grid
+                .merged_regions
+                .all_ranges()
+                .iter()
+                .map(|&(r1, c1, r2, c2)| CellRange {
+                    row1: r1,
+                    col1: c1,
+                    row2: r2,
+                    col2: c2,
+                })
+                .collect(),
+        })
     }
 
-    fn get_memory_usage(&self, request: GridHandle) -> Result<MemoryUsageResponse, String> {
-        self.manager()
-            .with_grid(request.id, |grid| grid.memory_usage())
+    fn get_memory_usage(&self, request: GridHandle) -> PluginResult<MemoryUsageResponse> {
+        self.with_grid(request.id, |grid| grid.memory_usage())
     }
 
     // ── Clipboard ──
 
-    fn clipboard(&self, request: ClipboardCommand) -> Result<ClipboardResponse, String> {
+    fn clipboard(&self, request: ClipboardCommand) -> PluginResult<ClipboardResponse> {
         let grid_id = request.grid_id;
-        self.manager()
-            .with_grid(grid_id, |grid| match request.command {
-                Some(clipboard_command::Command::Copy(_)) => {
-                    let (text, rich_data) = volvoxgrid_engine::clipboard::copy(grid);
-                    ClipboardResponse { text, rich_data }
+        self.with_grid(grid_id, |grid| match request.command {
+            Some(clipboard_command::Command::Copy(_)) => {
+                let (text, rich_data) = volvoxgrid_engine::clipboard::copy(grid);
+                ClipboardResponse { text, rich_data }
+            }
+            Some(clipboard_command::Command::Cut(_)) => {
+                let (text, rich_data) = volvoxgrid_engine::clipboard::cut(grid);
+                ClipboardResponse { text, rich_data }
+            }
+            Some(clipboard_command::Command::Paste(paste)) => {
+                if !paste.text.is_empty() {
+                    volvoxgrid_engine::clipboard::paste(grid, &paste.text);
                 }
-                Some(clipboard_command::Command::Cut(_)) => {
-                    let (text, rich_data) = volvoxgrid_engine::clipboard::cut(grid);
-                    ClipboardResponse { text, rich_data }
-                }
-                Some(clipboard_command::Command::Paste(paste)) => {
-                    if !paste.text.is_empty() {
-                        volvoxgrid_engine::clipboard::paste(grid, &paste.text);
-                    }
-                    ClipboardResponse {
-                        text: String::new(),
-                        rich_data: Vec::new(),
-                    }
-                }
-                Some(clipboard_command::Command::Delete(_)) => {
-                    volvoxgrid_engine::clipboard::delete_selection(grid);
-                    ClipboardResponse {
-                        text: String::new(),
-                        rich_data: Vec::new(),
-                    }
-                }
-                None => ClipboardResponse {
+                ClipboardResponse {
                     text: String::new(),
                     rich_data: Vec::new(),
-                },
-            })
+                }
+            }
+            Some(clipboard_command::Command::Delete(_)) => {
+                volvoxgrid_engine::clipboard::delete_selection(grid);
+                ClipboardResponse {
+                    text: String::new(),
+                    rich_data: Vec::new(),
+                }
+            }
+            None => ClipboardResponse {
+                text: String::new(),
+                rich_data: Vec::new(),
+            },
+        })
     }
 
     // ── Import / Export ──
 
-    fn export(&self, request: ExportRequest) -> Result<ExportResponse, String> {
-        let data = self.manager().with_grid(request.grid_id, |grid| {
+    fn export(&self, request: ExportRequest) -> PluginResult<ExportResponse> {
+        let data = self.with_grid(request.grid_id, |grid| {
             volvoxgrid_engine::save::save_grid(grid, request.format, request.scope)
         })?;
         Ok(ExportResponse {
@@ -2166,8 +2262,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         })
     }
 
-    fn import(&self, request: ImportRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn import(&self, request: ImportRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             if let Some(url) = &request.url {
                 if !url.is_empty() {
                     volvoxgrid_engine::save::load_grid_url(
@@ -2185,8 +2281,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(Empty {})
     }
 
-    fn print(&self, request: PrintRequest) -> Result<PrintResponse, String> {
-        let pages = self.manager().with_grid(request.grid_id, |grid| {
+    fn print(&self, request: PrintRequest) -> PluginResult<PrintResponse> {
+        let pages = self.with_grid(request.grid_id, |grid| {
             ensure_layout(grid);
             let orientation = request.orientation.unwrap_or(0);
             let margin_left = request.margin_left.unwrap_or(50);
@@ -2222,8 +2318,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(PrintResponse { pages })
     }
 
-    fn archive(&self, request: ArchiveRequest) -> Result<ArchiveResponse, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn archive(&self, request: ArchiveRequest) -> PluginResult<ArchiveResponse> {
+        self.with_grid(request.grid_id, |grid| {
             let (data, names) = volvoxgrid_engine::save::archive(
                 grid,
                 &request.name,
@@ -2236,15 +2332,15 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
     // ── Render Control ──
 
-    fn resize_viewport(&self, request: ResizeViewportRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn resize_viewport(&self, request: ResizeViewportRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             grid.resize_viewport(request.width, request.height);
         })?;
         Ok(Empty {})
     }
 
-    fn set_redraw(&self, request: SetRedrawRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
+    fn set_redraw(&self, request: SetRedrawRequest) -> PluginResult<Empty> {
+        self.with_grid(request.grid_id, |grid| {
             let was_off = !grid.redraw;
             grid.redraw = request.enabled;
             if request.enabled {
@@ -2258,18 +2354,18 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(Empty {})
     }
 
-    fn refresh(&self, request: GridHandle) -> Result<Empty, String> {
-        self.manager().with_grid(request.id, |grid| {
+    fn refresh(&self, request: GridHandle) -> PluginResult<Empty> {
+        self.with_grid(request.id, |grid| {
             grid.layout.invalidate();
             grid.mark_dirty();
         })?;
         Ok(Empty {})
     }
 
-    fn load_demo(&self, request: LoadDemoRequest) -> Result<Empty, String> {
+    fn load_demo(&self, request: LoadDemoRequest) -> PluginResult<Empty> {
         #[cfg(feature = "demo")]
         {
-            self.manager().with_grid(request.grid_id, |grid| {
+            self.with_grid_result(request.grid_id, |grid| {
                 match request.demo.as_str() {
                     "sales" => volvoxgrid_engine::demo::setup_sales_demo(grid),
                     "hierarchy" => volvoxgrid_engine::demo::setup_hierarchy_demo(grid),
@@ -2277,13 +2373,13 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                     other => return Err(format!("unknown demo: {other}")),
                 }
                 Ok(())
-            })??;
+            })?;
             Ok(Empty {})
         }
         #[cfg(not(feature = "demo"))]
         {
             let _ = request;
-            Err("demo feature is not enabled".into())
+            Err(not_implemented("demo feature is not enabled"))
         }
     }
 
@@ -2292,7 +2388,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
     fn render_session(
         &self,
         stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
-    ) -> Result<(), String> {
+    ) -> PluginResult<()> {
         let mut renderer: Option<volvoxgrid_engine::render::Renderer> = None;
         let mut renderer_text_registration: Option<TextRendererRegistration> = None;
         let mut cpu_font_count_applied: usize = 0;
@@ -2316,7 +2412,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
             match input.input {
                 Some(render_input::Input::Viewport(vs)) => {
-                    let _ = self.manager().with_grid(grid_id, |grid| {
+                    let _ = self.with_grid(grid_id, |grid| {
                         grid.resize_viewport(vs.width, vs.height);
                     });
                     stream.send(RenderOutput {
@@ -2336,7 +2432,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                     };
                     last_fling_tick = Some(now);
 
-                    let result = self.manager().with_grid(grid_id, |grid| {
+                    let result = self.with_grid(grid_id, |grid| {
                         let needs_fling_tick = grid.fling_enabled && grid.scroll.fling_active;
                         if !grid.dirty && !needs_fling_tick {
                             return (false, 0, 0, 0, 0);
@@ -2540,7 +2636,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         }
                         last_surface_handle = 0;
                         // Stop engine-side fling so it doesn't resume after suspend.
-                        let _ = self.manager().with_grid(grid_id, |grid| {
+                        let _ = self.with_grid(grid_id, |grid| {
                             grid.scroll.stop_fling();
                         });
                         stream.send(RenderOutput {
@@ -2592,7 +2688,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                 gpu_renderer = Some(gr);
                             }
                             Err(_e) => {
-                                let _ = self.manager().with_grid(grid_id, |grid| {
+                                let _ = self.with_grid(grid_id, |grid| {
                                     grid.renderer_mode = 1; // CPU fallback
                                 });
                                 stream.send(RenderOutput {
@@ -2629,7 +2725,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             )
                         });
                         if let Err(_e) = configure_result {
-                            let _ = self.manager().with_grid(grid_id, |grid| {
+                            let _ = self.with_grid(grid_id, |grid| {
                                 grid.renderer_mode = 1; // CPU fallback
                             });
                             last_surface_handle = 0;
@@ -2650,7 +2746,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         // Surface reconfiguration can happen after Android HOME/resume
                         // with no data mutation. Force one redraw so the newly bound
                         // surface is populated instead of staying black.
-                        let _ = self.manager().with_grid(grid_id, |grid| {
+                        let _ = self.with_grid(grid_id, |grid| {
                             grid.mark_dirty();
                         });
                     } else {
@@ -2680,7 +2776,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                     let gr_present_mode_name = gr.present_mode_name();
                     let gr_text_cache_len = gr.text_cache_len() as i32;
 
-                    let result = self.manager().with_grid(grid_id, |grid| {
+                    let result = self.with_grid(grid_id, |grid| {
                         let needs_fling_tick = grid.fling_enabled && grid.scroll.fling_active;
                         if !grid.dirty && !needs_fling_tick {
                             return Ok((false, 0, 0, 0, 0));
@@ -2729,13 +2825,14 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         grid.debug_renderer_actual = RendererMode::RendererGpu as i32;
                         grid.debug_gpu_backend = gr_backend_name;
                         grid.debug_gpu_present_mode = gr_present_mode_name;
-                        
+
                         match gr.render_to_surface(grid, width, height) {
                             Ok((dx, dy, dw, dh)) => {
                                 grid.debug_instance_count = gr.instance_count() as i32;
                                 let elapsed = frame_start.elapsed().as_secs_f32() * 1000.0;
                                 grid.debug_frame_time_ms = elapsed;
-                                grid.debug_fps = grid.debug_fps * 0.9 + (1000.0 / elapsed.max(0.1)) * 0.1;
+                                grid.debug_fps =
+                                    grid.debug_fps * 0.9 + (1000.0 / elapsed.max(0.1)) * 0.1;
                                 grid.clear_dirty();
                                 Ok((true, dx, dy, dw, dh))
                             }
@@ -2788,7 +2885,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 }
 
                 Some(render_input::Input::Pointer(pe)) => {
-                    let sel_and_editor = self.manager().with_grid(grid_id, |grid| {
+                    let sel_and_editor = self.with_grid(grid_id, |grid| {
                         if !grid.layout.valid {
                             ensure_layout(grid);
                         }
@@ -2941,8 +3038,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             editor_output,
                         )
                     });
-                    if let Ok((selection_changed, row, col, ranges, editor_output)) =
-                        sel_and_editor
+                    if let Ok((selection_changed, row, col, ranges, editor_output)) = sel_and_editor
                     {
                         if pe.r#type != 2 || selection_changed {
                             stream.send(RenderOutput {
@@ -2961,7 +3057,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 }
 
                 Some(render_input::Input::Key(ke)) => {
-                    let sel_and_editor = self.manager().with_grid(grid_id, |grid| {
+                    let sel_and_editor = self.with_grid(grid_id, |grid| {
                         if !grid.layout.valid {
                             ensure_layout(grid);
                         }
@@ -3089,7 +3185,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 }
 
                 Some(render_input::Input::Scroll(se)) => {
-                    let tooltip = self.manager().with_grid(grid_id, |grid| {
+                    let tooltip = self.with_grid(grid_id, |grid| {
                         if !grid.layout.valid {
                             ensure_layout(grid);
                         }
@@ -3138,7 +3234,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         0 => {
                             // ZOOM_BEGIN
                             let base_zoom_scale = self.current_zoom_scale(grid_id);
-                            if let Ok(state) = self.manager().with_grid(grid_id, |grid| {
+                            if let Ok(state) = self.with_grid(grid_id, |grid| {
                                 if !grid.layout.valid {
                                     ensure_layout(grid);
                                 }
@@ -3169,7 +3265,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                             if !zoom_sessions.contains_key(&grid_id) {
                                 let base_zoom_scale = self.current_zoom_scale(grid_id);
-                                if let Ok(state) = self.manager().with_grid(grid_id, |grid| {
+                                if let Ok(state) = self.with_grid(grid_id, |grid| {
                                     if !grid.layout.valid {
                                         ensure_layout(grid);
                                     }
@@ -3258,7 +3354,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                 };
                                 let needs_final_apply =
                                     zoom_relative_delta(final_scale, state.applied_scale) > 0.0001;
-                                let _ = self.manager().with_grid(grid_id, |grid| {
+                                let _ = self.with_grid(grid_id, |grid| {
                                     if !grid.layout.valid {
                                         ensure_layout(grid);
                                     }
@@ -3270,7 +3366,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                 });
                                 self.set_current_zoom_scale(grid_id, final_scale);
                             } else {
-                                let _ = self.manager().with_grid(grid_id, |grid| {
+                                let _ = self.with_grid(grid_id, |grid| {
                                     if !grid.layout.valid {
                                         ensure_layout(grid);
                                     }
@@ -3322,7 +3418,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         &self,
         request: GridHandle,
         stream: &dyn PluginStreamSender<GridEvent>,
-    ) -> Result<(), String> {
+    ) -> PluginResult<()> {
         let grid_id = request.id;
 
         loop {

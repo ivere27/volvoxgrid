@@ -9,7 +9,6 @@ use super::*;
 use prost::Message;
 use std::sync::OnceLock;
 
-
 // =============================================================================
 // Last Error (thread-local, dlerror()-style)
 // =============================================================================
@@ -138,12 +137,19 @@ pub unsafe extern "C" fn volvox_grid_create(
     viewport_width: i32,
     viewport_height: i32,
     scale: f32,
-    config: *const u8, config_len: i32,
+    config: *const u8,
+    config_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = CreateRequest {
         viewport_width,
@@ -152,9 +158,17 @@ pub unsafe extern "C" fn volvox_grid_create(
         config: if !config.is_null() && config_len > 0 {
             match GridConfig::decode(std::slice::from_raw_parts(config, config_len as usize)) {
                 Ok(m) => Some(m),
-                Err(e) => { set_last_error(format!("decode 'config': {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); }
+                Err(e) => {
+                    set_last_error(format!("decode 'config': {}", e));
+                    if !out_len.is_null() {
+                        *out_len = 0;
+                    }
+                    return std::ptr::null_mut();
+                }
             }
-        } else { None },
+        } else {
+            None
+        },
         ..Default::default()
     };
     match plugin.create(req) {
@@ -162,26 +176,39 @@ pub unsafe extern "C" fn volvox_grid_create(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// Destroy
 #[no_mangle]
-pub unsafe extern "C" fn volvox_grid_destroy(
-    id: i64,
-    out_len: *mut i32,
-) -> *mut u8 {
+pub unsafe extern "C" fn volvox_grid_destroy(id: i64, out_len: *mut i32) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = GridHandle {
         id,
@@ -192,14 +219,24 @@ pub unsafe extern "C" fn volvox_grid_destroy(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -207,21 +244,36 @@ pub unsafe extern "C" fn volvox_grid_destroy(
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_configure(
     grid_id: i64,
-    config: *const u8, config_len: i32,
+    config: *const u8,
+    config_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = ConfigureRequest {
         grid_id,
         config: if !config.is_null() && config_len > 0 {
             match GridConfig::decode(std::slice::from_raw_parts(config, config_len as usize)) {
                 Ok(m) => Some(m),
-                Err(e) => { set_last_error(format!("decode 'config': {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); }
+                Err(e) => {
+                    set_last_error(format!("decode 'config': {}", e));
+                    if !out_len.is_null() {
+                        *out_len = 0;
+                    }
+                    return std::ptr::null_mut();
+                }
             }
-        } else { None },
+        } else {
+            None
+        },
         ..Default::default()
     };
     match plugin.configure(req) {
@@ -229,26 +281,39 @@ pub unsafe extern "C" fn volvox_grid_configure(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// GetConfig
 #[no_mangle]
-pub unsafe extern "C" fn volvox_grid_get_config(
-    id: i64,
-    out_len: *mut i32,
-) -> *mut u8 {
+pub unsafe extern "C" fn volvox_grid_get_config(id: i64, out_len: *mut i32) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = GridHandle {
         id,
@@ -259,26 +324,43 @@ pub unsafe extern "C" fn volvox_grid_get_config(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// LoadFontData (protobuf input — has repeated/oneof fields)
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_load_font_data_pb(
-    data: *const u8, data_len: i32,
+    data: *const u8,
+    data_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let input = if data.is_null() || data_len <= 0 {
         Vec::new()
@@ -287,33 +369,56 @@ pub unsafe extern "C" fn volvox_grid_load_font_data_pb(
     };
     let req = match LoadFontDataRequest::decode(input.as_slice()) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     match plugin.load_font_data(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// DefineColumns (protobuf input — has repeated/oneof fields)
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_define_columns_pb(
-    data: *const u8, data_len: i32,
+    data: *const u8,
+    data_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let input = if data.is_null() || data_len <= 0 {
         Vec::new()
@@ -322,33 +427,52 @@ pub unsafe extern "C" fn volvox_grid_define_columns_pb(
     };
     let req = match DefineColumnsRequest::decode(input.as_slice()) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     match plugin.define_columns(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// GetSchema
 #[no_mangle]
-pub unsafe extern "C" fn volvox_grid_get_schema(
-    id: i64,
-    out_len: *mut i32,
-) -> *mut u8 {
+pub unsafe extern "C" fn volvox_grid_get_schema(id: i64, out_len: *mut i32) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = GridHandle {
         id,
@@ -359,26 +483,43 @@ pub unsafe extern "C" fn volvox_grid_get_schema(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// DefineRows (protobuf input — has repeated/oneof fields)
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_define_rows_pb(
-    data: *const u8, data_len: i32,
+    data: *const u8,
+    data_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let input = if data.is_null() || data_len <= 0 {
         Vec::new()
@@ -387,33 +528,56 @@ pub unsafe extern "C" fn volvox_grid_define_rows_pb(
     };
     let req = match DefineRowsRequest::decode(input.as_slice()) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     match plugin.define_rows(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// InsertRows (protobuf input — has repeated/oneof fields)
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_insert_rows_pb(
-    data: *const u8, data_len: i32,
+    data: *const u8,
+    data_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let input = if data.is_null() || data_len <= 0 {
         Vec::new()
@@ -422,21 +586,37 @@ pub unsafe extern "C" fn volvox_grid_insert_rows_pb(
     };
     let req = match InsertRowsRequest::decode(input.as_slice()) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     match plugin.insert_rows(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -450,7 +630,13 @@ pub unsafe extern "C" fn volvox_grid_remove_rows(
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = RemoveRowsRequest {
         grid_id,
@@ -463,14 +649,24 @@ pub unsafe extern "C" fn volvox_grid_remove_rows(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -484,7 +680,13 @@ pub unsafe extern "C" fn volvox_grid_move_column(
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = MoveColumnRequest {
         grid_id,
@@ -497,14 +699,24 @@ pub unsafe extern "C" fn volvox_grid_move_column(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -518,7 +730,13 @@ pub unsafe extern "C" fn volvox_grid_move_row(
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = MoveRowRequest {
         grid_id,
@@ -531,26 +749,43 @@ pub unsafe extern "C" fn volvox_grid_move_row(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// UpdateCells (protobuf input — has repeated/oneof fields)
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_update_cells_pb(
-    data: *const u8, data_len: i32,
+    data: *const u8,
+    data_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let input = if data.is_null() || data_len <= 0 {
         Vec::new()
@@ -559,21 +794,37 @@ pub unsafe extern "C" fn volvox_grid_update_cells_pb(
     };
     let req = match UpdateCellsRequest::decode(input.as_slice()) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     match plugin.update_cells(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -592,7 +843,13 @@ pub unsafe extern "C" fn volvox_grid_get_cells(
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = GetCellsRequest {
         grid_id,
@@ -610,26 +867,43 @@ pub unsafe extern "C" fn volvox_grid_get_cells(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// LoadTable (protobuf input — has repeated/oneof fields)
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_load_table_pb(
-    data: *const u8, data_len: i32,
+    data: *const u8,
+    data_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let input = if data.is_null() || data_len <= 0 {
         Vec::new()
@@ -638,21 +912,37 @@ pub unsafe extern "C" fn volvox_grid_load_table_pb(
     };
     let req = match LoadTableRequest::decode(input.as_slice()) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     match plugin.load_table(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -666,7 +956,13 @@ pub unsafe extern "C" fn volvox_grid_clear(
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = ClearRequest {
         grid_id,
@@ -679,26 +975,43 @@ pub unsafe extern "C" fn volvox_grid_clear(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// Select (protobuf input — has repeated/oneof fields)
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_select_pb(
-    data: *const u8, data_len: i32,
+    data: *const u8,
+    data_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let input = if data.is_null() || data_len <= 0 {
         Vec::new()
@@ -707,33 +1020,52 @@ pub unsafe extern "C" fn volvox_grid_select_pb(
     };
     let req = match SelectRequest::decode(input.as_slice()) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     match plugin.select(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// GetSelection
 #[no_mangle]
-pub unsafe extern "C" fn volvox_grid_get_selection(
-    id: i64,
-    out_len: *mut i32,
-) -> *mut u8 {
+pub unsafe extern "C" fn volvox_grid_get_selection(id: i64, out_len: *mut i32) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = GridHandle {
         id,
@@ -744,14 +1076,24 @@ pub unsafe extern "C" fn volvox_grid_get_selection(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -765,7 +1107,13 @@ pub unsafe extern "C" fn volvox_grid_show_cell(
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = ShowCellRequest {
         grid_id,
@@ -778,14 +1126,24 @@ pub unsafe extern "C" fn volvox_grid_show_cell(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -798,7 +1156,13 @@ pub unsafe extern "C" fn volvox_grid_set_top_row(
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = SetRowRequest {
         grid_id,
@@ -810,14 +1174,24 @@ pub unsafe extern "C" fn volvox_grid_set_top_row(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -830,7 +1204,13 @@ pub unsafe extern "C" fn volvox_grid_set_left_col(
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = SetColRequest {
         grid_id,
@@ -842,26 +1222,43 @@ pub unsafe extern "C" fn volvox_grid_set_left_col(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// Edit (protobuf input — has repeated/oneof fields)
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_edit_pb(
-    data: *const u8, data_len: i32,
+    data: *const u8,
+    data_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let input = if data.is_null() || data_len <= 0 {
         Vec::new()
@@ -870,33 +1267,56 @@ pub unsafe extern "C" fn volvox_grid_edit_pb(
     };
     let req = match EditCommand::decode(input.as_slice()) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     match plugin.edit(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// Sort (protobuf input — has repeated/oneof fields)
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_sort_pb(
-    data: *const u8, data_len: i32,
+    data: *const u8,
+    data_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let input = if data.is_null() || data_len <= 0 {
         Vec::new()
@@ -905,21 +1325,37 @@ pub unsafe extern "C" fn volvox_grid_sort_pb(
     };
     let req = match SortRequest::decode(input.as_slice()) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     match plugin.sort(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -930,7 +1366,8 @@ pub unsafe extern "C" fn volvox_grid_subtotal(
     aggregate: i32,
     group_on_col: i32,
     aggregate_col: i32,
-    caption: *const u8, caption_len: i32,
+    caption: *const u8,
+    caption_len: i32,
     back_color: u32,
     fore_color: u32,
     add_outline: i32,
@@ -938,7 +1375,13 @@ pub unsafe extern "C" fn volvox_grid_subtotal(
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = SubtotalRequest {
         grid_id,
@@ -948,9 +1391,17 @@ pub unsafe extern "C" fn volvox_grid_subtotal(
         caption: if !caption.is_null() && caption_len > 0 {
             match std::str::from_utf8(std::slice::from_raw_parts(caption, caption_len as usize)) {
                 Ok(s) => s.to_string(),
-                Err(e) => { set_last_error(format!("invalid utf-8 in 'caption': {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); }
+                Err(e) => {
+                    set_last_error(format!("invalid utf-8 in 'caption': {}", e));
+                    if !out_len.is_null() {
+                        *out_len = 0;
+                    }
+                    return std::ptr::null_mut();
+                }
             }
-        } else { String::new() },
+        } else {
+            String::new()
+        },
         back_color,
         fore_color,
         add_outline: add_outline != 0,
@@ -961,14 +1412,24 @@ pub unsafe extern "C" fn volvox_grid_subtotal(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -984,7 +1445,13 @@ pub unsafe extern "C" fn volvox_grid_auto_size(
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = AutoSizeRequest {
         grid_id,
@@ -999,14 +1466,24 @@ pub unsafe extern "C" fn volvox_grid_auto_size(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -1019,7 +1496,13 @@ pub unsafe extern "C" fn volvox_grid_outline(
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = OutlineRequest {
         grid_id,
@@ -1031,26 +1514,43 @@ pub unsafe extern "C" fn volvox_grid_outline(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// GetNode (protobuf input — has repeated/oneof fields)
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_get_node_pb(
-    data: *const u8, data_len: i32,
+    data: *const u8,
+    data_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let input = if data.is_null() || data_len <= 0 {
         Vec::new()
@@ -1059,33 +1559,56 @@ pub unsafe extern "C" fn volvox_grid_get_node_pb(
     };
     let req = match GetNodeRequest::decode(input.as_slice()) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     match plugin.get_node(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// Find (protobuf input — has repeated/oneof fields)
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_find_pb(
-    data: *const u8, data_len: i32,
+    data: *const u8,
+    data_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let input = if data.is_null() || data_len <= 0 {
         Vec::new()
@@ -1094,21 +1617,37 @@ pub unsafe extern "C" fn volvox_grid_find_pb(
     };
     let req = match FindRequest::decode(input.as_slice()) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     match plugin.find(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -1125,7 +1664,13 @@ pub unsafe extern "C" fn volvox_grid_aggregate(
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = AggregateRequest {
         grid_id,
@@ -1141,14 +1686,24 @@ pub unsafe extern "C" fn volvox_grid_aggregate(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -1162,7 +1717,13 @@ pub unsafe extern "C" fn volvox_grid_get_merged_range(
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = GetMergedRangeRequest {
         grid_id,
@@ -1175,14 +1736,24 @@ pub unsafe extern "C" fn volvox_grid_get_merged_range(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -1190,21 +1761,36 @@ pub unsafe extern "C" fn volvox_grid_get_merged_range(
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_merge_cells(
     grid_id: i64,
-    range: *const u8, range_len: i32,
+    range: *const u8,
+    range_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = MergeCellsRequest {
         grid_id,
         range: if !range.is_null() && range_len > 0 {
             match CellRange::decode(std::slice::from_raw_parts(range, range_len as usize)) {
                 Ok(m) => Some(m),
-                Err(e) => { set_last_error(format!("decode 'range': {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); }
+                Err(e) => {
+                    set_last_error(format!("decode 'range': {}", e));
+                    if !out_len.is_null() {
+                        *out_len = 0;
+                    }
+                    return std::ptr::null_mut();
+                }
             }
-        } else { None },
+        } else {
+            None
+        },
         ..Default::default()
     };
     match plugin.merge_cells(req) {
@@ -1212,14 +1798,24 @@ pub unsafe extern "C" fn volvox_grid_merge_cells(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -1227,21 +1823,36 @@ pub unsafe extern "C" fn volvox_grid_merge_cells(
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_unmerge_cells(
     grid_id: i64,
-    range: *const u8, range_len: i32,
+    range: *const u8,
+    range_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = UnmergeCellsRequest {
         grid_id,
         range: if !range.is_null() && range_len > 0 {
             match CellRange::decode(std::slice::from_raw_parts(range, range_len as usize)) {
                 Ok(m) => Some(m),
-                Err(e) => { set_last_error(format!("decode 'range': {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); }
+                Err(e) => {
+                    set_last_error(format!("decode 'range': {}", e));
+                    if !out_len.is_null() {
+                        *out_len = 0;
+                    }
+                    return std::ptr::null_mut();
+                }
             }
-        } else { None },
+        } else {
+            None
+        },
         ..Default::default()
     };
     match plugin.unmerge_cells(req) {
@@ -1249,26 +1860,39 @@ pub unsafe extern "C" fn volvox_grid_unmerge_cells(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// GetMergedRegions
 #[no_mangle]
-pub unsafe extern "C" fn volvox_grid_get_merged_regions(
-    id: i64,
-    out_len: *mut i32,
-) -> *mut u8 {
+pub unsafe extern "C" fn volvox_grid_get_merged_regions(id: i64, out_len: *mut i32) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = GridHandle {
         id,
@@ -1279,26 +1903,39 @@ pub unsafe extern "C" fn volvox_grid_get_merged_regions(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// GetMemoryUsage
 #[no_mangle]
-pub unsafe extern "C" fn volvox_grid_get_memory_usage(
-    id: i64,
-    out_len: *mut i32,
-) -> *mut u8 {
+pub unsafe extern "C" fn volvox_grid_get_memory_usage(id: i64, out_len: *mut i32) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = GridHandle {
         id,
@@ -1309,26 +1946,43 @@ pub unsafe extern "C" fn volvox_grid_get_memory_usage(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// Clipboard (protobuf input — has repeated/oneof fields)
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_clipboard_pb(
-    data: *const u8, data_len: i32,
+    data: *const u8,
+    data_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let input = if data.is_null() || data_len <= 0 {
         Vec::new()
@@ -1337,21 +1991,37 @@ pub unsafe extern "C" fn volvox_grid_clipboard_pb(
     };
     let req = match ClipboardCommand::decode(input.as_slice()) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     match plugin.clipboard(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -1365,7 +2035,13 @@ pub unsafe extern "C" fn volvox_grid_export(
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = ExportRequest {
         grid_id,
@@ -1378,26 +2054,43 @@ pub unsafe extern "C" fn volvox_grid_export(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// Import (protobuf input — has repeated/oneof fields)
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_import_pb(
-    data: *const u8, data_len: i32,
+    data: *const u8,
+    data_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let input = if data.is_null() || data_len <= 0 {
         Vec::new()
@@ -1406,33 +2099,56 @@ pub unsafe extern "C" fn volvox_grid_import_pb(
     };
     let req = match ImportRequest::decode(input.as_slice()) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     match plugin.import(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// Print (protobuf input — has repeated/oneof fields)
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_print_pb(
-    data: *const u8, data_len: i32,
+    data: *const u8,
+    data_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let input = if data.is_null() || data_len <= 0 {
         Vec::new()
@@ -1441,21 +2157,37 @@ pub unsafe extern "C" fn volvox_grid_print_pb(
     };
     let req = match PrintRequest::decode(input.as_slice()) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     match plugin.print(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -1463,27 +2195,45 @@ pub unsafe extern "C" fn volvox_grid_print_pb(
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_archive(
     grid_id: i64,
-    name: *const u8, name_len: i32,
+    name: *const u8,
+    name_len: i32,
     action: i32,
-    data: *const u8, data_len: i32,
+    data: *const u8,
+    data_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = ArchiveRequest {
         grid_id,
         name: if !name.is_null() && name_len > 0 {
             match std::str::from_utf8(std::slice::from_raw_parts(name, name_len as usize)) {
                 Ok(s) => s.to_string(),
-                Err(e) => { set_last_error(format!("invalid utf-8 in 'name': {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); }
+                Err(e) => {
+                    set_last_error(format!("invalid utf-8 in 'name': {}", e));
+                    if !out_len.is_null() {
+                        *out_len = 0;
+                    }
+                    return std::ptr::null_mut();
+                }
             }
-        } else { String::new() },
+        } else {
+            String::new()
+        },
         action,
         data: if !data.is_null() && data_len > 0 {
             std::slice::from_raw_parts(data, data_len as usize).to_vec()
-        } else { Vec::new() },
+        } else {
+            Vec::new()
+        },
         ..Default::default()
     };
     match plugin.archive(req) {
@@ -1491,14 +2241,24 @@ pub unsafe extern "C" fn volvox_grid_archive(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -1512,7 +2272,13 @@ pub unsafe extern "C" fn volvox_grid_resize_viewport(
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = ResizeViewportRequest {
         grid_id,
@@ -1525,14 +2291,24 @@ pub unsafe extern "C" fn volvox_grid_resize_viewport(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -1545,7 +2321,13 @@ pub unsafe extern "C" fn volvox_grid_set_redraw(
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = SetRedrawRequest {
         grid_id,
@@ -1557,26 +2339,39 @@ pub unsafe extern "C" fn volvox_grid_set_redraw(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
 /// Refresh
 #[no_mangle]
-pub unsafe extern "C" fn volvox_grid_refresh(
-    id: i64,
-    out_len: *mut i32,
-) -> *mut u8 {
+pub unsafe extern "C" fn volvox_grid_refresh(id: i64, out_len: *mut i32) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = GridHandle {
         id,
@@ -1587,14 +2382,24 @@ pub unsafe extern "C" fn volvox_grid_refresh(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
 
@@ -1602,21 +2407,36 @@ pub unsafe extern "C" fn volvox_grid_refresh(
 #[no_mangle]
 pub unsafe extern "C" fn volvox_grid_load_demo(
     grid_id: i64,
-    demo: *const u8, demo_len: i32,
+    demo: *const u8,
+    demo_len: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     };
     let req = LoadDemoRequest {
         grid_id,
         demo: if !demo.is_null() && demo_len > 0 {
             match std::str::from_utf8(std::slice::from_raw_parts(demo, demo_len as usize)) {
                 Ok(s) => s.to_string(),
-                Err(e) => { set_last_error(format!("invalid utf-8 in 'demo': {}", e)); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); }
+                Err(e) => {
+                    set_last_error(format!("invalid utf-8 in 'demo': {}", e));
+                    if !out_len.is_null() {
+                        *out_len = 0;
+                    }
+                    return std::ptr::null_mut();
+                }
             }
-        } else { String::new() },
+        } else {
+            String::new()
+        },
         ..Default::default()
     };
     match plugin.load_demo(req) {
@@ -1624,18 +2444,26 @@ pub unsafe extern "C" fn volvox_grid_load_demo(
             clear_last_error();
             let mut buf = Vec::new();
             if r.encode(&mut buf).is_ok() {
-                if !out_len.is_null() { *out_len = buf.len() as i32; }
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
                 alloc_payload_with_header(buf)
             } else {
-                if !out_len.is_null() { *out_len = 0; }
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
                 std::ptr::null_mut()
             }
-        },
-        Err(e) => { set_last_error(e); if !out_len.is_null() { *out_len = 0; } return std::ptr::null_mut(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
     }
 }
-
-
 
 // =============================================================================
 // Memory Management & Error Retrieval
@@ -1656,13 +2484,16 @@ pub unsafe extern "C" fn volvox_grid_last_error(out_len: *mut i32) -> *const u8 
     LAST_ERROR.with(|e| {
         let msg = e.borrow();
         if msg.is_empty() {
-            if !out_len.is_null() { *out_len = 0; }
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
             return std::ptr::null();
         }
-        if !out_len.is_null() { *out_len = msg.len() as i32; }
+        if !out_len.is_null() {
+            *out_len = msg.len() as i32;
+        }
         msg.as_ptr()
     })
 }
 
 // Module: volvoxgrid_v1
-

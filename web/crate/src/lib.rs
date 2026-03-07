@@ -101,11 +101,10 @@ fn replay_loaded_fonts_into_grid(grid: &mut volvoxgrid_engine::grid::VolvoxGrid)
 }
 
 const DEFAULT_ROW_INDICATOR_MODE_BITS: u32 =
-    RowIndicatorMode::RowIndicatorCurrent as u32
-        | RowIndicatorMode::RowIndicatorSelection as u32;
-const DEFAULT_COL_INDICATOR_MODE_BITS: u32 =
-    ColIndicatorCellMode::ColIndicatorCellHeaderText as u32
-        | ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32;
+    RowIndicatorMode::RowIndicatorCurrent as u32 | RowIndicatorMode::RowIndicatorSelection as u32;
+const DEFAULT_COL_INDICATOR_MODE_BITS: u32 = ColIndicatorCellMode::ColIndicatorCellHeaderText
+    as u32
+    | ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32;
 
 fn apply_default_indicator_bands(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
     grid.indicator_bands.row_start.visible = false;
@@ -735,6 +734,23 @@ pub fn set_col_indicator_top_band_rows(id: i32, band_rows: i32) {
 #[wasm_bindgen]
 pub fn get_col_indicator_top_band_rows(id: i32) -> i32 {
     with_grid(id, |grid| grid.indicator_bands.col_top.band_rows).unwrap_or(0)
+}
+
+#[wasm_bindgen]
+pub fn set_col_indicator_top_default_row_height(id: i32, height_px: i32) {
+    with_grid(id, |grid| {
+        grid.indicator_bands.col_top.default_row_height_px = height_px.max(1);
+        grid.layout.invalidate();
+        grid.dirty = true;
+    });
+}
+
+#[wasm_bindgen]
+pub fn get_col_indicator_top_default_row_height(id: i32) -> i32 {
+    with_grid(id, |grid| {
+        grid.indicator_bands.col_top.default_row_height_px.max(1)
+    })
+    .unwrap_or(volvoxgrid_engine::indicator::DEFAULT_COL_INDICATOR_ROW_HEIGHT)
 }
 
 #[wasm_bindgen]

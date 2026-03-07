@@ -2201,7 +2201,7 @@ checksum = "0bf256ce5efdfa370213c1dabab5935a12e49f2c58d15e9eac2870d3b4f27263"
 [[package]]
 name = "synurang-host"
 version = "0.1.0"
-source = "git+https://github.com/ivere27/synurang?tag=v0.5.0#f3e5213c2ac2f9ad4831671a7d3281c32be128a8"
+source = "git+https://github.com/ivere27/synurang?tag=v0.5.4#fe3d921b9a395b16a43be0290e37de87696ad749"
 dependencies = [
  "hyper-util",
  "libc",

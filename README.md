@@ -24,11 +24,11 @@ VolvoxGrid renders grids directly to RGBA pixel buffers, giving you full control
   - Per-cell style overrides (font, color, background, borders, alignment, text effects)
   - Owner-draw cells via event callbacks
   - Print to paginated PNG images (portrait/landscape, headers/footers)
-  - Save/load in multiple formats (binary FXGD, TSV, CSV, custom-delimited, Excel SpreadsheetML)
+  - Save/load in multiple formats (binary FXGD, TSV, CSV, custom-delimited, SpreadsheetML)
 - **Adapter ecosystem** -- Feasibility-focused compatibility layers to test VolvoxGrid against battle-tested, mature grid frameworks and identify gaps:
   - AG Grid (Web/WASM)
   - Syncfusion SfDataGrid (Flutter)
-  - Excel/Sheets spreadsheet UI (Web/WASM)
+  - Sheet spreadsheet UI (Web/WASM)
   - VSFlexGrid ActiveX (Windows COM/OCX)
 - **Codegen** -- Auto-generated FFI bindings for Rust, Dart, Java, C/C++ from `.proto` definitions
 - **Docker builds** -- Reproducible packaging for Android AAR, Desktop JAR, iOS XCFramework, and WASM
@@ -85,7 +85,7 @@ volvoxgrid/
 ├── dotnet/           # .NET WinForms wrapper library + sample
 ├── adapters/
 │   ├── aggrid/       # AG Grid-compatible adapter (TypeScript, npm: @volvoxgrid/ag-grid)
-│   ├── excel/        # Excel/Sheets spreadsheet UI (TypeScript, npm: @volvoxgrid/excel)
+│   ├── sheet/        # Sheet spreadsheet UI (TypeScript, npm: @volvoxgrid/sheet)
 │   ├── sfdatagrid/   # Syncfusion SfDataGrid adapter (Dart/Flutter)
 │   └── vsflexgrid/   # ActiveX/COM OCX control (Rust + C, MinGW cross-compiled)
 ├── proto/            # Protobuf service definitions
@@ -241,14 +241,14 @@ const grid = new AgGridVolvox(container, {
 });
 ```
 
-### Excel/Sheets (Web/WASM)
+### Sheet (Web/WASM)
 
-A full spreadsheet UI (`@volvoxgrid/excel`) built on VolvoxGrid with formula bar, toolbar, sheet tabs, status bar, context menu, and find/replace. Supports cell editing, formatting (bold, italic, colors, borders, alignment), undo/redo, clipboard, merge/unmerge, freeze panes, insert/delete rows and columns, drag-fill, and A1-style cell references.
+A full spreadsheet UI (`@volvoxgrid/sheet`) built on VolvoxGrid with formula bar, toolbar, sheet tabs, status bar, context menu, and find/replace. Supports cell editing, formatting (bold, italic, colors, borders, alignment), undo/redo, clipboard, merge/unmerge, freeze panes, insert/delete rows and columns, drag-fill, and A1-style cell references.
 
 ```typescript
-import { VolvoxExcel } from '@volvoxgrid/excel';
+import { VolvoxSheet } from '@volvoxgrid/sheet';
 
-const excel = new VolvoxExcel(container, {
+const sheet = new VolvoxSheet(container, {
   rows: 100,
   cols: 26,
   showFormulaBar: true,
@@ -258,11 +258,11 @@ const excel = new VolvoxExcel(container, {
 ```
 
 ```bash
-# Build WASM + start Excel adapter dev server
-make excel
+# Build WASM + start Sheet adapter dev server
+make sheet
 
 # Build the npm package only
-make excel-build
+make sheet-build
 ```
 
 ### SfDataGrid (Flutter)
@@ -397,7 +397,7 @@ into VolvoxGrid protobuf calls.
  ┌─────────────────────────────────────────────────────────────────────┐
  │                          Adapters                                   │
  │                                                                     │
- │  AG Grid         Excel/Sheets          SfDataGrid      VSFlexGrid   │
+ │  AG Grid            Sheet             SfDataGrid      VSFlexGrid    │
  │  (TypeScript)    (TypeScript)          (Dart)          (C/COM)      │
  └──┬───────────────┬─────────────────────┬───────────────┬────────────┘
     │               │                     │               │

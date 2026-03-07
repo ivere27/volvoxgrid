@@ -144,7 +144,7 @@ HRESULT CVolvoxGridCtrl::FinalConstruct()
         m_bmi.bmiHeader.biCompression = BI_RGB;
 
         return S_OK;
-    } catch (const synurang::PluginError& e) {
+    } catch (const synurang::FfiError& e) {
         // Plugin load failed -- return error but allow the control to exist
         OutputDebugStringA(e.what());
         return E_FAIL;

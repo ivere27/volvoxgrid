@@ -6,7 +6,9 @@ set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 TARGET="${WEB_DOCKER_TARGET:-all}"
-VERSION="${VOLVOXGRID_VERSION:-0.1.0}"
+VERSION="${VOLVOXGRID_VERSION:-${VERSION:-0.1.0}}"
+WASM_DIST_ROOT="${REPO_ROOT}/dist/wasm"
+WASM_LITE_DIST_ROOT="${REPO_ROOT}/dist/wasm-lite"
 WEB_DIST_ROOT="${REPO_ROOT}/dist/web"
 TMP_ROOT="$(mktemp -d /tmp/volvoxgrid-web-build-XXXXXX)"
 trap 'rm -rf "${TMP_ROOT}"' EXIT
@@ -36,7 +38,7 @@ build_js() {
   )
 }
 
-write_excel_demo_index() {
+write_sheet_demo_index() {
   local out_dir="$1"
   local title="$2"
   cat > "${out_dir}/index.html" <<EOF
@@ -46,7 +48,7 @@ write_excel_demo_index() {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${title}</title>
-  <link rel="stylesheet" href="./assets/excel.css" />
+  <link rel="stylesheet" href="./assets/sheet.css" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; }
@@ -65,7 +67,7 @@ write_excel_demo_index() {
   <script type="module">
     import init from "./wasm/volvoxgrid_wasm.js";
     import * as wasm from "./wasm/volvoxgrid_wasm.js";
-    import { VolvoxExcel } from "./volvox-excel.js";
+    import { VolvoxSheet } from "./volvox-sheet.js";
 
     async function main() {
       await init();
@@ -73,7 +75,7 @@ write_excel_demo_index() {
         wasm.init_v1_plugin();
       }
 
-      const excel = new VolvoxExcel({
+      const sheet = new VolvoxSheet({
         container: document.getElementById("app"),
         wasm,
         rows: 100,
@@ -88,7 +90,7 @@ write_excel_demo_index() {
         ]
       });
 
-      window.excel = excel;
+      window.sheet = sheet;
     }
 
     main().catch(console.error);
@@ -126,13 +128,18 @@ build_bundles() {
 
   make wasm
   snapshot_current_wasm "${wasm_gpu}"
+  copy_dir_clean "${wasm_gpu}" "${WASM_DIST_ROOT}"
   make wasm-lite
   snapshot_current_wasm "${wasm_lite}"
+  copy_dir_clean "${wasm_lite}" "${WASM_LITE_DIST_ROOT}"
   build_js
 
   package_bundle "volvoxgrid-web" "${wasm_gpu}" "${zip_gpu}"
   package_bundle "volvoxgrid-web-lite" "${wasm_lite}" "${zip_lite}"
 
+  echo "Exported WASM dist:"
+  echo "  ${WASM_DIST_ROOT}"
+  echo "  ${WASM_LITE_DIST_ROOT}"
   echo "Built web bundles:"
   echo "  ${zip_gpu}"
   echo "  ${zip_lite}"
@@ -153,33 +160,33 @@ build_web_dist() {
   echo "Built web dist: ${WEB_DIST_ROOT}/demos/web"
 }
 
-build_excel_dist() {
+build_sheet_dist() {
   local mode="${1:-gpu}" # gpu|lite
-  local out_dir="${WEB_DIST_ROOT}/demos/excel"
+  local out_dir="${WEB_DIST_ROOT}/demos/sheet"
   if [[ "${mode}" == "lite" ]]; then
-    out_dir="${WEB_DIST_ROOT}/demos/excel-lite"
+    out_dir="${WEB_DIST_ROOT}/demos/sheet-lite"
     make wasm-lite
   else
     make wasm
   fi
 
   build_js
-  mkdir -p "${REPO_ROOT}/adapters/excel/wasm"
-  ln -sf "${REPO_ROOT}/web/example/wasm/"* "${REPO_ROOT}/adapters/excel/wasm/"
+  mkdir -p "${REPO_ROOT}/adapters/sheet/wasm"
+  ln -sf "${REPO_ROOT}/web/example/wasm/"* "${REPO_ROOT}/adapters/sheet/wasm/"
   (
-    cd "${REPO_ROOT}/adapters/excel"
+    cd "${REPO_ROOT}/adapters/sheet"
     npm ci
     npm run build
   )
-  copy_dir_clean "${REPO_ROOT}/adapters/excel/dist" "${out_dir}"
+  copy_dir_clean "${REPO_ROOT}/adapters/sheet/dist" "${out_dir}"
   copy_dir_clean "${REPO_ROOT}/web/example/wasm" "${out_dir}/wasm"
   copy_dir_clean "${REPO_ROOT}/web/js/dist" "${out_dir}/volvoxgrid"
   if [[ "${mode}" == "lite" ]]; then
-    write_excel_demo_index "${out_dir}" "VolvoxExcel Lite"
+    write_sheet_demo_index "${out_dir}" "VolvoxSheet Lite"
   else
-    write_excel_demo_index "${out_dir}" "VolvoxExcel"
+    write_sheet_demo_index "${out_dir}" "VolvoxSheet"
   fi
-  echo "Built excel dist: ${out_dir}"
+  echo "Built sheet dist: ${out_dir}"
 }
 
 build_report_dist() {
@@ -197,11 +204,11 @@ build_report_dist() {
 }
 
 case "${TARGET}" in
-  all|bundle|web|excel|excel-lite|report|wasm|wasm-lite|wasm-threaded)
+  all|bundle|web|sheet|sheet-lite|report|wasm|wasm-lite|wasm-threaded)
     ;;
   *)
     echo "Error: unsupported WEB_DOCKER_TARGET='${TARGET}'." >&2
-    echo "Valid values: all, bundle, web, excel, excel-lite, report, wasm, wasm-lite, wasm-threaded" >&2
+    echo "Valid values: all, bundle, web, sheet, sheet-lite, report, wasm, wasm-lite, wasm-threaded" >&2
     exit 1
     ;;
 esac
@@ -221,11 +228,11 @@ case "${TARGET}" in
   web)
     build_web_dist
     ;;
-  excel)
-    build_excel_dist gpu
+  sheet)
+    build_sheet_dist gpu
     ;;
-  excel-lite)
-    build_excel_dist lite
+  sheet-lite)
+    build_sheet_dist lite
     ;;
   report)
     build_report_dist
@@ -236,8 +243,8 @@ case "${TARGET}" in
   all)
     build_bundles
     build_web_dist
-    build_excel_dist gpu
-    build_excel_dist lite
+    build_sheet_dist gpu
+    build_sheet_dist lite
     build_report_dist
     ;;
 esac

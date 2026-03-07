@@ -1,5 +1,5 @@
 # Toolbar font size controls + selection style guard
-# 1) Default font size baseline is 11 with Excel-style stepping
+# 1) Default font size baseline is 11 with Sheet-style stepping
 setSelection {"row1":0,"col1":0,"row2":0,"col2":0}
 assertCellStyle 0 0 fontBold false
 invokeToolbarAction "fontSizeIncrease"

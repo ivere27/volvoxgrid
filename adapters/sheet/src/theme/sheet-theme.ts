@@ -1,8 +1,8 @@
 /**
- * Excel/Sheets-like visual configuration for VolvoxGrid.
+ * Spreadsheet-like visual configuration for VolvoxGrid.
  */
 
-import type { ExcelGridConfig } from "../proto/config-encoder.js";
+import type { SheetGridConfig } from "../proto/config-encoder.js";
 
 // ── Proto enum values ──────────────────────────────────────
 // From volvoxgrid.proto
@@ -20,7 +20,7 @@ const ALIGN_LEFT_CENTER = 1;
 
 // ── Colors (ARGB uint32) ──────────────────────────────────
 
-export const EXCEL_COLORS = {
+export const SHEET_COLORS = {
   white:          0xffffffff,
   black:          0xff000000,
   headerBg:       0xfff5f5f5,  // Light gray for headers (Office 365)
@@ -33,14 +33,14 @@ export const EXCEL_COLORS = {
 } as const;
 
 /** Build the GridConfig for a spreadsheet-like appearance. */
-export function buildExcelConfig(opts?: {
+export function buildSheetConfig(opts?: {
   rows?: number;
   cols?: number;
   fontName?: string;
   fontSize?: number;
   defaultRowHeight?: number;
   defaultColWidth?: number;
-}): ExcelGridConfig {
+}): SheetGridConfig {
   const resolvedFontSize =
     typeof opts?.fontSize === "number" && Number.isFinite(opts.fontSize) && opts.fontSize > 0
       ? opts.fontSize
@@ -54,14 +54,14 @@ export function buildExcelConfig(opts?: {
     textOverflow: true,
 
     // Style
-    backColor: EXCEL_COLORS.white,
-    foreColor: EXCEL_COLORS.black,
-    backColorFixed: EXCEL_COLORS.headerBg,
-    foreColorFixed: EXCEL_COLORS.headerFg,
+    backColor: SHEET_COLORS.white,
+    foreColor: SHEET_COLORS.black,
+    backColorFixed: SHEET_COLORS.headerBg,
+    foreColorFixed: SHEET_COLORS.headerFg,
     gridLines: GRIDLINE_SOLID,
     gridLinesFixed: GRIDLINE_SOLID,
-    gridColor: EXCEL_COLORS.gridLine,
-    gridColorFixed: EXCEL_COLORS.gridLineFixed,
+    gridColor: SHEET_COLORS.gridLine,
+    gridColorFixed: SHEET_COLORS.gridLineFixed,
     gridLineWidth: 1,
     fontName: opts?.fontName ?? "Calibri",
     fontSize: resolvedFontSize,
@@ -71,8 +71,8 @@ export function buildExcelConfig(opts?: {
     selectionMode: SELECTION_MULTI_RANGE,
     focusBorder: FOCUS_BORDER_THICK,
     selectionStyle: {
-      backColor: EXCEL_COLORS.selectionBg,
-      foreColor: EXCEL_COLORS.selectionFg,
+      backColor: SHEET_COLORS.selectionBg,
+      foreColor: SHEET_COLORS.selectionFg,
       fillHandle: FILL_HANDLE_BOTTOM_RIGHT,
       fillHandleColor: 0xff217346,
     },
@@ -87,7 +87,7 @@ export function buildExcelConfig(opts?: {
     autoResize: false,
 
     // Span
-    // Disable auto-span — Excel does not auto-span adjacent identical cells
+    // Disable auto-span — spreadsheets do not auto-span adjacent identical cells
     cellSpan: 0,
     cellSpanFixed: 0,
   };

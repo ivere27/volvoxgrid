@@ -19,6 +19,17 @@ fun captureCommandOutput(workDir: File, vararg command: String): String? {
 fun quoteForBuildConfig(value: String): String =
     "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
+fun requireExistingFile(path: String, label: String, sourceProperty: String): File {
+    if (path.isBlank()) {
+        throw org.gradle.api.GradleException("$label must be set when $sourceProperty=local")
+    }
+    val file = File(path)
+    if (!file.isFile) {
+        throw org.gradle.api.GradleException("$label file not found: $path")
+    }
+    return file
+}
+
 fun findVolvoxgridVersionFile(startDir: File): File? {
     var current: File? = startDir.canonicalFile
     while (current != null) {
@@ -47,6 +58,19 @@ val volvoxgridGitCommit = providers.gradleProperty("volvoxgridGitCommit")
     .get()
 val volvoxgridBuildDate = providers.gradleProperty("volvoxgridBuildDate")
     .orElse(Instant.now().toString())
+    .get()
+val synurangAndroidVersion = providers.gradleProperty("synurangAndroidVersion")
+    .orElse("0.5.4")
+    .get()
+val isSynurangAndroidSnapshot = synurangAndroidVersion.endsWith("-SNAPSHOT")
+val synurangAndroidSource = providers.gradleProperty("synurangAndroidSource")
+    .orElse(System.getenv("SYNURANG_ANDROID_SOURCE") ?: "maven")
+    .get()
+    .trim()
+    .lowercase()
+val synurangJavaJar = providers.gradleProperty("synurangJavaJar")
+    .orElse(providers.environmentVariable("SYNURANG_JAVA_JAR"))
+    .orElse("")
     .get()
 
 plugins {
@@ -77,7 +101,13 @@ android {
 
         externalNativeBuild {
             cmake {
-                // synurang_jni.so is provided by the synurang-android AAR dependency.
+                arguments += listOf(
+                    "-DVOLVOXGRID_BUILD_LOCAL_SYNURANG_JNI=${
+                        if (synurangAndroidSource == "local") "ON" else "OFF"
+                    }"
+                )
+                // When using the published AAR, synurang_jni.so comes from that dependency.
+                // Local jar mode needs to build the vendored JNI runtime into this AAR.
             }
         }
     }
@@ -158,6 +188,12 @@ tasks.withType<KotlinCompile>().configureEach {
     incremental = false
 }
 
+configurations.configureEach {
+    if (isSynurangAndroidSnapshot) {
+        resolutionStrategy.cacheChangingModulesFor(0, "seconds")
+    }
+}
+
 protobuf {
     protoc {
         artifact = "com.google.protobuf:protoc:3.25.1"
@@ -180,7 +216,22 @@ dependencies {
     // Protobuf lite
     implementation("com.google.protobuf:protobuf-javalite:3.25.1")
 
-    // Synurang runtime from Maven Central.
-    api("io.github.ivere27:synurang-android:0.5.3")
+    when (synurangAndroidSource) {
+        "maven" -> api("io.github.ivere27:synurang-android:$synurangAndroidVersion") {
+            isChanging = isSynurangAndroidSnapshot
+        }
+        "local" -> api(
+            files(
+                requireExistingFile(
+                    synurangJavaJar,
+                    "synurangJavaJar/SYNURANG_JAVA_JAR",
+                    "synurangAndroidSource"
+                )
+            )
+        )
+        else -> throw GradleException(
+            "Invalid synurangAndroidSource='$synurangAndroidSource'. Expected 'maven' or 'local'."
+        )
+    }
 
 }
