@@ -82,6 +82,30 @@ static int get_int(IDispatch *pDisp, LPCOLESTR name, int fallback) {
     return out;
 }
 
+static double get_double(IDispatch *pDisp, LPCOLESTR name, double fallback) {
+    DISPID dispid;
+    if (FAILED(get_dispid(pDisp, name, &dispid))) return fallback;
+    DISPPARAMS dp = { 0 };
+    VARIANT vr;
+    VariantInit(&vr);
+    HRESULT hr = pDisp->lpVtbl->Invoke(
+        pDisp, dispid, &IID_NULL, 0, DISPATCH_PROPERTYGET, &dp, &vr, NULL, NULL);
+    if (FAILED(hr)) return fallback;
+    VARIANT tmp;
+    VariantInit(&tmp);
+    hr = VariantChangeType(&tmp, &vr, 0, VT_R8);
+    VariantClear(&vr);
+    if (FAILED(hr)) {
+        VariantClear(&tmp);
+        return fallback;
+    }
+    {
+        double out = tmp.dblVal;
+        VariantClear(&tmp);
+        return out;
+    }
+}
+
 static int get_indexed_int(IDispatch *pDisp, LPCOLESTR name, int index, int fallback) {
     DISPID dispid;
     if (FAILED(get_dispid(pDisp, name, &dispid))) return fallback;
@@ -108,6 +132,45 @@ static int get_indexed_int(IDispatch *pDisp, LPCOLESTR name, int index, int fall
     int out = tmp.lVal;
     VariantClear(&tmp);
     return out;
+}
+
+static void get_string_utf8(IDispatch *pDisp, LPCOLESTR name, char *out, int out_cap) {
+    DISPID dispid;
+    DISPPARAMS dp = { 0 };
+    VARIANT vr;
+    VARIANT tmp;
+    int wlen;
+    int n;
+
+    if (!out || out_cap <= 0) return;
+    out[0] = '\0';
+    if (FAILED(get_dispid(pDisp, name, &dispid))) return;
+
+    VariantInit(&vr);
+    if (FAILED(pDisp->lpVtbl->Invoke(
+            pDisp, dispid, &IID_NULL, 0, DISPATCH_PROPERTYGET, &dp, &vr, NULL, NULL))) {
+        return;
+    }
+
+    VariantInit(&tmp);
+    if (FAILED(VariantChangeType(&tmp, &vr, 0, VT_BSTR))) {
+        VariantClear(&vr);
+        VariantClear(&tmp);
+        return;
+    }
+    VariantClear(&vr);
+
+    if (!tmp.bstrVal) {
+        VariantClear(&tmp);
+        return;
+    }
+
+    wlen = SysStringLen(tmp.bstrVal);
+    n = WideCharToMultiByte(CP_UTF8, 0, tmp.bstrVal, wlen, out, out_cap - 1, NULL, NULL);
+    if (n < 0) n = 0;
+    if (n >= out_cap) n = out_cap - 1;
+    out[n] = '\0';
+    VariantClear(&tmp);
 }
 
 static void get_text_matrix_utf8(
@@ -145,11 +208,26 @@ static void get_text_matrix_utf8(
     VariantClear(&vr);
 }
 
+static unsigned int get_u32_prop(IDispatch *disp, LPCOLESTR name, unsigned int fallback);
+
 static void dump_grid_rows(IDispatch *pDisp, const char *tag, int test_no) {
     int rows = get_int(pDisp, L"Rows", 0);
     int cols = get_int(pDisp, L"Cols", 0);
+    int row = get_int(pDisp, L"Row", 0);
+    int col = get_int(pDisp, L"Col", 0);
+    int row_sel = get_int(pDisp, L"RowSel", 0);
+    int col_sel = get_int(pDisp, L"ColSel", 0);
+    unsigned int back_color = get_u32_prop(pDisp, L"BackColor", 0);
+    unsigned int grid_color = get_u32_prop(pDisp, L"GridColor", 0);
+    unsigned int back_color_sel = get_u32_prop(pDisp, L"BackColorSel", 0);
+    unsigned int fore_color_sel = get_u32_prop(pDisp, L"ForeColorSel", 0);
+    int grid_lines = get_int(pDisp, L"GridLines", 0);
+    int grid_lines_fixed = get_int(pDisp, L"GridLinesFixed", 0);
+    int focus_rect = get_int(pDisp, L"FocusRect", 0);
     if (cols > 5) cols = 5;
-    printf("  DUMP[%s][%02d]: rows=%d cols=%d\n", tag, test_no, rows, cols);
+    printf("  DUMP[%s][%02d]: rows=%d cols=%d row=%d col=%d row_sel=%d col_sel=%d focus_rect=%d grid_lines=%d grid_lines_fixed=%d back=%08X grid=%08X sel_back=%08X sel_fore=%08X\n",
+           tag, test_no, rows, cols, row, col, row_sel, col_sel, focus_rect, grid_lines, grid_lines_fixed,
+           back_color, grid_color, back_color_sel, fore_color_sel);
     for (int r = 0; r < rows; r++) {
         int lvl = get_indexed_int(pDisp, L"RowOutlineLevel", r, -9999);
         int sub = get_indexed_int(pDisp, L"IsSubtotal", r, -9999);
@@ -160,6 +238,19 @@ static void dump_grid_rows(IDispatch *pDisp, const char *tag, int test_no) {
         get_text_matrix_utf8(pDisp, r, 3, c3, sizeof(c3));
         get_text_matrix_utf8(pDisp, r, 4, c4, sizeof(c4));
         printf("    %d|L=%d|S=%d|%s|%s|%s|%s|%s\n", r, lvl, sub, c0, c1, c2, c3, c4);
+    }
+}
+
+static void pump_messages_ms(DWORD ms) {
+    DWORD end = GetTickCount() + ms;
+    MSG msg;
+    for (;;) {
+        while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        if ((LONG)(GetTickCount() - end) >= 0) break;
+        Sleep(5);
     }
 }
 
@@ -231,6 +322,567 @@ static int render_to_bmp(IDispatch *pGrid, const char *filename, int w, int h) {
     ReleaseDC(NULL, hdcScreen);
     pView->lpVtbl->Release(pView);
     return SUCCEEDED(hr) ? 0 : -1;
+}
+
+typedef struct HostSite HostSite;
+
+typedef struct {
+    IOleClientSiteVtbl *lpVtbl;
+    HostSite *site;
+} HostClientSite;
+
+typedef struct {
+    IOleInPlaceSiteVtbl *lpVtbl;
+    HostSite *site;
+} HostInPlaceSite;
+
+typedef struct {
+    IOleInPlaceFrameVtbl *lpVtbl;
+    HostSite *site;
+} HostInPlaceFrame;
+
+struct HostSite {
+    LONG ref;
+    HWND hwnd_host;
+    IOleInPlaceObject *inplace_obj;
+    HostClientSite client;
+    HostInPlaceSite inplace;
+    HostInPlaceFrame frame;
+};
+
+static IOleClientSiteVtbl g_host_client_vtbl;
+static IOleInPlaceSiteVtbl g_host_inplace_vtbl;
+static IOleInPlaceFrameVtbl g_host_frame_vtbl;
+
+static ULONG host_addref(HostSite *s) {
+    return (ULONG)InterlockedIncrement(&s->ref);
+}
+
+static ULONG host_release(HostSite *s) {
+    LONG c = InterlockedDecrement(&s->ref);
+    if (c == 0) {
+        if (s->inplace_obj) {
+            s->inplace_obj->lpVtbl->Release(s->inplace_obj);
+            s->inplace_obj = NULL;
+        }
+        free(s);
+    }
+    return (ULONG)c;
+}
+
+static HRESULT host_query_from_client(HostSite *s, REFIID riid, void **ppv) {
+    if (!ppv) return E_POINTER;
+    *ppv = NULL;
+
+    if (IsEqualIID(riid, &IID_IUnknown) || IsEqualIID(riid, &IID_IOleClientSite)) {
+        *ppv = &s->client;
+        host_addref(s);
+        return S_OK;
+    }
+    if (IsEqualIID(riid, &IID_IOleInPlaceSite) || IsEqualIID(riid, &IID_IOleWindow)) {
+        *ppv = &s->inplace;
+        host_addref(s);
+        return S_OK;
+    }
+    if (IsEqualIID(riid, &IID_IOleInPlaceFrame) || IsEqualIID(riid, &IID_IOleInPlaceUIWindow)) {
+        *ppv = &s->frame;
+        host_addref(s);
+        return S_OK;
+    }
+    return E_NOINTERFACE;
+}
+
+static HRESULT host_query_from_inplace(HostSite *s, REFIID riid, void **ppv) {
+    if (!ppv) return E_POINTER;
+    *ppv = NULL;
+
+    if (IsEqualIID(riid, &IID_IUnknown) || IsEqualIID(riid, &IID_IOleInPlaceSite) || IsEqualIID(riid, &IID_IOleWindow)) {
+        *ppv = &s->inplace;
+        host_addref(s);
+        return S_OK;
+    }
+    if (IsEqualIID(riid, &IID_IOleClientSite)) {
+        *ppv = &s->client;
+        host_addref(s);
+        return S_OK;
+    }
+    if (IsEqualIID(riid, &IID_IOleInPlaceFrame) || IsEqualIID(riid, &IID_IOleInPlaceUIWindow)) {
+        *ppv = &s->frame;
+        host_addref(s);
+        return S_OK;
+    }
+    return E_NOINTERFACE;
+}
+
+static HRESULT host_query_from_frame(HostSite *s, REFIID riid, void **ppv) {
+    if (!ppv) return E_POINTER;
+    *ppv = NULL;
+
+    if (IsEqualIID(riid, &IID_IUnknown) || IsEqualIID(riid, &IID_IOleInPlaceFrame) || IsEqualIID(riid, &IID_IOleInPlaceUIWindow) || IsEqualIID(riid, &IID_IOleWindow)) {
+        *ppv = &s->frame;
+        host_addref(s);
+        return S_OK;
+    }
+    if (IsEqualIID(riid, &IID_IOleClientSite)) {
+        *ppv = &s->client;
+        host_addref(s);
+        return S_OK;
+    }
+    if (IsEqualIID(riid, &IID_IOleInPlaceSite)) {
+        *ppv = &s->inplace;
+        host_addref(s);
+        return S_OK;
+    }
+    return E_NOINTERFACE;
+}
+
+static HRESULT STDMETHODCALLTYPE hs_client_qi(IOleClientSite *This, REFIID riid, void **ppv) {
+    HostClientSite *cs = (HostClientSite *)This;
+    return host_query_from_client(cs->site, riid, ppv);
+}
+static ULONG STDMETHODCALLTYPE hs_client_addref(IOleClientSite *This) {
+    HostClientSite *cs = (HostClientSite *)This;
+    return host_addref(cs->site);
+}
+static ULONG STDMETHODCALLTYPE hs_client_release(IOleClientSite *This) {
+    HostClientSite *cs = (HostClientSite *)This;
+    return host_release(cs->site);
+}
+static HRESULT STDMETHODCALLTYPE hs_client_save_object(IOleClientSite *This) {
+    (void)This;
+    return E_NOTIMPL;
+}
+static HRESULT STDMETHODCALLTYPE hs_client_get_moniker(IOleClientSite *This, DWORD a, DWORD b, IMoniker **ppmk) {
+    (void)This; (void)a; (void)b;
+    if (ppmk) *ppmk = NULL;
+    return E_NOTIMPL;
+}
+static HRESULT STDMETHODCALLTYPE hs_client_get_container(IOleClientSite *This, IOleContainer **ppC) {
+    (void)This;
+    if (!ppC) return E_POINTER;
+    *ppC = NULL;
+    return E_NOINTERFACE;
+}
+static HRESULT STDMETHODCALLTYPE hs_client_show_object(IOleClientSite *This) {
+    (void)This;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_client_on_show_window(IOleClientSite *This, BOOL fShow) {
+    (void)This; (void)fShow;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_client_request_new_object_layout(IOleClientSite *This) {
+    (void)This;
+    return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE hs_inplace_qi(IOleInPlaceSite *This, REFIID riid, void **ppv) {
+    HostInPlaceSite *ips = (HostInPlaceSite *)This;
+    return host_query_from_inplace(ips->site, riid, ppv);
+}
+static ULONG STDMETHODCALLTYPE hs_inplace_addref(IOleInPlaceSite *This) {
+    HostInPlaceSite *ips = (HostInPlaceSite *)This;
+    return host_addref(ips->site);
+}
+static ULONG STDMETHODCALLTYPE hs_inplace_release(IOleInPlaceSite *This) {
+    HostInPlaceSite *ips = (HostInPlaceSite *)This;
+    return host_release(ips->site);
+}
+static HRESULT STDMETHODCALLTYPE hs_inplace_get_window(IOleInPlaceSite *This, HWND *phwnd) {
+    HostInPlaceSite *ips = (HostInPlaceSite *)This;
+    if (!phwnd) return E_POINTER;
+    *phwnd = ips->site->hwnd_host;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_inplace_context_help(IOleInPlaceSite *This, BOOL fEnter) {
+    (void)This; (void)fEnter;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_inplace_can_activate(IOleInPlaceSite *This) {
+    (void)This;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_inplace_on_activate(IOleInPlaceSite *This) {
+    (void)This;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_inplace_on_ui_activate(IOleInPlaceSite *This) {
+    (void)This;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_inplace_get_window_context(
+    IOleInPlaceSite *This,
+    IOleInPlaceFrame **ppFrame,
+    IOleInPlaceUIWindow **ppDoc,
+    LPRECT lprcPosRect,
+    LPRECT lprcClipRect,
+    OLEINPLACEFRAMEINFO *lpFrameInfo)
+{
+    HostInPlaceSite *ips = (HostInPlaceSite *)This;
+    RECT rc;
+
+    if (ppFrame) {
+        *ppFrame = (IOleInPlaceFrame *)&ips->site->frame;
+        host_addref(ips->site);
+    }
+    if (ppDoc) *ppDoc = NULL;
+
+    GetClientRect(ips->site->hwnd_host, &rc);
+    if (lprcPosRect) *lprcPosRect = rc;
+    if (lprcClipRect) *lprcClipRect = rc;
+
+    if (lpFrameInfo) {
+        memset(lpFrameInfo, 0, sizeof(*lpFrameInfo));
+        lpFrameInfo->cb = sizeof(*lpFrameInfo);
+        lpFrameInfo->fMDIApp = FALSE;
+        lpFrameInfo->hwndFrame = ips->site->hwnd_host;
+        lpFrameInfo->haccel = NULL;
+        lpFrameInfo->cAccelEntries = 0;
+    }
+
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_inplace_scroll(IOleInPlaceSite *This, SIZE sz) {
+    (void)This; (void)sz;
+    return E_NOTIMPL;
+}
+static HRESULT STDMETHODCALLTYPE hs_inplace_on_ui_deactivate(IOleInPlaceSite *This, BOOL fUndoable) {
+    (void)This; (void)fUndoable;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_inplace_on_deactivate(IOleInPlaceSite *This) {
+    (void)This;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_inplace_discard_undo(IOleInPlaceSite *This) {
+    (void)This;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_inplace_deactivate_and_undo(IOleInPlaceSite *This) {
+    (void)This;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_inplace_on_pos_rect_change(IOleInPlaceSite *This, LPCRECT lprcPosRect) {
+    HostInPlaceSite *ips = (HostInPlaceSite *)This;
+    if (ips->site->inplace_obj && lprcPosRect) {
+        ips->site->inplace_obj->lpVtbl->SetObjectRects(
+            ips->site->inplace_obj,
+            lprcPosRect,
+            lprcPosRect);
+    }
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE hs_frame_qi(IOleInPlaceFrame *This, REFIID riid, void **ppv) {
+    HostInPlaceFrame *f = (HostInPlaceFrame *)This;
+    return host_query_from_frame(f->site, riid, ppv);
+}
+static ULONG STDMETHODCALLTYPE hs_frame_addref(IOleInPlaceFrame *This) {
+    HostInPlaceFrame *f = (HostInPlaceFrame *)This;
+    return host_addref(f->site);
+}
+static ULONG STDMETHODCALLTYPE hs_frame_release(IOleInPlaceFrame *This) {
+    HostInPlaceFrame *f = (HostInPlaceFrame *)This;
+    return host_release(f->site);
+}
+static HRESULT STDMETHODCALLTYPE hs_frame_get_window(IOleInPlaceFrame *This, HWND *phwnd) {
+    HostInPlaceFrame *f = (HostInPlaceFrame *)This;
+    if (!phwnd) return E_POINTER;
+    *phwnd = f->site->hwnd_host;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_frame_context_help(IOleInPlaceFrame *This, BOOL fEnter) {
+    (void)This; (void)fEnter;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_frame_get_border(IOleInPlaceFrame *This, LPRECT lprectBorder) {
+    (void)This; (void)lprectBorder;
+    return INPLACE_E_NOTOOLSPACE;
+}
+static HRESULT STDMETHODCALLTYPE hs_frame_request_border_space(IOleInPlaceFrame *This, LPCBORDERWIDTHS pborderwidths) {
+    (void)This; (void)pborderwidths;
+    return INPLACE_E_NOTOOLSPACE;
+}
+static HRESULT STDMETHODCALLTYPE hs_frame_set_border_space(IOleInPlaceFrame *This, LPCBORDERWIDTHS pborderwidths) {
+    (void)This; (void)pborderwidths;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_frame_set_active_object(IOleInPlaceFrame *This, IOleInPlaceActiveObject *pActiveObject, LPCOLESTR pszObjName) {
+    (void)This; (void)pActiveObject; (void)pszObjName;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_frame_insert_menus(IOleInPlaceFrame *This, HMENU hmenuShared, LPOLEMENUGROUPWIDTHS lpMenuWidths) {
+    (void)This; (void)hmenuShared; (void)lpMenuWidths;
+    return E_NOTIMPL;
+}
+static HRESULT STDMETHODCALLTYPE hs_frame_set_menu(IOleInPlaceFrame *This, HMENU hmenuShared, HOLEMENU holemenu, HWND hwndActiveObject) {
+    (void)This; (void)hmenuShared; (void)holemenu; (void)hwndActiveObject;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_frame_remove_menus(IOleInPlaceFrame *This, HMENU hmenuShared) {
+    (void)This; (void)hmenuShared;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_frame_set_status_text(IOleInPlaceFrame *This, LPCOLESTR pszStatusText) {
+    (void)This; (void)pszStatusText;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_frame_enable_modeless(IOleInPlaceFrame *This, BOOL fEnable) {
+    (void)This; (void)fEnable;
+    return S_OK;
+}
+static HRESULT STDMETHODCALLTYPE hs_frame_translate_accel(IOleInPlaceFrame *This, LPMSG lpmsg, WORD wID) {
+    (void)This; (void)lpmsg; (void)wID;
+    return S_FALSE;
+}
+
+static IOleClientSiteVtbl g_host_client_vtbl = {
+    hs_client_qi,
+    hs_client_addref,
+    hs_client_release,
+    hs_client_save_object,
+    hs_client_get_moniker,
+    hs_client_get_container,
+    hs_client_show_object,
+    hs_client_on_show_window,
+    hs_client_request_new_object_layout
+};
+
+static IOleInPlaceSiteVtbl g_host_inplace_vtbl = {
+    hs_inplace_qi,
+    hs_inplace_addref,
+    hs_inplace_release,
+    hs_inplace_get_window,
+    hs_inplace_context_help,
+    hs_inplace_can_activate,
+    hs_inplace_on_activate,
+    hs_inplace_on_ui_activate,
+    hs_inplace_get_window_context,
+    hs_inplace_scroll,
+    hs_inplace_on_ui_deactivate,
+    hs_inplace_on_deactivate,
+    hs_inplace_discard_undo,
+    hs_inplace_deactivate_and_undo,
+    hs_inplace_on_pos_rect_change
+};
+
+static IOleInPlaceFrameVtbl g_host_frame_vtbl = {
+    hs_frame_qi,
+    hs_frame_addref,
+    hs_frame_release,
+    hs_frame_get_window,
+    hs_frame_context_help,
+    hs_frame_get_border,
+    hs_frame_request_border_space,
+    hs_frame_set_border_space,
+    hs_frame_set_active_object,
+    hs_frame_insert_menus,
+    hs_frame_set_menu,
+    hs_frame_remove_menus,
+    hs_frame_set_status_text,
+    hs_frame_enable_modeless,
+    hs_frame_translate_accel
+};
+
+static HostSite *host_site_create(HWND hwnd_host) {
+    HostSite *s = (HostSite *)calloc(1, sizeof(HostSite));
+    if (!s) return NULL;
+    s->ref = 1;
+    s->hwnd_host = hwnd_host;
+    s->client.lpVtbl = &g_host_client_vtbl;
+    s->client.site = s;
+    s->inplace.lpVtbl = &g_host_inplace_vtbl;
+    s->inplace.site = s;
+    s->frame.lpVtbl = &g_host_frame_vtbl;
+    s->frame.site = s;
+    return s;
+}
+
+static const WCHAR HOST_WND_CLASS[] = L"VFG_CompareHostWindow";
+
+static LRESULT CALLBACK host_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+    (void)wp; (void)lp;
+    switch (msg) {
+    case WM_ERASEBKGND:
+        return 1;
+    default:
+        return DefWindowProcW(hwnd, msg, wp, lp);
+    }
+}
+
+static int ensure_host_window_class(void) {
+    static int registered = 0;
+    if (registered) return 1;
+
+    {
+        WNDCLASSW wc;
+        memset(&wc, 0, sizeof(wc));
+        wc.lpfnWndProc = host_wnd_proc;
+        wc.hInstance = GetModuleHandleW(NULL);
+        wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+        wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+        wc.lpszClassName = HOST_WND_CLASS;
+
+        if (!RegisterClassW(&wc)) {
+            DWORD err = GetLastError();
+            if (err != ERROR_CLASS_ALREADY_EXISTS) {
+                return 0;
+            }
+        }
+    }
+
+    registered = 1;
+    return 1;
+}
+
+static HWND create_host_window(int client_w, int client_h, const WCHAR *title, int x_offset) {
+    RECT rc = {0, 0, client_w, client_h};
+    HWND hwnd;
+
+    if (!ensure_host_window_class()) return NULL;
+
+    AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+    hwnd = CreateWindowW(
+        HOST_WND_CLASS,
+        title,
+        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+        80 + x_offset,
+        80,
+        rc.right - rc.left,
+        rc.bottom - rc.top,
+        NULL,
+        NULL,
+        GetModuleHandleW(NULL),
+        NULL);
+
+    if (!hwnd) return NULL;
+    ShowWindow(hwnd, SW_SHOW);
+    UpdateWindow(hwnd);
+    return hwnd;
+}
+
+typedef struct {
+    HWND hwnd_host;
+    HostSite *site;
+    IOleObject *ole_obj;
+    IOleInPlaceObject *inplace_obj;
+    IDispatch *disp;
+    int render_width;
+    int render_height;
+} HostedGrid;
+
+static void hosted_grid_destroy(HostedGrid *hg) {
+    if (!hg) return;
+
+    if (hg->inplace_obj) {
+        hg->inplace_obj->lpVtbl->InPlaceDeactivate(hg->inplace_obj);
+    }
+
+    if (hg->ole_obj) {
+        hg->ole_obj->lpVtbl->Close(hg->ole_obj, OLECLOSE_NOSAVE);
+        hg->ole_obj->lpVtbl->SetClientSite(hg->ole_obj, NULL);
+    }
+
+    if (hg->disp) {
+        hg->disp->lpVtbl->Release(hg->disp);
+        hg->disp = NULL;
+    }
+
+    if (hg->site) {
+        hg->site->inplace_obj = NULL;
+    }
+    if (hg->inplace_obj) {
+        hg->inplace_obj->lpVtbl->Release(hg->inplace_obj);
+        hg->inplace_obj = NULL;
+    }
+    if (hg->ole_obj) {
+        hg->ole_obj->lpVtbl->Release(hg->ole_obj);
+        hg->ole_obj = NULL;
+    }
+
+    if (hg->site) {
+        host_release(hg->site);
+        hg->site = NULL;
+    }
+
+    if (hg->hwnd_host && IsWindow(hg->hwnd_host)) {
+        DestroyWindow(hg->hwnd_host);
+        hg->hwnd_host = NULL;
+    }
+}
+
+static int hosted_grid_create(HostedGrid *hg, const WCHAR *progid, const WCHAR *title, int width, int height, int x_offset) {
+    CLSID clsid;
+    HRESULT hr;
+    RECT rc;
+
+    memset(hg, 0, sizeof(*hg));
+
+    hg->hwnd_host = create_host_window(width, height, title, x_offset);
+    if (!hg->hwnd_host) {
+        printf("  Host window create failed\n");
+        return -1;
+    }
+
+    hg->site = host_site_create(hg->hwnd_host);
+    if (!hg->site) {
+        printf("  Host site allocation failed\n");
+        hosted_grid_destroy(hg);
+        return -1;
+    }
+
+    hr = CLSIDFromProgID(progid, &clsid);
+    if (FAILED(hr)) {
+        printf("  CLSIDFromProgID failed: 0x%08lx\n", hr);
+        hosted_grid_destroy(hg);
+        return -1;
+    }
+
+    hr = CoCreateInstance(&clsid, NULL, CLSCTX_INPROC_SERVER, &IID_IOleObject, (void **)&hg->ole_obj);
+    if (FAILED(hr) || !hg->ole_obj) {
+        printf("  CoCreateInstance(IOleObject) failed: 0x%08lx\n", hr);
+        hosted_grid_destroy(hg);
+        return -1;
+    }
+
+    hg->ole_obj->lpVtbl->SetClientSite(hg->ole_obj, (IOleClientSite *)&hg->site->client);
+    hg->ole_obj->lpVtbl->SetHostNames(hg->ole_obj, L"VFGHost", L"VFGDoc");
+    OleSetContainedObject((IUnknown *)hg->ole_obj, TRUE);
+
+    GetClientRect(hg->hwnd_host, &rc);
+    hr = hg->ole_obj->lpVtbl->DoVerb(
+        hg->ole_obj,
+        OLEIVERB_INPLACEACTIVATE,
+        NULL,
+        (IOleClientSite *)&hg->site->client,
+        0,
+        hg->hwnd_host,
+        &rc);
+    if (FAILED(hr)) {
+        printf("  DoVerb(INPLACEACTIVATE) failed: 0x%08lx\n", hr);
+        hosted_grid_destroy(hg);
+        return -1;
+    }
+
+    hr = hg->ole_obj->lpVtbl->QueryInterface(hg->ole_obj, &IID_IOleInPlaceObject, (void **)&hg->inplace_obj);
+    if (SUCCEEDED(hr) && hg->inplace_obj) {
+        hg->site->inplace_obj = hg->inplace_obj;
+        hg->inplace_obj->lpVtbl->SetObjectRects(hg->inplace_obj, &rc, &rc);
+    }
+
+    hr = hg->ole_obj->lpVtbl->QueryInterface(hg->ole_obj, &IID_IDispatch, (void **)&hg->disp);
+    if (FAILED(hr) || !hg->disp) {
+        printf("  QueryInterface(IDispatch) failed: 0x%08lx\n", hr);
+        hosted_grid_destroy(hg);
+        return -1;
+    }
+
+    hg->render_width = width;
+    hg->render_height = height;
+    SetForegroundWindow(hg->hwnd_host);
+    SetFocus(hg->hwnd_host);
+    pump_messages_ms(120);
+    return 0;
 }
 
 /* ════════════════════════════════════════════════════════════ */
@@ -325,7 +977,6 @@ static const WCHAR g_vbs_preamble[] =
     L"\r\n"
     L"Sub PopulateStandard()\r\n"
     L"    fg.Redraw = 0\r\n"
-    L"    fg.FontName = \"Arial\"\r\n"
     L"    fg.Cols = 5\r\n"
     L"    fg.Rows = 21\r\n"
     L"    fg.FixedRows = 1\r\n"
@@ -705,6 +1356,204 @@ static int test_selected(int test_no, int only_test, const char *test_filter) {
     return 0;
 }
 
+typedef struct {
+    const char *name;
+    const WCHAR *script;
+} ProbeCase;
+
+static const ProbeCase g_probe_cases[] = {
+    { "fresh_hosted", L"" },
+    { "single_cell_grid",
+      L"fg.Cols = 1\r\n"
+      L"fg.Rows = 1\r\n"
+      L"fg.FixedRows = 0\r\n"
+      L"fg.FixedCols = 0\r\n" },
+    { "dims_only_standard",
+      L"fg.Cols = 5\r\n"
+      L"fg.Rows = 21\r\n"
+      L"fg.FixedRows = 1\r\n"
+      L"fg.FixedCols = 0\r\n" },
+    { "fixed_before_dims",
+      L"fg.FixedRows = 1\r\n"
+      L"fg.FixedCols = 0\r\n"
+      L"fg.Cols = 5\r\n"
+      L"fg.Rows = 21\r\n" },
+    { "rows_before_cols",
+      L"fg.Rows = 21\r\n"
+      L"fg.Cols = 5\r\n"
+      L"fg.FixedRows = 1\r\n"
+      L"fg.FixedCols = 0\r\n" },
+    { "font_then_dims_test01",
+      L"fg.FontName = \"Arial\"\r\n"
+      L"fg.FontSize = 10\r\n"
+      L"fg.Cols = 5\r\n"
+      L"fg.Rows = 21\r\n"
+      L"fg.FixedRows = 1\r\n"
+      L"fg.FixedCols = 0\r\n" },
+    { "dims_then_font",
+      L"fg.Cols = 5\r\n"
+      L"fg.Rows = 21\r\n"
+      L"fg.FixedRows = 1\r\n"
+      L"fg.FixedCols = 0\r\n"
+      L"fg.FontName = \"Arial\"\r\n"
+      L"fg.FontSize = 10\r\n" },
+    { "populate_standard",
+      L"Call PopulateStandard()\r\n" },
+    { "font_then_populate_standard",
+      L"fg.FontName = \"Arial\"\r\n"
+      L"fg.FontSize = 10\r\n"
+      L"Call PopulateStandard()\r\n" },
+    { "populate_then_font",
+      L"Call PopulateStandard()\r\n"
+      L"fg.FontName = \"Arial\"\r\n"
+      L"fg.FontSize = 10\r\n" },
+    { "toggle_fixed_rows",
+      L"fg.Cols = 5\r\n"
+      L"fg.Rows = 21\r\n"
+      L"fg.FixedRows = 0\r\n"
+      L"fg.FixedCols = 0\r\n"
+      L"fg.FixedRows = 1\r\n" },
+    { NULL, NULL }
+};
+
+static double twips_to_px(int twips) {
+    if (twips < 0) return -1.0;
+    return (double)twips / 15.0;
+}
+
+static unsigned int get_u32_prop(IDispatch *disp, LPCOLESTR name, unsigned int fallback) {
+    int value = get_int(disp, name, (int)fallback);
+    return (unsigned int)value;
+}
+
+static void dump_probe_metrics(IDispatch *disp, const char *label, const char *case_name) {
+    int rows = get_int(disp, L"Rows", 0);
+    int cols = get_int(disp, L"Cols", 0);
+    int fixed_rows = get_int(disp, L"FixedRows", 0);
+    int fixed_cols = get_int(disp, L"FixedCols", 0);
+    int row = get_int(disp, L"Row", 0);
+    int col = get_int(disp, L"Col", 0);
+    int row_sel = get_int(disp, L"RowSel", 0);
+    int col_sel = get_int(disp, L"ColSel", 0);
+    int top_row = get_int(disp, L"TopRow", 0);
+    int left_col = get_int(disp, L"LeftCol", 0);
+    double font_size = get_double(disp, L"FontSize", -1.0);
+    unsigned int back_color = get_u32_prop(disp, L"BackColor", 0);
+    unsigned int back_color_fixed = get_u32_prop(disp, L"BackColorFixed", 0);
+    unsigned int fore_color_fixed = get_u32_prop(disp, L"ForeColorFixed", 0);
+    unsigned int back_color_sel = get_u32_prop(disp, L"BackColorSel", 0);
+    unsigned int fore_color_sel = get_u32_prop(disp, L"ForeColorSel", 0);
+    char font_name[128];
+    long long total_row_twips = 0;
+    long long total_col_twips = 0;
+    int row_samples = rows < 3 ? rows : 3;
+    int col_samples = cols < 3 ? cols : 3;
+    int i;
+
+    get_string_utf8(disp, L"FontName", font_name, sizeof(font_name));
+
+    for (i = 0; i < rows; i++) {
+        int tw = get_indexed_int(disp, L"RowHeight", i, -1);
+        if (tw >= 0) total_row_twips += tw;
+    }
+    for (i = 0; i < cols; i++) {
+        int tw = get_indexed_int(disp, L"ColWidth", i, -1);
+        if (tw >= 0) total_col_twips += tw;
+    }
+
+    printf("PROBE[%s][%s]\n", label, case_name);
+    printf("  state: rows=%d cols=%d fixed_rows=%d fixed_cols=%d row=%d col=%d row_sel=%d col_sel=%d top_row=%d left_col=%d font=\"%s\" size=%.2f\n",
+           rows, cols, fixed_rows, fixed_cols, row, col, row_sel, col_sel, top_row, left_col, font_name, font_size);
+    printf("  colors: back=%08X fixed_back=%08X fixed_fore=%08X sel_back=%08X sel_fore=%08X\n",
+           back_color, back_color_fixed, fore_color_fixed, back_color_sel, fore_color_sel);
+
+    printf("  row_height:");
+    if (row_samples <= 0) {
+        printf(" <none>");
+    } else {
+        for (i = 0; i < row_samples; i++) {
+            int tw = get_indexed_int(disp, L"RowHeight", i, -1);
+            printf(" r%d=%d twips(%.2fpx)", i, tw, twips_to_px(tw));
+        }
+    }
+    printf("\n");
+
+    printf("  col_width:");
+    if (col_samples <= 0) {
+        printf(" <none>");
+    } else {
+        for (i = 0; i < col_samples; i++) {
+            int tw = get_indexed_int(disp, L"ColWidth", i, -1);
+            printf(" c%d=%d twips(%.2fpx)", i, tw, twips_to_px(tw));
+        }
+    }
+    printf("\n");
+
+    printf("  totals: row_sum=%lld twips(%.2fpx) col_sum=%lld twips(%.2fpx)\n",
+           total_row_twips, twips_to_px((int)total_row_twips),
+           total_col_twips, twips_to_px((int)total_col_twips));
+}
+
+static int run_probe_cases_for_control(const WCHAR *progid, const WCHAR *title, const char *label, int x_offset) {
+    int i;
+
+    for (i = 0; g_probe_cases[i].name; i++) {
+        HostedGrid hg;
+        printf("\n[%s] %s\n", label, g_probe_cases[i].name);
+        if (hosted_grid_create(&hg, progid, title, 800, 400, x_offset) != 0) {
+            printf("  FAILED: could not host control for probe\n");
+            return -1;
+        }
+        if (g_probe_cases[i].script && g_probe_cases[i].script[0]) {
+            run_vbs(hg.disp, g_probe_cases[i].script);
+        }
+        pump_messages_ms(120);
+        dump_probe_metrics(hg.disp, label, g_probe_cases[i].name);
+        hosted_grid_destroy(&hg);
+    }
+
+    return 0;
+}
+
+static int run_probe_cases_for_dispatch_only_control(const WCHAR *progid, const char *label) {
+    int i;
+
+    for (i = 0; g_probe_cases[i].name; i++) {
+        IDispatch *disp;
+
+        printf("\n[%s] %s\n", label, g_probe_cases[i].name);
+        disp = create_grid(progid, label);
+        if (!disp) {
+            printf("  FAILED: could not create control for probe\n");
+            return -1;
+        }
+        if (g_probe_cases[i].script && g_probe_cases[i].script[0]) {
+            run_vbs(disp, g_probe_cases[i].script);
+        }
+        pump_messages_ms(120);
+        dump_probe_metrics(disp, label, g_probe_cases[i].name);
+        disp->lpVtbl->Release(disp);
+    }
+
+    return 0;
+}
+
+static int run_default_metric_probe(void) {
+    int rc = 0;
+
+    printf("=== Default Metric Probe ===\n");
+    printf("Cases: hosted creation, init order changes, font changes, and PopulateStandard()\n");
+
+    if (g_ref_progid[0]) {
+        rc |= run_probe_cases_for_control(g_ref_progid, L"Reference Metric Probe", "REF", 0);
+    } else {
+        printf("\n[REF] skipped (no --ref-progid provided)\n");
+    }
+
+    rc |= run_probe_cases_for_dispatch_only_control(PROGID_VOLVOXGRID, "VV");
+    return rc;
+}
+
 /* ── Main ────────────────────────────────────────────────── */
 
 int main(int argc, char *argv[]) {
@@ -712,12 +1561,14 @@ int main(int argc, char *argv[]) {
     int skip_diff = 0;
     int dump_test = 0;
     int only_test = 0;
+    int probe_defaults = 0;
     char test_filter[256] = {0};
     /* Keep tests non-interactive/silent on faults in CI/Wine runs. */
     SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
     for (int a = 1; a < argc; a++) {
         if (strcmp(argv[a], "--only-vv") == 0) only_vv = 1;
         else if (strcmp(argv[a], "--no-diff") == 0) skip_diff = 1;
+        else if (strcmp(argv[a], "--probe-defaults") == 0) probe_defaults = 1;
         else if (strcmp(argv[a], "--test") == 0 && a + 1 < argc) {
             only_test = atoi(argv[++a]);
         }
@@ -744,6 +1595,12 @@ int main(int argc, char *argv[]) {
     if (FAILED(hr)) {
         printf("CoInitializeEx failed: 0x%08lx\n", hr);
         return 1;
+    }
+
+    if (probe_defaults) {
+        int probe_rc = run_default_metric_probe();
+        CoUninitialize();
+        return probe_rc ? 1 : 0;
     }
 
     int pass = 0, fail = 0, compared = 0;
@@ -775,17 +1632,18 @@ int main(int argc, char *argv[]) {
 
         /* FlexGrid (reference) */
         if (!only_vv) {
-            IDispatch *pLG = create_grid(g_ref_progid, "LG");
-            if (pLG) {
-                run_vbs(pLG, vbs_code);
+            HostedGrid lg;
+            if (hosted_grid_create(&lg, g_ref_progid, L"FlexGrid Host", tc->width, tc->height, 0) == 0) {
+                run_vbs(lg.disp, vbs_code);
+                pump_messages_ms(120);
                 if (dump_test == (i + 1)) {
-                    dump_grid_rows(pLG, "LG", i + 1);
+                    dump_grid_rows(lg.disp, "LG", i + 1);
                 }
-                render_to_bmp(pLG, bmp_lg, tc->width, tc->height);
-                pLG->lpVtbl->Release(pLG);
+                render_to_bmp(lg.disp, bmp_lg, lg.render_width, lg.render_height);
+                hosted_grid_destroy(&lg);
                 has_lg = 1;
             } else {
-                printf("  LG: skipped (not registered)\n");
+                printf("  LG: host/create failed\n");
             }
         }
 

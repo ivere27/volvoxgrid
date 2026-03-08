@@ -1226,6 +1226,32 @@ fn apply_before_sort(grid: &mut volvoxgrid_engine::grid::VolvoxGrid, col: i32) {
     }
 }
 
+fn expand_sort_request_columns(
+    grid: &volvoxgrid_engine::grid::VolvoxGrid,
+    sort_columns: &[SortColumn],
+) -> Vec<(i32, i32)> {
+    let mut sort_keys = Vec::new();
+
+    for sc in sort_columns {
+        if sc.col >= 0 && sc.col < grid.cols {
+            sort_keys.push((sc.col, sc.order));
+            continue;
+        }
+
+        let lo = grid.selection.col.min(grid.selection.col_end).max(0);
+        let hi = grid.selection.col.max(grid.selection.col_end).min(grid.cols - 1);
+        if lo > hi {
+            continue;
+        }
+
+        for col in lo..=hi {
+            sort_keys.push((col, sc.order));
+        }
+    }
+
+    sort_keys
+}
+
 // ---------------------------------------------------------------------------
 // VolvoxGridPlugin pending action / decision helpers
 // ---------------------------------------------------------------------------
@@ -2022,11 +2048,10 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 grid.layout.invalidate();
                 grid.mark_dirty();
             } else {
-                let sort_keys: Vec<(i32, i32)> = request
-                    .sort_columns
-                    .iter()
-                    .map(|sc| (sc.col, sc.order))
-                    .collect();
+                let sort_keys = expand_sort_request_columns(grid, &request.sort_columns);
+                if sort_keys.is_empty() {
+                    return;
+                }
                 grid.sort_state.sort_keys = sort_keys;
                 volvoxgrid_engine::sort::sort_grid_all_multi(grid);
             }

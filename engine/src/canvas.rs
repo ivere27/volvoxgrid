@@ -1744,8 +1744,7 @@ fn is_highlight_active(grid: &VolvoxGrid) -> bool {
 
 /// Whether a cell should be rendered with selection highlight (selection_style
 /// back/fore colors). In listbox mode the current cursor row is always
-/// highlighted regardless of the selection visibility setting.  In other modes the cursor
-/// cell itself is excluded — the focus rect (Layer 8) handles it instead.
+/// highlighted regardless of the selection visibility setting.
 fn should_highlight_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
     if row < grid.fixed_rows || col < grid.fixed_cols {
         return false;
@@ -1758,14 +1757,6 @@ fn should_highlight_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
         }
         // Other toggled rows: follow highlight setting
         return is_highlight_active(grid) && grid.selection.selected_rows.contains(&row);
-    }
-    // Row/column selection keeps the cursor cell highlighted as part of
-    // the selected stripe; only free-mode cursor highlighting is suppressed.
-    if row == grid.selection.row
-        && col == grid.selection.col
-        && grid.selection.mode == pb::SelectionMode::SelectionFree as i32
-    {
-        return false;
     }
     is_highlight_active(grid) && grid.is_cell_selected(row, col)
 }
@@ -2921,11 +2912,12 @@ fn draw_grid_lines_for_zone<C: Canvas>(
         || mode == pb::GridLineStyle::GridlineRaisedHorizontal as i32
         || mode == pb::GridLineStyle::GridlineRaisedVertical as i32;
 
+    let shade_percent = if is_fixed_zone { 68 } else { 80 };
     let (color_light, color_dark) = if is_3d {
         if is_raised {
-            (0xFFFFFFFF_u32, darken(color, 80))
+            (0xFFFFFFFF_u32, darken(color, shade_percent))
         } else {
-            (darken(color, 80), 0xFFFFFFFF_u32)
+            (darken(color, shade_percent), 0xFFFFFFFF_u32)
         }
     } else {
         (color, color)
@@ -2948,7 +2940,7 @@ fn draw_grid_lines_for_zone<C: Canvas>(
                 canvas.vline(right - 1, cy, ch, color_light);
                 canvas.vline(right, cy, ch, color_dark);
             } else {
-                canvas.vline(right, cy, ch, color);
+                canvas.vline(right - 1, cy, ch, color);
             }
         }
 
@@ -2957,7 +2949,7 @@ fn draw_grid_lines_for_zone<C: Canvas>(
                 canvas.hline(cx, bottom - 1, cw, color_light);
                 canvas.hline(cx, bottom, cw, color_dark);
             } else {
-                canvas.hline(cx, bottom, cw, color);
+                canvas.hline(cx, bottom - 1, cw, color);
             }
         }
     }
@@ -4715,6 +4707,12 @@ fn render_focus_rect<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleR
         return;
     }
 
+    if grid.selection.focus_border == pb::FocusBorderStyle::FocusBorderThin as i32
+        && should_highlight_cell(grid, grid.selection.row, grid.selection.col)
+    {
+        return;
+    }
+
     let (cx, cy, cw, ch) = match cell_rect(grid, grid.selection.row, grid.selection.col, vp) {
         Some(r) => r,
         None => return,
@@ -5022,9 +5020,43 @@ fn subtotal_visual_level(level: i32, is_subtotal: bool, subtotal_level_floor: i3
 // ===========================================================================
 
 fn render_frozen_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRange) {
-    let border_color = 0xFF000000_u32;
     let buf_w = canvas.width();
     let buf_h = canvas.height();
+    let mode = grid.style.grid_lines_fixed;
+    if mode == pb::GridLineStyle::GridlineNone as i32 {
+        return;
+    }
+    let color = grid.style.grid_color_fixed;
+    let draw_horz = mode == pb::GridLineStyle::GridlineSolid as i32
+        || mode == pb::GridLineStyle::GridlineInset as i32
+        || mode == pb::GridLineStyle::GridlineRaised as i32
+        || mode == pb::GridLineStyle::GridlineSolidHorizontal as i32
+        || mode == pb::GridLineStyle::GridlineInsetHorizontal as i32
+        || mode == pb::GridLineStyle::GridlineRaisedHorizontal as i32;
+    let draw_vert = mode == pb::GridLineStyle::GridlineSolid as i32
+        || mode == pb::GridLineStyle::GridlineInset as i32
+        || mode == pb::GridLineStyle::GridlineRaised as i32
+        || mode == pb::GridLineStyle::GridlineSolidVertical as i32
+        || mode == pb::GridLineStyle::GridlineInsetVertical as i32
+        || mode == pb::GridLineStyle::GridlineRaisedVertical as i32;
+    let is_3d = mode == pb::GridLineStyle::GridlineInset as i32
+        || mode == pb::GridLineStyle::GridlineRaised as i32
+        || mode == pb::GridLineStyle::GridlineInsetHorizontal as i32
+        || mode == pb::GridLineStyle::GridlineInsetVertical as i32
+        || mode == pb::GridLineStyle::GridlineRaisedHorizontal as i32
+        || mode == pb::GridLineStyle::GridlineRaisedVertical as i32;
+    let is_raised = mode == pb::GridLineStyle::GridlineRaised as i32
+        || mode == pb::GridLineStyle::GridlineRaisedHorizontal as i32
+        || mode == pb::GridLineStyle::GridlineRaisedVertical as i32;
+    let (color_inner, color_outer) = if is_3d {
+        if is_raised {
+            (0xFFFFFFFF_u32, darken(color, 68))
+        } else {
+            (darken(color, 68), 0xFFFFFFFF_u32)
+        }
+    } else {
+        (color, color)
+    };
 
     // Grid content boundaries — lines should not extend beyond these.
     // Account for indicator bands and scroll offset so separators align with
@@ -5035,32 +5067,28 @@ fn render_frozen_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visi
     let content_bottom = (vp.data_y + grid.row_pos(grid.rows) - scroll_y).clamp(0, buf_h);
 
     // Horizontal frozen row border
-    if grid.frozen_rows > 0 {
+    if draw_horz && grid.frozen_rows > 0 {
         let frozen_row_bottom = vp.data_y + grid.row_pos(grid.fixed_rows + grid.frozen_rows);
         if frozen_row_bottom > 0 && frozen_row_bottom < buf_h {
-            canvas.hline(0, frozen_row_bottom, content_right, border_color);
+            if is_3d {
+                canvas.hline(0, frozen_row_bottom - 1, content_right, color_inner);
+                canvas.hline(0, frozen_row_bottom, content_right, color_outer);
+            } else {
+                canvas.hline(0, frozen_row_bottom - 1, content_right, color);
+            }
         }
     }
 
     // Vertical frozen col border
-    if grid.frozen_cols > 0 {
+    if draw_vert && grid.frozen_cols > 0 {
         let frozen_col_right = vp.data_x + grid.col_pos(grid.fixed_cols + grid.frozen_cols);
         if frozen_col_right > 0 && frozen_col_right < buf_w {
-            canvas.vline(frozen_col_right, 0, content_bottom, border_color);
-        }
-    }
-
-    // Fixed row/col separator line (single pixel)
-    if grid.fixed_rows > 0 {
-        let fixed_row_bottom = vp.data_y + grid.row_pos(grid.fixed_rows);
-        if fixed_row_bottom > 0 && fixed_row_bottom < buf_h {
-            canvas.hline(0, fixed_row_bottom, content_right, border_color);
-        }
-    }
-    if grid.fixed_cols > 0 {
-        let fixed_col_right = vp.data_x + grid.col_pos(grid.fixed_cols);
-        if fixed_col_right > 0 && fixed_col_right < buf_w {
-            canvas.vline(fixed_col_right, 0, content_bottom, border_color);
+            if is_3d {
+                canvas.vline(frozen_col_right - 1, 0, content_bottom, color_inner);
+                canvas.vline(frozen_col_right, 0, content_bottom, color_outer);
+            } else {
+                canvas.vline(frozen_col_right - 1, 0, content_bottom, color);
+            }
         }
     }
 }

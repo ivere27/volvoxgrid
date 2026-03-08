@@ -100,6 +100,38 @@ impl SelectionState {
         }
     }
 
+    /// Keep a collapsed default cursor attached to the first scrollable cell
+    /// when the fixed bands change.
+    pub fn remap_collapsed_cursor_after_fixed_change(
+        &mut self,
+        rows: i32,
+        cols: i32,
+        old_fixed_rows: i32,
+        old_fixed_cols: i32,
+        new_fixed_rows: i32,
+        new_fixed_cols: i32,
+    ) {
+        if rows <= 0 || cols <= 0 {
+            return;
+        }
+
+        let old_first_row = old_fixed_rows.min(rows - 1);
+        let old_first_col = old_fixed_cols.min(cols - 1);
+        let new_first_row = new_fixed_rows.min(rows - 1);
+        let new_first_col = new_fixed_cols.min(cols - 1);
+
+        if self.row == self.row_end && self.row == old_first_row {
+            self.row = new_first_row;
+            self.row_end = new_first_row;
+        }
+        if self.col == self.col_end && self.col == old_first_col {
+            self.col = new_first_col;
+            self.col_end = new_first_col;
+        }
+
+        self.clamp(rows, cols, new_fixed_rows, new_fixed_cols);
+    }
+
     /// Set cursor position, clamping to valid range.
     /// Always collapses selection to a single cell (setting Row/Col
     /// programmatically resets RowSel/ColSel).
@@ -374,5 +406,30 @@ mod tests {
             selection.all_ranges(10, 10),
             vec![(4, 2, 4, 2), (1, 0, 1, 9)]
         );
+    }
+
+    #[test]
+    fn collapsed_cursor_tracks_first_scrollable_cell_after_fixed_change() {
+        let mut selection = SelectionState::with_initial(1, 1);
+
+        selection.remap_collapsed_cursor_after_fixed_change(21, 5, 1, 1, 1, 0);
+
+        assert_eq!(selection.row, 1);
+        assert_eq!(selection.col, 0);
+        assert_eq!(selection.row_end, 1);
+        assert_eq!(selection.col_end, 0);
+    }
+
+    #[test]
+    fn expanded_selection_keeps_logical_bounds_after_fixed_change() {
+        let mut selection = SelectionState::default();
+        selection.select(1, 1, 4, 3, 21, 5);
+
+        selection.remap_collapsed_cursor_after_fixed_change(21, 5, 1, 1, 1, 0);
+
+        assert_eq!(selection.row, 1);
+        assert_eq!(selection.col, 1);
+        assert_eq!(selection.row_end, 4);
+        assert_eq!(selection.col_end, 3);
     }
 }

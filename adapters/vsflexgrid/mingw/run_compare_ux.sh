@@ -12,13 +12,13 @@
 #   - override with env TESTS_DIR_UIUX=./my_uiux_tests
 #
 # Headless mode:
-#   - `--headless` forces `xvfb-run` wrapping
-#   - auto-enabled when DISPLAY is unset (disable with `--no-headless`)
+#   - enabled by default via xvfb-run
+#   - disable with --no-headless
 #   - Xvfb screen can be customized via XVFB_SCREEN (default: 1920x1080x24)
 #
 # Parallel mode:
 #   - `--jobs N` runs N wine workers in parallel by splitting selected tests
-#   - default is half of CPU count (minimum 1)
+#   - default is max(CPU count - 2, 1)
 
 set -euo pipefail
 SCRIPT_PATH="${BASH_SOURCE[0]}"
@@ -48,8 +48,7 @@ ARGS=()
 NO_HTML=0
 HAS_FILTER=0
 DEFAULT_FILTER=""
-FORCE_HEADLESS=0
-AUTO_HEADLESS=1
+HEADLESS=1
 XVFB_SCREEN="${XVFB_SCREEN:-1920x1080x24}"
 JOBS=0
 JOBS_SET=0
@@ -58,11 +57,11 @@ ORIG_ARGS=("$@")
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --headless)
-            FORCE_HEADLESS=1
+            HEADLESS=1
             shift
             ;;
         --no-headless)
-            AUTO_HEADLESS=0
+            HEADLESS=0
             shift
             ;;
         --jobs)
@@ -114,7 +113,7 @@ if [ "$JOBS_SET" -eq 0 ]; then
     if ! [[ "$CPU_COUNT" =~ ^[0-9]+$ ]] || [ "$CPU_COUNT" -lt 1 ]; then
         CPU_COUNT=1
     fi
-    JOBS=$((CPU_COUNT / 2))
+    JOBS=$((CPU_COUNT - 2))
     if [ "$JOBS" -lt 1 ]; then
         JOBS=1
     fi
@@ -125,27 +124,14 @@ if ! [[ "$JOBS" =~ ^[0-9]+$ ]] || [ "$JOBS" -lt 1 ]; then
     exit 1
 fi
 
-# Wine+COM under xvfb can deadlock with multiple workers.
-# Keep headless default stable unless user explicitly requested --jobs.
-if [ "$JOBS_SET" -eq 0 ] && [ "${RUN_COMPARE_UX_XVFB_WRAPPED:-0}" = "1" ]; then
-    JOBS=1
-    echo "Headless mode: defaulting to --jobs 1 for Wine stability (override with --jobs N)"
-fi
-
 if [ "$HAS_FILTER" -eq 0 ]; then
     DEFAULT_FILTER="${UIUX_TEST_FILTER:-1-65}"
     ARGS+=(--tests "$DEFAULT_FILTER")
 fi
 
-# Re-exec under Xvfb for headless Wine runs when requested/needed.
+# Re-exec under Xvfb for headless Wine runs when requested.
 if [ "${RUN_COMPARE_UX_XVFB_WRAPPED:-0}" != "1" ]; then
-    NEED_HEADLESS=0
-    if [ "$FORCE_HEADLESS" -eq 1 ]; then
-        NEED_HEADLESS=1
-    elif [ "$AUTO_HEADLESS" -eq 1 ] && [ -z "${DISPLAY:-}" ]; then
-        NEED_HEADLESS=1
-    fi
-    if [ "$NEED_HEADLESS" -eq 1 ]; then
+    if [ "$HEADLESS" -eq 1 ]; then
         if ! command -v xvfb-run >/dev/null 2>&1; then
             echo "ERROR: headless mode requested but xvfb-run is not installed"
             exit 1
@@ -203,11 +189,11 @@ echo "  Done: $TARGET_DIR/grid_compare_ux_test.exe"
 # ── Register OCXs ─────────────────────────────────────────
 echo "[2/5] Registering OCXs in Wine..."
 
-WINEDEBUG=-all wine regsvr32 "$(realpath "$VOLVOX_OCX")" 2>/dev/null || true
+WINEDEBUG=-all wine regsvr32 /s "$(realpath "$VOLVOX_OCX")" 2>/dev/null || true
 echo "  VolvoxGrid: registered"
 
 if [[ ! " ${ARGS[*]:-} " =~ " --only-vv " ]]; then
-    WINEDEBUG=-all wine regsvr32 "$(realpath "$REF_OCX")" 2>/dev/null || true
+    WINEDEBUG=-all wine regsvr32 /s "$(realpath "$REF_OCX")" 2>/dev/null || true
     echo "  FlexGrid: registered"
 fi
 
@@ -385,12 +371,43 @@ echo "  Done."
 echo "[4/5] Converting BMPs to PNG..."
 BMP_COUNT=0
 if command -v convert >/dev/null 2>&1; then
+    BMP_FILES=()
     for bmp in "$OUT_DIR"/test_*.bmp; do
         [ -f "$bmp" ] || continue
-        png="${bmp%.bmp}.png"
-        convert "$bmp" "$png" 2>/dev/null && rm -f "$bmp"
-        BMP_COUNT=$((BMP_COUNT + 1))
+        BMP_FILES+=("$bmp")
     done
+    BMP_COUNT="${#BMP_FILES[@]}"
+
+    if [ "$BMP_COUNT" -gt 0 ]; then
+        CONVERT_JOBS="$JOBS"
+        if [ "$CONVERT_JOBS" -gt "$BMP_COUNT" ]; then
+            CONVERT_JOBS="$BMP_COUNT"
+        fi
+
+        if [ "$CONVERT_JOBS" -le 1 ]; then
+            for bmp in "${BMP_FILES[@]}"; do
+                png="${bmp%.bmp}.png"
+                convert "$bmp" "$png" 2>/dev/null && rm -f "$bmp"
+            done
+        else
+            echo "  Converting in parallel with $CONVERT_JOBS workers"
+            set +e
+            printf '%s\0' "${BMP_FILES[@]}" | xargs -0 -P "$CONVERT_JOBS" -I '{}' sh -c '
+                bmp="$1"
+                png="${bmp%.bmp}.png"
+                if convert "$bmp" "$png" 2>/dev/null; then
+                    rm -f "$bmp"
+                    exit 0
+                fi
+                exit 1
+            ' _ '{}'
+            CONVERT_RC=$?
+            set -e
+            if [ "$CONVERT_RC" -ne 0 ]; then
+                echo "  WARN: some BMP->PNG conversions failed"
+            fi
+        fi
+    fi
     echo "  Converted $BMP_COUNT images."
 else
     echo "  ImageMagick not found — keeping BMPs."
