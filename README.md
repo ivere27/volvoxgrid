@@ -24,11 +24,11 @@ VolvoxGrid renders grids directly to RGBA pixel buffers, giving you full control
   - Per-cell style overrides (font, color, background, borders, alignment, text effects)
   - Owner-draw cells via event callbacks
   - Print to paginated PNG images (portrait/landscape, headers/footers)
-  - Save/load in multiple formats (binary FXGD, TSV, CSV, custom-delimited, Excel SpreadsheetML)
+  - Save/load in multiple formats (binary FXGD, TSV, CSV, custom-delimited, SpreadsheetML)
 - **Adapter ecosystem** -- Feasibility-focused compatibility layers to test VolvoxGrid against battle-tested, mature grid frameworks and identify gaps:
   - AG Grid (Web/WASM)
   - Syncfusion SfDataGrid (Flutter)
-  - Excel/Sheets spreadsheet UI (Web/WASM)
+  - Sheet spreadsheet UI (Web/WASM)
   - VSFlexGrid ActiveX (Windows COM/OCX)
 - **Codegen** -- Auto-generated FFI bindings for Rust, Dart, Java, C/C++ from `.proto` definitions
 - **Docker builds** -- Reproducible packaging for Android AAR, Desktop JAR, iOS XCFramework, and WASM
@@ -85,7 +85,7 @@ volvoxgrid/
 ├── dotnet/           # .NET WinForms wrapper library + sample
 ├── adapters/
 │   ├── aggrid/       # AG Grid-compatible adapter (TypeScript, npm: @volvoxgrid/ag-grid)
-│   ├── excel/        # Excel/Sheets spreadsheet UI (TypeScript, npm: @volvoxgrid/excel)
+│   ├── sheet/        # Sheet spreadsheet UI (TypeScript, npm: @volvoxgrid/sheet)
 │   ├── sfdatagrid/   # Syncfusion SfDataGrid adapter (Dart/Flutter)
 │   └── vsflexgrid/   # ActiveX/COM OCX control (Rust + C, MinGW cross-compiled)
 ├── proto/            # Protobuf service definitions
@@ -179,7 +179,7 @@ make android
 make android-run-release
 
 # Use published Maven AAR in the example app (default is local project module)
-make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.2
+make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.2.0
 ```
 
 ### Java Desktop
@@ -192,7 +192,7 @@ make java-desktop-run
 make java-desktop-run-simple
 
 # Use published Maven JAR in the desktop example (default is local)
-make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.2
+make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.2.0
 ```
 
 ### .NET WinForms
@@ -241,14 +241,14 @@ const grid = new AgGridVolvox(container, {
 });
 ```
 
-### Excel/Sheets (Web/WASM)
+### Sheet (Web/WASM)
 
-A full spreadsheet UI (`@volvoxgrid/excel`) built on VolvoxGrid with formula bar, toolbar, sheet tabs, status bar, context menu, and find/replace. Supports cell editing, formatting (bold, italic, colors, borders, alignment), undo/redo, clipboard, merge/unmerge, freeze panes, insert/delete rows and columns, drag-fill, and A1-style cell references.
+A full spreadsheet UI (`@volvoxgrid/sheet`) built on VolvoxGrid with formula bar, toolbar, sheet tabs, status bar, context menu, and find/replace. Supports cell editing, formatting (bold, italic, colors, borders, alignment), undo/redo, clipboard, merge/unmerge, freeze panes, insert/delete rows and columns, drag-fill, and A1-style cell references.
 
 ```typescript
-import { VolvoxExcel } from '@volvoxgrid/excel';
+import { VolvoxSheet } from '@volvoxgrid/sheet';
 
-const excel = new VolvoxExcel(container, {
+const sheet = new VolvoxSheet(container, {
   rows: 100,
   cols: 26,
   showFormulaBar: true,
@@ -258,11 +258,11 @@ const excel = new VolvoxExcel(container, {
 ```
 
 ```bash
-# Build WASM + start Excel adapter dev server
-make excel
+# Build WASM + start Sheet adapter dev server
+make sheet
 
 # Build the npm package only
-make excel-build
+make sheet-build
 ```
 
 ### SfDataGrid (Flutter)
@@ -359,7 +359,7 @@ Requires `.maven-settings.xml` with Sonatype Central credentials and GPG signing
 ```bash
 # Build snapshot artifacts
 # (automatically installs to mavenLocal: ~/.m2/repository)
-make docker_android_aar docker_desktop VOLVOXGRID_VERSION=0.1.2-SNAPSHOT
+make docker_android_aar docker_desktop VOLVOXGRID_VERSION=0.2.0-SNAPSHOT
 ```
 
 ### Optional Features and Binary Size
@@ -397,7 +397,7 @@ into VolvoxGrid protobuf calls.
  ┌─────────────────────────────────────────────────────────────────────┐
  │                          Adapters                                   │
  │                                                                     │
- │  AG Grid         Excel/Sheets          SfDataGrid      VSFlexGrid   │
+ │  AG Grid            Sheet             SfDataGrid      VSFlexGrid    │
  │  (TypeScript)    (TypeScript)          (Dart)          (C/COM)      │
  └──┬───────────────┬─────────────────────┬───────────────┬────────────┘
     │               │                     │               │
@@ -873,7 +873,7 @@ The engine includes a high-performance, backend-agnostic debug overlay for real-
 
 | Line | Example | Description |
 |---|---|---|
-| **Line 1** | `Engine v0.1.5-SNAPSHOT · 59ccdeb · 2026-03-02 14:46 UTC` | Engine version, short git commit, and UTC build date. |
+| **Line 1** | `Engine v0.2.0-SNAPSHOT · 59ccdeb · 2026-03-02 14:46 UTC` | Engine version, short git commit, and UTC build date. |
 | **Line 2** | `FPS: 60.0 \| 1.2ms \| Q: 1242 \| ID: 1001 \| Z: 100% \| Res: 1080x2240` | FPS, Frame Time, Instance Count (Quads), Grid ID, Zoom level, Render Resolution. |
 | **Line 3** | `Mode: GPU(Vulkan-Mailbox) \| Grid: 1,000,000x20 \| DIRTY` | Render Backend, Logical Grid Dimensions (Rows x Cols), Engine Status. |
 | **Line 4** | `Vis: 42x8(336) \| P: 0,15420 \| M: 12.4MB \| C: 842/8192` | Visible Viewport Dimensions & Total Cells, Scroll Position, Estimated Heap Memory, Text Cache Usage. |

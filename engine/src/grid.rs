@@ -2661,12 +2661,27 @@ impl VolvoxGrid {
         let fixed_h = self.layout.row_pos(first_scrollable);
         let row_top = self.layout.row_pos(target_row);
         let target_scroll_y = (row_top - fixed_h).max(0) as f32;
+        let viewport_w = self.data_viewport_width();
+        let viewport_h = self.data_viewport_height();
+        let pinned_h = self.pinned_top_height() + self.pinned_bottom_height();
+        let pinned_w = self.pinned_left_width() + self.pinned_right_width();
+        let (max_scroll_x, max_scroll_y) = ScrollState::compute_max_scroll(
+            &self.layout,
+            viewport_w,
+            viewport_h,
+            self.fixed_rows,
+            self.fixed_cols,
+            pinned_h,
+            pinned_w,
+        );
         // Programmatic jumps (e.g. host fast scroller) should cancel inertia so
         // the requested row stays stable instead of being overridden by fling.
         self.scroll.stop_fling();
-        // Set scroll_y directly (not via scroll_to which would clamp to the
-        // current max).  update_bounds will raise max_scroll_y to accommodate.
-        self.scroll.scroll_y = target_scroll_y;
+        // Clamp to the real content extent so near-end jumps keep the last
+        // rows visible instead of overscrolling into blank space.
+        self.scroll.max_scroll_x = max_scroll_x;
+        self.scroll.max_scroll_y = max_scroll_y;
+        self.scroll.scroll_y = target_scroll_y.min(max_scroll_y);
         self.mark_dirty();
     }
 
@@ -2711,9 +2726,23 @@ impl VolvoxGrid {
         let fixed_w = self.layout.col_pos(first_scrollable);
         let col_left = self.layout.col_pos(target_col);
         let target_scroll_x = (col_left - fixed_w).max(0) as f32;
-        // Set scroll_x directly (not via scroll_to which would clamp to the
-        // current max).  update_bounds will raise max_scroll_x to accommodate.
-        self.scroll.scroll_x = target_scroll_x;
+        let viewport_w = self.data_viewport_width();
+        let viewport_h = self.data_viewport_height();
+        let pinned_h = self.pinned_top_height() + self.pinned_bottom_height();
+        let pinned_w = self.pinned_left_width() + self.pinned_right_width();
+        let (max_scroll_x, max_scroll_y) = ScrollState::compute_max_scroll(
+            &self.layout,
+            viewport_w,
+            viewport_h,
+            self.fixed_rows,
+            self.fixed_cols,
+            pinned_h,
+            pinned_w,
+        );
+        self.scroll.stop_fling();
+        self.scroll.max_scroll_x = max_scroll_x;
+        self.scroll.max_scroll_y = max_scroll_y;
+        self.scroll.scroll_x = target_scroll_x.min(max_scroll_x);
         self.mark_dirty();
     }
 
@@ -3341,5 +3370,29 @@ mod tests {
         let edit = grid.edit_cell_rect(1, 1).expect("edit rect");
         assert_eq!(edit.0, cell.0);
         assert_eq!(edit.1, cell.1);
+    }
+
+    #[test]
+    fn set_top_row_clamps_to_last_valid_viewport() {
+        let mut grid = VolvoxGrid::new(1, 120, 30, 10, 3, 0, 0);
+        grid.default_row_height = 10;
+
+        grid.set_top_row(9);
+
+        assert_eq!(grid.scroll.scroll_y, 70.0);
+        assert_eq!(grid.top_row(), 7);
+        assert_eq!(grid.bottom_row(), 9);
+    }
+
+    #[test]
+    fn set_left_col_clamps_to_last_valid_viewport() {
+        let mut grid = VolvoxGrid::new(1, 30, 120, 3, 10, 0, 0);
+        grid.default_col_width = 10;
+
+        grid.set_left_col(9);
+
+        assert_eq!(grid.scroll.scroll_x, 70.0);
+        assert_eq!(grid.left_col(), 7);
+        assert_eq!(grid.right_col(), 9);
     }
 }

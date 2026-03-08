@@ -76,7 +76,10 @@ pub trait PluginStreamReceiver<T> {
     fn is_cancelled(&self) -> bool;
 }
 
-pub trait PluginStreamBidi<Req, Resp>: PluginStreamSender<Resp> + PluginStreamReceiver<Req> {}
+pub trait PluginStreamBidi<Req, Resp>:
+    PluginStreamSender<Resp> + PluginStreamReceiver<Req>
+{
+}
 
 struct LocalStreamSender<T> {
     outputs: RefCell<Vec<Vec<u8>>>,
@@ -297,7 +300,6 @@ fn get_volvox_grid_service_plugin() -> Option<&'static dyn VolvoxGridServicePlug
     PLUGIN_VOLVOX_GRID_SERVICE.get().map(|p| p.as_ref())
 }
 
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum VolvoxGridServiceStreamMode {
     Server,
@@ -375,8 +377,9 @@ fn volvox_grid_service_run_stream(ctx: &mut VolvoxGridServiceStreamContext) {
                 return;
             }
 
-            let bidi =
-                LocalStreamBidi::<RenderInput, RenderOutput>::from_queue(std::mem::take(&mut ctx.send_queue));
+            let bidi = LocalStreamBidi::<RenderInput, RenderOutput>::from_queue(std::mem::take(
+                &mut ctx.send_queue,
+            ));
             match plugin.render_session(&bidi) {
                 Ok(_) => {
                     if let Some(e) = bidi.take_decode_error() {
@@ -455,8 +458,6 @@ fn volvox_grid_service_run_stream(ctx: &mut VolvoxGridServiceStreamContext) {
     }
 }
 
-
-
 // =============================================================================
 // WASM Exports
 // =============================================================================
@@ -470,7 +471,10 @@ pub fn volvox_grid_create(
 ) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = CreateRequest {
         viewport_width,
@@ -478,7 +482,10 @@ pub fn volvox_grid_create(
         scale,
         config: match GridConfig::decode(config) {
             Ok(m) => Some(m),
-            Err(e) => { set_last_error(format!("decode 'config': {}", e)); return Vec::new(); }
+            Err(e) => {
+                set_last_error(format!("decode 'config': {}", e));
+                return Vec::new();
+            }
         },
         ..Default::default()
     };
@@ -488,18 +495,22 @@ pub fn volvox_grid_create(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_destroy(
-    id: i64,
-) -> Vec<u8> {
+pub fn volvox_grid_destroy(id: i64) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = GridHandle {
         id,
@@ -511,25 +522,31 @@ pub fn volvox_grid_destroy(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_configure(
-    grid_id: i64,
-    config: &[u8],
-) -> Vec<u8> {
+pub fn volvox_grid_configure(grid_id: i64, config: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = ConfigureRequest {
         grid_id,
         config: match GridConfig::decode(config) {
             Ok(m) => Some(m),
-            Err(e) => { set_last_error(format!("decode 'config': {}", e)); return Vec::new(); }
+            Err(e) => {
+                set_last_error(format!("decode 'config': {}", e));
+                return Vec::new();
+            }
         },
         ..Default::default()
     };
@@ -539,18 +556,22 @@ pub fn volvox_grid_configure(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_get_config(
-    id: i64,
-) -> Vec<u8> {
+pub fn volvox_grid_get_config(id: i64) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = GridHandle {
         id,
@@ -562,8 +583,11 @@ pub fn volvox_grid_get_config(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -571,11 +595,17 @@ pub fn volvox_grid_get_config(
 pub fn volvox_grid_load_font_data_pb(data: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = match LoadFontDataRequest::decode(data) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); return Vec::new(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
     };
     match plugin.load_font_data(req) {
         Ok(r) => {
@@ -583,8 +613,11 @@ pub fn volvox_grid_load_font_data_pb(data: &[u8]) -> Vec<u8> {
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -592,11 +625,17 @@ pub fn volvox_grid_load_font_data_pb(data: &[u8]) -> Vec<u8> {
 pub fn volvox_grid_define_columns_pb(data: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = match DefineColumnsRequest::decode(data) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); return Vec::new(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
     };
     match plugin.define_columns(req) {
         Ok(r) => {
@@ -604,18 +643,22 @@ pub fn volvox_grid_define_columns_pb(data: &[u8]) -> Vec<u8> {
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_get_schema(
-    id: i64,
-) -> Vec<u8> {
+pub fn volvox_grid_get_schema(id: i64) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = GridHandle {
         id,
@@ -627,8 +670,11 @@ pub fn volvox_grid_get_schema(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -636,11 +682,17 @@ pub fn volvox_grid_get_schema(
 pub fn volvox_grid_define_rows_pb(data: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = match DefineRowsRequest::decode(data) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); return Vec::new(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
     };
     match plugin.define_rows(req) {
         Ok(r) => {
@@ -648,8 +700,11 @@ pub fn volvox_grid_define_rows_pb(data: &[u8]) -> Vec<u8> {
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -657,11 +712,17 @@ pub fn volvox_grid_define_rows_pb(data: &[u8]) -> Vec<u8> {
 pub fn volvox_grid_insert_rows_pb(data: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = match InsertRowsRequest::decode(data) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); return Vec::new(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
     };
     match plugin.insert_rows(req) {
         Ok(r) => {
@@ -669,20 +730,22 @@ pub fn volvox_grid_insert_rows_pb(data: &[u8]) -> Vec<u8> {
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_remove_rows(
-    grid_id: i64,
-    index: i32,
-    count: i32,
-) -> Vec<u8> {
+pub fn volvox_grid_remove_rows(grid_id: i64, index: i32, count: i32) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = RemoveRowsRequest {
         grid_id,
@@ -696,20 +759,22 @@ pub fn volvox_grid_remove_rows(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_move_column(
-    grid_id: i64,
-    col: i32,
-    position: i32,
-) -> Vec<u8> {
+pub fn volvox_grid_move_column(grid_id: i64, col: i32, position: i32) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = MoveColumnRequest {
         grid_id,
@@ -723,20 +788,22 @@ pub fn volvox_grid_move_column(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_move_row(
-    grid_id: i64,
-    row: i32,
-    position: i32,
-) -> Vec<u8> {
+pub fn volvox_grid_move_row(grid_id: i64, row: i32, position: i32) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = MoveRowRequest {
         grid_id,
@@ -750,8 +817,11 @@ pub fn volvox_grid_move_row(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -759,11 +829,17 @@ pub fn volvox_grid_move_row(
 pub fn volvox_grid_update_cells_pb(data: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = match UpdateCellsRequest::decode(data) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); return Vec::new(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
     };
     match plugin.update_cells(req) {
         Ok(r) => {
@@ -771,8 +847,11 @@ pub fn volvox_grid_update_cells_pb(data: &[u8]) -> Vec<u8> {
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -789,7 +868,10 @@ pub fn volvox_grid_get_cells(
 ) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = GetCellsRequest {
         grid_id,
@@ -808,8 +890,11 @@ pub fn volvox_grid_get_cells(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -817,11 +902,17 @@ pub fn volvox_grid_get_cells(
 pub fn volvox_grid_load_table_pb(data: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = match LoadTableRequest::decode(data) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); return Vec::new(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
     };
     match plugin.load_table(req) {
         Ok(r) => {
@@ -829,20 +920,22 @@ pub fn volvox_grid_load_table_pb(data: &[u8]) -> Vec<u8> {
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_clear(
-    grid_id: i64,
-    scope: i32,
-    region: i32,
-) -> Vec<u8> {
+pub fn volvox_grid_clear(grid_id: i64, scope: i32, region: i32) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = ClearRequest {
         grid_id,
@@ -856,8 +949,11 @@ pub fn volvox_grid_clear(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -865,11 +961,17 @@ pub fn volvox_grid_clear(
 pub fn volvox_grid_select_pb(data: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = match SelectRequest::decode(data) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); return Vec::new(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
     };
     match plugin.select(req) {
         Ok(r) => {
@@ -877,18 +979,22 @@ pub fn volvox_grid_select_pb(data: &[u8]) -> Vec<u8> {
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_get_selection(
-    id: i64,
-) -> Vec<u8> {
+pub fn volvox_grid_get_selection(id: i64) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = GridHandle {
         id,
@@ -900,20 +1006,22 @@ pub fn volvox_grid_get_selection(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_show_cell(
-    grid_id: i64,
-    row: i32,
-    col: i32,
-) -> Vec<u8> {
+pub fn volvox_grid_show_cell(grid_id: i64, row: i32, col: i32) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = ShowCellRequest {
         grid_id,
@@ -927,19 +1035,22 @@ pub fn volvox_grid_show_cell(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_set_top_row(
-    grid_id: i64,
-    row: i32,
-) -> Vec<u8> {
+pub fn volvox_grid_set_top_row(grid_id: i64, row: i32) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = SetRowRequest {
         grid_id,
@@ -952,19 +1063,22 @@ pub fn volvox_grid_set_top_row(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_set_left_col(
-    grid_id: i64,
-    col: i32,
-) -> Vec<u8> {
+pub fn volvox_grid_set_left_col(grid_id: i64, col: i32) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = SetColRequest {
         grid_id,
@@ -977,8 +1091,11 @@ pub fn volvox_grid_set_left_col(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -986,11 +1103,17 @@ pub fn volvox_grid_set_left_col(
 pub fn volvox_grid_edit_pb(data: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = match EditCommand::decode(data) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); return Vec::new(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
     };
     match plugin.edit(req) {
         Ok(r) => {
@@ -998,8 +1121,11 @@ pub fn volvox_grid_edit_pb(data: &[u8]) -> Vec<u8> {
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -1007,11 +1133,17 @@ pub fn volvox_grid_edit_pb(data: &[u8]) -> Vec<u8> {
 pub fn volvox_grid_sort_pb(data: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = match SortRequest::decode(data) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); return Vec::new(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
     };
     match plugin.sort(req) {
         Ok(r) => {
@@ -1019,8 +1151,11 @@ pub fn volvox_grid_sort_pb(data: &[u8]) -> Vec<u8> {
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -1037,7 +1172,10 @@ pub fn volvox_grid_subtotal(
 ) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = SubtotalRequest {
         grid_id,
@@ -1056,8 +1194,11 @@ pub fn volvox_grid_subtotal(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -1071,7 +1212,10 @@ pub fn volvox_grid_auto_size(
 ) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = AutoSizeRequest {
         grid_id,
@@ -1087,19 +1231,22 @@ pub fn volvox_grid_auto_size(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_outline(
-    grid_id: i64,
-    level: i32,
-) -> Vec<u8> {
+pub fn volvox_grid_outline(grid_id: i64, level: i32) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = OutlineRequest {
         grid_id,
@@ -1112,8 +1259,11 @@ pub fn volvox_grid_outline(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -1121,11 +1271,17 @@ pub fn volvox_grid_outline(
 pub fn volvox_grid_get_node_pb(data: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = match GetNodeRequest::decode(data) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); return Vec::new(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
     };
     match plugin.get_node(req) {
         Ok(r) => {
@@ -1133,8 +1289,11 @@ pub fn volvox_grid_get_node_pb(data: &[u8]) -> Vec<u8> {
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -1142,11 +1301,17 @@ pub fn volvox_grid_get_node_pb(data: &[u8]) -> Vec<u8> {
 pub fn volvox_grid_find_pb(data: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = match FindRequest::decode(data) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); return Vec::new(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
     };
     match plugin.find(req) {
         Ok(r) => {
@@ -1154,8 +1319,11 @@ pub fn volvox_grid_find_pb(data: &[u8]) -> Vec<u8> {
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -1170,7 +1338,10 @@ pub fn volvox_grid_aggregate(
 ) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = AggregateRequest {
         grid_id,
@@ -1187,20 +1358,22 @@ pub fn volvox_grid_aggregate(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_get_merged_range(
-    grid_id: i64,
-    row: i32,
-    col: i32,
-) -> Vec<u8> {
+pub fn volvox_grid_get_merged_range(grid_id: i64, row: i32, col: i32) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = GetMergedRangeRequest {
         grid_id,
@@ -1214,25 +1387,31 @@ pub fn volvox_grid_get_merged_range(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_merge_cells(
-    grid_id: i64,
-    range: &[u8],
-) -> Vec<u8> {
+pub fn volvox_grid_merge_cells(grid_id: i64, range: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = MergeCellsRequest {
         grid_id,
         range: match CellRange::decode(range) {
             Ok(m) => Some(m),
-            Err(e) => { set_last_error(format!("decode 'range': {}", e)); return Vec::new(); }
+            Err(e) => {
+                set_last_error(format!("decode 'range': {}", e));
+                return Vec::new();
+            }
         },
         ..Default::default()
     };
@@ -1242,25 +1421,31 @@ pub fn volvox_grid_merge_cells(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_unmerge_cells(
-    grid_id: i64,
-    range: &[u8],
-) -> Vec<u8> {
+pub fn volvox_grid_unmerge_cells(grid_id: i64, range: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = UnmergeCellsRequest {
         grid_id,
         range: match CellRange::decode(range) {
             Ok(m) => Some(m),
-            Err(e) => { set_last_error(format!("decode 'range': {}", e)); return Vec::new(); }
+            Err(e) => {
+                set_last_error(format!("decode 'range': {}", e));
+                return Vec::new();
+            }
         },
         ..Default::default()
     };
@@ -1270,18 +1455,22 @@ pub fn volvox_grid_unmerge_cells(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_get_merged_regions(
-    id: i64,
-) -> Vec<u8> {
+pub fn volvox_grid_get_merged_regions(id: i64) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = GridHandle {
         id,
@@ -1293,18 +1482,22 @@ pub fn volvox_grid_get_merged_regions(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_get_memory_usage(
-    id: i64,
-) -> Vec<u8> {
+pub fn volvox_grid_get_memory_usage(id: i64) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = GridHandle {
         id,
@@ -1316,8 +1509,11 @@ pub fn volvox_grid_get_memory_usage(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -1325,11 +1521,17 @@ pub fn volvox_grid_get_memory_usage(
 pub fn volvox_grid_clipboard_pb(data: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = match ClipboardCommand::decode(data) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); return Vec::new(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
     };
     match plugin.clipboard(req) {
         Ok(r) => {
@@ -1337,20 +1539,22 @@ pub fn volvox_grid_clipboard_pb(data: &[u8]) -> Vec<u8> {
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_export(
-    grid_id: i64,
-    format: i32,
-    scope: i32,
-) -> Vec<u8> {
+pub fn volvox_grid_export(grid_id: i64, format: i32, scope: i32) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = ExportRequest {
         grid_id,
@@ -1364,8 +1568,11 @@ pub fn volvox_grid_export(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -1373,11 +1580,17 @@ pub fn volvox_grid_export(
 pub fn volvox_grid_import_pb(data: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = match ImportRequest::decode(data) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); return Vec::new(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
     };
     match plugin.import(req) {
         Ok(r) => {
@@ -1385,8 +1598,11 @@ pub fn volvox_grid_import_pb(data: &[u8]) -> Vec<u8> {
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
@@ -1394,11 +1610,17 @@ pub fn volvox_grid_import_pb(data: &[u8]) -> Vec<u8> {
 pub fn volvox_grid_print_pb(data: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = match PrintRequest::decode(data) {
         Ok(r) => r,
-        Err(e) => { set_last_error(format!("decode: {}", e)); return Vec::new(); },
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
     };
     match plugin.print(req) {
         Ok(r) => {
@@ -1406,21 +1628,22 @@ pub fn volvox_grid_print_pb(data: &[u8]) -> Vec<u8> {
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_archive(
-    grid_id: i64,
-    name: &str,
-    action: i32,
-    data: &[u8],
-) -> Vec<u8> {
+pub fn volvox_grid_archive(grid_id: i64, name: &str, action: i32, data: &[u8]) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = ArchiveRequest {
         grid_id,
@@ -1435,20 +1658,22 @@ pub fn volvox_grid_archive(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_resize_viewport(
-    grid_id: i64,
-    width: i32,
-    height: i32,
-) -> Vec<u8> {
+pub fn volvox_grid_resize_viewport(grid_id: i64, width: i32, height: i32) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = ResizeViewportRequest {
         grid_id,
@@ -1462,19 +1687,22 @@ pub fn volvox_grid_resize_viewport(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_set_redraw(
-    grid_id: i64,
-    enabled: bool,
-) -> Vec<u8> {
+pub fn volvox_grid_set_redraw(grid_id: i64, enabled: bool) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = SetRedrawRequest {
         grid_id,
@@ -1487,18 +1715,22 @@ pub fn volvox_grid_set_redraw(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_refresh(
-    id: i64,
-) -> Vec<u8> {
+pub fn volvox_grid_refresh(id: i64) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = GridHandle {
         id,
@@ -1510,19 +1742,22 @@ pub fn volvox_grid_refresh(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
 
 #[wasm_bindgen]
-pub fn volvox_grid_load_demo(
-    grid_id: i64,
-    demo: &str,
-) -> Vec<u8> {
+pub fn volvox_grid_load_demo(grid_id: i64, demo: &str) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
-        None => { set_last_error("plugin not registered".into()); return Vec::new(); },
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
     };
     let req = LoadDemoRequest {
         grid_id,
@@ -1535,12 +1770,13 @@ pub fn volvox_grid_load_demo(
             let mut buf = Vec::new();
             let _ = r.encode(&mut buf);
             buf
-        },
-        Err(e) => { set_last_error(e); return Vec::new(); },
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
     }
 }
-
-
 
 // =============================================================================
 // WASM Stream Exports
@@ -1554,8 +1790,14 @@ pub fn volvox_grid_stream_open(method: &str) -> i64 {
     }
 
     let (method_id, mode) = match method {
-        "/volvoxgrid.v1.VolvoxGridService/RenderSession" => (VolvoxGridServiceStreamMethod::RenderSession, VolvoxGridServiceStreamMode::Bidi),
-        "/volvoxgrid.v1.VolvoxGridService/EventStream" => (VolvoxGridServiceStreamMethod::EventStream, VolvoxGridServiceStreamMode::Server),
+        "/volvoxgrid.v1.VolvoxGridService/RenderSession" => (
+            VolvoxGridServiceStreamMethod::RenderSession,
+            VolvoxGridServiceStreamMode::Bidi,
+        ),
+        "/volvoxgrid.v1.VolvoxGridService/EventStream" => (
+            VolvoxGridServiceStreamMethod::EventStream,
+            VolvoxGridServiceStreamMode::Server,
+        ),
         _ => {
             set_last_error(format!("unknown streaming method: {}", method));
             return -1;
@@ -1597,7 +1839,9 @@ pub fn volvox_grid_stream_send(handle: i64, data: &[u8]) -> i32 {
             return -1;
         }
 
-        if matches!(ctx.mode, VolvoxGridServiceStreamMode::Server) && (ctx.started || !ctx.send_queue.is_empty()) {
+        if matches!(ctx.mode, VolvoxGridServiceStreamMode::Server)
+            && (ctx.started || !ctx.send_queue.is_empty())
+        {
             set_last_error("server stream accepts a single request".into());
             return -1;
         }
@@ -1713,8 +1957,6 @@ pub fn volvox_grid_stream_close(handle: i64) {
     clear_last_error();
 }
 
-
-
 // =============================================================================
 // Error Retrieval
 // =============================================================================
@@ -1727,4 +1969,3 @@ pub fn volvox_grid_last_error() -> String {
 }
 
 // Module: volvoxgrid_v1
-

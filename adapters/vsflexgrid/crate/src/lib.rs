@@ -68,9 +68,8 @@ fn apply_default_indicator_bands(grid: &mut volvoxgrid_engine::grid::VolvoxGrid)
     grid.indicator_bands.row_start.visible = false;
     grid.indicator_bands.row_start.width_px =
         volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
-    grid.indicator_bands.row_start.mode_bits =
-        (RowIndicatorMode::RowIndicatorCurrent as u32)
-            | (RowIndicatorMode::RowIndicatorSelection as u32);
+    grid.indicator_bands.row_start.mode_bits = (RowIndicatorMode::RowIndicatorCurrent as u32)
+        | (RowIndicatorMode::RowIndicatorSelection as u32);
 
     grid.indicator_bands.col_top.visible = true;
     if grid.indicator_bands.col_top.band_rows <= 0 {
@@ -80,9 +79,9 @@ fn apply_default_indicator_bands(grid: &mut volvoxgrid_engine::grid::VolvoxGrid)
         grid.indicator_bands.col_top.default_row_height_px =
             volvoxgrid_engine::indicator::DEFAULT_COL_INDICATOR_ROW_HEIGHT;
     }
-    grid.indicator_bands.col_top.mode_bits =
-        (ColIndicatorCellMode::ColIndicatorCellHeaderText as u32)
-            | (ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32);
+    grid.indicator_bands.col_top.mode_bits = (ColIndicatorCellMode::ColIndicatorCellHeaderText
+        as u32)
+        | (ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32);
     grid.layout.invalidate();
     grid.mark_dirty();
 }
@@ -3030,8 +3029,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
 
     fn update_cells(&self, request: UpdateCellsRequest) -> Result<WriteResult, String> {
-        self.manager()
-            .with_grid(request.grid_id, |grid| grid.write_cells(&request.cells, request.atomic))
+        self.manager().with_grid(request.grid_id, |grid| {
+            grid.write_cells(&request.cells, request.atomic)
+        })
     }
 
     fn get_cells(&self, request: GetCellsRequest) -> Result<CellsResponse, String> {

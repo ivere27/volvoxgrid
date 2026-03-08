@@ -400,11 +400,6 @@ enum ErrorCode {
   ERROR_INTERNAL         = 8;
 }
 
-message RpcError {
-  ErrorCode code    = 1;
-  string    message = 2;
-}
-
 message ImageData {
   bytes  data   = 1;
   string format = 2;  // "png", "bmp", etc.

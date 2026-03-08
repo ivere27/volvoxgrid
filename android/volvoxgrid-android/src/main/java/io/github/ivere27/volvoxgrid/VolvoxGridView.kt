@@ -24,7 +24,7 @@ import android.widget.FrameLayout
 import android.widget.OverScroller
 import io.github.ivere27.volvoxgrid.common.VolvoxGridHost
 import io.github.ivere27.synurang.BidiStream
-import io.github.ivere27.synurang.PluginError
+import io.github.ivere27.synurang.FfiError
 import io.github.ivere27.synurang.PluginHost
 import java.io.File
 import java.nio.ByteBuffer
@@ -875,7 +875,7 @@ class VolvoxGridView @JvmOverloads constructor(
                 sendRenderInput(keyPress)
             }
             requestRenderFrame()
-        } catch (_: PluginError) {}
+        } catch (_: FfiError) {}
         return true
     }
 
@@ -894,7 +894,7 @@ class VolvoxGridView @JvmOverloads constructor(
                 .build()
             sendRenderInput(input)
             requestRenderFrame()
-        } catch (_: PluginError) {}
+        } catch (_: FfiError) {}
         return true
     }
 
@@ -1456,7 +1456,7 @@ class VolvoxGridView @JvmOverloads constructor(
                 )
                 .build()
             sendRenderInput(input)
-        } catch (_: PluginError) {
+        } catch (_: FfiError) {
             // Stream may have been closed
         }
     }
@@ -1477,7 +1477,7 @@ class VolvoxGridView @JvmOverloads constructor(
                 )
                 .build()
             sendRenderInput(input)
-        } catch (_: PluginError) {
+        } catch (_: FfiError) {
             // Stream may have been closed
         }
     }
@@ -1507,7 +1507,7 @@ class VolvoxGridView @JvmOverloads constructor(
                 )
                 .build()
             sendRenderInput(input)
-        } catch (_: PluginError) {
+        } catch (_: FfiError) {
             // Stream may have been closed
         }
         if (requestRender) {
@@ -1531,7 +1531,7 @@ class VolvoxGridView @JvmOverloads constructor(
                     .setHeight(height)
                     .build()
             )
-        } catch (_: PluginError) {
+        } catch (_: FfiError) {
             // Best-effort on attach; resizeBuffer/sync path will retry.
         }
     }
@@ -1586,7 +1586,7 @@ class VolvoxGridView @JvmOverloads constructor(
                     .setHeight(height)
                     .build()
             )
-        } catch (_: PluginError) {}
+        } catch (_: FfiError) {}
 
         // Dispatch a new frame (GPU or CPU) with updated size
         requestRenderFrame()
@@ -1631,7 +1631,7 @@ class VolvoxGridView @JvmOverloads constructor(
                     requestRenderFrame()
                 }
             }
-        } catch (_: PluginError) {
+        } catch (_: FfiError) {
             pendingFrame.set(false)
             if (needsFollowupRender.getAndSet(false)) {
                 requestRenderFrame()
@@ -1687,7 +1687,7 @@ class VolvoxGridView @JvmOverloads constructor(
                     requestRenderFrame()
                 }
             }
-        } catch (_: PluginError) {
+        } catch (_: FfiError) {
             pendingFrame.set(false)
             if (needsFollowupRender.getAndSet(false)) {
                 requestRenderFrame()
@@ -1708,7 +1708,7 @@ class VolvoxGridView @JvmOverloads constructor(
                 )
                 .build()
             sendRenderInput(input)
-        } catch (_: PluginError) {
+        } catch (_: FfiError) {
             // Best-effort
         }
     }
@@ -1908,7 +1908,7 @@ class VolvoxGridView @JvmOverloads constructor(
                     .setCommit(EditCommit.newBuilder().setText(text).build())
                     .build()
             )
-        } catch (_: PluginError) {}
+        } catch (_: FfiError) {}
         editListener?.onEditCommit(row, col, text)
         dismissEditOverlay()
     }
@@ -1921,7 +1921,7 @@ class VolvoxGridView @JvmOverloads constructor(
                     .setCancel(EditCancel.newBuilder().build())
                     .build()
             )
-        } catch (_: PluginError) {}
+        } catch (_: FfiError) {}
         editListener?.onEditCancel(row, col)
         dismissEditOverlay()
     }

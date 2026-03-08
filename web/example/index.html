@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>VolvoxGrid Demo</title>
   <style>
     * {
@@ -21,31 +21,58 @@
       --accent: #3159e6;
       --accent-soft: #e4ebff;
       --radius: 10px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      --app-height: 100vh;
+    }
+    @supports (height: 100svh) {
+      :root {
+        --app-height: 100svh;
+      }
     }
     html,
     body {
       width: 100%;
-      height: 100%;
+      height: var(--app-height);
+      overflow: hidden;
     }
     body {
       font-family: "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
       color: var(--text);
       background: var(--bg);
+      overscroll-behavior: none;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
     }
     .app {
       display: flex;
       flex-direction: column;
       width: 100%;
-      height: 100%;
-      min-height: 100%;
+      height: var(--app-height);
+      min-height: var(--app-height);
+      overflow: hidden;
     }
     .top-row {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 8px;
-      padding: 8px 12px;
+      padding: calc(8px + var(--safe-top)) calc(12px + var(--safe-right)) 8px calc(12px + var(--safe-left));
       background: var(--surface);
       border-bottom: 1px solid var(--line);
+    }
+    .top-row-group {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-width: 0;
+    }
+    .top-row-spacer {
+      flex: 1 1 auto;
+      min-width: 0;
     }
     .top-row select {
       border: 1px solid var(--line-strong);
@@ -118,16 +145,18 @@
     }
     .demo-row {
       display: flex;
+      flex-wrap: nowrap;
       gap: 8px;
-      padding: 8px 12px;
+      padding: 8px calc(12px + var(--safe-right)) 8px calc(12px + var(--safe-left));
       background: var(--surface-alt);
       border-bottom: 1px solid var(--line);
     }
     .doom-row {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 10px;
-      padding: 8px 12px;
+      padding: 8px calc(12px + var(--safe-right)) 8px calc(12px + var(--safe-left));
       background: #eef3ff;
       border-bottom: 1px solid var(--line);
       font-size: 12px;
@@ -150,6 +179,7 @@
     }
     .segment {
       flex: 1 1 0;
+      min-width: 0;
       height: 34px;
       border: 1px solid var(--line-strong);
       border-radius: 8px;
@@ -158,6 +188,7 @@
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
+      white-space: nowrap;
     }
     .segment:hover {
       background: #f7f9ff;
@@ -186,8 +217,14 @@
       display: none;
       align-items: center;
       justify-content: center;
-      padding: 16px;
+      padding:
+        max(16px, calc(16px + var(--safe-top)))
+        max(16px, calc(16px + var(--safe-right)))
+        max(16px, calc(16px + var(--safe-bottom)))
+        max(16px, calc(16px + var(--safe-left)));
       background: rgba(15, 23, 42, 0.5);
+      overflow: auto;
+      overscroll-behavior: contain;
     }
     #doom-remote-modal.show,
     #stress-confirm-modal.show {
@@ -195,12 +232,15 @@
     }
     #doom-remote-panel,
     #stress-confirm-panel {
-      width: min(560px, 100%);
+      width: min(560px, calc(100vw - 32px - var(--safe-left) - var(--safe-right)));
+      max-width: 100%;
+      max-height: calc(var(--app-height) - 32px - var(--safe-top) - var(--safe-bottom));
       border: 1px solid var(--line-strong);
       border-radius: 12px;
       background: var(--surface);
       box-shadow: 0 24px 56px rgba(15, 23, 42, 0.26);
       padding: 16px;
+      overflow: auto;
     }
     #doom-remote-panel h2,
     #stress-confirm-panel h2 {
@@ -262,9 +302,10 @@
       filter: brightness(0.94);
     }
     #grid-container {
+      position: relative;
       flex: 1 1 auto;
       min-height: 0;
-      padding: 10px 12px;
+      padding: 10px calc(12px + var(--safe-right)) calc(10px + var(--safe-bottom)) calc(12px + var(--safe-left));
       overflow: hidden;
     }
     #grid-canvas {
@@ -274,12 +315,117 @@
       border-radius: var(--radius);
       background: #ffffff;
       outline: none;
+      touch-action: none;
+      user-select: none;
+    }
+    #doom-touch-controls {
+      position: absolute;
+      inset: 0;
+      display: none;
+      pointer-events: none;
+      z-index: 2;
+    }
+    #doom-touch-controls.show {
+      display: block;
+    }
+    .doom-touch-pad,
+    .doom-touch-actions {
+      pointer-events: auto;
+    }
+    .doom-touch-pad {
+      position: absolute;
+      left: 18px;
+      bottom: max(18px, calc(18px + var(--safe-bottom)));
+      width: 132px;
+      height: 132px;
+      border-radius: 50%;
+      border: 1px solid rgba(49, 89, 230, 0.28);
+      background:
+        radial-gradient(circle at center, rgba(49, 89, 230, 0.22) 0%, rgba(49, 89, 230, 0.12) 45%, rgba(49, 89, 230, 0.06) 70%, rgba(49, 89, 230, 0.02) 100%);
+      box-shadow: 0 16px 30px rgba(21, 34, 66, 0.18);
+      backdrop-filter: blur(10px);
+      touch-action: none;
+      user-select: none;
+    }
+    .doom-touch-pad-arrow {
+      position: absolute;
+      color: rgba(31, 37, 51, 0.65);
+      font-size: 16px;
+      font-weight: 700;
+      pointer-events: none;
+    }
+    .doom-touch-pad-arrow.up {
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .doom-touch-pad-arrow.down {
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .doom-touch-pad-arrow.left {
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .doom-touch-pad-arrow.right {
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .doom-touch-thumb {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 48px;
+      height: 48px;
+      margin-left: -24px;
+      margin-top: -24px;
+      border-radius: 50%;
+      border: 1px solid rgba(49, 89, 230, 0.4);
+      background: rgba(255, 255, 255, 0.78);
+      box-shadow: 0 10px 18px rgba(21, 34, 66, 0.18);
+      transition: transform 0.06s ease-out, background 0.12s ease-out, border-color 0.12s ease-out;
+    }
+    .doom-touch-pad.active .doom-touch-thumb {
+      background: rgba(228, 235, 255, 0.92);
+      border-color: rgba(49, 89, 230, 0.62);
+    }
+    .doom-touch-actions {
+      position: absolute;
+      right: 18px;
+      bottom: max(18px, calc(18px + var(--safe-bottom)));
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .doom-touch-btn {
+      min-width: 92px;
+      min-height: 52px;
+      border: 1px solid rgba(49, 89, 230, 0.28);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.84);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      box-shadow: 0 16px 30px rgba(21, 34, 66, 0.18);
+      backdrop-filter: blur(10px);
+      touch-action: none;
+      user-select: none;
+    }
+    .doom-touch-btn.active {
+      background: rgba(49, 89, 230, 0.18);
+      border-color: rgba(49, 89, 230, 0.6);
+      color: var(--accent);
     }
     #status-bar {
       flex: 0 0 auto;
       border-top: 1px solid var(--line);
       background: var(--surface);
-      padding: 8px 12px;
+      padding: 8px calc(12px + var(--safe-right)) calc(8px + var(--safe-bottom)) calc(12px + var(--safe-left));
       font-size: 12px;
       color: var(--muted);
       white-space: nowrap;
@@ -290,12 +436,108 @@
       display: none;
     }
     @media (max-width: 720px) {
+      .top-row {
+        align-items: stretch;
+      }
+      .top-row-group {
+        width: 100%;
+      }
+      .top-row-group-controls {
+        gap: 6px;
+      }
+      .top-row-group-controls select {
+        flex: 1 1 150px;
+      }
+      .top-row-spacer {
+        display: none;
+      }
+      .top-row-group-actions {
+        gap: 6px;
+      }
+      .icon-btn,
+      .segment,
+      .modal-btn {
+        min-height: 38px;
+      }
       .meta,
-      .switch {
+      .toggle,
+      .doom-row,
+      #status-bar {
         font-size: 11px;
+      }
+      .demo-row {
+        gap: 6px;
       }
       .segment {
         font-size: 12px;
+      }
+      #doom-remote-actions,
+      #stress-confirm-actions {
+        flex-direction: column-reverse;
+      }
+      .modal-btn {
+        width: 100%;
+      }
+      #status-bar {
+        white-space: normal;
+        line-height: 1.4;
+      }
+      .doom-touch-pad {
+        width: 118px;
+        height: 118px;
+        left: 12px;
+      }
+      .doom-touch-thumb {
+        width: 42px;
+        height: 42px;
+        margin-left: -21px;
+        margin-top: -21px;
+      }
+      .doom-touch-actions {
+        right: 12px;
+      }
+      .doom-touch-btn {
+        min-width: 84px;
+        min-height: 48px;
+        font-size: 12px;
+      }
+    }
+    @media (max-width: 460px) {
+      .top-row-group-actions {
+        gap: 4px;
+      }
+      .top-row-group-actions .icon-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+      }
+      .top-row-group-actions .toggle {
+        min-width: 0;
+        gap: 4px;
+        font-size: 10px;
+      }
+      .top-row-group-actions .toggle > span:first-child {
+        letter-spacing: -0.01em;
+      }
+      .top-row-group-actions .toggle-track {
+        width: 28px;
+        height: 16px;
+      }
+      .top-row-group-actions .toggle-track::after {
+        top: 2px;
+        left: 2px;
+        width: 12px;
+        height: 12px;
+      }
+      .top-row-group-actions .toggle input:checked + .toggle-track::after {
+        transform: translateX(12px);
+      }
+      .doom-touch-pad {
+        width: 108px;
+        height: 108px;
+      }
+      .doom-touch-btn {
+        min-width: 76px;
       }
     }
   </style>
@@ -303,7 +545,7 @@
 <body>
   <div class="app">
     <div class="top-row">
-      <div class="meta">
+      <div class="top-row-group top-row-group-controls meta">
         <select id="sel-canvas-res" aria-label="Canvas Resolution">
           <option value="auto" selected>AUTO</option>
         </select>
@@ -316,29 +558,31 @@
           <option value="0">0</option>
         </select>
       </div>
-      <div style="flex:1"></div>
-      <button id="btn-sort-asc" class="icon-btn" aria-label="Sort Ascending">↑</button>
-      <button id="btn-sort-desc" class="icon-btn" aria-label="Sort Descending">↓</button>
-      <label class="toggle">
-        <span>GPU</span>
-        <input type="checkbox" id="chk-gpu">
-        <span class="toggle-track"></span>
-      </label>
-      <label class="toggle">
-        <span>Anim</span>
-        <input type="checkbox" id="chk-anim">
-        <span class="toggle-track"></span>
-      </label>
-      <label class="toggle">
-        <span>Hover</span>
-        <input type="checkbox" id="chk-hover">
-        <span class="toggle-track"></span>
-      </label>
-      <label class="toggle">
-        <span>Debug</span>
-        <input type="checkbox" id="chk-debug">
-        <span class="toggle-track"></span>
-      </label>
+      <div class="top-row-spacer"></div>
+      <div class="top-row-group top-row-group-actions">
+        <button id="btn-sort-asc" class="icon-btn" aria-label="Sort Ascending">↑</button>
+        <button id="btn-sort-desc" class="icon-btn" aria-label="Sort Descending">↓</button>
+        <label class="toggle">
+          <span>GPU</span>
+          <input type="checkbox" id="chk-gpu">
+          <span class="toggle-track"></span>
+        </label>
+        <label class="toggle">
+          <span>Anim</span>
+          <input type="checkbox" id="chk-anim">
+          <span class="toggle-track"></span>
+        </label>
+        <label class="toggle">
+          <span>Hover</span>
+          <input type="checkbox" id="chk-hover">
+          <span class="toggle-track"></span>
+        </label>
+        <label class="toggle">
+          <span>Debug</span>
+          <input type="checkbox" id="chk-debug">
+          <span class="toggle-track"></span>
+        </label>
+      </div>
     </div>
 
     <div class="demo-row">
@@ -368,6 +612,20 @@
 
     <div id="grid-container">
       <canvas id="grid-canvas" tabindex="0"></canvas>
+      <div id="doom-touch-controls" aria-hidden="true">
+        <div id="doom-joystick" class="doom-touch-pad" aria-label="DOOM movement joystick">
+          <span class="doom-touch-pad-arrow up">^</span>
+          <span class="doom-touch-pad-arrow left">&lt;</span>
+          <span class="doom-touch-pad-arrow right">&gt;</span>
+          <span class="doom-touch-pad-arrow down">v</span>
+          <div id="doom-joystick-thumb" class="doom-touch-thumb"></div>
+        </div>
+        <div class="doom-touch-actions">
+          <button id="btn-doom-select" class="doom-touch-btn" type="button">Select</button>
+          <button id="btn-doom-fire" class="doom-touch-btn" type="button">Fire</button>
+          <button id="btn-doom-use" class="doom-touch-btn" type="button">Use</button>
+        </div>
+      </div>
     </div>
 
     <div id="status-bar">

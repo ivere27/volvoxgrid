@@ -1,8 +1,8 @@
-export { VolvoxExcel } from "./volvox-excel.js";
-export { VolvoxExcelElement } from "./volvox-excel-element.js";
+export { VolvoxSheet } from "./volvox-sheet.js";
+export { VolvoxSheetElement } from "./volvox-sheet-element.js";
 export type {
-  VolvoxExcelOptions,
-  VolvoxExcelApi,
+  VolvoxSheetOptions,
+  VolvoxSheetApi,
   CellRef,
   CellRange,
   CellStyleUpdate,
@@ -11,5 +11,5 @@ export type {
   KeyBinding,
   UndoableCommand,
 } from "./types.js";
-export { ALIGN } from "./theme/excel-theme.js";
+export { ALIGN } from "./theme/sheet-theme.js";
 export { colToLetter, letterToCol, toA1, fromA1 } from "./core/cell-reference.js";

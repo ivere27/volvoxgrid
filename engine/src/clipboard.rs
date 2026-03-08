@@ -53,9 +53,10 @@ pub fn copy(grid: &VolvoxGrid) -> (String, Vec<u8>) {
             if c > c1 {
                 text.push_str(col_sep);
             }
-            if ranges.iter().any(|&(sr1, sc1, sr2, sc2)| {
-                r >= sr1 && r <= sr2 && c >= sc1 && c <= sc2
-            }) {
+            if ranges
+                .iter()
+                .any(|&(sr1, sc1, sr2, sc2)| r >= sr1 && r <= sr2 && c >= sc1 && c <= sc2)
+            {
                 text.push_str(grid.cells.get_text(r, c));
             }
         }

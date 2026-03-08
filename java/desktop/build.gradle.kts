@@ -18,6 +18,28 @@ fun captureCommandOutput(workDir: File, vararg command: String): String? {
 fun escapeJavaString(value: String): String =
     value.replace("\\", "\\\\").replace("\"", "\\\"")
 
+fun requireExistingFile(path: String, label: String, sourceProperty: String): File {
+    if (path.isBlank()) {
+        throw org.gradle.api.GradleException("$label must be set when $sourceProperty=local")
+    }
+    val file = File(path)
+    if (!file.isFile) {
+        throw org.gradle.api.GradleException("$label file not found: $path")
+    }
+    return file
+}
+
+fun requireExistingDirectory(path: String, label: String, sourceProperty: String): File {
+    if (path.isBlank()) {
+        throw org.gradle.api.GradleException("$label must be set when $sourceProperty=local")
+    }
+    val file = File(path)
+    if (!file.isDirectory) {
+        throw org.gradle.api.GradleException("$label directory not found: $path")
+    }
+    return file
+}
+
 fun findVolvoxgridVersionFile(startDir: File): File? {
     var current: File? = startDir.canonicalFile
     while (current != null) {
@@ -60,7 +82,7 @@ repositories {
 }
 
 val synurangDesktopVersion = providers.gradleProperty("synurangDesktopVersion")
-    .orElse("0.5.3")
+    .orElse("0.5.4")
     .get()
 val isSynurangDesktopSnapshot = synurangDesktopVersion.endsWith("-SNAPSHOT")
 val volvoxgridDesktopSource = providers.gradleProperty("volvoxgridDesktopSource")
@@ -91,20 +113,18 @@ val synurangDesktopSource = providers.gradleProperty("synurangDesktopSource")
     .get()
     .trim()
     .lowercase()
-val defaultSynurangMavenDir = rootDir.toPath()
-    .resolve("../../../../../open/synurang/dist/maven")
-    .normalize()
-    .toAbsolutePath()
-    .toString()
-val synurangMavenDir = providers.gradleProperty("synurangMavenDir")
-    .orElse(providers.environmentVariable("SYNURANG_MAVEN_DIR"))
-    .orElse(defaultSynurangMavenDir)
+val synurangJavaJar = providers.gradleProperty("synurangJavaJar")
+    .orElse(providers.environmentVariable("SYNURANG_JAVA_JAR"))
+    .orElse("")
     .get()
-val synurangDesktopJars = fileTree(synurangMavenDir) {
-    include("synurang-desktop-*.jar")
-    include("synurang-desktop-grpc-*.jar")
-    include("classes.jar")
-}
+val synurangJavaLibDir = providers.gradleProperty("synurangJavaLibDir")
+    .orElse(providers.environmentVariable("SYNURANG_JAVA_LIB_DIR"))
+    .orElse("")
+    .get()
+val synurangNativeLibPath = providers.gradleProperty("synurangNativeLibPath")
+    .orElse(providers.environmentVariable("SYNURANG_NATIVE_LIB_PATH"))
+    .orElse("")
+    .get()
 
 configurations.configureEach {
     if (isVolvoxgridSnapshot || isSynurangDesktopSnapshot) {
@@ -132,7 +152,24 @@ dependencies {
         }
         implementation("io.grpc:grpc-api:1.60.0")
     } else {
-        implementation(synurangDesktopJars)
+        val localSynurangJavaJar = requireExistingFile(
+            synurangJavaJar,
+            "synurangJavaJar/SYNURANG_JAVA_JAR",
+            "synurangDesktopSource"
+        )
+        val localSynurangJavaLibDir = requireExistingDirectory(
+            synurangJavaLibDir,
+            "synurangJavaLibDir/SYNURANG_JAVA_LIB_DIR",
+            "synurangDesktopSource"
+        )
+        implementation(
+            files(
+                localSynurangJavaJar,
+                fileTree(localSynurangJavaLibDir) {
+                    include("*.jar")
+                }
+            )
+        )
     }
 
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
@@ -226,6 +263,15 @@ tasks.register<JavaExec>("runSimpleDemo") {
     description = "Run the minimal desktop demo."
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("io.github.ivere27.volvoxgrid.desktop.VolvoxGridDesktopDemo")
+}
+
+tasks.withType<JavaExec>().configureEach {
+    if (synurangDesktopSource == "local" && synurangNativeLibPath.isNotBlank()) {
+        val nativeLibFile = file(synurangNativeLibPath)
+        if (nativeLibFile.isFile) {
+            systemProperty("synurang.library.path", nativeLibFile.absolutePath)
+        }
+    }
 }
 
 tasks.test {

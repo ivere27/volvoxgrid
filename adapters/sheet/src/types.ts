@@ -1,6 +1,6 @@
 import type { VolvoxGrid } from "volvoxgrid";
 
-export type VolvoxExcelGrid = VolvoxGrid & {
+export type VolvoxSheetGrid = VolvoxGrid & {
   rowCount: number;
   colCount: number;
   selectionMode: number;
@@ -105,7 +105,7 @@ export interface KeyBinding {
 
 // ── Options ────────────────────────────────────────────────
 
-export interface VolvoxExcelOptions {
+export interface VolvoxSheetOptions {
   container: HTMLElement;
   wasm: any;
   rows?: number;
@@ -124,8 +124,8 @@ export interface VolvoxExcelOptions {
 
 // ── Public API ─────────────────────────────────────────────
 
-export interface VolvoxExcelApi {
-  readonly grid: VolvoxExcelGrid;
+export interface VolvoxSheetApi {
+  readonly grid: VolvoxSheetGrid;
 
   // Data
   getCellValue(row: number, col: number): string;
@@ -182,13 +182,13 @@ export interface UndoableCommand {
 
 // ── Events ─────────────────────────────────────────────────
 
-export interface ExcelSelectionChangedDetail {
+export interface SheetSelectionChangedDetail {
   row: number;
   col: number;
   ref: string;   // "A1" style
 }
 
-export interface ExcelCellEditDetail {
+export interface SheetCellEditDetail {
   row: number;
   col: number;
   oldText: string;

@@ -5,7 +5,7 @@
  * mechanics). Higher-level input — keyboard navigation, edit-on-keypress,
  * and context menus — is left to the consumer.
  *
- * For adapters like VolvoxExcel that implement their own key dispatch and
+ * For adapters like VolvoxSheet that implement their own key dispatch and
  * context menus, these helpers are NOT needed.
  *
  * For simple demos or thin wrappers, call:

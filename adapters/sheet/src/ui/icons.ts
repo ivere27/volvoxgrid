@@ -1,7 +1,7 @@
 /**
  * Material Icons icon helper.
  *
- * Uses the bundled .ttf font declared via @font-face in volvox-excel.css.
+ * Uses the bundled .ttf font declared via @font-face in volvox-sheet.css.
  * Icons are rendered as ligature text: the span's textContent is the
  * Material Icons ligature name (e.g. "undo", "format_bold").
  */

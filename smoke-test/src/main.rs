@@ -5,7 +5,7 @@
 
 use prost::Message;
 use std::path::Path;
-use synurang_host::PluginHost;
+use synurang_host::{Error, FfiError, PluginHost};
 
 use volvoxgrid_engine::proto::volvoxgrid::v1::*;
 
@@ -39,6 +39,14 @@ fn invoke(plugin: &PluginHost, method: &str, req: &[u8]) -> Vec<u8> {
     }
 }
 
+fn expect_plugin_error(plugin: &PluginHost, method: &str, req: &[u8]) -> FfiError {
+    match plugin.invoke(SERVICE, method, req) {
+        Ok(_) => panic!("RPC {} unexpectedly succeeded", method),
+        Err(Error::PluginError(err)) => err,
+        Err(e) => panic!("RPC {} failed with unexpected host error: {}", method, e),
+    }
+}
+
 fn main() {
     let plugin_path = std::env::args()
         .nth(1)
@@ -48,7 +56,7 @@ fn main() {
     let plugin = PluginHost::load(&plugin_path).expect("Failed to load plugin");
     println!("Plugin loaded successfully.");
 
-    // 1. Create — returns GridHandle
+    // 1. Create — returns CreateResponse with GridHandle
     let req = CreateRequest {
         viewport_width: 800,
         viewport_height: 600,
@@ -90,8 +98,8 @@ fn main() {
         "/volvoxgrid.v1.VolvoxGridService/Create",
         &req.encode_to_vec(),
     );
-    let handle = GridHandle::decode(resp_bytes.as_slice()).expect("decode GridHandle");
-    let grid_id = handle.id;
+    let create = CreateResponse::decode(resp_bytes.as_slice()).expect("decode CreateResponse");
+    let grid_id = create.handle.expect("create handle should be present").id;
     println!("Created grid: id={}", grid_id);
 
     // 2. GetConfig — verify rows/cols
@@ -111,7 +119,34 @@ fn main() {
         layout.cols.unwrap()
     );
 
-    // 3. DefineColumns — set captions for the top column-indicator band
+    // 3. Structured FFI error — empty font payload should round-trip as FfiError
+    let ffi_error = expect_plugin_error(
+        &plugin,
+        "/volvoxgrid.v1.VolvoxGridService/LoadFontData",
+        &LoadFontDataRequest {
+            data: Vec::new(),
+            font_name: String::new(),
+            font_names: Vec::new(),
+        }
+        .encode_to_vec(),
+    );
+    assert_eq!(
+        ffi_error.code,
+        ErrorCode::ErrorInvalidArgument as i32,
+        "Expected VolvoxGrid invalid-argument error code"
+    );
+    assert_eq!(ffi_error.grpc_code, 3, "Expected gRPC INVALID_ARGUMENT");
+    assert_eq!(ffi_error.message, "font data is empty");
+    assert!(
+        !ffi_error.payload.is_empty(),
+        "Expected serialized core.v1.Error payload"
+    );
+    println!(
+        "Structured FFI error verified: code={}, grpc_code={}, message={}",
+        ffi_error.code, ffi_error.grpc_code, ffi_error.message
+    );
+
+    // 4. DefineColumns — set captions for the top column-indicator band
     let headers = ["Product", "Category", "Sales", "Quarter", "Region"];
     let columns: Vec<ColumnDef> = headers
         .iter()
@@ -123,10 +158,7 @@ fn main() {
             ..Default::default()
         })
         .collect();
-    let req = DefineColumnsRequest {
-        grid_id,
-        columns,
-    };
+    let req = DefineColumnsRequest { grid_id, columns };
     invoke(
         &plugin,
         "/volvoxgrid.v1.VolvoxGridService/DefineColumns",
@@ -134,7 +166,7 @@ fn main() {
     );
     println!("Defined {} column captions.", headers.len());
 
-    // 4. UpdateCells — data rows (batch all 250 cells in one call)
+    // 5. UpdateCells — data rows (batch all 250 cells in one call)
     let products = ["Widget A", "Widget B", "Gadget X", "Gadget Y", "Tool Z"];
     let categories = [
         "Electronics",
@@ -177,7 +209,7 @@ fn main() {
     );
     println!("Populated 50 data rows.");
 
-    // 5. GetCells — verify the first data row
+    // 6. GetCells — verify the first data row
     let req = GetCellsRequest {
         grid_id,
         row1: 0,
@@ -205,7 +237,7 @@ fn main() {
     }
     println!("GetCells verified.");
 
-    // 6. Sort
+    // 7. Sort
     let req = SortRequest {
         grid_id,
         sort_columns: vec![SortColumn {
@@ -220,7 +252,7 @@ fn main() {
     );
     println!("Sort complete.");
 
-    // 7. GetCells after sort
+    // 8. GetCells after sort
     let req = GetCellsRequest {
         grid_id,
         row1: 0,
@@ -245,7 +277,7 @@ fn main() {
         println!("After sort, row 1 col 0 = \"{}\"", t);
     }
 
-    // 8. Configure selection mode + Select
+    // 9. Configure selection mode + Select
     let req = ConfigureRequest {
         grid_id,
         config: Some(GridConfig {
@@ -281,7 +313,7 @@ fn main() {
     );
     println!("Selection set: rows 2-5.");
 
-    // 9. Destroy
+    // 10. Destroy
     let handle = GridHandle { id: grid_id };
     invoke(
         &plugin,

@@ -7,8 +7,8 @@
 #   make wasm         — build WASM crate
 #   make web          — build WASM + start web dev server
 #   make codegen      — regenerate FFI bindings for all languages
-#   make excel        — build WASM + start Excel adapter dev server
-#   make excel-lite   — build WASM lite + start Excel adapter dev server
+#   make sheet        — build WASM + start Sheet adapter dev server
+#   make sheet-lite   — build WASM lite + start Sheet adapter dev server
 #   make doom-deps    — download optional DOOM assets for web demo mode
 #   make publish_web  — copy dist/web into public and deploy to Firebase
 #   make clean        — remove build artifacts
@@ -17,7 +17,7 @@
 # Variables
 # =============================================================================
 SYNURANG_MODULE ?= github.com/ivere27/synurang
-SYNURANG_VERSION ?= v0.5.3
+SYNURANG_VERSION ?= v0.5.4
 PROTOC_PLUGIN ?= $(shell command -v protoc-gen-synurang-ffi 2>/dev/null)
 ifeq ($(strip $(PROTOC_PLUGIN)),)
 PROTOC_PLUGIN := $(shell go env GOPATH 2>/dev/null)/bin/protoc-gen-synurang-ffi
@@ -202,7 +202,7 @@ endif
         flutter-run flutter-run-release flutter-linux \
         java-desktop-run java-desktop-run-release java-desktop-run-simple java-desktop-smoke \
         dotnet-build dotnet-build-release dotnet-run dotnet-run-release dotnet-smoke dotnet-smoke-release \
-        excel excel-lite excel-build \
+        sheet sheet-lite sheet-build \
         report report-build \
         activex activex-release activex-lite activex-lite-release \
         activex-gpu activex-gpu-release \
@@ -264,9 +264,9 @@ help:
 	@echo "  dotnet-smoke-release  Run automated .NET controller smoke checks (release)"
 	@echo "    (set DOTNET_TFM=net8.0-windows to switch target; default: net40)"
 	@echo "    (set DOTNET_ARCH=x86 to build 32-bit; default: x64)"
-	@echo "  excel          Build WASM + start Excel adapter Vite dev server"
-	@echo "  excel-lite     Build WASM lite + start Excel adapter Vite dev server"
-	@echo "  excel-build    Build Excel adapter npm package only"
+	@echo "  sheet          Build WASM + start Sheet adapter Vite dev server"
+	@echo "  sheet-lite     Build WASM lite + start Sheet adapter Vite dev server"
+	@echo "  sheet-build    Build Sheet adapter npm package only"
 	@echo "  doom-deps      Download GPL-2.0 DOOM assets for web mode (not part of Apache-2.0 source)"
 	@echo "  gtk-test       Build & launch GTK4 visual test (requires GTK4 dev libs)"
 	@echo ""
@@ -276,7 +276,7 @@ help:
 	@echo "  docker_desktop_image      Build Docker image for desktop JAR"
 	@echo "  docker_desktop            Build desktop JAR + .NET artifacts via Docker (+ ActiveX OCX release/release-lite), auto-install SNAPSHOT to mavenLocal"
 	@echo "  docker_web_image          Build Docker image for web dist/bundle tasks"
-	@echo "  docker_web                Build in Docker: WEB_DOCKER_TARGET={all|bundle|web|excel|excel-lite|report|wasm|wasm-lite|wasm-threaded}"
+	@echo "  docker_web                Build in Docker (default WEB_DOCKER_TARGET=all): WEB_DOCKER_TARGET={all|bundle|web|sheet|sheet-lite|report|wasm|wasm-lite|wasm-threaded}"
 	@echo "  docker_ios_image          Build Docker image for iOS"
 	@echo "  docker_ios                Build iOS XCFramework via Docker"
 	@echo "  docker_all_image          Build unified Docker image (all toolchains)"
@@ -287,9 +287,9 @@ help:
 	@echo "  publish_web               Copy dist/web -> public (clean), then run firebase deploy"
 	@echo ""
 	@echo "Example dependency source flags (default is local):"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.5"
-	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.1.5"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.1.5"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.2.0"
+	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.2.0"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.2.0"
 	@echo "  (maven mode skips local plugin build for the example targets)"
 	@echo "  Flutter defaults to maven when VOLVOXGRID_SOURCE is omitted."
 	@echo "  VOLVOXGRID_SOURCE=local builds from source."
@@ -452,36 +452,36 @@ web-lite: wasm-lite
 	cd web/example && npm install && VITE_VG_INITIAL_SCALE="$(WEB_SCALE)" VITE_VG_ENABLE_HOVER="$(WEB_HOVER)" npm run dev -- --host "$(WEB_HOST)"
 
 # =============================================================================
-# Excel Adapter — Spreadsheet UX on top of VolvoxGrid WASM
+# Sheet Adapter — Spreadsheet UX on top of VolvoxGrid WASM
 # =============================================================================
-EXCEL_DIR := adapters/excel
-EXCEL_WASM_DIR := $(EXCEL_DIR)/wasm
+SHEET_DIR := adapters/sheet
+SHEET_WASM_DIR := $(SHEET_DIR)/wasm
 WEB_JS_DIR := web/js
 
-excel: wasm
-	@echo "Building VolvoxGrid JS package for Excel adapter..."
+sheet: wasm
+	@echo "Building VolvoxGrid JS package for Sheet adapter..."
 	cd "$(WEB_JS_DIR)" && npm install && npm run build
-	@echo "Linking WASM output into Excel adapter..."
-	@mkdir -p "$(EXCEL_WASM_DIR)"
-	@ln -sf "$(abspath web/example/wasm)"/* "$(EXCEL_WASM_DIR)/"
-	@echo "Starting Excel adapter dev server (host=$(WEB_HOST))..."
-	cd "$(EXCEL_DIR)" && npm install && npx vite --host "$(WEB_HOST)"
+	@echo "Linking WASM output into Sheet adapter..."
+	@mkdir -p "$(SHEET_WASM_DIR)"
+	@ln -sf "$(abspath web/example/wasm)"/* "$(SHEET_WASM_DIR)/"
+	@echo "Starting Sheet adapter dev server (host=$(WEB_HOST))..."
+	cd "$(SHEET_DIR)" && npm install && npx vite --host "$(WEB_HOST)"
 
-excel-lite: wasm-lite
-	@echo "Building VolvoxGrid JS package for Excel adapter..."
+sheet-lite: wasm-lite
+	@echo "Building VolvoxGrid JS package for Sheet adapter..."
 	cd "$(WEB_JS_DIR)" && npm install && npm run build
-	@echo "Linking WASM lite output into Excel adapter..."
-	@mkdir -p "$(EXCEL_WASM_DIR)"
-	@ln -sf "$(abspath web/example/wasm)"/* "$(EXCEL_WASM_DIR)/"
-	@echo "Starting Excel adapter dev server (lite mode, host=$(WEB_HOST))..."
-	cd "$(EXCEL_DIR)" && npm install && npx vite --host "$(WEB_HOST)"
+	@echo "Linking WASM lite output into Sheet adapter..."
+	@mkdir -p "$(SHEET_WASM_DIR)"
+	@ln -sf "$(abspath web/example/wasm)"/* "$(SHEET_WASM_DIR)/"
+	@echo "Starting Sheet adapter dev server (lite mode, host=$(WEB_HOST))..."
+	cd "$(SHEET_DIR)" && npm install && npx vite --host "$(WEB_HOST)"
 
-excel-build:
-	@echo "Building VolvoxGrid JS package for Excel adapter..."
+sheet-build:
+	@echo "Building VolvoxGrid JS package for Sheet adapter..."
 	cd "$(WEB_JS_DIR)" && npm install && npm run build
-	@echo "Building Excel adapter npm package..."
-	cd "$(EXCEL_DIR)" && npm install && npm run build
-	@echo "Excel adapter build complete: $(EXCEL_DIR)/dist/"
+	@echo "Building Sheet adapter npm package..."
+	cd "$(SHEET_DIR)" && npm install && npm run build
+	@echo "Sheet adapter build complete: $(SHEET_DIR)/dist/"
 
 # =============================================================================
 # Report Engine — YAML-based reporting on top of VolvoxGrid WASM
@@ -821,11 +821,47 @@ android-plugin-release:
 					break; \
 				fi; \
 			done; \
-		done; \
-		if [ "$$JNI_COPIED" -eq 0 ]; then \
-			echo "Error: libvolvoxgrid_jni.so not found after Gradle build."; \
-			exit 1; \
-		fi
+			done; \
+			if [ "$$JNI_COPIED" -eq 0 ]; then \
+				echo "Error: libvolvoxgrid_jni.so not found after Gradle build."; \
+				exit 1; \
+			fi; \
+			if [ "$(VOLVOXGRID_SOURCE_RESOLVED)" = "maven" ] && echo "$(VOLVOXGRID_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
+				echo "Packaging Android SNAPSHOT AAR for mavenLocal..."; \
+				PACKAGE_MODE="full"; \
+				PACKAGE_GROUP_ID="$(AAR_GROUP_ID)"; \
+				PACKAGE_ARTIFACT_ID="$(AAR_ARTIFACT_ID)"; \
+				if [ "$(strip $(VOLVOXGRID_VARIANT))" = "lite" ]; then \
+					PACKAGE_MODE="lite"; \
+					PACKAGE_GROUP_ID="$(AAR_LITE_GROUP_ID)"; \
+					PACKAGE_ARTIFACT_ID="$(AAR_LITE_ARTIFACT_ID)"; \
+				fi; \
+				VERSION="$(VOLVOXGRID_VERSION)" \
+				SYNURANG_VERSION="$${SYNURANG_VERSION:-$(patsubst v%,%,$(SYNURANG_VERSION))}" \
+				GROUP_ID="$$PACKAGE_GROUP_ID" \
+				ARTIFACT_ID="$$PACKAGE_ARTIFACT_ID" \
+				GIT_COMMIT="$(AAR_GIT_COMMIT)" \
+				BUILD_DATE="$(AAR_BUILD_DATE)" \
+				PLUGIN_BUILD_MODE="$$PACKAGE_MODE" \
+				ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
+				BUILD_JOBS="$(BUILD_JOBS)" \
+				CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" \
+				GRADLE_MAX_WORKERS="$(GRADLE_MAX_WORKERS)" \
+				bash "$(CURRENT_DIR)/docker/build_android_aar.sh"; \
+				if [ "$$PACKAGE_MODE" = "lite" ]; then \
+					$(MAKE) publish_local \
+						AAR_VERSION="$(VOLVOXGRID_VERSION)" \
+						AAR_ARTIFACT_ID="__skip__" \
+						AAR_LITE_ARTIFACT_ID="$(AAR_LITE_ARTIFACT_ID)" \
+						DESKTOP_VERSION=0; \
+				else \
+					$(MAKE) publish_local \
+						AAR_VERSION="$(VOLVOXGRID_VERSION)" \
+						AAR_ARTIFACT_ID="$(AAR_ARTIFACT_ID)" \
+						AAR_LITE_ARTIFACT_ID="__skip__" \
+						DESKTOP_VERSION=0; \
+				fi; \
+			fi
 	@echo "Android release plugin build complete."
 
 android-install: $(ANDROID_INSTALL_PREREQ)
@@ -1349,7 +1385,7 @@ publish_web:
 	@command -v firebase >/dev/null 2>&1 || { echo "Error: firebase CLI not found in PATH."; echo "Install with: npm install -g firebase-tools"; exit 1; }
 	@if [ ! -d "$(WEB_BUNDLE_DIR)" ]; then \
 		echo "Error: $(WEB_BUNDLE_DIR) not found."; \
-		echo "Build web artifacts first (for example: make docker_web WEB_DOCKER_TARGET=web)."; \
+		echo "Build web artifacts first (for example: make docker_web)."; \
 		exit 1; \
 	fi
 	@echo "Syncing $(WEB_BUNDLE_DIR) -> $(FIREBASE_PUBLIC_DIR) (clean copy, keeping index.html)..."
@@ -1477,4 +1513,4 @@ clean:
 clean-all: clean
 	rm -rf web/crate/pkg web/example/wasm web/example/node_modules web/js/node_modules
 	rm -rf web/example/public/doom
-	rm -rf adapters/excel/node_modules adapters/excel/dist adapters/excel/wasm
+	rm -rf adapters/sheet/node_modules adapters/sheet/dist adapters/sheet/wasm

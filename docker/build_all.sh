@@ -48,7 +48,7 @@ run_desktop() {
   echo "========================================"
   local desktop_group_id="${DESKTOP_GROUP_ID:-io.github.ivere27}"
   local desktop_artifact_id="${DESKTOP_ARTIFACT_ID:-volvoxgrid-desktop}"
-  local desktop_version="${DESKTOP_VERSION:-${VERSION:-0.1.2}}"
+  local desktop_version="${DESKTOP_VERSION:-${VERSION:-0.2.0}}"
   local desktop_git_commit="${DESKTOP_GIT_COMMIT:-${GIT_COMMIT:-unknown}}"
   local desktop_build_date="${DESKTOP_BUILD_DATE:-${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}}"
 
@@ -69,57 +69,28 @@ run_ios() {
 
 run_wasm() {
   echo "========================================"
-  echo "  Building: WASM + Web JS bundles"
+  echo "  Building: WASM + Web demos/bundles"
   echo "========================================"
-  DIST_DIR="${DIST_DIR:-${REPO_ROOT}/dist/wasm}"
-  DIST_LITE_DIR="${DIST_LITE_DIR:-${REPO_ROOT}/dist/wasm-lite}"
+  local dist_dir="${DIST_DIR:-${REPO_ROOT}/dist/wasm}"
+  local dist_lite_dir="${DIST_LITE_DIR:-${REPO_ROOT}/dist/wasm-lite}"
+  local web_target="${WEB_DOCKER_TARGET:-all}"
   WEB_DIST_DIR="${WEB_DIST_DIR:-${REPO_ROOT}/dist/web}"
-  WEB_BUNDLE_VERSION="${WEB_BUNDLE_VERSION:-${VERSION:-0.1.2}}"
-  WEB_BUNDLE_NAME="${WEB_BUNDLE_NAME:-volvoxgrid-web-${WEB_BUNDLE_VERSION}.zip}"
-  WEB_BUNDLE_LITE_NAME="${WEB_BUNDLE_LITE_NAME:-volvoxgrid-web-lite-${WEB_BUNDLE_VERSION}.zip}"
+  WEB_BUNDLE_VERSION="${WEB_BUNDLE_VERSION:-${VERSION:-0.2.0}}"
+  if [[ -z "${WEB_DOCKER_TARGET:-}" && "${BUILD_TARGET}" == "wasm" ]]; then
+    web_target="bundle"
+  fi
 
-  package_web_bundle() {
-    local root_name="$1"
-    local wasm_dir="$2"
-    local zip_path="$3"
-    local bundle_tmp
-    bundle_tmp="$(mktemp -d /tmp/volvoxgrid-web-XXXXXX)"
-    local bundle_root="${bundle_tmp}/${root_name}"
+  VOLVOXGRID_VERSION="${WEB_BUNDLE_VERSION}" \
+  WEB_DOCKER_TARGET="${web_target}" \
+  WEB_SCALE="${WEB_SCALE:-1.0}" \
+    bash "${REPO_ROOT}/docker/build_web.sh"
 
-    mkdir -p "${bundle_root}/js" "${bundle_root}/wasm"
-    cp -a "${REPO_ROOT}/web/js/dist/." "${bundle_root}/js/"
-    cp "${REPO_ROOT}/web/js/package.json" "${bundle_root}/js/"
-    cp -a "${wasm_dir}/." "${bundle_root}/wasm/"
-
-    (
-      cd "${bundle_tmp}"
-      rm -f "${zip_path}"
-      zip -qr "${zip_path}" "${root_name}"
-    )
-    rm -rf "${bundle_tmp}"
-  }
-
-  mkdir -p "${DIST_DIR}" "${DIST_LITE_DIR}" "${WEB_DIST_DIR}"
-  (
-    cd "${REPO_ROOT}/web/crate"
-    rustup run nightly wasm-pack build . --release --target web --out-dir "${DIST_DIR}" --features gpu
-    rustup run nightly wasm-pack build . --release --target web --out-dir "${DIST_LITE_DIR}" --no-default-features
-  )
-
-  (
-    cd "${REPO_ROOT}/web/js"
-    npm ci
-    npm run build
-  )
-
-  package_web_bundle "volvoxgrid-web" "${DIST_DIR}" "${WEB_DIST_DIR}/${WEB_BUNDLE_NAME}"
-  package_web_bundle "volvoxgrid-web-lite" "${DIST_LITE_DIR}" "${WEB_DIST_DIR}/${WEB_BUNDLE_LITE_NAME}"
-
-  echo "WASM artifacts: ${DIST_DIR}/"
-  echo "WASM lite artifacts: ${DIST_LITE_DIR}/"
-  echo "Web bundles:"
-  echo "  ${WEB_DIST_DIR}/${WEB_BUNDLE_NAME}"
-  echo "  ${WEB_DIST_DIR}/${WEB_BUNDLE_LITE_NAME}"
+  echo "WASM artifacts: ${dist_dir}/"
+  echo "WASM lite artifacts: ${dist_lite_dir}/"
+  echo "Web demos:"
+  echo "  ${WEB_DIST_DIR}/demos/web"
+  echo "  ${WEB_DIST_DIR}/demos/sheet"
+  echo "  ${WEB_DIST_DIR}/demos/sheet-lite"
 }
 
 case "${BUILD_TARGET}" in

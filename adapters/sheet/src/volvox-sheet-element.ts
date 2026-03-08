@@ -1,5 +1,5 @@
 /**
- * <volvox-excel> custom element.
+ * <volvox-sheet> custom element.
  *
  * Attributes:
  *   rows      - number of data rows (default 100)
@@ -7,11 +7,11 @@
  *   wasm-url  - URL of the WASM module (default "./wasm/volvoxgrid_wasm.js")
  */
 
-import { VolvoxExcel } from "./volvox-excel.js";
-import type { VolvoxExcelApi } from "./types.js";
+import { VolvoxSheet } from "./volvox-sheet.js";
+import type { VolvoxSheetApi } from "./types.js";
 
-class VolvoxExcelElement extends HTMLElement {
-  private _excel?: VolvoxExcel;
+class VolvoxSheetElement extends HTMLElement {
+  private _sheet?: VolvoxSheet;
   private shadow: ShadowRoot;
 
   static get observedAttributes(): string[] {
@@ -48,14 +48,14 @@ class VolvoxExcelElement extends HTMLElement {
   }
 
   disconnectedCallback(): void {
-    if (this._excel) {
-      this._excel.destroy();
-      this._excel = undefined;
+    if (this._sheet) {
+      this._sheet.destroy();
+      this._sheet = undefined;
     }
   }
 
-  get excel(): VolvoxExcelApi | undefined {
-    return this._excel;
+  get sheet(): VolvoxSheetApi | undefined {
+    return this._sheet;
   }
 
   private async initWasm(host: HTMLElement): Promise<void> {
@@ -67,7 +67,7 @@ class VolvoxExcelElement extends HTMLElement {
       const wasmModule = await import(/* @vite-ignore */ wasmUrl);
       await wasmModule.default();
 
-      this._excel = new VolvoxExcel({
+      this._sheet = new VolvoxSheet({
         container: host,
         wasm: wasmModule,
         rows,
@@ -75,17 +75,17 @@ class VolvoxExcelElement extends HTMLElement {
       });
 
       this.dispatchEvent(
-        new CustomEvent("volvox-excel-ready", {
-          detail: { excel: this._excel },
+        new CustomEvent("volvox-sheet-ready", {
+          detail: { sheet: this._sheet },
           bubbles: true,
         }),
       );
     } catch (err) {
-      console.error("Failed to initialise VolvoxExcel WASM module:", err);
+      console.error("Failed to initialise VolvoxSheet WASM module:", err);
     }
   }
 }
 
-customElements.define("volvox-excel", VolvoxExcelElement);
+customElements.define("volvox-sheet", VolvoxSheetElement);
 
-export { VolvoxExcelElement };
+export { VolvoxSheetElement };

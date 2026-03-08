@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>VolvoxExcel — Capture Compare</title>
+<title>VolvoxSheet — Capture Compare</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: sans-serif; background: #f0f0f0; padding: 20px; }
@@ -23,7 +23,7 @@
 <script type="module">
 import init from "../wasm/volvoxgrid_wasm.js";
 import * as wasmModule from "../wasm/volvoxgrid_wasm.js";
-import { VolvoxExcel } from "../src/index.ts";
+import { VolvoxSheet } from "../src/index.ts";
 
 const pageParams = new URLSearchParams(window.location.search);
 const captureFontFamily = (pageParams.get("vv-font-family") || "").trim();
@@ -40,7 +40,7 @@ document.documentElement.style.setProperty("--grid-height", `${gridHeight}px`);
 window.__captureReady = false;
 window.__error = null;
 
-let excelInstance = null;
+let sheetInstance = null;
 let wasmReady = false;
 let wasm = null;
 
@@ -154,9 +154,9 @@ function parseLine(line) {
 }
 
 /**
- * Execute a parsed command against a VolvoxExcel instance.
+ * Execute a parsed command against a VolvoxSheet instance.
  */
-async function executeCommand(excel, cmd) {
+async function executeCommand(sheet, cmd) {
   const { method, args } = cmd;
 
   function parseExpectedValue(raw) {
@@ -174,19 +174,19 @@ async function executeCommand(excel, cmd) {
 
   switch (method) {
     case "setCellValue":
-      excel.setCellValue(args[0], args[1], String(args[2]));
+      sheet.setCellValue(args[0], args[1], String(args[2]));
       break;
     case "getCellValue":
-      return excel.getCellValue(args[0], args[1]);
+      return sheet.getCellValue(args[0], args[1]);
     case "getCellRawValue":
-      return excel.getCellRawValue(args[0], args[1]);
+      return sheet.getCellRawValue(args[0], args[1]);
     case "getCellFormula":
-      return excel.getCellFormula(args[0], args[1]);
+      return sheet.getCellFormula(args[0], args[1]);
     case "assertCellValue": {
       const row = Number(args[0]);
       const col = Number(args[1]);
       const expected = String(args[2] ?? "");
-      const actual = excel.getCellValue(row, col);
+      const actual = sheet.getCellValue(row, col);
       if (actual !== expected) {
         throw new Error(
           `assertCellValue failed at (${row},${col}): expected "${expected}", got "${actual}"`,
@@ -198,7 +198,7 @@ async function executeCommand(excel, cmd) {
       const row = Number(args[0]);
       const col = Number(args[1]);
       const expected = String(args[2] ?? "");
-      const actual = excel.getCellRawValue(row, col);
+      const actual = sheet.getCellRawValue(row, col);
       if (actual !== expected) {
         throw new Error(
           `assertCellRawValue failed at (${row},${col}): expected "${expected}", got "${actual}"`,
@@ -210,7 +210,7 @@ async function executeCommand(excel, cmd) {
       const row = Number(args[0]);
       const col = Number(args[1]);
       const expected = parseExpectedValue(args[2]);
-      const actual = excel.getCellFormula(row, col);
+      const actual = sheet.getCellFormula(row, col);
       if (actual !== expected) {
         throw new Error(
           `assertCellFormula failed at (${row},${col}): expected ${String(expected)}, got ${String(actual)}`,
@@ -222,7 +222,7 @@ async function executeCommand(excel, cmd) {
       const row = Number(args[0]);
       const col = Number(args[1]);
       const pattern = String(args[2] ?? "");
-      const actual = excel.getCellValue(row, col);
+      const actual = sheet.getCellValue(row, col);
       const re = new RegExp(pattern);
       if (!re.test(actual)) {
         throw new Error(
@@ -234,7 +234,7 @@ async function executeCommand(excel, cmd) {
     case "assertCanUndo": {
       const raw = args[0];
       const expected = raw === true || raw === 1 || String(raw).toLowerCase() === "true";
-      const actual = Boolean(excel.undoStack && excel.undoStack.canUndo);
+      const actual = Boolean(sheet.undoStack && sheet.undoStack.canUndo);
       if (actual !== expected) {
         throw new Error(`assertCanUndo failed: expected ${expected}, got ${actual}`);
       }
@@ -243,7 +243,7 @@ async function executeCommand(excel, cmd) {
     case "assertCanRedo": {
       const raw = args[0];
       const expected = raw === true || raw === 1 || String(raw).toLowerCase() === "true";
-      const actual = Boolean(excel.undoStack && excel.undoStack.canRedo);
+      const actual = Boolean(sheet.undoStack && sheet.undoStack.canRedo);
       if (actual !== expected) {
         throw new Error(`assertCanRedo failed: expected ${expected}, got ${actual}`);
       }
@@ -257,7 +257,7 @@ async function executeCommand(excel, cmd) {
       const gridRow = dataRow;
       const gridCol = dataCol;
       const key = `${gridRow}:${gridCol}`;
-      const style = excel.cellStyleCache?.get?.(key) || {};
+      const style = sheet.cellStyleCache?.get?.(key) || {};
       const actual = style[prop];
       if (actual !== expected) {
         throw new Error(
@@ -268,9 +268,9 @@ async function executeCommand(excel, cmd) {
     }
     case "assertSelection": {
       const expected = args[0] || {};
-      const actual = excel.getSelection();
-      const maxRow = excel.grid.rowCount - 1;
-      const maxCol = excel.grid.colCount - 1;
+      const actual = sheet.getSelection();
+      const maxRow = sheet.grid.rowCount - 1;
+      const maxCol = sheet.grid.colCount - 1;
       for (const key of ["row1", "col1", "row2", "col2"]) {
         if (expected[key] == null) continue;
         const rawWant = expected[key];
@@ -290,7 +290,7 @@ async function executeCommand(excel, cmd) {
       const dataRow = Number(args[0]);
       const expected = Number(args[1]);
       const gridRow = dataRow;
-      const actual = excel.grid.getRowHeight(gridRow);
+      const actual = sheet.grid.getRowHeight(gridRow);
       if (actual !== expected) {
         throw new Error(
           `assertRowHeight failed at dataRow=${dataRow}: expected ${expected}, got ${actual}`,
@@ -302,7 +302,7 @@ async function executeCommand(excel, cmd) {
       const dataCol = Number(args[0]);
       const expected = Number(args[1]);
       const gridCol = dataCol;
-      const actual = excel.grid.getColWidth(gridCol);
+      const actual = sheet.grid.getColWidth(gridCol);
       if (actual !== expected) {
         throw new Error(
           `assertColWidth failed at dataCol=${dataCol}: expected ${expected}, got ${actual}`,
@@ -311,84 +311,84 @@ async function executeCommand(excel, cmd) {
       break;
     }
     case "setData":
-      excel.setData(args[0]);
+      sheet.setData(args[0]);
       break;
     case "clearRange":
-      excel.clearRange(args[0]);
+      sheet.clearRange(args[0]);
       break;
     case "setSelection":
-      excel.setSelection(args[0]);
+      sheet.setSelection(args[0]);
       break;
     case "setCellStyle":
-      excel.setCellStyle(args[0], args[1], args[2]);
+      sheet.setCellStyle(args[0], args[1], args[2]);
       break;
     case "setRangeStyle":
-      excel.setRangeStyle(args[0], args[1]);
+      sheet.setRangeStyle(args[0], args[1]);
       break;
     case "insertRows":
-      excel.insertRows(args[0], args[1] ?? 1);
+      sheet.insertRows(args[0], args[1] ?? 1);
       break;
     case "deleteRows":
-      excel.deleteRows(args[0], args[1] ?? 1);
+      sheet.deleteRows(args[0], args[1] ?? 1);
       break;
     case "insertColumns":
-      excel.insertColumns(args[0], args[1] ?? 1);
+      sheet.insertColumns(args[0], args[1] ?? 1);
       break;
     case "deleteColumns":
-      excel.deleteColumns(args[0], args[1] ?? 1);
+      sheet.deleteColumns(args[0], args[1] ?? 1);
       break;
     case "setColumnWidth":
-      excel.setColumnWidth(args[0], args[1]);
+      sheet.setColumnWidth(args[0], args[1]);
       break;
     case "setRowHeight":
-      excel.setRowHeight(args[0], args[1]);
+      sheet.setRowHeight(args[0], args[1]);
       break;
     case "mergeCells":
-      excel.mergeCells(args[0]);
+      sheet.mergeCells(args[0]);
       break;
     case "unmergeCells":
-      excel.unmergeCells(args[0]);
+      sheet.unmergeCells(args[0]);
       break;
     case "freezeRows":
-      excel.freezeRows(args[0]);
+      sheet.freezeRows(args[0]);
       break;
     case "freezeColumns":
-      excel.freezeColumns(args[0]);
+      sheet.freezeColumns(args[0]);
       break;
     case "setColumnFormat":
-      excel.setColumnFormat(args[0], String(args[1]));
+      sheet.setColumnFormat(args[0], String(args[1]));
       break;
     case "undo":
-      excel.undo();
+      sheet.undo();
       break;
     case "redo":
-      excel.redo();
+      sheet.redo();
       break;
     case "copy":
-      await excel.copy();
+      await sheet.copy();
       break;
     case "cut":
-      await excel.cut();
+      await sheet.cut();
       break;
     case "paste":
-      await excel.paste(args[0]);
+      await sheet.paste(args[0]);
       break;
     case "invokeContextAction":
-      if (typeof excel.handleContextMenuAction === "function") {
-        excel.handleContextMenuAction(String(args[0]));
+      if (typeof sheet.handleContextMenuAction === "function") {
+        sheet.handleContextMenuAction(String(args[0]));
       } else {
         throw new Error("invokeContextAction not supported by this build");
       }
       break;
     case "invokeToolbarAction":
-      if (typeof excel.handleToolbarAction === "function") {
-        excel.handleToolbarAction(String(args[0]));
+      if (typeof sheet.handleToolbarAction === "function") {
+        sheet.handleToolbarAction(String(args[0]));
       } else {
         throw new Error("invokeToolbarAction not supported by this build");
       }
       break;
     case "invokeFillTo": {
-      const fh = excel.fillHandle;
+      const fh = sheet.fillHandle;
       if (!fh || typeof fh.executeFill !== "function") {
         throw new Error("invokeFillTo not supported by this build");
       }
@@ -400,23 +400,23 @@ async function executeCommand(excel, cmd) {
     case "invokeContextAtGrid": {
       const row = Number(args[0]);
       const col = Number(args[1]);
-      if (typeof excel.resolveContextMenuScope !== "function"
-        || typeof excel.applyContextMenuSelection !== "function") {
+      if (typeof sheet.resolveContextMenuScope !== "function"
+        || typeof sheet.applyContextMenuSelection !== "function") {
         throw new Error("invokeContextAtGrid not supported by this build");
       }
-      const scope = excel.resolveContextMenuScope(row, col);
-      excel.contextMenuScope = scope;
-      excel.applyContextMenuSelection(row, col, scope);
+      const scope = sheet.resolveContextMenuScope(row, col);
+      sheet.contextMenuScope = scope;
+      sheet.applyContextMenuSelection(row, col, scope);
       break;
     }
     case "assertContextScopeAtGrid": {
       const row = Number(args[0]);
       const col = Number(args[1]);
       const expected = String(args[2] ?? "");
-      if (typeof excel.resolveContextMenuScope !== "function") {
+      if (typeof sheet.resolveContextMenuScope !== "function") {
         throw new Error("assertContextScopeAtGrid not supported by this build");
       }
-      const actual = excel.resolveContextMenuScope(row, col);
+      const actual = sheet.resolveContextMenuScope(row, col);
       if (actual !== expected) {
         throw new Error(
           `assertContextScopeAtGrid failed at (${row},${col}): expected "${expected}", got "${actual}"`,
@@ -430,7 +430,7 @@ async function executeCommand(excel, cmd) {
 }
 
 /**
- * Run a full script against a fresh VolvoxExcel instance.
+ * Run a full script against a fresh VolvoxSheet instance.
  */
 window.__runScript = async function(scriptText, options = {}) {
   window.__captureReady = false;
@@ -443,41 +443,41 @@ window.__runScript = async function(scriptText, options = {}) {
     const container = document.getElementById("vx-grid");
 
     // Destroy previous instance
-    if (excelInstance) {
-      try { excelInstance.destroy(); } catch (_) {}
-      excelInstance = null;
+    if (sheetInstance) {
+      try { sheetInstance.destroy(); } catch (_) {}
+      sheetInstance = null;
     }
     container.innerHTML = "";
 
     // Init WASM
     const w = await initWasm();
 
-    // Create VolvoxExcel
-    excelInstance = new VolvoxExcel({
+    // Create VolvoxSheet
+    sheetInstance = new VolvoxSheet({
       container,
       wasm: w,
       rows: options.rows || 50,
       cols: options.cols || 26,
     });
 
-    if (captureFontFamily && excelInstance.grid && typeof excelInstance.grid.setFontName === "function") {
-      excelInstance.grid.setFontName(captureFontFamily);
+    if (captureFontFamily && sheetInstance.grid && typeof sheetInstance.grid.setFontName === "function") {
+      sheetInstance.grid.setFontName(captureFontFamily);
     }
 
-    window.excel = excelInstance;
+    window.sheet = sheetInstance;
 
     // Parse and execute
     const lines = scriptText.split("\n");
     for (const line of lines) {
       const cmd = parseLine(line);
       if (cmd) {
-        await executeCommand(excelInstance, cmd);
+        await executeCommand(sheetInstance, cmd);
       }
     }
 
     // Let grid render
     await new Promise(r => setTimeout(r, settleMs));
-    excelInstance.grid.invalidate();
+    sheetInstance.grid.invalidate();
     await new Promise(r => setTimeout(r, 100));
 
     window.__captureReady = true;

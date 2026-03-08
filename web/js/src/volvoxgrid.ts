@@ -222,11 +222,77 @@ const ICON_ALIGN_TO_WASM = new Map<VolvoxGridIconAlign, number>([
 ]);
 
 const PB_TEXT_ENCODER = new TextEncoder();
+const PB_TEXT_DECODER = new TextDecoder();
 const STREAM_STATUS_DATA = 0;
 const STREAM_STATUS_EOF = 1;
-const STREAM_STATUS_ERROR = 2;
-const STREAM_STATUS_PENDING = 3;
+const STREAM_STATUS_PENDING = 2;
 type StreamHandle = number | bigint;
+
+function decodeSignedStatus(statusByte: number): number {
+  return statusByte > 127 ? statusByte - 256 : statusByte;
+}
+
+function decodeFfiErrorPayload(payload: Uint8Array): {
+  message: string;
+  code: number;
+  grpcCode: number;
+} {
+  let offset = 0;
+  let code = 0;
+  let grpcCode = 0;
+  let message: string | null = null;
+  while (offset < payload.length) {
+    const tag = pbReadVarint(payload, offset);
+    offset = tag.next;
+    if (tag.value === 0n) {
+      break;
+    }
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (field === 1 && wire === 0) {
+      const value = pbReadVarint(payload, offset);
+      code = pbAsInt32(value.value);
+      offset = value.next;
+      continue;
+    }
+    if (field === 2 && wire === 2) {
+      const len = pbReadVarint(payload, offset);
+      const size = Number(len.value);
+      offset = len.next;
+      if (!Number.isFinite(size) || size < 0 || offset + size > payload.length) {
+        break;
+      }
+      message = PB_TEXT_DECODER.decode(payload.subarray(offset, offset + size));
+      offset += size;
+      continue;
+    }
+    if (field === 3 && wire === 0) {
+      const value = pbReadVarint(payload, offset);
+      grpcCode = pbAsInt32(value.value);
+      offset = value.next;
+      continue;
+    }
+    offset = pbSkipField(payload, offset, wire);
+  }
+  if (message == null) {
+    message = PB_TEXT_DECODER.decode(payload);
+  }
+  return { message, code, grpcCode };
+}
+
+function throwFfiErrorPayload(payload: Uint8Array): never {
+  const decoded = decodeFfiErrorPayload(payload);
+  const error = new Error(decoded.message || "FFI error") as Error & {
+    code: number;
+    grpcCode: number;
+    payload: Uint8Array;
+  };
+  error.name = "FfiError";
+  error.code = decoded.code;
+  error.grpcCode = decoded.grpcCode;
+  error.payload = payload.slice();
+  throw error;
+}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value != null && !Array.isArray(value);
@@ -1089,6 +1155,8 @@ export class VolvoxGrid {
   private renderWidth: number = 0;
   private renderHeight: number = 0;
   private gpuCanvas: HTMLCanvasElement | null = null;
+  private cpuCanvas: HTMLCanvasElement | null = null;
+  private canvasOpacityBeforeOverlay: string | null = null;
   private readonly touchPoints = new Map<number, { x: number; y: number }>();
   private touchMode: "none" | "pan" | "fast-scroll" | "pinch" = "none";
   private activeTouchPointerId: number | null = null;
@@ -1109,9 +1177,16 @@ export class VolvoxGrid {
   private dpr: number = 1;
   private dprX: number = 1;
   private dprY: number = 1;
+  private pendingCanvasWidth: number = 0;
+  private pendingCanvasHeight: number = 0;
+  private pendingDpr: number = 0;
+  private pendingDprX: number = 0;
+  private pendingDprY: number = 0;
   private forcedRenderWidth: number = 0;
   private forcedRenderHeight: number = 0;
   private _maxDpr: number = 0;
+  private presentCssWidth: number = 0;
+  private presentCssHeight: number = 0;
 
   // Host-side editors for full caret/IME/text-selection UX.
   private editInput: HTMLInputElement;
@@ -1173,6 +1248,7 @@ export class VolvoxGrid {
     this.dpr = Number.isFinite(rawDpr) && rawDpr > 0 ? rawDpr : 1;
     this.dprX = this.dpr;
     this.dprY = this.dpr;
+    this.ensureCpuCanvasOverlay();
 
     // Context creation is deferred — tryInitGpu() may claim the canvas for
     // WebGPU. If GPU init fails (or is never attempted), ensureCtx() lazily
@@ -1230,7 +1306,7 @@ export class VolvoxGrid {
     this.initHostEditors();
 
     // Sync canvas size
-    this.syncSize();
+    this.syncSize(true);
 
     // Wire up DOM events
     this.setupEventListeners();
@@ -2844,6 +2920,7 @@ export class VolvoxGrid {
    */
   async tryInitGpu(): Promise<boolean> {
     try {
+      this.commitPendingSize();
       if (!this.wasm.has_gpu_renderer()) {
         console.info("VolvoxGrid: GPU feature not compiled in");
         return false;
@@ -2876,24 +2953,21 @@ export class VolvoxGrid {
       gpuCanvas.style.pointerEvents = "none";
       gpuCanvas.style.display = "none";
 
-      const parent = this.canvas.parentElement;
+      const parent = this.ensureOverlayParent();
       if (parent) {
-        const pos = getComputedStyle(parent).position;
-        if (pos === "static") {
-          parent.style.position = "relative";
-        }
         parent.appendChild(gpuCanvas);
       }
-      this.matchGpuCanvasPosition(gpuCanvas);
+      this.gpuCanvas = gpuCanvas;
+      this.syncPresentCanvasPosition();
 
       const configured = this.wasm.gpu_configure_surface(gpuCanvas, w, h, this._presentMode);
       if (!configured) {
         gpuCanvas.remove();
+        this.gpuCanvas = null;
         this.useGpu = false;
         return false;
       }
 
-      this.gpuCanvas = gpuCanvas;
       this.useGpu = true;
       this.dirty = true;
       return true;
@@ -2904,10 +2978,48 @@ export class VolvoxGrid {
     }
   }
 
+  private ensureOverlayParent(): HTMLElement | null {
+    const parent = this.canvas.parentElement;
+    if (!parent) {
+      return null;
+    }
+    if (getComputedStyle(parent).position === "static") {
+      parent.style.position = "relative";
+    }
+    return parent;
+  }
+
+  private ensureCpuCanvasOverlay(): void {
+    if (this.cpuCanvas) {
+      return;
+    }
+    const parent = this.ensureOverlayParent();
+    if (!parent) {
+      return;
+    }
+    const cpuCanvas = document.createElement("canvas");
+    cpuCanvas.style.position = "absolute";
+    cpuCanvas.style.pointerEvents = "none";
+    cpuCanvas.style.display = "block";
+    cpuCanvas.width = Math.max(1, this.canvas.width || 1);
+    cpuCanvas.height = Math.max(1, this.canvas.height || 1);
+    parent.appendChild(cpuCanvas);
+    this.cpuCanvas = cpuCanvas;
+    this.ctx = null;
+    this.canvasOpacityBeforeOverlay = this.canvas.style.opacity;
+    this.canvas.style.opacity = "0";
+    this.syncPresentCanvasPosition();
+  }
+
+  private getCpuSurfaceCanvas(): HTMLCanvasElement {
+    return this.cpuCanvas ?? this.canvas;
+  }
+
   /** Lazily acquire the 2D context (CPU fallback path). */
   private ensureCtx(): CanvasRenderingContext2D {
     if (!this.ctx) {
-      const ctx = this.canvas.getContext("2d", { willReadFrequently: false });
+      this.ensureCpuCanvasOverlay();
+      const ctx = this.getCpuSurfaceCanvas().getContext("2d", { willReadFrequently: false });
       if (!ctx) {
         throw new Error("Failed to get 2d context from canvas");
       }
@@ -3046,12 +3158,15 @@ export class VolvoxGrid {
         if (!(frame instanceof Uint8Array) || frame.length < 1) {
           break;
         }
-        const status = Number(frame[0]);
+        const status = decodeSignedStatus(Number(frame[0]));
         if (status === 0) {
           out.push(frame.slice(1));
           continue;
         }
-        if (status === 1 || status === 3 || status === 2) {
+        if (status < 0) {
+          throwFfiErrorPayload(frame.slice(1));
+        }
+        if (status === STREAM_STATUS_EOF || status === STREAM_STATUS_PENDING) {
           break;
         }
         break;
@@ -3382,6 +3497,7 @@ export class VolvoxGrid {
 
   /** Force synchronous layout calculation. */
   ensureLayout(): void {
+    this.commitPendingSize();
     if (typeof this.wasm.render === "function") {
       // Calling render with 0,0 usually triggers ensure_layout in the engine
       // without actually painting pixels if the viewport is empty.
@@ -3475,7 +3591,7 @@ export class VolvoxGrid {
         const frame = this.wasm.volvox_grid_stream_recv(handle) as Uint8Array;
         if (!(frame instanceof Uint8Array) || frame.length < 1) break;
 
-        const status = Number(frame[0]);
+        const status = decodeSignedStatus(Number(frame[0]));
         if (status === STREAM_STATUS_DATA) {
           const data = frame.slice(1);
           const decoded = pbDecodePrintResponse(data);
@@ -3489,9 +3605,10 @@ export class VolvoxGrid {
           }
           continue;
         }
-        if (status === STREAM_STATUS_EOF
-          || status === STREAM_STATUS_PENDING
-          || status === STREAM_STATUS_ERROR) {
+        if (status < 0) {
+          throwFfiErrorPayload(frame.slice(1));
+        }
+        if (status === STREAM_STATUS_EOF || status === STREAM_STATUS_PENDING) {
           break;
         }
         break;
@@ -3547,6 +3664,14 @@ export class VolvoxGrid {
     this.removeEventListeners();
     this.removeHostEditors();
     this.invalidateRenderCache();
+    if (this.cpuCanvas) {
+      this.cpuCanvas.remove();
+      this.cpuCanvas = null;
+    }
+    if (this.canvasOpacityBeforeOverlay != null) {
+      this.canvas.style.opacity = this.canvasOpacityBeforeOverlay;
+      this.canvasOpacityBeforeOverlay = null;
+    }
     if (this.gpuCanvas) {
       this.gpuCanvas.remove();
       this.gpuCanvas = null;
@@ -3556,7 +3681,8 @@ export class VolvoxGrid {
 
   // ── Internal: rendering ──────────────────────────────────────────────
 
-  private syncSize(): void {
+  private syncSize(applyImmediately: boolean = false): void {
+    this.ensureCpuCanvasOverlay();
     // Re-sample DPR on each resize (user may drag between monitors).
     const rawDpr = window.devicePixelRatio || 1;
     const deviceDpr = Number.isFinite(rawDpr) && rawDpr > 0 ? rawDpr : 1;
@@ -3578,29 +3704,95 @@ export class VolvoxGrid {
 
     const nextDprX = w / cssW;
     const nextDprY = h / cssH;
-    this.dprX = Number.isFinite(nextDprX) && nextDprX > 0 ? nextDprX : deviceDpr;
-    this.dprY = Number.isFinite(nextDprY) && nextDprY > 0 ? nextDprY : deviceDpr;
-    this.dpr = (this.dprX + this.dprY) * 0.5;
+    const dprX = Number.isFinite(nextDprX) && nextDprX > 0 ? nextDprX : deviceDpr;
+    const dprY = Number.isFinite(nextDprY) && nextDprY > 0 ? nextDprY : deviceDpr;
+    const dpr = (dprX + dprY) * 0.5;
 
-    if (this.canvas.width !== w || this.canvas.height !== h) {
-      this.canvas.width = w;
-      this.canvas.height = h;
+    if (applyImmediately) {
+      this.applyCanvasSize(w, h, dprX, dprY, dpr);
+      return;
+    }
+
+    this.pendingCanvasWidth = w;
+    this.pendingCanvasHeight = h;
+    this.pendingDprX = dprX;
+    this.pendingDprY = dprY;
+    this.pendingDpr = dpr;
+
+    if (
+      this.canvas.width !== w
+      || this.canvas.height !== h
+      || Math.abs(this.dprX - dprX) > 0.0001
+      || Math.abs(this.dprY - dprY) > 0.0001
+    ) {
+      this.dirty = true;
+    }
+
+    this.syncPresentCanvasPosition();
+  }
+
+  private applyCanvasSize(
+    width: number,
+    height: number,
+    dprX: number,
+    dprY: number,
+    dpr: number,
+  ): void {
+    this.dprX = dprX;
+    this.dprY = dprY;
+    this.dpr = dpr;
+    this.presentCssWidth = Math.max(1, width / dprX);
+    this.presentCssHeight = Math.max(1, height / dprY);
+
+    if (this.canvas.width !== width || this.canvas.height !== height) {
+      this.canvas.width = width;
+      this.canvas.height = height;
+    }
+
+    const cpuSurface = this.getCpuSurfaceCanvas();
+    if (cpuSurface.width !== width || cpuSurface.height !== height) {
+      cpuSurface.width = width;
+      cpuSurface.height = height;
       this.invalidateRenderCache();
       this.dirty = true;
     }
 
     if (this.gpuCanvas) {
-      if (this.gpuCanvas.width !== w || this.gpuCanvas.height !== h) {
-        this.gpuCanvas.width = w;
-        this.gpuCanvas.height = h;
-        this.wasm.gpu_resize_surface(w, h);
+      if (this.gpuCanvas.width !== width || this.gpuCanvas.height !== height) {
+        this.gpuCanvas.width = width;
+        this.gpuCanvas.height = height;
+        this.wasm.gpu_resize_surface(width, height);
         this.dirty = true;
       }
-      this.matchGpuCanvasPosition(this.gpuCanvas);
     }
+    this.syncPresentCanvasPosition();
   }
 
-  private matchGpuCanvasPosition(gpuCanvas: HTMLCanvasElement): void {
+  private commitPendingSize(): void {
+    if (this.pendingCanvasWidth <= 0 || this.pendingCanvasHeight <= 0) {
+      return;
+    }
+
+    const width = this.pendingCanvasWidth;
+    const height = this.pendingCanvasHeight;
+    const dprX = this.pendingDprX > 0 ? this.pendingDprX : this.dprX;
+    const dprY = this.pendingDprY > 0 ? this.pendingDprY : this.dprY;
+    const dpr = this.pendingDpr > 0 ? this.pendingDpr : (dprX + dprY) * 0.5;
+
+    this.pendingCanvasWidth = 0;
+    this.pendingCanvasHeight = 0;
+    this.pendingDprX = 0;
+    this.pendingDprY = 0;
+    this.pendingDpr = 0;
+
+    this.applyCanvasSize(width, height, dprX, dprY, dpr);
+  }
+
+  private matchOverlayCanvasPosition(
+    overlayCanvas: HTMLCanvasElement,
+    cssWidth: number,
+    cssHeight: number,
+  ): void {
     // Position the GPU overlay exactly over the canvas content box
     // (inside border/padding) so it matches the CPU drawable area.
     const rect = this.canvas.getBoundingClientRect();
@@ -3608,11 +3800,26 @@ export class VolvoxGrid {
     const bw = this.canvas.clientLeft;  // border-left width
     const bt = this.canvas.clientTop;   // border-top width
     if (parentRect) {
-      gpuCanvas.style.top = `${rect.top - parentRect.top + bt}px`;
-      gpuCanvas.style.left = `${rect.left - parentRect.left + bw}px`;
+      overlayCanvas.style.top = `${rect.top - parentRect.top + bt}px`;
+      overlayCanvas.style.left = `${rect.left - parentRect.left + bw}px`;
     }
-    gpuCanvas.style.width = `${this.canvas.clientWidth}px`;
-    gpuCanvas.style.height = `${this.canvas.clientHeight}px`;
+    overlayCanvas.style.width = `${Math.max(1, cssWidth)}px`;
+    overlayCanvas.style.height = `${Math.max(1, cssHeight)}px`;
+  }
+
+  private syncPresentCanvasPosition(): void {
+    const cssWidth = this.presentCssWidth > 0
+      ? this.presentCssWidth
+      : Math.max(1, this.canvas.clientWidth);
+    const cssHeight = this.presentCssHeight > 0
+      ? this.presentCssHeight
+      : Math.max(1, this.canvas.clientHeight);
+    if (this.cpuCanvas) {
+      this.matchOverlayCanvasPosition(this.cpuCanvas, cssWidth, cssHeight);
+    }
+    if (this.gpuCanvas) {
+      this.matchOverlayCanvasPosition(this.gpuCanvas, cssWidth, cssHeight);
+    }
   }
 
   private invalidateRenderCache(): void {
@@ -3701,8 +3908,10 @@ export class VolvoxGrid {
   }
 
   private render(): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    this.commitPendingSize();
+    const cpuSurface = this.getCpuSurfaceCanvas();
+    const w = cpuSurface.width;
+    const h = cpuSurface.height;
     if (w <= 0 || h <= 0) return;
 
     // ── GPU path (renders to separate gpuCanvas) ─────────────────────
@@ -3784,7 +3993,7 @@ export class VolvoxGrid {
         if (!(frame instanceof Uint8Array) || frame.length < 1) {
           break;
         }
-        const status = Number(frame[0]);
+        const status = decodeSignedStatus(Number(frame[0]));
         if (status === STREAM_STATUS_DATA) {
           const decoded = pbDecodeRenderOutput(frame.slice(1));
           if (decoded.rendered) {
@@ -3795,9 +4004,10 @@ export class VolvoxGrid {
           }
           continue;
         }
-        if (status === STREAM_STATUS_EOF
-          || status === STREAM_STATUS_PENDING
-          || status === STREAM_STATUS_ERROR) {
+        if (status < 0) {
+          throwFfiErrorPayload(frame.slice(1));
+        }
+        if (status === STREAM_STATUS_EOF || status === STREAM_STATUS_PENDING) {
           break;
         }
         break;

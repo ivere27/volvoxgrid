@@ -9,20 +9,89 @@ use prost::Message;
 use std::collections::HashMap;
 use std::ffi::{c_char, c_int, c_void, CStr};
 use std::ptr;
-use std::sync::{Arc, Mutex, RwLock};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
+
+unsafe extern "C" {
+    fn malloc(size: usize) -> *mut c_void;
+    fn free(ptr: *mut c_void);
+}
+
+#[derive(Clone, PartialEq, Message)]
+struct CoreFfiError {
+    #[prost(int32, tag = "1")]
+    code: i32,
+    #[prost(string, tag = "2")]
+    message: String,
+    #[prost(int32, tag = "3")]
+    grpc_code: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FfiError {
+    pub message: String,
+    pub code: i32,
+    pub grpc_code: i32,
+}
+
+impl FfiError {
+    pub fn new(message: impl Into<String>, code: i32, grpc_code: i32) -> Self {
+        Self {
+            message: message.into(),
+            code,
+            grpc_code,
+        }
+    }
+}
+
+impl std::fmt::Display for FfiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.message.fmt(f)
+    }
+}
+
+impl std::error::Error for FfiError {}
+
+impl From<String> for FfiError {
+    fn from(message: String) -> Self {
+        Self::new(message, 0, 2)
+    }
+}
+
+impl From<&str> for FfiError {
+    fn from(message: &str) -> Self {
+        Self::new(message, 0, 2)
+    }
+}
+
+impl From<&String> for FfiError {
+    fn from(message: &String) -> Self {
+        Self::from(message.as_str())
+    }
+}
+
+impl From<&FfiError> for FfiError {
+    fn from(error: &FfiError) -> Self {
+        error.clone()
+    }
+}
 
 // =============================================================================
 // Stream Infrastructure
 // =============================================================================
 
 struct StreamContext {
-    send_queue: Mutex<Vec<Vec<u8>>>,  // host -> plugin
-    recv_queue: Mutex<Vec<Vec<u8>>>,  // plugin -> host
+    send_queue: Mutex<Vec<Vec<u8>>>,      // host -> plugin
+    recv_queue: Mutex<Vec<StreamResult>>, // plugin -> host
     send_cv: std::sync::Condvar,
     recv_cv: std::sync::Condvar,
     closed: std::sync::atomic::AtomicBool,
     send_closed: std::sync::atomic::AtomicBool,
+}
+
+struct StreamResult {
+    status: i32,
+    payload: Vec<u8>,
 }
 
 impl StreamContext {
@@ -36,15 +105,22 @@ impl StreamContext {
             send_closed: std::sync::atomic::AtomicBool::new(false),
         }
     }
-    
+
     fn send_to_plugin(&self, data: Vec<u8>) {
         if let Ok(mut queue) = self.send_queue.lock() {
             queue.push(data);
             self.send_cv.notify_one();
         }
     }
-    
-    fn recv_from_plugin(&self) -> Option<Vec<u8>> {
+
+    fn push_recv_result(&self, status: i32, payload: Vec<u8>) {
+        if let Ok(mut queue) = self.recv_queue.lock() {
+            queue.push(StreamResult { status, payload });
+            self.recv_cv.notify_one();
+        }
+    }
+
+    fn recv_from_plugin(&self) -> Option<StreamResult> {
         let mut queue = self.recv_queue.lock().ok()?;
         loop {
             if !queue.is_empty() {
@@ -56,7 +132,7 @@ impl StreamContext {
             queue = self.recv_cv.wait(queue).ok()?;
         }
     }
-    
+
     fn close(&self) {
         // Hold send_queue lock to prevent lost wakeup on send_cv
         {
@@ -70,84 +146,100 @@ impl StreamContext {
         }
         self.recv_cv.notify_all();
     }
-    
+
     fn is_closed(&self) -> bool {
         self.closed.load(Ordering::SeqCst)
     }
 }
 
-lazy_static::lazy_static! {
-    static ref STREAMS: RwLock<HashMap<u64, Arc<StreamContext>>> = RwLock::new(HashMap::new());
-    static ref NEXT_HANDLE: AtomicU64 = AtomicU64::new(1);
+static STREAMS: OnceLock<RwLock<HashMap<u64, Arc<StreamContext>>>> = OnceLock::new();
+static NEXT_HANDLE: OnceLock<AtomicU64> = OnceLock::new();
+
+fn streams() -> &'static RwLock<HashMap<u64, Arc<StreamContext>>> {
+    STREAMS.get_or_init(|| RwLock::new(HashMap::new()))
+}
+
+fn next_handle() -> &'static AtomicU64 {
+    NEXT_HANDLE.get_or_init(|| AtomicU64::new(1))
 }
 
 fn get_stream(handle: u64) -> Option<Arc<StreamContext>> {
-    STREAMS.read().ok()?.get(&handle).cloned()
+    streams().read().ok()?.get(&handle).cloned()
 }
 
 // =============================================================================
 // Plugin Trait
 // =============================================================================
 
-
 pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
-    fn create(&self, request: CreateRequest) -> Result<CreateResponse, String>;
-    fn destroy(&self, request: GridHandle) -> Result<Empty, String>;
-    fn configure(&self, request: ConfigureRequest) -> Result<Empty, String>;
-    fn get_config(&self, request: GridHandle) -> Result<GridConfig, String>;
-    fn load_font_data(&self, request: LoadFontDataRequest) -> Result<Empty, String>;
-    fn define_columns(&self, request: DefineColumnsRequest) -> Result<Empty, String>;
-    fn get_schema(&self, request: GridHandle) -> Result<DefineColumnsRequest, String>;
-    fn define_rows(&self, request: DefineRowsRequest) -> Result<Empty, String>;
-    fn insert_rows(&self, request: InsertRowsRequest) -> Result<Empty, String>;
-    fn remove_rows(&self, request: RemoveRowsRequest) -> Result<Empty, String>;
-    fn move_column(&self, request: MoveColumnRequest) -> Result<Empty, String>;
-    fn move_row(&self, request: MoveRowRequest) -> Result<Empty, String>;
-    fn update_cells(&self, request: UpdateCellsRequest) -> Result<WriteResult, String>;
-    fn get_cells(&self, request: GetCellsRequest) -> Result<CellsResponse, String>;
-    fn load_table(&self, request: LoadTableRequest) -> Result<WriteResult, String>;
-    fn clear(&self, request: ClearRequest) -> Result<Empty, String>;
-    fn select(&self, request: SelectRequest) -> Result<Empty, String>;
-    fn get_selection(&self, request: GridHandle) -> Result<SelectionState, String>;
-    fn show_cell(&self, request: ShowCellRequest) -> Result<Empty, String>;
-    fn set_top_row(&self, request: SetRowRequest) -> Result<Empty, String>;
-    fn set_left_col(&self, request: SetColRequest) -> Result<Empty, String>;
-    fn edit(&self, request: EditCommand) -> Result<EditState, String>;
-    fn sort(&self, request: SortRequest) -> Result<Empty, String>;
-    fn subtotal(&self, request: SubtotalRequest) -> Result<Empty, String>;
-    fn auto_size(&self, request: AutoSizeRequest) -> Result<Empty, String>;
-    fn outline(&self, request: OutlineRequest) -> Result<Empty, String>;
-    fn get_node(&self, request: GetNodeRequest) -> Result<NodeInfo, String>;
-    fn find(&self, request: FindRequest) -> Result<FindResponse, String>;
-    fn aggregate(&self, request: AggregateRequest) -> Result<AggregateResponse, String>;
-    fn get_merged_range(&self, request: GetMergedRangeRequest) -> Result<CellRange, String>;
-    fn merge_cells(&self, request: MergeCellsRequest) -> Result<Empty, String>;
-    fn unmerge_cells(&self, request: UnmergeCellsRequest) -> Result<Empty, String>;
-    fn get_merged_regions(&self, request: GridHandle) -> Result<MergedRegionsResponse, String>;
-    fn get_memory_usage(&self, request: GridHandle) -> Result<MemoryUsageResponse, String>;
-    fn clipboard(&self, request: ClipboardCommand) -> Result<ClipboardResponse, String>;
-    fn export(&self, request: ExportRequest) -> Result<ExportResponse, String>;
-    fn import(&self, request: ImportRequest) -> Result<Empty, String>;
-    fn print(&self, request: PrintRequest) -> Result<PrintResponse, String>;
-    fn archive(&self, request: ArchiveRequest) -> Result<ArchiveResponse, String>;
-    fn resize_viewport(&self, request: ResizeViewportRequest) -> Result<Empty, String>;
-    fn set_redraw(&self, request: SetRedrawRequest) -> Result<Empty, String>;
-    fn refresh(&self, request: GridHandle) -> Result<Empty, String>;
-    fn load_demo(&self, request: LoadDemoRequest) -> Result<Empty, String>;
-    fn render_session(&self, stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>) -> Result<(), String>;
-    fn event_stream(&self, request: GridHandle, stream: &dyn PluginStreamSender<GridEvent>) -> Result<(), String>;
+    fn create(&self, request: CreateRequest) -> Result<CreateResponse, FfiError>;
+    fn destroy(&self, request: GridHandle) -> Result<Empty, FfiError>;
+    fn configure(&self, request: ConfigureRequest) -> Result<Empty, FfiError>;
+    fn get_config(&self, request: GridHandle) -> Result<GridConfig, FfiError>;
+    fn load_font_data(&self, request: LoadFontDataRequest) -> Result<Empty, FfiError>;
+    fn define_columns(&self, request: DefineColumnsRequest) -> Result<Empty, FfiError>;
+    fn get_schema(&self, request: GridHandle) -> Result<DefineColumnsRequest, FfiError>;
+    fn define_rows(&self, request: DefineRowsRequest) -> Result<Empty, FfiError>;
+    fn insert_rows(&self, request: InsertRowsRequest) -> Result<Empty, FfiError>;
+    fn remove_rows(&self, request: RemoveRowsRequest) -> Result<Empty, FfiError>;
+    fn move_column(&self, request: MoveColumnRequest) -> Result<Empty, FfiError>;
+    fn move_row(&self, request: MoveRowRequest) -> Result<Empty, FfiError>;
+    fn update_cells(&self, request: UpdateCellsRequest) -> Result<WriteResult, FfiError>;
+    fn get_cells(&self, request: GetCellsRequest) -> Result<CellsResponse, FfiError>;
+    fn load_table(&self, request: LoadTableRequest) -> Result<WriteResult, FfiError>;
+    fn clear(&self, request: ClearRequest) -> Result<Empty, FfiError>;
+    fn select(&self, request: SelectRequest) -> Result<Empty, FfiError>;
+    fn get_selection(&self, request: GridHandle) -> Result<SelectionState, FfiError>;
+    fn show_cell(&self, request: ShowCellRequest) -> Result<Empty, FfiError>;
+    fn set_top_row(&self, request: SetRowRequest) -> Result<Empty, FfiError>;
+    fn set_left_col(&self, request: SetColRequest) -> Result<Empty, FfiError>;
+    fn edit(&self, request: EditCommand) -> Result<EditState, FfiError>;
+    fn sort(&self, request: SortRequest) -> Result<Empty, FfiError>;
+    fn subtotal(&self, request: SubtotalRequest) -> Result<Empty, FfiError>;
+    fn auto_size(&self, request: AutoSizeRequest) -> Result<Empty, FfiError>;
+    fn outline(&self, request: OutlineRequest) -> Result<Empty, FfiError>;
+    fn get_node(&self, request: GetNodeRequest) -> Result<NodeInfo, FfiError>;
+    fn find(&self, request: FindRequest) -> Result<FindResponse, FfiError>;
+    fn aggregate(&self, request: AggregateRequest) -> Result<AggregateResponse, FfiError>;
+    fn get_merged_range(&self, request: GetMergedRangeRequest) -> Result<CellRange, FfiError>;
+    fn merge_cells(&self, request: MergeCellsRequest) -> Result<Empty, FfiError>;
+    fn unmerge_cells(&self, request: UnmergeCellsRequest) -> Result<Empty, FfiError>;
+    fn get_merged_regions(&self, request: GridHandle) -> Result<MergedRegionsResponse, FfiError>;
+    fn get_memory_usage(&self, request: GridHandle) -> Result<MemoryUsageResponse, FfiError>;
+    fn clipboard(&self, request: ClipboardCommand) -> Result<ClipboardResponse, FfiError>;
+    fn export(&self, request: ExportRequest) -> Result<ExportResponse, FfiError>;
+    fn import(&self, request: ImportRequest) -> Result<Empty, FfiError>;
+    fn print(&self, request: PrintRequest) -> Result<PrintResponse, FfiError>;
+    fn archive(&self, request: ArchiveRequest) -> Result<ArchiveResponse, FfiError>;
+    fn resize_viewport(&self, request: ResizeViewportRequest) -> Result<Empty, FfiError>;
+    fn set_redraw(&self, request: SetRedrawRequest) -> Result<Empty, FfiError>;
+    fn refresh(&self, request: GridHandle) -> Result<Empty, FfiError>;
+    fn load_demo(&self, request: LoadDemoRequest) -> Result<Empty, FfiError>;
+    fn render_session(
+        &self,
+        stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
+    ) -> Result<(), FfiError>;
+    fn event_stream(
+        &self,
+        request: GridHandle,
+        stream: &dyn PluginStreamSender<GridEvent>,
+    ) -> Result<(), FfiError>;
 }
 
-static PLUGIN_VOLVOX_GRID_SERVICE: std::sync::OnceLock<Box<dyn VolvoxGridServicePlugin>> = std::sync::OnceLock::new();
+static PLUGIN_VOLVOX_GRID_SERVICE: std::sync::OnceLock<Box<dyn VolvoxGridServicePlugin>> =
+    std::sync::OnceLock::new();
 
 pub fn register_volvox_grid_service_plugin(plugin: impl VolvoxGridServicePlugin) {
     let _ = PLUGIN_VOLVOX_GRID_SERVICE.set(Box::new(plugin));
 }
 
 fn get_volvox_grid_service_plugin() -> Option<&'static dyn VolvoxGridServicePlugin> {
-    Some(PLUGIN_VOLVOX_GRID_SERVICE.get_or_init(super::create_plugin).as_ref())
+    Some(
+        PLUGIN_VOLVOX_GRID_SERVICE
+            .get_or_init(super::create_plugin)
+            .as_ref(),
+    )
 }
-
 
 // =============================================================================
 // Stream Interfaces
@@ -163,7 +255,10 @@ pub trait PluginStreamReceiver<T> {
     fn is_cancelled(&self) -> bool;
 }
 
-pub trait PluginStreamBidi<Req, Resp>: PluginStreamSender<Resp> + PluginStreamReceiver<Req> {}
+pub trait PluginStreamBidi<Req, Resp>:
+    PluginStreamSender<Resp> + PluginStreamReceiver<Req>
+{
+}
 
 struct StreamSender<T> {
     ctx: Arc<StreamContext>,
@@ -179,16 +274,10 @@ impl<T: Message + Default> PluginStreamSender<T> for StreamSender<T> {
         if msg.encode(&mut buf).is_err() {
             return false;
         }
-        // Format: [status:1][payload]
-        let mut result = vec![0u8]; // success
-        result.extend(buf);
-        if let Ok(mut queue) = self.ctx.recv_queue.lock() {
-            queue.push(result);
-            self.ctx.recv_cv.notify_one();
-        }
+        self.ctx.push_recv_result(0, buf);
         true
     }
-    
+
     fn is_cancelled(&self) -> bool {
         self.ctx.is_closed()
     }
@@ -207,7 +296,7 @@ impl<T: Message + Default> PluginStreamReceiver<T> for StreamReceiver<T> {
                 return None;
             }
             if !queue.is_empty() {
-                let data = queue.remove(0);  // FIFO order
+                let data = queue.remove(0); // FIFO order
                 return T::decode(data.as_slice()).ok();
             }
             if self.ctx.send_closed.load(Ordering::SeqCst) && queue.is_empty() {
@@ -216,7 +305,7 @@ impl<T: Message + Default> PluginStreamReceiver<T> for StreamReceiver<T> {
             queue = self.ctx.send_cv.wait(queue).ok()?;
         }
     }
-    
+
     fn is_cancelled(&self) -> bool {
         self.ctx.is_closed()
     }
@@ -227,7 +316,9 @@ struct StreamBidi<Req, Resp> {
     receiver: StreamReceiver<Req>,
 }
 
-impl<Req: Message + Default, Resp: Message + Default> PluginStreamSender<Resp> for StreamBidi<Req, Resp> {
+impl<Req: Message + Default, Resp: Message + Default> PluginStreamSender<Resp>
+    for StreamBidi<Req, Resp>
+{
     fn send(&self, msg: Resp) -> bool {
         self.sender.send(msg)
     }
@@ -236,7 +327,9 @@ impl<Req: Message + Default, Resp: Message + Default> PluginStreamSender<Resp> f
     }
 }
 
-impl<Req: Message + Default, Resp: Message + Default> PluginStreamReceiver<Req> for StreamBidi<Req, Resp> {
+impl<Req: Message + Default, Resp: Message + Default> PluginStreamReceiver<Req>
+    for StreamBidi<Req, Resp>
+{
     fn recv(&self) -> Option<Req> {
         self.receiver.recv()
     }
@@ -245,7 +338,10 @@ impl<Req: Message + Default, Resp: Message + Default> PluginStreamReceiver<Req> 
     }
 }
 
-impl<Req: Message + Default, Resp: Message + Default> PluginStreamBidi<Req, Resp> for StreamBidi<Req, Resp> {}
+impl<Req: Message + Default, Resp: Message + Default> PluginStreamBidi<Req, Resp>
+    for StreamBidi<Req, Resp>
+{
+}
 
 // =============================================================================
 // C ABI Exports
@@ -254,12 +350,9 @@ impl<Req: Message + Default, Resp: Message + Default> PluginStreamBidi<Req, Resp
 #[no_mangle]
 pub extern "C" fn Synurang_Free(ptr: *mut c_void) {
     if !ptr.is_null() {
-        unsafe {
-            let _ = Box::from_raw(ptr as *mut u8);
-        }
+        unsafe { free(ptr) };
     }
 }
-
 
 #[no_mangle]
 pub extern "C" fn Synurang_Invoke_VolvoxGridService(
@@ -277,18 +370,18 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
             Err(_) => return error_response(resp_len, "invalid method utf8"),
         }
     };
-    
+
     let input = if data.is_null() || data_len <= 0 {
         Vec::new()
     } else {
         unsafe { std::slice::from_raw_parts(data as *const u8, data_len as usize).to_vec() }
     };
-    
+
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
         None => return error_response(resp_len, "plugin not registered"),
     };
-    
+
     match method_str {
         "/volvoxgrid.v1.VolvoxGridService/Create" => {
             match CreateRequest::decode(input.as_slice()) {
@@ -306,22 +399,20 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
                 Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
             }
         }
-        "/volvoxgrid.v1.VolvoxGridService/Destroy" => {
-            match GridHandle::decode(input.as_slice()) {
-                Ok(req) => match plugin.destroy(req) {
-                    Ok(resp) => {
-                        let mut buf = Vec::new();
-                        if resp.encode(&mut buf).is_ok() {
-                            success_response(resp_len, &buf)
-                        } else {
-                            error_response(resp_len, "encode failed")
-                        }
+        "/volvoxgrid.v1.VolvoxGridService/Destroy" => match GridHandle::decode(input.as_slice()) {
+            Ok(req) => match plugin.destroy(req) {
+                Ok(resp) => {
+                    let mut buf = Vec::new();
+                    if resp.encode(&mut buf).is_ok() {
+                        success_response(resp_len, &buf)
+                    } else {
+                        error_response(resp_len, "encode failed")
                     }
-                    Err(e) => error_response(resp_len, &e),
-                },
-                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
-            }
-        }
+                }
+                Err(e) => error_response(resp_len, &e),
+            },
+            Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+        },
         "/volvoxgrid.v1.VolvoxGridService/Configure" => {
             match ConfigureRequest::decode(input.as_slice()) {
                 Ok(req) => match plugin.configure(req) {
@@ -530,22 +621,20 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
                 Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
             }
         }
-        "/volvoxgrid.v1.VolvoxGridService/Clear" => {
-            match ClearRequest::decode(input.as_slice()) {
-                Ok(req) => match plugin.clear(req) {
-                    Ok(resp) => {
-                        let mut buf = Vec::new();
-                        if resp.encode(&mut buf).is_ok() {
-                            success_response(resp_len, &buf)
-                        } else {
-                            error_response(resp_len, "encode failed")
-                        }
+        "/volvoxgrid.v1.VolvoxGridService/Clear" => match ClearRequest::decode(input.as_slice()) {
+            Ok(req) => match plugin.clear(req) {
+                Ok(resp) => {
+                    let mut buf = Vec::new();
+                    if resp.encode(&mut buf).is_ok() {
+                        success_response(resp_len, &buf)
+                    } else {
+                        error_response(resp_len, "encode failed")
                     }
-                    Err(e) => error_response(resp_len, &e),
-                },
-                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
-            }
-        }
+                }
+                Err(e) => error_response(resp_len, &e),
+            },
+            Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+        },
         "/volvoxgrid.v1.VolvoxGridService/Select" => {
             match SelectRequest::decode(input.as_slice()) {
                 Ok(req) => match plugin.select(req) {
@@ -626,38 +715,34 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
                 Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
             }
         }
-        "/volvoxgrid.v1.VolvoxGridService/Edit" => {
-            match EditCommand::decode(input.as_slice()) {
-                Ok(req) => match plugin.edit(req) {
-                    Ok(resp) => {
-                        let mut buf = Vec::new();
-                        if resp.encode(&mut buf).is_ok() {
-                            success_response(resp_len, &buf)
-                        } else {
-                            error_response(resp_len, "encode failed")
-                        }
+        "/volvoxgrid.v1.VolvoxGridService/Edit" => match EditCommand::decode(input.as_slice()) {
+            Ok(req) => match plugin.edit(req) {
+                Ok(resp) => {
+                    let mut buf = Vec::new();
+                    if resp.encode(&mut buf).is_ok() {
+                        success_response(resp_len, &buf)
+                    } else {
+                        error_response(resp_len, "encode failed")
                     }
-                    Err(e) => error_response(resp_len, &e),
-                },
-                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
-            }
-        }
-        "/volvoxgrid.v1.VolvoxGridService/Sort" => {
-            match SortRequest::decode(input.as_slice()) {
-                Ok(req) => match plugin.sort(req) {
-                    Ok(resp) => {
-                        let mut buf = Vec::new();
-                        if resp.encode(&mut buf).is_ok() {
-                            success_response(resp_len, &buf)
-                        } else {
-                            error_response(resp_len, "encode failed")
-                        }
+                }
+                Err(e) => error_response(resp_len, &e),
+            },
+            Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+        },
+        "/volvoxgrid.v1.VolvoxGridService/Sort" => match SortRequest::decode(input.as_slice()) {
+            Ok(req) => match plugin.sort(req) {
+                Ok(resp) => {
+                    let mut buf = Vec::new();
+                    if resp.encode(&mut buf).is_ok() {
+                        success_response(resp_len, &buf)
+                    } else {
+                        error_response(resp_len, "encode failed")
                     }
-                    Err(e) => error_response(resp_len, &e),
-                },
-                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
-            }
-        }
+                }
+                Err(e) => error_response(resp_len, &e),
+            },
+            Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+        },
         "/volvoxgrid.v1.VolvoxGridService/Subtotal" => {
             match SubtotalRequest::decode(input.as_slice()) {
                 Ok(req) => match plugin.subtotal(req) {
@@ -722,22 +807,20 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
                 Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
             }
         }
-        "/volvoxgrid.v1.VolvoxGridService/Find" => {
-            match FindRequest::decode(input.as_slice()) {
-                Ok(req) => match plugin.find(req) {
-                    Ok(resp) => {
-                        let mut buf = Vec::new();
-                        if resp.encode(&mut buf).is_ok() {
-                            success_response(resp_len, &buf)
-                        } else {
-                            error_response(resp_len, "encode failed")
-                        }
+        "/volvoxgrid.v1.VolvoxGridService/Find" => match FindRequest::decode(input.as_slice()) {
+            Ok(req) => match plugin.find(req) {
+                Ok(resp) => {
+                    let mut buf = Vec::new();
+                    if resp.encode(&mut buf).is_ok() {
+                        success_response(resp_len, &buf)
+                    } else {
+                        error_response(resp_len, "encode failed")
                     }
-                    Err(e) => error_response(resp_len, &e),
-                },
-                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
-            }
-        }
+                }
+                Err(e) => error_response(resp_len, &e),
+            },
+            Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+        },
         "/volvoxgrid.v1.VolvoxGridService/Aggregate" => {
             match AggregateRequest::decode(input.as_slice()) {
                 Ok(req) => match plugin.aggregate(req) {
@@ -882,22 +965,20 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
                 Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
             }
         }
-        "/volvoxgrid.v1.VolvoxGridService/Print" => {
-            match PrintRequest::decode(input.as_slice()) {
-                Ok(req) => match plugin.print(req) {
-                    Ok(resp) => {
-                        let mut buf = Vec::new();
-                        if resp.encode(&mut buf).is_ok() {
-                            success_response(resp_len, &buf)
-                        } else {
-                            error_response(resp_len, "encode failed")
-                        }
+        "/volvoxgrid.v1.VolvoxGridService/Print" => match PrintRequest::decode(input.as_slice()) {
+            Ok(req) => match plugin.print(req) {
+                Ok(resp) => {
+                    let mut buf = Vec::new();
+                    if resp.encode(&mut buf).is_ok() {
+                        success_response(resp_len, &buf)
+                    } else {
+                        error_response(resp_len, "encode failed")
                     }
-                    Err(e) => error_response(resp_len, &e),
-                },
-                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
-            }
-        }
+                }
+                Err(e) => error_response(resp_len, &e),
+            },
+            Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+        },
         "/volvoxgrid.v1.VolvoxGridService/Archive" => {
             match ArchiveRequest::decode(input.as_slice()) {
                 Ok(req) => match plugin.archive(req) {
@@ -946,22 +1027,20 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
                 Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
             }
         }
-        "/volvoxgrid.v1.VolvoxGridService/Refresh" => {
-            match GridHandle::decode(input.as_slice()) {
-                Ok(req) => match plugin.refresh(req) {
-                    Ok(resp) => {
-                        let mut buf = Vec::new();
-                        if resp.encode(&mut buf).is_ok() {
-                            success_response(resp_len, &buf)
-                        } else {
-                            error_response(resp_len, "encode failed")
-                        }
+        "/volvoxgrid.v1.VolvoxGridService/Refresh" => match GridHandle::decode(input.as_slice()) {
+            Ok(req) => match plugin.refresh(req) {
+                Ok(resp) => {
+                    let mut buf = Vec::new();
+                    if resp.encode(&mut buf).is_ok() {
+                        success_response(resp_len, &buf)
+                    } else {
+                        error_response(resp_len, "encode failed")
                     }
-                    Err(e) => error_response(resp_len, &e),
-                },
-                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
-            }
-        }
+                }
+                Err(e) => error_response(resp_len, &e),
+            },
+            Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+        },
         "/volvoxgrid.v1.VolvoxGridService/LoadDemo" => {
             match LoadDemoRequest::decode(input.as_slice()) {
                 Ok(req) => match plugin.load_demo(req) {
@@ -982,7 +1061,6 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
     }
 }
 
-
 #[no_mangle]
 pub extern "C" fn Synurang_Stream_VolvoxGridService_Open(method: *const c_char) -> u64 {
     let method_str = unsafe {
@@ -994,20 +1072,20 @@ pub extern "C" fn Synurang_Stream_VolvoxGridService_Open(method: *const c_char) 
             Err(_) => return 0,
         }
     };
-    
+
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
         None => return 0,
     };
-    
+
     let ctx = Arc::new(StreamContext::new());
-    let handle = NEXT_HANDLE.fetch_add(1, Ordering::SeqCst);
-    
+    let handle = next_handle().fetch_add(1, Ordering::SeqCst);
+
     {
-        let mut streams = STREAMS.write().unwrap();
+        let mut streams = streams().write().unwrap();
         streams.insert(handle, ctx.clone());
     }
-    
+
     // Start handler thread
     let ctx_clone = ctx.clone();
     let _ = std::thread::spawn(move || {
@@ -1023,7 +1101,9 @@ pub extern "C" fn Synurang_Stream_VolvoxGridService_Open(method: *const c_char) 
                         _marker: std::marker::PhantomData,
                     },
                 };
-                let _ = plugin.render_session(&bidi);
+                if let Err(e) = plugin.render_session(&bidi) {
+                    push_stream_error(&ctx_clone, &e);
+                }
                 ctx_clone.close();
             }
             "/volvoxgrid.v1.VolvoxGridService/EventStream" => {
@@ -1034,9 +1114,11 @@ pub extern "C" fn Synurang_Stream_VolvoxGridService_Open(method: *const c_char) 
                         Err(_) => return,
                     };
                     loop {
-                        if ctx_clone.is_closed() { return; }
+                        if ctx_clone.is_closed() {
+                            return;
+                        }
                         if !queue.is_empty() {
-                            break queue.remove(0);  // FIFO order
+                            break queue.remove(0); // FIFO order
                         }
                         queue = match ctx_clone.send_cv.wait(queue) {
                             Ok(q) => q,
@@ -1049,19 +1131,23 @@ pub extern "C" fn Synurang_Stream_VolvoxGridService_Open(method: *const c_char) 
                         ctx: ctx_clone.clone(),
                         _marker: std::marker::PhantomData,
                     };
-                    let _ = plugin.event_stream(req, &sender);
+                    if let Err(e) = plugin.event_stream(req, &sender) {
+                        push_stream_error(&ctx_clone, &e);
+                    }
+                } else {
+                    push_stream_error(&ctx_clone, "failed to parse stream request");
                 }
                 ctx_clone.close();
             }
-            _ => {}
+            _ => {
+                push_stream_error(&ctx_clone, format!("unknown method: {}", method_str));
+                ctx_clone.close();
+            }
         }
     });
-    
+
     handle
 }
-
-
-
 
 #[no_mangle]
 pub extern "C" fn Synurang_Stream_Send(handle: u64, data: *const c_char, data_len: c_int) -> c_int {
@@ -1069,17 +1155,17 @@ pub extern "C" fn Synurang_Stream_Send(handle: u64, data: *const c_char, data_le
         Some(c) => c,
         None => return -1,
     };
-    
+
     if ctx.is_closed() {
         return -1;
     }
-    
+
     let bytes = if data.is_null() || data_len <= 0 {
         Vec::new()
     } else {
         unsafe { std::slice::from_raw_parts(data as *const u8, data_len as usize).to_vec() }
     };
-    
+
     ctx.send_to_plugin(bytes);
     0
 }
@@ -1093,20 +1179,23 @@ pub extern "C" fn Synurang_Stream_Recv(
     let ctx = match get_stream(handle) {
         Some(c) => c,
         None => {
-            unsafe { *status = 2; *resp_len = 0; }
-            return ptr::null_mut();
+            let payload = encode_ffi_error_payload(&FfiError::new("stream not found", 0, 2));
+            unsafe {
+                *status = -1;
+                *resp_len = payload.len() as c_int;
+            }
+            return alloc_payload(&payload);
         }
     };
-    
+
     // Block for data using Condvar (no busy-wait polling)
     match ctx.recv_from_plugin() {
-        Some(data) => {
-            let ptr = Box::into_raw(data.clone().into_boxed_slice()) as *mut c_char;
+        Some(result) => {
             unsafe {
-                *resp_len = data.len() as c_int;
-                *status = 0;
+                *resp_len = result.payload.len() as c_int;
+                *status = result.status;
             }
-            ptr
+            alloc_payload(&result.payload)
         }
         None => {
             unsafe {
@@ -1132,31 +1221,72 @@ pub extern "C" fn Synurang_Stream_CloseSend(handle: u64) {
 #[no_mangle]
 pub extern "C" fn Synurang_Stream_Close(handle: u64) {
     if let Some(ctx) = get_stream(handle) {
-        ctx.close();  // This now notifies all waiters
+        ctx.close(); // This now notifies all waiters
     }
-    if let Ok(mut streams) = STREAMS.write() {
+    if let Ok(mut streams) = streams().write() {
         streams.remove(&handle);
     }
 }
-
 
 // =============================================================================
 // Helper Functions
 // =============================================================================
 
-fn error_response(resp_len: *mut c_int, msg: &str) -> *mut c_char {
-    let mut result = vec![1u8]; // error status
-    result.extend(msg.as_bytes());
-    unsafe { *resp_len = result.len() as c_int; }
-    Box::into_raw(result.into_boxed_slice()) as *mut c_char
+fn encode_ffi_error_payload(error: &FfiError) -> Vec<u8> {
+    let pb_err = CoreFfiError {
+        code: error.code,
+        message: error.message.clone(),
+        grpc_code: error.grpc_code,
+    };
+    let mut payload = Vec::new();
+    if pb_err.encode(&mut payload).is_ok() {
+        if payload.is_empty() {
+            vec![0x12, 0x00]
+        } else {
+            payload
+        }
+    } else {
+        if error.message.is_empty() {
+            vec![0x12, 0x00]
+        } else {
+            error.message.as_bytes().to_vec()
+        }
+    }
+}
+
+fn alloc_payload(data: &[u8]) -> *mut c_char {
+    if data.is_empty() {
+        return ptr::null_mut();
+    }
+    unsafe {
+        let raw = malloc(data.len()) as *mut u8;
+        if raw.is_null() {
+            return ptr::null_mut();
+        }
+        ptr::copy_nonoverlapping(data.as_ptr(), raw, data.len());
+        raw as *mut c_char
+    }
+}
+
+fn push_stream_error<E: Into<FfiError>>(ctx: &Arc<StreamContext>, error: E) {
+    let error = error.into();
+    ctx.push_recv_result(-1, encode_ffi_error_payload(&error));
+}
+
+fn error_response<E: Into<FfiError>>(resp_len: *mut c_int, error: E) -> *mut c_char {
+    let error = error.into();
+    let payload = encode_ffi_error_payload(&error);
+    unsafe {
+        *resp_len = -(payload.len() as c_int);
+    }
+    alloc_payload(&payload)
 }
 
 fn success_response(resp_len: *mut c_int, data: &[u8]) -> *mut c_char {
-    let mut result = vec![0u8]; // success status
-    result.extend(data);
-    unsafe { *resp_len = result.len() as c_int; }
-    Box::into_raw(result.into_boxed_slice()) as *mut c_char
+    unsafe {
+        *resp_len = data.len() as c_int;
+    }
+    alloc_payload(data)
 }
 
 // Module: volvoxgrid_v1
-

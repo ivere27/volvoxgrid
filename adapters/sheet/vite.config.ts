@@ -5,7 +5,7 @@ export default defineConfig({
   server: {
     fs: {
       allow: [
-        resolve(__dirname),           // adapters/excel/
+        resolve(__dirname),           // adapters/sheet/
         resolve(__dirname, "../.."),   // repo root (for symlinked wasm/)
       ],
     },
@@ -13,10 +13,10 @@ export default defineConfig({
   build: {
     lib: {
       entry: resolve(__dirname, "src/index.ts"),
-      name: "VolvoxExcel",
+      name: "VolvoxSheet",
       formats: ["es", "umd"],
       fileName: (format) =>
-        format === "es" ? "volvox-excel.js" : "volvox-excel.umd.js",
+        format === "es" ? "volvox-sheet.js" : "volvox-sheet.umd.js",
     },
     rollupOptions: {
       external: ["volvoxgrid"],

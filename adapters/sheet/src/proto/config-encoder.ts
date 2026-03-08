@@ -11,7 +11,7 @@ import {
   type HighlightStyleArg,
 } from "./proto-utils.js";
 
-export interface ExcelGridConfig {
+export interface SheetGridConfig {
   // Layout
   rows?: number;
   cols?: number;
@@ -54,7 +54,7 @@ export interface ExcelGridConfig {
   textOverflow?: boolean;
 }
 
-export function encodeGridConfig(config: ExcelGridConfig): Uint8Array {
+export function encodeGridConfig(config: SheetGridConfig): Uint8Array {
   const gridConfig: number[] = [];
 
   // ── LayoutConfig (field 1) ──

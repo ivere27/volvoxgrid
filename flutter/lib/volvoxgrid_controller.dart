@@ -15,8 +15,7 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-import 'src/generated/volvoxgrid.pb.dart';
-import 'src/generated/volvoxgrid_ffi.pb.dart';
+import 'volvoxgrid_ffi.dart';
 
 /// Simple row/col/text entry used by [setCells] batch operations.
 class CellTextEntry {
@@ -130,7 +129,7 @@ class VolvoxGridController extends ChangeNotifier {
           ..rows = rows
           ..cols = cols)
         ..indicatorBands = _defaultIndicatorBandsConfig());
-    final response = await VolvoxGridServiceFfi.Create(req);
+    final response = await VolvoxGridService.Create(req);
     _gridId = response.handle.id;
     notifyListeners();
   }
@@ -138,7 +137,7 @@ class VolvoxGridController extends ChangeNotifier {
   /// Destroy the native grid and release resources.
   Future<void> destroyGrid() async {
     if (!isCreated) return;
-    await VolvoxGridServiceFfi.Destroy(_handle);
+    await VolvoxGridService.Destroy(_handle);
     _gridId = Int64.ZERO;
   }
 
@@ -154,14 +153,14 @@ class VolvoxGridController extends ChangeNotifier {
   // ── Internal helpers ────────────────────────────────────────────────────────
 
   Future<void> _configure(GridConfig config) async {
-    await VolvoxGridServiceFfi.Configure(ConfigureRequest()
+    await VolvoxGridService.Configure(ConfigureRequest()
       ..gridId = _gridId
       ..config = config);
     notifyListeners();
   }
 
   Future<GridConfig> _getConfig() {
-    return VolvoxGridServiceFfi.GetConfig(_handle);
+    return VolvoxGridService.GetConfig(_handle);
   }
 
   SelectRequest _buildSelectRequest(
@@ -300,7 +299,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the height of a specific row in pixels.
   Future<void> setRowHeight(int row, int height) async {
-    await VolvoxGridServiceFfi.DefineRows(DefineRowsRequest()
+    await VolvoxGridService.DefineRows(DefineRowsRequest()
       ..gridId = _gridId
       ..rows.add(RowDef()
         ..index = row
@@ -310,7 +309,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the width of a specific column in pixels.
   Future<void> setColWidth(int col, int width) async {
-    await VolvoxGridServiceFfi.DefineColumns(DefineColumnsRequest()
+    await VolvoxGridService.DefineColumns(DefineColumnsRequest()
       ..gridId = _gridId
       ..columns.add(ColumnDef()
         ..index = col
@@ -320,7 +319,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the caption shown in the top column-indicator band for a column.
   Future<void> setColumnCaption(int col, String caption) async {
-    await VolvoxGridServiceFfi.DefineColumns(DefineColumnsRequest()
+    await VolvoxGridService.DefineColumns(DefineColumnsRequest()
       ..gridId = _gridId
       ..columns.add(ColumnDef()
         ..index = col
@@ -359,13 +358,13 @@ class VolvoxGridController extends ChangeNotifier {
     if (text.isNotEmpty) {
       req.text.addAll(text);
     }
-    await VolvoxGridServiceFfi.InsertRows(req);
+    await VolvoxGridService.InsertRows(req);
     notifyListeners();
   }
 
   /// Remove [count] rows starting at [index].
   Future<void> removeRows(int index, {int count = 1}) async {
-    await VolvoxGridServiceFfi.RemoveRows(RemoveRowsRequest()
+    await VolvoxGridService.RemoveRows(RemoveRowsRequest()
       ..gridId = _gridId
       ..index = index
       ..count = count);
@@ -374,7 +373,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Move a column to a new [position].
   Future<void> moveColumn(int col, int position) async {
-    await VolvoxGridServiceFfi.MoveColumn(MoveColumnRequest()
+    await VolvoxGridService.MoveColumn(MoveColumnRequest()
       ..gridId = _gridId
       ..col = col
       ..position = position);
@@ -383,7 +382,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Move a row to a new [position].
   Future<void> moveRow(int row, int position) async {
-    await VolvoxGridServiceFfi.MoveRow(MoveRowRequest()
+    await VolvoxGridService.MoveRow(MoveRowRequest()
       ..gridId = _gridId
       ..row = row
       ..position = position);
@@ -394,7 +393,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the text of a cell at the given [row] and [col].
   Future<void> setCellText(int row, int col, String text) async {
-    await VolvoxGridServiceFfi.UpdateCells(UpdateCellsRequest()
+    await VolvoxGridService.UpdateCells(UpdateCellsRequest()
       ..gridId = _gridId
       ..cells.add(CellUpdate()
         ..row = row
@@ -405,7 +404,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Get the text of a cell at the given [row] and [col].
   Future<String> getCellText(int row, int col) async {
-    final resp = await VolvoxGridServiceFfi.GetCells(GetCellsRequest()
+    final resp = await VolvoxGridService.GetCells(GetCellsRequest()
       ..gridId = _gridId
       ..row1 = row
       ..col1 = col
@@ -428,7 +427,7 @@ class VolvoxGridController extends ChangeNotifier {
         ..col = cell.col
         ..value = (CellValue()..text = cell.text));
     }
-    await VolvoxGridServiceFfi.UpdateCells(req);
+    await VolvoxGridService.UpdateCells(req);
     notifyListeners();
   }
 
@@ -484,7 +483,7 @@ class VolvoxGridController extends ChangeNotifier {
     List<CellValue> values, {
     bool atomic = false,
   }) async {
-    await VolvoxGridServiceFfi.LoadTable(LoadTableRequest()
+    await VolvoxGridService.LoadTable(LoadTableRequest()
       ..gridId = _gridId
       ..rows = rows
       ..cols = cols
@@ -498,7 +497,7 @@ class VolvoxGridController extends ChangeNotifier {
     ClearScope scope = ClearScope.CLEAR_EVERYTHING,
     ClearRegion region = ClearRegion.CLEAR_SCROLLABLE,
   }) async {
-    await VolvoxGridServiceFfi.Clear(ClearRequest()
+    await VolvoxGridService.Clear(ClearRequest()
       ..gridId = _gridId
       ..scope = scope
       ..region = region);
@@ -511,12 +510,13 @@ class VolvoxGridController extends ChangeNotifier {
   Future<void> setCursorRow(int row) async {
     int targetCol;
     try {
-      targetCol = (await VolvoxGridServiceFfi.GetSelection(_handle)).activeCol;
+      targetCol = (await VolvoxGridService.GetSelection(_handle)).activeCol;
     } catch (_) {
       targetCol = 0;
     }
-    await VolvoxGridServiceFfi.Select(
-      _buildSingleRangeSelectRequest(row, targetCol, rowEnd: row, colEnd: targetCol),
+    await VolvoxGridService.Select(
+      _buildSingleRangeSelectRequest(row, targetCol,
+          rowEnd: row, colEnd: targetCol),
     );
     notifyListeners();
   }
@@ -525,32 +525,33 @@ class VolvoxGridController extends ChangeNotifier {
   Future<void> setCursorCol(int col) async {
     int targetRow;
     try {
-      targetRow = (await VolvoxGridServiceFfi.GetSelection(_handle)).activeRow;
+      targetRow = (await VolvoxGridService.GetSelection(_handle)).activeRow;
     } catch (_) {
       targetRow = 0;
     }
-    await VolvoxGridServiceFfi.Select(
-      _buildSingleRangeSelectRequest(targetRow, col, rowEnd: targetRow, colEnd: col),
+    await VolvoxGridService.Select(
+      _buildSingleRangeSelectRequest(targetRow, col,
+          rowEnd: targetRow, colEnd: col),
     );
     notifyListeners();
   }
 
   /// Get the current cursor row.
   Future<int> cursorRow() async {
-    final sel = await VolvoxGridServiceFfi.GetSelection(_handle);
+    final sel = await VolvoxGridService.GetSelection(_handle);
     return sel.activeRow;
   }
 
   /// Get the current cursor column.
   Future<int> cursorCol() async {
-    final sel = await VolvoxGridServiceFfi.GetSelection(_handle);
+    final sel = await VolvoxGridService.GetSelection(_handle);
     return sel.activeCol;
   }
 
   /// Select a rectangular range of cells.
   Future<void> selectRange(
       int rowStart, int colStart, int rowEnd, int colEnd) async {
-    await VolvoxGridServiceFfi.Select(_buildSingleRangeSelectRequest(
+    await VolvoxGridService.Select(_buildSingleRangeSelectRequest(
       rowStart,
       colStart,
       rowEnd: rowEnd,
@@ -574,7 +575,7 @@ class VolvoxGridController extends ChangeNotifier {
           ..col2 = range.col1 > range.col2 ? range.col1 : range.col2)
         .toList(growable: false);
     if (normalized.isEmpty) return;
-    await VolvoxGridServiceFfi.Select(_buildSelectRequest(
+    await VolvoxGridService.Select(_buildSelectRequest(
       activeRow ?? normalized.first.row1,
       activeCol ?? normalized.first.col1,
       normalized,
@@ -585,13 +586,13 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Get the current selection state, including all returned ranges.
   Future<SelectionState> getSelection() async {
-    return VolvoxGridServiceFfi.GetSelection(_handle);
+    return VolvoxGridService.GetSelection(_handle);
   }
 
   /// Clear the current selection.
   Future<void> clearSelection() async {
-    final sel = await VolvoxGridServiceFfi.GetSelection(_handle);
-    await VolvoxGridServiceFfi.Select(_buildSingleRangeSelectRequest(
+    final sel = await VolvoxGridService.GetSelection(_handle);
+    await VolvoxGridService.Select(_buildSingleRangeSelectRequest(
       sel.activeRow,
       sel.activeCol,
       rowEnd: sel.activeRow,
@@ -614,7 +615,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Scroll the grid so that the specified cell is visible.
   Future<void> showCell(int row, int col) async {
-    await VolvoxGridServiceFfi.ShowCell(
+    await VolvoxGridService.ShowCell(
       ShowCellRequest()
         ..gridId = _gridId
         ..row = row
@@ -624,7 +625,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the topmost visible scrollable row.
   Future<void> setTopRow(int row) async {
-    await VolvoxGridServiceFfi.SetTopRow(
+    await VolvoxGridService.SetTopRow(
       SetRowRequest()
         ..gridId = _gridId
         ..row = row,
@@ -633,13 +634,13 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Get the topmost visible scrollable row.
   Future<int> topRow() async {
-    final sel = await VolvoxGridServiceFfi.GetSelection(_handle);
+    final sel = await VolvoxGridService.GetSelection(_handle);
     return sel.topRow;
   }
 
   /// Set the leftmost visible scrollable column.
   Future<void> setLeftCol(int col) async {
-    await VolvoxGridServiceFfi.SetLeftCol(
+    await VolvoxGridService.SetLeftCol(
       SetColRequest()
         ..gridId = _gridId
         ..col = col,
@@ -648,7 +649,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Get the leftmost visible scrollable column.
   Future<int> leftCol() async {
-    final sel = await VolvoxGridServiceFfi.GetSelection(_handle);
+    final sel = await VolvoxGridService.GetSelection(_handle);
     return sel.leftCol;
   }
 
@@ -659,7 +660,7 @@ class VolvoxGridController extends ChangeNotifier {
   /// Single-column: `sort(SortOrder.SORT_GENERIC_ASCENDING, col: 0)`
   /// Multi-column:  `sortMulti([(0, SortOrder.SORT_GENERIC_ASCENDING), (2, SortOrder.SORT_GENERIC_DESCENDING)])`
   Future<void> sort(SortOrder order, {int col = -1}) async {
-    await VolvoxGridServiceFfi.Sort(SortRequest()
+    await VolvoxGridService.Sort(SortRequest()
       ..gridId = _gridId
       ..sortColumns.add(SortColumn()
         ..col = col
@@ -675,7 +676,7 @@ class VolvoxGridController extends ChangeNotifier {
         ..col = col
         ..order = order);
     }
-    await VolvoxGridServiceFfi.Sort(req);
+    await VolvoxGridService.Sort(req);
     notifyListeners();
   }
 
@@ -698,7 +699,7 @@ class VolvoxGridController extends ChangeNotifier {
     int foreColor = 0xFF000000,
     bool addOutline = true,
   }) async {
-    await VolvoxGridServiceFfi.Subtotal(SubtotalRequest()
+    await VolvoxGridService.Subtotal(SubtotalRequest()
       ..gridId = _gridId
       ..aggregate = aggregate
       ..groupOnCol = groupOnCol
@@ -720,7 +721,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the outline level for a specific row.
   Future<void> setRowOutlineLevel(int row, int level) async {
-    await VolvoxGridServiceFfi.DefineRows(DefineRowsRequest()
+    await VolvoxGridService.DefineRows(DefineRowsRequest()
       ..gridId = _gridId
       ..rows.add(RowDef()
         ..index = row
@@ -729,7 +730,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Expand/collapse rows to the requested [level].
   Future<void> outline(int level) async {
-    await VolvoxGridServiceFfi.Outline(OutlineRequest()
+    await VolvoxGridService.Outline(OutlineRequest()
       ..gridId = _gridId
       ..level = level);
     notifyListeners();
@@ -737,7 +738,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Mark a row as a subtotal node (shows +/- expand/collapse button).
   Future<void> setIsSubtotal(int row, bool isSubtotal) async {
-    await VolvoxGridServiceFfi.DefineRows(DefineRowsRequest()
+    await VolvoxGridService.DefineRows(DefineRowsRequest()
       ..gridId = _gridId
       ..rows.add(RowDef()
         ..index = row
@@ -752,7 +753,7 @@ class VolvoxGridController extends ChangeNotifier {
     if (relation != null) {
       req.relation = relation;
     }
-    return VolvoxGridServiceFfi.GetNode(req);
+    return VolvoxGridService.GetNode(req);
   }
 
   // ── Span ─────────────────────────────────────────────────────────────────
@@ -764,7 +765,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Enable or disable spanning for a specific column.
   Future<void> setSpanCol(int col, bool span) async {
-    await VolvoxGridServiceFfi.DefineColumns(DefineColumnsRequest()
+    await VolvoxGridService.DefineColumns(DefineColumnsRequest()
       ..gridId = _gridId
       ..columns.add(ColumnDef()
         ..index = col
@@ -774,7 +775,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Enable or disable spanning for a specific row.
   Future<void> setSpanRow(int row, bool span) async {
-    await VolvoxGridServiceFfi.DefineRows(DefineRowsRequest()
+    await VolvoxGridService.DefineRows(DefineRowsRequest()
       ..gridId = _gridId
       ..rows.add(RowDef()
         ..index = row
@@ -786,7 +787,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the dropdown items for a column (pipe-delimited, e.g. "A|B|C").
   Future<void> setColDropdownItems(int col, String items) async {
-    await VolvoxGridServiceFfi.DefineColumns(DefineColumnsRequest()
+    await VolvoxGridService.DefineColumns(DefineColumnsRequest()
       ..gridId = _gridId
       ..columns.add(ColumnDef()
         ..index = col
@@ -795,7 +796,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set dropdown items for an individual cell.
   Future<void> setCellDropdownItems(int row, int col, String items) async {
-    await VolvoxGridServiceFfi.UpdateCells(UpdateCellsRequest()
+    await VolvoxGridService.UpdateCells(UpdateCellsRequest()
       ..gridId = _gridId
       ..cells.add(CellUpdate()
         ..row = row
@@ -861,7 +862,7 @@ class VolvoxGridController extends ChangeNotifier {
     if (formulaMode != null) {
       start.formulaMode = formulaMode;
     }
-    await VolvoxGridServiceFfi.Edit(EditCommand()
+    await VolvoxGridService.Edit(EditCommand()
       ..gridId = _gridId
       ..start = start);
     notifyListeners();
@@ -870,11 +871,11 @@ class VolvoxGridController extends ChangeNotifier {
   /// Commit or cancel the current cell edit.
   Future<void> commitEdit(String text, {bool cancel = false}) async {
     if (cancel) {
-      await VolvoxGridServiceFfi.Edit(EditCommand()
+      await VolvoxGridService.Edit(EditCommand()
         ..gridId = _gridId
         ..cancel = EditCancel());
     } else {
-      await VolvoxGridServiceFfi.Edit(EditCommand()
+      await VolvoxGridService.Edit(EditCommand()
         ..gridId = _gridId
         ..commit = (EditCommit()..text = text));
     }
@@ -883,7 +884,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Cancel the current cell edit.
   Future<void> cancelEdit() async {
-    await VolvoxGridServiceFfi.Edit(EditCommand()
+    await VolvoxGridService.Edit(EditCommand()
       ..gridId = _gridId
       ..cancel = EditCancel());
     notifyListeners();
@@ -893,7 +894,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the data type for a column (string, number, date, etc.).
   Future<void> setColDataType(int col, ColumnDataType dataType) async {
-    await VolvoxGridServiceFfi.DefineColumns(DefineColumnsRequest()
+    await VolvoxGridService.DefineColumns(DefineColumnsRequest()
       ..gridId = _gridId
       ..columns.add(ColumnDef()
         ..index = col
@@ -902,7 +903,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the text alignment for a column.
   Future<void> setColAlignment(int col, Align alignment) async {
-    await VolvoxGridServiceFfi.DefineColumns(DefineColumnsRequest()
+    await VolvoxGridService.DefineColumns(DefineColumnsRequest()
       ..gridId = _gridId
       ..columns.add(ColumnDef()
         ..index = col
@@ -911,7 +912,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the format string for a column (e.g. '#,##0.00' for currency).
   Future<void> setColFormat(int col, String format) async {
-    await VolvoxGridServiceFfi.DefineColumns(DefineColumnsRequest()
+    await VolvoxGridService.DefineColumns(DefineColumnsRequest()
       ..gridId = _gridId
       ..columns.add(ColumnDef()
         ..index = col
@@ -958,7 +959,7 @@ class VolvoxGridController extends ChangeNotifier {
           ..style = style);
       }
     }
-    await VolvoxGridServiceFfi.UpdateCells(req);
+    await VolvoxGridService.UpdateCells(req);
     notifyListeners();
   }
 
@@ -1000,7 +1001,7 @@ class VolvoxGridController extends ChangeNotifier {
     bool equal = false,
     int maxWidth = 0,
   }) async {
-    await VolvoxGridServiceFfi.AutoSize(AutoSizeRequest()
+    await VolvoxGridService.AutoSize(AutoSizeRequest()
       ..gridId = _gridId
       ..colFrom = colFrom
       ..colTo = colTo
@@ -1034,7 +1035,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Notify the native grid that the viewport size changed.
   Future<void> resizeViewport(int width, int height) async {
-    await VolvoxGridServiceFfi.ResizeViewport(ResizeViewportRequest()
+    await VolvoxGridService.ResizeViewport(ResizeViewportRequest()
       ..gridId = _gridId
       ..width = width
       ..height = height);
@@ -1048,7 +1049,7 @@ class VolvoxGridController extends ChangeNotifier {
     ExportFormat format = ExportFormat.EXPORT_BINARY,
     ExportScope scope = ExportScope.EXPORT_ALL,
   }) async {
-    return VolvoxGridServiceFfi.Export(ExportRequest()
+    return VolvoxGridService.Export(ExportRequest()
       ..gridId = _gridId
       ..format = format
       ..scope = scope);
@@ -1060,7 +1061,7 @@ class VolvoxGridController extends ChangeNotifier {
     ExportFormat format = ExportFormat.EXPORT_BINARY,
     ExportScope scope = ExportScope.EXPORT_ALL,
   }) async {
-    await VolvoxGridServiceFfi.Import(ImportRequest()
+    await VolvoxGridService.Import(ImportRequest()
       ..gridId = _gridId
       ..data = data
       ..format = format
@@ -1079,7 +1080,7 @@ class VolvoxGridController extends ChangeNotifier {
     String footer = '',
     bool showPageNumbers = true,
   }) async {
-    return VolvoxGridServiceFfi.Print(PrintRequest()
+    return VolvoxGridService.Print(PrintRequest()
       ..gridId = _gridId
       ..orientation = orientation
       ..marginLeft = marginLeft
@@ -1104,21 +1105,21 @@ class VolvoxGridController extends ChangeNotifier {
     if (data.isNotEmpty) {
       req.data = data;
     }
-    return VolvoxGridServiceFfi.Archive(req);
+    return VolvoxGridService.Archive(req);
   }
 
   // ── Clipboard ──────────────────────────────────────────────────────────────
 
   /// Copy current selection to clipboard payload.
   Future<ClipboardResponse> copy() async {
-    return VolvoxGridServiceFfi.Clipboard(ClipboardCommand()
+    return VolvoxGridService.Clipboard(ClipboardCommand()
       ..gridId = _gridId
       ..copy = ClipboardCopy());
   }
 
   /// Cut current selection to clipboard payload.
   Future<ClipboardResponse> cut() async {
-    final data = await VolvoxGridServiceFfi.Clipboard(ClipboardCommand()
+    final data = await VolvoxGridService.Clipboard(ClipboardCommand()
       ..gridId = _gridId
       ..cut = ClipboardCut());
     notifyListeners();
@@ -1127,7 +1128,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Paste provided clipboard text into current selection.
   Future<void> paste(String text) async {
-    await VolvoxGridServiceFfi.Clipboard(ClipboardCommand()
+    await VolvoxGridService.Clipboard(ClipboardCommand()
       ..gridId = _gridId
       ..paste = (ClipboardPaste()..text = text));
     notifyListeners();
@@ -1135,7 +1136,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Delete current selection contents.
   Future<void> deleteSelection() async {
-    await VolvoxGridServiceFfi.Clipboard(ClipboardCommand()
+    await VolvoxGridService.Clipboard(ClipboardCommand()
       ..gridId = _gridId
       ..delete = ClipboardDelete());
     notifyListeners();
@@ -1145,7 +1146,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Pin a row to top or bottom, or unpin it.
   Future<void> pinRow(int row, PinPosition pin) async {
-    await VolvoxGridServiceFfi.DefineRows(DefineRowsRequest()
+    await VolvoxGridService.DefineRows(DefineRowsRequest()
       ..gridId = _gridId
       ..rows.add(RowDef()
         ..index = row
@@ -1155,7 +1156,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set sticky edge for a row.
   Future<void> setRowSticky(int row, StickyEdge edge) async {
-    await VolvoxGridServiceFfi.DefineRows(DefineRowsRequest()
+    await VolvoxGridService.DefineRows(DefineRowsRequest()
       ..gridId = _gridId
       ..rows.add(RowDef()
         ..index = row
@@ -1165,7 +1166,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set sticky edge for a column.
   Future<void> setColSticky(int col, StickyEdge edge) async {
-    await VolvoxGridServiceFfi.DefineColumns(DefineColumnsRequest()
+    await VolvoxGridService.DefineColumns(DefineColumnsRequest()
       ..gridId = _gridId
       ..columns.add(ColumnDef()
         ..index = col
@@ -1183,7 +1184,7 @@ class VolvoxGridController extends ChangeNotifier {
     bool caseSensitive = false,
     bool fullMatch = false,
   }) async {
-    final resp = await VolvoxGridServiceFfi.Find(FindRequest()
+    final resp = await VolvoxGridService.Find(FindRequest()
       ..gridId = _gridId
       ..col = col
       ..startRow = startRow
@@ -1200,7 +1201,7 @@ class VolvoxGridController extends ChangeNotifier {
     required int col,
     int startRow = 0,
   }) async {
-    final resp = await VolvoxGridServiceFfi.Find(FindRequest()
+    final resp = await VolvoxGridService.Find(FindRequest()
       ..gridId = _gridId
       ..col = col
       ..startRow = startRow
@@ -1216,7 +1217,7 @@ class VolvoxGridController extends ChangeNotifier {
     int row2,
     int col2,
   ) async {
-    final resp = await VolvoxGridServiceFfi.Aggregate(AggregateRequest()
+    final resp = await VolvoxGridService.Aggregate(AggregateRequest()
       ..gridId = _gridId
       ..aggregate = type
       ..row1 = row1
@@ -1228,7 +1229,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Return the merged range containing ([row], [col]).
   Future<CellRange> getMergedRange(int row, int col) async {
-    return VolvoxGridServiceFfi.GetMergedRange(GetMergedRangeRequest()
+    return VolvoxGridService.GetMergedRange(GetMergedRangeRequest()
       ..gridId = _gridId
       ..row = row
       ..col = col);
@@ -1236,7 +1237,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Merge cells in the given range.
   Future<void> mergeCells(int row1, int col1, int row2, int col2) async {
-    await VolvoxGridServiceFfi.MergeCells(MergeCellsRequest()
+    await VolvoxGridService.MergeCells(MergeCellsRequest()
       ..gridId = _gridId
       ..range = (CellRange()
         ..row1 = row1
@@ -1248,7 +1249,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Unmerge cells in the given range.
   Future<void> unmergeCells(int row1, int col1, int row2, int col2) async {
-    await VolvoxGridServiceFfi.UnmergeCells(UnmergeCellsRequest()
+    await VolvoxGridService.UnmergeCells(UnmergeCellsRequest()
       ..gridId = _gridId
       ..range = (CellRange()
         ..row1 = row1
@@ -1260,28 +1261,28 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Return all explicit merge regions.
   Future<MergedRegionsResponse> getMergedRegions() async {
-    return VolvoxGridServiceFfi.GetMergedRegions(GridHandle()..id = _gridId);
+    return VolvoxGridService.GetMergedRegions(GridHandle()..id = _gridId);
   }
 
   // ── Render Session ────────────────────────────────────────────────────────
 
   /// Open a bidirectional render session.
   Stream<RenderOutput> renderSession(Stream<RenderInput> inputs) {
-    return VolvoxGridServiceFfi.RenderSession(inputs);
+    return VolvoxGridService.RenderSession(inputs);
   }
 
   // ── Event Stream ──────────────────────────────────────────────────────────
 
   /// Subscribe to native grid events (selection changes, edits, etc.).
   Stream<GridEvent> eventStream() {
-    return VolvoxGridServiceFfi.EventStream(_handle);
+    return VolvoxGridService.EventStream(_handle);
   }
 
   // ── Demo ─────────────────────────────────────────────────────────────────
 
   /// Load a built-in engine demo ("sales", "hierarchy", or "stress").
   Future<void> loadDemo(String demo) async {
-    await VolvoxGridServiceFfi.LoadDemo(LoadDemoRequest()
+    await VolvoxGridService.LoadDemo(LoadDemoRequest()
       ..gridId = _gridId
       ..demo = demo);
     notifyListeners();
@@ -1291,7 +1292,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Suspend or resume native redraw.
   Future<void> setRedraw(bool enabled) async {
-    await VolvoxGridServiceFfi.SetRedraw(SetRedrawRequest()
+    await VolvoxGridService.SetRedraw(SetRedrawRequest()
       ..gridId = _gridId
       ..enabled = enabled);
   }
@@ -1425,7 +1426,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Force a full repaint.
   Future<void> refresh() async {
-    await VolvoxGridServiceFfi.Refresh(_handle);
+    await VolvoxGridService.Refresh(_handle);
     notifyListeners();
   }
 

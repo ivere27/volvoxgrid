@@ -1681,21 +1681,14 @@ uint8_t* volvox_grid_load_demo(
 
 
 /* ═══════════════════════════════════════════════════════════ */
-/* Memory Management & Error Retrieval                        */
+/* Memory Management                                          */
 /* ═══════════════════════════════════════════════════════════ */
 
 /* Free memory returned by native API functions.              */
 /* The allocation size is recovered from the prepended header. */
 void volvox_grid_free(uint8_t* ptr);
 
-/* Returns a pointer to the last error message (UTF-8, not    */
-/* null-terminated). Valid until the next FFI call into this   */
-/* module. Returns NULL if no error. Writes byte length to    */
-/* out_len.                                                   */
-const uint8_t* volvox_grid_last_error(int32_t* out_len);
-
 
 #ifdef __cplusplus
 }
 #endif
-

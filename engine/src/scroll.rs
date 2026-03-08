@@ -32,6 +32,29 @@ impl ScrollState {
         Self::default()
     }
 
+    /// Compute the maximum legal scroll offsets for the current layout and
+    /// viewport geometry.
+    pub fn compute_max_scroll(
+        layout: &crate::layout::LayoutCache,
+        viewport_width: i32,
+        viewport_height: i32,
+        fixed_rows: i32,
+        fixed_cols: i32,
+        pinned_height: i32,
+        pinned_width: i32,
+    ) -> (f32, f32) {
+        let fixed_height = layout.row_pos(fixed_rows);
+        let fixed_width = layout.col_pos(fixed_cols);
+        let max_scroll_x =
+            (layout.total_width - viewport_width + fixed_width + pinned_width).max(0) as f32;
+        // Pinned rows have 0 height in layout (total_height excludes them),
+        // but they consume viewport space, so we ADD pinned_height to reserve
+        // that viewport space for the pinned sections.
+        let max_scroll_y =
+            (layout.total_height - viewport_height + fixed_height + pinned_height).max(0) as f32;
+        (max_scroll_x, max_scroll_y)
+    }
+
     /// Update max scroll values based on layout.
     ///
     /// `pinned_height` is the total pixel height of all structurally pinned rows
@@ -51,22 +74,17 @@ impl ScrollState {
         pinned_height: i32,
         pinned_width: i32,
     ) {
-        // Max scroll = total content size - viewport + fixed area - pinned rows
-        let fixed_height = layout.row_pos(fixed_rows);
-        let fixed_width = layout.col_pos(fixed_cols);
-
-        self.max_scroll_x =
-            (layout.total_width - viewport_width + fixed_width + pinned_width).max(0) as f32;
-        // Pinned rows have 0 height in layout (total_height excludes them),
-        // but they consume viewport space, so we ADD pinned_height to reserve
-        // that viewport space for the pinned sections.
-        self.max_scroll_y =
-            (layout.total_height - viewport_height + fixed_height + pinned_height).max(0) as f32;
-        // Honor programmatic TopRow/LeftCol: never reduce max below the
-        // current scroll position so set_top_row/set_left_col values persist
-        // across layout recomputes.
-        self.max_scroll_x = self.max_scroll_x.max(self.scroll_x);
-        self.max_scroll_y = self.max_scroll_y.max(self.scroll_y);
+        let (max_scroll_x, max_scroll_y) = Self::compute_max_scroll(
+            layout,
+            viewport_width,
+            viewport_height,
+            fixed_rows,
+            fixed_cols,
+            pinned_height,
+            pinned_width,
+        );
+        self.max_scroll_x = max_scroll_x;
+        self.max_scroll_y = max_scroll_y;
         self.clamp();
     }
 
@@ -251,5 +269,20 @@ mod tests {
         assert!(!scroll.fling_active);
         assert_eq!(scroll.fling_vx, 0.0);
         assert_eq!(scroll.fling_vy, 0.0);
+    }
+
+    #[test]
+    fn update_bounds_clamps_scroll_when_content_shrinks() {
+        let mut scroll = ScrollState::new();
+        scroll.scroll_x = 640.0;
+        scroll.scroll_y = 1_600.0;
+
+        let layout = uniform_layout(20, 10, 20, 80);
+        scroll.update_bounds(&layout, 240, 100, 0, 0, 0, 0);
+
+        assert_eq!(scroll.max_scroll_x, 560.0);
+        assert_eq!(scroll.max_scroll_y, 300.0);
+        assert_eq!(scroll.scroll_x, 560.0);
+        assert_eq!(scroll.scroll_y, 300.0);
     }
 }

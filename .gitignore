@@ -84,8 +84,8 @@ adapters/vsflexgrid/x64/
 adapters/vsflexgrid/build/
 adapters/sfdatagrid/build/
 adapters/sfdatagrid/pubspec.lock
-adapters/excel/package-lock.json
-adapters/excel/wasm/
+adapters/sheet/package-lock.json
+adapters/sheet/wasm/
 adapters/report/package-lock.json
 adapters/report/wasm/
 

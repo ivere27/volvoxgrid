@@ -5021,46 +5021,46 @@ fn subtotal_visual_level(level: i32, is_subtotal: bool, subtotal_level_floor: i3
 // Layer 10 -- Frozen pane separator lines
 // ===========================================================================
 
-fn render_frozen_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, _vp: &VisibleRange) {
+fn render_frozen_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRange) {
     let border_color = 0xFF000000_u32;
     let buf_w = canvas.width();
     let buf_h = canvas.height();
 
     // Grid content boundaries — lines should not extend beyond these.
-    // Account for scroll offset: scrollable cells are rendered shifted by scroll_x/scroll_y,
-    // so the visible right/bottom edge is the total extent minus the scroll offset.
+    // Account for indicator bands and scroll offset so separators align with
+    // the same canvas-space coordinates as rendered cells.
     let scroll_x = grid.scroll.scroll_x as i32;
     let scroll_y = grid.scroll.scroll_y as i32;
-    let content_w = (grid.col_pos(grid.cols) - scroll_x).min(buf_w);
-    let content_h = (grid.row_pos(grid.rows) - scroll_y).min(buf_h);
+    let content_right = (vp.data_x + grid.col_pos(grid.cols) - scroll_x).clamp(0, buf_w);
+    let content_bottom = (vp.data_y + grid.row_pos(grid.rows) - scroll_y).clamp(0, buf_h);
 
     // Horizontal frozen row border
     if grid.frozen_rows > 0 {
-        let frozen_row_bottom = grid.row_pos(grid.fixed_rows + grid.frozen_rows);
+        let frozen_row_bottom = vp.data_y + grid.row_pos(grid.fixed_rows + grid.frozen_rows);
         if frozen_row_bottom > 0 && frozen_row_bottom < buf_h {
-            canvas.hline(0, frozen_row_bottom, content_w, border_color);
+            canvas.hline(0, frozen_row_bottom, content_right, border_color);
         }
     }
 
     // Vertical frozen col border
     if grid.frozen_cols > 0 {
-        let frozen_col_right = grid.col_pos(grid.fixed_cols + grid.frozen_cols);
+        let frozen_col_right = vp.data_x + grid.col_pos(grid.fixed_cols + grid.frozen_cols);
         if frozen_col_right > 0 && frozen_col_right < buf_w {
-            canvas.vline(frozen_col_right, 0, content_h, border_color);
+            canvas.vline(frozen_col_right, 0, content_bottom, border_color);
         }
     }
 
     // Fixed row/col separator line (single pixel)
     if grid.fixed_rows > 0 {
-        let fixed_row_bottom = grid.row_pos(grid.fixed_rows);
+        let fixed_row_bottom = vp.data_y + grid.row_pos(grid.fixed_rows);
         if fixed_row_bottom > 0 && fixed_row_bottom < buf_h {
-            canvas.hline(0, fixed_row_bottom, content_w, border_color);
+            canvas.hline(0, fixed_row_bottom, content_right, border_color);
         }
     }
     if grid.fixed_cols > 0 {
-        let fixed_col_right = grid.col_pos(grid.fixed_cols);
+        let fixed_col_right = vp.data_x + grid.col_pos(grid.fixed_cols);
         if fixed_col_right > 0 && fixed_col_right < buf_w {
-            canvas.vline(fixed_col_right, 0, content_h, border_color);
+            canvas.vline(fixed_col_right, 0, content_bottom, border_color);
         }
     }
 }

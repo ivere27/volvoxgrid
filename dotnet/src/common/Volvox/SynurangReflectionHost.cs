@@ -7,6 +7,21 @@ namespace VolvoxGrid.DotNet.Internal
 {
     internal sealed class SynurangReflectionHost : IDisposable
     {
+        internal sealed class SynurangFfiException : InvalidOperationException
+        {
+            public int Code { get; private set; }
+            public int GrpcCode { get; private set; }
+            public byte[] Payload { get; private set; }
+
+            public SynurangFfiException(string message, int code, int grpcCode, byte[] payload)
+                : base(message)
+            {
+                Code = code;
+                GrpcCode = grpcCode;
+                Payload = payload ?? new byte[0];
+            }
+        }
+
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         internal delegate IntPtr SynInvokeDelegate(
             [MarshalAs(UnmanagedType.LPStr)] string method,
@@ -127,35 +142,35 @@ namespace VolvoxGrid.DotNet.Internal
 
                 int respLen;
                 IntPtr respPtr = _invoke(method, dataPtr, dataLen, out respLen);
-                if (respPtr == IntPtr.Zero || respLen <= 0)
+                if (respLen < 0)
                 {
-                    return new byte[0];
+                    int errorLen = -respLen;
+                    byte[] errorPayload = CopyAndFreeResponse(respPtr, errorLen);
+                    throw DecodeFfiError(
+                        errorPayload,
+                        "Synurang invoke failed for method " + method);
                 }
 
-                byte[] responseWithStatus = CopyAndFreeResponse(respPtr, respLen);
-                if (responseWithStatus.Length == 0)
+                if (respPtr == IntPtr.Zero)
                 {
-                    return new byte[0];
-                }
-
-                byte status = responseWithStatus[0];
-                if (status == 0)
-                {
-                    int bodyLen = responseWithStatus.Length - 1;
-                    if (bodyLen <= 0)
+                    if (respLen == 0)
                     {
                         return new byte[0];
                     }
 
-                    var body = new byte[bodyLen];
-                    Buffer.BlockCopy(responseWithStatus, 1, body, 0, bodyLen);
-                    return body;
+                    throw new InvalidOperationException(
+                        "Synurang invoke failed for method " + method + ": plugin returned null");
                 }
 
-                string message = responseWithStatus.Length > 1
-                    ? Encoding.UTF8.GetString(responseWithStatus, 1, responseWithStatus.Length - 1)
-                    : "Unknown plugin error";
-                throw new InvalidOperationException("Synurang invoke failed for method " + method + ": " + message);
+                if (respLen == 0)
+                {
+                    _free(respPtr);
+                    return new byte[0];
+                }
+
+                return NormalizeUnaryPayload(
+                    method,
+                    CopyAndFreeResponse(respPtr, respLen));
             }
             finally
             {
@@ -206,14 +221,46 @@ namespace VolvoxGrid.DotNet.Internal
         {
             try
             {
+                if (ptr == IntPtr.Zero || len <= 0)
+                {
+                    return new byte[0];
+                }
+
                 byte[] buffer = new byte[len];
                 Marshal.Copy(ptr, buffer, 0, len);
                 return buffer;
             }
             finally
             {
-                _free(ptr);
+                if (ptr != IntPtr.Zero)
+                {
+                    _free(ptr);
+                }
             }
+        }
+
+        private static byte[] NormalizeUnaryPayload(string method, byte[] payload)
+        {
+            if (payload == null || payload.Length == 0)
+            {
+                return new byte[0];
+            }
+
+            byte marker = payload[0];
+            if (!LooksLikeLegacyFramedPayload(marker))
+            {
+                return payload;
+            }
+
+            byte[] body = SliceLegacyFrameBody(payload);
+            if (marker == 0)
+            {
+                return body;
+            }
+
+            throw DecodeFfiError(
+                body,
+                "Synurang invoke failed for method " + method);
         }
 
         private void EnsureNotDisposed()
@@ -258,6 +305,140 @@ namespace VolvoxGrid.DotNet.Internal
             }
 
             return Type.GetType("Mono.Runtime") == null;
+        }
+
+        internal static SynurangFfiException DecodeFfiError(byte[] payload, string context)
+        {
+            int code = 0;
+            int grpcCode = 2;
+            string message = null;
+            int offset = 0;
+
+            while (offset < payload.Length)
+            {
+                ulong tag = ReadVarint(payload, ref offset);
+                if (tag == 0)
+                {
+                    break;
+                }
+
+                int field = (int)(tag >> 3);
+                int wire = (int)(tag & 0x07);
+
+                if (field == 1 && wire == 0)
+                {
+                    code = unchecked((int)ReadVarint(payload, ref offset));
+                    continue;
+                }
+
+                if (field == 2 && wire == 2)
+                {
+                    int length = (int)ReadVarint(payload, ref offset);
+                    if (length < 0 || offset + length > payload.Length)
+                    {
+                        offset = payload.Length;
+                        break;
+                    }
+
+                    message = Encoding.UTF8.GetString(payload, offset, length);
+                    offset += length;
+                    continue;
+                }
+
+                if (field == 3 && wire == 0)
+                {
+                    grpcCode = unchecked((int)ReadVarint(payload, ref offset));
+                    continue;
+                }
+
+                offset = SkipField(payload, offset, wire);
+            }
+
+            if (message == null)
+            {
+                message = payload.Length == 0 ? "Unknown plugin error" : Encoding.UTF8.GetString(payload);
+            }
+
+            return new SynurangFfiException(context + ": " + message, code, grpcCode, payload);
+        }
+
+        internal static bool LooksLikeLegacyFramedPayload(byte marker)
+        {
+            // Valid protobuf payloads never begin with field number 0, so marker values 0..7
+            // are reserved for the legacy status-prefixed transport.
+            return marker <= 0x07;
+        }
+
+        internal static byte[] SliceLegacyFrameBody(byte[] payload)
+        {
+            if (payload == null || payload.Length <= 1)
+            {
+                return new byte[0];
+            }
+
+            byte[] body = new byte[payload.Length - 1];
+            Buffer.BlockCopy(payload, 1, body, 0, body.Length);
+            return body;
+        }
+
+        private static ulong ReadVarint(byte[] payload, ref int offset)
+        {
+            ulong value = 0;
+            int shift = 0;
+            while (offset < payload.Length && shift < 64)
+            {
+                byte b = payload[offset++];
+                value |= ((ulong)(b & 0x7f)) << shift;
+                if ((b & 0x80) == 0)
+                {
+                    return value;
+                }
+
+                shift += 7;
+            }
+
+            offset = payload.Length;
+            return 0;
+        }
+
+        private static int SkipField(byte[] payload, int offset, int wireType)
+        {
+            if (wireType == 0)
+            {
+                ReadVarint(payload, ref offset);
+                return offset;
+            }
+
+            if (wireType == 2)
+            {
+                ulong length = ReadVarint(payload, ref offset);
+                if (length > int.MaxValue)
+                {
+                    return payload.Length;
+                }
+
+                int next = offset + (int)length;
+                if (next < offset || next > payload.Length)
+                {
+                    return payload.Length;
+                }
+
+                return next;
+            }
+
+            if (wireType == 1)
+            {
+                int next = offset + 8;
+                return next > payload.Length ? payload.Length : next;
+            }
+
+            if (wireType == 5)
+            {
+                int next = offset + 4;
+                return next > payload.Length ? payload.Length : next;
+            }
+
+            return payload.Length;
         }
     }
 
@@ -324,11 +505,27 @@ namespace VolvoxGrid.DotNet.Internal
 
             if (status == 1)
             {
+                if (ptr != IntPtr.Zero)
+                {
+                    _free(ptr);
+                }
                 return null;
+            }
+
+            if (status < 0)
+            {
+                byte[] errorPayload = CopyAndFreeResponse(ptr, respLen, _free);
+                throw SynurangReflectionHost.DecodeFfiError(
+                    errorPayload,
+                    "Synurang stream recv failed");
             }
 
             if (status != 0)
             {
+                if (ptr != IntPtr.Zero)
+                {
+                    _free(ptr);
+                }
                 throw new InvalidOperationException("Synurang stream recv failed with status " + status);
             }
 
@@ -356,31 +553,46 @@ namespace VolvoxGrid.DotNet.Internal
                 return new byte[0];
             }
 
-            // Stream payloads from the generated Rust bridge are status-prefixed:
-            // [status:1][protobuf payload or utf8 error].
             byte marker = data[0];
-            if (marker <= 0x07)
+            if (!SynurangReflectionHost.LooksLikeLegacyFramedPayload(marker))
             {
-                if (marker == 0)
-                {
-                    if (data.Length == 1)
-                    {
-                        return new byte[0];
-                    }
-
-                    byte[] payload = new byte[data.Length - 1];
-                    Buffer.BlockCopy(data, 1, payload, 0, payload.Length);
-                    return payload;
-                }
-
-                string message = data.Length > 1
-                    ? Encoding.UTF8.GetString(data, 1, data.Length - 1)
-                    : "Unknown stream error";
-                throw new InvalidOperationException(
-                    "Synurang stream recv returned status " + marker + ": " + message);
+                return data;
             }
 
-            return data;
+            byte[] body = SynurangReflectionHost.SliceLegacyFrameBody(data);
+            if (marker == 0)
+            {
+                return body;
+            }
+
+            throw SynurangReflectionHost.DecodeFfiError(
+                body,
+                "Synurang stream recv failed");
+        }
+
+        private static byte[] CopyAndFreeResponse(
+            IntPtr ptr,
+            int len,
+            SynurangReflectionHost.SynFreeDelegate free)
+        {
+            try
+            {
+                if (ptr == IntPtr.Zero || len <= 0)
+                {
+                    return new byte[0];
+                }
+
+                byte[] buffer = new byte[len];
+                Marshal.Copy(ptr, buffer, 0, len);
+                return buffer;
+            }
+            finally
+            {
+                if (ptr != IntPtr.Zero)
+                {
+                    free(ptr);
+                }
+            }
         }
 
         public void CloseSend()

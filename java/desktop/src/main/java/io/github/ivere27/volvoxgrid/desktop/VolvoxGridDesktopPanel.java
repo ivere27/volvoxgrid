@@ -69,8 +69,25 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         void onEditRequest(EditRequest request);
     }
 
+    private static final class FrameTarget {
+        final ByteBuffer pixelBuffer;
+        final BufferedImage image;
+        final int width;
+        final int height;
+        final int[] argbPixels;
+
+        FrameTarget(ByteBuffer pixelBuffer, BufferedImage image, int width, int height) {
+            this.pixelBuffer = pixelBuffer;
+            this.image = image;
+            this.width = width;
+            this.height = height;
+            this.argbPixels = new int[width * height];
+        }
+    }
+
     private final Object sendLock = new Object();
     private final Object imageLock = new Object();
+    private final Object resizeLock = new Object();
     private final Object flingLock = new Object();
 
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -88,11 +105,10 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private volatile Thread renderThread;
     private volatile Thread eventThread;
 
-    private volatile ByteBuffer pixelBuffer;
-    private volatile BufferedImage image;
-    private volatile int bufferWidth;
-    private volatile int bufferHeight;
-    private volatile int[] argbPixels = new int[0];
+    private volatile FrameTarget displayTarget;
+    private volatile FrameTarget inflightTarget;
+    private volatile int pendingResizeWidth;
+    private volatile int pendingResizeHeight;
 
     private volatile GridEventListener gridEventListener;
     private volatile EditRequestListener editRequestListener;
@@ -163,7 +179,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         );
         this.gridId = response.getHandle().getId();
 
-        allocateBuffer(w, h);
+        displayTarget = createFrameTarget(w, h);
         safeResizeViewport(w, h);
         startStreams();
     }
@@ -183,7 +199,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
         int w = resolveViewportWidth();
         int h = resolveViewportHeight();
-        allocateBuffer(w, h);
+        displayTarget = createFrameTarget(w, h);
         safeResizeViewport(w, h);
         startStreams();
     }
@@ -353,15 +369,15 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
-        BufferedImage current = image;
-        if (current == null) {
+        FrameTarget target = displayTarget;
+        if (target == null) {
             g.setColor(Color.GRAY);
             g.drawString("VolvoxGrid (desktop CPU mode)", 12, 20);
             return;
         }
 
         synchronized (imageLock) {
-            g.drawImage(current, 0, 0, getWidth(), getHeight(), null);
+            g.drawImage(target.image, 0, 0, null);
         }
     }
 
@@ -786,9 +802,8 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     }
 
     private void sendBufferReady() {
-        ByteBuffer buf = pixelBuffer;
         SynurangDesktopBridge p = plugin;
-        if (buf == null || p == null || gridId == 0L) {
+        if (p == null || gridId == 0L) {
             return;
         }
 
@@ -797,16 +812,41 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             return;
         }
 
+        FrameTarget current = displayTarget;
+        FrameTarget target = null;
+        int resizeWidth = 0;
+        int resizeHeight = 0;
+        synchronized (resizeLock) {
+            if (pendingResizeWidth > 0 && pendingResizeHeight > 0) {
+                resizeWidth = pendingResizeWidth;
+                resizeHeight = pendingResizeHeight;
+                pendingResizeWidth = 0;
+                pendingResizeHeight = 0;
+            }
+        }
+        if (resizeWidth > 0 && resizeHeight > 0) {
+            target = createFrameTarget(resizeWidth, resizeHeight);
+            safeResizeViewport(resizeWidth, resizeHeight);
+        } else {
+            target = current;
+        }
+        inflightTarget = target;
+        if (target == null) {
+            inflightTarget = null;
+            pendingFrame.set(false);
+            return;
+        }
+
         try {
-            long nativePtr = p.getDirectBufferAddress(buf);
+            long nativePtr = p.getDirectBufferAddress(target.pixelBuffer);
             RenderInput input = RenderInput.newBuilder()
                 .setGridId(gridId)
                 .setBuffer(
                     BufferReady.newBuilder()
                         .setHandle(nativePtr)
-                        .setStride(bufferWidth * 4)
-                        .setWidth(bufferWidth)
-                        .setHeight(bufferHeight)
+                        .setStride(target.width * 4)
+                        .setWidth(target.width)
+                        .setHeight(target.height)
                         .build()
                 )
                 .build();
@@ -823,12 +863,20 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             }
 
             if (!sent) {
+                if (target != current) {
+                    queuePendingResize(target.width, target.height);
+                }
+                inflightTarget = null;
                 pendingFrame.set(false);
                 if (needsFollowupRender.getAndSet(false)) {
                     requestFrame();
                 }
             }
         } catch (Exception e) {
+            if (target != current) {
+                queuePendingResize(target.width, target.height);
+            }
+            inflightTarget = null;
             pendingFrame.set(false);
             if (needsFollowupRender.getAndSet(false)) {
                 requestFrame();
@@ -942,10 +990,13 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         boolean isBufferResponse = output.hasFrameDone();
         boolean isGpuResponse = output.hasGpuFrameDone();
         boolean renderedFrame = output.getRendered() && (isBufferResponse || isGpuResponse);
+        FrameTarget completedTarget = inflightTarget;
 
         if (output.hasFrameDone()) {
             if (output.getRendered()) {
-                blitFrame(output.getFrameDone());
+                blitFrame(output.getFrameDone(), completedTarget);
+            } else if (completedTarget != null && completedTarget != displayTarget) {
+                queuePendingResize(completedTarget.width, completedTarget.height);
             }
         } else if (output.hasEditRequest()) {
             EditRequest request = output.getEditRequest();
@@ -959,6 +1010,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         }
 
         if (isBufferResponse || isGpuResponse) {
+            inflightTarget = null;
             pendingFrame.set(false);
             if (needsFollowupRender.getAndSet(false)) {
                 requestFrame();
@@ -969,24 +1021,31 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         }
     }
 
-    private void blitFrame(FrameDone frame) {
-        ByteBuffer buf = pixelBuffer;
-        BufferedImage img = image;
-        if (buf == null || img == null) {
+    private void blitFrame(FrameDone frame, FrameTarget target) {
+        if (target == null) {
             return;
         }
 
+        boolean fullRepaint = false;
         synchronized (imageLock) {
-            ByteBuffer view = buf.duplicate().order(ByteOrder.LITTLE_ENDIAN);
+            FrameTarget previous = displayTarget;
+            ByteBuffer view = target.pixelBuffer.duplicate().order(ByteOrder.LITTLE_ENDIAN);
             IntBuffer intView = view.asIntBuffer();
-            int pixelCount = Math.min(intView.remaining(), argbPixels.length);
-            intView.get(argbPixels, 0, pixelCount);
+            int pixelCount = Math.min(intView.remaining(), target.argbPixels.length);
+            intView.get(target.argbPixels, 0, pixelCount);
             for (int i = 0; i < pixelCount; i++) {
-                int px = argbPixels[i];
+                int px = target.argbPixels[i];
                 // Engine writes RGBA bytes; Swing setRGB expects packed ARGB.
-                argbPixels[i] = (px & 0xFF00FF00) | ((px & 0x00FF0000) >>> 16) | ((px & 0x000000FF) << 16);
+                target.argbPixels[i] = (px & 0xFF00FF00) | ((px & 0x00FF0000) >>> 16) | ((px & 0x000000FF) << 16);
             }
-            img.setRGB(0, 0, bufferWidth, bufferHeight, argbPixels, 0, bufferWidth);
+            target.image.setRGB(0, 0, target.width, target.height, target.argbPixels, 0, target.width);
+            displayTarget = target;
+            fullRepaint = previous != target;
+        }
+
+        if (fullRepaint) {
+            repaint();
+            return;
         }
 
         int dirtyX = Math.max(0, frame.getDirtyX());
@@ -1019,19 +1078,14 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         return Math.max(1f, dpi / 96f);
     }
 
-    private void allocateBuffer(int width, int height) {
+    private FrameTarget createFrameTarget(int width, int height) {
         int w = Math.max(1, width);
         int h = Math.max(1, height);
 
         int size = Math.multiplyExact(Math.multiplyExact(w, h), 4);
         ByteBuffer newBuffer = ByteBuffer.allocateDirect(size);
         BufferedImage newImage = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-
-        bufferWidth = w;
-        bufferHeight = h;
-        pixelBuffer = newBuffer;
-        image = newImage;
-        argbPixels = new int[w * h];
+        return new FrameTarget(newBuffer, newImage, w, h);
     }
 
     private void handleResize() {
@@ -1042,9 +1096,17 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
         int w = resolveViewportWidth();
         int h = resolveViewportHeight();
-        allocateBuffer(w, h);
-        safeResizeViewport(w, h);
+        queuePendingResize(w, h);
         requestFrameImmediate();
+    }
+
+    private void queuePendingResize(int width, int height) {
+        int w = Math.max(1, width);
+        int h = Math.max(1, height);
+        synchronized (resizeLock) {
+            pendingResizeWidth = w;
+            pendingResizeHeight = h;
+        }
     }
 
     private void safeResizeViewport(int width, int height) {
@@ -1128,11 +1190,12 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     }
 
     private void clearImage() {
-        image = null;
-        pixelBuffer = null;
-        argbPixels = new int[0];
-        bufferWidth = 0;
-        bufferHeight = 0;
+        displayTarget = null;
+        inflightTarget = null;
+        synchronized (resizeLock) {
+            pendingResizeWidth = 0;
+            pendingResizeHeight = 0;
+        }
         repaint();
     }
 }

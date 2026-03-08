@@ -1,5 +1,5 @@
 #!/bin/bash
-# run_compare_ui.sh — Capture screenshots of VolvoxExcel test cases,
+# run_compare_ui.sh — Capture screenshots of VolvoxSheet test cases,
 # generate pixel diffs and HTML comparison report.
 #
 # Each test case is a .txt script in test/cases/ with one API call per line.
@@ -11,7 +11,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-OUT_DIR="$ROOT_DIR/target/excel/compare"
+OUT_DIR="$ROOT_DIR/target/sheet/compare"
 COMPARE_LOG="$OUT_DIR/compare_output.log"
 
 NO_HTML=0
@@ -42,7 +42,7 @@ fi
 rm -f "$OUT_DIR"/test_*_vv.png "$OUT_DIR"/test_*_diff.png "$OUT_DIR"/scripts.json "$OUT_DIR"/report.html
 
 # ── Preflight ──────────────────────────────────────────────────────
-echo "=== VolvoxExcel — Capture Compare ==="
+echo "=== VolvoxSheet — Capture Compare ==="
 echo ""
 
 command -v node >/dev/null 2>&1 || { echo "ERROR: node not found"; exit 1; }
@@ -114,7 +114,7 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
     # ── Build VolvoxGrid WASM ──────────────────────────────────────
     echo "[build] Building VolvoxGrid WASM runtime..."
     command -v wasm-pack >/dev/null 2>&1 || { echo "ERROR: wasm-pack not found"; exit 1; }
-    # Build to web/example/wasm/ (symlinked from adapters/excel/wasm/)
+    # Build to web/example/wasm/ (symlinked from adapters/sheet/wasm/)
     (cd "$ROOT_DIR/web/crate" && rustup run nightly wasm-pack build . --release --target web --out-dir "$ROOT_DIR/web/example/wasm" --features gpu) >/dev/null
     echo "  Done."
 
@@ -195,7 +195,7 @@ for k, v in m.items():
 <html>
 <head>
 <meta charset="utf-8">
-<title>VolvoxExcel — Test Report</title>
+<title>VolvoxSheet — Test Report</title>
 <style>
 * { box-sizing: border-box; }
 body { font-family: 'Segoe UI', -apple-system, sans-serif; background: #0d1117; color: #c9d1d9; margin: 0; padding: 20px 40px; }
@@ -222,7 +222,7 @@ h1 { color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 12px; }
 </style>
 </head>
 <body>
-<h1>VolvoxExcel — Test Report</h1>
+<h1>VolvoxSheet — Test Report</h1>
 HEADER
     echo "<div class=\"generated-at\">Generated: $REPORT_GENERATED_AT</div>" >> "$REPORT"
 
@@ -274,7 +274,7 @@ except Exception:
 
             # Right: Screenshot
             echo "    <div class=\"cell\">"
-            echo "      <div class=\"cell-label label-vv\">VolvoxExcel</div>"
+            echo "      <div class=\"cell-label label-vv\">VolvoxSheet</div>"
             echo "      <img src=\"${base}_vv.png\">"
             echo "    </div>"
 

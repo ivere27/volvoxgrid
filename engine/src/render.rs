@@ -551,4 +551,25 @@ mod tests {
 
         assert_eq!(pixel_argb(&buffer, 180, 20, 12), 0xFFE0E0E0);
     }
+
+    #[test]
+    fn render_frozen_column_separator_offsets_by_row_indicator_width() {
+        let mut grid = VolvoxGrid::new(1, 200, 80, 4, 3, 0, 0);
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.width_px = 40;
+        grid.frozen_cols = 1;
+        grid.selection.allow_selection = false;
+        grid.selection.focus_border = pb::FocusBorderStyle::FocusBorderNone as i32;
+        grid.selection.selection_visibility = pb::SelectionVisibility::SelectionVisNone as i32;
+        grid.ensure_layout();
+
+        let mut renderer = Renderer::with_custom_text_renderer(Box::new(SolidTextRenderer));
+        let mut buffer = vec![0u8; (200 * 80 * 4) as usize];
+        renderer.render(&grid, &mut buffer, 200, 80, 200 * 4);
+
+        // Frozen separator should be offset by the 40px row indicator band:
+        // indicator width (40) + first column width (68) = 108.
+        assert_eq!(pixel_argb(&buffer, 200, 108, 10), 0xFF000000);
+        assert_ne!(pixel_argb(&buffer, 200, 68, 10), 0xFF000000);
+    }
 }
