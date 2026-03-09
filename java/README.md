@@ -123,6 +123,25 @@ gridPanel.setGridEventListener(event -> {
     if (event.hasAfterEdit()) { /* cell edited */ }
 });
 
+// Cancelable "before" events. Supported here: BeforeEdit, CellEditValidate, BeforeSort.
+gridPanel.setBeforeEditListener(details -> {
+    if (details.getRow() == 0) {
+        details.setCancel(true);
+    }
+});
+
+gridPanel.setCellEditValidatingListener(details -> {
+    if (details.getEditText().isEmpty()) {
+        details.setCancel(true);
+    }
+});
+
+gridPanel.setBeforeSortListener(details -> {
+    if (details.getCol() == 0) {
+        details.setCancel(true);
+    }
+});
+
 // Edit request callback
 gridPanel.setEditRequestListener(request -> {
     // handle inline edit requests
@@ -169,10 +188,23 @@ ctrl.setColWidth(0, 200);
 ctrl.sort(1, true);  // col 1, ascending
 
 // With sort order enum
-ctrl.sort(SortOrder.SORT_NUMERIC_ASCENDING, 1);
+ctrl.sort(SortOrder.SORT_ASCENDING, 1);
+
+// Configure header features with the generated proto message
+ctrl.configure(
+    GridConfig.newBuilder()
+        .setInteraction(
+            InteractionConfig.newBuilder()
+                .setHeaderFeatures(HeaderFeatures.newBuilder().setSort(true).build())
+                .build()
+        )
+        .build()
+);
 ```
 
-**SortOrder values:** `SORT_NONE`, `SORT_GENERIC_ASCENDING`, `SORT_GENERIC_DESCENDING`, `SORT_NUMERIC_ASCENDING`, `SORT_NUMERIC_DESCENDING`, `SORT_STRING_ASC`, `SORT_STRING_DESC`, `SORT_STRING_NO_CASE_ASC`, `SORT_STRING_NO_CASE_DESC`, `SORT_CUSTOM`
+**SortOrder values:** `SORT_NONE`, `SORT_ASCENDING`, `SORT_DESCENDING`
+
+**SortType values:** `SORT_TYPE_AUTO`, `SORT_TYPE_NUMERIC`, `SORT_TYPE_STRING`, `SORT_TYPE_STRING_NO_CASE`, `SORT_TYPE_CUSTOM`
 
 #### Selection
 

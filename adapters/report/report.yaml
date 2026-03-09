@@ -18,11 +18,11 @@ bands:
   - type: "title"
     height: 60
     cells:
-      - { text: "VOLVOX SALES CORP", col_span: 3, style: { font_size: 24, bold: true, back_color: "#2c3e50", fore_color: "#ffffff", align: "center" } }
+      - { text: "VOLVOX SALES CORP", col_span: 3, style: { font_size: 24, bold: true, background: "#2c3e50", foreground: "#ffffff", align: "center" } }
 
   - type: "header"
     height: 30
-    style: { back_color: "#ecf0f1", bold: true, border_bottom: "2px solid #000000" }
+    style: { background: "#ecf0f1", bold: true, border_bottom: "2px solid #000000" }
     fields:
       - { name: "product", label: "Product Name", width: 300 }
       - { name: "qty", label: "Quantity", width: 100, align: "right" }
@@ -39,7 +39,7 @@ bands:
 
   - type: "summary"
     height: 40
-    style: { bold: true, back_color: "#f9f9f9", border_top: "1px solid #bdc3c7" }
+    style: { bold: true, background: "#f9f9f9", border_top: "1px solid #bdc3c7" }
     cells:
       - { text: "GRAND TOTAL:", col_span: 3, align: "right" }
       - { aggregate: "sum", field: "total", format: "$#,##0.00" }

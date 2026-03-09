@@ -36,15 +36,15 @@ int _rowIndicatorModeBits(Iterable<RowIndicatorMode> modes) =>
 int _colIndicatorModeBits(Iterable<ColIndicatorCellMode> modes) =>
     modes.fold<int>(0, (bits, mode) => bits | mode.value);
 
-IndicatorBandsConfig _defaultIndicatorBandsConfig() => IndicatorBandsConfig()
-  ..rowIndicatorStart = (RowIndicatorConfig()
+IndicatorsConfig _defaultIndicatorsConfig() => IndicatorsConfig()
+  ..rowStart = (RowIndicatorConfig()
     ..visible = false
-    ..widthPx = 35
+    ..width = 35
     ..modeBits = _rowIndicatorModeBits([
       RowIndicatorMode.ROW_INDICATOR_CURRENT,
       RowIndicatorMode.ROW_INDICATOR_SELECTION,
     ]))
-  ..colIndicatorTop = (ColIndicatorConfig()
+  ..colTop = (ColIndicatorConfig()
     ..visible = true
     ..bandRows = 1
     ..modeBits = _colIndicatorModeBits([
@@ -128,7 +128,7 @@ class VolvoxGridController extends ChangeNotifier {
         ..layout = (LayoutConfig()
           ..rows = rows
           ..cols = cols)
-        ..indicatorBands = _defaultIndicatorBandsConfig());
+        ..indicators = _defaultIndicatorsConfig());
     final response = await VolvoxGridService.Create(req);
     _gridId = response.handle.id;
     notifyListeners();
@@ -223,7 +223,7 @@ class VolvoxGridController extends ChangeNotifier {
     final top = ColIndicatorConfig()..visible = visible;
     await _configure(
       GridConfig()
-        ..indicatorBands = (IndicatorBandsConfig()..colIndicatorTop = top),
+        ..indicators = (IndicatorsConfig()..colTop = top),
     );
   }
 
@@ -232,7 +232,7 @@ class VolvoxGridController extends ChangeNotifier {
     final top = ColIndicatorConfig()..modeBits = modeBits;
     await _configure(
       GridConfig()
-        ..indicatorBands = (IndicatorBandsConfig()..colIndicatorTop = top),
+        ..indicators = (IndicatorsConfig()..colTop = top),
     );
   }
 
@@ -241,7 +241,7 @@ class VolvoxGridController extends ChangeNotifier {
     final top = ColIndicatorConfig()..bandRows = rows < 0 ? 0 : rows;
     await _configure(
       GridConfig()
-        ..indicatorBands = (IndicatorBandsConfig()..colIndicatorTop = top),
+        ..indicators = (IndicatorsConfig()..colTop = top),
     );
   }
 
@@ -250,7 +250,7 @@ class VolvoxGridController extends ChangeNotifier {
     final row = RowIndicatorConfig()..visible = visible;
     await _configure(
       GridConfig()
-        ..indicatorBands = (IndicatorBandsConfig()..rowIndicatorStart = row),
+        ..indicators = (IndicatorsConfig()..rowStart = row),
     );
   }
 
@@ -259,7 +259,7 @@ class VolvoxGridController extends ChangeNotifier {
     final row = RowIndicatorConfig()..modeBits = modeBits;
     await _configure(
       GridConfig()
-        ..indicatorBands = (IndicatorBandsConfig()..rowIndicatorStart = row),
+        ..indicators = (IndicatorsConfig()..rowStart = row),
     );
   }
 
@@ -267,9 +267,8 @@ class VolvoxGridController extends ChangeNotifier {
   Future<void> setRowIndicatorStartWidth(int width) async {
     await _configure(
       GridConfig()
-        ..indicatorBands = (IndicatorBandsConfig()
-          ..rowIndicatorStart =
-              (RowIndicatorConfig()..widthPx = width < 1 ? 1 : width)),
+        ..indicators = (IndicatorsConfig()
+          ..rowStart = (RowIndicatorConfig()..width = width < 1 ? 1 : width)),
     );
   }
 
@@ -610,7 +609,7 @@ class VolvoxGridController extends ChangeNotifier {
   /// Set the selection visibility style.
   Future<void> setSelectionVisibility(SelectionVisibility style) async {
     await _configure(GridConfig()
-      ..selection = (SelectionConfig()..selectionVisibility = style));
+      ..selection = (SelectionConfig()..visibility = style));
   }
 
   /// Scroll the grid so that the specified cell is visible.
@@ -657,8 +656,8 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Sort the grid by one or more columns.
   ///
-  /// Single-column: `sort(SortOrder.SORT_GENERIC_ASCENDING, col: 0)`
-  /// Multi-column:  `sortMulti([(0, SortOrder.SORT_GENERIC_ASCENDING), (2, SortOrder.SORT_GENERIC_DESCENDING)])`
+  /// Single-column: `sort(SortOrder.SORT_ASCENDING, col: 0)`
+  /// Multi-column:  `sortMulti([(0, SortOrder.SORT_ASCENDING), (2, SortOrder.SORT_DESCENDING)])`
   Future<void> sort(SortOrder order, {int col = -1}) async {
     await VolvoxGridService.Sort(SortRequest()
       ..gridId = _gridId
@@ -681,9 +680,9 @@ class VolvoxGridController extends ChangeNotifier {
   }
 
   /// Configure header features (sort/reorder/chooser behavior).
-  Future<void> setHeaderFeatures(HeaderFeatures mode) async {
+  Future<void> setHeaderFeatures(HeaderFeatures features) async {
     await _configure(GridConfig()
-      ..interaction = (InteractionConfig()..headerFeatures = mode));
+      ..interaction = (InteractionConfig()..headerFeatures = features));
   }
 
   // ── Subtotals ─────────────────────────────────────────────────────────────
@@ -705,8 +704,8 @@ class VolvoxGridController extends ChangeNotifier {
       ..groupOnCol = groupOnCol
       ..aggregateCol = aggregateCol
       ..caption = caption
-      ..backColor = backColor
-      ..foreColor = foreColor
+      ..background = backColor
+      ..foreground = foreColor
       ..addOutline = addOutline);
     notifyListeners();
   }
@@ -829,13 +828,12 @@ class VolvoxGridController extends ChangeNotifier {
     if (!config.hasEditing()) {
       return EditTrigger.EDIT_TRIGGER_NONE;
     }
-    return config.editing.editTrigger;
+    return config.editing.trigger;
   }
 
   /// Set the edit trigger mode for the grid.
   Future<void> setEditTrigger(EditTrigger mode) async {
-    await _configure(
-        GridConfig()..editing = (EditConfig()..editTrigger = mode));
+    await _configure(GridConfig()..editing = (EditConfig()..trigger = mode));
   }
 
   /// Begin editing the given cell.
@@ -907,7 +905,7 @@ class VolvoxGridController extends ChangeNotifier {
       ..gridId = _gridId
       ..columns.add(ColumnDef()
         ..index = col
-        ..alignment = alignment));
+        ..align = alignment));
   }
 
   /// Set the format string for a column (e.g. '#,##0.00' for currency).
@@ -948,7 +946,7 @@ class VolvoxGridController extends ChangeNotifier {
     int col1,
     int row2,
     int col2,
-    CellStyleOverride style,
+    CellStyle style,
   ) async {
     final req = UpdateCellsRequest()..gridId = _gridId;
     for (var r = row1; r <= row2; r++) {
@@ -965,10 +963,10 @@ class VolvoxGridController extends ChangeNotifier {
 
   // ── User Interaction ──────────────────────────────────────────────────────
 
-  /// Allow the user to resize rows and/or columns.
-  Future<void> setAllowUserResizing(AllowUserResizingMode mode) async {
+  /// Configure row/column resizing behavior.
+  Future<void> setResizePolicy(ResizePolicy policy) async {
     await _configure(GridConfig()
-      ..interaction = (InteractionConfig()..allowUserResizing = mode));
+      ..interaction = (InteractionConfig()..resize = policy));
   }
 
   /// Set scrollbar visibility mode.

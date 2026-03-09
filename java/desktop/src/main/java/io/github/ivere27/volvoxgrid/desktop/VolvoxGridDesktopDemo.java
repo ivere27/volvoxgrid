@@ -61,7 +61,7 @@ public final class VolvoxGridDesktopDemo {
             try {
                 VolvoxGridDesktopController ctrl = gridPanel.createController();
                 int col = ctrl.getSelection().getCol();
-                ctrl.sort(SortOrder.SORT_GENERIC_ASCENDING, Math.max(col, 0));
+                ctrl.sort(SortOrder.SORT_ASCENDING, Math.max(col, 0));
                 ctrl.refresh();
                 gridPanel.requestFrame();
                 status.setText("Sorted ascending");
@@ -74,7 +74,7 @@ public final class VolvoxGridDesktopDemo {
             try {
                 VolvoxGridDesktopController ctrl = gridPanel.createController();
                 int col = ctrl.getSelection().getCol();
-                ctrl.sort(SortOrder.SORT_GENERIC_DESCENDING, Math.max(col, 0));
+                ctrl.sort(SortOrder.SORT_DESCENDING, Math.max(col, 0));
                 ctrl.refresh();
                 gridPanel.requestFrame();
                 status.setText("Sorted descending");

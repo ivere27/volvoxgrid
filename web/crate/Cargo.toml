@@ -27,4 +27,5 @@ wasm-bindgen-futures = "0.4"
 wasm-bindgen-rayon = { version = "1.2", optional = true }
 js-sys = "0.3"
 web-sys = { version = "0.3", features = ["console", "ImageData", "HtmlCanvasElement"] }
+web-time = "1"
 getrandom = { version = "0.2", features = ["js"] }

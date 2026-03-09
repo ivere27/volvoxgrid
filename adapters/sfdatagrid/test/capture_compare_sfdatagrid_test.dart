@@ -1,7 +1,5 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -9,7 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:syncfusion_flutter_datagrid/datagrid.dart' as sf;
-import 'package:volvoxgrid/volvoxgrid.dart' hide Align;
+import 'package:volvoxgrid/volvoxgrid.dart' hide Align, Border, Padding;
 import 'package:volvoxgrid/volvoxgrid_ffi.dart' as vg_ffi;
 import 'package:volvoxgrid_sfdatagrid/volvoxgrid_sfdatagrid.dart' as vv;
 
@@ -107,11 +105,9 @@ final List<_Case> _cases = [
       _vr([_vc('name', 'Bob'), _vc('age', 44), _vc('city', 'Busan')]),
     ],
     sfColumnsFactory: () => [
-      sf.GridColumn(
-          columnName: 'name', label: Text('Name', style: _textStyle)),
+      sf.GridColumn(columnName: 'name', label: Text('Name', style: _textStyle)),
       sf.GridColumn(columnName: 'age', label: Text('Age', style: _textStyle)),
-      sf.GridColumn(
-          columnName: 'city', label: Text('City', style: _textStyle)),
+      sf.GridColumn(columnName: 'city', label: Text('City', style: _textStyle)),
     ],
     sfSourceFactory: () => _StaticSfSource([
       _sr([_sc('name', 'Alice'), _sc('age', 31), _sc('city', 'Seoul')]),
@@ -172,12 +168,10 @@ final List<_Case> _cases = [
       _vr([_vc('name', 'C'), _vc('status', 'ok'), _vc('note', '')]),
     ],
     sfColumnsFactory: () => [
-      sf.GridColumn(
-          columnName: 'name', label: Text('Name', style: _textStyle)),
+      sf.GridColumn(columnName: 'name', label: Text('Name', style: _textStyle)),
       sf.GridColumn(
           columnName: 'status', label: Text('Status', style: _textStyle)),
-      sf.GridColumn(
-          columnName: 'note', label: Text('Note', style: _textStyle)),
+      sf.GridColumn(columnName: 'note', label: Text('Note', style: _textStyle)),
     ],
     // SfDataGrid requires each row to have cells matching column count,
     // so pad missing cells with null values for the reference grid.
@@ -221,8 +215,7 @@ final List<_Case> _cases = [
       sf.GridColumn(columnName: 'id', label: Text('ID', style: _textStyle)),
       sf.GridColumn(
           columnName: 'active', label: Text('Active', style: _textStyle)),
-      sf.GridColumn(
-          columnName: 'meta', label: Text('Meta', style: _textStyle)),
+      sf.GridColumn(columnName: 'meta', label: Text('Meta', style: _textStyle)),
       sf.GridColumn(
           columnName: 'created', label: Text('Created', style: _textStyle)),
     ],
@@ -278,8 +271,7 @@ final List<_Case> _cases = [
       ],
       [
         sf.SortColumnDetails(
-            name: 'amount',
-            sortDirection: sf.DataGridSortDirection.descending),
+            name: 'amount', sortDirection: sf.DataGridSortDirection.descending),
       ],
     ),
   ),
@@ -361,8 +353,8 @@ double _computeSimilarity(Uint8List a, Uint8List b) {
 
 Future<void> _pumpFfi(WidgetTester tester, {int cycles = 40}) async {
   for (int i = 0; i < cycles; i++) {
-    await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 50)));
+    await tester
+        .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
     await tester.pump();
   }
 }
@@ -475,18 +467,17 @@ void main() {
         await tester.runAsync(() async {
           await controller.setGridStyle(
             vg_ffi.StyleConfig()
-              ..fontName = 'DejaVu Sans'
-              ..fontSize = 14.0,
+              ..font = (vg_ffi.Font()
+                ..family = 'DejaVu Sans'
+                ..size = 14.0),
           );
         });
       }
       await _pumpFfi(tester, cycles: 40);
 
       // Capture via runAsync — toImage() is a real engine call.
-      final refImage =
-          await tester.runAsync(() => _captureWidget(refKey));
-      final vvImage =
-          await tester.runAsync(() => _captureWidget(vvKey));
+      final refImage = await tester.runAsync(() => _captureWidget(refKey));
+      final vvImage = await tester.runAsync(() => _captureWidget(vvKey));
 
       expect(refImage, isNotNull, reason: '[$numStr] ref capture failed');
       expect(vvImage, isNotNull, reason: '[$numStr] vv capture failed');
@@ -524,8 +515,7 @@ void main() {
       for (final tc in _cases) {
         scriptsMap[tc.id.toString().padLeft(2, '0')] = tc.script;
       }
-      await File('$outDir/scripts.json')
-          .writeAsString(jsonEncode(scriptsMap));
+      await File('$outDir/scripts.json').writeAsString(jsonEncode(scriptsMap));
     });
   });
 }

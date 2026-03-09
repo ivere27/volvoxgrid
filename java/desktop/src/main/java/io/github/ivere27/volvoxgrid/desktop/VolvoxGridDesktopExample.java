@@ -288,7 +288,7 @@ public final class VolvoxGridDesktopExample {
                     .setCols(2)
                     .build()
             )
-            .setIndicatorBands(VolvoxGridDesktopController.defaultIndicatorBandsConfig())
+            .setIndicators(VolvoxGridDesktopController.defaultIndicatorsConfig())
             .setRendering(RenderConfig.newBuilder().setRendererMode(RendererMode.RENDERER_CPU).build())
             .build();
 
@@ -388,7 +388,7 @@ public final class VolvoxGridDesktopExample {
         try {
             int col = Math.max(ctrl.getSelection().getCol(), 0);
             ctrl.sort(
-                ascending ? SortOrder.SORT_GENERIC_ASCENDING : SortOrder.SORT_GENERIC_DESCENDING,
+                ascending ? SortOrder.SORT_ASCENDING : SortOrder.SORT_DESCENDING,
                 col
             );
             ctrl.refresh();

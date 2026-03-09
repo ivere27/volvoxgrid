@@ -203,11 +203,15 @@ function pbEncodeMessageField(field: number, payload: Uint8Array): number[] {
   ];
 }
 
-function pbEncodeSelectionHoverModeConfig(mode: number): Uint8Array {
+function pbEncodeSelectionHoverConfig(mode: number): Uint8Array {
   const nextMode = Number.isFinite(mode) ? (Math.max(0, Math.trunc(mode)) >>> 0) : 0;
+  const hoverConfig: number[] = [];
+  hoverConfig.push(...pbEncodeTag(1, 0), ...pbEncodeVarint((nextMode & HOVER_ROW) !== 0 ? 1n : 0n));
+  hoverConfig.push(...pbEncodeTag(2, 0), ...pbEncodeVarint((nextMode & HOVER_COLUMN) !== 0 ? 1n : 0n));
+  hoverConfig.push(...pbEncodeTag(3, 0), ...pbEncodeVarint((nextMode & HOVER_CELL) !== 0 ? 1n : 0n));
   const selectionConfig: number[] = [];
-  // SelectionConfig.hover_mode = 7
-  selectionConfig.push(...pbEncodeTag(7, 0), ...pbEncodeVarint(BigInt(nextMode)));
+  // SelectionConfig.hover = 7
+  selectionConfig.push(...pbEncodeMessageField(7, new Uint8Array(hoverConfig)));
 
   const gridConfig: number[] = [];
   // GridConfig.selection = 3
@@ -496,7 +500,7 @@ async function main() {
       return;
     }
     try {
-      configure(BigInt(Math.trunc(id)), pbEncodeSelectionHoverModeConfig(mode));
+      configure(BigInt(Math.trunc(id)), pbEncodeSelectionHoverConfig(mode));
     } catch (err) {
       console.warn("VolvoxGrid: failed to update hover mode", err);
     }
@@ -883,7 +887,7 @@ async function main() {
     grid.selectionVisibility = 1;
     grid.focusBorder = 2;
     grid.selectionMode = 0;
-    grid.headerFeatures = 3;
+    grid.setHeaderFeatures({ sort: true, reorder: true, chooser: false });
     grid.scrollBars = 3;
   }
 
@@ -899,7 +903,7 @@ async function main() {
     grid.selectionVisibility = 0;
     grid.focusBorder = 0;
     grid.selectionMode = 0;
-    grid.headerFeatures = 0;
+    grid.setHeaderFeatures({ sort: false, reorder: false, chooser: false });
     grid.scrollBars = 0;
     grid.setGridLines(chkDoomBorder.checked ? 1 : 0);
 
@@ -1484,7 +1488,11 @@ async function main() {
   document.getElementById("btn-expl-bar")!.addEventListener("click", () => {
     if (currentDemo === "doom") return;
     explorerBar = (explorerBar + 1) % 4;
-    grid.headerFeatures = explorerBar;
+    grid.setHeaderFeatures({
+      sort: explorerBar === 1 || explorerBar === 3,
+      reorder: explorerBar === 2 || explorerBar === 3,
+      chooser: false,
+    });
     const labels = ["ExplBar:Off", "ExplBar:Sort", "ExplBar:Move", "ExplBar:3"];
     document.getElementById("btn-expl-bar")!.textContent = labels[explorerBar];
     grid.invalidate();

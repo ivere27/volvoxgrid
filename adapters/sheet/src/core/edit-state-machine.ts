@@ -26,10 +26,12 @@ export class EditStateMachine {
 
   private wasm: any;
   private gridId: number;
+  private readonly flushPendingDecisions: (() => void) | null;
 
-  constructor(wasm: any, gridId: number) {
+  constructor(wasm: any, gridId: number, flushPendingDecisions?: () => void) {
     this.wasm = wasm;
     this.gridId = gridId;
+    this.flushPendingDecisions = flushPendingDecisions ?? null;
   }
 
   get phase(): EditPhase { return this._phase; }
@@ -45,7 +47,21 @@ export class EditStateMachine {
   get originalText(): string { return this._originalText; }
   get currentText(): string { return this._currentText; }
 
-  /** Start editing a cell. */
+  /** Sync local state to an already-active engine edit session without dispatching another start command. */
+  syncActiveEdit(row: number, col: number, currentText: string, opts?: {
+    mode?: EditMode;
+    formulaMode?: boolean;
+  }): void {
+    this._phase = "editing";
+    this._row = row;
+    this._col = col;
+    this._originalText = currentText;
+    this._currentText = currentText;
+    this._mode = opts?.mode ?? "enter";
+    this._formulaMode = opts?.formulaMode ?? currentText.trimStart().startsWith("=");
+  }
+
+  /** Start editing a cell. Returns true when the engine accepted the edit session. */
   startEdit(row: number, col: number, opts?: {
     selectAll?: boolean;
     caretEnd?: boolean;
@@ -53,9 +69,12 @@ export class EditStateMachine {
     currentText?: string;
     mode?: EditMode;
     formulaMode?: boolean;
-  }): void {
+  }): boolean {
     if (this._phase === "editing") {
-      this.commitEdit();
+      const committed = this.commitEdit();
+      if (committed?.canceled) {
+        return false;
+      }
     }
 
     this._row = row;
@@ -79,11 +98,17 @@ export class EditStateMachine {
         formulaMode: this._formulaMode,
       });
       this.wasm.volvox_grid_edit_pb(req);
+      this.flushPendingDecisions?.();
+      if (typeof this.wasm.is_editing === "function" && this.wasm.is_editing(this.gridId) === 0) {
+        this.reset();
+        return false;
+      }
     }
+    return true;
   }
 
-  /** Commit the current edit. Returns { oldText, newText } or null if not editing. */
-  commitEdit(text?: string): { oldText: string; newText: string } | null {
+  /** Commit the current edit. Returns commit state or null if not editing. */
+  commitEdit(text?: string): { oldText: string; newText: string; canceled: boolean } | null {
     if (this._phase !== "editing") return null;
 
     const oldText = this._originalText;
@@ -92,10 +117,16 @@ export class EditStateMachine {
     if (typeof this.wasm.volvox_grid_edit_pb === "function") {
       const req = encodeEditCommit({ gridId: this.gridId, text });
       this.wasm.volvox_grid_edit_pb(req);
+      this.flushPendingDecisions?.();
+      if (typeof this.wasm.is_editing === "function" && this.wasm.is_editing(this.gridId) !== 0) {
+        this._currentText = newText;
+        this._formulaMode = newText.trimStart().startsWith("=");
+        return { oldText, newText, canceled: true };
+      }
     }
 
     this._phase = "idle";
-    return { oldText, newText };
+    return { oldText, newText, canceled: false };
   }
 
   /** Cancel the current edit. */

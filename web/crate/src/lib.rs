@@ -1,4 +1,5 @@
 use js_sys::Array;
+use prost::Message;
 use wasm_bindgen::prelude::*;
 #[cfg(feature = "gpu")]
 use wasm_bindgen_futures::future_to_promise;
@@ -8,8 +9,10 @@ use volvoxgrid_engine::render::Renderer;
 use volvoxgrid_engine::sort;
 use volvoxgrid_engine::GridManager;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{LazyLock, Mutex};
+use std::time::Duration;
+use web_time::Instant;
 
 // v1 proto types (re-exported for generated WASM bindings)
 pub use volvoxgrid_engine::proto::volvoxgrid::v1::*;
@@ -26,6 +29,13 @@ static RENDERER: Mutex<Option<Renderer>> = Mutex::new(None);
 static RENDER_BUF: Mutex<Vec<u8>> = Mutex::new(Vec::new());
 static RENDER_DIRTY_RECT: Mutex<(i32, i32, i32, i32)> = Mutex::new((0, 0, 0, 0));
 static LAST_MEM_CALC_MS: LazyLock<Mutex<HashMap<i64, f64>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static NEXT_EVENT_ID: LazyLock<Mutex<i64>> = LazyLock::new(|| Mutex::new(1));
+static DECISION_ENABLED: LazyLock<Mutex<HashSet<i64>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
+static PENDING_ACTIONS: LazyLock<Mutex<HashMap<(i64, i64), PendingActionEntry>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+static PENDING_DECISION_EVENTS: LazyLock<Mutex<HashMap<i64, VecDeque<PendingDecisionEvent>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 // GPU renderer globals (opt-in via `gpu` feature).
@@ -47,6 +57,41 @@ static GPU_AVAILABLE: Mutex<bool> = Mutex::new(false);
 static LOADED_FONTS: Mutex<Vec<Vec<u8>>> = Mutex::new(Vec::new());
 
 const DEBUG_MEM_SAMPLE_MS: f64 = 10_000.0;
+const DECISION_TIMEOUT: Duration = Duration::from_millis(250);
+
+#[derive(Clone, Debug)]
+enum PendingAction {
+    BeginEdit {
+        row: i32,
+        col: i32,
+        force: bool,
+        seed_text: Option<String>,
+        select_all: Option<bool>,
+        caret_end: Option<bool>,
+        formula_mode: Option<bool>,
+    },
+    ValidateEdit {
+        row: i32,
+        col: i32,
+        old_text: String,
+        committed_text: String,
+    },
+    BeforeSort {
+        col: i32,
+    },
+}
+
+#[derive(Clone, Debug)]
+struct PendingActionEntry {
+    created_at: Instant,
+    action: PendingAction,
+}
+
+#[derive(Clone, Debug)]
+struct PendingDecisionEvent {
+    event_id: i64,
+    data: volvoxgrid_engine::event::GridEventData,
+}
 
 fn ensure_manager() {
     let mut m = MANAGER.lock().unwrap();
@@ -130,6 +175,425 @@ fn truncate_to_char_count(input: &str, max_chars: i32) -> String {
         return input.to_string();
     }
     input.chars().take(max_chars as usize).collect()
+}
+
+fn next_event_id() -> i64 {
+    let mut next = NEXT_EVENT_ID.lock().unwrap();
+    let event_id = *next;
+    *next += 1;
+    event_id
+}
+
+fn decision_channel_enabled(grid_id: i64) -> bool {
+    DECISION_ENABLED.lock().unwrap().contains(&grid_id)
+}
+
+fn set_decision_channel_enabled(grid_id: i64, enabled: bool) {
+    let mut channels = DECISION_ENABLED.lock().unwrap();
+    if enabled {
+        channels.insert(grid_id);
+    } else {
+        channels.remove(&grid_id);
+    }
+}
+
+fn clear_grid_decision_state(grid_id: i64) {
+    DECISION_ENABLED.lock().unwrap().remove(&grid_id);
+    PENDING_ACTIONS
+        .lock()
+        .unwrap()
+        .retain(|(pending_grid, _), _| *pending_grid != grid_id);
+    PENDING_DECISION_EVENTS.lock().unwrap().remove(&grid_id);
+}
+
+fn queue_pending_decision_event(
+    grid_id: i64,
+    event_id: i64,
+    data: volvoxgrid_engine::event::GridEventData,
+) {
+    PENDING_DECISION_EVENTS
+        .lock()
+        .unwrap()
+        .entry(grid_id)
+        .or_default()
+        .push_back(PendingDecisionEvent { event_id, data });
+}
+
+fn begin_edit_session_core(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    force: bool,
+    emit_before_event: bool,
+    seed_text: Option<String>,
+) {
+    if !grid.can_begin_edit(row, col, force) {
+        return;
+    }
+
+    let combo_list = grid.active_dropdown_list(row, col);
+    if emit_before_event {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
+    }
+
+    if combo_list.trim() == "..." {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::CellButtonClick { row, col });
+        return;
+    }
+
+    let stored_text = grid.cells.get_text(row, col).to_string();
+    let display_text = grid.get_display_text(row, col);
+    grid.edit.start_edit_with_options(
+        row,
+        col,
+        &display_text,
+        None,
+        None,
+        seed_text.as_deref(),
+        None,
+    );
+    grid.edit.parse_dropdown_items(&combo_list);
+    if !combo_list.is_empty() {
+        for i in 0..grid.edit.dropdown_count() {
+            if (!stored_text.is_empty() && grid.edit.get_dropdown_data(i) == stored_text)
+                || grid.edit.get_dropdown_item(i) == display_text
+            {
+                grid.edit.set_dropdown_index(i);
+                break;
+            }
+        }
+    }
+
+    if !combo_list.is_empty() {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::DropdownOpened);
+    }
+    if let Some(seed) = seed_text {
+        if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
+            grid.edit.edit_text = seed.clone();
+            grid.edit.sel_start = seed.chars().count() as i32;
+            grid.edit.sel_length = 0;
+            grid.events
+                .push(volvoxgrid_engine::event::GridEventData::CellEditChange { text: seed });
+        }
+    }
+    grid.events
+        .push(volvoxgrid_engine::event::GridEventData::StartEdit { row, col });
+}
+
+fn begin_edit_session_after_before(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    force: bool,
+    seed_text: Option<String>,
+) {
+    begin_edit_session_core(grid, row, col, force, false, seed_text);
+}
+
+fn apply_edit_start_options(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    select_all: Option<bool>,
+    caret_end: Option<bool>,
+    formula_mode: Option<bool>,
+) {
+    if !grid.edit.is_active() || grid.edit.edit_row != row || grid.edit.edit_col != col {
+        return;
+    }
+
+    if let Some(formula_mode) = formula_mode {
+        grid.edit.set_formula_mode(formula_mode);
+    }
+
+    if caret_end == Some(true) {
+        grid.edit.sel_start = grid.edit.edit_text.chars().count() as i32;
+        grid.edit.sel_length = 0;
+        grid.mark_dirty();
+        return;
+    }
+
+    if select_all == Some(true) {
+        grid.edit.sel_start = 0;
+        grid.edit.sel_length = grid.edit.edit_text.chars().count() as i32;
+        grid.mark_dirty();
+    }
+}
+
+fn normalize_committed_edit_text(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    new_text: &str,
+) -> String {
+    let mut committed = truncate_to_char_count(new_text, grid.edit_max_length);
+
+    let cell_combo = grid
+        .cells
+        .get(row, col)
+        .map(|c| c.dropdown_items().to_string())
+        .unwrap_or_default();
+    if cell_combo.is_empty() && col >= 0 && (col as usize) < grid.columns.len() {
+        let col_list = &grid.columns[col as usize].dropdown_items;
+        if !col_list.is_empty() {
+            if let Some(mapped) =
+                volvoxgrid_engine::edit::translate_dropdown_display_to_value(col_list, &committed)
+            {
+                committed = mapped;
+            }
+        }
+    }
+    committed
+}
+
+fn apply_committed_edit_text(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    old_text: String,
+    committed: String,
+) {
+    grid.cells.set_text(row, col, committed.clone());
+
+    if old_text != committed {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::AfterEdit {
+                row,
+                col,
+                old_text: old_text.clone(),
+                new_text: committed.clone(),
+            });
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::CellChanged {
+                row,
+                col,
+                old_text,
+                new_text: committed,
+            });
+    }
+
+    let active_combo = grid.active_dropdown_list(row, col);
+    if !active_combo.is_empty() && active_combo.trim() != "..." {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::DropdownClosed);
+    }
+    grid.mark_dirty();
+}
+
+fn apply_before_sort(grid: &mut volvoxgrid_engine::grid::VolvoxGrid, col: i32) {
+    let old_sort_keys = grid.sort_state.sort_keys.clone();
+    volvoxgrid_engine::sort::handle_header_click(grid, col);
+    if grid.sort_state.sort_keys != old_sort_keys {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::AfterSort { col });
+    }
+}
+
+fn request_before_edit(
+    grid_id: i64,
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    force: bool,
+    seed_text: Option<String>,
+    select_all: Option<bool>,
+    caret_end: Option<bool>,
+    formula_mode: Option<bool>,
+) {
+    if !grid.can_begin_edit(row, col, force) {
+        return;
+    }
+
+    if !decision_channel_enabled(grid_id) {
+        begin_edit_session_core(grid, row, col, force, true, seed_text);
+        apply_edit_start_options(grid, row, col, select_all, caret_end, formula_mode);
+        return;
+    }
+
+    let event_id = next_event_id();
+    PENDING_ACTIONS.lock().unwrap().insert(
+        (grid_id, event_id),
+        PendingActionEntry {
+            created_at: Instant::now(),
+            action: PendingAction::BeginEdit {
+                row,
+                col,
+                force,
+                seed_text: seed_text.clone(),
+                select_all,
+                caret_end,
+                formula_mode,
+            },
+        },
+    );
+    let event = volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col };
+    grid.events.push_with_id(event_id, event.clone());
+    queue_pending_decision_event(grid_id, event_id, event);
+}
+
+fn request_validate_edit(
+    grid_id: i64,
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    old_text: String,
+    new_text: String,
+) {
+    let committed_text = normalize_committed_edit_text(grid, row, col, &new_text);
+
+    if !decision_channel_enabled(grid_id) {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                row,
+                col,
+                edit_text: committed_text.clone(),
+            });
+        if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
+            grid.edit.cancel();
+        }
+        apply_committed_edit_text(grid, row, col, old_text, committed_text);
+        return;
+    }
+
+    let event_id = next_event_id();
+    PENDING_ACTIONS.lock().unwrap().insert(
+        (grid_id, event_id),
+        PendingActionEntry {
+            created_at: Instant::now(),
+            action: PendingAction::ValidateEdit {
+                row,
+                col,
+                old_text,
+                committed_text: committed_text.clone(),
+            },
+        },
+    );
+    let event = volvoxgrid_engine::event::GridEventData::CellEditValidate {
+        row,
+        col,
+        edit_text: committed_text,
+    };
+    grid.events.push_with_id(event_id, event.clone());
+    queue_pending_decision_event(grid_id, event_id, event);
+}
+
+fn request_before_sort(grid_id: i64, grid: &mut volvoxgrid_engine::grid::VolvoxGrid, col: i32) {
+    if !decision_channel_enabled(grid_id) {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::BeforeSort { col });
+        apply_before_sort(grid, col);
+        return;
+    }
+
+    let event_id = next_event_id();
+    PENDING_ACTIONS.lock().unwrap().insert(
+        (grid_id, event_id),
+        PendingActionEntry {
+            created_at: Instant::now(),
+            action: PendingAction::BeforeSort { col },
+        },
+    );
+    let event = volvoxgrid_engine::event::GridEventData::BeforeSort { col };
+    grid.events.push_with_id(event_id, event.clone());
+    queue_pending_decision_event(grid_id, event_id, event);
+}
+
+fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
+    let _ = wasm_with_grid(grid_id, |grid| match action {
+        PendingAction::BeginEdit {
+            row,
+            col,
+            force,
+            seed_text,
+            select_all,
+            caret_end,
+            formula_mode,
+        } => {
+            if cancel {
+                return;
+            }
+            begin_edit_session_after_before(grid, row, col, force, seed_text);
+            apply_edit_start_options(grid, row, col, select_all, caret_end, formula_mode);
+        }
+        PendingAction::ValidateEdit {
+            row,
+            col,
+            old_text,
+            committed_text,
+        } => {
+            if cancel {
+                grid.mark_dirty();
+                return;
+            }
+            if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
+                grid.edit.cancel();
+            }
+            apply_committed_edit_text(grid, row, col, old_text, committed_text);
+        }
+        PendingAction::BeforeSort { col } => {
+            if cancel {
+                return;
+            }
+            apply_before_sort(grid, col);
+        }
+    });
+}
+
+fn resolve_event_decision(grid_id: i64, event_id: i64, cancel: bool) {
+    if event_id <= 0 {
+        return;
+    }
+
+    let pending = PENDING_ACTIONS.lock().unwrap().remove(&(grid_id, event_id));
+    if let Some(entry) = pending {
+        apply_pending_action(grid_id, entry.action, cancel);
+    }
+}
+
+fn resolve_expired_actions(grid_id: i64) {
+    let now = Instant::now();
+    let expired: Vec<(i64, PendingAction)> = {
+        let mut pending = PENDING_ACTIONS.lock().unwrap();
+        let expired_keys: Vec<(i64, i64)> = pending
+            .iter()
+            .filter_map(|(key, entry)| {
+                if key.0 == grid_id && now.duration_since(entry.created_at) >= DECISION_TIMEOUT {
+                    Some(*key)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        expired_keys
+            .into_iter()
+            .filter_map(|key| pending.remove(&key).map(|entry| (key.1, entry.action)))
+            .collect()
+    };
+
+    for (_event_id, action) in expired {
+        apply_pending_action(grid_id, action, false);
+    }
+}
+
+fn resolve_all_pending_actions(grid_id: i64, cancel: bool) {
+    let actions: Vec<PendingAction> = {
+        let mut pending = PENDING_ACTIONS.lock().unwrap();
+        let keys: Vec<(i64, i64)> = pending
+            .keys()
+            .copied()
+            .filter(|(pending_grid, _)| *pending_grid == grid_id)
+            .collect();
+        keys.into_iter()
+            .filter_map(|key| pending.remove(&key).map(|entry| entry.action))
+            .collect()
+    };
+
+    for action in actions {
+        apply_pending_action(grid_id, action, cancel);
+    }
 }
 
 fn char_count(input: &str) -> i32 {
@@ -590,6 +1054,65 @@ pub fn destroy_grid(id: i32) {
         mgr.destroy_grid(id as i64);
     }
     LAST_MEM_CALC_MS.lock().unwrap().remove(&(id as i64));
+    clear_grid_decision_state(id as i64);
+}
+
+#[wasm_bindgen]
+pub fn set_event_decision_enabled(id: i32, enabled: bool) {
+    let grid_id = id as i64;
+    if enabled {
+        set_decision_channel_enabled(grid_id, true);
+        return;
+    }
+
+    resolve_all_pending_actions(grid_id, false);
+    set_decision_channel_enabled(grid_id, false);
+    PENDING_DECISION_EVENTS.lock().unwrap().remove(&grid_id);
+}
+
+#[wasm_bindgen]
+pub fn resolve_expired_event_decisions(id: i32) {
+    resolve_expired_actions(id as i64);
+}
+
+#[wasm_bindgen]
+pub fn take_pending_decision_event(id: i32) -> Vec<u8> {
+    let grid_id = id as i64;
+    resolve_expired_actions(grid_id);
+
+    loop {
+        let next = {
+            let mut queues = PENDING_DECISION_EVENTS.lock().unwrap();
+            let maybe_event = queues.get_mut(&grid_id).and_then(|queue| queue.pop_front());
+            if queues
+                .get(&grid_id)
+                .map(|queue| queue.is_empty())
+                .unwrap_or(false)
+            {
+                queues.remove(&grid_id);
+            }
+            maybe_event
+        };
+
+        let Some(event) = next else {
+            return Vec::new();
+        };
+
+        if !PENDING_ACTIONS
+            .lock()
+            .unwrap()
+            .contains_key(&(grid_id, event.event_id))
+        {
+            continue;
+        }
+
+        return engine_event_to_proto(grid_id, event.event_id, event.data).encode_to_vec();
+    }
+}
+
+#[wasm_bindgen]
+pub fn send_event_decision(id: i32, event_id: i64, cancel: bool) {
+    resolve_event_decision(id as i64, event_id, cancel);
 }
 
 // ---------------------------------------------------------------------------
@@ -1397,7 +1920,7 @@ pub fn get_checkbox_indeterminate_picture(id: i32) -> Vec<u8> {
 }
 
 fn icon_slot_mut(
-    slots: &mut volvoxgrid_engine::style::IconThemeSlots,
+    slots: &mut volvoxgrid_engine::style::IconSlots,
     slot: i32,
 ) -> Option<&mut Option<String>> {
     match slot {
@@ -1419,7 +1942,7 @@ fn icon_slot_mut(
 }
 
 fn icon_slot_ref(
-    slots: &volvoxgrid_engine::style::IconThemeSlots,
+    slots: &volvoxgrid_engine::style::IconSlots,
     slot: i32,
 ) -> Option<&Option<String>> {
     match slot {
@@ -1441,9 +1964,9 @@ fn icon_slot_ref(
 }
 
 fn icon_slot_style_mut(
-    slots: &mut volvoxgrid_engine::style::IconThemeSlotStyles,
+    slots: &mut volvoxgrid_engine::style::IconSlotStyles,
     slot: i32,
-) -> Option<&mut Option<volvoxgrid_engine::style::IconThemeSlotStyle>> {
+) -> Option<&mut Option<volvoxgrid_engine::style::IconSlotStyle>> {
     match slot {
         1 => Some(&mut slots.sort_ascending),
         2 => Some(&mut slots.sort_descending),
@@ -1596,7 +2119,7 @@ pub fn patch_icon_theme_slot_text_style(
             return;
         };
         let slot_style =
-            slot_entry.get_or_insert_with(volvoxgrid_engine::style::IconThemeSlotStyle::default);
+            slot_entry.get_or_insert_with(volvoxgrid_engine::style::IconSlotStyle::default);
         if let Some(v) = font_name {
             let trimmed = v.trim();
             if trimmed.is_empty() {
@@ -1638,7 +2161,7 @@ pub fn patch_icon_theme_slot_font_names(id: i32, slot: i32, font_names: Option<A
             return;
         };
         let slot_style =
-            slot_entry.get_or_insert_with(volvoxgrid_engine::style::IconThemeSlotStyle::default);
+            slot_entry.get_or_insert_with(volvoxgrid_engine::style::IconSlotStyle::default);
         let next = sanitize_font_names(&font_names);
         slot_style.text_style.font_name = next.first().cloned();
         slot_style.text_style.font_names = next;
@@ -1654,7 +2177,7 @@ pub fn patch_icon_theme_slot_layout(id: i32, slot: i32, align: Option<i32>, gap_
             return;
         };
         let slot_style =
-            slot_entry.get_or_insert_with(volvoxgrid_engine::style::IconThemeSlotStyle::default);
+            slot_entry.get_or_insert_with(volvoxgrid_engine::style::IconSlotStyle::default);
         let mut layout = slot_style
             .layout
             .unwrap_or(grid.style.icon_theme_defaults.layout);
@@ -1715,19 +2238,23 @@ pub fn get_active_combo_list(id: i32, row: i32, col: i32) -> String {
 
 #[wasm_bindgen]
 pub fn begin_edit_cell(id: i32, row: i32, col: i32) {
+    let grid_id = id as i64;
+    resolve_expired_actions(grid_id);
     with_grid(id, |grid| {
         ensure_layout(grid);
-        grid.begin_edit(row, col);
+        request_before_edit(grid_id, grid, row, col, false, None, None, None, None);
     });
 }
 
 #[wasm_bindgen]
 pub fn begin_edit_at_selection(id: i32) {
+    let grid_id = id as i64;
+    resolve_expired_actions(grid_id);
     with_grid(id, |grid| {
         ensure_layout(grid);
         let row = grid.selection.row;
         let col = grid.selection.col;
-        grid.begin_edit(row, col);
+        request_before_edit(grid_id, grid, row, col, false, None, None, None, None);
     });
 }
 
@@ -1934,6 +2461,8 @@ pub fn combo_dropdown_hit_index(id: i32, x: f32, y: f32) -> i32 {
 
 #[wasm_bindgen]
 pub fn choose_dropdown_item(id: i32, idx: i32) {
+    let grid_id = id as i64;
+    resolve_expired_actions(grid_id);
     with_grid(id, |grid| {
         if !grid.edit.is_active() {
             return;
@@ -1945,7 +2474,15 @@ pub fn choose_dropdown_item(id: i32, idx: i32) {
         let text = grid.edit.edit_text.clone();
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::CellEditChange { text });
-        grid.commit_edit();
+        if decision_channel_enabled(grid_id) {
+            let row = grid.edit.edit_row;
+            let col = grid.edit.edit_col;
+            let old_text = grid.cells.get_text(row, col).to_string();
+            let new_text = grid.edit.edit_text.clone();
+            request_validate_edit(grid_id, grid, row, col, old_text, new_text);
+        } else {
+            grid.commit_edit();
+        }
     });
 }
 
@@ -1956,8 +2493,18 @@ pub fn choose_combo_dropdown_item(id: i32, idx: i32) {
 
 #[wasm_bindgen]
 pub fn commit_edit(id: i32) {
+    let grid_id = id as i64;
+    resolve_expired_actions(grid_id);
     with_grid(id, |grid| {
-        grid.commit_edit();
+        if decision_channel_enabled(grid_id) && grid.edit.is_active() {
+            let row = grid.edit.edit_row;
+            let col = grid.edit.edit_col;
+            let old_text = grid.cells.get_text(row, col).to_string();
+            let new_text = grid.edit.edit_text.clone();
+            request_validate_edit(grid_id, grid, row, col, old_text, new_text);
+        } else {
+            grid.commit_edit();
+        }
     });
 }
 
@@ -2396,7 +2943,11 @@ pub fn set_explorer_bar(id: i32, mode: i32) {
     set_header_features(id, mode);
 }
 
-/// Set grid lines mode: 0=none, 1=flat, 2=inset, 3=raised, 4=dashes, 5=dots
+/// Set legacy grid line mode:
+/// 0=none, 1=solid both, 2=inset both, 3=raised both,
+/// 4=solid horizontal, 5=solid vertical,
+/// 6=inset horizontal, 7=inset vertical,
+/// 8=raised horizontal, 9=raised vertical.
 #[wasm_bindgen]
 pub fn set_grid_lines(id: i32, mode: i32) {
     with_grid(id, |grid| {
@@ -2574,6 +3125,8 @@ pub fn render_dirty_h() -> i32 {
 /// Returns 1 if pixels were painted, 0 if the grid was clean.
 #[wasm_bindgen]
 pub fn render(id: i32, width: i32, height: i32) -> i32 {
+    resolve_expired_actions(id as i64);
+
     let mut dirty_rect = RENDER_DIRTY_RECT.lock().unwrap();
     *dirty_rect = (0, 0, 0, 0);
     drop(dirty_rect);
@@ -2879,9 +3432,65 @@ pub fn render_gpu(_id: i32, _w: i32, _h: i32) -> i32 {
 
 #[wasm_bindgen]
 pub fn handle_pointer_down(id: i32, x: f32, y: f32, button: i32, modifier: i32, dbl_click: bool) {
+    let grid_id = id as i64;
+    resolve_expired_actions(grid_id);
     with_grid(id, |grid| {
         ensure_layout(grid);
-        input::handle_pointer_down(grid, x, y, button, modifier, dbl_click);
+        if decision_channel_enabled(grid_id) {
+            let hit = input::hit_test(grid, x, y);
+            input::handle_pointer_down_with_behavior(
+                grid,
+                x,
+                y,
+                button,
+                modifier,
+                dbl_click,
+                input::InputBehavior {
+                    allow_begin_edit: false,
+                    allow_header_sort: false,
+                },
+            );
+
+            if hit.row >= 0 && hit.col >= 0 {
+                let area = hit.area.clone();
+                let is_cell_like = area == input::HitArea::Cell
+                    || area == input::HitArea::FixedRow
+                    || area == input::HitArea::FixedCol;
+                let combo_list = if is_cell_like {
+                    grid.active_dropdown_list(hit.row, hit.col)
+                } else {
+                    String::new()
+                };
+                let is_combo_cell = !combo_list.is_empty() && combo_list.trim() != "...";
+
+                if area == input::HitArea::DropdownButton {
+                    if !(grid.edit.is_active()
+                        && grid.edit.edit_row == hit.row
+                        && grid.edit.edit_col == hit.col)
+                    {
+                        request_before_edit(
+                            grid_id, grid, hit.row, hit.col, false, None, None, None, None,
+                        );
+                    }
+                } else if is_cell_like
+                    && ((dbl_click && grid.edit_trigger_mode >= 2) || is_combo_cell)
+                {
+                    request_before_edit(
+                        grid_id, grid, hit.row, hit.col, false, None, None, None, None,
+                    );
+                }
+
+                if area == input::HitArea::FixedRow
+                    && hit.row < grid.fixed_rows
+                    && !is_combo_cell
+                    && grid.header_features > 0
+                {
+                    request_before_sort(grid_id, grid, hit.col);
+                }
+            }
+        } else {
+            input::handle_pointer_down(grid, x, y, button, modifier, dbl_click);
+        }
     });
 }
 
@@ -2903,9 +3512,41 @@ pub fn handle_pointer_up(id: i32, x: f32, y: f32, button: i32) {
 
 #[wasm_bindgen]
 pub fn handle_key_down(id: i32, key_code: i32, modifier: i32) {
+    let grid_id = id as i64;
+    resolve_expired_actions(grid_id);
     with_grid(id, |grid| {
         ensure_layout(grid);
-        input::handle_key_down(grid, key_code, modifier);
+        if decision_channel_enabled(grid_id) {
+            let was_editing = grid.edit.is_active();
+            input::handle_key_down_with_behavior(
+                grid,
+                key_code,
+                modifier,
+                input::InputBehavior {
+                    allow_begin_edit: false,
+                    allow_header_sort: true,
+                },
+            );
+            if (key_code == 13 || key_code == 113)
+                && !grid.host_key_dispatch
+                && grid.edit_trigger_mode >= 1
+                && !was_editing
+            {
+                request_before_edit(
+                    grid_id,
+                    grid,
+                    grid.selection.row,
+                    grid.selection.col,
+                    false,
+                    None,
+                    None,
+                    None,
+                    None,
+                );
+            }
+        } else {
+            input::handle_key_down(grid, key_code, modifier);
+        }
     });
 }
 
@@ -2913,9 +3554,44 @@ pub fn handle_key_down(id: i32, key_code: i32, modifier: i32) {
 /// char_code is a Unicode code point (e.g. 65 = 'A').
 #[wasm_bindgen]
 pub fn handle_key_press(id: i32, char_code: u32) {
+    let grid_id = id as i64;
+    resolve_expired_actions(grid_id);
     with_grid(id, |grid| {
         ensure_layout(grid);
-        input::handle_key_press(grid, char_code);
+        if decision_channel_enabled(grid_id) {
+            let was_editing = grid.edit.is_active();
+            input::handle_key_press_with_behavior(
+                grid,
+                char_code,
+                input::InputBehavior {
+                    allow_begin_edit: false,
+                    allow_header_sort: true,
+                },
+            );
+            if !was_editing
+                && !grid.host_key_dispatch
+                && grid.edit_trigger_mode >= 1
+                && grid.type_ahead_mode == 0
+            {
+                if let Some(seed) = char::from_u32(char_code).map(|c| c.to_string()) {
+                    if !seed.is_empty() {
+                        request_before_edit(
+                            grid_id,
+                            grid,
+                            grid.selection.row,
+                            grid.selection.col,
+                            false,
+                            Some(seed),
+                            None,
+                            None,
+                            None,
+                        );
+                    }
+                }
+            }
+        } else {
+            input::handle_key_press(grid, char_code);
+        }
     });
 }
 
@@ -2931,30 +3607,40 @@ pub fn handle_scroll(id: i32, delta_x: f32, delta_y: f32) {
 // User resizing / freezing
 // ---------------------------------------------------------------------------
 
-/// Set allow_user_resizing mode: 0=none, 1=cols, 2=rows, 3=both,
-/// 4=uniform cols, 5=uniform rows, 6=uniform both
 #[wasm_bindgen]
-pub fn set_allow_user_resizing(id: i32, mode: i32) {
+pub fn set_resize_policy(id: i32, columns: bool, rows: bool, uniform: bool) {
     with_grid(id, |grid| {
-        grid.allow_user_resizing = mode.clamp(0, 6);
+        grid.allow_user_resizing = match (columns, rows, uniform) {
+            (true, true, true) => 6,
+            (true, true, false) => 3,
+            (true, false, true) => 4,
+            (true, false, false) => 1,
+            (false, true, true) => 5,
+            (false, true, false) => 2,
+            (false, false, _) => 0,
+        };
     });
 }
 
 #[wasm_bindgen]
-pub fn get_allow_user_resizing(id: i32) -> i32 {
+pub fn get_resize_policy_mode(id: i32) -> i32 {
     with_grid(id, |grid| grid.allow_user_resizing).unwrap_or(0)
 }
 
-/// Set allow_user_freezing mode: 0=none, 1=rows, 2=cols, 3=both
 #[wasm_bindgen]
-pub fn set_allow_user_freezing(id: i32, mode: i32) {
+pub fn set_freeze_policy(id: i32, columns: bool, rows: bool) {
     with_grid(id, |grid| {
-        grid.allow_user_freezing = mode.clamp(0, 3);
+        grid.allow_user_freezing = match (columns, rows) {
+            (true, true) => 3,
+            (true, false) => 1,
+            (false, true) => 2,
+            (false, false) => 0,
+        };
     });
 }
 
 #[wasm_bindgen]
-pub fn get_allow_user_freezing(id: i32) -> i32 {
+pub fn get_freeze_policy_mode(id: i32) -> i32 {
     with_grid(id, |grid| grid.allow_user_freezing).unwrap_or(0)
 }
 
@@ -3323,7 +4009,6 @@ fn engine_event_to_proto(
                 old_col,
                 new_row,
                 new_col,
-                cancel: false,
             },
         )),
         E::CellFocusChanged {
@@ -3354,7 +4039,6 @@ fn engine_event_to_proto(
                     .collect(),
                 active_row,
                 active_col,
-                cancel: false,
             },
         )),
         E::SelectionChanged {
@@ -3380,11 +4064,9 @@ fn engine_event_to_proto(
         E::LeaveCell { row, col } => {
             Some(grid_event::Event::LeaveCell(LeaveCellEvent { row, col }))
         }
-        E::BeforeEdit { row, col } => Some(grid_event::Event::BeforeEdit(BeforeEditEvent {
-            row,
-            col,
-            cancel: false,
-        })),
+        E::BeforeEdit { row, col } => {
+            Some(grid_event::Event::BeforeEdit(BeforeEditEvent { row, col }))
+        }
         E::StartEdit { row, col } => {
             Some(grid_event::Event::StartEdit(StartEditEvent { row, col }))
         }
@@ -3407,7 +4089,6 @@ fn engine_event_to_proto(
             row,
             col,
             edit_text,
-            cancel: false,
         })),
         E::CellEditChange { text } => {
             Some(grid_event::Event::CellEditChange(CellEditChangeEvent {
@@ -3458,10 +4139,7 @@ fn engine_event_to_proto(
                 status,
             }))
         }
-        E::BeforeSort { col } => Some(grid_event::Event::BeforeSort(BeforeSortEvent {
-            col,
-            cancel: false,
-        })),
+        E::BeforeSort { col } => Some(grid_event::Event::BeforeSort(BeforeSortEvent { col })),
         E::AfterSort { col } => Some(grid_event::Event::AfterSort(AfterSortEvent { col })),
         E::Compare {
             row1,
@@ -3478,7 +4156,6 @@ fn engine_event_to_proto(
             Some(grid_event::Event::BeforeNodeToggle(BeforeNodeToggleEvent {
                 row,
                 collapse,
-                cancel: false,
             }))
         }
         E::AfterNodeToggle { row, collapse } => {
@@ -3497,7 +4174,6 @@ fn engine_event_to_proto(
             old_left_col,
             new_top_row,
             new_left_col,
-            cancel: false,
         })),
         E::AfterScroll {
             old_top_row,
@@ -3517,7 +4193,6 @@ fn engine_event_to_proto(
             Some(grid_event::Event::BeforeUserResize(BeforeUserResizeEvent {
                 row,
                 col,
-                cancel: false,
             }))
         }
         E::AfterUserResize { row, col } => {
@@ -3537,7 +4212,6 @@ fn engine_event_to_proto(
             Some(grid_event::Event::BeforeMoveColumn(BeforeMoveColumnEvent {
                 col,
                 new_position,
-                cancel: false,
             }))
         }
         E::AfterMoveColumn { col, old_position } => {
@@ -3550,7 +4224,6 @@ fn engine_event_to_proto(
             Some(grid_event::Event::BeforeMoveRow(BeforeMoveRowEvent {
                 row,
                 new_position,
-                cancel: false,
             }))
         }
         E::AfterMoveRow { row, old_position } => {
@@ -3563,7 +4236,6 @@ fn engine_event_to_proto(
             Some(grid_event::Event::BeforeMouseDown(BeforeMouseDownEvent {
                 row,
                 col,
-                cancel: false,
             }))
         }
         E::MouseDown {
@@ -3647,9 +4319,7 @@ fn engine_event_to_proto(
             }))
         }
         E::TypeAheadEnded => Some(grid_event::Event::TypeAheadEnded(TypeAheadEndedEvent {})),
-        E::DataRefreshing => Some(grid_event::Event::DataRefreshing(DataRefreshingEvent {
-            cancel: false,
-        })),
+        E::DataRefreshing => Some(grid_event::Event::DataRefreshing(DataRefreshingEvent {})),
         E::DataRefreshed => Some(grid_event::Event::DataRefreshed(DataRefreshedEvent {})),
         E::FilterData { row, col, text } => Some(grid_event::Event::FilterData(FilterDataEvent {
             row,
@@ -3660,7 +4330,6 @@ fn engine_event_to_proto(
         E::BeforePageBreak { row } => {
             Some(grid_event::Event::BeforePageBreak(BeforePageBreakEvent {
                 row,
-                cancel: false,
             }))
         }
         E::StartPage { page } => Some(grid_event::Event::StartPage(StartPageEvent { page })),
@@ -3743,7 +4412,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         let apply_default_bands = request
             .config
             .as_ref()
-            .and_then(|c| c.indicator_bands.as_ref())
+            .and_then(|c| c.indicators.as_ref())
             .is_none();
         if let Some(config) = &request.config {
             let _ = mgr.with_grid(id, |grid| grid.apply_config(config));
@@ -3993,36 +4662,67 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
     }
 
     fn edit(&self, request: EditCommand) -> Result<EditState, String> {
-        wasm_with_grid(request.grid_id, |grid| {
+        let grid_id = request.grid_id;
+        wasm_with_grid(grid_id, |grid| {
             use edit_command::Command;
             match request.command {
                 Some(Command::Start(s)) => {
-                    grid.begin_edit(s.row, s.col);
-                    if grid.edit.is_active()
-                        && grid.edit.edit_row == s.row
-                        && grid.edit.edit_col == s.col
-                    {
-                        grid.edit.set_formula_mode(s.formula_mode.unwrap_or(false));
+                    let select_all = Some(s.select_all.unwrap_or(true));
+                    let caret_end = Some(s.caret_end.unwrap_or(false));
+                    let formula_mode = Some(s.formula_mode.unwrap_or(false));
+                    if decision_channel_enabled(grid_id) {
+                        request_before_edit(
+                            grid_id,
+                            grid,
+                            s.row,
+                            s.col,
+                            false,
+                            s.seed_text.clone(),
+                            select_all,
+                            caret_end,
+                            formula_mode,
+                        );
+                    } else {
+                        grid.begin_edit(s.row, s.col);
+                        if grid.edit.is_active()
+                            && grid.edit.edit_row == s.row
+                            && grid.edit.edit_col == s.col
+                        {
+                            grid.edit.set_formula_mode(formula_mode.unwrap_or(false));
 
-                        if let Some(seed) = s.seed_text {
-                            grid.edit.update_text(seed);
-                            grid.edit.sel_start = grid.edit.edit_text.chars().count() as i32;
-                            grid.edit.sel_length = 0;
-                        } else if s.caret_end == Some(true) {
-                            grid.edit.sel_start = grid.edit.edit_text.chars().count() as i32;
-                            grid.edit.sel_length = 0;
-                        } else if s.select_all == Some(true) || s.select_all.is_none() {
-                            grid.edit.sel_start = 0;
-                            grid.edit.sel_length = grid.edit.edit_text.chars().count() as i32;
+                            if let Some(seed) = s.seed_text {
+                                grid.edit.update_text(seed);
+                                grid.edit.sel_start = grid.edit.edit_text.chars().count() as i32;
+                                grid.edit.sel_length = 0;
+                            } else if caret_end == Some(true) {
+                                grid.edit.sel_start = grid.edit.edit_text.chars().count() as i32;
+                                grid.edit.sel_length = 0;
+                            } else if select_all == Some(true) {
+                                grid.edit.sel_start = 0;
+                                grid.edit.sel_length = grid.edit.edit_text.chars().count() as i32;
+                            }
+                            grid.mark_dirty();
                         }
-                        grid.mark_dirty();
                     }
                 }
                 Some(Command::Commit(c)) => {
-                    if let Some(text) = &c.text {
-                        grid.edit.update_text(text.clone());
+                    if grid.edit.is_active() {
+                        let row = grid.edit.edit_row;
+                        let col = grid.edit.edit_col;
+                        let old_text = grid.cells.get_text(row, col).to_string();
+                        let new_text = c.text.unwrap_or_else(|| grid.edit.edit_text.clone());
+                        if decision_channel_enabled(grid_id) {
+                            let pending_text =
+                                truncate_to_char_count(&new_text, grid.edit_max_length);
+                            grid.edit.update_text(pending_text.clone());
+                            grid.edit.sel_start = pending_text.chars().count() as i32;
+                            grid.edit.sel_length = 0;
+                            request_validate_edit(grid_id, grid, row, col, old_text, pending_text);
+                        } else {
+                            grid.edit.update_text(new_text);
+                            grid.edit.commit();
+                        }
                     }
-                    grid.edit.commit();
                 }
                 Some(Command::Cancel(_)) => {
                     grid.edit.cancel();
@@ -4058,7 +4758,15 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                     grid.mark_dirty();
                 }
                 Some(Command::Finish(_)) => {
-                    grid.edit.commit();
+                    if grid.edit.is_active() && decision_channel_enabled(grid_id) {
+                        let row = grid.edit.edit_row;
+                        let col = grid.edit.edit_col;
+                        let old_text = grid.cells.get_text(row, col).to_string();
+                        let new_text = grid.edit.edit_text.clone();
+                        request_validate_edit(grid_id, grid, row, col, old_text, new_text);
+                    } else {
+                        grid.edit.commit();
+                    }
                 }
                 None => {}
             }
@@ -4083,7 +4791,14 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 let sort_keys: Vec<(i32, i32)> = request
                     .sort_columns
                     .iter()
-                    .map(|sc| (sc.col, sc.order))
+                    .filter_map(|sc| {
+                        let merged = volvoxgrid_engine::sort::merge_sort_spec(
+                            volvoxgrid_engine::sort::SORT_NONE,
+                            sc.order,
+                            sc.r#type,
+                        );
+                        (merged != volvoxgrid_engine::sort::SORT_NONE).then_some((sc.col, merged))
+                    })
                     .collect();
                 grid.sort_state.sort_keys = sort_keys;
                 volvoxgrid_engine::sort::sort_grid_all_multi(grid);
@@ -4100,8 +4815,8 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 request.group_on_col,
                 request.aggregate_col,
                 &request.caption,
-                request.back_color,
-                request.fore_color,
+                request.background,
+                request.foreground,
                 request.add_outline,
             );
         })?;

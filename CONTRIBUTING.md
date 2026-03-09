@@ -93,7 +93,7 @@ make web
 # Requires connected Android device or emulator
 make flutter-run
 
-# Run GTK4 Visual Test (Linux)
+# Run GTK4 Plugin-Host Visual Test (Linux)
 make gtk-test
 ```
 
@@ -110,7 +110,7 @@ volvoxgrid/
 ├── android/       # Android-specific build configurations
 ├── adapters/
 │   └── vsflexgrid/ # ActiveX control (Windows)
-├── gtk-test/      # GTK4 visual test harness
+├── gtk-test/      # GTK4 plugin-host visual test harness
 ├── smoke-test/    # CLI smoke test
 └── scripts/       # Utility scripts
 ```
@@ -122,7 +122,7 @@ volvoxgrid/
 - **Integration**:
     - **Flutter**: Run the example app via `make flutter-run`.
     - **Web**: Run the web demo via `make web`.
-    - **GTK**: Run the GTK harness via `make gtk-test` to visually verify rendering changes on Linux.
+    - **GTK**: Run the GTK plugin-host harness via `make gtk-test` to visually verify the native FFI path on Linux.
 
 ## Questions?
 

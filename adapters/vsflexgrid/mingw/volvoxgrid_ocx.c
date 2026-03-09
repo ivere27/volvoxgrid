@@ -235,7 +235,7 @@ static int32_t volvox_grid_sort_compat(int64_t grid_id, int32_t order, int32_t c
     /*  SortRequest {
      *    int64 grid_id      = 1;  // varint
      *    repeated SortColumn sort_columns = 2;  // length-delimited
-     *      SortColumn { int32 col = 1; SortOrder order = 2; }
+     *      SortColumn { int32 col = 1; FlexSortSpec order = 2; }
      *  }
      */
     uint8_t buf[64];
@@ -291,6 +291,63 @@ static int32_t volvox_grid_subtotal_compat(
     return vfg_take_status_response(out);
 }
 
+static int vfg_encode_resize_policy(uint8_t *buf, int32_t mode) {
+    int pos = 0;
+    int columns = 0;
+    int rows = 0;
+    int uniform = 0;
+
+    switch (mode) {
+    case 1:
+        columns = 1;
+        break;
+    case 2:
+        rows = 1;
+        break;
+    case 3:
+        columns = 1;
+        rows = 1;
+        break;
+    case 4:
+        columns = 1;
+        uniform = 1;
+        break;
+    case 5:
+        rows = 1;
+        uniform = 1;
+        break;
+    case 6:
+        columns = 1;
+        rows = 1;
+        uniform = 1;
+        break;
+    default:
+        break;
+    }
+
+    if (columns) {
+        buf[pos++] = 0x08; /* field 1, varint */
+        buf[pos++] = 0x01;
+    }
+    if (rows) {
+        buf[pos++] = 0x10; /* field 2, varint */
+        buf[pos++] = 0x01;
+    }
+    if (uniform) {
+        buf[pos++] = 0x18; /* field 3, varint */
+        buf[pos++] = 0x01;
+    }
+    return pos;
+}
+
+static int32_t volvox_grid_set_resize_policy_compat(int64_t grid_id, int32_t mode) {
+    uint8_t policy[8];
+    int32_t out_len = 0;
+    int policy_len = vfg_encode_resize_policy(policy, mode);
+    uint8_t *out = volvox_grid_set_resize_policy(grid_id, policy, policy_len, &out_len);
+    return vfg_take_status_response(out);
+}
+
 /* Compat wrappers for generated dispatch (simple int set/get properties) */
 VG_WRAP_STATUS_2(volvox_grid_set_rows, int64_t, grid_id, int32_t, rows)
 VG_WRAP_STATUS_2(volvox_grid_set_cols, int64_t, grid_id, int32_t, cols)
@@ -311,7 +368,6 @@ VG_WRAP_STATUS_2(volvox_grid_set_word_wrap, int64_t, grid_id, int32_t, value)
 VG_WRAP_STATUS_2(volvox_grid_set_selection_mode, int64_t, grid_id, int32_t, mode)
 VG_WRAP_STATUS_2(volvox_grid_set_allow_selection, int64_t, grid_id, int32_t, value)
 VG_WRAP_STATUS_2(volvox_grid_set_allow_big_selection, int64_t, grid_id, int32_t, value)
-VG_WRAP_STATUS_2(volvox_grid_set_allow_user_resizing, int64_t, grid_id, int32_t, mode)
 VG_WRAP_STATUS_2(volvox_grid_set_ellipsis, int64_t, grid_id, int32_t, value)
 VG_WRAP_STATUS_2(volvox_grid_set_extend_last_col, int64_t, grid_id, int32_t, value)
 VG_WRAP_STATUS_2(volvox_grid_set_merge_cells, int64_t, grid_id, int32_t, mode)
@@ -357,7 +413,7 @@ static int32_t volvox_grid_set_redraw_compat(int64_t grid_id, int32_t value) {
 #define volvox_grid_select volvox_grid_select_compat
 #define volvox_grid_set_allow_big_selection volvox_grid_set_allow_big_selection_compat
 #define volvox_grid_set_allow_selection volvox_grid_set_allow_selection_compat
-#define volvox_grid_set_allow_user_resizing volvox_grid_set_allow_user_resizing_compat
+#define volvox_grid_set_resize_policy volvox_grid_set_resize_policy_compat
 #define volvox_grid_set_cell_checked volvox_grid_set_cell_checked_compat
 #define volvox_grid_set_cell_flood volvox_grid_set_cell_flood_compat
 #define volvox_grid_set_col volvox_grid_set_col_compat

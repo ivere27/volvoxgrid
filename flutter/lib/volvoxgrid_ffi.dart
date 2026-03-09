@@ -13,7 +13,7 @@ library;
 
 import 'dart:async';
 import 'dart:developer' as developer;
-import 'dart:io' show Platform;
+import 'dart:io' show Directory, File, Platform;
 import 'dart:typed_data';
 
 import 'package:protobuf/protobuf.dart' show GeneratedMessage;
@@ -489,16 +489,79 @@ bool _looksLikeLibraryPath(String value) {
       value.contains('.framework/');
 }
 
+Iterable<String> _searchRoots() sync* {
+  final seen = <String>{};
+  final roots = <String>[];
+
+  void walk(Directory start) {
+    Directory? current = start.absolute;
+    while (current != null) {
+      if (seen.add(current.path)) {
+        roots.add(current.path);
+      }
+      final parent = current.parent;
+      current = parent.path == current.path ? null : parent;
+    }
+  }
+
+  walk(Directory.current);
+  walk(File(Platform.resolvedExecutable).absolute.parent);
+  yield* roots;
+}
+
+Iterable<String> _candidateLibraryPaths(String fileName) sync* {
+  final seen = <String>{};
+  final separator = Platform.pathSeparator;
+
+  String join(String root, String suffix) => '$root$separator$suffix';
+
+  final candidates = <String>[];
+
+  void add(String candidate) {
+    if (candidate.isNotEmpty && seen.add(candidate)) {
+      candidates.add(candidate);
+    }
+  }
+
+  void addExistingPath(String candidate) {
+    if (File(candidate).existsSync()) {
+      add(candidate);
+    }
+  }
+
+  final envPath = Platform.environment['VOLVOXGRID_LIBRARY_PATH']?.trim();
+  if (envPath != null && envPath.isNotEmpty) {
+    add(envPath);
+  }
+
+  for (final root in _searchRoots()) {
+    addExistingPath(join(root, fileName));
+    addExistingPath(join(root, 'target${separator}debug${separator}$fileName'));
+    addExistingPath(
+        join(root, 'target${separator}release${separator}$fileName'));
+    addExistingPath(join(root,
+        'target${separator}x86_64-unknown-linux-gnu${separator}debug${separator}$fileName'));
+    addExistingPath(join(root,
+        'target${separator}x86_64-unknown-linux-gnu${separator}release${separator}$fileName'));
+  }
+
+  add(fileName);
+
+  if (Platform.isAndroid && fileName != 'libvolvoxgrid_plugin.so') {
+    add('libvolvoxgrid_plugin.so');
+  }
+
+  yield* candidates;
+}
+
 Future<void> initVolvoxGrid({String? libraryName}) {
   final raw = libraryName?.trim();
   final hasRaw = raw != null && raw.isNotEmpty;
   final treatAsPath = hasRaw && _looksLikeLibraryPath(raw);
   final effectivePath = treatAsPath ? raw : _defaultLibraryFileName();
-  final candidates = <String>{effectivePath};
-
-  if (Platform.isAndroid && !treatAsPath) {
-    candidates.add('libvolvoxgrid_plugin.so');
-  }
+  final candidates = treatAsPath
+      ? <String>[effectivePath]
+      : _candidateLibraryPaths(effectivePath).toList(growable: false);
 
   Object? lastError;
   StackTrace? lastStackTrace;

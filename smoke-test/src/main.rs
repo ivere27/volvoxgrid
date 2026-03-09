@@ -69,8 +69,8 @@ fn main() {
                 fixed_cols: Some(0),
                 ..Default::default()
             }),
-            indicator_bands: Some(IndicatorBandsConfig {
-                col_indicator_top: Some(ColIndicatorConfig {
+            indicators: Some(IndicatorsConfig {
+                col_top: Some(ColIndicatorConfig {
                     visible: Some(true),
                     band_rows: Some(1),
                     mode_bits: Some(
@@ -79,9 +79,9 @@ fn main() {
                     ),
                     ..Default::default()
                 }),
-                row_indicator_start: Some(RowIndicatorConfig {
+                row_start: Some(RowIndicatorConfig {
                     visible: Some(false),
-                    width_px: Some(35),
+                    width: Some(35),
                     mode_bits: Some(
                         (RowIndicatorMode::RowIndicatorCurrent as u32)
                             | (RowIndicatorMode::RowIndicatorSelection as u32),
@@ -242,7 +242,8 @@ fn main() {
         grid_id,
         sort_columns: vec![SortColumn {
             col: 0,
-            order: SortOrder::SortGenericAscending as i32,
+            order: Some(SortOrder::SortAscending as i32),
+            r#type: Some(SortType::Auto as i32),
         }],
     };
     invoke(

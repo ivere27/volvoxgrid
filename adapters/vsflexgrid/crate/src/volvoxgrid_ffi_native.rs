@@ -1368,8 +1368,8 @@ pub unsafe extern "C" fn volvox_grid_subtotal(
     aggregate_col: i32,
     caption: *const u8,
     caption_len: i32,
-    back_color: u32,
-    fore_color: u32,
+    background: u32,
+    foreground: u32,
     add_outline: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
@@ -1402,8 +1402,8 @@ pub unsafe extern "C" fn volvox_grid_subtotal(
         } else {
             String::new()
         },
-        back_color,
-        fore_color,
+        background,
+        foreground,
         add_outline: add_outline != 0,
         ..Default::default()
     };

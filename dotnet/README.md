@@ -36,6 +36,7 @@ Useful enums include:
 - `VolvoxGridRendererMode`
 - `VolvoxGridSelectionMode`
 - `VolvoxGridHeaderFeatures`
+- `VolvoxGridResizePolicy`
 - `VolvoxGridColumnDataType`
 - `VolvoxGridSortDirection`
 
@@ -112,7 +113,7 @@ public sealed class MainForm : Form
         Editable = true,
         MultiSelect = true,
         RendererMode = VolvoxGridRendererMode.Auto,
-        HeaderFeatures = VolvoxGridHeaderFeatures.SortReorderChooser,
+        HeaderFeatures = new VolvoxGridHeaderFeatures { Sort = true, Reorder = true },
     };
 
     public MainForm()
@@ -263,8 +264,8 @@ grid.MultiSelect = true;
 grid.SelectionVisibility = VolvoxGridSelectionVisibility.Always;
 grid.RendererMode = VolvoxGridRendererMode.Auto;
 grid.ScrollBars = VolvoxGridScrollBarsMode.Both;
-grid.AllowUserResizing = VolvoxGridAllowUserResizingMode.Both;
-grid.HeaderFeatures = VolvoxGridHeaderFeatures.SortReorderChooser;
+grid.ResizePolicy = new VolvoxGridResizePolicy { Columns = true, Rows = true };
+grid.HeaderFeatures = new VolvoxGridHeaderFeatures { Sort = true, Reorder = true };
 grid.DebugOverlay = false;
 ```
 
@@ -341,6 +342,9 @@ grid.SelectRanges(
 | `FocusedCellChanged` | Track active-cell movement |
 | `CellValueChanged` | React to edits or programmatic cell changes reported back from the engine |
 | `SelectionChanged` | Track row selection changes |
+| `BeforeEdit` | Cancel entry into edit mode for a cell |
+| `CellEditValidating` | Cancel a pending text commit before it is applied |
+| `BeforeSort` | Cancel a header-click sort before it runs |
 
 Example:
 
@@ -359,7 +363,33 @@ grid.SelectionChanged += (sender, e) =>
 {
     Console.WriteLine(string.Join(", ", e.SelectedRows));
 };
+
+grid.BeforeEdit += (sender, e) =>
+{
+    if (e.FieldName == "Status")
+    {
+        e.Cancel = true;
+    }
+};
+
+grid.CellEditValidating += (sender, e) =>
+{
+    if (e.FieldName == "Qty" && !int.TryParse(e.ProposedText, out _))
+    {
+        e.Cancel = true;
+    }
+};
+
+grid.BeforeSort += (sender, e) =>
+{
+    if (e.FieldName == "Notes")
+    {
+        e.Cancel = true;
+    }
+};
 ```
+
+Cancelable `.NET` events currently cover `BeforeEdit`, `CellEditValidating`, and `BeforeSort`. The control hides the internal `EventDecision` transport; app code only uses `e.Cancel`.
 
 ## Demo and Smoke-Test Helpers
 

@@ -30,7 +30,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     private static RowIndicatorConfig defaultRowIndicatorStartConfig() {
         return RowIndicatorConfig.newBuilder()
             .setVisible(false)
-            .setWidthPx(DEFAULT_ROW_INDICATOR_WIDTH_PX)
+            .setWidth(DEFAULT_ROW_INDICATOR_WIDTH_PX)
             .setModeBits(DEFAULT_ROW_INDICATOR_MODE_BITS)
             .build();
     }
@@ -43,10 +43,10 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
             .build();
     }
 
-    public static IndicatorBandsConfig defaultIndicatorBandsConfig() {
-        return IndicatorBandsConfig.newBuilder()
-            .setRowIndicatorStart(defaultRowIndicatorStartConfig())
-            .setColIndicatorTop(defaultColIndicatorTopConfig())
+    public static IndicatorsConfig defaultIndicatorsConfig() {
+        return IndicatorsConfig.newBuilder()
+            .setRowStart(defaultRowIndicatorStartConfig())
+            .setColTop(defaultColIndicatorTopConfig())
             .build();
     }
 
@@ -124,9 +124,9 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     @Override
     public boolean getShowColumnHeaders() throws SynurangDesktopBridge.SynurangBridgeException {
         GridConfig config = getConfig();
-        return config.hasIndicatorBands()
-            && config.getIndicatorBands().hasColIndicatorTop()
-            && config.getIndicatorBands().getColIndicatorTop().getVisible();
+        return config.hasIndicators()
+            && config.getIndicators().hasColTop()
+            && config.getIndicators().getColTop().getVisible();
     }
 
     public boolean isShowColumnHeaders() throws SynurangDesktopBridge.SynurangBridgeException {
@@ -137,9 +137,9 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     public void setShowColumnHeaders(boolean value) throws SynurangDesktopBridge.SynurangBridgeException {
         configure(
             GridConfig.newBuilder()
-                .setIndicatorBands(
-                    IndicatorBandsConfig.newBuilder()
-                        .setColIndicatorTop(
+                .setIndicators(
+                    IndicatorsConfig.newBuilder()
+                        .setColTop(
                             ColIndicatorConfig.newBuilder()
                                 .setVisible(value)
                                 .build()
@@ -153,19 +153,19 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     @Override
     public int getColumnIndicatorTopModeBits() throws SynurangDesktopBridge.SynurangBridgeException {
         GridConfig config = getConfig();
-        if (!config.hasIndicatorBands() || !config.getIndicatorBands().hasColIndicatorTop()) {
+        if (!config.hasIndicators() || !config.getIndicators().hasColTop()) {
             return 0;
         }
-        return config.getIndicatorBands().getColIndicatorTop().getModeBits();
+        return config.getIndicators().getColTop().getModeBits();
     }
 
     @Override
     public void setColumnIndicatorTopModeBits(int value) throws SynurangDesktopBridge.SynurangBridgeException {
         configure(
             GridConfig.newBuilder()
-                .setIndicatorBands(
-                    IndicatorBandsConfig.newBuilder()
-                        .setColIndicatorTop(
+                .setIndicators(
+                    IndicatorsConfig.newBuilder()
+                        .setColTop(
                             ColIndicatorConfig.newBuilder()
                                 .setModeBits(value)
                                 .build()
@@ -179,10 +179,10 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     @Override
     public int getColumnIndicatorTopRowCount() throws SynurangDesktopBridge.SynurangBridgeException {
         GridConfig config = getConfig();
-        if (!config.hasIndicatorBands() || !config.getIndicatorBands().hasColIndicatorTop()) {
+        if (!config.hasIndicators() || !config.getIndicators().hasColTop()) {
             return 0;
         }
-        return config.getIndicatorBands().getColIndicatorTop().getBandRows();
+        return config.getIndicators().getColTop().getBandRows();
     }
 
     @Override
@@ -190,9 +190,9 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         int normalized = Math.max(0, value);
         configure(
             GridConfig.newBuilder()
-                .setIndicatorBands(
-                    IndicatorBandsConfig.newBuilder()
-                        .setColIndicatorTop(
+                .setIndicators(
+                    IndicatorsConfig.newBuilder()
+                        .setColTop(
                             ColIndicatorConfig.newBuilder()
                                 .setBandRows(normalized)
                                 .build()
@@ -206,9 +206,9 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     @Override
     public boolean getShowRowIndicator() throws SynurangDesktopBridge.SynurangBridgeException {
         GridConfig config = getConfig();
-        return config.hasIndicatorBands()
-            && config.getIndicatorBands().hasRowIndicatorStart()
-            && config.getIndicatorBands().getRowIndicatorStart().getVisible();
+        return config.hasIndicators()
+            && config.getIndicators().hasRowStart()
+            && config.getIndicators().getRowStart().getVisible();
     }
 
     public boolean isShowRowIndicator() throws SynurangDesktopBridge.SynurangBridgeException {
@@ -219,9 +219,9 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     public void setShowRowIndicator(boolean value) throws SynurangDesktopBridge.SynurangBridgeException {
         configure(
             GridConfig.newBuilder()
-                .setIndicatorBands(
-                    IndicatorBandsConfig.newBuilder()
-                        .setRowIndicatorStart(
+                .setIndicators(
+                    IndicatorsConfig.newBuilder()
+                        .setRowStart(
                             RowIndicatorConfig.newBuilder()
                                 .setVisible(value)
                                 .build()
@@ -235,19 +235,19 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     @Override
     public int getRowIndicatorStartModeBits() throws SynurangDesktopBridge.SynurangBridgeException {
         GridConfig config = getConfig();
-        if (!config.hasIndicatorBands() || !config.getIndicatorBands().hasRowIndicatorStart()) {
+        if (!config.hasIndicators() || !config.getIndicators().hasRowStart()) {
             return 0;
         }
-        return config.getIndicatorBands().getRowIndicatorStart().getModeBits();
+        return config.getIndicators().getRowStart().getModeBits();
     }
 
     @Override
     public void setRowIndicatorStartModeBits(int value) throws SynurangDesktopBridge.SynurangBridgeException {
         configure(
             GridConfig.newBuilder()
-                .setIndicatorBands(
-                    IndicatorBandsConfig.newBuilder()
-                        .setRowIndicatorStart(
+                .setIndicators(
+                    IndicatorsConfig.newBuilder()
+                        .setRowStart(
                             RowIndicatorConfig.newBuilder()
                                 .setModeBits(value)
                                 .build()
@@ -261,21 +261,21 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     @Override
     public int getRowIndicatorStartWidth() throws SynurangDesktopBridge.SynurangBridgeException {
         GridConfig config = getConfig();
-        if (!config.hasIndicatorBands() || !config.getIndicatorBands().hasRowIndicatorStart()) {
+        if (!config.hasIndicators() || !config.getIndicators().hasRowStart()) {
             return DEFAULT_ROW_INDICATOR_WIDTH_PX;
         }
-        return config.getIndicatorBands().getRowIndicatorStart().getWidthPx();
+        return config.getIndicators().getRowStart().getWidth();
     }
 
     @Override
     public void setRowIndicatorStartWidth(int value) throws SynurangDesktopBridge.SynurangBridgeException {
         configure(
             GridConfig.newBuilder()
-                .setIndicatorBands(
-                    IndicatorBandsConfig.newBuilder()
-                        .setRowIndicatorStart(
+                .setIndicators(
+                    IndicatorsConfig.newBuilder()
+                        .setRowStart(
                             RowIndicatorConfig.newBuilder()
-                                .setWidthPx(Math.max(1, value))
+                                .setWidth(Math.max(1, value))
                                 .build()
                         )
                         .build()
@@ -341,14 +341,14 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         if (!config.hasEditing()) {
             return EditTrigger.EDIT_TRIGGER_NONE;
         }
-        return config.getEditing().getEditTrigger();
+        return config.getEditing().getTrigger();
     }
 
     public void setEditTrigger(EditTrigger value) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(value, "value");
         configure(
             GridConfig.newBuilder()
-                .setEditing(EditConfig.newBuilder().setEditTrigger(value).build())
+                .setEditing(EditConfig.newBuilder().setTrigger(value).build())
                 .build()
         );
     }
@@ -665,8 +665,8 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
                 .setGroupOnCol(groupOnCol)
                 .setAggregateCol(aggregateCol)
                 .setCaption(caption == null ? "" : caption)
-                .setBackColor((int) backColor)
-                .setForeColor((int) foreColor)
+                .setBackground((int) backColor)
+                .setForeground((int) foreColor)
                 .setAddOutline(addOutline)
                 .build()
         );
@@ -823,7 +823,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     @Override
     public void sort(int col, boolean ascending) throws SynurangDesktopBridge.SynurangBridgeException {
         sort(
-            ascending ? SortOrder.SORT_GENERIC_ASCENDING : SortOrder.SORT_GENERIC_DESCENDING,
+            ascending ? SortOrder.SORT_ASCENDING : SortOrder.SORT_DESCENDING,
             col
         );
     }

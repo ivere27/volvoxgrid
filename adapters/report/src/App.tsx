@@ -10,6 +10,18 @@ type CanonicalVolvoxGrid = VolvoxGrid & {
   frozenRowCount: number;
   frozenColCount: number;
   setCellText(row: number, col: number, text: string): void;
+  setCellStyle(
+    row: number,
+    col: number,
+    style: {
+      background?: number;
+      foreground?: number;
+      align?: number;
+      font?: {
+        bold?: boolean;
+      };
+    },
+  ): void;
 };
 
 const FONT_FETCH_TIMEOUT_MS = 3000;
@@ -25,7 +37,7 @@ page:
 bands:
   - type: "header"
     height: 40
-    style: { back_color: "#2c3e50", fore_color: "#ffffff", bold: true }
+    style: { background: "#2c3e50", foreground: "#ffffff", bold: true }
     cells:
       - { text: "PRODUCT", width: 300 }
       - { text: "QTY", width: 100, align: "right" }
@@ -40,6 +52,21 @@ bands:
       - { text: "499.00", width: 150, align: "right" }
       - { text: "4990.00", width: 150, align: "right" }
 `;
+
+function parseArgbColor(value: unknown): number | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("#")) {
+    return undefined;
+  }
+  const hex = trimmed.slice(1);
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) {
+    return undefined;
+  }
+  return Number.parseInt(`FF${hex}`, 16);
+}
 
 async function fetchFontWithTimeout(url: string): Promise<Uint8Array | null> {
   const ctrl = new AbortController();
@@ -218,11 +245,11 @@ export default function App() {
             
             if (band.style || cell.style) {
               const s = { ...(band.style || {}), ...(cell.style || {}) };
-              grid.setCellStyleOverride(currentRow, currentCol, {
-                backColor: s.back_color ? parseInt(s.back_color.replace("#", "0xFF"), 16) : undefined,
-                foreColor: s.fore_color ? parseInt(s.fore_color.replace("#", "0xFF"), 16) : undefined,
-                fontBold: s.bold,
-                alignment: s.align === "right" ? 2 : (s.align === "center" ? 1 : 0),
+              grid.setCellStyle(currentRow, currentCol, {
+                background: parseArgbColor(s.background ?? s.back_color),
+                foreground: parseArgbColor(s.foreground ?? s.fore_color),
+                font: s.bold == null ? undefined : { bold: Boolean(s.bold) },
+                align: s.align === "right" ? 2 : (s.align === "center" ? 1 : 0),
               });
             }
             currentCol++;

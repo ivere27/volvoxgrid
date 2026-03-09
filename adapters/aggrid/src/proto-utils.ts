@@ -70,12 +70,80 @@ function encodeDouble(value: number): number[] {
   return Array.from(new Uint8Array(buf));
 }
 
+function encodeFloat(value: number): number[] {
+  const buf = new ArrayBuffer(4);
+  const view = new DataView(buf);
+  view.setFloat32(0, value, true);
+  return Array.from(new Uint8Array(buf));
+}
+
 function encodeMessageField(field: number, payload: number[]): number[] {
   return [
     ...encodeTag(field, 2),
     ...encodeVarintUnsigned(BigInt(payload.length)),
     ...payload,
   ];
+}
+
+function encodeStringField(field: number, value: string): number[] {
+  const text = encodeString(value);
+  return [
+    ...encodeTag(field, 2),
+    ...encodeVarintUnsigned(BigInt(text.length)),
+    ...text,
+  ];
+}
+
+interface FontArg {
+  family?: string;
+  size?: number;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strikethrough?: boolean;
+  width?: number;
+}
+
+interface BorderArg {
+  style?: number;
+  color?: number;
+}
+
+interface BordersArg {
+  all?: BorderArg;
+  top?: BorderArg;
+  right?: BorderArg;
+  bottom?: BorderArg;
+  left?: BorderArg;
+}
+
+function encodeFont(font: FontArg): number[] {
+  const out: number[] = [];
+  if (font.family != null) out.push(...encodeStringField(1, font.family));
+  if (font.size != null) out.push(...encodeTag(3, 5), ...encodeFloat(font.size));
+  if (font.bold != null) out.push(...encodeTag(4, 0), ...encodeBool(font.bold));
+  if (font.italic != null) out.push(...encodeTag(5, 0), ...encodeBool(font.italic));
+  if (font.underline != null) out.push(...encodeTag(6, 0), ...encodeBool(font.underline));
+  if (font.strikethrough != null) out.push(...encodeTag(7, 0), ...encodeBool(font.strikethrough));
+  if (font.width != null) out.push(...encodeTag(8, 5), ...encodeFloat(font.width));
+  return out;
+}
+
+function encodeBorder(border: BorderArg): number[] {
+  const out: number[] = [];
+  if (border.style != null) out.push(...encodeTag(1, 0), ...encodeInt32(border.style));
+  if (border.color != null) out.push(...encodeTag(2, 0), ...encodeVarintUnsigned(BigInt(border.color >>> 0)));
+  return out;
+}
+
+function encodeBorders(borders: BordersArg): number[] {
+  const out: number[] = [];
+  if (borders.all) out.push(...encodeMessageField(1, encodeBorder(borders.all)));
+  if (borders.top) out.push(...encodeMessageField(2, encodeBorder(borders.top)));
+  if (borders.right) out.push(...encodeMessageField(3, encodeBorder(borders.right)));
+  if (borders.bottom) out.push(...encodeMessageField(4, encodeBorder(borders.bottom)));
+  if (borders.left) out.push(...encodeMessageField(5, encodeBorder(borders.left)));
+  return out;
 }
 
 function encodeCellValue(value: unknown): number[] {
@@ -275,8 +343,11 @@ export function encodeUpdateBoldCellsRequest(args: {
 
   for (const update of args.updates) {
     const style: number[] = [];
-    // CellStyleOverride.font_bold = 7
-    style.push(...encodeTag(7, 0), ...encodeBool(update.bold));
+    const font = encodeFont({ bold: update.bold });
+    if (font.length > 0) {
+      // CellStyle.font = 4
+      style.push(...encodeMessageField(4, font));
+    }
 
     const cellUpdate: number[] = [];
     // CellUpdate.row = 1
@@ -316,15 +387,15 @@ export function encodeUpdateCellPaddingRequest(args: {
 
   for (const update of args.updates) {
     const padding: number[] = [];
-    // CellPadding fields (left=1, top=2, right=3, bottom=4)
+    // Padding fields (left=1, top=2, right=3, bottom=4)
     padding.push(...encodeTag(1, 0), ...encodeInt32(update.left));
     padding.push(...encodeTag(2, 0), ...encodeInt32(update.top));
     padding.push(...encodeTag(3, 0), ...encodeInt32(update.right));
     padding.push(...encodeTag(4, 0), ...encodeInt32(update.bottom));
 
     const style: number[] = [];
-    // CellStyleOverride.padding = 16
-    style.push(...encodeTag(16, 2), ...encodeVarintUnsigned(BigInt(padding.length)), ...padding);
+    // CellStyle.padding = 5
+    style.push(...encodeMessageField(5, padding));
 
     const cellUpdate: number[] = [];
     // CellUpdate.row = 1
@@ -382,77 +453,61 @@ export function encodeUpdateCellBordersRequest(args: {
     ) {
       const padding: number[] = [];
       if (typeof update.left === "number") {
-        // CellPadding.left = 1
+        // Padding.left = 1
         padding.push(...encodeTag(1, 0), ...encodeInt32(update.left));
       }
       if (typeof update.top === "number") {
-        // CellPadding.top = 2
+        // Padding.top = 2
         padding.push(...encodeTag(2, 0), ...encodeInt32(update.top));
       }
       if (typeof update.right === "number") {
-        // CellPadding.right = 3
+        // Padding.right = 3
         padding.push(...encodeTag(3, 0), ...encodeInt32(update.right));
       }
       if (typeof update.bottom === "number") {
-        // CellPadding.bottom = 4
+        // Padding.bottom = 4
         padding.push(...encodeTag(4, 0), ...encodeInt32(update.bottom));
       }
       if (padding.length > 0) {
-        // CellStyleOverride.padding = 16
-        style.push(...encodeTag(16, 2), ...encodeVarintUnsigned(BigInt(padding.length)), ...padding);
+        // CellStyle.padding = 5
+        style.push(...encodeMessageField(5, padding));
       }
     }
-    if (typeof update.border === "number") {
-      // CellStyleOverride.border = 14
-      style.push(...encodeTag(14, 0), ...encodeInt32(update.border));
+    const borders: BordersArg = {};
+    if (typeof update.border === "number" || typeof update.borderColor === "number") {
+      borders.all = {
+        style: update.border,
+        color: update.borderColor,
+      };
     }
-    if (typeof update.borderColor === "number") {
-      // CellStyleOverride.border_color = 15
-      style.push(...encodeTag(15, 0), ...encodeVarintUnsigned(BigInt(update.borderColor >>> 0)));
+    if (typeof update.borderTop === "number" || typeof update.borderTopColor === "number") {
+      borders.top = {
+        style: update.borderTop,
+        color: update.borderTopColor,
+      };
     }
-    if (typeof update.borderTop === "number") {
-      // CellStyleOverride.border_top = 17
-      style.push(...encodeTag(17, 0), ...encodeInt32(update.borderTop));
+    if (typeof update.borderRight === "number" || typeof update.borderRightColor === "number") {
+      borders.right = {
+        style: update.borderRight,
+        color: update.borderRightColor,
+      };
     }
-    if (typeof update.borderRight === "number") {
-      // CellStyleOverride.border_right = 18
-      style.push(...encodeTag(18, 0), ...encodeInt32(update.borderRight));
+    if (typeof update.borderBottom === "number" || typeof update.borderBottomColor === "number") {
+      borders.bottom = {
+        style: update.borderBottom,
+        color: update.borderBottomColor,
+      };
     }
-    if (typeof update.borderBottom === "number") {
-      // CellStyleOverride.border_bottom = 19
-      style.push(...encodeTag(19, 0), ...encodeInt32(update.borderBottom));
+    if (typeof update.borderLeft === "number" || typeof update.borderLeftColor === "number") {
+      borders.left = {
+        style: update.borderLeft,
+        color: update.borderLeftColor,
+      };
     }
-    if (typeof update.borderLeft === "number") {
-      // CellStyleOverride.border_left = 20
-      style.push(...encodeTag(20, 0), ...encodeInt32(update.borderLeft));
-    }
-    if (typeof update.borderTopColor === "number") {
-      // CellStyleOverride.border_top_color = 21
-      style.push(
-        ...encodeTag(21, 0),
-        ...encodeVarintUnsigned(BigInt(update.borderTopColor >>> 0)),
-      );
-    }
-    if (typeof update.borderRightColor === "number") {
-      // CellStyleOverride.border_right_color = 22
-      style.push(
-        ...encodeTag(22, 0),
-        ...encodeVarintUnsigned(BigInt(update.borderRightColor >>> 0)),
-      );
-    }
-    if (typeof update.borderBottomColor === "number") {
-      // CellStyleOverride.border_bottom_color = 23
-      style.push(
-        ...encodeTag(23, 0),
-        ...encodeVarintUnsigned(BigInt(update.borderBottomColor >>> 0)),
-      );
-    }
-    if (typeof update.borderLeftColor === "number") {
-      // CellStyleOverride.border_left_color = 24
-      style.push(
-        ...encodeTag(24, 0),
-        ...encodeVarintUnsigned(BigInt(update.borderLeftColor >>> 0)),
-      );
+    const bordersPayload = encodeBorders(borders);
+    if (bordersPayload.length > 0) {
+      // CellStyle.borders = 6
+      style.push(...encodeMessageField(6, bordersPayload));
     }
 
     if (style.length === 0) {

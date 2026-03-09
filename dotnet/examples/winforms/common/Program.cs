@@ -392,8 +392,8 @@ namespace VolvoxGrid.DotNet.Sample
             _grid.AllowSelection = true;
             _grid.ScrollBars = VolvoxGridScrollBarsMode.Both;
             _grid.FastScrollEnabled = true;
-            _grid.AllowUserResizing = VolvoxGridAllowUserResizingMode.Both;
-            _grid.HeaderFeatures = VolvoxGridHeaderFeatures.SortReorderChooser;
+            _grid.ResizePolicy = new VolvoxGridResizePolicy { Columns = true, Rows = true, Uniform = false };
+            _grid.HeaderFeatures = new VolvoxGridHeaderFeatures { Sort = true, Reorder = true, Chooser = false };
             _grid.TreeIndicator = VolvoxGridTreeIndicatorStyle.Arrows;
             _grid.CellSpanMode = VolvoxGridCellSpanMode.None;
             _grid.AnimationEnabled = true;

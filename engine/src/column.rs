@@ -1,4 +1,4 @@
-use crate::style::CellPadding;
+use crate::style::Padding;
 
 /// Per-column properties
 #[derive(Clone, Debug)]
@@ -29,9 +29,9 @@ pub struct ColumnProps {
     /// Visual sticky edge: 0=none, 3=LEFT, 4=RIGHT.
     pub sticky: i32,
     /// Optional per-column text insets for non-fixed cells.
-    pub cell_padding: Option<CellPadding>,
+    pub cell_padding: Option<Padding>,
     /// Optional per-column text insets for fixed/header cells.
-    pub fixed_cell_padding: Option<CellPadding>,
+    pub fixed_cell_padding: Option<Padding>,
     /// Whether null/empty writes are allowed for this column.
     pub nullable: bool,
     /// Inbound coercion behavior (`v1::CoercionMode` value).

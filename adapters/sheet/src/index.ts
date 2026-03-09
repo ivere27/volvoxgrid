@@ -6,6 +6,8 @@ export type {
   CellRef,
   CellRange,
   CellStyleUpdate,
+  SheetBeforeEditDetail,
+  SheetCellEditValidatingDetail,
   SpreadsheetAction,
   KeyContext,
   KeyBinding,

@@ -22,94 +22,651 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'volvoxgrid.pbenum.dart';
 
-class Empty extends $pb.GeneratedMessage {
-  factory Empty() => create();
-
-  Empty._();
-
-  factory Empty.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory Empty.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'Empty',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
-      createEmptyInstance: create)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  Empty clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  Empty copyWith(void Function(Empty) updates) =>
-      super.copyWith((message) => updates(message as Empty)) as Empty;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static Empty create() => Empty._();
-  @$core.override
-  Empty createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static Empty getDefault() =>
-      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Empty>(create);
-  static Empty? _defaultInstance;
-}
-
-class GridHandle extends $pb.GeneratedMessage {
-  factory GridHandle({
-    $fixnum.Int64? id,
+class Font extends $pb.GeneratedMessage {
+  factory Font({
+    $core.String? family,
+    $core.Iterable<$core.String>? families,
+    $core.double? size,
+    $core.bool? bold,
+    $core.bool? italic,
+    $core.bool? underline,
+    $core.bool? strikethrough,
+    $core.double? width,
   }) {
     final result = create();
-    if (id != null) result.id = id;
+    if (family != null) result.family = family;
+    if (families != null) result.families.addAll(families);
+    if (size != null) result.size = size;
+    if (bold != null) result.bold = bold;
+    if (italic != null) result.italic = italic;
+    if (underline != null) result.underline = underline;
+    if (strikethrough != null) result.strikethrough = strikethrough;
+    if (width != null) result.width = width;
     return result;
   }
 
-  GridHandle._();
+  Font._();
 
-  factory GridHandle.fromBuffer($core.List<$core.int> data,
+  factory Font.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory GridHandle.fromJson($core.String json,
+  factory Font.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'GridHandle',
+      _omitMessageNames ? '' : 'Font',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aInt64(1, _omitFieldNames ? '' : 'id')
+    ..aOS(1, _omitFieldNames ? '' : 'family')
+    ..pPS(2, _omitFieldNames ? '' : 'families')
+    ..aD(3, _omitFieldNames ? '' : 'size', fieldType: $pb.PbFieldType.OF)
+    ..aOB(4, _omitFieldNames ? '' : 'bold')
+    ..aOB(5, _omitFieldNames ? '' : 'italic')
+    ..aOB(6, _omitFieldNames ? '' : 'underline')
+    ..aOB(7, _omitFieldNames ? '' : 'strikethrough')
+    ..aD(8, _omitFieldNames ? '' : 'width', fieldType: $pb.PbFieldType.OF)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  GridHandle clone() => deepCopy();
+  Font clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  GridHandle copyWith(void Function(GridHandle) updates) =>
-      super.copyWith((message) => updates(message as GridHandle)) as GridHandle;
+  Font copyWith(void Function(Font) updates) =>
+      super.copyWith((message) => updates(message as Font)) as Font;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static GridHandle create() => GridHandle._();
+  static Font create() => Font._();
   @$core.override
-  GridHandle createEmptyInstance() => create();
+  Font createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static GridHandle getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<GridHandle>(create);
-  static GridHandle? _defaultInstance;
+  static Font getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Font>(create);
+  static Font? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $fixnum.Int64 get id => $_getI64(0);
+  $core.String get family => $_getSZ(0);
   @$pb.TagNumber(1)
-  set id($fixnum.Int64 value) => $_setInt64(0, value);
+  set family($core.String value) => $_setString(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasId() => $_has(0);
+  $core.bool hasFamily() => $_has(0);
   @$pb.TagNumber(1)
-  void clearId() => $_clearField(1);
+  void clearFamily() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $pb.PbList<$core.String> get families => $_getList(1);
+
+  @$pb.TagNumber(3)
+  $core.double get size => $_getN(2);
+  @$pb.TagNumber(3)
+  set size($core.double value) => $_setFloat(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSize() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSize() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get bold => $_getBF(3);
+  @$pb.TagNumber(4)
+  set bold($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasBold() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearBold() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get italic => $_getBF(4);
+  @$pb.TagNumber(5)
+  set italic($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasItalic() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearItalic() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get underline => $_getBF(5);
+  @$pb.TagNumber(6)
+  set underline($core.bool value) => $_setBool(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasUnderline() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearUnderline() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get strikethrough => $_getBF(6);
+  @$pb.TagNumber(7)
+  set strikethrough($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasStrikethrough() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearStrikethrough() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.double get width => $_getN(7);
+  @$pb.TagNumber(8)
+  set width($core.double value) => $_setFloat(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasWidth() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearWidth() => $_clearField(8);
+}
+
+class Padding extends $pb.GeneratedMessage {
+  factory Padding({
+    $core.int? left,
+    $core.int? top,
+    $core.int? right,
+    $core.int? bottom,
+  }) {
+    final result = create();
+    if (left != null) result.left = left;
+    if (top != null) result.top = top;
+    if (right != null) result.right = right;
+    if (bottom != null) result.bottom = bottom;
+    return result;
+  }
+
+  Padding._();
+
+  factory Padding.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory Padding.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Padding',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'left')
+    ..aI(2, _omitFieldNames ? '' : 'top')
+    ..aI(3, _omitFieldNames ? '' : 'right')
+    ..aI(4, _omitFieldNames ? '' : 'bottom')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Padding clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Padding copyWith(void Function(Padding) updates) =>
+      super.copyWith((message) => updates(message as Padding)) as Padding;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static Padding create() => Padding._();
+  @$core.override
+  Padding createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static Padding getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Padding>(create);
+  static Padding? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get left => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set left($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasLeft() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearLeft() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get top => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set top($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTop() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTop() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get right => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set right($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRight() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRight() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get bottom => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set bottom($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasBottom() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearBottom() => $_clearField(4);
+}
+
+class Border extends $pb.GeneratedMessage {
+  factory Border({
+    BorderStyle? style,
+    $core.int? color,
+  }) {
+    final result = create();
+    if (style != null) result.style = style;
+    if (color != null) result.color = color;
+    return result;
+  }
+
+  Border._();
+
+  factory Border.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory Border.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Border',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aE<BorderStyle>(1, _omitFieldNames ? '' : 'style',
+        enumValues: BorderStyle.values)
+    ..aI(2, _omitFieldNames ? '' : 'color', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Border clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Border copyWith(void Function(Border) updates) =>
+      super.copyWith((message) => updates(message as Border)) as Border;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static Border create() => Border._();
+  @$core.override
+  Border createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static Border getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Border>(create);
+  static Border? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  BorderStyle get style => $_getN(0);
+  @$pb.TagNumber(1)
+  set style(BorderStyle value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStyle() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStyle() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get color => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set color($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasColor() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearColor() => $_clearField(2);
+}
+
+/// Per-edge borders with a shorthand `all` field.
+/// Resolution: per-edge > all > inherited.
+class Borders extends $pb.GeneratedMessage {
+  factory Borders({
+    Border? all,
+    Border? top,
+    Border? right,
+    Border? bottom,
+    Border? left,
+  }) {
+    final result = create();
+    if (all != null) result.all = all;
+    if (top != null) result.top = top;
+    if (right != null) result.right = right;
+    if (bottom != null) result.bottom = bottom;
+    if (left != null) result.left = left;
+    return result;
+  }
+
+  Borders._();
+
+  factory Borders.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory Borders.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Borders',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOM<Border>(1, _omitFieldNames ? '' : 'all', subBuilder: Border.create)
+    ..aOM<Border>(2, _omitFieldNames ? '' : 'top', subBuilder: Border.create)
+    ..aOM<Border>(3, _omitFieldNames ? '' : 'right', subBuilder: Border.create)
+    ..aOM<Border>(4, _omitFieldNames ? '' : 'bottom', subBuilder: Border.create)
+    ..aOM<Border>(5, _omitFieldNames ? '' : 'left', subBuilder: Border.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Borders clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Borders copyWith(void Function(Borders) updates) =>
+      super.copyWith((message) => updates(message as Borders)) as Borders;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static Borders create() => Borders._();
+  @$core.override
+  Borders createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static Borders getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Borders>(create);
+  static Borders? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  Border get all => $_getN(0);
+  @$pb.TagNumber(1)
+  set all(Border value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasAll() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAll() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Border ensureAll() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  Border get top => $_getN(1);
+  @$pb.TagNumber(2)
+  set top(Border value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTop() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTop() => $_clearField(2);
+  @$pb.TagNumber(2)
+  Border ensureTop() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  Border get right => $_getN(2);
+  @$pb.TagNumber(3)
+  set right(Border value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRight() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRight() => $_clearField(3);
+  @$pb.TagNumber(3)
+  Border ensureRight() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  Border get bottom => $_getN(3);
+  @$pb.TagNumber(4)
+  set bottom(Border value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasBottom() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearBottom() => $_clearField(4);
+  @$pb.TagNumber(4)
+  Border ensureBottom() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  Border get left => $_getN(4);
+  @$pb.TagNumber(5)
+  set left(Border value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasLeft() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearLeft() => $_clearField(5);
+  @$pb.TagNumber(5)
+  Border ensureLeft() => $_ensure(4);
+}
+
+class GridLines extends $pb.GeneratedMessage {
+  factory GridLines({
+    GridLineStyle? style,
+    GridLineDirection? direction,
+    $core.int? color,
+    $core.int? width,
+  }) {
+    final result = create();
+    if (style != null) result.style = style;
+    if (direction != null) result.direction = direction;
+    if (color != null) result.color = color;
+    if (width != null) result.width = width;
+    return result;
+  }
+
+  GridLines._();
+
+  factory GridLines.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GridLines.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GridLines',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aE<GridLineStyle>(1, _omitFieldNames ? '' : 'style',
+        enumValues: GridLineStyle.values)
+    ..aE<GridLineDirection>(2, _omitFieldNames ? '' : 'direction',
+        enumValues: GridLineDirection.values)
+    ..aI(3, _omitFieldNames ? '' : 'color', fieldType: $pb.PbFieldType.OU3)
+    ..aI(4, _omitFieldNames ? '' : 'width')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GridLines clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GridLines copyWith(void Function(GridLines) updates) =>
+      super.copyWith((message) => updates(message as GridLines)) as GridLines;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GridLines create() => GridLines._();
+  @$core.override
+  GridLines createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GridLines getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<GridLines>(create);
+  static GridLines? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  GridLineStyle get style => $_getN(0);
+  @$pb.TagNumber(1)
+  set style(GridLineStyle value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStyle() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStyle() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  GridLineDirection get direction => $_getN(1);
+  @$pb.TagNumber(2)
+  set direction(GridLineDirection value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDirection() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDirection() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get color => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set color($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasColor() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearColor() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get width => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set width($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasWidth() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearWidth() => $_clearField(4);
+}
+
+class Separator extends $pb.GeneratedMessage {
+  factory Separator({
+    $core.bool? visible,
+    $core.int? color,
+    $core.int? width,
+  }) {
+    final result = create();
+    if (visible != null) result.visible = visible;
+    if (color != null) result.color = color;
+    if (width != null) result.width = width;
+    return result;
+  }
+
+  Separator._();
+
+  factory Separator.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory Separator.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Separator',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'visible')
+    ..aI(2, _omitFieldNames ? '' : 'color', fieldType: $pb.PbFieldType.OU3)
+    ..aI(3, _omitFieldNames ? '' : 'width')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Separator clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Separator copyWith(void Function(Separator) updates) =>
+      super.copyWith((message) => updates(message as Separator)) as Separator;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static Separator create() => Separator._();
+  @$core.override
+  Separator createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static Separator getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Separator>(create);
+  static Separator? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get visible => $_getBF(0);
+  @$pb.TagNumber(1)
+  set visible($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasVisible() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearVisible() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get color => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set color($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasColor() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearColor() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get width => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set width($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasWidth() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearWidth() => $_clearField(3);
+}
+
+class TextRendering extends $pb.GeneratedMessage {
+  factory TextRendering({
+    TextRenderMode? mode,
+    TextHintingMode? hinting,
+    $core.bool? pixelSnap,
+  }) {
+    final result = create();
+    if (mode != null) result.mode = mode;
+    if (hinting != null) result.hinting = hinting;
+    if (pixelSnap != null) result.pixelSnap = pixelSnap;
+    return result;
+  }
+
+  TextRendering._();
+
+  factory TextRendering.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TextRendering.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TextRendering',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aE<TextRenderMode>(1, _omitFieldNames ? '' : 'mode',
+        enumValues: TextRenderMode.values)
+    ..aE<TextHintingMode>(2, _omitFieldNames ? '' : 'hinting',
+        enumValues: TextHintingMode.values)
+    ..aOB(3, _omitFieldNames ? '' : 'pixelSnap')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TextRendering clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TextRendering copyWith(void Function(TextRendering) updates) =>
+      super.copyWith((message) => updates(message as TextRendering))
+          as TextRendering;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TextRendering create() => TextRendering._();
+  @$core.override
+  TextRendering createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TextRendering getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TextRendering>(create);
+  static TextRendering? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  TextRenderMode get mode => $_getN(0);
+  @$pb.TagNumber(1)
+  set mode(TextRenderMode value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMode() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMode() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  TextHintingMode get hinting => $_getN(1);
+  @$pb.TagNumber(2)
+  set hinting(TextHintingMode value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasHinting() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearHinting() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get pixelSnap => $_getBF(2);
+  @$pb.TagNumber(3)
+  set pixelSnap($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPixelSnap() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPixelSnap() => $_clearField(3);
 }
 
 class ImageData extends $pb.GeneratedMessage {
@@ -176,132 +733,6 @@ class ImageData extends $pb.GeneratedMessage {
   $core.bool hasFormat() => $_has(1);
   @$pb.TagNumber(2)
   void clearFormat() => $_clearField(2);
-}
-
-enum CellValue_Value { text, number, flag, data, timestamp, notSet }
-
-class CellValue extends $pb.GeneratedMessage {
-  factory CellValue({
-    $core.String? text,
-    $core.double? number,
-    $core.bool? flag,
-    $core.List<$core.int>? data,
-    $fixnum.Int64? timestamp,
-  }) {
-    final result = create();
-    if (text != null) result.text = text;
-    if (number != null) result.number = number;
-    if (flag != null) result.flag = flag;
-    if (data != null) result.data = data;
-    if (timestamp != null) result.timestamp = timestamp;
-    return result;
-  }
-
-  CellValue._();
-
-  factory CellValue.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory CellValue.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static const $core.Map<$core.int, CellValue_Value> _CellValue_ValueByTag = {
-    1: CellValue_Value.text,
-    2: CellValue_Value.number,
-    3: CellValue_Value.flag,
-    4: CellValue_Value.data,
-    5: CellValue_Value.timestamp,
-    0: CellValue_Value.notSet
-  };
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'CellValue',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
-      createEmptyInstance: create)
-    ..oo(0, [1, 2, 3, 4, 5])
-    ..aOS(1, _omitFieldNames ? '' : 'text')
-    ..aD(2, _omitFieldNames ? '' : 'number')
-    ..aOB(3, _omitFieldNames ? '' : 'flag')
-    ..a<$core.List<$core.int>>(
-        4, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
-    ..aInt64(5, _omitFieldNames ? '' : 'timestamp')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  CellValue clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  CellValue copyWith(void Function(CellValue) updates) =>
-      super.copyWith((message) => updates(message as CellValue)) as CellValue;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static CellValue create() => CellValue._();
-  @$core.override
-  CellValue createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static CellValue getDefault() =>
-      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<CellValue>(create);
-  static CellValue? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  @$pb.TagNumber(2)
-  @$pb.TagNumber(3)
-  @$pb.TagNumber(4)
-  @$pb.TagNumber(5)
-  CellValue_Value whichValue() => _CellValue_ValueByTag[$_whichOneof(0)]!;
-  @$pb.TagNumber(1)
-  @$pb.TagNumber(2)
-  @$pb.TagNumber(3)
-  @$pb.TagNumber(4)
-  @$pb.TagNumber(5)
-  void clearValue() => $_clearField($_whichOneof(0));
-
-  @$pb.TagNumber(1)
-  $core.String get text => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set text($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasText() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearText() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.double get number => $_getN(1);
-  @$pb.TagNumber(2)
-  set number($core.double value) => $_setDouble(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasNumber() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearNumber() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.bool get flag => $_getBF(2);
-  @$pb.TagNumber(3)
-  set flag($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasFlag() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearFlag() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.List<$core.int> get data => $_getN(3);
-  @$pb.TagNumber(4)
-  set data($core.List<$core.int> value) => $_setBytes(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasData() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearData() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $fixnum.Int64 get timestamp => $_getI64(4);
-  @$pb.TagNumber(5)
-  set timestamp($fixnum.Int64 value) => $_setInt64(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasTimestamp() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearTimestamp() => $_clearField(5);
 }
 
 class CellRange extends $pb.GeneratedMessage {
@@ -393,127 +824,457 @@ class CellRange extends $pb.GeneratedMessage {
   void clearCol2() => $_clearField(4);
 }
 
-class CellPadding extends $pb.GeneratedMessage {
-  factory CellPadding({
-    $core.int? left,
-    $core.int? top,
-    $core.int? right,
-    $core.int? bottom,
+enum CellValue_Value { text, number, flag, raw, timestamp, notSet }
+
+class CellValue extends $pb.GeneratedMessage {
+  factory CellValue({
+    $core.String? text,
+    $core.double? number,
+    $core.bool? flag,
+    $core.List<$core.int>? raw,
+    $fixnum.Int64? timestamp,
   }) {
     final result = create();
-    if (left != null) result.left = left;
-    if (top != null) result.top = top;
-    if (right != null) result.right = right;
-    if (bottom != null) result.bottom = bottom;
+    if (text != null) result.text = text;
+    if (number != null) result.number = number;
+    if (flag != null) result.flag = flag;
+    if (raw != null) result.raw = raw;
+    if (timestamp != null) result.timestamp = timestamp;
     return result;
   }
 
-  CellPadding._();
+  CellValue._();
 
-  factory CellPadding.fromBuffer($core.List<$core.int> data,
+  factory CellValue.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory CellPadding.fromJson($core.String json,
+  factory CellValue.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
+  static const $core.Map<$core.int, CellValue_Value> _CellValue_ValueByTag = {
+    1: CellValue_Value.text,
+    2: CellValue_Value.number,
+    3: CellValue_Value.flag,
+    4: CellValue_Value.raw,
+    5: CellValue_Value.timestamp,
+    0: CellValue_Value.notSet
+  };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'CellPadding',
+      _omitMessageNames ? '' : 'CellValue',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'left')
-    ..aI(2, _omitFieldNames ? '' : 'top')
-    ..aI(3, _omitFieldNames ? '' : 'right')
-    ..aI(4, _omitFieldNames ? '' : 'bottom')
+    ..oo(0, [1, 2, 3, 4, 5])
+    ..aOS(1, _omitFieldNames ? '' : 'text')
+    ..aD(2, _omitFieldNames ? '' : 'number')
+    ..aOB(3, _omitFieldNames ? '' : 'flag')
+    ..a<$core.List<$core.int>>(
+        4, _omitFieldNames ? '' : 'raw', $pb.PbFieldType.OY)
+    ..aInt64(5, _omitFieldNames ? '' : 'timestamp')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  CellPadding clone() => deepCopy();
+  CellValue clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  CellPadding copyWith(void Function(CellPadding) updates) =>
-      super.copyWith((message) => updates(message as CellPadding))
-          as CellPadding;
+  CellValue copyWith(void Function(CellValue) updates) =>
+      super.copyWith((message) => updates(message as CellValue)) as CellValue;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static CellPadding create() => CellPadding._();
+  static CellValue create() => CellValue._();
   @$core.override
-  CellPadding createEmptyInstance() => create();
+  CellValue createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static CellPadding getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<CellPadding>(create);
-  static CellPadding? _defaultInstance;
+  static CellValue getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<CellValue>(create);
+  static CellValue? _defaultInstance;
 
-  /// Pixel insets applied inside cell content bounds.
   @$pb.TagNumber(1)
-  $core.int get left => $_getIZ(0);
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  @$pb.TagNumber(5)
+  CellValue_Value whichValue() => _CellValue_ValueByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(1)
-  set left($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  @$pb.TagNumber(5)
+  void clearValue() => $_clearField($_whichOneof(0));
+
   @$pb.TagNumber(1)
-  $core.bool hasLeft() => $_has(0);
+  $core.String get text => $_getSZ(0);
   @$pb.TagNumber(1)
-  void clearLeft() => $_clearField(1);
+  set text($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasText() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearText() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get top => $_getIZ(1);
+  $core.double get number => $_getN(1);
   @$pb.TagNumber(2)
-  set top($core.int value) => $_setSignedInt32(1, value);
+  set number($core.double value) => $_setDouble(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasTop() => $_has(1);
+  $core.bool hasNumber() => $_has(1);
   @$pb.TagNumber(2)
-  void clearTop() => $_clearField(2);
+  void clearNumber() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.int get right => $_getIZ(2);
+  $core.bool get flag => $_getBF(2);
   @$pb.TagNumber(3)
-  set right($core.int value) => $_setSignedInt32(2, value);
+  set flag($core.bool value) => $_setBool(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasRight() => $_has(2);
+  $core.bool hasFlag() => $_has(2);
   @$pb.TagNumber(3)
-  void clearRight() => $_clearField(3);
+  void clearFlag() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.int get bottom => $_getIZ(3);
+  $core.List<$core.int> get raw => $_getN(3);
   @$pb.TagNumber(4)
-  set bottom($core.int value) => $_setSignedInt32(3, value);
+  set raw($core.List<$core.int> value) => $_setBytes(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasBottom() => $_has(3);
+  $core.bool hasRaw() => $_has(3);
   @$pb.TagNumber(4)
-  void clearBottom() => $_clearField(4);
+  void clearRaw() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get timestamp => $_getI64(4);
+  @$pb.TagNumber(5)
+  set timestamp($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasTimestamp() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearTimestamp() => $_clearField(5);
 }
 
+/// Override style for a region (fixed rows, frozen rows, etc.).
+/// Only set fields override the grid-level default.
+class RegionStyle extends $pb.GeneratedMessage {
+  factory RegionStyle({
+    $core.int? background,
+    $core.int? foreground,
+    Font? font,
+    GridLines? gridLines,
+    TextEffect? textEffect,
+    Separator? separator,
+    Padding? cellPadding,
+  }) {
+    final result = create();
+    if (background != null) result.background = background;
+    if (foreground != null) result.foreground = foreground;
+    if (font != null) result.font = font;
+    if (gridLines != null) result.gridLines = gridLines;
+    if (textEffect != null) result.textEffect = textEffect;
+    if (separator != null) result.separator = separator;
+    if (cellPadding != null) result.cellPadding = cellPadding;
+    return result;
+  }
+
+  RegionStyle._();
+
+  factory RegionStyle.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RegionStyle.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RegionStyle',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
+    ..aOM<Font>(3, _omitFieldNames ? '' : 'font', subBuilder: Font.create)
+    ..aOM<GridLines>(4, _omitFieldNames ? '' : 'gridLines',
+        subBuilder: GridLines.create)
+    ..aE<TextEffect>(5, _omitFieldNames ? '' : 'textEffect',
+        enumValues: TextEffect.values)
+    ..aOM<Separator>(6, _omitFieldNames ? '' : 'separator',
+        subBuilder: Separator.create)
+    ..aOM<Padding>(7, _omitFieldNames ? '' : 'cellPadding',
+        subBuilder: Padding.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RegionStyle clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RegionStyle copyWith(void Function(RegionStyle) updates) =>
+      super.copyWith((message) => updates(message as RegionStyle))
+          as RegionStyle;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RegionStyle create() => RegionStyle._();
+  @$core.override
+  RegionStyle createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RegionStyle getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RegionStyle>(create);
+  static RegionStyle? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get background => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set background($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBackground() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBackground() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get foreground => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set foreground($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasForeground() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearForeground() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  Font get font => $_getN(2);
+  @$pb.TagNumber(3)
+  set font(Font value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFont() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFont() => $_clearField(3);
+  @$pb.TagNumber(3)
+  Font ensureFont() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  GridLines get gridLines => $_getN(3);
+  @$pb.TagNumber(4)
+  set gridLines(GridLines value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasGridLines() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearGridLines() => $_clearField(4);
+  @$pb.TagNumber(4)
+  GridLines ensureGridLines() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  TextEffect get textEffect => $_getN(4);
+  @$pb.TagNumber(5)
+  set textEffect(TextEffect value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasTextEffect() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearTextEffect() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  Separator get separator => $_getN(5);
+  @$pb.TagNumber(6)
+  set separator(Separator value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasSeparator() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearSeparator() => $_clearField(6);
+  @$pb.TagNumber(6)
+  Separator ensureSeparator() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  Padding get cellPadding => $_getN(6);
+  @$pb.TagNumber(7)
+  set cellPadding(Padding value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasCellPadding() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearCellPadding() => $_clearField(7);
+  @$pb.TagNumber(7)
+  Padding ensureCellPadding() => $_ensure(6);
+}
+
+/// Per-cell style override. Composed from building blocks.
+class CellStyle extends $pb.GeneratedMessage {
+  factory CellStyle({
+    $core.int? background,
+    $core.int? foreground,
+    Align? align,
+    Font? font,
+    Padding? padding,
+    Borders? borders,
+    TextEffect? textEffect,
+    $core.double? progress,
+    $core.int? progressColor,
+    $core.bool? shrinkToFit,
+  }) {
+    final result = create();
+    if (background != null) result.background = background;
+    if (foreground != null) result.foreground = foreground;
+    if (align != null) result.align = align;
+    if (font != null) result.font = font;
+    if (padding != null) result.padding = padding;
+    if (borders != null) result.borders = borders;
+    if (textEffect != null) result.textEffect = textEffect;
+    if (progress != null) result.progress = progress;
+    if (progressColor != null) result.progressColor = progressColor;
+    if (shrinkToFit != null) result.shrinkToFit = shrinkToFit;
+    return result;
+  }
+
+  CellStyle._();
+
+  factory CellStyle.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CellStyle.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CellStyle',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
+    ..aE<Align>(3, _omitFieldNames ? '' : 'align', enumValues: Align.values)
+    ..aOM<Font>(4, _omitFieldNames ? '' : 'font', subBuilder: Font.create)
+    ..aOM<Padding>(5, _omitFieldNames ? '' : 'padding',
+        subBuilder: Padding.create)
+    ..aOM<Borders>(6, _omitFieldNames ? '' : 'borders',
+        subBuilder: Borders.create)
+    ..aE<TextEffect>(7, _omitFieldNames ? '' : 'textEffect',
+        enumValues: TextEffect.values)
+    ..aD(8, _omitFieldNames ? '' : 'progress', fieldType: $pb.PbFieldType.OF)
+    ..aI(9, _omitFieldNames ? '' : 'progressColor',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOB(10, _omitFieldNames ? '' : 'shrinkToFit')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CellStyle clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CellStyle copyWith(void Function(CellStyle) updates) =>
+      super.copyWith((message) => updates(message as CellStyle)) as CellStyle;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CellStyle create() => CellStyle._();
+  @$core.override
+  CellStyle createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CellStyle getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<CellStyle>(create);
+  static CellStyle? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get background => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set background($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBackground() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBackground() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get foreground => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set foreground($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasForeground() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearForeground() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  Align get align => $_getN(2);
+  @$pb.TagNumber(3)
+  set align(Align value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAlign() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAlign() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  Font get font => $_getN(3);
+  @$pb.TagNumber(4)
+  set font(Font value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasFont() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearFont() => $_clearField(4);
+  @$pb.TagNumber(4)
+  Font ensureFont() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  Padding get padding => $_getN(4);
+  @$pb.TagNumber(5)
+  set padding(Padding value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasPadding() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPadding() => $_clearField(5);
+  @$pb.TagNumber(5)
+  Padding ensurePadding() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  Borders get borders => $_getN(5);
+  @$pb.TagNumber(6)
+  set borders(Borders value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasBorders() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearBorders() => $_clearField(6);
+  @$pb.TagNumber(6)
+  Borders ensureBorders() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  TextEffect get textEffect => $_getN(6);
+  @$pb.TagNumber(7)
+  set textEffect(TextEffect value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasTextEffect() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearTextEffect() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.double get progress => $_getN(7);
+  @$pb.TagNumber(8)
+  set progress($core.double value) => $_setFloat(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasProgress() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearProgress() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get progressColor => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set progressColor($core.int value) => $_setUnsignedInt32(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasProgressColor() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearProgressColor() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.bool get shrinkToFit => $_getBF(9);
+  @$pb.TagNumber(10)
+  set shrinkToFit($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasShrinkToFit() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearShrinkToFit() => $_clearField(10);
+}
+
+/// Selection / hover highlight appearance.
 class HighlightStyle extends $pb.GeneratedMessage {
   factory HighlightStyle({
-    $core.int? backColor,
-    $core.int? foreColor,
-    BorderStyle? border,
-    $core.int? borderColor,
-    BorderStyle? borderTop,
-    BorderStyle? borderRight,
-    BorderStyle? borderBottom,
-    BorderStyle? borderLeft,
-    $core.int? borderTopColor,
-    $core.int? borderRightColor,
-    $core.int? borderBottomColor,
-    $core.int? borderLeftColor,
+    $core.int? background,
+    $core.int? foreground,
+    Borders? borders,
     FillHandlePosition? fillHandle,
     $core.int? fillHandleColor,
   }) {
     final result = create();
-    if (backColor != null) result.backColor = backColor;
-    if (foreColor != null) result.foreColor = foreColor;
-    if (border != null) result.border = border;
-    if (borderColor != null) result.borderColor = borderColor;
-    if (borderTop != null) result.borderTop = borderTop;
-    if (borderRight != null) result.borderRight = borderRight;
-    if (borderBottom != null) result.borderBottom = borderBottom;
-    if (borderLeft != null) result.borderLeft = borderLeft;
-    if (borderTopColor != null) result.borderTopColor = borderTopColor;
-    if (borderRightColor != null) result.borderRightColor = borderRightColor;
-    if (borderBottomColor != null) result.borderBottomColor = borderBottomColor;
-    if (borderLeftColor != null) result.borderLeftColor = borderLeftColor;
+    if (background != null) result.background = background;
+    if (foreground != null) result.foreground = foreground;
+    if (borders != null) result.borders = borders;
     if (fillHandle != null) result.fillHandle = fillHandle;
     if (fillHandleColor != null) result.fillHandleColor = fillHandleColor;
     return result;
@@ -532,31 +1293,13 @@ class HighlightStyle extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'HighlightStyle',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'backColor', fieldType: $pb.PbFieldType.OU3)
-    ..aI(2, _omitFieldNames ? '' : 'foreColor', fieldType: $pb.PbFieldType.OU3)
-    ..aE<BorderStyle>(3, _omitFieldNames ? '' : 'border',
-        enumValues: BorderStyle.values)
-    ..aI(4, _omitFieldNames ? '' : 'borderColor',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aE<BorderStyle>(5, _omitFieldNames ? '' : 'borderTop',
-        enumValues: BorderStyle.values)
-    ..aE<BorderStyle>(6, _omitFieldNames ? '' : 'borderRight',
-        enumValues: BorderStyle.values)
-    ..aE<BorderStyle>(7, _omitFieldNames ? '' : 'borderBottom',
-        enumValues: BorderStyle.values)
-    ..aE<BorderStyle>(8, _omitFieldNames ? '' : 'borderLeft',
-        enumValues: BorderStyle.values)
-    ..aI(9, _omitFieldNames ? '' : 'borderTopColor',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aI(10, _omitFieldNames ? '' : 'borderRightColor',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aI(11, _omitFieldNames ? '' : 'borderBottomColor',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aI(12, _omitFieldNames ? '' : 'borderLeftColor',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aE<FillHandlePosition>(13, _omitFieldNames ? '' : 'fillHandle',
+    ..aI(1, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
+    ..aOM<Borders>(3, _omitFieldNames ? '' : 'borders',
+        subBuilder: Borders.create)
+    ..aE<FillHandlePosition>(4, _omitFieldNames ? '' : 'fillHandle',
         enumValues: FillHandlePosition.values)
-    ..aI(14, _omitFieldNames ? '' : 'fillHandleColor',
+    ..aI(5, _omitFieldNames ? '' : 'fillHandleColor',
         fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
@@ -580,130 +1323,51 @@ class HighlightStyle extends $pb.GeneratedMessage {
   static HighlightStyle? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.int get backColor => $_getIZ(0);
+  $core.int get background => $_getIZ(0);
   @$pb.TagNumber(1)
-  set backColor($core.int value) => $_setUnsignedInt32(0, value);
+  set background($core.int value) => $_setUnsignedInt32(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasBackColor() => $_has(0);
+  $core.bool hasBackground() => $_has(0);
   @$pb.TagNumber(1)
-  void clearBackColor() => $_clearField(1);
+  void clearBackground() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get foreColor => $_getIZ(1);
+  $core.int get foreground => $_getIZ(1);
   @$pb.TagNumber(2)
-  set foreColor($core.int value) => $_setUnsignedInt32(1, value);
+  set foreground($core.int value) => $_setUnsignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasForeColor() => $_has(1);
+  $core.bool hasForeground() => $_has(1);
   @$pb.TagNumber(2)
-  void clearForeColor() => $_clearField(2);
+  void clearForeground() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  BorderStyle get border => $_getN(2);
+  Borders get borders => $_getN(2);
   @$pb.TagNumber(3)
-  set border(BorderStyle value) => $_setField(3, value);
+  set borders(Borders value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasBorder() => $_has(2);
+  $core.bool hasBorders() => $_has(2);
   @$pb.TagNumber(3)
-  void clearBorder() => $_clearField(3);
+  void clearBorders() => $_clearField(3);
+  @$pb.TagNumber(3)
+  Borders ensureBorders() => $_ensure(2);
 
   @$pb.TagNumber(4)
-  $core.int get borderColor => $_getIZ(3);
+  FillHandlePosition get fillHandle => $_getN(3);
   @$pb.TagNumber(4)
-  set borderColor($core.int value) => $_setUnsignedInt32(3, value);
+  set fillHandle(FillHandlePosition value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasBorderColor() => $_has(3);
+  $core.bool hasFillHandle() => $_has(3);
   @$pb.TagNumber(4)
-  void clearBorderColor() => $_clearField(4);
+  void clearFillHandle() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  BorderStyle get borderTop => $_getN(4);
+  $core.int get fillHandleColor => $_getIZ(4);
   @$pb.TagNumber(5)
-  set borderTop(BorderStyle value) => $_setField(5, value);
+  set fillHandleColor($core.int value) => $_setUnsignedInt32(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasBorderTop() => $_has(4);
+  $core.bool hasFillHandleColor() => $_has(4);
   @$pb.TagNumber(5)
-  void clearBorderTop() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  BorderStyle get borderRight => $_getN(5);
-  @$pb.TagNumber(6)
-  set borderRight(BorderStyle value) => $_setField(6, value);
-  @$pb.TagNumber(6)
-  $core.bool hasBorderRight() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearBorderRight() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  BorderStyle get borderBottom => $_getN(6);
-  @$pb.TagNumber(7)
-  set borderBottom(BorderStyle value) => $_setField(7, value);
-  @$pb.TagNumber(7)
-  $core.bool hasBorderBottom() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearBorderBottom() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  BorderStyle get borderLeft => $_getN(7);
-  @$pb.TagNumber(8)
-  set borderLeft(BorderStyle value) => $_setField(8, value);
-  @$pb.TagNumber(8)
-  $core.bool hasBorderLeft() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearBorderLeft() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $core.int get borderTopColor => $_getIZ(8);
-  @$pb.TagNumber(9)
-  set borderTopColor($core.int value) => $_setUnsignedInt32(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasBorderTopColor() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearBorderTopColor() => $_clearField(9);
-
-  @$pb.TagNumber(10)
-  $core.int get borderRightColor => $_getIZ(9);
-  @$pb.TagNumber(10)
-  set borderRightColor($core.int value) => $_setUnsignedInt32(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasBorderRightColor() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearBorderRightColor() => $_clearField(10);
-
-  @$pb.TagNumber(11)
-  $core.int get borderBottomColor => $_getIZ(10);
-  @$pb.TagNumber(11)
-  set borderBottomColor($core.int value) => $_setUnsignedInt32(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasBorderBottomColor() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearBorderBottomColor() => $_clearField(11);
-
-  @$pb.TagNumber(12)
-  $core.int get borderLeftColor => $_getIZ(11);
-  @$pb.TagNumber(12)
-  set borderLeftColor($core.int value) => $_setUnsignedInt32(11, value);
-  @$pb.TagNumber(12)
-  $core.bool hasBorderLeftColor() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearBorderLeftColor() => $_clearField(12);
-
-  @$pb.TagNumber(13)
-  FillHandlePosition get fillHandle => $_getN(12);
-  @$pb.TagNumber(13)
-  set fillHandle(FillHandlePosition value) => $_setField(13, value);
-  @$pb.TagNumber(13)
-  $core.bool hasFillHandle() => $_has(12);
-  @$pb.TagNumber(13)
-  void clearFillHandle() => $_clearField(13);
-
-  @$pb.TagNumber(14)
-  $core.int get fillHandleColor => $_getIZ(13);
-  @$pb.TagNumber(14)
-  set fillHandleColor($core.int value) => $_setUnsignedInt32(13, value);
-  @$pb.TagNumber(14)
-  $core.bool hasFillHandleColor() => $_has(13);
-  @$pb.TagNumber(14)
-  void clearFillHandleColor() => $_clearField(14);
+  void clearFillHandleColor() => $_clearField(5);
 }
 
 enum HeaderMarkSize_Value { ratio, px, notSet }
@@ -789,62 +1453,62 @@ class HeaderMarkSize extends $pb.GeneratedMessage {
   void clearPx() => $_clearField(2);
 }
 
-class HeaderSeparatorStyle extends $pb.GeneratedMessage {
-  factory HeaderSeparatorStyle({
+class HeaderSeparator extends $pb.GeneratedMessage {
+  factory HeaderSeparator({
     $core.bool? enabled,
     $core.int? color,
-    $core.int? widthPx,
+    $core.int? width,
     HeaderMarkSize? height,
     $core.bool? skipMerged,
   }) {
     final result = create();
     if (enabled != null) result.enabled = enabled;
     if (color != null) result.color = color;
-    if (widthPx != null) result.widthPx = widthPx;
+    if (width != null) result.width = width;
     if (height != null) result.height = height;
     if (skipMerged != null) result.skipMerged = skipMerged;
     return result;
   }
 
-  HeaderSeparatorStyle._();
+  HeaderSeparator._();
 
-  factory HeaderSeparatorStyle.fromBuffer($core.List<$core.int> data,
+  factory HeaderSeparator.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory HeaderSeparatorStyle.fromJson($core.String json,
+  factory HeaderSeparator.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'HeaderSeparatorStyle',
+      _omitMessageNames ? '' : 'HeaderSeparator',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'enabled')
     ..aI(2, _omitFieldNames ? '' : 'color', fieldType: $pb.PbFieldType.OU3)
-    ..aI(3, _omitFieldNames ? '' : 'widthPx')
+    ..aI(3, _omitFieldNames ? '' : 'width')
     ..aOM<HeaderMarkSize>(4, _omitFieldNames ? '' : 'height',
         subBuilder: HeaderMarkSize.create)
     ..aOB(5, _omitFieldNames ? '' : 'skipMerged')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  HeaderSeparatorStyle clone() => deepCopy();
+  HeaderSeparator clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  HeaderSeparatorStyle copyWith(void Function(HeaderSeparatorStyle) updates) =>
-      super.copyWith((message) => updates(message as HeaderSeparatorStyle))
-          as HeaderSeparatorStyle;
+  HeaderSeparator copyWith(void Function(HeaderSeparator) updates) =>
+      super.copyWith((message) => updates(message as HeaderSeparator))
+          as HeaderSeparator;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static HeaderSeparatorStyle create() => HeaderSeparatorStyle._();
+  static HeaderSeparator create() => HeaderSeparator._();
   @$core.override
-  HeaderSeparatorStyle createEmptyInstance() => create();
+  HeaderSeparator createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static HeaderSeparatorStyle getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<HeaderSeparatorStyle>(create);
-  static HeaderSeparatorStyle? _defaultInstance;
+  static HeaderSeparator getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<HeaderSeparator>(create);
+  static HeaderSeparator? _defaultInstance;
 
   @$pb.TagNumber(1)
   $core.bool get enabled => $_getBF(0);
@@ -865,13 +1529,13 @@ class HeaderSeparatorStyle extends $pb.GeneratedMessage {
   void clearColor() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.int get widthPx => $_getIZ(2);
+  $core.int get width => $_getIZ(2);
   @$pb.TagNumber(3)
-  set widthPx($core.int value) => $_setSignedInt32(2, value);
+  set width($core.int value) => $_setSignedInt32(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasWidthPx() => $_has(2);
+  $core.bool hasWidth() => $_has(2);
   @$pb.TagNumber(3)
-  void clearWidthPx() => $_clearField(3);
+  void clearWidth() => $_clearField(3);
 
   @$pb.TagNumber(4)
   HeaderMarkSize get height => $_getN(3);
@@ -894,67 +1558,66 @@ class HeaderSeparatorStyle extends $pb.GeneratedMessage {
   void clearSkipMerged() => $_clearField(5);
 }
 
-class HeaderResizeHandleStyle extends $pb.GeneratedMessage {
-  factory HeaderResizeHandleStyle({
+class HeaderResizeHandle extends $pb.GeneratedMessage {
+  factory HeaderResizeHandle({
     $core.bool? enabled,
     $core.int? color,
-    $core.int? widthPx,
+    $core.int? width,
     HeaderMarkSize? height,
-    $core.int? hitWidthPx,
+    $core.int? hitWidth,
     $core.bool? showOnlyWhenResizable,
   }) {
     final result = create();
     if (enabled != null) result.enabled = enabled;
     if (color != null) result.color = color;
-    if (widthPx != null) result.widthPx = widthPx;
+    if (width != null) result.width = width;
     if (height != null) result.height = height;
-    if (hitWidthPx != null) result.hitWidthPx = hitWidthPx;
+    if (hitWidth != null) result.hitWidth = hitWidth;
     if (showOnlyWhenResizable != null)
       result.showOnlyWhenResizable = showOnlyWhenResizable;
     return result;
   }
 
-  HeaderResizeHandleStyle._();
+  HeaderResizeHandle._();
 
-  factory HeaderResizeHandleStyle.fromBuffer($core.List<$core.int> data,
+  factory HeaderResizeHandle.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory HeaderResizeHandleStyle.fromJson($core.String json,
+  factory HeaderResizeHandle.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'HeaderResizeHandleStyle',
+      _omitMessageNames ? '' : 'HeaderResizeHandle',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'enabled')
     ..aI(2, _omitFieldNames ? '' : 'color', fieldType: $pb.PbFieldType.OU3)
-    ..aI(3, _omitFieldNames ? '' : 'widthPx')
+    ..aI(3, _omitFieldNames ? '' : 'width')
     ..aOM<HeaderMarkSize>(4, _omitFieldNames ? '' : 'height',
         subBuilder: HeaderMarkSize.create)
-    ..aI(5, _omitFieldNames ? '' : 'hitWidthPx')
+    ..aI(5, _omitFieldNames ? '' : 'hitWidth')
     ..aOB(6, _omitFieldNames ? '' : 'showOnlyWhenResizable')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  HeaderResizeHandleStyle clone() => deepCopy();
+  HeaderResizeHandle clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  HeaderResizeHandleStyle copyWith(
-          void Function(HeaderResizeHandleStyle) updates) =>
-      super.copyWith((message) => updates(message as HeaderResizeHandleStyle))
-          as HeaderResizeHandleStyle;
+  HeaderResizeHandle copyWith(void Function(HeaderResizeHandle) updates) =>
+      super.copyWith((message) => updates(message as HeaderResizeHandle))
+          as HeaderResizeHandle;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static HeaderResizeHandleStyle create() => HeaderResizeHandleStyle._();
+  static HeaderResizeHandle create() => HeaderResizeHandle._();
   @$core.override
-  HeaderResizeHandleStyle createEmptyInstance() => create();
+  HeaderResizeHandle createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static HeaderResizeHandleStyle getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<HeaderResizeHandleStyle>(create);
-  static HeaderResizeHandleStyle? _defaultInstance;
+  static HeaderResizeHandle getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<HeaderResizeHandle>(create);
+  static HeaderResizeHandle? _defaultInstance;
 
   @$pb.TagNumber(1)
   $core.bool get enabled => $_getBF(0);
@@ -975,13 +1638,13 @@ class HeaderResizeHandleStyle extends $pb.GeneratedMessage {
   void clearColor() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.int get widthPx => $_getIZ(2);
+  $core.int get width => $_getIZ(2);
   @$pb.TagNumber(3)
-  set widthPx($core.int value) => $_setSignedInt32(2, value);
+  set width($core.int value) => $_setSignedInt32(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasWidthPx() => $_has(2);
+  $core.bool hasWidth() => $_has(2);
   @$pb.TagNumber(3)
-  void clearWidthPx() => $_clearField(3);
+  void clearWidth() => $_clearField(3);
 
   @$pb.TagNumber(4)
   HeaderMarkSize get height => $_getN(3);
@@ -995,13 +1658,13 @@ class HeaderResizeHandleStyle extends $pb.GeneratedMessage {
   HeaderMarkSize ensureHeight() => $_ensure(3);
 
   @$pb.TagNumber(5)
-  $core.int get hitWidthPx => $_getIZ(4);
+  $core.int get hitWidth => $_getIZ(4);
   @$pb.TagNumber(5)
-  set hitWidthPx($core.int value) => $_setSignedInt32(4, value);
+  set hitWidth($core.int value) => $_setSignedInt32(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasHitWidthPx() => $_has(4);
+  $core.bool hasHitWidth() => $_has(4);
   @$pb.TagNumber(5)
-  void clearHitWidthPx() => $_clearField(5);
+  void clearHitWidth() => $_clearField(5);
 
   @$pb.TagNumber(6)
   $core.bool get showOnlyWhenResizable => $_getBF(5);
@@ -1013,8 +1676,81 @@ class HeaderResizeHandleStyle extends $pb.GeneratedMessage {
   void clearShowOnlyWhenResizable() => $_clearField(6);
 }
 
-class IconThemeSlots extends $pb.GeneratedMessage {
-  factory IconThemeSlots({
+class HeaderStyle extends $pb.GeneratedMessage {
+  factory HeaderStyle({
+    HeaderSeparator? separator,
+    HeaderResizeHandle? resizeHandle,
+  }) {
+    final result = create();
+    if (separator != null) result.separator = separator;
+    if (resizeHandle != null) result.resizeHandle = resizeHandle;
+    return result;
+  }
+
+  HeaderStyle._();
+
+  factory HeaderStyle.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory HeaderStyle.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'HeaderStyle',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOM<HeaderSeparator>(1, _omitFieldNames ? '' : 'separator',
+        subBuilder: HeaderSeparator.create)
+    ..aOM<HeaderResizeHandle>(2, _omitFieldNames ? '' : 'resizeHandle',
+        subBuilder: HeaderResizeHandle.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HeaderStyle clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HeaderStyle copyWith(void Function(HeaderStyle) updates) =>
+      super.copyWith((message) => updates(message as HeaderStyle))
+          as HeaderStyle;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static HeaderStyle create() => HeaderStyle._();
+  @$core.override
+  HeaderStyle createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static HeaderStyle getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<HeaderStyle>(create);
+  static HeaderStyle? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  HeaderSeparator get separator => $_getN(0);
+  @$pb.TagNumber(1)
+  set separator(HeaderSeparator value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSeparator() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSeparator() => $_clearField(1);
+  @$pb.TagNumber(1)
+  HeaderSeparator ensureSeparator() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  HeaderResizeHandle get resizeHandle => $_getN(1);
+  @$pb.TagNumber(2)
+  set resizeHandle(HeaderResizeHandle value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasResizeHandle() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearResizeHandle() => $_clearField(2);
+  @$pb.TagNumber(2)
+  HeaderResizeHandle ensureResizeHandle() => $_ensure(1);
+}
+
+/// Text glyph values per slot (e.g. Material Icons codepoints).
+class IconSlots extends $pb.GeneratedMessage {
+  factory IconSlots({
     $core.String? sortAscending,
     $core.String? sortDescending,
     $core.String? sortNone,
@@ -1047,17 +1783,17 @@ class IconThemeSlots extends $pb.GeneratedMessage {
     return result;
   }
 
-  IconThemeSlots._();
+  IconSlots._();
 
-  factory IconThemeSlots.fromBuffer($core.List<$core.int> data,
+  factory IconSlots.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory IconThemeSlots.fromJson($core.String json,
+  factory IconSlots.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'IconThemeSlots',
+      _omitMessageNames ? '' : 'IconSlots',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'sortAscending')
@@ -1076,25 +1812,23 @@ class IconThemeSlots extends $pb.GeneratedMessage {
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  IconThemeSlots clone() => deepCopy();
+  IconSlots clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  IconThemeSlots copyWith(void Function(IconThemeSlots) updates) =>
-      super.copyWith((message) => updates(message as IconThemeSlots))
-          as IconThemeSlots;
+  IconSlots copyWith(void Function(IconSlots) updates) =>
+      super.copyWith((message) => updates(message as IconSlots)) as IconSlots;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static IconThemeSlots create() => IconThemeSlots._();
+  static IconSlots create() => IconSlots._();
   @$core.override
-  IconThemeSlots createEmptyInstance() => create();
+  IconSlots createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static IconThemeSlots getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<IconThemeSlots>(create);
-  static IconThemeSlots? _defaultInstance;
+  static IconSlots getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<IconSlots>(create);
+  static IconSlots? _defaultInstance;
 
-  /// Sort header icons.
   @$pb.TagNumber(1)
   $core.String get sortAscending => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -1122,7 +1856,6 @@ class IconThemeSlots extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearSortNone() => $_clearField(3);
 
-  /// Tree/group expand-collapse icons.
   @$pb.TagNumber(4)
   $core.String get treeExpanded => $_getSZ(3);
   @$pb.TagNumber(4)
@@ -1141,7 +1874,6 @@ class IconThemeSlots extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearTreeCollapsed() => $_clearField(5);
 
-  /// Common datagrid header/action icons.
   @$pb.TagNumber(6)
   $core.String get menu => $_getSZ(5);
   @$pb.TagNumber(6)
@@ -1187,7 +1919,6 @@ class IconThemeSlots extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   void clearDragHandle() => $_clearField(10);
 
-  /// Selection icons.
   @$pb.TagNumber(11)
   $core.String get checkboxChecked => $_getSZ(10);
   @$pb.TagNumber(11)
@@ -1216,342 +1947,115 @@ class IconThemeSlots extends $pb.GeneratedMessage {
   void clearCheckboxIndeterminate() => $_clearField(13);
 }
 
-class IconTextStyle extends $pb.GeneratedMessage {
-  factory IconTextStyle({
-    $core.String? fontName,
-    $core.double? fontSize,
-    $core.bool? fontBold,
-    $core.bool? fontItalic,
+/// Rendering style for a single icon slot.
+class IconStyle extends $pb.GeneratedMessage {
+  factory IconStyle({
+    Font? font,
     $core.int? color,
-    $core.Iterable<$core.String>? fontNames,
-  }) {
-    final result = create();
-    if (fontName != null) result.fontName = fontName;
-    if (fontSize != null) result.fontSize = fontSize;
-    if (fontBold != null) result.fontBold = fontBold;
-    if (fontItalic != null) result.fontItalic = fontItalic;
-    if (color != null) result.color = color;
-    if (fontNames != null) result.fontNames.addAll(fontNames);
-    return result;
-  }
-
-  IconTextStyle._();
-
-  factory IconTextStyle.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory IconTextStyle.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'IconTextStyle',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'fontName')
-    ..aD(2, _omitFieldNames ? '' : 'fontSize', fieldType: $pb.PbFieldType.OF)
-    ..aOB(3, _omitFieldNames ? '' : 'fontBold')
-    ..aOB(4, _omitFieldNames ? '' : 'fontItalic')
-    ..aI(5, _omitFieldNames ? '' : 'color', fieldType: $pb.PbFieldType.OU3)
-    ..pPS(6, _omitFieldNames ? '' : 'fontNames')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  IconTextStyle clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  IconTextStyle copyWith(void Function(IconTextStyle) updates) =>
-      super.copyWith((message) => updates(message as IconTextStyle))
-          as IconTextStyle;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static IconTextStyle create() => IconTextStyle._();
-  @$core.override
-  IconTextStyle createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static IconTextStyle getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<IconTextStyle>(create);
-  static IconTextStyle? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get fontName => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set fontName($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasFontName() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearFontName() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.double get fontSize => $_getN(1);
-  @$pb.TagNumber(2)
-  set fontSize($core.double value) => $_setFloat(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasFontSize() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearFontSize() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.bool get fontBold => $_getBF(2);
-  @$pb.TagNumber(3)
-  set fontBold($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasFontBold() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearFontBold() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.bool get fontItalic => $_getBF(3);
-  @$pb.TagNumber(4)
-  set fontItalic($core.bool value) => $_setBool(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasFontItalic() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearFontItalic() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.int get color => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set color($core.int value) => $_setUnsignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasColor() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearColor() => $_clearField(5);
-
-  /// Preferred family order for icon text rendering (CSS font-family style).
-  /// When set, this takes precedence over `font_name`.
-  @$pb.TagNumber(6)
-  $pb.PbList<$core.String> get fontNames => $_getList(5);
-}
-
-class IconLayoutStyle extends $pb.GeneratedMessage {
-  factory IconLayoutStyle({
     IconAlign? align,
-    $core.int? gapPx,
+    $core.int? gap,
   }) {
     final result = create();
+    if (font != null) result.font = font;
+    if (color != null) result.color = color;
     if (align != null) result.align = align;
-    if (gapPx != null) result.gapPx = gapPx;
+    if (gap != null) result.gap = gap;
     return result;
   }
 
-  IconLayoutStyle._();
+  IconStyle._();
 
-  factory IconLayoutStyle.fromBuffer($core.List<$core.int> data,
+  factory IconStyle.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory IconLayoutStyle.fromJson($core.String json,
+  factory IconStyle.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'IconLayoutStyle',
+      _omitMessageNames ? '' : 'IconStyle',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aE<IconAlign>(1, _omitFieldNames ? '' : 'align',
+    ..aOM<Font>(1, _omitFieldNames ? '' : 'font', subBuilder: Font.create)
+    ..aI(2, _omitFieldNames ? '' : 'color', fieldType: $pb.PbFieldType.OU3)
+    ..aE<IconAlign>(3, _omitFieldNames ? '' : 'align',
         enumValues: IconAlign.values)
-    ..aI(2, _omitFieldNames ? '' : 'gapPx')
+    ..aI(4, _omitFieldNames ? '' : 'gap')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  IconLayoutStyle clone() => deepCopy();
+  IconStyle clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  IconLayoutStyle copyWith(void Function(IconLayoutStyle) updates) =>
-      super.copyWith((message) => updates(message as IconLayoutStyle))
-          as IconLayoutStyle;
+  IconStyle copyWith(void Function(IconStyle) updates) =>
+      super.copyWith((message) => updates(message as IconStyle)) as IconStyle;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static IconLayoutStyle create() => IconLayoutStyle._();
+  static IconStyle create() => IconStyle._();
   @$core.override
-  IconLayoutStyle createEmptyInstance() => create();
+  IconStyle createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static IconLayoutStyle getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<IconLayoutStyle>(create);
-  static IconLayoutStyle? _defaultInstance;
+  static IconStyle getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<IconStyle>(create);
+  static IconStyle? _defaultInstance;
 
   @$pb.TagNumber(1)
-  IconAlign get align => $_getN(0);
+  Font get font => $_getN(0);
   @$pb.TagNumber(1)
-  set align(IconAlign value) => $_setField(1, value);
+  set font(Font value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasAlign() => $_has(0);
+  $core.bool hasFont() => $_has(0);
   @$pb.TagNumber(1)
-  void clearAlign() => $_clearField(1);
+  void clearFont() => $_clearField(1);
+  @$pb.TagNumber(1)
+  Font ensureFont() => $_ensure(0);
 
   @$pb.TagNumber(2)
-  $core.int get gapPx => $_getIZ(1);
+  $core.int get color => $_getIZ(1);
   @$pb.TagNumber(2)
-  set gapPx($core.int value) => $_setSignedInt32(1, value);
+  set color($core.int value) => $_setUnsignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasGapPx() => $_has(1);
+  $core.bool hasColor() => $_has(1);
   @$pb.TagNumber(2)
-  void clearGapPx() => $_clearField(2);
+  void clearColor() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  IconAlign get align => $_getN(2);
+  @$pb.TagNumber(3)
+  set align(IconAlign value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAlign() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAlign() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get gap => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set gap($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasGap() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearGap() => $_clearField(4);
 }
 
-class IconThemeDefaults extends $pb.GeneratedMessage {
-  factory IconThemeDefaults({
-    IconTextStyle? textStyle,
-    IconLayoutStyle? layout,
-  }) {
-    final result = create();
-    if (textStyle != null) result.textStyle = textStyle;
-    if (layout != null) result.layout = layout;
-    return result;
-  }
-
-  IconThemeDefaults._();
-
-  factory IconThemeDefaults.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory IconThemeDefaults.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'IconThemeDefaults',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
-      createEmptyInstance: create)
-    ..aOM<IconTextStyle>(1, _omitFieldNames ? '' : 'textStyle',
-        subBuilder: IconTextStyle.create)
-    ..aOM<IconLayoutStyle>(2, _omitFieldNames ? '' : 'layout',
-        subBuilder: IconLayoutStyle.create)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  IconThemeDefaults clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  IconThemeDefaults copyWith(void Function(IconThemeDefaults) updates) =>
-      super.copyWith((message) => updates(message as IconThemeDefaults))
-          as IconThemeDefaults;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static IconThemeDefaults create() => IconThemeDefaults._();
-  @$core.override
-  IconThemeDefaults createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static IconThemeDefaults getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<IconThemeDefaults>(create);
-  static IconThemeDefaults? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  IconTextStyle get textStyle => $_getN(0);
-  @$pb.TagNumber(1)
-  set textStyle(IconTextStyle value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasTextStyle() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearTextStyle() => $_clearField(1);
-  @$pb.TagNumber(1)
-  IconTextStyle ensureTextStyle() => $_ensure(0);
-
-  @$pb.TagNumber(2)
-  IconLayoutStyle get layout => $_getN(1);
-  @$pb.TagNumber(2)
-  set layout(IconLayoutStyle value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasLayout() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearLayout() => $_clearField(2);
-  @$pb.TagNumber(2)
-  IconLayoutStyle ensureLayout() => $_ensure(1);
-}
-
-class IconThemeSlotStyle extends $pb.GeneratedMessage {
-  factory IconThemeSlotStyle({
-    IconTextStyle? textStyle,
-    IconLayoutStyle? layout,
-  }) {
-    final result = create();
-    if (textStyle != null) result.textStyle = textStyle;
-    if (layout != null) result.layout = layout;
-    return result;
-  }
-
-  IconThemeSlotStyle._();
-
-  factory IconThemeSlotStyle.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory IconThemeSlotStyle.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'IconThemeSlotStyle',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
-      createEmptyInstance: create)
-    ..aOM<IconTextStyle>(1, _omitFieldNames ? '' : 'textStyle',
-        subBuilder: IconTextStyle.create)
-    ..aOM<IconLayoutStyle>(2, _omitFieldNames ? '' : 'layout',
-        subBuilder: IconLayoutStyle.create)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  IconThemeSlotStyle clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  IconThemeSlotStyle copyWith(void Function(IconThemeSlotStyle) updates) =>
-      super.copyWith((message) => updates(message as IconThemeSlotStyle))
-          as IconThemeSlotStyle;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static IconThemeSlotStyle create() => IconThemeSlotStyle._();
-  @$core.override
-  IconThemeSlotStyle createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static IconThemeSlotStyle getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<IconThemeSlotStyle>(create);
-  static IconThemeSlotStyle? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  IconTextStyle get textStyle => $_getN(0);
-  @$pb.TagNumber(1)
-  set textStyle(IconTextStyle value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasTextStyle() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearTextStyle() => $_clearField(1);
-  @$pb.TagNumber(1)
-  IconTextStyle ensureTextStyle() => $_ensure(0);
-
-  @$pb.TagNumber(2)
-  IconLayoutStyle get layout => $_getN(1);
-  @$pb.TagNumber(2)
-  set layout(IconLayoutStyle value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasLayout() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearLayout() => $_clearField(2);
-  @$pb.TagNumber(2)
-  IconLayoutStyle ensureLayout() => $_ensure(1);
-}
-
-class IconThemeSlotStyles extends $pb.GeneratedMessage {
-  factory IconThemeSlotStyles({
-    IconThemeSlotStyle? sortAscending,
-    IconThemeSlotStyle? sortDescending,
-    IconThemeSlotStyle? sortNone,
-    IconThemeSlotStyle? treeExpanded,
-    IconThemeSlotStyle? treeCollapsed,
-    IconThemeSlotStyle? menu,
-    IconThemeSlotStyle? filter,
-    IconThemeSlotStyle? filterActive,
-    IconThemeSlotStyle? columns,
-    IconThemeSlotStyle? dragHandle,
-    IconThemeSlotStyle? checkboxChecked,
-    IconThemeSlotStyle? checkboxUnchecked,
-    IconThemeSlotStyle? checkboxIndeterminate,
+/// Per-slot style overrides.
+class IconSlotStyles extends $pb.GeneratedMessage {
+  factory IconSlotStyles({
+    IconStyle? sortAscending,
+    IconStyle? sortDescending,
+    IconStyle? sortNone,
+    IconStyle? treeExpanded,
+    IconStyle? treeCollapsed,
+    IconStyle? menu,
+    IconStyle? filter,
+    IconStyle? filterActive,
+    IconStyle? columns,
+    IconStyle? dragHandle,
+    IconStyle? checkboxChecked,
+    IconStyle? checkboxUnchecked,
+    IconStyle? checkboxIndeterminate,
   }) {
     final result = create();
     if (sortAscending != null) result.sortAscending = sortAscending;
@@ -1571,209 +2075,803 @@ class IconThemeSlotStyles extends $pb.GeneratedMessage {
     return result;
   }
 
-  IconThemeSlotStyles._();
+  IconSlotStyles._();
 
-  factory IconThemeSlotStyles.fromBuffer($core.List<$core.int> data,
+  factory IconSlotStyles.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory IconThemeSlotStyles.fromJson($core.String json,
+  factory IconSlotStyles.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'IconThemeSlotStyles',
+      _omitMessageNames ? '' : 'IconSlotStyles',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aOM<IconThemeSlotStyle>(1, _omitFieldNames ? '' : 'sortAscending',
-        subBuilder: IconThemeSlotStyle.create)
-    ..aOM<IconThemeSlotStyle>(2, _omitFieldNames ? '' : 'sortDescending',
-        subBuilder: IconThemeSlotStyle.create)
-    ..aOM<IconThemeSlotStyle>(3, _omitFieldNames ? '' : 'sortNone',
-        subBuilder: IconThemeSlotStyle.create)
-    ..aOM<IconThemeSlotStyle>(4, _omitFieldNames ? '' : 'treeExpanded',
-        subBuilder: IconThemeSlotStyle.create)
-    ..aOM<IconThemeSlotStyle>(5, _omitFieldNames ? '' : 'treeCollapsed',
-        subBuilder: IconThemeSlotStyle.create)
-    ..aOM<IconThemeSlotStyle>(6, _omitFieldNames ? '' : 'menu',
-        subBuilder: IconThemeSlotStyle.create)
-    ..aOM<IconThemeSlotStyle>(7, _omitFieldNames ? '' : 'filter',
-        subBuilder: IconThemeSlotStyle.create)
-    ..aOM<IconThemeSlotStyle>(8, _omitFieldNames ? '' : 'filterActive',
-        subBuilder: IconThemeSlotStyle.create)
-    ..aOM<IconThemeSlotStyle>(9, _omitFieldNames ? '' : 'columns',
-        subBuilder: IconThemeSlotStyle.create)
-    ..aOM<IconThemeSlotStyle>(10, _omitFieldNames ? '' : 'dragHandle',
-        subBuilder: IconThemeSlotStyle.create)
-    ..aOM<IconThemeSlotStyle>(11, _omitFieldNames ? '' : 'checkboxChecked',
-        subBuilder: IconThemeSlotStyle.create)
-    ..aOM<IconThemeSlotStyle>(12, _omitFieldNames ? '' : 'checkboxUnchecked',
-        subBuilder: IconThemeSlotStyle.create)
-    ..aOM<IconThemeSlotStyle>(
-        13, _omitFieldNames ? '' : 'checkboxIndeterminate',
-        subBuilder: IconThemeSlotStyle.create)
+    ..aOM<IconStyle>(1, _omitFieldNames ? '' : 'sortAscending',
+        subBuilder: IconStyle.create)
+    ..aOM<IconStyle>(2, _omitFieldNames ? '' : 'sortDescending',
+        subBuilder: IconStyle.create)
+    ..aOM<IconStyle>(3, _omitFieldNames ? '' : 'sortNone',
+        subBuilder: IconStyle.create)
+    ..aOM<IconStyle>(4, _omitFieldNames ? '' : 'treeExpanded',
+        subBuilder: IconStyle.create)
+    ..aOM<IconStyle>(5, _omitFieldNames ? '' : 'treeCollapsed',
+        subBuilder: IconStyle.create)
+    ..aOM<IconStyle>(6, _omitFieldNames ? '' : 'menu',
+        subBuilder: IconStyle.create)
+    ..aOM<IconStyle>(7, _omitFieldNames ? '' : 'filter',
+        subBuilder: IconStyle.create)
+    ..aOM<IconStyle>(8, _omitFieldNames ? '' : 'filterActive',
+        subBuilder: IconStyle.create)
+    ..aOM<IconStyle>(9, _omitFieldNames ? '' : 'columns',
+        subBuilder: IconStyle.create)
+    ..aOM<IconStyle>(10, _omitFieldNames ? '' : 'dragHandle',
+        subBuilder: IconStyle.create)
+    ..aOM<IconStyle>(11, _omitFieldNames ? '' : 'checkboxChecked',
+        subBuilder: IconStyle.create)
+    ..aOM<IconStyle>(12, _omitFieldNames ? '' : 'checkboxUnchecked',
+        subBuilder: IconStyle.create)
+    ..aOM<IconStyle>(13, _omitFieldNames ? '' : 'checkboxIndeterminate',
+        subBuilder: IconStyle.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  IconThemeSlotStyles clone() => deepCopy();
+  IconSlotStyles clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  IconThemeSlotStyles copyWith(void Function(IconThemeSlotStyles) updates) =>
-      super.copyWith((message) => updates(message as IconThemeSlotStyles))
-          as IconThemeSlotStyles;
+  IconSlotStyles copyWith(void Function(IconSlotStyles) updates) =>
+      super.copyWith((message) => updates(message as IconSlotStyles))
+          as IconSlotStyles;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static IconThemeSlotStyles create() => IconThemeSlotStyles._();
+  static IconSlotStyles create() => IconSlotStyles._();
   @$core.override
-  IconThemeSlotStyles createEmptyInstance() => create();
+  IconSlotStyles createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static IconThemeSlotStyles getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<IconThemeSlotStyles>(create);
-  static IconThemeSlotStyles? _defaultInstance;
+  static IconSlotStyles getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<IconSlotStyles>(create);
+  static IconSlotStyles? _defaultInstance;
 
   @$pb.TagNumber(1)
-  IconThemeSlotStyle get sortAscending => $_getN(0);
+  IconStyle get sortAscending => $_getN(0);
   @$pb.TagNumber(1)
-  set sortAscending(IconThemeSlotStyle value) => $_setField(1, value);
+  set sortAscending(IconStyle value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasSortAscending() => $_has(0);
   @$pb.TagNumber(1)
   void clearSortAscending() => $_clearField(1);
   @$pb.TagNumber(1)
-  IconThemeSlotStyle ensureSortAscending() => $_ensure(0);
+  IconStyle ensureSortAscending() => $_ensure(0);
 
   @$pb.TagNumber(2)
-  IconThemeSlotStyle get sortDescending => $_getN(1);
+  IconStyle get sortDescending => $_getN(1);
   @$pb.TagNumber(2)
-  set sortDescending(IconThemeSlotStyle value) => $_setField(2, value);
+  set sortDescending(IconStyle value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasSortDescending() => $_has(1);
   @$pb.TagNumber(2)
   void clearSortDescending() => $_clearField(2);
   @$pb.TagNumber(2)
-  IconThemeSlotStyle ensureSortDescending() => $_ensure(1);
+  IconStyle ensureSortDescending() => $_ensure(1);
 
   @$pb.TagNumber(3)
-  IconThemeSlotStyle get sortNone => $_getN(2);
+  IconStyle get sortNone => $_getN(2);
   @$pb.TagNumber(3)
-  set sortNone(IconThemeSlotStyle value) => $_setField(3, value);
+  set sortNone(IconStyle value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasSortNone() => $_has(2);
   @$pb.TagNumber(3)
   void clearSortNone() => $_clearField(3);
   @$pb.TagNumber(3)
-  IconThemeSlotStyle ensureSortNone() => $_ensure(2);
+  IconStyle ensureSortNone() => $_ensure(2);
 
   @$pb.TagNumber(4)
-  IconThemeSlotStyle get treeExpanded => $_getN(3);
+  IconStyle get treeExpanded => $_getN(3);
   @$pb.TagNumber(4)
-  set treeExpanded(IconThemeSlotStyle value) => $_setField(4, value);
+  set treeExpanded(IconStyle value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasTreeExpanded() => $_has(3);
   @$pb.TagNumber(4)
   void clearTreeExpanded() => $_clearField(4);
   @$pb.TagNumber(4)
-  IconThemeSlotStyle ensureTreeExpanded() => $_ensure(3);
+  IconStyle ensureTreeExpanded() => $_ensure(3);
 
   @$pb.TagNumber(5)
-  IconThemeSlotStyle get treeCollapsed => $_getN(4);
+  IconStyle get treeCollapsed => $_getN(4);
   @$pb.TagNumber(5)
-  set treeCollapsed(IconThemeSlotStyle value) => $_setField(5, value);
+  set treeCollapsed(IconStyle value) => $_setField(5, value);
   @$pb.TagNumber(5)
   $core.bool hasTreeCollapsed() => $_has(4);
   @$pb.TagNumber(5)
   void clearTreeCollapsed() => $_clearField(5);
   @$pb.TagNumber(5)
-  IconThemeSlotStyle ensureTreeCollapsed() => $_ensure(4);
+  IconStyle ensureTreeCollapsed() => $_ensure(4);
 
   @$pb.TagNumber(6)
-  IconThemeSlotStyle get menu => $_getN(5);
+  IconStyle get menu => $_getN(5);
   @$pb.TagNumber(6)
-  set menu(IconThemeSlotStyle value) => $_setField(6, value);
+  set menu(IconStyle value) => $_setField(6, value);
   @$pb.TagNumber(6)
   $core.bool hasMenu() => $_has(5);
   @$pb.TagNumber(6)
   void clearMenu() => $_clearField(6);
   @$pb.TagNumber(6)
-  IconThemeSlotStyle ensureMenu() => $_ensure(5);
+  IconStyle ensureMenu() => $_ensure(5);
 
   @$pb.TagNumber(7)
-  IconThemeSlotStyle get filter => $_getN(6);
+  IconStyle get filter => $_getN(6);
   @$pb.TagNumber(7)
-  set filter(IconThemeSlotStyle value) => $_setField(7, value);
+  set filter(IconStyle value) => $_setField(7, value);
   @$pb.TagNumber(7)
   $core.bool hasFilter() => $_has(6);
   @$pb.TagNumber(7)
   void clearFilter() => $_clearField(7);
   @$pb.TagNumber(7)
-  IconThemeSlotStyle ensureFilter() => $_ensure(6);
+  IconStyle ensureFilter() => $_ensure(6);
 
   @$pb.TagNumber(8)
-  IconThemeSlotStyle get filterActive => $_getN(7);
+  IconStyle get filterActive => $_getN(7);
   @$pb.TagNumber(8)
-  set filterActive(IconThemeSlotStyle value) => $_setField(8, value);
+  set filterActive(IconStyle value) => $_setField(8, value);
   @$pb.TagNumber(8)
   $core.bool hasFilterActive() => $_has(7);
   @$pb.TagNumber(8)
   void clearFilterActive() => $_clearField(8);
   @$pb.TagNumber(8)
-  IconThemeSlotStyle ensureFilterActive() => $_ensure(7);
+  IconStyle ensureFilterActive() => $_ensure(7);
 
   @$pb.TagNumber(9)
-  IconThemeSlotStyle get columns => $_getN(8);
+  IconStyle get columns => $_getN(8);
   @$pb.TagNumber(9)
-  set columns(IconThemeSlotStyle value) => $_setField(9, value);
+  set columns(IconStyle value) => $_setField(9, value);
   @$pb.TagNumber(9)
   $core.bool hasColumns() => $_has(8);
   @$pb.TagNumber(9)
   void clearColumns() => $_clearField(9);
   @$pb.TagNumber(9)
-  IconThemeSlotStyle ensureColumns() => $_ensure(8);
+  IconStyle ensureColumns() => $_ensure(8);
 
   @$pb.TagNumber(10)
-  IconThemeSlotStyle get dragHandle => $_getN(9);
+  IconStyle get dragHandle => $_getN(9);
   @$pb.TagNumber(10)
-  set dragHandle(IconThemeSlotStyle value) => $_setField(10, value);
+  set dragHandle(IconStyle value) => $_setField(10, value);
   @$pb.TagNumber(10)
   $core.bool hasDragHandle() => $_has(9);
   @$pb.TagNumber(10)
   void clearDragHandle() => $_clearField(10);
   @$pb.TagNumber(10)
-  IconThemeSlotStyle ensureDragHandle() => $_ensure(9);
+  IconStyle ensureDragHandle() => $_ensure(9);
 
   @$pb.TagNumber(11)
-  IconThemeSlotStyle get checkboxChecked => $_getN(10);
+  IconStyle get checkboxChecked => $_getN(10);
   @$pb.TagNumber(11)
-  set checkboxChecked(IconThemeSlotStyle value) => $_setField(11, value);
+  set checkboxChecked(IconStyle value) => $_setField(11, value);
   @$pb.TagNumber(11)
   $core.bool hasCheckboxChecked() => $_has(10);
   @$pb.TagNumber(11)
   void clearCheckboxChecked() => $_clearField(11);
   @$pb.TagNumber(11)
-  IconThemeSlotStyle ensureCheckboxChecked() => $_ensure(10);
+  IconStyle ensureCheckboxChecked() => $_ensure(10);
 
   @$pb.TagNumber(12)
-  IconThemeSlotStyle get checkboxUnchecked => $_getN(11);
+  IconStyle get checkboxUnchecked => $_getN(11);
   @$pb.TagNumber(12)
-  set checkboxUnchecked(IconThemeSlotStyle value) => $_setField(12, value);
+  set checkboxUnchecked(IconStyle value) => $_setField(12, value);
   @$pb.TagNumber(12)
   $core.bool hasCheckboxUnchecked() => $_has(11);
   @$pb.TagNumber(12)
   void clearCheckboxUnchecked() => $_clearField(12);
   @$pb.TagNumber(12)
-  IconThemeSlotStyle ensureCheckboxUnchecked() => $_ensure(11);
+  IconStyle ensureCheckboxUnchecked() => $_ensure(11);
 
   @$pb.TagNumber(13)
-  IconThemeSlotStyle get checkboxIndeterminate => $_getN(12);
+  IconStyle get checkboxIndeterminate => $_getN(12);
   @$pb.TagNumber(13)
-  set checkboxIndeterminate(IconThemeSlotStyle value) => $_setField(13, value);
+  set checkboxIndeterminate(IconStyle value) => $_setField(13, value);
   @$pb.TagNumber(13)
   $core.bool hasCheckboxIndeterminate() => $_has(12);
   @$pb.TagNumber(13)
   void clearCheckboxIndeterminate() => $_clearField(13);
   @$pb.TagNumber(13)
-  IconThemeSlotStyle ensureCheckboxIndeterminate() => $_ensure(12);
+  IconStyle ensureCheckboxIndeterminate() => $_ensure(12);
+}
+
+/// Image-based icon alternatives (PNG/BMP assets).
+class IconPictures extends $pb.GeneratedMessage {
+  factory IconPictures({
+    ImageData? sortAscending,
+    ImageData? sortDescending,
+    ImageData? nodeOpen,
+    ImageData? nodeClosed,
+    ImageData? checkboxChecked,
+    ImageData? checkboxUnchecked,
+    ImageData? checkboxIndeterminate,
+  }) {
+    final result = create();
+    if (sortAscending != null) result.sortAscending = sortAscending;
+    if (sortDescending != null) result.sortDescending = sortDescending;
+    if (nodeOpen != null) result.nodeOpen = nodeOpen;
+    if (nodeClosed != null) result.nodeClosed = nodeClosed;
+    if (checkboxChecked != null) result.checkboxChecked = checkboxChecked;
+    if (checkboxUnchecked != null) result.checkboxUnchecked = checkboxUnchecked;
+    if (checkboxIndeterminate != null)
+      result.checkboxIndeterminate = checkboxIndeterminate;
+    return result;
+  }
+
+  IconPictures._();
+
+  factory IconPictures.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory IconPictures.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'IconPictures',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOM<ImageData>(1, _omitFieldNames ? '' : 'sortAscending',
+        subBuilder: ImageData.create)
+    ..aOM<ImageData>(2, _omitFieldNames ? '' : 'sortDescending',
+        subBuilder: ImageData.create)
+    ..aOM<ImageData>(3, _omitFieldNames ? '' : 'nodeOpen',
+        subBuilder: ImageData.create)
+    ..aOM<ImageData>(4, _omitFieldNames ? '' : 'nodeClosed',
+        subBuilder: ImageData.create)
+    ..aOM<ImageData>(5, _omitFieldNames ? '' : 'checkboxChecked',
+        subBuilder: ImageData.create)
+    ..aOM<ImageData>(6, _omitFieldNames ? '' : 'checkboxUnchecked',
+        subBuilder: ImageData.create)
+    ..aOM<ImageData>(7, _omitFieldNames ? '' : 'checkboxIndeterminate',
+        subBuilder: ImageData.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  IconPictures clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  IconPictures copyWith(void Function(IconPictures) updates) =>
+      super.copyWith((message) => updates(message as IconPictures))
+          as IconPictures;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static IconPictures create() => IconPictures._();
+  @$core.override
+  IconPictures createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static IconPictures getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<IconPictures>(create);
+  static IconPictures? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ImageData get sortAscending => $_getN(0);
+  @$pb.TagNumber(1)
+  set sortAscending(ImageData value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSortAscending() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSortAscending() => $_clearField(1);
+  @$pb.TagNumber(1)
+  ImageData ensureSortAscending() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  ImageData get sortDescending => $_getN(1);
+  @$pb.TagNumber(2)
+  set sortDescending(ImageData value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSortDescending() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSortDescending() => $_clearField(2);
+  @$pb.TagNumber(2)
+  ImageData ensureSortDescending() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  ImageData get nodeOpen => $_getN(2);
+  @$pb.TagNumber(3)
+  set nodeOpen(ImageData value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasNodeOpen() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearNodeOpen() => $_clearField(3);
+  @$pb.TagNumber(3)
+  ImageData ensureNodeOpen() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  ImageData get nodeClosed => $_getN(3);
+  @$pb.TagNumber(4)
+  set nodeClosed(ImageData value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasNodeClosed() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearNodeClosed() => $_clearField(4);
+  @$pb.TagNumber(4)
+  ImageData ensureNodeClosed() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  ImageData get checkboxChecked => $_getN(4);
+  @$pb.TagNumber(5)
+  set checkboxChecked(ImageData value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCheckboxChecked() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCheckboxChecked() => $_clearField(5);
+  @$pb.TagNumber(5)
+  ImageData ensureCheckboxChecked() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  ImageData get checkboxUnchecked => $_getN(5);
+  @$pb.TagNumber(6)
+  set checkboxUnchecked(ImageData value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCheckboxUnchecked() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCheckboxUnchecked() => $_clearField(6);
+  @$pb.TagNumber(6)
+  ImageData ensureCheckboxUnchecked() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  ImageData get checkboxIndeterminate => $_getN(6);
+  @$pb.TagNumber(7)
+  set checkboxIndeterminate(ImageData value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasCheckboxIndeterminate() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearCheckboxIndeterminate() => $_clearField(7);
+  @$pb.TagNumber(7)
+  ImageData ensureCheckboxIndeterminate() => $_ensure(6);
+}
+
+class IconTheme extends $pb.GeneratedMessage {
+  factory IconTheme({
+    IconSlots? slots,
+    IconStyle? defaults,
+    IconSlotStyles? overrides,
+    IconPictures? pictures,
+  }) {
+    final result = create();
+    if (slots != null) result.slots = slots;
+    if (defaults != null) result.defaults = defaults;
+    if (overrides != null) result.overrides = overrides;
+    if (pictures != null) result.pictures = pictures;
+    return result;
+  }
+
+  IconTheme._();
+
+  factory IconTheme.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory IconTheme.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'IconTheme',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOM<IconSlots>(1, _omitFieldNames ? '' : 'slots',
+        subBuilder: IconSlots.create)
+    ..aOM<IconStyle>(2, _omitFieldNames ? '' : 'defaults',
+        subBuilder: IconStyle.create)
+    ..aOM<IconSlotStyles>(3, _omitFieldNames ? '' : 'overrides',
+        subBuilder: IconSlotStyles.create)
+    ..aOM<IconPictures>(4, _omitFieldNames ? '' : 'pictures',
+        subBuilder: IconPictures.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  IconTheme clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  IconTheme copyWith(void Function(IconTheme) updates) =>
+      super.copyWith((message) => updates(message as IconTheme)) as IconTheme;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static IconTheme create() => IconTheme._();
+  @$core.override
+  IconTheme createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static IconTheme getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<IconTheme>(create);
+  static IconTheme? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  IconSlots get slots => $_getN(0);
+  @$pb.TagNumber(1)
+  set slots(IconSlots value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSlots() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSlots() => $_clearField(1);
+  @$pb.TagNumber(1)
+  IconSlots ensureSlots() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  IconStyle get defaults => $_getN(1);
+  @$pb.TagNumber(2)
+  set defaults(IconStyle value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasDefaults() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDefaults() => $_clearField(2);
+  @$pb.TagNumber(2)
+  IconStyle ensureDefaults() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  IconSlotStyles get overrides => $_getN(2);
+  @$pb.TagNumber(3)
+  set overrides(IconSlotStyles value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasOverrides() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOverrides() => $_clearField(3);
+  @$pb.TagNumber(3)
+  IconSlotStyles ensureOverrides() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  IconPictures get pictures => $_getN(3);
+  @$pb.TagNumber(4)
+  set pictures(IconPictures value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasPictures() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearPictures() => $_clearField(4);
+  @$pb.TagNumber(4)
+  IconPictures ensurePictures() => $_ensure(3);
+}
+
+class HoverConfig extends $pb.GeneratedMessage {
+  factory HoverConfig({
+    $core.bool? row,
+    $core.bool? column,
+    $core.bool? cell,
+    HighlightStyle? rowStyle,
+    HighlightStyle? columnStyle,
+    HighlightStyle? cellStyle,
+  }) {
+    final result = create();
+    if (row != null) result.row = row;
+    if (column != null) result.column = column;
+    if (cell != null) result.cell = cell;
+    if (rowStyle != null) result.rowStyle = rowStyle;
+    if (columnStyle != null) result.columnStyle = columnStyle;
+    if (cellStyle != null) result.cellStyle = cellStyle;
+    return result;
+  }
+
+  HoverConfig._();
+
+  factory HoverConfig.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory HoverConfig.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'HoverConfig',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'row')
+    ..aOB(2, _omitFieldNames ? '' : 'column')
+    ..aOB(3, _omitFieldNames ? '' : 'cell')
+    ..aOM<HighlightStyle>(4, _omitFieldNames ? '' : 'rowStyle',
+        subBuilder: HighlightStyle.create)
+    ..aOM<HighlightStyle>(5, _omitFieldNames ? '' : 'columnStyle',
+        subBuilder: HighlightStyle.create)
+    ..aOM<HighlightStyle>(6, _omitFieldNames ? '' : 'cellStyle',
+        subBuilder: HighlightStyle.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HoverConfig clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HoverConfig copyWith(void Function(HoverConfig) updates) =>
+      super.copyWith((message) => updates(message as HoverConfig))
+          as HoverConfig;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static HoverConfig create() => HoverConfig._();
+  @$core.override
+  HoverConfig createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static HoverConfig getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<HoverConfig>(create);
+  static HoverConfig? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get row => $_getBF(0);
+  @$pb.TagNumber(1)
+  set row($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRow() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRow() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get column => $_getBF(1);
+  @$pb.TagNumber(2)
+  set column($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasColumn() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearColumn() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get cell => $_getBF(2);
+  @$pb.TagNumber(3)
+  set cell($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCell() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCell() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  HighlightStyle get rowStyle => $_getN(3);
+  @$pb.TagNumber(4)
+  set rowStyle(HighlightStyle value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRowStyle() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRowStyle() => $_clearField(4);
+  @$pb.TagNumber(4)
+  HighlightStyle ensureRowStyle() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  HighlightStyle get columnStyle => $_getN(4);
+  @$pb.TagNumber(5)
+  set columnStyle(HighlightStyle value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasColumnStyle() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearColumnStyle() => $_clearField(5);
+  @$pb.TagNumber(5)
+  HighlightStyle ensureColumnStyle() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  HighlightStyle get cellStyle => $_getN(5);
+  @$pb.TagNumber(6)
+  set cellStyle(HighlightStyle value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCellStyle() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCellStyle() => $_clearField(6);
+  @$pb.TagNumber(6)
+  HighlightStyle ensureCellStyle() => $_ensure(5);
+}
+
+class ResizePolicy extends $pb.GeneratedMessage {
+  factory ResizePolicy({
+    $core.bool? columns,
+    $core.bool? rows,
+    $core.bool? uniform,
+  }) {
+    final result = create();
+    if (columns != null) result.columns = columns;
+    if (rows != null) result.rows = rows;
+    if (uniform != null) result.uniform = uniform;
+    return result;
+  }
+
+  ResizePolicy._();
+
+  factory ResizePolicy.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ResizePolicy.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ResizePolicy',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'columns')
+    ..aOB(2, _omitFieldNames ? '' : 'rows')
+    ..aOB(3, _omitFieldNames ? '' : 'uniform')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ResizePolicy clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ResizePolicy copyWith(void Function(ResizePolicy) updates) =>
+      super.copyWith((message) => updates(message as ResizePolicy))
+          as ResizePolicy;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ResizePolicy create() => ResizePolicy._();
+  @$core.override
+  ResizePolicy createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ResizePolicy getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ResizePolicy>(create);
+  static ResizePolicy? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get columns => $_getBF(0);
+  @$pb.TagNumber(1)
+  set columns($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasColumns() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearColumns() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get rows => $_getBF(1);
+  @$pb.TagNumber(2)
+  set rows($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRows() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRows() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get uniform => $_getBF(2);
+  @$pb.TagNumber(3)
+  set uniform($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasUniform() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearUniform() => $_clearField(3);
+}
+
+class FreezePolicy extends $pb.GeneratedMessage {
+  factory FreezePolicy({
+    $core.bool? columns,
+    $core.bool? rows,
+  }) {
+    final result = create();
+    if (columns != null) result.columns = columns;
+    if (rows != null) result.rows = rows;
+    return result;
+  }
+
+  FreezePolicy._();
+
+  factory FreezePolicy.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory FreezePolicy.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FreezePolicy',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'columns')
+    ..aOB(2, _omitFieldNames ? '' : 'rows')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FreezePolicy clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FreezePolicy copyWith(void Function(FreezePolicy) updates) =>
+      super.copyWith((message) => updates(message as FreezePolicy))
+          as FreezePolicy;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FreezePolicy create() => FreezePolicy._();
+  @$core.override
+  FreezePolicy createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FreezePolicy getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FreezePolicy>(create);
+  static FreezePolicy? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get columns => $_getBF(0);
+  @$pb.TagNumber(1)
+  set columns($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasColumns() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearColumns() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get rows => $_getBF(1);
+  @$pb.TagNumber(2)
+  set rows($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRows() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRows() => $_clearField(2);
+}
+
+class HeaderFeatures extends $pb.GeneratedMessage {
+  factory HeaderFeatures({
+    $core.bool? sort,
+    $core.bool? reorder,
+    $core.bool? chooser,
+  }) {
+    final result = create();
+    if (sort != null) result.sort = sort;
+    if (reorder != null) result.reorder = reorder;
+    if (chooser != null) result.chooser = chooser;
+    return result;
+  }
+
+  HeaderFeatures._();
+
+  factory HeaderFeatures.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory HeaderFeatures.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'HeaderFeatures',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'sort')
+    ..aOB(2, _omitFieldNames ? '' : 'reorder')
+    ..aOB(3, _omitFieldNames ? '' : 'chooser')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HeaderFeatures clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  HeaderFeatures copyWith(void Function(HeaderFeatures) updates) =>
+      super.copyWith((message) => updates(message as HeaderFeatures))
+          as HeaderFeatures;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static HeaderFeatures create() => HeaderFeatures._();
+  @$core.override
+  HeaderFeatures createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static HeaderFeatures getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<HeaderFeatures>(create);
+  static HeaderFeatures? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get sort => $_getBF(0);
+  @$pb.TagNumber(1)
+  set sort($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSort() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSort() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get reorder => $_getBF(1);
+  @$pb.TagNumber(2)
+  set reorder($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasReorder() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearReorder() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get chooser => $_getBF(2);
+  @$pb.TagNumber(3)
+  set chooser($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasChooser() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearChooser() => $_clearField(3);
 }
 
 class GridConfig extends $pb.GeneratedMessage {
@@ -1788,7 +2886,7 @@ class GridConfig extends $pb.GeneratedMessage {
     InteractionConfig? interaction,
     RenderConfig? rendering,
     $core.String? version,
-    IndicatorBandsConfig? indicatorBands,
+    IndicatorsConfig? indicators,
   }) {
     final result = create();
     if (layout != null) result.layout = layout;
@@ -1801,7 +2899,7 @@ class GridConfig extends $pb.GeneratedMessage {
     if (interaction != null) result.interaction = interaction;
     if (rendering != null) result.rendering = rendering;
     if (version != null) result.version = version;
-    if (indicatorBands != null) result.indicatorBands = indicatorBands;
+    if (indicators != null) result.indicators = indicators;
     return result;
   }
 
@@ -1837,8 +2935,8 @@ class GridConfig extends $pb.GeneratedMessage {
     ..aOM<RenderConfig>(9, _omitFieldNames ? '' : 'rendering',
         subBuilder: RenderConfig.create)
     ..aOS(10, _omitFieldNames ? '' : 'version')
-    ..aOM<IndicatorBandsConfig>(11, _omitFieldNames ? '' : 'indicatorBands',
-        subBuilder: IndicatorBandsConfig.create)
+    ..aOM<IndicatorsConfig>(11, _omitFieldNames ? '' : 'indicators',
+        subBuilder: IndicatorsConfig.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1968,17 +3066,19 @@ class GridConfig extends $pb.GeneratedMessage {
   void clearVersion() => $_clearField(10);
 
   @$pb.TagNumber(11)
-  IndicatorBandsConfig get indicatorBands => $_getN(10);
+  IndicatorsConfig get indicators => $_getN(10);
   @$pb.TagNumber(11)
-  set indicatorBands(IndicatorBandsConfig value) => $_setField(11, value);
+  set indicators(IndicatorsConfig value) => $_setField(11, value);
   @$pb.TagNumber(11)
-  $core.bool hasIndicatorBands() => $_has(10);
+  $core.bool hasIndicators() => $_has(10);
   @$pb.TagNumber(11)
-  void clearIndicatorBands() => $_clearField(11);
+  void clearIndicators() => $_clearField(11);
   @$pb.TagNumber(11)
-  IndicatorBandsConfig ensureIndicatorBands() => $_ensure(10);
+  IndicatorsConfig ensureIndicators() => $_ensure(10);
 }
 
+/// ── Layout ──
+/// Pure structural dimensions. Text defaults moved to StyleConfig.
 class LayoutConfig extends $pb.GeneratedMessage {
   factory LayoutConfig({
     $core.int? rows,
@@ -1991,10 +3091,6 @@ class LayoutConfig extends $pb.GeneratedMessage {
     $core.int? defaultColWidth,
     $core.bool? rightToLeft,
     $core.bool? extendLastCol,
-    $core.String? formatString,
-    $core.bool? wordWrap,
-    $core.int? ellipsis,
-    $core.bool? textOverflow,
   }) {
     final result = create();
     if (rows != null) result.rows = rows;
@@ -2007,10 +3103,6 @@ class LayoutConfig extends $pb.GeneratedMessage {
     if (defaultColWidth != null) result.defaultColWidth = defaultColWidth;
     if (rightToLeft != null) result.rightToLeft = rightToLeft;
     if (extendLastCol != null) result.extendLastCol = extendLastCol;
-    if (formatString != null) result.formatString = formatString;
-    if (wordWrap != null) result.wordWrap = wordWrap;
-    if (ellipsis != null) result.ellipsis = ellipsis;
-    if (textOverflow != null) result.textOverflow = textOverflow;
     return result;
   }
 
@@ -2037,10 +3129,6 @@ class LayoutConfig extends $pb.GeneratedMessage {
     ..aI(8, _omitFieldNames ? '' : 'defaultColWidth')
     ..aOB(9, _omitFieldNames ? '' : 'rightToLeft')
     ..aOB(10, _omitFieldNames ? '' : 'extendLastCol')
-    ..aOS(11, _omitFieldNames ? '' : 'formatString')
-    ..aOB(12, _omitFieldNames ? '' : 'wordWrap')
-    ..aI(13, _omitFieldNames ? '' : 'ellipsis')
-    ..aOB(14, _omitFieldNames ? '' : 'textOverflow')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2151,153 +3239,68 @@ class LayoutConfig extends $pb.GeneratedMessage {
   $core.bool hasExtendLastCol() => $_has(9);
   @$pb.TagNumber(10)
   void clearExtendLastCol() => $_clearField(10);
-
-  @$pb.TagNumber(11)
-  $core.String get formatString => $_getSZ(10);
-  @$pb.TagNumber(11)
-  set formatString($core.String value) => $_setString(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasFormatString() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearFormatString() => $_clearField(11);
-
-  @$pb.TagNumber(12)
-  $core.bool get wordWrap => $_getBF(11);
-  @$pb.TagNumber(12)
-  set wordWrap($core.bool value) => $_setBool(11, value);
-  @$pb.TagNumber(12)
-  $core.bool hasWordWrap() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearWordWrap() => $_clearField(12);
-
-  @$pb.TagNumber(13)
-  $core.int get ellipsis => $_getIZ(12);
-  @$pb.TagNumber(13)
-  set ellipsis($core.int value) => $_setSignedInt32(12, value);
-  @$pb.TagNumber(13)
-  $core.bool hasEllipsis() => $_has(12);
-  @$pb.TagNumber(13)
-  void clearEllipsis() => $_clearField(13);
-
-  @$pb.TagNumber(14)
-  $core.bool get textOverflow => $_getBF(13);
-  @$pb.TagNumber(14)
-  set textOverflow($core.bool value) => $_setBool(13, value);
-  @$pb.TagNumber(14)
-  $core.bool hasTextOverflow() => $_has(13);
-  @$pb.TagNumber(14)
-  void clearTextOverflow() => $_clearField(14);
 }
 
+/// ── Style ──
+/// Nested by region. Building blocks eliminate flat field sprawl.
 class StyleConfig extends $pb.GeneratedMessage {
   factory StyleConfig({
-    BorderAppearance? appearance,
-    $core.int? backColor,
-    $core.int? foreColor,
-    $core.int? backColorFixed,
-    $core.int? foreColorFixed,
-    $core.int? backColorFrozen,
-    $core.int? foreColorFrozen,
-    $core.int? backColorBkg,
-    $core.int? backColorAlternate,
-    GridLineStyle? gridLines,
-    GridLineStyle? gridLinesFixed,
-    $core.int? gridColor,
-    $core.int? gridColorFixed,
-    $core.int? gridLineWidth,
+    $core.int? background,
+    $core.int? foreground,
+    $core.int? alternateBackground,
+    Font? font,
+    Padding? cellPadding,
     TextEffect? textEffect,
-    TextEffect? textEffectFixed,
-    $core.String? fontName,
-    $core.double? fontSize,
-    $core.bool? fontBold,
-    $core.bool? fontItalic,
-    $core.bool? fontUnderline,
-    $core.bool? fontStrikethrough,
-    $core.double? fontWidth,
-    $core.int? sheetBorder,
     $core.int? progressColor,
-    $core.bool? imageOverText,
+    GridLines? gridLines,
+    RegionStyle? fixed,
+    RegionStyle? frozen,
+    HeaderStyle? header,
+    $core.int? sheetBackground,
+    $core.int? sheetBorder,
+    BorderAppearance? appearance,
     $core.List<$core.int>? backgroundImage,
-    ImageAlignment? backgroundImageAlignment,
-    TextRenderMode? textRenderMode,
-    TextHintingMode? textHintingMode,
-    $core.bool? textPixelSnap,
+    ImageAlignment? backgroundImageAlign,
+    TextRendering? textRendering,
+    IconTheme? icons,
+    $core.bool? imageOverText,
+    $core.bool? showSortNumbers,
     ApplyScope? applyScope,
     CustomRenderMode? customRender,
-    ImageData? sortAscendingPicture,
-    ImageData? sortDescendingPicture,
-    ImageData? nodeOpenPicture,
-    ImageData? nodeClosedPicture,
-    CellPadding? cellPadding,
-    CellPadding? fixedCellPadding,
-    HeaderSeparatorStyle? headerSeparator,
-    HeaderResizeHandleStyle? headerResizeHandle,
-    IconThemeSlots? iconThemeSlots,
-    ImageData? checkboxCheckedPicture,
-    ImageData? checkboxUncheckedPicture,
-    ImageData? checkboxIndeterminatePicture,
-    IconThemeDefaults? iconThemeDefaults,
-    IconThemeSlotStyles? iconThemeSlotStyles,
-    $core.bool? showSortNumbers,
+    $core.String? format,
+    $core.bool? wordWrap,
+    $core.int? ellipsis,
+    $core.bool? textOverflow,
   }) {
     final result = create();
-    if (appearance != null) result.appearance = appearance;
-    if (backColor != null) result.backColor = backColor;
-    if (foreColor != null) result.foreColor = foreColor;
-    if (backColorFixed != null) result.backColorFixed = backColorFixed;
-    if (foreColorFixed != null) result.foreColorFixed = foreColorFixed;
-    if (backColorFrozen != null) result.backColorFrozen = backColorFrozen;
-    if (foreColorFrozen != null) result.foreColorFrozen = foreColorFrozen;
-    if (backColorBkg != null) result.backColorBkg = backColorBkg;
-    if (backColorAlternate != null)
-      result.backColorAlternate = backColorAlternate;
-    if (gridLines != null) result.gridLines = gridLines;
-    if (gridLinesFixed != null) result.gridLinesFixed = gridLinesFixed;
-    if (gridColor != null) result.gridColor = gridColor;
-    if (gridColorFixed != null) result.gridColorFixed = gridColorFixed;
-    if (gridLineWidth != null) result.gridLineWidth = gridLineWidth;
+    if (background != null) result.background = background;
+    if (foreground != null) result.foreground = foreground;
+    if (alternateBackground != null)
+      result.alternateBackground = alternateBackground;
+    if (font != null) result.font = font;
+    if (cellPadding != null) result.cellPadding = cellPadding;
     if (textEffect != null) result.textEffect = textEffect;
-    if (textEffectFixed != null) result.textEffectFixed = textEffectFixed;
-    if (fontName != null) result.fontName = fontName;
-    if (fontSize != null) result.fontSize = fontSize;
-    if (fontBold != null) result.fontBold = fontBold;
-    if (fontItalic != null) result.fontItalic = fontItalic;
-    if (fontUnderline != null) result.fontUnderline = fontUnderline;
-    if (fontStrikethrough != null) result.fontStrikethrough = fontStrikethrough;
-    if (fontWidth != null) result.fontWidth = fontWidth;
-    if (sheetBorder != null) result.sheetBorder = sheetBorder;
     if (progressColor != null) result.progressColor = progressColor;
-    if (imageOverText != null) result.imageOverText = imageOverText;
+    if (gridLines != null) result.gridLines = gridLines;
+    if (fixed != null) result.fixed = fixed;
+    if (frozen != null) result.frozen = frozen;
+    if (header != null) result.header = header;
+    if (sheetBackground != null) result.sheetBackground = sheetBackground;
+    if (sheetBorder != null) result.sheetBorder = sheetBorder;
+    if (appearance != null) result.appearance = appearance;
     if (backgroundImage != null) result.backgroundImage = backgroundImage;
-    if (backgroundImageAlignment != null)
-      result.backgroundImageAlignment = backgroundImageAlignment;
-    if (textRenderMode != null) result.textRenderMode = textRenderMode;
-    if (textHintingMode != null) result.textHintingMode = textHintingMode;
-    if (textPixelSnap != null) result.textPixelSnap = textPixelSnap;
+    if (backgroundImageAlign != null)
+      result.backgroundImageAlign = backgroundImageAlign;
+    if (textRendering != null) result.textRendering = textRendering;
+    if (icons != null) result.icons = icons;
+    if (imageOverText != null) result.imageOverText = imageOverText;
+    if (showSortNumbers != null) result.showSortNumbers = showSortNumbers;
     if (applyScope != null) result.applyScope = applyScope;
     if (customRender != null) result.customRender = customRender;
-    if (sortAscendingPicture != null)
-      result.sortAscendingPicture = sortAscendingPicture;
-    if (sortDescendingPicture != null)
-      result.sortDescendingPicture = sortDescendingPicture;
-    if (nodeOpenPicture != null) result.nodeOpenPicture = nodeOpenPicture;
-    if (nodeClosedPicture != null) result.nodeClosedPicture = nodeClosedPicture;
-    if (cellPadding != null) result.cellPadding = cellPadding;
-    if (fixedCellPadding != null) result.fixedCellPadding = fixedCellPadding;
-    if (headerSeparator != null) result.headerSeparator = headerSeparator;
-    if (headerResizeHandle != null)
-      result.headerResizeHandle = headerResizeHandle;
-    if (iconThemeSlots != null) result.iconThemeSlots = iconThemeSlots;
-    if (checkboxCheckedPicture != null)
-      result.checkboxCheckedPicture = checkboxCheckedPicture;
-    if (checkboxUncheckedPicture != null)
-      result.checkboxUncheckedPicture = checkboxUncheckedPicture;
-    if (checkboxIndeterminatePicture != null)
-      result.checkboxIndeterminatePicture = checkboxIndeterminatePicture;
-    if (iconThemeDefaults != null) result.iconThemeDefaults = iconThemeDefaults;
-    if (iconThemeSlotStyles != null)
-      result.iconThemeSlotStyles = iconThemeSlotStyles;
-    if (showSortNumbers != null) result.showSortNumbers = showSortNumbers;
+    if (format != null) result.format = format;
+    if (wordWrap != null) result.wordWrap = wordWrap;
+    if (ellipsis != null) result.ellipsis = ellipsis;
+    if (textOverflow != null) result.textOverflow = textOverflow;
     return result;
   }
 
@@ -2314,89 +3317,49 @@ class StyleConfig extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'StyleConfig',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aE<BorderAppearance>(1, _omitFieldNames ? '' : 'appearance',
+    ..aI(1, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
+    ..aI(3, _omitFieldNames ? '' : 'alternateBackground',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOM<Font>(4, _omitFieldNames ? '' : 'font', subBuilder: Font.create)
+    ..aOM<Padding>(5, _omitFieldNames ? '' : 'cellPadding',
+        subBuilder: Padding.create)
+    ..aE<TextEffect>(6, _omitFieldNames ? '' : 'textEffect',
+        enumValues: TextEffect.values)
+    ..aI(7, _omitFieldNames ? '' : 'progressColor',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOM<GridLines>(10, _omitFieldNames ? '' : 'gridLines',
+        subBuilder: GridLines.create)
+    ..aOM<RegionStyle>(11, _omitFieldNames ? '' : 'fixed',
+        subBuilder: RegionStyle.create)
+    ..aOM<RegionStyle>(12, _omitFieldNames ? '' : 'frozen',
+        subBuilder: RegionStyle.create)
+    ..aOM<HeaderStyle>(13, _omitFieldNames ? '' : 'header',
+        subBuilder: HeaderStyle.create)
+    ..aI(20, _omitFieldNames ? '' : 'sheetBackground',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(21, _omitFieldNames ? '' : 'sheetBorder',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aE<BorderAppearance>(22, _omitFieldNames ? '' : 'appearance',
         enumValues: BorderAppearance.values)
-    ..aI(2, _omitFieldNames ? '' : 'backColor', fieldType: $pb.PbFieldType.OU3)
-    ..aI(3, _omitFieldNames ? '' : 'foreColor', fieldType: $pb.PbFieldType.OU3)
-    ..aI(4, _omitFieldNames ? '' : 'backColorFixed',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aI(5, _omitFieldNames ? '' : 'foreColorFixed',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aI(6, _omitFieldNames ? '' : 'backColorFrozen',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aI(7, _omitFieldNames ? '' : 'foreColorFrozen',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aI(10, _omitFieldNames ? '' : 'backColorBkg',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aI(11, _omitFieldNames ? '' : 'backColorAlternate',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aE<GridLineStyle>(12, _omitFieldNames ? '' : 'gridLines',
-        enumValues: GridLineStyle.values)
-    ..aE<GridLineStyle>(13, _omitFieldNames ? '' : 'gridLinesFixed',
-        enumValues: GridLineStyle.values)
-    ..aI(14, _omitFieldNames ? '' : 'gridColor', fieldType: $pb.PbFieldType.OU3)
-    ..aI(15, _omitFieldNames ? '' : 'gridColorFixed',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aI(16, _omitFieldNames ? '' : 'gridLineWidth')
-    ..aE<TextEffect>(17, _omitFieldNames ? '' : 'textEffect',
-        enumValues: TextEffect.values)
-    ..aE<TextEffect>(18, _omitFieldNames ? '' : 'textEffectFixed',
-        enumValues: TextEffect.values)
-    ..aOS(19, _omitFieldNames ? '' : 'fontName')
-    ..aD(20, _omitFieldNames ? '' : 'fontSize', fieldType: $pb.PbFieldType.OF)
-    ..aOB(21, _omitFieldNames ? '' : 'fontBold')
-    ..aOB(22, _omitFieldNames ? '' : 'fontItalic')
-    ..aOB(23, _omitFieldNames ? '' : 'fontUnderline')
-    ..aOB(24, _omitFieldNames ? '' : 'fontStrikethrough')
-    ..aD(25, _omitFieldNames ? '' : 'fontWidth', fieldType: $pb.PbFieldType.OF)
-    ..aI(26, _omitFieldNames ? '' : 'sheetBorder',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aI(27, _omitFieldNames ? '' : 'progressColor',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aOB(28, _omitFieldNames ? '' : 'imageOverText')
     ..a<$core.List<$core.int>>(
-        29, _omitFieldNames ? '' : 'backgroundImage', $pb.PbFieldType.OY)
-    ..aE<ImageAlignment>(30, _omitFieldNames ? '' : 'backgroundImageAlignment',
+        23, _omitFieldNames ? '' : 'backgroundImage', $pb.PbFieldType.OY)
+    ..aE<ImageAlignment>(24, _omitFieldNames ? '' : 'backgroundImageAlign',
         enumValues: ImageAlignment.values)
-    ..aE<TextRenderMode>(31, _omitFieldNames ? '' : 'textRenderMode',
-        enumValues: TextRenderMode.values)
-    ..aE<TextHintingMode>(32, _omitFieldNames ? '' : 'textHintingMode',
-        enumValues: TextHintingMode.values)
-    ..aOB(33, _omitFieldNames ? '' : 'textPixelSnap')
-    ..aE<ApplyScope>(34, _omitFieldNames ? '' : 'applyScope',
+    ..aOM<TextRendering>(25, _omitFieldNames ? '' : 'textRendering',
+        subBuilder: TextRendering.create)
+    ..aOM<IconTheme>(30, _omitFieldNames ? '' : 'icons',
+        subBuilder: IconTheme.create)
+    ..aOB(31, _omitFieldNames ? '' : 'imageOverText')
+    ..aOB(32, _omitFieldNames ? '' : 'showSortNumbers')
+    ..aE<ApplyScope>(33, _omitFieldNames ? '' : 'applyScope',
         enumValues: ApplyScope.values)
-    ..aE<CustomRenderMode>(35, _omitFieldNames ? '' : 'customRender',
+    ..aE<CustomRenderMode>(34, _omitFieldNames ? '' : 'customRender',
         enumValues: CustomRenderMode.values)
-    ..aOM<ImageData>(36, _omitFieldNames ? '' : 'sortAscendingPicture',
-        subBuilder: ImageData.create)
-    ..aOM<ImageData>(37, _omitFieldNames ? '' : 'sortDescendingPicture',
-        subBuilder: ImageData.create)
-    ..aOM<ImageData>(38, _omitFieldNames ? '' : 'nodeOpenPicture',
-        subBuilder: ImageData.create)
-    ..aOM<ImageData>(39, _omitFieldNames ? '' : 'nodeClosedPicture',
-        subBuilder: ImageData.create)
-    ..aOM<CellPadding>(40, _omitFieldNames ? '' : 'cellPadding',
-        subBuilder: CellPadding.create)
-    ..aOM<CellPadding>(41, _omitFieldNames ? '' : 'fixedCellPadding',
-        subBuilder: CellPadding.create)
-    ..aOM<HeaderSeparatorStyle>(42, _omitFieldNames ? '' : 'headerSeparator',
-        subBuilder: HeaderSeparatorStyle.create)
-    ..aOM<HeaderResizeHandleStyle>(
-        43, _omitFieldNames ? '' : 'headerResizeHandle',
-        subBuilder: HeaderResizeHandleStyle.create)
-    ..aOM<IconThemeSlots>(44, _omitFieldNames ? '' : 'iconThemeSlots',
-        subBuilder: IconThemeSlots.create)
-    ..aOM<ImageData>(45, _omitFieldNames ? '' : 'checkboxCheckedPicture',
-        subBuilder: ImageData.create)
-    ..aOM<ImageData>(46, _omitFieldNames ? '' : 'checkboxUncheckedPicture',
-        subBuilder: ImageData.create)
-    ..aOM<ImageData>(47, _omitFieldNames ? '' : 'checkboxIndeterminatePicture',
-        subBuilder: ImageData.create)
-    ..aOM<IconThemeDefaults>(48, _omitFieldNames ? '' : 'iconThemeDefaults',
-        subBuilder: IconThemeDefaults.create)
-    ..aOM<IconThemeSlotStyles>(49, _omitFieldNames ? '' : 'iconThemeSlotStyles',
-        subBuilder: IconThemeSlotStyles.create)
-    ..aOB(50, _omitFieldNames ? '' : 'showSortNumbers')
+    ..aOS(40, _omitFieldNames ? '' : 'format')
+    ..aOB(41, _omitFieldNames ? '' : 'wordWrap')
+    ..aI(42, _omitFieldNames ? '' : 'ellipsis')
+    ..aOB(43, _omitFieldNames ? '' : 'textOverflow')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2418,502 +3381,290 @@ class StyleConfig extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<StyleConfig>(create);
   static StyleConfig? _defaultInstance;
 
+  /// Cell defaults
   @$pb.TagNumber(1)
-  BorderAppearance get appearance => $_getN(0);
+  $core.int get background => $_getIZ(0);
   @$pb.TagNumber(1)
-  set appearance(BorderAppearance value) => $_setField(1, value);
+  set background($core.int value) => $_setUnsignedInt32(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasAppearance() => $_has(0);
+  $core.bool hasBackground() => $_has(0);
   @$pb.TagNumber(1)
-  void clearAppearance() => $_clearField(1);
+  void clearBackground() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get backColor => $_getIZ(1);
+  $core.int get foreground => $_getIZ(1);
   @$pb.TagNumber(2)
-  set backColor($core.int value) => $_setUnsignedInt32(1, value);
+  set foreground($core.int value) => $_setUnsignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasBackColor() => $_has(1);
+  $core.bool hasForeground() => $_has(1);
   @$pb.TagNumber(2)
-  void clearBackColor() => $_clearField(2);
+  void clearForeground() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.int get foreColor => $_getIZ(2);
+  $core.int get alternateBackground => $_getIZ(2);
   @$pb.TagNumber(3)
-  set foreColor($core.int value) => $_setUnsignedInt32(2, value);
+  set alternateBackground($core.int value) => $_setUnsignedInt32(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasForeColor() => $_has(2);
+  $core.bool hasAlternateBackground() => $_has(2);
   @$pb.TagNumber(3)
-  void clearForeColor() => $_clearField(3);
+  void clearAlternateBackground() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.int get backColorFixed => $_getIZ(3);
+  Font get font => $_getN(3);
   @$pb.TagNumber(4)
-  set backColorFixed($core.int value) => $_setUnsignedInt32(3, value);
+  set font(Font value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasBackColorFixed() => $_has(3);
+  $core.bool hasFont() => $_has(3);
   @$pb.TagNumber(4)
-  void clearBackColorFixed() => $_clearField(4);
+  void clearFont() => $_clearField(4);
+  @$pb.TagNumber(4)
+  Font ensureFont() => $_ensure(3);
 
   @$pb.TagNumber(5)
-  $core.int get foreColorFixed => $_getIZ(4);
+  Padding get cellPadding => $_getN(4);
   @$pb.TagNumber(5)
-  set foreColorFixed($core.int value) => $_setUnsignedInt32(4, value);
+  set cellPadding(Padding value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasForeColorFixed() => $_has(4);
+  $core.bool hasCellPadding() => $_has(4);
   @$pb.TagNumber(5)
-  void clearForeColorFixed() => $_clearField(5);
+  void clearCellPadding() => $_clearField(5);
+  @$pb.TagNumber(5)
+  Padding ensureCellPadding() => $_ensure(4);
 
   @$pb.TagNumber(6)
-  $core.int get backColorFrozen => $_getIZ(5);
+  TextEffect get textEffect => $_getN(5);
   @$pb.TagNumber(6)
-  set backColorFrozen($core.int value) => $_setUnsignedInt32(5, value);
+  set textEffect(TextEffect value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasBackColorFrozen() => $_has(5);
+  $core.bool hasTextEffect() => $_has(5);
   @$pb.TagNumber(6)
-  void clearBackColorFrozen() => $_clearField(6);
+  void clearTextEffect() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $core.int get foreColorFrozen => $_getIZ(6);
+  $core.int get progressColor => $_getIZ(6);
   @$pb.TagNumber(7)
-  set foreColorFrozen($core.int value) => $_setUnsignedInt32(6, value);
+  set progressColor($core.int value) => $_setUnsignedInt32(6, value);
   @$pb.TagNumber(7)
-  $core.bool hasForeColorFrozen() => $_has(6);
+  $core.bool hasProgressColor() => $_has(6);
   @$pb.TagNumber(7)
-  void clearForeColorFrozen() => $_clearField(7);
+  void clearProgressColor() => $_clearField(7);
 
+  /// Grid lines (scrollable area)
   @$pb.TagNumber(10)
-  $core.int get backColorBkg => $_getIZ(7);
+  GridLines get gridLines => $_getN(7);
   @$pb.TagNumber(10)
-  set backColorBkg($core.int value) => $_setUnsignedInt32(7, value);
+  set gridLines(GridLines value) => $_setField(10, value);
   @$pb.TagNumber(10)
-  $core.bool hasBackColorBkg() => $_has(7);
+  $core.bool hasGridLines() => $_has(7);
   @$pb.TagNumber(10)
-  void clearBackColorBkg() => $_clearField(10);
+  void clearGridLines() => $_clearField(10);
+  @$pb.TagNumber(10)
+  GridLines ensureGridLines() => $_ensure(7);
 
+  /// Region overrides — only set fields override the defaults above
   @$pb.TagNumber(11)
-  $core.int get backColorAlternate => $_getIZ(8);
+  RegionStyle get fixed => $_getN(8);
   @$pb.TagNumber(11)
-  set backColorAlternate($core.int value) => $_setUnsignedInt32(8, value);
+  set fixed(RegionStyle value) => $_setField(11, value);
   @$pb.TagNumber(11)
-  $core.bool hasBackColorAlternate() => $_has(8);
+  $core.bool hasFixed() => $_has(8);
   @$pb.TagNumber(11)
-  void clearBackColorAlternate() => $_clearField(11);
+  void clearFixed() => $_clearField(11);
+  @$pb.TagNumber(11)
+  RegionStyle ensureFixed() => $_ensure(8);
 
   @$pb.TagNumber(12)
-  GridLineStyle get gridLines => $_getN(9);
+  RegionStyle get frozen => $_getN(9);
   @$pb.TagNumber(12)
-  set gridLines(GridLineStyle value) => $_setField(12, value);
+  set frozen(RegionStyle value) => $_setField(12, value);
   @$pb.TagNumber(12)
-  $core.bool hasGridLines() => $_has(9);
+  $core.bool hasFrozen() => $_has(9);
   @$pb.TagNumber(12)
-  void clearGridLines() => $_clearField(12);
+  void clearFrozen() => $_clearField(12);
+  @$pb.TagNumber(12)
+  RegionStyle ensureFrozen() => $_ensure(9);
 
+  /// Header-specific appearance
   @$pb.TagNumber(13)
-  GridLineStyle get gridLinesFixed => $_getN(10);
+  HeaderStyle get header => $_getN(10);
   @$pb.TagNumber(13)
-  set gridLinesFixed(GridLineStyle value) => $_setField(13, value);
+  set header(HeaderStyle value) => $_setField(13, value);
   @$pb.TagNumber(13)
-  $core.bool hasGridLinesFixed() => $_has(10);
+  $core.bool hasHeader() => $_has(10);
   @$pb.TagNumber(13)
-  void clearGridLinesFixed() => $_clearField(13);
+  void clearHeader() => $_clearField(13);
+  @$pb.TagNumber(13)
+  HeaderStyle ensureHeader() => $_ensure(10);
 
-  @$pb.TagNumber(14)
-  $core.int get gridColor => $_getIZ(11);
-  @$pb.TagNumber(14)
-  set gridColor($core.int value) => $_setUnsignedInt32(11, value);
-  @$pb.TagNumber(14)
-  $core.bool hasGridColor() => $_has(11);
-  @$pb.TagNumber(14)
-  void clearGridColor() => $_clearField(14);
-
-  @$pb.TagNumber(15)
-  $core.int get gridColorFixed => $_getIZ(12);
-  @$pb.TagNumber(15)
-  set gridColorFixed($core.int value) => $_setUnsignedInt32(12, value);
-  @$pb.TagNumber(15)
-  $core.bool hasGridColorFixed() => $_has(12);
-  @$pb.TagNumber(15)
-  void clearGridColorFixed() => $_clearField(15);
-
-  @$pb.TagNumber(16)
-  $core.int get gridLineWidth => $_getIZ(13);
-  @$pb.TagNumber(16)
-  set gridLineWidth($core.int value) => $_setSignedInt32(13, value);
-  @$pb.TagNumber(16)
-  $core.bool hasGridLineWidth() => $_has(13);
-  @$pb.TagNumber(16)
-  void clearGridLineWidth() => $_clearField(16);
-
-  @$pb.TagNumber(17)
-  TextEffect get textEffect => $_getN(14);
-  @$pb.TagNumber(17)
-  set textEffect(TextEffect value) => $_setField(17, value);
-  @$pb.TagNumber(17)
-  $core.bool hasTextEffect() => $_has(14);
-  @$pb.TagNumber(17)
-  void clearTextEffect() => $_clearField(17);
-
-  @$pb.TagNumber(18)
-  TextEffect get textEffectFixed => $_getN(15);
-  @$pb.TagNumber(18)
-  set textEffectFixed(TextEffect value) => $_setField(18, value);
-  @$pb.TagNumber(18)
-  $core.bool hasTextEffectFixed() => $_has(15);
-  @$pb.TagNumber(18)
-  void clearTextEffectFixed() => $_clearField(18);
-
-  @$pb.TagNumber(19)
-  $core.String get fontName => $_getSZ(16);
-  @$pb.TagNumber(19)
-  set fontName($core.String value) => $_setString(16, value);
-  @$pb.TagNumber(19)
-  $core.bool hasFontName() => $_has(16);
-  @$pb.TagNumber(19)
-  void clearFontName() => $_clearField(19);
-
+  /// Sheet-level
   @$pb.TagNumber(20)
-  $core.double get fontSize => $_getN(17);
+  $core.int get sheetBackground => $_getIZ(11);
   @$pb.TagNumber(20)
-  set fontSize($core.double value) => $_setFloat(17, value);
+  set sheetBackground($core.int value) => $_setUnsignedInt32(11, value);
   @$pb.TagNumber(20)
-  $core.bool hasFontSize() => $_has(17);
+  $core.bool hasSheetBackground() => $_has(11);
   @$pb.TagNumber(20)
-  void clearFontSize() => $_clearField(20);
+  void clearSheetBackground() => $_clearField(20);
 
   @$pb.TagNumber(21)
-  $core.bool get fontBold => $_getBF(18);
+  $core.int get sheetBorder => $_getIZ(12);
   @$pb.TagNumber(21)
-  set fontBold($core.bool value) => $_setBool(18, value);
+  set sheetBorder($core.int value) => $_setUnsignedInt32(12, value);
   @$pb.TagNumber(21)
-  $core.bool hasFontBold() => $_has(18);
+  $core.bool hasSheetBorder() => $_has(12);
   @$pb.TagNumber(21)
-  void clearFontBold() => $_clearField(21);
+  void clearSheetBorder() => $_clearField(21);
 
   @$pb.TagNumber(22)
-  $core.bool get fontItalic => $_getBF(19);
+  BorderAppearance get appearance => $_getN(13);
   @$pb.TagNumber(22)
-  set fontItalic($core.bool value) => $_setBool(19, value);
+  set appearance(BorderAppearance value) => $_setField(22, value);
   @$pb.TagNumber(22)
-  $core.bool hasFontItalic() => $_has(19);
+  $core.bool hasAppearance() => $_has(13);
   @$pb.TagNumber(22)
-  void clearFontItalic() => $_clearField(22);
+  void clearAppearance() => $_clearField(22);
 
+  /// Background image
   @$pb.TagNumber(23)
-  $core.bool get fontUnderline => $_getBF(20);
+  $core.List<$core.int> get backgroundImage => $_getN(14);
   @$pb.TagNumber(23)
-  set fontUnderline($core.bool value) => $_setBool(20, value);
+  set backgroundImage($core.List<$core.int> value) => $_setBytes(14, value);
   @$pb.TagNumber(23)
-  $core.bool hasFontUnderline() => $_has(20);
+  $core.bool hasBackgroundImage() => $_has(14);
   @$pb.TagNumber(23)
-  void clearFontUnderline() => $_clearField(23);
+  void clearBackgroundImage() => $_clearField(23);
 
   @$pb.TagNumber(24)
-  $core.bool get fontStrikethrough => $_getBF(21);
+  ImageAlignment get backgroundImageAlign => $_getN(15);
   @$pb.TagNumber(24)
-  set fontStrikethrough($core.bool value) => $_setBool(21, value);
+  set backgroundImageAlign(ImageAlignment value) => $_setField(24, value);
   @$pb.TagNumber(24)
-  $core.bool hasFontStrikethrough() => $_has(21);
+  $core.bool hasBackgroundImageAlign() => $_has(15);
   @$pb.TagNumber(24)
-  void clearFontStrikethrough() => $_clearField(24);
+  void clearBackgroundImageAlign() => $_clearField(24);
 
+  /// Text rendering
   @$pb.TagNumber(25)
-  $core.double get fontWidth => $_getN(22);
+  TextRendering get textRendering => $_getN(16);
   @$pb.TagNumber(25)
-  set fontWidth($core.double value) => $_setFloat(22, value);
+  set textRendering(TextRendering value) => $_setField(25, value);
   @$pb.TagNumber(25)
-  $core.bool hasFontWidth() => $_has(22);
+  $core.bool hasTextRendering() => $_has(16);
   @$pb.TagNumber(25)
-  void clearFontWidth() => $_clearField(25);
+  void clearTextRendering() => $_clearField(25);
+  @$pb.TagNumber(25)
+  TextRendering ensureTextRendering() => $_ensure(16);
 
-  @$pb.TagNumber(26)
-  $core.int get sheetBorder => $_getIZ(23);
-  @$pb.TagNumber(26)
-  set sheetBorder($core.int value) => $_setUnsignedInt32(23, value);
-  @$pb.TagNumber(26)
-  $core.bool hasSheetBorder() => $_has(23);
-  @$pb.TagNumber(26)
-  void clearSheetBorder() => $_clearField(26);
-
-  @$pb.TagNumber(27)
-  $core.int get progressColor => $_getIZ(24);
-  @$pb.TagNumber(27)
-  set progressColor($core.int value) => $_setUnsignedInt32(24, value);
-  @$pb.TagNumber(27)
-  $core.bool hasProgressColor() => $_has(24);
-  @$pb.TagNumber(27)
-  void clearProgressColor() => $_clearField(27);
-
-  @$pb.TagNumber(28)
-  $core.bool get imageOverText => $_getBF(25);
-  @$pb.TagNumber(28)
-  set imageOverText($core.bool value) => $_setBool(25, value);
-  @$pb.TagNumber(28)
-  $core.bool hasImageOverText() => $_has(25);
-  @$pb.TagNumber(28)
-  void clearImageOverText() => $_clearField(28);
-
-  @$pb.TagNumber(29)
-  $core.List<$core.int> get backgroundImage => $_getN(26);
-  @$pb.TagNumber(29)
-  set backgroundImage($core.List<$core.int> value) => $_setBytes(26, value);
-  @$pb.TagNumber(29)
-  $core.bool hasBackgroundImage() => $_has(26);
-  @$pb.TagNumber(29)
-  void clearBackgroundImage() => $_clearField(29);
-
+  /// Icons
   @$pb.TagNumber(30)
-  ImageAlignment get backgroundImageAlignment => $_getN(27);
+  IconTheme get icons => $_getN(17);
   @$pb.TagNumber(30)
-  set backgroundImageAlignment(ImageAlignment value) => $_setField(30, value);
+  set icons(IconTheme value) => $_setField(30, value);
   @$pb.TagNumber(30)
-  $core.bool hasBackgroundImageAlignment() => $_has(27);
+  $core.bool hasIcons() => $_has(17);
   @$pb.TagNumber(30)
-  void clearBackgroundImageAlignment() => $_clearField(30);
+  void clearIcons() => $_clearField(30);
+  @$pb.TagNumber(30)
+  IconTheme ensureIcons() => $_ensure(17);
 
+  /// Rendering options
   @$pb.TagNumber(31)
-  TextRenderMode get textRenderMode => $_getN(28);
+  $core.bool get imageOverText => $_getBF(18);
   @$pb.TagNumber(31)
-  set textRenderMode(TextRenderMode value) => $_setField(31, value);
+  set imageOverText($core.bool value) => $_setBool(18, value);
   @$pb.TagNumber(31)
-  $core.bool hasTextRenderMode() => $_has(28);
+  $core.bool hasImageOverText() => $_has(18);
   @$pb.TagNumber(31)
-  void clearTextRenderMode() => $_clearField(31);
+  void clearImageOverText() => $_clearField(31);
 
   @$pb.TagNumber(32)
-  TextHintingMode get textHintingMode => $_getN(29);
+  $core.bool get showSortNumbers => $_getBF(19);
   @$pb.TagNumber(32)
-  set textHintingMode(TextHintingMode value) => $_setField(32, value);
+  set showSortNumbers($core.bool value) => $_setBool(19, value);
   @$pb.TagNumber(32)
-  $core.bool hasTextHintingMode() => $_has(29);
+  $core.bool hasShowSortNumbers() => $_has(19);
   @$pb.TagNumber(32)
-  void clearTextHintingMode() => $_clearField(32);
+  void clearShowSortNumbers() => $_clearField(32);
 
   @$pb.TagNumber(33)
-  $core.bool get textPixelSnap => $_getBF(30);
+  ApplyScope get applyScope => $_getN(20);
   @$pb.TagNumber(33)
-  set textPixelSnap($core.bool value) => $_setBool(30, value);
+  set applyScope(ApplyScope value) => $_setField(33, value);
   @$pb.TagNumber(33)
-  $core.bool hasTextPixelSnap() => $_has(30);
+  $core.bool hasApplyScope() => $_has(20);
   @$pb.TagNumber(33)
-  void clearTextPixelSnap() => $_clearField(33);
+  void clearApplyScope() => $_clearField(33);
 
   @$pb.TagNumber(34)
-  ApplyScope get applyScope => $_getN(31);
+  CustomRenderMode get customRender => $_getN(21);
   @$pb.TagNumber(34)
-  set applyScope(ApplyScope value) => $_setField(34, value);
+  set customRender(CustomRenderMode value) => $_setField(34, value);
   @$pb.TagNumber(34)
-  $core.bool hasApplyScope() => $_has(31);
+  $core.bool hasCustomRender() => $_has(21);
   @$pb.TagNumber(34)
-  void clearApplyScope() => $_clearField(34);
+  void clearCustomRender() => $_clearField(34);
 
-  @$pb.TagNumber(35)
-  CustomRenderMode get customRender => $_getN(32);
-  @$pb.TagNumber(35)
-  set customRender(CustomRenderMode value) => $_setField(35, value);
-  @$pb.TagNumber(35)
-  $core.bool hasCustomRender() => $_has(32);
-  @$pb.TagNumber(35)
-  void clearCustomRender() => $_clearField(35);
-
-  @$pb.TagNumber(36)
-  ImageData get sortAscendingPicture => $_getN(33);
-  @$pb.TagNumber(36)
-  set sortAscendingPicture(ImageData value) => $_setField(36, value);
-  @$pb.TagNumber(36)
-  $core.bool hasSortAscendingPicture() => $_has(33);
-  @$pb.TagNumber(36)
-  void clearSortAscendingPicture() => $_clearField(36);
-  @$pb.TagNumber(36)
-  ImageData ensureSortAscendingPicture() => $_ensure(33);
-
-  @$pb.TagNumber(37)
-  ImageData get sortDescendingPicture => $_getN(34);
-  @$pb.TagNumber(37)
-  set sortDescendingPicture(ImageData value) => $_setField(37, value);
-  @$pb.TagNumber(37)
-  $core.bool hasSortDescendingPicture() => $_has(34);
-  @$pb.TagNumber(37)
-  void clearSortDescendingPicture() => $_clearField(37);
-  @$pb.TagNumber(37)
-  ImageData ensureSortDescendingPicture() => $_ensure(34);
-
-  @$pb.TagNumber(38)
-  ImageData get nodeOpenPicture => $_getN(35);
-  @$pb.TagNumber(38)
-  set nodeOpenPicture(ImageData value) => $_setField(38, value);
-  @$pb.TagNumber(38)
-  $core.bool hasNodeOpenPicture() => $_has(35);
-  @$pb.TagNumber(38)
-  void clearNodeOpenPicture() => $_clearField(38);
-  @$pb.TagNumber(38)
-  ImageData ensureNodeOpenPicture() => $_ensure(35);
-
-  @$pb.TagNumber(39)
-  ImageData get nodeClosedPicture => $_getN(36);
-  @$pb.TagNumber(39)
-  set nodeClosedPicture(ImageData value) => $_setField(39, value);
-  @$pb.TagNumber(39)
-  $core.bool hasNodeClosedPicture() => $_has(36);
-  @$pb.TagNumber(39)
-  void clearNodeClosedPicture() => $_clearField(39);
-  @$pb.TagNumber(39)
-  ImageData ensureNodeClosedPicture() => $_ensure(36);
-
-  /// Default insets for non-fixed cells.
+  /// Default cell text behavior (moved from LayoutConfig)
   @$pb.TagNumber(40)
-  CellPadding get cellPadding => $_getN(37);
+  $core.String get format => $_getSZ(22);
   @$pb.TagNumber(40)
-  set cellPadding(CellPadding value) => $_setField(40, value);
+  set format($core.String value) => $_setString(22, value);
   @$pb.TagNumber(40)
-  $core.bool hasCellPadding() => $_has(37);
+  $core.bool hasFormat() => $_has(22);
   @$pb.TagNumber(40)
-  void clearCellPadding() => $_clearField(40);
-  @$pb.TagNumber(40)
-  CellPadding ensureCellPadding() => $_ensure(37);
+  void clearFormat() => $_clearField(40);
 
-  /// Default insets for fixed/header cells.
   @$pb.TagNumber(41)
-  CellPadding get fixedCellPadding => $_getN(38);
+  $core.bool get wordWrap => $_getBF(23);
   @$pb.TagNumber(41)
-  set fixedCellPadding(CellPadding value) => $_setField(41, value);
+  set wordWrap($core.bool value) => $_setBool(23, value);
   @$pb.TagNumber(41)
-  $core.bool hasFixedCellPadding() => $_has(38);
+  $core.bool hasWordWrap() => $_has(23);
   @$pb.TagNumber(41)
-  void clearFixedCellPadding() => $_clearField(41);
-  @$pb.TagNumber(41)
-  CellPadding ensureFixedCellPadding() => $_ensure(38);
+  void clearWordWrap() => $_clearField(41);
 
-  /// Short per-column divider marks in fixed/header rows.
   @$pb.TagNumber(42)
-  HeaderSeparatorStyle get headerSeparator => $_getN(39);
+  $core.int get ellipsis => $_getIZ(24);
   @$pb.TagNumber(42)
-  set headerSeparator(HeaderSeparatorStyle value) => $_setField(42, value);
+  set ellipsis($core.int value) => $_setSignedInt32(24, value);
   @$pb.TagNumber(42)
-  $core.bool hasHeaderSeparator() => $_has(39);
+  $core.bool hasEllipsis() => $_has(24);
   @$pb.TagNumber(42)
-  void clearHeaderSeparator() => $_clearField(42);
-  @$pb.TagNumber(42)
-  HeaderSeparatorStyle ensureHeaderSeparator() => $_ensure(39);
+  void clearEllipsis() => $_clearField(42);
 
-  /// Header resize handle appearance + hit region tuning.
   @$pb.TagNumber(43)
-  HeaderResizeHandleStyle get headerResizeHandle => $_getN(40);
+  $core.bool get textOverflow => $_getBF(25);
   @$pb.TagNumber(43)
-  set headerResizeHandle(HeaderResizeHandleStyle value) =>
-      $_setField(43, value);
+  set textOverflow($core.bool value) => $_setBool(25, value);
   @$pb.TagNumber(43)
-  $core.bool hasHeaderResizeHandle() => $_has(40);
+  $core.bool hasTextOverflow() => $_has(25);
   @$pb.TagNumber(43)
-  void clearHeaderResizeHandle() => $_clearField(43);
-  @$pb.TagNumber(43)
-  HeaderResizeHandleStyle ensureHeaderResizeHandle() => $_ensure(40);
-
-  /// String-based icon slots for themed UI glyphs.
-  @$pb.TagNumber(44)
-  IconThemeSlots get iconThemeSlots => $_getN(41);
-  @$pb.TagNumber(44)
-  set iconThemeSlots(IconThemeSlots value) => $_setField(44, value);
-  @$pb.TagNumber(44)
-  $core.bool hasIconThemeSlots() => $_has(41);
-  @$pb.TagNumber(44)
-  void clearIconThemeSlots() => $_clearField(44);
-  @$pb.TagNumber(44)
-  IconThemeSlots ensureIconThemeSlots() => $_ensure(41);
-
-  /// PNG icon pictures for checkbox states.
-  @$pb.TagNumber(45)
-  ImageData get checkboxCheckedPicture => $_getN(42);
-  @$pb.TagNumber(45)
-  set checkboxCheckedPicture(ImageData value) => $_setField(45, value);
-  @$pb.TagNumber(45)
-  $core.bool hasCheckboxCheckedPicture() => $_has(42);
-  @$pb.TagNumber(45)
-  void clearCheckboxCheckedPicture() => $_clearField(45);
-  @$pb.TagNumber(45)
-  ImageData ensureCheckboxCheckedPicture() => $_ensure(42);
-
-  @$pb.TagNumber(46)
-  ImageData get checkboxUncheckedPicture => $_getN(43);
-  @$pb.TagNumber(46)
-  set checkboxUncheckedPicture(ImageData value) => $_setField(46, value);
-  @$pb.TagNumber(46)
-  $core.bool hasCheckboxUncheckedPicture() => $_has(43);
-  @$pb.TagNumber(46)
-  void clearCheckboxUncheckedPicture() => $_clearField(46);
-  @$pb.TagNumber(46)
-  ImageData ensureCheckboxUncheckedPicture() => $_ensure(43);
-
-  @$pb.TagNumber(47)
-  ImageData get checkboxIndeterminatePicture => $_getN(44);
-  @$pb.TagNumber(47)
-  set checkboxIndeterminatePicture(ImageData value) => $_setField(47, value);
-  @$pb.TagNumber(47)
-  $core.bool hasCheckboxIndeterminatePicture() => $_has(44);
-  @$pb.TagNumber(47)
-  void clearCheckboxIndeterminatePicture() => $_clearField(47);
-  @$pb.TagNumber(47)
-  ImageData ensureCheckboxIndeterminatePicture() => $_ensure(44);
-
-  /// Default text/layout style for icon slots.
-  @$pb.TagNumber(48)
-  IconThemeDefaults get iconThemeDefaults => $_getN(45);
-  @$pb.TagNumber(48)
-  set iconThemeDefaults(IconThemeDefaults value) => $_setField(48, value);
-  @$pb.TagNumber(48)
-  $core.bool hasIconThemeDefaults() => $_has(45);
-  @$pb.TagNumber(48)
-  void clearIconThemeDefaults() => $_clearField(48);
-  @$pb.TagNumber(48)
-  IconThemeDefaults ensureIconThemeDefaults() => $_ensure(45);
-
-  /// Per-slot icon text/layout style overrides.
-  @$pb.TagNumber(49)
-  IconThemeSlotStyles get iconThemeSlotStyles => $_getN(46);
-  @$pb.TagNumber(49)
-  set iconThemeSlotStyles(IconThemeSlotStyles value) => $_setField(49, value);
-  @$pb.TagNumber(49)
-  $core.bool hasIconThemeSlotStyles() => $_has(46);
-  @$pb.TagNumber(49)
-  void clearIconThemeSlotStyles() => $_clearField(49);
-  @$pb.TagNumber(49)
-  IconThemeSlotStyles ensureIconThemeSlotStyles() => $_ensure(46);
-
-  /// Show sort priority numbers (1, 2, 3…) next to sort indicators in multi-sort.
-  @$pb.TagNumber(50)
-  $core.bool get showSortNumbers => $_getBF(47);
-  @$pb.TagNumber(50)
-  set showSortNumbers($core.bool value) => $_setBool(47, value);
-  @$pb.TagNumber(50)
-  $core.bool hasShowSortNumbers() => $_has(47);
-  @$pb.TagNumber(50)
-  void clearShowSortNumbers() => $_clearField(50);
+  void clearTextOverflow() => $_clearField(43);
 }
 
+/// ── Selection ──
 class SelectionConfig extends $pb.GeneratedMessage {
   factory SelectionConfig({
     SelectionMode? mode,
     FocusBorderStyle? focusBorder,
-    SelectionVisibility? selectionVisibility,
-    $core.bool? allowSelection,
+    SelectionVisibility? visibility,
+    $core.bool? allow,
     $core.bool? headerClickSelect,
-    HighlightStyle? selectionStyle,
-    $core.int? hoverMode,
-    HighlightStyle? hoverRowStyle,
-    HighlightStyle? hoverColumnStyle,
-    HighlightStyle? hoverCellStyle,
+    HighlightStyle? style,
+    HoverConfig? hover,
+    HighlightStyle? indicatorRowStyle,
+    HighlightStyle? indicatorColStyle,
   }) {
     final result = create();
     if (mode != null) result.mode = mode;
     if (focusBorder != null) result.focusBorder = focusBorder;
-    if (selectionVisibility != null)
-      result.selectionVisibility = selectionVisibility;
-    if (allowSelection != null) result.allowSelection = allowSelection;
+    if (visibility != null) result.visibility = visibility;
+    if (allow != null) result.allow = allow;
     if (headerClickSelect != null) result.headerClickSelect = headerClickSelect;
-    if (selectionStyle != null) result.selectionStyle = selectionStyle;
-    if (hoverMode != null) result.hoverMode = hoverMode;
-    if (hoverRowStyle != null) result.hoverRowStyle = hoverRowStyle;
-    if (hoverColumnStyle != null) result.hoverColumnStyle = hoverColumnStyle;
-    if (hoverCellStyle != null) result.hoverCellStyle = hoverCellStyle;
+    if (style != null) result.style = style;
+    if (hover != null) result.hover = hover;
+    if (indicatorRowStyle != null) result.indicatorRowStyle = indicatorRowStyle;
+    if (indicatorColStyle != null) result.indicatorColStyle = indicatorColStyle;
     return result;
   }
 
@@ -2934,18 +3685,17 @@ class SelectionConfig extends $pb.GeneratedMessage {
         enumValues: SelectionMode.values)
     ..aE<FocusBorderStyle>(2, _omitFieldNames ? '' : 'focusBorder',
         enumValues: FocusBorderStyle.values)
-    ..aE<SelectionVisibility>(3, _omitFieldNames ? '' : 'selectionVisibility',
+    ..aE<SelectionVisibility>(3, _omitFieldNames ? '' : 'visibility',
         enumValues: SelectionVisibility.values)
-    ..aOB(4, _omitFieldNames ? '' : 'allowSelection')
+    ..aOB(4, _omitFieldNames ? '' : 'allow')
     ..aOB(5, _omitFieldNames ? '' : 'headerClickSelect')
-    ..aOM<HighlightStyle>(6, _omitFieldNames ? '' : 'selectionStyle',
+    ..aOM<HighlightStyle>(6, _omitFieldNames ? '' : 'style',
         subBuilder: HighlightStyle.create)
-    ..aI(7, _omitFieldNames ? '' : 'hoverMode', fieldType: $pb.PbFieldType.OU3)
-    ..aOM<HighlightStyle>(8, _omitFieldNames ? '' : 'hoverRowStyle',
+    ..aOM<HoverConfig>(7, _omitFieldNames ? '' : 'hover',
+        subBuilder: HoverConfig.create)
+    ..aOM<HighlightStyle>(8, _omitFieldNames ? '' : 'indicatorRowStyle',
         subBuilder: HighlightStyle.create)
-    ..aOM<HighlightStyle>(9, _omitFieldNames ? '' : 'hoverColumnStyle',
-        subBuilder: HighlightStyle.create)
-    ..aOM<HighlightStyle>(10, _omitFieldNames ? '' : 'hoverCellStyle',
+    ..aOM<HighlightStyle>(9, _omitFieldNames ? '' : 'indicatorColStyle',
         subBuilder: HighlightStyle.create)
     ..hasRequiredFields = false;
 
@@ -2987,22 +3737,22 @@ class SelectionConfig extends $pb.GeneratedMessage {
   void clearFocusBorder() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  SelectionVisibility get selectionVisibility => $_getN(2);
+  SelectionVisibility get visibility => $_getN(2);
   @$pb.TagNumber(3)
-  set selectionVisibility(SelectionVisibility value) => $_setField(3, value);
+  set visibility(SelectionVisibility value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasSelectionVisibility() => $_has(2);
+  $core.bool hasVisibility() => $_has(2);
   @$pb.TagNumber(3)
-  void clearSelectionVisibility() => $_clearField(3);
+  void clearVisibility() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.bool get allowSelection => $_getBF(3);
+  $core.bool get allow => $_getBF(3);
   @$pb.TagNumber(4)
-  set allowSelection($core.bool value) => $_setBool(3, value);
+  set allow($core.bool value) => $_setBool(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasAllowSelection() => $_has(3);
+  $core.bool hasAllow() => $_has(3);
   @$pb.TagNumber(4)
-  void clearAllowSelection() => $_clearField(4);
+  void clearAllow() => $_clearField(4);
 
   @$pb.TagNumber(5)
   $core.bool get headerClickSelect => $_getBF(4);
@@ -3014,77 +3764,69 @@ class SelectionConfig extends $pb.GeneratedMessage {
   void clearHeaderClickSelect() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  HighlightStyle get selectionStyle => $_getN(5);
+  HighlightStyle get style => $_getN(5);
   @$pb.TagNumber(6)
-  set selectionStyle(HighlightStyle value) => $_setField(6, value);
+  set style(HighlightStyle value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasSelectionStyle() => $_has(5);
+  $core.bool hasStyle() => $_has(5);
   @$pb.TagNumber(6)
-  void clearSelectionStyle() => $_clearField(6);
+  void clearStyle() => $_clearField(6);
   @$pb.TagNumber(6)
-  HighlightStyle ensureSelectionStyle() => $_ensure(5);
+  HighlightStyle ensureStyle() => $_ensure(5);
 
   @$pb.TagNumber(7)
-  $core.int get hoverMode => $_getIZ(6);
+  HoverConfig get hover => $_getN(6);
   @$pb.TagNumber(7)
-  set hoverMode($core.int value) => $_setUnsignedInt32(6, value);
+  set hover(HoverConfig value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasHoverMode() => $_has(6);
+  $core.bool hasHover() => $_has(6);
   @$pb.TagNumber(7)
-  void clearHoverMode() => $_clearField(7);
+  void clearHover() => $_clearField(7);
+  @$pb.TagNumber(7)
+  HoverConfig ensureHover() => $_ensure(6);
 
   @$pb.TagNumber(8)
-  HighlightStyle get hoverRowStyle => $_getN(7);
+  HighlightStyle get indicatorRowStyle => $_getN(7);
   @$pb.TagNumber(8)
-  set hoverRowStyle(HighlightStyle value) => $_setField(8, value);
+  set indicatorRowStyle(HighlightStyle value) => $_setField(8, value);
   @$pb.TagNumber(8)
-  $core.bool hasHoverRowStyle() => $_has(7);
+  $core.bool hasIndicatorRowStyle() => $_has(7);
   @$pb.TagNumber(8)
-  void clearHoverRowStyle() => $_clearField(8);
+  void clearIndicatorRowStyle() => $_clearField(8);
   @$pb.TagNumber(8)
-  HighlightStyle ensureHoverRowStyle() => $_ensure(7);
+  HighlightStyle ensureIndicatorRowStyle() => $_ensure(7);
 
   @$pb.TagNumber(9)
-  HighlightStyle get hoverColumnStyle => $_getN(8);
+  HighlightStyle get indicatorColStyle => $_getN(8);
   @$pb.TagNumber(9)
-  set hoverColumnStyle(HighlightStyle value) => $_setField(9, value);
+  set indicatorColStyle(HighlightStyle value) => $_setField(9, value);
   @$pb.TagNumber(9)
-  $core.bool hasHoverColumnStyle() => $_has(8);
+  $core.bool hasIndicatorColStyle() => $_has(8);
   @$pb.TagNumber(9)
-  void clearHoverColumnStyle() => $_clearField(9);
+  void clearIndicatorColStyle() => $_clearField(9);
   @$pb.TagNumber(9)
-  HighlightStyle ensureHoverColumnStyle() => $_ensure(8);
-
-  @$pb.TagNumber(10)
-  HighlightStyle get hoverCellStyle => $_getN(9);
-  @$pb.TagNumber(10)
-  set hoverCellStyle(HighlightStyle value) => $_setField(10, value);
-  @$pb.TagNumber(10)
-  $core.bool hasHoverCellStyle() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearHoverCellStyle() => $_clearField(10);
-  @$pb.TagNumber(10)
-  HighlightStyle ensureHoverCellStyle() => $_ensure(9);
+  HighlightStyle ensureIndicatorColStyle() => $_ensure(8);
 }
 
+/// ── Editing ──
 class EditConfig extends $pb.GeneratedMessage {
   factory EditConfig({
-    EditTrigger? editTrigger,
+    EditTrigger? trigger,
     TabBehavior? tabBehavior,
     DropdownTrigger? dropdownTrigger,
     $core.bool? dropdownSearch,
-    $core.int? editMaxLength,
-    $core.String? editMask,
+    $core.int? maxLength,
+    $core.String? mask,
     $core.bool? hostKeyDispatch,
     $core.bool? hostPointerDispatch,
   }) {
     final result = create();
-    if (editTrigger != null) result.editTrigger = editTrigger;
+    if (trigger != null) result.trigger = trigger;
     if (tabBehavior != null) result.tabBehavior = tabBehavior;
     if (dropdownTrigger != null) result.dropdownTrigger = dropdownTrigger;
     if (dropdownSearch != null) result.dropdownSearch = dropdownSearch;
-    if (editMaxLength != null) result.editMaxLength = editMaxLength;
-    if (editMask != null) result.editMask = editMask;
+    if (maxLength != null) result.maxLength = maxLength;
+    if (mask != null) result.mask = mask;
     if (hostKeyDispatch != null) result.hostKeyDispatch = hostKeyDispatch;
     if (hostPointerDispatch != null)
       result.hostPointerDispatch = hostPointerDispatch;
@@ -3104,15 +3846,15 @@ class EditConfig extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'EditConfig',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aE<EditTrigger>(1, _omitFieldNames ? '' : 'editTrigger',
+    ..aE<EditTrigger>(1, _omitFieldNames ? '' : 'trigger',
         enumValues: EditTrigger.values)
     ..aE<TabBehavior>(2, _omitFieldNames ? '' : 'tabBehavior',
         enumValues: TabBehavior.values)
     ..aE<DropdownTrigger>(3, _omitFieldNames ? '' : 'dropdownTrigger',
         enumValues: DropdownTrigger.values)
     ..aOB(4, _omitFieldNames ? '' : 'dropdownSearch')
-    ..aI(5, _omitFieldNames ? '' : 'editMaxLength')
-    ..aOS(6, _omitFieldNames ? '' : 'editMask')
+    ..aI(5, _omitFieldNames ? '' : 'maxLength')
+    ..aOS(6, _omitFieldNames ? '' : 'mask')
     ..aOB(7, _omitFieldNames ? '' : 'hostKeyDispatch')
     ..aOB(8, _omitFieldNames ? '' : 'hostPointerDispatch')
     ..hasRequiredFields = false;
@@ -3136,13 +3878,13 @@ class EditConfig extends $pb.GeneratedMessage {
   static EditConfig? _defaultInstance;
 
   @$pb.TagNumber(1)
-  EditTrigger get editTrigger => $_getN(0);
+  EditTrigger get trigger => $_getN(0);
   @$pb.TagNumber(1)
-  set editTrigger(EditTrigger value) => $_setField(1, value);
+  set trigger(EditTrigger value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasEditTrigger() => $_has(0);
+  $core.bool hasTrigger() => $_has(0);
   @$pb.TagNumber(1)
-  void clearEditTrigger() => $_clearField(1);
+  void clearTrigger() => $_clearField(1);
 
   @$pb.TagNumber(2)
   TabBehavior get tabBehavior => $_getN(1);
@@ -3172,22 +3914,22 @@ class EditConfig extends $pb.GeneratedMessage {
   void clearDropdownSearch() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.int get editMaxLength => $_getIZ(4);
+  $core.int get maxLength => $_getIZ(4);
   @$pb.TagNumber(5)
-  set editMaxLength($core.int value) => $_setSignedInt32(4, value);
+  set maxLength($core.int value) => $_setSignedInt32(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasEditMaxLength() => $_has(4);
+  $core.bool hasMaxLength() => $_has(4);
   @$pb.TagNumber(5)
-  void clearEditMaxLength() => $_clearField(5);
+  void clearMaxLength() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.String get editMask => $_getSZ(5);
+  $core.String get mask => $_getSZ(5);
   @$pb.TagNumber(6)
-  set editMask($core.String value) => $_setString(5, value);
+  set mask($core.String value) => $_setString(5, value);
   @$pb.TagNumber(6)
-  $core.bool hasEditMask() => $_has(5);
+  $core.bool hasMask() => $_has(5);
   @$pb.TagNumber(6)
-  void clearEditMask() => $_clearField(6);
+  void clearMask() => $_clearField(6);
 
   @$pb.TagNumber(7)
   $core.bool get hostKeyDispatch => $_getBF(6);
@@ -3208,6 +3950,7 @@ class EditConfig extends $pb.GeneratedMessage {
   void clearHostPointerDispatch() => $_clearField(8);
 }
 
+/// ── Scrolling ──
 class ScrollConfig extends $pb.GeneratedMessage {
   factory ScrollConfig({
     ScrollBarsMode? scrollbars,
@@ -3349,6 +4092,7 @@ class ScrollConfig extends $pb.GeneratedMessage {
   void clearFastScroll() => $_clearField(8);
 }
 
+/// ── Outline / Tree ──
 class OutlineConfig extends $pb.GeneratedMessage {
   factory OutlineConfig({
     TreeIndicatorStyle? treeIndicator,
@@ -3454,6 +4198,7 @@ class OutlineConfig extends $pb.GeneratedMessage {
   void clearMultiTotals() => $_clearField(5);
 }
 
+/// ── Cell Span ──
 class SpanConfig extends $pb.GeneratedMessage {
   factory SpanConfig({
     CellSpanMode? cellSpan,
@@ -3545,10 +4290,11 @@ class SpanConfig extends $pb.GeneratedMessage {
   void clearGroupSpanCompare() => $_clearField(4);
 }
 
+/// ── Interaction ──
 class InteractionConfig extends $pb.GeneratedMessage {
   factory InteractionConfig({
-    AllowUserResizingMode? allowUserResizing,
-    UserFreezeMode? allowUserFreezing,
+    ResizePolicy? resize,
+    FreezePolicy? freeze_2,
     TypeAheadMode? typeAhead,
     $core.int? typeAheadDelay,
     $core.bool? autoSizeMouse,
@@ -3559,8 +4305,8 @@ class InteractionConfig extends $pb.GeneratedMessage {
     HeaderFeatures? headerFeatures,
   }) {
     final result = create();
-    if (allowUserResizing != null) result.allowUserResizing = allowUserResizing;
-    if (allowUserFreezing != null) result.allowUserFreezing = allowUserFreezing;
+    if (resize != null) result.resize = resize;
+    if (freeze_2 != null) result.freeze_2 = freeze_2;
     if (typeAhead != null) result.typeAhead = typeAhead;
     if (typeAheadDelay != null) result.typeAheadDelay = typeAheadDelay;
     if (autoSizeMouse != null) result.autoSizeMouse = autoSizeMouse;
@@ -3585,10 +4331,10 @@ class InteractionConfig extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'InteractionConfig',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aE<AllowUserResizingMode>(1, _omitFieldNames ? '' : 'allowUserResizing',
-        enumValues: AllowUserResizingMode.values)
-    ..aE<UserFreezeMode>(2, _omitFieldNames ? '' : 'allowUserFreezing',
-        enumValues: UserFreezeMode.values)
+    ..aOM<ResizePolicy>(1, _omitFieldNames ? '' : 'resize',
+        subBuilder: ResizePolicy.create)
+    ..aOM<FreezePolicy>(2, _omitFieldNames ? '' : 'freeze',
+        subBuilder: FreezePolicy.create)
     ..aE<TypeAheadMode>(3, _omitFieldNames ? '' : 'typeAhead',
         enumValues: TypeAheadMode.values)
     ..aI(4, _omitFieldNames ? '' : 'typeAheadDelay')
@@ -3600,8 +4346,8 @@ class InteractionConfig extends $pb.GeneratedMessage {
         enumValues: DragMode.values)
     ..aE<DropMode>(9, _omitFieldNames ? '' : 'dropMode',
         enumValues: DropMode.values)
-    ..aE<HeaderFeatures>(10, _omitFieldNames ? '' : 'headerFeatures',
-        enumValues: HeaderFeatures.values)
+    ..aOM<HeaderFeatures>(10, _omitFieldNames ? '' : 'headerFeatures',
+        subBuilder: HeaderFeatures.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3624,22 +4370,26 @@ class InteractionConfig extends $pb.GeneratedMessage {
   static InteractionConfig? _defaultInstance;
 
   @$pb.TagNumber(1)
-  AllowUserResizingMode get allowUserResizing => $_getN(0);
+  ResizePolicy get resize => $_getN(0);
   @$pb.TagNumber(1)
-  set allowUserResizing(AllowUserResizingMode value) => $_setField(1, value);
+  set resize(ResizePolicy value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasAllowUserResizing() => $_has(0);
+  $core.bool hasResize() => $_has(0);
   @$pb.TagNumber(1)
-  void clearAllowUserResizing() => $_clearField(1);
+  void clearResize() => $_clearField(1);
+  @$pb.TagNumber(1)
+  ResizePolicy ensureResize() => $_ensure(0);
 
   @$pb.TagNumber(2)
-  UserFreezeMode get allowUserFreezing => $_getN(1);
+  FreezePolicy get freeze_2 => $_getN(1);
   @$pb.TagNumber(2)
-  set allowUserFreezing(UserFreezeMode value) => $_setField(2, value);
+  set freeze_2(FreezePolicy value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasAllowUserFreezing() => $_has(1);
+  $core.bool hasFreeze_2() => $_has(1);
   @$pb.TagNumber(2)
-  void clearAllowUserFreezing() => $_clearField(2);
+  void clearFreeze_2() => $_clearField(2);
+  @$pb.TagNumber(2)
+  FreezePolicy ensureFreeze_2() => $_ensure(1);
 
   @$pb.TagNumber(3)
   TypeAheadMode get typeAhead => $_getN(2);
@@ -3712,8 +4462,11 @@ class InteractionConfig extends $pb.GeneratedMessage {
   $core.bool hasHeaderFeatures() => $_has(9);
   @$pb.TagNumber(10)
   void clearHeaderFeatures() => $_clearField(10);
+  @$pb.TagNumber(10)
+  HeaderFeatures ensureHeaderFeatures() => $_ensure(9);
 }
 
+/// ── Rendering ──
 class RenderConfig extends $pb.GeneratedMessage {
   factory RenderConfig({
     RendererMode? rendererMode,
@@ -3835,14 +4588,14 @@ class RenderConfig extends $pb.GeneratedMessage {
 class RowIndicatorSlot extends $pb.GeneratedMessage {
   factory RowIndicatorSlot({
     RowIndicatorSlotKind? kind,
-    $core.int? widthPx,
+    $core.int? width,
     $core.bool? visible,
     $core.String? customKey,
     $core.List<$core.int>? data,
   }) {
     final result = create();
     if (kind != null) result.kind = kind;
-    if (widthPx != null) result.widthPx = widthPx;
+    if (width != null) result.width = width;
     if (visible != null) result.visible = visible;
     if (customKey != null) result.customKey = customKey;
     if (data != null) result.data = data;
@@ -3864,7 +4617,7 @@ class RowIndicatorSlot extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aE<RowIndicatorSlotKind>(1, _omitFieldNames ? '' : 'kind',
         enumValues: RowIndicatorSlotKind.values)
-    ..aI(2, _omitFieldNames ? '' : 'widthPx')
+    ..aI(2, _omitFieldNames ? '' : 'width')
     ..aOB(3, _omitFieldNames ? '' : 'visible')
     ..aOS(4, _omitFieldNames ? '' : 'customKey')
     ..a<$core.List<$core.int>>(
@@ -3900,13 +4653,13 @@ class RowIndicatorSlot extends $pb.GeneratedMessage {
   void clearKind() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get widthPx => $_getIZ(1);
+  $core.int get width => $_getIZ(1);
   @$pb.TagNumber(2)
-  set widthPx($core.int value) => $_setSignedInt32(1, value);
+  set width($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasWidthPx() => $_has(1);
+  $core.bool hasWidth() => $_has(1);
   @$pb.TagNumber(2)
-  void clearWidthPx() => $_clearField(2);
+  void clearWidth() => $_clearField(2);
 
   @$pb.TagNumber(3)
   $core.bool get visible => $_getBF(2);
@@ -3939,10 +4692,10 @@ class RowIndicatorSlot extends $pb.GeneratedMessage {
 class RowIndicatorConfig extends $pb.GeneratedMessage {
   factory RowIndicatorConfig({
     $core.bool? visible,
-    $core.int? widthPx,
+    $core.int? width,
     $core.int? modeBits,
-    $core.int? backColor,
-    $core.int? foreColor,
+    $core.int? background,
+    $core.int? foreground,
     GridLineStyle? gridLines,
     $core.int? gridColor,
     $core.bool? autoSize,
@@ -3953,10 +4706,10 @@ class RowIndicatorConfig extends $pb.GeneratedMessage {
   }) {
     final result = create();
     if (visible != null) result.visible = visible;
-    if (widthPx != null) result.widthPx = widthPx;
+    if (width != null) result.width = width;
     if (modeBits != null) result.modeBits = modeBits;
-    if (backColor != null) result.backColor = backColor;
-    if (foreColor != null) result.foreColor = foreColor;
+    if (background != null) result.background = background;
+    if (foreground != null) result.foreground = foreground;
     if (gridLines != null) result.gridLines = gridLines;
     if (gridColor != null) result.gridColor = gridColor;
     if (autoSize != null) result.autoSize = autoSize;
@@ -3981,10 +4734,10 @@ class RowIndicatorConfig extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'visible')
-    ..aI(2, _omitFieldNames ? '' : 'widthPx')
+    ..aI(2, _omitFieldNames ? '' : 'width')
     ..aI(3, _omitFieldNames ? '' : 'modeBits', fieldType: $pb.PbFieldType.OU3)
-    ..aI(4, _omitFieldNames ? '' : 'backColor', fieldType: $pb.PbFieldType.OU3)
-    ..aI(5, _omitFieldNames ? '' : 'foreColor', fieldType: $pb.PbFieldType.OU3)
+    ..aI(4, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
+    ..aI(5, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
     ..aE<GridLineStyle>(6, _omitFieldNames ? '' : 'gridLines',
         enumValues: GridLineStyle.values)
     ..aI(7, _omitFieldNames ? '' : 'gridColor', fieldType: $pb.PbFieldType.OU3)
@@ -4025,13 +4778,13 @@ class RowIndicatorConfig extends $pb.GeneratedMessage {
   void clearVisible() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get widthPx => $_getIZ(1);
+  $core.int get width => $_getIZ(1);
   @$pb.TagNumber(2)
-  set widthPx($core.int value) => $_setSignedInt32(1, value);
+  set width($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasWidthPx() => $_has(1);
+  $core.bool hasWidth() => $_has(1);
   @$pb.TagNumber(2)
-  void clearWidthPx() => $_clearField(2);
+  void clearWidth() => $_clearField(2);
 
   @$pb.TagNumber(3)
   $core.int get modeBits => $_getIZ(2);
@@ -4043,22 +4796,22 @@ class RowIndicatorConfig extends $pb.GeneratedMessage {
   void clearModeBits() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.int get backColor => $_getIZ(3);
+  $core.int get background => $_getIZ(3);
   @$pb.TagNumber(4)
-  set backColor($core.int value) => $_setUnsignedInt32(3, value);
+  set background($core.int value) => $_setUnsignedInt32(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasBackColor() => $_has(3);
+  $core.bool hasBackground() => $_has(3);
   @$pb.TagNumber(4)
-  void clearBackColor() => $_clearField(4);
+  void clearBackground() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.int get foreColor => $_getIZ(4);
+  $core.int get foreground => $_getIZ(4);
   @$pb.TagNumber(5)
-  set foreColor($core.int value) => $_setUnsignedInt32(4, value);
+  set foreground($core.int value) => $_setUnsignedInt32(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasForeColor() => $_has(4);
+  $core.bool hasForeground() => $_has(4);
   @$pb.TagNumber(5)
-  void clearForeColor() => $_clearField(5);
+  void clearForeground() => $_clearField(5);
 
   @$pb.TagNumber(6)
   GridLineStyle get gridLines => $_getN(5);
@@ -4121,11 +4874,11 @@ class RowIndicatorConfig extends $pb.GeneratedMessage {
 class ColIndicatorRowDef extends $pb.GeneratedMessage {
   factory ColIndicatorRowDef({
     $core.int? index,
-    $core.int? heightPx,
+    $core.int? height,
   }) {
     final result = create();
     if (index != null) result.index = index;
-    if (heightPx != null) result.heightPx = heightPx;
+    if (height != null) result.height = height;
     return result;
   }
 
@@ -4143,7 +4896,7 @@ class ColIndicatorRowDef extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'index')
-    ..aI(2, _omitFieldNames ? '' : 'heightPx')
+    ..aI(2, _omitFieldNames ? '' : 'height')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4175,13 +4928,13 @@ class ColIndicatorRowDef extends $pb.GeneratedMessage {
   void clearIndex() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get heightPx => $_getIZ(1);
+  $core.int get height => $_getIZ(1);
   @$pb.TagNumber(2)
-  set heightPx($core.int value) => $_setSignedInt32(1, value);
+  set height($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasHeightPx() => $_has(1);
+  $core.bool hasHeight() => $_has(1);
   @$pb.TagNumber(2)
-  void clearHeightPx() => $_clearField(2);
+  void clearHeight() => $_clearField(2);
 }
 
 class ColIndicatorCell extends $pb.GeneratedMessage {
@@ -4326,11 +5079,11 @@ class ColIndicatorCell extends $pb.GeneratedMessage {
 class ColIndicatorConfig extends $pb.GeneratedMessage {
   factory ColIndicatorConfig({
     $core.bool? visible,
-    $core.int? defaultRowHeightPx,
+    $core.int? defaultRowHeight,
     $core.int? bandRows,
     $core.int? modeBits,
-    $core.int? backColor,
-    $core.int? foreColor,
+    $core.int? background,
+    $core.int? foreground,
     GridLineStyle? gridLines,
     $core.int? gridColor,
     $core.bool? autoSize,
@@ -4342,12 +5095,11 @@ class ColIndicatorConfig extends $pb.GeneratedMessage {
   }) {
     final result = create();
     if (visible != null) result.visible = visible;
-    if (defaultRowHeightPx != null)
-      result.defaultRowHeightPx = defaultRowHeightPx;
+    if (defaultRowHeight != null) result.defaultRowHeight = defaultRowHeight;
     if (bandRows != null) result.bandRows = bandRows;
     if (modeBits != null) result.modeBits = modeBits;
-    if (backColor != null) result.backColor = backColor;
-    if (foreColor != null) result.foreColor = foreColor;
+    if (background != null) result.background = background;
+    if (foreground != null) result.foreground = foreground;
     if (gridLines != null) result.gridLines = gridLines;
     if (gridColor != null) result.gridColor = gridColor;
     if (autoSize != null) result.autoSize = autoSize;
@@ -4373,11 +5125,11 @@ class ColIndicatorConfig extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'visible')
-    ..aI(2, _omitFieldNames ? '' : 'defaultRowHeightPx')
+    ..aI(2, _omitFieldNames ? '' : 'defaultRowHeight')
     ..aI(3, _omitFieldNames ? '' : 'bandRows')
     ..aI(4, _omitFieldNames ? '' : 'modeBits', fieldType: $pb.PbFieldType.OU3)
-    ..aI(5, _omitFieldNames ? '' : 'backColor', fieldType: $pb.PbFieldType.OU3)
-    ..aI(6, _omitFieldNames ? '' : 'foreColor', fieldType: $pb.PbFieldType.OU3)
+    ..aI(5, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
+    ..aI(6, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
     ..aE<GridLineStyle>(7, _omitFieldNames ? '' : 'gridLines',
         enumValues: GridLineStyle.values)
     ..aI(8, _omitFieldNames ? '' : 'gridColor', fieldType: $pb.PbFieldType.OU3)
@@ -4420,13 +5172,13 @@ class ColIndicatorConfig extends $pb.GeneratedMessage {
   void clearVisible() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get defaultRowHeightPx => $_getIZ(1);
+  $core.int get defaultRowHeight => $_getIZ(1);
   @$pb.TagNumber(2)
-  set defaultRowHeightPx($core.int value) => $_setSignedInt32(1, value);
+  set defaultRowHeight($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasDefaultRowHeightPx() => $_has(1);
+  $core.bool hasDefaultRowHeight() => $_has(1);
   @$pb.TagNumber(2)
-  void clearDefaultRowHeightPx() => $_clearField(2);
+  void clearDefaultRowHeight() => $_clearField(2);
 
   @$pb.TagNumber(3)
   $core.int get bandRows => $_getIZ(2);
@@ -4447,22 +5199,22 @@ class ColIndicatorConfig extends $pb.GeneratedMessage {
   void clearModeBits() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.int get backColor => $_getIZ(4);
+  $core.int get background => $_getIZ(4);
   @$pb.TagNumber(5)
-  set backColor($core.int value) => $_setUnsignedInt32(4, value);
+  set background($core.int value) => $_setUnsignedInt32(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasBackColor() => $_has(4);
+  $core.bool hasBackground() => $_has(4);
   @$pb.TagNumber(5)
-  void clearBackColor() => $_clearField(5);
+  void clearBackground() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.int get foreColor => $_getIZ(5);
+  $core.int get foreground => $_getIZ(5);
   @$pb.TagNumber(6)
-  set foreColor($core.int value) => $_setUnsignedInt32(5, value);
+  set foreground($core.int value) => $_setUnsignedInt32(5, value);
   @$pb.TagNumber(6)
-  $core.bool hasForeColor() => $_has(5);
+  $core.bool hasForeground() => $_has(5);
   @$pb.TagNumber(6)
-  void clearForeColor() => $_clearField(6);
+  void clearForeground() => $_clearField(6);
 
   @$pb.TagNumber(7)
   GridLineStyle get gridLines => $_getN(6);
@@ -4529,16 +5281,16 @@ class CornerIndicatorConfig extends $pb.GeneratedMessage {
   factory CornerIndicatorConfig({
     $core.bool? visible,
     $core.int? modeBits,
-    $core.int? backColor,
-    $core.int? foreColor,
+    $core.int? background,
+    $core.int? foreground,
     $core.String? customKey,
     $core.List<$core.int>? data,
   }) {
     final result = create();
     if (visible != null) result.visible = visible;
     if (modeBits != null) result.modeBits = modeBits;
-    if (backColor != null) result.backColor = backColor;
-    if (foreColor != null) result.foreColor = foreColor;
+    if (background != null) result.background = background;
+    if (foreground != null) result.foreground = foreground;
     if (customKey != null) result.customKey = customKey;
     if (data != null) result.data = data;
     return result;
@@ -4559,8 +5311,8 @@ class CornerIndicatorConfig extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'visible')
     ..aI(2, _omitFieldNames ? '' : 'modeBits', fieldType: $pb.PbFieldType.OU3)
-    ..aI(3, _omitFieldNames ? '' : 'backColor', fieldType: $pb.PbFieldType.OU3)
-    ..aI(4, _omitFieldNames ? '' : 'foreColor', fieldType: $pb.PbFieldType.OU3)
+    ..aI(3, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
+    ..aI(4, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
     ..aOS(5, _omitFieldNames ? '' : 'customKey')
     ..a<$core.List<$core.int>>(
         6, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
@@ -4605,22 +5357,22 @@ class CornerIndicatorConfig extends $pb.GeneratedMessage {
   void clearModeBits() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.int get backColor => $_getIZ(2);
+  $core.int get background => $_getIZ(2);
   @$pb.TagNumber(3)
-  set backColor($core.int value) => $_setUnsignedInt32(2, value);
+  set background($core.int value) => $_setUnsignedInt32(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasBackColor() => $_has(2);
+  $core.bool hasBackground() => $_has(2);
   @$pb.TagNumber(3)
-  void clearBackColor() => $_clearField(3);
+  void clearBackground() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.int get foreColor => $_getIZ(3);
+  $core.int get foreground => $_getIZ(3);
   @$pb.TagNumber(4)
-  set foreColor($core.int value) => $_setUnsignedInt32(3, value);
+  set foreground($core.int value) => $_setUnsignedInt32(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasForeColor() => $_has(3);
+  $core.bool hasForeground() => $_has(3);
   @$pb.TagNumber(4)
-  void clearForeColor() => $_clearField(4);
+  void clearForeground() => $_clearField(4);
 
   @$pb.TagNumber(5)
   $core.String get customKey => $_getSZ(4);
@@ -4641,23 +5393,22 @@ class CornerIndicatorConfig extends $pb.GeneratedMessage {
   void clearData() => $_clearField(6);
 }
 
-class IndicatorBandsConfig extends $pb.GeneratedMessage {
-  factory IndicatorBandsConfig({
-    RowIndicatorConfig? rowIndicatorStart,
-    RowIndicatorConfig? rowIndicatorEnd,
-    ColIndicatorConfig? colIndicatorTop,
-    ColIndicatorConfig? colIndicatorBottom,
+class IndicatorsConfig extends $pb.GeneratedMessage {
+  factory IndicatorsConfig({
+    RowIndicatorConfig? rowStart,
+    RowIndicatorConfig? rowEnd,
+    ColIndicatorConfig? colTop,
+    ColIndicatorConfig? colBottom,
     CornerIndicatorConfig? cornerTopStart,
     CornerIndicatorConfig? cornerTopEnd,
     CornerIndicatorConfig? cornerBottomStart,
     CornerIndicatorConfig? cornerBottomEnd,
   }) {
     final result = create();
-    if (rowIndicatorStart != null) result.rowIndicatorStart = rowIndicatorStart;
-    if (rowIndicatorEnd != null) result.rowIndicatorEnd = rowIndicatorEnd;
-    if (colIndicatorTop != null) result.colIndicatorTop = colIndicatorTop;
-    if (colIndicatorBottom != null)
-      result.colIndicatorBottom = colIndicatorBottom;
+    if (rowStart != null) result.rowStart = rowStart;
+    if (rowEnd != null) result.rowEnd = rowEnd;
+    if (colTop != null) result.colTop = colTop;
+    if (colBottom != null) result.colBottom = colBottom;
     if (cornerTopStart != null) result.cornerTopStart = cornerTopStart;
     if (cornerTopEnd != null) result.cornerTopEnd = cornerTopEnd;
     if (cornerBottomStart != null) result.cornerBottomStart = cornerBottomStart;
@@ -4665,26 +5416,26 @@ class IndicatorBandsConfig extends $pb.GeneratedMessage {
     return result;
   }
 
-  IndicatorBandsConfig._();
+  IndicatorsConfig._();
 
-  factory IndicatorBandsConfig.fromBuffer($core.List<$core.int> data,
+  factory IndicatorsConfig.fromBuffer($core.List<$core.int> data,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromBuffer(data, registry);
-  factory IndicatorBandsConfig.fromJson($core.String json,
+  factory IndicatorsConfig.fromJson($core.String json,
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'IndicatorBandsConfig',
+      _omitMessageNames ? '' : 'IndicatorsConfig',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aOM<RowIndicatorConfig>(1, _omitFieldNames ? '' : 'rowIndicatorStart',
+    ..aOM<RowIndicatorConfig>(1, _omitFieldNames ? '' : 'rowStart',
         subBuilder: RowIndicatorConfig.create)
-    ..aOM<RowIndicatorConfig>(2, _omitFieldNames ? '' : 'rowIndicatorEnd',
+    ..aOM<RowIndicatorConfig>(2, _omitFieldNames ? '' : 'rowEnd',
         subBuilder: RowIndicatorConfig.create)
-    ..aOM<ColIndicatorConfig>(3, _omitFieldNames ? '' : 'colIndicatorTop',
+    ..aOM<ColIndicatorConfig>(3, _omitFieldNames ? '' : 'colTop',
         subBuilder: ColIndicatorConfig.create)
-    ..aOM<ColIndicatorConfig>(4, _omitFieldNames ? '' : 'colIndicatorBottom',
+    ..aOM<ColIndicatorConfig>(4, _omitFieldNames ? '' : 'colBottom',
         subBuilder: ColIndicatorConfig.create)
     ..aOM<CornerIndicatorConfig>(5, _omitFieldNames ? '' : 'cornerTopStart',
         subBuilder: CornerIndicatorConfig.create)
@@ -4697,67 +5448,67 @@ class IndicatorBandsConfig extends $pb.GeneratedMessage {
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  IndicatorBandsConfig clone() => deepCopy();
+  IndicatorsConfig clone() => deepCopy();
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  IndicatorBandsConfig copyWith(void Function(IndicatorBandsConfig) updates) =>
-      super.copyWith((message) => updates(message as IndicatorBandsConfig))
-          as IndicatorBandsConfig;
+  IndicatorsConfig copyWith(void Function(IndicatorsConfig) updates) =>
+      super.copyWith((message) => updates(message as IndicatorsConfig))
+          as IndicatorsConfig;
 
   @$core.override
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static IndicatorBandsConfig create() => IndicatorBandsConfig._();
+  static IndicatorsConfig create() => IndicatorsConfig._();
   @$core.override
-  IndicatorBandsConfig createEmptyInstance() => create();
+  IndicatorsConfig createEmptyInstance() => create();
   @$core.pragma('dart2js:noInline')
-  static IndicatorBandsConfig getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<IndicatorBandsConfig>(create);
-  static IndicatorBandsConfig? _defaultInstance;
+  static IndicatorsConfig getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<IndicatorsConfig>(create);
+  static IndicatorsConfig? _defaultInstance;
 
   @$pb.TagNumber(1)
-  RowIndicatorConfig get rowIndicatorStart => $_getN(0);
+  RowIndicatorConfig get rowStart => $_getN(0);
   @$pb.TagNumber(1)
-  set rowIndicatorStart(RowIndicatorConfig value) => $_setField(1, value);
+  set rowStart(RowIndicatorConfig value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasRowIndicatorStart() => $_has(0);
+  $core.bool hasRowStart() => $_has(0);
   @$pb.TagNumber(1)
-  void clearRowIndicatorStart() => $_clearField(1);
+  void clearRowStart() => $_clearField(1);
   @$pb.TagNumber(1)
-  RowIndicatorConfig ensureRowIndicatorStart() => $_ensure(0);
+  RowIndicatorConfig ensureRowStart() => $_ensure(0);
 
   @$pb.TagNumber(2)
-  RowIndicatorConfig get rowIndicatorEnd => $_getN(1);
+  RowIndicatorConfig get rowEnd => $_getN(1);
   @$pb.TagNumber(2)
-  set rowIndicatorEnd(RowIndicatorConfig value) => $_setField(2, value);
+  set rowEnd(RowIndicatorConfig value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasRowIndicatorEnd() => $_has(1);
+  $core.bool hasRowEnd() => $_has(1);
   @$pb.TagNumber(2)
-  void clearRowIndicatorEnd() => $_clearField(2);
+  void clearRowEnd() => $_clearField(2);
   @$pb.TagNumber(2)
-  RowIndicatorConfig ensureRowIndicatorEnd() => $_ensure(1);
+  RowIndicatorConfig ensureRowEnd() => $_ensure(1);
 
   @$pb.TagNumber(3)
-  ColIndicatorConfig get colIndicatorTop => $_getN(2);
+  ColIndicatorConfig get colTop => $_getN(2);
   @$pb.TagNumber(3)
-  set colIndicatorTop(ColIndicatorConfig value) => $_setField(3, value);
+  set colTop(ColIndicatorConfig value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasColIndicatorTop() => $_has(2);
+  $core.bool hasColTop() => $_has(2);
   @$pb.TagNumber(3)
-  void clearColIndicatorTop() => $_clearField(3);
+  void clearColTop() => $_clearField(3);
   @$pb.TagNumber(3)
-  ColIndicatorConfig ensureColIndicatorTop() => $_ensure(2);
+  ColIndicatorConfig ensureColTop() => $_ensure(2);
 
   @$pb.TagNumber(4)
-  ColIndicatorConfig get colIndicatorBottom => $_getN(3);
+  ColIndicatorConfig get colBottom => $_getN(3);
   @$pb.TagNumber(4)
-  set colIndicatorBottom(ColIndicatorConfig value) => $_setField(4, value);
+  set colBottom(ColIndicatorConfig value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasColIndicatorBottom() => $_has(3);
+  $core.bool hasColBottom() => $_has(3);
   @$pb.TagNumber(4)
-  void clearColIndicatorBottom() => $_clearField(4);
+  void clearColBottom() => $_clearField(4);
   @$pb.TagNumber(4)
-  ColIndicatorConfig ensureColIndicatorBottom() => $_ensure(3);
+  ColIndicatorConfig ensureColBottom() => $_ensure(3);
 
   @$pb.TagNumber(5)
   CornerIndicatorConfig get cornerTopStart => $_getN(4);
@@ -4811,12 +5562,13 @@ class ColumnDef extends $pb.GeneratedMessage {
     $core.int? minWidth,
     $core.int? maxWidth,
     $core.String? caption,
-    Align? alignment,
-    Align? fixedAlignment,
+    Align? align,
+    Align? fixedAlign,
     ColumnDataType? dataType,
     $core.String? format,
     $core.String? key,
-    SortOrder? sort,
+    SortOrder? sortOrder,
+    SortType? sortType,
     $core.String? dropdownItems,
     $core.String? editMask,
     $core.int? indent,
@@ -4825,8 +5577,8 @@ class ColumnDef extends $pb.GeneratedMessage {
     $core.Iterable<ImageData>? imageList,
     $core.List<$core.int>? data,
     StickyEdge? sticky,
-    CellPadding? cellPadding,
-    CellPadding? fixedCellPadding,
+    Padding? padding,
+    Padding? fixedPadding,
     $core.bool? nullable,
     CoercionMode? coercionMode,
     WriteErrorMode? errorMode,
@@ -4837,12 +5589,13 @@ class ColumnDef extends $pb.GeneratedMessage {
     if (minWidth != null) result.minWidth = minWidth;
     if (maxWidth != null) result.maxWidth = maxWidth;
     if (caption != null) result.caption = caption;
-    if (alignment != null) result.alignment = alignment;
-    if (fixedAlignment != null) result.fixedAlignment = fixedAlignment;
+    if (align != null) result.align = align;
+    if (fixedAlign != null) result.fixedAlign = fixedAlign;
     if (dataType != null) result.dataType = dataType;
     if (format != null) result.format = format;
     if (key != null) result.key = key;
-    if (sort != null) result.sort = sort;
+    if (sortOrder != null) result.sortOrder = sortOrder;
+    if (sortType != null) result.sortType = sortType;
     if (dropdownItems != null) result.dropdownItems = dropdownItems;
     if (editMask != null) result.editMask = editMask;
     if (indent != null) result.indent = indent;
@@ -4851,8 +5604,8 @@ class ColumnDef extends $pb.GeneratedMessage {
     if (imageList != null) result.imageList.addAll(imageList);
     if (data != null) result.data = data;
     if (sticky != null) result.sticky = sticky;
-    if (cellPadding != null) result.cellPadding = cellPadding;
-    if (fixedCellPadding != null) result.fixedCellPadding = fixedCellPadding;
+    if (padding != null) result.padding = padding;
+    if (fixedPadding != null) result.fixedPadding = fixedPadding;
     if (nullable != null) result.nullable = nullable;
     if (coercionMode != null) result.coercionMode = coercionMode;
     if (errorMode != null) result.errorMode = errorMode;
@@ -4877,34 +5630,36 @@ class ColumnDef extends $pb.GeneratedMessage {
     ..aI(3, _omitFieldNames ? '' : 'minWidth')
     ..aI(4, _omitFieldNames ? '' : 'maxWidth')
     ..aOS(5, _omitFieldNames ? '' : 'caption')
-    ..aE<Align>(6, _omitFieldNames ? '' : 'alignment', enumValues: Align.values)
-    ..aE<Align>(7, _omitFieldNames ? '' : 'fixedAlignment',
+    ..aE<Align>(6, _omitFieldNames ? '' : 'align', enumValues: Align.values)
+    ..aE<Align>(7, _omitFieldNames ? '' : 'fixedAlign',
         enumValues: Align.values)
     ..aE<ColumnDataType>(8, _omitFieldNames ? '' : 'dataType',
         enumValues: ColumnDataType.values)
     ..aOS(9, _omitFieldNames ? '' : 'format')
     ..aOS(10, _omitFieldNames ? '' : 'key')
-    ..aE<SortOrder>(11, _omitFieldNames ? '' : 'sort',
+    ..aE<SortOrder>(11, _omitFieldNames ? '' : 'sortOrder',
         enumValues: SortOrder.values)
-    ..aOS(12, _omitFieldNames ? '' : 'dropdownItems')
-    ..aOS(13, _omitFieldNames ? '' : 'editMask')
-    ..aI(14, _omitFieldNames ? '' : 'indent')
-    ..aOB(15, _omitFieldNames ? '' : 'hidden')
-    ..aOB(16, _omitFieldNames ? '' : 'span')
-    ..pPM<ImageData>(17, _omitFieldNames ? '' : 'imageList',
+    ..aE<SortType>(12, _omitFieldNames ? '' : 'sortType',
+        enumValues: SortType.values)
+    ..aOS(13, _omitFieldNames ? '' : 'dropdownItems')
+    ..aOS(14, _omitFieldNames ? '' : 'editMask')
+    ..aI(15, _omitFieldNames ? '' : 'indent')
+    ..aOB(16, _omitFieldNames ? '' : 'hidden')
+    ..aOB(17, _omitFieldNames ? '' : 'span')
+    ..pPM<ImageData>(18, _omitFieldNames ? '' : 'imageList',
         subBuilder: ImageData.create)
     ..a<$core.List<$core.int>>(
-        18, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
-    ..aE<StickyEdge>(19, _omitFieldNames ? '' : 'sticky',
+        19, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..aE<StickyEdge>(20, _omitFieldNames ? '' : 'sticky',
         enumValues: StickyEdge.values)
-    ..aOM<CellPadding>(20, _omitFieldNames ? '' : 'cellPadding',
-        subBuilder: CellPadding.create)
-    ..aOM<CellPadding>(21, _omitFieldNames ? '' : 'fixedCellPadding',
-        subBuilder: CellPadding.create)
-    ..aOB(22, _omitFieldNames ? '' : 'nullable')
-    ..aE<CoercionMode>(23, _omitFieldNames ? '' : 'coercionMode',
+    ..aOM<Padding>(21, _omitFieldNames ? '' : 'padding',
+        subBuilder: Padding.create)
+    ..aOM<Padding>(22, _omitFieldNames ? '' : 'fixedPadding',
+        subBuilder: Padding.create)
+    ..aOB(23, _omitFieldNames ? '' : 'nullable')
+    ..aE<CoercionMode>(24, _omitFieldNames ? '' : 'coercionMode',
         enumValues: CoercionMode.values)
-    ..aE<WriteErrorMode>(24, _omitFieldNames ? '' : 'errorMode',
+    ..aE<WriteErrorMode>(25, _omitFieldNames ? '' : 'errorMode',
         enumValues: WriteErrorMode.values)
     ..hasRequiredFields = false;
 
@@ -4972,22 +5727,22 @@ class ColumnDef extends $pb.GeneratedMessage {
   void clearCaption() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  Align get alignment => $_getN(5);
+  Align get align => $_getN(5);
   @$pb.TagNumber(6)
-  set alignment(Align value) => $_setField(6, value);
+  set align(Align value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasAlignment() => $_has(5);
+  $core.bool hasAlign() => $_has(5);
   @$pb.TagNumber(6)
-  void clearAlignment() => $_clearField(6);
+  void clearAlign() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  Align get fixedAlignment => $_getN(6);
+  Align get fixedAlign => $_getN(6);
   @$pb.TagNumber(7)
-  set fixedAlignment(Align value) => $_setField(7, value);
+  set fixedAlign(Align value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasFixedAlignment() => $_has(6);
+  $core.bool hasFixedAlign() => $_has(6);
   @$pb.TagNumber(7)
-  void clearFixedAlignment() => $_clearField(7);
+  void clearFixedAlign() => $_clearField(7);
 
   @$pb.TagNumber(8)
   ColumnDataType get dataType => $_getN(7);
@@ -5017,133 +5772,137 @@ class ColumnDef extends $pb.GeneratedMessage {
   void clearKey() => $_clearField(10);
 
   @$pb.TagNumber(11)
-  SortOrder get sort => $_getN(10);
+  SortOrder get sortOrder => $_getN(10);
   @$pb.TagNumber(11)
-  set sort(SortOrder value) => $_setField(11, value);
+  set sortOrder(SortOrder value) => $_setField(11, value);
   @$pb.TagNumber(11)
-  $core.bool hasSort() => $_has(10);
+  $core.bool hasSortOrder() => $_has(10);
   @$pb.TagNumber(11)
-  void clearSort() => $_clearField(11);
+  void clearSortOrder() => $_clearField(11);
 
   @$pb.TagNumber(12)
-  $core.String get dropdownItems => $_getSZ(11);
+  SortType get sortType => $_getN(11);
   @$pb.TagNumber(12)
-  set dropdownItems($core.String value) => $_setString(11, value);
+  set sortType(SortType value) => $_setField(12, value);
   @$pb.TagNumber(12)
-  $core.bool hasDropdownItems() => $_has(11);
+  $core.bool hasSortType() => $_has(11);
   @$pb.TagNumber(12)
-  void clearDropdownItems() => $_clearField(12);
+  void clearSortType() => $_clearField(12);
 
   @$pb.TagNumber(13)
-  $core.String get editMask => $_getSZ(12);
+  $core.String get dropdownItems => $_getSZ(12);
   @$pb.TagNumber(13)
-  set editMask($core.String value) => $_setString(12, value);
+  set dropdownItems($core.String value) => $_setString(12, value);
   @$pb.TagNumber(13)
-  $core.bool hasEditMask() => $_has(12);
+  $core.bool hasDropdownItems() => $_has(12);
   @$pb.TagNumber(13)
-  void clearEditMask() => $_clearField(13);
+  void clearDropdownItems() => $_clearField(13);
 
   @$pb.TagNumber(14)
-  $core.int get indent => $_getIZ(13);
+  $core.String get editMask => $_getSZ(13);
   @$pb.TagNumber(14)
-  set indent($core.int value) => $_setSignedInt32(13, value);
+  set editMask($core.String value) => $_setString(13, value);
   @$pb.TagNumber(14)
-  $core.bool hasIndent() => $_has(13);
+  $core.bool hasEditMask() => $_has(13);
   @$pb.TagNumber(14)
-  void clearIndent() => $_clearField(14);
+  void clearEditMask() => $_clearField(14);
 
   @$pb.TagNumber(15)
-  $core.bool get hidden => $_getBF(14);
+  $core.int get indent => $_getIZ(14);
   @$pb.TagNumber(15)
-  set hidden($core.bool value) => $_setBool(14, value);
+  set indent($core.int value) => $_setSignedInt32(14, value);
   @$pb.TagNumber(15)
-  $core.bool hasHidden() => $_has(14);
+  $core.bool hasIndent() => $_has(14);
   @$pb.TagNumber(15)
-  void clearHidden() => $_clearField(15);
+  void clearIndent() => $_clearField(15);
 
   @$pb.TagNumber(16)
-  $core.bool get span => $_getBF(15);
+  $core.bool get hidden => $_getBF(15);
   @$pb.TagNumber(16)
-  set span($core.bool value) => $_setBool(15, value);
+  set hidden($core.bool value) => $_setBool(15, value);
   @$pb.TagNumber(16)
-  $core.bool hasSpan() => $_has(15);
+  $core.bool hasHidden() => $_has(15);
   @$pb.TagNumber(16)
-  void clearSpan() => $_clearField(16);
+  void clearHidden() => $_clearField(16);
 
   @$pb.TagNumber(17)
-  $pb.PbList<ImageData> get imageList => $_getList(16);
+  $core.bool get span => $_getBF(16);
+  @$pb.TagNumber(17)
+  set span($core.bool value) => $_setBool(16, value);
+  @$pb.TagNumber(17)
+  $core.bool hasSpan() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearSpan() => $_clearField(17);
 
   @$pb.TagNumber(18)
-  $core.List<$core.int> get data => $_getN(17);
-  @$pb.TagNumber(18)
-  set data($core.List<$core.int> value) => $_setBytes(17, value);
-  @$pb.TagNumber(18)
-  $core.bool hasData() => $_has(17);
-  @$pb.TagNumber(18)
-  void clearData() => $_clearField(18);
+  $pb.PbList<ImageData> get imageList => $_getList(17);
 
   @$pb.TagNumber(19)
-  StickyEdge get sticky => $_getN(18);
+  $core.List<$core.int> get data => $_getN(18);
   @$pb.TagNumber(19)
-  set sticky(StickyEdge value) => $_setField(19, value);
+  set data($core.List<$core.int> value) => $_setBytes(18, value);
   @$pb.TagNumber(19)
-  $core.bool hasSticky() => $_has(18);
+  $core.bool hasData() => $_has(18);
   @$pb.TagNumber(19)
-  void clearSticky() => $_clearField(19);
+  void clearData() => $_clearField(19);
 
-  /// Per-column insets for non-fixed cells.
   @$pb.TagNumber(20)
-  CellPadding get cellPadding => $_getN(19);
+  StickyEdge get sticky => $_getN(19);
   @$pb.TagNumber(20)
-  set cellPadding(CellPadding value) => $_setField(20, value);
+  set sticky(StickyEdge value) => $_setField(20, value);
   @$pb.TagNumber(20)
-  $core.bool hasCellPadding() => $_has(19);
+  $core.bool hasSticky() => $_has(19);
   @$pb.TagNumber(20)
-  void clearCellPadding() => $_clearField(20);
-  @$pb.TagNumber(20)
-  CellPadding ensureCellPadding() => $_ensure(19);
+  void clearSticky() => $_clearField(20);
 
-  /// Per-column insets for fixed/header cells.
   @$pb.TagNumber(21)
-  CellPadding get fixedCellPadding => $_getN(20);
+  Padding get padding => $_getN(20);
   @$pb.TagNumber(21)
-  set fixedCellPadding(CellPadding value) => $_setField(21, value);
+  set padding(Padding value) => $_setField(21, value);
   @$pb.TagNumber(21)
-  $core.bool hasFixedCellPadding() => $_has(20);
+  $core.bool hasPadding() => $_has(20);
   @$pb.TagNumber(21)
-  void clearFixedCellPadding() => $_clearField(21);
+  void clearPadding() => $_clearField(21);
   @$pb.TagNumber(21)
-  CellPadding ensureFixedCellPadding() => $_ensure(20);
+  Padding ensurePadding() => $_ensure(20);
 
-  /// Strict typing: true allows null/empty cell values.
   @$pb.TagNumber(22)
-  $core.bool get nullable => $_getBF(21);
+  Padding get fixedPadding => $_getN(21);
   @$pb.TagNumber(22)
-  set nullable($core.bool value) => $_setBool(21, value);
+  set fixedPadding(Padding value) => $_setField(22, value);
   @$pb.TagNumber(22)
-  $core.bool hasNullable() => $_has(21);
+  $core.bool hasFixedPadding() => $_has(21);
   @$pb.TagNumber(22)
-  void clearNullable() => $_clearField(22);
+  void clearFixedPadding() => $_clearField(22);
+  @$pb.TagNumber(22)
+  Padding ensureFixedPadding() => $_ensure(21);
 
-  /// Strict typing: controls inbound coercion behavior.
   @$pb.TagNumber(23)
-  CoercionMode get coercionMode => $_getN(22);
+  $core.bool get nullable => $_getBF(22);
   @$pb.TagNumber(23)
-  set coercionMode(CoercionMode value) => $_setField(23, value);
+  set nullable($core.bool value) => $_setBool(22, value);
   @$pb.TagNumber(23)
-  $core.bool hasCoercionMode() => $_has(22);
+  $core.bool hasNullable() => $_has(22);
   @$pb.TagNumber(23)
-  void clearCoercionMode() => $_clearField(23);
+  void clearNullable() => $_clearField(23);
 
-  /// Strict typing: controls write behavior on validation failure.
   @$pb.TagNumber(24)
-  WriteErrorMode get errorMode => $_getN(23);
+  CoercionMode get coercionMode => $_getN(23);
   @$pb.TagNumber(24)
-  set errorMode(WriteErrorMode value) => $_setField(24, value);
+  set coercionMode(CoercionMode value) => $_setField(24, value);
   @$pb.TagNumber(24)
-  $core.bool hasErrorMode() => $_has(23);
+  $core.bool hasCoercionMode() => $_has(23);
   @$pb.TagNumber(24)
-  void clearErrorMode() => $_clearField(24);
+  void clearCoercionMode() => $_clearField(24);
+
+  @$pb.TagNumber(25)
+  WriteErrorMode get errorMode => $_getN(24);
+  @$pb.TagNumber(25)
+  set errorMode(WriteErrorMode value) => $_setField(25, value);
+  @$pb.TagNumber(25)
+  $core.bool hasErrorMode() => $_has(24);
+  @$pb.TagNumber(25)
+  void clearErrorMode() => $_clearField(25);
 }
 
 class DefineColumnsRequest extends $pb.GeneratedMessage {
@@ -5443,376 +6202,15 @@ class DefineRowsRequest extends $pb.GeneratedMessage {
   $pb.PbList<RowDef> get rows => $_getList(1);
 }
 
-class CellStyleOverride extends $pb.GeneratedMessage {
-  factory CellStyleOverride({
-    $core.int? backColor,
-    $core.int? foreColor,
-    Align? alignment,
-    TextEffect? textEffect,
-    $core.String? fontName,
-    $core.double? fontSize,
-    $core.bool? fontBold,
-    $core.bool? fontItalic,
-    $core.bool? fontUnderline,
-    $core.bool? fontStrikethrough,
-    $core.double? fontWidth,
-    $core.int? progressColor,
-    $core.double? progressPercent,
-    BorderStyle? border,
-    $core.int? borderColor,
-    CellPadding? padding,
-    BorderStyle? borderTop,
-    BorderStyle? borderRight,
-    BorderStyle? borderBottom,
-    BorderStyle? borderLeft,
-    $core.int? borderTopColor,
-    $core.int? borderRightColor,
-    $core.int? borderBottomColor,
-    $core.int? borderLeftColor,
-    $core.bool? shrinkToFit,
-  }) {
-    final result = create();
-    if (backColor != null) result.backColor = backColor;
-    if (foreColor != null) result.foreColor = foreColor;
-    if (alignment != null) result.alignment = alignment;
-    if (textEffect != null) result.textEffect = textEffect;
-    if (fontName != null) result.fontName = fontName;
-    if (fontSize != null) result.fontSize = fontSize;
-    if (fontBold != null) result.fontBold = fontBold;
-    if (fontItalic != null) result.fontItalic = fontItalic;
-    if (fontUnderline != null) result.fontUnderline = fontUnderline;
-    if (fontStrikethrough != null) result.fontStrikethrough = fontStrikethrough;
-    if (fontWidth != null) result.fontWidth = fontWidth;
-    if (progressColor != null) result.progressColor = progressColor;
-    if (progressPercent != null) result.progressPercent = progressPercent;
-    if (border != null) result.border = border;
-    if (borderColor != null) result.borderColor = borderColor;
-    if (padding != null) result.padding = padding;
-    if (borderTop != null) result.borderTop = borderTop;
-    if (borderRight != null) result.borderRight = borderRight;
-    if (borderBottom != null) result.borderBottom = borderBottom;
-    if (borderLeft != null) result.borderLeft = borderLeft;
-    if (borderTopColor != null) result.borderTopColor = borderTopColor;
-    if (borderRightColor != null) result.borderRightColor = borderRightColor;
-    if (borderBottomColor != null) result.borderBottomColor = borderBottomColor;
-    if (borderLeftColor != null) result.borderLeftColor = borderLeftColor;
-    if (shrinkToFit != null) result.shrinkToFit = shrinkToFit;
-    return result;
-  }
-
-  CellStyleOverride._();
-
-  factory CellStyleOverride.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory CellStyleOverride.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'CellStyleOverride',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
-      createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'backColor', fieldType: $pb.PbFieldType.OU3)
-    ..aI(2, _omitFieldNames ? '' : 'foreColor', fieldType: $pb.PbFieldType.OU3)
-    ..aE<Align>(3, _omitFieldNames ? '' : 'alignment', enumValues: Align.values)
-    ..aE<TextEffect>(4, _omitFieldNames ? '' : 'textEffect',
-        enumValues: TextEffect.values)
-    ..aOS(5, _omitFieldNames ? '' : 'fontName')
-    ..aD(6, _omitFieldNames ? '' : 'fontSize', fieldType: $pb.PbFieldType.OF)
-    ..aOB(7, _omitFieldNames ? '' : 'fontBold')
-    ..aOB(8, _omitFieldNames ? '' : 'fontItalic')
-    ..aOB(9, _omitFieldNames ? '' : 'fontUnderline')
-    ..aOB(10, _omitFieldNames ? '' : 'fontStrikethrough')
-    ..aD(11, _omitFieldNames ? '' : 'fontWidth', fieldType: $pb.PbFieldType.OF)
-    ..aI(12, _omitFieldNames ? '' : 'progressColor',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aD(13, _omitFieldNames ? '' : 'progressPercent',
-        fieldType: $pb.PbFieldType.OF)
-    ..aE<BorderStyle>(14, _omitFieldNames ? '' : 'border',
-        enumValues: BorderStyle.values)
-    ..aI(15, _omitFieldNames ? '' : 'borderColor',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aOM<CellPadding>(16, _omitFieldNames ? '' : 'padding',
-        subBuilder: CellPadding.create)
-    ..aE<BorderStyle>(17, _omitFieldNames ? '' : 'borderTop',
-        enumValues: BorderStyle.values)
-    ..aE<BorderStyle>(18, _omitFieldNames ? '' : 'borderRight',
-        enumValues: BorderStyle.values)
-    ..aE<BorderStyle>(19, _omitFieldNames ? '' : 'borderBottom',
-        enumValues: BorderStyle.values)
-    ..aE<BorderStyle>(20, _omitFieldNames ? '' : 'borderLeft',
-        enumValues: BorderStyle.values)
-    ..aI(21, _omitFieldNames ? '' : 'borderTopColor',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aI(22, _omitFieldNames ? '' : 'borderRightColor',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aI(23, _omitFieldNames ? '' : 'borderBottomColor',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aI(24, _omitFieldNames ? '' : 'borderLeftColor',
-        fieldType: $pb.PbFieldType.OU3)
-    ..aOB(25, _omitFieldNames ? '' : 'shrinkToFit')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  CellStyleOverride clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  CellStyleOverride copyWith(void Function(CellStyleOverride) updates) =>
-      super.copyWith((message) => updates(message as CellStyleOverride))
-          as CellStyleOverride;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static CellStyleOverride create() => CellStyleOverride._();
-  @$core.override
-  CellStyleOverride createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static CellStyleOverride getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<CellStyleOverride>(create);
-  static CellStyleOverride? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.int get backColor => $_getIZ(0);
-  @$pb.TagNumber(1)
-  set backColor($core.int value) => $_setUnsignedInt32(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasBackColor() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearBackColor() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.int get foreColor => $_getIZ(1);
-  @$pb.TagNumber(2)
-  set foreColor($core.int value) => $_setUnsignedInt32(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasForeColor() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearForeColor() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  Align get alignment => $_getN(2);
-  @$pb.TagNumber(3)
-  set alignment(Align value) => $_setField(3, value);
-  @$pb.TagNumber(3)
-  $core.bool hasAlignment() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearAlignment() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  TextEffect get textEffect => $_getN(3);
-  @$pb.TagNumber(4)
-  set textEffect(TextEffect value) => $_setField(4, value);
-  @$pb.TagNumber(4)
-  $core.bool hasTextEffect() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearTextEffect() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.String get fontName => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set fontName($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasFontName() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearFontName() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.double get fontSize => $_getN(5);
-  @$pb.TagNumber(6)
-  set fontSize($core.double value) => $_setFloat(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasFontSize() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearFontSize() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  $core.bool get fontBold => $_getBF(6);
-  @$pb.TagNumber(7)
-  set fontBold($core.bool value) => $_setBool(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasFontBold() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearFontBold() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.bool get fontItalic => $_getBF(7);
-  @$pb.TagNumber(8)
-  set fontItalic($core.bool value) => $_setBool(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasFontItalic() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearFontItalic() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $core.bool get fontUnderline => $_getBF(8);
-  @$pb.TagNumber(9)
-  set fontUnderline($core.bool value) => $_setBool(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasFontUnderline() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearFontUnderline() => $_clearField(9);
-
-  @$pb.TagNumber(10)
-  $core.bool get fontStrikethrough => $_getBF(9);
-  @$pb.TagNumber(10)
-  set fontStrikethrough($core.bool value) => $_setBool(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasFontStrikethrough() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearFontStrikethrough() => $_clearField(10);
-
-  @$pb.TagNumber(11)
-  $core.double get fontWidth => $_getN(10);
-  @$pb.TagNumber(11)
-  set fontWidth($core.double value) => $_setFloat(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasFontWidth() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearFontWidth() => $_clearField(11);
-
-  @$pb.TagNumber(12)
-  $core.int get progressColor => $_getIZ(11);
-  @$pb.TagNumber(12)
-  set progressColor($core.int value) => $_setUnsignedInt32(11, value);
-  @$pb.TagNumber(12)
-  $core.bool hasProgressColor() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearProgressColor() => $_clearField(12);
-
-  @$pb.TagNumber(13)
-  $core.double get progressPercent => $_getN(12);
-  @$pb.TagNumber(13)
-  set progressPercent($core.double value) => $_setFloat(12, value);
-  @$pb.TagNumber(13)
-  $core.bool hasProgressPercent() => $_has(12);
-  @$pb.TagNumber(13)
-  void clearProgressPercent() => $_clearField(13);
-
-  @$pb.TagNumber(14)
-  BorderStyle get border => $_getN(13);
-  @$pb.TagNumber(14)
-  set border(BorderStyle value) => $_setField(14, value);
-  @$pb.TagNumber(14)
-  $core.bool hasBorder() => $_has(13);
-  @$pb.TagNumber(14)
-  void clearBorder() => $_clearField(14);
-
-  @$pb.TagNumber(15)
-  $core.int get borderColor => $_getIZ(14);
-  @$pb.TagNumber(15)
-  set borderColor($core.int value) => $_setUnsignedInt32(14, value);
-  @$pb.TagNumber(15)
-  $core.bool hasBorderColor() => $_has(14);
-  @$pb.TagNumber(15)
-  void clearBorderColor() => $_clearField(15);
-
-  /// Per-cell insets (highest priority).
-  @$pb.TagNumber(16)
-  CellPadding get padding => $_getN(15);
-  @$pb.TagNumber(16)
-  set padding(CellPadding value) => $_setField(16, value);
-  @$pb.TagNumber(16)
-  $core.bool hasPadding() => $_has(15);
-  @$pb.TagNumber(16)
-  void clearPadding() => $_clearField(16);
-  @$pb.TagNumber(16)
-  CellPadding ensurePadding() => $_ensure(15);
-
-  /// Per-edge border style overrides. If set, each edge can differ.
-  @$pb.TagNumber(17)
-  BorderStyle get borderTop => $_getN(16);
-  @$pb.TagNumber(17)
-  set borderTop(BorderStyle value) => $_setField(17, value);
-  @$pb.TagNumber(17)
-  $core.bool hasBorderTop() => $_has(16);
-  @$pb.TagNumber(17)
-  void clearBorderTop() => $_clearField(17);
-
-  @$pb.TagNumber(18)
-  BorderStyle get borderRight => $_getN(17);
-  @$pb.TagNumber(18)
-  set borderRight(BorderStyle value) => $_setField(18, value);
-  @$pb.TagNumber(18)
-  $core.bool hasBorderRight() => $_has(17);
-  @$pb.TagNumber(18)
-  void clearBorderRight() => $_clearField(18);
-
-  @$pb.TagNumber(19)
-  BorderStyle get borderBottom => $_getN(18);
-  @$pb.TagNumber(19)
-  set borderBottom(BorderStyle value) => $_setField(19, value);
-  @$pb.TagNumber(19)
-  $core.bool hasBorderBottom() => $_has(18);
-  @$pb.TagNumber(19)
-  void clearBorderBottom() => $_clearField(19);
-
-  @$pb.TagNumber(20)
-  BorderStyle get borderLeft => $_getN(19);
-  @$pb.TagNumber(20)
-  set borderLeft(BorderStyle value) => $_setField(20, value);
-  @$pb.TagNumber(20)
-  $core.bool hasBorderLeft() => $_has(19);
-  @$pb.TagNumber(20)
-  void clearBorderLeft() => $_clearField(20);
-
-  /// Per-edge border colors (fallback to border_color when unset).
-  @$pb.TagNumber(21)
-  $core.int get borderTopColor => $_getIZ(20);
-  @$pb.TagNumber(21)
-  set borderTopColor($core.int value) => $_setUnsignedInt32(20, value);
-  @$pb.TagNumber(21)
-  $core.bool hasBorderTopColor() => $_has(20);
-  @$pb.TagNumber(21)
-  void clearBorderTopColor() => $_clearField(21);
-
-  @$pb.TagNumber(22)
-  $core.int get borderRightColor => $_getIZ(21);
-  @$pb.TagNumber(22)
-  set borderRightColor($core.int value) => $_setUnsignedInt32(21, value);
-  @$pb.TagNumber(22)
-  $core.bool hasBorderRightColor() => $_has(21);
-  @$pb.TagNumber(22)
-  void clearBorderRightColor() => $_clearField(22);
-
-  @$pb.TagNumber(23)
-  $core.int get borderBottomColor => $_getIZ(22);
-  @$pb.TagNumber(23)
-  set borderBottomColor($core.int value) => $_setUnsignedInt32(22, value);
-  @$pb.TagNumber(23)
-  $core.bool hasBorderBottomColor() => $_has(22);
-  @$pb.TagNumber(23)
-  void clearBorderBottomColor() => $_clearField(23);
-
-  @$pb.TagNumber(24)
-  $core.int get borderLeftColor => $_getIZ(23);
-  @$pb.TagNumber(24)
-  set borderLeftColor($core.int value) => $_setUnsignedInt32(23, value);
-  @$pb.TagNumber(24)
-  $core.bool hasBorderLeftColor() => $_has(23);
-  @$pb.TagNumber(24)
-  void clearBorderLeftColor() => $_clearField(24);
-
-  @$pb.TagNumber(25)
-  $core.bool get shrinkToFit => $_getBF(24);
-  @$pb.TagNumber(25)
-  set shrinkToFit($core.bool value) => $_setBool(24, value);
-  @$pb.TagNumber(25)
-  $core.bool hasShrinkToFit() => $_has(24);
-  @$pb.TagNumber(25)
-  void clearShrinkToFit() => $_clearField(25);
-}
-
 class CellUpdate extends $pb.GeneratedMessage {
   factory CellUpdate({
     $core.int? row,
     $core.int? col,
     CellValue? value,
-    CellStyleOverride? style,
+    CellStyle? style,
     CheckedState? checked,
     ImageData? picture,
-    ImageAlignment? pictureAlignment,
+    ImageAlignment? pictureAlign,
     ImageData? buttonPicture,
     $core.String? dropdownItems,
     StickyEdge? stickyRow,
@@ -5825,7 +6223,7 @@ class CellUpdate extends $pb.GeneratedMessage {
     if (style != null) result.style = style;
     if (checked != null) result.checked = checked;
     if (picture != null) result.picture = picture;
-    if (pictureAlignment != null) result.pictureAlignment = pictureAlignment;
+    if (pictureAlign != null) result.pictureAlign = pictureAlign;
     if (buttonPicture != null) result.buttonPicture = buttonPicture;
     if (dropdownItems != null) result.dropdownItems = dropdownItems;
     if (stickyRow != null) result.stickyRow = stickyRow;
@@ -5850,13 +6248,13 @@ class CellUpdate extends $pb.GeneratedMessage {
     ..aI(2, _omitFieldNames ? '' : 'col')
     ..aOM<CellValue>(3, _omitFieldNames ? '' : 'value',
         subBuilder: CellValue.create)
-    ..aOM<CellStyleOverride>(4, _omitFieldNames ? '' : 'style',
-        subBuilder: CellStyleOverride.create)
+    ..aOM<CellStyle>(4, _omitFieldNames ? '' : 'style',
+        subBuilder: CellStyle.create)
     ..aE<CheckedState>(5, _omitFieldNames ? '' : 'checked',
         enumValues: CheckedState.values)
     ..aOM<ImageData>(6, _omitFieldNames ? '' : 'picture',
         subBuilder: ImageData.create)
-    ..aE<ImageAlignment>(7, _omitFieldNames ? '' : 'pictureAlignment',
+    ..aE<ImageAlignment>(7, _omitFieldNames ? '' : 'pictureAlign',
         enumValues: ImageAlignment.values)
     ..aOM<ImageData>(8, _omitFieldNames ? '' : 'buttonPicture',
         subBuilder: ImageData.create)
@@ -5903,7 +6301,6 @@ class CellUpdate extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearCol() => $_clearField(2);
 
-  /// Only set fields are applied.
   @$pb.TagNumber(3)
   CellValue get value => $_getN(2);
   @$pb.TagNumber(3)
@@ -5916,15 +6313,15 @@ class CellUpdate extends $pb.GeneratedMessage {
   CellValue ensureValue() => $_ensure(2);
 
   @$pb.TagNumber(4)
-  CellStyleOverride get style => $_getN(3);
+  CellStyle get style => $_getN(3);
   @$pb.TagNumber(4)
-  set style(CellStyleOverride value) => $_setField(4, value);
+  set style(CellStyle value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasStyle() => $_has(3);
   @$pb.TagNumber(4)
   void clearStyle() => $_clearField(4);
   @$pb.TagNumber(4)
-  CellStyleOverride ensureStyle() => $_ensure(3);
+  CellStyle ensureStyle() => $_ensure(3);
 
   @$pb.TagNumber(5)
   CheckedState get checked => $_getN(4);
@@ -5947,13 +6344,13 @@ class CellUpdate extends $pb.GeneratedMessage {
   ImageData ensurePicture() => $_ensure(5);
 
   @$pb.TagNumber(7)
-  ImageAlignment get pictureAlignment => $_getN(6);
+  ImageAlignment get pictureAlign => $_getN(6);
   @$pb.TagNumber(7)
-  set pictureAlignment(ImageAlignment value) => $_setField(7, value);
+  set pictureAlign(ImageAlignment value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasPictureAlignment() => $_has(6);
+  $core.bool hasPictureAlign() => $_has(6);
   @$pb.TagNumber(7)
-  void clearPictureAlignment() => $_clearField(7);
+  void clearPictureAlign() => $_clearField(7);
 
   @$pb.TagNumber(8)
   ImageData get buttonPicture => $_getN(7);
@@ -6057,7 +6454,6 @@ class UpdateCellsRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   $pb.PbList<CellUpdate> get cells => $_getList(1);
 
-  /// true = all-or-nothing write.
   @$pb.TagNumber(3)
   $core.bool get atomic => $_getBF(2);
   @$pb.TagNumber(3)
@@ -6178,7 +6574,6 @@ class GetCellsRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearCol2() => $_clearField(5);
 
-  /// Control what to include in the response.
   @$pb.TagNumber(6)
   $core.bool get includeStyle => $_getBF(5);
   @$pb.TagNumber(6)
@@ -6197,7 +6592,6 @@ class GetCellsRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearIncludeChecked() => $_clearField(7);
 
-  /// When true, return typed values instead of text-only values.
   @$pb.TagNumber(8)
   $core.bool get includeTyped => $_getBF(7);
   @$pb.TagNumber(8)
@@ -6213,7 +6607,7 @@ class CellData extends $pb.GeneratedMessage {
     $core.int? row,
     $core.int? col,
     CellValue? value,
-    CellStyleOverride? style,
+    CellStyle? style,
     CheckedState? checked,
   }) {
     final result = create();
@@ -6242,8 +6636,8 @@ class CellData extends $pb.GeneratedMessage {
     ..aI(2, _omitFieldNames ? '' : 'col')
     ..aOM<CellValue>(3, _omitFieldNames ? '' : 'value',
         subBuilder: CellValue.create)
-    ..aOM<CellStyleOverride>(4, _omitFieldNames ? '' : 'style',
-        subBuilder: CellStyleOverride.create)
+    ..aOM<CellStyle>(4, _omitFieldNames ? '' : 'style',
+        subBuilder: CellStyle.create)
     ..aE<CheckedState>(5, _omitFieldNames ? '' : 'checked',
         enumValues: CheckedState.values)
     ..hasRequiredFields = false;
@@ -6296,15 +6690,15 @@ class CellData extends $pb.GeneratedMessage {
   CellValue ensureValue() => $_ensure(2);
 
   @$pb.TagNumber(4)
-  CellStyleOverride get style => $_getN(3);
+  CellStyle get style => $_getN(3);
   @$pb.TagNumber(4)
-  set style(CellStyleOverride value) => $_setField(4, value);
+  set style(CellStyle value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasStyle() => $_has(3);
   @$pb.TagNumber(4)
   void clearStyle() => $_clearField(4);
   @$pb.TagNumber(4)
-  CellStyleOverride ensureStyle() => $_ensure(3);
+  CellStyle ensureStyle() => $_ensure(3);
 
   @$pb.TagNumber(5)
   CheckedState get checked => $_getN(4);
@@ -6450,7 +6844,6 @@ class TypeViolation extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearExpected() => $_clearField(3);
 
-  /// The rejected inbound value.
   @$pb.TagNumber(4)
   CellValue get actual => $_getN(3);
   @$pb.TagNumber(4)
@@ -6462,7 +6855,6 @@ class TypeViolation extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   CellValue ensureActual() => $_ensure(3);
 
-  /// Human-readable reason.
   @$pb.TagNumber(5)
   $core.String get reason => $_getSZ(4);
   @$pb.TagNumber(5)
@@ -6630,7 +7022,6 @@ class LoadTableRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearCols() => $_clearField(3);
 
-  /// Dense row-major array, length should be rows * cols.
   @$pb.TagNumber(4)
   $pb.PbList<CellValue> get values => $_getList(3);
 
@@ -7364,8 +7755,6 @@ class HighlightRegion extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   HighlightStyle ensureStyle() => $_ensure(1);
 
-  /// Stable id for one formula reference token (keeps color/handle mapping stable
-  /// while users edit text and reorder references).
   @$pb.TagNumber(3)
   $core.int get refId => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -7375,8 +7764,6 @@ class HighlightRegion extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearRefId() => $_clearField(3);
 
-  /// Optional source span in the formula text, for adapters that highlight the
-  /// matching token in editor/formula-bar UI.
   @$pb.TagNumber(4)
   $core.int get textStart => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -8122,10 +8509,12 @@ class SortColumn extends $pb.GeneratedMessage {
   factory SortColumn({
     $core.int? col,
     SortOrder? order,
+    SortType? type,
   }) {
     final result = create();
     if (col != null) result.col = col;
     if (order != null) result.order = order;
+    if (type != null) result.type = type;
     return result;
   }
 
@@ -8145,6 +8534,8 @@ class SortColumn extends $pb.GeneratedMessage {
     ..aI(1, _omitFieldNames ? '' : 'col')
     ..aE<SortOrder>(2, _omitFieldNames ? '' : 'order',
         enumValues: SortOrder.values)
+    ..aE<SortType>(3, _omitFieldNames ? '' : 'type',
+        enumValues: SortType.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8182,6 +8573,15 @@ class SortColumn extends $pb.GeneratedMessage {
   $core.bool hasOrder() => $_has(1);
   @$pb.TagNumber(2)
   void clearOrder() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  SortType get type => $_getN(2);
+  @$pb.TagNumber(3)
+  set type(SortType value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasType() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearType() => $_clearField(3);
 }
 
 class SortRequest extends $pb.GeneratedMessage {
@@ -8252,8 +8652,8 @@ class SubtotalRequest extends $pb.GeneratedMessage {
     $core.int? groupOnCol,
     $core.int? aggregateCol,
     $core.String? caption,
-    $core.int? backColor,
-    $core.int? foreColor,
+    $core.int? background,
+    $core.int? foreground,
     $core.bool? addOutline,
   }) {
     final result = create();
@@ -8262,8 +8662,8 @@ class SubtotalRequest extends $pb.GeneratedMessage {
     if (groupOnCol != null) result.groupOnCol = groupOnCol;
     if (aggregateCol != null) result.aggregateCol = aggregateCol;
     if (caption != null) result.caption = caption;
-    if (backColor != null) result.backColor = backColor;
-    if (foreColor != null) result.foreColor = foreColor;
+    if (background != null) result.background = background;
+    if (foreground != null) result.foreground = foreground;
     if (addOutline != null) result.addOutline = addOutline;
     return result;
   }
@@ -8287,8 +8687,8 @@ class SubtotalRequest extends $pb.GeneratedMessage {
     ..aI(3, _omitFieldNames ? '' : 'groupOnCol')
     ..aI(4, _omitFieldNames ? '' : 'aggregateCol')
     ..aOS(5, _omitFieldNames ? '' : 'caption')
-    ..aI(6, _omitFieldNames ? '' : 'backColor', fieldType: $pb.PbFieldType.OU3)
-    ..aI(7, _omitFieldNames ? '' : 'foreColor', fieldType: $pb.PbFieldType.OU3)
+    ..aI(6, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
+    ..aI(7, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
     ..aOB(8, _omitFieldNames ? '' : 'addOutline')
     ..hasRequiredFields = false;
 
@@ -8357,22 +8757,22 @@ class SubtotalRequest extends $pb.GeneratedMessage {
   void clearCaption() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.int get backColor => $_getIZ(5);
+  $core.int get background => $_getIZ(5);
   @$pb.TagNumber(6)
-  set backColor($core.int value) => $_setUnsignedInt32(5, value);
+  set background($core.int value) => $_setUnsignedInt32(5, value);
   @$pb.TagNumber(6)
-  $core.bool hasBackColor() => $_has(5);
+  $core.bool hasBackground() => $_has(5);
   @$pb.TagNumber(6)
-  void clearBackColor() => $_clearField(6);
+  void clearBackground() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $core.int get foreColor => $_getIZ(6);
+  $core.int get foreground => $_getIZ(6);
   @$pb.TagNumber(7)
-  set foreColor($core.int value) => $_setUnsignedInt32(6, value);
+  set foreground($core.int value) => $_setUnsignedInt32(6, value);
   @$pb.TagNumber(7)
-  $core.bool hasForeColor() => $_has(6);
+  $core.bool hasForeground() => $_has(6);
   @$pb.TagNumber(7)
-  void clearForeColor() => $_clearField(7);
+  void clearForeground() => $_clearField(7);
 
   @$pb.TagNumber(8)
   $core.bool get addOutline => $_getBF(7);
@@ -10789,6 +11189,96 @@ class ArchiveResponse extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(2)
   $pb.PbList<$core.String> get names => $_getList(1);
+}
+
+class Empty extends $pb.GeneratedMessage {
+  factory Empty() => create();
+
+  Empty._();
+
+  factory Empty.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory Empty.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Empty',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Empty clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Empty copyWith(void Function(Empty) updates) =>
+      super.copyWith((message) => updates(message as Empty)) as Empty;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static Empty create() => Empty._();
+  @$core.override
+  Empty createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static Empty getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Empty>(create);
+  static Empty? _defaultInstance;
+}
+
+class GridHandle extends $pb.GeneratedMessage {
+  factory GridHandle({
+    $fixnum.Int64? id,
+  }) {
+    final result = create();
+    if (id != null) result.id = id;
+    return result;
+  }
+
+  GridHandle._();
+
+  factory GridHandle.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GridHandle.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GridHandle',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'id')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GridHandle clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GridHandle copyWith(void Function(GridHandle) updates) =>
+      super.copyWith((message) => updates(message as GridHandle)) as GridHandle;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GridHandle create() => GridHandle._();
+  @$core.override
+  GridHandle createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GridHandle getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GridHandle>(create);
+  static GridHandle? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get id => $_getI64(0);
+  @$pb.TagNumber(1)
+  set id($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
 }
 
 class CreateRequest extends $pb.GeneratedMessage {
@@ -14601,14 +15091,12 @@ class CellFocusChangingEvent extends $pb.GeneratedMessage {
     $core.int? oldCol,
     $core.int? newRow,
     $core.int? newCol,
-    $core.bool? cancel,
   }) {
     final result = create();
     if (oldRow != null) result.oldRow = oldRow;
     if (oldCol != null) result.oldCol = oldCol;
     if (newRow != null) result.newRow = newRow;
     if (newCol != null) result.newCol = newCol;
-    if (cancel != null) result.cancel = cancel;
     return result;
   }
 
@@ -14629,7 +15117,6 @@ class CellFocusChangingEvent extends $pb.GeneratedMessage {
     ..aI(2, _omitFieldNames ? '' : 'oldCol')
     ..aI(3, _omitFieldNames ? '' : 'newRow')
     ..aI(4, _omitFieldNames ? '' : 'newCol')
-    ..aOB(5, _omitFieldNames ? '' : 'cancel')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -14687,15 +15174,6 @@ class CellFocusChangingEvent extends $pb.GeneratedMessage {
   $core.bool hasNewCol() => $_has(3);
   @$pb.TagNumber(4)
   void clearNewCol() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.bool get cancel => $_getBF(4);
-  @$pb.TagNumber(5)
-  set cancel($core.bool value) => $_setBool(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasCancel() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearCancel() => $_clearField(5);
 }
 
 class CellFocusChangedEvent extends $pb.GeneratedMessage {
@@ -14795,14 +15273,12 @@ class SelectionChangingEvent extends $pb.GeneratedMessage {
     $core.Iterable<CellRange>? newRanges,
     $core.int? activeRow,
     $core.int? activeCol,
-    $core.bool? cancel,
   }) {
     final result = create();
     if (oldRanges != null) result.oldRanges.addAll(oldRanges);
     if (newRanges != null) result.newRanges.addAll(newRanges);
     if (activeRow != null) result.activeRow = activeRow;
     if (activeCol != null) result.activeCol = activeCol;
-    if (cancel != null) result.cancel = cancel;
     return result;
   }
 
@@ -14825,7 +15301,6 @@ class SelectionChangingEvent extends $pb.GeneratedMessage {
         subBuilder: CellRange.create)
     ..aI(3, _omitFieldNames ? '' : 'activeRow')
     ..aI(4, _omitFieldNames ? '' : 'activeCol')
-    ..aOB(5, _omitFieldNames ? '' : 'cancel')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -14871,15 +15346,6 @@ class SelectionChangingEvent extends $pb.GeneratedMessage {
   $core.bool hasActiveCol() => $_has(3);
   @$pb.TagNumber(4)
   void clearActiveCol() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.bool get cancel => $_getBF(4);
-  @$pb.TagNumber(5)
-  set cancel($core.bool value) => $_setBool(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasCancel() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearCancel() => $_clearField(5);
 }
 
 class SelectionChangedEvent extends $pb.GeneratedMessage {
@@ -15100,12 +15566,10 @@ class BeforeEditEvent extends $pb.GeneratedMessage {
   factory BeforeEditEvent({
     $core.int? row,
     $core.int? col,
-    $core.bool? cancel,
   }) {
     final result = create();
     if (row != null) result.row = row;
     if (col != null) result.col = col;
-    if (cancel != null) result.cancel = cancel;
     return result;
   }
 
@@ -15124,7 +15588,6 @@ class BeforeEditEvent extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'row')
     ..aI(2, _omitFieldNames ? '' : 'col')
-    ..aOB(3, _omitFieldNames ? '' : 'cancel')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -15163,15 +15626,6 @@ class BeforeEditEvent extends $pb.GeneratedMessage {
   $core.bool hasCol() => $_has(1);
   @$pb.TagNumber(2)
   void clearCol() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.bool get cancel => $_getBF(2);
-  @$pb.TagNumber(3)
-  set cancel($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasCancel() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearCancel() => $_clearField(3);
 }
 
 class StartEditEvent extends $pb.GeneratedMessage {
@@ -15335,13 +15789,11 @@ class CellEditValidateEvent extends $pb.GeneratedMessage {
     $core.int? row,
     $core.int? col,
     $core.String? editText,
-    $core.bool? cancel,
   }) {
     final result = create();
     if (row != null) result.row = row;
     if (col != null) result.col = col;
     if (editText != null) result.editText = editText;
-    if (cancel != null) result.cancel = cancel;
     return result;
   }
 
@@ -15361,7 +15813,6 @@ class CellEditValidateEvent extends $pb.GeneratedMessage {
     ..aI(1, _omitFieldNames ? '' : 'row')
     ..aI(2, _omitFieldNames ? '' : 'col')
     ..aOS(3, _omitFieldNames ? '' : 'editText')
-    ..aOB(4, _omitFieldNames ? '' : 'cancel')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -15410,15 +15861,6 @@ class CellEditValidateEvent extends $pb.GeneratedMessage {
   $core.bool hasEditText() => $_has(2);
   @$pb.TagNumber(3)
   void clearEditText() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.bool get cancel => $_getBF(3);
-  @$pb.TagNumber(4)
-  set cancel($core.bool value) => $_setBool(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasCancel() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearCancel() => $_clearField(4);
 }
 
 class CellEditChangeEvent extends $pb.GeneratedMessage {
@@ -16102,11 +16544,9 @@ class RowStatusChangeEvent extends $pb.GeneratedMessage {
 class BeforeSortEvent extends $pb.GeneratedMessage {
   factory BeforeSortEvent({
     $core.int? col,
-    $core.bool? cancel,
   }) {
     final result = create();
     if (col != null) result.col = col;
-    if (cancel != null) result.cancel = cancel;
     return result;
   }
 
@@ -16124,7 +16564,6 @@ class BeforeSortEvent extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'col')
-    ..aOB(2, _omitFieldNames ? '' : 'cancel')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -16154,15 +16593,6 @@ class BeforeSortEvent extends $pb.GeneratedMessage {
   $core.bool hasCol() => $_has(0);
   @$pb.TagNumber(1)
   void clearCol() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.bool get cancel => $_getBF(1);
-  @$pb.TagNumber(2)
-  set cancel($core.bool value) => $_setBool(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasCancel() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearCancel() => $_clearField(2);
 }
 
 class AfterSortEvent extends $pb.GeneratedMessage {
@@ -16314,12 +16744,10 @@ class BeforeNodeToggleEvent extends $pb.GeneratedMessage {
   factory BeforeNodeToggleEvent({
     $core.int? row,
     $core.bool? collapse,
-    $core.bool? cancel,
   }) {
     final result = create();
     if (row != null) result.row = row;
     if (collapse != null) result.collapse = collapse;
-    if (cancel != null) result.cancel = cancel;
     return result;
   }
 
@@ -16338,7 +16766,6 @@ class BeforeNodeToggleEvent extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'row')
     ..aOB(2, _omitFieldNames ? '' : 'collapse')
-    ..aOB(3, _omitFieldNames ? '' : 'cancel')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -16378,15 +16805,6 @@ class BeforeNodeToggleEvent extends $pb.GeneratedMessage {
   $core.bool hasCollapse() => $_has(1);
   @$pb.TagNumber(2)
   void clearCollapse() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.bool get cancel => $_getBF(2);
-  @$pb.TagNumber(3)
-  set cancel($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasCancel() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearCancel() => $_clearField(3);
 }
 
 class AfterNodeToggleEvent extends $pb.GeneratedMessage {
@@ -16458,14 +16876,12 @@ class AfterNodeToggleEvent extends $pb.GeneratedMessage {
 /// ── Scroll Events ──
 class BeforeScrollEvent extends $pb.GeneratedMessage {
   factory BeforeScrollEvent({
-    $core.bool? cancel,
     $core.int? oldTopRow,
     $core.int? oldLeftCol,
     $core.int? newTopRow,
     $core.int? newLeftCol,
   }) {
     final result = create();
-    if (cancel != null) result.cancel = cancel;
     if (oldTopRow != null) result.oldTopRow = oldTopRow;
     if (oldLeftCol != null) result.oldLeftCol = oldLeftCol;
     if (newTopRow != null) result.newTopRow = newTopRow;
@@ -16486,11 +16902,10 @@ class BeforeScrollEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'BeforeScrollEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aOB(1, _omitFieldNames ? '' : 'cancel')
-    ..aI(2, _omitFieldNames ? '' : 'oldTopRow')
-    ..aI(3, _omitFieldNames ? '' : 'oldLeftCol')
-    ..aI(4, _omitFieldNames ? '' : 'newTopRow')
-    ..aI(5, _omitFieldNames ? '' : 'newLeftCol')
+    ..aI(1, _omitFieldNames ? '' : 'oldTopRow')
+    ..aI(2, _omitFieldNames ? '' : 'oldLeftCol')
+    ..aI(3, _omitFieldNames ? '' : 'newTopRow')
+    ..aI(4, _omitFieldNames ? '' : 'newLeftCol')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -16513,49 +16928,40 @@ class BeforeScrollEvent extends $pb.GeneratedMessage {
   static BeforeScrollEvent? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.bool get cancel => $_getBF(0);
+  $core.int get oldTopRow => $_getIZ(0);
   @$pb.TagNumber(1)
-  set cancel($core.bool value) => $_setBool(0, value);
+  set oldTopRow($core.int value) => $_setSignedInt32(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasCancel() => $_has(0);
+  $core.bool hasOldTopRow() => $_has(0);
   @$pb.TagNumber(1)
-  void clearCancel() => $_clearField(1);
+  void clearOldTopRow() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get oldTopRow => $_getIZ(1);
+  $core.int get oldLeftCol => $_getIZ(1);
   @$pb.TagNumber(2)
-  set oldTopRow($core.int value) => $_setSignedInt32(1, value);
+  set oldLeftCol($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasOldTopRow() => $_has(1);
+  $core.bool hasOldLeftCol() => $_has(1);
   @$pb.TagNumber(2)
-  void clearOldTopRow() => $_clearField(2);
+  void clearOldLeftCol() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.int get oldLeftCol => $_getIZ(2);
+  $core.int get newTopRow => $_getIZ(2);
   @$pb.TagNumber(3)
-  set oldLeftCol($core.int value) => $_setSignedInt32(2, value);
+  set newTopRow($core.int value) => $_setSignedInt32(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasOldLeftCol() => $_has(2);
+  $core.bool hasNewTopRow() => $_has(2);
   @$pb.TagNumber(3)
-  void clearOldLeftCol() => $_clearField(3);
+  void clearNewTopRow() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.int get newTopRow => $_getIZ(3);
+  $core.int get newLeftCol => $_getIZ(3);
   @$pb.TagNumber(4)
-  set newTopRow($core.int value) => $_setSignedInt32(3, value);
+  set newLeftCol($core.int value) => $_setSignedInt32(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasNewTopRow() => $_has(3);
+  $core.bool hasNewLeftCol() => $_has(3);
   @$pb.TagNumber(4)
-  void clearNewTopRow() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.int get newLeftCol => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set newLeftCol($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasNewLeftCol() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearNewLeftCol() => $_clearField(5);
+  void clearNewLeftCol() => $_clearField(4);
 }
 
 class AfterScrollEvent extends $pb.GeneratedMessage {
@@ -16707,12 +17113,10 @@ class BeforeUserResizeEvent extends $pb.GeneratedMessage {
   factory BeforeUserResizeEvent({
     $core.int? row,
     $core.int? col,
-    $core.bool? cancel,
   }) {
     final result = create();
     if (row != null) result.row = row;
     if (col != null) result.col = col;
-    if (cancel != null) result.cancel = cancel;
     return result;
   }
 
@@ -16731,7 +17135,6 @@ class BeforeUserResizeEvent extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'row')
     ..aI(2, _omitFieldNames ? '' : 'col')
-    ..aOB(3, _omitFieldNames ? '' : 'cancel')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -16771,15 +17174,6 @@ class BeforeUserResizeEvent extends $pb.GeneratedMessage {
   $core.bool hasCol() => $_has(1);
   @$pb.TagNumber(2)
   void clearCol() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.bool get cancel => $_getBF(2);
-  @$pb.TagNumber(3)
-  set cancel($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasCancel() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearCancel() => $_clearField(3);
 }
 
 class AfterUserResizeEvent extends $pb.GeneratedMessage {
@@ -16919,12 +17313,10 @@ class BeforeMoveColumnEvent extends $pb.GeneratedMessage {
   factory BeforeMoveColumnEvent({
     $core.int? col,
     $core.int? newPosition,
-    $core.bool? cancel,
   }) {
     final result = create();
     if (col != null) result.col = col;
     if (newPosition != null) result.newPosition = newPosition;
-    if (cancel != null) result.cancel = cancel;
     return result;
   }
 
@@ -16943,7 +17335,6 @@ class BeforeMoveColumnEvent extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'col')
     ..aI(2, _omitFieldNames ? '' : 'newPosition')
-    ..aOB(3, _omitFieldNames ? '' : 'cancel')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -16983,15 +17374,6 @@ class BeforeMoveColumnEvent extends $pb.GeneratedMessage {
   $core.bool hasNewPosition() => $_has(1);
   @$pb.TagNumber(2)
   void clearNewPosition() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.bool get cancel => $_getBF(2);
-  @$pb.TagNumber(3)
-  set cancel($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasCancel() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearCancel() => $_clearField(3);
 }
 
 class AfterMoveColumnEvent extends $pb.GeneratedMessage {
@@ -17064,12 +17446,10 @@ class BeforeMoveRowEvent extends $pb.GeneratedMessage {
   factory BeforeMoveRowEvent({
     $core.int? row,
     $core.int? newPosition,
-    $core.bool? cancel,
   }) {
     final result = create();
     if (row != null) result.row = row;
     if (newPosition != null) result.newPosition = newPosition;
-    if (cancel != null) result.cancel = cancel;
     return result;
   }
 
@@ -17088,7 +17468,6 @@ class BeforeMoveRowEvent extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'row')
     ..aI(2, _omitFieldNames ? '' : 'newPosition')
-    ..aOB(3, _omitFieldNames ? '' : 'cancel')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -17127,15 +17506,6 @@ class BeforeMoveRowEvent extends $pb.GeneratedMessage {
   $core.bool hasNewPosition() => $_has(1);
   @$pb.TagNumber(2)
   void clearNewPosition() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.bool get cancel => $_getBF(2);
-  @$pb.TagNumber(3)
-  set cancel($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasCancel() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearCancel() => $_clearField(3);
 }
 
 class AfterMoveRowEvent extends $pb.GeneratedMessage {
@@ -17209,12 +17579,10 @@ class BeforeMouseDownEvent extends $pb.GeneratedMessage {
   factory BeforeMouseDownEvent({
     $core.int? row,
     $core.int? col,
-    $core.bool? cancel,
   }) {
     final result = create();
     if (row != null) result.row = row;
     if (col != null) result.col = col;
-    if (cancel != null) result.cancel = cancel;
     return result;
   }
 
@@ -17233,7 +17601,6 @@ class BeforeMouseDownEvent extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'row')
     ..aI(2, _omitFieldNames ? '' : 'col')
-    ..aOB(3, _omitFieldNames ? '' : 'cancel')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -17272,15 +17639,6 @@ class BeforeMouseDownEvent extends $pb.GeneratedMessage {
   $core.bool hasCol() => $_has(1);
   @$pb.TagNumber(2)
   void clearCol() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.bool get cancel => $_getBF(2);
-  @$pb.TagNumber(3)
-  set cancel($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasCancel() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearCancel() => $_clearField(3);
 }
 
 class MouseDownEvent extends $pb.GeneratedMessage {
@@ -17824,7 +18182,7 @@ class CustomRenderCellEvent extends $pb.GeneratedMessage {
     $core.double? width,
     $core.double? height,
     $core.String? text,
-    CellStyleOverride? style,
+    CellStyle? style,
     $core.bool? done,
   }) {
     final result = create();
@@ -17860,8 +18218,8 @@ class CustomRenderCellEvent extends $pb.GeneratedMessage {
     ..aD(5, _omitFieldNames ? '' : 'width', fieldType: $pb.PbFieldType.OF)
     ..aD(6, _omitFieldNames ? '' : 'height', fieldType: $pb.PbFieldType.OF)
     ..aOS(7, _omitFieldNames ? '' : 'text')
-    ..aOM<CellStyleOverride>(8, _omitFieldNames ? '' : 'style',
-        subBuilder: CellStyleOverride.create)
+    ..aOM<CellStyle>(8, _omitFieldNames ? '' : 'style',
+        subBuilder: CellStyle.create)
     ..aOB(9, _omitFieldNames ? '' : 'done')
     ..hasRequiredFields = false;
 
@@ -17949,15 +18307,15 @@ class CustomRenderCellEvent extends $pb.GeneratedMessage {
   void clearText() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  CellStyleOverride get style => $_getN(7);
+  CellStyle get style => $_getN(7);
   @$pb.TagNumber(8)
-  set style(CellStyleOverride value) => $_setField(8, value);
+  set style(CellStyle value) => $_setField(8, value);
   @$pb.TagNumber(8)
   $core.bool hasStyle() => $_has(7);
   @$pb.TagNumber(8)
   void clearStyle() => $_clearField(8);
   @$pb.TagNumber(8)
-  CellStyleOverride ensureStyle() => $_ensure(7);
+  CellStyle ensureStyle() => $_ensure(7);
 
   @$pb.TagNumber(9)
   $core.bool get done => $_getBF(8);
@@ -18354,13 +18712,7 @@ class TypeAheadEndedEvent extends $pb.GeneratedMessage {
 
 /// ── Data Refresh Events ──
 class DataRefreshingEvent extends $pb.GeneratedMessage {
-  factory DataRefreshingEvent({
-    $core.bool? cancel,
-  }) {
-    final result = create();
-    if (cancel != null) result.cancel = cancel;
-    return result;
-  }
+  factory DataRefreshingEvent() => create();
 
   DataRefreshingEvent._();
 
@@ -18375,7 +18727,6 @@ class DataRefreshingEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'DataRefreshingEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aOB(1, _omitFieldNames ? '' : 'cancel')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -18396,15 +18747,6 @@ class DataRefreshingEvent extends $pb.GeneratedMessage {
   static DataRefreshingEvent getDefault() => _defaultInstance ??=
       $pb.GeneratedMessage.$_defaultFor<DataRefreshingEvent>(create);
   static DataRefreshingEvent? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.bool get cancel => $_getBF(0);
-  @$pb.TagNumber(1)
-  set cancel($core.bool value) => $_setBool(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasCancel() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearCancel() => $_clearField(1);
 }
 
 class DataRefreshedEvent extends $pb.GeneratedMessage {
@@ -18593,11 +18935,9 @@ class ErrorEvent extends $pb.GeneratedMessage {
 class BeforePageBreakEvent extends $pb.GeneratedMessage {
   factory BeforePageBreakEvent({
     $core.int? row,
-    $core.bool? cancel,
   }) {
     final result = create();
     if (row != null) result.row = row;
-    if (cancel != null) result.cancel = cancel;
     return result;
   }
 
@@ -18615,7 +18955,6 @@ class BeforePageBreakEvent extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'row')
-    ..aOB(2, _omitFieldNames ? '' : 'cancel')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -18645,15 +18984,6 @@ class BeforePageBreakEvent extends $pb.GeneratedMessage {
   $core.bool hasRow() => $_has(0);
   @$pb.TagNumber(1)
   void clearRow() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.bool get cancel => $_getBF(1);
-  @$pb.TagNumber(2)
-  set cancel($core.bool value) => $_setBool(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasCancel() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearCancel() => $_clearField(2);
 }
 
 class StartPageEvent extends $pb.GeneratedMessage {
@@ -18779,19 +19109,14 @@ class VolvoxGridServiceApi {
           ctx, 'VolvoxGridService', 'Destroy', request, Empty());
 
   /// ── Configuration ──
-  /// Apply partial config — only set fields are updated.
   $async.Future<Empty> configure(
           $pb.ClientContext? ctx, ConfigureRequest request) =>
       _client.invoke<Empty>(
           ctx, 'VolvoxGridService', 'Configure', request, Empty());
-
-  /// Return the full current configuration.
   $async.Future<GridConfig> getConfig(
           $pb.ClientContext? ctx, GridHandle request) =>
       _client.invoke<GridConfig>(
           ctx, 'VolvoxGridService', 'GetConfig', request, GridConfig());
-
-  /// Register a runtime font (TTF/OTF/TTC bytes) for text/icon rendering.
   $async.Future<Empty> loadFontData(
           $pb.ClientContext? ctx, LoadFontDataRequest request) =>
       _client.invoke<Empty>(

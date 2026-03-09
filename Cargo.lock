@@ -2743,8 +2743,9 @@ version = "0.2.0"
 dependencies = [
  "cairo-rs",
  "gtk4",
- "pollster",
- "volvoxgrid-engine",
+ "libc",
+ "prost 0.12.6",
+ "prost-build",
 ]
 
 [[package]]
@@ -2781,6 +2782,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-bindgen-rayon",
  "web-sys",
+ "web-time",
 ]
 
 [[package]]

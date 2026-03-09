@@ -2,6 +2,7 @@ use crate::canvas::VisibleRange;
 use crate::event::GridEventData;
 use crate::grid::VolvoxGrid;
 use crate::proto::volvoxgrid::v1 as pb;
+use crate::selection::{hover_mode_has, HOVER_CELL, HOVER_COLUMN, HOVER_NONE, HOVER_ROW};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 #[cfg(target_arch = "wasm32")]
@@ -90,11 +91,6 @@ fn type_ahead_delay_ms(grid: &VolvoxGrid) -> u128 {
     } else {
         raw as u128
     }
-}
-
-#[inline]
-fn hover_mode_has(mode: u32, flag: pb::HoverMode) -> bool {
-    mode & (flag as u32) != 0
 }
 
 fn clear_type_ahead_buffer(grid: &mut VolvoxGrid, emit_end_event: bool) {
@@ -205,6 +201,7 @@ fn begin_edit_from_input(grid: &mut VolvoxGrid, row: i32, col: i32) {
     if dropdown_list.trim() == "..." {
         grid.events
             .push(GridEventData::CellButtonClick { row, col });
+        grid.mark_dirty();
         return;
     }
 
@@ -228,6 +225,21 @@ fn begin_edit_from_input(grid: &mut VolvoxGrid, row: i32, col: i32) {
         grid.events.push(GridEventData::DropdownOpened);
     }
     grid.events.push(GridEventData::StartEdit { row, col });
+    grid.mark_dirty();
+}
+
+fn set_fast_scroll_target_row(grid: &mut VolvoxGrid, target: i32, force: bool) {
+    if grid.rows <= 0 {
+        return;
+    }
+    let fixed = grid.fixed_rows.clamp(0, grid.rows.saturating_sub(1).max(0));
+    let target = target.clamp(fixed, grid.rows - 1);
+    if !force && target == grid.fast_scroll_target_row {
+        return;
+    }
+    grid.fast_scroll_target_row = target;
+    grid.set_top_row(target);
+    grid.mark_dirty();
 }
 
 /// Map a touch Y coordinate to a target row for fast scroll and apply it.
@@ -239,21 +251,24 @@ fn update_fast_scroll_target(grid: &mut VolvoxGrid, y: f32) {
     let track_top = vert_inset;
     let track_bottom = (vp_h - vert_inset).max(track_top + 1.0);
     let track_height = track_bottom - track_top;
-
-    let ratio = ((y - track_top) / track_height).clamp(0.0, 1.0);
     let fixed = grid.fixed_rows;
     let data_rows = grid.rows - fixed;
     if data_rows <= 1 {
         return;
     }
-    let target = fixed + (ratio * (data_rows - 1) as f32).round() as i32;
-    let target = target.clamp(fixed, grid.rows - 1);
-    if target == grid.fast_scroll_target_row {
+
+    if y <= track_top {
+        set_fast_scroll_target_row(grid, fixed, true);
         return;
     }
-    grid.fast_scroll_target_row = target;
-    grid.set_top_row(target);
-    grid.mark_dirty();
+    if y >= track_bottom {
+        set_fast_scroll_target_row(grid, grid.rows - 1, true);
+        return;
+    }
+
+    let ratio = ((y - track_top) / track_height).clamp(0.0, 1.0);
+    let target = fixed + (ratio * (data_rows - 1) as f32).round() as i32;
+    set_fast_scroll_target_row(grid, target, false);
 }
 
 /// Resolve the current display position for a logical column key.
@@ -1119,8 +1134,11 @@ pub fn handle_pointer_down_with_behavior(
     }
     let hit = hit_test(grid, x, y);
 
-    // Click-away behavior: if editing, and click is not on the active dropdown or active dropdown button, commit and close.
-    // This allows the user to dismiss the dropdown/editor by tapping elsewhere.
+    // Click-away behavior: if editing, and click is not on the active dropdown or
+    // active dropdown button, close the editor.
+    // Plain text edits commit on click-away, but dropdown-backed edits cancel so
+    // keyboard-previewed choices do not overwrite the stored value unless the
+    // user explicitly confirms them.
     // Skipped when host_pointer_dispatch — the host adapter handles commit-on-click-away.
     if !grid.host_pointer_dispatch
         && grid.is_editing()
@@ -1132,7 +1150,11 @@ pub fn handle_pointer_down_with_behavior(
             && hit.col == grid.edit.edit_col;
 
         if !is_active_btn {
-            grid.commit_edit();
+            if grid.edit.dropdown_items.is_empty() {
+                grid.commit_edit();
+            } else {
+                grid.cancel_edit();
+            }
         }
     }
 
@@ -1150,7 +1172,9 @@ pub fn handle_pointer_down_with_behavior(
                 grid.edit.update_text(text.clone());
                 grid.events.push(GridEventData::CellEditChange { text });
 
-                // Commit immediately on selection
+                // Consume the rest of this pointer gesture after committing so
+                // the closing popup does not leak into grid selection.
+                grid.dropdown_click_active = true;
                 grid.commit_edit();
                 grid.mark_dirty();
             }
@@ -1424,9 +1448,9 @@ pub fn handle_pointer_down_with_behavior(
                     new_col: hit.col,
                 });
 
-                // Handle double click for editing, OR single click if it's a dropdown cell (user preference).
-                // This aligns Android behavior (where single-tap is expected for dropdowns) with GTK4
-                // where the host manually triggers edit on click.
+                // Handle double click for editing, or single click for dropdown
+                // cells so touch-style hosts can open combo editors without an
+                // extra activation gesture.
                 let is_dropdown = !grid.active_dropdown_list(hit.row, hit.col).is_empty()
                     && grid.active_dropdown_list(hit.row, hit.col).trim() != "...";
 
@@ -1766,8 +1790,11 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, _
         return;
     }
 
-    // Suppress selection extension after outline button click
+    // Suppress selection extension after outline or dropdown popup clicks.
     if grid.outline_click_active {
+        return;
+    }
+    if grid.dropdown_click_active {
         return;
     }
 
@@ -1797,15 +1824,15 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, _
     grid.mouse_row = hit.row;
     grid.mouse_col = hit.col;
     let hover_mode = grid.selection.hover_mode;
-    if hover_mode != pb::HoverMode::HoverNone as u32 {
+    if hover_mode != HOVER_NONE {
         let row_changed = grid.mouse_row != prev_mouse_row;
         let col_changed = grid.mouse_col != prev_mouse_col;
         // Invalidate only for axes actually used by hover mode.
         // ROW should ignore pure column motion, COLUMN should ignore pure row motion.
-        let row_relevant = hover_mode_has(hover_mode, pb::HoverMode::HoverRow)
-            || hover_mode_has(hover_mode, pb::HoverMode::HoverCell);
-        let col_relevant = hover_mode_has(hover_mode, pb::HoverMode::HoverColumn)
-            || hover_mode_has(hover_mode, pb::HoverMode::HoverCell);
+        let row_relevant =
+            hover_mode_has(hover_mode, HOVER_ROW) || hover_mode_has(hover_mode, HOVER_CELL);
+        let col_relevant =
+            hover_mode_has(hover_mode, HOVER_COLUMN) || hover_mode_has(hover_mode, HOVER_CELL);
         if (row_relevant && row_changed) || (col_relevant && col_changed) {
             grid.mark_dirty();
         }
@@ -1869,6 +1896,12 @@ pub fn handle_pointer_up(grid: &mut VolvoxGrid, x: f32, y: f32, _button: i32, _m
     // Clear outline button click guard
     if grid.outline_click_active {
         grid.outline_click_active = false;
+        return;
+    }
+
+    // Consume the mouse-up that completes a dropdown popup click.
+    if grid.dropdown_click_active {
+        grid.dropdown_click_active = false;
         return;
     }
 
@@ -2001,14 +2034,16 @@ pub fn handle_key_down_with_behavior(
         match key_code {
             27 if !grid.host_key_dispatch => {
                 // Escape: cancel edit (skipped when host drives dispatch)
-                if let Some((row, col)) = grid.edit.cancel() {
+                let row = grid.edit.edit_row;
+                let col = grid.edit.edit_col;
+                let original_text = grid.edit.original_text.clone();
+                if grid.cancel_edit() {
                     grid.events.push(GridEventData::AfterEdit {
                         row,
                         col,
-                        old_text: grid.edit.original_text.clone(),
-                        new_text: grid.edit.original_text.clone(),
+                        old_text: original_text.clone(),
+                        new_text: original_text,
                     });
-                    grid.mark_dirty();
                 }
             }
             13 if !grid.host_key_dispatch => {
@@ -2575,8 +2610,7 @@ pub fn handle_scroll(grid: &mut VolvoxGrid, delta_x: f32, delta_y: f32) {
     }
 
     if scrolled {
-        if grid.selection.hover_mode != pb::HoverMode::HoverNone as u32
-            && (grid.mouse_row != -1 || grid.mouse_col != -1)
+        if grid.selection.hover_mode != HOVER_NONE && (grid.mouse_row != -1 || grid.mouse_col != -1)
         {
             // Hover hit target is pointer-position based. After scroll, clear stale
             // hover until the next pointer move updates hit-test coordinates.
@@ -2776,6 +2810,138 @@ mod tests {
         assert!(!grid.is_editing());
         assert_eq!(grid.cells.get_text(1, 0), "Very long display item");
         assert_eq!(grid.get_row_height(1), 52);
+    }
+
+    #[test]
+    fn enter_on_dropdown_cell_starts_edit_and_marks_dirty() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.columns[0].dropdown_items = "A|B|C".to_string();
+        grid.selection.row = 1;
+        grid.selection.col = 0;
+        prime_layout(&mut grid);
+        grid.dirty = false;
+        grid.events.drain();
+
+        handle_key_down(&mut grid, 13, 0);
+
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.dropdown_count(), 3);
+        assert!(grid.dirty);
+        let events = grid.events.drain();
+        assert!(events
+            .iter()
+            .any(|evt| matches!(evt.data, GridEventData::DropdownOpened)));
+        assert!(events
+            .iter()
+            .any(|evt| matches!(evt.data, GridEventData::StartEdit { row: 1, col: 0 })));
+    }
+
+    #[test]
+    fn dropdown_keyboard_preview_is_canceled_on_click_away() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.columns[0].dropdown_items = "A|B|C".to_string();
+        grid.cells.set_text(1, 0, "A".to_string());
+        prime_layout(&mut grid);
+
+        begin_edit_from_input(&mut grid, 1, 0);
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.edit_text, "A");
+
+        handle_key_down(&mut grid, 40, 0);
+        assert_eq!(grid.edit.dropdown_index, 1);
+        assert_eq!(grid.edit.edit_text, "B");
+
+        let click_x = (grid.col_pos(1) + 4) as f32;
+        let click_y = (grid.row_pos(1) + 4) as f32;
+        handle_pointer_down(&mut grid, click_x, click_y, 0, 0, false);
+
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "A");
+        assert_eq!(grid.selection.row, 1);
+        assert_eq!(grid.selection.col, 1);
+    }
+
+    #[test]
+    fn dropdown_keyboard_preview_is_canceled_on_escape() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.columns[0].dropdown_items = "A|B|C".to_string();
+        grid.cells.set_text(1, 0, "A".to_string());
+        prime_layout(&mut grid);
+
+        begin_edit_from_input(&mut grid, 1, 0);
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.edit_text, "A");
+
+        handle_key_down(&mut grid, 40, 0);
+        assert_eq!(grid.edit.dropdown_index, 1);
+        assert_eq!(grid.edit.edit_text, "B");
+
+        grid.events.drain();
+        handle_key_down(&mut grid, 27, 0);
+
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "A");
+
+        let queued = grid.events.drain();
+        assert!(queued
+            .iter()
+            .any(|evt| matches!(evt.data, GridEventData::DropdownClosed)));
+        assert!(queued.iter().any(|evt| matches!(
+            evt.data,
+            GridEventData::AfterEdit {
+                ref old_text,
+                ref new_text,
+                ..
+            } if old_text == "A" && new_text == "A"
+        )));
+    }
+
+    #[test]
+    fn dropdown_item_click_does_not_start_selection_drag_on_followup_move() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.columns[0].dropdown_items = "A|B|C".to_string();
+        grid.cells.set_text(1, 0, "A".to_string());
+        prime_layout(&mut grid);
+
+        begin_edit_from_input(&mut grid, 1, 0);
+        assert!(grid.is_editing());
+
+        let cell_rect = grid.cell_screen_rect(1, 0).expect("cell rect");
+        let popup = crate::canvas::active_dropdown_popup_geometry(
+            &grid,
+            cell_rect,
+            grid.viewport_width,
+            grid.viewport_height,
+        )
+        .expect("dropdown popup");
+
+        // Click the second dropdown item to commit "B".
+        let popup_x = (popup.x + 8) as f32;
+        let popup_y = (popup.y + popup.item_h + popup.item_h / 2) as f32;
+        handle_pointer_down(&mut grid, popup_x, popup_y, 0, 0, false);
+
+        assert_eq!(grid.cells.get_text(1, 0), "B");
+        assert!(grid.dropdown_click_active);
+        assert_eq!(grid.selection.row, 1);
+        assert_eq!(grid.selection.col, 0);
+        assert_eq!(grid.selection.row_end, 1);
+        assert_eq!(grid.selection.col_end, 0);
+
+        // A follow-up move in the same held click must not start extending the
+        // underlying cell selection after the popup closes.
+        let (other_x, other_y, _, _) = grid.cell_screen_rect(1, 1).expect("other cell rect");
+        handle_pointer_move(&mut grid, (other_x + 8) as f32, (other_y + 8) as f32, 1, 0);
+        assert_eq!(grid.selection.row, 1);
+        assert_eq!(grid.selection.col, 0);
+        assert_eq!(grid.selection.row_end, 1);
+        assert_eq!(grid.selection.col_end, 0);
+
+        handle_pointer_up(&mut grid, (other_x + 8) as f32, (other_y + 8) as f32, 0, 0);
+        assert!(!grid.dropdown_click_active);
     }
 
     #[test]
@@ -3100,10 +3266,56 @@ mod tests {
     }
 
     #[test]
+    fn fast_scroll_locks_to_top_when_dragging_above_track() {
+        let mut grid = VolvoxGrid::new(1, 320, 180, 200, 4, 1, 0);
+        grid.fast_scroll_enabled = true;
+        prime_layout(&mut grid);
+
+        update_fast_scroll_target(&mut grid, 90.0);
+        assert!(grid.top_row() > grid.fixed_rows);
+
+        let track_top = 12.0 * grid.scale.max(0.01);
+        update_fast_scroll_target(&mut grid, track_top - 60.0);
+        let locked_scroll_y = grid.scroll.scroll_y;
+
+        assert_eq!(grid.fast_scroll_target_row, grid.fixed_rows);
+        assert_eq!(grid.top_row(), grid.fixed_rows);
+        assert_eq!(locked_scroll_y, 0.0);
+
+        update_fast_scroll_target(&mut grid, track_top - 160.0);
+        assert_eq!(grid.fast_scroll_target_row, grid.fixed_rows);
+        assert_eq!(grid.top_row(), grid.fixed_rows);
+        assert_eq!(grid.scroll.scroll_y, locked_scroll_y);
+    }
+
+    #[test]
+    fn fast_scroll_locks_to_bottom_when_dragging_below_track() {
+        let mut grid = VolvoxGrid::new(1, 320, 180, 200, 4, 1, 0);
+        grid.fast_scroll_enabled = true;
+        prime_layout(&mut grid);
+
+        update_fast_scroll_target(&mut grid, 90.0);
+        let track_bottom = (grid.viewport_height as f32 - 12.0 * grid.scale.max(0.01)).max(13.0);
+        update_fast_scroll_target(&mut grid, track_bottom + 60.0);
+        let locked_top_row = grid.top_row();
+        let locked_scroll_y = grid.scroll.scroll_y;
+
+        assert_eq!(grid.fast_scroll_target_row, grid.rows - 1);
+        assert_eq!(grid.bottom_row(), grid.rows - 1);
+        assert_eq!(grid.scroll.scroll_y, grid.scroll.max_scroll_y);
+
+        update_fast_scroll_target(&mut grid, track_bottom + 160.0);
+        assert_eq!(grid.fast_scroll_target_row, grid.rows - 1);
+        assert_eq!(grid.bottom_row(), grid.rows - 1);
+        assert_eq!(grid.top_row(), locked_top_row);
+        assert_eq!(grid.scroll.scroll_y, locked_scroll_y);
+    }
+
+    #[test]
     fn hover_row_mode_ignores_column_only_pointer_motion() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 100, 8, 1, 0);
         prime_layout(&mut grid);
-        grid.selection.hover_mode = pb::HoverMode::HoverRow as u32;
+        grid.selection.hover_mode = HOVER_ROW;
 
         let y = (grid.row_pos(1) + 2) as f32;
         let x1 = (grid.col_pos(1) + 2) as f32;
@@ -3121,7 +3333,7 @@ mod tests {
     fn hover_column_mode_ignores_row_only_pointer_motion() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 100, 8, 1, 0);
         prime_layout(&mut grid);
-        grid.selection.hover_mode = pb::HoverMode::HoverColumn as u32;
+        grid.selection.hover_mode = HOVER_COLUMN;
 
         let x = (grid.col_pos(2) + 2) as f32;
         let y1 = (grid.row_pos(1) + 2) as f32;
@@ -3142,9 +3354,7 @@ mod tests {
         grid.indicator_bands.col_top.visible = true;
         grid.indicator_bands.col_top.band_rows = 1;
         grid.indicator_bands.col_top.default_row_height_px = 24;
-        grid.selection.hover_mode = (pb::HoverMode::HoverRow as u32)
-            | (pb::HoverMode::HoverColumn as u32)
-            | (pb::HoverMode::HoverCell as u32);
+        grid.selection.hover_mode = HOVER_ROW | HOVER_COLUMN | HOVER_CELL;
 
         let x = (grid.col_pos(2) + grid.col_width(2) / 2) as f32;
         let y = 10.0;
@@ -3155,10 +3365,34 @@ mod tests {
     }
 
     #[test]
+    fn dropdown_list_hit_test_respects_top_indicator_offset() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 2, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.columns[1].dropdown_items = "A|B|C".to_string();
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        prime_layout(&mut grid);
+
+        grid.begin_edit(1, 1);
+        assert!(grid.is_editing());
+
+        let (cx, cy, _cw, ch) = grid.cell_screen_rect(1, 1).unwrap();
+        let item_h = ch.max(18);
+        let click_x = cx + 4;
+        let click_y = cy + ch - 1 + item_h + item_h / 2;
+
+        handle_pointer_down(&mut grid, click_x as f32, click_y as f32, 0, 0, false);
+
+        assert_eq!(grid.cells.get_text(1, 1), "B");
+        assert!(!grid.is_editing());
+    }
+
+    #[test]
     fn hover_none_pointer_move_does_not_dirty_grid() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 100, 8, 1, 0);
         prime_layout(&mut grid);
-        grid.selection.hover_mode = pb::HoverMode::HoverNone as u32;
+        grid.selection.hover_mode = HOVER_NONE;
 
         let x = (grid.col_pos(2) + 2) as f32;
         let y = (grid.row_pos(3) + 2) as f32;

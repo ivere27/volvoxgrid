@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 
 namespace VolvoxGrid.DotNet
 {
@@ -41,15 +42,11 @@ namespace VolvoxGrid.DotNet
         KeyClick = 2,
     }
 
-    public enum VolvoxGridHeaderFeatures
+    public sealed class VolvoxGridHeaderFeatures
     {
-        None = 0,
-        Sort = 1,
-        Reorder = 2,
-        SortReorder = 3,
-        SortChooser = 5,
-        ReorderChooser = 6,
-        SortReorderChooser = 7,
+        public bool Sort { get; set; }
+        public bool Reorder { get; set; }
+        public bool Chooser { get; set; }
     }
 
     [Flags]
@@ -149,15 +146,11 @@ namespace VolvoxGrid.DotNet
         General = 9,
     }
 
-    public enum VolvoxGridAllowUserResizingMode
+    public sealed class VolvoxGridResizePolicy
     {
-        None = 0,
-        Columns = 1,
-        Rows = 2,
-        Both = 3,
-        ColumnsUniform = 4,
-        RowsUniform = 5,
-        BothUniform = 6,
+        public bool Columns { get; set; }
+        public bool Rows { get; set; }
+        public bool Uniform { get; set; }
     }
 
     public enum VolvoxGridScrollBarsMode
@@ -331,6 +324,52 @@ namespace VolvoxGrid.DotNet
         public VolvoxGridSelectionChangedEventArgs(int[] selectedRows)
         {
             SelectedRows = selectedRows ?? new int[0];
+        }
+    }
+
+    public sealed class VolvoxGridBeforeEditEventArgs : CancelEventArgs
+    {
+        public int RowIndex { get; private set; }
+        public int ColumnIndex { get; private set; }
+        public string FieldName { get; private set; }
+
+        public VolvoxGridBeforeEditEventArgs(int rowIndex, int columnIndex, string fieldName)
+        {
+            RowIndex = rowIndex;
+            ColumnIndex = columnIndex;
+            FieldName = fieldName ?? string.Empty;
+        }
+    }
+
+    public sealed class VolvoxGridCellEditValidatingEventArgs : CancelEventArgs
+    {
+        public int RowIndex { get; private set; }
+        public int ColumnIndex { get; private set; }
+        public string FieldName { get; private set; }
+        public string ProposedText { get; private set; }
+
+        public VolvoxGridCellEditValidatingEventArgs(
+            int rowIndex,
+            int columnIndex,
+            string fieldName,
+            string proposedText)
+        {
+            RowIndex = rowIndex;
+            ColumnIndex = columnIndex;
+            FieldName = fieldName ?? string.Empty;
+            ProposedText = proposedText ?? string.Empty;
+        }
+    }
+
+    public sealed class VolvoxGridBeforeSortEventArgs : CancelEventArgs
+    {
+        public int ColumnIndex { get; private set; }
+        public string FieldName { get; private set; }
+
+        public VolvoxGridBeforeSortEventArgs(int columnIndex, string fieldName)
+        {
+            ColumnIndex = columnIndex;
+            FieldName = fieldName ?? string.Empty;
         }
     }
 

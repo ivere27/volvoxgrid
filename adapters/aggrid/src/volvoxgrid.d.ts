@@ -3,7 +3,7 @@ declare module "volvoxgrid" {
     | { mode: "ratio"; value: number }
     | { mode: "px"; value: number };
 
-  export interface VolvoxGridHeaderSeparatorStyle {
+  export interface VolvoxGridHeaderSeparator {
     enabled?: boolean;
     colorArgb?: number;
     widthPx?: number;
@@ -11,7 +11,9 @@ declare module "volvoxgrid" {
     skipMerged?: boolean;
   }
 
-  export interface VolvoxGridHeaderResizeHandleStyle {
+  export type VolvoxGridHeaderSeparatorStyle = VolvoxGridHeaderSeparator;
+
+  export interface VolvoxGridHeaderResizeHandle {
     enabled?: boolean;
     colorArgb?: number;
     widthPx?: number;
@@ -20,7 +22,9 @@ declare module "volvoxgrid" {
     showOnlyWhenResizable?: boolean;
   }
 
-  export interface VolvoxGridIconThemeSlots {
+  export type VolvoxGridHeaderResizeHandleStyle = VolvoxGridHeaderResizeHandle;
+
+  export interface VolvoxGridIconSlots {
     sortAscending?: string;
     sortDescending?: string;
     sortNone?: string;
@@ -36,7 +40,9 @@ declare module "volvoxgrid" {
     checkboxIndeterminate?: string;
   }
 
-  export type VolvoxGridIconSlotName = keyof VolvoxGridIconThemeSlots;
+  export type VolvoxGridIconThemeSlots = VolvoxGridIconSlots;
+
+  export type VolvoxGridIconSlotName = keyof VolvoxGridIconSlots;
 
   export interface VolvoxGridIconSourceNone {
     kind: "none";
@@ -109,6 +115,88 @@ declare module "volvoxgrid" {
     ranges: VolvoxGridCellRange[];
   }
 
+  export interface VolvoxGridBeforeEditDetails {
+    eventId: bigint;
+    rawEvent: Uint8Array;
+    row: number;
+    col: number;
+    cancel: boolean;
+  }
+
+  export interface VolvoxGridCellEditValidatingDetails {
+    eventId: bigint;
+    rawEvent: Uint8Array;
+    row: number;
+    col: number;
+    editText: string;
+    cancel: boolean;
+  }
+
+  export interface VolvoxGridBeforeSortDetails {
+    eventId: bigint;
+    rawEvent: Uint8Array;
+    col: number;
+    cancel: boolean;
+  }
+
+  export interface VolvoxGridHeaderFeatures {
+    sort?: boolean;
+    reorder?: boolean;
+    chooser?: boolean;
+  }
+
+  export interface VolvoxGridResizePolicy {
+    columns?: boolean;
+    rows?: boolean;
+    uniform?: boolean;
+  }
+
+  export interface VolvoxGridPadding {
+    left?: number;
+    top?: number;
+    right?: number;
+    bottom?: number;
+  }
+
+  export type VolvoxGridCellPadding = VolvoxGridPadding;
+
+  export interface VolvoxGridFont {
+    family?: string;
+    families?: string[];
+    size?: number;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+    strikethrough?: boolean;
+    width?: number;
+  }
+
+  export interface VolvoxGridBorder {
+    style?: number;
+    colorArgb?: number;
+  }
+
+  export interface VolvoxGridBorders {
+    all?: VolvoxGridBorder;
+    top?: VolvoxGridBorder;
+    right?: VolvoxGridBorder;
+    bottom?: VolvoxGridBorder;
+    left?: VolvoxGridBorder;
+  }
+
+  export interface VolvoxGridCellStyle {
+    background?: number;
+    foreground?: number;
+    align?: number;
+    font?: VolvoxGridFont;
+    padding?: VolvoxGridPadding;
+    borders?: VolvoxGridBorders;
+    textEffect?: number;
+    progress?: number;
+    progressColor?: number;
+    shrinkToFit?: boolean;
+  }
+
   export class VolvoxGrid {
     static readonly PIN_NONE: number;
     static readonly PIN_TOP: number;
@@ -140,6 +228,9 @@ declare module "volvoxgrid" {
     set cursorRow(value: number);
     get cursorCol(): number;
     set cursorCol(value: number);
+    onBeforeEdit: ((details: VolvoxGridBeforeEditDetails) => void) | null;
+    onCellEditValidating: ((details: VolvoxGridCellEditValidatingDetails) => void) | null;
+    onBeforeSort: ((details: VolvoxGridBeforeSortDetails) => void) | null;
     getSelection(): VolvoxGridSelection;
     selectRange(row1: number, col1: number, row2?: number, col2?: number, show?: boolean): void;
     selectRanges(ranges: ReadonlyArray<VolvoxGridCellRange>, activeRow?: number, activeCol?: number, show?: boolean): void;
@@ -165,9 +256,6 @@ declare module "volvoxgrid" {
     selectionMode: number;
     selectionVisibility: number;
     focusBorder: number;
-    headerFeatures: number;
-    allowUserResizing: number;
-    allowUserFreezing: number;
     editTrigger: number;
     editable: boolean;
     dropdownTrigger: number;
@@ -189,12 +277,21 @@ declare module "volvoxgrid" {
     setFontName(name: string): void;
     setFontSize(size: number): void;
     setGridLines(mode: number): void;
+    setHeaderFeatures(features: VolvoxGridHeaderFeatures): void;
+    setResizePolicy(policy: VolvoxGridResizePolicy): void;
+    setCellStyle(row: number, col: number, style: VolvoxGridCellStyle): void;
     setIconTheme(theme: VolvoxGridIconTheme): void;
     getIconTheme(): VolvoxGridIconTheme;
+    setHeaderSeparator(style: VolvoxGridHeaderSeparator): void;
+    setHeaderResizeHandle(style: VolvoxGridHeaderResizeHandle): void;
+    setIconSlots(slots: VolvoxGridIconSlots): void;
+    getIconSlots(): VolvoxGridIconSlots;
     setHeaderSeparatorStyle(style: VolvoxGridHeaderSeparatorStyle): void;
     setHeaderResizeHandleStyle(style: VolvoxGridHeaderResizeHandleStyle): void;
     setIconThemeSlots(slots: VolvoxGridIconThemeSlots): void;
     getIconThemeSlots(): VolvoxGridIconThemeSlots;
+    getHeaderSeparator(): VolvoxGridHeaderSeparator;
+    getHeaderResizeHandle(): VolvoxGridHeaderResizeHandle;
     getHeaderSeparatorStyle(): VolvoxGridHeaderSeparatorStyle;
     getHeaderResizeHandleStyle(): VolvoxGridHeaderResizeHandleStyle;
 
@@ -207,6 +304,10 @@ declare module "volvoxgrid" {
     sortMulti(cols: number[], orders: number[]): void;
     autoSize(colFrom?: number, colTo?: number, equal?: boolean, maxWidth?: number): void;
     moveColumn(col: number, position: number): void;
+    setEventDecisionEnabled(enabled: boolean): void;
+    sendEventDecision(eventId: bigint, cancel: boolean): boolean;
+    sendRawEventDecision(rawEvent: Uint8Array, cancel: boolean): boolean;
     drainEventStreamRaw(maxEvents?: number): Uint8Array[];
+    flushPendingEventDecisions(): boolean;
   }
 }

@@ -8,16 +8,22 @@ const String _sortNoneGlyph = '⇅';
 const String _sortAscendingGlyph = '↑';
 const String _sortDescendingGlyph = '↓';
 
-vg.GridLineStyle mapGridLines(GridLinesVisibility visibility) {
+vg.GridLines mapGridLines(GridLinesVisibility visibility) {
+  final lines = vg.GridLines()..style = vg.GridLineStyle.GRIDLINE_SOLID;
   switch (visibility) {
     case GridLinesVisibility.none:
-      return vg.GridLineStyle.GRIDLINE_NONE;
+      lines.style = vg.GridLineStyle.GRIDLINE_NONE;
+      lines.direction = vg.GridLineDirection.GRIDLINE_BOTH;
+      return lines;
     case GridLinesVisibility.horizontal:
-      return vg.GridLineStyle.GRIDLINE_SOLID_HORIZONTAL;
+      lines.direction = vg.GridLineDirection.GRIDLINE_HORIZONTAL;
+      return lines;
     case GridLinesVisibility.vertical:
-      return vg.GridLineStyle.GRIDLINE_SOLID_VERTICAL;
+      lines.direction = vg.GridLineDirection.GRIDLINE_VERTICAL;
+      return lines;
     case GridLinesVisibility.both:
-      return vg.GridLineStyle.GRIDLINE_SOLID;
+      lines.direction = vg.GridLineDirection.GRIDLINE_BOTH;
+      return lines;
   }
 }
 
@@ -32,11 +38,12 @@ Future<void> applyStyleConfig(
   final style = vg.StyleConfig()
     ..gridLines = mapGridLines(gridLinesVisibility)
     // Syncfusion's header/fixed area is white by default.
-    ..backColorFixed = _whiteArgb
-    ..iconThemeSlots = (vg.IconThemeSlots()
-      ..sortNone = allowSorting ? _sortNoneGlyph : ''
-      ..sortAscending = allowSorting ? _sortAscendingGlyph : ''
-      ..sortDescending = allowSorting ? _sortDescendingGlyph : '');
+    ..fixed = (vg.RegionStyle()..background = _whiteArgb)
+    ..icons = (vg.IconTheme()
+      ..slots = (vg.IconSlots()
+        ..sortNone = allowSorting ? _sortNoneGlyph : ''
+        ..sortAscending = allowSorting ? _sortAscendingGlyph : ''
+        ..sortDescending = allowSorting ? _sortDescendingGlyph : ''));
   await controller.setGridStyle(style);
 
   final layout = vg.LayoutConfig();
@@ -64,11 +71,11 @@ Future<void> applyStyleConfig(
       vg.ConfigureRequest()
         ..gridId = controller.gridId
         ..config = (vg.GridConfig()
-          ..indicatorBands = (vg.IndicatorBandsConfig()
-            ..colIndicatorTop = (vg.ColIndicatorConfig()
+          ..indicators = (vg.IndicatorsConfig()
+            ..colTop = (vg.ColIndicatorConfig()
               ..visible = true
               ..bandRows = 1
-              ..defaultRowHeightPx = headerRowHeight.round()))),
+              ..defaultRowHeight = headerRowHeight.round()))),
     );
   }
 }

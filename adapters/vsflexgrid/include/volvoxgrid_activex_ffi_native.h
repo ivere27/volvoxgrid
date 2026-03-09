@@ -984,11 +984,9 @@ uint8_t* volvox_grid_set_ellipsis(
     int32_t* out_len
 );
 
-/* Sort */
-uint8_t* volvox_grid_sort(
-    int64_t grid_id,
-    int32_t order,
-    int32_t col,
+/* Sort (protobuf input — has repeated/oneof fields) */
+uint8_t* volvox_grid_sort_pb(
+    const uint8_t* data, int32_t data_len,
     int32_t* out_len
 );
 
@@ -1306,17 +1304,17 @@ uint8_t* volvox_grid_drag_row(
     int32_t* out_len
 );
 
-/* SetAllowUserResizing */
-uint8_t* volvox_grid_set_allow_user_resizing(
+/* SetResizePolicy */
+uint8_t* volvox_grid_set_resize_policy(
     int64_t grid_id,
-    int32_t mode,
+    const uint8_t* policy, int32_t policy_len,
     int32_t* out_len
 );
 
-/* SetAllowUserFreezing */
-uint8_t* volvox_grid_set_allow_user_freezing(
+/* SetFreezePolicy */
+uint8_t* volvox_grid_set_freeze_policy(
     int64_t grid_id,
-    int32_t mode,
+    const uint8_t* policy, int32_t policy_len,
     int32_t* out_len
 );
 
@@ -1681,14 +1679,21 @@ uint8_t* volvox_grid_load_demo(
 
 
 /* ═══════════════════════════════════════════════════════════ */
-/* Memory Management                                          */
+/* Memory Management & Error Retrieval                        */
 /* ═══════════════════════════════════════════════════════════ */
 
 /* Free memory returned by native API functions.              */
 /* The allocation size is recovered from the prepended header. */
 void volvox_grid_free(uint8_t* ptr);
 
+/* Returns a pointer to the last error message (UTF-8, not    */
+/* null-terminated). Valid until the next FFI call into this   */
+/* module. Returns NULL if no error. Writes byte length to    */
+/* out_len.                                                   */
+const uint8_t* volvox_grid_last_error(int32_t* out_len);
+
 
 #ifdef __cplusplus
 }
 #endif
+

@@ -76,6 +76,37 @@ export interface SortChangedEvent<TData extends RowData = RowData> {
   colId?: string;
 }
 
+export interface BeforeEditEvent<TData extends RowData = RowData> {
+  api: GridApiLike<TData>;
+  rowIndex: number;
+  colIndex: number;
+  colId?: string;
+  colDef: ColDef<TData>;
+  data?: TData;
+  value: unknown;
+  cancel: boolean;
+}
+
+export interface CellEditValidatingEvent<TData extends RowData = RowData> {
+  api: GridApiLike<TData>;
+  rowIndex: number;
+  colIndex: number;
+  colId?: string;
+  colDef: ColDef<TData>;
+  data?: TData;
+  value: unknown;
+  editText: string;
+  cancel: boolean;
+}
+
+export interface BeforeSortEvent<TData extends RowData = RowData> {
+  api: GridApiLike<TData>;
+  colIndex: number;
+  colId?: string;
+  colDef: ColDef<TData>;
+  cancel: boolean;
+}
+
 export interface ColumnResizedEvent<TData extends RowData = RowData> {
   api: GridApiLike<TData>;
   row: number;
@@ -105,6 +136,9 @@ export interface GridOptions<TData extends RowData = RowData> {
   animateRows?: boolean;
   theme?: AgThemeName;
   onGridReady?: (event: GridReadyEvent<TData>) => void;
+  onBeforeEdit?: (event: BeforeEditEvent<TData>) => void;
+  onCellEditValidating?: (event: CellEditValidatingEvent<TData>) => void;
+  onBeforeSort?: (event: BeforeSortEvent<TData>) => void;
   onSelectionChanged?: (event: SelectionChangedEvent<TData>) => void;
   onSortChanged?: (event: SortChangedEvent<TData>) => void;
   onColumnResized?: (event: ColumnResizedEvent<TData>) => void;

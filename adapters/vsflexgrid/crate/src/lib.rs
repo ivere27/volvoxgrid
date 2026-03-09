@@ -35,7 +35,7 @@ fn proto_value_to_engine(cv: &Option<CellValue>) -> CellValueData {
             Some(cell_value::Value::Text(t)) => CellValueData::Text(t.clone()),
             Some(cell_value::Value::Number(n)) => CellValueData::Number(*n),
             Some(cell_value::Value::Flag(b)) => CellValueData::Bool(*b),
-            Some(cell_value::Value::Data(d)) => CellValueData::Bytes(d.clone()),
+            Some(cell_value::Value::Raw(d)) => CellValueData::Bytes(d.clone()),
             Some(cell_value::Value::Timestamp(ts)) => CellValueData::Timestamp(*ts),
             None => CellValueData::Empty,
         },
@@ -55,7 +55,7 @@ fn engine_value_to_proto(v: &CellValueData) -> CellValue {
             value: Some(cell_value::Value::Flag(*b)),
         },
         CellValueData::Bytes(d) => CellValue {
-            value: Some(cell_value::Value::Data(d.clone())),
+            value: Some(cell_value::Value::Raw(d.clone())),
         },
         CellValueData::Timestamp(ts) => CellValue {
             value: Some(cell_value::Value::Timestamp(*ts)),
@@ -134,19 +134,31 @@ fn expand_sort_request_columns(
     let mut sort_keys = Vec::new();
 
     for sc in sort_columns {
+        let merged = volvoxgrid_engine::sort::merge_sort_spec(
+            volvoxgrid_engine::sort::SORT_NONE,
+            sc.order,
+            sc.r#type,
+        );
+        if merged == volvoxgrid_engine::sort::SORT_NONE {
+            continue;
+        }
         if sc.col >= 0 && sc.col < grid.cols {
-            sort_keys.push((sc.col, sc.order));
+            sort_keys.push((sc.col, merged));
             continue;
         }
 
         let lo = grid.selection.col.min(grid.selection.col_end).max(0);
-        let hi = grid.selection.col.max(grid.selection.col_end).min(grid.cols - 1);
+        let hi = grid
+            .selection
+            .col
+            .max(grid.selection.col_end)
+            .min(grid.cols - 1);
         if lo > hi {
             continue;
         }
 
         for col in lo..=hi {
-            sort_keys.push((col, sc.order));
+            sort_keys.push((col, merged));
         }
     }
 
@@ -265,8 +277,8 @@ fn engine_style_to_proto(s: &volvoxgrid_engine::style::GridStyleState) -> GridSt
 }
 
 #[cfg(any())]
-fn proto_cell_style_to_override(cs: &CellStyle) -> CellStyleOverride {
-    CellStyleOverride {
+fn proto_cell_style_to_override(cs: &CellStyle) -> CellStylePatch {
+    CellStylePatch {
         back_color: if cs.back_color != 0 {
             Some(cs.back_color)
         } else {
@@ -304,7 +316,7 @@ fn proto_cell_style_to_override(cs: &CellStyle) -> CellStyleOverride {
 }
 
 #[cfg(any())]
-fn engine_override_to_proto(so: &CellStyleOverride) -> CellStyle {
+fn engine_override_to_proto(so: &CellStylePatch) -> CellStyle {
     CellStyle {
         back_color: so.back_color.unwrap_or(0),
         fore_color: so.fore_color.unwrap_or(0),
@@ -363,7 +375,7 @@ fn set_cell_property(
                 }
                 3 => {
                     if let Some(cv) = value {
-                        if let Some(cell_value::Value::Data(d)) = &cv.value {
+                        if let Some(cell_value::Value::Raw(d)) = &cv.value {
                             grid.cells.get_mut(r, c).extra_mut().picture = Some(d.clone());
                         }
                     }
@@ -471,7 +483,7 @@ fn set_cell_property(
                 }
                 18 => {
                     if let Some(cv) = value {
-                        if let Some(cell_value::Value::Data(d)) = &cv.value {
+                        if let Some(cell_value::Value::Raw(d)) = &cv.value {
                             grid.cells.get_mut(r, c).extra_mut().user_data = Some(d.clone());
                         }
                     }
@@ -485,7 +497,7 @@ fn set_cell_property(
                 }
                 24 => {
                     if let Some(cv) = value {
-                        if let Some(cell_value::Value::Data(d)) = &cv.value {
+                        if let Some(cell_value::Value::Raw(d)) = &cv.value {
                             grid.cells.get_mut(r, c).extra_mut().button_picture = Some(d.clone());
                         }
                     }
@@ -535,7 +547,7 @@ fn get_cell_property(
                 .and_then(|c| c.picture().map(|d| d.to_vec()))
                 .unwrap_or_default();
             CellValue {
-                value: Some(cell_value::Value::Data(data)),
+                value: Some(cell_value::Value::Raw(data)),
             }
         }
         4 => {
@@ -634,7 +646,7 @@ fn get_cell_property(
                 .and_then(|c| c.extra.as_ref().and_then(|e| e.user_data.clone()))
                 .unwrap_or_default();
             CellValue {
-                value: Some(cell_value::Value::Data(data)),
+                value: Some(cell_value::Value::Raw(data)),
             }
         }
         19 => {
@@ -665,7 +677,7 @@ fn get_cell_property(
                 .and_then(|c| c.extra.as_ref().and_then(|e| e.button_picture.clone()))
                 .unwrap_or_default();
             CellValue {
-                value: Some(cell_value::Value::Data(data)),
+                value: Some(cell_value::Value::Raw(data)),
             }
         }
         25 => {
@@ -2292,8 +2304,8 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 r.group_on_col,
                 r.aggregate_col,
                 &r.caption,
-                r.back_color,
-                r.fore_color,
+                r.background,
+                r.foreground,
                 r.add_outline,
             );
         })?;
@@ -2449,11 +2461,11 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         })?;
         Ok(Empty {})
     }
-    fn set_allow_user_resizing(&self, r: SetAllowUserResizingRequest) -> Result<Empty, String> {
+    fn set_resize_policy(&self, r: SetResizePolicyRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.allow_user_resizing = r.mode)?;
         Ok(Empty {})
     }
-    fn set_allow_user_freezing(&self, r: SetAllowUserFreezingRequest) -> Result<Empty, String> {
+    fn set_freeze_policy(&self, r: SetFreezePolicyRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.allow_user_freezing = r.mode)?;
         Ok(Empty {})
     }
@@ -3366,8 +3378,8 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 request.group_on_col,
                 request.aggregate_col,
                 &request.caption,
-                request.back_color,
-                request.fore_color,
+                request.background,
+                request.foreground,
                 request.add_outline,
             );
         })?;
@@ -4765,7 +4777,7 @@ pub extern "C" fn volvox_grid_set_subtotal_position(
 }
 
 #[no_mangle]
-pub extern "C" fn volvox_grid_set_allow_user_resizing(
+pub extern "C" fn volvox_grid_set_resize_policy(
     grid_id: i64,
     mode: i32,
     out_len: *mut i32,

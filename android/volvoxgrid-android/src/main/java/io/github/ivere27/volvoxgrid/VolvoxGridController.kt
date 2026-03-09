@@ -20,7 +20,7 @@ private val DEFAULT_COL_INDICATOR_MODE_BITS =
 private fun defaultRowIndicatorStartConfig(): RowIndicatorConfig =
     RowIndicatorConfig.newBuilder()
         .setVisible(false)
-        .setWidthPx(DEFAULT_ROW_INDICATOR_WIDTH_PX)
+        .setWidth(DEFAULT_ROW_INDICATOR_WIDTH_PX)
         .setModeBits(DEFAULT_ROW_INDICATOR_MODE_BITS)
         .build()
 
@@ -31,10 +31,10 @@ private fun defaultColIndicatorTopConfig(): ColIndicatorConfig =
         .setModeBits(DEFAULT_COL_INDICATOR_MODE_BITS)
         .build()
 
-internal fun defaultIndicatorBandsConfig(): IndicatorBandsConfig =
-    IndicatorBandsConfig.newBuilder()
-        .setRowIndicatorStart(defaultRowIndicatorStartConfig())
-        .setColIndicatorTop(defaultColIndicatorTopConfig())
+internal fun defaultIndicatorsConfig(): IndicatorsConfig =
+    IndicatorsConfig.newBuilder()
+        .setRowStart(defaultRowIndicatorStartConfig())
+        .setColTop(defaultColIndicatorTopConfig())
         .build()
 
 /**
@@ -49,7 +49,7 @@ internal fun defaultIndicatorBandsConfig(): IndicatorBandsConfig =
  * controller.rowCount = 100
  * controller.colCount = 5
  * controller.setCellText(0, 0, "Header")
- * controller.sort(SortOrder.SORT_GENERIC_ASCENDING, col = 2)
+ * controller.sort(SortOrder.SORT_ASCENDING, col = 2)
  * ```
  */
 class VolvoxGridController(
@@ -77,7 +77,7 @@ class VolvoxGridController(
                                 .setCols(cols)
                                 .build()
                         )
-                        .setIndicatorBands(defaultIndicatorBandsConfig())
+                        .setIndicators(defaultIndicatorsConfig())
                         .build()
                 )
                 .build()
@@ -198,17 +198,17 @@ class VolvoxGridController(
 
     override fun getShowColumnHeaders(): Boolean {
         val config = getConfig()
-        if (!config.hasIndicatorBands() || !config.indicatorBands.hasColIndicatorTop()) {
+        if (!config.hasIndicators() || !config.indicators.hasColTop()) {
             return false
         }
-        return config.indicatorBands.colIndicatorTop.visible
+        return config.indicators.colTop.visible
     }
 
     override fun setShowColumnHeaders(value: Boolean) {
         configure(GridConfig.newBuilder()
-            .setIndicatorBands(
-                IndicatorBandsConfig.newBuilder()
-                    .setColIndicatorTop(
+            .setIndicators(
+                IndicatorsConfig.newBuilder()
+                    .setColTop(
                         ColIndicatorConfig.newBuilder()
                             .setVisible(value)
                             .build()
@@ -220,17 +220,17 @@ class VolvoxGridController(
 
     override fun getColumnIndicatorTopModeBits(): Int {
         val config = getConfig()
-        if (!config.hasIndicatorBands() || !config.indicatorBands.hasColIndicatorTop()) {
+        if (!config.hasIndicators() || !config.indicators.hasColTop()) {
             return 0
         }
-        return config.indicatorBands.colIndicatorTop.modeBits
+        return config.indicators.colTop.modeBits
     }
 
     override fun setColumnIndicatorTopModeBits(value: Int) {
         configure(GridConfig.newBuilder()
-            .setIndicatorBands(
-                IndicatorBandsConfig.newBuilder()
-                    .setColIndicatorTop(
+            .setIndicators(
+                IndicatorsConfig.newBuilder()
+                    .setColTop(
                         ColIndicatorConfig.newBuilder()
                             .setModeBits(value)
                             .build()
@@ -242,18 +242,18 @@ class VolvoxGridController(
 
     override fun getColumnIndicatorTopRowCount(): Int {
         val config = getConfig()
-        if (!config.hasIndicatorBands() || !config.indicatorBands.hasColIndicatorTop()) {
+        if (!config.hasIndicators() || !config.indicators.hasColTop()) {
             return 0
         }
-        return config.indicatorBands.colIndicatorTop.bandRows
+        return config.indicators.colTop.bandRows
     }
 
     override fun setColumnIndicatorTopRowCount(value: Int) {
         val normalized = value.coerceAtLeast(0)
         configure(GridConfig.newBuilder()
-            .setIndicatorBands(
-                IndicatorBandsConfig.newBuilder()
-                    .setColIndicatorTop(
+            .setIndicators(
+                IndicatorsConfig.newBuilder()
+                    .setColTop(
                         ColIndicatorConfig.newBuilder()
                             .setBandRows(normalized)
                             .build()
@@ -265,17 +265,17 @@ class VolvoxGridController(
 
     override fun getShowRowIndicator(): Boolean {
         val config = getConfig()
-        if (!config.hasIndicatorBands() || !config.indicatorBands.hasRowIndicatorStart()) {
+        if (!config.hasIndicators() || !config.indicators.hasRowStart()) {
             return false
         }
-        return config.indicatorBands.rowIndicatorStart.visible
+        return config.indicators.rowStart.visible
     }
 
     override fun setShowRowIndicator(value: Boolean) {
         configure(GridConfig.newBuilder()
-            .setIndicatorBands(
-                IndicatorBandsConfig.newBuilder()
-                    .setRowIndicatorStart(
+            .setIndicators(
+                IndicatorsConfig.newBuilder()
+                    .setRowStart(
                         RowIndicatorConfig.newBuilder()
                             .setVisible(value)
                             .build()
@@ -287,17 +287,17 @@ class VolvoxGridController(
 
     override fun getRowIndicatorStartModeBits(): Int {
         val config = getConfig()
-        if (!config.hasIndicatorBands() || !config.indicatorBands.hasRowIndicatorStart()) {
+        if (!config.hasIndicators() || !config.indicators.hasRowStart()) {
             return 0
         }
-        return config.indicatorBands.rowIndicatorStart.modeBits
+        return config.indicators.rowStart.modeBits
     }
 
     override fun setRowIndicatorStartModeBits(value: Int) {
         configure(GridConfig.newBuilder()
-            .setIndicatorBands(
-                IndicatorBandsConfig.newBuilder()
-                    .setRowIndicatorStart(
+            .setIndicators(
+                IndicatorsConfig.newBuilder()
+                    .setRowStart(
                         RowIndicatorConfig.newBuilder()
                             .setModeBits(value)
                             .build()
@@ -309,19 +309,19 @@ class VolvoxGridController(
 
     override fun getRowIndicatorStartWidth(): Int {
         val config = getConfig()
-        if (!config.hasIndicatorBands() || !config.indicatorBands.hasRowIndicatorStart()) {
+        if (!config.hasIndicators() || !config.indicators.hasRowStart()) {
             return DEFAULT_ROW_INDICATOR_WIDTH_PX
         }
-        return config.indicatorBands.rowIndicatorStart.widthPx
+        return config.indicators.rowStart.width
     }
 
     override fun setRowIndicatorStartWidth(value: Int) {
         configure(GridConfig.newBuilder()
-            .setIndicatorBands(
-                IndicatorBandsConfig.newBuilder()
-                    .setRowIndicatorStart(
+            .setIndicators(
+                IndicatorsConfig.newBuilder()
+                    .setRowStart(
                         RowIndicatorConfig.newBuilder()
-                            .setWidthPx(value.coerceAtLeast(1))
+                            .setWidth(value.coerceAtLeast(1))
                             .build()
                     )
                     .build()
@@ -671,13 +671,13 @@ class VolvoxGridController(
 
     fun setSelectionVisibility(style: SelectionVisibility) {
         configure(GridConfig.newBuilder()
-            .setSelection(SelectionConfig.newBuilder().setSelectionVisibility(style).build())
+            .setSelection(SelectionConfig.newBuilder().setVisibility(style).build())
             .build())
     }
 
     fun setSelectionStyle(style: HighlightStyle) {
         configure(GridConfig.newBuilder()
-            .setSelection(SelectionConfig.newBuilder().setSelectionStyle(style).build())
+            .setSelection(SelectionConfig.newBuilder().setStyle(style).build())
             .build())
     }
 
@@ -737,14 +737,14 @@ class VolvoxGridController(
 
     override fun sort(col: Int, ascending: Boolean) {
         sort(
-            if (ascending) SortOrder.SORT_GENERIC_ASCENDING else SortOrder.SORT_GENERIC_DESCENDING,
+            if (ascending) SortOrder.SORT_ASCENDING else SortOrder.SORT_DESCENDING,
             col
         )
     }
 
-    fun setHeaderFeatures(mode: HeaderFeatures) {
+    fun setHeaderFeatures(features: HeaderFeatures) {
         configure(GridConfig.newBuilder()
-            .setInteraction(InteractionConfig.newBuilder().setHeaderFeatures(mode).build())
+            .setInteraction(InteractionConfig.newBuilder().setHeaderFeatures(features).build())
             .build())
     }
 
@@ -754,7 +754,7 @@ class VolvoxGridController(
                 .setGridId(gridId)
                 .addColumns(ColumnDef.newBuilder()
                     .setIndex(col)
-                    .setSort(order)
+                    .setSortOrder(order)
                     .build())
                 .build()
         )
@@ -854,8 +854,8 @@ class VolvoxGridController(
                 .setGroupOnCol(groupOnCol)
                 .setAggregateCol(aggregateCol)
                 .setCaption(caption)
-                .setBackColor(backColor.toInt())
-                .setForeColor(foreColor.toInt())
+                .setBackground(backColor.toInt())
+                .setForeground(foreColor.toInt())
                 .setAddOutline(addOutline)
                 .build()
         )
@@ -937,12 +937,12 @@ class VolvoxGridController(
         if (!config.hasEditing()) {
             return EditTrigger.EDIT_TRIGGER_NONE
         }
-        return config.editing.editTrigger
+        return config.editing.trigger
     }
 
     fun setEditTrigger(mode: EditTrigger) {
         configure(GridConfig.newBuilder()
-            .setEditing(EditConfig.newBuilder().setEditTrigger(mode).build())
+            .setEditing(EditConfig.newBuilder().setTrigger(mode).build())
             .build())
     }
 
@@ -991,7 +991,7 @@ class VolvoxGridController(
         return getConfig().style
     }
 
-    fun setCellStyleRange(row1: Int, col1: Int, row2: Int, col2: Int, style: CellStyleOverride) {
+    fun setCellStyleRange(row1: Int, col1: Int, row2: Int, col2: Int, style: CellStyle) {
         val builder = UpdateCellsRequest.newBuilder().setGridId(gridId)
         for (r in row1..row2) {
             for (c in col1..col2) {
@@ -1011,7 +1011,7 @@ class VolvoxGridController(
                 .setGridId(gridId)
                 .addColumns(ColumnDef.newBuilder()
                     .setIndex(col)
-                    .setAlignment(alignment)
+                    .setAlign(alignment)
                     .build())
                 .build()
         )
@@ -1059,7 +1059,7 @@ class VolvoxGridController(
 
     fun setWordWrap(enabled: Boolean) {
         configure(GridConfig.newBuilder()
-            .setLayout(LayoutConfig.newBuilder().setWordWrap(enabled).build())
+            .setStyle(StyleConfig.newBuilder().setWordWrap(enabled).build())
             .build())
     }
 
@@ -1069,7 +1069,7 @@ class VolvoxGridController(
 
     fun setEllipsisMode(mode: Int) {
         configure(GridConfig.newBuilder()
-            .setLayout(LayoutConfig.newBuilder().setEllipsis(mode.coerceIn(0, 2)).build())
+            .setStyle(StyleConfig.newBuilder().setEllipsis(mode.coerceIn(0, 2)).build())
             .build())
     }
 
@@ -1079,9 +1079,9 @@ class VolvoxGridController(
             .build())
     }
 
-    fun setAllowUserResizing(mode: AllowUserResizingMode) {
+    fun setResizePolicy(policy: ResizePolicy) {
         configure(GridConfig.newBuilder()
-            .setInteraction(InteractionConfig.newBuilder().setAllowUserResizing(mode).build())
+            .setInteraction(InteractionConfig.newBuilder().setResize(policy).build())
             .build())
     }
 

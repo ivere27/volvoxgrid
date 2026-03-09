@@ -11,10 +11,13 @@ path = "src/main.rs"
 
 [features]
 default = []
-gpu = ["volvoxgrid-engine/gpu", "dep:pollster"]
+gpu = []
 
 [dependencies]
-volvoxgrid-engine = { path = "../engine", features = ["demo"] }
 gtk4 = "0.8"
 cairo = { version = "0.19", package = "cairo-rs", features = ["v1_16"] }
-pollster = { version = "0.4", optional = true }
+prost = "0.12"
+libc = "0.2"
+
+[build-dependencies]
+prost-build = "0.12"

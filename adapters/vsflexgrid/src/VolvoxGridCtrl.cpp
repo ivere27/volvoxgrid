@@ -33,6 +33,40 @@ static std::string GetPluginPath()
     return path + "volvoxgrid_plugin.dll";
 }
 
+static void PopulateResizePolicy(ResizePolicy* policy, FlexAllowUserResizing mode)
+{
+    if (!policy) return;
+
+    switch (mode) {
+    case flexResizeColumns:
+        policy->set_columns(true);
+        break;
+    case flexResizeRows:
+        policy->set_rows(true);
+        break;
+    case flexResizeBoth:
+        policy->set_columns(true);
+        policy->set_rows(true);
+        break;
+    case flexResizeColumnsUniform:
+        policy->set_columns(true);
+        policy->set_uniform(true);
+        break;
+    case flexResizeRowsUniform:
+        policy->set_rows(true);
+        policy->set_uniform(true);
+        break;
+    case flexResizeBothUniform:
+        policy->set_columns(true);
+        policy->set_rows(true);
+        policy->set_uniform(true);
+        break;
+    case flexResizeNone:
+    default:
+        break;
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════
@@ -78,7 +112,7 @@ void CVolvoxGridCtrl::RefreshCachedStyle()
     std::string serialized = handle.SerializeAsString();
     std::vector<uint8_t> data(serialized.begin(), serialized.end());
 
-    auto resp = InvokePlugin("/volvoxgrid.v1.VolvoxGridService/GetGridStyle", data);
+    auto resp = InvokePlugin("/volvoxgrid.activex.VolvoxGridService/GetGridStyle", data);
     if (resp.size() > 1 && resp[0] == 0) {
         m_cachedStyle.ParseFromArray(resp.data() + 1, (int)resp.size() - 1);
     }
@@ -107,7 +141,7 @@ HRESULT CVolvoxGridCtrl::FinalConstruct()
 
         std::string serialized = req.SerializeAsString();
         std::vector<uint8_t> data(serialized.begin(), serialized.end());
-        auto resp = InvokePlugin("/volvoxgrid.v1.VolvoxGridService/CreateGrid", data);
+        auto resp = InvokePlugin("/volvoxgrid.activex.VolvoxGridService/CreateGrid", data);
 
         if (resp.size() > 1 && resp[0] == 0) {
             GridHandle handle;
@@ -120,12 +154,12 @@ HRESULT CVolvoxGridCtrl::FinalConstruct()
         // Open the render session stream
         m_renderStream = m_pluginHost.open_stream(
             "VolvoxGridService",
-            "/volvoxgrid.v1.VolvoxGridService/RenderSession");
+            "/volvoxgrid.activex.VolvoxGridService/RenderSession");
 
         // Open the event stream
         m_eventStream = m_pluginHost.open_stream(
             "VolvoxGridService",
-            "/volvoxgrid.v1.VolvoxGridService/EventStream");
+            "/volvoxgrid.activex.VolvoxGridService/EventStream");
 
         // Send GridHandle to event stream to start receiving events
         auto handleMsg = MakeHandle();
@@ -170,7 +204,7 @@ void CVolvoxGridCtrl::FinalRelease()
         auto handle = MakeHandle();
         std::string serialized = handle.SerializeAsString();
         std::vector<uint8_t> data(serialized.begin(), serialized.end());
-        InvokePlugin("/volvoxgrid.v1.VolvoxGridService/DestroyGrid", data);
+        InvokePlugin("/volvoxgrid.activex.VolvoxGridService/DestroyGrid", data);
         m_gridId = 0;
     }
 
@@ -371,7 +405,7 @@ LRESULT CVolvoxGridCtrl::OnSize(UINT, WPARAM, LPARAM lParam, BOOL& bHandled)
 
         std::string serialized = req.SerializeAsString();
         std::vector<uint8_t> data(serialized.begin(), serialized.end());
-        InvokePlugin("/volvoxgrid.v1.VolvoxGridService/ResizeViewport", data);
+        InvokePlugin("/volvoxgrid.activex.VolvoxGridService/ResizeViewport", data);
 
         // Request a new frame
         RequestFrame();
@@ -611,7 +645,7 @@ LRESULT CVolvoxGridCtrl::OnChar(UINT, WPARAM wParam, LPARAM, BOOL& bHandled)
         std::string s = h.SerializeAsString();                        \
         std::vector<uint8_t> data(s.begin(), s.end());                \
         auto resp = InvokePlugin(                                     \
-            "/volvoxgrid.v1.VolvoxGridService/" Method, data);            \
+            "/volvoxgrid.activex.VolvoxGridService/" Method, data);            \
         if (resp.size() > 1 && resp[0] == 0) {                       \
             Int32Value val;                                           \
             if (val.ParseFromArray(resp.data()+1,(int)resp.size()-1)) \
@@ -636,7 +670,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_Rows(long newVal)
     req.set_rows(newVal);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetRows", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetRows", data);
     RequestFrame();
     return S_OK;
 }
@@ -648,7 +682,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_Cols(long newVal)
     req.set_cols(newVal);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetCols", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetCols", data);
     RequestFrame();
     return S_OK;
 }
@@ -667,7 +701,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_FixedRows(long newVal)
     req.set_fixed_rows(newVal);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetFixedRows", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetFixedRows", data);
     m_fixedRows = std::max<long>(0, newVal);
     RequestFrame();
     return S_OK;
@@ -687,7 +721,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_FixedCols(long newVal)
     req.set_fixed_cols(newVal);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetFixedCols", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetFixedCols", data);
     RequestFrame();
     return S_OK;
 }
@@ -699,7 +733,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_Row(long newVal)
     req.set_row(newVal);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetRow", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetRow", data);
     RequestFrame();
     return S_OK;
 }
@@ -711,7 +745,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_Col(long newVal)
     req.set_col(newVal);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetCol", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetCol", data);
     RequestFrame();
     return S_OK;
 }
@@ -722,7 +756,7 @@ STDMETHODIMP CVolvoxGridCtrl::get_RowSel(long* pVal)
     auto h = MakeHandle();
     std::string s = h.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    auto resp = InvokePlugin("/volvoxgrid.v1.VolvoxGridService/GetSelection", data);
+    auto resp = InvokePlugin("/volvoxgrid.activex.VolvoxGridService/GetSelection", data);
     if (resp.size() > 1 && resp[0] == 0) {
         SelectionRange sel;
         if (sel.ParseFromArray(resp.data()+1, (int)resp.size()-1))
@@ -738,7 +772,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_RowSel(long newVal)
     req.set_row_sel(newVal);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetRowSel", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetRowSel", data);
     RequestFrame();
     return S_OK;
 }
@@ -749,7 +783,7 @@ STDMETHODIMP CVolvoxGridCtrl::get_ColSel(long* pVal)
     auto h = MakeHandle();
     std::string s = h.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    auto resp = InvokePlugin("/volvoxgrid.v1.VolvoxGridService/GetSelection", data);
+    auto resp = InvokePlugin("/volvoxgrid.activex.VolvoxGridService/GetSelection", data);
     if (resp.size() > 1 && resp[0] == 0) {
         SelectionRange sel;
         if (sel.ParseFromArray(resp.data()+1, (int)resp.size()-1))
@@ -765,7 +799,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_ColSel(long newVal)
     req.set_col_sel(newVal);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetColSel", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetColSel", data);
     RequestFrame();
     return S_OK;
 }
@@ -786,7 +820,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_SelectionMode(FlexSelectionMode newVal)
     req.set_mode(static_cast<SelectionMode>(newVal));
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetSelectionMode", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetSelectionMode", data);
     RequestFrame();
     return S_OK;
 }
@@ -805,7 +839,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_HighLight(FlexHighLight newVal)
     req.set_style(static_cast<HighLightStyle>(newVal));
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetHighLight", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetHighLight", data);
     RequestFrame();
     return S_OK;
 }
@@ -824,7 +858,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_FocusRect(FlexFocusRect newVal)
     req.set_style(static_cast<FocusRectStyle>(newVal));
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetFocusRect", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetFocusRect", data);
     RequestFrame();
     return S_OK;
 }
@@ -847,7 +881,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_FocusRect(FlexFocusRect newVal)
         *req.mutable_style() = m_cachedStyle;                              \
         std::string s = req.SerializeAsString();                           \
         std::vector<uint8_t> data(s.begin(), s.end());                     \
-        InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetGridStyle", data);   \
+        InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetGridStyle", data);   \
         m_styleDirty = true;                                               \
         RequestFrame();                                                    \
         return S_OK;                                                       \
@@ -882,7 +916,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_GridLines(VolvoxGridLines newVal)
     *req.mutable_style() = m_cachedStyle;
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetGridStyle", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetGridStyle", data);
     m_styleDirty = true;
     RequestFrame();
     return S_OK;
@@ -904,7 +938,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_Editable(FlexEditableMode newVal)
     req.set_mode(static_cast<EditableMode>(newVal));
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetEditable", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetEditable", data);
     return S_OK;
 }
 
@@ -917,7 +951,7 @@ STDMETHODIMP CVolvoxGridCtrl::get_Text(BSTR* pVal)
     req.set_grid_id(m_gridId);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    auto resp = InvokePlugin("/volvoxgrid.v1.VolvoxGridService/GetText", data);
+    auto resp = InvokePlugin("/volvoxgrid.activex.VolvoxGridService/GetText", data);
     if (resp.size() > 1 && resp[0] == 0) {
         StringValue val;
         if (val.ParseFromArray(resp.data()+1, (int)resp.size()-1)) {
@@ -935,7 +969,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_Text(BSTR newVal)
     req.set_text(BstrToUtf8(newVal));
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetText", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetText", data);
     RequestFrame();
     return S_OK;
 }
@@ -956,7 +990,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_MergeCells(FlexMergeCells newVal)
     req.set_mode(static_cast<MergeCellsMode>(newVal));
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetMergeCells", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetMergeCells", data);
     RequestFrame();
     return S_OK;
 }
@@ -977,7 +1011,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_WordWrap(VARIANT_BOOL newVal)
     req.set_value(newVal != VARIANT_FALSE);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetWordWrap", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetWordWrap", data);
     RequestFrame();
     return S_OK;
 }
@@ -998,7 +1032,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_FrozenRows(long newVal)
     req.set_frozen_rows(newVal);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetFrozenRows", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetFrozenRows", data);
     RequestFrame();
     return S_OK;
 }
@@ -1017,7 +1051,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_FrozenCols(long newVal)
     req.set_frozen_cols(newVal);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetFrozenCols", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetFrozenCols", data);
     RequestFrame();
     return S_OK;
 }
@@ -1033,12 +1067,13 @@ STDMETHODIMP CVolvoxGridCtrl::get_AllowUserResizing(FlexAllowUserResizing* pVal)
 
 STDMETHODIMP CVolvoxGridCtrl::put_AllowUserResizing(FlexAllowUserResizing newVal)
 {
-    SetAllowUserResizingRequest req;
+    SetResizePolicyRequest req;
     req.set_grid_id(m_gridId);
-    req.set_mode(static_cast<AllowUserResizingMode>(newVal));
+    PopulateResizePolicy(req.mutable_policy(), newVal);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetAllowUserResizing", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetResizePolicy", data);
+    RequestFrame();
     return S_OK;
 }
 
@@ -1051,7 +1086,7 @@ STDMETHODIMP CVolvoxGridCtrl::get_Clip(BSTR* pVal)
     req.set_grid_id(m_gridId);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    auto resp = InvokePlugin("/volvoxgrid.v1.VolvoxGridService/GetClip", data);
+    auto resp = InvokePlugin("/volvoxgrid.activex.VolvoxGridService/GetClip", data);
     if (resp.size() > 1 && resp[0] == 0) {
         StringValue val;
         if (val.ParseFromArray(resp.data()+1, (int)resp.size()-1)) {
@@ -1069,7 +1104,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_Clip(BSTR newVal)
     req.set_clip(BstrToUtf8(newVal));
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetClip", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetClip", data);
     RequestFrame();
     return S_OK;
 }
@@ -1090,7 +1125,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_Redraw(VARIANT_BOOL newVal)
     req.set_value(newVal != VARIANT_FALSE);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetRedraw", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetRedraw", data);
     if (newVal != VARIANT_FALSE) {
         RequestFrame();
     }
@@ -1110,7 +1145,7 @@ STDMETHODIMP CVolvoxGridCtrl::SetTextMatrix(long row, long col, BSTR text)
     req.set_text(BstrToUtf8(text));
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetTextMatrix", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetTextMatrix", data);
     return S_OK;
 }
 
@@ -1123,7 +1158,7 @@ STDMETHODIMP CVolvoxGridCtrl::GetTextMatrix(long row, long col, BSTR* pText)
     req.set_col(col);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    auto resp = InvokePlugin("/volvoxgrid.v1.VolvoxGridService/GetTextMatrix", data);
+    auto resp = InvokePlugin("/volvoxgrid.activex.VolvoxGridService/GetTextMatrix", data);
     if (resp.size() > 1 && resp[0] == 0) {
         StringValue val;
         if (val.ParseFromArray(resp.data()+1, (int)resp.size()-1)) {
@@ -1138,11 +1173,12 @@ STDMETHODIMP CVolvoxGridCtrl::Sort(FlexSortOrder order)
 {
     SortRequest req;
     req.set_grid_id(m_gridId);
-    req.set_order(static_cast<SortOrder>(order));
-    req.set_col(-1);  // sort all columns by default
+    auto* sortCol = req.add_sort_columns();
+    sortCol->set_col(-1);  // apply to the current/selected column scope
+    sortCol->set_order(static_cast<FlexSortSpec>(order));
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/Sort", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/Sort", data);
     RequestFrame();
     return S_OK;
 }
@@ -1155,7 +1191,7 @@ STDMETHODIMP CVolvoxGridCtrl::AutoSize(long colFrom, long colTo)
     req.set_col_to(colTo);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/AutoSize", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/AutoSize", data);
     RequestFrame();
     return S_OK;
 }
@@ -1172,7 +1208,7 @@ STDMETHODIMP CVolvoxGridCtrl::Subtotal(
     req.set_caption(BstrToUtf8(caption));
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/Subtotal", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/Subtotal", data);
     RequestFrame();
     return S_OK;
 }
@@ -1185,7 +1221,7 @@ STDMETHODIMP CVolvoxGridCtrl::Clear(FlexClearScope scope)
     req.set_region(CLEAR_SCROLLABLE);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/Clear", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/Clear", data);
     RequestFrame();
     return S_OK;
 }
@@ -1199,7 +1235,7 @@ STDMETHODIMP CVolvoxGridCtrl::SaveGrid(BSTR path, FlexSaveFormat fmt)
     req.set_scope(SAVE_ALL);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    auto resp = InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SaveGrid", data);
+    auto resp = InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SaveGrid", data);
 
     if (resp.size() > 1 && resp[0] == 0) {
         GridData gridData;
@@ -1239,7 +1275,7 @@ STDMETHODIMP CVolvoxGridCtrl::LoadGrid(BSTR path, FlexSaveFormat fmt)
     req.set_scope(SAVE_ALL);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/LoadGrid", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/LoadGrid", data);
     RequestFrame();
     return S_OK;
 }
@@ -1252,7 +1288,7 @@ STDMETHODIMP CVolvoxGridCtrl::AddItem(BSTR item, long index)
     req.set_index(index);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/AddItem", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/AddItem", data);
     RequestFrame();
     return S_OK;
 }
@@ -1264,7 +1300,7 @@ STDMETHODIMP CVolvoxGridCtrl::RemoveItem(long index)
     req.set_index(index);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/RemoveItem", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/RemoveItem", data);
     RequestFrame();
     return S_OK;
 }
@@ -1279,7 +1315,7 @@ STDMETHODIMP CVolvoxGridCtrl::Select(long row1, long col1, long row2, long col2)
     req.set_col2(col2);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/Select", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/Select", data);
     RequestFrame();
     return S_OK;
 }
@@ -1289,7 +1325,7 @@ STDMETHODIMP CVolvoxGridCtrl::Refresh()
     auto h = MakeHandle();
     std::string s = h.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/Refresh", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/Refresh", data);
     RequestFrame();
     return S_OK;
 }
@@ -1304,7 +1340,7 @@ STDMETHODIMP CVolvoxGridCtrl::get_ColWidth(long col, long* pVal)
     req.set_index(col);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    auto resp = InvokePlugin("/volvoxgrid.v1.VolvoxGridService/GetColWidth", data);
+    auto resp = InvokePlugin("/volvoxgrid.activex.VolvoxGridService/GetColWidth", data);
     if (resp.size() > 1 && resp[0] == 0) {
         Int32Value val;
         if (val.ParseFromArray(resp.data()+1, (int)resp.size()-1))
@@ -1321,7 +1357,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_ColWidth(long col, long newVal)
     req.set_width(newVal);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetColWidth", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetColWidth", data);
     RequestFrame();
     return S_OK;
 }
@@ -1334,7 +1370,7 @@ STDMETHODIMP CVolvoxGridCtrl::get_RowHeight(long row, long* pVal)
     req.set_index(row);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    auto resp = InvokePlugin("/volvoxgrid.v1.VolvoxGridService/GetRowHeight", data);
+    auto resp = InvokePlugin("/volvoxgrid.activex.VolvoxGridService/GetRowHeight", data);
     if (resp.size() > 1 && resp[0] == 0) {
         Int32Value val;
         if (val.ParseFromArray(resp.data()+1, (int)resp.size()-1))
@@ -1351,7 +1387,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_RowHeight(long row, long newVal)
     req.set_height(newVal);
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetRowHeight", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetRowHeight", data);
     RequestFrame();
     return S_OK;
 }
@@ -1371,7 +1407,7 @@ STDMETHODIMP CVolvoxGridCtrl::put_ColAlignment(long col, FlexAlign newVal)
     req.set_alignment(static_cast<Align>(newVal));
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetColAlignment", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetColAlignment", data);
     RequestFrame();
     return S_OK;
 }
@@ -1384,7 +1420,7 @@ STDMETHODIMP CVolvoxGridCtrl::SetColFormat(long col, BSTR format)
     req.set_format(BstrToUtf8(format));
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetColFormat", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetColFormat", data);
     RequestFrame();
     return S_OK;
 }
@@ -1394,10 +1430,10 @@ STDMETHODIMP CVolvoxGridCtrl::SetColSort(long col, FlexSortOrder order)
     SetColSortRequest req;
     req.set_grid_id(m_gridId);
     req.set_col(col);
-    req.set_order(static_cast<SortOrder>(order));
+    req.set_order(static_cast<FlexSortSpec>(order));
     std::string s = req.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
-    InvokePlugin("/volvoxgrid.v1.VolvoxGridService/SetColSort", data);
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetColSort", data);
     return S_OK;
 }
 

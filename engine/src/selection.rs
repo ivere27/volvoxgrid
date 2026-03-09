@@ -1,6 +1,16 @@
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::style::HighlightStyle;
 
+pub const HOVER_NONE: u32 = 0;
+pub const HOVER_ROW: u32 = 1;
+pub const HOVER_COLUMN: u32 = 2;
+pub const HOVER_CELL: u32 = 4;
+
+#[inline]
+pub fn hover_mode_has(mode: u32, flag: u32) -> bool {
+    mode & flag != 0
+}
+
 /// Selection state
 #[derive(Clone, Debug)]
 pub struct SelectionState {
@@ -19,6 +29,10 @@ pub struct SelectionState {
     pub hover_row_style: HighlightStyle,
     pub hover_column_style: HighlightStyle,
     pub hover_cell_style: HighlightStyle,
+    /// Optional indicator-specific selection highlight.
+    /// When set, row/col indicators use these instead of `selection_style`.
+    pub indicator_row_style: Option<HighlightStyle>,
+    pub indicator_col_style: Option<HighlightStyle>,
     // For listbox mode - track individually selected rows
     pub selected_rows: std::collections::HashSet<i32>,
 }
@@ -43,7 +57,7 @@ impl Default for SelectionState {
                 fill_handle_color: Some(0xFF217346),
                 ..HighlightStyle::default()
             },
-            hover_mode: pb::HoverMode::HoverNone as u32,
+            hover_mode: HOVER_NONE,
             // ROW/COLUMN are intentionally subtle to provide axis context.
             hover_row_style: HighlightStyle {
                 back_color: Some(0x10000000),
@@ -60,6 +74,8 @@ impl Default for SelectionState {
                 border_color: Some(0xFF1A73E8),
                 ..HighlightStyle::default()
             },
+            indicator_row_style: None,
+            indicator_col_style: None,
             selected_rows: std::collections::HashSet::new(),
         }
     }

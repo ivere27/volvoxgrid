@@ -111,6 +111,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
 
   // Pointer-driven selection drag state
   private _pointerDrag = false;
+  private _pointerDragAnchor: CellRef | null = null;
   private _multiRangePointerDrag = false;
   private _multiRangeBaseRanges: CellRange[] = [];
   private _multiRangeAnchor: CellRef | null = null;
@@ -187,8 +188,8 @@ export class VolvoxSheet implements VolvoxSheetApi {
       defaultRowHeight: options.defaultRowHeight,
       defaultColWidth: options.defaultColWidth,
     });
-    this.defaultFontName = sheetConfig.fontName ?? "Calibri";
-    this.defaultFontSize = sheetConfig.fontSize ?? 11;
+    this.defaultFontName = sheetConfig.font?.family ?? "Calibri";
+    this.defaultFontSize = sheetConfig.font?.size ?? 11;
     this.baseDefaultRowHeight = sheetConfig.defaultRowHeight ?? 21;
     this.baseDefaultColWidth = sheetConfig.defaultColWidth ?? 64;
     this.baseColumnHeaderHeight = Math.max(24, this.baseDefaultRowHeight);
@@ -232,10 +233,14 @@ export class VolvoxSheet implements VolvoxSheetApi {
     this.grid.showRowIndicator = true;
     this.grid.rowIndicatorStartModeBits = SHEET_ROW_INDICATOR_MODE;
     this.grid.rowIndicatorStartWidth = this.baseRowIndicatorStartWidth;
+    this.applyIndicatorTheme();
 
-    // Enable column/row resize via direct API (bypasses protobuf config path)
-    this.grid.allowUserResizing = 3; // RESIZE_BOTH
-    this.grid.setHeaderResizeHandleStyle({ enabled: true });
+    this.grid.setResizePolicy({ columns: true, rows: true, uniform: false });
+    if (typeof this.grid.setHeaderResizeHandle === "function") {
+      this.grid.setHeaderResizeHandle({ enabled: true });
+    } else {
+      this.grid.setHeaderResizeHandleStyle({ enabled: true });
+    }
 
     // Enable double-click editing via the direct wrapper property (bypasses protobuf config)
     // 2 = EDIT_TRIGGER_KEY_CLICK: allows editing from RPC and dblclick.
@@ -258,7 +263,13 @@ export class VolvoxSheet implements VolvoxSheetApi {
 
     // Initialize core modules
     this.keyDispatch = new KeyDispatch(options.keyBindings);
-    this.editState = new EditStateMachine(this.wasm, this.grid.id);
+    this.editState = new EditStateMachine(
+      this.wasm,
+      this.grid.id,
+      () => {
+        this.flushPendingGridEventDecisions();
+      },
+    );
     this.selection = new SelectionModel(this.wasm, this.grid.id, this.grid);
     this.store = new DataStore(this.wasm, this.grid.id, this.grid);
     this.undoStack = new UndoRedoStack();
@@ -266,6 +277,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
 
     // Initialize data + headers
     this.store.init(options.data);
+    this.installCancelableHooks(options);
 
     // Apply header alignment
     this.applyHeaderStyles();
@@ -542,16 +554,9 @@ export class VolvoxSheet implements VolvoxSheetApi {
     }
 
     // Commit the engine edit directly
-    if (typeof this.wasm.commit_edit === "function" &&
-        this.wasm.is_editing(this.grid.id) !== 0) {
-      if (this.gridEditInput) {
-        this.wasm.set_edit_text(this.grid.id, this.gridEditInput.value);
-      }
-      this.wasm.commit_edit(this.grid.id);
+    if (!this.commitActiveHostEdit()) {
+      return;
     }
-    this.editState.reset();
-    this.updateEditModeUI(false);
-    this.focusCanvasClean();
 
     // Enter/Tab: engine ignores these with host_key_dispatch, move ourselves
     const moveMap: Partial<Record<SpreadsheetAction, [number, number]>> = {
@@ -569,16 +574,9 @@ export class VolvoxSheet implements VolvoxSheetApi {
 
   /** Commit edit and navigate via arrow key (used in "enter" mode). */
   private commitEditAndNavigateArrow(e: KeyboardEvent): void {
-    if (typeof this.wasm.commit_edit === "function" &&
-        this.wasm.is_editing(this.grid.id) !== 0) {
-      if (this.gridEditInput) {
-        this.wasm.set_edit_text(this.grid.id, this.gridEditInput.value);
-      }
-      this.wasm.commit_edit(this.grid.id);
+    if (!this.commitActiveHostEdit()) {
+      return;
     }
-    this.editState.reset();
-    this.updateEditModeUI(false);
-    this.focusCanvasClean();
 
     const arrowDelta: Record<string, [number, number]> = {
       ArrowDown: [1, 0], ArrowUp: [-1, 0],
@@ -728,6 +726,15 @@ export class VolvoxSheet implements VolvoxSheetApi {
     if (this.destroyed) return;
     if (this.trackTouchPointerStart(e)) return;
 
+    const engineEditing = this.wasm.is_editing(this.grid.id) !== 0;
+    if (this.editState.isEditing && !engineEditing) {
+      this.editState.reset();
+      this.updateEditModeUI(false);
+      this.syncSelectionFromEngine();
+      this.focusCanvasClean();
+      return;
+    }
+
     // Right-click: don't change selection (context menu handles it)
     if (e.button === 2) return;
     const formulaPickMode = this.editState.isEditing && this.editState.isFormulaMode;
@@ -736,16 +743,9 @@ export class VolvoxSheet implements VolvoxSheetApi {
     // Formula mode keeps the edit session alive and repurposes selection to
     // insert/update references (Sheet-style point mode).
     if (this.editState.isEditing && !formulaPickMode) {
-      if (typeof this.wasm.commit_edit === "function" &&
-          this.wasm.is_editing(this.grid.id) !== 0) {
-        if (this.gridEditInput) {
-          this.wasm.set_edit_text(this.grid.id, this.gridEditInput.value);
-        }
-        this.wasm.commit_edit(this.grid.id);
+      if (!this.commitActiveHostEdit()) {
+        return;
       }
-      this.editState.reset();
-      this.updateEditModeUI(false);
-      this.focusCanvasClean();
       // Fall through to select the clicked cell
     }
 
@@ -776,6 +776,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
       }
       this._preMergeRow = row;
       this._preMergeCol = col;
+      this._pointerDragAnchor = { row: this.selection.row, col: this.selection.col };
       this._pointerDrag = true;
       this.upsertFormulaReferenceFromSelection(true);
       this.onSelectionUpdated();
@@ -812,6 +813,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
       }
       this._preMergeRow = row;
       this._preMergeCol = col;
+      this._pointerDragAnchor = additiveMultiRange ? null : { row: this.selection.row, col: this.selection.col };
       if (!additiveMultiRange) {
         this.onSelectionUpdated();
       }
@@ -825,13 +827,15 @@ export class VolvoxSheet implements VolvoxSheetApi {
             const master = this.resolveMergedMaster(this.selection.row, this.selection.col);
             const masterDataRow = master.row;
             const masterDataCol = master.col;
-            this.editState.startEdit(master.row, master.col, {
+            const started = this.editState.startEdit(master.row, master.col, {
               selectAll: true,
               currentText: this.store.getCellRawValue(masterDataRow, masterDataCol),
               mode: "edit",
             });
-            this.updateEditModeUI(true);
-            requestAnimationFrame(() => this.syncEditInputAlign());
+            if (started) {
+              this.updateEditModeUI(true);
+              requestAnimationFrame(() => this.syncEditInputAlign());
+            }
           }
         }, 300);
       } else {
@@ -847,6 +851,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
       }
     } else {
       clearTimeout(this.singleClickTimer);
+      this._pointerDragAnchor = null;
       this.clearAdditivePointerSelection();
       if (scope === "rowHeader") {
         this.selection.select(row, 0, row, this.grid.colCount - 1);
@@ -887,8 +892,9 @@ export class VolvoxSheet implements VolvoxSheetApi {
       const { row, col } = this.getMouseCell();
       if (row >= 0 && col >= 0) {
         if (row !== this.selection.rowEnd || col !== this.selection.colEnd) {
+          const anchor = this._pointerDragAnchor ?? { row: this.selection.row, col: this.selection.col };
           this.selection.select(
-            this.selection.row, this.selection.col,
+            anchor.row, anchor.col,
             row, col,
           );
           this.upsertFormulaReferenceFromSelection(false);
@@ -902,8 +908,9 @@ export class VolvoxSheet implements VolvoxSheetApi {
     const { row, col } = this.getMouseCell();
     if (row >= 0 && col >= 0) {
       if (row !== this.selection.rowEnd || col !== this.selection.colEnd) {
+        const anchor = this._pointerDragAnchor ?? { row: this.selection.row, col: this.selection.col };
         this.selection.select(
-          this.selection.row, this.selection.col,
+          anchor.row, anchor.col,
           row, col,
         );
         this.onSelectionUpdated();
@@ -914,6 +921,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
   private onPointerUp = (e: PointerEvent): void => {
     this.trackTouchPointerEnd(e);
     this._pointerDrag = false;
+    this._pointerDragAnchor = null;
     this.clearAdditivePointerSelection();
     this._formulaDragRefSpan = null;
   };
@@ -921,6 +929,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
   private onPointerCancel = (e: PointerEvent): void => {
     this.trackTouchPointerEnd(e);
     this._pointerDrag = false;
+    this._pointerDragAnchor = null;
     this.clearAdditivePointerSelection();
     this._formulaDragRefSpan = null;
   };
@@ -945,32 +954,29 @@ export class VolvoxSheet implements VolvoxSheetApi {
 
     if (!engineEditing) {
       // Engine didn't start editing — force it
-      if (typeof this.wasm.begin_edit_cell === "function") {
-        this.wasm.begin_edit_cell(this.grid.id, master.row, master.col);
-      } else if (typeof this.wasm.begin_edit_at_selection === "function") {
-        this.wasm.begin_edit_at_selection(this.grid.id);
-      }
-      if (this.wasm.is_editing(this.grid.id) !== 0) {
+      if (this.tryBeginDirectEdit(master.row, master.col)) {
         // Engine is now editing — sync adapter state immediately so the
         // editInput focus guard doesn't reject focus before drainEvents
         // processes the StartEdit event.
-        this.editState.startEdit(master.row, master.col, {
-          selectAll: false,
-          currentText: cellText,
-          mode: "edit",
-        });
+        this.editState.syncActiveEdit(master.row, master.col, cellText, { mode: "edit" });
         this.updateEditModeUI(true);
       } else {
         // Still not editing — try adapter RPC path
-        this.editState.startEdit(master.row, master.col, {
+        const started = this.editState.startEdit(master.row, master.col, {
           selectAll: true,
           currentText: cellText,
           mode: "edit",
         });
-        this.updateEditModeUI(true);
+        if (started) {
+          this.updateEditModeUI(true);
+        }
       }
     }
     // Dblclick always uses "edit" mode (arrows move caret, not cell)
+    if (!this.editState.isEditing && this.wasm.is_editing(this.grid.id) === 0) {
+      (this.grid as any).suppressEditorSelect = false;
+      return;
+    }
     this.editState.editMode = "edit";
 
     if (!cellText) {
@@ -1403,7 +1409,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
       row2: ref.row2 + rowOffset,
       col2: ref.col2 + colOffset,
       style: {
-        borderColor: VolvoxSheet.FORMULA_REF_COLORS[idx % VolvoxSheet.FORMULA_REF_COLORS.length],
+        borders: { all: { color: VolvoxSheet.FORMULA_REF_COLORS[idx % VolvoxSheet.FORMULA_REF_COLORS.length] } },
         fillHandle: 5, // FILL_HANDLE_ALL_CORNERS
       },
       refId: idx + 1,
@@ -1425,13 +1431,15 @@ export class VolvoxSheet implements VolvoxSheetApi {
           const master = this.resolveMergedMaster(this.selection.row, this.selection.col);
           const masterDataRow = master.row - 0;
           const masterDataCol = master.col - 0;
-          this.editState.startEdit(master.row, master.col, {
+          const started = this.editState.startEdit(master.row, master.col, {
             selectAll: true,
             currentText: this.store.getCellRawValue(masterDataRow, masterDataCol),
           });
-          requestAnimationFrame(() => this.syncEditInputAlign());
+          if (started) {
+            this.updateEditModeUI(true);
+            requestAnimationFrame(() => this.syncEditInputAlign());
+          }
         }
-        this.updateEditModeUI(true);
         break;
       }
       case "startEditCaretEnd": {
@@ -1440,23 +1448,26 @@ export class VolvoxSheet implements VolvoxSheetApi {
         const masterDataRow = master.row - 0;
         const masterDataCol = master.col - 0;
         const cellText = this.store.getCellRawValue(masterDataRow, masterDataCol);
-        this.editState.startEdit(master.row, master.col, {
+        const started = this.editState.startEdit(master.row, master.col, {
           caretEnd: true,
           currentText: cellText,
           mode: "edit",
         });
-        this.updateEditModeUI(true);
-        requestAnimationFrame(() => {
-          this.syncEditInputAlign();
-          // F2: caret at end, no selection
-          this.setCaretPosition(cellText.length);
+        if (started) {
+          this.updateEditModeUI(true);
+          requestAnimationFrame(() => {
+            this.syncEditInputAlign();
+            // F2: caret at end, no selection
+            this.setCaretPosition(cellText.length);
+            (this.grid as any).suppressEditorSelect = false;
+          });
+        } else {
           (this.grid as any).suppressEditorSelect = false;
-        });
+        }
         break;
       }
       case "startEditClear":
         this.startEditWithSeed("");
-        this.updateEditModeUI(true);
         break;
       case "clearCell":
         this.clearSelectedCells();
@@ -1544,6 +1555,76 @@ export class VolvoxSheet implements VolvoxSheetApi {
     }
   }
 
+  private flushPendingGridEventDecisions(): boolean {
+    const grid = this.grid as VolvoxSheetGrid & {
+      flushPendingEventDecisions?: () => boolean;
+    };
+    if (typeof grid.flushPendingEventDecisions !== "function") {
+      return false;
+    }
+    return grid.flushPendingEventDecisions();
+  }
+
+  private installCancelableHooks(options: VolvoxSheetOptions): void {
+    this.grid.onBeforeEdit = options.onBeforeEdit == null
+      ? null
+      : (details) => {
+          const event = {
+            row: details.row,
+            col: details.col,
+            value: this.store.getCellRawValue(details.row, details.col),
+            cancel: false,
+          };
+          options.onBeforeEdit?.(event);
+          details.cancel = event.cancel;
+        };
+
+    this.grid.onCellEditValidating = options.onCellEditValidating == null
+      ? null
+      : (details) => {
+          const event = {
+            row: details.row,
+            col: details.col,
+            oldText: this.store.getCellRawValue(details.row, details.col),
+            newText: details.editText,
+            cancel: false,
+          };
+          options.onCellEditValidating?.(event);
+          details.cancel = event.cancel;
+        };
+  }
+
+  private commitActiveHostEdit(): boolean {
+    if (typeof this.wasm.commit_edit !== "function"
+      || this.wasm.is_editing(this.grid.id) === 0) {
+      return false;
+    }
+    if (this.gridEditInput) {
+      this.wasm.set_edit_text(this.grid.id, this.gridEditInput.value);
+    }
+    this.wasm.commit_edit(this.grid.id);
+    this.flushPendingGridEventDecisions();
+    if (this.wasm.is_editing(this.grid.id) !== 0) {
+      this.updateEditModeUI(true);
+      requestAnimationFrame(() => this.syncEditInputAlign());
+      return false;
+    }
+    this.editState.reset();
+    this.updateEditModeUI(false);
+    this.focusCanvasClean();
+    return true;
+  }
+
+  private tryBeginDirectEdit(row: number, col: number): boolean {
+    if (typeof this.wasm.begin_edit_cell === "function") {
+      this.wasm.begin_edit_cell(this.grid.id, row, col);
+    } else if (typeof this.wasm.begin_edit_at_selection === "function") {
+      this.wasm.begin_edit_at_selection(this.grid.id);
+    }
+    this.flushPendingGridEventDecisions();
+    return this.wasm.is_editing(this.grid.id) !== 0;
+  }
+
   // ── Edit helpers ─────────────────────────────────────────
 
   /** Sync editInput text-align with the current cell's alignment. */
@@ -1571,10 +1652,14 @@ export class VolvoxSheet implements VolvoxSheetApi {
     const masterDataRow = master.row - 0;
     const masterDataCol = master.col - 0;
     (this.grid as any).suppressEditorSelect = true;
-    this.editState.startEdit(master.row, master.col, {
+    const started = this.editState.startEdit(master.row, master.col, {
       seedText,
       currentText: this.store.getCellRawValue(masterDataRow, masterDataCol),
     });
+    if (!started) {
+      (this.grid as any).suppressEditorSelect = false;
+      return;
+    }
     this.updateEditModeUI(true);
     requestAnimationFrame(() => {
       this.syncEditInputAlign();
@@ -1588,6 +1673,15 @@ export class VolvoxSheet implements VolvoxSheetApi {
 
   private commitAndMove(dRow: number, dCol: number): void {
     const result = this.editState.commitEdit();
+    if (result == null) {
+      return;
+    }
+    if (result?.canceled) {
+      this.updateEditModeUI(true);
+      this.formulaBar?.updateFormulaInput();
+      requestAnimationFrame(() => this.syncEditInputAlign());
+      return;
+    }
     // EVENT_AFTER_EDIT is the single source of truth for edit undo history.
     if (result && result.oldText !== result.newText) {
       // no-op
@@ -1600,6 +1694,12 @@ export class VolvoxSheet implements VolvoxSheetApi {
   private commitFromFormulaBar(text: string): void {
     if (this.editState.isEditing) {
       const result = this.editState.commitEdit(text);
+      if (result?.canceled) {
+        this.updateEditModeUI(true);
+        this.formulaBar?.updateFormulaInput();
+        requestAnimationFrame(() => this.syncEditInputAlign());
+        return;
+      }
       // EVENT_AFTER_EDIT records undo/history after engine commit.
       if (result && result.oldText !== text) {
         // no-op
@@ -2253,7 +2353,44 @@ export class VolvoxSheet implements VolvoxSheetApi {
     this.grid.rowIndicatorStartWidth = this.toLayoutPixels(
       Math.max(24, this.baseRowIndicatorStartWidth * this.responsiveScale * this.userZoomScale),
     );
+    this.applyIndicatorTheme();
     this.grid.invalidate();
+  }
+
+  private applyIndicatorTheme(): void {
+    if (typeof this.wasm.volvox_grid_configure !== "function") {
+      return;
+    }
+    try {
+      const configBytes = encodeGridConfig({
+        indicators: {
+          rowStart: {
+            visible: true,
+            background: SHEET_COLORS.headerBg,
+            foreground: SHEET_COLORS.headerFg,
+            gridLines: 1,
+            gridColor: SHEET_COLORS.headerBorder,
+            allowResize: true,
+          },
+          colTop: {
+            visible: true,
+            bandRows: 1,
+            defaultRowHeight: this.currentColumnHeaderHeight,
+            background: SHEET_COLORS.headerBg,
+            foreground: SHEET_COLORS.headerFg,
+            gridLines: 1,
+            gridColor: SHEET_COLORS.headerBorder,
+            allowResize: true,
+          },
+          cornerTopStart: {
+            visible: true,
+            background: SHEET_COLORS.headerCornerBg,
+            foreground: SHEET_COLORS.headerFg,
+          },
+        },
+      });
+      this.wasm.volvox_grid_configure(BigInt(this.grid.id), configBytes);
+    } catch (_) {}
   }
 
   // ── Header highlight on selection ────────────────────────
@@ -3001,18 +3138,24 @@ export class VolvoxSheet implements VolvoxSheetApi {
     }
   }
 
+  private syncFreezePolicy(): void {
+    if (typeof this.wasm.set_freeze_policy === "function") {
+      this.wasm.set_freeze_policy(
+        this.grid.id,
+        this.grid.frozenColCount > 0,
+        this.grid.frozenRowCount > 0,
+      );
+    }
+  }
+
   freezeRows(count: number): void {
     this.grid.frozenRowCount = Math.max(0, Math.trunc(count));
-    if (typeof this.wasm.set_allow_user_freezing === "function") {
-      this.wasm.set_allow_user_freezing(this.grid.id, count > 0 ? 3 : 0);
-    }
+    this.syncFreezePolicy();
   }
 
   freezeColumns(count: number): void {
     this.grid.frozenColCount = Math.max(0, Math.trunc(count));
-    if (typeof this.wasm.set_allow_user_freezing === "function") {
-      this.wasm.set_allow_user_freezing(this.grid.id, count > 0 ? 3 : 0);
-    }
+    this.syncFreezePolicy();
   }
 
   undo(): void {

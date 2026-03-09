@@ -154,12 +154,12 @@ namespace VolvoxGrid.DotNet.Internal
         public int Row { get; set; }
         public int Col { get; set; }
         public VolvoxCellValueData Value { get; set; }
-        public VolvoxCellStyleOverride Style { get; set; }
+        public VolvoxCellStylePatch Style { get; set; }
         public VolvoxCheckedState? Checked { get; set; }
         public string DropdownItems { get; set; }
     }
 
-    internal sealed class VolvoxCellStyleOverride
+    internal sealed class VolvoxCellStylePatch
     {
         public uint? BackColor { get; set; }
         public uint? ForeColor { get; set; }
@@ -421,7 +421,7 @@ namespace VolvoxGrid.DotNet.Internal
         General = 9,
     }
 
-    internal enum VolvoxAllowUserResizingMode
+    internal enum VolvoxResizePolicyMode
     {
         None = 0,
         Columns = 1,
@@ -547,7 +547,7 @@ namespace VolvoxGrid.DotNet.Internal
         public VolvoxSpanConfigData Span { get; set; } = new VolvoxSpanConfigData();
         public VolvoxInteractionConfigData Interaction { get; set; } = new VolvoxInteractionConfigData();
         public VolvoxRenderConfigData Rendering { get; set; } = new VolvoxRenderConfigData();
-        public VolvoxIndicatorBandsConfigData IndicatorBands { get; set; } = new VolvoxIndicatorBandsConfigData();
+        public VolvoxIndicatorsConfigData Indicators { get; set; } = new VolvoxIndicatorsConfigData();
     }
 
     internal sealed class VolvoxLayoutConfigData
@@ -567,7 +567,7 @@ namespace VolvoxGrid.DotNet.Internal
         public VolvoxSelectionMode? Mode { get; set; }
         public VolvoxSelectionVisibility? SelectionVisibility { get; set; }
         public bool? AllowSelection { get; set; }
-        public uint? HoverMode { get; set; }
+        public uint? HoverMask { get; set; }
     }
 
     internal sealed class VolvoxEditConfigData
@@ -597,7 +597,7 @@ namespace VolvoxGrid.DotNet.Internal
 
     internal sealed class VolvoxInteractionConfigData
     {
-        public VolvoxAllowUserResizingMode? AllowUserResizing { get; set; }
+        public VolvoxResizePolicyMode? ResizePolicy { get; set; }
         public VolvoxHeaderFeatures? HeaderFeatures { get; set; }
     }
 
@@ -681,7 +681,7 @@ namespace VolvoxGrid.DotNet.Internal
         public byte[] Data { get; set; }
     }
 
-    internal sealed class VolvoxIndicatorBandsConfigData
+    internal sealed class VolvoxIndicatorsConfigData
     {
         public VolvoxRowIndicatorConfigData RowIndicatorStart { get; set; } = new VolvoxRowIndicatorConfigData();
         public VolvoxRowIndicatorConfigData RowIndicatorEnd { get; set; } = new VolvoxRowIndicatorConfigData();

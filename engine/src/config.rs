@@ -10,9 +10,18 @@ use crate::indicator::{
     ColIndicatorCellState, ColIndicatorRowDefState, CornerIndicatorState, RowIndicatorSlotState,
 };
 use crate::proto::volvoxgrid::v1;
+use crate::selection::{HOVER_CELL, HOVER_COLUMN, HOVER_ROW};
+use crate::sort::{decode_sort_spec, merge_sort_spec};
 use crate::style;
 
-fn apply_padding_patch(base: style::CellPadding, patch: &v1::CellPadding) -> style::CellPadding {
+const LEGACY_GRIDLINE_SOLID_HORIZONTAL: i32 = 4;
+const LEGACY_GRIDLINE_SOLID_VERTICAL: i32 = 5;
+const LEGACY_GRIDLINE_INSET_HORIZONTAL: i32 = 6;
+const LEGACY_GRIDLINE_INSET_VERTICAL: i32 = 7;
+const LEGACY_GRIDLINE_RAISED_HORIZONTAL: i32 = 8;
+const LEGACY_GRIDLINE_RAISED_VERTICAL: i32 = 9;
+
+fn apply_padding_patch(base: style::Padding, patch: &v1::Padding) -> style::Padding {
     let mut next = base;
     if let Some(v) = patch.left {
         next.left = v.max(0);
@@ -29,8 +38,8 @@ fn apply_padding_patch(base: style::CellPadding, patch: &v1::CellPadding) -> sty
     next.clamped_non_negative()
 }
 
-fn engine_padding_to_v1(p: style::CellPadding) -> v1::CellPadding {
-    v1::CellPadding {
+fn engine_padding_to_v1(p: style::Padding) -> v1::Padding {
+    v1::Padding {
         left: Some(p.left.max(0)),
         top: Some(p.top.max(0)),
         right: Some(p.right.max(0)),
@@ -43,6 +52,131 @@ fn apply_highlight_style_patch(target: &mut style::HighlightStyle, patch: &v1::H
     target.merge_from(&patch_style);
 }
 
+fn apply_hover_flag(mode: &mut u32, flag: u32, value: Option<bool>) {
+    match value {
+        Some(true) => *mode |= flag,
+        Some(false) => *mode &= !flag,
+        None => {}
+    }
+}
+
+fn compose_grid_line_mode(style: i32, direction: i32) -> i32 {
+    match (style, direction) {
+        (s, _) if s == v1::GridLineStyle::GridlineNone as i32 => {
+            v1::GridLineStyle::GridlineNone as i32
+        }
+        (s, d)
+            if s == v1::GridLineStyle::GridlineSolid as i32
+                && d == v1::GridLineDirection::GridlineHorizontal as i32 =>
+        {
+            LEGACY_GRIDLINE_SOLID_HORIZONTAL
+        }
+        (s, d)
+            if s == v1::GridLineStyle::GridlineSolid as i32
+                && d == v1::GridLineDirection::GridlineVertical as i32 =>
+        {
+            LEGACY_GRIDLINE_SOLID_VERTICAL
+        }
+        (s, d)
+            if s == v1::GridLineStyle::GridlineInset as i32
+                && d == v1::GridLineDirection::GridlineHorizontal as i32 =>
+        {
+            LEGACY_GRIDLINE_INSET_HORIZONTAL
+        }
+        (s, d)
+            if s == v1::GridLineStyle::GridlineInset as i32
+                && d == v1::GridLineDirection::GridlineVertical as i32 =>
+        {
+            LEGACY_GRIDLINE_INSET_VERTICAL
+        }
+        (s, d)
+            if s == v1::GridLineStyle::GridlineRaised as i32
+                && d == v1::GridLineDirection::GridlineHorizontal as i32 =>
+        {
+            LEGACY_GRIDLINE_RAISED_HORIZONTAL
+        }
+        (s, d)
+            if s == v1::GridLineStyle::GridlineRaised as i32
+                && d == v1::GridLineDirection::GridlineVertical as i32 =>
+        {
+            LEGACY_GRIDLINE_RAISED_VERTICAL
+        }
+        (s, _) => s,
+    }
+}
+
+fn split_grid_line_mode(mode: i32) -> (i32, i32) {
+    match mode {
+        LEGACY_GRIDLINE_SOLID_HORIZONTAL => (
+            v1::GridLineStyle::GridlineSolid as i32,
+            v1::GridLineDirection::GridlineHorizontal as i32,
+        ),
+        LEGACY_GRIDLINE_SOLID_VERTICAL => (
+            v1::GridLineStyle::GridlineSolid as i32,
+            v1::GridLineDirection::GridlineVertical as i32,
+        ),
+        LEGACY_GRIDLINE_INSET_HORIZONTAL => (
+            v1::GridLineStyle::GridlineInset as i32,
+            v1::GridLineDirection::GridlineHorizontal as i32,
+        ),
+        LEGACY_GRIDLINE_INSET_VERTICAL => (
+            v1::GridLineStyle::GridlineInset as i32,
+            v1::GridLineDirection::GridlineVertical as i32,
+        ),
+        LEGACY_GRIDLINE_RAISED_HORIZONTAL => (
+            v1::GridLineStyle::GridlineRaised as i32,
+            v1::GridLineDirection::GridlineHorizontal as i32,
+        ),
+        LEGACY_GRIDLINE_RAISED_VERTICAL => (
+            v1::GridLineStyle::GridlineRaised as i32,
+            v1::GridLineDirection::GridlineVertical as i32,
+        ),
+        mode if mode == v1::GridLineStyle::GridlineInset as i32 => (
+            v1::GridLineStyle::GridlineInset as i32,
+            v1::GridLineDirection::GridlineBoth as i32,
+        ),
+        mode if mode == v1::GridLineStyle::GridlineRaised as i32 => (
+            v1::GridLineStyle::GridlineRaised as i32,
+            v1::GridLineDirection::GridlineBoth as i32,
+        ),
+        mode if mode == v1::GridLineStyle::GridlineSolid as i32 => (
+            v1::GridLineStyle::GridlineSolid as i32,
+            v1::GridLineDirection::GridlineBoth as i32,
+        ),
+        _ => (
+            v1::GridLineStyle::GridlineNone as i32,
+            v1::GridLineDirection::GridlineBoth as i32,
+        ),
+    }
+}
+
+fn apply_grid_lines_patch(mode: &mut i32, color: &mut u32, width: &mut i32, patch: &v1::GridLines) {
+    let (mut next_style, mut next_direction) = split_grid_line_mode(*mode);
+    if let Some(v) = patch.style {
+        next_style = v;
+    }
+    if let Some(v) = patch.direction {
+        next_direction = v;
+    }
+    *mode = compose_grid_line_mode(next_style, next_direction);
+    if let Some(v) = patch.color {
+        *color = v;
+    }
+    if let Some(v) = patch.width {
+        *width = v.max(1);
+    }
+}
+
+fn grid_lines_to_v1(mode: i32, color: u32, width: i32) -> v1::GridLines {
+    let (style, direction) = split_grid_line_mode(mode);
+    v1::GridLines {
+        style: Some(style),
+        direction: Some(direction),
+        color: Some(color),
+        width: Some(width.max(1)),
+    }
+}
+
 fn apply_row_indicator_config(
     target: &mut crate::indicator::RowIndicatorState,
     cfg: &v1::RowIndicatorConfig,
@@ -50,16 +184,16 @@ fn apply_row_indicator_config(
     if let Some(v) = cfg.visible {
         target.visible = v;
     }
-    if let Some(v) = cfg.width_px {
+    if let Some(v) = cfg.width {
         target.width_px = v.max(1);
     }
     if let Some(v) = cfg.mode_bits {
         target.mode_bits = v;
     }
-    if let Some(v) = cfg.back_color {
+    if let Some(v) = cfg.background {
         target.back_color = Some(v);
     }
-    if let Some(v) = cfg.fore_color {
+    if let Some(v) = cfg.foreground {
         target.fore_color = Some(v);
     }
     if let Some(v) = cfg.grid_lines {
@@ -88,7 +222,7 @@ fn apply_row_indicator_config(
                 kind: slot
                     .kind
                     .unwrap_or(v1::RowIndicatorSlotKind::RowIndicatorSlotNone as i32),
-                width_px: slot.width_px.unwrap_or(0).max(0),
+                width_px: slot.width.unwrap_or(0).max(0),
                 visible: slot.visible.unwrap_or(true),
                 custom_key: slot.custom_key.clone().unwrap_or_default(),
                 data: slot.data.clone().unwrap_or_default(),
@@ -100,10 +234,10 @@ fn apply_row_indicator_config(
 fn row_indicator_to_proto(src: &crate::indicator::RowIndicatorState) -> v1::RowIndicatorConfig {
     v1::RowIndicatorConfig {
         visible: Some(src.visible),
-        width_px: Some(src.width_px.max(1)),
+        width: Some(src.width_px.max(1)),
         mode_bits: Some(src.mode_bits),
-        back_color: src.back_color,
-        fore_color: src.fore_color,
+        background: src.back_color,
+        foreground: src.fore_color,
         grid_lines: src.grid_lines,
         grid_color: src.grid_color,
         auto_size: Some(src.auto_size),
@@ -115,7 +249,7 @@ fn row_indicator_to_proto(src: &crate::indicator::RowIndicatorState) -> v1::RowI
             .iter()
             .map(|slot| v1::RowIndicatorSlot {
                 kind: Some(slot.kind),
-                width_px: Some(slot.width_px.max(0)),
+                width: Some(slot.width_px.max(0)),
                 visible: Some(slot.visible),
                 custom_key: Some(slot.custom_key.clone()),
                 data: Some(slot.data.clone()),
@@ -131,7 +265,7 @@ fn apply_col_indicator_config(
     if let Some(v) = cfg.visible {
         target.visible = v;
     }
-    if let Some(v) = cfg.default_row_height_px {
+    if let Some(v) = cfg.default_row_height {
         target.default_row_height_px = v.max(1);
     }
     if let Some(v) = cfg.band_rows {
@@ -140,10 +274,10 @@ fn apply_col_indicator_config(
     if let Some(v) = cfg.mode_bits {
         target.mode_bits = v;
     }
-    if let Some(v) = cfg.back_color {
+    if let Some(v) = cfg.background {
         target.back_color = Some(v);
     }
-    if let Some(v) = cfg.fore_color {
+    if let Some(v) = cfg.foreground {
         target.fore_color = Some(v);
     }
     if let Some(v) = cfg.grid_lines {
@@ -170,7 +304,7 @@ fn apply_col_indicator_config(
             .iter()
             .map(|row| ColIndicatorRowDefState {
                 index: row.index.unwrap_or(0).max(0),
-                height_px: row.height_px.unwrap_or(0).max(1),
+                height_px: row.height.unwrap_or(0).max(1),
             })
             .collect();
     }
@@ -195,11 +329,11 @@ fn apply_col_indicator_config(
 fn col_indicator_to_proto(src: &crate::indicator::ColIndicatorState) -> v1::ColIndicatorConfig {
     v1::ColIndicatorConfig {
         visible: Some(src.visible),
-        default_row_height_px: Some(src.default_row_height_px.max(1)),
+        default_row_height: Some(src.default_row_height_px.max(1)),
         band_rows: Some(src.band_rows.max(0)),
         mode_bits: Some(src.mode_bits),
-        back_color: src.back_color,
-        fore_color: src.fore_color,
+        background: src.back_color,
+        foreground: src.fore_color,
         grid_lines: src.grid_lines,
         grid_color: src.grid_color,
         auto_size: Some(src.auto_size),
@@ -211,7 +345,7 @@ fn col_indicator_to_proto(src: &crate::indicator::ColIndicatorState) -> v1::ColI
             .iter()
             .map(|row| v1::ColIndicatorRowDef {
                 index: Some(row.index.max(0)),
-                height_px: Some(row.height_px.max(1)),
+                height: Some(row.height_px.max(1)),
             })
             .collect(),
         cells: src
@@ -241,10 +375,10 @@ fn apply_corner_indicator_config(
     if let Some(v) = cfg.mode_bits {
         target.mode_bits = v;
     }
-    if let Some(v) = cfg.back_color {
+    if let Some(v) = cfg.background {
         target.back_color = Some(v);
     }
-    if let Some(v) = cfg.fore_color {
+    if let Some(v) = cfg.foreground {
         target.fore_color = Some(v);
     }
     if let Some(v) = &cfg.custom_key {
@@ -259,8 +393,8 @@ fn corner_indicator_to_proto(src: &CornerIndicatorState) -> v1::CornerIndicatorC
     v1::CornerIndicatorConfig {
         visible: Some(src.visible),
         mode_bits: Some(src.mode_bits),
-        back_color: src.back_color,
-        fore_color: src.fore_color,
+        background: src.back_color,
+        foreground: src.fore_color,
         custom_key: Some(src.custom_key.clone()),
         data: Some(src.data.clone()),
     }
@@ -296,97 +430,298 @@ fn sanitize_font_names(names: &[String]) -> Vec<String> {
         .collect()
 }
 
-fn apply_icon_text_style_patch(target: &mut style::IconTextStyle, patch: &v1::IconTextStyle) {
-    if let Some(v) = &patch.font_name {
+fn apply_grid_font_patch(target: &mut style::GridStyleState, patch: &v1::Font) {
+    if let Some(v) = &patch.family {
+        target.font_name = v.trim().to_string();
+    }
+    if !patch.families.is_empty() {
+        let names = sanitize_font_names(&patch.families);
+        target.font_name = names.into_iter().next().unwrap_or_default();
+    }
+    if let Some(v) = patch.size {
+        if v.is_finite() && v > 0.0 {
+            target.font_size = v.clamp(1.0, 256.0);
+        }
+    }
+    if let Some(v) = patch.bold {
+        target.font_bold = v;
+    }
+    if let Some(v) = patch.italic {
+        target.font_italic = v;
+    }
+    if let Some(v) = patch.underline {
+        target.font_underline = v;
+    }
+    if let Some(v) = patch.strikethrough {
+        target.font_strikethrough = v;
+    }
+    if let Some(v) = patch.width {
+        if v.is_finite() {
+            target.font_width = v;
+        }
+    }
+}
+
+fn grid_font_to_v1(target: &style::GridStyleState) -> v1::Font {
+    let family = (!target.font_name.is_empty()).then(|| target.font_name.clone());
+    let families = family.clone().into_iter().collect();
+    v1::Font {
+        family,
+        families,
+        size: Some(target.font_size),
+        bold: Some(target.font_bold),
+        italic: Some(target.font_italic),
+        underline: Some(target.font_underline),
+        strikethrough: Some(target.font_strikethrough),
+        width: Some(target.font_width),
+    }
+}
+
+fn apply_font_patch(
+    font_name: &mut Option<String>,
+    font_names: &mut Vec<String>,
+    font_size: &mut Option<f32>,
+    font_bold: &mut Option<bool>,
+    font_italic: &mut Option<bool>,
+    patch: &v1::Font,
+) {
+    if let Some(v) = &patch.family {
         let trimmed = v.trim();
         if trimmed.is_empty() {
-            target.font_name = None;
-            target.font_names.clear();
+            *font_name = None;
+            font_names.clear();
         } else {
-            target.font_name = Some(trimmed.to_string());
-            target.font_names.clear();
+            *font_name = Some(trimmed.to_string());
+            font_names.clear();
         }
     }
-    if !patch.font_names.is_empty() {
-        let names = sanitize_font_names(&patch.font_names);
-        target.font_name = names.first().cloned();
-        target.font_names = names;
+    if !patch.families.is_empty() {
+        let names = sanitize_font_names(&patch.families);
+        *font_name = names.first().cloned();
+        *font_names = names;
     }
-    if let Some(v) = patch.font_size {
+    if let Some(v) = patch.size {
+        if v.is_finite() && v > 0.0 {
+            *font_size = Some(v.clamp(1.0, 256.0));
+        } else {
+            *font_size = None;
+        }
+    }
+    if let Some(v) = patch.bold {
+        *font_bold = Some(v);
+    }
+    if let Some(v) = patch.italic {
+        *font_italic = Some(v);
+    }
+}
+
+fn font_to_v1(
+    font_name: &Option<String>,
+    font_names: &[String],
+    font_size: Option<f32>,
+    font_bold: Option<bool>,
+    font_italic: Option<bool>,
+) -> v1::Font {
+    let family = font_name.clone().or_else(|| font_names.first().cloned());
+    let families = if !font_names.is_empty() {
+        font_names.to_vec()
+    } else {
+        family.clone().into_iter().collect()
+    };
+    v1::Font {
+        family,
+        families,
+        size: font_size,
+        bold: font_bold,
+        italic: font_italic,
+        underline: None,
+        strikethrough: None,
+        width: None,
+    }
+}
+
+fn apply_cell_style_font_patch(target: &mut style::CellStylePatch, patch: &v1::Font) {
+    if let Some(v) = &patch.family {
+        let trimmed = v.trim();
+        target.font_name = if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        };
+    }
+    if !patch.families.is_empty() {
+        let names = sanitize_font_names(&patch.families);
+        target.font_name = names.first().cloned();
+    }
+    if let Some(v) = patch.size {
         if v.is_finite() && v > 0.0 {
             target.font_size = Some(v.clamp(1.0, 256.0));
-        } else {
-            target.font_size = None;
         }
     }
-    if let Some(v) = patch.font_bold {
+    if let Some(v) = patch.bold {
         target.font_bold = Some(v);
     }
-    if let Some(v) = patch.font_italic {
+    if let Some(v) = patch.italic {
         target.font_italic = Some(v);
     }
+    if let Some(v) = patch.underline {
+        target.font_underline = Some(v);
+    }
+    if let Some(v) = patch.strikethrough {
+        target.font_strikethrough = Some(v);
+    }
+    if let Some(v) = patch.width {
+        if v.is_finite() {
+            target.font_width = Some(v);
+        }
+    }
+}
+
+fn cell_style_font_to_v1(target: &style::CellStylePatch) -> Option<v1::Font> {
+    if target.font_name.is_none()
+        && target.font_size.is_none()
+        && target.font_bold.is_none()
+        && target.font_italic.is_none()
+        && target.font_underline.is_none()
+        && target.font_strikethrough.is_none()
+        && target.font_width.is_none()
+    {
+        return None;
+    }
+
+    let family = target.font_name.clone();
+    let families = family.clone().into_iter().collect();
+    Some(v1::Font {
+        family,
+        families,
+        size: target.font_size,
+        bold: target.font_bold,
+        italic: target.font_italic,
+        underline: target.font_underline,
+        strikethrough: target.font_strikethrough,
+        width: target.font_width,
+    })
+}
+
+fn apply_icon_style_patch(
+    text_style: &mut style::IconFontStyle,
+    layout: &mut style::IconLayout,
+    patch: &v1::IconStyle,
+) {
+    if let Some(font) = &patch.font {
+        apply_font_patch(
+            &mut text_style.font_name,
+            &mut text_style.font_names,
+            &mut text_style.font_size,
+            &mut text_style.font_bold,
+            &mut text_style.font_italic,
+            font,
+        );
+    }
     if let Some(v) = patch.color {
-        target.color = Some(v);
+        text_style.color = Some(v);
     }
-}
-
-fn icon_text_style_to_v1(style: &style::IconTextStyle) -> v1::IconTextStyle {
-    let font_name = style
-        .font_name
-        .clone()
-        .or_else(|| style.font_names.first().cloned());
-    v1::IconTextStyle {
-        font_name,
-        font_names: style.font_names.clone(),
-        font_size: style.font_size,
-        font_bold: style.font_bold,
-        font_italic: style.font_italic,
-        color: style.color,
-    }
-}
-
-fn apply_icon_layout_patch(target: &mut style::IconLayoutStyle, patch: &v1::IconLayoutStyle) {
     if let Some(v) = patch.align {
-        target.align = normalize_icon_align(v);
+        layout.align = normalize_icon_align(v);
     }
-    if let Some(v) = patch.gap_px {
-        target.gap_px = v.max(0);
+    if let Some(v) = patch.gap {
+        layout.gap_px = v.max(0);
     }
 }
 
-fn icon_layout_to_v1(layout: style::IconLayoutStyle) -> v1::IconLayoutStyle {
-    v1::IconLayoutStyle {
+fn icon_style_to_v1(text_style: &style::IconFontStyle, layout: style::IconLayout) -> v1::IconStyle {
+    v1::IconStyle {
+        font: Some(font_to_v1(
+            &text_style.font_name,
+            &text_style.font_names,
+            text_style.font_size,
+            text_style.font_bold,
+            text_style.font_italic,
+        )),
+        color: text_style.color,
         align: Some(normalize_icon_align(layout.align)),
-        gap_px: Some(layout.gap_px.max(0)),
+        gap: Some(layout.gap_px.max(0)),
     }
 }
 
 fn apply_icon_slot_style_patch(
-    target: &mut Option<style::IconThemeSlotStyle>,
-    patch: &Option<v1::IconThemeSlotStyle>,
-    default_layout: style::IconLayoutStyle,
+    target: &mut Option<style::IconSlotStyle>,
+    patch: &Option<v1::IconStyle>,
+    default_layout: style::IconLayout,
 ) {
     let Some(patch) = patch else {
         return;
     };
-    let slot = target.get_or_insert_with(style::IconThemeSlotStyle::default);
-    if let Some(text_style) = &patch.text_style {
-        apply_icon_text_style_patch(&mut slot.text_style, text_style);
-    }
-    if let Some(layout_patch) = &patch.layout {
-        let mut layout = slot.layout.unwrap_or(default_layout);
-        apply_icon_layout_patch(&mut layout, layout_patch);
-        slot.layout = Some(layout);
-    }
+    let slot = target.get_or_insert_with(style::IconSlotStyle::default);
+    let mut layout = slot.layout.unwrap_or(default_layout);
+    apply_icon_style_patch(&mut slot.text_style, &mut layout, patch);
+    slot.layout = Some(layout);
 }
 
 fn icon_slot_style_to_v1(
-    slot: &Option<style::IconThemeSlotStyle>,
-) -> Option<v1::IconThemeSlotStyle> {
-    slot.as_ref().map(|s| v1::IconThemeSlotStyle {
-        text_style: Some(icon_text_style_to_v1(&s.text_style)),
-        layout: s.layout.map(icon_layout_to_v1),
-    })
+    slot: &Option<style::IconSlotStyle>,
+    default_layout: style::IconLayout,
+) -> Option<v1::IconStyle> {
+    slot.as_ref()
+        .map(|s| icon_style_to_v1(&s.text_style, s.layout.unwrap_or(default_layout)))
+}
+
+fn decode_resize_policy(mode: i32) -> (bool, bool, bool) {
+    match mode {
+        1 => (true, false, false),
+        2 => (false, true, false),
+        3 => (true, true, false),
+        4 => (true, false, true),
+        5 => (false, true, true),
+        6 => (true, true, true),
+        _ => (false, false, false),
+    }
+}
+
+fn encode_resize_policy(columns: bool, rows: bool, uniform: bool) -> i32 {
+    match (columns, rows, uniform) {
+        (true, false, false) => 1,
+        (false, true, false) => 2,
+        (true, true, false) => 3,
+        (true, false, true) => 4,
+        (false, true, true) => 5,
+        (true, true, true) => 6,
+        _ => 0,
+    }
+}
+
+fn decode_freeze_policy(mode: i32) -> (bool, bool) {
+    match mode {
+        1 => (true, false),
+        2 => (false, true),
+        3 => (true, true),
+        _ => (false, false),
+    }
+}
+
+fn encode_freeze_policy(columns: bool, rows: bool) -> i32 {
+    match (columns, rows) {
+        (true, false) => 1,
+        (false, true) => 2,
+        (true, true) => 3,
+        _ => 0,
+    }
+}
+
+fn apply_header_feature_bit(bits: &mut i32, mask: i32, value: Option<bool>) {
+    match value {
+        Some(true) => *bits |= mask,
+        Some(false) => *bits &= !mask,
+        None => {}
+    }
+}
+
+fn image_bytes_to_proto(data: Option<&[u8]>, format: &str) -> Option<v1::ImageData> {
+    data.filter(|bytes| !bytes.is_empty())
+        .map(|bytes| v1::ImageData {
+            data: bytes.to_vec(),
+            format: format.to_string(),
+        })
 }
 
 fn v1_header_mark_to_engine(
@@ -470,16 +805,16 @@ fn normalize_column_data_type(data_type: i32) -> i32 {
 
 fn effective_coercion_mode(mode: i32) -> EffectiveCoercionMode {
     match mode {
-        v if v == v1::CoercionMode::Strict as i32 => EffectiveCoercionMode::Strict,
-        v if v == v1::CoercionMode::ParseOnly as i32 => EffectiveCoercionMode::ParseOnly,
+        v if v == v1::CoercionMode::CoercionStrict as i32 => EffectiveCoercionMode::Strict,
+        v if v == v1::CoercionMode::CoercionParseOnly as i32 => EffectiveCoercionMode::ParseOnly,
         _ => EffectiveCoercionMode::Flexible,
     }
 }
 
 fn effective_error_mode(mode: i32) -> EffectiveWriteErrorMode {
     match mode {
-        v if v == v1::WriteErrorMode::SetNull as i32 => EffectiveWriteErrorMode::SetNull,
-        v if v == v1::WriteErrorMode::Skip as i32 => EffectiveWriteErrorMode::Skip,
+        v if v == v1::WriteErrorMode::WriteErrorSetNull as i32 => EffectiveWriteErrorMode::SetNull,
+        v if v == v1::WriteErrorMode::WriteErrorSkip as i32 => EffectiveWriteErrorMode::Skip,
         _ => EffectiveWriteErrorMode::Reject,
     }
 }
@@ -610,7 +945,7 @@ impl VolvoxGrid {
         if let Some(rc) = &config.rendering {
             self.apply_render_config(rc);
         }
-        if let Some(ic) = &config.indicator_bands {
+        if let Some(ic) = &config.indicators {
             self.apply_indicator_bands_config(ic);
         }
     }
@@ -627,7 +962,7 @@ impl VolvoxGrid {
             span: Some(self.get_span_config()),
             interaction: Some(self.get_interaction_config()),
             rendering: Some(self.get_render_config()),
-            indicator_bands: Some(self.get_indicator_bands_config()),
+            indicators: Some(self.get_indicator_bands_config()),
             version: Self::version().to_string(),
         }
     }
@@ -675,32 +1010,20 @@ impl VolvoxGrid {
             self.extend_last_col = elc;
             self.layout.invalidate();
         }
-        if let Some(fs) = &lc.format_string {
-            self.format_string = fs.clone();
-        }
-        if let Some(ww) = lc.word_wrap {
-            self.word_wrap = ww;
-        }
-        if let Some(e) = lc.ellipsis {
-            self.ellipsis_mode = e;
-        }
-        if let Some(to) = lc.text_overflow {
-            self.text_overflow = to;
-        }
         self.mark_dirty();
     }
 
-    fn apply_indicator_bands_config(&mut self, bands: &v1::IndicatorBandsConfig) {
-        if let Some(cfg) = &bands.row_indicator_start {
+    fn apply_indicator_bands_config(&mut self, bands: &v1::IndicatorsConfig) {
+        if let Some(cfg) = &bands.row_start {
             apply_row_indicator_config(&mut self.indicator_bands.row_start, cfg);
         }
-        if let Some(cfg) = &bands.row_indicator_end {
+        if let Some(cfg) = &bands.row_end {
             apply_row_indicator_config(&mut self.indicator_bands.row_end, cfg);
         }
-        if let Some(cfg) = &bands.col_indicator_top {
+        if let Some(cfg) = &bands.col_top {
             apply_col_indicator_config(&mut self.indicator_bands.col_top, cfg);
         }
-        if let Some(cfg) = &bands.col_indicator_bottom {
+        if let Some(cfg) = &bands.col_bottom {
             apply_col_indicator_config(&mut self.indicator_bands.col_bottom, cfg);
         }
         if let Some(cfg) = &bands.corner_top_start {
@@ -719,282 +1042,328 @@ impl VolvoxGrid {
     }
 
     fn apply_style_config(&mut self, sc: &v1::StyleConfig) {
-        if let Some(v) = sc.appearance {
-            self.style.appearance = v;
-        }
-        if let Some(v) = sc.back_color {
+        if let Some(v) = sc.background {
             self.style.back_color = v;
         }
-        if let Some(v) = sc.fore_color {
+        if let Some(v) = sc.foreground {
             self.style.fore_color = v;
         }
-        if let Some(v) = sc.back_color_fixed {
-            self.style.back_color_fixed = v;
-        }
-        if let Some(v) = sc.fore_color_fixed {
-            self.style.fore_color_fixed = v;
-        }
-        if let Some(v) = sc.back_color_frozen {
-            self.style.back_color_frozen = v;
-        }
-        if let Some(v) = sc.fore_color_frozen {
-            self.style.fore_color_frozen = v;
-        }
-        if let Some(v) = sc.back_color_bkg {
-            self.style.back_color_bkg = v;
-        }
-        if let Some(v) = sc.back_color_alternate {
+        if let Some(v) = sc.alternate_background {
             self.style.back_color_alternate = v;
         }
-        if let Some(v) = sc.grid_lines {
-            self.style.grid_lines = v;
-        }
-        if let Some(v) = sc.grid_lines_fixed {
-            self.style.grid_lines_fixed = v;
-        }
-        if let Some(v) = sc.grid_color {
-            self.style.grid_color = v;
-        }
-        if let Some(v) = sc.grid_color_fixed {
-            self.style.grid_color_fixed = v;
-        }
-        if let Some(v) = sc.grid_line_width {
-            self.style.grid_line_width = v;
-        }
-        if let Some(v) = sc.text_effect {
-            self.style.text_effect = v;
-        }
-        if let Some(v) = sc.text_effect_fixed {
-            self.style.text_effect_fixed = v;
-        }
-        if let Some(v) = &sc.font_name {
-            self.style.font_name = v.clone();
-        }
-        if let Some(v) = sc.font_size {
-            self.style.font_size = v;
-        }
-        if let Some(v) = sc.font_bold {
-            self.style.font_bold = v;
-        }
-        if let Some(v) = sc.font_italic {
-            self.style.font_italic = v;
-        }
-        if let Some(v) = sc.font_underline {
-            self.style.font_underline = v;
-        }
-        if let Some(v) = sc.font_strikethrough {
-            self.style.font_strikethrough = v;
-        }
-        if let Some(v) = sc.font_width {
-            self.style.font_width = v;
-        }
-        if let Some(v) = sc.sheet_border {
-            self.style.sheet_border = v;
-        }
-        if let Some(v) = sc.progress_color {
-            self.style.progress_color = v;
-        }
-        if let Some(v) = sc.image_over_text {
-            self.style.image_over_text = v;
-        }
-        if let Some(v) = &sc.background_image {
-            self.style.background_image = v.clone();
-        }
-        if let Some(v) = sc.background_image_alignment {
-            self.style.background_image_alignment = v;
-        }
-        if let Some(v) = sc.text_render_mode {
-            self.style.text_render_mode = v;
-        }
-        if let Some(v) = sc.text_hinting_mode {
-            self.style.text_hinting_mode = v;
-        }
-        if let Some(v) = sc.text_pixel_snap {
-            self.style.text_pixel_snap = v;
+        if let Some(v) = &sc.font {
+            apply_grid_font_patch(&mut self.style, v);
         }
         if let Some(v) = &sc.cell_padding {
             self.style.cell_padding = apply_padding_patch(self.style.cell_padding, v);
         }
-        if let Some(v) = &sc.fixed_cell_padding {
-            self.style.fixed_cell_padding = apply_padding_patch(self.style.fixed_cell_padding, v);
+        if let Some(v) = sc.text_effect {
+            self.style.text_effect = v;
         }
-        if let Some(v) = &sc.header_separator {
-            if let Some(enabled) = v.enabled {
-                self.style.header_separator.enabled = enabled;
-            }
-            if let Some(color) = v.color {
-                self.style.header_separator.color = color;
-            }
-            if let Some(width_px) = v.width_px {
-                self.style.header_separator.width_px = width_px.max(1);
-            }
-            if let Some(height) = &v.height {
-                self.style.header_separator.height =
-                    v1_header_mark_to_engine(height, self.style.header_separator.height);
-            }
-            if let Some(skip_merged) = v.skip_merged {
-                self.style.header_separator.skip_merged = skip_merged;
-            }
+        if let Some(v) = sc.progress_color {
+            self.style.progress_color = v;
         }
-        if let Some(v) = &sc.header_resize_handle {
-            if let Some(enabled) = v.enabled {
-                self.style.header_resize_handle.enabled = enabled;
-            }
-            if let Some(color) = v.color {
-                self.style.header_resize_handle.color = color;
-            }
-            if let Some(width_px) = v.width_px {
-                self.style.header_resize_handle.width_px = width_px.max(1);
-            }
-            if let Some(height) = &v.height {
-                self.style.header_resize_handle.height =
-                    v1_header_mark_to_engine(height, self.style.header_resize_handle.height);
-            }
-            if let Some(hit_width_px) = v.hit_width_px {
-                self.style.header_resize_handle.hit_width_px = hit_width_px.max(1);
-            }
-            if let Some(show_only_when_resizable) = v.show_only_when_resizable {
-                self.style.header_resize_handle.show_only_when_resizable = show_only_when_resizable;
-            }
-        }
-        if let Some(v) = &sc.icon_theme_slots {
-            apply_icon_slot_patch(
-                &mut self.style.icon_theme_slots.sort_ascending,
-                &v.sort_ascending,
-            );
-            apply_icon_slot_patch(
-                &mut self.style.icon_theme_slots.sort_descending,
-                &v.sort_descending,
-            );
-            apply_icon_slot_patch(&mut self.style.icon_theme_slots.sort_none, &v.sort_none);
-            apply_icon_slot_patch(
-                &mut self.style.icon_theme_slots.tree_expanded,
-                &v.tree_expanded,
-            );
-            apply_icon_slot_patch(
-                &mut self.style.icon_theme_slots.tree_collapsed,
-                &v.tree_collapsed,
-            );
-            apply_icon_slot_patch(&mut self.style.icon_theme_slots.menu, &v.menu);
-            apply_icon_slot_patch(&mut self.style.icon_theme_slots.filter, &v.filter);
-            apply_icon_slot_patch(
-                &mut self.style.icon_theme_slots.filter_active,
-                &v.filter_active,
-            );
-            apply_icon_slot_patch(&mut self.style.icon_theme_slots.columns, &v.columns);
-            apply_icon_slot_patch(&mut self.style.icon_theme_slots.drag_handle, &v.drag_handle);
-            apply_icon_slot_patch(
-                &mut self.style.icon_theme_slots.checkbox_checked,
-                &v.checkbox_checked,
-            );
-            apply_icon_slot_patch(
-                &mut self.style.icon_theme_slots.checkbox_unchecked,
-                &v.checkbox_unchecked,
-            );
-            apply_icon_slot_patch(
-                &mut self.style.icon_theme_slots.checkbox_indeterminate,
-                &v.checkbox_indeterminate,
+        if let Some(v) = &sc.grid_lines {
+            apply_grid_lines_patch(
+                &mut self.style.grid_lines,
+                &mut self.style.grid_color,
+                &mut self.style.grid_line_width,
+                v,
             );
         }
-        if let Some(v) = &sc.icon_theme_defaults {
-            if let Some(text_style) = &v.text_style {
-                apply_icon_text_style_patch(
-                    &mut self.style.icon_theme_defaults.text_style,
-                    text_style,
+        if let Some(v) = &sc.fixed {
+            if let Some(value) = v.background {
+                self.style.back_color_fixed = value;
+            }
+            if let Some(value) = v.foreground {
+                self.style.fore_color_fixed = value;
+            }
+            if let Some(value) = v.text_effect {
+                self.style.text_effect_fixed = value;
+            }
+            if let Some(value) = &v.grid_lines {
+                apply_grid_lines_patch(
+                    &mut self.style.grid_lines_fixed,
+                    &mut self.style.grid_color_fixed,
+                    &mut self.style.grid_line_width,
+                    value,
                 );
             }
-            if let Some(layout) = &v.layout {
-                apply_icon_layout_patch(&mut self.style.icon_theme_defaults.layout, layout);
+            if let Some(value) = &v.cell_padding {
+                self.style.fixed_cell_padding =
+                    apply_padding_patch(self.style.fixed_cell_padding, value);
             }
         }
-        if let Some(v) = &sc.icon_theme_slot_styles {
-            let default_layout = self.style.icon_theme_defaults.layout;
-            apply_icon_slot_style_patch(
-                &mut self.style.icon_theme_slot_styles.sort_ascending,
-                &v.sort_ascending,
-                default_layout,
-            );
-            apply_icon_slot_style_patch(
-                &mut self.style.icon_theme_slot_styles.sort_descending,
-                &v.sort_descending,
-                default_layout,
-            );
-            apply_icon_slot_style_patch(
-                &mut self.style.icon_theme_slot_styles.sort_none,
-                &v.sort_none,
-                default_layout,
-            );
-            apply_icon_slot_style_patch(
-                &mut self.style.icon_theme_slot_styles.tree_expanded,
-                &v.tree_expanded,
-                default_layout,
-            );
-            apply_icon_slot_style_patch(
-                &mut self.style.icon_theme_slot_styles.tree_collapsed,
-                &v.tree_collapsed,
-                default_layout,
-            );
-            apply_icon_slot_style_patch(
-                &mut self.style.icon_theme_slot_styles.menu,
-                &v.menu,
-                default_layout,
-            );
-            apply_icon_slot_style_patch(
-                &mut self.style.icon_theme_slot_styles.filter,
-                &v.filter,
-                default_layout,
-            );
-            apply_icon_slot_style_patch(
-                &mut self.style.icon_theme_slot_styles.filter_active,
-                &v.filter_active,
-                default_layout,
-            );
-            apply_icon_slot_style_patch(
-                &mut self.style.icon_theme_slot_styles.columns,
-                &v.columns,
-                default_layout,
-            );
-            apply_icon_slot_style_patch(
-                &mut self.style.icon_theme_slot_styles.drag_handle,
-                &v.drag_handle,
-                default_layout,
-            );
-            apply_icon_slot_style_patch(
-                &mut self.style.icon_theme_slot_styles.checkbox_checked,
-                &v.checkbox_checked,
-                default_layout,
-            );
-            apply_icon_slot_style_patch(
-                &mut self.style.icon_theme_slot_styles.checkbox_unchecked,
-                &v.checkbox_unchecked,
-                default_layout,
-            );
-            apply_icon_slot_style_patch(
-                &mut self.style.icon_theme_slot_styles.checkbox_indeterminate,
-                &v.checkbox_indeterminate,
-                default_layout,
-            );
+        if let Some(v) = &sc.frozen {
+            if let Some(value) = v.background {
+                self.style.back_color_frozen = value;
+            }
+            if let Some(value) = v.foreground {
+                self.style.fore_color_frozen = value;
+            }
+            if sc
+                .fixed
+                .as_ref()
+                .and_then(|region| region.text_effect)
+                .is_none()
+            {
+                if let Some(value) = v.text_effect {
+                    self.style.text_effect_fixed = value;
+                }
+            }
+            if sc
+                .fixed
+                .as_ref()
+                .and_then(|region| region.grid_lines.as_ref())
+                .is_none()
+            {
+                if let Some(value) = &v.grid_lines {
+                    apply_grid_lines_patch(
+                        &mut self.style.grid_lines_fixed,
+                        &mut self.style.grid_color_fixed,
+                        &mut self.style.grid_line_width,
+                        value,
+                    );
+                }
+            }
+            if sc
+                .fixed
+                .as_ref()
+                .and_then(|region| region.cell_padding.as_ref())
+                .is_none()
+            {
+                if let Some(value) = &v.cell_padding {
+                    self.style.fixed_cell_padding =
+                        apply_padding_patch(self.style.fixed_cell_padding, value);
+                }
+            }
         }
-        if let Some(img) = &sc.checkbox_checked_picture {
-            self.style.checkbox_checked_picture = if img.data.is_empty() {
-                None
-            } else {
-                Some(img.data.clone())
-            };
+        if let Some(v) = sc.sheet_background {
+            self.style.back_color_bkg = v;
         }
-        if let Some(img) = &sc.checkbox_unchecked_picture {
-            self.style.checkbox_unchecked_picture = if img.data.is_empty() {
-                None
-            } else {
-                Some(img.data.clone())
-            };
+        if let Some(v) = sc.sheet_border {
+            self.style.sheet_border = v;
         }
-        if let Some(img) = &sc.checkbox_indeterminate_picture {
-            self.style.checkbox_indeterminate_picture = if img.data.is_empty() {
-                None
-            } else {
-                Some(img.data.clone())
-            };
+        if let Some(v) = sc.appearance {
+            self.style.appearance = v;
+        }
+        if let Some(v) = &sc.background_image {
+            self.style.background_image = v.clone();
+        }
+        if let Some(v) = sc.background_image_align {
+            self.style.background_image_alignment = v;
+        }
+        if let Some(v) = &sc.text_rendering {
+            if let Some(mode) = v.mode {
+                self.style.text_render_mode = mode;
+            }
+            if let Some(hinting) = v.hinting {
+                self.style.text_hinting_mode = hinting;
+            }
+            if let Some(pixel_snap) = v.pixel_snap {
+                self.style.text_pixel_snap = pixel_snap;
+            }
+        }
+        if let Some(v) = &sc.header {
+            if let Some(separator) = &v.separator {
+                if let Some(enabled) = separator.enabled {
+                    self.style.header_separator.enabled = enabled;
+                }
+                if let Some(color) = separator.color {
+                    self.style.header_separator.color = color;
+                }
+                if let Some(width) = separator.width {
+                    self.style.header_separator.width_px = width.max(1);
+                }
+                if let Some(height) = &separator.height {
+                    self.style.header_separator.height =
+                        v1_header_mark_to_engine(height, self.style.header_separator.height);
+                }
+                if let Some(skip_merged) = separator.skip_merged {
+                    self.style.header_separator.skip_merged = skip_merged;
+                }
+            }
+            if let Some(handle) = &v.resize_handle {
+                if let Some(enabled) = handle.enabled {
+                    self.style.header_resize_handle.enabled = enabled;
+                }
+                if let Some(color) = handle.color {
+                    self.style.header_resize_handle.color = color;
+                }
+                if let Some(width) = handle.width {
+                    self.style.header_resize_handle.width_px = width.max(1);
+                }
+                if let Some(height) = &handle.height {
+                    self.style.header_resize_handle.height =
+                        v1_header_mark_to_engine(height, self.style.header_resize_handle.height);
+                }
+                if let Some(hit_width) = handle.hit_width {
+                    self.style.header_resize_handle.hit_width_px = hit_width.max(1);
+                }
+                if let Some(show_only_when_resizable) = handle.show_only_when_resizable {
+                    self.style.header_resize_handle.show_only_when_resizable =
+                        show_only_when_resizable;
+                }
+            }
+        }
+        if let Some(v) = &sc.icons {
+            if let Some(slots) = &v.slots {
+                apply_icon_slot_patch(
+                    &mut self.style.icon_theme_slots.sort_ascending,
+                    &slots.sort_ascending,
+                );
+                apply_icon_slot_patch(
+                    &mut self.style.icon_theme_slots.sort_descending,
+                    &slots.sort_descending,
+                );
+                apply_icon_slot_patch(&mut self.style.icon_theme_slots.sort_none, &slots.sort_none);
+                apply_icon_slot_patch(
+                    &mut self.style.icon_theme_slots.tree_expanded,
+                    &slots.tree_expanded,
+                );
+                apply_icon_slot_patch(
+                    &mut self.style.icon_theme_slots.tree_collapsed,
+                    &slots.tree_collapsed,
+                );
+                apply_icon_slot_patch(&mut self.style.icon_theme_slots.menu, &slots.menu);
+                apply_icon_slot_patch(&mut self.style.icon_theme_slots.filter, &slots.filter);
+                apply_icon_slot_patch(
+                    &mut self.style.icon_theme_slots.filter_active,
+                    &slots.filter_active,
+                );
+                apply_icon_slot_patch(&mut self.style.icon_theme_slots.columns, &slots.columns);
+                apply_icon_slot_patch(
+                    &mut self.style.icon_theme_slots.drag_handle,
+                    &slots.drag_handle,
+                );
+                apply_icon_slot_patch(
+                    &mut self.style.icon_theme_slots.checkbox_checked,
+                    &slots.checkbox_checked,
+                );
+                apply_icon_slot_patch(
+                    &mut self.style.icon_theme_slots.checkbox_unchecked,
+                    &slots.checkbox_unchecked,
+                );
+                apply_icon_slot_patch(
+                    &mut self.style.icon_theme_slots.checkbox_indeterminate,
+                    &slots.checkbox_indeterminate,
+                );
+            }
+            if let Some(defaults) = &v.defaults {
+                apply_icon_style_patch(
+                    &mut self.style.icon_theme_defaults.text_style,
+                    &mut self.style.icon_theme_defaults.layout,
+                    defaults,
+                );
+            }
+            if let Some(overrides) = &v.overrides {
+                let default_layout = self.style.icon_theme_defaults.layout;
+                apply_icon_slot_style_patch(
+                    &mut self.style.icon_theme_slot_styles.sort_ascending,
+                    &overrides.sort_ascending,
+                    default_layout,
+                );
+                apply_icon_slot_style_patch(
+                    &mut self.style.icon_theme_slot_styles.sort_descending,
+                    &overrides.sort_descending,
+                    default_layout,
+                );
+                apply_icon_slot_style_patch(
+                    &mut self.style.icon_theme_slot_styles.sort_none,
+                    &overrides.sort_none,
+                    default_layout,
+                );
+                apply_icon_slot_style_patch(
+                    &mut self.style.icon_theme_slot_styles.tree_expanded,
+                    &overrides.tree_expanded,
+                    default_layout,
+                );
+                apply_icon_slot_style_patch(
+                    &mut self.style.icon_theme_slot_styles.tree_collapsed,
+                    &overrides.tree_collapsed,
+                    default_layout,
+                );
+                apply_icon_slot_style_patch(
+                    &mut self.style.icon_theme_slot_styles.menu,
+                    &overrides.menu,
+                    default_layout,
+                );
+                apply_icon_slot_style_patch(
+                    &mut self.style.icon_theme_slot_styles.filter,
+                    &overrides.filter,
+                    default_layout,
+                );
+                apply_icon_slot_style_patch(
+                    &mut self.style.icon_theme_slot_styles.filter_active,
+                    &overrides.filter_active,
+                    default_layout,
+                );
+                apply_icon_slot_style_patch(
+                    &mut self.style.icon_theme_slot_styles.columns,
+                    &overrides.columns,
+                    default_layout,
+                );
+                apply_icon_slot_style_patch(
+                    &mut self.style.icon_theme_slot_styles.drag_handle,
+                    &overrides.drag_handle,
+                    default_layout,
+                );
+                apply_icon_slot_style_patch(
+                    &mut self.style.icon_theme_slot_styles.checkbox_checked,
+                    &overrides.checkbox_checked,
+                    default_layout,
+                );
+                apply_icon_slot_style_patch(
+                    &mut self.style.icon_theme_slot_styles.checkbox_unchecked,
+                    &overrides.checkbox_unchecked,
+                    default_layout,
+                );
+                apply_icon_slot_style_patch(
+                    &mut self.style.icon_theme_slot_styles.checkbox_indeterminate,
+                    &overrides.checkbox_indeterminate,
+                    default_layout,
+                );
+            }
+            if let Some(pictures) = &v.pictures {
+                self.sort_state.sort_ascending_picture = pictures
+                    .sort_ascending
+                    .as_ref()
+                    .filter(|img| !img.data.is_empty())
+                    .map(|img| img.data.clone());
+                self.sort_state.sort_descending_picture = pictures
+                    .sort_descending
+                    .as_ref()
+                    .filter(|img| !img.data.is_empty())
+                    .map(|img| img.data.clone());
+                self.outline.node_open_picture = pictures
+                    .node_open
+                    .as_ref()
+                    .filter(|img| !img.data.is_empty())
+                    .map(|img| img.data.clone());
+                self.outline.node_closed_picture = pictures
+                    .node_closed
+                    .as_ref()
+                    .filter(|img| !img.data.is_empty())
+                    .map(|img| img.data.clone());
+                self.style.checkbox_checked_picture = pictures
+                    .checkbox_checked
+                    .as_ref()
+                    .filter(|img| !img.data.is_empty())
+                    .map(|img| img.data.clone());
+                self.style.checkbox_unchecked_picture = pictures
+                    .checkbox_unchecked
+                    .as_ref()
+                    .filter(|img| !img.data.is_empty())
+                    .map(|img| img.data.clone());
+                self.style.checkbox_indeterminate_picture = pictures
+                    .checkbox_indeterminate
+                    .as_ref()
+                    .filter(|img| !img.data.is_empty())
+                    .map(|img| img.data.clone());
+            }
+        }
+        if let Some(v) = sc.image_over_text {
+            self.style.image_over_text = v;
         }
         if let Some(v) = sc.show_sort_numbers {
             self.style.show_sort_numbers = v;
@@ -1005,35 +1374,17 @@ impl VolvoxGrid {
         if let Some(v) = sc.custom_render {
             self.custom_render = v;
         }
-        // Sort pictures live on SortState
-        if let Some(img) = &sc.sort_ascending_picture {
-            self.sort_state.sort_ascending_picture = if img.data.is_empty() {
-                None
-            } else {
-                Some(img.data.clone())
-            };
+        if let Some(v) = &sc.format {
+            self.format_string = v.clone();
         }
-        if let Some(img) = &sc.sort_descending_picture {
-            self.sort_state.sort_descending_picture = if img.data.is_empty() {
-                None
-            } else {
-                Some(img.data.clone())
-            };
+        if let Some(v) = sc.word_wrap {
+            self.word_wrap = v;
         }
-        // Node pictures live on OutlineState
-        if let Some(img) = &sc.node_open_picture {
-            self.outline.node_open_picture = if img.data.is_empty() {
-                None
-            } else {
-                Some(img.data.clone())
-            };
+        if let Some(v) = sc.ellipsis {
+            self.ellipsis_mode = v;
         }
-        if let Some(img) = &sc.node_closed_picture {
-            self.outline.node_closed_picture = if img.data.is_empty() {
-                None
-            } else {
-                Some(img.data.clone())
-            };
+        if let Some(v) = sc.text_overflow {
+            self.text_overflow = v;
         }
         self.mark_dirty();
     }
@@ -1045,35 +1396,59 @@ impl VolvoxGrid {
         if let Some(v) = sel.focus_border {
             self.selection.focus_border = v;
         }
-        if let Some(v) = sel.selection_visibility {
+        if let Some(v) = sel.visibility {
             self.selection.selection_visibility = v;
         }
-        if let Some(v) = sel.allow_selection {
+        if let Some(v) = sel.allow {
             self.allow_selection = v;
+            self.selection.allow_selection = v;
         }
         if let Some(v) = sel.header_click_select {
             self.header_click_select = v;
+            self.selection.header_click_select = v;
         }
-        if let Some(v) = &sel.selection_style {
+        if let Some(v) = &sel.style {
             apply_highlight_style_patch(&mut self.selection.selection_style, v);
         }
-        if let Some(v) = sel.hover_mode {
-            self.selection.hover_mode = v;
+        if let Some(v) = &sel.hover {
+            let mut hover_mode = self.selection.hover_mode;
+            apply_hover_flag(&mut hover_mode, HOVER_ROW, v.row);
+            apply_hover_flag(&mut hover_mode, HOVER_COLUMN, v.column);
+            apply_hover_flag(&mut hover_mode, HOVER_CELL, v.cell);
+            self.selection.hover_mode = hover_mode;
+            if let Some(style) = &v.row_style {
+                apply_highlight_style_patch(&mut self.selection.hover_row_style, style);
+            }
+            if let Some(style) = &v.column_style {
+                apply_highlight_style_patch(&mut self.selection.hover_column_style, style);
+            }
+            if let Some(style) = &v.cell_style {
+                apply_highlight_style_patch(&mut self.selection.hover_cell_style, style);
+            }
         }
-        if let Some(v) = &sel.hover_row_style {
-            apply_highlight_style_patch(&mut self.selection.hover_row_style, v);
+        if let Some(v) = &sel.indicator_row_style {
+            let mut style = self
+                .selection
+                .indicator_row_style
+                .clone()
+                .unwrap_or_default();
+            apply_highlight_style_patch(&mut style, v);
+            self.selection.indicator_row_style = Some(style);
         }
-        if let Some(v) = &sel.hover_column_style {
-            apply_highlight_style_patch(&mut self.selection.hover_column_style, v);
-        }
-        if let Some(v) = &sel.hover_cell_style {
-            apply_highlight_style_patch(&mut self.selection.hover_cell_style, v);
+        if let Some(v) = &sel.indicator_col_style {
+            let mut style = self
+                .selection
+                .indicator_col_style
+                .clone()
+                .unwrap_or_default();
+            apply_highlight_style_patch(&mut style, v);
+            self.selection.indicator_col_style = Some(style);
         }
         self.mark_dirty();
     }
 
     fn apply_edit_config(&mut self, ec: &v1::EditConfig) {
-        if let Some(v) = ec.edit_trigger {
+        if let Some(v) = ec.trigger {
             self.edit_trigger_mode = v;
         }
         if let Some(v) = ec.tab_behavior {
@@ -1085,10 +1460,10 @@ impl VolvoxGrid {
         if let Some(v) = ec.dropdown_search {
             self.dropdown_search = v;
         }
-        if let Some(v) = ec.edit_max_length {
+        if let Some(v) = ec.max_length {
             self.edit_max_length = v;
         }
-        if let Some(v) = &ec.edit_mask {
+        if let Some(v) = &ec.mask {
             self.edit_mask = v.clone();
         }
         if let Some(v) = ec.host_key_dispatch {
@@ -1169,11 +1544,29 @@ impl VolvoxGrid {
     }
 
     fn apply_interaction_config(&mut self, ic: &v1::InteractionConfig) {
-        if let Some(v) = ic.allow_user_resizing {
-            self.allow_user_resizing = v;
+        if let Some(v) = &ic.resize {
+            let (mut columns, mut rows, mut uniform) =
+                decode_resize_policy(self.allow_user_resizing);
+            if let Some(value) = v.columns {
+                columns = value;
+            }
+            if let Some(value) = v.rows {
+                rows = value;
+            }
+            if let Some(value) = v.uniform {
+                uniform = value;
+            }
+            self.allow_user_resizing = encode_resize_policy(columns, rows, uniform);
         }
-        if let Some(v) = ic.allow_user_freezing {
-            self.allow_user_freezing = v;
+        if let Some(v) = &ic.freeze {
+            let (mut columns, mut rows) = decode_freeze_policy(self.allow_user_freezing);
+            if let Some(value) = v.columns {
+                columns = value;
+            }
+            if let Some(value) = v.rows {
+                rows = value;
+            }
+            self.allow_user_freezing = encode_freeze_policy(columns, rows);
         }
         if let Some(v) = ic.type_ahead {
             self.type_ahead_mode = v;
@@ -1196,8 +1589,12 @@ impl VolvoxGrid {
         if let Some(v) = ic.drop_mode {
             self.drag.drop_mode = v;
         }
-        if let Some(v) = ic.header_features {
-            self.header_features = v;
+        if let Some(v) = &ic.header_features {
+            let mut bits = self.header_features;
+            apply_header_feature_bit(&mut bits, 1, v.sort);
+            apply_header_feature_bit(&mut bits, 2, v.reorder);
+            apply_header_feature_bit(&mut bits, 4, v.chooser);
+            self.header_features = bits;
         }
         self.mark_dirty();
     }
@@ -1240,172 +1637,194 @@ impl VolvoxGrid {
             default_col_width: Some(self.default_col_width),
             right_to_left: Some(self.right_to_left),
             extend_last_col: Some(self.extend_last_col),
-            format_string: Some(self.format_string.clone()),
-            word_wrap: Some(self.word_wrap),
-            ellipsis: Some(self.ellipsis_mode),
-            text_overflow: Some(self.text_overflow),
         }
     }
 
     fn get_style_config(&self) -> v1::StyleConfig {
         v1::StyleConfig {
-            appearance: Some(self.style.appearance),
-            back_color: Some(self.style.back_color),
-            fore_color: Some(self.style.fore_color),
-            back_color_fixed: Some(self.style.back_color_fixed),
-            fore_color_fixed: Some(self.style.fore_color_fixed),
-            back_color_frozen: Some(self.style.back_color_frozen),
-            fore_color_frozen: Some(self.style.fore_color_frozen),
-            back_color_bkg: Some(self.style.back_color_bkg),
-            back_color_alternate: Some(self.style.back_color_alternate),
-            grid_lines: Some(self.style.grid_lines),
-            grid_lines_fixed: Some(self.style.grid_lines_fixed),
-            grid_color: Some(self.style.grid_color),
-            grid_color_fixed: Some(self.style.grid_color_fixed),
-            grid_line_width: Some(self.style.grid_line_width),
-            text_effect: Some(self.style.text_effect),
-            text_effect_fixed: Some(self.style.text_effect_fixed),
-            font_name: Some(self.style.font_name.clone()),
-            font_size: Some(self.style.font_size),
-            font_bold: Some(self.style.font_bold),
-            font_italic: Some(self.style.font_italic),
-            font_underline: Some(self.style.font_underline),
-            font_strikethrough: Some(self.style.font_strikethrough),
-            font_width: Some(self.style.font_width),
-            sheet_border: Some(self.style.sheet_border),
-            progress_color: Some(self.style.progress_color),
-            image_over_text: Some(self.style.image_over_text),
-            background_image: if self.style.background_image.is_empty() {
-                None
-            } else {
-                Some(self.style.background_image.clone())
-            },
-            background_image_alignment: Some(self.style.background_image_alignment),
-            text_render_mode: Some(self.style.text_render_mode),
-            text_hinting_mode: Some(self.style.text_hinting_mode),
-            text_pixel_snap: Some(self.style.text_pixel_snap),
+            background: Some(self.style.back_color),
+            foreground: Some(self.style.fore_color),
+            alternate_background: Some(self.style.back_color_alternate),
+            font: Some(grid_font_to_v1(&self.style)),
             cell_padding: Some(engine_padding_to_v1(self.style.cell_padding)),
-            fixed_cell_padding: Some(engine_padding_to_v1(self.style.fixed_cell_padding)),
-            header_separator: Some(v1::HeaderSeparatorStyle {
-                enabled: Some(self.style.header_separator.enabled),
-                color: Some(self.style.header_separator.color),
-                width_px: Some(self.style.header_separator.width_px.max(1)),
-                height: Some(engine_header_mark_to_v1(self.style.header_separator.height)),
-                skip_merged: Some(self.style.header_separator.skip_merged),
-            }),
-            header_resize_handle: Some(v1::HeaderResizeHandleStyle {
-                enabled: Some(self.style.header_resize_handle.enabled),
-                color: Some(self.style.header_resize_handle.color),
-                width_px: Some(self.style.header_resize_handle.width_px.max(1)),
-                height: Some(engine_header_mark_to_v1(
-                    self.style.header_resize_handle.height,
+            text_effect: Some(self.style.text_effect),
+            progress_color: Some(self.style.progress_color),
+            grid_lines: Some(grid_lines_to_v1(
+                self.style.grid_lines,
+                self.style.grid_color,
+                self.style.grid_line_width,
+            )),
+            fixed: Some(v1::RegionStyle {
+                background: Some(self.style.back_color_fixed),
+                foreground: Some(self.style.fore_color_fixed),
+                font: None,
+                grid_lines: Some(grid_lines_to_v1(
+                    self.style.grid_lines_fixed,
+                    self.style.grid_color_fixed,
+                    self.style.grid_line_width,
                 )),
-                hit_width_px: Some(self.style.header_resize_handle.hit_width_px.max(1)),
-                show_only_when_resizable: Some(
-                    self.style.header_resize_handle.show_only_when_resizable,
-                ),
+                text_effect: Some(self.style.text_effect_fixed),
+                separator: None,
+                cell_padding: Some(engine_padding_to_v1(self.style.fixed_cell_padding)),
             }),
-            icon_theme_slots: Some(v1::IconThemeSlots {
-                sort_ascending: self.style.icon_theme_slots.sort_ascending.clone(),
-                sort_descending: self.style.icon_theme_slots.sort_descending.clone(),
-                sort_none: self.style.icon_theme_slots.sort_none.clone(),
-                tree_expanded: self.style.icon_theme_slots.tree_expanded.clone(),
-                tree_collapsed: self.style.icon_theme_slots.tree_collapsed.clone(),
-                menu: self.style.icon_theme_slots.menu.clone(),
-                filter: self.style.icon_theme_slots.filter.clone(),
-                filter_active: self.style.icon_theme_slots.filter_active.clone(),
-                columns: self.style.icon_theme_slots.columns.clone(),
-                drag_handle: self.style.icon_theme_slots.drag_handle.clone(),
-                checkbox_checked: self.style.icon_theme_slots.checkbox_checked.clone(),
-                checkbox_unchecked: self.style.icon_theme_slots.checkbox_unchecked.clone(),
-                checkbox_indeterminate: self.style.icon_theme_slots.checkbox_indeterminate.clone(),
+            frozen: Some(v1::RegionStyle {
+                background: Some(self.style.back_color_frozen),
+                foreground: Some(self.style.fore_color_frozen),
+                font: None,
+                grid_lines: None,
+                text_effect: None,
+                separator: None,
+                cell_padding: None,
             }),
-            checkbox_checked_picture: self.style.checkbox_checked_picture.as_ref().map(|d| {
-                v1::ImageData {
-                    data: d.clone(),
-                    format: "png".into(),
-                }
+            header: Some(v1::HeaderStyle {
+                separator: Some(v1::HeaderSeparator {
+                    enabled: Some(self.style.header_separator.enabled),
+                    color: Some(self.style.header_separator.color),
+                    width: Some(self.style.header_separator.width_px.max(1)),
+                    height: Some(engine_header_mark_to_v1(self.style.header_separator.height)),
+                    skip_merged: Some(self.style.header_separator.skip_merged),
+                }),
+                resize_handle: Some(v1::HeaderResizeHandle {
+                    enabled: Some(self.style.header_resize_handle.enabled),
+                    color: Some(self.style.header_resize_handle.color),
+                    width: Some(self.style.header_resize_handle.width_px.max(1)),
+                    height: Some(engine_header_mark_to_v1(
+                        self.style.header_resize_handle.height,
+                    )),
+                    hit_width: Some(self.style.header_resize_handle.hit_width_px.max(1)),
+                    show_only_when_resizable: Some(
+                        self.style.header_resize_handle.show_only_when_resizable,
+                    ),
+                }),
             }),
-            checkbox_unchecked_picture: self.style.checkbox_unchecked_picture.as_ref().map(|d| {
-                v1::ImageData {
-                    data: d.clone(),
-                    format: "png".into(),
-                }
+            sheet_background: Some(self.style.back_color_bkg),
+            sheet_border: Some(self.style.sheet_border),
+            appearance: Some(self.style.appearance),
+            background_image: (!self.style.background_image.is_empty())
+                .then(|| self.style.background_image.clone()),
+            background_image_align: Some(self.style.background_image_alignment),
+            text_rendering: Some(v1::TextRendering {
+                mode: Some(self.style.text_render_mode),
+                hinting: Some(self.style.text_hinting_mode),
+                pixel_snap: Some(self.style.text_pixel_snap),
             }),
-            checkbox_indeterminate_picture: self.style.checkbox_indeterminate_picture.as_ref().map(
-                |d| v1::ImageData {
-                    data: d.clone(),
-                    format: "png".into(),
-                },
-            ),
-            icon_theme_defaults: Some(v1::IconThemeDefaults {
-                text_style: Some(icon_text_style_to_v1(
+            icons: Some(v1::IconTheme {
+                slots: Some(v1::IconSlots {
+                    sort_ascending: self.style.icon_theme_slots.sort_ascending.clone(),
+                    sort_descending: self.style.icon_theme_slots.sort_descending.clone(),
+                    sort_none: self.style.icon_theme_slots.sort_none.clone(),
+                    tree_expanded: self.style.icon_theme_slots.tree_expanded.clone(),
+                    tree_collapsed: self.style.icon_theme_slots.tree_collapsed.clone(),
+                    menu: self.style.icon_theme_slots.menu.clone(),
+                    filter: self.style.icon_theme_slots.filter.clone(),
+                    filter_active: self.style.icon_theme_slots.filter_active.clone(),
+                    columns: self.style.icon_theme_slots.columns.clone(),
+                    drag_handle: self.style.icon_theme_slots.drag_handle.clone(),
+                    checkbox_checked: self.style.icon_theme_slots.checkbox_checked.clone(),
+                    checkbox_unchecked: self.style.icon_theme_slots.checkbox_unchecked.clone(),
+                    checkbox_indeterminate: self
+                        .style
+                        .icon_theme_slots
+                        .checkbox_indeterminate
+                        .clone(),
+                }),
+                defaults: Some(icon_style_to_v1(
                     &self.style.icon_theme_defaults.text_style,
+                    self.style.icon_theme_defaults.layout,
                 )),
-                layout: Some(icon_layout_to_v1(self.style.icon_theme_defaults.layout)),
+                overrides: Some(v1::IconSlotStyles {
+                    sort_ascending: icon_slot_style_to_v1(
+                        &self.style.icon_theme_slot_styles.sort_ascending,
+                        self.style.icon_theme_defaults.layout,
+                    ),
+                    sort_descending: icon_slot_style_to_v1(
+                        &self.style.icon_theme_slot_styles.sort_descending,
+                        self.style.icon_theme_defaults.layout,
+                    ),
+                    sort_none: icon_slot_style_to_v1(
+                        &self.style.icon_theme_slot_styles.sort_none,
+                        self.style.icon_theme_defaults.layout,
+                    ),
+                    tree_expanded: icon_slot_style_to_v1(
+                        &self.style.icon_theme_slot_styles.tree_expanded,
+                        self.style.icon_theme_defaults.layout,
+                    ),
+                    tree_collapsed: icon_slot_style_to_v1(
+                        &self.style.icon_theme_slot_styles.tree_collapsed,
+                        self.style.icon_theme_defaults.layout,
+                    ),
+                    menu: icon_slot_style_to_v1(
+                        &self.style.icon_theme_slot_styles.menu,
+                        self.style.icon_theme_defaults.layout,
+                    ),
+                    filter: icon_slot_style_to_v1(
+                        &self.style.icon_theme_slot_styles.filter,
+                        self.style.icon_theme_defaults.layout,
+                    ),
+                    filter_active: icon_slot_style_to_v1(
+                        &self.style.icon_theme_slot_styles.filter_active,
+                        self.style.icon_theme_defaults.layout,
+                    ),
+                    columns: icon_slot_style_to_v1(
+                        &self.style.icon_theme_slot_styles.columns,
+                        self.style.icon_theme_defaults.layout,
+                    ),
+                    drag_handle: icon_slot_style_to_v1(
+                        &self.style.icon_theme_slot_styles.drag_handle,
+                        self.style.icon_theme_defaults.layout,
+                    ),
+                    checkbox_checked: icon_slot_style_to_v1(
+                        &self.style.icon_theme_slot_styles.checkbox_checked,
+                        self.style.icon_theme_defaults.layout,
+                    ),
+                    checkbox_unchecked: icon_slot_style_to_v1(
+                        &self.style.icon_theme_slot_styles.checkbox_unchecked,
+                        self.style.icon_theme_defaults.layout,
+                    ),
+                    checkbox_indeterminate: icon_slot_style_to_v1(
+                        &self.style.icon_theme_slot_styles.checkbox_indeterminate,
+                        self.style.icon_theme_defaults.layout,
+                    ),
+                }),
+                pictures: Some(v1::IconPictures {
+                    sort_ascending: image_bytes_to_proto(
+                        self.sort_state.sort_ascending_picture.as_deref(),
+                        "png",
+                    ),
+                    sort_descending: image_bytes_to_proto(
+                        self.sort_state.sort_descending_picture.as_deref(),
+                        "png",
+                    ),
+                    node_open: image_bytes_to_proto(
+                        self.outline.node_open_picture.as_deref(),
+                        "png",
+                    ),
+                    node_closed: image_bytes_to_proto(
+                        self.outline.node_closed_picture.as_deref(),
+                        "png",
+                    ),
+                    checkbox_checked: image_bytes_to_proto(
+                        self.style.checkbox_checked_picture.as_deref(),
+                        "png",
+                    ),
+                    checkbox_unchecked: image_bytes_to_proto(
+                        self.style.checkbox_unchecked_picture.as_deref(),
+                        "png",
+                    ),
+                    checkbox_indeterminate: image_bytes_to_proto(
+                        self.style.checkbox_indeterminate_picture.as_deref(),
+                        "png",
+                    ),
+                }),
             }),
-            icon_theme_slot_styles: Some(v1::IconThemeSlotStyles {
-                sort_ascending: icon_slot_style_to_v1(
-                    &self.style.icon_theme_slot_styles.sort_ascending,
-                ),
-                sort_descending: icon_slot_style_to_v1(
-                    &self.style.icon_theme_slot_styles.sort_descending,
-                ),
-                sort_none: icon_slot_style_to_v1(&self.style.icon_theme_slot_styles.sort_none),
-                tree_expanded: icon_slot_style_to_v1(
-                    &self.style.icon_theme_slot_styles.tree_expanded,
-                ),
-                tree_collapsed: icon_slot_style_to_v1(
-                    &self.style.icon_theme_slot_styles.tree_collapsed,
-                ),
-                menu: icon_slot_style_to_v1(&self.style.icon_theme_slot_styles.menu),
-                filter: icon_slot_style_to_v1(&self.style.icon_theme_slot_styles.filter),
-                filter_active: icon_slot_style_to_v1(
-                    &self.style.icon_theme_slot_styles.filter_active,
-                ),
-                columns: icon_slot_style_to_v1(&self.style.icon_theme_slot_styles.columns),
-                drag_handle: icon_slot_style_to_v1(&self.style.icon_theme_slot_styles.drag_handle),
-                checkbox_checked: icon_slot_style_to_v1(
-                    &self.style.icon_theme_slot_styles.checkbox_checked,
-                ),
-                checkbox_unchecked: icon_slot_style_to_v1(
-                    &self.style.icon_theme_slot_styles.checkbox_unchecked,
-                ),
-                checkbox_indeterminate: icon_slot_style_to_v1(
-                    &self.style.icon_theme_slot_styles.checkbox_indeterminate,
-                ),
-            }),
+            image_over_text: Some(self.style.image_over_text),
             show_sort_numbers: Some(self.style.show_sort_numbers),
             apply_scope: Some(self.apply_scope),
             custom_render: Some(self.custom_render),
-            sort_ascending_picture: self.sort_state.sort_ascending_picture.as_ref().map(|d| {
-                v1::ImageData {
-                    data: d.clone(),
-                    format: "png".into(),
-                }
-            }),
-            sort_descending_picture: self.sort_state.sort_descending_picture.as_ref().map(|d| {
-                v1::ImageData {
-                    data: d.clone(),
-                    format: "png".into(),
-                }
-            }),
-            node_open_picture: self
-                .outline
-                .node_open_picture
-                .as_ref()
-                .map(|d| v1::ImageData {
-                    data: d.clone(),
-                    format: "png".into(),
-                }),
-            node_closed_picture: self
-                .outline
-                .node_closed_picture
-                .as_ref()
-                .map(|d| v1::ImageData {
-                    data: d.clone(),
-                    format: "png".into(),
-                }),
+            format: Some(self.format_string.clone()),
+            word_wrap: Some(self.word_wrap),
+            ellipsis: Some(self.ellipsis_mode),
+            text_overflow: Some(self.text_overflow),
         }
     }
 
@@ -1413,25 +1832,39 @@ impl VolvoxGrid {
         v1::SelectionConfig {
             mode: Some(self.selection.mode),
             focus_border: Some(self.selection.focus_border),
-            selection_visibility: Some(self.selection.selection_visibility),
-            allow_selection: Some(self.allow_selection),
+            visibility: Some(self.selection.selection_visibility),
+            allow: Some(self.allow_selection),
             header_click_select: Some(self.header_click_select),
-            selection_style: Some(self.selection.selection_style.to_proto()),
-            hover_mode: Some(self.selection.hover_mode),
-            hover_row_style: Some(self.selection.hover_row_style.to_proto()),
-            hover_column_style: Some(self.selection.hover_column_style.to_proto()),
-            hover_cell_style: Some(self.selection.hover_cell_style.to_proto()),
+            style: Some(self.selection.selection_style.to_proto()),
+            hover: Some(v1::HoverConfig {
+                row: Some(self.selection.hover_mode & HOVER_ROW != 0),
+                column: Some(self.selection.hover_mode & HOVER_COLUMN != 0),
+                cell: Some(self.selection.hover_mode & HOVER_CELL != 0),
+                row_style: Some(self.selection.hover_row_style.to_proto()),
+                column_style: Some(self.selection.hover_column_style.to_proto()),
+                cell_style: Some(self.selection.hover_cell_style.to_proto()),
+            }),
+            indicator_row_style: self
+                .selection
+                .indicator_row_style
+                .as_ref()
+                .map(|s| s.to_proto()),
+            indicator_col_style: self
+                .selection
+                .indicator_col_style
+                .as_ref()
+                .map(|s| s.to_proto()),
         }
     }
 
     fn get_edit_config(&self) -> v1::EditConfig {
         v1::EditConfig {
-            edit_trigger: Some(self.edit_trigger_mode),
+            trigger: Some(self.edit_trigger_mode),
             tab_behavior: Some(self.tab_behavior),
             dropdown_trigger: Some(self.dropdown_trigger),
             dropdown_search: Some(self.dropdown_search),
-            edit_max_length: Some(self.edit_max_length),
-            edit_mask: Some(self.edit_mask.clone()),
+            max_length: Some(self.edit_max_length),
+            mask: Some(self.edit_mask.clone()),
             host_key_dispatch: Some(self.host_key_dispatch),
             host_pointer_dispatch: Some(self.host_pointer_dispatch),
         }
@@ -1470,9 +1903,19 @@ impl VolvoxGrid {
     }
 
     fn get_interaction_config(&self) -> v1::InteractionConfig {
+        let (resize_columns, resize_rows, resize_uniform) =
+            decode_resize_policy(self.allow_user_resizing);
+        let (freeze_columns, freeze_rows) = decode_freeze_policy(self.allow_user_freezing);
         v1::InteractionConfig {
-            allow_user_resizing: Some(self.allow_user_resizing),
-            allow_user_freezing: Some(self.allow_user_freezing),
+            resize: Some(v1::ResizePolicy {
+                columns: Some(resize_columns),
+                rows: Some(resize_rows),
+                uniform: Some(resize_uniform),
+            }),
+            freeze: Some(v1::FreezePolicy {
+                columns: Some(freeze_columns),
+                rows: Some(freeze_rows),
+            }),
             type_ahead: Some(self.type_ahead_mode),
             type_ahead_delay: Some(self.type_ahead_delay),
             auto_size_mouse: Some(self.auto_size_mouse),
@@ -1480,7 +1923,11 @@ impl VolvoxGrid {
             auto_resize: Some(self.auto_resize),
             drag_mode: Some(self.drag.drag_mode),
             drop_mode: Some(self.drag.drop_mode),
-            header_features: Some(self.header_features),
+            header_features: Some(v1::HeaderFeatures {
+                sort: Some(self.header_features & 1 != 0),
+                reorder: Some(self.header_features & 2 != 0),
+                chooser: Some(self.header_features & 4 != 0),
+            }),
         }
     }
 
@@ -1495,12 +1942,12 @@ impl VolvoxGrid {
         }
     }
 
-    fn get_indicator_bands_config(&self) -> v1::IndicatorBandsConfig {
-        v1::IndicatorBandsConfig {
-            row_indicator_start: Some(row_indicator_to_proto(&self.indicator_bands.row_start)),
-            row_indicator_end: Some(row_indicator_to_proto(&self.indicator_bands.row_end)),
-            col_indicator_top: Some(col_indicator_to_proto(&self.indicator_bands.col_top)),
-            col_indicator_bottom: Some(col_indicator_to_proto(&self.indicator_bands.col_bottom)),
+    fn get_indicator_bands_config(&self) -> v1::IndicatorsConfig {
+        v1::IndicatorsConfig {
+            row_start: Some(row_indicator_to_proto(&self.indicator_bands.row_start)),
+            row_end: Some(row_indicator_to_proto(&self.indicator_bands.row_end)),
+            col_top: Some(col_indicator_to_proto(&self.indicator_bands.col_top)),
+            col_bottom: Some(col_indicator_to_proto(&self.indicator_bands.col_bottom)),
             corner_top_start: Some(corner_indicator_to_proto(
                 &self.indicator_bands.corner_top_start,
             )),
@@ -1554,10 +2001,10 @@ impl VolvoxGrid {
                 if let Some(v) = &def.caption {
                     cp.caption = v.clone();
                 }
-                if let Some(v) = def.alignment {
+                if let Some(v) = def.align {
                     cp.alignment = v;
                 }
-                if let Some(v) = def.fixed_alignment {
+                if let Some(v) = def.fixed_align {
                     cp.fixed_alignment = v;
                 }
                 if let Some(v) = def.data_type {
@@ -1569,8 +2016,8 @@ impl VolvoxGrid {
                 if let Some(v) = &def.key {
                     cp.key = v.clone();
                 }
-                if let Some(v) = def.sort {
-                    cp.sort_order = v;
+                if def.sort_order.is_some() || def.sort_type.is_some() {
+                    cp.sort_order = merge_sort_spec(cp.sort_order, def.sort_order, def.sort_type);
                     cp.sort_defined = true;
                 }
                 if let Some(v) = &def.dropdown_items {
@@ -1604,11 +2051,11 @@ impl VolvoxGrid {
                     cp.sticky = v;
                     sticky_to_apply = Some(v);
                 }
-                if let Some(v) = &def.cell_padding {
+                if let Some(v) = &def.padding {
                     let base = cp.cell_padding.unwrap_or(grid_cell_padding);
                     cp.cell_padding = Some(apply_padding_patch(base, v));
                 }
-                if let Some(v) = &def.fixed_cell_padding {
+                if let Some(v) = &def.fixed_padding {
                     let base = cp
                         .fixed_cell_padding
                         .or(cp.cell_padding)
@@ -1746,7 +2193,7 @@ impl VolvoxGrid {
                     v1::cell_value::Value::Flag(b) => Ok(CellValueData::Text(
                         if *b { "true" } else { "false" }.to_string(),
                     )),
-                    v1::cell_value::Value::Data(d) => {
+                    v1::cell_value::Value::Raw(d) => {
                         Ok(CellValueData::Text(String::from_utf8_lossy(d).to_string()))
                     }
                     v1::cell_value::Value::Timestamp(ts) => Ok(CellValueData::Text(ts.to_string())),
@@ -1777,7 +2224,7 @@ impl VolvoxGrid {
                         v1::cell_value::Value::Timestamp(ts) => {
                             Ok(CellValueData::Number(*ts as f64))
                         }
-                        v1::cell_value::Value::Data(_) => {
+                        v1::cell_value::Value::Raw(_) => {
                             Err("Cannot coerce Bytes to Number".to_string())
                         }
                     },
@@ -1801,9 +2248,7 @@ impl VolvoxGrid {
                     v1::cell_value::Value::Flag(_) => {
                         Err("Cannot coerce Boolean to Date".to_string())
                     }
-                    v1::cell_value::Value::Data(_) => {
-                        Err("Cannot coerce Bytes to Date".to_string())
-                    }
+                    v1::cell_value::Value::Raw(_) => Err("Cannot coerce Bytes to Date".to_string()),
                     v1::cell_value::Value::Number(_) => {
                         Err("Cannot coerce non-finite Number to Date".to_string())
                     }
@@ -1823,7 +2268,7 @@ impl VolvoxGrid {
                     v1::cell_value::Value::Text(t) => parse_bool(t).map(CellValueData::Bool),
                     v1::cell_value::Value::Number(n) => Ok(CellValueData::Bool(*n != 0.0)),
                     v1::cell_value::Value::Timestamp(ts) => Ok(CellValueData::Bool(*ts != 0)),
-                    v1::cell_value::Value::Data(_) => {
+                    v1::cell_value::Value::Raw(_) => {
                         Err("Cannot coerce Bytes to Boolean".to_string())
                     }
                 },
@@ -2037,7 +2482,7 @@ impl VolvoxGrid {
             }
         }
 
-        if let Some(pa) = u.picture_alignment {
+        if let Some(pa) = u.picture_align {
             let cell = self.cells.get_mut(row, col);
             cell.extra_mut().picture_alignment = pa;
         }
@@ -2094,7 +2539,7 @@ impl VolvoxGrid {
             if entry.update.style.is_some()
                 || entry.update.checked.is_some()
                 || entry.update.picture.is_some()
-                || entry.update.picture_alignment.is_some()
+                || entry.update.picture_align.is_some()
                 || entry.update.button_picture.is_some()
                 || entry.update.dropdown_items.is_some()
                 || entry.update.sticky_row.is_some()
@@ -2143,7 +2588,7 @@ impl VolvoxGrid {
                     style: None,
                     checked: None,
                     picture: None,
-                    picture_alignment: None,
+                    picture_align: None,
                     button_picture: None,
                     dropdown_items: None,
                     sticky_row: None,
@@ -2187,6 +2632,11 @@ impl VolvoxGrid {
                 .get(col as usize)
                 .cloned()
                 .unwrap_or_else(crate::column::ColumnProps::default);
+            let (sort_order, sort_type) = if cp.sort_defined {
+                decode_sort_spec(cp.sort_order)
+            } else {
+                (None, None)
+            };
             columns.push(v1::ColumnDef {
                 index: col,
                 width: Some(self.get_col_width(col)),
@@ -2205,8 +2655,8 @@ impl VolvoxGrid {
                 } else {
                     Some(cp.caption)
                 },
-                alignment: Some(cp.alignment),
-                fixed_alignment: Some(cp.fixed_alignment),
+                align: Some(cp.alignment),
+                fixed_align: Some(cp.fixed_alignment),
                 data_type: Some(normalize_column_data_type(cp.data_type)),
                 format: if cp.format.is_empty() {
                     None
@@ -2218,11 +2668,8 @@ impl VolvoxGrid {
                 } else {
                     Some(cp.key)
                 },
-                sort: if cp.sort_defined {
-                    Some(cp.sort_order)
-                } else {
-                    None
-                },
+                sort_order,
+                sort_type,
                 dropdown_items: if cp.dropdown_items.is_empty() {
                     None
                 } else {
@@ -2254,8 +2701,8 @@ impl VolvoxGrid {
                 } else {
                     None
                 },
-                cell_padding: cp.cell_padding.map(engine_padding_to_v1),
-                fixed_cell_padding: cp.fixed_cell_padding.map(engine_padding_to_v1),
+                padding: cp.cell_padding.map(engine_padding_to_v1),
+                fixed_padding: cp.fixed_cell_padding.map(engine_padding_to_v1),
                 nullable: Some(cp.nullable),
                 coercion_mode: if cp.coercion_mode != 0 {
                     Some(cp.coercion_mode)
@@ -2304,7 +2751,7 @@ impl VolvoxGrid {
                             value: Some(v1::cell_value::Value::Flag(*v)),
                         }),
                         CellValueData::Bytes(v) => Some(v1::CellValue {
-                            value: Some(v1::cell_value::Value::Data(v.clone())),
+                            value: Some(v1::cell_value::Value::Raw(v.clone())),
                         }),
                         CellValueData::Timestamp(v) => Some(v1::CellValue {
                             value: Some(v1::cell_value::Value::Timestamp(*v)),
@@ -2355,70 +2802,78 @@ impl VolvoxGrid {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Conversion helpers: v2 proto ↔ engine types
+// Conversion helpers: proto ↔ engine types
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Convert a v2 `CellStyleOverride` proto to the engine's `CellStyleOverride`.
-///
-/// Unlike v1, v2 uses proper `Option<T>` — no sentinel-value heuristics needed.
-pub fn v2_cell_style_to_engine(s: &v1::CellStyleOverride) -> style::CellStyleOverride {
-    style::CellStyleOverride {
-        back_color: s.back_color,
-        fore_color: s.fore_color,
-        alignment: s.alignment,
+pub fn v2_cell_style_to_engine(s: &v1::CellStyle) -> style::CellStylePatch {
+    let (
+        border,
+        border_color,
+        border_top,
+        border_top_color,
+        border_right,
+        border_right_color,
+        border_bottom,
+        border_bottom_color,
+        border_left,
+        border_left_color,
+    ) = style::proto_borders_to_parts(s.borders.as_ref());
+    let mut result = style::CellStylePatch {
+        back_color: s.background,
+        fore_color: s.foreground,
+        alignment: s.align,
         text_effect: s.text_effect,
-        font_name: s.font_name.clone(),
-        font_size: s.font_size,
-        font_bold: s.font_bold,
-        font_italic: s.font_italic,
-        font_underline: s.font_underline,
-        font_strikethrough: s.font_strikethrough,
-        font_width: s.font_width,
-        border: s.border,
-        border_color: s.border_color,
-        border_top: s.border_top,
-        border_right: s.border_right,
-        border_bottom: s.border_bottom,
-        border_left: s.border_left,
-        border_top_color: s.border_top_color,
-        border_right_color: s.border_right_color,
-        border_bottom_color: s.border_bottom_color,
-        border_left_color: s.border_left_color,
+        font_name: None,
+        font_size: None,
+        font_bold: None,
+        font_italic: None,
+        font_underline: None,
+        font_strikethrough: None,
+        font_width: None,
+        border,
+        border_color,
+        border_top,
+        border_right,
+        border_bottom,
+        border_left,
+        border_top_color,
+        border_right_color,
+        border_bottom_color,
+        border_left_color,
         padding: s
             .padding
             .as_ref()
-            .map(|p| apply_padding_patch(style::CellPadding::default(), p)),
+            .map(|p| apply_padding_patch(style::Padding::default(), p)),
         shrink_to_fit: s.shrink_to_fit,
+    };
+    if let Some(font) = &s.font {
+        apply_cell_style_font_patch(&mut result, font);
     }
+    result
 }
 
-/// Convert the engine's `CellStyleOverride` to a v2 proto `CellStyleOverride`.
-pub fn engine_cell_style_to_v2(s: &style::CellStyleOverride) -> v1::CellStyleOverride {
-    v1::CellStyleOverride {
-        back_color: s.back_color,
-        fore_color: s.fore_color,
-        alignment: s.alignment,
-        text_effect: s.text_effect,
-        font_name: s.font_name.clone(),
-        font_size: s.font_size,
-        font_bold: s.font_bold,
-        font_italic: s.font_italic,
-        font_underline: s.font_underline,
-        font_strikethrough: s.font_strikethrough,
-        font_width: s.font_width,
-        progress_color: None,
-        progress_percent: None,
-        border: s.border,
-        border_color: s.border_color,
-        border_top: s.border_top,
-        border_right: s.border_right,
-        border_bottom: s.border_bottom,
-        border_left: s.border_left,
-        border_top_color: s.border_top_color,
-        border_right_color: s.border_right_color,
-        border_bottom_color: s.border_bottom_color,
-        border_left_color: s.border_left_color,
+pub fn engine_cell_style_to_v2(s: &style::CellStylePatch) -> v1::CellStyle {
+    v1::CellStyle {
+        background: s.back_color,
+        foreground: s.fore_color,
+        align: s.alignment,
+        font: cell_style_font_to_v1(s),
         padding: s.padding.map(engine_padding_to_v1),
+        borders: style::parts_to_proto_borders(
+            s.border,
+            s.border_color,
+            s.border_top,
+            s.border_top_color,
+            s.border_right,
+            s.border_right_color,
+            s.border_bottom,
+            s.border_bottom_color,
+            s.border_left,
+            s.border_left_color,
+        ),
+        text_effect: s.text_effect,
+        progress: None,
+        progress_color: None,
         shrink_to_fit: s.shrink_to_fit,
     }
 }
@@ -2462,7 +2917,7 @@ mod tests {
 
         let config = v1::GridConfig {
             style: Some(v1::StyleConfig {
-                back_color: Some(0xFF112233),
+                background: Some(0xFF112233),
                 ..Default::default()
             }),
             ..Default::default()
@@ -2483,8 +2938,8 @@ mod tests {
 
         let config = grid.get_config();
 
-        assert_eq!(config.style.as_ref().unwrap().back_color, Some(0xAABBCCDD));
-        assert_eq!(config.editing.as_ref().unwrap().edit_trigger, Some(2));
+        assert_eq!(config.style.as_ref().unwrap().background, Some(0xAABBCCDD));
+        assert_eq!(config.editing.as_ref().unwrap().trigger, Some(2));
         assert_eq!(config.scrolling.as_ref().unwrap().scrollbars, Some(3));
     }
 
@@ -2518,7 +2973,7 @@ mod tests {
             v1::ColumnDef {
                 index: 0,
                 width: Some(100),
-                alignment: Some(4),
+                align: Some(4),
                 hidden: Some(false),
                 ..Default::default()
             },
@@ -2545,7 +3000,7 @@ mod tests {
 
         let config = v1::GridConfig {
             style: Some(v1::StyleConfig {
-                cell_padding: Some(v1::CellPadding {
+                cell_padding: Some(v1::Padding {
                     left: Some(12),
                     ..Default::default()
                 }),
@@ -2566,12 +3021,12 @@ mod tests {
         let mut grid = test_grid();
         let defs = vec![v1::ColumnDef {
             index: 1,
-            cell_padding: Some(v1::CellPadding {
+            padding: Some(v1::Padding {
                 left: Some(7),
                 right: Some(9),
                 ..Default::default()
             }),
-            fixed_cell_padding: Some(v1::CellPadding {
+            fixed_padding: Some(v1::Padding {
                 left: Some(2),
                 right: Some(2),
                 ..Default::default()
@@ -2625,8 +3080,8 @@ mod tests {
                 value: Some(v1::CellValue {
                     value: Some(v1::cell_value::Value::Text("World".to_string())),
                 }),
-                style: Some(v1::CellStyleOverride {
-                    back_color: Some(0xFF0000FF),
+                style: Some(v1::CellStyle {
+                    background: Some(0xFF0000FF),
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -2648,8 +3103,8 @@ mod tests {
         grid.define_columns(&[v1::ColumnDef {
             index: 0,
             data_type: Some(v1::ColumnDataType::ColumnDataNumber as i32),
-            coercion_mode: Some(v1::CoercionMode::Strict as i32),
-            error_mode: Some(v1::WriteErrorMode::Reject as i32),
+            coercion_mode: Some(v1::CoercionMode::CoercionStrict as i32),
+            error_mode: Some(v1::WriteErrorMode::WriteErrorReject as i32),
             ..Default::default()
         }]);
 
@@ -2677,8 +3132,8 @@ mod tests {
         grid.define_columns(&[v1::ColumnDef {
             index: 0,
             data_type: Some(v1::ColumnDataType::ColumnDataNumber as i32),
-            coercion_mode: Some(v1::CoercionMode::Strict as i32),
-            error_mode: Some(v1::WriteErrorMode::Reject as i32),
+            coercion_mode: Some(v1::CoercionMode::CoercionStrict as i32),
+            error_mode: Some(v1::WriteErrorMode::WriteErrorReject as i32),
             ..Default::default()
         }]);
         grid.cells.set_text(1, 0, "old".to_string());
@@ -2716,7 +3171,7 @@ mod tests {
         grid.define_columns(&[v1::ColumnDef {
             index: 0,
             data_type: Some(v1::ColumnDataType::ColumnDataDate as i32),
-            coercion_mode: Some(v1::CoercionMode::Strict as i32),
+            coercion_mode: Some(v1::CoercionMode::CoercionStrict as i32),
             ..Default::default()
         }]);
 
@@ -2762,11 +3217,11 @@ mod tests {
 
     #[test]
     fn cell_style_roundtrip() {
-        let engine_style = style::CellStyleOverride {
+        let engine_style = style::CellStylePatch {
             back_color: Some(0xFF112233),
             font_bold: Some(true),
             border: Some(1),
-            padding: Some(style::CellPadding {
+            padding: Some(style::Padding {
                 left: 4,
                 top: 1,
                 right: 5,
@@ -2800,7 +3255,7 @@ mod tests {
         assert!(!grid.text_overflow);
 
         let config = v1::GridConfig {
-            layout: Some(v1::LayoutConfig {
+            style: Some(v1::StyleConfig {
                 text_overflow: Some(true),
                 ..Default::default()
             }),
@@ -2827,7 +3282,7 @@ mod tests {
         let mut grid = test_grid();
         grid.text_overflow = true;
         let config = grid.get_config();
-        assert_eq!(config.layout.as_ref().unwrap().text_overflow, Some(true));
+        assert_eq!(config.style.as_ref().unwrap().text_overflow, Some(true));
     }
 
     #[test]
@@ -2872,7 +3327,7 @@ mod tests {
 
     #[test]
     fn shrink_to_fit_roundtrip() {
-        let engine_style = style::CellStyleOverride {
+        let engine_style = style::CellStylePatch {
             shrink_to_fit: Some(true),
             ..Default::default()
         };
@@ -2884,7 +3339,7 @@ mod tests {
 
     #[test]
     fn shrink_to_fit_none_roundtrip() {
-        let engine_style = style::CellStyleOverride {
+        let engine_style = style::CellStylePatch {
             font_bold: Some(true),
             ..Default::default()
         };
@@ -2898,19 +3353,19 @@ mod tests {
     #[test]
     fn shrink_to_fit_is_empty_and_merge() {
         // is_empty should return false when shrink_to_fit is set
-        let s = style::CellStyleOverride {
+        let s = style::CellStylePatch {
             shrink_to_fit: Some(true),
             ..Default::default()
         };
         assert!(!s.is_empty());
 
         // is_empty should return true when all fields are None
-        let empty = style::CellStyleOverride::default();
+        let empty = style::CellStylePatch::default();
         assert!(empty.is_empty());
 
         // merge_from should overwrite shrink_to_fit
-        let mut base = style::CellStyleOverride::default();
-        let patch = style::CellStyleOverride {
+        let mut base = style::CellStylePatch::default();
+        let patch = style::CellStylePatch {
             shrink_to_fit: Some(true),
             ..Default::default()
         };
@@ -2918,7 +3373,7 @@ mod tests {
         assert_eq!(base.shrink_to_fit, Some(true));
 
         // merge_from with None should not overwrite
-        let noop = style::CellStyleOverride::default();
+        let noop = style::CellStylePatch::default();
         base.merge_from(&noop);
         assert_eq!(base.shrink_to_fit, Some(true));
     }
@@ -2932,7 +3387,7 @@ mod tests {
             value: Some(v1::CellValue {
                 value: Some(v1::cell_value::Value::Text("Hello".into())),
             }),
-            style: Some(v1::CellStyleOverride {
+            style: Some(v1::CellStyle {
                 shrink_to_fit: Some(true),
                 ..Default::default()
             }),
@@ -2950,7 +3405,7 @@ mod tests {
     fn text_overflow_and_ellipsis_coexist_in_config() {
         let mut grid = test_grid();
         let config = v1::GridConfig {
-            layout: Some(v1::LayoutConfig {
+            style: Some(v1::StyleConfig {
                 text_overflow: Some(true),
                 ellipsis: Some(1),
                 ..Default::default()

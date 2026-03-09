@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.RectF
+import android.os.Looper
 import android.text.InputType
 import android.util.AttributeSet
 import android.view.KeyEvent as AndroidKeyEvent
@@ -30,6 +31,8 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 import kotlin.math.roundToInt
 
@@ -66,6 +69,8 @@ class VolvoxGridView @JvmOverloads constructor(
     @Volatile
     private var renderStream: BidiStream<RenderInput, RenderOutput>? = null
     private var eventIterator: Iterator<GridEvent>? = null
+    @Volatile
+    private var decisionChannelEnabled = false
 
     private var pixelBuffer: ByteBuffer? = null
     private var bitmap: Bitmap? = null
@@ -256,6 +261,30 @@ class VolvoxGridView @JvmOverloads constructor(
     /** Listener for grid events delivered by the EventStream. */
     var eventListener: GridEventListener? = null
 
+    var beforeEditListener: BeforeEditListener? = null
+        set(value) {
+            field = value
+            if (value != null) {
+                ensureDecisionChannelEnabled()
+            }
+        }
+
+    var cellEditValidatingListener: CellEditValidatingListener? = null
+        set(value) {
+            field = value
+            if (value != null) {
+                ensureDecisionChannelEnabled()
+            }
+        }
+
+    var beforeSortListener: BeforeSortListener? = null
+        set(value) {
+            field = value
+            if (value != null) {
+                ensureDecisionChannelEnabled()
+            }
+        }
+
     /** Listener for edit commit/cancel from the inline EditText overlay. */
     var editListener: EditCommitListener? = null
 
@@ -263,10 +292,43 @@ class VolvoxGridView @JvmOverloads constructor(
         fun onGridEvent(event: GridEvent)
     }
 
+    interface BeforeEditListener {
+        fun onBeforeEdit(details: BeforeEditDetails)
+    }
+
+    interface CellEditValidatingListener {
+        fun onCellEditValidating(details: CellEditValidatingDetails)
+    }
+
+    interface BeforeSortListener {
+        fun onBeforeSort(details: BeforeSortDetails)
+    }
+
     interface EditCommitListener {
         fun onEditCommit(row: Int, col: Int, text: String)
         fun onEditCancel(row: Int, col: Int)
     }
+
+    data class BeforeEditDetails(
+        val rawEvent: GridEvent,
+        val row: Int,
+        val col: Int,
+        var cancel: Boolean = false
+    )
+
+    data class CellEditValidatingDetails(
+        val rawEvent: GridEvent,
+        val row: Int,
+        val col: Int,
+        val editText: String,
+        var cancel: Boolean = false
+    )
+
+    data class BeforeSortDetails(
+        val rawEvent: GridEvent,
+        val col: Int,
+        var cancel: Boolean = false
+    )
 
     init {
         isFocusable = true
@@ -394,7 +456,7 @@ class VolvoxGridView @JvmOverloads constructor(
                         .setRows(rows)
                         .setCols(cols)
                         .build())
-                    .setIndicatorBands(defaultIndicatorBandsConfig())
+                    .setIndicators(defaultIndicatorsConfig())
                     .build())
                 .build()
         )
@@ -439,6 +501,7 @@ class VolvoxGridView @JvmOverloads constructor(
      */
     fun detachGrid() {
         running.set(false)
+        decisionChannelEnabled = false
         stopEngineFlingForCurrentGrid()
         stopFling()
         stopEngineMomentumPump()
@@ -575,6 +638,7 @@ class VolvoxGridView @JvmOverloads constructor(
     override fun release() {
         if (!released.compareAndSet(false, true)) return
         running.set(false)
+        decisionChannelEnabled = false
         stopEngineFlingForCurrentGrid()
         if (useHostFling) {
             stopFling()
@@ -1723,11 +1787,13 @@ class VolvoxGridView @JvmOverloads constructor(
         needsFollowupRender.set(false)
         renderRequestPending.set(false)
         running.set(true)
+        decisionChannelEnabled = false
 
         thread(name = "volvoxgrid-render", isDaemon = true) {
             try {
                 val stream = client.RenderSession()
                 renderStream = stream
+                ensureDecisionChannelEnabled()
 
                 // Send initial frame (dispatches to GPU or CPU based on mode)
                 dispatchRenderFrame()
@@ -2016,8 +2082,127 @@ class VolvoxGridView @JvmOverloads constructor(
             }
         }
 
+        if (decisionChannelEnabled && isCancelableGridEvent(event)) {
+            val cancel = dispatchCancelableGridEvent(event)
+            sendEventDecision(event.eventId, cancel)
+        }
+
         // Forward all events to the listener
         eventListener?.onGridEvent(event)
+    }
+
+    private fun wantsCancelableGridEvents(): Boolean =
+        beforeEditListener != null ||
+            cellEditValidatingListener != null ||
+            beforeSortListener != null
+
+    private fun isCancelableGridEvent(event: GridEvent): Boolean =
+        event.hasBeforeEdit() || event.hasCellEditValidate() || event.hasBeforeSort()
+
+    private fun ensureDecisionChannelEnabled() {
+        if (decisionChannelEnabled || !wantsCancelableGridEvents() || gridId == 0L) {
+            return
+        }
+        val stream = synchronized(sendLock) { renderStream } ?: return
+        try {
+            stream.send(
+                RenderInput.newBuilder()
+                    .setGridId(gridId)
+                    .setEventDecision(
+                        EventDecision.newBuilder()
+                            .setGridId(gridId)
+                            .setEventId(0L)
+                            .setCancel(false)
+                            .build()
+                    )
+                    .build()
+            )
+            decisionChannelEnabled = true
+        } catch (_: Exception) {
+            // Render session may not be ready yet. The next attach/listener update will retry.
+        }
+    }
+
+    private fun sendEventDecision(eventId: Long, cancel: Boolean) {
+        if (!decisionChannelEnabled || gridId == 0L || eventId == 0L) {
+            return
+        }
+        try {
+            sendRenderInput(
+                RenderInput.newBuilder()
+                    .setGridId(gridId)
+                    .setEventDecision(
+                        EventDecision.newBuilder()
+                            .setGridId(gridId)
+                            .setEventId(eventId)
+                            .setCancel(cancel)
+                            .build()
+                    )
+                    .build()
+            )
+            requestRenderFrame()
+        } catch (_: Exception) {
+            // Best-effort; a closed stream will be reopened by the next session attach.
+        }
+    }
+
+    private fun dispatchCancelableGridEvent(event: GridEvent): Boolean {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return dispatchCancelableGridEventOnMain(event)
+        }
+
+        val latch = CountDownLatch(1)
+        val cancelRef = AtomicBoolean(false)
+        if (!post {
+                try {
+                    cancelRef.set(dispatchCancelableGridEventOnMain(event))
+                } finally {
+                    latch.countDown()
+                }
+            }) {
+            return false
+        }
+
+        return try {
+            latch.await(200, TimeUnit.MILLISECONDS)
+            cancelRef.get()
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            false
+        }
+    }
+
+    private fun dispatchCancelableGridEventOnMain(event: GridEvent): Boolean {
+        when {
+            event.hasBeforeEdit() -> {
+                val details = BeforeEditDetails(
+                    rawEvent = event,
+                    row = event.beforeEdit.row,
+                    col = event.beforeEdit.col,
+                )
+                beforeEditListener?.onBeforeEdit(details)
+                return details.cancel
+            }
+            event.hasCellEditValidate() -> {
+                val details = CellEditValidatingDetails(
+                    rawEvent = event,
+                    row = event.cellEditValidate.row,
+                    col = event.cellEditValidate.col,
+                    editText = event.cellEditValidate.editText,
+                )
+                cellEditValidatingListener?.onCellEditValidating(details)
+                return details.cancel
+            }
+            event.hasBeforeSort() -> {
+                val details = BeforeSortDetails(
+                    rawEvent = event,
+                    col = event.beforeSort.col,
+                )
+                beforeSortListener?.onBeforeSort(details)
+                return details.cancel
+            }
+            else -> return false
+        }
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {

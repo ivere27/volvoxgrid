@@ -337,7 +337,7 @@ pub fn subtotal_ex(
                 // at the generated subtotal caption cell and continues to the right.
                 // Cells to the left (copied key columns) remain unfilled.
                 let apply_back_color = back_color != 0 && c >= label_col;
-                let style = crate::style::CellStyleOverride {
+                let style = crate::style::CellStylePatch {
                     back_color: if apply_back_color {
                         Some(back_color)
                     } else {
@@ -638,7 +638,7 @@ fn subtotal_caption(aggregate: i32, caption: &str, group_on_col: i32, group_name
 mod tests {
     use super::{subtotal, subtotal_ex};
     use crate::grid::VolvoxGrid;
-    use crate::style::CellStyleOverride;
+    use crate::style::CellStylePatch;
 
     fn sample_grid() -> VolvoxGrid {
         let mut grid = VolvoxGrid::new(1, 800, 600, 5, 4, 1, 0);
@@ -773,7 +773,7 @@ mod tests {
         grid.row_props.entry(3).or_default().status = 2;
         grid.cell_styles.insert(
             (3, 1),
-            CellStyleOverride {
+            CellStylePatch {
                 fore_color: Some(0xFF00AA00),
                 ..Default::default()
             },

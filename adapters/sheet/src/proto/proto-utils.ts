@@ -67,66 +67,64 @@ function encodeCellRange(row1: number, col1: number, row2: number, col2: number)
   return out;
 }
 
+export interface BorderArg {
+  style?: number;   // BorderStyle enum
+  color?: number;   // ARGB uint32
+}
+
+export interface BordersArg {
+  all?: BorderArg;
+  top?: BorderArg;
+  right?: BorderArg;
+  bottom?: BorderArg;
+  left?: BorderArg;
+}
+
 export interface HighlightStyleArg {
-  backColor?: number;
-  foreColor?: number;
-  border?: number;
-  borderColor?: number;
-  borderTop?: number;
-  borderRight?: number;
-  borderBottom?: number;
-  borderLeft?: number;
-  borderTopColor?: number;
-  borderRightColor?: number;
-  borderBottomColor?: number;
-  borderLeftColor?: number;
+  background?: number;
+  foreground?: number;
+  borders?: BordersArg;
   fillHandle?: number;
   fillHandleColor?: number;
 }
 
+export function encodeBorder(border: BorderArg): number[] {
+  const out: number[] = [];
+  if (border.style != null) out.push(...encodeTag(1, 0), ...encodeInt32(border.style));
+  if (border.color != null) {
+    out.push(...encodeTag(2, 0), ...encodeVarintUnsigned(BigInt(border.color >>> 0)));
+  }
+  return out;
+}
+
+export function encodeBorders(borders: BordersArg): number[] {
+  const out: number[] = [];
+  if (borders.all) out.push(...encodeMessageField(1, encodeBorder(borders.all)));
+  if (borders.top) out.push(...encodeMessageField(2, encodeBorder(borders.top)));
+  if (borders.right) out.push(...encodeMessageField(3, encodeBorder(borders.right)));
+  if (borders.bottom) out.push(...encodeMessageField(4, encodeBorder(borders.bottom)));
+  if (borders.left) out.push(...encodeMessageField(5, encodeBorder(borders.left)));
+  return out;
+}
+
 export function encodeHighlightStyle(style: HighlightStyleArg): number[] {
   const out: number[] = [];
-  if (style.backColor != null) {
-    out.push(...encodeTag(1, 0), ...encodeVarintUnsigned(BigInt(style.backColor >>> 0)));
+  // HighlightStyle: background=1, foreground=2, borders=3, fill_handle=4, fill_handle_color=5
+  if (style.background != null) {
+    out.push(...encodeTag(1, 0), ...encodeVarintUnsigned(BigInt(style.background >>> 0)));
   }
-  if (style.foreColor != null) {
-    out.push(...encodeTag(2, 0), ...encodeVarintUnsigned(BigInt(style.foreColor >>> 0)));
+  if (style.foreground != null) {
+    out.push(...encodeTag(2, 0), ...encodeVarintUnsigned(BigInt(style.foreground >>> 0)));
   }
-  if (style.border != null) {
-    out.push(...encodeTag(3, 0), ...encodeInt32(style.border));
-  }
-  if (style.borderColor != null) {
-    out.push(...encodeTag(4, 0), ...encodeVarintUnsigned(BigInt(style.borderColor >>> 0)));
-  }
-  if (style.borderTop != null) {
-    out.push(...encodeTag(5, 0), ...encodeInt32(style.borderTop));
-  }
-  if (style.borderRight != null) {
-    out.push(...encodeTag(6, 0), ...encodeInt32(style.borderRight));
-  }
-  if (style.borderBottom != null) {
-    out.push(...encodeTag(7, 0), ...encodeInt32(style.borderBottom));
-  }
-  if (style.borderLeft != null) {
-    out.push(...encodeTag(8, 0), ...encodeInt32(style.borderLeft));
-  }
-  if (style.borderTopColor != null) {
-    out.push(...encodeTag(9, 0), ...encodeVarintUnsigned(BigInt(style.borderTopColor >>> 0)));
-  }
-  if (style.borderRightColor != null) {
-    out.push(...encodeTag(10, 0), ...encodeVarintUnsigned(BigInt(style.borderRightColor >>> 0)));
-  }
-  if (style.borderBottomColor != null) {
-    out.push(...encodeTag(11, 0), ...encodeVarintUnsigned(BigInt(style.borderBottomColor >>> 0)));
-  }
-  if (style.borderLeftColor != null) {
-    out.push(...encodeTag(12, 0), ...encodeVarintUnsigned(BigInt(style.borderLeftColor >>> 0)));
+  if (style.borders) {
+    const b = encodeBorders(style.borders);
+    if (b.length > 0) out.push(...encodeMessageField(3, b));
   }
   if (style.fillHandle != null) {
-    out.push(...encodeTag(13, 0), ...encodeInt32(style.fillHandle));
+    out.push(...encodeTag(4, 0), ...encodeInt32(style.fillHandle));
   }
   if (style.fillHandleColor != null) {
-    out.push(...encodeTag(14, 0), ...encodeVarintUnsigned(BigInt(style.fillHandleColor >>> 0)));
+    out.push(...encodeTag(5, 0), ...encodeVarintUnsigned(BigInt(style.fillHandleColor >>> 0)));
   }
   return out;
 }
@@ -343,6 +341,18 @@ export function encodeSelectRequest(args: {
 
 // ── UpdateCells encoder ────────────────────────────────────
 
+export interface FontArg {
+  family?: string;
+  size?: number;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strikethrough?: boolean;
+  width?: number;
+}
+
+// Flat cell style interface — used by sheet adapter for internal cache/toggles.
+// The encoder maps these flat fields to the nested proto CellStyle structure.
 export interface CellStyleFields {
   backColor?: number;
   foreColor?: number;
@@ -353,7 +363,6 @@ export interface CellStyleFields {
   fontStrikethrough?: boolean;
   fontName?: string;
   fontSize?: number;
-  // Per-edge borders (tags 17-24 in CellStyleOverride)
   borderTop?: number;        // BorderStyle enum
   borderRight?: number;
   borderBottom?: number;
@@ -365,76 +374,72 @@ export interface CellStyleFields {
   shrinkToFit?: boolean;
 }
 
-function encodeStyleOverride(style: CellStyleFields): number[] {
+export function encodeFont(font: FontArg): number[] {
+  const out: number[] = [];
+  // Font: family=1, families=2, size=3, bold=4, italic=5, underline=6, strikethrough=7, width=8
+  if (font.family != null) out.push(...encodeStringField(1, font.family));
+  if (font.size != null) {
+    const buf = new ArrayBuffer(4);
+    new DataView(buf).setFloat32(0, font.size, true);
+    out.push(...encodeTag(3, 5), ...new Uint8Array(buf));
+  }
+  if (font.bold != null) out.push(...encodeTag(4, 0), ...encodeBool(font.bold));
+  if (font.italic != null) out.push(...encodeTag(5, 0), ...encodeBool(font.italic));
+  if (font.underline != null) out.push(...encodeTag(6, 0), ...encodeBool(font.underline));
+  if (font.strikethrough != null) out.push(...encodeTag(7, 0), ...encodeBool(font.strikethrough));
+  if (font.width != null) {
+    const buf = new ArrayBuffer(4);
+    new DataView(buf).setFloat32(0, font.width, true);
+    out.push(...encodeTag(8, 5), ...new Uint8Array(buf));
+  }
+  return out;
+}
+
+// Encodes flat CellStyleFields → nested proto CellStyle
+// CellStyle: background=1, foreground=2, align=3, font=4, padding=5,
+//            borders=6, text_effect=7, progress=8, progress_color=9, shrink_to_fit=10
+function encodeCellStyle(style: CellStyleFields): number[] {
   const out: number[] = [];
   if (typeof style.backColor === "number") {
-    // CellStyleOverride.back_color = 1
     out.push(...encodeTag(1, 0), ...encodeVarintUnsigned(BigInt(style.backColor >>> 0)));
   }
   if (typeof style.foreColor === "number") {
-    // CellStyleOverride.fore_color = 2
     out.push(...encodeTag(2, 0), ...encodeVarintUnsigned(BigInt(style.foreColor >>> 0)));
   }
   if (typeof style.alignment === "number") {
-    // CellStyleOverride.alignment = 3
     out.push(...encodeTag(3, 0), ...encodeInt32(style.alignment));
   }
-  if (typeof style.fontName === "string") {
-    // CellStyleOverride.font_name = 5
-    out.push(...encodeStringField(5, style.fontName));
+
+  // Font: nest flat font* fields into Font message (field 4)
+  const font: FontArg = {};
+  if (typeof style.fontName === "string") font.family = style.fontName;
+  if (typeof style.fontSize === "number") font.size = style.fontSize;
+  if (typeof style.fontBold === "boolean") font.bold = style.fontBold;
+  if (typeof style.fontItalic === "boolean") font.italic = style.fontItalic;
+  if (typeof style.fontUnderline === "boolean") font.underline = style.fontUnderline;
+  if (typeof style.fontStrikethrough === "boolean") font.strikethrough = style.fontStrikethrough;
+  const fontBytes = encodeFont(font);
+  if (fontBytes.length > 0) out.push(...encodeMessageField(4, fontBytes));
+
+  // Borders: nest flat border* fields into Borders message (field 6)
+  const borders: BordersArg = {};
+  if (style.borderTop != null || style.borderTopColor != null) {
+    borders.top = { style: style.borderTop, color: style.borderTopColor };
   }
-  if (typeof style.fontSize === "number") {
-    // CellStyleOverride.font_size = 6 (float, wire type 5 = fixed32)
-    const buf = new ArrayBuffer(4);
-    new DataView(buf).setFloat32(0, style.fontSize, true);
-    const bytes = new Uint8Array(buf);
-    out.push(...encodeTag(6, 5), ...bytes);
+  if (style.borderRight != null || style.borderRightColor != null) {
+    borders.right = { style: style.borderRight, color: style.borderRightColor };
   }
-  if (typeof style.fontBold === "boolean") {
-    // CellStyleOverride.font_bold = 7
-    out.push(...encodeTag(7, 0), ...encodeBool(style.fontBold));
+  if (style.borderBottom != null || style.borderBottomColor != null) {
+    borders.bottom = { style: style.borderBottom, color: style.borderBottomColor };
   }
-  if (typeof style.fontItalic === "boolean") {
-    // CellStyleOverride.font_italic = 8
-    out.push(...encodeTag(8, 0), ...encodeBool(style.fontItalic));
+  if (style.borderLeft != null || style.borderLeftColor != null) {
+    borders.left = { style: style.borderLeft, color: style.borderLeftColor };
   }
-  if (typeof style.fontUnderline === "boolean") {
-    // CellStyleOverride.font_underline = 9
-    out.push(...encodeTag(9, 0), ...encodeBool(style.fontUnderline));
-  }
-  if (typeof style.fontStrikethrough === "boolean") {
-    // CellStyleOverride.font_strikethrough = 10
-    out.push(...encodeTag(10, 0), ...encodeBool(style.fontStrikethrough));
-  }
-  // Border styles (tags 17-20)
-  if (typeof style.borderTop === "number") {
-    out.push(...encodeTag(17, 0), ...encodeInt32(style.borderTop));
-  }
-  if (typeof style.borderRight === "number") {
-    out.push(...encodeTag(18, 0), ...encodeInt32(style.borderRight));
-  }
-  if (typeof style.borderBottom === "number") {
-    out.push(...encodeTag(19, 0), ...encodeInt32(style.borderBottom));
-  }
-  if (typeof style.borderLeft === "number") {
-    out.push(...encodeTag(20, 0), ...encodeInt32(style.borderLeft));
-  }
-  // Border colors (tags 21-24)
-  if (typeof style.borderTopColor === "number") {
-    out.push(...encodeTag(21, 0), ...encodeVarintUnsigned(BigInt(style.borderTopColor >>> 0)));
-  }
-  if (typeof style.borderRightColor === "number") {
-    out.push(...encodeTag(22, 0), ...encodeVarintUnsigned(BigInt(style.borderRightColor >>> 0)));
-  }
-  if (typeof style.borderBottomColor === "number") {
-    out.push(...encodeTag(23, 0), ...encodeVarintUnsigned(BigInt(style.borderBottomColor >>> 0)));
-  }
-  if (typeof style.borderLeftColor === "number") {
-    out.push(...encodeTag(24, 0), ...encodeVarintUnsigned(BigInt(style.borderLeftColor >>> 0)));
-  }
+  const bordersBytes = encodeBorders(borders);
+  if (bordersBytes.length > 0) out.push(...encodeMessageField(6, bordersBytes));
+
   if (typeof style.shrinkToFit === "boolean") {
-    // CellStyleOverride.shrink_to_fit = 25
-    out.push(...encodeTag(25, 0), ...encodeBool(style.shrinkToFit));
+    out.push(...encodeTag(10, 0), ...encodeBool(style.shrinkToFit));
   }
   return out;
 }
@@ -469,7 +474,7 @@ export function encodeUpdateCellsRequest(args: {
     }
 
     if (update.style) {
-      const style = encodeStyleOverride(update.style);
+      const style = encodeCellStyle(update.style);
       if (style.length > 0) {
         // CellUpdate.style = 4
         cellUpdate.push(...encodeMessageField(4, style));
