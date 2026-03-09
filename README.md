@@ -7,7 +7,7 @@ VolvoxGrid renders grids directly to RGBA pixel buffers, giving you full control
 ## Features
 
 - **Pixel-perfect rendering** -- CPU (tiny-skia) and GPU (wgpu/WebGPU) backends
-- **Cross-platform** -- Flutter, Web (WASM), Android, Java Desktop, ActiveX (Windows), GTK4 (Linux)
+- **Cross-platform** -- Flutter, Web (WASM), Android, Java Desktop, ActiveX (Windows), GTK4 plugin host (Linux)
 - **Protobuf API** -- All FFI communication uses Protocol Buffers for type-safe, language-agnostic bindings
 - **Rich grid functionality**:
   - Cell editing with validation and cancelable events
@@ -90,7 +90,7 @@ volvoxgrid/
 │   └── vsflexgrid/   # ActiveX/COM OCX control (Rust + C, MinGW cross-compiled)
 ├── proto/            # Protobuf service definitions
 ├── codegen/          # Generated FFI bindings (Dart, Java, C++, Rust)
-├── gtk-test/         # GTK4 visual test harness (Linux)
+├── gtk-test/         # GTK4 plugin-host visual test harness (Linux)
 ├── smoke-test/       # CLI smoke test (Rust host loads plugin)
 ├── docker/           # Docker build scripts
 ├── legacy/           # Adapter feasibility docs and planning
@@ -212,7 +212,7 @@ Direct scripts:
 ./dotnet/run_sample.sh
 ```
 
-### GTK4
+### GTK4 Plugin Host
 
 ```bash
 make gtk-test
@@ -409,8 +409,8 @@ into VolvoxGrid protobuf calls.
  │  (Dart)    (Java/Kotlin)   (Swing)      (COM/C++)   (Rust)   (TS)  │
  └──┬──────────┬───────────┬──────────────┬──────────┬──────────┬──────┘
     │          │           │              │          │          │
-    │ protobuf │ protobuf  │  protobuf    │ protobuf │ direct   │ wasm-
-    │ FFI      │ JNI       │  JNI         │ C ABI    │ Rust     │ bindgen
+    │ protobuf │ protobuf  │  protobuf    │ protobuf │ protobuf │ wasm-
+    │ FFI      │ JNI       │  JNI         │ C ABI    │ FFI      │ bindgen
     │          │           │              │          │          │
  ┌──▼──────────▼───────────▼──────────────▼──┐    ┌──▼──┐  ┌───▼──────┐
  │       Synurang FFI Plugin (cdylib)        │    │     │  │  WASM    │
@@ -805,7 +805,7 @@ Notes:
 
 - `LoadFontData` is global (not tied to a grid id).
 - The plugin stores loaded font bytes and replays them into both CPU and GPU renderers.
-- Font selection in styles uses `font_name`/`font_names` fields (for example `StyleConfig.font_name`, `IconTextStyle.font_name`, `IconTextStyle.font_names`).
+- Font selection in style/config messages uses nested `Font.family`/`Font.families` fields (for example `StyleConfig.font`, `CellStyle.font`, `RegionStyle.font`, `IconStyle.font`).
 - For icon fonts (Material Icons, etc.), load the font bytes first, then set the icon slot glyph and font name in style config.
 
 Dart example:

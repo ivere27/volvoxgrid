@@ -19,7 +19,7 @@ use crate::scroll::ScrollState;
 use crate::selection::SelectionState;
 use crate::sort::SortState;
 use crate::span::SpanState;
-use crate::style::{CellPadding, CellStyleOverride, GridStyleState};
+use crate::style::{CellStylePatch, GridStyleState, Padding};
 use crate::text::{TextEngine, DEFAULT_LAYOUT_CACHE_CAP};
 
 /// Default row height in pixels.
@@ -161,7 +161,7 @@ pub struct VolvoxGrid {
     /// Grid-level style (colors, grid lines, fonts, appearance, background image).
     pub style: GridStyleState,
     /// Per-cell style overrides keyed by `(row, col)`.
-    pub cell_styles: HashMap<(i32, i32), CellStyleOverride>,
+    pub cell_styles: HashMap<(i32, i32), CellStylePatch>,
     /// Indicator bands around the data viewport.
     pub indicator_bands: IndicatorBandsState,
 
@@ -401,6 +401,9 @@ pub struct VolvoxGrid {
     // ── Outline Button Click ─────────────────────────────────────────────
     /// Set during an outline +/- button click to suppress selection extension.
     pub outline_click_active: bool,
+    /// Set after a dropdown item click commits, to consume the rest of the
+    /// same pointer gesture so it does not leak into grid selection.
+    pub dropdown_click_active: bool,
 
     // ── Fast Scroll Tracking ──────────────────────────────────────────────
     /// Whether the fast-scroll touch overlay is enabled (mobile).
@@ -684,6 +687,7 @@ impl VolvoxGrid {
 
             // Outline button click
             outline_click_active: false,
+            dropdown_click_active: false,
 
             // Fast scroll tracking
             fast_scroll_enabled: false,
@@ -1809,7 +1813,7 @@ impl VolvoxGrid {
     }
 
     /// Returns the cell style override for a cell, or a default if none.
-    pub fn get_cell_style(&self, row: i32, col: i32) -> CellStyleOverride {
+    pub fn get_cell_style(&self, row: i32, col: i32) -> CellStylePatch {
         self.cell_styles
             .get(&(row, col))
             .cloned()
@@ -1823,8 +1827,8 @@ impl VolvoxGrid {
         &self,
         row: i32,
         col: i32,
-        style_override: &CellStyleOverride,
-    ) -> CellPadding {
+        style_override: &CellStylePatch,
+    ) -> Padding {
         if let Some(p) = style_override.padding {
             return p.clamped_non_negative();
         }
@@ -1833,7 +1837,7 @@ impl VolvoxGrid {
     }
 
     /// Resolve column/grid padding defaults, without per-cell overrides.
-    pub fn resolve_column_padding(&self, col: i32, is_fixed: bool) -> CellPadding {
+    pub fn resolve_column_padding(&self, col: i32, is_fixed: bool) -> Padding {
         let mut padding = if is_fixed {
             self.style.fixed_cell_padding
         } else {
@@ -3049,60 +3053,22 @@ impl VolvoxGrid {
             return None;
         }
 
-        let count = self.edit.dropdown_count();
-        if count <= 0 {
-            return None;
-        }
-
-        let mut cell_x = self.col_pos(col);
-        let mut cell_y = self.row_pos(row);
-        let cell_w = self.col_width(col);
-        let cell_h = self.row_height(row);
-        if row >= self.fixed_rows + self.frozen_rows {
-            cell_y -= self.scroll.scroll_y as i32;
-        }
-        if col >= self.fixed_cols + self.frozen_cols {
-            cell_x -= self.scroll.scroll_x as i32;
-        }
-
-        let visible_count = count.min(8).max(1);
-        let item_h = cell_h.max(18);
-        let drop_h = item_h * visible_count;
-        let drop_w = cell_w.max(90);
-        let mut drop_x = cell_x;
-        let mut drop_y = cell_y + cell_h - 1;
-
-        if drop_x + drop_w > self.viewport_width {
-            drop_x = (self.viewport_width - drop_w).max(0);
-        }
-        if drop_y + drop_h > self.viewport_height {
-            drop_y = cell_y - drop_h + 1;
-        }
-        if drop_y < 0 {
-            drop_y = 0;
-        }
-        if drop_y + drop_h > self.viewport_height {
-            drop_y = (self.viewport_height - drop_h).max(0);
-        }
+        let drop = crate::canvas::active_dropdown_popup_geometry(
+            self,
+            self.cell_screen_rect(row, col)?,
+            self.viewport_width,
+            self.viewport_height,
+        )?;
 
         let mx = px as i32;
         let my = py as i32;
-        if mx < drop_x || mx >= drop_x + drop_w || my < drop_y || my >= drop_y + drop_h {
+        if mx < drop.x || mx >= drop.x + drop.w || my < drop.y || my >= drop.y + drop.h {
             return None;
         }
 
-        let mut start = 0;
-        let sel = self.edit.dropdown_index;
-        if sel >= 0 && sel >= visible_count {
-            start = sel - visible_count + 1;
-        }
-        let max_start = (count - visible_count).max(0);
-        if start > max_start {
-            start = max_start;
-        }
-
-        let slot = ((my - drop_y) / item_h).clamp(0, visible_count - 1);
-        let idx = start + slot;
+        let slot = ((my - drop.y) / drop.item_h).clamp(0, drop.visible_count - 1);
+        let idx = drop.start + slot;
+        let count = self.edit.dropdown_count();
         if idx >= 0 && idx < count {
             Some(idx)
         } else {
@@ -3190,7 +3156,7 @@ mod tests {
         let mut grid = VolvoxGrid::new(1, 640, 480, 2, 3, 1, 0);
         grid.cell_styles.insert(
             (1, 1),
-            crate::style::CellStyleOverride {
+            crate::style::CellStylePatch {
                 font_bold: Some(true),
                 ..Default::default()
             },
@@ -3219,7 +3185,7 @@ mod tests {
         let mut grid = VolvoxGrid::new(1, 640, 480, 4, 2, 1, 0);
         grid.cell_styles.insert(
             (3, 1),
-            crate::style::CellStyleOverride {
+            crate::style::CellStylePatch {
                 font_italic: Some(true),
                 ..Default::default()
             },

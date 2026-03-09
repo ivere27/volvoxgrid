@@ -299,16 +299,16 @@ class MainActivity : AppCompatActivity() {
                             .setRows(rows)
                             .setCols(cols)
                             .build())
-                        .setIndicatorBands(IndicatorBandsConfig.newBuilder()
-                            .setRowIndicatorStart(RowIndicatorConfig.newBuilder()
+                        .setIndicators(IndicatorsConfig.newBuilder()
+                            .setRowStart(RowIndicatorConfig.newBuilder()
                                 .setVisible(false)
-                                .setWidthPx(35)
+                                .setWidth(35)
                                 .setModeBits(
                                     RowIndicatorMode.ROW_INDICATOR_CURRENT.number or
                                         RowIndicatorMode.ROW_INDICATOR_SELECTION.number
                                 )
                                 .build())
-                            .setColIndicatorTop(ColIndicatorConfig.newBuilder()
+                            .setColTop(ColIndicatorConfig.newBuilder()
                                 .setVisible(true)
                                 .setBandRows(1)
                                 .setModeBits(
@@ -336,16 +336,20 @@ class MainActivity : AppCompatActivity() {
 
                 // Setup styling
                 val style = ctrl.getGridStyle().toBuilder()
-                    .setForeColor(0xFF000000.toInt())
-                    .setForeColorFixed(0xFF000000.toInt())
-                    .setForeColorFrozen(0xFF000000.toInt())
-                    .setFontName("")
-                    .setFontSize(spToPx(14f).toFloat())
+                    .setForeground(0xFF000000.toInt())
+                    .setFixed(RegionStyle.newBuilder().setForeground(0xFF000000.toInt()).build())
+                    .setFrozen(RegionStyle.newBuilder().setForeground(0xFF000000.toInt()).build())
+                    .setFont(
+                        Font.newBuilder()
+                            .setFamily("")
+                            .setSize(spToPx(14f).toFloat())
+                            .build()
+                    )
                     .build()
                 ctrl.setGridStyle(style)
                 ctrl.setSelectionStyle(
                     HighlightStyle.newBuilder()
-                        .setForeColor(0xFFFFFFFF.toInt())
+                        .setForeground(0xFFFFFFFF.toInt())
                         .build()
                 )
                 applyDisplayToggles(ctrl)
@@ -393,9 +397,9 @@ class MainActivity : AppCompatActivity() {
             try {
                 val ctrl = controller ?: return@thread updateStatus("Grid not ready")
                 val order = if (ascending)
-                    SortOrder.SORT_GENERIC_ASCENDING
+                    SortOrder.SORT_ASCENDING
                 else
-                    SortOrder.SORT_GENERIC_DESCENDING
+                    SortOrder.SORT_DESCENDING
                 ctrl.sort(order, col = ctrl.cursorCol())
                 ctrl.refresh()
                 gridView.requestFrame()

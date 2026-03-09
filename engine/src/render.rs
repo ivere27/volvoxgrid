@@ -7,6 +7,8 @@
 use crate::canvas::render_grid;
 use crate::canvas_cpu::CpuCanvas;
 use crate::grid::VolvoxGrid;
+#[cfg(test)]
+use crate::selection::HOVER_COLUMN;
 use crate::text::{TextEngine, TextRenderer};
 
 /// Full pixel renderer for VolvoxGrid.
@@ -354,6 +356,25 @@ mod tests {
     }
 
     #[test]
+    fn render_col_indicator_keeps_vertical_boundary_aligned_with_data_cells() {
+        let mut grid = VolvoxGrid::new(1, 180, 80, 2, 2, 0, 0);
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        grid.indicator_bands.col_top.grid_lines = Some(pb::GridLineStyle::GridlineSolid as i32);
+        grid.indicator_bands.col_top.grid_color = Some(0xFF112233);
+        grid.indicator_bands.col_top.back_color = Some(0xFFE0E0E0);
+        grid.ensure_layout();
+
+        let mut renderer = Renderer::with_custom_text_renderer(Box::new(SolidTextRenderer));
+        let mut buffer = vec![0u8; (180 * 80 * 4) as usize];
+        renderer.render(&grid, &mut buffer, 180, 80, 180 * 4);
+
+        assert_eq!(pixel_argb(&buffer, 180, 67, 10), 0xFF112233);
+        assert_eq!(pixel_argb(&buffer, 180, 68, 10), 0xFFE0E0E0);
+    }
+
+    #[test]
     fn render_highlights_hovered_column_in_top_indicator_band() {
         let mut grid = VolvoxGrid::new(1, 220, 80, 4, 3, 0, 0);
         grid.indicator_bands.col_top.visible = true;
@@ -361,7 +382,7 @@ mod tests {
         grid.indicator_bands.col_top.default_row_height_px = 24;
         grid.indicator_bands.col_top.mode_bits =
             pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
-        grid.selection.hover_mode = pb::HoverMode::HoverColumn as u32;
+        grid.selection.hover_mode = HOVER_COLUMN;
         grid.selection.hover_column_style.back_color = Some(0xFF557799);
         grid.mouse_row = -1;
         grid.mouse_col = 2;
@@ -390,7 +411,7 @@ mod tests {
         assert_eq!(pixel_argb(&buffer, 300, 60, 2), back_color);
         assert_eq!(pixel_argb(&buffer, 300, 60, 30), back_color);
         assert_eq!(pixel_argb(&buffer, 300, 125, 20), back_color);
-        assert_eq!(pixel_argb(&buffer, 300, 10, 20), grid_color);
+        assert_eq!(pixel_argb(&buffer, 300, 10, 19), grid_color);
     }
 
     #[test]
@@ -422,7 +443,7 @@ mod tests {
         grid.header_features = 1;
         grid.sort_state
             .sort_keys
-            .push((2, pb::SortOrder::SortGenericDescending as i32));
+            .push((2, crate::sort::SORT_DESCENDING_AUTO));
         grid.ensure_layout();
 
         let mut renderer = Renderer::with_custom_text_renderer(Box::new(SolidTextRenderer));
@@ -485,7 +506,7 @@ mod tests {
         let mut buffer = vec![0u8; (180 * 80 * 4) as usize];
         renderer.render(&grid, &mut buffer, 180, 80, 180 * 4);
 
-        assert_eq!(pixel_argb(&buffer, 180, 4, 20), 0xFF112233);
+        assert_eq!(pixel_argb(&buffer, 180, 4, 19), 0xFF112233);
     }
 
     #[test]
@@ -508,7 +529,7 @@ mod tests {
         let mut buffer = vec![0u8; (180 * 80 * 4) as usize];
         renderer.render(&grid, &mut buffer, 180, 80, 180 * 4);
 
-        assert_eq!(pixel_argb(&buffer, 180, 4, 20), 0xFF112233);
+        assert_eq!(pixel_argb(&buffer, 180, 4, 19), 0xFF112233);
     }
 
     #[test]
@@ -529,8 +550,8 @@ mod tests {
         let mut buffer = vec![0u8; (180 * 80 * 4) as usize];
         renderer.render(&grid, &mut buffer, 180, 80, 180 * 4);
 
-        assert_eq!(pixel_argb(&buffer, 180, 4, 24), 0xFF112233);
-        assert_eq!(pixel_argb(&buffer, 180, 4, 23), 0xFFE0E0E0);
+        assert_eq!(pixel_argb(&buffer, 180, 4, 23), 0xFF112233);
+        assert_eq!(pixel_argb(&buffer, 180, 4, 22), 0xFFE0E0E0);
     }
 
     #[test]
@@ -567,9 +588,11 @@ mod tests {
         let mut buffer = vec![0u8; (200 * 80 * 4) as usize];
         renderer.render(&grid, &mut buffer, 200, 80, 200 * 4);
 
-        // Frozen separator should be offset by the 40px row indicator band:
+        // Frozen inset separator is offset by the 40px row indicator band:
         // indicator width (40) + first column width (68) = 108.
-        assert_eq!(pixel_argb(&buffer, 200, 108, 10), 0xFF000000);
-        assert_ne!(pixel_argb(&buffer, 200, 68, 10), 0xFF000000);
+        // In inset mode the dark edge is drawn at x-1 and the light edge at x.
+        assert_eq!(pixel_argb(&buffer, 200, 107, 10), 0xFF828282);
+        assert_eq!(pixel_argb(&buffer, 200, 108, 10), 0xFFFFFFFF);
+        assert_ne!(pixel_argb(&buffer, 200, 68, 10), 0xFF828282);
     }
 }

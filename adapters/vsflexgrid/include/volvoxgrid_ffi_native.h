@@ -184,8 +184,8 @@ uint8_t* volvox_grid_subtotal(
     int32_t group_on_col,
     int32_t aggregate_col,
     const uint8_t* caption, int32_t caption_len,
-    uint32_t back_color,
-    uint32_t fore_color,
+    uint32_t background,
+    uint32_t foreground,
     int32_t add_outline,
     int32_t* out_len
 );

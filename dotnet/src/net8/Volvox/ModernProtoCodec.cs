@@ -561,6 +561,9 @@ namespace VolvoxGrid.DotNet.Internal
                     data.Kind = VolvoxGridEventKind.CellEditValidate; data.Row = evt.CellEditValidate.Row; data.Col = evt.CellEditValidate.Col;
                     data.EditText = evt.CellEditValidate.EditText; data.IsCancelable = true;
                     break;
+                case GridEvent.EventOneofCase.BeforeSort:
+                    data.Kind = VolvoxGridEventKind.BeforeSort; data.Col = evt.BeforeSort.Col; data.IsCancelable = true;
+                    break;
             }
             return data;
         }
@@ -584,14 +587,14 @@ namespace VolvoxGrid.DotNet.Internal
             {
                 res.Selection = new SelectionConfig();
                 if (config.Selection.Mode.HasValue) res.Selection.Mode = (SelectionMode)config.Selection.Mode.Value;
-                if (config.Selection.SelectionVisibility.HasValue) res.Selection.SelectionVisibility = (SelectionVisibility)config.Selection.SelectionVisibility.Value;
-                if (config.Selection.AllowSelection.HasValue) res.Selection.AllowSelection = config.Selection.AllowSelection.Value;
-                if (config.Selection.HoverMode.HasValue) res.Selection.HoverMode = config.Selection.HoverMode.Value;
+                if (config.Selection.SelectionVisibility.HasValue) res.Selection.Visibility = (SelectionVisibility)config.Selection.SelectionVisibility.Value;
+                if (config.Selection.AllowSelection.HasValue) res.Selection.Allow = config.Selection.AllowSelection.Value;
+                if (config.Selection.HoverMask.HasValue) res.Selection.Hover = MapHoverConfig(config.Selection.HoverMask.Value);
             }
             if (config.Editing != null)
             {
                 res.Editing = new EditConfig();
-                if (config.Editing.EditTrigger.HasValue) res.Editing.EditTrigger = (EditTrigger)config.Editing.EditTrigger.Value;
+                if (config.Editing.EditTrigger.HasValue) res.Editing.Trigger = (EditTrigger)config.Editing.EditTrigger.Value;
             }
             if (config.Scrolling != null)
             {
@@ -616,8 +619,8 @@ namespace VolvoxGrid.DotNet.Internal
             if (config.Interaction != null)
             {
                 res.Interaction = new InteractionConfig();
-                if (config.Interaction.AllowUserResizing.HasValue) res.Interaction.AllowUserResizing = (AllowUserResizingMode)config.Interaction.AllowUserResizing.Value;
-                if (config.Interaction.HeaderFeatures.HasValue) res.Interaction.HeaderFeatures = (HeaderFeatures)config.Interaction.HeaderFeatures.Value;
+                if (config.Interaction.ResizePolicy.HasValue) res.Interaction.Resize = MapResizePolicy(config.Interaction.ResizePolicy.Value);
+                if (config.Interaction.HeaderFeatures.HasValue) res.Interaction.HeaderFeatures = MapHeaderFeatures(config.Interaction.HeaderFeatures.Value);
             }
             if (config.Rendering != null)
             {
@@ -628,9 +631,9 @@ namespace VolvoxGrid.DotNet.Internal
                 if (config.Rendering.AnimationDurationMs.HasValue) res.Rendering.AnimationDurationMs = config.Rendering.AnimationDurationMs.Value;
                 if (config.Rendering.TextLayoutCacheCap.HasValue) res.Rendering.TextLayoutCacheCap = config.Rendering.TextLayoutCacheCap.Value;
             }
-            if (config.IndicatorBands != null)
+            if (config.Indicators != null)
             {
-                res.IndicatorBands = MapIndicatorBands(config.IndicatorBands);
+                res.Indicators = MapIndicators(config.Indicators);
             }
             return res;
         }
@@ -647,12 +650,12 @@ namespace VolvoxGrid.DotNet.Internal
             }
             if (c.Selection != null)
             {
-                res.Selection.Mode = (VolvoxSelectionMode)c.Selection.Mode;
-                res.Selection.SelectionVisibility = (VolvoxSelectionVisibility)c.Selection.SelectionVisibility;
-                res.Selection.AllowSelection = c.Selection.AllowSelection;
-                res.Selection.HoverMode = c.Selection.HoverMode;
+                if (c.Selection.HasMode) res.Selection.Mode = (VolvoxSelectionMode)c.Selection.Mode;
+                if (c.Selection.HasVisibility) res.Selection.SelectionVisibility = (VolvoxSelectionVisibility)c.Selection.Visibility;
+                if (c.Selection.HasAllow) res.Selection.AllowSelection = c.Selection.Allow;
+                if (c.Selection.Hover != null) res.Selection.HoverMask = UnmapHoverConfig(c.Selection.Hover);
             }
-            if (c.Editing != null) res.Editing.EditTrigger = (VolvoxEditTrigger)c.Editing.EditTrigger;
+            if (c.Editing != null && c.Editing.HasTrigger) res.Editing.EditTrigger = (VolvoxEditTrigger)c.Editing.Trigger;
             if (c.Scrolling != null)
             {
                 res.Scrolling.Scrollbars = (VolvoxScrollBarsMode)c.Scrolling.Scrollbars;
@@ -669,8 +672,8 @@ namespace VolvoxGrid.DotNet.Internal
             if (c.Span != null) res.Span.CellSpan = (VolvoxCellSpanMode)c.Span.CellSpan;
             if (c.Interaction != null)
             {
-                res.Interaction.AllowUserResizing = (VolvoxAllowUserResizingMode)c.Interaction.AllowUserResizing;
-                res.Interaction.HeaderFeatures = (VolvoxHeaderFeatures)c.Interaction.HeaderFeatures;
+                if (c.Interaction.Resize != null) res.Interaction.ResizePolicy = UnmapResizePolicy(c.Interaction.Resize);
+                if (c.Interaction.HeaderFeatures != null) res.Interaction.HeaderFeatures = UnmapHeaderFeatures(c.Interaction.HeaderFeatures);
             }
             if (c.Rendering != null)
             {
@@ -680,17 +683,17 @@ namespace VolvoxGrid.DotNet.Internal
                 res.Rendering.AnimationDurationMs = c.Rendering.AnimationDurationMs;
                 res.Rendering.TextLayoutCacheCap = c.Rendering.TextLayoutCacheCap;
             }
-            if (c.IndicatorBands != null)
+            if (c.Indicators != null)
             {
-                res.IndicatorBands = UnmapIndicatorBands(c.IndicatorBands);
+                res.Indicators = UnmapIndicators(c.Indicators);
             }
             return res;
         }
 
-        private static IndicatorBandsConfig MapIndicatorBands(VolvoxIndicatorBandsConfigData data)
+        private static IndicatorsConfig MapIndicators(VolvoxIndicatorsConfigData data)
         {
             if (data == null) return null;
-            return new IndicatorBandsConfig
+            return new IndicatorsConfig
             {
                 RowIndicatorStart = MapRowIndicator(data.RowIndicatorStart),
                 RowIndicatorEnd = MapRowIndicator(data.RowIndicatorEnd),
@@ -703,10 +706,10 @@ namespace VolvoxGrid.DotNet.Internal
             };
         }
 
-        private static VolvoxIndicatorBandsConfigData UnmapIndicatorBands(IndicatorBandsConfig data)
+        private static VolvoxIndicatorsConfigData UnmapIndicators(IndicatorsConfig data)
         {
             if (data == null) return null;
-            return new VolvoxIndicatorBandsConfigData
+            return new VolvoxIndicatorsConfigData
             {
                 RowIndicatorStart = UnmapRowIndicator(data.RowIndicatorStart),
                 RowIndicatorEnd = UnmapRowIndicator(data.RowIndicatorEnd),
@@ -890,47 +893,179 @@ namespace VolvoxGrid.DotNet.Internal
             };
         }
 
-        private CellStyleOverride MapCellStyle(VolvoxCellStyleOverride s)
+        private static HoverConfig MapHoverConfig(uint hoverMode)
         {
-            var res = new CellStyleOverride();
-            if (s.BackColor.HasValue) res.BackColor = s.BackColor.Value;
-            if (s.ForeColor.HasValue) res.ForeColor = s.ForeColor.Value;
-            if (s.Alignment.HasValue) res.Alignment = (Align)s.Alignment.Value;
+            return new HoverConfig
+            {
+                Row = (hoverMode & 1u) != 0,
+                Column = (hoverMode & 2u) != 0,
+                Cell = (hoverMode & 4u) != 0,
+            };
+        }
+
+        private static uint UnmapHoverConfig(HoverConfig hover)
+        {
+            uint mode = 0;
+            if (hover != null)
+            {
+                if (hover.HasRow && hover.Row) mode |= 1u;
+                if (hover.HasColumn && hover.Column) mode |= 2u;
+                if (hover.HasCell && hover.Cell) mode |= 4u;
+            }
+            return mode;
+        }
+
+        private static ResizePolicy MapResizePolicy(VolvoxResizePolicyMode mode)
+        {
+            bool columns;
+            bool rows;
+            bool uniform;
+            DecodeResizePolicyMode(mode, out columns, out rows, out uniform);
+            return new ResizePolicy
+            {
+                Columns = columns,
+                Rows = rows,
+                Uniform = uniform,
+            };
+        }
+
+        private static VolvoxResizePolicyMode UnmapResizePolicy(ResizePolicy policy)
+        {
+            bool columns = policy != null && policy.HasColumns && policy.Columns;
+            bool rows = policy != null && policy.HasRows && policy.Rows;
+            bool uniform = policy != null && policy.HasUniform && policy.Uniform;
+            return EncodeResizePolicyMode(columns, rows, uniform);
+        }
+
+        private static HeaderFeatures MapHeaderFeatures(VolvoxHeaderFeatures features)
+        {
+            int bits = (int)features;
+            return new HeaderFeatures
+            {
+                Sort = (bits & 1) != 0,
+                Reorder = (bits & 2) != 0,
+                Chooser = (bits & 4) != 0,
+            };
+        }
+
+        private static VolvoxHeaderFeatures UnmapHeaderFeatures(HeaderFeatures features)
+        {
+            int bits = 0;
+            if (features != null)
+            {
+                if (features.HasSort && features.Sort) bits |= 1;
+                if (features.HasReorder && features.Reorder) bits |= 2;
+                if (features.HasChooser && features.Chooser) bits |= 4;
+            }
+            return (VolvoxHeaderFeatures)bits;
+        }
+
+        private static void DecodeResizePolicyMode(VolvoxResizePolicyMode mode, out bool columns, out bool rows, out bool uniform)
+        {
+            columns = false;
+            rows = false;
+            uniform = false;
+
+            switch (mode)
+            {
+                case VolvoxResizePolicyMode.Columns:
+                    columns = true;
+                    break;
+                case VolvoxResizePolicyMode.Rows:
+                    rows = true;
+                    break;
+                case VolvoxResizePolicyMode.Both:
+                    columns = true;
+                    rows = true;
+                    break;
+                case VolvoxResizePolicyMode.ColumnsUniform:
+                    columns = true;
+                    uniform = true;
+                    break;
+                case VolvoxResizePolicyMode.RowsUniform:
+                    rows = true;
+                    uniform = true;
+                    break;
+                case VolvoxResizePolicyMode.BothUniform:
+                    columns = true;
+                    rows = true;
+                    uniform = true;
+                    break;
+            }
+        }
+
+        private static VolvoxResizePolicyMode EncodeResizePolicyMode(bool columns, bool rows, bool uniform)
+        {
+            if (columns && rows) return uniform ? VolvoxResizePolicyMode.BothUniform : VolvoxResizePolicyMode.Both;
+            if (columns) return uniform ? VolvoxResizePolicyMode.ColumnsUniform : VolvoxResizePolicyMode.Columns;
+            if (rows) return uniform ? VolvoxResizePolicyMode.RowsUniform : VolvoxResizePolicyMode.Rows;
+            return VolvoxResizePolicyMode.None;
+        }
+
+        private static Border UnmapFirstBorder(Borders borders)
+        {
+            if (borders == null) return null;
+            return borders.All ?? borders.Top ?? borders.Right ?? borders.Bottom ?? borders.Left;
+        }
+
+        private CellStyle MapCellStyle(VolvoxCellStylePatch s)
+        {
+            var res = new CellStyle();
+            if (s.BackColor.HasValue) res.Background = s.BackColor.Value;
+            if (s.ForeColor.HasValue) res.Foreground = s.ForeColor.Value;
+            if (s.Alignment.HasValue) res.Align = (Align)s.Alignment.Value;
             if (s.TextEffect.HasValue) res.TextEffect = (TextEffect)s.TextEffect.Value;
-            if (s.FontName != null) res.FontName = s.FontName;
-            if (s.FontSize.HasValue) res.FontSize = s.FontSize.Value;
-            if (s.FontBold.HasValue) res.FontBold = s.FontBold.Value;
-            if (s.FontItalic.HasValue) res.FontItalic = s.FontItalic.Value;
-            if (s.FontUnderline.HasValue) res.FontUnderline = s.FontUnderline.Value;
-            if (s.FontStrikethrough.HasValue) res.FontStrikethrough = s.FontStrikethrough.Value;
-            if (s.FontWidth.HasValue) res.FontWidth = s.FontWidth.Value;
             if (s.ProgressColor.HasValue) res.ProgressColor = s.ProgressColor.Value;
-            if (s.ProgressPercent.HasValue) res.ProgressPercent = s.ProgressPercent.Value;
-            if (s.Border.HasValue) res.Border = (BorderStyle)s.Border.Value;
-            if (s.BorderColor.HasValue) res.BorderColor = s.BorderColor.Value;
+            if (s.ProgressPercent.HasValue) res.Progress = s.ProgressPercent.Value;
+            if (s.FontName != null || s.FontSize.HasValue || s.FontBold.HasValue || s.FontItalic.HasValue || s.FontUnderline.HasValue || s.FontStrikethrough.HasValue || s.FontWidth.HasValue)
+            {
+                var font = new Font();
+                if (s.FontName != null) font.Family = s.FontName;
+                if (s.FontSize.HasValue) font.Size = s.FontSize.Value;
+                if (s.FontBold.HasValue) font.Bold = s.FontBold.Value;
+                if (s.FontItalic.HasValue) font.Italic = s.FontItalic.Value;
+                if (s.FontUnderline.HasValue) font.Underline = s.FontUnderline.Value;
+                if (s.FontStrikethrough.HasValue) font.Strikethrough = s.FontStrikethrough.Value;
+                if (s.FontWidth.HasValue) font.Width = s.FontWidth.Value;
+                res.Font = font;
+            }
+            if (s.Border.HasValue || s.BorderColor.HasValue)
+            {
+                var border = new Border();
+                if (s.Border.HasValue) border.Style = (BorderStyle)s.Border.Value;
+                if (s.BorderColor.HasValue) border.Color = s.BorderColor.Value;
+                res.Borders = new Borders { All = border };
+            }
             return res;
         }
 
-        private VolvoxCellStyleOverride UnmapCellStyle(CellStyleOverride s)
+        private VolvoxCellStylePatch UnmapCellStyle(CellStyle s)
         {
-            return new VolvoxCellStyleOverride
+            var result = new VolvoxCellStylePatch
             {
-                BackColor = s.HasBackColor ? (uint?)s.BackColor : null,
-                ForeColor = s.HasForeColor ? (uint?)s.ForeColor : null,
-                Alignment = s.HasAlignment ? (VolvoxAlign?)s.Alignment : null,
+                BackColor = s.HasBackground ? (uint?)s.Background : null,
+                ForeColor = s.HasForeground ? (uint?)s.Foreground : null,
+                Alignment = s.HasAlign ? (VolvoxAlign?)s.Align : null,
                 TextEffect = s.HasTextEffect ? (VolvoxTextEffect?)s.TextEffect : null,
-                FontName = s.FontName,
-                FontSize = s.HasFontSize ? (float?)s.FontSize : null,
-                FontBold = s.HasFontBold ? (bool?)s.FontBold : null,
-                FontItalic = s.HasFontItalic ? (bool?)s.FontItalic : null,
-                FontUnderline = s.HasFontUnderline ? (bool?)s.FontUnderline : null,
-                FontStrikethrough = s.HasFontStrikethrough ? (bool?)s.FontStrikethrough : null,
-                FontWidth = s.HasFontWidth ? (float?)s.FontWidth : null,
+                FontName = s.Font != null && s.Font.HasFamily ? s.Font.Family : null,
+                FontSize = s.Font != null && s.Font.HasSize ? (float?)s.Font.Size : null,
+                FontBold = s.Font != null && s.Font.HasBold ? (bool?)s.Font.Bold : null,
+                FontItalic = s.Font != null && s.Font.HasItalic ? (bool?)s.Font.Italic : null,
+                FontUnderline = s.Font != null && s.Font.HasUnderline ? (bool?)s.Font.Underline : null,
+                FontStrikethrough = s.Font != null && s.Font.HasStrikethrough ? (bool?)s.Font.Strikethrough : null,
+                FontWidth = s.Font != null && s.Font.HasWidth ? (float?)s.Font.Width : null,
                 ProgressColor = s.HasProgressColor ? (uint?)s.ProgressColor : null,
-                ProgressPercent = s.HasProgressPercent ? (float?)s.ProgressPercent : null,
-                Border = s.HasBorder ? (VolvoxBorderStyle?)s.Border : null,
-                BorderColor = s.HasBorderColor ? (uint?)s.BorderColor : null,
+                ProgressPercent = s.HasProgress ? (float?)s.Progress : null,
             };
+
+            var border = UnmapFirstBorder(s.Borders);
+            if (border != null)
+            {
+                result.Border = border.HasStyle ? (VolvoxBorderStyle?)border.Style : null;
+                result.BorderColor = border.HasColor ? (uint?)border.Color : null;
+            }
+
+            return result;
         }
 
         private static CellValue ToProtoCellValue(VolvoxCellValueData value)

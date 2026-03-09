@@ -1,6 +1,16 @@
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::style::HighlightStyle;
 
+pub const HOVER_NONE: u32 = 0;
+pub const HOVER_ROW: u32 = 1;
+pub const HOVER_COLUMN: u32 = 2;
+pub const HOVER_CELL: u32 = 4;
+
+#[inline]
+pub fn hover_mode_has(mode: u32, flag: u32) -> bool {
+    mode & flag != 0
+}
+
 /// Selection state
 #[derive(Clone, Debug)]
 pub struct SelectionState {
@@ -19,6 +29,10 @@ pub struct SelectionState {
     pub hover_row_style: HighlightStyle,
     pub hover_column_style: HighlightStyle,
     pub hover_cell_style: HighlightStyle,
+    /// Optional indicator-specific selection highlight.
+    /// When set, row/col indicators use these instead of `selection_style`.
+    pub indicator_row_style: Option<HighlightStyle>,
+    pub indicator_col_style: Option<HighlightStyle>,
     // For listbox mode - track individually selected rows
     pub selected_rows: std::collections::HashSet<i32>,
 }
@@ -43,7 +57,7 @@ impl Default for SelectionState {
                 fill_handle_color: Some(0xFF217346),
                 ..HighlightStyle::default()
             },
-            hover_mode: pb::HoverMode::HoverNone as u32,
+            hover_mode: HOVER_NONE,
             // ROW/COLUMN are intentionally subtle to provide axis context.
             hover_row_style: HighlightStyle {
                 back_color: Some(0x10000000),
@@ -60,6 +74,8 @@ impl Default for SelectionState {
                 border_color: Some(0xFF1A73E8),
                 ..HighlightStyle::default()
             },
+            indicator_row_style: None,
+            indicator_col_style: None,
             selected_rows: std::collections::HashSet::new(),
         }
     }
@@ -98,6 +114,38 @@ impl SelectionState {
         for range in &mut self.extra_ranges {
             *range = Self::normalize_range(range.0, range.1, range.2, range.3, rows, cols);
         }
+    }
+
+    /// Keep a collapsed default cursor attached to the first scrollable cell
+    /// when the fixed bands change.
+    pub fn remap_collapsed_cursor_after_fixed_change(
+        &mut self,
+        rows: i32,
+        cols: i32,
+        old_fixed_rows: i32,
+        old_fixed_cols: i32,
+        new_fixed_rows: i32,
+        new_fixed_cols: i32,
+    ) {
+        if rows <= 0 || cols <= 0 {
+            return;
+        }
+
+        let old_first_row = old_fixed_rows.min(rows - 1);
+        let old_first_col = old_fixed_cols.min(cols - 1);
+        let new_first_row = new_fixed_rows.min(rows - 1);
+        let new_first_col = new_fixed_cols.min(cols - 1);
+
+        if self.row == self.row_end && self.row == old_first_row {
+            self.row = new_first_row;
+            self.row_end = new_first_row;
+        }
+        if self.col == self.col_end && self.col == old_first_col {
+            self.col = new_first_col;
+            self.col_end = new_first_col;
+        }
+
+        self.clamp(rows, cols, new_fixed_rows, new_fixed_cols);
     }
 
     /// Set cursor position, clamping to valid range.
@@ -374,5 +422,30 @@ mod tests {
             selection.all_ranges(10, 10),
             vec![(4, 2, 4, 2), (1, 0, 1, 9)]
         );
+    }
+
+    #[test]
+    fn collapsed_cursor_tracks_first_scrollable_cell_after_fixed_change() {
+        let mut selection = SelectionState::with_initial(1, 1);
+
+        selection.remap_collapsed_cursor_after_fixed_change(21, 5, 1, 1, 1, 0);
+
+        assert_eq!(selection.row, 1);
+        assert_eq!(selection.col, 0);
+        assert_eq!(selection.row_end, 1);
+        assert_eq!(selection.col_end, 0);
+    }
+
+    #[test]
+    fn expanded_selection_keeps_logical_bounds_after_fixed_change() {
+        let mut selection = SelectionState::default();
+        selection.select(1, 1, 4, 3, 21, 5);
+
+        selection.remap_collapsed_cursor_after_fixed_change(21, 5, 1, 1, 1, 0);
+
+        assert_eq!(selection.row, 1);
+        assert_eq!(selection.col, 1);
+        assert_eq!(selection.row_end, 4);
+        assert_eq!(selection.col_end, 3);
     }
 }

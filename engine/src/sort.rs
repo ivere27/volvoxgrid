@@ -19,6 +19,112 @@ macro_rules! sort_indices {
 use crate::grid::VolvoxGrid;
 use crate::proto::volvoxgrid::v1 as pb;
 
+pub const SORT_NONE: i32 = 0;
+pub const SORT_ASCENDING_AUTO: i32 = 1;
+pub const SORT_DESCENDING_AUTO: i32 = 2;
+pub const SORT_ASCENDING_NUMERIC: i32 = 3;
+pub const SORT_DESCENDING_NUMERIC: i32 = 4;
+pub const SORT_ASCENDING_STRING_NO_CASE: i32 = 5;
+pub const SORT_DESCENDING_STRING_NO_CASE: i32 = 6;
+pub const SORT_ASCENDING_STRING: i32 = 7;
+pub const SORT_DESCENDING_STRING: i32 = 8;
+pub const SORT_ASCENDING_CUSTOM: i32 = 9;
+pub const SORT_USE_COLUMN: i32 = 10;
+pub const SORT_DESCENDING_CUSTOM: i32 = 11;
+
+pub fn sort_order_is_ascending(order: i32) -> bool {
+    matches!(
+        order,
+        SORT_ASCENDING_AUTO
+            | SORT_ASCENDING_NUMERIC
+            | SORT_ASCENDING_STRING_NO_CASE
+            | SORT_ASCENDING_STRING
+            | SORT_ASCENDING_CUSTOM
+    )
+}
+
+pub fn sort_order_is_none(order: i32) -> bool {
+    order == SORT_NONE
+}
+
+pub fn decode_sort_spec(order: i32) -> (Option<i32>, Option<i32>) {
+    match order {
+        SORT_NONE => (Some(pb::SortOrder::SortNone as i32), None),
+        SORT_ASCENDING_AUTO => (
+            Some(pb::SortOrder::SortAscending as i32),
+            Some(pb::SortType::Auto as i32),
+        ),
+        SORT_DESCENDING_AUTO => (
+            Some(pb::SortOrder::SortDescending as i32),
+            Some(pb::SortType::Auto as i32),
+        ),
+        SORT_ASCENDING_NUMERIC => (
+            Some(pb::SortOrder::SortAscending as i32),
+            Some(pb::SortType::Numeric as i32),
+        ),
+        SORT_DESCENDING_NUMERIC => (
+            Some(pb::SortOrder::SortDescending as i32),
+            Some(pb::SortType::Numeric as i32),
+        ),
+        SORT_ASCENDING_STRING_NO_CASE => (
+            Some(pb::SortOrder::SortAscending as i32),
+            Some(pb::SortType::StringNoCase as i32),
+        ),
+        SORT_DESCENDING_STRING_NO_CASE => (
+            Some(pb::SortOrder::SortDescending as i32),
+            Some(pb::SortType::StringNoCase as i32),
+        ),
+        SORT_ASCENDING_STRING => (
+            Some(pb::SortOrder::SortAscending as i32),
+            Some(pb::SortType::String as i32),
+        ),
+        SORT_DESCENDING_STRING => (
+            Some(pb::SortOrder::SortDescending as i32),
+            Some(pb::SortType::String as i32),
+        ),
+        SORT_ASCENDING_CUSTOM => (
+            Some(pb::SortOrder::SortAscending as i32),
+            Some(pb::SortType::Custom as i32),
+        ),
+        SORT_DESCENDING_CUSTOM => (
+            Some(pb::SortOrder::SortDescending as i32),
+            Some(pb::SortType::Custom as i32),
+        ),
+        _ => (
+            Some(pb::SortOrder::SortAscending as i32),
+            Some(pb::SortType::Auto as i32),
+        ),
+    }
+}
+
+pub fn merge_sort_spec(current: i32, order: Option<i32>, sort_type: Option<i32>) -> i32 {
+    let (current_order, current_type) = decode_sort_spec(current);
+    let next_order = order
+        .or(current_order)
+        .unwrap_or(pb::SortOrder::SortAscending as i32);
+    if next_order == pb::SortOrder::SortNone as i32 {
+        return SORT_NONE;
+    }
+
+    let next_type = sort_type
+        .or(current_type)
+        .unwrap_or(pb::SortType::Auto as i32);
+    let ascending = next_order != pb::SortOrder::SortDescending as i32;
+
+    match (next_type, ascending) {
+        (t, true) if t == pb::SortType::Numeric as i32 => SORT_ASCENDING_NUMERIC,
+        (t, false) if t == pb::SortType::Numeric as i32 => SORT_DESCENDING_NUMERIC,
+        (t, true) if t == pb::SortType::StringNoCase as i32 => SORT_ASCENDING_STRING_NO_CASE,
+        (t, false) if t == pb::SortType::StringNoCase as i32 => SORT_DESCENDING_STRING_NO_CASE,
+        (t, true) if t == pb::SortType::String as i32 => SORT_ASCENDING_STRING,
+        (t, false) if t == pb::SortType::String as i32 => SORT_DESCENDING_STRING,
+        (t, true) if t == pb::SortType::Custom as i32 => SORT_ASCENDING_CUSTOM,
+        (t, false) if t == pb::SortType::Custom as i32 => SORT_DESCENDING_CUSTOM,
+        (_, true) => SORT_ASCENDING_AUTO,
+        _ => SORT_DESCENDING_AUTO,
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct SortState {
     /// Active sort keys: `(col, order)` pairs in priority order.
@@ -38,9 +144,7 @@ impl SortState {
 
     /// Primary sort order, or SortNone if no sort is active.
     pub fn last_sort_order(&self) -> i32 {
-        self.sort_keys
-            .first()
-            .map_or(pb::SortOrder::SortNone as i32, |k| k.1)
+        self.sort_keys.first().map_or(SORT_NONE, |k| k.1)
     }
 
     /// Remove all sort keys.
@@ -337,11 +441,11 @@ fn sort_key_columns(grid: &VolvoxGrid, col_override: i32) -> Vec<i32> {
 }
 
 fn effective_order_for_col(grid: &VolvoxGrid, global_order: i32, col: i32) -> i32 {
-    if global_order == pb::SortOrder::SortUseColSort as i32 {
+    if global_order == SORT_USE_COLUMN {
         if col >= 0 && (col as usize) < grid.columns.len() {
             grid.columns[col as usize].sort_order
         } else {
-            pb::SortOrder::SortNone as i32
+            SORT_NONE
         }
     } else {
         global_order
@@ -350,10 +454,10 @@ fn effective_order_for_col(grid: &VolvoxGrid, global_order: i32, col: i32) -> i3
 
 #[inline]
 fn apply_sort_direction(cmp: std::cmp::Ordering, order: i32) -> std::cmp::Ordering {
-    if order % 2 == 0 {
-        cmp.reverse()
-    } else {
+    if sort_order_is_ascending(order) {
         cmp
+    } else {
+        cmp.reverse()
     }
 }
 
@@ -372,9 +476,7 @@ fn sort_single_key_indices(
 ) {
     match order {
         // Numeric
-        o if o == pb::SortOrder::SortNumericAscending as i32
-            || o == pb::SortOrder::SortNumericDescending as i32 =>
-        {
+        o if o == SORT_ASCENDING_NUMERIC || o == SORT_DESCENDING_NUMERIC => {
             let keys: Vec<f64> = group
                 .iter()
                 .map(|&row| parse_number(grid.cells.get_text(row, col)).unwrap_or(0.0))
@@ -385,9 +487,7 @@ fn sort_single_key_indices(
             });
         }
         // String no-case
-        o if o == pb::SortOrder::SortStringNoCaseAsc as i32
-            || o == pb::SortOrder::SortStringNoCaseDesc as i32 =>
-        {
+        o if o == SORT_ASCENDING_STRING_NO_CASE || o == SORT_DESCENDING_STRING_NO_CASE => {
             let keys: Vec<Box<str>> = group
                 .iter()
                 .map(|&row| {
@@ -403,9 +503,7 @@ fn sort_single_key_indices(
             });
         }
         // String (case-sensitive)
-        o if o == pb::SortOrder::SortStringAsc as i32
-            || o == pb::SortOrder::SortStringDesc as i32 =>
-        {
+        o if o == SORT_ASCENDING_STRING || o == SORT_DESCENDING_STRING => {
             let keys: Vec<&str> = group
                 .iter()
                 .map(|&row| grid.cells.get_text(row, col))
@@ -416,9 +514,10 @@ fn sort_single_key_indices(
             });
         }
         // Generic / date-generic
-        o if o == pb::SortOrder::SortGenericAscending as i32
-            || o == pb::SortOrder::SortGenericDescending as i32
-            || o == pb::SortOrder::SortCustom as i32 =>
+        o if o == SORT_ASCENDING_AUTO
+            || o == SORT_DESCENDING_AUTO
+            || o == SORT_ASCENDING_CUSTOM
+            || o == SORT_DESCENDING_CUSTOM =>
         {
             let texts: Vec<&str> = group
                 .iter()
@@ -488,40 +587,38 @@ fn compare_extracted(
     col_infos: &[(i32, i32)],
 ) -> std::cmp::Ordering {
     for (i, &(order, data_type)) in col_infos.iter().enumerate() {
-        if order == pb::SortOrder::SortNone as i32 {
+        if order == SORT_NONE {
             continue;
         }
         let text_a = keys_a[i];
         let text_b = keys_b[i];
         let cmp = match order {
-            o if o == pb::SortOrder::SortGenericAscending as i32
-                || o == pb::SortOrder::SortGenericDescending as i32 =>
-            {
+            o if o == SORT_ASCENDING_AUTO || o == SORT_DESCENDING_AUTO => {
                 if data_type == pb::ColumnDataType::ColumnDataDate as i32 {
                     date_compare(text_a, text_b)
                 } else {
                     generic_compare(text_a, text_b)
                 }
             }
-            o if o == pb::SortOrder::SortNumericAscending as i32
-                || o == pb::SortOrder::SortNumericDescending as i32 =>
-            {
+            o if o == SORT_ASCENDING_NUMERIC || o == SORT_DESCENDING_NUMERIC => {
                 numeric_compare(text_a, text_b)
             }
-            o if o == pb::SortOrder::SortStringNoCaseAsc as i32
-                || o == pb::SortOrder::SortStringNoCaseDesc as i32 =>
-            {
+            o if o == SORT_ASCENDING_STRING_NO_CASE || o == SORT_DESCENDING_STRING_NO_CASE => {
                 string_nocase_compare(text_a, text_b)
             }
-            o if o == pb::SortOrder::SortStringAsc as i32
-                || o == pb::SortOrder::SortStringDesc as i32 =>
-            {
+            o if o == SORT_ASCENDING_STRING || o == SORT_DESCENDING_STRING => {
                 string_compare(text_a, text_b)
             }
-            o if o == pb::SortOrder::SortCustom as i32 => generic_compare(text_a, text_b),
+            o if o == SORT_ASCENDING_CUSTOM || o == SORT_DESCENDING_CUSTOM => {
+                generic_compare(text_a, text_b)
+            }
             _ => std::cmp::Ordering::Equal,
         };
-        let cmp = if order % 2 == 0 { cmp.reverse() } else { cmp };
+        let cmp = if sort_order_is_ascending(order) {
+            cmp
+        } else {
+            cmp.reverse()
+        };
         if cmp != std::cmp::Ordering::Equal {
             return cmp;
         }
@@ -729,19 +826,17 @@ pub fn handle_header_click(grid: &mut VolvoxGrid, col: i32) {
             .iter()
             .find(|&&(c, _)| c == col)
             .map(|&(_, o)| o)
-            .unwrap_or(pb::SortOrder::SortNone as i32);
+            .unwrap_or(SORT_NONE);
 
         let new_order = match current_order {
-            o if o == pb::SortOrder::SortGenericAscending as i32 => {
-                pb::SortOrder::SortGenericDescending as i32
-            }
-            o if o == pb::SortOrder::SortGenericDescending as i32 => pb::SortOrder::SortNone as i32,
-            _ => pb::SortOrder::SortGenericAscending as i32,
+            o if o == SORT_ASCENDING_AUTO => SORT_DESCENDING_AUTO,
+            o if o == SORT_DESCENDING_AUTO => SORT_NONE,
+            _ => SORT_ASCENDING_AUTO,
         };
 
         // Header click always resets to single-column sort.
         grid.sort_state.sort_keys.clear();
-        if new_order == pb::SortOrder::SortNone as i32 {
+        if new_order == SORT_NONE {
             grid.sort_state.last_sort_elapsed_ms = 0.0;
             grid.layout.invalidate();
             grid.mark_dirty();
@@ -755,7 +850,7 @@ pub fn handle_header_click(grid: &mut VolvoxGrid, col: i32) {
 mod tests {
     use super::{
         date_compare, generic_compare, handle_header_click, sort_grid, sort_grid_all,
-        sort_grid_all_multi,
+        sort_grid_all_multi, SORT_ASCENDING_AUTO,
     };
     use crate::grid::VolvoxGrid;
 
@@ -940,8 +1035,6 @@ mod tests {
 
     #[test]
     fn multi_sort_api_two_columns() {
-        use crate::proto::volvoxgrid::v1 as pb;
-
         let mut grid = VolvoxGrid::new(1, 640, 480, 5, 3, 1, 0);
         // Data: (col0=department, col1=name)
         // Row 1: Sales, Charlie
@@ -958,7 +1051,7 @@ mod tests {
         grid.cells.set_text(4, 1, "Alice".to_string());
 
         // Sort by col0 asc, then col1 asc
-        let asc = pb::SortOrder::SortGenericAscending as i32;
+        let asc = SORT_ASCENDING_AUTO;
         grid.sort_state.sort_keys = vec![(0, asc), (1, asc)];
         sort_grid_all_multi(&mut grid);
 
@@ -985,8 +1078,6 @@ mod tests {
 
     #[test]
     fn multi_sort_state_after_header_click_resets_to_single() {
-        use crate::proto::volvoxgrid::v1 as pb;
-
         let mut grid = VolvoxGrid::new(1, 640, 480, 5, 3, 1, 0);
         grid.header_features = 1; // HEADER_SORT
         for r in 1..=4 {
@@ -995,7 +1086,7 @@ mod tests {
         }
 
         // Set multi-sort via API
-        let asc = pb::SortOrder::SortGenericAscending as i32;
+        let asc = SORT_ASCENDING_AUTO;
         grid.sort_state.sort_keys = vec![(0, asc), (1, asc)];
         sort_grid_all_multi(&mut grid);
         assert_eq!(grid.sort_state.sort_keys.len(), 2);

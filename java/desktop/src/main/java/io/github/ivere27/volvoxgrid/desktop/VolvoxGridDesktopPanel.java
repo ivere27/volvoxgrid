@@ -6,6 +6,7 @@ import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.CreateResponse;
 import io.github.ivere27.volvoxgrid.CellRange;
 import io.github.ivere27.volvoxgrid.EditRequest;
+import io.github.ivere27.volvoxgrid.EventDecision;
 import io.github.ivere27.volvoxgrid.FrameDone;
 import io.github.ivere27.volvoxgrid.GridConfig;
 import io.github.ivere27.volvoxgrid.GridEvent;
@@ -65,8 +66,122 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         void onGridEvent(GridEvent event);
     }
 
+    @FunctionalInterface
+    public interface BeforeEditListener {
+        void onBeforeEdit(BeforeEditDetails details);
+    }
+
+    @FunctionalInterface
+    public interface CellEditValidatingListener {
+        void onCellEditValidating(CellEditValidatingDetails details);
+    }
+
+    @FunctionalInterface
+    public interface BeforeSortListener {
+        void onBeforeSort(BeforeSortDetails details);
+    }
+
     public interface EditRequestListener {
         void onEditRequest(EditRequest request);
+    }
+
+    public static final class BeforeEditDetails {
+        private final GridEvent rawEvent;
+        private final int row;
+        private final int col;
+        private boolean cancel;
+
+        private BeforeEditDetails(GridEvent rawEvent, int row, int col) {
+            this.rawEvent = rawEvent;
+            this.row = row;
+            this.col = col;
+        }
+
+        public GridEvent getRawEvent() {
+            return rawEvent;
+        }
+
+        public int getRow() {
+            return row;
+        }
+
+        public int getCol() {
+            return col;
+        }
+
+        public boolean isCancel() {
+            return cancel;
+        }
+
+        public void setCancel(boolean cancel) {
+            this.cancel = cancel;
+        }
+    }
+
+    public static final class CellEditValidatingDetails {
+        private final GridEvent rawEvent;
+        private final int row;
+        private final int col;
+        private final String editText;
+        private boolean cancel;
+
+        private CellEditValidatingDetails(GridEvent rawEvent, int row, int col, String editText) {
+            this.rawEvent = rawEvent;
+            this.row = row;
+            this.col = col;
+            this.editText = editText;
+        }
+
+        public GridEvent getRawEvent() {
+            return rawEvent;
+        }
+
+        public int getRow() {
+            return row;
+        }
+
+        public int getCol() {
+            return col;
+        }
+
+        public String getEditText() {
+            return editText;
+        }
+
+        public boolean isCancel() {
+            return cancel;
+        }
+
+        public void setCancel(boolean cancel) {
+            this.cancel = cancel;
+        }
+    }
+
+    public static final class BeforeSortDetails {
+        private final GridEvent rawEvent;
+        private final int col;
+        private boolean cancel;
+
+        private BeforeSortDetails(GridEvent rawEvent, int col) {
+            this.rawEvent = rawEvent;
+            this.col = col;
+        }
+
+        public GridEvent getRawEvent() {
+            return rawEvent;
+        }
+
+        public int getCol() {
+            return col;
+        }
+
+        public boolean isCancel() {
+            return cancel;
+        }
+
+        public void setCancel(boolean cancel) {
+            this.cancel = cancel;
+        }
     }
 
     private static final class FrameTarget {
@@ -111,7 +226,11 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private volatile int pendingResizeHeight;
 
     private volatile GridEventListener gridEventListener;
+    private volatile BeforeEditListener beforeEditListener;
+    private volatile CellEditValidatingListener cellEditValidatingListener;
+    private volatile BeforeSortListener beforeSortListener;
     private volatile EditRequestListener editRequestListener;
+    private volatile boolean decisionChannelEnabled = false;
 
     private volatile RendererBackend rendererBackend = RendererBackend.CPU;
     private volatile boolean hostFlingEnabled = false;
@@ -130,6 +249,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         setBackground(Color.WHITE);
         setPreferredSize(new Dimension(960, 600));
         setFocusable(true);
+        setFocusTraversalKeysEnabled(false);
 
         installInputHandlers();
 
@@ -165,7 +285,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                     .setCols(cols)
                     .build()
             )
-            .setIndicatorBands(VolvoxGridDesktopController.defaultIndicatorBandsConfig())
+            .setIndicators(VolvoxGridDesktopController.defaultIndicatorsConfig())
             .setRendering(RenderConfig.newBuilder().setRendererMode(RendererMode.RENDERER_CPU).build())
             .build();
 
@@ -257,6 +377,27 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
     public void setGridEventListener(GridEventListener listener) {
         this.gridEventListener = listener;
+    }
+
+    public void setBeforeEditListener(BeforeEditListener listener) {
+        this.beforeEditListener = listener;
+        if (listener != null) {
+            ensureDecisionChannelEnabled();
+        }
+    }
+
+    public void setCellEditValidatingListener(CellEditValidatingListener listener) {
+        this.cellEditValidatingListener = listener;
+        if (listener != null) {
+            ensureDecisionChannelEnabled();
+        }
+    }
+
+    public void setBeforeSortListener(BeforeSortListener listener) {
+        this.beforeSortListener = listener;
+        if (listener != null) {
+            ensureDecisionChannelEnabled();
+        }
     }
 
     public void setEditRequestListener(EditRequestListener listener) {
@@ -387,6 +528,18 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             public void mousePressed(MouseEvent e) {
                 stopHostFling();
                 requestFocusInWindow();
+                if (SwingUtilities.isRightMouseButton(e)) {
+                    sendPointer(
+                        PointerEvent.Type.MOVE,
+                        e.getX(),
+                        e.getY(),
+                        mapModifierFlags(e.getModifiersEx()),
+                        0,
+                        false
+                    );
+                    requestFrame();
+                    return;
+                }
                 if (tryBeginMultiRangeSelection(e)) {
                     requestFrame();
                     return;
@@ -469,7 +622,14 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     }
 
     private void sendPointer(PointerEvent.Type type, MouseEvent e, boolean dblClick) {
-        sendPointer(type, e.getX(), e.getY(), e.getModifiersEx(), mapMouseButton(e), dblClick);
+        sendPointer(
+            type,
+            e.getX(),
+            e.getY(),
+            mapModifierFlags(e.getModifiersEx()),
+            mapMouseButtons(e),
+            dblClick
+        );
     }
 
     private void sendPointer(PointerEvent.Type type, int x, int y, int modifier, int button, boolean dblClick) {
@@ -493,18 +653,33 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         }
     }
 
-    private int mapMouseButton(MouseEvent e) {
-        int button = e.getButton();
-        if (button == MouseEvent.NOBUTTON && (e.getModifiersEx() & InputEvent.BUTTON1_DOWN_MASK) != 0) {
-            return MouseEvent.BUTTON1;
+    private int mapMouseButtons(MouseEvent e) {
+        int buttons = 0;
+        int modifiers = e.getModifiersEx();
+        if ((modifiers & InputEvent.BUTTON1_DOWN_MASK) != 0) {
+            buttons |= 1;
         }
-        if (button == MouseEvent.NOBUTTON && (e.getModifiersEx() & InputEvent.BUTTON2_DOWN_MASK) != 0) {
-            return MouseEvent.BUTTON2;
+        if ((modifiers & InputEvent.BUTTON3_DOWN_MASK) != 0) {
+            buttons |= 2;
         }
-        if (button == MouseEvent.NOBUTTON && (e.getModifiersEx() & InputEvent.BUTTON3_DOWN_MASK) != 0) {
-            return MouseEvent.BUTTON3;
+        if ((modifiers & InputEvent.BUTTON2_DOWN_MASK) != 0) {
+            buttons |= 4;
         }
-        return button;
+
+        if (buttons != 0) {
+            return buttons;
+        }
+
+        switch (e.getButton()) {
+            case MouseEvent.BUTTON1:
+                return 1;
+            case MouseEvent.BUTTON3:
+                return 2;
+            case MouseEvent.BUTTON2:
+                return 4;
+            default:
+                return 0;
+        }
     }
 
     private boolean tryBeginMultiRangeSelection(MouseEvent e) {
@@ -556,7 +731,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     }
 
     private SelectionState updateMouseSelectionState(MouseEvent e) throws SynurangDesktopBridge.SynurangBridgeException {
-        sendPointer(PointerEvent.Type.MOVE, e.getX(), e.getY(), e.getModifiersEx(), 0, false);
+        sendPointer(PointerEvent.Type.MOVE, e.getX(), e.getY(), mapModifierFlags(e.getModifiersEx()), 0, false);
         return client.getSelection(GridHandle.newBuilder().setId(gridId).build());
     }
 
@@ -652,8 +827,8 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                 .setKey(
                     io.github.ivere27.volvoxgrid.KeyEvent.newBuilder()
                         .setType(type)
-                        .setKeyCode(awtEvent.getKeyCode())
-                        .setModifier(awtEvent.getModifiersEx())
+                        .setKeyCode(mapKeyCode(awtEvent))
+                        .setModifier(mapModifierFlags(awtEvent.getModifiersEx()))
                         .setCharacter(character)
                         .build()
                 )
@@ -661,6 +836,55 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             sendRenderInput(input);
         } catch (Exception ex) {
             LOG.log(Level.FINER, "Key send failed", ex);
+        }
+    }
+
+    private static int mapModifierFlags(int awtModifiers) {
+        int flags = 0;
+        if ((awtModifiers & InputEvent.SHIFT_DOWN_MASK) != 0) {
+            flags |= 1;
+        }
+        if ((awtModifiers & InputEvent.CTRL_DOWN_MASK) != 0) {
+            flags |= 2;
+        }
+        if ((awtModifiers & InputEvent.ALT_DOWN_MASK) != 0) {
+            flags |= 4;
+        }
+        return flags;
+    }
+
+    private static int mapKeyCode(java.awt.event.KeyEvent e) {
+        switch (e.getKeyCode()) {
+            case java.awt.event.KeyEvent.VK_LEFT:
+                return 37;
+            case java.awt.event.KeyEvent.VK_UP:
+                return 38;
+            case java.awt.event.KeyEvent.VK_RIGHT:
+                return 39;
+            case java.awt.event.KeyEvent.VK_DOWN:
+                return 40;
+            case java.awt.event.KeyEvent.VK_PAGE_UP:
+                return 33;
+            case java.awt.event.KeyEvent.VK_PAGE_DOWN:
+                return 34;
+            case java.awt.event.KeyEvent.VK_HOME:
+                return 36;
+            case java.awt.event.KeyEvent.VK_END:
+                return 35;
+            case java.awt.event.KeyEvent.VK_TAB:
+                return 9;
+            case java.awt.event.KeyEvent.VK_ENTER:
+                return 13;
+            case java.awt.event.KeyEvent.VK_DELETE:
+                return 46;
+            case java.awt.event.KeyEvent.VK_BACK_SPACE:
+                return 8;
+            case java.awt.event.KeyEvent.VK_F2:
+                return 113;
+            case java.awt.event.KeyEvent.VK_ESCAPE:
+                return 27;
+            default:
+                return e.getKeyCode();
         }
     }
 
@@ -890,6 +1114,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         needsFollowupRender.set(false);
         renderRequestPending.set(false);
         running.set(true);
+        decisionChannelEnabled = false;
 
         startRenderSession();
         startEventStream();
@@ -909,6 +1134,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                 synchronized (sendLock) {
                     renderSession = session;
                 }
+                ensureDecisionChannelEnabled();
                 requestFrameImmediate();
 
                 while (running.get()) {
@@ -959,10 +1185,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                     if (event == null) {
                         break;
                     }
-                    GridEventListener listener = gridEventListener;
-                    if (listener != null) {
-                        SwingUtilities.invokeLater(() -> listener.onGridEvent(event));
-                    }
+                    handleGridEvent(event);
                 }
             } catch (Exception e) {
                 if (running.get()) {
@@ -984,6 +1207,146 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         t.setDaemon(true);
         eventThread = t;
         t.start();
+    }
+
+    private void handleGridEvent(GridEvent event) {
+        if (decisionChannelEnabled && isCancelableGridEvent(event)) {
+            boolean cancel = dispatchCancelableGridEvent(event);
+            sendEventDecision(event.getEventId(), cancel);
+        }
+
+        GridEventListener listener = gridEventListener;
+        if (listener != null) {
+            SwingUtilities.invokeLater(() -> listener.onGridEvent(event));
+        }
+    }
+
+    private boolean wantsCancelableGridEvents() {
+        return beforeEditListener != null
+            || cellEditValidatingListener != null
+            || beforeSortListener != null;
+    }
+
+    private boolean isCancelableGridEvent(GridEvent event) {
+        return event.hasBeforeEdit() || event.hasCellEditValidate() || event.hasBeforeSort();
+    }
+
+    private void ensureDecisionChannelEnabled() {
+        if (decisionChannelEnabled || !wantsCancelableGridEvents() || gridId == 0L) {
+            return;
+        }
+
+        VolvoxGridDesktopClient.RenderSession session;
+        synchronized (sendLock) {
+            session = renderSession;
+        }
+        if (session == null) {
+            return;
+        }
+
+        try {
+            session.send(
+                RenderInput.newBuilder()
+                    .setGridId(gridId)
+                    .setEventDecision(
+                        EventDecision.newBuilder()
+                            .setGridId(gridId)
+                            .setEventId(0L)
+                            .setCancel(false)
+                            .build()
+                    )
+                    .build()
+            );
+            decisionChannelEnabled = true;
+        } catch (Exception e) {
+            LOG.log(Level.FINER, "Decision channel enable failed", e);
+        }
+    }
+
+    private void sendEventDecision(long eventId, boolean cancel) {
+        if (!decisionChannelEnabled || gridId == 0L || eventId == 0L) {
+            return;
+        }
+
+        try {
+            sendRenderInput(
+                RenderInput.newBuilder()
+                    .setGridId(gridId)
+                    .setEventDecision(
+                        EventDecision.newBuilder()
+                            .setGridId(gridId)
+                            .setEventId(eventId)
+                            .setCancel(cancel)
+                            .build()
+                    )
+                    .build()
+            );
+            requestFrame();
+        } catch (Exception e) {
+            LOG.log(Level.FINER, "Event decision send failed", e);
+        }
+    }
+
+    private boolean dispatchCancelableGridEvent(GridEvent event) {
+        if (SwingUtilities.isEventDispatchThread()) {
+            return dispatchCancelableGridEventOnEdt(event);
+        }
+
+        AtomicBoolean cancel = new AtomicBoolean(false);
+        try {
+            SwingUtilities.invokeAndWait(() -> cancel.set(dispatchCancelableGridEventOnEdt(event)));
+        } catch (Exception e) {
+            LOG.log(Level.WARNING, "Cancelable grid event dispatch failed", e);
+            return false;
+        }
+        return cancel.get();
+    }
+
+    private boolean dispatchCancelableGridEventOnEdt(GridEvent event) {
+        try {
+            if (event.hasBeforeEdit()) {
+                BeforeEditListener listener = beforeEditListener;
+                BeforeEditDetails details = new BeforeEditDetails(
+                    event,
+                    event.getBeforeEdit().getRow(),
+                    event.getBeforeEdit().getCol()
+                );
+                if (listener != null) {
+                    listener.onBeforeEdit(details);
+                }
+                return details.isCancel();
+            }
+
+            if (event.hasCellEditValidate()) {
+                CellEditValidatingListener listener = cellEditValidatingListener;
+                CellEditValidatingDetails details = new CellEditValidatingDetails(
+                    event,
+                    event.getCellEditValidate().getRow(),
+                    event.getCellEditValidate().getCol(),
+                    event.getCellEditValidate().getEditText()
+                );
+                if (listener != null) {
+                    listener.onCellEditValidating(details);
+                }
+                return details.isCancel();
+            }
+
+            if (event.hasBeforeSort()) {
+                BeforeSortListener listener = beforeSortListener;
+                BeforeSortDetails details = new BeforeSortDetails(
+                    event,
+                    event.getBeforeSort().getCol()
+                );
+                if (listener != null) {
+                    listener.onBeforeSort(details);
+                }
+                return details.isCancel();
+            }
+        } catch (Exception e) {
+            LOG.log(Level.WARNING, "Cancelable grid listener failed", e);
+        }
+
+        return false;
     }
 
     private void handleRenderOutput(RenderOutput output) {
@@ -1134,6 +1497,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         renderRequestPending.set(false);
         pendingFrame.set(false);
         needsFollowupRender.set(false);
+        decisionChannelEnabled = false;
 
         VolvoxGridDesktopClient.RenderSession render = renderSession;
         renderSession = null;

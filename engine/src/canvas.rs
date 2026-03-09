@@ -9,7 +9,9 @@
 
 use crate::grid::VolvoxGrid;
 use crate::proto::volvoxgrid::v1 as pb;
-use crate::style::{CellStyleOverride, HeaderMarkHeight, HighlightStyle, IconThemeSlotStyle};
+use crate::selection::{hover_mode_has, HOVER_CELL, HOVER_COLUMN, HOVER_NONE, HOVER_ROW};
+use crate::sort::{sort_order_is_ascending as sort_order_is_ascending_internal, SORT_NONE};
+use crate::style::{CellStylePatch, HeaderMarkHeight, HighlightStyle, IconSlotStyle};
 use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -19,6 +21,15 @@ pub enum BorderEdge {
     Bottom,
     Left,
 }
+
+const LEGACY_BORDER_RAISED: i32 = 6;
+const LEGACY_BORDER_INSET: i32 = 7;
+const LEGACY_GRIDLINE_SOLID_HORIZONTAL: i32 = 4;
+const LEGACY_GRIDLINE_SOLID_VERTICAL: i32 = 5;
+const LEGACY_GRIDLINE_INSET_HORIZONTAL: i32 = 6;
+const LEGACY_GRIDLINE_INSET_VERTICAL: i32 = 7;
+const LEGACY_GRIDLINE_RAISED_HORIZONTAL: i32 = 8;
+const LEGACY_GRIDLINE_RAISED_VERTICAL: i32 = 9;
 
 // ===========================================================================
 // Canvas trait
@@ -287,12 +298,8 @@ pub trait Canvas {
                     self.rect_outline(x + 2, y + 2, w - 4, h - 4, color);
                 }
             }
-            b if b == pb::BorderStyle::BorderRaised as i32 => {
-                self.rect_3d_color(x, y, w, h, color, true)
-            }
-            b if b == pb::BorderStyle::BorderInset as i32 => {
-                self.rect_3d_color(x, y, w, h, color, false)
-            }
+            b if b == LEGACY_BORDER_RAISED => self.rect_3d_color(x, y, w, h, color, true),
+            b if b == LEGACY_BORDER_INSET => self.rect_3d_color(x, y, w, h, color, false),
             _ => self.rect_outline(x, y, w, h, color),
         }
     }
@@ -388,12 +395,10 @@ pub trait Canvas {
                     }
                 }
             }
-            b if b == pb::BorderStyle::BorderRaised as i32
-                || b == pb::BorderStyle::BorderInset as i32 =>
-            {
+            b if b == LEGACY_BORDER_RAISED || b == LEGACY_BORDER_INSET => {
                 let light = lighten(color, 145);
                 let dark = darken(color, 70);
-                let edge_color = if b == pb::BorderStyle::BorderRaised as i32 {
+                let edge_color = if b == LEGACY_BORDER_RAISED {
                     match edge {
                         BorderEdge::Top | BorderEdge::Left => light,
                         BorderEdge::Right | BorderEdge::Bottom => dark,
@@ -1430,7 +1435,7 @@ pub(crate) fn resolve_alignment(
     grid: &VolvoxGrid,
     row: i32,
     col: i32,
-    style_override: &CellStyleOverride,
+    style_override: &CellStylePatch,
     text: &str,
 ) -> i32 {
     // Check cell-level override first
@@ -1744,8 +1749,7 @@ fn is_highlight_active(grid: &VolvoxGrid) -> bool {
 
 /// Whether a cell should be rendered with selection highlight (selection_style
 /// back/fore colors). In listbox mode the current cursor row is always
-/// highlighted regardless of the selection visibility setting.  In other modes the cursor
-/// cell itself is excluded — the focus rect (Layer 8) handles it instead.
+/// highlighted regardless of the selection visibility setting.
 fn should_highlight_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
     if row < grid.fixed_rows || col < grid.fixed_cols {
         return false;
@@ -1758,14 +1762,6 @@ fn should_highlight_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
         }
         // Other toggled rows: follow highlight setting
         return is_highlight_active(grid) && grid.selection.selected_rows.contains(&row);
-    }
-    // Row/column selection keeps the cursor cell highlighted as part of
-    // the selected stripe; only free-mode cursor highlighting is suppressed.
-    if row == grid.selection.row
-        && col == grid.selection.col
-        && grid.selection.mode == pb::SelectionMode::SelectionFree as i32
-    {
-        return false;
     }
     is_highlight_active(grid) && grid.is_cell_selected(row, col)
 }
@@ -1827,24 +1823,20 @@ fn selection_fore_color(grid: &VolvoxGrid) -> u32 {
         .unwrap_or(0xFFFFFFFF)
 }
 
-fn hover_mode_has(mode: u32, flag: pb::HoverMode) -> bool {
-    (mode & (flag as u32)) != 0
-}
-
 fn hover_matches_row(grid: &VolvoxGrid, row: i32) -> bool {
-    hover_mode_has(grid.selection.hover_mode, pb::HoverMode::HoverRow)
+    hover_mode_has(grid.selection.hover_mode, HOVER_ROW)
         && grid.mouse_row >= 0
         && row == grid.mouse_row
 }
 
 fn hover_matches_column(grid: &VolvoxGrid, col: i32) -> bool {
-    hover_mode_has(grid.selection.hover_mode, pb::HoverMode::HoverColumn)
+    hover_mode_has(grid.selection.hover_mode, HOVER_COLUMN)
         && grid.mouse_col >= 0
         && col == grid.mouse_col
 }
 
 fn hover_matches_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
-    hover_mode_has(grid.selection.hover_mode, pb::HoverMode::HoverCell)
+    hover_mode_has(grid.selection.hover_mode, HOVER_CELL)
         && grid.mouse_row >= 0
         && grid.mouse_col >= 0
         && row == grid.mouse_row
@@ -2143,9 +2135,9 @@ fn indicator_draws_vertical_grid_lines(band: &crate::indicator::ColIndicatorStat
     mode == pb::GridLineStyle::GridlineSolid as i32
         || mode == pb::GridLineStyle::GridlineInset as i32
         || mode == pb::GridLineStyle::GridlineRaised as i32
-        || mode == pb::GridLineStyle::GridlineSolidVertical as i32
-        || mode == pb::GridLineStyle::GridlineInsetVertical as i32
-        || mode == pb::GridLineStyle::GridlineRaisedVertical as i32
+        || mode == LEGACY_GRIDLINE_SOLID_VERTICAL
+        || mode == LEGACY_GRIDLINE_INSET_VERTICAL
+        || mode == LEGACY_GRIDLINE_RAISED_VERTICAL
 }
 
 fn indicator_cell_rect_for_col(
@@ -2401,7 +2393,12 @@ fn render_row_indicator_start<C: Canvas>(
     for (&row, &(cy, ch)) in &row_rects {
         let is_selected = should_highlight_row_indicator(grid, row);
         if is_selected {
-            canvas.fill_rect(band_x, cy, band_w, ch, selection_back_color(grid));
+            if let Some(ind_style) = &grid.selection.indicator_row_style {
+                draw_highlight_fill(canvas, band_x, cy, band_w, ch, ind_style);
+                draw_highlight_border(canvas, band_x, cy, band_w, ch, ind_style, 0);
+            } else {
+                canvas.fill_rect(band_x, cy, band_w, ch, selection_back_color(grid));
+            }
         } else if hover_matches_row(grid, row) {
             draw_highlight_fill(
                 canvas,
@@ -2413,7 +2410,11 @@ fn render_row_indicator_start<C: Canvas>(
             );
         }
         let row_fore_color = if is_selected {
-            selection_fore_color(grid)
+            if let Some(ind_style) = &grid.selection.indicator_row_style {
+                ind_style.fore_color.unwrap_or(fore_color)
+            } else {
+                selection_fore_color(grid)
+            }
         } else {
             fore_color
         };
@@ -2490,7 +2491,7 @@ fn render_row_indicator_start<C: Canvas>(
         }
     }
     for &(cy, ch) in row_rects.values() {
-        canvas.hline(band_x, cy + ch, band_w, grid_color);
+        canvas.hline(band_x, cy + ch - 1, band_w, grid_color);
     }
     canvas.vline(band_x + band_w - 1, band_y, band_h, grid_color);
 }
@@ -2518,7 +2519,12 @@ fn render_col_indicator_top<C: Canvas>(
     let col_rects = build_visible_col_rects(vis_cells);
     for (&col, &(cx, cw)) in &col_rects {
         if should_highlight_col_indicator(grid, col) {
-            canvas.fill_rect(cx, band_y, cw, band_h, selection_back_color(grid));
+            if let Some(ind_style) = &grid.selection.indicator_col_style {
+                draw_highlight_fill(canvas, cx, band_y, cw, band_h, ind_style);
+                draw_highlight_border(canvas, cx, band_y, cw, band_h, ind_style, 0);
+            } else {
+                canvas.fill_rect(cx, band_y, cw, band_h, selection_back_color(grid));
+            }
         } else if hover_matches_column(grid, col) {
             draw_highlight_fill(
                 canvas,
@@ -2545,7 +2551,11 @@ fn render_col_indicator_top<C: Canvas>(
             }
             let (_row_idx, row_y, row_h) = row_offsets[0];
             let text_color = if should_highlight_col_indicator(grid, col) {
-                selection_fore_color(grid)
+                if let Some(ind_style) = &grid.selection.indicator_col_style {
+                    ind_style.fore_color.unwrap_or(fore_color)
+                } else {
+                    selection_fore_color(grid)
+                }
             } else {
                 fore_color
             };
@@ -2580,7 +2590,11 @@ fn render_col_indicator_top<C: Canvas>(
         };
         if !text.is_empty() {
             let text_color = if span_has_highlighted_col(grid, cell.col1, cell.col2) {
-                selection_fore_color(grid)
+                if let Some(ind_style) = &grid.selection.indicator_col_style {
+                    ind_style.fore_color.unwrap_or(fore_color)
+                } else {
+                    selection_fore_color(grid)
+                }
             } else {
                 fore_color
             };
@@ -2613,11 +2627,15 @@ fn render_col_indicator_top<C: Canvas>(
                 continue;
             };
             let sort_fore_color = if should_highlight_col_indicator(grid, *sort_col) {
-                selection_fore_color(grid)
+                if let Some(ind_style) = &grid.selection.indicator_col_style {
+                    ind_style.fore_color.unwrap_or(fore_color)
+                } else {
+                    selection_fore_color(grid)
+                }
             } else {
                 fore_color
             };
-            let glyph = if *sort_order == pb::SortOrder::SortNone as i32 {
+            let glyph = if *sort_order == SORT_NONE {
                 continue;
             } else if sort_order_is_ascending(*sort_order) {
                 true
@@ -2669,7 +2687,7 @@ fn render_col_indicator_top<C: Canvas>(
     for row_idx in 0..row_offsets.len().saturating_sub(1) {
         let row = row_offsets[row_idx].0;
         let next_row = row_offsets[row_idx + 1].0;
-        let boundary_y = row_offsets[row_idx].1 + row_offsets[row_idx].2;
+        let boundary_y = row_offsets[row_idx].1 + row_offsets[row_idx].2 - 1;
         for (&col, &(cx, cw)) in &col_rects {
             if indicator_slots_share_cell(band, row, col, next_row, col) {
                 continue;
@@ -2678,7 +2696,7 @@ fn render_col_indicator_top<C: Canvas>(
         }
     }
     if let Some((_row, cy, ch)) = row_offsets.last() {
-        canvas.hline(band_x, *cy + *ch, band_w, grid_color);
+        canvas.hline(band_x, *cy + *ch - 1, band_w, grid_color);
     }
 
     if indicator_draws_vertical_grid_lines(band) {
@@ -2689,7 +2707,7 @@ fn render_col_indicator_top<C: Canvas>(
         for pair in visible_cols.windows(2) {
             let (left_col, left_x, left_w) = pair[0];
             let (right_col, _right_x, _right_w) = pair[1];
-            let boundary_x = left_x + left_w;
+            let boundary_x = left_x + left_w - 1;
             for (row, cy, ch) in &row_offsets {
                 if indicator_slots_share_cell(band, *row, left_col, *row, right_col) {
                     continue;
@@ -2698,7 +2716,7 @@ fn render_col_indicator_top<C: Canvas>(
             }
         }
         if let Some((_, cx, cw)) = visible_cols.last() {
-            canvas.vline(*cx + *cw, band_y, band_h, grid_color);
+            canvas.vline(*cx + *cw - 1, band_y, band_h, grid_color);
         }
     }
 }
@@ -2727,10 +2745,11 @@ fn render_corner_top_start<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Vi
     let mut y = 0;
     for row in 0..row_count {
         y += col_top.row_height_px(row).max(1);
-        if y > vp.data_y {
+        let line_y = y - 1;
+        if line_y >= vp.data_y {
             break;
         }
-        canvas.hline(0, y, vp.data_x, grid_color);
+        canvas.hline(0, line_y, vp.data_x, grid_color);
     }
     canvas.vline(vp.data_x - 1, 0, vp.data_y, grid_color);
 }
@@ -2902,30 +2921,31 @@ fn draw_grid_lines_for_zone<C: Canvas>(
     let draw_horz = mode == pb::GridLineStyle::GridlineSolid as i32
         || mode == pb::GridLineStyle::GridlineInset as i32
         || mode == pb::GridLineStyle::GridlineRaised as i32
-        || mode == pb::GridLineStyle::GridlineSolidHorizontal as i32
-        || mode == pb::GridLineStyle::GridlineInsetHorizontal as i32
-        || mode == pb::GridLineStyle::GridlineRaisedHorizontal as i32;
+        || mode == LEGACY_GRIDLINE_SOLID_HORIZONTAL
+        || mode == LEGACY_GRIDLINE_INSET_HORIZONTAL
+        || mode == LEGACY_GRIDLINE_RAISED_HORIZONTAL;
     let draw_vert = mode == pb::GridLineStyle::GridlineSolid as i32
         || mode == pb::GridLineStyle::GridlineInset as i32
         || mode == pb::GridLineStyle::GridlineRaised as i32
-        || mode == pb::GridLineStyle::GridlineSolidVertical as i32
-        || mode == pb::GridLineStyle::GridlineInsetVertical as i32
-        || mode == pb::GridLineStyle::GridlineRaisedVertical as i32;
+        || mode == LEGACY_GRIDLINE_SOLID_VERTICAL
+        || mode == LEGACY_GRIDLINE_INSET_VERTICAL
+        || mode == LEGACY_GRIDLINE_RAISED_VERTICAL;
     let is_3d = mode == pb::GridLineStyle::GridlineInset as i32
         || mode == pb::GridLineStyle::GridlineRaised as i32
-        || mode == pb::GridLineStyle::GridlineInsetHorizontal as i32
-        || mode == pb::GridLineStyle::GridlineInsetVertical as i32
-        || mode == pb::GridLineStyle::GridlineRaisedHorizontal as i32
-        || mode == pb::GridLineStyle::GridlineRaisedVertical as i32;
+        || mode == LEGACY_GRIDLINE_INSET_HORIZONTAL
+        || mode == LEGACY_GRIDLINE_INSET_VERTICAL
+        || mode == LEGACY_GRIDLINE_RAISED_HORIZONTAL
+        || mode == LEGACY_GRIDLINE_RAISED_VERTICAL;
     let is_raised = mode == pb::GridLineStyle::GridlineRaised as i32
-        || mode == pb::GridLineStyle::GridlineRaisedHorizontal as i32
-        || mode == pb::GridLineStyle::GridlineRaisedVertical as i32;
+        || mode == LEGACY_GRIDLINE_RAISED_HORIZONTAL
+        || mode == LEGACY_GRIDLINE_RAISED_VERTICAL;
 
+    let shade_percent = if is_fixed_zone { 68 } else { 80 };
     let (color_light, color_dark) = if is_3d {
         if is_raised {
-            (0xFFFFFFFF_u32, darken(color, 80))
+            (0xFFFFFFFF_u32, darken(color, shade_percent))
         } else {
-            (darken(color, 80), 0xFFFFFFFF_u32)
+            (darken(color, shade_percent), 0xFFFFFFFF_u32)
         }
     } else {
         (color, color)
@@ -2948,7 +2968,7 @@ fn draw_grid_lines_for_zone<C: Canvas>(
                 canvas.vline(right - 1, cy, ch, color_light);
                 canvas.vline(right, cy, ch, color_dark);
             } else {
-                canvas.vline(right, cy, ch, color);
+                canvas.vline(right - 1, cy, ch, color);
             }
         }
 
@@ -2957,7 +2977,7 @@ fn draw_grid_lines_for_zone<C: Canvas>(
                 canvas.hline(cx, bottom - 1, cw, color_light);
                 canvas.hline(cx, bottom, cw, color_dark);
             } else {
-                canvas.hline(cx, bottom, cw, color);
+                canvas.hline(cx, bottom - 1, cw, color);
             }
         }
     }
@@ -3554,7 +3574,7 @@ fn first_font_name(names: &[String]) -> Option<&str> {
 
 fn resolve_icon_text_style(
     grid: &VolvoxGrid,
-    slot_style: Option<&IconThemeSlotStyle>,
+    slot_style: Option<&IconSlotStyle>,
     fallback_font_size: f32,
     fallback_bold: bool,
     fallback_italic: bool,
@@ -3604,8 +3624,8 @@ fn resolve_icon_text_style(
 
 fn resolve_icon_layout_style(
     grid: &VolvoxGrid,
-    slot_style: Option<&IconThemeSlotStyle>,
-) -> crate::style::IconLayoutStyle {
+    slot_style: Option<&IconSlotStyle>,
+) -> crate::style::IconLayout {
     let mut layout = grid.style.icon_theme_defaults.layout;
     if let Some(slot) = slot_style {
         if let Some(slot_layout) = slot.layout {
@@ -3617,11 +3637,8 @@ fn resolve_icon_layout_style(
     layout
 }
 
-fn resolve_sort_slot_style<'a>(
-    grid: &'a VolvoxGrid,
-    sort_order: i32,
-) -> Option<&'a IconThemeSlotStyle> {
-    if sort_order == pb::SortOrder::SortNone as i32 {
+fn resolve_sort_slot_style<'a>(grid: &'a VolvoxGrid, sort_order: i32) -> Option<&'a IconSlotStyle> {
+    if sort_order == SORT_NONE {
         grid.style.icon_theme_slot_styles.sort_none.as_ref()
     } else if sort_order_is_ascending(sort_order) {
         grid.style.icon_theme_slot_styles.sort_ascending.as_ref()
@@ -3633,7 +3650,7 @@ fn resolve_sort_slot_style<'a>(
 fn resolve_checkbox_slot_style<'a>(
     grid: &'a VolvoxGrid,
     checked_state: i32,
-) -> Option<&'a IconThemeSlotStyle> {
+) -> Option<&'a IconSlotStyle> {
     if checked_state == pb::CheckedState::CheckedChecked as i32 {
         grid.style.icon_theme_slot_styles.checkbox_checked.as_ref()
     } else if checked_state == pb::CheckedState::CheckedGrayed as i32 {
@@ -3657,7 +3674,7 @@ fn resolve_checkbox_slot_style<'a>(
 fn resolve_tree_slot_style<'a>(
     grid: &'a VolvoxGrid,
     is_collapsed: bool,
-) -> Option<&'a IconThemeSlotStyle> {
+) -> Option<&'a IconSlotStyle> {
     if is_collapsed {
         grid.style.icon_theme_slot_styles.tree_collapsed.as_ref()
     } else {
@@ -3670,7 +3687,7 @@ fn place_icon_x_from_layout(
     inner_right: i32,
     inner_w: i32,
     glyph_w: i32,
-    layout: crate::style::IconLayoutStyle,
+    layout: crate::style::IconLayout,
     header_has_text: bool,
     header_text_left: i32,
     header_text_right: i32,
@@ -3701,10 +3718,7 @@ fn place_icon_x_from_layout(
 }
 
 fn sort_order_is_ascending(sort_order: i32) -> bool {
-    sort_order == pb::SortOrder::SortGenericAscending as i32
-        || sort_order == pb::SortOrder::SortNumericAscending as i32
-        || sort_order == pb::SortOrder::SortStringNoCaseAsc as i32
-        || sort_order == pb::SortOrder::SortStringAsc as i32
+    sort_order_is_ascending_internal(sort_order)
 }
 
 fn render_sort_glyphs<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRange) {
@@ -3731,7 +3745,7 @@ fn render_sort_glyphs<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visible
     let show_sort_numbers = grid.style.show_sort_numbers && sort_targets.len() > 1;
 
     for (sort_idx, &(sort_col, sort_order)) in sort_targets.iter().enumerate() {
-        let is_sort_none = sort_order == pb::SortOrder::SortNone as i32;
+        let is_sort_none = sort_order == SORT_NONE;
 
         for row in 0..grid.fixed_rows {
             if grid.is_row_hidden(row) {
@@ -4544,7 +4558,7 @@ fn render_hover_highlight<C: Canvas>(
     canvas: &mut C,
     vis_cells: &[(i32, i32, i32, i32, i32, i32)],
 ) {
-    if grid.selection.hover_mode == pb::HoverMode::HoverNone as u32 {
+    if grid.selection.hover_mode == HOVER_NONE {
         return;
     }
 
@@ -4712,6 +4726,12 @@ fn render_edit_highlights<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Vis
 
 fn render_focus_rect<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRange) {
     if grid.selection.focus_border == pb::FocusBorderStyle::FocusBorderNone as i32 {
+        return;
+    }
+
+    if grid.selection.focus_border == pb::FocusBorderStyle::FocusBorderThin as i32
+        && should_highlight_cell(grid, grid.selection.row, grid.selection.col)
+    {
         return;
     }
 
@@ -5022,9 +5042,43 @@ fn subtotal_visual_level(level: i32, is_subtotal: bool, subtotal_level_floor: i3
 // ===========================================================================
 
 fn render_frozen_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRange) {
-    let border_color = 0xFF000000_u32;
     let buf_w = canvas.width();
     let buf_h = canvas.height();
+    let mode = grid.style.grid_lines_fixed;
+    if mode == pb::GridLineStyle::GridlineNone as i32 {
+        return;
+    }
+    let color = grid.style.grid_color_fixed;
+    let draw_horz = mode == pb::GridLineStyle::GridlineSolid as i32
+        || mode == pb::GridLineStyle::GridlineInset as i32
+        || mode == pb::GridLineStyle::GridlineRaised as i32
+        || mode == LEGACY_GRIDLINE_SOLID_HORIZONTAL
+        || mode == LEGACY_GRIDLINE_INSET_HORIZONTAL
+        || mode == LEGACY_GRIDLINE_RAISED_HORIZONTAL;
+    let draw_vert = mode == pb::GridLineStyle::GridlineSolid as i32
+        || mode == pb::GridLineStyle::GridlineInset as i32
+        || mode == pb::GridLineStyle::GridlineRaised as i32
+        || mode == LEGACY_GRIDLINE_SOLID_VERTICAL
+        || mode == LEGACY_GRIDLINE_INSET_VERTICAL
+        || mode == LEGACY_GRIDLINE_RAISED_VERTICAL;
+    let is_3d = mode == pb::GridLineStyle::GridlineInset as i32
+        || mode == pb::GridLineStyle::GridlineRaised as i32
+        || mode == LEGACY_GRIDLINE_INSET_HORIZONTAL
+        || mode == LEGACY_GRIDLINE_INSET_VERTICAL
+        || mode == LEGACY_GRIDLINE_RAISED_HORIZONTAL
+        || mode == LEGACY_GRIDLINE_RAISED_VERTICAL;
+    let is_raised = mode == pb::GridLineStyle::GridlineRaised as i32
+        || mode == LEGACY_GRIDLINE_RAISED_HORIZONTAL
+        || mode == LEGACY_GRIDLINE_RAISED_VERTICAL;
+    let (color_inner, color_outer) = if is_3d {
+        if is_raised {
+            (0xFFFFFFFF_u32, darken(color, 68))
+        } else {
+            (darken(color, 68), 0xFFFFFFFF_u32)
+        }
+    } else {
+        (color, color)
+    };
 
     // Grid content boundaries — lines should not extend beyond these.
     // Account for indicator bands and scroll offset so separators align with
@@ -5035,32 +5089,28 @@ fn render_frozen_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visi
     let content_bottom = (vp.data_y + grid.row_pos(grid.rows) - scroll_y).clamp(0, buf_h);
 
     // Horizontal frozen row border
-    if grid.frozen_rows > 0 {
+    if draw_horz && grid.frozen_rows > 0 {
         let frozen_row_bottom = vp.data_y + grid.row_pos(grid.fixed_rows + grid.frozen_rows);
         if frozen_row_bottom > 0 && frozen_row_bottom < buf_h {
-            canvas.hline(0, frozen_row_bottom, content_right, border_color);
+            if is_3d {
+                canvas.hline(0, frozen_row_bottom - 1, content_right, color_inner);
+                canvas.hline(0, frozen_row_bottom, content_right, color_outer);
+            } else {
+                canvas.hline(0, frozen_row_bottom - 1, content_right, color);
+            }
         }
     }
 
     // Vertical frozen col border
-    if grid.frozen_cols > 0 {
+    if draw_vert && grid.frozen_cols > 0 {
         let frozen_col_right = vp.data_x + grid.col_pos(grid.fixed_cols + grid.frozen_cols);
         if frozen_col_right > 0 && frozen_col_right < buf_w {
-            canvas.vline(frozen_col_right, 0, content_bottom, border_color);
-        }
-    }
-
-    // Fixed row/col separator line (single pixel)
-    if grid.fixed_rows > 0 {
-        let fixed_row_bottom = vp.data_y + grid.row_pos(grid.fixed_rows);
-        if fixed_row_bottom > 0 && fixed_row_bottom < buf_h {
-            canvas.hline(0, fixed_row_bottom, content_right, border_color);
-        }
-    }
-    if grid.fixed_cols > 0 {
-        let fixed_col_right = vp.data_x + grid.col_pos(grid.fixed_cols);
-        if fixed_col_right > 0 && fixed_col_right < buf_w {
-            canvas.vline(fixed_col_right, 0, content_bottom, border_color);
+            if is_3d {
+                canvas.vline(frozen_col_right - 1, 0, content_bottom, color_inner);
+                canvas.vline(frozen_col_right, 0, content_bottom, color_outer);
+            } else {
+                canvas.vline(frozen_col_right - 1, 0, content_bottom, color);
+            }
         }
     }
 }
@@ -5223,6 +5273,70 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visib
 // Layer 12 -- Active dropdown list
 // ===========================================================================
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct DropdownPopupGeometry {
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
+    pub item_h: i32,
+    pub visible_count: i32,
+    pub start: i32,
+}
+
+pub(crate) fn active_dropdown_popup_geometry(
+    grid: &VolvoxGrid,
+    cell_rect: (i32, i32, i32, i32),
+    surface_w: i32,
+    surface_h: i32,
+) -> Option<DropdownPopupGeometry> {
+    let count = grid.edit.dropdown_count();
+    if count <= 0 {
+        return None;
+    }
+
+    let (cx, cy, cw, ch) = cell_rect;
+    let visible_count = count.min(8).max(1);
+    let item_h = ch.max(18);
+    let drop_h = item_h * visible_count;
+    let drop_w = cw.max(90);
+    let mut drop_x = cx;
+    let mut drop_y = cy + ch - 1;
+
+    if drop_x + drop_w > surface_w {
+        drop_x = (surface_w - drop_w).max(0);
+    }
+    if drop_y + drop_h > surface_h {
+        drop_y = cy - drop_h + 1;
+    }
+    if drop_y < 0 {
+        drop_y = 0;
+    }
+    if drop_y + drop_h > surface_h {
+        drop_y = (surface_h - drop_h).max(0);
+    }
+
+    let sel = grid.edit.dropdown_index;
+    let mut start = 0;
+    if sel >= 0 && sel >= visible_count {
+        start = sel - visible_count + 1;
+    }
+    let max_start = (count - visible_count).max(0);
+    if start > max_start {
+        start = max_start;
+    }
+
+    Some(DropdownPopupGeometry {
+        x: drop_x,
+        y: drop_y,
+        w: drop_w,
+        h: drop_h,
+        item_h,
+        visible_count,
+        start,
+    })
+}
+
 fn render_active_dropdown<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRange) {
     if grid.host_dropdown_overlay {
         return;
@@ -5251,43 +5365,17 @@ fn render_active_dropdown<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Vis
         return;
     };
 
-    let buf_w = canvas.width();
-    let buf_h = canvas.height();
+    let Some(drop) =
+        active_dropdown_popup_geometry(grid, (cx, cy, cw, ch), canvas.width(), canvas.height())
+    else {
+        return;
+    };
 
-    let visible_count = count.min(8).max(1);
-    let item_h = ch.max(18);
-    let drop_h = item_h * visible_count;
-    /* Listbox geometry: width follows the source column. */
-    let drop_w = cw.max(90);
-    let mut drop_x = cx;
-    let mut drop_y = cy + ch - 1;
+    canvas.blend_rect(drop.x + 2, drop.y + 2, drop.w, drop.h, 0x55000000);
+    canvas.fill_rect(drop.x, drop.y, drop.w, drop.h, 0xFFFFFFFF);
+    canvas.rect_outline(drop.x, drop.y, drop.w, drop.h, 0xFF4A4A4A);
 
-    if drop_x + drop_w > buf_w {
-        drop_x = (buf_w - drop_w).max(0);
-    }
-    if drop_y + drop_h > buf_h {
-        drop_y = cy - drop_h + 1;
-    }
-    if drop_y < 0 {
-        drop_y = 0;
-    }
-    if drop_y + drop_h > buf_h {
-        drop_y = (buf_h - drop_h).max(0);
-    }
-
-    canvas.blend_rect(drop_x + 2, drop_y + 2, drop_w, drop_h, 0x55000000);
-    canvas.fill_rect(drop_x, drop_y, drop_w, drop_h, 0xFFFFFFFF);
-    canvas.rect_outline(drop_x, drop_y, drop_w, drop_h, 0xFF4A4A4A);
-
-    let mut start = 0;
     let sel = grid.edit.dropdown_index;
-    if sel >= 0 && sel >= visible_count {
-        start = sel - visible_count + 1;
-    }
-    let max_start = (count - visible_count).max(0);
-    if start > max_start {
-        start = max_start;
-    }
 
     let font_name = &grid.style.font_name;
     let font_size = grid.style.font_size;
@@ -5296,9 +5384,9 @@ fn render_active_dropdown<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Vis
     let text_style = grid.style.text_effect;
     let text_padding = 4_i32;
 
-    for slot in 0..visible_count {
-        let idx = start + slot;
-        let item_y = drop_y + slot * item_h;
+    for slot in 0..drop.visible_count {
+        let idx = drop.start + slot;
+        let item_y = drop.y + slot * drop.item_h;
         let selected = idx == sel;
 
         let row_bg = if selected {
@@ -5307,10 +5395,10 @@ fn render_active_dropdown<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Vis
             0xFFFFFFFF
         };
         canvas.fill_rect(
-            drop_x + 1,
+            drop.x + 1,
             item_y + 1,
-            (drop_w - 2).max(0),
-            (item_h - 1).max(0),
+            (drop.w - 2).max(0),
+            (drop.item_h - 1).max(0),
             row_bg,
         );
 
@@ -5328,9 +5416,9 @@ fn render_active_dropdown<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Vis
             font_italic,
             None,
         );
-        let text_y = item_y + ((item_h - th.ceil() as i32) / 2).max(0);
+        let text_y = item_y + ((drop.item_h - th.ceil() as i32) / 2).max(0);
         canvas.draw_text_styled(
-            drop_x + text_padding,
+            drop.x + text_padding,
             text_y,
             item_text,
             font_name,
@@ -5338,10 +5426,10 @@ fn render_active_dropdown<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Vis
             font_bold,
             font_italic,
             text_color,
-            drop_x + text_padding,
+            drop.x + text_padding,
             0,
-            (drop_w - text_padding * 2).max(1),
-            item_h,
+            (drop.w - text_padding * 2).max(1),
+            drop.item_h,
             text_style,
             None,
         );

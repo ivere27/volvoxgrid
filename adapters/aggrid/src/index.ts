@@ -2,7 +2,10 @@ export { AgGridVolvox } from "./ag-grid-volvox.js";
 export type {
   AgGridVolvoxParams,
   AgThemeName,
+  BeforeEditEvent,
+  BeforeSortEvent,
   CellClickedEvent,
+  CellEditValidatingEvent,
   CellStyle,
   ColDef,
   ColumnResizedEvent,

@@ -1,9 +1,8 @@
 //! Shared demo scenarios for VolvoxGrid host examples.
 //!
 //! This module is feature-gated behind `demo` and not included in
-//! production builds.  Every host example (GTK, Web/WASM, Android,
-//! Flutter) can call these functions instead of duplicating the
-//! setup/data logic.
+//! production builds. Direct engine targets and host/plugin adapters can
+//! reuse these functions instead of duplicating setup/data logic.
 //!
 //! Three demos are provided:
 //!
@@ -23,9 +22,87 @@ use crate::grid::VolvoxGrid;
 use crate::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
 use crate::outline::{subtotal, subtotal_ex};
 use crate::proto::volvoxgrid::v1 as pb;
-use crate::style::{CellStyleOverride, HighlightStyle};
+use crate::selection::{HOVER_CELL, HOVER_COLUMN, HOVER_ROW};
+use crate::style::{CellStylePatch, HighlightStyle};
 
 // ── Shared helpers ──────────────────────────────────────────────────
+
+#[derive(Clone, Copy, Debug)]
+struct DemoTheme {
+    body_bg: u32,
+    body_fg: u32,
+    canvas_bg: u32,
+    alt_row_bg: u32,
+    fixed_bg: u32,
+    fixed_fg: u32,
+    grid_color: u32,
+    fixed_grid_color: u32,
+    header_bg: u32,
+    header_fg: u32,
+    indicator_bg: u32,
+    indicator_fg: u32,
+    selection_bg: u32,
+    selection_fg: u32,
+    accent: u32,
+    tree_color: u32,
+}
+
+const SALES_THEME: DemoTheme = DemoTheme {
+    body_bg: 0xFFFFFFFF,
+    body_fg: 0xFF111827,
+    canvas_bg: 0xFFFAFAFB,
+    alt_row_bg: 0xFFF9FAFB,
+    fixed_bg: 0xFFF3F4F6,
+    fixed_fg: 0xFF374151,
+    grid_color: 0xFFE5E7EB,
+    fixed_grid_color: 0xFFD1D5DB,
+    header_bg: 0xFFF9FAFB,
+    header_fg: 0xFF111827,
+    indicator_bg: 0xFFF9FAFB,
+    indicator_fg: 0xFF6B7280,
+    selection_bg: 0xFF6366F1,
+    selection_fg: 0xFFFFFFFF,
+    accent: 0xFF818CF8,
+    tree_color: 0xFF9CA3AF,
+};
+
+const HIERARCHY_THEME: DemoTheme = DemoTheme {
+    body_bg: 0xFFFFFFFF,
+    body_fg: 0xFF1C1917,
+    canvas_bg: 0xFFFAFAF9,
+    alt_row_bg: 0xFFF5F5F4,
+    fixed_bg: 0xFFF5F5F4,
+    fixed_fg: 0xFF44403C,
+    grid_color: 0xFFE7E5E4,
+    fixed_grid_color: 0xFFD6D3D1,
+    header_bg: 0xFFFAFAF9,
+    header_fg: 0xFF1C1917,
+    indicator_bg: 0xFFFAFAF9,
+    indicator_fg: 0xFF78716C,
+    selection_bg: 0xFFD97706,
+    selection_fg: 0xFFFFFFFF,
+    accent: 0xFFF59E0B,
+    tree_color: 0xFFA8A29E,
+};
+
+const STRESS_THEME: DemoTheme = DemoTheme {
+    body_bg: 0xFFFFFFFF,
+    body_fg: 0xFF1A1A1A,
+    canvas_bg: 0xFFF3F3F3,
+    alt_row_bg: 0xFFFAFAFA,
+    fixed_bg: 0xFFEBEBEB,
+    fixed_fg: 0xFF323232,
+    grid_color: 0xFFE0E0E0,
+    fixed_grid_color: 0xFFCCCCCC,
+    header_bg: 0xFFF5F5F5,
+    header_fg: 0xFF1A1A1A,
+    indicator_bg: 0xFFF5F5F5,
+    indicator_fg: 0xFF616161,
+    selection_bg: 0xFF005FB8,
+    selection_fg: 0xFFFFFFFF,
+    accent: 0xFF0078D4,
+    tree_color: 0xFF9E9E9E,
+};
 
 /// Scale a logical-pixel value by the grid's DPI scale factor.
 fn sp(grid: &VolvoxGrid, px: i32) -> i32 {
@@ -36,7 +113,52 @@ fn sp(grid: &VolvoxGrid, px: i32) -> i32 {
     }
 }
 
-fn apply_demo_column_headers(grid: &mut VolvoxGrid, headers: &[&str], band_row_height_px: i32) {
+fn logical_px(grid: &VolvoxGrid, px: i32) -> i32 {
+    if grid.scale <= 1.001 {
+        px
+    } else {
+        ((px as f32) / grid.scale).ceil() as i32
+    }
+}
+
+fn apply_demo_theme(grid: &mut VolvoxGrid, theme: &DemoTheme) {
+    grid.style.back_color = theme.body_bg;
+    grid.style.fore_color = theme.body_fg;
+    grid.style.back_color_fixed = theme.fixed_bg;
+    grid.style.fore_color_fixed = theme.fixed_fg;
+    grid.style.back_color_frozen = theme.body_bg;
+    grid.style.fore_color_frozen = theme.body_fg;
+    grid.style.back_color_bkg = theme.canvas_bg;
+    grid.style.back_color_alternate = theme.alt_row_bg;
+    grid.style.grid_lines = pb::GridLineStyle::GridlineSolid as i32;
+    grid.style.grid_lines_fixed = pb::GridLineStyle::GridlineSolid as i32;
+    grid.style.grid_color = theme.grid_color;
+    grid.style.grid_color_fixed = theme.fixed_grid_color;
+    grid.style.sheet_border = theme.fixed_grid_color;
+    grid.style.progress_color = theme.accent;
+    grid.style.tree_color = theme.tree_color;
+    grid.style.header_separator.enabled = true;
+    grid.style.header_separator.color = theme.fixed_grid_color;
+    grid.style.header_separator.width_px = 1;
+    grid.style.header_resize_handle.enabled = true;
+    grid.style.header_resize_handle.color = theme.fixed_grid_color;
+    grid.style.header_resize_handle.width_px = 1;
+    grid.style.header_resize_handle.hit_width_px = 6;
+    grid.selection.selection_style = HighlightStyle {
+        back_color: Some(theme.selection_bg),
+        fore_color: Some(theme.selection_fg),
+        fill_handle: Some(pb::FillHandlePosition::FillHandleNone as i32),
+        fill_handle_color: Some(theme.accent),
+        ..HighlightStyle::default()
+    };
+}
+
+fn apply_demo_column_headers(
+    grid: &mut VolvoxGrid,
+    headers: &[&str],
+    band_row_height_px: i32,
+    theme: &DemoTheme,
+) {
     for (col, &header) in headers.iter().enumerate() {
         if let Some(cp) = grid.columns.get_mut(col) {
             cp.caption = header.to_string();
@@ -49,8 +171,9 @@ fn apply_demo_column_headers(grid: &mut VolvoxGrid, headers: &[&str], band_row_h
     grid.indicator_bands.col_top.mode_bits = (pb::ColIndicatorCellMode::ColIndicatorCellHeaderText
         as u32)
         | (pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32);
-    grid.indicator_bands.col_top.back_color = Some(0xFF2244AA);
-    grid.indicator_bands.col_top.fore_color = Some(0xFFFFFFFF);
+    grid.indicator_bands.col_top.back_color = Some(theme.header_bg);
+    grid.indicator_bands.col_top.fore_color = Some(theme.header_fg);
+    grid.indicator_bands.col_top.grid_color = Some(theme.fixed_grid_color);
     grid.indicator_bands.col_top.allow_resize = true;
     grid.indicator_bands.corner_top_start.visible = false;
     grid.indicator_bands.corner_top_start.mode_bits = 0;
@@ -58,13 +181,13 @@ fn apply_demo_column_headers(grid: &mut VolvoxGrid, headers: &[&str], band_row_h
     grid.indicator_bands.corner_top_start.data.clear();
 }
 
-fn apply_demo_row_indicator(grid: &mut VolvoxGrid, width_px: i32) {
+fn apply_demo_row_indicator(grid: &mut VolvoxGrid, width_px: i32, theme: &DemoTheme) {
     grid.indicator_bands.row_start.visible = true;
     grid.indicator_bands.row_start.width_px = sp(grid, width_px.max(DEFAULT_ROW_INDICATOR_WIDTH));
     grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
-    grid.indicator_bands.row_start.back_color = Some(grid.style.back_color_bkg);
-    grid.indicator_bands.row_start.fore_color = Some(grid.style.fore_color);
-    grid.indicator_bands.row_start.grid_color = Some(grid.style.grid_color);
+    grid.indicator_bands.row_start.back_color = Some(theme.indicator_bg);
+    grid.indicator_bands.row_start.fore_color = Some(theme.indicator_fg);
+    grid.indicator_bands.row_start.grid_color = Some(theme.fixed_grid_color);
     grid.indicator_bands.row_start.allow_resize = true;
 }
 
@@ -87,7 +210,43 @@ fn stress_row_indicator_width_px(grid: &mut VolvoxGrid, data_rows: i32) -> i32 {
         }
     };
 
-    (text_w + 8).max(DEFAULT_ROW_INDICATOR_WIDTH)
+    (logical_px(grid, text_w) + 8).max(DEFAULT_ROW_INDICATOR_WIDTH)
+}
+
+fn stress_text_col_width_px(grid: &mut VolvoxGrid) -> i32 {
+    let font_name = grid.style.font_name.clone();
+    let font_size = if grid.style.font_size > 0.0 {
+        grid.style.font_size
+    } else {
+        13.0
+    };
+    let samples: Vec<&str> = STRESS_TEXT_POOL
+        .iter()
+        .copied()
+        .chain(std::iter::once(STRESS_HEADERS[0]))
+        .collect();
+    let text_w = {
+        let te = grid.ensure_text_engine();
+        if te.has_fonts() {
+            samples
+                .iter()
+                .map(|text| {
+                    te.measure_text(text, &font_name, font_size, false, false, None)
+                        .0
+                        .ceil() as i32
+                })
+                .max()
+                .unwrap_or(0)
+        } else {
+            samples
+                .iter()
+                .map(|text| (text.chars().count() as f32 * font_size * 0.6).ceil() as i32)
+                .max()
+                .unwrap_or(0)
+        }
+    };
+
+    (text_w + sp(grid, STRESS_TEXT_COL_PADDING_PX)).max(sp(grid, STRESS_COL_WIDTHS[0]))
 }
 
 fn apply_sales_subtotal_merges(grid: &mut VolvoxGrid) {
@@ -213,6 +372,7 @@ const SALES_DATA_ROWS: i32 = 1000;
 /// Outline levels: 0=grand, 1=category, 2=product, 3=data.
 pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
     reset_grid(grid);
+    apply_demo_theme(grid, &SALES_THEME);
 
     // ── Generate data in memory ──────────────────────────────────────
     struct Entry {
@@ -278,8 +438,8 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
         grid.set_col_width(c as i32, sp(grid, w));
     }
     grid.default_row_height = sp(grid, crate::grid::DEFAULT_ROW_HEIGHT);
-    apply_demo_column_headers(grid, &SALES_HEADERS, 28);
-    apply_demo_row_indicator(grid, 40);
+    apply_demo_column_headers(grid, &SALES_HEADERS, 28, &SALES_THEME);
+    apply_demo_row_indicator(grid, 40, &SALES_THEME);
 
     grid.columns[0].alignment = pb::Align::CenterCenter as i32;
     grid.columns[4].alignment = pb::Align::RightCenter as i32;
@@ -288,8 +448,7 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
     grid.columns[4].format = "$#,##0".to_string();
     grid.columns[5].format = "$#,##0".to_string();
     grid.columns[7].dropdown_items = "Active|Pending|Shipped|Returned|Cancelled".to_string();
-    grid.columns[6].progress_color = 0xFF4488CC;
-    grid.style.back_color_alternate = 0xFFF0F5FF;
+    grid.columns[6].progress_color = SALES_THEME.accent;
 
     grid.allow_user_resizing = 3;
     grid.tab_behavior = 1;
@@ -302,21 +461,19 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
     grid.header_features = 3;
     grid.auto_size_mouse = true;
     grid.allow_user_freezing = 3;
-    grid.selection.hover_mode = (pb::HoverMode::HoverRow as u32)
-        | (pb::HoverMode::HoverColumn as u32)
-        | (pb::HoverMode::HoverCell as u32);
+    grid.selection.hover_mode = HOVER_ROW | HOVER_COLUMN | HOVER_CELL;
     grid.selection.hover_row_style = HighlightStyle {
-        back_color: Some(0x0A1A73E8),
+        back_color: Some(0x106366F1),
         ..HighlightStyle::default()
     };
     grid.selection.hover_column_style = HighlightStyle {
-        back_color: Some(0x0A1A73E8),
+        back_color: Some(0x106366F1),
         ..HighlightStyle::default()
     };
     grid.selection.hover_cell_style = HighlightStyle {
-        back_color: Some(0x241A73E8),
+        back_color: Some(0x1E818CF8),
         border: Some(pb::BorderStyle::BorderThin as i32),
-        border_color: Some(0xFF1A73E8),
+        border_color: Some(SALES_THEME.accent),
         ..HighlightStyle::default()
     };
 
@@ -335,8 +492,8 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
         if e.margin_pct < 0.0 {
             grid.cell_styles.insert(
                 (r, 6),
-                CellStyleOverride {
-                    fore_color: Some(0xFFCC0000),
+                CellStylePatch {
+                    fore_color: Some(0xFFDC2626),
                     font_bold: Some(true),
                     ..Default::default()
                 },
@@ -347,14 +504,45 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
     // ── Subtotals: Q → Region → Grand Total (below) ────────────────
     grid.outline.group_total_position = 1; // below
     subtotal(grid, 1, 0, 0, "", 0, 0, false); // clear existing
-    subtotal(grid, 2, -1, 4, "Grand Total", 0xFFC0C0C0, 0xFF000000, true);
+    subtotal(
+        grid,
+        2,
+        -1,
+        4,
+        "Grand Total",
+        0xFFEEF2FF,
+        SALES_THEME.body_fg,
+        true,
+    );
     // Group by Q (col 0), match_from=1
     subtotal_ex(
-        grid, 2, 0, 4, "", 0xFFD0D0D0, 0xFF000000, true, "", false, 1, false,
+        grid,
+        2,
+        0,
+        4,
+        "",
+        0xFFF5F3FF,
+        SALES_THEME.body_fg,
+        true,
+        "",
+        false,
+        1,
+        false,
     );
     // Group by Region (col 1), match_from=1 so Q+Region both participate
     subtotal_ex(
-        grid, 2, 1, 4, "", 0xFFE8E8E8, 0xFF000000, true, "", false, 1, false,
+        grid,
+        2,
+        1,
+        4,
+        "",
+        0xFFF8F7FF,
+        SALES_THEME.body_fg,
+        true,
+        "",
+        false,
+        1,
+        false,
     );
 
     // Fill cost and margin for subtotal rows from their data rows above.
@@ -438,6 +626,7 @@ struct DirEntry {
 /// expand/collapse, indented names, and styled folder rows.
 pub fn setup_hierarchy_demo(grid: &mut VolvoxGrid) {
     reset_grid(grid);
+    apply_demo_theme(grid, &HIERARCHY_THEME);
     let entries = build_hierarchy_entries();
     let data_rows = entries.len() as i32;
 
@@ -450,15 +639,13 @@ pub fn setup_hierarchy_demo(grid: &mut VolvoxGrid) {
     }
 
     grid.default_row_height = sp(grid, crate::grid::DEFAULT_ROW_HEIGHT);
-    apply_demo_column_headers(grid, &HIERARCHY_HEADERS, 28);
+    apply_demo_column_headers(grid, &HIERARCHY_HEADERS, 28, &HIERARCHY_THEME);
 
     // Column alignments
     grid.columns[2].alignment = pb::Align::RightCenter as i32;
     grid.columns[4].alignment = pb::Align::CenterCenter as i32;
 
     // Alternating row color
-    grid.style.back_color_alternate = 0xFFF5F5F5;
-
     // Interaction defaults
     grid.allow_user_resizing = 3;
     grid.tab_behavior = 1;
@@ -468,13 +655,13 @@ pub fn setup_hierarchy_demo(grid: &mut VolvoxGrid) {
     grid.fling_friction = 0.9;
     grid.header_features = 0; // disabled — flat sort is incompatible with tree hierarchy
     grid.auto_size_mouse = true;
-    grid.selection.hover_mode = pb::HoverMode::HoverCell as u32;
+    grid.selection.hover_mode = HOVER_CELL;
     grid.selection.hover_row_style = HighlightStyle::default();
     grid.selection.hover_column_style = HighlightStyle::default();
     grid.selection.hover_cell_style = HighlightStyle {
-        back_color: Some(0x1A2E7D32),
+        back_color: Some(0x1AD97706),
         border: Some(pb::BorderStyle::BorderThin as i32),
-        border_color: Some(0xFF2E7D32),
+        border_color: Some(HIERARCHY_THEME.accent),
         ..HighlightStyle::default()
     };
 
@@ -503,9 +690,9 @@ pub fn setup_hierarchy_demo(grid: &mut VolvoxGrid) {
         if entry.kind == "Folder" {
             grid.cell_styles.insert(
                 (r, 0),
-                CellStyleOverride {
+                CellStylePatch {
                     font_bold: Some(true),
-                    fore_color: Some(0xFF1A5276),
+                    fore_color: Some(0xFF92400E),
                     ..Default::default()
                 },
             );
@@ -719,7 +906,8 @@ const STRESS_HEADERS: [&str; 11] = [
     "Rating",
     "Code",
 ];
-const STRESS_COL_WIDTHS: [i32; 11] = [110, 80, 90, 60, 100, 50, 90, 160, 90, 60, 100];
+const STRESS_COL_WIDTHS: [i32; 11] = [68, 80, 90, 60, 100, 50, 90, 160, 90, 60, 100];
+const STRESS_TEXT_COL_PADDING_PX: i32 = 12;
 
 const STRESS_TEXT_POOL: [&str; 10] = [
     "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliet",
@@ -827,6 +1015,7 @@ fn stress_cell_capacity_for_rows(data_rows: i32) -> usize {
 
 fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize) {
     reset_grid(grid);
+    apply_demo_theme(grid, &STRESS_THEME);
     // Capacity is caller-defined: eager path uses full dataset; lazy path
     // keeps startup memory/time low and grows on demand.
     grid.cells = crate::cell::CellStore::with_capacity(cell_capacity.max(12));
@@ -834,14 +1023,16 @@ fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize
     grid.set_cols(11);
 
     // Column widths
-    for (c, &w) in STRESS_COL_WIDTHS.iter().enumerate() {
+    let text_col_width = stress_text_col_width_px(grid);
+    grid.set_col_width(0, text_col_width);
+    for (c, &w) in STRESS_COL_WIDTHS.iter().enumerate().skip(1) {
         grid.set_col_width(c as i32, sp(grid, w));
     }
 
     grid.default_row_height = sp(grid, crate::grid::DEFAULT_ROW_HEIGHT);
-    apply_demo_column_headers(grid, &STRESS_HEADERS, 28);
+    apply_demo_column_headers(grid, &STRESS_HEADERS, 28, &STRESS_THEME);
     let row_indicator_width = stress_row_indicator_width_px(grid, data_rows);
-    apply_demo_row_indicator(grid, row_indicator_width);
+    apply_demo_row_indicator(grid, row_indicator_width, &STRESS_THEME);
 
     // Column alignments
     grid.columns[1].alignment = pb::Align::RightCenter as i32;
@@ -857,10 +1048,7 @@ fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize
     grid.columns[6].dropdown_items = "Option A|Option B|Option C|Option D|Option E".to_string();
 
     // Rating progress (data-bar)
-    grid.columns[9].progress_color = 0xFF44AA88;
-
-    // Alternating row color
-    grid.style.back_color_alternate = 0xFFF0F5FF;
+    grid.columns[9].progress_color = 0xFF0078D4;
 
     // Interaction defaults
     grid.allow_user_resizing = 3;
@@ -874,9 +1062,9 @@ fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize
     grid.header_features = 3;
     grid.auto_size_mouse = true;
     grid.allow_user_freezing = 3;
-    grid.selection.hover_mode = pb::HoverMode::HoverRow as u32;
+    grid.selection.hover_mode = HOVER_ROW;
     grid.selection.hover_row_style = HighlightStyle {
-        back_color: Some(0x12000000),
+        back_color: Some(0x120078D4),
         ..HighlightStyle::default()
     };
     grid.selection.hover_column_style = HighlightStyle::default();
@@ -1130,5 +1318,113 @@ mod tests {
             )
         );
         assert!(grid.indicator_bands.row_start.width_px > 40);
+    }
+
+    #[test]
+    fn demos_apply_modern_theme_palettes() {
+        let mut sales = VolvoxGrid::new(1, 960, 540, 1, 1, 0, 0);
+        setup_sales_demo(&mut sales);
+        assert_eq!(sales.style.back_color_fixed, SALES_THEME.fixed_bg);
+        assert_eq!(
+            sales.indicator_bands.col_top.back_color,
+            Some(SALES_THEME.header_bg)
+        );
+        assert_eq!(
+            sales.indicator_bands.row_start.back_color,
+            Some(SALES_THEME.indicator_bg)
+        );
+
+        let mut hierarchy = VolvoxGrid::new(2, 960, 540, 1, 1, 0, 0);
+        setup_hierarchy_demo(&mut hierarchy);
+        assert_eq!(hierarchy.style.back_color_fixed, HIERARCHY_THEME.fixed_bg);
+        assert_eq!(
+            hierarchy.indicator_bands.col_top.back_color,
+            Some(HIERARCHY_THEME.header_bg)
+        );
+
+        let mut stress = VolvoxGrid::new(3, 960, 540, 1, 1, 0, 0);
+        setup_stress_grid(&mut stress, 128, 2048);
+        assert_eq!(stress.style.back_color_fixed, STRESS_THEME.fixed_bg);
+        assert_eq!(
+            stress.indicator_bands.col_top.back_color,
+            Some(STRESS_THEME.header_bg)
+        );
+        assert_eq!(
+            stress.indicator_bands.row_start.back_color,
+            Some(STRESS_THEME.indicator_bg)
+        );
+    }
+
+    #[test]
+    fn stress_demo_row_indicator_avoids_double_scaling_on_high_dpi() {
+        let mut grid = VolvoxGrid::new(1, 0, 0, 1, 1, 0, 0);
+        let data_rows = STRESS_DATA_ROWS;
+        grid.scale = 3.0;
+        grid.style.font_size = 42.0;
+
+        let label = data_rows.max(1).to_string();
+        let font_name = grid.style.font_name.clone();
+        let font_size = grid.style.font_size;
+        let measured_text_px = {
+            let te = grid.ensure_text_engine();
+            if te.has_fonts() {
+                te.measure_text(&label, &font_name, font_size, false, false, None)
+                    .0
+                    .ceil() as i32
+            } else {
+                (label.chars().count() as f32 * font_size * 0.6).ceil() as i32
+            }
+        };
+        let expected_logical_width =
+            (logical_px(&grid, measured_text_px) + 8).max(DEFAULT_ROW_INDICATOR_WIDTH);
+
+        setup_stress_grid(&mut grid, data_rows, 12);
+
+        assert_eq!(
+            grid.indicator_bands.row_start.width_px,
+            sp(&grid, expected_logical_width)
+        );
+    }
+
+    #[test]
+    fn stress_demo_text_column_fits_samples_without_legacy_overwidth() {
+        let mut grid = VolvoxGrid::new(1, 0, 0, 1, 1, 0, 0);
+        grid.scale = 3.0;
+        grid.style.font_size = 42.0;
+
+        let font_name = grid.style.font_name.clone();
+        let font_size = grid.style.font_size;
+        let samples: Vec<&str> = STRESS_TEXT_POOL
+            .iter()
+            .copied()
+            .chain(std::iter::once(STRESS_HEADERS[0]))
+            .collect();
+        let measured_text_px = {
+            let te = grid.ensure_text_engine();
+            if te.has_fonts() {
+                samples
+                    .iter()
+                    .map(|text| {
+                        te.measure_text(text, &font_name, font_size, false, false, None)
+                            .0
+                            .ceil() as i32
+                    })
+                    .max()
+                    .unwrap_or(0)
+            } else {
+                samples
+                    .iter()
+                    .map(|text| (text.chars().count() as f32 * font_size * 0.6).ceil() as i32)
+                    .max()
+                    .unwrap_or(0)
+            }
+        };
+        let expected_width = (measured_text_px + sp(&grid, STRESS_TEXT_COL_PADDING_PX))
+            .max(sp(&grid, STRESS_COL_WIDTHS[0]));
+
+        setup_stress_grid(&mut grid, STRESS_DATA_ROWS, 12);
+
+        assert_eq!(grid.col_width(0), expected_width);
+        assert!(grid.col_width(0) < sp(&grid, 110));
     }
 }

@@ -37,6 +37,11 @@ namespace VolvoxGrid.DotNet
         private int _focusedRowIndex;
         private int _focusedColIndex;
         private int[] _selectedRows;
+        private bool _cancelableEventChannelRequested;
+
+        private EventHandler<VolvoxGridBeforeEditEventArgs> _beforeEdit;
+        private EventHandler<VolvoxGridCellEditValidatingEventArgs> _cellEditValidating;
+        private EventHandler<VolvoxGridBeforeSortEventArgs> _beforeSort;
 
         public VolvoxGridControl()
         {
@@ -52,17 +57,17 @@ namespace VolvoxGrid.DotNet
             _config.Selection.Mode = VolvoxSelectionMode.Free;
             _config.Selection.SelectionVisibility = VolvoxSelectionVisibility.Always;
             _config.Selection.AllowSelection = true;
-            _config.Selection.HoverMode = 7; // Row | Col | Cell
+            _config.Selection.HoverMask = 7; // Row | Col | Cell
             _config.Scrolling.Scrollbars = VolvoxScrollBarsMode.Both;
             _config.Scrolling.FlingEnabled = true;
             _config.Scrolling.FastScroll = true;
             _config.Rendering.RendererMode = VolvoxGridRendererMode.Auto;
-            _config.IndicatorBands.ColIndicatorTop.Visible = true;
-            _config.IndicatorBands.ColIndicatorTop.BandRows = 1;
-            _config.IndicatorBands.ColIndicatorTop.ModeBits = VolvoxColIndicatorCellMode.HeaderText | VolvoxColIndicatorCellMode.SortGlyph;
-            _config.IndicatorBands.RowIndicatorStart.Visible = false;
-            _config.IndicatorBands.RowIndicatorStart.WidthPx = 35;
-            _config.IndicatorBands.RowIndicatorStart.ModeBits = VolvoxRowIndicatorMode.Current | VolvoxRowIndicatorMode.Selection;
+            _config.Indicators.ColIndicatorTop.Visible = true;
+            _config.Indicators.ColIndicatorTop.BandRows = 1;
+            _config.Indicators.ColIndicatorTop.ModeBits = VolvoxColIndicatorCellMode.HeaderText | VolvoxColIndicatorCellMode.SortGlyph;
+            _config.Indicators.RowIndicatorStart.Visible = false;
+            _config.Indicators.RowIndicatorStart.WidthPx = 35;
+            _config.Indicators.RowIndicatorStart.ModeBits = VolvoxRowIndicatorMode.Current | VolvoxRowIndicatorMode.Selection;
 
             _renderHost = new RenderHostCpu
             {
@@ -75,6 +80,35 @@ namespace VolvoxGrid.DotNet
         public event EventHandler<VolvoxGridFocusedCellChangedEventArgs> FocusedCellChanged;
         public event EventHandler<VolvoxGridCellValueChangedEventArgs> CellValueChanged;
         public event EventHandler<VolvoxGridSelectionChangedEventArgs> SelectionChanged;
+        public event EventHandler<VolvoxGridBeforeEditEventArgs> BeforeEdit
+        {
+            add
+            {
+                _beforeEdit += value;
+                EnableCancelableEventChannel();
+            }
+            remove { _beforeEdit -= value; }
+        }
+
+        public event EventHandler<VolvoxGridCellEditValidatingEventArgs> CellEditValidating
+        {
+            add
+            {
+                _cellEditValidating += value;
+                EnableCancelableEventChannel();
+            }
+            remove { _cellEditValidating -= value; }
+        }
+
+        public event EventHandler<VolvoxGridBeforeSortEventArgs> BeforeSort
+        {
+            add
+            {
+                _beforeSort += value;
+                EnableCancelableEventChannel();
+            }
+            remove { _beforeSort -= value; }
+        }
 
         #region Public Properties
 
@@ -157,8 +191,8 @@ namespace VolvoxGrid.DotNet
 
         public bool HoverEnabled
         {
-            get { return (_config.Selection.HoverMode ?? 0) != 0; }
-            set { uint mask = value ? 7u : 0u; if (_config.Selection.HoverMode != mask) { _config.Selection.HoverMode = mask; ApplyEngineConfig(); } }
+            get { return (_config.Selection.HoverMask ?? 0) != 0; }
+            set { uint mask = value ? 7u : 0u; if (_config.Selection.HoverMask != mask) { _config.Selection.HoverMask = mask; ApplyEngineConfig(); } }
         }
 
         public bool FlingEnabled
@@ -203,16 +237,32 @@ namespace VolvoxGrid.DotNet
             set { if (_config.Scrolling.FastScroll != value) { _config.Scrolling.FastScroll = value; ApplyEngineConfig(); } }
         }
 
-        public VolvoxGridAllowUserResizingMode AllowUserResizing
+        public VolvoxGridResizePolicy ResizePolicy
         {
-            get { return (VolvoxGridAllowUserResizingMode)(_config.Interaction.AllowUserResizing ?? VolvoxAllowUserResizingMode.Both); }
-            set { var mapped = (VolvoxAllowUserResizingMode)value; if (_config.Interaction.AllowUserResizing != mapped) { _config.Interaction.AllowUserResizing = mapped; ApplyEngineConfig(); } }
+            get { return DecodeResizePolicy(_config.Interaction.ResizePolicy); }
+            set
+            {
+                var mapped = EncodeResizePolicy(value);
+                if (_config.Interaction.ResizePolicy != mapped)
+                {
+                    _config.Interaction.ResizePolicy = mapped;
+                    ApplyEngineConfig();
+                }
+            }
         }
 
         public VolvoxGridHeaderFeatures HeaderFeatures
         {
-            get { return (VolvoxGridHeaderFeatures)(_config.Interaction.HeaderFeatures ?? VolvoxHeaderFeatures.SortReorderChooser); }
-            set { var mapped = (VolvoxHeaderFeatures)value; if (_config.Interaction.HeaderFeatures != mapped) { _config.Interaction.HeaderFeatures = mapped; ApplyEngineConfig(); } }
+            get { return DecodeHeaderFeatures(_config.Interaction.HeaderFeatures); }
+            set
+            {
+                var mapped = EncodeHeaderFeatures(value);
+                if (_config.Interaction.HeaderFeatures != mapped)
+                {
+                    _config.Interaction.HeaderFeatures = mapped;
+                    ApplyEngineConfig();
+                }
+            }
         }
 
         public bool ShowColumnHeaders
@@ -436,16 +486,16 @@ namespace VolvoxGrid.DotNet
 
         private VolvoxRowIndicatorConfigData EnsureRowIndicatorStartConfig()
         {
-            if (_config.IndicatorBands == null) _config.IndicatorBands = new VolvoxIndicatorBandsConfigData();
-            if (_config.IndicatorBands.RowIndicatorStart == null) _config.IndicatorBands.RowIndicatorStart = new VolvoxRowIndicatorConfigData();
-            return _config.IndicatorBands.RowIndicatorStart;
+            if (_config.Indicators == null) _config.Indicators = new VolvoxIndicatorsConfigData();
+            if (_config.Indicators.RowIndicatorStart == null) _config.Indicators.RowIndicatorStart = new VolvoxRowIndicatorConfigData();
+            return _config.Indicators.RowIndicatorStart;
         }
 
         private VolvoxColIndicatorConfigData EnsureColIndicatorTopConfig()
         {
-            if (_config.IndicatorBands == null) _config.IndicatorBands = new VolvoxIndicatorBandsConfigData();
-            if (_config.IndicatorBands.ColIndicatorTop == null) _config.IndicatorBands.ColIndicatorTop = new VolvoxColIndicatorConfigData();
-            return _config.IndicatorBands.ColIndicatorTop;
+            if (_config.Indicators == null) _config.Indicators = new VolvoxIndicatorsConfigData();
+            if (_config.Indicators.ColIndicatorTop == null) _config.Indicators.ColIndicatorTop = new VolvoxColIndicatorConfigData();
+            return _config.Indicators.ColIndicatorTop;
         }
 
         #endregion
@@ -1456,6 +1506,12 @@ namespace VolvoxGrid.DotNet
             if (evt == null) return null;
             switch (evt.Kind)
             {
+                case VolvoxGridEventKind.BeforeEdit:
+                    return OnBeforeEdit(evt);
+                case VolvoxGridEventKind.CellEditValidate:
+                    return OnCellEditValidating(evt);
+                case VolvoxGridEventKind.BeforeSort:
+                    return OnBeforeSort(evt);
                 case VolvoxGridEventKind.CellFocusChanged:
                     int prevRow = _focusedRowIndex; string prevField = GetFieldName(_focusedColIndex);
                     _focusedRowIndex = evt.NewRow; _focusedColIndex = Math.Max(0, evt.NewCol);
@@ -1469,6 +1525,57 @@ namespace VolvoxGrid.DotNet
                     break;
             }
             return null;
+        }
+
+        private void EnableCancelableEventChannel()
+        {
+            if (_cancelableEventChannelRequested)
+            {
+                return;
+            }
+
+            _cancelableEventChannelRequested = true;
+            _renderHost.EnableEventDecisionChannel();
+        }
+
+        private bool? OnBeforeEdit(VolvoxGridEventData evt)
+        {
+            if (_beforeEdit == null)
+            {
+                return _cancelableEventChannelRequested ? (bool?)false : null;
+            }
+
+            var args = new VolvoxGridBeforeEditEventArgs(evt.Row, evt.Col, GetFieldName(evt.Col));
+            _beforeEdit.Invoke(this, args);
+            return args.Cancel;
+        }
+
+        private bool? OnCellEditValidating(VolvoxGridEventData evt)
+        {
+            if (_cellEditValidating == null)
+            {
+                return _cancelableEventChannelRequested ? (bool?)false : null;
+            }
+
+            var args = new VolvoxGridCellEditValidatingEventArgs(
+                evt.Row,
+                evt.Col,
+                GetFieldName(evt.Col),
+                evt.EditText);
+            _cellEditValidating.Invoke(this, args);
+            return args.Cancel;
+        }
+
+        private bool? OnBeforeSort(VolvoxGridEventData evt)
+        {
+            if (_beforeSort == null)
+            {
+                return _cancelableEventChannelRequested ? (bool?)false : null;
+            }
+
+            var args = new VolvoxGridBeforeSortEventArgs(evt.Col, GetFieldName(evt.Col));
+            _beforeSort.Invoke(this, args);
+            return args.Cancel;
         }
 
         private void UpdateSelectionFromEngine()
@@ -1578,7 +1685,7 @@ namespace VolvoxGrid.DotNet
                 _config.Span = config.Span ?? new VolvoxSpanConfigData();
                 _config.Interaction = config.Interaction ?? new VolvoxInteractionConfigData();
                 _config.Rendering = config.Rendering ?? new VolvoxRenderConfigData();
-                _config.IndicatorBands = config.IndicatorBands ?? new VolvoxIndicatorBandsConfigData();
+                _config.Indicators = config.Indicators ?? new VolvoxIndicatorsConfigData();
                 SyncRenderHostSelectionMode();
             }
             catch (Exception ex)
@@ -1593,6 +1700,98 @@ namespace VolvoxGrid.DotNet
             {
                 _renderHost.SelectionMode = _config.Selection.Mode ?? VolvoxSelectionMode.Free;
             }
+        }
+
+        private static VolvoxGridResizePolicy DecodeResizePolicy(VolvoxResizePolicyMode? mode)
+        {
+            bool columns;
+            bool rows;
+            bool uniform;
+            DecodeResizePolicyMode(mode ?? VolvoxResizePolicyMode.Both, out columns, out rows, out uniform);
+            return new VolvoxGridResizePolicy
+            {
+                Columns = columns,
+                Rows = rows,
+                Uniform = uniform,
+            };
+        }
+
+        private static VolvoxResizePolicyMode EncodeResizePolicy(VolvoxGridResizePolicy value)
+        {
+            var policy = value ?? new VolvoxGridResizePolicy();
+            return EncodeResizePolicyMode(policy.Columns, policy.Rows, policy.Uniform);
+        }
+
+        private static VolvoxGridHeaderFeatures DecodeHeaderFeatures(VolvoxHeaderFeatures? features)
+        {
+            int bits = (int)(features ?? VolvoxHeaderFeatures.SortReorder);
+            return new VolvoxGridHeaderFeatures
+            {
+                Sort = (bits & 1) != 0,
+                Reorder = (bits & 2) != 0,
+                Chooser = (bits & 4) != 0,
+            };
+        }
+
+        private static VolvoxHeaderFeatures EncodeHeaderFeatures(VolvoxGridHeaderFeatures value)
+        {
+            var features = value ?? new VolvoxGridHeaderFeatures();
+            int bits = 0;
+            if (features.Sort) bits |= 1;
+            if (features.Reorder) bits |= 2;
+            if (features.Chooser) bits |= 4;
+            return (VolvoxHeaderFeatures)bits;
+        }
+
+        private static void DecodeResizePolicyMode(VolvoxResizePolicyMode mode, out bool columns, out bool rows, out bool uniform)
+        {
+            columns = false;
+            rows = false;
+            uniform = false;
+
+            switch (mode)
+            {
+                case VolvoxResizePolicyMode.Columns:
+                    columns = true;
+                    break;
+                case VolvoxResizePolicyMode.Rows:
+                    rows = true;
+                    break;
+                case VolvoxResizePolicyMode.Both:
+                    columns = true;
+                    rows = true;
+                    break;
+                case VolvoxResizePolicyMode.ColumnsUniform:
+                    columns = true;
+                    uniform = true;
+                    break;
+                case VolvoxResizePolicyMode.RowsUniform:
+                    rows = true;
+                    uniform = true;
+                    break;
+                case VolvoxResizePolicyMode.BothUniform:
+                    columns = true;
+                    rows = true;
+                    uniform = true;
+                    break;
+            }
+        }
+
+        private static VolvoxResizePolicyMode EncodeResizePolicyMode(bool columns, bool rows, bool uniform)
+        {
+            if (columns && rows)
+            {
+                return uniform ? VolvoxResizePolicyMode.BothUniform : VolvoxResizePolicyMode.Both;
+            }
+            if (columns)
+            {
+                return uniform ? VolvoxResizePolicyMode.ColumnsUniform : VolvoxResizePolicyMode.Columns;
+            }
+            if (rows)
+            {
+                return uniform ? VolvoxResizePolicyMode.RowsUniform : VolvoxResizePolicyMode.Rows;
+            }
+            return VolvoxResizePolicyMode.None;
         }
 
         private int GetColumnIndex(string name) => string.IsNullOrEmpty(name) ? -1 : _columns.FindIndex(c => string.Equals(c.FieldName, name, StringComparison.OrdinalIgnoreCase));

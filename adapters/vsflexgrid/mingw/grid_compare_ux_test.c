@@ -1081,7 +1081,6 @@ static const WCHAR g_vbs_preamble[] =
     L"\r\n"
     L"Sub PopulateStandard()\r\n"
     L"    fg.Redraw = 0\r\n"
-    L"    fg.FontName = \"Arial\"\r\n"
     L"    fg.Cols = 5\r\n"
     L"    fg.Rows = 21\r\n"
     L"    fg.FixedRows = 1\r\n"

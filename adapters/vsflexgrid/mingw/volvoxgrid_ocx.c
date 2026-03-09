@@ -217,6 +217,7 @@ static int32_t volvox_grid_refresh_compat(int64_t id) {
 
 /* Forward-declare protobuf-based Sort (generated header may be stale). */
 uint8_t* volvox_grid_sort_pb(const uint8_t* data, int32_t data_len, int32_t* out_len);
+int32_t volvox_grid_set_grid_color_fixed(int64_t id, uint32_t color);
 
 /* Encode a varint into buf, return number of bytes written. */
 static int vfg_write_varint(uint8_t *buf, uint64_t v) {
@@ -234,7 +235,7 @@ static int32_t volvox_grid_sort_compat(int64_t grid_id, int32_t order, int32_t c
     /*  SortRequest {
      *    int64 grid_id      = 1;  // varint
      *    repeated SortColumn sort_columns = 2;  // length-delimited
-     *      SortColumn { int32 col = 1; SortOrder order = 2; }
+     *      SortColumn { int32 col = 1; FlexSortSpec order = 2; }
      *  }
      */
     uint8_t buf[64];
@@ -290,6 +291,63 @@ static int32_t volvox_grid_subtotal_compat(
     return vfg_take_status_response(out);
 }
 
+static int vfg_encode_resize_policy(uint8_t *buf, int32_t mode) {
+    int pos = 0;
+    int columns = 0;
+    int rows = 0;
+    int uniform = 0;
+
+    switch (mode) {
+    case 1:
+        columns = 1;
+        break;
+    case 2:
+        rows = 1;
+        break;
+    case 3:
+        columns = 1;
+        rows = 1;
+        break;
+    case 4:
+        columns = 1;
+        uniform = 1;
+        break;
+    case 5:
+        rows = 1;
+        uniform = 1;
+        break;
+    case 6:
+        columns = 1;
+        rows = 1;
+        uniform = 1;
+        break;
+    default:
+        break;
+    }
+
+    if (columns) {
+        buf[pos++] = 0x08; /* field 1, varint */
+        buf[pos++] = 0x01;
+    }
+    if (rows) {
+        buf[pos++] = 0x10; /* field 2, varint */
+        buf[pos++] = 0x01;
+    }
+    if (uniform) {
+        buf[pos++] = 0x18; /* field 3, varint */
+        buf[pos++] = 0x01;
+    }
+    return pos;
+}
+
+static int32_t volvox_grid_set_resize_policy_compat(int64_t grid_id, int32_t mode) {
+    uint8_t policy[8];
+    int32_t out_len = 0;
+    int policy_len = vfg_encode_resize_policy(policy, mode);
+    uint8_t *out = volvox_grid_set_resize_policy(grid_id, policy, policy_len, &out_len);
+    return vfg_take_status_response(out);
+}
+
 /* Compat wrappers for generated dispatch (simple int set/get properties) */
 VG_WRAP_STATUS_2(volvox_grid_set_rows, int64_t, grid_id, int32_t, rows)
 VG_WRAP_STATUS_2(volvox_grid_set_cols, int64_t, grid_id, int32_t, cols)
@@ -310,7 +368,6 @@ VG_WRAP_STATUS_2(volvox_grid_set_word_wrap, int64_t, grid_id, int32_t, value)
 VG_WRAP_STATUS_2(volvox_grid_set_selection_mode, int64_t, grid_id, int32_t, mode)
 VG_WRAP_STATUS_2(volvox_grid_set_allow_selection, int64_t, grid_id, int32_t, value)
 VG_WRAP_STATUS_2(volvox_grid_set_allow_big_selection, int64_t, grid_id, int32_t, value)
-VG_WRAP_STATUS_2(volvox_grid_set_allow_user_resizing, int64_t, grid_id, int32_t, mode)
 VG_WRAP_STATUS_2(volvox_grid_set_ellipsis, int64_t, grid_id, int32_t, value)
 VG_WRAP_STATUS_2(volvox_grid_set_extend_last_col, int64_t, grid_id, int32_t, value)
 VG_WRAP_STATUS_2(volvox_grid_set_merge_cells, int64_t, grid_id, int32_t, mode)
@@ -356,7 +413,7 @@ static int32_t volvox_grid_set_redraw_compat(int64_t grid_id, int32_t value) {
 #define volvox_grid_select volvox_grid_select_compat
 #define volvox_grid_set_allow_big_selection volvox_grid_set_allow_big_selection_compat
 #define volvox_grid_set_allow_selection volvox_grid_set_allow_selection_compat
-#define volvox_grid_set_allow_user_resizing volvox_grid_set_allow_user_resizing_compat
+#define volvox_grid_set_resize_policy volvox_grid_set_resize_policy_compat
 #define volvox_grid_set_cell_checked volvox_grid_set_cell_checked_compat
 #define volvox_grid_set_cell_flood volvox_grid_set_cell_flood_compat
 #define volvox_grid_set_col volvox_grid_set_col_compat
@@ -738,9 +795,51 @@ static BSTR variant_to_bstr(VARIANT *pv, VARIANT *tmp) {
 
 /* Coerce a VARIANT to uint32_t (OLE_COLOR) */
 static HRESULT variant_to_u32(VARIANT *pv, uint32_t *out) {
-    int32_t v = 0;
-    HRESULT hr = variant_to_i4(pv, &v);
-    if (SUCCEEDED(hr)) *out = (uint32_t)v;
+    VARIANT tmp;
+    HRESULT hr;
+
+    if (!pv || !out) return E_POINTER;
+
+    switch (V_VT(pv)) {
+    case VT_UI4:
+    case VT_UINT:
+        *out = V_UI4(pv);
+        return S_OK;
+    case VT_I4:
+    case VT_INT: {
+        int32_t v = 0;
+        hr = variant_to_i4(pv, &v);
+        if (FAILED(hr)) return hr;
+        if (v < 0) {
+            uint32_t raw = (uint32_t)v;
+            if ((raw & 0xFF000000u) == 0x80000000u) {
+                *out = raw;
+                return S_OK;
+            }
+            return DISP_E_OVERFLOW;
+        }
+        *out = (uint32_t)v;
+        return S_OK;
+    }
+    case VT_I2:
+    case VT_I1: {
+        int32_t v = 0;
+        hr = variant_to_i4(pv, &v);
+        if (FAILED(hr)) return hr;
+        if (v < 0) return DISP_E_OVERFLOW;
+        *out = (uint32_t)v;
+        return S_OK;
+    }
+    default:
+        break;
+    }
+
+    VariantInit(&tmp);
+    hr = VariantChangeType(&tmp, pv, 0, VT_UI4);
+    if (SUCCEEDED(hr)) {
+        *out = V_UI4(&tmp);
+    }
+    VariantClear(&tmp);
     return hr;
 }
 
@@ -986,7 +1085,9 @@ static int32_t vfg_resolve_outline_node_row(int64_t gid, int32_t row) {
             return S_OK; \
         } \
         if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) { \
-            uint32_t val = 0; variant_to_u32(NAMED_ARG(0), &val); \
+            uint32_t val = 0; \
+            HRESULT hr = variant_to_u32(NAMED_ARG(0), &val); \
+            if (FAILED(hr)) return hr; \
             set_fn(gid, olecolor_to_argb(val)); \
             return S_OK; \
         } \
@@ -2356,7 +2457,25 @@ HRESULT VolvoxGrid_CreateInstance(IUnknown *pOuter, REFIID riid, void **ppv) {
     volvox_grid_set_text_renderer(obj->grid_id,
         gdi_measure_text, gdi_render_text, NULL);
 
-    /* Match selection colors to the host system highlight palette. */
+    /* Match classic FlexGrid's system-driven palette defaults. */
+    volvox_grid_set_back_color(
+        obj->grid_id,
+        olecolor_to_argb((uint32_t)GetSysColor(COLOR_WINDOW)));
+    volvox_grid_set_fore_color(
+        obj->grid_id,
+        olecolor_to_argb((uint32_t)GetSysColor(COLOR_WINDOWTEXT)));
+    volvox_grid_set_back_color_fixed(
+        obj->grid_id,
+        olecolor_to_argb((uint32_t)GetSysColor(COLOR_BTNFACE)));
+    volvox_grid_set_fore_color_fixed(
+        obj->grid_id,
+        olecolor_to_argb((uint32_t)GetSysColor(COLOR_BTNTEXT)));
+    volvox_grid_set_grid_color(
+        obj->grid_id,
+        olecolor_to_argb((uint32_t)GetSysColor(COLOR_BTNFACE)));
+    volvox_grid_set_grid_color_fixed(
+        obj->grid_id,
+        olecolor_to_argb((uint32_t)GetSysColor(COLOR_BTNFACE)));
     volvox_grid_set_back_color_sel(
         obj->grid_id,
         olecolor_to_argb((uint32_t)GetSysColor(COLOR_HIGHLIGHT)));

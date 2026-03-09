@@ -42,7 +42,8 @@ void main(List<String> args) {
   buffer.writeln("import 'package:flutter_test/flutter_test.dart';");
   buffer.writeln(
       "import 'package:syncfusion_flutter_datagrid/datagrid.dart' as sf;");
-  buffer.writeln("import 'package:volvoxgrid/volvoxgrid.dart' hide Align;");
+  buffer.writeln(
+      "import 'package:volvoxgrid/volvoxgrid.dart' hide Align, Border, Padding;");
   buffer.writeln("import 'package:volvoxgrid/volvoxgrid_ffi.dart' as vg_ffi;");
   buffer.writeln(
       "import 'package:volvoxgrid_sfdatagrid/volvoxgrid_sfdatagrid.dart' as vv;");
@@ -413,8 +414,9 @@ void main() {
           try {
             await controller.setGridStyle(
               vg_ffi.StyleConfig()
-                ..fontName = 'DejaVu Sans'
-                ..fontSize = 14.0,
+                ..font = (vg_ffi.Font()
+                  ..family = 'DejaVu Sans'
+                  ..size = 14.0),
             );
           } catch (e) {
             print('WARNING: setGridStyle failed for test \$numStr: \$e');

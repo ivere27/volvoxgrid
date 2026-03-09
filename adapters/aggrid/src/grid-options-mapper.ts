@@ -6,12 +6,6 @@ const SELECTION_FREE = 0;
 const SELECTION_BY_ROW = 1;
 const HIGHLIGHT_NEVER = 0;
 const HIGHLIGHT_WITH_FOCUS = 2;
-const RESIZE_NONE = 0;
-const RESIZE_BOTH = 3;
-const HEADER_NONE = 0;
-const HEADER_SORT = 1;
-const HEADER_REORDER = 2;
-const HEADER_SORT_REORDER = 3;
 const CELL_SPAN_NONE = 0;
 const CELL_SPAN_HEADER_ONLY = 5;
 const COLOR_WHITE_ARGB = 0xffffffff;
@@ -89,12 +83,24 @@ function encodeCellPaddingMessage(padding: CellPaddingConfig): number[] {
 }
 
 function encodeStyleBackColorFixedConfig(colorArgb: number): Uint8Array {
-  // GridConfig.style (field=2) => StyleConfig.back_color_fixed (field=4)
+  // GridConfig.style (field=2) => StyleConfig.fixed (field=11)
+  // => RegionStyle.background (field=1)
+  const fixedPayload: number[] = [];
+  fixedPayload.push(...encodeTag(1, 0), ...encodeVarintUnsigned(BigInt(colorArgb >>> 0)));
+
   const stylePayload: number[] = [];
-  stylePayload.push(...encodeTag(4, 0), ...encodeVarintUnsigned(BigInt(colorArgb >>> 0)));
+  stylePayload.push(
+    ...encodeTag(11, 2),
+    ...encodeVarintUnsigned(BigInt(fixedPayload.length)),
+    ...fixedPayload,
+  );
 
   const configPayload: number[] = [];
-  configPayload.push(...encodeTag(2, 2), ...encodeVarintUnsigned(BigInt(stylePayload.length)), ...stylePayload);
+  configPayload.push(
+    ...encodeTag(2, 2),
+    ...encodeVarintUnsigned(BigInt(stylePayload.length)),
+    ...stylePayload,
+  );
   return new Uint8Array(configPayload);
 }
 
@@ -103,21 +109,28 @@ function encodeStylePaddingConfig(args: {
   fixedCellPadding: CellPaddingConfig;
 }): Uint8Array {
   // GridConfig.style (field=2)
-  // StyleConfig.cell_padding = 40, fixed_cell_padding = 41
+  // StyleConfig.cell_padding = 5
+  // StyleConfig.fixed = 11 => RegionStyle.cell_padding = 7
   const stylePayload: number[] = [];
 
   const cellPadding = encodeCellPaddingMessage(args.cellPadding);
   stylePayload.push(
-    ...encodeTag(40, 2),
+    ...encodeTag(5, 2),
     ...encodeVarintUnsigned(BigInt(cellPadding.length)),
     ...cellPadding,
   );
 
   const fixedCellPadding = encodeCellPaddingMessage(args.fixedCellPadding);
-  stylePayload.push(
-    ...encodeTag(41, 2),
+  const fixedRegionPayload: number[] = [];
+  fixedRegionPayload.push(
+    ...encodeTag(7, 2),
     ...encodeVarintUnsigned(BigInt(fixedCellPadding.length)),
     ...fixedCellPadding,
+  );
+  stylePayload.push(
+    ...encodeTag(11, 2),
+    ...encodeVarintUnsigned(BigInt(fixedRegionPayload.length)),
+    ...fixedRegionPayload,
   );
 
   const configPayload: number[] = [];
@@ -316,16 +329,7 @@ export function applyGridOptionsToVolvox<TData extends RowData>(
   const colDefs = gridOptions.columnDefs ?? [];
   const sortable = hasAnySortable(colDefs, gridOptions.defaultColDef);
   const reorder = hasAnyReorder(colDefs);
-
-  if (sortable && reorder) {
-    grid.headerFeatures = HEADER_SORT_REORDER;
-  } else if (sortable) {
-    grid.headerFeatures = HEADER_SORT;
-  } else if (reorder) {
-    grid.headerFeatures = HEADER_REORDER;
-  } else {
-    grid.headerFeatures = HEADER_NONE;
-  }
+  grid.setHeaderFeatures({ sort: sortable, reorder, chooser: false });
 
   const rowSelectionEnabled =
     gridOptions.rowSelection === "single" || gridOptions.rowSelection === "multiple";
@@ -334,7 +338,7 @@ export function applyGridOptionsToVolvox<TData extends RowData>(
   grid.focusBorder = 0;
 
   const resizable = hasAnyResizable(colDefs, gridOptions.defaultColDef);
-  grid.allowUserResizing = resizable ? RESIZE_BOTH : RESIZE_NONE;
+  grid.setResizePolicy({ columns: resizable, rows: resizable, uniform: false });
 
   const rowHeight =
     typeof gridOptions.rowHeight === "number" && gridOptions.rowHeight > 0

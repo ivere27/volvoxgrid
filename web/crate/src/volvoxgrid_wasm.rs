@@ -1166,8 +1166,8 @@ pub fn volvox_grid_subtotal(
     group_on_col: i32,
     aggregate_col: i32,
     caption: &str,
-    back_color: u32,
-    fore_color: u32,
+    background: u32,
+    foreground: u32,
     add_outline: bool,
 ) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
@@ -1183,8 +1183,8 @@ pub fn volvox_grid_subtotal(
         group_on_col,
         aggregate_col,
         caption: caption.to_string(),
-        back_color,
-        fore_color,
+        background,
+        foreground,
         add_outline,
         ..Default::default()
     };

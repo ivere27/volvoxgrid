@@ -49,18 +49,23 @@ enum TabBehavior {
   TAB_CELLS            = 1;
 }
 
-enum SortOrder {
-  SORT_NONE                = 0;
-  SORT_GENERIC_ASCENDING   = 1;
-  SORT_GENERIC_DESCENDING  = 2;
-  SORT_NUMERIC_ASCENDING   = 3;
-  SORT_NUMERIC_DESCENDING  = 4;
-  SORT_STRING_NO_CASE_ASC  = 5;
-  SORT_STRING_NO_CASE_DESC = 6;
-  SORT_STRING_ASC          = 7;
-  SORT_STRING_DESC         = 8;
-  SORT_CUSTOM              = 9;
-  SORT_USE_COL_SORT        = 10;
+// VSFlexGrid-style combined sort choice carried across COM.
+//
+// The COM enum stays legacy-shaped in `VolvoxGrid.idl`, but the ActiveX bridge
+// uses neutral internal names so it does not mirror the removed core proto
+// values directly.
+enum FlexSortSpec {
+  FLEX_SORT_NONE                    = 0;
+  FLEX_SORT_ASCENDING_AUTO          = 1;
+  FLEX_SORT_DESCENDING_AUTO         = 2;
+  FLEX_SORT_ASCENDING_NUMERIC       = 3;
+  FLEX_SORT_DESCENDING_NUMERIC      = 4;
+  FLEX_SORT_ASCENDING_STRING_NOCASE = 5;
+  FLEX_SORT_DESCENDING_STRING_NOCASE = 6;
+  FLEX_SORT_ASCENDING_STRING        = 7;
+  FLEX_SORT_DESCENDING_STRING       = 8;
+  FLEX_SORT_CUSTOM                  = 9;
+  FLEX_SORT_USE_COLUMN              = 10;
 }
 
 enum ExplorerBarMode {
@@ -217,23 +222,6 @@ enum CellPropertyType {
   CELL_HEIGHT           = 23;
   CELL_BUTTON_PICTURE   = 24;
   CELL_COMBO_LIST       = 25;
-}
-
-enum AllowUserResizingMode {
-  RESIZE_NONE          = 0;
-  RESIZE_COLUMNS       = 1;
-  RESIZE_ROWS          = 2;
-  RESIZE_BOTH          = 3;
-  RESIZE_COLUMNS_UNIFORM = 4;
-  RESIZE_ROWS_UNIFORM  = 5;
-  RESIZE_BOTH_UNIFORM  = 6;
-}
-
-enum AllowUserFreezingMode {
-  FREEZE_NONE          = 0;
-  FREEZE_COLUMNS       = 1;
-  FREEZE_ROWS          = 2;
-  FREEZE_BOTH          = 3;
 }
 
 enum AutoSizeMode {
@@ -863,9 +851,9 @@ message GetColIndexRequest {
 }
 
 message SetColSortRequest {
-  int64     grid_id = 1;
-  int32     col     = 2;
-  SortOrder order   = 3;
+  int64        grid_id = 1;
+  int32        col     = 2;
+  FlexSortSpec order   = 3;
 }
 
 message ImageData {
@@ -946,8 +934,8 @@ message CellBorderRangeRequest {
 // ═══════════════════════════════════════════════════════════
 
 message SortColumn {
-  int32     col   = 1;
-  SortOrder order = 2;
+  int32        col   = 1;
+  FlexSortSpec order = 2;
 }
 
 message SortRequest {
@@ -1184,14 +1172,25 @@ message DragRowRequest {
 // User Interaction Messages
 // ═══════════════════════════════════════════════════════════
 
-message SetAllowUserResizingRequest {
-  int64                    grid_id = 1;
-  AllowUserResizingMode    mode    = 2;
+message ResizePolicy {
+  bool columns = 1;
+  bool rows    = 2;
+  bool uniform = 3;
 }
 
-message SetAllowUserFreezingRequest {
-  int64                    grid_id = 1;
-  AllowUserFreezingMode    mode    = 2;
+message FreezePolicy {
+  bool columns = 1;
+  bool rows    = 2;
+}
+
+message SetResizePolicyRequest {
+  int64        grid_id = 1;
+  ResizePolicy policy  = 2;
+}
+
+message SetFreezePolicyRequest {
+  int64        grid_id = 1;
+  FreezePolicy policy  = 2;
 }
 
 message SetAutoSearchRequest {
@@ -1752,7 +1751,7 @@ service VolvoxGridService {
     properties: { dispid: 27  name: "SelectionMode" }
     properties: { dispid: 28  name: "AllowSelection" }
     properties: { dispid: 29  name: "AllowBigSelection" }
-    properties: { dispid: 30  name: "AllowUserResizing" }
+    properties: { dispid: 30  name: "AllowUserResizing" set_method: "SetResizePolicy" }
     properties: { dispid: 31  name: "Ellipsis" }
     properties: { dispid: 32  name: "ExtendLastCol" }
     properties: { dispid: 33  name: "SubtotalPosition"  custom: true }
@@ -2005,8 +2004,8 @@ service VolvoxGridService {
   rpc DragRow(DragRowRequest)               returns (Empty);
 
   // User Interaction
-  rpc SetAllowUserResizing(SetAllowUserResizingRequest) returns (Empty);
-  rpc SetAllowUserFreezing(SetAllowUserFreezingRequest) returns (Empty);
+  rpc SetResizePolicy(SetResizePolicyRequest) returns (Empty);
+  rpc SetFreezePolicy(SetFreezePolicyRequest) returns (Empty);
   rpc SetAutoSearch(SetAutoSearchRequest)   returns (Empty);
   rpc SetAutoSearchDelay(SetInt32Prop)      returns (Empty);
   rpc SetAutoSizeMouse(SetBoolProp)         returns (Empty);

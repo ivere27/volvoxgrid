@@ -90,8 +90,8 @@ Future<void> applyGridColumns(
     }
 
     // Match SfDataGrid's common row-adapter default (left/center text).
-    columnDef.alignment = vg.Align.ALIGN_LEFT_CENTER;
-    columnDef.fixedAlignment = vg.Align.ALIGN_LEFT_CENTER;
+    columnDef.align = vg.Align.ALIGN_LEFT_CENTER;
+    columnDef.fixedAlign = vg.Align.ALIGN_LEFT_CENTER;
 
     columnDef.key = col.columnName;
     columnDef.hidden = !col.visible;
@@ -101,8 +101,9 @@ Future<void> applyGridColumns(
     }
 
     if (allowSorting && col.allowSorting) {
-      columnDef.sort =
+      columnDef.sortOrder =
           sortOrderByName[col.columnName] ?? vg.SortOrder.SORT_NONE;
+      columnDef.sortType = vg.SortType.SORT_TYPE_AUTO;
     }
 
     defineReq.columns.add(columnDef);

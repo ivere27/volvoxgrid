@@ -168,6 +168,25 @@ gridView.setEventListener(new VolvoxGridView.GridEventListener() {
     }
 });
 
+// Cancelable "before" events. Supported here: BeforeEdit, CellEditValidate, BeforeSort.
+gridView.setBeforeEditListener(details -> {
+    if (details.getRow() == 0) {
+        details.setCancel(true);
+    }
+});
+
+gridView.setCellEditValidatingListener(details -> {
+    if (details.getEditText().isEmpty()) {
+        details.setCancel(true);
+    }
+});
+
+gridView.setBeforeSortListener(details -> {
+    if (details.getCol() == 0) {
+        details.setCancel(true);
+    }
+});
+
 // Edit commit/cancel callbacks
 gridView.setEditListener(new VolvoxGridView.EditCommitListener() {
     @Override
@@ -247,19 +266,21 @@ ctrl.moveRow(10, 0);             // move row 10 to position 0
 ctrl.sort(1, true);              // col 1, ascending
 
 // With sort order enum
-ctrl.sort(SortOrder.SORT_NUMERIC_ASCENDING, 1);
+ctrl.sort(SortOrder.SORT_ASCENDING, 1);
 
 // Multi-column sort
 ctrl.sortMulti(Arrays.asList(
-    new Pair<>(0, SortOrder.SORT_STRING_ASC),
-    new Pair<>(1, SortOrder.SORT_NUMERIC_DESCENDING)
+    new Pair<>(0, SortOrder.SORT_ASCENDING),
+    new Pair<>(1, SortOrder.SORT_DESCENDING)
 ));
 
 // Show sort indicator on header
-ctrl.setHeaderFeatures(HeaderFeatures.HEADER_SORT);
+ctrl.setHeaderFeatures(HeaderFeatures.newBuilder().setSort(true).build());
 ```
 
-**SortOrder values:** `SORT_NONE`, `SORT_GENERIC_ASCENDING`, `SORT_GENERIC_DESCENDING`, `SORT_NUMERIC_ASCENDING`, `SORT_NUMERIC_DESCENDING`, `SORT_STRING_ASC`, `SORT_STRING_DESC`, `SORT_STRING_NO_CASE_ASC`, `SORT_STRING_NO_CASE_DESC`, `SORT_CUSTOM`
+**SortOrder values:** `SORT_NONE`, `SORT_ASCENDING`, `SORT_DESCENDING`
+
+**SortType values:** `SORT_TYPE_AUTO`, `SORT_TYPE_NUMERIC`, `SORT_TYPE_STRING`, `SORT_TYPE_STRING_NO_CASE`, `SORT_TYPE_CUSTOM`
 
 #### Selection
 
@@ -522,10 +543,10 @@ ctrl.withRedrawSuspended {
 
 // Sorting
 ctrl.sort(col = 1, ascending = true)
-ctrl.sort(SortOrder.SORT_NUMERIC_ASCENDING, col = 1)
+ctrl.sort(SortOrder.SORT_ASCENDING, col = 1)
 ctrl.sortMulti(listOf(
-    Pair(0, SortOrder.SORT_STRING_ASC),
-    Pair(1, SortOrder.SORT_NUMERIC_DESCENDING),
+    Pair(0, SortOrder.SORT_ASCENDING),
+    Pair(1, SortOrder.SORT_DESCENDING),
 ))
 
 // Selection
@@ -548,6 +569,25 @@ gridView.eventListener = object : VolvoxGridView.GridEventListener {
             event.hasAfterSort() -> { /* ... */ }
             event.hasAfterEdit() -> { /* ... */ }
         }
+    }
+}
+
+// Cancelable "before" events. Supported here: BeforeEdit, CellEditValidate, BeforeSort.
+gridView.beforeEditListener = VolvoxGridView.BeforeEditListener { details ->
+    if (details.row == 0) {
+        details.cancel = true
+    }
+}
+
+gridView.cellEditValidatingListener = VolvoxGridView.CellEditValidatingListener { details ->
+    if (details.editText.isBlank()) {
+        details.cancel = true
+    }
+}
+
+gridView.beforeSortListener = VolvoxGridView.BeforeSortListener { details ->
+    if (details.col == 0) {
+        details.cancel = true
     }
 }
 

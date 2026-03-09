@@ -211,7 +211,7 @@ endif
         docker_web_image docker_web \
         docker_ios_image docker_ios docker_all_image docker_all publish_maven \
         publish_local publish_github publish_web \
-        gtk-test clean clean-all help
+        gtk-test gtk-test-release clean clean-all help
 
 # =============================================================================
 # Default
@@ -268,7 +268,8 @@ help:
 	@echo "  sheet-lite     Build WASM lite + start Sheet adapter Vite dev server"
 	@echo "  sheet-build    Build Sheet adapter npm package only"
 	@echo "  doom-deps      Download GPL-2.0 DOOM assets for web mode (not part of Apache-2.0 source)"
-	@echo "  gtk-test       Build & launch GTK4 visual test (requires GTK4 dev libs)"
+	@echo "  gtk-test       Build & launch GTK4 plugin-host visual test (debug; requires GTK4 dev libs)"
+	@echo "  gtk-test-release  Build & launch GTK4 plugin-host visual test (release)"
 	@echo ""
 	@echo "Docker + Maven:"
 	@echo "  docker_android_aar_image  Build Docker image for Android AAR"
@@ -497,6 +498,9 @@ report: wasm
 	cd "$(REPORT_DIR)" && npm install && npx vite --host "$(WEB_HOST)"
 
 report-build:
+	@echo "Linking WASM output into Report adapter..."
+	@mkdir -p "$(REPORT_WASM_DIR)"
+	@ln -sf "$(abspath web/example/wasm)"/* "$(REPORT_WASM_DIR)/"
 	@echo "Building Report adapter package..."
 	cd "$(REPORT_DIR)" && npm install && npm run build
 	@echo "Report adapter build complete: $(REPORT_DIR)/dist/"
@@ -588,9 +592,18 @@ codegen: build_plugin
 	# ActiveX COM dispatch metadata
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_PLUGIN_FLAG) \
+		--synurang-ffi_out=$(VSFLEXGRID_DIR)/include --synurang-ffi_opt=lang=c,mode=native \
+		$(VSFLEXGRID_DIR)/proto/volvoxgrid_activex.proto
+	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
+		$(PROTOC_PLUGIN_FLAG) \
 		--synurang-ffi_out=$(VSFLEXGRID_DIR)/include --synurang-ffi_opt=lang=c,mode=activex \
 		$(VSFLEXGRID_DIR)/proto/volvoxgrid_activex.proto
 	@cp $(VSFLEXGRID_DIR)/include/volvoxgrid_activex_activex.h $(VSFLEXGRID_DIR)/include/volvoxgrid_activex.h
+	@rustfmt \
+		codegen/volvoxgrid_ffi.rs \
+		plugin/src/volvoxgrid_ffi_plugin.rs \
+		web/crate/src/volvoxgrid_wasm.rs \
+		$(VSFLEXGRID_DIR)/crate/src/volvoxgrid_ffi_native.rs
 	@echo "Codegen complete: codegen/ + $(DOTNET_CODEGEN_DIR)/ + plugin/ + web/ + $(VSFLEXGRID_DIR)/"
 
 # =============================================================================
@@ -1462,13 +1475,19 @@ flutter-linux: flutter-setup
 	  fi
 
 # =============================================================================
-# GTK4 Visual Test — Direct engine embedding, no plugin
+# GTK4 Visual Test — plugin FFI host path
 # =============================================================================
-gtk-test: engine
+gtk-test: host-plugin
 	@echo "Building GTK4 test..."
-	cd gtk-test && cargo build $(CARGO_JOBS_FLAG) --features gpu
+	cd gtk-test && cargo build $(CARGO_JOBS_FLAG)
 	@echo "Launching GTK4 test..."
-	./target/debug/volvoxgrid-gtk-test
+	VOLVOXGRID_PLUGIN_PATH="$(JAVA_DESKTOP_PLUGIN)" ./target/debug/volvoxgrid-gtk-test
+
+gtk-test-release: host-plugin-release
+	@echo "Building GTK4 test (release)..."
+	cd gtk-test && cargo build $(CARGO_JOBS_FLAG) --release
+	@echo "Launching GTK4 test (release)..."
+	VOLVOXGRID_PLUGIN_PATH="$(JAVA_DESKTOP_PLUGIN_RELEASE)" ./target/release/volvoxgrid-gtk-test
 
 # =============================================================================
 # ActiveX OCX — Windows control via MinGW cross-compilation

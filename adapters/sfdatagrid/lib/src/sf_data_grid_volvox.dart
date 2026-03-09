@@ -265,16 +265,13 @@ class _SfDataGridVolvoxState extends State<SfDataGridVolvox> {
     );
 
     await _controller.setHeaderFeatures(
-      widget.allowSorting
-          ? vg.HeaderFeatures.HEADER_SORT
-          : vg.HeaderFeatures.HEADER_NONE,
+      vg.HeaderFeatures()..sort = widget.allowSorting,
     );
 
-    await _controller.setAllowUserResizing(
-      widget.allowColumnsResizing
-          ? vg.AllowUserResizingMode.RESIZE_COLUMNS
-          : vg.AllowUserResizingMode.RESIZE_NONE,
-    );
+    await _controller.setResizePolicy(vg.ResizePolicy()
+      ..columns = widget.allowColumnsResizing
+      ..rows = false
+      ..uniform = false);
 
     final platform = Theme.of(context).platform;
     final isDesktop = kIsWeb ||
@@ -352,7 +349,7 @@ class _SfDataGridVolvoxState extends State<SfDataGridVolvox> {
       return cell;
     }
     if (value is Uint8List) {
-      cell.data = value;
+      cell.raw = value;
       return cell;
     }
     cell.text = value.toString();

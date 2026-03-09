@@ -21,6 +21,10 @@ lazy_static::lazy_static! {
     static ref GRID_MANAGER: GridManager = GridManager::new();
 }
 
+// Match classic LegacyGrid's baseline footprint more closely in ActiveX mode.
+const ACTIVEX_DEFAULT_ROW_HEIGHT: i32 = 19;
+const ACTIVEX_DEFAULT_COL_WIDTH: i32 = 76;
+
 // ---------------------------------------------------------------------------
 // Helpers (ported from plugin/src/lib.rs, without streaming/zoom/events)
 // ---------------------------------------------------------------------------
@@ -31,7 +35,7 @@ fn proto_value_to_engine(cv: &Option<CellValue>) -> CellValueData {
             Some(cell_value::Value::Text(t)) => CellValueData::Text(t.clone()),
             Some(cell_value::Value::Number(n)) => CellValueData::Number(*n),
             Some(cell_value::Value::Flag(b)) => CellValueData::Bool(*b),
-            Some(cell_value::Value::Data(d)) => CellValueData::Bytes(d.clone()),
+            Some(cell_value::Value::Raw(d)) => CellValueData::Bytes(d.clone()),
             Some(cell_value::Value::Timestamp(ts)) => CellValueData::Timestamp(*ts),
             None => CellValueData::Empty,
         },
@@ -51,7 +55,7 @@ fn engine_value_to_proto(v: &CellValueData) -> CellValue {
             value: Some(cell_value::Value::Flag(*b)),
         },
         CellValueData::Bytes(d) => CellValue {
-            value: Some(cell_value::Value::Data(d.clone())),
+            value: Some(cell_value::Value::Raw(d.clone())),
         },
         CellValueData::Timestamp(ts) => CellValue {
             value: Some(cell_value::Value::Timestamp(*ts)),
@@ -121,6 +125,44 @@ fn apply_picture_type_to_rgba(buf: &mut [u8], picture_type: i32) {
         px[1] = bw;
         px[2] = bw;
     }
+}
+
+fn expand_sort_request_columns(
+    grid: &volvoxgrid_engine::grid::VolvoxGrid,
+    sort_columns: &[SortColumn],
+) -> Vec<(i32, i32)> {
+    let mut sort_keys = Vec::new();
+
+    for sc in sort_columns {
+        let merged = volvoxgrid_engine::sort::merge_sort_spec(
+            volvoxgrid_engine::sort::SORT_NONE,
+            sc.order,
+            sc.r#type,
+        );
+        if merged == volvoxgrid_engine::sort::SORT_NONE {
+            continue;
+        }
+        if sc.col >= 0 && sc.col < grid.cols {
+            sort_keys.push((sc.col, merged));
+            continue;
+        }
+
+        let lo = grid.selection.col.min(grid.selection.col_end).max(0);
+        let hi = grid
+            .selection
+            .col
+            .max(grid.selection.col_end)
+            .min(grid.cols - 1);
+        if lo > hi {
+            continue;
+        }
+
+        for col in lo..=hi {
+            sort_keys.push((col, merged));
+        }
+    }
+
+    sort_keys
 }
 
 fn capture_grid_picture(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) -> ImageData {
@@ -235,8 +277,8 @@ fn engine_style_to_proto(s: &volvoxgrid_engine::style::GridStyleState) -> GridSt
 }
 
 #[cfg(any())]
-fn proto_cell_style_to_override(cs: &CellStyle) -> CellStyleOverride {
-    CellStyleOverride {
+fn proto_cell_style_to_override(cs: &CellStyle) -> CellStylePatch {
+    CellStylePatch {
         back_color: if cs.back_color != 0 {
             Some(cs.back_color)
         } else {
@@ -274,7 +316,7 @@ fn proto_cell_style_to_override(cs: &CellStyle) -> CellStyleOverride {
 }
 
 #[cfg(any())]
-fn engine_override_to_proto(so: &CellStyleOverride) -> CellStyle {
+fn engine_override_to_proto(so: &CellStylePatch) -> CellStyle {
     CellStyle {
         back_color: so.back_color.unwrap_or(0),
         fore_color: so.fore_color.unwrap_or(0),
@@ -333,7 +375,7 @@ fn set_cell_property(
                 }
                 3 => {
                     if let Some(cv) = value {
-                        if let Some(cell_value::Value::Data(d)) = &cv.value {
+                        if let Some(cell_value::Value::Raw(d)) = &cv.value {
                             grid.cells.get_mut(r, c).extra_mut().picture = Some(d.clone());
                         }
                     }
@@ -441,7 +483,7 @@ fn set_cell_property(
                 }
                 18 => {
                     if let Some(cv) = value {
-                        if let Some(cell_value::Value::Data(d)) = &cv.value {
+                        if let Some(cell_value::Value::Raw(d)) = &cv.value {
                             grid.cells.get_mut(r, c).extra_mut().user_data = Some(d.clone());
                         }
                     }
@@ -455,7 +497,7 @@ fn set_cell_property(
                 }
                 24 => {
                     if let Some(cv) = value {
-                        if let Some(cell_value::Value::Data(d)) = &cv.value {
+                        if let Some(cell_value::Value::Raw(d)) = &cv.value {
                             grid.cells.get_mut(r, c).extra_mut().button_picture = Some(d.clone());
                         }
                     }
@@ -505,7 +547,7 @@ fn get_cell_property(
                 .and_then(|c| c.picture().map(|d| d.to_vec()))
                 .unwrap_or_default();
             CellValue {
-                value: Some(cell_value::Value::Data(data)),
+                value: Some(cell_value::Value::Raw(data)),
             }
         }
         4 => {
@@ -604,7 +646,7 @@ fn get_cell_property(
                 .and_then(|c| c.extra.as_ref().and_then(|e| e.user_data.clone()))
                 .unwrap_or_default();
             CellValue {
-                value: Some(cell_value::Value::Data(data)),
+                value: Some(cell_value::Value::Raw(data)),
             }
         }
         19 => {
@@ -635,7 +677,7 @@ fn get_cell_property(
                 .and_then(|c| c.extra.as_ref().and_then(|e| e.button_picture.clone()))
                 .unwrap_or_default();
             CellValue {
-                value: Some(cell_value::Value::Data(data)),
+                value: Some(cell_value::Value::Raw(data)),
             }
         }
         25 => {
@@ -765,7 +807,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 g.style.font_size = 10.0 * 96.0 / 72.0; // 10pt at 96 DPI ≈ 13.3px
                 g.style.back_color_bkg = 0xFF808080; // gray (AppWorkspace)
                 g.style.back_color_fixed = 0xFFD4D0C8; // ButtonFace RGB(212,208,200)
-                g.default_row_height = 17; // default row height at 96 DPI
+                g.default_row_height = ACTIVEX_DEFAULT_ROW_HEIGHT;
+                g.default_col_width = ACTIVEX_DEFAULT_COL_WIDTH;
+                g.indicator_bands.col_top.default_row_height_px = ACTIVEX_DEFAULT_ROW_HEIGHT;
                 g.selection.selection_visibility = 1; // HighlightAlways — default
                 g.has_focus = true; // OCX control always considered focused for rendering
             })
@@ -807,12 +851,20 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn set_fixed_rows(&self, r: SetFixedRowsRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            g.fixed_rows = r.fixed_rows.max(0).min(g.rows);
-            if g.fixed_rows == 0 && !g.indicator_bands.col_top.visible {
+            let old_fixed_rows = g.fixed_rows;
+            let new_fixed_rows = r.fixed_rows.max(0).min(g.rows);
+            g.fixed_rows = new_fixed_rows;
+            if new_fixed_rows == 0 && !g.indicator_bands.col_top.visible {
                 apply_default_indicator_bands(g);
             }
-            g.selection
-                .clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
+            g.selection.remap_collapsed_cursor_after_fixed_change(
+                g.rows,
+                g.cols,
+                old_fixed_rows,
+                g.fixed_cols,
+                new_fixed_rows,
+                g.fixed_cols,
+            );
             g.layout.invalidate();
             g.mark_dirty();
         })?;
@@ -820,9 +872,17 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn set_fixed_cols(&self, r: SetFixedColsRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            g.fixed_cols = r.fixed_cols.max(0).min(g.cols);
-            g.selection
-                .clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
+            let old_fixed_cols = g.fixed_cols;
+            let new_fixed_cols = r.fixed_cols.max(0).min(g.cols);
+            g.fixed_cols = new_fixed_cols;
+            g.selection.remap_collapsed_cursor_after_fixed_change(
+                g.rows,
+                g.cols,
+                g.fixed_rows,
+                old_fixed_cols,
+                g.fixed_rows,
+                new_fixed_cols,
+            );
             g.layout.invalidate();
             g.mark_dirty();
         })?;
@@ -2014,8 +2074,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 g.layout.invalidate();
                 g.mark_dirty();
             } else {
-                let sort_keys: Vec<(i32, i32)> =
-                    r.sort_columns.iter().map(|sc| (sc.col, sc.order)).collect();
+                let sort_keys = expand_sort_request_columns(g, &r.sort_columns);
+                if sort_keys.is_empty() {
+                    return;
+                }
                 g.sort_state.sort_keys = sort_keys;
                 volvoxgrid_engine::sort::sort_grid_all_multi(g);
             }
@@ -2242,8 +2304,8 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 r.group_on_col,
                 r.aggregate_col,
                 &r.caption,
-                r.back_color,
-                r.fore_color,
+                r.background,
+                r.foreground,
                 r.add_outline,
             );
         })?;
@@ -2399,11 +2461,11 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         })?;
         Ok(Empty {})
     }
-    fn set_allow_user_resizing(&self, r: SetAllowUserResizingRequest) -> Result<Empty, String> {
+    fn set_resize_policy(&self, r: SetResizePolicyRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.allow_user_resizing = r.mode)?;
         Ok(Empty {})
     }
-    fn set_allow_user_freezing(&self, r: SetAllowUserFreezingRequest) -> Result<Empty, String> {
+    fn set_freeze_policy(&self, r: SetFreezePolicyRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.allow_user_freezing = r.mode)?;
         Ok(Empty {})
     }
@@ -2898,7 +2960,11 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             g.style.font_size = 10.0 * 96.0 / 72.0; // 10pt @ 96 DPI
             g.style.back_color_bkg = 0xFF808080;
             g.style.back_color_fixed = 0xFFD4D0C8;
-            g.default_row_height = 17;
+            g.style.grid_color = g.style.back_color_fixed;
+            g.style.grid_color_fixed = g.style.back_color_fixed;
+            g.default_row_height = ACTIVEX_DEFAULT_ROW_HEIGHT;
+            g.default_col_width = ACTIVEX_DEFAULT_COL_WIDTH;
+            g.indicator_bands.col_top.default_row_height_px = ACTIVEX_DEFAULT_ROW_HEIGHT;
             g.selection.selection_visibility = 1;
             g.has_focus = true;
             if fixed_rows == 0 {
@@ -3293,11 +3359,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 grid.layout.invalidate();
                 grid.mark_dirty();
             } else {
-                let sort_keys: Vec<(i32, i32)> = request
-                    .sort_columns
-                    .iter()
-                    .map(|sc| (sc.col, sc.order))
-                    .collect();
+                let sort_keys = expand_sort_request_columns(grid, &request.sort_columns);
+                if sort_keys.is_empty() {
+                    return;
+                }
                 grid.sort_state.sort_keys = sort_keys;
                 volvoxgrid_engine::sort::sort_grid_all_multi(grid);
             }
@@ -3313,8 +3378,8 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 request.group_on_col,
                 request.aggregate_col,
                 &request.caption,
-                request.back_color,
-                request.fore_color,
+                request.background,
+                request.foreground,
                 request.add_outline,
             );
         })?;
@@ -3734,7 +3799,9 @@ fn apply_activex_defaults(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
     grid.style.font_size = 10.0 * 96.0 / 72.0; // 10pt @ 96 DPI
     grid.style.back_color_bkg = 0xFF808080;
     grid.style.back_color_fixed = 0xFFD4D0C8;
-    grid.default_row_height = 17;
+    grid.default_row_height = ACTIVEX_DEFAULT_ROW_HEIGHT;
+    grid.default_col_width = ACTIVEX_DEFAULT_COL_WIDTH;
+    grid.indicator_bands.col_top.default_row_height_px = ACTIVEX_DEFAULT_ROW_HEIGHT;
     grid.selection.selection_visibility = 1;
     grid.has_focus = true;
 }
@@ -3810,12 +3877,20 @@ pub extern "C" fn volvox_grid_set_fixed_rows(
 ) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
-            g.fixed_rows = fixed_rows.max(0).min(g.rows);
-            if g.fixed_rows == 0 && !g.indicator_bands.col_top.visible {
+            let old_fixed_rows = g.fixed_rows;
+            let new_fixed_rows = fixed_rows.max(0).min(g.rows);
+            g.fixed_rows = new_fixed_rows;
+            if new_fixed_rows == 0 && !g.indicator_bands.col_top.visible {
                 apply_default_indicator_bands(g);
             }
-            g.selection
-                .clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
+            g.selection.remap_collapsed_cursor_after_fixed_change(
+                g.rows,
+                g.cols,
+                old_fixed_rows,
+                g.fixed_cols,
+                new_fixed_rows,
+                g.fixed_cols,
+            );
             g.layout.invalidate();
             g.mark_dirty();
         }),
@@ -3831,9 +3906,17 @@ pub extern "C" fn volvox_grid_set_fixed_cols(
 ) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
-            g.fixed_cols = fixed_cols.max(0).min(g.cols);
-            g.selection
-                .clamp(g.rows, g.cols, g.fixed_rows, g.fixed_cols);
+            let old_fixed_cols = g.fixed_cols;
+            let new_fixed_cols = fixed_cols.max(0).min(g.cols);
+            g.fixed_cols = new_fixed_cols;
+            g.selection.remap_collapsed_cursor_after_fixed_change(
+                g.rows,
+                g.cols,
+                g.fixed_rows,
+                old_fixed_cols,
+                g.fixed_rows,
+                new_fixed_cols,
+            );
             g.layout.invalidate();
             g.mark_dirty();
         }),
@@ -4694,7 +4777,7 @@ pub extern "C" fn volvox_grid_set_subtotal_position(
 }
 
 #[no_mangle]
-pub extern "C" fn volvox_grid_set_allow_user_resizing(
+pub extern "C" fn volvox_grid_set_resize_policy(
     grid_id: i64,
     mode: i32,
     out_len: *mut i32,
@@ -4865,6 +4948,11 @@ style_color_accessors!(
     volvox_grid_set_grid_color,
     volvox_grid_get_grid_color,
     grid_color
+);
+style_color_accessors!(
+    volvox_grid_set_grid_color_fixed,
+    volvox_grid_get_grid_color_fixed,
+    grid_color_fixed
 );
 style_color_accessors!(
     volvox_grid_set_back_color_fixed,

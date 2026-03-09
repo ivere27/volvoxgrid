@@ -89,7 +89,16 @@ namespace VolvoxGrid.DotNet.Internal
                         if (sel.Mode.HasValue) s.WriteInt32(1, (int)sel.Mode.Value);
                         if (sel.SelectionVisibility.HasValue) s.WriteInt32(3, (int)sel.SelectionVisibility.Value);
                         if (sel.AllowSelection.HasValue) s.WriteBool(4, sel.AllowSelection.Value);
-                        if (sel.HoverMode.HasValue) s.WriteInt32(7, (int)sel.HoverMode.Value);
+                        if (sel.HoverMask.HasValue)
+                        {
+                            uint hoverMode = sel.HoverMask.Value;
+                            s.WriteMessage(7, hover =>
+                            {
+                                hover.WriteBool(1, (hoverMode & 1u) != 0);
+                                hover.WriteBool(2, (hoverMode & 2u) != 0);
+                                hover.WriteBool(3, (hoverMode & 4u) != 0);
+                            });
+                        }
                     });
                 }
 
@@ -139,8 +148,31 @@ namespace VolvoxGrid.DotNet.Internal
                     var interaction = configDataOrDefault.Interaction;
                     cfg.WriteMessage(8, i =>
                     {
-                        if (interaction.AllowUserResizing.HasValue) i.WriteInt32(1, (int)interaction.AllowUserResizing.Value);
-                        if (interaction.HeaderFeatures.HasValue) i.WriteInt32(10, (int)interaction.HeaderFeatures.Value);
+                        if (interaction.ResizePolicy.HasValue)
+                        {
+                            var mode = interaction.ResizePolicy.Value;
+                            i.WriteMessage(1, resize =>
+                            {
+                                bool columns;
+                                bool rows;
+                                bool uniform;
+                                DecodeResizePolicyMode(mode, out columns, out rows, out uniform);
+                                resize.WriteBool(1, columns);
+                                resize.WriteBool(2, rows);
+                                resize.WriteBool(3, uniform);
+                            });
+                        }
+
+                        if (interaction.HeaderFeatures.HasValue)
+                        {
+                            int features = (int)interaction.HeaderFeatures.Value;
+                            i.WriteMessage(10, header =>
+                            {
+                                header.WriteBool(1, (features & 1) != 0);
+                                header.WriteBool(2, (features & 2) != 0);
+                                header.WriteBool(3, (features & 4) != 0);
+                            });
+                        }
                     });
                 }
 
@@ -157,19 +189,19 @@ namespace VolvoxGrid.DotNet.Internal
                     });
                 }
 
-                if (configDataOrDefault.IndicatorBands != null)
+                if (configDataOrDefault.Indicators != null)
                 {
-                    var bands = configDataOrDefault.IndicatorBands;
+                    var indicators = configDataOrDefault.Indicators;
                     cfg.WriteMessage(11, b =>
                     {
-                        if (bands.RowIndicatorStart != null) b.WriteMessage(1, slot => EncodeRowIndicatorConfig(slot, bands.RowIndicatorStart));
-                        if (bands.RowIndicatorEnd != null) b.WriteMessage(2, slot => EncodeRowIndicatorConfig(slot, bands.RowIndicatorEnd));
-                        if (bands.ColIndicatorTop != null) b.WriteMessage(3, slot => EncodeColIndicatorConfig(slot, bands.ColIndicatorTop));
-                        if (bands.ColIndicatorBottom != null) b.WriteMessage(4, slot => EncodeColIndicatorConfig(slot, bands.ColIndicatorBottom));
-                        if (bands.CornerTopStart != null) b.WriteMessage(5, slot => EncodeCornerIndicatorConfig(slot, bands.CornerTopStart));
-                        if (bands.CornerTopEnd != null) b.WriteMessage(6, slot => EncodeCornerIndicatorConfig(slot, bands.CornerTopEnd));
-                        if (bands.CornerBottomStart != null) b.WriteMessage(7, slot => EncodeCornerIndicatorConfig(slot, bands.CornerBottomStart));
-                        if (bands.CornerBottomEnd != null) b.WriteMessage(8, slot => EncodeCornerIndicatorConfig(slot, bands.CornerBottomEnd));
+                        if (indicators.RowIndicatorStart != null) b.WriteMessage(1, slot => EncodeRowIndicatorConfig(slot, indicators.RowIndicatorStart));
+                        if (indicators.RowIndicatorEnd != null) b.WriteMessage(2, slot => EncodeRowIndicatorConfig(slot, indicators.RowIndicatorEnd));
+                        if (indicators.ColIndicatorTop != null) b.WriteMessage(3, slot => EncodeColIndicatorConfig(slot, indicators.ColIndicatorTop));
+                        if (indicators.ColIndicatorBottom != null) b.WriteMessage(4, slot => EncodeColIndicatorConfig(slot, indicators.ColIndicatorBottom));
+                        if (indicators.CornerTopStart != null) b.WriteMessage(5, slot => EncodeCornerIndicatorConfig(slot, indicators.CornerTopStart));
+                        if (indicators.CornerTopEnd != null) b.WriteMessage(6, slot => EncodeCornerIndicatorConfig(slot, indicators.CornerTopEnd));
+                        if (indicators.CornerBottomStart != null) b.WriteMessage(7, slot => EncodeCornerIndicatorConfig(slot, indicators.CornerBottomStart));
+                        if (indicators.CornerBottomEnd != null) b.WriteMessage(8, slot => EncodeCornerIndicatorConfig(slot, indicators.CornerBottomEnd));
                     });
                 }
             });
@@ -224,7 +256,7 @@ namespace VolvoxGrid.DotNet.Internal
                         DecodeRenderConfig(result.Rendering, bytes);
                         break;
                     case 11:
-                        DecodeIndicatorBandsConfig(result.IndicatorBands, bytes);
+                        DecodeIndicatorsConfig(result.Indicators, bytes);
                         break;
                 }
             }
@@ -244,7 +276,7 @@ namespace VolvoxGrid.DotNet.Internal
             config.Selection.Mode = multiSelect ? VolvoxSelectionMode.Listbox : VolvoxSelectionMode.Free;
             config.Selection.SelectionVisibility = VolvoxSelectionVisibility.Always;
             config.Selection.AllowSelection = true;
-            config.Selection.HoverMode = hoverEnabled ? (uint)7 : 0;
+            config.Selection.HoverMask = hoverEnabled ? (uint)7 : 0;
             config.Editing.EditTrigger = editable ? VolvoxEditTrigger.KeyClick : VolvoxEditTrigger.None;
             config.Scrolling.Scrollbars = VolvoxScrollBarsMode.Both;
             config.Scrolling.FlingEnabled = flingEnabled;
@@ -305,13 +337,20 @@ namespace VolvoxGrid.DotNet.Internal
                         if (column.DataType.HasValue) c.WriteInt32(8, (int)column.DataType.Value);
                         if (column.Format != null) c.WriteString(9, column.Format);
                         if (column.Key != null) c.WriteString(10, column.Key);
-                        if (column.SortOrder != VolvoxSortOrder.None) c.WriteInt32(11, ToProtoSort(column.SortOrder));
-                        if (column.DropdownItems != null) c.WriteString(12, column.DropdownItems);
-                        if (column.EditMask != null) c.WriteString(13, column.EditMask);
-                        if (column.Indent.HasValue) c.WriteInt32(14, column.Indent.Value);
-                        c.WriteBool(15, column.Hidden);
-                        c.WriteBool(16, column.Span);
-                        if (column.Sticky.HasValue) c.WriteInt32(19, (int)column.Sticky.Value);
+                        if (column.SortOrder != VolvoxSortOrder.None)
+                        {
+                            int protoOrder;
+                            int? protoType;
+                            MapProtoSort(column.SortOrder, out protoOrder, out protoType);
+                            c.WriteInt32(11, protoOrder);
+                            if (protoType.HasValue) c.WriteInt32(12, protoType.Value);
+                        }
+                        if (column.DropdownItems != null) c.WriteString(13, column.DropdownItems);
+                        if (column.EditMask != null) c.WriteString(14, column.EditMask);
+                        if (column.Indent.HasValue) c.WriteInt32(15, column.Indent.Value);
+                        c.WriteBool(16, column.Hidden);
+                        c.WriteBool(17, column.Span);
+                        if (column.Sticky.HasValue) c.WriteInt32(20, (int)column.Sticky.Value);
                     });
                 }
             }
@@ -704,7 +743,11 @@ namespace VolvoxGrid.DotNet.Internal
                     writer.WriteMessage(2, s =>
                     {
                         s.WriteInt32(1, sort.ColumnIndex);
-                        s.WriteInt32(2, ToProtoSort(sort.SortOrder));
+                        int protoOrder;
+                        int? protoType;
+                        MapProtoSort(sort.SortOrder, out protoOrder, out protoType);
+                        s.WriteInt32(2, protoOrder);
+                        if (protoType.HasValue) s.WriteInt32(3, protoType.Value);
                     });
                 }
             }
@@ -1350,6 +1393,17 @@ namespace VolvoxGrid.DotNet.Internal
                         }
                         break;
 
+                    case 23:
+                        if (wire == ProtoWireType.LengthDelimited)
+                        {
+                            DecodeBeforeSort(data, reader.ReadLengthDelimited());
+                        }
+                        else
+                        {
+                            reader.SkipField(wire);
+                        }
+                        break;
+
                     default:
                         reader.SkipField(wire);
                         break;
@@ -1483,6 +1537,27 @@ namespace VolvoxGrid.DotNet.Internal
                         break;
                     case 3:
                         data.EditText = reader.ReadString();
+                        break;
+                    default:
+                        reader.SkipField(wire);
+                        break;
+                }
+            }
+        }
+
+        private static void DecodeBeforeSort(VolvoxGridEventData data, byte[] payload)
+        {
+            data.Kind = VolvoxGridEventKind.BeforeSort;
+            data.IsCancelable = true;
+            var reader = new ProtoReader(payload);
+            int field;
+            ProtoWireType wire;
+            while (reader.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1:
+                        data.Col = reader.ReadInt32();
                         break;
                     default:
                         reader.SkipField(wire);
@@ -1646,7 +1721,111 @@ namespace VolvoxGrid.DotNet.Internal
 
         private static int ToProtoSort(VolvoxSortOrder order)
         {
-            return (int)order;
+            int protoOrder;
+            int? protoType;
+            MapProtoSort(order, out protoOrder, out protoType);
+            return protoOrder;
+        }
+
+        private static void MapProtoSort(VolvoxSortOrder order, out int protoOrder, out int? protoType)
+        {
+            protoType = null;
+            switch (order)
+            {
+                case VolvoxSortOrder.Ascending:
+                    protoOrder = 1;
+                    break;
+                case VolvoxSortOrder.Descending:
+                    protoOrder = 2;
+                    break;
+                case VolvoxSortOrder.NumericAscending:
+                    protoOrder = 1;
+                    protoType = 1;
+                    break;
+                case VolvoxSortOrder.NumericDescending:
+                    protoOrder = 2;
+                    protoType = 1;
+                    break;
+                case VolvoxSortOrder.StringAsc:
+                    protoOrder = 1;
+                    protoType = 2;
+                    break;
+                case VolvoxSortOrder.StringDesc:
+                    protoOrder = 2;
+                    protoType = 2;
+                    break;
+                case VolvoxSortOrder.StringNoCaseAsc:
+                    protoOrder = 1;
+                    protoType = 3;
+                    break;
+                case VolvoxSortOrder.StringNoCaseDesc:
+                    protoOrder = 2;
+                    protoType = 3;
+                    break;
+                case VolvoxSortOrder.Custom:
+                    protoOrder = 1;
+                    protoType = 4;
+                    break;
+                case VolvoxSortOrder.UseColSort:
+                case VolvoxSortOrder.None:
+                default:
+                    protoOrder = 0;
+                    break;
+            }
+        }
+
+        private static void DecodeResizePolicyMode(VolvoxResizePolicyMode mode, out bool columns, out bool rows, out bool uniform)
+        {
+            columns = false;
+            rows = false;
+            uniform = false;
+
+            switch (mode)
+            {
+                case VolvoxResizePolicyMode.Columns:
+                    columns = true;
+                    break;
+                case VolvoxResizePolicyMode.Rows:
+                    rows = true;
+                    break;
+                case VolvoxResizePolicyMode.Both:
+                    columns = true;
+                    rows = true;
+                    break;
+                case VolvoxResizePolicyMode.ColumnsUniform:
+                    columns = true;
+                    uniform = true;
+                    break;
+                case VolvoxResizePolicyMode.RowsUniform:
+                    rows = true;
+                    uniform = true;
+                    break;
+                case VolvoxResizePolicyMode.BothUniform:
+                    columns = true;
+                    rows = true;
+                    uniform = true;
+                    break;
+            }
+        }
+
+        private static VolvoxResizePolicyMode EncodeResizePolicyMode(bool columns, bool rows, bool uniform)
+        {
+            if (columns && rows)
+            {
+                return uniform ? VolvoxResizePolicyMode.BothUniform : VolvoxResizePolicyMode.Both;
+            }
+
+            if (columns)
+            {
+                return uniform ? VolvoxResizePolicyMode.ColumnsUniform : VolvoxResizePolicyMode.Columns;
+            }
+
+            if (rows)
+            {
+                return uniform ? VolvoxResizePolicyMode.RowsUniform : VolvoxResizePolicyMode.Rows;
+            }
+
+            return VolvoxResizePolicyMode.None;
         }
 
         private static int ToProtoRendererMode(VolvoxGridRendererMode mode)
@@ -1735,8 +1914,14 @@ namespace VolvoxGrid.DotNet.Internal
                         else reader.SkipField(wire);
                         break;
                     case 7:
-                        if (wire == ProtoWireType.Varint) selection.HoverMode = unchecked((uint)reader.ReadInt32());
-                        else reader.SkipField(wire);
+                        if (wire == ProtoWireType.LengthDelimited)
+                        {
+                            selection.HoverMask = DecodeHoverMask(reader.ReadLengthDelimited());
+                        }
+                        else
+                        {
+                            reader.SkipField(wire);
+                        }
                         break;
                     default:
                         reader.SkipField(wire);
@@ -1844,12 +2029,24 @@ namespace VolvoxGrid.DotNet.Internal
                 switch (field)
                 {
                     case 1:
-                        if (wire == ProtoWireType.Varint) interaction.AllowUserResizing = (VolvoxAllowUserResizingMode)reader.ReadInt32();
-                        else reader.SkipField(wire);
+                        if (wire == ProtoWireType.LengthDelimited)
+                        {
+                            interaction.ResizePolicy = DecodeResizePolicy(reader.ReadLengthDelimited());
+                        }
+                        else
+                        {
+                            reader.SkipField(wire);
+                        }
                         break;
                     case 10:
-                        if (wire == ProtoWireType.Varint) interaction.HeaderFeatures = (VolvoxHeaderFeatures)reader.ReadInt32();
-                        else reader.SkipField(wire);
+                        if (wire == ProtoWireType.LengthDelimited)
+                        {
+                            interaction.HeaderFeatures = DecodeHeaderFeatures(reader.ReadLengthDelimited());
+                        }
+                        else
+                        {
+                            reader.SkipField(wire);
+                        }
                         break;
                     default:
                         reader.SkipField(wire);
@@ -1893,6 +2090,109 @@ namespace VolvoxGrid.DotNet.Internal
                         break;
                 }
             }
+        }
+
+        private static uint DecodeHoverMask(byte[] payload)
+        {
+            if (payload == null) return 0;
+            uint mode = 0;
+            var reader = new ProtoReader(payload);
+            int field;
+            ProtoWireType wire;
+            while (reader.TryReadTag(out field, out wire))
+            {
+                if (wire != ProtoWireType.Varint)
+                {
+                    reader.SkipField(wire);
+                    continue;
+                }
+
+                bool enabled = reader.ReadBool();
+                if (!enabled) continue;
+
+                switch (field)
+                {
+                    case 1:
+                        mode |= 1u;
+                        break;
+                    case 2:
+                        mode |= 2u;
+                        break;
+                    case 3:
+                        mode |= 4u;
+                        break;
+                }
+            }
+
+            return mode;
+        }
+
+        private static VolvoxResizePolicyMode DecodeResizePolicy(byte[] payload)
+        {
+            bool columns = false;
+            bool rows = false;
+            bool uniform = false;
+            var reader = new ProtoReader(payload ?? new byte[0]);
+            int field;
+            ProtoWireType wire;
+            while (reader.TryReadTag(out field, out wire))
+            {
+                if (wire != ProtoWireType.Varint)
+                {
+                    reader.SkipField(wire);
+                    continue;
+                }
+
+                bool value = reader.ReadBool();
+                switch (field)
+                {
+                    case 1:
+                        columns = value;
+                        break;
+                    case 2:
+                        rows = value;
+                        break;
+                    case 3:
+                        uniform = value;
+                        break;
+                }
+            }
+
+            return EncodeResizePolicyMode(columns, rows, uniform);
+        }
+
+        private static VolvoxHeaderFeatures DecodeHeaderFeatures(byte[] payload)
+        {
+            int features = 0;
+            var reader = new ProtoReader(payload ?? new byte[0]);
+            int field;
+            ProtoWireType wire;
+            while (reader.TryReadTag(out field, out wire))
+            {
+                if (wire != ProtoWireType.Varint)
+                {
+                    reader.SkipField(wire);
+                    continue;
+                }
+
+                bool value = reader.ReadBool();
+                if (!value) continue;
+
+                switch (field)
+                {
+                    case 1:
+                        features |= 1;
+                        break;
+                    case 2:
+                        features |= 2;
+                        break;
+                    case 3:
+                        features |= 4;
+                        break;
+                }
+            }
+
+            return (VolvoxHeaderFeatures)features;
         }
 
         private static void EncodeRowIndicatorConfig(ProtoWriter writer, VolvoxRowIndicatorConfigData data)
@@ -1972,9 +2272,9 @@ namespace VolvoxGrid.DotNet.Internal
             if (data.Data != null) writer.WriteBytes(6, data.Data);
         }
 
-        private static void DecodeIndicatorBandsConfig(VolvoxIndicatorBandsConfigData bands, byte[] payload)
+        private static void DecodeIndicatorsConfig(VolvoxIndicatorsConfigData indicators, byte[] payload)
         {
-            if (bands == null || payload == null) return;
+            if (indicators == null || payload == null) return;
             var reader = new ProtoReader(payload);
             int field;
             ProtoWireType wire;
@@ -1989,14 +2289,14 @@ namespace VolvoxGrid.DotNet.Internal
                 var bytes = reader.ReadLengthDelimited();
                 switch (field)
                 {
-                    case 1: DecodeRowIndicatorConfig(bands.RowIndicatorStart, bytes); break;
-                    case 2: DecodeRowIndicatorConfig(bands.RowIndicatorEnd, bytes); break;
-                    case 3: DecodeColIndicatorConfig(bands.ColIndicatorTop, bytes); break;
-                    case 4: DecodeColIndicatorConfig(bands.ColIndicatorBottom, bytes); break;
-                    case 5: DecodeCornerIndicatorConfig(bands.CornerTopStart, bytes); break;
-                    case 6: DecodeCornerIndicatorConfig(bands.CornerTopEnd, bytes); break;
-                    case 7: DecodeCornerIndicatorConfig(bands.CornerBottomStart, bytes); break;
-                    case 8: DecodeCornerIndicatorConfig(bands.CornerBottomEnd, bytes); break;
+                    case 1: DecodeRowIndicatorConfig(indicators.RowIndicatorStart, bytes); break;
+                    case 2: DecodeRowIndicatorConfig(indicators.RowIndicatorEnd, bytes); break;
+                    case 3: DecodeColIndicatorConfig(indicators.ColIndicatorTop, bytes); break;
+                    case 4: DecodeColIndicatorConfig(indicators.ColIndicatorBottom, bytes); break;
+                    case 5: DecodeCornerIndicatorConfig(indicators.CornerTopStart, bytes); break;
+                    case 6: DecodeCornerIndicatorConfig(indicators.CornerTopEnd, bytes); break;
+                    case 7: DecodeCornerIndicatorConfig(indicators.CornerBottomStart, bytes); break;
+                    case 8: DecodeCornerIndicatorConfig(indicators.CornerBottomEnd, bytes); break;
                     default: break;
                 }
             }
@@ -2167,31 +2467,46 @@ namespace VolvoxGrid.DotNet.Internal
             }
         }
 
-        private static byte[] EncodeCellStyle(VolvoxCellStyleOverride style)
+        private static byte[] EncodeCellStyle(VolvoxCellStylePatch style)
         {
-            var s = style ?? new VolvoxCellStyleOverride();
+            var s = style ?? new VolvoxCellStylePatch();
             var writer = new ProtoWriter();
             if (s.BackColor.HasValue) writer.WriteInt32(1, unchecked((int)s.BackColor.Value));
             if (s.ForeColor.HasValue) writer.WriteInt32(2, unchecked((int)s.ForeColor.Value));
             if (s.Alignment.HasValue) writer.WriteInt32(3, (int)s.Alignment.Value);
-            if (s.TextEffect.HasValue) writer.WriteInt32(4, (int)s.TextEffect.Value);
-            if (s.FontName != null) writer.WriteString(5, s.FontName);
-            if (s.FontSize.HasValue) writer.WriteFloat(6, s.FontSize.Value);
-            if (s.FontBold.HasValue) writer.WriteBool(7, s.FontBold.Value);
-            if (s.FontItalic.HasValue) writer.WriteBool(8, s.FontItalic.Value);
-            if (s.FontUnderline.HasValue) writer.WriteBool(9, s.FontUnderline.Value);
-            if (s.FontStrikethrough.HasValue) writer.WriteBool(10, s.FontStrikethrough.Value);
-            if (s.FontWidth.HasValue) writer.WriteFloat(11, s.FontWidth.Value);
-            if (s.ProgressColor.HasValue) writer.WriteInt32(12, unchecked((int)s.ProgressColor.Value));
-            if (s.ProgressPercent.HasValue) writer.WriteFloat(13, s.ProgressPercent.Value);
-            if (s.Border.HasValue) writer.WriteInt32(14, (int)s.Border.Value);
-            if (s.BorderColor.HasValue) writer.WriteInt32(15, unchecked((int)s.BorderColor.Value));
+            if (s.FontName != null || s.FontSize.HasValue || s.FontBold.HasValue || s.FontItalic.HasValue || s.FontUnderline.HasValue || s.FontStrikethrough.HasValue || s.FontWidth.HasValue)
+            {
+                writer.WriteMessage(4, font =>
+                {
+                    if (s.FontName != null) font.WriteString(1, s.FontName);
+                    if (s.FontSize.HasValue) font.WriteFloat(3, s.FontSize.Value);
+                    if (s.FontBold.HasValue) font.WriteBool(4, s.FontBold.Value);
+                    if (s.FontItalic.HasValue) font.WriteBool(5, s.FontItalic.Value);
+                    if (s.FontUnderline.HasValue) font.WriteBool(6, s.FontUnderline.Value);
+                    if (s.FontStrikethrough.HasValue) font.WriteBool(7, s.FontStrikethrough.Value);
+                    if (s.FontWidth.HasValue) font.WriteFloat(8, s.FontWidth.Value);
+                });
+            }
+            if (s.Border.HasValue || s.BorderColor.HasValue)
+            {
+                writer.WriteMessage(6, borders =>
+                {
+                    borders.WriteMessage(1, border =>
+                    {
+                        if (s.Border.HasValue) border.WriteInt32(1, (int)s.Border.Value);
+                        if (s.BorderColor.HasValue) border.WriteInt32(2, unchecked((int)s.BorderColor.Value));
+                    });
+                });
+            }
+            if (s.TextEffect.HasValue) writer.WriteInt32(7, (int)s.TextEffect.Value);
+            if (s.ProgressPercent.HasValue) writer.WriteFloat(8, s.ProgressPercent.Value);
+            if (s.ProgressColor.HasValue) writer.WriteInt32(9, unchecked((int)s.ProgressColor.Value));
             return writer.ToArray();
         }
 
-        private static VolvoxCellStyleOverride DecodeCellStyle(byte[] payload)
+        private static VolvoxCellStylePatch DecodeCellStyle(byte[] payload)
         {
-            var style = new VolvoxCellStyleOverride();
+            var style = new VolvoxCellStylePatch();
             var reader = new ProtoReader(payload);
             int field;
             ProtoWireType wire;
@@ -2212,51 +2527,23 @@ namespace VolvoxGrid.DotNet.Internal
                         else reader.SkipField(wire);
                         break;
                     case 4:
-                        if (wire == ProtoWireType.Varint) style.TextEffect = (VolvoxTextEffect)reader.ReadInt32();
-                        else reader.SkipField(wire);
-                        break;
-                    case 5:
-                        if (wire == ProtoWireType.LengthDelimited) style.FontName = reader.ReadString();
+                        if (wire == ProtoWireType.LengthDelimited) DecodeCellStyleFont(style, reader.ReadLengthDelimited());
                         else reader.SkipField(wire);
                         break;
                     case 6:
-                        if (wire == ProtoWireType.Fixed32) style.FontSize = reader.ReadFloat();
+                        if (wire == ProtoWireType.LengthDelimited) DecodeCellStyleBorders(style, reader.ReadLengthDelimited());
                         else reader.SkipField(wire);
                         break;
                     case 7:
-                        if (wire == ProtoWireType.Varint) style.FontBold = reader.ReadBool();
+                        if (wire == ProtoWireType.Varint) style.TextEffect = (VolvoxTextEffect)reader.ReadInt32();
                         else reader.SkipField(wire);
                         break;
                     case 8:
-                        if (wire == ProtoWireType.Varint) style.FontItalic = reader.ReadBool();
-                        else reader.SkipField(wire);
-                        break;
-                    case 9:
-                        if (wire == ProtoWireType.Varint) style.FontUnderline = reader.ReadBool();
-                        else reader.SkipField(wire);
-                        break;
-                    case 10:
-                        if (wire == ProtoWireType.Varint) style.FontStrikethrough = reader.ReadBool();
-                        else reader.SkipField(wire);
-                        break;
-                    case 11:
-                        if (wire == ProtoWireType.Fixed32) style.FontWidth = reader.ReadFloat();
-                        else reader.SkipField(wire);
-                        break;
-                    case 12:
-                        if (wire == ProtoWireType.Varint) style.ProgressColor = unchecked((uint)reader.ReadInt32());
-                        else reader.SkipField(wire);
-                        break;
-                    case 13:
                         if (wire == ProtoWireType.Fixed32) style.ProgressPercent = reader.ReadFloat();
                         else reader.SkipField(wire);
                         break;
-                    case 14:
-                        if (wire == ProtoWireType.Varint) style.Border = (VolvoxBorderStyle)reader.ReadInt32();
-                        else reader.SkipField(wire);
-                        break;
-                    case 15:
-                        if (wire == ProtoWireType.Varint) style.BorderColor = unchecked((uint)reader.ReadInt32());
+                    case 9:
+                        if (wire == ProtoWireType.Varint) style.ProgressColor = unchecked((uint)reader.ReadInt32());
                         else reader.SkipField(wire);
                         break;
                     default:
@@ -2266,6 +2553,95 @@ namespace VolvoxGrid.DotNet.Internal
             }
 
             return style;
+        }
+
+        private static void DecodeCellStyleFont(VolvoxCellStylePatch style, byte[] payload)
+        {
+            var reader = new ProtoReader(payload ?? new byte[0]);
+            int field;
+            ProtoWireType wire;
+            while (reader.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1:
+                        if (wire == ProtoWireType.LengthDelimited) style.FontName = reader.ReadString();
+                        else reader.SkipField(wire);
+                        break;
+                    case 3:
+                        if (wire == ProtoWireType.Fixed32) style.FontSize = reader.ReadFloat();
+                        else reader.SkipField(wire);
+                        break;
+                    case 4:
+                        if (wire == ProtoWireType.Varint) style.FontBold = reader.ReadBool();
+                        else reader.SkipField(wire);
+                        break;
+                    case 5:
+                        if (wire == ProtoWireType.Varint) style.FontItalic = reader.ReadBool();
+                        else reader.SkipField(wire);
+                        break;
+                    case 6:
+                        if (wire == ProtoWireType.Varint) style.FontUnderline = reader.ReadBool();
+                        else reader.SkipField(wire);
+                        break;
+                    case 7:
+                        if (wire == ProtoWireType.Varint) style.FontStrikethrough = reader.ReadBool();
+                        else reader.SkipField(wire);
+                        break;
+                    case 8:
+                        if (wire == ProtoWireType.Fixed32) style.FontWidth = reader.ReadFloat();
+                        else reader.SkipField(wire);
+                        break;
+                    default:
+                        reader.SkipField(wire);
+                        break;
+                }
+            }
+        }
+
+        private static void DecodeCellStyleBorders(VolvoxCellStylePatch style, byte[] payload)
+        {
+            var reader = new ProtoReader(payload ?? new byte[0]);
+            int field;
+            ProtoWireType wire;
+            while (reader.TryReadTag(out field, out wire))
+            {
+                if (wire != ProtoWireType.LengthDelimited)
+                {
+                    reader.SkipField(wire);
+                    continue;
+                }
+
+                DecodeCellStyleBorder(style, reader.ReadLengthDelimited());
+                if (field == 1 || style.Border.HasValue || style.BorderColor.HasValue)
+                {
+                    break;
+                }
+            }
+        }
+
+        private static void DecodeCellStyleBorder(VolvoxCellStylePatch style, byte[] payload)
+        {
+            var reader = new ProtoReader(payload ?? new byte[0]);
+            int field;
+            ProtoWireType wire;
+            while (reader.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1:
+                        if (wire == ProtoWireType.Varint) style.Border = (VolvoxBorderStyle)reader.ReadInt32();
+                        else reader.SkipField(wire);
+                        break;
+                    case 2:
+                        if (wire == ProtoWireType.Varint) style.BorderColor = unchecked((uint)reader.ReadInt32());
+                        else reader.SkipField(wire);
+                        break;
+                    default:
+                        reader.SkipField(wire);
+                        break;
+                }
+            }
         }
 
         private static byte[] EncodeCellValue(VolvoxCellValueData value)

@@ -287,7 +287,7 @@ fn load_binary(grid: &mut VolvoxGrid, data: &[u8], scope: i32) {
                         0.0
                     };
 
-                    let style = crate::style::CellStyleOverride {
+                    let style = crate::style::CellStylePatch {
                         back_color: if flags & 1 != 0 { Some(back) } else { None },
                         fore_color: if flags & 2 != 0 { Some(fore) } else { None },
                         alignment: if flags & 4 != 0 { Some(align) } else { None },

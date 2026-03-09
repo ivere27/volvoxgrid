@@ -107,12 +107,25 @@ VolvoxGridWidget(
     if (event.hasAfterSort()) { /* sort completed */ }
     if (event.hasAfterEdit()) { /* cell edited */ }
   },
-  onCancelableEvent: (event) {
-    // Return true to cancel BeforeEdit, ValidateEdit, or BeforeSort
-    return false;
+  onBeforeEdit: (details) {
+    if (details.col == 0) {
+      details.cancel = true;
+    }
+  },
+  onCellEditValidating: (details) {
+    if (details.col == 2 && int.tryParse(details.editText) == null) {
+      details.cancel = true;
+    }
+  },
+  onBeforeSort: (details) {
+    if (details.col == 4) {
+      details.cancel = true;
+    }
   },
 )
 ```
+
+Cancelable Flutter hooks currently cover `onBeforeEdit`, `onCellEditValidating`, and `onBeforeSort`. The legacy raw `onCancelableEvent` callback is still available, but the event-specific `details.cancel = true` API is clearer for app code.
 
 ### VolvoxGridController
 
@@ -200,19 +213,21 @@ await controller.moveRow(10, 0);             // move row 10 to position 0
 
 ```dart
 // Single-column sort
-await controller.sort(SortOrder.SORT_GENERIC_ASCENDING, col: 0);
+await controller.sort(SortOrder.SORT_ASCENDING, col: 0);
 
 // Multi-column sort
 await controller.sortMulti([
-  (0, SortOrder.SORT_STRING_ASC),
-  (1, SortOrder.SORT_NUMERIC_DESCENDING),
+  (0, SortOrder.SORT_ASCENDING),
+  (1, SortOrder.SORT_DESCENDING),
 ]);
 
 // Show sort indicator on header
-await controller.setHeaderFeatures(HeaderFeatures.HEADER_SORT);
+await controller.setHeaderFeatures(HeaderFeatures()..sort = true);
 ```
 
-**SortOrder values:** `SORT_NONE`, `SORT_GENERIC_ASCENDING`, `SORT_GENERIC_DESCENDING`, `SORT_NUMERIC_ASCENDING`, `SORT_NUMERIC_DESCENDING`, `SORT_STRING_ASC`, `SORT_STRING_DESC`, `SORT_STRING_NO_CASE_ASC`, `SORT_STRING_NO_CASE_DESC`, `SORT_CUSTOM`
+**SortOrder values:** `SORT_NONE`, `SORT_ASCENDING`, `SORT_DESCENDING`
+
+**SortType values:** `SORT_TYPE_AUTO`, `SORT_TYPE_NUMERIC`, `SORT_TYPE_STRING`, `SORT_TYPE_STRING_NO_CASE`, `SORT_TYPE_CUSTOM`
 
 #### Selection
 

@@ -21,7 +21,8 @@ export interface ThemePreset {
   fixedCellPadding: PaddingPreset;
 }
 
-const GRIDLINE_SOLID_HORIZONTAL = 4;
+// `setGridLines()` still accepts the engine's legacy numeric compatibility modes.
+const COMPAT_GRIDLINE_SOLID_HORIZONTAL = 4;
 
 const DEFAULT_THEME: ThemePreset = {
   themeClass: "ag-theme-alpine",
@@ -38,7 +39,7 @@ const DEFAULT_THEME: ThemePreset = {
   fontSize: 14,
   rowHeight: 42,
   headerHeight: 48,
-  gridLines: GRIDLINE_SOLID_HORIZONTAL,
+  gridLines: COMPAT_GRIDLINE_SOLID_HORIZONTAL,
   // AG Alpine defaults: header 18px horizontal, body 17px (18px - 1px border).
   cellPadding: { left: 17, top: 0, right: 17, bottom: 0 },
   fixedCellPadding: { left: 18, top: 0, right: 18, bottom: 0 },
@@ -60,7 +61,7 @@ const THEMES: Record<AgThemeName, ThemePreset> = {
     fontSize: 12,
     rowHeight: 28,
     headerHeight: 32,
-    gridLines: GRIDLINE_SOLID_HORIZONTAL,
+    gridLines: COMPAT_GRIDLINE_SOLID_HORIZONTAL,
     // Balham: --ag-cell-horizontal-padding = 12px.
     // Body effectively renders at 11px due internal border handling.
     cellPadding: { left: 11, top: 0, right: 11, bottom: 0 },
@@ -80,7 +81,7 @@ const THEMES: Record<AgThemeName, ThemePreset> = {
     fontSize: 12,
     rowHeight: 48,
     headerHeight: 56,
-    gridLines: GRIDLINE_SOLID_HORIZONTAL,
+    gridLines: COMPAT_GRIDLINE_SOLID_HORIZONTAL,
     // Material: --ag-cell-horizontal-padding = 24px.
     // Body effectively renders at 23px due internal border handling.
     cellPadding: { left: 23, top: 0, right: 23, bottom: 0 },

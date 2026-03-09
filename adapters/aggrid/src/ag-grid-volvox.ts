@@ -1,4 +1,9 @@
-import { VolvoxGrid } from "volvoxgrid";
+import {
+  VolvoxGrid,
+  type VolvoxGridBeforeEditDetails,
+  type VolvoxGridBeforeSortDetails,
+  type VolvoxGridCellEditValidatingDetails,
+} from "volvoxgrid";
 import { setupDefaultInput } from "volvoxgrid/dist/default-input.js";
 import {
   normalizeColumnDefs,
@@ -43,8 +48,6 @@ const BORDER_THICK = 2;
 const BORDER_DOTTED = 3;
 const BORDER_DASHED = 4;
 const BORDER_DOUBLE = 5;
-const BORDER_RAISED = 6;
-const BORDER_INSET = 7;
 
 const AG_TO_VV_ICON_SLOT: Array<{
   agKey: string;
@@ -367,14 +370,10 @@ function parseBorderStyleKeyword(raw: string, widthPx?: number): number | undefi
   if (value === "double") {
     return BORDER_DOUBLE;
   }
-  if (value === "inset") {
-    return BORDER_INSET;
-  }
-  if (value === "outset" || value === "ridge") {
-    return BORDER_RAISED;
-  }
-  if (value === "groove") {
-    return BORDER_INSET;
+  if (value === "inset" || value === "outset" || value === "ridge" || value === "groove") {
+    // The current proto no longer exposes raised/inset border enums.
+    // Preserve width intent with the nearest supported flat border style.
+    return (widthPx ?? 1) >= 2 ? BORDER_THICK : BORDER_THIN;
   }
   if (value === "solid") {
     return (widthPx ?? 1) >= 2 ? BORDER_THICK : BORDER_THIN;
@@ -803,6 +802,7 @@ export class AgGridVolvox<TData extends RowData = RowData> {
     this.grid = new VolvoxGrid(this.canvas, this.wasm, 2, initialCols);
     this.cleanupDefaultInput = setupDefaultInput(this.grid as any, this.wasm, this.canvas);
     this.installHeaderStyleHooks();
+    this.syncCancelableHooks();
 
     this.gridApi = new VolvoxGridApi<TData>({
       getGrid: () => this.grid,
@@ -851,7 +851,76 @@ export class AgGridVolvox<TData extends RowData = RowData> {
 
   setGridOptions(options: GridOptions<TData>): void {
     this.options = options;
+    this.syncCancelableHooks();
     this.reloadData();
+  }
+
+  private syncCancelableHooks(): void {
+    const beforeEdit = this.options.onBeforeEdit;
+    this.grid.onBeforeEdit = beforeEdit == null
+      ? null
+      : (details: VolvoxGridBeforeEditDetails) => {
+          const column = this.columns[details.col];
+          if (column == null) {
+            return;
+          }
+          const row = details.row >= 0 ? this.shadowRows[details.row] : undefined;
+          const event = {
+            api: this.gridApi,
+            rowIndex: details.row,
+            colIndex: details.col,
+            colId: column.field,
+            colDef: column.def,
+            data: row,
+            value: row != null ? row[column.field as keyof TData] : undefined,
+            cancel: false,
+          };
+          beforeEdit(event);
+          details.cancel = event.cancel;
+        };
+
+    const cellEditValidating = this.options.onCellEditValidating;
+    this.grid.onCellEditValidating = cellEditValidating == null
+      ? null
+      : (details: VolvoxGridCellEditValidatingDetails) => {
+          const column = this.columns[details.col];
+          if (column == null) {
+            return;
+          }
+          const row = details.row >= 0 ? this.shadowRows[details.row] : undefined;
+          const event = {
+            api: this.gridApi,
+            rowIndex: details.row,
+            colIndex: details.col,
+            colId: column.field,
+            colDef: column.def,
+            data: row,
+            value: row != null ? row[column.field as keyof TData] : undefined,
+            editText: details.editText,
+            cancel: false,
+          };
+          cellEditValidating(event);
+          details.cancel = event.cancel;
+        };
+
+    const beforeSort = this.options.onBeforeSort;
+    this.grid.onBeforeSort = beforeSort == null
+      ? null
+      : (details: VolvoxGridBeforeSortDetails) => {
+          const column = this.columns[details.col];
+          if (column == null) {
+            return;
+          }
+          const event = {
+            api: this.gridApi,
+            colIndex: details.col,
+            colId: column.field,
+            colDef: column.def,
+            cancel: false,
+          };
+          beforeSort(event);
+          details.cancel = event.cancel;
+        };
   }
 
   private getEffectiveColumnDefs(): ColDef<TData>[] {
@@ -1190,6 +1259,15 @@ export class AgGridVolvox<TData extends RowData = RowData> {
       this.grid.setIconTheme({ slots });
       return;
     }
+    if (typeof this.grid.setIconSlots === "function") {
+      const legacySlots: Record<string, string> = {};
+      for (const mapping of AG_TO_VV_ICON_SLOT) {
+        const text = resolveAgIconText(icons[mapping.agKey]);
+        legacySlots[mapping.vvKey] = text ?? "";
+      }
+      this.grid.setIconSlots(legacySlots);
+      return;
+    }
     if (typeof this.grid.setIconThemeSlots === "function") {
       const legacySlots: Record<string, string> = {};
       for (const mapping of AG_TO_VV_ICON_SLOT) {
@@ -1335,8 +1413,14 @@ export class AgGridVolvox<TData extends RowData = RowData> {
     const separator = resolveHeaderSeparatorSpec(this.container);
     const resizeHandle = resolveHeaderResizeHandleSpec(this.container);
     const visualSpec = separator ?? resizeHandle;
+    const setHeaderSeparator = typeof this.grid.setHeaderSeparator === "function"
+      ? this.grid.setHeaderSeparator.bind(this.grid)
+      : this.grid.setHeaderSeparatorStyle.bind(this.grid);
+    const setHeaderResizeHandle = typeof this.grid.setHeaderResizeHandle === "function"
+      ? this.grid.setHeaderResizeHandle.bind(this.grid)
+      : this.grid.setHeaderResizeHandleStyle.bind(this.grid);
     if (visualSpec != null) {
-      this.grid.setHeaderSeparatorStyle({
+      setHeaderSeparator({
         enabled: true,
         colorArgb: visualSpec.colorArgb,
         widthPx: visualSpec.widthPx,
@@ -1347,12 +1431,12 @@ export class AgGridVolvox<TData extends RowData = RowData> {
         skipMerged: true,
       });
     } else {
-      this.grid.setHeaderSeparatorStyle({
+      setHeaderSeparator({
         enabled: false,
       });
     }
 
-    this.grid.setHeaderResizeHandleStyle({
+    setHeaderResizeHandle({
       // Keep resize-handle style for interaction hitbox only.
       enabled: false,
       hitWidthPx: resizeHandle != null ? Math.max(6, resizeHandle.widthPx) : 6,

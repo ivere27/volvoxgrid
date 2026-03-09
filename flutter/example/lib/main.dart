@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide Align;
 import 'package:flutter/services.dart';
-import 'package:volvoxgrid/volvoxgrid.dart';
+import 'package:volvoxgrid/volvoxgrid.dart' hide Padding;
 
 const bool _forceFlingForDesktop = bool.fromEnvironment(
   'VG_ENABLE_FLING',
@@ -104,12 +104,12 @@ class _DemoPageState extends State<DemoPage> {
     await controller.setDebugOverlay(_showDebugOverlay);
     await controller.setTextLayoutCacheCap(_textLayoutCacheCap);
     final style = await controller.getGridStyle();
-    style
-      ..foreColor = 0xFF000000
-      ..foreColorFixed = 0xFF000000
-      ..foreColorFrozen = 0xFF000000
-      ..fontName = ''
-      ..fontSize = 14.0 * dpr;
+    style.foreground = 0xFF000000;
+    style.ensureFixed().foreground = 0xFF000000;
+    style.ensureFrozen().foreground = 0xFF000000;
+    style.ensureFont()
+      ..family = ''
+      ..size = 14.0 * dpr;
     await controller.setGridStyle(style);
     await controller.setRedraw(false);
     try {
@@ -191,13 +191,13 @@ class _DemoPageState extends State<DemoPage> {
   Future<void> _onSortAscending() async {
     if (_loading) return;
     final col = await _activeController.cursorCol();
-    await _activeController.sort(SortOrder.SORT_GENERIC_ASCENDING, col: col);
+    await _activeController.sort(SortOrder.SORT_ASCENDING, col: col);
   }
 
   Future<void> _onSortDescending() async {
     if (_loading) return;
     final col = await _activeController.cursorCol();
-    await _activeController.sort(SortOrder.SORT_GENERIC_DESCENDING, col: col);
+    await _activeController.sort(SortOrder.SORT_DESCENDING, col: col);
   }
 
   Future<void> _switchRendererBackend(RendererBackend backend) async {

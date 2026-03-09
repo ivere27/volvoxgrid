@@ -2,14 +2,14 @@ use crate::proto::volvoxgrid::v1 as pb;
 
 /// Insets inside a cell's draw/edit bounds, in pixels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct CellPadding {
+pub struct Padding {
     pub left: i32,
     pub top: i32,
     pub right: i32,
     pub bottom: i32,
 }
 
-impl Default for CellPadding {
+impl Default for Padding {
     fn default() -> Self {
         Self {
             left: 3,
@@ -20,7 +20,7 @@ impl Default for CellPadding {
     }
 }
 
-impl CellPadding {
+impl Padding {
     pub fn clamped_non_negative(self) -> Self {
         Self {
             left: self.left.max(0),
@@ -52,7 +52,7 @@ impl Default for HeaderMarkHeight {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct HeaderSeparatorStyle {
+pub struct HeaderSeparator {
     pub enabled: bool,
     pub color: u32,
     pub width_px: i32,
@@ -60,7 +60,7 @@ pub struct HeaderSeparatorStyle {
     pub skip_merged: bool,
 }
 
-impl Default for HeaderSeparatorStyle {
+impl Default for HeaderSeparator {
     fn default() -> Self {
         Self {
             enabled: false,
@@ -73,7 +73,7 @@ impl Default for HeaderSeparatorStyle {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct HeaderResizeHandleStyle {
+pub struct HeaderResizeHandle {
     pub enabled: bool,
     pub color: u32,
     pub width_px: i32,
@@ -82,7 +82,7 @@ pub struct HeaderResizeHandleStyle {
     pub show_only_when_resizable: bool,
 }
 
-impl Default for HeaderResizeHandleStyle {
+impl Default for HeaderResizeHandle {
     fn default() -> Self {
         Self {
             enabled: false,
@@ -96,7 +96,7 @@ impl Default for HeaderResizeHandleStyle {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct IconThemeSlots {
+pub struct IconSlots {
     pub sort_ascending: Option<String>,
     pub sort_descending: Option<String>,
     pub sort_none: Option<String>,
@@ -112,7 +112,7 @@ pub struct IconThemeSlots {
     pub checkbox_indeterminate: Option<String>,
 }
 
-impl IconThemeSlots {
+impl IconSlots {
     pub fn heap_size_bytes(&self) -> usize {
         self.sort_ascending.as_ref().map_or(0, String::capacity)
             + self.sort_descending.as_ref().map_or(0, String::capacity)
@@ -134,7 +134,7 @@ impl IconThemeSlots {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct IconTextStyle {
+pub struct IconFontStyle {
     pub font_name: Option<String>,
     pub font_names: Vec<String>,
     pub font_size: Option<f32>,
@@ -143,7 +143,7 @@ pub struct IconTextStyle {
     pub color: Option<u32>,
 }
 
-impl IconTextStyle {
+impl IconFontStyle {
     pub fn heap_size_bytes(&self) -> usize {
         self.font_name.as_ref().map_or(0, String::capacity)
             + self.font_names.capacity() * std::mem::size_of::<String>()
@@ -152,12 +152,12 @@ impl IconTextStyle {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct IconLayoutStyle {
+pub struct IconLayout {
     pub align: i32,
     pub gap_px: i32,
 }
 
-impl Default for IconLayoutStyle {
+impl Default for IconLayout {
     fn default() -> Self {
         Self {
             align: pb::IconAlign::InlineEnd as i32,
@@ -167,41 +167,41 @@ impl Default for IconLayoutStyle {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct IconThemeDefaults {
-    pub text_style: IconTextStyle,
-    pub layout: IconLayoutStyle,
+pub struct IconDefaults {
+    pub text_style: IconFontStyle,
+    pub layout: IconLayout,
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct IconThemeSlotStyle {
-    pub text_style: IconTextStyle,
-    pub layout: Option<IconLayoutStyle>,
+pub struct IconSlotStyle {
+    pub text_style: IconFontStyle,
+    pub layout: Option<IconLayout>,
 }
 
-impl IconThemeSlotStyle {
+impl IconSlotStyle {
     pub fn heap_size_bytes(&self) -> usize {
         self.text_style.heap_size_bytes()
     }
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct IconThemeSlotStyles {
-    pub sort_ascending: Option<IconThemeSlotStyle>,
-    pub sort_descending: Option<IconThemeSlotStyle>,
-    pub sort_none: Option<IconThemeSlotStyle>,
-    pub tree_expanded: Option<IconThemeSlotStyle>,
-    pub tree_collapsed: Option<IconThemeSlotStyle>,
-    pub menu: Option<IconThemeSlotStyle>,
-    pub filter: Option<IconThemeSlotStyle>,
-    pub filter_active: Option<IconThemeSlotStyle>,
-    pub columns: Option<IconThemeSlotStyle>,
-    pub drag_handle: Option<IconThemeSlotStyle>,
-    pub checkbox_checked: Option<IconThemeSlotStyle>,
-    pub checkbox_unchecked: Option<IconThemeSlotStyle>,
-    pub checkbox_indeterminate: Option<IconThemeSlotStyle>,
+pub struct IconSlotStyles {
+    pub sort_ascending: Option<IconSlotStyle>,
+    pub sort_descending: Option<IconSlotStyle>,
+    pub sort_none: Option<IconSlotStyle>,
+    pub tree_expanded: Option<IconSlotStyle>,
+    pub tree_collapsed: Option<IconSlotStyle>,
+    pub menu: Option<IconSlotStyle>,
+    pub filter: Option<IconSlotStyle>,
+    pub filter_active: Option<IconSlotStyle>,
+    pub columns: Option<IconSlotStyle>,
+    pub drag_handle: Option<IconSlotStyle>,
+    pub checkbox_checked: Option<IconSlotStyle>,
+    pub checkbox_unchecked: Option<IconSlotStyle>,
+    pub checkbox_indeterminate: Option<IconSlotStyle>,
 }
 
-impl IconThemeSlotStyles {
+impl IconSlotStyles {
     pub fn heap_size_bytes(&self) -> usize {
         let slots = [
             self.sort_ascending.as_ref(),
@@ -221,8 +221,92 @@ impl IconThemeSlotStyles {
         slots
             .into_iter()
             .flatten()
-            .map(IconThemeSlotStyle::heap_size_bytes)
+            .map(IconSlotStyle::heap_size_bytes)
             .sum()
+    }
+}
+
+pub(crate) fn proto_border_to_parts(border: Option<&pb::Border>) -> (Option<i32>, Option<u32>) {
+    match border {
+        Some(border) => (border.style, border.color),
+        None => (None, None),
+    }
+}
+
+pub(crate) fn proto_borders_to_parts(
+    borders: Option<&pb::Borders>,
+) -> (
+    Option<i32>,
+    Option<u32>,
+    Option<i32>,
+    Option<u32>,
+    Option<i32>,
+    Option<u32>,
+    Option<i32>,
+    Option<u32>,
+    Option<i32>,
+    Option<u32>,
+) {
+    let Some(borders) = borders else {
+        return (None, None, None, None, None, None, None, None, None, None);
+    };
+
+    let (all_style, all_color) = proto_border_to_parts(borders.all.as_ref());
+    let (top_style, top_color) = proto_border_to_parts(borders.top.as_ref());
+    let (right_style, right_color) = proto_border_to_parts(borders.right.as_ref());
+    let (bottom_style, bottom_color) = proto_border_to_parts(borders.bottom.as_ref());
+    let (left_style, left_color) = proto_border_to_parts(borders.left.as_ref());
+
+    (
+        all_style,
+        all_color,
+        top_style,
+        top_color,
+        right_style,
+        right_color,
+        bottom_style,
+        bottom_color,
+        left_style,
+        left_color,
+    )
+}
+
+pub(crate) fn parts_to_proto_border(style: Option<i32>, color: Option<u32>) -> Option<pb::Border> {
+    if style.is_none() && color.is_none() {
+        None
+    } else {
+        Some(pb::Border { style, color })
+    }
+}
+
+pub(crate) fn parts_to_proto_borders(
+    all_style: Option<i32>,
+    all_color: Option<u32>,
+    top_style: Option<i32>,
+    top_color: Option<u32>,
+    right_style: Option<i32>,
+    right_color: Option<u32>,
+    bottom_style: Option<i32>,
+    bottom_color: Option<u32>,
+    left_style: Option<i32>,
+    left_color: Option<u32>,
+) -> Option<pb::Borders> {
+    let all = parts_to_proto_border(all_style, all_color);
+    let top = parts_to_proto_border(top_style, top_color);
+    let right = parts_to_proto_border(right_style, right_color);
+    let bottom = parts_to_proto_border(bottom_style, bottom_color);
+    let left = parts_to_proto_border(left_style, left_color);
+
+    if all.is_none() && top.is_none() && right.is_none() && bottom.is_none() && left.is_none() {
+        None
+    } else {
+        Some(pb::Borders {
+            all,
+            top,
+            right,
+            bottom,
+            left,
+        })
     }
 }
 
@@ -250,19 +334,31 @@ impl HighlightStyle {
         let Some(src) = src else {
             return Self::default();
         };
+        let (
+            border,
+            border_color,
+            border_top,
+            border_top_color,
+            border_right,
+            border_right_color,
+            border_bottom,
+            border_bottom_color,
+            border_left,
+            border_left_color,
+        ) = proto_borders_to_parts(src.borders.as_ref());
         Self {
-            back_color: src.back_color,
-            fore_color: src.fore_color,
-            border: src.border,
-            border_color: src.border_color,
-            border_top: src.border_top,
-            border_right: src.border_right,
-            border_bottom: src.border_bottom,
-            border_left: src.border_left,
-            border_top_color: src.border_top_color,
-            border_right_color: src.border_right_color,
-            border_bottom_color: src.border_bottom_color,
-            border_left_color: src.border_left_color,
+            back_color: src.background,
+            fore_color: src.foreground,
+            border,
+            border_color,
+            border_top,
+            border_right,
+            border_bottom,
+            border_left,
+            border_top_color,
+            border_right_color,
+            border_bottom_color,
+            border_left_color,
             fill_handle: src.fill_handle,
             fill_handle_color: src.fill_handle_color,
         }
@@ -270,18 +366,20 @@ impl HighlightStyle {
 
     pub fn to_proto(&self) -> pb::HighlightStyle {
         pb::HighlightStyle {
-            back_color: self.back_color,
-            fore_color: self.fore_color,
-            border: self.border,
-            border_color: self.border_color,
-            border_top: self.border_top,
-            border_right: self.border_right,
-            border_bottom: self.border_bottom,
-            border_left: self.border_left,
-            border_top_color: self.border_top_color,
-            border_right_color: self.border_right_color,
-            border_bottom_color: self.border_bottom_color,
-            border_left_color: self.border_left_color,
+            background: self.back_color,
+            foreground: self.fore_color,
+            borders: parts_to_proto_borders(
+                self.border,
+                self.border_color,
+                self.border_top,
+                self.border_top_color,
+                self.border_right,
+                self.border_right_color,
+                self.border_bottom,
+                self.border_bottom_color,
+                self.border_left,
+                self.border_left_color,
+            ),
             fill_handle: self.fill_handle,
             fill_handle_color: self.fill_handle_color,
         }
@@ -368,13 +466,13 @@ pub struct GridStyleState {
     pub text_hinting_mode: i32,
     pub text_pixel_snap: bool,
     pub tree_color: u32,
-    pub cell_padding: CellPadding,
-    pub fixed_cell_padding: CellPadding,
-    pub header_separator: HeaderSeparatorStyle,
-    pub header_resize_handle: HeaderResizeHandleStyle,
-    pub icon_theme_slots: IconThemeSlots,
-    pub icon_theme_defaults: IconThemeDefaults,
-    pub icon_theme_slot_styles: IconThemeSlotStyles,
+    pub cell_padding: Padding,
+    pub fixed_cell_padding: Padding,
+    pub header_separator: HeaderSeparator,
+    pub header_resize_handle: HeaderResizeHandle,
+    pub icon_theme_slots: IconSlots,
+    pub icon_theme_defaults: IconDefaults,
+    pub icon_theme_slot_styles: IconSlotStyles,
     pub checkbox_checked_picture: Option<Vec<u8>>,
     pub checkbox_unchecked_picture: Option<Vec<u8>>,
     pub checkbox_indeterminate_picture: Option<Vec<u8>>,
@@ -421,13 +519,13 @@ impl Default for GridStyleState {
             text_hinting_mode: pb::TextHintingMode::TextHintAuto as i32,
             text_pixel_snap: false,
             tree_color: 0xFF808080, // gray
-            cell_padding: CellPadding::default(),
-            fixed_cell_padding: CellPadding::default(),
-            header_separator: HeaderSeparatorStyle::default(),
-            header_resize_handle: HeaderResizeHandleStyle::default(),
-            icon_theme_slots: IconThemeSlots::default(),
-            icon_theme_defaults: IconThemeDefaults::default(),
-            icon_theme_slot_styles: IconThemeSlotStyles::default(),
+            cell_padding: Padding::default(),
+            fixed_cell_padding: Padding::default(),
+            header_separator: HeaderSeparator::default(),
+            header_resize_handle: HeaderResizeHandle::default(),
+            icon_theme_slots: IconSlots::default(),
+            icon_theme_defaults: IconDefaults::default(),
+            icon_theme_slot_styles: IconSlotStyles::default(),
             checkbox_checked_picture: None,
             checkbox_unchecked_picture: None,
             checkbox_indeterminate_picture: None,
@@ -464,7 +562,7 @@ impl GridStyleState {
 
 /// Per-cell style override (only stores overrides, not full style)
 #[derive(Clone, Debug, Default)]
-pub struct CellStyleOverride {
+pub struct CellStylePatch {
     pub back_color: Option<u32>,
     pub fore_color: Option<u32>,
     pub alignment: Option<i32>,
@@ -486,11 +584,11 @@ pub struct CellStyleOverride {
     pub border_right_color: Option<u32>,
     pub border_bottom_color: Option<u32>,
     pub border_left_color: Option<u32>,
-    pub padding: Option<CellPadding>,
+    pub padding: Option<Padding>,
     pub shrink_to_fit: Option<bool>,
 }
 
-impl CellStyleOverride {
+impl CellStylePatch {
     pub fn new() -> Self {
         Self::default()
     }
@@ -527,7 +625,7 @@ impl CellStyleOverride {
 
     /// Merge `other` into `self`: any `Some` field in `other` overwrites `self`.
     /// Fields that are `None` in `other` are left unchanged in `self`.
-    pub fn merge_from(&mut self, other: &CellStyleOverride) {
+    pub fn merge_from(&mut self, other: &CellStylePatch) {
         if other.back_color.is_some() {
             self.back_color = other.back_color;
         }

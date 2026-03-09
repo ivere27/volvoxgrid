@@ -1,6 +1,9 @@
 import type { VolvoxGrid } from "volvoxgrid";
 
 export type VolvoxSheetGrid = VolvoxGrid & {
+  onBeforeEdit: ((detail: { row: number; col: number; cancel: boolean }) => void) | null;
+  onCellEditValidating:
+    ((detail: { row: number; col: number; editText: string; cancel: boolean }) => void) | null;
   rowCount: number;
   colCount: number;
   selectionMode: number;
@@ -13,8 +16,9 @@ export type VolvoxSheetGrid = VolvoxGrid & {
   rowIndicatorStartWidth: number;
   frozenRowCount: number;
   frozenColCount: number;
-  allowUserResizing: number;
   editTrigger: number;
+  setHeaderResizeHandle?(style: { enabled?: boolean; hitWidthPx?: number; showOnlyWhenResizable?: boolean }): void;
+  setResizePolicy(policy: VolvoxGridResizePolicy): void;
   setCellText(row: number, col: number, text: string): void;
   getSelection(): {
     row: number;
@@ -26,6 +30,12 @@ export type VolvoxSheetGrid = VolvoxGrid & {
   selectRanges(ranges: ReadonlyArray<CellRange>, activeRow?: number, activeCol?: number, show?: boolean): void;
   setColumnCaption(col: number, caption: string): void;
 };
+
+export interface VolvoxGridResizePolicy {
+  columns?: boolean;
+  rows?: boolean;
+  uniform?: boolean;
+}
 
 // ── Cell References ────────────────────────────────────────
 
@@ -120,6 +130,8 @@ export interface VolvoxSheetOptions {
   fontSize?: number;
   /** URL to a .ttf/.otf font file for the grid engine. Defaults to Roboto from CDN. */
   fontUrl?: string;
+  onBeforeEdit?: (detail: SheetBeforeEditDetail) => void;
+  onCellEditValidating?: (detail: SheetCellEditValidatingDetail) => void;
 }
 
 // ── Public API ─────────────────────────────────────────────
@@ -193,4 +205,19 @@ export interface SheetCellEditDetail {
   col: number;
   oldText: string;
   newText: string;
+}
+
+export interface SheetBeforeEditDetail {
+  row: number;
+  col: number;
+  value: string;
+  cancel: boolean;
+}
+
+export interface SheetCellEditValidatingDetail {
+  row: number;
+  col: number;
+  oldText: string;
+  newText: string;
+  cancel: boolean;
 }

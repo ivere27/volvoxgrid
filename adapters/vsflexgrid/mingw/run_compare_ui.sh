@@ -5,10 +5,25 @@
 # output BMPs to PNG, and generates a side-by-side HTML report.
 #
 # Usage:
-#   ./run_compare_ui.sh [--only-vv] [--no-diff] [--no-html] [--test N] [--tests LIST]
+#   ./run_compare_ui.sh [--headless] [--no-headless] [--jobs N] [--only-vv] [--no-diff] [--no-html] [--test N] [--tests LIST]
+#
+# Headless mode:
+#   - enabled by default via xvfb-run
+#   - disable with --no-headless
+#   - Xvfb screen can be customized via XVFB_SCREEN (default: 1920x1080x24)
+#
+# Parallel mode:
+#   - `--jobs N` runs N wine workers in parallel by splitting selected tests
+#   - default is max(CPU count - 2, 1)
 
 set -euo pipefail
-cd "$(dirname "$0")"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+if [[ "$SCRIPT_PATH" != /* ]]; then
+    SCRIPT_PATH="$(pwd)/$SCRIPT_PATH"
+fi
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+SCRIPT_PATH="$SCRIPT_DIR/$(basename "$SCRIPT_PATH")"
+cd "$SCRIPT_DIR"
 
 REF_OCX_FILE="${REF_OCX_FILE:-../../../legacy/legacy_ocx.txt}"
 REF_OCX_NAME=""
@@ -29,18 +44,98 @@ ARGS=()
 NO_HTML=0
 HAS_FILTER=0
 DEFAULT_FILTER=""
+HEADLESS=1
+XVFB_SCREEN="${XVFB_SCREEN:-1920x1080x24}"
+JOBS=0
+JOBS_SET=0
 
-for arg in "$@"; do
-    case "$arg" in
-        --no-html) NO_HTML=1 ;;
-        --test|--tests|--test=*|--tests=*) HAS_FILTER=1; ARGS+=("$arg") ;;
-        *) ARGS+=("$arg") ;;
+ORIG_ARGS=("$@")
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --headless)
+            HEADLESS=1
+            shift
+            ;;
+        --no-headless)
+            HEADLESS=0
+            shift
+            ;;
+        --jobs)
+            if [ "$#" -lt 2 ]; then
+                echo "ERROR: --jobs requires a value"
+                exit 1
+            fi
+            JOBS="$2"
+            JOBS_SET=1
+            shift 2
+            ;;
+        --jobs=*)
+            JOBS="${1#--jobs=}"
+            JOBS_SET=1
+            shift
+            ;;
+        --no-html)
+            NO_HTML=1
+            ARGS+=("$1")
+            shift
+            ;;
+        --test|--tests)
+            if [ "$#" -lt 2 ]; then
+                echo "ERROR: $1 requires a value"
+                exit 1
+            fi
+            HAS_FILTER=1
+            ARGS+=("$1" "$2")
+            shift 2
+            ;;
+        --test=*|--tests=*)
+            HAS_FILTER=1
+            ARGS+=("$1")
+            shift
+            ;;
+        *)
+            ARGS+=("$1")
+            shift
+            ;;
     esac
 done
+
+if [ "$JOBS_SET" -eq 0 ]; then
+    CPU_COUNT=1
+    if command -v nproc >/dev/null 2>&1; then
+        CPU_COUNT="$(nproc 2>/dev/null || echo 1)"
+    else
+        CPU_COUNT="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
+    fi
+    if ! [[ "$CPU_COUNT" =~ ^[0-9]+$ ]] || [ "$CPU_COUNT" -lt 1 ]; then
+        CPU_COUNT=1
+    fi
+    JOBS=$((CPU_COUNT - 2))
+    if [ "$JOBS" -lt 1 ]; then
+        JOBS=1
+    fi
+fi
+
+if ! [[ "$JOBS" =~ ^[0-9]+$ ]] || [ "$JOBS" -lt 1 ]; then
+    echo "ERROR: --jobs must be a positive integer"
+    exit 1
+fi
 
 if [ "$HAS_FILTER" -eq 0 ]; then
     DEFAULT_FILTER="${UI_TEST_FILTER:-1-64}"
     ARGS+=(--tests "$DEFAULT_FILTER")
+fi
+
+if [ "${RUN_COMPARE_UI_XVFB_WRAPPED:-0}" != "1" ]; then
+    if [ "$HEADLESS" -eq 1 ]; then
+        if ! command -v xvfb-run >/dev/null 2>&1; then
+            echo "ERROR: headless mode requested but xvfb-run is not installed"
+            exit 1
+        fi
+        echo "Running under xvfb-run (headless display)"
+        export RUN_COMPARE_UI_XVFB_WRAPPED=1
+        exec xvfb-run -a -s "-screen 0 ${XVFB_SCREEN}" "$SCRIPT_PATH" "${ORIG_ARGS[@]}"
+    fi
 fi
 
 # ── Preflight ──────────────────────────────────────────────
@@ -89,11 +184,11 @@ echo "  Done: $TARGET_DIR/grid_compare_test.exe"
 # ── Register OCXs ─────────────────────────────────────────
 echo "[2/5] Registering OCXs in Wine..."
 
-WINEDEBUG=-all wine regsvr32 "$(realpath "$VOLVOX_OCX")" 2>/dev/null || true
+WINEDEBUG=-all wine regsvr32 /s "$(realpath "$VOLVOX_OCX")" 2>/dev/null || true
 echo "  VolvoxGrid: registered"
 
 if [[ ! " ${ARGS[*]:-} " =~ " --only-vv " ]]; then
-    WINEDEBUG=-all wine regsvr32 "$(realpath "$REF_OCX")" 2>/dev/null || true
+    WINEDEBUG=-all wine regsvr32 /s "$(realpath "$REF_OCX")" 2>/dev/null || true
     echo "  FlexGrid: registered"
 fi
 
@@ -114,7 +209,155 @@ ln -sfn "$(realpath "$TESTS_DIR")" "$OUT_DIR/tests"
 # Run in output dir so BMPs land there; capture output for similarity parsing
 pushd "$OUT_DIR" > /dev/null
 COMPARE_LOG="compare_output.log"
-WINEDEBUG=-all wine "./grid_compare_test.exe" "${ARGS[@]:-}" 2>/dev/null | tee "$COMPARE_LOG" || true
+if [ "$JOBS" -le 1 ]; then
+    WINEDEBUG=-all wine "./grid_compare_test.exe" "${ARGS[@]:-}" 2>/dev/null | tee "$COMPARE_LOG" || true
+else
+    declare -A TEST_SET=()
+    TEST_FILTER=""
+    ONLY_TEST=""
+    BASE_ARGS=()
+    TEST_LIST=()
+    CHUNKS=()
+    PIDS=()
+    WORKER_IDS=()
+    WORKER_CHUNKS=()
+    WORKER_LOGS=()
+    WORKER_FAILS=0
+    WORKER_IDX=0
+
+    # Extract filter options and build argument list without test selectors.
+    i=0
+    while [ "$i" -lt "${#ARGS[@]}" ]; do
+        a="${ARGS[$i]}"
+        case "$a" in
+            --test)
+                if [ $((i + 1)) -lt "${#ARGS[@]}" ]; then
+                    ONLY_TEST="${ARGS[$((i + 1))]}"
+                fi
+                i=$((i + 2))
+                ;;
+            --test=*)
+                ONLY_TEST="${a#--test=}"
+                i=$((i + 1))
+                ;;
+            --tests)
+                if [ $((i + 1)) -lt "${#ARGS[@]}" ]; then
+                    TEST_FILTER="${ARGS[$((i + 1))]}"
+                fi
+                i=$((i + 2))
+                ;;
+            --tests=*)
+                TEST_FILTER="${a#--tests=}"
+                i=$((i + 1))
+                ;;
+            *)
+                BASE_ARGS+=("$a")
+                i=$((i + 1))
+                ;;
+        esac
+    done
+
+    if [ -n "$ONLY_TEST" ]; then
+        if [[ "$ONLY_TEST" =~ ^[0-9]+$ ]] && [ "$ONLY_TEST" -gt 0 ]; then
+            TEST_SET["$ONLY_TEST"]=1
+        fi
+    else
+        IFS=',' read -ra TOKENS <<< "$TEST_FILTER"
+        for tok in "${TOKENS[@]}"; do
+            tok="${tok//[[:space:]]/}"
+            [ -z "$tok" ] && continue
+            if [[ "$tok" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+                a="${BASH_REMATCH[1]}"
+                b="${BASH_REMATCH[2]}"
+                if [ "$a" -le "$b" ]; then
+                    for ((t=a; t<=b; t++)); do TEST_SET["$t"]=1; done
+                else
+                    for ((t=b; t<=a; t++)); do TEST_SET["$t"]=1; done
+                fi
+            elif [[ "$tok" =~ ^[0-9]+$ ]]; then
+                TEST_SET["$tok"]=1
+            fi
+        done
+    fi
+
+    if [ "${#TEST_SET[@]}" -eq 0 ]; then
+        echo "  WARN: --jobs requested, but no valid tests parsed; falling back to sequential"
+        WINEDEBUG=-all wine "./grid_compare_test.exe" "${ARGS[@]:-}" 2>/dev/null | tee "$COMPARE_LOG" || true
+    else
+        mapfile -t TEST_LIST < <(printf "%s\n" "${!TEST_SET[@]}" | sort -n)
+        if [ "$JOBS" -gt "${#TEST_LIST[@]}" ]; then
+            JOBS="${#TEST_LIST[@]}"
+        fi
+
+        for ((w=0; w<JOBS; w++)); do
+            CHUNKS[w]=""
+        done
+        for idx in "${!TEST_LIST[@]}"; do
+            w=$((idx % JOBS))
+            t="${TEST_LIST[$idx]}"
+            if [ -n "${CHUNKS[$w]}" ]; then
+                CHUNKS[$w]="${CHUNKS[$w]},${t}"
+            else
+                CHUNKS[$w]="${t}"
+            fi
+        done
+
+        echo "  Running in parallel with $JOBS workers"
+        for chunk in "${CHUNKS[@]}"; do
+            [ -z "$chunk" ] && continue
+            WORKER_IDX=$((WORKER_IDX + 1))
+            wlog="compare_output.worker${WORKER_IDX}.log"
+            WORKER_LOGS+=("$wlog")
+            echo "    worker ${WORKER_IDX}: tests ${chunk} (log: ${wlog})"
+            (
+                start_ts="$(date +%s)"
+                start_human="$(date '+%Y-%m-%d %H:%M:%S')"
+                {
+                    echo "=== worker ${WORKER_IDX} START pid=$$ tests=${chunk} at ${start_human} ==="
+                } > "$wlog"
+                set +e
+                WINEDEBUG=-all wine "./grid_compare_test.exe" "${BASE_ARGS[@]}" --tests "$chunk" \
+                    2>/dev/null >> "$wlog"
+                rc=$?
+                set -e
+                end_ts="$(date +%s)"
+                end_human="$(date '+%Y-%m-%d %H:%M:%S')"
+                elapsed=$((end_ts - start_ts))
+                {
+                    echo "=== worker ${WORKER_IDX} END rc=${rc} elapsed=${elapsed}s at ${end_human} ==="
+                } >> "$wlog"
+                exit "$rc"
+            ) &
+            pid="$!"
+            PIDS+=("$pid")
+            WORKER_IDS+=("$WORKER_IDX")
+            WORKER_CHUNKS+=("$chunk")
+            echo "      -> worker ${WORKER_IDX} started (pid=${pid})"
+        done
+
+        for idx in "${!PIDS[@]}"; do
+            pid="${PIDS[$idx]}"
+            wid="${WORKER_IDS[$idx]}"
+            chunk="${WORKER_CHUNKS[$idx]}"
+            if wait "$pid"; then
+                echo "      <- worker ${wid} done (pid=${pid}, tests=${chunk})"
+            else
+                WORKER_FAILS=$((WORKER_FAILS + 1))
+                echo "      <- worker ${wid} FAILED (pid=${pid}, tests=${chunk})"
+            fi
+        done
+
+        : > "$COMPARE_LOG"
+        for wlog in "${WORKER_LOGS[@]}"; do
+            [ -f "$wlog" ] || continue
+            cat "$wlog" >> "$COMPARE_LOG"
+        done
+        cat "$COMPARE_LOG"
+        if [ "$WORKER_FAILS" -gt 0 ]; then
+            echo "  WARN: $WORKER_FAILS worker(s) exited non-zero"
+        fi
+    fi
+fi
 popd > /dev/null
 
 echo "  Done."
@@ -123,12 +366,43 @@ echo "  Done."
 echo "[4/5] Converting BMPs to PNG..."
 BMP_COUNT=0
 if command -v convert >/dev/null 2>&1; then
+    BMP_FILES=()
     for bmp in "$OUT_DIR"/test_*.bmp; do
         [ -f "$bmp" ] || continue
-        png="${bmp%.bmp}.png"
-        convert "$bmp" "$png" 2>/dev/null && rm -f "$bmp"
-        BMP_COUNT=$((BMP_COUNT + 1))
+        BMP_FILES+=("$bmp")
     done
+    BMP_COUNT="${#BMP_FILES[@]}"
+
+    if [ "$BMP_COUNT" -gt 0 ]; then
+        CONVERT_JOBS="$JOBS"
+        if [ "$CONVERT_JOBS" -gt "$BMP_COUNT" ]; then
+            CONVERT_JOBS="$BMP_COUNT"
+        fi
+
+        if [ "$CONVERT_JOBS" -le 1 ]; then
+            for bmp in "${BMP_FILES[@]}"; do
+                png="${bmp%.bmp}.png"
+                convert "$bmp" "$png" 2>/dev/null && rm -f "$bmp"
+            done
+        else
+            echo "  Converting in parallel with $CONVERT_JOBS workers"
+            set +e
+            printf '%s\0' "${BMP_FILES[@]}" | xargs -0 -P "$CONVERT_JOBS" -I '{}' sh -c '
+                bmp="$1"
+                png="${bmp%.bmp}.png"
+                if convert "$bmp" "$png" 2>/dev/null; then
+                    rm -f "$bmp"
+                    exit 0
+                fi
+                exit 1
+            ' _ '{}'
+            CONVERT_RC=$?
+            set -e
+            if [ "$CONVERT_RC" -ne 0 ]; then
+                echo "  WARN: some BMP->PNG conversions failed"
+            fi
+        fi
+    fi
     echo "  Converted $BMP_COUNT images."
 else
     echo "  ImageMagick not found — keeping BMPs."

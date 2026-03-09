@@ -240,7 +240,7 @@ fn proto_value_to_engine(cv: &Option<CellValue>) -> CellValueData {
             Some(cell_value::Value::Text(t)) => CellValueData::Text(t.clone()),
             Some(cell_value::Value::Number(n)) => CellValueData::Number(*n),
             Some(cell_value::Value::Flag(b)) => CellValueData::Bool(*b),
-            Some(cell_value::Value::Data(d)) => CellValueData::Bytes(d.clone()),
+            Some(cell_value::Value::Raw(d)) => CellValueData::Bytes(d.clone()),
             Some(cell_value::Value::Timestamp(ts)) => CellValueData::Timestamp(*ts),
             None => CellValueData::Empty,
         },
@@ -263,7 +263,7 @@ fn engine_value_to_proto(v: &CellValueData) -> CellValue {
             value: Some(cell_value::Value::Flag(*b)),
         },
         CellValueData::Bytes(d) => CellValue {
-            value: Some(cell_value::Value::Data(d.clone())),
+            value: Some(cell_value::Value::Raw(d.clone())),
         },
         CellValueData::Timestamp(ts) => CellValue {
             value: Some(cell_value::Value::Timestamp(*ts)),
@@ -574,7 +574,6 @@ fn engine_event_to_proto(
                 old_col,
                 new_row,
                 new_col,
-                cancel: false,
             },
         )),
         E::CellFocusChanged {
@@ -605,7 +604,6 @@ fn engine_event_to_proto(
                     .collect(),
                 active_row,
                 active_col,
-                cancel: false,
             },
         )),
         E::SelectionChanged {
@@ -631,11 +629,9 @@ fn engine_event_to_proto(
         E::LeaveCell { row, col } => {
             Some(grid_event::Event::LeaveCell(LeaveCellEvent { row, col }))
         }
-        E::BeforeEdit { row, col } => Some(grid_event::Event::BeforeEdit(BeforeEditEvent {
-            row,
-            col,
-            cancel: false,
-        })),
+        E::BeforeEdit { row, col } => {
+            Some(grid_event::Event::BeforeEdit(BeforeEditEvent { row, col }))
+        }
         E::StartEdit { row, col } => {
             Some(grid_event::Event::StartEdit(StartEditEvent { row, col }))
         }
@@ -658,7 +654,6 @@ fn engine_event_to_proto(
             row,
             col,
             edit_text,
-            cancel: false,
         })),
         E::CellEditChange { text } => {
             Some(grid_event::Event::CellEditChange(CellEditChangeEvent {
@@ -709,10 +704,7 @@ fn engine_event_to_proto(
                 status,
             }))
         }
-        E::BeforeSort { col } => Some(grid_event::Event::BeforeSort(BeforeSortEvent {
-            col,
-            cancel: false,
-        })),
+        E::BeforeSort { col } => Some(grid_event::Event::BeforeSort(BeforeSortEvent { col })),
         E::AfterSort { col } => Some(grid_event::Event::AfterSort(AfterSortEvent { col })),
         E::Compare {
             row1,
@@ -729,7 +721,6 @@ fn engine_event_to_proto(
             Some(grid_event::Event::BeforeNodeToggle(BeforeNodeToggleEvent {
                 row,
                 collapse,
-                cancel: false,
             }))
         }
         E::AfterNodeToggle { row, collapse } => {
@@ -748,7 +739,6 @@ fn engine_event_to_proto(
             old_left_col,
             new_top_row,
             new_left_col,
-            cancel: false,
         })),
         E::AfterScroll {
             old_top_row,
@@ -768,7 +758,6 @@ fn engine_event_to_proto(
             Some(grid_event::Event::BeforeUserResize(BeforeUserResizeEvent {
                 row,
                 col,
-                cancel: false,
             }))
         }
         E::AfterUserResize { row, col } => {
@@ -788,7 +777,6 @@ fn engine_event_to_proto(
             Some(grid_event::Event::BeforeMoveColumn(BeforeMoveColumnEvent {
                 col,
                 new_position,
-                cancel: false,
             }))
         }
         E::AfterMoveColumn { col, old_position } => {
@@ -801,7 +789,6 @@ fn engine_event_to_proto(
             Some(grid_event::Event::BeforeMoveRow(BeforeMoveRowEvent {
                 row,
                 new_position,
-                cancel: false,
             }))
         }
         E::AfterMoveRow { row, old_position } => {
@@ -814,7 +801,6 @@ fn engine_event_to_proto(
             Some(grid_event::Event::BeforeMouseDown(BeforeMouseDownEvent {
                 row,
                 col,
-                cancel: false,
             }))
         }
         E::MouseDown {
@@ -898,9 +884,7 @@ fn engine_event_to_proto(
             }))
         }
         E::TypeAheadEnded => Some(grid_event::Event::TypeAheadEnded(TypeAheadEndedEvent {})),
-        E::DataRefreshing => Some(grid_event::Event::DataRefreshing(DataRefreshingEvent {
-            cancel: false,
-        })),
+        E::DataRefreshing => Some(grid_event::Event::DataRefreshing(DataRefreshingEvent {})),
         E::DataRefreshed => Some(grid_event::Event::DataRefreshed(DataRefreshedEvent {})),
         E::FilterData { row, col, text } => Some(grid_event::Event::FilterData(FilterDataEvent {
             row,
@@ -911,7 +895,6 @@ fn engine_event_to_proto(
         E::BeforePageBreak { row } => {
             Some(grid_event::Event::BeforePageBreak(BeforePageBreakEvent {
                 row,
-                cancel: false,
             }))
         }
         E::StartPage { page } => Some(grid_event::Event::StartPage(StartPageEvent { page })),
@@ -1226,6 +1209,44 @@ fn apply_before_sort(grid: &mut volvoxgrid_engine::grid::VolvoxGrid, col: i32) {
     }
 }
 
+fn expand_sort_request_columns(
+    grid: &volvoxgrid_engine::grid::VolvoxGrid,
+    sort_columns: &[SortColumn],
+) -> Vec<(i32, i32)> {
+    let mut sort_keys = Vec::new();
+
+    for sc in sort_columns {
+        let merged = volvoxgrid_engine::sort::merge_sort_spec(
+            volvoxgrid_engine::sort::SORT_NONE,
+            sc.order,
+            sc.r#type,
+        );
+        if merged == volvoxgrid_engine::sort::SORT_NONE {
+            continue;
+        }
+        if sc.col >= 0 && sc.col < grid.cols {
+            sort_keys.push((sc.col, merged));
+            continue;
+        }
+
+        let lo = grid.selection.col.min(grid.selection.col_end).max(0);
+        let hi = grid
+            .selection
+            .col
+            .max(grid.selection.col_end)
+            .min(grid.cols - 1);
+        if lo > hi {
+            continue;
+        }
+
+        for col in lo..=hi {
+            sort_keys.push((col, merged));
+        }
+    }
+
+    sort_keys
+}
+
 // ---------------------------------------------------------------------------
 // VolvoxGridPlugin pending action / decision helpers
 // ---------------------------------------------------------------------------
@@ -1414,10 +1435,6 @@ impl VolvoxGridPlugin {
         action: PendingAction,
         cancel: bool,
     ) -> Option<RenderOutput> {
-        if cancel {
-            return None;
-        }
-
         match action {
             PendingAction::BeginEdit {
                 row,
@@ -1425,41 +1442,65 @@ impl VolvoxGridPlugin {
                 force,
                 prefer_combo,
                 seed_text,
-            } => self
-                .manager()
-                .with_grid(grid_id, |grid| {
-                    begin_edit_session_after_before(grid, row, col, force);
-                    if let Some(seed) = seed_text {
-                        if grid.edit.is_active()
-                            && grid.edit.edit_row == row
-                            && grid.edit.edit_col == col
-                        {
-                            grid.edit.edit_text = seed.clone();
-                            grid.edit.sel_start = seed.chars().count() as i32;
-                            grid.edit.sel_length = 0;
-                            grid.events.push(
-                                volvoxgrid_engine::event::GridEventData::CellEditChange {
-                                    text: seed,
-                                },
-                            );
+            } => {
+                if cancel {
+                    return None;
+                }
+                self.manager()
+                    .with_grid(grid_id, |grid| {
+                        begin_edit_session_after_before(grid, row, col, force);
+                        if let Some(seed) = seed_text {
+                            if grid.edit.is_active()
+                                && grid.edit.edit_row == row
+                                && grid.edit.edit_col == col
+                            {
+                                grid.edit.edit_text = seed.clone();
+                                grid.edit.sel_start = seed.chars().count() as i32;
+                                grid.edit.sel_length = 0;
+                                grid.events.push(
+                                    volvoxgrid_engine::event::GridEventData::CellEditChange {
+                                        text: seed,
+                                    },
+                                );
+                            }
                         }
-                    }
-                    maybe_render_editor_output(grid, prefer_combo)
-                })
-                .ok()
-                .flatten(),
+                        maybe_render_editor_output(grid, prefer_combo)
+                    })
+                    .ok()
+                    .flatten()
+            }
             PendingAction::ValidateEdit {
                 row,
                 col,
                 old_text,
                 committed_text,
-            } => {
-                let _ = self.manager().with_grid(grid_id, |grid| {
+            } => self
+                .manager()
+                .with_grid(grid_id, |grid| {
+                    let edit_matches = grid.edit.is_active()
+                        && grid.edit.edit_row == row
+                        && grid.edit.edit_col == col;
+
+                    if cancel {
+                        if edit_matches {
+                            let prefer_combo = grid.edit.dropdown_count() > 0;
+                            return maybe_render_editor_output(grid, prefer_combo);
+                        }
+                        return None;
+                    }
+
+                    if edit_matches {
+                        grid.edit.cancel();
+                    }
                     apply_committed_edit_text(grid, row, col, old_text, committed_text);
-                });
-                None
-            }
+                    None
+                })
+                .ok()
+                .flatten(),
             PendingAction::BeforeSort { col } => {
+                if cancel {
+                    return None;
+                }
                 let _ = self.manager().with_grid(grid_id, |grid| {
                     apply_before_sort(grid, col);
                 });
@@ -1914,16 +1955,33 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         let col = grid.edit.edit_col;
                         let old_text = grid.cells.get_text(row, col).to_string();
                         let new_text = commit.text.unwrap_or_else(|| grid.edit.edit_text.clone());
-                        let committed = normalize_committed_edit_text(grid, row, col, &new_text);
-                        grid.edit.cancel();
-                        grid.events.push(
-                            volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                        if self.decision_channel_enabled(grid_id) {
+                            let pending_text =
+                                truncate_to_char_count(&new_text, grid.edit_max_length);
+                            grid.edit.update_text(pending_text.clone());
+                            grid.edit.sel_start = pending_text.chars().count() as i32;
+                            grid.edit.sel_length = 0;
+                            self.request_validate_edit(
+                                grid_id,
+                                grid,
                                 row,
                                 col,
-                                edit_text: committed.clone(),
-                            },
-                        );
-                        apply_committed_edit_text(grid, row, col, old_text, committed);
+                                old_text,
+                                pending_text,
+                            );
+                        } else {
+                            let committed =
+                                normalize_committed_edit_text(grid, row, col, &new_text);
+                            grid.edit.cancel();
+                            grid.events.push(
+                                volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                                    row,
+                                    col,
+                                    edit_text: committed.clone(),
+                                },
+                            );
+                            apply_committed_edit_text(grid, row, col, old_text, committed);
+                        }
                     }
                 }
                 Some(edit_command::Command::Cancel(_)) => {
@@ -1985,16 +2043,21 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         let col = grid.edit.edit_col;
                         let old_text = grid.cells.get_text(row, col).to_string();
                         let new_text = grid.edit.edit_text.clone();
-                        let committed = normalize_committed_edit_text(grid, row, col, &new_text);
-                        grid.edit.cancel();
-                        grid.events.push(
-                            volvoxgrid_engine::event::GridEventData::CellEditValidate {
-                                row,
-                                col,
-                                edit_text: committed.clone(),
-                            },
-                        );
-                        apply_committed_edit_text(grid, row, col, old_text, committed);
+                        if self.decision_channel_enabled(grid_id) {
+                            self.request_validate_edit(grid_id, grid, row, col, old_text, new_text);
+                        } else {
+                            let committed =
+                                normalize_committed_edit_text(grid, row, col, &new_text);
+                            grid.edit.cancel();
+                            grid.events.push(
+                                volvoxgrid_engine::event::GridEventData::CellEditValidate {
+                                    row,
+                                    col,
+                                    edit_text: committed.clone(),
+                                },
+                            );
+                            apply_committed_edit_text(grid, row, col, old_text, committed);
+                        }
                     }
                 }
                 None => {}
@@ -2022,11 +2085,10 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 grid.layout.invalidate();
                 grid.mark_dirty();
             } else {
-                let sort_keys: Vec<(i32, i32)> = request
-                    .sort_columns
-                    .iter()
-                    .map(|sc| (sc.col, sc.order))
-                    .collect();
+                let sort_keys = expand_sort_request_columns(grid, &request.sort_columns);
+                if sort_keys.is_empty() {
+                    return;
+                }
                 grid.sort_state.sort_keys = sort_keys;
                 volvoxgrid_engine::sort::sort_grid_all_multi(grid);
             }
@@ -2042,8 +2104,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 request.group_on_col,
                 request.aggregate_col,
                 &request.caption,
-                request.back_color,
-                request.fore_color,
+                request.background,
+                request.foreground,
                 request.add_outline,
             );
         })?;

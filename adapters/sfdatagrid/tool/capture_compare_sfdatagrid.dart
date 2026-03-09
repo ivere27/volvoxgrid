@@ -7,7 +7,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:syncfusion_flutter_datagrid/datagrid.dart' as sf;
-import 'package:volvoxgrid/volvoxgrid.dart' hide Align;
+import 'package:volvoxgrid/volvoxgrid.dart' hide Align, Border, Padding;
 import 'package:volvoxgrid_sfdatagrid/volvoxgrid_sfdatagrid.dart' as vv;
 
 // ── Test Case Definition ─────────────────────────────────────────────

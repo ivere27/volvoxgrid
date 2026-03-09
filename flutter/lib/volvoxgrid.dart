@@ -36,6 +36,60 @@ import 'src/generated/volvoxgrid.pb.dart' as pb;
 export 'volvoxgrid_controller.dart';
 export 'volvoxgrid_ffi.dart';
 
+class VolvoxGridBeforeEditDetails {
+  final pb.GridEvent rawEvent;
+  final int row;
+  final int col;
+  bool cancel;
+
+  VolvoxGridBeforeEditDetails({
+    required this.rawEvent,
+    required this.row,
+    required this.col,
+    this.cancel = false,
+  });
+}
+
+class VolvoxGridCellEditValidatingDetails {
+  final pb.GridEvent rawEvent;
+  final int row;
+  final int col;
+  final String editText;
+  bool cancel;
+
+  VolvoxGridCellEditValidatingDetails({
+    required this.rawEvent,
+    required this.row,
+    required this.col,
+    required this.editText,
+    this.cancel = false,
+  });
+}
+
+class VolvoxGridBeforeSortDetails {
+  final pb.GridEvent rawEvent;
+  final int col;
+  bool cancel;
+
+  VolvoxGridBeforeSortDetails({
+    required this.rawEvent,
+    required this.col,
+    this.cancel = false,
+  });
+}
+
+class _CellEditValidatingPayload {
+  final int row;
+  final int col;
+  final String editText;
+
+  const _CellEditValidatingPayload({
+    required this.row,
+    required this.col,
+    required this.editText,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // VolvoxGridWidget
 // ---------------------------------------------------------------------------
@@ -55,6 +109,28 @@ class VolvoxGridWidget extends StatefulWidget {
   /// Optional callback for every native [GridEvent].
   final ValueChanged<pb.GridEvent>? onGridEvent;
 
+  /// Optional callback fired before editing begins.
+  ///
+  /// Set [VolvoxGridBeforeEditDetails.cancel] to true to cancel the edit.
+  ///
+  /// This is one of the currently supported cancelable widget hooks.
+  final ValueChanged<VolvoxGridBeforeEditDetails>? onBeforeEdit;
+
+  /// Optional callback fired before an edited value is committed.
+  ///
+  /// Set [VolvoxGridCellEditValidatingDetails.cancel] to true to reject the
+  /// pending edit.
+  ///
+  /// This is one of the currently supported cancelable widget hooks.
+  final ValueChanged<VolvoxGridCellEditValidatingDetails>? onCellEditValidating;
+
+  /// Optional callback fired before header-click sorting is applied.
+  ///
+  /// Set [VolvoxGridBeforeSortDetails.cancel] to true to keep the current sort.
+  ///
+  /// This is one of the currently supported cancelable widget hooks.
+  final ValueChanged<VolvoxGridBeforeSortDetails>? onBeforeSort;
+
   /// Optional callback for custom-render cell events.
   ///
   /// Receives either legacy `DrawCell` payloads or modern `CustomRenderCell`
@@ -64,16 +140,20 @@ class VolvoxGridWidget extends StatefulWidget {
   /// Legacy alias for draw-cell events.
   final ValueChanged<Object>? onDrawCell;
 
-  /// Optional callback for cancelable events.
+  /// Legacy raw callback for cancelable events.
   ///
-  /// If this returns true for `BeforeEdit`, `ValidateEdit`, or `BeforeSort`,
-  /// the corresponding native action is canceled.
+  /// Prefer [onBeforeEdit], [onCellEditValidating], and [onBeforeSort] for a
+  /// clearer cancel-style API. Returning true here still cancels the
+  /// corresponding native action.
   final bool Function(pb.GridEvent event)? onCancelableEvent;
 
   const VolvoxGridWidget({
     required this.controller,
     this.onSelectionChanged,
     this.onGridEvent,
+    this.onBeforeEdit,
+    this.onCellEditValidating,
+    this.onBeforeSort,
     this.onCustomRenderCell,
     this.onDrawCell,
     this.onCancelableEvent,
@@ -117,6 +197,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   int _bufferHeight = 0;
   int _bufferStride = 0;
   int _bufferSize = 0;
+  int _stagedBufferWidth = 0;
+  int _stagedBufferHeight = 0;
 
   /// Stale pixel buffers waiting to be freed after in-flight renders complete.
   /// When the viewport resizes while a render is in flight, the old buffer
@@ -352,6 +434,9 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       }
     }
     if (oldWidget.onGridEvent != widget.onGridEvent ||
+        oldWidget.onBeforeEdit != widget.onBeforeEdit ||
+        oldWidget.onCellEditValidating != widget.onCellEditValidating ||
+        oldWidget.onBeforeSort != widget.onBeforeSort ||
         oldWidget.onCustomRenderCell != widget.onCustomRenderCell ||
         oldWidget.onDrawCell != widget.onDrawCell ||
         oldWidget.onCancelableEvent != widget.onCancelableEvent) {
@@ -467,6 +552,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     _pendingViewportHeight = 0;
     _pendingViewportDpr = 1.0;
     _viewportDispatchScheduled = false;
+    _stagedBufferWidth = 0;
+    _stagedBufferHeight = 0;
     _decisionChannelEnabled = false;
   }
 
@@ -500,8 +587,17 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   bool get _wantsGridEvents =>
       widget.onGridEvent != null ||
+      widget.onBeforeEdit != null ||
+      widget.onCellEditValidating != null ||
+      widget.onBeforeSort != null ||
       widget.onCustomRenderCell != null ||
       widget.onDrawCell != null ||
+      widget.onCancelableEvent != null;
+
+  bool get _wantsCancelableGridEvents =>
+      widget.onBeforeEdit != null ||
+      widget.onCellEditValidating != null ||
+      widget.onBeforeSort != null ||
       widget.onCancelableEvent != null;
 
   void _syncEventStreamSubscription() {
@@ -510,7 +606,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       return;
     }
     _ensureEventStream();
-    if (widget.onCancelableEvent != null) {
+    if (_wantsCancelableGridEvents) {
       _enableDecisionChannel();
     }
   }
@@ -538,21 +634,40 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   }
 
   bool _isCancelableGridEvent(pb.GridEvent event) {
+    if (event.hasBeforeEdit() || event.hasBeforeSort()) {
+      return true;
+    }
+    return _tryGetCellEditValidatingPayload(event) != null;
+  }
+
+  _CellEditValidatingPayload? _tryGetCellEditValidatingPayload(
+      pb.GridEvent event) {
     final dynamic dyn = event;
-    var hasValidate = false;
     try {
-      hasValidate = dyn.hasCellEditValidate() == true;
+      if (dyn.hasCellEditValidate() == true) {
+        final payload = dyn.cellEditValidate;
+        return _CellEditValidatingPayload(
+          row: payload.row as int,
+          col: payload.col as int,
+          editText: (payload.editText as String?) ?? '',
+        );
+      }
     } catch (_) {
       // Older generated bindings expose hasValidateEdit().
     }
-    if (!hasValidate) {
-      try {
-        hasValidate = dyn.hasValidateEdit() == true;
-      } catch (_) {
-        // Newer generated bindings may only expose hasCellEditValidate().
+    try {
+      if (dyn.hasValidateEdit() == true) {
+        final payload = dyn.validateEdit;
+        return _CellEditValidatingPayload(
+          row: payload.row as int,
+          col: payload.col as int,
+          editText: (payload.editText as String?) ?? '',
+        );
       }
+    } catch (_) {
+      // Newer generated bindings may only expose hasCellEditValidate().
     }
-    return event.hasBeforeEdit() || hasValidate || event.hasBeforeSort();
+    return null;
   }
 
   void _dispatchCustomRenderCell(pb.GridEvent event) {
@@ -608,8 +723,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     widget.onGridEvent?.call(event);
     _dispatchCustomRenderCell(event);
 
-    final onCancelableEvent = widget.onCancelableEvent;
-    if (onCancelableEvent == null || !_isCancelableGridEvent(event)) {
+    if (!_wantsCancelableGridEvents || !_isCancelableGridEvent(event)) {
       return;
     }
 
@@ -618,7 +732,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       return;
     }
 
-    final cancel = onCancelableEvent(event);
+    final cancel = _dispatchCancelableGridEvent(event);
     _sendInput(
       pb.RenderInput()
         ..eventDecision = (pb.EventDecision()
@@ -627,6 +741,48 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
           ..cancel = cancel),
     );
     _requestRender();
+  }
+
+  bool _dispatchCancelableGridEvent(pb.GridEvent event) {
+    var cancel = false;
+
+    if (event.hasBeforeEdit()) {
+      final details = VolvoxGridBeforeEditDetails(
+        rawEvent: event,
+        row: event.beforeEdit.row,
+        col: event.beforeEdit.col,
+      );
+      widget.onBeforeEdit?.call(details);
+      cancel = cancel || details.cancel;
+    }
+
+    final validate = _tryGetCellEditValidatingPayload(event);
+    if (validate != null) {
+      final details = VolvoxGridCellEditValidatingDetails(
+        rawEvent: event,
+        row: validate.row,
+        col: validate.col,
+        editText: validate.editText,
+      );
+      widget.onCellEditValidating?.call(details);
+      cancel = cancel || details.cancel;
+    }
+
+    if (event.hasBeforeSort()) {
+      final details = VolvoxGridBeforeSortDetails(
+        rawEvent: event,
+        col: event.beforeSort.col,
+      );
+      widget.onBeforeSort?.call(details);
+      cancel = cancel || details.cancel;
+    }
+
+    final onCancelableEvent = widget.onCancelableEvent;
+    if (onCancelableEvent != null) {
+      cancel = onCancelableEvent(event) || cancel;
+    }
+
+    return cancel;
   }
 
   void _sendInput(pb.RenderInput input, {bool tracksBufferReady = false}) {
@@ -703,6 +859,24 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     if (width <= 0 || height <= 0) {
       return;
     }
+    _stagedBufferWidth = width;
+    _stagedBufferHeight = height;
+    if (_pendingFrame) {
+      return;
+    }
+    _applyStagedRenderBufferResize();
+  }
+
+  void _applyStagedRenderBufferResize() {
+    final width = _stagedBufferWidth > 0 ? _stagedBufferWidth : _bufferWidth;
+    final height =
+        _stagedBufferHeight > 0 ? _stagedBufferHeight : _bufferHeight;
+    if (width <= 0 || height <= 0) {
+      return;
+    }
+    _stagedBufferWidth = 0;
+    _stagedBufferHeight = 0;
+
     if (widget.controller.gpuTextureId != null) {
       _bufferWidth = width;
       _bufferHeight = height;
@@ -717,9 +891,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       return;
     }
 
-    // If a render is in flight, the native thread may still be writing to the
-    // current buffer.  Move it to _stalePixelBuffers instead of freeing it
-    // immediately; it will be freed when the pending frame completes.
+    // Freeze-and-swap resize: hold the front buffer stable until the previous
+    // frame completes, then swap to a freshly sized back buffer.
     final oldBuffer = _pixelBuffer;
     if (oldBuffer != null) {
       if (_pendingFrame) {
@@ -751,6 +924,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     _decodeScratch = null;
     _bufferStride = 0;
     _bufferSize = 0;
+    _stagedBufferWidth = 0;
+    _stagedBufferHeight = 0;
   }
 
   void _freeRenderBuffer() {
@@ -768,6 +943,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     _bufferHeight = 0;
     _bufferStride = 0;
     _bufferSize = 0;
+    _stagedBufferWidth = 0;
+    _stagedBufferHeight = 0;
   }
 
   void _sendBufferReady() {
@@ -779,6 +956,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
         _needsFollowupRender = true;
         return;
       }
+      _applyStagedRenderBufferResize();
       _releaseCpuRenderBuffersForGpuMode();
       _pendingFrame = true;
       _sendInput(
@@ -792,12 +970,13 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       return;
     }
 
-    final buffer = _pixelBuffer;
-    if (buffer == null || _inputController == null) {
-      return;
-    }
     if (_pendingFrame) {
       _needsFollowupRender = true;
+      return;
+    }
+    _applyStagedRenderBufferResize();
+    final buffer = _pixelBuffer;
+    if (buffer == null || _inputController == null) {
       return;
     }
 

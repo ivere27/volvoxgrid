@@ -42,7 +42,7 @@ public final class VolvoxGridDesktopSmoke {
 
             GridConfig config = GridConfig.newBuilder()
                 .setLayout(LayoutConfig.newBuilder().setRows(2).setCols(2).build())
-                .setIndicatorBands(VolvoxGridDesktopController.defaultIndicatorBandsConfig())
+                .setIndicators(VolvoxGridDesktopController.defaultIndicatorsConfig())
                 .build();
 
             CreateResponse response = client.create(

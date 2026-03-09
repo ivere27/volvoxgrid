@@ -28,6 +28,8 @@ namespace VolvoxGrid.DotNet.Internal
         private bool _running;
         private bool _pendingFrame;
         private bool _followupFrame;
+        private bool _decisionChannelRequested;
+        private bool _decisionChannelHandshakeSent;
 
         private byte[] _pixelBuffer;
         private byte[] _blitBuffer;
@@ -49,6 +51,27 @@ namespace VolvoxGrid.DotNet.Internal
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
             TabStop = true;
             BackColor = Color.White;
+        }
+
+        protected override bool IsInputKey(Keys keyData)
+        {
+            switch (keyData & Keys.KeyCode)
+            {
+                case Keys.Left:
+                case Keys.Right:
+                case Keys.Up:
+                case Keys.Down:
+                case Keys.Enter:
+                case Keys.Escape:
+                case Keys.Tab:
+                case Keys.Home:
+                case Keys.End:
+                case Keys.PageUp:
+                case Keys.PageDown:
+                    return true;
+                default:
+                    return base.IsInputKey(keyData);
+            }
         }
 
         public VolvoxSelectionMode SelectionMode
@@ -83,6 +106,8 @@ namespace VolvoxGrid.DotNet.Internal
             _eventStream = _client.OpenEventStream(gridId);
 
             _running = true;
+            _decisionChannelHandshakeSent = false;
+            EnsureDecisionChannelEnabled();
             StartRenderThread();
             StartEventThread();
             RequestFrame();
@@ -93,6 +118,7 @@ namespace VolvoxGrid.DotNet.Internal
             _running = false;
             _pendingFrame = false;
             _followupFrame = false;
+            _decisionChannelHandshakeSent = false;
             ClearMultiRangeDrag();
 
             var renderStream = _renderStream;
@@ -177,6 +203,12 @@ namespace VolvoxGrid.DotNet.Internal
             SendBufferReady();
         }
 
+        public void EnableEventDecisionChannel()
+        {
+            _decisionChannelRequested = true;
+            EnsureDecisionChannelEnabled();
+        }
+
         public void SendEventDecision(long eventId, bool cancel)
         {
             if (!_running || _client == null || _renderStream == null || _gridId == 0 || eventId == 0)
@@ -186,6 +218,24 @@ namespace VolvoxGrid.DotNet.Internal
 
             var payload = _client.EncodeRenderInputEventDecision(_gridId, eventId, cancel);
             SendRenderInput(payload);
+            RequestFrame();
+        }
+
+        private void EnsureDecisionChannelEnabled()
+        {
+            if (!_decisionChannelRequested
+                || _decisionChannelHandshakeSent
+                || !_running
+                || _client == null
+                || _renderStream == null
+                || _gridId == 0)
+            {
+                return;
+            }
+
+            var payload = _client.EncodeRenderInputEventDecision(_gridId, 0, false);
+            SendRenderInput(payload);
+            _decisionChannelHandshakeSent = true;
         }
 
         protected override void Dispose(bool disposing)
