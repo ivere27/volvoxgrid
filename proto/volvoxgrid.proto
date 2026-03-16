@@ -386,6 +386,13 @@ enum PresentMode {
   PRESENT_IMMEDIATE = 3;
 }
 
+enum FramePacingMode {
+  FRAME_PACING_MODE_AUTO      = 0;
+  FRAME_PACING_MODE_PLATFORM  = 1;
+  FRAME_PACING_MODE_UNLIMITED = 2;
+  FRAME_PACING_MODE_FIXED     = 3;
+}
+
 // ── Clear / Export / Print ──
 
 enum ClearScope {
@@ -773,12 +780,14 @@ message InteractionConfig {
 
 // ── Rendering ──
 message RenderConfig {
-  optional RendererMode renderer_mode         = 1;
-  optional bool         debug_overlay         = 2;
-  optional bool         animation_enabled     = 3;
-  optional int32        animation_duration_ms = 4;
-  optional int32        text_layout_cache_cap = 5;
-  optional PresentMode  present_mode          = 6;
+  optional RendererMode    renderer_mode         = 1;
+  optional bool            debug_overlay         = 2;
+  optional bool            animation_enabled     = 3;
+  optional int32           animation_duration_ms = 4;
+  optional int32           text_layout_cache_cap = 5;
+  optional PresentMode     present_mode          = 6;
+  optional FramePacingMode frame_pacing_mode     = 7;
+  optional int32           target_frame_rate_hz  = 8;
 }
 
 // ═══════════════════════════════════════════════════════════

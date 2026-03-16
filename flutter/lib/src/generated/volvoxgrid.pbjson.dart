@@ -646,6 +646,23 @@ final $typed_data.Uint8List presentModeDescriptor = $convert.base64Decode(
     'CgtQcmVzZW50TW9kZRIQCgxQUkVTRU5UX0FVVE8QABIQCgxQUkVTRU5UX0ZJRk8QARITCg9QUk'
     'VTRU5UX01BSUxCT1gQAhIVChFQUkVTRU5UX0lNTUVESUFURRAD');
 
+@$core.Deprecated('Use framePacingModeDescriptor instead')
+const FramePacingMode$json = {
+  '1': 'FramePacingMode',
+  '2': [
+    {'1': 'FRAME_PACING_MODE_AUTO', '2': 0},
+    {'1': 'FRAME_PACING_MODE_PLATFORM', '2': 1},
+    {'1': 'FRAME_PACING_MODE_UNLIMITED', '2': 2},
+    {'1': 'FRAME_PACING_MODE_FIXED', '2': 3},
+  ],
+};
+
+/// Descriptor for `FramePacingMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List framePacingModeDescriptor = $convert.base64Decode(
+    'Cg9GcmFtZVBhY2luZ01vZGUSGgoWRlJBTUVfUEFDSU5HX01PREVfQVVUTxAAEh4KGkZSQU1FX1'
+    'BBQ0lOR19NT0RFX1BMQVRGT1JNEAESHwobRlJBTUVfUEFDSU5HX01PREVfVU5MSU1JVEVEEAIS'
+    'GwoXRlJBTUVfUEFDSU5HX01PREVfRklYRUQQAw==');
+
 @$core.Deprecated('Use clearScopeDescriptor instead')
 const ClearScope$json = {
   '1': 'ClearScope',
@@ -3336,6 +3353,25 @@ const RenderConfig$json = {
       '10': 'presentMode',
       '17': true
     },
+    {
+      '1': 'frame_pacing_mode',
+      '3': 7,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.FramePacingMode',
+      '9': 6,
+      '10': 'framePacingMode',
+      '17': true
+    },
+    {
+      '1': 'target_frame_rate_hz',
+      '3': 8,
+      '4': 1,
+      '5': 5,
+      '9': 7,
+      '10': 'targetFrameRateHz',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_renderer_mode'},
@@ -3344,6 +3380,8 @@ const RenderConfig$json = {
     {'1': '_animation_duration_ms'},
     {'1': '_text_layout_cache_cap'},
     {'1': '_present_mode'},
+    {'1': '_frame_pacing_mode'},
+    {'1': '_target_frame_rate_hz'},
   ],
 };
 
@@ -3355,9 +3393,13 @@ final $typed_data.Uint8List renderConfigDescriptor = $convert.base64Decode(
     '5FbmFibGVkiAEBEjcKFWFuaW1hdGlvbl9kdXJhdGlvbl9tcxgEIAEoBUgDUhNhbmltYXRpb25E'
     'dXJhdGlvbk1ziAEBEjYKFXRleHRfbGF5b3V0X2NhY2hlX2NhcBgFIAEoBUgEUhJ0ZXh0TGF5b3'
     'V0Q2FjaGVDYXCIAQESQgoMcHJlc2VudF9tb2RlGAYgASgOMhoudm9sdm94Z3JpZC52MS5QcmVz'
-    'ZW50TW9kZUgFUgtwcmVzZW50TW9kZYgBAUIQCg5fcmVuZGVyZXJfbW9kZUIQCg5fZGVidWdfb3'
-    'ZlcmxheUIUChJfYW5pbWF0aW9uX2VuYWJsZWRCGAoWX2FuaW1hdGlvbl9kdXJhdGlvbl9tc0IY'
-    'ChZfdGV4dF9sYXlvdXRfY2FjaGVfY2FwQg8KDV9wcmVzZW50X21vZGU=');
+    'ZW50TW9kZUgFUgtwcmVzZW50TW9kZYgBARJPChFmcmFtZV9wYWNpbmdfbW9kZRgHIAEoDjIeLn'
+    'ZvbHZveGdyaWQudjEuRnJhbWVQYWNpbmdNb2RlSAZSD2ZyYW1lUGFjaW5nTW9kZYgBARI0ChR0'
+    'YXJnZXRfZnJhbWVfcmF0ZV9oehgIIAEoBUgHUhF0YXJnZXRGcmFtZVJhdGVIeogBAUIQCg5fcm'
+    'VuZGVyZXJfbW9kZUIQCg5fZGVidWdfb3ZlcmxheUIUChJfYW5pbWF0aW9uX2VuYWJsZWRCGAoW'
+    'X2FuaW1hdGlvbl9kdXJhdGlvbl9tc0IYChZfdGV4dF9sYXlvdXRfY2FjaGVfY2FwQg8KDV9wcm'
+    'VzZW50X21vZGVCFAoSX2ZyYW1lX3BhY2luZ19tb2RlQhcKFV90YXJnZXRfZnJhbWVfcmF0ZV9o'
+    'eg==');
 
 @$core.Deprecated('Use rowIndicatorSlotDescriptor instead')
 const RowIndicatorSlot$json = {

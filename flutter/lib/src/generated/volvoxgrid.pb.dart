@@ -4475,6 +4475,8 @@ class RenderConfig extends $pb.GeneratedMessage {
     $core.int? animationDurationMs,
     $core.int? textLayoutCacheCap,
     PresentMode? presentMode,
+    FramePacingMode? framePacingMode,
+    $core.int? targetFrameRateHz,
   }) {
     final result = create();
     if (rendererMode != null) result.rendererMode = rendererMode;
@@ -4485,6 +4487,8 @@ class RenderConfig extends $pb.GeneratedMessage {
     if (textLayoutCacheCap != null)
       result.textLayoutCacheCap = textLayoutCacheCap;
     if (presentMode != null) result.presentMode = presentMode;
+    if (framePacingMode != null) result.framePacingMode = framePacingMode;
+    if (targetFrameRateHz != null) result.targetFrameRateHz = targetFrameRateHz;
     return result;
   }
 
@@ -4509,6 +4513,9 @@ class RenderConfig extends $pb.GeneratedMessage {
     ..aI(5, _omitFieldNames ? '' : 'textLayoutCacheCap')
     ..aE<PresentMode>(6, _omitFieldNames ? '' : 'presentMode',
         enumValues: PresentMode.values)
+    ..aE<FramePacingMode>(7, _omitFieldNames ? '' : 'framePacingMode',
+        enumValues: FramePacingMode.values)
+    ..aI(8, _omitFieldNames ? '' : 'targetFrameRateHz')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4583,6 +4590,24 @@ class RenderConfig extends $pb.GeneratedMessage {
   $core.bool hasPresentMode() => $_has(5);
   @$pb.TagNumber(6)
   void clearPresentMode() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  FramePacingMode get framePacingMode => $_getN(6);
+  @$pb.TagNumber(7)
+  set framePacingMode(FramePacingMode value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasFramePacingMode() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearFramePacingMode() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get targetFrameRateHz => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set targetFrameRateHz($core.int value) => $_setSignedInt32(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasTargetFrameRateHz() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearTargetFrameRateHz() => $_clearField(8);
 }
 
 class RowIndicatorSlot extends $pb.GeneratedMessage {

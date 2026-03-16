@@ -47,16 +47,22 @@ pub mod text;
 
 use std::collections::HashMap;
 use std::sync::{
-    atomic::{AtomicI64, Ordering},
-    Arc, Mutex,
+    atomic::{AtomicBool, AtomicI64, Ordering},
+    Arc, Condvar, Mutex,
 };
 
 use grid::VolvoxGrid;
 
 static NEXT_GRID_ID: AtomicI64 = AtomicI64::new(1);
 
+struct GridSlot {
+    grid: Arc<Mutex<VolvoxGrid>>,
+    event_cv: Arc<Condvar>,
+    destroyed: Arc<AtomicBool>,
+}
+
 pub struct GridManager {
-    grids: Mutex<HashMap<i64, Arc<Mutex<VolvoxGrid>>>>,
+    grids: Mutex<HashMap<i64, Arc<GridSlot>>>,
 }
 
 impl GridManager {
@@ -87,38 +93,75 @@ impl GridManager {
             fixed_cols,
         );
         grid.scale = if scale > 0.01 { scale } else { 1.0 };
-        self.grids
-            .lock()
-            .unwrap()
-            .insert(id, Arc::new(Mutex::new(grid)));
+        let slot = Arc::new(GridSlot {
+            grid: Arc::new(Mutex::new(grid)),
+            event_cv: Arc::new(Condvar::new()),
+            destroyed: Arc::new(AtomicBool::new(false)),
+        });
+        self.grids.lock().unwrap().insert(id, slot);
         id
     }
 
     pub fn destroy_grid(&self, id: i64) {
-        self.grids.lock().unwrap().remove(&id);
+        if let Some(slot) = self.grids.lock().unwrap().remove(&id) {
+            slot.destroyed.store(true, Ordering::SeqCst);
+            slot.event_cv.notify_all();
+        }
     }
 
     pub fn with_grid<F, R>(&self, id: i64, f: F) -> Result<R, String>
     where
         F: FnOnce(&mut VolvoxGrid) -> R,
     {
-        let grid_arc = {
+        let slot = {
             let grids = self.grids.lock().unwrap();
             grids
                 .get(&id)
                 .cloned()
                 .ok_or_else(|| format!("grid {} not found", id))?
         };
-        let mut grid = grid_arc.lock().unwrap();
-        Ok(f(&mut grid))
+        let (result, should_notify) = {
+            let mut grid = slot.grid.lock().unwrap();
+            let events_before = grid.events.len();
+            let result = f(&mut grid);
+            let should_notify = grid.events.len() > events_before;
+            (result, should_notify)
+        };
+        if should_notify {
+            slot.event_cv.notify_all();
+        }
+        Ok(result)
     }
 
     pub fn get_grid(&self, id: i64) -> Result<Arc<Mutex<VolvoxGrid>>, String> {
         let grids = self.grids.lock().unwrap();
         grids
             .get(&id)
-            .cloned()
+            .map(|slot| Arc::clone(&slot.grid))
             .ok_or_else(|| format!("grid {} not found", id))
+    }
+
+    pub fn get_grid_waiter(
+        &self,
+        id: i64,
+    ) -> Result<(Arc<Mutex<VolvoxGrid>>, Arc<Condvar>, Arc<AtomicBool>), String> {
+        let grids = self.grids.lock().unwrap();
+        let slot = grids
+            .get(&id)
+            .cloned()
+            .ok_or_else(|| format!("grid {} not found", id))?;
+        Ok((
+            Arc::clone(&slot.grid),
+            Arc::clone(&slot.event_cv),
+            Arc::clone(&slot.destroyed),
+        ))
+    }
+
+    pub fn notify_all_event_waiters(&self) {
+        let slots: Vec<Arc<GridSlot>> = self.grids.lock().unwrap().values().cloned().collect();
+        for slot in slots {
+            slot.event_cv.notify_all();
+        }
     }
 
     pub fn grid_ids(&self) -> Vec<i64> {
@@ -136,7 +179,7 @@ impl Default for GridManager {
 #[cfg(test)]
 mod tests {
     use super::GridManager;
-    use std::sync::{mpsc, Arc};
+    use std::sync::{atomic::Ordering, mpsc, Arc};
     use std::time::Duration;
 
     #[test]
@@ -176,5 +219,69 @@ mod tests {
         let _ = release_tx.send(());
         with_grid_thread.join().expect("with_grid thread panicked");
         destroy_thread.join().expect("destroy thread panicked");
+    }
+
+    #[test]
+    fn with_grid_notifies_event_waiters_when_events_arrive() {
+        let manager = Arc::new(GridManager::new());
+        let id = manager.create_grid(100, 100, 10, 10, 1, 1, 1.0);
+        let (grid_arc, event_cv, destroyed) = manager
+            .get_grid_waiter(id)
+            .expect("grid waiter should exist");
+        let (ready_tx, ready_rx) = mpsc::channel::<()>();
+        let (done_tx, done_rx) = mpsc::channel::<()>();
+
+        let waiter = std::thread::spawn(move || {
+            let mut grid = grid_arc.lock().unwrap();
+            ready_tx.send(()).expect("ready send should succeed");
+            while grid.events.is_empty() && !destroyed.load(Ordering::SeqCst) {
+                grid = event_cv.wait(grid).unwrap();
+            }
+            done_tx.send(()).expect("done send should succeed");
+        });
+
+        ready_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("waiter did not start");
+        manager
+            .with_grid(id, |grid| {
+                grid.events.push(crate::event::GridEventData::Click);
+            })
+            .expect("with_grid should succeed");
+        done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("waiter did not receive notification");
+
+        waiter.join().expect("waiter thread panicked");
+    }
+
+    #[test]
+    fn destroy_grid_notifies_event_waiters() {
+        let manager = Arc::new(GridManager::new());
+        let id = manager.create_grid(100, 100, 10, 10, 1, 1, 1.0);
+        let (grid_arc, event_cv, destroyed) = manager
+            .get_grid_waiter(id)
+            .expect("grid waiter should exist");
+        let (ready_tx, ready_rx) = mpsc::channel::<()>();
+        let (done_tx, done_rx) = mpsc::channel::<()>();
+
+        let waiter = std::thread::spawn(move || {
+            let mut grid = grid_arc.lock().unwrap();
+            ready_tx.send(()).expect("ready send should succeed");
+            while grid.events.is_empty() && !destroyed.load(Ordering::SeqCst) {
+                grid = event_cv.wait(grid).unwrap();
+            }
+            done_tx.send(()).expect("done send should succeed");
+        });
+
+        ready_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("waiter did not start");
+        manager.destroy_grid(id);
+        done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("waiter did not wake on destroy");
+
+        waiter.join().expect("waiter thread panicked");
     }
 }

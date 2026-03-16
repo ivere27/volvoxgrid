@@ -47,6 +47,50 @@ namespace VolvoxGrid.DotNet.Internal
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         internal delegate void SynFreeDelegate(IntPtr ptr);
 
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void SynMeasureTextCallback(
+            IntPtr textPtr,
+            int textLen,
+            IntPtr fontNamePtr,
+            int fontNameLen,
+            float fontSize,
+            int bold,
+            int italic,
+            float maxWidth,
+            out float outWidth,
+            out float outHeight,
+            IntPtr userData);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate float SynRenderTextCallback(
+            IntPtr buffer,
+            int bufWidth,
+            int bufHeight,
+            int stride,
+            int x,
+            int y,
+            int clipX,
+            int clipY,
+            int clipW,
+            int clipH,
+            IntPtr textPtr,
+            int textLen,
+            IntPtr fontNamePtr,
+            int fontNameLen,
+            float fontSize,
+            int bold,
+            int italic,
+            uint color,
+            float maxWidth,
+            IntPtr userData);
+
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate int SynSetTextRendererDelegate(
+            long gridId,
+            IntPtr measureFn,
+            IntPtr renderFn,
+            IntPtr userData);
+
         private readonly IntPtr _module;
         private readonly SynInvokeDelegate _invoke;
         private readonly SynStreamOpenDelegate _openStream;
@@ -54,6 +98,7 @@ namespace VolvoxGrid.DotNet.Internal
         private readonly SynStreamRecvDelegate _streamRecv;
         private readonly SynStreamCloseSendDelegate _streamCloseSend;
         private readonly SynStreamCloseDelegate _streamClose;
+        private readonly SynSetTextRendererDelegate _setTextRenderer;
         private readonly SynFreeDelegate _free;
 
         private bool _disposed;
@@ -66,6 +111,7 @@ namespace VolvoxGrid.DotNet.Internal
             SynStreamRecvDelegate streamRecv,
             SynStreamCloseSendDelegate streamCloseSend,
             SynStreamCloseDelegate streamClose,
+            SynSetTextRendererDelegate setTextRenderer,
             SynFreeDelegate free)
         {
             _module = module;
@@ -75,6 +121,7 @@ namespace VolvoxGrid.DotNet.Internal
             _streamRecv = streamRecv;
             _streamCloseSend = streamCloseSend;
             _streamClose = streamClose;
+            _setTextRenderer = setTextRenderer;
             _free = free;
         }
 
@@ -106,6 +153,7 @@ namespace VolvoxGrid.DotNet.Internal
                 IntPtr recvPtr = GetRequiredExport(module, "Synurang_Stream_Recv");
                 IntPtr closeSendPtr = GetRequiredExport(module, "Synurang_Stream_CloseSend");
                 IntPtr closePtr = GetRequiredExport(module, "Synurang_Stream_Close");
+                IntPtr setTextRendererPtr = GetProcAddress(module, "volvox_grid_set_text_renderer");
                 IntPtr freePtr = GetRequiredExport(module, "Synurang_Free");
 
                 var invoke = (SynInvokeDelegate)Marshal.GetDelegateForFunctionPointer(invokePtr, typeof(SynInvokeDelegate));
@@ -114,9 +162,12 @@ namespace VolvoxGrid.DotNet.Internal
                 var recv = (SynStreamRecvDelegate)Marshal.GetDelegateForFunctionPointer(recvPtr, typeof(SynStreamRecvDelegate));
                 var closeSend = (SynStreamCloseSendDelegate)Marshal.GetDelegateForFunctionPointer(closeSendPtr, typeof(SynStreamCloseSendDelegate));
                 var close = (SynStreamCloseDelegate)Marshal.GetDelegateForFunctionPointer(closePtr, typeof(SynStreamCloseDelegate));
+                var setTextRenderer = setTextRendererPtr != IntPtr.Zero
+                    ? (SynSetTextRendererDelegate)Marshal.GetDelegateForFunctionPointer(setTextRendererPtr, typeof(SynSetTextRendererDelegate))
+                    : null;
                 var free = (SynFreeDelegate)Marshal.GetDelegateForFunctionPointer(freePtr, typeof(SynFreeDelegate));
 
-                return new SynurangReflectionHost(module, invoke, open, send, recv, closeSend, close, free);
+                return new SynurangReflectionHost(module, invoke, open, send, recv, closeSend, close, setTextRenderer, free);
             }
             catch
             {
@@ -198,6 +249,37 @@ namespace VolvoxGrid.DotNet.Internal
                 _streamCloseSend,
                 _streamClose,
                 _free);
+        }
+
+        public bool SupportsTextRenderer
+        {
+            get { return _setTextRenderer != null; }
+        }
+
+        public void SetTextRenderer(
+            long gridId,
+            SynMeasureTextCallback measure,
+            SynRenderTextCallback render,
+            IntPtr userData)
+        {
+            EnsureNotDisposed();
+            if (_setTextRenderer == null)
+            {
+                return;
+            }
+
+            if ((measure == null) != (render == null))
+            {
+                throw new ArgumentException("measure and render callbacks must both be null or both be non-null.");
+            }
+
+            IntPtr measurePtr = measure == null ? IntPtr.Zero : Marshal.GetFunctionPointerForDelegate(measure);
+            IntPtr renderPtr = render == null ? IntPtr.Zero : Marshal.GetFunctionPointerForDelegate(render);
+            int rc = _setTextRenderer(gridId, measurePtr, renderPtr, userData);
+            if (rc != 0)
+            {
+                throw new InvalidOperationException("volvox_grid_set_text_renderer failed with status " + rc);
+            }
         }
 
         public void Dispose()
@@ -304,7 +386,12 @@ namespace VolvoxGrid.DotNet.Internal
                 return true;
             }
 
-            return Type.GetType("Mono.Runtime") == null;
+            return !IsWineHosted() && Type.GetType("Mono.Runtime") == null;
+        }
+
+        private static bool IsWineHosted()
+        {
+            return !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WINEPREFIX"));
         }
 
         internal static SynurangFfiException DecodeFfiError(byte[] payload, string context)

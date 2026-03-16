@@ -16,6 +16,7 @@ namespace VolvoxGrid.DotNet
     {
         private readonly RenderHostCpu _renderHost;
         private readonly ProtoMapper _mapper;
+        private readonly GdiTextRendererBridge _hostTextRenderer;
 
         private VolvoxClient _client;
         private long _gridId;
@@ -62,12 +63,18 @@ namespace VolvoxGrid.DotNet
             _config.Scrolling.FlingEnabled = true;
             _config.Scrolling.FastScroll = true;
             _config.Rendering.RendererMode = VolvoxGridRendererMode.Auto;
+            _config.Rendering.FramePacingMode = VolvoxFramePacingMode.Auto;
+            _config.Rendering.TargetFrameRateHz = 30;
             _config.Indicators.ColIndicatorTop.Visible = true;
             _config.Indicators.ColIndicatorTop.BandRows = 1;
             _config.Indicators.ColIndicatorTop.ModeBits = VolvoxColIndicatorCellMode.HeaderText | VolvoxColIndicatorCellMode.SortGlyph;
             _config.Indicators.RowIndicatorStart.Visible = false;
             _config.Indicators.RowIndicatorStart.WidthPx = 35;
             _config.Indicators.RowIndicatorStart.ModeBits = VolvoxRowIndicatorMode.Current | VolvoxRowIndicatorMode.Selection;
+            if (GdiTextRendererBridge.ShouldUseForCurrentProcess())
+            {
+                _hostTextRenderer = new GdiTextRendererBridge();
+            }
 
             _renderHost = new RenderHostCpu
             {
@@ -223,6 +230,18 @@ namespace VolvoxGrid.DotNet
         {
             get { return RendererMode; }
             set { RendererMode = value; }
+        }
+
+        public VolvoxFramePacingMode FramePacingMode
+        {
+            get { return _config.Rendering.FramePacingMode ?? VolvoxFramePacingMode.Auto; }
+            set { if (_config.Rendering.FramePacingMode != value) { _config.Rendering.FramePacingMode = value; ApplyEngineConfig(); } }
+        }
+
+        public int TargetFrameRateHz
+        {
+            get { return _config.Rendering.TargetFrameRateHz ?? 30; }
+            set { if (_config.Rendering.TargetFrameRateHz != value) { _config.Rendering.TargetFrameRateHz = value; ApplyEngineConfig(); } }
         }
 
         public VolvoxGridScrollBarsMode ScrollBars
@@ -512,6 +531,7 @@ namespace VolvoxGrid.DotNet
                 int h = Math.Max(1, _renderHost.ClientSize.Height > 0 ? _renderHost.ClientSize.Height : ClientSize.Height);
                 gridId = _client.CreateGrid(w, h, 1.0f);
                 _ownedGridIds.Add(gridId);
+                RegisterHostTextRenderer(gridId);
                 _client.ConfigureGrid(gridId, _config);
                 _lastError = null;
                 return true;
@@ -527,6 +547,7 @@ namespace VolvoxGrid.DotNet
             if (!_ownedGridIds.Contains(gridId)) { _lastError = "Unknown gridId: " + gridId; return false; }
             try
             {
+                RegisterHostTextRenderer(gridId);
                 _renderHost.Attach(_client, gridId, OnGridEvent);
                 _gridId = gridId;
                 _focusedRowIndex = -1;
@@ -1405,7 +1426,15 @@ namespace VolvoxGrid.DotNet
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) { DisposeEngine(); _renderHost.Dispose(); }
+            if (disposing)
+            {
+                DisposeEngine();
+                _renderHost.Dispose();
+                if (_hostTextRenderer != null)
+                {
+                    _hostTextRenderer.Dispose();
+                }
+            }
             base.Dispose(disposing);
         }
 
@@ -1420,6 +1449,7 @@ namespace VolvoxGrid.DotNet
                 int h = Math.Max(1, _renderHost.ClientSize.Height > 0 ? _renderHost.ClientSize.Height : ClientSize.Height);
                 _gridId = _client.CreateGrid(w, h, 1.0f);
                 _ownedGridIds.Add(_gridId);
+                RegisterHostTextRenderer(_gridId);
                 ApplyEngineConfig();
                 _renderHost.Attach(_client, _gridId, OnGridEvent);
                 _renderHost.RequestFrame();
@@ -1450,6 +1480,16 @@ namespace VolvoxGrid.DotNet
         {
             SyncRenderHostSelectionMode();
             if (_client != null && _gridId != 0) { _client.ConfigureGrid(_gridId, _config); _renderHost.RequestFrame(); }
+        }
+
+        private void RegisterHostTextRenderer(long gridId)
+        {
+            if (_hostTextRenderer == null || _client == null || gridId == 0)
+            {
+                return;
+            }
+
+            _hostTextRenderer.Register(_client, gridId);
         }
 
         #endregion
