@@ -545,7 +545,26 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         let state = Rc::clone(&state);
         drawing_area.connect_resize(move |_area, w, h| {
             if let Ok(mut st) = state.try_borrow_mut() {
-                st.pending_resize = Some((w.max(1), h.max(1)));
+                let width = w.max(1);
+                let height = h.max(1);
+                let pending_matches = st.pending_resize == Some((width, height));
+                let inflight_matches = st
+                    .inflight_target
+                    .as_ref()
+                    .is_some_and(|target| target.width == width && target.height == height);
+                let display_matches = st
+                    .display_target
+                    .as_ref()
+                    .is_some_and(|target| target.width == width && target.height == height);
+                let viewport_matches = st.viewport_width == width && st.viewport_height == height;
+
+                // GTK can deliver repeated size-allocation callbacks without an
+                // actual size change; don't turn those into clean render requests.
+                if pending_matches || ((inflight_matches || display_matches) && viewport_matches) {
+                    return;
+                }
+
+                st.pending_resize = Some((width, height));
                 let _ = request_frame(&mut st);
             }
         });
@@ -2095,8 +2114,8 @@ fn handle_render_output(
                     if complete_frame_target(state, frame.handle) {
                         needs_redraw = true;
                     }
-                } else if retire_unrendered_inflight_target(state, frame.handle) {
-                    return request_frame(state).map(|_| false);
+                } else {
+                    retire_unrendered_inflight_target(state, frame.handle);
                 }
             }
             pb::render_output::Event::Selection(selection) => {

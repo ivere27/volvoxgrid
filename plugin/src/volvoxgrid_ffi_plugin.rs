@@ -1223,6 +1223,7 @@ pub extern "C" fn Synurang_Stream_Close(handle: u64) {
     if let Some(ctx) = get_stream(handle) {
         ctx.close(); // This now notifies all waiters
     }
+    notify_all_event_waiters();
     if let Ok(mut streams) = streams().write() {
         streams.remove(&handle);
     }

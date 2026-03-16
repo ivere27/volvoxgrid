@@ -261,6 +261,14 @@ namespace VolvoxGrid.DotNet.Internal
             int width = Math.Max(1, ClientSize.Width);
             int height = Math.Max(1, ClientSize.Height);
 
+            // Wine/WinForms can raise redundant resize/layout notifications
+            // without an actual size change; don't turn those into clean
+            // viewport resizes and follow-up render requests.
+            if (width == _bufferWidth && height == _bufferHeight)
+            {
+                return;
+            }
+
             ResizeBuffers(width, height);
             _client.ResizeViewport(_gridId, width, height);
             RequestFrame();

@@ -23,6 +23,10 @@ lazy_static::lazy_static! {
     static ref SHARED_GRID_MANAGER: GridManager = GridManager::new();
 }
 
+fn notify_all_event_waiters() {
+    SHARED_GRID_MANAGER.notify_all_event_waiters();
+}
+
 type PluginResult<T> = Result<T, FfiError>;
 
 const ERROR_UNKNOWN: i32 = 0;
@@ -3482,33 +3486,33 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         stream: &dyn PluginStreamSender<GridEvent>,
     ) -> PluginResult<()> {
         let grid_id = request.id;
+        let (grid_arc, event_cv, destroyed) = self
+            .manager()
+            .get_grid_waiter(grid_id)
+            .map_err(map_plugin_error)?;
 
         loop {
-            let events = self
-                .manager()
-                .with_grid(grid_id, |grid| grid.events.drain());
-
-            match events {
-                Ok(event_list) => {
-                    if event_list.is_empty() {
-                        std::thread::sleep(std::time::Duration::from_millis(10));
-                    }
-                    for evt in event_list {
-                        let proto_evt = engine_event_to_proto(grid_id, evt.event_id, evt.data);
-                        if proto_evt.event.is_some() {
-                            if !stream.send(proto_evt) {
-                                return Ok(());
-                            }
-                        }
-                    }
+            let event_list = {
+                let mut grid = grid_arc.lock().unwrap_or_else(|e| e.into_inner());
+                while grid.events.is_empty()
+                    && !destroyed.load(Ordering::SeqCst)
+                    && !stream.is_cancelled()
+                {
+                    grid = event_cv.wait(grid).unwrap_or_else(|e| e.into_inner());
                 }
-                Err(_) => {
+
+                if destroyed.load(Ordering::SeqCst) || stream.is_cancelled() {
                     return Ok(());
                 }
-            }
 
-            if stream.is_cancelled() {
-                return Ok(());
+                grid.events.drain()
+            };
+
+            for evt in event_list {
+                let proto_evt = engine_event_to_proto(grid_id, evt.event_id, evt.data);
+                if proto_evt.event.is_some() && !stream.send(proto_evt) {
+                    return Ok(());
+                }
             }
         }
     }
