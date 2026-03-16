@@ -7,6 +7,7 @@ import io.github.ivere27.volvoxgrid.CreateResponse;
 import io.github.ivere27.volvoxgrid.CellRange;
 import io.github.ivere27.volvoxgrid.EditRequest;
 import io.github.ivere27.volvoxgrid.EventDecision;
+import io.github.ivere27.volvoxgrid.FramePacingMode;
 import io.github.ivere27.volvoxgrid.FrameDone;
 import io.github.ivere27.volvoxgrid.GridConfig;
 import io.github.ivere27.volvoxgrid.GridEvent;
@@ -49,6 +50,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 
 /**
  * Swing-based VolvoxGrid host with CPU shared-buffer rendering.
@@ -61,6 +63,8 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private static final float HOST_FLING_MIN_VELOCITY = 0.12f;
     private static final float HOST_FLING_MAX_VELOCITY = 120f;
     private static final long HOST_FLING_FRAME_MILLIS = 16L;
+    private static final int AUTO_FALLBACK_FRAME_RATE_HZ = 30;
+    private static final long FRAME_PACING_CONFIG_REFRESH_NANOS = 250_000_000L;
 
     public interface GridEventListener {
         void onGridEvent(GridEvent event);
@@ -209,6 +213,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private final AtomicBoolean pendingFrame = new AtomicBoolean(false);
     private final AtomicBoolean needsFollowupRender = new AtomicBoolean(false);
     private final AtomicBoolean renderRequestPending = new AtomicBoolean(false);
+    private final AtomicBoolean followupRenderScheduled = new AtomicBoolean(false);
 
     private SynurangDesktopBridge plugin;
     private VolvoxGridDesktopClient client;
@@ -244,6 +249,10 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private volatile int multiRangeAnchorCol = -1;
     private volatile int multiRangeDragRow = -1;
     private volatile int multiRangeDragCol = -1;
+    private volatile int framePacingModeValue = FramePacingMode.FRAME_PACING_MODE_AUTO_VALUE;
+    private volatile int targetFrameRateHz = AUTO_FALLBACK_FRAME_RATE_HZ;
+    private volatile long framePacingConfigLastRefreshNanos = 0L;
+    private volatile Timer followupRenderTimer;
 
     public VolvoxGridDesktopPanel() {
         setBackground(Color.WHITE);
@@ -286,7 +295,13 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                     .build()
             )
             .setIndicators(VolvoxGridDesktopController.defaultIndicatorsConfig())
-            .setRendering(RenderConfig.newBuilder().setRendererMode(RendererMode.RENDERER_CPU).build())
+            .setRendering(
+                RenderConfig.newBuilder()
+                    .setRendererMode(RendererMode.RENDERER_CPU)
+                    .setFramePacingMode(FramePacingMode.FRAME_PACING_MODE_AUTO)
+                    .setTargetFrameRateHz(AUTO_FALLBACK_FRAME_RATE_HZ)
+                    .build()
+            )
             .build();
 
         CreateResponse response = client.create(
@@ -429,7 +444,13 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                     .setGridId(id)
                     .setConfig(
                         GridConfig.newBuilder()
-                            .setRendering(RenderConfig.newBuilder().setRendererMode(RendererMode.RENDERER_CPU).build())
+                            .setRendering(
+                                RenderConfig.newBuilder()
+                                    .setRendererMode(RendererMode.RENDERER_CPU)
+                                    .setFramePacingMode(FramePacingMode.FRAME_PACING_MODE_AUTO)
+                                    .setTargetFrameRateHz(AUTO_FALLBACK_FRAME_RATE_HZ)
+                                    .build()
+                            )
                             .build()
                     )
                     .build()
@@ -488,6 +509,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         if (!renderRequestPending.compareAndSet(false, true)) {
             return;
         }
+        cancelScheduledFollowupRender();
 
         SwingUtilities.invokeLater(() -> {
             renderRequestPending.set(false);
@@ -503,6 +525,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         if (renderRequestPending.get()) {
             return;
         }
+        cancelScheduledFollowupRender();
         dispatchRenderFrame();
     }
 
@@ -1378,10 +1401,80 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             if (needsFollowupRender.getAndSet(false)) {
                 requestFrame();
             } else if (renderedFrame) {
-                // Keep pumping frames while the engine still reports rendered output (e.g. fling).
-                requestFrame();
+                scheduleFollowupFrame();
             }
         }
+    }
+
+    private void refreshFramePacingConfigIfStale() {
+        VolvoxGridDesktopClient c = client;
+        long id = gridId;
+        if (c == null || id == 0L) {
+            return;
+        }
+        long now = System.nanoTime();
+        if (now - framePacingConfigLastRefreshNanos < FRAME_PACING_CONFIG_REFRESH_NANOS) {
+            return;
+        }
+        try {
+            GridConfig config = c.getConfig(GridHandle.newBuilder().setId(id).build());
+            RenderConfig rendering = config.getRendering();
+            framePacingModeValue = rendering.hasFramePacingMode()
+                ? rendering.getFramePacingModeValue()
+                : FramePacingMode.FRAME_PACING_MODE_AUTO_VALUE;
+            targetFrameRateHz = normalizeTargetFrameRateHz(
+                rendering.hasTargetFrameRateHz() ? rendering.getTargetFrameRateHz() : AUTO_FALLBACK_FRAME_RATE_HZ
+            );
+        } catch (Exception e) {
+            LOG.log(Level.FINER, "refreshFramePacingConfigIfStale failed", e);
+            framePacingModeValue = FramePacingMode.FRAME_PACING_MODE_AUTO_VALUE;
+            targetFrameRateHz = AUTO_FALLBACK_FRAME_RATE_HZ;
+        } finally {
+            framePacingConfigLastRefreshNanos = now;
+        }
+    }
+
+    private static int normalizeTargetFrameRateHz(int hz) {
+        return hz > 0 ? hz : AUTO_FALLBACK_FRAME_RATE_HZ;
+    }
+
+    private void cancelScheduledFollowupRender() {
+        followupRenderScheduled.set(false);
+        Timer timer = followupRenderTimer;
+        if (timer != null) {
+            timer.stop();
+            followupRenderTimer = null;
+        }
+    }
+
+    private void scheduleFollowupFrame() {
+        if (gridId == 0L || !running.get()) {
+            return;
+        }
+        refreshFramePacingConfigIfStale();
+        int mode = framePacingModeValue;
+        if (mode == FramePacingMode.FRAME_PACING_MODE_UNLIMITED_VALUE) {
+            requestFrame();
+            return;
+        }
+        if (!followupRenderScheduled.compareAndSet(false, true)) {
+            return;
+        }
+
+        int hz = AUTO_FALLBACK_FRAME_RATE_HZ;
+        if (mode == FramePacingMode.FRAME_PACING_MODE_FIXED_VALUE) {
+            hz = normalizeTargetFrameRateHz(targetFrameRateHz);
+        }
+
+        int delayMs = Math.max(1, Math.round(1000f / hz));
+        Timer timer = new Timer(delayMs, event -> {
+            followupRenderScheduled.set(false);
+            followupRenderTimer = null;
+            requestFrame();
+        });
+        timer.setRepeats(false);
+        followupRenderTimer = timer;
+        timer.start();
     }
 
     private void blitFrame(FrameDone frame, FrameTarget target) {
@@ -1493,11 +1586,13 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
     private synchronized void shutdownStreams(boolean destroyGrid) {
         stopHostFling();
+        cancelScheduledFollowupRender();
         running.set(false);
         renderRequestPending.set(false);
         pendingFrame.set(false);
         needsFollowupRender.set(false);
         decisionChannelEnabled = false;
+        framePacingConfigLastRefreshNanos = 0L;
 
         VolvoxGridDesktopClient.RenderSession render = renderSession;
         renderSession = null;

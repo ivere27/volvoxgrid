@@ -1618,6 +1618,16 @@ impl VolvoxGrid {
         if let Some(v) = rc.present_mode {
             self.present_mode = v;
         }
+        if let Some(v) = rc.frame_pacing_mode {
+            self.frame_pacing_mode = v;
+        }
+        if let Some(v) = rc.target_frame_rate_hz {
+            self.target_frame_rate_hz = if v <= 0 {
+                crate::grid::DEFAULT_TARGET_FRAME_RATE_HZ
+            } else {
+                v
+            };
+        }
         self.mark_dirty();
     }
 
@@ -1939,6 +1949,8 @@ impl VolvoxGrid {
             animation_duration_ms: Some(self.animation.duration_ms),
             text_layout_cache_cap: Some(self.text_layout_cache_cap.min(i32::MAX as usize) as i32),
             present_mode: Some(self.present_mode),
+            frame_pacing_mode: Some(self.frame_pacing_mode),
+            target_frame_rate_hz: Some(self.target_frame_rate_hz),
         }
     }
 
@@ -3321,6 +3333,55 @@ mod tests {
             config.rendering.as_ref().unwrap().text_layout_cache_cap,
             Some(1234)
         );
+    }
+
+    #[test]
+    fn apply_config_sets_frame_pacing_config() {
+        let mut grid = test_grid();
+        assert_eq!(grid.frame_pacing_mode, v1::FramePacingMode::Auto as i32);
+        assert_eq!(
+            grid.target_frame_rate_hz,
+            crate::grid::DEFAULT_TARGET_FRAME_RATE_HZ
+        );
+
+        let config = v1::GridConfig {
+            rendering: Some(v1::RenderConfig {
+                frame_pacing_mode: Some(v1::FramePacingMode::Fixed as i32),
+                target_frame_rate_hz: Some(120),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        grid.apply_config(&config);
+        assert_eq!(grid.frame_pacing_mode, v1::FramePacingMode::Fixed as i32);
+        assert_eq!(grid.target_frame_rate_hz, 120);
+
+        let fallback = v1::GridConfig {
+            rendering: Some(v1::RenderConfig {
+                target_frame_rate_hz: Some(0),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        grid.apply_config(&fallback);
+        assert_eq!(
+            grid.target_frame_rate_hz,
+            crate::grid::DEFAULT_TARGET_FRAME_RATE_HZ
+        );
+    }
+
+    #[test]
+    fn get_config_returns_frame_pacing_config() {
+        let mut grid = test_grid();
+        grid.frame_pacing_mode = v1::FramePacingMode::Platform as i32;
+        grid.target_frame_rate_hz = 45;
+        let config = grid.get_config();
+        let rendering = config.rendering.as_ref().unwrap();
+        assert_eq!(
+            rendering.frame_pacing_mode,
+            Some(v1::FramePacingMode::Platform as i32)
+        );
+        assert_eq!(rendering.target_frame_rate_hz, Some(45));
     }
 
     // ── shrink_to_fit style tests ──────────────────────────────────

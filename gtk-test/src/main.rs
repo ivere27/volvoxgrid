@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
 use std::sync::{mpsc, Arc};
+use std::time::Duration;
 
 use cairo::ImageSurface;
 use gtk4::gdk;
@@ -20,7 +21,7 @@ use gtk4::prelude::*;
 use gtk4::{
     Align, Application, ApplicationWindow, Box as GtkBox, Button, CheckButton, ComboBoxText,
     CssProvider, DrawingArea, DropDown, Entry, EventControllerKey, EventControllerMotion,
-    EventControllerScroll, GestureClick, Label, Orientation, Overlay, Separator,
+    EventControllerScroll, GestureClick, Label, Orientation, Overlay, Separator, SpinButton,
 };
 use prost::Message;
 
@@ -35,6 +36,7 @@ const DEMO_STRESS: &str = "stress";
 const DEMO_SALES: &str = "sales";
 const DEMO_HIERARCHY: &str = "hierarchy";
 const SELECTION_MODE_LABELS: [&str; 5] = ["Free", "ByRow", "ByCol", "Listbox", "MultiRange"];
+const FRAME_PACING_LABELS: [&str; 4] = ["Auto", "Platform", "Unlimited", "Fixed"];
 const INLINE_EDITOR_CSS: &str = r#"
 entry.volvox-inline-editor,
 entry.volvox-inline-editor text {
@@ -325,6 +327,10 @@ struct State {
     event_count: u64,
     last_event: String,
     status_note: String,
+    frame_pacing_mode: i32,
+    target_frame_rate_hz: i32,
+    followup_frame_scheduled: bool,
+    followup_schedule_seq: u64,
     debug_overlay: bool,
     style_on: bool,
     span_on: bool,
@@ -402,6 +408,10 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
                 create.warnings.join(", ")
             )
         },
+        frame_pacing_mode: pb::FramePacingMode::Auto as i32,
+        target_frame_rate_hz: 30,
+        followup_frame_scheduled: false,
+        followup_schedule_seq: 0,
         debug_overlay: false,
         style_on: false,
         span_on: false,
@@ -466,6 +476,28 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     let selection_mode = DropDown::from_strings(&SELECTION_MODE_LABELS);
     selection_mode.set_selected(0);
     let chk_debug = CheckButton::with_label("Debug");
+    let frame_pacing_box = GtkBox::new(Orientation::Horizontal, 4);
+    let frame_pacing_label = Label::new(Some("Pacing"));
+    let frame_pacing_mode = DropDown::from_strings(&FRAME_PACING_LABELS);
+    let frame_pacing_fixed_label = Label::new(Some("Hz"));
+    let frame_pacing_fixed_hz = SpinButton::with_range(1.0, 1000.0, 1.0);
+    frame_pacing_mode.set_selected(frame_pacing_dropdown_index(
+        state.borrow().frame_pacing_mode,
+    ));
+    frame_pacing_fixed_hz.set_digits(0);
+    frame_pacing_fixed_hz.set_numeric(true);
+    frame_pacing_fixed_hz.set_width_chars(4);
+    frame_pacing_fixed_hz.set_value(state.borrow().target_frame_rate_hz as f64);
+    frame_pacing_fixed_hz.set_tooltip_text(Some("Target Hz used when frame pacing is Fixed"));
+    sync_frame_pacing_widgets(
+        state.borrow().frame_pacing_mode,
+        &frame_pacing_fixed_label,
+        &frame_pacing_fixed_hz,
+    );
+    frame_pacing_box.append(&frame_pacing_label);
+    frame_pacing_box.append(&frame_pacing_mode);
+    frame_pacing_box.append(&frame_pacing_fixed_label);
+    frame_pacing_box.append(&frame_pacing_fixed_hz);
     let btn_sort_asc = Button::with_label("SortAsc");
     let btn_sort_desc = Button::with_label("SortDesc");
     let btn_style = Button::with_label("Style");
@@ -492,6 +524,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     toolbar_row1.append(&Separator::new(Orientation::Vertical));
     toolbar_row1.append(&selection_mode);
     toolbar_row1.append(&chk_debug);
+    toolbar_row1.append(&frame_pacing_box);
     toolbar_row1.append(&btn_sort_asc);
     toolbar_row1.append(&btn_sort_desc);
     toolbar_row1.append(&btn_style);
@@ -986,6 +1019,43 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         let state = Rc::clone(&state);
         let area = drawing_area.clone();
         let status = status_label.clone();
+        let fixed_label = frame_pacing_fixed_label.clone();
+        let fixed_hz = frame_pacing_fixed_hz.clone();
+        frame_pacing_mode.connect_selected_notify(move |dd| {
+            let mode = frame_pacing_mode_value(dd.selected());
+            sync_frame_pacing_widgets(mode, &fixed_label, &fixed_hz);
+            run_action(&state, &area, &status, |st| {
+                st.frame_pacing_mode = mode;
+                st.target_frame_rate_hz = fixed_hz.value_as_int();
+                apply_host_runtime_config(st, st.grid_id)?;
+                Ok(format!(
+                    "Frame pacing {}",
+                    frame_pacing_status_text(st.frame_pacing_mode, st.target_frame_rate_hz)
+                ))
+            });
+        });
+    }
+
+    {
+        let state = Rc::clone(&state);
+        let area = drawing_area.clone();
+        let status = status_label.clone();
+        frame_pacing_fixed_hz.connect_value_changed(move |spin| {
+            run_action(&state, &area, &status, |st| {
+                st.target_frame_rate_hz = spin.value_as_int();
+                apply_host_runtime_config(st, st.grid_id)?;
+                Ok(format!(
+                    "Frame pacing {}",
+                    frame_pacing_status_text(st.frame_pacing_mode, st.target_frame_rate_hz)
+                ))
+            });
+        });
+    }
+
+    {
+        let state = Rc::clone(&state);
+        let area = drawing_area.clone();
+        let status = status_label.clone();
         chk_debug.connect_toggled(move |chk| {
             run_action(&state, &area, &status, |st| {
                 st.debug_overlay = chk.is_active();
@@ -1441,6 +1511,8 @@ impl VolvoxServiceClient {
                     rendering: Some(pb::RenderConfig {
                         renderer_mode: Some(pb::RendererMode::RendererCpu as i32),
                         animation_enabled: Some(true),
+                        frame_pacing_mode: Some(pb::FramePacingMode::Auto as i32),
+                        target_frame_rate_hz: Some(30),
                         ..Default::default()
                     }),
                     ..Default::default()
@@ -1795,6 +1867,8 @@ fn apply_initial_config_for_grid(client: &VolvoxServiceClient, grid_id: i64) -> 
             rendering: Some(pb::RenderConfig {
                 renderer_mode: Some(pb::RendererMode::RendererCpu as i32),
                 animation_enabled: Some(true),
+                frame_pacing_mode: Some(pb::FramePacingMode::Auto as i32),
+                target_frame_rate_hz: Some(30),
                 ..Default::default()
             }),
             editing: Some(pb::EditConfig {
@@ -1826,6 +1900,8 @@ fn apply_host_runtime_config(state: &State, grid_id: i64) -> Result<(), String> 
         pb::GridConfig {
             rendering: Some(pb::RenderConfig {
                 debug_overlay: Some(state.debug_overlay),
+                frame_pacing_mode: Some(state.frame_pacing_mode),
+                target_frame_rate_hz: Some(state.target_frame_rate_hz),
                 ..Default::default()
             }),
             selection: Some(pb::SelectionConfig {
@@ -1888,6 +1964,8 @@ fn attach_grid_session(state: &mut State, grid_id: i64) -> Result<(), String> {
     state.grid_id = grid_id;
     state.frame_in_flight = false;
     state.needs_followup_frame = false;
+    state.followup_frame_scheduled = false;
+    state.followup_schedule_seq = state.followup_schedule_seq.wrapping_add(1);
     state.pending_resize = None;
     state.inflight_target = None;
     state.spare_target = None;
@@ -2054,46 +2132,55 @@ fn process_ui_message(
     status_label: &Label,
     msg: UiMessage,
 ) -> bool {
-    let mut st = state.borrow_mut();
     let mut needs_redraw = false;
-    match msg {
-        UiMessage::RenderOutput(epoch, output) => {
-            if epoch != st.stream_epoch {
-                return false;
+    let mut schedule_followup = false;
+    {
+        let mut st = state.borrow_mut();
+        match msg {
+            UiMessage::RenderOutput(epoch, output) => {
+                if epoch != st.stream_epoch {
+                    return false;
+                }
+                match handle_render_output(
+                    &mut st,
+                    &output,
+                    area,
+                    edit_entry,
+                    dropdown_combo,
+                    dropdown_combo_editable,
+                ) {
+                    Ok((redraw, followup)) => {
+                        needs_redraw = redraw;
+                        schedule_followup = followup;
+                    }
+                    Err(err) => st.status_note = format!("Render output failed: {err}"),
+                }
             }
-            match handle_render_output(
-                &mut st,
-                &output,
-                area,
-                edit_entry,
-                dropdown_combo,
-                dropdown_combo_editable,
-            ) {
-                Ok(redraw) => needs_redraw = redraw,
-                Err(err) => st.status_note = format!("Render output failed: {err}"),
+            UiMessage::GridEvent(epoch, event) => {
+                if epoch != st.stream_epoch {
+                    return false;
+                }
+                st.event_count += 1;
+                st.last_event = grid_event_name(&event).to_string();
+            }
+            UiMessage::StreamEnded(epoch, kind) => {
+                if epoch != st.stream_epoch {
+                    return false;
+                }
+                st.status_note = format!("{kind} stream ended");
+            }
+            UiMessage::StreamError(epoch, kind, err) => {
+                if epoch != st.stream_epoch {
+                    return false;
+                }
+                st.status_note = format!("{kind} stream error: {err}");
             }
         }
-        UiMessage::GridEvent(epoch, event) => {
-            if epoch != st.stream_epoch {
-                return false;
-            }
-            st.event_count += 1;
-            st.last_event = grid_event_name(&event).to_string();
-        }
-        UiMessage::StreamEnded(epoch, kind) => {
-            if epoch != st.stream_epoch {
-                return false;
-            }
-            st.status_note = format!("{kind} stream ended");
-        }
-        UiMessage::StreamError(epoch, kind, err) => {
-            if epoch != st.stream_epoch {
-                return false;
-            }
-            st.status_note = format!("{kind} stream error: {err}");
-        }
+        update_status_label(&st, status_label);
     }
-    update_status_label(&st, status_label);
+    if schedule_followup {
+        schedule_followup_frame(state, area);
+    }
     needs_redraw
 }
 
@@ -2104,8 +2191,9 @@ fn handle_render_output(
     edit_entry: &Entry,
     dropdown_combo: &ComboBoxText,
     dropdown_combo_editable: &ComboBoxText,
-) -> Result<bool, String> {
+) -> Result<(bool, bool), String> {
     let mut needs_redraw = false;
+    let mut schedule_followup = false;
     if let Some(event) = &output.event {
         match event {
             pb::render_output::Event::FrameDone(frame) => {
@@ -2168,10 +2256,10 @@ fn handle_render_output(
     }
 
     if output.rendered {
-        request_frame(state)?;
+        schedule_followup = true;
     }
 
-    Ok(needs_redraw)
+    Ok((needs_redraw, schedule_followup))
 }
 
 fn complete_frame_target(state: &mut State, handle: i64) -> bool {
@@ -2216,6 +2304,9 @@ fn take_frame_target(state: &mut State, width: i32, height: i32) -> Result<Frame
 }
 
 fn request_frame(state: &mut State) -> Result<(), String> {
+    state.followup_schedule_seq = state.followup_schedule_seq.wrapping_add(1);
+    state.followup_frame_scheduled = false;
+
     let (width, height) = match state.pending_resize.take() {
         Some((w, h)) => (w.max(1), h.max(1)),
         None => (state.viewport_width.max(1), state.viewport_height.max(1)),
@@ -2267,6 +2358,67 @@ fn request_frame(state: &mut State) -> Result<(), String> {
         state.needs_followup_frame = false;
     }
     Ok(())
+}
+
+fn normalized_target_frame_rate_hz(target_hz: i32) -> i32 {
+    if target_hz <= 0 {
+        30
+    } else {
+        target_hz
+    }
+}
+
+fn run_scheduled_followup_frame(state: &Rc<RefCell<State>>, seq: u64) {
+    let mut st = state.borrow_mut();
+    if seq != st.followup_schedule_seq {
+        return;
+    }
+    st.followup_frame_scheduled = false;
+    let _ = request_frame(&mut st);
+}
+
+fn schedule_followup_frame(state: &Rc<RefCell<State>>, area: &DrawingArea) {
+    let (mode, target_hz, seq) = {
+        let mut st = state.borrow_mut();
+        if st.followup_frame_scheduled {
+            return;
+        }
+        st.followup_frame_scheduled = true;
+        (
+            st.frame_pacing_mode,
+            normalized_target_frame_rate_hz(st.target_frame_rate_hz),
+            st.followup_schedule_seq,
+        )
+    };
+
+    let mode_auto = pb::FramePacingMode::Auto as i32;
+    let mode_platform = pb::FramePacingMode::Platform as i32;
+    let mode_unlimited = pb::FramePacingMode::Unlimited as i32;
+    let mode_fixed = pb::FramePacingMode::Fixed as i32;
+
+    if mode == mode_unlimited {
+        run_scheduled_followup_frame(state, seq);
+        return;
+    }
+
+    if mode == mode_fixed {
+        let state = Rc::clone(state);
+        glib::timeout_add_local_once(Duration::from_secs_f64(1.0 / target_hz as f64), move || {
+            run_scheduled_followup_frame(&state, seq)
+        });
+        return;
+    }
+
+    if mode == mode_auto || mode == mode_platform {
+        let state = Rc::clone(state);
+        area.add_tick_callback(move |_, _| {
+            run_scheduled_followup_frame(&state, seq);
+            glib::ControlFlow::Break
+        });
+        return;
+    }
+
+    run_scheduled_followup_frame(state, seq);
 }
 
 fn send_pointer_input(
@@ -2530,9 +2682,10 @@ fn update_status_label(state: &State, label: &Label) {
     let col = state.selection.active_col + 1;
     let ranges = state.selection.ranges.len();
     label.set_text(&format!(
-        "Grid {} | Demo: {} | Cell: R{} C{} | Ranges: {} | Events: {} | Last: {} | {}",
+        "Grid {} | Demo: {} | Pacing: {} | Cell: R{} C{} | Ranges: {} | Events: {} | Last: {} | {}",
         state.grid_id,
         state.current_demo,
+        frame_pacing_status_text(state.frame_pacing_mode, state.target_frame_rate_hz),
         row.max(0),
         col.max(0),
         ranges,
@@ -2604,6 +2757,41 @@ fn selection_mode_value(index: u32) -> i32 {
         3 => pb::SelectionMode::SelectionListbox as i32,
         4 => pb::SelectionMode::SelectionMultiRange as i32,
         _ => pb::SelectionMode::SelectionFree as i32,
+    }
+}
+
+fn frame_pacing_mode_value(index: u32) -> i32 {
+    match index {
+        1 => pb::FramePacingMode::Platform as i32,
+        2 => pb::FramePacingMode::Unlimited as i32,
+        3 => pb::FramePacingMode::Fixed as i32,
+        _ => pb::FramePacingMode::Auto as i32,
+    }
+}
+
+fn frame_pacing_dropdown_index(mode: i32) -> u32 {
+    match mode {
+        value if value == pb::FramePacingMode::Platform as i32 => 1,
+        value if value == pb::FramePacingMode::Unlimited as i32 => 2,
+        value if value == pb::FramePacingMode::Fixed as i32 => 3,
+        _ => 0,
+    }
+}
+
+fn sync_frame_pacing_widgets(mode: i32, fixed_label: &Label, fixed_hz: &SpinButton) {
+    let fixed_visible = mode == pb::FramePacingMode::Fixed as i32;
+    fixed_label.set_visible(fixed_visible);
+    fixed_hz.set_visible(fixed_visible);
+}
+
+fn frame_pacing_status_text(mode: i32, target_hz: i32) -> String {
+    match mode {
+        value if value == pb::FramePacingMode::Platform as i32 => "Platform".to_string(),
+        value if value == pb::FramePacingMode::Unlimited as i32 => "Unlimited".to_string(),
+        value if value == pb::FramePacingMode::Fixed as i32 => {
+            format!("Fixed {} Hz", normalized_target_frame_rate_hz(target_hz))
+        }
+        _ => "Auto".to_string(),
     }
 }
 

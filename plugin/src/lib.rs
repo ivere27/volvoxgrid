@@ -2504,9 +2504,10 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             return (false, 0, 0, 0, 0);
                         }
 
-                        if !grid.layout.valid {
-                            ensure_layout(grid);
-                        }
+                        // Tick per-frame layout/animation state even when the
+                        // cached layout is already valid so animation can settle
+                        // and clear `dirty` instead of self-pumping forever.
+                        ensure_layout(grid);
                         let pinned_h = grid.pinned_top_height() + grid.pinned_bottom_height();
                         let pinned_w = grid.pinned_left_width() + grid.pinned_right_width();
                         grid.scroll.update_bounds(
@@ -2848,9 +2849,10 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             return Ok((false, 0, 0, 0, 0));
                         }
 
-                        if !grid.layout.valid {
-                            ensure_layout(grid);
-                        }
+                        // Tick per-frame layout/animation state even when the
+                        // cached layout is already valid so animation can settle
+                        // and clear `dirty` instead of self-pumping forever.
+                        ensure_layout(grid);
                         let pinned_h = grid.pinned_top_height() + grid.pinned_bottom_height();
                         let pinned_w = grid.pinned_left_width() + grid.pinned_right_width();
                         grid.scroll.update_bounds(

@@ -19,6 +19,14 @@ namespace VolvoxGrid.DotNet
         GpuGles = 4,
     }
 
+    public enum VolvoxFramePacingMode
+    {
+        Auto = 0,
+        Platform = 1,
+        Unlimited = 2,
+        Fixed = 3,
+    }
+
     public enum VolvoxGridSelectionMode
     {
         Free = 0,

@@ -63,6 +63,8 @@ namespace VolvoxGrid.DotNet
             _config.Scrolling.FlingEnabled = true;
             _config.Scrolling.FastScroll = true;
             _config.Rendering.RendererMode = VolvoxGridRendererMode.Auto;
+            _config.Rendering.FramePacingMode = VolvoxFramePacingMode.Auto;
+            _config.Rendering.TargetFrameRateHz = 30;
             _config.Indicators.ColIndicatorTop.Visible = true;
             _config.Indicators.ColIndicatorTop.BandRows = 1;
             _config.Indicators.ColIndicatorTop.ModeBits = VolvoxColIndicatorCellMode.HeaderText | VolvoxColIndicatorCellMode.SortGlyph;
@@ -228,6 +230,18 @@ namespace VolvoxGrid.DotNet
         {
             get { return RendererMode; }
             set { RendererMode = value; }
+        }
+
+        public VolvoxFramePacingMode FramePacingMode
+        {
+            get { return _config.Rendering.FramePacingMode ?? VolvoxFramePacingMode.Auto; }
+            set { if (_config.Rendering.FramePacingMode != value) { _config.Rendering.FramePacingMode = value; ApplyEngineConfig(); } }
+        }
+
+        public int TargetFrameRateHz
+        {
+            get { return _config.Rendering.TargetFrameRateHz ?? 30; }
+            set { if (_config.Rendering.TargetFrameRateHz != value) { _config.Rendering.TargetFrameRateHz = value; ApplyEngineConfig(); } }
         }
 
         public VolvoxGridScrollBarsMode ScrollBars

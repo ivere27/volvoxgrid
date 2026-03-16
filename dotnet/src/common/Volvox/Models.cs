@@ -608,6 +608,8 @@ namespace VolvoxGrid.DotNet.Internal
         public bool? AnimationEnabled { get; set; }
         public int? AnimationDurationMs { get; set; }
         public int? TextLayoutCacheCap { get; set; }
+        public VolvoxFramePacingMode? FramePacingMode { get; set; }
+        public int? TargetFrameRateHz { get; set; }
     }
 
     internal sealed class VolvoxRowIndicatorSlotData

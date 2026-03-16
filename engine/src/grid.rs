@@ -27,6 +27,8 @@ pub const DEFAULT_ROW_HEIGHT: i32 = 20;
 
 /// Default column width in pixels.
 pub const DEFAULT_COL_WIDTH: i32 = 68;
+/// Default fixed-rate pacing fallback when no platform frame clock is available.
+pub const DEFAULT_TARGET_FRAME_RATE_HZ: i32 = 30;
 
 /// Minimum allowed row count.
 const MIN_ROWS: i32 = 1;
@@ -321,6 +323,10 @@ pub struct VolvoxGrid {
     pub renderer_mode: i32,
     /// 0 = Auto (Fifo), 1 = Fifo, 2 = Mailbox, 3 = Immediate.
     pub present_mode: i32,
+    /// 0 = AUTO, 1 = PLATFORM, 2 = UNLIMITED, 3 = FIXED.
+    pub frame_pacing_mode: i32,
+    /// Target frame rate in Hz used when frame_pacing_mode = FIXED.
+    pub target_frame_rate_hz: i32,
 
     // ── Debug Overlay ────────────────────────────────────────────────
     /// Whether the debug overlay is visible.
@@ -642,6 +648,9 @@ impl VolvoxGrid {
             renderer_mode: 0,
             // Present mode (0=Auto, 1=Fifo, 2=Mailbox, 3=Immediate)
             present_mode: 0,
+            // Frame pacing (0=AUTO, 1=PLATFORM, 2=UNLIMITED, 3=FIXED)
+            frame_pacing_mode: 0,
+            target_frame_rate_hz: DEFAULT_TARGET_FRAME_RATE_HZ,
 
             // Debug overlay
             debug_overlay: false,

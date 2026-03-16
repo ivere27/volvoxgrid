@@ -12,6 +12,8 @@ namespace VolvoxGrid.DotNet.Internal
     internal sealed class RenderHostCpu : Control
     {
         private const int WmMouseHWheel = 0x020E;
+        private const int AutoFallbackFrameRateHz = 30;
+        private const long FramePacingConfigRefreshMs = 250;
 
         private readonly object _sendLock = new object();
         private readonly object _frameLock = new object();
@@ -30,6 +32,10 @@ namespace VolvoxGrid.DotNet.Internal
         private bool _followupFrame;
         private bool _decisionChannelRequested;
         private bool _decisionChannelHandshakeSent;
+        private int _followupScheduleSeq;
+        private VolvoxFramePacingMode _framePacingMode = VolvoxFramePacingMode.Auto;
+        private int _targetFrameRateHz = AutoFallbackFrameRateHz;
+        private long _framePacingConfigLastRefreshTick;
 
         private byte[] _pixelBuffer;
         private byte[] _blitBuffer;
@@ -119,6 +125,8 @@ namespace VolvoxGrid.DotNet.Internal
             _pendingFrame = false;
             _followupFrame = false;
             _decisionChannelHandshakeSent = false;
+            CancelScheduledFollowupFrame();
+            _framePacingConfigLastRefreshTick = 0;
             ClearMultiRangeDrag();
 
             var renderStream = _renderStream;
@@ -188,6 +196,8 @@ namespace VolvoxGrid.DotNet.Internal
             {
                 return;
             }
+
+            CancelScheduledFollowupFrame();
 
             lock (_frameLock)
             {
@@ -558,8 +568,117 @@ namespace VolvoxGrid.DotNet.Internal
 
             if (shouldRequestAnother)
             {
-                RequestFrame();
+                ScheduleFollowupFrame();
             }
+        }
+
+        private void RefreshFramePacingConfigIfStale()
+        {
+            if (_client == null || _gridId == 0)
+            {
+                return;
+            }
+            long now = GetMonotonicMilliseconds();
+            if (now - _framePacingConfigLastRefreshTick < FramePacingConfigRefreshMs)
+            {
+                return;
+            }
+
+            try
+            {
+                var config = _client.GetConfig(_gridId);
+                var rendering = config.Rendering ?? new VolvoxRenderConfigData();
+                _framePacingMode = rendering.FramePacingMode ?? VolvoxFramePacingMode.Auto;
+                _targetFrameRateHz = NormalizeTargetFrameRateHz(rendering.TargetFrameRateHz ?? AutoFallbackFrameRateHz);
+            }
+            catch
+            {
+                _framePacingMode = VolvoxFramePacingMode.Auto;
+                _targetFrameRateHz = AutoFallbackFrameRateHz;
+            }
+            finally
+            {
+                _framePacingConfigLastRefreshTick = now;
+            }
+        }
+
+        private static int NormalizeTargetFrameRateHz(int hz)
+        {
+            return hz > 0 ? hz : AutoFallbackFrameRateHz;
+        }
+
+        private static long GetMonotonicMilliseconds()
+        {
+            return (long)(Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency);
+        }
+
+        private int ReadFollowupScheduleSeq()
+        {
+            return Interlocked.CompareExchange(ref _followupScheduleSeq, 0, 0);
+        }
+
+        private void CancelScheduledFollowupFrame()
+        {
+            Interlocked.Increment(ref _followupScheduleSeq);
+        }
+
+        private void ScheduleFollowupFrame()
+        {
+            if (!_running || _client == null || _renderStream == null || _gridId == 0)
+            {
+                return;
+            }
+
+            RefreshFramePacingConfigIfStale();
+            if (_framePacingMode == VolvoxFramePacingMode.Unlimited)
+            {
+                RequestFrame();
+                return;
+            }
+
+            int hz = _framePacingMode == VolvoxFramePacingMode.Fixed
+                ? NormalizeTargetFrameRateHz(_targetFrameRateHz)
+                : AutoFallbackFrameRateHz;
+            int delayMs = Math.Max(1, (int)Math.Round(1000.0 / hz));
+            int seq = Interlocked.Increment(ref _followupScheduleSeq);
+
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                Thread.Sleep(delayMs);
+                if (seq != ReadFollowupScheduleSeq()
+                    || !_running
+                    || _client == null
+                    || _renderStream == null
+                    || _gridId == 0)
+                {
+                    return;
+                }
+
+                MethodInvoker request = () =>
+                {
+                    if (seq != ReadFollowupScheduleSeq())
+                    {
+                        return;
+                    }
+                    RequestFrame();
+                };
+
+                if (IsHandleCreated && InvokeRequired)
+                {
+                    try
+                    {
+                        BeginInvoke(request);
+                    }
+                    catch
+                    {
+                        // Best effort while shutting down.
+                    }
+                }
+                else
+                {
+                    request();
+                }
+            });
         }
 
         private void SendBufferReady()

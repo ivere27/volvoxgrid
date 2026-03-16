@@ -994,6 +994,31 @@ class PresentMode extends $pb.ProtobufEnum {
   const PresentMode._(super.value, super.name);
 }
 
+class FramePacingMode extends $pb.ProtobufEnum {
+  static const FramePacingMode FRAME_PACING_MODE_AUTO =
+      FramePacingMode._(0, _omitEnumNames ? '' : 'FRAME_PACING_MODE_AUTO');
+  static const FramePacingMode FRAME_PACING_MODE_PLATFORM =
+      FramePacingMode._(1, _omitEnumNames ? '' : 'FRAME_PACING_MODE_PLATFORM');
+  static const FramePacingMode FRAME_PACING_MODE_UNLIMITED =
+      FramePacingMode._(2, _omitEnumNames ? '' : 'FRAME_PACING_MODE_UNLIMITED');
+  static const FramePacingMode FRAME_PACING_MODE_FIXED =
+      FramePacingMode._(3, _omitEnumNames ? '' : 'FRAME_PACING_MODE_FIXED');
+
+  static const $core.List<FramePacingMode> values = <FramePacingMode>[
+    FRAME_PACING_MODE_AUTO,
+    FRAME_PACING_MODE_PLATFORM,
+    FRAME_PACING_MODE_UNLIMITED,
+    FRAME_PACING_MODE_FIXED,
+  ];
+
+  static final $core.List<FramePacingMode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static FramePacingMode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const FramePacingMode._(super.value, super.name);
+}
+
 class ClearScope extends $pb.ProtobufEnum {
   static const ClearScope CLEAR_EVERYTHING =
       ClearScope._(0, _omitEnumNames ? '' : 'CLEAR_EVERYTHING');

@@ -630,6 +630,8 @@ namespace VolvoxGrid.DotNet.Internal
                 if (config.Rendering.AnimationEnabled.HasValue) res.Rendering.AnimationEnabled = config.Rendering.AnimationEnabled.Value;
                 if (config.Rendering.AnimationDurationMs.HasValue) res.Rendering.AnimationDurationMs = config.Rendering.AnimationDurationMs.Value;
                 if (config.Rendering.TextLayoutCacheCap.HasValue) res.Rendering.TextLayoutCacheCap = config.Rendering.TextLayoutCacheCap.Value;
+                if (config.Rendering.FramePacingMode.HasValue) res.Rendering.FramePacingMode = (FramePacingMode)config.Rendering.FramePacingMode.Value;
+                if (config.Rendering.TargetFrameRateHz.HasValue) res.Rendering.TargetFrameRateHz = config.Rendering.TargetFrameRateHz.Value;
             }
             if (config.Indicators != null)
             {
@@ -682,6 +684,8 @@ namespace VolvoxGrid.DotNet.Internal
                 res.Rendering.AnimationEnabled = c.Rendering.AnimationEnabled;
                 res.Rendering.AnimationDurationMs = c.Rendering.AnimationDurationMs;
                 res.Rendering.TextLayoutCacheCap = c.Rendering.TextLayoutCacheCap;
+                if (c.Rendering.HasFramePacingMode) res.Rendering.FramePacingMode = (VolvoxFramePacingMode)c.Rendering.FramePacingMode;
+                if (c.Rendering.HasTargetFrameRateHz) res.Rendering.TargetFrameRateHz = c.Rendering.TargetFrameRateHz;
             }
             if (c.Indicators != null)
             {
