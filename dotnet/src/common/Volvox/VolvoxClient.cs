@@ -299,6 +299,24 @@ namespace VolvoxGrid.DotNet.Internal
             return stream;
         }
 
+        public bool SupportsHostTextRenderer
+        {
+            get { return _host.SupportsTextRenderer; }
+        }
+
+        public void SetTextRenderer(
+            long gridId,
+            SynurangReflectionHost.SynMeasureTextCallback measure,
+            SynurangReflectionHost.SynRenderTextCallback render)
+        {
+            _host.SetTextRenderer(gridId, measure, render, IntPtr.Zero);
+        }
+
+        public void ClearTextRenderer(long gridId)
+        {
+            _host.SetTextRenderer(gridId, null, null, IntPtr.Zero);
+        }
+
         public byte[] EncodeRenderInputBufferReady(long gridId, long handle, int stride, int width, int height)
         {
             return _codec.EncodeRenderInputBufferReady(gridId, handle, stride, width, height);

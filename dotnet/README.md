@@ -21,6 +21,7 @@ Runtime notes:
 - WinForms only
 - `volvoxgrid_plugin.dll` is required at runtime
 - The plugin architecture must match your process architecture (`x64` or `x86`)
+- Linux/Wine sample runs use the built-in `cosmic-text` engine by default. Set `VOLVOXGRID_DOTNET_USE_HOST_TEXT_RENDERER=1` to opt into the host GDI text bridge.
 
 ## Main Types
 
