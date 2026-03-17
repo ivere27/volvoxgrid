@@ -77,6 +77,11 @@ class VolvoxGridController(
                                 .setCols(cols)
                                 .build()
                         )
+                        .setRendering(
+                            RenderConfig.newBuilder()
+                                .setFramePacingMode(FramePacingMode.FRAME_PACING_MODE_PLATFORM)
+                                .build()
+                        )
                         .setIndicators(defaultIndicatorsConfig())
                         .build()
                 )
