@@ -176,7 +176,7 @@ impl GpuRenderer {
                 &wgpu::DeviceDescriptor {
                     label: Some("VolvoxGrid GPU"),
                     required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::downlevel_defaults(),
+                    required_limits: adapter.limits(),
                     memory_hints: wgpu::MemoryHints::Performance,
                 },
                 None,
@@ -540,7 +540,7 @@ impl GpuRenderer {
                         &wgpu::DeviceDescriptor {
                             label: Some("VolvoxGrid GPU"),
                             required_features: wgpu::Features::empty(),
-                            required_limits: wgpu::Limits::downlevel_defaults(),
+                            required_limits: new_adapter.limits(),
                             memory_hints: wgpu::MemoryHints::Performance,
                         },
                         None,
