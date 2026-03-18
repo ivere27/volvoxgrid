@@ -781,6 +781,57 @@ final $typed_data.Uint8List iconAlignDescriptor = $convert.base64Decode(
     'xJTkVfU1RBUlQQARIUChBJQ09OX0FMSUdOX1NUQVJUEAISEgoOSUNPTl9BTElHTl9FTkQQAxIV'
     'ChFJQ09OX0FMSUdOX0NFTlRFUhAE');
 
+@$core.Deprecated('Use renderLayerBitDescriptor instead')
+const RenderLayerBit$json = {
+  '1': 'RenderLayerBit',
+  '2': [
+    {'1': 'RENDER_LAYER_OVERLAY_BANDS', '2': 0},
+    {'1': 'RENDER_LAYER_INDICATORS', '2': 1},
+    {'1': 'RENDER_LAYER_BACKGROUNDS', '2': 2},
+    {'1': 'RENDER_LAYER_PROGRESS_BARS', '2': 3},
+    {'1': 'RENDER_LAYER_GRID_LINES', '2': 4},
+    {'1': 'RENDER_LAYER_HEADER_MARKS', '2': 5},
+    {'1': 'RENDER_LAYER_BACKGROUND_IMAGE', '2': 6},
+    {'1': 'RENDER_LAYER_CELL_BORDERS', '2': 7},
+    {'1': 'RENDER_LAYER_CELL_TEXT', '2': 8},
+    {'1': 'RENDER_LAYER_CELL_PICTURES', '2': 9},
+    {'1': 'RENDER_LAYER_SORT_GLYPHS', '2': 10},
+    {'1': 'RENDER_LAYER_COL_DRAG_MARKER', '2': 11},
+    {'1': 'RENDER_LAYER_CHECKBOXES', '2': 12},
+    {'1': 'RENDER_LAYER_DROPDOWN_BUTTONS', '2': 13},
+    {'1': 'RENDER_LAYER_SELECTION', '2': 14},
+    {'1': 'RENDER_LAYER_HOVER_HIGHLIGHT', '2': 15},
+    {'1': 'RENDER_LAYER_EDIT_HIGHLIGHTS', '2': 16},
+    {'1': 'RENDER_LAYER_FOCUS_RECT', '2': 17},
+    {'1': 'RENDER_LAYER_FILL_HANDLE', '2': 18},
+    {'1': 'RENDER_LAYER_OUTLINE', '2': 19},
+    {'1': 'RENDER_LAYER_FROZEN_BORDERS', '2': 20},
+    {'1': 'RENDER_LAYER_ACTIVE_EDITOR', '2': 21},
+    {'1': 'RENDER_LAYER_ACTIVE_DROPDOWN', '2': 22},
+    {'1': 'RENDER_LAYER_SCROLL_BARS', '2': 23},
+    {'1': 'RENDER_LAYER_FAST_SCROLL', '2': 24},
+    {'1': 'RENDER_LAYER_DEBUG_OVERLAY', '2': 25},
+  ],
+};
+
+/// Descriptor for `RenderLayerBit`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List renderLayerBitDescriptor = $convert.base64Decode(
+    'Cg5SZW5kZXJMYXllckJpdBIeChpSRU5ERVJfTEFZRVJfT1ZFUkxBWV9CQU5EUxAAEhsKF1JFTk'
+    'RFUl9MQVlFUl9JTkRJQ0FUT1JTEAESHAoYUkVOREVSX0xBWUVSX0JBQ0tHUk9VTkRTEAISHgoa'
+    'UkVOREVSX0xBWUVSX1BST0dSRVNTX0JBUlMQAxIbChdSRU5ERVJfTEFZRVJfR1JJRF9MSU5FUx'
+    'AEEh0KGVJFTkRFUl9MQVlFUl9IRUFERVJfTUFSS1MQBRIhCh1SRU5ERVJfTEFZRVJfQkFDS0dS'
+    'T1VORF9JTUFHRRAGEh0KGVJFTkRFUl9MQVlFUl9DRUxMX0JPUkRFUlMQBxIaChZSRU5ERVJfTE'
+    'FZRVJfQ0VMTF9URVhUEAgSHgoaUkVOREVSX0xBWUVSX0NFTExfUElDVFVSRVMQCRIcChhSRU5E'
+    'RVJfTEFZRVJfU09SVF9HTFlQSFMQChIgChxSRU5ERVJfTEFZRVJfQ09MX0RSQUdfTUFSS0VSEA'
+    'sSGwoXUkVOREVSX0xBWUVSX0NIRUNLQk9YRVMQDBIhCh1SRU5ERVJfTEFZRVJfRFJPUERPV05f'
+    'QlVUVE9OUxANEhoKFlJFTkRFUl9MQVlFUl9TRUxFQ1RJT04QDhIgChxSRU5ERVJfTEFZRVJfSE'
+    '9WRVJfSElHSExJR0hUEA8SIAocUkVOREVSX0xBWUVSX0VESVRfSElHSExJR0hUUxAQEhsKF1JF'
+    'TkRFUl9MQVlFUl9GT0NVU19SRUNUEBESHAoYUkVOREVSX0xBWUVSX0ZJTExfSEFORExFEBISGA'
+    'oUUkVOREVSX0xBWUVSX09VVExJTkUQExIfChtSRU5ERVJfTEFZRVJfRlJPWkVOX0JPUkRFUlMQ'
+    'FBIeChpSRU5ERVJfTEFZRVJfQUNUSVZFX0VESVRPUhAVEiAKHFJFTkRFUl9MQVlFUl9BQ1RJVk'
+    'VfRFJPUERPV04QFhIcChhSRU5ERVJfTEFZRVJfU0NST0xMX0JBUlMQFxIcChhSRU5ERVJfTEFZ'
+    'RVJfRkFTVF9TQ1JPTEwQGBIeChpSRU5ERVJfTEFZRVJfREVCVUdfT1ZFUkxBWRAZ');
+
 @$core.Deprecated('Use rowIndicatorSlotKindDescriptor instead')
 const RowIndicatorSlotKind$json = {
   '1': 'RowIndicatorSlotKind',
@@ -3372,6 +3423,15 @@ const RenderConfig$json = {
       '10': 'targetFrameRateHz',
       '17': true
     },
+    {
+      '1': 'render_layer_mask',
+      '3': 9,
+      '4': 1,
+      '5': 3,
+      '9': 8,
+      '10': 'renderLayerMask',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_renderer_mode'},
@@ -3382,6 +3442,7 @@ const RenderConfig$json = {
     {'1': '_present_mode'},
     {'1': '_frame_pacing_mode'},
     {'1': '_target_frame_rate_hz'},
+    {'1': '_render_layer_mask'},
   ],
 };
 
@@ -3395,11 +3456,12 @@ final $typed_data.Uint8List renderConfigDescriptor = $convert.base64Decode(
     'V0Q2FjaGVDYXCIAQESQgoMcHJlc2VudF9tb2RlGAYgASgOMhoudm9sdm94Z3JpZC52MS5QcmVz'
     'ZW50TW9kZUgFUgtwcmVzZW50TW9kZYgBARJPChFmcmFtZV9wYWNpbmdfbW9kZRgHIAEoDjIeLn'
     'ZvbHZveGdyaWQudjEuRnJhbWVQYWNpbmdNb2RlSAZSD2ZyYW1lUGFjaW5nTW9kZYgBARI0ChR0'
-    'YXJnZXRfZnJhbWVfcmF0ZV9oehgIIAEoBUgHUhF0YXJnZXRGcmFtZVJhdGVIeogBAUIQCg5fcm'
-    'VuZGVyZXJfbW9kZUIQCg5fZGVidWdfb3ZlcmxheUIUChJfYW5pbWF0aW9uX2VuYWJsZWRCGAoW'
-    'X2FuaW1hdGlvbl9kdXJhdGlvbl9tc0IYChZfdGV4dF9sYXlvdXRfY2FjaGVfY2FwQg8KDV9wcm'
-    'VzZW50X21vZGVCFAoSX2ZyYW1lX3BhY2luZ19tb2RlQhcKFV90YXJnZXRfZnJhbWVfcmF0ZV9o'
-    'eg==');
+    'YXJnZXRfZnJhbWVfcmF0ZV9oehgIIAEoBUgHUhF0YXJnZXRGcmFtZVJhdGVIeogBARIvChFyZW'
+    '5kZXJfbGF5ZXJfbWFzaxgJIAEoA0gIUg9yZW5kZXJMYXllck1hc2uIAQFCEAoOX3JlbmRlcmVy'
+    'X21vZGVCEAoOX2RlYnVnX292ZXJsYXlCFAoSX2FuaW1hdGlvbl9lbmFibGVkQhgKFl9hbmltYX'
+    'Rpb25fZHVyYXRpb25fbXNCGAoWX3RleHRfbGF5b3V0X2NhY2hlX2NhcEIPCg1fcHJlc2VudF9t'
+    'b2RlQhQKEl9mcmFtZV9wYWNpbmdfbW9kZUIXChVfdGFyZ2V0X2ZyYW1lX3JhdGVfaHpCFAoSX3'
+    'JlbmRlcl9sYXllcl9tYXNr');
 
 @$core.Deprecated('Use rowIndicatorSlotDescriptor instead')
 const RowIndicatorSlot$json = {

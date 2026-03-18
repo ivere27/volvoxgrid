@@ -47,34 +47,50 @@ impl<'a> Canvas for CpuCanvas<'a> {
     }
 
     fn fill_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: u32) {
-        let r = ((color >> 16) & 0xFF) as u8;
-        let g = ((color >> 8) & 0xFF) as u8;
-        let b = (color & 0xFF) as u8;
-        let a = ((color >> 24) & 0xFF) as u8;
+        let x0 = x.max(0) as usize;
+        let y0 = y.max(0) as usize;
+        let x1 = (x + w).min(self.width) as usize;
+        let y1 = (y + h).min(self.height) as usize;
+        if x0 >= x1 || y0 >= y1 {
+            return;
+        }
 
-        let x0 = x.max(0);
-        let y0 = y.max(0);
-        let x1 = (x + w).min(self.width);
-        let y1 = (y + h).min(self.height);
+        let stride = self.stride as usize;
+        let pixel = color.to_ne_bytes(); // ARGB → native byte order
+        // We store RGBA in the buffer, so rearrange:
+        let rgba = [
+            ((color >> 16) & 0xFF) as u8,
+            ((color >> 8) & 0xFF) as u8,
+            (color & 0xFF) as u8,
+            ((color >> 24) & 0xFF) as u8,
+        ];
+        let _ = pixel;
 
-        for py in y0..y1 {
-            let row_off = (py * self.stride) as usize;
-            for px in x0..x1 {
-                let off = row_off + (px * 4) as usize;
-                if off + 3 < self.buf.len() {
-                    self.buf[off] = r;
-                    self.buf[off + 1] = g;
-                    self.buf[off + 2] = b;
-                    self.buf[off + 3] = a;
-                }
+        let row_bytes = (x1 - x0) * 4;
+        let first_row_start = y0 * stride + x0 * 4;
+        let first_row_end = first_row_start + row_bytes;
+
+        if first_row_end > self.buf.len() {
+            return;
+        }
+
+        // Fill first row pixel-by-pixel
+        for chunk in self.buf[first_row_start..first_row_end].chunks_exact_mut(4) {
+            chunk.copy_from_slice(&rgba);
+        }
+
+        // Copy first row to remaining rows
+        for py in (y0 + 1)..y1 {
+            let dst_start = py * stride + x0 * 4;
+            let dst_end = dst_start + row_bytes;
+            if dst_end > self.buf.len() {
+                break;
             }
+            self.buf.copy_within(first_row_start..first_row_end, dst_start);
         }
     }
 
     fn blend_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: u32) {
-        let src_r = ((color >> 16) & 0xFF) as u32;
-        let src_g = ((color >> 8) & 0xFF) as u32;
-        let src_b = (color & 0xFF) as u32;
         let src_a = ((color >> 24) & 0xFF) as u32;
 
         if src_a == 0 {
@@ -85,49 +101,62 @@ impl<'a> Canvas for CpuCanvas<'a> {
             return;
         }
 
+        let src_r = ((color >> 16) & 0xFF) as u32;
+        let src_g = ((color >> 8) & 0xFF) as u32;
+        let src_b = (color & 0xFF) as u32;
         let inv_a = 255 - src_a;
-        let x0 = x.max(0);
-        let y0 = y.max(0);
-        let x1 = (x + w).min(self.width);
-        let y1 = (y + h).min(self.height);
+
+        let x0 = x.max(0) as usize;
+        let y0 = y.max(0) as usize;
+        let x1 = (x + w).min(self.width) as usize;
+        let y1 = (y + h).min(self.height) as usize;
+        if x0 >= x1 || y0 >= y1 {
+            return;
+        }
+
+        let stride = self.stride as usize;
+        let row_bytes = (x1 - x0) * 4;
 
         for py in y0..y1 {
-            let row_off = (py * self.stride) as usize;
-            for px in x0..x1 {
-                let off = row_off + (px * 4) as usize;
-                if off + 3 < self.buf.len() {
-                    let dr = self.buf[off] as u32;
-                    let dg = self.buf[off + 1] as u32;
-                    let db = self.buf[off + 2] as u32;
-                    self.buf[off] = ((src_r * src_a + dr * inv_a + 127) / 255) as u8;
-                    self.buf[off + 1] = ((src_g * src_a + dg * inv_a + 127) / 255) as u8;
-                    self.buf[off + 2] = ((src_b * src_a + db * inv_a + 127) / 255) as u8;
-                    self.buf[off + 3] = 255;
-                }
+            let row_start = py * stride + x0 * 4;
+            let row_end = row_start + row_bytes;
+            if row_end > self.buf.len() {
+                break;
+            }
+            for chunk in self.buf[row_start..row_end].chunks_exact_mut(4) {
+                let dr = chunk[0] as u32;
+                let dg = chunk[1] as u32;
+                let db = chunk[2] as u32;
+                chunk[0] = ((src_r * src_a + dr * inv_a + 127) / 255) as u8;
+                chunk[1] = ((src_g * src_a + dg * inv_a + 127) / 255) as u8;
+                chunk[2] = ((src_b * src_a + db * inv_a + 127) / 255) as u8;
+                chunk[3] = 255;
             }
         }
     }
 
     fn hline(&mut self, x: i32, y: i32, w: i32, color: u32) {
-        let py = y;
-        if py < 0 || py >= self.height {
+        if y < 0 || y >= self.height || w <= 0 {
             return;
         }
-        let r = ((color >> 16) & 0xFF) as u8;
-        let g = ((color >> 8) & 0xFF) as u8;
-        let b = (color & 0xFF) as u8;
-        let a = ((color >> 24) & 0xFF) as u8;
-        let x0 = x.max(0);
-        let x1 = (x + w).min(self.width);
-        let row_off = (py * self.stride) as usize;
-        for px in x0..x1 {
-            let off = row_off + (px * 4) as usize;
-            if off + 3 < self.buf.len() {
-                self.buf[off] = r;
-                self.buf[off + 1] = g;
-                self.buf[off + 2] = b;
-                self.buf[off + 3] = a;
-            }
+        let rgba = [
+            ((color >> 16) & 0xFF) as u8,
+            ((color >> 8) & 0xFF) as u8,
+            (color & 0xFF) as u8,
+            ((color >> 24) & 0xFF) as u8,
+        ];
+        let x0 = x.max(0) as usize;
+        let x1 = (x + w).min(self.width) as usize;
+        if x0 >= x1 {
+            return;
+        }
+        let start = y as usize * self.stride as usize + x0 * 4;
+        let end = start + (x1 - x0) * 4;
+        if end > self.buf.len() {
+            return;
+        }
+        for chunk in self.buf[start..end].chunks_exact_mut(4) {
+            chunk.copy_from_slice(&rgba);
         }
     }
 

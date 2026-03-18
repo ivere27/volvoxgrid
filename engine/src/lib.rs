@@ -12,6 +12,7 @@ pub mod demo;
 pub mod animation;
 pub mod canvas;
 pub mod canvas_cpu;
+pub mod debug_font;
 #[cfg(feature = "gpu")]
 pub mod canvas_gpu;
 pub mod cell;

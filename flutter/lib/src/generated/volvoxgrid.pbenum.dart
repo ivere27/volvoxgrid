@@ -1203,6 +1203,98 @@ class IconAlign extends $pb.ProtobufEnum {
   const IconAlign._(super.value, super.name);
 }
 
+/// ── Render layer bit positions (for render_layer_mask bitmask) ──
+class RenderLayerBit extends $pb.ProtobufEnum {
+  static const RenderLayerBit RENDER_LAYER_OVERLAY_BANDS =
+      RenderLayerBit._(0, _omitEnumNames ? '' : 'RENDER_LAYER_OVERLAY_BANDS');
+  static const RenderLayerBit RENDER_LAYER_INDICATORS =
+      RenderLayerBit._(1, _omitEnumNames ? '' : 'RENDER_LAYER_INDICATORS');
+  static const RenderLayerBit RENDER_LAYER_BACKGROUNDS =
+      RenderLayerBit._(2, _omitEnumNames ? '' : 'RENDER_LAYER_BACKGROUNDS');
+  static const RenderLayerBit RENDER_LAYER_PROGRESS_BARS =
+      RenderLayerBit._(3, _omitEnumNames ? '' : 'RENDER_LAYER_PROGRESS_BARS');
+  static const RenderLayerBit RENDER_LAYER_GRID_LINES =
+      RenderLayerBit._(4, _omitEnumNames ? '' : 'RENDER_LAYER_GRID_LINES');
+  static const RenderLayerBit RENDER_LAYER_HEADER_MARKS =
+      RenderLayerBit._(5, _omitEnumNames ? '' : 'RENDER_LAYER_HEADER_MARKS');
+  static const RenderLayerBit RENDER_LAYER_BACKGROUND_IMAGE = RenderLayerBit._(
+      6, _omitEnumNames ? '' : 'RENDER_LAYER_BACKGROUND_IMAGE');
+  static const RenderLayerBit RENDER_LAYER_CELL_BORDERS =
+      RenderLayerBit._(7, _omitEnumNames ? '' : 'RENDER_LAYER_CELL_BORDERS');
+  static const RenderLayerBit RENDER_LAYER_CELL_TEXT =
+      RenderLayerBit._(8, _omitEnumNames ? '' : 'RENDER_LAYER_CELL_TEXT');
+  static const RenderLayerBit RENDER_LAYER_CELL_PICTURES =
+      RenderLayerBit._(9, _omitEnumNames ? '' : 'RENDER_LAYER_CELL_PICTURES');
+  static const RenderLayerBit RENDER_LAYER_SORT_GLYPHS =
+      RenderLayerBit._(10, _omitEnumNames ? '' : 'RENDER_LAYER_SORT_GLYPHS');
+  static const RenderLayerBit RENDER_LAYER_COL_DRAG_MARKER = RenderLayerBit._(
+      11, _omitEnumNames ? '' : 'RENDER_LAYER_COL_DRAG_MARKER');
+  static const RenderLayerBit RENDER_LAYER_CHECKBOXES =
+      RenderLayerBit._(12, _omitEnumNames ? '' : 'RENDER_LAYER_CHECKBOXES');
+  static const RenderLayerBit RENDER_LAYER_DROPDOWN_BUTTONS = RenderLayerBit._(
+      13, _omitEnumNames ? '' : 'RENDER_LAYER_DROPDOWN_BUTTONS');
+  static const RenderLayerBit RENDER_LAYER_SELECTION =
+      RenderLayerBit._(14, _omitEnumNames ? '' : 'RENDER_LAYER_SELECTION');
+  static const RenderLayerBit RENDER_LAYER_HOVER_HIGHLIGHT = RenderLayerBit._(
+      15, _omitEnumNames ? '' : 'RENDER_LAYER_HOVER_HIGHLIGHT');
+  static const RenderLayerBit RENDER_LAYER_EDIT_HIGHLIGHTS = RenderLayerBit._(
+      16, _omitEnumNames ? '' : 'RENDER_LAYER_EDIT_HIGHLIGHTS');
+  static const RenderLayerBit RENDER_LAYER_FOCUS_RECT =
+      RenderLayerBit._(17, _omitEnumNames ? '' : 'RENDER_LAYER_FOCUS_RECT');
+  static const RenderLayerBit RENDER_LAYER_FILL_HANDLE =
+      RenderLayerBit._(18, _omitEnumNames ? '' : 'RENDER_LAYER_FILL_HANDLE');
+  static const RenderLayerBit RENDER_LAYER_OUTLINE =
+      RenderLayerBit._(19, _omitEnumNames ? '' : 'RENDER_LAYER_OUTLINE');
+  static const RenderLayerBit RENDER_LAYER_FROZEN_BORDERS =
+      RenderLayerBit._(20, _omitEnumNames ? '' : 'RENDER_LAYER_FROZEN_BORDERS');
+  static const RenderLayerBit RENDER_LAYER_ACTIVE_EDITOR =
+      RenderLayerBit._(21, _omitEnumNames ? '' : 'RENDER_LAYER_ACTIVE_EDITOR');
+  static const RenderLayerBit RENDER_LAYER_ACTIVE_DROPDOWN = RenderLayerBit._(
+      22, _omitEnumNames ? '' : 'RENDER_LAYER_ACTIVE_DROPDOWN');
+  static const RenderLayerBit RENDER_LAYER_SCROLL_BARS =
+      RenderLayerBit._(23, _omitEnumNames ? '' : 'RENDER_LAYER_SCROLL_BARS');
+  static const RenderLayerBit RENDER_LAYER_FAST_SCROLL =
+      RenderLayerBit._(24, _omitEnumNames ? '' : 'RENDER_LAYER_FAST_SCROLL');
+  static const RenderLayerBit RENDER_LAYER_DEBUG_OVERLAY =
+      RenderLayerBit._(25, _omitEnumNames ? '' : 'RENDER_LAYER_DEBUG_OVERLAY');
+
+  static const $core.List<RenderLayerBit> values = <RenderLayerBit>[
+    RENDER_LAYER_OVERLAY_BANDS,
+    RENDER_LAYER_INDICATORS,
+    RENDER_LAYER_BACKGROUNDS,
+    RENDER_LAYER_PROGRESS_BARS,
+    RENDER_LAYER_GRID_LINES,
+    RENDER_LAYER_HEADER_MARKS,
+    RENDER_LAYER_BACKGROUND_IMAGE,
+    RENDER_LAYER_CELL_BORDERS,
+    RENDER_LAYER_CELL_TEXT,
+    RENDER_LAYER_CELL_PICTURES,
+    RENDER_LAYER_SORT_GLYPHS,
+    RENDER_LAYER_COL_DRAG_MARKER,
+    RENDER_LAYER_CHECKBOXES,
+    RENDER_LAYER_DROPDOWN_BUTTONS,
+    RENDER_LAYER_SELECTION,
+    RENDER_LAYER_HOVER_HIGHLIGHT,
+    RENDER_LAYER_EDIT_HIGHLIGHTS,
+    RENDER_LAYER_FOCUS_RECT,
+    RENDER_LAYER_FILL_HANDLE,
+    RENDER_LAYER_OUTLINE,
+    RENDER_LAYER_FROZEN_BORDERS,
+    RENDER_LAYER_ACTIVE_EDITOR,
+    RENDER_LAYER_ACTIVE_DROPDOWN,
+    RENDER_LAYER_SCROLL_BARS,
+    RENDER_LAYER_FAST_SCROLL,
+    RENDER_LAYER_DEBUG_OVERLAY,
+  ];
+
+  static final $core.List<RenderLayerBit?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 25);
+  static RenderLayerBit? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const RenderLayerBit._(super.value, super.name);
+}
+
 class RowIndicatorSlotKind extends $pb.ProtobufEnum {
   static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_NONE =
       RowIndicatorSlotKind._(

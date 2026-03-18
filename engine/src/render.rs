@@ -4,7 +4,7 @@
 //! buffer. Actual rendering logic lives in `canvas.rs` (shared with the GPU
 //! path); this module creates a `CpuCanvas` and delegates to `render_grid()`.
 
-use crate::canvas::render_grid;
+use crate::canvas::{render_grid, RenderResult};
 use crate::canvas_cpu::CpuCanvas;
 use crate::grid::VolvoxGrid;
 #[cfg(test)]
@@ -88,8 +88,7 @@ impl Renderer {
     /// `buffer` must be at least `stride * height` bytes.  `stride` is the
     /// number of bytes per row (typically `width * 4` for RGBA with no padding).
     ///
-    /// Returns a dirty rect `(x, y, w, h)` describing the region that was
-    /// painted.  Currently the entire viewport is always repainted.
+    /// Returns `RenderResult`: dirty rect, per-layer times (us), zone cell counts.
     pub fn render(
         &mut self,
         grid: &VolvoxGrid,
@@ -97,9 +96,9 @@ impl Renderer {
         width: i32,
         height: i32,
         stride: i32,
-    ) -> (i32, i32, i32, i32) {
+    ) -> RenderResult {
         if width <= 0 || height <= 0 || buffer.len() < (stride * height) as usize {
-            return (0, 0, 0, 0);
+            return ((0, 0, 0, 0), [0.0; crate::canvas::layer::COUNT], [0; 4]);
         }
 
         // Keep renderer-owned text cache policy in sync with runtime grid config.

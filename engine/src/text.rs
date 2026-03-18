@@ -1,7 +1,9 @@
 #[cfg(feature = "cosmic-text")]
 use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, SwashCache};
 #[cfg(feature = "cosmic-text")]
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
+#[cfg(feature = "cosmic-text")]
+use std::hash::{BuildHasher, Hash, Hasher};
 
 use crate::glyph_rasterizer::ExternalGlyphRasterizer;
 use crate::proto::volvoxgrid::v1 as pb;
@@ -110,10 +112,15 @@ pub struct TextEngine {
     #[cfg(feature = "cosmic-text")]
     pub swash_cache: SwashCache,
     #[cfg(feature = "cosmic-text")]
-    pub layout_cache: HashMap<MeasureKey, CachedLayout>,
+    pub layout_cache: hashbrown::HashMap<MeasureKey, CachedLayout>,
     #[cfg(feature = "cosmic-text")]
     pub layout_fifo: VecDeque<MeasureKey>,
     pub layout_cache_cap: usize,
+
+    /// Monotonically increasing counter bumped when fonts change.
+    /// Downstream caches (e.g. GPU glyph position cache) compare this
+    /// to detect staleness.
+    pub font_generation: u64,
 
     render_options: TextRenderOptions,
     external_rasterizer: Option<Box<dyn ExternalGlyphRasterizer>>,
@@ -137,9 +144,10 @@ impl TextEngine {
             Self {
                 font_system,
                 swash_cache: SwashCache::new(),
-                layout_cache: HashMap::new(),
+                layout_cache: hashbrown::HashMap::new(),
                 layout_fifo: VecDeque::new(),
                 layout_cache_cap: DEFAULT_LAYOUT_CACHE_CAP,
+                font_generation: 0,
                 render_options: TextRenderOptions {
                     render_mode: pb::TextRenderMode::TextRenderAuto as i32,
                     hinting_mode: pb::TextHintingMode::TextHintAuto as i32,
@@ -153,6 +161,7 @@ impl TextEngine {
         {
             Self {
                 layout_cache_cap: DEFAULT_LAYOUT_CACHE_CAP,
+                font_generation: 0,
                 render_options: TextRenderOptions {
                     render_mode: pb::TextRenderMode::TextRenderAuto as i32,
                     hinting_mode: pb::TextHintingMode::TextHintAuto as i32,
@@ -286,6 +295,7 @@ impl TextEngine {
             self.layout_cache.clear();
             self.layout_fifo.clear();
         }
+        self.font_generation += 1;
         #[cfg(not(feature = "cosmic-text"))]
         let _ = data;
     }
@@ -326,35 +336,49 @@ impl TextEngine {
         self.external_renderer = r;
     }
 
-    fn make_measure_key(
+    /// Compute the hash of key components without allocating String fields.
+    #[cfg(feature = "cosmic-text")]
+    fn hash_key_components(
+        hasher_builder: &impl BuildHasher,
         text: &str,
         font_name: &str,
-        font_size: f32,
+        font_size_bits: u32,
         bold: bool,
         italic: bool,
-        max_width: Option<f32>,
-    ) -> Option<MeasureKey> {
-        // Avoid caching very large unique payloads.
-        if text.len() > 96 {
-            return None;
-        }
-        let max_width_quarter_px = match max_width {
-            Some(w) => (w * 4.0).round() as i32,
-            None => -1,
-        };
-        Some(MeasureKey {
-            text: text.to_string(),
-            font_name: font_name.to_string(),
-            font_size_bits: font_size.to_bits(),
-            bold,
-            italic,
-            max_width_quarter_px,
-        })
+        max_width_quarter_px: i32,
+    ) -> u64 {
+        let mut h = hasher_builder.build_hasher();
+        text.hash(&mut h);
+        font_name.hash(&mut h);
+        font_size_bits.hash(&mut h);
+        bold.hash(&mut h);
+        italic.hash(&mut h);
+        max_width_quarter_px.hash(&mut h);
+        h.finish()
+    }
+
+    /// Check whether a `MeasureKey` matches borrowed key components.
+    #[cfg(feature = "cosmic-text")]
+    fn key_matches(
+        k: &MeasureKey,
+        text: &str,
+        font_name: &str,
+        font_size_bits: u32,
+        bold: bool,
+        italic: bool,
+        max_width_quarter_px: i32,
+    ) -> bool {
+        k.font_size_bits == font_size_bits
+            && k.bold == bold
+            && k.italic == italic
+            && k.max_width_quarter_px == max_width_quarter_px
+            && k.text == text
+            && k.font_name == font_name
     }
 
     #[cfg(feature = "cosmic-text")]
     pub fn get_or_shape_buffer<'a>(
-        layout_cache: &'a mut HashMap<MeasureKey, CachedLayout>,
+        layout_cache: &'a mut hashbrown::HashMap<MeasureKey, CachedLayout>,
         layout_fifo: &mut VecDeque<MeasureKey>,
         cache_cap: usize,
         font_system: &mut FontSystem,
@@ -368,13 +392,39 @@ impl TextEngine {
         if text.is_empty() || font_system.db().len() == 0 {
             return None;
         }
-        let cache_key = Self::make_measure_key(text, font_name, font_size, bold, italic, max_width);
-        if let Some(key) = cache_key.as_ref() {
-            if layout_cache.contains_key(key) {
-                return Some(LayoutResult::Cached(layout_cache.get(key).unwrap()));
+
+        // Skip caching very large unique payloads.
+        let cacheable = text.len() <= 96;
+
+        let font_size_bits = font_size.to_bits();
+        let max_width_quarter_px = match max_width {
+            Some(w) => (w * 4.0).round() as i32,
+            None => -1,
+        };
+
+        // Fast-path: probe the cache using borrowed &str — zero allocation.
+        if cacheable {
+            let hash = Self::hash_key_components(
+                layout_cache.hasher(),
+                text,
+                font_name,
+                font_size_bits,
+                bold,
+                italic,
+                max_width_quarter_px,
+            );
+            if let Some((_, v)) = layout_cache.raw_entry().from_hash(hash, |k| {
+                Self::key_matches(k, text, font_name, font_size_bits, bold, italic, max_width_quarter_px)
+            }) {
+                // SAFETY: Convert the shared reference lifetime. The entry
+                // lives in layout_cache which is borrowed for 'a. We
+                // return early so the mutable borrow below is never reached.
+                let stable: &'a CachedLayout = unsafe { &*(v as *const CachedLayout) };
+                return Some(LayoutResult::Cached(stable));
             }
         }
 
+        // Cache miss — perform text shaping.
         let line_height = (font_size * 1.2).ceil();
         let metrics = Metrics::new(font_size, line_height);
         let attrs = Self::make_attrs(font_system, font_name, bold, italic);
@@ -405,16 +455,23 @@ impl TextEngine {
             measured_height: height.ceil(),
         };
 
-        if let Some(key) = cache_key {
+        if cacheable {
             if cache_cap == 0 {
                 return Some(LayoutResult::Owned(layout));
             }
             Self::enforce_cache_cap(layout_cache, layout_fifo, cache_cap.saturating_sub(1));
             if layout_cache.len() >= cache_cap {
-                // If FIFO is stale/corrupted and cannot evict entries, fail closed.
                 layout_cache.clear();
                 layout_fifo.clear();
             }
+            let key = MeasureKey {
+                text: text.to_string(),
+                font_name: font_name.to_string(),
+                font_size_bits,
+                bold,
+                italic,
+                max_width_quarter_px,
+            };
             layout_fifo.push_back(key.clone());
             layout_cache.insert(key.clone(), layout);
             return Some(LayoutResult::Cached(layout_cache.get(&key).unwrap()));
@@ -425,7 +482,7 @@ impl TextEngine {
 
     #[cfg(feature = "cosmic-text")]
     fn enforce_cache_cap(
-        layout_cache: &mut HashMap<MeasureKey, CachedLayout>,
+        layout_cache: &mut hashbrown::HashMap<MeasureKey, CachedLayout>,
         layout_fifo: &mut VecDeque<MeasureKey>,
         cap: usize,
     ) {

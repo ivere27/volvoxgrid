@@ -1308,6 +1308,15 @@ class VolvoxGridController extends ChangeNotifier {
     await _configure(GridConfig()..rendering = rc);
   }
 
+  /// Set the render layer visibility bitmask.
+  ///
+  /// Each bit corresponds to a [RenderLayerBit] position.
+  /// Pass `Int64(-1)` (all bits set) to show all layers.
+  Future<void> setRenderLayerMask(Int64 mask) async {
+    await _configure(
+        GridConfig()..rendering = (RenderConfig()..renderLayerMask = mask));
+  }
+
   /// Set the text layout cache capacity (0 = disabled).
   Future<void> setTextLayoutCacheCap(int cap) async {
     final safeCap = cap < 0 ? 0 : cap;

@@ -778,6 +778,36 @@ message InteractionConfig {
   HeaderFeatures      header_features  = 10;
 }
 
+// ── Render layer bit positions (for render_layer_mask bitmask) ──
+enum RenderLayerBit {
+  RENDER_LAYER_OVERLAY_BANDS    = 0;
+  RENDER_LAYER_INDICATORS       = 1;
+  RENDER_LAYER_BACKGROUNDS      = 2;
+  RENDER_LAYER_PROGRESS_BARS    = 3;
+  RENDER_LAYER_GRID_LINES       = 4;
+  RENDER_LAYER_HEADER_MARKS     = 5;
+  RENDER_LAYER_BACKGROUND_IMAGE = 6;
+  RENDER_LAYER_CELL_BORDERS     = 7;
+  RENDER_LAYER_CELL_TEXT        = 8;
+  RENDER_LAYER_CELL_PICTURES    = 9;
+  RENDER_LAYER_SORT_GLYPHS      = 10;
+  RENDER_LAYER_COL_DRAG_MARKER  = 11;
+  RENDER_LAYER_CHECKBOXES       = 12;
+  RENDER_LAYER_DROPDOWN_BUTTONS = 13;
+  RENDER_LAYER_SELECTION        = 14;
+  RENDER_LAYER_HOVER_HIGHLIGHT  = 15;
+  RENDER_LAYER_EDIT_HIGHLIGHTS  = 16;
+  RENDER_LAYER_FOCUS_RECT       = 17;
+  RENDER_LAYER_FILL_HANDLE      = 18;
+  RENDER_LAYER_OUTLINE          = 19;
+  RENDER_LAYER_FROZEN_BORDERS   = 20;
+  RENDER_LAYER_ACTIVE_EDITOR    = 21;
+  RENDER_LAYER_ACTIVE_DROPDOWN  = 22;
+  RENDER_LAYER_SCROLL_BARS      = 23;
+  RENDER_LAYER_FAST_SCROLL      = 24;
+  RENDER_LAYER_DEBUG_OVERLAY    = 25;
+}
+
 // ── Rendering ──
 message RenderConfig {
   optional RendererMode    renderer_mode         = 1;
@@ -788,6 +818,7 @@ message RenderConfig {
   optional PresentMode     present_mode          = 6;
   optional FramePacingMode frame_pacing_mode     = 7;
   optional int32           target_frame_rate_hz  = 8;
+  optional int64           render_layer_mask     = 9;   // bitmask using RenderLayerBit; -1 = all on
 }
 
 // ═══════════════════════════════════════════════════════════

@@ -127,6 +127,10 @@ pub struct GlyphAtlas {
     pages: Vec<AtlasPage>,
     cache: HashMap<GlyphKey, GlyphEntry>,
     external_rasterizer: Option<Box<dyn ExternalGlyphRasterizer>>,
+    /// Pre-rasterised 7x13 bitmap-font glyphs for the debug overlay.
+    /// Stored as `(scale, entries)` where each of the 95 printable ASCII
+    /// chars (0x20..=0x7E) maps to an atlas GlyphEntry.
+    bitmap_font: Option<(i32, [GlyphEntry; 95])>,
 }
 
 impl GlyphAtlas {
@@ -135,6 +139,7 @@ impl GlyphAtlas {
             pages: vec![AtlasPage::new()],
             cache: HashMap::new(),
             external_rasterizer: None,
+            bitmap_font: None,
         }
     }
 
@@ -271,6 +276,93 @@ impl GlyphAtlas {
         self.cache.clear();
         self.pages.clear();
         self.pages.push(AtlasPage::new());
+        self.bitmap_font = None;
+    }
+
+    /// Ensure the 95 printable-ASCII bitmap-font glyphs are packed into the
+    /// atlas at the given integer scale.  No-op if already done at this scale.
+    pub fn ensure_bitmap_font(&mut self, scale: i32) {
+        if let Some((s, _)) = &self.bitmap_font {
+            if *s == scale {
+                return;
+            }
+        }
+
+        use crate::debug_font::{FONT, GLYPH_H, GLYPH_W};
+
+        let s = scale as u32;
+        let gw = GLYPH_W as u32 * s;
+        let gh = GLYPH_H as u32 * s;
+
+        let blank = GlyphEntry {
+            page: 0,
+            uv: [0.0; 4],
+            width: 0,
+            height: 0,
+            offset_x: 0,
+            offset_y: 0,
+            advance_width: None,
+        };
+        let mut entries = [blank; 95];
+        let mut alpha = vec![0u8; (gw * gh) as usize];
+
+        for idx in 0..95u32 {
+            let glyph = &FONT[idx as usize];
+
+            // Clear buffer.
+            alpha.iter_mut().for_each(|b| *b = 0);
+
+            // Rasterise at target scale so every texel = 1 screen pixel
+            // (avoids blurry upscale with the atlas's linear sampler).
+            for row in 0..GLYPH_H as u32 {
+                let bits = glyph[row as usize];
+                if bits == 0 {
+                    continue;
+                }
+                for col in 0..GLYPH_W as u32 {
+                    if bits & (0x40 >> col) != 0 {
+                        for dy in 0..s {
+                            for dx in 0..s {
+                                alpha[((row * s + dy) * gw + col * s + dx) as usize] = 0xFF;
+                            }
+                        }
+                    }
+                }
+            }
+
+            let (page_idx, px, py) = self.pack_glyph(gw, gh);
+            self.pages[page_idx].blit(px, py, gw, gh, &alpha);
+
+            let inv = 1.0 / ATLAS_SIZE as f32;
+            entries[idx as usize] = GlyphEntry {
+                page: page_idx,
+                uv: [
+                    px as f32 * inv,
+                    py as f32 * inv,
+                    (px + gw) as f32 * inv,
+                    (py + gh) as f32 * inv,
+                ],
+                width: gw,
+                height: gh,
+                offset_x: 0,
+                offset_y: 0,
+                advance_width: None,
+            };
+        }
+
+        self.bitmap_font = Some((scale, entries));
+    }
+
+    /// Look up a pre-rasterised bitmap-font glyph.
+    /// Returns `None` if `ensure_bitmap_font` hasn't been called or the
+    /// character is outside printable ASCII.
+    pub fn bitmap_glyph(&self, ch: u8) -> Option<GlyphEntry> {
+        let (_, entries) = self.bitmap_font.as_ref()?;
+        if ch >= 0x20 && ch <= 0x7E {
+            Some(entries[(ch - 0x20) as usize])
+        } else {
+            None
+        }
     }
 
     /// Register an external glyph rasterizer (e.g. Canvas2D on WASM).
@@ -402,8 +494,8 @@ impl GlyphAtlas {
 /// Collect glyph quads for a text string positioned at `(x, y)` in pixel
 /// space, clipped to `(clip_x, clip_y, clip_w, clip_h)`.
 ///
-/// Returns a list of `(GlyphEntry, dest_x, dest_y)` tuples that the GPU
-/// renderer converts to `TexturedInstance` data.
+/// Pushes `(GlyphEntry, dest_x, dest_y)` tuples into the caller-supplied
+/// `out` buffer (cleared first), avoiding per-call heap allocation.
 pub fn layout_text_glyphs(
     atlas: &mut GlyphAtlas,
     font_system: &mut FontSystem,
@@ -416,11 +508,12 @@ pub fn layout_text_glyphs(
     italic: bool,
     x: f32,
     y: f32,
-) -> Vec<(GlyphEntry, f32, f32)> {
-    let mut result = Vec::new();
+    out: &mut Vec<(GlyphEntry, f32, f32)>,
+) {
+    out.clear();
 
     if text.is_empty() || font_system.db().len() == 0 {
-        return result;
+        return;
     }
 
     let has_external = atlas.external_rasterizer.is_some();
@@ -453,7 +546,7 @@ pub fn layout_text_glyphs(
                 if entry.width > 0 && entry.height > 0 {
                     let dx = physical.x as f32 + entry.offset_x as f32 + x_adjust;
                     let dy = physical.y as f32 - entry.offset_y as f32;
-                    result.push((entry, dx, dy));
+                    out.push((entry, dx, dy));
                 }
                 // Adjust cumulative offset for externally-rasterized glyphs
                 // whose true advance differs from cosmic-text's .notdef advance.
@@ -463,6 +556,4 @@ pub fn layout_text_glyphs(
             }
         }
     }
-
-    result
 }
