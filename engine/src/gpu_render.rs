@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
-use crate::canvas::render_grid;
+use crate::canvas::{render_grid, RenderResult};
 use crate::canvas_gpu::GpuCanvas;
 use crate::glyph_atlas::GlyphAtlas;
 use crate::grid::VolvoxGrid;
@@ -106,6 +106,14 @@ pub struct GpuRenderer {
 
     // Text shaping engine (shared with CpuCanvas via Canvas trait)
     text_engine: TextEngine,
+
+    // Reusable buffer for glyph layout (avoids per-draw_text allocation)
+    glyph_buf: Vec<(crate::glyph_atlas::GlyphEntry, f32, f32)>,
+
+    // Per-text glyph position cache: maps hash of (text, font, size, bold, italic)
+    // to the Vec of (GlyphEntry, dx, dy) positions. Skips layout_text_glyphs on hit.
+    glyph_pos_cache: hashbrown::HashMap<u64, Vec<(crate::glyph_atlas::GlyphEntry, f32, f32)>>,
+    glyph_pos_cache_font_gen: u64,
 
     // Image texture cache
     _image_textures: HashMap<u64, (wgpu::Texture, wgpu::BindGroup, u32, u32)>,
@@ -280,6 +288,9 @@ impl GpuRenderer {
             atlas_bind_groups: Vec::new(),
             atlas_sampler,
             text_engine,
+            glyph_buf: Vec::new(),
+            glyph_pos_cache: hashbrown::HashMap::new(),
+            glyph_pos_cache_font_gen: 0,
             _image_textures: HashMap::new(),
             rect_instances: Vec::new(),
             textured_instances: Vec::new(),
@@ -902,13 +913,13 @@ impl GpuRenderer {
 
     /// Render directly to the configured GPU surface (zero-copy).
     ///
-    /// Returns the dirty rect `(x, y, w, h)`.
+    /// Returns `RenderResult`: dirty rect, per-layer times (us), zone cell counts.
     pub fn render_to_surface(
         &mut self,
         grid: &VolvoxGrid,
         w: i32,
         h: i32,
-    ) -> Result<(i32, i32, i32, i32), wgpu::SurfaceError> {
+    ) -> Result<RenderResult, wgpu::SurfaceError> {
         let surface = match self.surface.as_ref() {
             Some(s) => s,
             None => return Err(wgpu::SurfaceError::Lost),
@@ -923,10 +934,10 @@ impl GpuRenderer {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        self.render_to_view(grid, &view, w, h);
+        let result = self.render_to_view(grid, &view, w, h);
 
         frame.present();
-        Ok((0, 0, w, h))
+        Ok(result)
     }
 
     /// Render to a CPU buffer (readback mode / fallback).
@@ -940,9 +951,9 @@ impl GpuRenderer {
         w: i32,
         h: i32,
         stride: i32,
-    ) -> (i32, i32, i32, i32) {
+    ) -> RenderResult {
         if w <= 0 || h <= 0 {
-            return (0, 0, 0, 0);
+            return ((0, 0, 0, 0), [0.0; crate::canvas::layer::COUNT], [0; 4]);
         }
 
         let uw = w as u32;
@@ -965,7 +976,7 @@ impl GpuRenderer {
         });
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        self.render_to_view(grid, &view, w, h);
+        let render_result = self.render_to_view(grid, &view, w, h);
 
         // Copy texture to buffer for readback
         let bytes_per_row = uw * 4;
@@ -1041,14 +1052,14 @@ impl GpuRenderer {
             }
         }
 
-        (0, 0, w, h)
+        render_result
     }
 
     // -----------------------------------------------------------------------
     // Internal: render to a wgpu TextureView
     // -----------------------------------------------------------------------
 
-    fn render_to_view(&mut self, grid: &VolvoxGrid, view: &wgpu::TextureView, w: i32, h: i32) {
+    fn render_to_view(&mut self, grid: &VolvoxGrid, view: &wgpu::TextureView, w: i32, h: i32) -> RenderResult {
         // Keep renderer-owned text cache policy in sync with runtime grid config.
         if self.text_engine.layout_cache_cap != grid.text_layout_cache_cap {
             self.text_engine
@@ -1065,12 +1076,19 @@ impl GpuRenderer {
             }),
         );
 
+        // Invalidate glyph position cache when fonts change.
+        let font_gen = self.text_engine.font_generation;
+        if font_gen != self.glyph_pos_cache_font_gen {
+            self.glyph_pos_cache.clear();
+            self.glyph_pos_cache_font_gen = font_gen;
+        }
+
         // Build all instance data
         self.rect_instances.clear();
         self.textured_instances.clear();
         self.overlay_rect_instances.clear();
         self.overlay_textured_instances.clear();
-        {
+        let render_result = {
             let mut gpu_canvas = GpuCanvas::new(
                 &mut self.rect_instances,
                 &mut self.textured_instances,
@@ -1078,11 +1096,13 @@ impl GpuRenderer {
                 &mut self.overlay_textured_instances,
                 &mut self.glyph_atlas,
                 &mut self.text_engine,
+                &mut self.glyph_buf,
+                &mut self.glyph_pos_cache,
                 w,
                 h,
             );
-            render_grid(grid, &mut gpu_canvas);
-        }
+            render_grid(grid, &mut gpu_canvas)
+        };
 
         // Ensure atlas textures are up to date
         self.sync_atlas_textures();
@@ -1193,6 +1213,8 @@ impl GpuRenderer {
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
+
+        render_result
     }
 
     // -----------------------------------------------------------------------

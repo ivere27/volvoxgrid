@@ -2598,8 +2598,12 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                 grid.debug_gpu_backend = gr.backend_name();
                                 grid.debug_gpu_present_mode = gr.present_mode_name();
                                 grid.debug_text_cache_len = gr.text_cache_len() as i32;
-                                let (dx, dy, dw, dh) =
+                                let ((dx, dy, dw, dh), layer_times, zone_counts) =
                                     gr.render_to_buffer(grid, buffer, width, height, stride);
+                                if grid.layer_profiling {
+                                    grid.layer_times_us = layer_times;
+                                    grid.zone_cell_counts = zone_counts;
+                                }
                                 grid.debug_instance_count = gr.instance_count() as i32;
                                 let elapsed = frame_start.elapsed().as_secs_f32() * 1000.0;
                                 grid.debug_frame_time_ms = elapsed;
@@ -2635,7 +2639,11 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             renderer_text_registration = desired_text_registration;
                         }
                         self.sync_fonts_into_renderer(r, &mut cpu_font_count_applied);
-                        let (dx, dy, dw, dh) = r.render(grid, buffer, width, height, stride);
+                        let ((dx, dy, dw, dh), layer_times, zone_counts) = r.render(grid, buffer, width, height, stride);
+                        if grid.layer_profiling {
+                            grid.layer_times_us = layer_times;
+                            grid.zone_cell_counts = zone_counts;
+                        }
                         grid.debug_text_cache_len = r.text_cache_len() as i32;
                         let elapsed = frame_start.elapsed().as_secs_f32() * 1000.0;
                         grid.debug_frame_time_ms = elapsed;
@@ -2895,7 +2903,11 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         grid.debug_gpu_present_mode = gr_present_mode_name;
 
                         match gr.render_to_surface(grid, width, height) {
-                            Ok((dx, dy, dw, dh)) => {
+                            Ok(((dx, dy, dw, dh), layer_times, zone_counts)) => {
+                                if grid.layer_profiling {
+                                    grid.layer_times_us = layer_times;
+                                    grid.zone_cell_counts = zone_counts;
+                                }
                                 grid.debug_instance_count = gr.instance_count() as i32;
                                 let elapsed = frame_start.elapsed().as_secs_f32() * 1000.0;
                                 grid.debug_frame_time_ms = elapsed;

@@ -4477,6 +4477,7 @@ class RenderConfig extends $pb.GeneratedMessage {
     PresentMode? presentMode,
     FramePacingMode? framePacingMode,
     $core.int? targetFrameRateHz,
+    $fixnum.Int64? renderLayerMask,
   }) {
     final result = create();
     if (rendererMode != null) result.rendererMode = rendererMode;
@@ -4489,6 +4490,7 @@ class RenderConfig extends $pb.GeneratedMessage {
     if (presentMode != null) result.presentMode = presentMode;
     if (framePacingMode != null) result.framePacingMode = framePacingMode;
     if (targetFrameRateHz != null) result.targetFrameRateHz = targetFrameRateHz;
+    if (renderLayerMask != null) result.renderLayerMask = renderLayerMask;
     return result;
   }
 
@@ -4516,6 +4518,7 @@ class RenderConfig extends $pb.GeneratedMessage {
     ..aE<FramePacingMode>(7, _omitFieldNames ? '' : 'framePacingMode',
         enumValues: FramePacingMode.values)
     ..aI(8, _omitFieldNames ? '' : 'targetFrameRateHz')
+    ..aInt64(9, _omitFieldNames ? '' : 'renderLayerMask')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4608,6 +4611,15 @@ class RenderConfig extends $pb.GeneratedMessage {
   $core.bool hasTargetFrameRateHz() => $_has(7);
   @$pb.TagNumber(8)
   void clearTargetFrameRateHz() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $fixnum.Int64 get renderLayerMask => $_getI64(8);
+  @$pb.TagNumber(9)
+  set renderLayerMask($fixnum.Int64 value) => $_setInt64(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasRenderLayerMask() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearRenderLayerMask() => $_clearField(9);
 }
 
 class RowIndicatorSlot extends $pb.GeneratedMessage {

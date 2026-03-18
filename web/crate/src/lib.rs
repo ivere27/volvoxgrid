@@ -3179,8 +3179,12 @@ pub fn render(id: i32, width: i32, height: i32) -> i32 {
     let now_ms = js_sys::Date::now();
     maybe_update_debug_memory(id, &mut grid, now_ms);
     let t0 = js_sys::Date::now();
-    let (dirty_x, dirty_y, dirty_w, dirty_h) =
+    let ((dirty_x, dirty_y, dirty_w, dirty_h), layer_times, zone_counts) =
         renderer.render(&grid, &mut buf, width, height, stride);
+    if grid.layer_profiling {
+        grid.layer_times_us = layer_times;
+        grid.zone_cell_counts = zone_counts;
+    }
     let elapsed = (js_sys::Date::now() - t0) as f32;
     grid.debug_frame_time_ms = elapsed;
     grid.debug_fps = grid.debug_fps * 0.9 + (1000.0 / elapsed.max(0.1)) * 0.1;
@@ -3224,8 +3228,30 @@ pub fn has_gpu_renderer() -> bool {
 pub fn set_debug_overlay(id: i32, enabled: bool) {
     with_grid(id, |grid| {
         grid.debug_overlay = enabled;
+        grid.layer_profiling = enabled;
         grid.mark_dirty();
     });
+}
+
+/// Set the render layer mask for a grid.
+#[wasm_bindgen]
+pub fn set_render_layer_mask(id: i32, mask_hi: i32, mask_lo: i32) {
+    with_grid(id, |grid| {
+        grid.render_layer_mask = ((mask_hi as u32 as u64) << 32) | (mask_lo as u32 as u64);
+        grid.mark_dirty();
+    });
+}
+
+/// Get the upper 32 bits of the render layer mask for a grid.
+#[wasm_bindgen]
+pub fn get_render_layer_mask_hi(id: i32) -> i32 {
+    with_grid(id, |grid| (grid.render_layer_mask >> 32) as u32 as i32).unwrap_or(0)
+}
+
+/// Get the lower 32 bits of the render layer mask for a grid.
+#[wasm_bindgen]
+pub fn get_render_layer_mask_lo(id: i32) -> i32 {
+    with_grid(id, |grid| grid.render_layer_mask as u32 as i32).unwrap_or(0)
 }
 
 /// Get the current debug overlay state.
@@ -3409,7 +3435,12 @@ pub fn render_gpu(id: i32, w: i32, h: i32) -> i32 {
     let now_ms = js_sys::Date::now();
     maybe_update_debug_memory(id64, &mut grid, now_ms);
     let t0 = js_sys::Date::now();
-    gpu.render_to_surface(&grid, w, h);
+    if let Ok((_, layer_times, zone_counts)) = gpu.render_to_surface(&grid, w, h) {
+        if grid.layer_profiling {
+            grid.layer_times_us = layer_times;
+            grid.zone_cell_counts = zone_counts;
+        }
+    }
     let elapsed = (js_sys::Date::now() - t0) as f32;
     grid.debug_frame_time_ms = elapsed;
     grid.debug_fps = grid.debug_fps * 0.9 + (1000.0 / elapsed.max(0.1)) * 0.1;

@@ -21,7 +21,8 @@ use gtk4::prelude::*;
 use gtk4::{
     Align, Application, ApplicationWindow, Box as GtkBox, Button, CheckButton, ComboBoxText,
     CssProvider, DrawingArea, DropDown, Entry, EventControllerKey, EventControllerMotion,
-    EventControllerScroll, GestureClick, Label, Orientation, Overlay, Separator, SpinButton,
+    EventControllerScroll, GestureClick, Label, MenuButton, Orientation, Overlay, Popover,
+    ScrolledWindow, Separator, SpinButton,
 };
 use prost::Message;
 
@@ -37,6 +38,35 @@ const DEMO_SALES: &str = "sales";
 const DEMO_HIERARCHY: &str = "hierarchy";
 const SELECTION_MODE_LABELS: [&str; 5] = ["Free", "ByRow", "ByCol", "Listbox", "MultiRange"];
 const FRAME_PACING_LABELS: [&str; 4] = ["Auto", "Platform", "Unlimited", "Fixed"];
+const LAYER_COUNT: usize = 26;
+const LAYER_LABELS: [&str; LAYER_COUNT] = [
+    "Overlay Bands",
+    "Indicators",
+    "Backgrounds",
+    "Progress Bars",
+    "Grid Lines",
+    "Header Marks",
+    "Background Image",
+    "Cell Borders",
+    "Cell Text",
+    "Cell Pictures",
+    "Sort Glyphs",
+    "Col Drag Marker",
+    "Checkboxes",
+    "Dropdown Buttons",
+    "Selection",
+    "Hover Highlight",
+    "Edit Highlights",
+    "Focus Rect",
+    "Fill Handle",
+    "Outline",
+    "Frozen Borders",
+    "Active Editor",
+    "Active Dropdown",
+    "Scroll Bars",
+    "Fast Scroll",
+    "Debug Overlay",
+];
 const INLINE_EDITOR_CSS: &str = r#"
 entry.volvox-inline-editor,
 entry.volvox-inline-editor text {
@@ -332,14 +362,12 @@ struct State {
     followup_frame_scheduled: bool,
     followup_schedule_seq: u64,
     debug_overlay: bool,
-    style_on: bool,
-    span_on: bool,
-    frozen: bool,
+    hover_enabled: bool,
     col_hidden: bool,
-    outline_level: i32,
     suppress_entry_changed: bool,
     suppress_combo_changed: bool,
     edit_overlay_cell: Option<(i32, i32)>,
+    render_layer_mask: u64,
 }
 
 fn main() {
@@ -413,14 +441,12 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         followup_frame_scheduled: false,
         followup_schedule_seq: 0,
         debug_overlay: false,
-        style_on: false,
-        span_on: false,
-        frozen: false,
+        hover_enabled: true,
         col_hidden: false,
-        outline_level: 0,
         suppress_entry_changed: false,
         suppress_combo_changed: false,
         edit_overlay_cell: None,
+        render_layer_mask: u64::MAX,
     };
 
     apply_initial_config(&mut state)?;
@@ -500,11 +526,8 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     frame_pacing_box.append(&frame_pacing_fixed_hz);
     let btn_sort_asc = Button::with_label("SortAsc");
     let btn_sort_desc = Button::with_label("SortDesc");
-    let btn_style = Button::with_label("Style");
-    let btn_span = Button::with_label("Span");
-    let btn_outline = Button::with_label("Outline");
-    let btn_edit = Button::with_label("Edit");
-    let btn_find = Button::with_label("Find");
+    let chk_hover = CheckButton::with_label("Hover");
+    chk_hover.set_active(true);
 
     let btn_save = Button::with_label("Save");
     let btn_load = Button::with_label("Load");
@@ -513,10 +536,6 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     let btn_add_row = Button::with_label("AddRow");
     let btn_del_row = Button::with_label("DelRow");
     let btn_hide_col = Button::with_label("HideCol");
-    let btn_freeze = Button::with_label("Freeze");
-    let btn_autosize = Button::with_label("AutoSize");
-    let btn_print = Button::with_label("Print");
-    let btn_mem = Button::with_label("Mem");
 
     toolbar_row1.append(&btn_demo_sales);
     toolbar_row1.append(&btn_demo_hierarchy);
@@ -527,11 +546,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     toolbar_row1.append(&frame_pacing_box);
     toolbar_row1.append(&btn_sort_asc);
     toolbar_row1.append(&btn_sort_desc);
-    toolbar_row1.append(&btn_style);
-    toolbar_row1.append(&btn_span);
-    toolbar_row1.append(&btn_outline);
-    toolbar_row1.append(&btn_edit);
-    toolbar_row1.append(&btn_find);
+    toolbar_row1.append(&chk_hover);
 
     toolbar_row2.append(&btn_save);
     toolbar_row2.append(&btn_load);
@@ -540,10 +555,39 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     toolbar_row2.append(&btn_add_row);
     toolbar_row2.append(&btn_del_row);
     toolbar_row2.append(&btn_hide_col);
-    toolbar_row2.append(&btn_freeze);
-    toolbar_row2.append(&btn_autosize);
-    toolbar_row2.append(&btn_print);
-    toolbar_row2.append(&btn_mem);
+
+    // Layer checkboxes inside a scrollable popover
+    let layer_box = GtkBox::new(Orientation::Vertical, 2);
+    let btn_all = Button::with_label("All On");
+    let btn_none = Button::with_label("All Off");
+    let btn_row = GtkBox::new(Orientation::Horizontal, 4);
+    btn_row.append(&btn_all);
+    btn_row.append(&btn_none);
+    layer_box.append(&btn_row);
+    layer_box.append(&Separator::new(Orientation::Horizontal));
+
+    let layer_checks: Vec<CheckButton> = (0..LAYER_COUNT)
+        .map(|i| {
+            let chk = CheckButton::with_label(LAYER_LABELS[i]);
+            chk.set_active(true);
+            layer_box.append(&chk);
+            chk
+        })
+        .collect();
+
+    let scrolled = ScrolledWindow::new();
+    scrolled.set_child(Some(&layer_box));
+    scrolled.set_min_content_height(400);
+    scrolled.set_min_content_width(200);
+
+    let popover = Popover::new();
+    popover.set_child(Some(&scrolled));
+
+    let menu_btn = MenuButton::new();
+    menu_btn.set_label("Layers");
+    menu_btn.set_popover(Some(&popover));
+
+    toolbar_row1.append(&menu_btn);
 
     set_demo_button_active(&btn_demo_sales, true);
     set_demo_button_active(&btn_demo_hierarchy, false);
@@ -1124,115 +1168,15 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         let state = Rc::clone(&state);
         let area = drawing_area.clone();
         let status = status_label.clone();
-        let button = btn_style.clone();
-        btn_style.connect_clicked(move |_| {
+        chk_hover.connect_toggled(move |chk| {
             run_action(&state, &area, &status, |st| {
-                st.style_on = !st.style_on;
-                let grid_lines = if st.style_on {
-                    pb::GridLineStyle::GridlineRaised as i32
+                st.hover_enabled = chk.is_active();
+                apply_host_runtime_config(st, st.grid_id)?;
+                Ok(if st.hover_enabled {
+                    "Hover enabled".to_string()
                 } else {
-                    pb::GridLineStyle::GridlineSolid as i32
-                };
-                let alternate = if st.style_on { 0xFFF5F8FF } else { 0xFFFFFFFF };
-                st.client.configure(
-                    st.grid_id,
-                    pb::GridConfig {
-                        style: Some(pb::StyleConfig {
-                            alternate_background: Some(alternate),
-                            grid_lines: Some(pb::GridLines {
-                                style: Some(grid_lines),
-                                direction: Some(pb::GridLineDirection::GridlineBoth as i32),
-                                color: Some(0xFFB7C3D7),
-                                width: Some(1),
-                            }),
-                            ..Default::default()
-                        }),
-                        ..Default::default()
-                    },
-                )?;
-                button.set_label(if st.style_on { "Style: ON" } else { "Style" });
-                Ok(if st.style_on {
-                    "Raised grid-line theme applied".to_string()
-                } else {
-                    "Grid-line theme reset".to_string()
+                    "Hover disabled".to_string()
                 })
-            });
-        });
-    }
-    {
-        let state = Rc::clone(&state);
-        let area = drawing_area.clone();
-        let status = status_label.clone();
-        let button = btn_span.clone();
-        btn_span.connect_clicked(move |_| {
-            run_action(&state, &area, &status, |st| {
-                st.span_on = !st.span_on;
-                let mode = if st.span_on {
-                    pb::CellSpanMode::CellSpanAdjacent as i32
-                } else {
-                    pb::CellSpanMode::CellSpanNone as i32
-                };
-                st.client.configure(
-                    st.grid_id,
-                    pb::GridConfig {
-                        span: Some(pb::SpanConfig {
-                            cell_span: Some(mode),
-                            cell_span_fixed: Some(mode),
-                            ..Default::default()
-                        }),
-                        ..Default::default()
-                    },
-                )?;
-                button.set_label(if st.span_on { "Span: ON" } else { "Span" });
-                Ok(format!(
-                    "Span mode {}",
-                    if st.span_on { "enabled" } else { "disabled" }
-                ))
-            });
-        });
-    }
-    {
-        let state = Rc::clone(&state);
-        let area = drawing_area.clone();
-        let status = status_label.clone();
-        btn_outline.connect_clicked(move |_| {
-            run_action(&state, &area, &status, |st| {
-                st.outline_level = (st.outline_level + 1) % 3;
-                st.client.outline(st.grid_id, st.outline_level)?;
-                Ok(format!("Outline level {}", st.outline_level))
-            });
-        });
-    }
-    {
-        let state = Rc::clone(&state);
-        let area = drawing_area.clone();
-        let status = status_label.clone();
-        let entry = edit_entry.clone();
-        btn_edit.connect_clicked(move |_| {
-            run_action(&state, &area, &status, |st| {
-                let row = active_row(st);
-                let col = active_col(st);
-                st.client.edit_start(st.grid_id, row, col)?;
-                entry.grab_focus();
-                Ok(format!("Edit request for R{} C{}", row + 1, col + 1))
-            });
-        });
-    }
-    {
-        let state = Rc::clone(&state);
-        let area = drawing_area.clone();
-        let status = status_label.clone();
-        btn_find.connect_clicked(move |_| {
-            run_action(&state, &area, &status, |st| {
-                let start_row = active_row(st).max(0);
-                let row = st.client.find_text(st.grid_id, 0, start_row, "Gadget")?;
-                if row >= 0 {
-                    st.client.select_single(st.grid_id, row, 0)?;
-                    st.client.show_cell(st.grid_id, row, 0)?;
-                    Ok(format!("Found Gadget at row {}", row + 1))
-                } else {
-                    Ok("No Gadget row found".to_string())
-                }
             });
         });
     }
@@ -1350,33 +1294,22 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
             });
         });
     }
-    {
+    // ── Layer checkbox handlers ──
+    for i in 0..LAYER_COUNT {
         let state = Rc::clone(&state);
         let area = drawing_area.clone();
         let status = status_label.clone();
-        let button = btn_freeze.clone();
-        btn_freeze.connect_clicked(move |_| {
+        layer_checks[i].connect_toggled(move |chk| {
             run_action(&state, &area, &status, |st| {
-                st.frozen = !st.frozen;
-                let frozen_rows = if st.frozen { Some(1) } else { Some(0) };
-                let frozen_cols = if st.frozen { Some(1) } else { Some(0) };
-                st.client.configure(
-                    st.grid_id,
-                    pb::GridConfig {
-                        layout: Some(pb::LayoutConfig {
-                            frozen_rows,
-                            frozen_cols,
-                            ..Default::default()
-                        }),
-                        ..Default::default()
-                    },
-                )?;
-                button.set_label(if st.frozen { "Freeze: ON" } else { "Freeze" });
-                Ok(if st.frozen {
-                    "Frozen first row/col".to_string()
+                if chk.is_active() {
+                    st.render_layer_mask |= 1u64 << i;
                 } else {
-                    "Unfrozen rows/cols".to_string()
-                })
+                    st.render_layer_mask &= !(1u64 << i);
+                }
+                apply_host_runtime_config(st, st.grid_id)?;
+                let on = st.render_layer_mask.count_ones();
+                Ok(format!("{}: {} ({}/{})", LAYER_LABELS[i],
+                    if chk.is_active() { "ON" } else { "OFF" }, on, LAYER_COUNT))
             });
         });
     }
@@ -1384,16 +1317,15 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         let state = Rc::clone(&state);
         let area = drawing_area.clone();
         let status = status_label.clone();
-        btn_autosize.connect_clicked(move |_| {
+        let checks: Vec<CheckButton> = layer_checks.iter().cloned().collect();
+        btn_all.connect_clicked(move |_| {
+            for chk in &checks {
+                chk.set_active(true);
+            }
             run_action(&state, &area, &status, |st| {
-                let config = st.client.get_config(st.grid_id)?;
-                let cols = config
-                    .layout
-                    .and_then(|layout| layout.cols)
-                    .unwrap_or(1)
-                    .max(1);
-                st.client.auto_size(st.grid_id, 0, cols - 1)?;
-                Ok(format!("Autosized {} columns", cols))
+                st.render_layer_mask = u64::MAX;
+                apply_host_runtime_config(st, st.grid_id)?;
+                Ok("All layers enabled".to_string())
             });
         });
     }
@@ -1401,29 +1333,18 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         let state = Rc::clone(&state);
         let area = drawing_area.clone();
         let status = status_label.clone();
-        btn_print.connect_clicked(move |_| {
+        let checks: Vec<CheckButton> = layer_checks.iter().cloned().collect();
+        btn_none.connect_clicked(move |_| {
+            for chk in &checks {
+                chk.set_active(false);
+            }
             run_action(&state, &area, &status, |st| {
-                let resp = st.client.print(st.grid_id)?;
-                Ok(format!("Rendered {} print pages", resp.pages.len()))
+                st.render_layer_mask = 0;
+                apply_host_runtime_config(st, st.grid_id)?;
+                Ok("All layers disabled".to_string())
             });
         });
     }
-    {
-        let state = Rc::clone(&state);
-        let area = drawing_area.clone();
-        let status = status_label.clone();
-        btn_mem.connect_clicked(move |_| {
-            run_action(&state, &area, &status, |st| {
-                let mem = st.client.get_memory_usage(st.grid_id)?;
-                Ok(format!(
-                    "Memory {} KB, {} cells",
-                    mem.total_bytes / 1024,
-                    mem.cell_count
-                ))
-            });
-        });
-    }
-
     let vbox = GtkBox::new(Orientation::Vertical, 0);
     vbox.append(&toolbar_row1);
     vbox.append(&toolbar_row2);
@@ -1902,10 +1823,17 @@ fn apply_host_runtime_config(state: &State, grid_id: i64) -> Result<(), String> 
                 debug_overlay: Some(state.debug_overlay),
                 frame_pacing_mode: Some(state.frame_pacing_mode),
                 target_frame_rate_hz: Some(state.target_frame_rate_hz),
+                render_layer_mask: Some(state.render_layer_mask as i64),
                 ..Default::default()
             }),
             selection: Some(pb::SelectionConfig {
                 mode: Some(selection_mode_value(state.selection_mode_idx)),
+                hover: Some(pb::HoverConfig {
+                    row: Some(state.hover_enabled),
+                    column: Some(state.hover_enabled),
+                    cell: Some(state.hover_enabled),
+                    ..Default::default()
+                }),
                 ..Default::default()
             }),
             ..Default::default()
@@ -1998,9 +1926,7 @@ fn switch_demo_session(
     state.client.refresh(grid_id)?;
 
     state.current_demo = demo.to_string();
-    state.outline_level = 0;
     state.col_hidden = false;
-    state.frozen = false;
     set_demo_button_active(btn_sales, demo == DEMO_SALES);
     set_demo_button_active(btn_hierarchy, demo == DEMO_HIERARCHY);
     set_demo_button_active(btn_stress, demo == DEMO_STRESS);

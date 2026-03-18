@@ -350,6 +350,16 @@ pub struct VolvoxGrid {
     /// Estimated total heap memory usage of the grid in bytes.
     pub debug_total_mem_bytes: i64,
 
+    // ── Render Layer Profiling ───────────────────────────────────────────
+    /// Bitmask controlling which render layers are enabled (default: all on).
+    pub render_layer_mask: u64,
+    /// Whether per-layer timing is active.
+    pub layer_profiling: bool,
+    /// Per-layer execution time in microseconds from the last frame.
+    pub layer_times_us: [f32; crate::canvas::layer::COUNT],
+    /// Cell counts per zone: [scrollable, sticky, pinned, fixed].
+    pub zone_cell_counts: [u32; 4],
+
     // ── Dirty Flag ────────────────────────────────────────────────────────
     /// Whether the grid has pending changes that require a re-render.
     pub dirty: bool,
@@ -663,6 +673,12 @@ impl VolvoxGrid {
             debug_instance_count: 0,
             debug_text_cache_len: 0,
             debug_total_mem_bytes: 0,
+
+            // Render layer profiling
+            render_layer_mask: u64::MAX,
+            layer_profiling: false,
+            layer_times_us: [0.0; crate::canvas::layer::COUNT],
+            zone_cell_counts: [0; 4],
 
             // Dirty
             dirty: true,

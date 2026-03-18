@@ -14,6 +14,11 @@ use crate::sort::{sort_order_is_ascending as sort_order_is_ascending_internal, S
 use crate::style::{CellStylePatch, HeaderMarkHeight, HighlightStyle, IconSlotStyle};
 use std::collections::BTreeMap;
 
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant as PortableInstant;
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant as PortableInstant;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BorderEdge {
     Top,
@@ -110,6 +115,42 @@ pub trait Canvas {
     fn end_overlay(&mut self) {}
 
     // -- Composed operations (default implementations) -----------------------
+
+    /// Draw a single bitmap-font character (7x13 debug font) at the given
+    /// scale.  Returns the advance width in pixels.
+    ///
+    /// The default implementation renders pixel-by-pixel via `set_pixel` /
+    /// `fill_rect`.  GPU backends override this to emit a single textured
+    /// quad from a pre-rasterised atlas, avoiding tens-of-thousands of tiny
+    /// rect instances per overlay frame.
+    fn draw_bitmap_char(&mut self, x: i32, y: i32, ch: u8, color: u32, scale: i32) -> i32 {
+        use crate::debug_font;
+        let idx = if ch >= 0x20 && ch <= 0x7E {
+            (ch - 0x20) as usize
+        } else {
+            0
+        };
+        let glyph = &debug_font::FONT[idx];
+        let s = scale;
+        for row in 0..debug_font::GLYPH_H {
+            let bits = glyph[row as usize];
+            if bits == 0 {
+                continue;
+            }
+            for col in 0..debug_font::GLYPH_W {
+                if bits & (0x40 >> col) != 0 {
+                    let px = x + col * s;
+                    let py = y + row * s;
+                    if s == 1 {
+                        self.set_pixel(px, py, color);
+                    } else {
+                        self.fill_rect(px, py, s, s, color);
+                    }
+                }
+            }
+        }
+        debug_font::CELL_W * s
+    }
 
     /// Clear the entire canvas with a solid color.
     fn clear(&mut self, color: u32) {
@@ -836,10 +877,13 @@ impl VisibleRange {
 /// 2. Sticky overlay cells
 /// 3. Pinned rows (top then bottom)
 /// 4. Fixed/frozen cells (topmost)
-pub(crate) fn iter_visible_cells<F>(grid: &VolvoxGrid, vp: &VisibleRange, mut f: F)
+///
+/// Returns `[scrollable, sticky, pinned, fixed]` cell counts per zone.
+pub(crate) fn iter_visible_cells<F>(grid: &VolvoxGrid, vp: &VisibleRange, mut f: F) -> [u32; 4]
 where
     F: FnMut(i32, i32, i32, i32, i32, i32),
 {
+    let mut zone_counts: [u32; 4] = [0; 4];
     let col_ranges = [
         (vp.scroll_col_start, vp.scroll_col_end),
         (0, vp.fixed_col_end),
@@ -863,6 +907,7 @@ where
                     continue;
                 }
                 if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
+                    zone_counts[0] += 1;
                     f(row, col, cx, cy, cw, ch);
                 }
             }
@@ -881,6 +926,7 @@ where
                     continue;
                 }
                 if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
+                    zone_counts[1] += 1;
                     f(row, col, cx, cy, cw, ch);
                 }
             }
@@ -909,6 +955,7 @@ where
                     continue;
                 }
                 if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
+                    zone_counts[1] += 1;
                     f(row, col, cx, cy, cw, ch);
                 }
             }
@@ -930,6 +977,7 @@ where
                     continue;
                 }
                 if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
+                    zone_counts[2] += 1;
                     f(row, col, cx, cy, cw, ch);
                 }
             }
@@ -947,11 +995,14 @@ where
                     continue;
                 }
                 if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
+                    zone_counts[3] += 1;
                     f(row, col, cx, cy, cw, ch);
                 }
             }
         }
     }
+
+    zone_counts
 }
 
 // ===========================================================================
@@ -1622,15 +1673,101 @@ pub(crate) fn compute_ellipsis_path_text<C: Canvas>(
 }
 
 // ===========================================================================
+// Render layer bitmask constants
+// ===========================================================================
+
+pub mod layer {
+    pub const OVERLAY_BANDS: u32 = 0;
+    pub const INDICATORS: u32 = 1;
+    pub const BACKGROUNDS: u32 = 2;
+    pub const PROGRESS_BARS: u32 = 3;
+    pub const GRID_LINES: u32 = 4;
+    pub const HEADER_MARKS: u32 = 5;
+    pub const BACKGROUND_IMAGE: u32 = 6;
+    pub const CELL_BORDERS: u32 = 7;
+    pub const CELL_TEXT: u32 = 8;
+    pub const CELL_PICTURES: u32 = 9;
+    pub const SORT_GLYPHS: u32 = 10;
+    pub const COL_DRAG_MARKER: u32 = 11;
+    pub const CHECKBOXES: u32 = 12;
+    pub const DROPDOWN_BUTTONS: u32 = 13;
+    pub const SELECTION: u32 = 14;
+    pub const HOVER_HIGHLIGHT: u32 = 15;
+    pub const EDIT_HIGHLIGHTS: u32 = 16;
+    pub const FOCUS_RECT: u32 = 17;
+    pub const FILL_HANDLE: u32 = 18;
+    pub const OUTLINE: u32 = 19;
+    pub const FROZEN_BORDERS: u32 = 20;
+    pub const ACTIVE_EDITOR: u32 = 21;
+    pub const ACTIVE_DROPDOWN: u32 = 22;
+    pub const SCROLL_BARS: u32 = 23;
+    pub const FAST_SCROLL: u32 = 24;
+    pub const DEBUG_OVERLAY: u32 = 25;
+
+    pub const COUNT: usize = 26;
+    pub const ALL: u64 = (1u64 << COUNT) - 1;
+
+    pub const NAMES: [&str; COUNT] = [
+        "bands",
+        "indicators",
+        "bkgrounds",
+        "progress",
+        "gridlines",
+        "hdr_marks",
+        "bg_image",
+        "borders",
+        "text",
+        "pictures",
+        "sort",
+        "col_drag",
+        "checkbox",
+        "dropdown",
+        "selection",
+        "hover",
+        "edit_hl",
+        "focus",
+        "fill_hnd",
+        "outline",
+        "frozen_bd",
+        "editor",
+        "dd_active",
+        "scrollbar",
+        "fast_scrl",
+        "debug_ovl",
+    ];
+}
+
+/// Return type from `render_grid`: dirty rect, per-layer times (us), zone cell counts.
+pub type RenderResult = ((i32, i32, i32, i32), [f32; layer::COUNT], [u32; 4]);
+
+// ===========================================================================
 // render_grid -- main entry point
 // ===========================================================================
 
-/// Render the entire grid onto a Canvas. Returns dirty rect (x, y, w, h).
-pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> (i32, i32, i32, i32) {
+/// Render the entire grid onto a Canvas. Returns dirty rect, layer times, and zone cell counts.
+pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> RenderResult {
     let w = canvas.width();
     let h = canvas.height();
     if w <= 0 || h <= 0 {
-        return (0, 0, 0, 0);
+        return ((0, 0, 0, 0), [0.0; layer::COUNT], [0; 4]);
+    }
+
+    let mask = grid.render_layer_mask;
+    let profiling = grid.layer_profiling;
+    let mut times = [0.0f32; layer::COUNT];
+
+    macro_rules! run_layer {
+        ($bit:expr, $body:expr) => {
+            if mask & (1u64 << $bit) != 0 {
+                if profiling {
+                    let t0 = PortableInstant::now();
+                    $body;
+                    times[$bit as usize] = t0.elapsed().as_secs_f32() * 1_000_000.0;
+                } else {
+                    $body;
+                }
+            }
+        };
     }
 
     grid.span.clear_span_cache();
@@ -1640,96 +1777,106 @@ pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> (i32, i32, i
 
     // Pre-compute visible cells once; every layer reuses this slice.
     let mut vis_cells: Vec<(i32, i32, i32, i32, i32, i32)> = Vec::new();
-    iter_visible_cells(grid, &vp, |row, col, cx, cy, cw, ch| {
+    let zone_counts = iter_visible_cells(grid, &vp, |row, col, cx, cy, cw, ch| {
         vis_cells.push((row, col, cx, cy, cw, ch));
     });
 
-    render_overlay_bands(grid, canvas, &vp);
-    render_indicator_surfaces(grid, canvas, &vp, &vis_cells);
-    render_backgrounds(grid, canvas, &vis_cells);
+    run_layer!(layer::OVERLAY_BANDS, render_overlay_bands(grid, canvas, &vp));
+    run_layer!(layer::INDICATORS, render_indicator_surfaces(grid, canvas, &vp, &vis_cells));
+    run_layer!(layer::BACKGROUNDS, render_backgrounds(grid, canvas, &vis_cells));
 
-    if grid.style.progress_color != 0 || grid.columns.iter().any(|c| c.progress_color != 0) {
-        render_progress_bars(grid, canvas, &vp, &vis_cells);
-    }
+    run_layer!(layer::PROGRESS_BARS, {
+        if grid.style.progress_color != 0 || grid.columns.iter().any(|c| c.progress_color != 0) {
+            render_progress_bars(grid, canvas, &vp, &vis_cells);
+        }
+    });
 
-    if grid.style.grid_lines != pb::GridLineStyle::GridlineNone as i32
-        || grid.style.grid_lines_fixed != pb::GridLineStyle::GridlineNone as i32
-    {
-        render_grid_lines(grid, canvas, &vis_cells);
-    }
+    run_layer!(layer::GRID_LINES, {
+        if grid.style.grid_lines != pb::GridLineStyle::GridlineNone as i32
+            || grid.style.grid_lines_fixed != pb::GridLineStyle::GridlineNone as i32
+        {
+            render_grid_lines(grid, canvas, &vis_cells);
+        }
+    });
 
-    render_header_marks(grid, canvas, &vp);
-    render_background_image(grid, canvas);
+    run_layer!(layer::HEADER_MARKS, render_header_marks(grid, canvas, &vp));
+    run_layer!(layer::BACKGROUND_IMAGE, render_background_image(grid, canvas));
 
-    if grid.cell_styles.values().any(|s| {
-        s.border.is_some()
-            || s.border_color.is_some()
-            || s.border_top.is_some()
-            || s.border_right.is_some()
-            || s.border_bottom.is_some()
-            || s.border_left.is_some()
-            || s.border_top_color.is_some()
-            || s.border_right_color.is_some()
-            || s.border_bottom_color.is_some()
-            || s.border_left_color.is_some()
-    }) {
-        render_cell_borders(grid, canvas, &vis_cells);
-    }
+    run_layer!(layer::CELL_BORDERS, {
+        if grid.cell_styles.values().any(|s| {
+            s.border.is_some()
+                || s.border_color.is_some()
+                || s.border_top.is_some()
+                || s.border_right.is_some()
+                || s.border_bottom.is_some()
+                || s.border_left.is_some()
+                || s.border_top_color.is_some()
+                || s.border_right_color.is_some()
+                || s.border_bottom_color.is_some()
+                || s.border_left_color.is_some()
+        }) {
+            render_cell_borders(grid, canvas, &vis_cells);
+        }
+    });
 
-    render_cell_text(grid, canvas, &vp, &vis_cells);
-    render_cell_pictures(grid, canvas, &vp, &vis_cells);
-    render_sort_glyphs(grid, canvas, &vp);
-    render_col_drag_marker(grid, canvas, &vp);
+    run_layer!(layer::CELL_TEXT, render_cell_text(grid, canvas, &vp, &vis_cells));
+    run_layer!(layer::CELL_PICTURES, render_cell_pictures(grid, canvas, &vp, &vis_cells));
+    run_layer!(layer::SORT_GLYPHS, render_sort_glyphs(grid, canvas, &vp));
+    run_layer!(layer::COL_DRAG_MARKER, render_col_drag_marker(grid, canvas, &vp));
 
-    if grid
-        .columns
-        .iter()
-        .any(|c| c.data_type == pb::ColumnDataType::ColumnDataBoolean as i32)
-        || grid.style.checkbox_checked_picture.is_some()
-        || grid.style.checkbox_unchecked_picture.is_some()
-        || grid.style.checkbox_indeterminate_picture.is_some()
-        || grid
-            .style
-            .icon_theme_slots
-            .checkbox_checked
-            .as_ref()
-            .is_some_and(|s| !s.trim().is_empty())
-        || grid
-            .style
-            .icon_theme_slots
-            .checkbox_unchecked
-            .as_ref()
-            .is_some_and(|s| !s.trim().is_empty())
-        || grid
-            .style
-            .icon_theme_slots
-            .checkbox_indeterminate
-            .as_ref()
-            .is_some_and(|s| !s.trim().is_empty())
-    {
-        render_checkboxes(grid, canvas, &vp, &vis_cells);
-    }
+    run_layer!(layer::CHECKBOXES, {
+        if grid
+            .columns
+            .iter()
+            .any(|c| c.data_type == pb::ColumnDataType::ColumnDataBoolean as i32)
+            || grid.style.checkbox_checked_picture.is_some()
+            || grid.style.checkbox_unchecked_picture.is_some()
+            || grid.style.checkbox_indeterminate_picture.is_some()
+            || grid
+                .style
+                .icon_theme_slots
+                .checkbox_checked
+                .as_ref()
+                .is_some_and(|s| !s.trim().is_empty())
+            || grid
+                .style
+                .icon_theme_slots
+                .checkbox_unchecked
+                .as_ref()
+                .is_some_and(|s| !s.trim().is_empty())
+            || grid
+                .style
+                .icon_theme_slots
+                .checkbox_indeterminate
+                .as_ref()
+                .is_some_and(|s| !s.trim().is_empty())
+        {
+            render_checkboxes(grid, canvas, &vp, &vis_cells);
+        }
+    });
 
-    if grid.dropdown_trigger != 0 && grid.columns.iter().any(|c| !c.dropdown_items.is_empty()) {
-        render_dropdown_buttons(grid, canvas, &vp, &vis_cells);
-    }
+    run_layer!(layer::DROPDOWN_BUTTONS, {
+        if grid.dropdown_trigger != 0 && grid.columns.iter().any(|c| !c.dropdown_items.is_empty()) {
+            render_dropdown_buttons(grid, canvas, &vp, &vis_cells);
+        }
+    });
 
-    render_selection(grid, canvas, &vis_cells);
-    render_hover_highlight(grid, canvas, &vis_cells);
-    render_edit_highlights(grid, canvas, &vp);
-    render_focus_rect(grid, canvas, &vp);
-    render_fill_handle(grid, canvas, &vp);
-    render_outline(grid, canvas, &vp);
-    render_frozen_borders(grid, canvas, &vp);
+    run_layer!(layer::SELECTION, render_selection(grid, canvas, &vis_cells));
+    run_layer!(layer::HOVER_HIGHLIGHT, render_hover_highlight(grid, canvas, &vis_cells));
+    run_layer!(layer::EDIT_HIGHLIGHTS, render_edit_highlights(grid, canvas, &vp));
+    run_layer!(layer::FOCUS_RECT, render_focus_rect(grid, canvas, &vp));
+    run_layer!(layer::FILL_HANDLE, render_fill_handle(grid, canvas, &vp));
+    run_layer!(layer::OUTLINE, render_outline(grid, canvas, &vp));
+    run_layer!(layer::FROZEN_BORDERS, render_frozen_borders(grid, canvas, &vp));
     canvas.begin_overlay();
-    render_active_editor(grid, canvas, &vp);
-    render_active_dropdown(grid, canvas, &vp);
+    run_layer!(layer::ACTIVE_EDITOR, render_active_editor(grid, canvas, &vp));
+    run_layer!(layer::ACTIVE_DROPDOWN, render_active_dropdown(grid, canvas, &vp));
+    run_layer!(layer::SCROLL_BARS, render_scroll_bars(grid, canvas));
+    run_layer!(layer::FAST_SCROLL, render_fast_scroll(grid, canvas));
+    run_layer!(layer::DEBUG_OVERLAY, render_debug_overlay(grid, canvas, &vp));
     canvas.end_overlay();
-    render_scroll_bars(grid, canvas);
-    render_fast_scroll(grid, canvas);
-    render_debug_overlay(grid, canvas, &vp);
 
-    (0, 0, w, h)
+    ((0, 0, w, h), times, zone_counts)
 }
 
 // ===========================================================================
@@ -5739,21 +5886,28 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visib
         return;
     }
 
+    use crate::debug_font as df;
+
     let buf_w = canvas.width();
     let buf_h = canvas.height();
 
-    let scale = (grid.style.font_size / 14.0).clamp(0.5, 3.0);
-    let font_name = "";
-    let font_size: f32 = (11.0 * scale).round();
-    let line_height: i32 = (font_size * 1.35).ceil() as i32;
-    let padding: i32 = (6.0 * scale).round() as i32;
+    // Keep the debug overlay at a fixed 2x on Android; raw density makes the
+    // bitmap font comically large on modern phones and tablets.
+    #[cfg(target_os = "android")]
+    let s = 2;
+    #[cfg(not(target_os = "android"))]
+    let s = (grid.scale.round() as i32).max(1);
+    let lh = df::line_height(s);
+    let pad = 4 * s;
     let text_color: u32 = 0xFFFFFFFF;
+    let dim_color: u32 = 0xFF808080;
     let bg_color: u32 = 0xC0000000;
 
+    // ── Build header lines ──
     let mut lines: Vec<String> = Vec::new();
 
     lines.push(format!(
-        "Engine v{} · {} · {}",
+        "Engine v{} | {} | {}",
         VolvoxGrid::version(),
         short_commit(VolvoxGrid::git_commit()),
         format_build_date_utc(VolvoxGrid::build_date())
@@ -5792,7 +5946,7 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visib
     };
 
     lines.push(format!(
-        "FPS: {:.1} | {:.1}ms | Q: {} | ID: {} | Z: {:.0}% | Res: {}x{}",
+        "FPS:{:>6.1} {:>5.1}ms Q:{} ID:{} Z:{:.0}% {}x{}",
         grid.debug_fps,
         grid.debug_frame_time_ms,
         grid.debug_instance_count,
@@ -5824,7 +5978,7 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visib
     };
 
     lines.push(format!(
-        "Mode: {} | Grid: {}x{} | {}",
+        "{} {}x{} {}",
         mode_str,
         format_number(grid.rows),
         grid.cols,
@@ -5841,7 +5995,7 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visib
     };
 
     lines.push(format!(
-        "Vis: {}x{}({}) | P: {},{} | M: {} | C: {}/{}",
+        "Vis: {}x{}({}) P:{},{} M:{} C:{}/{}",
         visible_rows,
         visible_cols,
         visible_rows * visible_cols,
@@ -5873,41 +6027,113 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visib
         ));
     }
 
-    let num_lines = lines.len() as i32;
-    let overlay_h = num_lines * line_height + padding * 2;
-    let mut max_text_w: i32 = 0;
-    for line in &lines {
-        let (line_w, _) = canvas.measure_text(line, font_name, font_size, false, false, None);
-        max_text_w = max_text_w.max(line_w.ceil() as i32);
+    // Zone cell counts
+    let zc = &grid.zone_cell_counts;
+    if zc[0] + zc[1] + zc[2] + zc[3] > 0 {
+        lines.push(format!(
+            "Cells: {} scrl {} stky {} pin {} fix",
+            zc[0], zc[1], zc[2], zc[3]
+        ));
     }
-    let min_overlay_w = (320.0 * scale) as i32;
-    let overlay_w = (max_text_w + padding * 2).max(min_overlay_w).min(buf_w);
-    let overlay_x = 0;
-    let overlay_y = buf_h - overlay_h;
 
-    if overlay_y < 0 {
-        return;
+    // Disabled layers
+    if grid.render_layer_mask != u64::MAX {
+        let mut disabled: Vec<&str> = Vec::new();
+        for i in 0..layer::COUNT {
+            if grid.render_layer_mask & (1u64 << i) == 0 {
+                disabled.push(layer::NAMES[i]);
+            }
+        }
+        if !disabled.is_empty() {
+            lines.push(format!("Off: {}", disabled.join(",")));
+        }
     }
+
+    // ── Compute geometry ──
+    let num_header = lines.len() as i32;
+    let mut max_header_w: i32 = 0;
+    for line in &lines {
+        max_header_w = max_header_w.max(df::str_width(line, s));
+    }
+
+    let profiling = grid.layer_profiling;
+    let total_us: f32 = if profiling {
+        grid.layer_times_us.iter().sum()
+    } else {
+        0.0
+    };
+    // Layer grid: 2 columns, ceil(26/2)=13 rows + 1 title
+    let layer_rows = if profiling { (layer::COUNT + 1) / 2 } else { 0 }; // 13
+    let layer_extra = if profiling { 1 + layer_rows as i32 } else { 0 };
+
+    // Column layout for layer grid:
+    // |<name 10ch>|<value 6ch>|<pct 4ch>|<gap 2ch>|<name 10ch>|<value 6ch>|<pct 4ch>|
+    let name_chars = 10;
+    let val_chars = 6; // " 9999u"
+    let pct_chars = 4; // " 99%"
+    let gap_chars = 2;
+    let one_col_chars = name_chars + val_chars + pct_chars;
+    let two_col_chars = one_col_chars * 2 + gap_chars;
+    let layer_grid_w = if profiling {
+        df::str_width("x", s) * two_col_chars as i32
+    } else {
+        0
+    };
+
+    let content_w = max_header_w.max(layer_grid_w);
+    let overlay_w = (content_w + pad * 2).min(buf_w);
+    let overlay_h = ((num_header + layer_extra) * lh + pad * 2).min(buf_h);
+    let overlay_x = 0;
+    let overlay_y = (buf_h - overlay_h).max(0);
 
     canvas.blend_rect(overlay_x, overlay_y, overlay_w, overlay_h, bg_color);
 
-    for (i, line) in lines.iter().enumerate() {
-        let tx = overlay_x + padding;
-        let ty = overlay_y + padding + (i as i32) * line_height;
-        canvas.draw_text(
-            tx,
-            ty,
-            line,
-            font_name,
-            font_size,
-            false,
-            false,
-            text_color,
-            tx,
-            0,
-            overlay_w - padding * 2,
-            line_height,
-            None,
-        );
+    // ── Draw header lines ──
+    let x0 = overlay_x + pad;
+    let mut y = overlay_y + pad;
+    for line in &lines {
+        df::draw_str(canvas, x0, y, line, text_color, s);
+        y += lh;
+    }
+
+    // ── Draw layer profiling grid ──
+    if profiling {
+        // Title
+        let title = format!("Layers: {:5.0}us total", total_us);
+        df::draw_str(canvas, x0, y, &title, text_color, s);
+        y += lh;
+
+        let char_w = df::CELL_W * s;
+        let col2_x = x0 + (one_col_chars + gap_chars) as i32 * char_w;
+        let val_off = name_chars as i32 * char_w;
+        let pct_off = (name_chars + val_chars) as i32 * char_w;
+
+        for i in 0..layer::COUNT {
+            let ci = i / layer_rows; // 0 or 1
+            let ri = i % layer_rows;
+            let cx = if ci == 0 { x0 } else { col2_x };
+            let cy = y + ri as i32 * lh;
+
+            let off = grid.render_layer_mask & (1u64 << i) == 0;
+            let color = if off { dim_color } else { text_color };
+
+            // Name (left-aligned)
+            df::draw_str(canvas, cx, cy, layer::NAMES[i], color, s);
+
+            if off {
+                df::draw_str_right(canvas, cx + pct_off + pct_chars as i32 * char_w, cy, "OFF", dim_color, s);
+            } else if total_us > 0.0 {
+                let t = grid.layer_times_us[i];
+                let pct = t / total_us * 100.0;
+                // Value right-aligned in val column
+                let val_s = format!("{:5.0}u", t);
+                df::draw_str_right(canvas, cx + val_off + val_chars as i32 * char_w, cy, &val_s, color, s);
+                // Percent right-aligned in pct column
+                let pct_s = format!("{:3.0}%", pct);
+                df::draw_str_right(canvas, cx + pct_off + pct_chars as i32 * char_w, cy, &pct_s, color, s);
+            } else {
+                df::draw_str_right(canvas, cx + pct_off + pct_chars as i32 * char_w, cy, "-", color, s);
+            }
+        }
     }
 }

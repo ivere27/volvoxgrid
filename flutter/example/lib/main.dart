@@ -1,3 +1,4 @@
+import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide Align;
 import 'package:flutter/services.dart';
@@ -51,6 +52,16 @@ class DemoPage extends StatefulWidget {
 
 class _DemoPageState extends State<DemoPage> {
   static const List<int> _textCacheCapOptions = [8192, 4096, 1024, 256, 0];
+  static const int _layerCount = 26;
+  static const List<String> _layerNames = [
+    'Overlay Bands', 'Indicators', 'Backgrounds', 'Progress Bars',
+    'Grid Lines', 'Header Marks', 'Background Image', 'Cell Borders',
+    'Cell Text', 'Cell Pictures', 'Sort Glyphs', 'Col Drag Marker',
+    'Checkboxes', 'Dropdown Buttons', 'Selection', 'Hover Highlight',
+    'Edit Highlights', 'Focus Rect', 'Fill Handle', 'Outline',
+    'Frozen Borders', 'Active Editor', 'Active Dropdown', 'Scroll Bars',
+    'Fast Scroll', 'Debug Overlay',
+  ];
 
   final Map<DemoMode, VolvoxGridController> _controllers = {
     for (final mode in DemoMode.values) mode: VolvoxGridController(),
@@ -67,6 +78,7 @@ class _DemoPageState extends State<DemoPage> {
   bool _showDebugOverlay = false;
   RendererBackend _rendererBackend = RendererBackend.cpu;
   int _textLayoutCacheCap = 8192;
+  int _renderLayerMask = -1; // all layers on (u64::MAX as i64)
 
   @override
   void didChangeDependencies() {
@@ -128,6 +140,7 @@ class _DemoPageState extends State<DemoPage> {
     }
     await controller.setDebugOverlay(_showDebugOverlay);
     await controller.setTextLayoutCacheCap(_textLayoutCacheCap);
+    await controller.setRenderLayerMask(Int64(_renderLayerMask));
   }
 
   Future<void> _ensureInitialized(DemoMode mode) {
@@ -200,6 +213,76 @@ class _DemoPageState extends State<DemoPage> {
     await _activeController.sort(SortOrder.SORT_DESCENDING, col: col);
   }
 
+  Future<void> _showLayersDialog() async {
+    var mask = _renderLayerMask;
+    final result = await showDialog<int>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Render Layers'),
+              content: SizedBox(
+                width: 300,
+                height: 400,
+                child: ListView(
+                  children: [
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: () =>
+                              setDialogState(() => mask = -1),
+                          child: const Text('All'),
+                        ),
+                        TextButton(
+                          onPressed: () =>
+                              setDialogState(() => mask = 0),
+                          child: const Text('None'),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 1),
+                    for (var i = 0; i < _layerCount; i++)
+                      CheckboxListTile(
+                        dense: true,
+                        title: Text(_layerNames[i],
+                            style: const TextStyle(fontSize: 13)),
+                        value: mask & (1 << i) != 0,
+                        onChanged: (val) {
+                          setDialogState(() {
+                            if (val == true) {
+                              mask |= 1 << i;
+                            } else {
+                              mask &= ~(1 << i);
+                            }
+                          });
+                        },
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, mask),
+                  child: const Text('Apply'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (result != null && result != _renderLayerMask) {
+      setState(() => _renderLayerMask = result);
+      await _activeController.setRenderLayerMask(Int64(result));
+      await _activeController.refresh();
+    }
+  }
+
   Future<void> _switchRendererBackend(RendererBackend backend) async {
     if (_loading || backend == _rendererBackend) {
       return;
@@ -250,43 +333,26 @@ class _DemoPageState extends State<DemoPage> {
       appBar: AppBar(
         title: const Text('VolvoxGrid Demo'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.arrow_upward),
-            tooltip: 'Sort Ascending',
-            onPressed: _loading ? null : _onSortAscending,
-          ),
-          IconButton(
-            icon: const Icon(Icons.arrow_downward),
-            tooltip: 'Sort Descending',
-            onPressed: _loading ? null : _onSortDescending,
-          ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Mode', style: TextStyle(fontSize: 12)),
-              const SizedBox(width: 6),
-              DropdownButtonHideUnderline(
-                child: DropdownButton<RendererBackend>(
-                  value: _rendererBackend,
-                  isDense: true,
-                  onChanged: _loading
-                      ? null
-                      : (value) async {
-                          if (value == null) return;
-                          await _switchRendererBackend(value);
-                        },
-                  items: RendererBackend.values
-                      .map((mode) => DropdownMenuItem<RendererBackend>(
-                            value: mode,
-                            child: Text(
-                              mode.name.toUpperCase(),
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ))
-                      .toList(),
-                ),
-              ),
-            ],
+          DropdownButtonHideUnderline(
+            child: DropdownButton<RendererBackend>(
+              value: _rendererBackend,
+              isDense: true,
+              onChanged: _loading
+                  ? null
+                  : (value) async {
+                      if (value == null) return;
+                      await _switchRendererBackend(value);
+                    },
+              items: RendererBackend.values
+                  .map((mode) => DropdownMenuItem<RendererBackend>(
+                        value: mode,
+                        child: Text(
+                          mode.name.toUpperCase(),
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ))
+                  .toList(),
+            ),
           ),
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -304,39 +370,77 @@ class _DemoPageState extends State<DemoPage> {
               ),
             ],
           ),
-          Padding(
-            padding: const EdgeInsetsDirectional.only(end: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Cache', style: TextStyle(fontSize: 12)),
-                const SizedBox(width: 6),
-                DropdownButtonHideUnderline(
-                  child: DropdownButton<int>(
-                    value: _textLayoutCacheCap,
-                    isDense: true,
-                    onChanged: _loading
-                        ? null
-                        : (value) async {
-                            if (value == null) return;
-                            setState(() => _textLayoutCacheCap = value);
-                            await _activeController
-                                .setTextLayoutCacheCap(value);
-                            await _activeController.refresh();
-                          },
-                    items: _textCacheCapOptions
-                        .map((cap) => DropdownMenuItem<int>(
-                              value: cap,
-                              child: Text(
-                                '$cap',
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ))
-                        .toList(),
-                  ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Cache', style: TextStyle(fontSize: 12)),
+              const SizedBox(width: 6),
+              DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: _textLayoutCacheCap,
+                  isDense: true,
+                  onChanged: _loading
+                      ? null
+                      : (value) async {
+                          if (value == null) return;
+                          setState(() => _textLayoutCacheCap = value);
+                          await _activeController
+                              .setTextLayoutCacheCap(value);
+                          await _activeController.refresh();
+                        },
+                  items: _textCacheCapOptions
+                      .map((cap) => DropdownMenuItem<int>(
+                            value: cap,
+                            child: Text(
+                              '$cap',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ))
+                      .toList(),
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            enabled: !_loading,
+            onSelected: (value) async {
+              switch (value) {
+                case 'sort_asc':
+                  await _onSortAscending();
+                case 'sort_desc':
+                  await _onSortDescending();
+                case 'layers':
+                  await _showLayersDialog();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'sort_asc',
+                child: ListTile(
+                  leading: Icon(Icons.arrow_upward),
+                  title: Text('Sort Ascending'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'sort_desc',
+                child: ListTile(
+                  leading: Icon(Icons.arrow_downward),
+                  title: Text('Sort Descending'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: 'layers',
+                child: ListTile(
+                  leading: Icon(Icons.layers),
+                  title: Text('Render Layers...'),
+                  dense: true,
+                ),
+              ),
+            ],
           ),
         ],
       ),

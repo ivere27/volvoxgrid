@@ -5,9 +5,30 @@
 //! in a single batched render pass.
 
 use crate::canvas::Canvas;
-use crate::glyph_atlas::{layout_text_glyphs, GlyphAtlas};
+use std::hash::{Hash, Hasher};
+
+use crate::glyph_atlas::{layout_text_glyphs, GlyphAtlas, GlyphEntry};
 use crate::gpu_render::{RectInstance, TexturedInstance};
 use crate::text::TextEngine;
+
+/// Compute a u64 hash for glyph position cache lookup.
+/// Note: max_width is intentionally excluded — glyph x/y offsets are
+/// laid out relative to (0,0) and don't depend on wrap width.
+fn glyph_cache_hash(
+    text: &str,
+    font_name: &str,
+    font_size: f32,
+    bold: bool,
+    italic: bool,
+) -> u64 {
+    let mut h = std::hash::DefaultHasher::new();
+    text.hash(&mut h);
+    font_name.hash(&mut h);
+    font_size.to_bits().hash(&mut h);
+    bold.hash(&mut h);
+    italic.hash(&mut h);
+    h.finish()
+}
 
 /// Convert a packed 0xAARRGGBB color to normalized `[r, g, b, a]`.
 fn color_to_f32(c: u32) -> [f32; 4] {
@@ -26,6 +47,8 @@ pub struct GpuCanvas<'a> {
     overlay_textured_instances: &'a mut Vec<TexturedInstance>,
     glyph_atlas: &'a mut GlyphAtlas,
     text_engine: &'a mut TextEngine,
+    glyph_buf: &'a mut Vec<(GlyphEntry, f32, f32)>,
+    glyph_pos_cache: &'a mut hashbrown::HashMap<u64, Vec<(GlyphEntry, f32, f32)>>,
     vp_width: i32,
     vp_height: i32,
     overlay_mode: bool,
@@ -41,6 +64,8 @@ impl<'a> GpuCanvas<'a> {
         overlay_textured_instances: &'a mut Vec<TexturedInstance>,
         glyph_atlas: &'a mut GlyphAtlas,
         text_engine: &'a mut TextEngine,
+        glyph_buf: &'a mut Vec<(GlyphEntry, f32, f32)>,
+        glyph_pos_cache: &'a mut hashbrown::HashMap<u64, Vec<(GlyphEntry, f32, f32)>>,
         vp_width: i32,
         vp_height: i32,
     ) -> Self {
@@ -51,6 +76,8 @@ impl<'a> GpuCanvas<'a> {
             overlay_textured_instances,
             glyph_atlas,
             text_engine,
+            glyph_buf,
+            glyph_pos_cache,
             vp_width,
             vp_height,
             overlay_mode: false,
@@ -124,6 +151,20 @@ impl<'a> Canvas for GpuCanvas<'a> {
         self.fill_rect(x, y, 1, 1, color);
     }
 
+    fn draw_bitmap_char(&mut self, x: i32, y: i32, ch: u8, color: u32, scale: i32) -> i32 {
+        self.glyph_atlas.ensure_bitmap_font(scale);
+        if let Some(entry) = self.glyph_atlas.bitmap_glyph(ch) {
+            let inst = TexturedInstance {
+                rect: [x as f32, y as f32, entry.width as f32, entry.height as f32],
+                uv_rect: entry.uv,
+                color: color_to_f32(color),
+                flags: [0.0, entry.page as f32],
+            };
+            self.texts().push(inst);
+        }
+        crate::debug_font::CELL_W * scale
+    }
+
     fn draw_text(
         &mut self,
         x: i32,
@@ -144,40 +185,58 @@ impl<'a> Canvas for GpuCanvas<'a> {
             return 0.0;
         }
 
-        let layout_res = crate::text::TextEngine::get_or_shape_buffer(
-            &mut self.text_engine.layout_cache,
-            &mut self.text_engine.layout_fifo,
-            self.text_engine.layout_cache_cap,
-            &mut self.text_engine.font_system,
-            text,
-            font_name,
-            font_size,
-            bold,
-            italic,
-            max_width,
-        );
-        let buffer = if let Some(r) = &layout_res {
-            &r.layout().buffer
+        // Check the glyph position cache first — avoids both
+        // get_or_shape_buffer AND layout_text_glyphs on repeat calls.
+        let cache_key = glyph_cache_hash(text, font_name, font_size, bold, italic);
+        if let Some(cached) = self.glyph_pos_cache.get(&cache_key) {
+            // Cache hit — copy into glyph_buf (cheap memcpy, capacity reused).
+            self.glyph_buf.clear();
+            self.glyph_buf.extend_from_slice(cached);
         } else {
-            return 0.0;
-        };
+            // Cache miss — shape the text buffer and compute glyph positions.
+            let layout_res = crate::text::TextEngine::get_or_shape_buffer(
+                &mut self.text_engine.layout_cache,
+                &mut self.text_engine.layout_fifo,
+                self.text_engine.layout_cache_cap,
+                &mut self.text_engine.font_system,
+                text,
+                font_name,
+                font_size,
+                bold,
+                italic,
+                max_width,
+            );
+            let buffer = if let Some(r) = &layout_res {
+                &r.layout().buffer
+            } else {
+                return 0.0;
+            };
 
-        let font_system = &mut self.text_engine.font_system;
-        let swash_cache = &mut self.text_engine.swash_cache;
+            let font_system = &mut self.text_engine.font_system;
+            let swash_cache = &mut self.text_engine.swash_cache;
 
-        let glyphs = layout_text_glyphs(
-            self.glyph_atlas,
-            font_system,
-            swash_cache,
-            buffer,
-            text,
-            font_name,
-            font_size,
-            bold,
-            italic,
-            0.0,
-            0.0,
-        );
+            layout_text_glyphs(
+                self.glyph_atlas,
+                font_system,
+                swash_cache,
+                buffer,
+                text,
+                font_name,
+                font_size,
+                bold,
+                italic,
+                0.0,
+                0.0,
+                &mut *self.glyph_buf,
+            );
+
+            // Store in cache (cap at 8192 entries to bound memory)
+            if self.glyph_pos_cache.len() >= 8192 {
+                self.glyph_pos_cache.clear();
+            }
+            self.glyph_pos_cache
+                .insert(cache_key, self.glyph_buf.clone());
+        }
 
         let color_f32 = color_to_f32(color);
         let mut rendered_width: f32 = 0.0;
@@ -188,47 +247,65 @@ impl<'a> Canvas for GpuCanvas<'a> {
         let clip_x_min = clip_x as f32;
         let clip_y_min = (clip_y.max(0)) as f32;
 
-        for (entry, dx, dy) in &glyphs {
+        let xf = x as f32;
+        let yf = y as f32;
+
+        for i in 0..self.glyph_buf.len() {
+            let (entry, dx, dy) = self.glyph_buf[i];
             rendered_width = rendered_width.max(dx + entry.width as f32);
             if entry.width == 0 || entry.height == 0 {
                 continue;
             }
 
             // Glyph quad in pixel coords
-            let gx = x as f32 + dx;
-            let gy = y as f32 + dy;
+            let gx = xf + dx;
+            let gy = yf + dy;
             let gw = entry.width as f32;
             let gh = entry.height as f32;
 
-            // Clip the glyph quad against the cell boundary
-            let left = gx.max(clip_x_min);
-            let top = gy.max(clip_y_min);
-            let right = (gx + gw).min(clip_x_max);
-            let bottom = (gy + gh).min(clip_y_max);
+            let inst;
 
-            if left >= right || top >= bottom {
-                continue; // fully clipped
+            // Fast path: glyph fully inside clip region — skip UV recalculation
+            if gx >= clip_x_min && gy >= clip_y_min
+                && gx + gw <= clip_x_max && gy + gh <= clip_y_max
+            {
+                inst = TexturedInstance {
+                    rect: [gx, gy, gw, gh],
+                    uv_rect: entry.uv,
+                    color: color_f32,
+                    flags: [0.0, entry.page as f32],
+                };
+            } else {
+                // Clip the glyph quad against the cell boundary
+                let left = gx.max(clip_x_min);
+                let top = gy.max(clip_y_min);
+                let right = (gx + gw).min(clip_x_max);
+                let bottom = (gy + gh).min(clip_y_max);
+
+                if left >= right || top >= bottom {
+                    continue; // fully clipped
+                }
+
+                // Adjust UV coordinates proportionally to the clipped region
+                let u_min = entry.uv[0];
+                let v_min = entry.uv[1];
+                let u_max = entry.uv[2];
+                let v_max = entry.uv[3];
+                let u_range = u_max - u_min;
+                let v_range = v_max - v_min;
+
+                let new_u_min = u_min + u_range * ((left - gx) / gw);
+                let new_v_min = v_min + v_range * ((top - gy) / gh);
+                let new_u_max = u_max - u_range * ((gx + gw - right) / gw);
+                let new_v_max = v_max - v_range * ((gy + gh - bottom) / gh);
+
+                inst = TexturedInstance {
+                    rect: [left, top, right - left, bottom - top],
+                    uv_rect: [new_u_min, new_v_min, new_u_max, new_v_max],
+                    color: color_f32,
+                    flags: [0.0, entry.page as f32],
+                };
             }
-
-            // Adjust UV coordinates proportionally to the clipped region
-            let u_min = entry.uv[0];
-            let v_min = entry.uv[1];
-            let u_max = entry.uv[2];
-            let v_max = entry.uv[3];
-            let u_range = u_max - u_min;
-            let v_range = v_max - v_min;
-
-            let new_u_min = u_min + u_range * ((left - gx) / gw);
-            let new_v_min = v_min + v_range * ((top - gy) / gh);
-            let new_u_max = u_max - u_range * ((gx + gw - right) / gw);
-            let new_v_max = v_max - v_range * ((gy + gh - bottom) / gh);
-
-            let inst = TexturedInstance {
-                rect: [left, top, right - left, bottom - top],
-                uv_rect: [new_u_min, new_v_min, new_u_max, new_v_max],
-                color: color_f32,
-                flags: [0.0, entry.page as f32], // glyph mode + atlas page
-            };
             self.texts().push(inst);
         }
 

@@ -1605,6 +1605,7 @@ impl VolvoxGrid {
         }
         if let Some(v) = rc.debug_overlay {
             self.debug_overlay = v;
+            self.layer_profiling = v;
         }
         if let Some(v) = rc.animation_enabled {
             self.animation.enabled = v;
@@ -1627,6 +1628,9 @@ impl VolvoxGrid {
             } else {
                 v
             };
+        }
+        if let Some(v) = rc.render_layer_mask {
+            self.render_layer_mask = v as u64;
         }
         self.mark_dirty();
     }
@@ -1951,6 +1955,7 @@ impl VolvoxGrid {
             present_mode: Some(self.present_mode),
             frame_pacing_mode: Some(self.frame_pacing_mode),
             target_frame_rate_hz: Some(self.target_frame_rate_hz),
+            render_layer_mask: Some(self.render_layer_mask as i64),
         }
     }
 

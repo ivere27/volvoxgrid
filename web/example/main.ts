@@ -35,6 +35,15 @@ const HOVER_NONE = 0;
 const HOVER_ROW = 1;
 const HOVER_COLUMN = 2;
 const HOVER_CELL = 4;
+const LAYER_NAMES = [
+  "bands", "indicators", "bkgrounds", "progress", "gridlines",
+  "hdr_marks", "bg_image", "borders", "text", "pictures",
+  "sort", "col_drag", "checkbox", "dropdown", "selection",
+  "hover", "edit_hl", "focus", "fill_hnd", "outline",
+  "frozen_bd", "editor", "dd_active", "scrollbar", "fast_scrl",
+  "debug_ovl",
+] as const;
+const LAYER_MASK_ALL = (1 << LAYER_NAMES.length) - 1;
 const DEMO_DEFAULT_HOVER_MODE: Record<StandardDemoMode, number> = {
   stress: HOVER_ROW,
   sales: HOVER_ROW | HOVER_COLUMN | HOVER_CELL,
@@ -241,6 +250,12 @@ async function main() {
   const selTextCache = document.getElementById("sel-text-cache") as HTMLSelectElement;
   const selDoomRes = document.getElementById("sel-doom-res") as HTMLSelectElement;
   const chkDoomBorder = document.getElementById("chk-doom-border") as HTMLInputElement;
+  const layerDropdown = document.getElementById("layer-dropdown") as HTMLDivElement;
+  const btnLayers = document.getElementById("btn-layers") as HTMLButtonElement;
+  const layerPanel = document.getElementById("layer-panel") as HTMLDivElement;
+  const layerPanelOptions = document.getElementById("layer-panel-options") as HTMLDivElement;
+  const btnLayersAll = document.getElementById("btn-layers-all") as HTMLButtonElement;
+  const btnLayersNone = document.getElementById("btn-layers-none") as HTMLButtonElement;
   const env = (import.meta as any).env as Record<string, string | undefined>;
   const isDev = Boolean((import.meta as any).env?.DEV);
   const baseUrl = normalizeBaseUrl(env.BASE_URL);
@@ -314,6 +329,8 @@ async function main() {
   let currentRenderDpiScale = getCurrentDeviceScale();
   const gridDpiScaleById = new Map<number, number>();
   const gridFontReadabilityBoostById = new Map<number, number>();
+  let layerMask = LAYER_MASK_ALL;
+  const layerCheckboxes: HTMLInputElement[] = [];
 
   const createScaledGrid = (rows: number, cols: number): number => {
     const createGridScaled = (wasmModule as any).create_grid_scaled as
@@ -335,6 +352,7 @@ async function main() {
 
     gridDpiScaleById.set(id, currentRenderDpiScale);
     gridFontReadabilityBoostById.set(id, 1.0);
+    applyRenderLayerMaskToGrid(id);
     return id;
   };
 
@@ -354,6 +372,9 @@ async function main() {
   gridDpiScaleById.set(grid.id, currentRenderDpiScale);
   gridFontReadabilityBoostById.set(grid.id, 1.0);
   applyAndroidLikeDemoStyle(grid.id);
+  if (typeof (wasmModule as any).get_render_layer_mask_lo === "function") {
+    layerMask = normalizeLayerMask(Number((wasmModule as any).get_render_layer_mask_lo(grid.id)));
+  }
   loadDemoFontsInBackground(wasmModule, () => {
     grid.invalidate();
   });
@@ -380,6 +401,17 @@ async function main() {
   const resetDoomActionButtons: Array<() => void> = [];
   let switchToken = 0;
 
+  function normalizeLayerMask(raw: number): number {
+    if (!Number.isFinite(raw)) {
+      return LAYER_MASK_ALL;
+    }
+    return Math.trunc(raw) & LAYER_MASK_ALL;
+  }
+
+  function isLayerEnabled(mask: number, bit: number): boolean {
+    return ((mask >>> bit) & 1) === 1;
+  }
+
   function knownGridIds(): number[] {
     const ids = new Set<number>();
     ids.add(grid.id);
@@ -393,6 +425,64 @@ async function main() {
       ids.add(doomGridId);
     }
     return Array.from(ids);
+  }
+
+  function applyRenderLayerMaskToGrid(id: number): void {
+    const setRenderLayerMask = (wasmModule as any).set_render_layer_mask as
+      | ((gridId: number, maskHi: number, maskLo: number) => void)
+      | undefined;
+    if (typeof setRenderLayerMask !== "function") {
+      return;
+    }
+    setRenderLayerMask(id, 0, layerMask);
+  }
+
+  function applyRenderLayerMaskToKnownGrids(): void {
+    for (const id of knownGridIds()) {
+      applyRenderLayerMaskToGrid(id);
+    }
+  }
+
+  function syncLayerCheckboxes(): void {
+    for (let i = 0; i < layerCheckboxes.length; i += 1) {
+      layerCheckboxes[i].checked = isLayerEnabled(layerMask, i);
+    }
+  }
+
+  function setLayerPanelOpen(open: boolean): void {
+    layerPanel.hidden = !open;
+    btnLayers.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function commitLayerMask(nextMask: number): void {
+    layerMask = normalizeLayerMask(nextMask);
+    syncLayerCheckboxes();
+    applyRenderLayerMaskToKnownGrids();
+    grid.invalidate();
+  }
+
+  function buildLayerPanel(): void {
+    layerPanelOptions.replaceChildren();
+    layerCheckboxes.length = 0;
+    for (let i = 0; i < LAYER_NAMES.length; i += 1) {
+      const option = document.createElement("label");
+      option.className = "layer-option";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = isLayerEnabled(layerMask, i);
+      checkbox.addEventListener("change", () => {
+        const bit = 1 << i;
+        commitLayerMask(checkbox.checked ? (layerMask | bit) : (layerMask & ~bit));
+      });
+
+      const label = document.createElement("span");
+      label.textContent = LAYER_NAMES[i];
+
+      option.append(checkbox, label);
+      layerPanelOptions.append(option);
+      layerCheckboxes.push(checkbox);
+    }
   }
 
   function applyDpiScaleToGrid(id: number, nextScaleRaw: number): void {
@@ -533,6 +623,7 @@ async function main() {
     grid.debugOverlay = chkDebug.checked;
     grid.animationEnabled = chkAnim.checked;
     grid.textLayoutCacheCap = selectedTextLayoutCacheCap();
+    applyRenderLayerMaskToGrid(grid.id);
   }
 
   const fmt = (n: number) => n.toLocaleString("en-US");
@@ -572,6 +663,8 @@ async function main() {
     hierarchy: document.getElementById("btn-demo-hierarchy")!,
     doom: document.getElementById("btn-demo-doom")!,
   };
+  buildLayerPanel();
+  syncLayerCheckboxes();
 
   function setDoomOptionsVisible(visible: boolean) {
     doomRow.classList.toggle("hidden", !visible);
@@ -1387,6 +1480,20 @@ async function main() {
     }
   });
 
+  document.addEventListener("pointerdown", (event) => {
+    const target = event.target;
+    if (layerPanel.hidden || !(target instanceof Node) || layerDropdown.contains(target)) {
+      return;
+    }
+    setLayerPanelOpen(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !layerPanel.hidden) {
+      setLayerPanelOpen(false);
+      btnLayers.focus();
+    }
+  });
+
   // Resize handler for DOOM layout.
   let resizeTimer = 0;
   window.addEventListener("resize", () => {
@@ -1527,6 +1634,16 @@ async function main() {
   // Hover highlight toggle.
   chkHover.addEventListener("change", () => {
     applyHoverToggleToKnownGrids();
+  });
+
+  btnLayers.addEventListener("click", () => {
+    setLayerPanelOpen(layerPanel.hidden);
+  });
+  btnLayersAll.addEventListener("click", () => {
+    commitLayerMask(LAYER_MASK_ALL);
+  });
+  btnLayersNone.addEventListener("click", () => {
+    commitLayerMask(0);
   });
 
   // Debug overlay toggle.
