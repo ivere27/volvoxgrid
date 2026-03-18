@@ -7,7 +7,7 @@ import android.view.Surface
  *
  * Used by [VolvoxGridView] to pass a raw surface handle to the GPU renderer plugin.
  */
-internal object NativeWindowHelper {
+object NativeWindowHelper {
     init {
         System.loadLibrary("volvoxgrid_jni")
     }

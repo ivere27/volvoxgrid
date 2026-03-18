@@ -16,39 +16,15 @@
         android:paddingBottom="4dp"
         android:background="#D0D0D0">
 
-        <ImageButton
-            android:id="@+id/btnSortAsc"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@android:drawable/arrow_up_float"
-            android:contentDescription="Sort Ascending"
-            android:background="?attr/selectableItemBackgroundBorderless" />
-
-        <ImageButton
-            android:id="@+id/btnSortDesc"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@android:drawable/arrow_down_float"
-            android:contentDescription="Sort Descending"
-            android:background="?attr/selectableItemBackgroundBorderless" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:text="Mode"
-            android:textSize="12sp" />
-
         <Spinner
             android:id="@+id/spRendererMode"
-            android:layout_width="92dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="2dp" />
+            android:layout_width="104dp"
+            android:layout_height="wrap_content" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
+            android:layout_marginStart="8dp"
             android:text="Debug"
             android:textSize="12sp" />
 
@@ -67,9 +43,23 @@
 
         <Spinner
             android:id="@+id/spTextCache"
-            android:layout_width="88dp"
+            android:layout_width="80dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <ImageButton
+            android:id="@+id/btnOverflowMenu"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="4dp"
+            android:src="@drawable/ic_more_vert"
+            android:contentDescription="More actions"
+            android:background="?attr/selectableItemBackgroundBorderless" />
     </LinearLayout>
 
     <!-- Row 2: Grid selector -->

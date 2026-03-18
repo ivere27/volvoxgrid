@@ -1215,6 +1215,20 @@ class VolvoxGridController(
         return getConfig().rendering.rendererModeValue
     }
 
+    fun setRenderLayerMask(mask: Long) {
+        configure(GridConfig.newBuilder()
+            .setRendering(
+                RenderConfig.newBuilder()
+                    .setRenderLayerMask(mask)
+                    .build()
+            )
+            .build())
+    }
+
+    fun renderLayerMask(): Long {
+        return getConfig().rendering.renderLayerMask
+    }
+
     override fun setRendererBackend(backend: RendererBackend) {
         when (backend) {
             RendererBackend.AUTO -> setRendererMode(0)

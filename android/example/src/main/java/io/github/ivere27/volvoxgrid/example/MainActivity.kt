@@ -7,11 +7,16 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.ImageButton
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.PopupMenu
 import io.github.ivere27.volvoxgrid.*
 import io.github.ivere27.synurang.PluginHost
 import java.io.File
@@ -28,8 +33,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var gridView: VolvoxGridView
     private lateinit var tvStatus: TextView
-    private lateinit var btnSortAsc: ImageButton
-    private lateinit var btnSortDesc: ImageButton
+    private lateinit var btnOverflowMenu: ImageButton
     private lateinit var btnDemoSales: Button
     private lateinit var btnDemoHierarchy: Button
     private lateinit var btnDemoStress: Button
@@ -47,9 +51,38 @@ class MainActivity : AppCompatActivity() {
     private val textCacheCapOptions = intArrayOf(8192, 4096, 1024, 256, 0)
     private val rendererModeOptions = arrayOf("AUTO", "CPU", "GPU", "GPU (Vulk)", "GPU (GLES)")
     private val rendererModeValues = intArrayOf(0, 1, 2, 3, 4)
+    private val renderLayerNames = arrayOf(
+        "Overlay Bands",
+        "Indicators",
+        "Backgrounds",
+        "Progress Bars",
+        "Grid Lines",
+        "Header Marks",
+        "Background Image",
+        "Cell Borders",
+        "Cell Text",
+        "Cell Pictures",
+        "Sort Glyphs",
+        "Col Drag Marker",
+        "Checkboxes",
+        "Dropdown Buttons",
+        "Selection",
+        "Hover Highlight",
+        "Edit Highlights",
+        "Focus Rect",
+        "Fill Handle",
+        "Outline",
+        "Frozen Borders",
+        "Active Editor",
+        "Active Dropdown",
+        "Scroll Bars",
+        "Fast Scroll",
+        "Debug Overlay",
+    )
 
     @Volatile private var controller: VolvoxGridController? = null
     @Volatile private var currentDemo: String = ""
+    private var renderLayerMask = -1L
     
     // Persistent state for multiple demos
     private var pluginHost: PluginHost? = null
@@ -63,8 +96,7 @@ class MainActivity : AppCompatActivity() {
 
         gridView = findViewById(R.id.gridView)
         tvStatus = findViewById(R.id.tvStatus)
-        btnSortAsc = findViewById(R.id.btnSortAsc)
-        btnSortDesc = findViewById(R.id.btnSortDesc)
+        btnOverflowMenu = findViewById(R.id.btnOverflowMenu)
         btnDemoSales = findViewById(R.id.btnDemoSales)
         btnDemoHierarchy = findViewById(R.id.btnDemoHierarchy)
         btnDemoStress = findViewById(R.id.btnDemoStress)
@@ -128,9 +160,7 @@ class MainActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
-        // Sort handlers
-        btnSortAsc.setOnClickListener { sortGrid(true) }
-        btnSortDesc.setOnClickListener { sortGrid(false) }
+        btnOverflowMenu.setOnClickListener { showGridActionsMenu(it) }
 
         // Debug overlay toggle
         swDebug.setOnCheckedChangeListener { _, isChecked ->
@@ -392,7 +422,109 @@ class MainActivity : AppCompatActivity() {
             gridView.setRendererMode(viewMode)
             ctrl.setDebugOverlay(debugOverlayEnabled)
             ctrl.setTextLayoutCacheCap(textLayoutCacheCap)
+            ctrl.setRenderLayerMask(renderLayerMask)
         } catch (_: Exception) {}
+    }
+
+    private fun showGridActionsMenu(anchor: View) {
+        PopupMenu(this, anchor).apply {
+            menuInflater.inflate(R.menu.grid_actions_menu, menu)
+            setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    R.id.action_sort_ascending -> {
+                        sortGrid(true)
+                        true
+                    }
+                    R.id.action_sort_descending -> {
+                        sortGrid(false)
+                        true
+                    }
+                    R.id.action_layer_selection -> {
+                        showLayerSelectionDialog()
+                        true
+                    }
+                    else -> false
+                }
+            }
+            show()
+        }
+    }
+
+    private fun showLayerSelectionDialog() {
+        var draftMask = renderLayerMask
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val padding = dpToPx(12f)
+            setPadding(padding, 0, padding, 0)
+        }
+        val actionsRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        val listLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        val scrollView = ScrollView(this).apply {
+            addView(listLayout)
+        }
+        val checkBoxes = renderLayerNames.mapIndexed { index, label ->
+            CheckBox(this).apply {
+                text = label
+                isChecked = draftMask and (1L shl index) != 0L
+                setOnCheckedChangeListener { _, isChecked ->
+                    val bit = 1L shl index
+                    draftMask = if (isChecked) {
+                        draftMask or bit
+                    } else {
+                        draftMask and bit.inv()
+                    }
+                }
+            }.also { listLayout.addView(it) }
+        }
+        fun updateChecks(mask: Long) {
+            draftMask = mask
+            checkBoxes.forEachIndexed { index, checkBox ->
+                val checked = mask and (1L shl index) != 0L
+                if (checkBox.isChecked != checked) {
+                    checkBox.isChecked = checked
+                }
+            }
+        }
+        actionsRow.addView(Button(this).apply {
+            text = "All"
+            setOnClickListener { updateChecks(-1L) }
+        })
+        actionsRow.addView(Button(this).apply {
+            text = "None"
+            setOnClickListener { updateChecks(0L) }
+        })
+        content.addView(actionsRow)
+        content.addView(
+            scrollView,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dpToPx(360f)
+            )
+        )
+        AlertDialog.Builder(this)
+            .setTitle("Layer Selection")
+            .setView(content)
+            .setPositiveButton("Apply") { _, _ ->
+                if (draftMask == renderLayerMask) return@setPositiveButton
+                renderLayerMask = draftMask
+                thread {
+                    try {
+                        val ctrl = controller ?: return@thread
+                        ctrl.setRenderLayerMask(draftMask)
+                        ctrl.refresh()
+                        gridView.requestFrame()
+                        updateStatus("Updated layer selection")
+                    } catch (e: Exception) {
+                        updateStatus("Layer selection error: ${e.message}")
+                    }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun sortGrid(ascending: Boolean) {
@@ -423,8 +555,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setGridControlsEnabled(enabled: Boolean) {
         runOnUiThread {
-            btnSortAsc.isEnabled = enabled
-            btnSortDesc.isEnabled = enabled
+            btnOverflowMenu.isEnabled = enabled
             btnDemoSales.isEnabled = enabled
             btnDemoHierarchy.isEnabled = enabled
             btnDemoStress.isEnabled = enabled
@@ -441,6 +572,12 @@ class MainActivity : AppCompatActivity() {
     private fun spToPx(sp: Float): Int {
         return TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_SP, sp, resources.displayMetrics
+        ).roundToInt().coerceAtLeast(1)
+    }
+
+    private fun dpToPx(dp: Float): Int {
+        return TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, dp, resources.displayMetrics
         ).roundToInt().coerceAtLeast(1)
     }
 }
