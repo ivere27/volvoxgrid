@@ -14,13 +14,7 @@ use crate::text::TextEngine;
 /// Compute a u64 hash for glyph position cache lookup.
 /// Note: max_width is intentionally excluded — glyph x/y offsets are
 /// laid out relative to (0,0) and don't depend on wrap width.
-fn glyph_cache_hash(
-    text: &str,
-    font_name: &str,
-    font_size: f32,
-    bold: bool,
-    italic: bool,
-) -> u64 {
+fn glyph_cache_hash(text: &str, font_name: &str, font_size: f32, bold: bool, italic: bool) -> u64 {
     let mut h = std::hash::DefaultHasher::new();
     text.hash(&mut h);
     font_name.hash(&mut h);
@@ -266,8 +260,10 @@ impl<'a> Canvas for GpuCanvas<'a> {
             let inst;
 
             // Fast path: glyph fully inside clip region — skip UV recalculation
-            if gx >= clip_x_min && gy >= clip_y_min
-                && gx + gw <= clip_x_max && gy + gh <= clip_y_max
+            if gx >= clip_x_min
+                && gy >= clip_y_min
+                && gx + gw <= clip_x_max
+                && gy + gh <= clip_y_max
             {
                 inst = TexturedInstance {
                     rect: [gx, gy, gw, gh],

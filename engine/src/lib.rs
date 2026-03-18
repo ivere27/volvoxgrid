@@ -12,13 +12,13 @@ pub mod demo;
 pub mod animation;
 pub mod canvas;
 pub mod canvas_cpu;
-pub mod debug_font;
 #[cfg(feature = "gpu")]
 pub mod canvas_gpu;
 pub mod cell;
 pub mod clipboard;
 pub mod column;
 pub mod config;
+pub mod debug_font;
 pub mod drag;
 pub mod edit;
 pub mod event;

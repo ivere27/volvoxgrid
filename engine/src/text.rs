@@ -414,7 +414,15 @@ impl TextEngine {
                 max_width_quarter_px,
             );
             if let Some((_, v)) = layout_cache.raw_entry().from_hash(hash, |k| {
-                Self::key_matches(k, text, font_name, font_size_bits, bold, italic, max_width_quarter_px)
+                Self::key_matches(
+                    k,
+                    text,
+                    font_name,
+                    font_size_bits,
+                    bold,
+                    italic,
+                    max_width_quarter_px,
+                )
             }) {
                 // SAFETY: Convert the shared reference lifetime. The entry
                 // lives in layout_cache which is borrowed for 'a. We

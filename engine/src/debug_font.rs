@@ -223,14 +223,7 @@ pub fn line_height(scale: i32) -> i32 {
 }
 
 /// Draw a single ASCII character.  Returns advance width.
-pub fn draw_char<C: Canvas>(
-    canvas: &mut C,
-    x: i32,
-    y: i32,
-    ch: u8,
-    color: u32,
-    scale: i32,
-) -> i32 {
+pub fn draw_char<C: Canvas>(canvas: &mut C, x: i32, y: i32, ch: u8, color: u32, scale: i32) -> i32 {
     canvas.draw_bitmap_char(x, y, ch, color, scale)
 }
 
