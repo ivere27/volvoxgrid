@@ -1379,27 +1379,42 @@ class VolvoxGridController extends ChangeNotifier {
         return;
       }
 
-      // For any GPU mode transition, drop the old surface first so no frame is
-      // rendered against an incompatible surface/backend pair during the switch.
-      await releaseGpuTexture(graceful: true);
+      try {
+        // For any GPU mode transition, drop the old surface first so no frame
+        // is rendered against an incompatible surface/backend pair.
+        await releaseGpuTexture(graceful: true);
 
-      if (backend == RendererBackend.vulkan) {
-        await setRendererMode(RendererBackend.vulkan.index);
-        await createGpuTexture(backend: 'vulkan');
-      } else {
-        // Bootstrap through explicit GLES so AUTO/GPU never inherit a stale
-        // Vulkan renderer after a mode transition.
-        await setRendererMode(RendererBackend.gles.index);
-        await createGpuTexture(backend: 'gles');
-        if (backend != RendererBackend.gles) {
-          await setRendererMode(backend.index);
+        if (backend == RendererBackend.vulkan) {
+          await setRendererMode(RendererBackend.vulkan.index);
+          await createGpuTexture(backend: 'vulkan');
+        } else {
+          // Bootstrap through explicit GLES so AUTO/GPU never inherit a stale
+          // Vulkan renderer after a mode transition.
+          await setRendererMode(RendererBackend.gles.index);
+          await createGpuTexture(backend: 'gles');
+          if (backend != RendererBackend.gles) {
+            await setRendererMode(backend.index);
+          }
         }
-      }
 
-      // Ensure the newly attached GPU surface gets a fresh frame even when the
-      // grid was previously clean (not dirty).
-      if (isCreated) {
-        await refresh();
+        // Ensure the newly attached GPU surface gets a fresh frame even when
+        // the grid was previously clean (not dirty).
+        if (isCreated) {
+          await refresh();
+        }
+      } catch (_) {
+        // A failed Android GPU transition must not leave the engine claiming a
+        // GPU backend without a valid native window/texture.
+        try {
+          await releaseGpuTexture(graceful: false);
+        } catch (_) {}
+        try {
+          await setRendererMode(RendererBackend.cpu.index);
+          if (isCreated) {
+            await refresh();
+          }
+        } catch (_) {}
+        rethrow;
       }
       return;
     }
@@ -1454,8 +1469,23 @@ class VolvoxGridController extends ChangeNotifier {
       },
     );
     if (res != null) {
-      _gpuTextureId = res['textureId'] as int?;
-      _gpuSurfaceHandle = res['surfaceHandle'] as int?;
+      final textureId = res['textureId'] as int?;
+      final surfaceHandle = res['surfaceHandle'] as int?;
+      if (textureId == null || surfaceHandle == null || surfaceHandle == 0) {
+        if (textureId != null) {
+          try {
+            await _channel.invokeMethod('releaseTexture', {'textureId': textureId});
+          } catch (_) {
+            // Best effort cleanup only.
+          }
+        }
+        throw PlatformException(
+          code: 'NATIVE_WINDOW_ERROR',
+          message: 'Failed to acquire native window',
+        );
+      }
+      _gpuTextureId = textureId;
+      _gpuSurfaceHandle = surfaceHandle;
       _gpuBackend = backend;
       notifyListeners();
     }

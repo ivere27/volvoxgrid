@@ -1,6 +1,7 @@
 package io.github.ivere27.volvoxgrid
 
 import android.graphics.SurfaceTexture
+import android.util.Log
 import android.view.Surface
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
@@ -10,6 +11,10 @@ import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.view.TextureRegistry
 
 class VolvoxGridPlugin: FlutterPlugin, MethodCallHandler {
+    companion object {
+        private const val TAG = "VolvoxGridPlugin"
+    }
+
     private lateinit var channel: MethodChannel
     private var textureRegistry: TextureRegistry? = null
     private val producers = mutableMapOf<Long, TextureRegistry.SurfaceProducer>()
@@ -52,8 +57,26 @@ class VolvoxGridPlugin: FlutterPlugin, MethodCallHandler {
                     handle = try {
                         NativeWindowCompat.getNativeWindow(surface)
                     } catch (t: Throwable) {
+                        Log.e(
+                            TAG,
+                            "createTexture(vulkan): failed to acquire native window for ${surface.javaClass.name}; ${NativeWindowCompat.describeHelperState()}",
+                            t
+                        )
                         producer.release()
                         result.error("NATIVE_WINDOW_ERROR", "Failed to acquire native window: ${t.message}", null)
+                        return
+                    }
+                    if (handle == 0L) {
+                        Log.e(
+                            TAG,
+                            "createTexture(vulkan): helper returned 0 for ${surface.javaClass.name}; ${NativeWindowCompat.describeHelperState()}"
+                        )
+                        producer.release()
+                        result.error(
+                            "NATIVE_WINDOW_ERROR",
+                            "Failed to acquire native window: helper returned 0",
+                            null
+                        )
                         return
                     }
 
@@ -70,9 +93,28 @@ class VolvoxGridPlugin: FlutterPlugin, MethodCallHandler {
                     handle = try {
                         NativeWindowCompat.getNativeWindow(surface)
                     } catch (t: Throwable) {
+                        Log.e(
+                            TAG,
+                            "createTexture(gles): failed to acquire native window for ${surface.javaClass.name}; ${NativeWindowCompat.describeHelperState()}",
+                            t
+                        )
                         surface.release()
                         entry.release()
                         result.error("NATIVE_WINDOW_ERROR", "Failed to acquire native window: ${t.message}", null)
+                        return
+                    }
+                    if (handle == 0L) {
+                        Log.e(
+                            TAG,
+                            "createTexture(gles): helper returned 0 for ${surface.javaClass.name}; ${NativeWindowCompat.describeHelperState()}"
+                        )
+                        surface.release()
+                        entry.release()
+                        result.error(
+                            "NATIVE_WINDOW_ERROR",
+                            "Failed to acquire native window: helper returned 0",
+                            null
+                        )
                         return
                     }
 
@@ -125,31 +167,34 @@ class VolvoxGridPlugin: FlutterPlugin, MethodCallHandler {
 }
 
 private object NativeWindowCompat {
-    private val helperClass: Class<*> by lazy {
-        Class.forName("io.github.ivere27.volvoxgrid.NativeWindowHelper")
-    }
-
-    private val helperInstance: Any by lazy {
-        helperClass.getField("INSTANCE").get(null)
-            ?: error("NativeWindowHelper.INSTANCE is null")
-    }
-
-    private val getNativeWindowMethod by lazy {
-        helperClass.getDeclaredMethod("getNativeWindow", Surface::class.java)
-    }
-
-    private val releaseNativeWindowMethod by lazy {
-        helperClass.getDeclaredMethod("releaseNativeWindow", Long::class.javaPrimitiveType)
+    fun describeHelperState(): String {
+        return try {
+            val helperClass = NativeWindowHelper::class.java
+            val available = helperClass.declaredMethods.joinToString { method ->
+                "${method.name}${method.parameterTypes.contentToString()}"
+            }
+            "helper=${helperClass.name}, methods=[$available]"
+        } catch (t: Throwable) {
+            "helperStateError=${t.message}"
+        }
     }
 
     fun getNativeWindow(surface: Surface): Long {
-        val value = getNativeWindowMethod.invoke(helperInstance, surface) as? Number
-        return value?.toLong() ?: 0L
+        try {
+            return NativeWindowHelper.getNativeWindow(surface)
+        } catch (t: Throwable) {
+            Log.e(
+                "VolvoxGridPlugin",
+                "NativeWindowCompat.getNativeWindow failed for ${surface.javaClass.name}; ${describeHelperState()}",
+                t
+            )
+            throw t
+        }
     }
 
     fun releaseNativeWindow(ptr: Long) {
         if (ptr != 0L) {
-            releaseNativeWindowMethod.invoke(helperInstance, ptr)
+            NativeWindowHelper.releaseNativeWindow(ptr)
         }
     }
 }

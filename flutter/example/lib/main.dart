@@ -290,7 +290,6 @@ class _DemoPageState extends State<DemoPage> {
     final token = ++_rendererSwitchToken;
     final controller = _activeController;
     setState(() {
-      _rendererBackend = backend;
       _switching = true;
       _statusText = 'Switching renderer to ${backend.name.toUpperCase()}...';
     });
@@ -304,7 +303,12 @@ class _DemoPageState extends State<DemoPage> {
       if (!mounted || token != _rendererSwitchToken) {
         return;
       }
+      final actualBackend = await controller.rendererBackend();
+      if (!mounted || token != _rendererSwitchToken) {
+        return;
+      }
       setState(() {
+        _rendererBackend = actualBackend;
         _switching = false;
         _statusText = 'Loaded ${_currentDemo.name} demo';
       });
@@ -312,7 +316,17 @@ class _DemoPageState extends State<DemoPage> {
       if (!mounted || token != _rendererSwitchToken) {
         return;
       }
+      var actualBackend = _rendererBackend;
+      try {
+        actualBackend = await controller.rendererBackend();
+      } catch (_) {
+        // Keep the last known UI selection if backend readback fails too.
+      }
+      if (!mounted || token != _rendererSwitchToken) {
+        return;
+      }
       setState(() {
+        _rendererBackend = actualBackend;
         _switching = false;
         _statusText = 'Renderer switch error: $e';
       });
@@ -331,7 +345,6 @@ class _DemoPageState extends State<DemoPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('VolvoxGrid Demo'),
         actions: [
           DropdownButtonHideUnderline(
             child: DropdownButton<RendererBackend>(
