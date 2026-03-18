@@ -8,11 +8,11 @@ set -euo pipefail
 # then packages a fat JAR
 # with classes from volvoxgrid-java-common + embedded native/ libraries.
 #
-# Usage (inside Docker): VERSION=0.2.0 /opt/volvoxgrid/build_desktop_jar.sh
+# Usage (inside Docker): VERSION=0.3.0 /opt/volvoxgrid/build_desktop_jar.sh
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}"
-VERSION="${VERSION:-0.2.0}"
+VERSION="${VERSION:-0.3.0}"
 SYNURANG_VERSION="${SYNURANG_VERSION:-0.5.4}"
 GROUP_ID="${GROUP_ID:-io.github.ivere27}"
 ARTIFACT_ID="${ARTIFACT_ID:-volvoxgrid-desktop}"

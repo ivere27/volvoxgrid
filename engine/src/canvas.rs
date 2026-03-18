@@ -1808,7 +1808,10 @@ pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> RenderResult
         }
     });
 
-    run_layer!(layer::HEADER_MARKS, render_header_marks(grid, canvas, &vp));
+    run_layer!(
+        layer::HEADER_MARKS,
+        render_header_marks(grid, canvas, &vp, &vis_cells)
+    );
     run_layer!(
         layer::BACKGROUND_IMAGE,
         render_background_image(grid, canvas)
@@ -2247,10 +2250,18 @@ fn build_visible_row_rects(grid: &VolvoxGrid, vp: &VisibleRange) -> BTreeMap<i32
 }
 
 fn build_visible_col_rects(
+    grid: &VolvoxGrid,
     vis_cells: &[(i32, i32, i32, i32, i32, i32)],
 ) -> BTreeMap<i32, (i32, i32)> {
     let mut cols = BTreeMap::new();
-    for &(_row, col, cx, _cy, cw, _ch) in vis_cells {
+    for &(row, col, cx, _cy, cw, _ch) in vis_cells {
+        // Skip cells that belong to a multi-column merge — their cx/cw
+        // cover the full merged column range, not the individual column.
+        if let Some((_r1, c1, _r2, c2)) = grid.get_merged_range(row, col) {
+            if c1 != c2 {
+                continue;
+            }
+        }
         cols.entry(col).or_insert((cx, cw));
     }
     cols
@@ -2702,7 +2713,7 @@ fn render_col_indicator_top<C: Canvas>(
     let band_h = vp.data_y;
     canvas.fill_rect(band_x, band_y, band_w, band_h, back_color);
 
-    let col_rects = build_visible_col_rects(vis_cells);
+    let col_rects = build_visible_col_rects(grid, vis_cells);
     for (&col, &(cx, cw)) in &col_rects {
         if should_highlight_col_indicator(grid, col) {
             if let Some(ind_style) = &grid.selection.indicator_col_style {
@@ -2960,6 +2971,11 @@ fn render_backgrounds<C: Canvas>(
     canvas: &mut C,
     vis_cells: &[(i32, i32, i32, i32, i32, i32)],
 ) {
+    // Track which merged ranges have already been rendered so each
+    // merge is drawn exactly once, avoiding expensive overdraw in CPU mode.
+    let mut rendered_merges: std::collections::HashSet<(i32, i32, i32, i32)> =
+        std::collections::HashSet::new();
+
     for &(row, col, cx, cy, cw, ch) in vis_cells {
         // For merged/spanned cells, always resolve style from the anchor
         // cell (top-left of the merge).  This prevents "blinking" when a
@@ -2967,7 +2983,13 @@ fn render_backgrounds<C: Canvas>(
         // this, the last-drawn column's style wins, and the winner changes
         // depending on whether the sticky threshold is crossed.
         let (style_row, style_col) = match grid.get_merged_range(row, col) {
-            Some((mr1, mc1, mr2, mc2)) if mr1 != mr2 || mc1 != mc2 => (mr1, mc1),
+            Some((mr1, mc1, mr2, mc2)) if mr1 != mr2 || mc1 != mc2 => {
+                let merge_key = (mr1, mc1, mr2, mc2);
+                if !rendered_merges.insert(merge_key) {
+                    continue;
+                }
+                (mr1, mc1)
+            }
             _ => (row, col),
         };
 
@@ -4280,7 +4302,12 @@ fn resolve_header_mark_height_px(height: HeaderMarkHeight, row_height: i32) -> i
 // Layer 4a -- Header separator / resize handle marks
 // ===========================================================================
 
-fn render_header_marks<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &VisibleRange) {
+fn render_header_marks<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    vp: &VisibleRange,
+    vis_cells: &[(i32, i32, i32, i32, i32, i32)],
+) {
     if grid.cols <= 1 {
         return;
     }
@@ -4309,26 +4336,25 @@ fn render_header_marks<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visibl
     if grid.indicator_bands.col_top.visible && vp.data_y > 0 {
         let band = &grid.indicator_bands.col_top;
         let row_offsets = build_indicator_row_offsets(band, 0);
-        let probe_row = if vp.scroll_row_start < grid.rows {
-            vp.scroll_row_start
-        } else {
-            0
-        };
+        let col_rects = build_visible_col_rects(grid, vis_cells);
         for col in 0..max_col {
             if grid.is_col_hidden(col) || grid.is_col_hidden(col + 1) {
                 continue;
             }
-            let Some((lx, _ly, lw, _lh)) = cell_rect(grid, probe_row, col, vp) else {
+            // Use stable per-column rects instead of sampling one scroll row.
+            // Sampling a merged row makes the separator jump as fling crosses
+            // row boundaries.
+            let Some((lx, lw)) = col_rects.get(&col).copied() else {
                 continue;
             };
-            let Some((_rx, _ry, rw, _rh)) = cell_rect(grid, probe_row, col + 1, vp) else {
+            let Some((_rx, rw)) = col_rects.get(&(col + 1)).copied() else {
                 continue;
             };
             if lw <= 0 || rw <= 0 {
                 continue;
             }
-            let center_x = lx + lw;
-            let draw_x = center_x - (width_px / 2);
+            let boundary_x = lx + lw - 1;
+            let draw_x = boundary_x - ((width_px - 1) / 2);
             for (row, row_y, row_h) in &row_offsets {
                 if skip_merged && indicator_slots_share_cell(band, *row, col, *row, col + 1) {
                     continue;
@@ -4381,8 +4407,8 @@ fn render_header_marks<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visibl
                 continue;
             }
 
-            let center_x = lx + lw;
-            let draw_x = center_x - (width_px / 2);
+            let boundary_x = lx + lw - 1;
+            let draw_x = boundary_x - ((width_px - 1) / 2);
             let draw_y = ly + ((row_height - mark_height) / 2);
             for dx in 0..width_px {
                 canvas.vline(draw_x + dx, draw_y, mark_height, color);
