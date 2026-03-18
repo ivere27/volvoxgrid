@@ -2960,6 +2960,11 @@ fn render_backgrounds<C: Canvas>(
     canvas: &mut C,
     vis_cells: &[(i32, i32, i32, i32, i32, i32)],
 ) {
+    // Track which merged ranges have already been rendered so each
+    // merge is drawn exactly once, avoiding expensive overdraw in CPU mode.
+    let mut rendered_merges: std::collections::HashSet<(i32, i32, i32, i32)> =
+        std::collections::HashSet::new();
+
     for &(row, col, cx, cy, cw, ch) in vis_cells {
         // For merged/spanned cells, always resolve style from the anchor
         // cell (top-left of the merge).  This prevents "blinking" when a
@@ -2967,7 +2972,13 @@ fn render_backgrounds<C: Canvas>(
         // this, the last-drawn column's style wins, and the winner changes
         // depending on whether the sticky threshold is crossed.
         let (style_row, style_col) = match grid.get_merged_range(row, col) {
-            Some((mr1, mc1, mr2, mc2)) if mr1 != mr2 || mc1 != mc2 => (mr1, mc1),
+            Some((mr1, mc1, mr2, mc2)) if mr1 != mr2 || mc1 != mc2 => {
+                let merge_key = (mr1, mc1, mr2, mc2);
+                if !rendered_merges.insert(merge_key) {
+                    continue;
+                }
+                (mr1, mc1)
+            }
             _ => (row, col),
         };
 
