@@ -1781,9 +1781,18 @@ pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> RenderResult
         vis_cells.push((row, col, cx, cy, cw, ch));
     });
 
-    run_layer!(layer::OVERLAY_BANDS, render_overlay_bands(grid, canvas, &vp));
-    run_layer!(layer::INDICATORS, render_indicator_surfaces(grid, canvas, &vp, &vis_cells));
-    run_layer!(layer::BACKGROUNDS, render_backgrounds(grid, canvas, &vis_cells));
+    run_layer!(
+        layer::OVERLAY_BANDS,
+        render_overlay_bands(grid, canvas, &vp)
+    );
+    run_layer!(
+        layer::INDICATORS,
+        render_indicator_surfaces(grid, canvas, &vp, &vis_cells)
+    );
+    run_layer!(
+        layer::BACKGROUNDS,
+        render_backgrounds(grid, canvas, &vis_cells)
+    );
 
     run_layer!(layer::PROGRESS_BARS, {
         if grid.style.progress_color != 0 || grid.columns.iter().any(|c| c.progress_color != 0) {
@@ -1800,7 +1809,10 @@ pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> RenderResult
     });
 
     run_layer!(layer::HEADER_MARKS, render_header_marks(grid, canvas, &vp));
-    run_layer!(layer::BACKGROUND_IMAGE, render_background_image(grid, canvas));
+    run_layer!(
+        layer::BACKGROUND_IMAGE,
+        render_background_image(grid, canvas)
+    );
 
     run_layer!(layer::CELL_BORDERS, {
         if grid.cell_styles.values().any(|s| {
@@ -1819,10 +1831,19 @@ pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> RenderResult
         }
     });
 
-    run_layer!(layer::CELL_TEXT, render_cell_text(grid, canvas, &vp, &vis_cells));
-    run_layer!(layer::CELL_PICTURES, render_cell_pictures(grid, canvas, &vp, &vis_cells));
+    run_layer!(
+        layer::CELL_TEXT,
+        render_cell_text(grid, canvas, &vp, &vis_cells)
+    );
+    run_layer!(
+        layer::CELL_PICTURES,
+        render_cell_pictures(grid, canvas, &vp, &vis_cells)
+    );
     run_layer!(layer::SORT_GLYPHS, render_sort_glyphs(grid, canvas, &vp));
-    run_layer!(layer::COL_DRAG_MARKER, render_col_drag_marker(grid, canvas, &vp));
+    run_layer!(
+        layer::COL_DRAG_MARKER,
+        render_col_drag_marker(grid, canvas, &vp)
+    );
 
     run_layer!(layer::CHECKBOXES, {
         if grid
@@ -1862,18 +1883,36 @@ pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> RenderResult
     });
 
     run_layer!(layer::SELECTION, render_selection(grid, canvas, &vis_cells));
-    run_layer!(layer::HOVER_HIGHLIGHT, render_hover_highlight(grid, canvas, &vis_cells));
-    run_layer!(layer::EDIT_HIGHLIGHTS, render_edit_highlights(grid, canvas, &vp));
+    run_layer!(
+        layer::HOVER_HIGHLIGHT,
+        render_hover_highlight(grid, canvas, &vis_cells)
+    );
+    run_layer!(
+        layer::EDIT_HIGHLIGHTS,
+        render_edit_highlights(grid, canvas, &vp)
+    );
     run_layer!(layer::FOCUS_RECT, render_focus_rect(grid, canvas, &vp));
     run_layer!(layer::FILL_HANDLE, render_fill_handle(grid, canvas, &vp));
     run_layer!(layer::OUTLINE, render_outline(grid, canvas, &vp));
-    run_layer!(layer::FROZEN_BORDERS, render_frozen_borders(grid, canvas, &vp));
+    run_layer!(
+        layer::FROZEN_BORDERS,
+        render_frozen_borders(grid, canvas, &vp)
+    );
     canvas.begin_overlay();
-    run_layer!(layer::ACTIVE_EDITOR, render_active_editor(grid, canvas, &vp));
-    run_layer!(layer::ACTIVE_DROPDOWN, render_active_dropdown(grid, canvas, &vp));
+    run_layer!(
+        layer::ACTIVE_EDITOR,
+        render_active_editor(grid, canvas, &vp)
+    );
+    run_layer!(
+        layer::ACTIVE_DROPDOWN,
+        render_active_dropdown(grid, canvas, &vp)
+    );
     run_layer!(layer::SCROLL_BARS, render_scroll_bars(grid, canvas));
     run_layer!(layer::FAST_SCROLL, render_fast_scroll(grid, canvas));
-    run_layer!(layer::DEBUG_OVERLAY, render_debug_overlay(grid, canvas, &vp));
+    run_layer!(
+        layer::DEBUG_OVERLAY,
+        render_debug_overlay(grid, canvas, &vp)
+    );
     canvas.end_overlay();
 
     ((0, 0, w, h), times, zone_counts)
@@ -6121,18 +6160,46 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, vp: &Visib
             df::draw_str(canvas, cx, cy, layer::NAMES[i], color, s);
 
             if off {
-                df::draw_str_right(canvas, cx + pct_off + pct_chars as i32 * char_w, cy, "OFF", dim_color, s);
+                df::draw_str_right(
+                    canvas,
+                    cx + pct_off + pct_chars as i32 * char_w,
+                    cy,
+                    "OFF",
+                    dim_color,
+                    s,
+                );
             } else if total_us > 0.0 {
                 let t = grid.layer_times_us[i];
                 let pct = t / total_us * 100.0;
                 // Value right-aligned in val column
                 let val_s = format!("{:5.0}u", t);
-                df::draw_str_right(canvas, cx + val_off + val_chars as i32 * char_w, cy, &val_s, color, s);
+                df::draw_str_right(
+                    canvas,
+                    cx + val_off + val_chars as i32 * char_w,
+                    cy,
+                    &val_s,
+                    color,
+                    s,
+                );
                 // Percent right-aligned in pct column
                 let pct_s = format!("{:3.0}%", pct);
-                df::draw_str_right(canvas, cx + pct_off + pct_chars as i32 * char_w, cy, &pct_s, color, s);
+                df::draw_str_right(
+                    canvas,
+                    cx + pct_off + pct_chars as i32 * char_w,
+                    cy,
+                    &pct_s,
+                    color,
+                    s,
+                );
             } else {
-                df::draw_str_right(canvas, cx + pct_off + pct_chars as i32 * char_w, cy, "-", color, s);
+                df::draw_str_right(
+                    canvas,
+                    cx + pct_off + pct_chars as i32 * char_w,
+                    cy,
+                    "-",
+                    color,
+                    s,
+                );
             }
         }
     }

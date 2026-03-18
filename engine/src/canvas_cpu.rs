@@ -35,6 +35,25 @@ impl<'a> CpuCanvas<'a> {
             text_renderer,
         }
     }
+
+    fn clip_span(start: i32, len: i32, limit: i32) -> Option<(usize, usize)> {
+        if limit <= 0 {
+            return None;
+        }
+        let clipped_start = start.clamp(0, limit);
+        let clipped_end = start.saturating_add(len).clamp(0, limit);
+        if clipped_start >= clipped_end {
+            None
+        } else {
+            Some((clipped_start as usize, clipped_end as usize))
+        }
+    }
+
+    fn clip_rect(&self, x: i32, y: i32, w: i32, h: i32) -> Option<(usize, usize, usize, usize)> {
+        let (x0, x1) = Self::clip_span(x, w, self.width)?;
+        let (y0, y1) = Self::clip_span(y, h, self.height)?;
+        Some((x0, y0, x1, y1))
+    }
 }
 
 impl<'a> Canvas for CpuCanvas<'a> {
@@ -47,17 +66,13 @@ impl<'a> Canvas for CpuCanvas<'a> {
     }
 
     fn fill_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: u32) {
-        let x0 = x.max(0) as usize;
-        let y0 = y.max(0) as usize;
-        let x1 = (x + w).min(self.width) as usize;
-        let y1 = (y + h).min(self.height) as usize;
-        if x0 >= x1 || y0 >= y1 {
+        let Some((x0, y0, x1, y1)) = self.clip_rect(x, y, w, h) else {
             return;
-        }
+        };
 
         let stride = self.stride as usize;
         let pixel = color.to_ne_bytes(); // ARGB → native byte order
-        // We store RGBA in the buffer, so rearrange:
+                                         // We store RGBA in the buffer, so rearrange:
         let rgba = [
             ((color >> 16) & 0xFF) as u8,
             ((color >> 8) & 0xFF) as u8,
@@ -86,7 +101,8 @@ impl<'a> Canvas for CpuCanvas<'a> {
             if dst_end > self.buf.len() {
                 break;
             }
-            self.buf.copy_within(first_row_start..first_row_end, dst_start);
+            self.buf
+                .copy_within(first_row_start..first_row_end, dst_start);
         }
     }
 
@@ -106,13 +122,9 @@ impl<'a> Canvas for CpuCanvas<'a> {
         let src_b = (color & 0xFF) as u32;
         let inv_a = 255 - src_a;
 
-        let x0 = x.max(0) as usize;
-        let y0 = y.max(0) as usize;
-        let x1 = (x + w).min(self.width) as usize;
-        let y1 = (y + h).min(self.height) as usize;
-        if x0 >= x1 || y0 >= y1 {
+        let Some((x0, y0, x1, y1)) = self.clip_rect(x, y, w, h) else {
             return;
-        }
+        };
 
         let stride = self.stride as usize;
         let row_bytes = (x1 - x0) * 4;
@@ -145,11 +157,9 @@ impl<'a> Canvas for CpuCanvas<'a> {
             (color & 0xFF) as u8,
             ((color >> 24) & 0xFF) as u8,
         ];
-        let x0 = x.max(0) as usize;
-        let x1 = (x + w).min(self.width) as usize;
-        if x0 >= x1 {
+        let Some((x0, x1)) = Self::clip_span(x, w, self.width) else {
             return;
-        }
+        };
         let start = y as usize * self.stride as usize + x0 * 4;
         let end = start + (x1 - x0) * 4;
         if end > self.buf.len() {
@@ -369,6 +379,97 @@ impl<'a> Canvas for CpuCanvas<'a> {
                     self.buf[off + 3] = ((c >> 24) & 0xFF) as u8;
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::text::TextRenderer;
+
+    struct NoopTextRenderer;
+
+    impl TextRenderer for NoopTextRenderer {
+        fn measure_text(
+            &mut self,
+            _text: &str,
+            _font_name: &str,
+            _font_size: f32,
+            _bold: bool,
+            _italic: bool,
+            _max_width: Option<f32>,
+        ) -> (f32, f32) {
+            (0.0, 0.0)
+        }
+
+        fn render_text(
+            &mut self,
+            _buffer_pixels: &mut [u8],
+            _buf_width: i32,
+            _buf_height: i32,
+            _stride: i32,
+            _x: i32,
+            _y: i32,
+            _clip_x: i32,
+            _clip_y: i32,
+            _clip_w: i32,
+            _clip_h: i32,
+            _text: &str,
+            _font_name: &str,
+            _font_size: f32,
+            _bold: bool,
+            _italic: bool,
+            _color: u32,
+            _max_width: Option<f32>,
+        ) -> f32 {
+            0.0
+        }
+    }
+
+    fn make_canvas<'a>(buf: &'a mut [u8], text: &'a mut NoopTextRenderer) -> CpuCanvas<'a> {
+        CpuCanvas::new(buf, 8, 4, 8 * 4, text)
+    }
+
+    #[test]
+    fn fill_rect_ignores_fully_offscreen_negative_rect() {
+        let mut buffer = vec![0u8; 8 * 4 * 4];
+        let original = buffer.clone();
+        let mut text = NoopTextRenderer;
+        let mut canvas = make_canvas(&mut buffer, &mut text);
+
+        canvas.fill_rect(-200, 1, 100, 2, 0xFFFF0000);
+
+        assert_eq!(buffer, original);
+    }
+
+    #[test]
+    fn blend_rect_ignores_fully_offscreen_negative_rect() {
+        let mut buffer = vec![0u8; 8 * 4 * 4];
+        let original = buffer.clone();
+        let mut text = NoopTextRenderer;
+        let mut canvas = make_canvas(&mut buffer, &mut text);
+
+        canvas.blend_rect(1, -200, 3, 100, 0x80FF0000);
+
+        assert_eq!(buffer, original);
+    }
+
+    #[test]
+    fn hline_clips_partially_offscreen_negative_span() {
+        let mut buffer = vec![0u8; 8 * 4 * 4];
+        let mut text = NoopTextRenderer;
+        let mut canvas = make_canvas(&mut buffer, &mut text);
+
+        canvas.hline(-2, 1, 5, 0xFF112233);
+
+        for x in 0..3 {
+            let off = ((1 * 8 + x) * 4) as usize;
+            assert_eq!(&buffer[off..off + 4], &[0x11, 0x22, 0x33, 0xFF]);
+        }
+        for x in 3..8 {
+            let off = ((1 * 8 + x) * 4) as usize;
+            assert_eq!(&buffer[off..off + 4], &[0, 0, 0, 0]);
         }
     }
 }

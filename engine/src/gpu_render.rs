@@ -1059,7 +1059,13 @@ impl GpuRenderer {
     // Internal: render to a wgpu TextureView
     // -----------------------------------------------------------------------
 
-    fn render_to_view(&mut self, grid: &VolvoxGrid, view: &wgpu::TextureView, w: i32, h: i32) -> RenderResult {
+    fn render_to_view(
+        &mut self,
+        grid: &VolvoxGrid,
+        view: &wgpu::TextureView,
+        w: i32,
+        h: i32,
+    ) -> RenderResult {
         // Keep renderer-owned text cache policy in sync with runtime grid config.
         if self.text_engine.layout_cache_cap != grid.text_layout_cache_cap {
             self.text_engine
