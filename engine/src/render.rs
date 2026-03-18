@@ -428,10 +428,46 @@ mod tests {
         let mut buffer = vec![0u8; (300 * 120 * 4) as usize];
         renderer.render(&grid, &mut buffer, 300, 120, 300 * 4);
 
-        assert_eq!(pixel_argb(&buffer, 300, 60, 5), back_color);
-        assert_eq!(pixel_argb(&buffer, 300, 60, 30), separator_color);
-        assert_eq!(pixel_argb(&buffer, 300, 120, 5), separator_color);
-        assert_eq!(pixel_argb(&buffer, 300, 120, 30), separator_color);
+        assert_ne!(pixel_argb(&buffer, 300, 59, 5), separator_color);
+        assert_eq!(pixel_argb(&buffer, 300, 59, 30), separator_color);
+        assert_eq!(pixel_argb(&buffer, 300, 119, 5), separator_color);
+        assert_eq!(pixel_argb(&buffer, 300, 119, 30), separator_color);
+    }
+
+    #[test]
+    fn render_header_separator_stays_on_column_boundary_when_scroll_row_changes() {
+        let back_color = 0xFFE0E0E0;
+        let separator_color = 0xFF445566;
+        let mut grid = VolvoxGrid::new(1, 180, 80, 6, 3, 0, 0);
+        grid.style.grid_lines = pb::GridLineStyle::GridlineNone as i32;
+        grid.style.grid_lines_fixed = pb::GridLineStyle::GridlineNone as i32;
+        for row in 0..grid.rows {
+            grid.set_row_height(row, 20);
+        }
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 60);
+        }
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        grid.indicator_bands.col_top.back_color = Some(back_color);
+        grid.indicator_bands.col_top.grid_color = Some(back_color);
+        grid.style.header_separator.enabled = true;
+        grid.style.header_separator.color = separator_color;
+        grid.style.header_separator.height = crate::style::HeaderMarkHeight::Px(12);
+        grid.merged_regions.add_merge(0, 0, 0, 1);
+        grid.ensure_layout();
+
+        let mut renderer = Renderer::with_custom_text_renderer(Box::new(SolidTextRenderer));
+        let mut top_row_merged = vec![0u8; (180 * 80 * 4) as usize];
+        renderer.render(&grid, &mut top_row_merged, 180, 80, 180 * 4);
+
+        grid.scroll.scroll_y = 20.0;
+        let mut next_row_visible = vec![0u8; (180 * 80 * 4) as usize];
+        renderer.render(&grid, &mut next_row_visible, 180, 80, 180 * 4);
+
+        assert_eq!(pixel_argb(&top_row_merged, 180, 59, 12), separator_color);
+        assert_eq!(pixel_argb(&next_row_visible, 180, 59, 12), separator_color);
     }
 
     #[test]
