@@ -11,7 +11,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  volvoxgrid: ^0.2.0
+  volvoxgrid: ^0.3.0
   syncfusion_flutter_datagrid: ^30.2.7 # Proprietary license — see https://www.syncfusion.com/products/communitylicense
 
 dev_dependencies:

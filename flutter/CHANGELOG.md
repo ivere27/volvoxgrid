@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Redesigned APIs.
+- Improved Android GPU support and frame pacing.
+- Fixed CPU-mode span and header separator rendering issues.
+
 ## 0.2.0
 
 - canonical APIs 

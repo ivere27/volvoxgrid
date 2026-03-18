@@ -179,7 +179,7 @@ make android
 make android-run-release
 
 # Use published Maven AAR in the example app (default is local project module)
-make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.2.0
+make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.3.0
 ```
 
 ### Java Desktop
@@ -192,7 +192,7 @@ make java-desktop-run
 make java-desktop-run-simple
 
 # Use published Maven JAR in the desktop example (default is local)
-make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.2.0
+make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.3.0
 ```
 
 ### .NET WinForms
@@ -359,7 +359,7 @@ Requires `.maven-settings.xml` with Sonatype Central credentials and GPG signing
 ```bash
 # Build snapshot artifacts
 # (automatically installs to mavenLocal: ~/.m2/repository)
-make docker_android_aar docker_desktop VOLVOXGRID_VERSION=0.2.0-SNAPSHOT
+make docker_android_aar docker_desktop VOLVOXGRID_VERSION=0.3.0-SNAPSHOT
 ```
 
 ### Optional Features and Binary Size
@@ -873,7 +873,7 @@ The engine includes a high-performance, backend-agnostic debug overlay for real-
 
 | Line | Example | Description |
 |---|---|---|
-| **Line 1** | `Engine v0.2.0-SNAPSHOT · 59ccdeb · 2026-03-02 14:46 UTC` | Engine version, short git commit, and UTC build date. |
+| **Line 1** | `Engine v0.3.0-SNAPSHOT · 59ccdeb · 2026-03-02 14:46 UTC` | Engine version, short git commit, and UTC build date. |
 | **Line 2** | `FPS: 60.0 \| 1.2ms \| Q: 1242 \| ID: 1001 \| Z: 100% \| Res: 1080x2240` | FPS, Frame Time, Instance Count (Quads), Grid ID, Zoom level, Render Resolution. |
 | **Line 3** | `Mode: GPU(Vulkan-Mailbox) \| Grid: 1,000,000x20 \| DIRTY` | Render Backend, Logical Grid Dimensions (Rows x Cols), Engine Status. |
 | **Line 4** | `Vis: 42x8(336) \| P: 0,15420 \| M: 12.4MB \| C: 842/8192` | Visible Viewport Dimensions & Total Cells, Scroll Position, Estimated Heap Memory, Text Cache Usage. |
