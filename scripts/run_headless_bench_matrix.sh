@@ -14,6 +14,7 @@ Examples:
   scripts/run_headless_bench_matrix.sh
   scripts/run_headless_bench_matrix.sh --runs 3 -- --width 1920 --height 1080
   scripts/run_headless_bench_matrix.sh -- --renderer gpu --scroll-blit-mode both
+  scripts/run_headless_bench_matrix.sh -- --visual-host --gpu-path surface
 
 Any args after `--` are passed directly to `headless_bench`.
 EOF

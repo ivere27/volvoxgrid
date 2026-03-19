@@ -101,6 +101,29 @@ extern "C" {
     fn ANativeWindow_release(window: *mut std::ffi::c_void);
 }
 
+pub const NATIVE_SURFACE_DESC_MAGIC: u32 = 0x5658_4753;
+pub const NATIVE_SURFACE_DESC_VERSION: u16 = 1;
+pub const NATIVE_SURFACE_KIND_WAYLAND: u16 = 1;
+pub const NATIVE_SURFACE_KIND_X11: u16 = 2;
+
+/// Opaque native surface descriptor used by desktop hosts for `GpuSurfaceReady`.
+///
+/// The host owns this descriptor and passes its stable pointer via
+/// `GpuSurfaceReady.surface_handle`. The plugin/engine only borrow it while
+/// configuring the wgpu surface.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct NativeSurfaceDescriptor {
+    pub magic: u32,
+    pub version: u16,
+    pub kind: u16,
+    pub screen: i32,
+    pub reserved: u32,
+    pub display: *mut std::ffi::c_void,
+    pub surface: *mut std::ffi::c_void,
+    pub window: u64,
+}
+
 /// GPU renderer for VolvoxGrid.
 pub struct GpuRenderer {
     #[allow(dead_code)]
@@ -511,15 +534,16 @@ impl GpuRenderer {
         (rect_pipeline, textured_pipeline)
     }
 
-    /// Create a surface from a raw native window handle (Android ANativeWindow*, etc.).
+    /// Create a surface from a raw native window handle.
     ///
     /// If `native_window_ptr` is null, drops the existing surface.
-    /// On Android, builds an `AndroidNdkWindowHandle` + `AndroidDisplayHandle`.
+    /// On Android, `native_window_ptr` is an `ANativeWindow*`.
+    /// On Linux desktop hosts, `native_window_ptr` points to a borrowed
+    /// [`NativeSurfaceDescriptor`].
     ///
     /// # Safety
-    /// The caller must ensure `native_window_ptr` is a valid ANativeWindow* that
-    /// remains valid for the duration of this call, and that `w`/`h` match the
-    /// window dimensions.
+    /// The caller must ensure `native_window_ptr` remains valid for the duration
+    /// of this call and that `w`/`h` match the target surface dimensions.
     #[cfg(not(target_arch = "wasm32"))]
     #[allow(unused_variables)]
     pub async unsafe fn configure_surface_from_raw_handle(
@@ -537,7 +561,7 @@ impl GpuRenderer {
         // Drop existing surface before creating a new one to ensure old handles are released.
         self.drop_surface();
 
-        // Build platform-specific raw handles
+        // Build platform-specific raw handles.
         #[cfg(target_os = "android")]
         let (raw_window, raw_display) = {
             // Take an owned native window reference for this configured surface.
@@ -556,152 +580,201 @@ impl GpuRenderer {
             )
         };
 
-        #[cfg(not(target_os = "android"))]
+        #[cfg(all(unix, not(target_os = "android")))]
+        let (raw_window, raw_display) = {
+            let desc = &*(native_window_ptr as *const NativeSurfaceDescriptor);
+            if desc.magic != NATIVE_SURFACE_DESC_MAGIC {
+                return Err(format!(
+                    "configure_surface_from_raw_handle: bad descriptor magic {:#x}",
+                    desc.magic
+                ));
+            }
+            if desc.version != NATIVE_SURFACE_DESC_VERSION {
+                return Err(format!(
+                    "configure_surface_from_raw_handle: unsupported descriptor version {}",
+                    desc.version
+                ));
+            }
+
+            match desc.kind {
+                NATIVE_SURFACE_KIND_WAYLAND => {
+                    let display = std::ptr::NonNull::new(desc.display).ok_or_else(|| {
+                        "configure_surface_from_raw_handle: null Wayland display".to_string()
+                    })?;
+                    let surface = std::ptr::NonNull::new(desc.surface).ok_or_else(|| {
+                        "configure_surface_from_raw_handle: null Wayland surface".to_string()
+                    })?;
+                    let wh = raw_window_handle::WaylandWindowHandle::new(surface);
+                    let dh = raw_window_handle::WaylandDisplayHandle::new(display);
+                    (
+                        raw_window_handle::RawWindowHandle::Wayland(wh),
+                        raw_window_handle::RawDisplayHandle::Wayland(dh),
+                    )
+                }
+                NATIVE_SURFACE_KIND_X11 => {
+                    let display = std::ptr::NonNull::new(desc.display).ok_or_else(|| {
+                        "configure_surface_from_raw_handle: null X11 display".to_string()
+                    })?;
+                    let wh =
+                        raw_window_handle::XlibWindowHandle::new(desc.window as std::ffi::c_ulong);
+                    let dh =
+                        raw_window_handle::XlibDisplayHandle::new(Some(display), desc.screen);
+                    (
+                        raw_window_handle::RawWindowHandle::Xlib(wh),
+                        raw_window_handle::RawDisplayHandle::Xlib(dh),
+                    )
+                }
+                other => {
+                    return Err(format!(
+                        "configure_surface_from_raw_handle: unsupported descriptor kind {}",
+                        other
+                    ));
+                }
+            }
+        };
+
+        #[cfg(not(any(target_os = "android", all(unix, not(target_os = "android")))))]
         return Err("configure_surface_from_raw_handle: unsupported platform".to_string());
 
-        #[cfg(target_os = "android")]
-        {
-            let target = wgpu::SurfaceTargetUnsafe::RawHandle {
-                raw_window_handle: raw_window,
-                raw_display_handle: raw_display,
-            };
+        let target = wgpu::SurfaceTargetUnsafe::RawHandle {
+            raw_window_handle: raw_window,
+            raw_display_handle: raw_display,
+        };
 
-            let surface = self
+        let surface = self
+            .instance
+            .create_surface_unsafe(target)
+            .map_err(|e| format!("Failed to create surface from raw handle: {}", e))?;
+
+        // Check if the current adapter is compatible with this surface.
+        let caps = surface.get_capabilities(&self.adapter);
+        if caps.formats.is_empty() {
+            // Re-request adapter with compatible_surface
+            let new_adapter = self
                 .instance
-                .create_surface_unsafe(target)
-                .map_err(|e| format!("Failed to create surface from raw handle: {}", e))?;
+                .request_adapter(&wgpu::RequestAdapterOptions {
+                    power_preference: wgpu::PowerPreference::HighPerformance,
+                    compatible_surface: Some(&surface),
+                    force_fallback_adapter: false,
+                })
+                .await
+                .ok_or_else(|| "No GPU adapter compatible with surface".to_string())?;
 
-            // Check if the current adapter is compatible with this surface.
-            let caps = surface.get_capabilities(&self.adapter);
-            if caps.formats.is_empty() {
-                // Re-request adapter with compatible_surface
-                let new_adapter = self
-                    .instance
-                    .request_adapter(&wgpu::RequestAdapterOptions {
-                        power_preference: wgpu::PowerPreference::HighPerformance,
-                        compatible_surface: Some(&surface),
-                        force_fallback_adapter: false,
-                    })
-                    .await
-                    .ok_or_else(|| "No GPU adapter compatible with surface".to_string())?;
+            let (new_device, new_queue) = new_adapter
+                .request_device(
+                    &wgpu::DeviceDescriptor {
+                        label: Some("VolvoxGrid GPU"),
+                        required_features: wgpu::Features::empty(),
+                        required_limits: new_adapter.limits(),
+                        memory_hints: wgpu::MemoryHints::Performance,
+                    },
+                    None,
+                )
+                .await
+                .map_err(|e| format!("Failed to create GPU device: {}", e))?;
 
-                let (new_device, new_queue) = new_adapter
-                    .request_device(
-                        &wgpu::DeviceDescriptor {
-                            label: Some("VolvoxGrid GPU"),
-                            required_features: wgpu::Features::empty(),
-                            required_limits: new_adapter.limits(),
-                            memory_hints: wgpu::MemoryHints::Performance,
-                        },
-                        None,
-                    )
-                    .await
-                    .map_err(|e| format!("Failed to create GPU device: {}", e))?;
+            self.adapter = new_adapter;
+            self.device = new_device;
+            self.queue = new_queue;
 
-                self.adapter = new_adapter;
-                self.device = new_device;
-                self.queue = new_queue;
-
-                // Rebuild uniform bind group layout and buffer
-                self.uniform_bind_group_layout =
-                    self.device
-                        .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                            label: Some("uniform_bgl"),
-                            entries: &[wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            }],
-                        });
-
-                self.uniform_buf =
-                    self.device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("uniforms"),
-                            contents: bytemuck::bytes_of(&Uniforms {
-                                viewport_size: [1.0, 1.0],
-                                _pad: [0.0, 0.0],
-                            }),
-                            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                        });
-
-                self.uniform_bind_group =
-                    self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some("uniform_bg"),
-                        layout: &self.uniform_bind_group_layout,
-                        entries: &[wgpu::BindGroupEntry {
+            // Rebuild uniform bind group layout and buffer
+            self.uniform_bind_group_layout =
+                self.device
+                    .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                        label: Some("uniform_bgl"),
+                        entries: &[wgpu::BindGroupLayoutEntry {
                             binding: 0,
-                            resource: self.uniform_buf.as_entire_binding(),
+                            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
                         }],
                     });
 
-                // Rebuild textured bind group layout
-                self.textured_bind_group_layout =
-                    self.device
-                        .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                            label: Some("textured_bgl"),
-                            entries: &[
-                                wgpu::BindGroupLayoutEntry {
-                                    binding: 0,
-                                    visibility: wgpu::ShaderStages::FRAGMENT,
-                                    ty: wgpu::BindingType::Texture {
-                                        sample_type: wgpu::TextureSampleType::Float {
-                                            filterable: true,
-                                        },
-                                        view_dimension: wgpu::TextureViewDimension::D2,
-                                        multisampled: false,
+            self.uniform_buf =
+                self.device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("uniforms"),
+                        contents: bytemuck::bytes_of(&Uniforms {
+                            viewport_size: [1.0, 1.0],
+                            _pad: [0.0, 0.0],
+                        }),
+                        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                    });
+
+            self.uniform_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("uniform_bg"),
+                layout: &self.uniform_bind_group_layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.uniform_buf.as_entire_binding(),
+                }],
+            });
+
+            // Rebuild textured bind group layout
+            self.textured_bind_group_layout =
+                self.device
+                    .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                        label: Some("textured_bgl"),
+                        entries: &[
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 0,
+                                visibility: wgpu::ShaderStages::FRAGMENT,
+                                ty: wgpu::BindingType::Texture {
+                                    sample_type: wgpu::TextureSampleType::Float {
+                                        filterable: true,
                                     },
-                                    count: None,
+                                    view_dimension: wgpu::TextureViewDimension::D2,
+                                    multisampled: false,
                                 },
-                                wgpu::BindGroupLayoutEntry {
-                                    binding: 1,
-                                    visibility: wgpu::ShaderStages::FRAGMENT,
-                                    ty: wgpu::BindingType::Sampler(
-                                        wgpu::SamplerBindingType::Filtering,
-                                    ),
-                                    count: None,
-                                },
-                            ],
-                        });
+                                count: None,
+                            },
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 1,
+                                visibility: wgpu::ShaderStages::FRAGMENT,
+                                ty: wgpu::BindingType::Sampler(
+                                    wgpu::SamplerBindingType::Filtering,
+                                ),
+                                count: None,
+                            },
+                        ],
+                    });
 
-                self.atlas_sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
-                    label: Some("atlas_sampler"),
-                    mag_filter: wgpu::FilterMode::Linear,
-                    min_filter: wgpu::FilterMode::Linear,
-                    ..Default::default()
-                });
+            self.atlas_sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
+                label: Some("atlas_sampler"),
+                mag_filter: wgpu::FilterMode::Linear,
+                min_filter: wgpu::FilterMode::Linear,
+                ..Default::default()
+            });
 
-                // Clear cached GPU resources that belong to the old device
-                self.atlas_textures.clear();
-                self.atlas_bind_groups.clear();
-                self.glyph_atlas.clear();
-                self.persistent_rect_buf = None;
-                self.persistent_rect_cap = 0;
-                self.persistent_tex_buf = None;
-                self.persistent_tex_cap = 0;
-                self.persistent_overlay_rect_buf = None;
-                self.persistent_overlay_rect_cap = 0;
-                self.persistent_overlay_tex_buf = None;
-                self.persistent_overlay_tex_cap = 0;
-                self.persistent_present_tex_buf = None;
-                self.persistent_present_tex_cap = 0;
-                self.frame_cache = None;
-                self.scroll_cache.invalidate();
+            // Clear cached GPU resources that belong to the old device
+            self.atlas_textures.clear();
+            self.atlas_bind_groups.clear();
+            self.glyph_atlas.clear();
+            self.persistent_rect_buf = None;
+            self.persistent_rect_cap = 0;
+            self.persistent_tex_buf = None;
+            self.persistent_tex_cap = 0;
+            self.persistent_overlay_rect_buf = None;
+            self.persistent_overlay_rect_cap = 0;
+            self.persistent_overlay_tex_buf = None;
+            self.persistent_overlay_tex_cap = 0;
+            self.persistent_present_tex_buf = None;
+            self.persistent_present_tex_cap = 0;
+            self.frame_cache = None;
+            self.scroll_cache.invalidate();
 
-                // Reset pipeline format to force recreation of pipelines with the new device
-                self.pipeline_format = wgpu::TextureFormat::Rgba8Uint;
-            }
-
-            if !self.configure_surface(surface, w, h, requested_present_mode) {
-                return Err("Surface configuration failed (incompatible surface)".to_string());
-            }
-            Ok(())
+            // Reset pipeline format to force recreation of pipelines with the new device
+            self.pipeline_format = wgpu::TextureFormat::Rgba8Uint;
         }
+
+        if !self.configure_surface(surface, w, h, requested_present_mode) {
+            return Err("Surface configuration failed (incompatible surface)".to_string());
+        }
+        Ok(())
     }
 
     /// Drop the current surface (e.g. when the native window is destroyed).

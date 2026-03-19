@@ -272,7 +272,7 @@ help:
 	@echo "  doom-deps      Download GPL-2.0 DOOM assets for web mode (not part of Apache-2.0 source)"
 	@echo "  gtk-test       Build & launch GTK4 plugin-host visual test (debug; requires GTK4 dev libs)"
 	@echo "  gtk-test-release  Build & launch GTK4 plugin-host visual test (release)"
-	@echo "  gtk-bench      Build and run GTK4 headless benchmark matrix (release; sudo with desktop session env)"
+	@echo "  gtk-bench      Build and run GTK4 benchmark matrix (release; real GPU surface for GPU cases, sudo with desktop session env)"
 	@echo "    gtk bench options: GTK_BENCH_RUNS=<n>, GTK_BENCH_ARGS='<extra headless_bench args>'"
 	@echo ""
 	@echo "Docker + Maven:"
@@ -1494,16 +1494,16 @@ gtk-test-release: host-plugin-release
 	VOLVOXGRID_PLUGIN_PATH="$(JAVA_DESKTOP_PLUGIN_RELEASE)" ./target/release/volvoxgrid-gtk-test
 
 gtk-bench: host-plugin-release
-	@echo "Building GTK4 headless benchmark (release)..."
+	@echo "Building GTK4 benchmark (release)..."
 	cd gtk-test && cargo build $(CARGO_JOBS_FLAG) --release --bin headless_bench
-	@echo "Running GTK4 headless benchmark matrix (release, sudo with session env)..."
+	@echo "Running GTK4 benchmark matrix (release, sudo with session env)..."
 	sudo env \
 		"PATH=$$PATH" \
 		"XDG_RUNTIME_DIR=/run/user/$$(id -u)" \
 		"DISPLAY=$$DISPLAY" \
 		"WAYLAND_DISPLAY=$${WAYLAND_DISPLAY:-}" \
 		"XAUTHORITY=$${XAUTHORITY:-$$HOME/.Xauthority}" \
-		./scripts/run_headless_bench_matrix.sh --runs "$(GTK_BENCH_RUNS)" --profile release --no-build $(if $(strip $(GTK_BENCH_ARGS)),-- $(GTK_BENCH_ARGS),)
+		./scripts/run_headless_bench_matrix.sh --runs "$(GTK_BENCH_RUNS)" --profile release --no-build -- --visual-host --gpu-path surface $(GTK_BENCH_ARGS)
 
 # =============================================================================
 # ActiveX OCX — Windows control via MinGW cross-compilation
