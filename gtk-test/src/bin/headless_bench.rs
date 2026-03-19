@@ -50,12 +50,71 @@ const LAYER_LABELS: [&str; LAYER_COUNT] = [
     "Debug Overlay",
 ];
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RendererChoice {
+    Cpu,
+    Gpu,
+}
+
+impl RendererChoice {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Cpu => "cpu",
+            Self::Gpu => "gpu",
+        }
+    }
+
+    fn proto_mode(self) -> i32 {
+        match self {
+            Self::Cpu => pb::RendererMode::RendererCpu as i32,
+            Self::Gpu => pb::RendererMode::RendererGpu as i32,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RendererSelection {
+    Cpu,
+    Gpu,
+    Both,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ToggleSelection {
+    Off,
+    On,
+    Both,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FrameBackend {
+    Cpu,
+    Gpu,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct BenchCase {
+    renderer: RendererChoice,
+    scroll_blit: bool,
+}
+
+impl BenchCase {
+    fn label(self) -> String {
+        format!(
+            "requested_renderer={} scroll_blit={}",
+            self.renderer.label(),
+            self.scroll_blit
+        )
+    }
+}
+
 #[derive(Clone, Debug)]
 struct Args {
     demo: String,
     width: i32,
     height: i32,
-    scroll_blit: bool,
+    renderer: RendererSelection,
+    scroll_blit: ToggleSelection,
     warmup_steps: usize,
     scroll_steps: usize,
     scroll_delta_y: f32,
@@ -70,7 +129,8 @@ impl Default for Args {
             demo: DEFAULT_DEMO.to_string(),
             width: DEFAULT_WIDTH,
             height: DEFAULT_HEIGHT,
-            scroll_blit: false,
+            renderer: RendererSelection::Both,
+            scroll_blit: ToggleSelection::Both,
             warmup_steps: 8,
             scroll_steps: 48,
             scroll_delta_y: 1.5,
@@ -99,6 +159,7 @@ struct BenchSession {
 struct FrameResult {
     rendered: bool,
     metrics: Option<pb::FrameMetrics>,
+    backend: FrameBackend,
 }
 
 #[derive(Clone, Debug)]
@@ -111,6 +172,8 @@ struct PhaseStats {
     layer_sum_us: [f64; LAYER_COUNT],
     layer_max_us: [f32; LAYER_COUNT],
     last_zone_counts: [u32; 4],
+    cpu_frames: usize,
+    gpu_frames: usize,
 }
 
 impl PhaseStats {
@@ -124,12 +187,18 @@ impl PhaseStats {
             layer_sum_us: [0.0; LAYER_COUNT],
             layer_max_us: [0.0; LAYER_COUNT],
             last_zone_counts: [0; 4],
+            cpu_frames: 0,
+            gpu_frames: 0,
         }
     }
 
-    fn record(&mut self, metrics: &pb::FrameMetrics) {
+    fn record(&mut self, metrics: &pb::FrameMetrics, backend: FrameBackend) {
         self.rendered_frames += 1;
         self.frame_ms.push(metrics.frame_time_ms);
+        match backend {
+            FrameBackend::Cpu => self.cpu_frames += 1,
+            FrameBackend::Gpu => self.gpu_frames += 1,
+        }
 
         let mut total = 0.0f32;
         for (idx, us) in metrics
@@ -166,11 +235,28 @@ impl PhaseStats {
             self.layer_max_us[idx] = self.layer_max_us[idx].max(other.layer_max_us[idx]);
         }
         self.last_zone_counts = other.last_zone_counts;
+        self.cpu_frames += other.cpu_frames;
+        self.gpu_frames += other.gpu_frames;
+    }
+
+    fn actual_backend_label(&self) -> &'static str {
+        match (self.cpu_frames > 0, self.gpu_frames > 0) {
+            (true, false) => "cpu",
+            (false, true) => "gpu",
+            (true, true) => "mixed",
+            (false, false) => "none",
+        }
     }
 
     fn print(&self) {
         println!("== {} ==", self.name);
         println!("rendered_frames: {}", self.rendered_frames);
+        println!(
+            "actual_backend: {} (cpu_frames={} gpu_frames={})",
+            self.actual_backend_label(),
+            self.cpu_frames,
+            self.gpu_frames
+        );
         if self.truncated {
             println!("truncated: true");
         }
@@ -237,6 +323,7 @@ impl VolvoxServiceClient {
         &self,
         width: i32,
         height: i32,
+        renderer: RendererChoice,
         scroll_blit: bool,
     ) -> Result<pb::CreateResponse, String> {
         self.invoke(
@@ -267,7 +354,7 @@ impl VolvoxServiceClient {
                         ..Default::default()
                     }),
                     rendering: Some(pb::RenderConfig {
-                        renderer_mode: Some(pb::RendererMode::RendererCpu as i32),
+                        renderer_mode: Some(renderer.proto_mode()),
                         animation_enabled: Some(true),
                         frame_pacing_mode: Some(pb::FramePacingMode::Auto as i32),
                         target_frame_rate_hz: Some(30),
@@ -337,16 +424,17 @@ impl VolvoxServiceClient {
 }
 
 impl BenchSession {
-    fn new(args: &Args) -> Result<Self, String> {
+    fn new(args: &Args, case: BenchCase) -> Result<Self, String> {
         let client = VolvoxServiceClient::load_default()?;
-        let create = client.create_grid(args.width, args.height, args.scroll_blit)?;
+        let create =
+            client.create_grid(args.width, args.height, case.renderer, case.scroll_blit)?;
         let grid_id = create
             .handle
             .as_ref()
             .map(|h| h.id)
             .ok_or_else(|| "create_grid returned no handle".to_string())?;
 
-        apply_initial_config_for_grid(&client, grid_id, args.scroll_blit)?;
+        apply_initial_config_for_grid(&client, grid_id, case.renderer, case.scroll_blit)?;
         client.resize_viewport(grid_id, args.width, args.height)?;
 
         let render_stream = client.open_render_session()?;
@@ -369,6 +457,7 @@ impl BenchSession {
         demo: &str,
         fling_enabled: bool,
         scroll_track: bool,
+        renderer: RendererChoice,
         scroll_blit: bool,
     ) -> Result<(), String> {
         self.client.load_demo(self.grid_id, demo)?;
@@ -376,7 +465,7 @@ impl BenchSession {
             self.grid_id,
             pb::GridConfig {
                 rendering: Some(pb::RenderConfig {
-                    renderer_mode: Some(pb::RendererMode::RendererCpu as i32),
+                    renderer_mode: Some(renderer.proto_mode()),
                     debug_overlay: Some(true),
                     layer_profiling: Some(true),
                     animation_enabled: Some(true),
@@ -410,6 +499,20 @@ impl BenchSession {
         }
         self.render_until_clean(None, 256)?;
         Ok(())
+    }
+
+    fn current_backend(&self) -> Result<FrameBackend, String> {
+        let cfg = self.client.get_config(self.grid_id)?;
+        let mode = cfg
+            .rendering
+            .as_ref()
+            .and_then(|rc| rc.renderer_mode)
+            .unwrap_or(pb::RendererMode::RendererCpu as i32);
+        Ok(if mode >= pb::RendererMode::RendererGpu as i32 {
+            FrameBackend::Gpu
+        } else {
+            FrameBackend::Cpu
+        })
     }
 
     fn send_scroll(&self, dx: f32, dy: f32) -> Result<(), String> {
@@ -451,12 +554,14 @@ impl BenchSession {
                     return Ok(FrameResult {
                         rendered: output.rendered,
                         metrics: frame.metrics,
+                        backend: self.current_backend()?,
                     });
                 }
                 pb::render_output::Event::GpuFrameDone(frame) => {
                     return Ok(FrameResult {
                         rendered: output.rendered,
                         metrics: frame.metrics,
+                        backend: FrameBackend::Gpu,
                     });
                 }
                 _ => {}
@@ -481,7 +586,7 @@ impl BenchSession {
                     .metrics
                     .as_ref()
                     .ok_or_else(|| "rendered frame missing metrics".to_string())?;
-                s.record(metrics);
+                s.record(metrics, frame.backend);
             }
             rendered += 1;
         }
@@ -514,7 +619,7 @@ impl BenchSession {
                     .metrics
                     .as_ref()
                     .ok_or_else(|| "rendered frame missing metrics".to_string())?;
-                s.record(metrics);
+                s.record(metrics, frame.backend);
             }
             rendered += 1;
         }
@@ -525,13 +630,14 @@ impl BenchSession {
 fn apply_initial_config_for_grid(
     client: &VolvoxServiceClient,
     grid_id: i64,
+    renderer: RendererChoice,
     scroll_blit: bool,
 ) -> Result<(), String> {
     client.configure(
         grid_id,
         pb::GridConfig {
             rendering: Some(pb::RenderConfig {
-                renderer_mode: Some(pb::RendererMode::RendererCpu as i32),
+                renderer_mode: Some(renderer.proto_mode()),
                 animation_enabled: Some(true),
                 frame_pacing_mode: Some(pb::FramePacingMode::Auto as i32),
                 target_frame_rate_hz: Some(30),
@@ -559,9 +665,10 @@ fn apply_initial_config_for_grid(
 fn run_steady_scroll(
     session: &mut BenchSession,
     args: &Args,
+    case: BenchCase,
     frame_interval: Duration,
 ) -> Result<PhaseStats, String> {
-    session.prepare_demo(&args.demo, false, false, args.scroll_blit)?;
+    session.prepare_demo(&args.demo, false, false, case.renderer, case.scroll_blit)?;
 
     for _ in 0..args.warmup_steps {
         session.send_scroll(0.0, args.scroll_delta_y)?;
@@ -582,9 +689,10 @@ fn run_steady_scroll(
 fn run_fling(
     session: &mut BenchSession,
     args: &Args,
+    case: BenchCase,
     frame_interval: Duration,
 ) -> Result<PhaseStats, String> {
-    session.prepare_demo(&args.demo, true, true, args.scroll_blit)?;
+    session.prepare_demo(&args.demo, true, true, case.renderer, case.scroll_blit)?;
 
     for _ in 0..args.fling_burst {
         session.send_scroll(0.0, args.scroll_delta_y)?;
@@ -611,7 +719,21 @@ fn parse_args() -> Result<Args, String> {
             "--demo" => args.demo = next_value(&mut it, "--demo")?,
             "--width" => args.width = parse_i32(&next_value(&mut it, "--width")?, "--width")?,
             "--height" => args.height = parse_i32(&next_value(&mut it, "--height")?, "--height")?,
-            "--scroll-blit" => args.scroll_blit = true,
+            "--renderer" => {
+                args.renderer =
+                    parse_renderer_selection(&next_value(&mut it, "--renderer")?, "--renderer")?
+            }
+            "--scroll-blit" => args.scroll_blit = ToggleSelection::On,
+            "--scroll-blit-mode" => {
+                args.scroll_blit = parse_toggle_selection(
+                    &next_value(&mut it, "--scroll-blit-mode")?,
+                    "--scroll-blit-mode",
+                )?
+            }
+            "--matrix" => {
+                args.renderer = RendererSelection::Both;
+                args.scroll_blit = ToggleSelection::Both;
+            }
             "--warmup-steps" => {
                 args.warmup_steps =
                     parse_usize(&next_value(&mut it, "--warmup-steps")?, "--warmup-steps")?
@@ -688,18 +810,101 @@ fn parse_f64(value: &str, flag: &str) -> Result<f64, String> {
         .map_err(|err| format!("invalid {flag}: {err}"))
 }
 
+fn parse_renderer_selection(value: &str, flag: &str) -> Result<RendererSelection, String> {
+    match value {
+        "cpu" => Ok(RendererSelection::Cpu),
+        "gpu" => Ok(RendererSelection::Gpu),
+        "both" | "all" => Ok(RendererSelection::Both),
+        _ => Err(format!(
+            "invalid {flag}: expected cpu, gpu, or both, got {value}"
+        )),
+    }
+}
+
+fn parse_toggle_selection(value: &str, flag: &str) -> Result<ToggleSelection, String> {
+    match value {
+        "off" => Ok(ToggleSelection::Off),
+        "on" => Ok(ToggleSelection::On),
+        "both" | "all" => Ok(ToggleSelection::Both),
+        _ => Err(format!(
+            "invalid {flag}: expected off, on, or both, got {value}"
+        )),
+    }
+}
+
+fn bench_cases(args: &Args) -> Vec<BenchCase> {
+    let renderers: &[RendererChoice] = match args.renderer {
+        RendererSelection::Cpu => &[RendererChoice::Cpu],
+        RendererSelection::Gpu => &[RendererChoice::Gpu],
+        RendererSelection::Both => &[RendererChoice::Cpu, RendererChoice::Gpu],
+    };
+    let scroll_blit_values: &[bool] = match args.scroll_blit {
+        ToggleSelection::Off => &[false],
+        ToggleSelection::On => &[true],
+        ToggleSelection::Both => &[false, true],
+    };
+
+    let mut cases = Vec::with_capacity(renderers.len() * scroll_blit_values.len());
+    for &renderer in renderers {
+        for &scroll_blit in scroll_blit_values {
+            cases.push(BenchCase {
+                renderer,
+                scroll_blit,
+            });
+        }
+    }
+    cases
+}
+
 fn print_usage() {
     println!("volvoxgrid headless benchmark");
     println!("  --demo <sales|hierarchy|stress>");
     println!("  --width <px>");
     println!("  --height <px>");
+    println!("  --renderer <cpu|gpu|both>");
     println!("  --scroll-blit");
+    println!("  --scroll-blit-mode <off|on|both>");
+    println!("  --matrix");
+    println!("Defaults: renderer=both, scroll_blit=both");
     println!("  --warmup-steps <count>");
     println!("  --scroll-steps <count>");
     println!("  --scroll-delta-y <delta>");
     println!("  --fling-burst <count>");
     println!("  --fling-max-frames <count>");
     println!("  --frame-interval-ms <ms>");
+}
+
+#[derive(Clone, Debug)]
+struct BenchOutcome {
+    case: BenchCase,
+    steady: PhaseStats,
+    fling: PhaseStats,
+    combined: PhaseStats,
+}
+
+fn print_summary(outcomes: &[BenchOutcome]) {
+    if outcomes.is_empty() {
+        return;
+    }
+
+    println!("== summary ==");
+    for outcome in outcomes {
+        let avg = mean_f32(&outcome.combined.frame_ms);
+        let p95 = percentile_f32(&outcome.combined.frame_ms, 0.95);
+        let max = max_f32(&outcome.combined.frame_ms);
+        println!(
+            "renderer={} scroll_blit={} actual={} steady_avg={:.3}ms fling_avg={:.3}ms combined_avg={:.3}ms combined_p95={:.3}ms combined_max={:.3}ms",
+            outcome.case.renderer.label(),
+            outcome.case.scroll_blit,
+            outcome.combined.actual_backend_label(),
+            mean_f32(&outcome.steady.frame_ms),
+            mean_f32(&outcome.fling.frame_ms),
+            avg,
+            p95,
+            max,
+        );
+    }
+    println!();
 }
 
 fn mean_f32(values: &[f32]) -> f32 {
@@ -725,6 +930,7 @@ fn percentile_f32(values: &[f32], percentile: f32) -> f32 {
 
 fn main() -> Result<(), String> {
     let args = parse_args()?;
+    let cases = bench_cases(&args);
     let frame_interval = if args.frame_interval_ms <= 0.0 {
         Duration::ZERO
     } else {
@@ -732,29 +938,45 @@ fn main() -> Result<(), String> {
     };
 
     println!(
-        "benchmark demo={} viewport={}x{} scroll_blit={} warmup_steps={} scroll_steps={} fling_burst={} frame_interval_ms={:.2}",
+        "benchmark demo={} viewport={}x{} renderer={:?} scroll_blit={:?} cases={} warmup_steps={} scroll_steps={} fling_burst={} frame_interval_ms={:.2}",
         args.demo,
         args.width,
         args.height,
+        args.renderer,
         args.scroll_blit,
+        cases.len(),
         args.warmup_steps,
         args.scroll_steps,
         args.fling_burst,
         args.frame_interval_ms,
     );
 
-    let mut session = BenchSession::new(&args)?;
-    let steady = run_steady_scroll(&mut session, &args, frame_interval)?;
-    let fling = run_fling(&mut session, &args, frame_interval)?;
+    let mut outcomes = Vec::with_capacity(cases.len());
+    for case in cases {
+        println!();
+        println!("## {}", case.label());
 
-    let mut combined = PhaseStats::new("combined");
-    combined.merge(&steady);
-    combined.merge(&fling);
+        let mut session = BenchSession::new(&args, case)?;
+        let steady = run_steady_scroll(&mut session, &args, case, frame_interval)?;
+        let fling = run_fling(&mut session, &args, case, frame_interval)?;
 
-    println!();
-    steady.print();
-    fling.print();
-    combined.print();
+        let mut combined = PhaseStats::new("combined");
+        combined.merge(&steady);
+        combined.merge(&fling);
+
+        steady.print();
+        fling.print();
+        combined.print();
+
+        outcomes.push(BenchOutcome {
+            case,
+            steady,
+            fling,
+            combined,
+        });
+    }
+
+    print_summary(&outcomes);
 
     Ok(())
 }

@@ -88,6 +88,20 @@ pub(crate) struct ScrollCacheState {
     bands: ScrollBands,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ScrollAxisBlit {
+    pub rect: DamageRect,
+    pub screen_dx: i32,
+    pub screen_dy: i32,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ScrollBlitPlan {
+    pub damage: DamageRegion,
+    pub horizontal: Option<ScrollAxisBlit>,
+    pub vertical: Option<ScrollAxisBlit>,
+}
+
 impl Default for ScrollCacheState {
     fn default() -> Self {
         Self {
@@ -152,12 +166,7 @@ impl ScrollCache {
         }
     }
 
-    pub(crate) fn try_blit(
-        &self,
-        buffer: &mut [u8],
-        stride: i32,
-        current: &ScrollCacheState,
-    ) -> Option<DamageRegion> {
+    pub(crate) fn plan(&self, current: &ScrollCacheState) -> Option<ScrollBlitPlan> {
         let prev = &self.prev;
         if !prev.valid || !current.valid {
             return None;
@@ -176,7 +185,11 @@ impl ScrollCache {
             return None;
         }
 
-        let mut damage = DamageRegion::default();
+        let mut plan = ScrollBlitPlan {
+            damage: DamageRegion::default(),
+            horizontal: None,
+            vertical: None,
+        };
 
         if delta_x != 0 {
             let Some(rect) = current.bands.horizontal_moving_rect() else {
@@ -186,10 +199,14 @@ impl ScrollCache {
                 return None;
             }
             let screen_dx = -delta_x;
-            blit_horizontal(buffer, stride, rect, screen_dx);
-            damage.mark_scrolled_x();
+            plan.horizontal = Some(ScrollAxisBlit {
+                rect,
+                screen_dx,
+                screen_dy: 0,
+            });
+            plan.damage.mark_scrolled_x();
             for edge in horizontal_damage_edges(rect, screen_dx.abs()) {
-                damage.push(edge);
+                plan.damage.push(edge);
             }
         }
 
@@ -201,18 +218,45 @@ impl ScrollCache {
                 return None;
             }
             let screen_dy = -delta_y;
-            blit_vertical(buffer, stride, rect, screen_dy);
-            damage.mark_scrolled_y();
+            plan.vertical = Some(ScrollAxisBlit {
+                rect,
+                screen_dx: 0,
+                screen_dy,
+            });
+            plan.damage.mark_scrolled_y();
             for edge in vertical_damage_edges(rect, screen_dy.abs()) {
-                damage.push(edge);
+                plan.damage.push(edge);
             }
         }
 
-        (!damage.is_empty()).then_some(damage)
+        (!plan.damage.is_empty()).then_some(plan)
+    }
+
+    pub(crate) fn try_blit(
+        &self,
+        buffer: &mut [u8],
+        stride: i32,
+        current: &ScrollCacheState,
+    ) -> Option<DamageRegion> {
+        let plan = self.plan(current)?;
+
+        if let Some(horizontal) = plan.horizontal {
+            blit_horizontal(buffer, stride, horizontal.rect, horizontal.screen_dx);
+        }
+        if let Some(vertical) = plan.vertical {
+            blit_vertical(buffer, stride, vertical.rect, vertical.screen_dy);
+        }
+
+        Some(plan.damage)
     }
 
     pub(crate) fn finish(&mut self, current: ScrollCacheState) {
         self.prev = current;
+    }
+
+    #[cfg(feature = "gpu")]
+    pub(crate) fn invalidate(&mut self) {
+        self.prev = ScrollCacheState::default();
     }
 }
 

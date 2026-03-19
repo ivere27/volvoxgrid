@@ -2144,7 +2144,7 @@ pub(crate) fn render_grid_partial<C: Canvas>(
 fn clear_partial_regions<C: Canvas>(
     grid: &VolvoxGrid,
     canvas: &mut C,
-    vp: &VisibleRange,
+    ctx: &RenderContext,
     damage: &DamageRegion,
 ) {
     let bg = grid.style.back_color_bkg;
@@ -2152,17 +2152,25 @@ fn clear_partial_regions<C: Canvas>(
         canvas.fill_rect(rect.x, rect.y, rect.w, rect.h, bg);
     }
 
-    if vp.data_y > 0 {
-        canvas.fill_rect(0, 0, canvas.width(), vp.data_y, bg);
+    // Partially re-emitted cells can paint outside the exposed damage band
+    // (for example, antialiased glyph coverage inside the rest of the cell).
+    // Clear the full cell rects we are about to redraw to avoid stacking
+    // alpha on top of preserved scrolled pixels.
+    for cell in &ctx.vis_cells {
+        canvas.fill_rect(cell.rect.x, cell.rect.y, cell.rect.w, cell.rect.h, bg);
     }
-    if vp.data_x > 0 {
-        canvas.fill_rect(0, 0, vp.data_x, canvas.height(), bg);
+
+    if ctx.vp.data_y > 0 {
+        canvas.fill_rect(0, 0, canvas.width(), ctx.vp.data_y, bg);
     }
-    let right_x = vp.data_x + vp.data_w;
+    if ctx.vp.data_x > 0 {
+        canvas.fill_rect(0, 0, ctx.vp.data_x, canvas.height(), bg);
+    }
+    let right_x = ctx.vp.data_x + ctx.vp.data_w;
     if right_x < canvas.width() {
         canvas.fill_rect(right_x, 0, canvas.width() - right_x, canvas.height(), bg);
     }
-    let bottom_y = vp.data_y + vp.data_h;
+    let bottom_y = ctx.vp.data_y + ctx.vp.data_h;
     if bottom_y < canvas.height() {
         canvas.fill_rect(0, bottom_y, canvas.width(), canvas.height() - bottom_y, bg);
     }
@@ -2201,7 +2209,7 @@ fn render_grid_internal<C: Canvas>(
 
     let ctx = RenderContext::new(grid, w, h, damage);
     if let Some(damage) = damage {
-        clear_partial_regions(grid, canvas, &ctx.vp, damage);
+        clear_partial_regions(grid, canvas, &ctx, damage);
     } else {
         canvas.clear(grid.style.back_color_bkg);
     }

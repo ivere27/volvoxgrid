@@ -3246,6 +3246,15 @@ pub fn set_debug_overlay(id: i32, enabled: bool) {
     });
 }
 
+/// Enable or disable scroll blit.
+#[wasm_bindgen]
+pub fn set_scroll_blit(id: i32, enabled: bool) {
+    with_grid(id, |grid| {
+        grid.scroll_blit_enabled = enabled;
+        grid.mark_dirty();
+    });
+}
+
 /// Set the render layer mask for a grid.
 #[wasm_bindgen]
 pub fn set_render_layer_mask(id: i32, mask_hi: i32, mask_lo: i32) {
@@ -3271,6 +3280,12 @@ pub fn get_render_layer_mask_lo(id: i32) -> i32 {
 #[wasm_bindgen]
 pub fn get_debug_overlay(id: i32) -> bool {
     with_grid(id, |grid| grid.debug_overlay).unwrap_or(false)
+}
+
+/// Get the current scroll blit state.
+#[wasm_bindgen]
+pub fn get_scroll_blit(id: i32) -> bool {
+    with_grid(id, |grid| grid.scroll_blit_enabled).unwrap_or(false)
 }
 
 /// Enable or disable layout animation.

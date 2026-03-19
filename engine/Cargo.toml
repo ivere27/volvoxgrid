@@ -35,3 +35,6 @@ web-time = "1"
 [build-dependencies]
 prost-build = "0.12"
 tonic-build = { version = "0.11", optional = true }
+
+[dev-dependencies]
+pollster = "0.4"

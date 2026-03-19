@@ -43,6 +43,8 @@ WEB_SCALE ?= 1.0
 WEB_HOVER ?= false
 DOTNET_TFM ?= net40
 DOTNET_ARCH ?= x64
+GTK_BENCH_RUNS ?= 5
+GTK_BENCH_ARGS ?=
 JAVA_DESKTOP_PROJECT_DIR := java/desktop
 ROOT_DIR := $(patsubst %/,%,$(abspath $(dir $(lastword $(MAKEFILE_LIST)))))
 UNAME_S := $(shell uname -s 2>/dev/null)
@@ -211,7 +213,7 @@ endif
         docker_web_image docker_web \
         docker_ios_image docker_ios docker_all_image docker_all publish_maven \
         publish_local publish_github publish_web \
-        gtk-test gtk-test-release clean clean-all help
+        gtk-test gtk-test-release gtk-bench clean clean-all help
 
 # =============================================================================
 # Default
@@ -270,6 +272,8 @@ help:
 	@echo "  doom-deps      Download GPL-2.0 DOOM assets for web mode (not part of Apache-2.0 source)"
 	@echo "  gtk-test       Build & launch GTK4 plugin-host visual test (debug; requires GTK4 dev libs)"
 	@echo "  gtk-test-release  Build & launch GTK4 plugin-host visual test (release)"
+	@echo "  gtk-bench      Build and run GTK4 headless benchmark matrix (release; sudo with desktop session env)"
+	@echo "    gtk bench options: GTK_BENCH_RUNS=<n>, GTK_BENCH_ARGS='<extra headless_bench args>'"
 	@echo ""
 	@echo "Docker + Maven:"
 	@echo "  docker_android_aar_image  Build Docker image for Android AAR"
@@ -1488,6 +1492,18 @@ gtk-test-release: host-plugin-release
 	cd gtk-test && cargo build $(CARGO_JOBS_FLAG) --release
 	@echo "Launching GTK4 test (release)..."
 	VOLVOXGRID_PLUGIN_PATH="$(JAVA_DESKTOP_PLUGIN_RELEASE)" ./target/release/volvoxgrid-gtk-test
+
+gtk-bench: host-plugin-release
+	@echo "Building GTK4 headless benchmark (release)..."
+	cd gtk-test && cargo build $(CARGO_JOBS_FLAG) --release --bin headless_bench
+	@echo "Running GTK4 headless benchmark matrix (release, sudo with session env)..."
+	sudo env \
+		"PATH=$$PATH" \
+		"XDG_RUNTIME_DIR=/run/user/$$(id -u)" \
+		"DISPLAY=$$DISPLAY" \
+		"WAYLAND_DISPLAY=$${WAYLAND_DISPLAY:-}" \
+		"XAUTHORITY=$${XAUTHORITY:-$$HOME/.Xauthority}" \
+		./scripts/run_headless_bench_matrix.sh --runs "$(GTK_BENCH_RUNS)" --profile release --no-build $(if $(strip $(GTK_BENCH_ARGS)),-- $(GTK_BENCH_ARGS),)
 
 # =============================================================================
 # ActiveX OCX — Windows control via MinGW cross-compilation
