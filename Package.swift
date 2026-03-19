@@ -9,8 +9,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "VolvoxGridPlugin",
-            url: "https://github.com/ivere27/volvoxgrid/releases/download/v0.2.0/VolvoxGridPlugin.xcframework.zip",
-            checksum: "ecde4f911113554f1a3359a7beebc1a1af6dc361d41a23ca46a77f8b1225af1c"
+            url: "https://github.com/ivere27/volvoxgrid/releases/download/v0.3.0/VolvoxGridPlugin.xcframework.zip",
+            checksum: "7c69739b1286c55f05768c7ff2f3a774b04addf9a19d4f96ef200733f8a6a0aa"
         ),
     ]
 )
