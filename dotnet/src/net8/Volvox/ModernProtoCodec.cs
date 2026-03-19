@@ -627,6 +627,7 @@ namespace VolvoxGrid.DotNet.Internal
                 res.Rendering = new RenderConfig();
                 if (config.Rendering.RendererMode.HasValue) res.Rendering.RendererMode = (RendererMode)config.Rendering.RendererMode.Value;
                 if (config.Rendering.DebugOverlay.HasValue) res.Rendering.DebugOverlay = config.Rendering.DebugOverlay.Value;
+                if (config.Rendering.ScrollBlit.HasValue) res.Rendering.ScrollBlit = config.Rendering.ScrollBlit.Value;
                 if (config.Rendering.AnimationEnabled.HasValue) res.Rendering.AnimationEnabled = config.Rendering.AnimationEnabled.Value;
                 if (config.Rendering.AnimationDurationMs.HasValue) res.Rendering.AnimationDurationMs = config.Rendering.AnimationDurationMs.Value;
                 if (config.Rendering.TextLayoutCacheCap.HasValue) res.Rendering.TextLayoutCacheCap = config.Rendering.TextLayoutCacheCap.Value;
@@ -680,10 +681,11 @@ namespace VolvoxGrid.DotNet.Internal
             if (c.Rendering != null)
             {
                 res.Rendering.RendererMode = (VolvoxGridRendererMode)c.Rendering.RendererMode;
-                res.Rendering.DebugOverlay = c.Rendering.DebugOverlay;
-                res.Rendering.AnimationEnabled = c.Rendering.AnimationEnabled;
-                res.Rendering.AnimationDurationMs = c.Rendering.AnimationDurationMs;
-                res.Rendering.TextLayoutCacheCap = c.Rendering.TextLayoutCacheCap;
+                if (c.Rendering.HasDebugOverlay) res.Rendering.DebugOverlay = c.Rendering.DebugOverlay;
+                if (c.Rendering.HasScrollBlit) res.Rendering.ScrollBlit = c.Rendering.ScrollBlit;
+                if (c.Rendering.HasAnimationEnabled) res.Rendering.AnimationEnabled = c.Rendering.AnimationEnabled;
+                if (c.Rendering.HasAnimationDurationMs) res.Rendering.AnimationDurationMs = c.Rendering.AnimationDurationMs;
+                if (c.Rendering.HasTextLayoutCacheCap) res.Rendering.TextLayoutCacheCap = c.Rendering.TextLayoutCacheCap;
                 if (c.Rendering.HasFramePacingMode) res.Rendering.FramePacingMode = (VolvoxFramePacingMode)c.Rendering.FramePacingMode;
                 if (c.Rendering.HasTargetFrameRateHz) res.Rendering.TargetFrameRateHz = c.Rendering.TargetFrameRateHz;
             }

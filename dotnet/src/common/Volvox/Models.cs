@@ -605,6 +605,7 @@ namespace VolvoxGrid.DotNet.Internal
     {
         public VolvoxGridRendererMode? RendererMode { get; set; }
         public bool? DebugOverlay { get; set; }
+        public bool? ScrollBlit { get; set; }
         public bool? AnimationEnabled { get; set; }
         public int? AnimationDurationMs { get; set; }
         public int? TextLayoutCacheCap { get; set; }

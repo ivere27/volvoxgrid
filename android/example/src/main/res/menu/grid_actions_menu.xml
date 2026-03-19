@@ -7,6 +7,10 @@
         android:id="@+id/action_sort_descending"
         android:title="Sort Descending" />
     <item
+        android:id="@+id/action_scroll_blit"
+        android:checkable="true"
+        android:title="Scroll Blit" />
+    <item
         android:id="@+id/action_layer_selection"
         android:title="Layer Selection..." />
 </menu>

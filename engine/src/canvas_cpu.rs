@@ -139,9 +139,9 @@ impl<'a> Canvas for CpuCanvas<'a> {
                 let dr = chunk[0] as u32;
                 let dg = chunk[1] as u32;
                 let db = chunk[2] as u32;
-                chunk[0] = ((src_r * src_a + dr * inv_a + 127) / 255) as u8;
-                chunk[1] = ((src_g * src_a + dg * inv_a + 127) / 255) as u8;
-                chunk[2] = ((src_b * src_a + db * inv_a + 127) / 255) as u8;
+                chunk[0] = ((src_r * src_a + dr * inv_a + 128) >> 8) as u8;
+                chunk[1] = ((src_g * src_a + dg * inv_a + 128) >> 8) as u8;
+                chunk[2] = ((src_b * src_a + db * inv_a + 128) >> 8) as u8;
                 chunk[3] = 255;
             }
         }
@@ -242,6 +242,43 @@ impl<'a> Canvas for CpuCanvas<'a> {
         )
     }
 
+    fn draw_text_fast(
+        &mut self,
+        x: i32,
+        y: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        color: u32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        max_width: Option<f32>,
+    ) {
+        self.text_renderer.render_text_fast(
+            self.buf,
+            self.width,
+            self.height,
+            self.stride,
+            x,
+            y,
+            clip_x,
+            clip_y,
+            clip_w,
+            clip_h,
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            color,
+            max_width,
+        );
+    }
+
     fn measure_text(
         &mut self,
         text: &str,
@@ -268,17 +305,19 @@ impl<'a> Canvas for CpuCanvas<'a> {
         if dw <= 0 || dh <= 0 || src_w <= 0 || src_h <= 0 {
             return;
         }
-        for py in 0..dh {
+        let py_start = (-dy).max(0);
+        let py_end = (self.height - dy).min(dh);
+        let px_start = (-dx).max(0);
+        let px_end = (self.width - dx).min(dw);
+        if py_start >= py_end || px_start >= px_end {
+            return;
+        }
+        for py in py_start..py_end {
             let by = dy + py;
-            if by < 0 || by >= self.height {
-                continue;
-            }
             let sy = ((py as i64 * src_h as i64) / dh as i64) as i32;
-            for px in 0..dw {
+            let dst_row = (by * self.stride) as usize;
+            for px in px_start..px_end {
                 let bx = dx + px;
-                if bx < 0 || bx >= self.width {
-                    continue;
-                }
                 let sx = ((px as i64 * src_w as i64) / dw as i64) as i32;
                 let src_off = ((sy * src_w + sx) * 4) as usize;
                 if src_off + 3 >= src.len() {
@@ -288,7 +327,7 @@ impl<'a> Canvas for CpuCanvas<'a> {
                 if src_a == 0 {
                     continue;
                 }
-                let dst_off = (by * self.stride + bx * 4) as usize;
+                let dst_off = dst_row + (bx * 4) as usize;
                 if dst_off + 3 >= self.buf.len() {
                     continue;
                 }
@@ -305,9 +344,9 @@ impl<'a> Canvas for CpuCanvas<'a> {
                     let dr = self.buf[dst_off] as u32;
                     let dg = self.buf[dst_off + 1] as u32;
                     let db = self.buf[dst_off + 2] as u32;
-                    self.buf[dst_off] = ((sr * src_a + dr * inv_a + 127) / 255) as u8;
-                    self.buf[dst_off + 1] = ((sg * src_a + dg * inv_a + 127) / 255) as u8;
-                    self.buf[dst_off + 2] = ((sb * src_a + db * inv_a + 127) / 255) as u8;
+                    self.buf[dst_off] = ((sr * src_a + dr * inv_a + 128) >> 8) as u8;
+                    self.buf[dst_off + 1] = ((sg * src_a + dg * inv_a + 128) >> 8) as u8;
+                    self.buf[dst_off + 2] = ((sb * src_a + db * inv_a + 128) >> 8) as u8;
                     self.buf[dst_off + 3] = 255;
                 }
             }
@@ -315,16 +354,18 @@ impl<'a> Canvas for CpuCanvas<'a> {
     }
 
     fn blit_image_at(&mut self, dx: i32, dy: i32, src: &[u8], src_w: i32, src_h: i32) {
-        for sy in 0..src_h {
+        let sy_start = (-dy).max(0);
+        let sy_end = (self.height - dy).min(src_h);
+        let sx_start = (-dx).max(0);
+        let sx_end = (self.width - dx).min(src_w);
+        if sy_start >= sy_end || sx_start >= sx_end {
+            return;
+        }
+        for sy in sy_start..sy_end {
             let by = dy + sy;
-            if by < 0 || by >= self.height {
-                continue;
-            }
-            for sx in 0..src_w {
+            let dst_row = (by * self.stride) as usize;
+            for sx in sx_start..sx_end {
                 let bx = dx + sx;
-                if bx < 0 || bx >= self.width {
-                    continue;
-                }
                 let src_off = ((sy * src_w + sx) * 4) as usize;
                 if src_off + 3 >= src.len() {
                     continue;
@@ -333,7 +374,7 @@ impl<'a> Canvas for CpuCanvas<'a> {
                 if src_a == 0 {
                     continue;
                 }
-                let dst_off = (by * self.stride + bx * 4) as usize;
+                let dst_off = dst_row + (bx * 4) as usize;
                 if dst_off + 3 >= self.buf.len() {
                     continue;
                 }
@@ -350,9 +391,9 @@ impl<'a> Canvas for CpuCanvas<'a> {
                     let dr = self.buf[dst_off] as u32;
                     let dg = self.buf[dst_off + 1] as u32;
                     let db = self.buf[dst_off + 2] as u32;
-                    self.buf[dst_off] = ((sr * src_a + dr * inv_a + 127) / 255) as u8;
-                    self.buf[dst_off + 1] = ((sg * src_a + dg * inv_a + 127) / 255) as u8;
-                    self.buf[dst_off + 2] = ((sb * src_a + db * inv_a + 127) / 255) as u8;
+                    self.buf[dst_off] = ((sr * src_a + dr * inv_a + 128) >> 8) as u8;
+                    self.buf[dst_off + 1] = ((sg * src_a + dg * inv_a + 128) >> 8) as u8;
+                    self.buf[dst_off + 2] = ((sb * src_a + db * inv_a + 128) >> 8) as u8;
                     self.buf[dst_off + 3] = 255;
                 }
             }

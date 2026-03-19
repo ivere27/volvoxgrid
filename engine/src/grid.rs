@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 #[cfg(target_arch = "wasm32")]
@@ -78,6 +80,17 @@ fn usize_to_i32_saturating(value: usize) -> i32 {
     } else {
         value as i32
     }
+}
+
+#[derive(Debug)]
+pub(crate) struct TextCellStaticMeta {
+    pub display_text: Arc<str>,
+    pub style_override: Arc<CellStylePatch>,
+    pub padding: Padding,
+    pub alignment: i32,
+    pub has_dropdown_list: bool,
+    pub suppress_text: bool,
+    pub shrink_to_fit: bool,
 }
 
 /// The main VolvoxGrid struct holding all grid state for a single grid instance.
@@ -216,7 +229,6 @@ pub struct VolvoxGrid {
     pub text_engine: Option<TextEngine>,
     /// Configured text layout cache capacity, applied to `text_engine` on init.
     pub text_layout_cache_cap: usize,
-
     // ── Compatibility Properties ────────────────────────────────────
     /// Whether rows/cols auto-resize when data changes.
     pub auto_resize: bool,
@@ -355,6 +367,8 @@ pub struct VolvoxGrid {
     pub render_layer_mask: u64,
     /// Whether per-layer timing is active.
     pub layer_profiling: bool,
+    /// Enables CPU scroll-blit reuse during scroll-only frames.
+    pub scroll_blit_enabled: bool,
     /// Per-layer execution time in microseconds from the last frame.
     pub layer_times_us: [f32; crate::canvas::layer::COUNT],
     /// Cell counts per zone: [scrollable, sticky, pinned, fixed].
@@ -363,6 +377,10 @@ pub struct VolvoxGrid {
     // ── Dirty Flag ────────────────────────────────────────────────────────
     /// Whether the grid has pending changes that require a re-render.
     pub dirty: bool,
+    /// Generation counter for text cell metadata invalidation.
+    pub(crate) text_meta_generation: u64,
+    /// Cache of `(generation, map)` for `build_text_cell_static_meta`.
+    text_meta_cache: RefCell<(u64, HashMap<(i32, i32), Arc<TextCellStaticMeta>>)>,
 
     // ── Mouse Tracking ────────────────────────────────────────────────────
     /// Row index currently under the mouse pointer (-1 if none).
@@ -677,11 +695,14 @@ impl VolvoxGrid {
             // Render layer profiling
             render_layer_mask: u64::MAX,
             layer_profiling: false,
+            scroll_blit_enabled: false,
             layer_times_us: [0.0; crate::canvas::layer::COUNT],
             zone_cell_counts: [0; 4],
 
             // Dirty
             dirty: true,
+            text_meta_generation: 0,
+            text_meta_cache: RefCell::new((0, HashMap::new())),
 
             // Mouse tracking
             mouse_row: -1,
@@ -907,7 +928,6 @@ impl VolvoxGrid {
         if rows == old_rows {
             return;
         }
-
         // Notify animation before changing state
         let h = self.default_row_height;
         if rows > old_rows {
@@ -961,6 +981,7 @@ impl VolvoxGrid {
 
         self.scroll.stop_fling();
         self.layout.invalidate();
+        self.text_meta_generation = self.text_meta_generation.wrapping_add(1);
         self.dirty = true;
     }
 
@@ -976,7 +997,6 @@ impl VolvoxGrid {
         if cols == old_cols {
             return;
         }
-
         // Notify animation before changing state
         let w = self.default_col_width;
         if cols > old_cols {
@@ -1030,6 +1050,7 @@ impl VolvoxGrid {
 
         self.scroll.stop_fling();
         self.layout.invalidate();
+        self.text_meta_generation = self.text_meta_generation.wrapping_add(1);
         self.dirty = true;
     }
 
@@ -1181,6 +1202,12 @@ impl VolvoxGrid {
 
     /// Marks the grid as dirty, requiring a re-render on the next frame.
     pub fn mark_dirty(&mut self) {
+        self.dirty = true;
+        self.text_meta_generation = self.text_meta_generation.wrapping_add(1);
+    }
+
+    /// Marks the grid as dirty without invalidating text/layout-derived caches.
+    pub fn mark_dirty_visual(&mut self) {
         self.dirty = true;
     }
 
@@ -1541,6 +1568,53 @@ impl VolvoxGrid {
         if let Some(te) = &mut self.text_engine {
             te.set_layout_cache_cap(cap);
         }
+    }
+
+    pub(crate) fn build_text_cell_static_meta(
+        &self,
+        row: i32,
+        col: i32,
+    ) -> Arc<TextCellStaticMeta> {
+        {
+            let mut cache = self.text_meta_cache.borrow_mut();
+            if cache.0 != self.text_meta_generation {
+                cache.1.clear();
+                cache.0 = self.text_meta_generation;
+            }
+            if let Some(cached) = cache.1.get(&(row, col)) {
+                return cached.clone();
+            }
+        }
+
+        let display_text = self.get_display_text(row, col);
+        let style_override = Arc::new(self.get_cell_style(row, col));
+        let padding = self.resolve_cell_padding(row, col, style_override.as_ref());
+        let alignment = crate::canvas::resolve_alignment(
+            self,
+            row,
+            col,
+            style_override.as_ref(),
+            &display_text,
+        );
+        let has_dropdown_list = !self.active_dropdown_list(row, col).is_empty();
+        let suppress_text = self.get_col_props(col).map_or(false, |cp| {
+            cp.data_type == pb::ColumnDataType::ColumnDataBoolean as i32 && row >= self.fixed_rows
+        });
+
+        let result = Arc::new(TextCellStaticMeta {
+            display_text: Arc::<str>::from(display_text),
+            style_override: style_override.clone(),
+            padding,
+            alignment,
+            has_dropdown_list,
+            suppress_text,
+            shrink_to_fit: style_override.shrink_to_fit.unwrap_or(false),
+        });
+        self.text_meta_cache
+            .borrow_mut()
+            .1
+            .insert((row, col), result.clone());
+        result
     }
 
     // ── Convenience Accessors (used by render, input, etc.) ─────────────
@@ -2073,6 +2147,7 @@ impl VolvoxGrid {
         self.events
             .push(crate::event::GridEventData::DataRefreshing);
         self.layout.invalidate();
+        self.text_meta_generation = self.text_meta_generation.wrapping_add(1);
         self.dirty = true;
         self.events.push(crate::event::GridEventData::DataRefreshed);
     }
@@ -2146,6 +2221,7 @@ impl VolvoxGrid {
         }
 
         self.layout.invalidate();
+        self.text_meta_generation = self.text_meta_generation.wrapping_add(1);
         self.dirty = true;
     }
 
@@ -2252,6 +2328,7 @@ impl VolvoxGrid {
         let h = self.get_row_height(insert_at);
         self.animation.notify_rows_inserted(insert_at, 1, h);
         self.layout.invalidate();
+        self.text_meta_generation = self.text_meta_generation.wrapping_add(1);
         self.dirty = true;
     }
 
@@ -2320,6 +2397,7 @@ impl VolvoxGrid {
             .clamp(self.rows, self.cols, self.fixed_rows, self.fixed_cols);
 
         self.layout.invalidate();
+        self.text_meta_generation = self.text_meta_generation.wrapping_add(1);
         self.dirty = true;
     }
 }
@@ -2711,7 +2789,7 @@ impl VolvoxGrid {
         self.scroll.max_scroll_x = max_scroll_x;
         self.scroll.max_scroll_y = max_scroll_y;
         self.scroll.scroll_y = target_scroll_y.min(max_scroll_y);
-        self.mark_dirty();
+        self.mark_dirty_visual();
     }
 
     /// Returns the bottommost visible scrollable row (`BottomRow`).
@@ -2772,7 +2850,7 @@ impl VolvoxGrid {
         self.scroll.max_scroll_x = max_scroll_x;
         self.scroll.max_scroll_y = max_scroll_y;
         self.scroll.scroll_x = target_scroll_x.min(max_scroll_x);
-        self.mark_dirty();
+        self.mark_dirty_visual();
     }
 
     /// Returns the rightmost visible scrollable column (`RightCol`).

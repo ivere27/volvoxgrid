@@ -2741,6 +2741,7 @@ dependencies = [
  "bytemuck",
  "cosmic-text",
  "hashbrown 0.16.1",
+ "pollster",
  "prost 0.12.6",
  "prost-build",
  "prost-types",

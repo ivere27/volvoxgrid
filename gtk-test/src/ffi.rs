@@ -274,9 +274,13 @@ pub fn resolve_default_plugin_path() -> String {
 
     let candidates = [
         "target/debug/libvolvoxgrid_plugin.so",
+        "target/release/libvolvoxgrid_plugin.so",
         "../target/debug/libvolvoxgrid_plugin.so",
+        "../target/release/libvolvoxgrid_plugin.so",
         "plugin/target/debug/libvolvoxgrid_plugin.so",
+        "plugin/target/release/libvolvoxgrid_plugin.so",
         "../plugin/target/debug/libvolvoxgrid_plugin.so",
+        "../plugin/target/release/libvolvoxgrid_plugin.so",
     ];
     for candidate in candidates {
         if Path::new(candidate).exists() {

@@ -1,18 +1,19 @@
 //! GPU renderer for VolvoxGrid using wgpu.
 //!
-//! Provides zero-copy rendering directly to a GPU surface or readback to a
-//! CPU buffer. Uses instanced colored quads (rect pipeline) and instanced
-//! textured quads (textured pipeline) to replicate all CPU rendering layers.
+//! Provides GPU-presented rendering to a surface or readback to a CPU buffer.
+//! Uses instanced colored quads (rect pipeline) and instanced textured quads
+//! (textured pipeline) to replicate all CPU rendering layers.
 
 use std::collections::HashMap;
 
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
 
-use crate::canvas::{render_grid, RenderResult};
+use crate::canvas::{render_grid, render_grid_partial, DamageRect, DamageRegion, RenderResult};
 use crate::canvas_gpu::GpuCanvas;
 use crate::glyph_atlas::GlyphAtlas;
 use crate::grid::VolvoxGrid;
+use crate::scroll_cache::{ScrollBlitPlan, ScrollCache, ScrollCacheState};
 use crate::text::TextEngine;
 
 /// Minimal block_on for futures that resolve immediately (e.g. wgpu error scopes).
@@ -60,6 +61,35 @@ pub struct TexturedInstance {
     pub flags: [f32; 2],   // x: mode (0=glyph, 1=image), y: atlas page index
 }
 
+#[derive(Clone)]
+struct FrameCacheTexture {
+    texture: wgpu::Texture,
+    view: wgpu::TextureView,
+    bind_group: wgpu::BindGroup,
+}
+
+struct FrameCache {
+    width: u32,
+    height: u32,
+    format: wgpu::TextureFormat,
+    textures: [FrameCacheTexture; 2],
+    front: usize,
+}
+
+impl FrameCache {
+    fn front(&self) -> &FrameCacheTexture {
+        &self.textures[self.front]
+    }
+
+    fn back(&self) -> &FrameCacheTexture {
+        &self.textures[1 - self.front]
+    }
+
+    fn swap(&mut self) {
+        self.front = 1 - self.front;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // GpuRenderer
 // ---------------------------------------------------------------------------
@@ -69,6 +99,29 @@ pub struct TexturedInstance {
 extern "C" {
     fn ANativeWindow_acquire(window: *mut std::ffi::c_void);
     fn ANativeWindow_release(window: *mut std::ffi::c_void);
+}
+
+pub const NATIVE_SURFACE_DESC_MAGIC: u32 = 0x5658_4753;
+pub const NATIVE_SURFACE_DESC_VERSION: u16 = 1;
+pub const NATIVE_SURFACE_KIND_WAYLAND: u16 = 1;
+pub const NATIVE_SURFACE_KIND_X11: u16 = 2;
+
+/// Opaque native surface descriptor used by desktop hosts for `GpuSurfaceReady`.
+///
+/// The host owns this descriptor and passes its stable pointer via
+/// `GpuSurfaceReady.surface_handle`. The plugin/engine only borrow it while
+/// configuring the wgpu surface.
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct NativeSurfaceDescriptor {
+    pub magic: u32,
+    pub version: u16,
+    pub kind: u16,
+    pub screen: i32,
+    pub reserved: u32,
+    pub display: *mut std::ffi::c_void,
+    pub surface: *mut std::ffi::c_void,
+    pub window: u64,
 }
 
 /// GPU renderer for VolvoxGrid.
@@ -92,7 +145,7 @@ pub struct GpuRenderer {
     // Textured bind group layout (for atlas textures)
     textured_bind_group_layout: wgpu::BindGroupLayout,
 
-    // Surface for zero-copy rendering
+    // Surface for final presentation
     surface: Option<wgpu::Surface<'static>>,
     surface_config: Option<wgpu::SurfaceConfiguration>,
     #[cfg(target_os = "android")]
@@ -135,6 +188,11 @@ pub struct GpuRenderer {
     persistent_overlay_rect_cap: usize,
     persistent_overlay_tex_buf: Option<wgpu::Buffer>,
     persistent_overlay_tex_cap: usize,
+    persistent_present_tex_buf: Option<wgpu::Buffer>,
+    persistent_present_tex_cap: usize,
+
+    frame_cache: Option<FrameCache>,
+    scroll_cache: ScrollCache,
 }
 
 impl GpuRenderer {
@@ -304,6 +362,10 @@ impl GpuRenderer {
             persistent_overlay_rect_cap: 0,
             persistent_overlay_tex_buf: None,
             persistent_overlay_tex_cap: 0,
+            persistent_present_tex_buf: None,
+            persistent_present_tex_cap: 0,
+            frame_cache: None,
+            scroll_cache: ScrollCache::new(),
         })
     }
 
@@ -472,15 +534,16 @@ impl GpuRenderer {
         (rect_pipeline, textured_pipeline)
     }
 
-    /// Create a surface from a raw native window handle (Android ANativeWindow*, etc.).
+    /// Create a surface from a raw native window handle.
     ///
     /// If `native_window_ptr` is null, drops the existing surface.
-    /// On Android, builds an `AndroidNdkWindowHandle` + `AndroidDisplayHandle`.
+    /// On Android, `native_window_ptr` is an `ANativeWindow*`.
+    /// On Linux desktop hosts, `native_window_ptr` points to a borrowed
+    /// [`NativeSurfaceDescriptor`].
     ///
     /// # Safety
-    /// The caller must ensure `native_window_ptr` is a valid ANativeWindow* that
-    /// remains valid for the duration of this call, and that `w`/`h` match the
-    /// window dimensions.
+    /// The caller must ensure `native_window_ptr` remains valid for the duration
+    /// of this call and that `w`/`h` match the target surface dimensions.
     #[cfg(not(target_arch = "wasm32"))]
     #[allow(unused_variables)]
     pub async unsafe fn configure_surface_from_raw_handle(
@@ -498,7 +561,7 @@ impl GpuRenderer {
         // Drop existing surface before creating a new one to ensure old handles are released.
         self.drop_surface();
 
-        // Build platform-specific raw handles
+        // Build platform-specific raw handles.
         #[cfg(target_os = "android")]
         let (raw_window, raw_display) = {
             // Take an owned native window reference for this configured surface.
@@ -517,148 +580,201 @@ impl GpuRenderer {
             )
         };
 
-        #[cfg(not(target_os = "android"))]
+        #[cfg(all(unix, not(target_os = "android")))]
+        let (raw_window, raw_display) = {
+            let desc = &*(native_window_ptr as *const NativeSurfaceDescriptor);
+            if desc.magic != NATIVE_SURFACE_DESC_MAGIC {
+                return Err(format!(
+                    "configure_surface_from_raw_handle: bad descriptor magic {:#x}",
+                    desc.magic
+                ));
+            }
+            if desc.version != NATIVE_SURFACE_DESC_VERSION {
+                return Err(format!(
+                    "configure_surface_from_raw_handle: unsupported descriptor version {}",
+                    desc.version
+                ));
+            }
+
+            match desc.kind {
+                NATIVE_SURFACE_KIND_WAYLAND => {
+                    let display = std::ptr::NonNull::new(desc.display).ok_or_else(|| {
+                        "configure_surface_from_raw_handle: null Wayland display".to_string()
+                    })?;
+                    let surface = std::ptr::NonNull::new(desc.surface).ok_or_else(|| {
+                        "configure_surface_from_raw_handle: null Wayland surface".to_string()
+                    })?;
+                    let wh = raw_window_handle::WaylandWindowHandle::new(surface);
+                    let dh = raw_window_handle::WaylandDisplayHandle::new(display);
+                    (
+                        raw_window_handle::RawWindowHandle::Wayland(wh),
+                        raw_window_handle::RawDisplayHandle::Wayland(dh),
+                    )
+                }
+                NATIVE_SURFACE_KIND_X11 => {
+                    let display = std::ptr::NonNull::new(desc.display).ok_or_else(|| {
+                        "configure_surface_from_raw_handle: null X11 display".to_string()
+                    })?;
+                    let wh =
+                        raw_window_handle::XlibWindowHandle::new(desc.window as std::ffi::c_ulong);
+                    let dh =
+                        raw_window_handle::XlibDisplayHandle::new(Some(display), desc.screen);
+                    (
+                        raw_window_handle::RawWindowHandle::Xlib(wh),
+                        raw_window_handle::RawDisplayHandle::Xlib(dh),
+                    )
+                }
+                other => {
+                    return Err(format!(
+                        "configure_surface_from_raw_handle: unsupported descriptor kind {}",
+                        other
+                    ));
+                }
+            }
+        };
+
+        #[cfg(not(any(target_os = "android", all(unix, not(target_os = "android")))))]
         return Err("configure_surface_from_raw_handle: unsupported platform".to_string());
 
-        #[cfg(target_os = "android")]
-        {
-            let target = wgpu::SurfaceTargetUnsafe::RawHandle {
-                raw_window_handle: raw_window,
-                raw_display_handle: raw_display,
-            };
+        let target = wgpu::SurfaceTargetUnsafe::RawHandle {
+            raw_window_handle: raw_window,
+            raw_display_handle: raw_display,
+        };
 
-            let surface = self
+        let surface = self
+            .instance
+            .create_surface_unsafe(target)
+            .map_err(|e| format!("Failed to create surface from raw handle: {}", e))?;
+
+        // Check if the current adapter is compatible with this surface.
+        let caps = surface.get_capabilities(&self.adapter);
+        if caps.formats.is_empty() {
+            // Re-request adapter with compatible_surface
+            let new_adapter = self
                 .instance
-                .create_surface_unsafe(target)
-                .map_err(|e| format!("Failed to create surface from raw handle: {}", e))?;
+                .request_adapter(&wgpu::RequestAdapterOptions {
+                    power_preference: wgpu::PowerPreference::HighPerformance,
+                    compatible_surface: Some(&surface),
+                    force_fallback_adapter: false,
+                })
+                .await
+                .ok_or_else(|| "No GPU adapter compatible with surface".to_string())?;
 
-            // Check if the current adapter is compatible with this surface.
-            let caps = surface.get_capabilities(&self.adapter);
-            if caps.formats.is_empty() {
-                // Re-request adapter with compatible_surface
-                let new_adapter = self
-                    .instance
-                    .request_adapter(&wgpu::RequestAdapterOptions {
-                        power_preference: wgpu::PowerPreference::HighPerformance,
-                        compatible_surface: Some(&surface),
-                        force_fallback_adapter: false,
-                    })
-                    .await
-                    .ok_or_else(|| "No GPU adapter compatible with surface".to_string())?;
+            let (new_device, new_queue) = new_adapter
+                .request_device(
+                    &wgpu::DeviceDescriptor {
+                        label: Some("VolvoxGrid GPU"),
+                        required_features: wgpu::Features::empty(),
+                        required_limits: new_adapter.limits(),
+                        memory_hints: wgpu::MemoryHints::Performance,
+                    },
+                    None,
+                )
+                .await
+                .map_err(|e| format!("Failed to create GPU device: {}", e))?;
 
-                let (new_device, new_queue) = new_adapter
-                    .request_device(
-                        &wgpu::DeviceDescriptor {
-                            label: Some("VolvoxGrid GPU"),
-                            required_features: wgpu::Features::empty(),
-                            required_limits: new_adapter.limits(),
-                            memory_hints: wgpu::MemoryHints::Performance,
-                        },
-                        None,
-                    )
-                    .await
-                    .map_err(|e| format!("Failed to create GPU device: {}", e))?;
+            self.adapter = new_adapter;
+            self.device = new_device;
+            self.queue = new_queue;
 
-                self.adapter = new_adapter;
-                self.device = new_device;
-                self.queue = new_queue;
-
-                // Rebuild uniform bind group layout and buffer
-                self.uniform_bind_group_layout =
-                    self.device
-                        .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                            label: Some("uniform_bgl"),
-                            entries: &[wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                                ty: wgpu::BindingType::Buffer {
-                                    ty: wgpu::BufferBindingType::Uniform,
-                                    has_dynamic_offset: false,
-                                    min_binding_size: None,
-                                },
-                                count: None,
-                            }],
-                        });
-
-                self.uniform_buf =
-                    self.device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("uniforms"),
-                            contents: bytemuck::bytes_of(&Uniforms {
-                                viewport_size: [1.0, 1.0],
-                                _pad: [0.0, 0.0],
-                            }),
-                            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                        });
-
-                self.uniform_bind_group =
-                    self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some("uniform_bg"),
-                        layout: &self.uniform_bind_group_layout,
-                        entries: &[wgpu::BindGroupEntry {
+            // Rebuild uniform bind group layout and buffer
+            self.uniform_bind_group_layout =
+                self.device
+                    .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                        label: Some("uniform_bgl"),
+                        entries: &[wgpu::BindGroupLayoutEntry {
                             binding: 0,
-                            resource: self.uniform_buf.as_entire_binding(),
+                            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                            ty: wgpu::BindingType::Buffer {
+                                ty: wgpu::BufferBindingType::Uniform,
+                                has_dynamic_offset: false,
+                                min_binding_size: None,
+                            },
+                            count: None,
                         }],
                     });
 
-                // Rebuild textured bind group layout
-                self.textured_bind_group_layout =
-                    self.device
-                        .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                            label: Some("textured_bgl"),
-                            entries: &[
-                                wgpu::BindGroupLayoutEntry {
-                                    binding: 0,
-                                    visibility: wgpu::ShaderStages::FRAGMENT,
-                                    ty: wgpu::BindingType::Texture {
-                                        sample_type: wgpu::TextureSampleType::Float {
-                                            filterable: true,
-                                        },
-                                        view_dimension: wgpu::TextureViewDimension::D2,
-                                        multisampled: false,
+            self.uniform_buf =
+                self.device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("uniforms"),
+                        contents: bytemuck::bytes_of(&Uniforms {
+                            viewport_size: [1.0, 1.0],
+                            _pad: [0.0, 0.0],
+                        }),
+                        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                    });
+
+            self.uniform_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some("uniform_bg"),
+                layout: &self.uniform_bind_group_layout,
+                entries: &[wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.uniform_buf.as_entire_binding(),
+                }],
+            });
+
+            // Rebuild textured bind group layout
+            self.textured_bind_group_layout =
+                self.device
+                    .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                        label: Some("textured_bgl"),
+                        entries: &[
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 0,
+                                visibility: wgpu::ShaderStages::FRAGMENT,
+                                ty: wgpu::BindingType::Texture {
+                                    sample_type: wgpu::TextureSampleType::Float {
+                                        filterable: true,
                                     },
-                                    count: None,
+                                    view_dimension: wgpu::TextureViewDimension::D2,
+                                    multisampled: false,
                                 },
-                                wgpu::BindGroupLayoutEntry {
-                                    binding: 1,
-                                    visibility: wgpu::ShaderStages::FRAGMENT,
-                                    ty: wgpu::BindingType::Sampler(
-                                        wgpu::SamplerBindingType::Filtering,
-                                    ),
-                                    count: None,
-                                },
-                            ],
-                        });
+                                count: None,
+                            },
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 1,
+                                visibility: wgpu::ShaderStages::FRAGMENT,
+                                ty: wgpu::BindingType::Sampler(
+                                    wgpu::SamplerBindingType::Filtering,
+                                ),
+                                count: None,
+                            },
+                        ],
+                    });
 
-                self.atlas_sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
-                    label: Some("atlas_sampler"),
-                    mag_filter: wgpu::FilterMode::Linear,
-                    min_filter: wgpu::FilterMode::Linear,
-                    ..Default::default()
-                });
+            self.atlas_sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
+                label: Some("atlas_sampler"),
+                mag_filter: wgpu::FilterMode::Linear,
+                min_filter: wgpu::FilterMode::Linear,
+                ..Default::default()
+            });
 
-                // Clear cached GPU resources that belong to the old device
-                self.atlas_textures.clear();
-                self.atlas_bind_groups.clear();
-                self.glyph_atlas.clear();
-                self.persistent_rect_buf = None;
-                self.persistent_rect_cap = 0;
-                self.persistent_tex_buf = None;
-                self.persistent_tex_cap = 0;
-                self.persistent_overlay_rect_buf = None;
-                self.persistent_overlay_rect_cap = 0;
-                self.persistent_overlay_tex_buf = None;
-                self.persistent_overlay_tex_cap = 0;
+            // Clear cached GPU resources that belong to the old device
+            self.atlas_textures.clear();
+            self.atlas_bind_groups.clear();
+            self.glyph_atlas.clear();
+            self.persistent_rect_buf = None;
+            self.persistent_rect_cap = 0;
+            self.persistent_tex_buf = None;
+            self.persistent_tex_cap = 0;
+            self.persistent_overlay_rect_buf = None;
+            self.persistent_overlay_rect_cap = 0;
+            self.persistent_overlay_tex_buf = None;
+            self.persistent_overlay_tex_cap = 0;
+            self.persistent_present_tex_buf = None;
+            self.persistent_present_tex_cap = 0;
+            self.frame_cache = None;
+            self.scroll_cache.invalidate();
 
-                // Reset pipeline format to force recreation of pipelines with the new device
-                self.pipeline_format = wgpu::TextureFormat::Rgba8Uint;
-            }
-
-            if !self.configure_surface(surface, w, h, requested_present_mode) {
-                return Err("Surface configuration failed (incompatible surface)".to_string());
-            }
-            Ok(())
+            // Reset pipeline format to force recreation of pipelines with the new device
+            self.pipeline_format = wgpu::TextureFormat::Rgba8Uint;
         }
+
+        if !self.configure_surface(surface, w, h, requested_present_mode) {
+            return Err("Surface configuration failed (incompatible surface)".to_string());
+        }
+        Ok(())
     }
 
     /// Drop the current surface (e.g. when the native window is destroyed).
@@ -911,7 +1027,7 @@ impl GpuRenderer {
         self.glyph_atlas.set_external_rasterizer(r);
     }
 
-    /// Render directly to the configured GPU surface (zero-copy).
+    /// Render to the configured GPU surface.
     ///
     /// Returns `RenderResult`: dirty rect, per-layer times (us), zone cell counts.
     pub fn render_to_surface(
@@ -920,22 +1036,22 @@ impl GpuRenderer {
         w: i32,
         h: i32,
     ) -> Result<RenderResult, wgpu::SurfaceError> {
-        let surface = match self.surface.as_ref() {
-            Some(s) => s,
-            None => return Err(wgpu::SurfaceError::Lost),
-        };
+        if self.surface.is_none() {
+            return Err(wgpu::SurfaceError::Lost);
+        }
 
-        let frame = match surface.get_current_texture() {
-            Ok(f) => f,
-            Err(e) => return Err(e),
-        };
+        let result = self.render_into_cache(grid, w, h);
+        if w <= 0 || h <= 0 {
+            return Ok(result);
+        }
 
+        let surface = self.surface.as_ref().unwrap();
+        let frame = surface.get_current_texture()?;
         let view = frame
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        let result = self.render_to_view(grid, &view, w, h);
-
+        self.present_cached_texture(&view, w, h);
         frame.present();
         Ok(result)
     }
@@ -952,31 +1068,19 @@ impl GpuRenderer {
         h: i32,
         stride: i32,
     ) -> RenderResult {
+        let render_result = self.render_into_cache(grid, w, h);
         if w <= 0 || h <= 0 {
-            return ((0, 0, 0, 0), [0.0; crate::canvas::layer::COUNT], [0; 4]);
+            return render_result;
         }
+
+        let front = self
+            .frame_cache
+            .as_ref()
+            .map(|cache| cache.front().clone())
+            .expect("frame cache must exist after GPU render");
 
         let uw = w as u32;
         let uh = h as u32;
-
-        // Create offscreen render target
-        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("readback_target"),
-            size: wgpu::Extent3d {
-                width: uw,
-                height: uh,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: self.pipeline_format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
-
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let render_result = self.render_to_view(grid, &view, w, h);
 
         // Copy texture to buffer for readback
         let bytes_per_row = uw * 4;
@@ -996,7 +1100,7 @@ impl GpuRenderer {
 
         encoder.copy_texture_to_buffer(
             wgpu::TexelCopyTextureInfo {
-                texture: &texture,
+                texture: &front.texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
@@ -1056,21 +1160,102 @@ impl GpuRenderer {
     }
 
     // -----------------------------------------------------------------------
-    // Internal: render to a wgpu TextureView
+    // Internal: cached scene rendering and presentation
     // -----------------------------------------------------------------------
 
-    fn render_to_view(
+    fn render_into_cache(
         &mut self,
         grid: &VolvoxGrid,
-        view: &wgpu::TextureView,
         w: i32,
         h: i32,
+    ) -> RenderResult {
+        if w <= 0 || h <= 0 {
+            return ((0, 0, 0, 0), [0.0; crate::canvas::layer::COUNT], [0; 4]);
+        }
+
+        self.ensure_frame_cache(w as u32, h as u32);
+        let current_scroll_state = ScrollCacheState::snapshot(grid, w, h);
+        let blit_plan = self.scroll_cache.plan(&current_scroll_state);
+        let (front, back) = {
+            let cache = self.frame_cache.as_ref().unwrap();
+            (cache.front().clone(), cache.back().clone())
+        };
+
+        let render_result = if let Some(plan) = blit_plan.as_ref() {
+            let render_result = self.build_scene(grid, w, h, Some(&plan.damage));
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("frame_cache_scroll_encoder"),
+                });
+            encoder.copy_texture_to_texture(
+                wgpu::TexelCopyTextureInfo {
+                    texture: &front.texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                wgpu::TexelCopyTextureInfo {
+                    texture: &back.texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                wgpu::Extent3d {
+                    width: w as u32,
+                    height: h as u32,
+                    depth_or_array_layers: 1,
+                },
+            );
+            encode_scroll_blit_copies(&mut encoder, &front.texture, &back.texture, plan);
+            self.encode_scene_pass(&mut encoder, &back.view, None);
+            self.queue.submit(std::iter::once(encoder.finish()));
+            render_result
+        } else {
+            let render_result = self.build_scene(grid, w, h, None);
+            let bkg = color_to_f32(grid.style.back_color_bkg);
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("frame_cache_full_encoder"),
+                });
+            self.encode_scene_pass(
+                &mut encoder,
+                &back.view,
+                Some(wgpu::Color {
+                    r: bkg[0] as f64,
+                    g: bkg[1] as f64,
+                    b: bkg[2] as f64,
+                    a: bkg[3] as f64,
+                }),
+            );
+            self.queue.submit(std::iter::once(encoder.finish()));
+            render_result
+        };
+
+        self.scroll_cache.finish(current_scroll_state);
+        self.frame_cache.as_mut().unwrap().swap();
+        render_result
+    }
+
+    fn build_scene(
+        &mut self,
+        grid: &VolvoxGrid,
+        w: i32,
+        h: i32,
+        damage: Option<&DamageRegion>,
     ) -> RenderResult {
         // Keep renderer-owned text cache policy in sync with runtime grid config.
         if self.text_engine.layout_cache_cap != grid.text_layout_cache_cap {
             self.text_engine
                 .set_layout_cache_cap(grid.text_layout_cache_cap);
         }
+
+        self.text_engine.set_render_options(
+            grid.style.text_render_mode,
+            grid.style.text_hinting_mode,
+            grid.style.text_pixel_snap,
+        );
 
         // Update uniforms
         self.queue.write_buffer(
@@ -1107,14 +1292,18 @@ impl GpuRenderer {
                 w,
                 h,
             );
-            render_grid(grid, &mut gpu_canvas)
+            if let Some(damage) = damage {
+                render_grid_partial(grid, &mut gpu_canvas, damage)
+            } else {
+                render_grid(grid, &mut gpu_canvas)
+            }
         };
 
         // Ensure atlas textures are up to date
         self.sync_atlas_textures();
 
         // Update persistent vertex buffers (realloc with 2x headroom when needed)
-        let has_rects = ensure_buffer(
+        ensure_buffer(
             &self.device,
             &self.queue,
             &mut self.persistent_rect_buf,
@@ -1122,7 +1311,7 @@ impl GpuRenderer {
             "rect_instances",
             bytemuck::cast_slice(&self.rect_instances),
         );
-        let has_tex = ensure_buffer(
+        ensure_buffer(
             &self.device,
             &self.queue,
             &mut self.persistent_tex_buf,
@@ -1130,7 +1319,7 @@ impl GpuRenderer {
             "textured_instances",
             bytemuck::cast_slice(&self.textured_instances),
         );
-        let has_overlay_rects = ensure_buffer(
+        ensure_buffer(
             &self.device,
             &self.queue,
             &mut self.persistent_overlay_rect_buf,
@@ -1138,7 +1327,7 @@ impl GpuRenderer {
             "overlay_rect_instances",
             bytemuck::cast_slice(&self.overlay_rect_instances),
         );
-        let has_overlay_tex = ensure_buffer(
+        ensure_buffer(
             &self.device,
             &self.queue,
             &mut self.persistent_overlay_tex_buf,
@@ -1147,27 +1336,108 @@ impl GpuRenderer {
             bytemuck::cast_slice(&self.overlay_textured_instances),
         );
 
-        // Encode render pass
-        let bkg = color_to_f32(grid.style.back_color_bkg);
+        render_result
+    }
+
+    fn encode_scene_pass(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        clear_color: Option<wgpu::Color>,
+    ) {
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("main_pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: clear_color.map_or(wgpu::LoadOp::Load, wgpu::LoadOp::Clear),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+
+        // --- Main layer: rects then textured ---
+        if !self.rect_instances.is_empty() {
+            let buf = self.persistent_rect_buf.as_ref().unwrap();
+            let count = self.rect_instances.len() as u32;
+            pass.set_pipeline(&self.rect_pipeline);
+            pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            pass.set_vertex_buffer(0, buf.slice(..));
+            pass.draw(0..6, 0..count);
+        }
+
+        if !self.textured_instances.is_empty() {
+            let buf = self.persistent_tex_buf.as_ref().unwrap();
+            pass.set_pipeline(&self.textured_pipeline);
+            pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            pass.set_vertex_buffer(0, buf.slice(..));
+            draw_textured_batches(&mut pass, &self.textured_instances, &self.atlas_bind_groups);
+        }
+
+        // --- Overlay layer (editor + dropdown): rects then textured ---
+        // Drawn after all main content so popups float on top.
+        if !self.overlay_rect_instances.is_empty() {
+            let buf = self.persistent_overlay_rect_buf.as_ref().unwrap();
+            let count = self.overlay_rect_instances.len() as u32;
+            pass.set_pipeline(&self.rect_pipeline);
+            pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            pass.set_vertex_buffer(0, buf.slice(..));
+            pass.draw(0..6, 0..count);
+        }
+
+        if !self.overlay_textured_instances.is_empty() {
+            let buf = self.persistent_overlay_tex_buf.as_ref().unwrap();
+            pass.set_pipeline(&self.textured_pipeline);
+            pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            pass.set_vertex_buffer(0, buf.slice(..));
+            draw_textured_batches(
+                &mut pass,
+                &self.overlay_textured_instances,
+                &self.atlas_bind_groups,
+            );
+        }
+    }
+
+    fn present_cached_texture(&mut self, surface_view: &wgpu::TextureView, w: i32, h: i32) {
+        let front = match self.frame_cache.as_ref() {
+            Some(cache) => cache.front().clone(),
+            None => return,
+        };
+        let present_instance = TexturedInstance {
+            rect: [0.0, 0.0, w as f32, h as f32],
+            uv_rect: [0.0, 0.0, 1.0, 1.0],
+            color: [1.0, 1.0, 1.0, 1.0],
+            flags: [1.0, 0.0],
+        };
+        let has_present = ensure_buffer(
+            &self.device,
+            &self.queue,
+            &mut self.persistent_present_tex_buf,
+            &mut self.persistent_present_tex_cap,
+            "present_cached_texture",
+            bytemuck::bytes_of(&present_instance),
+        );
+        if !has_present {
+            return;
+        }
+
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("frame_encoder"),
+                label: Some("surface_present_encoder"),
             });
-
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("main_pass"),
+                label: Some("surface_present_pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
+                    view: surface_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: bkg[0] as f64,
-                            g: bkg[1] as f64,
-                            b: bkg[2] as f64,
-                            a: bkg[3] as f64,
-                        }),
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -1175,52 +1445,78 @@ impl GpuRenderer {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-
-            // --- Main layer: rects then textured ---
-            if has_rects {
-                let buf = self.persistent_rect_buf.as_ref().unwrap();
-                let count = self.rect_instances.len() as u32;
-                pass.set_pipeline(&self.rect_pipeline);
-                pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-                pass.set_vertex_buffer(0, buf.slice(..));
-                pass.draw(0..6, 0..count);
-            }
-
-            if has_tex {
-                let buf = self.persistent_tex_buf.as_ref().unwrap();
-                pass.set_pipeline(&self.textured_pipeline);
-                pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-                pass.set_vertex_buffer(0, buf.slice(..));
-                draw_textured_batches(&mut pass, &self.textured_instances, &self.atlas_bind_groups);
-            }
-
-            // --- Overlay layer (editor + dropdown): rects then textured ---
-            // Drawn after all main content so popups float on top.
-            if has_overlay_rects {
-                let buf = self.persistent_overlay_rect_buf.as_ref().unwrap();
-                let count = self.overlay_rect_instances.len() as u32;
-                pass.set_pipeline(&self.rect_pipeline);
-                pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-                pass.set_vertex_buffer(0, buf.slice(..));
-                pass.draw(0..6, 0..count);
-            }
-
-            if has_overlay_tex {
-                let buf = self.persistent_overlay_tex_buf.as_ref().unwrap();
-                pass.set_pipeline(&self.textured_pipeline);
-                pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-                pass.set_vertex_buffer(0, buf.slice(..));
-                draw_textured_batches(
-                    &mut pass,
-                    &self.overlay_textured_instances,
-                    &self.atlas_bind_groups,
-                );
-            }
+            let buf = self.persistent_present_tex_buf.as_ref().unwrap();
+            pass.set_pipeline(&self.textured_pipeline);
+            pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            pass.set_bind_group(1, &front.bind_group, &[]);
+            pass.set_vertex_buffer(0, buf.slice(..));
+            pass.draw(0..6, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
+    }
 
-        render_result
+    fn ensure_frame_cache(&mut self, w: u32, h: u32) {
+        let needs_recreate = self.frame_cache.as_ref().map_or(true, |cache| {
+            cache.width != w || cache.height != h || cache.format != self.pipeline_format
+        });
+        if !needs_recreate {
+            return;
+        }
+
+        let textures = [
+            self.create_frame_cache_texture("frame_cache_a", w, h),
+            self.create_frame_cache_texture("frame_cache_b", w, h),
+        ];
+        self.frame_cache = Some(FrameCache {
+            width: w,
+            height: h,
+            format: self.pipeline_format,
+            textures,
+            front: 0,
+        });
+        self.scroll_cache.invalidate();
+    }
+
+    fn create_frame_cache_texture(&self, label: &str, w: u32, h: u32) -> FrameCacheTexture {
+        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some(label),
+            size: wgpu::Extent3d {
+                width: w.max(1),
+                height: h.max(1),
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: self.pipeline_format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("frame_cache_bg"),
+            layout: &self.textured_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.atlas_sampler),
+                },
+            ],
+        });
+
+        FrameCacheTexture {
+            texture,
+            view,
+            bind_group,
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -1291,6 +1587,204 @@ impl GpuRenderer {
             }
         }
     }
+}
+
+fn encode_scroll_blit_copies(
+    encoder: &mut wgpu::CommandEncoder,
+    src_texture: &wgpu::Texture,
+    dst_texture: &wgpu::Texture,
+    plan: &ScrollBlitPlan,
+) {
+    match (plan.horizontal, plan.vertical) {
+        (Some(horizontal), Some(vertical)) => {
+            if let Some(center) = rect_intersection(horizontal.rect, vertical.rect) {
+                encode_shifted_texture_copy(
+                    encoder,
+                    src_texture,
+                    dst_texture,
+                    center,
+                    horizontal.screen_dx,
+                    vertical.screen_dy,
+                );
+
+                let top_h = center.y - horizontal.rect.y;
+                if top_h > 0 {
+                    encode_shifted_texture_copy(
+                        encoder,
+                        src_texture,
+                        dst_texture,
+                        DamageRect {
+                            x: horizontal.rect.x,
+                            y: horizontal.rect.y,
+                            w: horizontal.rect.w,
+                            h: top_h,
+                        },
+                        horizontal.screen_dx,
+                        0,
+                    );
+                }
+
+                let bottom_y = center.y + center.h;
+                let bottom_h = horizontal.rect.y + horizontal.rect.h - bottom_y;
+                if bottom_h > 0 {
+                    encode_shifted_texture_copy(
+                        encoder,
+                        src_texture,
+                        dst_texture,
+                        DamageRect {
+                            x: horizontal.rect.x,
+                            y: bottom_y,
+                            w: horizontal.rect.w,
+                            h: bottom_h,
+                        },
+                        horizontal.screen_dx,
+                        0,
+                    );
+                }
+
+                let left_w = center.x - vertical.rect.x;
+                if left_w > 0 {
+                    encode_shifted_texture_copy(
+                        encoder,
+                        src_texture,
+                        dst_texture,
+                        DamageRect {
+                            x: vertical.rect.x,
+                            y: vertical.rect.y,
+                            w: left_w,
+                            h: vertical.rect.h,
+                        },
+                        0,
+                        vertical.screen_dy,
+                    );
+                }
+
+                let right_x = center.x + center.w;
+                let right_w = vertical.rect.x + vertical.rect.w - right_x;
+                if right_w > 0 {
+                    encode_shifted_texture_copy(
+                        encoder,
+                        src_texture,
+                        dst_texture,
+                        DamageRect {
+                            x: right_x,
+                            y: vertical.rect.y,
+                            w: right_w,
+                            h: vertical.rect.h,
+                        },
+                        0,
+                        vertical.screen_dy,
+                    );
+                }
+            }
+        }
+        (Some(horizontal), None) => {
+            encode_shifted_texture_copy(
+                encoder,
+                src_texture,
+                dst_texture,
+                horizontal.rect,
+                horizontal.screen_dx,
+                0,
+            );
+        }
+        (None, Some(vertical)) => {
+            encode_shifted_texture_copy(
+                encoder,
+                src_texture,
+                dst_texture,
+                vertical.rect,
+                0,
+                vertical.screen_dy,
+            );
+        }
+        (None, None) => {}
+    }
+}
+
+fn encode_shifted_texture_copy(
+    encoder: &mut wgpu::CommandEncoder,
+    src_texture: &wgpu::Texture,
+    dst_texture: &wgpu::Texture,
+    rect: DamageRect,
+    dx: i32,
+    dy: i32,
+) {
+    let Some((src, dst)) = shifted_copy_rects(rect, dx, dy) else {
+        return;
+    };
+
+    encoder.copy_texture_to_texture(
+        wgpu::TexelCopyTextureInfo {
+            texture: src_texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d {
+                x: src.x as u32,
+                y: src.y as u32,
+                z: 0,
+            },
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::TexelCopyTextureInfo {
+            texture: dst_texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d {
+                x: dst.x as u32,
+                y: dst.y as u32,
+                z: 0,
+            },
+            aspect: wgpu::TextureAspect::All,
+        },
+        wgpu::Extent3d {
+            width: src.w as u32,
+            height: src.h as u32,
+            depth_or_array_layers: 1,
+        },
+    );
+}
+
+fn shifted_copy_rects(rect: DamageRect, dx: i32, dy: i32) -> Option<(DamageRect, DamageRect)> {
+    let copy_w = rect.w - dx.abs();
+    let copy_h = rect.h - dy.abs();
+    if copy_w <= 0 || copy_h <= 0 {
+        return None;
+    }
+
+    let (src_x, dst_x) = if dx >= 0 {
+        (rect.x, rect.x + dx)
+    } else {
+        (rect.x + dx.abs(), rect.x)
+    };
+    let (src_y, dst_y) = if dy >= 0 {
+        (rect.y, rect.y + dy)
+    } else {
+        (rect.y + dy.abs(), rect.y)
+    };
+
+    Some((
+        DamageRect {
+            x: src_x,
+            y: src_y,
+            w: copy_w,
+            h: copy_h,
+        },
+        DamageRect {
+            x: dst_x,
+            y: dst_y,
+            w: copy_w,
+            h: copy_h,
+        },
+    ))
+}
+
+fn rect_intersection(a: DamageRect, b: DamageRect) -> Option<DamageRect> {
+    let x = a.x.max(b.x);
+    let y = a.y.max(b.y);
+    let right = (a.x + a.w).min(b.x + b.w);
+    let bottom = (a.y + a.h).min(b.y + b.h);
+    let w = right - x;
+    let h = bottom - y;
+    (w > 0 && h > 0).then_some(DamageRect { x, y, w, h })
 }
 
 /// Reuse or grow a persistent GPU vertex buffer and upload `data` into it.
@@ -1376,4 +1870,87 @@ fn color_to_f32(c: u32) -> [f32; 4] {
     let g = ((c >> 8) & 0xFF) as f32 / 255.0;
     let b = (c & 0xFF) as f32 / 255.0;
     [r, g, b, a]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::GpuRenderer;
+    use crate::grid::VolvoxGrid;
+    use crate::proto::volvoxgrid::v1 as pb;
+
+    fn scroll_blit_test_grid(scroll_blit_enabled: bool) -> VolvoxGrid {
+        let mut grid = VolvoxGrid::new(1, 320, 220, 40, 12, 1, 1);
+        grid.scroll_blit_enabled = scroll_blit_enabled;
+        grid.scroll_bars = pb::ScrollBarsMode::ScrollbarBoth as i32;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.width_px = 36;
+        grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        grid.indicator_bands.col_top.mode_bits =
+            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+
+        for row in 0..grid.rows {
+            grid.set_row_height(row, 20 + (row % 3) * 4);
+            for col in 0..grid.cols {
+                grid.cells.set_text(row, col, format!("R{row}C{col}"));
+            }
+        }
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 56 + (col % 4) * 8);
+        }
+        grid.ensure_layout();
+        grid
+    }
+
+    #[test]
+    fn gpu_scroll_blit_matches_full_render_after_diagonal_scroll() {
+        let Ok(mut blit_renderer) = pollster::block_on(GpuRenderer::new(None)) else {
+            return;
+        };
+        let mut blit_grid = scroll_blit_test_grid(true);
+        let mut blit_buffer = vec![0u8; (320 * 220 * 4) as usize];
+        blit_renderer.render_to_buffer(&blit_grid, &mut blit_buffer, 320, 220, 320 * 4);
+        let seeded_buffer = blit_buffer.clone();
+
+        blit_grid.scroll.scroll_x = 17.0;
+        blit_grid.scroll.scroll_y = 29.0;
+        blit_renderer.render_to_buffer(&blit_grid, &mut blit_buffer, 320, 220, 320 * 4);
+
+        let Ok(mut full_renderer) = pollster::block_on(GpuRenderer::new(None)) else {
+            return;
+        };
+        let mut full_grid = scroll_blit_test_grid(false);
+        full_grid.scroll.scroll_x = 17.0;
+        full_grid.scroll.scroll_y = 29.0;
+        let mut full_buffer = vec![0u8; (320 * 220 * 4) as usize];
+        full_renderer.render_to_buffer(&full_grid, &mut full_buffer, 320, 220, 320 * 4);
+
+        if let Some(idx) = blit_buffer
+            .iter()
+            .zip(full_buffer.iter())
+            .position(|(left, right)| left != right)
+        {
+            let pixel = idx / 4;
+            let x = (pixel % 320) as i32;
+            let y = (pixel / 320) as i32;
+            let source_right = pixel_argb(&seeded_buffer, 320, (x + 17).min(319), y);
+            let source_down = pixel_argb(&seeded_buffer, 320, x, (y + 29).min(219));
+            let source_diag = pixel_argb(&seeded_buffer, 320, (x + 17).min(319), (y + 29).min(219));
+            panic!(
+                "gpu scroll blit mismatch at ({x}, {y}): got {:?}, expected {:?}, seeded_right=0x{source_right:08X}, seeded_down=0x{source_down:08X}, seeded_diag=0x{source_diag:08X}",
+                &blit_buffer[idx - (idx % 4)..idx - (idx % 4) + 4],
+                &full_buffer[idx - (idx % 4)..idx - (idx % 4) + 4],
+            );
+        }
+    }
+
+    fn pixel_argb(buffer: &[u8], width: i32, x: i32, y: i32) -> u32 {
+        let off = ((y * width + x) * 4) as usize;
+        ((buffer[off + 3] as u32) << 24)
+            | ((buffer[off] as u32) << 16)
+            | ((buffer[off + 1] as u32) << 8)
+            | (buffer[off + 2] as u32)
+    }
 }

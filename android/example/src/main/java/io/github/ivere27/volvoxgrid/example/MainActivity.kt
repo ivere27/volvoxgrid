@@ -44,6 +44,7 @@ class MainActivity : AppCompatActivity() {
     private var rendererMode = 0 // 0=AUTO, 1=CPU, 2=GPU, 3=GPU(Vulkan), 4=GPU(GLES)
     private var litePluginLoaded = false
     private var debugOverlayEnabled = false
+    private var scrollBlitEnabled = false
     private var textLayoutCacheCap = 8192
     // Keep enabled by default. VolvoxGridView now falls back automatically to
     // CPU present path if runtime surface producer switching fails on device.
@@ -331,6 +332,7 @@ class MainActivity : AppCompatActivity() {
                             .build())
                         .setRendering(RenderConfig.newBuilder()
                             .setFramePacingMode(FramePacingMode.FRAME_PACING_MODE_PLATFORM)
+                            .setScrollBlit(scrollBlitEnabled)
                             .build())
                         .setIndicators(IndicatorsConfig.newBuilder()
                             .setRowStart(RowIndicatorConfig.newBuilder()
@@ -421,6 +423,7 @@ class MainActivity : AppCompatActivity() {
             val viewMode = if (useGpuSurfacePath) mode else 0
             gridView.setRendererMode(viewMode)
             ctrl.setDebugOverlay(debugOverlayEnabled)
+            ctrl.setScrollBlit(scrollBlitEnabled)
             ctrl.setTextLayoutCacheCap(textLayoutCacheCap)
             ctrl.setRenderLayerMask(renderLayerMask)
         } catch (_: Exception) {}
@@ -429,6 +432,7 @@ class MainActivity : AppCompatActivity() {
     private fun showGridActionsMenu(anchor: View) {
         PopupMenu(this, anchor).apply {
             menuInflater.inflate(R.menu.grid_actions_menu, menu)
+            menu.findItem(R.id.action_scroll_blit)?.isChecked = scrollBlitEnabled
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     R.id.action_sort_ascending -> {
@@ -437,6 +441,29 @@ class MainActivity : AppCompatActivity() {
                     }
                     R.id.action_sort_descending -> {
                         sortGrid(false)
+                        true
+                    }
+                    R.id.action_scroll_blit -> {
+                        val nextValue = !scrollBlitEnabled
+                        scrollBlitEnabled = nextValue
+                        item.isChecked = nextValue
+                        thread {
+                            try {
+                                controller?.setScrollBlit(nextValue)
+                                controller?.refresh()
+                                gridView.requestFrame()
+                                updateStatus(
+                                    if (nextValue) {
+                                        "Scroll blit enabled"
+                                    } else {
+                                        "Scroll blit disabled"
+                                    }
+                                )
+                            } catch (e: Exception) {
+                                updateStatus("Scroll blit toggle failed: ${e.message}")
+                                android.util.Log.e("VolvoxGridDemo", "Scroll blit toggle failed", e)
+                            }
+                        }
                         true
                     }
                     R.id.action_layer_selection -> {

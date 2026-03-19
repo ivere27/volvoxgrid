@@ -353,6 +353,7 @@ async function main() {
     gridDpiScaleById.set(id, currentRenderDpiScale);
     gridFontReadabilityBoostById.set(id, 1.0);
     applyRenderLayerMaskToGrid(id);
+    setGridScrollBlit(id, scrollBlitEnabled);
     return id;
   };
 
@@ -394,6 +395,7 @@ async function main() {
   };
   const demoInitialized: Partial<Record<StandardDemoMode, boolean>> = {};
   let activeRendererMode = 1; // CPU
+  let scrollBlitEnabled = false;
   let doomGridId: number | null = null;
   const doomRuntime = new DoomRuntime();
   let doomJoystickPointerId: number | null = null;
@@ -574,8 +576,10 @@ async function main() {
 
   const chkDebug = document.getElementById("chk-debug") as HTMLInputElement;
   const chkGpu = document.getElementById("chk-gpu") as HTMLInputElement;
+  const chkScrollBlit = document.getElementById("chk-scroll-blit") as HTMLInputElement;
   const chkAnim = document.getElementById("chk-anim") as HTMLInputElement;
   const chkHover = document.getElementById("chk-hover") as HTMLInputElement;
+  chkScrollBlit.checked = scrollBlitEnabled;
   chkHover.checked = parseEnvBool(env?.VITE_VG_ENABLE_HOVER, false);
 
   function hoverModeForDemo(mode: StandardDemoMode): number {
@@ -596,6 +600,16 @@ async function main() {
     }
   }
 
+  function setGridScrollBlit(id: number, enabled: boolean): void {
+    const setScrollBlit = (wasmModule as any).set_scroll_blit as
+      | ((gridId: number, enabled: boolean) => void)
+      | undefined;
+    if (typeof setScrollBlit !== "function") {
+      return;
+    }
+    setScrollBlit(id, enabled);
+  }
+
   function applyHoverToggleToKnownGrids(): void {
     for (const mode of Object.keys(demoGridIds) as StandardDemoMode[]) {
       const id = demoGridIds[mode];
@@ -610,6 +624,13 @@ async function main() {
     grid.invalidate();
   }
 
+  function applyScrollBlitToKnownGrids(): void {
+    for (const id of knownGridIds()) {
+      setGridScrollBlit(id, scrollBlitEnabled);
+    }
+    grid.invalidate();
+  }
+
   function selectedTextLayoutCacheCap(): number {
     const parsed = Number.parseInt(selTextCache.value, 10);
     if (Number.isFinite(parsed) && parsed >= 0) {
@@ -620,6 +641,7 @@ async function main() {
 
   function applyActiveRenderSettings(): void {
     grid.rendererMode = activeRendererMode;
+    grid.scrollBlit = scrollBlitEnabled;
     grid.debugOverlay = chkDebug.checked;
     grid.animationEnabled = chkAnim.checked;
     grid.textLayoutCacheCap = selectedTextLayoutCacheCap();
@@ -1621,6 +1643,13 @@ async function main() {
   chkGpu.checked = false;
   chkGpu.addEventListener("change", () => {
     activeRendererMode = chkGpu.checked ? 2 : 1;
+    applyActiveRenderSettings();
+    grid.invalidate();
+  });
+
+  chkScrollBlit.addEventListener("change", () => {
+    scrollBlitEnabled = chkScrollBlit.checked;
+    applyScrollBlitToKnownGrids();
     applyActiveRenderSettings();
     grid.invalidate();
   });

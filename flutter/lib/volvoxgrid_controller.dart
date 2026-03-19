@@ -222,8 +222,7 @@ class VolvoxGridController extends ChangeNotifier {
   Future<void> setShowColumnHeaders(bool visible) async {
     final top = ColIndicatorConfig()..visible = visible;
     await _configure(
-      GridConfig()
-        ..indicators = (IndicatorsConfig()..colTop = top),
+      GridConfig()..indicators = (IndicatorsConfig()..colTop = top),
     );
   }
 
@@ -231,8 +230,7 @@ class VolvoxGridController extends ChangeNotifier {
   Future<void> setColumnIndicatorTopModeBits(int modeBits) async {
     final top = ColIndicatorConfig()..modeBits = modeBits;
     await _configure(
-      GridConfig()
-        ..indicators = (IndicatorsConfig()..colTop = top),
+      GridConfig()..indicators = (IndicatorsConfig()..colTop = top),
     );
   }
 
@@ -240,8 +238,7 @@ class VolvoxGridController extends ChangeNotifier {
   Future<void> setColumnIndicatorTopRowCount(int rows) async {
     final top = ColIndicatorConfig()..bandRows = rows < 0 ? 0 : rows;
     await _configure(
-      GridConfig()
-        ..indicators = (IndicatorsConfig()..colTop = top),
+      GridConfig()..indicators = (IndicatorsConfig()..colTop = top),
     );
   }
 
@@ -249,8 +246,7 @@ class VolvoxGridController extends ChangeNotifier {
   Future<void> setShowRowIndicator(bool visible) async {
     final row = RowIndicatorConfig()..visible = visible;
     await _configure(
-      GridConfig()
-        ..indicators = (IndicatorsConfig()..rowStart = row),
+      GridConfig()..indicators = (IndicatorsConfig()..rowStart = row),
     );
   }
 
@@ -258,8 +254,7 @@ class VolvoxGridController extends ChangeNotifier {
   Future<void> setRowIndicatorStartModeBits(int modeBits) async {
     final row = RowIndicatorConfig()..modeBits = modeBits;
     await _configure(
-      GridConfig()
-        ..indicators = (IndicatorsConfig()..rowStart = row),
+      GridConfig()..indicators = (IndicatorsConfig()..rowStart = row),
     );
   }
 
@@ -608,8 +603,8 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the selection visibility style.
   Future<void> setSelectionVisibility(SelectionVisibility style) async {
-    await _configure(GridConfig()
-      ..selection = (SelectionConfig()..visibility = style));
+    await _configure(
+        GridConfig()..selection = (SelectionConfig()..visibility = style));
   }
 
   /// Scroll the grid so that the specified cell is visible.
@@ -965,8 +960,8 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Configure row/column resizing behavior.
   Future<void> setResizePolicy(ResizePolicy policy) async {
-    await _configure(GridConfig()
-      ..interaction = (InteractionConfig()..resize = policy));
+    await _configure(
+        GridConfig()..interaction = (InteractionConfig()..resize = policy));
   }
 
   /// Set scrollbar visibility mode.
@@ -1308,6 +1303,12 @@ class VolvoxGridController extends ChangeNotifier {
     await _configure(GridConfig()..rendering = rc);
   }
 
+  /// Enable or disable scroll blitting during panning/scrolling.
+  Future<void> setScrollBlit(bool enabled) async {
+    await _configure(
+        GridConfig()..rendering = (RenderConfig()..scrollBlit = enabled));
+  }
+
   /// Set the render layer visibility bitmask.
   ///
   /// Each bit corresponds to a [RenderLayerBit] position.
@@ -1328,6 +1329,12 @@ class VolvoxGridController extends ChangeNotifier {
   Future<bool> animationEnabled() async {
     final config = await _getConfig();
     return config.rendering.animationEnabled;
+  }
+
+  /// Get whether scroll blitting is enabled.
+  Future<bool> scrollBlitEnabled() async {
+    final config = await _getConfig();
+    return config.rendering.scrollBlit;
   }
 
   /// Get text layout cache capacity.
@@ -1474,7 +1481,8 @@ class VolvoxGridController extends ChangeNotifier {
       if (textureId == null || surfaceHandle == null || surfaceHandle == 0) {
         if (textureId != null) {
           try {
-            await _channel.invokeMethod('releaseTexture', {'textureId': textureId});
+            await _channel
+                .invokeMethod('releaseTexture', {'textureId': textureId});
           } catch (_) {
             // Best effort cleanup only.
           }

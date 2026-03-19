@@ -137,6 +137,12 @@ namespace VolvoxGrid.DotNet
             set { if (_config.Rendering.DebugOverlay != value) { _config.Rendering.DebugOverlay = value; ApplyEngineConfig(); } }
         }
 
+        public bool ScrollBlitEnabled
+        {
+            get { return _config.Rendering.ScrollBlit ?? false; }
+            set { if (_config.Rendering.ScrollBlit != value) { _config.Rendering.ScrollBlit = value; ApplyEngineConfig(); } }
+        }
+
         public object DataSource
         {
             get { return _dataSource; }

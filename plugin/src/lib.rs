@@ -112,6 +112,19 @@ fn map_plugin_error(message: impl Into<String>) -> FfiError {
     internal_error(message)
 }
 
+fn current_frame_metrics(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Option<FrameMetrics> {
+    if !grid.layer_profiling && !grid.debug_overlay {
+        return None;
+    }
+    Some(FrameMetrics {
+        frame_time_ms: grid.debug_frame_time_ms,
+        fps: grid.debug_fps,
+        layer_times_us: grid.layer_times_us.to_vec(),
+        zone_cell_counts: grid.zone_cell_counts.to_vec(),
+        instance_count: grid.debug_instance_count,
+    })
+}
+
 struct VolvoxGridPlugin {
     next_event_id: AtomicI64,
     decision_enabled: Mutex<HashSet<i64>>,
@@ -1737,6 +1750,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 if src != dst && !grid.row_positions.is_empty() {
                     let val = grid.row_positions.remove(src as usize);
                     grid.row_positions.insert(dst as usize, val);
+                    grid.cells.set_row_map(grid.row_positions.clone());
                     grid.layout.invalidate();
                     grid.mark_dirty();
                 }
@@ -1915,7 +1929,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 grid.pinned_top_height() + grid.pinned_bottom_height(),
                 grid.pinned_left_width() + grid.pinned_right_width(),
             );
-            grid.mark_dirty();
+            grid.mark_dirty_visual();
         })?;
         Ok(Empty {})
     }
@@ -2010,12 +2024,14 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             .push(volvoxgrid_engine::event::GridEventData::CellEditChange {
                                 text: t,
                             });
+                        grid.mark_dirty();
                     }
                 }
                 Some(edit_command::Command::SetSelection(sel)) => {
                     if grid.edit.is_active() {
                         grid.edit.set_sel_start(sel.start);
                         grid.edit.set_sel_length(sel.length);
+                        grid.mark_dirty();
                     }
                 }
                 Some(edit_command::Command::SetHighlights(set_highlights)) => {
@@ -2522,7 +2538,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                         if needs_fling_tick {
                             if grid.scroll.tick_fling(dt_seconds, grid.fling_friction) {
-                                grid.mark_dirty();
+                                grid.mark_dirty_visual();
                             }
                         }
 
@@ -2639,7 +2655,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             renderer_text_registration = desired_text_registration;
                         }
                         self.sync_fonts_into_renderer(r, &mut cpu_font_count_applied);
-                        let ((dx, dy, dw, dh), layer_times, zone_counts) = r.render(grid, buffer, width, height, stride);
+                        let ((dx, dy, dw, dh), layer_times, zone_counts) =
+                            r.render(grid, buffer, width, height, stride);
                         if grid.layer_profiling {
                             grid.layer_times_us = layer_times;
                             grid.zone_cell_counts = zone_counts;
@@ -2654,6 +2671,13 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                     match result {
                         Ok((rendered, dx, dy, dw, dh)) => {
+                            let metrics = if rendered {
+                                self.with_grid(grid_id, |grid| current_frame_metrics(grid))
+                                    .ok()
+                                    .flatten()
+                            } else {
+                                None
+                            };
                             stream.send(RenderOutput {
                                 rendered,
                                 event: Some(render_output::Event::FrameDone(FrameDone {
@@ -2662,6 +2686,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     dirty_y: dy,
                                     dirty_w: dw,
                                     dirty_h: dh,
+                                    metrics,
                                 })),
                             });
                         }
@@ -2674,6 +2699,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     dirty_y: 0,
                                     dirty_w: 0,
                                     dirty_h: 0,
+                                    metrics: None,
                                 })),
                             });
                         }
@@ -2721,6 +2747,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                 dirty_y: 0,
                                 dirty_w: 0,
                                 dirty_h: 0,
+                                metrics: None,
                             })),
                         });
                         continue;
@@ -2773,6 +2800,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                         dirty_y: 0,
                                         dirty_w: 0,
                                         dirty_h: 0,
+                                        metrics: None,
                                     })),
                                 });
                                 continue;
@@ -2812,6 +2840,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     dirty_y: 0,
                                     dirty_w: 0,
                                     dirty_h: 0,
+                                    metrics: None,
                                 })),
                             });
                             continue;
@@ -2839,6 +2868,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     dirty_y: 0,
                                     dirty_w: 0,
                                     dirty_h: 0,
+                                    metrics: None,
                                 })),
                             });
                             continue;
@@ -2875,7 +2905,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                         if needs_fling_tick {
                             if grid.scroll.tick_fling(dt_seconds, grid.fling_friction) {
-                                grid.mark_dirty();
+                                grid.mark_dirty_visual();
                             }
                         }
 
@@ -2922,6 +2952,13 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                     match result {
                         Ok(Ok((rendered, dx, dy, dw, dh))) => {
+                            let metrics = if rendered {
+                                self.with_grid(grid_id, |grid| current_frame_metrics(grid))
+                                    .ok()
+                                    .flatten()
+                            } else {
+                                None
+                            };
                             stream.send(RenderOutput {
                                 rendered,
                                 event: Some(render_output::Event::GpuFrameDone(GpuFrameDone {
@@ -2929,6 +2966,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     dirty_y: dy,
                                     dirty_w: dw,
                                     dirty_h: dh,
+                                    metrics,
                                 })),
                             });
                         }
@@ -2947,6 +2985,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     dirty_y: 0,
                                     dirty_w: 0,
                                     dirty_h: 0,
+                                    metrics: None,
                                 })),
                             });
                         }
@@ -2958,6 +2997,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     dirty_y: 0,
                                     dirty_w: 0,
                                     dirty_h: 0,
+                                    metrics: None,
                                 })),
                             });
                         }

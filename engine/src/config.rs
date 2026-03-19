@@ -1605,6 +1605,11 @@ impl VolvoxGrid {
         }
         if let Some(v) = rc.debug_overlay {
             self.debug_overlay = v;
+            if rc.layer_profiling.is_none() {
+                self.layer_profiling = v;
+            }
+        }
+        if let Some(v) = rc.layer_profiling {
             self.layer_profiling = v;
         }
         if let Some(v) = rc.animation_enabled {
@@ -1631,6 +1636,9 @@ impl VolvoxGrid {
         }
         if let Some(v) = rc.render_layer_mask {
             self.render_layer_mask = v as u64;
+        }
+        if let Some(v) = rc.scroll_blit {
+            self.scroll_blit_enabled = v;
         }
         self.mark_dirty();
     }
@@ -1956,6 +1964,8 @@ impl VolvoxGrid {
             frame_pacing_mode: Some(self.frame_pacing_mode),
             target_frame_rate_hz: Some(self.target_frame_rate_hz),
             render_layer_mask: Some(self.render_layer_mask as i64),
+            layer_profiling: Some(self.layer_profiling),
+            scroll_blit: Some(self.scroll_blit_enabled),
         }
     }
 
@@ -3387,6 +3397,30 @@ mod tests {
             Some(v1::FramePacingMode::Platform as i32)
         );
         assert_eq!(rendering.target_frame_rate_hz, Some(45));
+    }
+
+    #[test]
+    fn apply_config_sets_scroll_blit() {
+        let mut grid = test_grid();
+        assert!(!grid.scroll_blit_enabled);
+
+        let config = v1::GridConfig {
+            rendering: Some(v1::RenderConfig {
+                scroll_blit: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        grid.apply_config(&config);
+        assert!(grid.scroll_blit_enabled);
+    }
+
+    #[test]
+    fn get_config_returns_scroll_blit() {
+        let mut grid = test_grid();
+        grid.scroll_blit_enabled = true;
+        let config = grid.get_config();
+        assert_eq!(config.rendering.as_ref().unwrap().scroll_blit, Some(true));
     }
 
     // ── shrink_to_fit style tests ──────────────────────────────────

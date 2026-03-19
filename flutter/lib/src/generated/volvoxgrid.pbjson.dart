@@ -3432,6 +3432,24 @@ const RenderConfig$json = {
       '10': 'renderLayerMask',
       '17': true
     },
+    {
+      '1': 'layer_profiling',
+      '3': 10,
+      '4': 1,
+      '5': 8,
+      '9': 9,
+      '10': 'layerProfiling',
+      '17': true
+    },
+    {
+      '1': 'scroll_blit',
+      '3': 11,
+      '4': 1,
+      '5': 8,
+      '9': 10,
+      '10': 'scrollBlit',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_renderer_mode'},
@@ -3443,6 +3461,8 @@ const RenderConfig$json = {
     {'1': '_frame_pacing_mode'},
     {'1': '_target_frame_rate_hz'},
     {'1': '_render_layer_mask'},
+    {'1': '_layer_profiling'},
+    {'1': '_scroll_blit'},
   ],
 };
 
@@ -3457,11 +3477,13 @@ final $typed_data.Uint8List renderConfigDescriptor = $convert.base64Decode(
     'ZW50TW9kZUgFUgtwcmVzZW50TW9kZYgBARJPChFmcmFtZV9wYWNpbmdfbW9kZRgHIAEoDjIeLn'
     'ZvbHZveGdyaWQudjEuRnJhbWVQYWNpbmdNb2RlSAZSD2ZyYW1lUGFjaW5nTW9kZYgBARI0ChR0'
     'YXJnZXRfZnJhbWVfcmF0ZV9oehgIIAEoBUgHUhF0YXJnZXRGcmFtZVJhdGVIeogBARIvChFyZW'
-    '5kZXJfbGF5ZXJfbWFzaxgJIAEoA0gIUg9yZW5kZXJMYXllck1hc2uIAQFCEAoOX3JlbmRlcmVy'
-    'X21vZGVCEAoOX2RlYnVnX292ZXJsYXlCFAoSX2FuaW1hdGlvbl9lbmFibGVkQhgKFl9hbmltYX'
-    'Rpb25fZHVyYXRpb25fbXNCGAoWX3RleHRfbGF5b3V0X2NhY2hlX2NhcEIPCg1fcHJlc2VudF9t'
-    'b2RlQhQKEl9mcmFtZV9wYWNpbmdfbW9kZUIXChVfdGFyZ2V0X2ZyYW1lX3JhdGVfaHpCFAoSX3'
-    'JlbmRlcl9sYXllcl9tYXNr');
+    '5kZXJfbGF5ZXJfbWFzaxgJIAEoA0gIUg9yZW5kZXJMYXllck1hc2uIAQESLAoPbGF5ZXJfcHJv'
+    'ZmlsaW5nGAogASgISAlSDmxheWVyUHJvZmlsaW5niAEBEiQKC3Njcm9sbF9ibGl0GAsgASgISA'
+    'pSCnNjcm9sbEJsaXSIAQFCEAoOX3JlbmRlcmVyX21vZGVCEAoOX2RlYnVnX292ZXJsYXlCFAoS'
+    'X2FuaW1hdGlvbl9lbmFibGVkQhgKFl9hbmltYXRpb25fZHVyYXRpb25fbXNCGAoWX3RleHRfbG'
+    'F5b3V0X2NhY2hlX2NhcEIPCg1fcHJlc2VudF9tb2RlQhQKEl9mcmFtZV9wYWNpbmdfbW9kZUIX'
+    'ChVfdGFyZ2V0X2ZyYW1lX3JhdGVfaHpCFAoSX3JlbmRlcl9sYXllcl9tYXNrQhIKEF9sYXllcl'
+    '9wcm9maWxpbmdCDgoMX3Njcm9sbF9ibGl0');
 
 @$core.Deprecated('Use rowIndicatorSlotDescriptor instead')
 const RowIndicatorSlot$json = {
@@ -6491,6 +6513,14 @@ const FrameDone$json = {
     {'1': 'dirty_y', '3': 3, '4': 1, '5': 5, '10': 'dirtyY'},
     {'1': 'dirty_w', '3': 4, '4': 1, '5': 5, '10': 'dirtyW'},
     {'1': 'dirty_h', '3': 5, '4': 1, '5': 5, '10': 'dirtyH'},
+    {
+      '1': 'metrics',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.FrameMetrics',
+      '10': 'metrics'
+    },
   ],
 };
 
@@ -6498,7 +6528,8 @@ const FrameDone$json = {
 final $typed_data.Uint8List frameDoneDescriptor = $convert.base64Decode(
     'CglGcmFtZURvbmUSFgoGaGFuZGxlGAEgASgDUgZoYW5kbGUSFwoHZGlydHlfeBgCIAEoBVIGZG'
     'lydHlYEhcKB2RpcnR5X3kYAyABKAVSBmRpcnR5WRIXCgdkaXJ0eV93GAQgASgFUgZkaXJ0eVcS'
-    'FwoHZGlydHlfaBgFIAEoBVIGZGlydHlI');
+    'FwoHZGlydHlfaBgFIAEoBVIGZGlydHlIEjUKB21ldHJpY3MYBiABKAsyGy52b2x2b3hncmlkLn'
+    'YxLkZyYW1lTWV0cmljc1IHbWV0cmljcw==');
 
 @$core.Deprecated('Use gpuFrameDoneDescriptor instead')
 const GpuFrameDone$json = {
@@ -6508,6 +6539,14 @@ const GpuFrameDone$json = {
     {'1': 'dirty_y', '3': 2, '4': 1, '5': 5, '10': 'dirtyY'},
     {'1': 'dirty_w', '3': 3, '4': 1, '5': 5, '10': 'dirtyW'},
     {'1': 'dirty_h', '3': 4, '4': 1, '5': 5, '10': 'dirtyH'},
+    {
+      '1': 'metrics',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.FrameMetrics',
+      '10': 'metrics'
+    },
   ],
 };
 
@@ -6515,7 +6554,27 @@ const GpuFrameDone$json = {
 final $typed_data.Uint8List gpuFrameDoneDescriptor = $convert.base64Decode(
     'CgxHcHVGcmFtZURvbmUSFwoHZGlydHlfeBgBIAEoBVIGZGlydHlYEhcKB2RpcnR5X3kYAiABKA'
     'VSBmRpcnR5WRIXCgdkaXJ0eV93GAMgASgFUgZkaXJ0eVcSFwoHZGlydHlfaBgEIAEoBVIGZGly'
-    'dHlI');
+    'dHlIEjUKB21ldHJpY3MYBSABKAsyGy52b2x2b3hncmlkLnYxLkZyYW1lTWV0cmljc1IHbWV0cm'
+    'ljcw==');
+
+@$core.Deprecated('Use frameMetricsDescriptor instead')
+const FrameMetrics$json = {
+  '1': 'FrameMetrics',
+  '2': [
+    {'1': 'frame_time_ms', '3': 1, '4': 1, '5': 2, '10': 'frameTimeMs'},
+    {'1': 'fps', '3': 2, '4': 1, '5': 2, '10': 'fps'},
+    {'1': 'layer_times_us', '3': 3, '4': 3, '5': 2, '10': 'layerTimesUs'},
+    {'1': 'zone_cell_counts', '3': 4, '4': 3, '5': 13, '10': 'zoneCellCounts'},
+    {'1': 'instance_count', '3': 5, '4': 1, '5': 5, '10': 'instanceCount'},
+  ],
+};
+
+/// Descriptor for `FrameMetrics`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List frameMetricsDescriptor = $convert.base64Decode(
+    'CgxGcmFtZU1ldHJpY3MSIgoNZnJhbWVfdGltZV9tcxgBIAEoAlILZnJhbWVUaW1lTXMSEAoDZn'
+    'BzGAIgASgCUgNmcHMSJAoObGF5ZXJfdGltZXNfdXMYAyADKAJSDGxheWVyVGltZXNVcxIoChB6'
+    'b25lX2NlbGxfY291bnRzGAQgAygNUg56b25lQ2VsbENvdW50cxIlCg5pbnN0YW5jZV9jb3VudB'
+    'gFIAEoBVINaW5zdGFuY2VDb3VudA==');
 
 @$core.Deprecated('Use selectionUpdateDescriptor instead')
 const SelectionUpdate$json = {
@@ -8474,6 +8533,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.GpuSurfaceReady': GpuSurfaceReady$json,
   '.volvoxgrid.v1.RenderOutput': RenderOutput$json,
   '.volvoxgrid.v1.FrameDone': FrameDone$json,
+  '.volvoxgrid.v1.FrameMetrics': FrameMetrics$json,
   '.volvoxgrid.v1.SelectionUpdate': SelectionUpdate$json,
   '.volvoxgrid.v1.CursorChange': CursorChange$json,
   '.volvoxgrid.v1.EditRequest': EditRequest$json,

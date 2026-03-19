@@ -218,6 +218,19 @@ namespace VolvoxGrid.DotNet.Sample
                 SetStatus(_grid.DebugOverlay ? "Debug overlay enabled." : "Debug overlay disabled.");
             };
 
+            var chkScrollBlit = new CheckBox
+            {
+                Text = "Scroll Blit",
+                Checked = false,
+                AutoSize = true,
+                Margin = new Padding(16, 6, 0, 0),
+            };
+            chkScrollBlit.CheckedChanged += delegate
+            {
+                _grid.ScrollBlitEnabled = chkScrollBlit.Checked;
+                SetStatus(_grid.ScrollBlitEnabled ? "Scroll blit enabled." : "Scroll blit disabled.");
+            };
+
             var chkHover = new CheckBox
             {
                 Text = "Hover",
@@ -246,6 +259,7 @@ namespace VolvoxGrid.DotNet.Sample
             topBar.Controls.Add(chkEditable);
             topBar.Controls.Add(chkHover);
             topBar.Controls.Add(chkDebug);
+            topBar.Controls.Add(chkScrollBlit);
 
             _grid = new VolvoxGridControl
             {

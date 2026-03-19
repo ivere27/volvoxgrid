@@ -54,13 +54,32 @@ class _DemoPageState extends State<DemoPage> {
   static const List<int> _textCacheCapOptions = [8192, 4096, 1024, 256, 0];
   static const int _layerCount = 26;
   static const List<String> _layerNames = [
-    'Overlay Bands', 'Indicators', 'Backgrounds', 'Progress Bars',
-    'Grid Lines', 'Header Marks', 'Background Image', 'Cell Borders',
-    'Cell Text', 'Cell Pictures', 'Sort Glyphs', 'Col Drag Marker',
-    'Checkboxes', 'Dropdown Buttons', 'Selection', 'Hover Highlight',
-    'Edit Highlights', 'Focus Rect', 'Fill Handle', 'Outline',
-    'Frozen Borders', 'Active Editor', 'Active Dropdown', 'Scroll Bars',
-    'Fast Scroll', 'Debug Overlay',
+    'Overlay Bands',
+    'Indicators',
+    'Backgrounds',
+    'Progress Bars',
+    'Grid Lines',
+    'Header Marks',
+    'Background Image',
+    'Cell Borders',
+    'Cell Text',
+    'Cell Pictures',
+    'Sort Glyphs',
+    'Col Drag Marker',
+    'Checkboxes',
+    'Dropdown Buttons',
+    'Selection',
+    'Hover Highlight',
+    'Edit Highlights',
+    'Focus Rect',
+    'Fill Handle',
+    'Outline',
+    'Frozen Borders',
+    'Active Editor',
+    'Active Dropdown',
+    'Scroll Bars',
+    'Fast Scroll',
+    'Debug Overlay',
   ];
 
   final Map<DemoMode, VolvoxGridController> _controllers = {
@@ -76,6 +95,7 @@ class _DemoPageState extends State<DemoPage> {
   double _dpr = 1.0;
   bool _started = false;
   bool _showDebugOverlay = false;
+  bool _scrollBlitEnabled = false;
   RendererBackend _rendererBackend = RendererBackend.cpu;
   int _textLayoutCacheCap = 8192;
   int _renderLayerMask = -1; // all layers on (u64::MAX as i64)
@@ -114,6 +134,7 @@ class _DemoPageState extends State<DemoPage> {
     }
     await controller.setRendererBackend(_rendererBackend);
     await controller.setDebugOverlay(_showDebugOverlay);
+    await controller.setScrollBlit(_scrollBlitEnabled);
     await controller.setTextLayoutCacheCap(_textLayoutCacheCap);
     final style = await controller.getGridStyle();
     style.foreground = 0xFF000000;
@@ -139,6 +160,7 @@ class _DemoPageState extends State<DemoPage> {
       await controller.setRendererBackend(_rendererBackend);
     }
     await controller.setDebugOverlay(_showDebugOverlay);
+    await controller.setScrollBlit(_scrollBlitEnabled);
     await controller.setTextLayoutCacheCap(_textLayoutCacheCap);
     await controller.setRenderLayerMask(Int64(_renderLayerMask));
   }
@@ -230,13 +252,11 @@ class _DemoPageState extends State<DemoPage> {
                     Row(
                       children: [
                         TextButton(
-                          onPressed: () =>
-                              setDialogState(() => mask = -1),
+                          onPressed: () => setDialogState(() => mask = -1),
                           child: const Text('All'),
                         ),
                         TextButton(
-                          onPressed: () =>
-                              setDialogState(() => mask = 0),
+                          onPressed: () => setDialogState(() => mask = 0),
                           child: const Text('None'),
                         ),
                       ],
@@ -397,8 +417,7 @@ class _DemoPageState extends State<DemoPage> {
                       : (value) async {
                           if (value == null) return;
                           setState(() => _textLayoutCacheCap = value);
-                          await _activeController
-                              .setTextLayoutCacheCap(value);
+                          await _activeController.setTextLayoutCacheCap(value);
                           await _activeController.refresh();
                         },
                   items: _textCacheCapOptions
@@ -423,6 +442,25 @@ class _DemoPageState extends State<DemoPage> {
                   await _onSortAscending();
                 case 'sort_desc':
                   await _onSortDescending();
+                case 'scroll_blit':
+                  final previous = _scrollBlitEnabled;
+                  final nextValue = !previous;
+                  setState(() {
+                    _scrollBlitEnabled = nextValue;
+                    _statusText = nextValue
+                        ? 'Scroll blit enabled'
+                        : 'Scroll blit disabled';
+                  });
+                  try {
+                    await _activeController.setScrollBlit(nextValue);
+                    await _activeController.refresh();
+                  } catch (e) {
+                    if (!mounted) return;
+                    setState(() {
+                      _scrollBlitEnabled = previous;
+                      _statusText = 'Scroll blit toggle failed: $e';
+                    });
+                  }
                 case 'layers':
                   await _showLayersDialog();
               }
@@ -445,6 +483,15 @@ class _DemoPageState extends State<DemoPage> {
                 ),
               ),
               const PopupMenuDivider(),
+              CheckedPopupMenuItem(
+                value: 'scroll_blit',
+                checked: _scrollBlitEnabled,
+                child: const ListTile(
+                  leading: Icon(Icons.swap_horiz),
+                  title: Text('Scroll Blit'),
+                  dense: true,
+                ),
+              ),
               const PopupMenuItem(
                 value: 'layers',
                 child: ListTile(

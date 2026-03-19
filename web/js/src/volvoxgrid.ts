@@ -3462,6 +3462,21 @@ export class VolvoxGrid {
     }
   }
 
+  /** Enable or disable scroll blit. */
+  get scrollBlit(): boolean {
+    if (typeof this.wasm.get_scroll_blit === "function") {
+      return Boolean(this.wasm.get_scroll_blit(this.gridId));
+    }
+    return false;
+  }
+
+  set scrollBlit(enabled: boolean) {
+    if (typeof this.wasm.set_scroll_blit === "function") {
+      this.wasm.set_scroll_blit(this.gridId, enabled);
+      this.dirty = true;
+    }
+  }
+
   get animationEnabled(): boolean {
     if (typeof this.wasm.get_animation_enabled === "function") {
       this.animationEnabledValue = Boolean(this.wasm.get_animation_enabled(this.gridId));
