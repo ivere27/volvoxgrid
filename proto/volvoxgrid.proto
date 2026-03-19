@@ -819,6 +819,7 @@ message RenderConfig {
   optional FramePacingMode frame_pacing_mode     = 7;
   optional int32           target_frame_rate_hz  = 8;
   optional int64           render_layer_mask     = 9;   // bitmask using RenderLayerBit; -1 = all on
+  optional bool            layer_profiling       = 10;  // collect per-layer timings without requiring debug overlay
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1569,6 +1570,7 @@ message FrameDone {
   int32 dirty_y = 3;
   int32 dirty_w = 4;
   int32 dirty_h = 5;
+  FrameMetrics metrics = 6;
 }
 
 message GpuFrameDone {
@@ -1576,6 +1578,15 @@ message GpuFrameDone {
   int32 dirty_y = 2;
   int32 dirty_w = 3;
   int32 dirty_h = 4;
+  FrameMetrics metrics = 5;
+}
+
+message FrameMetrics {
+  float frame_time_ms = 1;
+  float fps = 2;
+  repeated float layer_times_us = 3;
+  repeated uint32 zone_cell_counts = 4;
+  int32 instance_count = 5;
 }
 
 message SelectionUpdate {

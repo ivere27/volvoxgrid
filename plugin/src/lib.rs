@@ -112,6 +112,19 @@ fn map_plugin_error(message: impl Into<String>) -> FfiError {
     internal_error(message)
 }
 
+fn current_frame_metrics(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Option<FrameMetrics> {
+    if !grid.layer_profiling && !grid.debug_overlay {
+        return None;
+    }
+    Some(FrameMetrics {
+        frame_time_ms: grid.debug_frame_time_ms,
+        fps: grid.debug_fps,
+        layer_times_us: grid.layer_times_us.to_vec(),
+        zone_cell_counts: grid.zone_cell_counts.to_vec(),
+        instance_count: grid.debug_instance_count,
+    })
+}
+
 struct VolvoxGridPlugin {
     next_event_id: AtomicI64,
     decision_enabled: Mutex<HashSet<i64>>,
@@ -2654,6 +2667,13 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                     match result {
                         Ok((rendered, dx, dy, dw, dh)) => {
+                            let metrics = if rendered {
+                                self.with_grid(grid_id, |grid| current_frame_metrics(grid))
+                                    .ok()
+                                    .flatten()
+                            } else {
+                                None
+                            };
                             stream.send(RenderOutput {
                                 rendered,
                                 event: Some(render_output::Event::FrameDone(FrameDone {
@@ -2662,6 +2682,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     dirty_y: dy,
                                     dirty_w: dw,
                                     dirty_h: dh,
+                                    metrics,
                                 })),
                             });
                         }
@@ -2674,6 +2695,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     dirty_y: 0,
                                     dirty_w: 0,
                                     dirty_h: 0,
+                                    metrics: None,
                                 })),
                             });
                         }
@@ -2721,6 +2743,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                 dirty_y: 0,
                                 dirty_w: 0,
                                 dirty_h: 0,
+                                metrics: None,
                             })),
                         });
                         continue;
@@ -2773,6 +2796,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                         dirty_y: 0,
                                         dirty_w: 0,
                                         dirty_h: 0,
+                                        metrics: None,
                                     })),
                                 });
                                 continue;
@@ -2812,6 +2836,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     dirty_y: 0,
                                     dirty_w: 0,
                                     dirty_h: 0,
+                                    metrics: None,
                                 })),
                             });
                             continue;
@@ -2839,6 +2864,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     dirty_y: 0,
                                     dirty_w: 0,
                                     dirty_h: 0,
+                                    metrics: None,
                                 })),
                             });
                             continue;
@@ -2922,6 +2948,13 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                     match result {
                         Ok(Ok((rendered, dx, dy, dw, dh))) => {
+                            let metrics = if rendered {
+                                self.with_grid(grid_id, |grid| current_frame_metrics(grid))
+                                    .ok()
+                                    .flatten()
+                            } else {
+                                None
+                            };
                             stream.send(RenderOutput {
                                 rendered,
                                 event: Some(render_output::Event::GpuFrameDone(GpuFrameDone {
@@ -2929,6 +2962,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     dirty_y: dy,
                                     dirty_w: dw,
                                     dirty_h: dh,
+                                    metrics,
                                 })),
                             });
                         }
@@ -2947,6 +2981,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     dirty_y: 0,
                                     dirty_w: 0,
                                     dirty_h: 0,
+                                    metrics: None,
                                 })),
                             });
                         }
@@ -2958,6 +2993,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     dirty_y: 0,
                                     dirty_w: 0,
                                     dirty_h: 0,
+                                    metrics: None,
                                 })),
                             });
                         }

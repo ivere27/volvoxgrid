@@ -1605,6 +1605,11 @@ impl VolvoxGrid {
         }
         if let Some(v) = rc.debug_overlay {
             self.debug_overlay = v;
+            if rc.layer_profiling.is_none() {
+                self.layer_profiling = v;
+            }
+        }
+        if let Some(v) = rc.layer_profiling {
             self.layer_profiling = v;
         }
         if let Some(v) = rc.animation_enabled {
@@ -1956,6 +1961,7 @@ impl VolvoxGrid {
             frame_pacing_mode: Some(self.frame_pacing_mode),
             target_frame_rate_hz: Some(self.target_frame_rate_hz),
             render_layer_mask: Some(self.render_layer_mask as i64),
+            layer_profiling: Some(self.layer_profiling),
         }
     }
 
