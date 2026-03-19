@@ -13,6 +13,7 @@ use crate::selection::{hover_mode_has, HOVER_CELL, HOVER_COLUMN, HOVER_NONE, HOV
 use crate::sort::{sort_order_is_ascending as sort_order_is_ascending_internal, SORT_NONE};
 use crate::style::{CellStylePatch, HeaderMarkHeight, HighlightStyle, IconSlotStyle};
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant as PortableInstant;
@@ -81,6 +82,31 @@ pub trait Canvas {
         clip_h: i32,
         max_width: Option<f32>,
     ) -> f32;
+
+    /// Draw text when the caller does not need the rendered width.
+    ///
+    /// Backends can override this to avoid width bookkeeping in hot paths.
+    fn draw_text_fast(
+        &mut self,
+        x: i32,
+        y: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        color: u32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        max_width: Option<f32>,
+    ) {
+        let _ = self.draw_text(
+            x, y, text, font_name, font_size, bold, italic, color, clip_x, clip_y, clip_w, clip_h,
+            max_width,
+        );
+    }
 
     /// Measure text dimensions (width, height).
     fn measure_text(
@@ -508,6 +534,37 @@ pub trait Canvas {
         tw
     }
 
+    /// Draw styled text when the caller does not need the rendered width.
+    fn draw_text_styled_fast(
+        &mut self,
+        x: i32,
+        y: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        color: u32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        text_style: i32,
+        max_width: Option<f32>,
+    ) {
+        if text_style & 3 == 0 {
+            self.draw_text_fast(
+                x, y, text, font_name, font_size, bold, italic, color, clip_x, clip_y, clip_w,
+                clip_h, max_width,
+            );
+        } else {
+            let _ = self.draw_text_styled(
+                x, y, text, font_name, font_size, bold, italic, color, clip_x, clip_y, clip_w,
+                clip_h, text_style, max_width,
+            );
+        }
+    }
+
     /// Draw a classic scroll-bar button face.
     fn draw_scroll_button(&mut self, x: i32, y: i32, w: i32, h: i32, face: u32) {
         if w <= 0 || h <= 0 {
@@ -631,14 +688,75 @@ pub(crate) struct VisibleRange {
     pub sticky_right_width: i32,
 }
 
-type VisibleCell = (i32, i32, i32, i32, i32, i32);
+type MergeRange = (i32, i32, i32, i32);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct CellKey {
+    row: i32,
+    col: i32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct CellRect {
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum VisibleCellZone {
+    Scrollable,
+    Sticky,
+    Pinned,
+    Fixed,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct VisibleCell {
+    key: CellKey,
+    rect: CellRect,
+    zone: VisibleCellZone,
+    merge: Option<MergeRange>,
+    // Stable source cell for merged spans. This is the natural hook for a
+    // future cross-frame cache keyed by cell content rather than viewport clip.
+    source_key: CellKey,
+}
+
+impl VisibleCell {
+    fn parts(self) -> (i32, i32, i32, i32, i32, i32) {
+        (
+            self.key.row,
+            self.key.col,
+            self.rect.x,
+            self.rect.y,
+            self.rect.w,
+            self.rect.h,
+        )
+    }
+
+    fn is_merged_span(self) -> bool {
+        self.merge
+            .map_or(false, |(r1, c1, r2, c2)| r1 != r2 || c1 != c2)
+    }
+}
+
+#[derive(Clone, Debug)]
+struct PreparedTextCell {
+    source_key: CellKey,
+    vis_rect: CellRect,
+    orig_rect: CellRect,
+    meta: Arc<crate::grid::TextCellStaticMeta>,
+    is_merged: bool,
+}
 
 pub(crate) struct RenderContext {
-    pub vp: VisibleRange,
-    pub vis_cells: Vec<VisibleCell>,
-    pub zone_counts: [u32; 4],
-    pub visible_row_rects: BTreeMap<i32, (i32, i32)>,
-    pub visible_col_rects: BTreeMap<i32, (i32, i32)>,
+    vp: VisibleRange,
+    vis_cells: Vec<VisibleCell>,
+    text_cells: Vec<PreparedTextCell>,
+    zone_counts: [u32; 4],
+    visible_row_rects: BTreeMap<i32, (i32, i32)>,
+    visible_col_rects: BTreeMap<i32, (i32, i32)>,
 }
 
 impl VisibleRange {
@@ -878,14 +996,33 @@ impl RenderContext {
     fn new(grid: &VolvoxGrid, vp_w: i32, vp_h: i32) -> Self {
         let vp = VisibleRange::compute(grid, vp_w, vp_h);
         let mut vis_cells: Vec<VisibleCell> = Vec::new();
-        let zone_counts = iter_visible_cells(grid, &vp, |row, col, cx, cy, cw, ch| {
-            vis_cells.push((row, col, cx, cy, cw, ch));
+        let zone_counts = iter_visible_cells(grid, &vp, |zone, row, col, cx, cy, cw, ch| {
+            let key = CellKey { row, col };
+            let merge = grid.get_merged_range(row, col);
+            let source_key = match merge {
+                Some((mr1, mc1, _mr2, _mc2)) => CellKey { row: mr1, col: mc1 },
+                None => key,
+            };
+            vis_cells.push(VisibleCell {
+                key,
+                rect: CellRect {
+                    x: cx,
+                    y: cy,
+                    w: cw,
+                    h: ch,
+                },
+                zone,
+                merge,
+                source_key,
+            });
         });
         let visible_row_rects = build_visible_row_rects(grid, &vp);
-        let visible_col_rects = build_visible_col_rects(grid, &vis_cells);
+        let visible_col_rects = build_visible_col_rects(&vis_cells);
+        let text_cells = build_text_cells(grid, &vp, &vis_cells);
         Self {
             vp,
             vis_cells,
+            text_cells,
             zone_counts,
             visible_row_rects,
             visible_col_rects,
@@ -897,7 +1034,7 @@ impl RenderContext {
 // Helper: iterate visible cells
 // ===========================================================================
 
-/// Call `f(row, col, cell_x, cell_y, cell_w, cell_h)` for every visible cell
+/// Call `f(zone, row, col, cell_x, cell_y, cell_w, cell_h)` for every visible cell
 /// in the viewport. Fixed cells are always included regardless of scroll
 /// offset. For merged cells the rectangle spans the full merge.
 ///
@@ -908,9 +1045,9 @@ impl RenderContext {
 /// 4. Fixed/frozen cells (topmost)
 ///
 /// Returns `[scrollable, sticky, pinned, fixed]` cell counts per zone.
-pub(crate) fn iter_visible_cells<F>(grid: &VolvoxGrid, vp: &VisibleRange, mut f: F) -> [u32; 4]
+fn iter_visible_cells<F>(grid: &VolvoxGrid, vp: &VisibleRange, mut f: F) -> [u32; 4]
 where
-    F: FnMut(i32, i32, i32, i32, i32, i32),
+    F: FnMut(VisibleCellZone, i32, i32, i32, i32, i32, i32),
 {
     let mut zone_counts: [u32; 4] = [0; 4];
     let col_ranges = [
@@ -937,7 +1074,7 @@ where
                 }
                 if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
                     zone_counts[0] += 1;
-                    f(row, col, cx, cy, cw, ch);
+                    f(VisibleCellZone::Scrollable, row, col, cx, cy, cw, ch);
                 }
             }
         }
@@ -956,7 +1093,7 @@ where
                 }
                 if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
                     zone_counts[1] += 1;
-                    f(row, col, cx, cy, cw, ch);
+                    f(VisibleCellZone::Sticky, row, col, cx, cy, cw, ch);
                 }
             }
         }
@@ -985,7 +1122,7 @@ where
                 }
                 if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
                     zone_counts[1] += 1;
-                    f(row, col, cx, cy, cw, ch);
+                    f(VisibleCellZone::Sticky, row, col, cx, cy, cw, ch);
                 }
             }
         }
@@ -1007,7 +1144,7 @@ where
                 }
                 if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
                     zone_counts[2] += 1;
-                    f(row, col, cx, cy, cw, ch);
+                    f(VisibleCellZone::Pinned, row, col, cx, cy, cw, ch);
                 }
             }
         }
@@ -1025,7 +1162,7 @@ where
                 }
                 if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
                     zone_counts[3] += 1;
-                    f(row, col, cx, cy, cw, ch);
+                    f(VisibleCellZone::Fixed, row, col, cx, cy, cw, ch);
                 }
             }
         }
@@ -1566,9 +1703,13 @@ pub(crate) fn resolve_alignment(
 }
 
 /// Whether a dropdown button should be shown for a given cell.
-pub(crate) fn show_dropdown_button_for_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
-    let list = grid.active_dropdown_list(row, col);
-    if list.is_empty() {
+fn should_show_dropdown_button_with_list(
+    grid: &VolvoxGrid,
+    row: i32,
+    col: i32,
+    has_dropdown_list: bool,
+) -> bool {
+    if !has_dropdown_list {
         return false;
     }
     match grid.dropdown_trigger {
@@ -1580,6 +1721,15 @@ pub(crate) fn show_dropdown_button_for_cell(grid: &VolvoxGrid, row: i32, col: i3
         3 => grid.selection.row == row && grid.selection.col == col,
         _ => false,
     }
+}
+
+pub(crate) fn show_dropdown_button_for_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
+    should_show_dropdown_button_with_list(
+        grid,
+        row,
+        col,
+        !grid.active_dropdown_list(row, col).is_empty(),
+    )
 }
 
 /// Compute the pixel rect for a dropdown button within a cell.
@@ -1812,10 +1962,7 @@ pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> RenderResult
         layer::INDICATORS,
         render_indicator_surfaces(grid, canvas, &ctx)
     );
-    run_layer!(
-        layer::BACKGROUNDS,
-        render_backgrounds(grid, canvas, &ctx)
-    );
+    run_layer!(layer::BACKGROUNDS, render_backgrounds(grid, canvas, &ctx));
     run_layer!(layer::SELECTION, render_selection(grid, canvas, &ctx));
 
     run_layer!(layer::PROGRESS_BARS, {
@@ -1832,10 +1979,7 @@ pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> RenderResult
         }
     });
 
-    run_layer!(
-        layer::HEADER_MARKS,
-        render_header_marks(grid, canvas, &ctx)
-    );
+    run_layer!(layer::HEADER_MARKS, render_header_marks(grid, canvas, &ctx));
     run_layer!(
         layer::BACKGROUND_IMAGE,
         render_background_image(grid, canvas)
@@ -1858,10 +2002,7 @@ pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> RenderResult
         }
     });
 
-    run_layer!(
-        layer::CELL_TEXT,
-        render_cell_text(grid, canvas, &ctx)
-    );
+    run_layer!(layer::CELL_TEXT, render_cell_text(grid, canvas, &ctx));
     run_layer!(
         layer::CELL_PICTURES,
         render_cell_pictures(grid, canvas, &ctx)
@@ -2286,15 +2427,13 @@ fn build_visible_row_rects(grid: &VolvoxGrid, vp: &VisibleRange) -> BTreeMap<i32
     rows
 }
 
-fn build_visible_col_rects(
-    grid: &VolvoxGrid,
-    vis_cells: &[(i32, i32, i32, i32, i32, i32)],
-) -> BTreeMap<i32, (i32, i32)> {
+fn build_visible_col_rects(vis_cells: &[VisibleCell]) -> BTreeMap<i32, (i32, i32)> {
     let mut cols = BTreeMap::new();
-    for &(row, col, cx, _cy, cw, _ch) in vis_cells {
+    for &cell in vis_cells {
+        let (_row, col, cx, _cy, cw, _ch) = cell.parts();
         // Skip cells that belong to a multi-column merge — their cx/cw
         // cover the full merged column range, not the individual column.
-        if let Some((_r1, c1, _r2, c2)) = grid.get_merged_range(row, col) {
+        if let Some((_r1, c1, _r2, c2)) = cell.merge {
             if c1 != c2 {
                 continue;
             }
@@ -2302,6 +2441,61 @@ fn build_visible_col_rects(
         cols.entry(col).or_insert((cx, cw));
     }
     cols
+}
+
+fn build_text_cells(
+    grid: &VolvoxGrid,
+    vp: &VisibleRange,
+    vis_cells: &[VisibleCell],
+) -> Vec<PreparedTextCell> {
+    let mut text_cells = Vec::new();
+    let mut prepared_sources: std::collections::HashSet<CellKey> = std::collections::HashSet::new();
+
+    for &cell in vis_cells {
+        if !prepared_sources.insert(cell.source_key) {
+            continue;
+        }
+
+        let text_row = cell.source_key.row;
+        let text_col = cell.source_key.col;
+        let vis_rect = if cell.is_merged_span() {
+            let vx = cell.rect.x.max(vp.data_x);
+            let vy = cell.rect.y.max(vp.data_y);
+            let vw = ((cell.rect.x + cell.rect.w).min(vp.data_x + vp.data_w) - vx).max(1);
+            let vh = ((cell.rect.y + cell.rect.h).min(vp.data_y + vp.data_h) - vy).max(1);
+            CellRect {
+                x: vx,
+                y: vy,
+                w: vw,
+                h: vh,
+            }
+        } else {
+            cell.rect
+        };
+        let orig_rect = if cell.is_merged_span() {
+            vis_rect
+        } else {
+            let (x, y, w, h) = original_cell_bounds(
+                grid, text_row, text_col, vis_rect.x, vis_rect.y, vis_rect.w, vis_rect.h, vp,
+            );
+            CellRect { x, y, w, h }
+        };
+
+        let meta = grid.build_text_cell_static_meta(text_row, text_col);
+        if meta.suppress_text || meta.display_text.is_empty() {
+            continue;
+        }
+
+        text_cells.push(PreparedTextCell {
+            source_key: cell.source_key,
+            vis_rect,
+            orig_rect,
+            meta,
+            is_merged: cell.is_merged_span(),
+        });
+    }
+
+    text_cells
 }
 
 fn build_indicator_row_offsets(
@@ -2484,7 +2678,7 @@ fn draw_indicator_text<C: Canvas>(
     }
     .clamp(x + 1, (x + w - text_w - 1).max(x + 1));
     let ty = (y + (h - text_h) / 2).clamp(y + 1, (y + h - text_h - 1).max(y + 1));
-    canvas.draw_text_styled(
+    canvas.draw_text_styled_fast(
         tx, ty, text, font_name, font_size, false, false, color, x, y, w, h, 0, None,
     );
 }
@@ -2595,11 +2789,7 @@ fn render_row_indicator_slot<C: Canvas>(
     }
 }
 
-fn render_row_indicator_start<C: Canvas>(
-    grid: &VolvoxGrid,
-    canvas: &mut C,
-    ctx: &RenderContext,
-) {
+fn render_row_indicator_start<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
     let vp = &ctx.vp;
     let band = &grid.indicator_bands.row_start;
     if !band.visible || vp.data_x <= 0 || vp.data_h <= 0 {
@@ -2721,11 +2911,7 @@ fn render_row_indicator_start<C: Canvas>(
     canvas.vline(band_x + band_w - 1, band_y, band_h, grid_color);
 }
 
-fn render_col_indicator_top<C: Canvas>(
-    grid: &VolvoxGrid,
-    canvas: &mut C,
-    ctx: &RenderContext,
-) {
+fn render_col_indicator_top<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
     let vp = &ctx.vp;
     let band = &grid.indicator_bands.col_top;
     if !band.visible || vp.data_y <= 0 || vp.data_w <= 0 {
@@ -2889,7 +3075,7 @@ fn render_col_indicator_top<C: Canvas>(
                 let num_h = nh.ceil() as i32;
                 let num_x = (glyph_x - num_w - 2).max(cx + 2);
                 let num_y = cy + (ch - num_h) / 2;
-                canvas.draw_text_styled(
+                canvas.draw_text_styled_fast(
                     num_x,
                     num_y,
                     &label,
@@ -2996,14 +3182,15 @@ fn render_backgrounds<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Render
     let mut rendered_merges: std::collections::HashSet<(i32, i32, i32, i32)> =
         std::collections::HashSet::new();
 
-    for &(row, col, cx, cy, cw, ch) in &ctx.vis_cells {
+    for &cell in &ctx.vis_cells {
+        let (row, col, cx, cy, cw, ch) = cell.parts();
         // For merged/spanned cells, always resolve style from the anchor
         // cell (top-left of the merge).  This prevents "blinking" when a
         // merged cell spans both sticky and non-sticky columns: without
         // this, the last-drawn column's style wins, and the winner changes
         // depending on whether the sticky threshold is crossed.
-        let (style_row, style_col) = match grid.get_merged_range(row, col) {
-            Some((mr1, mc1, mr2, mc2)) if mr1 != mr2 || mc1 != mc2 => {
+        let (style_row, style_col) = match cell.merge {
+            Some((mr1, mc1, mr2, mc2)) if cell.is_merged_span() => {
                 let merge_key = (mr1, mc1, mr2, mc2);
                 if !rendered_merges.insert(merge_key) {
                     continue;
@@ -3066,7 +3253,8 @@ fn render_backgrounds<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Render
 
 fn render_progress_bars<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
     let vp = &ctx.vp;
-    for &(row, col, cx, cy, cw, ch) in &ctx.vis_cells {
+    for &cell in &ctx.vis_cells {
+        let (row, col, cx, cy, cw, ch) = cell.parts();
         let col_progress = if col >= 0 && (col as usize) < grid.columns.len() {
             grid.columns[col as usize].progress_color
         } else {
@@ -3125,7 +3313,7 @@ fn render_grid_lines<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderC
 fn draw_grid_lines_for_zone<C: Canvas>(
     grid: &VolvoxGrid,
     canvas: &mut C,
-    vis_cells: &[(i32, i32, i32, i32, i32, i32)],
+    vis_cells: &[VisibleCell],
     is_fixed_zone: bool,
 ) {
     let (mode, color) = if is_fixed_zone {
@@ -3174,7 +3362,8 @@ fn draw_grid_lines_for_zone<C: Canvas>(
     let buf_w = canvas.width();
     let buf_h = canvas.height();
 
-    for &(row, col, cx, cy, cw, ch) in vis_cells {
+    for &cell in vis_cells {
+        let (row, col, cx, cy, cw, ch) = cell.parts();
         let cell_is_fixed = row < grid.fixed_rows || col < grid.fixed_cols;
         if cell_is_fixed != is_fixed_zone {
             continue;
@@ -3257,9 +3446,10 @@ fn render_background_image<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
 // ===========================================================================
 
 fn render_cell_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
-    for &(row, col, cx, cy, cw, ch) in &ctx.vis_cells {
+    for &cell in &ctx.vis_cells {
+        let (row, col, cx, cy, cw, ch) = cell.parts();
         // For merged cells, draw border once at the merge-origin cell.
-        if let Some((mr1, mc1, _mr2, _mc2)) = grid.get_merged_range(row, col) {
+        if let Some((mr1, mc1, _mr2, _mc2)) = cell.merge {
             if row != mr1 || col != mc1 {
                 continue;
             }
@@ -3328,83 +3518,31 @@ fn render_cell_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rende
 // ===========================================================================
 
 fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
-    let vp = &ctx.vp;
     let has_subtotal_nodes = grid.row_props.values().any(|rp| rp.is_subtotal);
     let subtotal_level_floor = first_subtotal_level(grid);
-
-    // Track which merged ranges have already been rendered so each
-    // merge is drawn exactly once, even when the origin row is off-screen.
-    let mut rendered_merges: std::collections::HashSet<(i32, i32, i32, i32)> =
-        std::collections::HashSet::new();
-
-    for &(row, col, cx, cy, cw, ch) in &ctx.vis_cells {
-        // Determine the text source and visible rect for merged cells.
-        // For a merged range, use the origin cell for text/style but
-        // center the text within the viewport-clipped visible area.
-        let (text_row, text_col, vis_x, vis_y, vis_w, vis_h) =
-            if let Some((mr1, mc1, mr2, mc2)) = grid.get_merged_range(row, col) {
-                if mr1 != mr2 || mc1 != mc2 {
-                    let merge_key = (mr1, mc1, mr2, mc2);
-                    if rendered_merges.contains(&merge_key) {
-                        continue;
-                    }
-                    rendered_merges.insert(merge_key);
-
-                    // cx/cy/cw/ch from cell_rect already cover the full
-                    // merged range and are clipped against fixed/frozen.
-                    // Further clip to the viewport so text centers in the
-                    // visible portion only.
-                    let vx = cx.max(vp.data_x);
-                    let vy = cy.max(vp.data_y);
-                    let vw = ((cx + cw).min(vp.data_x + vp.data_w) - vx).max(1);
-                    let vh = ((cy + ch).min(vp.data_y + vp.data_h) - vy).max(1);
-                    (mr1, mc1, vx, vy, vw, vh)
-                } else {
-                    (row, col, cx, cy, cw, ch)
-                }
-            } else {
-                (row, col, cx, cy, cw, ch)
-            };
-
-        // Compute original (pre-clip) cell bounds for smooth panning.
-        //
-        // Merged cells: center text in the *visible* portion so it stays
-        // readable as the merge scrolls.  Single cells: position text at
-        // the original (pre-clip) location so content pans naturally.
-        //
-        let is_merged = grid
-            .get_merged_range(text_row, text_col)
-            .map_or(false, |(r1, c1, r2, c2)| r1 != r2 || c1 != c2);
-
-        let (orig_x, orig_y, orig_w, orig_h) = if is_merged {
-            // Merged cells: keep text centered in the visible portion.
-            (vis_x, vis_y, vis_w, vis_h)
-        } else {
-            original_cell_bounds(grid, text_row, text_col, vis_x, vis_y, vis_w, vis_h, vp)
-        };
-
-        // Boolean columns render checkboxes in data rows (handled in layer 5)
-        if let Some(cp) = grid.get_col_props(text_col) {
-            if cp.data_type == pb::ColumnDataType::ColumnDataBoolean as i32
-                && text_row >= grid.fixed_rows
-            {
-                continue;
-            }
-        }
-
-        let display_text = grid.get_display_text(text_row, text_col);
-        if display_text.is_empty() {
-            continue;
-        }
-
-        // Resolve font and color from the merge-origin cell
+    for text_cell in &ctx.text_cells {
+        let text_row = text_cell.source_key.row;
+        let text_col = text_cell.source_key.col;
+        let meta = text_cell.meta.as_ref();
+        let style_override = meta.style_override.as_ref();
+        let CellRect {
+            x: vis_x,
+            y: vis_y,
+            w: vis_w,
+            h: vis_h,
+        } = text_cell.vis_rect;
+        let CellRect {
+            x: orig_x,
+            y: orig_y,
+            w: orig_w,
+            h: orig_h,
+        } = text_cell.orig_rect;
+        let display_text = meta.display_text.as_ref();
         let is_fixed = text_row < grid.fixed_rows || text_col < grid.fixed_cols;
         let is_frozen = !is_fixed
             && (text_row < grid.fixed_rows + grid.frozen_rows
                 || text_col < grid.fixed_cols + grid.frozen_cols);
         let is_selected = should_highlight_cell(grid, text_row, text_col);
-
-        let style_override = grid.get_cell_style(text_row, text_col);
         let fore = style_override.resolve_fore_color(
             &grid.style,
             is_fixed,
@@ -3412,7 +3550,6 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
             is_selected,
             selection_fore_color(grid),
         );
-
         let font_name = style_override
             .font_name
             .as_deref()
@@ -3427,12 +3564,15 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
         } else {
             style_override.text_effect.unwrap_or(grid.style.text_effect)
         };
+        let alignment = meta.alignment;
+        let cell_padding = meta.padding;
 
-        // Resolve alignment
-        let alignment = resolve_alignment(grid, text_row, text_col, &style_override, &display_text);
-        let cell_padding = grid.resolve_cell_padding(text_row, text_col, &style_override);
-
-        let button_reserve = if show_dropdown_button_for_cell(grid, text_row, text_col) {
+        let button_reserve = if should_show_dropdown_button_with_list(
+            grid,
+            text_row,
+            text_col,
+            meta.has_dropdown_list,
+        ) {
             dropdown_button_rect(vis_x, vis_y, vis_w, vis_h).map_or(0, |(_, _, bw, _)| bw + 2)
         } else {
             0
@@ -3499,10 +3639,8 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
             None
         };
 
-        let shrink_to_fit = style_override.shrink_to_fit.unwrap_or(false);
-        let is_merged_cell = grid
-            .get_merged_range(text_row, text_col)
-            .map_or(false, |(r1, c1, r2, c2)| r1 != r2 || c1 != c2);
+        let shrink_to_fit = meta.shrink_to_fit;
+        let is_merged_cell = text_cell.is_merged;
 
         let needs_measure = grid.word_wrap
             || halign != 0
@@ -3512,7 +3650,7 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
             || (grid.text_overflow && !grid.word_wrap && !shrink_to_fit && !is_merged_cell);
         let (tw, th) = if needs_measure {
             canvas.measure_text(
-                &display_text,
+                display_text,
                 font_name,
                 font_size,
                 font_bold,
@@ -3529,7 +3667,7 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
                 let scale = inner_w as f32 / tw;
                 let shrunk = (font_size * scale).floor().max(6.0);
                 let (stw, sth) = canvas.measure_text(
-                    &display_text,
+                    display_text,
                     font_name,
                     shrunk,
                     font_bold,
@@ -3648,7 +3786,7 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
             let ellipsis_text = if ellipsis_mode == 2 {
                 compute_ellipsis_path_text(
                     canvas,
-                    &display_text,
+                    display_text,
                     font_name,
                     effective_font_size,
                     font_bold,
@@ -3666,7 +3804,7 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
                     inner_w as f32,
                 )
             };
-            canvas.draw_text_styled(
+            canvas.draw_text_styled_fast(
                 text_x,
                 text_y,
                 &ellipsis_text,
@@ -3683,10 +3821,10 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
                 wrap_width,
             );
         } else {
-            canvas.draw_text_styled(
+            canvas.draw_text_styled_fast(
                 text_x,
                 text_y,
-                &display_text,
+                display_text,
                 font_name,
                 effective_font_size,
                 font_bold,
@@ -3709,7 +3847,8 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
 
 fn render_cell_pictures<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
     let vp = &ctx.vp;
-    for &(row, col, cx, cy, cw, ch) in &ctx.vis_cells {
+    for &cell in &ctx.vis_cells {
+        let (row, col, cx, cy, cw, ch) = cell.parts();
         let cell = match grid.cells.get(row, col) {
             Some(c) => c,
             None => continue,
@@ -4097,7 +4236,7 @@ fn render_sort_glyphs<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Render
                         let glyph_x = place_sort_icon_x(text_w);
                         let glyph_y = inner_top + ((inner_h - text_h).max(0) / 2);
                         let clip_h = (inner_bottom - glyph_y).max(1);
-                        canvas.draw_text_styled(
+                        canvas.draw_text_styled_fast(
                             glyph_x,
                             glyph_y,
                             icon_text,
@@ -4197,7 +4336,7 @@ fn draw_sort_priority_number<C: Canvas>(
     let (_, th) = canvas.measure_text(&label, &grid.style.font_name, num_size, false, false, None);
     let num_y = inner_top + ((inner_h - th.ceil() as i32).max(0) / 2);
     let clip_h = (inner_bottom - num_y).max(1);
-    canvas.draw_text_styled(
+    canvas.draw_text_styled_fast(
         x,
         num_y,
         &label,
@@ -4455,7 +4594,8 @@ fn render_checkboxes<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderC
         .as_deref()
         .filter(|s| !s.trim().is_empty());
 
-    for &(row, col, cx, cy, cw, ch) in &ctx.vis_cells {
+    for &cell in &ctx.vis_cells {
+        let (row, col, cx, cy, cw, ch) = cell.parts();
         let is_boolean_col = grid.get_col_props(col).map_or(false, |cp| {
             cp.data_type == pb::ColumnDataType::ColumnDataBoolean as i32
         });
@@ -4577,7 +4717,7 @@ fn render_checkboxes<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderC
             let max_ty = (oy + oh - text_h).max(oy);
             let tx = place_icon_x(text_w);
             let ty = (oy + (oh - text_h) / 2).clamp(oy, max_ty);
-            canvas.draw_text_styled(
+            canvas.draw_text_styled_fast(
                 tx,
                 ty,
                 icon_text,
@@ -4641,13 +4781,10 @@ fn render_checkboxes<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderC
 // Layer 6 -- Dropdown buttons
 // ===========================================================================
 
-fn render_dropdown_buttons<C: Canvas>(
-    grid: &VolvoxGrid,
-    canvas: &mut C,
-    ctx: &RenderContext,
-) {
+fn render_dropdown_buttons<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
     let vp = &ctx.vp;
-    for &(row, col, cx, cy, cw, ch) in &ctx.vis_cells {
+    for &cell in &ctx.vis_cells {
+        let (row, col, cx, cy, cw, ch) = cell.parts();
         if !show_dropdown_button_for_cell(grid, row, col) {
             continue;
         }
@@ -4713,11 +4850,7 @@ fn render_dropdown_buttons<C: Canvas>(
 // Layer 7 -- Selection highlight
 // ===========================================================================
 
-fn render_selection<C: Canvas>(
-    grid: &VolvoxGrid,
-    canvas: &mut C,
-    ctx: &RenderContext,
-) {
+fn render_selection<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
     if grid.selection.selection_style.back_color.is_none() {
         return;
     }
@@ -4726,9 +4859,10 @@ fn render_selection<C: Canvas>(
     let mut rendered_merges: std::collections::HashSet<(i32, i32, i32, i32)> =
         std::collections::HashSet::new();
 
-    for &(row, col, cx, cy, cw, ch) in &ctx.vis_cells {
-        let (style_row, style_col) = match grid.get_merged_range(row, col) {
-            Some((mr1, mc1, mr2, mc2)) if mr1 != mr2 || mc1 != mc2 => {
+    for &cell in &ctx.vis_cells {
+        let (row, col, cx, cy, cw, ch) = cell.parts();
+        let (style_row, style_col) = match cell.merge {
+            Some((mr1, mc1, mr2, mc2)) if cell.is_merged_span() => {
                 let merge_key = (mr1, mc1, mr2, mc2);
                 if !rendered_merges.insert(merge_key) {
                     continue;
@@ -4794,9 +4928,10 @@ fn render_hover_highlight<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Re
         return;
     }
 
-    for &(row, col, cx, cy, cw, ch) in &ctx.vis_cells {
-        let (style_row, style_col) = match grid.get_merged_range(row, col) {
-            Some((mr1, mc1, mr2, mc2)) if mr1 != mr2 || mc1 != mc2 => (mr1, mc1),
+    for &cell in &ctx.vis_cells {
+        let (row, col, cx, cy, cw, ch) = cell.parts();
+        let (style_row, style_col) = match cell.merge {
+            Some((mr1, mc1, _mr2, _mc2)) if cell.is_merged_span() => (mr1, mc1),
             _ => (row, col),
         };
 
@@ -4870,7 +5005,8 @@ fn range_screen_rect(
     let mut max_y = i32::MIN;
     let mut any = false;
 
-    for &(row, col, x, y, w, h) in &ctx.vis_cells {
+    for &cell in &ctx.vis_cells {
+        let (row, col, x, y, w, h) = cell.parts();
         if row < r1 || row > r2 || col < c1 || col > c2 {
             continue;
         }
@@ -4928,9 +5064,14 @@ fn render_edit_highlights<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Re
     }
 
     for region in &grid.edit.formula_highlights {
-        let Some((x, y, w, h)) =
-            range_screen_rect(grid, ctx, region.row1, region.col1, region.row2, region.col2)
-        else {
+        let Some((x, y, w, h)) = range_screen_rect(
+            grid,
+            ctx,
+            region.row1,
+            region.col1,
+            region.row2,
+            region.col2,
+        ) else {
             continue;
         };
         let color = region.color();
@@ -5186,7 +5327,7 @@ fn render_outline<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCont
                     let text_h = th.ceil() as i32;
                     let tx = bx + (tg.btn_size - text_w) / 2;
                     let ty = by + (tg.btn_size - text_h) / 2;
-                    canvas.draw_text_styled(
+                    canvas.draw_text_styled_fast(
                         tx,
                         ty,
                         icon,
@@ -5449,7 +5590,7 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
     }
 
     // Editor text
-    canvas.draw_text_styled(
+    canvas.draw_text_styled_fast(
         text_x,
         text_y,
         text,
@@ -5471,7 +5612,7 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
         let (prefix_w, _) =
             canvas.measure_text(prefix, font_name, font_size, font_bold, font_italic, None);
         let sel_x = text_x + prefix_w.ceil() as i32;
-        canvas.draw_text_styled(
+        canvas.draw_text_styled_fast(
             sel_x,
             text_y,
             selected,
@@ -5648,7 +5789,7 @@ fn render_active_dropdown<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Re
             None,
         );
         let text_y = item_y + ((drop.item_h - th.ceil() as i32) / 2).max(0);
-        canvas.draw_text_styled(
+        canvas.draw_text_styled_fast(
             drop.x + text_padding,
             text_y,
             item_text,

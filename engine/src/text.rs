@@ -53,6 +53,48 @@ pub trait TextRenderer: Send {
         color: u32,
         max_width: Option<f32>,
     ) -> f32;
+
+    /// Render text when the caller does not need the rendered width.
+    fn render_text_fast(
+        &mut self,
+        buffer_pixels: &mut [u8],
+        buf_width: i32,
+        buf_height: i32,
+        stride: i32,
+        x: i32,
+        y: i32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        color: u32,
+        max_width: Option<f32>,
+    ) {
+        let _ = self.render_text(
+            buffer_pixels,
+            buf_width,
+            buf_height,
+            stride,
+            x,
+            y,
+            clip_x,
+            clip_y,
+            clip_w,
+            clip_h,
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            color,
+            max_width,
+        );
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -560,15 +602,7 @@ impl TextEngine {
         }
     }
 
-    /// Render text to an RGBA pixel buffer at position (`x`, `y`).
-    ///
-    /// Glyphs are clipped to the rectangle (`x`, `y`, `clip_w`, `clip_h`) and
-    /// to the buffer dimensions.  Alpha blending is performed against the
-    /// existing pixel content so that sub-pixel anti-aliasing composites
-    /// correctly over cell backgrounds.
-    ///
-    /// Returns the rendered text width.
-    pub fn render_text(
+    fn render_text_internal<const TRACK_WIDTH: bool>(
         &mut self,
         buffer_pixels: &mut [u8],
         buf_width: i32,
@@ -593,7 +627,28 @@ impl TextEngine {
         }
 
         if let Some(ext) = &mut self.external_renderer {
-            return ext.render_text(
+            if TRACK_WIDTH {
+                return ext.render_text(
+                    buffer_pixels,
+                    buf_width,
+                    buf_height,
+                    stride,
+                    x,
+                    y,
+                    clip_x,
+                    clip_y,
+                    clip_w,
+                    clip_h,
+                    text,
+                    font_name,
+                    font_size,
+                    bold,
+                    italic,
+                    color,
+                    max_width,
+                );
+            }
+            ext.render_text_fast(
                 buffer_pixels,
                 buf_width,
                 buf_height,
@@ -612,6 +667,7 @@ impl TextEngine {
                 color,
                 max_width,
             );
+            return 0.0;
         }
 
         #[cfg(feature = "cosmic-text")]
@@ -654,9 +710,10 @@ impl TextEngine {
             let clip_x_max = (clip_x + clip_w).min(buf_width);
             let clip_y_max = (text_y + clip_h).min(buf_height);
 
-            // Compute the maximum line width for the return value
-            for run in text_buf.layout_runs() {
-                rendered_width = rendered_width.max(run.line_w);
+            if TRACK_WIDTH {
+                for run in text_buf.layout_runs() {
+                    rendered_width = rendered_width.max(run.line_w);
+                }
             }
 
             // Iterate glyphs individually so we can fall back to the external
@@ -689,24 +746,32 @@ impl TextEngine {
                                 if bitmap.width > 0 && bitmap.height > 0 {
                                     let gx = physical.x + bitmap.offset_x + x_off;
                                     let gy = physical.y - bitmap.offset_y;
-                                    blit_alpha_glyph(
-                                        buffer_pixels,
-                                        stride,
-                                        &bitmap.alpha_data,
-                                        bitmap.width as i32,
-                                        bitmap.height as i32,
-                                        gx,
-                                        gy,
-                                        r,
-                                        g,
-                                        b,
-                                        clip_x_min,
-                                        clip_y_min,
-                                        clip_x_max,
-                                        clip_y_max,
-                                        render_mode,
-                                        hinting_mode,
-                                    );
+                                    let gw = bitmap.width as i32;
+                                    let gh = bitmap.height as i32;
+                                    if gx < clip_x_max
+                                        && gy < clip_y_max
+                                        && gx + gw > clip_x_min
+                                        && gy + gh > clip_y_min
+                                    {
+                                        blit_mask_glyph(
+                                            buffer_pixels,
+                                            stride,
+                                            &bitmap.alpha_data,
+                                            gw,
+                                            gh,
+                                            gx,
+                                            gy,
+                                            r,
+                                            g,
+                                            b,
+                                            clip_x_min,
+                                            clip_y_min,
+                                            clip_x_max,
+                                            clip_y_max,
+                                            render_mode,
+                                            hinting_mode,
+                                        );
+                                    }
                                 }
                                 // Adjust cumulative offset: actual advance vs cosmic-text's advance.
                                 let actual_advance =
@@ -730,42 +795,71 @@ impl TextEngine {
                             continue;
                         }
 
-                        let alpha_data: Vec<u8> = match image.content {
-                            cosmic_text::SwashContent::Mask => image.data.clone(),
-                            cosmic_text::SwashContent::Color => {
-                                image.data.iter().skip(3).step_by(4).copied().collect()
-                            }
-                            cosmic_text::SwashContent::SubpixelMask => image
-                                .data
-                                .chunks(3)
-                                .map(|rgb| {
-                                    let sum = rgb[0] as u16 + rgb[1] as u16 + rgb[2] as u16;
-                                    (sum / 3) as u8
-                                })
-                                .collect(),
-                        };
-
                         let gx = physical.x + image.placement.left + x_off;
                         let gy = physical.y - image.placement.top;
-
-                        blit_alpha_glyph(
-                            buffer_pixels,
-                            stride,
-                            &alpha_data,
-                            w,
-                            h,
-                            gx,
-                            gy,
-                            r,
-                            g,
-                            b,
-                            clip_x_min,
-                            clip_y_min,
-                            clip_x_max,
-                            clip_y_max,
-                            render_mode,
-                            hinting_mode,
-                        );
+                        if gx >= clip_x_max
+                            || gy >= clip_y_max
+                            || gx + w <= clip_x_min
+                            || gy + h <= clip_y_min
+                        {
+                            continue;
+                        }
+                        match image.content {
+                            cosmic_text::SwashContent::Mask => blit_mask_glyph(
+                                buffer_pixels,
+                                stride,
+                                &image.data,
+                                w,
+                                h,
+                                gx,
+                                gy,
+                                r,
+                                g,
+                                b,
+                                clip_x_min,
+                                clip_y_min,
+                                clip_x_max,
+                                clip_y_max,
+                                render_mode,
+                                hinting_mode,
+                            ),
+                            cosmic_text::SwashContent::Color => blit_color_glyph(
+                                buffer_pixels,
+                                stride,
+                                &image.data,
+                                w,
+                                h,
+                                gx,
+                                gy,
+                                r,
+                                g,
+                                b,
+                                clip_x_min,
+                                clip_y_min,
+                                clip_x_max,
+                                clip_y_max,
+                                render_mode,
+                                hinting_mode,
+                            ),
+                            cosmic_text::SwashContent::SubpixelMask => blit_subpixel_mask_glyph(
+                                buffer_pixels,
+                                stride,
+                                &image.data,
+                                w,
+                                h,
+                                gx,
+                                gy,
+                                r,
+                                g,
+                                b,
+                                clip_x_min,
+                                clip_y_min,
+                                clip_x_max,
+                                clip_y_max,
+                                render_mode,
+                                hinting_mode,
+                            ),
+                        }
                     } else if has_external {
                         // get_image returned None — try external rasterizer.
                         let character = text.get(glyph.start..).and_then(|s| s.chars().next());
@@ -778,24 +872,32 @@ impl TextEngine {
                                 if bitmap.width > 0 && bitmap.height > 0 {
                                     let gx = physical.x + bitmap.offset_x + x_off;
                                     let gy = physical.y - bitmap.offset_y;
-                                    blit_alpha_glyph(
-                                        buffer_pixels,
-                                        stride,
-                                        &bitmap.alpha_data,
-                                        bitmap.width as i32,
-                                        bitmap.height as i32,
-                                        gx,
-                                        gy,
-                                        r,
-                                        g,
-                                        b,
-                                        clip_x_min,
-                                        clip_y_min,
-                                        clip_x_max,
-                                        clip_y_max,
-                                        render_mode,
-                                        hinting_mode,
-                                    );
+                                    let gw = bitmap.width as i32;
+                                    let gh = bitmap.height as i32;
+                                    if gx < clip_x_max
+                                        && gy < clip_y_max
+                                        && gx + gw > clip_x_min
+                                        && gy + gh > clip_y_min
+                                    {
+                                        blit_mask_glyph(
+                                            buffer_pixels,
+                                            stride,
+                                            &bitmap.alpha_data,
+                                            gw,
+                                            gh,
+                                            gx,
+                                            gy,
+                                            r,
+                                            g,
+                                            b,
+                                            clip_x_min,
+                                            clip_y_min,
+                                            clip_x_max,
+                                            clip_y_max,
+                                            render_mode,
+                                            hinting_mode,
+                                        );
+                                    }
                                 }
                                 let actual_advance =
                                     bitmap.advance_width.unwrap_or(bitmap.width as f32);
@@ -812,6 +914,96 @@ impl TextEngine {
         {
             0.0
         }
+    }
+
+    /// Render text to an RGBA pixel buffer at position (`x`, `y`).
+    ///
+    /// Glyphs are clipped to the rectangle (`x`, `y`, `clip_w`, `clip_h`) and
+    /// to the buffer dimensions.  Alpha blending is performed against the
+    /// existing pixel content so that sub-pixel anti-aliasing composites
+    /// correctly over cell backgrounds.
+    ///
+    /// Returns the rendered text width.
+    pub fn render_text(
+        &mut self,
+        buffer_pixels: &mut [u8],
+        buf_width: i32,
+        buf_height: i32,
+        stride: i32,
+        x: i32,
+        y: i32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        color: u32,
+        max_width: Option<f32>,
+    ) -> f32 {
+        self.render_text_internal::<true>(
+            buffer_pixels,
+            buf_width,
+            buf_height,
+            stride,
+            x,
+            y,
+            clip_x,
+            clip_y,
+            clip_w,
+            clip_h,
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            color,
+            max_width,
+        )
+    }
+
+    pub fn render_text_fast(
+        &mut self,
+        buffer_pixels: &mut [u8],
+        buf_width: i32,
+        buf_height: i32,
+        stride: i32,
+        x: i32,
+        y: i32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        color: u32,
+        max_width: Option<f32>,
+    ) {
+        let _ = self.render_text_internal::<false>(
+            buffer_pixels,
+            buf_width,
+            buf_height,
+            stride,
+            x,
+            y,
+            clip_x,
+            clip_y,
+            clip_w,
+            clip_h,
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            color,
+            max_width,
+        );
     }
 
     /// Render text with a shadow/offset for raised or inset text style effects.
@@ -1085,7 +1277,7 @@ fn mono_alpha_threshold(hinting_mode: i32) -> u32 {
 /// Blit an R8 alpha glyph bitmap into an RGBA pixel buffer with color and
 /// alpha blending, respecting clip bounds and render mode.
 #[allow(clippy::too_many_arguments)]
-fn blit_alpha_glyph(
+fn blit_mask_glyph(
     buffer_pixels: &mut [u8],
     stride: i32,
     alpha_data: &[u8],
@@ -1103,16 +1295,18 @@ fn blit_alpha_glyph(
     render_mode: i32,
     hinting_mode: i32,
 ) {
-    for row in 0..h {
+    let row_start = (clip_y_min.max(0) - gy).max(0);
+    let row_end = (clip_y_max - gy).min(h);
+    let col_start = (clip_x_min.max(0) - gx).max(0);
+    let col_end = (clip_x_max - gx).min(w);
+    if row_start >= row_end || col_start >= col_end {
+        return;
+    }
+
+    for row in row_start..row_end {
         let py = gy + row;
-        if py < clip_y_min || py >= clip_y_max {
-            continue;
-        }
-        for col in 0..w {
-            let px = gx + col;
-            if px < clip_x_min || px >= clip_x_max || px < 0 || py < 0 {
-                continue;
-            }
+        let dst_row_offset = (py * stride) as usize;
+        for col in col_start..col_end {
             let src_idx = (row * w + col) as usize;
             if src_idx >= alpha_data.len() {
                 continue;
@@ -1130,7 +1324,8 @@ fn blit_alpha_glyph(
                 continue;
             }
 
-            let offset = (py * stride + px * 4) as usize;
+            let px = gx + col;
+            let offset = dst_row_offset + (px * 4) as usize;
             if offset + 3 >= buffer_pixels.len() {
                 continue;
             }
@@ -1147,10 +1342,167 @@ fn blit_alpha_glyph(
                 let dst_b = buffer_pixels[offset + 2] as u32;
                 let dst_a = buffer_pixels[offset + 3] as u32;
 
-                buffer_pixels[offset] = ((r as u32 * alpha + dst_r * inv + 127) / 255) as u8;
-                buffer_pixels[offset + 1] = ((g as u32 * alpha + dst_g * inv + 127) / 255) as u8;
-                buffer_pixels[offset + 2] = ((b as u32 * alpha + dst_b * inv + 127) / 255) as u8;
-                let out_a = alpha + (dst_a * inv + 127) / 255;
+                buffer_pixels[offset] = ((r as u32 * alpha + dst_r * inv + 128) >> 8) as u8;
+                buffer_pixels[offset + 1] = ((g as u32 * alpha + dst_g * inv + 128) >> 8) as u8;
+                buffer_pixels[offset + 2] = ((b as u32 * alpha + dst_b * inv + 128) >> 8) as u8;
+                let out_a = alpha + ((dst_a * inv + 128) >> 8);
+                buffer_pixels[offset + 3] = out_a.min(255) as u8;
+            }
+        }
+    }
+}
+
+/// Blit an RGBA glyph image using the source alpha channel as mask.
+#[allow(clippy::too_many_arguments)]
+fn blit_color_glyph(
+    buffer_pixels: &mut [u8],
+    stride: i32,
+    rgba_data: &[u8],
+    w: i32,
+    h: i32,
+    gx: i32,
+    gy: i32,
+    r: u8,
+    g: u8,
+    b: u8,
+    clip_x_min: i32,
+    clip_y_min: i32,
+    clip_x_max: i32,
+    clip_y_max: i32,
+    render_mode: i32,
+    hinting_mode: i32,
+) {
+    let row_start = (clip_y_min.max(0) - gy).max(0);
+    let row_end = (clip_y_max - gy).min(h);
+    let col_start = (clip_x_min.max(0) - gx).max(0);
+    let col_end = (clip_x_max - gx).min(w);
+    if row_start >= row_end || col_start >= col_end {
+        return;
+    }
+
+    for row in row_start..row_end {
+        let py = gy + row;
+        let dst_row_offset = (py * stride) as usize;
+        for col in col_start..col_end {
+            let src_idx = ((row * w + col) * 4 + 3) as usize;
+            if src_idx >= rgba_data.len() {
+                continue;
+            }
+
+            let mut alpha = rgba_data[src_idx] as u32;
+            if render_mode == pb::TextRenderMode::TextRenderMono as i32 {
+                alpha = if alpha >= mono_alpha_threshold(hinting_mode) {
+                    255
+                } else {
+                    0
+                };
+            }
+            if alpha == 0 {
+                continue;
+            }
+
+            let px = gx + col;
+            let offset = dst_row_offset + (px * 4) as usize;
+            if offset + 3 >= buffer_pixels.len() {
+                continue;
+            }
+
+            if alpha == 255 {
+                buffer_pixels[offset] = r;
+                buffer_pixels[offset + 1] = g;
+                buffer_pixels[offset + 2] = b;
+                buffer_pixels[offset + 3] = 255;
+            } else {
+                let inv = 255 - alpha;
+                let dst_r = buffer_pixels[offset] as u32;
+                let dst_g = buffer_pixels[offset + 1] as u32;
+                let dst_b = buffer_pixels[offset + 2] as u32;
+                let dst_a = buffer_pixels[offset + 3] as u32;
+
+                buffer_pixels[offset] = ((r as u32 * alpha + dst_r * inv + 128) >> 8) as u8;
+                buffer_pixels[offset + 1] = ((g as u32 * alpha + dst_g * inv + 128) >> 8) as u8;
+                buffer_pixels[offset + 2] = ((b as u32 * alpha + dst_b * inv + 128) >> 8) as u8;
+                let out_a = alpha + ((dst_a * inv + 128) >> 8);
+                buffer_pixels[offset + 3] = out_a.min(255) as u8;
+            }
+        }
+    }
+}
+
+/// Blit an RGB subpixel mask glyph by collapsing each RGB triplet into one alpha sample.
+#[allow(clippy::too_many_arguments)]
+fn blit_subpixel_mask_glyph(
+    buffer_pixels: &mut [u8],
+    stride: i32,
+    subpixel_data: &[u8],
+    w: i32,
+    h: i32,
+    gx: i32,
+    gy: i32,
+    r: u8,
+    g: u8,
+    b: u8,
+    clip_x_min: i32,
+    clip_y_min: i32,
+    clip_x_max: i32,
+    clip_y_max: i32,
+    render_mode: i32,
+    hinting_mode: i32,
+) {
+    let row_start = (clip_y_min.max(0) - gy).max(0);
+    let row_end = (clip_y_max - gy).min(h);
+    let col_start = (clip_x_min.max(0) - gx).max(0);
+    let col_end = (clip_x_max - gx).min(w);
+    if row_start >= row_end || col_start >= col_end {
+        return;
+    }
+
+    for row in row_start..row_end {
+        let py = gy + row;
+        let dst_row_offset = (py * stride) as usize;
+        for col in col_start..col_end {
+            let src_idx = ((row * w + col) * 3) as usize;
+            if src_idx + 2 >= subpixel_data.len() {
+                continue;
+            }
+
+            let mut alpha = ((subpixel_data[src_idx] as u16
+                + subpixel_data[src_idx + 1] as u16
+                + subpixel_data[src_idx + 2] as u16)
+                / 3) as u32;
+            if render_mode == pb::TextRenderMode::TextRenderMono as i32 {
+                alpha = if alpha >= mono_alpha_threshold(hinting_mode) {
+                    255
+                } else {
+                    0
+                };
+            }
+            if alpha == 0 {
+                continue;
+            }
+
+            let px = gx + col;
+            let offset = dst_row_offset + (px * 4) as usize;
+            if offset + 3 >= buffer_pixels.len() {
+                continue;
+            }
+
+            if alpha == 255 {
+                buffer_pixels[offset] = r;
+                buffer_pixels[offset + 1] = g;
+                buffer_pixels[offset + 2] = b;
+                buffer_pixels[offset + 3] = 255;
+            } else {
+                let inv = 255 - alpha;
+                let dst_r = buffer_pixels[offset] as u32;
+                let dst_g = buffer_pixels[offset + 1] as u32;
+                let dst_b = buffer_pixels[offset + 2] as u32;
+                let dst_a = buffer_pixels[offset + 3] as u32;
+
+                buffer_pixels[offset] = ((r as u32 * alpha + dst_r * inv + 128) >> 8) as u8;
+                buffer_pixels[offset + 1] = ((g as u32 * alpha + dst_g * inv + 128) >> 8) as u8;
+                buffer_pixels[offset + 2] = ((b as u32 * alpha + dst_b * inv + 128) >> 8) as u8;
+                let out_a = alpha + ((dst_a * inv + 128) >> 8);
                 buffer_pixels[offset + 3] = out_a.min(255) as u8;
             }
         }
@@ -1246,5 +1598,47 @@ impl TextRenderer for TextEngine {
             color,
             max_width,
         )
+    }
+
+    fn render_text_fast(
+        &mut self,
+        buffer_pixels: &mut [u8],
+        buf_width: i32,
+        buf_height: i32,
+        stride: i32,
+        x: i32,
+        y: i32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        color: u32,
+        max_width: Option<f32>,
+    ) {
+        TextEngine::render_text_fast(
+            self,
+            buffer_pixels,
+            buf_width,
+            buf_height,
+            stride,
+            x,
+            y,
+            clip_x,
+            clip_y,
+            clip_w,
+            clip_h,
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            color,
+            max_width,
+        );
     }
 }

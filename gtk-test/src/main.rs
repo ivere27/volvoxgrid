@@ -1308,8 +1308,13 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
                 }
                 apply_host_runtime_config(st, st.grid_id)?;
                 let on = st.render_layer_mask.count_ones();
-                Ok(format!("{}: {} ({}/{})", LAYER_LABELS[i],
-                    if chk.is_active() { "ON" } else { "OFF" }, on, LAYER_COUNT))
+                Ok(format!(
+                    "{}: {} ({}/{})",
+                    LAYER_LABELS[i],
+                    if chk.is_active() { "ON" } else { "OFF" },
+                    on,
+                    LAYER_COUNT
+                ))
             });
         });
     }

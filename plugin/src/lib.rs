@@ -1750,6 +1750,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 if src != dst && !grid.row_positions.is_empty() {
                     let val = grid.row_positions.remove(src as usize);
                     grid.row_positions.insert(dst as usize, val);
+                    grid.cells.set_row_map(grid.row_positions.clone());
                     grid.layout.invalidate();
                     grid.mark_dirty();
                 }
@@ -2023,12 +2024,14 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             .push(volvoxgrid_engine::event::GridEventData::CellEditChange {
                                 text: t,
                             });
+                        grid.mark_dirty();
                     }
                 }
                 Some(edit_command::Command::SetSelection(sel)) => {
                     if grid.edit.is_active() {
                         grid.edit.set_sel_start(sel.start);
                         grid.edit.set_sel_length(sel.length);
+                        grid.mark_dirty();
                     }
                 }
                 Some(edit_command::Command::SetHighlights(set_highlights)) => {
@@ -2652,7 +2655,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             renderer_text_registration = desired_text_registration;
                         }
                         self.sync_fonts_into_renderer(r, &mut cpu_font_count_applied);
-                        let ((dx, dy, dw, dh), layer_times, zone_counts) = r.render(grid, buffer, width, height, stride);
+                        let ((dx, dy, dw, dh), layer_times, zone_counts) =
+                            r.render(grid, buffer, width, height, stride);
                         if grid.layer_profiling {
                             grid.layer_times_us = layer_times;
                             grid.zone_cell_counts = zone_counts;

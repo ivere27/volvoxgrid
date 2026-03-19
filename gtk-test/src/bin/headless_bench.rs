@@ -130,7 +130,13 @@ impl PhaseStats {
         self.frame_ms.push(metrics.frame_time_ms);
 
         let mut total = 0.0f32;
-        for (idx, us) in metrics.layer_times_us.iter().copied().enumerate().take(LAYER_COUNT) {
+        for (idx, us) in metrics
+            .layer_times_us
+            .iter()
+            .copied()
+            .enumerate()
+            .take(LAYER_COUNT)
+        {
             total += us;
             self.layer_sum_us[idx] += us as f64;
             self.layer_max_us[idx] = self.layer_max_us[idx].max(us);
@@ -211,10 +217,7 @@ impl PhaseStats {
             };
             println!(
                 "  {:<18} avg {:>8.1}us max {:>8.1}us {:>6.1}%",
-                LAYER_LABELS[idx],
-                avg_us,
-                self.layer_max_us[idx],
-                pct,
+                LAYER_LABELS[idx], avg_us, self.layer_max_us[idx], pct,
             );
         }
         println!();
@@ -369,7 +372,9 @@ impl BenchSession {
                     layer_profiling: Some(true),
                     animation_enabled: Some(true),
                     frame_pacing_mode: Some(pb::FramePacingMode::Unlimited as i32),
-                    render_layer_mask: Some(((1i64 << LAYER_COUNT) - 1) & !(1i64 << DEBUG_OVERLAY_BIT)),
+                    render_layer_mask: Some(
+                        ((1i64 << LAYER_COUNT) - 1) & !(1i64 << DEBUG_OVERLAY_BIT),
+                    ),
                     ..Default::default()
                 }),
                 scrolling: Some(pb::ScrollConfig {
@@ -541,7 +546,7 @@ fn run_steady_scroll(
     args: &Args,
     frame_interval: Duration,
 ) -> Result<PhaseStats, String> {
-        session.prepare_demo(&args.demo, false, false)?;
+    session.prepare_demo(&args.demo, false, false)?;
 
     for _ in 0..args.warmup_steps {
         session.send_scroll(0.0, args.scroll_delta_y)?;
@@ -571,8 +576,11 @@ fn run_fling(
     }
 
     let mut stats = PhaseStats::new("fling");
-    let rendered =
-        session.paced_render_until_clean(Some(&mut stats), args.fling_max_frames, frame_interval)?;
+    let rendered = session.paced_render_until_clean(
+        Some(&mut stats),
+        args.fling_max_frames,
+        frame_interval,
+    )?;
     if rendered >= args.fling_max_frames {
         stats.truncated = true;
     }
@@ -597,8 +605,10 @@ fn parse_args() -> Result<Args, String> {
                     parse_usize(&next_value(&mut it, "--scroll-steps")?, "--scroll-steps")?
             }
             "--scroll-delta-y" => {
-                args.scroll_delta_y =
-                    parse_f32(&next_value(&mut it, "--scroll-delta-y")?, "--scroll-delta-y")?
+                args.scroll_delta_y = parse_f32(
+                    &next_value(&mut it, "--scroll-delta-y")?,
+                    "--scroll-delta-y",
+                )?
             }
             "--fling-burst" => {
                 args.fling_burst =
@@ -634,12 +644,8 @@ fn parse_args() -> Result<Args, String> {
     Ok(args)
 }
 
-fn next_value(
-    it: &mut impl Iterator<Item = String>,
-    flag: &str,
-) -> Result<String, String> {
-    it.next()
-        .ok_or_else(|| format!("missing value for {flag}"))
+fn next_value(it: &mut impl Iterator<Item = String>, flag: &str) -> Result<String, String> {
+    it.next().ok_or_else(|| format!("missing value for {flag}"))
 }
 
 fn parse_i32(value: &str, flag: &str) -> Result<i32, String> {
