@@ -55,6 +55,7 @@ struct Args {
     demo: String,
     width: i32,
     height: i32,
+    scroll_blit: bool,
     warmup_steps: usize,
     scroll_steps: usize,
     scroll_delta_y: f32,
@@ -69,6 +70,7 @@ impl Default for Args {
             demo: DEFAULT_DEMO.to_string(),
             width: DEFAULT_WIDTH,
             height: DEFAULT_HEIGHT,
+            scroll_blit: false,
             warmup_steps: 8,
             scroll_steps: 48,
             scroll_delta_y: 1.5,
@@ -231,7 +233,12 @@ impl VolvoxServiceClient {
         Ok(Self { plugin })
     }
 
-    fn create_grid(&self, width: i32, height: i32) -> Result<pb::CreateResponse, String> {
+    fn create_grid(
+        &self,
+        width: i32,
+        height: i32,
+        scroll_blit: bool,
+    ) -> Result<pb::CreateResponse, String> {
         self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Create",
             &pb::CreateRequest {
@@ -264,6 +271,7 @@ impl VolvoxServiceClient {
                         animation_enabled: Some(true),
                         frame_pacing_mode: Some(pb::FramePacingMode::Auto as i32),
                         target_frame_rate_hz: Some(30),
+                        scroll_blit: Some(scroll_blit),
                         ..Default::default()
                     }),
                     ..Default::default()
@@ -331,14 +339,14 @@ impl VolvoxServiceClient {
 impl BenchSession {
     fn new(args: &Args) -> Result<Self, String> {
         let client = VolvoxServiceClient::load_default()?;
-        let create = client.create_grid(args.width, args.height)?;
+        let create = client.create_grid(args.width, args.height, args.scroll_blit)?;
         let grid_id = create
             .handle
             .as_ref()
             .map(|h| h.id)
             .ok_or_else(|| "create_grid returned no handle".to_string())?;
 
-        apply_initial_config_for_grid(&client, grid_id)?;
+        apply_initial_config_for_grid(&client, grid_id, args.scroll_blit)?;
         client.resize_viewport(grid_id, args.width, args.height)?;
 
         let render_stream = client.open_render_session()?;
@@ -361,6 +369,7 @@ impl BenchSession {
         demo: &str,
         fling_enabled: bool,
         scroll_track: bool,
+        scroll_blit: bool,
     ) -> Result<(), String> {
         self.client.load_demo(self.grid_id, demo)?;
         self.client.configure(
@@ -375,6 +384,7 @@ impl BenchSession {
                     render_layer_mask: Some(
                         ((1i64 << LAYER_COUNT) - 1) & !(1i64 << DEBUG_OVERLAY_BIT),
                     ),
+                    scroll_blit: Some(scroll_blit),
                     ..Default::default()
                 }),
                 scrolling: Some(pb::ScrollConfig {
@@ -512,7 +522,11 @@ impl BenchSession {
     }
 }
 
-fn apply_initial_config_for_grid(client: &VolvoxServiceClient, grid_id: i64) -> Result<(), String> {
+fn apply_initial_config_for_grid(
+    client: &VolvoxServiceClient,
+    grid_id: i64,
+    scroll_blit: bool,
+) -> Result<(), String> {
     client.configure(
         grid_id,
         pb::GridConfig {
@@ -521,6 +535,7 @@ fn apply_initial_config_for_grid(client: &VolvoxServiceClient, grid_id: i64) -> 
                 animation_enabled: Some(true),
                 frame_pacing_mode: Some(pb::FramePacingMode::Auto as i32),
                 target_frame_rate_hz: Some(30),
+                scroll_blit: Some(scroll_blit),
                 ..Default::default()
             }),
             editing: Some(pb::EditConfig {
@@ -546,7 +561,7 @@ fn run_steady_scroll(
     args: &Args,
     frame_interval: Duration,
 ) -> Result<PhaseStats, String> {
-    session.prepare_demo(&args.demo, false, false)?;
+    session.prepare_demo(&args.demo, false, false, args.scroll_blit)?;
 
     for _ in 0..args.warmup_steps {
         session.send_scroll(0.0, args.scroll_delta_y)?;
@@ -569,7 +584,7 @@ fn run_fling(
     args: &Args,
     frame_interval: Duration,
 ) -> Result<PhaseStats, String> {
-    session.prepare_demo(&args.demo, true, true)?;
+    session.prepare_demo(&args.demo, true, true, args.scroll_blit)?;
 
     for _ in 0..args.fling_burst {
         session.send_scroll(0.0, args.scroll_delta_y)?;
@@ -596,6 +611,7 @@ fn parse_args() -> Result<Args, String> {
             "--demo" => args.demo = next_value(&mut it, "--demo")?,
             "--width" => args.width = parse_i32(&next_value(&mut it, "--width")?, "--width")?,
             "--height" => args.height = parse_i32(&next_value(&mut it, "--height")?, "--height")?,
+            "--scroll-blit" => args.scroll_blit = true,
             "--warmup-steps" => {
                 args.warmup_steps =
                     parse_usize(&next_value(&mut it, "--warmup-steps")?, "--warmup-steps")?
@@ -677,6 +693,7 @@ fn print_usage() {
     println!("  --demo <sales|hierarchy|stress>");
     println!("  --width <px>");
     println!("  --height <px>");
+    println!("  --scroll-blit");
     println!("  --warmup-steps <count>");
     println!("  --scroll-steps <count>");
     println!("  --scroll-delta-y <delta>");
@@ -715,10 +732,11 @@ fn main() -> Result<(), String> {
     };
 
     println!(
-        "benchmark demo={} viewport={}x{} warmup_steps={} scroll_steps={} fling_burst={} frame_interval_ms={:.2}",
+        "benchmark demo={} viewport={}x{} scroll_blit={} warmup_steps={} scroll_steps={} fling_burst={} frame_interval_ms={:.2}",
         args.demo,
         args.width,
         args.height,
+        args.scroll_blit,
         args.warmup_steps,
         args.scroll_steps,
         args.fling_burst,

@@ -820,6 +820,7 @@ message RenderConfig {
   optional int32           target_frame_rate_hz  = 8;
   optional int64           render_layer_mask     = 9;   // bitmask using RenderLayerBit; -1 = all on
   optional bool            layer_profiling       = 10;  // collect per-layer timings without requiring debug overlay
+  optional bool            scroll_blit           = 11;
 }
 
 // ═══════════════════════════════════════════════════════════

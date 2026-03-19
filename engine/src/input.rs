@@ -239,7 +239,7 @@ fn set_fast_scroll_target_row(grid: &mut VolvoxGrid, target: i32, force: bool) {
     }
     grid.fast_scroll_target_row = target;
     grid.set_top_row(target);
-    grid.mark_dirty();
+    grid.mark_dirty_visual();
 }
 
 /// Map a touch Y coordinate to a target row for fast scroll and apply it.
@@ -1572,7 +1572,7 @@ pub fn handle_pointer_down_with_behavior(
                 if ix >= sbg.h_left_arrow_x && ix < sbg.h_left_arrow_x + SB_SIZE {
                     let step = (SB_SIZE * 3) as f32;
                     scroll_by_with_events(grid, -step, 0.0);
-                    grid.mark_dirty();
+                    grid.mark_dirty_visual();
                     grid.scrollbar_repeat_active = true;
                     grid.scrollbar_repeat_horizontal = true;
                     grid.scrollbar_repeat_delta = -step;
@@ -1584,7 +1584,7 @@ pub fn handle_pointer_down_with_behavior(
                 else if ix >= sbg.h_right_arrow_x && ix < sbg.h_right_arrow_x + SB_SIZE {
                     let step = (SB_SIZE * 3) as f32;
                     scroll_by_with_events(grid, step, 0.0);
-                    grid.mark_dirty();
+                    grid.mark_dirty_visual();
                     grid.scrollbar_repeat_active = true;
                     grid.scrollbar_repeat_horizontal = true;
                     grid.scrollbar_repeat_delta = step;
@@ -1605,7 +1605,7 @@ pub fn handle_pointer_down_with_behavior(
                         let page =
                             (grid.viewport_width - if sbg.show_v { SB_SIZE } else { 0 }) as f32;
                         scroll_by_with_events(grid, -page, 0.0);
-                        grid.mark_dirty();
+                        grid.mark_dirty_visual();
                         grid.scrollbar_repeat_active = true;
                         grid.scrollbar_repeat_horizontal = true;
                         grid.scrollbar_repeat_delta = -page;
@@ -1617,7 +1617,7 @@ pub fn handle_pointer_down_with_behavior(
                         let page =
                             (grid.viewport_width - if sbg.show_v { SB_SIZE } else { 0 }) as f32;
                         scroll_by_with_events(grid, page, 0.0);
-                        grid.mark_dirty();
+                        grid.mark_dirty_visual();
                         grid.scrollbar_repeat_active = true;
                         grid.scrollbar_repeat_horizontal = true;
                         grid.scrollbar_repeat_delta = page;
@@ -1631,7 +1631,7 @@ pub fn handle_pointer_down_with_behavior(
                 if iy >= sbg.v_top_arrow_y && iy < sbg.v_top_arrow_y + SB_SIZE {
                     let step = (SB_SIZE * 3) as f32;
                     scroll_by_with_events(grid, 0.0, -step);
-                    grid.mark_dirty();
+                    grid.mark_dirty_visual();
                     grid.scrollbar_repeat_active = true;
                     grid.scrollbar_repeat_horizontal = false;
                     grid.scrollbar_repeat_delta = -step;
@@ -1643,7 +1643,7 @@ pub fn handle_pointer_down_with_behavior(
                 else if iy >= sbg.v_bot_arrow_y && iy < sbg.v_bot_arrow_y + SB_SIZE {
                     let step = (SB_SIZE * 3) as f32;
                     scroll_by_with_events(grid, 0.0, step);
-                    grid.mark_dirty();
+                    grid.mark_dirty_visual();
                     grid.scrollbar_repeat_active = true;
                     grid.scrollbar_repeat_horizontal = false;
                     grid.scrollbar_repeat_delta = step;
@@ -1664,7 +1664,7 @@ pub fn handle_pointer_down_with_behavior(
                         let page =
                             (grid.viewport_height - if sbg.show_h { SB_SIZE } else { 0 }) as f32;
                         scroll_by_with_events(grid, 0.0, -page);
-                        grid.mark_dirty();
+                        grid.mark_dirty_visual();
                         grid.scrollbar_repeat_active = true;
                         grid.scrollbar_repeat_horizontal = false;
                         grid.scrollbar_repeat_delta = -page;
@@ -1676,7 +1676,7 @@ pub fn handle_pointer_down_with_behavior(
                         let page =
                             (grid.viewport_height - if sbg.show_h { SB_SIZE } else { 0 }) as f32;
                         scroll_by_with_events(grid, 0.0, page);
-                        grid.mark_dirty();
+                        grid.mark_dirty_visual();
                         grid.scrollbar_repeat_active = true;
                         grid.scrollbar_repeat_horizontal = false;
                         grid.scrollbar_repeat_delta = page;
@@ -1733,7 +1733,7 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, _
             };
             scroll_to_with_events(grid, grid.scroll.scroll_x, new_scroll);
         }
-        grid.mark_dirty();
+        grid.mark_dirty_visual();
         return;
     }
 
@@ -1882,14 +1882,14 @@ pub fn handle_pointer_up(grid: &mut VolvoxGrid, x: f32, y: f32, _button: i32, _m
     if grid.fast_scroll_active {
         grid.fast_scroll_active = false;
         grid.fast_scroll_target_row = -1;
-        grid.mark_dirty();
+        grid.mark_dirty_visual();
         return;
     }
 
     // Complete scrollbar thumb drag
     if grid.scrollbar_drag_active {
         grid.scrollbar_drag_active = false;
-        grid.mark_dirty();
+        grid.mark_dirty_visual();
         return;
     }
 
@@ -2625,7 +2625,7 @@ pub fn handle_scroll(grid: &mut VolvoxGrid, delta_x: f32, delta_y: f32) {
         });
     }
 
-    grid.mark_dirty();
+    grid.mark_dirty_visual();
 }
 
 /// Tick the scrollbar auto-repeat timer. Call this from the host's frame timer
@@ -2670,7 +2670,7 @@ pub fn tick_scrollbar_repeat(grid: &mut VolvoxGrid, dt_seconds: f32) -> bool {
         scroll_by_with_events(grid, 0.0, grid.scrollbar_repeat_delta)
     };
     if scrolled {
-        grid.mark_dirty();
+        grid.mark_dirty_visual();
     }
     // Set short interval for subsequent repeats (~50ms)
     grid.scrollbar_repeat_delay = 0.05;

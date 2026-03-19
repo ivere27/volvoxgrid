@@ -362,6 +362,7 @@ struct State {
     followup_frame_scheduled: bool,
     followup_schedule_seq: u64,
     debug_overlay: bool,
+    scroll_blit_enabled: bool,
     hover_enabled: bool,
     col_hidden: bool,
     suppress_entry_changed: bool,
@@ -394,7 +395,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         .handle
         .map(|handle| handle.id)
         .ok_or_else(|| "plugin returned no grid handle".to_string())?;
-    apply_initial_config_for_grid(&client, sales_grid_id)?;
+    apply_initial_config_for_grid(&client, sales_grid_id, false)?;
     client.load_demo(sales_grid_id, DEMO_SALES)?;
 
     let render_stream = client.open_render_session()?;
@@ -441,6 +442,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         followup_frame_scheduled: false,
         followup_schedule_seq: 0,
         debug_overlay: false,
+        scroll_blit_enabled: false,
         hover_enabled: true,
         col_hidden: false,
         suppress_entry_changed: false,
@@ -502,6 +504,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     let selection_mode = DropDown::from_strings(&SELECTION_MODE_LABELS);
     selection_mode.set_selected(0);
     let chk_debug = CheckButton::with_label("Debug");
+    let chk_scroll_blit = CheckButton::with_label("ScrollBlit");
     let frame_pacing_box = GtkBox::new(Orientation::Horizontal, 4);
     let frame_pacing_label = Label::new(Some("Pacing"));
     let frame_pacing_mode = DropDown::from_strings(&FRAME_PACING_LABELS);
@@ -528,6 +531,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     let btn_sort_desc = Button::with_label("SortDesc");
     let chk_hover = CheckButton::with_label("Hover");
     chk_hover.set_active(true);
+    chk_scroll_blit.set_active(state.borrow().scroll_blit_enabled);
 
     let btn_save = Button::with_label("Save");
     let btn_load = Button::with_label("Load");
@@ -543,6 +547,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     toolbar_row1.append(&Separator::new(Orientation::Vertical));
     toolbar_row1.append(&selection_mode);
     toolbar_row1.append(&chk_debug);
+    toolbar_row1.append(&chk_scroll_blit);
     toolbar_row1.append(&frame_pacing_box);
     toolbar_row1.append(&btn_sort_asc);
     toolbar_row1.append(&btn_sort_desc);
@@ -1108,6 +1113,23 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
                     "Debug overlay enabled".to_string()
                 } else {
                     "Debug overlay disabled".to_string()
+                })
+            });
+        });
+    }
+
+    {
+        let state = Rc::clone(&state);
+        let area = drawing_area.clone();
+        let status = status_label.clone();
+        chk_scroll_blit.connect_toggled(move |chk| {
+            run_action(&state, &area, &status, |st| {
+                st.scroll_blit_enabled = chk.is_active();
+                apply_host_runtime_config(st, st.grid_id)?;
+                Ok(if st.scroll_blit_enabled {
+                    "Scroll blit enabled".to_string()
+                } else {
+                    "Scroll blit disabled".to_string()
                 })
             });
         });
@@ -1786,7 +1808,11 @@ impl VolvoxServiceClient {
     }
 }
 
-fn apply_initial_config_for_grid(client: &VolvoxServiceClient, grid_id: i64) -> Result<(), String> {
+fn apply_initial_config_for_grid(
+    client: &VolvoxServiceClient,
+    grid_id: i64,
+    scroll_blit_enabled: bool,
+) -> Result<(), String> {
     client.configure(
         grid_id,
         pb::GridConfig {
@@ -1795,6 +1821,7 @@ fn apply_initial_config_for_grid(client: &VolvoxServiceClient, grid_id: i64) -> 
                 animation_enabled: Some(true),
                 frame_pacing_mode: Some(pb::FramePacingMode::Auto as i32),
                 target_frame_rate_hz: Some(30),
+                scroll_blit: Some(scroll_blit_enabled),
                 ..Default::default()
             }),
             editing: Some(pb::EditConfig {
@@ -1817,7 +1844,7 @@ fn apply_initial_config_for_grid(client: &VolvoxServiceClient, grid_id: i64) -> 
 }
 
 fn apply_initial_config(state: &mut State) -> Result<(), String> {
-    apply_initial_config_for_grid(&state.client, state.grid_id)
+    apply_initial_config_for_grid(&state.client, state.grid_id, state.scroll_blit_enabled)
 }
 
 fn apply_host_runtime_config(state: &State, grid_id: i64) -> Result<(), String> {
@@ -1829,6 +1856,7 @@ fn apply_host_runtime_config(state: &State, grid_id: i64) -> Result<(), String> 
                 frame_pacing_mode: Some(state.frame_pacing_mode),
                 target_frame_rate_hz: Some(state.target_frame_rate_hz),
                 render_layer_mask: Some(state.render_layer_mask as i64),
+                scroll_blit: Some(state.scroll_blit_enabled),
                 ..Default::default()
             }),
             selection: Some(pb::SelectionConfig {
@@ -1867,7 +1895,7 @@ fn ensure_demo_grid(state: &mut State, demo: &str) -> Result<(i64, bool), String
         .handle
         .map(|handle| handle.id)
         .ok_or_else(|| "plugin returned no grid handle".to_string())?;
-    apply_initial_config_for_grid(&state.client, grid_id)?;
+    apply_initial_config_for_grid(&state.client, grid_id, state.scroll_blit_enabled)?;
     state.grid_sessions.insert(demo.to_string(), grid_id);
     Ok((grid_id, true))
 }

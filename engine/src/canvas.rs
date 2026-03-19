@@ -641,6 +641,7 @@ pub trait Canvas {
 // ===========================================================================
 
 /// Pre-computed visible ranges for fixed and scrollable row/column regions.
+#[derive(Clone, Debug)]
 pub(crate) struct VisibleRange {
     /// Exclusive end of fixed + frozen rows.
     pub fixed_row_end: i32,
@@ -702,6 +703,81 @@ struct CellRect {
     y: i32,
     w: i32,
     h: i32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct DamageRect {
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
+}
+
+impl DamageRect {
+    fn intersects(self, rect: CellRect) -> bool {
+        rect.x + rect.w > self.x
+            && rect.y + rect.h > self.y
+            && rect.x < self.x + self.w
+            && rect.y < self.y + self.h
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct DamageRegion {
+    rects: [Option<DamageRect>; 4],
+    scrolled_x: bool,
+    scrolled_y: bool,
+}
+
+impl DamageRegion {
+    pub(crate) fn push(&mut self, rect: DamageRect) {
+        if rect.w <= 0 || rect.h <= 0 {
+            return;
+        }
+        for slot in &mut self.rects {
+            if slot.is_none() {
+                *slot = Some(rect);
+                return;
+            }
+        }
+    }
+
+    fn intersects(self, rect: CellRect) -> bool {
+        self.rects
+            .into_iter()
+            .flatten()
+            .any(|damage| damage.intersects(rect))
+    }
+
+    pub(crate) fn is_empty(self) -> bool {
+        self.rects.iter().all(Option::is_none)
+    }
+
+    pub(crate) fn mark_scrolled_x(&mut self) {
+        self.scrolled_x = true;
+    }
+
+    pub(crate) fn mark_scrolled_y(&mut self) {
+        self.scrolled_y = true;
+    }
+
+    fn scrolled_x(self) -> bool {
+        self.scrolled_x
+    }
+
+    fn scrolled_y(self) -> bool {
+        self.scrolled_y
+    }
+}
+
+impl Default for DamageRegion {
+    fn default() -> Self {
+        Self {
+            rects: [None, None, None, None],
+            scrolled_x: false,
+            scrolled_y: false,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -993,31 +1069,32 @@ impl VisibleRange {
 }
 
 impl RenderContext {
-    fn new(grid: &VolvoxGrid, vp_w: i32, vp_h: i32) -> Self {
+    fn new(grid: &VolvoxGrid, vp_w: i32, vp_h: i32, damage: Option<&DamageRegion>) -> Self {
         let vp = VisibleRange::compute(grid, vp_w, vp_h);
         let mut vis_cells: Vec<VisibleCell> = Vec::new();
-        let zone_counts = iter_visible_cells(grid, &vp, |zone, row, col, cx, cy, cw, ch| {
-            let key = CellKey { row, col };
-            let merge = grid.get_merged_range(row, col);
-            let source_key = match merge {
-                Some((mr1, mc1, _mr2, _mc2)) => CellKey { row: mr1, col: mc1 },
-                None => key,
-            };
-            vis_cells.push(VisibleCell {
-                key,
-                rect: CellRect {
-                    x: cx,
-                    y: cy,
-                    w: cw,
-                    h: ch,
-                },
-                zone,
-                merge,
-                source_key,
+        let zone_counts =
+            iter_visible_cells(grid, &vp, damage, |zone, row, col, cx, cy, cw, ch| {
+                let key = CellKey { row, col };
+                let merge = grid.get_merged_range(row, col);
+                let source_key = match merge {
+                    Some((mr1, mc1, _mr2, _mc2)) => CellKey { row: mr1, col: mc1 },
+                    None => key,
+                };
+                vis_cells.push(VisibleCell {
+                    key,
+                    rect: CellRect {
+                        x: cx,
+                        y: cy,
+                        w: cw,
+                        h: ch,
+                    },
+                    zone,
+                    merge,
+                    source_key,
+                });
             });
-        });
         let visible_row_rects = build_visible_row_rects(grid, &vp);
-        let visible_col_rects = build_visible_col_rects(&vis_cells);
+        let visible_col_rects = build_visible_col_rects(grid, &vp);
         let text_cells = build_text_cells(grid, &vp, &vis_cells);
         Self {
             vp,
@@ -1045,7 +1122,45 @@ impl RenderContext {
 /// 4. Fixed/frozen cells (topmost)
 ///
 /// Returns `[scrollable, sticky, pinned, fixed]` cell counts per zone.
-fn iter_visible_cells<F>(grid: &VolvoxGrid, vp: &VisibleRange, mut f: F) -> [u32; 4]
+fn should_emit_partial_cell(
+    vp: &VisibleRange,
+    damage: &DamageRegion,
+    zone: VisibleCellZone,
+    row: i32,
+    col: i32,
+    rect: CellRect,
+) -> bool {
+    let row_is_locked = row < vp.fixed_row_end
+        || vp.pinned_top_rows.contains(&row)
+        || vp.pinned_bottom_rows.contains(&row)
+        || vp.sticky_top_rows.contains(&row)
+        || vp.sticky_bottom_rows.contains(&row);
+    let col_is_locked = col < vp.fixed_col_end
+        || vp.sticky_left_cols.contains(&col)
+        || vp.sticky_right_cols.contains(&col);
+
+    if damage.scrolled_x() && row_is_locked && zone != VisibleCellZone::Scrollable {
+        return true;
+    }
+    if damage.scrolled_x() && row < vp.fixed_row_end {
+        return true;
+    }
+    if damage.scrolled_y() && col_is_locked && zone != VisibleCellZone::Scrollable {
+        return true;
+    }
+    if damage.scrolled_y() && col < vp.fixed_col_end {
+        return true;
+    }
+
+    damage.intersects(rect)
+}
+
+fn iter_visible_cells<F>(
+    grid: &VolvoxGrid,
+    vp: &VisibleRange,
+    damage: Option<&DamageRegion>,
+    mut f: F,
+) -> [u32; 4]
 where
     F: FnMut(VisibleCellZone, i32, i32, i32, i32, i32, i32),
 {
@@ -1073,6 +1188,24 @@ where
                     continue;
                 }
                 if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
+                    let rect = CellRect {
+                        x: cx,
+                        y: cy,
+                        w: cw,
+                        h: ch,
+                    };
+                    if damage.is_some_and(|region| {
+                        !should_emit_partial_cell(
+                            vp,
+                            region,
+                            VisibleCellZone::Scrollable,
+                            row,
+                            col,
+                            rect,
+                        )
+                    }) {
+                        continue;
+                    }
                     zone_counts[0] += 1;
                     f(VisibleCellZone::Scrollable, row, col, cx, cy, cw, ch);
                 }
@@ -1092,6 +1225,24 @@ where
                     continue;
                 }
                 if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
+                    let rect = CellRect {
+                        x: cx,
+                        y: cy,
+                        w: cw,
+                        h: ch,
+                    };
+                    if damage.is_some_and(|region| {
+                        !should_emit_partial_cell(
+                            vp,
+                            region,
+                            VisibleCellZone::Sticky,
+                            row,
+                            col,
+                            rect,
+                        )
+                    }) {
+                        continue;
+                    }
                     zone_counts[1] += 1;
                     f(VisibleCellZone::Sticky, row, col, cx, cy, cw, ch);
                 }
@@ -1121,6 +1272,24 @@ where
                     continue;
                 }
                 if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
+                    let rect = CellRect {
+                        x: cx,
+                        y: cy,
+                        w: cw,
+                        h: ch,
+                    };
+                    if damage.is_some_and(|region| {
+                        !should_emit_partial_cell(
+                            vp,
+                            region,
+                            VisibleCellZone::Sticky,
+                            row,
+                            col,
+                            rect,
+                        )
+                    }) {
+                        continue;
+                    }
                     zone_counts[1] += 1;
                     f(VisibleCellZone::Sticky, row, col, cx, cy, cw, ch);
                 }
@@ -1143,6 +1312,24 @@ where
                     continue;
                 }
                 if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
+                    let rect = CellRect {
+                        x: cx,
+                        y: cy,
+                        w: cw,
+                        h: ch,
+                    };
+                    if damage.is_some_and(|region| {
+                        !should_emit_partial_cell(
+                            vp,
+                            region,
+                            VisibleCellZone::Pinned,
+                            row,
+                            col,
+                            rect,
+                        )
+                    }) {
+                        continue;
+                    }
                     zone_counts[2] += 1;
                     f(VisibleCellZone::Pinned, row, col, cx, cy, cw, ch);
                 }
@@ -1161,6 +1348,24 @@ where
                     continue;
                 }
                 if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
+                    let rect = CellRect {
+                        x: cx,
+                        y: cy,
+                        w: cw,
+                        h: ch,
+                    };
+                    if damage.is_some_and(|region| {
+                        !should_emit_partial_cell(
+                            vp,
+                            region,
+                            VisibleCellZone::Fixed,
+                            row,
+                            col,
+                            rect,
+                        )
+                    }) {
+                        continue;
+                    }
                     zone_counts[3] += 1;
                     f(VisibleCellZone::Fixed, row, col, cx, cy, cw, ch);
                 }
@@ -1925,6 +2130,49 @@ pub type RenderResult = ((i32, i32, i32, i32), [f32; layer::COUNT], [u32; 4]);
 
 /// Render the entire grid onto a Canvas. Returns dirty rect, layer times, and zone cell counts.
 pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> RenderResult {
+    render_grid_internal(grid, canvas, None)
+}
+
+pub(crate) fn render_grid_partial<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    damage: &DamageRegion,
+) -> RenderResult {
+    render_grid_internal(grid, canvas, Some(damage))
+}
+
+fn clear_partial_regions<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    vp: &VisibleRange,
+    damage: &DamageRegion,
+) {
+    let bg = grid.style.back_color_bkg;
+    for rect in damage.rects.into_iter().flatten() {
+        canvas.fill_rect(rect.x, rect.y, rect.w, rect.h, bg);
+    }
+
+    if vp.data_y > 0 {
+        canvas.fill_rect(0, 0, canvas.width(), vp.data_y, bg);
+    }
+    if vp.data_x > 0 {
+        canvas.fill_rect(0, 0, vp.data_x, canvas.height(), bg);
+    }
+    let right_x = vp.data_x + vp.data_w;
+    if right_x < canvas.width() {
+        canvas.fill_rect(right_x, 0, canvas.width() - right_x, canvas.height(), bg);
+    }
+    let bottom_y = vp.data_y + vp.data_h;
+    if bottom_y < canvas.height() {
+        canvas.fill_rect(0, bottom_y, canvas.width(), canvas.height() - bottom_y, bg);
+    }
+}
+
+fn render_grid_internal<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    damage: Option<&DamageRegion>,
+) -> RenderResult {
     let w = canvas.width();
     let h = canvas.height();
     if w <= 0 || h <= 0 {
@@ -1951,8 +2199,12 @@ pub fn render_grid<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) -> RenderResult
 
     grid.span.clear_span_cache();
 
-    let ctx = RenderContext::new(grid, w, h);
-    canvas.clear(grid.style.back_color_bkg);
+    let ctx = RenderContext::new(grid, w, h, damage);
+    if let Some(damage) = damage {
+        clear_partial_regions(grid, canvas, &ctx.vp, damage);
+    } else {
+        canvas.clear(grid.style.back_color_bkg);
+    }
 
     run_layer!(
         layer::OVERLAY_BANDS,
@@ -2427,20 +2679,98 @@ fn build_visible_row_rects(grid: &VolvoxGrid, vp: &VisibleRange) -> BTreeMap<i32
     rows
 }
 
-fn build_visible_col_rects(vis_cells: &[VisibleCell]) -> BTreeMap<i32, (i32, i32)> {
-    let mut cols = BTreeMap::new();
-    for &cell in vis_cells {
-        let (_row, col, cx, _cy, cw, _ch) = cell.parts();
-        // Skip cells that belong to a multi-column merge — their cx/cw
-        // cover the full merged column range, not the individual column.
-        if let Some((_r1, c1, _r2, c2)) = cell.merge {
-            if c1 != c2 {
-                continue;
-            }
-        }
-        cols.entry(col).or_insert((cx, cw));
+fn insert_visible_col_rect(
+    cols: &mut BTreeMap<i32, (i32, i32)>,
+    col: i32,
+    mut x: i32,
+    mut w: i32,
+    clip_left: i32,
+    clip_right: i32,
+) {
+    if w <= 0 {
+        return;
     }
-    cols
+    if x < clip_left {
+        let clip = clip_left - x;
+        x = clip_left;
+        w -= clip;
+    }
+    if x + w > clip_right {
+        w = clip_right - x;
+    }
+    if w > 0 {
+        cols.insert(col, (x, w));
+    }
+}
+
+fn build_visible_col_rects(grid: &VolvoxGrid, vp: &VisibleRange) -> BTreeMap<i32, (i32, i32)> {
+    let mut cols = BTreeMap::new();
+    let band_left = vp.data_x;
+    let band_right = vp.data_x + vp.data_w;
+    let fixed_right = grid.col_pos(vp.fixed_col_end);
+
+    for col in 0..vp.fixed_col_end {
+        if grid.is_col_hidden(col) {
+            continue;
+        }
+        insert_visible_col_rect(
+            &mut cols,
+            col,
+            vp.data_x + grid.col_pos(col),
+            grid.col_width(col),
+            band_left,
+            band_right,
+        );
+    }
+
+    let scroll_clip_left = vp.data_x + fixed_right + vp.sticky_left_width;
+    let scroll_clip_right = vp.data_x + vp.data_w - vp.sticky_right_width;
+    for col in vp.scroll_col_start..vp.scroll_col_end {
+        if grid.is_col_hidden(col)
+            || vp.sticky_left_cols.contains(&col)
+            || vp.sticky_right_cols.contains(&col)
+        {
+            continue;
+        }
+        insert_visible_col_rect(
+            &mut cols,
+            col,
+            vp.data_x + grid.col_pos(col) - grid.scroll.scroll_x as i32,
+            grid.col_width(col),
+            scroll_clip_left,
+            scroll_clip_right,
+        );
+    }
+
+    let mut sticky_left_x = vp.data_x + fixed_right;
+    for &col in &vp.sticky_left_cols {
+        if grid.is_col_hidden(col) {
+            continue;
+        }
+        let col_w = grid.col_width(col);
+        insert_visible_col_rect(&mut cols, col, sticky_left_x, col_w, band_left, band_right);
+        sticky_left_x += col_w;
+    }
+
+    let mut sticky_right_x = vp.data_x + vp.data_w - vp.sticky_right_width;
+    for &col in &vp.sticky_right_cols {
+        if grid.is_col_hidden(col) {
+            continue;
+        }
+        let col_w = grid.col_width(col);
+        insert_visible_col_rect(&mut cols, col, sticky_right_x, col_w, band_left, band_right);
+        sticky_right_x += col_w;
+    }
+
+    if grid.right_to_left {
+        let mut rtl_cols = BTreeMap::new();
+        for (col, (x, w)) in cols {
+            rtl_cols.insert(col, (vp.data_x + vp.data_w - ((x - vp.data_x) + w), w));
+        }
+        rtl_cols
+    } else {
+        cols
+    }
 }
 
 fn build_text_cells(

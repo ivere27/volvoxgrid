@@ -1185,6 +1185,12 @@ class VolvoxGridController(
             .build())
     }
 
+    fun setScrollBlit(enabled: Boolean) {
+        configure(GridConfig.newBuilder()
+            .setRendering(RenderConfig.newBuilder().setScrollBlit(enabled).build())
+            .build())
+    }
+
     fun setTextLayoutCacheCap(cap: Int) {
         configure(GridConfig.newBuilder()
             .setRendering(
@@ -1197,6 +1203,10 @@ class VolvoxGridController(
 
     fun animationEnabled(): Boolean {
         return getConfig().rendering.animationEnabled
+    }
+
+    fun scrollBlitEnabled(): Boolean {
+        return getConfig().rendering.scrollBlit
     }
 
     fun textLayoutCacheCap(): Int {

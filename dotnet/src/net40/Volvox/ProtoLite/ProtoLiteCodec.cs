@@ -188,6 +188,7 @@ namespace VolvoxGrid.DotNet.Internal
                         if (rendering.TextLayoutCacheCap.HasValue) r.WriteInt32(5, rendering.TextLayoutCacheCap.Value);
                         if (rendering.FramePacingMode.HasValue) r.WriteInt32(7, (int)rendering.FramePacingMode.Value);
                         if (rendering.TargetFrameRateHz.HasValue) r.WriteInt32(8, rendering.TargetFrameRateHz.Value);
+                        if (rendering.ScrollBlit.HasValue) r.WriteBool(11, rendering.ScrollBlit.Value);
                     });
                 }
 
@@ -2093,6 +2094,10 @@ namespace VolvoxGrid.DotNet.Internal
                         break;
                     case 8:
                         if (wire == ProtoWireType.Varint) rendering.TargetFrameRateHz = reader.ReadInt32();
+                        else reader.SkipField(wire);
+                        break;
+                    case 11:
+                        if (wire == ProtoWireType.Varint) rendering.ScrollBlit = reader.ReadBool();
                         else reader.SkipField(wire);
                         break;
                     default:

@@ -4478,6 +4478,8 @@ class RenderConfig extends $pb.GeneratedMessage {
     FramePacingMode? framePacingMode,
     $core.int? targetFrameRateHz,
     $fixnum.Int64? renderLayerMask,
+    $core.bool? layerProfiling,
+    $core.bool? scrollBlit,
   }) {
     final result = create();
     if (rendererMode != null) result.rendererMode = rendererMode;
@@ -4491,6 +4493,8 @@ class RenderConfig extends $pb.GeneratedMessage {
     if (framePacingMode != null) result.framePacingMode = framePacingMode;
     if (targetFrameRateHz != null) result.targetFrameRateHz = targetFrameRateHz;
     if (renderLayerMask != null) result.renderLayerMask = renderLayerMask;
+    if (layerProfiling != null) result.layerProfiling = layerProfiling;
+    if (scrollBlit != null) result.scrollBlit = scrollBlit;
     return result;
   }
 
@@ -4519,6 +4523,8 @@ class RenderConfig extends $pb.GeneratedMessage {
         enumValues: FramePacingMode.values)
     ..aI(8, _omitFieldNames ? '' : 'targetFrameRateHz')
     ..aInt64(9, _omitFieldNames ? '' : 'renderLayerMask')
+    ..aOB(10, _omitFieldNames ? '' : 'layerProfiling')
+    ..aOB(11, _omitFieldNames ? '' : 'scrollBlit')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4620,6 +4626,24 @@ class RenderConfig extends $pb.GeneratedMessage {
   $core.bool hasRenderLayerMask() => $_has(8);
   @$pb.TagNumber(9)
   void clearRenderLayerMask() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.bool get layerProfiling => $_getBF(9);
+  @$pb.TagNumber(10)
+  set layerProfiling($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasLayerProfiling() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearLayerProfiling() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.bool get scrollBlit => $_getBF(10);
+  @$pb.TagNumber(11)
+  set scrollBlit($core.bool value) => $_setBool(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasScrollBlit() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearScrollBlit() => $_clearField(11);
 }
 
 class RowIndicatorSlot extends $pb.GeneratedMessage {
@@ -13158,6 +13182,7 @@ class FrameDone extends $pb.GeneratedMessage {
     $core.int? dirtyY,
     $core.int? dirtyW,
     $core.int? dirtyH,
+    FrameMetrics? metrics,
   }) {
     final result = create();
     if (handle != null) result.handle = handle;
@@ -13165,6 +13190,7 @@ class FrameDone extends $pb.GeneratedMessage {
     if (dirtyY != null) result.dirtyY = dirtyY;
     if (dirtyW != null) result.dirtyW = dirtyW;
     if (dirtyH != null) result.dirtyH = dirtyH;
+    if (metrics != null) result.metrics = metrics;
     return result;
   }
 
@@ -13186,6 +13212,8 @@ class FrameDone extends $pb.GeneratedMessage {
     ..aI(3, _omitFieldNames ? '' : 'dirtyY')
     ..aI(4, _omitFieldNames ? '' : 'dirtyW')
     ..aI(5, _omitFieldNames ? '' : 'dirtyH')
+    ..aOM<FrameMetrics>(6, _omitFieldNames ? '' : 'metrics',
+        subBuilder: FrameMetrics.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -13250,6 +13278,17 @@ class FrameDone extends $pb.GeneratedMessage {
   $core.bool hasDirtyH() => $_has(4);
   @$pb.TagNumber(5)
   void clearDirtyH() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  FrameMetrics get metrics => $_getN(5);
+  @$pb.TagNumber(6)
+  set metrics(FrameMetrics value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasMetrics() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearMetrics() => $_clearField(6);
+  @$pb.TagNumber(6)
+  FrameMetrics ensureMetrics() => $_ensure(5);
 }
 
 class GpuFrameDone extends $pb.GeneratedMessage {
@@ -13258,12 +13297,14 @@ class GpuFrameDone extends $pb.GeneratedMessage {
     $core.int? dirtyY,
     $core.int? dirtyW,
     $core.int? dirtyH,
+    FrameMetrics? metrics,
   }) {
     final result = create();
     if (dirtyX != null) result.dirtyX = dirtyX;
     if (dirtyY != null) result.dirtyY = dirtyY;
     if (dirtyW != null) result.dirtyW = dirtyW;
     if (dirtyH != null) result.dirtyH = dirtyH;
+    if (metrics != null) result.metrics = metrics;
     return result;
   }
 
@@ -13284,6 +13325,8 @@ class GpuFrameDone extends $pb.GeneratedMessage {
     ..aI(2, _omitFieldNames ? '' : 'dirtyY')
     ..aI(3, _omitFieldNames ? '' : 'dirtyW')
     ..aI(4, _omitFieldNames ? '' : 'dirtyH')
+    ..aOM<FrameMetrics>(5, _omitFieldNames ? '' : 'metrics',
+        subBuilder: FrameMetrics.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -13340,6 +13383,109 @@ class GpuFrameDone extends $pb.GeneratedMessage {
   $core.bool hasDirtyH() => $_has(3);
   @$pb.TagNumber(4)
   void clearDirtyH() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  FrameMetrics get metrics => $_getN(4);
+  @$pb.TagNumber(5)
+  set metrics(FrameMetrics value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasMetrics() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearMetrics() => $_clearField(5);
+  @$pb.TagNumber(5)
+  FrameMetrics ensureMetrics() => $_ensure(4);
+}
+
+class FrameMetrics extends $pb.GeneratedMessage {
+  factory FrameMetrics({
+    $core.double? frameTimeMs,
+    $core.double? fps,
+    $core.Iterable<$core.double>? layerTimesUs,
+    $core.Iterable<$core.int>? zoneCellCounts,
+    $core.int? instanceCount,
+  }) {
+    final result = create();
+    if (frameTimeMs != null) result.frameTimeMs = frameTimeMs;
+    if (fps != null) result.fps = fps;
+    if (layerTimesUs != null) result.layerTimesUs.addAll(layerTimesUs);
+    if (zoneCellCounts != null) result.zoneCellCounts.addAll(zoneCellCounts);
+    if (instanceCount != null) result.instanceCount = instanceCount;
+    return result;
+  }
+
+  FrameMetrics._();
+
+  factory FrameMetrics.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory FrameMetrics.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FrameMetrics',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aD(1, _omitFieldNames ? '' : 'frameTimeMs', fieldType: $pb.PbFieldType.OF)
+    ..aD(2, _omitFieldNames ? '' : 'fps', fieldType: $pb.PbFieldType.OF)
+    ..p<$core.double>(
+        3, _omitFieldNames ? '' : 'layerTimesUs', $pb.PbFieldType.KF)
+    ..p<$core.int>(
+        4, _omitFieldNames ? '' : 'zoneCellCounts', $pb.PbFieldType.KU3)
+    ..aI(5, _omitFieldNames ? '' : 'instanceCount')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FrameMetrics clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FrameMetrics copyWith(void Function(FrameMetrics) updates) =>
+      super.copyWith((message) => updates(message as FrameMetrics))
+          as FrameMetrics;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FrameMetrics create() => FrameMetrics._();
+  @$core.override
+  FrameMetrics createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FrameMetrics getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FrameMetrics>(create);
+  static FrameMetrics? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.double get frameTimeMs => $_getN(0);
+  @$pb.TagNumber(1)
+  set frameTimeMs($core.double value) => $_setFloat(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasFrameTimeMs() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearFrameTimeMs() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.double get fps => $_getN(1);
+  @$pb.TagNumber(2)
+  set fps($core.double value) => $_setFloat(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasFps() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearFps() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $pb.PbList<$core.double> get layerTimesUs => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $pb.PbList<$core.int> get zoneCellCounts => $_getList(3);
+
+  @$pb.TagNumber(5)
+  $core.int get instanceCount => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set instanceCount($core.int value) => $_setSignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasInstanceCount() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearInstanceCount() => $_clearField(5);
 }
 
 class SelectionUpdate extends $pb.GeneratedMessage {

@@ -5,6 +5,7 @@ import java.awt.BorderLayout;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -39,14 +40,17 @@ public final class VolvoxGridDesktopDemo {
 
         VolvoxGridDesktopPanel gridPanel = new VolvoxGridDesktopPanel();
         JLabel status = new JLabel("Loading...");
+        final boolean[] scrollBlitEnabled = {false};
 
         JPanel topBar = new JPanel(new BorderLayout());
         JButton sortAsc = new JButton("Sort Asc");
         JButton sortDesc = new JButton("Sort Desc");
+        JCheckBox scrollBlit = new JCheckBox("Scroll Blit", scrollBlitEnabled[0]);
 
         JPanel buttonRow = new JPanel();
         buttonRow.add(sortAsc);
         buttonRow.add(sortDesc);
+        buttonRow.add(scrollBlit);
 
         topBar.add(buttonRow, BorderLayout.WEST);
         topBar.add(status, BorderLayout.CENTER);
@@ -56,6 +60,7 @@ public final class VolvoxGridDesktopDemo {
 
         sortAsc.setEnabled(false);
         sortDesc.setEnabled(false);
+        scrollBlit.setEnabled(false);
 
         sortAsc.addActionListener(e -> {
             try {
@@ -80,6 +85,20 @@ public final class VolvoxGridDesktopDemo {
                 status.setText("Sorted descending");
             } catch (Exception ex) {
                 status.setText("Sort failed: " + ex.getMessage());
+            }
+        });
+
+        scrollBlit.addActionListener(e -> {
+            boolean selected = scrollBlit.isSelected();
+            scrollBlitEnabled[0] = selected;
+            try {
+                VolvoxGridDesktopController ctrl = gridPanel.createController();
+                ctrl.setScrollBlit(selected);
+                ctrl.refresh();
+                gridPanel.requestFrame();
+                status.setText(selected ? "Scroll blit enabled" : "Scroll blit disabled");
+            } catch (Exception ex) {
+                status.setText("Scroll blit toggle failed: " + ex.getMessage());
             }
         });
 
@@ -129,6 +148,7 @@ public final class VolvoxGridDesktopDemo {
                 ctrl.setColWidth(1, 200);
                 ctrl.setColWidth(2, 120);
                 ctrl.setColWidth(3, 120);
+                ctrl.setScrollBlit(scrollBlitEnabled[0]);
 
                 ctrl.setRedraw(true);
                 ctrl.refresh();
@@ -137,6 +157,7 @@ public final class VolvoxGridDesktopDemo {
                 SwingUtilities.invokeLater(() -> {
                     sortAsc.setEnabled(true);
                     sortDesc.setEnabled(true);
+                    scrollBlit.setEnabled(true);
                     status.setText("Ready (CPU mode)");
                 });
             } catch (Exception ex) {

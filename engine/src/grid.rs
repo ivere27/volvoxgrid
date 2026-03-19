@@ -367,6 +367,8 @@ pub struct VolvoxGrid {
     pub render_layer_mask: u64,
     /// Whether per-layer timing is active.
     pub layer_profiling: bool,
+    /// Enables CPU scroll-blit reuse during scroll-only frames.
+    pub scroll_blit_enabled: bool,
     /// Per-layer execution time in microseconds from the last frame.
     pub layer_times_us: [f32; crate::canvas::layer::COUNT],
     /// Cell counts per zone: [scrollable, sticky, pinned, fixed].
@@ -693,6 +695,7 @@ impl VolvoxGrid {
             // Render layer profiling
             render_layer_mask: u64::MAX,
             layer_profiling: false,
+            scroll_blit_enabled: false,
             layer_times_us: [0.0; crate::canvas::layer::COUNT],
             zone_cell_counts: [0; 4],
 
@@ -1203,6 +1206,11 @@ impl VolvoxGrid {
         self.text_meta_generation = self.text_meta_generation.wrapping_add(1);
     }
 
+    /// Marks the grid as dirty without invalidating text/layout-derived caches.
+    pub fn mark_dirty_visual(&mut self) {
+        self.dirty = true;
+    }
+
     /// Clear the dirty flag after rendering.
     /// Keeps dirty=true if animation is still in-flight so the host
     /// continues to re-render until the animation settles.
@@ -1602,7 +1610,10 @@ impl VolvoxGrid {
             suppress_text,
             shrink_to_fit: style_override.shrink_to_fit.unwrap_or(false),
         });
-        self.text_meta_cache.borrow_mut().1.insert((row, col), result.clone());
+        self.text_meta_cache
+            .borrow_mut()
+            .1
+            .insert((row, col), result.clone());
         result
     }
 
@@ -2778,7 +2789,7 @@ impl VolvoxGrid {
         self.scroll.max_scroll_x = max_scroll_x;
         self.scroll.max_scroll_y = max_scroll_y;
         self.scroll.scroll_y = target_scroll_y.min(max_scroll_y);
-        self.mark_dirty();
+        self.mark_dirty_visual();
     }
 
     /// Returns the bottommost visible scrollable row (`BottomRow`).
@@ -2839,7 +2850,7 @@ impl VolvoxGrid {
         self.scroll.max_scroll_x = max_scroll_x;
         self.scroll.max_scroll_y = max_scroll_y;
         self.scroll.scroll_x = target_scroll_x.min(max_scroll_x);
-        self.mark_dirty();
+        self.mark_dirty_visual();
     }
 
     /// Returns the rightmost visible scrollable column (`RightCol`).

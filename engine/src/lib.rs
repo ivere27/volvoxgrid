@@ -39,6 +39,7 @@ pub mod render;
 pub mod row;
 pub mod save;
 pub mod scroll;
+mod scroll_cache;
 pub mod search;
 pub mod selection;
 pub mod sort;

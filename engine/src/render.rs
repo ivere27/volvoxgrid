@@ -4,9 +4,10 @@
 //! buffer. Actual rendering logic lives in `canvas.rs` (shared with the GPU
 //! path); this module creates a `CpuCanvas` and delegates to `render_grid()`.
 
-use crate::canvas::{render_grid, RenderResult};
+use crate::canvas::{render_grid, render_grid_partial, RenderResult};
 use crate::canvas_cpu::CpuCanvas;
 use crate::grid::VolvoxGrid;
+use crate::scroll_cache::{ScrollCache, ScrollCacheState};
 #[cfg(test)]
 use crate::selection::HOVER_COLUMN;
 use crate::text::{TextEngine, TextRenderer};
@@ -19,6 +20,7 @@ use crate::text::{TextEngine, TextRenderer};
 pub struct Renderer {
     text_engine: TextEngine,
     custom_text_renderer: Option<Box<dyn TextRenderer + Send>>,
+    scroll_cache: ScrollCache,
 }
 
 impl Renderer {
@@ -26,6 +28,7 @@ impl Renderer {
         Self {
             text_engine: TextEngine::new(),
             custom_text_renderer: None,
+            scroll_cache: ScrollCache::new(),
         }
     }
 
@@ -34,6 +37,7 @@ impl Renderer {
         Self {
             text_engine,
             custom_text_renderer: None,
+            scroll_cache: ScrollCache::new(),
         }
     }
 
@@ -45,6 +49,7 @@ impl Renderer {
         Self {
             text_engine: TextEngine::new(),
             custom_text_renderer: Some(custom),
+            scroll_cache: ScrollCache::new(),
         }
     }
 
@@ -119,8 +124,18 @@ impl Renderer {
             None => &mut self.text_engine,
         };
 
+        let current_scroll_state = ScrollCacheState::snapshot(grid, width, height);
+        let damage = self
+            .scroll_cache
+            .try_blit(buffer, stride, &current_scroll_state);
         let mut canvas = CpuCanvas::new(buffer, width, height, stride, text_renderer);
-        render_grid(grid, &mut canvas)
+        let result = if let Some(damage) = damage.as_ref() {
+            render_grid_partial(grid, &mut canvas, damage)
+        } else {
+            render_grid(grid, &mut canvas)
+        };
+        self.scroll_cache.finish(current_scroll_state);
+        result
     }
 }
 
@@ -629,5 +644,70 @@ mod tests {
         assert_eq!(pixel_argb(&buffer, 200, 107, 10), 0xFF828282);
         assert_eq!(pixel_argb(&buffer, 200, 108, 10), 0xFFFFFFFF);
         assert_ne!(pixel_argb(&buffer, 200, 68, 10), 0xFF828282);
+    }
+
+    fn scroll_blit_test_grid(scroll_blit_enabled: bool) -> VolvoxGrid {
+        let mut grid = VolvoxGrid::new(1, 320, 220, 40, 12, 1, 1);
+        grid.scroll_blit_enabled = scroll_blit_enabled;
+        grid.scroll_bars = pb::ScrollBarsMode::ScrollbarBoth as i32;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.width_px = 36;
+        grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        grid.indicator_bands.col_top.mode_bits =
+            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+
+        for row in 0..grid.rows {
+            grid.set_row_height(row, 20 + (row % 3) * 4);
+            for col in 0..grid.cols {
+                grid.cells.set_text(row, col, format!("R{row}C{col}"));
+            }
+        }
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 56 + (col % 4) * 8);
+        }
+        grid.ensure_layout();
+        grid
+    }
+
+    #[test]
+    fn scroll_blit_matches_full_render_after_diagonal_scroll() {
+        let mut blit_grid = scroll_blit_test_grid(true);
+        let mut blit_renderer = Renderer::with_custom_text_renderer(Box::new(SolidTextRenderer));
+        let mut blit_buffer = vec![0u8; (320 * 220 * 4) as usize];
+        blit_renderer.render(&blit_grid, &mut blit_buffer, 320, 220, 320 * 4);
+        let seeded_buffer = blit_buffer.clone();
+
+        blit_grid.scroll.scroll_x = 17.0;
+        blit_grid.scroll.scroll_y = 29.0;
+        blit_renderer.render(&blit_grid, &mut blit_buffer, 320, 220, 320 * 4);
+
+        let mut full_grid = scroll_blit_test_grid(false);
+        full_grid.scroll.scroll_x = 17.0;
+        full_grid.scroll.scroll_y = 29.0;
+        let mut full_renderer = Renderer::with_custom_text_renderer(Box::new(SolidTextRenderer));
+        let mut full_buffer = vec![0u8; (320 * 220 * 4) as usize];
+        full_renderer.render(&full_grid, &mut full_buffer, 320, 220, 320 * 4);
+
+        if let Some(idx) = blit_buffer
+            .iter()
+            .zip(full_buffer.iter())
+            .position(|(left, right)| left != right)
+        {
+            let pixel = idx / 4;
+            let x = (pixel % 320) as i32;
+            let y = (pixel / 320) as i32;
+            let source_right = pixel_argb(&seeded_buffer, 320, (x + 17).min(319), y);
+            let source_left = pixel_argb(&seeded_buffer, 320, (x - 17).max(0), y);
+            let source_diag = pixel_argb(&seeded_buffer, 320, (x + 17).min(319), (y + 29).min(219));
+            panic!(
+                "scroll blit mismatch at ({x}, {y}): got {:02X?}, expected {:02X?}, seeded {:02X?}, seeded_right=0x{source_right:08X}, seeded_left=0x{source_left:08X}, seeded_diag=0x{source_diag:08X}",
+                &blit_buffer[idx - (idx % 4)..idx - (idx % 4) + 4],
+                &full_buffer[idx - (idx % 4)..idx - (idx % 4) + 4],
+                &seeded_buffer[idx - (idx % 4)..idx - (idx % 4) + 4],
+            );
+        }
     }
 }

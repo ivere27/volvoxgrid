@@ -46,6 +46,7 @@ public final class VolvoxGridDesktopExample {
 
     private volatile boolean gpuEnabled = false;
     private volatile boolean debugOverlayEnabled = false;
+    private volatile boolean scrollBlitEnabled = false;
     private volatile boolean scrollbarsEnabled = true;
     private volatile boolean flingEnabled = true;
     private volatile SelectionMode selectionMode = SelectionMode.SELECTION_FREE;
@@ -60,6 +61,7 @@ public final class VolvoxGridDesktopExample {
     private JButton btnSortDesc;
     private JCheckBox cbGpu;
     private JCheckBox cbDebug;
+    private JCheckBox cbScrollBlit;
     private JCheckBox cbScrollbars;
     private JCheckBox cbFling;
     private JComboBox<SelectionMode> selectionModeBox;
@@ -117,6 +119,7 @@ public final class VolvoxGridDesktopExample {
         btnSortDesc = new JButton("Sort Desc");
         cbGpu = new JCheckBox("GPU (stub)");
         cbDebug = new JCheckBox("Debug");
+        cbScrollBlit = new JCheckBox("Scroll Blit", scrollBlitEnabled);
         cbScrollbars = new JCheckBox("Scrollbars", scrollbarsEnabled);
         cbFling = new JCheckBox("Fling", flingEnabled);
         selectionModeBox = new JComboBox<>(
@@ -138,6 +141,7 @@ public final class VolvoxGridDesktopExample {
         row1.add(selectionModeBox);
         row1.add(cbGpu);
         row1.add(cbDebug);
+        row1.add(cbScrollBlit);
         row1.add(cbScrollbars);
         row1.add(cbFling);
 
@@ -171,6 +175,13 @@ public final class VolvoxGridDesktopExample {
             boolean selected = cbDebug.isSelected();
             submit(() -> {
                 debugOverlayEnabled = selected;
+                applyDisplayToggles();
+            });
+        });
+        cbScrollBlit.addActionListener(e -> {
+            boolean selected = cbScrollBlit.isSelected();
+            submit(() -> {
+                scrollBlitEnabled = selected;
                 applyDisplayToggles();
             });
         });
@@ -289,7 +300,12 @@ public final class VolvoxGridDesktopExample {
                     .build()
             )
             .setIndicators(VolvoxGridDesktopController.defaultIndicatorsConfig())
-            .setRendering(RenderConfig.newBuilder().setRendererMode(RendererMode.RENDERER_CPU).build())
+            .setRendering(
+                RenderConfig.newBuilder()
+                    .setRendererMode(RendererMode.RENDERER_CPU)
+                    .setScrollBlit(scrollBlitEnabled)
+                    .build()
+            )
             .build();
 
         CreateResponse response = svc.create(
@@ -332,6 +348,12 @@ public final class VolvoxGridDesktopExample {
             ctrl.setDebugOverlay(debugOverlayEnabled);
         } catch (Exception e) {
             updateStatus("Debug toggle failed: " + e.getMessage());
+        }
+
+        try {
+            ctrl.setScrollBlit(scrollBlitEnabled);
+        } catch (Exception e) {
+            updateStatus("Scroll blit toggle failed: " + e.getMessage());
         }
 
         try {
@@ -408,6 +430,7 @@ public final class VolvoxGridDesktopExample {
             btnSortDesc.setEnabled(enabled);
             cbGpu.setEnabled(enabled);
             cbDebug.setEnabled(enabled);
+            cbScrollBlit.setEnabled(enabled);
             cbScrollbars.setEnabled(enabled);
             cbFling.setEnabled(enabled);
         });

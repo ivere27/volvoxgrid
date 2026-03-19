@@ -1929,7 +1929,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 grid.pinned_top_height() + grid.pinned_bottom_height(),
                 grid.pinned_left_width() + grid.pinned_right_width(),
             );
-            grid.mark_dirty();
+            grid.mark_dirty_visual();
         })?;
         Ok(Empty {})
     }
@@ -2538,7 +2538,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                         if needs_fling_tick {
                             if grid.scroll.tick_fling(dt_seconds, grid.fling_friction) {
-                                grid.mark_dirty();
+                                grid.mark_dirty_visual();
                             }
                         }
 
@@ -2905,7 +2905,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                         if needs_fling_tick {
                             if grid.scroll.tick_fling(dt_seconds, grid.fling_friction) {
-                                grid.mark_dirty();
+                                grid.mark_dirty_visual();
                             }
                         }
 

@@ -115,6 +115,19 @@ fn ensure_layout(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
     grid.ensure_layout();
 }
 
+fn current_frame_metrics(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Option<FrameMetrics> {
+    if !grid.layer_profiling && !grid.debug_overlay {
+        return None;
+    }
+    Some(FrameMetrics {
+        frame_time_ms: grid.debug_frame_time_ms,
+        fps: grid.debug_fps,
+        layer_times_us: grid.layer_times_us.to_vec(),
+        zone_cell_counts: grid.zone_cell_counts.to_vec(),
+        instance_count: grid.debug_instance_count,
+    })
+}
+
 fn maybe_update_debug_memory(
     grid_id: i64,
     grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
@@ -1465,7 +1478,7 @@ pub fn tick_fling(id: i32, dt_ms: f32) -> i32 {
         }
         let dt_sec = (dt_ms / 1000.0).max(0.0);
         if grid.scroll.tick_fling(dt_sec, grid.fling_friction) {
-            grid.mark_dirty();
+            grid.mark_dirty_visual();
             1
         } else {
             0
@@ -5114,7 +5127,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 grid.pinned_top_height() + grid.pinned_bottom_height(),
                 grid.pinned_left_width() + grid.pinned_right_width(),
             );
-            grid.mark_dirty();
+            grid.mark_dirty_visual();
         })?;
         Ok(Empty {})
     }
@@ -5273,6 +5286,13 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 Some(render_input::Input::Buffer(buf)) => {
                     let rendered = render(grid_id, buf.width, buf.height) != 0;
                     let (dirty_x, dirty_y, dirty_w, dirty_h) = *RENDER_DIRTY_RECT.lock().unwrap();
+                    let metrics = if rendered {
+                        wasm_with_grid(grid_id as i64, |grid| current_frame_metrics(grid))
+                            .ok()
+                            .flatten()
+                    } else {
+                        None
+                    };
                     if !stream.send(RenderOutput {
                         rendered,
                         event: Some(render_output::Event::FrameDone(FrameDone {
@@ -5281,6 +5301,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                             dirty_y,
                             dirty_w,
                             dirty_h,
+                            metrics,
                         })),
                     }) {
                         break;

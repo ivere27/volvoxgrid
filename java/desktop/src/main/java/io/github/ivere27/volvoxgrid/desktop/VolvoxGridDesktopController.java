@@ -1058,6 +1058,14 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         );
     }
 
+    public void setScrollBlit(boolean enabled) throws SynurangDesktopBridge.SynurangBridgeException {
+        configure(
+            GridConfig.newBuilder()
+                .setRendering(RenderConfig.newBuilder().setScrollBlit(enabled).build())
+                .build()
+        );
+    }
+
     public void setScrollBars(ScrollBarsMode mode) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(mode, "mode");
         configure(
