@@ -2863,6 +2863,14 @@ const SelectionConfig$json = {
       '6': '.volvoxgrid.v1.HighlightStyle',
       '10': 'indicatorColStyle'
     },
+    {
+      '1': 'active_cell_style',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.HighlightStyle',
+      '10': 'activeCellStyle'
+    },
   ],
   '8': [
     {'1': '_mode'},
@@ -2885,8 +2893,9 @@ final $typed_data.Uint8List selectionConfigDescriptor = $convert.base64Decode(
     'NvbmZpZ1IFaG92ZXISTQoTaW5kaWNhdG9yX3Jvd19zdHlsZRgIIAEoCzIdLnZvbHZveGdyaWQu'
     'djEuSGlnaGxpZ2h0U3R5bGVSEWluZGljYXRvclJvd1N0eWxlEk0KE2luZGljYXRvcl9jb2xfc3'
     'R5bGUYCSABKAsyHS52b2x2b3hncmlkLnYxLkhpZ2hsaWdodFN0eWxlUhFpbmRpY2F0b3JDb2xT'
-    'dHlsZUIHCgVfbW9kZUIPCg1fZm9jdXNfYm9yZGVyQg0KC192aXNpYmlsaXR5QggKBl9hbGxvd0'
-    'IWChRfaGVhZGVyX2NsaWNrX3NlbGVjdA==');
+    'dHlsZRJJChFhY3RpdmVfY2VsbF9zdHlsZRgKIAEoCzIdLnZvbHZveGdyaWQudjEuSGlnaGxpZ2'
+    'h0U3R5bGVSD2FjdGl2ZUNlbGxTdHlsZUIHCgVfbW9kZUIPCg1fZm9jdXNfYm9yZGVyQg0KC192'
+    'aXNpYmlsaXR5QggKBl9hbGxvd0IWChRfaGVhZGVyX2NsaWNrX3NlbGVjdA==');
 
 @$core.Deprecated('Use editConfigDescriptor instead')
 const EditConfig$json = {

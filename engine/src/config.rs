@@ -1410,6 +1410,9 @@ impl VolvoxGrid {
         if let Some(v) = &sel.style {
             apply_highlight_style_patch(&mut self.selection.selection_style, v);
         }
+        if let Some(v) = &sel.active_cell_style {
+            apply_highlight_style_patch(&mut self.selection.active_cell_style, v);
+        }
         if let Some(v) = &sel.hover {
             let mut hover_mode = self.selection.hover_mode;
             apply_hover_flag(&mut hover_mode, HOVER_ROW, v.row);
@@ -1858,6 +1861,7 @@ impl VolvoxGrid {
             allow: Some(self.allow_selection),
             header_click_select: Some(self.header_click_select),
             style: Some(self.selection.selection_style.to_proto()),
+            active_cell_style: Some(self.selection.active_cell_style.to_proto()),
             hover: Some(v1::HoverConfig {
                 row: Some(self.selection.hover_mode & HOVER_ROW != 0),
                 column: Some(self.selection.hover_mode & HOVER_COLUMN != 0),
@@ -2962,12 +2966,42 @@ mod tests {
         grid.style.back_color = 0xAABBCCDD;
         grid.edit_trigger_mode = 2;
         grid.scroll_bars = 3;
+        grid.selection.active_cell_style.back_color = Some(0x4400FF00);
+        grid.selection.active_cell_style.border = Some(v1::BorderStyle::BorderThick as i32);
 
         let config = grid.get_config();
 
         assert_eq!(config.style.as_ref().unwrap().background, Some(0xAABBCCDD));
         assert_eq!(config.editing.as_ref().unwrap().trigger, Some(2));
         assert_eq!(config.scrolling.as_ref().unwrap().scrollbars, Some(3));
+        assert_eq!(
+            config
+                .selection
+                .as_ref()
+                .unwrap()
+                .active_cell_style
+                .as_ref()
+                .unwrap()
+                .background,
+            Some(0x4400FF00)
+        );
+        assert_eq!(
+            config
+                .selection
+                .as_ref()
+                .unwrap()
+                .active_cell_style
+                .as_ref()
+                .unwrap()
+                .borders
+                .as_ref()
+                .unwrap()
+                .all
+                .as_ref()
+                .unwrap()
+                .style,
+            Some(v1::BorderStyle::BorderThick as i32)
+        );
     }
 
     #[test]

@@ -151,6 +151,13 @@ fn apply_demo_theme(grid: &mut VolvoxGrid, theme: &DemoTheme) {
         fill_handle_color: Some(theme.accent),
         ..HighlightStyle::default()
     };
+    grid.selection.active_cell_style = HighlightStyle {
+        back_color: Some(0x22000000),
+        fore_color: Some(theme.selection_fg),
+        border: Some(pb::BorderStyle::BorderThick as i32),
+        border_color: Some(theme.accent),
+        ..HighlightStyle::default()
+    };
 }
 
 fn apply_demo_column_headers(
@@ -1332,6 +1339,14 @@ mod tests {
         assert_eq!(
             sales.indicator_bands.row_start.back_color,
             Some(SALES_THEME.indicator_bg)
+        );
+        assert_eq!(
+            sales.selection.active_cell_style.back_color,
+            Some(0x22000000)
+        );
+        assert_eq!(
+            sales.selection.active_cell_style.border_color,
+            Some(SALES_THEME.accent)
         );
 
         let mut hierarchy = VolvoxGrid::new(2, 960, 540, 1, 1, 0, 0);

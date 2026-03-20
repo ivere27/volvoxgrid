@@ -25,6 +25,7 @@ pub struct SelectionState {
     pub allow_selection: bool,
     pub header_click_select: bool,
     pub selection_style: HighlightStyle,
+    pub active_cell_style: HighlightStyle,
     pub hover_mode: u32,
     pub hover_row_style: HighlightStyle,
     pub hover_column_style: HighlightStyle,
@@ -57,6 +58,7 @@ impl Default for SelectionState {
                 fill_handle_color: Some(0xFF217346),
                 ..HighlightStyle::default()
             },
+            active_cell_style: HighlightStyle::default(),
             hover_mode: HOVER_NONE,
             // ROW/COLUMN are intentionally subtle to provide axis context.
             hover_row_style: HighlightStyle {

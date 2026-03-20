@@ -135,6 +135,7 @@ export interface SheetGridConfig {
   selectionMode?: number;
   focusBorder?: number;
   selectionStyle?: HighlightStyleArg;
+  activeCellStyle?: HighlightStyleArg;
   hover?: HoverConfigArg;
   indicatorRowStyle?: HighlightStyleArg;
   indicatorColStyle?: HighlightStyleArg;
@@ -313,7 +314,8 @@ export function encodeGridConfig(config: SheetGridConfig): Uint8Array {
 
   // ── SelectionConfig (field 3) ──
   // SelectionConfig { mode=1, focus_border=2, visibility=3, allow=4,
-  //   header_click_select=5, style=6, hover=7, indicator_row_style=8, indicator_col_style=9 }
+  //   header_click_select=5, style=6, hover=7, indicator_row_style=8,
+  //   indicator_col_style=9, active_cell_style=10 }
   const selection: number[] = [];
   if (config.selectionMode != null) {
     selection.push(...encodeTag(1, 0), ...encodeInt32(config.selectionMode));
@@ -323,6 +325,9 @@ export function encodeGridConfig(config: SheetGridConfig): Uint8Array {
   }
   if (config.selectionStyle != null) {
     selection.push(...encodeMessageField(6, encodeHighlightStyle(config.selectionStyle)));
+  }
+  if (config.activeCellStyle != null) {
+    selection.push(...encodeMessageField(10, encodeHighlightStyle(config.activeCellStyle)));
   }
   if (config.hover) {
     const h = encodeHoverConfig(config.hover);

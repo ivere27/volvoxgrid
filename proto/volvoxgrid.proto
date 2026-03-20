@@ -721,6 +721,7 @@ message SelectionConfig {
   HoverConfig                  hover                = 7;
   HighlightStyle               indicator_row_style  = 8;
   HighlightStyle               indicator_col_style  = 9;
+  HighlightStyle               active_cell_style    = 10;
 }
 
 // ── Editing ──

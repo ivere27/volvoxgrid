@@ -2364,6 +2364,23 @@ fn is_selection_layer_enabled(grid: &VolvoxGrid) -> bool {
     grid.render_layer_mask & (1u64 << layer::SELECTION) != 0
 }
 
+fn active_cell_origin(grid: &VolvoxGrid) -> Option<(i32, i32)> {
+    if grid.rows <= 0 || grid.cols <= 0 {
+        return None;
+    }
+    let row = grid.selection.row.clamp(0, grid.rows - 1);
+    let col = grid.selection.col.clamp(0, grid.cols - 1);
+    Some(match grid.get_merged_range(row, col) {
+        Some((r1, c1, _, _)) => (r1, c1),
+        None => (row, col),
+    })
+}
+
+fn is_active_cell_origin(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
+    active_cell_origin(grid)
+        .is_some_and(|(active_row, active_col)| row == active_row && col == active_col)
+}
+
 /// Whether a cell should be rendered with selection highlight (selection_style
 /// back/fore colors). In listbox mode the current cursor row is always
 /// highlighted regardless of the selection visibility setting.
@@ -3849,6 +3866,22 @@ fn render_cell_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rende
             canvas.cell_border_edge_style(cx, cy, cw, ch, edge, style, color);
         }
     }
+
+    if is_selection_layer_enabled(grid) && has_highlight_border(&grid.selection.active_cell_style) {
+        if let Some((cx, cy, cw, ch)) =
+            cell_rect(grid, grid.selection.row, grid.selection.col, &ctx.vp)
+        {
+            draw_highlight_border(
+                canvas,
+                cx,
+                cy,
+                cw,
+                ch,
+                &grid.selection.active_cell_style,
+                selection_fore_color(grid),
+            );
+        }
+    }
 }
 
 // ===========================================================================
@@ -3881,13 +3914,18 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
             && (text_row < grid.fixed_rows + grid.frozen_rows
                 || text_col < grid.fixed_cols + grid.frozen_cols);
         let is_selected = should_highlight_cell(grid, text_row, text_col);
-        let fore = style_override.resolve_fore_color(
+        let mut fore = style_override.resolve_fore_color(
             &grid.style,
             is_fixed,
             is_frozen,
             is_selected,
             selection_fore_color(grid),
         );
+        if is_selection_layer_enabled(grid) && is_active_cell_origin(grid, text_row, text_col) {
+            if let Some(active_fore) = grid.selection.active_cell_style.fore_color {
+                fore = active_fore;
+            }
+        }
         let font_name = style_override
             .font_name
             .as_deref()
@@ -5189,32 +5227,44 @@ fn render_dropdown_buttons<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &R
 // ===========================================================================
 
 fn render_selection<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
-    if grid.selection.selection_style.back_color.is_none() {
+    let show_selection_fill = grid.selection.selection_style.back_color.is_some();
+    let show_active_fill = grid.selection.active_cell_style.back_color.is_some();
+    if !show_selection_fill && !show_active_fill {
         return;
     }
 
-    // Merged selections should paint once per visible merged range.
-    let mut rendered_merges: std::collections::HashSet<(i32, i32, i32, i32)> =
-        std::collections::HashSet::new();
+    if show_selection_fill {
+        // Merged selections should paint once per visible merged range.
+        let mut rendered_merges: std::collections::HashSet<(i32, i32, i32, i32)> =
+            std::collections::HashSet::new();
 
-    for &cell in &ctx.vis_cells {
-        let (row, col, cx, cy, cw, ch) = cell.parts();
-        let (style_row, style_col) = match cell.merge {
-            Some((mr1, mc1, mr2, mc2)) if cell.is_merged_span() => {
-                let merge_key = (mr1, mc1, mr2, mc2);
-                if !rendered_merges.insert(merge_key) {
-                    continue;
+        for &cell in &ctx.vis_cells {
+            let (row, col, cx, cy, cw, ch) = cell.parts();
+            let (style_row, style_col) = match cell.merge {
+                Some((mr1, mc1, mr2, mc2)) if cell.is_merged_span() => {
+                    let merge_key = (mr1, mc1, mr2, mc2);
+                    if !rendered_merges.insert(merge_key) {
+                        continue;
+                    }
+                    (mr1, mc1)
                 }
-                (mr1, mc1)
+                _ => (row, col),
+            };
+
+            if !should_highlight_cell(grid, style_row, style_col) {
+                continue;
             }
-            _ => (row, col),
-        };
 
-        if !should_highlight_cell(grid, style_row, style_col) {
-            continue;
+            draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.selection_style);
         }
+    }
 
-        draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.selection_style);
+    if show_active_fill {
+        if let Some((cx, cy, cw, ch)) =
+            cell_rect(grid, grid.selection.row, grid.selection.col, &ctx.vp)
+        {
+            draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.active_cell_style);
+        }
     }
 }
 
@@ -5434,8 +5484,13 @@ fn render_focus_rect<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderC
         return;
     }
 
+    let active_has_custom_style = grid.selection.active_cell_style.back_color.is_some()
+        || grid.selection.active_cell_style.fore_color.is_some()
+        || has_highlight_border(&grid.selection.active_cell_style);
+
     if grid.selection.focus_border == pb::FocusBorderStyle::FocusBorderThin as i32
         && should_highlight_cell(grid, grid.selection.row, grid.selection.col)
+        && !active_has_custom_style
     {
         return;
     }

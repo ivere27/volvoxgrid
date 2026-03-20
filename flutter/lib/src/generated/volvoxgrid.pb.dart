@@ -3654,6 +3654,7 @@ class SelectionConfig extends $pb.GeneratedMessage {
     HoverConfig? hover,
     HighlightStyle? indicatorRowStyle,
     HighlightStyle? indicatorColStyle,
+    HighlightStyle? activeCellStyle,
   }) {
     final result = create();
     if (mode != null) result.mode = mode;
@@ -3665,6 +3666,7 @@ class SelectionConfig extends $pb.GeneratedMessage {
     if (hover != null) result.hover = hover;
     if (indicatorRowStyle != null) result.indicatorRowStyle = indicatorRowStyle;
     if (indicatorColStyle != null) result.indicatorColStyle = indicatorColStyle;
+    if (activeCellStyle != null) result.activeCellStyle = activeCellStyle;
     return result;
   }
 
@@ -3696,6 +3698,8 @@ class SelectionConfig extends $pb.GeneratedMessage {
     ..aOM<HighlightStyle>(8, _omitFieldNames ? '' : 'indicatorRowStyle',
         subBuilder: HighlightStyle.create)
     ..aOM<HighlightStyle>(9, _omitFieldNames ? '' : 'indicatorColStyle',
+        subBuilder: HighlightStyle.create)
+    ..aOM<HighlightStyle>(10, _omitFieldNames ? '' : 'activeCellStyle',
         subBuilder: HighlightStyle.create)
     ..hasRequiredFields = false;
 
@@ -3806,6 +3810,17 @@ class SelectionConfig extends $pb.GeneratedMessage {
   void clearIndicatorColStyle() => $_clearField(9);
   @$pb.TagNumber(9)
   HighlightStyle ensureIndicatorColStyle() => $_ensure(8);
+
+  @$pb.TagNumber(10)
+  HighlightStyle get activeCellStyle => $_getN(9);
+  @$pb.TagNumber(10)
+  set activeCellStyle(HighlightStyle value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasActiveCellStyle() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearActiveCellStyle() => $_clearField(10);
+  @$pb.TagNumber(10)
+  HighlightStyle ensureActiveCellStyle() => $_ensure(9);
 }
 
 /// ── Editing ──
