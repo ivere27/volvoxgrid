@@ -1783,7 +1783,7 @@ pub(crate) fn text_looks_numeric(text: &str) -> bool {
         .all(|c| c.is_ascii_digit() || c == '.' || c == ',' || c == '%')
 }
 
-/// Parse progress percent from cell text.  Handles "75%", "75", "0.75".
+/// Parse progress percent from cell text. Handles "75%", "75", "0.75", "1".
 pub(crate) fn parse_progress_percent(text: &str) -> f32 {
     let t = text.trim();
     if t.is_empty() {
@@ -1796,7 +1796,10 @@ pub(crate) fn parse_progress_percent(text: &str) -> f32 {
     };
     let cleaned = num_str.replace(',', "");
     if let Ok(v) = cleaned.parse::<f32>() {
-        let pct = if is_percent || v > 1.0 { v / 100.0 } else { v };
+        // Treat whole-number input as percentage points so editing a progress
+        // cell to "1" produces 1% instead of a full bar. Fractional values
+        // below 1.0 still work as ratios, e.g. "0.75" -> 75%.
+        let pct = if is_percent || v >= 1.0 { v / 100.0 } else { v };
         if pct >= 0.0 && pct <= 1.0 {
             pct
         } else {
@@ -6782,5 +6785,18 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_progress_percent;
+
+    #[test]
+    fn parse_progress_percent_treats_one_as_one_percent() {
+        assert!((parse_progress_percent("1") - 0.01).abs() < 1e-6);
+        assert!((parse_progress_percent("0.75") - 0.75).abs() < 1e-6);
+        assert!((parse_progress_percent("75") - 0.75).abs() < 1e-6);
+        assert!((parse_progress_percent("100") - 1.0).abs() < 1e-6);
     }
 }
