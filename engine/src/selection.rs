@@ -213,23 +213,32 @@ impl SelectionState {
         let clamped_active_row = active_row.clamp(0, rows - 1);
         let clamped_active_col = active_col.clamp(0, cols - 1);
         if let Some(index) = normalized.iter().position(|&(row1, col1, row2, col2)| {
-            (row1 == clamped_active_row && col1 == clamped_active_col)
-                || (row2 == clamped_active_row && col2 == clamped_active_col)
+            clamped_active_row >= row1
+                && clamped_active_row <= row2
+                && clamped_active_col >= col1
+                && clamped_active_col <= col2
         }) {
             active_index = index;
         }
 
         let active = normalized[active_index];
-        if active.0 == clamped_active_row && active.1 == clamped_active_col {
-            self.row = active.0;
-            self.col = active.1;
-            self.row_end = active.2;
-            self.col_end = active.3;
-        } else if active.2 == clamped_active_row && active.3 == clamped_active_col {
-            self.row = active.2;
-            self.col = active.3;
-            self.row_end = active.0;
-            self.col_end = active.1;
+        if clamped_active_row >= active.0
+            && clamped_active_row <= active.2
+            && clamped_active_col >= active.1
+            && clamped_active_col <= active.3
+        {
+            self.row = clamped_active_row;
+            self.col = clamped_active_col;
+            self.row_end = if clamped_active_row == active.0 {
+                active.2
+            } else {
+                active.0
+            };
+            self.col_end = if clamped_active_col == active.1 {
+                active.3
+            } else {
+                active.1
+            };
         } else {
             self.row = active.0;
             self.col = active.1;
@@ -407,6 +416,34 @@ mod tests {
             selection.all_ranges(10, 10),
             vec![(5, 6, 7, 8), (1, 1, 2, 2)]
         );
+    }
+
+    #[test]
+    fn select_ranges_preserves_top_right_anchor() {
+        let mut selection = SelectionState::default();
+        selection.select_ranges(5, 8, &[(5, 6, 7, 8), (1, 1, 2, 2)], 10, 10);
+
+        assert_eq!(selection.row, 5);
+        assert_eq!(selection.col, 8);
+        assert_eq!(selection.row_end, 7);
+        assert_eq!(selection.col_end, 6);
+        assert_eq!(selection.extra_ranges, vec![(1, 1, 2, 2)]);
+        assert_eq!(
+            selection.all_ranges(10, 10),
+            vec![(5, 6, 7, 8), (1, 1, 2, 2)]
+        );
+    }
+
+    #[test]
+    fn select_ranges_preserves_bottom_left_anchor() {
+        let mut selection = SelectionState::default();
+        selection.select_ranges(7, 6, &[(5, 6, 7, 8)], 10, 10);
+
+        assert_eq!(selection.row, 7);
+        assert_eq!(selection.col, 6);
+        assert_eq!(selection.row_end, 5);
+        assert_eq!(selection.col_end, 8);
+        assert_eq!(selection.all_ranges(10, 10), vec![(5, 6, 7, 8)]);
     }
 
     #[test]

@@ -204,23 +204,21 @@ export class SelectionModel {
     const clampedActiveRow = Math.max(0, Math.min(this._grid.rowCount - 1, activeRow));
     const clampedActiveCol = Math.max(0, Math.min(this._grid.colCount - 1, activeCol));
     let activeIndex = normalized.findIndex((range) =>
-      (range.row1 === clampedActiveRow && range.col1 === clampedActiveCol)
-      || (range.row2 === clampedActiveRow && range.col2 === clampedActiveCol),
+      clampedActiveRow >= range.row1 && clampedActiveRow <= range.row2
+      && clampedActiveCol >= range.col1 && clampedActiveCol <= range.col2,
     );
     if (activeIndex < 0) {
       activeIndex = 0;
     }
     const activeRange = normalized[activeIndex];
-    if (activeRange.row1 === clampedActiveRow && activeRange.col1 === clampedActiveCol) {
-      this._row = activeRange.row1;
-      this._col = activeRange.col1;
-      this._rowEnd = activeRange.row2;
-      this._colEnd = activeRange.col2;
-    } else if (activeRange.row2 === clampedActiveRow && activeRange.col2 === clampedActiveCol) {
-      this._row = activeRange.row2;
-      this._col = activeRange.col2;
-      this._rowEnd = activeRange.row1;
-      this._colEnd = activeRange.col1;
+    if (
+      clampedActiveRow >= activeRange.row1 && clampedActiveRow <= activeRange.row2
+      && clampedActiveCol >= activeRange.col1 && clampedActiveCol <= activeRange.col2
+    ) {
+      this._row = clampedActiveRow;
+      this._col = clampedActiveCol;
+      this._rowEnd = clampedActiveRow === activeRange.row1 ? activeRange.row2 : activeRange.row1;
+      this._colEnd = clampedActiveCol === activeRange.col1 ? activeRange.col2 : activeRange.col1;
     } else {
       this._row = activeRange.row1;
       this._col = activeRange.col1;
