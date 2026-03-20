@@ -4160,18 +4160,18 @@ fn engine_event_to_proto(
                 col,
             }))
         }
-        E::KeyDownEdit { key_code, shift } => {
+        E::KeyDownEdit { key_code, modifier } => {
             Some(grid_event::Event::KeyDownEdit(KeyDownEditEvent {
                 key_code,
-                shift,
+                modifier,
             }))
         }
         E::KeyPressEdit { key_ascii } => Some(grid_event::Event::KeyPressEdit(KeyPressEditEvent {
             key_ascii,
         })),
-        E::KeyUpEdit { key_code, shift } => Some(grid_event::Event::KeyUpEdit(KeyUpEditEvent {
+        E::KeyUpEdit { key_code, modifier } => Some(grid_event::Event::KeyUpEdit(KeyUpEditEvent {
             key_code,
-            shift,
+            modifier,
         })),
         E::CellEditConfigureStyle { row, col } => Some(grid_event::Event::CellEditConfigureStyle(
             CellEditConfigureStyleEvent { row, col },
@@ -4299,45 +4299,45 @@ fn engine_event_to_proto(
         }
         E::MouseDown {
             button,
-            shift,
+            modifier,
             x,
             y,
         } => Some(grid_event::Event::MouseDown(MouseDownEvent {
             button,
-            shift,
+            modifier,
             x,
             y,
         })),
         E::MouseUp {
             button,
-            shift,
+            modifier,
             x,
             y,
         } => Some(grid_event::Event::MouseUp(MouseUpEvent {
             button,
-            shift,
+            modifier,
             x,
             y,
         })),
         E::MouseMove {
             button,
-            shift,
+            modifier,
             x,
             y,
         } => Some(grid_event::Event::MouseMove(MouseMoveEvent {
             button,
-            shift,
+            modifier,
             x,
             y,
         })),
         E::Click => Some(grid_event::Event::Click(ClickEvent {})),
         E::DblClick => Some(grid_event::Event::DblClick(DblClickEvent {})),
-        E::KeyDown { key_code, shift } => {
-            Some(grid_event::Event::KeyDown(KeyDownEvent { key_code, shift }))
+        E::KeyDown { key_code, modifier } => {
+            Some(grid_event::Event::KeyDown(KeyDownEvent { key_code, modifier }))
         }
         E::KeyPress { key_ascii } => Some(grid_event::Event::KeyPress(KeyPressEvent { key_ascii })),
-        E::KeyUp { key_code, shift } => {
-            Some(grid_event::Event::KeyUp(KeyUpEvent { key_code, shift }))
+        E::KeyUp { key_code, modifier } => {
+            Some(grid_event::Event::KeyUp(KeyUpEvent { key_code, modifier }))
         }
         E::CustomRenderCell {
             row,

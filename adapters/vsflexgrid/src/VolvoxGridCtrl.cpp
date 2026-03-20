@@ -343,14 +343,14 @@ void CVolvoxGridCtrl::StartEventThread()
                     }
                     else if (evt.has_key_down()) {
                         auto& e = evt.key_down();
-                        Fire_KeyDown(e.key_code(), e.shift());
+                        Fire_KeyDown(e.key_code(), e.modifier());
                     }
                     else if (evt.has_key_press()) {
                         Fire_KeyPress(evt.key_press().key_ascii());
                     }
                     else if (evt.has_key_up()) {
                         auto& e = evt.key_up();
-                        Fire_KeyUp(e.key_code(), e.shift());
+                        Fire_KeyUp(e.key_code(), e.modifier());
                     }
                     else if (evt.has_cell_changed()) {
                         auto& e = evt.cell_changed();

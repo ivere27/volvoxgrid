@@ -2134,7 +2134,7 @@ pub fn handle_key_down_with_behavior(
         }
         grid.events.push(GridEventData::KeyDownEdit {
             key_code,
-            shift: modifier,
+            modifier,
         });
         return;
     }
@@ -2394,7 +2394,7 @@ pub fn handle_key_down_with_behavior(
 
     grid.events.push(GridEventData::KeyDown {
         key_code,
-        shift: modifier,
+        modifier,
     });
 }
 

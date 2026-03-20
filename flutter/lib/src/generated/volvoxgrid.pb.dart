@@ -16184,11 +16184,11 @@ class CellButtonClickEvent extends $pb.GeneratedMessage {
 class KeyDownEditEvent extends $pb.GeneratedMessage {
   factory KeyDownEditEvent({
     $core.int? keyCode,
-    $core.int? shift,
+    $core.int? modifier,
   }) {
     final result = create();
     if (keyCode != null) result.keyCode = keyCode;
-    if (shift != null) result.shift = shift;
+    if (modifier != null) result.modifier = modifier;
     return result;
   }
 
@@ -16206,7 +16206,7 @@ class KeyDownEditEvent extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'keyCode')
-    ..aI(2, _omitFieldNames ? '' : 'shift')
+    ..aI(2, _omitFieldNames ? '' : 'modifier')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -16238,13 +16238,13 @@ class KeyDownEditEvent extends $pb.GeneratedMessage {
   void clearKeyCode() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get shift => $_getIZ(1);
+  $core.int get modifier => $_getIZ(1);
   @$pb.TagNumber(2)
-  set shift($core.int value) => $_setSignedInt32(1, value);
+  set modifier($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasShift() => $_has(1);
+  $core.bool hasModifier() => $_has(1);
   @$pb.TagNumber(2)
-  void clearShift() => $_clearField(2);
+  void clearModifier() => $_clearField(2);
 }
 
 class KeyPressEditEvent extends $pb.GeneratedMessage {
@@ -16304,11 +16304,11 @@ class KeyPressEditEvent extends $pb.GeneratedMessage {
 class KeyUpEditEvent extends $pb.GeneratedMessage {
   factory KeyUpEditEvent({
     $core.int? keyCode,
-    $core.int? shift,
+    $core.int? modifier,
   }) {
     final result = create();
     if (keyCode != null) result.keyCode = keyCode;
-    if (shift != null) result.shift = shift;
+    if (modifier != null) result.modifier = modifier;
     return result;
   }
 
@@ -16326,7 +16326,7 @@ class KeyUpEditEvent extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'keyCode')
-    ..aI(2, _omitFieldNames ? '' : 'shift')
+    ..aI(2, _omitFieldNames ? '' : 'modifier')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -16358,13 +16358,13 @@ class KeyUpEditEvent extends $pb.GeneratedMessage {
   void clearKeyCode() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get shift => $_getIZ(1);
+  $core.int get modifier => $_getIZ(1);
   @$pb.TagNumber(2)
-  set shift($core.int value) => $_setSignedInt32(1, value);
+  set modifier($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasShift() => $_has(1);
+  $core.bool hasModifier() => $_has(1);
   @$pb.TagNumber(2)
-  void clearShift() => $_clearField(2);
+  void clearModifier() => $_clearField(2);
 }
 
 class CellEditConfigureStyleEvent extends $pb.GeneratedMessage {
@@ -17842,13 +17842,13 @@ class BeforeMouseDownEvent extends $pb.GeneratedMessage {
 class MouseDownEvent extends $pb.GeneratedMessage {
   factory MouseDownEvent({
     $core.int? button,
-    $core.int? shift,
+    $core.int? modifier,
     $core.double? x,
     $core.double? y,
   }) {
     final result = create();
     if (button != null) result.button = button;
-    if (shift != null) result.shift = shift;
+    if (modifier != null) result.modifier = modifier;
     if (x != null) result.x = x;
     if (y != null) result.y = y;
     return result;
@@ -17868,7 +17868,7 @@ class MouseDownEvent extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'button')
-    ..aI(2, _omitFieldNames ? '' : 'shift')
+    ..aI(2, _omitFieldNames ? '' : 'modifier')
     ..aD(3, _omitFieldNames ? '' : 'x', fieldType: $pb.PbFieldType.OF)
     ..aD(4, _omitFieldNames ? '' : 'y', fieldType: $pb.PbFieldType.OF)
     ..hasRequiredFields = false;
@@ -17902,13 +17902,13 @@ class MouseDownEvent extends $pb.GeneratedMessage {
   void clearButton() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get shift => $_getIZ(1);
+  $core.int get modifier => $_getIZ(1);
   @$pb.TagNumber(2)
-  set shift($core.int value) => $_setSignedInt32(1, value);
+  set modifier($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasShift() => $_has(1);
+  $core.bool hasModifier() => $_has(1);
   @$pb.TagNumber(2)
-  void clearShift() => $_clearField(2);
+  void clearModifier() => $_clearField(2);
 
   @$pb.TagNumber(3)
   $core.double get x => $_getN(2);
@@ -17932,13 +17932,13 @@ class MouseDownEvent extends $pb.GeneratedMessage {
 class MouseUpEvent extends $pb.GeneratedMessage {
   factory MouseUpEvent({
     $core.int? button,
-    $core.int? shift,
+    $core.int? modifier,
     $core.double? x,
     $core.double? y,
   }) {
     final result = create();
     if (button != null) result.button = button;
-    if (shift != null) result.shift = shift;
+    if (modifier != null) result.modifier = modifier;
     if (x != null) result.x = x;
     if (y != null) result.y = y;
     return result;
@@ -17958,7 +17958,7 @@ class MouseUpEvent extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'button')
-    ..aI(2, _omitFieldNames ? '' : 'shift')
+    ..aI(2, _omitFieldNames ? '' : 'modifier')
     ..aD(3, _omitFieldNames ? '' : 'x', fieldType: $pb.PbFieldType.OF)
     ..aD(4, _omitFieldNames ? '' : 'y', fieldType: $pb.PbFieldType.OF)
     ..hasRequiredFields = false;
@@ -17992,13 +17992,13 @@ class MouseUpEvent extends $pb.GeneratedMessage {
   void clearButton() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get shift => $_getIZ(1);
+  $core.int get modifier => $_getIZ(1);
   @$pb.TagNumber(2)
-  set shift($core.int value) => $_setSignedInt32(1, value);
+  set modifier($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasShift() => $_has(1);
+  $core.bool hasModifier() => $_has(1);
   @$pb.TagNumber(2)
-  void clearShift() => $_clearField(2);
+  void clearModifier() => $_clearField(2);
 
   @$pb.TagNumber(3)
   $core.double get x => $_getN(2);
@@ -18022,13 +18022,13 @@ class MouseUpEvent extends $pb.GeneratedMessage {
 class MouseMoveEvent extends $pb.GeneratedMessage {
   factory MouseMoveEvent({
     $core.int? button,
-    $core.int? shift,
+    $core.int? modifier,
     $core.double? x,
     $core.double? y,
   }) {
     final result = create();
     if (button != null) result.button = button;
-    if (shift != null) result.shift = shift;
+    if (modifier != null) result.modifier = modifier;
     if (x != null) result.x = x;
     if (y != null) result.y = y;
     return result;
@@ -18048,7 +18048,7 @@ class MouseMoveEvent extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'button')
-    ..aI(2, _omitFieldNames ? '' : 'shift')
+    ..aI(2, _omitFieldNames ? '' : 'modifier')
     ..aD(3, _omitFieldNames ? '' : 'x', fieldType: $pb.PbFieldType.OF)
     ..aD(4, _omitFieldNames ? '' : 'y', fieldType: $pb.PbFieldType.OF)
     ..hasRequiredFields = false;
@@ -18082,13 +18082,13 @@ class MouseMoveEvent extends $pb.GeneratedMessage {
   void clearButton() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get shift => $_getIZ(1);
+  $core.int get modifier => $_getIZ(1);
   @$pb.TagNumber(2)
-  set shift($core.int value) => $_setSignedInt32(1, value);
+  set modifier($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasShift() => $_has(1);
+  $core.bool hasModifier() => $_has(1);
   @$pb.TagNumber(2)
-  void clearShift() => $_clearField(2);
+  void clearModifier() => $_clearField(2);
 
   @$pb.TagNumber(3)
   $core.double get x => $_getN(2);
@@ -18188,11 +18188,11 @@ class DblClickEvent extends $pb.GeneratedMessage {
 class KeyDownEvent extends $pb.GeneratedMessage {
   factory KeyDownEvent({
     $core.int? keyCode,
-    $core.int? shift,
+    $core.int? modifier,
   }) {
     final result = create();
     if (keyCode != null) result.keyCode = keyCode;
-    if (shift != null) result.shift = shift;
+    if (modifier != null) result.modifier = modifier;
     return result;
   }
 
@@ -18210,7 +18210,7 @@ class KeyDownEvent extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'keyCode')
-    ..aI(2, _omitFieldNames ? '' : 'shift')
+    ..aI(2, _omitFieldNames ? '' : 'modifier')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -18242,13 +18242,13 @@ class KeyDownEvent extends $pb.GeneratedMessage {
   void clearKeyCode() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get shift => $_getIZ(1);
+  $core.int get modifier => $_getIZ(1);
   @$pb.TagNumber(2)
-  set shift($core.int value) => $_setSignedInt32(1, value);
+  set modifier($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasShift() => $_has(1);
+  $core.bool hasModifier() => $_has(1);
   @$pb.TagNumber(2)
-  void clearShift() => $_clearField(2);
+  void clearModifier() => $_clearField(2);
 }
 
 class KeyPressEvent extends $pb.GeneratedMessage {
@@ -18308,11 +18308,11 @@ class KeyPressEvent extends $pb.GeneratedMessage {
 class KeyUpEvent extends $pb.GeneratedMessage {
   factory KeyUpEvent({
     $core.int? keyCode,
-    $core.int? shift,
+    $core.int? modifier,
   }) {
     final result = create();
     if (keyCode != null) result.keyCode = keyCode;
-    if (shift != null) result.shift = shift;
+    if (modifier != null) result.modifier = modifier;
     return result;
   }
 
@@ -18330,7 +18330,7 @@ class KeyUpEvent extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'keyCode')
-    ..aI(2, _omitFieldNames ? '' : 'shift')
+    ..aI(2, _omitFieldNames ? '' : 'modifier')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -18361,13 +18361,13 @@ class KeyUpEvent extends $pb.GeneratedMessage {
   void clearKeyCode() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get shift => $_getIZ(1);
+  $core.int get modifier => $_getIZ(1);
   @$pb.TagNumber(2)
-  set shift($core.int value) => $_setSignedInt32(1, value);
+  set modifier($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasShift() => $_has(1);
+  $core.bool hasModifier() => $_has(1);
   @$pb.TagNumber(2)
-  void clearShift() => $_clearField(2);
+  void clearModifier() => $_clearField(2);
 }
 
 /// ── Draw Events ──

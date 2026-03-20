@@ -1759,9 +1759,9 @@ message AfterEditEvent    { int32 row = 1; int32 col = 2; string old_text = 3; s
 message CellEditValidateEvent { int32 row = 1; int32 col = 2; string edit_text = 3; }
 message CellEditChangeEvent   { string text = 1; }
 message CellButtonClickEvent  { int32 row = 1; int32 col = 2; }
-message KeyDownEditEvent  { int32 key_code = 1; int32 shift = 2; }
+message KeyDownEditEvent  { int32 key_code = 1; int32 modifier = 2; }
 message KeyPressEditEvent { int32 key_ascii = 1; }
-message KeyUpEditEvent    { int32 key_code = 1; int32 shift = 2; }
+message KeyUpEditEvent    { int32 key_code = 1; int32 modifier = 2; }
 message CellEditConfigureStyleEvent  { int32 row = 1; int32 col = 2; }
 message CellEditConfigureWindowEvent { int32 row = 1; int32 col = 2; }
 message DropdownClosedEvent {}
@@ -1804,16 +1804,16 @@ message AfterMoveRowEvent     { int32 row = 1; int32 old_position = 2; }
 
 // ── Mouse Events ──
 message BeforeMouseDownEvent { int32 row = 1; int32 col = 2; }
-message MouseDownEvent  { int32 button = 1; int32 shift = 2; float x = 3; float y = 4; }
-message MouseUpEvent    { int32 button = 1; int32 shift = 2; float x = 3; float y = 4; }
-message MouseMoveEvent  { int32 button = 1; int32 shift = 2; float x = 3; float y = 4; }
+message MouseDownEvent  { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
+message MouseUpEvent    { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
+message MouseMoveEvent  { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
 message ClickEvent      {}
 message DblClickEvent   {}
 
 // ── Keyboard Events ──
-message KeyDownEvent  { int32 key_code = 1; int32 shift = 2; }
+message KeyDownEvent  { int32 key_code = 1; int32 modifier = 2; }
 message KeyPressEvent { int32 key_ascii = 1; }
-message KeyUpEvent    { int32 key_code = 1; int32 shift = 2; }
+message KeyUpEvent    { int32 key_code = 1; int32 modifier = 2; }
 
 // ── Draw Events ──
 message CustomRenderCellEvent {

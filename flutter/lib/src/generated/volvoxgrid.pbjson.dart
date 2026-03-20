@@ -7543,14 +7543,14 @@ const KeyDownEditEvent$json = {
   '1': 'KeyDownEditEvent',
   '2': [
     {'1': 'key_code', '3': 1, '4': 1, '5': 5, '10': 'keyCode'},
-    {'1': 'shift', '3': 2, '4': 1, '5': 5, '10': 'shift'},
+    {'1': 'modifier', '3': 2, '4': 1, '5': 5, '10': 'modifier'},
   ],
 };
 
 /// Descriptor for `KeyDownEditEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List keyDownEditEventDescriptor = $convert.base64Decode(
-    'ChBLZXlEb3duRWRpdEV2ZW50EhkKCGtleV9jb2RlGAEgASgFUgdrZXlDb2RlEhQKBXNoaWZ0GA'
-    'IgASgFUgVzaGlmdA==');
+    'ChBLZXlEb3duRWRpdEV2ZW50EhkKCGtleV9jb2RlGAEgASgFUgdrZXlDb2RlEhoKCG1vZGlmaW'
+    'VyGAIgASgFUghtb2RpZmllcg==');
 
 @$core.Deprecated('Use keyPressEditEventDescriptor instead')
 const KeyPressEditEvent$json = {
@@ -7569,14 +7569,14 @@ const KeyUpEditEvent$json = {
   '1': 'KeyUpEditEvent',
   '2': [
     {'1': 'key_code', '3': 1, '4': 1, '5': 5, '10': 'keyCode'},
-    {'1': 'shift', '3': 2, '4': 1, '5': 5, '10': 'shift'},
+    {'1': 'modifier', '3': 2, '4': 1, '5': 5, '10': 'modifier'},
   ],
 };
 
 /// Descriptor for `KeyUpEditEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List keyUpEditEventDescriptor = $convert.base64Decode(
-    'Cg5LZXlVcEVkaXRFdmVudBIZCghrZXlfY29kZRgBIAEoBVIHa2V5Q29kZRIUCgVzaGlmdBgCIA'
-    'EoBVIFc2hpZnQ=');
+    'Cg5LZXlVcEVkaXRFdmVudBIZCghrZXlfY29kZRgBIAEoBVIHa2V5Q29kZRIaCghtb2RpZmllch'
+    'gCIAEoBVIIbW9kaWZpZXI=');
 
 @$core.Deprecated('Use cellEditConfigureStyleEventDescriptor instead')
 const CellEditConfigureStyleEvent$json = {
@@ -7887,7 +7887,7 @@ const MouseDownEvent$json = {
   '1': 'MouseDownEvent',
   '2': [
     {'1': 'button', '3': 1, '4': 1, '5': 5, '10': 'button'},
-    {'1': 'shift', '3': 2, '4': 1, '5': 5, '10': 'shift'},
+    {'1': 'modifier', '3': 2, '4': 1, '5': 5, '10': 'modifier'},
     {'1': 'x', '3': 3, '4': 1, '5': 2, '10': 'x'},
     {'1': 'y', '3': 4, '4': 1, '5': 2, '10': 'y'},
   ],
@@ -7895,15 +7895,15 @@ const MouseDownEvent$json = {
 
 /// Descriptor for `MouseDownEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List mouseDownEventDescriptor = $convert.base64Decode(
-    'Cg5Nb3VzZURvd25FdmVudBIWCgZidXR0b24YASABKAVSBmJ1dHRvbhIUCgVzaGlmdBgCIAEoBV'
-    'IFc2hpZnQSDAoBeBgDIAEoAlIBeBIMCgF5GAQgASgCUgF5');
+    'Cg5Nb3VzZURvd25FdmVudBIWCgZidXR0b24YASABKAVSBmJ1dHRvbhIaCghtb2RpZmllchgCIA'
+    'EoBVIIbW9kaWZpZXISDAoBeBgDIAEoAlIBeBIMCgF5GAQgASgCUgF5');
 
 @$core.Deprecated('Use mouseUpEventDescriptor instead')
 const MouseUpEvent$json = {
   '1': 'MouseUpEvent',
   '2': [
     {'1': 'button', '3': 1, '4': 1, '5': 5, '10': 'button'},
-    {'1': 'shift', '3': 2, '4': 1, '5': 5, '10': 'shift'},
+    {'1': 'modifier', '3': 2, '4': 1, '5': 5, '10': 'modifier'},
     {'1': 'x', '3': 3, '4': 1, '5': 2, '10': 'x'},
     {'1': 'y', '3': 4, '4': 1, '5': 2, '10': 'y'},
   ],
@@ -7911,15 +7911,15 @@ const MouseUpEvent$json = {
 
 /// Descriptor for `MouseUpEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List mouseUpEventDescriptor = $convert.base64Decode(
-    'CgxNb3VzZVVwRXZlbnQSFgoGYnV0dG9uGAEgASgFUgZidXR0b24SFAoFc2hpZnQYAiABKAVSBX'
-    'NoaWZ0EgwKAXgYAyABKAJSAXgSDAoBeRgEIAEoAlIBeQ==');
+    'CgxNb3VzZVVwRXZlbnQSFgoGYnV0dG9uGAEgASgFUgZidXR0b24SGgoIbW9kaWZpZXIYAiABKA'
+    'VSCG1vZGlmaWVyEgwKAXgYAyABKAJSAXgSDAoBeRgEIAEoAlIBeQ==');
 
 @$core.Deprecated('Use mouseMoveEventDescriptor instead')
 const MouseMoveEvent$json = {
   '1': 'MouseMoveEvent',
   '2': [
     {'1': 'button', '3': 1, '4': 1, '5': 5, '10': 'button'},
-    {'1': 'shift', '3': 2, '4': 1, '5': 5, '10': 'shift'},
+    {'1': 'modifier', '3': 2, '4': 1, '5': 5, '10': 'modifier'},
     {'1': 'x', '3': 3, '4': 1, '5': 2, '10': 'x'},
     {'1': 'y', '3': 4, '4': 1, '5': 2, '10': 'y'},
   ],
@@ -7927,8 +7927,8 @@ const MouseMoveEvent$json = {
 
 /// Descriptor for `MouseMoveEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List mouseMoveEventDescriptor = $convert.base64Decode(
-    'Cg5Nb3VzZU1vdmVFdmVudBIWCgZidXR0b24YASABKAVSBmJ1dHRvbhIUCgVzaGlmdBgCIAEoBV'
-    'IFc2hpZnQSDAoBeBgDIAEoAlIBeBIMCgF5GAQgASgCUgF5');
+    'Cg5Nb3VzZU1vdmVFdmVudBIWCgZidXR0b24YASABKAVSBmJ1dHRvbhIaCghtb2RpZmllchgCIA'
+    'EoBVIIbW9kaWZpZXISDAoBeBgDIAEoAlIBeBIMCgF5GAQgASgCUgF5');
 
 @$core.Deprecated('Use clickEventDescriptor instead')
 const ClickEvent$json = {
@@ -7953,14 +7953,14 @@ const KeyDownEvent$json = {
   '1': 'KeyDownEvent',
   '2': [
     {'1': 'key_code', '3': 1, '4': 1, '5': 5, '10': 'keyCode'},
-    {'1': 'shift', '3': 2, '4': 1, '5': 5, '10': 'shift'},
+    {'1': 'modifier', '3': 2, '4': 1, '5': 5, '10': 'modifier'},
   ],
 };
 
 /// Descriptor for `KeyDownEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List keyDownEventDescriptor = $convert.base64Decode(
-    'CgxLZXlEb3duRXZlbnQSGQoIa2V5X2NvZGUYASABKAVSB2tleUNvZGUSFAoFc2hpZnQYAiABKA'
-    'VSBXNoaWZ0');
+    'CgxLZXlEb3duRXZlbnQSGQoIa2V5X2NvZGUYASABKAVSB2tleUNvZGUSGgoIbW9kaWZpZXIYAi'
+    'ABKAVSCG1vZGlmaWVy');
 
 @$core.Deprecated('Use keyPressEventDescriptor instead')
 const KeyPressEvent$json = {
@@ -7979,14 +7979,14 @@ const KeyUpEvent$json = {
   '1': 'KeyUpEvent',
   '2': [
     {'1': 'key_code', '3': 1, '4': 1, '5': 5, '10': 'keyCode'},
-    {'1': 'shift', '3': 2, '4': 1, '5': 5, '10': 'shift'},
+    {'1': 'modifier', '3': 2, '4': 1, '5': 5, '10': 'modifier'},
   ],
 };
 
 /// Descriptor for `KeyUpEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List keyUpEventDescriptor = $convert.base64Decode(
-    'CgpLZXlVcEV2ZW50EhkKCGtleV9jb2RlGAEgASgFUgdrZXlDb2RlEhQKBXNoaWZ0GAIgASgFUg'
-    'VzaGlmdA==');
+    'CgpLZXlVcEV2ZW50EhkKCGtleV9jb2RlGAEgASgFUgdrZXlDb2RlEhoKCG1vZGlmaWVyGAIgAS'
+    'gFUghtb2RpZmllcg==');
 
 @$core.Deprecated('Use customRenderCellEventDescriptor instead')
 const CustomRenderCellEvent$json = {
