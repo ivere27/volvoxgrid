@@ -490,6 +490,38 @@ final $typed_data.Uint8List scrollBarsModeDescriptor = $convert.base64Decode(
     'Cg5TY3JvbGxCYXJzTW9kZRISCg5TQ1JPTExCQVJfTk9ORRAAEhgKFFNDUk9MTEJBUl9IT1JJWk'
     '9OVEFMEAESFgoSU0NST0xMQkFSX1ZFUlRJQ0FMEAISEgoOU0NST0xMQkFSX0JPVEgQAw==');
 
+@$core.Deprecated('Use scrollBarModeDescriptor instead')
+const ScrollBarMode$json = {
+  '1': 'ScrollBarMode',
+  '2': [
+    {'1': 'SCROLLBAR_MODE_AUTO', '2': 0},
+    {'1': 'SCROLLBAR_MODE_ALWAYS', '2': 1},
+    {'1': 'SCROLLBAR_MODE_NEVER', '2': 2},
+  ],
+};
+
+/// Descriptor for `ScrollBarMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List scrollBarModeDescriptor = $convert.base64Decode(
+    'Cg1TY3JvbGxCYXJNb2RlEhcKE1NDUk9MTEJBUl9NT0RFX0FVVE8QABIZChVTQ1JPTExCQVJfTU'
+    '9ERV9BTFdBWVMQARIYChRTQ1JPTExCQVJfTU9ERV9ORVZFUhAC');
+
+@$core.Deprecated('Use scrollBarAppearanceDescriptor instead')
+const ScrollBarAppearance$json = {
+  '1': 'ScrollBarAppearance',
+  '2': [
+    {'1': 'SCROLLBAR_APPEARANCE_CLASSIC', '2': 0},
+    {'1': 'SCROLLBAR_APPEARANCE_FLAT', '2': 1},
+    {'1': 'SCROLLBAR_APPEARANCE_MODERN', '2': 2},
+    {'1': 'SCROLLBAR_APPEARANCE_OVERLAY', '2': 3},
+  ],
+};
+
+/// Descriptor for `ScrollBarAppearance`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List scrollBarAppearanceDescriptor = $convert.base64Decode(
+    'ChNTY3JvbGxCYXJBcHBlYXJhbmNlEiAKHFNDUk9MTEJBUl9BUFBFQVJBTkNFX0NMQVNTSUMQAB'
+    'IdChlTQ1JPTExCQVJfQVBQRUFSQU5DRV9GTEFUEAESHwobU0NST0xMQkFSX0FQUEVBUkFOQ0Vf'
+    'TU9ERVJOEAISIAocU0NST0xMQkFSX0FQUEVBUkFOQ0VfT1ZFUkxBWRAD');
+
 @$core.Deprecated('Use pinPositionDescriptor instead')
 const PinPosition$json = {
   '1': 'PinPosition',
@@ -1282,6 +1314,176 @@ final $typed_data.Uint8List cellValueDescriptor = $convert.base64Decode(
     'CglDZWxsVmFsdWUSFAoEdGV4dBgBIAEoCUgAUgR0ZXh0EhgKBm51bWJlchgCIAEoAUgAUgZudW'
     '1iZXISFAoEZmxhZxgDIAEoCEgAUgRmbGFnEhIKA3JhdxgEIAEoDEgAUgNyYXcSHgoJdGltZXN0'
     'YW1wGAUgASgDSABSCXRpbWVzdGFtcEIHCgV2YWx1ZQ==');
+
+@$core.Deprecated('Use scrollBarColorsDescriptor instead')
+const ScrollBarColors$json = {
+  '1': 'ScrollBarColors',
+  '2': [
+    {'1': 'thumb', '3': 1, '4': 1, '5': 13, '9': 0, '10': 'thumb', '17': true},
+    {
+      '1': 'thumb_hover',
+      '3': 2,
+      '4': 1,
+      '5': 13,
+      '9': 1,
+      '10': 'thumbHover',
+      '17': true
+    },
+    {
+      '1': 'thumb_active',
+      '3': 3,
+      '4': 1,
+      '5': 13,
+      '9': 2,
+      '10': 'thumbActive',
+      '17': true
+    },
+    {'1': 'track', '3': 4, '4': 1, '5': 13, '9': 3, '10': 'track', '17': true},
+    {'1': 'arrow', '3': 5, '4': 1, '5': 13, '9': 4, '10': 'arrow', '17': true},
+    {
+      '1': 'border',
+      '3': 6,
+      '4': 1,
+      '5': 13,
+      '9': 5,
+      '10': 'border',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_thumb'},
+    {'1': '_thumb_hover'},
+    {'1': '_thumb_active'},
+    {'1': '_track'},
+    {'1': '_arrow'},
+    {'1': '_border'},
+  ],
+};
+
+/// Descriptor for `ScrollBarColors`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List scrollBarColorsDescriptor = $convert.base64Decode(
+    'Cg9TY3JvbGxCYXJDb2xvcnMSGQoFdGh1bWIYASABKA1IAFIFdGh1bWKIAQESJAoLdGh1bWJfaG'
+    '92ZXIYAiABKA1IAVIKdGh1bWJIb3ZlcogBARImCgx0aHVtYl9hY3RpdmUYAyABKA1IAlILdGh1'
+    'bWJBY3RpdmWIAQESGQoFdHJhY2sYBCABKA1IA1IFdHJhY2uIAQESGQoFYXJyb3cYBSABKA1IBF'
+    'IFYXJyb3eIAQESGwoGYm9yZGVyGAYgASgNSAVSBmJvcmRlcogBAUIICgZfdGh1bWJCDgoMX3Ro'
+    'dW1iX2hvdmVyQg8KDV90aHVtYl9hY3RpdmVCCAoGX3RyYWNrQggKBl9hcnJvd0IJCgdfYm9yZG'
+    'Vy');
+
+@$core.Deprecated('Use scrollBarConfigDescriptor instead')
+const ScrollBarConfig$json = {
+  '1': 'ScrollBarConfig',
+  '2': [
+    {
+      '1': 'show_h',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.ScrollBarMode',
+      '9': 0,
+      '10': 'showH',
+      '17': true
+    },
+    {
+      '1': 'show_v',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.ScrollBarMode',
+      '9': 1,
+      '10': 'showV',
+      '17': true
+    },
+    {
+      '1': 'appearance',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.ScrollBarAppearance',
+      '9': 2,
+      '10': 'appearance',
+      '17': true
+    },
+    {'1': 'size', '3': 4, '4': 1, '5': 5, '9': 3, '10': 'size', '17': true},
+    {
+      '1': 'min_thumb',
+      '3': 5,
+      '4': 1,
+      '5': 5,
+      '9': 4,
+      '10': 'minThumb',
+      '17': true
+    },
+    {
+      '1': 'corner_radius',
+      '3': 6,
+      '4': 1,
+      '5': 5,
+      '9': 5,
+      '10': 'cornerRadius',
+      '17': true
+    },
+    {
+      '1': 'colors',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.ScrollBarColors',
+      '10': 'colors'
+    },
+    {
+      '1': 'fade_delay_ms',
+      '3': 8,
+      '4': 1,
+      '5': 5,
+      '9': 6,
+      '10': 'fadeDelayMs',
+      '17': true
+    },
+    {
+      '1': 'fade_duration_ms',
+      '3': 9,
+      '4': 1,
+      '5': 5,
+      '9': 7,
+      '10': 'fadeDurationMs',
+      '17': true
+    },
+    {
+      '1': 'margin',
+      '3': 10,
+      '4': 1,
+      '5': 5,
+      '9': 8,
+      '10': 'margin',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_show_h'},
+    {'1': '_show_v'},
+    {'1': '_appearance'},
+    {'1': '_size'},
+    {'1': '_min_thumb'},
+    {'1': '_corner_radius'},
+    {'1': '_fade_delay_ms'},
+    {'1': '_fade_duration_ms'},
+    {'1': '_margin'},
+  ],
+};
+
+/// Descriptor for `ScrollBarConfig`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List scrollBarConfigDescriptor = $convert.base64Decode(
+    'Cg9TY3JvbGxCYXJDb25maWcSOAoGc2hvd19oGAEgASgOMhwudm9sdm94Z3JpZC52MS5TY3JvbG'
+    'xCYXJNb2RlSABSBXNob3dIiAEBEjgKBnNob3dfdhgCIAEoDjIcLnZvbHZveGdyaWQudjEuU2Ny'
+    'b2xsQmFyTW9kZUgBUgVzaG93VogBARJHCgphcHBlYXJhbmNlGAMgASgOMiIudm9sdm94Z3JpZC'
+    '52MS5TY3JvbGxCYXJBcHBlYXJhbmNlSAJSCmFwcGVhcmFuY2WIAQESFwoEc2l6ZRgEIAEoBUgD'
+    'UgRzaXpliAEBEiAKCW1pbl90aHVtYhgFIAEoBUgEUghtaW5UaHVtYogBARIoCg1jb3JuZXJfcm'
+    'FkaXVzGAYgASgFSAVSDGNvcm5lclJhZGl1c4gBARI2CgZjb2xvcnMYByABKAsyHi52b2x2b3hn'
+    'cmlkLnYxLlNjcm9sbEJhckNvbG9yc1IGY29sb3JzEicKDWZhZGVfZGVsYXlfbXMYCCABKAVIBl'
+    'ILZmFkZURlbGF5TXOIAQESLQoQZmFkZV9kdXJhdGlvbl9tcxgJIAEoBUgHUg5mYWRlRHVyYXRp'
+    'b25Nc4gBARIbCgZtYXJnaW4YCiABKAVICFIGbWFyZ2luiAEBQgkKB19zaG93X2hCCQoHX3Nob3'
+    'dfdkINCgtfYXBwZWFyYW5jZUIHCgVfc2l6ZUIMCgpfbWluX3RodW1iQhAKDl9jb3JuZXJfcmFk'
+    'aXVzQhAKDl9mYWRlX2RlbGF5X21zQhMKEV9mYWRlX2R1cmF0aW9uX21zQgkKB19tYXJnaW4=');
 
 @$core.Deprecated('Use regionStyleDescriptor instead')
 const RegionStyle$json = {
@@ -3000,21 +3202,19 @@ const ScrollConfig$json = {
   '1': 'ScrollConfig',
   '2': [
     {
-      '1': 'scrollbars',
+      '1': 'scroll_bar',
       '3': 1,
       '4': 1,
-      '5': 14,
-      '6': '.volvoxgrid.v1.ScrollBarsMode',
-      '9': 0,
-      '10': 'scrollbars',
-      '17': true
+      '5': 11,
+      '6': '.volvoxgrid.v1.ScrollBarConfig',
+      '10': 'scrollBar'
     },
     {
       '1': 'scroll_track',
       '3': 2,
       '4': 1,
       '5': 8,
-      '9': 1,
+      '9': 0,
       '10': 'scrollTrack',
       '17': true
     },
@@ -3023,7 +3223,7 @@ const ScrollConfig$json = {
       '3': 3,
       '4': 1,
       '5': 8,
-      '9': 2,
+      '9': 1,
       '10': 'scrollTips',
       '17': true
     },
@@ -3032,7 +3232,7 @@ const ScrollConfig$json = {
       '3': 4,
       '4': 1,
       '5': 8,
-      '9': 3,
+      '9': 2,
       '10': 'flingEnabled',
       '17': true
     },
@@ -3041,7 +3241,7 @@ const ScrollConfig$json = {
       '3': 5,
       '4': 1,
       '5': 2,
-      '9': 4,
+      '9': 3,
       '10': 'flingImpulseGain',
       '17': true
     },
@@ -3050,7 +3250,7 @@ const ScrollConfig$json = {
       '3': 6,
       '4': 1,
       '5': 2,
-      '9': 5,
+      '9': 4,
       '10': 'flingFriction',
       '17': true
     },
@@ -3059,7 +3259,7 @@ const ScrollConfig$json = {
       '3': 7,
       '4': 1,
       '5': 8,
-      '9': 6,
+      '9': 5,
       '10': 'pinchZoomEnabled',
       '17': true
     },
@@ -3068,13 +3268,22 @@ const ScrollConfig$json = {
       '3': 8,
       '4': 1,
       '5': 8,
-      '9': 7,
+      '9': 6,
       '10': 'fastScroll',
+      '17': true
+    },
+    {
+      '1': 'scrollbars',
+      '3': 9,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.ScrollBarsMode',
+      '9': 7,
+      '10': 'scrollbars',
       '17': true
     },
   ],
   '8': [
-    {'1': '_scrollbars'},
     {'1': '_scroll_track'},
     {'1': '_scroll_tips'},
     {'1': '_fling_enabled'},
@@ -3082,21 +3291,23 @@ const ScrollConfig$json = {
     {'1': '_fling_friction'},
     {'1': '_pinch_zoom_enabled'},
     {'1': '_fast_scroll'},
+    {'1': '_scrollbars'},
   ],
 };
 
 /// Descriptor for `ScrollConfig`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List scrollConfigDescriptor = $convert.base64Decode(
-    'CgxTY3JvbGxDb25maWcSQgoKc2Nyb2xsYmFycxgBIAEoDjIdLnZvbHZveGdyaWQudjEuU2Nyb2'
-    'xsQmFyc01vZGVIAFIKc2Nyb2xsYmFyc4gBARImCgxzY3JvbGxfdHJhY2sYAiABKAhIAVILc2Ny'
-    'b2xsVHJhY2uIAQESJAoLc2Nyb2xsX3RpcHMYAyABKAhIAlIKc2Nyb2xsVGlwc4gBARIoCg1mbG'
-    'luZ19lbmFibGVkGAQgASgISANSDGZsaW5nRW5hYmxlZIgBARIxChJmbGluZ19pbXB1bHNlX2dh'
-    'aW4YBSABKAJIBFIQZmxpbmdJbXB1bHNlR2FpbogBARIqCg5mbGluZ19mcmljdGlvbhgGIAEoAk'
-    'gFUg1mbGluZ0ZyaWN0aW9uiAEBEjEKEnBpbmNoX3pvb21fZW5hYmxlZBgHIAEoCEgGUhBwaW5j'
-    'aFpvb21FbmFibGVkiAEBEiQKC2Zhc3Rfc2Nyb2xsGAggASgISAdSCmZhc3RTY3JvbGyIAQFCDQ'
-    'oLX3Njcm9sbGJhcnNCDwoNX3Njcm9sbF90cmFja0IOCgxfc2Nyb2xsX3RpcHNCEAoOX2ZsaW5n'
-    'X2VuYWJsZWRCFQoTX2ZsaW5nX2ltcHVsc2VfZ2FpbkIRCg9fZmxpbmdfZnJpY3Rpb25CFQoTX3'
-    'BpbmNoX3pvb21fZW5hYmxlZEIOCgxfZmFzdF9zY3JvbGw=');
+    'CgxTY3JvbGxDb25maWcSPQoKc2Nyb2xsX2JhchgBIAEoCzIeLnZvbHZveGdyaWQudjEuU2Nyb2'
+    'xsQmFyQ29uZmlnUglzY3JvbGxCYXISJgoMc2Nyb2xsX3RyYWNrGAIgASgISABSC3Njcm9sbFRy'
+    'YWNriAEBEiQKC3Njcm9sbF90aXBzGAMgASgISAFSCnNjcm9sbFRpcHOIAQESKAoNZmxpbmdfZW'
+    '5hYmxlZBgEIAEoCEgCUgxmbGluZ0VuYWJsZWSIAQESMQoSZmxpbmdfaW1wdWxzZV9nYWluGAUg'
+    'ASgCSANSEGZsaW5nSW1wdWxzZUdhaW6IAQESKgoOZmxpbmdfZnJpY3Rpb24YBiABKAJIBFINZm'
+    'xpbmdGcmljdGlvbogBARIxChJwaW5jaF96b29tX2VuYWJsZWQYByABKAhIBVIQcGluY2hab29t'
+    'RW5hYmxlZIgBARIkCgtmYXN0X3Njcm9sbBgIIAEoCEgGUgpmYXN0U2Nyb2xsiAEBEkIKCnNjcm'
+    '9sbGJhcnMYCSABKA4yHS52b2x2b3hncmlkLnYxLlNjcm9sbEJhcnNNb2RlSAdSCnNjcm9sbGJh'
+    'cnOIAQFCDwoNX3Njcm9sbF90cmFja0IOCgxfc2Nyb2xsX3RpcHNCEAoOX2ZsaW5nX2VuYWJsZW'
+    'RCFQoTX2ZsaW5nX2ltcHVsc2VfZ2FpbkIRCg9fZmxpbmdfZnJpY3Rpb25CFQoTX3BpbmNoX3pv'
+    'b21fZW5hYmxlZEIOCgxfZmFzdF9zY3JvbGxCDQoLX3Njcm9sbGJhcnM=');
 
 @$core.Deprecated('Use outlineConfigDescriptor instead')
 const OutlineConfig$json = {
@@ -8442,6 +8653,8 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.HoverConfig': HoverConfig$json,
   '.volvoxgrid.v1.EditConfig': EditConfig$json,
   '.volvoxgrid.v1.ScrollConfig': ScrollConfig$json,
+  '.volvoxgrid.v1.ScrollBarConfig': ScrollBarConfig$json,
+  '.volvoxgrid.v1.ScrollBarColors': ScrollBarColors$json,
   '.volvoxgrid.v1.OutlineConfig': OutlineConfig$json,
   '.volvoxgrid.v1.SpanConfig': SpanConfig$json,
   '.volvoxgrid.v1.InteractionConfig': InteractionConfig$json,

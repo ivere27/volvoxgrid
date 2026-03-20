@@ -1478,7 +1478,11 @@ impl VolvoxServiceClient {
                         ..Default::default()
                     }),
                     scrolling: Some(pb::ScrollConfig {
-                        scrollbars: Some(pb::ScrollBarsMode::ScrollbarBoth as i32),
+                        scroll_bar: Some(pb::ScrollBarConfig {
+                            show_h: Some(pb::ScrollBarMode::ScrollbarModeAuto as i32),
+                            show_v: Some(pb::ScrollBarMode::ScrollbarModeAuto as i32),
+                            ..Default::default()
+                        }),
                         fling_enabled: Some(true),
                         fast_scroll: Some(true),
                         ..Default::default()

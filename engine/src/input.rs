@@ -2,6 +2,10 @@ use crate::canvas::VisibleRange;
 use crate::event::GridEventData;
 use crate::grid::VolvoxGrid;
 use crate::proto::volvoxgrid::v1 as pb;
+use crate::scrollbar::{
+    bump_scrollbar_fade, compute_scrollbar_geometry, normalize_scrollbar_mode,
+    scrollbar_overlays_content,
+};
 use crate::selection::{hover_mode_has, HOVER_CELL, HOVER_COLUMN, HOVER_NONE, HOVER_ROW};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
@@ -129,6 +133,9 @@ fn visible_top_left_for_scroll(grid: &mut VolvoxGrid, scroll_x: f32, scroll_y: f
 }
 
 fn scroll_by_with_events(grid: &mut VolvoxGrid, dx: f32, dy: f32) -> bool {
+    if dx != 0.0 || dy != 0.0 {
+        let _ = bump_scrollbar_fade(grid);
+    }
     let old = visible_top_left_for_scroll(grid, grid.scroll.scroll_x, grid.scroll.scroll_y);
 
     let mut next_scroll = grid.scroll.clone();
@@ -160,6 +167,7 @@ fn scroll_by_with_events(grid: &mut VolvoxGrid, dx: f32, dy: f32) -> bool {
 }
 
 fn scroll_to_with_events(grid: &mut VolvoxGrid, x: f32, y: f32) -> bool {
+    let _ = bump_scrollbar_fade(grid);
     let old = visible_top_left_for_scroll(grid, grid.scroll.scroll_x, grid.scroll.scroll_y);
 
     let mut next_scroll = grid.scroll.clone();
@@ -399,200 +407,6 @@ fn dropdown_button_rect(cx: i32, cy: i32, cw: i32, ch: i32) -> Option<(i32, i32,
     Some((bx, by, bw, bh))
 }
 
-/// Scrollbar size in pixels (matches render.rs SB_SIZE).
-const SB_SIZE: i32 = 16;
-
-/// Computed scrollbar layout geometry, replicating the logic from `render_scroll_bars`.
-struct ScrollBarGeometry {
-    show_h: bool,
-    show_v: bool,
-    // Horizontal bar
-    h_bar_y: i32,
-    h_left_arrow_x: i32,
-    h_right_arrow_x: i32,
-    h_track_x: i32,
-    h_track_w: i32,
-    h_thumb_x: i32,
-    h_thumb_w: i32,
-    h_thumb_range: i32,
-    h_max_scroll: f32,
-    // Vertical bar
-    v_bar_x: i32,
-    v_top_arrow_y: i32,
-    v_bot_arrow_y: i32,
-    v_track_y: i32,
-    v_track_h: i32,
-    v_thumb_y: i32,
-    v_thumb_h: i32,
-    v_thumb_range: i32,
-    v_max_scroll: f32,
-}
-
-/// Compute scrollbar geometry matching the renderer's `render_scroll_bars` layout.
-fn compute_scrollbar_geometry(grid: &VolvoxGrid) -> ScrollBarGeometry {
-    let buf_w = grid.viewport_width;
-    let buf_h = grid.viewport_height;
-
-    let allow_h = grid.scroll_bars == pb::ScrollBarsMode::ScrollbarHorizontal as i32
-        || grid.scroll_bars == pb::ScrollBarsMode::ScrollbarBoth as i32;
-    let allow_v = grid.scroll_bars == pb::ScrollBarsMode::ScrollbarVertical as i32
-        || grid.scroll_bars == pb::ScrollBarsMode::ScrollbarBoth as i32;
-
-    let fixed_height = grid.layout.row_pos(grid.fixed_rows);
-    let fixed_width = grid.layout.col_pos(grid.fixed_cols);
-    let pinned_height = grid.pinned_top_height() + grid.pinned_bottom_height();
-    let pinned_width = grid.pinned_left_width() + grid.pinned_right_width();
-
-    let compute_max_scroll = |view_w: i32, view_h: i32| -> (f32, f32) {
-        let mx = (grid.layout.total_width - view_w + fixed_width + pinned_width).max(0) as f32;
-        let my = (grid.layout.total_height - view_h + fixed_height + pinned_height).max(0) as f32;
-        (mx, my)
-    };
-
-    // Resolve bar visibility iteratively (same as renderer)
-    let mut show_h = false;
-    let mut show_v = false;
-    if buf_w > SB_SIZE && buf_h > SB_SIZE {
-        for _ in 0..3 {
-            let view_w = (buf_w - if show_v { SB_SIZE } else { 0 }).max(1);
-            let view_h = (buf_h - if show_h { SB_SIZE } else { 0 }).max(1);
-            let (mx, my) = compute_max_scroll(view_w, view_h);
-            let next_h = allow_h && mx > 0.0;
-            let next_v = allow_v && my > 0.0;
-            if next_h == show_h && next_v == show_v {
-                break;
-            }
-            show_h = next_h;
-            show_v = next_v;
-        }
-    }
-
-    let view_w = (buf_w - if show_v { SB_SIZE } else { 0 }).max(1);
-    let view_h = (buf_h - if show_h { SB_SIZE } else { 0 }).max(1);
-    let (max_x, max_y) = compute_max_scroll(view_w, view_h);
-    let scroll_x = grid.scroll.scroll_x.clamp(0.0, max_x);
-    let scroll_y = grid.scroll.scroll_y.clamp(0.0, max_y);
-
-    // Horizontal bar geometry
-    let h_bar_y;
-    let h_left_arrow_x;
-    let h_right_arrow_x;
-    let h_track_x;
-    let h_track_w;
-    let h_thumb_x;
-    let h_thumb_w;
-    let h_thumb_range;
-    if show_h {
-        let x = 0;
-        let w = (buf_w - if show_v { SB_SIZE } else { 0 }).max(SB_SIZE);
-        h_bar_y = buf_h - SB_SIZE;
-        h_left_arrow_x = x;
-        h_right_arrow_x = x + w - SB_SIZE;
-        h_track_x = x + SB_SIZE;
-        h_track_w = (w - SB_SIZE * 2).max(0);
-        if h_track_w > 0 {
-            let mut tw = if max_x > 0.0 {
-                ((view_w as f32 / (view_w as f32 + max_x)) * h_track_w as f32).round() as i32
-            } else {
-                h_track_w
-            };
-            tw = tw.clamp(12, h_track_w.max(12)).min(h_track_w);
-            h_thumb_w = tw;
-            h_thumb_range = (h_track_w - tw).max(0);
-            let thumb_off = if max_x > 0.0 && h_thumb_range > 0 {
-                ((scroll_x / max_x) * h_thumb_range as f32).round() as i32
-            } else {
-                0
-            };
-            h_thumb_x = h_track_x + thumb_off;
-        } else {
-            h_thumb_w = 0;
-            h_thumb_range = 0;
-            h_thumb_x = h_track_x;
-        }
-    } else {
-        h_bar_y = 0;
-        h_left_arrow_x = 0;
-        h_right_arrow_x = 0;
-        h_track_x = 0;
-        h_track_w = 0;
-        h_thumb_x = 0;
-        h_thumb_w = 0;
-        h_thumb_range = 0;
-    }
-
-    // Vertical bar geometry
-    let v_bar_x;
-    let v_top_arrow_y;
-    let v_bot_arrow_y;
-    let v_track_y;
-    let v_track_h;
-    let v_thumb_y;
-    let v_thumb_h;
-    let v_thumb_range;
-    if show_v {
-        let y = 0;
-        let h = (buf_h - if show_h { SB_SIZE } else { 0 }).max(SB_SIZE);
-        v_bar_x = buf_w - SB_SIZE;
-        v_top_arrow_y = y;
-        v_bot_arrow_y = y + h - SB_SIZE;
-        v_track_y = y + SB_SIZE;
-        v_track_h = (h - SB_SIZE * 2).max(0);
-        if v_track_h > 0 {
-            let mut th = if max_y > 0.0 {
-                ((view_h as f32 / (view_h as f32 + max_y)) * v_track_h as f32).round() as i32
-            } else {
-                v_track_h
-            };
-            th = th.clamp(12, v_track_h.max(12)).min(v_track_h);
-            v_thumb_h = th;
-            v_thumb_range = (v_track_h - th).max(0);
-            let thumb_off = if max_y > 0.0 && v_thumb_range > 0 {
-                ((scroll_y / max_y) * v_thumb_range as f32).round() as i32
-            } else {
-                0
-            };
-            v_thumb_y = v_track_y + thumb_off;
-        } else {
-            v_thumb_h = 0;
-            v_thumb_range = 0;
-            v_thumb_y = v_track_y;
-        }
-    } else {
-        v_bar_x = 0;
-        v_top_arrow_y = 0;
-        v_bot_arrow_y = 0;
-        v_track_y = 0;
-        v_track_h = 0;
-        v_thumb_y = 0;
-        v_thumb_h = 0;
-        v_thumb_range = 0;
-    }
-
-    ScrollBarGeometry {
-        show_h,
-        show_v,
-        h_bar_y,
-        h_left_arrow_x,
-        h_right_arrow_x,
-        h_track_x,
-        h_track_w,
-        h_thumb_x,
-        h_thumb_w,
-        h_thumb_range,
-        h_max_scroll: max_x,
-        v_bar_x,
-        v_top_arrow_y,
-        v_bot_arrow_y,
-        v_track_y,
-        v_track_h,
-        v_thumb_y,
-        v_thumb_h,
-        v_thumb_range,
-        v_max_scroll: max_y,
-    }
-}
-
 fn resolve_row_hit(
     grid: &VolvoxGrid,
     layout: &crate::layout::LayoutCache,
@@ -794,7 +608,38 @@ fn resolve_col_hit(
     }
 }
 
-/// Perform hit testing: pixel coordinates -> grid cell + area
+fn scrollbar_geometry(grid: &VolvoxGrid) -> crate::scrollbar::ScrollBarGeometry {
+    compute_scrollbar_geometry(grid, grid.viewport_width, grid.viewport_height)
+}
+
+fn overlay_scrollbar_hidden(grid: &VolvoxGrid, horizontal: bool) -> bool {
+    if !scrollbar_overlays_content(grid.scrollbar_appearance)
+        || grid.scrollbar_drag_active
+        || grid.scrollbar_repeat_active
+        || grid.scrollbar_hover
+    {
+        return false;
+    }
+    let mode = if horizontal {
+        grid.scrollbar_show_h
+    } else {
+        grid.scrollbar_show_v
+    };
+    normalize_scrollbar_mode(mode) != pb::ScrollBarMode::ScrollbarModeAlways as i32
+        && grid.scrollbar_fade_opacity <= 0.0
+}
+
+fn update_scrollbar_hover(grid: &mut VolvoxGrid, x: f32, y: f32) -> bool {
+    let geom = scrollbar_geometry(grid);
+    let hovered = geom.contains_h(x as i32, y as i32) || geom.contains_v(x as i32, y as i32);
+    let mut changed = grid.scrollbar_hover != hovered;
+    grid.scrollbar_hover = hovered;
+    if hovered && bump_scrollbar_fade(grid) {
+        changed = true;
+    }
+    changed
+}
+
 pub fn hit_test(grid: &VolvoxGrid, px: f32, py: f32) -> HitTestResult {
     let px = if grid.right_to_left {
         (grid.viewport_width as f32 - px).max(0.0)
@@ -827,17 +672,16 @@ pub fn hit_test(grid: &VolvoxGrid, px: f32, py: f32) -> HitTestResult {
 
     // Check scrollbar areas first — they overlay the grid content.
     {
-        let sbg = compute_scrollbar_geometry(grid);
+        let sbg = scrollbar_geometry(grid);
         let ix = px as i32;
         let iy = py as i32;
-        if sbg.show_v && ix >= sbg.v_bar_x && ix < sbg.v_bar_x + SB_SIZE {
-            // Exclude the corner area when both bars are shown
-            let v_bottom = if sbg.show_h {
-                grid.viewport_height - SB_SIZE
+        if sbg.show_v && !overlay_scrollbar_hidden(grid, false) && sbg.contains_v(ix, iy) {
+            let v_bottom = if sbg.show_h && !sbg.overlays_content {
+                sbg.corner_y
             } else {
-                grid.viewport_height
+                sbg.v_bar_y + sbg.v_bar_h
             };
-            if iy >= 0 && iy < v_bottom {
+            if iy >= sbg.v_bar_y && iy < v_bottom {
                 return HitTestResult {
                     row: -1,
                     col: -1,
@@ -847,13 +691,13 @@ pub fn hit_test(grid: &VolvoxGrid, px: f32, py: f32) -> HitTestResult {
                 };
             }
         }
-        if sbg.show_h && iy >= sbg.h_bar_y && iy < sbg.h_bar_y + SB_SIZE {
-            let h_right = if sbg.show_v {
-                grid.viewport_width - SB_SIZE
+        if sbg.show_h && !overlay_scrollbar_hidden(grid, true) && sbg.contains_h(ix, iy) {
+            let h_right = if sbg.show_v && !sbg.overlays_content {
+                sbg.corner_x
             } else {
-                grid.viewport_width
+                sbg.h_bar_x + sbg.h_bar_w
             };
-            if ix >= 0 && ix < h_right {
+            if ix >= sbg.h_bar_x && ix < h_right {
                 return HitTestResult {
                     row: -1,
                     col: -1,
@@ -1562,15 +1406,20 @@ pub fn handle_pointer_down_with_behavior(
             }
         }
         HitArea::HScrollBar | HitArea::VScrollBar => {
-            let sbg = compute_scrollbar_geometry(grid);
+            let sbg = scrollbar_geometry(grid);
+            let sb_size = sbg.bar_size as f32;
             let ix = x as i32;
             let iy = y as i32;
             let is_h = hit.area == HitArea::HScrollBar;
+            grid.scrollbar_hover = true;
+            let _ = bump_scrollbar_fade(grid);
 
             if is_h && sbg.show_h {
-                // Left arrow button
-                if ix >= sbg.h_left_arrow_x && ix < sbg.h_left_arrow_x + SB_SIZE {
-                    let step = (SB_SIZE * 3) as f32;
+                if sbg.uses_arrows
+                    && ix >= sbg.h_left_arrow_x
+                    && ix < sbg.h_left_arrow_x + sbg.bar_size
+                {
+                    let step = sb_size * 3.0;
                     scroll_by_with_events(grid, -step, 0.0);
                     grid.mark_dirty_visual();
                     grid.scrollbar_repeat_active = true;
@@ -1579,10 +1428,11 @@ pub fn handle_pointer_down_with_behavior(
                     grid.scrollbar_repeat_delay = 0.4;
                     grid.scrollbar_repeat_is_track = false;
                     grid.scrollbar_repeat_mouse_pos = 0.0;
-                }
-                // Right arrow button
-                else if ix >= sbg.h_right_arrow_x && ix < sbg.h_right_arrow_x + SB_SIZE {
-                    let step = (SB_SIZE * 3) as f32;
+                } else if sbg.uses_arrows
+                    && ix >= sbg.h_right_arrow_x
+                    && ix < sbg.h_right_arrow_x + sbg.bar_size
+                {
+                    let step = sb_size * 3.0;
                     scroll_by_with_events(grid, step, 0.0);
                     grid.mark_dirty_visual();
                     grid.scrollbar_repeat_active = true;
@@ -1591,19 +1441,14 @@ pub fn handle_pointer_down_with_behavior(
                     grid.scrollbar_repeat_delay = 0.4;
                     grid.scrollbar_repeat_is_track = false;
                     grid.scrollbar_repeat_mouse_pos = 0.0;
-                }
-                // Track area (including thumb)
-                else if ix >= sbg.h_track_x && ix < sbg.h_track_x + sbg.h_track_w {
+                } else if ix >= sbg.h_track_x && ix < sbg.h_track_x + sbg.h_track_w {
                     if ix >= sbg.h_thumb_x && ix < sbg.h_thumb_x + sbg.h_thumb_w {
-                        // Thumb: start drag
                         grid.scrollbar_drag_active = true;
                         grid.scrollbar_drag_horizontal = true;
                         grid.scrollbar_drag_start_pos = x;
                         grid.scrollbar_drag_start_scroll = grid.scroll.scroll_x;
                     } else if ix < sbg.h_thumb_x {
-                        // Track left of thumb: page scroll left
-                        let page =
-                            (grid.viewport_width - if sbg.show_v { SB_SIZE } else { 0 }) as f32;
+                        let page = sbg.view_w as f32;
                         scroll_by_with_events(grid, -page, 0.0);
                         grid.mark_dirty_visual();
                         grid.scrollbar_repeat_active = true;
@@ -1613,9 +1458,7 @@ pub fn handle_pointer_down_with_behavior(
                         grid.scrollbar_repeat_is_track = true;
                         grid.scrollbar_repeat_mouse_pos = ix as f32;
                     } else {
-                        // Track right of thumb: page scroll right
-                        let page =
-                            (grid.viewport_width - if sbg.show_v { SB_SIZE } else { 0 }) as f32;
+                        let page = sbg.view_w as f32;
                         scroll_by_with_events(grid, page, 0.0);
                         grid.mark_dirty_visual();
                         grid.scrollbar_repeat_active = true;
@@ -1627,9 +1470,11 @@ pub fn handle_pointer_down_with_behavior(
                     }
                 }
             } else if !is_h && sbg.show_v {
-                // Top arrow button
-                if iy >= sbg.v_top_arrow_y && iy < sbg.v_top_arrow_y + SB_SIZE {
-                    let step = (SB_SIZE * 3) as f32;
+                if sbg.uses_arrows
+                    && iy >= sbg.v_top_arrow_y
+                    && iy < sbg.v_top_arrow_y + sbg.bar_size
+                {
+                    let step = sb_size * 3.0;
                     scroll_by_with_events(grid, 0.0, -step);
                     grid.mark_dirty_visual();
                     grid.scrollbar_repeat_active = true;
@@ -1638,10 +1483,11 @@ pub fn handle_pointer_down_with_behavior(
                     grid.scrollbar_repeat_delay = 0.4;
                     grid.scrollbar_repeat_is_track = false;
                     grid.scrollbar_repeat_mouse_pos = 0.0;
-                }
-                // Bottom arrow button
-                else if iy >= sbg.v_bot_arrow_y && iy < sbg.v_bot_arrow_y + SB_SIZE {
-                    let step = (SB_SIZE * 3) as f32;
+                } else if sbg.uses_arrows
+                    && iy >= sbg.v_bot_arrow_y
+                    && iy < sbg.v_bot_arrow_y + sbg.bar_size
+                {
+                    let step = sb_size * 3.0;
                     scroll_by_with_events(grid, 0.0, step);
                     grid.mark_dirty_visual();
                     grid.scrollbar_repeat_active = true;
@@ -1650,19 +1496,14 @@ pub fn handle_pointer_down_with_behavior(
                     grid.scrollbar_repeat_delay = 0.4;
                     grid.scrollbar_repeat_is_track = false;
                     grid.scrollbar_repeat_mouse_pos = 0.0;
-                }
-                // Track area (including thumb)
-                else if iy >= sbg.v_track_y && iy < sbg.v_track_y + sbg.v_track_h {
+                } else if iy >= sbg.v_track_y && iy < sbg.v_track_y + sbg.v_track_h {
                     if iy >= sbg.v_thumb_y && iy < sbg.v_thumb_y + sbg.v_thumb_h {
-                        // Thumb: start drag
                         grid.scrollbar_drag_active = true;
                         grid.scrollbar_drag_horizontal = false;
                         grid.scrollbar_drag_start_pos = y;
                         grid.scrollbar_drag_start_scroll = grid.scroll.scroll_y;
                     } else if iy < sbg.v_thumb_y {
-                        // Track above thumb: page scroll up
-                        let page =
-                            (grid.viewport_height - if sbg.show_h { SB_SIZE } else { 0 }) as f32;
+                        let page = sbg.view_h as f32;
                         scroll_by_with_events(grid, 0.0, -page);
                         grid.mark_dirty_visual();
                         grid.scrollbar_repeat_active = true;
@@ -1672,9 +1513,7 @@ pub fn handle_pointer_down_with_behavior(
                         grid.scrollbar_repeat_is_track = true;
                         grid.scrollbar_repeat_mouse_pos = iy as f32;
                     } else {
-                        // Track below thumb: page scroll down
-                        let page =
-                            (grid.viewport_height - if sbg.show_h { SB_SIZE } else { 0 }) as f32;
+                        let page = sbg.view_h as f32;
                         scroll_by_with_events(grid, 0.0, page);
                         grid.mark_dirty_visual();
                         grid.scrollbar_repeat_active = true;
@@ -1713,7 +1552,8 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, _
 
     // Handle active scrollbar thumb drag
     if grid.scrollbar_drag_active {
-        let sbg = compute_scrollbar_geometry(grid);
+        let sbg = scrollbar_geometry(grid);
+        let _ = bump_scrollbar_fade(grid);
         if grid.scrollbar_drag_horizontal {
             let delta_px = x - grid.scrollbar_drag_start_pos;
             let new_scroll = if sbg.h_thumb_range > 0 && sbg.h_max_scroll > 0.0 {
@@ -1818,6 +1658,10 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, _
         return;
     }
 
+    if update_scrollbar_hover(grid, x, y) {
+        grid.mark_dirty_visual();
+    }
+
     let prev_mouse_row = grid.mouse_row;
     let prev_mouse_col = grid.mouse_col;
     let hit = hit_test(grid, x, y);
@@ -1889,6 +1733,10 @@ pub fn handle_pointer_up(grid: &mut VolvoxGrid, x: f32, y: f32, _button: i32, _m
     // Complete scrollbar thumb drag
     if grid.scrollbar_drag_active {
         grid.scrollbar_drag_active = false;
+        let hover_changed = update_scrollbar_hover(grid, x, y);
+        if hover_changed {
+            grid.mark_dirty_visual();
+        }
         grid.mark_dirty_visual();
         return;
     }
@@ -2132,10 +1980,8 @@ pub fn handle_key_down_with_behavior(
             }
             _ => {}
         }
-        grid.events.push(GridEventData::KeyDownEdit {
-            key_code,
-            modifier,
-        });
+        grid.events
+            .push(GridEventData::KeyDownEdit { key_code, modifier });
         return;
     }
 
@@ -2392,10 +2238,8 @@ pub fn handle_key_down_with_behavior(
         grid.mark_dirty();
     }
 
-    grid.events.push(GridEventData::KeyDown {
-        key_code,
-        modifier,
-    });
+    grid.events
+        .push(GridEventData::KeyDown { key_code, modifier });
 }
 
 /// Handle key press event (character input)
@@ -2560,6 +2404,9 @@ pub fn handle_scroll(grid: &mut VolvoxGrid, delta_x: f32, delta_y: f32) {
     if grid.col_drag_active || grid.col_drag_pending {
         return;
     }
+    if delta_x != 0.0 || delta_y != 0.0 {
+        let _ = bump_scrollbar_fade(grid);
+    }
 
     let line_height = grid.default_row_height as f32;
     let dx = delta_x * line_height;
@@ -2639,9 +2486,8 @@ pub fn tick_scrollbar_repeat(grid: &mut VolvoxGrid, dt_seconds: f32) -> bool {
     if grid.scrollbar_repeat_delay > 0.0 {
         return false;
     }
-    // For track clicks, stop repeating once the thumb has reached the click position.
     if grid.scrollbar_repeat_is_track {
-        let sbg = compute_scrollbar_geometry(grid);
+        let sbg = scrollbar_geometry(grid);
         let mp = grid.scrollbar_repeat_mouse_pos as i32;
         let thumb_covers_mouse = if grid.scrollbar_repeat_horizontal {
             mp >= sbg.h_thumb_x && mp < sbg.h_thumb_x + sbg.h_thumb_w
@@ -2649,8 +2495,6 @@ pub fn tick_scrollbar_repeat(grid: &mut VolvoxGrid, dt_seconds: f32) -> bool {
             mp >= sbg.v_thumb_y && mp < sbg.v_thumb_y + sbg.v_thumb_h
         };
         if thumb_covers_mouse {
-            // Transition into thumb drag so moving the mouse while still
-            // holding the button drags the scrollbar thumb.
             grid.scrollbar_repeat_active = false;
             grid.scrollbar_drag_active = true;
             grid.scrollbar_drag_horizontal = grid.scrollbar_repeat_horizontal;
@@ -2663,7 +2507,6 @@ pub fn tick_scrollbar_repeat(grid: &mut VolvoxGrid, dt_seconds: f32) -> bool {
             return false;
         }
     }
-    // Apply the scroll delta
     let scrolled = if grid.scrollbar_repeat_horizontal {
         scroll_by_with_events(grid, grid.scrollbar_repeat_delta, 0.0)
     } else {
@@ -2672,9 +2515,41 @@ pub fn tick_scrollbar_repeat(grid: &mut VolvoxGrid, dt_seconds: f32) -> bool {
     if scrolled {
         grid.mark_dirty_visual();
     }
-    // Set short interval for subsequent repeats (~50ms)
     grid.scrollbar_repeat_delay = 0.05;
     scrolled
+}
+
+pub fn tick_scrollbar_fade(grid: &mut VolvoxGrid, dt_seconds: f32) -> bool {
+    if !scrollbar_overlays_content(grid.scrollbar_appearance)
+        || !dt_seconds.is_finite()
+        || dt_seconds <= 0.0
+    {
+        return false;
+    }
+    if grid.scrollbar_hover || grid.scrollbar_drag_active || grid.scrollbar_repeat_active {
+        let changed = bump_scrollbar_fade(grid);
+        if changed {
+            grid.mark_dirty_visual();
+        }
+        return changed;
+    }
+
+    let old_opacity = grid.scrollbar_fade_opacity;
+    let old_timer = grid.scrollbar_fade_timer;
+    if grid.scrollbar_fade_timer > 0.0 {
+        grid.scrollbar_fade_timer = (grid.scrollbar_fade_timer - dt_seconds).max(0.0);
+    } else {
+        let duration = (grid.scrollbar_fade_duration_ms.max(1) as f32) / 1000.0;
+        grid.scrollbar_fade_opacity =
+            (grid.scrollbar_fade_opacity - dt_seconds / duration).clamp(0.0, 1.0);
+    }
+
+    let changed = (grid.scrollbar_fade_opacity - old_opacity).abs() > f32::EPSILON
+        || (old_timer > 0.0 && grid.scrollbar_fade_timer == 0.0);
+    if changed {
+        grid.mark_dirty_visual();
+    }
+    changed
 }
 
 #[cfg(test)]
@@ -3309,6 +3184,83 @@ mod tests {
         assert_eq!(grid.bottom_row(), grid.rows - 1);
         assert_eq!(grid.top_row(), locked_top_row);
         assert_eq!(grid.scroll.scroll_y, locked_scroll_y);
+    }
+
+    #[test]
+    fn overlay_scrollbar_geometry_does_not_shrink_viewport() {
+        let mut grid = VolvoxGrid::new(1, 200, 120, 50, 12, 1, 1);
+        prime_layout(&mut grid);
+        grid.scrollbar_show_h =
+            crate::proto::volvoxgrid::v1::ScrollBarMode::ScrollbarModeAlways as i32;
+        grid.scrollbar_show_v =
+            crate::proto::volvoxgrid::v1::ScrollBarMode::ScrollbarModeAlways as i32;
+        grid.scrollbar_appearance =
+            crate::proto::volvoxgrid::v1::ScrollBarAppearance::ScrollbarAppearanceOverlay as i32;
+        grid.scrollbar_size = 6;
+        grid.scrollbar_margin = 2;
+
+        let geom = scrollbar_geometry(&grid);
+
+        assert!(geom.show_h);
+        assert!(geom.show_v);
+        assert_eq!(geom.view_w, grid.viewport_width);
+        assert_eq!(geom.view_h, grid.viewport_height);
+        assert_eq!(
+            geom.h_bar_y,
+            grid.viewport_height - grid.scrollbar_size - grid.scrollbar_margin
+        );
+    }
+
+    #[test]
+    fn overlay_scrollbar_hover_resets_fade() {
+        let mut grid = VolvoxGrid::new(1, 200, 120, 50, 12, 1, 1);
+        prime_layout(&mut grid);
+        grid.scrollbar_show_h =
+            crate::proto::volvoxgrid::v1::ScrollBarMode::ScrollbarModeAlways as i32;
+        grid.scrollbar_show_v =
+            crate::proto::volvoxgrid::v1::ScrollBarMode::ScrollbarModeAlways as i32;
+        grid.scrollbar_appearance =
+            crate::proto::volvoxgrid::v1::ScrollBarAppearance::ScrollbarAppearanceOverlay as i32;
+        grid.scrollbar_size = 6;
+        grid.scrollbar_margin = 2;
+        grid.scrollbar_fade_opacity = 0.0;
+        grid.scrollbar_fade_timer = 0.0;
+
+        let geom = scrollbar_geometry(&grid);
+        handle_pointer_move(
+            &mut grid,
+            (geom.h_bar_x + 1) as f32,
+            (geom.h_bar_y + 1) as f32,
+            0,
+            0,
+        );
+
+        assert!(grid.scrollbar_hover);
+        assert_eq!(grid.scrollbar_fade_opacity, 1.0);
+        assert!(grid.scrollbar_fade_timer > 0.0);
+    }
+
+    #[test]
+    fn overlay_vertical_always_stays_hittable_when_horizontal_fades() {
+        let mut grid = VolvoxGrid::new(1, 200, 120, 50, 12, 1, 1);
+        prime_layout(&mut grid);
+        grid.scrollbar_show_h =
+            crate::proto::volvoxgrid::v1::ScrollBarMode::ScrollbarModeAuto as i32;
+        grid.scrollbar_show_v =
+            crate::proto::volvoxgrid::v1::ScrollBarMode::ScrollbarModeAlways as i32;
+        grid.scrollbar_appearance =
+            crate::proto::volvoxgrid::v1::ScrollBarAppearance::ScrollbarAppearanceOverlay as i32;
+        grid.scrollbar_size = 6;
+        grid.scrollbar_margin = 2;
+        grid.scrollbar_fade_opacity = 0.0;
+        grid.scrollbar_fade_timer = 0.0;
+
+        let geom = scrollbar_geometry(&grid);
+        let vertical = hit_test(&grid, (geom.v_bar_x + 1) as f32, (geom.v_bar_y + 1) as f32);
+        let horizontal = hit_test(&grid, (geom.h_bar_x + 1) as f32, (geom.h_bar_y + 1) as f32);
+
+        assert!(matches!(vertical.area, HitArea::VScrollBar));
+        assert!(!matches!(horizontal.area, HitArea::HScrollBar));
     }
 
     #[test]

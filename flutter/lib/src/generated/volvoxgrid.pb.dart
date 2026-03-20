@@ -950,6 +950,289 @@ class CellValue extends $pb.GeneratedMessage {
   void clearTimestamp() => $_clearField(5);
 }
 
+class ScrollBarColors extends $pb.GeneratedMessage {
+  factory ScrollBarColors({
+    $core.int? thumb,
+    $core.int? thumbHover,
+    $core.int? thumbActive,
+    $core.int? track,
+    $core.int? arrow,
+    $core.int? border,
+  }) {
+    final result = create();
+    if (thumb != null) result.thumb = thumb;
+    if (thumbHover != null) result.thumbHover = thumbHover;
+    if (thumbActive != null) result.thumbActive = thumbActive;
+    if (track != null) result.track = track;
+    if (arrow != null) result.arrow = arrow;
+    if (border != null) result.border = border;
+    return result;
+  }
+
+  ScrollBarColors._();
+
+  factory ScrollBarColors.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ScrollBarColors.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ScrollBarColors',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'thumb', fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'thumbHover', fieldType: $pb.PbFieldType.OU3)
+    ..aI(3, _omitFieldNames ? '' : 'thumbActive',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(4, _omitFieldNames ? '' : 'track', fieldType: $pb.PbFieldType.OU3)
+    ..aI(5, _omitFieldNames ? '' : 'arrow', fieldType: $pb.PbFieldType.OU3)
+    ..aI(6, _omitFieldNames ? '' : 'border', fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ScrollBarColors clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ScrollBarColors copyWith(void Function(ScrollBarColors) updates) =>
+      super.copyWith((message) => updates(message as ScrollBarColors))
+          as ScrollBarColors;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ScrollBarColors create() => ScrollBarColors._();
+  @$core.override
+  ScrollBarColors createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ScrollBarColors getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ScrollBarColors>(create);
+  static ScrollBarColors? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get thumb => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set thumb($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasThumb() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearThumb() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get thumbHover => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set thumbHover($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasThumbHover() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearThumbHover() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get thumbActive => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set thumbActive($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasThumbActive() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearThumbActive() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get track => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set track($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTrack() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTrack() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get arrow => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set arrow($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasArrow() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearArrow() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get border => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set border($core.int value) => $_setUnsignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasBorder() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearBorder() => $_clearField(6);
+}
+
+class ScrollBarConfig extends $pb.GeneratedMessage {
+  factory ScrollBarConfig({
+    ScrollBarMode? showH,
+    ScrollBarMode? showV,
+    ScrollBarAppearance? appearance,
+    $core.int? size,
+    $core.int? minThumb,
+    $core.int? cornerRadius,
+    ScrollBarColors? colors,
+    $core.int? fadeDelayMs,
+    $core.int? fadeDurationMs,
+    $core.int? margin,
+  }) {
+    final result = create();
+    if (showH != null) result.showH = showH;
+    if (showV != null) result.showV = showV;
+    if (appearance != null) result.appearance = appearance;
+    if (size != null) result.size = size;
+    if (minThumb != null) result.minThumb = minThumb;
+    if (cornerRadius != null) result.cornerRadius = cornerRadius;
+    if (colors != null) result.colors = colors;
+    if (fadeDelayMs != null) result.fadeDelayMs = fadeDelayMs;
+    if (fadeDurationMs != null) result.fadeDurationMs = fadeDurationMs;
+    if (margin != null) result.margin = margin;
+    return result;
+  }
+
+  ScrollBarConfig._();
+
+  factory ScrollBarConfig.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ScrollBarConfig.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ScrollBarConfig',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aE<ScrollBarMode>(1, _omitFieldNames ? '' : 'showH',
+        enumValues: ScrollBarMode.values)
+    ..aE<ScrollBarMode>(2, _omitFieldNames ? '' : 'showV',
+        enumValues: ScrollBarMode.values)
+    ..aE<ScrollBarAppearance>(3, _omitFieldNames ? '' : 'appearance',
+        enumValues: ScrollBarAppearance.values)
+    ..aI(4, _omitFieldNames ? '' : 'size')
+    ..aI(5, _omitFieldNames ? '' : 'minThumb')
+    ..aI(6, _omitFieldNames ? '' : 'cornerRadius')
+    ..aOM<ScrollBarColors>(7, _omitFieldNames ? '' : 'colors',
+        subBuilder: ScrollBarColors.create)
+    ..aI(8, _omitFieldNames ? '' : 'fadeDelayMs')
+    ..aI(9, _omitFieldNames ? '' : 'fadeDurationMs')
+    ..aI(10, _omitFieldNames ? '' : 'margin')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ScrollBarConfig clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ScrollBarConfig copyWith(void Function(ScrollBarConfig) updates) =>
+      super.copyWith((message) => updates(message as ScrollBarConfig))
+          as ScrollBarConfig;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ScrollBarConfig create() => ScrollBarConfig._();
+  @$core.override
+  ScrollBarConfig createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ScrollBarConfig getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ScrollBarConfig>(create);
+  static ScrollBarConfig? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ScrollBarMode get showH => $_getN(0);
+  @$pb.TagNumber(1)
+  set showH(ScrollBarMode value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasShowH() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearShowH() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  ScrollBarMode get showV => $_getN(1);
+  @$pb.TagNumber(2)
+  set showV(ScrollBarMode value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasShowV() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearShowV() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  ScrollBarAppearance get appearance => $_getN(2);
+  @$pb.TagNumber(3)
+  set appearance(ScrollBarAppearance value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAppearance() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAppearance() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get size => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set size($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSize() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSize() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get minThumb => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set minThumb($core.int value) => $_setSignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasMinThumb() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearMinThumb() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get cornerRadius => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set cornerRadius($core.int value) => $_setSignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCornerRadius() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCornerRadius() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  ScrollBarColors get colors => $_getN(6);
+  @$pb.TagNumber(7)
+  set colors(ScrollBarColors value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasColors() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearColors() => $_clearField(7);
+  @$pb.TagNumber(7)
+  ScrollBarColors ensureColors() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  $core.int get fadeDelayMs => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set fadeDelayMs($core.int value) => $_setSignedInt32(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasFadeDelayMs() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearFadeDelayMs() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get fadeDurationMs => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set fadeDurationMs($core.int value) => $_setSignedInt32(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasFadeDurationMs() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearFadeDurationMs() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get margin => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set margin($core.int value) => $_setSignedInt32(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasMargin() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearMargin() => $_clearField(10);
+}
+
 /// Override style for a region (fixed rows, frozen rows, etc.).
 /// Only set fields override the grid-level default.
 class RegionStyle extends $pb.GeneratedMessage {
@@ -3968,7 +4251,7 @@ class EditConfig extends $pb.GeneratedMessage {
 /// ── Scrolling ──
 class ScrollConfig extends $pb.GeneratedMessage {
   factory ScrollConfig({
-    ScrollBarsMode? scrollbars,
+    ScrollBarConfig? scrollBar,
     $core.bool? scrollTrack,
     $core.bool? scrollTips,
     $core.bool? flingEnabled,
@@ -3976,9 +4259,10 @@ class ScrollConfig extends $pb.GeneratedMessage {
     $core.double? flingFriction,
     $core.bool? pinchZoomEnabled,
     $core.bool? fastScroll,
+    ScrollBarsMode? scrollbars,
   }) {
     final result = create();
-    if (scrollbars != null) result.scrollbars = scrollbars;
+    if (scrollBar != null) result.scrollBar = scrollBar;
     if (scrollTrack != null) result.scrollTrack = scrollTrack;
     if (scrollTips != null) result.scrollTips = scrollTips;
     if (flingEnabled != null) result.flingEnabled = flingEnabled;
@@ -3986,6 +4270,7 @@ class ScrollConfig extends $pb.GeneratedMessage {
     if (flingFriction != null) result.flingFriction = flingFriction;
     if (pinchZoomEnabled != null) result.pinchZoomEnabled = pinchZoomEnabled;
     if (fastScroll != null) result.fastScroll = fastScroll;
+    if (scrollbars != null) result.scrollbars = scrollbars;
     return result;
   }
 
@@ -4002,8 +4287,8 @@ class ScrollConfig extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'ScrollConfig',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aE<ScrollBarsMode>(1, _omitFieldNames ? '' : 'scrollbars',
-        enumValues: ScrollBarsMode.values)
+    ..aOM<ScrollBarConfig>(1, _omitFieldNames ? '' : 'scrollBar',
+        subBuilder: ScrollBarConfig.create)
     ..aOB(2, _omitFieldNames ? '' : 'scrollTrack')
     ..aOB(3, _omitFieldNames ? '' : 'scrollTips')
     ..aOB(4, _omitFieldNames ? '' : 'flingEnabled')
@@ -4013,6 +4298,8 @@ class ScrollConfig extends $pb.GeneratedMessage {
         fieldType: $pb.PbFieldType.OF)
     ..aOB(7, _omitFieldNames ? '' : 'pinchZoomEnabled')
     ..aOB(8, _omitFieldNames ? '' : 'fastScroll')
+    ..aE<ScrollBarsMode>(9, _omitFieldNames ? '' : 'scrollbars',
+        enumValues: ScrollBarsMode.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4035,13 +4322,15 @@ class ScrollConfig extends $pb.GeneratedMessage {
   static ScrollConfig? _defaultInstance;
 
   @$pb.TagNumber(1)
-  ScrollBarsMode get scrollbars => $_getN(0);
+  ScrollBarConfig get scrollBar => $_getN(0);
   @$pb.TagNumber(1)
-  set scrollbars(ScrollBarsMode value) => $_setField(1, value);
+  set scrollBar(ScrollBarConfig value) => $_setField(1, value);
   @$pb.TagNumber(1)
-  $core.bool hasScrollbars() => $_has(0);
+  $core.bool hasScrollBar() => $_has(0);
   @$pb.TagNumber(1)
-  void clearScrollbars() => $_clearField(1);
+  void clearScrollBar() => $_clearField(1);
+  @$pb.TagNumber(1)
+  ScrollBarConfig ensureScrollBar() => $_ensure(0);
 
   @$pb.TagNumber(2)
   $core.bool get scrollTrack => $_getBF(1);
@@ -4105,6 +4394,15 @@ class ScrollConfig extends $pb.GeneratedMessage {
   $core.bool hasFastScroll() => $_has(7);
   @$pb.TagNumber(8)
   void clearFastScroll() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  ScrollBarsMode get scrollbars => $_getN(8);
+  @$pb.TagNumber(9)
+  set scrollbars(ScrollBarsMode value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasScrollbars() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearScrollbars() => $_clearField(9);
 }
 
 /// ── Outline / Tree ──

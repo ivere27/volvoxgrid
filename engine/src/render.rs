@@ -649,7 +649,8 @@ mod tests {
     fn scroll_blit_test_grid(scroll_blit_enabled: bool) -> VolvoxGrid {
         let mut grid = VolvoxGrid::new(1, 320, 220, 40, 12, 1, 1);
         grid.scroll_blit_enabled = scroll_blit_enabled;
-        grid.scroll_bars = pb::ScrollBarsMode::ScrollbarBoth as i32;
+        grid.scrollbar_show_h = pb::ScrollBarMode::ScrollbarModeAuto as i32;
+        grid.scrollbar_show_v = pb::ScrollBarMode::ScrollbarModeAuto as i32;
         grid.indicator_bands.row_start.visible = true;
         grid.indicator_bands.row_start.width_px = 36;
         grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;

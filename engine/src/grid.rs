@@ -18,6 +18,11 @@ use crate::outline::OutlineState;
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::row::RowProps;
 use crate::scroll::ScrollState;
+use crate::scrollbar::{
+    scrollbar_fade_animating, scrollbar_overlays_content, ScrollBarColors,
+    DEFAULT_SCROLLBAR_FADE_DELAY_MS, DEFAULT_SCROLLBAR_FADE_DURATION_MS, DEFAULT_SCROLLBAR_MARGIN,
+    DEFAULT_SCROLLBAR_MIN_THUMB,
+};
 use crate::selection::SelectionState;
 use crate::sort::SortState;
 use crate::span::SpanState;
@@ -268,8 +273,34 @@ pub struct VolvoxGrid {
     pub auto_size_mode: i32,
     /// Whether double-clicking a column border auto-sizes the column.
     pub auto_size_mouse: bool,
-    /// Scroll bar visibility: 0=none, 1=horizontal, 2=vertical, 3=both.
-    pub scroll_bars: i32,
+    /// Horizontal scrollbar visibility mode.
+    pub scrollbar_show_h: i32,
+    /// Vertical scrollbar visibility mode.
+    pub scrollbar_show_v: i32,
+    /// Scrollbar appearance preset.
+    pub scrollbar_appearance: i32,
+    /// Scrollbar thickness in pixels.
+    pub scrollbar_size: i32,
+    /// Minimum scrollbar thumb length in pixels.
+    pub scrollbar_min_thumb: i32,
+    /// Thumb corner radius in pixels.
+    pub scrollbar_corner_radius: i32,
+    /// Resolved scrollbar colors.
+    pub scrollbar_colors: ScrollBarColors,
+    /// Overlay scrollbar fade delay in milliseconds.
+    pub scrollbar_fade_delay_ms: i32,
+    /// Overlay scrollbar fade duration in milliseconds.
+    pub scrollbar_fade_duration_ms: i32,
+    /// Overlay scrollbar edge inset in pixels.
+    pub scrollbar_margin: i32,
+    /// Overlay scrollbar opacity in the 0.0..=1.0 range.
+    pub scrollbar_fade_opacity: f32,
+    /// Overlay scrollbar fade countdown in seconds.
+    pub scrollbar_fade_timer: f32,
+    /// Timestamp of the last engine-side overlay scrollbar fade tick.
+    pub scrollbar_fade_last_tick: Option<Instant>,
+    /// Whether the pointer is currently over a scrollbar hit area.
+    pub scrollbar_hover: bool,
     /// Whether scroll position updates live while dragging the thumb.
     pub scroll_track: bool,
     /// Whether scroll tips are shown while dragging the scroll thumb.
@@ -644,7 +675,22 @@ impl VolvoxGrid {
             type_ahead_delay: 2000,
             auto_size_mode: 0,
             auto_size_mouse: false,
-            scroll_bars: 0, // none
+            scrollbar_show_h: pb::ScrollBarMode::ScrollbarModeNever as i32,
+            scrollbar_show_v: pb::ScrollBarMode::ScrollbarModeNever as i32,
+            scrollbar_appearance: pb::ScrollBarAppearance::ScrollbarAppearanceClassic as i32,
+            scrollbar_size: 16,
+            scrollbar_min_thumb: DEFAULT_SCROLLBAR_MIN_THUMB,
+            scrollbar_corner_radius: 0,
+            scrollbar_colors: crate::scrollbar::default_scrollbar_colors(
+                pb::ScrollBarAppearance::ScrollbarAppearanceClassic as i32,
+            ),
+            scrollbar_fade_delay_ms: DEFAULT_SCROLLBAR_FADE_DELAY_MS,
+            scrollbar_fade_duration_ms: DEFAULT_SCROLLBAR_FADE_DURATION_MS,
+            scrollbar_margin: DEFAULT_SCROLLBAR_MARGIN,
+            scrollbar_fade_opacity: 1.0,
+            scrollbar_fade_timer: 0.0,
+            scrollbar_fade_last_tick: None,
+            scrollbar_hover: false,
             scroll_track: true,
             scroll_tips: false,
             fling_enabled: true,
@@ -1211,11 +1257,56 @@ impl VolvoxGrid {
         self.dirty = true;
     }
 
+    pub fn tick_scrollbar_fade(&mut self, dt_seconds: f32) -> bool {
+        if !self.animation.enabled {
+            let visible_timer = if scrollbar_overlays_content(self.scrollbar_appearance) {
+                (self.scrollbar_fade_delay_ms.max(0) as f32) / 1000.0
+            } else {
+                0.0
+            };
+            let changed = (self.scrollbar_fade_opacity - 1.0).abs() > f32::EPSILON
+                || (self.scrollbar_fade_timer - visible_timer).abs() > f32::EPSILON
+                || self.scrollbar_fade_last_tick.is_some();
+            self.scrollbar_fade_opacity = 1.0;
+            self.scrollbar_fade_timer = visible_timer;
+            self.scrollbar_fade_last_tick = None;
+            return changed;
+        }
+
+        let now = Instant::now();
+        let changed = crate::input::tick_scrollbar_fade(self, dt_seconds);
+        self.scrollbar_fade_last_tick = if scrollbar_fade_animating(self) {
+            Some(now)
+        } else {
+            None
+        };
+        changed
+    }
+
+    fn tick_scrollbar_fade_animation(&mut self) -> bool {
+        if !self.animation.enabled {
+            let _ = self.tick_scrollbar_fade(0.0);
+            return false;
+        }
+        if !scrollbar_fade_animating(self) {
+            self.scrollbar_fade_last_tick = None;
+            return false;
+        }
+
+        let now = Instant::now();
+        let dt_seconds = self
+            .scrollbar_fade_last_tick
+            .map(|prev| now.duration_since(prev).as_secs_f32().min(1.0 / 20.0))
+            .unwrap_or(0.0);
+
+        self.tick_scrollbar_fade(dt_seconds)
+    }
+
     /// Clear the dirty flag after rendering.
-    /// Keeps dirty=true if animation is still in-flight so the host
-    /// continues to re-render until the animation settles.
+    /// Keeps dirty=true if an engine-driven visual animation is still in-flight
+    /// so the host continues to re-render until the animation settles.
     pub fn clear_dirty(&mut self) {
-        if self.animation.active || self.background_loading {
+        if self.animation.active || self.background_loading || scrollbar_fade_animating(self) {
             self.dirty = true;
         } else {
             self.dirty = false;
@@ -2740,6 +2831,9 @@ impl VolvoxGrid {
         if self.animation.tick() {
             self.dirty = true;
         }
+        if self.tick_scrollbar_fade_animation() {
+            self.dirty = true;
+        }
     }
 
     /// Returns the topmost visible scrollable row (`TopRow`).
@@ -3191,6 +3285,8 @@ fn truncate_chars(input: &str, max_chars: i32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::proto::volvoxgrid::v1 as pb;
+    use std::time::Duration;
 
     #[test]
     fn format_string_sets_columns() {
@@ -3464,4 +3560,66 @@ mod tests {
         assert_eq!(grid.left_col(), 7);
         assert_eq!(grid.right_col(), 9);
     }
+
+    #[test]
+    fn clear_dirty_keeps_overlay_scrollbar_fade_animating() {
+        let mut grid = VolvoxGrid::new(1, 200, 120, 50, 12, 1, 1);
+        grid.animation.enabled = true;
+        grid.scrollbar_appearance = pb::ScrollBarAppearance::ScrollbarAppearanceOverlay as i32;
+        grid.scrollbar_show_h = pb::ScrollBarMode::ScrollbarModeAuto as i32;
+        grid.scrollbar_fade_delay_ms = 0;
+        grid.scrollbar_fade_duration_ms = 100;
+        grid.scrollbar_fade_opacity = 1.0;
+        grid.scrollbar_fade_timer = 0.0;
+        grid.scrollbar_fade_last_tick = Some(Instant::now() - Duration::from_millis(16));
+
+        grid.ensure_layout();
+        grid.clear_dirty();
+
+        assert!(grid.dirty);
+        assert!(grid.scrollbar_fade_opacity < 1.0);
+        assert!(grid.scrollbar_fade_last_tick.is_some());
+    }
+
+    #[test]
+    fn clear_dirty_stops_once_overlay_scrollbar_fade_finishes() {
+        let mut grid = VolvoxGrid::new(1, 200, 120, 50, 12, 1, 1);
+        grid.animation.enabled = true;
+        grid.scrollbar_appearance = pb::ScrollBarAppearance::ScrollbarAppearanceOverlay as i32;
+        grid.scrollbar_show_h = pb::ScrollBarMode::ScrollbarModeAuto as i32;
+        grid.scrollbar_fade_delay_ms = 0;
+        grid.scrollbar_fade_duration_ms = 1;
+        grid.scrollbar_fade_opacity = 0.1;
+        grid.scrollbar_fade_timer = 0.0;
+        grid.scrollbar_fade_last_tick = Some(Instant::now() - Duration::from_millis(16));
+
+        grid.ensure_layout();
+        grid.clear_dirty();
+
+        assert!(!grid.dirty);
+        assert_eq!(grid.scrollbar_fade_opacity, 0.0);
+        assert!(grid.scrollbar_fade_last_tick.is_none());
+    }
+
+    #[test]
+    fn clear_dirty_does_not_run_overlay_scrollbar_fade_when_animation_disabled() {
+        let mut grid = VolvoxGrid::new(1, 200, 120, 50, 12, 1, 1);
+        grid.animation.enabled = false;
+        grid.scrollbar_appearance = pb::ScrollBarAppearance::ScrollbarAppearanceOverlay as i32;
+        grid.scrollbar_show_h = pb::ScrollBarMode::ScrollbarModeAuto as i32;
+        grid.scrollbar_fade_delay_ms = 0;
+        grid.scrollbar_fade_duration_ms = 100;
+        grid.scrollbar_fade_opacity = 0.4;
+        grid.scrollbar_fade_timer = 0.0;
+        grid.scrollbar_fade_last_tick = Some(Instant::now() - Duration::from_millis(16));
+
+        grid.ensure_layout();
+        grid.clear_dirty();
+
+        assert!(!grid.dirty);
+        assert_eq!(grid.scrollbar_fade_opacity, 1.0);
+        assert_eq!(grid.scrollbar_fade_timer, 0.0);
+        assert!(grid.scrollbar_fade_last_tick.is_none());
+    }
+
 }

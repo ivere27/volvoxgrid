@@ -855,9 +855,10 @@ fn engine_event_to_proto(
         })),
         E::Click => Some(grid_event::Event::Click(ClickEvent {})),
         E::DblClick => Some(grid_event::Event::DblClick(DblClickEvent {})),
-        E::KeyDown { key_code, modifier } => {
-            Some(grid_event::Event::KeyDown(KeyDownEvent { key_code, modifier }))
-        }
+        E::KeyDown { key_code, modifier } => Some(grid_event::Event::KeyDown(KeyDownEvent {
+            key_code,
+            modifier,
+        })),
         E::KeyPress { key_ascii } => Some(grid_event::Event::KeyPress(KeyPressEvent { key_ascii })),
         E::KeyUp { key_code, modifier } => {
             Some(grid_event::Event::KeyUp(KeyUpEvent { key_code, modifier }))

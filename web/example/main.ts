@@ -1003,7 +1003,6 @@ async function main() {
     grid.focusBorder = 2;
     grid.selectionMode = 0;
     grid.setHeaderFeatures({ sort: true, reorder: true, chooser: false });
-    grid.scrollBars = 3;
   }
 
   function applyDoomGridLayout() {

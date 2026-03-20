@@ -617,8 +617,7 @@ impl GpuRenderer {
                     })?;
                     let wh =
                         raw_window_handle::XlibWindowHandle::new(desc.window as std::ffi::c_ulong);
-                    let dh =
-                        raw_window_handle::XlibDisplayHandle::new(Some(display), desc.screen);
+                    let dh = raw_window_handle::XlibDisplayHandle::new(Some(display), desc.screen);
                     (
                         raw_window_handle::RawWindowHandle::Xlib(wh),
                         raw_window_handle::RawDisplayHandle::Xlib(dh),
@@ -694,16 +693,16 @@ impl GpuRenderer {
                         }],
                     });
 
-            self.uniform_buf =
-                self.device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("uniforms"),
-                        contents: bytemuck::bytes_of(&Uniforms {
-                            viewport_size: [1.0, 1.0],
-                            _pad: [0.0, 0.0],
-                        }),
-                        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                    });
+            self.uniform_buf = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("uniforms"),
+                    contents: bytemuck::bytes_of(&Uniforms {
+                        viewport_size: [1.0, 1.0],
+                        _pad: [0.0, 0.0],
+                    }),
+                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                });
 
             self.uniform_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("uniform_bg"),
@@ -735,9 +734,7 @@ impl GpuRenderer {
                             wgpu::BindGroupLayoutEntry {
                                 binding: 1,
                                 visibility: wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Sampler(
-                                    wgpu::SamplerBindingType::Filtering,
-                                ),
+                                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                                 count: None,
                             },
                         ],
@@ -1163,12 +1160,7 @@ impl GpuRenderer {
     // Internal: cached scene rendering and presentation
     // -----------------------------------------------------------------------
 
-    fn render_into_cache(
-        &mut self,
-        grid: &VolvoxGrid,
-        w: i32,
-        h: i32,
-    ) -> RenderResult {
+    fn render_into_cache(&mut self, grid: &VolvoxGrid, w: i32, h: i32) -> RenderResult {
         if w <= 0 || h <= 0 {
             return ((0, 0, 0, 0), [0.0; crate::canvas::layer::COUNT], [0; 4]);
         }
@@ -1881,7 +1873,8 @@ mod tests {
     fn scroll_blit_test_grid(scroll_blit_enabled: bool) -> VolvoxGrid {
         let mut grid = VolvoxGrid::new(1, 320, 220, 40, 12, 1, 1);
         grid.scroll_blit_enabled = scroll_blit_enabled;
-        grid.scroll_bars = pb::ScrollBarsMode::ScrollbarBoth as i32;
+        grid.scrollbar_show_h = pb::ScrollBarMode::ScrollbarModeAuto as i32;
+        grid.scrollbar_show_v = pb::ScrollBarMode::ScrollbarModeAuto as i32;
         grid.indicator_bands.row_start.visible = true;
         grid.indicator_bands.row_start.width_px = 36;
         grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;

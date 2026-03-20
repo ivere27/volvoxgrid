@@ -1487,6 +1487,19 @@ pub fn tick_fling(id: i32, dt_ms: f32) -> i32 {
     .unwrap_or(0)
 }
 
+#[wasm_bindgen]
+pub fn tick_scrollbar_fade(id: i32, dt_ms: f32) -> i32 {
+    with_grid(id, |grid| {
+        let dt_sec = (dt_ms / 1000.0).max(0.0);
+        if grid.tick_scrollbar_fade(dt_sec) {
+            1
+        } else {
+            0
+        }
+    })
+    .unwrap_or(0)
+}
+
 // ---------------------------------------------------------------------------
 // Editing / Combo
 // ---------------------------------------------------------------------------
@@ -3299,6 +3312,9 @@ pub fn set_animation_enabled(id: i32, enabled: bool, duration_ms: i32) {
         }
         if !enabled {
             grid.animation.clear();
+            if grid.tick_scrollbar_fade(0.0) {
+                grid.mark_dirty_visual();
+            }
         }
     });
 }
@@ -3918,7 +3934,25 @@ pub fn set_redraw(id: i32, on: bool) {
 #[wasm_bindgen]
 pub fn set_scroll_bars(id: i32, mode: i32) {
     with_grid(id, |grid| {
-        grid.scroll_bars = mode;
+        match mode {
+            1 => {
+                grid.scrollbar_show_h = ScrollBarMode::ScrollbarModeAuto as i32;
+                grid.scrollbar_show_v = ScrollBarMode::ScrollbarModeNever as i32;
+            }
+            2 => {
+                grid.scrollbar_show_h = ScrollBarMode::ScrollbarModeNever as i32;
+                grid.scrollbar_show_v = ScrollBarMode::ScrollbarModeAuto as i32;
+            }
+            3 => {
+                grid.scrollbar_show_h = ScrollBarMode::ScrollbarModeAuto as i32;
+                grid.scrollbar_show_v = ScrollBarMode::ScrollbarModeAuto as i32;
+            }
+            _ => {
+                grid.scrollbar_show_h = ScrollBarMode::ScrollbarModeNever as i32;
+                grid.scrollbar_show_v = ScrollBarMode::ScrollbarModeNever as i32;
+            }
+        }
+        grid.mark_dirty();
     });
 }
 
@@ -4332,9 +4366,10 @@ fn engine_event_to_proto(
         })),
         E::Click => Some(grid_event::Event::Click(ClickEvent {})),
         E::DblClick => Some(grid_event::Event::DblClick(DblClickEvent {})),
-        E::KeyDown { key_code, modifier } => {
-            Some(grid_event::Event::KeyDown(KeyDownEvent { key_code, modifier }))
-        }
+        E::KeyDown { key_code, modifier } => Some(grid_event::Event::KeyDown(KeyDownEvent {
+            key_code,
+            modifier,
+        })),
         E::KeyPress { key_ascii } => Some(grid_event::Event::KeyPress(KeyPressEvent { key_ascii })),
         E::KeyUp { key_code, modifier } => {
             Some(grid_event::Event::KeyUp(KeyUpEvent { key_code, modifier }))

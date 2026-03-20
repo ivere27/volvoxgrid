@@ -4,7 +4,6 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 #![allow(clippy::missing_safety_doc)]
-
 use super::*;
 
 use prost::Message;

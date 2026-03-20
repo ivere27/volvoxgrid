@@ -759,6 +759,57 @@ class ScrollBarsMode extends $pb.ProtobufEnum {
   const ScrollBarsMode._(super.value, super.name);
 }
 
+class ScrollBarMode extends $pb.ProtobufEnum {
+  static const ScrollBarMode SCROLLBAR_MODE_AUTO =
+      ScrollBarMode._(0, _omitEnumNames ? '' : 'SCROLLBAR_MODE_AUTO');
+  static const ScrollBarMode SCROLLBAR_MODE_ALWAYS =
+      ScrollBarMode._(1, _omitEnumNames ? '' : 'SCROLLBAR_MODE_ALWAYS');
+  static const ScrollBarMode SCROLLBAR_MODE_NEVER =
+      ScrollBarMode._(2, _omitEnumNames ? '' : 'SCROLLBAR_MODE_NEVER');
+
+  static const $core.List<ScrollBarMode> values = <ScrollBarMode>[
+    SCROLLBAR_MODE_AUTO,
+    SCROLLBAR_MODE_ALWAYS,
+    SCROLLBAR_MODE_NEVER,
+  ];
+
+  static final $core.List<ScrollBarMode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static ScrollBarMode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ScrollBarMode._(super.value, super.name);
+}
+
+class ScrollBarAppearance extends $pb.ProtobufEnum {
+  static const ScrollBarAppearance SCROLLBAR_APPEARANCE_CLASSIC =
+      ScrollBarAppearance._(
+          0, _omitEnumNames ? '' : 'SCROLLBAR_APPEARANCE_CLASSIC');
+  static const ScrollBarAppearance SCROLLBAR_APPEARANCE_FLAT =
+      ScrollBarAppearance._(
+          1, _omitEnumNames ? '' : 'SCROLLBAR_APPEARANCE_FLAT');
+  static const ScrollBarAppearance SCROLLBAR_APPEARANCE_MODERN =
+      ScrollBarAppearance._(
+          2, _omitEnumNames ? '' : 'SCROLLBAR_APPEARANCE_MODERN');
+  static const ScrollBarAppearance SCROLLBAR_APPEARANCE_OVERLAY =
+      ScrollBarAppearance._(
+          3, _omitEnumNames ? '' : 'SCROLLBAR_APPEARANCE_OVERLAY');
+
+  static const $core.List<ScrollBarAppearance> values = <ScrollBarAppearance>[
+    SCROLLBAR_APPEARANCE_CLASSIC,
+    SCROLLBAR_APPEARANCE_FLAT,
+    SCROLLBAR_APPEARANCE_MODERN,
+    SCROLLBAR_APPEARANCE_OVERLAY,
+  ];
+
+  static final $core.List<ScrollBarAppearance?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static ScrollBarAppearance? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ScrollBarAppearance._(super.value, super.name);
+}
+
 class PinPosition extends $pb.ProtobufEnum {
   static const PinPosition PIN_NONE =
       PinPosition._(0, _omitEnumNames ? '' : 'PIN_NONE');
