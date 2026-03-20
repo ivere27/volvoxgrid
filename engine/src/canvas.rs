@@ -9,6 +9,10 @@
 
 use crate::grid::VolvoxGrid;
 use crate::proto::volvoxgrid::v1 as pb;
+use crate::scrollbar::{
+    compute_scrollbar_geometry, normalize_scrollbar_appearance, normalize_scrollbar_mode,
+    scale_color_alpha, scrollbar_mode_visible, scrollbar_overlays_content,
+};
 use crate::selection::{hover_mode_has, HOVER_CELL, HOVER_COLUMN, HOVER_NONE, HOVER_ROW};
 use crate::sort::{sort_order_is_ascending as sort_order_is_ascending_internal, SORT_NONE};
 use crate::style::{CellStylePatch, HeaderMarkHeight, HighlightStyle, IconSlotStyle};
@@ -62,6 +66,68 @@ pub trait Canvas {
 
     /// Set a single pixel.
     fn set_pixel(&mut self, x: i32, y: i32, color: u32);
+
+    /// Fill a rounded rectangle with a solid color.
+    fn fill_rounded_rect(&mut self, x: i32, y: i32, w: i32, h: i32, radius: i32, color: u32) {
+        if w <= 0 || h <= 0 {
+            return;
+        }
+        let r = radius.max(0).min(w / 2).min(h / 2);
+        if r <= 0 {
+            self.fill_rect(x, y, w, h, color);
+            return;
+        }
+        let rf = r as f32;
+        for row in 0..h {
+            let dy = if row < r {
+                (r - 1 - row) as f32 + 0.5
+            } else if row >= h - r {
+                (row - (h - r)) as f32 + 0.5
+            } else {
+                -1.0
+            };
+            let inset = if dy >= 0.0 {
+                (rf - (rf * rf - dy * dy).max(0.0).sqrt()).ceil() as i32
+            } else {
+                0
+            };
+            let span_w = (w - inset * 2).max(0);
+            if span_w > 0 {
+                self.fill_rect(x + inset, y + row, span_w, 1, color);
+            }
+        }
+    }
+
+    /// Alpha-blend a rounded rectangle over existing content.
+    fn blend_rounded_rect(&mut self, x: i32, y: i32, w: i32, h: i32, radius: i32, color: u32) {
+        if w <= 0 || h <= 0 {
+            return;
+        }
+        let r = radius.max(0).min(w / 2).min(h / 2);
+        if r <= 0 {
+            self.blend_rect(x, y, w, h, color);
+            return;
+        }
+        let rf = r as f32;
+        for row in 0..h {
+            let dy = if row < r {
+                (r - 1 - row) as f32 + 0.5
+            } else if row >= h - r {
+                (row - (h - r)) as f32 + 0.5
+            } else {
+                -1.0
+            };
+            let inset = if dy >= 0.0 {
+                (rf - (rf * rf - dy * dy).max(0.0).sqrt()).ceil() as i32
+            } else {
+                0
+            };
+            let span_w = (w - inset * 2).max(0);
+            if span_w > 0 {
+                self.blend_rect(x + inset, y + row, span_w, 1, color);
+            }
+        }
+    }
 
     /// Draw text at (x, y), clipped to the rectangle (clip_x, clip_y, clip_w, clip_h).
     /// `clip_y` sets the top clip boundary; `clip_h` measures from `y` downward.
@@ -845,44 +911,56 @@ impl VisibleRange {
         let indicator_top_h = grid.indicator_top_height().max(0);
         let indicator_bottom_h = grid.indicator_bottom_height().max(0);
 
-        // Shrink the effective viewport when scrollbars are visible so that
+        // Shrink the effective viewport when non-overlay scrollbars are visible so
         // pinned-bottom / sticky-bottom rows are placed above the horizontal
         // scrollbar (and pinned-right / sticky-right cols left of the vertical
         // scrollbar) rather than being partially obscured by them.
-        const SB_SIZE: i32 = 16;
-        let allow_h = grid.scroll_bars == pb::ScrollBarsMode::ScrollbarHorizontal as i32
-            || grid.scroll_bars == pb::ScrollBarsMode::ScrollbarBoth as i32;
-        let allow_v = grid.scroll_bars == pb::ScrollBarsMode::ScrollbarVertical as i32
-            || grid.scroll_bars == pb::ScrollBarsMode::ScrollbarBoth as i32;
+        let sb_size = grid.scrollbar_size.max(1);
+        let overlay_scrollbars = scrollbar_overlays_content(grid.scrollbar_appearance);
+        let mode_h = normalize_scrollbar_mode(grid.scrollbar_show_h);
+        let mode_v = normalize_scrollbar_mode(grid.scrollbar_show_v);
 
         let fixed_height = grid.layout.row_pos(grid.fixed_rows);
         let fixed_width = grid.layout.col_pos(grid.fixed_cols);
         let pinned_height_total = grid.pinned_top_height() + grid.pinned_bottom_height();
         let pinned_width_total = grid.pinned_left_width() + grid.pinned_right_width();
-        let (mut show_h, mut show_v) = (false, false);
+        let mut show_h = mode_h == pb::ScrollBarMode::ScrollbarModeAlways as i32;
+        let mut show_v = mode_v == pb::ScrollBarMode::ScrollbarModeAlways as i32;
         for _ in 0..3 {
-            let vw = (vp_w - if show_v { SB_SIZE } else { 0 }).max(1);
-            let vh = (vp_h - if show_h { SB_SIZE } else { 0 }).max(1);
+            let vw = (vp_w
+                - if show_v && !overlay_scrollbars {
+                    sb_size
+                } else {
+                    0
+                })
+            .max(1);
+            let vh = (vp_h
+                - if show_h && !overlay_scrollbars {
+                    sb_size
+                } else {
+                    0
+                })
+            .max(1);
             let data_vw = (vw - indicator_start_w - indicator_end_w).max(1);
             let data_vh = (vh - indicator_top_h - indicator_bottom_h).max(1);
             let mx = (grid.layout.total_width - data_vw + fixed_width + pinned_width_total).max(0);
             let my =
                 (grid.layout.total_height - data_vh + fixed_height + pinned_height_total).max(0);
-            let next_h = allow_h && mx > 0;
-            let next_v = allow_v && my > 0;
+            let next_h = scrollbar_mode_visible(mode_h, mx > 0);
+            let next_v = scrollbar_mode_visible(mode_v, my > 0);
             if next_h == show_h && next_v == show_v {
                 break;
             }
             show_h = next_h;
             show_v = next_v;
         }
-        let vp_w = if show_v {
-            (vp_w - SB_SIZE).max(1)
+        let vp_w = if show_v && !overlay_scrollbars {
+            (vp_w - sb_size).max(1)
         } else {
             vp_w
         };
-        let vp_h = if show_h {
-            (vp_h - SB_SIZE).max(1)
+        let vp_h = if show_h && !overlay_scrollbars {
+            (vp_h - sb_size).max(1)
         } else {
             vp_h
         };
@@ -1783,7 +1861,7 @@ pub(crate) fn text_looks_numeric(text: &str) -> bool {
         .all(|c| c.is_ascii_digit() || c == '.' || c == ',' || c == '%')
 }
 
-/// Parse progress percent from cell text.  Handles "75%", "75", "0.75".
+/// Parse progress percent from cell text. Handles "75%", "75", "0.75", "1".
 pub(crate) fn parse_progress_percent(text: &str) -> f32 {
     let t = text.trim();
     if t.is_empty() {
@@ -1796,7 +1874,10 @@ pub(crate) fn parse_progress_percent(text: &str) -> f32 {
     };
     let cleaned = num_str.replace(',', "");
     if let Ok(v) = cleaned.parse::<f32>() {
-        let pct = if is_percent || v > 1.0 { v / 100.0 } else { v };
+        // Treat whole-number input as percentage points so editing a progress
+        // cell to "1" produces 1% instead of a full bar. Fractional values
+        // below 1.0 still work as ratios, e.g. "0.75" -> 75%.
+        let pct = if is_percent || v >= 1.0 { v / 100.0 } else { v };
         if pct >= 0.0 && pct <= 1.0 {
             pct
         } else {
@@ -2362,6 +2443,23 @@ fn is_highlight_active(grid: &VolvoxGrid) -> bool {
 
 fn is_selection_layer_enabled(grid: &VolvoxGrid) -> bool {
     grid.render_layer_mask & (1u64 << layer::SELECTION) != 0
+}
+
+fn active_cell_origin(grid: &VolvoxGrid) -> Option<(i32, i32)> {
+    if grid.rows <= 0 || grid.cols <= 0 {
+        return None;
+    }
+    let row = grid.selection.row.clamp(0, grid.rows - 1);
+    let col = grid.selection.col.clamp(0, grid.cols - 1);
+    Some(match grid.get_merged_range(row, col) {
+        Some((r1, c1, _, _)) => (r1, c1),
+        None => (row, col),
+    })
+}
+
+fn is_active_cell_origin(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
+    active_cell_origin(grid)
+        .is_some_and(|(active_row, active_col)| row == active_row && col == active_col)
 }
 
 /// Whether a cell should be rendered with selection highlight (selection_style
@@ -3849,6 +3947,22 @@ fn render_cell_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rende
             canvas.cell_border_edge_style(cx, cy, cw, ch, edge, style, color);
         }
     }
+
+    if is_selection_layer_enabled(grid) && has_highlight_border(&grid.selection.active_cell_style) {
+        if let Some((cx, cy, cw, ch)) =
+            cell_rect(grid, grid.selection.row, grid.selection.col, &ctx.vp)
+        {
+            draw_highlight_border(
+                canvas,
+                cx,
+                cy,
+                cw,
+                ch,
+                &grid.selection.active_cell_style,
+                selection_fore_color(grid),
+            );
+        }
+    }
 }
 
 // ===========================================================================
@@ -3881,13 +3995,18 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
             && (text_row < grid.fixed_rows + grid.frozen_rows
                 || text_col < grid.fixed_cols + grid.frozen_cols);
         let is_selected = should_highlight_cell(grid, text_row, text_col);
-        let fore = style_override.resolve_fore_color(
+        let mut fore = style_override.resolve_fore_color(
             &grid.style,
             is_fixed,
             is_frozen,
             is_selected,
             selection_fore_color(grid),
         );
+        if is_selection_layer_enabled(grid) && is_active_cell_origin(grid, text_row, text_col) {
+            if let Some(active_fore) = grid.selection.active_cell_style.fore_color {
+                fore = active_fore;
+            }
+        }
         let font_name = style_override
             .font_name
             .as_deref()
@@ -5189,32 +5308,44 @@ fn render_dropdown_buttons<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &R
 // ===========================================================================
 
 fn render_selection<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
-    if grid.selection.selection_style.back_color.is_none() {
+    let show_selection_fill = grid.selection.selection_style.back_color.is_some();
+    let show_active_fill = grid.selection.active_cell_style.back_color.is_some();
+    if !show_selection_fill && !show_active_fill {
         return;
     }
 
-    // Merged selections should paint once per visible merged range.
-    let mut rendered_merges: std::collections::HashSet<(i32, i32, i32, i32)> =
-        std::collections::HashSet::new();
+    if show_selection_fill {
+        // Merged selections should paint once per visible merged range.
+        let mut rendered_merges: std::collections::HashSet<(i32, i32, i32, i32)> =
+            std::collections::HashSet::new();
 
-    for &cell in &ctx.vis_cells {
-        let (row, col, cx, cy, cw, ch) = cell.parts();
-        let (style_row, style_col) = match cell.merge {
-            Some((mr1, mc1, mr2, mc2)) if cell.is_merged_span() => {
-                let merge_key = (mr1, mc1, mr2, mc2);
-                if !rendered_merges.insert(merge_key) {
-                    continue;
+        for &cell in &ctx.vis_cells {
+            let (row, col, cx, cy, cw, ch) = cell.parts();
+            let (style_row, style_col) = match cell.merge {
+                Some((mr1, mc1, mr2, mc2)) if cell.is_merged_span() => {
+                    let merge_key = (mr1, mc1, mr2, mc2);
+                    if !rendered_merges.insert(merge_key) {
+                        continue;
+                    }
+                    (mr1, mc1)
                 }
-                (mr1, mc1)
+                _ => (row, col),
+            };
+
+            if !should_highlight_cell(grid, style_row, style_col) {
+                continue;
             }
-            _ => (row, col),
-        };
 
-        if !should_highlight_cell(grid, style_row, style_col) {
-            continue;
+            draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.selection_style);
         }
+    }
 
-        draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.selection_style);
+    if show_active_fill {
+        if let Some((cx, cy, cw, ch)) =
+            cell_rect(grid, grid.selection.row, grid.selection.col, &ctx.vp)
+        {
+            draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.active_cell_style);
+        }
     }
 }
 
@@ -5434,8 +5565,13 @@ fn render_focus_rect<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderC
         return;
     }
 
+    let active_has_custom_style = grid.selection.active_cell_style.back_color.is_some()
+        || grid.selection.active_cell_style.fore_color.is_some()
+        || has_highlight_border(&grid.selection.active_cell_style);
+
     if grid.selection.focus_border == pb::FocusBorderStyle::FocusBorderThin as i32
         && should_highlight_cell(grid, grid.selection.row, grid.selection.col)
+        && !active_has_custom_style
     {
         return;
     }
@@ -6151,149 +6287,443 @@ fn render_active_dropdown<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Re
 // ===========================================================================
 
 fn render_scroll_bars<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
-    let allow_h = grid.scroll_bars == pb::ScrollBarsMode::ScrollbarHorizontal as i32
-        || grid.scroll_bars == pb::ScrollBarsMode::ScrollbarBoth as i32;
-    let allow_v = grid.scroll_bars == pb::ScrollBarsMode::ScrollbarVertical as i32
-        || grid.scroll_bars == pb::ScrollBarsMode::ScrollbarBoth as i32;
-    if !allow_h && !allow_v {
+    let geom = compute_scrollbar_geometry(grid, canvas.width(), canvas.height());
+    if !geom.show_h && !geom.show_v {
         return;
     }
 
-    const SB_SIZE: i32 = 16;
-    let buf_w = canvas.width();
-    let buf_h = canvas.height();
-    if buf_w <= SB_SIZE || buf_h <= SB_SIZE {
+    let appearance = normalize_scrollbar_appearance(grid.scrollbar_appearance);
+    let overlay = geom.overlays_content;
+    let mode_h = normalize_scrollbar_mode(grid.scrollbar_show_h);
+    let mode_v = normalize_scrollbar_mode(grid.scrollbar_show_v);
+    let fade_opacity = grid.scrollbar_fade_opacity.clamp(0.0, 1.0);
+    let axis_opacity = |mode: i32| {
+        if !overlay || mode == pb::ScrollBarMode::ScrollbarModeAlways as i32 {
+            1.0
+        } else {
+            fade_opacity
+        }
+    };
+    let opacity_h = axis_opacity(mode_h);
+    let opacity_v = axis_opacity(mode_v);
+    if (!geom.show_h || opacity_h <= 0.0) && (!geom.show_v || opacity_v <= 0.0) {
         return;
     }
 
-    let fixed_height = grid.layout.row_pos(grid.fixed_rows);
-    let fixed_width = grid.layout.col_pos(grid.fixed_cols);
-    let pinned_height = grid.pinned_top_height() + grid.pinned_bottom_height();
-    let pinned_width = grid.pinned_left_width() + grid.pinned_right_width();
-
-    let compute_max_scroll = |view_w: i32, view_h: i32| -> (f32, f32) {
-        let mx = (grid.layout.total_width - view_w + fixed_width + pinned_width).max(0) as f32;
-        let my = (grid.layout.total_height - view_h + fixed_height + pinned_height).max(0) as f32;
-        (mx, my)
+    let thumb_base_color = |active: bool| {
+        if active {
+            grid.scrollbar_colors.thumb_active
+        } else if grid.scrollbar_hover {
+            grid.scrollbar_colors.thumb_hover
+        } else {
+            grid.scrollbar_colors.thumb
+        }
     };
 
-    // Resolve bar visibility iteratively
-    let mut show_h = false;
-    let mut show_v = false;
-    for _ in 0..3 {
-        let view_w = (buf_w - if show_v { SB_SIZE } else { 0 }).max(1);
-        let view_h = (buf_h - if show_h { SB_SIZE } else { 0 }).max(1);
-        let (mx, my) = compute_max_scroll(view_w, view_h);
-        let next_h = allow_h && mx > 0.0;
-        let next_v = allow_v && my > 0.0;
-        if next_h == show_h && next_v == show_v {
-            break;
+    let fill_box = |canvas: &mut C, x: i32, y: i32, w: i32, h: i32, color: u32| {
+        if w <= 0 || h <= 0 || (color >> 24) == 0 {
+            return;
         }
-        show_h = next_h;
-        show_v = next_v;
-    }
+        if overlay {
+            canvas.blend_rect(x, y, w, h, color);
+        } else {
+            canvas.fill_rect(x, y, w, h, color);
+        }
+    };
+    let outline_box = |canvas: &mut C, x: i32, y: i32, w: i32, h: i32, color: u32| {
+        if w <= 0 || h <= 0 || (color >> 24) == 0 {
+            return;
+        }
+        if overlay {
+            canvas.blend_rect(x, y, w, 1, color);
+            if h > 1 {
+                canvas.blend_rect(x, y + h - 1, w, 1, color);
+            }
+            if h > 2 {
+                canvas.blend_rect(x, y + 1, 1, h - 2, color);
+                if w > 1 {
+                    canvas.blend_rect(x + w - 1, y + 1, 1, h - 2, color);
+                }
+            }
+        } else {
+            canvas.rect_outline(x, y, w, h, color);
+        }
+    };
+    let rounded_box = |canvas: &mut C, x: i32, y: i32, w: i32, h: i32, r: i32, color: u32| {
+        if w <= 0 || h <= 0 || (color >> 24) == 0 {
+            return;
+        }
+        if overlay {
+            canvas.blend_rounded_rect(x, y, w, h, r, color);
+        } else {
+            canvas.fill_rounded_rect(x, y, w, h, r, color);
+        }
+    };
 
-    if !show_h && !show_v {
-        return;
-    }
-
-    let view_w = (buf_w - if show_v { SB_SIZE } else { 0 }).max(1);
-    let view_h = (buf_h - if show_h { SB_SIZE } else { 0 }).max(1);
-    let (max_x, max_y) = compute_max_scroll(view_w, view_h);
-    let scroll_x = grid.scroll.scroll_x.clamp(0.0, max_x);
-    let scroll_y = grid.scroll.scroll_y.clamp(0.0, max_y);
-
-    let face = 0xFFC0C0C0_u32;
-    let track = 0xFFD8D8D8_u32;
-    let arrow = 0xFF000000_u32;
-    let border = 0xFF606060_u32;
-
-    if show_h {
-        let x = 0;
-        let y = buf_h - SB_SIZE;
-        let w = (buf_w - if show_v { SB_SIZE } else { 0 }).max(SB_SIZE);
-        let h = SB_SIZE;
-
-        canvas.fill_rect(x, y, w, h, face);
-        canvas.rect_outline(x, y, w, h, border);
-
-        let left_x = x;
-        let right_x = x + w - SB_SIZE;
-        canvas.draw_scroll_button(left_x, y, SB_SIZE, h, face);
-        canvas.draw_scroll_button(right_x, y, SB_SIZE, h, face);
-        canvas.draw_scroll_arrow_left(left_x, y, SB_SIZE, h, arrow);
-        canvas.draw_scroll_arrow_right(right_x, y, SB_SIZE, h, arrow);
-
-        let track_x = x + SB_SIZE;
-        let track_w = (w - SB_SIZE * 2).max(0);
-        if track_w > 0 {
-            canvas.fill_rect(track_x, y, track_w, h, track);
-            canvas.fill_checker(track_x, y, track_w, h);
-            canvas.rect_outline(track_x, y, track_w, h, border);
-
-            let mut thumb_w = if max_x > 0.0 {
-                ((view_w as f32 / (view_w as f32 + max_x)) * track_w as f32).round() as i32
+    if geom.show_h && opacity_h > 0.0 {
+        let apply_alpha = |color: u32| {
+            if overlay {
+                scale_color_alpha(color, opacity_h)
             } else {
-                track_w
+                color
+            }
+        };
+        let track = apply_alpha(grid.scrollbar_colors.track);
+        let border = apply_alpha(grid.scrollbar_colors.border);
+        let arrow = apply_alpha(grid.scrollbar_colors.arrow);
+        let thumb = apply_alpha(thumb_base_color(
+            grid.scrollbar_drag_active && grid.scrollbar_drag_horizontal,
+        ));
+        if appearance == pb::ScrollBarAppearance::ScrollbarAppearanceClassic as i32
+            || appearance == pb::ScrollBarAppearance::ScrollbarAppearanceFlat as i32
+        {
+            let flat_button = |canvas: &mut C, x: i32, y: i32, w: i32, h: i32, color: u32| {
+                fill_box(canvas, x, y, w, h, color);
+                outline_box(canvas, x, y, w, h, border);
             };
-            thumb_w = thumb_w.clamp(12, track_w.max(12)).min(track_w);
-            let thumb_range = (track_w - thumb_w).max(0);
-            let thumb_off = if max_x > 0.0 && thumb_range > 0 {
-                ((scroll_x / max_x) * thumb_range as f32).round() as i32
-            } else {
-                0
+            let flat_thumb = |canvas: &mut C, x: i32, y: i32, w: i32, h: i32, color: u32| {
+                fill_box(canvas, x, y, w, h, color);
+                outline_box(canvas, x, y, w, h, border);
             };
-            let thumb_x = track_x + thumb_off;
-            canvas.draw_scroll_thumb(thumb_x, y + 1, thumb_w, h - 2, face);
+            fill_box(
+                canvas,
+                geom.h_bar_x,
+                geom.h_bar_y,
+                geom.h_bar_w,
+                geom.h_bar_h,
+                track,
+            );
+            outline_box(
+                canvas,
+                geom.h_bar_x,
+                geom.h_bar_y,
+                geom.h_bar_w,
+                geom.h_bar_h,
+                border,
+            );
+
+            if geom.uses_arrows {
+                if appearance == pb::ScrollBarAppearance::ScrollbarAppearanceClassic as i32 {
+                    canvas.draw_scroll_button(
+                        geom.h_left_arrow_x,
+                        geom.h_bar_y,
+                        geom.bar_size,
+                        geom.h_bar_h,
+                        thumb,
+                    );
+                    canvas.draw_scroll_button(
+                        geom.h_right_arrow_x,
+                        geom.h_bar_y,
+                        geom.bar_size,
+                        geom.h_bar_h,
+                        thumb,
+                    );
+                } else {
+                    flat_button(
+                        canvas,
+                        geom.h_left_arrow_x,
+                        geom.h_bar_y,
+                        geom.bar_size,
+                        geom.h_bar_h,
+                        thumb,
+                    );
+                    flat_button(
+                        canvas,
+                        geom.h_right_arrow_x,
+                        geom.h_bar_y,
+                        geom.bar_size,
+                        geom.h_bar_h,
+                        thumb,
+                    );
+                }
+                if (arrow >> 24) != 0 {
+                    canvas.draw_scroll_arrow_left(
+                        geom.h_left_arrow_x,
+                        geom.h_bar_y,
+                        geom.bar_size,
+                        geom.h_bar_h,
+                        arrow,
+                    );
+                    canvas.draw_scroll_arrow_right(
+                        geom.h_right_arrow_x,
+                        geom.h_bar_y,
+                        geom.bar_size,
+                        geom.h_bar_h,
+                        arrow,
+                    );
+                }
+            }
+
+            if geom.h_track_w > 0 {
+                fill_box(
+                    canvas,
+                    geom.h_track_x,
+                    geom.h_track_y,
+                    geom.h_track_w,
+                    geom.h_track_h,
+                    track,
+                );
+                if appearance == pb::ScrollBarAppearance::ScrollbarAppearanceClassic as i32 {
+                    canvas.fill_checker(
+                        geom.h_track_x,
+                        geom.h_track_y,
+                        geom.h_track_w,
+                        geom.h_track_h,
+                    );
+                }
+                outline_box(
+                    canvas,
+                    geom.h_track_x,
+                    geom.h_track_y,
+                    geom.h_track_w,
+                    geom.h_track_h,
+                    border,
+                );
+                if geom.h_thumb_w > 0 {
+                    if appearance == pb::ScrollBarAppearance::ScrollbarAppearanceClassic as i32 {
+                        canvas.draw_scroll_thumb(
+                            geom.h_thumb_x,
+                            geom.h_thumb_y,
+                            geom.h_thumb_w,
+                            geom.h_thumb_h,
+                            thumb,
+                        );
+                    } else {
+                        flat_thumb(
+                            canvas,
+                            geom.h_thumb_x,
+                            geom.h_thumb_y,
+                            geom.h_thumb_w,
+                            geom.h_thumb_h,
+                            thumb,
+                        );
+                    }
+                }
+            }
+        } else {
+            if geom.h_track_w > 0 {
+                fill_box(
+                    canvas,
+                    geom.h_track_x,
+                    geom.h_track_y,
+                    geom.h_track_w,
+                    geom.h_track_h,
+                    track,
+                );
+                outline_box(
+                    canvas,
+                    geom.h_track_x,
+                    geom.h_track_y,
+                    geom.h_track_w,
+                    geom.h_track_h,
+                    border,
+                );
+                rounded_box(
+                    canvas,
+                    geom.h_thumb_x,
+                    geom.h_thumb_y,
+                    geom.h_thumb_w,
+                    geom.h_thumb_h,
+                    grid.scrollbar_corner_radius.max(0),
+                    thumb,
+                );
+            }
         }
     }
 
-    if show_v {
-        let x = buf_w - SB_SIZE;
-        let y = 0;
-        let w = SB_SIZE;
-        let h = (buf_h - if show_h { SB_SIZE } else { 0 }).max(SB_SIZE);
-
-        canvas.fill_rect(x, y, w, h, face);
-        canvas.rect_outline(x, y, w, h, border);
-
-        let top_y = y;
-        let bot_y = y + h - SB_SIZE;
-        canvas.draw_scroll_button(x, top_y, w, SB_SIZE, face);
-        canvas.draw_scroll_button(x, bot_y, w, SB_SIZE, face);
-        canvas.draw_scroll_arrow_up(x, top_y, w, SB_SIZE, arrow);
-        canvas.draw_scroll_arrow_down(x, bot_y, w, SB_SIZE, arrow);
-
-        let track_y = y + SB_SIZE;
-        let track_h = (h - SB_SIZE * 2).max(0);
-        if track_h > 0 {
-            canvas.fill_rect(x, track_y, w, track_h, track);
-            canvas.fill_checker(x, track_y, w, track_h);
-            canvas.rect_outline(x, track_y, w, track_h, border);
-
-            let mut thumb_h = if max_y > 0.0 {
-                ((view_h as f32 / (view_h as f32 + max_y)) * track_h as f32).round() as i32
+    if geom.show_v && opacity_v > 0.0 {
+        let apply_alpha = |color: u32| {
+            if overlay {
+                scale_color_alpha(color, opacity_v)
             } else {
-                track_h
+                color
+            }
+        };
+        let track = apply_alpha(grid.scrollbar_colors.track);
+        let border = apply_alpha(grid.scrollbar_colors.border);
+        let arrow = apply_alpha(grid.scrollbar_colors.arrow);
+        let thumb = apply_alpha(thumb_base_color(
+            grid.scrollbar_drag_active && !grid.scrollbar_drag_horizontal,
+        ));
+        if appearance == pb::ScrollBarAppearance::ScrollbarAppearanceClassic as i32
+            || appearance == pb::ScrollBarAppearance::ScrollbarAppearanceFlat as i32
+        {
+            let flat_button = |canvas: &mut C, x: i32, y: i32, w: i32, h: i32, color: u32| {
+                fill_box(canvas, x, y, w, h, color);
+                outline_box(canvas, x, y, w, h, border);
             };
-            thumb_h = thumb_h.clamp(12, track_h.max(12)).min(track_h);
-            let thumb_range = (track_h - thumb_h).max(0);
-            let thumb_off = if max_y > 0.0 && thumb_range > 0 {
-                ((scroll_y / max_y) * thumb_range as f32).round() as i32
-            } else {
-                0
+            let flat_thumb = |canvas: &mut C, x: i32, y: i32, w: i32, h: i32, color: u32| {
+                fill_box(canvas, x, y, w, h, color);
+                outline_box(canvas, x, y, w, h, border);
             };
-            let thumb_y = track_y + thumb_off;
-            canvas.draw_scroll_thumb(x + 1, thumb_y, w - 2, thumb_h, face);
+            fill_box(
+                canvas,
+                geom.v_bar_x,
+                geom.v_bar_y,
+                geom.v_bar_w,
+                geom.v_bar_h,
+                track,
+            );
+            outline_box(
+                canvas,
+                geom.v_bar_x,
+                geom.v_bar_y,
+                geom.v_bar_w,
+                geom.v_bar_h,
+                border,
+            );
+
+            if geom.uses_arrows {
+                if appearance == pb::ScrollBarAppearance::ScrollbarAppearanceClassic as i32 {
+                    canvas.draw_scroll_button(
+                        geom.v_bar_x,
+                        geom.v_top_arrow_y,
+                        geom.v_bar_w,
+                        geom.bar_size,
+                        thumb,
+                    );
+                    canvas.draw_scroll_button(
+                        geom.v_bar_x,
+                        geom.v_bot_arrow_y,
+                        geom.v_bar_w,
+                        geom.bar_size,
+                        thumb,
+                    );
+                } else {
+                    flat_button(
+                        canvas,
+                        geom.v_bar_x,
+                        geom.v_top_arrow_y,
+                        geom.v_bar_w,
+                        geom.bar_size,
+                        thumb,
+                    );
+                    flat_button(
+                        canvas,
+                        geom.v_bar_x,
+                        geom.v_bot_arrow_y,
+                        geom.v_bar_w,
+                        geom.bar_size,
+                        thumb,
+                    );
+                }
+                if (arrow >> 24) != 0 {
+                    canvas.draw_scroll_arrow_up(
+                        geom.v_bar_x,
+                        geom.v_top_arrow_y,
+                        geom.v_bar_w,
+                        geom.bar_size,
+                        arrow,
+                    );
+                    canvas.draw_scroll_arrow_down(
+                        geom.v_bar_x,
+                        geom.v_bot_arrow_y,
+                        geom.v_bar_w,
+                        geom.bar_size,
+                        arrow,
+                    );
+                }
+            }
+
+            if geom.v_track_h > 0 {
+                fill_box(
+                    canvas,
+                    geom.v_track_x,
+                    geom.v_track_y,
+                    geom.v_track_w,
+                    geom.v_track_h,
+                    track,
+                );
+                if appearance == pb::ScrollBarAppearance::ScrollbarAppearanceClassic as i32 {
+                    canvas.fill_checker(
+                        geom.v_track_x,
+                        geom.v_track_y,
+                        geom.v_track_w,
+                        geom.v_track_h,
+                    );
+                }
+                outline_box(
+                    canvas,
+                    geom.v_track_x,
+                    geom.v_track_y,
+                    geom.v_track_w,
+                    geom.v_track_h,
+                    border,
+                );
+                if geom.v_thumb_h > 0 {
+                    if appearance == pb::ScrollBarAppearance::ScrollbarAppearanceClassic as i32 {
+                        canvas.draw_scroll_thumb(
+                            geom.v_thumb_x,
+                            geom.v_thumb_y,
+                            geom.v_thumb_w,
+                            geom.v_thumb_h,
+                            thumb,
+                        );
+                    } else {
+                        flat_thumb(
+                            canvas,
+                            geom.v_thumb_x,
+                            geom.v_thumb_y,
+                            geom.v_thumb_w,
+                            geom.v_thumb_h,
+                            thumb,
+                        );
+                    }
+                }
+            }
+        } else {
+            if geom.v_track_h > 0 {
+                fill_box(
+                    canvas,
+                    geom.v_track_x,
+                    geom.v_track_y,
+                    geom.v_track_w,
+                    geom.v_track_h,
+                    track,
+                );
+                outline_box(
+                    canvas,
+                    geom.v_track_x,
+                    geom.v_track_y,
+                    geom.v_track_w,
+                    geom.v_track_h,
+                    border,
+                );
+                rounded_box(
+                    canvas,
+                    geom.v_thumb_x,
+                    geom.v_thumb_y,
+                    geom.v_thumb_w,
+                    geom.v_thumb_h,
+                    grid.scrollbar_corner_radius.max(0),
+                    thumb,
+                );
+            }
         }
     }
 
-    if show_h && show_v {
-        let x = buf_w - SB_SIZE;
-        let y = buf_h - SB_SIZE;
-        canvas.fill_rect(x, y, SB_SIZE, SB_SIZE, track);
-        canvas.fill_checker(x, y, SB_SIZE, SB_SIZE);
-        canvas.rect_outline(x, y, SB_SIZE, SB_SIZE, border);
+    if geom.corner_w > 0 && geom.corner_h > 0 {
+        let corner_track = grid.scrollbar_colors.track;
+        let corner_border = grid.scrollbar_colors.border;
+        fill_box(
+            canvas,
+            geom.corner_x,
+            geom.corner_y,
+            geom.corner_w,
+            geom.corner_h,
+            corner_track,
+        );
+        if appearance == pb::ScrollBarAppearance::ScrollbarAppearanceClassic as i32 {
+            canvas.fill_checker(geom.corner_x, geom.corner_y, geom.corner_w, geom.corner_h);
+        }
+        outline_box(
+            canvas,
+            geom.corner_x,
+            geom.corner_y,
+            geom.corner_w,
+            geom.corner_h,
+            corner_border,
+        );
     }
 }
 
@@ -6727,5 +7157,18 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_progress_percent;
+
+    #[test]
+    fn parse_progress_percent_treats_one_as_one_percent() {
+        assert!((parse_progress_percent("1") - 0.01).abs() < 1e-6);
+        assert!((parse_progress_percent("0.75") - 0.75).abs() < 1e-6);
+        assert!((parse_progress_percent("75") - 0.75).abs() < 1e-6);
+        assert!((parse_progress_percent("100") - 1.0).abs() < 1e-6);
     }
 }

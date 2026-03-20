@@ -10,6 +10,12 @@ use crate::indicator::{
     ColIndicatorCellState, ColIndicatorRowDefState, CornerIndicatorState, RowIndicatorSlotState,
 };
 use crate::proto::volvoxgrid::v1;
+use crate::scrollbar::{
+    default_scrollbar_colors, default_scrollbar_corner_radius, default_scrollbar_size,
+    merge_scrollbar_colors, normalize_scrollbar_appearance, normalize_scrollbar_mode,
+    reset_scrollbar_fade_state, DEFAULT_SCROLLBAR_FADE_DELAY_MS,
+    DEFAULT_SCROLLBAR_FADE_DURATION_MS, DEFAULT_SCROLLBAR_MARGIN, DEFAULT_SCROLLBAR_MIN_THUMB,
+};
 use crate::selection::{HOVER_CELL, HOVER_COLUMN, HOVER_ROW};
 use crate::sort::{decode_sort_spec, merge_sort_spec};
 use crate::style;
@@ -44,6 +50,17 @@ fn engine_padding_to_v1(p: style::Padding) -> v1::Padding {
         top: Some(p.top.max(0)),
         right: Some(p.right.max(0)),
         bottom: Some(p.bottom.max(0)),
+    }
+}
+
+fn engine_scrollbar_colors_to_v1(colors: crate::scrollbar::ScrollBarColors) -> v1::ScrollBarColors {
+    v1::ScrollBarColors {
+        thumb: Some(colors.thumb),
+        thumb_hover: Some(colors.thumb_hover),
+        thumb_active: Some(colors.thumb_active),
+        track: Some(colors.track),
+        arrow: Some(colors.arrow),
+        border: Some(colors.border),
     }
 }
 
@@ -1410,6 +1427,9 @@ impl VolvoxGrid {
         if let Some(v) = &sel.style {
             apply_highlight_style_patch(&mut self.selection.selection_style, v);
         }
+        if let Some(v) = &sel.active_cell_style {
+            apply_highlight_style_patch(&mut self.selection.active_cell_style, v);
+        }
         if let Some(v) = &sel.hover {
             let mut hover_mode = self.selection.hover_mode;
             apply_hover_flag(&mut hover_mode, HOVER_ROW, v.row);
@@ -1475,9 +1495,69 @@ impl VolvoxGrid {
         self.mark_dirty();
     }
 
+    fn apply_scrollbar_config(&mut self, sb: &v1::ScrollBarConfig) {
+        let prev_appearance = normalize_scrollbar_appearance(self.scrollbar_appearance);
+        let next_appearance = sb
+            .appearance
+            .map(normalize_scrollbar_appearance)
+            .unwrap_or(prev_appearance);
+        let appearance_changed = next_appearance != prev_appearance;
+        self.scrollbar_appearance = next_appearance;
+
+        if let Some(v) = sb.show_h {
+            self.scrollbar_show_h = normalize_scrollbar_mode(v);
+        }
+        if let Some(v) = sb.show_v {
+            self.scrollbar_show_v = normalize_scrollbar_mode(v);
+        }
+        if let Some(v) = sb.size {
+            self.scrollbar_size = v.max(1);
+        } else if appearance_changed {
+            self.scrollbar_size = default_scrollbar_size(next_appearance);
+        }
+        if let Some(v) = sb.min_thumb {
+            self.scrollbar_min_thumb = v.max(1);
+        } else if self.scrollbar_min_thumb <= 0 {
+            self.scrollbar_min_thumb = DEFAULT_SCROLLBAR_MIN_THUMB;
+        }
+        if let Some(v) = sb.corner_radius {
+            self.scrollbar_corner_radius = v.max(0);
+        } else if appearance_changed {
+            self.scrollbar_corner_radius = default_scrollbar_corner_radius(next_appearance);
+        }
+        let color_base = if appearance_changed {
+            default_scrollbar_colors(next_appearance)
+        } else {
+            self.scrollbar_colors
+        };
+        self.scrollbar_colors = merge_scrollbar_colors(color_base, sb.colors.as_ref());
+        if let Some(v) = sb.fade_delay_ms {
+            self.scrollbar_fade_delay_ms = v.max(0);
+        } else if appearance_changed
+            && next_appearance == v1::ScrollBarAppearance::ScrollbarAppearanceOverlay as i32
+        {
+            self.scrollbar_fade_delay_ms = DEFAULT_SCROLLBAR_FADE_DELAY_MS;
+        }
+        if let Some(v) = sb.fade_duration_ms {
+            self.scrollbar_fade_duration_ms = v.max(0);
+        } else if appearance_changed
+            && next_appearance == v1::ScrollBarAppearance::ScrollbarAppearanceOverlay as i32
+        {
+            self.scrollbar_fade_duration_ms = DEFAULT_SCROLLBAR_FADE_DURATION_MS;
+        }
+        if let Some(v) = sb.margin {
+            self.scrollbar_margin = v.max(0);
+        } else if appearance_changed
+            && next_appearance == v1::ScrollBarAppearance::ScrollbarAppearanceOverlay as i32
+        {
+            self.scrollbar_margin = DEFAULT_SCROLLBAR_MARGIN;
+        }
+        reset_scrollbar_fade_state(self);
+    }
+
     fn apply_scroll_config(&mut self, sc: &v1::ScrollConfig) {
-        if let Some(v) = sc.scrollbars {
-            self.scroll_bars = v;
+        if let Some(sb) = sc.scroll_bar.as_ref() {
+            self.apply_scrollbar_config(sb);
         }
         if let Some(v) = sc.scroll_track {
             self.scroll_track = v;
@@ -1858,6 +1938,7 @@ impl VolvoxGrid {
             allow: Some(self.allow_selection),
             header_click_select: Some(self.header_click_select),
             style: Some(self.selection.selection_style.to_proto()),
+            active_cell_style: Some(self.selection.active_cell_style.to_proto()),
             hover: Some(v1::HoverConfig {
                 row: Some(self.selection.hover_mode & HOVER_ROW != 0),
                 column: Some(self.selection.hover_mode & HOVER_COLUMN != 0),
@@ -1894,7 +1975,7 @@ impl VolvoxGrid {
 
     fn get_scroll_config(&self) -> v1::ScrollConfig {
         v1::ScrollConfig {
-            scrollbars: Some(self.scroll_bars),
+            scrollbars: None,
             scroll_track: Some(self.scroll_track),
             scroll_tips: Some(self.scroll_tips),
             fling_enabled: Some(self.fling_enabled),
@@ -1902,6 +1983,18 @@ impl VolvoxGrid {
             fling_friction: Some(self.fling_friction),
             pinch_zoom_enabled: Some(self.pinch_zoom_enabled),
             fast_scroll: Some(self.fast_scroll_enabled),
+            scroll_bar: Some(v1::ScrollBarConfig {
+                show_h: Some(self.scrollbar_show_h),
+                show_v: Some(self.scrollbar_show_v),
+                appearance: Some(self.scrollbar_appearance),
+                size: Some(self.scrollbar_size),
+                min_thumb: Some(self.scrollbar_min_thumb),
+                corner_radius: Some(self.scrollbar_corner_radius),
+                colors: Some(engine_scrollbar_colors_to_v1(self.scrollbar_colors)),
+                fade_delay_ms: Some(self.scrollbar_fade_delay_ms),
+                fade_duration_ms: Some(self.scrollbar_fade_duration_ms),
+                margin: Some(self.scrollbar_margin),
+            }),
         }
     }
 
@@ -2961,13 +3054,60 @@ mod tests {
         let mut grid = test_grid();
         grid.style.back_color = 0xAABBCCDD;
         grid.edit_trigger_mode = 2;
-        grid.scroll_bars = 3;
+        grid.scrollbar_show_h = v1::ScrollBarMode::ScrollbarModeAlways as i32;
+        grid.scrollbar_show_v = v1::ScrollBarMode::ScrollbarModeAuto as i32;
+        grid.scrollbar_appearance = v1::ScrollBarAppearance::ScrollbarAppearanceModern as i32;
+        grid.scrollbar_size = 9;
+        grid.selection.active_cell_style.back_color = Some(0x4400FF00);
+        grid.selection.active_cell_style.border = Some(v1::BorderStyle::BorderThick as i32);
 
         let config = grid.get_config();
 
         assert_eq!(config.style.as_ref().unwrap().background, Some(0xAABBCCDD));
         assert_eq!(config.editing.as_ref().unwrap().trigger, Some(2));
-        assert_eq!(config.scrolling.as_ref().unwrap().scrollbars, Some(3));
+        let scrolling = config.scrolling.as_ref().unwrap();
+        let scroll_bar = scrolling.scroll_bar.as_ref().unwrap();
+        assert_eq!(
+            scroll_bar.show_h,
+            Some(v1::ScrollBarMode::ScrollbarModeAlways as i32)
+        );
+        assert_eq!(
+            scroll_bar.show_v,
+            Some(v1::ScrollBarMode::ScrollbarModeAuto as i32)
+        );
+        assert_eq!(
+            scroll_bar.appearance,
+            Some(v1::ScrollBarAppearance::ScrollbarAppearanceModern as i32)
+        );
+        assert_eq!(scroll_bar.size, Some(9));
+        assert_eq!(
+            config
+                .selection
+                .as_ref()
+                .unwrap()
+                .active_cell_style
+                .as_ref()
+                .unwrap()
+                .background,
+            Some(0x4400FF00)
+        );
+        assert_eq!(
+            config
+                .selection
+                .as_ref()
+                .unwrap()
+                .active_cell_style
+                .as_ref()
+                .unwrap()
+                .borders
+                .as_ref()
+                .unwrap()
+                .all
+                .as_ref()
+                .unwrap()
+                .style,
+            Some(v1::BorderStyle::BorderThick as i32)
+        );
     }
 
     #[test]
@@ -2991,6 +3131,46 @@ mod tests {
         assert!(!grid.scroll.fling_active);
         assert_eq!(grid.scroll.fling_vx, 0.0);
         assert_eq!(grid.scroll.fling_vy, 0.0);
+    }
+
+    #[test]
+    fn apply_scroll_config_uses_structured_scrollbar_config() {
+        let mut grid = test_grid();
+        let config = v1::GridConfig {
+            scrolling: Some(v1::ScrollConfig {
+                scroll_bar: Some(v1::ScrollBarConfig {
+                    show_h: Some(v1::ScrollBarMode::ScrollbarModeAlways as i32),
+                    appearance: Some(v1::ScrollBarAppearance::ScrollbarAppearanceOverlay as i32),
+                    colors: Some(v1::ScrollBarColors {
+                        thumb: Some(0xFF123456),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        grid.apply_config(&config);
+
+        assert_eq!(
+            grid.scrollbar_show_h,
+            v1::ScrollBarMode::ScrollbarModeAlways as i32
+        );
+        assert_eq!(
+            grid.scrollbar_show_v,
+            v1::ScrollBarMode::ScrollbarModeNever as i32
+        );
+        assert_eq!(
+            grid.scrollbar_appearance,
+            v1::ScrollBarAppearance::ScrollbarAppearanceOverlay as i32
+        );
+        assert_eq!(grid.scrollbar_size, 6);
+        assert_eq!(grid.scrollbar_corner_radius, 4);
+        assert_eq!(grid.scrollbar_colors.thumb, 0xFF123456);
+        assert_eq!(grid.scrollbar_fade_delay_ms, 1000);
+        assert_eq!(grid.scrollbar_margin, 2);
     }
 
     #[test]

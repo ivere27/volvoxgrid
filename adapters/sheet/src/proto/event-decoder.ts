@@ -243,11 +243,11 @@ export function decodeSelectionChangedPayload(data: Uint8Array): SelectionChange
 
 export interface KeyEventPayload {
   keyCode: number;
-  shift: number;
+  modifier: number;
 }
 
 export function decodeKeyEventPayload(data: Uint8Array): KeyEventPayload {
-  let keyCode = 0, shift = 0;
+  let keyCode = 0, modifier = 0;
   let offset = 0;
   while (offset < data.length) {
     const tag = readVarint(data, offset);
@@ -259,12 +259,12 @@ export function decodeKeyEventPayload(data: Uint8Array): KeyEventPayload {
       offset = v.next;
       const n = asInt32(v.value);
       if (field === 1) keyCode = n;
-      if (field === 2) shift = n;
+      if (field === 2) modifier = n;
       continue;
     }
     offset = skipField(data, offset, wire);
   }
-  return { keyCode, shift };
+  return { keyCode, modifier };
 }
 
 export interface KeyPressPayload {

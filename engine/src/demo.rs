@@ -22,6 +22,11 @@ use crate::grid::VolvoxGrid;
 use crate::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
 use crate::outline::{subtotal, subtotal_ex};
 use crate::proto::volvoxgrid::v1 as pb;
+use crate::scrollbar::{
+    default_scrollbar_colors, default_scrollbar_corner_radius, default_scrollbar_size,
+    reset_scrollbar_fade_state, DEFAULT_SCROLLBAR_FADE_DELAY_MS,
+    DEFAULT_SCROLLBAR_FADE_DURATION_MS, DEFAULT_SCROLLBAR_MARGIN, DEFAULT_SCROLLBAR_MIN_THUMB,
+};
 use crate::selection::{HOVER_CELL, HOVER_COLUMN, HOVER_ROW};
 use crate::style::{CellStylePatch, HighlightStyle};
 
@@ -121,6 +126,20 @@ fn logical_px(grid: &VolvoxGrid, px: i32) -> i32 {
     }
 }
 
+fn apply_demo_scrollbar_style(grid: &mut VolvoxGrid, appearance: i32) {
+    grid.scrollbar_show_h = pb::ScrollBarMode::ScrollbarModeAuto as i32;
+    grid.scrollbar_show_v = pb::ScrollBarMode::ScrollbarModeAuto as i32;
+    grid.scrollbar_appearance = appearance;
+    grid.scrollbar_size = default_scrollbar_size(appearance);
+    grid.scrollbar_min_thumb = DEFAULT_SCROLLBAR_MIN_THUMB;
+    grid.scrollbar_corner_radius = default_scrollbar_corner_radius(appearance);
+    grid.scrollbar_colors = default_scrollbar_colors(appearance);
+    grid.scrollbar_fade_delay_ms = DEFAULT_SCROLLBAR_FADE_DELAY_MS;
+    grid.scrollbar_fade_duration_ms = DEFAULT_SCROLLBAR_FADE_DURATION_MS;
+    grid.scrollbar_margin = DEFAULT_SCROLLBAR_MARGIN;
+    reset_scrollbar_fade_state(grid);
+}
+
 fn apply_demo_theme(grid: &mut VolvoxGrid, theme: &DemoTheme) {
     grid.style.back_color = theme.body_bg;
     grid.style.fore_color = theme.body_fg;
@@ -149,6 +168,13 @@ fn apply_demo_theme(grid: &mut VolvoxGrid, theme: &DemoTheme) {
         fore_color: Some(theme.selection_fg),
         fill_handle: Some(pb::FillHandlePosition::FillHandleNone as i32),
         fill_handle_color: Some(theme.accent),
+        ..HighlightStyle::default()
+    };
+    grid.selection.active_cell_style = HighlightStyle {
+        back_color: Some(0x22000000),
+        fore_color: Some(theme.selection_fg),
+        border: Some(pb::BorderStyle::BorderThick as i32),
+        border_color: Some(theme.accent),
         ..HighlightStyle::default()
     };
 }
@@ -373,6 +399,10 @@ const SALES_DATA_ROWS: i32 = 1000;
 pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
     reset_grid(grid);
     apply_demo_theme(grid, &SALES_THEME);
+    apply_demo_scrollbar_style(
+        grid,
+        pb::ScrollBarAppearance::ScrollbarAppearanceClassic as i32,
+    );
 
     // ── Generate data in memory ──────────────────────────────────────
     struct Entry {
@@ -627,6 +657,10 @@ struct DirEntry {
 pub fn setup_hierarchy_demo(grid: &mut VolvoxGrid) {
     reset_grid(grid);
     apply_demo_theme(grid, &HIERARCHY_THEME);
+    apply_demo_scrollbar_style(
+        grid,
+        pb::ScrollBarAppearance::ScrollbarAppearanceModern as i32,
+    );
     let entries = build_hierarchy_entries();
     let data_rows = entries.len() as i32;
 
@@ -1016,6 +1050,12 @@ fn stress_cell_capacity_for_rows(data_rows: i32) -> usize {
 fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize) {
     reset_grid(grid);
     apply_demo_theme(grid, &STRESS_THEME);
+    apply_demo_scrollbar_style(
+        grid,
+        pb::ScrollBarAppearance::ScrollbarAppearanceOverlay as i32,
+    );
+    grid.scrollbar_show_h = pb::ScrollBarMode::ScrollbarModeAuto as i32;
+    grid.scrollbar_show_v = pb::ScrollBarMode::ScrollbarModeAlways as i32;
     // Capacity is caller-defined: eager path uses full dataset; lazy path
     // keeps startup memory/time low and grows on demand.
     grid.cells = crate::cell::CellStore::with_capacity(cell_capacity.max(12));
@@ -1321,7 +1361,7 @@ mod tests {
     }
 
     #[test]
-    fn demos_apply_modern_theme_palettes() {
+    fn demos_apply_theme_palettes_and_scrollbar_styles() {
         let mut sales = VolvoxGrid::new(1, 960, 540, 1, 1, 0, 0);
         setup_sales_demo(&mut sales);
         assert_eq!(sales.style.back_color_fixed, SALES_THEME.fixed_bg);
@@ -1333,6 +1373,18 @@ mod tests {
             sales.indicator_bands.row_start.back_color,
             Some(SALES_THEME.indicator_bg)
         );
+        assert_eq!(
+            sales.selection.active_cell_style.back_color,
+            Some(0x22000000)
+        );
+        assert_eq!(
+            sales.selection.active_cell_style.border_color,
+            Some(SALES_THEME.accent)
+        );
+        assert_eq!(
+            sales.scrollbar_appearance,
+            pb::ScrollBarAppearance::ScrollbarAppearanceClassic as i32
+        );
 
         let mut hierarchy = VolvoxGrid::new(2, 960, 540, 1, 1, 0, 0);
         setup_hierarchy_demo(&mut hierarchy);
@@ -1340,6 +1392,10 @@ mod tests {
         assert_eq!(
             hierarchy.indicator_bands.col_top.back_color,
             Some(HIERARCHY_THEME.header_bg)
+        );
+        assert_eq!(
+            hierarchy.scrollbar_appearance,
+            pb::ScrollBarAppearance::ScrollbarAppearanceModern as i32
         );
 
         let mut stress = VolvoxGrid::new(3, 960, 540, 1, 1, 0, 0);
@@ -1352,6 +1408,18 @@ mod tests {
         assert_eq!(
             stress.indicator_bands.row_start.back_color,
             Some(STRESS_THEME.indicator_bg)
+        );
+        assert_eq!(
+            stress.scrollbar_appearance,
+            pb::ScrollBarAppearance::ScrollbarAppearanceOverlay as i32
+        );
+        assert_eq!(
+            stress.scrollbar_show_h,
+            pb::ScrollBarMode::ScrollbarModeAuto as i32
+        );
+        assert_eq!(
+            stress.scrollbar_show_v,
+            pb::ScrollBarMode::ScrollbarModeAlways as i32
         );
     }
 

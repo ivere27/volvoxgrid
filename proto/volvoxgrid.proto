@@ -317,6 +317,41 @@ enum ScrollBarsMode {
   SCROLLBAR_BOTH       = 3;
 }
 
+enum ScrollBarMode {
+  SCROLLBAR_MODE_AUTO   = 0;
+  SCROLLBAR_MODE_ALWAYS = 1;
+  SCROLLBAR_MODE_NEVER  = 2;
+}
+
+enum ScrollBarAppearance {
+  SCROLLBAR_APPEARANCE_CLASSIC = 0;
+  SCROLLBAR_APPEARANCE_FLAT    = 1;
+  SCROLLBAR_APPEARANCE_MODERN  = 2;
+  SCROLLBAR_APPEARANCE_OVERLAY = 3;
+}
+
+message ScrollBarColors {
+  optional uint32 thumb        = 1;
+  optional uint32 thumb_hover  = 2;
+  optional uint32 thumb_active = 3;
+  optional uint32 track        = 4;
+  optional uint32 arrow        = 5;
+  optional uint32 border       = 6;
+}
+
+message ScrollBarConfig {
+  optional ScrollBarMode       show_h           = 1;
+  optional ScrollBarMode       show_v           = 2;
+  optional ScrollBarAppearance appearance       = 3;
+  optional int32               size             = 4;
+  optional int32               min_thumb        = 5;
+  optional int32               corner_radius    = 6;
+  ScrollBarColors              colors           = 7;
+  optional int32               fade_delay_ms    = 8;
+  optional int32               fade_duration_ms = 9;
+  optional int32               margin           = 10;
+}
+
 // ── Layout ──
 
 enum PinPosition {
@@ -721,6 +756,7 @@ message SelectionConfig {
   HoverConfig                  hover                = 7;
   HighlightStyle               indicator_row_style  = 8;
   HighlightStyle               indicator_col_style  = 9;
+  HighlightStyle               active_cell_style    = 10;
 }
 
 // ── Editing ──
@@ -737,7 +773,7 @@ message EditConfig {
 
 // ── Scrolling ──
 message ScrollConfig {
-  optional ScrollBarsMode scrollbars         = 1;
+  ScrollBarConfig         scroll_bar         = 1;
   optional bool           scroll_track       = 2;
   optional bool           scroll_tips        = 3;
   optional bool           fling_enabled      = 4;
@@ -745,6 +781,7 @@ message ScrollConfig {
   optional float          fling_friction     = 6;
   optional bool           pinch_zoom_enabled = 7;
   optional bool           fast_scroll        = 8;
+  optional ScrollBarsMode scrollbars         = 9;
 }
 
 // ── Outline / Tree ──
@@ -1758,9 +1795,9 @@ message AfterEditEvent    { int32 row = 1; int32 col = 2; string old_text = 3; s
 message CellEditValidateEvent { int32 row = 1; int32 col = 2; string edit_text = 3; }
 message CellEditChangeEvent   { string text = 1; }
 message CellButtonClickEvent  { int32 row = 1; int32 col = 2; }
-message KeyDownEditEvent  { int32 key_code = 1; int32 shift = 2; }
+message KeyDownEditEvent  { int32 key_code = 1; int32 modifier = 2; }
 message KeyPressEditEvent { int32 key_ascii = 1; }
-message KeyUpEditEvent    { int32 key_code = 1; int32 shift = 2; }
+message KeyUpEditEvent    { int32 key_code = 1; int32 modifier = 2; }
 message CellEditConfigureStyleEvent  { int32 row = 1; int32 col = 2; }
 message CellEditConfigureWindowEvent { int32 row = 1; int32 col = 2; }
 message DropdownClosedEvent {}
@@ -1803,16 +1840,16 @@ message AfterMoveRowEvent     { int32 row = 1; int32 old_position = 2; }
 
 // ── Mouse Events ──
 message BeforeMouseDownEvent { int32 row = 1; int32 col = 2; }
-message MouseDownEvent  { int32 button = 1; int32 shift = 2; float x = 3; float y = 4; }
-message MouseUpEvent    { int32 button = 1; int32 shift = 2; float x = 3; float y = 4; }
-message MouseMoveEvent  { int32 button = 1; int32 shift = 2; float x = 3; float y = 4; }
+message MouseDownEvent  { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
+message MouseUpEvent    { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
+message MouseMoveEvent  { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
 message ClickEvent      {}
 message DblClickEvent   {}
 
 // ── Keyboard Events ──
-message KeyDownEvent  { int32 key_code = 1; int32 shift = 2; }
+message KeyDownEvent  { int32 key_code = 1; int32 modifier = 2; }
 message KeyPressEvent { int32 key_ascii = 1; }
-message KeyUpEvent    { int32 key_code = 1; int32 shift = 2; }
+message KeyUpEvent    { int32 key_code = 1; int32 modifier = 2; }
 
 // ── Draw Events ──
 message CustomRenderCellEvent {

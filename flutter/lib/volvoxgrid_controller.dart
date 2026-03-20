@@ -607,6 +607,12 @@ class VolvoxGridController extends ChangeNotifier {
         GridConfig()..selection = (SelectionConfig()..visibility = style));
   }
 
+  /// Set the active/current cell highlight style.
+  Future<void> setActiveCellStyle(HighlightStyle style) async {
+    await _configure(
+        GridConfig()..selection = (SelectionConfig()..activeCellStyle = style));
+  }
+
   /// Scroll the grid so that the specified cell is visible.
   Future<void> showCell(int row, int col) async {
     await VolvoxGridService.ShowCell(

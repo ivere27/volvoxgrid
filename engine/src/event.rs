@@ -67,14 +67,14 @@ pub enum GridEventData {
     },
     KeyDownEdit {
         key_code: i32,
-        shift: i32,
+        modifier: i32,
     },
     KeyPressEdit {
         key_ascii: i32,
     },
     KeyUpEdit {
         key_code: i32,
-        shift: i32,
+        modifier: i32,
     },
     CellEditConfigureStyle {
         row: i32,
@@ -165,19 +165,19 @@ pub enum GridEventData {
     },
     MouseDown {
         button: i32,
-        shift: i32,
+        modifier: i32,
         x: f32,
         y: f32,
     },
     MouseUp {
         button: i32,
-        shift: i32,
+        modifier: i32,
         x: f32,
         y: f32,
     },
     MouseMove {
         button: i32,
-        shift: i32,
+        modifier: i32,
         x: f32,
         y: f32,
     },
@@ -185,14 +185,14 @@ pub enum GridEventData {
     DblClick,
     KeyDown {
         key_code: i32,
-        shift: i32,
+        modifier: i32,
     },
     KeyPress {
         key_ascii: i32,
     },
     KeyUp {
         key_code: i32,
-        shift: i32,
+        modifier: i32,
     },
     CustomRenderCell {
         row: i32,

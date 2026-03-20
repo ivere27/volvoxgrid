@@ -1112,7 +1112,24 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn set_scroll_bars(&self, r: SetScrollBarsRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            g.scroll_bars = r.mode;
+            match r.mode {
+                1 => {
+                    g.scrollbar_show_h = ScrollBarMode::ScrollbarModeAuto as i32;
+                    g.scrollbar_show_v = ScrollBarMode::ScrollbarModeNever as i32;
+                }
+                2 => {
+                    g.scrollbar_show_h = ScrollBarMode::ScrollbarModeNever as i32;
+                    g.scrollbar_show_v = ScrollBarMode::ScrollbarModeAuto as i32;
+                }
+                3 => {
+                    g.scrollbar_show_h = ScrollBarMode::ScrollbarModeAuto as i32;
+                    g.scrollbar_show_v = ScrollBarMode::ScrollbarModeAuto as i32;
+                }
+                _ => {
+                    g.scrollbar_show_h = ScrollBarMode::ScrollbarModeNever as i32;
+                    g.scrollbar_show_v = ScrollBarMode::ScrollbarModeNever as i32;
+                }
+            }
             g.mark_dirty();
         })?;
         Ok(Empty {})
@@ -2560,6 +2577,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             }
             if !r.enabled {
                 g.animation.clear();
+                if g.tick_scrollbar_fade(0.0) {
+                    g.mark_dirty_visual();
+                }
             }
         })?;
         Ok(Empty {})
@@ -4086,7 +4106,24 @@ pub extern "C" fn volvox_grid_set_scroll_bars(
 ) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
-            g.scroll_bars = mode;
+            match mode {
+                1 => {
+                    g.scrollbar_show_h = ScrollBarMode::ScrollbarModeAuto as i32;
+                    g.scrollbar_show_v = ScrollBarMode::ScrollbarModeNever as i32;
+                }
+                2 => {
+                    g.scrollbar_show_h = ScrollBarMode::ScrollbarModeNever as i32;
+                    g.scrollbar_show_v = ScrollBarMode::ScrollbarModeAuto as i32;
+                }
+                3 => {
+                    g.scrollbar_show_h = ScrollBarMode::ScrollbarModeAuto as i32;
+                    g.scrollbar_show_v = ScrollBarMode::ScrollbarModeAuto as i32;
+                }
+                _ => {
+                    g.scrollbar_show_h = ScrollBarMode::ScrollbarModeNever as i32;
+                    g.scrollbar_show_v = ScrollBarMode::ScrollbarModeNever as i32;
+                }
+            }
             g.mark_dirty();
         }),
         out_len,

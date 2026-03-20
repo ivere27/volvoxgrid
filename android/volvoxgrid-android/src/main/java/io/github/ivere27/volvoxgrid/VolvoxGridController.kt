@@ -686,6 +686,12 @@ class VolvoxGridController(
             .build())
     }
 
+    fun setActiveCellStyle(style: HighlightStyle) {
+        configure(GridConfig.newBuilder()
+            .setSelection(SelectionConfig.newBuilder().setActiveCellStyle(style).build())
+            .build())
+    }
+
     fun setFocusBorder(style: FocusBorderStyle) {
         configure(GridConfig.newBuilder()
             .setSelection(SelectionConfig.newBuilder().setFocusBorder(style).build())

@@ -610,7 +610,11 @@ impl VolvoxServiceClient {
                         ..Default::default()
                     }),
                     scrolling: Some(pb::ScrollConfig {
-                        scrollbars: Some(pb::ScrollBarsMode::ScrollbarBoth as i32),
+                        scroll_bar: Some(pb::ScrollBarConfig {
+                            show_h: Some(pb::ScrollBarMode::ScrollbarModeAuto as i32),
+                            show_v: Some(pb::ScrollBarMode::ScrollbarModeAuto as i32),
+                            ..Default::default()
+                        }),
                         fling_enabled: Some(true),
                         fast_scroll: Some(true),
                         ..Default::default()
@@ -966,7 +970,9 @@ unsafe fn lookup_gtk_symbol<T>(name: &str) -> Result<T, String> {
     Ok(std::mem::transmute_copy(&symbol))
 }
 
-fn build_native_surface_descriptor(surface: &gdk::Surface) -> Result<NativeSurfaceDescriptor, String> {
+fn build_native_surface_descriptor(
+    surface: &gdk::Surface,
+) -> Result<NativeSurfaceDescriptor, String> {
     type GetWaylandDisplay = unsafe extern "C" fn(*mut libc::c_void) -> *mut libc::c_void;
     type GetWaylandSurface = unsafe extern "C" fn(*mut libc::c_void) -> *mut libc::c_void;
     type GetX11Display = unsafe extern "C" fn(*mut libc::c_void) -> *mut libc::c_void;

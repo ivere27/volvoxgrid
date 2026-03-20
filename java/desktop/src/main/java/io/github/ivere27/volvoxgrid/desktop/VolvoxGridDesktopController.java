@@ -924,6 +924,15 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         );
     }
 
+    public void setActiveCellStyle(HighlightStyle style) throws SynurangDesktopBridge.SynurangBridgeException {
+        Objects.requireNonNull(style, "style");
+        configure(
+            GridConfig.newBuilder()
+                .setSelection(SelectionConfig.newBuilder().setActiveCellStyle(style).build())
+                .build()
+        );
+    }
+
     @Override
     public GridSelection getSelection() throws SynurangDesktopBridge.SynurangBridgeException {
         SelectionState sel = selectionState();

@@ -174,6 +174,13 @@ impl FrameTarget {
         self.surface.mark_dirty();
         Ok(())
     }
+
+    fn copy_render_from(&mut self, source: &FrameTarget) {
+        if self.width != source.width || self.height != source.height {
+            return;
+        }
+        self.render_buffer.copy_from_slice(&source.render_buffer);
+    }
 }
 
 fn create_present_surface(
@@ -347,6 +354,7 @@ struct State {
     inflight_target: Option<FrameTarget>,
     spare_target: Option<FrameTarget>,
     frame_in_flight: bool,
+    frame_awaiting_present: bool,
     needs_followup_frame: bool,
     pending_resize: Option<(i32, i32)>,
     selection: pb::SelectionState,
@@ -420,6 +428,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         inflight_target: None,
         spare_target: None,
         frame_in_flight: false,
+        frame_awaiting_present: false,
         needs_followup_frame: false,
         pending_resize: None,
         selection: pb::SelectionState::default(),
@@ -600,15 +609,33 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
 
     drawing_area.set_draw_func({
         let state = Rc::clone(&state);
-        move |_area, cr, _w, _h| {
-            let st = state.borrow();
-            if let Some(target) = &st.display_target {
-                let surface = &target.surface;
-                let _ = cr.set_source_surface(surface, 0.0, 0.0);
-                let _ = cr.paint();
-            } else {
-                cr.set_source_rgb(0.92, 0.92, 0.92);
-                let _ = cr.paint();
+        move |area, cr, _w, _h| {
+            {
+                let st = state.borrow();
+                if let Some(target) = &st.display_target {
+                    let surface = &target.surface;
+                    let _ = cr.set_source_surface(surface, 0.0, 0.0);
+                    let _ = cr.paint();
+                } else {
+                    cr.set_source_rgb(0.92, 0.92, 0.92);
+                    let _ = cr.paint();
+                }
+            }
+
+            let should_schedule = {
+                let Ok(mut st) = state.try_borrow_mut() else {
+                    return;
+                };
+                if !st.frame_awaiting_present {
+                    false
+                } else {
+                    st.frame_awaiting_present = false;
+                    st.needs_followup_frame && !st.followup_frame_scheduled
+                }
+            };
+
+            if should_schedule {
+                schedule_followup_frame(&state, area);
             }
         }
     });
@@ -1451,7 +1478,11 @@ impl VolvoxServiceClient {
                         ..Default::default()
                     }),
                     scrolling: Some(pb::ScrollConfig {
-                        scrollbars: Some(pb::ScrollBarsMode::ScrollbarBoth as i32),
+                        scroll_bar: Some(pb::ScrollBarConfig {
+                            show_h: Some(pb::ScrollBarMode::ScrollbarModeAuto as i32),
+                            show_v: Some(pb::ScrollBarMode::ScrollbarModeAuto as i32),
+                            ..Default::default()
+                        }),
                         fling_enabled: Some(true),
                         fast_scroll: Some(true),
                         ..Default::default()
@@ -1924,6 +1955,7 @@ fn attach_grid_session(state: &mut State, grid_id: i64) -> Result<(), String> {
     state.stream_epoch = next_epoch;
     state.grid_id = grid_id;
     state.frame_in_flight = false;
+    state.frame_awaiting_present = false;
     state.needs_followup_frame = false;
     state.followup_frame_scheduled = false;
     state.followup_schedule_seq = state.followup_schedule_seq.wrapping_add(1);
@@ -2153,12 +2185,17 @@ fn handle_render_output(
 ) -> Result<(bool, bool), String> {
     let mut needs_redraw = false;
     let mut schedule_followup = false;
+    let mut gpu_present_path = false;
     if let Some(event) = &output.event {
         match event {
             pb::render_output::Event::FrameDone(frame) => {
                 state.frame_in_flight = false;
                 if output.rendered {
                     if complete_frame_target(state, frame.handle) {
+                        // Keep CPU presentation one frame behind rendering so
+                        // fast partial-scroll frames do not overtake GTK paint.
+                        state.frame_awaiting_present = true;
+                        state.needs_followup_frame = true;
                         needs_redraw = true;
                     }
                 } else {
@@ -2210,11 +2247,12 @@ fn handle_render_output(
             }
             pb::render_output::Event::GpuFrameDone(_) => {
                 state.frame_in_flight = false;
+                gpu_present_path = true;
             }
         }
     }
 
-    if output.rendered {
+    if output.rendered && gpu_present_path {
         schedule_followup = true;
     }
 
@@ -2275,7 +2313,7 @@ fn request_frame(state: &mut State) -> Result<(), String> {
         return Ok(());
     }
 
-    if state.frame_in_flight {
+    if state.frame_in_flight || state.frame_awaiting_present {
         state.needs_followup_frame = true;
         return Ok(());
     }
@@ -2285,7 +2323,12 @@ fn request_frame(state: &mut State) -> Result<(), String> {
         None => true,
     };
 
-    let target = take_frame_target(state, width, height)?;
+    let mut target = take_frame_target(state, width, height)?;
+    if state.scroll_blit_enabled && !needs_resize {
+        if let Some(display) = state.display_target.as_ref() {
+            target.copy_render_from(display);
+        }
+    }
 
     let (handle, stride) = if needs_resize {
         state.viewport_width = width;
