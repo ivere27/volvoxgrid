@@ -966,6 +966,20 @@ final $typed_data.Uint8List colIndicatorCellModeDescriptor = $convert.base64Deco
     'TEVDVF9BTEwQgAgSIwoeQ09MX0lORElDQVRPUl9DRUxMX1NUQVRVU19JQ09OEIAQEh4KGUNPTF'
     '9JTkRJQ0FUT1JfQ0VMTF9DVVNUT00QgCA=');
 
+@$core.Deprecated('Use editUiModeDescriptor instead')
+const EditUiMode$json = {
+  '1': 'EditUiMode',
+  '2': [
+    {'1': 'EDIT_UI_MODE_ENTER', '2': 0},
+    {'1': 'EDIT_UI_MODE_EDIT', '2': 1},
+  ],
+};
+
+/// Descriptor for `EditUiMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List editUiModeDescriptor = $convert.base64Decode(
+    'CgpFZGl0VWlNb2RlEhYKEkVESVRfVUlfTU9ERV9FTlRFUhAAEhUKEUVESVRfVUlfTU9ERV9FRE'
+    'lUEAE=');
+
 @$core.Deprecated('Use errorCodeDescriptor instead')
 const ErrorCode$json = {
   '1': 'ErrorCode',
@@ -5240,6 +5254,15 @@ const EditCommand$json = {
       '9': 0,
       '10': 'setHighlights'
     },
+    {
+      '1': 'set_preedit',
+      '3': 9,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.EditSetPreedit',
+      '9': 0,
+      '10': 'setPreedit'
+    },
   ],
   '8': [
     {'1': 'command'},
@@ -5256,7 +5279,8 @@ final $typed_data.Uint8List editCommandDescriptor = $convert.base64Decode(
     'ZvbHZveGdyaWQudjEuRWRpdFNldFNlbGVjdGlvbkgAUgxzZXRTZWxlY3Rpb24SMwoGZmluaXNo'
     'GAcgASgLMhkudm9sdm94Z3JpZC52MS5FZGl0RmluaXNoSABSBmZpbmlzaBJJCg5zZXRfaGlnaG'
     'xpZ2h0cxgIIAEoCzIgLnZvbHZveGdyaWQudjEuRWRpdFNldEhpZ2hsaWdodHNIAFINc2V0SGln'
-    'aGxpZ2h0c0IJCgdjb21tYW5k');
+    'aGxpZ2h0cxJACgtzZXRfcHJlZWRpdBgJIAEoCzIdLnZvbHZveGdyaWQudjEuRWRpdFNldFByZW'
+    'VkaXRIAFIKc2V0UHJlZWRpdEIJCgdjb21tYW5k');
 
 @$core.Deprecated('Use editStartDescriptor instead')
 const EditStart$json = {
@@ -5367,6 +5391,21 @@ final $typed_data.Uint8List editSetSelectionDescriptor = $convert.base64Decode(
     'ChBFZGl0U2V0U2VsZWN0aW9uEhQKBXN0YXJ0GAEgASgFUgVzdGFydBIWCgZsZW5ndGgYAiABKA'
     'VSBmxlbmd0aA==');
 
+@$core.Deprecated('Use editSetPreeditDescriptor instead')
+const EditSetPreedit$json = {
+  '1': 'EditSetPreedit',
+  '2': [
+    {'1': 'text', '3': 1, '4': 1, '5': 9, '10': 'text'},
+    {'1': 'cursor', '3': 2, '4': 1, '5': 5, '10': 'cursor'},
+    {'1': 'commit', '3': 3, '4': 1, '5': 8, '10': 'commit'},
+  ],
+};
+
+/// Descriptor for `EditSetPreedit`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List editSetPreeditDescriptor = $convert.base64Decode(
+    'Cg5FZGl0U2V0UHJlZWRpdBISCgR0ZXh0GAEgASgJUgR0ZXh0EhYKBmN1cnNvchgCIAEoBVIGY3'
+    'Vyc29yEhYKBmNvbW1pdBgDIAEoCFIGY29tbWl0');
+
 @$core.Deprecated('Use editFinishDescriptor instead')
 const EditFinish$json = {
   '1': 'EditFinish',
@@ -5386,6 +5425,16 @@ const EditState$json = {
     {'1': 'text', '3': 4, '4': 1, '5': 9, '10': 'text'},
     {'1': 'sel_start', '3': 5, '4': 1, '5': 5, '10': 'selStart'},
     {'1': 'sel_length', '3': 6, '4': 1, '5': 5, '10': 'selLength'},
+    {'1': 'composing', '3': 7, '4': 1, '5': 8, '10': 'composing'},
+    {'1': 'preedit_text', '3': 8, '4': 1, '5': 9, '10': 'preeditText'},
+    {
+      '1': 'ui_mode',
+      '3': 9,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.EditUiMode',
+      '10': 'uiMode'
+    },
   ],
 };
 
@@ -5393,7 +5442,9 @@ const EditState$json = {
 final $typed_data.Uint8List editStateDescriptor = $convert.base64Decode(
     'CglFZGl0U3RhdGUSFgoGYWN0aXZlGAEgASgIUgZhY3RpdmUSEAoDcm93GAIgASgFUgNyb3cSEA'
     'oDY29sGAMgASgFUgNjb2wSEgoEdGV4dBgEIAEoCVIEdGV4dBIbCglzZWxfc3RhcnQYBSABKAVS'
-    'CHNlbFN0YXJ0Eh0KCnNlbF9sZW5ndGgYBiABKAVSCXNlbExlbmd0aA==');
+    'CHNlbFN0YXJ0Eh0KCnNlbF9sZW5ndGgYBiABKAVSCXNlbExlbmd0aBIcCgljb21wb3NpbmcYBy'
+    'ABKAhSCWNvbXBvc2luZxIhCgxwcmVlZGl0X3RleHQYCCABKAlSC3ByZWVkaXRUZXh0EjIKB3Vp'
+    'X21vZGUYCSABKA4yGS52b2x2b3hncmlkLnYxLkVkaXRVaU1vZGVSBnVpTW9kZQ==');
 
 @$core.Deprecated('Use sortColumnDescriptor instead')
 const SortColumn$json = {
@@ -6868,6 +6919,16 @@ const EditRequest$json = {
     {'1': 'current_value', '3': 7, '4': 1, '5': 9, '10': 'currentValue'},
     {'1': 'edit_mask', '3': 8, '4': 1, '5': 9, '10': 'editMask'},
     {'1': 'max_length', '3': 9, '4': 1, '5': 5, '10': 'maxLength'},
+    {'1': 'sel_start', '3': 10, '4': 1, '5': 5, '10': 'selStart'},
+    {'1': 'sel_length', '3': 11, '4': 1, '5': 5, '10': 'selLength'},
+    {
+      '1': 'ui_mode',
+      '3': 12,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.EditUiMode',
+      '10': 'uiMode'
+    },
   ],
 };
 
@@ -6876,7 +6937,9 @@ final $typed_data.Uint8List editRequestDescriptor = $convert.base64Decode(
     'CgtFZGl0UmVxdWVzdBIQCgNyb3cYASABKAVSA3JvdxIQCgNjb2wYAiABKAVSA2NvbBIMCgF4GA'
     'MgASgCUgF4EgwKAXkYBCABKAJSAXkSFAoFd2lkdGgYBSABKAJSBXdpZHRoEhYKBmhlaWdodBgG'
     'IAEoAlIGaGVpZ2h0EiMKDWN1cnJlbnRfdmFsdWUYByABKAlSDGN1cnJlbnRWYWx1ZRIbCgllZG'
-    'l0X21hc2sYCCABKAlSCGVkaXRNYXNrEh0KCm1heF9sZW5ndGgYCSABKAVSCW1heExlbmd0aA==');
+    'l0X21hc2sYCCABKAlSCGVkaXRNYXNrEh0KCm1heF9sZW5ndGgYCSABKAVSCW1heExlbmd0aBIb'
+    'CglzZWxfc3RhcnQYCiABKAVSCHNlbFN0YXJ0Eh0KCnNlbF9sZW5ndGgYCyABKAVSCXNlbExlbm'
+    'd0aBIyCgd1aV9tb2RlGAwgASgOMhkudm9sdm94Z3JpZC52MS5FZGl0VWlNb2RlUgZ1aU1vZGU=');
 
 @$core.Deprecated('Use dropdownRequestDescriptor instead')
 const DropdownRequest$json = {
@@ -8708,6 +8771,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.EditFinish': EditFinish$json,
   '.volvoxgrid.v1.EditSetHighlights': EditSetHighlights$json,
   '.volvoxgrid.v1.HighlightRegion': HighlightRegion$json,
+  '.volvoxgrid.v1.EditSetPreedit': EditSetPreedit$json,
   '.volvoxgrid.v1.EditState': EditState$json,
   '.volvoxgrid.v1.SortRequest': SortRequest$json,
   '.volvoxgrid.v1.SortColumn': SortColumn$json,

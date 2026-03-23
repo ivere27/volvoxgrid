@@ -1544,6 +1544,25 @@ class ColIndicatorCellMode extends $pb.ProtobufEnum {
   const ColIndicatorCellMode._(super.value, super.name);
 }
 
+class EditUiMode extends $pb.ProtobufEnum {
+  static const EditUiMode EDIT_UI_MODE_ENTER =
+      EditUiMode._(0, _omitEnumNames ? '' : 'EDIT_UI_MODE_ENTER');
+  static const EditUiMode EDIT_UI_MODE_EDIT =
+      EditUiMode._(1, _omitEnumNames ? '' : 'EDIT_UI_MODE_EDIT');
+
+  static const $core.List<EditUiMode> values = <EditUiMode>[
+    EDIT_UI_MODE_ENTER,
+    EDIT_UI_MODE_EDIT,
+  ];
+
+  static final $core.List<EditUiMode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 1);
+  static EditUiMode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const EditUiMode._(super.value, super.name);
+}
+
 class ErrorCode extends $pb.ProtobufEnum {
   static const ErrorCode ERROR_UNKNOWN =
       ErrorCode._(0, _omitEnumNames ? '' : 'ERROR_UNKNOWN');

@@ -5963,6 +5963,16 @@ fn render_frozen_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Ren
 // Layer 11 -- Active in-place editor
 // ===========================================================================
 
+pub(crate) fn compose_preedit_display_text(text: &str, sel_start: i32, sel_end: i32, preedit: &str) -> String {
+    let text_char_count = text.chars().count() as i32;
+    let sel_start = sel_start.clamp(0, text_char_count);
+    let sel_end = sel_end.clamp(sel_start, text_char_count);
+    let before_byte = byte_index_at_char(text, sel_start);
+    let after_byte = byte_index_at_char(text, sel_end);
+
+    format!("{}{}{}", &text[..before_byte], preedit, &text[after_byte..])
+}
+
 fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
     let vp = &ctx.vp;
     if !grid.edit.is_active() {
@@ -6030,87 +6040,187 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
     );
     canvas.rect_outline(cx, cy, edit_w, ch, editor_border);
 
+    let composing = grid.edit.composing && !grid.edit.preedit_text.is_empty();
     let text = grid.edit.edit_text.as_str();
     let text_char_count = text.chars().count() as i32;
     let sel_start = grid.edit.sel_start.clamp(0, text_char_count);
     let sel_end = (grid.edit.sel_start + grid.edit.sel_length).clamp(0, text_char_count);
 
-    let prefix = &text[..byte_index_at_char(text, sel_start)];
-    let selected = &text[byte_index_at_char(text, sel_start)..byte_index_at_char(text, sel_end)];
-    let (_, th) = canvas.measure_text(text, font_name, font_size, font_bold, font_italic, None);
-    let text_y = cy + top_padding + ((inner_h - th.ceil() as i32) / 2).max(0);
-
     let text_x = cx + left_padding;
     let clip_w = (edit_w - left_padding - right_padding).max(1);
     let clip_h = inner_h;
+    let scroll_margin = 2; // pixels of margin to keep between caret and clip edge
 
-    // Selection highlight
-    if sel_end > sel_start {
-        let (prefix_w, _) =
-            canvas.measure_text(prefix, font_name, font_size, font_bold, font_italic, None);
-        let (sel_w, _) =
-            canvas.measure_text(selected, font_name, font_size, font_bold, font_italic, None);
-        let sel_x = text_x + prefix_w.ceil() as i32;
-        let sel_w_px = sel_w.ceil() as i32;
-        let sel_left = sel_x.max(text_x);
-        let sel_right = (sel_x + sel_w_px).min(cx + edit_w - right_padding);
-        canvas.fill_rect(
-            sel_left,
-            cy + top_padding,
-            (sel_right - sel_left).max(1),
-            inner_h,
-            0xFFBDD7FF,
-        );
-    }
+    if composing {
+        // IME composition mode: preview the preedit text replacing any active selection.
+        let preedit = grid.edit.preedit_text.as_str();
+        let before_preedit_byte = byte_index_at_char(text, sel_start);
+        let composite = compose_preedit_display_text(text, sel_start, sel_end, preedit);
 
-    // Editor text
-    canvas.draw_text_styled_fast(
-        text_x,
-        text_y,
-        text,
-        font_name,
-        font_size,
-        font_bold,
-        font_italic,
-        fore,
-        text_x,
-        0,
-        clip_w,
-        clip_h,
-        text_style,
-        None,
-    );
-
-    // Re-render selected run with selection foreground for contrast.
-    if sel_end > sel_start && !selected.is_empty() {
-        let (prefix_w, _) =
-            canvas.measure_text(prefix, font_name, font_size, font_bold, font_italic, None);
-        let sel_x = text_x + prefix_w.ceil() as i32;
-        canvas.draw_text_styled_fast(
-            sel_x,
-            text_y,
-            selected,
+        let (_, th) = canvas.measure_text(
+            &composite,
             font_name,
             font_size,
             font_bold,
             font_italic,
-            0xFF000000,
-            sel_x,
+            None,
+        );
+        let text_y = cy + top_padding + ((inner_h - th.ceil() as i32) / 2).max(0);
+
+        // Compute caret position for scroll offset.
+        let before_preedit = &text[..before_preedit_byte];
+        let (before_w, _) = canvas.measure_text(
+            before_preedit,
+            font_name,
+            font_size,
+            font_bold,
+            font_italic,
+            None,
+        );
+        let (preedit_w, _) =
+            canvas.measure_text(preedit, font_name, font_size, font_bold, font_italic, None);
+        let preedit_cursor = grid
+            .edit
+            .preedit_cursor
+            .clamp(0, preedit.chars().count() as i32);
+        let cursor_prefix = &preedit[..byte_index_at_char(preedit, preedit_cursor)];
+        let (cursor_w, _) = canvas.measure_text(
+            cursor_prefix,
+            font_name,
+            font_size,
+            font_bold,
+            font_italic,
+            None,
+        );
+        let caret_px = before_w.ceil() as i32 + cursor_w.ceil() as i32;
+        let scroll_offset = if caret_px + scroll_margin > clip_w {
+            caret_px + scroll_margin - clip_w
+        } else {
+            0
+        };
+        let draw_x = text_x - scroll_offset;
+
+        // Draw the full composite string.
+        canvas.draw_text_styled_fast(
+            draw_x,
+            text_y,
+            &composite,
+            font_name,
+            font_size,
+            font_bold,
+            font_italic,
+            fore,
+            text_x,
             0,
             clip_w,
             clip_h,
             text_style,
             None,
         );
-    }
 
-    // Caret (when no range is selected)
-    if sel_end == sel_start {
-        let (prefix_w, _) =
-            canvas.measure_text(prefix, font_name, font_size, font_bold, font_italic, None);
-        let caret_max = (cx + edit_w - right_padding).max(text_x);
-        let caret_x = (text_x + prefix_w.ceil() as i32).clamp(text_x, caret_max);
+        // Draw underline under the preedit portion.
+        let underline_x = draw_x + before_w.ceil() as i32;
+        let underline_w = preedit_w.ceil() as i32;
+        let underline_y = text_y + th.ceil() as i32;
+        if underline_w > 0 {
+            let ul_left = underline_x.max(text_x);
+            let ul_right = (underline_x + underline_w).min(text_x + clip_w);
+            if ul_right > ul_left {
+                canvas.hline(ul_left, underline_y, ul_right - ul_left, fore);
+            }
+        }
+
+        // Caret within the preedit.
+        let caret_x = (draw_x + caret_px).clamp(text_x, (text_x + clip_w).max(text_x));
         canvas.vline(caret_x, cy + top_padding, inner_h, 0xFF000000);
+    } else {
+        // Normal editing mode (no IME composition).
+        let prefix = &text[..byte_index_at_char(text, sel_start)];
+        let selected =
+            &text[byte_index_at_char(text, sel_start)..byte_index_at_char(text, sel_end)];
+        let (_, th) = canvas.measure_text(text, font_name, font_size, font_bold, font_italic, None);
+        let text_y = cy + top_padding + ((inner_h - th.ceil() as i32) / 2).max(0);
+
+        // Compute scroll offset to keep the caret (or selection end) visible.
+        let caret_char = if sel_end > sel_start { sel_end } else { sel_start };
+        let caret_prefix = &text[..byte_index_at_char(text, caret_char)];
+        let (caret_prefix_w, _) =
+            canvas.measure_text(caret_prefix, font_name, font_size, font_bold, font_italic, None);
+        let caret_px = caret_prefix_w.ceil() as i32;
+        let scroll_offset = if caret_px + scroll_margin > clip_w {
+            caret_px + scroll_margin - clip_w
+        } else {
+            0
+        };
+        let draw_x = text_x - scroll_offset;
+
+        // Selection highlight
+        if sel_end > sel_start {
+            let (prefix_w, _) =
+                canvas.measure_text(prefix, font_name, font_size, font_bold, font_italic, None);
+            let (sel_w, _) =
+                canvas.measure_text(selected, font_name, font_size, font_bold, font_italic, None);
+            let sel_x = draw_x + prefix_w.ceil() as i32;
+            let sel_w_px = sel_w.ceil() as i32;
+            let sel_left = sel_x.max(text_x);
+            let sel_right = (sel_x + sel_w_px).min(text_x + clip_w);
+            if sel_right > sel_left {
+                canvas.fill_rect(
+                    sel_left,
+                    cy + top_padding,
+                    sel_right - sel_left,
+                    inner_h,
+                    0xFFBDD7FF,
+                );
+            }
+        }
+
+        // Editor text
+        canvas.draw_text_styled_fast(
+            draw_x,
+            text_y,
+            text,
+            font_name,
+            font_size,
+            font_bold,
+            font_italic,
+            fore,
+            text_x,
+            0,
+            clip_w,
+            clip_h,
+            text_style,
+            None,
+        );
+
+        // Re-render selected run with selection foreground for contrast.
+        if sel_end > sel_start && !selected.is_empty() {
+            let (prefix_w, _) =
+                canvas.measure_text(prefix, font_name, font_size, font_bold, font_italic, None);
+            let sel_x = draw_x + prefix_w.ceil() as i32;
+            canvas.draw_text_styled_fast(
+                sel_x,
+                text_y,
+                selected,
+                font_name,
+                font_size,
+                font_bold,
+                font_italic,
+                0xFF000000,
+                sel_x,
+                0,
+                clip_w,
+                clip_h,
+                text_style,
+                None,
+            );
+        }
+
+        // Caret (when no range is selected)
+        if sel_end == sel_start {
+            let caret_x = (draw_x + caret_px).clamp(text_x, (text_x + clip_w).max(text_x));
+            canvas.vline(caret_x, cy + top_padding, inner_h, 0xFF000000);
+        }
     }
 }
 
@@ -7162,7 +7272,7 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
 
 #[cfg(test)]
 mod tests {
-    use super::parse_progress_percent;
+    use super::{compose_preedit_display_text, parse_progress_percent};
 
     #[test]
     fn parse_progress_percent_treats_one_as_one_percent() {
@@ -7170,5 +7280,12 @@ mod tests {
         assert!((parse_progress_percent("0.75") - 0.75).abs() < 1e-6);
         assert!((parse_progress_percent("75") - 0.75).abs() < 1e-6);
         assert!((parse_progress_percent("100") - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn compose_preedit_display_text_replaces_selected_text() {
+        assert_eq!(compose_preedit_display_text("abcd", 0, 4, "우"), "우");
+        assert_eq!(compose_preedit_display_text("abcd", 1, 3, "우"), "a우d");
+        assert_eq!(compose_preedit_display_text("abcd", 4, 4, "우"), "abcd우");
     }
 }

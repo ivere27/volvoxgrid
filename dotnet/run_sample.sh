@@ -17,7 +17,7 @@ PROFILE="debug"
 DOTNET_TFM="${DOTNET_TFM:-net40}"
 DOTNET_ARCH="${DOTNET_ARCH:-x64}"
 MONO_VERSION="${WINE_MONO_VERSION:-6.0.0}"
-BOOTSTRAP_STAMP_NAME=".volvoxgrid_wine_bootstrap_v1"
+BOOTSTRAP_STAMP_NAME=".volvoxgrid_wine_bootstrap_v2"
 LOG_HASHES="${VOLVOXGRID_LOG_HASHES:-0}"
 
 normalize_tfm_for_path() {
@@ -155,6 +155,26 @@ prepare_wine_prefix() {
     wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontSubstitutes" /v "MS Sans Serif" /t REG_SZ /d "DejaVu Sans" /f >/dev/null 2>&1 || true
     wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontSubstitutes" /v "MS Shell Dlg" /t REG_SZ /d "DejaVu Sans" /f >/dev/null 2>&1 || true
     wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontSubstitutes" /v "MS Shell Dlg 2" /t REG_SZ /d "DejaVu Sans" /f >/dev/null 2>&1 || true
+
+    # CJK font fallback: copy host Noto CJK font into the Wine prefix under
+    # the Windows font names the engine expects (msyh.ttc, msjh.ttc, malgun.ttf).
+    local cjk_src=""
+    local cjk_candidates=(
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
+        "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc"
+        "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc"
+    )
+    for candidate in "${cjk_candidates[@]}"; do
+        if [ -f "$candidate" ]; then
+            cjk_src="$candidate"
+            break
+        fi
+    done
+    if [ -n "$cjk_src" ]; then
+        cp -f "$cjk_src" "$fonts_dir/msyh.ttc"
+        cp -f "$cjk_src" "$fonts_dir/msjh.ttc"
+        cp -f "$cjk_src" "$fonts_dir/malgun.ttf"
+    fi
 
     mkdir -p "$WINEPREFIX"
     date -u +"%Y-%m-%dT%H:%M:%SZ" > "$stamp_path"

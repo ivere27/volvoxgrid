@@ -12,12 +12,9 @@ import {
 } from "../proto/proto-utils.js";
 
 export type EditPhase = "idle" | "editing";
-/** "enter" = started by typing a key (arrow exits); "edit" = F2/dblclick (arrow moves caret). */
-export type EditMode = "enter" | "edit";
 
 export class EditStateMachine {
   private _phase: EditPhase = "idle";
-  private _mode: EditMode = "enter";
   private _formulaMode = false;
   private _row: number = -1;
   private _col: number = -1;
@@ -36,12 +33,7 @@ export class EditStateMachine {
 
   get phase(): EditPhase { return this._phase; }
   get isEditing(): boolean { return this._phase === "editing"; }
-  get mode(): EditMode { return this._mode; }
-  /** True when arrow keys should move the caret instead of committing. */
-  get isEditMode(): boolean { return this._mode === "edit"; }
   get isFormulaMode(): boolean { return this._formulaMode; }
-  /** Override the edit mode (e.g. dblclick forces "edit" mode). */
-  set editMode(m: EditMode) { this._mode = m; }
   get row(): number { return this._row; }
   get col(): number { return this._col; }
   get originalText(): string { return this._originalText; }
@@ -49,7 +41,6 @@ export class EditStateMachine {
 
   /** Sync local state to an already-active engine edit session without dispatching another start command. */
   syncActiveEdit(row: number, col: number, currentText: string, opts?: {
-    mode?: EditMode;
     formulaMode?: boolean;
   }): void {
     this._phase = "editing";
@@ -57,7 +48,6 @@ export class EditStateMachine {
     this._col = col;
     this._originalText = currentText;
     this._currentText = currentText;
-    this._mode = opts?.mode ?? "enter";
     this._formulaMode = opts?.formulaMode ?? currentText.trimStart().startsWith("=");
   }
 
@@ -67,7 +57,6 @@ export class EditStateMachine {
     caretEnd?: boolean;
     seedText?: string;
     currentText?: string;
-    mode?: EditMode;
     formulaMode?: boolean;
   }): boolean {
     if (this._phase === "editing") {
@@ -82,7 +71,6 @@ export class EditStateMachine {
     this._originalText = opts?.currentText ?? "";
     this._currentText = opts?.seedText ?? this._originalText;
     this._phase = "editing";
-    this._mode = opts?.mode ?? "enter";
     this._formulaMode =
       opts?.formulaMode
       ?? this._currentText.trimStart().startsWith("=");
@@ -168,7 +156,6 @@ export class EditStateMachine {
   /** Reset state on destroy. */
   reset(): void {
     this._phase = "idle";
-    this._mode = "enter";
     this._row = -1;
     this._col = -1;
     this._originalText = "";

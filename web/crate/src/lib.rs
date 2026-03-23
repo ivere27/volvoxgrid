@@ -67,6 +67,7 @@ enum PendingAction {
         force: bool,
         seed_text: Option<String>,
         select_all: Option<bool>,
+        click_caret: Option<i32>,
         caret_end: Option<bool>,
         formula_mode: Option<bool>,
     },
@@ -311,6 +312,7 @@ fn apply_edit_start_options(
     row: i32,
     col: i32,
     select_all: Option<bool>,
+    click_caret: Option<i32>,
     caret_end: Option<bool>,
     formula_mode: Option<bool>,
 ) {
@@ -320,6 +322,17 @@ fn apply_edit_start_options(
 
     if let Some(formula_mode) = formula_mode {
         grid.edit.set_formula_mode(formula_mode);
+    }
+
+    if caret_end == Some(true) || click_caret.is_some() {
+        grid.edit.ui_mode = volvoxgrid_engine::edit::EditUiMode::EditMode;
+    }
+
+    if let Some(caret) = click_caret {
+        grid.edit.sel_start = caret;
+        grid.edit.sel_length = 0;
+        grid.mark_dirty();
+        return;
     }
 
     if caret_end == Some(true) {
@@ -413,6 +426,7 @@ fn request_before_edit(
     force: bool,
     seed_text: Option<String>,
     select_all: Option<bool>,
+    click_caret: Option<i32>,
     caret_end: Option<bool>,
     formula_mode: Option<bool>,
 ) {
@@ -422,7 +436,15 @@ fn request_before_edit(
 
     if !decision_channel_enabled(grid_id) {
         begin_edit_session_core(grid, row, col, force, true, seed_text);
-        apply_edit_start_options(grid, row, col, select_all, caret_end, formula_mode);
+        apply_edit_start_options(
+            grid,
+            row,
+            col,
+            select_all,
+            click_caret,
+            caret_end,
+            formula_mode,
+        );
         return;
     }
 
@@ -437,6 +459,7 @@ fn request_before_edit(
                 force,
                 seed_text: seed_text.clone(),
                 select_all,
+                click_caret,
                 caret_end,
                 formula_mode,
             },
@@ -522,6 +545,7 @@ fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
             force,
             seed_text,
             select_all,
+            click_caret,
             caret_end,
             formula_mode,
         } => {
@@ -529,7 +553,15 @@ fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
                 return;
             }
             begin_edit_session_after_before(grid, row, col, force, seed_text);
-            apply_edit_start_options(grid, row, col, select_all, caret_end, formula_mode);
+            apply_edit_start_options(
+                grid,
+                row,
+                col,
+                select_all,
+                click_caret,
+                caret_end,
+                formula_mode,
+            );
         }
         PendingAction::ValidateEdit {
             row,
@@ -1515,6 +1547,13 @@ pub fn set_host_pointer_dispatch(id: i32, enabled: i32) {
 }
 
 #[wasm_bindgen]
+pub fn get_host_pointer_dispatch(id: i32) -> i32 {
+    with_grid(id, |grid| {
+        if grid.host_pointer_dispatch { 1 } else { 0 }
+    }).unwrap_or(0)
+}
+
+#[wasm_bindgen]
 pub fn set_edit_trigger(id: i32, mode: i32) {
     with_grid(id, |grid| {
         grid.edit_trigger_mode = mode.clamp(0, 2);
@@ -2268,7 +2307,29 @@ pub fn begin_edit_cell(id: i32, row: i32, col: i32) {
     resolve_expired_actions(grid_id);
     with_grid(id, |grid| {
         ensure_layout(grid);
-        request_before_edit(grid_id, grid, row, col, false, None, None, None, None);
+        request_before_edit(grid_id, grid, row, col, false, None, None, None, None, None);
+    });
+}
+
+#[wasm_bindgen]
+pub fn begin_edit_cell_at_click(id: i32, row: i32, col: i32, x_in_cell: f32) {
+    let grid_id = id as i64;
+    resolve_expired_actions(grid_id);
+    with_grid(id, |grid| {
+        ensure_layout(grid);
+        let click_caret = grid.caret_index_from_display_click(row, col, x_in_cell);
+        request_before_edit(
+            grid_id,
+            grid,
+            row,
+            col,
+            false,
+            None,
+            None,
+            Some(click_caret),
+            Some(true),
+            None,
+        );
     });
 }
 
@@ -2280,7 +2341,7 @@ pub fn begin_edit_at_selection(id: i32) {
         ensure_layout(grid);
         let row = grid.selection.row;
         let col = grid.selection.col;
-        request_before_edit(grid_id, grid, row, col, false, None, None, None, None);
+        request_before_edit(grid_id, grid, row, col, false, None, None, None, None, None);
     });
 }
 
@@ -2323,6 +2384,34 @@ pub fn get_edit_text(id: i32) -> String {
         }
     })
     .unwrap_or_default()
+}
+
+#[wasm_bindgen]
+pub fn get_edit_ui_mode(id: i32) -> i32 {
+    with_grid(id, |grid| {
+        if !grid.edit.is_active() {
+            return 0;
+        }
+        match grid.edit.ui_mode {
+            volvoxgrid_engine::edit::EditUiMode::EnterMode => 0,
+            volvoxgrid_engine::edit::EditUiMode::EditMode => 1,
+        }
+    })
+    .unwrap_or(0)
+}
+
+#[wasm_bindgen]
+pub fn set_edit_ui_mode(id: i32, mode: i32) {
+    with_grid(id, |grid| {
+        if !grid.edit.is_active() {
+            return;
+        }
+        grid.edit.ui_mode = if mode == 1 {
+            volvoxgrid_engine::edit::EditUiMode::EditMode
+        } else {
+            volvoxgrid_engine::edit::EditUiMode::EnterMode
+        };
+    });
 }
 
 #[wasm_bindgen]
@@ -2523,6 +2612,7 @@ pub fn commit_edit(id: i32) {
     resolve_expired_actions(grid_id);
     with_grid(id, |grid| {
         if decision_channel_enabled(grid_id) && grid.edit.is_active() {
+            grid.edit.flush_preedit();
             let row = grid.edit.edit_row;
             let col = grid.edit.edit_col;
             let old_text = grid.cells.get_text(row, col).to_string();
@@ -2539,6 +2629,44 @@ pub fn cancel_edit(id: i32) {
     with_grid(id, |grid| {
         grid.cancel_edit();
     });
+}
+
+#[wasm_bindgen]
+pub fn set_edit_preedit(id: i32, text: &str, cursor: i32) {
+    with_grid(id, |grid| {
+        if !grid.edit.is_active() {
+            return;
+        }
+        if text.is_empty() {
+            grid.edit.cancel_preedit();
+        } else {
+            grid.edit.set_preedit(text, cursor);
+        }
+        grid.mark_dirty();
+    });
+}
+
+#[wasm_bindgen]
+pub fn commit_edit_preedit(id: i32, text: &str) {
+    with_grid(id, |grid| {
+        if !grid.edit.is_active() {
+            return;
+        }
+        grid.edit.commit_preedit(text);
+        grid.mark_dirty();
+    });
+}
+
+#[wasm_bindgen]
+pub fn is_edit_composing(id: i32) -> i32 {
+    with_grid(id, |grid| {
+        if grid.edit.is_active() && grid.edit.composing {
+            1
+        } else {
+            0
+        }
+    })
+    .unwrap_or(0)
 }
 
 #[wasm_bindgen]
@@ -2571,6 +2699,80 @@ pub fn get_edit_cell_h(id: i32) -> i32 {
         active_edit_cell_rect(grid).map(|v| v.3).unwrap_or(0)
     })
     .unwrap_or(0)
+}
+
+#[wasm_bindgen]
+pub fn get_edit_font_size(id: i32) -> f32 {
+    with_grid(id, |grid| {
+        if !grid.edit.is_active() {
+            return 0.0;
+        }
+        let row = grid.edit.edit_row;
+        let col = grid.edit.edit_col;
+        let style_override = grid.get_cell_style(row, col);
+        style_override.font_size.unwrap_or(grid.style.font_size)
+    })
+    .unwrap_or(0.0)
+}
+
+#[wasm_bindgen]
+pub fn get_edit_font_name(id: i32) -> String {
+    with_grid(id, |grid| {
+        if !grid.edit.is_active() {
+            return String::new();
+        }
+        let row = grid.edit.edit_row;
+        let col = grid.edit.edit_col;
+        let style_override = grid.get_cell_style(row, col);
+        style_override
+            .font_name
+            .clone()
+            .unwrap_or_else(|| grid.style.font_name.clone())
+    })
+    .unwrap_or_default()
+}
+
+#[wasm_bindgen]
+pub fn get_edit_font_bold(id: i32) -> i32 {
+    with_grid(id, |grid| {
+        if !grid.edit.is_active() {
+            return 0;
+        }
+        let row = grid.edit.edit_row;
+        let col = grid.edit.edit_col;
+        let style_override = grid.get_cell_style(row, col);
+        if style_override.font_bold.unwrap_or(grid.style.font_bold) { 1 } else { 0 }
+    })
+    .unwrap_or(0)
+}
+
+#[wasm_bindgen]
+pub fn get_edit_font_italic(id: i32) -> i32 {
+    with_grid(id, |grid| {
+        if !grid.edit.is_active() {
+            return 0;
+        }
+        let row = grid.edit.edit_row;
+        let col = grid.edit.edit_col;
+        let style_override = grid.get_cell_style(row, col);
+        if style_override.font_italic.unwrap_or(grid.style.font_italic) { 1 } else { 0 }
+    })
+    .unwrap_or(0)
+}
+
+#[wasm_bindgen]
+pub fn get_edit_cell_padding(id: i32) -> Vec<i32> {
+    with_grid(id, |grid| {
+        if !grid.edit.is_active() {
+            return vec![0, 0, 0, 0];
+        }
+        let row = grid.edit.edit_row;
+        let col = grid.edit.edit_col;
+        let style_override = grid.get_cell_style(row, col);
+        let p = grid.resolve_cell_padding(row, col, &style_override);
+        vec![p.left, p.top, p.right, p.bottom]
+    })
+    .unwrap_or_else(|| vec![0, 0, 0, 0])
 }
 
 /// Screen-space rect (x, y, w, h) for any cell, accounting for scroll offset.
@@ -3544,14 +3746,28 @@ pub fn handle_pointer_down(id: i32, x: f32, y: f32, button: i32, modifier: i32, 
                         && grid.edit.edit_col == hit.col)
                     {
                         request_before_edit(
-                            grid_id, grid, hit.row, hit.col, false, None, None, None, None,
+                            grid_id, grid, hit.row, hit.col, false, None, None, None, None, None,
                         );
                     }
                 } else if is_cell_like
                     && ((dbl_click && grid.edit_trigger_mode >= 2) || is_combo_cell)
                 {
+                    let click_caret = if dbl_click {
+                        Some(grid.caret_index_from_display_click(hit.row, hit.col, hit.x_in_cell))
+                    } else {
+                        None
+                    };
                     request_before_edit(
-                        grid_id, grid, hit.row, hit.col, false, None, None, None, None,
+                        grid_id,
+                        grid,
+                        hit.row,
+                        hit.col,
+                        false,
+                        None,
+                        None,
+                        click_caret,
+                        if dbl_click { Some(true) } else { None },
+                        None,
                     );
                 }
 
@@ -3616,6 +3832,7 @@ pub fn handle_key_down(id: i32, key_code: i32, modifier: i32) {
                     None,
                     None,
                     None,
+                    if key_code == 113 { Some(true) } else { None },
                     None,
                 );
             }
@@ -3657,6 +3874,7 @@ pub fn handle_key_press(id: i32, char_code: u32) {
                             grid.selection.col,
                             false,
                             Some(seed),
+                            None,
                             None,
                             None,
                             None,
@@ -4773,6 +4991,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                             false,
                             s.seed_text.clone(),
                             select_all,
+                            None,
                             caret_end,
                             formula_mode,
                         );
@@ -4785,13 +5004,16 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                             grid.edit.set_formula_mode(formula_mode.unwrap_or(false));
 
                             if let Some(seed) = s.seed_text {
+                                grid.edit.ui_mode = volvoxgrid_engine::edit::EditUiMode::EnterMode;
                                 grid.edit.update_text(seed);
                                 grid.edit.sel_start = grid.edit.edit_text.chars().count() as i32;
                                 grid.edit.sel_length = 0;
                             } else if caret_end == Some(true) {
+                                grid.edit.ui_mode = volvoxgrid_engine::edit::EditUiMode::EditMode;
                                 grid.edit.sel_start = grid.edit.edit_text.chars().count() as i32;
                                 grid.edit.sel_length = 0;
                             } else if select_all == Some(true) {
+                                grid.edit.ui_mode = volvoxgrid_engine::edit::EditUiMode::EnterMode;
                                 grid.edit.sel_start = 0;
                                 grid.edit.sel_length = grid.edit.edit_text.chars().count() as i32;
                             }
@@ -4801,6 +5023,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 }
                 Some(Command::Commit(c)) => {
                     if grid.edit.is_active() {
+                        grid.edit.flush_preedit();
                         let row = grid.edit.edit_row;
                         let col = grid.edit.edit_col;
                         let old_text = grid.cells.get_text(row, col).to_string();
@@ -4814,7 +5037,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                             request_validate_edit(grid_id, grid, row, col, old_text, pending_text);
                         } else {
                             grid.edit.update_text(new_text);
-                            grid.edit.commit();
+                            grid.commit_edit();
                         }
                     }
                 }
@@ -4851,15 +5074,28 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                     grid.edit.set_highlights(highlights);
                     grid.mark_dirty();
                 }
+                Some(Command::SetPreedit(preedit)) => {
+                    if grid.edit.is_active() {
+                        if preedit.commit {
+                            grid.edit.commit_preedit(&preedit.text);
+                        } else if preedit.text.is_empty() {
+                            grid.edit.cancel_preedit();
+                        } else {
+                            grid.edit.set_preedit(&preedit.text, preedit.cursor);
+                        }
+                        grid.mark_dirty();
+                    }
+                }
                 Some(Command::Finish(_)) => {
                     if grid.edit.is_active() && decision_channel_enabled(grid_id) {
+                        grid.edit.flush_preedit();
                         let row = grid.edit.edit_row;
                         let col = grid.edit.edit_col;
                         let old_text = grid.cells.get_text(row, col).to_string();
                         let new_text = grid.edit.edit_text.clone();
                         request_validate_edit(grid_id, grid, row, col, old_text, new_text);
                     } else {
-                        grid.edit.commit();
+                        grid.commit_edit();
                     }
                 }
                 None => {}
@@ -4871,6 +5107,12 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 text: grid.edit.edit_text.clone(),
                 sel_start: grid.edit.sel_start,
                 sel_length: grid.edit.sel_length,
+                composing: grid.edit.composing,
+                preedit_text: grid.edit.preedit_text.clone(),
+                ui_mode: match grid.edit.ui_mode {
+                    volvoxgrid_engine::edit::EditUiMode::EnterMode => EditUiMode::Enter as i32,
+                    volvoxgrid_engine::edit::EditUiMode::EditMode => EditUiMode::Edit as i32,
+                },
             }
         })
     }

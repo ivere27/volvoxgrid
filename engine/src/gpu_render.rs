@@ -635,143 +635,149 @@ impl GpuRenderer {
         #[cfg(not(any(target_os = "android", all(unix, not(target_os = "android")))))]
         return Err("configure_surface_from_raw_handle: unsupported platform".to_string());
 
-        let target = wgpu::SurfaceTargetUnsafe::RawHandle {
-            raw_window_handle: raw_window,
-            raw_display_handle: raw_display,
-        };
+        #[cfg(any(target_os = "android", all(unix, not(target_os = "android"))))]
+        {
+            let target = wgpu::SurfaceTargetUnsafe::RawHandle {
+                raw_window_handle: raw_window,
+                raw_display_handle: raw_display,
+            };
 
-        let surface = self
-            .instance
-            .create_surface_unsafe(target)
-            .map_err(|e| format!("Failed to create surface from raw handle: {}", e))?;
-
-        // Check if the current adapter is compatible with this surface.
-        let caps = surface.get_capabilities(&self.adapter);
-        if caps.formats.is_empty() {
-            // Re-request adapter with compatible_surface
-            let new_adapter = self
+            let surface = self
                 .instance
-                .request_adapter(&wgpu::RequestAdapterOptions {
-                    power_preference: wgpu::PowerPreference::HighPerformance,
-                    compatible_surface: Some(&surface),
-                    force_fallback_adapter: false,
-                })
-                .await
-                .ok_or_else(|| "No GPU adapter compatible with surface".to_string())?;
+                .create_surface_unsafe(target)
+                .map_err(|e| format!("Failed to create surface from raw handle: {}", e))?;
 
-            let (new_device, new_queue) = new_adapter
-                .request_device(
-                    &wgpu::DeviceDescriptor {
-                        label: Some("VolvoxGrid GPU"),
-                        required_features: wgpu::Features::empty(),
-                        required_limits: new_adapter.limits(),
-                        memory_hints: wgpu::MemoryHints::Performance,
-                    },
-                    None,
-                )
-                .await
-                .map_err(|e| format!("Failed to create GPU device: {}", e))?;
+            // Check if the current adapter is compatible with this surface.
+            let caps = surface.get_capabilities(&self.adapter);
+            if caps.formats.is_empty() {
+                // Re-request adapter with compatible_surface
+                let new_adapter = self
+                    .instance
+                    .request_adapter(&wgpu::RequestAdapterOptions {
+                        power_preference: wgpu::PowerPreference::HighPerformance,
+                        compatible_surface: Some(&surface),
+                        force_fallback_adapter: false,
+                    })
+                    .await
+                    .ok_or_else(|| "No GPU adapter compatible with surface".to_string())?;
 
-            self.adapter = new_adapter;
-            self.device = new_device;
-            self.queue = new_queue;
+                let (new_device, new_queue) = new_adapter
+                    .request_device(
+                        &wgpu::DeviceDescriptor {
+                            label: Some("VolvoxGrid GPU"),
+                            required_features: wgpu::Features::empty(),
+                            required_limits: new_adapter.limits(),
+                            memory_hints: wgpu::MemoryHints::Performance,
+                        },
+                        None,
+                    )
+                    .await
+                    .map_err(|e| format!("Failed to create GPU device: {}", e))?;
 
-            // Rebuild uniform bind group layout and buffer
-            self.uniform_bind_group_layout =
-                self.device
-                    .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                        label: Some("uniform_bgl"),
-                        entries: &[wgpu::BindGroupLayoutEntry {
+                self.adapter = new_adapter;
+                self.device = new_device;
+                self.queue = new_queue;
+
+                // Rebuild uniform bind group layout and buffer
+                self.uniform_bind_group_layout =
+                    self.device
+                        .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                            label: Some("uniform_bgl"),
+                            entries: &[wgpu::BindGroupLayoutEntry {
+                                binding: 0,
+                                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+                                ty: wgpu::BindingType::Buffer {
+                                    ty: wgpu::BufferBindingType::Uniform,
+                                    has_dynamic_offset: false,
+                                    min_binding_size: None,
+                                },
+                                count: None,
+                            }],
+                        });
+
+                self.uniform_buf =
+                    self.device
+                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("uniforms"),
+                            contents: bytemuck::bytes_of(&Uniforms {
+                                viewport_size: [1.0, 1.0],
+                                _pad: [0.0, 0.0],
+                            }),
+                            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                        });
+
+                self.uniform_bind_group =
+                    self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: Some("uniform_bg"),
+                        layout: &self.uniform_bind_group_layout,
+                        entries: &[wgpu::BindGroupEntry {
                             binding: 0,
-                            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                            ty: wgpu::BindingType::Buffer {
-                                ty: wgpu::BufferBindingType::Uniform,
-                                has_dynamic_offset: false,
-                                min_binding_size: None,
-                            },
-                            count: None,
+                            resource: self.uniform_buf.as_entire_binding(),
                         }],
                     });
 
-            self.uniform_buf = self
-                .device
-                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("uniforms"),
-                    contents: bytemuck::bytes_of(&Uniforms {
-                        viewport_size: [1.0, 1.0],
-                        _pad: [0.0, 0.0],
-                    }),
-                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                // Rebuild textured bind group layout
+                self.textured_bind_group_layout =
+                    self.device
+                        .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                            label: Some("textured_bgl"),
+                            entries: &[
+                                wgpu::BindGroupLayoutEntry {
+                                    binding: 0,
+                                    visibility: wgpu::ShaderStages::FRAGMENT,
+                                    ty: wgpu::BindingType::Texture {
+                                        sample_type: wgpu::TextureSampleType::Float {
+                                            filterable: true,
+                                        },
+                                        view_dimension: wgpu::TextureViewDimension::D2,
+                                        multisampled: false,
+                                    },
+                                    count: None,
+                                },
+                                wgpu::BindGroupLayoutEntry {
+                                    binding: 1,
+                                    visibility: wgpu::ShaderStages::FRAGMENT,
+                                    ty: wgpu::BindingType::Sampler(
+                                        wgpu::SamplerBindingType::Filtering,
+                                    ),
+                                    count: None,
+                                },
+                            ],
+                        });
+
+                self.atlas_sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
+                    label: Some("atlas_sampler"),
+                    mag_filter: wgpu::FilterMode::Linear,
+                    min_filter: wgpu::FilterMode::Linear,
+                    ..Default::default()
                 });
 
-            self.uniform_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("uniform_bg"),
-                layout: &self.uniform_bind_group_layout,
-                entries: &[wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: self.uniform_buf.as_entire_binding(),
-                }],
-            });
+                // Clear cached GPU resources that belong to the old device
+                self.atlas_textures.clear();
+                self.atlas_bind_groups.clear();
+                self.glyph_atlas.clear();
+                self.persistent_rect_buf = None;
+                self.persistent_rect_cap = 0;
+                self.persistent_tex_buf = None;
+                self.persistent_tex_cap = 0;
+                self.persistent_overlay_rect_buf = None;
+                self.persistent_overlay_rect_cap = 0;
+                self.persistent_overlay_tex_buf = None;
+                self.persistent_overlay_tex_cap = 0;
+                self.persistent_present_tex_buf = None;
+                self.persistent_present_tex_cap = 0;
+                self.frame_cache = None;
+                self.scroll_cache.invalidate();
 
-            // Rebuild textured bind group layout
-            self.textured_bind_group_layout =
-                self.device
-                    .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                        label: Some("textured_bgl"),
-                        entries: &[
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 0,
-                                visibility: wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Texture {
-                                    sample_type: wgpu::TextureSampleType::Float {
-                                        filterable: true,
-                                    },
-                                    view_dimension: wgpu::TextureViewDimension::D2,
-                                    multisampled: false,
-                                },
-                                count: None,
-                            },
-                            wgpu::BindGroupLayoutEntry {
-                                binding: 1,
-                                visibility: wgpu::ShaderStages::FRAGMENT,
-                                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                                count: None,
-                            },
-                        ],
-                    });
+                // Reset pipeline format to force recreation of pipelines with the new device
+                self.pipeline_format = wgpu::TextureFormat::Rgba8Uint;
+            }
 
-            self.atlas_sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
-                label: Some("atlas_sampler"),
-                mag_filter: wgpu::FilterMode::Linear,
-                min_filter: wgpu::FilterMode::Linear,
-                ..Default::default()
-            });
-
-            // Clear cached GPU resources that belong to the old device
-            self.atlas_textures.clear();
-            self.atlas_bind_groups.clear();
-            self.glyph_atlas.clear();
-            self.persistent_rect_buf = None;
-            self.persistent_rect_cap = 0;
-            self.persistent_tex_buf = None;
-            self.persistent_tex_cap = 0;
-            self.persistent_overlay_rect_buf = None;
-            self.persistent_overlay_rect_cap = 0;
-            self.persistent_overlay_tex_buf = None;
-            self.persistent_overlay_tex_cap = 0;
-            self.persistent_present_tex_buf = None;
-            self.persistent_present_tex_cap = 0;
-            self.frame_cache = None;
-            self.scroll_cache.invalidate();
-
-            // Reset pipeline format to force recreation of pipelines with the new device
-            self.pipeline_format = wgpu::TextureFormat::Rgba8Uint;
-        }
-
-        if !self.configure_surface(surface, w, h, requested_present_mode) {
-            return Err("Surface configuration failed (incompatible surface)".to_string());
-        }
-        Ok(())
+            if !self.configure_surface(surface, w, h, requested_present_mode) {
+                return Err("Surface configuration failed (incompatible surface)".to_string());
+            }
+            Ok(())
+        } // #[cfg(any(target_os = "android", unix))]
     }
 
     /// Drop the current surface (e.g. when the native window is destroyed).

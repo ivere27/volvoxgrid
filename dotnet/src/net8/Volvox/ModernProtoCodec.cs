@@ -399,6 +399,24 @@ namespace VolvoxGrid.DotNet.Internal
             return new EditCommand { GridId = gridId, Cancel = new EditCancel() }.ToByteArray();
         }
 
+        public byte[] EncodeEditCommandSetPreedit(long gridId, string text, int cursor, bool commit)
+        {
+            return new EditCommand
+            {
+                GridId = gridId,
+                SetPreedit = new EditSetPreedit { Text = text ?? string.Empty, Cursor = cursor, Commit = commit }
+            }.ToByteArray();
+        }
+
+        public byte[] EncodeEditCommandSetText(long gridId, string text)
+        {
+            return new EditCommand
+            {
+                GridId = gridId,
+                SetText = new EditSetText { Text = text ?? string.Empty }
+            }.ToByteArray();
+        }
+
         public byte[] EncodeClipboardRequest(long gridId, string action, string pasteText)
         {
             var cmd = new ClipboardCommand { GridId = gridId };
@@ -563,6 +581,12 @@ namespace VolvoxGrid.DotNet.Internal
                     break;
                 case GridEvent.EventOneofCase.BeforeSort:
                     data.Kind = VolvoxGridEventKind.BeforeSort; data.Col = evt.BeforeSort.Col; data.IsCancelable = true;
+                    break;
+                case GridEvent.EventOneofCase.StartEdit:
+                    data.Kind = VolvoxGridEventKind.StartEdit; data.Row = evt.StartEdit.Row; data.Col = evt.StartEdit.Col;
+                    break;
+                case GridEvent.EventOneofCase.AfterEdit:
+                    data.Kind = VolvoxGridEventKind.AfterEdit; data.Row = evt.AfterEdit.Row; data.Col = evt.AfterEdit.Col;
                     break;
             }
             return data;

@@ -1203,6 +1203,7 @@ message EditCommand {
     EditSetSelection  set_selection  = 6;
     EditFinish        finish         = 7;
     EditSetHighlights set_highlights = 8;
+    EditSetPreedit    set_preedit    = 9;
   }
 }
 
@@ -1219,15 +1220,24 @@ message EditCommit  { optional string text = 1; }
 message EditCancel  {}
 message EditSetText { string text = 1; }
 message EditSetSelection { int32 start = 1; int32 length = 2; }
+message EditSetPreedit { string text = 1; int32 cursor = 2; bool commit = 3; }
 message EditFinish  {}
 
+enum EditUiMode {
+  EDIT_UI_MODE_ENTER = 0;
+  EDIT_UI_MODE_EDIT  = 1;
+}
+
 message EditState {
-  bool   active     = 1;
-  int32  row        = 2;
-  int32  col        = 3;
-  string text       = 4;
-  int32  sel_start  = 5;
-  int32  sel_length = 6;
+  bool       active       = 1;
+  int32      row          = 2;
+  int32      col          = 3;
+  string     text         = 4;
+  int32      sel_start    = 5;
+  int32      sel_length   = 6;
+  bool       composing    = 7;
+  string     preedit_text = 8;
+  EditUiMode ui_mode      = 9;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1646,15 +1656,18 @@ message CursorChange {
 }
 
 message EditRequest {
-  int32  row           = 1;
-  int32  col           = 2;
-  float  x             = 3;
-  float  y             = 4;
-  float  width         = 5;
-  float  height        = 6;
-  string current_value = 7;
-  string edit_mask     = 8;
-  int32  max_length    = 9;
+  int32      row           = 1;
+  int32      col           = 2;
+  float      x             = 3;
+  float      y             = 4;
+  float      width         = 5;
+  float      height        = 6;
+  string     current_value = 7;
+  string     edit_mask     = 8;
+  int32      max_length    = 9;
+  int32      sel_start     = 10;
+  int32      sel_length    = 11;
+  EditUiMode ui_mode       = 12;
 }
 
 message DropdownRequest {

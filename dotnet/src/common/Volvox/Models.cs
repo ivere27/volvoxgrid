@@ -245,6 +245,8 @@ namespace VolvoxGrid.DotNet.Internal
         AfterMoveColumn = 15,
         BeforeMoveRow = 16,
         AfterMoveRow = 17,
+        StartEdit = 18,
+        AfterEdit = 19,
     }
 
     internal sealed class VolvoxGridEventData

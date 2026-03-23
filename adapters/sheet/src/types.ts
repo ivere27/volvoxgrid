@@ -128,7 +128,12 @@ export interface VolvoxSheetOptions {
   defaultRowHeight?: number;
   fontName?: string;
   fontSize?: number;
-  /** URL to a .ttf/.otf font file for the grid engine. Defaults to Roboto from CDN. */
+  /**
+   * URL to a .ttf/.otf font file for the built-in grid text engine.
+   * When omitted in full WASM mode, VolvoxSheet loads one locale-appropriate
+   * default font. If you set this, also set `fontName` to the matching family
+   * name for predictable layout and fallback behavior.
+   */
   fontUrl?: string;
   onBeforeEdit?: (detail: SheetBeforeEditDetail) => void;
   onCellEditValidating?: (detail: SheetCellEditValidatingDetail) => void;

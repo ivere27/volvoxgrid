@@ -4,6 +4,7 @@
 // symbols defined in the generated volvoxgrid_ffi_native.rs. It is designed
 // to be linked into the VolvoxGrid.ocx ActiveX control.
 
+use std::time::{Duration, Instant};
 use volvoxgrid_engine::cell::CellValueData;
 use volvoxgrid_engine::proto::volvoxgrid::v1::*;
 use volvoxgrid_engine::GridManager;
@@ -3292,6 +3293,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 }
                 Some(edit_command::Command::Commit(commit)) => {
                     if grid.edit.is_active() {
+                        grid.edit.flush_preedit();
                         let row = grid.edit.edit_row;
                         let col = grid.edit.edit_col;
                         let old_text = grid.cells.get_text(row, col).to_string();
@@ -3339,8 +3341,21 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                     }
                 }
                 Some(edit_command::Command::SetHighlights(_)) => {}
+                Some(edit_command::Command::SetPreedit(preedit)) => {
+                    if grid.edit.is_active() {
+                        if preedit.commit {
+                            grid.edit.commit_preedit(&preedit.text);
+                        } else if preedit.text.is_empty() {
+                            grid.edit.cancel_preedit();
+                        } else {
+                            grid.edit.set_preedit(&preedit.text, preedit.cursor);
+                        }
+                        grid.mark_dirty();
+                    }
+                }
                 Some(edit_command::Command::Finish(_)) => {
                     if grid.edit.is_active() {
+                        grid.edit.flush_preedit();
                         let row = grid.edit.edit_row;
                         let col = grid.edit.edit_col;
                         let old_text = grid.cells.get_text(row, col).to_string();
@@ -3367,6 +3382,12 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 text: grid.edit.edit_text.clone(),
                 sel_start: grid.edit.sel_start,
                 sel_length: grid.edit.sel_length,
+                composing: grid.edit.composing,
+                preedit_text: grid.edit.preedit_text.clone(),
+                ui_mode: match grid.edit.ui_mode {
+                    volvoxgrid_engine::edit::EditUiMode::EnterMode => EditUiMode::Enter as i32,
+                    volvoxgrid_engine::edit::EditUiMode::EditMode => EditUiMode::Edit as i32,
+                },
             }
         })?;
         Ok(state)

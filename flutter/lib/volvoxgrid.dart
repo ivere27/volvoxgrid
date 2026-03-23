@@ -90,6 +90,8 @@ class _CellEditValidatingPayload {
   });
 }
 
+enum _HostEditUiMode { enter, edit }
+
 // ---------------------------------------------------------------------------
 // VolvoxGridWidget
 // ---------------------------------------------------------------------------
@@ -220,10 +222,30 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   /// Overlay edit field state.
   bool _editing = false;
+  bool _editOverlayVisible = true;
+  bool _editOverlayPendingReveal = false;
+  int _editRow = -1;
+  int _editCol = -1;
   Rect _editRect = Rect.zero;
-  String _editInitialValue = '';
+  double _editFontSize = 13.0;
+  String? _editFontFamily;
+  bool _editFontBold = false;
+  bool _editFontItalic = false;
+  EdgeInsets _editPadding = EdgeInsets.zero;
+  _HostEditUiMode _editUiMode = _HostEditUiMode.enter;
+
   final TextEditingController _editTextController = TextEditingController();
   final FocusNode _editFocusNode = FocusNode();
+  final TextEditingController _imeProxyController = TextEditingController();
+  final FocusNode _imeProxyFocusNode = FocusNode();
+  pb.EditRequest? _deferredEditRequest;
+  Timer? _imeProxyRevealTimer;
+  Future<void> _queuedEditCommand = Future<void>.value();
+  bool _deferOverlayWhileImeProxyActive = false;
+  bool _imeProxySessionActive = false;
+  bool _suppressImeProxyChanges = false;
+  String _imeProxyCommittedText = '';
+  String? _suppressedPlainProxyText;
 
   /// Focus node for keyboard events on the grid itself.
   final FocusNode _gridFocusNode = FocusNode();
@@ -280,6 +302,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   Timer? _longPressTimer;
   Offset _longPressPosition = Offset.zero;
   static const Duration _longPressDuration = Duration(milliseconds: 500);
+  Duration? _lastPrimaryMouseDownAt;
+  Offset? _lastPrimaryMouseDownPosition;
+  Duration? _lastTouchDownAt;
+  Offset? _lastTouchDownPosition;
 
   bool _wasUsingGpuTexture = false;
 
@@ -290,6 +316,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       onPause: _onPause,
       onResume: _onResume,
     );
+    HardwareKeyboard.instance.addHandler(_handleHardwareKeyEvent);
+    _imeProxyController.addListener(_handleImeProxyChanged);
     widget.controller.addListener(_onControllerChanged);
     _syncEventStreamSubscription();
   }
@@ -387,10 +415,14 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   void dispose() {
     _lifecycleListener.dispose();
     _longPressTimer?.cancel();
+    _imeProxyRevealTimer?.cancel();
+    HardwareKeyboard.instance.removeHandler(_handleHardwareKeyEvent);
     _closeRenderSession(controller: widget.controller);
     _closeEventStream();
     _freeRenderBuffer();
     widget.controller.removeListener(_onControllerChanged);
+    _imeProxyController.dispose();
+    _imeProxyFocusNode.dispose();
     _editTextController.dispose();
     _editFocusNode.dispose();
     _gridFocusNode.dispose();
@@ -555,6 +587,15 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     _stagedBufferWidth = 0;
     _stagedBufferHeight = 0;
     _decisionChannelEnabled = false;
+    _imeProxyRevealTimer?.cancel();
+    _imeProxyRevealTimer = null;
+    _deferredEditRequest = null;
+    _deferOverlayWhileImeProxyActive = false;
+    _imeProxySessionActive = false;
+    _editOverlayPendingReveal = false;
+    _imeProxyCommittedText = '';
+    _suppressedPlainProxyText = null;
+    _suppressImeProxyChanges = false;
   }
 
   Future<void> _setFlingEnabledBestEffort(
@@ -853,6 +894,9 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     _resizeRenderBuffer(width, height);
     _sendViewport();
     _sendBufferReady();
+    if (_editing && _editRow >= 0 && _editCol >= 0) {
+      unawaited(widget.controller.showCell(_editRow, _editCol));
+    }
   }
 
   void _resizeRenderBuffer(int width, int height) {
@@ -1173,6 +1217,17 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       }
     }
 
+    if ((output.hasFrameDone() || output.hasGpuFrameDone()) &&
+        !output.rendered &&
+        _editOverlayPendingReveal &&
+        !_pendingFrame &&
+        _editing) {
+      setState(() {
+        _editOverlayVisible = true;
+        _editOverlayPendingReveal = false;
+      });
+    }
+
     if (output.rendered &&
         output.hasFrameDone() &&
         output.frameDone.dirtyW > 0) {
@@ -1208,7 +1263,12 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       }
     }
     if (output.hasEditRequest() && output.editRequest.width > 0) {
-      _showEditOverlay(output.editRequest);
+      if (_deferOverlayWhileImeProxyActive) {
+        _deferredEditRequest = pb.EditRequest()
+          ..mergeFromMessage(output.editRequest);
+      } else {
+        _showEditOverlay(output.editRequest);
+      }
     }
     if (output.rendered) {
       _sendBufferReady();
@@ -1355,48 +1415,549 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   // ── Edit overlay ──────────────────────────────────────────────────────────
 
-  void _showEditOverlay(pb.EditRequest req) {
-    final dpr = _devicePixelRatio <= 0 ? 1.0 : _devicePixelRatio;
-    setState(() {
-      _editing = true;
-      _editRect = Rect.fromLTWH(
-        req.x.toDouble() / dpr,
-        req.y.toDouble() / dpr,
-        req.width.toDouble() / dpr,
-        req.height.toDouble() / dpr,
-      );
-      _editInitialValue = req.currentValue;
-      _editTextController.text = _editInitialValue;
-      _editTextController.selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: _editInitialValue.length,
-      );
-    });
-    // Focus the edit field on the next frame.
+  void _queueEditCommand(Future<void> Function() op) {
+    _queuedEditCommand = _queuedEditCommand.then((_) async {
+      if (!mounted || !widget.controller.isCreated) {
+        return;
+      }
+      await op();
+    }).catchError((Object _) {});
+  }
+
+  int _codePointOffsetFromCodeUnitOffset(String text, int codeUnitOffset) {
+    final clamped = codeUnitOffset.clamp(0, text.length);
+    var codePointOffset = 0;
+    var consumed = 0;
+    for (final rune in text.runes) {
+      final runeLength = String.fromCharCode(rune).length;
+      if (consumed + runeLength > clamped) {
+        break;
+      }
+      consumed += runeLength;
+      codePointOffset += 1;
+    }
+    return codePointOffset;
+  }
+
+  int _codeUnitOffsetFromCodePointOffset(String text, int codePointOffset) {
+    final target = codePointOffset < 0 ? 0 : codePointOffset;
+    var currentCodePoint = 0;
+    var codeUnitOffset = 0;
+    for (final rune in text.runes) {
+      if (currentCodePoint >= target) {
+        break;
+      }
+      codeUnitOffset += String.fromCharCode(rune).length;
+      currentCodePoint += 1;
+    }
+    return codeUnitOffset.clamp(0, text.length);
+  }
+
+  TextSelection _textSelectionFromEditRequest(pb.EditRequest req) {
+    final start = _codeUnitOffsetFromCodePointOffset(
+      req.currentValue,
+      req.selStart,
+    );
+    final extent = _codeUnitOffsetFromCodePointOffset(
+      req.currentValue,
+      req.selStart + req.selLength,
+    );
+    return TextSelection(
+      baseOffset: start,
+      extentOffset: extent,
+    );
+  }
+
+  void _applyEditRequestSelection(pb.EditRequest req) {
+    final selection = _textSelectionFromEditRequest(req);
+    final text = _editTextController.text;
+    final clampedBase = selection.baseOffset.clamp(0, text.length);
+    final clampedExtent = selection.extentOffset.clamp(0, text.length);
+    _editTextController.selection = TextSelection(
+      baseOffset: clampedBase,
+      extentOffset: clampedExtent,
+    );
+  }
+
+  void _clearImeProxyValue() {
+    if (_imeProxyController.value.text.isEmpty &&
+        (!_imeProxyController.value.composing.isValid ||
+            _imeProxyController.value.composing.isCollapsed)) {
+      return;
+    }
+    _suppressImeProxyChanges = true;
+    _imeProxyController.value = const TextEditingValue();
+    _suppressImeProxyChanges = false;
+  }
+
+  void _requestIdleInputFocus() {
+    if (_editing) {
+      return;
+    }
+    // On mobile (Android/iOS), focusing the hidden imeProxy TextField would
+    // open the soft keyboard on every tap.  The imeProxy is only useful on
+    // desktop where a hardware keyboard may produce IME composition without
+    // an active edit overlay.
+    if (_isMobilePlatform) {
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _editFocusNode.requestFocus();
+      if (!mounted || _editing) {
+        return;
+      }
+      _imeProxyFocusNode.requestFocus();
     });
   }
 
+  void _showEditOverlay(pb.EditRequest req) {
+    _imeProxyRevealTimer?.cancel();
+    _imeProxyRevealTimer = null;
+    _deferredEditRequest = null;
+    _deferOverlayWhileImeProxyActive = false;
+    _imeProxySessionActive = false;
+    _imeProxyCommittedText = '';
+    _suppressedPlainProxyText = null;
+    _clearImeProxyValue();
+
+    final dpr = _devicePixelRatio <= 0 ? 1.0 : _devicePixelRatio;
+    final nextRect = Rect.fromLTWH(
+      req.x.toDouble() / dpr,
+      req.y.toDouble() / dpr,
+      req.width.toDouble() / dpr,
+      req.height.toDouble() / dpr,
+    );
+    final nextMode = req.uiMode == pb.EditUiMode.EDIT_UI_MODE_EDIT
+        ? _HostEditUiMode.edit
+        : _HostEditUiMode.enter;
+    final sameSession = _editing && _editRow == req.row && _editCol == req.col;
+
+    if (sameSession) {
+      final shouldHideDuringMove =
+          defaultTargetPlatform == TargetPlatform.android && _editRect != nextRect;
+      setState(() {
+        _editRect = nextRect;
+        _editUiMode = nextMode;
+        if (shouldHideDuringMove) {
+          _editOverlayVisible = false;
+          _editOverlayPendingReveal = true;
+        }
+      });
+      return;
+    }
+
+    final selection = _textSelectionFromEditRequest(req);
+    setState(() {
+      _editing = true;
+      _editOverlayVisible = true;
+      _editOverlayPendingReveal = false;
+      _editRow = req.row;
+      _editCol = req.col;
+      _editRect = nextRect;
+      _editUiMode = nextMode;
+      // Reset style state so stale values from a previous cell don't flash.
+      _editFontSize = 13.0;
+      _editFontFamily = null;
+      _editFontBold = false;
+      _editFontItalic = false;
+      _editPadding = EdgeInsets.zero;
+      _editTextController.value = TextEditingValue(
+        text: req.currentValue,
+        selection: selection,
+      );
+    });
+    // Resolve the cell's effective style asynchronously.
+    _resolveEditCellStyle(req.row, req.col);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_editing || _editRow != req.row || _editCol != req.col) {
+        return;
+      }
+      _editFocusNode.requestFocus();
+      _applyEditRequestSelection(req);
+      // Re-apply after another frame — on desktop, requestFocus() can
+      // trigger an async selection-all that overrides our caret position.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_editing || _editRow != req.row || _editCol != req.col) {
+          return;
+        }
+        _applyEditRequestSelection(req);
+      });
+    });
+  }
+
+  void _resolveEditCellStyle(int row, int col) {
+    widget.controller.getEditCellStyle(row, col).then((style) {
+      if (!mounted || !_editing || _editRow != row || _editCol != col) return;
+      if (style == null) return;
+      // Engine values are in physical pixels; convert to logical.
+      final dpr = _devicePixelRatio <= 0 ? 1.0 : _devicePixelRatio;
+      setState(() {
+        if (style.fontSize != null) _editFontSize = style.fontSize! / dpr;
+        _editFontFamily = style.fontFamily;
+        _editFontBold = style.bold;
+        _editFontItalic = style.italic;
+        _editPadding = EdgeInsets.fromLTRB(
+          style.padLeft / dpr, style.padTop / dpr,
+          style.padRight / dpr, style.padBottom / dpr,
+        );
+      });
+    });
+  }
+
+  void _scheduleDeferredImeOverlayReveal() {
+    _imeProxyRevealTimer?.cancel();
+    _imeProxyRevealTimer = Timer(const Duration(milliseconds: 40), () {
+      if (!mounted) {
+        return;
+      }
+      _deferOverlayWhileImeProxyActive = false;
+      _imeProxySessionActive = false;
+      final pending = _deferredEditRequest;
+      _deferredEditRequest = null;
+      if (pending != null) {
+        _showEditOverlay(pending);
+      } else {
+        _requestRender();
+      }
+    });
+  }
+
+  void _handleImeProxyChanged() {
+    if (_suppressImeProxyChanges) {
+      return;
+    }
+    final value = _imeProxyController.value;
+    final composing = value.composing.isValid && !value.composing.isCollapsed;
+
+    if (_editing) {
+      if (value.text.isNotEmpty || composing) {
+        _clearImeProxyValue();
+      }
+      return;
+    }
+
+    if (!composing &&
+        _suppressedPlainProxyText != null &&
+        value.text == _suppressedPlainProxyText &&
+        !_imeProxySessionActive) {
+      _suppressedPlainProxyText = null;
+      _clearImeProxyValue();
+      return;
+    }
+
+    if (composing) {
+      if (_selRow < 0 || _selCol < 0) {
+        _clearImeProxyValue();
+        return;
+      }
+      _suppressedPlainProxyText = null;
+      _imeProxyRevealTimer?.cancel();
+      _deferOverlayWhileImeProxyActive = true;
+      if (!_imeProxySessionActive) {
+        _imeProxySessionActive = true;
+        _imeProxyCommittedText = '';
+        _deferredEditRequest = null;
+        final row = _selRow;
+        final col = _selCol;
+        _queueEditCommand(() async {
+          await widget.controller.beginEdit(row, col, seedText: '');
+          _requestRender();
+        });
+      }
+      final start = value.composing.start.clamp(0, value.text.length);
+      final end = value.composing.end.clamp(start, value.text.length);
+      final prefix = value.text.substring(0, start);
+      var delta = prefix;
+      if (_imeProxyCommittedText.isNotEmpty &&
+          prefix.startsWith(_imeProxyCommittedText)) {
+        delta = prefix.substring(_imeProxyCommittedText.length);
+      }
+      _imeProxyCommittedText = prefix;
+      if (delta.isNotEmpty) {
+        _queueEditCommand(() async {
+          await widget.controller.setEditPreedit(delta, commit: true);
+          _requestRender();
+        });
+      }
+      final preedit = value.text.substring(start, end);
+      final extentOffset = value.selection.isValid
+          ? value.selection.extentOffset.clamp(start, end)
+          : end;
+      final cursor = _codePointOffsetFromCodeUnitOffset(
+        preedit,
+        extentOffset - start,
+      );
+      _queueEditCommand(() async {
+        await widget.controller.setEditPreedit(preedit, cursor: cursor);
+        _requestRender();
+      });
+      return;
+    }
+
+    if (_imeProxySessionActive) {
+      final committed = value.text;
+      var delta = committed;
+      if (_imeProxyCommittedText.isNotEmpty &&
+          committed.startsWith(_imeProxyCommittedText)) {
+        delta = committed.substring(_imeProxyCommittedText.length);
+      }
+      _imeProxyCommittedText = '';
+      if (delta.isNotEmpty) {
+        _queueEditCommand(() async {
+          await widget.controller.setEditPreedit(delta, commit: true);
+          _requestRender();
+        });
+      } else {
+        _queueEditCommand(() async {
+          await widget.controller.setEditPreedit('', cursor: 0);
+          _requestRender();
+        });
+      }
+      _clearImeProxyValue();
+      _scheduleDeferredImeOverlayReveal();
+      return;
+    }
+
+    if (value.text.isEmpty) {
+      return;
+    }
+    if (_selRow < 0 || _selCol < 0) {
+      _clearImeProxyValue();
+      return;
+    }
+    final row = _selRow;
+    final col = _selCol;
+    final seedText = value.text;
+    _imeProxyRevealTimer?.cancel();
+    _deferOverlayWhileImeProxyActive = true;
+    _imeProxySessionActive = true;
+    _imeProxyCommittedText = '';
+    _deferredEditRequest = null;
+    _clearImeProxyValue();
+    _queueEditCommand(() async {
+      await widget.controller.beginEdit(row, col, seedText: seedText);
+      _requestRender();
+    });
+    _scheduleDeferredImeOverlayReveal();
+  }
+
+  void _forwardRawKeyEvent(KeyEvent event) {
+    final pb.KeyEvent_Type type;
+    if (event is KeyDownEvent) {
+      type = pb.KeyEvent_Type.KEY_DOWN;
+    } else if (event is KeyUpEvent) {
+      type = pb.KeyEvent_Type.KEY_UP;
+    } else {
+      return;
+    }
+    _sendInput(
+      pb.RenderInput()
+        ..key = (pb.KeyEvent()
+          ..type = type
+          ..keyCode = (event.logicalKey.keyId & 0x7FFFFFFF).toInt()
+          ..character = event.character ?? ''
+          ..modifier = _modifiers()),
+    );
+    _requestRender();
+  }
+
+  bool _isPrintableKey(KeyEvent event) {
+    final character = event.character;
+    if (character == null || character.isEmpty) {
+      return false;
+    }
+    return character.runes.any((rune) => rune >= 0x20 && rune != 0x7F);
+  }
+
+  bool _shouldLetImeProxyHandleText(KeyEvent event) {
+    final hasTextModifiers = HardwareKeyboard.instance.isControlPressed ||
+        HardwareKeyboard.instance.isAltPressed ||
+        HardwareKeyboard.instance.isMetaPressed;
+    return _isPrintableKey(event) && !hasTextModifiers;
+  }
+
+  bool _handleHardwareKeyEvent(KeyEvent event) {
+    if (!mounted ||
+        _editing ||
+        _imeProxySessionActive ||
+        _deferOverlayWhileImeProxyActive ||
+        !_imeProxyFocusNode.hasFocus) {
+      return false;
+    }
+    if (event is! KeyDownEvent && event is! KeyUpEvent) {
+      return false;
+    }
+    if (_shouldLetImeProxyHandleText(event)) {
+      return false;
+    }
+    _forwardRawKeyEvent(event);
+    return false;
+  }
+
+  KeyEventResult _onGridFocusKeyEvent(FocusNode node, KeyEvent event) {
+    if (_editing ||
+        _imeProxySessionActive ||
+        _deferOverlayWhileImeProxyActive) {
+      return KeyEventResult.ignored;
+    }
+    if (event is! KeyDownEvent && event is! KeyUpEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (_shouldLetImeProxyHandleText(event) && event is KeyDownEvent) {
+      _suppressedPlainProxyText = event.character;
+    }
+    _forwardRawKeyEvent(event);
+    return KeyEventResult.ignored;
+  }
+
+  void _moveEditCaretToEdge({required bool end}) {
+    final offset = end ? _editTextController.text.length : 0;
+    _editTextController.selection = TextSelection.collapsed(offset: offset);
+  }
+
+  KeyEventResult _onEditOverlayKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+    final composing = _editTextController.value.composing.isValid &&
+        !_editTextController.value.composing.isCollapsed;
+    if (composing) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      _cancelEdit();
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      if (_editUiMode == _HostEditUiMode.edit) {
+        _moveEditCaretToEdge(end: false);
+      } else {
+        unawaited(_commitEditAndMove(-1));
+      }
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      if (_editUiMode == _HostEditUiMode.edit) {
+        _moveEditCaretToEdge(end: true);
+      } else {
+        unawaited(_commitEditAndMove(1));
+      }
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  Future<void> _commitEditAndMove(int rowDelta) async {
+    final currentRow = _editRow >= 0 ? _editRow : _selRow;
+    final currentCol = _editCol >= 0 ? _editCol : _selCol;
+    await widget.controller.commitEdit(_editTextController.text);
+
+    if (currentRow >= 0 && currentCol >= 0) {
+      try {
+        final rowCount = await widget.controller.rowCount();
+        final maxRow = rowCount > 0 ? rowCount - 1 : 0;
+        final targetRow = (currentRow + rowDelta).clamp(0, maxRow);
+        await widget.controller.selectRange(
+          targetRow,
+          currentCol,
+          targetRow,
+          currentCol,
+        );
+        await widget.controller.showCell(targetRow, currentCol);
+        _selRow = targetRow;
+        _selCol = currentCol;
+      } catch (_) {
+        // Best-effort navigation after commit.
+      }
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _editing = false;
+      _editOverlayVisible = true;
+      _editOverlayPendingReveal = false;
+      _editRow = -1;
+      _editCol = -1;
+    });
+    _requestIdleInputFocus();
+    _requestRender();
+  }
+
+  Future<void> _commitActiveEdit() async {
+    await widget.controller.commitEdit(_editTextController.text);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _editing = false;
+      _editRow = -1;
+      _editCol = -1;
+    });
+    _requestIdleInputFocus();
+    _requestRender();
+  }
+
   void _commitEdit() {
-    final text = _editTextController.text;
-    widget.controller.commitEdit(text);
-    setState(() => _editing = false);
-    _gridFocusNode.requestFocus();
+    unawaited(_commitActiveEdit());
+  }
+
+  Future<void> _cancelActiveEdit() async {
+    await widget.controller.cancelEdit();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _editing = false;
+      _editRow = -1;
+      _editCol = -1;
+    });
+    _requestIdleInputFocus();
     _requestRender();
   }
 
   void _cancelEdit() {
-    widget.controller.cancelEdit();
-    setState(() => _editing = false);
-    _gridFocusNode.requestFocus();
-    _requestRender();
+    unawaited(_cancelActiveEdit());
   }
 
   // ── Event forwarding ─────────────────────────────────────────────────────
 
+  bool _isPrimaryMouseDoubleClick(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.mouse || event.buttons != kPrimaryMouseButton) {
+      return false;
+    }
+    final lastAt = _lastPrimaryMouseDownAt;
+    final lastPosition = _lastPrimaryMouseDownPosition;
+    final isDoubleClick = lastAt != null &&
+        event.timeStamp >= lastAt &&
+        event.timeStamp - lastAt <= kDoubleTapTimeout &&
+        lastPosition != null &&
+        (event.localPosition - lastPosition).distance <= kDoubleTapSlop;
+    _lastPrimaryMouseDownAt = event.timeStamp;
+    _lastPrimaryMouseDownPosition = event.localPosition;
+    return isDoubleClick;
+  }
+
+  bool _isTouchDoubleTap(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.touch) {
+      return false;
+    }
+    final lastAt = _lastTouchDownAt;
+    final lastPosition = _lastTouchDownPosition;
+    final isDoubleTap = lastAt != null &&
+        event.timeStamp >= lastAt &&
+        event.timeStamp - lastAt <= kDoubleTapTimeout &&
+        lastPosition != null &&
+        (event.localPosition - lastPosition).distance <= kDoubleTapSlop;
+    _lastTouchDownAt = event.timeStamp;
+    _lastTouchDownPosition = event.localPosition;
+    return isDoubleTap;
+  }
+
   void _onPointerDown(PointerDownEvent event) {
-    _gridFocusNode.requestFocus();
+    final isDoubleClick =
+        _isPrimaryMouseDoubleClick(event) || _isTouchDoubleTap(event);
+    _requestIdleInputFocus();
     if (event.kind == PointerDeviceKind.touch) {
       _syncTouchScrollUnitBestEffort();
     }
@@ -1412,7 +1973,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
             ..x = event.localPosition.dx * dpr
             ..y = event.localPosition.dy * dpr
             ..button = event.buttons
-            ..modifier = _modifiers()),
+            ..modifier = _modifiers()
+            ..dblClick = isDoubleClick),
       );
       _requestRender();
       // Show context menu after a short delay to let engine process selection.
@@ -1460,7 +2022,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
           ..x = event.localPosition.dx * dpr
           ..y = event.localPosition.dy * dpr
           ..button = event.kind == PointerDeviceKind.touch ? 0 : event.buttons
-          ..modifier = _modifiers()),
+          ..modifier = _modifiers()
+          ..dblClick = isDoubleClick),
     );
     _requestRender();
   }
@@ -1812,34 +2375,6 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     );
   }
 
-  void _onKeyEvent(KeyEvent event) {
-    if (_editing &&
-        event is KeyDownEvent &&
-        event.logicalKey == LogicalKeyboardKey.escape) {
-      _cancelEdit();
-      return;
-    }
-
-    final pb.KeyEvent_Type type;
-    if (event is KeyDownEvent) {
-      type = pb.KeyEvent_Type.KEY_DOWN;
-    } else if (event is KeyUpEvent) {
-      type = pb.KeyEvent_Type.KEY_UP;
-    } else {
-      return;
-    }
-
-    _sendInput(
-      pb.RenderInput()
-        ..key = (pb.KeyEvent()
-          ..type = type
-          ..keyCode = (event.logicalKey.keyId & 0x7FFFFFFF).toInt()
-          ..character = event.character ?? ''
-          ..modifier = _modifiers()),
-    );
-    _requestRender();
-  }
-
   // ── Context menu ───────────────────────────────────────────────────────
 
   void _showGridContextMenu(BuildContext ctx, Offset position) {
@@ -2091,75 +2626,131 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
           _queueViewportResize(w, h, dpr);
         }
 
-        return KeyboardListener(
+        return Focus(
           focusNode: _gridFocusNode,
           autofocus: true,
-          onKeyEvent: _onKeyEvent,
-          child: Listener(
-            onPointerDown: _onPointerDown,
-            onPointerUp: _onPointerUp,
-            onPointerMove: _onPointerMove,
-            onPointerHover: _onPointerHover,
-            onPointerCancel: _onPointerCancel,
-            onPointerSignal: _onPointerSignal,
-            onPointerPanZoomStart: _onPointerPanZoomStart,
-            onPointerPanZoomUpdate: _onPointerPanZoomUpdate,
-            onPointerPanZoomEnd: _onPointerPanZoomEnd,
-            child: Stack(
-              children: [
-                // Current Flutter path: decode native RGBA frames and show via
-                // RawImage. A platform texture path can be added separately.
-                SizedBox(
-                  width: constraints.maxWidth,
-                  height: constraints.maxHeight,
-                  child: ClipRect(
-                    child: _gesturePreviewActive
-                        ? Transform(
-                            transform: Matrix4.identity()
-                              ..translate(
-                                _gesturePreviewPan.dx + _gesturePreviewFocal.dx,
-                                _gesturePreviewPan.dy + _gesturePreviewFocal.dy,
-                              )
-                              ..scale(
-                                  _gesturePreviewScale, _gesturePreviewScale)
-                              ..translate(
-                                -_gesturePreviewFocal.dx,
-                                -_gesturePreviewFocal.dy,
+          onKeyEvent: _onGridFocusKeyEvent,
+          child: SizedBox(
+            width: constraints.maxWidth,
+            height: constraints.maxHeight,
+            child: ClipRect(
+              child: Listener(
+                  onPointerDown: _onPointerDown,
+                  onPointerUp: _onPointerUp,
+                  onPointerMove: _onPointerMove,
+                  onPointerHover: _onPointerHover,
+                  onPointerCancel: _onPointerCancel,
+                  onPointerSignal: _onPointerSignal,
+                  onPointerPanZoomStart: _onPointerPanZoomStart,
+                  onPointerPanZoomUpdate: _onPointerPanZoomUpdate,
+                  onPointerPanZoomEnd: _onPointerPanZoomEnd,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned(
+                        left: -1000,
+                        top: -1000,
+                        width: 1,
+                        height: 1,
+                        child: IgnorePointer(
+                          ignoring: true,
+                          child: Opacity(
+                            opacity: 0,
+                            child: TextField(
+                              controller: _imeProxyController,
+                              focusNode: _imeProxyFocusNode,
+                              decoration:
+                                  const InputDecoration.collapsed(hintText: ''),
+                              style: const TextStyle(
+                                fontSize: 1,
+                                color: Colors.transparent,
                               ),
-                            filterQuality: FilterQuality.none,
-                            child: _buildSurface(constraints),
-                          )
-                        : _buildSurface(constraints),
-                  ),
-                ),
-
-                // Overlay edit TextField.
-                if (_editing)
-                  Positioned(
-                    left: _editRect.left,
-                    top: _editRect.top,
-                    width: _editRect.width,
-                    height: _editRect.height,
-                    child: Material(
-                      elevation: 2,
-                      child: TextField(
-                        controller: _editTextController,
-                        focusNode: _editFocusNode,
-                        decoration: const InputDecoration(
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 2,
+                              cursorColor: Colors.transparent,
+                              autocorrect: false,
+                              enableSuggestions: false,
+                              enableInteractiveSelection: false,
+                              maxLines: 1,
+                            ),
                           ),
-                          border: OutlineInputBorder(),
                         ),
-                        style: const TextStyle(fontSize: 13),
-                        onSubmitted: (_) => _commitEdit(),
-                        onTapOutside: (_) => _commitEdit(),
                       ),
-                    ),
+
+                      // Current Flutter path: decode native RGBA frames and
+                      // show via RawImage.  A platform texture path can be
+                      // added separately.
+                      SizedBox(
+                        width: constraints.maxWidth,
+                        height: constraints.maxHeight,
+                        child: ClipRect(
+                          child: _gesturePreviewActive
+                              ? Transform(
+                                  transform: Matrix4.identity()
+                                    ..translate(
+                                      _gesturePreviewPan.dx +
+                                          _gesturePreviewFocal.dx,
+                                      _gesturePreviewPan.dy +
+                                          _gesturePreviewFocal.dy,
+                                    )
+                                    ..scale(_gesturePreviewScale,
+                                        _gesturePreviewScale)
+                                    ..translate(
+                                      -_gesturePreviewFocal.dx,
+                                      -_gesturePreviewFocal.dy,
+                                    ),
+                                  filterQuality: FilterQuality.none,
+                                  child: _buildSurface(constraints),
+                                )
+                              : _buildSurface(constraints),
+                        ),
+                      ),
+
+                      // Overlay edit TextField.
+                      if (_editing)
+                        Positioned(
+                          left: _editRect.left,
+                          top: _editRect.top,
+                          width: _editRect.width,
+                          height: _editRect.height,
+                          child: IgnorePointer(
+                            ignoring: !_editOverlayVisible,
+                            child: Opacity(
+                              opacity: _editOverlayVisible ? 1 : 0,
+                              child: Material(
+                                elevation: 2,
+                                child: Focus(
+                                  onKeyEvent: _onEditOverlayKeyEvent,
+                                  child: TextField(
+                                    controller: _editTextController,
+                                    focusNode: _editFocusNode,
+                                    decoration: InputDecoration(
+                                      isDense: true,
+                                      contentPadding: _editPadding,
+                                      border: InputBorder.none,
+                                    ),
+                                    style: TextStyle(
+                                      fontSize: _editFontSize,
+                                      height: 1.0,
+                                      fontFamily: _editFontFamily,
+                                      fontWeight: _editFontBold
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      fontStyle: _editFontItalic
+                                          ? FontStyle.italic
+                                          : FontStyle.normal,
+                                    ),
+                                    textAlignVertical: TextAlignVertical.center,
+                                    maxLines: 1,
+                                    onSubmitted: (_) => _commitEdit(),
+                                    onTapOutside: (_) => _commitEdit(),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
+              ),
             ),
           ),
         );

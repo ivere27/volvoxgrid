@@ -17,6 +17,29 @@ import 'package:flutter/services.dart';
 
 import 'volvoxgrid_ffi.dart';
 
+/// Resolved style properties for the edit overlay.
+class EditCellStyle {
+  final String? fontFamily;
+  final double? fontSize;
+  final bool bold;
+  final bool italic;
+  final double padLeft;
+  final double padTop;
+  final double padRight;
+  final double padBottom;
+
+  const EditCellStyle({
+    this.fontFamily,
+    this.fontSize,
+    this.bold = false,
+    this.italic = false,
+    this.padLeft = 0,
+    this.padTop = 0,
+    this.padRight = 0,
+    this.padBottom = 0,
+  });
+}
+
 /// Simple row/col/text entry used by [setCells] batch operations.
 class CellTextEntry {
   final int row;
@@ -409,6 +432,53 @@ class VolvoxGridController extends ChangeNotifier {
       if (v.hasText()) return v.text;
     }
     return '';
+  }
+
+  /// Get the effective edit style for a cell (font, padding).
+  ///
+  /// Resolves per-cell overrides with grid default fallback.
+  /// Returns `null` if the grid is not created or the query fails.
+  Future<EditCellStyle?> getEditCellStyle(int row, int col) async {
+    if (!isCreated) return null;
+    try {
+      final resp = await VolvoxGridService.GetCells(GetCellsRequest()
+        ..gridId = _gridId
+        ..row1 = row
+        ..col1 = col
+        ..row2 = row
+        ..col2 = col
+        ..includeStyle = true);
+      final config = await _getConfig();
+      final cellFont = (resp.cells.isNotEmpty) ? resp.cells.first.style.font : null;
+      final gridFont = config.style.font;
+      return EditCellStyle(
+        fontFamily: (cellFont != null && cellFont.hasFamily() && cellFont.family.isNotEmpty)
+            ? cellFont.family
+            : (gridFont.hasFamily() ? gridFont.family : null),
+        fontSize: (cellFont != null && cellFont.hasSize() && cellFont.size > 0)
+            ? cellFont.size.toDouble()
+            : (gridFont.hasSize() && gridFont.size > 0 ? gridFont.size.toDouble() : null),
+        bold: (cellFont != null && cellFont.hasBold())
+            ? cellFont.bold
+            : (gridFont.hasBold() && gridFont.bold),
+        italic: (cellFont != null && cellFont.hasItalic())
+            ? cellFont.italic
+            : (gridFont.hasItalic() && gridFont.italic),
+        padLeft: (resp.cells.isNotEmpty && resp.cells.first.style.hasPadding())
+            ? resp.cells.first.style.padding.left.toDouble()
+            : (config.style.hasCellPadding() ? config.style.cellPadding.left.toDouble() : 0),
+        padTop: (resp.cells.isNotEmpty && resp.cells.first.style.hasPadding())
+            ? resp.cells.first.style.padding.top.toDouble()
+            : (config.style.hasCellPadding() ? config.style.cellPadding.top.toDouble() : 0),
+        padRight: (resp.cells.isNotEmpty && resp.cells.first.style.hasPadding())
+            ? resp.cells.first.style.padding.right.toDouble()
+            : (config.style.hasCellPadding() ? config.style.cellPadding.right.toDouble() : 0),
+        padBottom: (resp.cells.isNotEmpty && resp.cells.first.style.hasPadding())
+            ? resp.cells.first.style.padding.bottom.toDouble()
+            : (config.style.hasCellPadding() ? config.style.cellPadding.bottom.toDouble() : 0),
+      );
+    } catch (_) {}
+    return null;
   }
 
   /// Batch set many cell values in a single RPC.
@@ -887,6 +957,22 @@ class VolvoxGridController extends ChangeNotifier {
       ..gridId = _gridId
       ..cancel = EditCancel());
     notifyListeners();
+  }
+
+  /// Update IME preedit/composition state for the active edit session.
+  Future<EditState> setEditPreedit(
+    String text, {
+    int cursor = 0,
+    bool commit = false,
+  }) async {
+    final state = await VolvoxGridService.Edit(EditCommand()
+      ..gridId = _gridId
+      ..setPreedit = (EditSetPreedit()
+        ..text = text
+        ..cursor = cursor
+        ..commit = commit));
+    notifyListeners();
+    return state;
   }
 
   // ── Column Formatting ─────────────────────────────────────────────────────
