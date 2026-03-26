@@ -1047,7 +1047,8 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                                     font_italic,
                                     None,
                                 );
-                                let needed = (tw.ceil() as i32) + 8;
+                                let needed = ((tw.ceil() as i32) + ACTIVEX_AUTOSIZE_TEXT_PAD_PX)
+                                    .max(ACTIVEX_AUTOSIZE_MIN_COL_WIDTH_PX);
                                 let idx = (c - c_from) as usize;
                                 if needed > max_widths[idx] {
                                     max_widths[idx] = needed;
@@ -2559,6 +2560,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     fn set_debug_overlay(&self, r: SetBoolProp) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             g.debug_overlay = r.value;
+            g.layer_profiling = r.value;
             g.mark_dirty();
         })?;
         Ok(Empty {})
@@ -4918,6 +4920,138 @@ pub extern "C" fn volvox_grid_set_col_sel(
     )
 }
 
+#[no_mangle]
+pub extern "C" fn volvox_grid_resize_viewport_native(id: i64, w: i32, h: i32) -> i32 {
+    if w <= 0 || h <= 0 {
+        return -1;
+    }
+    match GRID_MANAGER.with_grid(id, |g| {
+        g.resize_viewport(w, h);
+        ensure_layout(g);
+        g.mark_dirty();
+    }) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_pointer_down_native(
+    id: i64,
+    x: f32,
+    y: f32,
+    button: i32,
+    modifier: i32,
+    dbl_click: i32,
+) -> i32 {
+    match GRID_MANAGER.with_grid(id, |g| {
+        volvoxgrid_engine::input::handle_pointer_down(g, x, y, button, modifier, dbl_click != 0);
+    }) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_pointer_move_native(
+    id: i64,
+    x: f32,
+    y: f32,
+    button: i32,
+    modifier: i32,
+) -> i32 {
+    match GRID_MANAGER.with_grid(id, |g| {
+        volvoxgrid_engine::input::handle_pointer_move(g, x, y, button, modifier);
+    }) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_pointer_up_native(
+    id: i64,
+    x: f32,
+    y: f32,
+    button: i32,
+    modifier: i32,
+) -> i32 {
+    match GRID_MANAGER.with_grid(id, |g| {
+        volvoxgrid_engine::input::handle_pointer_up(g, x, y, button, modifier);
+    }) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_scroll_native(id: i64, delta_x: f32, delta_y: f32) -> i32 {
+    match GRID_MANAGER.with_grid(id, |g| {
+        volvoxgrid_engine::input::handle_scroll(g, delta_x, delta_y);
+    }) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_key_down_native(id: i64, key_code: i32, modifier: i32) -> i32 {
+    match GRID_MANAGER.with_grid(id, |g| {
+        volvoxgrid_engine::input::handle_key_down(g, key_code, modifier);
+    }) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_key_press_native(id: i64, char_code: u32) -> i32 {
+    match GRID_MANAGER.with_grid(id, |g| {
+        volvoxgrid_engine::input::handle_key_press(g, char_code);
+    }) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_hover_mode_native(id: i64, mode: u32) -> i32 {
+    match GRID_MANAGER.with_grid(id, |g| {
+        g.selection.hover_mode = mode;
+        if mode == volvoxgrid_engine::selection::HOVER_NONE {
+            g.mouse_row = -1;
+            g.mouse_col = -1;
+        }
+        g.mark_dirty_visual();
+    }) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_debug_overlay_native(id: i64, enabled: i32) -> i32 {
+    match GRID_MANAGER.with_grid(id, |g| {
+        g.debug_overlay = enabled != 0;
+        g.layer_profiling = enabled != 0;
+        g.mark_dirty();
+    }) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_scroll_blit_native(id: i64, enabled: i32) -> i32 {
+    match GRID_MANAGER.with_grid(id, |g| {
+        g.scroll_blit_enabled = enabled != 0;
+        g.mark_dirty_visual();
+    }) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Initialization
 // ---------------------------------------------------------------------------
@@ -4938,21 +5072,49 @@ pub extern "C" fn volvox_grid_render_bgra(id: i64, buf: *mut u8, w: i32, h: i32)
     if buf.is_null() || w <= 0 || h <= 0 {
         return -1;
     }
+    let now = Instant::now();
     let result = GRID_MANAGER.with_grid(id, |g| {
         // Resize viewport to match
         g.resize_viewport(w, h);
         ensure_layout(g);
+        g.debug_renderer_actual = RendererMode::RendererCpu as i32;
+        g.debug_gpu_backend.clear();
+        g.debug_gpu_present_mode.clear();
+        g.debug_instance_count = 0;
+        if g.debug_overlay {
+            LAST_MEM_CALC.with(|last_mem_calc| {
+                let mut last_mem_calc = last_mem_calc.borrow_mut();
+                if last_mem_calc
+                    .get(&id)
+                    .map_or(true, |t| now.duration_since(*t) >= Duration::from_secs(10))
+                {
+                    g.debug_total_mem_bytes = g.heap_size_bytes() as i64;
+                    last_mem_calc.insert(id, now);
+                }
+            });
+        }
         let stride = w * 4;
         let len = (stride * h) as usize;
         let slice = unsafe { std::slice::from_raw_parts_mut(buf, len) };
+        let frame_start = Instant::now();
         // Use per-grid renderer (no lock — thread-local).
-        RENDERERS.with(|r| {
+        let (layer_times, zone_counts, text_cache_len) = RENDERERS.with(|r| {
             let mut map = r.borrow_mut();
             let renderer = map
                 .entry(id)
                 .or_insert_with(volvoxgrid_engine::render::Renderer::new);
-            renderer.render(g, slice, w, h, stride);
+            let (_dirty_rect, layer_times, zone_counts) = renderer.render(g, slice, w, h, stride);
+            (layer_times, zone_counts, renderer.text_cache_len() as i32)
         });
+        if g.layer_profiling {
+            g.layer_times_us = layer_times;
+            g.zone_cell_counts = zone_counts;
+        }
+        g.debug_text_cache_len = text_cache_len;
+        let elapsed = frame_start.elapsed().as_secs_f32() * 1000.0;
+        g.debug_frame_time_ms = elapsed;
+        g.debug_fps = g.debug_fps * 0.9 + (1000.0 / elapsed.max(0.1)) * 0.1;
+        g.clear_dirty();
         // Convert RGBA → BGRA in-place (swap R and B)
         for y in 0..h as usize {
             for x in 0..w as usize {
@@ -5301,13 +5463,14 @@ impl volvoxgrid_engine::text::TextRenderer for FfiTextRenderer {
 }
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 thread_local! {
     /// Per-grid `Renderer` instances.  Stored in thread-local storage because
     /// ActiveX runs in a COM Single-Threaded Apartment — no locking required.
-    static RENDERERS: RefCell<
-        std::collections::HashMap<i64, volvoxgrid_engine::render::Renderer>
-    > = RefCell::new(std::collections::HashMap::new());
+    static RENDERERS: RefCell<HashMap<i64, volvoxgrid_engine::render::Renderer>> =
+        RefCell::new(HashMap::new());
+    static LAST_MEM_CALC: RefCell<HashMap<i64, Instant>> = RefCell::new(HashMap::new());
 }
 
 /// Register a custom text renderer for a grid, or clear it.

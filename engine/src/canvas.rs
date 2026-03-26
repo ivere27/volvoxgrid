@@ -2354,36 +2354,7 @@ fn render_grid_internal<C: Canvas>(
         render_col_drag_marker(grid, canvas, &ctx)
     );
 
-    run_layer!(layer::CHECKBOXES, {
-        if grid
-            .columns
-            .iter()
-            .any(|c| c.data_type == pb::ColumnDataType::ColumnDataBoolean as i32)
-            || grid.style.checkbox_checked_picture.is_some()
-            || grid.style.checkbox_unchecked_picture.is_some()
-            || grid.style.checkbox_indeterminate_picture.is_some()
-            || grid
-                .style
-                .icon_theme_slots
-                .checkbox_checked
-                .as_ref()
-                .is_some_and(|s| !s.trim().is_empty())
-            || grid
-                .style
-                .icon_theme_slots
-                .checkbox_unchecked
-                .as_ref()
-                .is_some_and(|s| !s.trim().is_empty())
-            || grid
-                .style
-                .icon_theme_slots
-                .checkbox_indeterminate
-                .as_ref()
-                .is_some_and(|s| !s.trim().is_empty())
-        {
-            render_checkboxes(grid, canvas, &ctx);
-        }
-    });
+    run_layer!(layer::CHECKBOXES, render_checkboxes(grid, canvas, &ctx));
 
     run_layer!(layer::DROPDOWN_BUTTONS, {
         if grid.dropdown_trigger != 0 && grid.columns.iter().any(|c| !c.dropdown_items.is_empty()) {
@@ -4236,7 +4207,8 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
         let clip_right = inner_right.min(vis_x + vis_w);
         let clip_w = (clip_right - clip_x).max(1);
         let clip_y_cell = vis_y;
-        let clip_h = ((vis_y + vis_h).min(inner_bottom) - text_y).max(1);
+        let clip_bottom = (vis_y + vis_h).min(inner_bottom);
+        let clip_h = (clip_bottom - clip_y_cell).max(1);
 
         // Handle ellipsis (uses effective_font_size and possibly extended inner_w)
         if ellipsis_mode != 0 && !grid.word_wrap && tw > inner_w as f32 {

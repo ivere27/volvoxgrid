@@ -809,12 +809,13 @@ STDMETHODIMP CVolvoxGridCtrl::put_ColSel(long newVal)
 STDMETHODIMP CVolvoxGridCtrl::get_SelectionMode(FlexSelectionMode* pVal)
 {
     if (!pVal) return E_POINTER;
-    *pVal = flexSelectionFree;  // cached default
+    *pVal = m_selectionMode;
     return S_OK;
 }
 
 STDMETHODIMP CVolvoxGridCtrl::put_SelectionMode(FlexSelectionMode newVal)
 {
+    m_selectionMode = newVal;
     SetSelectionModeRequest req;
     req.set_grid_id(m_gridId);
     req.set_mode(static_cast<SelectionMode>(newVal));
@@ -828,12 +829,13 @@ STDMETHODIMP CVolvoxGridCtrl::put_SelectionMode(FlexSelectionMode newVal)
 STDMETHODIMP CVolvoxGridCtrl::get_HighLight(FlexHighLight* pVal)
 {
     if (!pVal) return E_POINTER;
-    *pVal = flexHighlightAlways;
+    *pVal = m_highLight;
     return S_OK;
 }
 
 STDMETHODIMP CVolvoxGridCtrl::put_HighLight(FlexHighLight newVal)
 {
+    m_highLight = newVal;
     SetHighLightRequest req;
     req.set_grid_id(m_gridId);
     req.set_style(static_cast<HighLightStyle>(newVal));
@@ -847,12 +849,13 @@ STDMETHODIMP CVolvoxGridCtrl::put_HighLight(FlexHighLight newVal)
 STDMETHODIMP CVolvoxGridCtrl::get_FocusRect(FlexFocusRect* pVal)
 {
     if (!pVal) return E_POINTER;
-    *pVal = flexFocusLight;
+    *pVal = m_focusRect;
     return S_OK;
 }
 
 STDMETHODIMP CVolvoxGridCtrl::put_FocusRect(FlexFocusRect newVal)
 {
+    m_focusRect = newVal;
     SetFocusRectRequest req;
     req.set_grid_id(m_gridId);
     req.set_style(static_cast<FocusRectStyle>(newVal));
@@ -927,12 +930,13 @@ STDMETHODIMP CVolvoxGridCtrl::put_GridLines(VolvoxGridLines newVal)
 STDMETHODIMP CVolvoxGridCtrl::get_Editable(FlexEditableMode* pVal)
 {
     if (!pVal) return E_POINTER;
-    *pVal = flexEditNone;
+    *pVal = m_editable;
     return S_OK;
 }
 
 STDMETHODIMP CVolvoxGridCtrl::put_Editable(FlexEditableMode newVal)
 {
+    m_editable = newVal;
     SetEditableRequest req;
     req.set_grid_id(m_gridId);
     req.set_mode(static_cast<EditableMode>(newVal));
@@ -979,12 +983,13 @@ STDMETHODIMP CVolvoxGridCtrl::put_Text(BSTR newVal)
 STDMETHODIMP CVolvoxGridCtrl::get_MergeCells(FlexMergeCells* pVal)
 {
     if (!pVal) return E_POINTER;
-    *pVal = flexMergeNever;
+    *pVal = m_mergeCells;
     return S_OK;
 }
 
 STDMETHODIMP CVolvoxGridCtrl::put_MergeCells(FlexMergeCells newVal)
 {
+    m_mergeCells = newVal;
     SetMergeCellsRequest req;
     req.set_grid_id(m_gridId);
     req.set_mode(static_cast<MergeCellsMode>(newVal));
@@ -1000,12 +1005,13 @@ STDMETHODIMP CVolvoxGridCtrl::put_MergeCells(FlexMergeCells newVal)
 STDMETHODIMP CVolvoxGridCtrl::get_WordWrap(VARIANT_BOOL* pVal)
 {
     if (!pVal) return E_POINTER;
-    *pVal = VARIANT_FALSE;
+    *pVal = m_wordWrap;
     return S_OK;
 }
 
 STDMETHODIMP CVolvoxGridCtrl::put_WordWrap(VARIANT_BOOL newVal)
 {
+    m_wordWrap = newVal;
     SetBoolProp req;
     req.set_grid_id(m_gridId);
     req.set_value(newVal != VARIANT_FALSE);
@@ -1021,12 +1027,13 @@ STDMETHODIMP CVolvoxGridCtrl::put_WordWrap(VARIANT_BOOL newVal)
 STDMETHODIMP CVolvoxGridCtrl::get_FrozenRows(long* pVal)
 {
     if (!pVal) return E_POINTER;
-    *pVal = 0;
+    *pVal = m_frozenRows;
     return S_OK;
 }
 
 STDMETHODIMP CVolvoxGridCtrl::put_FrozenRows(long newVal)
 {
+    m_frozenRows = newVal;
     SetFrozenRowsRequest req;
     req.set_grid_id(m_gridId);
     req.set_frozen_rows(newVal);
@@ -1040,12 +1047,13 @@ STDMETHODIMP CVolvoxGridCtrl::put_FrozenRows(long newVal)
 STDMETHODIMP CVolvoxGridCtrl::get_FrozenCols(long* pVal)
 {
     if (!pVal) return E_POINTER;
-    *pVal = 0;
+    *pVal = m_frozenCols;
     return S_OK;
 }
 
 STDMETHODIMP CVolvoxGridCtrl::put_FrozenCols(long newVal)
 {
+    m_frozenCols = newVal;
     SetFrozenColsRequest req;
     req.set_grid_id(m_gridId);
     req.set_frozen_cols(newVal);
@@ -1061,12 +1069,13 @@ STDMETHODIMP CVolvoxGridCtrl::put_FrozenCols(long newVal)
 STDMETHODIMP CVolvoxGridCtrl::get_AllowUserResizing(FlexAllowUserResizing* pVal)
 {
     if (!pVal) return E_POINTER;
-    *pVal = flexResizeNone;
+    *pVal = m_allowUserResizing;
     return S_OK;
 }
 
 STDMETHODIMP CVolvoxGridCtrl::put_AllowUserResizing(FlexAllowUserResizing newVal)
 {
+    m_allowUserResizing = newVal;
     SetResizePolicyRequest req;
     req.set_grid_id(m_gridId);
     PopulateResizePolicy(req.mutable_policy(), newVal);
@@ -1129,6 +1138,21 @@ STDMETHODIMP CVolvoxGridCtrl::put_Redraw(VARIANT_BOOL newVal)
     if (newVal != VARIANT_FALSE) {
         RequestFrame();
     }
+    return S_OK;
+}
+
+// --- AutoResize ---
+
+STDMETHODIMP CVolvoxGridCtrl::get_AutoResize(VARIANT_BOOL* pVal)
+{
+    if (!pVal) return E_POINTER;
+    *pVal = m_autoResize;
+    return S_OK;
+}
+
+STDMETHODIMP CVolvoxGridCtrl::put_AutoResize(VARIANT_BOOL newVal)
+{
+    m_autoResize = newVal;
     return S_OK;
 }
 
@@ -1322,6 +1346,9 @@ STDMETHODIMP CVolvoxGridCtrl::Select(long row1, long col1, long row2, long col2)
 
 STDMETHODIMP CVolvoxGridCtrl::Refresh()
 {
+    if (m_dataSource) {
+        return DataRefresh();
+    }
     auto h = MakeHandle();
     std::string s = h.SerializeAsString();
     std::vector<uint8_t> data(s.begin(), s.end());
@@ -1439,12 +1466,111 @@ STDMETHODIMP CVolvoxGridCtrl::SetColSort(long col, FlexSortOrder order)
 
 // --- Data Source (delegated to ADOAdapter.cpp) ---
 
+STDMETHODIMP CVolvoxGridCtrl::get_DataSource(IDispatch** pVal)
+{
+    if (!pVal) return E_POINTER;
+    *pVal = nullptr;
+    return m_dataSource.CopyTo(pVal);
+}
+
 STDMETHODIMP CVolvoxGridCtrl::putref_DataSource(IDispatch* pDataSource)
 {
     m_dataSource = pDataSource;
-    // ADOAdapter::BindRecordset handles the population
-    extern HRESULT ADOAdapter_BindRecordset(CVolvoxGridCtrl* ctrl, IDispatch* pRS);
-    return ADOAdapter_BindRecordset(this, pDataSource);
+    if (m_dataMode != 0) {
+        VARIANT_BOOL cancel = VARIANT_FALSE;
+        Fire_BeforeDataRefresh(&cancel);
+        if (cancel != VARIANT_FALSE) {
+            return S_OK;
+        }
+    }
+    extern HRESULT ADOAdapter_BindDataSource(CVolvoxGridCtrl* ctrl, IDispatch* pDataSource, BSTR dataMember);
+    HRESULT hr = ADOAdapter_BindDataSource(this, pDataSource, m_dataMember);
+    if (SUCCEEDED(hr)) {
+        RequestFrame();
+    }
+    if (SUCCEEDED(hr) && m_dataMode != 0) {
+        Fire_AfterDataRefresh();
+    }
+    return hr;
+}
+
+STDMETHODIMP CVolvoxGridCtrl::get_DataMember(BSTR* pVal)
+{
+    if (!pVal) return E_POINTER;
+    *pVal = m_dataMember.Copy();
+    return S_OK;
+}
+
+STDMETHODIMP CVolvoxGridCtrl::put_DataMember(BSTR newVal)
+{
+    m_dataMember = newVal;
+    if (m_dataSource) {
+        return DataRefresh();
+    }
+    return S_OK;
+}
+
+STDMETHODIMP CVolvoxGridCtrl::get_DataMode(FlexDataMode* pVal)
+{
+    if (!pVal) return E_POINTER;
+    *pVal = static_cast<FlexDataMode>(m_dataMode);
+    return S_OK;
+}
+
+STDMETHODIMP CVolvoxGridCtrl::put_DataMode(FlexDataMode newVal)
+{
+    m_dataMode = static_cast<long>(newVal);
+    SetInt32Prop req;
+    req.set_grid_id(m_gridId);
+    req.set_value(m_dataMode);
+    std::string s = req.SerializeAsString();
+    std::vector<uint8_t> data(s.begin(), s.end());
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetDataMode", data);
+    return S_OK;
+}
+
+STDMETHODIMP CVolvoxGridCtrl::get_VirtualData(VARIANT_BOOL* pVal)
+{
+    if (!pVal) return E_POINTER;
+    *pVal = m_virtualData;
+    return S_OK;
+}
+
+STDMETHODIMP CVolvoxGridCtrl::put_VirtualData(VARIANT_BOOL newVal)
+{
+    m_virtualData = newVal != VARIANT_FALSE ? VARIANT_TRUE : VARIANT_FALSE;
+    SetBoolProp req;
+    req.set_grid_id(m_gridId);
+    req.set_value(m_virtualData != VARIANT_FALSE);
+    std::string s = req.SerializeAsString();
+    std::vector<uint8_t> data(s.begin(), s.end());
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/SetVirtualData", data);
+    return S_OK;
+}
+
+STDMETHODIMP CVolvoxGridCtrl::DataRefresh()
+{
+    if (m_dataMode != 0) {
+        VARIANT_BOOL cancel = VARIANT_FALSE;
+        Fire_BeforeDataRefresh(&cancel);
+        if (cancel != VARIANT_FALSE) {
+            return S_OK;
+        }
+    }
+
+    extern HRESULT ADOAdapter_BindDataSource(CVolvoxGridCtrl* ctrl, IDispatch* pDataSource, BSTR dataMember);
+    HRESULT hr = ADOAdapter_BindDataSource(this, m_dataSource, m_dataMember);
+
+    auto h = MakeHandle();
+    std::string s = h.SerializeAsString();
+    std::vector<uint8_t> data(s.begin(), s.end());
+    InvokePlugin("/volvoxgrid.activex.VolvoxGridService/DataRefresh", data);
+    RequestFrame();
+
+    if (SUCCEEDED(hr) && m_dataMode != 0) {
+        Fire_AfterDataRefresh();
+    }
+    return hr;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1583,6 +1709,41 @@ void CVolvoxGridCtrl::Fire_AfterSort()
 
         DISPPARAMS dp = { nullptr, nullptr, 0, 0 };
         pDisp->Invoke(6, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &dp, nullptr, nullptr, nullptr);
+    }
+}
+
+void CVolvoxGridCtrl::Fire_BeforeDataRefresh(VARIANT_BOOL* cancel)
+{
+    IConnectionPointImpl<CVolvoxGridCtrl, &DIID__DVolvoxGridEvents>* pCP = this;
+    int nConnections = pCP->m_vec.GetSize();
+    for (int i = 0; i < nConnections; i++) {
+        CComPtr<IUnknown> pUnk = pCP->m_vec.GetAt(i);
+        if (!pUnk) continue;
+        CComPtr<IDispatch> pDisp;
+        pUnk->QueryInterface(IID_IDispatch, (void**)&pDisp);
+        if (!pDisp) continue;
+
+        VARIANT args[1];
+        VariantInit(&args[0]); args[0].vt = VT_BYREF | VT_BOOL; args[0].pboolVal = cancel;
+
+        DISPPARAMS dp = { args, nullptr, 1, 0 };
+        pDisp->Invoke(22, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &dp, nullptr, nullptr, nullptr);
+    }
+}
+
+void CVolvoxGridCtrl::Fire_AfterDataRefresh()
+{
+    IConnectionPointImpl<CVolvoxGridCtrl, &DIID__DVolvoxGridEvents>* pCP = this;
+    int nConnections = pCP->m_vec.GetSize();
+    for (int i = 0; i < nConnections; i++) {
+        CComPtr<IUnknown> pUnk = pCP->m_vec.GetAt(i);
+        if (!pUnk) continue;
+        CComPtr<IDispatch> pDisp;
+        pUnk->QueryInterface(IID_IDispatch, (void**)&pDisp);
+        if (!pDisp) continue;
+
+        DISPPARAMS dp = { nullptr, nullptr, 0, 0 };
+        pDisp->Invoke(23, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &dp, nullptr, nullptr, nullptr);
     }
 }
 

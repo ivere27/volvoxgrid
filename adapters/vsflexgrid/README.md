@@ -59,6 +59,7 @@ adapters/vsflexgrid/
 │   └── volvoxgrid_ffi_native.h  C header (200+ function declarations)
 ├── mingw/                       MinGW cross-compilation sources
 │   ├── build_ocx.sh             Build script (i686 + x86_64)
+│   ├── setup_mdac28.sh          One-time MDAC prefix setup helper
 │   ├── run_compare_ui.sh        UI comparison test runner + HTML report
 │   ├── run_compare_ux.sh        UX interaction comparison test + HTML report
 │   ├── dllexports.c             DLL entry, COM class factory, self-registration
@@ -107,7 +108,12 @@ adapters/vsflexgrid/
 cd adapters/vsflexgrid/mingw
 ./build_ocx.sh           # Debug build (both i686 and x86_64)
 ./build_ocx.sh release   # Release build (stripped)
+
+# Or from the repo root, build and launch the classic demo shell under Wine
+make activex-run-release
 ```
+
+The ActiveX demo runner defaults to `ACTIVEX_ARCH=x86_64`. Use `ACTIVEX_ARCH=i686` only when you need the 32-bit Wine/OCX host.
 
 **Output** (in `target/ocx/`):
 
@@ -163,6 +169,54 @@ This creates the following registry entries:
 | `HKCR\VolvoxGrid.VolvoxGridCtrl\CLSID` | `{A7E3B4D1-...}` |
 
 **ProgID:** `VolvoxGrid.VolvoxGridCtrl`
+
+## Comparison Harness
+
+The UI/data comparison runners under `adapters/vsflexgrid/mingw/` now default to a Wine prefix that uses Microsoft MDAC 2.8 SP1 ADO components instead of Wine's builtin `msado15`. This is required for VBScript `CreateObject("ADODB.Recordset")` and legacy `VSFlexGrid8.VSFlexGridADO` binding behavior to match the real OCX path closely enough for comparison.
+
+Default compare environment:
+
+- `WINEPREFIX=$HOME/.wine`
+- `WINEDLLOVERRIDES=msado15,mtxdm,odbc32,odbccp32,oledb32=n,b`
+
+Use `$HOME/...`, not a quoted literal `~`, when setting the prefix path.
+
+Examples:
+
+```bash
+cd adapters/vsflexgrid/mingw
+./run_compare_ui.sh
+./run_compare_ui.sh --data
+```
+
+Before the first compare run, prepare the prefix once:
+
+```bash
+cd adapters/vsflexgrid/mingw
+MDAC28SDK_DIR=/path/to/mdac28sdk ./setup_mdac28.sh /path/to/MDAC_TYP.EXE
+```
+
+Start the MSSQL test server before running UI comparison tests that include SQL cases `84-103`. `./run_compare_ui.sh` includes them by default:
+
+```bash
+docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=sapassword12#$%" -e "MSSQL_PID=Express" -p 1433:1433 -d mcr.microsoft.com/mssql/server:2017-latest
+```
+
+`run_compare_ui.sh` verifies the MDAC/MSSQL client setup when SQL compare tests are selected, but it does not install anything for you. Prepare the prefix once with `setup_mdac28.sh` before running the live SQL cases.
+
+Override the SQL target with `VFG_SQL_SERVER`, `VFG_SQL_DATABASE`, `VFG_SQL_USER`, and `VFG_SQL_PASSWORD` when needed. The defaults match the Docker command above: `127.0.0.1,1433`, `tempdb`, `sa`, and `sapassword12#$%`.
+
+If the typelibs in `~/.wine` still point to `/tmp/mdac28sdk`, rerun `setup_mdac28.sh` with `MDAC28SDK_DIR` to rehome them into `C:\windows\system32\mdac28` inside the prefix.
+
+Override the defaults when needed:
+
+```bash
+WINEPREFIX=/path/to/prefix \
+WINEDLLOVERRIDES=msado15,mtxdm,odbc32,odbccp32,oledb32=n,b \
+./run_compare_ui.sh --data
+```
+
+If the default native MDAC prefix does not exist, `run_compare_ui.sh` exits with an error and asks you to provide a valid `WINEPREFIX` or `DEFAULT_NATIVE_WINEPREFIX`.
 
 ## COM Interfaces
 

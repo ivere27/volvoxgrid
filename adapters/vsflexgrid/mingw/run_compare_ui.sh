@@ -5,7 +5,7 @@
 # output BMPs to PNG, and generates a side-by-side HTML report.
 #
 # Usage:
-#   ./run_compare_ui.sh [--headless] [--no-headless] [--jobs N] [--only-vv] [--no-diff] [--no-html] [--test N] [--tests LIST]
+#   ./run_compare_ui.sh [--data] [--headless] [--no-headless] [--jobs N] [--only-vv] [--no-diff] [--no-html] [--test N] [--tests LIST]
 #
 # Headless mode:
 #   - enabled by default via xvfb-run
@@ -40,6 +40,7 @@ VOLVOX_OCX="../../../target/ocx/VolvoxGrid_i686.ocx"
 TARGET_DIR="../../../target/ocx/compare"
 OUT_DIR="$TARGET_DIR"
 TESTS_DIR="${TESTS_DIR_UI:-./tests}"
+TESTS_MODE="ui"
 ARGS=()
 NO_HTML=0
 HAS_FILTER=0
@@ -48,8 +49,218 @@ HEADLESS=1
 XVFB_SCREEN="${XVFB_SCREEN:-1920x1080x24}"
 JOBS=0
 JOBS_SET=0
+WORKER_TIMEOUT_SEC="${WORKER_TIMEOUT_SEC:-60}"
+PARALLEL_UNSAFE_TESTS="${PARALLEL_UNSAFE_TESTS:-}"
+DEFAULT_NATIVE_WINEPREFIX="${DEFAULT_NATIVE_WINEPREFIX:-$HOME/.wine}"
+DEFAULT_NATIVE_WINEDLLOVERRIDES="${DEFAULT_NATIVE_WINEDLLOVERRIDES:-msado15,msadce,msadco,msdart,msdaps,msdatl3,oledb32,msdadc,msdaenum,msdaer,msdasql,sqloledb,sqlsrv32,mtxdm,odbc32,odbccp32=n,b}"
 
 ORIG_ARGS=("$@")
+
+build_default_filter() {
+    local dir="$1"
+    local file base num
+    local nums=()
+
+    for file in "$dir"/*.vbs; do
+        [ -f "$file" ] || continue
+        base="$(basename "$file")"
+        num="${base%%_*}"
+        nums+=("$((10#$num))")
+    done
+
+    if [ "${#nums[@]}" -eq 0 ]; then
+        return 1
+    fi
+
+    printf "%s\n" "${nums[@]}" | sort -n | paste -sd, -
+}
+
+filter_includes_test() {
+    local filter="$1"
+    local needle="$2"
+    local tok a b t
+    local IFS=","
+    local tokens=()
+
+    read -ra tokens <<< "$filter"
+    for tok in "${tokens[@]}"; do
+        tok="${tok//[[:space:]]/}"
+        [ -z "$tok" ] && continue
+        if [[ "$tok" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+            a="${BASH_REMATCH[1]}"
+            b="${BASH_REMATCH[2]}"
+            if [ "$a" -gt "$b" ]; then
+                t="$a"
+                a="$b"
+                b="$t"
+            fi
+            if [ "$needle" -ge "$a" ] && [ "$needle" -le "$b" ]; then
+                return 0
+            fi
+        elif [[ "$tok" =~ ^[0-9]+$ ]] && [ "$tok" -eq "$needle" ]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+filter_includes_threshold() {
+    local filter="$1"
+    local threshold="$2"
+    local tok a b t
+    local IFS=","
+    local tokens=()
+
+    read -ra tokens <<< "$filter"
+    for tok in "${tokens[@]}"; do
+        tok="${tok//[[:space:]]/}"
+        [ -z "$tok" ] && continue
+        if [[ "$tok" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+            a="${BASH_REMATCH[1]}"
+            b="${BASH_REMATCH[2]}"
+            if [ "$a" -gt "$b" ]; then
+                t="$a"
+                a="$b"
+                b="$t"
+            fi
+            if [ "$b" -ge "$threshold" ]; then
+                return 0
+            fi
+        elif [[ "$tok" =~ ^[0-9]+$ ]] && [ "$tok" -ge "$threshold" ]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+run_compare_worker() {
+    if [ "$WORKER_TIMEOUT_SEC" -gt 0 ] && command -v timeout >/dev/null 2>&1; then
+        timeout --signal=TERM --kill-after=5s "${WORKER_TIMEOUT_SEC}s" \
+            wine "./grid_compare_test.exe" "$@"
+    else
+        wine "./grid_compare_test.exe" "$@"
+    fi
+}
+
+parallel_test_is_serial_only() {
+    local test_id="$1"
+
+    case ",${PARALLEL_UNSAFE_TESTS}," in
+        *,"${test_id}",*)
+            return 0
+            ;;
+    esac
+
+    return 1
+}
+
+selected_tests_require_sql_client() {
+    local i=0
+    local a
+    local only_test=""
+    local test_filter=""
+
+    while [ "$i" -lt "${#ARGS[@]}" ]; do
+        a="${ARGS[$i]}"
+        case "$a" in
+            --test)
+                if [ $((i + 1)) -lt "${#ARGS[@]}" ]; then
+                    only_test="${ARGS[$((i + 1))]}"
+                fi
+                i=$((i + 2))
+                ;;
+            --test=*)
+                only_test="${a#--test=}"
+                i=$((i + 1))
+                ;;
+            --tests)
+                if [ $((i + 1)) -lt "${#ARGS[@]}" ]; then
+                    test_filter="${ARGS[$((i + 1))]}"
+                fi
+                i=$((i + 2))
+                ;;
+            --tests=*)
+                test_filter="${a#--tests=}"
+                i=$((i + 1))
+                ;;
+            *)
+                i=$((i + 1))
+                ;;
+        esac
+    done
+
+    if [ -n "$only_test" ]; then
+        [[ "$only_test" =~ ^[0-9]+$ ]] && [ "$only_test" -ge 84 ]
+        return $?
+    fi
+
+    if [ -z "$test_filter" ]; then
+        return 1
+    fi
+
+    filter_includes_threshold "$test_filter" 84
+}
+
+selected_tests_include_parallel_unsafe() {
+    local i=0
+    local a
+    local only_test=""
+    local test_filter=""
+    local serial_test
+    local IFS=","
+    local serial_tests=()
+
+    read -ra serial_tests <<< "${PARALLEL_UNSAFE_TESTS}"
+
+    while [ "$i" -lt "${#ARGS[@]}" ]; do
+        a="${ARGS[$i]}"
+        case "$a" in
+            --test)
+                if [ $((i + 1)) -lt "${#ARGS[@]}" ]; then
+                    only_test="${ARGS[$((i + 1))]}"
+                fi
+                i=$((i + 2))
+                ;;
+            --test=*)
+                only_test="${a#--test=}"
+                i=$((i + 1))
+                ;;
+            --tests)
+                if [ $((i + 1)) -lt "${#ARGS[@]}" ]; then
+                    test_filter="${ARGS[$((i + 1))]}"
+                fi
+                i=$((i + 2))
+                ;;
+            --tests=*)
+                test_filter="${a#--tests=}"
+                i=$((i + 1))
+                ;;
+            *)
+                i=$((i + 1))
+                ;;
+        esac
+    done
+
+    if [ -n "$only_test" ]; then
+        parallel_test_is_serial_only "$only_test"
+        return $?
+    fi
+
+    if [ -z "$test_filter" ]; then
+        return 1
+    fi
+
+    for serial_test in "${serial_tests[@]}"; do
+        if filter_includes_test "$test_filter" "$serial_test"; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --headless)
@@ -58,6 +269,11 @@ while [ "$#" -gt 0 ]; do
             ;;
         --no-headless)
             HEADLESS=0
+            shift
+            ;;
+        --data)
+            TESTS_MODE="data"
+            TESTS_DIR="${TESTS_DIR_DATA:-./tests_data}"
             shift
             ;;
         --jobs)
@@ -122,8 +338,25 @@ if ! [[ "$JOBS" =~ ^[0-9]+$ ]] || [ "$JOBS" -lt 1 ]; then
 fi
 
 if [ "$HAS_FILTER" -eq 0 ]; then
-    DEFAULT_FILTER="${UI_TEST_FILTER:-1-64}"
+    if ! DEFAULT_FILTER="$(build_default_filter "$TESTS_DIR")"; then
+        if [ "$TESTS_MODE" = "data" ]; then
+            DEFAULT_FILTER="${DATA_TEST_FILTER:-66-67}"
+        else
+            DEFAULT_FILTER="${UI_TEST_FILTER:-1-64}"
+        fi
+    fi
     ARGS+=(--tests "$DEFAULT_FILTER")
+fi
+
+if [ -z "${WINEPREFIX:-}" ]; then
+    if [ ! -d "$DEFAULT_NATIVE_WINEPREFIX" ]; then
+        echo "ERROR: native MDAC Wine prefix not found: $DEFAULT_NATIVE_WINEPREFIX"
+        exit 1
+    fi
+    export WINEPREFIX="$DEFAULT_NATIVE_WINEPREFIX"
+fi
+if [ -z "${WINEDLLOVERRIDES:-}" ]; then
+    export WINEDLLOVERRIDES="$DEFAULT_NATIVE_WINEDLLOVERRIDES"
 fi
 
 if [ "${RUN_COMPARE_UI_XVFB_WRAPPED:-0}" != "1" ]; then
@@ -139,7 +372,14 @@ if [ "${RUN_COMPARE_UI_XVFB_WRAPPED:-0}" != "1" ]; then
 fi
 
 # ── Preflight ──────────────────────────────────────────────
-echo "=== Grid Compare: FlexGrid vs VolvoxGrid ==="
+if [ "$TESTS_MODE" = "data" ]; then
+    echo "=== Grid Compare (Data Patterns) ==="
+else
+    echo "=== Grid Compare: FlexGrid vs VolvoxGrid ==="
+fi
+echo ""
+echo "Using WINEPREFIX: $WINEPREFIX"
+echo "Using WINEDLLOVERRIDES: $WINEDLLOVERRIDES"
 echo ""
 
 command -v wine >/dev/null 2>&1 || { echo "ERROR: wine not found"; exit 1; }
@@ -169,9 +409,26 @@ if [ ! -d "$TESTS_DIR" ]; then
     echo "ERROR: test scripts directory not found: $TESTS_DIR"
     exit 1
 fi
-echo "Using test scripts: $TESTS_DIR"
+if [ "$TESTS_MODE" = "data" ]; then
+    echo "Using data test scripts: $TESTS_DIR"
+else
+    echo "Using test scripts: $TESTS_DIR"
+fi
 if [ "$HAS_FILTER" -eq 0 ]; then
-    echo "Default UI test filter: $DEFAULT_FILTER"
+    if [ "$TESTS_MODE" = "data" ]; then
+        echo "Default data test filter: $DEFAULT_FILTER"
+    else
+        echo "Default UI test filter: $DEFAULT_FILTER"
+    fi
+fi
+
+if [ "$TESTS_MODE" = "ui" ] && selected_tests_require_sql_client; then
+    echo "[preflight] Verifying MDAC/MSSQL client setup for live SQL compare tests..."
+    if ! WINEPREFIX="$WINEPREFIX" WINEDLLOVERRIDES="$WINEDLLOVERRIDES" "$SCRIPT_DIR/setup_mdac28.sh" --verify --sql; then
+        echo "ERROR: live SQL compare prerequisites are not ready in $WINEPREFIX"
+        echo "Run: $SCRIPT_DIR/setup_mdac28.sh /path/to/MDAC_TYP.EXE"
+        exit 1
+    fi
 fi
 
 # ── Build test exe ─────────────────────────────────────────
@@ -208,9 +465,15 @@ ln -sfn "$(realpath "$TESTS_DIR")" "$OUT_DIR/tests"
 
 # Run in output dir so BMPs land there; capture output for similarity parsing
 pushd "$OUT_DIR" > /dev/null
+find . -maxdepth 1 -type f \( -name "test_*_lg.bmp" -o -name "test_*_vv.bmp" -o -name "test_*_diff.bmp" -o -name "test_*_lg.png" -o -name "test_*_vv.png" -o -name "test_*_diff.png" -o -name "test_*_cells.diff.txt" -o -name "compare_output.worker*.log" \) -delete
 COMPARE_LOG="compare_output.log"
-if [ "$JOBS" -le 1 ]; then
-    WINEDEBUG=-all wine "./grid_compare_test.exe" "${ARGS[@]:-}" 2>/dev/null | tee "$COMPARE_LOG" || true
+FORCE_SERIAL_JOBS=0
+if [ "$JOBS" -gt 1 ] && selected_tests_include_parallel_unsafe; then
+    FORCE_SERIAL_JOBS=1
+    echo "  INFO: running sequentially because tests ${PARALLEL_UNSAFE_TESTS} hang under parallel Wine/ADO compare"
+fi
+if [ "$JOBS" -le 1 ] || [ "$FORCE_SERIAL_JOBS" -eq 1 ]; then
+    WINEDEBUG=-all run_compare_worker "${ARGS[@]:-}" 2>/dev/null | tee "$COMPARE_LOG" || true
 else
     declare -A TEST_SET=()
     TEST_FILTER=""
@@ -282,7 +545,7 @@ else
 
     if [ "${#TEST_SET[@]}" -eq 0 ]; then
         echo "  WARN: --jobs requested, but no valid tests parsed; falling back to sequential"
-        WINEDEBUG=-all wine "./grid_compare_test.exe" "${ARGS[@]:-}" 2>/dev/null | tee "$COMPARE_LOG" || true
+        WINEDEBUG=-all run_compare_worker "${ARGS[@]:-}" 2>/dev/null | tee "$COMPARE_LOG" || true
     else
         mapfile -t TEST_LIST < <(printf "%s\n" "${!TEST_SET[@]}" | sort -n)
         if [ "$JOBS" -gt "${#TEST_LIST[@]}" ]; then
@@ -316,9 +579,12 @@ else
                     echo "=== worker ${WORKER_IDX} START pid=$$ tests=${chunk} at ${start_human} ==="
                 } > "$wlog"
                 set +e
-                WINEDEBUG=-all wine "./grid_compare_test.exe" "${BASE_ARGS[@]}" --tests "$chunk" \
+                WINEDEBUG=-all run_compare_worker "${BASE_ARGS[@]}" --tests "$chunk" \
                     2>/dev/null >> "$wlog"
                 rc=$?
+                if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+                    echo "=== worker ${WORKER_IDX} TIMEOUT limit=${WORKER_TIMEOUT_SEC}s ===" >> "$wlog"
+                fi
                 set -e
                 end_ts="$(date +%s)"
                 end_human="$(date '+%Y-%m-%d %H:%M:%S')"
@@ -464,6 +730,8 @@ h1 { color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 12px; }
 .cell pre { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; font-size: 12.5px; line-height: 1.6; color: #e6edf3; overflow-x: auto; white-space: pre-wrap; word-break: break-word; font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace; margin: 0; max-height: 400px; overflow-y: auto; }
 .cell img { width: 100%; border: 1px solid #30363d; border-radius: 4px; image-rendering: pixelated; display: block; }
 .cell .placeholder { background: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 40px; text-align: center; color: #484f58; font-size: 13px; }
+.cell-diff { padding: 0 16px 16px; }
+.label-celltext { color: #79c0ff; }
 </style>
 </head>
 <body>
@@ -479,6 +747,14 @@ HEADER
         TESTS+=("$base")
     done
     NUM_TESTS=${#TESTS[@]}
+    CELL_DIFF_TESTS=0
+    if [ "$HAS_LG" -eq 1 ]; then
+        for base in "${TESTS[@]}"; do
+            if [ -f "$OUT_DIR/${base}_cells.diff.txt" ]; then
+                CELL_DIFF_TESTS=$((CELL_DIFF_TESTS + 1))
+            fi
+        done
+    fi
 
     # Parse similarity from log
     COMPARE_LOG_FILE="$OUT_DIR/compare_output.log"
@@ -500,6 +776,7 @@ HEADER
         done < "$COMPARE_LOG_FILE"
     fi
 
+    set +u
     if [ "${#SIM_MAP[@]}" -gt 0 ]; then
         rm -f "$CURR_SIM_FILE"
         for key in $(printf '%s\n' "${!SIM_MAP[@]}" | sort -n); do
@@ -546,6 +823,7 @@ HEADER
         echo "  <div class=\"stat\"><div class=\"num\">$NUM_TESTS</div><div class=\"label\">Tests</div></div>"
         if [ "$HAS_LG" -eq 1 ]; then
             echo "  <div class=\"stat\"><div class=\"num\">2</div><div class=\"label\">Controls</div></div>"
+            echo "  <div class=\"stat\"><div class=\"num\">$CELL_DIFF_TESTS</div><div class=\"label\">Cell Diff Tests</div></div>"
         fi
         if [ -n "$AVG_SIM" ]; then
             echo "  <div class=\"stat\"><div class=\"num\">${AVG_SIM}%</div><div class=\"label\">Avg Similarity</div></div>"
@@ -565,6 +843,12 @@ HEADER
             vbs_content=$(sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g' "$vbs_file")
         else
             vbs_content="' (no script file: ${num}_${name}.vbs)"
+        fi
+
+        cell_diff_file="$OUT_DIR/${base}_cells.diff.txt"
+        cell_diff_content=""
+        if [ -f "$cell_diff_file" ]; then
+            cell_diff_content=$(sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g' "$cell_diff_file")
         fi
 
         # Get similarity for this test
@@ -624,6 +908,17 @@ HEADER
             echo "    </div>"
 
             echo "  </div>"
+
+            echo "  <div class=\"cell cell-diff\">"
+            echo "    <div class=\"cell-label label-celltext\">Cell Text Diff</div>"
+            if [ "$HAS_LG" -eq 1 ] && [ -n "$cell_diff_content" ]; then
+                echo "    <pre>$cell_diff_content</pre>"
+            elif [ "$HAS_LG" -eq 1 ]; then
+                echo "    <div class=\"placeholder\">No cell text differences</div>"
+            else
+                echo "    <div class=\"placeholder\">No reference control</div>"
+            fi
+            echo "  </div>"
             echo "</div>"
         } >> "$REPORT"
     done
@@ -635,9 +930,28 @@ else
 fi
 
 # ── Summary ────────────────────────────────────────────────
+CELL_DIFF_CASES=()
+for cell_diff_path in "$OUT_DIR"/test_*_cells.diff.txt; do
+    [ -f "$cell_diff_path" ] || continue
+    cell_diff_base="$(basename "$cell_diff_path")"
+    cell_diff_num="${cell_diff_base#test_}"
+    cell_diff_num="${cell_diff_num%%_*}"
+    cell_diff_name="${cell_diff_base#test_${cell_diff_num}_}"
+    cell_diff_name="${cell_diff_name%_cells.diff.txt}"
+    CELL_DIFF_CASES+=("[$cell_diff_num] $cell_diff_name")
+done
+
 echo ""
 echo "════════════════════════════════════════════════"
 echo "  Output: $OUT_DIR/"
 ls "$OUT_DIR"/*.${EXT:-png} 2>/dev/null | wc -l | xargs -I{} echo "  Images: {} files"
 [ -f "$OUT_DIR/report.html" ] && echo "  Report: $OUT_DIR/report.html"
+if [ "${#CELL_DIFF_CASES[@]}" -gt 0 ]; then
+    echo "  Cell Text Diff Cases:"
+    for cell_diff_case in "${CELL_DIFF_CASES[@]}"; do
+        echo "    $cell_diff_case"
+    done
+else
+    echo "  Cell Text Diff Cases: none"
+fi
 echo "════════════════════════════════════════════════"

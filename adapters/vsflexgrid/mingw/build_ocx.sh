@@ -150,6 +150,20 @@ build_arch() {
         -static-libgcc
     echo "  Done: ${OUT_DIR}/grid_compare_test_${ARCH}.exe"
 
+    echo "  Build gdi_measure_text_${ARCH}.exe..."
+    $CC $CFLAGS -o "${OUT_DIR}/gdi_measure_text_${ARCH}.exe" \
+        gdi_measure_text.c \
+        -lgdi32 \
+        -static-libgcc
+    echo "  Done: ${OUT_DIR}/gdi_measure_text_${ARCH}.exe"
+
+    echo "  Build volvoxgrid_demo_host_${ARCH}.exe..."
+    $CC $CFLAGS -o "${OUT_DIR}/volvoxgrid_demo_host_${ARCH}.exe" \
+        activex_demo_host.c \
+        -lole32 -loleaut32 -luuid -lgdi32 \
+        -mwindows -static-libgcc
+    echo "  Done: ${OUT_DIR}/volvoxgrid_demo_host_${ARCH}.exe"
+
 }
 
 # Build both architectures (skip if toolchain not available)

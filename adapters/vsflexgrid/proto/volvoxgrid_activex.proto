@@ -1728,11 +1728,11 @@ service VolvoxGridService {
     properties: { dispid: 5   name: "TextMatrix"      custom: true }
     properties: { dispid: 6   name: "Text"             custom: true }
     properties: { dispid: 7   name: "Row" }
-    properties: { dispid: 8   name: "Col" }
+    properties: { dispid: 8   name: "Col"             custom: true }
     properties: { dispid: 9   name: "RowHeight"       custom: true }
     properties: { dispid: 10  name: "ColWidth"         custom: true }
-    properties: { dispid: 11  name: "FrozenRows"      set_method: "SetFrozenRows" }
-    properties: { dispid: 12  name: "FrozenCols"      set_method: "SetFrozenCols" }
+    properties: { dispid: 11  name: "FrozenRows"      custom: true }
+    properties: { dispid: 12  name: "FrozenCols"      custom: true }
     properties: { dispid: 13  name: "ScrollBars" }
     properties: { dispid: 14  name: "TopRow" }
     properties: { dispid: 15  name: "LeftCol" }
@@ -1741,9 +1741,9 @@ service VolvoxGridService {
     properties: { dispid: 18  name: "Redraw" }
     properties: { dispid: 19  name: "Picture"          custom: true }
     properties: { dispid: 20  name: "TextArray"        custom: true }
-    properties: { dispid: 21  name: "Editable" }
-    properties: { dispid: 22  name: "RowSel" }
-    properties: { dispid: 23  name: "ColSel" }
+    properties: { dispid: 21  name: "Editable"        custom: true }
+    properties: { dispid: 22  name: "RowSel"          custom: true }
+    properties: { dispid: 23  name: "ColSel"          custom: true }
     properties: { dispid: 24  name: "FillStyle" }
     properties: { dispid: 25  name: "WordWrap" }
     properties: { dispid: 26  name: "GridStyle"        custom: true }
@@ -1803,6 +1803,17 @@ service VolvoxGridService {
     properties: { dispid: 80  name: "ColComboList"     custom: true }
     properties: { dispid: 81  name: "ShowComboButton"  custom: true }
     properties: { dispid: 82  name: "EditCell"         custom: true }
+    properties: { dispid: 83  name: "LoadDemo"         custom: true }
+    properties: { dispid: 84  name: "ResizeViewport"   custom: true }
+    properties: { dispid: 85  name: "PointerDown"      custom: true }
+    properties: { dispid: 86  name: "PointerMove"      custom: true }
+    properties: { dispid: 87  name: "PointerUp"        custom: true }
+    properties: { dispid: 88  name: "Scroll"           custom: true }
+    properties: { dispid: 89  name: "KeyDown"          custom: true }
+    properties: { dispid: 90  name: "KeyPress"         custom: true }
+    properties: { dispid: 91  name: "SetHoverMode"     custom: true }
+    properties: { dispid: 92  name: "SetDebugOverlay"  custom: true }
+    properties: { dispid: 93  name: "SetScrollBlit"    custom: true }
   };
 
   // Lifecycle
