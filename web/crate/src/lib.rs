@@ -1548,9 +1548,7 @@ pub fn set_host_pointer_dispatch(id: i32, enabled: i32) {
 
 #[wasm_bindgen]
 pub fn get_host_pointer_dispatch(id: i32) -> i32 {
-    with_grid(id, |grid| {
-        if grid.host_pointer_dispatch { 1 } else { 0 }
-    }).unwrap_or(0)
+    with_grid(id, |grid| if grid.host_pointer_dispatch { 1 } else { 0 }).unwrap_or(0)
 }
 
 #[wasm_bindgen]
@@ -2741,7 +2739,11 @@ pub fn get_edit_font_bold(id: i32) -> i32 {
         let row = grid.edit.edit_row;
         let col = grid.edit.edit_col;
         let style_override = grid.get_cell_style(row, col);
-        if style_override.font_bold.unwrap_or(grid.style.font_bold) { 1 } else { 0 }
+        if style_override.font_bold.unwrap_or(grid.style.font_bold) {
+            1
+        } else {
+            0
+        }
     })
     .unwrap_or(0)
 }
@@ -2755,7 +2757,11 @@ pub fn get_edit_font_italic(id: i32) -> i32 {
         let row = grid.edit.edit_row;
         let col = grid.edit.edit_col;
         let style_override = grid.get_cell_style(row, col);
-        if style_override.font_italic.unwrap_or(grid.style.font_italic) { 1 } else { 0 }
+        if style_override.font_italic.unwrap_or(grid.style.font_italic) {
+            1
+        } else {
+            0
+        }
     })
     .unwrap_or(0)
 }

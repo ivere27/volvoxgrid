@@ -381,10 +381,10 @@ const SALES_REGIONS: [&str; 4] = ["North", "South", "East", "West"];
 const SALES_QUARTERS: [&str; 4] = ["Q1", "Q2", "Q3", "Q4"];
 const SALES_STATUSES: [&str; 5] = ["Active", "Pending", "Shipped", "Returned", "Cancelled"];
 
-const SALES_HEADERS: [&str; 9] = [
-    "Q", "Region", "Category", "Product", "Sales", "Cost", "Margin%", "Status", "Notes",
+const SALES_HEADERS: [&str; 10] = [
+    "Q", "Region", "Category", "Product", "Sales", "Cost", "Margin%", "Flag", "Status", "Notes",
 ];
-const SALES_COL_WIDTHS: [i32; 9] = [40, 80, 100, 120, 90, 90, 70, 80, 140];
+const SALES_COL_WIDTHS: [i32; 10] = [40, 80, 100, 120, 90, 90, 70, 56, 80, 140];
 const SALES_DATA_ROWS: i32 = 1000;
 
 /// Configure and populate a grid as the Sales Showcase demo.
@@ -413,6 +413,7 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
         sales: i32,
         cost: i32,
         margin_pct: f32,
+        flagged: bool,
         status: &'static str,
         note: String,
     }
@@ -435,6 +436,7 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
         let qi = rand_idx(r, 0xD4, SALES_QUARTERS.len());
         let si = rand_idx(r, 0xE5, SALES_STATUSES.len());
         let ni = rand_idx(r, 0xF6, note_tags.len());
+        let flagged = (splitmix64((r as u64) ^ 0x7788) % 4) == 0;
         let sales = 500 + (splitmix64((r as u64) ^ 0x51F0_0DAD) % 49_501) as i32;
         let cost_pct = 40 + (splitmix64((r as u64) ^ 0x22AA_BB) % 46) as i32;
         let cost = sales * cost_pct / 100;
@@ -452,6 +454,7 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
             sales,
             cost,
             margin_pct: margin,
+            flagged,
             status: SALES_STATUSES[si],
             note: format!("{} note {}", note_tags[ni], nc),
         });
@@ -462,7 +465,7 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
 
     // ── Configure grid ───────────────────────────────────────────────
     grid.set_rows(entries.len() as i32);
-    grid.set_cols(9);
+    grid.set_cols(10);
 
     for (c, &w) in SALES_COL_WIDTHS.iter().enumerate() {
         grid.set_col_width(c as i32, sp(grid, w));
@@ -475,9 +478,11 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
     grid.columns[4].alignment = pb::Align::RightCenter as i32;
     grid.columns[5].alignment = pb::Align::RightCenter as i32;
     grid.columns[6].alignment = pb::Align::CenterCenter as i32;
+    grid.columns[7].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+    grid.columns[7].alignment = pb::Align::CenterCenter as i32;
     grid.columns[4].format = "$#,##0".to_string();
     grid.columns[5].format = "$#,##0".to_string();
-    grid.columns[7].dropdown_items = "Active|Pending|Shipped|Returned|Cancelled".to_string();
+    grid.columns[8].dropdown_items = "Active|Pending|Shipped|Returned|Cancelled".to_string();
     grid.columns[6].progress_color = SALES_THEME.accent;
 
     grid.allow_user_resizing = 3;
@@ -517,8 +522,20 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
         grid.cells.set_text(r, 4, format!("{}", e.sales));
         grid.cells.set_text(r, 5, format!("{}", e.cost));
         grid.cells.set_text(r, 6, format!("{:.0}", e.margin_pct));
-        grid.cells.set_text(r, 7, e.status.to_string());
-        grid.cells.set_text(r, 8, e.note.clone());
+        grid.cells
+            .set_text(r, 7, if e.flagged { "Yes" } else { "No" }.to_string());
+        {
+            let cell = grid.cells.get_mut(r, 7);
+            let extra = cell.extra_mut();
+            extra.value = crate::cell::CellValueData::Bool(e.flagged);
+            extra.checked = if e.flagged {
+                pb::CheckedState::CheckedChecked as i32
+            } else {
+                pb::CheckedState::CheckedUnchecked as i32
+            };
+        }
+        grid.cells.set_text(r, 8, e.status.to_string());
+        grid.cells.set_text(r, 9, e.note.clone());
         if e.margin_pct < 0.0 {
             grid.cell_styles.insert(
                 (r, 6),
@@ -591,6 +608,12 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
         };
         if !props.is_subtotal {
             continue;
+        }
+        {
+            let cell = grid.cells.get_mut(row, 7);
+            let extra = cell.extra_mut();
+            extra.value = crate::cell::CellValueData::Bool(false);
+            extra.checked = pb::CheckedState::CheckedGrayed as i32;
         }
         let level = props.outline_level;
         let mut sales_sum = 0_i64;
@@ -961,6 +984,27 @@ const STRESS_LONG_TEXT: [&str; 8] = [
     "Completed",
 ];
 
+fn stress_bool_value(source_row: i32) -> bool {
+    let logical_row = source_row.max(0) + 1;
+    (splitmix64((logical_row as u64) ^ 0xDEF0) % 2) != 0
+}
+
+fn stress_checkbox_state(source_row: i32) -> i32 {
+    if stress_bool_value(source_row) {
+        pb::CheckedState::CheckedChecked as i32
+    } else {
+        pb::CheckedState::CheckedUnchecked as i32
+    }
+}
+
+fn stress_apply_bool_cell(grid: &mut VolvoxGrid, row: i32, source_row: i32) {
+    let bool_value = stress_bool_value(source_row);
+    let cell = grid.cells.get_mut(row, 5);
+    let extra = cell.extra_mut();
+    extra.value = crate::cell::CellValueData::Bool(bool_value);
+    extra.checked = stress_checkbox_state(source_row);
+}
+
 /// Configure a grid as the Stress Test demo (1M rows, 12 columns).
 ///
 /// Sets up column widths, headers, alignment, dropdown lists, formats,
@@ -1001,6 +1045,7 @@ pub fn setup_stress_demo(grid: &mut VolvoxGrid) {
         for (c, text) in texts.into_iter().enumerate() {
             grid.cells.set_text(r, c as i32, text);
         }
+        stress_apply_bool_cell(grid, r, r);
     }
 }
 
@@ -1078,6 +1123,7 @@ fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize
     grid.columns[1].alignment = pb::Align::RightCenter as i32;
     grid.columns[2].alignment = pb::Align::RightCenter as i32;
     grid.columns[3].alignment = pb::Align::CenterCenter as i32;
+    grid.columns[5].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
     grid.columns[5].alignment = pb::Align::CenterCenter as i32;
     grid.columns[9].alignment = pb::Align::CenterCenter as i32;
 
@@ -1183,6 +1229,7 @@ pub fn stress_materialize_row(grid: &mut VolvoxGrid, row: i32) {
         grid.cells
             .set_text(row, col, stress_cell_text(source_row, col));
     }
+    stress_apply_bool_cell(grid, row, source_row);
 }
 
 /// Ensure layout is up to date and materialize visible stress rows.
@@ -1266,6 +1313,18 @@ mod tests {
         assert_eq!(grid.fixed_cols, 0);
         assert_eq!(grid.columns[0].caption, "Q");
         assert_eq!(grid.columns[4].caption, "Sales");
+        assert_eq!(grid.columns[7].caption, "Flag");
+        assert_eq!(grid.columns[8].caption, "Status");
+        assert_eq!(
+            grid.columns[7].data_type,
+            pb::ColumnDataType::ColumnDataBoolean as i32
+        );
+        assert!(matches!(
+            grid.cells.get(0, 7).map(|cell| cell.checked()),
+            Some(v)
+                if v == pb::CheckedState::CheckedChecked as i32
+                    || v == pb::CheckedState::CheckedUnchecked as i32
+        ));
         assert!(grid.indicator_bands.col_top.visible);
         assert!(grid.indicator_bands.row_start.visible);
         assert_eq!(grid.indicator_bands.col_top.row_count(), 1);
@@ -1291,6 +1350,11 @@ mod tests {
             if !props.is_subtotal {
                 continue;
             }
+
+            assert_eq!(
+                grid.cells.get(row, 7).map(|cell| cell.checked()),
+                Some(pb::CheckedState::CheckedGrayed as i32)
+            );
 
             if props.outline_level <= 0 {
                 merged_subtotal_rows += 1;
@@ -1336,14 +1400,26 @@ mod tests {
         assert_eq!(grid.fixed_cols, 0);
         assert_eq!(grid.columns[0].caption, "Text");
         assert_eq!(grid.columns[10].caption, "Code");
+        assert_eq!(
+            grid.columns[5].data_type,
+            pb::ColumnDataType::ColumnDataBoolean as i32
+        );
         assert!(grid.indicator_bands.col_top.visible);
         assert!(grid.indicator_bands.row_start.visible);
         assert_eq!(grid.cells.get_text(0, 0), stress_cell_text(0, 0));
         assert_eq!(grid.cells.get_text(2, 0), stress_cell_text(2, 0));
+        assert_eq!(
+            grid.cells.get(2, 5).map(|cell| cell.checked()),
+            Some(stress_checkbox_state(2))
+        );
         assert_eq!(grid.cells.get_text(3, 0), "");
 
         stress_materialize_row(&mut grid, 3);
         assert_eq!(grid.cells.get_text(3, 0), stress_cell_text(3, 0));
+        assert_eq!(
+            grid.cells.get(3, 5).map(|cell| cell.checked()),
+            Some(stress_checkbox_state(3))
+        );
     }
 
     #[test]

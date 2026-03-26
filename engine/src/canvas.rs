@@ -5935,7 +5935,12 @@ fn render_frozen_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Ren
 // Layer 11 -- Active in-place editor
 // ===========================================================================
 
-pub(crate) fn compose_preedit_display_text(text: &str, sel_start: i32, sel_end: i32, preedit: &str) -> String {
+pub(crate) fn compose_preedit_display_text(
+    text: &str,
+    sel_start: i32,
+    sel_end: i32,
+    preedit: &str,
+) -> String {
     let text_char_count = text.chars().count() as i32;
     let sel_start = sel_start.clamp(0, text_char_count);
     let sel_end = sel_end.clamp(sel_start, text_char_count);
@@ -6114,10 +6119,20 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
         let text_y = cy + top_padding + ((inner_h - th.ceil() as i32) / 2).max(0);
 
         // Compute scroll offset to keep the caret (or selection end) visible.
-        let caret_char = if sel_end > sel_start { sel_end } else { sel_start };
+        let caret_char = if sel_end > sel_start {
+            sel_end
+        } else {
+            sel_start
+        };
         let caret_prefix = &text[..byte_index_at_char(text, caret_char)];
-        let (caret_prefix_w, _) =
-            canvas.measure_text(caret_prefix, font_name, font_size, font_bold, font_italic, None);
+        let (caret_prefix_w, _) = canvas.measure_text(
+            caret_prefix,
+            font_name,
+            font_size,
+            font_bold,
+            font_italic,
+            None,
+        );
         let caret_px = caret_prefix_w.ceil() as i32;
         let scroll_offset = if caret_px + scroll_margin > clip_w {
             caret_px + scroll_margin - clip_w
