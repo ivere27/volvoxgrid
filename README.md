@@ -299,6 +299,15 @@ make activex
 
 # Build ActiveX OCX (release)
 make activex-release
+
+# Build and launch the classic Win32 demo shell under Wine
+make activex-run-release
+```
+
+`make activex-run-release` defaults to `ACTIVEX_ARCH=x86_64`. Override it only when you specifically want the 32-bit host:
+
+```bash
+make activex-run-release ACTIVEX_ARCH=i686
 ```
 
 ### Comparison Testing

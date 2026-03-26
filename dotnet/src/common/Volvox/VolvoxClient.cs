@@ -238,6 +238,16 @@ namespace VolvoxGrid.DotNet.Internal
             InvokeUnary(EditMethod, _codec.EncodeEditCommandCancel(gridId));
         }
 
+        public void EditSetPreedit(long gridId, string text, int cursor, bool commit)
+        {
+            InvokeUnary(EditMethod, _codec.EncodeEditCommandSetPreedit(gridId, text, cursor, commit));
+        }
+
+        public void EditSetText(long gridId, string text)
+        {
+            InvokeUnary(EditMethod, _codec.EncodeEditCommandSetText(gridId, text));
+        }
+
         public VolvoxClipboardResponseData Clipboard(long gridId, string action, string pasteText)
         {
             byte[] response = InvokeUnary(ClipboardMethod, _codec.EncodeClipboardRequest(gridId, action, pasteText));

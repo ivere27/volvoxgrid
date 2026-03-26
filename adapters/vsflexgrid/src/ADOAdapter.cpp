@@ -1,20 +1,12 @@
 // ADOAdapter.cpp -- ADO/DAO Recordset adapter for VolvoxGrid ActiveX
 //
-// Provides data binding support: when a VBA/VB6 user sets
-//     VolvoxGrid1.DataSource = rs   ' ADO Recordset
-// this adapter iterates the recordset and populates the grid.
-//
-// We use late-bound IDispatch calls so there is no compile-time
-// dependency on the ADO type library. This keeps the build simple
-// and works with any ADO version.
+// Provides data binding support for the ADO-facing ActiveX surface. The
+// adapter remains late-bound so the control does not require a compile-time
+// dependency on specific ADO type libraries.
 
 #include "VolvoxGridCtrl.h"
 #include <comutil.h>
 #include <oleauto.h>
-
-// ═══════════════════════════════════════════════════════════════════
-// IDispatch helper -- invoke a method/property by name
-// ═══════════════════════════════════════════════════════════════════
 
 static HRESULT DispatchGet(IDispatch* pDisp, LPCOLESTR name, VARIANT* pResult)
 {
@@ -23,39 +15,48 @@ static HRESULT DispatchGet(IDispatch* pDisp, LPCOLESTR name, VARIANT* pResult)
     DISPID dispid = 0;
     LPOLESTR nameArr[] = { const_cast<LPOLESTR>(name) };
     HRESULT hr = pDisp->GetIDsOfNames(IID_NULL, nameArr, 1,
-                                       LOCALE_USER_DEFAULT, &dispid);
+                                      LOCALE_USER_DEFAULT, &dispid);
     if (FAILED(hr)) return hr;
 
     DISPPARAMS dp = { nullptr, nullptr, 0, 0 };
+    VariantInit(pResult);
     return pDisp->Invoke(dispid, IID_NULL, LOCALE_USER_DEFAULT,
                          DISPATCH_PROPERTYGET, &dp, pResult, nullptr, nullptr);
 }
 
-static HRESULT DispatchCall(IDispatch* pDisp, LPCOLESTR name,
-                            VARIANT* args = nullptr, int nArgs = 0)
+static HRESULT DispatchGetByDispid(IDispatch* pDisp, DISPID dispid, VARIANT* pResult)
+{
+    if (!pDisp || !pResult) return E_POINTER;
+    DISPPARAMS dp = { nullptr, nullptr, 0, 0 };
+    VariantInit(pResult);
+    return pDisp->Invoke(dispid, IID_NULL, LOCALE_USER_DEFAULT,
+                         DISPATCH_PROPERTYGET, &dp, pResult, nullptr, nullptr);
+}
+
+static HRESULT DispatchCall(IDispatch* pDisp, LPCOLESTR name)
 {
     if (!pDisp) return E_POINTER;
 
     DISPID dispid = 0;
     LPOLESTR nameArr[] = { const_cast<LPOLESTR>(name) };
     HRESULT hr = pDisp->GetIDsOfNames(IID_NULL, nameArr, 1,
-                                       LOCALE_USER_DEFAULT, &dispid);
+                                      LOCALE_USER_DEFAULT, &dispid);
     if (FAILED(hr)) return hr;
 
-    DISPPARAMS dp = { args, nullptr, (UINT)nArgs, 0 };
+    DISPPARAMS dp = { nullptr, nullptr, 0, 0 };
     return pDisp->Invoke(dispid, IID_NULL, LOCALE_USER_DEFAULT,
                          DISPATCH_METHOD, &dp, nullptr, nullptr, nullptr);
 }
 
 static HRESULT DispatchGetIndexed(IDispatch* pDisp, LPCOLESTR name,
-                                   long index, VARIANT* pResult)
+                                  long index, VARIANT* pResult)
 {
     if (!pDisp || !pResult) return E_POINTER;
 
     DISPID dispid = 0;
     LPOLESTR nameArr[] = { const_cast<LPOLESTR>(name) };
     HRESULT hr = pDisp->GetIDsOfNames(IID_NULL, nameArr, 1,
-                                       LOCALE_USER_DEFAULT, &dispid);
+                                      LOCALE_USER_DEFAULT, &dispid);
     if (FAILED(hr)) return hr;
 
     VARIANT arg;
@@ -64,165 +65,186 @@ static HRESULT DispatchGetIndexed(IDispatch* pDisp, LPCOLESTR name,
     arg.lVal = index;
 
     DISPPARAMS dp = { &arg, nullptr, 1, 0 };
+    VariantInit(pResult);
     return pDisp->Invoke(dispid, IID_NULL, LOCALE_USER_DEFAULT,
                          DISPATCH_PROPERTYGET, &dp, pResult, nullptr, nullptr);
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// ADOAdapter_BindRecordset
-//
-// Called from CVolvoxGridCtrl::putref_DataSource when the user
-// assigns an ADO Recordset to the control.
-// ═══════════════════════════════════════════════════════════════════
+static bool VariantIsTrue(const VARIANT& value)
+{
+    return value.vt == VT_BOOL && value.boolVal != VARIANT_FALSE;
+}
+
+static CComBSTR VariantToDisplayBstr(const VARIANT& value)
+{
+    if (value.vt == VT_EMPTY || value.vt == VT_NULL) {
+        return CComBSTR(L"");
+    }
+
+    CComVariant converted;
+    if (SUCCEEDED(VariantChangeType(&converted, const_cast<VARIANT*>(&value), 0, VT_BSTR))) {
+        return CComBSTR(converted.bstrVal ? converted.bstrVal : L"");
+    }
+    return CComBSTR(L"");
+}
+
+static HRESULT ResolveRecordset(IDispatch* pDataSource, BSTR dataMember, IDispatch** ppRecordset)
+{
+    if (!ppRecordset) return E_POINTER;
+    *ppRecordset = nullptr;
+    if (!pDataSource) return S_OK;
+
+    if (dataMember && SysStringLen(dataMember) > 0) {
+        DISPID dispid = 0;
+        LPOLESTR nameArr[] = { dataMember };
+        HRESULT hr = pDataSource->GetIDsOfNames(IID_NULL, nameArr, 1,
+                                                LOCALE_USER_DEFAULT, &dispid);
+        if (SUCCEEDED(hr)) {
+            CComVariant v;
+            hr = DispatchGetByDispid(pDataSource, dispid, &v);
+            if (SUCCEEDED(hr) && v.vt == VT_DISPATCH && v.pdispVal) {
+                *ppRecordset = v.pdispVal;
+                (*ppRecordset)->AddRef();
+                return S_OK;
+            }
+        }
+    }
+
+    {
+        CComVariant v;
+        HRESULT hr = DispatchGet(pDataSource, L"Recordset", &v);
+        if (SUCCEEDED(hr) && v.vt == VT_DISPATCH && v.pdispVal) {
+            *ppRecordset = v.pdispVal;
+            (*ppRecordset)->AddRef();
+            return S_OK;
+        }
+    }
+
+    {
+        CComVariant v;
+        HRESULT hr = DispatchGet(pDataSource, L"Fields", &v);
+        if (SUCCEEDED(hr) && v.vt == VT_DISPATCH && v.pdispVal) {
+            *ppRecordset = pDataSource;
+            (*ppRecordset)->AddRef();
+            return S_OK;
+        }
+    }
+
+    return DISP_E_TYPEMISMATCH;
+}
 
 HRESULT ADOAdapter_BindRecordset(CVolvoxGridCtrl* ctrl, IDispatch* pRS)
 {
     if (!ctrl) return E_POINTER;
     if (!pRS) {
-        // Unbind -- clear the grid
         ctrl->Clear(flexClearEverything);
+        ctrl->put_Rows(1);
+        ctrl->put_Cols(0);
         return S_OK;
     }
 
-    HRESULT hr;
-    VARIANT v;
-    VariantInit(&v);
+    VARIANT_BOOL virtualData = VARIANT_FALSE;
+    if (SUCCEEDED(ctrl->get_VirtualData(&virtualData)) && virtualData != VARIANT_FALSE) {
+        long rows = 0;
+        long cols = 0;
+        if (SUCCEEDED(ctrl->get_Rows(&rows)) && rows < 50) {
+            ctrl->put_Rows(50);
+        }
+        if (SUCCEEDED(ctrl->get_Cols(&cols)) && cols < 5) {
+            ctrl->put_Cols(5);
+        }
+        return S_OK;
+    }
 
-    // ---------------------------------------------------------------
-    // 1. Get the Fields collection and field count
-    // ---------------------------------------------------------------
-    VARIANT vFields;
-    VariantInit(&vFields);
-    hr = DispatchGet(pRS, L"Fields", &vFields);
+    CComVariant vFields;
+    HRESULT hr = DispatchGet(pRS, L"Fields", &vFields);
     if (FAILED(hr) || vFields.vt != VT_DISPATCH || !vFields.pdispVal) {
-        VariantClear(&vFields);
         return E_FAIL;
     }
 
-    IDispatch* pFields = vFields.pdispVal;
-
-    VARIANT vCount;
-    VariantInit(&vCount);
-    hr = DispatchGet(pFields, L"Count", &vCount);
-    if (FAILED(hr)) {
-        VariantClear(&vFields);
-        return E_FAIL;
-    }
+    CComVariant vCount;
+    hr = DispatchGet(vFields.pdispVal, L"Count", &vCount);
+    if (FAILED(hr)) return E_FAIL;
 
     long fieldCount = 0;
     if (vCount.vt == VT_I4) fieldCount = vCount.lVal;
     else if (vCount.vt == VT_I2) fieldCount = vCount.iVal;
-    VariantClear(&vCount);
+    else fieldCount = vCount.intVal;
 
-    if (fieldCount <= 0) {
-        VariantClear(&vFields);
-        return S_OK;
-    }
-
-    // ---------------------------------------------------------------
-    // 2. Move to first record and count rows
-    // ---------------------------------------------------------------
-    DispatchCall(pRS, L"MoveFirst");
-
-    // Count records: try RecordCount property first
-    long recordCount = 0;
-    VARIANT vRecCount;
-    VariantInit(&vRecCount);
-    hr = DispatchGet(pRS, L"RecordCount", &vRecCount);
-    if (SUCCEEDED(hr) && (vRecCount.vt == VT_I4 || vRecCount.vt == VT_I2)) {
-        recordCount = (vRecCount.vt == VT_I4) ? vRecCount.lVal : vRecCount.iVal;
-    }
-    VariantClear(&vRecCount);
-
-    // If RecordCount is -1 (forward-only), scan the recordset
-    if (recordCount <= 0) {
-        recordCount = 0;
-        while (true) {
-            VARIANT vEOF;
-            VariantInit(&vEOF);
-            DispatchGet(pRS, L"EOF", &vEOF);
-            bool isEOF = (vEOF.vt == VT_BOOL && vEOF.boolVal != VARIANT_FALSE);
-            VariantClear(&vEOF);
-            if (isEOF) break;
-            recordCount++;
-            DispatchCall(pRS, L"MoveNext");
-        }
-        DispatchCall(pRS, L"MoveFirst");
-    }
-
-    // ---------------------------------------------------------------
-    // 3. Configure the grid dimensions
-    // ---------------------------------------------------------------
-    // Suppress redraw while populating
     ctrl->put_Redraw(VARIANT_FALSE);
-
-    ctrl->put_Rows(recordCount + 1);  // +1 for header row
-    ctrl->put_Cols(fieldCount);
+    ctrl->put_Cols(fieldCount > 0 ? fieldCount : 0);
+    ctrl->put_Rows(1);
     ctrl->put_FixedRows(1);
     ctrl->put_FixedCols(0);
 
-    // ---------------------------------------------------------------
-    // 4. Set column headers from field names
-    // ---------------------------------------------------------------
-    for (long col = 0; col < fieldCount; col++) {
-        VARIANT vField;
-        VariantInit(&vField);
-        hr = DispatchGetIndexed(pFields, L"Item", col, &vField);
+    for (long col = 0; col < fieldCount; ++col) {
+        CComVariant vField;
+        hr = DispatchGetIndexed(vFields.pdispVal, L"Item", col, &vField);
         if (SUCCEEDED(hr) && vField.vt == VT_DISPATCH && vField.pdispVal) {
-            VARIANT vName;
-            VariantInit(&vName);
-            DispatchGet(vField.pdispVal, L"Name", &vName);
-            if (vName.vt == VT_BSTR && vName.bstrVal) {
+            CComVariant vName;
+            if (SUCCEEDED(DispatchGet(vField.pdispVal, L"Name", &vName)) &&
+                vName.vt == VT_BSTR && vName.bstrVal) {
                 ctrl->SetTextMatrix(0, col, vName.bstrVal);
             }
-            VariantClear(&vName);
         }
-        VariantClear(&vField);
     }
 
-    // ---------------------------------------------------------------
-    // 5. Iterate rows and populate cell data
-    // ---------------------------------------------------------------
+    DispatchCall(pRS, L"MoveFirst");
+
+    long recordCount = -1;
+    CComVariant vRecordCount;
+    hr = DispatchGet(pRS, L"RecordCount", &vRecordCount);
+    if (SUCCEEDED(hr)) {
+        if (vRecordCount.vt == VT_I4) recordCount = vRecordCount.lVal;
+        else if (vRecordCount.vt == VT_I2) recordCount = vRecordCount.iVal;
+    }
+    if (recordCount > 0) {
+        ctrl->put_Rows(recordCount + 1);
+    }
+
     long row = 1;
     while (true) {
-        VARIANT vEOF;
-        VariantInit(&vEOF);
-        DispatchGet(pRS, L"EOF", &vEOF);
-        bool isEOF = (vEOF.vt == VT_BOOL && vEOF.boolVal != VARIANT_FALSE);
-        VariantClear(&vEOF);
-        if (isEOF) break;
+        CComVariant vEOF;
+        hr = DispatchGet(pRS, L"EOF", &vEOF);
+        if (FAILED(hr) || VariantIsTrue(vEOF)) break;
 
-        for (long col = 0; col < fieldCount; col++) {
-            VARIANT vField;
-            VariantInit(&vField);
-            hr = DispatchGetIndexed(pFields, L"Item", col, &vField);
-            if (SUCCEEDED(hr) && vField.vt == VT_DISPATCH && vField.pdispVal) {
-                VARIANT vValue;
-                VariantInit(&vValue);
-                DispatchGet(vField.pdispVal, L"Value", &vValue);
-
-                // Convert to BSTR for SetTextMatrix
-                VARIANT vStr;
-                VariantInit(&vStr);
-                if (SUCCEEDED(VariantChangeType(&vStr, &vValue, 0, VT_BSTR))) {
-                    ctrl->SetTextMatrix(row, col, vStr.bstrVal);
-                }
-                VariantClear(&vStr);
-                VariantClear(&vValue);
-            }
-            VariantClear(&vField);
+        if (recordCount <= 0) {
+            ctrl->put_Rows(row + 1);
         }
 
-        DispatchCall(pRS, L"MoveNext");
-        row++;
+        for (long col = 0; col < fieldCount; ++col) {
+            CComVariant vField;
+            hr = DispatchGetIndexed(vFields.pdispVal, L"Item", col, &vField);
+            if (SUCCEEDED(hr) && vField.vt == VT_DISPATCH && vField.pdispVal) {
+                CComVariant vValue;
+                if (SUCCEEDED(DispatchGet(vField.pdispVal, L"Value", &vValue))) {
+                    CComBSTR text = VariantToDisplayBstr(vValue);
+                    ctrl->SetTextMatrix(row, col, text);
+                }
+            }
+        }
+
+        ++row;
+        if (FAILED(DispatchCall(pRS, L"MoveNext"))) break;
     }
 
-    // ---------------------------------------------------------------
-    // 6. Re-enable redraw and refresh
-    // ---------------------------------------------------------------
-    ctrl->put_Redraw(VARIANT_TRUE);
-    ctrl->Refresh();
+    if (recordCount > 0 && row != recordCount + 1) {
+        ctrl->put_Rows(row);
+    }
 
-    VariantClear(&vFields);
+    ctrl->put_Redraw(VARIANT_TRUE);
     return S_OK;
+}
+
+HRESULT ADOAdapter_BindDataSource(CVolvoxGridCtrl* ctrl, IDispatch* pDataSource, BSTR dataMember)
+{
+    if (!ctrl) return E_POINTER;
+    if (!pDataSource) {
+        return ADOAdapter_BindRecordset(ctrl, nullptr);
+    }
+
+    CComPtr<IDispatch> recordset;
+    HRESULT hr = ResolveRecordset(pDataSource, dataMember, &recordset);
+    if (FAILED(hr)) return hr;
+    return ADOAdapter_BindRecordset(ctrl, recordset);
 }

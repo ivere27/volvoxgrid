@@ -8214,6 +8214,7 @@ enum EditCommand_Command {
   setSelection,
   finish,
   setHighlights,
+  setPreedit,
   notSet
 }
 
@@ -8227,6 +8228,7 @@ class EditCommand extends $pb.GeneratedMessage {
     EditSetSelection? setSelection,
     EditFinish? finish,
     EditSetHighlights? setHighlights,
+    EditSetPreedit? setPreedit,
   }) {
     final result = create();
     if (gridId != null) result.gridId = gridId;
@@ -8237,6 +8239,7 @@ class EditCommand extends $pb.GeneratedMessage {
     if (setSelection != null) result.setSelection = setSelection;
     if (finish != null) result.finish = finish;
     if (setHighlights != null) result.setHighlights = setHighlights;
+    if (setPreedit != null) result.setPreedit = setPreedit;
     return result;
   }
 
@@ -8258,13 +8261,14 @@ class EditCommand extends $pb.GeneratedMessage {
     6: EditCommand_Command.setSelection,
     7: EditCommand_Command.finish,
     8: EditCommand_Command.setHighlights,
+    9: EditCommand_Command.setPreedit,
     0: EditCommand_Command.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'EditCommand',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..oo(0, [2, 3, 4, 5, 6, 7, 8])
+    ..oo(0, [2, 3, 4, 5, 6, 7, 8, 9])
     ..aInt64(1, _omitFieldNames ? '' : 'gridId')
     ..aOM<EditStart>(2, _omitFieldNames ? '' : 'start',
         subBuilder: EditStart.create)
@@ -8280,6 +8284,8 @@ class EditCommand extends $pb.GeneratedMessage {
         subBuilder: EditFinish.create)
     ..aOM<EditSetHighlights>(8, _omitFieldNames ? '' : 'setHighlights',
         subBuilder: EditSetHighlights.create)
+    ..aOM<EditSetPreedit>(9, _omitFieldNames ? '' : 'setPreedit',
+        subBuilder: EditSetPreedit.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8308,6 +8314,7 @@ class EditCommand extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   @$pb.TagNumber(7)
   @$pb.TagNumber(8)
+  @$pb.TagNumber(9)
   EditCommand_Command whichCommand() =>
       _EditCommand_CommandByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(2)
@@ -8317,6 +8324,7 @@ class EditCommand extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   @$pb.TagNumber(7)
   @$pb.TagNumber(8)
+  @$pb.TagNumber(9)
   void clearCommand() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -8404,6 +8412,17 @@ class EditCommand extends $pb.GeneratedMessage {
   void clearSetHighlights() => $_clearField(8);
   @$pb.TagNumber(8)
   EditSetHighlights ensureSetHighlights() => $_ensure(7);
+
+  @$pb.TagNumber(9)
+  EditSetPreedit get setPreedit => $_getN(8);
+  @$pb.TagNumber(9)
+  set setPreedit(EditSetPreedit value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasSetPreedit() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearSetPreedit() => $_clearField(9);
+  @$pb.TagNumber(9)
+  EditSetPreedit ensureSetPreedit() => $_ensure(8);
 }
 
 class EditStart extends $pb.GeneratedMessage {
@@ -8729,6 +8748,84 @@ class EditSetSelection extends $pb.GeneratedMessage {
   void clearLength() => $_clearField(2);
 }
 
+class EditSetPreedit extends $pb.GeneratedMessage {
+  factory EditSetPreedit({
+    $core.String? text,
+    $core.int? cursor,
+    $core.bool? commit,
+  }) {
+    final result = create();
+    if (text != null) result.text = text;
+    if (cursor != null) result.cursor = cursor;
+    if (commit != null) result.commit = commit;
+    return result;
+  }
+
+  EditSetPreedit._();
+
+  factory EditSetPreedit.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EditSetPreedit.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EditSetPreedit',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'text')
+    ..aI(2, _omitFieldNames ? '' : 'cursor')
+    ..aOB(3, _omitFieldNames ? '' : 'commit')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditSetPreedit clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EditSetPreedit copyWith(void Function(EditSetPreedit) updates) =>
+      super.copyWith((message) => updates(message as EditSetPreedit))
+          as EditSetPreedit;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EditSetPreedit create() => EditSetPreedit._();
+  @$core.override
+  EditSetPreedit createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EditSetPreedit getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EditSetPreedit>(create);
+  static EditSetPreedit? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get text => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set text($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasText() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearText() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get cursor => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set cursor($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCursor() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCursor() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get commit => $_getBF(2);
+  @$pb.TagNumber(3)
+  set commit($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCommit() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCommit() => $_clearField(3);
+}
+
 class EditFinish extends $pb.GeneratedMessage {
   factory EditFinish() => create();
 
@@ -8774,6 +8871,9 @@ class EditState extends $pb.GeneratedMessage {
     $core.String? text,
     $core.int? selStart,
     $core.int? selLength,
+    $core.bool? composing,
+    $core.String? preeditText,
+    EditUiMode? uiMode,
   }) {
     final result = create();
     if (active != null) result.active = active;
@@ -8782,6 +8882,9 @@ class EditState extends $pb.GeneratedMessage {
     if (text != null) result.text = text;
     if (selStart != null) result.selStart = selStart;
     if (selLength != null) result.selLength = selLength;
+    if (composing != null) result.composing = composing;
+    if (preeditText != null) result.preeditText = preeditText;
+    if (uiMode != null) result.uiMode = uiMode;
     return result;
   }
 
@@ -8804,6 +8907,10 @@ class EditState extends $pb.GeneratedMessage {
     ..aOS(4, _omitFieldNames ? '' : 'text')
     ..aI(5, _omitFieldNames ? '' : 'selStart')
     ..aI(6, _omitFieldNames ? '' : 'selLength')
+    ..aOB(7, _omitFieldNames ? '' : 'composing')
+    ..aOS(8, _omitFieldNames ? '' : 'preeditText')
+    ..aE<EditUiMode>(9, _omitFieldNames ? '' : 'uiMode',
+        enumValues: EditUiMode.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8877,6 +8984,33 @@ class EditState extends $pb.GeneratedMessage {
   $core.bool hasSelLength() => $_has(5);
   @$pb.TagNumber(6)
   void clearSelLength() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get composing => $_getBF(6);
+  @$pb.TagNumber(7)
+  set composing($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasComposing() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearComposing() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get preeditText => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set preeditText($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasPreeditText() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearPreeditText() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  EditUiMode get uiMode => $_getN(8);
+  @$pb.TagNumber(9)
+  set uiMode(EditUiMode value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasUiMode() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearUiMode() => $_clearField(9);
 }
 
 class SortColumn extends $pb.GeneratedMessage {
@@ -13940,6 +14074,9 @@ class EditRequest extends $pb.GeneratedMessage {
     $core.String? currentValue,
     $core.String? editMask,
     $core.int? maxLength,
+    $core.int? selStart,
+    $core.int? selLength,
+    EditUiMode? uiMode,
   }) {
     final result = create();
     if (row != null) result.row = row;
@@ -13951,6 +14088,9 @@ class EditRequest extends $pb.GeneratedMessage {
     if (currentValue != null) result.currentValue = currentValue;
     if (editMask != null) result.editMask = editMask;
     if (maxLength != null) result.maxLength = maxLength;
+    if (selStart != null) result.selStart = selStart;
+    if (selLength != null) result.selLength = selLength;
+    if (uiMode != null) result.uiMode = uiMode;
     return result;
   }
 
@@ -13976,6 +14116,10 @@ class EditRequest extends $pb.GeneratedMessage {
     ..aOS(7, _omitFieldNames ? '' : 'currentValue')
     ..aOS(8, _omitFieldNames ? '' : 'editMask')
     ..aI(9, _omitFieldNames ? '' : 'maxLength')
+    ..aI(10, _omitFieldNames ? '' : 'selStart')
+    ..aI(11, _omitFieldNames ? '' : 'selLength')
+    ..aE<EditUiMode>(12, _omitFieldNames ? '' : 'uiMode',
+        enumValues: EditUiMode.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -14077,6 +14221,33 @@ class EditRequest extends $pb.GeneratedMessage {
   $core.bool hasMaxLength() => $_has(8);
   @$pb.TagNumber(9)
   void clearMaxLength() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get selStart => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set selStart($core.int value) => $_setSignedInt32(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasSelStart() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearSelStart() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.int get selLength => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set selLength($core.int value) => $_setSignedInt32(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasSelLength() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearSelLength() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  EditUiMode get uiMode => $_getN(11);
+  @$pb.TagNumber(12)
+  set uiMode(EditUiMode value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasUiMode() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearUiMode() => $_clearField(12);
 }
 
 class DropdownRequest extends $pb.GeneratedMessage {

@@ -141,6 +141,8 @@ enum PendingAction {
         force: bool,
         prefer_combo: bool,
         seed_text: Option<String>,
+        click_caret: Option<i32>,
+        caret_end: Option<bool>,
     },
     ValidateEdit {
         row: i32,
@@ -993,11 +995,21 @@ fn build_edit_request(
     col: i32,
 ) -> Option<EditRequest> {
     let (x, y, w, h) = grid.edit_cell_rect(row, col)?;
-    let current_value =
+    let (current_value, sel_start, sel_length, ui_mode) =
         if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
-            grid.edit.edit_text.clone()
+            (
+                grid.edit.edit_text.clone(),
+                grid.edit.sel_start,
+                grid.edit.sel_length,
+                match grid.edit.ui_mode {
+                    volvoxgrid_engine::edit::EditUiMode::EnterMode => EditUiMode::Enter as i32,
+                    volvoxgrid_engine::edit::EditUiMode::EditMode => EditUiMode::Edit as i32,
+                },
+            )
         } else {
-            grid.get_display_text(row, col)
+            let current_value = grid.get_display_text(row, col);
+            let current_len = current_value.chars().count() as i32;
+            (current_value, 0, current_len, EditUiMode::Enter as i32)
         };
     Some(EditRequest {
         row,
@@ -1009,6 +1021,9 @@ fn build_edit_request(
         current_value,
         edit_mask: effective_edit_mask(grid, col),
         max_length: grid.edit_max_length,
+        sel_start,
+        sel_length,
+        ui_mode,
     })
 }
 
@@ -1060,6 +1075,69 @@ fn maybe_render_editor_output(
         rendered: false,
         event: Some(render_output::Event::EditRequest(req)),
     })
+}
+
+fn same_edit_request_geometry(lhs: &EditRequest, rhs: &EditRequest) -> bool {
+    lhs.row == rhs.row
+        && lhs.col == rhs.col
+        && lhs.ui_mode == rhs.ui_mode
+        && lhs.x.to_bits() == rhs.x.to_bits()
+        && lhs.y.to_bits() == rhs.y.to_bits()
+        && lhs.width.to_bits() == rhs.width.to_bits()
+        && lhs.height.to_bits() == rhs.height.to_bits()
+}
+
+fn track_sent_edit_request(
+    sent_edit_requests: &mut HashMap<i64, EditRequest>,
+    grid_id: i64,
+    output: &RenderOutput,
+) {
+    if let Some(render_output::Event::EditRequest(req)) = output.event.as_ref() {
+        sent_edit_requests.insert(grid_id, req.clone());
+    }
+}
+
+fn send_render_output_tracked(
+    stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
+    sent_edit_requests: &mut HashMap<i64, EditRequest>,
+    grid_id: i64,
+    output: RenderOutput,
+) {
+    track_sent_edit_request(sent_edit_requests, grid_id, &output);
+    stream.send(output);
+}
+
+fn maybe_send_refreshed_edit_request(
+    plugin: &VolvoxGridPlugin,
+    stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
+    sent_edit_requests: &mut HashMap<i64, EditRequest>,
+    grid_id: i64,
+) {
+    let output = plugin
+        .with_grid(grid_id, |grid| {
+            if !grid.layout.valid {
+                ensure_layout(grid);
+            }
+            maybe_render_editor_output(grid, false)
+        })
+        .ok()
+        .flatten();
+
+    let Some(output) = output else {
+        sent_edit_requests.remove(&grid_id);
+        return;
+    };
+    let Some(render_output::Event::EditRequest(req)) = output.event.as_ref() else {
+        return;
+    };
+
+    let should_send = sent_edit_requests
+        .get(&grid_id)
+        .map_or(true, |prev| !same_edit_request_geometry(prev, req));
+    if should_send {
+        sent_edit_requests.insert(grid_id, req.clone());
+        stream.send(output);
+    }
 }
 
 fn begin_edit_session_core(
@@ -1324,22 +1402,37 @@ impl VolvoxGridPlugin {
         force: bool,
         prefer_combo: bool,
         seed_text: Option<String>,
+        click_caret: Option<i32>,
+        caret_end: Option<bool>,
     ) -> Option<RenderOutput> {
         if !grid.can_begin_edit(row, col, force) {
             return None;
         }
 
         if !self.decision_channel_enabled(grid_id) {
-            begin_edit_session(grid, row, col, force);
+            begin_edit_session_core_opts(
+                grid,
+                row,
+                col,
+                force,
+                true,
+                None,
+                caret_end,
+                seed_text.clone(),
+                None,
+            );
             if let Some(seed) = seed_text {
                 if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
-                    grid.edit.edit_text = seed.clone();
-                    grid.edit.sel_start = seed.chars().count() as i32;
-                    grid.edit.sel_length = 0;
                     grid.events
                         .push(volvoxgrid_engine::event::GridEventData::CellEditChange {
                             text: seed,
                         });
+                }
+            }
+            if let Some(caret) = click_caret {
+                if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
+                    grid.edit.sel_start = caret;
+                    grid.edit.sel_length = 0;
                 }
             }
             return maybe_render_editor_output(grid, prefer_combo);
@@ -1359,6 +1452,8 @@ impl VolvoxGridPlugin {
                         force,
                         prefer_combo,
                         seed_text,
+                        click_caret,
+                        caret_end,
                     },
                 },
             );
@@ -1460,26 +1555,44 @@ impl VolvoxGridPlugin {
                 force,
                 prefer_combo,
                 seed_text,
+                click_caret,
+                caret_end,
             } => {
                 if cancel {
                     return None;
                 }
                 self.manager()
                     .with_grid(grid_id, |grid| {
-                        begin_edit_session_after_before(grid, row, col, force);
+                        begin_edit_session_core_opts(
+                            grid,
+                            row,
+                            col,
+                            force,
+                            false,
+                            None,
+                            caret_end,
+                            seed_text.clone(),
+                            None,
+                        );
                         if let Some(seed) = seed_text {
                             if grid.edit.is_active()
                                 && grid.edit.edit_row == row
                                 && grid.edit.edit_col == col
                             {
-                                grid.edit.edit_text = seed.clone();
-                                grid.edit.sel_start = seed.chars().count() as i32;
-                                grid.edit.sel_length = 0;
                                 grid.events.push(
                                     volvoxgrid_engine::event::GridEventData::CellEditChange {
                                         text: seed,
                                     },
                                 );
+                            }
+                        }
+                        if let Some(caret) = click_caret {
+                            if grid.edit.is_active()
+                                && grid.edit.edit_row == row
+                                && grid.edit.edit_col == col
+                            {
+                                grid.edit.sel_start = caret;
+                                grid.edit.sel_length = 0;
                             }
                         }
                         maybe_render_editor_output(grid, prefer_combo)
@@ -1970,6 +2083,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 }
                 Some(edit_command::Command::Commit(commit)) => {
                     if grid.edit.is_active() {
+                        grid.edit.flush_preedit();
                         let row = grid.edit.edit_row;
                         let col = grid.edit.edit_col;
                         let old_text = grid.cells.get_text(row, col).to_string();
@@ -2058,8 +2172,22 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                     grid.edit.set_highlights(highlights);
                     grid.mark_dirty();
                 }
+                Some(edit_command::Command::SetPreedit(preedit)) => {
+                    if grid.edit.is_active() {
+                        if preedit.commit {
+                            // IME committed text: insert into edit_text at cursor.
+                            grid.edit.commit_preedit(&preedit.text);
+                        } else if preedit.text.is_empty() {
+                            grid.edit.cancel_preedit();
+                        } else {
+                            grid.edit.set_preedit(&preedit.text, preedit.cursor);
+                        }
+                        grid.mark_dirty();
+                    }
+                }
                 Some(edit_command::Command::Finish(_)) => {
                     if grid.edit.is_active() {
+                        grid.edit.flush_preedit();
                         let row = grid.edit.edit_row;
                         let col = grid.edit.edit_col;
                         let old_text = grid.cells.get_text(row, col).to_string();
@@ -2091,6 +2219,12 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 text: grid.edit.edit_text.clone(),
                 sel_start: grid.edit.sel_start,
                 sel_length: grid.edit.sel_length,
+                composing: grid.edit.composing,
+                preedit_text: grid.edit.preedit_text.clone(),
+                ui_mode: match grid.edit.ui_mode {
+                    volvoxgrid_engine::edit::EditUiMode::EnterMode => EditUiMode::Enter as i32,
+                    volvoxgrid_engine::edit::EditUiMode::EditMode => EditUiMode::Edit as i32,
+                },
             }
         })?;
         Ok(state)
@@ -2485,12 +2619,13 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         let mut last_present_mode: i32 = -1;
         let mut last_fling_tick: Option<std::time::Instant> = None;
         let mut last_mem_calc: HashMap<i64, Instant> = HashMap::new();
+        let mut sent_edit_requests: HashMap<i64, EditRequest> = HashMap::new();
         let mut zoom_sessions: HashMap<i64, ZoomGestureState> = HashMap::new();
 
         while let Some(input) = stream.recv() {
             let grid_id = input.grid_id;
             for output in self.resolve_expired_actions(grid_id) {
-                stream.send(output);
+                send_render_output_tracked(stream, &mut sent_edit_requests, grid_id, output);
             }
 
             match input.input {
@@ -2690,6 +2825,14 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     metrics,
                                 })),
                             });
+                            if rendered {
+                                maybe_send_refreshed_edit_request(
+                                    self,
+                                    stream,
+                                    &mut sent_edit_requests,
+                                    grid_id,
+                                );
+                            }
                         }
                         Err(_) => {
                             stream.send(RenderOutput {
@@ -2970,6 +3113,14 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     metrics,
                                 })),
                             });
+                            if rendered {
+                                maybe_send_refreshed_edit_request(
+                                    self,
+                                    stream,
+                                    &mut sent_edit_requests,
+                                    grid_id,
+                                );
+                            }
                         }
                         Ok(Err(_)) => {
                             // Surface error (e.g. Lost, Outdated). Drop the surface immediately
@@ -3072,13 +3223,22 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                                 {
                                                     let _ = self.request_before_edit(
                                                         grid_id, grid, hit.row, hit.col, false,
-                                                        true, None,
+                                                        true, None, None, None,
                                                     );
                                                 }
                                             } else if is_cell_like
                                                 && ((pe.dbl_click && grid.edit_trigger_mode >= 2)
                                                     || is_combo_cell)
                                             {
+                                                let click_caret = if pe.dbl_click {
+                                                    Some(grid.caret_index_from_display_click(
+                                                        hit.row,
+                                                        hit.col,
+                                                        hit.x_in_cell,
+                                                    ))
+                                                } else {
+                                                    None
+                                                };
                                                 let _ = self.request_before_edit(
                                                     grid_id,
                                                     grid,
@@ -3087,6 +3247,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                                     false,
                                                     is_combo_cell,
                                                     None,
+                                                    click_caret,
+                                                    if pe.dbl_click { Some(true) } else { None },
                                                 );
                                             }
 
@@ -3172,7 +3334,12 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             });
                         }
                         if let Some(output) = editor_output {
-                            stream.send(output);
+                            send_render_output_tracked(
+                                stream,
+                                &mut sent_edit_requests,
+                                grid_id,
+                                output,
+                            );
                         }
                     }
                 }
@@ -3212,6 +3379,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                             false,
                                             false,
                                             None,
+                                            None,
+                                            if ke.key_code == 113 { Some(true) } else { None },
                                         );
                                     }
                                 } else {
@@ -3258,6 +3427,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                                     false,
                                                     false,
                                                     Some(seed),
+                                                    None,
+                                                    None,
                                                 );
                                             }
                                         }
@@ -3300,7 +3471,12 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             })),
                         });
                         if let Some(output) = editor_output {
-                            stream.send(output);
+                            send_render_output_tracked(
+                                stream,
+                                &mut sent_edit_requests,
+                                grid_id,
+                                output,
+                            );
                         }
                     }
                 }
@@ -3514,7 +3690,12 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         decision.event_id,
                         decision.cancel,
                     ) {
-                        stream.send(output);
+                        send_render_output_tracked(
+                            stream,
+                            &mut sent_edit_requests,
+                            decision_grid_id,
+                            output,
+                        );
                     }
                     stream.send(RenderOutput {
                         rendered: false,

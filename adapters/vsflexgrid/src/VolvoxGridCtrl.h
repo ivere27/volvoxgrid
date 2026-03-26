@@ -208,6 +208,10 @@ public:
     STDMETHOD(get_Redraw)(VARIANT_BOOL* pVal);
     STDMETHOD(put_Redraw)(VARIANT_BOOL newVal);
 
+    // AutoResize
+    STDMETHOD(get_AutoResize)(VARIANT_BOOL* pVal);
+    STDMETHOD(put_AutoResize)(VARIANT_BOOL newVal);
+
     // ═══════════════════════════════════════════════════════
     // IVolvoxGrid Method Implementations
     // ═══════════════════════════════════════════════════════
@@ -235,9 +239,26 @@ public:
     STDMETHOD(put_ColAlignment)(long col, FlexAlign newVal);
     STDMETHOD(SetColFormat)(long col, BSTR format);
     STDMETHOD(SetColSort)(long col, FlexSortOrder order);
+    STDMETHOD(get_ColDataType)(long col, short* pVal);
+    STDMETHOD(put_ColDataType)(long col, short newVal);
+    STDMETHOD(get_ColKey)(long col, BSTR* pVal);
+    STDMETHOD(put_ColKey)(long col, BSTR newVal);
+    STDMETHOD(get_ColIndex)(BSTR key, long* pVal);
+    STDMETHOD(get_ColData)(long col, long* pVal);
+    STDMETHOD(put_ColData)(long col, long newVal);
+    STDMETHOD(get_CellChecked)(long row, long col, FlexCheckBoxState* pVal);
+    STDMETHOD(put_CellChecked)(long row, long col, FlexCheckBoxState newVal);
 
     // Data Binding
+    STDMETHOD(get_DataSource)(IDispatch** pVal);
     STDMETHOD(putref_DataSource)(IDispatch* pDataSource);
+    STDMETHOD(get_DataMember)(BSTR* pVal);
+    STDMETHOD(put_DataMember)(BSTR newVal);
+    STDMETHOD(get_DataMode)(FlexDataMode* pVal);
+    STDMETHOD(put_DataMode)(FlexDataMode newVal);
+    STDMETHOD(get_VirtualData)(VARIANT_BOOL* pVal);
+    STDMETHOD(put_VirtualData)(VARIANT_BOOL newVal);
+    STDMETHOD(DataRefresh)();
 
     // Mouse Info
     STDMETHOD(get_MouseRow)(long* pVal);
@@ -265,6 +286,8 @@ public:
     void Fire_MouseMove(long button, long shift, float x, float y);
     void Fire_CellChanged(long row, long col);
     void Fire_Scroll();
+    void Fire_BeforeDataRefresh(VARIANT_BOOL* cancel);
+    void Fire_AfterDataRefresh();
 
 private:
     // ═══════════════════════════════════════════════════════
@@ -327,8 +350,29 @@ private:
     bool                                               m_styleDirty = true;
     long                                               m_fixedRows = 1;
 
+    // Caches for Grid Properties
+    FlexSelectionMode                                  m_selectionMode = flexSelectionFree;
+    FlexHighLight                                      m_highLight = flexHighlightAlways;
+    FlexFocusRect                                      m_focusRect = flexFocusLight;
+    FlexEditableMode                                   m_editable = flexEditNone;
+    FlexMergeCells                                     m_mergeCells = flexMergeNever;
+    VARIANT_BOOL                                       m_wordWrap = VARIANT_FALSE;
+    long                                               m_frozenRows = 0;
+    long                                               m_frozenCols = 0;
+    FlexAllowUserResizing                              m_allowUserResizing = flexResizeNone;
+    VARIANT_BOOL                                       m_autoResize = VARIANT_FALSE;
+
+    // Caches for Column Properties
+    #include <map>
+    std::map<long, short>                              m_colDataType;
+    std::map<long, CComBSTR>                           m_colKey;
+    std::map<long, long>                               m_colData;
+
     // ADO data source binding (see ADOAdapter.cpp)
     CComPtr<IDispatch>                                 m_dataSource;
+    CComBSTR                                           m_dataMember;
+    long                                               m_dataMode = 0;
+    VARIANT_BOOL                                       m_virtualData = VARIANT_FALSE;
 
     // Helper: invoke a unary RPC on the plugin
     std::vector<uint8_t> InvokePlugin(const std::string& method,

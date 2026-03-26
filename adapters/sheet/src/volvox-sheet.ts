@@ -51,13 +51,99 @@ import { FillHandle } from "./core/fill-handle.js";
 import { letterToCol, toA1 } from "./core/cell-reference.js";
 import "./theme/css/volvox-sheet.css";
 
-const DEFAULT_FONT_URL =
-  "https://cdn.jsdelivr.net/gh/googlefonts/roboto-2@main/src/hinted/Roboto-Regular.ttf";
+interface DefaultFontSource {
+  family: string;
+  url: string;
+}
+
+const DEFAULT_LATIN_FONT: DefaultFontSource = {
+  family: "Roboto",
+  url: "https://cdn.jsdelivr.net/gh/googlefonts/roboto-2@main/src/hinted/Roboto-Regular.ttf",
+};
+const DEFAULT_CJK_FONTS = {
+  ko: {
+    family: "Noto Sans KR",
+    url: "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/SubsetOTF/KR/NotoSansKR-Regular.otf",
+  },
+  ja: {
+    family: "Noto Sans JP",
+    url: "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/SubsetOTF/JP/NotoSansJP-Regular.otf",
+  },
+  zhHans: {
+    family: "Noto Sans SC",
+    url: "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/SubsetOTF/SC/NotoSansSC-Regular.otf",
+  },
+  zhHant: {
+    family: "Noto Sans TC",
+    url: "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/SubsetOTF/TC/NotoSansTC-Regular.otf",
+  },
+} as const satisfies Record<string, DefaultFontSource>;
 const SHEET_ROW_INDICATOR_MODE = 1; // numbers
 
 const createCanvas2DTextRendererMaybe =
   (volvoxgrid as { createCanvas2DTextRenderer?: (wasm: any) => { measureText: Function; renderText: Function } })
     .createCanvas2DTextRenderer;
+const createCanvas2DRasterizerMaybe =
+  (volvoxgrid as { createCanvas2DRasterizer?: () => Function })
+    .createCanvas2DRasterizer;
+
+function preferredBrowserLanguages(): string[] {
+  if (typeof navigator === "undefined") {
+    return [];
+  }
+  const values: string[] = [];
+  if (Array.isArray(navigator.languages)) {
+    values.push(...navigator.languages);
+  }
+  if (typeof navigator.language === "string") {
+    values.push(navigator.language);
+  }
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized || seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
+function isTraditionalChinese(tag: string): boolean {
+  return tag.startsWith("zh-hant")
+    || tag.includes("-hant-")
+    || tag.startsWith("zh-tw")
+    || tag.startsWith("zh-hk")
+    || tag.startsWith("zh-mo");
+}
+
+function isSimplifiedChinese(tag: string): boolean {
+  return tag === "zh"
+    || tag.startsWith("zh-hans")
+    || tag.includes("-hans-")
+    || tag.startsWith("zh-cn")
+    || tag.startsWith("zh-sg");
+}
+
+function resolveDefaultFontSource(): DefaultFontSource {
+  for (const language of preferredBrowserLanguages()) {
+    if (language.startsWith("ko")) {
+      return DEFAULT_CJK_FONTS.ko;
+    }
+    if (language.startsWith("ja")) {
+      return DEFAULT_CJK_FONTS.ja;
+    }
+    if (isTraditionalChinese(language)) {
+      return DEFAULT_CJK_FONTS.zhHant;
+    }
+    if (isSimplifiedChinese(language)) {
+      return DEFAULT_CJK_FONTS.zhHans;
+    }
+  }
+  return DEFAULT_LATIN_FONT;
+}
 
 interface FormulaRefToken {
   start: number;
@@ -127,7 +213,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
 
   // Event loop
   private eventPollTimer: number = 0;
-  private defaultFontName: string = "Calibri";
+  private defaultFontName: string = "";
   private defaultFontSize: number = 11;
   private baseDefaultRowHeight: number = 21;
   private baseDefaultColWidth: number = 64;
@@ -165,11 +251,21 @@ export class VolvoxSheet implements VolvoxSheetApi {
     const hasBuiltinTextEngine = typeof this.wasm.has_builtin_text_engine === "function"
       ? Boolean(this.wasm.has_builtin_text_engine())
       : true;
+    const defaultFontSource = resolveDefaultFontSource();
+    const explicitFontUrl =
+      typeof options.fontUrl === "string" ? options.fontUrl.trim() : "";
+    const resolvedFontName =
+      options.fontName ?? (hasBuiltinTextEngine ? defaultFontSource.family : "");
     if (!hasBuiltinTextEngine
       && typeof this.wasm.set_text_renderer === "function"
       && typeof createCanvas2DTextRendererMaybe === "function") {
       const textRenderer = createCanvas2DTextRendererMaybe(this.wasm);
       this.wasm.set_text_renderer(textRenderer.measureText, textRenderer.renderText);
+    }
+    if (hasBuiltinTextEngine
+      && typeof this.wasm.set_glyph_rasterizer === "function"
+      && typeof createCanvas2DRasterizerMaybe === "function") {
+      this.wasm.set_glyph_rasterizer(createCanvas2DRasterizerMaybe());
     }
 
     // Build DOM structure
@@ -183,12 +279,12 @@ export class VolvoxSheet implements VolvoxSheetApi {
     const sheetConfig = buildSheetConfig({
       rows: options.rows,
       cols: options.cols,
-      fontName: options.fontName,
+      fontName: resolvedFontName,
       fontSize: options.fontSize,
       defaultRowHeight: options.defaultRowHeight,
       defaultColWidth: options.defaultColWidth,
     });
-    this.defaultFontName = sheetConfig.font?.family ?? "Calibri";
+    this.defaultFontName = sheetConfig.font?.family ?? resolvedFontName;
     this.defaultFontSize = sheetConfig.font?.size ?? 11;
     this.baseDefaultRowHeight = sheetConfig.defaultRowHeight ?? 21;
     this.baseDefaultColWidth = sheetConfig.defaultColWidth ?? 64;
@@ -258,8 +354,13 @@ export class VolvoxSheet implements VolvoxSheetApi {
       this.wasm.set_host_pointer_dispatch(this.grid.id, 1);
     }
 
-    // Load font into WASM engine (async, grid renders once ready)
-    this.loadFont(options.fontUrl ?? DEFAULT_FONT_URL);
+    // Full WASM mode needs one real font in the engine for shaping/measurement.
+    // Lite mode uses browser text rendering, so skip the default fetch there.
+    if (hasBuiltinTextEngine) {
+      this.loadFont(explicitFontUrl || defaultFontSource.url);
+    } else if (explicitFontUrl) {
+      this.loadFont(explicitFontUrl);
+    }
 
     // Initialize core modules
     this.keyDispatch = new KeyDispatch(options.keyBindings);
@@ -399,6 +500,27 @@ export class VolvoxSheet implements VolvoxSheetApi {
       this.gridEditInput.addEventListener("blur", this.onEditInputBlurCapture, true);
     }
 
+    // Hook into VolvoxGrid's imeProxy composition-start callback so the
+    // sheet's EditStateMachine is synchronously updated before editInput
+    // gets focused (avoiding the onEditInputFocus guard rejection).
+    // NOTE: The engine is already in editing mode (VolvoxGrid called
+    // begin_edit_at_selection).  We only sync the JS-side state here.
+    (this.grid as any).onCompositionEditStart = () => {
+      const master = this.resolveMergedMaster(this.selection.row, this.selection.col);
+      (this.grid as any).suppressEditorSelect = true;
+      this.editState.onEngineStartEdit(master.row, master.col);
+      this.updateEditModeUI(true);
+      const dataRow = master.row;
+      const dataCol = master.col;
+      if (dataRow >= 0 && dataCol >= 0) {
+        const key = `${dataRow}:${dataCol}`;
+        this.pendingEditOriginalRaw.set(key, this.store.getCellRawValue(dataRow, dataCol));
+      }
+      requestAnimationFrame(() => {
+        (this.grid as any).suppressEditorSelect = false;
+      });
+    };
+
     // Start event polling
     this.startEventPoll();
 
@@ -518,16 +640,17 @@ export class VolvoxSheet implements VolvoxSheetApi {
       return; // Don't process this key on editInput; canvas will get next one
     }
 
-    // In "edit" mode (F2/dblclick) and formula mode, arrow keys stay in the
-    // input (do not auto-commit the edit session).
     const isArrow = e.key === "ArrowLeft" || e.key === "ArrowRight"
                  || e.key === "ArrowUp" || e.key === "ArrowDown";
-    if (isArrow && (this.editState.isEditMode || this.editState.isFormulaMode)) {
+    const engineEditMode = this.getEngineEditUiMode();
+    // In engine edit mode (F2/dblclick) and formula mode, arrow keys stay in
+    // the input (do not auto-commit the edit session).
+    if (isArrow && (engineEditMode === "edit" || this.editState.isFormulaMode)) {
       return; // let the input handle caret movement natively
     }
 
-    // In "enter" mode (typed key), arrow keys commit and move.
-    if (isArrow && !this.editState.isEditMode) {
+    // In engine enter mode (typed key / select-all edit), arrow keys commit and move.
+    if (isArrow && engineEditMode !== "edit") {
       e.preventDefault();
       e.stopImmediatePropagation();
       this.commitEditAndNavigateArrow(e);
@@ -600,6 +723,21 @@ export class VolvoxSheet implements VolvoxSheetApi {
     (this.grid as any).suppressBlurCommit = false;
   }
 
+  private getEngineEditUiMode(): "enter" | "edit" {
+    if (typeof this.wasm.get_edit_ui_mode === "function"
+      && this.wasm.is_editing(this.grid.id) !== 0) {
+      return Number(this.wasm.get_edit_ui_mode(this.grid.id)) === 1 ? "edit" : "enter";
+    }
+    return "enter";
+  }
+
+  private setEngineEditUiMode(mode: "enter" | "edit"): void {
+    if (typeof this.wasm.set_edit_ui_mode === "function"
+      && this.wasm.is_editing(this.grid.id) !== 0) {
+      this.wasm.set_edit_ui_mode(this.grid.id, mode === "edit" ? 1 : 0);
+    }
+  }
+
   private pointerToGridPixels(e: MouseEvent | PointerEvent): { x: number; y: number } {
     const rect = this.canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
@@ -607,6 +745,37 @@ export class VolvoxSheet implements VolvoxSheetApi {
       x: (e.clientX - rect.left) * dpr,
       y: (e.clientY - rect.top) * dpr,
     };
+  }
+
+  private pointerXInCell(e: MouseEvent | PointerEvent, row: number, col: number): number | null {
+    if (typeof this.wasm.get_cell_screen_x !== "function") {
+      return null;
+    }
+    const { x } = this.pointerToGridPixels(e);
+    return x - Number(this.wasm.get_cell_screen_x(this.grid.id, row, col));
+  }
+
+  private syncHostEditSelectionFromEngine(): void {
+    if (!this.gridEditInput
+      || typeof this.wasm.get_edit_sel_start !== "function"
+      || typeof this.wasm.get_edit_sel_length !== "function"
+      || this.wasm.is_editing(this.grid.id) === 0) {
+      return;
+    }
+
+    const value = this.gridEditInput.value;
+    const chars = Array.from(value);
+    const rawStart = Number(this.wasm.get_edit_sel_start(this.grid.id));
+    const rawLength = Number(this.wasm.get_edit_sel_length(this.grid.id));
+    if (!Number.isFinite(rawStart) || !Number.isFinite(rawLength)) {
+      return;
+    }
+
+    const startChars = Math.max(0, Math.min(chars.length, rawStart));
+    const endChars = Math.max(startChars, Math.min(chars.length, startChars + rawLength));
+    const startUnits = chars.slice(0, startChars).join("").length;
+    const endUnits = chars.slice(0, endChars).join("").length;
+    this.gridEditInput.setSelectionRange(startUnits, endUnits);
   }
 
   private resolvePointerScope(
@@ -830,9 +999,9 @@ export class VolvoxSheet implements VolvoxSheetApi {
             const started = this.editState.startEdit(master.row, master.col, {
               selectAll: true,
               currentText: this.store.getCellRawValue(masterDataRow, masterDataCol),
-              mode: "edit",
             });
             if (started) {
+              this.setEngineEditUiMode("edit");
               this.updateEditModeUI(true);
               requestAnimationFrame(() => this.syncEditInputAlign());
             }
@@ -951,46 +1120,42 @@ export class VolvoxSheet implements VolvoxSheetApi {
     (this.grid as any).suppressEditorSelect = true;
     const engineEditing = this.wasm.is_editing(this.grid.id) !== 0;
     const cellText = this.store.getCellRawValue(masterDataRow, masterDataCol);
+    const clickXInCell = this.pointerXInCell(e, master.row, master.col);
 
+    let usedFallbackEditStart = false;
     if (!engineEditing) {
       // Engine didn't start editing — force it
-      if (this.tryBeginDirectEdit(master.row, master.col)) {
+      if (this.tryBeginDirectEdit(master.row, master.col, clickXInCell)) {
         // Engine is now editing — sync adapter state immediately so the
         // editInput focus guard doesn't reject focus before drainEvents
         // processes the StartEdit event.
-        this.editState.syncActiveEdit(master.row, master.col, cellText, { mode: "edit" });
+        this.editState.syncActiveEdit(master.row, master.col, cellText);
         this.updateEditModeUI(true);
       } else {
         // Still not editing — try adapter RPC path
         const started = this.editState.startEdit(master.row, master.col, {
           selectAll: true,
           currentText: cellText,
-          mode: "edit",
         });
         if (started) {
+          usedFallbackEditStart = true;
+          this.setEngineEditUiMode("edit");
           this.updateEditModeUI(true);
         }
       }
     }
-    // Dblclick always uses "edit" mode (arrows move caret, not cell)
     if (!this.editState.isEditing && this.wasm.is_editing(this.grid.id) === 0) {
       (this.grid as any).suppressEditorSelect = false;
       return;
     }
-    this.editState.editMode = "edit";
 
-    if (!cellText) {
-      requestAnimationFrame(() => {
-        this.syncEditInputAlign();
-        (this.grid as any).suppressEditorSelect = false;
-      });
-      return;
-    }
-
-    const clientX = e.clientX;
     requestAnimationFrame(() => {
       this.syncEditInputAlign();
-      this.positionCaretFromClick(clientX, cellText);
+      if (usedFallbackEditStart && cellText) {
+        this.positionCaretFromClick(e.clientX, cellText);
+      } else {
+        this.syncHostEditSelectionFromEngine();
+      }
       (this.grid as any).suppressEditorSelect = false;
     });
   };
@@ -1451,9 +1616,9 @@ export class VolvoxSheet implements VolvoxSheetApi {
         const started = this.editState.startEdit(master.row, master.col, {
           caretEnd: true,
           currentText: cellText,
-          mode: "edit",
         });
         if (started) {
+          this.setEngineEditUiMode("edit");
           this.updateEditModeUI(true);
           requestAnimationFrame(() => {
             this.syncEditInputAlign();
@@ -1615,8 +1780,12 @@ export class VolvoxSheet implements VolvoxSheetApi {
     return true;
   }
 
-  private tryBeginDirectEdit(row: number, col: number): boolean {
-    if (typeof this.wasm.begin_edit_cell === "function") {
+  private tryBeginDirectEdit(row: number, col: number, clickXInCell?: number | null): boolean {
+    if (typeof clickXInCell === "number"
+      && Number.isFinite(clickXInCell)
+      && typeof this.wasm.begin_edit_cell_at_click === "function") {
+      this.wasm.begin_edit_cell_at_click(this.grid.id, row, col, clickXInCell);
+    } else if (typeof this.wasm.begin_edit_cell === "function") {
       this.wasm.begin_edit_cell(this.grid.id, row, col);
     } else if (typeof this.wasm.begin_edit_at_selection === "function") {
       this.wasm.begin_edit_at_selection(this.grid.id);
@@ -2465,6 +2634,10 @@ export class VolvoxSheet implements VolvoxSheetApi {
           this.editState.onEditTextChanged(this.gridEditInput.value);
         }
         this.updateEditModeUI(true);
+        requestAnimationFrame(() => {
+          this.syncEditInputAlign();
+          this.syncHostEditSelectionFromEngine();
+        });
         const dataRow = row - 0;
         const dataCol = col - 0;
         if (dataRow >= 0 && dataCol >= 0) {
@@ -3238,6 +3411,7 @@ export class VolvoxSheet implements VolvoxSheetApi {
     this.activeTouchPointers.clear();
     this.pinchBaseZoomScale = null;
     this.grid.onZoomChange = null;
+    (this.grid as any).onCompositionEditStart = null;
 
     this.grid.destroy();
     this.rootEl.remove();

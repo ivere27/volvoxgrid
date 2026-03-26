@@ -43,6 +43,7 @@ WEB_SCALE ?= 1.0
 WEB_HOVER ?= false
 DOTNET_TFM ?= net40
 DOTNET_ARCH ?= x64
+ACTIVEX_ARCH ?= x86_64
 GTK_BENCH_RUNS ?= 5
 GTK_BENCH_ARGS ?=
 JAVA_DESKTOP_PROJECT_DIR := java/desktop
@@ -206,7 +207,7 @@ endif
         dotnet-build dotnet-build-release dotnet-run dotnet-run-release dotnet-smoke dotnet-smoke-release \
         sheet sheet-lite sheet-build \
         report report-build \
-        activex activex-release activex-lite activex-lite-release \
+        activex activex-release activex-run activex-run-release activex-lite activex-lite-release \
         activex-gpu activex-gpu-release \
         vsflexgrid vsflexgrid-release \
         docker_android_aar_image docker_android docker_desktop_image docker_desktop \
@@ -242,9 +243,12 @@ help:
 	@echo "    web options: WEB_SCALE=<value>, WEB_HOVER={true|false} (default false)"
 	@echo "  codegen        Regenerate all FFI bindings"
 	@echo "  activex        Build ActiveX OCX (debug)"
+	@echo "  activex-run    Build and run ActiveX demo shell (debug, default x86_64)"
+	@echo "  activex-run-release  Build and run ActiveX demo shell (release, default x86_64)"
 	@echo "  activex-lite   Build ActiveX OCX without rayon/regex (debug)"
 	@echo "  activex-lite-release Build ActiveX OCX without rayon/regex (release, ~1MB)"
 	@echo "  activex-gpu-release Build ActiveX OCX with GPU enabled (release, ~3MB)"
+	@echo "    activex-run option: ACTIVEX_ARCH=i686|x86_64"
 	@echo "  android        Build AAR, install example app, and launch on device"
 	@echo "  android-build  Build Android AAR only (requires Android SDK)"
 	@echo "  android-plugin Build/copy Android plugin .so into example jniLibs"
@@ -408,6 +412,16 @@ dotnet-run: dotnet-build
 dotnet-run-release: dotnet-build-release
 	@echo "Running .NET sample (release, $(DOTNET_TFM), $(DOTNET_ARCH))..."
 	DOTNET_TFM="$(DOTNET_TFM)" DOTNET_ARCH="$(DOTNET_ARCH)" ./dotnet/run_sample.sh release
+	@echo ""
+
+activex-run: activex
+	@echo "Running ActiveX demo (debug, $(ACTIVEX_ARCH))..."
+	ACTIVEX_ARCH="$(ACTIVEX_ARCH)" ./adapters/vsflexgrid/mingw/run_demo.sh
+	@echo ""
+
+activex-run-release: activex-release
+	@echo "Running ActiveX demo (release, $(ACTIVEX_ARCH))..."
+	ACTIVEX_ARCH="$(ACTIVEX_ARCH)" ./adapters/vsflexgrid/mingw/run_demo.sh release
 	@echo ""
 
 dotnet-smoke: dotnet-build
@@ -598,11 +612,14 @@ codegen: build_plugin
 		$(PROTOC_PLUGIN_FLAG) \
 		--synurang-ffi_out=$(VSFLEXGRID_DIR)/include --synurang-ffi_opt=lang=c,mode=native \
 		$(VSFLEXGRID_DIR)/proto/volvoxgrid_activex.proto
+	@tmp_activex_dir=$$(mktemp -d); \
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_PLUGIN_FLAG) \
-		--synurang-ffi_out=$(VSFLEXGRID_DIR)/include --synurang-ffi_opt=lang=c,mode=activex \
-		$(VSFLEXGRID_DIR)/proto/volvoxgrid_activex.proto
-	@cp $(VSFLEXGRID_DIR)/include/volvoxgrid_activex_activex.h $(VSFLEXGRID_DIR)/include/volvoxgrid_activex.h
+		--synurang-ffi_out=$$tmp_activex_dir --synurang-ffi_opt=lang=c,mode=activex \
+		$(VSFLEXGRID_DIR)/proto/volvoxgrid_activex.proto; \
+	cp $$tmp_activex_dir/volvoxgrid_activex_activex.h $(VSFLEXGRID_DIR)/include/volvoxgrid_activex.h; \
+	rm -f $(VSFLEXGRID_DIR)/include/volvoxgrid_activex_activex.h; \
+	rm -rf $$tmp_activex_dir
 	@rustfmt \
 		codegen/volvoxgrid_ffi.rs \
 		plugin/src/volvoxgrid_ffi_plugin.rs \

@@ -1355,6 +1355,22 @@ static TestCase g_tests[] = {
     { "event_edit_hooks", 820, 420 },
     { "datasource_bind", 840, 400 },
     { "data_roundtrip_refresh", 840, 400 },
+    { "ado_properties_refresh", 840, 400 },
+    { "ado_clone_bind", 840, 400 },
+    { "ado_filter_refresh", 840, 400 },
+    { "ado_null_display", 840, 400 },
+    { "ado_source_swap", 840, 400 },
+    { "ado_datamember_bind", 840, 400 },
+    { "ado_move_cursor_ops", 840, 400 },
+    { "ado_absoluteposition_ops", 840, 400 },
+    { "ado_find_ops", 840, 400 },
+    { "ado_bookmark_ops", 840, 400 },
+    { "ado_bound_immediate_edit", 840, 400 },
+    { "ado_bound_batch_edit", 840, 400 },
+    { "ado_external_addnew_ops", 840, 400 },
+    { "ado_external_delete_ops", 840, 400 },
+    { "ado_bound_additem_ops", 840, 400 },
+    { "ado_bound_removeitem_ops", 840, 400 },
     { NULL, 0, 0 }
 };
 

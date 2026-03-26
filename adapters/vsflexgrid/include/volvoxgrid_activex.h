@@ -81,6 +81,17 @@
 #define DISPID_VG_COLCOMBOLIST  80
 #define DISPID_VG_SHOWCOMBOBUTTON  81
 #define DISPID_VG_EDITCELL  82
+#define DISPID_VG_LOADDEMO  83
+#define DISPID_VG_RESIZEVIEWPORT  84
+#define DISPID_VG_POINTERDOWN  85
+#define DISPID_VG_POINTERMOVE  86
+#define DISPID_VG_POINTERUP  87
+#define DISPID_VG_SCROLL  88
+#define DISPID_VG_KEYDOWN  89
+#define DISPID_VG_KEYPRESS  90
+#define DISPID_VG_SETHOVERMODE  91
+#define DISPID_VG_SETDEBUGOVERLAY  92
+#define DISPID_VG_SETSCROLLBLIT  93
 
 /* ═══════ Section 2: Name Table ═══════ */
 typedef struct { const wchar_t *name; int id; } VG_NameEntry;
@@ -161,6 +172,17 @@ static const VG_NameEntry vg_activex_names[] = {
     { L"ColComboList", DISPID_VG_COLCOMBOLIST },
     { L"ShowComboButton", DISPID_VG_SHOWCOMBOBUTTON },
     { L"EditCell", DISPID_VG_EDITCELL },
+    { L"LoadDemo", DISPID_VG_LOADDEMO },
+    { L"ResizeViewport", DISPID_VG_RESIZEVIEWPORT },
+    { L"PointerDown", DISPID_VG_POINTERDOWN },
+    { L"PointerMove", DISPID_VG_POINTERMOVE },
+    { L"PointerUp", DISPID_VG_POINTERUP },
+    { L"Scroll", DISPID_VG_SCROLL },
+    { L"KeyDown", DISPID_VG_KEYDOWN },
+    { L"KeyPress", DISPID_VG_KEYPRESS },
+    { L"SetHoverMode", DISPID_VG_SETHOVERMODE },
+    { L"SetDebugOverlay", DISPID_VG_SETDEBUGOVERLAY },
+    { L"SetScrollBlit", DISPID_VG_SETSCROLLBLIT },
     { NULL, 0 }
 };
 
@@ -175,18 +197,12 @@ static const VG_NameEntry vg_activex_names[] = {
 CASE_INT_GETPUT(DISPID_VG_ROWS, volvox_grid_set_rows, volvox_grid_get_rows)
 CASE_INT_GETPUT(DISPID_VG_COLS, volvox_grid_set_cols, volvox_grid_get_cols)
 CASE_INT_GETPUT(DISPID_VG_ROW, volvox_grid_set_row, volvox_grid_get_row)
-CASE_INT_GETPUT(DISPID_VG_COL, volvox_grid_set_col, volvox_grid_get_col)
-CASE_INT_PUT(DISPID_VG_FROZENROWS, volvox_grid_set_frozen_rows)
-CASE_INT_PUT(DISPID_VG_FROZENCOLS, volvox_grid_set_frozen_cols)
 CASE_INT_PUT(DISPID_VG_SCROLLBARS, volvox_grid_set_scroll_bars)
 CASE_INT_GETPUT(DISPID_VG_TOPROW, volvox_grid_set_top_row, volvox_grid_get_top_row)
 CASE_INT_GETPUT(DISPID_VG_LEFTCOL, volvox_grid_set_left_col, volvox_grid_get_left_col)
 CASE_INT_PUT(DISPID_VG_FOCUSRECT, volvox_grid_set_focus_rect)
 CASE_INT_PUT(DISPID_VG_HIGHLIGHT, volvox_grid_set_high_light)
 CASE_INT_PUT(DISPID_VG_REDRAW, volvox_grid_set_redraw)
-CASE_INT_PUT(DISPID_VG_EDITABLE, volvox_grid_set_editable)
-CASE_INT_PUT(DISPID_VG_ROWSEL, volvox_grid_set_row_sel)
-CASE_INT_PUT(DISPID_VG_COLSEL, volvox_grid_set_col_sel)
 CASE_INT_PUT(DISPID_VG_FILLSTYLE, volvox_grid_set_fill_style)
 CASE_INT_PUT(DISPID_VG_WORDWRAP, volvox_grid_set_word_wrap)
 CASE_INT_PUT(DISPID_VG_SELECTIONMODE, volvox_grid_set_selection_mode)

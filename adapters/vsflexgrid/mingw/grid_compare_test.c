@@ -35,7 +35,9 @@
 #include <oleauto.h>
 #include <olectl.h>
 #include <activscp.h>
+#include <servprov.h>
 #include <ctype.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -80,6 +82,28 @@ static int get_int(IDispatch *pDisp, LPCOLESTR name, int fallback) {
     int out = tmp.lVal;
     VariantClear(&tmp);
     return out;
+}
+
+static HRESULT call_resize_viewport(IDispatch *pDisp, int width, int height) {
+    DISPID dispid;
+    VARIANT args[2];
+    DISPPARAMS dp;
+
+    if (FAILED(get_dispid(pDisp, L"ResizeViewport", &dispid))) return DISP_E_MEMBERNOTFOUND;
+
+    VariantInit(&args[0]);
+    VariantInit(&args[1]);
+    args[0].vt = VT_I4;
+    args[0].lVal = height;
+    args[1].vt = VT_I4;
+    args[1].lVal = width;
+
+    dp.rgvarg = args;
+    dp.rgdispidNamedArgs = NULL;
+    dp.cArgs = 2;
+    dp.cNamedArgs = 0;
+    return pDisp->lpVtbl->Invoke(
+        pDisp, dispid, &IID_NULL, 0, DISPATCH_METHOD, &dp, NULL, NULL, NULL);
 }
 
 static double get_double(IDispatch *pDisp, LPCOLESTR name, double fallback) {
@@ -173,39 +197,131 @@ static void get_string_utf8(IDispatch *pDisp, LPCOLESTR name, char *out, int out
     VariantClear(&tmp);
 }
 
+
+static char *dup_utf8_string(const char *src) {
+    size_t len;
+    char *copy;
+
+    if (!src) src = "";
+    len = strlen(src);
+    copy = (char *)malloc(len + 1);
+    if (!copy) return NULL;
+    memcpy(copy, src, len + 1);
+    return copy;
+}
+
+static char *get_text_matrix_utf8_alloc(
+    IDispatch *pDisp,
+    int row,
+    int col,
+    HRESULT *out_hr)
+{
+    DISPID dispid;
+    LPOLESTR name = L"TextMatrix";
+    VARIANT args[2];
+    DISPPARAMS dp;
+    VARIANT vr;
+    VARIANT tmp;
+    HRESULT hr;
+    int wlen;
+    int n;
+    char *out;
+
+    if (out_hr) *out_hr = E_FAIL;
+    if (!pDisp) {
+        if (out_hr) *out_hr = E_POINTER;
+        return NULL;
+    }
+
+    if (FAILED(pDisp->lpVtbl->GetIDsOfNames(pDisp, &IID_NULL, &name, 1, 0, &dispid))) {
+        if (out_hr) *out_hr = DISP_E_MEMBERNOTFOUND;
+        return NULL;
+    }
+
+    VariantInit(&args[0]);
+    VariantInit(&args[1]);
+    args[0].vt = VT_I4;
+    args[0].lVal = col;
+    args[1].vt = VT_I4;
+    args[1].lVal = row;
+    dp.rgvarg = args;
+    dp.rgdispidNamedArgs = NULL;
+    dp.cArgs = 2;
+    dp.cNamedArgs = 0;
+
+    VariantInit(&vr);
+    hr = pDisp->lpVtbl->Invoke(
+        pDisp, dispid, &IID_NULL, 0, DISPATCH_PROPERTYGET, &dp, &vr, NULL, NULL);
+    if (FAILED(hr)) {
+        if (out_hr) *out_hr = hr;
+        VariantClear(&vr);
+        return NULL;
+    }
+
+    VariantInit(&tmp);
+    hr = VariantChangeType(&tmp, &vr, 0, VT_BSTR);
+    VariantClear(&vr);
+    if (FAILED(hr)) {
+        if (out_hr) *out_hr = hr;
+        VariantClear(&tmp);
+        return NULL;
+    }
+
+    if (!tmp.bstrVal) {
+        if (out_hr) *out_hr = S_OK;
+        VariantClear(&tmp);
+        return dup_utf8_string("");
+    }
+
+    wlen = SysStringLen(tmp.bstrVal);
+    if (wlen <= 0) {
+        if (out_hr) *out_hr = S_OK;
+        VariantClear(&tmp);
+        return dup_utf8_string("");
+    }
+
+    n = WideCharToMultiByte(CP_UTF8, 0, tmp.bstrVal, wlen, NULL, 0, NULL, NULL);
+    if (n <= 0) {
+        hr = HRESULT_FROM_WIN32(GetLastError());
+        if (hr == S_OK) hr = E_FAIL;
+        if (out_hr) *out_hr = hr;
+        VariantClear(&tmp);
+        return NULL;
+    }
+
+    out = (char *)malloc((size_t)n + 1);
+    if (!out) {
+        if (out_hr) *out_hr = E_OUTOFMEMORY;
+        VariantClear(&tmp);
+        return NULL;
+    }
+
+    if (WideCharToMultiByte(CP_UTF8, 0, tmp.bstrVal, wlen, out, n, NULL, NULL) <= 0) {
+        hr = HRESULT_FROM_WIN32(GetLastError());
+        if (hr == S_OK) hr = E_FAIL;
+        if (out_hr) *out_hr = hr;
+        VariantClear(&tmp);
+        free(out);
+        return NULL;
+    }
+
+    out[n] = '\0';
+    if (out_hr) *out_hr = S_OK;
+    VariantClear(&tmp);
+    return out;
+}
+
 static void get_text_matrix_utf8(
     IDispatch *pDisp, int row, int col, char *out, int out_cap)
 {
+    char *text;
+
     if (!out || out_cap <= 0) return;
     out[0] = '\0';
-
-    DISPID dispid;
-    LPOLESTR name = L"TextMatrix";
-    if (FAILED(pDisp->lpVtbl->GetIDsOfNames(pDisp, &IID_NULL, &name, 1, 0, &dispid))) {
-        return;
-    }
-
-    VARIANT args[2];
-    VariantInit(&args[0]); args[0].vt = VT_I4; args[0].lVal = col;
-    VariantInit(&args[1]); args[1].vt = VT_I4; args[1].lVal = row;
-    DISPPARAMS dp = { args, NULL, 2, 0 };
-
-    VARIANT vr;
-    VariantInit(&vr);
-    HRESULT hr = pDisp->lpVtbl->Invoke(
-        pDisp, dispid, &IID_NULL, 0, DISPATCH_PROPERTYGET, &dp, &vr, NULL, NULL);
-    if (FAILED(hr)) return;
-    if (vr.vt != VT_BSTR || !vr.bstrVal) {
-        VariantClear(&vr);
-        return;
-    }
-
-    int wlen = SysStringLen(vr.bstrVal);
-    int n = WideCharToMultiByte(CP_UTF8, 0, vr.bstrVal, wlen, out, out_cap - 1, NULL, NULL);
-    if (n < 0) n = 0;
-    if (n >= out_cap) n = out_cap - 1;
-    out[n] = '\0';
-    VariantClear(&vr);
+    text = get_text_matrix_utf8_alloc(pDisp, row, col, NULL);
+    if (!text) return;
+    snprintf(out, (size_t)out_cap, "%s", text);
+    free(text);
 }
 
 static unsigned int get_u32_prop(IDispatch *disp, LPCOLESTR name, unsigned int fallback);
@@ -239,6 +355,302 @@ static void dump_grid_rows(IDispatch *pDisp, const char *tag, int test_no) {
         get_text_matrix_utf8(pDisp, r, 4, c4, sizeof(c4));
         printf("    %d|L=%d|S=%d|%s|%s|%s|%s|%s\n", r, lvl, sub, c0, c1, c2, c3, c4);
     }
+}
+
+#define SNAP_MISSING_INT (-2147483647)
+
+typedef struct {
+    int rows;
+    int cols;
+    int fixed_rows;
+    int fixed_cols;
+    int frozen_rows;
+    int frozen_cols;
+    int row;
+    int col;
+    int row_sel;
+    int col_sel;
+    int top_row;
+    int left_col;
+    int *row_heights;
+    int row_heights_count;
+    int *col_widths;
+    int col_widths_count;
+} GridSnapshot;
+
+static void free_grid_snapshot(GridSnapshot *snap) {
+    if (!snap) return;
+    free(snap->row_heights);
+    free(snap->col_widths);
+    memset(snap, 0, sizeof(*snap));
+}
+
+static void capture_grid_snapshot(IDispatch *pDisp, GridSnapshot *snap) {
+    int i;
+    if (!snap) return;
+    memset(snap, 0, sizeof(*snap));
+    snap->rows = get_int(pDisp, L"Rows", SNAP_MISSING_INT);
+    snap->cols = get_int(pDisp, L"Cols", SNAP_MISSING_INT);
+    snap->fixed_rows = get_int(pDisp, L"FixedRows", SNAP_MISSING_INT);
+    snap->fixed_cols = get_int(pDisp, L"FixedCols", SNAP_MISSING_INT);
+    snap->frozen_rows = get_int(pDisp, L"FrozenRows", SNAP_MISSING_INT);
+    snap->frozen_cols = get_int(pDisp, L"FrozenCols", SNAP_MISSING_INT);
+    snap->row = get_int(pDisp, L"Row", SNAP_MISSING_INT);
+    snap->col = get_int(pDisp, L"Col", SNAP_MISSING_INT);
+    snap->row_sel = get_int(pDisp, L"RowSel", SNAP_MISSING_INT);
+    snap->col_sel = get_int(pDisp, L"ColSel", SNAP_MISSING_INT);
+    snap->top_row = get_int(pDisp, L"TopRow", SNAP_MISSING_INT);
+    snap->left_col = get_int(pDisp, L"LeftCol", SNAP_MISSING_INT);
+
+    if (snap->rows > 0) {
+        snap->row_heights_count = snap->rows;
+        snap->row_heights = (int *)calloc((size_t)snap->row_heights_count, sizeof(int));
+        if (snap->row_heights) {
+            for (i = 0; i < snap->row_heights_count; i++) {
+                snap->row_heights[i] = get_indexed_int(pDisp, L"RowHeight", i, SNAP_MISSING_INT);
+            }
+        }
+    }
+    if (snap->cols > 0) {
+        snap->col_widths_count = snap->cols;
+        snap->col_widths = (int *)calloc((size_t)snap->col_widths_count, sizeof(int));
+        if (snap->col_widths) {
+            for (i = 0; i < snap->col_widths_count; i++) {
+                snap->col_widths[i] = get_indexed_int(pDisp, L"ColWidth", i, SNAP_MISSING_INT);
+            }
+        }
+    }
+}
+
+static void format_snapshot_value(int value, char *buf, size_t buf_cap) {
+    if (!buf || buf_cap == 0) return;
+    if (value == SNAP_MISSING_INT) {
+        snprintf(buf, buf_cap, "<missing>");
+    } else {
+        snprintf(buf, buf_cap, "%d", value);
+    }
+}
+
+static void print_snapshot_int_diff(const char *name, int lg_value, int vv_value, int *printed) {
+    char lg_buf[32];
+    char vv_buf[32];
+    if (lg_value == vv_value) return;
+    if (printed && !*printed) {
+        printf("  PropertyDiff:\n");
+        *printed = 1;
+    }
+    format_snapshot_value(lg_value, lg_buf, sizeof(lg_buf));
+    format_snapshot_value(vv_value, vv_buf, sizeof(vv_buf));
+    printf("    %s: lg=%s vv=%s\n", name, lg_buf, vv_buf);
+}
+
+static void print_snapshot_array_diff(
+    const char *name,
+    const int *lg_values,
+    int lg_count,
+    const int *vv_values,
+    int vv_count,
+    int *printed)
+{
+    int count = lg_count > vv_count ? lg_count : vv_count;
+    int i;
+    for (i = 0; i < count; i++) {
+        int lg_value = i < lg_count && lg_values ? lg_values[i] : SNAP_MISSING_INT;
+        int vv_value = i < vv_count && vv_values ? vv_values[i] : SNAP_MISSING_INT;
+        char label[64];
+        if (lg_value == vv_value) continue;
+        if (printed && !*printed) {
+            printf("  PropertyDiff:\n");
+            *printed = 1;
+        }
+        snprintf(label, sizeof(label), "%s[%d]", name, i);
+        print_snapshot_int_diff(label, lg_value, vv_value, printed);
+    }
+}
+
+static void print_grid_property_diffs(
+    int test_no,
+    const char *test_name,
+    const GridSnapshot *lg,
+    const GridSnapshot *vv)
+{
+    int printed = 0;
+    if (!lg || !vv) return;
+    print_snapshot_int_diff("Rows", lg->rows, vv->rows, &printed);
+    print_snapshot_int_diff("Cols", lg->cols, vv->cols, &printed);
+    print_snapshot_int_diff("FixedRows", lg->fixed_rows, vv->fixed_rows, &printed);
+    print_snapshot_int_diff("FixedCols", lg->fixed_cols, vv->fixed_cols, &printed);
+    print_snapshot_int_diff("FrozenRows", lg->frozen_rows, vv->frozen_rows, &printed);
+    print_snapshot_int_diff("FrozenCols", lg->frozen_cols, vv->frozen_cols, &printed);
+    print_snapshot_int_diff("Row", lg->row, vv->row, &printed);
+    print_snapshot_int_diff("Col", lg->col, vv->col, &printed);
+    print_snapshot_int_diff("RowSel", lg->row_sel, vv->row_sel, &printed);
+    print_snapshot_int_diff("ColSel", lg->col_sel, vv->col_sel, &printed);
+    print_snapshot_int_diff("TopRow", lg->top_row, vv->top_row, &printed);
+    print_snapshot_int_diff("LeftCol", lg->left_col, vv->left_col, &printed);
+    print_snapshot_array_diff("RowHeight", lg->row_heights, lg->row_heights_count, vv->row_heights, vv->row_heights_count, &printed);
+    print_snapshot_array_diff("ColWidth", lg->col_widths, lg->col_widths_count, vv->col_widths, vv->col_widths_count, &printed);
+    if (printed) {
+        printf("  PropertyDiffEnd[%02d] %s\n", test_no, test_name);
+    }
+}
+
+
+static char *escape_cell_text_for_diff_alloc(const char *src) {
+    size_t src_len;
+    size_t cap;
+    size_t si;
+    size_t di = 0;
+    char *dst;
+
+    if (!src) src = "";
+    src_len = strlen(src);
+    cap = src_len * 4 + 1;
+    if (cap < src_len + 1) cap = src_len + 1;
+    dst = (char *)malloc(cap);
+    if (!dst) return NULL;
+
+    for (si = 0; si < src_len; si++) {
+        unsigned char ch = (unsigned char)src[si];
+        if (di + 5 >= cap) break;
+        switch (ch) {
+        case '\\':
+            dst[di++] = '\\';
+            dst[di++] = '\\';
+            break;
+        case '"':
+            dst[di++] = '\\';
+            dst[di++] = '"';
+            break;
+        case '\r':
+            dst[di++] = '\\';
+            dst[di++] = 'r';
+            break;
+        case '\n':
+            dst[di++] = '\\';
+            dst[di++] = 'n';
+            break;
+        case '\t':
+            dst[di++] = '\\';
+            dst[di++] = 't';
+            break;
+        default:
+            if (ch < 0x20 || ch == 0x7F) {
+                snprintf(dst + di, cap - di, "\\x%02X", ch);
+                di += 4;
+            } else {
+                dst[di++] = (char)ch;
+            }
+            break;
+        }
+    }
+
+    dst[di] = '\0';
+    return dst;
+}
+
+static char *get_cell_compare_value(
+    IDispatch *pDisp,
+    int row,
+    int col,
+    int rows,
+    int cols)
+{
+    HRESULT hr;
+    char marker[64];
+    char *text;
+
+    if (!pDisp || row < 0 || col < 0 || row >= rows || col >= cols) {
+        return dup_utf8_string("<missing>");
+    }
+
+    text = get_text_matrix_utf8_alloc(pDisp, row, col, &hr);
+    if (text) return text;
+
+    snprintf(marker, sizeof(marker), "<error 0x%08lx>", hr);
+    return dup_utf8_string(marker);
+}
+
+static int write_grid_cell_diff_file(
+    int test_no,
+    const char *test_name,
+    const GridSnapshot *lg,
+    const GridSnapshot *vv,
+    IDispatch *lg_disp,
+    IDispatch *vv_disp,
+    const char *path)
+{
+    int lg_rows = (lg && lg->rows > 0) ? lg->rows : 0;
+    int lg_cols = (lg && lg->cols > 0) ? lg->cols : 0;
+    int vv_rows = (vv && vv->rows > 0) ? vv->rows : 0;
+    int vv_cols = (vv && vv->cols > 0) ? vv->cols : 0;
+    int max_rows = lg_rows > vv_rows ? lg_rows : vv_rows;
+    int max_cols = lg_cols > vv_cols ? lg_cols : vv_cols;
+    long long total_cells = (long long)max_rows * (long long)max_cols;
+    int diff_count = 0;
+    int r;
+    int c;
+    FILE *f;
+
+    if (!path || !*path || !lg_disp || !vv_disp) return -1;
+
+    remove(path);
+
+    f = fopen(path, "wb");
+    if (!f) {
+        printf("  CellTextDiff: failed to open %s\n", path);
+        return -1;
+    }
+
+    fprintf(f, "Cell text diff [%02d] %s\n", test_no, test_name);
+    fprintf(f, "Compared %lld cell slots including header and fixed cells\n", total_cells);
+    fprintf(f, "LG size: %d rows x %d cols\n", lg_rows, lg_cols);
+    fprintf(f, "VV size: %d rows x %d cols\n", vv_rows, vv_cols);
+    fprintf(f, "\n");
+
+    for (r = 0; r < max_rows; r++) {
+        for (c = 0; c < max_cols; c++) {
+            char *lg_value = get_cell_compare_value(lg_disp, r, c, lg_rows, lg_cols);
+            char *vv_value = get_cell_compare_value(vv_disp, r, c, vv_rows, vv_cols);
+
+            if (!lg_value) lg_value = dup_utf8_string("<oom>");
+            if (!vv_value) vv_value = dup_utf8_string("<oom>");
+
+            if (lg_value && vv_value && strcmp(lg_value, vv_value) != 0) {
+                char *lg_escaped = escape_cell_text_for_diff_alloc(lg_value);
+                char *vv_escaped = escape_cell_text_for_diff_alloc(vv_value);
+                fprintf(
+                    f,
+                    "[r=%d c=%d] lg=\"%s\" vv=\"%s\"\n",
+                    r,
+                    c,
+                    lg_escaped ? lg_escaped : "<oom>",
+                    vv_escaped ? vv_escaped : "<oom>");
+                free(lg_escaped);
+                free(vv_escaped);
+                diff_count++;
+            }
+
+            free(lg_value);
+            free(vv_value);
+        }
+    }
+
+    if (diff_count == 0) {
+        fclose(f);
+        remove(path);
+        printf("  CellTextDiff: 0/%lld cells differ (including header)\n", total_cells);
+        return 0;
+    }
+
+    fprintf(f, "\nSummary: %d/%lld cell slots differ\n", diff_count, total_cells);
+    fclose(f);
+    printf(
+        "  CellTextDiff: %d/%lld cells differ (including header) -> %s\n",
+        diff_count,
+        total_cells,
+        path);
+    return diff_count;
 }
 
 static void pump_messages_ms(DWORD ms) {
@@ -893,13 +1305,23 @@ static int hosted_grid_create(HostedGrid *hg, const WCHAR *progid, const WCHAR *
 
 typedef struct {
     IActiveScriptSiteVtbl *lpVtbl;
+    IServiceProviderVtbl *lpVtblServiceProvider;
     LONG ref;
     IDispatch *grid;
 } ScriptSite;
 
+#define SCRIPT_SITE_FROM_SP(p) \
+    ((ScriptSite *)((char *)(p) - offsetof(ScriptSite, lpVtblServiceProvider)))
+
 static HRESULT STDMETHODCALLTYPE ss_qi(IActiveScriptSite *This, REFIID riid, void **ppv) {
     if (IsEqualGUID(riid, &IID_IUnknown) || IsEqualGUID(riid, &IID_IActiveScriptSite)) {
         *ppv = This;
+        This->lpVtbl->AddRef(This);
+        return S_OK;
+    }
+    if (IsEqualGUID(riid, &IID_IServiceProvider)) {
+        ScriptSite *ss = (ScriptSite *)This;
+        *ppv = (void *)&ss->lpVtblServiceProvider;
         This->lpVtbl->AddRef(This);
         return S_OK;
     }
@@ -959,6 +1381,32 @@ static HRESULT STDMETHODCALLTYPE ss_onerror(IActiveScriptSite *This,
 }
 static HRESULT STDMETHODCALLTYPE ss_enter(IActiveScriptSite *This) { return S_OK; }
 static HRESULT STDMETHODCALLTYPE ss_leave(IActiveScriptSite *This) { return S_OK; }
+
+static HRESULT STDMETHODCALLTYPE sp_qi(IServiceProvider *This, REFIID riid, void **ppv) {
+    ScriptSite *ss = SCRIPT_SITE_FROM_SP(This);
+    return ss_qi((IActiveScriptSite *)ss, riid, ppv);
+}
+static ULONG STDMETHODCALLTYPE sp_addref(IServiceProvider *This) {
+    ScriptSite *ss = SCRIPT_SITE_FROM_SP(This);
+    return ss_addref((IActiveScriptSite *)ss);
+}
+static ULONG STDMETHODCALLTYPE sp_release(IServiceProvider *This) {
+    ScriptSite *ss = SCRIPT_SITE_FROM_SP(This);
+    return ss_release((IActiveScriptSite *)ss);
+}
+static HRESULT STDMETHODCALLTYPE sp_queryservice(
+    IServiceProvider *This, REFGUID guidService, REFIID riid, void **ppv)
+{
+    (void)This;
+    (void)guidService;
+    (void)riid;
+    if (ppv) *ppv = NULL;
+    return E_NOINTERFACE;
+}
+
+static IServiceProviderVtbl g_sp_vtbl = {
+    sp_qi, sp_addref, sp_release, sp_queryservice
+};
 
 static IActiveScriptSiteVtbl g_ss_vtbl = {
     ss_qi, ss_addref, ss_release,
@@ -1040,7 +1488,339 @@ static const WCHAR g_vbs_preamble[] =
     L"    fg.Row = prevRow\r\n"
     L"    fg.Col = prevCol\r\n"
     L"End Sub\r\n"
+    L"\r\n"
+
+    L"Rem Shared ADO and live SQL helpers for compare tests\r\n"
+    L"Const adInteger = 3\r\n"
+    L"Const adDouble = 5\r\n"
+    L"Const adCurrency = 6\r\n"
+    L"Const adDate = 7\r\n"
+    L"Const adBoolean = 11\r\n"
+    L"Const adVariant = 12\r\n"
+    L"Const adVarChar = 200\r\n"
+    L"Const adUseClient = 3\r\n"  /* adUseServer (2) requires MSDAINITIALIZE
+                                      and OLEDB_CONVERSIONLIBRARY COM classes
+                                      that are OS-level Windows components, not
+                                      part of the MDAC 2.8 SP1 redistributable.
+                                      Wine does not provide them, so we must use
+                                      adUseClient (3) which routes through the
+                                      ADO client cursor engine (msadce.dll)
+                                      instead. */
+    L"Const adOpenKeyset = 1\r\n"
+    L"Const adOpenStatic = 3\r\n"
+    L"Const adLockReadOnly = 1\r\n"
+    L"Const adLockOptimistic = 3\r\n"
+    L"Const adCmdText = 1\r\n"
+    L"\r\n"
+    L"Dim g_sqlConn\r\n"
+    L"Dim g_sqlTableSeq\r\n"
+    L"Dim g_sqlLastError\r\n"
+    L"Set g_sqlConn = Nothing\r\n"
+    L"g_sqlTableSeq = 0\r\n"
+    L"g_sqlLastError = \"\"\r\n"
+    L"Randomize Timer\r\n"
+    L"\r\n"
+    L"Sub SetupBoundFallback(title, detail)\r\n"
+    L"    Err.Clear\r\n"
+    L"    fg.Redraw = False\r\n"
+    L"    fg.Cols = 2\r\n"
+    L"    fg.Rows = 2\r\n"
+    L"    fg.FixedRows = 1\r\n"
+    L"    fg.FixedCols = 0\r\n"
+    L"    fg.TextMatrix(0, 0) = title\r\n"
+    L"    fg.TextMatrix(0, 1) = \"Status\"\r\n"
+    L"    fg.TextMatrix(1, 0) = \"SQL\"\r\n"
+    L"    fg.TextMatrix(1, 1) = detail\r\n"
+    L"    fg.Redraw = True\r\n"
+    L"End Sub\r\n"
+    L"\r\n"
+    L"Function SqlStatus(defaultText)\r\n"
+    L"    If Len(g_sqlLastError) > 0 Then\r\n"
+    L"        SqlStatus = g_sqlLastError\r\n"
+    L"    Else\r\n"
+    L"        SqlStatus = defaultText\r\n"
+    L"    End If\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function ReadProcessEnv(name, fallbackValue)\r\n"
+    L"    On Error Resume Next\r\n"
+    L"    Dim sh, env, value\r\n"
+    L"    value = \"\"\r\n"
+    L"    Set sh = CreateObject(\"WScript.Shell\")\r\n"
+    L"    If Err.Number = 0 Then\r\n"
+    L"        Set env = sh.Environment(\"PROCESS\")\r\n"
+    L"        value = env(name)\r\n"
+    L"    End If\r\n"
+    L"    Err.Clear\r\n"
+    L"    On Error GoTo 0\r\n"
+    L"    If Len(value) = 0 Then value = fallbackValue\r\n"
+    L"    ReadProcessEnv = value\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function BuildSqlConnectionString()\r\n"
+    L"    Dim serverName, databaseName, userName, passwordText\r\n"
+    L"    serverName = ReadProcessEnv(\"VFG_SQL_SERVER\", \"127.0.0.1,1433\")\r\n"
+    L"    databaseName = ReadProcessEnv(\"VFG_SQL_DATABASE\", \"tempdb\")\r\n"
+    L"    userName = ReadProcessEnv(\"VFG_SQL_USER\", \"sa\")\r\n"
+    L"    passwordText = ReadProcessEnv(\"VFG_SQL_PASSWORD\", \"sapassword12#\" & Chr(36) & \"%\")\r\n"
+    L"    BuildSqlConnectionString = \"Provider=SQLOLEDB.1;Network Library=DBMSSOCN;Data Source=\" & serverName & \";Initial Catalog=\" & databaseName & \";User ID=\" & userName & \";Password=\" & passwordText & \";Persist Security Info=True;\"\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Sub SetSqlLastError(prefix)\r\n"
+    L"    If Err.Number <> 0 Then\r\n"
+    L"        g_sqlLastError = prefix & \" Err=\" & CStr(Err.Number)\r\n"
+    L"        If Len(Err.Description) > 0 Then g_sqlLastError = g_sqlLastError & \" \" & Err.Description\r\n"
+    L"        Err.Clear\r\n"
+    L"    Else\r\n"
+    L"        g_sqlLastError = prefix\r\n"
+    L"    End If\r\n"
+    L"End Sub\r\n"
+    L"\r\n"
+    L"Function OpenSqlConnection()\r\n"
+    L"    On Error Resume Next\r\n"
+    L"    g_sqlLastError = \"\"\r\n"
+    L"    If Not (g_sqlConn Is Nothing) Then\r\n"
+    L"        If g_sqlConn.State = 1 Then\r\n"
+    L"            Set OpenSqlConnection = g_sqlConn\r\n"
+    L"            Exit Function\r\n"
+    L"        End If\r\n"
+    L"    End If\r\n"
+    L"    Set g_sqlConn = CreateObject(\"ADODB.Connection\")\r\n"
+    L"    If Err.Number <> 0 Then\r\n"
+    L"        SetSqlLastError \"Create ADODB.Connection failed\"\r\n"
+    L"        Set g_sqlConn = Nothing\r\n"
+    L"        Set OpenSqlConnection = Nothing\r\n"
+    L"        Exit Function\r\n"
+    L"    End If\r\n"
+    L"    g_sqlConn.ConnectionTimeout = 15\r\n"
+    L"    g_sqlConn.CommandTimeout = 15\r\n"
+    L"    g_sqlConn.Open BuildSqlConnectionString()\r\n"
+    L"    If Err.Number <> 0 Then\r\n"
+    L"        SetSqlLastError \"SQL connect failed\"\r\n"
+    L"        Set g_sqlConn = Nothing\r\n"
+    L"        Set OpenSqlConnection = Nothing\r\n"
+    L"        Exit Function\r\n"
+    L"    End If\r\n"
+    L"    g_sqlConn.Execute \"SET NOCOUNT ON\"\r\n"
+    L"    If Err.Number <> 0 Then\r\n"
+    L"        SetSqlLastError \"SQL session init failed\"\r\n"
+    L"        Set g_sqlConn = Nothing\r\n"
+    L"        Set OpenSqlConnection = Nothing\r\n"
+    L"        Exit Function\r\n"
+    L"    End If\r\n"
+    L"    Set OpenSqlConnection = g_sqlConn\r\n"
+    L"    On Error GoTo 0\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function SqlIdentifier(name)\r\n"
+    L"    SqlIdentifier = \"[\" & Replace(CStr(name), \"]\", \"]]\") & \"]\"\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function CreateBoundRecordset(fieldNames, fieldTypes, fieldSizes)\r\n"
+    L"    On Error Resume Next\r\n"
+    L"    Dim rs, i\r\n"
+    L"    Set rs = CreateObject(\"ADODB.Recordset\")\r\n"
+    L"    If Err.Number <> 0 Then\r\n"
+    L"        Err.Clear\r\n"
+    L"        Set CreateBoundRecordset = Nothing\r\n"
+    L"        Exit Function\r\n"
+    L"    End If\r\n"
+    L"    rs.CursorLocation = 3\r\n"
+    L"    rs.CursorType = 3\r\n"
+    L"    rs.LockType = 3\r\n"
+    L"    For i = 0 To UBound(fieldNames)\r\n"
+    L"        If fieldSizes(i) > 0 Then\r\n"
+    L"            rs.Fields.Append fieldNames(i), fieldTypes(i), fieldSizes(i)\r\n"
+    L"        Else\r\n"
+    L"            rs.Fields.Append fieldNames(i), fieldTypes(i)\r\n"
+    L"        End If\r\n"
+    L"    Next\r\n"
+    L"    rs.Open\r\n"
+    L"    If Err.Number <> 0 Then\r\n"
+    L"        Err.Clear\r\n"
+    L"        Set CreateBoundRecordset = Nothing\r\n"
+    L"        Exit Function\r\n"
+    L"    End If\r\n"
+    L"    Set CreateBoundRecordset = rs\r\n"
+    L"    On Error GoTo 0\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Sub AppendRecord(rs, values)\r\n"
+    L"    Dim i\r\n"
+    L"    rs.AddNew\r\n"
+    L"    For i = 0 To UBound(values)\r\n"
+    L"        rs.Fields(i).Value = values(i)\r\n"
+    L"    Next\r\n"
+    L"    rs.Update\r\n"
+    L"End Sub\r\n"
+    L"\r\n"
+    L"Function SqlTypeName(adoType, fieldSize)\r\n"
+    L"    Select Case adoType\r\n"
+    L"        Case adInteger\r\n"
+    L"            SqlTypeName = \"int\"\r\n"
+    L"        Case adDouble\r\n"
+    L"            SqlTypeName = \"float\"\r\n"
+    L"        Case adCurrency\r\n"
+    L"            SqlTypeName = \"money\"\r\n"
+    L"        Case adDate\r\n"
+    L"            SqlTypeName = \"datetime\"\r\n"
+    L"        Case adBoolean\r\n"
+    L"            SqlTypeName = \"bit\"\r\n"
+    L"        Case adVarChar\r\n"
+    L"            If fieldSize < 1 Then fieldSize = 255\r\n"
+    L"            If fieldSize > 8000 Then fieldSize = 8000\r\n"
+    L"            SqlTypeName = \"varchar(\" & CStr(fieldSize) & \")\"\r\n"
+    L"        Case Else\r\n"
+    L"            SqlTypeName = \"varchar(255)\"\r\n"
+    L"    End Select\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function SqlDateTimeText(value)\r\n"
+    L"    SqlDateTimeText = Right(\"0000\" & CStr(Year(value)), 4) & \"-\" & Right(\"00\" & CStr(Month(value)), 2) & \"-\" & Right(\"00\" & CStr(Day(value)), 2) & \" \" & Right(\"00\" & CStr(Hour(value)), 2) & \":\" & Right(\"00\" & CStr(Minute(value)), 2) & \":\" & Right(\"00\" & CStr(Second(value)), 2)\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function SqlStringLiteral(value)\r\n"
+    L"    SqlStringLiteral = Chr(39) & Replace(CStr(value), Chr(39), Chr(39) & Chr(39)) & Chr(39)\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function SqlNumberLiteral(value)\r\n"
+    L"    Dim txt\r\n"
+    L"    txt = Trim(Str(CDbl(value)))\r\n"
+    L"    txt = Replace(txt, \",\", \".\")\r\n"
+    L"    SqlNumberLiteral = txt\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function SqlValueLiteral(value, adoType)\r\n"
+    L"    If IsNull(value) Then\r\n"
+    L"        SqlValueLiteral = \"NULL\"\r\n"
+    L"        Exit Function\r\n"
+    L"    End If\r\n"
+    L"    Select Case adoType\r\n"
+    L"        Case adInteger\r\n"
+    L"            SqlValueLiteral = CStr(CLng(value))\r\n"
+    L"        Case adDouble, adCurrency\r\n"
+    L"            SqlValueLiteral = SqlNumberLiteral(value)\r\n"
+    L"        Case adBoolean\r\n"
+    L"            If CBool(value) Then\r\n"
+    L"                SqlValueLiteral = \"1\"\r\n"
+    L"            Else\r\n"
+    L"                SqlValueLiteral = \"0\"\r\n"
+    L"            End If\r\n"
+    L"        Case adDate\r\n"
+    L"            SqlValueLiteral = Chr(39) & SqlDateTimeText(value) & Chr(39)\r\n"
+    L"        Case Else\r\n"
+    L"            SqlValueLiteral = SqlStringLiteral(value)\r\n"
+    L"    End Select\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function BuildSqlColumnDefinitions(fieldNames, fieldTypes, fieldSizes)\r\n"
+    L"    Dim sqlText, i\r\n"
+    L"    sqlText = \"__vfg_pk int IDENTITY(1,1) NOT NULL PRIMARY KEY\"\r\n"
+    L"    For i = 0 To UBound(fieldNames)\r\n"
+    L"        sqlText = sqlText & \", \" & SqlIdentifier(fieldNames(i)) & \" \" & SqlTypeName(fieldTypes(i), fieldSizes(i))\r\n"
+    L"    Next\r\n"
+    L"    BuildSqlColumnDefinitions = sqlText\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function BuildSqlFieldList(fieldNames)\r\n"
+    L"    Dim sqlText, i\r\n"
+    L"    sqlText = \"\"\r\n"
+    L"    For i = 0 To UBound(fieldNames)\r\n"
+    L"        If i > 0 Then sqlText = sqlText & \", \"\r\n"
+    L"        sqlText = sqlText & SqlIdentifier(fieldNames(i))\r\n"
+    L"    Next\r\n"
+    L"    BuildSqlFieldList = sqlText\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function BuildSqlRowValues(fieldTypes, values)\r\n"
+    L"    Dim sqlText, i\r\n"
+    L"    sqlText = \"\"\r\n"
+    L"    For i = 0 To UBound(fieldTypes)\r\n"
+    L"        If i > 0 Then sqlText = sqlText & \", \"\r\n"
+    L"        sqlText = sqlText & SqlValueLiteral(values(i), fieldTypes(i))\r\n"
+    L"    Next\r\n"
+    L"    BuildSqlRowValues = sqlText\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function NextSqlTableName()\r\n"
+    L"    g_sqlTableSeq = g_sqlTableSeq + 1\r\n"
+    L"    NextSqlTableName = \"#vfg_sql_\" & CStr(CLng(Timer * 1000)) & \"_\" & CStr(g_sqlTableSeq)\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function OpenSqlRecordset(selectSql, cursorType, lockType)\r\n"
+    L"    On Error Resume Next\r\n"
+    L"    Dim cn, rs\r\n"
+    L"    g_sqlLastError = \"\"\r\n"
+    L"    Set cn = OpenSqlConnection()\r\n"
+    L"    If cn Is Nothing Then\r\n"
+    L"        Set OpenSqlRecordset = Nothing\r\n"
+    L"        Exit Function\r\n"
+    L"    End If\r\n"
+    L"    Set rs = CreateObject(\"ADODB.Recordset\")\r\n"
+    L"    If Err.Number <> 0 Then\r\n"
+    L"        SetSqlLastError \"Create ADODB.Recordset failed\"\r\n"
+    L"        Set OpenSqlRecordset = Nothing\r\n"
+    L"        Exit Function\r\n"
+    L"    End If\r\n"
+    L"    rs.CursorLocation = adUseClient\r\n"  /* see adUseClient comment above */
+    L"    rs.Open selectSql, cn, cursorType, lockType, adCmdText\r\n"
+    L"    If Err.Number <> 0 Then\r\n"
+    L"        SetSqlLastError \"SQL query failed\"\r\n"
+    L"        Set OpenSqlRecordset = Nothing\r\n"
+    L"        Exit Function\r\n"
+    L"    End If\r\n"
+    L"    Set OpenSqlRecordset = rs\r\n"
+    L"    On Error GoTo 0\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function OpenSqlQueryRecordset(selectSql)\r\n"
+    L"    Set OpenSqlQueryRecordset = OpenSqlRecordset(selectSql, adOpenStatic, adLockReadOnly)\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function OpenSqlTableRecordset(selectSql)\r\n"
+    L"    Set OpenSqlTableRecordset = OpenSqlRecordset(selectSql, adOpenKeyset, adLockOptimistic)\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function CreateSequenceRows(maxN)\r\n"
+    L"    Dim rows(), i\r\n"
+    L"    ReDim rows(maxN - 1)\r\n"
+    L"    For i = 1 To maxN\r\n"
+    L"        rows(i - 1) = Array(i)\r\n"
+    L"    Next\r\n"
+    L"    CreateSequenceRows = rows\r\n"
+    L"End Function\r\n"
+    L"\r\n"
+    L"Function CreateSqlRecordset(fieldNames, fieldTypes, fieldSizes, rows)\r\n"
+    L"    On Error Resume Next\r\n"
+    L"    Dim cn, tableName, fieldList, i, rowSql\r\n"
+    L"    g_sqlLastError = \"\"\r\n"
+    L"    Set cn = OpenSqlConnection()\r\n"
+    L"    If cn Is Nothing Then\r\n"
+    L"        Set CreateSqlRecordset = Nothing\r\n"
+    L"        Exit Function\r\n"
+    L"    End If\r\n"
+    L"    tableName = NextSqlTableName()\r\n"
+    L"    fieldList = BuildSqlFieldList(fieldNames)\r\n"
+    L"    cn.Execute \"CREATE TABLE \" & tableName & \" (\" & BuildSqlColumnDefinitions(fieldNames, fieldTypes, fieldSizes) & \")\"\r\n"
+    L"    If Err.Number <> 0 Then\r\n"
+    L"        SetSqlLastError \"SQL create table failed\"\r\n"
+    L"        Set CreateSqlRecordset = Nothing\r\n"
+    L"        Exit Function\r\n"
+    L"    End If\r\n"
+    L"    For i = 0 To UBound(rows)\r\n"
+    L"        rowSql = \"INSERT INTO \" & tableName & \" (\" & fieldList & \") VALUES (\" & BuildSqlRowValues(fieldTypes, rows(i)) & \")\"\r\n"
+    L"        cn.Execute rowSql\r\n"
+    L"        If Err.Number <> 0 Then\r\n"
+    L"            SetSqlLastError \"SQL insert failed\"\r\n"
+    L"            Set CreateSqlRecordset = Nothing\r\n"
+    L"            Exit Function\r\n"
+    L"        End If\r\n"
+    L"    Next\r\n"
+    L"    Set CreateSqlRecordset = OpenSqlTableRecordset(\"SELECT \" & fieldList & \" FROM \" & tableName & \" ORDER BY __vfg_pk\")\r\n"
+    L"    On Error GoTo 0\r\n"
+    L"End Function\r\n"
     L"\r\n";
+
 
 /* Load a UTF-8 text file and return wide string (malloc'd). */
 static WCHAR *load_file_wide(const char *path) {
@@ -1065,6 +1845,7 @@ static WCHAR *load_file_wide(const char *path) {
 static HRESULT run_vbs(IDispatch *grid, const WCHAR *code) {
     ScriptSite site;
     site.lpVtbl = &g_ss_vtbl;
+    site.lpVtblServiceProvider = &g_sp_vtbl;
     site.ref = 1;
     site.grid = grid;
 
@@ -1187,6 +1968,42 @@ static TestCase g_tests[] = {
     { "event_edit_hooks", 820, 420 },
     { "datasource_bind", 840, 400 },
     { "data_roundtrip_refresh", 840, 400 },
+    { "ado_properties_refresh", 840, 400 },
+    { "ado_clone_bind", 840, 400 },
+    { "ado_filter_refresh", 840, 400 },
+    { "ado_null_display", 840, 400 },
+    { "ado_source_swap", 840, 400 },
+    { "ado_datamember_bind", 840, 400 },
+    { "ado_move_cursor_ops", 840, 400 },
+    { "ado_absoluteposition_ops", 840, 400 },
+    { "ado_find_ops", 840, 400 },
+    { "ado_bookmark_ops", 840, 400 },
+    { "ado_bound_immediate_edit", 840, 400 },
+    { "ado_bound_batch_edit", 840, 400 },
+    { "ado_external_addnew_ops", 840, 400 },
+    { "ado_external_delete_ops", 840, 400 },
+    { "ado_bound_additem_ops", 840, 400 },
+    { "ado_bound_removeitem_ops", 840, 400 },
+    { "sql_connect_basic", 840, 400 },
+    { "sql_datatypes", 840, 400 },
+    { "sql_nulls", 840, 400 },
+    { "sql_datamode_0", 840, 400 },
+    { "sql_datamode_1_read_only", 840, 400 },
+    { "sql_datamode_1_updatable", 840, 400 },
+    { "sql_col_formatting", 840, 400 },
+    { "sql_edit_update", 840, 400 },
+    { "sql_additem_error", 840, 400 },
+    { "sql_col_alignment", 840, 400 },
+    { "sql_auto_resize", 840, 400 },
+    { "sql_sort_live", 840, 400 },
+    { "sql_colkey_mapping", 840, 400 },
+    { "sql_boolean_checkboxes", 840, 400 },
+    { "sql_large_rowset", 840, 400 },
+    { "sql_subtotals", 840, 400 },
+    { "sql_refresh", 840, 400 },
+    { "sql_unbind", 840, 400 },
+    { "sql_rebind", 840, 400 },
+    { "sql_error_handling", 840, 400 },
     { NULL, 0, 0 }
 };
 
@@ -1611,10 +2428,12 @@ int main(int argc, char *argv[]) {
             continue;
         }
         TestCase *tc = &g_tests[i];
-        char bmp_lg[128], bmp_vv[128], bmp_diff[128];
+        char bmp_lg[128], bmp_vv[128], bmp_diff[128], cell_diff_txt[128];
         snprintf(bmp_lg, sizeof(bmp_lg), "test_%02d_%s_lg.bmp", i+1, tc->name);
         snprintf(bmp_vv, sizeof(bmp_vv), "test_%02d_%s_vv.bmp", i+1, tc->name);
         snprintf(bmp_diff, sizeof(bmp_diff), "test_%02d_%s_diff.bmp", i+1, tc->name);
+        snprintf(cell_diff_txt, sizeof(cell_diff_txt), "test_%02d_%s_cells.diff.txt", i+1, tc->name);
+        remove(cell_diff_txt);
 
         printf("[%02d] %s\n", i+1, tc->name);
 
@@ -1629,19 +2448,25 @@ int main(int argc, char *argv[]) {
         }
 
         int has_lg = 0;
+        int has_lg_snapshot = 0;
+        int lg_active = 0;
+        HostedGrid lg = {0};
+        GridSnapshot lg_snapshot = {0};
+        GridSnapshot vv_snapshot = {0};
 
         /* FlexGrid (reference) */
         if (!only_vv) {
-            HostedGrid lg;
             if (hosted_grid_create(&lg, g_ref_progid, L"FlexGrid Host", tc->width, tc->height, 0) == 0) {
                 run_vbs(lg.disp, vbs_code);
                 pump_messages_ms(120);
+                capture_grid_snapshot(lg.disp, &lg_snapshot);
+                has_lg_snapshot = 1;
                 if (dump_test == (i + 1)) {
                     dump_grid_rows(lg.disp, "LG", i + 1);
                 }
                 render_to_bmp(lg.disp, bmp_lg, lg.render_width, lg.render_height);
-                hosted_grid_destroy(&lg);
                 has_lg = 1;
+                lg_active = 1;
             } else {
                 printf("  LG: host/create failed\n");
             }
@@ -1650,9 +2475,25 @@ int main(int argc, char *argv[]) {
         /* VolvoxGrid */
         IDispatch *pVV = create_grid(PROGID_VOLVOXGRID, "VV");
         if (pVV) {
+            HRESULT resize_hr = call_resize_viewport(pVV, tc->width, tc->height);
+            if (FAILED(resize_hr)) {
+                printf("  VV: ResizeViewport failed: 0x%08lx\n", resize_hr);
+            }
             run_vbs(pVV, vbs_code);
+            capture_grid_snapshot(pVV, &vv_snapshot);
             if (dump_test == (i + 1)) {
                 dump_grid_rows(pVV, "VV", i + 1);
+            }
+            if (has_lg_snapshot) {
+                print_grid_property_diffs(i + 1, tc->name, &lg_snapshot, &vv_snapshot);
+                write_grid_cell_diff_file(
+                    i + 1,
+                    tc->name,
+                    &lg_snapshot,
+                    &vv_snapshot,
+                    lg.disp,
+                    pVV,
+                    cell_diff_txt);
             }
             render_to_bmp(pVV, bmp_vv, tc->width, tc->height);
             pVV->lpVtbl->Release(pVV);
@@ -1671,6 +2512,13 @@ int main(int argc, char *argv[]) {
             printf("  VV: FAILED to create\n");
             fail++;
         }
+
+        if (lg_active) {
+            hosted_grid_destroy(&lg);
+        }
+
+        free_grid_snapshot(&lg_snapshot);
+        free_grid_snapshot(&vv_snapshot);
 
         free(vbs_code);
     }

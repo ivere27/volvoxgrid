@@ -20,6 +20,8 @@ export interface DefaultInputGrid {
   pinRow(row: number, mode: number): void;
   setRowSticky(row: number, edge: number): void;
   setColSticky(col: number, edge: number): void;
+  /** When true, syncInputEditor skips select() so the first typed char isn't selected. */
+  suppressEditorSelect?: boolean;
 }
 
 // ── Keyboard ────────────────────────────────────────────────────
@@ -63,8 +65,11 @@ export function setupDefaultKeyboard(
     }
 
     // Printable key starts edit mode and seeds the first character.
+    // suppressEditorSelect prevents editInput.select() from selecting
+    // the seeded character (which would cause "abc" → "bc").
     if (!wasm.is_editing(gridId) && isPrintableEditKey(e)) {
       if (typeof wasm.begin_edit_at_selection === "function") {
+        (grid as any).suppressEditorSelect = true;
         wasm.begin_edit_at_selection(gridId);
         if (wasm.is_editing(gridId)) {
           wasm.set_edit_text(gridId, e.key);
@@ -73,8 +78,10 @@ export function setupDefaultKeyboard(
           }
           grid.invalidate();
           e.preventDefault();
+          requestAnimationFrame(() => { (grid as any).suppressEditorSelect = false; });
           return;
         }
+        (grid as any).suppressEditorSelect = false;
       }
     }
 

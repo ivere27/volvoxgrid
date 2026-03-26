@@ -5,6 +5,7 @@ import io.github.ivere27.volvoxgrid.ConfigureRequest;
 import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.CreateResponse;
 import io.github.ivere27.volvoxgrid.CellRange;
+import io.github.ivere27.volvoxgrid.EditCommand;
 import io.github.ivere27.volvoxgrid.EditRequest;
 import io.github.ivere27.volvoxgrid.EventDecision;
 import io.github.ivere27.volvoxgrid.FramePacingMode;
@@ -32,13 +33,19 @@ import java.awt.Toolkit;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.InputEvent;
+import java.awt.Rectangle;
+import java.awt.event.InputMethodEvent;
+import java.awt.event.InputMethodListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
+import java.awt.font.TextHitInfo;
+import java.awt.im.InputMethodRequests;
 import java.awt.image.BufferedImage;
+import java.text.AttributedCharacterIterator;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
@@ -236,6 +243,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private volatile BeforeSortListener beforeSortListener;
     private volatile EditRequestListener editRequestListener;
     private volatile boolean decisionChannelEnabled = false;
+    private volatile boolean engineEditing = false;
 
     private volatile RendererBackend rendererBackend = RendererBackend.CPU;
     private volatile boolean hostFlingEnabled = false;
@@ -259,6 +267,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         setPreferredSize(new Dimension(960, 600));
         setFocusable(true);
         setFocusTraversalKeysEnabled(false);
+        enableInputMethods(true);
 
         installInputHandlers();
 
@@ -634,6 +643,179 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                 requestFrame();
             }
         });
+
+        addInputMethodListener(new InputMethodListener() {
+            @Override
+            public void inputMethodTextChanged(InputMethodEvent e) {
+                handleInputMethodTextChanged(e);
+            }
+
+            @Override
+            public void caretPositionChanged(InputMethodEvent e) {
+                e.consume();
+            }
+        });
+    }
+
+    @Override
+    public InputMethodRequests getInputMethodRequests() {
+        return new InputMethodRequests() {
+            @Override
+            public Rectangle getTextLocation(TextHitInfo offset) {
+                java.awt.Point loc = getLocationOnScreen();
+                return new Rectangle(loc.x, loc.y, 0, getHeight());
+            }
+
+            @Override
+            public TextHitInfo getLocationOffset(int x, int y) {
+                return null;
+            }
+
+            @Override
+            public int getInsertPositionOffset() {
+                return 0;
+            }
+
+            @Override
+            public AttributedCharacterIterator getCommittedText(int beginIndex, int endIndex, AttributedCharacterIterator.Attribute[] attributes) {
+                return new java.text.AttributedString("").getIterator();
+            }
+
+            @Override
+            public int getCommittedTextLength() {
+                return 0;
+            }
+
+            @Override
+            public AttributedCharacterIterator cancelLatestCommittedText(AttributedCharacterIterator.Attribute[] attributes) {
+                return null;
+            }
+
+            @Override
+            public AttributedCharacterIterator getSelectedText(AttributedCharacterIterator.Attribute[] attributes) {
+                return null;
+            }
+        };
+    }
+
+    private void handleInputMethodTextChanged(InputMethodEvent e) {
+        VolvoxGridDesktopClient c = client;
+        if (c == null) {
+            e.consume();
+            return;
+        }
+
+        AttributedCharacterIterator text = e.getText();
+        int committedCount = e.getCommittedCharacterCount();
+
+        if (text != null) {
+            // Extract committed text
+            StringBuilder committed = new StringBuilder();
+            StringBuilder composing = new StringBuilder();
+            text.first();
+            for (int i = 0; i < committedCount && text.getIndex() < text.getEndIndex(); i++) {
+                committed.append(text.current());
+                text.next();
+            }
+            while (text.getIndex() < text.getEndIndex()) {
+                composing.append(text.current());
+                text.next();
+            }
+
+            try {
+                if (committed.length() > 0) {
+                    if (!engineEditing) {
+                        // Start editing: first char via KeyPress to trigger auto-edit
+                        String first = String.valueOf(committed.charAt(0));
+                        sendKeyDirect(io.github.ivere27.volvoxgrid.KeyEvent.Type.KEY_PRESS, 0, 0, first);
+                        engineEditing = true;
+                        // Remaining committed chars via preedit commit
+                        if (committed.length() > 1) {
+                            String rest = committed.substring(1);
+                            c.edit(EditCommand.newBuilder()
+                                .setGridId(gridId)
+                                .setSetPreedit(io.github.ivere27.volvoxgrid.EditSetPreedit.newBuilder()
+                                    .setText(rest)
+                                    .setCursor(rest.length())
+                                    .setCommit(true)
+                                    .build())
+                                .build());
+                        }
+                    } else {
+                        c.edit(EditCommand.newBuilder()
+                            .setGridId(gridId)
+                            .setSetPreedit(io.github.ivere27.volvoxgrid.EditSetPreedit.newBuilder()
+                                .setText(committed.toString())
+                                .setCursor(committed.length())
+                                .setCommit(true)
+                                .build())
+                            .build());
+                    }
+                }
+
+                if (composing.length() > 0) {
+                    if (!engineEditing) {
+                        // Start editing with empty text, then set preedit
+                        sendKeyDirect(io.github.ivere27.volvoxgrid.KeyEvent.Type.KEY_PRESS, 0, 0, " ");
+                        // Replace the space with empty text via edit command
+                        c.edit(EditCommand.newBuilder()
+                            .setGridId(gridId)
+                            .setSetText(io.github.ivere27.volvoxgrid.EditSetText.newBuilder()
+                                .setText("")
+                                .build())
+                            .build());
+                        engineEditing = true;
+                    }
+                    c.edit(EditCommand.newBuilder()
+                        .setGridId(gridId)
+                        .setSetPreedit(io.github.ivere27.volvoxgrid.EditSetPreedit.newBuilder()
+                            .setText(composing.toString())
+                            .setCursor(composing.length())
+                            .setCommit(false)
+                            .build())
+                        .build());
+                } else if (committed.length() > 0) {
+                    // Composition ended — clear preedit
+                    c.edit(EditCommand.newBuilder()
+                        .setGridId(gridId)
+                        .setSetPreedit(io.github.ivere27.volvoxgrid.EditSetPreedit.newBuilder()
+                            .setText("")
+                            .setCursor(0)
+                            .setCommit(false)
+                            .build())
+                        .build());
+                }
+            } catch (Exception ex) {
+                LOG.log(Level.FINER, "IME edit failed", ex);
+            }
+        }
+
+        requestFrame();
+        e.consume();
+    }
+
+    private void sendKeyDirect(
+        io.github.ivere27.volvoxgrid.KeyEvent.Type type,
+        int keyCode,
+        int modifier,
+        String character
+    ) {
+        try {
+            RenderInput input = RenderInput.newBuilder()
+                .setGridId(gridId)
+                .setKey(
+                    io.github.ivere27.volvoxgrid.KeyEvent.newBuilder()
+                        .setType(type)
+                        .setKeyCode(keyCode)
+                        .setModifier(modifier)
+                        .setCharacter(character)
+                        .build()
+                )
+                .build();
+            sendRenderInput(input);
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "Key send failed", ex);
+        }
     }
 
     private String printableChar(java.awt.event.KeyEvent e) {
@@ -1233,6 +1415,12 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     }
 
     private void handleGridEvent(GridEvent event) {
+        if (event.hasStartEdit()) {
+            engineEditing = true;
+        } else if (event.hasAfterEdit()) {
+            engineEditing = false;
+        }
+
         if (decisionChannelEnabled && isCancelableGridEvent(event)) {
             boolean cancel = dispatchCancelableGridEvent(event);
             sendEventDecision(event.getEventId(), cancel);

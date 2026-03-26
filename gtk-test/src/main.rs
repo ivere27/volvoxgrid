@@ -377,6 +377,8 @@ struct State {
     suppress_combo_changed: bool,
     edit_overlay_cell: Option<(i32, i32)>,
     render_layer_mask: u64,
+    /// Tracks whether the engine is in edit mode (for IME commit/preedit).
+    engine_editing: bool,
 }
 
 fn main() {
@@ -458,6 +460,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         suppress_combo_changed: false,
         edit_overlay_cell: None,
         render_layer_mask: u64::MAX,
+        engine_editing: false,
     };
 
     apply_initial_config(&mut state)?;
@@ -980,18 +983,98 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     }
     drawing_area.add_controller(scroll);
 
+    let im_context = gtk4::IMMulticontext::new();
+    im_context.set_client_widget(Some(&drawing_area));
     let key = EventControllerKey::new();
+    key.set_im_context(Some(&im_context));
+
+    // IME commit: final text from IME (e.g. "a" for English, "한" for Korean).
+    {
+        let state = Rc::clone(&state);
+        let status = status_label.clone();
+        let area = drawing_area.clone();
+        im_context.connect_commit(move |_ctx, text| {
+            let Ok(mut st) = state.try_borrow_mut() else {
+                return;
+            };
+
+            if !st.engine_editing {
+                // Idle cell: send KeyPress for first char to trigger auto-edit,
+                // then commit_preedit for remaining chars (engine is now editing).
+                let mut chars = text.chars();
+                if let Some(first) = chars.next() {
+                    let _ = send_key_input(
+                        &mut st,
+                        pb::key_event::Type::KeyPress,
+                        0,
+                        0,
+                        first.to_string(),
+                    );
+                    // The engine processes KeyPress synchronously on the render
+                    // thread, entering edit mode. Mark it here so subsequent
+                    // commits in the same pump don't re-trigger auto-edit.
+                    st.engine_editing = true;
+                }
+                // Remaining chars: engine is already editing, insert directly.
+                let rest: String = chars.collect();
+                if !rest.is_empty() {
+                    let _ = st.client.edit_commit_preedit(st.grid_id, &rest);
+                }
+            } else {
+                // Editing: commit preedit text into edit_text.
+                if let Err(err) = st.client.edit_commit_preedit(st.grid_id, text) {
+                    st.status_note = format!("IME commit failed: {err}");
+                }
+            }
+            update_status_label(&st, &status);
+            let _ = request_frame(&mut st);
+            area.queue_draw();
+        });
+    }
+
+    // IME preedit changed: live composition updates (e.g. "ㅇ" → "아").
+    {
+        let state = Rc::clone(&state);
+        let status = status_label.clone();
+        let area = drawing_area.clone();
+        im_context.connect_preedit_changed(move |ctx| {
+            let (text, _attrs, cursor) = ctx.preedit_string();
+            let Ok(mut st) = state.try_borrow_mut() else {
+                return;
+            };
+
+            if !text.is_empty() && !st.engine_editing {
+                // Composition starting on idle cell: begin edit with empty text.
+                let sel = st.selection.clone();
+                if let Ok(()) =
+                    st.client
+                        .edit_start_empty(st.grid_id, sel.active_row, sel.active_col)
+                {
+                    st.engine_editing = true;
+                }
+            }
+
+            // Forward preedit to engine.
+            if let Err(err) = st
+                .client
+                .edit_set_preedit(st.grid_id, text.to_string(), cursor)
+            {
+                st.status_note = format!("Preedit update failed: {err}");
+            }
+            update_status_label(&st, &status);
+            let _ = request_frame(&mut st);
+            area.queue_draw();
+        });
+    }
+
+    // Key pressed: only fires for keys the IMContext doesn't handle
+    // (arrows, escape, enter, tab, function keys, etc.)
     {
         let state = Rc::clone(&state);
         let status = status_label.clone();
         key.connect_key_pressed(move |_ctrl, keyval, _keycode, modifier| {
             let key_code = gdk_keyval_to_vk(keyval);
-            let printable = keyval
-                .to_unicode()
-                .filter(|ch| !ch.is_control())
-                .map(|ch| ch.to_string())
-                .unwrap_or_default();
-            if key_code == 0 && printable.is_empty() {
+            if key_code == 0 {
                 return glib::Propagation::Proceed;
             }
 
@@ -1007,14 +1090,6 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
                 String::new(),
             ) {
                 st.status_note = format!("Key down failed: {err}");
-            } else if !printable.is_empty() {
-                let _ = send_key_input(
-                    &mut st,
-                    pb::key_event::Type::KeyPress,
-                    key_code,
-                    flags,
-                    printable,
-                );
             }
             update_status_label(&st, &status);
             let _ = request_frame(&mut st);
@@ -1050,6 +1125,20 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         });
     }
     drawing_area.add_controller(key);
+
+    // IMContext focus management.
+    {
+        let im = im_context.clone();
+        let focus_ctrl = gtk4::EventControllerFocus::new();
+        focus_ctrl.connect_enter(move |_| {
+            im.focus_in();
+        });
+        let im2 = im_context;
+        focus_ctrl.connect_leave(move |_| {
+            im2.focus_out();
+        });
+        drawing_area.add_controller(focus_ctrl);
+    }
 
     connect_demo_button(
         &btn_demo_sales,
@@ -1634,6 +1723,54 @@ impl VolvoxServiceClient {
         Ok(())
     }
 
+    fn edit_set_preedit(&self, grid_id: i64, text: String, cursor: i32) -> Result<(), String> {
+        let _: pb::EditState = self.invoke(
+            "/volvoxgrid.v1.VolvoxGridService/Edit",
+            &pb::EditCommand {
+                grid_id,
+                command: Some(pb::edit_command::Command::SetPreedit(pb::EditSetPreedit {
+                    text,
+                    cursor,
+                    commit: false,
+                })),
+            },
+        )?;
+        Ok(())
+    }
+
+    fn edit_start_empty(&self, grid_id: i64, row: i32, col: i32) -> Result<(), String> {
+        let _: pb::EditState = self.invoke(
+            "/volvoxgrid.v1.VolvoxGridService/Edit",
+            &pb::EditCommand {
+                grid_id,
+                command: Some(pb::edit_command::Command::Start(pb::EditStart {
+                    row,
+                    col,
+                    select_all: None,
+                    caret_end: None,
+                    seed_text: Some(String::new()),
+                    formula_mode: None,
+                })),
+            },
+        )?;
+        Ok(())
+    }
+
+    fn edit_commit_preedit(&self, grid_id: i64, committed_text: &str) -> Result<(), String> {
+        let _: pb::EditState = self.invoke(
+            "/volvoxgrid.v1.VolvoxGridService/Edit",
+            &pb::EditCommand {
+                grid_id,
+                command: Some(pb::edit_command::Command::SetPreedit(pb::EditSetPreedit {
+                    text: committed_text.to_string(),
+                    cursor: 0,
+                    commit: true,
+                })),
+            },
+        )?;
+        Ok(())
+    }
+
     fn find_text(&self, grid_id: i64, col: i32, start_row: i32, text: &str) -> Result<i32, String> {
         let resp: pb::FindResponse = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Find",
@@ -1992,6 +2129,7 @@ fn switch_demo_session(
 
     state.current_demo = demo.to_string();
     state.col_hidden = false;
+    state.engine_editing = false;
     set_demo_button_active(btn_sales, demo == DEMO_SALES);
     set_demo_button_active(btn_hierarchy, demo == DEMO_HIERARCHY);
     set_demo_button_active(btn_stress, demo == DEMO_STRESS);
@@ -2153,6 +2291,16 @@ fn process_ui_message(
                 }
                 st.event_count += 1;
                 st.last_event = grid_event_name(&event).to_string();
+                // Track engine edit state for IME support.
+                match &event.event {
+                    Some(pb::grid_event::Event::StartEdit(_)) => {
+                        st.engine_editing = true;
+                    }
+                    Some(pb::grid_event::Event::AfterEdit(_)) => {
+                        st.engine_editing = false;
+                    }
+                    _ => {}
+                }
             }
             UiMessage::StreamEnded(epoch, kind) => {
                 if epoch != st.stream_epoch {
@@ -2224,14 +2372,13 @@ fn handle_render_output(
                 };
                 area.set_cursor_from_name(name);
             }
-            pb::render_output::Event::EditRequest(request) => {
-                show_edit_overlay(
-                    state,
-                    edit_entry,
-                    dropdown_combo,
-                    dropdown_combo_editable,
-                    request,
-                );
+            pb::render_output::Event::EditRequest(_request) => {
+                // Don't show the host GtkEntry overlay. The engine renders the
+                // editor itself in the canvas and the IMContext on the drawing
+                // area handles text input (including CJK composition). Showing
+                // the overlay would steal focus from the drawing area and break
+                // IME support.
+                state.engine_editing = true;
             }
             pb::render_output::Event::DropdownRequest(request) => {
                 show_combo_overlay(

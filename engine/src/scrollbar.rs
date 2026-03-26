@@ -248,13 +248,12 @@ pub(crate) fn reset_scrollbar_fade_state(grid: &mut VolvoxGrid) {
     } else {
         0.0
     };
-    grid.scrollbar_fade_last_tick = if scrollbar_overlays_content(grid.scrollbar_appearance)
-        && grid.animation.enabled
-    {
-        Some(Instant::now())
-    } else {
-        None
-    };
+    grid.scrollbar_fade_last_tick =
+        if scrollbar_overlays_content(grid.scrollbar_appearance) && grid.animation.enabled {
+            Some(Instant::now())
+        } else {
+            None
+        };
 }
 
 pub(crate) fn compute_scrollbar_geometry(

@@ -116,7 +116,7 @@ namespace VolvoxGrid.DotNet.Internal
                     var scroll = configDataOrDefault.Scrolling;
                     cfg.WriteMessage(5, s =>
                     {
-                        if (scroll.Scrollbars.HasValue) s.WriteInt32(1, (int)scroll.Scrollbars.Value);
+                        if (scroll.Scrollbars.HasValue) s.WriteInt32(9, (int)scroll.Scrollbars.Value);
                         if (scroll.FlingEnabled.HasValue) s.WriteBool(4, scroll.FlingEnabled.Value);
                         if (scroll.FlingImpulseGain.HasValue) s.WriteFloat(5, scroll.FlingImpulseGain.Value);
                         if (scroll.FlingFriction.HasValue) s.WriteFloat(6, scroll.FlingFriction.Value);
@@ -987,6 +987,30 @@ namespace VolvoxGrid.DotNet.Internal
             return writer.ToArray();
         }
 
+        public byte[] EncodeEditCommandSetPreedit(long gridId, string text, int cursor, bool commit)
+        {
+            var writer = new ProtoWriter();
+            writer.WriteInt64(1, gridId);
+            writer.WriteMessage(9, preedit =>
+            {
+                preedit.WriteString(1, text ?? string.Empty);
+                preedit.WriteInt32(2, cursor);
+                if (commit) preedit.WriteBool(3, true);
+            });
+            return writer.ToArray();
+        }
+
+        public byte[] EncodeEditCommandSetText(long gridId, string text)
+        {
+            var writer = new ProtoWriter();
+            writer.WriteInt64(1, gridId);
+            writer.WriteMessage(5, setText =>
+            {
+                setText.WriteString(1, text ?? string.Empty);
+            });
+            return writer.ToArray();
+        }
+
         public byte[] EncodeClipboardRequest(long gridId, string action, string pasteText)
         {
             var writer = new ProtoWriter();
@@ -1407,6 +1431,28 @@ namespace VolvoxGrid.DotNet.Internal
                         }
                         break;
 
+                    case 9:
+                        if (wire == ProtoWireType.LengthDelimited)
+                        {
+                            DecodeStartEdit(data, reader.ReadLengthDelimited());
+                        }
+                        else
+                        {
+                            reader.SkipField(wire);
+                        }
+                        break;
+
+                    case 10:
+                        if (wire == ProtoWireType.LengthDelimited)
+                        {
+                            DecodeAfterEdit(data, reader.ReadLengthDelimited());
+                        }
+                        else
+                        {
+                            reader.SkipField(wire);
+                        }
+                        break;
+
                     default:
                         reader.SkipField(wire);
                         break;
@@ -1565,6 +1611,40 @@ namespace VolvoxGrid.DotNet.Internal
                     default:
                         reader.SkipField(wire);
                         break;
+                }
+            }
+        }
+
+        private static void DecodeStartEdit(VolvoxGridEventData data, byte[] payload)
+        {
+            data.Kind = VolvoxGridEventKind.StartEdit;
+            var reader = new ProtoReader(payload);
+            int field;
+            ProtoWireType wire;
+            while (reader.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: data.Row = reader.ReadInt32(); break;
+                    case 2: data.Col = reader.ReadInt32(); break;
+                    default: reader.SkipField(wire); break;
+                }
+            }
+        }
+
+        private static void DecodeAfterEdit(VolvoxGridEventData data, byte[] payload)
+        {
+            data.Kind = VolvoxGridEventKind.AfterEdit;
+            var reader = new ProtoReader(payload);
+            int field;
+            ProtoWireType wire;
+            while (reader.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: data.Row = reader.ReadInt32(); break;
+                    case 2: data.Col = reader.ReadInt32(); break;
+                    default: reader.SkipField(wire); break;
                 }
             }
         }
@@ -1956,7 +2036,7 @@ namespace VolvoxGrid.DotNet.Internal
             {
                 switch (field)
                 {
-                    case 1:
+                    case 9:
                         if (wire == ProtoWireType.Varint) scrolling.Scrollbars = (VolvoxScrollBarsMode)reader.ReadInt32();
                         else reader.SkipField(wire);
                         break;

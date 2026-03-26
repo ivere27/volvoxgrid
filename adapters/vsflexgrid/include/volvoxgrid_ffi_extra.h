@@ -9,6 +9,35 @@ extern "C" {
 
 /* Render grid to a BGRA pixel buffer (for IViewObject) */
 int32_t volvox_grid_render_bgra(int64_t id, uint8_t* buf, int32_t w, int32_t h);
+int32_t volvox_grid_resize_viewport_native(int64_t id, int32_t w, int32_t h);
+int32_t volvox_grid_pointer_down_native(
+    int64_t id,
+    float x,
+    float y,
+    int32_t button,
+    int32_t modifier,
+    int32_t dbl_click
+);
+int32_t volvox_grid_pointer_move_native(
+    int64_t id,
+    float x,
+    float y,
+    int32_t button,
+    int32_t modifier
+);
+int32_t volvox_grid_pointer_up_native(
+    int64_t id,
+    float x,
+    float y,
+    int32_t button,
+    int32_t modifier
+);
+int32_t volvox_grid_scroll_native(int64_t id, float delta_x, float delta_y);
+int32_t volvox_grid_key_down_native(int64_t id, int32_t key_code, int32_t modifier);
+int32_t volvox_grid_key_press_native(int64_t id, uint32_t char_code);
+int32_t volvox_grid_set_hover_mode_native(int64_t id, uint32_t mode);
+int32_t volvox_grid_set_debug_overlay_native(int64_t id, int32_t enabled);
+int32_t volvox_grid_set_scroll_blit_native(int64_t id, int32_t enabled);
 
 /* Color properties (OLE_COLOR as u32 ARGB) */
 int32_t  volvox_grid_set_back_color(int64_t id, uint32_t color);

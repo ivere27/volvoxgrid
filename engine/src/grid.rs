@@ -3232,6 +3232,110 @@ impl VolvoxGrid {
         Some((x, y, w, h))
     }
 
+    /// Approximate the display-text caret index from a click inside the cell.
+    ///
+    /// Used for spreadsheet-style double-click editing: edit mode opens with
+    /// the caret nearest the clicked glyph boundary rather than selecting all.
+    pub fn caret_index_from_display_click(&mut self, row: i32, col: i32, x_in_cell: f32) -> i32 {
+        if row < 0 || row >= self.rows || col < 0 || col >= self.cols || !self.layout.valid {
+            return 0;
+        }
+
+        let meta = self.build_text_cell_static_meta(row, col);
+        if meta.suppress_text || meta.display_text.is_empty() {
+            return 0;
+        }
+
+        let text = meta.display_text.as_ref();
+        let (_, _, cw, ch) = self.layout.cell_rect(row, col);
+        let font_name = meta
+            .style_override
+            .font_name
+            .clone()
+            .unwrap_or_else(|| self.style.font_name.clone());
+        let font_size = meta
+            .style_override
+            .font_size
+            .unwrap_or(self.style.font_size);
+        let font_bold = meta
+            .style_override
+            .font_bold
+            .unwrap_or(self.style.font_bold);
+        let font_italic = meta
+            .style_override
+            .font_italic
+            .unwrap_or(self.style.font_italic);
+
+        let button_reserve = if self.edit_trigger_mode > 0
+            && meta.has_dropdown_list
+            && match self.dropdown_trigger {
+                b if b == pb::DropdownTrigger::DropdownAlways as i32 => true,
+                3 => self.selection.row == row && self.selection.col == col,
+                _ => false,
+            } {
+            crate::canvas::dropdown_button_rect(0, 0, cw, ch).map_or(0, |(_, _, bw, _)| bw + 2)
+        } else {
+            0
+        };
+
+        let inner_left = meta.padding.left;
+        let inner_right = (cw - button_reserve - meta.padding.right).max(inner_left + 1);
+        let inner_w = (inner_right - inner_left).max(1);
+        let (halign, _) = crate::canvas::alignment_components(meta.alignment);
+
+        let te = self.ensure_text_engine();
+        let measure_width = |sample: &str, size: f32, te: &mut TextEngine| -> f32 {
+            if te.has_fonts() {
+                te.measure_text(sample, &font_name, size, font_bold, font_italic, None)
+                    .0
+            } else {
+                sample.chars().count() as f32 * size * 0.6
+            }
+        };
+
+        let mut effective_font_size = font_size;
+        let mut text_w = measure_width(text, effective_font_size, te);
+        if meta.shrink_to_fit && text_w > inner_w as f32 && inner_w > 0 {
+            let scale = inner_w as f32 / text_w;
+            effective_font_size = (font_size * scale).floor().max(6.0);
+            text_w = measure_width(text, effective_font_size, te);
+        }
+
+        let text_x = match halign {
+            0 => inner_left,
+            1 => inner_left + (inner_w - text_w.ceil() as i32) / 2,
+            _ => inner_right - text_w.ceil() as i32,
+        };
+
+        let relative_x = x_in_cell - text_x as f32;
+        if relative_x <= 0.0 {
+            return 0;
+        }
+
+        let char_count = text.chars().count() as i32;
+        if relative_x >= text_w {
+            return char_count;
+        }
+
+        let mut prefix = String::new();
+        let mut prev_w = 0.0f32;
+        let mut pos = 0i32;
+        for ch in text.chars() {
+            prefix.push(ch);
+            let next_w = measure_width(&prefix, effective_font_size, te);
+            if next_w >= relative_x {
+                if pos > 0 && (relative_x - prev_w) < (next_w - relative_x) {
+                    return pos;
+                }
+                return pos + 1;
+            }
+            prev_w = next_w;
+            pos += 1;
+        }
+
+        char_count
+    }
+
     /// Hit-test a pixel coordinate against the active dropdown.
     /// Returns the dropdown item index if the point is inside the dropdown,
     /// or `None` if outside or no dropdown is active.
@@ -3621,5 +3725,4 @@ mod tests {
         assert_eq!(grid.scrollbar_fade_timer, 0.0);
         assert!(grid.scrollbar_fade_last_tick.is_none());
     }
-
 }

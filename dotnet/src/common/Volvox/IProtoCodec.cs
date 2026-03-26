@@ -50,6 +50,8 @@ namespace VolvoxGrid.DotNet.Internal
         byte[] EncodeEditCommandStart(long gridId, int row, int col, bool? selectAll, bool? caretEnd, string seedText);
         byte[] EncodeEditCommandCommit(long gridId, string text);
         byte[] EncodeEditCommandCancel(long gridId);
+        byte[] EncodeEditCommandSetPreedit(long gridId, string text, int cursor, bool commit);
+        byte[] EncodeEditCommandSetText(long gridId, string text);
 
         byte[] EncodeClipboardRequest(long gridId, string action, string pasteText);
         VolvoxClipboardResponseData DecodeClipboardResponse(byte[] payload);

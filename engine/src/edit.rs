@@ -152,6 +152,13 @@ pub fn translate_dropdown_display_to_value(list: &str, display_value: &str) -> O
     None
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum EditUiMode {
+    #[default]
+    EnterMode,
+    EditMode,
+}
+
 #[derive(Clone, Debug)]
 pub struct EditState {
     pub editing: bool,
@@ -161,6 +168,8 @@ pub struct EditState {
     pub original_text: String,
     pub formula_mode: bool,
     pub formula_highlights: Vec<EditHighlightRegion>,
+    /// Whether the current edit session is Excel-style Enter mode or F2 edit mode.
+    pub ui_mode: EditUiMode,
     /// Start position of selected text in editor (EditSelStart).
     pub sel_start: i32,
     /// Length of selected text in editor (EditSelLength).
@@ -173,6 +182,12 @@ pub struct EditState {
     pub dropdown_data: Vec<String>,
     /// Whether the current list is an editable dropdown (`|item1|item2`).
     pub dropdown_editable: bool,
+    /// True during IME composition (preedit active).
+    pub composing: bool,
+    /// In-progress preedit text from IME (e.g. "ㅇ").
+    pub preedit_text: String,
+    /// Cursor position within the preedit text.
+    pub preedit_cursor: i32,
 }
 
 impl Default for EditState {
@@ -185,12 +200,16 @@ impl Default for EditState {
             original_text: String::new(),
             formula_mode: false,
             formula_highlights: Vec::new(),
+            ui_mode: EditUiMode::EnterMode,
             sel_start: 0,
             sel_length: 0,
             dropdown_index: -1,
             dropdown_items: Vec::new(),
             dropdown_data: Vec::new(),
             dropdown_editable: false,
+            composing: false,
+            preedit_text: String::new(),
+            preedit_cursor: 0,
         }
     }
 }
@@ -211,6 +230,7 @@ impl EditState {
         let mut bytes = 0usize;
         bytes += self.edit_text.capacity();
         bytes += self.original_text.capacity();
+        bytes += self.preedit_text.capacity();
         bytes += self.formula_highlights.capacity() * std::mem::size_of::<EditHighlightRegion>();
 
         bytes += self.dropdown_items.capacity() * std::mem::size_of::<String>();
@@ -240,6 +260,7 @@ impl EditState {
         self.edit_row = row;
         self.edit_col = col;
         self.original_text = current_text.to_string();
+        self.ui_mode = EditUiMode::EnterMode;
         self.edit_text = current_text.to_string();
         self.formula_mode = self.edit_text.trim_start().starts_with('=');
         self.formula_highlights.clear();
@@ -267,6 +288,11 @@ impl EditState {
         self.edit_row = row;
         self.edit_col = col;
         self.original_text = current_text.to_string();
+        self.ui_mode = if caret_end == Some(true) {
+            EditUiMode::EditMode
+        } else {
+            EditUiMode::EnterMode
+        };
 
         if let Some(seed) = seed_text {
             // seed_text: replace cell text with seed, caret at end
@@ -296,6 +322,16 @@ impl EditState {
         self.sel_length = self.edit_text.chars().count() as i32;
     }
 
+    /// If an IME preedit is active, commit it into `edit_text` so the
+    /// pending composition is not lost when the edit session is committed
+    /// or the text is read for validation.
+    pub fn flush_preedit(&mut self) {
+        if self.composing && !self.preedit_text.is_empty() {
+            let preedit = self.preedit_text.clone();
+            self.commit_preedit(&preedit);
+        }
+    }
+
     /// Commit the current edit, returning the cell coordinates and
     /// both old and new text: `(row, col, original_text, edit_text)`.
     ///
@@ -304,6 +340,9 @@ impl EditState {
         if !self.editing {
             return None;
         }
+        // Flush any pending IME preedit into edit_text so the composed
+        // text is included in the committed result.
+        self.flush_preedit();
         self.editing = false;
         let result = (
             self.edit_row,
@@ -315,6 +354,7 @@ impl EditState {
         self.edit_col = -1;
         self.formula_mode = false;
         self.formula_highlights.clear();
+        self.cancel_preedit();
         Some(result)
     }
 
@@ -331,6 +371,7 @@ impl EditState {
         self.edit_col = -1;
         self.formula_mode = false;
         self.formula_highlights.clear();
+        self.cancel_preedit();
         Some(result)
     }
 
@@ -555,6 +596,64 @@ impl EditState {
     pub fn move_end(&mut self) {
         self.sel_start = self.edit_text.chars().count() as i32;
         self.sel_length = 0;
+    }
+
+    // ── IME Preedit (composition) ────────────────────────────────────
+
+    /// Update preedit (composition) state from IME.
+    ///
+    /// Non-empty text activates composing mode. Empty text cancels it.
+    /// When a text selection is active and composition starts, the selected
+    /// text is deleted first (standard editor behavior — typing while text
+    /// is selected replaces it).
+    pub fn set_preedit(&mut self, text: &str, cursor: i32) {
+        // If starting composition with a selection, delete the selected text
+        // so the preedit replaces it. This mirrors what happens when typing
+        // a normal character while text is selected.
+        if !text.is_empty() && self.sel_length > 0 {
+            let chars: Vec<char> = self.edit_text.chars().collect();
+            let total = chars.len() as i32;
+            let start = self.sel_start.clamp(0, total) as usize;
+            let end = (self.sel_start + self.sel_length).clamp(0, total) as usize;
+            let mut result: Vec<char> = Vec::with_capacity(chars.len());
+            result.extend_from_slice(&chars[..start]);
+            result.extend_from_slice(&chars[end..]);
+            self.edit_text = result.into_iter().collect();
+            self.sel_length = 0;
+        }
+        self.preedit_text = text.to_string();
+        self.preedit_cursor = cursor;
+        self.composing = !text.is_empty();
+    }
+
+    /// Commit the preedit text: insert it into edit_text at the cursor,
+    /// replacing any selection, then clear preedit state.
+    pub fn commit_preedit(&mut self, committed: &str) {
+        let chars: Vec<char> = self.edit_text.chars().collect();
+        let total = chars.len() as i32;
+        let sel_start = self.sel_start.clamp(0, total);
+        let sel_end = (self.sel_start + self.sel_length.max(0)).clamp(sel_start, total);
+
+        let committed_chars: Vec<char> = committed.chars().collect();
+        let mut result: Vec<char> = Vec::with_capacity(chars.len() + committed_chars.len());
+        result.extend_from_slice(&chars[..sel_start as usize]);
+        result.extend_from_slice(&committed_chars);
+        result.extend_from_slice(&chars[sel_end as usize..]);
+
+        self.edit_text = result.into_iter().collect();
+        self.sel_start = sel_start + committed_chars.len() as i32;
+        self.sel_length = 0;
+        self.composing = false;
+        self.preedit_text.clear();
+        self.preedit_cursor = 0;
+        self.sync_formula_mode_from_text();
+    }
+
+    /// Cancel preedit without modifying edit_text.
+    pub fn cancel_preedit(&mut self) {
+        self.composing = false;
+        self.preedit_text.clear();
+        self.preedit_cursor = 0;
     }
 
     /// Search dropdown items for a prefix match, returning the index or -1.
@@ -874,5 +973,276 @@ mod tests {
         let _ = edit.cancel();
         assert!(!edit.formula_mode);
         assert!(edit.formula_highlights.is_empty());
+    }
+
+    #[test]
+    fn commit_flushes_pending_preedit() {
+        let mut edit = EditState::default();
+        edit.start_edit(0, 0, "");
+        edit.update_text(String::new());
+        edit.sel_start = 0;
+        edit.sel_length = 0;
+
+        // Simulate Korean IME: syllable boundaries commit preedit,
+        // last syllable stays as preedit.
+        edit.commit_preedit("우");
+        edit.commit_preedit("리");
+        edit.commit_preedit("나");
+        // Last syllable is still in preedit (not committed)
+        edit.set_preedit("라", 1);
+
+        assert_eq!(edit.edit_text, "우리나");
+        assert_eq!(edit.preedit_text, "라");
+        assert!(edit.composing);
+
+        // Commit should flush the pending preedit first
+        let result = edit.commit().unwrap();
+        assert_eq!(result.3, "우리나라");
+    }
+
+    #[test]
+    fn flush_preedit_inserts_at_cursor() {
+        let mut edit = EditState::default();
+        edit.start_edit(0, 0, "abc");
+        edit.sel_start = 1;
+        edit.sel_length = 0;
+        edit.set_preedit("X", 1);
+
+        edit.flush_preedit();
+        assert_eq!(edit.edit_text, "aXbc");
+        assert!(!edit.composing);
+        assert!(edit.preedit_text.is_empty());
+    }
+
+    #[test]
+    fn flush_preedit_noop_when_not_composing() {
+        let mut edit = EditState::default();
+        edit.start_edit(0, 0, "hello");
+        let before = edit.edit_text.clone();
+        edit.flush_preedit();
+        assert_eq!(edit.edit_text, before);
+    }
+
+    // ── Preedit rendering (compose_preedit_display_text) ────────────
+
+    #[test]
+    fn compose_preedit_inserts_at_cursor() {
+        use crate::canvas::compose_preedit_display_text;
+        // Cursor at position 3 in "abcdef", preedit "XY"
+        let result = compose_preedit_display_text("abcdef", 3, 3, "XY");
+        assert_eq!(result, "abcXYdef");
+    }
+
+    #[test]
+    fn compose_preedit_replaces_selection() {
+        use crate::canvas::compose_preedit_display_text;
+        // Selection from 1 to 4 in "abcdef", preedit "XY"
+        let result = compose_preedit_display_text("abcdef", 1, 4, "XY");
+        assert_eq!(result, "aXYef");
+    }
+
+    #[test]
+    fn compose_preedit_at_start() {
+        use crate::canvas::compose_preedit_display_text;
+        let result = compose_preedit_display_text("hello", 0, 0, "ㅇ");
+        assert_eq!(result, "ㅇhello");
+    }
+
+    #[test]
+    fn compose_preedit_at_end() {
+        use crate::canvas::compose_preedit_display_text;
+        let result = compose_preedit_display_text("hello", 5, 5, "ㅇ");
+        assert_eq!(result, "helloㅇ");
+    }
+
+    #[test]
+    fn compose_preedit_with_cjk_text() {
+        use crate::canvas::compose_preedit_display_text;
+        // CJK text "안녕", cursor at char 1, preedit "하"
+        let result = compose_preedit_display_text("안녕", 1, 1, "하");
+        assert_eq!(result, "안하녕");
+    }
+
+    #[test]
+    fn compose_preedit_empty_preedit() {
+        use crate::canvas::compose_preedit_display_text;
+        let result = compose_preedit_display_text("hello", 2, 2, "");
+        assert_eq!(result, "hello");
+    }
+
+    #[test]
+    fn compose_preedit_clamped_out_of_bounds() {
+        use crate::canvas::compose_preedit_display_text;
+        // sel_start and sel_end beyond text length — should clamp
+        let result = compose_preedit_display_text("abc", 10, 20, "X");
+        assert_eq!(result, "abcX");
+    }
+
+    // ── IME integration flow ────────────────────────────────────────
+
+    #[test]
+    fn ime_korean_syllable_composition_flow() {
+        // Simulate Korean IME typing "우리" (two syllables):
+        // 1. compositionstart
+        // 2. set_preedit("ㅇ") → compositionupdate
+        // 3. set_preedit("우") → compositionupdate
+        // 4. commit_preedit("우") → compositionend
+        // 5. set_preedit("ㄹ") → compositionstart (new syllable)
+        // 6. set_preedit("리") → compositionupdate
+        // 7. commit_preedit("리") → compositionend
+        let mut edit = EditState::default();
+        edit.start_edit(0, 0, "");
+        edit.sel_start = 0;
+        edit.sel_length = 0;
+
+        // First syllable
+        edit.set_preedit("ㅇ", 1);
+        assert!(edit.composing);
+        assert_eq!(edit.preedit_text, "ㅇ");
+        assert_eq!(edit.edit_text, "");
+
+        edit.set_preedit("우", 1);
+        assert_eq!(edit.preedit_text, "우");
+
+        edit.commit_preedit("우");
+        assert!(!edit.composing);
+        assert_eq!(edit.edit_text, "우");
+        assert_eq!(edit.sel_start, 1);
+
+        // Second syllable
+        edit.set_preedit("ㄹ", 1);
+        assert!(edit.composing);
+        assert_eq!(edit.edit_text, "우");
+        assert_eq!(edit.preedit_text, "ㄹ");
+
+        edit.set_preedit("리", 1);
+        edit.commit_preedit("리");
+        assert_eq!(edit.edit_text, "우리");
+        assert_eq!(edit.sel_start, 2);
+    }
+
+    #[test]
+    fn ime_multi_segment_composition() {
+        // Simulate Japanese IME: type "nihon" → preedit "にほん" → commit "日本"
+        let mut edit = EditState::default();
+        edit.start_edit(0, 0, "prefix");
+        edit.sel_start = 6; // caret at end
+        edit.sel_length = 0;
+
+        edit.set_preedit("に", 1);
+        assert!(edit.composing);
+        assert_eq!(edit.edit_text, "prefix");
+
+        edit.set_preedit("にほ", 2);
+        edit.set_preedit("にほん", 3);
+
+        // IME converts and commits
+        edit.commit_preedit("日本");
+        assert!(!edit.composing);
+        assert_eq!(edit.edit_text, "prefix日本");
+        assert_eq!(edit.sel_start, 8); // 6 + 2 chars
+    }
+
+    #[test]
+    fn ime_cancel_mid_preedit() {
+        // Start composition, then cancel (Escape)
+        let mut edit = EditState::default();
+        edit.start_edit(0, 0, "hello");
+        edit.sel_start = 5;
+        edit.sel_length = 0;
+
+        edit.set_preedit("ㅎ", 1);
+        assert!(edit.composing);
+        assert_eq!(edit.edit_text, "hello");
+
+        // User presses Escape → cancel preedit
+        edit.cancel_preedit();
+        assert!(!edit.composing);
+        assert!(edit.preedit_text.is_empty());
+        assert_eq!(edit.edit_text, "hello"); // unchanged
+    }
+
+    #[test]
+    fn ime_preedit_with_active_selection_deletes_selection() {
+        // When composition starts with text selected, the selection is deleted
+        let mut edit = EditState::default();
+        edit.start_edit(0, 0, "abcdef");
+        edit.sel_start = 1;
+        edit.sel_length = 3; // "bcd" selected
+
+        edit.set_preedit("X", 1);
+        assert!(edit.composing);
+        // Selection should be deleted
+        assert_eq!(edit.edit_text, "aef");
+        assert_eq!(edit.sel_start, 1);
+        assert_eq!(edit.sel_length, 0);
+        // Preedit is "X"
+        assert_eq!(edit.preedit_text, "X");
+
+        // Commit → inserts at cursor
+        edit.commit_preedit("XY");
+        assert_eq!(edit.edit_text, "aXYef");
+        assert_eq!(edit.sel_start, 3);
+    }
+
+    #[test]
+    fn ime_preedit_on_empty_text() {
+        let mut edit = EditState::default();
+        edit.start_edit(0, 0, "");
+        edit.sel_start = 0;
+        edit.sel_length = 0;
+
+        edit.set_preedit("あ", 1);
+        assert!(edit.composing);
+        assert_eq!(edit.edit_text, "");
+
+        edit.commit_preedit("亜");
+        assert_eq!(edit.edit_text, "亜");
+        assert_eq!(edit.sel_start, 1);
+    }
+
+    #[test]
+    fn ime_commit_flushes_preedit_on_edit_commit() {
+        // Full flow: start edit → type with IME → commit edit
+        let mut edit = EditState::default();
+        edit.start_edit(0, 0, "");
+        edit.sel_start = 0;
+        edit.sel_length = 0;
+
+        // Type Korean "나라" with last syllable still in preedit
+        edit.commit_preedit("나");
+        edit.set_preedit("라", 1);
+        assert!(edit.composing);
+        assert_eq!(edit.edit_text, "나");
+
+        // Commit the edit session (e.g., Enter key)
+        let result = edit.commit().unwrap();
+        // flush_preedit should have inserted "라" before commit
+        assert_eq!(result.3, "나라");
+    }
+
+    #[test]
+    fn ime_successive_preedit_updates_dont_re_delete_selection() {
+        // After the first set_preedit deletes the selection,
+        // subsequent calls should NOT delete more text
+        let mut edit = EditState::default();
+        edit.start_edit(0, 0, "abcdef");
+        edit.sel_start = 2;
+        edit.sel_length = 2; // "cd" selected
+
+        edit.set_preedit("X", 1);
+        assert_eq!(edit.edit_text, "abef"); // "cd" deleted
+        assert_eq!(edit.sel_length, 0);
+
+        // Update preedit — should not delete anything more
+        edit.set_preedit("XY", 2);
+        assert_eq!(edit.edit_text, "abef"); // unchanged
+        assert_eq!(edit.preedit_text, "XY");
+
+        edit.set_preedit("XYZ", 3);
+        assert_eq!(edit.edit_text, "abef"); // still unchanged
+
+        edit.commit_preedit("XYZ");
+        assert_eq!(edit.edit_text, "abXYZef");
     }
 }

@@ -127,6 +127,21 @@ typedef [v1_enum] enum FlexClearScope {
     flexClearSelection   = 3
 } FlexClearScope;
 
+typedef [v1_enum] enum FlexDataMode {
+    flexDMFree            = 0,
+    flexDMBound           = 1,
+    flexDMBoundBatch      = 2,
+    flexDMBoundImmediate  = 3,
+    flexDMBoundNoRowCount = 4
+} FlexDataMode;
+
+typedef [v1_enum] enum FlexCheckBoxState {
+    flexCheckNone      = 0,
+    flexCheckChecked   = 1,
+    flexCheckUnchecked = 2,
+    flexCheckGrayed    = 3
+} FlexCheckBoxState;
+
 // ═══════════════════════════════════════════════════════════════════
 // IVolvoxGrid Interface (IDispatch-based for VBA/VB6 compatibility)
 // ═══════════════════════════════════════════════════════════════════
@@ -305,6 +320,11 @@ interface IVolvoxGrid : IDispatch
     [propput, id(65)]
     HRESULT Redraw([in] VARIANT_BOOL newVal);
 
+    [propget, id(66), helpstring("Enable or suppress auto-resize")]
+    HRESULT AutoResize([out, retval] VARIANT_BOOL* pVal);
+    [propput, id(66)]
+    HRESULT AutoResize([in] VARIANT_BOOL newVal);
+
     // ═══════════════════════════════════════════════════════
     // Methods
     // ═══════════════════════════════════════════════════════
@@ -373,10 +393,53 @@ interface IVolvoxGrid : IDispatch
     [id(124), helpstring("Set column sort order")]
     HRESULT SetColSort([in] long col, [in] FlexSortOrder order);
 
+    [propget, id(125), helpstring("Column data type")]
+    HRESULT ColDataType([in] long col, [out, retval] short* pVal);
+    [propput, id(125)]
+    HRESULT ColDataType([in] long col, [in] short newVal);
+
+    [propget, id(126), helpstring("Column key")]
+    HRESULT ColKey([in] long col, [out, retval] BSTR* pVal);
+    [propput, id(126)]
+    HRESULT ColKey([in] long col, [in] BSTR newVal);
+
+    [propget, id(127), helpstring("Column index by key")]
+    HRESULT ColIndex([in] BSTR key, [out, retval] long* pVal);
+
+    [propget, id(128), helpstring("Column user data")]
+    HRESULT ColData([in] long col, [out, retval] long* pVal);
+    [propput, id(128)]
+    HRESULT ColData([in] long col, [in] long newVal);
+
+    [propget, id(129), helpstring("Cell checkbox state")]
+    HRESULT CellChecked([in] long row, [in] long col, [out, retval] FlexCheckBoxState* pVal);
+    [propput, id(129)]
+    HRESULT CellChecked([in] long row, [in] long col, [in] FlexCheckBoxState newVal);
+
     // --- Data Binding ---
 
+    [propget, id(130), helpstring("Current ADO data source object")]
+    HRESULT DataSource([out, retval] IDispatch** pDataSource);
     [propputref, id(130), helpstring("Bind an ADO/DAO Recordset")]
     HRESULT DataSource([in] IDispatch* pDataSource);
+
+    [propget, id(131), helpstring("Current data member name")]
+    HRESULT DataMember([out, retval] BSTR* pVal);
+    [propput, id(131)]
+    HRESULT DataMember([in] BSTR newVal);
+
+    [propget, id(132), helpstring("ADO binding mode")]
+    HRESULT DataMode([out, retval] FlexDataMode* pVal);
+    [propput, id(132)]
+    HRESULT DataMode([in] FlexDataMode newVal);
+
+    [propget, id(133), helpstring("Virtual data fetch mode")]
+    HRESULT VirtualData([out, retval] VARIANT_BOOL* pVal);
+    [propput, id(133)]
+    HRESULT VirtualData([in] VARIANT_BOOL newVal);
+
+    [id(134), helpstring("Reload data from the current data source")]
+    HRESULT DataRefresh();
 
     // --- Mouse Info ---
 
@@ -477,6 +540,12 @@ dispinterface _DVolvoxGridEvents
 
     [id(21), helpstring("Fired after user resizes row/column")]
     void AfterUserResize([in] long row, [in] long col);
+
+    [id(22), helpstring("Fired before bound data is refreshed")]
+    void BeforeDataRefresh([in, out] VARIANT_BOOL* cancel);
+
+    [id(23), helpstring("Fired after bound data is refreshed")]
+    void AfterDataRefresh();
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -505,6 +574,8 @@ library VolvoxGridLib
     enum FlexAllowUserResizing;
     enum FlexSaveFormat;
     enum FlexClearScope;
+    enum FlexDataMode;
+    enum FlexCheckBoxState;
 
     interface IVolvoxGrid;
     dispinterface _DVolvoxGridEvents;

@@ -12,6 +12,12 @@ namespace VolvoxGrid.DotNet.Internal
     internal sealed class RenderHostCpu : Control
     {
         private const int WmMouseHWheel = 0x020E;
+        private const int WmImeStartComposition = 0x010D;
+        private const int WmImeComposition = 0x010F;
+        private const int WmImeEndComposition = 0x010E;
+        private const int WmImeChar = 0x0286;
+        private const int GcsCompStr = 0x0008;
+        private const int GcsResultStr = 0x0800;
         private const int AutoFallbackFrameRateHz = 30;
         private const long FramePacingConfigRefreshMs = 250;
 
@@ -45,12 +51,22 @@ namespace VolvoxGrid.DotNet.Internal
         private int _bufferHeight;
         private readonly List<RetiredBuffers> _retiredBuffers = new List<RetiredBuffers>();
         private VolvoxSelectionMode _selectionMode = VolvoxSelectionMode.Free;
+        private bool _engineEditing;
         private bool _multiRangeDragActive;
         private readonly List<VolvoxCellRangeData> _multiRangeBaseRanges = new List<VolvoxCellRangeData>();
         private int _multiRangeAnchorRow = -1;
         private int _multiRangeAnchorCol = -1;
         private int _multiRangeDragRow = -1;
         private int _multiRangeDragCol = -1;
+
+        [DllImport("imm32.dll")]
+        private static extern IntPtr ImmGetContext(IntPtr hWnd);
+
+        [DllImport("imm32.dll")]
+        private static extern bool ImmReleaseContext(IntPtr hWnd, IntPtr hImc);
+
+        [DllImport("imm32.dll", CharSet = CharSet.Unicode)]
+        private static extern int ImmGetCompositionString(IntPtr hImc, int dwIndex, byte[] lpBuf, int dwBufLen);
 
         public RenderHostCpu()
         {
@@ -357,7 +373,105 @@ namespace VolvoxGrid.DotNet.Internal
                 return;
             }
 
+            if (m.Msg == WmImeStartComposition)
+            {
+                if (_client != null && _gridId != 0 && !_engineEditing)
+                {
+                    TryBeginImeEdit();
+                }
+                base.WndProc(ref m);
+                return;
+            }
+
+            if (m.Msg == WmImeComposition)
+            {
+                if (_client != null && _gridId != 0)
+                {
+                    IntPtr hImc = ImmGetContext(Handle);
+                    if (hImc != IntPtr.Zero)
+                    {
+                        try
+                        {
+                            // Check for result string (committed text)
+                            if ((m.LParam.ToInt32() & GcsResultStr) != 0)
+                            {
+                                string result = GetImmString(hImc, GcsResultStr);
+                                if (!string.IsNullOrEmpty(result))
+                                {
+                                    _client.EditSetPreedit(_gridId, result, result.Length, true);
+                                    RequestFrame();
+                                }
+                            }
+
+                            // Check for composition string (preedit)
+                            if ((m.LParam.ToInt32() & GcsCompStr) != 0)
+                            {
+                                string comp = GetImmString(hImc, GcsCompStr);
+                                _client.EditSetPreedit(_gridId, comp ?? string.Empty, (comp ?? string.Empty).Length, false);
+                                RequestFrame();
+                            }
+                        }
+                        finally
+                        {
+                            ImmReleaseContext(Handle, hImc);
+                        }
+                    }
+                }
+                base.WndProc(ref m);
+                return;
+            }
+
+            if (m.Msg == WmImeEndComposition)
+            {
+                if (_client != null && _gridId != 0)
+                {
+                    // Clear preedit state
+                    _client.EditSetPreedit(_gridId, string.Empty, 0, false);
+                    RequestFrame();
+                }
+                base.WndProc(ref m);
+                return;
+            }
+
+            if (m.Msg == WmImeChar)
+            {
+                // Suppress WM_IME_CHAR — committed text is handled via WM_IME_COMPOSITION GCS_RESULTSTR.
+                // Without this, WM_CHAR would fire for each committed character, causing duplicate input.
+                return;
+            }
             base.WndProc(ref m);
+        }
+
+        private void TryBeginImeEdit()
+        {
+            try
+            {
+                var selection = _client.GetSelection(_gridId);
+                if (selection == null || selection.ActiveRow < 0 || selection.ActiveCol < 0)
+                {
+                    return;
+                }
+
+                // IME composition should start a clean edit session for the
+                // active cell without injecting a synthetic printable key.
+                _client.EditStart(_gridId, selection.ActiveRow, selection.ActiveCol, null, null, string.Empty);
+                _engineEditing = true;
+                RequestFrame();
+            }
+            catch
+            {
+                // Best effort: let the IME message continue even if the host
+                // cannot begin editing yet.
+            }
+        }
+
+        private static string GetImmString(IntPtr hImc, int dwIndex)
+        {
+            int byteLen = ImmGetCompositionString(hImc, dwIndex, null, 0);
+            if (byteLen <= 0) return string.Empty;
+            byte[] buf = new byte[byteLen];
+            ImmGetCompositionString(hImc, dwIndex, buf, byteLen);
+            return System.Text.Encoding.Unicode.GetString(buf, 0, byteLen);
         }
 
         protected override void OnKeyDown(KeyEventArgs e)
@@ -501,6 +615,15 @@ namespace VolvoxGrid.DotNet.Internal
 
         private bool? DispatchEvent(VolvoxGridEventData evt)
         {
+            if (evt.Kind == VolvoxGridEventKind.StartEdit)
+            {
+                _engineEditing = true;
+            }
+            else if (evt.Kind == VolvoxGridEventKind.AfterEdit)
+            {
+                _engineEditing = false;
+            }
+
             if (_eventHandler == null)
             {
                 return null;

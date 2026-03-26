@@ -9,8 +9,13 @@ import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.RectF
 import android.os.Looper
+import android.os.Handler
+import android.text.Editable
 import android.text.InputType
+import android.text.TextWatcher
 import android.util.AttributeSet
+import android.util.TypedValue
+import android.view.inputmethod.BaseInputConnection
 import android.view.KeyEvent as AndroidKeyEvent
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
@@ -20,6 +25,7 @@ import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.OverScroller
@@ -107,6 +113,31 @@ class VolvoxGridView @JvmOverloads constructor(
     private var knownRows = 0
     private var longPressRunnable: Runnable? = null
     private val longPressTimeout = 600L
+    private var lastTapTime = 0L
+    private var lastTapX = 0f
+    private var lastTapY = 0f
+    private val doubleTapTimeout = ViewConfiguration.getDoubleTapTimeout().toLong()
+    private val doubleTapSlop = ViewConfiguration.get(context).scaledDoubleTapSlop.toFloat()
+
+    // IME proxy: zero-size EditText that captures composition when no edit overlay is visible
+    private var imeProxy: EditText? = null
+    private var imeProxyComposing = false
+    private var imeProxyLastCommittedLen = 0
+    private var suppressImeProxyWatcher = false
+
+    // Edit overlay IME state
+    private var currentEditUiMode = EditUiMode.EDIT_UI_MODE_ENTER
+    private var suppressEditorSync = false
+    private var editOverlayComposing = false
+
+    // Editing cell tracking (for scroll-into-view after resize)
+    private var editingRow = -1
+    private var editingCol = -1
+
+    // Deferred overlay reveal
+    private var deferOverlayWhileImeActive = false
+    private var pendingEditRequest: EditRequest? = null
+    private val deferOverlayHandler = Handler(Looper.getMainLooper())
     @Volatile
     private var gesturePreviewActive = false
     @Volatile
@@ -333,11 +364,14 @@ class VolvoxGridView @JvmOverloads constructor(
     init {
         isFocusable = true
         isFocusableInTouchMode = true
+        clipChildren = false
+        clipToPadding = false
         if (useHostFling) {
             flingScroller.setFriction(flingFriction)
         }
 
         setupSurfaceView()
+        setupImeProxy()
     }
 
     private fun setupSurfaceView() {
@@ -385,6 +419,187 @@ class VolvoxGridView @JvmOverloads constructor(
         removeView(surfaceView)
         surfaceView = SurfaceView(context)
         setupSurfaceView()
+    }
+
+    private fun setupImeProxy() {
+        val proxy = EditText(context).apply {
+            isFocusable = true
+            isFocusableInTouchMode = true
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            showSoftInputOnFocus = false
+            layoutParams = LayoutParams(1, 1).apply {
+                leftMargin = -1
+                topMargin = -1
+            }
+            alpha = 0f
+            setBackgroundColor(0)
+            setPadding(0, 0, 0, 0)
+        }
+        // Don't addView here — adding an EditText to the tree at init causes
+        // some Android versions to auto-focus it and show the soft keyboard.
+        // It is added lazily in requestIdleInputFocus() on first user touch.
+        imeProxy = proxy
+
+        proxy.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable) {
+                if (suppressImeProxyWatcher) return
+                if (gridId == 0L) return
+
+                val composingStart = BaseInputConnection.getComposingSpanStart(s)
+                val composingEnd = BaseInputConnection.getComposingSpanEnd(s)
+                val isComposing = composingStart >= 0 && composingEnd > composingStart
+
+                if (isComposing) {
+                    val preeditText = s.subSequence(composingStart, composingEnd).toString()
+                    if (!imeProxyComposing) {
+                        // Composition just started — begin edit in engine
+                        imeProxyComposing = true
+                        deferOverlayWhileImeActive = true
+                        imeProxyLastCommittedLen = composingStart
+                        try {
+                            ffiClient?.Edit(
+                                EditCommand.newBuilder()
+                                    .setGridId(gridId)
+                                    .setStart(EditStart.newBuilder().build())
+                                    .build()
+                            )
+                        } catch (_: FfiError) {}
+                    }
+                    sendPreedit(preeditText, preeditText.length, commit = false)
+                } else if (imeProxyComposing) {
+                    // Composition just ended — commit
+                    imeProxyComposing = false
+                    val fullText = s.toString()
+                    val delta = if (fullText.length > imeProxyLastCommittedLen) {
+                        fullText.substring(imeProxyLastCommittedLen)
+                    } else {
+                        ""
+                    }
+                    if (delta.isNotEmpty()) {
+                        sendPreedit(delta, 0, commit = true)
+                    }
+                    imeProxyLastCommittedLen = fullText.length
+                    // Schedule deferred overlay reveal
+                    deferOverlayHandler.postDelayed({
+                        val pending = pendingEditRequest
+                        if (pending != null) {
+                            pendingEditRequest = null
+                            deferOverlayWhileImeActive = false
+                            showEditOverlay(pending)
+                        } else {
+                            deferOverlayWhileImeActive = false
+                        }
+                    }, 60L)
+                } else {
+                    // Plain text without composition (hardware keyboard)
+                    val fullText = s.toString()
+                    if (fullText.length > imeProxyLastCommittedLen) {
+                        val delta = fullText.substring(imeProxyLastCommittedLen)
+                        imeProxyLastCommittedLen = fullText.length
+                        // Start edit with seed text
+                        deferOverlayWhileImeActive = true
+                        try {
+                            ffiClient?.Edit(
+                                EditCommand.newBuilder()
+                                    .setGridId(gridId)
+                                    .setStart(EditStart.newBuilder()
+                                        .setSeedText(delta)
+                                        .build())
+                                    .build()
+                            )
+                        } catch (_: FfiError) {}
+                        deferOverlayHandler.postDelayed({
+                            val pending = pendingEditRequest
+                            if (pending != null) {
+                                pendingEditRequest = null
+                                deferOverlayWhileImeActive = false
+                                showEditOverlay(pending)
+                            } else {
+                                deferOverlayWhileImeActive = false
+                            }
+                        }, 60L)
+                    }
+                }
+            }
+        })
+
+        // Forward hardware key events from imeProxy to the engine
+        proxy.setOnKeyListener { _, keyCode, event ->
+            if (editOverlay != null) return@setOnKeyListener false
+            renderStream ?: return@setOnKeyListener false
+            when (keyCode) {
+                AndroidKeyEvent.KEYCODE_DPAD_UP,
+                AndroidKeyEvent.KEYCODE_DPAD_DOWN,
+                AndroidKeyEvent.KEYCODE_DPAD_LEFT,
+                AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
+                AndroidKeyEvent.KEYCODE_ENTER,
+                AndroidKeyEvent.KEYCODE_NUMPAD_ENTER,
+                AndroidKeyEvent.KEYCODE_ESCAPE,
+                AndroidKeyEvent.KEYCODE_TAB -> {
+                    if (event.action == AndroidKeyEvent.ACTION_DOWN) {
+                        onKeyDown(keyCode, event)
+                    } else if (event.action == AndroidKeyEvent.ACTION_UP) {
+                        onKeyUp(keyCode, event)
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun requestIdleInputFocus() {
+        val proxy = imeProxy ?: return
+        if (proxy.parent == null) {
+            addView(proxy, 0) // behind SurfaceView
+        }
+        if (!proxy.hasFocus()) {
+            proxy.requestFocus()
+        }
+    }
+
+    private fun clearImeProxy() {
+        suppressImeProxyWatcher = true
+        imeProxy?.setText("")
+        imeProxyComposing = false
+        imeProxyLastCommittedLen = 0
+        suppressImeProxyWatcher = false
+    }
+
+    private fun sendPreedit(text: String, cursor: Int, commit: Boolean) {
+        try {
+            ffiClient?.Edit(
+                EditCommand.newBuilder()
+                    .setGridId(gridId)
+                    .setSetPreedit(
+                        EditSetPreedit.newBuilder()
+                            .setText(text)
+                            .setCursor(cursor)
+                            .setCommit(commit)
+                            .build()
+                    )
+                    .build()
+            )
+        } catch (_: FfiError) {}
+        requestRenderFrame()
+    }
+
+    private fun codeUnitOffset(text: String, codePointOffset: Int): Int {
+        if (codePointOffset <= 0) return 0
+        val len = text.length
+        var cpCount = 0
+        var i = 0
+        while (i < len && cpCount < codePointOffset) {
+            if (Character.isHighSurrogate(text[i]) && i + 1 < len && Character.isLowSurrogate(text[i + 1])) {
+                i += 2
+            } else {
+                i += 1
+            }
+            cpCount++
+        }
+        return i.coerceAtMost(len)
     }
 
     // =========================================================================
@@ -525,6 +740,10 @@ class VolvoxGridView @JvmOverloads constructor(
         pendingFrame.set(false)
         needsFollowupRender.set(false)
         renderRequestPending.set(false)
+        deferOverlayWhileImeActive = false
+        pendingEditRequest = null
+        deferOverlayHandler.removeCallbacksAndMessages(null)
+        clearImeProxy()
         dismissEditOverlay()
 
         // Release GPU native window to avoid resource leak across grid switches.
@@ -662,6 +881,10 @@ class VolvoxGridView @JvmOverloads constructor(
         clearGesturePreviewOnNextFrame = false
         stopGesturePreview()
         knownRows = 0
+        deferOverlayWhileImeActive = false
+        pendingEditRequest = null
+        deferOverlayHandler.removeCallbacksAndMessages(null)
+        clearImeProxy()
         dismissEditOverlay()
 
         gpuSurfaceActive = false
@@ -739,7 +962,11 @@ class VolvoxGridView @JvmOverloads constructor(
                 }
                 resetVelocityTracker(event)
                 stopEngineMomentumPump()
-                requestFocus()
+                if (editOverlay != null) {
+                    commitEdit(editingRow, editingCol, editOverlay?.text?.toString() ?: "")
+                } else {
+                    requestIdleInputFocus()
+                }
                 activePointerId = event.getPointerId(0)
                 touchStartX = event.x
                 touchStartY = event.y
@@ -750,7 +977,15 @@ class VolvoxGridView @JvmOverloads constructor(
                 pendingScrollDeltaY = 0f
                 pendingScrollNeedsRender = false
                 clearQueuedZoom()
-                sendPointerEvent(stream, PointerEvent.Type.DOWN, lastTouchX, lastTouchY)
+                val now = android.os.SystemClock.uptimeMillis()
+                val dx = event.x - lastTapX
+                val dy = event.y - lastTapY
+                val isDoubleTap = (now - lastTapTime) <= doubleTapTimeout
+                    && (dx * dx + dy * dy) <= doubleTapSlop * doubleTapSlop
+                lastTapTime = now
+                lastTapX = event.x
+                lastTapY = event.y
+                sendPointerEvent(stream, PointerEvent.Type.DOWN, lastTouchX, lastTouchY, dblClick = isDoubleTap)
                 requestRenderFrame()
                 longPressRunnable?.let { removeCallbacks(it) }
                 longPressRunnable = Runnable {
@@ -782,6 +1017,9 @@ class VolvoxGridView @JvmOverloads constructor(
                 ) {
                     isTouchScrolling = true
                     longPressRunnable?.let { removeCallbacks(it) }
+                    if (editOverlay != null) {
+                        cancelEdit(editingRow, editingCol)
+                    }
                 }
 
                 // Always forward pointer MOVE so engine-side long-press header
@@ -1508,7 +1746,8 @@ class VolvoxGridView @JvmOverloads constructor(
         stream: BidiStream<RenderInput, RenderOutput>,
         pointerType: PointerEvent.Type,
         x: Float,
-        y: Float
+        y: Float,
+        dblClick: Boolean = false
     ) {
         try {
             val input = RenderInput.newBuilder()
@@ -1519,6 +1758,7 @@ class VolvoxGridView @JvmOverloads constructor(
                         .setX(x)
                         .setY(y)
                         .setButton(0)
+                        .setDblClick(dblClick)
                         .build()
                 )
                 .build()
@@ -1657,6 +1897,18 @@ class VolvoxGridView @JvmOverloads constructor(
 
         // Dispatch a new frame (GPU or CPU) with updated size
         requestRenderFrame()
+
+        if (editingRow >= 0 && editingCol >= 0) {
+            try {
+                ffiClient?.ShowCell(
+                    ShowCellRequest.newBuilder()
+                        .setGridId(gridId)
+                        .setRow(editingRow)
+                        .setCol(editingCol)
+                        .build()
+                )
+            } catch (_: FfiError) {}
+        }
     }
 
     private fun sendBufferReady() {
@@ -1722,10 +1974,10 @@ class VolvoxGridView @JvmOverloads constructor(
     }
 
     private fun sendGpuSurfaceReady(handle: Long, w: Int, h: Int) {
-        if (!pendingFrame.compareAndSet(false, true)) {
-            needsFollowupRender.set(true)
-            return
-        }
+        // Critical surface updates should always proceed to avoid black-outs
+        // during resizes (like keyboard toggles). We reset pendingFrame here
+        // to ensure the engine receives the latest surface handle immediately.
+        pendingFrame.set(true) 
 
         try {
             val input = RenderInput.newBuilder()
@@ -1851,7 +2103,13 @@ class VolvoxGridView @JvmOverloads constructor(
                     stopGesturePreview()
                 }
             }
-            output.hasEditRequest() -> showEditOverlay(output.editRequest)
+            output.hasEditRequest() -> {
+                if (deferOverlayWhileImeActive) {
+                    pendingEditRequest = output.editRequest
+                } else {
+                    showEditOverlay(output.editRequest)
+                }
+            }
             output.hasDropdownRequest() -> handleDropdownRequest(output.dropdownRequest)
             output.hasTooltipRequest() -> {
                 surfaceView.tooltipText = output.tooltipRequest.text
@@ -1924,49 +2182,243 @@ class VolvoxGridView @JvmOverloads constructor(
 
     private fun showEditOverlay(request: EditRequest) {
         post {
-            dismissEditOverlay()
+            if (deferOverlayWhileImeActive) {
+                pendingEditRequest = request
+                return@post
+            }
+
+            val existingOverlay = editOverlay
+            val refreshingSameCell = existingOverlay != null &&
+                editingRow == request.row &&
+                editingCol == request.col
+
+            editingRow = request.row
+            editingCol = request.col
+
+            // Remove imeProxy so only the edit overlay captures IME input.
+            // It will be re-added on the next touch via requestIdleInputFocus().
+            imeProxy?.let { proxy ->
+                if (proxy.parent != null) removeView(proxy)
+            }
+            clearImeProxy()
+
+            val uiMode = request.uiMode
+            currentEditUiMode = uiMode
+
+            if (refreshingSameCell) {
+                // A geometry refresh can happen when the IME shows or hides.
+                // Keep the existing editor in place, but do not force the IME
+                // back open after the user dismissed it with the back button.
+                positionEditOverlay(existingOverlay!!, request)
+                return@post
+            }
+
+            // Remove old overlay directly (we are already on the UI thread).
+            // Do NOT call dismissEditOverlay() here — it uses post{} which
+            // would defer the removal and race with the new overlay we are
+            // about to create.
+            editOverlay?.let { removeView(it) }
+            editOverlay = null
+            editOverlayComposing = false
+            suppressEditorSync = false
+
+            // Resolve the effective style for the edited cell.
+            val cellStyle = resolveEditCellStyle(request.row, request.col)
 
             val editText = EditText(context).apply {
-                setText(request.currentValue)
-                setSelection(request.currentValue.length)
                 inputType = InputType.TYPE_CLASS_TEXT
                 setSingleLine(true)
                 imeOptions = EditorInfo.IME_ACTION_DONE
                 setBackgroundColor(0xFFFFFFFF.toInt())
-                setPadding(4, 2, 4, 2)
-                textSize = 14f
+                setPadding(cellStyle.padLeft, cellStyle.padTop, cellStyle.padRight, cellStyle.padBottom)
+                setTextSize(TypedValue.COMPLEX_UNIT_PX, cellStyle.fontSize)
+                includeFontPadding = false
+                setLineSpacing(0f, 1f)
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                val typefaceStyle = (if (cellStyle.bold) android.graphics.Typeface.BOLD else 0) or
+                    (if (cellStyle.italic) android.graphics.Typeface.ITALIC else 0)
+                val tf = if (cellStyle.fontFamily != null)
+                    android.graphics.Typeface.create(cellStyle.fontFamily, typefaceStyle)
+                else if (typefaceStyle != 0)
+                    android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, typefaceStyle)
+                else null
+                if (tf != null) typeface = tf
 
-                setOnEditorActionListener { _, actionId, _ ->
-                    if (actionId == EditorInfo.IME_ACTION_DONE) {
-                        commitEdit(request.row, request.col, text.toString())
-                        true
-                    } else {
-                        false
-                    }
+                suppressEditorSync = true
+                setText(request.currentValue)
+                // Map code-point offsets to code-unit offsets for selection
+                val text = request.currentValue
+                val selStartCu = codeUnitOffset(text, request.selStart)
+                val selEndCu = codeUnitOffset(text, request.selStart + request.selLength)
+                    .coerceAtMost(text.length)
+                if (selStartCu in 0..text.length && selEndCu in selStartCu..text.length) {
+                    setSelection(selStartCu, selEndCu)
+                } else {
+                    setSelection(text.length)
+                }
+                suppressEditorSync = false
+
+                setOnEditorActionListener { _, _, _ ->
+                    commitEdit(request.row, request.col, getText().toString())
+                    true
                 }
 
                 setOnKeyListener { _, keyCode, event ->
-                    if (keyCode == AndroidKeyEvent.KEYCODE_ESCAPE
-                        && event.action == AndroidKeyEvent.ACTION_UP) {
-                        cancelEdit(request.row, request.col)
-                        true
-                    } else {
-                        false
+                    if (event.action != AndroidKeyEvent.ACTION_UP) return@setOnKeyListener false
+                    when (keyCode) {
+                        AndroidKeyEvent.KEYCODE_ENTER,
+                        AndroidKeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                            commitEdit(request.row, request.col, getText().toString())
+                            true
+                        }
+                        AndroidKeyEvent.KEYCODE_ESCAPE -> {
+                            cancelEdit(request.row, request.col)
+                            true
+                        }
+                        AndroidKeyEvent.KEYCODE_DPAD_UP,
+                        AndroidKeyEvent.KEYCODE_DPAD_DOWN -> {
+                            if (uiMode == EditUiMode.EDIT_UI_MODE_ENTER) {
+                                commitEdit(request.row, request.col, getText().toString())
+                                // Forward arrow to engine for cell navigation
+                                val stream = renderStream
+                                if (stream != null) {
+                                    this@VolvoxGridView.onKeyDown(keyCode, event)
+                                    this@VolvoxGridView.onKeyUp(keyCode, event)
+                                }
+                                true
+                            } else {
+                                false // let EditText handle caret movement
+                            }
+                        }
+                        else -> false
                     }
                 }
+
+                // TextWatcher for composition forwarding
+                addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                    override fun afterTextChanged(s: Editable) {
+                        if (suppressEditorSync) return
+                        if (gridId == 0L) return
+
+                        val composingStart = BaseInputConnection.getComposingSpanStart(s)
+                        val composingEnd = BaseInputConnection.getComposingSpanEnd(s)
+                        val isComposing = composingStart >= 0 && composingEnd > composingStart
+
+                        if (isComposing) {
+                            val preeditText = s.subSequence(composingStart, composingEnd).toString()
+                            editOverlayComposing = true
+                            sendPreedit(preeditText, preeditText.length, commit = false)
+                        } else if (editOverlayComposing) {
+                            // Composition ended — commit preedit
+                            editOverlayComposing = false
+                            sendPreedit(s.toString(), 0, commit = true)
+                        } else {
+                            // Plain text change — sync to engine
+                            try {
+                                ffiClient?.Edit(
+                                    EditCommand.newBuilder()
+                                        .setGridId(gridId)
+                                        .setSetText(
+                                            EditSetText.newBuilder()
+                                                .setText(s.toString())
+                                                .build()
+                                        )
+                                        .build()
+                                )
+                            } catch (_: FfiError) {}
+                            requestRenderFrame()
+                        }
+                    }
+                })
             }
 
-            val lp = LayoutParams(
-                request.width.toInt().coerceAtLeast(60),
-                request.height.toInt().coerceAtLeast(30)
-            )
-            lp.leftMargin = request.x.toInt()
-            lp.topMargin = request.y.toInt()
-
-            addView(editText, lp)
+            addView(editText, editOverlayLayoutParams(request))
             editOverlay = editText
+            positionEditOverlay(editText, request)
             editText.requestFocus()
+            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
         }
+    }
+
+    private fun editOverlayLayoutParams(request: EditRequest): LayoutParams {
+        return LayoutParams(
+            request.width.toInt().coerceAtLeast(60),
+            request.height.toInt().coerceAtLeast(30)
+        ).apply {
+            leftMargin = request.x.toInt()
+            topMargin = request.y.toInt()
+        }
+    }
+
+    private fun positionEditOverlay(editText: EditText, request: EditRequest) {
+        val lp = (editText.layoutParams as? LayoutParams) ?: editOverlayLayoutParams(request)
+        lp.width = request.width.toInt().coerceAtLeast(60)
+        lp.height = request.height.toInt().coerceAtLeast(30)
+        lp.leftMargin = request.x.toInt()
+        lp.topMargin = request.y.toInt()
+        editText.layoutParams = lp
+        val overlayZ = dp(8f)
+        editText.elevation = overlayZ
+        editText.translationZ = overlayZ
+        editText.bringToFront()
+    }
+
+    private class EditCellStyle(
+        val fontSize: Float = 14f,
+        val fontFamily: String? = null,
+        val bold: Boolean = false,
+        val italic: Boolean = false,
+        val padLeft: Int = 0,
+        val padTop: Int = 0,
+        val padRight: Int = 0,
+        val padBottom: Int = 0,
+    )
+
+    /** Resolve the effective style for the cell being edited. */
+    private fun resolveEditCellStyle(row: Int, col: Int): EditCellStyle {
+        try {
+            val client = ffiClient ?: return EditCellStyle()
+            val resp = client.GetCells(
+                GetCellsRequest.newBuilder()
+                    .setGridId(gridId)
+                    .setRow1(row).setCol1(col)
+                    .setRow2(row).setCol2(col)
+                    .setIncludeStyle(true)
+                    .build()
+            )
+            val config = client.GetConfig(
+                GridHandle.newBuilder().setId(gridId).build()
+            )
+            val cellFont = if (resp.cellsCount > 0) resp.getCells(0).style.font else null
+            val gridFont = config.style.font
+            val cellPad = if (resp.cellsCount > 0 && resp.getCells(0).style.hasPadding())
+                resp.getCells(0).style.padding else null
+            val gridPad = if (config.style.hasCellPadding()) config.style.cellPadding else null
+            return EditCellStyle(
+                fontSize = when {
+                    cellFont != null && cellFont.hasSize() && cellFont.size > 0f -> cellFont.size
+                    gridFont.hasSize() && gridFont.size > 0f -> gridFont.size
+                    else -> 14f
+                },
+                fontFamily = when {
+                    cellFont != null && cellFont.hasFamily() && cellFont.family.isNotEmpty() -> cellFont.family
+                    gridFont.hasFamily() && gridFont.family.isNotEmpty() -> gridFont.family
+                    else -> null
+                },
+                bold = if (cellFont != null && cellFont.hasBold()) cellFont.bold
+                       else gridFont.hasBold() && gridFont.bold,
+                italic = if (cellFont != null && cellFont.hasItalic()) cellFont.italic
+                         else gridFont.hasItalic() && gridFont.italic,
+                padLeft = cellPad?.left ?: gridPad?.left ?: 0,
+                padTop = cellPad?.top ?: gridPad?.top ?: 0,
+                padRight = cellPad?.right ?: gridPad?.right ?: 0,
+                padBottom = cellPad?.bottom ?: gridPad?.bottom ?: 0,
+            )
+        } catch (_: Exception) {}
+        return EditCellStyle()
     }
 
     private fun commitEdit(row: Int, col: Int, text: String) {
@@ -1997,9 +2449,16 @@ class VolvoxGridView @JvmOverloads constructor(
 
     private fun dismissEditOverlay() {
         post {
+            editingRow = -1
+            editingCol = -1
             editOverlay?.let {
+                val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                imm?.hideSoftInputFromWindow(it.windowToken, 0)
                 removeView(it)
                 editOverlay = null
+                editOverlayComposing = false
+                suppressEditorSync = false
+                clearImeProxy()
             }
         }
     }

@@ -30,7 +30,7 @@ const STRESS_ROWS = 1_000_000;
 const STRESS_COLS = 12;
 const SALES_COLS = 10;
 const HIERARCHY_COLS = 5;
-const FONT_FETCH_TIMEOUT_MS = 3000;
+const FONT_FETCH_TIMEOUT_MS = 5000;
 const HOVER_NONE = 0;
 const HOVER_ROW = 1;
 const HOVER_COLUMN = 2;
@@ -71,18 +71,28 @@ function loadDemoFontsInBackground(
   wasmModule: WasmModule,
   onFontLoaded: () => void,
 ): void {
-  const fontUrl =
-    "https://cdn.jsdelivr.net/gh/googlefonts/roboto-2@main/src/hinted/Roboto-Regular.ttf";
+  const fonts = [
+    {
+      url: "https://cdn.jsdelivr.net/gh/googlefonts/roboto-2@main/src/hinted/Roboto-Regular.ttf",
+      label: "Roboto (Latin)",
+    },
+    {
+      url: "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/SubsetOTF/KR/NotoSansKR-Regular.otf",
+      label: "Noto Sans KR (CJK)",
+    },
+  ];
 
   void (async () => {
-    const fontData = await fetchFontWithTimeout(fontUrl);
-    if (!fontData) {
-      console.warn("Could not load demo font - grid text may be missing");
-      return;
+    for (const font of fonts) {
+      const fontData = await fetchFontWithTimeout(font.url);
+      if (fontData) {
+        wasmModule.load_font(fontData);
+        console.info(`Loaded demo font: ${font.label}`);
+        onFontLoaded();
+      } else {
+        console.warn(`Could not load ${font.label} - some glyphs may be missing`);
+      }
     }
-    wasmModule.load_font(fontData);
-    console.info("Loaded demo font");
-    onFontLoaded();
   })();
 }
 

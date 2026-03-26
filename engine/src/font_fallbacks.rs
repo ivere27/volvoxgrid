@@ -295,6 +295,11 @@ const WINDOWS_COMMON_FALLBACKS: &[&str] = &[
     "C:\\Windows\\Fonts\\segoeui.ttf",
     "C:\\Windows\\Fonts\\arial.ttf",
     "C:\\Windows\\Fonts\\seguiemj.ttf",
+    // CJK fallback — Microsoft YaHei covers CJK Unified Ideographs, Hangul,
+    // and Kana so that CJK text renders even when the locale is Latin.
+    "C:\\Windows\\Fonts\\msyh.ttc",
+    "C:\\Windows\\Fonts\\msjh.ttc",
+    "C:\\Windows\\Fonts\\malgun.ttf",
 ];
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
