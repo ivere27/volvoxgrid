@@ -436,12 +436,12 @@ double sum = ctrl.aggregate(AggregateType.AGG_SUM, 1, 1, 100, 1);
 //                           type                  row1 col1 row2 col2
 ```
 
-#### Save & Load
+#### Export & LoadData
 
 ```java
 ExportResponse exported = ctrl.saveGrid(ExportFormat.EXPORT_BINARY);
-ctrl.loadGrid(exported.getData().toByteArray(), ExportFormat.EXPORT_BINARY);
-// Formats: EXPORT_BINARY, EXPORT_TSV, EXPORT_CSV, EXPORT_SPREADSHEET_ML
+LoadDataResult loaded = ctrl.loadData("name,qty\napple,3\nbanana,5".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+// loadData parses CSV or JSON bytes; saveGrid remains export-only.
 ```
 
 #### Rendering

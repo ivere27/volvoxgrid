@@ -506,7 +506,8 @@ namespace VolvoxGrid.DotNet.Sample
 
             var exportData = _grid.SaveGrid(VolvoxGridExportFormat.Binary, VolvoxGridExportScope.All);
             SmokeAssert(exportData != null && exportData.Data != null && exportData.Data.Length > 0, "SaveGrid");
-            _grid.LoadGrid(exportData.Data, exportData.Format, VolvoxGridExportScope.All);
+            _grid.LoadData(System.Text.Encoding.UTF8.GetBytes("Id,Name,Amount,Flag\n1,Reloaded,42,true\n2,Second,7,false\n3,Third,9,true"));
+            SmokeAssert(WaitForCellText(1, 1, "Reloaded"), "LoadData");
 
             RunOptionalSmokeStep("Archive save/load/list/delete", delegate
             {

@@ -3642,23 +3642,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         })
     }
 
-    fn import(&self, request: ImportRequest) -> Result<Empty, String> {
+    fn load_data(&self, request: LoadDataRequest) -> Result<LoadDataResult, String> {
         self.manager().with_grid(request.grid_id, |grid| {
-            if let Some(url) = &request.url {
-                if !url.is_empty() {
-                    volvoxgrid_engine::save::load_grid_url(
-                        grid,
-                        url,
-                        &request.data,
-                        request.format,
-                        request.scope,
-                    );
-                    return;
-                }
-            }
-            volvoxgrid_engine::save::load_grid(grid, &request.data, request.format, request.scope);
-        })?;
-        Ok(Empty {})
+            volvoxgrid_engine::load::load_data(grid, &request.data, request.options.as_ref())
+        })
     }
 
     fn print(&self, request: PrintRequest) -> Result<PrintResponse, String> {

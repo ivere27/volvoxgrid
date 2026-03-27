@@ -2748,6 +2748,7 @@ dependencies = [
  "raw-window-handle",
  "rayon",
  "regex",
+ "serde_json",
  "tiny-skia",
  "tonic 0.11.0",
  "tonic-build",

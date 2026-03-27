@@ -245,6 +245,18 @@ fn begin_edit_session_core(
         return;
     }
 
+    let is_boolean_checkbox = row >= grid.fixed_rows
+        && row < grid.rows
+        && col >= 0
+        && col < grid.cols
+        && !grid.row_props.get(&row).map_or(false, |rp| rp.is_subtotal)
+        && grid.get_col_props(col).map_or(false, |cp| {
+            cp.data_type == ColumnDataType::ColumnDataBoolean as i32
+        });
+    if is_boolean_checkbox {
+        return;
+    }
+
     let combo_list = grid.active_dropdown_list(row, col);
     if emit_before_event {
         grid.events
@@ -4863,6 +4875,12 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         })
     }
 
+    fn load_data(&self, request: LoadDataRequest) -> Result<LoadDataResult, String> {
+        wasm_with_grid(request.grid_id, |grid| {
+            volvoxgrid_engine::load::load_data(grid, &request.data, request.options.as_ref())
+        })
+    }
+
     fn clear(&self, request: ClearRequest) -> Result<Empty, String> {
         wasm_with_grid(request.grid_id, |grid| {
             let (r1, c1, r2, c2) = match request.region {
@@ -5361,13 +5379,6 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 format: request.format,
             }
         })
-    }
-
-    fn import(&self, request: ImportRequest) -> Result<Empty, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            volvoxgrid_engine::save::load_grid(grid, &request.data, request.format, request.scope);
-        })?;
-        Ok(Empty {})
     }
 
     fn print(&self, request: PrintRequest) -> Result<PrintResponse, String> {

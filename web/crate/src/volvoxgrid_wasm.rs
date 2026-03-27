@@ -249,6 +249,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn update_cells(&self, request: UpdateCellsRequest) -> Result<WriteResult, String>;
     fn get_cells(&self, request: GetCellsRequest) -> Result<CellsResponse, String>;
     fn load_table(&self, request: LoadTableRequest) -> Result<WriteResult, String>;
+    fn load_data(&self, request: LoadDataRequest) -> Result<LoadDataResult, String>;
     fn clear(&self, request: ClearRequest) -> Result<Empty, String>;
     fn select(&self, request: SelectRequest) -> Result<Empty, String>;
     fn get_selection(&self, request: GridHandle) -> Result<SelectionState, String>;
@@ -270,7 +271,6 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn get_memory_usage(&self, request: GridHandle) -> Result<MemoryUsageResponse, String>;
     fn clipboard(&self, request: ClipboardCommand) -> Result<ClipboardResponse, String>;
     fn export(&self, request: ExportRequest) -> Result<ExportResponse, String>;
-    fn import(&self, request: ImportRequest) -> Result<Empty, String>;
     fn print(&self, request: PrintRequest) -> Result<PrintResponse, String>;
     fn archive(&self, request: ArchiveRequest) -> Result<ArchiveResponse, String>;
     fn resize_viewport(&self, request: ResizeViewportRequest) -> Result<Empty, String>;
@@ -929,6 +929,36 @@ pub fn volvox_grid_load_table_pb(data: &[u8]) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
+pub fn volvox_grid_load_data_pb(data: &[u8]) -> Vec<u8> {
+    let plugin = match get_volvox_grid_service_plugin() {
+        Some(p) => p,
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = match LoadDataRequest::decode(data) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            return Vec::new();
+        }
+    };
+    match plugin.load_data(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+
+#[wasm_bindgen]
 pub fn volvox_grid_clear(grid_id: i64, scope: i32, region: i32) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
@@ -1563,36 +1593,6 @@ pub fn volvox_grid_export(grid_id: i64, format: i32, scope: i32) -> Vec<u8> {
         ..Default::default()
     };
     match plugin.export(req) {
-        Ok(r) => {
-            clear_last_error();
-            let mut buf = Vec::new();
-            let _ = r.encode(&mut buf);
-            buf
-        }
-        Err(e) => {
-            set_last_error(e);
-            return Vec::new();
-        }
-    }
-}
-
-#[wasm_bindgen]
-pub fn volvox_grid_import_pb(data: &[u8]) -> Vec<u8> {
-    let plugin = match get_volvox_grid_service_plugin() {
-        Some(p) => p,
-        None => {
-            set_last_error("plugin not registered".into());
-            return Vec::new();
-        }
-    };
-    let req = match ImportRequest::decode(data) {
-        Ok(r) => r,
-        Err(e) => {
-            set_last_error(format!("decode: {}", e));
-            return Vec::new();
-        }
-    };
-    match plugin.import(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();

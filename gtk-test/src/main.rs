@@ -545,8 +545,8 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     chk_hover.set_active(true);
     chk_scroll_blit.set_active(state.borrow().scroll_blit_enabled);
 
-    let btn_save = Button::with_label("Save");
-    let btn_load = Button::with_label("Load");
+    let btn_save = Button::with_label("SaveCSV");
+    let btn_load = Button::with_label("LoadCSV");
     let btn_copy = Button::with_label("Copy");
     let btn_paste = Button::with_label("Paste");
     let btn_add_row = Button::with_label("AddRow");
@@ -1327,12 +1327,12 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
             run_action(&state, &area, &status, |st| {
                 let resp = st.client.export(
                     st.grid_id,
-                    pb::ExportFormat::ExportBinary,
+                    pb::ExportFormat::ExportCsv,
                     pb::ExportScope::ExportAll,
                 )?;
                 let bytes = resp.data.len();
                 st.saved_data = Some(resp.data);
-                Ok(format!("Saved {} bytes", bytes))
+                Ok(format!("Saved {} CSV bytes", bytes))
             });
         });
     }
@@ -1346,13 +1346,8 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
                     .saved_data
                     .clone()
                     .ok_or_else(|| "nothing saved yet".to_string())?;
-                st.client.import(
-                    st.grid_id,
-                    data,
-                    pb::ExportFormat::ExportBinary,
-                    pb::ExportScope::ExportAll,
-                )?;
-                Ok("Loaded saved snapshot".to_string())
+                let result = st.client.load_data(st.grid_id, data)?;
+                Ok(format!("Loaded {} rows from CSV", result.rows))
             });
         });
     }
@@ -1832,24 +1827,15 @@ impl VolvoxServiceClient {
         )
     }
 
-    fn import(
-        &self,
-        grid_id: i64,
-        data: Vec<u8>,
-        format: pb::ExportFormat,
-        scope: pb::ExportScope,
-    ) -> Result<(), String> {
-        let _: pb::Empty = self.invoke(
-            "/volvoxgrid.v1.VolvoxGridService/Import",
-            &pb::ImportRequest {
+    fn load_data(&self, grid_id: i64, data: Vec<u8>) -> Result<pb::LoadDataResult, String> {
+        self.invoke(
+            "/volvoxgrid.v1.VolvoxGridService/LoadData",
+            &pb::LoadDataRequest {
                 grid_id,
                 data,
-                format: format as i32,
-                scope: scope as i32,
-                url: None,
+                options: None,
             },
-        )?;
-        Ok(())
+        )
     }
 
     fn clipboard_copy(&self, grid_id: i64) -> Result<pb::ClipboardResponse, String> {

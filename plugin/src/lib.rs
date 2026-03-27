@@ -1063,7 +1063,9 @@ fn maybe_render_editor_output(
     if row < 0 || col < 0 {
         return None;
     }
-    if prefer_combo && grid.edit.dropdown_count() > 0 {
+    let wants_combo_request =
+        grid.edit.dropdown_count() > 0 && (prefer_combo || !grid.edit.dropdown_editable);
+    if wants_combo_request {
         if let Some(req) = build_combo_request(grid, row, col) {
             return Some(RenderOutput {
                 rendered: false,
@@ -1172,6 +1174,18 @@ fn begin_edit_session_core_opts(
     formula_mode: Option<bool>,
 ) {
     if !grid.can_begin_edit(row, col, force) {
+        return;
+    }
+
+    let is_boolean_checkbox = row >= grid.fixed_rows
+        && row < grid.rows
+        && col >= 0
+        && col < grid.cols
+        && !grid.row_props.get(&row).map_or(false, |rp| rp.is_subtotal)
+        && grid.get_col_props(col).map_or(false, |cp| {
+            cp.data_type == ColumnDataType::ColumnDataBoolean as i32
+        });
+    if is_boolean_checkbox {
         return;
     }
 
@@ -1902,6 +1916,12 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         })
     }
 
+    fn load_data(&self, request: LoadDataRequest) -> PluginResult<LoadDataResult> {
+        self.with_grid(request.grid_id, |grid| {
+            volvoxgrid_engine::load::load_data(grid, &request.data, request.options.as_ref())
+        })
+    }
+
     fn clear(&self, request: ClearRequest) -> PluginResult<Empty> {
         self.with_grid(request.grid_id, |grid| {
             let (r1, c1, r2, c2) = match request.region {
@@ -2467,7 +2487,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         })
     }
 
-    // ── Import / Export ──
+    // ── Export / Print / Archive ──
 
     fn export(&self, request: ExportRequest) -> PluginResult<ExportResponse> {
         let data = self.with_grid(request.grid_id, |grid| {
@@ -2477,25 +2497,6 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
             data,
             format: request.format,
         })
-    }
-
-    fn import(&self, request: ImportRequest) -> PluginResult<Empty> {
-        self.with_grid(request.grid_id, |grid| {
-            if let Some(url) = &request.url {
-                if !url.is_empty() {
-                    volvoxgrid_engine::save::load_grid_url(
-                        grid,
-                        url,
-                        &request.data,
-                        request.format,
-                        request.scope,
-                    );
-                    return;
-                }
-            }
-            volvoxgrid_engine::save::load_grid(grid, &request.data, request.format, request.scope);
-        })?;
-        Ok(Empty {})
     }
 
     fn print(&self, request: PrintRequest) -> PluginResult<PrintResponse> {

@@ -482,14 +482,15 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
     grid.columns[7].alignment = pb::Align::CenterCenter as i32;
     grid.columns[4].format = "$#,##0".to_string();
     grid.columns[5].format = "$#,##0".to_string();
+    // Select-only dropdown: no leading `|`.
     grid.columns[8].dropdown_items = "Active|Pending|Shipped|Returned|Cancelled".to_string();
     grid.columns[6].progress_color = SALES_THEME.accent;
 
     grid.allow_user_resizing = 3;
     grid.tab_behavior = 1;
-    grid.edit_trigger_mode = 2;
+    grid.edit_trigger_mode = 0; // read-only by default; host demos may enable edit
     grid.dropdown_trigger = 1;
-    grid.dropdown_search = true;
+    grid.dropdown_search = false;
     grid.fling_enabled = true;
     grid.fling_impulse_gain = 220.0;
     grid.fling_friction = 0.9;
@@ -1131,6 +1132,7 @@ fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize
     grid.columns[2].format = "$#,##0".to_string(); // Currency
 
     // Dropdown list
+    // Select-only dropdown: no leading `|`.
     grid.columns[6].dropdown_items = "Option A|Option B|Option C|Option D|Option E".to_string();
 
     // Rating progress (data-bar)
@@ -1139,9 +1141,9 @@ fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize
     // Interaction defaults
     grid.allow_user_resizing = 3;
     grid.tab_behavior = 1;
-    grid.edit_trigger_mode = 2;
+    grid.edit_trigger_mode = 0; // read-only by default; host demos may enable edit
     grid.dropdown_trigger = 1;
-    grid.dropdown_search = true;
+    grid.dropdown_search = false;
     grid.fling_enabled = true;
     grid.fling_impulse_gain = 220.0;
     grid.fling_friction = 0.9;

@@ -34,7 +34,8 @@ import io.github.ivere27.volvoxgrid.UnmergeCellsRequest;
 import io.github.ivere27.volvoxgrid.MergedRegionsResponse;
 import io.github.ivere27.volvoxgrid.GridEvent;
 import io.github.ivere27.volvoxgrid.GridHandle;
-import io.github.ivere27.volvoxgrid.ImportRequest;
+import io.github.ivere27.volvoxgrid.LoadDataRequest;
+import io.github.ivere27.volvoxgrid.LoadDataResult;
 import io.github.ivere27.volvoxgrid.InsertRowsRequest;
 import io.github.ivere27.volvoxgrid.LoadTableRequest;
 import io.github.ivere27.volvoxgrid.LoadDemoRequest;
@@ -99,7 +100,7 @@ public final class VolvoxGridDesktopClient {
     private static final String GET_MERGED_REGIONS = "/volvoxgrid.v1.VolvoxGridService/GetMergedRegions";
     private static final String CLIPBOARD = "/volvoxgrid.v1.VolvoxGridService/Clipboard";
     private static final String EXPORT = "/volvoxgrid.v1.VolvoxGridService/Export";
-    private static final String IMPORT = "/volvoxgrid.v1.VolvoxGridService/Import";
+    private static final String LOAD_DATA = "/volvoxgrid.v1.VolvoxGridService/LoadData";
     private static final String PRINT = "/volvoxgrid.v1.VolvoxGridService/Print";
     private static final String ARCHIVE = "/volvoxgrid.v1.VolvoxGridService/Archive";
     private static final String RESIZE_VIEWPORT = "/volvoxgrid.v1.VolvoxGridService/ResizeViewport";
@@ -252,8 +253,8 @@ public final class VolvoxGridDesktopClient {
         return unary(EXPORT, request, ExportResponse.parser());
     }
 
-    public Empty importGrid(ImportRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(IMPORT, request, Empty.parser());
+    public LoadDataResult loadData(LoadDataRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(LOAD_DATA, request, LoadDataResult.parser());
     }
 
     public PrintResponse printGrid(PrintRequest request) throws SynurangDesktopBridge.SynurangBridgeException {

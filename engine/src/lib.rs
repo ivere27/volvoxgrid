@@ -32,6 +32,7 @@ pub mod grid;
 pub mod indicator;
 pub mod input;
 pub mod layout;
+pub mod load;
 pub mod merge_registry;
 pub mod outline;
 pub mod print;

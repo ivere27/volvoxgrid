@@ -207,6 +207,30 @@ enum WriteErrorMode {
   WRITE_ERROR_SKIP       = 3;
 }
 
+enum HeaderPolicy {
+  HEADER_AUTO      = 0;
+  HEADER_NONE      = 1;
+  HEADER_FIRST_ROW = 2;
+}
+
+enum TypePolicy {
+  TYPE_AUTO_DETECT = 0;
+  TYPE_ALL_STRING  = 1;
+  TYPE_FROM_SCHEMA = 2;
+}
+
+enum LoadMode {
+  LOAD_REPLACE = 0;
+  LOAD_APPEND  = 1;
+}
+
+enum LoadDataStatus {
+  LOAD_OK      = 0;
+  LOAD_PARTIAL = 1;
+  LOAD_FAILED  = 2;
+}
+
+
 // ── Selection ──
 
 enum SelectionMode {
@@ -1010,6 +1034,7 @@ message ColumnDef {
   optional string         key            = 10;
   optional SortOrder      sort_order     = 11;
   optional SortType       sort_type      = 12;
+  // Pipe-delimited dropdown items; prefix with `|` to make the list editable.
   optional string         dropdown_items = 13;
   optional string         edit_mask      = 14;
   optional int32          indent         = 15;
@@ -1062,6 +1087,7 @@ message CellUpdate {
   ImageData              picture        = 6;
   optional ImageAlignment picture_align = 7;
   ImageData              button_picture = 8;
+  // Pipe-delimited dropdown items; prefix with `|` to make the list editable.
   optional string        dropdown_items = 9;
   optional StickyEdge    sticky_row     = 10;
   optional StickyEdge    sticky_col     = 11;
@@ -1117,6 +1143,61 @@ message LoadTableRequest {
   repeated CellValue values  = 4;
   bool               atomic  = 5;
 }
+
+message FieldMapping {
+  string field = 1;
+  oneof target {
+    int32  col_index = 2;
+    string col_key   = 3;
+  }
+}
+
+message CsvOptions {
+  optional string delimiter       = 1;
+  optional string quote_char      = 2;
+  optional bool   trim_whitespace = 3;
+}
+
+message JsonOptions {
+  optional string data_path = 1;
+}
+
+message LoadDataOptions {
+  oneof format {
+    CsvOptions  csv  = 1;
+    JsonOptions json = 2;
+  }
+
+  optional HeaderPolicy   header_policy       = 10;
+  repeated FieldMapping   field_map           = 11;
+  optional TypePolicy     type_policy         = 12;
+  optional CoercionMode   coercion            = 13;
+  optional WriteErrorMode error_mode          = 14;
+  optional string         date_format         = 15;
+  optional string         decimal_char        = 16;
+  optional bool           auto_create_columns = 17;
+  optional LoadMode       mode                = 18;
+  optional bool           atomic              = 19;
+  optional int32          skip_rows           = 20;
+  optional int32          max_rows            = 21;
+}
+
+message LoadDataRequest {
+  int64                    grid_id = 1;
+  bytes                    data    = 2;
+  optional LoadDataOptions options = 3;
+}
+
+message LoadDataResult {
+  LoadDataStatus       status           = 1;
+  int32                rows             = 2;
+  int32                cols             = 3;
+  int32                rejected         = 4;
+  repeated TypeViolation violations     = 5;
+  repeated string      warnings         = 6;
+  repeated ColumnDef   inferred_columns = 7;
+}
+
 
 message ClearRequest {
   int64       grid_id = 1;
@@ -1394,7 +1475,7 @@ message ClipboardResponse {
 }
 
 // ═══════════════════════════════════════════════════════════
-// Import / Export / Print
+// Export / Print / Archive
 // ═══════════════════════════════════════════════════════════
 
 message ExportRequest {
@@ -1406,14 +1487,6 @@ message ExportRequest {
 message ExportResponse {
   bytes        data   = 1;
   ExportFormat format = 2;
-}
-
-message ImportRequest {
-  int64           grid_id = 1;
-  bytes           data    = 2;
-  ExportFormat    format  = 3;
-  ExportScope     scope   = 4;
-  optional string url     = 5;
 }
 
 message PrintRequest {
@@ -1679,6 +1752,7 @@ message DropdownRequest {
   float           height   = 6;
   repeated string items    = 7;
   int32           selected = 8;
+  // True if free-form text entry is allowed.
   bool            editable = 9;
 }
 
@@ -1927,6 +2001,7 @@ service VolvoxGridService {
   rpc UpdateCells(UpdateCellsRequest)     returns (WriteResult);
   rpc GetCells(GetCellsRequest)           returns (CellsResponse);
   rpc LoadTable(LoadTableRequest)         returns (WriteResult);
+  rpc LoadData(LoadDataRequest)           returns (LoadDataResult);
   rpc Clear(ClearRequest)                 returns (Empty);
 
   // ── Selection ──
@@ -1956,9 +2031,8 @@ service VolvoxGridService {
   // ── Clipboard ──
   rpc Clipboard(ClipboardCommand)         returns (ClipboardResponse);
 
-  // ── Import / Export ──
+  // ── Export / Print / Archive ──
   rpc Export(ExportRequest)               returns (ExportResponse);
-  rpc Import(ImportRequest)               returns (Empty);
   rpc Print(PrintRequest)                 returns (PrintResponse);
   rpc Archive(ArchiveRequest)             returns (ArchiveResponse);
 

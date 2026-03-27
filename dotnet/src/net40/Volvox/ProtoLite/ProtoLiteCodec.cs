@@ -1098,13 +1098,11 @@ namespace VolvoxGrid.DotNet.Internal
             return result;
         }
 
-        public byte[] EncodeImportRequest(long gridId, byte[] data, VolvoxExportFormat format, VolvoxExportScope scope)
+        public byte[] EncodeLoadDataRequest(long gridId, byte[] data)
         {
             var writer = new ProtoWriter();
             writer.WriteInt64(1, gridId);
             writer.WriteBytes(2, data ?? new byte[0]);
-            writer.WriteInt32(3, (int)format);
-            writer.WriteInt32(4, (int)scope);
             return writer.ToArray();
         }
 

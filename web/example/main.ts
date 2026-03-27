@@ -364,6 +364,7 @@ async function main() {
     gridFontReadabilityBoostById.set(id, 1.0);
     applyRenderLayerMaskToGrid(id);
     setGridScrollBlit(id, scrollBlitEnabled);
+    setGridEditable(id, editEnabled);
     return id;
   };
 
@@ -406,6 +407,7 @@ async function main() {
   const demoInitialized: Partial<Record<StandardDemoMode, boolean>> = {};
   let activeRendererMode = 1; // CPU
   let scrollBlitEnabled = false;
+  let editEnabled = false;
   let doomGridId: number | null = null;
   const doomRuntime = new DoomRuntime();
   let doomJoystickPointerId: number | null = null;
@@ -589,7 +591,9 @@ async function main() {
   const chkScrollBlit = document.getElementById("chk-scroll-blit") as HTMLInputElement;
   const chkAnim = document.getElementById("chk-anim") as HTMLInputElement;
   const chkHover = document.getElementById("chk-hover") as HTMLInputElement;
+  const chkEdit = document.getElementById("chk-edit") as HTMLInputElement;
   chkScrollBlit.checked = scrollBlitEnabled;
+  chkEdit.checked = editEnabled;
   chkHover.checked = parseEnvBool(env?.VITE_VG_ENABLE_HOVER, false);
 
   function hoverModeForDemo(mode: StandardDemoMode): number {
@@ -618,6 +622,36 @@ async function main() {
       return;
     }
     setScrollBlit(id, enabled);
+  }
+
+  function setGridEditable(id: number, enabled: boolean): void {
+    const setEditTrigger = (wasmModule as any).set_edit_trigger as
+      | ((gridId: number, mode: number) => void)
+      | undefined;
+    const setEditableMode = (wasmModule as any).set_editable_mode as
+      | ((gridId: number, mode: number) => void)
+      | undefined;
+    const mode = enabled ? 2 : 0;
+    if (typeof setEditTrigger === "function") {
+      setEditTrigger(id, mode);
+    } else if (typeof setEditableMode === "function") {
+      setEditableMode(id, mode);
+    }
+  }
+
+  function applyEditableToKnownDemoGrids(): void {
+    for (const mode of Object.keys(demoGridIds) as StandardDemoMode[]) {
+      const id = demoGridIds[mode];
+      if (typeof id !== "number" || id <= 0) {
+        continue;
+      }
+      setGridEditable(id, editEnabled);
+    }
+    grid.invalidate();
+  }
+
+  function syncEditToggleEnabledState(): void {
+    chkEdit.disabled = currentDemo === "doom";
   }
 
   function applyHoverToggleToKnownGrids(): void {
@@ -697,6 +731,7 @@ async function main() {
   };
   buildLayerPanel();
   syncLayerCheckboxes();
+  syncEditToggleEnabledState();
 
   function setDoomOptionsVisible(visible: boolean) {
     doomRow.classList.toggle("hidden", !visible);
@@ -1229,6 +1264,7 @@ async function main() {
     setGridHoverMode(id, chkHover.checked ? hoverModeForDemo(mode) : HOVER_NONE);
     wasmModule.set_fast_scroll_enabled(id, true);
     applyDemoViewDefaults(mode);
+    setGridEditable(id, editEnabled);
     grid.invalidate();
     demoInitialized[mode] = true;
 
@@ -1334,6 +1370,7 @@ async function main() {
         return;
       }
       currentDemo = "doom";
+      syncEditToggleEnabledState();
       setDoomOptionsVisible(true);
       updateDoomTouchControlsVisibility();
       highlightDemoBtn("doom");
@@ -1352,6 +1389,7 @@ async function main() {
     applyActiveRenderSettings();
 
     currentDemo = mode;
+    syncEditToggleEnabledState();
     highlightDemoBtn(mode);
     dataRows = Math.max(0, grid.rowCount - 1);
 
@@ -1661,6 +1699,14 @@ async function main() {
     applyScrollBlitToKnownGrids();
     applyActiveRenderSettings();
     grid.invalidate();
+  });
+
+  chkEdit.addEventListener("change", () => {
+    editEnabled = chkEdit.checked;
+    applyEditableToKnownDemoGrids();
+    if (currentDemo !== "doom") {
+      updateStatus(editEnabled ? "Edit enabled" : "Edit disabled");
+    }
   });
 
   // Animation toggle.

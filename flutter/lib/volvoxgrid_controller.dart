@@ -959,6 +959,11 @@ class VolvoxGridController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Query the current edit session state without changing it.
+  Future<EditState> getEditState() {
+    return VolvoxGridService.Edit(EditCommand()..gridId = _gridId);
+  }
+
   /// Update IME preedit/composition state for the active edit session.
   Future<EditState> setEditPreedit(
     String text, {
@@ -1127,7 +1132,7 @@ class VolvoxGridController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Save / Load / Print ───────────────────────────────────────────────────
+  // ── Save / LoadData / Print ───────────────────────────────────────────────
 
   /// Save the grid to an in-memory payload.
   Future<ExportResponse> saveGrid({
@@ -1140,18 +1145,20 @@ class VolvoxGridController extends ChangeNotifier {
       ..scope = scope);
   }
 
-  /// Load grid data from a previously saved payload.
-  Future<void> loadGrid(
+  /// Parse CSV or JSON bytes and load them into the grid.
+  Future<LoadDataResult> loadData(
     List<int> data, {
-    ExportFormat format = ExportFormat.EXPORT_BINARY,
-    ExportScope scope = ExportScope.EXPORT_ALL,
+    LoadDataOptions? options,
   }) async {
-    await VolvoxGridService.Import(ImportRequest()
+    final request = LoadDataRequest()
       ..gridId = _gridId
-      ..data = data
-      ..format = format
-      ..scope = scope);
+      ..data = data;
+    if (options != null) {
+      request.options = options;
+    }
+    final result = await VolvoxGridService.LoadData(request);
     notifyListeners();
+    return result;
   }
 
   /// Render printable pages.

@@ -122,6 +122,13 @@ public class VolvoxGridServiceFfi
         return WriteResult.Parser.ParseFrom(result);
     }
 
+    public LoadDataResult LoadData(LoadDataRequest request)
+    {
+        byte[] data = request.ToByteArray();
+        byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/LoadData", data);
+        return LoadDataResult.Parser.ParseFrom(result);
+    }
+
     public Empty Clear(ClearRequest request)
     {
         byte[] data = request.ToByteArray();
@@ -267,13 +274,6 @@ public class VolvoxGridServiceFfi
         byte[] data = request.ToByteArray();
         byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/Export", data);
         return ExportResponse.Parser.ParseFrom(result);
-    }
-
-    public Empty Import(ImportRequest request)
-    {
-        byte[] data = request.ToByteArray();
-        byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/Import", data);
-        return Empty.Parser.ParseFrom(result);
     }
 
     public PrintResponse Print(PrintRequest request)

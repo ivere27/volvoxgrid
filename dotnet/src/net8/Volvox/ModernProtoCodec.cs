@@ -447,9 +447,9 @@ namespace VolvoxGrid.DotNet.Internal
             return new VolvoxExportResponseData { Data = resp.Data.ToByteArray(), Format = (VolvoxExportFormat)resp.Format };
         }
 
-        public byte[] EncodeImportRequest(long gridId, byte[] data, VolvoxExportFormat format, VolvoxExportScope scope)
+        public byte[] EncodeLoadDataRequest(long gridId, byte[] data)
         {
-            return new ImportRequest { GridId = gridId, Data = ByteString.CopyFrom(data ?? Array.Empty<byte>()), Format = (ExportFormat)format, Scope = (ExportScope)scope }.ToByteArray();
+            return new LoadDataRequest { GridId = gridId, Data = ByteString.CopyFrom(data ?? Array.Empty<byte>()) }.ToByteArray();
         }
 
         public byte[] EncodePrintRequest(long gridId, bool landscape, int marginL, int marginT, int marginR, int marginB, string header, string footer, bool showPageNumbers)

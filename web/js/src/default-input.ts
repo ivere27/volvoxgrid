@@ -47,7 +47,8 @@ function isPrintableEditKey(e: KeyboardEvent): boolean {
 /**
  * Attach a default keyboard handler that:
  * - Navigates with arrow/tab/page/home/end keys
- * - Starts editing on printable key press
+ * - Forwards printable characters via handle_key_press so the engine decides
+ *   whether to edit, toggle, or ignore them
  * - Forwards all keys to the engine via handle_key_down
  *
  * Returns a cleanup function to remove the listener.
@@ -64,29 +65,19 @@ export function setupDefaultKeyboard(
       e.preventDefault();
     }
 
-    // Printable key starts edit mode and seeds the first character.
-    // suppressEditorSelect prevents editInput.select() from selecting
-    // the seeded character (which would cause "abc" → "bc").
-    if (!wasm.is_editing(gridId) && isPrintableEditKey(e)) {
-      if (typeof wasm.begin_edit_at_selection === "function") {
-        (grid as any).suppressEditorSelect = true;
-        wasm.begin_edit_at_selection(gridId);
-        if (wasm.is_editing(gridId)) {
-          wasm.set_edit_text(gridId, e.key);
-          if (typeof wasm.set_edit_selection === "function") {
-            wasm.set_edit_selection(gridId, 1, 0);
-          }
-          grid.invalidate();
-          e.preventDefault();
-          requestAnimationFrame(() => { (grid as any).suppressEditorSelect = false; });
-          return;
-        }
-        (grid as any).suppressEditorSelect = false;
-      }
+    const printable = isPrintableEditKey(e);
+    if (printable) {
+      e.preventDefault();
     }
 
     const modifier = modifierBits(e);
     wasm.handle_key_down(gridId, e.keyCode, modifier);
+    if (printable && typeof wasm.handle_key_press === "function") {
+      const charCode = e.key.codePointAt(0);
+      if (charCode != null) {
+        wasm.handle_key_press(gridId, charCode);
+      }
+    }
     grid.invalidate();
   };
 

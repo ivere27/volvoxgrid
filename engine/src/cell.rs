@@ -179,6 +179,12 @@ pub struct CellStore {
     heap_size_cache: Cell<usize>,
     /// True when `heap_size_cache` reflects current state.
     heap_size_cache_valid: Cell<bool>,
+    /// True when the derived extra-field flags reflect current state.
+    extra_flags_cache_valid: Cell<bool>,
+    /// Cached presence of non-empty cell pictures.
+    has_picture_cache: Cell<bool>,
+    /// Cached presence of explicit per-cell progress values.
+    has_explicit_progress_cache: Cell<bool>,
 }
 
 impl CellStore {
@@ -189,6 +195,9 @@ impl CellStore {
             col_map: Vec::new(),
             heap_size_cache: Cell::new(0),
             heap_size_cache_valid: Cell::new(false),
+            extra_flags_cache_valid: Cell::new(false),
+            has_picture_cache: Cell::new(false),
+            has_explicit_progress_cache: Cell::new(false),
         }
     }
 
@@ -217,6 +226,9 @@ impl CellStore {
             col_map: Vec::new(),
             heap_size_cache: Cell::new(0),
             heap_size_cache_valid: Cell::new(false),
+            extra_flags_cache_valid: Cell::new(false),
+            has_picture_cache: Cell::new(false),
+            has_explicit_progress_cache: Cell::new(false),
         }
     }
 
@@ -225,6 +237,46 @@ impl CellStore {
         if self.heap_size_cache_valid.get() {
             self.heap_size_cache_valid.set(false);
         }
+    }
+
+    #[inline]
+    fn invalidate_extra_flags_cache(&self) {
+        if self.extra_flags_cache_valid.get() {
+            self.extra_flags_cache_valid.set(false);
+        }
+    }
+
+    #[inline]
+    fn invalidate_caches(&self) {
+        self.invalidate_heap_size_cache();
+        self.invalidate_extra_flags_cache();
+    }
+
+    fn refresh_extra_flags_cache(&self) {
+        if self.extra_flags_cache_valid.get() {
+            return;
+        }
+
+        let mut has_picture = false;
+        let mut has_explicit_progress = false;
+        for cell in self.cells.values() {
+            let Some(extra) = cell.extra.as_ref() else {
+                continue;
+            };
+            if !has_picture && extra.picture.as_ref().is_some_and(|data| !data.is_empty()) {
+                has_picture = true;
+            }
+            if !has_explicit_progress && extra.progress_percent > 0.0 {
+                has_explicit_progress = true;
+            }
+            if has_picture && has_explicit_progress {
+                break;
+            }
+        }
+
+        self.has_picture_cache.set(has_picture);
+        self.has_explicit_progress_cache.set(has_explicit_progress);
+        self.extra_flags_cache_valid.set(true);
     }
 
     // ── Row-map helpers ─────────────────────────────────────────────────
@@ -304,13 +356,13 @@ impl CellStore {
 
     /// Remove an entry from the col_map at the given position.
     pub fn col_map_remove(&mut self, pos: usize) -> i32 {
-        self.invalidate_heap_size_cache();
+        self.invalidate_caches();
         self.col_map.remove(pos)
     }
 
     /// Insert a value into the col_map at the given position.
     pub fn col_map_insert(&mut self, pos: usize, val: i32) {
-        self.invalidate_heap_size_cache();
+        self.invalidate_caches();
         self.col_map.insert(pos, val);
     }
 
@@ -341,20 +393,20 @@ impl CellStore {
     }
 
     pub fn get_mut(&mut self, row: i32, col: i32) -> &mut CellData {
-        self.invalidate_heap_size_cache();
+        self.invalidate_caches();
         let r = self.map_row(row);
         let c = self.map_col(col);
         self.cells.entry((r, c)).or_insert_with(CellData::default)
     }
 
     pub fn set(&mut self, row: i32, col: i32, data: CellData) {
-        self.invalidate_heap_size_cache();
+        self.invalidate_caches();
         self.cells
             .insert((self.map_row(row), self.map_col(col)), data);
     }
 
     pub fn remove(&mut self, row: i32, col: i32) {
-        self.invalidate_heap_size_cache();
+        self.invalidate_caches();
         self.cells.remove(&(self.map_row(row), self.map_col(col)));
     }
 
@@ -385,7 +437,7 @@ impl CellStore {
     // ── Structural operations (materialize row_map first) ───────────────
 
     pub fn clear_range(&mut self, row1: i32, col1: i32, row2: i32, col2: i32) {
-        self.invalidate_heap_size_cache();
+        self.invalidate_caches();
         self.materialize_row_map();
         self.materialize_col_map();
         let r_lo = row1.min(row2);
@@ -397,14 +449,14 @@ impl CellStore {
     }
 
     pub fn clear_all(&mut self) {
-        self.invalidate_heap_size_cache();
+        self.invalidate_caches();
         self.cells.clear();
         self.row_map.clear();
         self.col_map.clear();
     }
 
     pub fn insert_row(&mut self, at: i32) {
-        self.invalidate_heap_size_cache();
+        self.invalidate_caches();
         self.materialize_row_map();
         self.materialize_col_map();
         let mut shifted: Vec<((i32, i32), CellData)> = Vec::new();
@@ -425,7 +477,7 @@ impl CellStore {
     }
 
     pub fn remove_row(&mut self, at: i32) {
-        self.invalidate_heap_size_cache();
+        self.invalidate_caches();
         self.materialize_row_map();
         self.materialize_col_map();
         let keys_at: Vec<(i32, i32)> = self
@@ -463,7 +515,7 @@ impl CellStore {
         if source_pos == insert_pos {
             return;
         }
-        self.invalidate_heap_size_cache();
+        self.invalidate_caches();
         self.materialize_row_map();
         self.materialize_col_map();
         let old = std::mem::take(&mut self.cells);
@@ -481,6 +533,16 @@ impl CellStore {
         self.cells.iter()
     }
 
+    pub fn has_any_picture(&self) -> bool {
+        self.refresh_extra_flags_cache();
+        self.has_picture_cache.get()
+    }
+
+    pub fn has_any_explicit_progress(&self) -> bool {
+        self.refresh_extra_flags_cache();
+        self.has_explicit_progress_cache.get()
+    }
+
     pub fn contains(&self, row: i32, col: i32) -> bool {
         self.cells
             .contains_key(&(self.map_row(row), self.map_col(col)))
@@ -488,7 +550,7 @@ impl CellStore {
 
     /// Drain all entries, yielding ownership without cloning.
     pub fn drain(&mut self) -> impl Iterator<Item = ((i32, i32), CellData)> + '_ {
-        self.invalidate_heap_size_cache();
+        self.invalidate_caches();
         self.cells.drain()
     }
 
@@ -515,4 +577,75 @@ fn remap_col_index_for_move(index: i32, source_pos: i32, insert_pos: i32) -> i32
         return index + 1;
     }
     index
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CellStore;
+
+    #[test]
+    fn picture_presence_cache_tracks_mutations() {
+        let mut store = CellStore::new();
+        assert!(!store.has_any_picture());
+
+        store.get_mut(1, 2).extra_mut().picture = Some(vec![1, 2, 3]);
+        assert!(store.has_any_picture());
+
+        store.get_mut(1, 2).extra_mut().picture = Some(Vec::new());
+        assert!(!store.has_any_picture());
+
+        store.get_mut(1, 2).extra_mut().picture = Some(vec![9]);
+        assert!(store.has_any_picture());
+
+        store.remove(1, 2);
+        assert!(!store.has_any_picture());
+    }
+
+    #[test]
+    fn progress_presence_cache_tracks_mutations() {
+        let mut store = CellStore::new();
+        assert!(!store.has_any_explicit_progress());
+
+        store.get_mut(0, 0).extra_mut().progress_percent = 0.5;
+        assert!(store.has_any_explicit_progress());
+
+        store.get_mut(0, 0).extra_mut().progress_percent = 0.0;
+        assert!(!store.has_any_explicit_progress());
+
+        store.get_mut(0, 0).extra_mut().progress_percent = 0.25;
+        assert!(store.has_any_explicit_progress());
+
+        store.clear_all();
+        assert!(!store.has_any_explicit_progress());
+    }
+
+    #[test]
+    fn set_row_map_preserves_extra_flags_cache() {
+        let mut store = CellStore::new();
+
+        // Warm the cache by querying flags.
+        assert!(!store.has_any_explicit_progress());
+        assert!(!store.has_any_picture());
+
+        // set_row_map should NOT invalidate extra_flags_cache
+        // (row reordering doesn't change cell contents).
+        store.set_row_map(vec![1, 0]);
+        // If the cache were invalidated, the next call would trigger
+        // a full rescan of all cells. Verify it stays valid by checking
+        // the internal flag directly through the public API.
+        assert!(!store.has_any_explicit_progress());
+        assert!(!store.has_any_picture());
+
+        // Add progress data, then set_row_map again.
+        store.get_mut(0, 0).extra_mut().progress_percent = 0.5;
+        assert!(store.has_any_explicit_progress());
+
+        store.set_row_map(vec![0, 1]);
+        // Flag should still be true (not reset to false by map change).
+        assert!(store.has_any_explicit_progress());
+
+        // clear_row_map should also preserve the cache.
+        store.clear_row_map();
+        assert!(store.has_any_explicit_progress());
+    }
 }

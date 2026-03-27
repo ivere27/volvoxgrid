@@ -187,6 +187,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn update_cells(&self, request: UpdateCellsRequest) -> Result<WriteResult, FfiError>;
     fn get_cells(&self, request: GetCellsRequest) -> Result<CellsResponse, FfiError>;
     fn load_table(&self, request: LoadTableRequest) -> Result<WriteResult, FfiError>;
+    fn load_data(&self, request: LoadDataRequest) -> Result<LoadDataResult, FfiError>;
     fn clear(&self, request: ClearRequest) -> Result<Empty, FfiError>;
     fn select(&self, request: SelectRequest) -> Result<Empty, FfiError>;
     fn get_selection(&self, request: GridHandle) -> Result<SelectionState, FfiError>;
@@ -208,7 +209,6 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn get_memory_usage(&self, request: GridHandle) -> Result<MemoryUsageResponse, FfiError>;
     fn clipboard(&self, request: ClipboardCommand) -> Result<ClipboardResponse, FfiError>;
     fn export(&self, request: ExportRequest) -> Result<ExportResponse, FfiError>;
-    fn import(&self, request: ImportRequest) -> Result<Empty, FfiError>;
     fn print(&self, request: PrintRequest) -> Result<PrintResponse, FfiError>;
     fn archive(&self, request: ArchiveRequest) -> Result<ArchiveResponse, FfiError>;
     fn resize_viewport(&self, request: ResizeViewportRequest) -> Result<Empty, FfiError>;
@@ -621,6 +621,22 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
                 Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
             }
         }
+        "/volvoxgrid.v1.VolvoxGridService/LoadData" => {
+            match LoadDataRequest::decode(input.as_slice()) {
+                Ok(req) => match plugin.load_data(req) {
+                    Ok(resp) => {
+                        let mut buf = Vec::new();
+                        if resp.encode(&mut buf).is_ok() {
+                            success_response(resp_len, &buf)
+                        } else {
+                            error_response(resp_len, "encode failed")
+                        }
+                    }
+                    Err(e) => error_response(resp_len, &e),
+                },
+                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+            }
+        }
         "/volvoxgrid.v1.VolvoxGridService/Clear" => match ClearRequest::decode(input.as_slice()) {
             Ok(req) => match plugin.clear(req) {
                 Ok(resp) => {
@@ -936,22 +952,6 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
         "/volvoxgrid.v1.VolvoxGridService/Export" => {
             match ExportRequest::decode(input.as_slice()) {
                 Ok(req) => match plugin.export(req) {
-                    Ok(resp) => {
-                        let mut buf = Vec::new();
-                        if resp.encode(&mut buf).is_ok() {
-                            success_response(resp_len, &buf)
-                        } else {
-                            error_response(resp_len, "encode failed")
-                        }
-                    }
-                    Err(e) => error_response(resp_len, &e),
-                },
-                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
-            }
-        }
-        "/volvoxgrid.v1.VolvoxGridService/Import" => {
-            match ImportRequest::decode(input.as_slice()) {
-                Ok(req) => match plugin.import(req) {
                     Ok(resp) => {
                         let mut buf = Vec::new();
                         if resp.encode(&mut buf).is_ok() {

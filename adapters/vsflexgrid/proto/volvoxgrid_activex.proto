@@ -700,11 +700,13 @@ message SetColEditMaskRequest {
 message SetColComboListRequest {
   int64  grid_id = 1;
   int32  col     = 2;
+  // Pipe-delimited combo items; prefix with `|` to make the list editable.
   string list    = 3;
 }
 
 message SetComboListRequest {
   int64  grid_id = 1;
+  // Pipe-delimited combo items; prefix with `|` to make the list editable.
   string list    = 2;
 }
 
@@ -1363,6 +1365,7 @@ message ComboRequest {
   float           height    = 6;
   repeated string items     = 7;
   int32           selected  = 8;
+  // True if free-form text entry is allowed.
   bool            editable  = 9;
 }
 

@@ -6163,6 +6163,7 @@ class ColumnDef extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   void clearSortType() => $_clearField(12);
 
+  /// Pipe-delimited dropdown items; prefix with `|` to make the list editable.
   @$pb.TagNumber(13)
   $core.String get dropdownItems => $_getSZ(12);
   @$pb.TagNumber(13)
@@ -6737,6 +6738,7 @@ class CellUpdate extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   ImageData ensureButtonPicture() => $_ensure(7);
 
+  /// Pipe-delimited dropdown items; prefix with `|` to make the list editable.
   @$pb.TagNumber(9)
   $core.String get dropdownItems => $_getSZ(8);
   @$pb.TagNumber(9)
@@ -7407,6 +7409,658 @@ class LoadTableRequest extends $pb.GeneratedMessage {
   $core.bool hasAtomic() => $_has(4);
   @$pb.TagNumber(5)
   void clearAtomic() => $_clearField(5);
+}
+
+enum FieldMapping_Target { colIndex, colKey, notSet }
+
+class FieldMapping extends $pb.GeneratedMessage {
+  factory FieldMapping({
+    $core.String? field_1,
+    $core.int? colIndex,
+    $core.String? colKey,
+  }) {
+    final result = create();
+    if (field_1 != null) result.field_1 = field_1;
+    if (colIndex != null) result.colIndex = colIndex;
+    if (colKey != null) result.colKey = colKey;
+    return result;
+  }
+
+  FieldMapping._();
+
+  factory FieldMapping.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory FieldMapping.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, FieldMapping_Target>
+      _FieldMapping_TargetByTag = {
+    2: FieldMapping_Target.colIndex,
+    3: FieldMapping_Target.colKey,
+    0: FieldMapping_Target.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'FieldMapping',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..oo(0, [2, 3])
+    ..aOS(1, _omitFieldNames ? '' : 'field')
+    ..aI(2, _omitFieldNames ? '' : 'colIndex')
+    ..aOS(3, _omitFieldNames ? '' : 'colKey')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FieldMapping clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  FieldMapping copyWith(void Function(FieldMapping) updates) =>
+      super.copyWith((message) => updates(message as FieldMapping))
+          as FieldMapping;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static FieldMapping create() => FieldMapping._();
+  @$core.override
+  FieldMapping createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static FieldMapping getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<FieldMapping>(create);
+  static FieldMapping? _defaultInstance;
+
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  FieldMapping_Target whichTarget() =>
+      _FieldMapping_TargetByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  void clearTarget() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  $core.String get field_1 => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set field_1($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasField_1() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearField_1() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get colIndex => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set colIndex($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasColIndex() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearColIndex() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get colKey => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set colKey($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasColKey() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearColKey() => $_clearField(3);
+}
+
+class CsvOptions extends $pb.GeneratedMessage {
+  factory CsvOptions({
+    $core.String? delimiter,
+    $core.String? quoteChar,
+    $core.bool? trimWhitespace,
+  }) {
+    final result = create();
+    if (delimiter != null) result.delimiter = delimiter;
+    if (quoteChar != null) result.quoteChar = quoteChar;
+    if (trimWhitespace != null) result.trimWhitespace = trimWhitespace;
+    return result;
+  }
+
+  CsvOptions._();
+
+  factory CsvOptions.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CsvOptions.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CsvOptions',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'delimiter')
+    ..aOS(2, _omitFieldNames ? '' : 'quoteChar')
+    ..aOB(3, _omitFieldNames ? '' : 'trimWhitespace')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CsvOptions clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CsvOptions copyWith(void Function(CsvOptions) updates) =>
+      super.copyWith((message) => updates(message as CsvOptions)) as CsvOptions;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CsvOptions create() => CsvOptions._();
+  @$core.override
+  CsvOptions createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CsvOptions getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CsvOptions>(create);
+  static CsvOptions? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get delimiter => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set delimiter($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDelimiter() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDelimiter() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get quoteChar => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set quoteChar($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasQuoteChar() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearQuoteChar() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get trimWhitespace => $_getBF(2);
+  @$pb.TagNumber(3)
+  set trimWhitespace($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTrimWhitespace() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTrimWhitespace() => $_clearField(3);
+}
+
+class JsonOptions extends $pb.GeneratedMessage {
+  factory JsonOptions({
+    $core.String? dataPath,
+  }) {
+    final result = create();
+    if (dataPath != null) result.dataPath = dataPath;
+    return result;
+  }
+
+  JsonOptions._();
+
+  factory JsonOptions.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory JsonOptions.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'JsonOptions',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'dataPath')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  JsonOptions clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  JsonOptions copyWith(void Function(JsonOptions) updates) =>
+      super.copyWith((message) => updates(message as JsonOptions))
+          as JsonOptions;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static JsonOptions create() => JsonOptions._();
+  @$core.override
+  JsonOptions createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static JsonOptions getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<JsonOptions>(create);
+  static JsonOptions? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get dataPath => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set dataPath($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDataPath() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDataPath() => $_clearField(1);
+}
+
+enum LoadDataOptions_Format { csv, json, notSet }
+
+class LoadDataOptions extends $pb.GeneratedMessage {
+  factory LoadDataOptions({
+    CsvOptions? csv,
+    JsonOptions? json,
+    HeaderPolicy? headerPolicy,
+    $core.Iterable<FieldMapping>? fieldMap,
+    TypePolicy? typePolicy,
+    CoercionMode? coercion,
+    WriteErrorMode? errorMode,
+    $core.String? dateFormat,
+    $core.String? decimalChar,
+    $core.bool? autoCreateColumns,
+    LoadMode? mode,
+    $core.bool? atomic,
+    $core.int? skipRows,
+    $core.int? maxRows,
+  }) {
+    final result = create();
+    if (csv != null) result.csv = csv;
+    if (json != null) result.json = json;
+    if (headerPolicy != null) result.headerPolicy = headerPolicy;
+    if (fieldMap != null) result.fieldMap.addAll(fieldMap);
+    if (typePolicy != null) result.typePolicy = typePolicy;
+    if (coercion != null) result.coercion = coercion;
+    if (errorMode != null) result.errorMode = errorMode;
+    if (dateFormat != null) result.dateFormat = dateFormat;
+    if (decimalChar != null) result.decimalChar = decimalChar;
+    if (autoCreateColumns != null) result.autoCreateColumns = autoCreateColumns;
+    if (mode != null) result.mode = mode;
+    if (atomic != null) result.atomic = atomic;
+    if (skipRows != null) result.skipRows = skipRows;
+    if (maxRows != null) result.maxRows = maxRows;
+    return result;
+  }
+
+  LoadDataOptions._();
+
+  factory LoadDataOptions.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LoadDataOptions.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, LoadDataOptions_Format>
+      _LoadDataOptions_FormatByTag = {
+    1: LoadDataOptions_Format.csv,
+    2: LoadDataOptions_Format.json,
+    0: LoadDataOptions_Format.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LoadDataOptions',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..oo(0, [1, 2])
+    ..aOM<CsvOptions>(1, _omitFieldNames ? '' : 'csv',
+        subBuilder: CsvOptions.create)
+    ..aOM<JsonOptions>(2, _omitFieldNames ? '' : 'json',
+        subBuilder: JsonOptions.create)
+    ..aE<HeaderPolicy>(10, _omitFieldNames ? '' : 'headerPolicy',
+        enumValues: HeaderPolicy.values)
+    ..pPM<FieldMapping>(11, _omitFieldNames ? '' : 'fieldMap',
+        subBuilder: FieldMapping.create)
+    ..aE<TypePolicy>(12, _omitFieldNames ? '' : 'typePolicy',
+        enumValues: TypePolicy.values)
+    ..aE<CoercionMode>(13, _omitFieldNames ? '' : 'coercion',
+        enumValues: CoercionMode.values)
+    ..aE<WriteErrorMode>(14, _omitFieldNames ? '' : 'errorMode',
+        enumValues: WriteErrorMode.values)
+    ..aOS(15, _omitFieldNames ? '' : 'dateFormat')
+    ..aOS(16, _omitFieldNames ? '' : 'decimalChar')
+    ..aOB(17, _omitFieldNames ? '' : 'autoCreateColumns')
+    ..aE<LoadMode>(18, _omitFieldNames ? '' : 'mode',
+        enumValues: LoadMode.values)
+    ..aOB(19, _omitFieldNames ? '' : 'atomic')
+    ..aI(20, _omitFieldNames ? '' : 'skipRows')
+    ..aI(21, _omitFieldNames ? '' : 'maxRows')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoadDataOptions clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoadDataOptions copyWith(void Function(LoadDataOptions) updates) =>
+      super.copyWith((message) => updates(message as LoadDataOptions))
+          as LoadDataOptions;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LoadDataOptions create() => LoadDataOptions._();
+  @$core.override
+  LoadDataOptions createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static LoadDataOptions getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LoadDataOptions>(create);
+  static LoadDataOptions? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  LoadDataOptions_Format whichFormat() =>
+      _LoadDataOptions_FormatByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  void clearFormat() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  CsvOptions get csv => $_getN(0);
+  @$pb.TagNumber(1)
+  set csv(CsvOptions value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCsv() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCsv() => $_clearField(1);
+  @$pb.TagNumber(1)
+  CsvOptions ensureCsv() => $_ensure(0);
+
+  @$pb.TagNumber(2)
+  JsonOptions get json => $_getN(1);
+  @$pb.TagNumber(2)
+  set json(JsonOptions value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasJson() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearJson() => $_clearField(2);
+  @$pb.TagNumber(2)
+  JsonOptions ensureJson() => $_ensure(1);
+
+  @$pb.TagNumber(10)
+  HeaderPolicy get headerPolicy => $_getN(2);
+  @$pb.TagNumber(10)
+  set headerPolicy(HeaderPolicy value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasHeaderPolicy() => $_has(2);
+  @$pb.TagNumber(10)
+  void clearHeaderPolicy() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $pb.PbList<FieldMapping> get fieldMap => $_getList(3);
+
+  @$pb.TagNumber(12)
+  TypePolicy get typePolicy => $_getN(4);
+  @$pb.TagNumber(12)
+  set typePolicy(TypePolicy value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasTypePolicy() => $_has(4);
+  @$pb.TagNumber(12)
+  void clearTypePolicy() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  CoercionMode get coercion => $_getN(5);
+  @$pb.TagNumber(13)
+  set coercion(CoercionMode value) => $_setField(13, value);
+  @$pb.TagNumber(13)
+  $core.bool hasCoercion() => $_has(5);
+  @$pb.TagNumber(13)
+  void clearCoercion() => $_clearField(13);
+
+  @$pb.TagNumber(14)
+  WriteErrorMode get errorMode => $_getN(6);
+  @$pb.TagNumber(14)
+  set errorMode(WriteErrorMode value) => $_setField(14, value);
+  @$pb.TagNumber(14)
+  $core.bool hasErrorMode() => $_has(6);
+  @$pb.TagNumber(14)
+  void clearErrorMode() => $_clearField(14);
+
+  @$pb.TagNumber(15)
+  $core.String get dateFormat => $_getSZ(7);
+  @$pb.TagNumber(15)
+  set dateFormat($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(15)
+  $core.bool hasDateFormat() => $_has(7);
+  @$pb.TagNumber(15)
+  void clearDateFormat() => $_clearField(15);
+
+  @$pb.TagNumber(16)
+  $core.String get decimalChar => $_getSZ(8);
+  @$pb.TagNumber(16)
+  set decimalChar($core.String value) => $_setString(8, value);
+  @$pb.TagNumber(16)
+  $core.bool hasDecimalChar() => $_has(8);
+  @$pb.TagNumber(16)
+  void clearDecimalChar() => $_clearField(16);
+
+  @$pb.TagNumber(17)
+  $core.bool get autoCreateColumns => $_getBF(9);
+  @$pb.TagNumber(17)
+  set autoCreateColumns($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(17)
+  $core.bool hasAutoCreateColumns() => $_has(9);
+  @$pb.TagNumber(17)
+  void clearAutoCreateColumns() => $_clearField(17);
+
+  @$pb.TagNumber(18)
+  LoadMode get mode => $_getN(10);
+  @$pb.TagNumber(18)
+  set mode(LoadMode value) => $_setField(18, value);
+  @$pb.TagNumber(18)
+  $core.bool hasMode() => $_has(10);
+  @$pb.TagNumber(18)
+  void clearMode() => $_clearField(18);
+
+  @$pb.TagNumber(19)
+  $core.bool get atomic => $_getBF(11);
+  @$pb.TagNumber(19)
+  set atomic($core.bool value) => $_setBool(11, value);
+  @$pb.TagNumber(19)
+  $core.bool hasAtomic() => $_has(11);
+  @$pb.TagNumber(19)
+  void clearAtomic() => $_clearField(19);
+
+  @$pb.TagNumber(20)
+  $core.int get skipRows => $_getIZ(12);
+  @$pb.TagNumber(20)
+  set skipRows($core.int value) => $_setSignedInt32(12, value);
+  @$pb.TagNumber(20)
+  $core.bool hasSkipRows() => $_has(12);
+  @$pb.TagNumber(20)
+  void clearSkipRows() => $_clearField(20);
+
+  @$pb.TagNumber(21)
+  $core.int get maxRows => $_getIZ(13);
+  @$pb.TagNumber(21)
+  set maxRows($core.int value) => $_setSignedInt32(13, value);
+  @$pb.TagNumber(21)
+  $core.bool hasMaxRows() => $_has(13);
+  @$pb.TagNumber(21)
+  void clearMaxRows() => $_clearField(21);
+}
+
+class LoadDataRequest extends $pb.GeneratedMessage {
+  factory LoadDataRequest({
+    $fixnum.Int64? gridId,
+    $core.List<$core.int>? data,
+    LoadDataOptions? options,
+  }) {
+    final result = create();
+    if (gridId != null) result.gridId = gridId;
+    if (data != null) result.data = data;
+    if (options != null) result.options = options;
+    return result;
+  }
+
+  LoadDataRequest._();
+
+  factory LoadDataRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LoadDataRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LoadDataRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'gridId')
+    ..a<$core.List<$core.int>>(
+        2, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..aOM<LoadDataOptions>(3, _omitFieldNames ? '' : 'options',
+        subBuilder: LoadDataOptions.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoadDataRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoadDataRequest copyWith(void Function(LoadDataRequest) updates) =>
+      super.copyWith((message) => updates(message as LoadDataRequest))
+          as LoadDataRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LoadDataRequest create() => LoadDataRequest._();
+  @$core.override
+  LoadDataRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static LoadDataRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LoadDataRequest>(create);
+  static LoadDataRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get gridId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set gridId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasGridId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearGridId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.List<$core.int> get data => $_getN(1);
+  @$pb.TagNumber(2)
+  set data($core.List<$core.int> value) => $_setBytes(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasData() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearData() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  LoadDataOptions get options => $_getN(2);
+  @$pb.TagNumber(3)
+  set options(LoadDataOptions value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasOptions() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOptions() => $_clearField(3);
+  @$pb.TagNumber(3)
+  LoadDataOptions ensureOptions() => $_ensure(2);
+}
+
+class LoadDataResult extends $pb.GeneratedMessage {
+  factory LoadDataResult({
+    LoadDataStatus? status,
+    $core.int? rows,
+    $core.int? cols,
+    $core.int? rejected,
+    $core.Iterable<TypeViolation>? violations,
+    $core.Iterable<$core.String>? warnings,
+    $core.Iterable<ColumnDef>? inferredColumns,
+  }) {
+    final result = create();
+    if (status != null) result.status = status;
+    if (rows != null) result.rows = rows;
+    if (cols != null) result.cols = cols;
+    if (rejected != null) result.rejected = rejected;
+    if (violations != null) result.violations.addAll(violations);
+    if (warnings != null) result.warnings.addAll(warnings);
+    if (inferredColumns != null) result.inferredColumns.addAll(inferredColumns);
+    return result;
+  }
+
+  LoadDataResult._();
+
+  factory LoadDataResult.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LoadDataResult.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LoadDataResult',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aE<LoadDataStatus>(1, _omitFieldNames ? '' : 'status',
+        enumValues: LoadDataStatus.values)
+    ..aI(2, _omitFieldNames ? '' : 'rows')
+    ..aI(3, _omitFieldNames ? '' : 'cols')
+    ..aI(4, _omitFieldNames ? '' : 'rejected')
+    ..pPM<TypeViolation>(5, _omitFieldNames ? '' : 'violations',
+        subBuilder: TypeViolation.create)
+    ..pPS(6, _omitFieldNames ? '' : 'warnings')
+    ..pPM<ColumnDef>(7, _omitFieldNames ? '' : 'inferredColumns',
+        subBuilder: ColumnDef.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoadDataResult clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoadDataResult copyWith(void Function(LoadDataResult) updates) =>
+      super.copyWith((message) => updates(message as LoadDataResult))
+          as LoadDataResult;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LoadDataResult create() => LoadDataResult._();
+  @$core.override
+  LoadDataResult createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static LoadDataResult getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LoadDataResult>(create);
+  static LoadDataResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  LoadDataStatus get status => $_getN(0);
+  @$pb.TagNumber(1)
+  set status(LoadDataStatus value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasStatus() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearStatus() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get rows => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set rows($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRows() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRows() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get cols => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set cols($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCols() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCols() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get rejected => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set rejected($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRejected() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRejected() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $pb.PbList<TypeViolation> get violations => $_getList(4);
+
+  @$pb.TagNumber(6)
+  $pb.PbList<$core.String> get warnings => $_getList(5);
+
+  @$pb.TagNumber(7)
+  $pb.PbList<ColumnDef> get inferredColumns => $_getList(6);
 }
 
 class ClearRequest extends $pb.GeneratedMessage {
@@ -11151,111 +11805,6 @@ class ExportResponse extends $pb.GeneratedMessage {
   void clearFormat() => $_clearField(2);
 }
 
-class ImportRequest extends $pb.GeneratedMessage {
-  factory ImportRequest({
-    $fixnum.Int64? gridId,
-    $core.List<$core.int>? data,
-    ExportFormat? format,
-    ExportScope? scope,
-    $core.String? url,
-  }) {
-    final result = create();
-    if (gridId != null) result.gridId = gridId;
-    if (data != null) result.data = data;
-    if (format != null) result.format = format;
-    if (scope != null) result.scope = scope;
-    if (url != null) result.url = url;
-    return result;
-  }
-
-  ImportRequest._();
-
-  factory ImportRequest.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory ImportRequest.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ImportRequest',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
-      createEmptyInstance: create)
-    ..aInt64(1, _omitFieldNames ? '' : 'gridId')
-    ..a<$core.List<$core.int>>(
-        2, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
-    ..aE<ExportFormat>(3, _omitFieldNames ? '' : 'format',
-        enumValues: ExportFormat.values)
-    ..aE<ExportScope>(4, _omitFieldNames ? '' : 'scope',
-        enumValues: ExportScope.values)
-    ..aOS(5, _omitFieldNames ? '' : 'url')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ImportRequest clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ImportRequest copyWith(void Function(ImportRequest) updates) =>
-      super.copyWith((message) => updates(message as ImportRequest))
-          as ImportRequest;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static ImportRequest create() => ImportRequest._();
-  @$core.override
-  ImportRequest createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static ImportRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<ImportRequest>(create);
-  static ImportRequest? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $fixnum.Int64 get gridId => $_getI64(0);
-  @$pb.TagNumber(1)
-  set gridId($fixnum.Int64 value) => $_setInt64(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasGridId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearGridId() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.List<$core.int> get data => $_getN(1);
-  @$pb.TagNumber(2)
-  set data($core.List<$core.int> value) => $_setBytes(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasData() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearData() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  ExportFormat get format => $_getN(2);
-  @$pb.TagNumber(3)
-  set format(ExportFormat value) => $_setField(3, value);
-  @$pb.TagNumber(3)
-  $core.bool hasFormat() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearFormat() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  ExportScope get scope => $_getN(3);
-  @$pb.TagNumber(4)
-  set scope(ExportScope value) => $_setField(4, value);
-  @$pb.TagNumber(4)
-  $core.bool hasScope() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearScope() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.String get url => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set url($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasUrl() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearUrl() => $_clearField(5);
-}
-
 class PrintRequest extends $pb.GeneratedMessage {
   factory PrintRequest({
     $fixnum.Int64? gridId,
@@ -14384,6 +14933,7 @@ class DropdownRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   void clearSelected() => $_clearField(8);
 
+  /// True if free-form text entry is allowed.
   @$pb.TagNumber(9)
   $core.bool get editable => $_getBF(8);
   @$pb.TagNumber(9)
@@ -19832,6 +20382,10 @@ class VolvoxGridServiceApi {
           $pb.ClientContext? ctx, LoadTableRequest request) =>
       _client.invoke<WriteResult>(
           ctx, 'VolvoxGridService', 'LoadTable', request, WriteResult());
+  $async.Future<LoadDataResult> loadData(
+          $pb.ClientContext? ctx, LoadDataRequest request) =>
+      _client.invoke<LoadDataResult>(
+          ctx, 'VolvoxGridService', 'LoadData', request, LoadDataResult());
   $async.Future<Empty> clear_($pb.ClientContext? ctx, ClearRequest request) =>
       _client.invoke<Empty>(
           ctx, 'VolvoxGridService', 'Clear', request, Empty());
@@ -19916,14 +20470,11 @@ class VolvoxGridServiceApi {
       _client.invoke<ClipboardResponse>(
           ctx, 'VolvoxGridService', 'Clipboard', request, ClipboardResponse());
 
-  /// ── Import / Export ──
+  /// ── Export / Print / Archive ──
   $async.Future<ExportResponse> export(
           $pb.ClientContext? ctx, ExportRequest request) =>
       _client.invoke<ExportResponse>(
           ctx, 'VolvoxGridService', 'Export', request, ExportResponse());
-  $async.Future<Empty> import($pb.ClientContext? ctx, ImportRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'Import', request, Empty());
   $async.Future<PrintResponse> print(
           $pb.ClientContext? ctx, PrintRequest request) =>
       _client.invoke<PrintResponse>(

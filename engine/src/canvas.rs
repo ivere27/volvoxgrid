@@ -1185,6 +1185,15 @@ impl RenderContext {
     }
 }
 
+fn any_visible_cell<F>(ctx: &RenderContext, mut predicate: F) -> bool
+where
+    F: FnMut(i32, i32) -> bool,
+{
+    ctx.vis_cells
+        .iter()
+        .any(|cell| predicate(cell.key.row, cell.key.col))
+}
+
 // ===========================================================================
 // Helper: iterate visible cells
 // ===========================================================================
@@ -1888,6 +1897,29 @@ pub(crate) fn parse_progress_percent(text: &str) -> f32 {
     }
 }
 
+fn progress_layer_needed(grid: &VolvoxGrid, ctx: &RenderContext) -> bool {
+    // Check column-level progress first (cheap) before the expensive
+    // has_any_explicit_progress() which scans the entire CellStore.
+    if !grid.columns.iter().any(|c| c.progress_color != 0)
+        && !grid.cells.has_any_explicit_progress()
+    {
+        return false;
+    }
+
+    any_visible_cell(ctx, |row, col| {
+        let col_progress = if col >= 0 && (col as usize) < grid.columns.len() {
+            grid.columns[col as usize].progress_color
+        } else {
+            0
+        };
+        col_progress != 0
+            || grid
+                .cells
+                .get(row, col)
+                .is_some_and(|cell| cell.progress_percent() > 0.0)
+    })
+}
+
 /// Format a number with comma separators (e.g. 1000000 -> "1,000,000").
 pub(crate) fn format_number(n: i32) -> String {
     let s = n.to_string();
@@ -2009,13 +2041,22 @@ fn should_show_dropdown_button_with_list(
     }
 }
 
+fn cell_has_dropdown_source(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
+    if !grid.can_begin_edit(row, col, true) {
+        return false;
+    }
+    if let Some(cell) = grid.cells.get(row, col) {
+        if !cell.dropdown_items().is_empty() {
+            return true;
+        }
+    }
+    col >= 0
+        && (col as usize) < grid.columns.len()
+        && !grid.columns[col as usize].dropdown_items.is_empty()
+}
+
 pub(crate) fn show_dropdown_button_for_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
-    should_show_dropdown_button_with_list(
-        grid,
-        row,
-        col,
-        !grid.active_dropdown_list(row, col).is_empty(),
-    )
+    should_show_dropdown_button_with_list(grid, row, col, cell_has_dropdown_source(grid, row, col))
 }
 
 /// Compute the pixel rect for a dropdown button within a cell.
@@ -2028,10 +2069,14 @@ pub(crate) fn dropdown_button_rect(
     if cw <= 2 || ch <= 2 {
         return None;
     }
-    let mut bw = (ch - 2).clamp(12, 18);
-    bw = bw.min((cw - 2).max(0));
     let bh = (ch - 2).max(0);
-    if bw <= 0 || bh <= 0 {
+    let max_bw = (cw - 2).max(0);
+    if bh <= 0 || max_bw <= 0 {
+        return None;
+    }
+    let target_bw = (((bh as f32) * 0.85).round() as i32).max(12);
+    let bw = target_bw.min(max_bw).min(36);
+    if bw <= 0 {
         return None;
     }
     let bx = cx + cw - bw - 1;
@@ -2307,7 +2352,7 @@ fn render_grid_internal<C: Canvas>(
     run_layer!(layer::SELECTION, render_selection(grid, canvas, &ctx));
 
     run_layer!(layer::PROGRESS_BARS, {
-        if grid.style.progress_color != 0 || grid.columns.iter().any(|c| c.progress_color != 0) {
+        if progress_layer_needed(grid, &ctx) {
             render_progress_bars(grid, canvas, &ctx);
         }
     });
@@ -2344,20 +2389,25 @@ fn render_grid_internal<C: Canvas>(
     });
 
     run_layer!(layer::CELL_TEXT, render_cell_text(grid, canvas, &ctx));
-    run_layer!(
-        layer::CELL_PICTURES,
-        render_cell_pictures(grid, canvas, &ctx)
-    );
+    run_layer!(layer::CELL_PICTURES, {
+        if picture_layer_needed(grid, &ctx) {
+            render_cell_pictures(grid, canvas, &ctx);
+        }
+    });
     run_layer!(layer::SORT_GLYPHS, render_sort_glyphs(grid, canvas, &ctx));
     run_layer!(
         layer::COL_DRAG_MARKER,
         render_col_drag_marker(grid, canvas, &ctx)
     );
 
-    run_layer!(layer::CHECKBOXES, render_checkboxes(grid, canvas, &ctx));
+    run_layer!(layer::CHECKBOXES, {
+        if checkbox_layer_needed(grid, &ctx) {
+            render_checkboxes(grid, canvas, &ctx);
+        }
+    });
 
     run_layer!(layer::DROPDOWN_BUTTONS, {
-        if grid.dropdown_trigger != 0 && grid.columns.iter().any(|c| !c.dropdown_items.is_empty()) {
+        if dropdown_layer_needed(grid, &ctx) {
             render_dropdown_buttons(grid, canvas, &ctx);
         }
     });
@@ -3090,8 +3140,26 @@ fn draw_indicator_text<C: Canvas>(
     );
 }
 
-fn sort_arrow_box_size(cell_h: i32) -> i32 {
-    cell_h.saturating_sub(6).clamp(8, 16)
+fn sort_arrow_box_size(cell_h: i32, scale: f32) -> i32 {
+    let scale = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    };
+    // Size the fallback vector arrow in logical pixels, then scale back to
+    // device pixels so high-DPI hosts do not get a 16px glyph inside a 3x header.
+    let logical_h = if scale > 1.001 {
+        ((cell_h as f32) / scale).round() as i32
+    } else {
+        cell_h
+    };
+    let logical_box = logical_h.saturating_sub(6).clamp(8, 16);
+    let device_box = if scale > 1.001 {
+        ((logical_box as f32) * scale).round() as i32
+    } else {
+        logical_box
+    };
+    device_box.min(cell_h.saturating_sub(2).max(0))
 }
 
 fn draw_sort_direction_arrow<C: Canvas>(
@@ -3460,7 +3528,7 @@ fn render_col_indicator_top<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &
             } else {
                 false
             };
-            let glyph_box = sort_arrow_box_size(ch).min((cw - 4).max(0));
+            let glyph_box = sort_arrow_box_size(ch, grid.scale).min((cw - 4).max(0));
             if glyph_box < 6 {
                 continue;
             }
@@ -4274,6 +4342,15 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
 // Layer 4.5 -- Cell pictures
 // ===========================================================================
 
+fn picture_layer_needed(grid: &VolvoxGrid, ctx: &RenderContext) -> bool {
+    grid.cells.has_any_picture()
+        && any_visible_cell(ctx, |row, col| {
+            grid.cells
+                .get(row, col)
+                .is_some_and(|cell| cell.picture().is_some_and(|data| !data.is_empty()))
+        })
+}
+
 fn render_cell_pictures<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
     let vp = &ctx.vp;
     for &cell in &ctx.vis_cells {
@@ -4715,7 +4792,7 @@ fn render_sort_glyphs<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Render
                         false,
                         grid.style.fore_color_fixed,
                     );
-                let glyph_box = sort_arrow_box_size(inner_h).min(inner_w.max(0));
+                let glyph_box = sort_arrow_box_size(inner_h, grid.scale).min(inner_w.max(0));
                 if glyph_box < 6 {
                     continue;
                 }
@@ -4987,6 +5064,158 @@ fn render_header_marks<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rende
 // Layer 5 -- Checkboxes
 // ===========================================================================
 
+pub(crate) fn checkbox_box_size(cell_h: i32) -> i32 {
+    let max_size = (cell_h - 2).max(1);
+    if max_size <= 13 {
+        max_size
+    } else {
+        (((cell_h as f32) * 0.8).round() as i32).clamp(13, max_size)
+    }
+}
+
+fn fill_rect_clipped<C: Canvas>(
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    clip_x0: i32,
+    clip_y0: i32,
+    clip_x1: i32,
+    clip_y1: i32,
+    color: u32,
+) {
+    if w <= 0 || h <= 0 {
+        return;
+    }
+    let rx0 = x.max(clip_x0);
+    let ry0 = y.max(clip_y0);
+    let rx1 = (x + w).min(clip_x1);
+    let ry1 = (y + h).min(clip_y1);
+    if rx1 > rx0 && ry1 > ry0 {
+        canvas.fill_rect(rx0, ry0, rx1 - rx0, ry1 - ry0, color);
+    }
+}
+
+fn draw_thick_line<C: Canvas>(
+    canvas: &mut C,
+    x0: i32,
+    y0: i32,
+    x1: i32,
+    y1: i32,
+    thickness: i32,
+    color: u32,
+) {
+    let thickness = thickness.max(1);
+    let dx = (x1 - x0) as f32;
+    let dy = (y1 - y0) as f32;
+    let steps = dx.abs().max(dy.abs()).round() as i32;
+    if steps <= 0 {
+        canvas.fill_rect(
+            x0 - thickness / 2,
+            y0 - thickness / 2,
+            thickness,
+            thickness,
+            color,
+        );
+        return;
+    }
+    let step_rect = |step: i32| {
+        let t = step as f32 / steps as f32;
+        let px = (x0 as f32 + dx * t).round() as i32 - thickness / 2;
+        let py = (y0 as f32 + dy * t).round() as i32 - thickness / 2;
+        (px, py)
+    };
+    let min_row = y0.min(y1) - thickness / 2;
+    let max_row = y0.max(y1) - thickness / 2 + thickness - 1;
+    let row_count = (max_row - min_row + 1).max(0) as usize;
+    const MAX_SCANLINE_ROWS: usize = 256;
+    const EMPTY_SCANLINE: (i32, i32) = (i32::MAX, i32::MIN);
+
+    if row_count > MAX_SCANLINE_ROWS {
+        for step in 0..=steps {
+            let (px, py) = step_rect(step);
+            canvas.fill_rect(px, py, thickness, thickness, color);
+        }
+        return;
+    }
+
+    // Merge the per-step squares into one horizontal span per touched row.
+    let mut scanlines = [EMPTY_SCANLINE; MAX_SCANLINE_ROWS];
+    for step in 0..=steps {
+        let (px, py) = step_rect(step);
+        for row in py..(py + thickness) {
+            let entry = &mut scanlines[(row - min_row) as usize];
+            entry.0 = entry.0.min(px);
+            entry.1 = entry.1.max(px + thickness);
+        }
+    }
+    for (offset, &(min_x, max_x)) in scanlines[..row_count].iter().enumerate() {
+        if min_x < max_x {
+            canvas.fill_rect(min_x, min_row + offset as i32, max_x - min_x, 1, color);
+        }
+    }
+}
+
+fn draw_checkbox_mark<C: Canvas>(canvas: &mut C, bx: i32, by: i32, box_size: i32, color: u32) {
+    let stroke = (((box_size as f32) * 0.12).round() as i32).clamp(1, 3);
+    let start_x = bx + ((box_size as f32) * 0.23).round() as i32;
+    let start_y = by + ((box_size as f32) * 0.56).round() as i32;
+    let mid_x = bx + ((box_size as f32) * 0.44).round() as i32;
+    let mid_y = by + ((box_size as f32) * 0.74).round() as i32;
+    let end_x = bx + ((box_size as f32) * 0.79).round() as i32;
+    let end_y = by + ((box_size as f32) * 0.30).round() as i32;
+    draw_thick_line(canvas, start_x, start_y, mid_x, mid_y, stroke, color);
+    draw_thick_line(canvas, mid_x, mid_y, end_x, end_y, stroke, color);
+}
+
+fn dropdown_glyph_metrics(bw: i32, bh: i32) -> (i32, i32, i32) {
+    let dot_size = (((bw.min(bh) as f32) * 0.12).round() as i32).clamp(1, 3);
+    let max_arrow_h = (bh - 4).max(1);
+    let arrow_h = if max_arrow_h <= 4 {
+        max_arrow_h
+    } else {
+        (((bh as f32) * 0.28).round() as i32).clamp(4, max_arrow_h)
+    };
+    let max_arrow_half = ((bw - 3) / 2).max(1);
+    let arrow_half = if max_arrow_half <= 3 {
+        max_arrow_half
+    } else {
+        (((bw as f32) * 0.24).round() as i32).clamp(3, max_arrow_half)
+    };
+    (dot_size, arrow_h, arrow_half)
+}
+
+fn cell_has_checkbox_visual(
+    grid: &VolvoxGrid,
+    row: i32,
+    col: i32,
+    is_boolean_col: bool,
+    checked_state: i32,
+) -> bool {
+    row >= grid.fixed_rows
+        && row < grid.rows
+        && col >= 0
+        && col < grid.cols
+        && !grid.row_props.get(&row).map_or(false, |rp| rp.is_subtotal)
+        && (is_boolean_col || checked_state != pb::CheckedState::CheckedUnchecked as i32)
+}
+
+fn checkbox_layer_needed(grid: &VolvoxGrid, ctx: &RenderContext) -> bool {
+    any_visible_cell(ctx, |row, col| {
+        let is_boolean_col = grid.get_col_props(col).map_or(false, |cp| {
+            cp.data_type == pb::ColumnDataType::ColumnDataBoolean as i32
+        });
+        let checked_state = grid
+            .cells
+            .get(row, col)
+            .map_or(pb::CheckedState::CheckedUnchecked as i32, |cell| {
+                cell.checked()
+            });
+        cell_has_checkbox_visual(grid, row, col, is_boolean_col, checked_state)
+    })
+}
+
 fn render_checkboxes<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
     let vp = &ctx.vp;
     let checked_pic = grid
@@ -5036,11 +5265,7 @@ fn render_checkboxes<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderC
         let slot_style = resolve_checkbox_slot_style(grid, checked_state);
         let icon_layout = resolve_icon_layout_style(grid, slot_style);
 
-        if !is_boolean_col && checked_state == pb::CheckedState::CheckedUnchecked as i32 {
-            continue;
-        }
-
-        if row < grid.fixed_rows {
+        if !cell_has_checkbox_visual(grid, row, col, is_boolean_col, checked_state) {
             continue;
         }
 
@@ -5048,7 +5273,7 @@ fn render_checkboxes<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderC
         // don't shift during smooth scrolling.
         let (ox, oy, ow, oh) = original_cell_bounds(grid, row, col, cx, cy, cw, ch, vp);
 
-        let box_size = 13_i32;
+        let box_size = checkbox_box_size(oh);
         let style_override = grid.get_cell_style(row, col);
         let alignment = resolve_alignment(grid, row, col, &style_override, "");
         let (halign, valign) = alignment_components(alignment);
@@ -5192,16 +5417,7 @@ fn render_checkboxes<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderC
             } else {
                 0xFF000000
             };
-            // Downstroke: (bx+3, by+6) to (bx+5, by+9)
-            for i in 0..3 {
-                canvas.set_pixel(bx + 3 + i, by + 6 + i, mark_color);
-                canvas.set_pixel(bx + 3 + i + 1, by + 6 + i, mark_color);
-            }
-            // Upstroke: (bx+5, by+9) to (bx+10, by+4)
-            for i in 0..5 {
-                canvas.set_pixel(bx + 5 + i, by + 9 - i, mark_color);
-                canvas.set_pixel(bx + 5 + i + 1, by + 9 - i, mark_color);
-            }
+            draw_checkbox_mark(canvas, bx, by, box_size, mark_color);
         }
     }
 }
@@ -5209,6 +5425,13 @@ fn render_checkboxes<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderC
 // ===========================================================================
 // Layer 6 -- Dropdown buttons
 // ===========================================================================
+
+fn dropdown_layer_needed(grid: &VolvoxGrid, ctx: &RenderContext) -> bool {
+    grid.dropdown_trigger != 0
+        && any_visible_cell(ctx, |row, col| {
+            show_dropdown_button_for_cell(grid, row, col)
+        })
+}
 
 fn render_dropdown_buttons<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
     let vp = &ctx.vp;
@@ -5244,32 +5467,53 @@ fn render_dropdown_buttons<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &R
 
         // Glyph — draw per-pixel only within visible bounds.
         let list = grid.active_dropdown_list(row, col);
+        let glyph_color = 0xFF202020;
+        let (dot_size, arrow_h, arrow_half) = dropdown_glyph_metrics(bw, bh);
         if list.trim() == "..." {
             // Ellipsis glyph
-            let gy = by + bh / 2;
-            let start_x = bx + (bw / 2) - 3;
+            let dot_gap = ((bw / 6).max(dot_size + 1)).min(dot_size + 6);
+            let total_w = dot_size * 3 + dot_gap * 2;
+            let start_x = bx + ((bw - total_w) / 2);
+            let gy = by + ((bh - dot_size) / 2);
             for i in 0..3 {
-                let gx = start_x + i * 3;
-                if gx >= vx0 && gx < vx1 && gy >= vy0 && gy < vy1 {
-                    canvas.set_pixel(gx, gy, 0xFF202020);
-                }
+                let gx = start_x + i * (dot_size + dot_gap);
+                fill_rect_clipped(
+                    canvas,
+                    gx,
+                    gy,
+                    dot_size,
+                    dot_size,
+                    vx0,
+                    vy0,
+                    vx1,
+                    vy1,
+                    glyph_color,
+                );
             }
         } else {
             // Dropdown arrow glyph
             let cxm = bx + bw / 2;
-            let cym = by + bh / 2;
-            for row_off in 0..4 {
-                let py = cym - 1 + row_off;
-                if py < vy0 || py >= vy1 {
-                    continue;
-                }
-                let half = 3 - row_off;
-                for dx in -half..=half {
-                    let px = cxm + dx;
-                    if px >= vx0 && px < vx1 {
-                        canvas.set_pixel(px, py, 0xFF202020);
-                    }
-                }
+            let start_y = by + ((bh - arrow_h) / 2);
+            let denom = (arrow_h - 1).max(1) as i64;
+            for row_off in 0..arrow_h {
+                let py = start_y + row_off;
+                let half = if arrow_h <= 1 {
+                    0
+                } else {
+                    ((arrow_half as i64 * (arrow_h - 1 - row_off) as i64) / denom) as i32
+                };
+                fill_rect_clipped(
+                    canvas,
+                    cxm - half,
+                    py,
+                    half * 2 + 1,
+                    1,
+                    vx0,
+                    vy0,
+                    vx1,
+                    vy1,
+                    glyph_color,
+                );
             }
         }
     }
@@ -7259,7 +7503,18 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
 
 #[cfg(test)]
 mod tests {
-    use super::{compose_preedit_display_text, parse_progress_percent};
+    use super::pb;
+    use super::{
+        cell_has_checkbox_visual, checkbox_box_size, checkbox_layer_needed,
+        compose_preedit_display_text, dropdown_button_rect, dropdown_glyph_metrics,
+        dropdown_layer_needed, parse_progress_percent, picture_layer_needed, progress_layer_needed,
+        sort_arrow_box_size, RenderContext,
+    };
+    use crate::grid::VolvoxGrid;
+
+    fn render_ctx(grid: &VolvoxGrid) -> RenderContext {
+        RenderContext::new(grid, grid.viewport_width, grid.viewport_height, None)
+    }
 
     #[test]
     fn parse_progress_percent_treats_one_as_one_percent() {
@@ -7270,9 +7525,114 @@ mod tests {
     }
 
     #[test]
+    fn progress_layer_guard_is_viewport_aware() {
+        let mut grid = VolvoxGrid::new(1, 68, 160, 3, 12, 1, 0);
+        grid.columns[10].progress_color = 0xFF00AA00;
+        assert!(!progress_layer_needed(&grid, &render_ctx(&grid)));
+
+        grid.cells.get_mut(1, 10).extra_mut().progress_percent = 0.5;
+        assert!(!progress_layer_needed(&grid, &render_ctx(&grid)));
+
+        grid.columns[0].progress_color = 0xFF00AA00;
+        assert!(progress_layer_needed(&grid, &render_ctx(&grid)));
+    }
+
+    #[test]
+    fn picture_layer_guard_is_viewport_aware() {
+        let mut grid = VolvoxGrid::new(1, 68, 160, 3, 12, 1, 0);
+        grid.cells.get_mut(1, 10).extra_mut().picture = Some(vec![1, 2, 3]);
+        assert!(!picture_layer_needed(&grid, &render_ctx(&grid)));
+
+        grid.cells.get_mut(1, 0).extra_mut().picture = Some(vec![1, 2, 3]);
+        assert!(picture_layer_needed(&grid, &render_ctx(&grid)));
+    }
+
+    #[test]
     fn compose_preedit_display_text_replaces_selected_text() {
         assert_eq!(compose_preedit_display_text("abcd", 0, 4, "우"), "우");
         assert_eq!(compose_preedit_display_text("abcd", 1, 3, "우"), "a우d");
         assert_eq!(compose_preedit_display_text("abcd", 4, 4, "우"), "abcd우");
+    }
+
+    #[test]
+    fn checkbox_box_size_scales_with_cell_height() {
+        assert_eq!(checkbox_box_size(14), 12);
+        assert_eq!(checkbox_box_size(20), 16);
+        assert!(checkbox_box_size(60) > checkbox_box_size(20));
+    }
+
+    #[test]
+    fn checkbox_layer_guard_is_viewport_aware() {
+        let mut grid = VolvoxGrid::new(1, 68, 160, 3, 12, 1, 0);
+        grid.columns[10].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        assert!(!checkbox_layer_needed(&grid, &render_ctx(&grid)));
+
+        grid.cells.get_mut(1, 10).extra_mut().checked = pb::CheckedState::CheckedChecked as i32;
+        assert!(!checkbox_layer_needed(&grid, &render_ctx(&grid)));
+
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        assert!(checkbox_layer_needed(&grid, &render_ctx(&grid)));
+    }
+
+    #[test]
+    fn dropdown_layer_guard_is_viewport_aware() {
+        let mut grid = VolvoxGrid::new(1, 68, 160, 3, 12, 1, 0);
+        grid.dropdown_trigger = pb::DropdownTrigger::DropdownAlways as i32;
+        grid.columns[10].dropdown_items = "A|B".to_string();
+        assert!(!dropdown_layer_needed(&grid, &render_ctx(&grid)));
+
+        grid.cells.get_mut(1, 10).extra_mut().dropdown_items = "X|Y".to_string();
+        assert!(!dropdown_layer_needed(&grid, &render_ctx(&grid)));
+
+        grid.columns[0].dropdown_items = "A|B".to_string();
+        assert!(dropdown_layer_needed(&grid, &render_ctx(&grid)));
+    }
+
+    #[test]
+    fn dropdown_button_rect_and_glyph_scale_with_row_height() {
+        let small = dropdown_button_rect(0, 0, 120, 20).expect("small button");
+        let large = dropdown_button_rect(0, 0, 120, 60).expect("large button");
+        assert!(large.2 > small.2);
+
+        let small_glyph = dropdown_glyph_metrics(small.2, small.3);
+        let large_glyph = dropdown_glyph_metrics(large.2, large.3);
+        assert!(large_glyph.1 > small_glyph.1);
+        assert!(large_glyph.2 > small_glyph.2);
+    }
+
+    #[test]
+    fn sort_arrow_box_scales_with_grid_scale() {
+        assert_eq!(sort_arrow_box_size(28, 1.0), 16);
+        assert_eq!(sort_arrow_box_size(84, 3.0), 48);
+        assert!(sort_arrow_box_size(84, 3.0) > sort_arrow_box_size(84, 1.0));
+    }
+
+    #[test]
+    fn subtotal_rows_do_not_render_checkbox_visuals() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+
+        {
+            let cell = grid.cells.get_mut(1, 0);
+            let extra = cell.extra_mut();
+            extra.checked = pb::CheckedState::CheckedChecked as i32;
+            extra.value = crate::cell::CellValueData::Bool(true);
+        }
+        assert!(cell_has_checkbox_visual(
+            &grid,
+            1,
+            0,
+            true,
+            pb::CheckedState::CheckedChecked as i32,
+        ));
+
+        grid.row_props.entry(1).or_default().is_subtotal = true;
+        assert!(!cell_has_checkbox_visual(
+            &grid,
+            1,
+            0,
+            true,
+            pb::CheckedState::CheckedChecked as i32,
+        ));
     }
 }

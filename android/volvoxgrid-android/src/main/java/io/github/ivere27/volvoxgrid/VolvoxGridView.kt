@@ -551,6 +551,15 @@ class VolvoxGridView @JvmOverloads constructor(
     }
 
     private fun requestIdleInputFocus() {
+        // On touch-only Android devices, focusing the hidden IME proxy can still
+        // surface the soft keyboard on some OEM builds. Keep the proxy only for
+        // physical-keyboard scenarios where composition without an edit overlay
+        // is still useful.
+        val cfg = resources.configuration
+        if (cfg.keyboard == android.content.res.Configuration.KEYBOARD_NOKEYS ||
+            cfg.hardKeyboardHidden != android.content.res.Configuration.HARDKEYBOARDHIDDEN_NO) {
+            return
+        }
         val proxy = imeProxy ?: return
         if (proxy.parent == null) {
             addView(proxy, 0) // behind SurfaceView
@@ -1974,10 +1983,13 @@ class VolvoxGridView @JvmOverloads constructor(
     }
 
     private fun sendGpuSurfaceReady(handle: Long, w: Int, h: Int) {
-        // Critical surface updates should always proceed to avoid black-outs
-        // during resizes (like keyboard toggles). We reset pendingFrame here
-        // to ensure the engine receives the latest surface handle immediately.
-        pendingFrame.set(true) 
+        // Keep GPU mode on the same single in-flight frame model as CPU mode.
+        // If the surface changes while a frame is still in flight, keep only one
+        // follow-up request; the next dispatch will send the latest handle/size.
+        if (!pendingFrame.compareAndSet(false, true)) {
+            needsFollowupRender.set(true)
+            return
+        }
 
         try {
             val input = RenderInput.newBuilder()
@@ -2201,6 +2213,7 @@ class VolvoxGridView @JvmOverloads constructor(
                 if (proxy.parent != null) removeView(proxy)
             }
             clearImeProxy()
+            dismissActiveDropdownPopup()
 
             val uiMode = request.uiMode
             currentEditUiMode = uiMode
@@ -2451,6 +2464,7 @@ class VolvoxGridView @JvmOverloads constructor(
         post {
             editingRow = -1
             editingCol = -1
+            dismissActiveDropdownPopup()
             editOverlay?.let {
                 val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
                 imm?.hideSoftInputFromWindow(it.windowToken, 0)
@@ -2467,40 +2481,78 @@ class VolvoxGridView @JvmOverloads constructor(
     // Combo Request
     // =========================================================================
 
-    private fun handleDropdownRequest(request: DropdownRequest) {
-        // Combo dropdown requests could show a Spinner or PopupMenu overlay.
-        // For now, we handle it as a simplified edit overlay.
-        post {
-            dismissEditOverlay()
-            val editText = EditText(context).apply {
-                if (request.selected in 0 until request.itemsCount) {
-                    setText(request.getItems(request.selected))
-                }
-                setSingleLine(true)
-                imeOptions = EditorInfo.IME_ACTION_DONE
-                setBackgroundColor(0xFFFFFFFF.toInt())
-                setPadding(4, 2, 4, 2)
+    private fun dismissActiveDropdownPopup() {
+    }
 
-                setOnEditorActionListener { _, actionId, _ ->
-                    if (actionId == EditorInfo.IME_ACTION_DONE) {
-                        commitEdit(request.row, request.col, text.toString())
-                        true
-                    } else {
-                        false
-                    }
+    private fun showEditableDropdownOverlay(request: DropdownRequest) {
+        val editText = EditText(context).apply {
+            if (request.selected in 0 until request.itemsCount) {
+                setText(request.getItems(request.selected))
+            }
+            setSingleLine(true)
+            imeOptions = EditorInfo.IME_ACTION_DONE
+            setBackgroundColor(0xFFFFFFFF.toInt())
+            setPadding(4, 2, 4, 2)
+
+            setOnEditorActionListener { _, actionId, _ ->
+                if (actionId == EditorInfo.IME_ACTION_DONE) {
+                    commitEdit(request.row, request.col, text.toString())
+                    true
+                } else {
+                    false
                 }
             }
+        }
 
-            val lp = LayoutParams(
-                request.width.toInt().coerceAtLeast(60),
-                request.height.toInt().coerceAtLeast(30)
-            )
-            lp.leftMargin = request.x.toInt()
-            lp.topMargin = request.y.toInt()
+        val lp = LayoutParams(
+            request.width.toInt().coerceAtLeast(60),
+            request.height.toInt().coerceAtLeast(30)
+        )
+        lp.leftMargin = request.x.toInt()
+        lp.topMargin = request.y.toInt()
 
-            addView(editText, lp)
-            editOverlay = editText
-            editText.requestFocus()
+        addView(editText, lp)
+        editOverlay = editText
+        editText.requestFocus()
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    private fun showReadonlyDropdownPopup(request: DropdownRequest) {
+        if (request.itemsCount <= 0) {
+            cancelEdit(request.row, request.col)
+            return
+        }
+
+        imeProxy?.clearFocus()
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.hideSoftInputFromWindow(windowToken, 0)
+        requestRenderFrame()
+    }
+
+    private fun handleDropdownRequest(request: DropdownRequest) {
+        post {
+            editingRow = request.row
+            editingCol = request.col
+            imeProxy?.let { proxy ->
+                if (proxy.parent != null) removeView(proxy)
+            }
+            clearImeProxy()
+            dismissActiveDropdownPopup()
+            editOverlay?.let {
+                val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                imm?.hideSoftInputFromWindow(it.windowToken, 0)
+                removeView(it)
+            }
+            editOverlay = null
+            editOverlayComposing = false
+            suppressEditorSync = false
+
+            if (request.editable) {
+                showEditableDropdownOverlay(request)
+            } else {
+                showReadonlyDropdownPopup(request)
+            }
         }
     }
 

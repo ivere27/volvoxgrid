@@ -405,17 +405,18 @@ double sum = await controller.aggregate(
 );
 ```
 
-#### Save & Load
+#### Export & LoadData
 
 ```dart
-ExportResponse exported = await controller.saveGrid(
+final exported = await controller.saveGrid(
   format: ExportFormat.EXPORT_BINARY,
 );
-await controller.loadGrid(
-  exported.data,
-  format: ExportFormat.EXPORT_BINARY,
+final loaded = await controller.loadData(
+  utf8.encode(name,qty
+apple,3
+banana,5),
 );
-// Formats: EXPORT_BINARY, EXPORT_TSV, EXPORT_CSV, EXPORT_SPREADSHEET_ML
+// loadData parses CSV or JSON bytes; saveGrid remains export-only.
 ```
 
 #### Rendering

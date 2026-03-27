@@ -45,6 +45,7 @@ class MainActivity : AppCompatActivity() {
     private var litePluginLoaded = false
     private var debugOverlayEnabled = false
     private var scrollBlitEnabled = false
+    private var editEnabled = false
     private var textLayoutCacheCap = 8192
     // Keep enabled by default. VolvoxGridView now falls back automatically to
     // CPU present path if runtime surface producer switching fails on device.
@@ -413,6 +414,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadDemoData(ctrl: VolvoxGridController, demo: String) {
         ctrl.loadDemo(demo)
+        ctrl.setEditable(editEnabled)
     }
 
     private fun applyDisplayToggles(ctrl: VolvoxGridController) {
@@ -424,6 +426,7 @@ class MainActivity : AppCompatActivity() {
             gridView.setRendererMode(viewMode)
             ctrl.setDebugOverlay(debugOverlayEnabled)
             ctrl.setScrollBlit(scrollBlitEnabled)
+            ctrl.setEditable(editEnabled)
             ctrl.setTextLayoutCacheCap(textLayoutCacheCap)
             ctrl.setRenderLayerMask(renderLayerMask)
         } catch (_: Exception) {}
@@ -433,6 +436,7 @@ class MainActivity : AppCompatActivity() {
         PopupMenu(this, anchor).apply {
             menuInflater.inflate(R.menu.grid_actions_menu, menu)
             menu.findItem(R.id.action_scroll_blit)?.isChecked = scrollBlitEnabled
+            menu.findItem(R.id.action_edit)?.isChecked = editEnabled
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     R.id.action_sort_ascending -> {
@@ -449,7 +453,7 @@ class MainActivity : AppCompatActivity() {
                         item.isChecked = nextValue
                         thread {
                             try {
-                                controller?.setScrollBlit(nextValue)
+                                controllerMap.values.forEach { it.setScrollBlit(nextValue) }
                                 controller?.refresh()
                                 gridView.requestFrame()
                                 updateStatus(
@@ -462,6 +466,29 @@ class MainActivity : AppCompatActivity() {
                             } catch (e: Exception) {
                                 updateStatus("Scroll blit toggle failed: ${e.message}")
                                 android.util.Log.e("VolvoxGridDemo", "Scroll blit toggle failed", e)
+                            }
+                        }
+                        true
+                    }
+                    R.id.action_edit -> {
+                        val nextValue = !editEnabled
+                        editEnabled = nextValue
+                        item.isChecked = nextValue
+                        thread {
+                            try {
+                                controllerMap.values.forEach { it.setEditable(nextValue) }
+                                controller?.refresh()
+                                gridView.requestFrame()
+                                updateStatus(
+                                    if (nextValue) {
+                                        "Editing enabled"
+                                    } else {
+                                        "Editing disabled"
+                                    }
+                                )
+                            } catch (e: Exception) {
+                                updateStatus("Edit toggle failed: ${e.message}")
+                                android.util.Log.e("VolvoxGridDemo", "Edit toggle failed", e)
                             }
                         }
                         true

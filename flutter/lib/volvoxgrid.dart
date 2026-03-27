@@ -92,6 +92,38 @@ class _CellEditValidatingPayload {
 
 enum _HostEditUiMode { enter, edit }
 
+class _DeferredPointerCompletion {
+  final PointerDeviceKind kind;
+  final Offset localPosition;
+  final int buttons;
+  final int pointer;
+
+  const _DeferredPointerCompletion._({
+    required this.kind,
+    required this.localPosition,
+    required this.buttons,
+    required this.pointer,
+  });
+
+  factory _DeferredPointerCompletion.up(PointerUpEvent event) {
+    return _DeferredPointerCompletion._(
+      kind: event.kind,
+      localPosition: event.localPosition,
+      buttons: event.buttons,
+      pointer: event.pointer,
+    );
+  }
+
+  factory _DeferredPointerCompletion.cancel(PointerCancelEvent event) {
+    return _DeferredPointerCompletion._(
+      kind: event.kind,
+      localPosition: event.localPosition,
+      buttons: 0,
+      pointer: event.pointer,
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // VolvoxGridWidget
 // ---------------------------------------------------------------------------
@@ -233,6 +265,9 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   bool _editFontItalic = false;
   EdgeInsets _editPadding = EdgeInsets.zero;
   _HostEditUiMode _editUiMode = _HostEditUiMode.enter;
+  int _editSessionToken = 0;
+  bool _editCommitReplayActive = false;
+  _DeferredPointerCompletion? _deferredPointerCompletionAfterEditCommit;
 
   final TextEditingController _editTextController = TextEditingController();
   final FocusNode _editFocusNode = FocusNode();
@@ -1270,6 +1305,13 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
         _showEditOverlay(output.editRequest);
       }
     }
+    if (output.hasDropdownRequest() && output.dropdownRequest.width > 0) {
+      if (output.dropdownRequest.editable) {
+        unawaited(_showEditableDropdownOverlay(output.dropdownRequest));
+      } else {
+        _showReadonlyDropdownOverlay(output.dropdownRequest);
+      }
+    }
     if (output.rendered) {
       _sendBufferReady();
     }
@@ -1533,7 +1575,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
     if (sameSession) {
       final shouldHideDuringMove =
-          defaultTargetPlatform == TargetPlatform.android && _editRect != nextRect;
+          defaultTargetPlatform == TargetPlatform.android &&
+              _editRect != nextRect;
       setState(() {
         _editRect = nextRect;
         _editUiMode = nextMode;
@@ -1554,6 +1597,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       _editCol = req.col;
       _editRect = nextRect;
       _editUiMode = nextMode;
+      _editSessionToken += 1;
       // Reset style state so stale values from a previous cell don't flash.
       _editFontSize = 13.0;
       _editFontFamily = null;
@@ -1576,7 +1620,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       // Re-apply after another frame — on desktop, requestFocus() can
       // trigger an async selection-all that overrides our caret position.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_editing || _editRow != req.row || _editCol != req.col) {
+        if (!mounted ||
+            !_editing ||
+            _editRow != req.row ||
+            _editCol != req.col) {
           return;
         }
         _applyEditRequestSelection(req);
@@ -1596,8 +1643,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
         _editFontBold = style.bold;
         _editFontItalic = style.italic;
         _editPadding = EdgeInsets.fromLTRB(
-          style.padLeft / dpr, style.padTop / dpr,
-          style.padRight / dpr, style.padBottom / dpr,
+          style.padLeft / dpr,
+          style.padTop / dpr,
+          style.padRight / dpr,
+          style.padBottom / dpr,
         );
       });
     });
@@ -1776,8 +1825,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   }
 
   bool _handleHardwareKeyEvent(KeyEvent event) {
-    if (!mounted ||
-        _editing ||
+    if (!mounted) {
+      return false;
+    }
+    if (_editing ||
         _imeProxySessionActive ||
         _deferOverlayWhileImeProxyActive ||
         !_imeProxyFocusNode.hasFocus) {
@@ -1873,14 +1924,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     if (!mounted) {
       return;
     }
-    setState(() {
-      _editing = false;
-      _editOverlayVisible = true;
-      _editOverlayPendingReveal = false;
-      _editRow = -1;
-      _editCol = -1;
-    });
-    _requestIdleInputFocus();
+    _closeLocalEditOverlay();
     _requestRender();
   }
 
@@ -1889,12 +1933,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     if (!mounted) {
       return;
     }
-    setState(() {
-      _editing = false;
-      _editRow = -1;
-      _editCol = -1;
-    });
-    _requestIdleInputFocus();
+    _closeLocalEditOverlay();
     _requestRender();
   }
 
@@ -1907,12 +1946,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     if (!mounted) {
       return;
     }
-    setState(() {
-      _editing = false;
-      _editRow = -1;
-      _editCol = -1;
-    });
-    _requestIdleInputFocus();
+    _closeLocalEditOverlay();
     _requestRender();
   }
 
@@ -1920,10 +1954,130 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     unawaited(_cancelActiveEdit());
   }
 
+  void _showReadonlyDropdownOverlay(pb.DropdownRequest req) {
+    if (_editing) {
+      _closeLocalEditOverlay(requestIdleInputFocus: false);
+    }
+    _editFocusNode.unfocus();
+    _imeProxyFocusNode.unfocus();
+    _requestRender();
+  }
+
+  Future<void> _showEditableDropdownOverlay(pb.DropdownRequest req) async {
+    var text = "";
+    if (req.selected >= 0 && req.selected < req.items.length) {
+      text = req.items[req.selected];
+    }
+    try {
+      final state = await widget.controller.getEditState();
+      if (state.active && state.row == req.row && state.col == req.col) {
+        text = state.text;
+      }
+    } catch (_) {
+      // Fall back to the selected item text when the current edit state is unavailable.
+    }
+    if (!mounted) {
+      return;
+    }
+    final codePointLength = text.runes.length;
+    _showEditOverlay(pb.EditRequest()
+      ..row = req.row
+      ..col = req.col
+      ..x = req.x
+      ..y = req.y
+      ..width = req.width
+      ..height = req.height
+      ..currentValue = text
+      ..selStart = codePointLength
+      ..selLength = 0
+      ..uiMode = pb.EditUiMode.EDIT_UI_MODE_ENTER);
+  }
+
+  bool _isPointerWithinActiveEditOverlay(Offset localPosition) {
+    if (!_editing || !_editOverlayVisible) {
+      return false;
+    }
+    return _editRect.contains(localPosition);
+  }
+
+  void _closeLocalEditOverlay({bool requestIdleInputFocus = true}) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _editing = false;
+      _editOverlayVisible = true;
+      _editOverlayPendingReveal = false;
+      _editRow = -1;
+      _editCol = -1;
+      _editSessionToken += 1;
+    });
+    if (requestIdleInputFocus) {
+      _requestIdleInputFocus();
+    }
+  }
+
+  void _commitEditIfSessionCurrent(int sessionToken, int row, int col) {
+    if (_editCommitReplayActive ||
+        !_editing ||
+        _editSessionToken != sessionToken ||
+        _editRow != row ||
+        _editCol != col) {
+      return;
+    }
+    _commitEdit();
+  }
+
+  Future<void> _commitEditBeforeDispatchingPointerDown(
+    PointerDownEvent event,
+    bool isDoubleClick,
+  ) async {
+    if (_editCommitReplayActive) {
+      return;
+    }
+    _editCommitReplayActive = true;
+    _deferredPointerCompletionAfterEditCommit = null;
+    final sessionToken = _editSessionToken;
+    final row = _editRow;
+    final col = _editCol;
+    final textValue = _editTextController.text;
+    try {
+      await widget.controller.commitEdit(textValue);
+      final state = await widget.controller.getEditState();
+      if (!mounted) {
+        return;
+      }
+      if (state.active) {
+        _requestRender();
+        return;
+      }
+      if (_editSessionToken == sessionToken &&
+          _editRow == row &&
+          _editCol == col) {
+        _closeLocalEditOverlay();
+      } else {
+        _requestIdleInputFocus();
+      }
+      _dispatchPointerDown(event, isDoubleClick);
+      final deferred = _deferredPointerCompletionAfterEditCommit;
+      _deferredPointerCompletionAfterEditCommit = null;
+      if (deferred != null) {
+        _dispatchPointerCompletion(deferred);
+      }
+    } catch (_) {
+      if (mounted) {
+        _requestRender();
+      }
+    } finally {
+      _editCommitReplayActive = false;
+    }
+  }
+
   // ── Event forwarding ─────────────────────────────────────────────────────
 
   bool _isPrimaryMouseDoubleClick(PointerDownEvent event) {
-    if (event.kind != PointerDeviceKind.mouse || event.buttons != kPrimaryMouseButton) {
+    if (event.kind != PointerDeviceKind.mouse ||
+        event.buttons != kPrimaryMouseButton) {
       return false;
     }
     final lastAt = _lastPrimaryMouseDownAt;
@@ -1957,6 +2111,14 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   void _onPointerDown(PointerDownEvent event) {
     final isDoubleClick =
         _isPrimaryMouseDoubleClick(event) || _isTouchDoubleTap(event);
+    if (_editing && !_isPointerWithinActiveEditOverlay(event.localPosition)) {
+      unawaited(_commitEditBeforeDispatchingPointerDown(event, isDoubleClick));
+      return;
+    }
+    _dispatchPointerDown(event, isDoubleClick);
+  }
+
+  void _dispatchPointerDown(PointerDownEvent event, bool isDoubleClick) {
     _requestIdleInputFocus();
     if (event.kind == PointerDeviceKind.touch) {
       _syncTouchScrollUnitBestEffort();
@@ -2029,6 +2191,15 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   }
 
   void _onPointerUp(PointerUpEvent event) {
+    if (_editCommitReplayActive) {
+      _deferredPointerCompletionAfterEditCommit =
+          _DeferredPointerCompletion.up(event);
+      return;
+    }
+    _dispatchPointerCompletion(_DeferredPointerCompletion.up(event));
+  }
+
+  void _dispatchPointerCompletion(_DeferredPointerCompletion event) {
     _longPressTimer?.cancel();
     if (event.kind == PointerDeviceKind.touch) {
       _touchPoints.remove(event.pointer);
@@ -2154,41 +2325,12 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   }
 
   void _onPointerCancel(PointerCancelEvent event) {
-    _longPressTimer?.cancel();
-    if (event.kind == PointerDeviceKind.touch) {
-      _touchPoints.remove(event.pointer);
-      if (_isTouchPinching) {
-        if (_touchPoints.length < 2) {
-          _endTouchPinch();
-        }
-        if (_touchPoints.isEmpty) {
-          _ignoreTouchUntilAllReleased = false;
-        }
-        return;
-      }
-      if (_ignoreTouchUntilAllReleased) {
-        if (_touchPoints.isEmpty) {
-          _ignoreTouchUntilAllReleased = false;
-        }
-        return;
-      }
-      if (event.pointer == _activeTouchPointer) {
-        _flushQueuedScroll();
-        _activeTouchPointer = -1;
-        _isTouchScrolling = false;
-      }
+    if (_editCommitReplayActive) {
+      _deferredPointerCompletionAfterEditCommit =
+          _DeferredPointerCompletion.cancel(event);
+      return;
     }
-    final dpr = _devicePixelRatio <= 0 ? 1.0 : _devicePixelRatio;
-    _sendInput(
-      pb.RenderInput()
-        ..pointer = (pb.PointerEvent()
-          ..type = pb.PointerEvent_Type.UP
-          ..x = event.localPosition.dx * dpr
-          ..y = event.localPosition.dy * dpr
-          ..button = 0
-          ..modifier = _modifiers()),
-    );
-    _requestRender();
+    _dispatchPointerCompletion(_DeferredPointerCompletion.cancel(event));
   }
 
   void _onPointerSignal(PointerSignalEvent event) {
@@ -2626,6 +2768,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
           _queueViewportResize(w, h, dpr);
         }
 
+        final currentEditSessionToken = _editSessionToken;
+        final currentEditRow = _editRow;
+        final currentEditCol = _editCol;
+
         return Focus(
           focusNode: _gridFocusNode,
           autofocus: true,
@@ -2635,121 +2781,131 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
             height: constraints.maxHeight,
             child: ClipRect(
               child: Listener(
-                  onPointerDown: _onPointerDown,
-                  onPointerUp: _onPointerUp,
-                  onPointerMove: _onPointerMove,
-                  onPointerHover: _onPointerHover,
-                  onPointerCancel: _onPointerCancel,
-                  onPointerSignal: _onPointerSignal,
-                  onPointerPanZoomStart: _onPointerPanZoomStart,
-                  onPointerPanZoomUpdate: _onPointerPanZoomUpdate,
-                  onPointerPanZoomEnd: _onPointerPanZoomEnd,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Positioned(
-                        left: -1000,
-                        top: -1000,
-                        width: 1,
-                        height: 1,
-                        child: IgnorePointer(
-                          ignoring: true,
-                          child: Opacity(
-                            opacity: 0,
-                            child: TextField(
-                              controller: _imeProxyController,
-                              focusNode: _imeProxyFocusNode,
-                              decoration:
-                                  const InputDecoration.collapsed(hintText: ''),
-                              style: const TextStyle(
-                                fontSize: 1,
-                                color: Colors.transparent,
-                              ),
-                              cursorColor: Colors.transparent,
-                              autocorrect: false,
-                              enableSuggestions: false,
-                              enableInteractiveSelection: false,
-                              maxLines: 1,
+                onPointerDown: _onPointerDown,
+                onPointerUp: _onPointerUp,
+                onPointerMove: _onPointerMove,
+                onPointerHover: _onPointerHover,
+                onPointerCancel: _onPointerCancel,
+                onPointerSignal: _onPointerSignal,
+                onPointerPanZoomStart: _onPointerPanZoomStart,
+                onPointerPanZoomUpdate: _onPointerPanZoomUpdate,
+                onPointerPanZoomEnd: _onPointerPanZoomEnd,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned(
+                      left: -1000,
+                      top: -1000,
+                      width: 1,
+                      height: 1,
+                      child: IgnorePointer(
+                        ignoring: true,
+                        child: Opacity(
+                          opacity: 0,
+                          child: TextField(
+                            controller: _imeProxyController,
+                            focusNode: _imeProxyFocusNode,
+                            decoration:
+                                const InputDecoration.collapsed(hintText: ''),
+                            style: const TextStyle(
+                              fontSize: 1,
+                              color: Colors.transparent,
                             ),
+                            cursorColor: Colors.transparent,
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            enableInteractiveSelection: false,
+                            maxLines: 1,
                           ),
                         ),
                       ),
+                    ),
 
-                      // Current Flutter path: decode native RGBA frames and
-                      // show via RawImage.  A platform texture path can be
-                      // added separately.
-                      SizedBox(
-                        width: constraints.maxWidth,
-                        height: constraints.maxHeight,
-                        child: ClipRect(
-                          child: _gesturePreviewActive
-                              ? Transform(
-                                  transform: Matrix4.identity()
-                                    ..translate(
-                                      _gesturePreviewPan.dx +
-                                          _gesturePreviewFocal.dx,
-                                      _gesturePreviewPan.dy +
-                                          _gesturePreviewFocal.dy,
-                                    )
-                                    ..scale(_gesturePreviewScale,
-                                        _gesturePreviewScale)
-                                    ..translate(
-                                      -_gesturePreviewFocal.dx,
-                                      -_gesturePreviewFocal.dy,
-                                    ),
-                                  filterQuality: FilterQuality.none,
-                                  child: _buildSurface(constraints),
-                                )
-                              : _buildSurface(constraints),
-                        ),
+                    // Current Flutter path: decode native RGBA frames and
+                    // show via RawImage.  A platform texture path can be
+                    // added separately.
+                    SizedBox(
+                      width: constraints.maxWidth,
+                      height: constraints.maxHeight,
+                      child: ClipRect(
+                        child: _gesturePreviewActive
+                            ? Transform(
+                                transform: Matrix4.identity()
+                                  ..translate(
+                                    _gesturePreviewPan.dx +
+                                        _gesturePreviewFocal.dx,
+                                    _gesturePreviewPan.dy +
+                                        _gesturePreviewFocal.dy,
+                                  )
+                                  ..scale(_gesturePreviewScale,
+                                      _gesturePreviewScale)
+                                  ..translate(
+                                    -_gesturePreviewFocal.dx,
+                                    -_gesturePreviewFocal.dy,
+                                  ),
+                                filterQuality: FilterQuality.none,
+                                child: _buildSurface(constraints),
+                              )
+                            : _buildSurface(constraints),
                       ),
+                    ),
 
-                      // Overlay edit TextField.
-                      if (_editing)
-                        Positioned(
-                          left: _editRect.left,
-                          top: _editRect.top,
-                          width: _editRect.width,
-                          height: _editRect.height,
-                          child: IgnorePointer(
-                            ignoring: !_editOverlayVisible,
-                            child: Opacity(
-                              opacity: _editOverlayVisible ? 1 : 0,
-                              child: Material(
-                                elevation: 2,
-                                child: Focus(
-                                  onKeyEvent: _onEditOverlayKeyEvent,
-                                  child: TextField(
-                                    controller: _editTextController,
-                                    focusNode: _editFocusNode,
-                                    decoration: InputDecoration(
-                                      isDense: true,
-                                      contentPadding: _editPadding,
-                                      border: InputBorder.none,
-                                    ),
-                                    style: TextStyle(
-                                      fontSize: _editFontSize,
-                                      height: 1.0,
-                                      fontFamily: _editFontFamily,
-                                      fontWeight: _editFontBold
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                      fontStyle: _editFontItalic
-                                          ? FontStyle.italic
-                                          : FontStyle.normal,
-                                    ),
-                                    textAlignVertical: TextAlignVertical.center,
-                                    maxLines: 1,
-                                    onSubmitted: (_) => _commitEdit(),
-                                    onTapOutside: (_) => _commitEdit(),
+                    // Overlay edit TextField.
+                    if (_editing)
+                      Positioned(
+                        left: _editRect.left,
+                        top: _editRect.top,
+                        width: _editRect.width,
+                        height: _editRect.height,
+                        child: IgnorePointer(
+                          ignoring: !_editOverlayVisible,
+                          child: Opacity(
+                            opacity: _editOverlayVisible ? 1 : 0,
+                            child: Material(
+                              elevation: 2,
+                              child: Focus(
+                                onKeyEvent: _onEditOverlayKeyEvent,
+                                child: TextField(
+                                  controller: _editTextController,
+                                  focusNode: _editFocusNode,
+                                  decoration: InputDecoration(
+                                    isDense: true,
+                                    contentPadding: _editPadding,
+                                    border: InputBorder.none,
+                                  ),
+                                  style: TextStyle(
+                                    fontSize: _editFontSize,
+                                    height: 1.0,
+                                    fontFamily: _editFontFamily,
+                                    fontWeight: _editFontBold
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                    fontStyle: _editFontItalic
+                                        ? FontStyle.italic
+                                        : FontStyle.normal,
+                                  ),
+                                  textAlignVertical: TextAlignVertical.center,
+                                  maxLines: 1,
+                                  onSubmitted: (_) =>
+                                      _commitEditIfSessionCurrent(
+                                    currentEditSessionToken,
+                                    currentEditRow,
+                                    currentEditCol,
+                                  ),
+                                  onTapOutside: (_) =>
+                                      _commitEditIfSessionCurrent(
+                                    currentEditSessionToken,
+                                    currentEditRow,
+                                    currentEditCol,
                                   ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

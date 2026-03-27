@@ -478,18 +478,7 @@ fn show_dropdown_button_for_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool 
 }
 
 fn dropdown_button_rect(cx: i32, cy: i32, cw: i32, ch: i32) -> Option<(i32, i32, i32, i32)> {
-    if cw <= 2 || ch <= 2 {
-        return None;
-    }
-    let mut bw = (ch - 2).clamp(12, 18);
-    bw = bw.min((cw - 2).max(0));
-    let bh = (ch - 2).max(0);
-    if bw <= 0 || bh <= 0 {
-        return None;
-    }
-    let bx = cx + cw - bw - 1;
-    let by = cy + 1;
-    Some((bx, by, bw, bh))
+    crate::canvas::dropdown_button_rect(cx, cy, cw, ch)
 }
 
 fn is_boolean_checkbox_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
@@ -509,7 +498,7 @@ fn checkbox_rect(grid: &VolvoxGrid, row: i32, col: i32) -> Option<(i32, i32, i32
     }
 
     let (cx, cy, cw, ch) = grid.cell_screen_rect(row, col)?;
-    let box_size = 13_i32;
+    let box_size = crate::canvas::checkbox_box_size(ch);
     let style_override = grid.get_cell_style(row, col);
     let alignment = crate::canvas::resolve_alignment(grid, row, col, &style_override, "");
     let (halign, valign) = crate::canvas::alignment_components(alignment);
@@ -577,6 +566,9 @@ fn checkbox_bool_value(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
 
 fn toggle_checkbox_cell(grid: &mut VolvoxGrid, row: i32, col: i32) -> bool {
     if !is_boolean_checkbox_cell(grid, row, col) {
+        return false;
+    }
+    if !grid.can_begin_edit(row, col, false) {
         return false;
     }
 
@@ -1228,6 +1220,7 @@ pub fn handle_pointer_down_with_behavior(
         HitArea::DropdownList => {
             if let Some(idx) = grid.dropdown_hit_index(x, y) {
                 grid.edit.set_dropdown_index(idx);
+                grid.edit.clear_dropdown_search();
                 // Update text to match selection
                 let text = grid.edit.get_dropdown_item(idx).to_string();
                 grid.edit.update_text(text.clone());
@@ -2171,20 +2164,28 @@ pub fn handle_key_down_with_behavior(
                 grid.mark_dirty();
             }
             8 => {
-                // Backspace
-                grid.edit.delete_back();
-                grid.events.push(GridEventData::CellEditChange {
-                    text: grid.edit.edit_text.clone(),
-                });
-                grid.mark_dirty();
+                if !grid.edit.dropdown_items.is_empty() && !grid.edit.dropdown_editable {
+                    grid.edit.clear_dropdown_search();
+                } else {
+                    // Backspace
+                    grid.edit.delete_back();
+                    grid.events.push(GridEventData::CellEditChange {
+                        text: grid.edit.edit_text.clone(),
+                    });
+                    grid.mark_dirty();
+                }
             }
             46 => {
-                // Delete
-                grid.edit.delete_forward();
-                grid.events.push(GridEventData::CellEditChange {
-                    text: grid.edit.edit_text.clone(),
-                });
-                grid.mark_dirty();
+                if !grid.edit.dropdown_items.is_empty() && !grid.edit.dropdown_editable {
+                    grid.edit.clear_dropdown_search();
+                } else {
+                    // Delete
+                    grid.edit.delete_forward();
+                    grid.events.push(GridEventData::CellEditChange {
+                        text: grid.edit.edit_text.clone(),
+                    });
+                    grid.mark_dirty();
+                }
             }
             37 => {
                 // Left arrow
@@ -2211,6 +2212,7 @@ pub fn handle_key_down_with_behavior(
                     // Up arrow in dropdown: move selection up
                     let new_idx = (grid.edit.dropdown_index - 1).max(0);
                     grid.edit.set_dropdown_index(new_idx);
+                    grid.edit.clear_dropdown_search();
                     grid.mark_dirty();
                 } else if grid.edit.ui_mode == crate::edit::EditUiMode::EditMode {
                     // F2 edit mode: Up moves caret to the start.
@@ -2231,6 +2233,7 @@ pub fn handle_key_down_with_behavior(
                     let max_idx = grid.edit.dropdown_count() - 1;
                     let new_idx = (grid.edit.dropdown_index + 1).min(max_idx);
                     grid.edit.set_dropdown_index(new_idx);
+                    grid.edit.clear_dropdown_search();
                     grid.mark_dirty();
                 } else if grid.edit.ui_mode == crate::edit::EditUiMode::EditMode {
                     // F2 edit mode: Down moves caret to the end.
@@ -2432,22 +2435,34 @@ pub fn handle_key_down_with_behavior(
                 }
             }
         }
-        // Enter - start editing if editable (skipped when host drives dispatch)
-        13 => {
+        // Space - toggle a selected checkbox without entering text edit.
+        32 => {
             if !grid.host_key_dispatch
-                && behavior.allow_begin_edit
-                && grid.edit_trigger_mode >= 1
                 && !grid.is_editing()
+                && toggle_checkbox_cell(grid, grid.selection.row, grid.selection.col)
             {
-                begin_edit_from_input(grid, grid.selection.row, grid.selection.col);
+                grid.mark_dirty();
             }
         }
-        // F2 - start editing with the caret at the end (skipped when host drives dispatch)
+        // Enter - toggle a selected checkbox, otherwise start editing if editable
+        // (skipped when host drives dispatch).
+        13 => {
+            if !grid.host_key_dispatch && !grid.is_editing() {
+                if toggle_checkbox_cell(grid, grid.selection.row, grid.selection.col) {
+                    grid.mark_dirty();
+                } else if behavior.allow_begin_edit && grid.edit_trigger_mode >= 1 {
+                    begin_edit_from_input(grid, grid.selection.row, grid.selection.col);
+                }
+            }
+        }
+        // F2 - start editing with the caret at the end (skipped when host drives dispatch).
+        // Checkbox cells are toggle-only and never enter text edit.
         113 => {
             if !grid.host_key_dispatch
                 && behavior.allow_begin_edit
                 && grid.edit_trigger_mode >= 1
                 && !grid.is_editing()
+                && !is_boolean_checkbox_cell(grid, grid.selection.row, grid.selection.col)
             {
                 begin_edit_from_input_with_options(
                     grid,
@@ -2534,6 +2549,20 @@ pub fn handle_key_press_with_behavior(
     };
 
     if grid.is_editing() {
+        if !grid.edit.dropdown_items.is_empty() && !grid.edit.dropdown_editable {
+            if grid.dropdown_search
+                && grid
+                    .edit
+                    .select_readonly_dropdown_char(ch, type_ahead_delay_ms(grid))
+            {
+                grid.events.push(GridEventData::CellEditChange {
+                    text: grid.edit.edit_text.clone(),
+                });
+                grid.mark_dirty();
+            }
+            return;
+        }
+
         // Check edit mask validation
         let mask = if !grid.edit_mask.is_empty() {
             grid.edit_mask.clone()
@@ -2647,20 +2676,44 @@ pub fn handle_key_press_with_behavior(
             }
         }
     } else if !grid.host_key_dispatch && behavior.allow_begin_edit && grid.edit_trigger_mode >= 1 {
-        // Auto-start editing on keypress (keyboard-edit mode)
+        // Auto-start editing on keypress (keyboard-edit mode), except for
+        // select-only dropdown lists which must not accept freeform text.
         let row = grid.selection.row;
         let col = grid.selection.col;
-        begin_edit_from_input(grid, row, col);
+        let dropdown_list = grid.active_dropdown_list(row, col);
+        let readonly_dropdown = !dropdown_list.is_empty()
+            && dropdown_list.trim() != "..."
+            && !dropdown_list.starts_with('|');
 
-        if grid.is_editing() {
-            // Clear old text and type the new character (VSVolvoxGrid8 behavior)
-            grid.edit.update_text(String::from(ch));
-            grid.edit.sel_start = 1;
-            grid.edit.sel_length = 0;
-            grid.events.push(GridEventData::CellEditChange {
-                text: grid.edit.edit_text.clone(),
-            });
-            grid.mark_dirty();
+        if readonly_dropdown {
+            if grid.dropdown_search {
+                begin_edit_from_input(grid, row, col);
+                if grid.is_editing()
+                    && grid
+                        .edit
+                        .select_readonly_dropdown_char(ch, type_ahead_delay_ms(grid))
+                {
+                    grid.events.push(GridEventData::CellEditChange {
+                        text: grid.edit.edit_text.clone(),
+                    });
+                    grid.mark_dirty();
+                } else if grid.is_editing() {
+                    grid.cancel_edit();
+                }
+            }
+        } else {
+            begin_edit_from_input(grid, row, col);
+
+            if grid.is_editing() {
+                // Clear old text and type the new character (VSVolvoxGrid8 behavior)
+                grid.edit.update_text(String::from(ch));
+                grid.edit.sel_start = 1;
+                grid.edit.sel_length = 0;
+                grid.events.push(GridEventData::CellEditChange {
+                    text: grid.edit.edit_text.clone(),
+                });
+                grid.mark_dirty();
+            }
         }
     }
 
@@ -3061,6 +3114,172 @@ mod tests {
     }
 
     #[test]
+    fn space_toggles_checkbox_without_entering_text_edit() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.cells.set_text(1, 0, "No".to_string());
+        {
+            let cell = grid.cells.get_mut(1, 0);
+            let extra = cell.extra_mut();
+            extra.value = crate::cell::CellValueData::Bool(false);
+            extra.checked = pb::CheckedState::CheckedUnchecked as i32;
+        }
+        prime_layout(&mut grid);
+        grid.selection.row = 1;
+        grid.selection.col = 0;
+
+        handle_key_down(&mut grid, 32, 0);
+        handle_key_press(&mut grid, ' ' as u32);
+
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "Yes");
+        assert_eq!(
+            grid.cells.get(1, 0).map(|cell| cell.checked()),
+            Some(pb::CheckedState::CheckedChecked as i32)
+        );
+    }
+
+    #[test]
+    fn enter_toggles_checkbox_without_entering_text_edit() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.cells.set_text(1, 0, "No".to_string());
+        {
+            let cell = grid.cells.get_mut(1, 0);
+            let extra = cell.extra_mut();
+            extra.value = crate::cell::CellValueData::Bool(false);
+            extra.checked = pb::CheckedState::CheckedUnchecked as i32;
+        }
+        prime_layout(&mut grid);
+        grid.selection.row = 1;
+        grid.selection.col = 0;
+
+        handle_key_down(&mut grid, 13, 0);
+
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "Yes");
+        assert_eq!(
+            grid.cells.get(1, 0).map(|cell| cell.checked()),
+            Some(pb::CheckedState::CheckedChecked as i32)
+        );
+    }
+
+    #[test]
+    fn click_on_readonly_checkbox_does_not_toggle() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
+        grid.edit_trigger_mode = 0;
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.cells.set_text(1, 0, "No".to_string());
+        {
+            let cell = grid.cells.get_mut(1, 0);
+            let extra = cell.extra_mut();
+            extra.value = crate::cell::CellValueData::Bool(false);
+            extra.checked = pb::CheckedState::CheckedUnchecked as i32;
+        }
+        prime_layout(&mut grid);
+
+        let (bx, by, bw, bh) = checkbox_rect(&grid, 1, 0).expect("checkbox rect");
+        let click_x = bx as f32 + bw as f32 * 0.5;
+        let click_y = by as f32 + bh as f32 * 0.5;
+
+        handle_pointer_down(&mut grid, click_x, click_y, 0, 0, false);
+
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "No");
+        assert_eq!(
+            grid.cells.get(1, 0).map(|cell| cell.checked()),
+            Some(pb::CheckedState::CheckedUnchecked as i32)
+        );
+    }
+
+    #[test]
+    fn space_on_readonly_checkbox_does_not_toggle() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
+        grid.edit_trigger_mode = 0;
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.cells.set_text(1, 0, "No".to_string());
+        {
+            let cell = grid.cells.get_mut(1, 0);
+            let extra = cell.extra_mut();
+            extra.value = crate::cell::CellValueData::Bool(false);
+            extra.checked = pb::CheckedState::CheckedUnchecked as i32;
+        }
+        prime_layout(&mut grid);
+        grid.selection.row = 1;
+        grid.selection.col = 0;
+
+        handle_key_down(&mut grid, 32, 0);
+        handle_key_press(&mut grid, 32);
+
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "No");
+        assert_eq!(
+            grid.cells.get(1, 0).map(|cell| cell.checked()),
+            Some(pb::CheckedState::CheckedUnchecked as i32)
+        );
+    }
+
+    #[test]
+    fn enter_on_readonly_checkbox_does_not_toggle() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
+        grid.edit_trigger_mode = 0;
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.cells.set_text(1, 0, "No".to_string());
+        {
+            let cell = grid.cells.get_mut(1, 0);
+            let extra = cell.extra_mut();
+            extra.value = crate::cell::CellValueData::Bool(false);
+            extra.checked = pb::CheckedState::CheckedUnchecked as i32;
+        }
+        prime_layout(&mut grid);
+        grid.selection.row = 1;
+        grid.selection.col = 0;
+
+        handle_key_down(&mut grid, 13, 0);
+
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "No");
+        assert_eq!(
+            grid.cells.get(1, 0).map(|cell| cell.checked()),
+            Some(pb::CheckedState::CheckedUnchecked as i32)
+        );
+    }
+
+    #[test]
+    fn f2_does_not_enter_text_edit_for_checkbox() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.cells.set_text(1, 0, "No".to_string());
+        {
+            let cell = grid.cells.get_mut(1, 0);
+            let extra = cell.extra_mut();
+            extra.value = crate::cell::CellValueData::Bool(false);
+            extra.checked = pb::CheckedState::CheckedUnchecked as i32;
+        }
+        prime_layout(&mut grid);
+        grid.selection.row = 1;
+        grid.selection.col = 0;
+
+        handle_key_down(&mut grid, 113, 0);
+
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "No");
+        assert_eq!(
+            grid.cells.get(1, 0).map(|cell| cell.checked()),
+            Some(pb::CheckedState::CheckedUnchecked as i32)
+        );
+    }
+
+    #[test]
     fn type_to_replace_arrow_down_commits_and_moves_selection() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 4, 2, 1, 0);
         grid.edit_trigger_mode = 1;
@@ -3136,6 +3355,93 @@ mod tests {
         assert!(events
             .iter()
             .any(|evt| matches!(evt.data, GridEventData::StartEdit { row: 1, col: 0 })));
+    }
+
+    #[test]
+    fn readonly_dropdown_ignores_freeform_text_edits_when_search_disabled() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.dropdown_search = false;
+        grid.columns[0].dropdown_items = "Active|Pending|Shipped".to_string();
+        grid.cells.set_text(1, 0, "Pending".to_string());
+        prime_layout(&mut grid);
+
+        begin_edit_from_input(&mut grid, 1, 0);
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.edit_text, "Pending");
+
+        handle_key_press(&mut grid, 'X' as u32);
+        handle_key_down(&mut grid, 8, 0);
+        handle_key_down(&mut grid, 46, 0);
+
+        assert_eq!(grid.edit.edit_text, "Pending");
+        handle_key_down(&mut grid, 13, 0);
+        assert_eq!(grid.cells.get_text(1, 0), "Pending");
+    }
+
+    #[test]
+    fn readonly_dropdown_search_selects_matching_item_without_freeform_text() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.dropdown_search = true;
+        grid.columns[0].dropdown_items = "Active|Pending|Shipped".to_string();
+        grid.cells.set_text(1, 0, "Pending".to_string());
+        prime_layout(&mut grid);
+
+        begin_edit_from_input(&mut grid, 1, 0);
+        assert!(grid.is_editing());
+
+        handle_key_press(&mut grid, 'S' as u32);
+        handle_key_press(&mut grid, 'h' as u32);
+        assert_eq!(grid.edit.dropdown_index, 2);
+        assert_eq!(grid.edit.edit_text, "Shipped");
+
+        handle_key_press(&mut grid, 'x' as u32);
+        assert_eq!(grid.edit.edit_text, "Shipped");
+
+        handle_key_down(&mut grid, 13, 0);
+        assert_eq!(grid.cells.get_text(1, 0), "Shipped");
+    }
+
+    #[test]
+    fn readonly_dropdown_keypress_does_not_begin_freeform_edit_when_search_disabled() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.dropdown_search = false;
+        grid.columns[0].dropdown_items = "Active|Pending|Shipped".to_string();
+        grid.cells.set_text(1, 0, "Pending".to_string());
+        prime_layout(&mut grid);
+        grid.selection
+            .set_cursor(1, 0, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+        grid.selection
+            .set_extent(grid.selection.row, grid.selection.col, grid.rows, grid.cols);
+
+        handle_key_press(&mut grid, 'X' as u32);
+
+        assert!(!grid.is_editing());
+        assert_eq!(grid.cells.get_text(1, 0), "Pending");
+        assert_eq!(grid.edit.edit_text, "");
+    }
+
+    #[test]
+    fn readonly_dropdown_keypress_uses_type_ahead_without_freeform_text() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.dropdown_search = true;
+        grid.columns[0].dropdown_items = "Active|Pending|Shipped".to_string();
+        grid.cells.set_text(1, 0, "Pending".to_string());
+        prime_layout(&mut grid);
+        grid.selection
+            .set_cursor(1, 0, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+        grid.selection
+            .set_extent(grid.selection.row, grid.selection.col, grid.rows, grid.cols);
+
+        handle_key_press(&mut grid, 'S' as u32);
+
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.dropdown_index, 2);
+        assert_eq!(grid.edit.edit_text, "Shipped");
+        assert_eq!(grid.cells.get_text(1, 0), "Pending");
     }
 
     #[test]
