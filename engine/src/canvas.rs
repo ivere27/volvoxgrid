@@ -2351,19 +2351,15 @@ fn render_grid_internal<C: Canvas>(
     run_layer!(layer::BACKGROUNDS, render_backgrounds(grid, canvas, &ctx));
     run_layer!(layer::SELECTION, render_selection(grid, canvas, &ctx));
 
-    run_layer!(layer::PROGRESS_BARS, {
-        if progress_layer_needed(grid, &ctx) {
-            render_progress_bars(grid, canvas, &ctx);
-        }
-    });
+    run_layer!(
+        layer::PROGRESS_BARS,
+        render_progress_bars(grid, canvas, &ctx)
+    );
 
-    run_layer!(layer::GRID_LINES, {
-        if grid.style.grid_lines != pb::GridLineStyle::GridlineNone as i32
-            || grid.style.grid_lines_fixed != pb::GridLineStyle::GridlineNone as i32
-        {
-            render_grid_lines(grid, canvas, &ctx);
-        }
-    });
+    run_layer!(
+        layer::GRID_LINES,
+        render_grid_lines(grid, canvas, &ctx)
+    );
 
     run_layer!(layer::HEADER_MARKS, render_header_marks(grid, canvas, &ctx));
     run_layer!(
@@ -2371,46 +2367,31 @@ fn render_grid_internal<C: Canvas>(
         render_background_image(grid, canvas)
     );
 
-    run_layer!(layer::CELL_BORDERS, {
-        if grid.cell_styles.values().any(|s| {
-            s.border.is_some()
-                || s.border_color.is_some()
-                || s.border_top.is_some()
-                || s.border_right.is_some()
-                || s.border_bottom.is_some()
-                || s.border_left.is_some()
-                || s.border_top_color.is_some()
-                || s.border_right_color.is_some()
-                || s.border_bottom_color.is_some()
-                || s.border_left_color.is_some()
-        }) {
-            render_cell_borders(grid, canvas, &ctx);
-        }
-    });
+    run_layer!(
+        layer::CELL_BORDERS,
+        render_cell_borders(grid, canvas, &ctx)
+    );
 
     run_layer!(layer::CELL_TEXT, render_cell_text(grid, canvas, &ctx));
-    run_layer!(layer::CELL_PICTURES, {
-        if picture_layer_needed(grid, &ctx) {
-            render_cell_pictures(grid, canvas, &ctx);
-        }
-    });
+    run_layer!(
+        layer::CELL_PICTURES,
+        render_cell_pictures(grid, canvas, &ctx)
+    );
     run_layer!(layer::SORT_GLYPHS, render_sort_glyphs(grid, canvas, &ctx));
     run_layer!(
         layer::COL_DRAG_MARKER,
         render_col_drag_marker(grid, canvas, &ctx)
     );
 
-    run_layer!(layer::CHECKBOXES, {
-        if checkbox_layer_needed(grid, &ctx) {
-            render_checkboxes(grid, canvas, &ctx);
-        }
-    });
+    run_layer!(
+        layer::CHECKBOXES,
+        render_checkboxes(grid, canvas, &ctx)
+    );
 
-    run_layer!(layer::DROPDOWN_BUTTONS, {
-        if dropdown_layer_needed(grid, &ctx) {
-            render_dropdown_buttons(grid, canvas, &ctx);
-        }
-    });
+    run_layer!(
+        layer::DROPDOWN_BUTTONS,
+        render_dropdown_buttons(grid, canvas, &ctx)
+    );
 
     run_layer!(
         layer::HOVER_HIGHLIGHT,
@@ -2615,6 +2596,15 @@ fn draw_highlight_fill<C: Canvas>(
 /// through between cell gaps.
 fn render_overlay_bands<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
     let vp = &ctx.vp;
+    if vp.pinned_top_height <= 0
+        && vp.pinned_bottom_height <= 0
+        && vp.sticky_top_rows.is_empty()
+        && vp.sticky_bottom_rows.is_empty()
+        && vp.sticky_left_cols.is_empty()
+        && vp.sticky_right_cols.is_empty()
+    {
+        return;
+    }
     let bg = grid.style.back_color_bkg;
     let x0 = vp.data_x;
     let y0 = vp.data_y;
@@ -3727,6 +3717,9 @@ fn render_backgrounds<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Render
 // ===========================================================================
 
 fn render_progress_bars<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
+    if !progress_layer_needed(grid, ctx) {
+        return;
+    }
     let vp = &ctx.vp;
     for &cell in &ctx.vis_cells {
         let (row, col, cx, cy, cw, ch) = cell.parts();
@@ -3781,6 +3774,11 @@ fn render_progress_bars<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
 // ===========================================================================
 
 fn render_grid_lines<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
+    if grid.style.grid_lines == pb::GridLineStyle::GridlineNone as i32
+        && grid.style.grid_lines_fixed == pb::GridLineStyle::GridlineNone as i32
+    {
+        return;
+    }
     draw_grid_lines_for_zone(grid, canvas, &ctx.vis_cells, false);
     draw_grid_lines_for_zone(grid, canvas, &ctx.vis_cells, true);
 }
@@ -3920,7 +3918,25 @@ fn render_background_image<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
 // Layer 3.6 -- Per-cell borders (CellBorder / CellBorderRange)
 // ===========================================================================
 
+fn cell_borders_needed(grid: &VolvoxGrid) -> bool {
+    grid.cell_styles.values().any(|s| {
+        s.border.is_some()
+            || s.border_color.is_some()
+            || s.border_top.is_some()
+            || s.border_right.is_some()
+            || s.border_bottom.is_some()
+            || s.border_left.is_some()
+            || s.border_top_color.is_some()
+            || s.border_right_color.is_some()
+            || s.border_bottom_color.is_some()
+            || s.border_left_color.is_some()
+    })
+}
+
 fn render_cell_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
+    if !cell_borders_needed(grid) {
+        return;
+    }
     for &cell in &ctx.vis_cells {
         let (row, col, cx, cy, cw, ch) = cell.parts();
         // For merged cells, draw border once at the merge-origin cell.
@@ -4352,6 +4368,9 @@ fn picture_layer_needed(grid: &VolvoxGrid, ctx: &RenderContext) -> bool {
 }
 
 fn render_cell_pictures<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
+    if !picture_layer_needed(grid, ctx) {
+        return;
+    }
     let vp = &ctx.vp;
     for &cell in &ctx.vis_cells {
         let (row, col, cx, cy, cw, ch) = cell.parts();
@@ -5202,6 +5221,16 @@ fn cell_has_checkbox_visual(
 }
 
 fn checkbox_layer_needed(grid: &VolvoxGrid, ctx: &RenderContext) -> bool {
+    // Fast path: skip per-cell scan if no column is boolean-typed.
+    // Cells with explicit checked state on non-boolean columns are rare;
+    // the per-cell scan below still catches them via any_visible_cell.
+    let has_boolean_col = grid
+        .columns
+        .iter()
+        .any(|c| c.data_type == pb::ColumnDataType::ColumnDataBoolean as i32);
+    if !has_boolean_col {
+        return false;
+    }
     any_visible_cell(ctx, |row, col| {
         let is_boolean_col = grid.get_col_props(col).map_or(false, |cp| {
             cp.data_type == pb::ColumnDataType::ColumnDataBoolean as i32
@@ -5217,6 +5246,9 @@ fn checkbox_layer_needed(grid: &VolvoxGrid, ctx: &RenderContext) -> bool {
 }
 
 fn render_checkboxes<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
+    if !checkbox_layer_needed(grid, ctx) {
+        return;
+    }
     let vp = &ctx.vp;
     let checked_pic = grid
         .style
@@ -5434,6 +5466,9 @@ fn dropdown_layer_needed(grid: &VolvoxGrid, ctx: &RenderContext) -> bool {
 }
 
 fn render_dropdown_buttons<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
+    if !dropdown_layer_needed(grid, ctx) {
+        return;
+    }
     let vp = &ctx.vp;
     for &cell in &ctx.vis_cells {
         let (row, col, cx, cy, cw, ch) = cell.parts();
@@ -5886,6 +5921,9 @@ fn render_outline<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCont
     if grid.outline.tree_indicator == pb::TreeIndicatorStyle::TreeIndicatorNone as i32 {
         return;
     }
+    if grid.row_props.is_empty() {
+        return;
+    }
     if grid.outline.tree_column < 0 || grid.outline.tree_column >= grid.cols {
         return;
     }
@@ -6101,6 +6139,9 @@ fn subtotal_visual_level(level: i32, is_subtotal: bool, subtotal_level_floor: i3
 // ===========================================================================
 
 fn render_frozen_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
+    if grid.frozen_rows <= 0 && grid.frozen_cols <= 0 {
+        return;
+    }
     let vp = &ctx.vp;
     let buf_w = canvas.width();
     let buf_h = canvas.height();
