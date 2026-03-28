@@ -1328,8 +1328,8 @@ function pbDecodeCellRange(data: Uint8Array): VolvoxGridCellRange | null {
 
 function pbDecodeSelectionState(data: Uint8Array): VolvoxGridSelection | null {
   let offset = 0;
-  let row = -1;
-  let col = -1;
+  let row = 0;
+  let col = 0;
   let topRow = 0;
   let leftCol = 0;
   let bottomRow = 0;
@@ -1483,8 +1483,8 @@ function pbDecodeGridEventEnvelope(
 }
 
 function pbDecodeBeforeEditPayload(data: Uint8Array): { row: number; col: number } {
-  let row = -1;
-  let col = -1;
+  let row = 0;
+  let col = 0;
   let offset = 0;
   while (offset < data.length) {
     const tag = pbReadVarint(data, offset);
@@ -1507,8 +1507,8 @@ function pbDecodeBeforeEditPayload(data: Uint8Array): { row: number; col: number
 function pbDecodeCellEditValidatePayload(
   data: Uint8Array,
 ): { row: number; col: number; editText: string } {
-  let row = -1;
-  let col = -1;
+  let row = 0;
+  let col = 0;
   let editText = "";
   let offset = 0;
   while (offset < data.length) {
@@ -1540,7 +1540,7 @@ function pbDecodeCellEditValidatePayload(
 }
 
 function pbDecodeBeforeSortPayload(data: Uint8Array): { col: number } {
-  let col = -1;
+  let col = 0;
   let offset = 0;
   while (offset < data.length) {
     const tag = pbReadVarint(data, offset);
@@ -1915,6 +1915,8 @@ function pbDecodeLoadDataResult(data: Uint8Array): VolvoxGridLoadDataResult {
 export class VolvoxGrid {
   private static readonly TOUCH_SCROLL_LINE_PX = 24;
   private static readonly TOUCH_PAN_START_PX = 2;
+  private static readonly TOUCH_DOUBLE_TAP_MS = 500;
+  private static readonly TOUCH_DOUBLE_TAP_SLOP_PX = 24;
   private static readonly ZOOM_MIN_SCALE = 0.25;
   private static readonly ZOOM_MAX_SCALE = 4.0;
   private static readonly ZOOM_STEP_MIN_SCALE = 1 / 32;
@@ -1949,11 +1951,18 @@ export class VolvoxGrid {
   private touchLastX: number = 0;
   private touchLastY: number = 0;
   private touchPanActive: boolean = false;
+  private touchTapOnlyPointerId: number | null = null;
   private pinchLastDistance: number = 0;
   private pinchLastCenterX: number = 0;
   private pinchLastCenterY: number = 0;
   private readonly zoomScaleByGrid = new Map<number, number>();
   private readonly zoomBaseFontSizeByGrid = new Map<number, number>();
+  private lastTouchTapTime: number = 0;
+  private lastTouchTapX: number = 0;
+  private lastTouchTapY: number = 0;
+  private lastTouchTapRow: number = -1;
+  private lastTouchTapCol: number = -1;
+  private suppressNextTouchTapRecord: boolean = false;
   private lastMouseDownTime: number = 0;
   private lastMouseDownX: number = 0;
   private lastMouseDownY: number = 0;
@@ -2000,6 +2009,8 @@ export class VolvoxGrid {
   private imeProxy: HTMLTextAreaElement | null = null;
   private imeComposing: boolean = false;
   private imeTransitionTimer: number = 0;
+  private skipNextCanvasImeRedirect: boolean = false;
+  private lastPointerWasTouch: boolean = false;
 
   /** Called when IME composition starts editing on an idle cell.
    *  Adapters (e.g. VolvoxSheet) can hook into this to synchronously
@@ -5045,9 +5056,66 @@ export class VolvoxGrid {
     this.touchMode = "none";
     this.activeTouchPointerId = null;
     this.touchPanActive = false;
+    this.touchTapOnlyPointerId = null;
     this.pinchLastDistance = 0;
     this.pinchLastCenterX = 0;
     this.pinchLastCenterY = 0;
+  }
+
+  private clearLastTouchTap(): void {
+    this.lastTouchTapTime = 0;
+    this.lastTouchTapX = 0;
+    this.lastTouchTapY = 0;
+    this.lastTouchTapRow = -1;
+    this.lastTouchTapCol = -1;
+    this.suppressNextTouchTapRecord = false;
+  }
+
+  private rememberTouchTap(
+    x: number,
+    y: number,
+    timeStamp: number,
+    row: number,
+    col: number,
+  ): void {
+    this.lastTouchTapTime = timeStamp;
+    this.lastTouchTapX = x;
+    this.lastTouchTapY = y;
+    this.lastTouchTapRow = row;
+    this.lastTouchTapCol = col;
+  }
+
+  private hitTestTouchCell(ex: number, ey: number): { row: number; col: number } {
+    const row = typeof this.wasm.hit_test_row === "function"
+      ? Number(this.wasm.hit_test_row(this.gridId, ex, ey))
+      : -1;
+    const col = typeof this.wasm.hit_test_col === "function"
+      ? Number(this.wasm.hit_test_col(this.gridId, ex, ey))
+      : -1;
+    return { row, col };
+  }
+
+  private isTouchDoubleTap(
+    x: number,
+    y: number,
+    timeStamp: number,
+    row: number,
+    col: number,
+  ): boolean {
+    if ((timeStamp - this.lastTouchTapTime) > VolvoxGrid.TOUCH_DOUBLE_TAP_MS) {
+      return false;
+    }
+    const dx = x - this.lastTouchTapX;
+    const dy = y - this.lastTouchTapY;
+    const slopSq =
+      VolvoxGrid.TOUCH_DOUBLE_TAP_SLOP_PX * VolvoxGrid.TOUCH_DOUBLE_TAP_SLOP_PX;
+    if ((dx * dx + dy * dy) > slopSq) {
+      return false;
+    }
+    if (row >= 0 && col >= 0 && this.lastTouchTapRow >= 0 && this.lastTouchTapCol >= 0) {
+      return row === this.lastTouchTapRow && col === this.lastTouchTapCol;
+    }
+    return this.lastTouchTapTime > 0;
   }
 
   private ensureZoomBaseForGrid(gridId: number): void {
@@ -5208,6 +5276,7 @@ export class VolvoxGrid {
     if (!metrics) {
       return;
     }
+    this.clearLastTouchTap();
     this.refreshZoomBaseForGrid(this.gridId);
     this.touchMode = "pinch";
     this.activeTouchPointerId = null;
@@ -5248,10 +5317,25 @@ export class VolvoxGrid {
 
   /** When canvas gets focus, redirect to imeProxy so OS IME toggle works. */
   private onCanvasFocusForIme = (): void => {
+    if (this.skipNextCanvasImeRedirect) {
+      return;
+    }
     if (this.imeProxy && !this.imeComposing && !this.editComposing) {
       this.imeProxy.focus();
     }
   };
+
+  private focusCanvas(skipImeRedirect: boolean): void {
+    if (skipImeRedirect) {
+      this.skipNextCanvasImeRedirect = true;
+    }
+    this.canvas.focus();
+    if (skipImeRedirect) {
+      window.setTimeout(() => {
+        this.skipNextCanvasImeRedirect = false;
+      }, 0);
+    }
+  }
 
   private onPointerDown = (e: PointerEvent): void => {
     const r = this.canvas.getBoundingClientRect();
@@ -5259,6 +5343,9 @@ export class VolvoxGrid {
     const y = e.clientY - r.top;
     const hostPointerDispatch = typeof this.wasm.get_host_pointer_dispatch === "function"
       && this.wasm.get_host_pointer_dispatch(this.gridId) !== 0;
+    const touchGestureDismissesEditor = e.pointerType === "touch"
+      && this.activeEditor !== "none"
+      && !hostPointerDispatch;
     // Commit host-side editors before the grid handles the click so the old
     // value cannot be applied to a newly selected/editing cell.
     if (this.activeEditor !== "none" && !hostPointerDispatch) {
@@ -5272,12 +5359,15 @@ export class VolvoxGrid {
       }
     }
     if (e.pointerType === "touch") {
+      this.lastPointerWasTouch = true;
       this.touchPoints.set(e.pointerId, { x, y });
       this.canvas.setPointerCapture(e.pointerId);
-      this.canvas.focus();
+      this.focusCanvas(true);
       e.preventDefault();
+      this.touchTapOnlyPointerId = touchGestureDismissesEditor ? e.pointerId : null;
 
       if (this.touchPoints.size >= 2) {
+        this.touchTapOnlyPointerId = null;
         this.beginPinchGesture();
         return;
       }
@@ -5285,10 +5375,17 @@ export class VolvoxGrid {
       // Forward touch to engine so it can hit-test FastScroll.
       const ex = x * this.dprX;
       const ey = y * this.dprY;
-      this.wasm.handle_pointer_down(this.gridId, ex, ey, 0, 0, false);
+      const touchHit = this.hitTestTouchCell(ex, ey);
+      const dblTap = this.isTouchDoubleTap(x, y, e.timeStamp, touchHit.row, touchHit.col);
+      if (dblTap) {
+        this.clearLastTouchTap();
+        this.suppressNextTouchTapRecord = true;
+      }
+      this.wasm.handle_pointer_down(this.gridId, ex, ey, 0, 0, dblTap);
       this.flushCancelableEventDecisions();
       if (typeof this.wasm.is_fast_scroll_active === "function" &&
           this.wasm.is_fast_scroll_active(this.gridId)) {
+        this.clearLastTouchTap();
         this.touchMode = "fast-scroll";
         this.activeTouchPointerId = e.pointerId;
         this.dirty = true;
@@ -5304,6 +5401,8 @@ export class VolvoxGrid {
       this.touchPanActive = false;
       return;
     }
+
+    this.lastPointerWasTouch = false;
 
     // Scale CSS coordinates to device pixels for the engine.
     const ex = x * this.dprX;
@@ -5329,7 +5428,7 @@ export class VolvoxGrid {
         }
         this.flushCancelableEventDecisions();
         this.dirty = true;
-        this.canvas.focus();
+        this.focusCanvas(false);
         return;
       }
       // Click outside dropdown: cancel previewed combo selection and close.
@@ -5346,7 +5445,7 @@ export class VolvoxGrid {
     // so the context menu operates on the existing selection.
     if (button === 2) {
       this.wasm.handle_pointer_move(this.gridId, ex, ey);
-      this.canvas.focus();
+      this.focusCanvas(false);
       return;
     }
 
@@ -5388,7 +5487,7 @@ export class VolvoxGrid {
 
     this.dirty = true;
     this.canvas.setPointerCapture(e.pointerId);
-    this.canvas.focus();
+    this.focusCanvas(false);
   };
 
   private onPointerMove = (e: PointerEvent): void => {
@@ -5437,6 +5536,11 @@ export class VolvoxGrid {
         this.activeTouchPointerId !== null &&
         e.pointerId === this.activeTouchPointerId
       ) {
+        if (this.touchTapOnlyPointerId === e.pointerId) {
+          e.preventDefault();
+          return;
+        }
+
         // Touch tracking stays in CSS pixels for scroll unit computation.
         const dxPx = x - this.touchLastX;
         const dyPx = y - this.touchLastY;
@@ -5448,6 +5552,7 @@ export class VolvoxGrid {
           const travelY = y - this.touchStartY;
           if (Math.hypot(travelX, travelY) >= VolvoxGrid.TOUCH_PAN_START_PX) {
             this.touchPanActive = true;
+            this.clearLastTouchTap();
           }
         }
 
@@ -5495,6 +5600,7 @@ export class VolvoxGrid {
         e.pointerId === this.activeTouchPointerId;
       if (wasFastScroll) {
         this.wasm.handle_pointer_up(this.gridId, ex, ey, 0);
+        this.clearLastTouchTap();
         this.touchMode = "none";
         this.activeTouchPointerId = null;
         this.dirty = true;
@@ -5503,9 +5609,24 @@ export class VolvoxGrid {
       const wasPan = this.touchMode === "pan";
       const wasActivePanPointer =
         this.activeTouchPointerId !== null && e.pointerId === this.activeTouchPointerId;
+      const wasTap = wasPan && wasActivePanPointer && !this.touchPanActive;
       if (wasPan && wasActivePanPointer) {
         // pointer_down was sent on touch start; send matching pointer_up.
         this.wasm.handle_pointer_up(this.gridId, ex, ey, 0);
+        if (!wasTap) {
+          this.touchTapOnlyPointerId = null;
+          this.clearLastTouchTap();
+        }
+      }
+
+      if (wasTap) {
+        this.touchTapOnlyPointerId = null;
+        if (this.suppressNextTouchTapRecord) {
+          this.suppressNextTouchTapRecord = false;
+        } else {
+          const touchHit = this.hitTestTouchCell(ex, ey);
+          this.rememberTouchTap(x, y, e.timeStamp, touchHit.row, touchHit.col);
+        }
       }
 
       this.touchPoints.delete(e.pointerId);
@@ -5553,6 +5674,8 @@ export class VolvoxGrid {
         this.activeTouchPointerId = null;
         this.dirty = true;
       }
+      this.touchTapOnlyPointerId = null;
+      this.clearLastTouchTap();
       this.touchPoints.delete(e.pointerId);
       if (this.touchPoints.size >= 2) {
         this.beginPinchGesture();
@@ -6103,10 +6226,10 @@ export class VolvoxGrid {
 
   /** Focus imeProxy if available, otherwise canvas. */
   private focusImeProxyOrCanvas(): void {
-    if (this.imeProxy) {
+    if (this.imeProxy && !this.lastPointerWasTouch) {
       this.imeProxy.focus();
     } else {
-      this.canvas.focus();
+      this.focusCanvas(this.lastPointerWasTouch);
     }
   }
 

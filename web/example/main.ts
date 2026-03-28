@@ -313,8 +313,8 @@ function pbDecodeGridEventEnvelope(
 function pbDecodeClickEventPayload(
   data: Uint8Array,
 ): { row: number; col: number; hitArea: number; interaction: number } {
-  let row = -1;
-  let col = -1;
+  let row = 0;
+  let col = 0;
   let hitArea = 0;
   let interaction = CELL_INTERACTION_UNSPECIFIED;
   let offset = 0;
@@ -1590,11 +1590,19 @@ async function main() {
     void switchDemo("doom");
   });
 
-  // Resolution selector.
-  selDoomRes.addEventListener("change", () => {
+  function applySelectedDoomResolution(): boolean {
     const preset = DOOM_RESOLUTIONS[selDoomRes.value];
-    if (!preset) return;
+    if (!preset) {
+      return false;
+    }
     doomRuntime.setResolution(preset[0], preset[1]);
+    return true;
+  }
+
+  // Resolution selector.
+  applySelectedDoomResolution();
+  selDoomRes.addEventListener("change", () => {
+    if (!applySelectedDoomResolution()) return;
     doomGridId = null;
 
     if (currentDemo === "doom") {
