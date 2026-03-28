@@ -2191,6 +2191,13 @@ impl VolvoxGrid {
                 if let Some(v) = def.error_mode {
                     cp.error_mode = v;
                 }
+                if let Some(v) = def.interaction {
+                    cp.interaction = if v == v1::CellInteraction::Unspecified as i32 {
+                        0
+                    } else {
+                        v
+                    };
+                }
                 if let Some(v) = sticky_to_apply {
                     self.set_col_sticky(idx, v);
                 }
@@ -2624,6 +2631,17 @@ impl VolvoxGrid {
             cell.extra_mut().dropdown_items = cl.clone();
         }
 
+        if let Some(v) = u.interaction {
+            let cell = self.cells.get_mut(row, col);
+            if v == v1::CellInteraction::Unspecified as i32 {
+                if let Some(extra) = cell.extra.as_mut() {
+                    extra.interaction = None;
+                }
+            } else {
+                cell.extra_mut().interaction = Some(v);
+            }
+        }
+
         if u.sticky_row.is_some() || u.sticky_col.is_some() {
             let sr = u.sticky_row.unwrap_or(0);
             let sc = u.sticky_col.unwrap_or(0);
@@ -2662,6 +2680,7 @@ impl VolvoxGrid {
                 || entry.update.picture_align.is_some()
                 || entry.update.button_picture.is_some()
                 || entry.update.dropdown_items.is_some()
+                || entry.update.interaction.is_some()
                 || entry.update.sticky_row.is_some()
                 || entry.update.sticky_col.is_some()
             {
@@ -2713,6 +2732,7 @@ impl VolvoxGrid {
                     dropdown_items: None,
                     sticky_row: None,
                     sticky_col: None,
+                    interaction: None,
                 }
             })
             .collect();
@@ -2834,6 +2854,11 @@ impl VolvoxGrid {
                 } else {
                     None
                 },
+                interaction: if cp.interaction > v1::CellInteraction::None as i32 {
+                    Some(cp.interaction)
+                } else {
+                    None
+                },
             });
         }
         v1::DefineColumnsRequest { grid_id, columns }
@@ -2908,12 +2933,18 @@ impl VolvoxGrid {
                     0
                 };
 
+                let interaction = match self.resolved_cell_interaction(row, col) {
+                    x if x == v1::CellInteraction::None as i32 => None,
+                    x => Some(x),
+                };
+
                 result.push(v1::CellData {
                     row,
                     col,
                     value: typed_value,
                     style,
                     checked,
+                    interaction,
                 });
             }
         }
@@ -3420,6 +3451,61 @@ mod tests {
                 value: Some(v1::cell_value::Value::Text(t))
             }) if t == "A"
         ));
+    }
+
+    #[test]
+    fn get_cells_returns_effective_interaction_and_clears_override() {
+        let mut grid = test_grid();
+        grid.columns[1].interaction = v1::CellInteraction::TextLink as i32;
+        grid.cells.set_text(1, 1, "Open".to_string());
+
+        let _ = grid.write_cells(
+            &[v1::CellUpdate {
+                row: 1,
+                col: 1,
+                value: None,
+                style: None,
+                checked: None,
+                picture: None,
+                picture_align: None,
+                button_picture: None,
+                dropdown_items: None,
+                sticky_row: None,
+                sticky_col: None,
+                interaction: Some(v1::CellInteraction::Button as i32),
+            }],
+            false,
+        );
+
+        let button_cell = grid.get_cells(1, 1, 1, 1, false, false, false);
+        assert_eq!(
+            button_cell.first().and_then(|c| c.interaction),
+            Some(v1::CellInteraction::Button as i32)
+        );
+
+        let _ = grid.write_cells(
+            &[v1::CellUpdate {
+                row: 1,
+                col: 1,
+                value: None,
+                style: None,
+                checked: None,
+                picture: None,
+                picture_align: None,
+                button_picture: None,
+                dropdown_items: None,
+                sticky_row: None,
+                sticky_col: None,
+                interaction: Some(v1::CellInteraction::Unspecified as i32),
+            }],
+            false,
+        );
+
+        let link_cell = grid.get_cells(1, 1, 1, 1, false, false, false);
+        assert_eq!(
+            link_cell.first().and_then(|c| c.interaction),
+            Some(v1::CellInteraction::TextLink as i32)
+        );
     }
 
     #[test]

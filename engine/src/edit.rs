@@ -1,5 +1,6 @@
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::style::HighlightStyle;
+use std::time::Instant;
 
 /// Edit state machine for in-place cell editing.
 ///
@@ -182,6 +183,10 @@ pub struct EditState {
     pub dropdown_data: Vec<String>,
     /// Whether the current list is an editable dropdown (`|item1|item2`).
     pub dropdown_editable: bool,
+    /// Buffered type-ahead prefix for a select-only dropdown.
+    pub dropdown_search_text: String,
+    /// Time of the last type-ahead update for a select-only dropdown.
+    pub dropdown_search_last_input: Option<Instant>,
     /// True during IME composition (preedit active).
     pub composing: bool,
     /// In-progress preedit text from IME (e.g. "ㅇ").
@@ -207,6 +212,8 @@ impl Default for EditState {
             dropdown_items: Vec::new(),
             dropdown_data: Vec::new(),
             dropdown_editable: false,
+            dropdown_search_text: String::new(),
+            dropdown_search_last_input: None,
             composing: false,
             preedit_text: String::new(),
             preedit_cursor: 0,
@@ -231,6 +238,7 @@ impl EditState {
         bytes += self.edit_text.capacity();
         bytes += self.original_text.capacity();
         bytes += self.preedit_text.capacity();
+        bytes += self.dropdown_search_text.capacity();
         bytes += self.formula_highlights.capacity() * std::mem::size_of::<EditHighlightRegion>();
 
         bytes += self.dropdown_items.capacity() * std::mem::size_of::<String>();
@@ -264,6 +272,7 @@ impl EditState {
         self.edit_text = current_text.to_string();
         self.formula_mode = self.edit_text.trim_start().starts_with('=');
         self.formula_highlights.clear();
+        self.clear_dropdown_search();
         // Select all text when entering edit mode.
         self.sel_start = 0;
         self.sel_length = self.edit_text.chars().count() as i32;
@@ -313,6 +322,7 @@ impl EditState {
         self.formula_mode =
             formula_mode.unwrap_or_else(|| self.edit_text.trim_start().starts_with('='));
         self.formula_highlights.clear();
+        self.clear_dropdown_search();
         let _ = select_all; // used implicitly as the default path
     }
 
@@ -354,6 +364,7 @@ impl EditState {
         self.edit_col = -1;
         self.formula_mode = false;
         self.formula_highlights.clear();
+        self.clear_dropdown_search();
         self.cancel_preedit();
         Some(result)
     }
@@ -371,6 +382,7 @@ impl EditState {
         self.edit_col = -1;
         self.formula_mode = false;
         self.formula_highlights.clear();
+        self.clear_dropdown_search();
         self.cancel_preedit();
         Some(result)
     }
@@ -438,6 +450,7 @@ impl EditState {
         self.dropdown_items.clear();
         self.dropdown_data.clear();
         self.dropdown_editable = list.starts_with('|');
+        self.clear_dropdown_search();
         if list.is_empty() {
             self.dropdown_index = -1;
             return;
@@ -668,6 +681,43 @@ impl EditState {
             }
         }
         -1
+    }
+
+    pub fn clear_dropdown_search(&mut self) {
+        self.dropdown_search_text.clear();
+        self.dropdown_search_last_input = None;
+    }
+
+    pub fn select_readonly_dropdown_char(&mut self, ch: char, delay_ms: u128) -> bool {
+        if self.dropdown_items.is_empty() || self.dropdown_editable {
+            return false;
+        }
+
+        let now = Instant::now();
+        if let Some(last) = self.dropdown_search_last_input {
+            if now.duration_since(last).as_millis() > delay_ms {
+                self.dropdown_search_text.clear();
+            }
+        } else {
+            self.dropdown_search_text.clear();
+        }
+        self.dropdown_search_last_input = Some(now);
+
+        self.dropdown_search_text.push(ch);
+        let mut idx = self.search_dropdown(&self.dropdown_search_text);
+        if idx < 0 {
+            self.dropdown_search_text.clear();
+            self.dropdown_search_text.push(ch);
+            idx = self.search_dropdown(&self.dropdown_search_text);
+        }
+
+        if idx >= 0 {
+            self.set_dropdown_index(idx);
+            true
+        } else {
+            self.dropdown_search_text.clear();
+            false
+        }
     }
 }
 

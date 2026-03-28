@@ -6,6 +6,7 @@
 
 use std::time::{Duration, Instant};
 use volvoxgrid_engine::cell::CellValueData;
+use volvoxgrid_engine::control::CellControl;
 use volvoxgrid_engine::proto::volvoxgrid::v1::*;
 use volvoxgrid_engine::GridManager;
 
@@ -507,6 +508,7 @@ fn set_cell_property(
                     if let Some(cv) = value {
                         if let Some(cell_value::Value::Text(t)) = &cv.value {
                             grid.cells.get_mut(r, c).extra_mut().dropdown_items = t.clone();
+                            sync_legacy_button_metadata_for_cell(grid, r, c, t);
                         }
                     }
                 }
@@ -702,6 +704,55 @@ fn truncate_to_char_count(s: &str, max_chars: i32) -> String {
     s.chars().take(max).collect()
 }
 
+fn is_legacy_ellipsis_button_list(list: &str) -> bool {
+    list.trim() == "..."
+}
+
+fn sync_legacy_button_metadata_for_column(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    col: i32,
+    list: &str,
+) {
+    if col < 0 || (col as usize) >= grid.columns.len() {
+        return;
+    }
+    let column = &mut grid.columns[col as usize];
+    if is_legacy_ellipsis_button_list(list) {
+        column.interaction = CellInteraction::Button as i32;
+        column.control = CellControl::EllipsisButton;
+    } else {
+        if column.interaction == CellInteraction::Button as i32 {
+            column.interaction = CellInteraction::None as i32;
+        }
+        if column.control == CellControl::EllipsisButton {
+            column.control = CellControl::None;
+        }
+    }
+}
+
+fn sync_legacy_button_metadata_for_cell(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    list: &str,
+) {
+    if row < 0 || row >= grid.rows || col < 0 || col >= grid.cols {
+        return;
+    }
+    let extra = grid.cells.get_mut(row, col).extra_mut();
+    if is_legacy_ellipsis_button_list(list) {
+        extra.interaction = Some(CellInteraction::Button as i32);
+        extra.control = Some(CellControl::EllipsisButton);
+    } else {
+        if extra.interaction == Some(CellInteraction::Button as i32) {
+            extra.interaction = None;
+        }
+        if extra.control == Some(CellControl::EllipsisButton) {
+            extra.control = None;
+        }
+    }
+}
+
 fn begin_edit_session(
     grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
     row: i32,
@@ -714,12 +765,6 @@ fn begin_edit_session(
     let combo_list = grid.active_dropdown_list(row, col);
     grid.events
         .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
-    if combo_list.trim() == "..." {
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::CellButtonClick { row, col });
-        grid.mark_dirty();
-        return;
-    }
     let stored_text = grid.cells.get_text(row, col).to_string();
     let display_text = grid.get_display_text(row, col);
     grid.edit.start_edit(row, col, &display_text);
@@ -1729,11 +1774,13 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     fn set_col_combo_list(&self, r: SetColComboListRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             if r.col == -1 {
-                for col in &mut g.columns {
-                    col.dropdown_items = r.list.clone();
+                for col in 0..g.columns.len() {
+                    g.columns[col].dropdown_items = r.list.clone();
+                    sync_legacy_button_metadata_for_column(g, col as i32, &r.list);
                 }
             } else if r.col >= 0 && (r.col as usize) < g.columns.len() {
                 g.columns[r.col as usize].dropdown_items = r.list.clone();
+                sync_legacy_button_metadata_for_column(g, r.col, &r.list);
             }
         })?;
         Ok(Empty {})
@@ -1744,6 +1791,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             let col = g.selection.col;
             let cell = g.cells.get_mut(row, col);
             cell.extra_mut().dropdown_items = r.list.clone();
+            sync_legacy_button_metadata_for_cell(g, row, col, &r.list);
         })?;
         Ok(Empty {})
     }
@@ -3317,7 +3365,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                         let active_combo =
                             grid.active_dropdown_list(grid.edit.edit_row, grid.edit.edit_col);
                         grid.edit.cancel();
-                        if !active_combo.is_empty() && active_combo.trim() != "..." {
+                        if !active_combo.is_empty() {
                             grid.events
                                 .push(volvoxgrid_engine::event::GridEventData::DropdownClosed);
                         }
@@ -3642,23 +3690,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         })
     }
 
-    fn import(&self, request: ImportRequest) -> Result<Empty, String> {
+    fn load_data(&self, request: LoadDataRequest) -> Result<LoadDataResult, String> {
         self.manager().with_grid(request.grid_id, |grid| {
-            if let Some(url) = &request.url {
-                if !url.is_empty() {
-                    volvoxgrid_engine::save::load_grid_url(
-                        grid,
-                        url,
-                        &request.data,
-                        request.format,
-                        request.scope,
-                    );
-                    return;
-                }
-            }
-            volvoxgrid_engine::save::load_grid(grid, &request.data, request.format, request.scope);
-        })?;
-        Ok(Empty {})
+            volvoxgrid_engine::load::load_data(grid, &request.data, request.options.as_ref())
+        })
     }
 
     fn print(&self, request: PrintRequest) -> Result<PrintResponse, String> {
@@ -4458,11 +4493,13 @@ pub extern "C" fn volvox_grid_set_col_combo_list(
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
             if col == -1 {
-                for c in &mut g.columns {
-                    c.dropdown_items = list.clone();
+                for idx in 0..g.columns.len() {
+                    g.columns[idx].dropdown_items = list.clone();
+                    sync_legacy_button_metadata_for_column(g, idx as i32, &list);
                 }
             } else if col >= 0 && (col as usize) < g.columns.len() {
                 g.columns[col as usize].dropdown_items = list.clone();
+                sync_legacy_button_metadata_for_column(g, col, &list);
             }
         }),
         out_len,

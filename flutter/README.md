@@ -17,7 +17,7 @@ A high-performance, pixel-rendered data grid widget for Flutter. The native Rust
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.3.0
+  volvoxgrid: ^0.4.0
 ```
 
 Native binaries are resolved automatically from Maven Central at build time. No manual downloads required.
@@ -29,7 +29,7 @@ By default, `VOLVOXGRID_SOURCE=maven` pulls pre-built binaries from Maven Centra
 | Variable | Default | Description |
 |---|---|---|
 | `VOLVOXGRID_SOURCE` | `maven` | `maven` or `local` |
-| `VOLVOXGRID_VERSION` | `0.3.0` | Maven artifact version |
+| `VOLVOXGRID_VERSION` | `0.4.0` | Maven artifact version |
 
 ## Quick Start
 
@@ -405,17 +405,18 @@ double sum = await controller.aggregate(
 );
 ```
 
-#### Save & Load
+#### Export & LoadData
 
 ```dart
-ExportResponse exported = await controller.saveGrid(
+final exported = await controller.saveGrid(
   format: ExportFormat.EXPORT_BINARY,
 );
-await controller.loadGrid(
-  exported.data,
-  format: ExportFormat.EXPORT_BINARY,
+final loaded = await controller.loadData(
+  utf8.encode(name,qty
+apple,3
+banana,5),
 );
-// Formats: EXPORT_BINARY, EXPORT_TSV, EXPORT_CSV, EXPORT_SPREADSHEET_ML
+// loadData parses CSV or JSON bytes; saveGrid remains export-only.
 ```
 
 #### Rendering

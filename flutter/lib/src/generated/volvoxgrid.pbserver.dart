@@ -50,6 +50,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $0.GetCellsRequest request);
   $async.Future<$0.WriteResult> loadTable(
       $pb.ServerContext ctx, $0.LoadTableRequest request);
+  $async.Future<$0.LoadDataResult> loadData(
+      $pb.ServerContext ctx, $0.LoadDataRequest request);
   $async.Future<$0.Empty> clear($pb.ServerContext ctx, $0.ClearRequest request);
   $async.Future<$0.Empty> select(
       $pb.ServerContext ctx, $0.SelectRequest request);
@@ -90,8 +92,6 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $0.ClipboardCommand request);
   $async.Future<$0.ExportResponse> export(
       $pb.ServerContext ctx, $0.ExportRequest request);
-  $async.Future<$0.Empty> import(
-      $pb.ServerContext ctx, $0.ImportRequest request);
   $async.Future<$0.PrintResponse> print(
       $pb.ServerContext ctx, $0.PrintRequest request);
   $async.Future<$0.ArchiveResponse> archive(
@@ -140,6 +140,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
         return $0.GetCellsRequest();
       case 'LoadTable':
         return $0.LoadTableRequest();
+      case 'LoadData':
+        return $0.LoadDataRequest();
       case 'Clear':
         return $0.ClearRequest();
       case 'Select':
@@ -182,8 +184,6 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
         return $0.ClipboardCommand();
       case 'Export':
         return $0.ExportRequest();
-      case 'Import':
-        return $0.ImportRequest();
       case 'Print':
         return $0.PrintRequest();
       case 'Archive':
@@ -238,6 +238,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
         return getCells(ctx, request as $0.GetCellsRequest);
       case 'LoadTable':
         return loadTable(ctx, request as $0.LoadTableRequest);
+      case 'LoadData':
+        return loadData(ctx, request as $0.LoadDataRequest);
       case 'Clear':
         return clear(ctx, request as $0.ClearRequest);
       case 'Select':
@@ -280,8 +282,6 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
         return clipboard(ctx, request as $0.ClipboardCommand);
       case 'Export':
         return export(ctx, request as $0.ExportRequest);
-      case 'Import':
-        return import(ctx, request as $0.ImportRequest);
       case 'Print':
         return print(ctx, request as $0.PrintRequest);
       case 'Archive':

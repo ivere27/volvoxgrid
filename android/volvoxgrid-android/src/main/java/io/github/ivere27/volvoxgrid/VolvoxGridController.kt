@@ -1435,15 +1435,14 @@ class VolvoxGridController(
         )
     }
 
-    fun loadGrid(data: ByteArray, format: ExportFormat = ExportFormat.EXPORT_BINARY) {
-        service.Import(
-            ImportRequest.newBuilder()
-                .setGridId(gridId)
-                .setData(com.google.protobuf.ByteString.copyFrom(data))
-                .setFormat(format)
-                .setScope(ExportScope.EXPORT_ALL)
-                .build()
-        )
+    fun loadData(data: ByteArray, options: LoadDataOptions? = null): LoadDataResult {
+        val builder = LoadDataRequest.newBuilder()
+            .setGridId(gridId)
+            .setData(com.google.protobuf.ByteString.copyFrom(data))
+        if (options != null) {
+            builder.setOptions(options)
+        }
+        return service.LoadData(builder.build())
     }
 
     fun printGrid(

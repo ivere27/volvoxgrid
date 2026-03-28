@@ -41,7 +41,7 @@ namespace VolvoxGrid.DotNet.Internal
         private const string EditMethod = "/volvoxgrid.v1.VolvoxGridService/Edit";
         private const string ClipboardMethod = "/volvoxgrid.v1.VolvoxGridService/Clipboard";
         private const string ExportMethod = "/volvoxgrid.v1.VolvoxGridService/Export";
-        private const string ImportMethod = "/volvoxgrid.v1.VolvoxGridService/Import";
+        private const string LoadDataMethod = "/volvoxgrid.v1.VolvoxGridService/LoadData";
         private const string PrintMethod = "/volvoxgrid.v1.VolvoxGridService/Print";
         private const string ArchiveMethod = "/volvoxgrid.v1.VolvoxGridService/Archive";
         private const string LoadDemoMethod = "/volvoxgrid.v1.VolvoxGridService/LoadDemo";
@@ -260,9 +260,9 @@ namespace VolvoxGrid.DotNet.Internal
             return _codec.DecodeExportResponse(response);
         }
 
-        public void Import(long gridId, byte[] data, VolvoxExportFormat format, VolvoxExportScope scope)
+        public void LoadData(long gridId, byte[] data)
         {
-            InvokeUnary(ImportMethod, _codec.EncodeImportRequest(gridId, data, format, scope));
+            InvokeUnary(LoadDataMethod, _codec.EncodeLoadDataRequest(gridId, data));
         }
 
         public void Print(long gridId, bool landscape, int marginL, int marginT, int marginR, int marginB, string header, string footer, bool showPageNumbers)

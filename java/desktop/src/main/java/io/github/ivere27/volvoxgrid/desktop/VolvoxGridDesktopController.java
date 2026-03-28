@@ -1225,20 +1225,25 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         );
     }
 
-    public Empty importGrid(ImportRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+    public LoadDataResult loadData(LoadDataRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(request, "request");
-        return client.importGrid(request.toBuilder().setGridId(gridId).build());
+        return client.loadData(request.toBuilder().setGridId(gridId).build());
     }
 
-    public void loadGrid(byte[] data, ExportFormat format, ExportScope scope) throws SynurangDesktopBridge.SynurangBridgeException {
-        ImportRequest.Builder builder = ImportRequest.newBuilder()
-            .setGridId(gridId)
-            .setFormat(format)
-            .setScope(scope);
+    public LoadDataResult loadData(byte[] data) throws SynurangDesktopBridge.SynurangBridgeException {
+        return loadData(data, null);
+    }
+
+    public LoadDataResult loadData(byte[] data, LoadDataOptions options) throws SynurangDesktopBridge.SynurangBridgeException {
+        LoadDataRequest.Builder builder = LoadDataRequest.newBuilder()
+            .setGridId(gridId);
         if (data != null && data.length > 0) {
             builder.setData(ByteString.copyFrom(data));
         }
-        client.importGrid(builder.build());
+        if (options != null) {
+            builder.setOptions(options);
+        }
+        return client.loadData(builder.build());
     }
 
     public PrintResponse printGrid(PrintRequest request) throws SynurangDesktopBridge.SynurangBridgeException {

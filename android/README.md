@@ -8,9 +8,9 @@ Add the Maven dependency to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-android:0.3.0")
+    implementation("io.github.ivere27:volvoxgrid-android:0.4.0")
     // or lite variant:
-    // implementation("io.github.ivere27:volvoxgrid-android-lite:0.3.0")
+    // implementation("io.github.ivere27:volvoxgrid-android-lite:0.4.0")
 }
 ```
 
@@ -18,9 +18,9 @@ Or `build.gradle`:
 
 ```groovy
 dependencies {
-    implementation 'io.github.ivere27:volvoxgrid-android:0.3.0'
+    implementation 'io.github.ivere27:volvoxgrid-android:0.4.0'
     // or lite variant:
-    // implementation 'io.github.ivere27:volvoxgrid-android-lite:0.3.0'
+    // implementation 'io.github.ivere27:volvoxgrid-android-lite:0.4.0'
 }
 ```
 
@@ -52,7 +52,7 @@ For the Android example app (`make android-run`), use:
 
 - Normal (default): `make android-run`
 - Lite (local build): `make android-run VOLVOXGRID_VARIANT=lite`
-- Lite (Maven): `make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.3.0`
+- Lite (Maven): `make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.4.0`
 
 `VOLVOXGRID_VARIANT` only treats `lite` as special. Any other value falls back to normal.
 
@@ -436,12 +436,12 @@ double sum = ctrl.aggregate(AggregateType.AGG_SUM, 1, 1, 100, 1);
 //                           type                  row1 col1 row2 col2
 ```
 
-#### Save & Load
+#### Export & LoadData
 
 ```java
 ExportResponse exported = ctrl.saveGrid(ExportFormat.EXPORT_BINARY);
-ctrl.loadGrid(exported.getData().toByteArray(), ExportFormat.EXPORT_BINARY);
-// Formats: EXPORT_BINARY, EXPORT_TSV, EXPORT_CSV, EXPORT_SPREADSHEET_ML
+LoadDataResult loaded = ctrl.loadData("name,qty\napple,3\nbanana,5".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+// loadData parses CSV or JSON bytes; saveGrid remains export-only.
 ```
 
 #### Rendering

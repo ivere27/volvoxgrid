@@ -11,6 +11,10 @@
         android:checkable="true"
         android:title="Scroll Blit" />
     <item
+        android:id="@+id/action_edit"
+        android:checkable="true"
+        android:title="Edit" />
+    <item
         android:id="@+id/action_layer_selection"
         android:title="Layer Selection..." />
 </menu>

@@ -14,6 +14,11 @@ import { VolvoxGrid } from "../js/src/volvoxgrid.js";
 import { setupDefaultInput } from "../js/src/default-input.js";
 import { createCanvas2DTextRenderer } from "../js/src/canvas2d-text-renderer.js";
 import {
+  CellHitArea,
+  CellInteraction,
+  GridEventFields,
+} from "../js/src/generated/volvoxgrid_ffi.js";
+import {
   DoomRuntime,
   DOOM_LOCAL_SOURCE,
   DOOM_REMOTE_CONSENT_KEY,
@@ -29,7 +34,11 @@ type DoomTouchActionCode = "ControlLeft" | "Space" | "Enter";
 const STRESS_ROWS = 1_000_000;
 const STRESS_COLS = 12;
 const SALES_COLS = 10;
-const HIERARCHY_COLS = 5;
+const HIERARCHY_COLS = 6;
+const GRID_EVENT_CLICK = GridEventFields["click"];
+const HIERARCHY_ACTION_COL = 5;
+const CELL_INTERACTION_UNSPECIFIED = CellInteraction.CELL_INTERACTION_UNSPECIFIED;
+const CELL_HIT_AREA_TEXT = CellHitArea.HIT_TEXT;
 const FONT_FETCH_TIMEOUT_MS = 5000;
 const HOVER_NONE = 0;
 const HOVER_ROW = 1;
@@ -238,6 +247,97 @@ function pbEncodeSelectionHoverConfig(mode: number): Uint8Array {
   return new Uint8Array(gridConfig);
 }
 
+function pbReadVarint(data: Uint8Array, offset: number): { value: bigint; next: number } {
+  let value = 0n;
+  let shift = 0n;
+  let index = offset;
+  while (index < data.length) {
+    const byte = BigInt(data[index]);
+    index += 1;
+    value |= (byte & 0x7fn) << shift;
+    if ((byte & 0x80n) === 0n) {
+      return { value, next: index };
+    }
+    shift += 7n;
+  }
+  return { value, next: data.length };
+}
+
+function pbSkipField(data: Uint8Array, offset: number, wireType: number): number {
+  if (wireType === 0) {
+    return pbReadVarint(data, offset).next;
+  }
+  if (wireType === 2) {
+    const len = pbReadVarint(data, offset);
+    return Math.min(data.length, len.next + Number(len.value));
+  }
+  return data.length;
+}
+
+function pbAsInt32(value: bigint): number {
+  return Number(BigInt.asIntN(32, value));
+}
+
+function pbDecodeGridEventEnvelope(
+  data: Uint8Array,
+): { eventField: number; payload: Uint8Array } | null {
+  let offset = 0;
+  let eventField = 0;
+  let payload = new Uint8Array(0);
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+
+    if (wire === 2 && field >= 2 && field <= 60) {
+      const len = pbReadVarint(data, offset);
+      const size = Number(len.value);
+      if (!Number.isFinite(size) || size < 0) {
+        return null;
+      }
+      const start = len.next;
+      const end = Math.min(data.length, start + size);
+      eventField = field;
+      payload = data.slice(start, end);
+      offset = end;
+      continue;
+    }
+
+    offset = pbSkipField(data, offset, wire);
+  }
+
+  return eventField === 0 ? null : { eventField, payload };
+}
+
+function pbDecodeClickEventPayload(
+  data: Uint8Array,
+): { row: number; col: number; hitArea: number; interaction: number } {
+  let row = -1;
+  let col = -1;
+  let hitArea = 0;
+  let interaction = CELL_INTERACTION_UNSPECIFIED;
+  let offset = 0;
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (wire === 0) {
+      const value = pbReadVarint(data, offset);
+      const n = pbAsInt32(value.value);
+      offset = value.next;
+      if (field === 1) row = n;
+      if (field === 2) col = n;
+      if (field === 3) hitArea = n;
+      if (field === 4) interaction = n;
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  return { row, col, hitArea, interaction };
+}
+
 async function main() {
   const status = document.getElementById("status")!;
   const canvas = document.getElementById("grid-canvas") as HTMLCanvasElement;
@@ -364,6 +464,7 @@ async function main() {
     gridFontReadabilityBoostById.set(id, 1.0);
     applyRenderLayerMaskToGrid(id);
     setGridScrollBlit(id, scrollBlitEnabled);
+    setGridEditable(id, editEnabled);
     return id;
   };
 
@@ -406,12 +507,57 @@ async function main() {
   const demoInitialized: Partial<Record<StandardDemoMode, boolean>> = {};
   let activeRendererMode = 1; // CPU
   let scrollBlitEnabled = false;
+  let editEnabled = false;
   let doomGridId: number | null = null;
   const doomRuntime = new DoomRuntime();
   let doomJoystickPointerId: number | null = null;
   let doomJoystickDirection: DoomDirectionCode | null = null;
   const resetDoomActionButtons: Array<() => void> = [];
   let switchToken = 0;
+  let pendingHierarchyActionAlert = 0;
+
+  function drainHierarchyActionClickEvents(): void {
+    if (currentDemo !== "hierarchy") {
+      return;
+    }
+    const hierarchyGridId = demoGridIds.hierarchy;
+    if (typeof hierarchyGridId !== "number" || grid.id !== hierarchyGridId) {
+      return;
+    }
+    try {
+      const rawEvents = grid.drainEventStreamRaw(32);
+      for (const rawEvent of rawEvents) {
+        const decoded = pbDecodeGridEventEnvelope(rawEvent);
+        if (decoded == null || decoded.eventField !== GRID_EVENT_CLICK) {
+          continue;
+        }
+        const click = pbDecodeClickEventPayload(decoded.payload);
+        if (click.row < 0 || click.col !== HIERARCHY_ACTION_COL || click.hitArea !== CELL_HIT_AREA_TEXT) {
+          continue;
+        }
+        const rowLabel = click.row + 1;
+        window.alert(
+          "Hierarchy action click: row " + rowLabel
+            + ", col " + click.col
+            + ", hit_area " + click.hitArea
+            + ", interaction " + click.interaction,
+        );
+        break;
+      }
+    } catch (error) {
+      console.warn("VolvoxGrid demo: failed to drain click events", error);
+    }
+  }
+
+  function scheduleHierarchyActionClickAlert(): void {
+    if (currentDemo !== "hierarchy" || pendingHierarchyActionAlert !== 0) {
+      return;
+    }
+    pendingHierarchyActionAlert = window.setTimeout(() => {
+      pendingHierarchyActionAlert = 0;
+      drainHierarchyActionClickEvents();
+    }, 0);
+  }
 
   function normalizeLayerMask(raw: number): number {
     if (!Number.isFinite(raw)) {
@@ -589,7 +735,9 @@ async function main() {
   const chkScrollBlit = document.getElementById("chk-scroll-blit") as HTMLInputElement;
   const chkAnim = document.getElementById("chk-anim") as HTMLInputElement;
   const chkHover = document.getElementById("chk-hover") as HTMLInputElement;
+  const chkEdit = document.getElementById("chk-edit") as HTMLInputElement;
   chkScrollBlit.checked = scrollBlitEnabled;
+  chkEdit.checked = editEnabled;
   chkHover.checked = parseEnvBool(env?.VITE_VG_ENABLE_HOVER, false);
 
   function hoverModeForDemo(mode: StandardDemoMode): number {
@@ -618,6 +766,36 @@ async function main() {
       return;
     }
     setScrollBlit(id, enabled);
+  }
+
+  function setGridEditable(id: number, enabled: boolean): void {
+    const setEditTrigger = (wasmModule as any).set_edit_trigger as
+      | ((gridId: number, mode: number) => void)
+      | undefined;
+    const setEditableMode = (wasmModule as any).set_editable_mode as
+      | ((gridId: number, mode: number) => void)
+      | undefined;
+    const mode = enabled ? 2 : 0;
+    if (typeof setEditTrigger === "function") {
+      setEditTrigger(id, mode);
+    } else if (typeof setEditableMode === "function") {
+      setEditableMode(id, mode);
+    }
+  }
+
+  function applyEditableToKnownDemoGrids(): void {
+    for (const mode of Object.keys(demoGridIds) as StandardDemoMode[]) {
+      const id = demoGridIds[mode];
+      if (typeof id !== "number" || id <= 0) {
+        continue;
+      }
+      setGridEditable(id, editEnabled);
+    }
+    grid.invalidate();
+  }
+
+  function syncEditToggleEnabledState(): void {
+    chkEdit.disabled = currentDemo === "doom";
   }
 
   function applyHoverToggleToKnownGrids(): void {
@@ -697,6 +875,7 @@ async function main() {
   };
   buildLayerPanel();
   syncLayerCheckboxes();
+  syncEditToggleEnabledState();
 
   function setDoomOptionsVisible(visible: boolean) {
     doomRow.classList.toggle("hidden", !visible);
@@ -1229,6 +1408,7 @@ async function main() {
     setGridHoverMode(id, chkHover.checked ? hoverModeForDemo(mode) : HOVER_NONE);
     wasmModule.set_fast_scroll_enabled(id, true);
     applyDemoViewDefaults(mode);
+    setGridEditable(id, editEnabled);
     grid.invalidate();
     demoInitialized[mode] = true;
 
@@ -1334,6 +1514,7 @@ async function main() {
         return;
       }
       currentDemo = "doom";
+      syncEditToggleEnabledState();
       setDoomOptionsVisible(true);
       updateDoomTouchControlsVisibility();
       highlightDemoBtn("doom");
@@ -1352,6 +1533,7 @@ async function main() {
     applyActiveRenderSettings();
 
     currentDemo = mode;
+    syncEditToggleEnabledState();
     highlightDemoBtn(mode);
     dataRows = Math.max(0, grid.rowCount - 1);
 
@@ -1380,6 +1562,10 @@ async function main() {
 
   setDoomOptionsVisible(false);
   updateDoomTouchControlsVisibility();
+
+  canvas.addEventListener("click", () => {
+    scheduleHierarchyActionClickAlert();
+  });
 
   rebuildCanvasResolutionOptions(false);
   selCanvasRes.addEventListener("change", () => {
@@ -1661,6 +1847,14 @@ async function main() {
     applyScrollBlitToKnownGrids();
     applyActiveRenderSettings();
     grid.invalidate();
+  });
+
+  chkEdit.addEventListener("change", () => {
+    editEnabled = chkEdit.checked;
+    applyEditableToKnownDemoGrids();
+    if (currentDemo !== "doom") {
+      updateStatus(editEnabled ? "Edit enabled" : "Edit disabled");
+    }
   });
 
   // Animation toggle.

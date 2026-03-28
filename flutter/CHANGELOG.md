@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- Improved rendering performance with GTK/Linux GPU surface work and CPU/GPU scroll blitting.
+- Fixed selection, active-cell, IME, checkbox, scrollbar, and progress-bar editing issues.
+- Added layering work and expanded ActiveX test coverage.
+
 ## 0.3.0
 
 - Redesigned APIs.

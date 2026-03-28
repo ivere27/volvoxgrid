@@ -397,10 +397,10 @@ class VolvoxGridService {
         ExportResponse.fromBuffer,
       );
 
-  static Future<Empty> Import(ImportRequest request) => _invokeUnary(
-        _serviceMethodPath('Import'),
+  static Future<LoadDataResult> LoadData(LoadDataRequest request) => _invokeUnary(
+        _serviceMethodPath('LoadData'),
         request,
-        Empty.fromBuffer,
+        LoadDataResult.fromBuffer,
       );
 
   static Future<PrintResponse> Print(PrintRequest request) => _invokeUnary(

@@ -10,7 +10,7 @@
 //!    subtotals, merged cells, dropdowns, currency/percentage formats,
 //!    data bars, alternating row colors, explorer bar, outline bar.
 //!
-//! 2. **Hierarchy Showcase** (`setup_hierarchy_demo`) — ~200 rows, 5 columns,
+//! 2. **Hierarchy Showcase** (`setup_hierarchy_demo`) — ~200 rows, 6 columns,
 //!    simulated directory tree with outline levels, expand/collapse, indented
 //!    text, styled folder rows.
 //!
@@ -482,14 +482,15 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
     grid.columns[7].alignment = pb::Align::CenterCenter as i32;
     grid.columns[4].format = "$#,##0".to_string();
     grid.columns[5].format = "$#,##0".to_string();
+    // Select-only dropdown: no leading `|`.
     grid.columns[8].dropdown_items = "Active|Pending|Shipped|Returned|Cancelled".to_string();
     grid.columns[6].progress_color = SALES_THEME.accent;
 
     grid.allow_user_resizing = 3;
     grid.tab_behavior = 1;
-    grid.edit_trigger_mode = 2;
+    grid.edit_trigger_mode = 0; // read-only by default; host demos may enable edit
     grid.dropdown_trigger = 1;
-    grid.dropdown_search = true;
+    grid.dropdown_search = false;
     grid.fling_enabled = true;
     grid.fling_impulse_gain = 220.0;
     grid.fling_friction = 0.9;
@@ -661,8 +662,8 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
 // Demo 2: Hierarchy Showcase (~200 rows)
 // =====================================================================
 
-const HIERARCHY_HEADERS: [&str; 5] = ["Name", "Type", "Size", "Modified", "Permissions"];
-const HIERARCHY_COL_WIDTHS: [i32; 5] = [260, 80, 80, 120, 100];
+const HIERARCHY_HEADERS: [&str; 6] = ["Name", "Type", "Size", "Modified", "Permissions", "Action"];
+const HIERARCHY_COL_WIDTHS: [i32; 6] = [260, 80, 80, 120, 100, 92];
 
 struct DirEntry {
     name: &'static str,
@@ -688,7 +689,7 @@ pub fn setup_hierarchy_demo(grid: &mut VolvoxGrid) {
     let data_rows = entries.len() as i32;
 
     grid.set_rows(data_rows);
-    grid.set_cols(5);
+    grid.set_cols(HIERARCHY_HEADERS.len() as i32);
 
     // Column widths
     for (c, &w) in HIERARCHY_COL_WIDTHS.iter().enumerate() {
@@ -701,6 +702,8 @@ pub fn setup_hierarchy_demo(grid: &mut VolvoxGrid) {
     // Column alignments
     grid.columns[2].alignment = pb::Align::RightCenter as i32;
     grid.columns[4].alignment = pb::Align::CenterCenter as i32;
+    grid.columns[5].alignment = pb::Align::CenterCenter as i32;
+    grid.columns[5].interaction = pb::CellInteraction::TextLink as i32;
 
     // Alternating row color
     // Interaction defaults
@@ -734,6 +737,16 @@ pub fn setup_hierarchy_demo(grid: &mut VolvoxGrid) {
         }
         grid.cells.set_text(r, 3, entry.modified.to_string());
         grid.cells.set_text(r, 4, entry.perms.to_string());
+        grid.cells.set_text(
+            r,
+            5,
+            if entry.kind == "Folder" {
+                "Browse"
+            } else {
+                "Open"
+            }
+            .to_string(),
+        );
 
         // Set outline level (shift +1 so root-level folders at level 0
         // become level 1 and get +/- buttons from the renderer)
@@ -742,6 +755,15 @@ pub fn setup_hierarchy_demo(grid: &mut VolvoxGrid) {
         if entry.kind == "Folder" {
             props.is_subtotal = true;
         }
+
+        grid.cell_styles.insert(
+            (r, 5),
+            CellStylePatch {
+                fore_color: Some(0xFF2563EB),
+                font_bold: Some(false),
+                ..Default::default()
+            },
+        );
 
         // Style folders bold
         if entry.kind == "Folder" {
@@ -1131,6 +1153,7 @@ fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize
     grid.columns[2].format = "$#,##0".to_string(); // Currency
 
     // Dropdown list
+    // Select-only dropdown: no leading `|`.
     grid.columns[6].dropdown_items = "Option A|Option B|Option C|Option D|Option E".to_string();
 
     // Rating progress (data-bar)
@@ -1139,9 +1162,9 @@ fn setup_stress_grid(grid: &mut VolvoxGrid, data_rows: i32, cell_capacity: usize
     // Interaction defaults
     grid.allow_user_resizing = 3;
     grid.tab_behavior = 1;
-    grid.edit_trigger_mode = 2;
+    grid.edit_trigger_mode = 0; // read-only by default; host demos may enable edit
     grid.dropdown_trigger = 1;
-    grid.dropdown_search = true;
+    grid.dropdown_search = false;
     grid.fling_enabled = true;
     grid.fling_impulse_gain = 220.0;
     grid.fling_friction = 0.9;
@@ -1385,11 +1408,19 @@ mod tests {
         assert_eq!(grid.fixed_rows, 0);
         assert_eq!(grid.columns[0].caption, "Name");
         assert_eq!(grid.columns[4].caption, "Permissions");
+        assert_eq!(grid.columns[5].caption, "Action");
+        assert_eq!(
+            grid.columns[5].interaction,
+            pb::CellInteraction::TextLink as i32
+        );
         assert!(grid.indicator_bands.col_top.visible);
         assert!(!grid.indicator_bands.row_start.visible);
         assert_eq!(grid.indicator_bands.col_top.row_count(), 1);
         assert_eq!(grid.cells.get_text(0, 0), "Documents");
         assert_ne!(grid.cells.get_text(0, 0), "Name");
+        assert_eq!(grid.cells.get_text(0, 5), "Browse");
+        assert_eq!(grid.cells.get_text(2, 5), "Open");
+        assert_eq!(grid.get_cell_style(0, 5).font_underline, None);
     }
 
     #[test]

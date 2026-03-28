@@ -310,7 +310,7 @@ Scrolling and rendering properties:
 | Search | `FindRowByText`, `FindRowByRegex` |
 | Clipboard | `Copy`, `Cut`, `Paste`, `DeleteSelection` |
 | Editing | `BeginEdit`, `CommitEdit`, `CancelEdit` |
-| Import and export | `SaveGrid`, `LoadGrid`, `PrintGrid`, `Archive` |
+| Export and data loading | `SaveGrid`, `LoadData`, `PrintGrid`, `Archive` |
 | Repaint control | `SetRedraw`, `WithRedrawSuspended`, `Refresh`, `ResizeViewport` |
 
 Batch update tip:

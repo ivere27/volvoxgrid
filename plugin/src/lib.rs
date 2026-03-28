@@ -679,12 +679,6 @@ fn engine_event_to_proto(
                 text,
             }))
         }
-        E::CellButtonClick { row, col } => {
-            Some(grid_event::Event::CellButtonClick(CellButtonClickEvent {
-                row,
-                col,
-            }))
-        }
         E::KeyDownEdit { key_code, modifier } => {
             Some(grid_event::Event::KeyDownEdit(KeyDownEditEvent {
                 key_code,
@@ -855,8 +849,18 @@ fn engine_event_to_proto(
             x,
             y,
         })),
-        E::Click => Some(grid_event::Event::Click(ClickEvent {})),
-        E::DblClick => Some(grid_event::Event::DblClick(DblClickEvent {})),
+        E::Click {
+            row,
+            col,
+            hit_area,
+            interaction,
+        } => Some(grid_event::Event::Click(ClickEvent {
+            row,
+            col,
+            hit_area,
+            interaction,
+        })),
+        E::DblClick { row, col } => Some(grid_event::Event::DblClick(DblClickEvent { row, col })),
         E::KeyDown { key_code, modifier } => Some(grid_event::Event::KeyDown(KeyDownEvent {
             key_code,
             modifier,
@@ -1063,7 +1067,9 @@ fn maybe_render_editor_output(
     if row < 0 || col < 0 {
         return None;
     }
-    if prefer_combo && grid.edit.dropdown_count() > 0 {
+    let wants_combo_request =
+        grid.edit.dropdown_count() > 0 && (prefer_combo || !grid.edit.dropdown_editable);
+    if wants_combo_request {
         if let Some(req) = build_combo_request(grid, row, col) {
             return Some(RenderOutput {
                 rendered: false,
@@ -1175,16 +1181,22 @@ fn begin_edit_session_core_opts(
         return;
     }
 
+    let is_boolean_checkbox = row >= grid.fixed_rows
+        && row < grid.rows
+        && col >= 0
+        && col < grid.cols
+        && !grid.row_props.get(&row).map_or(false, |rp| rp.is_subtotal)
+        && grid.get_col_props(col).map_or(false, |cp| {
+            cp.data_type == ColumnDataType::ColumnDataBoolean as i32
+        });
+    if is_boolean_checkbox {
+        return;
+    }
+
     let combo_list = grid.active_dropdown_list(row, col);
     if emit_before_event {
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
-    }
-
-    if combo_list.trim() == "..." {
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::CellButtonClick { row, col });
-        return;
     }
 
     let stored_text = grid.cells.get_text(row, col).to_string();
@@ -1289,7 +1301,7 @@ fn apply_committed_edit_text(
     }
 
     let active_combo = grid.active_dropdown_list(row, col);
-    if !active_combo.is_empty() && active_combo.trim() != "..." {
+    if !active_combo.is_empty() {
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::DropdownClosed);
     }
@@ -1902,6 +1914,12 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         })
     }
 
+    fn load_data(&self, request: LoadDataRequest) -> PluginResult<LoadDataResult> {
+        self.with_grid(request.grid_id, |grid| {
+            volvoxgrid_engine::load::load_data(grid, &request.data, request.options.as_ref())
+        })
+    }
+
     fn clear(&self, request: ClearRequest) -> PluginResult<Empty> {
         self.with_grid(request.grid_id, |grid| {
             let (r1, c1, r2, c2) = match request.region {
@@ -2122,7 +2140,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         let active_combo =
                             grid.active_dropdown_list(grid.edit.edit_row, grid.edit.edit_col);
                         grid.edit.cancel();
-                        if !active_combo.is_empty() && active_combo.trim() != "..." {
+                        if !active_combo.is_empty() {
                             grid.events
                                 .push(volvoxgrid_engine::event::GridEventData::DropdownClosed);
                         }
@@ -2467,7 +2485,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         })
     }
 
-    // ── Import / Export ──
+    // ── Export / Print / Archive ──
 
     fn export(&self, request: ExportRequest) -> PluginResult<ExportResponse> {
         let data = self.with_grid(request.grid_id, |grid| {
@@ -2477,25 +2495,6 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
             data,
             format: request.format,
         })
-    }
-
-    fn import(&self, request: ImportRequest) -> PluginResult<Empty> {
-        self.with_grid(request.grid_id, |grid| {
-            if let Some(url) = &request.url {
-                if !url.is_empty() {
-                    volvoxgrid_engine::save::load_grid_url(
-                        grid,
-                        url,
-                        &request.data,
-                        request.format,
-                        request.scope,
-                    );
-                    return;
-                }
-            }
-            volvoxgrid_engine::save::load_grid(grid, &request.data, request.format, request.scope);
-        })?;
-        Ok(Empty {})
     }
 
     fn print(&self, request: PrintRequest) -> PluginResult<PrintResponse> {
@@ -3211,8 +3210,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                             } else {
                                                 String::new()
                                             };
-                                            let is_combo_cell = !combo_list.is_empty()
-                                                && combo_list.trim() != "...";
+                                            let is_combo_cell = !combo_list.is_empty();
 
                                             if hit.area
                                                 == volvoxgrid_engine::input::HitArea::DropdownButton

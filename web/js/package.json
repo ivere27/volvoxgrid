@@ -10,6 +10,20 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./generated/volvoxgrid_ffi.js": {
+      "types": "./dist/generated/volvoxgrid_ffi.d.ts",
+      "default": "./dist/generated/volvoxgrid_ffi.js"
+    },
+    "./default-input.js": {
+      "types": "./dist/default-input.d.ts",
+      "default": "./dist/default-input.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "build:wasm": "cd ../crate && rustup run nightly wasm-pack build . --target web --out-dir ../js/wasm",

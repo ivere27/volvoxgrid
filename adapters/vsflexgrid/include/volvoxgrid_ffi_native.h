@@ -123,6 +123,12 @@ uint8_t* volvox_grid_load_table_pb(
     int32_t* out_len
 );
 
+/* LoadData (protobuf input — has repeated/oneof fields) */
+uint8_t* volvox_grid_load_data_pb(
+    const uint8_t* data, int32_t data_len,
+    int32_t* out_len
+);
+
 /* Clear */
 uint8_t* volvox_grid_clear(
     int64_t grid_id,
@@ -275,12 +281,6 @@ uint8_t* volvox_grid_export(
     int64_t grid_id,
     int32_t format,
     int32_t scope,
-    int32_t* out_len
-);
-
-/* Import (protobuf input — has repeated/oneof fields) */
-uint8_t* volvox_grid_import_pb(
-    const uint8_t* data, int32_t data_len,
     int32_t* out_len
 );
 

@@ -412,6 +412,116 @@ class WriteErrorMode extends $pb.ProtobufEnum {
   const WriteErrorMode._(super.value, super.name);
 }
 
+class CellInteraction extends $pb.ProtobufEnum {
+  static const CellInteraction CELL_INTERACTION_UNSPECIFIED = CellInteraction._(
+      0, _omitEnumNames ? '' : 'CELL_INTERACTION_UNSPECIFIED');
+  static const CellInteraction CELL_INTERACTION_NONE =
+      CellInteraction._(1, _omitEnumNames ? '' : 'CELL_INTERACTION_NONE');
+  static const CellInteraction CELL_INTERACTION_TEXT_LINK =
+      CellInteraction._(2, _omitEnumNames ? '' : 'CELL_INTERACTION_TEXT_LINK');
+  static const CellInteraction CELL_INTERACTION_BUTTON =
+      CellInteraction._(3, _omitEnumNames ? '' : 'CELL_INTERACTION_BUTTON');
+
+  static const $core.List<CellInteraction> values = <CellInteraction>[
+    CELL_INTERACTION_UNSPECIFIED,
+    CELL_INTERACTION_NONE,
+    CELL_INTERACTION_TEXT_LINK,
+    CELL_INTERACTION_BUTTON,
+  ];
+
+  static final $core.List<CellInteraction?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static CellInteraction? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const CellInteraction._(super.value, super.name);
+}
+
+class HeaderPolicy extends $pb.ProtobufEnum {
+  static const HeaderPolicy HEADER_AUTO =
+      HeaderPolicy._(0, _omitEnumNames ? '' : 'HEADER_AUTO');
+  static const HeaderPolicy HEADER_NONE =
+      HeaderPolicy._(1, _omitEnumNames ? '' : 'HEADER_NONE');
+  static const HeaderPolicy HEADER_FIRST_ROW =
+      HeaderPolicy._(2, _omitEnumNames ? '' : 'HEADER_FIRST_ROW');
+
+  static const $core.List<HeaderPolicy> values = <HeaderPolicy>[
+    HEADER_AUTO,
+    HEADER_NONE,
+    HEADER_FIRST_ROW,
+  ];
+
+  static final $core.List<HeaderPolicy?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static HeaderPolicy? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const HeaderPolicy._(super.value, super.name);
+}
+
+class TypePolicy extends $pb.ProtobufEnum {
+  static const TypePolicy TYPE_AUTO_DETECT =
+      TypePolicy._(0, _omitEnumNames ? '' : 'TYPE_AUTO_DETECT');
+  static const TypePolicy TYPE_ALL_STRING =
+      TypePolicy._(1, _omitEnumNames ? '' : 'TYPE_ALL_STRING');
+  static const TypePolicy TYPE_FROM_SCHEMA =
+      TypePolicy._(2, _omitEnumNames ? '' : 'TYPE_FROM_SCHEMA');
+
+  static const $core.List<TypePolicy> values = <TypePolicy>[
+    TYPE_AUTO_DETECT,
+    TYPE_ALL_STRING,
+    TYPE_FROM_SCHEMA,
+  ];
+
+  static final $core.List<TypePolicy?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static TypePolicy? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const TypePolicy._(super.value, super.name);
+}
+
+class LoadMode extends $pb.ProtobufEnum {
+  static const LoadMode LOAD_REPLACE =
+      LoadMode._(0, _omitEnumNames ? '' : 'LOAD_REPLACE');
+  static const LoadMode LOAD_APPEND =
+      LoadMode._(1, _omitEnumNames ? '' : 'LOAD_APPEND');
+
+  static const $core.List<LoadMode> values = <LoadMode>[
+    LOAD_REPLACE,
+    LOAD_APPEND,
+  ];
+
+  static final $core.List<LoadMode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 1);
+  static LoadMode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const LoadMode._(super.value, super.name);
+}
+
+class LoadDataStatus extends $pb.ProtobufEnum {
+  static const LoadDataStatus LOAD_OK =
+      LoadDataStatus._(0, _omitEnumNames ? '' : 'LOAD_OK');
+  static const LoadDataStatus LOAD_PARTIAL =
+      LoadDataStatus._(1, _omitEnumNames ? '' : 'LOAD_PARTIAL');
+  static const LoadDataStatus LOAD_FAILED =
+      LoadDataStatus._(2, _omitEnumNames ? '' : 'LOAD_FAILED');
+
+  static const $core.List<LoadDataStatus> values = <LoadDataStatus>[
+    LOAD_OK,
+    LOAD_PARTIAL,
+    LOAD_FAILED,
+  ];
+
+  static final $core.List<LoadDataStatus?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static LoadDataStatus? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const LoadDataStatus._(super.value, super.name);
+}
+
 class SelectionMode extends $pb.ProtobufEnum {
   static const SelectionMode SELECTION_FREE =
       SelectionMode._(0, _omitEnumNames ? '' : 'SELECTION_FREE');
@@ -1252,6 +1362,37 @@ class IconAlign extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const IconAlign._(super.value, super.name);
+}
+
+class CellHitArea extends $pb.ProtobufEnum {
+  static const CellHitArea HIT_CELL =
+      CellHitArea._(0, _omitEnumNames ? '' : 'HIT_CELL');
+  static const CellHitArea HIT_TEXT =
+      CellHitArea._(1, _omitEnumNames ? '' : 'HIT_TEXT');
+  static const CellHitArea HIT_PICTURE =
+      CellHitArea._(2, _omitEnumNames ? '' : 'HIT_PICTURE');
+  static const CellHitArea HIT_BUTTON =
+      CellHitArea._(3, _omitEnumNames ? '' : 'HIT_BUTTON');
+  static const CellHitArea HIT_CHECKBOX =
+      CellHitArea._(4, _omitEnumNames ? '' : 'HIT_CHECKBOX');
+  static const CellHitArea HIT_DROPDOWN =
+      CellHitArea._(5, _omitEnumNames ? '' : 'HIT_DROPDOWN');
+
+  static const $core.List<CellHitArea> values = <CellHitArea>[
+    HIT_CELL,
+    HIT_TEXT,
+    HIT_PICTURE,
+    HIT_BUTTON,
+    HIT_CHECKBOX,
+    HIT_DROPDOWN,
+  ];
+
+  static final $core.List<CellHitArea?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
+  static CellHitArea? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const CellHitArea._(super.value, super.name);
 }
 
 /// ── Render layer bit positions (for render_layer_mask bitmask) ──

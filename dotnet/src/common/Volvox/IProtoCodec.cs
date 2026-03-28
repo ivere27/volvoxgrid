@@ -58,7 +58,7 @@ namespace VolvoxGrid.DotNet.Internal
 
         byte[] EncodeExportRequest(long gridId, VolvoxExportFormat format, VolvoxExportScope scope);
         VolvoxExportResponseData DecodeExportResponse(byte[] payload);
-        byte[] EncodeImportRequest(long gridId, byte[] data, VolvoxExportFormat format, VolvoxExportScope scope);
+        byte[] EncodeLoadDataRequest(long gridId, byte[] data);
         byte[] EncodePrintRequest(long gridId, bool landscape, int marginL, int marginT, int marginR, int marginB, string header, string footer, bool showPageNumbers);
         byte[] EncodeArchiveRequest(long gridId, VolvoxArchiveAction action, string name, byte[] data);
         VolvoxArchiveResponseData DecodeArchiveResponse(byte[] payload);

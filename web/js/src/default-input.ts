@@ -47,7 +47,8 @@ function isPrintableEditKey(e: KeyboardEvent): boolean {
 /**
  * Attach a default keyboard handler that:
  * - Navigates with arrow/tab/page/home/end keys
- * - Starts editing on printable key press
+ * - Forwards printable characters via handle_key_press so the engine decides
+ *   whether to edit, toggle, or ignore them
  * - Forwards all keys to the engine via handle_key_down
  *
  * Returns a cleanup function to remove the listener.
@@ -57,36 +58,26 @@ export function setupDefaultKeyboard(
   wasm: any,
   canvas: HTMLCanvasElement,
 ): () => void {
-  const gridId = grid.id;
-
   const onKeyDown = (e: KeyboardEvent): void => {
+    const gridId = grid.id;
+
     if (NAV_KEYS.has(e.key)) {
       e.preventDefault();
     }
 
-    // Printable key starts edit mode and seeds the first character.
-    // suppressEditorSelect prevents editInput.select() from selecting
-    // the seeded character (which would cause "abc" → "bc").
-    if (!wasm.is_editing(gridId) && isPrintableEditKey(e)) {
-      if (typeof wasm.begin_edit_at_selection === "function") {
-        (grid as any).suppressEditorSelect = true;
-        wasm.begin_edit_at_selection(gridId);
-        if (wasm.is_editing(gridId)) {
-          wasm.set_edit_text(gridId, e.key);
-          if (typeof wasm.set_edit_selection === "function") {
-            wasm.set_edit_selection(gridId, 1, 0);
-          }
-          grid.invalidate();
-          e.preventDefault();
-          requestAnimationFrame(() => { (grid as any).suppressEditorSelect = false; });
-          return;
-        }
-        (grid as any).suppressEditorSelect = false;
-      }
+    const printable = isPrintableEditKey(e);
+    if (printable) {
+      e.preventDefault();
     }
 
     const modifier = modifierBits(e);
     wasm.handle_key_down(gridId, e.keyCode, modifier);
+    if (printable && typeof wasm.handle_key_press === "function") {
+      const charCode = e.key.codePointAt(0);
+      if (charCode != null) {
+        wasm.handle_key_press(gridId, charCode);
+      }
+    }
     grid.invalidate();
   };
 
@@ -105,7 +96,6 @@ export function setupDefaultContextMenu(
   wasm: any,
   canvas: HTMLCanvasElement,
 ): () => void {
-  const gridId = grid.id;
   let menuEl: HTMLDivElement | null = null;
   let dismissHandler: ((e: Event) => void) | null = null;
   let escHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -139,6 +129,7 @@ export function setupDefaultContextMenu(
     e.preventDefault();
     dismiss();
 
+    const gridId = grid.id;
     const me = e as MouseEvent;
     const row = Number(wasm.get_mouse_row(gridId));
     const col = Number(wasm.get_mouse_col(gridId));
@@ -146,6 +137,7 @@ export function setupDefaultContextMenu(
     const fixedCols = Number(wasm.get_fixed_cols(gridId));
     const isDataRow = row >= fixedRows;
     const isDataCol = col >= fixedCols;
+    const rowLabel = isDataRow ? Math.max(1, row - fixedRows + 1) : row;
 
     const menu = document.createElement("div");
     Object.assign(menu.style, {
@@ -166,18 +158,18 @@ export function setupDefaultContextMenu(
     // Row pin items (only for data rows)
     if (isDataRow && row >= 0) {
       const pinned = typeof wasm.is_row_pinned === "function" ? Number(wasm.is_row_pinned(gridId, row)) : 0;
-      if (pinned !== 1) addItem(menu, `Pin Row ${row} to Top`, () => grid.pinRow(row, 1));
-      if (pinned !== 2) addItem(menu, `Pin Row ${row} to Bottom`, () => grid.pinRow(row, 2));
-      addItem(menu, `Unpin Row ${row}`, () => grid.pinRow(row, 0));
+      if (pinned !== 1) addItem(menu, "Pin Row " + rowLabel + " to Top", () => grid.pinRow(row, 1));
+      if (pinned !== 2) addItem(menu, "Pin Row " + rowLabel + " to Bottom", () => grid.pinRow(row, 2));
+      addItem(menu, "Unpin Row " + rowLabel, () => grid.pinRow(row, 0));
 
       addSeparator(menu);
 
       // Row sticky items
       const stickyRow = typeof wasm.get_row_sticky === "function" ? Number(wasm.get_row_sticky(gridId, row)) : 0;
-      if (stickyRow !== 1) addItem(menu, `Sticky Row ${row} to Top`, () => grid.setRowSticky(row, 1));
-      if (stickyRow !== 2) addItem(menu, `Sticky Row ${row} to Bottom`, () => grid.setRowSticky(row, 2));
-      if (stickyRow !== 5) addItem(menu, `Sticky Row ${row} Both`, () => grid.setRowSticky(row, 5));
-      addItem(menu, `Unsticky Row ${row}`, () => grid.setRowSticky(row, 0));
+      if (stickyRow !== 1) addItem(menu, "Sticky Row " + rowLabel + " to Top", () => grid.setRowSticky(row, 1));
+      if (stickyRow !== 2) addItem(menu, "Sticky Row " + rowLabel + " to Bottom", () => grid.setRowSticky(row, 2));
+      if (stickyRow !== 5) addItem(menu, "Sticky Row " + rowLabel + " Both", () => grid.setRowSticky(row, 5));
+      addItem(menu, "Unsticky Row " + rowLabel, () => grid.setRowSticky(row, 0));
     }
 
     // Column sticky items (for data columns)

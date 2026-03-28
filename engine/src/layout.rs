@@ -6,6 +6,9 @@ pub struct LayoutCache {
     pub total_width: i32,
     pub total_height: i32,
     pub valid: bool,
+    /// Monotonically increasing counter, bumped on every `invalidate()`.
+    /// Used as a cache key for render context reuse.
+    pub generation: u64,
     pub rows: i32,
     pub cols: i32,
     pub uniform_rows: bool,
@@ -22,6 +25,7 @@ impl LayoutCache {
             total_width: 0,
             total_height: 0,
             valid: false,
+            generation: 0,
             rows: 0,
             cols: 0,
             uniform_rows: false,
@@ -38,6 +42,7 @@ impl LayoutCache {
 
     pub fn invalidate(&mut self) {
         self.valid = false;
+        self.generation = self.generation.wrapping_add(1);
     }
 
     fn row_count(&self) -> i32 {

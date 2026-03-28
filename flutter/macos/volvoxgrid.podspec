@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'volvoxgrid'
-  s.version          = '0.3.0'
+  s.version          = '0.4.0'
   s.summary          = 'VolvoxGrid pixel-rendering grid widget for Flutter.'
   s.description      = <<-DESC
 VolvoxGrid pixel-rendering grid widget for Flutter.
@@ -33,7 +33,7 @@ set -eu
 PACKAGE_ROOT="${PODS_TARGET_SRCROOT}"
 PLUGIN_ROOT="${PACKAGE_ROOT}/.."
 VOLVOXGRID_SOURCE="${VOLVOXGRID_SOURCE:-maven}"
-VOLVOXGRID_VERSION="${VOLVOXGRID_VERSION:-0.3.0}"
+VOLVOXGRID_VERSION="${VOLVOXGRID_VERSION:-0.4.0}"
 
 if [ "${VOLVOXGRID_SOURCE}" != "maven" ]; then
   exit 0

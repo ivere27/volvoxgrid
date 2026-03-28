@@ -1,3 +1,25 @@
+import {
+  AfterSortEventFields,
+  AfterUserResizeEventFields,
+  BorderFields,
+  BordersFields,
+  CellRangeFields,
+  CellStyleFields,
+  CellUpdateFields,
+  CellValueFields,
+  ColumnDataType,
+  ColumnDefFields,
+  DefineColumnsRequestFields,
+  ExportResponseFields,
+  FontFields,
+  GridEventFields,
+  LoadTableRequestFields,
+  PaddingFields,
+  SelectRequestFields,
+  SelectionStateFields,
+  UpdateCellsRequestFields,
+} from "volvoxgrid/generated/volvoxgrid_ffi.js";
+
 export interface SelectionState {
   row: number;
   col: number;
@@ -26,6 +48,12 @@ export interface GridEventEnvelope {
 }
 
 const TEXT_ENCODER = new TextEncoder();
+
+const GRID_EVENT_PAYLOAD_FIELDS: ReadonlySet<number> = new Set<number>(
+  (Object.values(GridEventFields) as number[]).filter(
+    (field) => field !== GridEventFields.grid_id && field !== GridEventFields.event_id,
+  ),
+);
 
 function encodeVarintUnsigned(value: bigint): number[] {
   const out: number[] = [];
@@ -119,30 +147,37 @@ interface BordersArg {
 
 function encodeFont(font: FontArg): number[] {
   const out: number[] = [];
-  if (font.family != null) out.push(...encodeStringField(1, font.family));
-  if (font.size != null) out.push(...encodeTag(3, 5), ...encodeFloat(font.size));
-  if (font.bold != null) out.push(...encodeTag(4, 0), ...encodeBool(font.bold));
-  if (font.italic != null) out.push(...encodeTag(5, 0), ...encodeBool(font.italic));
-  if (font.underline != null) out.push(...encodeTag(6, 0), ...encodeBool(font.underline));
-  if (font.strikethrough != null) out.push(...encodeTag(7, 0), ...encodeBool(font.strikethrough));
-  if (font.width != null) out.push(...encodeTag(8, 5), ...encodeFloat(font.width));
+  if (font.family != null) out.push(...encodeStringField(FontFields.family, font.family));
+  if (font.size != null) out.push(...encodeTag(FontFields.size, 5), ...encodeFloat(font.size));
+  if (font.bold != null) out.push(...encodeTag(FontFields.bold, 0), ...encodeBool(font.bold));
+  if (font.italic != null) out.push(...encodeTag(FontFields.italic, 0), ...encodeBool(font.italic));
+  if (font.underline != null) out.push(...encodeTag(FontFields.underline, 0), ...encodeBool(font.underline));
+  if (font.strikethrough != null) out.push(...encodeTag(FontFields.strikethrough, 0), ...encodeBool(font.strikethrough));
+  if (font.width != null) out.push(...encodeTag(FontFields.width, 5), ...encodeFloat(font.width));
   return out;
 }
 
 function encodeBorder(border: BorderArg): number[] {
   const out: number[] = [];
-  if (border.style != null) out.push(...encodeTag(1, 0), ...encodeInt32(border.style));
-  if (border.color != null) out.push(...encodeTag(2, 0), ...encodeVarintUnsigned(BigInt(border.color >>> 0)));
+  if (border.style != null) out.push(...encodeTag(BorderFields.style, 0), ...encodeInt32(border.style));
+  if (border.color != null) {
+    out.push(
+      ...encodeTag(BorderFields.color, 0),
+      ...encodeVarintUnsigned(BigInt(border.color >>> 0)),
+    );
+  }
   return out;
 }
 
 function encodeBorders(borders: BordersArg): number[] {
   const out: number[] = [];
-  if (borders.all) out.push(...encodeMessageField(1, encodeBorder(borders.all)));
-  if (borders.top) out.push(...encodeMessageField(2, encodeBorder(borders.top)));
-  if (borders.right) out.push(...encodeMessageField(3, encodeBorder(borders.right)));
-  if (borders.bottom) out.push(...encodeMessageField(4, encodeBorder(borders.bottom)));
-  if (borders.left) out.push(...encodeMessageField(5, encodeBorder(borders.left)));
+  if (borders.all) out.push(...encodeMessageField(BordersFields.all, encodeBorder(borders.all)));
+  if (borders.top) out.push(...encodeMessageField(BordersFields.top, encodeBorder(borders.top)));
+  if (borders.right) out.push(...encodeMessageField(BordersFields.right, encodeBorder(borders.right)));
+  if (borders.bottom) {
+    out.push(...encodeMessageField(BordersFields.bottom, encodeBorder(borders.bottom)));
+  }
+  if (borders.left) out.push(...encodeMessageField(BordersFields.left, encodeBorder(borders.left)));
   return out;
 }
 
@@ -153,34 +188,34 @@ function encodeCellValue(value: unknown): number[] {
   if (typeof value === "string") {
     const text = encodeString(value);
     return [
-      ...encodeTag(1, 2),
+      ...encodeTag(CellValueFields.text, 2),
       ...encodeVarintUnsigned(BigInt(text.length)),
       ...text,
     ];
   }
   if (typeof value === "number") {
     return [
-      ...encodeTag(2, 1),
+      ...encodeTag(CellValueFields.number, 1),
       ...encodeDouble(value),
     ];
   }
   if (typeof value === "boolean") {
     return [
-      ...encodeTag(3, 0),
+      ...encodeTag(CellValueFields.flag, 0),
       ...encodeBool(value),
     ];
   }
   if (value instanceof Uint8Array) {
     const bytes = encodeBytes(value);
     return [
-      ...encodeTag(4, 2),
+      ...encodeTag(CellValueFields.raw, 2),
       ...encodeVarintUnsigned(BigInt(bytes.length)),
       ...bytes,
     ];
   }
   if (value instanceof Date) {
     return [
-      ...encodeTag(5, 0),
+      ...encodeTag(CellValueFields.timestamp, 0),
       ...encodeInt64(value.getTime()),
     ];
   }
@@ -197,25 +232,21 @@ export function encodeLoadTableRequest(args: {
   const out: number[] = [];
   const total = Math.max(0, args.rows) * Math.max(0, args.cols);
 
-  // LoadTableRequest.grid_id = 1
-  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
-  // LoadTableRequest.rows = 2
-  out.push(...encodeTag(2, 0), ...encodeInt32(args.rows));
-  // LoadTableRequest.cols = 3
-  out.push(...encodeTag(3, 0), ...encodeInt32(args.cols));
+  out.push(...encodeTag(LoadTableRequestFields.grid_id, 0), ...encodeInt64(args.gridId));
+  out.push(...encodeTag(LoadTableRequestFields.rows, 0), ...encodeInt32(args.rows));
+  out.push(...encodeTag(LoadTableRequestFields.cols, 0), ...encodeInt32(args.cols));
 
   for (let i = 0; i < total; i += 1) {
     const cell = encodeCellValue(args.values[i]);
     out.push(
-      ...encodeTag(4, 2),
+      ...encodeTag(LoadTableRequestFields.values, 2),
       ...encodeVarintUnsigned(BigInt(cell.length)),
       ...cell,
     );
   }
 
   if (args.atomic) {
-    // LoadTableRequest.atomic = 5
-    out.push(...encodeTag(5, 0), ...encodeBool(true));
+    out.push(...encodeTag(LoadTableRequestFields.atomic, 0), ...encodeBool(true));
   }
 
   return new Uint8Array(out);
@@ -223,10 +254,10 @@ export function encodeLoadTableRequest(args: {
 
 function encodeCellRange(row1: number, col1: number, row2: number, col2: number): number[] {
   const out: number[] = [];
-  out.push(...encodeTag(1, 0), ...encodeInt32(row1));
-  out.push(...encodeTag(2, 0), ...encodeInt32(col1));
-  out.push(...encodeTag(3, 0), ...encodeInt32(row2));
-  out.push(...encodeTag(4, 0), ...encodeInt32(col2));
+  out.push(...encodeTag(CellRangeFields.row1, 0), ...encodeInt32(row1));
+  out.push(...encodeTag(CellRangeFields.col1, 0), ...encodeInt32(col1));
+  out.push(...encodeTag(CellRangeFields.row2, 0), ...encodeInt32(row2));
+  out.push(...encodeTag(CellRangeFields.col2, 0), ...encodeInt32(col2));
   return out;
 }
 
@@ -241,16 +272,17 @@ export function encodeSelectRequest(args: {
   const out: number[] = [];
   const rowEnd = args.rowEnd ?? args.row;
   const colEnd = args.colEnd ?? args.col;
-  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
-  // SelectRequest.active_row = 2
-  out.push(...encodeTag(2, 0), ...encodeInt32(args.row));
-  // SelectRequest.active_col = 3
-  out.push(...encodeTag(3, 0), ...encodeInt32(args.col));
-  // SelectRequest.ranges = 4 (single-range compatibility)
-  out.push(...encodeMessageField(4, encodeCellRange(args.row, args.col, rowEnd, colEnd)));
+  out.push(...encodeTag(SelectRequestFields.grid_id, 0), ...encodeInt64(args.gridId));
+  out.push(...encodeTag(SelectRequestFields.active_row, 0), ...encodeInt32(args.row));
+  out.push(...encodeTag(SelectRequestFields.active_col, 0), ...encodeInt32(args.col));
+  out.push(
+    ...encodeMessageField(
+      SelectRequestFields.ranges,
+      encodeCellRange(args.row, args.col, rowEnd, colEnd),
+    ),
+  );
   if (args.show != null) {
-    // SelectRequest.show = 5
-    out.push(...encodeTag(5, 0), ...encodeBool(args.show));
+    out.push(...encodeTag(SelectRequestFields.show, 0), ...encodeBool(args.show));
   }
   return new Uint8Array(out);
 }
@@ -260,18 +292,21 @@ export function encodeDefineBooleanColumnsRequest(args: {
   columnIndices: number[];
 }): Uint8Array {
   const out: number[] = [];
-  // DefineColumnsRequest.grid_id = 1
-  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
+  out.push(...encodeTag(DefineColumnsRequestFields.grid_id, 0), ...encodeInt64(args.gridId));
 
   for (const idx of args.columnIndices) {
     const colDef: number[] = [];
-    // ColumnDef.index = 1
-    colDef.push(...encodeTag(1, 0), ...encodeInt32(idx));
-    // ColumnDef.data_type = 7 (COLUMN_DATA_BOOLEAN = 3)
-    colDef.push(...encodeTag(7, 0), ...encodeInt32(3));
+    colDef.push(...encodeTag(ColumnDefFields.index, 0), ...encodeInt32(idx));
+    colDef.push(
+      ...encodeTag(ColumnDefFields.data_type, 0),
+      ...encodeInt32(ColumnDataType.COLUMN_DATA_BOOLEAN),
+    );
 
-    // DefineColumnsRequest.columns = 2
-    out.push(...encodeTag(2, 2), ...encodeVarintUnsigned(BigInt(colDef.length)), ...colDef);
+    out.push(
+      ...encodeTag(DefineColumnsRequestFields.columns, 2),
+      ...encodeVarintUnsigned(BigInt(colDef.length)),
+      ...colDef,
+    );
   }
 
   return new Uint8Array(out);
@@ -284,22 +319,24 @@ export function encodeDefineColumnAlignmentsRequest(args: {
   fixedAlignment?: number;
 }): Uint8Array {
   const out: number[] = [];
-  // DefineColumnsRequest.grid_id = 1
-  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
+  out.push(...encodeTag(DefineColumnsRequestFields.grid_id, 0), ...encodeInt64(args.gridId));
 
   for (const idx of args.columnIndices) {
     const colDef: number[] = [];
-    // ColumnDef.index = 1
-    colDef.push(...encodeTag(1, 0), ...encodeInt32(idx));
-    // ColumnDef.alignment = 5
-    colDef.push(...encodeTag(5, 0), ...encodeInt32(args.alignment));
+    colDef.push(...encodeTag(ColumnDefFields.index, 0), ...encodeInt32(idx));
+    colDef.push(...encodeTag(ColumnDefFields.align, 0), ...encodeInt32(args.alignment));
     if (typeof args.fixedAlignment === "number") {
-      // ColumnDef.fixed_alignment = 6
-      colDef.push(...encodeTag(6, 0), ...encodeInt32(args.fixedAlignment));
+      colDef.push(
+        ...encodeTag(ColumnDefFields.fixed_align, 0),
+        ...encodeInt32(args.fixedAlignment),
+      );
     }
 
-    // DefineColumnsRequest.columns = 2
-    out.push(...encodeTag(2, 2), ...encodeVarintUnsigned(BigInt(colDef.length)), ...colDef);
+    out.push(
+      ...encodeTag(DefineColumnsRequestFields.columns, 2),
+      ...encodeVarintUnsigned(BigInt(colDef.length)),
+      ...colDef,
+    );
   }
 
   return new Uint8Array(out);
@@ -310,21 +347,16 @@ export function encodeUpdateCheckedCellsRequest(args: {
   updates: Array<{ row: number; col: number; checked: number }>;
 }): Uint8Array {
   const out: number[] = [];
-  // UpdateCellsRequest.grid_id = 1
-  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
+  out.push(...encodeTag(UpdateCellsRequestFields.grid_id, 0), ...encodeInt64(args.gridId));
 
   for (const update of args.updates) {
     const cellUpdate: number[] = [];
-    // CellUpdate.row = 1
-    cellUpdate.push(...encodeTag(1, 0), ...encodeInt32(update.row));
-    // CellUpdate.col = 2
-    cellUpdate.push(...encodeTag(2, 0), ...encodeInt32(update.col));
-    // CellUpdate.checked = 5 (CHECKED_UNCHECKED=0, CHECKED_CHECKED=1)
-    cellUpdate.push(...encodeTag(5, 0), ...encodeInt32(update.checked));
+    cellUpdate.push(...encodeTag(CellUpdateFields.row, 0), ...encodeInt32(update.row));
+    cellUpdate.push(...encodeTag(CellUpdateFields.col, 0), ...encodeInt32(update.col));
+    cellUpdate.push(...encodeTag(CellUpdateFields.checked, 0), ...encodeInt32(update.checked));
 
-    // UpdateCellsRequest.cells = 2
     out.push(
-      ...encodeTag(2, 2),
+      ...encodeTag(UpdateCellsRequestFields.cells, 2),
       ...encodeVarintUnsigned(BigInt(cellUpdate.length)),
       ...cellUpdate,
     );
@@ -338,28 +370,26 @@ export function encodeUpdateBoldCellsRequest(args: {
   updates: Array<{ row: number; col: number; bold: boolean }>;
 }): Uint8Array {
   const out: number[] = [];
-  // UpdateCellsRequest.grid_id = 1
-  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
+  out.push(...encodeTag(UpdateCellsRequestFields.grid_id, 0), ...encodeInt64(args.gridId));
 
   for (const update of args.updates) {
     const style: number[] = [];
     const font = encodeFont({ bold: update.bold });
     if (font.length > 0) {
-      // CellStyle.font = 4
-      style.push(...encodeMessageField(4, font));
+      style.push(...encodeMessageField(CellStyleFields.font, font));
     }
 
     const cellUpdate: number[] = [];
-    // CellUpdate.row = 1
-    cellUpdate.push(...encodeTag(1, 0), ...encodeInt32(update.row));
-    // CellUpdate.col = 2
-    cellUpdate.push(...encodeTag(2, 0), ...encodeInt32(update.col));
-    // CellUpdate.style = 4
-    cellUpdate.push(...encodeTag(4, 2), ...encodeVarintUnsigned(BigInt(style.length)), ...style);
+    cellUpdate.push(...encodeTag(CellUpdateFields.row, 0), ...encodeInt32(update.row));
+    cellUpdate.push(...encodeTag(CellUpdateFields.col, 0), ...encodeInt32(update.col));
+    cellUpdate.push(
+      ...encodeTag(CellUpdateFields.style, 2),
+      ...encodeVarintUnsigned(BigInt(style.length)),
+      ...style,
+    );
 
-    // UpdateCellsRequest.cells = 2
     out.push(
-      ...encodeTag(2, 2),
+      ...encodeTag(UpdateCellsRequestFields.cells, 2),
       ...encodeVarintUnsigned(BigInt(cellUpdate.length)),
       ...cellUpdate,
     );
@@ -382,32 +412,29 @@ export function encodeUpdateCellPaddingRequest(args: {
   updates: CellPaddingUpdate[];
 }): Uint8Array {
   const out: number[] = [];
-  // UpdateCellsRequest.grid_id = 1
-  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
+  out.push(...encodeTag(UpdateCellsRequestFields.grid_id, 0), ...encodeInt64(args.gridId));
 
   for (const update of args.updates) {
     const padding: number[] = [];
-    // Padding fields (left=1, top=2, right=3, bottom=4)
-    padding.push(...encodeTag(1, 0), ...encodeInt32(update.left));
-    padding.push(...encodeTag(2, 0), ...encodeInt32(update.top));
-    padding.push(...encodeTag(3, 0), ...encodeInt32(update.right));
-    padding.push(...encodeTag(4, 0), ...encodeInt32(update.bottom));
+    padding.push(...encodeTag(PaddingFields.left, 0), ...encodeInt32(update.left));
+    padding.push(...encodeTag(PaddingFields.top, 0), ...encodeInt32(update.top));
+    padding.push(...encodeTag(PaddingFields.right, 0), ...encodeInt32(update.right));
+    padding.push(...encodeTag(PaddingFields.bottom, 0), ...encodeInt32(update.bottom));
 
     const style: number[] = [];
-    // CellStyle.padding = 5
-    style.push(...encodeMessageField(5, padding));
+    style.push(...encodeMessageField(CellStyleFields.padding, padding));
 
     const cellUpdate: number[] = [];
-    // CellUpdate.row = 1
-    cellUpdate.push(...encodeTag(1, 0), ...encodeInt32(update.row));
-    // CellUpdate.col = 2
-    cellUpdate.push(...encodeTag(2, 0), ...encodeInt32(update.col));
-    // CellUpdate.style = 4
-    cellUpdate.push(...encodeTag(4, 2), ...encodeVarintUnsigned(BigInt(style.length)), ...style);
+    cellUpdate.push(...encodeTag(CellUpdateFields.row, 0), ...encodeInt32(update.row));
+    cellUpdate.push(...encodeTag(CellUpdateFields.col, 0), ...encodeInt32(update.col));
+    cellUpdate.push(
+      ...encodeTag(CellUpdateFields.style, 2),
+      ...encodeVarintUnsigned(BigInt(style.length)),
+      ...style,
+    );
 
-    // UpdateCellsRequest.cells = 2
     out.push(
-      ...encodeTag(2, 2),
+      ...encodeTag(UpdateCellsRequestFields.cells, 2),
       ...encodeVarintUnsigned(BigInt(cellUpdate.length)),
       ...cellUpdate,
     );
@@ -440,8 +467,7 @@ export function encodeUpdateCellBordersRequest(args: {
   updates: CellBorderUpdate[];
 }): Uint8Array {
   const out: number[] = [];
-  // UpdateCellsRequest.grid_id = 1
-  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
+  out.push(...encodeTag(UpdateCellsRequestFields.grid_id, 0), ...encodeInt64(args.gridId));
 
   for (const update of args.updates) {
     const style: number[] = [];
@@ -453,24 +479,19 @@ export function encodeUpdateCellBordersRequest(args: {
     ) {
       const padding: number[] = [];
       if (typeof update.left === "number") {
-        // Padding.left = 1
-        padding.push(...encodeTag(1, 0), ...encodeInt32(update.left));
+        padding.push(...encodeTag(PaddingFields.left, 0), ...encodeInt32(update.left));
       }
       if (typeof update.top === "number") {
-        // Padding.top = 2
-        padding.push(...encodeTag(2, 0), ...encodeInt32(update.top));
+        padding.push(...encodeTag(PaddingFields.top, 0), ...encodeInt32(update.top));
       }
       if (typeof update.right === "number") {
-        // Padding.right = 3
-        padding.push(...encodeTag(3, 0), ...encodeInt32(update.right));
+        padding.push(...encodeTag(PaddingFields.right, 0), ...encodeInt32(update.right));
       }
       if (typeof update.bottom === "number") {
-        // Padding.bottom = 4
-        padding.push(...encodeTag(4, 0), ...encodeInt32(update.bottom));
+        padding.push(...encodeTag(PaddingFields.bottom, 0), ...encodeInt32(update.bottom));
       }
       if (padding.length > 0) {
-        // CellStyle.padding = 5
-        style.push(...encodeMessageField(5, padding));
+        style.push(...encodeMessageField(CellStyleFields.padding, padding));
       }
     }
     const borders: BordersArg = {};
@@ -506,8 +527,7 @@ export function encodeUpdateCellBordersRequest(args: {
     }
     const bordersPayload = encodeBorders(borders);
     if (bordersPayload.length > 0) {
-      // CellStyle.borders = 6
-      style.push(...encodeMessageField(6, bordersPayload));
+      style.push(...encodeMessageField(CellStyleFields.borders, bordersPayload));
     }
 
     if (style.length === 0) {
@@ -515,16 +535,16 @@ export function encodeUpdateCellBordersRequest(args: {
     }
 
     const cellUpdate: number[] = [];
-    // CellUpdate.row = 1
-    cellUpdate.push(...encodeTag(1, 0), ...encodeInt32(update.row));
-    // CellUpdate.col = 2
-    cellUpdate.push(...encodeTag(2, 0), ...encodeInt32(update.col));
-    // CellUpdate.style = 4
-    cellUpdate.push(...encodeTag(4, 2), ...encodeVarintUnsigned(BigInt(style.length)), ...style);
+    cellUpdate.push(...encodeTag(CellUpdateFields.row, 0), ...encodeInt32(update.row));
+    cellUpdate.push(...encodeTag(CellUpdateFields.col, 0), ...encodeInt32(update.col));
+    cellUpdate.push(
+      ...encodeTag(CellUpdateFields.style, 2),
+      ...encodeVarintUnsigned(BigInt(style.length)),
+      ...style,
+    );
 
-    // UpdateCellsRequest.cells = 2
     out.push(
-      ...encodeTag(2, 2),
+      ...encodeTag(UpdateCellsRequestFields.cells, 2),
       ...encodeVarintUnsigned(BigInt(cellUpdate.length)),
       ...cellUpdate,
     );
@@ -596,10 +616,10 @@ function decodeCellRange(data: Uint8Array): CellRangePayload {
       const value = readVarint(data, offset);
       offset = value.next;
       const n = asInt32(value.value);
-      if (field === 1) out.row1 = n;
-      if (field === 2) out.col1 = n;
-      if (field === 3) out.row2 = n;
-      if (field === 4) out.col2 = n;
+      if (field === CellRangeFields.row1) out.row1 = n;
+      if (field === CellRangeFields.col1) out.col1 = n;
+      if (field === CellRangeFields.row2) out.row2 = n;
+      if (field === CellRangeFields.col2) out.col2 = n;
       continue;
     }
     offset = skipField(data, offset, wire);
@@ -631,7 +651,7 @@ export function decodeSelectionState(data: Uint8Array): SelectionState {
     const field = Number(tag.value >> 3n);
     const wire = Number(tag.value & 0x7n);
 
-    if (field === 3 && wire === 2) {
+    if (field === SelectionStateFields.ranges && wire === 2) {
       const length = readVarint(data, offset);
       const n = Number(length.value);
       if (!Number.isFinite(n) || n < 0) {
@@ -656,17 +676,34 @@ export function decodeSelectionState(data: Uint8Array): SelectionState {
     offset = skipField(data, offset, wire);
   }
 
-  if (typeof scalarByField[1] === "number") out.row = scalarByField[1];
-  if (typeof scalarByField[2] === "number") out.col = scalarByField[2];
+  if (typeof scalarByField[SelectionStateFields.active_row] === "number") {
+    out.row = scalarByField[SelectionStateFields.active_row] ?? out.row;
+  }
+  if (typeof scalarByField[SelectionStateFields.active_col] === "number") {
+    out.col = scalarByField[SelectionStateFields.active_col] ?? out.col;
+  }
 
   if (hasRanges) {
-    if (typeof scalarByField[4] === "number") out.topRow = scalarByField[4];
-    if (typeof scalarByField[5] === "number") out.leftCol = scalarByField[5];
-    if (typeof scalarByField[6] === "number") out.bottomRow = scalarByField[6];
-    if (typeof scalarByField[7] === "number") out.rightCol = scalarByField[7];
-    if (typeof scalarByField[8] === "number") out.mouseRow = scalarByField[8];
-    if (typeof scalarByField[9] === "number") out.mouseCol = scalarByField[9];
+    if (typeof scalarByField[SelectionStateFields.top_row] === "number") {
+      out.topRow = scalarByField[SelectionStateFields.top_row] ?? out.topRow;
+    }
+    if (typeof scalarByField[SelectionStateFields.left_col] === "number") {
+      out.leftCol = scalarByField[SelectionStateFields.left_col] ?? out.leftCol;
+    }
+    if (typeof scalarByField[SelectionStateFields.bottom_row] === "number") {
+      out.bottomRow = scalarByField[SelectionStateFields.bottom_row] ?? out.bottomRow;
+    }
+    if (typeof scalarByField[SelectionStateFields.right_col] === "number") {
+      out.rightCol = scalarByField[SelectionStateFields.right_col] ?? out.rightCol;
+    }
+    if (typeof scalarByField[SelectionStateFields.mouse_row] === "number") {
+      out.mouseRow = scalarByField[SelectionStateFields.mouse_row] ?? out.mouseRow;
+    }
+    if (typeof scalarByField[SelectionStateFields.mouse_col] === "number") {
+      out.mouseCol = scalarByField[SelectionStateFields.mouse_col] ?? out.mouseCol;
+    }
   } else {
+    // Legacy flat selection payloads used rowEnd/colEnd instead of ranges.
     if (typeof scalarByField[3] === "number") out.rowEnd = scalarByField[3];
     if (typeof scalarByField[4] === "number") out.colEnd = scalarByField[4];
     if (typeof scalarByField[5] === "number") out.topRow = scalarByField[5];
@@ -707,7 +744,7 @@ export function decodeExportCsv(data: Uint8Array): string {
     const field = Number(tag.value >> 3n);
     const wire = Number(tag.value & 0x7n);
 
-    if (field === 1 && wire === 2) {
+    if (field === ExportResponseFields.data && wire === 2) {
       const length = readVarint(data, offset);
       const n = Number(length.value);
       if (!Number.isFinite(n) || n < 0) {
@@ -731,7 +768,7 @@ export function decodeGridEventEnvelope(data: Uint8Array): GridEventEnvelope | n
     const field = Number(tag.value >> 3n);
     const wire = Number(tag.value & 0x7n);
 
-    if (wire === 2 && field >= 2 && field <= 60) {
+    if (wire === 2 && GRID_EVENT_PAYLOAD_FIELDS.has(field)) {
       const length = readVarint(data, offset);
       const n = Number(length.value);
       if (!Number.isFinite(n) || n < 0) {
@@ -758,7 +795,7 @@ export function decodeAfterSortPayload(data: Uint8Array): AfterSortPayload {
     offset = tag.next;
     const field = Number(tag.value >> 3n);
     const wire = Number(tag.value & 0x7n);
-    if (field === 1 && wire === 0) {
+    if (field === AfterSortEventFields.col && wire === 0) {
       const value = readVarint(data, offset);
       col = asInt32(value.value);
       offset = value.next;
@@ -782,8 +819,8 @@ export function decodeAfterUserResizePayload(data: Uint8Array): AfterUserResizeP
       const value = readVarint(data, offset);
       const n = asInt32(value.value);
       offset = value.next;
-      if (field === 1) row = n;
-      if (field === 2) col = n;
+      if (field === AfterUserResizeEventFields.row) row = n;
+      if (field === AfterUserResizeEventFields.col) col = n;
       continue;
     }
     offset = skipField(data, offset, wire);

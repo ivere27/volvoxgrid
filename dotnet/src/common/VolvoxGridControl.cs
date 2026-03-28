@@ -1327,15 +1327,12 @@ namespace VolvoxGrid.DotNet
             catch (Exception ex) { _lastError = ex.Message; return new VolvoxGridExportData(); }
         }
 
-        public void LoadGrid(
-            byte[] data,
-            VolvoxGridExportFormat format = VolvoxGridExportFormat.Binary,
-            VolvoxGridExportScope scope = VolvoxGridExportScope.All)
+        public void LoadData(byte[] data)
         {
             if (!EnsureEngine()) return;
             try
             {
-                _client.Import(_gridId, data ?? new byte[0], (VolvoxExportFormat)format, (VolvoxExportScope)scope);
+                _client.LoadData(_gridId, data ?? new byte[0]);
                 _client.Refresh(_gridId);
                 _renderHost.RequestFrame();
             }

@@ -96,6 +96,7 @@ class _DemoPageState extends State<DemoPage> {
   bool _started = false;
   bool _showDebugOverlay = false;
   bool _scrollBlitEnabled = false;
+  bool _editEnabled = false;
   RendererBackend _rendererBackend = RendererBackend.cpu;
   int _textLayoutCacheCap = 8192;
   int _renderLayerMask = -1; // all layers on (u64::MAX as i64)
@@ -135,6 +136,7 @@ class _DemoPageState extends State<DemoPage> {
     await controller.setRendererBackend(_rendererBackend);
     await controller.setDebugOverlay(_showDebugOverlay);
     await controller.setScrollBlit(_scrollBlitEnabled);
+    await controller.setEditable(_editEnabled);
     await controller.setTextLayoutCacheCap(_textLayoutCacheCap);
     final style = await controller.getGridStyle();
     style.foreground = 0xFF000000;
@@ -150,6 +152,7 @@ class _DemoPageState extends State<DemoPage> {
     } finally {
       await controller.setRedraw(true);
     }
+    await controller.setEditable(_editEnabled);
     await controller.refresh();
     _initializedModes.add(mode);
   }
@@ -161,6 +164,7 @@ class _DemoPageState extends State<DemoPage> {
     }
     await controller.setDebugOverlay(_showDebugOverlay);
     await controller.setScrollBlit(_scrollBlitEnabled);
+    await controller.setEditable(_editEnabled);
     await controller.setTextLayoutCacheCap(_textLayoutCacheCap);
     await controller.setRenderLayerMask(Int64(_renderLayerMask));
   }
@@ -233,6 +237,35 @@ class _DemoPageState extends State<DemoPage> {
     if (_loading) return;
     final col = await _activeController.cursorCol();
     await _activeController.sort(SortOrder.SORT_DESCENDING, col: col);
+  }
+
+  Future<void> _setEditEnabled(bool enabled) async {
+    if (_loading) return;
+    final previous = _editEnabled;
+    final initializedControllers = _initializedModes
+        .map((mode) => _controllers[mode]!)
+        .toList(growable: false);
+    setState(() {
+      _editEnabled = enabled;
+      _statusText = enabled ? 'Editing enabled' : 'Editing disabled';
+    });
+    try {
+      for (final controller in initializedControllers) {
+        await controller.setEditable(enabled);
+      }
+      await _activeController.refresh();
+    } catch (e) {
+      for (final controller in initializedControllers) {
+        try {
+          await controller.setEditable(previous);
+        } catch (_) {}
+      }
+      if (!mounted) return;
+      setState(() {
+        _editEnabled = previous;
+        _statusText = 'Edit toggle failed: $e';
+      });
+    }
   }
 
   Future<void> _showLayersDialog() async {
@@ -440,9 +473,11 @@ class _DemoPageState extends State<DemoPage> {
               switch (value) {
                 case 'sort_asc':
                   await _onSortAscending();
+                  return;
                 case 'sort_desc':
                   await _onSortDescending();
-                case 'scroll_blit':
+                  return;
+                case 'scroll_blit': {
                   final previous = _scrollBlitEnabled;
                   final nextValue = !previous;
                   setState(() {
@@ -461,8 +496,14 @@ class _DemoPageState extends State<DemoPage> {
                       _statusText = 'Scroll blit toggle failed: $e';
                     });
                   }
+                  return;
+                }
+                case 'edit':
+                  await _setEditEnabled(!_editEnabled);
+                  return;
                 case 'layers':
                   await _showLayersDialog();
+                  return;
               }
             },
             itemBuilder: (context) => [
@@ -489,6 +530,15 @@ class _DemoPageState extends State<DemoPage> {
                 child: const ListTile(
                   leading: Icon(Icons.swap_horiz),
                   title: Text('Scroll Blit'),
+                  dense: true,
+                ),
+              ),
+              CheckedPopupMenuItem(
+                value: 'edit',
+                checked: _editEnabled,
+                child: const ListTile(
+                  leading: Icon(Icons.edit),
+                  title: Text('Edit'),
                   dense: true,
                 ),
               ),

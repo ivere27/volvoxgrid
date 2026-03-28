@@ -7,6 +7,7 @@
 //! Concrete backends live in `canvas_cpu` (pixel-buffer) and `canvas_gpu`
 //! (wgpu surface).
 
+use crate::control::CellControl;
 use crate::grid::VolvoxGrid;
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::scrollbar::{
@@ -707,7 +708,7 @@ pub trait Canvas {
 // ===========================================================================
 
 /// Pre-computed visible ranges for fixed and scrollable row/column regions.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct VisibleRange {
     /// Exclusive end of fixed + frozen rows.
     pub fixed_row_end: i32,
@@ -753,6 +754,10 @@ pub(crate) struct VisibleRange {
     pub sticky_left_width: i32,
     /// Total pixel width of sticky-right cols.
     pub sticky_right_width: i32,
+    /// Exact scroll X offset as float bits (sub-pixel precision for cache key).
+    pub scroll_x_bits: u32,
+    /// Exact scroll Y offset as float bits (sub-pixel precision for cache key).
+    pub scroll_y_bits: u32,
 }
 
 type MergeRange = (i32, i32, i32, i32);
@@ -1142,6 +1147,8 @@ impl VisibleRange {
             sticky_bottom_height,
             sticky_left_width,
             sticky_right_width,
+            scroll_x_bits: (grid.scroll.scroll_x as f32).to_bits(),
+            scroll_y_bits: (grid.scroll.scroll_y as f32).to_bits(),
         }
     }
 }
@@ -1149,14 +1156,31 @@ impl VisibleRange {
 impl RenderContext {
     fn new(grid: &VolvoxGrid, vp_w: i32, vp_h: i32, damage: Option<&DamageRegion>) -> Self {
         let vp = VisibleRange::compute(grid, vp_w, vp_h);
-        let mut vis_cells: Vec<VisibleCell> = Vec::new();
+        let has_merges = !grid.merged_regions.all_ranges().is_empty()
+            || grid.span.mode != 0
+            || grid.span.mode_fixed != 0;
+        // Pre-allocate with estimated visible cell count to avoid repeated reallocs.
+        let est_rows = (vp.scroll_row_end - vp.scroll_row_start
+            + grid.fixed_rows
+            + grid.frozen_rows)
+            .max(0) as usize;
+        let est_cols = (vp.scroll_col_end - vp.scroll_col_start
+            + grid.fixed_cols
+            + grid.frozen_cols)
+            .max(0) as usize;
+        let mut vis_cells: Vec<VisibleCell> = Vec::with_capacity(est_rows * est_cols);
         let zone_counts =
             iter_visible_cells(grid, &vp, damage, |zone, row, col, cx, cy, cw, ch| {
                 let key = CellKey { row, col };
-                let merge = grid.get_merged_range(row, col);
-                let source_key = match merge {
-                    Some((mr1, mc1, _mr2, _mc2)) => CellKey { row: mr1, col: mc1 },
-                    None => key,
+                let (merge, source_key) = if has_merges {
+                    let merge = grid.get_merged_range(row, col);
+                    let source_key = match merge {
+                        Some((mr1, mc1, _mr2, _mc2)) => CellKey { row: mr1, col: mc1 },
+                        None => key,
+                    };
+                    (merge, source_key)
+                } else {
+                    (None, key)
                 };
                 vis_cells.push(VisibleCell {
                     key,
@@ -1173,7 +1197,12 @@ impl RenderContext {
             });
         let visible_row_rects = build_visible_row_rects(grid, &vp);
         let visible_col_rects = build_visible_col_rects(grid, &vp);
-        let text_cells = build_text_cells(grid, &vp, &vis_cells);
+        // Skip text precomputation when the grid has no cell data at all.
+        let text_cells = if grid.cells.len() == 0 {
+            Vec::new()
+        } else {
+            build_text_cells(grid, &vp, &vis_cells, has_merges)
+        };
         Self {
             vp,
             vis_cells,
@@ -1183,6 +1212,15 @@ impl RenderContext {
             visible_col_rects,
         }
     }
+}
+
+fn any_visible_cell<F>(ctx: &RenderContext, mut predicate: F) -> bool
+where
+    F: FnMut(i32, i32) -> bool,
+{
+    ctx.vis_cells
+        .iter()
+        .any(|cell| predicate(cell.key.row, cell.key.col))
 }
 
 // ===========================================================================
@@ -1888,6 +1926,29 @@ pub(crate) fn parse_progress_percent(text: &str) -> f32 {
     }
 }
 
+fn progress_layer_needed(grid: &VolvoxGrid, ctx: &RenderContext) -> bool {
+    // Check column-level progress first (cheap) before the expensive
+    // has_any_explicit_progress() which scans the entire CellStore.
+    if !grid.columns.iter().any(|c| c.progress_color != 0)
+        && !grid.cells.has_any_explicit_progress()
+    {
+        return false;
+    }
+
+    any_visible_cell(ctx, |row, col| {
+        let col_progress = if col >= 0 && (col as usize) < grid.columns.len() {
+            grid.columns[col as usize].progress_color
+        } else {
+            0
+        };
+        col_progress != 0
+            || grid
+                .cells
+                .get(row, col)
+                .is_some_and(|cell| cell.progress_percent() > 0.0)
+    })
+}
+
 /// Format a number with comma separators (e.g. 1000000 -> "1,000,000").
 pub(crate) fn format_number(n: i32) -> String {
     let s = n.to_string();
@@ -1988,14 +2049,14 @@ pub(crate) fn resolve_alignment(
     }
 }
 
-/// Whether a dropdown button should be shown for a given cell.
-fn should_show_dropdown_button_with_list(
+/// Whether a button accessory should be shown for a given cell.
+fn should_show_dropdown_button_for_control(
     grid: &VolvoxGrid,
     row: i32,
     col: i32,
-    has_dropdown_list: bool,
+    control: CellControl,
 ) -> bool {
-    if !has_dropdown_list {
+    if control == CellControl::None {
         return false;
     }
     match grid.dropdown_trigger {
@@ -2003,19 +2064,14 @@ fn should_show_dropdown_button_with_list(
         b if b == pb::DropdownTrigger::DropdownOnEdit as i32 => {
             grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col
         }
-        /* ActiveX compatibility: show on current cell when dropdown lists exist. */
+        /* ActiveX compatibility: show on current cell when button-like controls exist. */
         3 => grid.selection.row == row && grid.selection.col == col,
         _ => false,
     }
 }
 
 pub(crate) fn show_dropdown_button_for_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
-    should_show_dropdown_button_with_list(
-        grid,
-        row,
-        col,
-        !grid.active_dropdown_list(row, col).is_empty(),
-    )
+    should_show_dropdown_button_for_control(grid, row, col, grid.resolved_cell_control(row, col))
 }
 
 /// Compute the pixel rect for a dropdown button within a cell.
@@ -2028,10 +2084,14 @@ pub(crate) fn dropdown_button_rect(
     if cw <= 2 || ch <= 2 {
         return None;
     }
-    let mut bw = (ch - 2).clamp(12, 18);
-    bw = bw.min((cw - 2).max(0));
     let bh = (ch - 2).max(0);
-    if bw <= 0 || bh <= 0 {
+    let max_bw = (cw - 2).max(0);
+    if bh <= 0 || max_bw <= 0 {
+        return None;
+    }
+    let target_bw = (((bh as f32) * 0.85).round() as i32).max(12);
+    let bw = target_bw.min(max_bw).min(36);
+    if bw <= 0 {
         return None;
     }
     let bx = cx + cw - bw - 1;
@@ -2257,6 +2317,95 @@ fn clear_partial_regions<C: Canvas>(
     }
 }
 
+// ===========================================================================
+// RenderContext frame-to-frame cache
+// ===========================================================================
+
+/// Key capturing all state that determines the structural RenderContext
+/// (vis_cells, visible_row_rects, visible_col_rects, zone_counts).
+///
+/// By using the fully computed `VisibleRange` as the key, we capture
+/// every input that affects the cell iteration (indicator bands,
+/// scrollbars, sticky rows/cols, RTL, pinned, frozen, hidden, etc.)
+/// without having to enumerate individual config fields.
+struct RenderCtxCacheKey {
+    vp: VisibleRange,
+}
+
+impl RenderCtxCacheKey {
+    fn matches(&self, other: &VisibleRange) -> bool {
+        self.vp == *other
+    }
+}
+
+/// Type-erased cache entry stored in `VolvoxGrid::render_ctx_cache`.
+struct RenderCtxCached {
+    key: RenderCtxCacheKey,
+    ctx: RenderContext,
+}
+
+/// Build a `RenderContext`, reusing cached structural data when possible.
+///
+/// Cache hit (same `VisibleRange`, no merges/spans, full render): skip
+/// `iter_visible_cells` and `build_visible_*_rects` entirely, only rebuild
+/// `text_cells`.
+///
+/// Cache miss, partial render, or merges/spans active: full rebuild.
+fn build_or_reuse_ctx(
+    grid: &VolvoxGrid,
+    w: i32,
+    h: i32,
+    damage: Option<&DamageRegion>,
+) -> RenderContext {
+    // Partial renders have filtered cell sets — never reuse.
+    if damage.is_some() {
+        return RenderContext::new(grid, w, h, damage);
+    }
+
+    // When merges or spans are active, cached vis_cells can be stale
+    // (merge results depend on cell text content which changes per frame).
+    let has_merges = !grid.merged_regions.all_ranges().is_empty()
+        || grid.span.mode != 0
+        || grid.span.mode_fixed != 0;
+    if has_merges {
+        return RenderContext::new(grid, w, h, None);
+    }
+
+    // Compute the VisibleRange first (cheap: binary searches + small vecs).
+    // This encodes ALL structural inputs that affect the cell iteration.
+    let current_vp = VisibleRange::compute(grid, w, h);
+
+    // Try to take the previous frame's cached context.
+    let cached = grid
+        .render_ctx_cache
+        .borrow_mut()
+        .take()
+        .and_then(|b| (b as Box<dyn std::any::Any>).downcast::<RenderCtxCached>().ok())
+        .map(|b| *b);
+
+    match cached {
+        Some(prev) if prev.key.matches(&current_vp) => {
+            // Structural hit — reuse vis_cells, row/col rects, zone_counts.
+            // Only rebuild text_cells (content may have changed).
+            let text_cells = if grid.cells.len() == 0 {
+                Vec::new()
+            } else {
+                build_text_cells(grid, &prev.ctx.vp, &prev.ctx.vis_cells, false)
+            };
+            RenderContext {
+                text_cells,
+                ..prev.ctx
+            }
+        }
+        _ => {
+            // Full rebuild.
+            RenderContext::new(grid, w, h, None)
+        }
+    }
+}
+
+
+
 fn render_grid_internal<C: Canvas>(
     grid: &VolvoxGrid,
     canvas: &mut C,
@@ -2288,11 +2437,20 @@ fn render_grid_internal<C: Canvas>(
 
     grid.span.clear_span_cache();
 
-    let ctx = RenderContext::new(grid, w, h, damage);
+    let t_ctx = if profiling { Some(PortableInstant::now()) } else { None };
+    let ctx = build_or_reuse_ctx(grid, w, h, damage);
+    if let Some(t0) = t_ctx {
+        grid.debug_ctx_time_us.set(t0.elapsed().as_secs_f32() * 1_000_000.0);
+    }
+
+    let t_clear = if profiling { Some(PortableInstant::now()) } else { None };
     if let Some(damage) = damage {
         clear_partial_regions(grid, canvas, &ctx, damage);
     } else {
         canvas.clear(grid.style.back_color_bkg);
+    }
+    if let Some(t0) = t_clear {
+        grid.debug_clear_time_us.set(t0.elapsed().as_secs_f32() * 1_000_000.0);
     }
 
     run_layer!(
@@ -2306,19 +2464,12 @@ fn render_grid_internal<C: Canvas>(
     run_layer!(layer::BACKGROUNDS, render_backgrounds(grid, canvas, &ctx));
     run_layer!(layer::SELECTION, render_selection(grid, canvas, &ctx));
 
-    run_layer!(layer::PROGRESS_BARS, {
-        if grid.style.progress_color != 0 || grid.columns.iter().any(|c| c.progress_color != 0) {
-            render_progress_bars(grid, canvas, &ctx);
-        }
-    });
+    run_layer!(
+        layer::PROGRESS_BARS,
+        render_progress_bars(grid, canvas, &ctx)
+    );
 
-    run_layer!(layer::GRID_LINES, {
-        if grid.style.grid_lines != pb::GridLineStyle::GridlineNone as i32
-            || grid.style.grid_lines_fixed != pb::GridLineStyle::GridlineNone as i32
-        {
-            render_grid_lines(grid, canvas, &ctx);
-        }
-    });
+    run_layer!(layer::GRID_LINES, render_grid_lines(grid, canvas, &ctx));
 
     run_layer!(layer::HEADER_MARKS, render_header_marks(grid, canvas, &ctx));
     run_layer!(
@@ -2326,22 +2477,7 @@ fn render_grid_internal<C: Canvas>(
         render_background_image(grid, canvas)
     );
 
-    run_layer!(layer::CELL_BORDERS, {
-        if grid.cell_styles.values().any(|s| {
-            s.border.is_some()
-                || s.border_color.is_some()
-                || s.border_top.is_some()
-                || s.border_right.is_some()
-                || s.border_bottom.is_some()
-                || s.border_left.is_some()
-                || s.border_top_color.is_some()
-                || s.border_right_color.is_some()
-                || s.border_bottom_color.is_some()
-                || s.border_left_color.is_some()
-        }) {
-            render_cell_borders(grid, canvas, &ctx);
-        }
-    });
+    run_layer!(layer::CELL_BORDERS, render_cell_borders(grid, canvas, &ctx));
 
     run_layer!(layer::CELL_TEXT, render_cell_text(grid, canvas, &ctx));
     run_layer!(
@@ -2356,11 +2492,10 @@ fn render_grid_internal<C: Canvas>(
 
     run_layer!(layer::CHECKBOXES, render_checkboxes(grid, canvas, &ctx));
 
-    run_layer!(layer::DROPDOWN_BUTTONS, {
-        if grid.dropdown_trigger != 0 && grid.columns.iter().any(|c| !c.dropdown_items.is_empty()) {
-            render_dropdown_buttons(grid, canvas, &ctx);
-        }
-    });
+    run_layer!(
+        layer::DROPDOWN_BUTTONS,
+        render_dropdown_buttons(grid, canvas, &ctx)
+    );
 
     run_layer!(
         layer::HOVER_HIGHLIGHT,
@@ -2394,7 +2529,15 @@ fn render_grid_internal<C: Canvas>(
     );
     canvas.end_overlay();
 
-    ((0, 0, w, h), times, ctx.zone_counts)
+    let zone_counts = ctx.zone_counts;
+    // Store structural parts back into the cache for next frame.
+    // Only cache full renders (partial renders have filtered vis_cells).
+    if damage.is_none() {
+        let key = RenderCtxCacheKey { vp: ctx.vp.clone() };
+        *grid.render_ctx_cache.borrow_mut() = Some(Box::new(RenderCtxCached { key, ctx }) as Box<dyn std::any::Any + Send>);
+    }
+
+    ((0, 0, w, h), times, zone_counts)
 }
 
 // ===========================================================================
@@ -2565,6 +2708,15 @@ fn draw_highlight_fill<C: Canvas>(
 /// through between cell gaps.
 fn render_overlay_bands<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
     let vp = &ctx.vp;
+    if vp.pinned_top_height <= 0
+        && vp.pinned_bottom_height <= 0
+        && vp.sticky_top_rows.is_empty()
+        && vp.sticky_bottom_rows.is_empty()
+        && vp.sticky_left_cols.is_empty()
+        && vp.sticky_right_cols.is_empty()
+    {
+        return;
+    }
     let bg = grid.style.back_color_bkg;
     let x0 = vp.data_x;
     let y0 = vp.data_y;
@@ -2854,17 +3006,43 @@ fn build_text_cells(
     grid: &VolvoxGrid,
     vp: &VisibleRange,
     vis_cells: &[VisibleCell],
+    has_merges: bool,
 ) -> Vec<PreparedTextCell> {
     let mut text_cells = Vec::new();
-    let mut prepared_sources: std::collections::HashSet<CellKey> = std::collections::HashSet::new();
+    // Only needed when merges exist — without merges every source_key is unique.
+    let mut prepared_sources: Option<std::collections::HashSet<CellKey>> = if has_merges {
+        Some(std::collections::HashSet::new())
+    } else {
+        None
+    };
 
     for &cell in vis_cells {
-        if !prepared_sources.insert(cell.source_key) {
-            continue;
+        if let Some(ref mut set) = prepared_sources {
+            if !set.insert(cell.source_key) {
+                continue;
+            }
         }
 
         let text_row = cell.source_key.row;
         let text_col = cell.source_key.col;
+
+        // ── Fast pre-checks before expensive meta computation ──
+        // Boolean columns suppress text in data rows.
+        if let Some(cp) = grid.get_col_props(text_col) {
+            if cp.data_type == crate::proto::volvoxgrid::v1::ColumnDataType::ColumnDataBoolean as i32
+                && text_row >= grid.fixed_rows
+            {
+                continue;
+            }
+        }
+        // Skip cells with no display text — avoids build_text_cell_static_meta
+        // (which does get_cell_style, resolve_alignment, resolve_cell_padding,
+        // Arc::new) for all empty cells.
+        let display_text = grid.get_display_text(text_row, text_col);
+        if display_text.is_empty() {
+            continue;
+        }
+
         let vis_rect = if cell.is_merged_span() {
             let vx = cell.rect.x.max(vp.data_x);
             let vy = cell.rect.y.max(vp.data_y);
@@ -3090,8 +3268,26 @@ fn draw_indicator_text<C: Canvas>(
     );
 }
 
-fn sort_arrow_box_size(cell_h: i32) -> i32 {
-    cell_h.saturating_sub(6).clamp(8, 16)
+fn sort_arrow_box_size(cell_h: i32, scale: f32) -> i32 {
+    let scale = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    };
+    // Size the fallback vector arrow in logical pixels, then scale back to
+    // device pixels so high-DPI hosts do not get a 16px glyph inside a 3x header.
+    let logical_h = if scale > 1.001 {
+        ((cell_h as f32) / scale).round() as i32
+    } else {
+        cell_h
+    };
+    let logical_box = logical_h.saturating_sub(6).clamp(8, 16);
+    let device_box = if scale > 1.001 {
+        ((logical_box as f32) * scale).round() as i32
+    } else {
+        logical_box
+    };
+    device_box.min(cell_h.saturating_sub(2).max(0))
 }
 
 fn draw_sort_direction_arrow<C: Canvas>(
@@ -3460,7 +3656,7 @@ fn render_col_indicator_top<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &
             } else {
                 false
             };
-            let glyph_box = sort_arrow_box_size(ch).min((cw - 4).max(0));
+            let glyph_box = sort_arrow_box_size(ch, grid.scale).min((cw - 4).max(0));
             if glyph_box < 6 {
                 continue;
             }
@@ -3659,6 +3855,9 @@ fn render_backgrounds<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Render
 // ===========================================================================
 
 fn render_progress_bars<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
+    if !progress_layer_needed(grid, ctx) {
+        return;
+    }
     let vp = &ctx.vp;
     for &cell in &ctx.vis_cells {
         let (row, col, cx, cy, cw, ch) = cell.parts();
@@ -3713,6 +3912,11 @@ fn render_progress_bars<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
 // ===========================================================================
 
 fn render_grid_lines<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
+    if grid.style.grid_lines == pb::GridLineStyle::GridlineNone as i32
+        && grid.style.grid_lines_fixed == pb::GridLineStyle::GridlineNone as i32
+    {
+        return;
+    }
     draw_grid_lines_for_zone(grid, canvas, &ctx.vis_cells, false);
     draw_grid_lines_for_zone(grid, canvas, &ctx.vis_cells, true);
 }
@@ -3852,7 +4056,25 @@ fn render_background_image<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
 // Layer 3.6 -- Per-cell borders (CellBorder / CellBorderRange)
 // ===========================================================================
 
+fn cell_borders_needed(grid: &VolvoxGrid) -> bool {
+    grid.cell_styles.values().any(|s| {
+        s.border.is_some()
+            || s.border_color.is_some()
+            || s.border_top.is_some()
+            || s.border_right.is_some()
+            || s.border_bottom.is_some()
+            || s.border_left.is_some()
+            || s.border_top_color.is_some()
+            || s.border_right_color.is_some()
+            || s.border_bottom_color.is_some()
+            || s.border_left_color.is_some()
+    })
+}
+
 fn render_cell_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
+    if !cell_borders_needed(grid) {
+        return;
+    }
     for &cell in &ctx.vis_cells {
         let (row, col, cx, cy, cw, ch) = cell.parts();
         // For merged cells, draw border once at the merge-origin cell.
@@ -3995,12 +4217,7 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
         let alignment = meta.alignment;
         let cell_padding = meta.padding;
 
-        let button_reserve = if should_show_dropdown_button_with_list(
-            grid,
-            text_row,
-            text_col,
-            meta.has_dropdown_list,
-        ) {
+        let button_reserve = if show_dropdown_button_for_cell(grid, text_row, text_col) {
             dropdown_button_rect(vis_x, vis_y, vis_w, vis_h).map_or(0, |(_, _, bw, _)| bw + 2)
         } else {
             0
@@ -4274,7 +4491,22 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
 // Layer 4.5 -- Cell pictures
 // ===========================================================================
 
+fn picture_layer_needed(grid: &VolvoxGrid, ctx: &RenderContext) -> bool {
+    // Only visible cells matter for this layer. Avoid consulting the
+    // CellStore-wide picture cache here because a cold/invalidated cache can
+    // force a full sparse-store scan, which is especially expensive for the
+    // eager 1M-row stress demo after unrelated cell mutations.
+    any_visible_cell(ctx, |row, col| {
+        grid.cells
+            .get(row, col)
+            .is_some_and(|cell| cell.picture().is_some_and(|data| !data.is_empty()))
+    })
+}
+
 fn render_cell_pictures<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
+    if !picture_layer_needed(grid, ctx) {
+        return;
+    }
     let vp = &ctx.vp;
     for &cell in &ctx.vis_cells {
         let (row, col, cx, cy, cw, ch) = cell.parts();
@@ -4715,7 +4947,7 @@ fn render_sort_glyphs<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Render
                         false,
                         grid.style.fore_color_fixed,
                     );
-                let glyph_box = sort_arrow_box_size(inner_h).min(inner_w.max(0));
+                let glyph_box = sort_arrow_box_size(inner_h, grid.scale).min(inner_w.max(0));
                 if glyph_box < 6 {
                     continue;
                 }
@@ -4987,7 +5219,172 @@ fn render_header_marks<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rende
 // Layer 5 -- Checkboxes
 // ===========================================================================
 
+pub(crate) fn checkbox_box_size(cell_h: i32) -> i32 {
+    let max_size = (cell_h - 2).max(1);
+    if max_size <= 13 {
+        max_size
+    } else {
+        (((cell_h as f32) * 0.8).round() as i32).clamp(13, max_size)
+    }
+}
+
+fn fill_rect_clipped<C: Canvas>(
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    clip_x0: i32,
+    clip_y0: i32,
+    clip_x1: i32,
+    clip_y1: i32,
+    color: u32,
+) {
+    if w <= 0 || h <= 0 {
+        return;
+    }
+    let rx0 = x.max(clip_x0);
+    let ry0 = y.max(clip_y0);
+    let rx1 = (x + w).min(clip_x1);
+    let ry1 = (y + h).min(clip_y1);
+    if rx1 > rx0 && ry1 > ry0 {
+        canvas.fill_rect(rx0, ry0, rx1 - rx0, ry1 - ry0, color);
+    }
+}
+
+fn draw_thick_line<C: Canvas>(
+    canvas: &mut C,
+    x0: i32,
+    y0: i32,
+    x1: i32,
+    y1: i32,
+    thickness: i32,
+    color: u32,
+) {
+    let thickness = thickness.max(1);
+    let dx = (x1 - x0) as f32;
+    let dy = (y1 - y0) as f32;
+    let steps = dx.abs().max(dy.abs()).round() as i32;
+    if steps <= 0 {
+        canvas.fill_rect(
+            x0 - thickness / 2,
+            y0 - thickness / 2,
+            thickness,
+            thickness,
+            color,
+        );
+        return;
+    }
+    let step_rect = |step: i32| {
+        let t = step as f32 / steps as f32;
+        let px = (x0 as f32 + dx * t).round() as i32 - thickness / 2;
+        let py = (y0 as f32 + dy * t).round() as i32 - thickness / 2;
+        (px, py)
+    };
+    let min_row = y0.min(y1) - thickness / 2;
+    let max_row = y0.max(y1) - thickness / 2 + thickness - 1;
+    let row_count = (max_row - min_row + 1).max(0) as usize;
+    const MAX_SCANLINE_ROWS: usize = 256;
+    const EMPTY_SCANLINE: (i32, i32) = (i32::MAX, i32::MIN);
+
+    if row_count > MAX_SCANLINE_ROWS {
+        for step in 0..=steps {
+            let (px, py) = step_rect(step);
+            canvas.fill_rect(px, py, thickness, thickness, color);
+        }
+        return;
+    }
+
+    // Merge the per-step squares into one horizontal span per touched row.
+    let mut scanlines = [EMPTY_SCANLINE; MAX_SCANLINE_ROWS];
+    for step in 0..=steps {
+        let (px, py) = step_rect(step);
+        for row in py..(py + thickness) {
+            let entry = &mut scanlines[(row - min_row) as usize];
+            entry.0 = entry.0.min(px);
+            entry.1 = entry.1.max(px + thickness);
+        }
+    }
+    for (offset, &(min_x, max_x)) in scanlines[..row_count].iter().enumerate() {
+        if min_x < max_x {
+            canvas.fill_rect(min_x, min_row + offset as i32, max_x - min_x, 1, color);
+        }
+    }
+}
+
+fn draw_checkbox_mark<C: Canvas>(canvas: &mut C, bx: i32, by: i32, box_size: i32, color: u32) {
+    let stroke = (((box_size as f32) * 0.12).round() as i32).clamp(1, 3);
+    let start_x = bx + ((box_size as f32) * 0.23).round() as i32;
+    let start_y = by + ((box_size as f32) * 0.56).round() as i32;
+    let mid_x = bx + ((box_size as f32) * 0.44).round() as i32;
+    let mid_y = by + ((box_size as f32) * 0.74).round() as i32;
+    let end_x = bx + ((box_size as f32) * 0.79).round() as i32;
+    let end_y = by + ((box_size as f32) * 0.30).round() as i32;
+    draw_thick_line(canvas, start_x, start_y, mid_x, mid_y, stroke, color);
+    draw_thick_line(canvas, mid_x, mid_y, end_x, end_y, stroke, color);
+}
+
+fn dropdown_glyph_metrics(bw: i32, bh: i32) -> (i32, i32, i32) {
+    let dot_size = (((bw.min(bh) as f32) * 0.12).round() as i32).clamp(1, 3);
+    let max_arrow_h = (bh - 4).max(1);
+    let arrow_h = if max_arrow_h <= 4 {
+        max_arrow_h
+    } else {
+        (((bh as f32) * 0.28).round() as i32).clamp(4, max_arrow_h)
+    };
+    let max_arrow_half = ((bw - 3) / 2).max(1);
+    let arrow_half = if max_arrow_half <= 3 {
+        max_arrow_half
+    } else {
+        (((bw as f32) * 0.24).round() as i32).clamp(3, max_arrow_half)
+    };
+    (dot_size, arrow_h, arrow_half)
+}
+
+fn cell_has_checkbox_visual(
+    grid: &VolvoxGrid,
+    row: i32,
+    col: i32,
+    is_boolean_col: bool,
+    checked_state: i32,
+) -> bool {
+    row >= grid.fixed_rows
+        && row < grid.rows
+        && col >= 0
+        && col < grid.cols
+        && !grid.row_props.get(&row).map_or(false, |rp| rp.is_subtotal)
+        && (is_boolean_col || checked_state != pb::CheckedState::CheckedUnchecked as i32)
+}
+
+fn checkbox_layer_needed(grid: &VolvoxGrid, ctx: &RenderContext) -> bool {
+    // Fast path: skip per-cell scan if no column is boolean-typed.
+    // Cells with explicit checked state on non-boolean columns are rare;
+    // the per-cell scan below still catches them via any_visible_cell.
+    let has_boolean_col = grid
+        .columns
+        .iter()
+        .any(|c| c.data_type == pb::ColumnDataType::ColumnDataBoolean as i32);
+    if !has_boolean_col {
+        return false;
+    }
+    any_visible_cell(ctx, |row, col| {
+        let is_boolean_col = grid.get_col_props(col).map_or(false, |cp| {
+            cp.data_type == pb::ColumnDataType::ColumnDataBoolean as i32
+        });
+        let checked_state = grid
+            .cells
+            .get(row, col)
+            .map_or(pb::CheckedState::CheckedUnchecked as i32, |cell| {
+                cell.checked()
+            });
+        cell_has_checkbox_visual(grid, row, col, is_boolean_col, checked_state)
+    })
+}
+
 fn render_checkboxes<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
+    if !checkbox_layer_needed(grid, ctx) {
+        return;
+    }
     let vp = &ctx.vp;
     let checked_pic = grid
         .style
@@ -5036,11 +5433,7 @@ fn render_checkboxes<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderC
         let slot_style = resolve_checkbox_slot_style(grid, checked_state);
         let icon_layout = resolve_icon_layout_style(grid, slot_style);
 
-        if !is_boolean_col && checked_state == pb::CheckedState::CheckedUnchecked as i32 {
-            continue;
-        }
-
-        if row < grid.fixed_rows {
+        if !cell_has_checkbox_visual(grid, row, col, is_boolean_col, checked_state) {
             continue;
         }
 
@@ -5048,7 +5441,7 @@ fn render_checkboxes<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderC
         // don't shift during smooth scrolling.
         let (ox, oy, ow, oh) = original_cell_bounds(grid, row, col, cx, cy, cw, ch, vp);
 
-        let box_size = 13_i32;
+        let box_size = checkbox_box_size(oh);
         let style_override = grid.get_cell_style(row, col);
         let alignment = resolve_alignment(grid, row, col, &style_override, "");
         let (halign, valign) = alignment_components(alignment);
@@ -5192,16 +5585,7 @@ fn render_checkboxes<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderC
             } else {
                 0xFF000000
             };
-            // Downstroke: (bx+3, by+6) to (bx+5, by+9)
-            for i in 0..3 {
-                canvas.set_pixel(bx + 3 + i, by + 6 + i, mark_color);
-                canvas.set_pixel(bx + 3 + i + 1, by + 6 + i, mark_color);
-            }
-            // Upstroke: (bx+5, by+9) to (bx+10, by+4)
-            for i in 0..5 {
-                canvas.set_pixel(bx + 5 + i, by + 9 - i, mark_color);
-                canvas.set_pixel(bx + 5 + i + 1, by + 9 - i, mark_color);
-            }
+            draw_checkbox_mark(canvas, bx, by, box_size, mark_color);
         }
     }
 }
@@ -5210,7 +5594,17 @@ fn render_checkboxes<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderC
 // Layer 6 -- Dropdown buttons
 // ===========================================================================
 
+fn dropdown_layer_needed(grid: &VolvoxGrid, ctx: &RenderContext) -> bool {
+    grid.dropdown_trigger != 0
+        && any_visible_cell(ctx, |row, col| {
+            show_dropdown_button_for_cell(grid, row, col)
+        })
+}
+
 fn render_dropdown_buttons<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
+    if !dropdown_layer_needed(grid, ctx) {
+        return;
+    }
     let vp = &ctx.vp;
     for &cell in &ctx.vis_cells {
         let (row, col, cx, cy, cw, ch) = cell.parts();
@@ -5226,12 +5620,21 @@ fn render_dropdown_buttons<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &R
             continue;
         };
 
+        let pressed = grid.dropdown_button_pressed
+            && grid.dropdown_button_pressed_row == row
+            && grid.dropdown_button_pressed_col == col;
+        let (draw_x, draw_y, draw_w, draw_h, fill_color) = if pressed {
+            (bx + 1, by + 1, (bw - 1).max(1), (bh - 1).max(1), 0xFFD0D0D0)
+        } else {
+            (bx, by, bw, bh, 0xFFEAEAEA)
+        };
+
         // Clip button against visible cell bounds so it doesn't draw into
         // fixed/frozen rows when scrolling — partial draw, not full skip.
-        let vx0 = bx.max(cx);
-        let vy0 = by.max(cy);
-        let vx1 = (bx + bw).min(cx + cw);
-        let vy1 = (by + bh).min(cy + ch);
+        let vx0 = draw_x.max(cx);
+        let vy0 = draw_y.max(cy);
+        let vx1 = (draw_x + draw_w).min(cx + cw);
+        let vy1 = (draw_y + draw_h).min(cy + ch);
         let vw = vx1 - vx0;
         let vh = vy1 - vy0;
         if vw <= 0 || vh <= 0 {
@@ -5239,37 +5642,55 @@ fn render_dropdown_buttons<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &R
         }
 
         // Button body — draw only the visible portion.
-        canvas.fill_rect(vx0, vy0, vw, vh, 0xFFEAEAEA);
+        canvas.fill_rect(vx0, vy0, vw, vh, fill_color);
         canvas.rect_outline(vx0, vy0, vw, vh, 0xFF6A6A6A);
 
         // Glyph — draw per-pixel only within visible bounds.
-        let list = grid.active_dropdown_list(row, col);
-        if list.trim() == "..." {
-            // Ellipsis glyph
-            let gy = by + bh / 2;
-            let start_x = bx + (bw / 2) - 3;
+        let glyph_color = 0xFF202020;
+        if grid.resolved_cell_control(row, col) == CellControl::EllipsisButton {
+            let dot = (draw_h / 9).clamp(1, 3);
+            let gap = (dot + 1).max(2);
+            let total_w = dot * 3 + gap * 2;
+            let start_x = draw_x + ((draw_w - total_w) / 2);
+            let dot_y = draw_y + ((draw_h - dot) / 2);
             for i in 0..3 {
-                let gx = start_x + i * 3;
-                if gx >= vx0 && gx < vx1 && gy >= vy0 && gy < vy1 {
-                    canvas.set_pixel(gx, gy, 0xFF202020);
-                }
+                fill_rect_clipped(
+                    canvas,
+                    start_x + i * (dot + gap),
+                    dot_y,
+                    dot,
+                    dot,
+                    vx0,
+                    vy0,
+                    vx1,
+                    vy1,
+                    glyph_color,
+                );
             }
         } else {
-            // Dropdown arrow glyph
-            let cxm = bx + bw / 2;
-            let cym = by + bh / 2;
-            for row_off in 0..4 {
-                let py = cym - 1 + row_off;
-                if py < vy0 || py >= vy1 {
-                    continue;
-                }
-                let half = 3 - row_off;
-                for dx in -half..=half {
-                    let px = cxm + dx;
-                    if px >= vx0 && px < vx1 {
-                        canvas.set_pixel(px, py, 0xFF202020);
-                    }
-                }
+            let (_, arrow_h, arrow_half) = dropdown_glyph_metrics(draw_w, draw_h);
+            let cxm = draw_x + draw_w / 2;
+            let start_y = draw_y + ((draw_h - arrow_h) / 2);
+            let denom = (arrow_h - 1).max(1) as i64;
+            for row_off in 0..arrow_h {
+                let py = start_y + row_off;
+                let half = if arrow_h <= 1 {
+                    0
+                } else {
+                    ((arrow_half as i64 * (arrow_h - 1 - row_off) as i64) / denom) as i32
+                };
+                fill_rect_clipped(
+                    canvas,
+                    cxm - half,
+                    py,
+                    half * 2 + 1,
+                    1,
+                    vx0,
+                    vy0,
+                    vx1,
+                    vy1,
+                    glyph_color,
+                );
             }
         }
     }
@@ -5642,6 +6063,9 @@ fn render_outline<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCont
     if grid.outline.tree_indicator == pb::TreeIndicatorStyle::TreeIndicatorNone as i32 {
         return;
     }
+    if grid.row_props.is_empty() {
+        return;
+    }
     if grid.outline.tree_column < 0 || grid.outline.tree_column >= grid.cols {
         return;
     }
@@ -5857,6 +6281,9 @@ fn subtotal_visual_level(level: i32, is_subtotal: bool, subtotal_level_floor: i3
 // ===========================================================================
 
 fn render_frozen_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
+    if grid.frozen_rows <= 0 && grid.frozen_cols <= 0 {
+        return;
+    }
     let vp = &ctx.vp;
     let buf_w = canvas.width();
     let buf_h = canvas.height();
@@ -6295,7 +6722,7 @@ fn render_active_dropdown<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Re
     }
 
     let list = grid.active_dropdown_list(row, col);
-    if list.is_empty() || list.trim() == "..." {
+    if list.is_empty() {
         return;
     }
 
@@ -7153,9 +7580,12 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
     } else {
         0.0
     };
-    // Layer grid: 2 columns, ceil(26/2)=13 rows + 1 title
+    let ctx_us = grid.debug_ctx_time_us.get();
+    let clear_us = grid.debug_clear_time_us.get();
+    let grand_us = ctx_us + clear_us + total_us;
+    // Layer grid: 2 columns, ceil(26/2)=13 rows + 1 title + 1 summary
     let layer_rows = if profiling { (layer::COUNT + 1) / 2 } else { 0 }; // 13
-    let layer_extra = if profiling { 1 + layer_rows as i32 } else { 0 };
+    let layer_extra = if profiling { 2 + layer_rows as i32 } else { 0 };
 
     // Column layout for layer grid:
     // |<name 10ch>|<value 6ch>|<pct 4ch>|<gap 2ch>|<name 10ch>|<value 6ch>|<pct 4ch>|
@@ -7190,7 +7620,10 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
     // ── Draw layer profiling grid ──
     if profiling {
         // Title
-        let title = format!("Layers: {:5.0}us total", total_us);
+        let title = format!(
+            "Render: {:5.0}us ctx:{:.0} clr:{:.0} lay:{:.0}",
+            grand_us, ctx_us, clear_us, total_us,
+        );
         df::draw_str(canvas, x0, y, &title, text_color, s);
         y += lh;
 
@@ -7254,12 +7687,35 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
                 );
             }
         }
+        // Summary line after layer grid
+        let summary_y = y + layer_rows as i32 * lh;
+        if grand_us > 0.0 {
+            let ctx_pct = ctx_us / grand_us * 100.0;
+            let clr_pct = clear_us / grand_us * 100.0;
+            let lay_pct = total_us / grand_us * 100.0;
+            let summary = format!(
+                "ctx {:3.0}% clr {:3.0}% layers {:3.0}%",
+                ctx_pct, clr_pct, lay_pct,
+            );
+            df::draw_str(canvas, x0, summary_y, &summary, dim_color, s);
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{compose_preedit_display_text, parse_progress_percent};
+    use super::pb;
+    use super::{
+        cell_has_checkbox_visual, checkbox_box_size, checkbox_layer_needed,
+        compose_preedit_display_text, dropdown_button_rect, dropdown_glyph_metrics,
+        dropdown_layer_needed, parse_progress_percent, picture_layer_needed, progress_layer_needed,
+        sort_arrow_box_size, RenderContext,
+    };
+    use crate::grid::VolvoxGrid;
+
+    fn render_ctx(grid: &VolvoxGrid) -> RenderContext {
+        RenderContext::new(grid, grid.viewport_width, grid.viewport_height, None)
+    }
 
     #[test]
     fn parse_progress_percent_treats_one_as_one_percent() {
@@ -7270,9 +7726,114 @@ mod tests {
     }
 
     #[test]
+    fn progress_layer_guard_is_viewport_aware() {
+        let mut grid = VolvoxGrid::new(1, 68, 160, 3, 12, 1, 0);
+        grid.columns[10].progress_color = 0xFF00AA00;
+        assert!(!progress_layer_needed(&grid, &render_ctx(&grid)));
+
+        grid.cells.get_mut(1, 10).extra_mut().progress_percent = 0.5;
+        assert!(!progress_layer_needed(&grid, &render_ctx(&grid)));
+
+        grid.columns[0].progress_color = 0xFF00AA00;
+        assert!(progress_layer_needed(&grid, &render_ctx(&grid)));
+    }
+
+    #[test]
+    fn picture_layer_guard_is_viewport_aware() {
+        let mut grid = VolvoxGrid::new(1, 68, 160, 3, 12, 1, 0);
+        grid.cells.get_mut(1, 10).extra_mut().picture = Some(vec![1, 2, 3]);
+        assert!(!picture_layer_needed(&grid, &render_ctx(&grid)));
+
+        grid.cells.get_mut(1, 0).extra_mut().picture = Some(vec![1, 2, 3]);
+        assert!(picture_layer_needed(&grid, &render_ctx(&grid)));
+    }
+
+    #[test]
     fn compose_preedit_display_text_replaces_selected_text() {
         assert_eq!(compose_preedit_display_text("abcd", 0, 4, "우"), "우");
         assert_eq!(compose_preedit_display_text("abcd", 1, 3, "우"), "a우d");
         assert_eq!(compose_preedit_display_text("abcd", 4, 4, "우"), "abcd우");
+    }
+
+    #[test]
+    fn checkbox_box_size_scales_with_cell_height() {
+        assert_eq!(checkbox_box_size(14), 12);
+        assert_eq!(checkbox_box_size(20), 16);
+        assert!(checkbox_box_size(60) > checkbox_box_size(20));
+    }
+
+    #[test]
+    fn checkbox_layer_guard_is_viewport_aware() {
+        let mut grid = VolvoxGrid::new(1, 68, 160, 3, 12, 1, 0);
+        grid.columns[10].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        assert!(!checkbox_layer_needed(&grid, &render_ctx(&grid)));
+
+        grid.cells.get_mut(1, 10).extra_mut().checked = pb::CheckedState::CheckedChecked as i32;
+        assert!(!checkbox_layer_needed(&grid, &render_ctx(&grid)));
+
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+        assert!(checkbox_layer_needed(&grid, &render_ctx(&grid)));
+    }
+
+    #[test]
+    fn dropdown_layer_guard_is_viewport_aware() {
+        let mut grid = VolvoxGrid::new(1, 68, 160, 3, 12, 1, 0);
+        grid.dropdown_trigger = pb::DropdownTrigger::DropdownAlways as i32;
+        grid.columns[10].dropdown_items = "A|B".to_string();
+        assert!(!dropdown_layer_needed(&grid, &render_ctx(&grid)));
+
+        grid.cells.get_mut(1, 10).extra_mut().dropdown_items = "X|Y".to_string();
+        assert!(!dropdown_layer_needed(&grid, &render_ctx(&grid)));
+
+        grid.columns[0].dropdown_items = "A|B".to_string();
+        assert!(dropdown_layer_needed(&grid, &render_ctx(&grid)));
+    }
+
+    #[test]
+    fn dropdown_button_rect_and_glyph_scale_with_row_height() {
+        let small = dropdown_button_rect(0, 0, 120, 20).expect("small button");
+        let large = dropdown_button_rect(0, 0, 120, 60).expect("large button");
+        assert!(large.2 > small.2);
+
+        let small_glyph = dropdown_glyph_metrics(small.2, small.3);
+        let large_glyph = dropdown_glyph_metrics(large.2, large.3);
+        assert!(large_glyph.1 > small_glyph.1);
+        assert!(large_glyph.2 > small_glyph.2);
+    }
+
+    #[test]
+    fn sort_arrow_box_scales_with_grid_scale() {
+        assert_eq!(sort_arrow_box_size(28, 1.0), 16);
+        assert_eq!(sort_arrow_box_size(84, 3.0), 48);
+        assert!(sort_arrow_box_size(84, 3.0) > sort_arrow_box_size(84, 1.0));
+    }
+
+    #[test]
+    fn subtotal_rows_do_not_render_checkbox_visuals() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
+
+        {
+            let cell = grid.cells.get_mut(1, 0);
+            let extra = cell.extra_mut();
+            extra.checked = pb::CheckedState::CheckedChecked as i32;
+            extra.value = crate::cell::CellValueData::Bool(true);
+        }
+        assert!(cell_has_checkbox_visual(
+            &grid,
+            1,
+            0,
+            true,
+            pb::CheckedState::CheckedChecked as i32,
+        ));
+
+        grid.row_props.entry(1).or_default().is_subtotal = true;
+        assert!(!cell_has_checkbox_visual(
+            &grid,
+            1,
+            0,
+            true,
+            pb::CheckedState::CheckedChecked as i32,
+        ));
     }
 }
