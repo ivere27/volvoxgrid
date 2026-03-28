@@ -7,6 +7,7 @@
 //! Concrete backends live in `canvas_cpu` (pixel-buffer) and `canvas_gpu`
 //! (wgpu surface).
 
+use crate::control::CellControl;
 use crate::grid::VolvoxGrid;
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::scrollbar::{
@@ -2020,14 +2021,14 @@ pub(crate) fn resolve_alignment(
     }
 }
 
-/// Whether a dropdown button should be shown for a given cell.
-fn should_show_dropdown_button_with_list(
+/// Whether a button accessory should be shown for a given cell.
+fn should_show_dropdown_button_for_control(
     grid: &VolvoxGrid,
     row: i32,
     col: i32,
-    has_dropdown_list: bool,
+    control: CellControl,
 ) -> bool {
-    if !has_dropdown_list {
+    if control == CellControl::None {
         return false;
     }
     match grid.dropdown_trigger {
@@ -2035,28 +2036,14 @@ fn should_show_dropdown_button_with_list(
         b if b == pb::DropdownTrigger::DropdownOnEdit as i32 => {
             grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col
         }
-        /* ActiveX compatibility: show on current cell when dropdown lists exist. */
+        /* ActiveX compatibility: show on current cell when button-like controls exist. */
         3 => grid.selection.row == row && grid.selection.col == col,
         _ => false,
     }
 }
 
-fn cell_has_dropdown_source(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
-    if !grid.can_begin_edit(row, col, true) {
-        return false;
-    }
-    if let Some(cell) = grid.cells.get(row, col) {
-        if !cell.dropdown_items().is_empty() {
-            return true;
-        }
-    }
-    col >= 0
-        && (col as usize) < grid.columns.len()
-        && !grid.columns[col as usize].dropdown_items.is_empty()
-}
-
 pub(crate) fn show_dropdown_button_for_cell(grid: &VolvoxGrid, row: i32, col: i32) -> bool {
-    should_show_dropdown_button_with_list(grid, row, col, cell_has_dropdown_source(grid, row, col))
+    should_show_dropdown_button_for_control(grid, row, col, grid.resolved_cell_control(row, col))
 }
 
 /// Compute the pixel rect for a dropdown button within a cell.
@@ -2356,10 +2343,7 @@ fn render_grid_internal<C: Canvas>(
         render_progress_bars(grid, canvas, &ctx)
     );
 
-    run_layer!(
-        layer::GRID_LINES,
-        render_grid_lines(grid, canvas, &ctx)
-    );
+    run_layer!(layer::GRID_LINES, render_grid_lines(grid, canvas, &ctx));
 
     run_layer!(layer::HEADER_MARKS, render_header_marks(grid, canvas, &ctx));
     run_layer!(
@@ -2367,10 +2351,7 @@ fn render_grid_internal<C: Canvas>(
         render_background_image(grid, canvas)
     );
 
-    run_layer!(
-        layer::CELL_BORDERS,
-        render_cell_borders(grid, canvas, &ctx)
-    );
+    run_layer!(layer::CELL_BORDERS, render_cell_borders(grid, canvas, &ctx));
 
     run_layer!(layer::CELL_TEXT, render_cell_text(grid, canvas, &ctx));
     run_layer!(
@@ -2383,10 +2364,7 @@ fn render_grid_internal<C: Canvas>(
         render_col_drag_marker(grid, canvas, &ctx)
     );
 
-    run_layer!(
-        layer::CHECKBOXES,
-        render_checkboxes(grid, canvas, &ctx)
-    );
+    run_layer!(layer::CHECKBOXES, render_checkboxes(grid, canvas, &ctx));
 
     run_layer!(
         layer::DROPDOWN_BUTTONS,
@@ -4079,12 +4057,7 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
         let alignment = meta.alignment;
         let cell_padding = meta.padding;
 
-        let button_reserve = if should_show_dropdown_button_with_list(
-            grid,
-            text_row,
-            text_col,
-            meta.has_dropdown_list,
-        ) {
+        let button_reserve = if show_dropdown_button_for_cell(grid, text_row, text_col) {
             dropdown_button_rect(vis_x, vis_y, vis_w, vis_h).map_or(0, |(_, _, bw, _)| bw + 2)
         } else {
             0
@@ -5484,12 +5457,21 @@ fn render_dropdown_buttons<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &R
             continue;
         };
 
+        let pressed = grid.dropdown_button_pressed
+            && grid.dropdown_button_pressed_row == row
+            && grid.dropdown_button_pressed_col == col;
+        let (draw_x, draw_y, draw_w, draw_h, fill_color) = if pressed {
+            (bx + 1, by + 1, (bw - 1).max(1), (bh - 1).max(1), 0xFFD0D0D0)
+        } else {
+            (bx, by, bw, bh, 0xFFEAEAEA)
+        };
+
         // Clip button against visible cell bounds so it doesn't draw into
         // fixed/frozen rows when scrolling — partial draw, not full skip.
-        let vx0 = bx.max(cx);
-        let vy0 = by.max(cy);
-        let vx1 = (bx + bw).min(cx + cw);
-        let vy1 = (by + bh).min(cy + ch);
+        let vx0 = draw_x.max(cx);
+        let vy0 = draw_y.max(cy);
+        let vx1 = (draw_x + draw_w).min(cx + cw);
+        let vy1 = (draw_y + draw_h).min(cy + ch);
         let vw = vx1 - vx0;
         let vh = vy1 - vy0;
         if vw <= 0 || vh <= 0 {
@@ -5497,27 +5479,24 @@ fn render_dropdown_buttons<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &R
         }
 
         // Button body — draw only the visible portion.
-        canvas.fill_rect(vx0, vy0, vw, vh, 0xFFEAEAEA);
+        canvas.fill_rect(vx0, vy0, vw, vh, fill_color);
         canvas.rect_outline(vx0, vy0, vw, vh, 0xFF6A6A6A);
 
         // Glyph — draw per-pixel only within visible bounds.
-        let list = grid.active_dropdown_list(row, col);
         let glyph_color = 0xFF202020;
-        let (dot_size, arrow_h, arrow_half) = dropdown_glyph_metrics(bw, bh);
-        if list.trim() == "..." {
-            // Ellipsis glyph
-            let dot_gap = ((bw / 6).max(dot_size + 1)).min(dot_size + 6);
-            let total_w = dot_size * 3 + dot_gap * 2;
-            let start_x = bx + ((bw - total_w) / 2);
-            let gy = by + ((bh - dot_size) / 2);
+        if grid.resolved_cell_control(row, col) == CellControl::EllipsisButton {
+            let dot = (draw_h / 9).clamp(1, 3);
+            let gap = (dot + 1).max(2);
+            let total_w = dot * 3 + gap * 2;
+            let start_x = draw_x + ((draw_w - total_w) / 2);
+            let dot_y = draw_y + ((draw_h - dot) / 2);
             for i in 0..3 {
-                let gx = start_x + i * (dot_size + dot_gap);
                 fill_rect_clipped(
                     canvas,
-                    gx,
-                    gy,
-                    dot_size,
-                    dot_size,
+                    start_x + i * (dot + gap),
+                    dot_y,
+                    dot,
+                    dot,
                     vx0,
                     vy0,
                     vx1,
@@ -5526,9 +5505,9 @@ fn render_dropdown_buttons<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &R
                 );
             }
         } else {
-            // Dropdown arrow glyph
-            let cxm = bx + bw / 2;
-            let start_y = by + ((bh - arrow_h) / 2);
+            let (_, arrow_h, arrow_half) = dropdown_glyph_metrics(draw_w, draw_h);
+            let cxm = draw_x + draw_w / 2;
+            let start_y = draw_y + ((draw_h - arrow_h) / 2);
             let denom = (arrow_h - 1).max(1) as i64;
             for row_off in 0..arrow_h {
                 let py = start_y + row_off;
@@ -6580,7 +6559,7 @@ fn render_active_dropdown<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Re
     }
 
     let list = grid.active_dropdown_list(row, col);
-    if list.is_empty() || list.trim() == "..." {
+    if list.is_empty() {
         return;
     }
 

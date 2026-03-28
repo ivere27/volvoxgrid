@@ -29,7 +29,11 @@ type DoomTouchActionCode = "ControlLeft" | "Space" | "Enter";
 const STRESS_ROWS = 1_000_000;
 const STRESS_COLS = 12;
 const SALES_COLS = 10;
-const HIERARCHY_COLS = 5;
+const HIERARCHY_COLS = 6;
+const GRID_EVENT_CLICK = 42;
+const HIERARCHY_ACTION_COL = 5;
+const CELL_INTERACTION_UNSPECIFIED = 0;
+const CELL_HIT_AREA_TEXT = 1;
 const FONT_FETCH_TIMEOUT_MS = 5000;
 const HOVER_NONE = 0;
 const HOVER_ROW = 1;
@@ -238,6 +242,97 @@ function pbEncodeSelectionHoverConfig(mode: number): Uint8Array {
   return new Uint8Array(gridConfig);
 }
 
+function pbReadVarint(data: Uint8Array, offset: number): { value: bigint; next: number } {
+  let value = 0n;
+  let shift = 0n;
+  let index = offset;
+  while (index < data.length) {
+    const byte = BigInt(data[index]);
+    index += 1;
+    value |= (byte & 0x7fn) << shift;
+    if ((byte & 0x80n) === 0n) {
+      return { value, next: index };
+    }
+    shift += 7n;
+  }
+  return { value, next: data.length };
+}
+
+function pbSkipField(data: Uint8Array, offset: number, wireType: number): number {
+  if (wireType === 0) {
+    return pbReadVarint(data, offset).next;
+  }
+  if (wireType === 2) {
+    const len = pbReadVarint(data, offset);
+    return Math.min(data.length, len.next + Number(len.value));
+  }
+  return data.length;
+}
+
+function pbAsInt32(value: bigint): number {
+  return Number(BigInt.asIntN(32, value));
+}
+
+function pbDecodeGridEventEnvelope(
+  data: Uint8Array,
+): { eventField: number; payload: Uint8Array } | null {
+  let offset = 0;
+  let eventField = 0;
+  let payload = new Uint8Array(0);
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+
+    if (wire === 2 && field >= 2 && field <= 60) {
+      const len = pbReadVarint(data, offset);
+      const size = Number(len.value);
+      if (!Number.isFinite(size) || size < 0) {
+        return null;
+      }
+      const start = len.next;
+      const end = Math.min(data.length, start + size);
+      eventField = field;
+      payload = data.slice(start, end);
+      offset = end;
+      continue;
+    }
+
+    offset = pbSkipField(data, offset, wire);
+  }
+
+  return eventField === 0 ? null : { eventField, payload };
+}
+
+function pbDecodeClickEventPayload(
+  data: Uint8Array,
+): { row: number; col: number; hitArea: number; interaction: number } {
+  let row = -1;
+  let col = -1;
+  let hitArea = 0;
+  let interaction = CELL_INTERACTION_UNSPECIFIED;
+  let offset = 0;
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (wire === 0) {
+      const value = pbReadVarint(data, offset);
+      const n = pbAsInt32(value.value);
+      offset = value.next;
+      if (field === 1) row = n;
+      if (field === 2) col = n;
+      if (field === 3) hitArea = n;
+      if (field === 4) interaction = n;
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  return { row, col, hitArea, interaction };
+}
+
 async function main() {
   const status = document.getElementById("status")!;
   const canvas = document.getElementById("grid-canvas") as HTMLCanvasElement;
@@ -414,6 +509,49 @@ async function main() {
   let doomJoystickDirection: DoomDirectionCode | null = null;
   const resetDoomActionButtons: Array<() => void> = [];
   let switchToken = 0;
+  let pendingHierarchyActionAlert = 0;
+
+  function drainHierarchyActionClickEvents(): void {
+    if (currentDemo !== "hierarchy") {
+      return;
+    }
+    const hierarchyGridId = demoGridIds.hierarchy;
+    if (typeof hierarchyGridId !== "number" || grid.id !== hierarchyGridId) {
+      return;
+    }
+    try {
+      const rawEvents = grid.drainEventStreamRaw(32);
+      for (const rawEvent of rawEvents) {
+        const decoded = pbDecodeGridEventEnvelope(rawEvent);
+        if (decoded == null || decoded.eventField !== GRID_EVENT_CLICK) {
+          continue;
+        }
+        const click = pbDecodeClickEventPayload(decoded.payload);
+        if (click.row < 1 || click.col !== HIERARCHY_ACTION_COL || click.hitArea !== CELL_HIT_AREA_TEXT) {
+          continue;
+        }
+        window.alert(
+          "Hierarchy action click: row " + click.row
+            + ", col " + click.col
+            + ", hit_area " + click.hitArea
+            + ", interaction " + click.interaction,
+        );
+        break;
+      }
+    } catch (error) {
+      console.warn("VolvoxGrid demo: failed to drain click events", error);
+    }
+  }
+
+  function scheduleHierarchyActionClickAlert(): void {
+    if (currentDemo !== "hierarchy" || pendingHierarchyActionAlert !== 0) {
+      return;
+    }
+    pendingHierarchyActionAlert = window.setTimeout(() => {
+      pendingHierarchyActionAlert = 0;
+      drainHierarchyActionClickEvents();
+    }, 0);
+  }
 
   function normalizeLayerMask(raw: number): number {
     if (!Number.isFinite(raw)) {
@@ -1418,6 +1556,10 @@ async function main() {
 
   setDoomOptionsVisible(false);
   updateDoomTouchControlsVisibility();
+
+  canvas.addEventListener("click", () => {
+    scheduleHierarchyActionClickAlert();
+  });
 
   rebuildCanvasResolutionOptions(false);
   selCanvasRes.addEventListener("change", () => {

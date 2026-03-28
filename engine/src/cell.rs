@@ -1,6 +1,8 @@
 use std::cell::Cell;
 use std::collections::HashMap;
 
+use crate::control::CellControl;
+
 /// Value stored in a cell
 #[derive(Clone, Debug)]
 pub enum CellValueData {
@@ -44,6 +46,10 @@ pub struct CellExtra {
     pub button_picture: Option<Vec<u8>>,
     /// Format of the button picture (e.g. "png", "bmp").
     pub button_picture_format: String,
+    /// Explicit per-cell interaction override. None means inherit column default.
+    pub interaction: Option<i32>,
+    // Explicit per-cell control override. None means inherit column/default inference.
+    pub control: Option<CellControl>,
 }
 
 impl Default for CellExtra {
@@ -61,6 +67,8 @@ impl Default for CellExtra {
             user_data: None,
             button_picture: None,
             button_picture_format: String::new(),
+            interaction: None,
+            control: None,
         }
     }
 }
@@ -147,6 +155,12 @@ impl CellData {
         self.extra.as_ref().map_or(0, |e| e.picture_alignment)
     }
 
+    pub fn button_picture(&self) -> Option<&[u8]> {
+        self.extra
+            .as_ref()
+            .and_then(|e| e.button_picture.as_deref())
+    }
+
     pub fn custom_format(&self) -> &str {
         self.extra.as_ref().map_or("", |e| e.custom_format.as_str())
     }
@@ -155,6 +169,14 @@ impl CellData {
         self.extra
             .as_ref()
             .map_or("", |e| e.dropdown_items.as_str())
+    }
+
+    pub fn interaction_override(&self) -> Option<i32> {
+        self.extra.as_ref().and_then(|e| e.interaction)
+    }
+
+    pub fn control_override(&self) -> Option<CellControl> {
+        self.extra.as_ref().and_then(|e| e.control)
     }
 
     /// Returns a mutable reference to the extra fields, allocating if needed.

@@ -325,6 +325,23 @@ enum CheckedState {
   CHECKED_GRAYED       = 2;
 }
 
+enum CellHitArea {
+  HIT_NONE            = 0;
+  HIT_CELL            = 1;
+  HIT_TEXT            = 2;
+  HIT_PICTURE         = 3;
+  HIT_BUTTON_PICTURE  = 4;
+  HIT_CHECKBOX        = 5;
+  HIT_DROPDOWN        = 6;
+}
+
+enum CellInteraction {
+  CELL_INTERACTION_UNSPECIFIED = 0;
+  CELL_INTERACTION_NONE        = 1;
+  CELL_INTERACTION_TEXT_LINK   = 2;
+  CELL_INTERACTION_BUTTON      = 3;
+}
+
 enum RendererMode {
   RENDERER_CPU  = 0; // Default CPU rendering (tiny-skia)
   RENDERER_GPU  = 1; // GPU rendering (wgpu)
@@ -1396,9 +1413,7 @@ message GridEvent {
     StartEditEvent          start_edit             = 9;
     AfterEditEvent          after_edit             = 10;
     ValidateEditEvent       validate_edit          = 11;
-    ChangeEditEvent         change_edit            = 12;
-    CellButtonClickEvent    cell_button_click      = 13;
-    KeyDownEditEvent        key_down_edit          = 14;
+    ChangeEditEvent         change_edit            = 12;    KeyDownEditEvent        key_down_edit          = 14;
     KeyPressEditEvent       key_press_edit         = 15;
     KeyUpEditEvent          key_up_edit            = 16;
     SetupEditStyleEvent     setup_edit_style       = 17;
@@ -1504,7 +1519,6 @@ message ValidateEditEvent {
 }
 
 message ChangeEditEvent { string text = 1; }
-message CellButtonClickEvent { int32 row = 1; int32 col = 2; }
 
 message KeyDownEditEvent  { int32 key_code = 1; int32 modifier = 2; }
 message KeyPressEditEvent { int32 key_ascii = 1; }
@@ -1616,8 +1630,13 @@ message BeforeMouseDownEvent {
 message MouseDownEvent  { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
 message MouseUpEvent    { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
 message MouseMoveEvent  { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
-message ClickEvent      {}
-message DblClickEvent   {}
+message ClickEvent {
+  int32 row = 1;
+  int32 col = 2;
+  CellHitArea hit_area = 3;
+  CellInteraction interaction = 4;
+}
+message DblClickEvent { int32 row = 1; int32 col = 2; }
 
 message KeyDownEvent  { int32 key_code = 1; int32 modifier = 2; }
 message KeyPressEvent { int32 key_ascii = 1; }

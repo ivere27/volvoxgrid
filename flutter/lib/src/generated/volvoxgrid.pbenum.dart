@@ -412,6 +412,31 @@ class WriteErrorMode extends $pb.ProtobufEnum {
   const WriteErrorMode._(super.value, super.name);
 }
 
+class CellInteraction extends $pb.ProtobufEnum {
+  static const CellInteraction CELL_INTERACTION_UNSPECIFIED = CellInteraction._(
+      0, _omitEnumNames ? '' : 'CELL_INTERACTION_UNSPECIFIED');
+  static const CellInteraction CELL_INTERACTION_NONE =
+      CellInteraction._(1, _omitEnumNames ? '' : 'CELL_INTERACTION_NONE');
+  static const CellInteraction CELL_INTERACTION_TEXT_LINK =
+      CellInteraction._(2, _omitEnumNames ? '' : 'CELL_INTERACTION_TEXT_LINK');
+  static const CellInteraction CELL_INTERACTION_BUTTON =
+      CellInteraction._(3, _omitEnumNames ? '' : 'CELL_INTERACTION_BUTTON');
+
+  static const $core.List<CellInteraction> values = <CellInteraction>[
+    CELL_INTERACTION_UNSPECIFIED,
+    CELL_INTERACTION_NONE,
+    CELL_INTERACTION_TEXT_LINK,
+    CELL_INTERACTION_BUTTON,
+  ];
+
+  static final $core.List<CellInteraction?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static CellInteraction? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const CellInteraction._(super.value, super.name);
+}
+
 class HeaderPolicy extends $pb.ProtobufEnum {
   static const HeaderPolicy HEADER_AUTO =
       HeaderPolicy._(0, _omitEnumNames ? '' : 'HEADER_AUTO');
@@ -1337,6 +1362,37 @@ class IconAlign extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const IconAlign._(super.value, super.name);
+}
+
+class CellHitArea extends $pb.ProtobufEnum {
+  static const CellHitArea HIT_CELL =
+      CellHitArea._(0, _omitEnumNames ? '' : 'HIT_CELL');
+  static const CellHitArea HIT_TEXT =
+      CellHitArea._(1, _omitEnumNames ? '' : 'HIT_TEXT');
+  static const CellHitArea HIT_PICTURE =
+      CellHitArea._(2, _omitEnumNames ? '' : 'HIT_PICTURE');
+  static const CellHitArea HIT_BUTTON =
+      CellHitArea._(3, _omitEnumNames ? '' : 'HIT_BUTTON');
+  static const CellHitArea HIT_CHECKBOX =
+      CellHitArea._(4, _omitEnumNames ? '' : 'HIT_CHECKBOX');
+  static const CellHitArea HIT_DROPDOWN =
+      CellHitArea._(5, _omitEnumNames ? '' : 'HIT_DROPDOWN');
+
+  static const $core.List<CellHitArea> values = <CellHitArea>[
+    HIT_CELL,
+    HIT_TEXT,
+    HIT_PICTURE,
+    HIT_BUTTON,
+    HIT_CHECKBOX,
+    HIT_DROPDOWN,
+  ];
+
+  static final $core.List<CellHitArea?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
+  static CellHitArea? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const CellHitArea._(super.value, super.name);
 }
 
 /// ── Render layer bit positions (for render_layer_mask bitmask) ──

@@ -5472,7 +5472,7 @@ export class VolvoxGrid {
 
     // Sync cursor style from engine
     const cursorStyle = Number(this.wasm.get_cursor_style(this.gridId));
-    const CURSOR_MAP = ["default", "col-resize", "row-resize", "grab"];
+    const CURSOR_MAP = ["default", "col-resize", "row-resize", "grab", "pointer", "pointer"];
     this.canvas.style.cursor = CURSOR_MAP[cursorStyle] ?? "default";
 
     if (e.buttons) {

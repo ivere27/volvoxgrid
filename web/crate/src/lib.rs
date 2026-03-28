@@ -263,12 +263,6 @@ fn begin_edit_session_core(
             .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
     }
 
-    if combo_list.trim() == "..." {
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::CellButtonClick { row, col });
-        return;
-    }
-
     let stored_text = grid.cells.get_text(row, col).to_string();
     let display_text = grid.get_display_text(row, col);
     grid.edit.start_edit_with_options(
@@ -414,7 +408,7 @@ fn apply_committed_edit_text(
     }
 
     let active_combo = grid.active_dropdown_list(row, col);
-    if !active_combo.is_empty() && active_combo.trim() != "..." {
+    if !active_combo.is_empty() {
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::DropdownClosed);
     }
@@ -3756,7 +3750,7 @@ pub fn handle_pointer_down(id: i32, x: f32, y: f32, button: i32, modifier: i32, 
                 } else {
                     String::new()
                 };
-                let is_combo_cell = !combo_list.is_empty() && combo_list.trim() != "...";
+                let is_combo_cell = !combo_list.is_empty();
 
                 if area == input::HitArea::DropdownButton {
                     if !(grid.edit.is_active()
@@ -4114,7 +4108,8 @@ pub fn is_dirty(id: i32) -> i32 {
 }
 
 /// Returns the cursor style the host should display.
-/// 0 = default, 1 = col-resize, 2 = row-resize, 3 = move/grab
+/// 0 = default, 1 = col-resize, 2 = row-resize, 3 = move/grab,
+/// 4 = pointer/hand, 5 = pointer/hand (interactive cell content)
 #[wasm_bindgen]
 pub fn get_cursor_style(id: i32) -> i32 {
     with_grid(id, |grid| grid.cursor_style).unwrap_or(0)
@@ -4424,12 +4419,6 @@ fn engine_event_to_proto(
                 text,
             }))
         }
-        E::CellButtonClick { row, col } => {
-            Some(grid_event::Event::CellButtonClick(CellButtonClickEvent {
-                row,
-                col,
-            }))
-        }
         E::KeyDownEdit { key_code, modifier } => {
             Some(grid_event::Event::KeyDownEdit(KeyDownEditEvent {
                 key_code,
@@ -4600,8 +4589,18 @@ fn engine_event_to_proto(
             x,
             y,
         })),
-        E::Click => Some(grid_event::Event::Click(ClickEvent {})),
-        E::DblClick => Some(grid_event::Event::DblClick(DblClickEvent {})),
+        E::Click {
+            row,
+            col,
+            hit_area,
+            interaction,
+        } => Some(grid_event::Event::Click(ClickEvent {
+            row,
+            col,
+            hit_area,
+            interaction,
+        })),
+        E::DblClick { row, col } => Some(grid_event::Event::DblClick(DblClickEvent { row, col })),
         E::KeyDown { key_code, modifier } => Some(grid_event::Event::KeyDown(KeyDownEvent {
             key_code,
             modifier,

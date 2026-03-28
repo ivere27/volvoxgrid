@@ -2865,7 +2865,6 @@ fn grid_event_name(event: &pb::GridEvent) -> &'static str {
         Some(pb::grid_event::Event::AfterEdit(_)) => "AfterEdit",
         Some(pb::grid_event::Event::CellEditValidate(_)) => "CellEditValidate",
         Some(pb::grid_event::Event::CellEditChange(_)) => "CellEditChange",
-        Some(pb::grid_event::Event::CellButtonClick(_)) => "CellButtonClick",
         Some(pb::grid_event::Event::BeforeSort(_)) => "BeforeSort",
         Some(pb::grid_event::Event::AfterSort(_)) => "AfterSort",
         Some(pb::grid_event::Event::BeforeScroll(_)) => "BeforeScroll",

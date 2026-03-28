@@ -207,6 +207,13 @@ enum WriteErrorMode {
   WRITE_ERROR_SKIP       = 3;
 }
 
+enum CellInteraction {
+  CELL_INTERACTION_UNSPECIFIED = 0;
+  CELL_INTERACTION_NONE        = 1;
+  CELL_INTERACTION_TEXT_LINK   = 2;
+  CELL_INTERACTION_BUTTON      = 3;
+}
+
 enum HeaderPolicy {
   HEADER_AUTO      = 0;
   HEADER_NONE      = 1;
@@ -506,6 +513,15 @@ enum IconAlign {
   ICON_ALIGN_START        = 2;
   ICON_ALIGN_END          = 3;
   ICON_ALIGN_CENTER       = 4;
+}
+
+enum CellHitArea {
+  HIT_CELL     = 0;
+  HIT_TEXT     = 1;
+  HIT_PICTURE  = 2;
+  HIT_BUTTON   = 3;
+  HIT_CHECKBOX = 4;
+  HIT_DROPDOWN = 5;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1048,6 +1064,7 @@ message ColumnDef {
   optional bool           nullable       = 23;
   optional CoercionMode   coercion_mode  = 24;
   optional WriteErrorMode error_mode     = 25;
+  optional CellInteraction interaction   = 26;
 }
 
 message DefineColumnsRequest {
@@ -1091,6 +1108,7 @@ message CellUpdate {
   optional string        dropdown_items = 9;
   optional StickyEdge    sticky_row     = 10;
   optional StickyEdge    sticky_col     = 11;
+  optional CellInteraction interaction  = 12;
 }
 
 message UpdateCellsRequest {
@@ -1111,11 +1129,12 @@ message GetCellsRequest {
 }
 
 message CellData {
-  int32        row     = 1;
-  int32        col     = 2;
-  CellValue    value   = 3;
-  CellStyle    style   = 4;
-  CheckedState checked = 5;
+  int32                   row         = 1;
+  int32                   col         = 2;
+  CellValue               value       = 3;
+  CellStyle               style       = 4;
+  CheckedState            checked     = 5;
+  optional CellInteraction interaction = 6;
 }
 
 message CellsResponse {
@@ -1786,7 +1805,6 @@ message GridEvent {
     AfterEditEvent          after_edit            = 10;
     CellEditValidateEvent   cell_edit_validate    = 11;
     CellEditChangeEvent     cell_edit_change      = 12;
-    CellButtonClickEvent    cell_button_click     = 13;
     KeyDownEditEvent        key_down_edit         = 14;
     KeyPressEditEvent       key_press_edit        = 15;
     KeyUpEditEvent          key_up_edit           = 16;
@@ -1881,7 +1899,6 @@ message StartEditEvent    { int32 row = 1; int32 col = 2; }
 message AfterEditEvent    { int32 row = 1; int32 col = 2; string old_text = 3; string new_text = 4; }
 message CellEditValidateEvent { int32 row = 1; int32 col = 2; string edit_text = 3; }
 message CellEditChangeEvent   { string text = 1; }
-message CellButtonClickEvent  { int32 row = 1; int32 col = 2; }
 message KeyDownEditEvent  { int32 key_code = 1; int32 modifier = 2; }
 message KeyPressEditEvent { int32 key_ascii = 1; }
 message KeyUpEditEvent    { int32 key_code = 1; int32 modifier = 2; }
@@ -1930,8 +1947,8 @@ message BeforeMouseDownEvent { int32 row = 1; int32 col = 2; }
 message MouseDownEvent  { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
 message MouseUpEvent    { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
 message MouseMoveEvent  { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
-message ClickEvent      {}
-message DblClickEvent   {}
+message ClickEvent      { int32 row = 1; int32 col = 2; CellHitArea hit_area = 3; CellInteraction interaction = 4; }
+message DblClickEvent   { int32 row = 1; int32 col = 2; }
 
 // ── Keyboard Events ──
 message KeyDownEvent  { int32 key_code = 1; int32 modifier = 2; }

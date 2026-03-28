@@ -251,6 +251,7 @@ pub fn load_data(
                 dropdown_items: None,
                 sticky_row: None,
                 sticky_col: None,
+                interaction: None,
             });
         }
     }
@@ -1608,6 +1609,7 @@ mod tests {
                 dropdown_items: None,
                 sticky_row: None,
                 sticky_col: None,
+                interaction: None,
             }],
             false,
         );

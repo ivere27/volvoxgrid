@@ -1,3 +1,4 @@
+use crate::control::CellControl;
 use crate::style::Padding;
 
 /// Per-column properties
@@ -38,6 +39,10 @@ pub struct ColumnProps {
     pub coercion_mode: i32,
     /// Error handling behavior (`v1::WriteErrorMode` value).
     pub error_mode: i32,
+    /// Default interaction behavior for cells in this column (`v1::CellInteraction`).
+    pub interaction: i32,
+    // Default accessory/control for cells in this column.
+    pub control: CellControl,
 }
 
 impl Default for ColumnProps {
@@ -67,6 +72,8 @@ impl Default for ColumnProps {
             nullable: true,
             coercion_mode: 0,
             error_mode: 0,
+            interaction: 0,
+            control: CellControl::None,
         }
     }
 }

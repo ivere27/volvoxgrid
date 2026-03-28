@@ -679,12 +679,6 @@ fn engine_event_to_proto(
                 text,
             }))
         }
-        E::CellButtonClick { row, col } => {
-            Some(grid_event::Event::CellButtonClick(CellButtonClickEvent {
-                row,
-                col,
-            }))
-        }
         E::KeyDownEdit { key_code, modifier } => {
             Some(grid_event::Event::KeyDownEdit(KeyDownEditEvent {
                 key_code,
@@ -855,8 +849,18 @@ fn engine_event_to_proto(
             x,
             y,
         })),
-        E::Click => Some(grid_event::Event::Click(ClickEvent {})),
-        E::DblClick => Some(grid_event::Event::DblClick(DblClickEvent {})),
+        E::Click {
+            row,
+            col,
+            hit_area,
+            interaction,
+        } => Some(grid_event::Event::Click(ClickEvent {
+            row,
+            col,
+            hit_area,
+            interaction,
+        })),
+        E::DblClick { row, col } => Some(grid_event::Event::DblClick(DblClickEvent { row, col })),
         E::KeyDown { key_code, modifier } => Some(grid_event::Event::KeyDown(KeyDownEvent {
             key_code,
             modifier,
@@ -1195,12 +1199,6 @@ fn begin_edit_session_core_opts(
             .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
     }
 
-    if combo_list.trim() == "..." {
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::CellButtonClick { row, col });
-        return;
-    }
-
     let stored_text = grid.cells.get_text(row, col).to_string();
     let display_text = grid.get_display_text(row, col);
     grid.edit.start_edit_with_options(
@@ -1303,7 +1301,7 @@ fn apply_committed_edit_text(
     }
 
     let active_combo = grid.active_dropdown_list(row, col);
-    if !active_combo.is_empty() && active_combo.trim() != "..." {
+    if !active_combo.is_empty() {
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::DropdownClosed);
     }
@@ -2142,7 +2140,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         let active_combo =
                             grid.active_dropdown_list(grid.edit.edit_row, grid.edit.edit_col);
                         grid.edit.cancel();
-                        if !active_combo.is_empty() && active_combo.trim() != "..." {
+                        if !active_combo.is_empty() {
                             grid.events
                                 .push(volvoxgrid_engine::event::GridEventData::DropdownClosed);
                         }
@@ -3212,8 +3210,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                             } else {
                                                 String::new()
                                             };
-                                            let is_combo_cell = !combo_list.is_empty()
-                                                && combo_list.trim() != "...";
+                                            let is_combo_cell = !combo_list.is_empty();
 
                                             if hit.area
                                                 == volvoxgrid_engine::input::HitArea::DropdownButton

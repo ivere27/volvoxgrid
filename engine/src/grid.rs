@@ -9,6 +9,7 @@ use web_time::Instant;
 use crate::animation::AnimationState;
 use crate::cell::CellStore;
 use crate::column::ColumnProps;
+use crate::control::CellControl;
 use crate::drag::DragState;
 use crate::edit::EditState;
 use crate::event::EventQueue;
@@ -419,7 +420,8 @@ pub struct VolvoxGrid {
     /// Column index currently under the mouse pointer (-1 if none).
     pub mouse_col: i32,
     /// Cursor style the host should display.
-    /// 0 = default, 1 = col-resize, 2 = row-resize, 3 = move/grab
+    /// 0 = default, 1 = col-resize, 2 = row-resize, 3 = move/grab,
+    /// 4 = pointer/hand, 5 = pointer/hand (interactive cell content)
     pub cursor_style: i32,
 
     // ── Resize Tracking ──────────────────────────────────────────────────
@@ -469,6 +471,12 @@ pub struct VolvoxGrid {
     /// Set after a dropdown item click commits, to consume the rest of the
     /// same pointer gesture so it does not leak into grid selection.
     pub dropdown_click_active: bool,
+    /// Whether a dropdown button is currently shown pressed.
+    pub dropdown_button_pressed: bool,
+    /// Cell row for the active dropdown button press.
+    pub dropdown_button_pressed_row: i32,
+    /// Cell column for the active dropdown button press.
+    pub dropdown_button_pressed_col: i32,
 
     // ── Fast Scroll Tracking ──────────────────────────────────────────────
     /// Whether the fast-scroll touch overlay is enabled (mobile).
@@ -780,6 +788,9 @@ impl VolvoxGrid {
             // Outline button click
             outline_click_active: false,
             dropdown_click_active: false,
+            dropdown_button_pressed: false,
+            dropdown_button_pressed_row: -1,
+            dropdown_button_pressed_col: -1,
 
             // Fast scroll tracking
             fast_scroll_enabled: false,
@@ -1627,6 +1638,41 @@ impl VolvoxGrid {
     ///
     /// Header rows and subtotal/grandtotal rows are always read-only.
     /// `force=true` bypasses only the global `edit_trigger_mode` gate.
+    pub fn resolved_cell_interaction(&self, row: i32, col: i32) -> i32 {
+        if row < 0 || row >= self.rows || col < 0 || col >= self.cols {
+            return pb::CellInteraction::None as i32;
+        }
+        if let Some(cell) = self.cells.get(row, col) {
+            if let Some(interaction) = cell.interaction_override() {
+                return interaction;
+            }
+        }
+        match self.get_col_props(col).map_or(0, |cp| cp.interaction) {
+            x if x <= pb::CellInteraction::Unspecified as i32 => pb::CellInteraction::None as i32,
+            x => x,
+        }
+    }
+
+    pub fn resolved_cell_control(&self, row: i32, col: i32) -> CellControl {
+        if row < 0 || row >= self.rows || col < 0 || col >= self.cols {
+            return CellControl::None;
+        }
+        if let Some(cell) = self.cells.get(row, col) {
+            if let Some(control) = cell.control_override() {
+                return control;
+            }
+        }
+        if let Some(control) = self.get_col_props(col).map(|cp| cp.control) {
+            if control != CellControl::None {
+                return control;
+            }
+        }
+        if !self.configured_dropdown_list(row, col).is_empty() {
+            return CellControl::DropdownButton;
+        }
+        CellControl::None
+    }
+
     pub fn can_begin_edit(&self, row: i32, col: i32, force: bool) -> bool {
         if row < 0 || row >= self.rows || col < 0 || col >= self.cols {
             return false;
@@ -1635,6 +1681,9 @@ impl VolvoxGrid {
             return false;
         }
         if self.row_props.get(&row).map_or(false, |rp| rp.is_subtotal) {
+            return false;
+        }
+        if self.resolved_cell_interaction(row, col) != pb::CellInteraction::None as i32 {
             return false;
         }
         if !force && self.edit_trigger_mode <= 0 {
@@ -1687,7 +1736,10 @@ impl VolvoxGrid {
             style_override.as_ref(),
             &display_text,
         );
-        let has_dropdown_list = !self.active_dropdown_list(row, col).is_empty();
+        let has_dropdown_list = matches!(
+            self.resolved_cell_control(row, col),
+            CellControl::DropdownButton | CellControl::EllipsisButton
+        );
         let suppress_text = self.get_col_props(col).map_or(false, |cp| {
             cp.data_type == pb::ColumnDataType::ColumnDataBoolean as i32 && row >= self.fixed_rows
         });
@@ -2048,14 +2100,10 @@ impl VolvoxGrid {
         padding.clamped_non_negative()
     }
 
-    /// Resolve the active dropdown list for a cell.
+    /// Resolve the configured dropdown list for a cell without applying editability rules.
     ///
     /// Cell-level dropdown list has priority over the column-level list.
-    pub fn active_dropdown_list(&self, row: i32, col: i32) -> String {
-        // Dropdown behavior follows the same row-level editability rule.
-        if !self.can_begin_edit(row, col, true) {
-            return String::new();
-        }
+    pub fn configured_dropdown_list(&self, row: i32, col: i32) -> String {
         if let Some(cell) = self.cells.get(row, col) {
             let cl = cell.dropdown_items();
             if !cl.is_empty() {
@@ -2066,6 +2114,17 @@ impl VolvoxGrid {
             return self.columns[col as usize].dropdown_items.clone();
         }
         String::new()
+    }
+
+    /// Resolve the active dropdown list for a cell.
+    ///
+    /// Cell-level dropdown list has priority over the column-level list.
+    pub fn active_dropdown_list(&self, row: i32, col: i32) -> String {
+        // Dropdown behavior follows the same row-level editability rule.
+        if !self.can_begin_edit(row, col, true) {
+            return String::new();
+        }
+        self.configured_dropdown_list(row, col)
     }
 
     /// Returns display text for a cell, applying dropdown list value translation
@@ -3011,7 +3070,7 @@ impl VolvoxGrid {
             });
         }
         let active_dropdown = self.active_dropdown_list(row, col);
-        if !active_dropdown.is_empty() && active_dropdown.trim() != "..." {
+        if !active_dropdown.is_empty() {
             self.events
                 .push(crate::event::GridEventData::DropdownClosed);
         }
@@ -3026,7 +3085,7 @@ impl VolvoxGrid {
             return false;
         };
         let active_dropdown = self.active_dropdown_list(row, col);
-        if !active_dropdown.is_empty() && active_dropdown.trim() != "..." {
+        if !active_dropdown.is_empty() {
             self.events
                 .push(crate::event::GridEventData::DropdownClosed);
         }
@@ -3034,8 +3093,7 @@ impl VolvoxGrid {
         true
     }
 
-    /// Begin editing a cell, handling dropdown list parsing, button cells ("..."),
-    /// and event emission.
+    /// Begin editing a cell, handling dropdown list parsing and event emission.
     pub fn begin_edit(&mut self, row: i32, col: i32) {
         if !self.can_begin_edit(row, col, false) {
             return;
@@ -3044,13 +3102,6 @@ impl VolvoxGrid {
         let dropdown_list = self.active_dropdown_list(row, col);
         self.events
             .push(crate::event::GridEventData::BeforeEdit { row, col });
-
-        if dropdown_list.trim() == "..." {
-            self.events
-                .push(crate::event::GridEventData::CellButtonClick { row, col });
-            self.mark_dirty();
-            return;
-        }
 
         let stored_text = self.cells.get_text(row, col).to_string();
         let display_text = self.get_display_text(row, col);
@@ -3350,7 +3401,7 @@ impl VolvoxGrid {
         }
 
         let list = self.active_dropdown_list(row, col);
-        if list.is_empty() || list.trim() == "..." {
+        if list.is_empty() {
             return None;
         }
 
@@ -3521,6 +3572,26 @@ mod tests {
     }
 
     #[test]
+    fn resolved_cell_control_prefers_explicit_metadata_over_dropdown_inference() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
+        grid.columns[0].dropdown_items = "A|B|C".to_string();
+
+        assert_eq!(
+            grid.resolved_cell_control(1, 0),
+            CellControl::DropdownButton
+        );
+
+        grid.columns[0].control = CellControl::EllipsisButton;
+        assert_eq!(
+            grid.resolved_cell_control(1, 0),
+            CellControl::EllipsisButton
+        );
+
+        grid.cells.get_mut(1, 0).extra_mut().control = Some(CellControl::None);
+        assert_eq!(grid.resolved_cell_control(1, 0), CellControl::None);
+    }
+
+    #[test]
     fn begin_edit_blocked_for_header_and_subtotal_rows() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 4, 2, 1, 0);
         grid.edit_trigger_mode = 2;
@@ -3554,6 +3625,19 @@ mod tests {
         // But force must not bypass row-level read-only constraints.
         assert!(!grid.can_begin_edit(0, 1, true)); // header
         assert!(!grid.can_begin_edit(2, 1, true)); // subtotal/grandtotal
+    }
+
+    #[test]
+    fn interactive_cells_do_not_begin_edit_even_with_force() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 2, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.columns[1].interaction = pb::CellInteraction::TextLink as i32;
+
+        assert!(!grid.can_begin_edit(1, 1, false));
+        assert!(!grid.can_begin_edit(1, 1, true));
+
+        grid.begin_edit(1, 1);
+        assert!(!grid.is_editing());
     }
 
     #[test]

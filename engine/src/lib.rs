@@ -18,6 +18,7 @@ pub mod cell;
 pub mod clipboard;
 pub mod column;
 pub mod config;
+pub mod control;
 pub mod debug_font;
 pub mod drag;
 pub mod edit;
@@ -249,7 +250,12 @@ mod tests {
             .expect("waiter did not start");
         manager
             .with_grid(id, |grid| {
-                grid.events.push(crate::event::GridEventData::Click);
+                grid.events.push(crate::event::GridEventData::Click {
+                    row: 0,
+                    col: 0,
+                    hit_area: 0,
+                    interaction: crate::proto::volvoxgrid::v1::CellInteraction::None as i32,
+                });
             })
             .expect("with_grid should succeed");
         done_rx

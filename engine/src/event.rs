@@ -61,10 +61,6 @@ pub enum GridEventData {
     CellEditChange {
         text: String,
     },
-    CellButtonClick {
-        row: i32,
-        col: i32,
-    },
     KeyDownEdit {
         key_code: i32,
         modifier: i32,
@@ -181,8 +177,16 @@ pub enum GridEventData {
         x: f32,
         y: f32,
     },
-    Click,
-    DblClick,
+    Click {
+        row: i32,
+        col: i32,
+        hit_area: i32,
+        interaction: i32,
+    },
+    DblClick {
+        row: i32,
+        col: i32,
+    },
     KeyDown {
         key_code: i32,
         modifier: i32,
