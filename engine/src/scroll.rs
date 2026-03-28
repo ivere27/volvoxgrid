@@ -244,6 +244,7 @@ mod tests {
             total_width: cols.saturating_mul(col_width.max(0)),
             total_height: rows.saturating_mul(row_height.max(0)),
             valid: true,
+            generation: 0,
             rows,
             cols,
             uniform_rows: true,

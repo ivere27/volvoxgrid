@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
@@ -403,6 +403,10 @@ pub struct VolvoxGrid {
     pub scroll_blit_enabled: bool,
     /// Per-layer execution time in microseconds from the last frame.
     pub layer_times_us: [f32; crate::canvas::layer::COUNT],
+    /// Time spent building `RenderContext` (us) — not included in layer times.
+    pub debug_ctx_time_us: Cell<f32>,
+    /// Time spent clearing/blitting the canvas (us) — not included in layer times.
+    pub debug_clear_time_us: Cell<f32>,
     /// Cell counts per zone: [scrollable, sticky, pinned, fixed].
     pub zone_cell_counts: [u32; 4],
 
@@ -413,6 +417,8 @@ pub struct VolvoxGrid {
     pub(crate) text_meta_generation: u64,
     /// Cache of `(generation, map)` for `build_text_cell_static_meta`.
     text_meta_cache: RefCell<(u64, HashMap<(i32, i32), Arc<TextCellStaticMeta>>)>,
+    /// Cached render context for frame-to-frame reuse (type-erased).
+    pub(crate) render_ctx_cache: RefCell<Option<Box<dyn std::any::Any + Send>>>,
 
     // ── Mouse Tracking ────────────────────────────────────────────────────
     /// Row index currently under the mouse pointer (-1 if none).
@@ -751,12 +757,15 @@ impl VolvoxGrid {
             layer_profiling: false,
             scroll_blit_enabled: false,
             layer_times_us: [0.0; crate::canvas::layer::COUNT],
+            debug_ctx_time_us: Cell::new(0.0),
+            debug_clear_time_us: Cell::new(0.0),
             zone_cell_counts: [0; 4],
 
             // Dirty
             dirty: true,
             text_meta_generation: 0,
             text_meta_cache: RefCell::new((0, HashMap::new())),
+            render_ctx_cache: RefCell::new(None),
 
             // Mouse tracking
             mouse_row: -1,

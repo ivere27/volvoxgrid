@@ -708,7 +708,7 @@ pub trait Canvas {
 // ===========================================================================
 
 /// Pre-computed visible ranges for fixed and scrollable row/column regions.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct VisibleRange {
     /// Exclusive end of fixed + frozen rows.
     pub fixed_row_end: i32,
@@ -754,6 +754,10 @@ pub(crate) struct VisibleRange {
     pub sticky_left_width: i32,
     /// Total pixel width of sticky-right cols.
     pub sticky_right_width: i32,
+    /// Exact scroll X offset as float bits (sub-pixel precision for cache key).
+    pub scroll_x_bits: u32,
+    /// Exact scroll Y offset as float bits (sub-pixel precision for cache key).
+    pub scroll_y_bits: u32,
 }
 
 type MergeRange = (i32, i32, i32, i32);
@@ -1143,6 +1147,8 @@ impl VisibleRange {
             sticky_bottom_height,
             sticky_left_width,
             sticky_right_width,
+            scroll_x_bits: (grid.scroll.scroll_x as f32).to_bits(),
+            scroll_y_bits: (grid.scroll.scroll_y as f32).to_bits(),
         }
     }
 }
@@ -1150,14 +1156,31 @@ impl VisibleRange {
 impl RenderContext {
     fn new(grid: &VolvoxGrid, vp_w: i32, vp_h: i32, damage: Option<&DamageRegion>) -> Self {
         let vp = VisibleRange::compute(grid, vp_w, vp_h);
-        let mut vis_cells: Vec<VisibleCell> = Vec::new();
+        let has_merges = !grid.merged_regions.all_ranges().is_empty()
+            || grid.span.mode != 0
+            || grid.span.mode_fixed != 0;
+        // Pre-allocate with estimated visible cell count to avoid repeated reallocs.
+        let est_rows = (vp.scroll_row_end - vp.scroll_row_start
+            + grid.fixed_rows
+            + grid.frozen_rows)
+            .max(0) as usize;
+        let est_cols = (vp.scroll_col_end - vp.scroll_col_start
+            + grid.fixed_cols
+            + grid.frozen_cols)
+            .max(0) as usize;
+        let mut vis_cells: Vec<VisibleCell> = Vec::with_capacity(est_rows * est_cols);
         let zone_counts =
             iter_visible_cells(grid, &vp, damage, |zone, row, col, cx, cy, cw, ch| {
                 let key = CellKey { row, col };
-                let merge = grid.get_merged_range(row, col);
-                let source_key = match merge {
-                    Some((mr1, mc1, _mr2, _mc2)) => CellKey { row: mr1, col: mc1 },
-                    None => key,
+                let (merge, source_key) = if has_merges {
+                    let merge = grid.get_merged_range(row, col);
+                    let source_key = match merge {
+                        Some((mr1, mc1, _mr2, _mc2)) => CellKey { row: mr1, col: mc1 },
+                        None => key,
+                    };
+                    (merge, source_key)
+                } else {
+                    (None, key)
                 };
                 vis_cells.push(VisibleCell {
                     key,
@@ -1174,7 +1197,12 @@ impl RenderContext {
             });
         let visible_row_rects = build_visible_row_rects(grid, &vp);
         let visible_col_rects = build_visible_col_rects(grid, &vp);
-        let text_cells = build_text_cells(grid, &vp, &vis_cells);
+        // Skip text precomputation when the grid has no cell data at all.
+        let text_cells = if grid.cells.len() == 0 {
+            Vec::new()
+        } else {
+            build_text_cells(grid, &vp, &vis_cells, has_merges)
+        };
         Self {
             vp,
             vis_cells,
@@ -2289,6 +2317,95 @@ fn clear_partial_regions<C: Canvas>(
     }
 }
 
+// ===========================================================================
+// RenderContext frame-to-frame cache
+// ===========================================================================
+
+/// Key capturing all state that determines the structural RenderContext
+/// (vis_cells, visible_row_rects, visible_col_rects, zone_counts).
+///
+/// By using the fully computed `VisibleRange` as the key, we capture
+/// every input that affects the cell iteration (indicator bands,
+/// scrollbars, sticky rows/cols, RTL, pinned, frozen, hidden, etc.)
+/// without having to enumerate individual config fields.
+struct RenderCtxCacheKey {
+    vp: VisibleRange,
+}
+
+impl RenderCtxCacheKey {
+    fn matches(&self, other: &VisibleRange) -> bool {
+        self.vp == *other
+    }
+}
+
+/// Type-erased cache entry stored in `VolvoxGrid::render_ctx_cache`.
+struct RenderCtxCached {
+    key: RenderCtxCacheKey,
+    ctx: RenderContext,
+}
+
+/// Build a `RenderContext`, reusing cached structural data when possible.
+///
+/// Cache hit (same `VisibleRange`, no merges/spans, full render): skip
+/// `iter_visible_cells` and `build_visible_*_rects` entirely, only rebuild
+/// `text_cells`.
+///
+/// Cache miss, partial render, or merges/spans active: full rebuild.
+fn build_or_reuse_ctx(
+    grid: &VolvoxGrid,
+    w: i32,
+    h: i32,
+    damage: Option<&DamageRegion>,
+) -> RenderContext {
+    // Partial renders have filtered cell sets — never reuse.
+    if damage.is_some() {
+        return RenderContext::new(grid, w, h, damage);
+    }
+
+    // When merges or spans are active, cached vis_cells can be stale
+    // (merge results depend on cell text content which changes per frame).
+    let has_merges = !grid.merged_regions.all_ranges().is_empty()
+        || grid.span.mode != 0
+        || grid.span.mode_fixed != 0;
+    if has_merges {
+        return RenderContext::new(grid, w, h, None);
+    }
+
+    // Compute the VisibleRange first (cheap: binary searches + small vecs).
+    // This encodes ALL structural inputs that affect the cell iteration.
+    let current_vp = VisibleRange::compute(grid, w, h);
+
+    // Try to take the previous frame's cached context.
+    let cached = grid
+        .render_ctx_cache
+        .borrow_mut()
+        .take()
+        .and_then(|b| (b as Box<dyn std::any::Any>).downcast::<RenderCtxCached>().ok())
+        .map(|b| *b);
+
+    match cached {
+        Some(prev) if prev.key.matches(&current_vp) => {
+            // Structural hit — reuse vis_cells, row/col rects, zone_counts.
+            // Only rebuild text_cells (content may have changed).
+            let text_cells = if grid.cells.len() == 0 {
+                Vec::new()
+            } else {
+                build_text_cells(grid, &prev.ctx.vp, &prev.ctx.vis_cells, false)
+            };
+            RenderContext {
+                text_cells,
+                ..prev.ctx
+            }
+        }
+        _ => {
+            // Full rebuild.
+            RenderContext::new(grid, w, h, None)
+        }
+    }
+}
+
+
+
 fn render_grid_internal<C: Canvas>(
     grid: &VolvoxGrid,
     canvas: &mut C,
@@ -2320,11 +2437,20 @@ fn render_grid_internal<C: Canvas>(
 
     grid.span.clear_span_cache();
 
-    let ctx = RenderContext::new(grid, w, h, damage);
+    let t_ctx = if profiling { Some(PortableInstant::now()) } else { None };
+    let ctx = build_or_reuse_ctx(grid, w, h, damage);
+    if let Some(t0) = t_ctx {
+        grid.debug_ctx_time_us.set(t0.elapsed().as_secs_f32() * 1_000_000.0);
+    }
+
+    let t_clear = if profiling { Some(PortableInstant::now()) } else { None };
     if let Some(damage) = damage {
         clear_partial_regions(grid, canvas, &ctx, damage);
     } else {
         canvas.clear(grid.style.back_color_bkg);
+    }
+    if let Some(t0) = t_clear {
+        grid.debug_clear_time_us.set(t0.elapsed().as_secs_f32() * 1_000_000.0);
     }
 
     run_layer!(
@@ -2403,7 +2529,15 @@ fn render_grid_internal<C: Canvas>(
     );
     canvas.end_overlay();
 
-    ((0, 0, w, h), times, ctx.zone_counts)
+    let zone_counts = ctx.zone_counts;
+    // Store structural parts back into the cache for next frame.
+    // Only cache full renders (partial renders have filtered vis_cells).
+    if damage.is_none() {
+        let key = RenderCtxCacheKey { vp: ctx.vp.clone() };
+        *grid.render_ctx_cache.borrow_mut() = Some(Box::new(RenderCtxCached { key, ctx }) as Box<dyn std::any::Any + Send>);
+    }
+
+    ((0, 0, w, h), times, zone_counts)
 }
 
 // ===========================================================================
@@ -2872,17 +3006,43 @@ fn build_text_cells(
     grid: &VolvoxGrid,
     vp: &VisibleRange,
     vis_cells: &[VisibleCell],
+    has_merges: bool,
 ) -> Vec<PreparedTextCell> {
     let mut text_cells = Vec::new();
-    let mut prepared_sources: std::collections::HashSet<CellKey> = std::collections::HashSet::new();
+    // Only needed when merges exist — without merges every source_key is unique.
+    let mut prepared_sources: Option<std::collections::HashSet<CellKey>> = if has_merges {
+        Some(std::collections::HashSet::new())
+    } else {
+        None
+    };
 
     for &cell in vis_cells {
-        if !prepared_sources.insert(cell.source_key) {
-            continue;
+        if let Some(ref mut set) = prepared_sources {
+            if !set.insert(cell.source_key) {
+                continue;
+            }
         }
 
         let text_row = cell.source_key.row;
         let text_col = cell.source_key.col;
+
+        // ── Fast pre-checks before expensive meta computation ──
+        // Boolean columns suppress text in data rows.
+        if let Some(cp) = grid.get_col_props(text_col) {
+            if cp.data_type == crate::proto::volvoxgrid::v1::ColumnDataType::ColumnDataBoolean as i32
+                && text_row >= grid.fixed_rows
+            {
+                continue;
+            }
+        }
+        // Skip cells with no display text — avoids build_text_cell_static_meta
+        // (which does get_cell_style, resolve_alignment, resolve_cell_padding,
+        // Arc::new) for all empty cells.
+        let display_text = grid.get_display_text(text_row, text_col);
+        if display_text.is_empty() {
+            continue;
+        }
+
         let vis_rect = if cell.is_merged_span() {
             let vx = cell.rect.x.max(vp.data_x);
             let vy = cell.rect.y.max(vp.data_y);
@@ -7417,9 +7577,12 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
     } else {
         0.0
     };
-    // Layer grid: 2 columns, ceil(26/2)=13 rows + 1 title
+    let ctx_us = grid.debug_ctx_time_us.get();
+    let clear_us = grid.debug_clear_time_us.get();
+    let grand_us = ctx_us + clear_us + total_us;
+    // Layer grid: 2 columns, ceil(26/2)=13 rows + 1 title + 1 summary
     let layer_rows = if profiling { (layer::COUNT + 1) / 2 } else { 0 }; // 13
-    let layer_extra = if profiling { 1 + layer_rows as i32 } else { 0 };
+    let layer_extra = if profiling { 2 + layer_rows as i32 } else { 0 };
 
     // Column layout for layer grid:
     // |<name 10ch>|<value 6ch>|<pct 4ch>|<gap 2ch>|<name 10ch>|<value 6ch>|<pct 4ch>|
@@ -7454,7 +7617,10 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
     // ── Draw layer profiling grid ──
     if profiling {
         // Title
-        let title = format!("Layers: {:5.0}us total", total_us);
+        let title = format!(
+            "Render: {:5.0}us ctx:{:.0} clr:{:.0} lay:{:.0}",
+            grand_us, ctx_us, clear_us, total_us,
+        );
         df::draw_str(canvas, x0, y, &title, text_color, s);
         y += lh;
 
@@ -7517,6 +7683,18 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
                     s,
                 );
             }
+        }
+        // Summary line after layer grid
+        let summary_y = y + layer_rows as i32 * lh;
+        if grand_us > 0.0 {
+            let ctx_pct = ctx_us / grand_us * 100.0;
+            let clr_pct = clear_us / grand_us * 100.0;
+            let lay_pct = total_us / grand_us * 100.0;
+            let summary = format!(
+                "ctx {:3.0}% clr {:3.0}% layers {:3.0}%",
+                ctx_pct, clr_pct, lay_pct,
+            );
+            df::draw_str(canvas, x0, summary_y, &summary, dim_color, s);
         }
     }
 }
