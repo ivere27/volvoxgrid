@@ -2524,22 +2524,23 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     final row = _selRow;
     final col = _selCol;
     if (row < 0 || col < 0) return;
+    final rowLabel = row + 1;
 
     final items = <PopupMenuEntry<String>>[
       PopupMenuItem<String>(
-          value: 'pin_top', child: Text('Pin Row $row to Top')),
+          value: 'pin_top', child: Text("Pin Row " + rowLabel.toString() + " to Top")),
       PopupMenuItem<String>(
-          value: 'pin_bottom', child: Text('Pin Row $row to Bottom')),
-      PopupMenuItem<String>(value: 'unpin', child: Text('Unpin Row $row')),
+          value: 'pin_bottom', child: Text("Pin Row " + rowLabel.toString() + " to Bottom")),
+      PopupMenuItem<String>(value: 'unpin', child: Text("Unpin Row " + rowLabel.toString())),
       const PopupMenuDivider(),
       PopupMenuItem<String>(
-          value: 'sticky_top', child: Text('Sticky Row $row to Top')),
+          value: 'sticky_top', child: Text("Sticky Row " + rowLabel.toString() + " to Top")),
       PopupMenuItem<String>(
-          value: 'sticky_bottom', child: Text('Sticky Row $row to Bottom')),
+          value: 'sticky_bottom', child: Text("Sticky Row " + rowLabel.toString() + " to Bottom")),
       PopupMenuItem<String>(
-          value: 'sticky_both', child: Text('Sticky Row $row Both')),
+          value: 'sticky_both', child: Text("Sticky Row " + rowLabel.toString() + " Both")),
       PopupMenuItem<String>(
-          value: 'unsticky_row', child: Text('Unsticky Row $row')),
+          value: 'unsticky_row', child: Text("Unsticky Row " + rowLabel.toString())),
       const PopupMenuDivider(),
       PopupMenuItem<String>(
           value: 'sticky_left', child: Text('Sticky Col $col to Left')),

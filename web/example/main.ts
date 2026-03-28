@@ -532,11 +532,12 @@ async function main() {
           continue;
         }
         const click = pbDecodeClickEventPayload(decoded.payload);
-        if (click.row < 1 || click.col !== HIERARCHY_ACTION_COL || click.hitArea !== CELL_HIT_AREA_TEXT) {
+        if (click.row < 0 || click.col !== HIERARCHY_ACTION_COL || click.hitArea !== CELL_HIT_AREA_TEXT) {
           continue;
         }
+        const rowLabel = click.row + 1;
         window.alert(
-          "Hierarchy action click: row " + click.row
+          "Hierarchy action click: row " + rowLabel
             + ", col " + click.col
             + ", hit_area " + click.hitArea
             + ", interaction " + click.interaction,

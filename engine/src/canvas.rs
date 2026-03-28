@@ -4492,12 +4492,15 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
 // ===========================================================================
 
 fn picture_layer_needed(grid: &VolvoxGrid, ctx: &RenderContext) -> bool {
-    grid.cells.has_any_picture()
-        && any_visible_cell(ctx, |row, col| {
-            grid.cells
-                .get(row, col)
-                .is_some_and(|cell| cell.picture().is_some_and(|data| !data.is_empty()))
-        })
+    // Only visible cells matter for this layer. Avoid consulting the
+    // CellStore-wide picture cache here because a cold/invalidated cache can
+    // force a full sparse-store scan, which is especially expensive for the
+    // eager 1M-row stress demo after unrelated cell mutations.
+    any_visible_cell(ctx, |row, col| {
+        grid.cells
+            .get(row, col)
+            .is_some_and(|cell| cell.picture().is_some_and(|data| !data.is_empty()))
+    })
 }
 
 fn render_cell_pictures<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {

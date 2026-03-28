@@ -2783,18 +2783,19 @@ class VolvoxGridView @JvmOverloads constructor(
         )
         val fixedRows = config.layout.fixedRows + config.layout.frozenRows
         val fixedCols = config.layout.fixedCols + config.layout.frozenCols
+        val rowLabel = if (row >= fixedRows) maxOf(1, row - fixedRows + 1) else row
 
         // Pin items (for data rows only)
         if (row >= fixedRows) {
-            menu.add("Pin Row $row to Top").setOnMenuItemClickListener {
+            menu.add("Pin Row " + rowLabel + " to Top").setOnMenuItemClickListener {
                 ctrl.pinRow(row, PinPosition.PIN_TOP)
                 requestRenderFrame(); true
             }
-            menu.add("Pin Row $row to Bottom").setOnMenuItemClickListener {
+            menu.add("Pin Row " + rowLabel + " to Bottom").setOnMenuItemClickListener {
                 ctrl.pinRow(row, PinPosition.PIN_BOTTOM)
                 requestRenderFrame(); true
             }
-            menu.add("Unpin Row $row").setOnMenuItemClickListener {
+            menu.add("Unpin Row " + rowLabel).setOnMenuItemClickListener {
                 ctrl.pinRow(row, PinPosition.PIN_NONE)
                 requestRenderFrame(); true
             }
@@ -2802,19 +2803,19 @@ class VolvoxGridView @JvmOverloads constructor(
 
         // Sticky row items (for data rows only)
         if (row >= fixedRows) {
-            menu.add("Sticky Row $row to Top").setOnMenuItemClickListener {
+            menu.add("Sticky Row " + rowLabel + " to Top").setOnMenuItemClickListener {
                 ctrl.setRowSticky(row, StickyEdge.STICKY_TOP)
                 requestRenderFrame(); true
             }
-            menu.add("Sticky Row $row to Bottom").setOnMenuItemClickListener {
+            menu.add("Sticky Row " + rowLabel + " to Bottom").setOnMenuItemClickListener {
                 ctrl.setRowSticky(row, StickyEdge.STICKY_BOTTOM)
                 requestRenderFrame(); true
             }
-            menu.add("Sticky Row $row Both").setOnMenuItemClickListener {
+            menu.add("Sticky Row " + rowLabel + " Both").setOnMenuItemClickListener {
                 ctrl.setRowSticky(row, StickyEdge.STICKY_BOTH)
                 requestRenderFrame(); true
             }
-            menu.add("Unsticky Row $row").setOnMenuItemClickListener {
+            menu.add("Unsticky Row " + rowLabel).setOnMenuItemClickListener {
                 ctrl.setRowSticky(row, StickyEdge.STICKY_NONE)
                 requestRenderFrame(); true
             }
