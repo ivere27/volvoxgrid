@@ -5,6 +5,8 @@
  * lives inside WASM memory; this class manages the render loop, the
  * HTML canvas, and event forwarding.
  */
+import { GridEventFields } from "./generated/volvoxgrid_ffi.js";
+
 export interface VolvoxGridCellRange {
   row1: number;
   col1: number;
@@ -397,9 +399,9 @@ const ICON_ALIGN_TO_WASM = new Map<VolvoxGridIconAlign, number>([
 
 const PB_TEXT_ENCODER = new TextEncoder();
 const PB_TEXT_DECODER = new TextDecoder();
-const GRID_EVENT_BEFORE_EDIT = 8;
-const GRID_EVENT_CELL_EDIT_VALIDATE = 11;
-const GRID_EVENT_BEFORE_SORT = 23;
+const GRID_EVENT_BEFORE_EDIT = GridEventFields["before_edit"];
+const GRID_EVENT_CELL_EDIT_VALIDATE = GridEventFields["cell_edit_validate"];
+const GRID_EVENT_BEFORE_SORT = GridEventFields["before_sort"];
 const STREAM_STATUS_DATA = 0;
 const STREAM_STATUS_EOF = 1;
 const STREAM_STATUS_PENDING = 2;

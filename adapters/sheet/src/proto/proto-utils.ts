@@ -3,10 +3,29 @@
  * Follows the same hand-rolled pattern as adapters/aggrid/src/proto-utils.ts.
  */
 
+import {
+  BorderFields as ProtoBorderFields,
+  BordersFields as ProtoBordersFields,
+  CellRangeFields as ProtoCellRangeFields,
+  CellStyleFields as ProtoCellStyleFields,
+  CellUpdateFields as ProtoCellUpdateFields,
+  CellValueFields as ProtoCellValueFields,
+  EditCommandFields as ProtoEditCommandFields,
+  EditCommitFields as ProtoEditCommitFields,
+  EditSetHighlightsFields as ProtoEditSetHighlightsFields,
+  EditSetTextFields as ProtoEditSetTextFields,
+  EditStartFields as ProtoEditStartFields,
+  FontFields as ProtoFontFields,
+  HighlightRegionFields as ProtoHighlightRegionFields,
+  HighlightStyleFields as ProtoHighlightStyleFields,
+  InsertRowsRequestFields as ProtoInsertRowsRequestFields,
+  SelectRequestFields as ProtoSelectRequestFields,
+  SelectionStateFields as ProtoSelectionStateFields,
+  UpdateCellsRequestFields as ProtoUpdateCellsRequestFields,
+} from "volvoxgrid/generated/volvoxgrid_ffi.js";
+
 const TEXT_ENCODER = new TextEncoder();
 const TEXT_DECODER = new TextDecoder();
-
-// ── Wire-level primitives ──────────────────────────────────
 
 export function encodeVarintUnsigned(value: bigint): number[] {
   const out: number[] = [];
@@ -60,16 +79,42 @@ export function encodeMessageField(field: number, payload: number[]): number[] {
 
 function encodeCellRange(row1: number, col1: number, row2: number, col2: number): number[] {
   const out: number[] = [];
-  out.push(...encodeTag(1, 0), ...encodeInt32(row1));
-  out.push(...encodeTag(2, 0), ...encodeInt32(col1));
-  out.push(...encodeTag(3, 0), ...encodeInt32(row2));
-  out.push(...encodeTag(4, 0), ...encodeInt32(col2));
+  out.push(...encodeTag(ProtoCellRangeFields.row1, 0), ...encodeInt32(row1));
+  out.push(...encodeTag(ProtoCellRangeFields.col1, 0), ...encodeInt32(col1));
+  out.push(...encodeTag(ProtoCellRangeFields.row2, 0), ...encodeInt32(row2));
+  out.push(...encodeTag(ProtoCellRangeFields.col2, 0), ...encodeInt32(col2));
   return out;
 }
 
+function decodeCellRange(data: Uint8Array): { row1: number; col1: number; row2: number; col2: number } {
+  let row1 = -1;
+  let col1 = -1;
+  let row2 = -1;
+  let col2 = -1;
+  let offset = 0;
+  while (offset < data.length) {
+    const tag = readVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (wire === 0) {
+      const value = readVarint(data, offset);
+      offset = value.next;
+      const n = asInt32(value.value);
+      if (field === ProtoCellRangeFields.row1) row1 = n;
+      if (field === ProtoCellRangeFields.col1) col1 = n;
+      if (field === ProtoCellRangeFields.row2) row2 = n;
+      if (field === ProtoCellRangeFields.col2) col2 = n;
+      continue;
+    }
+    offset = skipField(data, offset, wire);
+  }
+  return { row1, col1, row2, col2 };
+}
+
 export interface BorderArg {
-  style?: number;   // BorderStyle enum
-  color?: number;   // ARGB uint32
+  style?: number;
+  color?: number;
 }
 
 export interface BordersArg {
@@ -90,46 +135,43 @@ export interface HighlightStyleArg {
 
 export function encodeBorder(border: BorderArg): number[] {
   const out: number[] = [];
-  if (border.style != null) out.push(...encodeTag(1, 0), ...encodeInt32(border.style));
+  if (border.style != null) out.push(...encodeTag(ProtoBorderFields.style, 0), ...encodeInt32(border.style));
   if (border.color != null) {
-    out.push(...encodeTag(2, 0), ...encodeVarintUnsigned(BigInt(border.color >>> 0)));
+    out.push(...encodeTag(ProtoBorderFields.color, 0), ...encodeVarintUnsigned(BigInt(border.color >>> 0)));
   }
   return out;
 }
 
 export function encodeBorders(borders: BordersArg): number[] {
   const out: number[] = [];
-  if (borders.all) out.push(...encodeMessageField(1, encodeBorder(borders.all)));
-  if (borders.top) out.push(...encodeMessageField(2, encodeBorder(borders.top)));
-  if (borders.right) out.push(...encodeMessageField(3, encodeBorder(borders.right)));
-  if (borders.bottom) out.push(...encodeMessageField(4, encodeBorder(borders.bottom)));
-  if (borders.left) out.push(...encodeMessageField(5, encodeBorder(borders.left)));
+  if (borders.all) out.push(...encodeMessageField(ProtoBordersFields.all, encodeBorder(borders.all)));
+  if (borders.top) out.push(...encodeMessageField(ProtoBordersFields.top, encodeBorder(borders.top)));
+  if (borders.right) out.push(...encodeMessageField(ProtoBordersFields.right, encodeBorder(borders.right)));
+  if (borders.bottom) out.push(...encodeMessageField(ProtoBordersFields.bottom, encodeBorder(borders.bottom)));
+  if (borders.left) out.push(...encodeMessageField(ProtoBordersFields.left, encodeBorder(borders.left)));
   return out;
 }
 
 export function encodeHighlightStyle(style: HighlightStyleArg): number[] {
   const out: number[] = [];
-  // HighlightStyle: background=1, foreground=2, borders=3, fill_handle=4, fill_handle_color=5
   if (style.background != null) {
-    out.push(...encodeTag(1, 0), ...encodeVarintUnsigned(BigInt(style.background >>> 0)));
+    out.push(...encodeTag(ProtoHighlightStyleFields.background, 0), ...encodeVarintUnsigned(BigInt(style.background >>> 0)));
   }
   if (style.foreground != null) {
-    out.push(...encodeTag(2, 0), ...encodeVarintUnsigned(BigInt(style.foreground >>> 0)));
+    out.push(...encodeTag(ProtoHighlightStyleFields.foreground, 0), ...encodeVarintUnsigned(BigInt(style.foreground >>> 0)));
   }
   if (style.borders) {
-    const b = encodeBorders(style.borders);
-    if (b.length > 0) out.push(...encodeMessageField(3, b));
+    const borders = encodeBorders(style.borders);
+    if (borders.length > 0) out.push(...encodeMessageField(ProtoHighlightStyleFields.borders, borders));
   }
   if (style.fillHandle != null) {
-    out.push(...encodeTag(4, 0), ...encodeInt32(style.fillHandle));
+    out.push(...encodeTag(ProtoHighlightStyleFields.fill_handle, 0), ...encodeInt32(style.fillHandle));
   }
   if (style.fillHandleColor != null) {
-    out.push(...encodeTag(5, 0), ...encodeVarintUnsigned(BigInt(style.fillHandleColor >>> 0)));
+    out.push(...encodeTag(ProtoHighlightStyleFields.fill_handle_color, 0), ...encodeVarintUnsigned(BigInt(style.fillHandleColor >>> 0)));
   }
   return out;
 }
-
-// ── Decoding primitives ────────────────────────────────────
 
 export function readVarint(data: Uint8Array, offset: number): { value: bigint; next: number } {
   let out = 0n;
@@ -181,8 +223,6 @@ export function readString(data: Uint8Array, offset: number): { value: string; n
   return { value: TEXT_DECODER.decode(ld.data), next: ld.next };
 }
 
-// ── Edit Command encoders ──────────────────────────────────
-
 export function encodeEditStart(args: {
   gridId: number;
   row: number;
@@ -192,36 +232,25 @@ export function encodeEditStart(args: {
   seedText?: string;
   formulaMode?: boolean;
 }): Uint8Array {
-  // EditStart message
   const start: number[] = [];
-  // EditStart.row = 1
-  start.push(...encodeTag(1, 0), ...encodeInt32(args.row));
-  // EditStart.col = 2
-  start.push(...encodeTag(2, 0), ...encodeInt32(args.col));
+  start.push(...encodeTag(ProtoEditStartFields.row, 0), ...encodeInt32(args.row));
+  start.push(...encodeTag(ProtoEditStartFields.col, 0), ...encodeInt32(args.col));
   if (args.selectAll != null) {
-    // EditStart.select_all = 3
-    start.push(...encodeTag(3, 0), ...encodeBool(args.selectAll));
+    start.push(...encodeTag(ProtoEditStartFields.select_all, 0), ...encodeBool(args.selectAll));
   }
   if (args.caretEnd != null) {
-    // EditStart.caret_end = 4
-    start.push(...encodeTag(4, 0), ...encodeBool(args.caretEnd));
+    start.push(...encodeTag(ProtoEditStartFields.caret_end, 0), ...encodeBool(args.caretEnd));
   }
   if (args.seedText != null) {
-    // EditStart.seed_text = 5
-    start.push(...encodeStringField(5, args.seedText));
+    start.push(...encodeStringField(ProtoEditStartFields.seed_text, args.seedText));
   }
   if (args.formulaMode != null) {
-    // EditStart.formula_mode = 6
-    start.push(...encodeTag(6, 0), ...encodeBool(args.formulaMode));
+    start.push(...encodeTag(ProtoEditStartFields.formula_mode, 0), ...encodeBool(args.formulaMode));
   }
 
-  // EditCommand wrapper
   const out: number[] = [];
-  // EditCommand.grid_id = 1
-  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
-  // EditCommand.start = 2 (oneof)
-  out.push(...encodeMessageField(2, start));
-
+  out.push(...encodeTag(ProtoEditCommandFields.grid_id, 0), ...encodeInt64(args.gridId));
+  out.push(...encodeMessageField(ProtoEditCommandFields.start, start));
   return new Uint8Array(out);
 }
 
@@ -231,23 +260,19 @@ export function encodeEditCommit(args: {
 }): Uint8Array {
   const commit: number[] = [];
   if (args.text != null) {
-    // EditCommit.text = 1
-    commit.push(...encodeStringField(1, args.text));
+    commit.push(...encodeStringField(ProtoEditCommitFields.text, args.text));
   }
 
   const out: number[] = [];
-  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
-  // EditCommand.commit = 3
-  out.push(...encodeMessageField(3, commit));
-
+  out.push(...encodeTag(ProtoEditCommandFields.grid_id, 0), ...encodeInt64(args.gridId));
+  out.push(...encodeMessageField(ProtoEditCommandFields.commit, commit));
   return new Uint8Array(out);
 }
 
 export function encodeEditCancel(gridId: number): Uint8Array {
   const out: number[] = [];
-  out.push(...encodeTag(1, 0), ...encodeInt64(gridId));
-  // EditCommand.cancel = 4 (empty message)
-  out.push(...encodeMessageField(4, []));
+  out.push(...encodeTag(ProtoEditCommandFields.grid_id, 0), ...encodeInt64(gridId));
+  out.push(...encodeMessageField(ProtoEditCommandFields.cancel, []));
   return new Uint8Array(out);
 }
 
@@ -256,13 +281,11 @@ export function encodeEditSetText(args: {
   text: string;
 }): Uint8Array {
   const setText: number[] = [];
-  // EditSetText.text = 1
-  setText.push(...encodeStringField(1, args.text));
+  setText.push(...encodeStringField(ProtoEditSetTextFields.text, args.text));
 
   const out: number[] = [];
-  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
-  // EditCommand.set_text = 5
-  out.push(...encodeMessageField(5, setText));
+  out.push(...encodeTag(ProtoEditCommandFields.grid_id, 0), ...encodeInt64(args.gridId));
+  out.push(...encodeMessageField(ProtoEditCommandFields.set_text, setText));
   return new Uint8Array(out);
 }
 
@@ -284,30 +307,28 @@ export function encodeEditSetHighlights(args: {
   const setHighlights: number[] = [];
   for (const region of args.regions) {
     const regionMsg: number[] = [];
-    regionMsg.push(
-      ...encodeMessageField(1, encodeCellRange(region.row1, region.col1, region.row2, region.col2)),
-    );
-    regionMsg.push(...encodeMessageField(2, encodeHighlightStyle(region.style)));
+    regionMsg.push(...encodeMessageField(
+      ProtoHighlightRegionFields.range,
+      encodeCellRange(region.row1, region.col1, region.row2, region.col2),
+    ));
+    regionMsg.push(...encodeMessageField(ProtoHighlightRegionFields.style, encodeHighlightStyle(region.style)));
     if (region.refId != null) {
-      regionMsg.push(...encodeTag(3, 0), ...encodeInt32(region.refId));
+      regionMsg.push(...encodeTag(ProtoHighlightRegionFields.ref_id, 0), ...encodeInt32(region.refId));
     }
     if (region.textStart != null) {
-      regionMsg.push(...encodeTag(4, 0), ...encodeInt32(region.textStart));
+      regionMsg.push(...encodeTag(ProtoHighlightRegionFields.text_start, 0), ...encodeInt32(region.textStart));
     }
     if (region.textLength != null) {
-      regionMsg.push(...encodeTag(5, 0), ...encodeInt32(region.textLength));
+      regionMsg.push(...encodeTag(ProtoHighlightRegionFields.text_length, 0), ...encodeInt32(region.textLength));
     }
-    setHighlights.push(...encodeMessageField(1, regionMsg));
+    setHighlights.push(...encodeMessageField(ProtoEditSetHighlightsFields.regions, regionMsg));
   }
 
   const out: number[] = [];
-  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
-  // EditCommand.set_highlights = 8
-  out.push(...encodeMessageField(8, setHighlights));
+  out.push(...encodeTag(ProtoEditCommandFields.grid_id, 0), ...encodeInt64(args.gridId));
+  out.push(...encodeMessageField(ProtoEditCommandFields.set_highlights, setHighlights));
   return new Uint8Array(out);
 }
-
-// ── Select encoder ─────────────────────────────────────────
 
 export function encodeSelectRequest(args: {
   gridId: number;
@@ -324,22 +345,21 @@ export function encodeSelectRequest(args: {
   const ranges = args.ranges && args.ranges.length > 0
     ? args.ranges
     : [{ row1: args.row, col1: args.col, row2: rowEnd, col2: colEnd }];
-  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
-  // SelectRequest.active_row = 2
-  out.push(...encodeTag(2, 0), ...encodeInt32(args.row));
-  // SelectRequest.active_col = 3
-  out.push(...encodeTag(3, 0), ...encodeInt32(args.col));
+
+  out.push(...encodeTag(ProtoSelectRequestFields.grid_id, 0), ...encodeInt64(args.gridId));
+  out.push(...encodeTag(ProtoSelectRequestFields.active_row, 0), ...encodeInt32(args.row));
+  out.push(...encodeTag(ProtoSelectRequestFields.active_col, 0), ...encodeInt32(args.col));
   for (const range of ranges) {
-    out.push(...encodeMessageField(4, encodeCellRange(range.row1, range.col1, range.row2, range.col2)));
+    out.push(...encodeMessageField(
+      ProtoSelectRequestFields.ranges,
+      encodeCellRange(range.row1, range.col1, range.row2, range.col2),
+    ));
   }
   if (args.show != null) {
-    // SelectRequest.show = 5
-    out.push(...encodeTag(5, 0), ...encodeBool(args.show));
+    out.push(...encodeTag(ProtoSelectRequestFields.show, 0), ...encodeBool(args.show));
   }
   return new Uint8Array(out);
 }
-
-// ── UpdateCells encoder ────────────────────────────────────
 
 export interface FontArg {
   family?: string;
@@ -351,8 +371,6 @@ export interface FontArg {
   width?: number;
 }
 
-// Flat cell style interface — used by sheet adapter for internal cache/toggles.
-// The encoder maps these flat fields to the nested proto CellStyle structure.
 export interface CellStyleFields {
   backColor?: number;
   foreColor?: number;
@@ -363,11 +381,11 @@ export interface CellStyleFields {
   fontStrikethrough?: boolean;
   fontName?: string;
   fontSize?: number;
-  borderTop?: number;        // BorderStyle enum
+  borderTop?: number;
   borderRight?: number;
   borderBottom?: number;
   borderLeft?: number;
-  borderTopColor?: number;   // ARGB uint32
+  borderTopColor?: number;
   borderRightColor?: number;
   borderBottomColor?: number;
   borderLeftColor?: number;
@@ -376,41 +394,36 @@ export interface CellStyleFields {
 
 export function encodeFont(font: FontArg): number[] {
   const out: number[] = [];
-  // Font: family=1, families=2, size=3, bold=4, italic=5, underline=6, strikethrough=7, width=8
-  if (font.family != null) out.push(...encodeStringField(1, font.family));
+  if (font.family != null) out.push(...encodeStringField(ProtoFontFields.family, font.family));
   if (font.size != null) {
     const buf = new ArrayBuffer(4);
     new DataView(buf).setFloat32(0, font.size, true);
-    out.push(...encodeTag(3, 5), ...new Uint8Array(buf));
+    out.push(...encodeTag(ProtoFontFields.size, 5), ...new Uint8Array(buf));
   }
-  if (font.bold != null) out.push(...encodeTag(4, 0), ...encodeBool(font.bold));
-  if (font.italic != null) out.push(...encodeTag(5, 0), ...encodeBool(font.italic));
-  if (font.underline != null) out.push(...encodeTag(6, 0), ...encodeBool(font.underline));
-  if (font.strikethrough != null) out.push(...encodeTag(7, 0), ...encodeBool(font.strikethrough));
+  if (font.bold != null) out.push(...encodeTag(ProtoFontFields.bold, 0), ...encodeBool(font.bold));
+  if (font.italic != null) out.push(...encodeTag(ProtoFontFields.italic, 0), ...encodeBool(font.italic));
+  if (font.underline != null) out.push(...encodeTag(ProtoFontFields.underline, 0), ...encodeBool(font.underline));
+  if (font.strikethrough != null) out.push(...encodeTag(ProtoFontFields.strikethrough, 0), ...encodeBool(font.strikethrough));
   if (font.width != null) {
     const buf = new ArrayBuffer(4);
     new DataView(buf).setFloat32(0, font.width, true);
-    out.push(...encodeTag(8, 5), ...new Uint8Array(buf));
+    out.push(...encodeTag(ProtoFontFields.width, 5), ...new Uint8Array(buf));
   }
   return out;
 }
 
-// Encodes flat CellStyleFields → nested proto CellStyle
-// CellStyle: background=1, foreground=2, align=3, font=4, padding=5,
-//            borders=6, text_effect=7, progress=8, progress_color=9, shrink_to_fit=10
 function encodeCellStyle(style: CellStyleFields): number[] {
   const out: number[] = [];
   if (typeof style.backColor === "number") {
-    out.push(...encodeTag(1, 0), ...encodeVarintUnsigned(BigInt(style.backColor >>> 0)));
+    out.push(...encodeTag(ProtoCellStyleFields.background, 0), ...encodeVarintUnsigned(BigInt(style.backColor >>> 0)));
   }
   if (typeof style.foreColor === "number") {
-    out.push(...encodeTag(2, 0), ...encodeVarintUnsigned(BigInt(style.foreColor >>> 0)));
+    out.push(...encodeTag(ProtoCellStyleFields.foreground, 0), ...encodeVarintUnsigned(BigInt(style.foreColor >>> 0)));
   }
   if (typeof style.alignment === "number") {
-    out.push(...encodeTag(3, 0), ...encodeInt32(style.alignment));
+    out.push(...encodeTag(ProtoCellStyleFields.align, 0), ...encodeInt32(style.alignment));
   }
 
-  // Font: nest flat font* fields into Font message (field 4)
   const font: FontArg = {};
   if (typeof style.fontName === "string") font.family = style.fontName;
   if (typeof style.fontSize === "number") font.size = style.fontSize;
@@ -419,9 +432,8 @@ function encodeCellStyle(style: CellStyleFields): number[] {
   if (typeof style.fontUnderline === "boolean") font.underline = style.fontUnderline;
   if (typeof style.fontStrikethrough === "boolean") font.strikethrough = style.fontStrikethrough;
   const fontBytes = encodeFont(font);
-  if (fontBytes.length > 0) out.push(...encodeMessageField(4, fontBytes));
+  if (fontBytes.length > 0) out.push(...encodeMessageField(ProtoCellStyleFields.font, fontBytes));
 
-  // Borders: nest flat border* fields into Borders message (field 6)
   const borders: BordersArg = {};
   if (style.borderTop != null || style.borderTopColor != null) {
     borders.top = { style: style.borderTop, color: style.borderTopColor };
@@ -436,10 +448,10 @@ function encodeCellStyle(style: CellStyleFields): number[] {
     borders.left = { style: style.borderLeft, color: style.borderLeftColor };
   }
   const bordersBytes = encodeBorders(borders);
-  if (bordersBytes.length > 0) out.push(...encodeMessageField(6, bordersBytes));
+  if (bordersBytes.length > 0) out.push(...encodeMessageField(ProtoCellStyleFields.borders, bordersBytes));
 
   if (typeof style.shrinkToFit === "boolean") {
-    out.push(...encodeTag(10, 0), ...encodeBool(style.shrinkToFit));
+    out.push(...encodeTag(ProtoCellStyleFields.shrink_to_fit, 0), ...encodeBool(style.shrinkToFit));
   }
   return out;
 }
@@ -456,39 +468,31 @@ export function encodeUpdateCellsRequest(args: {
   updates: CellUpdateEntry[];
 }): Uint8Array {
   const out: number[] = [];
-  // UpdateCellsRequest.grid_id = 1
-  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
+  out.push(...encodeTag(ProtoUpdateCellsRequestFields.grid_id, 0), ...encodeInt64(args.gridId));
 
   for (const update of args.updates) {
     const cellUpdate: number[] = [];
-    // CellUpdate.row = 1
-    cellUpdate.push(...encodeTag(1, 0), ...encodeInt32(update.row));
-    // CellUpdate.col = 2
-    cellUpdate.push(...encodeTag(2, 0), ...encodeInt32(update.col));
+    cellUpdate.push(...encodeTag(ProtoCellUpdateFields.row, 0), ...encodeInt32(update.row));
+    cellUpdate.push(...encodeTag(ProtoCellUpdateFields.col, 0), ...encodeInt32(update.col));
 
     if (update.text != null) {
-      // CellUpdate.value = 3 (CellValue message, text = 1)
       const cellValue: number[] = [];
-      cellValue.push(...encodeStringField(1, update.text));
-      cellUpdate.push(...encodeMessageField(3, cellValue));
+      cellValue.push(...encodeStringField(ProtoCellValueFields.text, update.text));
+      cellUpdate.push(...encodeMessageField(ProtoCellUpdateFields.value, cellValue));
     }
 
     if (update.style) {
       const style = encodeCellStyle(update.style);
       if (style.length > 0) {
-        // CellUpdate.style = 4
-        cellUpdate.push(...encodeMessageField(4, style));
+        cellUpdate.push(...encodeMessageField(ProtoCellUpdateFields.style, style));
       }
     }
 
-    // UpdateCellsRequest.cells = 2
-    out.push(...encodeMessageField(2, cellUpdate));
+    out.push(...encodeMessageField(ProtoUpdateCellsRequestFields.cells, cellUpdate));
   }
 
   return new Uint8Array(out);
 }
-
-// ── InsertRows encoder ─────────────────────────────────────
 
 export function encodeInsertRowsRequest(args: {
   gridId: number;
@@ -497,18 +501,16 @@ export function encodeInsertRowsRequest(args: {
   text?: string[];
 }): Uint8Array {
   const out: number[] = [];
-  out.push(...encodeTag(1, 0), ...encodeInt64(args.gridId));
-  out.push(...encodeTag(2, 0), ...encodeInt32(args.index));
-  out.push(...encodeTag(3, 0), ...encodeInt32(args.count));
+  out.push(...encodeTag(ProtoInsertRowsRequestFields.grid_id, 0), ...encodeInt64(args.gridId));
+  out.push(...encodeTag(ProtoInsertRowsRequestFields.index, 0), ...encodeInt32(args.index));
+  out.push(...encodeTag(ProtoInsertRowsRequestFields.count, 0), ...encodeInt32(args.count));
   if (args.text) {
     for (const rowText of args.text) {
-      out.push(...encodeStringField(4, rowText));
+      out.push(...encodeStringField(ProtoInsertRowsRequestFields.text, rowText));
     }
   }
   return new Uint8Array(out);
 }
-
-// ── Selection state decoder ────────────────────────────────
 
 export interface SelectionState {
   row: number;
@@ -519,25 +521,59 @@ export interface SelectionState {
 
 export function decodeSelectionState(data: Uint8Array): SelectionState {
   const out: SelectionState = { row: -1, col: -1, rowEnd: -1, colEnd: -1 };
+  let activeRow = -1;
+  let activeCol = -1;
+  let lastRange: { row1: number; col1: number; row2: number; col2: number } | null = null;
+  let hasRanges = false;
+  let bottomRow = -1;
+  let rightCol = -1;
   let offset = 0;
+
   while (offset < data.length) {
     const tag = readVarint(data, offset);
     offset = tag.next;
     const field = Number(tag.value >> 3n);
     const wire = Number(tag.value & 0x7n);
+    if (field === ProtoSelectionStateFields.ranges && wire === 2) {
+      const ld = readLengthDelimited(data, offset);
+      offset = ld.next;
+      lastRange = decodeCellRange(ld.data);
+      hasRanges = true;
+      continue;
+    }
     if (wire === 0) {
       const value = readVarint(data, offset);
       offset = value.next;
       const n = asInt32(value.value);
-      if (field === 1) out.row = n;
-      if (field === 2) out.col = n;
-      if (field === 3) out.rowEnd = n;
-      if (field === 4) out.colEnd = n;
+      if (field === ProtoSelectionStateFields.active_row) activeRow = n;
+      if (field === ProtoSelectionStateFields.active_col) activeCol = n;
+      if (field === ProtoSelectionStateFields.bottom_row) bottomRow = n;
+      if (field === ProtoSelectionStateFields.right_col) rightCol = n;
       continue;
     }
     offset = skipField(data, offset, wire);
   }
-  if (out.rowEnd < 0) out.rowEnd = out.row;
-  if (out.colEnd < 0) out.colEnd = out.col;
+
+  out.row = activeRow;
+  out.col = activeCol;
+
+  if (lastRange != null) {
+    if (activeRow === lastRange.row1 && activeCol === lastRange.col1) {
+      out.rowEnd = lastRange.row2;
+      out.colEnd = lastRange.col2;
+    } else if (activeRow === lastRange.row2 && activeCol === lastRange.col2) {
+      out.rowEnd = lastRange.row1;
+      out.colEnd = lastRange.col1;
+    } else {
+      out.rowEnd = lastRange.row2;
+      out.colEnd = lastRange.col2;
+    }
+  } else {
+    out.rowEnd = bottomRow >= 0 ? bottomRow : activeRow;
+    out.colEnd = rightCol >= 0 ? rightCol : activeCol;
+    if (!hasRanges && out.rowEnd < 0) out.rowEnd = out.row;
+    if (!hasRanges && out.colEnd < 0) out.colEnd = out.col;
+  }
+
   return out;
 }

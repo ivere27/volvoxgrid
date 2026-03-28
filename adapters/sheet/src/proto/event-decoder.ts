@@ -1,22 +1,38 @@
 /**
  * Decode GridEvent stream into typed objects.
  *
- * GridEvent is a oneof — we identify the event by its field number
+ * GridEvent is a oneof. We identify the event by its field number
  * and decode the inner payload accordingly.
  */
 
+import {
+  AfterEditEventFields,
+  CellEditChangeEventFields,
+  CellFocusChangedEventFields,
+  CellRangeFields,
+  EnterCellEventFields,
+  GridEventFields,
+  KeyDownEventFields,
+  KeyPressEventFields,
+  SelectionChangedEventFields,
+} from "volvoxgrid/generated/volvoxgrid_ffi.js";
 import { readVarint, skipField, asInt32, readString, readLengthDelimited } from "./proto-utils.js";
 
-// GridEvent oneof field numbers (from volvoxgrid.proto)
-export const EVENT_CELL_FOCUS_CHANGED = 3;
-export const EVENT_SELECTION_CHANGED = 5;
-export const EVENT_ENTER_CELL = 6;
-export const EVENT_START_EDIT = 9;
-export const EVENT_AFTER_EDIT = 10;
-export const EVENT_CELL_EDIT_CHANGE = 12;
-export const EVENT_KEY_DOWN_EDIT = 14;
-export const EVENT_KEY_DOWN = 44;
-export const EVENT_KEY_PRESS = 45;
+export const EVENT_CELL_FOCUS_CHANGED = GridEventFields.cell_focus_changed;
+export const EVENT_SELECTION_CHANGED = GridEventFields.selection_changed;
+export const EVENT_ENTER_CELL = GridEventFields.enter_cell;
+export const EVENT_START_EDIT = GridEventFields.start_edit;
+export const EVENT_AFTER_EDIT = GridEventFields.after_edit;
+export const EVENT_CELL_EDIT_CHANGE = GridEventFields.cell_edit_change;
+export const EVENT_KEY_DOWN_EDIT = GridEventFields.key_down_edit;
+export const EVENT_KEY_DOWN = GridEventFields.key_down;
+export const EVENT_KEY_PRESS = GridEventFields.key_press;
+
+const GRID_EVENT_PAYLOAD_FIELDS: ReadonlySet<number> = new Set<number>(
+  (Object.values(GridEventFields) as number[]).filter(
+    (field) => field !== GridEventFields.grid_id && field !== GridEventFields.event_id,
+  ),
+);
 
 export interface GridEventEnvelope {
   eventField: number;
@@ -31,10 +47,12 @@ export function decodeGridEventEnvelope(data: Uint8Array): GridEventEnvelope | n
     const field = Number(tag.value >> 3n);
     const wire = Number(tag.value & 0x7n);
 
-    if (wire === 2 && field >= 2 && field <= 60) {
+    if (wire === 2 && GRID_EVENT_PAYLOAD_FIELDS.has(field)) {
       const length = readVarint(data, offset);
       const n = Number(length.value);
-      if (!Number.isFinite(n) || n < 0) return null;
+      if (!Number.isFinite(n) || n < 0) {
+        return null;
+      }
       const start = length.next;
       const end = Math.min(data.length, start + n);
       return { eventField: field, payload: data.slice(start, end) };
@@ -45,20 +63,16 @@ export function decodeGridEventEnvelope(data: Uint8Array): GridEventEnvelope | n
   return null;
 }
 
-// ── Payload decoders ───────────────────────────────────────
-
 export interface CellFocusPayload {
   row: number;
   col: number;
 }
 
 export function decodeCellFocusPayload(data: Uint8Array): CellFocusPayload {
-  // Shared by EnterCellEvent (row=1, col=2),
-  //           StartEditEvent (row=1, col=2),
-  //           CellFocusChangedEvent (old_row=1, old_col=2, new_row=3, new_col=4).
-  // For CellFocusChanged we want new_row/new_col (fields 3/4).
-  // For the others, only fields 1/2 are present.
-  let f1 = 0, f2 = 0, f3: number | null = null, f4: number | null = null;
+  let row = 0;
+  let col = 0;
+  let newRow: number | null = null;
+  let newCol: number | null = null;
   let offset = 0;
   while (offset < data.length) {
     const tag = readVarint(data, offset);
@@ -69,18 +83,18 @@ export function decodeCellFocusPayload(data: Uint8Array): CellFocusPayload {
       const v = readVarint(data, offset);
       offset = v.next;
       const n = asInt32(v.value);
-      if (field === 1) f1 = n;
-      if (field === 2) f2 = n;
-      if (field === 3) f3 = n;
-      if (field === 4) f4 = n;
+      if (field === EnterCellEventFields.row) row = n;
+      if (field === EnterCellEventFields.col) col = n;
+      if (field === CellFocusChangedEventFields.new_row) newRow = n;
+      if (field === CellFocusChangedEventFields.new_col) newCol = n;
       continue;
     }
     offset = skipField(data, offset, wire);
   }
-  // Prefer new_row/new_col (fields 3/4) when present; fall back to fields 1/2
-  const row = f3 != null ? f3 : f1;
-  const col = f4 != null ? f4 : f2;
-  return { row, col };
+  return {
+    row: newRow ?? row,
+    col: newCol ?? col,
+  };
 }
 
 export interface AfterEditPayload {
@@ -91,7 +105,10 @@ export interface AfterEditPayload {
 }
 
 export function decodeAfterEditPayload(data: Uint8Array): AfterEditPayload {
-  let row = -1, col = -1, oldText = "", newText = "";
+  let row = -1;
+  let col = -1;
+  let oldText = "";
+  let newText = "";
   let offset = 0;
   while (offset < data.length) {
     const tag = readVarint(data, offset);
@@ -102,14 +119,14 @@ export function decodeAfterEditPayload(data: Uint8Array): AfterEditPayload {
       const v = readVarint(data, offset);
       offset = v.next;
       const n = asInt32(v.value);
-      if (field === 1) row = n;
-      if (field === 2) col = n;
+      if (field === AfterEditEventFields.row) row = n;
+      if (field === AfterEditEventFields.col) col = n;
       continue;
     }
     if (wire === 2) {
       const s = readString(data, offset);
-      if (field === 3) oldText = s.value;
-      if (field === 4) newText = s.value;
+      if (field === AfterEditEventFields.old_text) oldText = s.value;
+      if (field === AfterEditEventFields.new_text) newText = s.value;
       offset = s.next;
       continue;
     }
@@ -130,7 +147,7 @@ export function decodeCellEditChangePayload(data: Uint8Array): CellEditChangePay
     offset = tag.next;
     const field = Number(tag.value >> 3n);
     const wire = Number(tag.value & 0x7n);
-    if (field === 1 && wire === 2) {
+    if (field === CellEditChangeEventFields.text && wire === 2) {
       const s = readString(data, offset);
       text = s.value;
       offset = s.next;
@@ -142,7 +159,6 @@ export function decodeCellEditChangePayload(data: Uint8Array): CellEditChangePay
 }
 
 export interface SelectionChangedPayload {
-  /** New selection range end (grid-space). */
   rowEnd: number;
   colEnd: number;
 }
@@ -169,10 +185,10 @@ function decodeCellRangePayload(data: Uint8Array): CellRangePayload {
       const v = readVarint(data, offset);
       offset = v.next;
       const n = asInt32(v.value);
-      if (field === 1) row1 = n;
-      if (field === 2) col1 = n;
-      if (field === 3) row2 = n;
-      if (field === 4) col2 = n;
+      if (field === CellRangeFields.row1) row1 = n;
+      if (field === CellRangeFields.col1) col1 = n;
+      if (field === CellRangeFields.row2) row2 = n;
+      if (field === CellRangeFields.col2) col2 = n;
       continue;
     }
     offset = skipField(data, offset, wire);
@@ -181,14 +197,6 @@ function decodeCellRangePayload(data: Uint8Array): CellRangePayload {
 }
 
 export function decodeSelectionChangedPayload(data: Uint8Array): SelectionChangedPayload {
-  // New schema:
-  // - old_ranges=1 (repeated CellRange)
-  // - new_ranges=2 (repeated CellRange)
-  // - active_row=3
-  // - active_col=4
-  // Legacy schema fallback:
-  // - new_row_end=3
-  // - new_col_end=4
   let rowEnd = -1;
   let colEnd = -1;
   let activeRow = -1;
@@ -201,7 +209,7 @@ export function decodeSelectionChangedPayload(data: Uint8Array): SelectionChange
     offset = tag.next;
     const field = Number(tag.value >> 3n);
     const wire = Number(tag.value & 0x7n);
-    if (field === 2 && wire === 2) {
+    if (field === SelectionChangedEventFields.new_ranges && wire === 2) {
       const ld = readLengthDelimited(data, offset);
       offset = ld.next;
       lastNewRange = decodeCellRangePayload(ld.data);
@@ -212,11 +220,11 @@ export function decodeSelectionChangedPayload(data: Uint8Array): SelectionChange
       const v = readVarint(data, offset);
       offset = v.next;
       const n = asInt32(v.value);
-      if (field === 3) {
+      if (field === SelectionChangedEventFields.active_row) {
         activeRow = n;
         if (!hasNewRanges) rowEnd = n;
       }
-      if (field === 4) {
+      if (field === SelectionChangedEventFields.active_col) {
         activeCol = n;
         if (!hasNewRanges) colEnd = n;
       }
@@ -247,7 +255,8 @@ export interface KeyEventPayload {
 }
 
 export function decodeKeyEventPayload(data: Uint8Array): KeyEventPayload {
-  let keyCode = 0, modifier = 0;
+  let keyCode = 0;
+  let modifier = 0;
   let offset = 0;
   while (offset < data.length) {
     const tag = readVarint(data, offset);
@@ -258,8 +267,8 @@ export function decodeKeyEventPayload(data: Uint8Array): KeyEventPayload {
       const v = readVarint(data, offset);
       offset = v.next;
       const n = asInt32(v.value);
-      if (field === 1) keyCode = n;
-      if (field === 2) modifier = n;
+      if (field === KeyDownEventFields.key_code) keyCode = n;
+      if (field === KeyDownEventFields.modifier) modifier = n;
       continue;
     }
     offset = skipField(data, offset, wire);
@@ -279,7 +288,7 @@ export function decodeKeyPressPayload(data: Uint8Array): KeyPressPayload {
     offset = tag.next;
     const field = Number(tag.value >> 3n);
     const wire = Number(tag.value & 0x7n);
-    if (field === 1 && wire === 0) {
+    if (field === KeyPressEventFields.key_ascii && wire === 0) {
       const v = readVarint(data, offset);
       keyAscii = asInt32(v.value);
       offset = v.next;

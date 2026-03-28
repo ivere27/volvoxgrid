@@ -4,7 +4,13 @@ import {
   type VolvoxGridBeforeSortDetails,
   type VolvoxGridCellEditValidatingDetails,
 } from "volvoxgrid";
-import { setupDefaultInput } from "volvoxgrid/dist/default-input.js";
+import { setupDefaultInput } from "volvoxgrid/default-input.js";
+import {
+  Align,
+  BorderStyle,
+  CheckedState,
+  SortOrder,
+} from "volvoxgrid/generated/volvoxgrid_ffi.js";
 import {
   normalizeColumnDefs,
   type ColumnLayout,
@@ -36,18 +42,7 @@ import type {
   RowData,
 } from "./types.js";
 
-const SORT_ASC = 1;
-const SORT_DESC = 2;
-const CHECKED_UNCHECKED = 0;
-const CHECKED_CHECKED = 1;
 const DEFAULT_COLUMN_WIDTH = 200;
-const ALIGN_LEFT_CENTER = 1;
-const BORDER_NONE = 0;
-const BORDER_THIN = 1;
-const BORDER_THICK = 2;
-const BORDER_DOTTED = 3;
-const BORDER_DASHED = 4;
-const BORDER_DOUBLE = 5;
 
 const AG_TO_VV_ICON_SLOT: Array<{
   agKey: string;
@@ -359,24 +354,24 @@ function parseBorderStyleKeyword(raw: string, widthPx?: number): number | undefi
     return undefined;
   }
   if (value === "none" || value === "hidden") {
-    return BORDER_NONE;
+    return BorderStyle.BORDER_NONE;
   }
   if (value === "dotted") {
-    return BORDER_DOTTED;
+    return BorderStyle.BORDER_DOTTED;
   }
   if (value === "dashed") {
-    return BORDER_DASHED;
+    return BorderStyle.BORDER_DASHED;
   }
   if (value === "double") {
-    return BORDER_DOUBLE;
+    return BorderStyle.BORDER_DOUBLE;
   }
   if (value === "inset" || value === "outset" || value === "ridge" || value === "groove") {
     // The current proto no longer exposes raised/inset border enums.
     // Preserve width intent with the nearest supported flat border style.
-    return (widthPx ?? 1) >= 2 ? BORDER_THICK : BORDER_THIN;
+    return (widthPx ?? 1) >= 2 ? BorderStyle.BORDER_THICK : BorderStyle.BORDER_THIN;
   }
   if (value === "solid") {
-    return (widthPx ?? 1) >= 2 ? BORDER_THICK : BORDER_THIN;
+    return (widthPx ?? 1) >= 2 ? BorderStyle.BORDER_THICK : BorderStyle.BORDER_THIN;
   }
   return undefined;
 }
@@ -431,7 +426,7 @@ function parseBorderDeclaration(raw: unknown): ResolvedCellBorderEdge | undefine
 
   if (typeof style !== "number") {
     if (typeof widthPx === "number" || typeof colorArgb === "number") {
-      style = (widthPx ?? 1) >= 2 ? BORDER_THICK : BORDER_THIN;
+      style = (widthPx ?? 1) >= 2 ? BorderStyle.BORDER_THICK : BorderStyle.BORDER_THIN;
     }
   }
 
@@ -496,7 +491,7 @@ function applyBorderPartOverrides(args: {
   if (typeof parsedStyle === "number") {
     target.style = parsedStyle;
   } else if (typeof widthPx === "number" && target.style == null) {
-    target.style = widthPx >= 2 ? BORDER_THICK : BORDER_THIN;
+    target.style = widthPx >= 2 ? BorderStyle.BORDER_THICK : BorderStyle.BORDER_THIN;
   }
   if (typeof parsedColor === "number") {
     target.colorArgb = parsedColor;
@@ -1118,7 +1113,7 @@ export class AgGridVolvox<TData extends RowData = RowData> {
         checkedUpdates.push({
           row: rowIndex,
           col: col.index,
-          checked: raw ? CHECKED_CHECKED : CHECKED_UNCHECKED,
+          checked: raw ? CheckedState.CHECKED_CHECKED : CheckedState.CHECKED_UNCHECKED,
         });
       }
     }
@@ -1149,8 +1144,8 @@ export class AgGridVolvox<TData extends RowData = RowData> {
     const req = encodeDefineColumnAlignmentsRequest({
       gridId: this.grid.id,
       columnIndices: this.columns.map((c) => c.index),
-      alignment: ALIGN_LEFT_CENTER,
-      fixedAlignment: ALIGN_LEFT_CENTER,
+      alignment: Align.ALIGN_LEFT_CENTER,
+      fixedAlignment: Align.ALIGN_LEFT_CENTER,
     });
     rawWasm.volvox_grid_define_columns_pb(req);
     this.logPbError(rawWasm, "column alignment update");
@@ -1385,10 +1380,10 @@ export class AgGridVolvox<TData extends RowData = RowData> {
     for (const col of this.columns) {
       if (col.def.sort === "asc") {
         cols.push(col.index);
-        orders.push(SORT_ASC);
+        orders.push(SortOrder.SORT_ASCENDING);
       } else if (col.def.sort === "desc") {
         cols.push(col.index);
-        orders.push(SORT_DESC);
+        orders.push(SortOrder.SORT_DESCENDING);
       }
     }
     if (cols.length > 0) {

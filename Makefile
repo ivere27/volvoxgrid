@@ -17,7 +17,7 @@
 # Variables
 # =============================================================================
 SYNURANG_MODULE ?= github.com/ivere27/synurang
-SYNURANG_VERSION ?= v0.5.4
+SYNURANG_VERSION ?= v0.5.5
 PROTOC_PLUGIN ?= $(shell command -v protoc-gen-synurang-ffi 2>/dev/null)
 ifeq ($(strip $(PROTOC_PLUGIN)),)
 PROTOC_PLUGIN := $(shell go env GOPATH 2>/dev/null)/bin/protoc-gen-synurang-ffi
@@ -546,6 +546,7 @@ doom-deps:
 # =============================================================================
 VSFLEXGRID_DIR := adapters/vsflexgrid
 DOTNET_CODEGEN_DIR := dotnet/src/net8/Generated
+WEB_TS_CODEGEN_DIR := web/js/src/generated
 PROTO_INCLUDES := -Iproto -I$(VSFLEXGRID_DIR)/proto
 PROTO3_OPT := --experimental_allow_proto3_optional
 
@@ -555,6 +556,7 @@ codegen: build_plugin
 	@echo "Generating v1 runtime FFI bindings..."
 	@mkdir -p codegen
 	@mkdir -p $(DOTNET_CODEGEN_DIR)
+	@mkdir -p $(WEB_TS_CODEGEN_DIR)
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_PLUGIN_FLAG) \
 		--synurang-ffi_out=codegen --synurang-ffi_opt=lang=java \
@@ -575,6 +577,10 @@ codegen: build_plugin
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_PLUGIN_FLAG) \
 		--synurang-ffi_out=codegen --synurang-ffi_opt=lang=rust \
+		proto/volvoxgrid.proto
+	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
+		$(PROTOC_PLUGIN_FLAG) \
+		--synurang-ffi_out=$(WEB_TS_CODEGEN_DIR) --synurang-ffi_opt=lang=typescript \
 		proto/volvoxgrid.proto
 	# .NET protobuf + Synurang FFI stubs
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
@@ -625,7 +631,7 @@ codegen: build_plugin
 		plugin/src/volvoxgrid_ffi_plugin.rs \
 		web/crate/src/volvoxgrid_wasm.rs \
 		$(VSFLEXGRID_DIR)/crate/src/volvoxgrid_ffi_native.rs
-	@echo "Codegen complete: codegen/ + $(DOTNET_CODEGEN_DIR)/ + plugin/ + web/ + $(VSFLEXGRID_DIR)/"
+	@echo "Codegen complete: codegen/ + $(DOTNET_CODEGEN_DIR)/ + $(WEB_TS_CODEGEN_DIR)/ + plugin/ + web/ + $(VSFLEXGRID_DIR)/"
 
 # =============================================================================
 # Android

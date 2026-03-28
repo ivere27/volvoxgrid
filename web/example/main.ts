@@ -14,6 +14,11 @@ import { VolvoxGrid } from "../js/src/volvoxgrid.js";
 import { setupDefaultInput } from "../js/src/default-input.js";
 import { createCanvas2DTextRenderer } from "../js/src/canvas2d-text-renderer.js";
 import {
+  CellHitArea,
+  CellInteraction,
+  GridEventFields,
+} from "../js/src/generated/volvoxgrid_ffi.js";
+import {
   DoomRuntime,
   DOOM_LOCAL_SOURCE,
   DOOM_REMOTE_CONSENT_KEY,
@@ -30,10 +35,10 @@ const STRESS_ROWS = 1_000_000;
 const STRESS_COLS = 12;
 const SALES_COLS = 10;
 const HIERARCHY_COLS = 6;
-const GRID_EVENT_CLICK = 42;
+const GRID_EVENT_CLICK = GridEventFields["click"];
 const HIERARCHY_ACTION_COL = 5;
-const CELL_INTERACTION_UNSPECIFIED = 0;
-const CELL_HIT_AREA_TEXT = 1;
+const CELL_INTERACTION_UNSPECIFIED = CellInteraction.CELL_INTERACTION_UNSPECIFIED;
+const CELL_HIT_AREA_TEXT = CellHitArea.HIT_TEXT;
 const FONT_FETCH_TIMEOUT_MS = 5000;
 const HOVER_NONE = 0;
 const HOVER_ROW = 1;

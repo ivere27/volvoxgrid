@@ -5,12 +5,8 @@ import {
   decodeAfterUserResizePayload,
   decodeGridEventEnvelope,
 } from "./proto-utils.js";
+import { GridEventFields } from "volvoxgrid/generated/volvoxgrid_ffi.js";
 import type { GridApiLike, GridOptions, RowData } from "./types.js";
-
-const EVENT_SELECTION_CHANGED = 5;
-const EVENT_AFTER_SORT = 24;
-const EVENT_AFTER_USER_RESIZE = 32;
-const EVENT_CLICK = 42;
 
 interface EventMapperContext<TData extends RowData> {
   grid: VolvoxGrid;
@@ -54,7 +50,7 @@ export class VolvoxGridEventMapper<TData extends RowData> {
         continue;
       }
 
-      if (event.eventField === EVENT_SELECTION_CHANGED) {
+      if (event.eventField === GridEventFields.selection_changed) {
         this.context.getOptions().onSelectionChanged?.({
           api: this.context.api,
           selectedRows: this.context.api.getSelectedRows(),
@@ -62,7 +58,7 @@ export class VolvoxGridEventMapper<TData extends RowData> {
         continue;
       }
 
-      if (event.eventField === EVENT_AFTER_SORT) {
+      if (event.eventField === GridEventFields.after_sort) {
         const payload = decodeAfterSortPayload(event.payload);
         this.context.getOptions().onSortChanged?.({
           api: this.context.api,
@@ -72,7 +68,7 @@ export class VolvoxGridEventMapper<TData extends RowData> {
         continue;
       }
 
-      if (event.eventField === EVENT_AFTER_USER_RESIZE) {
+      if (event.eventField === GridEventFields.after_user_resize) {
         const payload = decodeAfterUserResizePayload(event.payload);
         this.context.getOptions().onColumnResized?.({
           api: this.context.api,
@@ -82,7 +78,7 @@ export class VolvoxGridEventMapper<TData extends RowData> {
         continue;
       }
 
-      if (event.eventField === EVENT_CLICK) {
+      if (event.eventField === GridEventFields.click) {
         this.emitClickEvents();
       }
     }

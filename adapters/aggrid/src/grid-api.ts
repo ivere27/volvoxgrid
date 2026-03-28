@@ -1,6 +1,7 @@
 import type { VolvoxGrid } from "volvoxgrid";
 import type { NormalizedColDef } from "./col-def-mapper.js";
 import { decodeExportCsv, decodeSelectionState, encodeSelectRequest } from "./proto-utils.js";
+import { ExportFormat, ExportScope } from "volvoxgrid/generated/volvoxgrid_ffi.js";
 import type { ColDef, GridApiLike, RowData } from "./types.js";
 
 interface GridApiDelegate<TData extends RowData> {
@@ -52,9 +53,11 @@ function readSelectionState(grid: VolvoxGrid, wasm: any) {
 
 function exportCsv(grid: VolvoxGrid, wasm: any): string | null {
   if (typeof wasm.volvox_grid_export === "function") {
-    const formatCsv = 2;
-    const scopeAll = 0;
-    const payload = wasm.volvox_grid_export(BigInt(grid.id), formatCsv, scopeAll) as Uint8Array;
+    const payload = wasm.volvox_grid_export(
+      BigInt(grid.id),
+      ExportFormat.EXPORT_CSV,
+      ExportScope.EXPORT_ALL,
+    ) as Uint8Array;
     if (payload instanceof Uint8Array && payload.length > 0) {
       return decodeExportCsv(payload);
     }
