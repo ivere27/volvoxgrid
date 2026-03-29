@@ -33,6 +33,7 @@ import io.github.ivere27.volvoxgrid.common.VolvoxGridHost
 import io.github.ivere27.synurang.BidiStream
 import io.github.ivere27.synurang.FfiError
 import io.github.ivere27.synurang.PluginHost
+import io.github.ivere27.synurang.PluginStream
 import java.io.File
 import java.nio.ByteBuffer
 import java.util.Locale
@@ -74,7 +75,11 @@ class VolvoxGridView @JvmOverloads constructor(
 
     @Volatile
     private var renderStream: BidiStream<RenderInput, RenderOutput>? = null
-    private var eventIterator: Iterator<GridEvent>? = null
+    @Volatile
+    private var eventStream: PluginStream? = null
+    @Volatile
+    private var eventThread: Thread? = null
+    private val eventStreamLock = Any()
     @Volatile
     private var decisionChannelEnabled = false
 
@@ -771,7 +776,7 @@ class VolvoxGridView @JvmOverloads constructor(
             try { it.close() } catch (_: Exception) {}
         }
 
-        eventIterator = null
+        stopEventStream(waitForThread = true)
 
         clearExternalTextRenderer(gridId)
         usingExternalTextRenderer = false
@@ -906,6 +911,7 @@ class VolvoxGridView @JvmOverloads constructor(
             try { it.close() } catch (_: Exception) {}
         }
         renderStream = null
+        stopEventStream(waitForThread = true)
 
         if (gridId != 0L) {
             clearExternalTextRenderer(gridId)
@@ -2560,25 +2566,68 @@ class VolvoxGridView @JvmOverloads constructor(
     // Event Stream
     // =========================================================================
 
-    private fun startEventStream() {
-        val client = ffiClient ?: return
+    private fun stopEventStream(waitForThread: Boolean) {
+        val streamToClose = synchronized(eventStreamLock) {
+            val stream = eventStream
+            eventStream = null
+            stream
+        }
+        streamToClose?.let {
+            try { it.close() } catch (_: Exception) {}
+        }
 
-        thread(name = "volvoxgrid-events", isDaemon = true) {
+        if (!waitForThread) return
+
+        val threadToJoin = synchronized(eventStreamLock) { eventThread }
+        if (threadToJoin != null && threadToJoin !== Thread.currentThread()) {
             try {
-                val handle = GridHandle.newBuilder().setId(gridId).build()
-                val iter = client.EventStream(handle)
-                eventIterator = iter
+                threadToJoin.join(1000)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+        }
+    }
 
-                while (running.get() && iter.hasNext()) {
-                    val event = iter.next()
+    private fun startEventStream() {
+        val host = plugin ?: return
+        val handle = GridHandle.newBuilder().setId(gridId).build()
+        val stream = host.openStream("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/EventStream")
+        try {
+            stream.send(handle.toByteArray())
+            stream.closeSend()
+        } catch (e: Exception) {
+            try { stream.close() } catch (_: Exception) {}
+            throw e
+        }
+
+        val worker = thread(name = "volvoxgrid-events", isDaemon = true, start = false) {
+            try {
+                while (running.get()) {
+                    val payload = stream.recv() ?: break
+                    val event = GridEvent.parseFrom(payload)
                     handleGridEvent(event)
                 }
             } catch (e: Exception) {
                 if (running.get()) {
                     android.util.Log.e(TAG, "Event stream error", e)
                 }
+            } finally {
+                try { stream.close() } catch (_: Exception) {}
+                synchronized(eventStreamLock) {
+                    if (eventStream === stream) {
+                        eventStream = null
+                    }
+                    if (eventThread === Thread.currentThread()) {
+                        eventThread = null
+                    }
+                }
             }
         }
+        synchronized(eventStreamLock) {
+            eventStream = stream
+            eventThread = worker
+        }
+        worker.start()
     }
 
     private fun handleGridEvent(event: GridEvent) {

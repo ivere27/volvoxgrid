@@ -4,12 +4,12 @@ set -euo pipefail
 # Android AAR packaging script — runs inside Docker (Dockerfile.android).
 #
 # Builds the Rust volvoxgrid plugin for Android ABIs via cargo-ndk,
-# assembles a release AAR via Gradle with all JNI .so files included,
+# assembles a debug or release AAR via Gradle with all JNI .so files included,
 # then merges volvoxgrid-java-common classes into classes.jar (fat AAR).
 # Outputs Maven-ready artifacts: AAR, POM, sources.jar, javadoc.jar.
 #
 # Usage (inside Docker): VERSION=0.4.0 /opt/volvoxgrid/build_android_aar.sh
-# Optional: PLUGIN_BUILD_MODE=lite (default: full)
+# Optional: PLUGIN_BUILD_MODE=lite (default: full), AAR_BUILD_TYPE=debug|release (default: release)
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}"
@@ -20,6 +20,7 @@ ARTIFACT_ID="${ARTIFACT_ID:-volvoxgrid-android}"
 GIT_COMMIT="${GIT_COMMIT:-$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)}"
 BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 PLUGIN_BUILD_MODE="${PLUGIN_BUILD_MODE:-full}"
+AAR_BUILD_TYPE="${AAR_BUILD_TYPE:-release}"
 ANDROID_ABIS="${ANDROID_ABIS:-arm64-v8a,armeabi-v7a}"
 DIST_DIR="${DIST_DIR:-${REPO_ROOT}/dist/maven}"
 
@@ -59,6 +60,23 @@ case "${PLUGIN_BUILD_MODE}" in
     ;;
 esac
 
+case "${AAR_BUILD_TYPE}" in
+  debug)
+    CARGO_PROFILE_ARGS=()
+    GRADLE_ASSEMBLE_TASK=":volvoxgrid-android:assembleDebug"
+    AAR_SRC="${REPO_ROOT}/android/volvoxgrid-android/build/outputs/aar/volvoxgrid-android-debug.aar"
+    ;;
+  release)
+    CARGO_PROFILE_ARGS=(--release)
+    GRADLE_ASSEMBLE_TASK=":volvoxgrid-android:assembleRelease"
+    AAR_SRC="${REPO_ROOT}/android/volvoxgrid-android/build/outputs/aar/volvoxgrid-android-release.aar"
+    ;;
+  *)
+    echo "Error: AAR_BUILD_TYPE must be 'debug' or 'release', got '${AAR_BUILD_TYPE}'." >&2
+    exit 1
+    ;;
+esac
+
 export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-/opt/android-sdk}"
 export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"
 export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-${ANDROID_SDK_ROOT}/ndk/28.2.13676358}"
@@ -82,18 +100,71 @@ for ABI in "${ABI_LIST[@]}"; do
 done
 ABI_LIST=("${NORMALIZED_ABIS[@]}")
 
+find_unstripped_jni_so() {
+  local abi="$1"
+  local cmake_dir="${REPO_ROOT}/android/volvoxgrid-android/build/intermediates/cmake/${AAR_BUILD_TYPE}/obj/${abi}"
+  local cmake_so="${cmake_dir}/libvolvoxgrid_jni.so"
+  if [[ -f "${cmake_so}" ]]; then
+    echo "${cmake_so}"
+    return 0
+  fi
+
+  local cxx_variant_dir=""
+  case "${AAR_BUILD_TYPE}" in
+    debug) cxx_variant_dir="Debug" ;;
+    release) cxx_variant_dir="Release" ;;
+  esac
+  if [[ -n "${cxx_variant_dir}" ]]; then
+    local cxx_root="${REPO_ROOT}/android/volvoxgrid-android/build/intermediates/cxx/${cxx_variant_dir}"
+    if [[ -d "${cxx_root}" ]]; then
+      local found
+      found="$(find "${cxx_root}" -path "*/obj/${abi}/libvolvoxgrid_jni.so" -print -quit 2>/dev/null || true)"
+      if [[ -n "${found}" && -f "${found}" ]]; then
+        echo "${found}"
+        return 0
+      fi
+    fi
+  fi
+
+  return 1
+}
+
+rust_target_for_abi() {
+  case "$1" in
+    arm64-v8a) echo "aarch64-linux-android" ;;
+    armeabi-v7a) echo "armv7-linux-androideabi" ;;
+    x86_64) echo "x86_64-linux-android" ;;
+    *) return 1 ;;
+  esac
+}
+
+find_unstripped_plugin_so() {
+  local abi="$1"
+  local rust_target
+  rust_target="$(rust_target_for_abi "${abi}" || true)"
+  if [[ -z "${rust_target}" ]]; then
+    return 1
+  fi
+  local candidate="${CARGO_TARGET_DIR}/${rust_target}/${AAR_BUILD_TYPE}/libvolvoxgrid_plugin.so"
+  if [[ -f "${candidate}" ]]; then
+    echo "${candidate}"
+    return 0
+  fi
+  return 1
+}
+
 JNI_STAGE_DIR="$(mktemp -d /tmp/volvoxgrid-android-jni-XXXXXX)"
 ANDROID_JNI_DIR="${JNI_STAGE_DIR}/jniLibs"
 # Full Android AAR should include GPU backend support.
-PLUGIN_FEATURE_ARGS=(--release --features gpu)
+PLUGIN_FEATURE_ARGS=("${CARGO_PROFILE_ARGS[@]}" --features gpu)
 AAR_PLUGIN_SO_NAME="libvolvoxgrid_plugin.so"
 if [[ "${PLUGIN_BUILD_MODE}" == "lite" ]]; then
-  PLUGIN_FEATURE_ARGS=(--release --no-default-features --features demo)
+  PLUGIN_FEATURE_ARGS=("${CARGO_PROFILE_ARGS[@]}" --no-default-features --features demo)
   AAR_PLUGIN_SO_NAME="libvolvoxgrid_plugin_lite.so"
 fi
 
 # ── Build Rust plugin .so for each ABI ──────────────────────────────────────
-echo "Building Rust plugin for Android ABIs: ${ANDROID_ABIS} (mode=${PLUGIN_BUILD_MODE})..."
+echo "Building Rust plugin for Android ABIs: ${ANDROID_ABIS} (mode=${PLUGIN_BUILD_MODE}, build=${AAR_BUILD_TYPE})..."
 
 NDK_TARGETS=""
 for ABI in "${ABI_LIST[@]}"; do
@@ -118,7 +189,7 @@ for ABI in "${ABI_LIST[@]}"; do
 done
 
 # ── Build AAR via Gradle ────────────────────────────────────────────────────
-echo "Building Android AAR (release)..."
+echo "Building Android AAR (${AAR_BUILD_TYPE})..."
 # Gradle/AGP stores absolute source paths in native build metadata under
 # .cxx and build/intermediates/cxx. When reusing a workspace across host and
 # Docker, those cached paths can become invalid and break configureCMake.
@@ -131,9 +202,8 @@ rm -rf \
   -PvolvoxgridVersion="${VERSION}" \
   -PvolvoxgridGitCommit="${GIT_COMMIT}" \
   -PvolvoxgridBuildDate="${BUILD_DATE}" \
-  :volvoxgrid-android:assembleRelease
+  "${GRADLE_ASSEMBLE_TASK}"
 
-AAR_SRC="${REPO_ROOT}/android/volvoxgrid-android/build/outputs/aar/volvoxgrid-android-release.aar"
 if [[ ! -f "${AAR_SRC}" ]]; then
   echo "Error: expected AAR not found at ${AAR_SRC}" >&2
   exit 1
@@ -184,9 +254,27 @@ if [[ -d "${AAR_UNPACKED_DIR}/jni" ]]; then
   done
 fi
 
+if [[ "${AAR_BUILD_TYPE}" == "debug" ]]; then
+  for ABI in "${ABI_LIST[@]}"; do
+    JNI_SO="$(find_unstripped_jni_so "${ABI}" || true)"
+    if [[ -z "${JNI_SO}" ]]; then
+      echo "Warning: unstripped libvolvoxgrid_jni.so not found for ${ABI}; keeping packaged JNI library as-is." >&2
+      continue
+    fi
+    mkdir -p "${AAR_UNPACKED_DIR}/jni/${ABI}"
+    cp -f "${JNI_SO}" "${AAR_UNPACKED_DIR}/jni/${ABI}/libvolvoxgrid_jni.so"
+  done
+fi
+
 # Inject plugin native libs from temp staging dir into AAR jni/ layout.
 for ABI in "${ABI_LIST[@]}"; do
   SRC_SO="${ANDROID_JNI_DIR}/${ABI}/libvolvoxgrid_plugin.so"
+  if [[ "${AAR_BUILD_TYPE}" == "debug" ]]; then
+    UNSTRIPPED_PLUGIN_SO="$(find_unstripped_plugin_so "${ABI}" || true)"
+    if [[ -n "${UNSTRIPPED_PLUGIN_SO}" ]]; then
+      SRC_SO="${UNSTRIPPED_PLUGIN_SO}"
+    fi
+  fi
   if [[ ! -f "${SRC_SO}" ]]; then
     echo "Error: expected staged .so not found: ${SRC_SO}" >&2
     exit 1

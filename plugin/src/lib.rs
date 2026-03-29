@@ -23,10 +23,6 @@ lazy_static::lazy_static! {
     static ref SHARED_GRID_MANAGER: GridManager = GridManager::new();
 }
 
-fn notify_all_event_waiters() {
-    SHARED_GRID_MANAGER.notify_all_event_waiters();
-}
-
 type PluginResult<T> = Result<T, FfiError>;
 
 const ERROR_UNKNOWN: i32 = 0;
@@ -3732,7 +3728,10 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                     && !destroyed.load(Ordering::SeqCst)
                     && !stream.is_cancelled()
                 {
-                    grid = event_cv.wait(grid).unwrap_or_else(|e| e.into_inner());
+                    let waited = event_cv
+                        .wait_timeout(grid, Duration::from_millis(50))
+                        .unwrap_or_else(|e| e.into_inner());
+                    grid = waited.0;
                 }
 
                 if destroyed.load(Ordering::SeqCst) || stream.is_cancelled() {

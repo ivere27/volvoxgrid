@@ -17,7 +17,7 @@
 # Variables
 # =============================================================================
 SYNURANG_MODULE ?= github.com/ivere27/synurang
-SYNURANG_VERSION ?= v0.5.5
+SYNURANG_VERSION ?= v0.5.6
 PROTOC_PLUGIN ?= $(shell command -v protoc-gen-synurang-ffi 2>/dev/null)
 ifeq ($(strip $(PROTOC_PLUGIN)),)
 PROTOC_PLUGIN := $(shell go env GOPATH 2>/dev/null)/bin/protoc-gen-synurang-ffi
@@ -115,8 +115,10 @@ AAR_DOCKER_IMAGE ?= volvoxgrid-android-aar:latest
 AAR_VERSION ?= $(VOLVOXGRID_VERSION)
 AAR_GROUP_ID ?= io.github.ivere27
 AAR_ARTIFACT_ID ?= volvoxgrid-android
+AAR_DEBUG_ARTIFACT_ID ?= $(AAR_ARTIFACT_ID)-debug
 AAR_LITE_GROUP_ID ?= $(AAR_GROUP_ID)
 AAR_LITE_ARTIFACT_ID ?= volvoxgrid-android-lite
+AAR_LITE_DEBUG_ARTIFACT_ID ?= $(AAR_LITE_ARTIFACT_ID)-debug
 AAR_GIT_COMMIT ?= $(shell git -C "$(CURRENT_DIR)" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 AAR_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 AAR_ANDROID_ABIS ?= arm64-v8a,armeabi-v7a
@@ -225,7 +227,7 @@ all: build
 help:
 	@echo "VolvoxGrid Makefile targets:"
 	@echo ""
-	@echo "  build_plugin   Install protoc-gen-synurang-ffi (requires Go)"
+	@echo "  build_plugin   Install protoc-gen-synurang-ffi from GitHub (requires Go)"
 	@echo "  build          Build engine + host-plugin (debug)"
 	@echo "  release        Build engine + host-plugin (release, optimized)"
 	@echo "  host-plugin    Build host (desktop) plugin crate (debug)"
@@ -251,7 +253,8 @@ help:
 	@echo "    activex-run option: ACTIVEX_ARCH=i686|x86_64"
 	@echo "  android        Build AAR, install example app, and launch on device"
 	@echo "  android-build  Build Android AAR only (requires Android SDK)"
-	@echo "  android-plugin Build/copy Android plugin .so into example jniLibs"
+	@echo "  android-plugin Build debug Android plugin .so for Flutter jniLibs and package debug fat AAR"
+	@echo "  android-plugin-release Build release plugin .so and package release fat AAR"
 	@echo "  android-run    Install and launch Android example app on device"
 	@echo "  android-run-release  Build release plugin, install debug app, and launch on device"
 	@echo "  flutter        Build Flutter example (requires Flutter SDK)"
@@ -673,7 +676,7 @@ android-build:
 	@echo "Android build complete."
 
 android-plugin:
-	@echo "Building Android VolvoxGrid plugin shared libraries..."
+	@echo "Building Android VolvoxGrid plugin shared libraries (debug + debug AAR)..."
 	@set -e; \
 	SDK_DIR=""; \
 	if [ -n "$$ANDROID_HOME" ]; then \
@@ -767,6 +770,46 @@ android-plugin:
 		if [ "$$JNI_COPIED" -eq 0 ]; then \
 			echo "Error: libvolvoxgrid_jni.so not found after Gradle build."; \
 			exit 1; \
+		fi; \
+		echo "Packaging Android debug fat AAR..."; \
+		PACKAGE_MODE="full"; \
+		PACKAGE_GROUP_ID="$(AAR_GROUP_ID)"; \
+		PACKAGE_ARTIFACT_ID="$(AAR_DEBUG_ARTIFACT_ID)"; \
+		if [ "$(strip $(VOLVOXGRID_VARIANT))" = "lite" ]; then \
+			PACKAGE_MODE="lite"; \
+			PACKAGE_GROUP_ID="$(AAR_LITE_GROUP_ID)"; \
+			PACKAGE_ARTIFACT_ID="$(AAR_LITE_DEBUG_ARTIFACT_ID)"; \
+		fi; \
+		ANDROID_HOME="$$SDK_DIR" \
+		ANDROID_SDK_ROOT="$$SDK_DIR" \
+		ANDROID_NDK_HOME="$$NDK_DIR" \
+		VERSION="$(VOLVOXGRID_VERSION)" \
+		SYNURANG_VERSION="$${SYNURANG_VERSION:-$(patsubst v%,%,$(SYNURANG_VERSION))}" \
+		GROUP_ID="$$PACKAGE_GROUP_ID" \
+		ARTIFACT_ID="$$PACKAGE_ARTIFACT_ID" \
+		GIT_COMMIT="$(AAR_GIT_COMMIT)" \
+		BUILD_DATE="$(AAR_BUILD_DATE)" \
+		PLUGIN_BUILD_MODE="$$PACKAGE_MODE" \
+		AAR_BUILD_TYPE="debug" \
+		ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
+		BUILD_JOBS="$(BUILD_JOBS)" \
+		CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" \
+		GRADLE_MAX_WORKERS="$(GRADLE_MAX_WORKERS)" \
+		bash "$(CURRENT_DIR)/docker/build_android_aar.sh"; \
+		if [ "$(VOLVOXGRID_SOURCE_RESOLVED)" = "maven" ] && echo "$(VOLVOXGRID_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
+			if [ "$$PACKAGE_MODE" = "lite" ]; then \
+				$(MAKE) publish_local \
+					AAR_VERSION="$(VOLVOXGRID_VERSION)" \
+					AAR_ARTIFACT_ID="__skip__" \
+					AAR_LITE_ARTIFACT_ID="$(AAR_LITE_DEBUG_ARTIFACT_ID)" \
+					DESKTOP_VERSION=0; \
+			else \
+				$(MAKE) publish_local \
+					AAR_VERSION="$(VOLVOXGRID_VERSION)" \
+					AAR_ARTIFACT_ID="$(AAR_DEBUG_ARTIFACT_ID)" \
+					AAR_LITE_ARTIFACT_ID="__skip__" \
+					DESKTOP_VERSION=0; \
+			fi; \
 		fi
 	@echo "Android plugin build complete."
 
@@ -866,8 +909,7 @@ android-plugin-release:
 				echo "Error: libvolvoxgrid_jni.so not found after Gradle build."; \
 				exit 1; \
 			fi; \
-			if [ "$(VOLVOXGRID_SOURCE_RESOLVED)" = "maven" ] && echo "$(VOLVOXGRID_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
-				echo "Packaging Android SNAPSHOT AAR for mavenLocal..."; \
+				echo "Packaging Android release fat AAR..."; \
 				PACKAGE_MODE="full"; \
 				PACKAGE_GROUP_ID="$(AAR_GROUP_ID)"; \
 				PACKAGE_ARTIFACT_ID="$(AAR_ARTIFACT_ID)"; \
@@ -876,6 +918,9 @@ android-plugin-release:
 					PACKAGE_GROUP_ID="$(AAR_LITE_GROUP_ID)"; \
 					PACKAGE_ARTIFACT_ID="$(AAR_LITE_ARTIFACT_ID)"; \
 				fi; \
+				ANDROID_HOME="$$SDK_DIR" \
+				ANDROID_SDK_ROOT="$$SDK_DIR" \
+				ANDROID_NDK_HOME="$$NDK_DIR" \
 				VERSION="$(VOLVOXGRID_VERSION)" \
 				SYNURANG_VERSION="$${SYNURANG_VERSION:-$(patsubst v%,%,$(SYNURANG_VERSION))}" \
 				GROUP_ID="$$PACKAGE_GROUP_ID" \
@@ -883,25 +928,27 @@ android-plugin-release:
 				GIT_COMMIT="$(AAR_GIT_COMMIT)" \
 				BUILD_DATE="$(AAR_BUILD_DATE)" \
 				PLUGIN_BUILD_MODE="$$PACKAGE_MODE" \
+				AAR_BUILD_TYPE="release" \
 				ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
 				BUILD_JOBS="$(BUILD_JOBS)" \
 				CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" \
 				GRADLE_MAX_WORKERS="$(GRADLE_MAX_WORKERS)" \
 				bash "$(CURRENT_DIR)/docker/build_android_aar.sh"; \
-				if [ "$$PACKAGE_MODE" = "lite" ]; then \
-					$(MAKE) publish_local \
-						AAR_VERSION="$(VOLVOXGRID_VERSION)" \
-						AAR_ARTIFACT_ID="__skip__" \
-						AAR_LITE_ARTIFACT_ID="$(AAR_LITE_ARTIFACT_ID)" \
-						DESKTOP_VERSION=0; \
-				else \
-					$(MAKE) publish_local \
-						AAR_VERSION="$(VOLVOXGRID_VERSION)" \
-						AAR_ARTIFACT_ID="$(AAR_ARTIFACT_ID)" \
-						AAR_LITE_ARTIFACT_ID="__skip__" \
-						DESKTOP_VERSION=0; \
-				fi; \
-			fi
+				if [ "$(VOLVOXGRID_SOURCE_RESOLVED)" = "maven" ] && echo "$(VOLVOXGRID_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
+					if [ "$$PACKAGE_MODE" = "lite" ]; then \
+						$(MAKE) publish_local \
+							AAR_VERSION="$(VOLVOXGRID_VERSION)" \
+							AAR_ARTIFACT_ID="__skip__" \
+							AAR_LITE_ARTIFACT_ID="$(AAR_LITE_ARTIFACT_ID)" \
+							DESKTOP_VERSION=0; \
+					else \
+						$(MAKE) publish_local \
+							AAR_VERSION="$(VOLVOXGRID_VERSION)" \
+							AAR_ARTIFACT_ID="$(AAR_ARTIFACT_ID)" \
+							AAR_LITE_ARTIFACT_ID="__skip__" \
+							DESKTOP_VERSION=0; \
+					fi; \
+				fi
 	@echo "Android release plugin build complete."
 
 android-install: $(ANDROID_INSTALL_PREREQ)
