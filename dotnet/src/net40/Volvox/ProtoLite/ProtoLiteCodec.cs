@@ -2567,7 +2567,7 @@ namespace VolvoxGrid.DotNet.Internal
             if (s.BackColor.HasValue) writer.WriteInt32(1, unchecked((int)s.BackColor.Value));
             if (s.ForeColor.HasValue) writer.WriteInt32(2, unchecked((int)s.ForeColor.Value));
             if (s.Alignment.HasValue) writer.WriteInt32(3, (int)s.Alignment.Value);
-            if (s.FontName != null || s.FontSize.HasValue || s.FontBold.HasValue || s.FontItalic.HasValue || s.FontUnderline.HasValue || s.FontStrikethrough.HasValue || s.FontWidth.HasValue)
+            if (s.FontName != null || s.FontSize.HasValue || s.FontBold.HasValue || s.FontItalic.HasValue || s.FontUnderline.HasValue || s.FontStrikethrough.HasValue || s.FontStretch.HasValue)
             {
                 writer.WriteMessage(4, font =>
                 {
@@ -2577,7 +2577,7 @@ namespace VolvoxGrid.DotNet.Internal
                     if (s.FontItalic.HasValue) font.WriteBool(5, s.FontItalic.Value);
                     if (s.FontUnderline.HasValue) font.WriteBool(6, s.FontUnderline.Value);
                     if (s.FontStrikethrough.HasValue) font.WriteBool(7, s.FontStrikethrough.Value);
-                    if (s.FontWidth.HasValue) font.WriteFloat(8, s.FontWidth.Value);
+                    if (s.FontStretch.HasValue) font.WriteFloat(8, s.FontStretch.Value);
                 });
             }
             if (s.Border.HasValue || s.BorderColor.HasValue)
@@ -2682,7 +2682,7 @@ namespace VolvoxGrid.DotNet.Internal
                         else reader.SkipField(wire);
                         break;
                     case 8:
-                        if (wire == ProtoWireType.Fixed32) style.FontWidth = reader.ReadFloat();
+                        if (wire == ProtoWireType.Fixed32) style.FontStretch = reader.ReadFloat();
                         else reader.SkipField(wire);
                         break;
                     default:

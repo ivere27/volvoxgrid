@@ -227,7 +227,7 @@ fn proto_style_to_engine(s: &GridStyle) -> volvoxgrid_engine::style::GridStyleSt
         font_italic: s.font_italic,
         font_underline: s.font_underline,
         font_strikethrough: s.font_strikethrough,
-        font_width: s.font_width,
+        font_stretch: s.font_width,
         sheet_border: s.sheet_border,
         flood_color: s.progress_color,
         pictures_over: s.pictures_over,
@@ -267,7 +267,7 @@ fn engine_style_to_proto(s: &volvoxgrid_engine::style::GridStyleState) -> GridSt
         font_italic: s.font_italic,
         font_underline: s.font_underline,
         font_strikethrough: s.font_strikethrough,
-        font_width: s.font_width,
+        font_stretch: s.font_width,
         sheet_border: s.sheet_border,
         flood_color: s.progress_color,
         pictures_over: s.pictures_over,
@@ -308,7 +308,7 @@ fn proto_cell_style_to_override(cs: &CellStyle) -> CellStylePatch {
         font_italic: Some(cs.font_italic),
         font_underline: Some(cs.font_underline),
         font_strikethrough: Some(cs.font_strikethrough),
-        font_width: if cs.font_width > 0.0 {
+        font_stretch: if cs.font_width > 0.0 {
             Some(cs.font_width)
         } else {
             None
@@ -331,7 +331,7 @@ fn engine_override_to_proto(so: &CellStylePatch) -> CellStyle {
         font_italic: so.font_italic.unwrap_or(false),
         font_underline: so.font_underline.unwrap_or(false),
         font_strikethrough: so.font_strikethrough.unwrap_or(false),
-        font_width: so.font_width.unwrap_or(0.0),
+        font_width: so.font_stretch.unwrap_or(0.0),
         flood_color: 0,
         flood_percent: 0.0,
         border: so.border.unwrap_or(0),
@@ -475,7 +475,7 @@ fn set_cell_property(
                 16 => {
                     if let Some(cv) = value {
                         if let Some(cell_value::Value::Number(n)) = &cv.value {
-                            grid.cell_styles.entry((r, c)).or_default().font_width =
+                            grid.cell_styles.entry((r, c)).or_default().font_stretch =
                                 Some(*n as f32);
                         }
                     }
@@ -638,7 +638,7 @@ fn get_cell_property(
             let so = grid.get_cell_style(row, col);
             CellValue {
                 value: Some(cell_value::Value::Number(
-                    so.font_width.unwrap_or(0.0) as f64
+                    so.font_stretch.unwrap_or(0.0) as f64
                 )),
             }
         }

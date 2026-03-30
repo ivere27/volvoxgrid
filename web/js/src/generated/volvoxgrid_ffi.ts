@@ -976,7 +976,7 @@ export const FontFields = {
   "italic": 5,
   "underline": 6,
   "strikethrough": 7,
-  "width": 8,
+  "stretch": 8,
 } as const;
 export const FrameDoneFields = {
   "handle": 1,

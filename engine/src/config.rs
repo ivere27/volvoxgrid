@@ -473,9 +473,9 @@ fn apply_grid_font_patch(target: &mut style::GridStyleState, patch: &v1::Font) {
     if let Some(v) = patch.strikethrough {
         target.font_strikethrough = v;
     }
-    if let Some(v) = patch.width {
+    if let Some(v) = patch.stretch {
         if v.is_finite() {
-            target.font_width = v;
+            target.font_stretch = v;
         }
     }
 }
@@ -491,7 +491,7 @@ fn grid_font_to_v1(target: &style::GridStyleState) -> v1::Font {
         italic: Some(target.font_italic),
         underline: Some(target.font_underline),
         strikethrough: Some(target.font_strikethrough),
-        width: Some(target.font_width),
+        stretch: Some(target.font_stretch),
     }
 }
 
@@ -554,7 +554,7 @@ fn font_to_v1(
         italic: font_italic,
         underline: None,
         strikethrough: None,
-        width: None,
+        stretch: None,
     }
 }
 
@@ -588,9 +588,9 @@ fn apply_cell_style_font_patch(target: &mut style::CellStylePatch, patch: &v1::F
     if let Some(v) = patch.strikethrough {
         target.font_strikethrough = Some(v);
     }
-    if let Some(v) = patch.width {
+    if let Some(v) = patch.stretch {
         if v.is_finite() {
-            target.font_width = Some(v);
+            target.font_stretch = Some(v);
         }
     }
 }
@@ -602,7 +602,7 @@ fn cell_style_font_to_v1(target: &style::CellStylePatch) -> Option<v1::Font> {
         && target.font_italic.is_none()
         && target.font_underline.is_none()
         && target.font_strikethrough.is_none()
-        && target.font_width.is_none()
+        && target.font_stretch.is_none()
     {
         return None;
     }
@@ -617,7 +617,7 @@ fn cell_style_font_to_v1(target: &style::CellStylePatch) -> Option<v1::Font> {
         italic: target.font_italic,
         underline: target.font_underline,
         strikethrough: target.font_strikethrough,
-        width: target.font_width,
+        stretch: target.font_stretch,
     })
 }
 
@@ -3031,7 +3031,7 @@ pub fn v2_cell_style_to_engine(s: &v1::CellStyle) -> style::CellStylePatch {
         font_italic: None,
         font_underline: None,
         font_strikethrough: None,
-        font_width: None,
+        font_stretch: None,
         border,
         border_color,
         border_top,

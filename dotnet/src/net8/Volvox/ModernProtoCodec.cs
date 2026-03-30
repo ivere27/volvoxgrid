@@ -1047,7 +1047,7 @@ namespace VolvoxGrid.DotNet.Internal
             if (s.TextEffect.HasValue) res.TextEffect = (TextEffect)s.TextEffect.Value;
             if (s.ProgressColor.HasValue) res.ProgressColor = s.ProgressColor.Value;
             if (s.ProgressPercent.HasValue) res.Progress = s.ProgressPercent.Value;
-            if (s.FontName != null || s.FontSize.HasValue || s.FontBold.HasValue || s.FontItalic.HasValue || s.FontUnderline.HasValue || s.FontStrikethrough.HasValue || s.FontWidth.HasValue)
+            if (s.FontName != null || s.FontSize.HasValue || s.FontBold.HasValue || s.FontItalic.HasValue || s.FontUnderline.HasValue || s.FontStrikethrough.HasValue || s.FontStretch.HasValue)
             {
                 var font = new Font();
                 if (s.FontName != null) font.Family = s.FontName;
@@ -1056,7 +1056,7 @@ namespace VolvoxGrid.DotNet.Internal
                 if (s.FontItalic.HasValue) font.Italic = s.FontItalic.Value;
                 if (s.FontUnderline.HasValue) font.Underline = s.FontUnderline.Value;
                 if (s.FontStrikethrough.HasValue) font.Strikethrough = s.FontStrikethrough.Value;
-                if (s.FontWidth.HasValue) font.Width = s.FontWidth.Value;
+                if (s.FontStretch.HasValue) font.Stretch = s.FontStretch.Value;
                 res.Font = font;
             }
             if (s.Border.HasValue || s.BorderColor.HasValue)
@@ -1083,7 +1083,7 @@ namespace VolvoxGrid.DotNet.Internal
                 FontItalic = s.Font != null && s.Font.HasItalic ? (bool?)s.Font.Italic : null,
                 FontUnderline = s.Font != null && s.Font.HasUnderline ? (bool?)s.Font.Underline : null,
                 FontStrikethrough = s.Font != null && s.Font.HasStrikethrough ? (bool?)s.Font.Strikethrough : null,
-                FontWidth = s.Font != null && s.Font.HasWidth ? (float?)s.Font.Width : null,
+                FontStretch = s.Font != null && s.Font.HasStretch ? (float?)s.Font.Stretch : null,
                 ProgressColor = s.HasProgressColor ? (uint?)s.ProgressColor : null,
                 ProgressPercent = s.HasProgress ? (float?)s.Progress : null,
             };

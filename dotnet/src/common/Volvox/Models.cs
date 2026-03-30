@@ -171,7 +171,7 @@ namespace VolvoxGrid.DotNet.Internal
         public bool? FontItalic { get; set; }
         public bool? FontUnderline { get; set; }
         public bool? FontStrikethrough { get; set; }
-        public float? FontWidth { get; set; }
+        public float? FontStretch { get; set; }
         public uint? ProgressColor { get; set; }
         public float? ProgressPercent { get; set; }
         public VolvoxBorderStyle? Border { get; set; }

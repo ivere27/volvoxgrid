@@ -1140,7 +1140,15 @@ const Font$json = {
       '10': 'strikethrough',
       '17': true
     },
-    {'1': 'width', '3': 8, '4': 1, '5': 2, '9': 6, '10': 'width', '17': true},
+    {
+      '1': 'stretch',
+      '3': 8,
+      '4': 1,
+      '5': 2,
+      '9': 6,
+      '10': 'stretch',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_family'},
@@ -1149,7 +1157,7 @@ const Font$json = {
     {'1': '_italic'},
     {'1': '_underline'},
     {'1': '_strikethrough'},
-    {'1': '_width'},
+    {'1': '_stretch'},
   ],
 };
 
@@ -1158,9 +1166,10 @@ final $typed_data.Uint8List fontDescriptor = $convert.base64Decode(
     'CgRGb250EhsKBmZhbWlseRgBIAEoCUgAUgZmYW1pbHmIAQESGgoIZmFtaWxpZXMYAiADKAlSCG'
     'ZhbWlsaWVzEhcKBHNpemUYAyABKAJIAVIEc2l6ZYgBARIXCgRib2xkGAQgASgISAJSBGJvbGSI'
     'AQESGwoGaXRhbGljGAUgASgISANSBml0YWxpY4gBARIhCgl1bmRlcmxpbmUYBiABKAhIBFIJdW'
-    '5kZXJsaW5liAEBEikKDXN0cmlrZXRocm91Z2gYByABKAhIBVINc3RyaWtldGhyb3VnaIgBARIZ'
-    'CgV3aWR0aBgIIAEoAkgGUgV3aWR0aIgBAUIJCgdfZmFtaWx5QgcKBV9zaXplQgcKBV9ib2xkQg'
-    'kKB19pdGFsaWNCDAoKX3VuZGVybGluZUIQCg5fc3RyaWtldGhyb3VnaEIICgZfd2lkdGg=');
+    '5kZXJsaW5liAEBEikKDXN0cmlrZXRocm91Z2gYByABKAhIBVINc3RyaWtldGhyb3VnaIgBARId'
+    'CgdzdHJldGNoGAggASgCSAZSB3N0cmV0Y2iIAQFCCQoHX2ZhbWlseUIHCgVfc2l6ZUIHCgVfYm'
+    '9sZEIJCgdfaXRhbGljQgwKCl91bmRlcmxpbmVCEAoOX3N0cmlrZXRocm91Z2hCCgoIX3N0cmV0'
+    'Y2g=');
 
 @$core.Deprecated('Use paddingDescriptor instead')
 const Padding$json = {

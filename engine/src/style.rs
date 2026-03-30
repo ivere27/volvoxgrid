@@ -456,7 +456,7 @@ pub struct GridStyleState {
     pub font_italic: bool,
     pub font_underline: bool,
     pub font_strikethrough: bool,
-    pub font_width: f32,
+    pub font_stretch: f32,
     pub sheet_border: u32,
     pub progress_color: u32,
     pub image_over_text: bool,
@@ -509,7 +509,7 @@ impl Default for GridStyleState {
             font_italic: false,
             font_underline: false,
             font_strikethrough: false,
-            font_width: 0.0,
+            font_stretch: 0.0,
             sheet_border: 0,
             progress_color: 0,
             image_over_text: false,
@@ -573,7 +573,7 @@ pub struct CellStylePatch {
     pub font_italic: Option<bool>,
     pub font_underline: Option<bool>,
     pub font_strikethrough: Option<bool>,
-    pub font_width: Option<f32>,
+    pub font_stretch: Option<f32>,
     pub border: Option<i32>,
     pub border_color: Option<u32>,
     pub border_top: Option<i32>,
@@ -608,7 +608,7 @@ impl CellStylePatch {
             && self.font_italic.is_none()
             && self.font_underline.is_none()
             && self.font_strikethrough.is_none()
-            && self.font_width.is_none()
+            && self.font_stretch.is_none()
             && self.border.is_none()
             && self.border_color.is_none()
             && self.border_top.is_none()
@@ -656,8 +656,8 @@ impl CellStylePatch {
         if other.font_strikethrough.is_some() {
             self.font_strikethrough = other.font_strikethrough;
         }
-        if other.font_width.is_some() {
-            self.font_width = other.font_width;
+        if other.font_stretch.is_some() {
+            self.font_stretch = other.font_stretch;
         }
         if other.border.is_some() {
             self.border = other.border;

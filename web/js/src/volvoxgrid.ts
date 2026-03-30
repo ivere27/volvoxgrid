@@ -115,7 +115,7 @@ export interface VolvoxGridFont {
   italic?: boolean;
   underline?: boolean;
   strikethrough?: boolean;
-  width?: number;
+  stretch?: number;
 }
 
 export interface VolvoxGridBorder {
@@ -826,8 +826,8 @@ function pbEncodeFont(font: VolvoxGridFont): Uint8Array {
   if (font.strikethrough != null) {
     out.push(...pbEncodeTag(7, 0), ...pbEncodeBool(font.strikethrough));
   }
-  if (font.width != null) {
-    out.push(...pbEncodeFloatField(8, font.width));
+  if (font.stretch != null) {
+    out.push(...pbEncodeFloatField(8, font.stretch));
   }
   return new Uint8Array(out);
 }

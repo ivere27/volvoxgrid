@@ -368,7 +368,7 @@ export interface FontArg {
   italic?: boolean;
   underline?: boolean;
   strikethrough?: boolean;
-  width?: number;
+  stretch?: number;
 }
 
 export interface CellStyleFields {
@@ -404,10 +404,10 @@ export function encodeFont(font: FontArg): number[] {
   if (font.italic != null) out.push(...encodeTag(ProtoFontFields.italic, 0), ...encodeBool(font.italic));
   if (font.underline != null) out.push(...encodeTag(ProtoFontFields.underline, 0), ...encodeBool(font.underline));
   if (font.strikethrough != null) out.push(...encodeTag(ProtoFontFields.strikethrough, 0), ...encodeBool(font.strikethrough));
-  if (font.width != null) {
+  if (font.stretch != null) {
     const buf = new ArrayBuffer(4);
-    new DataView(buf).setFloat32(0, font.width, true);
-    out.push(...encodeTag(ProtoFontFields.width, 5), ...new Uint8Array(buf));
+    new DataView(buf).setFloat32(0, font.stretch, true);
+    out.push(...encodeTag(ProtoFontFields.stretch, 5), ...new Uint8Array(buf));
   }
   return out;
 }

@@ -19,7 +19,9 @@ message Font {
   optional bool   italic        = 5;
   optional bool   underline     = 6;
   optional bool   strikethrough = 7;
-  optional float  width         = 8;  // font stretch
+  // Horizontal font stretch (condensed/expanded width of the glyphs).
+  // VSFlexGrid legacy `font_width` maps to this field.
+  optional float  stretch       = 8;
 }
 
 message Padding {

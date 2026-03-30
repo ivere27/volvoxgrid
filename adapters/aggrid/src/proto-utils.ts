@@ -129,7 +129,7 @@ interface FontArg {
   italic?: boolean;
   underline?: boolean;
   strikethrough?: boolean;
-  width?: number;
+  stretch?: number;
 }
 
 interface BorderArg {
@@ -153,7 +153,7 @@ function encodeFont(font: FontArg): number[] {
   if (font.italic != null) out.push(...encodeTag(FontFields.italic, 0), ...encodeBool(font.italic));
   if (font.underline != null) out.push(...encodeTag(FontFields.underline, 0), ...encodeBool(font.underline));
   if (font.strikethrough != null) out.push(...encodeTag(FontFields.strikethrough, 0), ...encodeBool(font.strikethrough));
-  if (font.width != null) out.push(...encodeTag(FontFields.width, 5), ...encodeFloat(font.width));
+  if (font.stretch != null) out.push(...encodeTag(FontFields.stretch, 5), ...encodeFloat(font.stretch));
   return out;
 }
 

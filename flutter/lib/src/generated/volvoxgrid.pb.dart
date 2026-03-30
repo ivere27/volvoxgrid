@@ -31,7 +31,7 @@ class Font extends $pb.GeneratedMessage {
     $core.bool? italic,
     $core.bool? underline,
     $core.bool? strikethrough,
-    $core.double? width,
+    $core.double? stretch,
   }) {
     final result = create();
     if (family != null) result.family = family;
@@ -41,7 +41,7 @@ class Font extends $pb.GeneratedMessage {
     if (italic != null) result.italic = italic;
     if (underline != null) result.underline = underline;
     if (strikethrough != null) result.strikethrough = strikethrough;
-    if (width != null) result.width = width;
+    if (stretch != null) result.stretch = stretch;
     return result;
   }
 
@@ -65,7 +65,7 @@ class Font extends $pb.GeneratedMessage {
     ..aOB(5, _omitFieldNames ? '' : 'italic')
     ..aOB(6, _omitFieldNames ? '' : 'underline')
     ..aOB(7, _omitFieldNames ? '' : 'strikethrough')
-    ..aD(8, _omitFieldNames ? '' : 'width', fieldType: $pb.PbFieldType.OF)
+    ..aD(8, _omitFieldNames ? '' : 'stretch', fieldType: $pb.PbFieldType.OF)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -144,13 +144,13 @@ class Font extends $pb.GeneratedMessage {
   void clearStrikethrough() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.double get width => $_getN(7);
+  $core.double get stretch => $_getN(7);
   @$pb.TagNumber(8)
-  set width($core.double value) => $_setFloat(7, value);
+  set stretch($core.double value) => $_setFloat(7, value);
   @$pb.TagNumber(8)
-  $core.bool hasWidth() => $_has(7);
+  $core.bool hasStretch() => $_has(7);
   @$pb.TagNumber(8)
-  void clearWidth() => $_clearField(8);
+  void clearStretch() => $_clearField(8);
 }
 
 class Padding extends $pb.GeneratedMessage {
