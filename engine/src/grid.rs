@@ -1705,7 +1705,7 @@ impl VolvoxGrid {
                 return control;
             }
         }
-        if !self.configured_dropdown_list(row, col).is_empty() {
+        if !self.active_dropdown_list(row, col).is_empty() {
             return CellControl::DropdownButton;
         }
         CellControl::None
@@ -4109,6 +4109,20 @@ mod tests {
 
         grid.cells.get_mut(1, 0).extra_mut().control = Some(CellControl::None);
         assert_eq!(grid.resolved_cell_control(1, 0), CellControl::None);
+    }
+
+    #[test]
+    fn resolved_cell_control_hides_inferred_dropdown_for_header_and_subtotal_rows() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 1, 1, 0);
+        grid.columns[0].dropdown_items = "A|B|C".to_string();
+        grid.row_props.entry(2).or_default().is_subtotal = true;
+
+        assert_eq!(grid.resolved_cell_control(0, 0), CellControl::None);
+        assert_eq!(
+            grid.resolved_cell_control(1, 0),
+            CellControl::DropdownButton
+        );
+        assert_eq!(grid.resolved_cell_control(2, 0), CellControl::None);
     }
 
     #[test]

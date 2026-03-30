@@ -7809,7 +7809,7 @@ mod tests {
         cell_has_checkbox_visual, checkbox_box_size, checkbox_layer_needed,
         compose_preedit_display_text, dropdown_button_rect, dropdown_glyph_metrics,
         dropdown_layer_needed, parse_progress_percent, picture_layer_needed, progress_layer_needed,
-        sort_arrow_box_size, CellKey, RenderContext,
+        show_dropdown_button_for_cell, sort_arrow_box_size, CellKey, RenderContext,
     };
     use crate::grid::VolvoxGrid;
 
@@ -7887,6 +7887,18 @@ mod tests {
 
         grid.columns[0].dropdown_items = "A|B".to_string();
         assert!(dropdown_layer_needed(&grid, &render_ctx(&grid)));
+    }
+
+    #[test]
+    fn dropdown_button_hidden_for_header_and_subtotal_rows() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 1, 1, 0);
+        grid.dropdown_trigger = pb::DropdownTrigger::DropdownAlways as i32;
+        grid.columns[0].dropdown_items = "A|B".to_string();
+        grid.row_props.entry(2).or_default().is_subtotal = true;
+
+        assert!(!show_dropdown_button_for_cell(&grid, 0, 0));
+        assert!(show_dropdown_button_for_cell(&grid, 1, 0));
+        assert!(!show_dropdown_button_for_cell(&grid, 2, 0));
     }
 
     #[test]
