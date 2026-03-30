@@ -4248,7 +4248,97 @@ class EditConfig extends $pb.GeneratedMessage {
   void clearHostPointerDispatch() => $_clearField(8);
 }
 
-/// ── Scrolling ──
+class PullToRefreshConfig extends $pb.GeneratedMessage {
+  factory PullToRefreshConfig({
+    $core.bool? enabled,
+    PullToRefreshTheme? theme,
+    $core.String? textPull,
+    $core.String? textRelease,
+  }) {
+    final result = create();
+    if (enabled != null) result.enabled = enabled;
+    if (theme != null) result.theme = theme;
+    if (textPull != null) result.textPull = textPull;
+    if (textRelease != null) result.textRelease = textRelease;
+    return result;
+  }
+
+  PullToRefreshConfig._();
+
+  factory PullToRefreshConfig.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory PullToRefreshConfig.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PullToRefreshConfig',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'enabled')
+    ..aE<PullToRefreshTheme>(2, _omitFieldNames ? '' : 'theme',
+        enumValues: PullToRefreshTheme.values)
+    ..aOS(3, _omitFieldNames ? '' : 'textPull')
+    ..aOS(4, _omitFieldNames ? '' : 'textRelease')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullToRefreshConfig clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullToRefreshConfig copyWith(void Function(PullToRefreshConfig) updates) =>
+      super.copyWith((message) => updates(message as PullToRefreshConfig))
+          as PullToRefreshConfig;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static PullToRefreshConfig create() => PullToRefreshConfig._();
+  @$core.override
+  PullToRefreshConfig createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static PullToRefreshConfig getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PullToRefreshConfig>(create);
+  static PullToRefreshConfig? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get enabled => $_getBF(0);
+  @$pb.TagNumber(1)
+  set enabled($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEnabled() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEnabled() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  PullToRefreshTheme get theme => $_getN(1);
+  @$pb.TagNumber(2)
+  set theme(PullToRefreshTheme value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTheme() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTheme() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get textPull => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set textPull($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTextPull() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTextPull() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get textRelease => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set textRelease($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTextRelease() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTextRelease() => $_clearField(4);
+}
+
 class ScrollConfig extends $pb.GeneratedMessage {
   factory ScrollConfig({
     ScrollBarConfig? scrollBar,
@@ -4260,6 +4350,7 @@ class ScrollConfig extends $pb.GeneratedMessage {
     $core.bool? pinchZoomEnabled,
     $core.bool? fastScroll,
     ScrollBarsMode? scrollbars,
+    PullToRefreshConfig? pullToRefresh,
   }) {
     final result = create();
     if (scrollBar != null) result.scrollBar = scrollBar;
@@ -4271,6 +4362,7 @@ class ScrollConfig extends $pb.GeneratedMessage {
     if (pinchZoomEnabled != null) result.pinchZoomEnabled = pinchZoomEnabled;
     if (fastScroll != null) result.fastScroll = fastScroll;
     if (scrollbars != null) result.scrollbars = scrollbars;
+    if (pullToRefresh != null) result.pullToRefresh = pullToRefresh;
     return result;
   }
 
@@ -4300,6 +4392,8 @@ class ScrollConfig extends $pb.GeneratedMessage {
     ..aOB(8, _omitFieldNames ? '' : 'fastScroll')
     ..aE<ScrollBarsMode>(9, _omitFieldNames ? '' : 'scrollbars',
         enumValues: ScrollBarsMode.values)
+    ..aOM<PullToRefreshConfig>(10, _omitFieldNames ? '' : 'pullToRefresh',
+        subBuilder: PullToRefreshConfig.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4403,6 +4497,17 @@ class ScrollConfig extends $pb.GeneratedMessage {
   $core.bool hasScrollbars() => $_has(8);
   @$pb.TagNumber(9)
   void clearScrollbars() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  PullToRefreshConfig get pullToRefresh => $_getN(9);
+  @$pb.TagNumber(10)
+  set pullToRefresh(PullToRefreshConfig value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasPullToRefresh() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearPullToRefresh() => $_clearField(10);
+  @$pb.TagNumber(10)
+  PullToRefreshConfig ensurePullToRefresh() => $_ensure(9);
 }
 
 /// ── Outline / Tree ──
@@ -4740,6 +4845,12 @@ class InteractionConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearAutoSizeMode() => $_clearField(6);
 
+  /// When true, bulk bind/load paths do a one-time auto-fit of row heights
+  /// and/or column widths using `auto_size_mode`.
+  /// Also enables the engine's per-cell auto-resize helper when an adapter
+  /// explicitly calls it.
+  /// Disable this for very large datasets (for example around 1M rows),
+  /// because auto-fit may scan many or all cells to find the required size.
   @$pb.TagNumber(7)
   $core.bool get autoResize => $_getBF(6);
   @$pb.TagNumber(7)
@@ -15120,6 +15231,8 @@ enum GridEvent_Event {
   beforePageBreak,
   startPage,
   getHeaderRow,
+  pullToRefreshTriggered,
+  pullToRefreshCanceled,
   notSet
 }
 
@@ -15184,6 +15297,8 @@ class GridEvent extends $pb.GeneratedMessage {
     BeforePageBreakEvent? beforePageBreak,
     StartPageEvent? startPage,
     GetHeaderRowEvent? getHeaderRow,
+    PullToRefreshTriggeredEvent? pullToRefreshTriggered,
+    PullToRefreshCanceledEvent? pullToRefreshCanceled,
     $fixnum.Int64? eventId,
   }) {
     final result = create();
@@ -15248,6 +15363,10 @@ class GridEvent extends $pb.GeneratedMessage {
     if (beforePageBreak != null) result.beforePageBreak = beforePageBreak;
     if (startPage != null) result.startPage = startPage;
     if (getHeaderRow != null) result.getHeaderRow = getHeaderRow;
+    if (pullToRefreshTriggered != null)
+      result.pullToRefreshTriggered = pullToRefreshTriggered;
+    if (pullToRefreshCanceled != null)
+      result.pullToRefreshCanceled = pullToRefreshCanceled;
     if (eventId != null) result.eventId = eventId;
     return result;
   }
@@ -15320,6 +15439,8 @@ class GridEvent extends $pb.GeneratedMessage {
     58: GridEvent_Event.beforePageBreak,
     59: GridEvent_Event.startPage,
     60: GridEvent_Event.getHeaderRow,
+    61: GridEvent_Event.pullToRefreshTriggered,
+    62: GridEvent_Event.pullToRefreshCanceled,
     0: GridEvent_Event.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -15384,7 +15505,9 @@ class GridEvent extends $pb.GeneratedMessage {
       57,
       58,
       59,
-      60
+      60,
+      61,
+      62
     ])
     ..aInt64(1, _omitFieldNames ? '' : 'gridId')
     ..aOM<CellFocusChangingEvent>(2, _omitFieldNames ? '' : 'cellFocusChanging',
@@ -15505,6 +15628,12 @@ class GridEvent extends $pb.GeneratedMessage {
         subBuilder: StartPageEvent.create)
     ..aOM<GetHeaderRowEvent>(60, _omitFieldNames ? '' : 'getHeaderRow',
         subBuilder: GetHeaderRowEvent.create)
+    ..aOM<PullToRefreshTriggeredEvent>(
+        61, _omitFieldNames ? '' : 'pullToRefreshTriggered',
+        subBuilder: PullToRefreshTriggeredEvent.create)
+    ..aOM<PullToRefreshCanceledEvent>(
+        62, _omitFieldNames ? '' : 'pullToRefreshCanceled',
+        subBuilder: PullToRefreshCanceledEvent.create)
     ..aInt64(100, _omitFieldNames ? '' : 'eventId')
     ..hasRequiredFields = false;
 
@@ -15584,6 +15713,8 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(58)
   @$pb.TagNumber(59)
   @$pb.TagNumber(60)
+  @$pb.TagNumber(61)
+  @$pb.TagNumber(62)
   GridEvent_Event whichEvent() => _GridEvent_EventByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(2)
   @$pb.TagNumber(3)
@@ -15643,6 +15774,8 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(58)
   @$pb.TagNumber(59)
   @$pb.TagNumber(60)
+  @$pb.TagNumber(61)
+  @$pb.TagNumber(62)
   void clearEvent() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -16310,12 +16443,37 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(60)
   GetHeaderRowEvent ensureGetHeaderRow() => $_ensure(58);
 
+  /// Pull to refresh
+  @$pb.TagNumber(61)
+  PullToRefreshTriggeredEvent get pullToRefreshTriggered => $_getN(59);
+  @$pb.TagNumber(61)
+  set pullToRefreshTriggered(PullToRefreshTriggeredEvent value) =>
+      $_setField(61, value);
+  @$pb.TagNumber(61)
+  $core.bool hasPullToRefreshTriggered() => $_has(59);
+  @$pb.TagNumber(61)
+  void clearPullToRefreshTriggered() => $_clearField(61);
+  @$pb.TagNumber(61)
+  PullToRefreshTriggeredEvent ensurePullToRefreshTriggered() => $_ensure(59);
+
+  @$pb.TagNumber(62)
+  PullToRefreshCanceledEvent get pullToRefreshCanceled => $_getN(60);
+  @$pb.TagNumber(62)
+  set pullToRefreshCanceled(PullToRefreshCanceledEvent value) =>
+      $_setField(62, value);
+  @$pb.TagNumber(62)
+  $core.bool hasPullToRefreshCanceled() => $_has(60);
+  @$pb.TagNumber(62)
+  void clearPullToRefreshCanceled() => $_clearField(62);
+  @$pb.TagNumber(62)
+  PullToRefreshCanceledEvent ensurePullToRefreshCanceled() => $_ensure(60);
+
   @$pb.TagNumber(100)
-  $fixnum.Int64 get eventId => $_getI64(59);
+  $fixnum.Int64 get eventId => $_getI64(61);
   @$pb.TagNumber(100)
-  set eventId($fixnum.Int64 value) => $_setInt64(59, value);
+  set eventId($fixnum.Int64 value) => $_setInt64(61, value);
   @$pb.TagNumber(100)
-  $core.bool hasEventId() => $_has(59);
+  $core.bool hasEventId() => $_has(61);
   @$pb.TagNumber(100)
   void clearEventId() => $_clearField(100);
 }
@@ -20115,6 +20273,88 @@ class FilterDataEvent extends $pb.GeneratedMessage {
   $core.bool hasText() => $_has(2);
   @$pb.TagNumber(3)
   void clearText() => $_clearField(3);
+}
+
+/// ── Pull to Refresh Events ──
+class PullToRefreshTriggeredEvent extends $pb.GeneratedMessage {
+  factory PullToRefreshTriggeredEvent() => create();
+
+  PullToRefreshTriggeredEvent._();
+
+  factory PullToRefreshTriggeredEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory PullToRefreshTriggeredEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PullToRefreshTriggeredEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullToRefreshTriggeredEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullToRefreshTriggeredEvent copyWith(
+          void Function(PullToRefreshTriggeredEvent) updates) =>
+      super.copyWith(
+              (message) => updates(message as PullToRefreshTriggeredEvent))
+          as PullToRefreshTriggeredEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static PullToRefreshTriggeredEvent create() =>
+      PullToRefreshTriggeredEvent._();
+  @$core.override
+  PullToRefreshTriggeredEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static PullToRefreshTriggeredEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PullToRefreshTriggeredEvent>(create);
+  static PullToRefreshTriggeredEvent? _defaultInstance;
+}
+
+class PullToRefreshCanceledEvent extends $pb.GeneratedMessage {
+  factory PullToRefreshCanceledEvent() => create();
+
+  PullToRefreshCanceledEvent._();
+
+  factory PullToRefreshCanceledEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory PullToRefreshCanceledEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PullToRefreshCanceledEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullToRefreshCanceledEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullToRefreshCanceledEvent copyWith(
+          void Function(PullToRefreshCanceledEvent) updates) =>
+      super.copyWith(
+              (message) => updates(message as PullToRefreshCanceledEvent))
+          as PullToRefreshCanceledEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static PullToRefreshCanceledEvent create() => PullToRefreshCanceledEvent._();
+  @$core.override
+  PullToRefreshCanceledEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static PullToRefreshCanceledEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PullToRefreshCanceledEvent>(create);
+  static PullToRefreshCanceledEvent? _defaultInstance;
 }
 
 /// ── Error Events ──

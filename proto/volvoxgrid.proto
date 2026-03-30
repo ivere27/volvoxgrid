@@ -812,6 +812,19 @@ message EditConfig {
 }
 
 // ── Scrolling ──
+enum PullToRefreshTheme {
+  PULL_TO_REFRESH_THEME_UNSPECIFIED = 0;
+  PULL_TO_REFRESH_THEME_TOP_BAND    = 1;
+  PULL_TO_REFRESH_THEME_MATERIAL    = 2;
+}
+
+message PullToRefreshConfig {
+  optional bool               enabled      = 1;
+  optional PullToRefreshTheme theme        = 2;
+  optional string             text_pull    = 3;
+  optional string             text_release = 4;
+}
+
 message ScrollConfig {
   ScrollBarConfig         scroll_bar         = 1;
   optional bool           scroll_track       = 2;
@@ -822,6 +835,7 @@ message ScrollConfig {
   optional bool           pinch_zoom_enabled = 7;
   optional bool           fast_scroll        = 8;
   optional ScrollBarsMode scrollbars         = 9;
+  PullToRefreshConfig     pull_to_refresh    = 10;
 }
 
 // ── Outline / Tree ──
@@ -1872,6 +1886,9 @@ message GridEvent {
     BeforePageBreakEvent    before_page_break     = 58;
     StartPageEvent          start_page            = 59;
     GetHeaderRowEvent       get_header_row        = 60;
+    // Pull to refresh
+    PullToRefreshTriggeredEvent pull_to_refresh_triggered = 61;
+    PullToRefreshCanceledEvent pull_to_refresh_canceled = 62;
   }
 }
 
@@ -1988,6 +2005,10 @@ message TypeAheadEndedEvent   {}
 message DataRefreshingEvent {}
 message DataRefreshedEvent  {}
 message FilterDataEvent { int32 row = 1; int32 col = 2; string text = 3; }
+
+// ── Pull to Refresh Events ──
+message PullToRefreshTriggeredEvent {}
+message PullToRefreshCanceledEvent {}
 
 // ── Error Events ──
 message ErrorEvent { int32 code = 1; string message = 2; }

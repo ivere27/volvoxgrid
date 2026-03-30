@@ -1202,6 +1202,12 @@ fn engine_event_to_proto(
             }))
         }
         E::TypeAheadEnded => Some(grid_event::Event::TypeAheadEnded(TypeAheadEndedEvent {})),
+        E::PullToRefreshTriggered => Some(grid_event::Event::PullToRefreshTriggered(
+            PullToRefreshTriggeredEvent {},
+        )),
+        E::PullToRefreshCanceled => Some(grid_event::Event::PullToRefreshCanceled(
+            PullToRefreshCanceledEvent {},
+        )),
         E::DataRefreshing => Some(grid_event::Event::DataRefreshing(DataRefreshingEvent {})),
         E::DataRefreshed => Some(grid_event::Event::DataRefreshed(DataRefreshedEvent {})),
         E::FilterData { row, col, text } => Some(grid_event::Event::FilterData(FilterDataEvent {
@@ -2890,7 +2896,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                     let result = self.with_grid(grid_id, |grid| {
                         let needs_fling_tick = grid.fling_enabled && grid.scroll.fling_active;
-                        if !grid.dirty && !needs_fling_tick {
+                        let needs_pull_tick = grid.pull_to_refresh_needs_frame();
+                        if !grid.dirty && !needs_fling_tick && !needs_pull_tick {
                             return (false, 0, 0, 0, 0);
                         }
 
@@ -2914,6 +2921,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             if grid.scroll.tick_fling(dt_seconds, grid.fling_friction) {
                                 grid.mark_dirty_visual();
                             }
+                        }
+                        if needs_pull_tick && grid.tick_pull_to_refresh(dt_seconds) {
+                            grid.mark_dirty_visual();
                         }
 
                         if !grid.dirty {
@@ -3265,7 +3275,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                     let result = self.with_grid(grid_id, |grid| {
                         let needs_fling_tick = grid.fling_enabled && grid.scroll.fling_active;
-                        if !grid.dirty && !needs_fling_tick {
+                        let needs_pull_tick = grid.pull_to_refresh_needs_frame();
+                        if !grid.dirty && !needs_fling_tick && !needs_pull_tick {
                             return Ok((false, 0, 0, 0, 0));
                         }
 
@@ -3289,6 +3300,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             if grid.scroll.tick_fling(dt_seconds, grid.fling_friction) {
                                 grid.mark_dirty_visual();
                             }
+                        }
+                        if needs_pull_tick && grid.tick_pull_to_refresh(dt_seconds) {
+                            grid.mark_dirty_visual();
                         }
 
                         if !grid.dirty {
@@ -3422,6 +3436,18 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         match pe.r#type {
                             0 => {
                                 // DOWN
+                                let allow_pull_contact = pe.button == 0
+                                    && !matches!(
+                                        hit.as_ref().map(|h| h.area.clone()),
+                                        Some(volvoxgrid_engine::input::HitArea::FastScroll)
+                                            | Some(volvoxgrid_engine::input::HitArea::HScrollBar)
+                                            | Some(volvoxgrid_engine::input::HitArea::VScrollBar)
+                                    );
+                                if allow_pull_contact {
+                                    grid.begin_pull_to_refresh_contact();
+                                } else {
+                                    grid.cancel_pull_to_refresh_contact(false);
+                                }
                                 if decision_enabled {
                                     volvoxgrid_engine::input::handle_pointer_down_with_behavior(
                                         grid,
@@ -3512,6 +3538,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             }
                             1 => {
                                 // UP
+                                grid.end_pull_to_refresh_contact();
                                 volvoxgrid_engine::input::handle_pointer_up(
                                     grid,
                                     pe.x,
@@ -3724,6 +3751,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             ensure_layout(grid);
                         }
                         volvoxgrid_engine::input::handle_scroll(grid, se.delta_x, se.delta_y);
+                        if grid.pull_to_refresh_is_visible() {
+                            return None;
+                        }
                         if !grid.scroll_tips {
                             return None;
                         }
@@ -3751,6 +3781,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 }
 
                 Some(render_input::Input::Zoom(ze)) => {
+                    let _ = self.with_grid(grid_id, |grid| {
+                        grid.cancel_pull_to_refresh_contact(false);
+                    });
                     let zoom_enabled = self
                         .manager()
                         .with_grid(grid_id, |grid| grid.pinch_zoom_enabled)

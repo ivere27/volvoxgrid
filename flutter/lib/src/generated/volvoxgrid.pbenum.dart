@@ -1395,6 +1395,32 @@ class CellHitArea extends $pb.ProtobufEnum {
   const CellHitArea._(super.value, super.name);
 }
 
+/// ── Scrolling ──
+class PullToRefreshTheme extends $pb.ProtobufEnum {
+  static const PullToRefreshTheme PULL_TO_REFRESH_THEME_UNSPECIFIED =
+      PullToRefreshTheme._(
+          0, _omitEnumNames ? '' : 'PULL_TO_REFRESH_THEME_UNSPECIFIED');
+  static const PullToRefreshTheme PULL_TO_REFRESH_THEME_TOP_BAND =
+      PullToRefreshTheme._(
+          1, _omitEnumNames ? '' : 'PULL_TO_REFRESH_THEME_TOP_BAND');
+  static const PullToRefreshTheme PULL_TO_REFRESH_THEME_MATERIAL =
+      PullToRefreshTheme._(
+          2, _omitEnumNames ? '' : 'PULL_TO_REFRESH_THEME_MATERIAL');
+
+  static const $core.List<PullToRefreshTheme> values = <PullToRefreshTheme>[
+    PULL_TO_REFRESH_THEME_UNSPECIFIED,
+    PULL_TO_REFRESH_THEME_TOP_BAND,
+    PULL_TO_REFRESH_THEME_MATERIAL,
+  ];
+
+  static final $core.List<PullToRefreshTheme?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static PullToRefreshTheme? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const PullToRefreshTheme._(super.value, super.name);
+}
+
 /// ── Render layer bit positions (for render_layer_mask bitmask) ──
 class RenderLayerBit extends $pb.ProtobufEnum {
   static const RenderLayerBit RENDER_LAYER_OVERLAY_BANDS =

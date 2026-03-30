@@ -3049,6 +3049,10 @@ pub fn handle_scroll(grid: &mut VolvoxGrid, delta_x: f32, delta_y: f32) {
     let line_height = grid.default_row_height as f32;
     let dx = delta_x * line_height;
     let dy = delta_y * line_height;
+    if grid.handle_pull_to_refresh_scroll(dx, dy) {
+        grid.scroll.stop_fling();
+        return;
+    }
     let old_top_left =
         visible_top_left_for_scroll(grid, grid.scroll.scroll_x, grid.scroll.scroll_y);
 

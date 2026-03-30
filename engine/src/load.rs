@@ -301,6 +301,14 @@ pub fn load_data(
     apply_request_modes(grid, final_cols, opts.coercion, opts.error_mode);
     let write_result = grid.write_cells(&updates, false);
     restore_request_modes(grid, &restore_modes);
+    
+    // Clear any active pull-to-refresh settling animations now that data arrived.
+    // If we are settling, this snaps the UI immediately closed without event emission.
+    grid.cancel_pull_to_refresh_contact(false);
+    grid.pull_to_refresh_state = crate::grid::PullToRefreshState::Idle;
+    grid.pull_to_refresh_reveal_px = 0.0;
+    grid.pull_to_refresh_target_reveal_px = 0.0;
+    
     grid.auto_resize_all();
 
     pb::LoadDataResult {

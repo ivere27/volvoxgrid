@@ -37,6 +37,13 @@ pub const DEFAULT_ROW_HEIGHT: i32 = 20;
 pub const DEFAULT_COL_WIDTH: i32 = 68;
 /// Default fixed-rate pacing fallback when no platform frame clock is available.
 pub const DEFAULT_TARGET_FRAME_RATE_HZ: i32 = 30;
+const DEFAULT_PULL_TO_REFRESH_THRESHOLD_PX: f32 = 72.0;
+const DEFAULT_PULL_TO_REFRESH_MAX_REVEAL_PX: f32 = 132.0;
+const DEFAULT_PULL_TO_REFRESH_CANCEL_SNAP_PX: f32 = 18.0;
+const DEFAULT_PULL_TO_REFRESH_TOUCH_SLOP_PX: f32 = 8.0;
+const DEFAULT_PULL_TO_REFRESH_SETTLE_SPEED_PX_PER_SEC: f32 = 480.0;
+const DEFAULT_PULL_TO_REFRESH_TEXT_PULL: &str = "Pull to refresh";
+const DEFAULT_PULL_TO_REFRESH_TEXT_RELEASE: &str = "Release to refresh";
 
 /// Minimum allowed row count.
 const MIN_ROWS: i32 = 1;
@@ -54,6 +61,14 @@ static VOLVOXGRID_BUILD_METADATA: &str = concat!(
     ";VOLVOXGRID_BUILD_DATE=",
     env!("VOLVOXGRID_BUILD_DATE")
 );
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PullToRefreshState {
+    Idle,
+    Pulling,
+    Armed,
+    Settling,
+}
 
 #[inline]
 fn heap_hash_map_bytes<K, V>(map: &HashMap<K, V>) -> usize {
@@ -343,6 +358,14 @@ pub struct VolvoxGrid {
     pub fling_impulse_gain: f32,
     /// Exponential damping coefficient used by fling physics (higher = stops faster).
     pub fling_friction: f32,
+    /// Whether built-in pull-to-refresh is enabled.
+    pub pull_to_refresh_enabled: bool,
+    /// Pull-to-refresh theme selection.
+    pub pull_to_refresh_theme: i32,
+    /// Optional override for the pull-state label shown before arming.
+    pub pull_to_refresh_text_pull: Option<String>,
+    /// Optional override for the armed-state label shown before release.
+    pub pull_to_refresh_text_release: Option<String>,
     /// Tab key behavior: 0=move to next control, 1=move to next cell.
     pub tab_behavior: i32,
     /// Header features mode: controls sort glyphs and column drag in headers.
@@ -547,6 +570,22 @@ pub struct VolvoxGrid {
     /// Mouse pixel position of the track click (x for horizontal, y for vertical).
     pub scrollbar_repeat_mouse_pos: f32,
 
+    // ── Pull-to-Refresh Tracking ─────────────────────────────────────────
+    /// Current engine-owned pull-to-refresh state.
+    pub pull_to_refresh_state: PullToRefreshState,
+    /// Current reveal amount in pixels.
+    pub pull_to_refresh_reveal_px: f32,
+    /// Target reveal amount used by settle/refresh animations.
+    pub pull_to_refresh_target_reveal_px: f32,
+    /// Whether a touch-like pointer contact is currently active.
+    pub pull_to_refresh_contact_active: bool,
+    /// Accumulated horizontal gesture distance during the current contact.
+    pub pull_to_refresh_drag_accum_x_px: f32,
+    /// Accumulated vertical gesture distance during the current contact.
+    pub pull_to_refresh_drag_accum_y_px: f32,
+    /// Tracks whether the current contact ever revealed the affordance.
+    pub pull_to_refresh_had_reveal: bool,
+
     // ── Virtual Data Generation ─────────────────────────────────────────
     /// Optional function to generate cell text for rows that haven't been
     /// materialized (e.g. stress test with lazy loading).
@@ -740,6 +779,10 @@ impl VolvoxGrid {
             pinch_zoom_enabled: true,
             fling_impulse_gain: 30.0,
             fling_friction: 2.0,
+            pull_to_refresh_enabled: false,
+            pull_to_refresh_theme: pb::PullToRefreshTheme::TopBand as i32,
+            pull_to_refresh_text_pull: None,
+            pull_to_refresh_text_release: None,
             tab_behavior: 0,
             header_features: 0,
             custom_render: 0,
@@ -850,6 +893,15 @@ impl VolvoxGrid {
             scrollbar_repeat_is_track: false,
             scrollbar_repeat_mouse_pos: 0.0,
 
+            // Pull-to-refresh tracking
+            pull_to_refresh_state: PullToRefreshState::Idle,
+            pull_to_refresh_reveal_px: 0.0,
+            pull_to_refresh_target_reveal_px: 0.0,
+            pull_to_refresh_contact_active: false,
+            pull_to_refresh_drag_accum_x_px: 0.0,
+            pull_to_refresh_drag_accum_y_px: 0.0,
+            pull_to_refresh_had_reveal: false,
+
             // Virtual data generation
             sort_value_generator: None,
 
@@ -934,6 +986,14 @@ impl VolvoxGrid {
         bytes += self.clip_col_separator.capacity();
         bytes += self.clip_row_separator.capacity();
         bytes += self.format_string.capacity();
+        bytes += self
+            .pull_to_refresh_text_pull
+            .as_ref()
+            .map_or(0, |v| v.capacity());
+        bytes += self
+            .pull_to_refresh_text_release
+            .as_ref()
+            .map_or(0, |v| v.capacity());
 
         bytes
     }
@@ -1355,11 +1415,258 @@ impl VolvoxGrid {
     /// Keeps dirty=true if an engine-driven visual animation is still in-flight
     /// so the host continues to re-render until the animation settles.
     pub fn clear_dirty(&mut self) {
-        if self.animation.active || self.background_loading || scrollbar_fade_animating(self) {
+        if self.animation.active
+            || self.background_loading
+            || scrollbar_fade_animating(self)
+            || self.pull_to_refresh_needs_frame()
+        {
             self.dirty = true;
         } else {
             self.dirty = false;
         }
+    }
+
+    pub fn normalize_pull_to_refresh_theme(theme: i32) -> i32 {
+        match theme {
+            x if x == pb::PullToRefreshTheme::TopBand as i32 => x,
+            x if x == pb::PullToRefreshTheme::Material as i32 => x,
+            _ => pb::PullToRefreshTheme::TopBand as i32,
+        }
+    }
+
+    pub fn pull_to_refresh_theme(&self) -> i32 {
+        Self::normalize_pull_to_refresh_theme(self.pull_to_refresh_theme)
+    }
+
+    pub fn pull_to_refresh_threshold_px(&self) -> f32 {
+        DEFAULT_PULL_TO_REFRESH_THRESHOLD_PX * self.scale.max(0.01)
+    }
+
+    pub fn pull_to_refresh_max_reveal_px(&self) -> f32 {
+        DEFAULT_PULL_TO_REFRESH_MAX_REVEAL_PX * self.scale.max(0.01)
+    }
+
+    pub fn pull_to_refresh_touch_slop_px(&self) -> f32 {
+        DEFAULT_PULL_TO_REFRESH_TOUCH_SLOP_PX * self.scale.max(0.01)
+    }
+
+    pub fn pull_to_refresh_cancel_snap_px(&self) -> f32 {
+        DEFAULT_PULL_TO_REFRESH_CANCEL_SNAP_PX * self.scale.max(0.01)
+    }
+
+    pub fn pull_to_refresh_progress(&self) -> f32 {
+        (self.pull_to_refresh_reveal_px / self.pull_to_refresh_threshold_px()).clamp(0.0, 1.0)
+    }
+
+    pub fn pull_to_refresh_label_pull(&self) -> &str {
+        self.pull_to_refresh_text_pull
+            .as_deref()
+            .unwrap_or(DEFAULT_PULL_TO_REFRESH_TEXT_PULL)
+    }
+
+    pub fn pull_to_refresh_label_release(&self) -> &str {
+        self.pull_to_refresh_text_release
+            .as_deref()
+            .unwrap_or(DEFAULT_PULL_TO_REFRESH_TEXT_RELEASE)
+    }
+
+    pub fn pull_to_refresh_is_visible(&self) -> bool {
+        self.pull_to_refresh_reveal_px > f32::EPSILON
+            || matches!(self.pull_to_refresh_state, PullToRefreshState::Settling)
+    }
+
+    pub fn pull_to_refresh_needs_frame(&self) -> bool {
+        (self.pull_to_refresh_reveal_px - self.pull_to_refresh_target_reveal_px).abs() > 0.5
+            || matches!(self.pull_to_refresh_state, PullToRefreshState::Settling)
+    }
+
+    fn reset_pull_to_refresh_contact_tracking(&mut self) {
+        self.pull_to_refresh_contact_active = false;
+        self.pull_to_refresh_drag_accum_x_px = 0.0;
+        self.pull_to_refresh_drag_accum_y_px = 0.0;
+        self.pull_to_refresh_had_reveal = false;
+    }
+
+    fn settle_pull_to_refresh_to(&mut self, target_px: f32, next_state: PullToRefreshState) {
+        self.pull_to_refresh_target_reveal_px =
+            target_px.clamp(0.0, self.pull_to_refresh_max_reveal_px());
+        self.pull_to_refresh_state = next_state;
+        self.mark_dirty_visual();
+    }
+
+    fn update_pull_to_refresh_visual_state(&mut self) {
+        if self.pull_to_refresh_reveal_px <= f32::EPSILON {
+            self.pull_to_refresh_reveal_px = 0.0;
+            if !self.pull_to_refresh_contact_active {
+                self.pull_to_refresh_target_reveal_px = 0.0;
+                self.pull_to_refresh_state = PullToRefreshState::Idle;
+            } else {
+                self.pull_to_refresh_state = PullToRefreshState::Pulling;
+            }
+            return;
+        }
+        self.pull_to_refresh_state =
+            if self.pull_to_refresh_reveal_px >= self.pull_to_refresh_threshold_px() {
+                PullToRefreshState::Armed
+            } else {
+                PullToRefreshState::Pulling
+            };
+    }
+
+    pub fn begin_pull_to_refresh_contact(&mut self) {
+        if !self.pull_to_refresh_enabled {
+            return;
+        }
+        self.pull_to_refresh_contact_active = true;
+        self.pull_to_refresh_drag_accum_x_px = 0.0;
+        self.pull_to_refresh_drag_accum_y_px = 0.0;
+        self.pull_to_refresh_had_reveal = false;
+    }
+
+    pub fn cancel_pull_to_refresh_contact(&mut self, emit_cancel_event: bool) {
+        let should_emit = emit_cancel_event && self.pull_to_refresh_had_reveal;
+        self.reset_pull_to_refresh_contact_tracking();
+        if should_emit {
+            self.events
+                .push(crate::event::GridEventData::PullToRefreshCanceled);
+        }
+        self.pull_to_refresh_target_reveal_px = 0.0;
+        if self.pull_to_refresh_reveal_px <= self.pull_to_refresh_cancel_snap_px() {
+            self.pull_to_refresh_reveal_px = 0.0;
+            self.pull_to_refresh_target_reveal_px = 0.0;
+            self.pull_to_refresh_state = PullToRefreshState::Idle;
+        } else {
+            self.pull_to_refresh_state = PullToRefreshState::Settling;
+        }
+        self.mark_dirty_visual();
+    }
+
+    pub fn end_pull_to_refresh_contact(&mut self) {
+        if !self.pull_to_refresh_enabled {
+            return;
+        }
+        self.pull_to_refresh_contact_active = false;
+        self.pull_to_refresh_drag_accum_x_px = 0.0;
+        self.pull_to_refresh_drag_accum_y_px = 0.0;
+        match self.pull_to_refresh_state {
+            PullToRefreshState::Armed => {
+                self.pull_to_refresh_had_reveal = false;
+                self.events
+                    .push(crate::event::GridEventData::PullToRefreshTriggered);
+                self.settle_pull_to_refresh_to(0.0, PullToRefreshState::Settling);
+            }
+            PullToRefreshState::Pulling => {
+                let should_emit = self.pull_to_refresh_had_reveal;
+                self.pull_to_refresh_had_reveal = false;
+                if should_emit {
+                    self.events
+                        .push(crate::event::GridEventData::PullToRefreshCanceled);
+                }
+                // Not armed — snap to invisible immediately (no settle animation).
+                self.pull_to_refresh_reveal_px = 0.0;
+                self.pull_to_refresh_target_reveal_px = 0.0;
+                self.pull_to_refresh_state = PullToRefreshState::Idle;
+            }
+            PullToRefreshState::Settling => {
+                self.pull_to_refresh_had_reveal = false;
+            }
+            PullToRefreshState::Idle => {
+                self.pull_to_refresh_had_reveal = false;
+            }
+        }
+        self.mark_dirty_visual();
+    }
+
+    pub fn handle_pull_to_refresh_scroll(&mut self, dx_px: f32, dy_px: f32) -> bool {
+        if !self.pull_to_refresh_enabled
+            || !self.pull_to_refresh_contact_active
+            || self.fast_scroll_active
+            || self.scrollbar_drag_active
+        {
+            return false;
+        }
+        if matches!(self.pull_to_refresh_state, PullToRefreshState::Settling)
+            && self.pull_to_refresh_reveal_px > f32::EPSILON
+        {
+            return true;
+        }
+
+        let was_revealed = self.pull_to_refresh_reveal_px > f32::EPSILON;
+        self.pull_to_refresh_drag_accum_x_px += dx_px.abs();
+        self.pull_to_refresh_drag_accum_y_px += dy_px.abs();
+
+        if !was_revealed {
+            let slop = self.pull_to_refresh_touch_slop_px();
+            if self.pull_to_refresh_drag_accum_y_px < slop
+                && self.pull_to_refresh_drag_accum_x_px < slop
+            {
+                return false;
+            }
+            let vertical_dominant =
+                self.pull_to_refresh_drag_accum_y_px >= self.pull_to_refresh_drag_accum_x_px * 1.15;
+            if !vertical_dominant || self.scroll.scroll_y > 0.5 || dy_px >= 0.0 {
+                return false;
+            }
+        }
+
+        let mut next_reveal = self.pull_to_refresh_reveal_px;
+        if dy_px < 0.0 {
+            let pull_delta = -dy_px;
+            let resistance =
+                (1.0 - (next_reveal / self.pull_to_refresh_max_reveal_px()) * 0.7).clamp(0.2, 1.0);
+            next_reveal = (next_reveal + pull_delta * resistance)
+                .clamp(0.0, self.pull_to_refresh_max_reveal_px());
+        } else if dy_px > 0.0 && next_reveal > 0.0 {
+            next_reveal = (next_reveal - dy_px).max(0.0);
+        }
+
+        let changed = (next_reveal - self.pull_to_refresh_reveal_px).abs() > f32::EPSILON;
+        self.pull_to_refresh_reveal_px = next_reveal;
+        self.pull_to_refresh_target_reveal_px = next_reveal;
+        if self.pull_to_refresh_reveal_px > f32::EPSILON {
+            self.pull_to_refresh_had_reveal = true;
+        }
+        self.update_pull_to_refresh_visual_state();
+        if changed {
+            self.mark_dirty_visual();
+        }
+        changed || was_revealed || self.pull_to_refresh_reveal_px > f32::EPSILON
+    }
+
+    pub fn tick_pull_to_refresh(&mut self, dt_seconds: f32) -> bool {
+        if !dt_seconds.is_finite() || dt_seconds <= 0.0 {
+            return false;
+        }
+        let prev_reveal = self.pull_to_refresh_reveal_px;
+        let target = self.pull_to_refresh_target_reveal_px;
+        let delta = target - self.pull_to_refresh_reveal_px;
+        if delta.abs() > 0.5 {
+            let step =
+                DEFAULT_PULL_TO_REFRESH_SETTLE_SPEED_PX_PER_SEC * self.scale.max(0.01) * dt_seconds;
+            if delta.abs() <= step {
+                self.pull_to_refresh_reveal_px = target;
+            } else {
+                self.pull_to_refresh_reveal_px += step.copysign(delta);
+            }
+        } else if self.pull_to_refresh_reveal_px != target {
+            self.pull_to_refresh_reveal_px = target;
+        }
+
+        if matches!(self.pull_to_refresh_state, PullToRefreshState::Settling)
+            && self.pull_to_refresh_reveal_px <= 0.5
+            && !self.pull_to_refresh_contact_active
+        {
+            self.pull_to_refresh_reveal_px = 0.0;
+            self.pull_to_refresh_target_reveal_px = 0.0;
+            self.pull_to_refresh_state = PullToRefreshState::Idle;
+        } else if matches!(
+            self.pull_to_refresh_state,
+            PullToRefreshState::Pulling | PullToRefreshState::Armed
+        ) {
+            self.update_pull_to_refresh_visual_state();
+        }
+
+        (self.pull_to_refresh_reveal_px - prev_reveal).abs() > f32::EPSILON
     }
 
     // ── Viewport ──────────────────────────────────────────────────────────
@@ -2729,6 +3036,11 @@ impl VolvoxGrid {
     /// Fires `DataRefreshing` and `DataRefreshed` events, invalidates
     /// layout, and marks the grid dirty for re-render.
     pub fn data_refresh(&mut self) {
+        self.cancel_pull_to_refresh_contact(false);
+        self.pull_to_refresh_state = crate::grid::PullToRefreshState::Idle;
+        self.pull_to_refresh_reveal_px = 0.0;
+        self.pull_to_refresh_target_reveal_px = 0.0;
+
         self.events
             .push(crate::event::GridEventData::DataRefreshing);
         self.layout.invalidate();
@@ -3875,8 +4187,23 @@ fn truncate_chars(input: &str, max_chars: i32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::GridEventData;
     use crate::proto::volvoxgrid::v1 as pb;
     use std::time::Duration;
+
+    fn pull_to_refresh_test_grid() -> VolvoxGrid {
+        let mut grid = VolvoxGrid::new(1, 320, 240, 20, 4, 1, 0);
+        grid.pull_to_refresh_enabled = true;
+        grid
+    }
+
+    fn drain_event_data(grid: &mut VolvoxGrid) -> Vec<GridEventData> {
+        grid.events
+            .drain()
+            .into_iter()
+            .map(|event| event.data)
+            .collect()
+    }
 
     #[test]
     fn format_string_sets_columns() {
@@ -4515,5 +4842,141 @@ mod tests {
         grid.merge_cells(subtotal_row, 0, subtotal_row, 1);
 
         assert!(grid.get_row_height(subtotal_row) < before_merge);
+    }
+
+    #[test]
+    fn pull_to_refresh_below_threshold_cancels() {
+        let mut grid = pull_to_refresh_test_grid();
+
+        grid.begin_pull_to_refresh_contact();
+        assert!(
+            grid.handle_pull_to_refresh_scroll(0.0, -(grid.pull_to_refresh_threshold_px() * 0.5),)
+        );
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Pulling
+        ));
+
+        grid.end_pull_to_refresh_contact();
+
+        let events = drain_event_data(&mut grid);
+        assert!(events
+            .iter()
+            .any(|event| matches!(event, GridEventData::PullToRefreshCanceled)));
+        assert!(!events
+            .iter()
+            .any(|event| matches!(event, GridEventData::PullToRefreshTriggered)));
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Idle
+        ));
+        assert_eq!(grid.pull_to_refresh_reveal_px, 0.0);
+        assert_eq!(grid.pull_to_refresh_target_reveal_px, 0.0);
+    }
+
+    #[test]
+    fn pull_to_refresh_above_threshold_triggers_and_settles_immediately() {
+        let mut grid = pull_to_refresh_test_grid();
+
+        grid.begin_pull_to_refresh_contact();
+        assert!(
+            grid.handle_pull_to_refresh_scroll(0.0, -(grid.pull_to_refresh_threshold_px() * 1.5),)
+        );
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Armed
+        ));
+
+        grid.end_pull_to_refresh_contact();
+
+        let gesture_events = drain_event_data(&mut grid);
+        assert!(gesture_events
+            .iter()
+            .any(|event| matches!(event, GridEventData::PullToRefreshTriggered)));
+        assert!(!gesture_events.iter().any(|event| matches!(
+            event,
+            GridEventData::DataRefreshing | GridEventData::DataRefreshed
+        )));
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Settling
+        ));
+        assert_eq!(grid.pull_to_refresh_target_reveal_px, 0.0);
+
+        assert!(grid.tick_pull_to_refresh(1.0));
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Idle
+        ));
+        assert_eq!(grid.pull_to_refresh_reveal_px, 0.0);
+    }
+
+    #[test]
+    fn pull_to_refresh_ignores_non_top_or_horizontal_drag() {
+        let mut grid = pull_to_refresh_test_grid();
+        grid.scroll.scroll_y = 16.0;
+        grid.begin_pull_to_refresh_contact();
+
+        assert!(
+            !grid.handle_pull_to_refresh_scroll(0.0, -(grid.pull_to_refresh_threshold_px() * 1.1),)
+        );
+        assert_eq!(grid.pull_to_refresh_reveal_px, 0.0);
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Idle
+        ));
+
+        grid.cancel_pull_to_refresh_contact(false);
+
+        let mut grid = pull_to_refresh_test_grid();
+        grid.begin_pull_to_refresh_contact();
+
+        assert!(!grid.handle_pull_to_refresh_scroll(
+            grid.pull_to_refresh_touch_slop_px() * 2.0,
+            -(grid.pull_to_refresh_touch_slop_px() * 0.75),
+        ));
+        assert_eq!(grid.pull_to_refresh_reveal_px, 0.0);
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Idle
+        ));
+    }
+
+    #[test]
+    fn pull_to_refresh_ignores_fast_scroll_active() {
+        let mut grid = pull_to_refresh_test_grid();
+        grid.fast_scroll_active = true;
+        grid.begin_pull_to_refresh_contact();
+
+        assert!(
+            !grid.handle_pull_to_refresh_scroll(0.0, -(grid.pull_to_refresh_threshold_px() * 1.1),)
+        );
+        assert_eq!(grid.pull_to_refresh_reveal_px, 0.0);
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Idle
+        ));
+    }
+
+    #[test]
+    fn pull_to_refresh_tiny_cancel_snaps_closed() {
+        let mut grid = pull_to_refresh_test_grid();
+        let tiny_pull = (grid.pull_to_refresh_cancel_snap_px() * 0.5).max(2.0);
+
+        grid.begin_pull_to_refresh_contact();
+        assert!(grid.handle_pull_to_refresh_scroll(0.0, -tiny_pull));
+
+        grid.end_pull_to_refresh_contact();
+
+        let events = drain_event_data(&mut grid);
+        assert!(events
+            .iter()
+            .any(|event| matches!(event, GridEventData::PullToRefreshCanceled)));
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Idle
+        ));
+        assert_eq!(grid.pull_to_refresh_reveal_px, 0.0);
+        assert_eq!(grid.pull_to_refresh_target_reveal_px, 0.0);
     }
 }

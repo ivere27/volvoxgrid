@@ -906,6 +906,22 @@ final $typed_data.Uint8List cellHitAreaDescriptor = $convert.base64Decode(
     'CgtDZWxsSGl0QXJlYRIMCghISVRfQ0VMTBAAEgwKCEhJVF9URVhUEAESDwoLSElUX1BJQ1RVUk'
     'UQAhIOCgpISVRfQlVUVE9OEAMSEAoMSElUX0NIRUNLQk9YEAQSEAoMSElUX0RST1BET1dOEAU=');
 
+@$core.Deprecated('Use pullToRefreshThemeDescriptor instead')
+const PullToRefreshTheme$json = {
+  '1': 'PullToRefreshTheme',
+  '2': [
+    {'1': 'PULL_TO_REFRESH_THEME_UNSPECIFIED', '2': 0},
+    {'1': 'PULL_TO_REFRESH_THEME_TOP_BAND', '2': 1},
+    {'1': 'PULL_TO_REFRESH_THEME_MATERIAL', '2': 2},
+  ],
+};
+
+/// Descriptor for `PullToRefreshTheme`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List pullToRefreshThemeDescriptor = $convert.base64Decode(
+    'ChJQdWxsVG9SZWZyZXNoVGhlbWUSJQohUFVMTF9UT19SRUZSRVNIX1RIRU1FX1VOU1BFQ0lGSU'
+    'VEEAASIgoeUFVMTF9UT19SRUZSRVNIX1RIRU1FX1RPUF9CQU5EEAESIgoeUFVMTF9UT19SRUZS'
+    'RVNIX1RIRU1FX01BVEVSSUFMEAI=');
+
 @$core.Deprecated('Use renderLayerBitDescriptor instead')
 const RenderLayerBit$json = {
   '1': 'RenderLayerBit',
@@ -3304,6 +3320,64 @@ final $typed_data.Uint8List editConfigDescriptor = $convert.base64Decode(
     'JjaEINCgtfbWF4X2xlbmd0aEIHCgVfbWFza0IUChJfaG9zdF9rZXlfZGlzcGF0Y2hCGAoWX2hv'
     'c3RfcG9pbnRlcl9kaXNwYXRjaA==');
 
+@$core.Deprecated('Use pullToRefreshConfigDescriptor instead')
+const PullToRefreshConfig$json = {
+  '1': 'PullToRefreshConfig',
+  '2': [
+    {
+      '1': 'enabled',
+      '3': 1,
+      '4': 1,
+      '5': 8,
+      '9': 0,
+      '10': 'enabled',
+      '17': true
+    },
+    {
+      '1': 'theme',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.PullToRefreshTheme',
+      '9': 1,
+      '10': 'theme',
+      '17': true
+    },
+    {
+      '1': 'text_pull',
+      '3': 3,
+      '4': 1,
+      '5': 9,
+      '9': 2,
+      '10': 'textPull',
+      '17': true
+    },
+    {
+      '1': 'text_release',
+      '3': 4,
+      '4': 1,
+      '5': 9,
+      '9': 3,
+      '10': 'textRelease',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_enabled'},
+    {'1': '_theme'},
+    {'1': '_text_pull'},
+    {'1': '_text_release'},
+  ],
+};
+
+/// Descriptor for `PullToRefreshConfig`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pullToRefreshConfigDescriptor = $convert.base64Decode(
+    'ChNQdWxsVG9SZWZyZXNoQ29uZmlnEh0KB2VuYWJsZWQYASABKAhIAFIHZW5hYmxlZIgBARI8Cg'
+    'V0aGVtZRgCIAEoDjIhLnZvbHZveGdyaWQudjEuUHVsbFRvUmVmcmVzaFRoZW1lSAFSBXRoZW1l'
+    'iAEBEiAKCXRleHRfcHVsbBgDIAEoCUgCUgh0ZXh0UHVsbIgBARImCgx0ZXh0X3JlbGVhc2UYBC'
+    'ABKAlIA1ILdGV4dFJlbGVhc2WIAQFCCgoIX2VuYWJsZWRCCAoGX3RoZW1lQgwKCl90ZXh0X3B1'
+    'bGxCDwoNX3RleHRfcmVsZWFzZQ==');
+
 @$core.Deprecated('Use scrollConfigDescriptor instead')
 const ScrollConfig$json = {
   '1': 'ScrollConfig',
@@ -3389,6 +3463,14 @@ const ScrollConfig$json = {
       '10': 'scrollbars',
       '17': true
     },
+    {
+      '1': 'pull_to_refresh',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.PullToRefreshConfig',
+      '10': 'pullToRefresh'
+    },
   ],
   '8': [
     {'1': '_scroll_track'},
@@ -3412,9 +3494,11 @@ final $typed_data.Uint8List scrollConfigDescriptor = $convert.base64Decode(
     'xpbmdGcmljdGlvbogBARIxChJwaW5jaF96b29tX2VuYWJsZWQYByABKAhIBVIQcGluY2hab29t'
     'RW5hYmxlZIgBARIkCgtmYXN0X3Njcm9sbBgIIAEoCEgGUgpmYXN0U2Nyb2xsiAEBEkIKCnNjcm'
     '9sbGJhcnMYCSABKA4yHS52b2x2b3hncmlkLnYxLlNjcm9sbEJhcnNNb2RlSAdSCnNjcm9sbGJh'
-    'cnOIAQFCDwoNX3Njcm9sbF90cmFja0IOCgxfc2Nyb2xsX3RpcHNCEAoOX2ZsaW5nX2VuYWJsZW'
-    'RCFQoTX2ZsaW5nX2ltcHVsc2VfZ2FpbkIRCg9fZmxpbmdfZnJpY3Rpb25CFQoTX3BpbmNoX3pv'
-    'b21fZW5hYmxlZEIOCgxfZmFzdF9zY3JvbGxCDQoLX3Njcm9sbGJhcnM=');
+    'cnOIAQESSgoPcHVsbF90b19yZWZyZXNoGAogASgLMiIudm9sdm94Z3JpZC52MS5QdWxsVG9SZW'
+    'ZyZXNoQ29uZmlnUg1wdWxsVG9SZWZyZXNoQg8KDV9zY3JvbGxfdHJhY2tCDgoMX3Njcm9sbF90'
+    'aXBzQhAKDl9mbGluZ19lbmFibGVkQhUKE19mbGluZ19pbXB1bHNlX2dhaW5CEQoPX2ZsaW5nX2'
+    'ZyaWN0aW9uQhUKE19waW5jaF96b29tX2VuYWJsZWRCDgoMX2Zhc3Rfc2Nyb2xsQg0KC19zY3Jv'
+    'bGxiYXJz');
 
 @$core.Deprecated('Use outlineConfigDescriptor instead')
 const OutlineConfig$json = {
@@ -7935,6 +8019,24 @@ const GridEvent$json = {
       '9': 0,
       '10': 'getHeaderRow'
     },
+    {
+      '1': 'pull_to_refresh_triggered',
+      '3': 61,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.PullToRefreshTriggeredEvent',
+      '9': 0,
+      '10': 'pullToRefreshTriggered'
+    },
+    {
+      '1': 'pull_to_refresh_canceled',
+      '3': 62,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.PullToRefreshCanceledEvent',
+      '9': 0,
+      '10': 'pullToRefreshCanceled'
+    },
   ],
   '8': [
     {'1': 'event'},
@@ -8021,7 +8123,11 @@ final $typed_data.Uint8List gridEventDescriptor = $convert.base64Decode(
     'JlZm9yZVBhZ2VCcmVha0V2ZW50SABSD2JlZm9yZVBhZ2VCcmVhaxI+CgpzdGFydF9wYWdlGDsg'
     'ASgLMh0udm9sdm94Z3JpZC52MS5TdGFydFBhZ2VFdmVudEgAUglzdGFydFBhZ2USSAoOZ2V0X2'
     'hlYWRlcl9yb3cYPCABKAsyIC52b2x2b3hncmlkLnYxLkdldEhlYWRlclJvd0V2ZW50SABSDGdl'
-    'dEhlYWRlclJvd0IHCgVldmVudA==');
+    'dEhlYWRlclJvdxJnChlwdWxsX3RvX3JlZnJlc2hfdHJpZ2dlcmVkGD0gASgLMioudm9sdm94Z3'
+    'JpZC52MS5QdWxsVG9SZWZyZXNoVHJpZ2dlcmVkRXZlbnRIAFIWcHVsbFRvUmVmcmVzaFRyaWdn'
+    'ZXJlZBJkChhwdWxsX3RvX3JlZnJlc2hfY2FuY2VsZWQYPiABKAsyKS52b2x2b3hncmlkLnYxLl'
+    'B1bGxUb1JlZnJlc2hDYW5jZWxlZEV2ZW50SABSFXB1bGxUb1JlZnJlc2hDYW5jZWxlZEIHCgVl'
+    'dmVudA==');
 
 @$core.Deprecated('Use cellFocusChangingEventDescriptor instead')
 const CellFocusChangingEvent$json = {
@@ -8833,6 +8939,24 @@ final $typed_data.Uint8List filterDataEventDescriptor = $convert.base64Decode(
     'Cg9GaWx0ZXJEYXRhRXZlbnQSEAoDcm93GAEgASgFUgNyb3cSEAoDY29sGAIgASgFUgNjb2wSEg'
     'oEdGV4dBgDIAEoCVIEdGV4dA==');
 
+@$core.Deprecated('Use pullToRefreshTriggeredEventDescriptor instead')
+const PullToRefreshTriggeredEvent$json = {
+  '1': 'PullToRefreshTriggeredEvent',
+};
+
+/// Descriptor for `PullToRefreshTriggeredEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pullToRefreshTriggeredEventDescriptor =
+    $convert.base64Decode('ChtQdWxsVG9SZWZyZXNoVHJpZ2dlcmVkRXZlbnQ=');
+
+@$core.Deprecated('Use pullToRefreshCanceledEventDescriptor instead')
+const PullToRefreshCanceledEvent$json = {
+  '1': 'PullToRefreshCanceledEvent',
+};
+
+/// Descriptor for `PullToRefreshCanceledEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pullToRefreshCanceledEventDescriptor =
+    $convert.base64Decode('ChpQdWxsVG9SZWZyZXNoQ2FuY2VsZWRFdmVudA==');
+
 @$core.Deprecated('Use errorEventDescriptor instead')
 const ErrorEvent$json = {
   '1': 'ErrorEvent',
@@ -9149,6 +9273,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.ScrollConfig': ScrollConfig$json,
   '.volvoxgrid.v1.ScrollBarConfig': ScrollBarConfig$json,
   '.volvoxgrid.v1.ScrollBarColors': ScrollBarColors$json,
+  '.volvoxgrid.v1.PullToRefreshConfig': PullToRefreshConfig$json,
   '.volvoxgrid.v1.OutlineConfig': OutlineConfig$json,
   '.volvoxgrid.v1.SpanConfig': SpanConfig$json,
   '.volvoxgrid.v1.InteractionConfig': InteractionConfig$json,
@@ -9323,6 +9448,9 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.BeforePageBreakEvent': BeforePageBreakEvent$json,
   '.volvoxgrid.v1.StartPageEvent': StartPageEvent$json,
   '.volvoxgrid.v1.GetHeaderRowEvent': GetHeaderRowEvent$json,
+  '.volvoxgrid.v1.PullToRefreshTriggeredEvent':
+      PullToRefreshTriggeredEvent$json,
+  '.volvoxgrid.v1.PullToRefreshCanceledEvent': PullToRefreshCanceledEvent$json,
 };
 
 /// Descriptor for `VolvoxGridService`. Decode as a `google.protobuf.ServiceDescriptorProto`.

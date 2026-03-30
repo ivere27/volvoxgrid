@@ -8,7 +8,7 @@
 //! (wgpu surface).
 
 use crate::control::CellControl;
-use crate::grid::VolvoxGrid;
+use crate::grid::{PullToRefreshState, VolvoxGrid};
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::scrollbar::{
     compute_scrollbar_geometry, normalize_scrollbar_appearance, normalize_scrollbar_mode,
@@ -2291,9 +2291,10 @@ pub mod layer {
     pub const ACTIVE_DROPDOWN: u32 = 22;
     pub const SCROLL_BARS: u32 = 23;
     pub const FAST_SCROLL: u32 = 24;
-    pub const DEBUG_OVERLAY: u32 = 25;
+    pub const PULL_TO_REFRESH: u32 = 25;
+    pub const DEBUG_OVERLAY: u32 = 26;
 
-    pub const COUNT: usize = 26;
+    pub const COUNT: usize = 27;
     pub const ALL: u64 = (1u64 << COUNT) - 1;
 
     pub const NAMES: [&str; COUNT] = [
@@ -2322,6 +2323,7 @@ pub mod layer {
         "dd_active",
         "scrollbar",
         "fast_scrl",
+        "pull_rfrsh",
         "debug_ovl",
     ];
 }
@@ -2605,6 +2607,10 @@ fn render_grid_internal<C: Canvas>(
     );
     run_layer!(layer::SCROLL_BARS, render_scroll_bars(grid, canvas));
     run_layer!(layer::FAST_SCROLL, render_fast_scroll(grid, canvas));
+    run_layer!(
+        layer::PULL_TO_REFRESH,
+        render_pull_to_refresh_overlay(grid, canvas)
+    );
     run_layer!(
         layer::DEBUG_OVERLAY,
         render_debug_overlay(grid, canvas, &ctx)
@@ -7457,7 +7463,211 @@ fn render_fast_scroll<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
 }
 
 // ===========================================================================
-// Layer 14 -- Debug overlay
+// Layer 14 -- Pull-to-refresh overlay
+// ===========================================================================
+
+const PULL_TO_REFRESH_MATERIAL_ICON_FONTS: &[&str] = &["Material Icons", "MaterialIcons"];
+
+fn pull_to_refresh_label(grid: &VolvoxGrid) -> &str {
+    match grid.pull_to_refresh_state {
+        PullToRefreshState::Armed => grid.pull_to_refresh_label_release(),
+        _ => grid.pull_to_refresh_label_pull(),
+    }
+}
+
+fn pull_to_refresh_material_icon_ligature(grid: &VolvoxGrid) -> &'static str {
+    if matches!(grid.pull_to_refresh_state, PullToRefreshState::Armed) {
+        "arrow_upward"
+    } else {
+        "arrow_downward"
+    }
+}
+
+fn draw_pull_to_refresh_icon<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    size: i32,
+    color: u32,
+) {
+    if matches!(grid.pull_to_refresh_state, PullToRefreshState::Armed) {
+        canvas.draw_scroll_arrow_up(x, y, size, size, color);
+    } else {
+        canvas.draw_scroll_arrow_down(x, y, size, size, color);
+    }
+}
+
+fn draw_pull_to_refresh_material_icon<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    size: i32,
+    color: u32,
+) -> bool {
+    let ligature = pull_to_refresh_material_icon_ligature(grid);
+    let font_size = (size as f32).max(8.0);
+    for font_name in PULL_TO_REFRESH_MATERIAL_ICON_FONTS {
+        let (tw, th) = canvas.measure_text(ligature, font_name, font_size, false, false, None);
+        let text_w = tw.ceil() as i32;
+        let text_h = th.ceil() as i32;
+        // If the icon font is missing, the ligature usually measures like the literal
+        // "arrow_downward"/"arrow_upward" text; reject that and fall back to vector arrows.
+        if text_w <= size * 2 && text_h <= size * 2 && text_w > 0 && text_h > 0 {
+            let text_x = x + ((size - text_w).max(0) / 2);
+            let text_y = y + ((size as f32 - th) * 0.5).round() as i32;
+            canvas.draw_text(
+                text_x,
+                text_y,
+                ligature,
+                font_name,
+                font_size,
+                false,
+                false,
+                color,
+                x,
+                y,
+                size.max(text_w),
+                size.max(text_h),
+                None,
+            );
+            return true;
+        }
+    }
+    false
+}
+
+fn render_pull_to_refresh_top_band<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
+    let reveal = grid.pull_to_refresh_reveal_px.round() as i32;
+    if reveal <= 0 {
+        return;
+    }
+    let band_h = reveal.min(canvas.height().max(1));
+    let bg = scale_color_alpha(grid.style.back_color_fixed, 0.96);
+    let border = scale_color_alpha(grid.style.grid_color_fixed, 0.92);
+    let text_color = grid.style.fore_color_fixed;
+    canvas.blend_rect(0, 0, canvas.width(), band_h, bg);
+    if band_h > 1 {
+        canvas.hline(0, band_h - 1, canvas.width(), border);
+    }
+
+    let progress = grid.pull_to_refresh_progress();
+    if progress > 0.0 {
+        let progress_w = ((canvas.width() as f32) * progress).round() as i32;
+        if progress_w > 0 {
+            canvas.fill_rect(0, band_h.saturating_sub(3), progress_w, 3, border);
+        }
+    }
+
+    let icon_size = (16.0 * grid.scale.max(0.01)).round() as i32;
+    let font_size = (13.0 * grid.scale.max(0.01)).round();
+    let label = pull_to_refresh_label(grid);
+    let (text_w, text_h) =
+        canvas.measure_text(label, &grid.style.font_name, font_size, false, false, None);
+    let gap = (10.0 * grid.scale.max(0.01)).round() as i32;
+    let total_w = icon_size
+        + if label.is_empty() {
+            0
+        } else {
+            gap + text_w.ceil() as i32
+        };
+    let start_x = ((canvas.width() - total_w) / 2).max(8);
+    let icon_y = ((band_h - icon_size) / 2).max(4);
+    draw_pull_to_refresh_icon(grid, canvas, start_x, icon_y, icon_size, text_color);
+    if !label.is_empty() {
+        let text_x = start_x + icon_size + gap;
+        let text_y = ((band_h as f32 - text_h) * 0.5).round() as i32;
+        let clip_y = icon_y.saturating_sub(6);
+        let clip_h = (band_h - clip_y).max(1);
+        canvas.draw_text(
+            text_x,
+            text_y,
+            label,
+            &grid.style.font_name,
+            font_size,
+            false,
+            false,
+            text_color,
+            0,
+            clip_y,
+            canvas.width(),
+            clip_h,
+            None,
+        );
+    }
+}
+
+fn render_pull_to_refresh_material<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
+    let reveal = grid.pull_to_refresh_reveal_px.max(0.0);
+    if reveal <= f32::EPSILON {
+        return;
+    }
+    let scale = grid.scale.max(0.01);
+    let label = pull_to_refresh_label(grid);
+    let font_size = (13.0 * scale).round();
+    let icon_size = (18.0 * scale).round() as i32;
+    let padding_x = (12.0 * scale).round() as i32;
+    let padding_y = (8.0 * scale).round() as i32;
+    let gap = if label.is_empty() {
+        0
+    } else {
+        (10.0 * scale).round() as i32
+    };
+    let (text_w, text_h) = if label.is_empty() {
+        (0.0, 0.0)
+    } else {
+        canvas.measure_text(label, &grid.style.font_name, font_size, false, false, None)
+    };
+    let pill_w = icon_size + gap + text_w.ceil() as i32 + padding_x * 2;
+    let pill_h = icon_size.max(text_h.ceil() as i32) + padding_y * 2;
+    let x = ((canvas.width() - pill_w) / 2).max(8);
+    let y = ((reveal.round() as i32 - pill_h) / 2).max((6.0 * scale).round() as i32);
+    let bg_alpha = (0.45 + 0.45 * grid.pull_to_refresh_progress()).clamp(0.45, 0.9);
+    let bg = scale_color_alpha(0xFF202124, bg_alpha);
+    let radius = (pill_h / 2).max(8);
+    canvas.fill_rounded_rect(x, y, pill_w, pill_h, radius, bg);
+
+    let icon_x = x + padding_x;
+    let icon_y = y + (pill_h - icon_size) / 2;
+    if !draw_pull_to_refresh_material_icon(grid, canvas, icon_x, icon_y, icon_size, 0xFFFFFFFF) {
+        draw_pull_to_refresh_icon(grid, canvas, icon_x, icon_y, icon_size, 0xFFFFFFFF);
+    }
+    if !label.is_empty() {
+        let text_x = icon_x + icon_size + gap;
+        let text_y = y + ((pill_h as f32 - text_h) * 0.5).round() as i32;
+        canvas.draw_text(
+            text_x,
+            text_y,
+            label,
+            &grid.style.font_name,
+            font_size,
+            false,
+            false,
+            0xFFFFFFFF,
+            x,
+            y,
+            pill_w,
+            pill_h,
+            None,
+        );
+    }
+}
+
+fn render_pull_to_refresh_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
+    if !grid.pull_to_refresh_enabled || !grid.pull_to_refresh_is_visible() {
+        return;
+    }
+    match grid.pull_to_refresh_theme() {
+        x if x == pb::PullToRefreshTheme::Material as i32 => {
+            render_pull_to_refresh_material(grid, canvas);
+        }
+        _ => render_pull_to_refresh_top_band(grid, canvas),
+    }
+}
+
+// ===========================================================================
+// Layer 15 -- Debug overlay
 // ===========================================================================
 
 fn short_commit(commit: &str) -> String {

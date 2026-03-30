@@ -289,6 +289,11 @@ export enum PrintOrientation {
   PRINT_PORTRAIT = 0,
   PRINT_LANDSCAPE = 1,
 }
+export enum PullToRefreshTheme {
+  PULL_TO_REFRESH_THEME_UNSPECIFIED = 0,
+  PULL_TO_REFRESH_THEME_TOP_BAND = 1,
+  PULL_TO_REFRESH_THEME_MATERIAL = 2,
+}
 export enum RenderLayerBit {
   RENDER_LAYER_OVERLAY_BANDS = 0,
   RENDER_LAYER_INDICATORS = 1,
@@ -1101,6 +1106,8 @@ export const GridEventFields = {
   "before_page_break": 58,
   "start_page": 59,
   "get_header_row": 60,
+  "pull_to_refresh_triggered": 61,
+  "pull_to_refresh_canceled": 62,
 } as const;
 export const GridHandleFields = {
   "id": 1,
@@ -1442,6 +1449,16 @@ export const PrintRequestFields = {
 export const PrintResponseFields = {
   "pages": 1,
 } as const;
+export const PullToRefreshCanceledEventFields = {
+} as const;
+export const PullToRefreshConfigFields = {
+  "enabled": 1,
+  "theme": 2,
+  "text_pull": 3,
+  "text_release": 4,
+} as const;
+export const PullToRefreshTriggeredEventFields = {
+} as const;
 export const RegexQueryFields = {
   "pattern": 1,
 } as const;
@@ -1571,6 +1588,7 @@ export const ScrollConfigFields = {
   "pinch_zoom_enabled": 7,
   "fast_scroll": 8,
   "scrollbars": 9,
+  "pull_to_refresh": 10,
 } as const;
 export const ScrollEventFields = {
   "delta_x": 1,

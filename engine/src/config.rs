@@ -1586,6 +1586,26 @@ impl VolvoxGrid {
         if let Some(v) = sc.fast_scroll {
             self.fast_scroll_enabled = v;
         }
+        if let Some(ptr) = sc.pull_to_refresh.as_ref() {
+            if let Some(v) = ptr.enabled {
+                self.pull_to_refresh_enabled = v;
+                if !v {
+                    self.cancel_pull_to_refresh_contact(false);
+                    self.pull_to_refresh_state = crate::grid::PullToRefreshState::Idle;
+                    self.pull_to_refresh_reveal_px = 0.0;
+                    self.pull_to_refresh_target_reveal_px = 0.0;
+                }
+            }
+            if let Some(v) = ptr.theme {
+                self.pull_to_refresh_theme = VolvoxGrid::normalize_pull_to_refresh_theme(v);
+            }
+            if let Some(v) = &ptr.text_pull {
+                self.pull_to_refresh_text_pull = Some(v.clone());
+            }
+            if let Some(v) = &ptr.text_release {
+                self.pull_to_refresh_text_release = Some(v.clone());
+            }
+        }
         self.mark_dirty();
     }
 
@@ -1984,6 +2004,12 @@ impl VolvoxGrid {
             fling_friction: Some(self.fling_friction),
             pinch_zoom_enabled: Some(self.pinch_zoom_enabled),
             fast_scroll: Some(self.fast_scroll_enabled),
+            pull_to_refresh: Some(v1::PullToRefreshConfig {
+                enabled: Some(self.pull_to_refresh_enabled),
+                theme: Some(self.pull_to_refresh_theme()),
+                text_pull: self.pull_to_refresh_text_pull.clone(),
+                text_release: self.pull_to_refresh_text_release.clone(),
+            }),
             scroll_bar: Some(v1::ScrollBarConfig {
                 show_h: Some(self.scrollbar_show_h),
                 show_v: Some(self.scrollbar_show_v),
@@ -3850,5 +3876,59 @@ mod tests {
         grid.apply_config(&config);
         assert!(grid.text_overflow);
         assert_eq!(grid.ellipsis_mode, 1);
+    }
+
+    #[test]
+    fn pull_to_refresh_config_roundtrip() {
+        let mut grid = test_grid();
+        grid.pull_to_refresh_enabled = true;
+        grid.pull_to_refresh_theme = v1::PullToRefreshTheme::Material as i32;
+        grid.pull_to_refresh_text_pull = Some("Pull newer rows".to_string());
+        grid.pull_to_refresh_text_release = Some("Release now".to_string());
+
+        let config = grid.get_config();
+        let pull = config
+            .scrolling
+            .as_ref()
+            .and_then(|scrolling| scrolling.pull_to_refresh.as_ref())
+            .expect("pull_to_refresh config should be present");
+
+        assert_eq!(pull.enabled, Some(true));
+        assert_eq!(pull.theme, Some(v1::PullToRefreshTheme::Material as i32));
+        assert_eq!(pull.text_pull.as_deref(), Some("Pull newer rows"));
+        assert_eq!(pull.text_release.as_deref(), Some("Release now"));
+    }
+
+    #[test]
+    fn disabling_pull_to_refresh_resets_runtime_state() {
+        let mut grid = test_grid();
+        grid.pull_to_refresh_enabled = true;
+        grid.begin_pull_to_refresh_contact();
+        assert!(
+            grid.handle_pull_to_refresh_scroll(0.0, -(grid.pull_to_refresh_threshold_px() * 0.75),)
+        );
+        assert!(grid.pull_to_refresh_reveal_px > 0.0);
+
+        let config = v1::GridConfig {
+            scrolling: Some(v1::ScrollConfig {
+                pull_to_refresh: Some(v1::PullToRefreshConfig {
+                    enabled: Some(false),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        grid.apply_config(&config);
+
+        assert!(!grid.pull_to_refresh_enabled);
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            crate::grid::PullToRefreshState::Idle
+        ));
+        assert_eq!(grid.pull_to_refresh_reveal_px, 0.0);
+        assert_eq!(grid.pull_to_refresh_target_reveal_px, 0.0);
+        assert!(!grid.pull_to_refresh_contact_active);
     }
 }

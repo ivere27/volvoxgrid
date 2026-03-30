@@ -4650,6 +4650,12 @@ fn engine_event_to_proto(
         E::TypeAheadEnded => Some(grid_event::Event::TypeAheadEnded(TypeAheadEndedEvent {})),
         E::DataRefreshing => Some(grid_event::Event::DataRefreshing(DataRefreshingEvent {})),
         E::DataRefreshed => Some(grid_event::Event::DataRefreshed(DataRefreshedEvent {})),
+        E::PullToRefreshTriggered => Some(grid_event::Event::PullToRefreshTriggered(
+            PullToRefreshTriggeredEvent {},
+        )),
+        E::PullToRefreshCanceled => Some(grid_event::Event::PullToRefreshCanceled(
+            PullToRefreshCanceledEvent {},
+        )),
         E::FilterData { row, col, text } => Some(grid_event::Event::FilterData(FilterDataEvent {
             row,
             col,
