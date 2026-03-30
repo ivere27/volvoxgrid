@@ -34,6 +34,19 @@ export interface VolvoxGridSelection {
   ranges: VolvoxGridCellRange[];
 }
 
+export type VolvoxGridContextMenuTrigger = "secondary_click";
+
+export interface VolvoxGridContextMenuRequest {
+  trigger: VolvoxGridContextMenuTrigger;
+  clientX: number;
+  clientY: number;
+  canvasX: number;
+  canvasY: number;
+  row: number;
+  col: number;
+  selection: VolvoxGridSelection;
+}
+
 export interface VolvoxGridNodeInfo {
   row: number;
   level: number;
@@ -1970,6 +1983,7 @@ export class VolvoxGrid {
   private readonly zoomBaseColWidthByGrid = new Map<number, number>();
   private readonly cellBackColorBatchEncoder = new CellBackColorBatchEncoder();
   onZoomChange: ((scale: number) => void) | null = null;
+  onContextMenuRequest: ((request: VolvoxGridContextMenuRequest) => void) | null = null;
   private beforeEditListener: ((details: VolvoxGridBeforeEditDetails) => void) | null = null;
   private cellEditValidatingListener:
     ((details: VolvoxGridCellEditValidatingDetails) => void) | null = null;
@@ -5707,6 +5721,24 @@ export class VolvoxGrid {
     this.dirty = true;
   };
 
+  private onContextMenu = (e: MouseEvent): void => {
+    e.preventDefault();
+    const rect = this.canvas.getBoundingClientRect();
+    const selection = this.getSelection();
+    const row = selection.mouseRow >= 0 ? selection.mouseRow : selection.row;
+    const col = selection.mouseCol >= 0 ? selection.mouseCol : selection.col;
+    this.onContextMenuRequest?.({
+      trigger: "secondary_click",
+      clientX: e.clientX,
+      clientY: e.clientY,
+      canvasX: e.clientX - rect.left,
+      canvasY: e.clientY - rect.top,
+      row,
+      col,
+      selection,
+    });
+  };
+
   private setupEventListeners(): void {
     const c = this.canvas;
     c.style.touchAction = "none";
@@ -5715,6 +5747,7 @@ export class VolvoxGrid {
     c.addEventListener("pointerup", this.onPointerUp);
     c.addEventListener("pointercancel", this.onPointerCancel);
     c.addEventListener("wheel", this.onWheel, { passive: false });
+    c.addEventListener("contextmenu", this.onContextMenu);
 
     // Make the canvas focusable so it receives keyboard events
     if (!c.hasAttribute("tabindex")) {
@@ -5729,6 +5762,7 @@ export class VolvoxGrid {
     c.removeEventListener("pointerup", this.onPointerUp);
     c.removeEventListener("pointercancel", this.onPointerCancel);
     c.removeEventListener("wheel", this.onWheel);
+    c.removeEventListener("contextmenu", this.onContextMenu);
   }
 
   private modifierBits(e: PointerEvent | KeyboardEvent): number {

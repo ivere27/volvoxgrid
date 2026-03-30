@@ -10,7 +10,7 @@
  * so the host only provides platform glue.
  */
 
-import { VolvoxGrid } from "../js/src/volvoxgrid.js";
+import { VolvoxGrid, type VolvoxGridContextMenuRequest } from "../js/src/volvoxgrid.js";
 import { setupDefaultInput } from "../js/src/default-input.js";
 import { createCanvas2DTextRenderer } from "../js/src/canvas2d-text-renderer.js";
 import {
@@ -515,6 +515,189 @@ async function main() {
   const resetDoomActionButtons: Array<() => void> = [];
   let switchToken = 0;
   let pendingHierarchyActionAlert = 0;
+  let contextMenuEl: HTMLDivElement | null = null;
+  let contextMenuDismissHandler: ((e: Event) => void) | null = null;
+  let contextMenuEscHandler: ((e: KeyboardEvent) => void) | null = null;
+
+  function dismissDebugContextMenu(): void {
+    if (contextMenuEl) {
+      contextMenuEl.remove();
+      contextMenuEl = null;
+    }
+    if (contextMenuDismissHandler) {
+      document.removeEventListener("pointerdown", contextMenuDismissHandler);
+      contextMenuDismissHandler = null;
+    }
+    if (contextMenuEscHandler) {
+      document.removeEventListener("keydown", contextMenuEscHandler);
+      contextMenuEscHandler = null;
+    }
+  }
+
+  function addDebugContextMenuItem(
+    menu: HTMLDivElement,
+    label: string,
+    action: () => void,
+  ): void {
+    const item = document.createElement("div");
+    item.textContent = label;
+    Object.assign(item.style, {
+      padding: "6px 16px",
+      cursor: "pointer",
+      whiteSpace: "nowrap",
+    });
+    item.addEventListener("pointerenter", () => {
+      item.style.background = "#f0f0f0";
+    });
+    item.addEventListener("pointerleave", () => {
+      item.style.background = "transparent";
+    });
+    item.addEventListener("click", () => {
+      action();
+      dismissDebugContextMenu();
+    });
+    menu.appendChild(item);
+  }
+
+  function addDebugContextMenuSeparator(menu: HTMLDivElement): void {
+    const last = menu.lastElementChild;
+    if (!last || (last as HTMLElement).dataset.separator === "1") {
+      return;
+    }
+    const sep = document.createElement("div");
+    sep.dataset.separator = "1";
+    Object.assign(sep.style, {
+      height: "1px",
+      background: "#e0e0e0",
+      margin: "4px 8px",
+    });
+    menu.appendChild(sep);
+  }
+
+  function showDebugContextMenu(request: VolvoxGridContextMenuRequest): void {
+    dismissDebugContextMenu();
+
+    const gridId = grid.id;
+    const row = request.row;
+    const col = request.col;
+    const fixedRows = typeof (wasmModule as any).get_fixed_rows === "function"
+      ? Number((wasmModule as any).get_fixed_rows(gridId))
+      : 0;
+    const fixedCols = typeof (wasmModule as any).get_fixed_cols === "function"
+      ? Number((wasmModule as any).get_fixed_cols(gridId))
+      : 0;
+    const isDataRow = row >= fixedRows;
+    const isDataCol = col >= fixedCols;
+    const rowLabel = isDataRow ? Math.max(1, row - fixedRows + 1) : row;
+
+    const menu = document.createElement("div");
+    Object.assign(menu.style, {
+      position: "fixed",
+      zIndex: "2147483647",
+      background: "#fff",
+      border: "1px solid #ccc",
+      borderRadius: "4px",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+      padding: "4px 0",
+      minWidth: "180px",
+      fontFamily: "system-ui, -apple-system, sans-serif",
+      fontSize: "13px",
+      color: "#222",
+      userSelect: "none",
+    });
+
+    addDebugContextMenuItem(menu, "Copy", () => {
+      const text = String((wasmModule as any).copy_selection(gridId));
+      if (text && navigator.clipboard) {
+        void navigator.clipboard.writeText(text);
+      }
+    });
+
+    if (isDataRow && row >= 0) {
+      addDebugContextMenuSeparator(menu);
+      const pinned = typeof (wasmModule as any).is_row_pinned === "function"
+        ? Number((wasmModule as any).is_row_pinned(gridId, row))
+        : 0;
+      if (pinned !== 1) {
+        addDebugContextMenuItem(menu, "Pin Row " + rowLabel + " to Top", () => grid.pinRow(row, 1));
+      }
+      if (pinned !== 2) {
+        addDebugContextMenuItem(menu, "Pin Row " + rowLabel + " to Bottom", () => grid.pinRow(row, 2));
+      }
+      addDebugContextMenuItem(menu, "Unpin Row " + rowLabel, () => grid.pinRow(row, 0));
+
+      addDebugContextMenuSeparator(menu);
+      const stickyRow = typeof (wasmModule as any).get_row_sticky === "function"
+        ? Number((wasmModule as any).get_row_sticky(gridId, row))
+        : 0;
+      if (stickyRow !== 1) {
+        addDebugContextMenuItem(menu, "Sticky Row " + rowLabel + " to Top", () => grid.setRowSticky(row, 1));
+      }
+      if (stickyRow !== 2) {
+        addDebugContextMenuItem(menu, "Sticky Row " + rowLabel + " to Bottom", () => grid.setRowSticky(row, 2));
+      }
+      if (stickyRow !== 5) {
+        addDebugContextMenuItem(menu, "Sticky Row " + rowLabel + " Both", () => grid.setRowSticky(row, 5));
+      }
+      addDebugContextMenuItem(menu, "Unsticky Row " + rowLabel, () => grid.setRowSticky(row, 0));
+    }
+
+    if (isDataCol && col >= 0) {
+      addDebugContextMenuSeparator(menu);
+      const stickyCol = typeof (wasmModule as any).get_col_sticky === "function"
+        ? Number((wasmModule as any).get_col_sticky(gridId, col))
+        : 0;
+      if (stickyCol !== 3) {
+        addDebugContextMenuItem(menu, `Sticky Col ${col} to Left`, () => grid.setColSticky(col, 3));
+      }
+      if (stickyCol !== 4) {
+        addDebugContextMenuItem(menu, `Sticky Col ${col} to Right`, () => grid.setColSticky(col, 4));
+      }
+      if (stickyCol !== 5) {
+        addDebugContextMenuItem(menu, `Sticky Col ${col} Both`, () => grid.setColSticky(col, 5));
+      }
+      addDebugContextMenuItem(menu, `Unsticky Col ${col}`, () => grid.setColSticky(col, 0));
+    }
+
+    contextMenuEl = menu;
+    document.body.appendChild(menu);
+
+    let x = request.clientX;
+    let y = request.clientY;
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    requestAnimationFrame(() => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const mw = menu.offsetWidth;
+      const mh = menu.offsetHeight;
+      if (x + mw > vw) {
+        x = Math.max(0, vw - mw - 4);
+      }
+      if (y + mh > vh) {
+        y = Math.max(0, vh - mh - 4);
+      }
+      menu.style.left = `${x}px`;
+      menu.style.top = `${y}px`;
+    });
+
+    window.setTimeout(() => {
+      contextMenuDismissHandler = (ev: Event) => {
+        if (!menu.contains(ev.target as Node)) {
+          dismissDebugContextMenu();
+        }
+      };
+      contextMenuEscHandler = (ev: KeyboardEvent) => {
+        if (ev.key === "Escape") {
+          dismissDebugContextMenu();
+        }
+      };
+      document.addEventListener("pointerdown", contextMenuDismissHandler);
+      document.addEventListener("keydown", contextMenuEscHandler);
+    }, 0);
+  }
+
+  grid.onContextMenuRequest = showDebugContextMenu;
 
   function drainHierarchyActionClickEvents(): void {
     if (currentDemo !== "hierarchy") {

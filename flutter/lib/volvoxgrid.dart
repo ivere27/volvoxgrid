@@ -66,6 +66,26 @@ class VolvoxGridCellEditValidatingDetails {
   });
 }
 
+enum VolvoxGridContextMenuTrigger { longPress, secondaryClick }
+
+class VolvoxGridContextMenuRequest {
+  final VolvoxGridContextMenuTrigger trigger;
+  final Offset localPosition;
+  final Offset globalPosition;
+  final int row;
+  final int col;
+  final pb.SelectionState selection;
+
+  const VolvoxGridContextMenuRequest({
+    required this.trigger,
+    required this.localPosition,
+    required this.globalPosition,
+    required this.row,
+    required this.col,
+    required this.selection,
+  });
+}
+
 class VolvoxGridBeforeSortDetails {
   final pb.GridEvent rawEvent;
   final int col;
@@ -165,6 +185,12 @@ class VolvoxGridWidget extends StatefulWidget {
   /// This is one of the currently supported cancelable widget hooks.
   final ValueChanged<VolvoxGridBeforeSortDetails>? onBeforeSort;
 
+  /// Optional callback fired when the host should show a context menu.
+  ///
+  /// When null, the widget shows no built-in context menu and only forwards
+  /// pointer input to the engine.
+  final ValueChanged<VolvoxGridContextMenuRequest>? onContextMenuRequest;
+
   /// Optional callback for custom-render cell events.
   ///
   /// Receives either legacy `DrawCell` payloads or modern `CustomRenderCell`
@@ -188,6 +214,7 @@ class VolvoxGridWidget extends StatefulWidget {
     this.onBeforeEdit,
     this.onCellEditValidating,
     this.onBeforeSort,
+    this.onContextMenuRequest,
     this.onCustomRenderCell,
     this.onDrawCell,
     this.onCancelableEvent,
@@ -336,6 +363,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   /// Long-press context menu timer (for touch devices).
   Timer? _longPressTimer;
   Offset _longPressPosition = Offset.zero;
+  Offset _longPressLocalPosition = Offset.zero;
   static const Duration _longPressDuration = Duration(milliseconds: 500);
   Duration? _lastPrimaryMouseDownAt;
   Offset? _lastPrimaryMouseDownPosition;
@@ -2139,12 +2167,18 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
             ..dblClick = isDoubleClick),
       );
       _requestRender();
-      // Show context menu after a short delay to let engine process selection.
-      Future.delayed(const Duration(milliseconds: 50), () {
-        if (mounted) {
-          _showGridContextMenu(context, event.position);
-        }
-      });
+      if (widget.onContextMenuRequest != null) {
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (!mounted) {
+            return;
+          }
+          unawaited(_dispatchContextMenuRequest(
+            trigger: VolvoxGridContextMenuTrigger.secondaryClick,
+            localPosition: event.localPosition,
+            globalPosition: event.position,
+          ));
+        });
+      }
       return;
     }
 
@@ -2167,14 +2201,21 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       _pendingScrollDeltaX = 0.0;
       _pendingScrollDeltaY = 0.0;
 
-      // Start long-press timer for touch context menu.
       _longPressTimer?.cancel();
-      _longPressPosition = event.position;
-      _longPressTimer = Timer(_longPressDuration, () {
-        if (mounted && !_isTouchScrolling && !_isTouchPinching) {
-          _showGridContextMenu(context, _longPressPosition);
-        }
-      });
+      if (widget.onContextMenuRequest != null) {
+        _longPressPosition = event.position;
+        _longPressLocalPosition = event.localPosition;
+        _longPressTimer = Timer(_longPressDuration, () {
+          if (!mounted || _isTouchScrolling || _isTouchPinching) {
+            return;
+          }
+          unawaited(_dispatchContextMenuRequest(
+            trigger: VolvoxGridContextMenuTrigger.longPress,
+            localPosition: _longPressLocalPosition,
+            globalPosition: _longPressPosition,
+          ));
+        });
+      }
     }
     final dpr = _devicePixelRatio <= 0 ? 1.0 : _devicePixelRatio;
     _sendInput(
@@ -2519,78 +2560,31 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   // ── Context menu ───────────────────────────────────────────────────────
 
-  void _showGridContextMenu(BuildContext ctx, Offset position) {
-    final controller = widget.controller;
-    final row = _selRow;
-    final col = _selCol;
-    if (row < 0 || col < 0) return;
-    final rowLabel = row + 1;
-
-    final items = <PopupMenuEntry<String>>[
-      PopupMenuItem<String>(
-          value: 'pin_top', child: Text("Pin Row " + rowLabel.toString() + " to Top")),
-      PopupMenuItem<String>(
-          value: 'pin_bottom', child: Text("Pin Row " + rowLabel.toString() + " to Bottom")),
-      PopupMenuItem<String>(value: 'unpin', child: Text("Unpin Row " + rowLabel.toString())),
-      const PopupMenuDivider(),
-      PopupMenuItem<String>(
-          value: 'sticky_top', child: Text("Sticky Row " + rowLabel.toString() + " to Top")),
-      PopupMenuItem<String>(
-          value: 'sticky_bottom', child: Text("Sticky Row " + rowLabel.toString() + " to Bottom")),
-      PopupMenuItem<String>(
-          value: 'sticky_both', child: Text("Sticky Row " + rowLabel.toString() + " Both")),
-      PopupMenuItem<String>(
-          value: 'unsticky_row', child: Text("Unsticky Row " + rowLabel.toString())),
-      const PopupMenuDivider(),
-      PopupMenuItem<String>(
-          value: 'sticky_left', child: Text('Sticky Col $col to Left')),
-      PopupMenuItem<String>(
-          value: 'sticky_right', child: Text('Sticky Col $col to Right')),
-      PopupMenuItem<String>(
-          value: 'sticky_col_both', child: Text('Sticky Col $col Both')),
-      PopupMenuItem<String>(
-          value: 'unsticky_col', child: Text('Unsticky Col $col')),
-      const PopupMenuDivider(),
-      const PopupMenuItem<String>(value: 'copy', child: Text('Copy')),
-    ];
-
-    showMenu<String>(
-      context: ctx,
-      position: RelativeRect.fromLTRB(
-          position.dx, position.dy, position.dx + 1, position.dy + 1),
-      items: items,
-    ).then((value) {
-      if (value == null) return;
-      switch (value) {
-        case 'pin_top':
-          controller.pinRow(row, pb.PinPosition.PIN_TOP);
-        case 'pin_bottom':
-          controller.pinRow(row, pb.PinPosition.PIN_BOTTOM);
-        case 'unpin':
-          controller.pinRow(row, pb.PinPosition.PIN_NONE);
-        case 'sticky_top':
-          controller.setRowSticky(row, pb.StickyEdge.STICKY_TOP);
-        case 'sticky_bottom':
-          controller.setRowSticky(row, pb.StickyEdge.STICKY_BOTTOM);
-        case 'sticky_both':
-          controller.setRowSticky(row, pb.StickyEdge.STICKY_BOTH);
-        case 'unsticky_row':
-          controller.setRowSticky(row, pb.StickyEdge.STICKY_NONE);
-        case 'sticky_left':
-          controller.setColSticky(col, pb.StickyEdge.STICKY_LEFT);
-        case 'sticky_right':
-          controller.setColSticky(col, pb.StickyEdge.STICKY_RIGHT);
-        case 'sticky_col_both':
-          controller.setColSticky(col, pb.StickyEdge.STICKY_BOTH);
-        case 'unsticky_col':
-          controller.setColSticky(col, pb.StickyEdge.STICKY_NONE);
-        case 'copy':
-          controller.copy().then((resp) {
-            Clipboard.setData(ClipboardData(text: resp.text));
-          });
-      }
-      _requestRender();
-    });
+  Future<void> _dispatchContextMenuRequest({
+    required VolvoxGridContextMenuTrigger trigger,
+    required Offset localPosition,
+    required Offset globalPosition,
+  }) async {
+    final onContextMenuRequest = widget.onContextMenuRequest;
+    if (onContextMenuRequest == null) {
+      return;
+    }
+    final selection = await widget.controller.getSelection();
+    if (!mounted) {
+      return;
+    }
+    final row = selection.mouseRow >= 0 ? selection.mouseRow : selection.activeRow;
+    final col = selection.mouseCol >= 0 ? selection.mouseCol : selection.activeCol;
+    onContextMenuRequest(
+      VolvoxGridContextMenuRequest(
+        trigger: trigger,
+        localPosition: localPosition,
+        globalPosition: globalPosition,
+        row: row,
+        col: col,
+        selection: selection,
+      ),
+    );
   }
 
   int _modifiers() {

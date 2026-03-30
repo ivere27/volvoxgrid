@@ -324,6 +324,9 @@ class VolvoxGridView @JvmOverloads constructor(
     /** Listener for edit commit/cancel from the inline EditText overlay. */
     var editListener: EditCommitListener? = null
 
+    /** Optional listener for wrapper-side context menu requests. */
+    var contextMenuRequestListener: ContextMenuRequestListener? = null
+
     interface GridEventListener {
         fun onGridEvent(event: GridEvent)
     }
@@ -343,6 +346,29 @@ class VolvoxGridView @JvmOverloads constructor(
     interface EditCommitListener {
         fun onEditCommit(row: Int, col: Int, text: String)
         fun onEditCancel(row: Int, col: Int)
+    }
+
+    enum class ContextMenuTrigger {
+        LONG_PRESS,
+        SECONDARY_CLICK,
+    }
+
+    data class ContextMenuRequest(
+        val trigger: ContextMenuTrigger,
+        val localX: Float,
+        val localY: Float,
+        val screenX: Float,
+        val screenY: Float,
+        val row: Int,
+        val col: Int,
+        val selectionRow1: Int,
+        val selectionCol1: Int,
+        val selectionRow2: Int,
+        val selectionCol2: Int,
+    )
+
+    interface ContextMenuRequestListener {
+        fun onContextMenuRequest(request: ContextMenuRequest)
     }
 
     data class BeforeEditDetails(
@@ -1000,15 +1026,37 @@ class VolvoxGridView @JvmOverloads constructor(
                 lastTapTime = now
                 lastTapX = event.x
                 lastTapY = event.y
+                val isSecondaryClick =
+                    event.getToolType(0) != MotionEvent.TOOL_TYPE_FINGER &&
+                        (event.buttonState and MotionEvent.BUTTON_SECONDARY) != 0
+                val downX = event.x
+                val downY = event.y
                 sendPointerEvent(stream, PointerEvent.Type.DOWN, lastTouchX, lastTouchY, dblClick = isDoubleTap)
                 requestRenderFrame()
                 longPressRunnable?.let { removeCallbacks(it) }
-                longPressRunnable = Runnable {
-                    if (!isTouchScrolling && !isPinchZooming) {
-                        showGridContextMenu(event.x, event.y)
+                if (isSecondaryClick) {
+                    if (contextMenuRequestListener != null) {
+                        postDelayed(
+                            {
+                                dispatchContextMenuRequest(
+                                    ContextMenuTrigger.SECONDARY_CLICK,
+                                    downX,
+                                    downY
+                                )
+                            },
+                            50L
+                        )
                     }
+                    return true
                 }
-                postDelayed(longPressRunnable!!, longPressTimeout)
+                if (contextMenuRequestListener != null) {
+                    longPressRunnable = Runnable {
+                        if (!isTouchScrolling && !isPinchZooming) {
+                            dispatchContextMenuRequest(ContextMenuTrigger.LONG_PRESS, downX, downY)
+                        }
+                    }
+                    postDelayed(longPressRunnable!!, longPressTimeout)
+                }
                 return true
             }
 
@@ -2802,105 +2850,31 @@ class VolvoxGridView @JvmOverloads constructor(
         release()
     }
 
-    // =========================================================================
-    // Long-Press Context Menu
-    // =========================================================================
-
-    private fun showGridContextMenu(x: Float, y: Float) {
+    private fun dispatchContextMenuRequest(trigger: ContextMenuTrigger, localX: Float, localY: Float) {
+        val listener = contextMenuRequestListener ?: return
         val client = ffiClient ?: return
         val ctrl = VolvoxGridController(client, gridId)
-        val row = ctrl.cursorRow()
-        val col = ctrl.cursorCol()
+        val selection = ctrl.getSelection()
+        val row = if (selection.mouseRow >= 0) selection.mouseRow else selection.row
+        val col = if (selection.mouseCol >= 0) selection.mouseCol else selection.col
         if (row < 0 || col < 0) return
-
-        // Create an invisible anchor view at the touch position so PopupMenu
-        // appears near the finger instead of at top-left.
-        val anchor = android.view.View(context)
-        anchor.layoutParams = FrameLayout.LayoutParams(1, 1).apply {
-            leftMargin = x.toInt()
-            topMargin = y.toInt()
-        }
-        addView(anchor)
-
-        val popup = android.widget.PopupMenu(context, anchor)
-        popup.setOnDismissListener { removeView(anchor) }
-        val menu = popup.menu
-
-        // Get grid config for fixed row/col counts
-        val config = client.GetConfig(
-            GridHandle.newBuilder().setId(gridId).build()
+        val location = IntArray(2)
+        getLocationOnScreen(location)
+        listener.onContextMenuRequest(
+            ContextMenuRequest(
+                trigger = trigger,
+                localX = localX,
+                localY = localY,
+                screenX = location[0] + localX,
+                screenY = location[1] + localY,
+                row = row,
+                col = col,
+                selectionRow1 = minOf(selection.row, selection.rowEnd),
+                selectionCol1 = minOf(selection.col, selection.colEnd),
+                selectionRow2 = maxOf(selection.row, selection.rowEnd),
+                selectionCol2 = maxOf(selection.col, selection.colEnd),
+            )
         )
-        val fixedRows = config.layout.fixedRows + config.layout.frozenRows
-        val fixedCols = config.layout.fixedCols + config.layout.frozenCols
-        val rowLabel = if (row >= fixedRows) maxOf(1, row - fixedRows + 1) else row
-
-        // Pin items (for data rows only)
-        if (row >= fixedRows) {
-            menu.add("Pin Row " + rowLabel + " to Top").setOnMenuItemClickListener {
-                ctrl.pinRow(row, PinPosition.PIN_TOP)
-                requestRenderFrame(); true
-            }
-            menu.add("Pin Row " + rowLabel + " to Bottom").setOnMenuItemClickListener {
-                ctrl.pinRow(row, PinPosition.PIN_BOTTOM)
-                requestRenderFrame(); true
-            }
-            menu.add("Unpin Row " + rowLabel).setOnMenuItemClickListener {
-                ctrl.pinRow(row, PinPosition.PIN_NONE)
-                requestRenderFrame(); true
-            }
-        }
-
-        // Sticky row items (for data rows only)
-        if (row >= fixedRows) {
-            menu.add("Sticky Row " + rowLabel + " to Top").setOnMenuItemClickListener {
-                ctrl.setRowSticky(row, StickyEdge.STICKY_TOP)
-                requestRenderFrame(); true
-            }
-            menu.add("Sticky Row " + rowLabel + " to Bottom").setOnMenuItemClickListener {
-                ctrl.setRowSticky(row, StickyEdge.STICKY_BOTTOM)
-                requestRenderFrame(); true
-            }
-            menu.add("Sticky Row " + rowLabel + " Both").setOnMenuItemClickListener {
-                ctrl.setRowSticky(row, StickyEdge.STICKY_BOTH)
-                requestRenderFrame(); true
-            }
-            menu.add("Unsticky Row " + rowLabel).setOnMenuItemClickListener {
-                ctrl.setRowSticky(row, StickyEdge.STICKY_NONE)
-                requestRenderFrame(); true
-            }
-        }
-
-        // Sticky col items (for data cols only)
-        if (col >= fixedCols) {
-            menu.add("Sticky Col $col to Left").setOnMenuItemClickListener {
-                ctrl.setColSticky(col, StickyEdge.STICKY_LEFT)
-                requestRenderFrame(); true
-            }
-            menu.add("Sticky Col $col to Right").setOnMenuItemClickListener {
-                ctrl.setColSticky(col, StickyEdge.STICKY_RIGHT)
-                requestRenderFrame(); true
-            }
-            menu.add("Sticky Col $col Both").setOnMenuItemClickListener {
-                ctrl.setColSticky(col, StickyEdge.STICKY_BOTH)
-                requestRenderFrame(); true
-            }
-            menu.add("Unsticky Col $col").setOnMenuItemClickListener {
-                ctrl.setColSticky(col, StickyEdge.STICKY_NONE)
-                requestRenderFrame(); true
-            }
-        }
-
-        // Copy
-        menu.add("Copy").setOnMenuItemClickListener {
-            val resp = ctrl.copy()
-            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("grid", resp.text))
-            true
-        }
-
-        if (menu.size() > 0) {
-            popup.show()
-        }
     }
 
     companion object {
