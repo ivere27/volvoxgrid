@@ -19,6 +19,7 @@ use crate::scrollbar::{
 use crate::selection::{HOVER_CELL, HOVER_COLUMN, HOVER_ROW};
 use crate::sort::{decode_sort_spec, merge_sort_spec};
 use crate::style;
+use std::collections::BTreeSet;
 
 const LEGACY_GRIDLINE_SOLID_HORIZONTAL: i32 = 4;
 const LEGACY_GRIDLINE_SOLID_VERTICAL: i32 = 5;
@@ -2089,12 +2090,15 @@ impl VolvoxGrid {
 
     /// Batch-set column properties. Only set (Some) fields per entry are applied.
     pub fn define_columns(&mut self, defs: &[v1::ColumnDef]) {
+        let mut auto_resize_cols = BTreeSet::new();
+
         for def in defs {
             let idx = def.index;
             if idx < 0 || idx >= self.cols {
                 continue;
             }
             let col = idx as usize;
+            let mut format_changed = false;
 
             // Width
             if let Some(w) = def.width {
@@ -2131,6 +2135,7 @@ impl VolvoxGrid {
                     cp.data_type = v;
                 }
                 if let Some(v) = &def.format {
+                    format_changed = cp.format != *v;
                     cp.format = v.clone();
                 }
                 if let Some(v) = &def.key {
@@ -2202,8 +2207,27 @@ impl VolvoxGrid {
                     self.set_col_sticky(idx, v);
                 }
             }
+
+            if format_changed {
+                auto_resize_cols.insert(idx);
+            }
         }
         self.layout.invalidate();
+        if self.auto_resize && !auto_resize_cols.is_empty() {
+            let resize_cols = self.auto_size_mode == 0 || self.auto_size_mode == 1;
+            let resize_rows = self.auto_size_mode == 0 || self.auto_size_mode == 2;
+
+            if resize_cols {
+                for &col in &auto_resize_cols {
+                    self.auto_resize_col(col);
+                }
+            }
+            if resize_cols && resize_rows && self.word_wrap {
+                for row in 0..self.rows {
+                    self.auto_resize_row(row);
+                }
+            }
+        }
         self.mark_dirty();
     }
 
@@ -3229,6 +3253,27 @@ mod tests {
         assert_eq!(grid.columns[0].alignment, 4);
         assert_eq!(*grid.col_widths.get(&2).unwrap(), 200);
         assert_eq!(grid.columns[2].key, "revenue");
+    }
+
+    #[test]
+    fn define_columns_format_change_auto_resizes_column_using_formatted_text() {
+        let mut grid = VolvoxGrid::new(1, 800, 600, 1, 1, 0, 0);
+        grid.default_col_width = 10;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 1;
+        grid.cells.set_text(0, 0, "1234567".to_string());
+
+        grid.auto_resize_col(0);
+        let before = grid.get_col_width(0);
+
+        grid.define_columns(&[v1::ColumnDef {
+            index: 0,
+            format: Some("#,##0".to_string()),
+            ..Default::default()
+        }]);
+
+        assert_eq!(grid.get_display_text(0, 0), "1,234,567");
+        assert!(grid.get_col_width(0) > before);
     }
 
     #[test]

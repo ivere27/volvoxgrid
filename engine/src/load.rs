@@ -1491,6 +1491,7 @@ fn days_from_civil(year: i32, month: i32, day: i32) -> i64 {
 mod tests {
     use super::load_data;
     use crate::grid::VolvoxGrid;
+    use crate::outline::subtotal;
     use crate::proto::volvoxgrid::v1 as pb;
 
     fn new_grid() -> VolvoxGrid {
@@ -1648,5 +1649,38 @@ mod tests {
 
         assert_eq!(result.status, pb::LoadDataStatus::LoadOk as i32);
         assert_eq!(grid.get_col_width(0), before);
+    }
+
+    #[test]
+    fn load_data_then_subtotal_auto_resizes_inserted_subtotal_row_height() {
+        let mut grid = VolvoxGrid::new(1, 800, 600, 1, 2, 0, 0);
+        grid.default_col_width = 24;
+        grid.default_row_height = 16;
+        grid.word_wrap = true;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 2;
+
+        let result = load_data(
+            &mut grid,
+            br#"[{"group":"A","value":10},{"group":"A","value":20}]"#,
+            Some(&json_options()),
+        );
+        assert_eq!(result.status, pb::LoadDataStatus::LoadOk as i32);
+
+        subtotal(
+            &mut grid,
+            pb::AggregateType::AggSum as i32,
+            0,
+            1,
+            "Very long subtotal label that should wrap",
+            0,
+            0,
+            false,
+        );
+
+        let subtotal_row = (0..grid.rows)
+            .find(|&row| grid.cells.get_text(row, 0) == "Very long subtotal label that should wrap")
+            .expect("subtotal row");
+        assert!(grid.get_row_height(subtotal_row) > grid.default_row_height);
     }
 }

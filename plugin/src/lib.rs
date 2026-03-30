@@ -2216,62 +2216,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
     fn clear(&self, request: ClearRequest) -> PluginResult<Empty> {
         self.with_grid(request.grid_id, |grid| {
-            let (r1, c1, r2, c2) = match request.region {
-                0 => (
-                    grid.fixed_rows,
-                    grid.fixed_cols,
-                    grid.rows - 1,
-                    grid.cols - 1,
-                ), // scrollable
-                1 => (0, 0, grid.fixed_rows - 1, grid.cols - 1), // fixed rows
-                2 => (0, 0, grid.rows - 1, grid.fixed_cols - 1), // fixed cols
-                3 => (0, 0, grid.fixed_rows - 1, grid.fixed_cols - 1), // fixed both
-                4 => (0, 0, grid.rows - 1, grid.cols - 1),       // all rows
-                5 => (0, 0, grid.rows - 1, grid.cols - 1),       // all cols
-                6 => (0, 0, grid.rows - 1, grid.cols - 1),       // all
-                _ => (
-                    grid.fixed_rows,
-                    grid.fixed_cols,
-                    grid.rows - 1,
-                    grid.cols - 1,
-                ),
-            };
-            match request.scope {
-                0 => {
-                    // CLEAR_EVERYTHING
-                    grid.cells.clear_range(r1, c1, r2, c2);
-                    for r in r1..=r2 {
-                        for c in c1..=c2 {
-                            grid.cell_styles.remove(&(r, c));
-                        }
-                    }
-                }
-                1 => {
-                    // CLEAR_FORMATTING
-                    for r in r1..=r2 {
-                        for c in c1..=c2 {
-                            grid.cell_styles.remove(&(r, c));
-                        }
-                    }
-                }
-                2 => {
-                    // CLEAR_DATA
-                    grid.cells.clear_range(r1, c1, r2, c2);
-                }
-                3 => {
-                    // CLEAR_SELECTION
-                    for (sr1, sc1, sr2, sc2) in selection_range_tuples(grid) {
-                        grid.cells.clear_range(sr1, sc1, sr2, sc2);
-                        for r in sr1..=sr2 {
-                            for c in sc1..=sc2 {
-                                grid.cell_styles.remove(&(r, c));
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-            grid.mark_dirty();
+            grid.clear_region(request.scope, request.region);
         })?;
         Ok(Empty {})
     }

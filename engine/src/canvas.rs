@@ -17,7 +17,7 @@ use crate::scrollbar::{
 use crate::selection::{hover_mode_has, HOVER_CELL, HOVER_COLUMN, HOVER_NONE, HOVER_ROW};
 use crate::sort::{sort_order_is_ascending as sort_order_is_ascending_internal, SORT_NONE};
 use crate::style::{CellStylePatch, HeaderMarkHeight, HighlightStyle, IconSlotStyle};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -900,10 +900,50 @@ struct PreparedTextCell {
 pub(crate) struct RenderContext {
     vp: VisibleRange,
     vis_cells: Vec<VisibleCell>,
+    merged_visible_rects: std::collections::HashMap<CellKey, CellRect>,
     text_cells: Vec<PreparedTextCell>,
     zone_counts: [u32; 4],
     visible_row_rects: BTreeMap<i32, (i32, i32)>,
     visible_col_rects: BTreeMap<i32, (i32, i32)>,
+}
+
+fn build_merged_visible_rects(
+    vis_cells: &[VisibleCell],
+    has_merges: bool,
+) -> std::collections::HashMap<CellKey, CellRect> {
+    if !has_merges {
+        return std::collections::HashMap::new();
+    }
+
+    let mut rects = std::collections::HashMap::new();
+    for &cell in vis_cells {
+        if !cell.is_merged_span() {
+            continue;
+        }
+        rects
+            .entry(cell.source_key)
+            .and_modify(|rect: &mut CellRect| {
+                let right = (rect.x + rect.w).max(cell.rect.x + cell.rect.w);
+                let bottom = (rect.y + rect.h).max(cell.rect.y + cell.rect.h);
+                rect.x = rect.x.min(cell.rect.x);
+                rect.y = rect.y.min(cell.rect.y);
+                rect.w = (right - rect.x).max(1);
+                rect.h = (bottom - rect.y).max(1);
+            })
+            .or_insert(cell.rect);
+    }
+    rects
+}
+
+fn merged_visible_rect(
+    rects: &std::collections::HashMap<CellKey, CellRect>,
+    cell: VisibleCell,
+) -> CellRect {
+    if cell.is_merged_span() {
+        rects.get(&cell.source_key).copied().unwrap_or(cell.rect)
+    } else {
+        cell.rect
+    }
 }
 
 impl VisibleRange {
@@ -1193,17 +1233,19 @@ impl RenderContext {
                     source_key,
                 });
             });
+        let merged_visible_rects = build_merged_visible_rects(&vis_cells, has_merges);
         let visible_row_rects = build_visible_row_rects(grid, &vp);
         let visible_col_rects = build_visible_col_rects(grid, &vp);
         // Skip text precomputation when the grid has no cell data at all.
         let text_cells = if grid.cells.len() == 0 {
             Vec::new()
         } else {
-            build_text_cells(grid, &vp, &vis_cells, has_merges)
+            build_text_cells(grid, &vp, &vis_cells, &merged_visible_rects, has_merges)
         };
         Self {
             vp,
             vis_cells,
+            merged_visible_rects,
             text_cells,
             zone_counts,
             visible_row_rects,
@@ -1283,6 +1325,21 @@ where
         (vp.scroll_col_start, vp.scroll_col_end),
         (0, vp.fixed_col_end),
     ];
+    let locked_row_cols = {
+        let mut cols = BTreeSet::new();
+        for (col_start, col_end) in col_ranges {
+            for col in col_start..col_end {
+                cols.insert(col);
+            }
+        }
+        for &col in &vp.sticky_left_cols {
+            cols.insert(col);
+        }
+        for &col in &vp.sticky_right_cols {
+            cols.insert(col);
+        }
+        cols.into_iter().collect::<Vec<_>>()
+    };
 
     // 1. Scrollable cells — skip pinned, sticky rows/cols (handled later)
     for row in vp.scroll_row_start..vp.scroll_row_end {
@@ -1333,33 +1390,24 @@ where
         .iter()
         .chain(vp.sticky_bottom_rows.iter())
     {
-        for (col_start, col_end) in col_ranges {
-            for col in col_start..col_end {
-                if grid.is_col_hidden(col) {
+        for &col in &locked_row_cols {
+            if grid.is_col_hidden(col) {
+                continue;
+            }
+            if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
+                let rect = CellRect {
+                    x: cx,
+                    y: cy,
+                    w: cw,
+                    h: ch,
+                };
+                if damage.is_some_and(|region| {
+                    !should_emit_partial_cell(vp, region, VisibleCellZone::Sticky, row, col, rect)
+                }) {
                     continue;
                 }
-                if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
-                    let rect = CellRect {
-                        x: cx,
-                        y: cy,
-                        w: cw,
-                        h: ch,
-                    };
-                    if damage.is_some_and(|region| {
-                        !should_emit_partial_cell(
-                            vp,
-                            region,
-                            VisibleCellZone::Sticky,
-                            row,
-                            col,
-                            rect,
-                        )
-                    }) {
-                        continue;
-                    }
-                    zone_counts[1] += 1;
-                    f(VisibleCellZone::Sticky, row, col, cx, cy, cw, ch);
-                }
+                zone_counts[1] += 1;
+                f(VisibleCellZone::Sticky, row, col, cx, cy, cw, ch);
             }
         }
     }
@@ -1420,33 +1468,24 @@ where
         if grid.is_row_hidden(row) {
             continue;
         }
-        for (col_start, col_end) in col_ranges {
-            for col in col_start..col_end {
-                if grid.is_col_hidden(col) {
+        for &col in &locked_row_cols {
+            if grid.is_col_hidden(col) {
+                continue;
+            }
+            if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
+                let rect = CellRect {
+                    x: cx,
+                    y: cy,
+                    w: cw,
+                    h: ch,
+                };
+                if damage.is_some_and(|region| {
+                    !should_emit_partial_cell(vp, region, VisibleCellZone::Pinned, row, col, rect)
+                }) {
                     continue;
                 }
-                if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
-                    let rect = CellRect {
-                        x: cx,
-                        y: cy,
-                        w: cw,
-                        h: ch,
-                    };
-                    if damage.is_some_and(|region| {
-                        !should_emit_partial_cell(
-                            vp,
-                            region,
-                            VisibleCellZone::Pinned,
-                            row,
-                            col,
-                            rect,
-                        )
-                    }) {
-                        continue;
-                    }
-                    zone_counts[2] += 1;
-                    f(VisibleCellZone::Pinned, row, col, cx, cy, cw, ch);
-                }
+                zone_counts[2] += 1;
+                f(VisibleCellZone::Pinned, row, col, cx, cy, cw, ch);
             }
         }
     }
@@ -1514,12 +1553,18 @@ pub(crate) fn cell_rect(
     // Check if this row is pinned — override y position
     let pin = grid.is_row_pinned(row);
     if pin != 0 {
+        let merged = grid
+            .get_merged_range(row, col)
+            .filter(|&(mr1, mc1, mr2, mc2)| mr1 != mr2 || mc1 != mc2);
+        let anchor_row = merged.map_or(row, |(mr1, _, _, _)| mr1);
+        let anchor_col = merged.map_or(col, |(_, mc1, _, _)| mc1);
+
         let fixed_bottom = grid.row_pos(grid.fixed_rows + grid.frozen_rows);
         if pin == 1 {
             // Top-pinned: stack below fixed/frozen area
             let mut pin_y = vp.data_y + fixed_bottom;
             for &r in &vp.pinned_top_rows {
-                if r == row {
+                if r == anchor_row {
                     break;
                 }
                 pin_y += grid.row_height(r);
@@ -1529,15 +1574,22 @@ pub(crate) fn cell_rect(
             // Bottom-pinned: stack from bottom of viewport upward
             let mut pin_y = vp.data_y + vp.data_h - vp.pinned_bottom_height;
             for &r in &vp.pinned_bottom_rows {
-                if r == row {
+                if r == anchor_row {
                     break;
                 }
                 pin_y += grid.row_height(r);
             }
             y = pin_y;
         }
+
+        if let Some((mr1, mc1, mr2, mc2)) = merged {
+            x = grid.col_pos(mc1);
+            w = (mc1..=mc2).map(|c| grid.col_width(c)).sum();
+            h = (mr1..=mr2).map(|r| grid.row_height(r)).sum();
+        }
+
         // Pinned rows don't scroll vertically, but do scroll horizontally
-        let is_col_scrollable = col >= grid.fixed_cols + grid.frozen_cols;
+        let is_col_scrollable = anchor_col >= grid.fixed_cols + grid.frozen_cols;
         if is_col_scrollable {
             x -= grid.scroll.scroll_x as i32;
         }
@@ -1546,8 +1598,22 @@ pub(crate) fn cell_rect(
         if vp.sticky_left_cols.contains(&col) {
             let fixed_right = vp.data_x + grid.col_pos(grid.fixed_cols + grid.frozen_cols);
             x = fixed_right;
+            for &sc in &vp.sticky_left_cols {
+                if sc == col {
+                    break;
+                }
+                x += grid.col_width(sc);
+            }
+            w = grid.col_width(col);
         } else if vp.sticky_right_cols.contains(&col) {
             x = vp.data_x + vp.data_w - w;
+            for &sc in vp.sticky_right_cols.iter().rev() {
+                if sc == col {
+                    break;
+                }
+                x -= grid.col_width(sc);
+            }
+            w = grid.col_width(col);
         } else if is_col_scrollable {
             // Clip scrollable cols against sticky area for pinned rows
             let clip_left =
@@ -2392,7 +2458,13 @@ fn build_or_reuse_ctx(
             let text_cells = if grid.cells.len() == 0 {
                 Vec::new()
             } else {
-                build_text_cells(grid, &prev.ctx.vp, &prev.ctx.vis_cells, false)
+                build_text_cells(
+                    grid,
+                    &prev.ctx.vp,
+                    &prev.ctx.vis_cells,
+                    &prev.ctx.merged_visible_rects,
+                    false,
+                )
             };
             RenderContext {
                 text_cells,
@@ -3017,6 +3089,7 @@ fn build_text_cells(
     grid: &VolvoxGrid,
     vp: &VisibleRange,
     vis_cells: &[VisibleCell],
+    merged_visible_rects: &std::collections::HashMap<CellKey, CellRect>,
     has_merges: bool,
 ) -> Vec<PreparedTextCell> {
     let mut text_cells = Vec::new();
@@ -3056,10 +3129,11 @@ fn build_text_cells(
         }
 
         let vis_rect = if cell.is_merged_span() {
-            let vx = cell.rect.x.max(vp.data_x);
-            let vy = cell.rect.y.max(vp.data_y);
-            let vw = ((cell.rect.x + cell.rect.w).min(vp.data_x + vp.data_w) - vx).max(1);
-            let vh = ((cell.rect.y + cell.rect.h).min(vp.data_y + vp.data_h) - vy).max(1);
+            let merged_rect = merged_visible_rect(merged_visible_rects, cell);
+            let vx = merged_rect.x.max(vp.data_x);
+            let vy = merged_rect.y.max(vp.data_y);
+            let vw = ((merged_rect.x + merged_rect.w).min(vp.data_x + vp.data_w) - vx).max(1);
+            let vh = ((merged_rect.y + merged_rect.h).min(vp.data_y + vp.data_h) - vy).max(1);
             CellRect {
                 x: vx,
                 y: vy,
@@ -3782,7 +3856,7 @@ fn render_backgrounds<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Render
         std::collections::HashSet::new();
 
     for &cell in &ctx.vis_cells {
-        let (row, col, cx, cy, cw, ch) = cell.parts();
+        let (row, col, _cx, _cy, _cw, _ch) = cell.parts();
         // For merged/spanned cells, always resolve style from the anchor
         // cell (top-left of the merge).  This prevents "blinking" when a
         // merged cell spans both sticky and non-sticky columns: without
@@ -3798,6 +3872,7 @@ fn render_backgrounds<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Render
             }
             _ => (row, col),
         };
+        let rect = merged_visible_rect(&ctx.merged_visible_rects, cell);
 
         let is_fixed = style_row < grid.fixed_rows || style_col < grid.fixed_cols;
         let is_frozen = !is_fixed
@@ -3819,7 +3894,6 @@ fn render_backgrounds<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Render
             is_alternate,
             selection_back_color(grid),
         );
-
         // Pinned/sticky cells overlay scrolled content, so they MUST always
         // get an opaque background fill (even when bg == back_color_bkg).
         let is_overlay = grid.is_row_pinned(row) != 0
@@ -3827,20 +3901,41 @@ fn render_backgrounds<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Render
             || grid.sticky_cols.contains_key(&col)
             || grid.is_col_pinned(col) != 0;
         if bg != grid.style.back_color_bkg || is_overlay {
-            canvas.fill_rect(cx, cy, cw, ch, bg);
+            canvas.fill_rect(rect.x, rect.y, rect.w, rect.h, bg);
         }
 
         // Hover overlays are layered after base/selection backgrounds so row/column/cell
         // hover emphasis can stack (row -> column -> cell). Keep selected cells stable.
         if !is_selected && style_row >= grid.fixed_rows && style_col >= grid.fixed_cols {
             if hover_matches_row(grid, style_row) {
-                draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.hover_row_style);
+                draw_highlight_fill(
+                    canvas,
+                    rect.x,
+                    rect.y,
+                    rect.w,
+                    rect.h,
+                    &grid.selection.hover_row_style,
+                );
             }
             if hover_matches_column(grid, style_col) {
-                draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.hover_column_style);
+                draw_highlight_fill(
+                    canvas,
+                    rect.x,
+                    rect.y,
+                    rect.w,
+                    rect.h,
+                    &grid.selection.hover_column_style,
+                );
             }
             if hover_matches_cell(grid, style_row, style_col) {
-                draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.hover_cell_style);
+                draw_highlight_fill(
+                    canvas,
+                    rect.x,
+                    rect.y,
+                    rect.w,
+                    rect.h,
+                    &grid.selection.hover_cell_style,
+                );
             }
         }
     }
@@ -4072,13 +4167,14 @@ fn render_cell_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rende
         return;
     }
     for &cell in &ctx.vis_cells {
-        let (row, col, cx, cy, cw, ch) = cell.parts();
+        let (row, col, _cx, _cy, _cw, _ch) = cell.parts();
         // For merged cells, draw border once at the merge-origin cell.
         if let Some((mr1, mc1, _mr2, _mc2)) = cell.merge {
             if row != mr1 || col != mc1 {
                 continue;
             }
         }
+        let rect = merged_visible_rect(&ctx.merged_visible_rects, cell);
 
         let style_override = grid.get_cell_style(row, col);
         let all_style = style_override.border;
@@ -4098,7 +4194,7 @@ fn render_cell_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rende
                 continue;
             }
             let border_color = all_color.unwrap_or(grid.style.grid_color);
-            canvas.cell_border_style(cx, cy, cw, ch, border_style, border_color);
+            canvas.cell_border_style(rect.x, rect.y, rect.w, rect.h, border_style, border_color);
             continue;
         }
 
@@ -4133,7 +4229,7 @@ fn render_cell_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rende
                 continue;
             }
             let color = edge_color.or(all_color).unwrap_or(grid.style.grid_color);
-            canvas.cell_border_edge_style(cx, cy, cw, ch, edge, style, color);
+            canvas.cell_border_edge_style(rect.x, rect.y, rect.w, rect.h, edge, style, color);
         }
     }
 
@@ -5709,7 +5805,7 @@ fn render_selection<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
             std::collections::HashSet::new();
 
         for &cell in &ctx.vis_cells {
-            let (row, col, cx, cy, cw, ch) = cell.parts();
+            let (row, col, _cx, _cy, _cw, _ch) = cell.parts();
             let (style_row, style_col) = match cell.merge {
                 Some((mr1, mc1, mr2, mc2)) if cell.is_merged_span() => {
                     let merge_key = (mr1, mc1, mr2, mc2);
@@ -5725,7 +5821,15 @@ fn render_selection<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
                 continue;
             }
 
-            draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.selection_style);
+            let rect = merged_visible_rect(&ctx.merged_visible_rects, cell);
+            draw_highlight_fill(
+                canvas,
+                rect.x,
+                rect.y,
+                rect.w,
+                rect.h,
+                &grid.selection.selection_style,
+            );
         }
     }
 
@@ -7705,7 +7809,7 @@ mod tests {
         cell_has_checkbox_visual, checkbox_box_size, checkbox_layer_needed,
         compose_preedit_display_text, dropdown_button_rect, dropdown_glyph_metrics,
         dropdown_layer_needed, parse_progress_percent, picture_layer_needed, progress_layer_needed,
-        sort_arrow_box_size, RenderContext,
+        sort_arrow_box_size, CellKey, RenderContext,
     };
     use crate::grid::VolvoxGrid;
 
@@ -7831,5 +7935,60 @@ mod tests {
             true,
             pb::CheckedState::CheckedChecked as i32,
         ));
+    }
+
+    #[test]
+    fn merged_text_rect_unions_sticky_and_scrollable_fragments() {
+        let mut grid = VolvoxGrid::new(1, 80, 60, 1, 3, 0, 0);
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cells.set_text(0, 0, "Grand Total".to_string());
+        grid.merge_cells(0, 0, 0, 2);
+        grid.set_col_sticky(1, 3);
+        grid.scroll.scroll_x = 40.0;
+        grid.ensure_layout();
+
+        let ctx = render_ctx(&grid);
+        let text_cell = ctx
+            .text_cells
+            .iter()
+            .find(|cell| cell.source_key == CellKey { row: 0, col: 0 })
+            .expect("merged text cell");
+
+        assert_eq!(text_cell.vis_rect.x, 0);
+        assert!(text_cell.vis_rect.w > grid.col_width(1));
+    }
+
+    #[test]
+    fn pinned_bottom_merged_text_survives_horizontal_scroll_with_sticky_col() {
+        let mut grid = VolvoxGrid::new(1, 80, 60, 2, 6, 0, 0);
+        grid.auto_resize = false;
+        for row in 0..grid.rows {
+            grid.set_row_height(row, 24);
+        }
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cells.set_text(1, 0, "Grand Total".to_string());
+        grid.merge_cells(1, 0, 1, 2);
+        grid.pin_row(1, 2);
+        grid.set_col_sticky(1, 3);
+        grid.scroll.scroll_x = 121.0;
+        grid.ensure_layout();
+
+        let ctx = render_ctx(&grid);
+        let text_cell = ctx
+            .text_cells
+            .iter()
+            .find(|cell| cell.source_key == CellKey { row: 1, col: 0 })
+            .expect("pinned merged text cell");
+
+        assert_eq!(text_cell.vis_rect.x, 0);
+        assert_eq!(text_cell.vis_rect.w, grid.col_width(1));
+        assert_eq!(
+            text_cell.vis_rect.y,
+            grid.viewport_height - grid.row_height(1)
+        );
     }
 }

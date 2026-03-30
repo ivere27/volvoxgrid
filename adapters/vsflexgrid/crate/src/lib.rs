@@ -3606,10 +3606,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     fn merge_cells(&self, request: MergeCellsRequest) -> Result<Empty, String> {
         let range = request.range.unwrap_or_default();
         self.manager().with_grid(request.grid_id, |grid| {
-            grid.merged_regions
-                .add_merge(range.row1, range.col1, range.row2, range.col2);
-            grid.layout.invalidate();
-            grid.mark_dirty();
+            grid.merge_cells(range.row1, range.col1, range.row2, range.col2);
         })?;
         Ok(Empty {})
     }
@@ -3617,10 +3614,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     fn unmerge_cells(&self, request: UnmergeCellsRequest) -> Result<Empty, String> {
         let range = request.range.unwrap_or_default();
         self.manager().with_grid(request.grid_id, |grid| {
-            grid.merged_regions
-                .remove_overlapping(range.row1, range.col1, range.row2, range.col2);
-            grid.layout.invalidate();
-            grid.mark_dirty();
+            grid.unmerge_cells(range.row1, range.col1, range.row2, range.col2);
         })?;
         Ok(Empty {})
     }

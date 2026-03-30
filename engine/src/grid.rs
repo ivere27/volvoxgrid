@@ -2154,6 +2154,74 @@ impl VolvoxGrid {
         String::new()
     }
 
+    fn resolve_text_measure_style<'a>(&'a self, row: i32, col: i32) -> (&'a str, f32, bool, bool) {
+        let style_override = self.cell_styles.get(&(row, col));
+        let font_name = style_override
+            .and_then(|style| style.font_name.as_deref())
+            .unwrap_or(&self.style.font_name);
+        let font_size = style_override
+            .and_then(|style| style.font_size)
+            .unwrap_or(self.style.font_size);
+        let font_bold = style_override
+            .and_then(|style| style.font_bold)
+            .unwrap_or(self.style.font_bold);
+        let font_italic = style_override
+            .and_then(|style| style.font_italic)
+            .unwrap_or(self.style.font_italic);
+        let font_size = if font_size > 0.0 { font_size } else { 13.0 };
+        (font_name, font_size, font_bold, font_italic)
+    }
+
+    fn resolve_header_text_measure_style<'a>(&'a self, col: i32) -> (&'a str, f32, bool, bool) {
+        if self.fixed_rows > 0 {
+            self.resolve_text_measure_style(0, col)
+        } else {
+            let font_size = if self.style.font_size > 0.0 {
+                self.style.font_size
+            } else {
+                13.0
+            };
+            (
+                &self.style.font_name,
+                font_size,
+                self.style.font_bold,
+                self.style.font_italic,
+            )
+        }
+    }
+
+    fn subtotal_caption_horizontal_merge(
+        &self,
+        row: i32,
+        col: i32,
+    ) -> Option<(i32, i32, i32, i32)> {
+        let props = self.row_props.get(&row)?;
+        if !props.is_subtotal || props.subtotal_caption_col != col {
+            return None;
+        }
+        let (r1, c1, r2, c2) = self.merged_regions.find_merge(row, col)?;
+        if r1 == row && r2 == row && c1 == col && c2 > c1 {
+            Some((r1, c1, r2, c2))
+        } else {
+            None
+        }
+    }
+
+    fn should_skip_cell_for_column_autosize(&self, row: i32, col: i32) -> bool {
+        self.subtotal_caption_horizontal_merge(row, col).is_some()
+    }
+
+    fn auto_resize_row_measure_width(&self, row: i32, col: i32, word_wrap: bool) -> Option<f32> {
+        if !word_wrap {
+            return None;
+        }
+        if let Some((_, c1, _, c2)) = self.subtotal_caption_horizontal_merge(row, col) {
+            let span_width: i32 = (c1..=c2).map(|span_col| self.get_col_width(span_col)).sum();
+            return Some(span_width.max(1) as f32);
+        }
+        Some(self.get_col_width(col).max(1) as f32)
+    }
+
     /// Resolve the active dropdown list for a cell.
     ///
     /// Cell-level dropdown list has priority over the column-level list.
@@ -2263,31 +2331,32 @@ impl VolvoxGrid {
         if col < 0 || col >= self.cols {
             return;
         }
-        let font_name = self.style.font_name.clone();
-        let font_size = if self.style.font_size > 0.0 {
-            self.style.font_size
-        } else {
-            13.0
-        };
-        let bold = self.style.font_bold;
-        let italic = self.style.font_italic;
         let body_padding = self.resolve_column_padding(col, false).horizontal();
         let fixed_padding = self.resolve_column_padding(col, true).horizontal();
         let padding = body_padding.max(fixed_padding);
 
+        self.ensure_text_engine();
+        let mut te = self.text_engine.take().unwrap();
         let mut max_w: f32 = 0.0;
-        // Collect texts first to avoid borrow conflicts with ensure_text_engine
-        let texts: Vec<String> = (0..self.rows)
-            .map(|r| self.get_display_text(r, col))
-            .collect();
-
-        let te = self.ensure_text_engine();
-        for text in &texts {
+        for row in 0..self.rows {
+            if self.should_skip_cell_for_column_autosize(row, col) {
+                continue;
+            }
+            let text = self.get_display_text(row, col);
             if !text.is_empty() {
-                let (w, _) = te.measure_text(text, &font_name, font_size, bold, italic, None);
+                let (font_name, font_size, bold, italic) =
+                    self.resolve_text_measure_style(row, col);
+                let (w, _) = te.measure_text(&text, font_name, font_size, bold, italic, None);
                 max_w = max_w.max(w);
             }
         }
+        let header_text = self.column_header_text(col);
+        if !header_text.is_empty() {
+            let (font_name, font_size, bold, italic) = self.resolve_header_text_measure_style(col);
+            let (w, _) = te.measure_text(&header_text, font_name, font_size, bold, italic, None);
+            max_w = max_w.max(w);
+        }
+        self.text_engine = Some(te);
 
         let new_width = (max_w.ceil() as i32 + padding).max(self.default_col_width.min(20));
         self.set_col_width(col, new_width);
@@ -2301,36 +2370,25 @@ impl VolvoxGrid {
         if row < 0 || row >= self.rows {
             return;
         }
-        let font_name = self.style.font_name.clone();
-        let font_size = if self.style.font_size > 0.0 {
-            self.style.font_size
-        } else {
-            13.0
-        };
-        let bold = self.style.font_bold;
-        let italic = self.style.font_italic;
         let word_wrap = self.word_wrap;
         let body_padding = self.style.cell_padding.vertical();
         let fixed_padding = self.style.fixed_cell_padding.vertical();
         let padding = body_padding.max(fixed_padding);
 
-        let texts_and_widths: Vec<(String, i32)> = (0..self.cols)
-            .map(|c| {
-                let text = self.get_display_text(row, c);
-                let w = self.get_col_width(c);
-                (text, w)
-            })
-            .collect();
-
-        let te = self.ensure_text_engine();
+        self.ensure_text_engine();
+        let mut te = self.text_engine.take().unwrap();
         let mut max_h: f32 = 0.0;
-        for (text, col_w) in &texts_and_widths {
+        for col in 0..self.cols {
+            let text = self.get_display_text(row, col);
             if !text.is_empty() {
-                let max_width = if word_wrap { Some(*col_w as f32) } else { None };
-                let (_, h) = te.measure_text(text, &font_name, font_size, bold, italic, max_width);
+                let max_width = self.auto_resize_row_measure_width(row, col, word_wrap);
+                let (font_name, font_size, bold, italic) =
+                    self.resolve_text_measure_style(row, col);
+                let (_, h) = te.measure_text(&text, font_name, font_size, bold, italic, max_width);
                 max_h = max_h.max(h);
             }
         }
+        self.text_engine = Some(te);
 
         let new_height = (max_h.ceil() as i32 + padding).max(self.default_row_height.min(10));
         self.set_row_height(row, new_height);
@@ -2434,14 +2492,12 @@ impl VolvoxGrid {
             return;
         }
 
-        let font_name = self.style.font_name.clone();
-        let font_size = if self.style.font_size > 0.0 {
+        let grid_font_name = self.style.font_name.clone();
+        let grid_font_size = if self.style.font_size > 0.0 {
             self.style.font_size
         } else {
             13.0
         };
-        let bold = self.style.font_bold;
-        let italic = self.style.font_italic;
         let word_wrap = self.word_wrap;
         let default_col_min = self.default_col_width.min(20);
         let default_row_min = self.default_row_height.min(10);
@@ -2466,14 +2522,32 @@ impl VolvoxGrid {
 
             for row in 0..self.rows {
                 for col in 0..self.cols {
+                    if self.should_skip_cell_for_column_autosize(row, col) {
+                        continue;
+                    }
                     let text = self.get_display_text(row, col);
                     if text.is_empty() {
                         continue;
                     }
-                    let (w, _) = te.measure_text(&text, &font_name, font_size, bold, italic, None);
+                    let (font_name, font_size, bold, italic) =
+                        self.resolve_text_measure_style(row, col);
+                    let (w, _) = te.measure_text(&text, font_name, font_size, bold, italic, None);
                     let idx = col as usize;
                     max_widths[idx] = max_widths[idx].max(w);
                 }
+            }
+
+            for col in 0..self.cols {
+                let header_text = self.column_header_text(col);
+                if header_text.is_empty() {
+                    continue;
+                }
+                let (font_name, font_size, bold, italic) =
+                    self.resolve_header_text_measure_style(col);
+                let (w, _) =
+                    te.measure_text(&header_text, font_name, font_size, bold, italic, None);
+                let idx = col as usize;
+                max_widths[idx] = max_widths[idx].max(w);
             }
 
             for col in 0..self.cols {
@@ -2493,13 +2567,11 @@ impl VolvoxGrid {
                     if text.is_empty() {
                         continue;
                     }
-                    let max_width = if word_wrap {
-                        Some(self.get_col_width(col) as f32)
-                    } else {
-                        None
-                    };
+                    let (font_name, font_size, bold, italic) =
+                        self.resolve_text_measure_style(row, col);
+                    let max_width = self.auto_resize_row_measure_width(row, col, word_wrap);
                     let (_, h) =
-                        te.measure_text(&text, &font_name, font_size, bold, italic, max_width);
+                        te.measure_text(&text, font_name, font_size, bold, italic, max_width);
                     let idx = row as usize;
                     max_heights[idx] = max_heights[idx].max(h);
                 }
@@ -2512,7 +2584,7 @@ impl VolvoxGrid {
                 self.set_row_height(row, new_height);
             }
 
-            self.auto_resize_col_top_header_rows(&mut te, &font_name, font_size);
+            self.auto_resize_col_top_header_rows(&mut te, &grid_font_name, grid_font_size);
         }
 
         self.text_engine = Some(te);
@@ -2525,6 +2597,129 @@ impl VolvoxGrid {
         }
         self.auto_resize_col(col);
         self.auto_resize_row(row);
+    }
+
+    fn clear_region_bounds(&self, region: i32) -> (i32, i32, i32, i32) {
+        match region {
+            0 => (
+                self.fixed_rows,
+                self.fixed_cols,
+                self.rows - 1,
+                self.cols - 1,
+            ),
+            1 => (0, 0, self.fixed_rows - 1, self.cols - 1),
+            2 => (0, 0, self.rows - 1, self.fixed_cols - 1),
+            3 => (0, 0, self.fixed_rows - 1, self.fixed_cols - 1),
+            4..=6 => (0, 0, self.rows - 1, self.cols - 1),
+            _ => (
+                self.fixed_rows,
+                self.fixed_cols,
+                self.rows - 1,
+                self.cols - 1,
+            ),
+        }
+    }
+
+    fn clear_cell_styles_in_bounds(&mut self, r1: i32, c1: i32, r2: i32, c2: i32) {
+        if r1 > r2 || c1 > c2 {
+            return;
+        }
+        for row in r1..=r2 {
+            for col in c1..=c2 {
+                self.cell_styles.remove(&(row, col));
+            }
+        }
+    }
+
+    fn clear_everything_in_bounds(&mut self, r1: i32, c1: i32, r2: i32, c2: i32) {
+        if r1 > r2 || c1 > c2 {
+            return;
+        }
+
+        self.cells.clear_range(r1, c1, r2, c2);
+        self.clear_cell_styles_in_bounds(r1, c1, r2, c2);
+        self.merged_regions.remove_overlapping(r1, c1, r2, c2);
+        self.row_props.retain(|row, _| *row < r1 || *row > r2);
+        self.rows_hidden.retain(|row| *row < r1 || *row > r2);
+        self.cols_hidden.retain(|col| *col < c1 || *col > c2);
+        self.pinned_rows_top.retain(|&row| row < r1 || row > r2);
+        self.pinned_rows_bottom.retain(|&row| row < r1 || row > r2);
+        self.pinned_cols_left.retain(|&col| col < c1 || col > c2);
+        self.pinned_cols_right.retain(|&col| col < c1 || col > c2);
+        self.sticky_rows.retain(|row, _| *row < r1 || *row > r2);
+        self.sticky_cols.retain(|col, _| *col < c1 || *col > c2);
+        self.sticky_cells
+            .retain(|&(row, col), _| row < r1 || row > r2 || col < c1 || col > c2);
+        self.layout.invalidate();
+    }
+
+    pub fn clear_region(&mut self, scope: i32, region: i32) {
+        let (r1, c1, r2, c2) = self.clear_region_bounds(region);
+
+        match scope {
+            0 => self.clear_everything_in_bounds(r1, c1, r2, c2),
+            1 => self.clear_cell_styles_in_bounds(r1, c1, r2, c2),
+            2 => {
+                if r1 <= r2 && c1 <= c2 {
+                    self.cells.clear_range(r1, c1, r2, c2);
+                }
+            }
+            3 => {
+                for (sr1, sc1, sr2, sc2) in self.selection.all_ranges(self.rows, self.cols) {
+                    self.cells.clear_range(sr1, sc1, sr2, sc2);
+                    self.clear_cell_styles_in_bounds(sr1, sc1, sr2, sc2);
+                }
+            }
+            _ => {}
+        }
+
+        self.mark_dirty();
+    }
+
+    fn auto_resize_for_merge_change(&mut self, r1: i32, c1: i32, r2: i32, c2: i32) {
+        if !self.auto_resize || self.rows <= 0 || self.cols <= 0 {
+            return;
+        }
+
+        let row_lo = r1.min(r2).clamp(0, self.rows - 1);
+        let row_hi = r1.max(r2).clamp(0, self.rows - 1);
+        let col_lo = c1.min(c2).clamp(0, self.cols - 1);
+        let col_hi = c1.max(c2).clamp(0, self.cols - 1);
+
+        let resize_cols = self.auto_size_mode == 0 || self.auto_size_mode == 1;
+        let resize_rows = self.auto_size_mode == 0 || self.auto_size_mode == 2;
+
+        if resize_cols {
+            for col in col_lo..=col_hi {
+                self.auto_resize_col(col);
+            }
+        }
+
+        if resize_rows {
+            for row in row_lo..=row_hi {
+                self.auto_resize_row(row);
+            }
+        }
+    }
+
+    pub fn merge_cells(&mut self, r1: i32, c1: i32, r2: i32, c2: i32) {
+        let (row_lo, row_hi) = (r1.min(r2), r1.max(r2));
+        let (col_lo, col_hi) = (c1.min(c2), c1.max(c2));
+        self.merged_regions
+            .add_merge(row_lo, col_lo, row_hi, col_hi);
+        self.layout.invalidate();
+        self.auto_resize_for_merge_change(row_lo, col_lo, row_hi, col_hi);
+        self.mark_dirty();
+    }
+
+    pub fn unmerge_cells(&mut self, r1: i32, c1: i32, r2: i32, c2: i32) {
+        let (row_lo, row_hi) = (r1.min(r2), r1.max(r2));
+        let (col_lo, col_hi) = (c1.min(c2), c1.max(c2));
+        self.merged_regions
+            .remove_overlapping(row_lo, col_lo, row_hi, col_hi);
+        self.layout.invalidate();
+        self.auto_resize_for_merge_change(row_lo, col_lo, row_hi, col_hi);
+        self.mark_dirty();
     }
 
     // ── Data Refresh ───────────────────────
@@ -3733,6 +3928,57 @@ mod tests {
     }
 
     #[test]
+    fn auto_resize_col_uses_cell_font_style_overrides() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        grid.default_col_width = 10;
+        grid.auto_resize = true;
+        grid.cells.set_text(0, 0, "1234567".to_string());
+
+        grid.auto_resize_col(0);
+        let before = grid.get_col_width(0);
+
+        grid.cell_styles.insert(
+            (0, 0),
+            crate::style::CellStylePatch {
+                font_bold: Some(true),
+                font_size: Some(24.0),
+                ..Default::default()
+            },
+        );
+
+        grid.auto_resize_col(0);
+
+        assert!(grid.get_col_width(0) > before);
+    }
+
+    #[test]
+    fn auto_resize_row_uses_cell_font_style_overrides() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        grid.default_col_width = 24;
+        grid.default_row_height = 16;
+        grid.word_wrap = true;
+        grid.auto_resize = true;
+        grid.cells
+            .set_text(0, 0, "wrapped text wrapped text wrapped text".to_string());
+
+        grid.auto_resize_row(0);
+        let before = grid.get_row_height(0);
+
+        grid.cell_styles.insert(
+            (0, 0),
+            crate::style::CellStylePatch {
+                font_bold: Some(true),
+                font_size: Some(24.0),
+                ..Default::default()
+            },
+        );
+
+        grid.auto_resize_row(0);
+
+        assert!(grid.get_row_height(0) > before);
+    }
+
+    #[test]
     fn add_item_inserts_row() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 2, 3, 1, 0);
         grid.cells.set_text(1, 0, "original".to_string());
@@ -3795,6 +4041,40 @@ mod tests {
         let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
         grid.remove_item(0); // fixed row
         assert_eq!(grid.rows, 3); // unchanged
+    }
+
+    #[test]
+    fn clear_everything_scrollable_removes_in_range_pin_and_sticky_state() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 4, 1, 1);
+
+        grid.set_row_sticky(0, 1);
+        grid.set_col_sticky(0, 3);
+        grid.pin_row(1, 1);
+        grid.pin_row(2, 2);
+        grid.pin_col(1, 1);
+        grid.pin_col(2, 2);
+        grid.set_row_sticky(1, 1);
+        grid.set_row_sticky(2, 2);
+        grid.set_col_sticky(1, 3);
+        grid.set_col_sticky(2, 4);
+        grid.set_cell_sticky(1, 1, 1, 3);
+        grid.set_cell_sticky(2, 2, 2, 4);
+
+        grid.clear_region(0, 0);
+
+        assert_eq!(grid.effective_sticky_row(0, 0), 1);
+        assert_eq!(grid.effective_sticky_col(0, 0), 3);
+
+        assert_eq!(grid.is_row_pinned(1), 0);
+        assert_eq!(grid.is_row_pinned(2), 0);
+        assert_eq!(grid.is_col_pinned(1), 0);
+        assert_eq!(grid.is_col_pinned(2), 0);
+        assert_eq!(grid.effective_sticky_row(1, 1), 0);
+        assert_eq!(grid.effective_sticky_row(2, 2), 0);
+        assert_eq!(grid.effective_sticky_col(1, 1), 0);
+        assert_eq!(grid.effective_sticky_col(2, 2), 0);
+        assert!(!grid.sticky_cells.contains_key(&(1, 1)));
+        assert!(!grid.sticky_cells.contains_key(&(2, 2)));
     }
 
     #[test]
@@ -3966,6 +4246,30 @@ mod tests {
     }
 
     #[test]
+    fn cell_screen_rect_expands_horizontal_merge_for_pinned_bottom_row() {
+        let mut grid = VolvoxGrid::new(1, 240, 120, 4, 4, 0, 0);
+        for row in 0..grid.rows {
+            grid.set_row_height(row, 20);
+        }
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cells.set_text(3, 0, "Grand Total".to_string());
+        grid.merge_cells(3, 0, 3, 2);
+        grid.pin_row(3, 2);
+        grid.ensure_layout();
+
+        let anchor = grid.cell_screen_rect(3, 0).expect("anchor rect");
+        let middle = grid.cell_screen_rect(3, 1).expect("middle rect");
+        let tail = grid.cell_screen_rect(3, 2).expect("tail rect");
+
+        assert_eq!(anchor, middle);
+        assert_eq!(anchor, tail);
+        assert!(anchor.2 > grid.col_width(0));
+        assert!(anchor.3 > 0);
+    }
+
+    #[test]
     fn set_top_row_clamps_to_last_valid_viewport() {
         let mut grid = VolvoxGrid::new(1, 120, 30, 10, 3, 0, 0);
         grid.default_row_height = 10;
@@ -4065,6 +4369,19 @@ mod tests {
     }
 
     #[test]
+    fn auto_resize_col_expands_for_caption_header_text() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        grid.default_col_width = 20;
+        grid.auto_resize = true;
+        grid.columns[0].caption = "A much longer header".to_string();
+
+        let before = grid.get_col_width(0);
+        grid.auto_resize_col(0);
+
+        assert!(grid.get_col_width(0) > before);
+    }
+
+    #[test]
     fn auto_resize_all_can_expand_rows_in_row_height_mode() {
         let mut grid = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
         grid.default_col_width = 24;
@@ -4112,5 +4429,77 @@ mod tests {
         grid.auto_resize_all();
 
         assert!(grid.indicator_bands.col_top.row_height_px(0) > before);
+    }
+
+    #[test]
+    fn merge_cells_shrinks_merged_subtotal_caption_anchor_column() {
+        let mut grid = VolvoxGrid::new(1, 480, 240, 4, 3, 1, 0);
+        grid.default_col_width = 20;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 1;
+        grid.cells.set_text(0, 0, "ID".to_string());
+        grid.cells.set_text(0, 1, "Name".to_string());
+        grid.cells.set_text(0, 2, "Qty".to_string());
+        grid.cells.set_text(1, 0, "A".to_string());
+        grid.cells.set_text(1, 2, "1".to_string());
+        grid.cells.set_text(2, 0, "B".to_string());
+        grid.cells.set_text(2, 2, "2".to_string());
+        grid.cells.set_text(3, 0, "C".to_string());
+        grid.cells.set_text(3, 2, "3".to_string());
+
+        grid.auto_resize_all();
+        let detail_width = grid.get_col_width(0);
+
+        crate::outline::subtotal(
+            &mut grid,
+            pb::AggregateType::AggSum as i32,
+            -1,
+            2,
+            "Very long subtotal caption",
+            0,
+            0,
+            false,
+        );
+        let subtotal_row = grid.fixed_rows;
+        let widened = grid.get_col_width(0);
+        assert!(widened > detail_width);
+
+        grid.merge_cells(subtotal_row, 0, subtotal_row, 1);
+
+        assert_eq!(grid.get_col_width(0), detail_width);
+    }
+
+    #[test]
+    fn merge_cells_recomputes_subtotal_caption_row_height_using_merged_width() {
+        let mut grid = VolvoxGrid::new(1, 480, 240, 3, 3, 1, 0);
+        grid.default_col_width = 40;
+        grid.default_row_height = 16;
+        grid.word_wrap = true;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 2;
+        grid.cells.set_text(0, 0, "ID".to_string());
+        grid.cells.set_text(0, 1, "Desc".to_string());
+        grid.cells.set_text(0, 2, "Qty".to_string());
+        grid.cells.set_text(1, 0, "A".to_string());
+        grid.cells.set_text(1, 2, "1".to_string());
+        grid.cells.set_text(2, 0, "B".to_string());
+        grid.cells.set_text(2, 2, "2".to_string());
+
+        crate::outline::subtotal(
+            &mut grid,
+            pb::AggregateType::AggSum as i32,
+            -1,
+            2,
+            "Very long subtotal caption that should wrap less after merge",
+            0,
+            0,
+            false,
+        );
+        let subtotal_row = grid.fixed_rows;
+        let before_merge = grid.get_row_height(subtotal_row);
+
+        grid.merge_cells(subtotal_row, 0, subtotal_row, 1);
+
+        assert!(grid.get_row_height(subtotal_row) < before_merge);
     }
 }

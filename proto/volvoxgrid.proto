@@ -830,7 +830,7 @@ message OutlineConfig {
   optional int32              tree_column           = 2;
   optional uint32             tree_color            = 3;
   optional GroupTotalPosition group_total_position  = 4;
-  optional bool               multi_totals          = 5;
+  optional bool               multi_totals          = 5; // When true, repeated Subtotal() calls with the same group_on_col reuse existing subtotal rows instead of inserting new ones, allowing multiple aggregate columns (e.g. Sales + Cost) in a single row.
 }
 
 // ── Cell Span ──

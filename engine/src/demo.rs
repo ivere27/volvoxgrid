@@ -285,7 +285,7 @@ fn apply_sales_subtotal_merges(grid: &mut VolvoxGrid) {
             continue;
         };
         if props.is_subtotal && props.outline_level <= 0 {
-            grid.merged_regions.add_merge(row, 0, row, 1);
+            grid.merge_cells(row, 0, row, 1);
         }
     }
 }
@@ -551,7 +551,10 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
 
     // ── Subtotals: Q → Region → Grand Total (below) ────────────────
     grid.outline.group_total_position = 1; // below
+    grid.outline.multi_totals = true;
     subtotal(grid, 1, 0, 0, "", 0, 0, false); // clear existing
+
+    // Sales (col 4)
     subtotal(
         grid,
         2,
@@ -562,7 +565,6 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
         SALES_THEME.body_fg,
         true,
     );
-    // Group by Q (col 0), match_from=1
     subtotal_ex(
         grid,
         2,
@@ -577,7 +579,6 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
         1,
         false,
     );
-    // Group by Region (col 1), match_from=1 so Q+Region both participate
     subtotal_ex(
         grid,
         2,
@@ -593,7 +594,47 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
         false,
     );
 
-    // Fill cost and margin for subtotal rows from their data rows above.
+    // Cost (col 5) — multi_totals reuses existing subtotal rows
+    subtotal(
+        grid,
+        2,
+        -1,
+        5,
+        "Grand Total",
+        0xFFEEF2FF,
+        SALES_THEME.body_fg,
+        true,
+    );
+    subtotal_ex(
+        grid,
+        2,
+        0,
+        5,
+        "",
+        0xFFF5F3FF,
+        SALES_THEME.body_fg,
+        true,
+        "",
+        false,
+        1,
+        false,
+    );
+    subtotal_ex(
+        grid,
+        2,
+        1,
+        5,
+        "",
+        0xFFF8F7FF,
+        SALES_THEME.body_fg,
+        true,
+        "",
+        false,
+        1,
+        false,
+    );
+
+    // Derive margin% and gray-out checkboxes on subtotal rows.
     let margin_f = |s: i64, c: i64| -> f64 {
         if s > 0 {
             (s - c) as f64 / s as f64 * 100.0
@@ -616,27 +657,8 @@ pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
             extra.value = crate::cell::CellValueData::Bool(false);
             extra.checked = pb::CheckedState::CheckedGrayed as i32;
         }
-        let level = props.outline_level;
-        let mut sales_sum = 0_i64;
-        let mut cost_sum = 0_i64;
-        // Walk backwards — subtotals are below their data rows
-        let mut r = row - 1;
-        while r >= grid.fixed_rows {
-            let (is_sub, row_level) = grid
-                .row_props
-                .get(&r)
-                .map(|p| (p.is_subtotal, p.outline_level))
-                .unwrap_or((false, 0));
-            if is_sub && row_level <= level {
-                break;
-            }
-            if !is_sub {
-                sales_sum += parse_i64(grid.cells.get_text(r, 4));
-                cost_sum += parse_i64(grid.cells.get_text(r, 5));
-            }
-            r -= 1;
-        }
-        grid.cells.set_text(row, 5, format!("{}", cost_sum));
+        let sales_sum = parse_i64(grid.cells.get_text(row, 4));
+        let cost_sum = parse_i64(grid.cells.get_text(row, 5));
         grid.cells
             .set_text(row, 6, format!("{:.1}", margin_f(sales_sum, cost_sum)));
     }
