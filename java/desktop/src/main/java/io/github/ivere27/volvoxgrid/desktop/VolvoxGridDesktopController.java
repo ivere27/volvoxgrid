@@ -477,54 +477,6 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         client.loadTable(builder.build());
     }
 
-    /**
-     * Fill a 2D matrix into the grid starting at the given offset.
-     *
-     * <p>When {@code resizeGrid} is true (the default), the grid is enlarged
-     * if the data exceeds the current row/column count.  Redraw is suspended
-     * for the duration so only a single repaint occurs at the end.</p>
-     */
-    public void setTableData(List<List<String>> data, int startRow, int startCol, boolean resizeGrid) throws SynurangDesktopBridge.SynurangBridgeException {
-        if (data == null || data.isEmpty()) return;
-        int mc = 0;
-        for (List<String> row : data) {
-            if (row.size() > mc) mc = row.size();
-        }
-        if (mc <= 0) return;
-        final int maxCols = mc;
-
-        withRedrawSuspended(() -> {
-            if (resizeGrid) {
-                int neededRows = startRow + data.size();
-                int neededCols = startCol + maxCols;
-                if (neededRows > rowCount()) setRowCount(neededRows);
-                if (neededCols > colCount()) setColCount(neededCols);
-            }
-
-            UpdateCellsRequest.Builder builder = UpdateCellsRequest.newBuilder().setGridId(gridId);
-            for (int r = 0; r < data.size(); r++) {
-                List<String> row = data.get(r);
-                for (int c = 0; c < row.size(); c++) {
-                    builder.addCells(
-                        CellUpdate.newBuilder()
-                            .setRow(startRow + r)
-                            .setCol(startCol + c)
-                            .setValue(CellValue.newBuilder().setText(row.get(c)).build())
-                            .build()
-                    );
-                }
-            }
-            client.updateCells(builder.build());
-        });
-    }
-
-    /**
-     * Fill a 2D matrix into the grid starting at row 0, column 0, resizing as needed.
-     */
-    public void setTableData(List<List<String>> data) throws SynurangDesktopBridge.SynurangBridgeException {
-        setTableData(data, 0, 0, true);
-    }
-
     @Override
     public void setRowHeight(int row, int height) throws SynurangDesktopBridge.SynurangBridgeException {
         client.defineRows(

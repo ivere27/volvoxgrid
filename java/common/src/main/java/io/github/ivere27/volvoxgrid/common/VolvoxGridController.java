@@ -101,46 +101,4 @@ public interface VolvoxGridController {
         }
     }
 
-    /**
-     * Fill a 2D matrix into the grid starting at the given offset.
-     *
-     * <p>When {@code resizeGrid} is true, the grid is enlarged if the data
-     * exceeds the current row/column count.  Redraw is suspended for the
-     * duration so only a single repaint occurs at the end.</p>
-     */
-    default void setTableData(List<List<String>> data, int startRow, int startCol, boolean resizeGrid) {
-        if (data == null || data.isEmpty()) return;
-        int mc = 0;
-        for (List<String> row : data) {
-            if (row.size() > mc) mc = row.size();
-        }
-        if (mc <= 0) return;
-
-        final int maxCols = mc;
-
-        withRedrawSuspended(() -> {
-            if (resizeGrid) {
-                int neededRows = startRow + data.size();
-                int neededCols = startCol + maxCols;
-                if (neededRows > rowCount()) setRowCount(neededRows);
-                if (neededCols > colCount()) setColCount(neededCols);
-            }
-
-            java.util.ArrayList<GridCellText> cells = new java.util.ArrayList<>();
-            for (int r = 0; r < data.size(); r++) {
-                List<String> row = data.get(r);
-                for (int c = 0; c < row.size(); c++) {
-                    cells.add(new GridCellText(startRow + r, startCol + c, row.get(c)));
-                }
-            }
-            setCells(cells);
-        });
-    }
-
-    /**
-     * Fill a 2D matrix into the grid starting at row 0, column 0, resizing as needed.
-     */
-    default void setTableData(List<List<String>> data) {
-        setTableData(data, 0, 0, true);
-    }
 }

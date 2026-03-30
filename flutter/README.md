@@ -172,12 +172,17 @@ await controller.setCells([
   CellTextEntry(row: 1, col: 0, text: 'C'),
 ]);
 
-// Fill a 2D matrix (auto-resizes grid if needed)
-await controller.setTableData([
-  ['Name', 'Price', 'Qty'],
-  ['Widget A', '29.99', '150'],
-  ['Widget B', '49.99', '200'],
-]);
+// Load a matrix-shaped JSON payload
+await controller.loadData(
+  utf8.encode(jsonEncode([
+    ['Name', 'Price', 'Qty'],
+    ['Widget A', '29.99', '150'],
+    ['Widget B', '49.99', '200'],
+  ])),
+  LoadDataOptions()
+    ..json = (JsonOptions())
+    ..headerPolicy = HeaderPolicy.HEADER_NONE,
+);
 
 // Bulk load a row-major typed table
 await controller.loadTable(3, 2, [

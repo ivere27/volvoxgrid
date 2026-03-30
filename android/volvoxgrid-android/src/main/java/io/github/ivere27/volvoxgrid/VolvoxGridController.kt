@@ -431,49 +431,6 @@ class VolvoxGridController(
         )
     }
 
-    /**
-     * Fill a 2D matrix into the grid starting at [startRow]/[startCol].
-     *
-     * When [resizeGrid] is true (the default), the grid is enlarged if the
-     * data exceeds the current row/column count.  Redraw is suspended for
-     * the duration so only a single repaint occurs at the end.
-     */
-    override fun setTableData(
-        data: List<List<String>>,
-        startRow: Int,
-        startCol: Int,
-        resizeGrid: Boolean
-    ) {
-        if (data.isEmpty()) return
-        val maxCols = data.maxOf { it.size }
-        if (maxCols <= 0) return
-
-        withRedrawSuspended {
-            if (resizeGrid) {
-                val neededRows = startRow + data.size
-                val neededCols = startCol + maxCols
-                val currentRows = layoutRowCount
-                val currentCols = layoutColCount
-                if (neededRows > currentRows) layoutRowCount = neededRows
-                if (neededCols > currentCols) layoutColCount = neededCols
-            }
-
-            val builder = UpdateCellsRequest.newBuilder().setGridId(gridId)
-            for ((r, row) in data.withIndex()) {
-                for ((c, text) in row.withIndex()) {
-                    builder.addCells(
-                        CellUpdate.newBuilder()
-                            .setRow(startRow + r)
-                            .setCol(startCol + c)
-                            .setValue(CellValue.newBuilder().setText(text).build())
-                            .build()
-                    )
-                }
-            }
-            service.UpdateCells(builder.build())
-        }
-    }
-
     fun getText(): String {
         val sel = service.GetSelection(handle())
         return getCellText(sel.activeRow, sel.activeCol)

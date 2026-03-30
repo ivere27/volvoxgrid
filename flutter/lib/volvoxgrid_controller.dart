@@ -495,49 +495,6 @@ class VolvoxGridController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Fill a 2D matrix into the grid starting at [startRow]/[startCol].
-  ///
-  /// When [resizeGrid] is true, rows/cols are grown before applying data.
-  Future<void> setTableData(
-    List<List<String>> rows, {
-    int startRow = 0,
-    int startCol = 0,
-    bool resizeGrid = true,
-  }) async {
-    if (rows.isEmpty) return;
-    final maxCols =
-        rows.fold<int>(0, (m, row) => row.length > m ? row.length : m);
-    if (maxCols <= 0) return;
-
-    await withRedrawSuspended(() async {
-      if (resizeGrid) {
-        final neededRows = startRow + rows.length;
-        final neededCols = startCol + maxCols;
-        final currentRows = await rowCount();
-        final currentCols = await colCount();
-        if (neededRows > currentRows || neededCols > currentCols) {
-          final layout = LayoutConfig();
-          if (neededRows > currentRows) layout.rows = neededRows;
-          if (neededCols > currentCols) layout.cols = neededCols;
-          await _configure(GridConfig()..layout = layout);
-        }
-      }
-
-      final cells = <CellTextEntry>[];
-      for (var r = 0; r < rows.length; r++) {
-        final row = rows[r];
-        for (var c = 0; c < row.length; c++) {
-          cells.add(CellTextEntry(
-            row: startRow + r,
-            col: startCol + c,
-            text: row[c],
-          ));
-        }
-      }
-      await setCells(cells);
-    });
-  }
-
   /// Load a row-major typed matrix in one RPC.
   ///
   /// [values] should be `rows * cols` long in row-major order.
