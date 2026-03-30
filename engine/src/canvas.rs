@@ -1160,14 +1160,12 @@ impl RenderContext {
             || grid.span.mode != 0
             || grid.span.mode_fixed != 0;
         // Pre-allocate with estimated visible cell count to avoid repeated reallocs.
-        let est_rows = (vp.scroll_row_end - vp.scroll_row_start
-            + grid.fixed_rows
-            + grid.frozen_rows)
-            .max(0) as usize;
-        let est_cols = (vp.scroll_col_end - vp.scroll_col_start
-            + grid.fixed_cols
-            + grid.frozen_cols)
-            .max(0) as usize;
+        let est_rows =
+            (vp.scroll_row_end - vp.scroll_row_start + grid.fixed_rows + grid.frozen_rows).max(0)
+                as usize;
+        let est_cols =
+            (vp.scroll_col_end - vp.scroll_col_start + grid.fixed_cols + grid.frozen_cols).max(0)
+                as usize;
         let mut vis_cells: Vec<VisibleCell> = Vec::with_capacity(est_rows * est_cols);
         let zone_counts =
             iter_visible_cells(grid, &vp, damage, |zone, row, col, cx, cy, cw, ch| {
@@ -2380,7 +2378,11 @@ fn build_or_reuse_ctx(
         .render_ctx_cache
         .borrow_mut()
         .take()
-        .and_then(|b| (b as Box<dyn std::any::Any>).downcast::<RenderCtxCached>().ok())
+        .and_then(|b| {
+            (b as Box<dyn std::any::Any>)
+                .downcast::<RenderCtxCached>()
+                .ok()
+        })
         .map(|b| *b);
 
     match cached {
@@ -2403,8 +2405,6 @@ fn build_or_reuse_ctx(
         }
     }
 }
-
-
 
 fn render_grid_internal<C: Canvas>(
     grid: &VolvoxGrid,
@@ -2437,20 +2437,30 @@ fn render_grid_internal<C: Canvas>(
 
     grid.span.clear_span_cache();
 
-    let t_ctx = if profiling { Some(PortableInstant::now()) } else { None };
+    let t_ctx = if profiling {
+        Some(PortableInstant::now())
+    } else {
+        None
+    };
     let ctx = build_or_reuse_ctx(grid, w, h, damage);
     if let Some(t0) = t_ctx {
-        grid.debug_ctx_time_us.set(t0.elapsed().as_secs_f32() * 1_000_000.0);
+        grid.debug_ctx_time_us
+            .set(t0.elapsed().as_secs_f32() * 1_000_000.0);
     }
 
-    let t_clear = if profiling { Some(PortableInstant::now()) } else { None };
+    let t_clear = if profiling {
+        Some(PortableInstant::now())
+    } else {
+        None
+    };
     if let Some(damage) = damage {
         clear_partial_regions(grid, canvas, &ctx, damage);
     } else {
         canvas.clear(grid.style.back_color_bkg);
     }
     if let Some(t0) = t_clear {
-        grid.debug_clear_time_us.set(t0.elapsed().as_secs_f32() * 1_000_000.0);
+        grid.debug_clear_time_us
+            .set(t0.elapsed().as_secs_f32() * 1_000_000.0);
     }
 
     run_layer!(
@@ -2534,7 +2544,8 @@ fn render_grid_internal<C: Canvas>(
     // Only cache full renders (partial renders have filtered vis_cells).
     if damage.is_none() {
         let key = RenderCtxCacheKey { vp: ctx.vp.clone() };
-        *grid.render_ctx_cache.borrow_mut() = Some(Box::new(RenderCtxCached { key, ctx }) as Box<dyn std::any::Any + Send>);
+        *grid.render_ctx_cache.borrow_mut() =
+            Some(Box::new(RenderCtxCached { key, ctx }) as Box<dyn std::any::Any + Send>);
     }
 
     ((0, 0, w, h), times, zone_counts)
@@ -3029,7 +3040,8 @@ fn build_text_cells(
         // ── Fast pre-checks before expensive meta computation ──
         // Boolean columns suppress text in data rows.
         if let Some(cp) = grid.get_col_props(text_col) {
-            if cp.data_type == crate::proto::volvoxgrid::v1::ColumnDataType::ColumnDataBoolean as i32
+            if cp.data_type
+                == crate::proto::volvoxgrid::v1::ColumnDataType::ColumnDataBoolean as i32
                 && text_row >= grid.fixed_rows
             {
                 continue;
@@ -3210,23 +3222,7 @@ fn indicator_cell_rect_for_col(
 }
 
 fn column_header_text(grid: &VolvoxGrid, col: i32) -> String {
-    if col < 0 || (col as usize) >= grid.columns.len() {
-        return String::new();
-    }
-    let cp = &grid.columns[col as usize];
-    if !cp.caption.trim().is_empty() {
-        return cp.caption.clone();
-    }
-    if !cp.key.trim().is_empty() {
-        return cp.key.clone();
-    }
-    if grid.fixed_rows > 0 {
-        let legacy = grid.get_display_text(0, col);
-        if !legacy.trim().is_empty() {
-            return legacy;
-        }
-    }
-    String::new()
+    grid.column_header_text(col)
 }
 
 fn indicator_fore_color(color: Option<u32>, fallback: u32) -> u32 {

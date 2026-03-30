@@ -2754,6 +2754,7 @@ impl VolvoxGrid {
                 self.apply_value_plan(entry.update.row, entry.update.col, &entry.value_plan);
             }
         }
+        self.auto_resize_all();
         self.mark_dirty();
 
         v1::WriteResult {
@@ -3233,8 +3234,8 @@ mod tests {
     #[test]
     fn style_padding_partial_update() {
         let mut grid = test_grid();
-        assert_eq!(grid.style.cell_padding.left, 3);
-        assert_eq!(grid.style.cell_padding.right, 3);
+        assert_eq!(grid.style.cell_padding.left, 6);
+        assert_eq!(grid.style.cell_padding.right, 6);
 
         let config = v1::GridConfig {
             style: Some(v1::StyleConfig {
@@ -3249,9 +3250,9 @@ mod tests {
         grid.apply_config(&config);
 
         assert_eq!(grid.style.cell_padding.left, 12);
-        assert_eq!(grid.style.cell_padding.top, 0);
-        assert_eq!(grid.style.cell_padding.right, 3);
-        assert_eq!(grid.style.cell_padding.bottom, 0);
+        assert_eq!(grid.style.cell_padding.top, 2);
+        assert_eq!(grid.style.cell_padding.right, 6);
+        assert_eq!(grid.style.cell_padding.bottom, 2);
     }
 
     #[test]
@@ -3432,6 +3433,29 @@ mod tests {
                 value: Some(v1::cell_value::Value::Timestamp(v))
             }) if v == ts
         ));
+    }
+
+    #[test]
+    fn load_table_auto_resizes_columns_when_enabled() {
+        let mut grid = test_grid();
+        grid.default_col_width = 20;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 1;
+
+        let before = grid.get_col_width(0);
+        let result = grid.load_table(
+            1,
+            1,
+            &[v1::CellValue {
+                value: Some(v1::cell_value::Value::Text(
+                    "A much longer value".to_string(),
+                )),
+            }],
+            true,
+        );
+
+        assert_eq!(result.written_count, 1);
+        assert!(grid.get_col_width(0) > before);
     }
 
     #[test]

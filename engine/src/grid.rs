@@ -13,7 +13,7 @@ use crate::control::CellControl;
 use crate::drag::DragState;
 use crate::edit::EditState;
 use crate::event::EventQueue;
-use crate::indicator::IndicatorBandsState;
+use crate::indicator::{ColIndicatorRowDefState, IndicatorBandsState};
 use crate::layout::LayoutCache;
 use crate::outline::OutlineState;
 use crate::proto::volvoxgrid::v1 as pb;
@@ -86,6 +86,31 @@ fn usize_to_i32_saturating(value: usize) -> i32 {
     } else {
         value as i32
     }
+}
+
+fn grow_span_heights_to_fit(
+    heights: &mut [i32],
+    row1: usize,
+    row2: usize,
+    needed_total: i32,
+) -> bool {
+    if row1 > row2 || row2 >= heights.len() {
+        return false;
+    }
+    let current_total: i32 = heights[row1..=row2].iter().sum();
+    if needed_total <= current_total {
+        return false;
+    }
+
+    let extra = needed_total - current_total;
+    let span_len = row2 - row1 + 1;
+    let base = extra / span_len as i32;
+    let remainder = extra % span_len as i32;
+    for offset in 0..span_len {
+        let add = base + if (offset as i32) < remainder { 1 } else { 0 };
+        heights[row1 + offset] = heights[row1 + offset].saturating_add(add);
+    }
+    true
 }
 
 #[derive(Debug)]
@@ -236,7 +261,11 @@ pub struct VolvoxGrid {
     /// Configured text layout cache capacity, applied to `text_engine` on init.
     pub text_layout_cache_cap: usize,
     // ── Compatibility Properties ────────────────────────────────────
-    /// Whether rows/cols auto-resize when data changes.
+    /// Whether bulk bind/load writes auto-fit row heights / column widths.
+    ///
+    /// This also gates the per-cell auto-resize helper when callers opt into
+    /// it. Disable for very large datasets because auto-fit may scan many or
+    /// all cells.
     pub auto_resize: bool,
     /// Whether type-ahead is currently active.
     pub is_type_ahead_active: bool,
@@ -2206,6 +2235,26 @@ impl VolvoxGrid {
 
     // ── Auto-Resize ─────────────────────────
 
+    pub(crate) fn column_header_text(&self, col: i32) -> String {
+        if col < 0 || (col as usize) >= self.columns.len() {
+            return String::new();
+        }
+        let cp = &self.columns[col as usize];
+        if !cp.caption.trim().is_empty() {
+            return cp.caption.clone();
+        }
+        if !cp.key.trim().is_empty() {
+            return cp.key.clone();
+        }
+        if self.fixed_rows > 0 {
+            let legacy = self.get_display_text(0, col);
+            if !legacy.trim().is_empty() {
+                return legacy;
+            }
+        }
+        String::new()
+    }
+
     /// Auto-resize a column width to fit its content.
     ///
     /// Measures text in all rows for the given column using the text engine
@@ -2285,6 +2334,188 @@ impl VolvoxGrid {
 
         let new_height = (max_h.ceil() as i32 + padding).max(self.default_row_height.min(10));
         self.set_row_height(row, new_height);
+    }
+
+    fn auto_resize_col_top_header_rows(
+        &mut self,
+        te: &mut TextEngine,
+        font_name: &str,
+        font_size: f32,
+    ) {
+        let band = self.indicator_bands.col_top.clone();
+        if !band.visible {
+            return;
+        }
+
+        let row_count = band.row_count();
+        if row_count <= 0 {
+            return;
+        }
+
+        let mut heights: Vec<i32> = (0..row_count).map(|row| band.row_height_px(row)).collect();
+        let padding = self.style.fixed_cell_padding.vertical().max(2);
+        let header_mode = pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+        let mut changed = false;
+
+        if band.cells.is_empty()
+            && band.has_mode(pb::ColIndicatorCellMode::ColIndicatorCellHeaderText)
+        {
+            for col in 0..self.cols {
+                let text = self.column_header_text(col);
+                if text.is_empty() {
+                    continue;
+                }
+                let (_, h) = te.measure_text(&text, font_name, font_size, false, false, None);
+                let needed = h.ceil() as i32 + padding;
+                if needed > heights[0] {
+                    heights[0] = needed;
+                    changed = true;
+                }
+            }
+        }
+
+        for cell in &band.cells {
+            let row1 = cell.row1.max(0) as usize;
+            let row2 = cell.row2.max(cell.row1).max(0) as usize;
+            if row1 >= heights.len() || row2 >= heights.len() {
+                continue;
+            }
+            let mode_bits = if cell.mode_bits != 0 {
+                cell.mode_bits
+            } else {
+                band.mode_bits
+            };
+            let text = if !cell.text.trim().is_empty() {
+                cell.text.clone()
+            } else if cell.col1 == cell.col2 && (mode_bits & header_mode != 0) {
+                self.column_header_text(cell.col1)
+            } else {
+                String::new()
+            };
+            if text.is_empty() {
+                continue;
+            }
+
+            let (_, h) = te.measure_text(&text, font_name, font_size, false, false, None);
+            let needed = h.ceil() as i32 + padding;
+            if grow_span_heights_to_fit(&mut heights, row1, row2, needed) {
+                changed = true;
+            }
+        }
+
+        if !changed {
+            return;
+        }
+
+        self.indicator_bands.col_top.row_defs = heights
+            .into_iter()
+            .enumerate()
+            .map(|(index, height_px)| ColIndicatorRowDefState {
+                index: index as i32,
+                height_px: height_px.max(1),
+            })
+            .collect();
+        self.layout.invalidate();
+        self.dirty = true;
+    }
+
+    /// Auto-resize the full grid using the current `auto_size_mode`.
+    ///
+    /// Column auto-fit runs before row auto-fit so wrapped row-height
+    /// measurement can use the final column widths.
+    pub fn auto_resize_all(&mut self) {
+        if !self.auto_resize || self.rows <= 0 || self.cols <= 0 {
+            return;
+        }
+
+        let resize_cols = self.auto_size_mode == 0 || self.auto_size_mode == 1;
+        let resize_rows = self.auto_size_mode == 0 || self.auto_size_mode == 2;
+        if !resize_cols && !resize_rows {
+            return;
+        }
+
+        let font_name = self.style.font_name.clone();
+        let font_size = if self.style.font_size > 0.0 {
+            self.style.font_size
+        } else {
+            13.0
+        };
+        let bold = self.style.font_bold;
+        let italic = self.style.font_italic;
+        let word_wrap = self.word_wrap;
+        let default_col_min = self.default_col_width.min(20);
+        let default_row_min = self.default_row_height.min(10);
+        let row_padding = self
+            .style
+            .cell_padding
+            .vertical()
+            .max(self.style.fixed_cell_padding.vertical());
+
+        self.ensure_text_engine();
+        let mut te = self.text_engine.take().unwrap();
+
+        if resize_cols {
+            let col_padding: Vec<i32> = (0..self.cols)
+                .map(|col| {
+                    let body_padding = self.resolve_column_padding(col, false).horizontal();
+                    let fixed_padding = self.resolve_column_padding(col, true).horizontal();
+                    body_padding.max(fixed_padding)
+                })
+                .collect();
+            let mut max_widths = vec![0.0f32; self.cols as usize];
+
+            for row in 0..self.rows {
+                for col in 0..self.cols {
+                    let text = self.get_display_text(row, col);
+                    if text.is_empty() {
+                        continue;
+                    }
+                    let (w, _) = te.measure_text(&text, &font_name, font_size, bold, italic, None);
+                    let idx = col as usize;
+                    max_widths[idx] = max_widths[idx].max(w);
+                }
+            }
+
+            for col in 0..self.cols {
+                let idx = col as usize;
+                let new_width =
+                    (max_widths[idx].ceil() as i32 + col_padding[idx]).max(default_col_min);
+                self.set_col_width(col, new_width);
+            }
+        }
+
+        if resize_rows {
+            let mut max_heights = vec![0.0f32; self.rows as usize];
+
+            for row in 0..self.rows {
+                for col in 0..self.cols {
+                    let text = self.get_display_text(row, col);
+                    if text.is_empty() {
+                        continue;
+                    }
+                    let max_width = if word_wrap {
+                        Some(self.get_col_width(col) as f32)
+                    } else {
+                        None
+                    };
+                    let (_, h) =
+                        te.measure_text(&text, &font_name, font_size, bold, italic, max_width);
+                    let idx = row as usize;
+                    max_heights[idx] = max_heights[idx].max(h);
+                }
+            }
+
+            for row in 0..self.rows {
+                let idx = row as usize;
+                let new_height =
+                    (max_heights[idx].ceil() as i32 + row_padding).max(default_row_min);
+                self.set_row_height(row, new_height);
+            }
+
+            self.auto_resize_col_top_header_rows(&mut te, &font_name, font_size);
+        }
+
+        self.text_engine = Some(te);
     }
 
     /// Trigger auto-resize for the given cell's row and column if `auto_resize` is enabled.
@@ -3817,5 +4048,69 @@ mod tests {
         assert_eq!(grid.scrollbar_fade_opacity, 1.0);
         assert_eq!(grid.scrollbar_fade_timer, 0.0);
         assert!(grid.scrollbar_fade_last_tick.is_none());
+    }
+
+    #[test]
+    fn auto_resize_all_expands_columns_when_enabled() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        grid.default_col_width = 20;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 1;
+        grid.cells.set_text(0, 0, "A much longer value".to_string());
+
+        let before = grid.get_col_width(0);
+        grid.auto_resize_all();
+
+        assert!(grid.get_col_width(0) > before);
+    }
+
+    #[test]
+    fn auto_resize_all_can_expand_rows_in_row_height_mode() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        grid.default_col_width = 24;
+        grid.default_row_height = 16;
+        grid.word_wrap = true;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 2;
+        grid.cells
+            .set_text(0, 0, "wrapped text wrapped text wrapped text".to_string());
+
+        let before = grid.get_row_height(0);
+        grid.auto_resize_all();
+
+        assert!(grid.get_row_height(0) > before);
+    }
+
+    #[test]
+    fn auto_resize_all_skips_when_disabled() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        grid.default_col_width = 20;
+        grid.auto_resize = false;
+        grid.auto_size_mode = 1;
+        grid.cells.set_text(0, 0, "A much longer value".to_string());
+
+        let before = grid.get_col_width(0);
+        grid.auto_resize_all();
+
+        assert_eq!(grid.get_col_width(0), before);
+    }
+
+    #[test]
+    fn auto_resize_all_expands_col_top_header_height_for_caption_headers() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1, 2, 0, 0);
+        grid.auto_resize = true;
+        grid.auto_size_mode = 2;
+        grid.style.font_size = 40.0;
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.mode_bits =
+            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+        grid.columns[0].caption = "품명".to_string();
+        grid.columns[1].caption = "고객명".to_string();
+
+        let before = grid.indicator_bands.col_top.row_height_px(0);
+        grid.auto_resize_all();
+
+        assert!(grid.indicator_bands.col_top.row_height_px(0) > before);
     }
 }

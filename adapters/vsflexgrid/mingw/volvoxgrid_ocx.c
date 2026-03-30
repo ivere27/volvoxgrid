@@ -187,6 +187,7 @@ VG_WRAP_STATUS_4(volvox_grid_add_item, int64_t, grid_id, const uint8_t*, item, i
 VG_WRAP_STATUS_1(volvox_grid_destroy_grid, int64_t, id)
 VG_WRAP_STATUS_3(volvox_grid_edit_cell, int64_t, grid_id, int32_t, row, int32_t, col)
 VG_WRAP_I32_3(volvox_grid_get_cell_checked, int64_t, grid_id, int32_t, row, int32_t, col)
+VG_WRAP_I32_1(volvox_grid_get_auto_resize, int64_t, id)
 VG_WRAP_I32_1(volvox_grid_get_col, int64_t, id)
 VG_WRAP_I32_3(volvox_grid_get_col_index, int64_t, grid_id, const uint8_t*, key, int32_t, key_len)
 VG_WRAP_I32_2(volvox_grid_get_col_is_visible, int64_t, grid_id, int32_t, index)
@@ -205,6 +206,7 @@ VG_WRAP_STATUS_5(volvox_grid_set_cell_flood, int64_t, grid_id, int32_t, row, int
 VG_WRAP_STATUS_4(volvox_grid_set_col_combo_list, int64_t, grid_id, int32_t, col, const uint8_t*, list, int32_t, list_len)
 VG_WRAP_STATUS_3(volvox_grid_set_col_data_type, int64_t, grid_id, int32_t, col, int32_t, data_type)
 VG_WRAP_STATUS_3(volvox_grid_set_col_width, int64_t, grid_id, int32_t, col, int32_t, width)
+VG_WRAP_STATUS_2(volvox_grid_set_auto_resize, int64_t, grid_id, int32_t, value)
 VG_WRAP_STATUS_2(volvox_grid_set_fixed_cols, int64_t, grid_id, int32_t, fixed_cols)
 VG_WRAP_STATUS_2(volvox_grid_set_fixed_rows, int64_t, grid_id, int32_t, fixed_rows)
 VG_WRAP_STATUS_3(volvox_grid_set_is_collapsed, int64_t, grid_id, int32_t, row, int32_t, collapsed)
@@ -234,6 +236,12 @@ static int32_t volvox_grid_refresh_compat(int64_t id) {
     int32_t out_len = 0;
     uint8_t *out = volvox_grid_refresh(id, &out_len);
     return vfg_take_status_response(out);
+}
+
+static int32_t vfg_engine_auto_resize_enabled(int64_t grid_id, int32_t fallback) {
+    int32_t value = volvox_grid_get_auto_resize_compat(grid_id);
+    if (value < 0) return fallback ? 1 : 0;
+    return value != 0;
 }
 
 /* Forward-declare protobuf-based Sort (generated header may be stale). */
@@ -2612,7 +2620,8 @@ static HRESULT vfg_populate_from_recordset(VolvoxGridObject *obj, IDispatch *pRS
     }
     volvox_grid_set_fixed_rows(gid, fixedRows);
     volvox_grid_set_fixed_cols(gid, fixedCols);
-    if (((!preservedWidths) || obj->auto_resize) && totalCols > dataColOffset) {
+    if (((!preservedWidths) || vfg_engine_auto_resize_enabled(gid, obj->auto_resize)) &&
+        totalCols > dataColOffset) {
         volvox_grid_auto_size(gid, dataColOffset, totalCols - 1, 0, 0);
         vfg_apply_bound_autosize_compat_widths(gid, dataColOffset, 0, totalCols - 1);
     }
@@ -3051,9 +3060,11 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
 
     case DISPID_VG_AUTORESIZE_COMPAT:
         if (wFlags & DISPATCH_PROPERTYGET) {
+            int32_t enabled = vfg_engine_auto_resize_enabled(obj->grid_id, obj->auto_resize);
+            obj->auto_resize = enabled ? 1 : 0;
             if (!pVarResult) return E_POINTER;
             V_VT(pVarResult) = VT_BOOL;
-            V_BOOL(pVarResult) = obj->auto_resize ? VARIANT_TRUE : VARIANT_FALSE;
+            V_BOOL(pVarResult) = enabled ? VARIANT_TRUE : VARIANT_FALSE;
             return S_OK;
         }
         if (wFlags & (DISPATCH_PROPERTYPUT | DISPATCH_PROPERTYPUTREF)) {
@@ -3069,6 +3080,9 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
                 VariantClear(&tmp);
             }
             obj->auto_resize = value ? 1 : 0;
+            if (volvox_grid_set_auto_resize_compat(obj->grid_id, obj->auto_resize) != 0) {
+                return E_FAIL;
+            }
             if (obj->data_source) {
                 HRESULT hr = vfg_rebind_ado_source(obj);
                 if (FAILED(hr)) return hr;
@@ -4727,7 +4741,7 @@ HRESULT VolvoxGrid_CreateInstance(IUnknown *pOuter, REFIID riid, void **ppv) {
     obj->col_sel_cached = 1;
     obj->data_mode = 0;
     obj->virtual_data = 0;
-    obj->auto_resize = 0;
+    obj->auto_resize = 1;
     obj->suppress_bound_text_writes = 0;
     obj->data_source = NULL;
     obj->recordset = NULL;

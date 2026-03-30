@@ -12,10 +12,10 @@ pub struct Padding {
 impl Default for Padding {
     fn default() -> Self {
         Self {
-            left: 3,
-            top: 0,
-            right: 3,
-            bottom: 0,
+            left: 6,
+            top: 2,
+            right: 6,
+            bottom: 2,
         }
     }
 }

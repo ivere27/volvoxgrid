@@ -849,6 +849,12 @@ message InteractionConfig {
   optional int32      type_ahead_delay = 4;
   optional bool       auto_size_mouse  = 5;
   optional AutoSizeMode auto_size_mode = 6;
+  // When true, bulk bind/load paths do a one-time auto-fit of row heights
+  // and/or column widths using `auto_size_mode`.
+  // Also enables the engine's per-cell auto-resize helper when an adapter
+  // explicitly calls it.
+  // Disable this for very large datasets (for example around 1M rows),
+  // because auto-fit may scan many or all cells to find the required size.
   optional bool       auto_resize      = 7;
   optional DragMode   drag_mode        = 8;
   optional DropMode   drop_mode        = 9;

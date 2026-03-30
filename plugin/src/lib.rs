@@ -169,6 +169,22 @@ struct ZoomGestureState {
     base_default_col_width: i32,
     base_row_heights: Vec<(i32, i32)>,
     base_col_widths: Vec<(i32, i32)>,
+    base_col_top_default_row_height: i32,
+    base_col_top_row_defs: Vec<(i32, i32)>,
+    base_col_bottom_default_row_height: i32,
+    base_col_bottom_row_defs: Vec<(i32, i32)>,
+    base_cell_padding: volvoxgrid_engine::style::Padding,
+    base_fixed_cell_padding: volvoxgrid_engine::style::Padding,
+    base_column_paddings: Vec<(
+        i32,
+        Option<volvoxgrid_engine::style::Padding>,
+        Option<volvoxgrid_engine::style::Padding>,
+    )>,
+    base_cell_style_metrics: Vec<(
+        (i32, i32),
+        Option<f32>,
+        Option<volvoxgrid_engine::style::Padding>,
+    )>,
     base_font_size: Option<f32>,
 }
 
@@ -446,6 +462,34 @@ fn quantize_zoom_font_size(size: f32) -> f32 {
     (size / step).round() * step
 }
 
+fn scale_indicator_extent_for_zoom(extent: i32, scale: f32) -> i32 {
+    ((extent as f32) * scale).round() as i32
+}
+
+fn indicator_row_defs_equal(
+    current: &[volvoxgrid_engine::indicator::ColIndicatorRowDefState],
+    next: &[volvoxgrid_engine::indicator::ColIndicatorRowDefState],
+) -> bool {
+    current.len() == next.len()
+        && current
+            .iter()
+            .zip(next.iter())
+            .all(|(a, b)| a.index == b.index && a.height_px == b.height_px)
+}
+
+fn scale_padding_for_zoom(
+    padding: volvoxgrid_engine::style::Padding,
+    scale: f32,
+) -> volvoxgrid_engine::style::Padding {
+    volvoxgrid_engine::style::Padding {
+        left: ((padding.left as f32) * scale).round() as i32,
+        top: ((padding.top as f32) * scale).round() as i32,
+        right: ((padding.right as f32) * scale).round() as i32,
+        bottom: ((padding.bottom as f32) * scale).round() as i32,
+    }
+    .clamped_non_negative()
+}
+
 fn capture_zoom_state(
     grid: &volvoxgrid_engine::grid::VolvoxGrid,
     defer_updates: bool,
@@ -464,6 +508,47 @@ fn capture_zoom_state(
         base_default_col_width: grid.default_col_width,
         base_row_heights: grid.row_heights.iter().map(|(r, h)| (*r, *h)).collect(),
         base_col_widths: grid.col_widths.iter().map(|(c, w)| (*c, *w)).collect(),
+        base_col_top_default_row_height: grid.indicator_bands.col_top.default_row_height_px,
+        base_col_top_row_defs: grid
+            .indicator_bands
+            .col_top
+            .row_defs
+            .iter()
+            .map(|row| (row.index, row.height_px))
+            .collect(),
+        base_col_bottom_default_row_height: grid.indicator_bands.col_bottom.default_row_height_px,
+        base_col_bottom_row_defs: grid
+            .indicator_bands
+            .col_bottom
+            .row_defs
+            .iter()
+            .map(|row| (row.index, row.height_px))
+            .collect(),
+        base_cell_padding: grid.style.cell_padding,
+        base_fixed_cell_padding: grid.style.fixed_cell_padding,
+        base_column_paddings: grid
+            .columns
+            .iter()
+            .enumerate()
+            .filter_map(|(index, column)| {
+                if column.cell_padding.is_none() && column.fixed_cell_padding.is_none() {
+                    None
+                } else {
+                    Some((index as i32, column.cell_padding, column.fixed_cell_padding))
+                }
+            })
+            .collect(),
+        base_cell_style_metrics: grid
+            .cell_styles
+            .iter()
+            .filter_map(|(&(row, col), style)| {
+                if style.font_size.is_none() && style.padding.is_none() {
+                    None
+                } else {
+                    Some(((row, col), style.font_size, style.padding))
+                }
+            })
+            .collect(),
         base_font_size: if grid.style.font_size > 0.0 {
             Some(grid.style.font_size)
         } else {
@@ -494,6 +579,66 @@ fn apply_zoom_scale(
     let next_default_col = scaled_default_col.max(1);
     if grid.default_col_width != next_default_col {
         grid.default_col_width = next_default_col;
+        changed = true;
+    }
+
+    let next_col_top_default_row =
+        scale_indicator_extent_for_zoom(state.base_col_top_default_row_height, scale).max(1);
+    if grid.indicator_bands.col_top.default_row_height_px != next_col_top_default_row {
+        grid.indicator_bands.col_top.default_row_height_px = next_col_top_default_row;
+        changed = true;
+    }
+    let next_col_top_row_defs = state
+        .base_col_top_row_defs
+        .iter()
+        .map(
+            |(index, height_px)| volvoxgrid_engine::indicator::ColIndicatorRowDefState {
+                index: *index,
+                height_px: scale_indicator_extent_for_zoom(*height_px, scale).max(1),
+            },
+        )
+        .collect::<Vec<_>>();
+    if !indicator_row_defs_equal(
+        &grid.indicator_bands.col_top.row_defs,
+        &next_col_top_row_defs,
+    ) {
+        grid.indicator_bands.col_top.row_defs = next_col_top_row_defs;
+        changed = true;
+    }
+
+    let next_col_bottom_default_row =
+        scale_indicator_extent_for_zoom(state.base_col_bottom_default_row_height, scale).max(1);
+    if grid.indicator_bands.col_bottom.default_row_height_px != next_col_bottom_default_row {
+        grid.indicator_bands.col_bottom.default_row_height_px = next_col_bottom_default_row;
+        changed = true;
+    }
+    let next_col_bottom_row_defs = state
+        .base_col_bottom_row_defs
+        .iter()
+        .map(
+            |(index, height_px)| volvoxgrid_engine::indicator::ColIndicatorRowDefState {
+                index: *index,
+                height_px: scale_indicator_extent_for_zoom(*height_px, scale).max(1),
+            },
+        )
+        .collect::<Vec<_>>();
+    if !indicator_row_defs_equal(
+        &grid.indicator_bands.col_bottom.row_defs,
+        &next_col_bottom_row_defs,
+    ) {
+        grid.indicator_bands.col_bottom.row_defs = next_col_bottom_row_defs;
+        changed = true;
+    }
+
+    let next_cell_padding = scale_padding_for_zoom(state.base_cell_padding, scale);
+    if grid.style.cell_padding != next_cell_padding {
+        grid.style.cell_padding = next_cell_padding;
+        changed = true;
+    }
+
+    let next_fixed_padding = scale_padding_for_zoom(state.base_fixed_cell_padding, scale);
+    if grid.style.fixed_cell_padding != next_fixed_padding {
+        grid.style.fixed_cell_padding = next_fixed_padding;
         changed = true;
     }
 
@@ -539,6 +684,51 @@ fn apply_zoom_scale(
         changed = true;
     }
 
+    for (col, base_padding, base_fixed_padding) in &state.base_column_paddings {
+        let Some(column) = grid.columns.get_mut(*col as usize) else {
+            continue;
+        };
+        let next_padding = base_padding.map(|padding| scale_padding_for_zoom(padding, scale));
+        if column.cell_padding != next_padding {
+            column.cell_padding = next_padding;
+            changed = true;
+        }
+        let next_fixed_padding =
+            base_fixed_padding.map(|padding| scale_padding_for_zoom(padding, scale));
+        if column.fixed_cell_padding != next_fixed_padding {
+            column.fixed_cell_padding = next_fixed_padding;
+            changed = true;
+        }
+    }
+
+    for ((row, col), base_font_size, base_padding) in &state.base_cell_style_metrics {
+        let Some(style) = grid.cell_styles.get_mut(&(*row, *col)) else {
+            continue;
+        };
+        if let Some(base_font_size) = base_font_size {
+            let next_font_size = if (scale - 1.0).abs() <= ZOOM_RESTORE_EPSILON as f32 {
+                base_font_size.clamp(4.0, 128.0)
+            } else {
+                quantize_zoom_font_size((base_font_size * scale).clamp(4.0, 128.0))
+            };
+            if style
+                .font_size
+                .map(|value| (value - next_font_size).abs() > 0.001)
+                .unwrap_or(true)
+            {
+                style.font_size = Some(next_font_size);
+                changed = true;
+            }
+        }
+        if let Some(base_padding) = base_padding {
+            let next_padding = scale_padding_for_zoom(*base_padding, scale);
+            if style.padding != Some(next_padding) {
+                style.padding = Some(next_padding);
+                changed = true;
+            }
+        }
+    }
+
     if let Some(base_font_size) = state.base_font_size {
         let next_font_size = if (scale - 1.0).abs() <= ZOOM_RESTORE_EPSILON as f32 {
             base_font_size.clamp(4.0, 128.0)
@@ -557,6 +747,114 @@ fn apply_zoom_scale(
         grid.mark_dirty();
     }
     changed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{apply_zoom_scale, capture_zoom_state};
+    use volvoxgrid_engine::style::{CellStylePatch, Padding};
+
+    #[test]
+    fn apply_zoom_scale_scales_padding_and_cell_style_metrics() {
+        let mut grid = volvoxgrid_engine::grid::VolvoxGrid::new(1, 320, 200, 2, 2, 0, 0);
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        grid.indicator_bands.col_top.row_defs =
+            vec![volvoxgrid_engine::indicator::ColIndicatorRowDefState {
+                index: 0,
+                height_px: 30,
+            }];
+        grid.style.cell_padding = Padding {
+            left: 6,
+            top: 2,
+            right: 6,
+            bottom: 2,
+        };
+        grid.style.fixed_cell_padding = Padding {
+            left: 8,
+            top: 4,
+            right: 8,
+            bottom: 4,
+        };
+        grid.columns[0].cell_padding = Some(Padding {
+            left: 4,
+            top: 2,
+            right: 4,
+            bottom: 2,
+        });
+        grid.columns[0].fixed_cell_padding = Some(Padding {
+            left: 10,
+            top: 4,
+            right: 10,
+            bottom: 4,
+        });
+        grid.cell_styles.insert(
+            (0, 0),
+            CellStylePatch {
+                font_size: Some(20.0),
+                padding: Some(Padding {
+                    left: 3,
+                    top: 1,
+                    right: 3,
+                    bottom: 1,
+                }),
+                ..Default::default()
+            },
+        );
+
+        let state = capture_zoom_state(&grid, false, true, 1.0);
+        assert!(apply_zoom_scale(&mut grid, &state, 0.5));
+
+        assert_eq!(
+            grid.style.cell_padding,
+            Padding {
+                left: 3,
+                top: 1,
+                right: 3,
+                bottom: 1,
+            }
+        );
+        assert_eq!(
+            grid.style.fixed_cell_padding,
+            Padding {
+                left: 4,
+                top: 2,
+                right: 4,
+                bottom: 2,
+            }
+        );
+        assert_eq!(
+            grid.columns[0].cell_padding,
+            Some(Padding {
+                left: 2,
+                top: 1,
+                right: 2,
+                bottom: 1,
+            })
+        );
+        assert_eq!(
+            grid.columns[0].fixed_cell_padding,
+            Some(Padding {
+                left: 5,
+                top: 2,
+                right: 5,
+                bottom: 2,
+            })
+        );
+        assert_eq!(grid.indicator_bands.col_top.default_row_height_px, 12);
+        assert_eq!(grid.indicator_bands.col_top.row_defs[0].height_px, 15);
+        let style = grid.cell_styles.get(&(0, 0)).unwrap();
+        assert_eq!(style.font_size, Some(10.0));
+        assert_eq!(
+            style.padding,
+            Some(Padding {
+                left: 2,
+                top: 1,
+                right: 2,
+                bottom: 1,
+            })
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------

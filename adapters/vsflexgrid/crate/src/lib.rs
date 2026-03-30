@@ -110,6 +110,7 @@ fn apply_array_data_to_grid(
         let col = idx % cols;
         grid.cells.set_text(row, col, value.clone());
     }
+    grid.auto_resize_all();
     grid.mark_dirty();
 }
 

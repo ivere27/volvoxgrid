@@ -301,6 +301,7 @@ pub fn load_data(
     apply_request_modes(grid, final_cols, opts.coercion, opts.error_mode);
     let write_result = grid.write_cells(&updates, false);
     restore_request_modes(grid, &restore_modes);
+    grid.auto_resize_all();
 
     pb::LoadDataResult {
         status: if write_result.rejected_count > 0 {
@@ -1629,5 +1630,23 @@ mod tests {
             Some(pb::cell_value::Value::Number(number)) => assert_eq!(*number, 42.0),
             _ => panic!("existing value should remain after atomic failure"),
         }
+    }
+
+    #[test]
+    fn load_data_respects_disabled_auto_resize() {
+        let mut grid = new_grid();
+        grid.default_col_width = 20;
+        grid.auto_resize = false;
+        grid.auto_size_mode = 1;
+
+        let before = grid.get_col_width(0);
+        let result = load_data(
+            &mut grid,
+            br#"[{"value":"A much longer value"}]"#,
+            Some(&json_options()),
+        );
+
+        assert_eq!(result.status, pb::LoadDataStatus::LoadOk as i32);
+        assert_eq!(grid.get_col_width(0), before);
     }
 }
