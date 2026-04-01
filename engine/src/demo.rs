@@ -1,34 +1,22 @@
-//! Shared demo scenarios for VolvoxGrid host examples.
+//! Shared demo support for VolvoxGrid host examples.
 //!
 //! This module is feature-gated behind `demo` and not included in
-//! production builds. Direct engine targets and host/plugin adapters can
-//! reuse these functions instead of duplicating setup/data logic.
-//!
-//! Three demos are provided:
-//!
-//! 1. **Sales Showcase** (`setup_sales_demo`) — ~1000 rows, 10 columns,
-//!    subtotals, merged cells, dropdowns, currency/percentage formats,
-//!    data bars, alternating row colors, explorer bar, outline bar.
-//!
-//! 2. **Hierarchy Showcase** (`setup_hierarchy_demo`) — ~200 rows, 6 columns,
-//!    simulated directory tree with outline levels, expand/collapse, indented
-//!    text, styled folder rows.
-//!
-//! 3. **Stress Test** (`setup_stress_demo`) — 1M rows, 12 columns, eagerly
-//!    materialized for full-dataset sort/scroll benchmarking.  A separate
-//!    lazy variant is available via `create_stress_grid`.
+//! production builds. It keeps shared demo helpers, stress-demo setup,
+//! and embedded fixture access for `GetDemoData`.
 
 use crate::grid::VolvoxGrid;
 use crate::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
-use crate::outline::{subtotal, subtotal_ex};
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::scrollbar::{
     default_scrollbar_colors, default_scrollbar_corner_radius, default_scrollbar_size,
     reset_scrollbar_fade_state, DEFAULT_SCROLLBAR_FADE_DELAY_MS,
     DEFAULT_SCROLLBAR_FADE_DURATION_MS, DEFAULT_SCROLLBAR_MARGIN, DEFAULT_SCROLLBAR_MIN_THUMB,
 };
-use crate::selection::{HOVER_CELL, HOVER_COLUMN, HOVER_ROW};
-use crate::style::{CellStylePatch, HighlightStyle};
+use crate::selection::HOVER_ROW;
+use crate::style::HighlightStyle;
+use flate2::read::GzDecoder;
+use std::io::Read;
+use std::sync::OnceLock;
 
 // ── Shared helpers ──────────────────────────────────────────────────
 
@@ -52,44 +40,6 @@ struct DemoTheme {
     tree_color: u32,
 }
 
-const SALES_THEME: DemoTheme = DemoTheme {
-    body_bg: 0xFFFFFFFF,
-    body_fg: 0xFF111827,
-    canvas_bg: 0xFFFAFAFB,
-    alt_row_bg: 0xFFF9FAFB,
-    fixed_bg: 0xFFF3F4F6,
-    fixed_fg: 0xFF374151,
-    grid_color: 0xFFE5E7EB,
-    fixed_grid_color: 0xFFD1D5DB,
-    header_bg: 0xFFF9FAFB,
-    header_fg: 0xFF111827,
-    indicator_bg: 0xFFF9FAFB,
-    indicator_fg: 0xFF6B7280,
-    selection_bg: 0xFF6366F1,
-    selection_fg: 0xFFFFFFFF,
-    accent: 0xFF818CF8,
-    tree_color: 0xFF9CA3AF,
-};
-
-const HIERARCHY_THEME: DemoTheme = DemoTheme {
-    body_bg: 0xFFFFFFFF,
-    body_fg: 0xFF1C1917,
-    canvas_bg: 0xFFFAFAF9,
-    alt_row_bg: 0xFFF5F5F4,
-    fixed_bg: 0xFFF5F5F4,
-    fixed_fg: 0xFF44403C,
-    grid_color: 0xFFE7E5E4,
-    fixed_grid_color: 0xFFD6D3D1,
-    header_bg: 0xFFFAFAF9,
-    header_fg: 0xFF1C1917,
-    indicator_bg: 0xFFFAFAF9,
-    indicator_fg: 0xFF78716C,
-    selection_bg: 0xFFD97706,
-    selection_fg: 0xFFFFFFFF,
-    accent: 0xFFF59E0B,
-    tree_color: 0xFFA8A29E,
-};
-
 const STRESS_THEME: DemoTheme = DemoTheme {
     body_bg: 0xFFFFFFFF,
     body_fg: 0xFF1A1A1A,
@@ -108,6 +58,13 @@ const STRESS_THEME: DemoTheme = DemoTheme {
     accent: 0xFF0078D4,
     tree_color: 0xFF9E9E9E,
 };
+
+const EMBEDDED_SALES_JSON_GZ: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/sales.json.gz"));
+const EMBEDDED_HIERARCHY_JSON_GZ: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/hierarchy.json.gz"));
+
+static EMBEDDED_SALES_JSON_BYTES: OnceLock<Vec<u8>> = OnceLock::new();
+static EMBEDDED_HIERARCHY_JSON_BYTES: OnceLock<Vec<u8>> = OnceLock::new();
 
 /// Scale a logical-pixel value by the grid's DPI scale factor.
 fn sp(grid: &VolvoxGrid, px: i32) -> i32 {
@@ -275,21 +232,6 @@ fn stress_text_col_width_px(grid: &mut VolvoxGrid) -> i32 {
     (text_w + sp(grid, STRESS_TEXT_COL_PADDING_PX)).max(sp(grid, STRESS_COL_WIDTHS[0]))
 }
 
-fn apply_sales_subtotal_merges(grid: &mut VolvoxGrid) {
-    if grid.cols < 2 {
-        return;
-    }
-
-    for row in grid.fixed_rows..grid.rows {
-        let Some(props) = grid.row_props.get(&row) else {
-            continue;
-        };
-        if props.is_subtotal && props.outline_level <= 0 {
-            grid.merged_regions.add_merge(row, 0, row, 1);
-        }
-    }
-}
-
 fn reset_grid(grid: &mut VolvoxGrid) {
     // Clear all data
     grid.cells.clear_all();
@@ -339,626 +281,35 @@ pub fn rand_idx(row: i32, salt: u64, len: usize) -> usize {
     (splitmix64((row as u64) ^ salt) as usize) % len
 }
 
-// =====================================================================
-// Demo 1: Sales Showcase (~1000 rows)
-// =====================================================================
-
-const SALES_PRODUCTS: [&str; 20] = [
-    "Widget A",
-    "Widget B",
-    "Widget C",
-    "Widget D",
-    "Gadget X",
-    "Gadget Y",
-    "Gadget Z",
-    "Gadget W",
-    "Tool Alpha",
-    "Tool Beta",
-    "Tool Gamma",
-    "Tool Delta",
-    "Sensor M1",
-    "Sensor M2",
-    "Module P1",
-    "Module P2",
-    "Board Q1",
-    "Board Q2",
-    "Cable R1",
-    "Chip S1",
-];
-
-const SALES_CATEGORIES: [&str; 5] = ["Electronics", "Hardware", "Tools", "Sensors", "Components"];
-
-/// Map each product index to a category index.
-const SALES_PRODUCT_CATEGORY: [usize; 20] = [
-    0, 0, 0, 0, // Electronics
-    1, 1, 1, 1, // Hardware
-    2, 2, 2, 2, // Tools
-    3, 3, 3, 3, // Sensors
-    4, 4, 4, 4, // Components
-];
-
-const SALES_REGIONS: [&str; 4] = ["North", "South", "East", "West"];
-const SALES_QUARTERS: [&str; 4] = ["Q1", "Q2", "Q3", "Q4"];
-const SALES_STATUSES: [&str; 5] = ["Active", "Pending", "Shipped", "Returned", "Cancelled"];
-
-const SALES_HEADERS: [&str; 10] = [
-    "Q", "Region", "Category", "Product", "Sales", "Cost", "Margin%", "Flag", "Status", "Notes",
-];
-const SALES_COL_WIDTHS: [i32; 10] = [40, 80, 100, 120, 90, 90, 70, 56, 80, 140];
-const SALES_DATA_ROWS: i32 = 1000;
-
-/// Configure and populate a grid as the Sales Showcase demo.
-///
-/// Creates ~1000 data rows with multi-level subtotals:
-/// - Product subtotals within each category
-/// - Category subtotals
-/// - Grand total
-///
-/// Subtotals are placed above each group for proper outline tree collapse.
-/// Outline levels: 0=grand, 1=category, 2=product, 3=data.
-pub fn setup_sales_demo(grid: &mut VolvoxGrid) {
-    reset_grid(grid);
-    apply_demo_theme(grid, &SALES_THEME);
-    apply_demo_scrollbar_style(
-        grid,
-        pb::ScrollBarAppearance::ScrollbarAppearanceClassic as i32,
-    );
-
-    // ── Generate data in memory ──────────────────────────────────────
-    struct Entry {
-        product: &'static str,
-        category: &'static str,
-        region: &'static str,
-        quarter: &'static str,
-        sales: i32,
-        cost: i32,
-        margin_pct: f32,
-        flagged: bool,
-        status: &'static str,
-        note: String,
-    }
-
-    let note_tags = [
-        "review",
-        "priority",
-        "follow-up",
-        "audit",
-        "bulk",
-        "check",
-        "normal",
-        "expedite",
-    ];
-    let mut entries = Vec::with_capacity(SALES_DATA_ROWS as usize);
-    for r in 1..=SALES_DATA_ROWS {
-        let pi = rand_idx(r, 0xA1, SALES_PRODUCTS.len());
-        let ci = SALES_PRODUCT_CATEGORY[pi];
-        let ri = rand_idx(r, 0xC3, SALES_REGIONS.len());
-        let qi = rand_idx(r, 0xD4, SALES_QUARTERS.len());
-        let si = rand_idx(r, 0xE5, SALES_STATUSES.len());
-        let ni = rand_idx(r, 0xF6, note_tags.len());
-        let flagged = (splitmix64((r as u64) ^ 0x7788) % 4) == 0;
-        let sales = 500 + (splitmix64((r as u64) ^ 0x51F0_0DAD) % 49_501) as i32;
-        let cost_pct = 40 + (splitmix64((r as u64) ^ 0x22AA_BB) % 46) as i32;
-        let cost = sales * cost_pct / 100;
-        let margin = if sales > 0 {
-            (sales - cost) as f32 / sales as f32 * 100.0
-        } else {
-            0.0
-        };
-        let nc = 1000 + (splitmix64((r as u64) ^ 0x4455) % 9000) as i32;
-        entries.push(Entry {
-            product: SALES_PRODUCTS[pi],
-            category: SALES_CATEGORIES[ci],
-            region: SALES_REGIONS[ri],
-            quarter: SALES_QUARTERS[qi],
-            sales,
-            cost,
-            margin_pct: margin,
-            flagged,
-            status: SALES_STATUSES[si],
-            note: format!("{} note {}", note_tags[ni], nc),
-        });
-    }
-
-    // ── Sort by Q, then Region ─────────────────────────────────────
-    entries.sort_by(|a, b| a.quarter.cmp(b.quarter).then(a.region.cmp(b.region)));
-
-    // ── Configure grid ───────────────────────────────────────────────
-    grid.set_rows(entries.len() as i32);
-    grid.set_cols(10);
-
-    for (c, &w) in SALES_COL_WIDTHS.iter().enumerate() {
-        grid.set_col_width(c as i32, sp(grid, w));
-    }
-    grid.default_row_height = sp(grid, crate::grid::DEFAULT_ROW_HEIGHT);
-    apply_demo_column_headers(grid, &SALES_HEADERS, 28, &SALES_THEME);
-    apply_demo_row_indicator(grid, 40, &SALES_THEME);
-
-    grid.columns[0].alignment = pb::Align::CenterCenter as i32;
-    grid.columns[4].alignment = pb::Align::RightCenter as i32;
-    grid.columns[5].alignment = pb::Align::RightCenter as i32;
-    grid.columns[6].alignment = pb::Align::CenterCenter as i32;
-    grid.columns[7].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
-    grid.columns[7].alignment = pb::Align::CenterCenter as i32;
-    grid.columns[4].format = "$#,##0".to_string();
-    grid.columns[5].format = "$#,##0".to_string();
-    // Select-only dropdown: no leading `|`.
-    grid.columns[8].dropdown_items = "Active|Pending|Shipped|Returned|Cancelled".to_string();
-    grid.columns[6].progress_color = SALES_THEME.accent;
-
-    grid.allow_user_resizing = 3;
-    grid.tab_behavior = 1;
-    grid.edit_trigger_mode = 0; // read-only by default; host demos may enable edit
-    grid.dropdown_trigger = 1;
-    grid.dropdown_search = false;
-    grid.fling_enabled = true;
-    grid.fling_impulse_gain = 220.0;
-    grid.fling_friction = 0.9;
-    grid.header_features = 3;
-    grid.auto_size_mouse = true;
-    grid.allow_user_freezing = 3;
-    grid.selection.hover_mode = HOVER_ROW | HOVER_COLUMN | HOVER_CELL;
-    grid.selection.hover_row_style = HighlightStyle {
-        back_color: Some(0x106366F1),
-        ..HighlightStyle::default()
-    };
-    grid.selection.hover_column_style = HighlightStyle {
-        back_color: Some(0x106366F1),
-        ..HighlightStyle::default()
-    };
-    grid.selection.hover_cell_style = HighlightStyle {
-        back_color: Some(0x1E818CF8),
-        border: Some(pb::BorderStyle::BorderThin as i32),
-        border_color: Some(SALES_THEME.accent),
-        ..HighlightStyle::default()
-    };
-
-    // ── Write flat data rows ─────────────────────────────────────────
-    for (idx, e) in entries.iter().enumerate() {
-        let r = idx as i32;
-        grid.cells.set_text(r, 0, e.quarter.to_string());
-        grid.cells.set_text(r, 1, e.region.to_string());
-        grid.cells.set_text(r, 2, e.category.to_string());
-        grid.cells.set_text(r, 3, e.product.to_string());
-        grid.cells.set_text(r, 4, format!("{}", e.sales));
-        grid.cells.set_text(r, 5, format!("{}", e.cost));
-        grid.cells.set_text(r, 6, format!("{:.0}", e.margin_pct));
-        grid.cells
-            .set_text(r, 7, if e.flagged { "Yes" } else { "No" }.to_string());
-        {
-            let cell = grid.cells.get_mut(r, 7);
-            let extra = cell.extra_mut();
-            extra.value = crate::cell::CellValueData::Bool(e.flagged);
-            extra.checked = if e.flagged {
-                pb::CheckedState::CheckedChecked as i32
-            } else {
-                pb::CheckedState::CheckedUnchecked as i32
-            };
-        }
-        grid.cells.set_text(r, 8, e.status.to_string());
-        grid.cells.set_text(r, 9, e.note.clone());
-        if e.margin_pct < 0.0 {
-            grid.cell_styles.insert(
-                (r, 6),
-                CellStylePatch {
-                    fore_color: Some(0xFFDC2626),
-                    font_bold: Some(true),
-                    ..Default::default()
-                },
-            );
-        }
-    }
-
-    // ── Subtotals: Q → Region → Grand Total (below) ────────────────
-    grid.outline.group_total_position = 1; // below
-    subtotal(grid, 1, 0, 0, "", 0, 0, false); // clear existing
-    subtotal(
-        grid,
-        2,
-        -1,
-        4,
-        "Grand Total",
-        0xFFEEF2FF,
-        SALES_THEME.body_fg,
-        true,
-    );
-    // Group by Q (col 0), match_from=1
-    subtotal_ex(
-        grid,
-        2,
-        0,
-        4,
-        "",
-        0xFFF5F3FF,
-        SALES_THEME.body_fg,
-        true,
-        "",
-        false,
-        1,
-        false,
-    );
-    // Group by Region (col 1), match_from=1 so Q+Region both participate
-    subtotal_ex(
-        grid,
-        2,
-        1,
-        4,
-        "",
-        0xFFF8F7FF,
-        SALES_THEME.body_fg,
-        true,
-        "",
-        false,
-        1,
-        false,
-    );
-
-    // Fill cost and margin for subtotal rows from their data rows above.
-    let margin_f = |s: i64, c: i64| -> f64 {
-        if s > 0 {
-            (s - c) as f64 / s as f64 * 100.0
-        } else {
-            0.0
-        }
-    };
-    let parse_i64 = |s: &str| -> i64 { s.parse::<i64>().unwrap_or(0) };
-    let row_count = grid.rows;
-    for row in grid.fixed_rows..row_count {
-        let Some(props) = grid.row_props.get(&row) else {
-            continue;
-        };
-        if !props.is_subtotal {
-            continue;
-        }
-        {
-            let cell = grid.cells.get_mut(row, 7);
-            let extra = cell.extra_mut();
-            extra.value = crate::cell::CellValueData::Bool(false);
-            extra.checked = pb::CheckedState::CheckedGrayed as i32;
-        }
-        let level = props.outline_level;
-        let mut sales_sum = 0_i64;
-        let mut cost_sum = 0_i64;
-        // Walk backwards — subtotals are below their data rows
-        let mut r = row - 1;
-        while r >= grid.fixed_rows {
-            let (is_sub, row_level) = grid
-                .row_props
-                .get(&r)
-                .map(|p| (p.is_subtotal, p.outline_level))
-                .unwrap_or((false, 0));
-            if is_sub && row_level <= level {
-                break;
-            }
-            if !is_sub {
-                sales_sum += parse_i64(grid.cells.get_text(r, 4));
-                cost_sum += parse_i64(grid.cells.get_text(r, 5));
-            }
-            r -= 1;
-        }
-        grid.cells.set_text(row, 5, format!("{}", cost_sum));
-        grid.cells
-            .set_text(row, 6, format!("{:.1}", margin_f(sales_sum, cost_sum)));
-    }
-
-    // Span on Q and Region columns
-    grid.span.mode = 4;
-    grid.span.mode_fixed = 0;
-    grid.span.span_cols.clear();
-    grid.span.span_cols.insert(0, true);
-    grid.span.span_cols.insert(1, true);
-    grid.span.span_compare = 1;
-    apply_sales_subtotal_merges(grid);
-
-    // Outline bar
-    grid.outline.tree_indicator = 0;
-    grid.outline.group_total_position = 1; // below
-
-    grid.layout.invalidate();
-    grid.mark_dirty();
+fn inflate_embedded_demo_bytes(compressed: &[u8]) -> Vec<u8> {
+    let mut decoder = GzDecoder::new(compressed);
+    let mut bytes = Vec::new();
+    decoder
+        .read_to_end(&mut bytes)
+        .expect("embedded demo fixture should decompress");
+    bytes
 }
 
-// =====================================================================
-// Demo 2: Hierarchy Showcase (~200 rows)
-// =====================================================================
-
-const HIERARCHY_HEADERS: [&str; 6] = ["Name", "Type", "Size", "Modified", "Permissions", "Action"];
-const HIERARCHY_COL_WIDTHS: [i32; 6] = [260, 80, 80, 120, 100, 92];
-
-struct DirEntry {
-    name: &'static str,
-    kind: &'static str, // "Folder", "File"
-    size_kb: i32,       // 0 for folders
-    modified: &'static str,
-    perms: &'static str,
-    level: i32,
-}
-
-/// Configure and populate a grid as the Hierarchy Showcase demo.
-///
-/// Creates ~200 rows showing a directory tree with outline levels,
-/// expand/collapse, indented names, and styled folder rows.
-pub fn setup_hierarchy_demo(grid: &mut VolvoxGrid) {
-    reset_grid(grid);
-    apply_demo_theme(grid, &HIERARCHY_THEME);
-    apply_demo_scrollbar_style(
-        grid,
-        pb::ScrollBarAppearance::ScrollbarAppearanceModern as i32,
-    );
-    let entries = build_hierarchy_entries();
-    let data_rows = entries.len() as i32;
-
-    grid.set_rows(data_rows);
-    grid.set_cols(HIERARCHY_HEADERS.len() as i32);
-
-    // Column widths
-    for (c, &w) in HIERARCHY_COL_WIDTHS.iter().enumerate() {
-        grid.set_col_width(c as i32, sp(grid, w));
-    }
-
-    grid.default_row_height = sp(grid, crate::grid::DEFAULT_ROW_HEIGHT);
-    apply_demo_column_headers(grid, &HIERARCHY_HEADERS, 28, &HIERARCHY_THEME);
-
-    // Column alignments
-    grid.columns[2].alignment = pb::Align::RightCenter as i32;
-    grid.columns[4].alignment = pb::Align::CenterCenter as i32;
-    grid.columns[5].alignment = pb::Align::CenterCenter as i32;
-    grid.columns[5].interaction = pb::CellInteraction::TextLink as i32;
-
-    // Alternating row color
-    // Interaction defaults
-    grid.allow_user_resizing = 3;
-    grid.tab_behavior = 1;
-    grid.edit_trigger_mode = 0; // read-only for hierarchy
-    grid.fling_enabled = true;
-    grid.fling_impulse_gain = 220.0;
-    grid.fling_friction = 0.9;
-    grid.header_features = 0; // disabled — flat sort is incompatible with tree hierarchy
-    grid.auto_size_mouse = true;
-    grid.selection.hover_mode = HOVER_CELL;
-    grid.selection.hover_row_style = HighlightStyle::default();
-    grid.selection.hover_column_style = HighlightStyle::default();
-    grid.selection.hover_cell_style = HighlightStyle {
-        back_color: Some(0x1AD97706),
-        border: Some(pb::BorderStyle::BorderThin as i32),
-        border_color: Some(HIERARCHY_THEME.accent),
-        ..HighlightStyle::default()
-    };
-
-    // Populate data rows
-    for (i, entry) in entries.iter().enumerate() {
-        let r = i as i32;
-
-        // Plain name — visual indent is handled by the outline tree renderer
-        grid.cells.set_text(r, 0, entry.name.to_string());
-        grid.cells.set_text(r, 1, entry.kind.to_string());
-        if entry.size_kb > 0 {
-            grid.cells.set_text(r, 2, format_size(entry.size_kb));
-        }
-        grid.cells.set_text(r, 3, entry.modified.to_string());
-        grid.cells.set_text(r, 4, entry.perms.to_string());
-        grid.cells.set_text(
-            r,
-            5,
-            if entry.kind == "Folder" {
-                "Browse"
-            } else {
-                "Open"
-            }
-            .to_string(),
-        );
-
-        // Set outline level (shift +1 so root-level folders at level 0
-        // become level 1 and get +/- buttons from the renderer)
-        let props = grid.row_props.entry(r).or_default();
-        props.outline_level = entry.level + 1;
-        if entry.kind == "Folder" {
-            props.is_subtotal = true;
-        }
-
-        grid.cell_styles.insert(
-            (r, 5),
-            CellStylePatch {
-                fore_color: Some(0xFF2563EB),
-                font_bold: Some(false),
-                ..Default::default()
-            },
-        );
-
-        // Style folders bold
-        if entry.kind == "Folder" {
-            grid.cell_styles.insert(
-                (r, 0),
-                CellStylePatch {
-                    font_bold: Some(true),
-                    fore_color: Some(0xFF92400E),
-                    ..Default::default()
-                },
-            );
-        }
-    }
-
-    // Outline bar in complete mode
-    grid.outline.tree_indicator = 2;
-    grid.outline.tree_column = 0;
-
-    grid.layout.invalidate();
-    grid.mark_dirty();
-}
-
-fn format_size(kb: i32) -> String {
-    if kb >= 1024 * 1024 {
-        format!("{:.1} GB", kb as f64 / (1024.0 * 1024.0))
-    } else if kb >= 1024 {
-        format!("{:.1} MB", kb as f64 / 1024.0)
-    } else {
-        format!("{} KB", kb)
+pub fn embedded_demo_data_bytes(demo: &str) -> Result<&'static [u8], String> {
+    match demo {
+        "sales" => Ok(EMBEDDED_SALES_JSON_BYTES
+            .get_or_init(|| inflate_embedded_demo_bytes(EMBEDDED_SALES_JSON_GZ))
+            .as_slice()),
+        "hierarchy" => Ok(EMBEDDED_HIERARCHY_JSON_BYTES
+            .get_or_init(|| inflate_embedded_demo_bytes(EMBEDDED_HIERARCHY_JSON_GZ))
+            .as_slice()),
+        "stress" => Err("embedded demo data is not available for procedural demo: stress".into()),
+        other => Err(format!("unknown demo: {other}")),
     }
 }
 
-fn build_hierarchy_entries() -> Vec<DirEntry> {
-    let mut entries = Vec::with_capacity(200);
-
-    // Helper macro for folder/file entries
-    macro_rules! folder {
-        ($name:expr, $level:expr, $date:expr) => {
-            entries.push(DirEntry {
-                name: $name,
-                kind: "Folder",
-                size_kb: 0,
-                modified: $date,
-                perms: "rwxr-xr-x",
-                level: $level,
-            });
-        };
-    }
-    macro_rules! file {
-        ($name:expr, $level:expr, $size:expr, $date:expr, $perms:expr) => {
-            entries.push(DirEntry {
-                name: $name,
-                kind: "File",
-                size_kb: $size,
-                modified: $date,
-                perms: $perms,
-                level: $level,
-            });
-        };
-    }
-
-    // Root-level directories
-    // Documents/
-    folder!("Documents", 0, "2025-12-01");
-    folder!("Reports", 1, "2025-11-15");
-    file!("Q1_Report.xlsx", 2, 245, "2025-03-31", "rw-r--r--");
-    file!("Q2_Report.xlsx", 2, 312, "2025-06-30", "rw-r--r--");
-    file!("Q3_Report.pdf", 2, 1840, "2025-09-30", "rw-r--r--");
-    file!("Q4_Report.docx", 2, 178, "2025-12-15", "rw-r--r--");
-    file!("Annual_Summary.pdf", 2, 4200, "2025-12-20", "rw-r--r--");
-    folder!("Invoices", 1, "2025-12-10");
-    file!("INV-001.pdf", 2, 89, "2025-01-15", "rw-r--r--");
-    file!("INV-002.pdf", 2, 92, "2025-02-18", "rw-r--r--");
-    file!("INV-003.pdf", 2, 76, "2025-03-22", "rw-r--r--");
-    file!("INV-004.pdf", 2, 134, "2025-04-10", "rw-r--r--");
-    file!("INV-005.pdf", 2, 98, "2025-05-05", "rw-r--r--");
-    file!("INV-006.pdf", 2, 112, "2025-06-08", "rw-r--r--");
-    file!("INV-007.pdf", 2, 87, "2025-07-14", "rw-r--r--");
-    file!("INV-008.pdf", 2, 145, "2025-08-19", "rw-r--r--");
-    file!("INV-009.pdf", 2, 93, "2025-09-23", "rw-r--r--");
-    file!("INV-010.pdf", 2, 101, "2025-10-30", "rw-r--r--");
-    file!("INV-011.pdf", 2, 88, "2025-11-12", "rw-r--r--");
-    file!("INV-012.pdf", 2, 156, "2025-12-05", "rw-r--r--");
-    folder!("Contracts", 1, "2025-10-01");
-    file!("Contract_Alpha.pdf", 2, 2100, "2025-01-20", "rw-------");
-    file!("Contract_Beta.pdf", 2, 1850, "2025-04-15", "rw-------");
-    file!("Contract_Gamma.docx", 2, 980, "2025-07-01", "rw-------");
-    file!("NDA_Template.docx", 2, 45, "2025-02-10", "rw-r--r--");
-    folder!("Presentations", 1, "2025-11-20");
-    file!("Roadmap_2025.pptx", 2, 8500, "2025-01-10", "rw-r--r--");
-    file!("Team_Kickoff.pptx", 2, 5200, "2025-03-01", "rw-r--r--");
-    file!("Client_Demo.pptx", 2, 12400, "2025-06-15", "rw-r--r--");
-    file!("Year_Review.pptx", 2, 9800, "2025-12-18", "rw-r--r--");
-
-    // Photos/
-    folder!("Photos", 0, "2025-11-30");
-    folder!("Vacation", 1, "2025-08-20");
-    file!("IMG_001.jpg", 2, 3200, "2025-08-01", "rw-r--r--");
-    file!("IMG_002.jpg", 2, 2800, "2025-08-01", "rw-r--r--");
-    file!("IMG_003.jpg", 2, 4100, "2025-08-02", "rw-r--r--");
-    file!("IMG_004.jpg", 2, 3600, "2025-08-03", "rw-r--r--");
-    file!("IMG_005.jpg", 2, 2950, "2025-08-04", "rw-r--r--");
-    file!("IMG_006.jpg", 2, 5100, "2025-08-05", "rw-r--r--");
-    file!("IMG_007.jpg", 2, 3800, "2025-08-06", "rw-r--r--");
-    file!("IMG_008.jpg", 2, 4200, "2025-08-07", "rw-r--r--");
-    folder!("Panoramas", 2, "2025-08-10");
-    file!("PANO_001.jpg", 3, 12500, "2025-08-02", "rw-r--r--");
-    file!("PANO_002.jpg", 3, 15200, "2025-08-04", "rw-r--r--");
-    file!("PANO_003.jpg", 3, 11800, "2025-08-06", "rw-r--r--");
-    folder!("Events", 1, "2025-11-10");
-    file!("Conference_01.jpg", 2, 2400, "2025-05-15", "rw-r--r--");
-    file!("Conference_02.jpg", 2, 3100, "2025-05-15", "rw-r--r--");
-    file!("Conference_03.jpg", 2, 2700, "2025-05-16", "rw-r--r--");
-    file!("TeamDinner.jpg", 2, 4500, "2025-09-20", "rw-r--r--");
-    file!("Award_Ceremony.jpg", 2, 3800, "2025-11-05", "rw-r--r--");
-    folder!("Screenshots", 1, "2025-12-15");
-    file!("Screen_001.png", 2, 890, "2025-10-01", "rw-r--r--");
-    file!("Screen_002.png", 2, 1200, "2025-10-15", "rw-r--r--");
-    file!("Screen_003.png", 2, 780, "2025-11-01", "rw-r--r--");
-    file!("Screen_004.png", 2, 950, "2025-11-20", "rw-r--r--");
-    file!("Screen_005.png", 2, 1100, "2025-12-10", "rw-r--r--");
-
-    // Projects/
-    folder!("Projects", 0, "2025-12-18");
-    folder!("VolvoxGrid", 1, "2025-12-18");
-    folder!("src", 2, "2025-12-18");
-    file!("main.rs", 3, 12, "2025-12-18", "rw-r--r--");
-    file!("lib.rs", 3, 45, "2025-12-17", "rw-r--r--");
-    file!("grid.rs", 3, 128, "2025-12-16", "rw-r--r--");
-    file!("render.rs", 3, 89, "2025-12-15", "rw-r--r--");
-    file!("cell.rs", 3, 34, "2025-12-14", "rw-r--r--");
-    file!("style.rs", 3, 22, "2025-12-13", "rw-r--r--");
-    folder!("tests", 2, "2025-12-10");
-    file!("test_grid.rs", 3, 56, "2025-12-10", "rw-r--r--");
-    file!("test_render.rs", 3, 78, "2025-12-09", "rw-r--r--");
-    file!("test_edit.rs", 3, 34, "2025-12-08", "rw-r--r--");
-    file!("Cargo.toml", 2, 2, "2025-12-15", "rw-r--r--");
-    file!("README.md", 2, 8, "2025-12-01", "rw-r--r--");
-    folder!("WebApp", 1, "2025-11-25");
-    folder!("src", 2, "2025-11-25");
-    file!("index.ts", 3, 15, "2025-11-25", "rw-r--r--");
-    file!("app.ts", 3, 42, "2025-11-24", "rw-r--r--");
-    file!("style.css", 3, 18, "2025-11-23", "rw-r--r--");
-    folder!("public", 2, "2025-11-20");
-    file!("index.html", 3, 3, "2025-11-20", "rw-r--r--");
-    file!("favicon.ico", 3, 4, "2025-11-01", "rw-r--r--");
-    file!("package.json", 2, 2, "2025-11-15", "rw-r--r--");
-    file!("tsconfig.json", 2, 1, "2025-11-10", "rw-r--r--");
-    folder!("MobileApp", 1, "2025-10-30");
-    folder!("android", 2, "2025-10-30");
-    file!("MainActivity.kt", 3, 28, "2025-10-30", "rw-r--r--");
-    file!("build.gradle.kts", 3, 5, "2025-10-25", "rw-r--r--");
-    folder!("ios", 2, "2025-10-28");
-    file!("AppDelegate.swift", 3, 15, "2025-10-28", "rw-r--r--");
-    file!("ContentView.swift", 3, 22, "2025-10-27", "rw-r--r--");
-
-    // Music/
-    folder!("Music", 0, "2025-09-15");
-    folder!("Classical", 1, "2025-06-01");
-    file!("Bach_BWV1007.flac", 2, 45000, "2025-01-10", "rw-r--r--");
-    file!("Mozart_K545.flac", 2, 38000, "2025-02-15", "rw-r--r--");
-    file!("Beethoven_Op27.flac", 2, 52000, "2025-03-20", "rw-r--r--");
-    folder!("Jazz", 1, "2025-09-15");
-    file!("Blue_Train.flac", 2, 61000, "2025-05-01", "rw-r--r--");
-    file!("Kind_of_Blue.flac", 2, 58000, "2025-06-10", "rw-r--r--");
-    file!("Mingus_Ah_Um.flac", 2, 49000, "2025-07-05", "rw-r--r--");
-    folder!("Playlists", 1, "2025-09-01");
-    file!("WorkFocus.m3u", 2, 2, "2025-08-01", "rw-r--r--");
-    file!("Relaxation.m3u", 2, 3, "2025-08-15", "rw-r--r--");
-    file!("Running.m3u", 2, 2, "2025-09-01", "rw-r--r--");
-
-    // Downloads/
-    folder!("Downloads", 0, "2025-12-20");
-    file!("setup_v3.2.exe", 1, 85000, "2025-12-01", "rw-r--r--");
-    file!("manual.pdf", 1, 12400, "2025-11-15", "rw-r--r--");
-    file!("data_export.csv", 1, 34000, "2025-12-10", "rw-r--r--");
-    file!("wallpaper.jpg", 1, 8900, "2025-10-20", "rw-r--r--");
-    file!("archive_2024.tar.gz", 1, 256000, "2025-01-05", "rw-r--r--");
-    file!("notes.txt", 1, 12, "2025-12-20", "rw-r--r--");
-    file!(
-        "presentation_draft.pptx",
-        1,
-        15600,
-        "2025-12-18",
-        "rw-r--r--"
-    );
-    file!("database_backup.sql", 1, 128000, "2025-12-15", "rw-------");
-
-    // Recycle Bin/
-    folder!("Recycle Bin", 0, "2025-12-19");
-    file!("old_report.docx", 1, 340, "2025-06-01", "rw-------");
-    file!("temp_data.xlsx", 1, 890, "2025-08-10", "rw-------");
-    file!("draft_v1.txt", 1, 15, "2025-09-22", "rw-------");
-
-    entries
+pub fn get_demo_data_response(demo: &str) -> Result<pb::GetDemoDataResponse, String> {
+    let data = embedded_demo_data_bytes(demo)?;
+    Ok(pb::GetDemoDataResponse {
+        demo: demo.to_string(),
+        format: pb::DemoDataFormat::Json as i32,
+        data: data.to_vec(),
+    })
 }
 
 // =====================================================================
@@ -1293,26 +644,6 @@ pub const DEFAULT_PRELOAD_ROWS: i32 = STRESS_PRELOAD_ROWS;
 /// Alias for `STRESS_MATERIALIZE_PADDING`.
 pub const DEFAULT_MATERIALIZE_PADDING: i32 = STRESS_MATERIALIZE_PADDING;
 
-/// Alias: configure grid as stress test.
-pub fn setup_sales_grid(grid: &mut VolvoxGrid) {
-    setup_stress_grid(
-        grid,
-        STRESS_DATA_ROWS,
-        stress_cell_capacity_for_rows(STRESS_DATA_ROWS),
-    );
-}
-
-/// Alias: create a stress test grid.
-pub fn create_sales_grid(
-    id: i64,
-    width: i32,
-    height: i32,
-    data_rows: i32,
-    preload_rows: i32,
-) -> VolvoxGrid {
-    create_stress_grid(id, width, height, data_rows, preload_rows)
-}
-
 /// Alias: materialize a stress test row.
 pub fn materialize_row(grid: &mut VolvoxGrid, row: i32) {
     stress_materialize_row(grid, row);
@@ -1324,104 +655,18 @@ pub fn materialize_visible_rows(grid: &mut VolvoxGrid, padding: i32) {
 }
 
 #[cfg(test)]
+fn demo_fixture_path(name: &str) -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("engine crate should live under the repo root")
+        .join("testdata")
+        .join(name)
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn sales_demo_uses_indicator_headers() {
-        let mut grid = VolvoxGrid::new(1, 960, 540, 1, 1, 0, 0);
-        setup_sales_demo(&mut grid);
-
-        assert_eq!(grid.fixed_rows, 0);
-        assert_eq!(grid.fixed_cols, 0);
-        assert_eq!(grid.columns[0].caption, "Q");
-        assert_eq!(grid.columns[4].caption, "Sales");
-        assert_eq!(grid.columns[7].caption, "Flag");
-        assert_eq!(grid.columns[8].caption, "Status");
-        assert_eq!(
-            grid.columns[7].data_type,
-            pb::ColumnDataType::ColumnDataBoolean as i32
-        );
-        assert!(matches!(
-            grid.cells.get(0, 7).map(|cell| cell.checked()),
-            Some(v)
-                if v == pb::CheckedState::CheckedChecked as i32
-                    || v == pb::CheckedState::CheckedUnchecked as i32
-        ));
-        assert!(grid.indicator_bands.col_top.visible);
-        assert!(grid.indicator_bands.row_start.visible);
-        assert_eq!(grid.indicator_bands.col_top.row_count(), 1);
-        assert_eq!(
-            grid.indicator_bands.row_start.mode_bits,
-            pb::RowIndicatorMode::RowIndicatorNumbers as u32
-        );
-        assert_ne!(grid.cells.get_text(0, 0), "Q");
-        assert_ne!(grid.cells.get_text(0, 4), "Sales");
-    }
-
-    #[test]
-    fn sales_demo_merges_q_and_region_for_q_subtotals_and_grand_total() {
-        let mut grid = VolvoxGrid::new(1, 960, 540, 1, 1, 0, 0);
-        setup_sales_demo(&mut grid);
-
-        let mut merged_subtotal_rows = 0;
-        let mut region_subtotal_rows = 0;
-        for row in grid.fixed_rows..grid.rows {
-            let Some(props) = grid.row_props.get(&row) else {
-                continue;
-            };
-            if !props.is_subtotal {
-                continue;
-            }
-
-            assert_eq!(
-                grid.cells.get(row, 7).map(|cell| cell.checked()),
-                Some(pb::CheckedState::CheckedGrayed as i32)
-            );
-
-            if props.outline_level <= 0 {
-                merged_subtotal_rows += 1;
-                assert_eq!(grid.get_merged_range(row, 0), Some((row, 0, row, 1)));
-                assert_eq!(grid.get_merged_range(row, 1), Some((row, 0, row, 1)));
-            } else {
-                region_subtotal_rows += 1;
-                assert_eq!(grid.get_merged_range(row, 0), None);
-                assert_eq!(grid.get_merged_range(row, 1), None);
-            }
-        }
-
-        assert!(
-            merged_subtotal_rows > 0,
-            "expected Q subtotal and grand-total merges"
-        );
-        assert!(
-            region_subtotal_rows > 0,
-            "expected region subtotal rows to remain unmerged"
-        );
-    }
-
-    #[test]
-    fn hierarchy_demo_hides_row_indicator() {
-        let mut grid = VolvoxGrid::new(1, 960, 540, 1, 1, 0, 0);
-        setup_hierarchy_demo(&mut grid);
-
-        assert_eq!(grid.fixed_rows, 0);
-        assert_eq!(grid.columns[0].caption, "Name");
-        assert_eq!(grid.columns[4].caption, "Permissions");
-        assert_eq!(grid.columns[5].caption, "Action");
-        assert_eq!(
-            grid.columns[5].interaction,
-            pb::CellInteraction::TextLink as i32
-        );
-        assert!(grid.indicator_bands.col_top.visible);
-        assert!(!grid.indicator_bands.row_start.visible);
-        assert_eq!(grid.indicator_bands.col_top.row_count(), 1);
-        assert_eq!(grid.cells.get_text(0, 0), "Documents");
-        assert_ne!(grid.cells.get_text(0, 0), "Name");
-        assert_eq!(grid.cells.get_text(0, 5), "Browse");
-        assert_eq!(grid.cells.get_text(2, 5), "Open");
-        assert_eq!(grid.get_cell_style(0, 5).font_underline, None);
-    }
+    use std::fs;
 
     #[test]
     fn create_stress_grid_uses_zero_based_rows_with_indicator_headers() {
@@ -1468,43 +713,7 @@ mod tests {
     }
 
     #[test]
-    fn demos_apply_theme_palettes_and_scrollbar_styles() {
-        let mut sales = VolvoxGrid::new(1, 960, 540, 1, 1, 0, 0);
-        setup_sales_demo(&mut sales);
-        assert_eq!(sales.style.back_color_fixed, SALES_THEME.fixed_bg);
-        assert_eq!(
-            sales.indicator_bands.col_top.back_color,
-            Some(SALES_THEME.header_bg)
-        );
-        assert_eq!(
-            sales.indicator_bands.row_start.back_color,
-            Some(SALES_THEME.indicator_bg)
-        );
-        assert_eq!(
-            sales.selection.active_cell_style.back_color,
-            Some(0x22000000)
-        );
-        assert_eq!(
-            sales.selection.active_cell_style.border_color,
-            Some(SALES_THEME.accent)
-        );
-        assert_eq!(
-            sales.scrollbar_appearance,
-            pb::ScrollBarAppearance::ScrollbarAppearanceClassic as i32
-        );
-
-        let mut hierarchy = VolvoxGrid::new(2, 960, 540, 1, 1, 0, 0);
-        setup_hierarchy_demo(&mut hierarchy);
-        assert_eq!(hierarchy.style.back_color_fixed, HIERARCHY_THEME.fixed_bg);
-        assert_eq!(
-            hierarchy.indicator_bands.col_top.back_color,
-            Some(HIERARCHY_THEME.header_bg)
-        );
-        assert_eq!(
-            hierarchy.scrollbar_appearance,
-            pb::ScrollBarAppearance::ScrollbarAppearanceModern as i32
-        );
-
+    fn stress_demo_applies_theme_palette_and_scrollbar_style() {
         let mut stress = VolvoxGrid::new(3, 960, 540, 1, 1, 0, 0);
         setup_stress_grid(&mut stress, 128, 2048);
         assert_eq!(stress.style.back_color_fixed, STRESS_THEME.fixed_bg);
@@ -1601,5 +810,22 @@ mod tests {
 
         assert_eq!(grid.col_width(0), expected_width);
         assert!(grid.col_width(0) < sp(&grid, 110));
+    }
+
+    #[test]
+    fn embedded_demo_data_matches_json_fixtures() {
+        let sales_path = super::demo_fixture_path("sales.json");
+        let hierarchy_path = super::demo_fixture_path("hierarchy.json");
+        let sales_expected = fs::read(&sales_path).expect("sales fixture should exist");
+        let hierarchy_expected = fs::read(&hierarchy_path).expect("hierarchy fixture should exist");
+
+        assert_eq!(
+            embedded_demo_data_bytes("sales").expect("sales embedded data should exist"),
+            sales_expected.as_slice()
+        );
+        assert_eq!(
+            embedded_demo_data_bytes("hierarchy").expect("hierarchy embedded data should exist"),
+            hierarchy_expected.as_slice()
+        );
     }
 }

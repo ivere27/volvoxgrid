@@ -25,6 +25,7 @@ use gtk4::{
     ScrolledWindow, Separator, SpinButton,
 };
 use prost::Message;
+use serde::{Deserialize, Serialize};
 
 use ffi::{resolve_default_plugin_path, PluginLibrary, PluginStream};
 use proto::volvoxgrid::v1 as pb;
@@ -36,9 +37,12 @@ const WHEEL_SCROLL_GAIN: f32 = 3.0;
 const DEMO_STRESS: &str = "stress";
 const DEMO_SALES: &str = "sales";
 const DEMO_HIERARCHY: &str = "hierarchy";
+const SALES_DEMO_COLS: i32 = 10;
+const HIERARCHY_DEMO_COLS: i32 = 6;
+const SALES_STATUS_ITEMS: &str = "Active|Pending|Shipped|Returned|Cancelled";
 const SELECTION_MODE_LABELS: [&str; 5] = ["Free", "ByRow", "ByCol", "Listbox", "MultiRange"];
 const FRAME_PACING_LABELS: [&str; 4] = ["Auto", "Platform", "Unlimited", "Fixed"];
-const LAYER_COUNT: usize = 26;
+const LAYER_COUNT: usize = 27;
 const LAYER_LABELS: [&str; LAYER_COUNT] = [
     "Overlay Bands",
     "Indicators",
@@ -65,6 +69,7 @@ const LAYER_LABELS: [&str; LAYER_COUNT] = [
     "Active Dropdown",
     "Scroll Bars",
     "Fast Scroll",
+    "Pull To Refresh",
     "Debug Overlay",
 ];
 const INLINE_EDITOR_CSS: &str = r#"
@@ -105,6 +110,40 @@ button.volvox-demo-active label {
   font-weight: 700;
 }
 "#;
+
+#[derive(Debug, Deserialize)]
+struct HierarchyJsonRow {
+    #[serde(rename = "Name")]
+    name: String,
+    #[serde(rename = "Type")]
+    kind: String,
+    #[serde(rename = "Size")]
+    size: String,
+    #[serde(rename = "Modified")]
+    modified: String,
+    #[serde(rename = "Permissions")]
+    permissions: String,
+    #[serde(rename = "Action")]
+    action: String,
+    #[serde(rename = "_level")]
+    level: i32,
+}
+
+#[derive(Serialize)]
+struct HierarchyLoadRow<'a> {
+    #[serde(rename = "Name")]
+    name: &'a str,
+    #[serde(rename = "Type")]
+    kind: &'a str,
+    #[serde(rename = "Size")]
+    size: &'a str,
+    #[serde(rename = "Modified")]
+    modified: &'a str,
+    #[serde(rename = "Permissions")]
+    permissions: &'a str,
+    #[serde(rename = "Action")]
+    action: &'a str,
+}
 
 #[derive(Clone)]
 struct VolvoxServiceClient {
@@ -406,7 +445,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         .map(|handle| handle.id)
         .ok_or_else(|| "plugin returned no grid handle".to_string())?;
     apply_initial_config_for_grid(&client, sales_grid_id, false)?;
-    client.load_demo(sales_grid_id, DEMO_SALES)?;
+    load_sales_json_demo(&client, sales_grid_id)?;
 
     let render_stream = client.open_render_session()?;
     let event_stream = client.open_event_stream(sales_grid_id)?;
@@ -1613,6 +1652,80 @@ impl VolvoxServiceClient {
         Ok(())
     }
 
+    fn get_demo_data(&self, demo: &str) -> Result<Vec<u8>, String> {
+        let response: pb::GetDemoDataResponse = self.invoke(
+            "/volvoxgrid.v1.VolvoxGridService/GetDemoData",
+            &pb::GetDemoDataRequest {
+                demo: demo.to_string(),
+            },
+        )?;
+        Ok(response.data)
+    }
+
+    fn get_cell_text(&self, grid_id: i64, row: i32, col: i32) -> Result<String, String> {
+        let response: pb::CellsResponse = self.invoke(
+            "/volvoxgrid.v1.VolvoxGridService/GetCells",
+            &pb::GetCellsRequest {
+                grid_id,
+                row1: row,
+                col1: col,
+                row2: row,
+                col2: col,
+                include_style: false,
+                include_checked: false,
+                include_typed: true,
+            },
+        )?;
+        Ok(response
+            .cells
+            .first()
+            .and_then(|cell| cell.value.as_ref())
+            .and_then(|value| match value.value.as_ref() {
+                Some(pb::cell_value::Value::Text(text)) => Some(text.clone()),
+                Some(pb::cell_value::Value::Number(number)) => Some(number.to_string()),
+                Some(pb::cell_value::Value::Flag(flag)) => {
+                    Some(if *flag { "true" } else { "false" }.to_string())
+                }
+                Some(pb::cell_value::Value::Timestamp(ts)) => Some(ts.to_string()),
+                _ => None,
+            })
+            .unwrap_or_default())
+    }
+
+    fn get_node(&self, grid_id: i64, row: i32) -> Result<pb::NodeInfo, String> {
+        self.invoke(
+            "/volvoxgrid.v1.VolvoxGridService/GetNode",
+            &pb::GetNodeRequest {
+                grid_id,
+                row,
+                relation: None,
+            },
+        )
+    }
+
+    fn merge_cells(
+        &self,
+        grid_id: i64,
+        row1: i32,
+        col1: i32,
+        row2: i32,
+        col2: i32,
+    ) -> Result<(), String> {
+        let _: pb::Empty = self.invoke(
+            "/volvoxgrid.v1.VolvoxGridService/MergeCells",
+            &pb::MergeCellsRequest {
+                grid_id,
+                range: Some(pb::CellRange {
+                    row1,
+                    col1,
+                    row2,
+                    col2,
+                }),
+            },
+        )?;
+        Ok(())
+    }
+
     fn refresh(&self, grid_id: i64) -> Result<(), String> {
         let _: pb::Empty = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Refresh",
@@ -1828,14 +1941,84 @@ impl VolvoxServiceClient {
     }
 
     fn load_data(&self, grid_id: i64, data: Vec<u8>) -> Result<pb::LoadDataResult, String> {
+        self.load_data_with_options(grid_id, data, None)
+    }
+
+    fn load_data_with_options(
+        &self,
+        grid_id: i64,
+        data: Vec<u8>,
+        options: Option<pb::LoadDataOptions>,
+    ) -> Result<pb::LoadDataResult, String> {
         self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/LoadData",
             &pb::LoadDataRequest {
                 grid_id,
                 data,
-                options: None,
+                options,
             },
         )
+    }
+
+    fn define_columns(&self, grid_id: i64, columns: Vec<pb::ColumnDef>) -> Result<(), String> {
+        let _: pb::Empty = self.invoke(
+            "/volvoxgrid.v1.VolvoxGridService/DefineColumns",
+            &pb::DefineColumnsRequest { grid_id, columns },
+        )?;
+        Ok(())
+    }
+
+    fn define_rows(&self, grid_id: i64, rows: Vec<pb::RowDef>) -> Result<(), String> {
+        let _: pb::Empty = self.invoke(
+            "/volvoxgrid.v1.VolvoxGridService/DefineRows",
+            &pb::DefineRowsRequest { grid_id, rows },
+        )?;
+        Ok(())
+    }
+
+    fn update_cells(
+        &self,
+        grid_id: i64,
+        cells: Vec<pb::CellUpdate>,
+        atomic: bool,
+    ) -> Result<(), String> {
+        let _: pb::WriteResult = self.invoke(
+            "/volvoxgrid.v1.VolvoxGridService/UpdateCells",
+            &pb::UpdateCellsRequest {
+                grid_id,
+                cells,
+                atomic,
+            },
+        )?;
+        Ok(())
+    }
+
+    fn subtotal(
+        &self,
+        grid_id: i64,
+        aggregate: pb::AggregateType,
+        group_on_col: i32,
+        aggregate_col: i32,
+        caption: &str,
+        background: u32,
+        foreground: u32,
+        add_outline: bool,
+    ) -> Result<(), String> {
+        let _: pb::SubtotalResult = self.invoke(
+            "/volvoxgrid.v1.VolvoxGridService/Subtotal",
+            &pb::SubtotalRequest {
+                grid_id,
+                aggregate: aggregate as i32,
+                group_on_col,
+                aggregate_col,
+                caption: caption.to_string(),
+                background,
+                foreground,
+                add_outline,
+                font: None,
+            },
+        )?;
+        Ok(())
     }
 
     fn clipboard_copy(&self, grid_id: i64) -> Result<pb::ClipboardResponse, String> {
@@ -2029,6 +2212,828 @@ fn apply_host_runtime_config(state: &State, grid_id: i64) -> Result<(), String> 
     Ok(())
 }
 
+fn sales_highlight_style(
+    background: u32,
+    foreground: Option<u32>,
+    border_style: Option<i32>,
+    border_color: Option<u32>,
+) -> pb::HighlightStyle {
+    pb::HighlightStyle {
+        background: Some(background),
+        foreground,
+        borders: match (border_style, border_color) {
+            (Some(style), Some(color)) => Some(pb::Borders {
+                all: Some(pb::Border {
+                    style: Some(style),
+                    color: Some(color),
+                }),
+                ..Default::default()
+            }),
+            _ => None,
+        },
+        ..Default::default()
+    }
+}
+
+fn sales_theme_config() -> pb::GridConfig {
+    pb::GridConfig {
+        layout: Some(pb::LayoutConfig {
+            fixed_rows: Some(0),
+            ..Default::default()
+        }),
+        style: Some(pb::StyleConfig {
+            background: Some(0xFFFFFFFF),
+            foreground: Some(0xFF111827),
+            alternate_background: Some(0xFFF9FAFB),
+            progress_color: Some(0xFF818CF8),
+            sheet_background: Some(0xFFFAFAFB),
+            sheet_border: Some(0xFFD1D5DB),
+            grid_lines: Some(pb::GridLines {
+                style: Some(pb::GridLineStyle::GridlineSolid as i32),
+                color: Some(0xFFE5E7EB),
+                ..Default::default()
+            }),
+            fixed: Some(pb::RegionStyle {
+                background: Some(0xFFF3F4F6),
+                foreground: Some(0xFF374151),
+                grid_lines: Some(pb::GridLines {
+                    style: Some(pb::GridLineStyle::GridlineSolid as i32),
+                    color: Some(0xFFD1D5DB),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            frozen: Some(pb::RegionStyle {
+                background: Some(0xFFFFFFFF),
+                foreground: Some(0xFF111827),
+                grid_lines: Some(pb::GridLines {
+                    style: Some(pb::GridLineStyle::GridlineSolid as i32),
+                    color: Some(0xFFD1D5DB),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            header: Some(pb::HeaderStyle {
+                separator: Some(pb::HeaderSeparator {
+                    enabled: Some(true),
+                    color: Some(0xFFD1D5DB),
+                    width: Some(1),
+                    ..Default::default()
+                }),
+                resize_handle: Some(pb::HeaderResizeHandle {
+                    enabled: Some(true),
+                    color: Some(0xFFD1D5DB),
+                    width: Some(1),
+                    hit_width: Some(6),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+        selection: Some(pb::SelectionConfig {
+            mode: Some(pb::SelectionMode::SelectionFree as i32),
+            style: Some(pb::HighlightStyle {
+                background: Some(0xFF6366F1),
+                foreground: Some(0xFFFFFFFF),
+                fill_handle: Some(pb::FillHandlePosition::FillHandleNone as i32),
+                fill_handle_color: Some(0xFF818CF8),
+                ..Default::default()
+            }),
+            active_cell_style: Some(sales_highlight_style(
+                0x22000000,
+                Some(0xFFFFFFFF),
+                Some(pb::BorderStyle::BorderThick as i32),
+                Some(0xFF818CF8),
+            )),
+            hover: Some(pb::HoverConfig {
+                row: Some(true),
+                column: Some(true),
+                cell: Some(true),
+                row_style: Some(sales_highlight_style(0x106366F1, None, None, None)),
+                column_style: Some(sales_highlight_style(0x106366F1, None, None, None)),
+                cell_style: Some(sales_highlight_style(
+                    0x1E818CF8,
+                    None,
+                    Some(pb::BorderStyle::BorderThin as i32),
+                    Some(0xFF818CF8),
+                )),
+            }),
+            ..Default::default()
+        }),
+        editing: Some(pb::EditConfig {
+            trigger: Some(pb::EditTrigger::None as i32),
+            tab_behavior: Some(pb::TabBehavior::TabCells as i32),
+            dropdown_trigger: Some(pb::DropdownTrigger::DropdownAlways as i32),
+            dropdown_search: Some(false),
+            ..Default::default()
+        }),
+        scrolling: Some(pb::ScrollConfig {
+            scrollbars: Some(pb::ScrollBarsMode::ScrollbarBoth as i32),
+            fling_enabled: Some(true),
+            fling_impulse_gain: Some(220.0),
+            fling_friction: Some(0.9),
+            ..Default::default()
+        }),
+        outline: Some(pb::OutlineConfig {
+            tree_indicator: Some(pb::TreeIndicatorStyle::TreeIndicatorNone as i32),
+            tree_color: Some(0xFF9CA3AF),
+            group_total_position: Some(pb::GroupTotalPosition::GroupTotalBelow as i32),
+            multi_totals: Some(true),
+            ..Default::default()
+        }),
+        span: Some(pb::SpanConfig {
+            cell_span: Some(pb::CellSpanMode::CellSpanAdjacent as i32),
+            cell_span_fixed: Some(pb::CellSpanMode::CellSpanNone as i32),
+            cell_span_compare: Some(1),
+            ..Default::default()
+        }),
+        interaction: Some(pb::InteractionConfig {
+            resize: Some(pb::ResizePolicy {
+                columns: Some(true),
+                rows: Some(true),
+                ..Default::default()
+            }),
+            freeze: Some(pb::FreezePolicy {
+                columns: Some(true),
+                rows: Some(true),
+                ..Default::default()
+            }),
+            auto_size_mouse: Some(true),
+            header_features: Some(pb::HeaderFeatures {
+                sort: Some(true),
+                reorder: Some(true),
+                chooser: Some(false),
+            }),
+            ..Default::default()
+        }),
+        indicators: Some(pb::IndicatorsConfig {
+            row_start: Some(pb::RowIndicatorConfig {
+                visible: Some(true),
+                width: Some(40),
+                mode_bits: Some(pb::RowIndicatorMode::RowIndicatorNumbers as u32),
+                background: Some(0xFFF9FAFB),
+                foreground: Some(0xFF6B7280),
+                grid_color: Some(0xFFD1D5DB),
+                allow_resize: Some(true),
+                ..Default::default()
+            }),
+            col_top: Some(pb::ColIndicatorConfig {
+                visible: Some(true),
+                default_row_height: Some(28),
+                band_rows: Some(1),
+                mode_bits: Some(
+                    (pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32)
+                        | (pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32),
+                ),
+                background: Some(0xFFF9FAFB),
+                foreground: Some(0xFF111827),
+                grid_color: Some(0xFFD1D5DB),
+                allow_resize: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+fn hierarchy_theme_config() -> pb::GridConfig {
+    pb::GridConfig {
+        layout: Some(pb::LayoutConfig {
+            fixed_rows: Some(0),
+            ..Default::default()
+        }),
+        style: Some(pb::StyleConfig {
+            background: Some(0xFFFFFFFF),
+            foreground: Some(0xFF1C1917),
+            alternate_background: Some(0xFFF5F5F4),
+            progress_color: Some(0xFFF59E0B),
+            sheet_background: Some(0xFFFAFAF9),
+            sheet_border: Some(0xFFD6D3D1),
+            grid_lines: Some(pb::GridLines {
+                style: Some(pb::GridLineStyle::GridlineSolid as i32),
+                color: Some(0xFFE7E5E4),
+                ..Default::default()
+            }),
+            fixed: Some(pb::RegionStyle {
+                background: Some(0xFFF5F5F4),
+                foreground: Some(0xFF44403C),
+                grid_lines: Some(pb::GridLines {
+                    style: Some(pb::GridLineStyle::GridlineSolid as i32),
+                    color: Some(0xFFD6D3D1),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            frozen: Some(pb::RegionStyle {
+                background: Some(0xFFFFFFFF),
+                foreground: Some(0xFF1C1917),
+                grid_lines: Some(pb::GridLines {
+                    style: Some(pb::GridLineStyle::GridlineSolid as i32),
+                    color: Some(0xFFD6D3D1),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            header: Some(pb::HeaderStyle {
+                separator: Some(pb::HeaderSeparator {
+                    enabled: Some(true),
+                    color: Some(0xFFD6D3D1),
+                    width: Some(1),
+                    ..Default::default()
+                }),
+                resize_handle: Some(pb::HeaderResizeHandle {
+                    enabled: Some(true),
+                    color: Some(0xFFD6D3D1),
+                    width: Some(1),
+                    hit_width: Some(6),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+        selection: Some(pb::SelectionConfig {
+            mode: Some(pb::SelectionMode::SelectionFree as i32),
+            style: Some(pb::HighlightStyle {
+                background: Some(0xFFD97706),
+                foreground: Some(0xFFFFFFFF),
+                fill_handle: Some(pb::FillHandlePosition::FillHandleNone as i32),
+                fill_handle_color: Some(0xFFF59E0B),
+                ..Default::default()
+            }),
+            active_cell_style: Some(sales_highlight_style(
+                0x22000000,
+                Some(0xFFFFFFFF),
+                Some(pb::BorderStyle::BorderThick as i32),
+                Some(0xFFF59E0B),
+            )),
+            hover: Some(pb::HoverConfig {
+                cell: Some(true),
+                cell_style: Some(sales_highlight_style(
+                    0x1AD97706,
+                    None,
+                    Some(pb::BorderStyle::BorderThin as i32),
+                    Some(0xFFF59E0B),
+                )),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+        editing: Some(pb::EditConfig {
+            trigger: Some(pb::EditTrigger::None as i32),
+            tab_behavior: Some(pb::TabBehavior::TabCells as i32),
+            dropdown_trigger: Some(pb::DropdownTrigger::DropdownNever as i32),
+            ..Default::default()
+        }),
+        scrolling: Some(pb::ScrollConfig {
+            scrollbars: Some(pb::ScrollBarsMode::ScrollbarBoth as i32),
+            fling_enabled: Some(true),
+            fling_impulse_gain: Some(220.0),
+            fling_friction: Some(0.9),
+            ..Default::default()
+        }),
+        outline: Some(pb::OutlineConfig {
+            tree_indicator: Some(pb::TreeIndicatorStyle::TreeIndicatorArrowsLeaf as i32),
+            tree_column: Some(0),
+            tree_color: Some(0xFFA8A29E),
+            ..Default::default()
+        }),
+        interaction: Some(pb::InteractionConfig {
+            resize: Some(pb::ResizePolicy {
+                columns: Some(true),
+                rows: Some(true),
+                ..Default::default()
+            }),
+            freeze: Some(pb::FreezePolicy {
+                columns: Some(true),
+                rows: Some(true),
+                ..Default::default()
+            }),
+            auto_size_mouse: Some(true),
+            header_features: Some(pb::HeaderFeatures {
+                sort: Some(false),
+                reorder: Some(false),
+                chooser: Some(false),
+            }),
+            ..Default::default()
+        }),
+        indicators: Some(pb::IndicatorsConfig {
+            row_start: Some(pb::RowIndicatorConfig {
+                visible: Some(false),
+                ..Default::default()
+            }),
+            col_top: Some(pb::ColIndicatorConfig {
+                visible: Some(true),
+                default_row_height: Some(28),
+                band_rows: Some(1),
+                mode_bits: Some(pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32),
+                background: Some(0xFFFAFAF9),
+                foreground: Some(0xFF1C1917),
+                grid_color: Some(0xFFD6D3D1),
+                allow_resize: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<(), String> {
+    client.configure(
+        grid_id,
+        pb::GridConfig {
+            layout: Some(pb::LayoutConfig {
+                cols: Some(SALES_DEMO_COLS),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    )?;
+    client.define_columns(
+        grid_id,
+        vec![
+            pb::ColumnDef {
+                index: 0,
+                width: Some(40),
+                caption: Some("Q".to_string()),
+                key: Some("Q".to_string()),
+                align: Some(pb::Align::CenterCenter as i32),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 1,
+                width: Some(80),
+                caption: Some("Region".to_string()),
+                key: Some("Region".to_string()),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 2,
+                width: Some(100),
+                caption: Some("Category".to_string()),
+                key: Some("Category".to_string()),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 3,
+                width: Some(120),
+                caption: Some("Product".to_string()),
+                key: Some("Product".to_string()),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 4,
+                width: Some(90),
+                caption: Some("Sales".to_string()),
+                key: Some("Sales".to_string()),
+                align: Some(pb::Align::RightCenter as i32),
+                data_type: Some(pb::ColumnDataType::ColumnDataCurrency as i32),
+                format: Some("$#,##0".to_string()),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 5,
+                width: Some(90),
+                caption: Some("Cost".to_string()),
+                key: Some("Cost".to_string()),
+                align: Some(pb::Align::RightCenter as i32),
+                data_type: Some(pb::ColumnDataType::ColumnDataCurrency as i32),
+                format: Some("$#,##0".to_string()),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 6,
+                width: Some(70),
+                caption: Some("Margin%".to_string()),
+                key: Some("Margin".to_string()),
+                align: Some(pb::Align::CenterCenter as i32),
+                data_type: Some(pb::ColumnDataType::ColumnDataNumber as i32),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 7,
+                width: Some(56),
+                caption: Some("Flag".to_string()),
+                key: Some("Flag".to_string()),
+                align: Some(pb::Align::CenterCenter as i32),
+                data_type: Some(pb::ColumnDataType::ColumnDataBoolean as i32),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 8,
+                width: Some(80),
+                caption: Some("Status".to_string()),
+                key: Some("Status".to_string()),
+                dropdown_items: Some(SALES_STATUS_ITEMS.to_string()),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 9,
+                width: Some(140),
+                caption: Some("Notes".to_string()),
+                key: Some("Notes".to_string()),
+                ..Default::default()
+            },
+        ],
+    )?;
+    let result = client.load_data_with_options(
+        grid_id,
+        client.get_demo_data(DEMO_SALES)?,
+        Some(pb::LoadDataOptions {
+            auto_create_columns: Some(false),
+            ..Default::default()
+        }),
+    )?;
+    if result.status == pb::LoadDataStatus::LoadFailed as i32 {
+        return Err("LoadData failed for embedded sales demo".to_string());
+    }
+    client.define_columns(
+        grid_id,
+        vec![
+            pb::ColumnDef {
+                index: 7,
+                align: Some(pb::Align::CenterCenter as i32),
+                data_type: Some(pb::ColumnDataType::ColumnDataBoolean as i32),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 8,
+                dropdown_items: Some(SALES_STATUS_ITEMS.to_string()),
+                ..Default::default()
+            },
+        ],
+    )?;
+    client.configure(grid_id, sales_theme_config())?;
+
+    client.subtotal(grid_id, pb::AggregateType::AggClear, 0, 0, "", 0, 0, false)?;
+    client.subtotal(
+        grid_id,
+        pb::AggregateType::AggSum,
+        -1,
+        4,
+        "Grand Total",
+        0xFFEEF2FF,
+        0xFF111827,
+        true,
+    )?;
+    client.subtotal(
+        grid_id,
+        pb::AggregateType::AggSum,
+        0,
+        4,
+        "",
+        0xFFF5F3FF,
+        0xFF111827,
+        true,
+    )?;
+    client.subtotal(
+        grid_id,
+        pb::AggregateType::AggSum,
+        1,
+        4,
+        "",
+        0xFFF8F7FF,
+        0xFF111827,
+        true,
+    )?;
+    client.subtotal(
+        grid_id,
+        pb::AggregateType::AggSum,
+        -1,
+        5,
+        "Grand Total",
+        0xFFEEF2FF,
+        0xFF111827,
+        true,
+    )?;
+    client.subtotal(
+        grid_id,
+        pb::AggregateType::AggSum,
+        0,
+        5,
+        "",
+        0xFFF5F3FF,
+        0xFF111827,
+        true,
+    )?;
+    client.subtotal(
+        grid_id,
+        pb::AggregateType::AggSum,
+        1,
+        5,
+        "",
+        0xFFF8F7FF,
+        0xFF111827,
+        true,
+    )?;
+    apply_sales_subtotal_decorations(client, grid_id)?;
+    Ok(())
+}
+
+fn apply_sales_subtotal_decorations(
+    client: &VolvoxServiceClient,
+    grid_id: i64,
+) -> Result<(), String> {
+    const SALES_MARGIN_PROGRESS_COLOR: u32 = 0xFF818CF8;
+
+    client.define_columns(
+        grid_id,
+        vec![
+            pb::ColumnDef {
+                index: 0,
+                span: Some(true),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 1,
+                span: Some(true),
+                ..Default::default()
+            },
+        ],
+    )?;
+
+    let total_rows = client
+        .get_config(grid_id)?
+        .layout
+        .and_then(|layout| layout.rows)
+        .unwrap_or(0);
+    let mut updates = Vec::new();
+    for row in 0..total_rows {
+        let product = client.get_cell_text(grid_id, row, 3)?;
+        let sales = client.get_cell_text(grid_id, row, 4)?;
+        let cost = client.get_cell_text(grid_id, row, 5)?;
+        let is_subtotal = product.is_empty() && (!sales.is_empty() || !cost.is_empty());
+        if !is_subtotal {
+            let margin = parse_sales_margin_percent(&client.get_cell_text(grid_id, row, 6)?);
+            updates.push(pb::CellUpdate {
+                row,
+                col: 6,
+                value: None,
+                checked: None,
+                style: Some(pb::CellStyle {
+                    progress: Some((margin / 100.0).clamp(0.0, 1.0)),
+                    progress_color: Some(SALES_MARGIN_PROGRESS_COLOR),
+                    ..Default::default()
+                }),
+                picture: None,
+                picture_align: None,
+                button_picture: None,
+                dropdown_items: None,
+                sticky_row: None,
+                sticky_col: None,
+                interaction: None,
+            });
+            let flagged = parse_sales_flag(&client.get_cell_text(grid_id, row, 7)?);
+            updates.push(pb::CellUpdate {
+                row,
+                col: 7,
+                value: Some(pb::CellValue {
+                    value: Some(pb::cell_value::Value::Flag(flagged)),
+                }),
+                checked: Some(if flagged {
+                    pb::CheckedState::CheckedChecked as i32
+                } else {
+                    pb::CheckedState::CheckedUnchecked as i32
+                }),
+                style: None,
+                picture: None,
+                picture_align: None,
+                button_picture: None,
+                dropdown_items: None,
+                sticky_row: None,
+                sticky_col: None,
+                interaction: None,
+            });
+            updates.push(pb::CellUpdate {
+                row,
+                col: 8,
+                value: None,
+                checked: None,
+                style: None,
+                picture: None,
+                picture_align: None,
+                button_picture: None,
+                dropdown_items: Some(SALES_STATUS_ITEMS.to_string()),
+                sticky_row: None,
+                sticky_col: None,
+                interaction: None,
+            });
+            continue;
+        }
+        if sales.is_empty() && cost.is_empty() {
+            continue;
+        }
+
+        updates.push(pb::CellUpdate {
+            row,
+            col: 7,
+            value: Some(pb::CellValue {
+                value: Some(pb::cell_value::Value::Flag(false)),
+            }),
+            checked: Some(pb::CheckedState::CheckedGrayed as i32),
+            style: None,
+            picture: None,
+            picture_align: None,
+            button_picture: None,
+            dropdown_items: None,
+            sticky_row: None,
+            sticky_col: None,
+            interaction: None,
+        });
+
+        let sales_value = sales.trim().parse::<i64>().unwrap_or(0);
+        let cost_value = cost.trim().parse::<i64>().unwrap_or(0);
+        let margin = if sales_value > 0 {
+            ((sales_value - cost_value) as f64 * 100.0) / sales_value as f64
+        } else {
+            0.0
+        };
+        updates.push(pb::CellUpdate {
+            row,
+            col: 6,
+            value: Some(pb::CellValue {
+                value: Some(pb::cell_value::Value::Text(format!("{margin:.1}"))),
+            }),
+            style: Some(pb::CellStyle {
+                progress: Some(((margin / 100.0) as f32).clamp(0.0, 1.0)),
+                progress_color: Some(SALES_MARGIN_PROGRESS_COLOR),
+                ..Default::default()
+            }),
+            checked: None,
+            picture: None,
+            picture_align: None,
+            button_picture: None,
+            dropdown_items: None,
+            sticky_row: None,
+            sticky_col: None,
+            interaction: None,
+        });
+
+        if client.get_node(grid_id, row)?.level <= 0 {
+            client.merge_cells(grid_id, row, 0, row, 1)?;
+        }
+    }
+
+    if !updates.is_empty() {
+        client.update_cells(grid_id, updates, false)?;
+    }
+    Ok(())
+}
+
+fn parse_sales_flag(text: &str) -> bool {
+    matches!(
+        text.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "y" | "on" | "checked"
+    )
+}
+
+fn parse_sales_margin_percent(text: &str) -> f32 {
+    text.trim().replace(',', "").parse::<f32>().unwrap_or(0.0)
+}
+
+fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<(), String> {
+    client.configure(
+        grid_id,
+        pb::GridConfig {
+            layout: Some(pb::LayoutConfig {
+                cols: Some(HIERARCHY_DEMO_COLS),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    )?;
+    let raw_json = client.get_demo_data(DEMO_HIERARCHY)?;
+    let rows: Vec<HierarchyJsonRow> = serde_json::from_slice(&raw_json)
+        .map_err(|err| format!("embedded hierarchy demo parse failed: {err}"))?;
+    let load_rows: Vec<HierarchyLoadRow<'_>> = rows
+        .iter()
+        .map(|row| HierarchyLoadRow {
+            name: &row.name,
+            kind: &row.kind,
+            size: &row.size,
+            modified: &row.modified,
+            permissions: &row.permissions,
+            action: &row.action,
+        })
+        .collect();
+    let load_data = serde_json::to_vec(&load_rows)
+        .map_err(|err| format!("embedded hierarchy demo encode failed: {err}"))?;
+    client.define_columns(
+        grid_id,
+        vec![
+            pb::ColumnDef {
+                index: 0,
+                width: Some(260),
+                caption: Some("Name".to_string()),
+                key: Some("Name".to_string()),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 1,
+                width: Some(80),
+                caption: Some("Type".to_string()),
+                key: Some("Type".to_string()),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 2,
+                width: Some(80),
+                caption: Some("Size".to_string()),
+                key: Some("Size".to_string()),
+                align: Some(pb::Align::RightCenter as i32),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 3,
+                width: Some(120),
+                caption: Some("Modified".to_string()),
+                key: Some("Modified".to_string()),
+                data_type: Some(pb::ColumnDataType::ColumnDataDate as i32),
+                format: Some("short date".to_string()),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 4,
+                width: Some(100),
+                caption: Some("Permissions".to_string()),
+                key: Some("Permissions".to_string()),
+                align: Some(pb::Align::CenterCenter as i32),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 5,
+                width: Some(92),
+                caption: Some("Action".to_string()),
+                key: Some("Action".to_string()),
+                align: Some(pb::Align::CenterCenter as i32),
+                interaction: Some(pb::CellInteraction::TextLink as i32),
+                ..Default::default()
+            },
+        ],
+    )?;
+    let result = client.load_data_with_options(
+        grid_id,
+        load_data,
+        Some(pb::LoadDataOptions {
+            auto_create_columns: Some(false),
+            ..Default::default()
+        }),
+    )?;
+    if result.status == pb::LoadDataStatus::LoadFailed as i32 {
+        return Err("LoadData failed for embedded hierarchy demo".to_string());
+    }
+
+    client.configure(grid_id, hierarchy_theme_config())?;
+
+    client.define_rows(
+        grid_id,
+        rows.iter()
+            .enumerate()
+            .map(|(index, row)| pb::RowDef {
+                index: index as i32,
+                outline_level: Some(row.level),
+                is_subtotal: Some(row.kind == "Folder"),
+                ..Default::default()
+            })
+            .collect(),
+    )?;
+
+    let action_style = pb::CellStyle {
+        foreground: Some(0xFF2563EB),
+        ..Default::default()
+    };
+    let folder_style = pb::CellStyle {
+        foreground: Some(0xFF92400E),
+        font: Some(pb::Font {
+            bold: Some(true),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let mut cells = Vec::with_capacity(rows.len() * 2);
+    for (index, row) in rows.iter().enumerate() {
+        cells.push(pb::CellUpdate {
+            row: index as i32,
+            col: 5,
+            style: Some(action_style.clone()),
+            ..Default::default()
+        });
+        if row.kind == "Folder" {
+            cells.push(pb::CellUpdate {
+                row: index as i32,
+                col: 0,
+                style: Some(folder_style.clone()),
+                ..Default::default()
+            });
+        }
+    }
+    client.update_cells(grid_id, cells, true)?;
+    Ok(())
+}
+
 fn ensure_demo_grid(state: &mut State, demo: &str) -> Result<(i64, bool), String> {
     if let Some(&grid_id) = state.grid_sessions.get(demo) {
         return Ok((grid_id, false));
@@ -2108,7 +3113,13 @@ fn switch_demo_session(
         attach_grid_session(state, grid_id)?;
     }
     if created {
-        state.client.load_demo(grid_id, demo)?;
+        if demo == DEMO_SALES {
+            load_sales_json_demo(&state.client, grid_id)?;
+        } else if demo == DEMO_HIERARCHY {
+            load_hierarchy_json_demo(&state.client, grid_id)?;
+        } else {
+            state.client.load_demo(grid_id, demo)?;
+        }
     }
     apply_host_runtime_config(state, grid_id)?;
     state.client.refresh(grid_id)?;

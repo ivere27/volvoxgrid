@@ -168,7 +168,7 @@ declare module "volvoxgrid" {
     italic?: boolean;
     underline?: boolean;
     strikethrough?: boolean;
-    width?: number;
+    stretch?: number;
   }
 
   export interface VolvoxGridBorder {

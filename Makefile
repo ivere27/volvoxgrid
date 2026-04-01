@@ -4,6 +4,7 @@
 # Usage:
 #   make              — build engine + host plugin
 #   make run          — build & run smoke test (Rust host loads host plugin, creates grid)
+#   make test_pixel   — run engine pixel regression tests
 #   make wasm         — build WASM crate
 #   make web          — build WASM + start web dev server
 #   make codegen      — regenerate FFI bindings for all languages
@@ -17,7 +18,7 @@
 # Variables
 # =============================================================================
 SYNURANG_MODULE ?= github.com/ivere27/synurang
-SYNURANG_VERSION ?= v0.5.5
+SYNURANG_VERSION ?= v0.5.6
 PROTOC_PLUGIN ?= $(shell command -v protoc-gen-synurang-ffi 2>/dev/null)
 ifeq ($(strip $(PROTOC_PLUGIN)),)
 PROTOC_PLUGIN := $(shell go env GOPATH 2>/dev/null)/bin/protoc-gen-synurang-ffi
@@ -115,8 +116,10 @@ AAR_DOCKER_IMAGE ?= volvoxgrid-android-aar:latest
 AAR_VERSION ?= $(VOLVOXGRID_VERSION)
 AAR_GROUP_ID ?= io.github.ivere27
 AAR_ARTIFACT_ID ?= volvoxgrid-android
+AAR_DEBUG_ARTIFACT_ID ?= $(AAR_ARTIFACT_ID)-debug
 AAR_LITE_GROUP_ID ?= $(AAR_GROUP_ID)
 AAR_LITE_ARTIFACT_ID ?= volvoxgrid-android-lite
+AAR_LITE_DEBUG_ARTIFACT_ID ?= $(AAR_LITE_ARTIFACT_ID)-debug
 AAR_GIT_COMMIT ?= $(shell git -C "$(CURRENT_DIR)" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 AAR_BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 AAR_ANDROID_ABIS ?= arm64-v8a,armeabi-v7a
@@ -198,7 +201,7 @@ JAVA_DESKTOP_PLUGIN_RELEASE_ARG := --args="$(JAVA_DESKTOP_PLUGIN_RELEASE)"
 endif
 
 .PHONY: all build engine host-plugin java-host-plugin plugin engine-release host-plugin-release java-host-plugin-release release \
-                build_plugin run run-release test wasm wasm-lite wasm-threaded web web-lite doom-deps \
+                build_plugin run run-release test test_pixel wasm wasm-lite wasm-threaded web web-lite doom-deps \
         codegen \
         android android-build \
         android-plugin android-plugin-release android-install android-install-release android-run android-run-release flutter flutter-setup \
@@ -225,7 +228,7 @@ all: build
 help:
 	@echo "VolvoxGrid Makefile targets:"
 	@echo ""
-	@echo "  build_plugin   Install protoc-gen-synurang-ffi (requires Go)"
+	@echo "  build_plugin   Install protoc-gen-synurang-ffi from GitHub (requires Go)"
 	@echo "  build          Build engine + host-plugin (debug)"
 	@echo "  release        Build engine + host-plugin (release, optimized)"
 	@echo "  host-plugin    Build host (desktop) plugin crate (debug)"
@@ -235,6 +238,7 @@ help:
 	@echo "  run            Build & run smoke test (debug)"
 	@echo "  run-release    Build & run smoke test (release)"
 	@echo "  test           Run engine unit tests"
+	@echo "  test_pixel     Run engine pixel regression tests"
 	@echo "  wasm           Build WASM crate (requires wasm-pack)"
 	@echo "  wasm-lite      Build WASM crate without cosmic-text/gpu (~1MB)"
 	@echo "  wasm-threaded  Build WASM crate with threads/atomics (requires COOP+COEP at runtime)"
@@ -251,7 +255,8 @@ help:
 	@echo "    activex-run option: ACTIVEX_ARCH=i686|x86_64"
 	@echo "  android        Build AAR, install example app, and launch on device"
 	@echo "  android-build  Build Android AAR only (requires Android SDK)"
-	@echo "  android-plugin Build/copy Android plugin .so into example jniLibs"
+	@echo "  android-plugin Build debug Android plugin .so for Flutter jniLibs and package debug fat AAR"
+	@echo "  android-plugin-release Build release plugin .so and package release fat AAR"
 	@echo "  android-run    Install and launch Android example app on device"
 	@echo "  android-run-release  Build release plugin, install debug app, and launch on device"
 	@echo "  flutter        Build Flutter example (requires Flutter SDK)"
@@ -357,6 +362,11 @@ test:
 	cd engine && cargo test $(CARGO_JOBS_FLAG) --features gpu
 	@echo "Tests complete."
 
+test_pixel:
+	@echo "Running engine pixel regression tests..."
+	cargo test $(CARGO_JOBS_FLAG) -p volvoxgrid-engine --features demo --test pixel_regression
+	@echo "Pixel regression tests complete."
+
 # =============================================================================
 # Smoke Test — Load plugin via Rust host, exercise basic RPCs
 # =============================================================================
@@ -437,23 +447,36 @@ dotnet-smoke-release: dotnet-build-release
 # =============================================================================
 # WASM
 # =============================================================================
+WASM_OUTPUT_DIR := web/example/wasm
+WASM_OUTPUT_MAIN := $(WASM_OUTPUT_DIR)/volvoxgrid_wasm_bg.wasm
+
 wasm:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
+	@command -v wasm-bindgen >/dev/null 2>&1 || { echo "Error: wasm-bindgen not found. Install with: cargo install wasm-bindgen-cli"; exit 1; }
 	@echo "Building WASM crate..."
-	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features gpu
+	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build --mode no-install . --target web --out-dir ../example/wasm --features gpu
 	@echo "WASM build complete: web/example/wasm/"
 
 wasm-lite:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
+	@command -v wasm-bindgen >/dev/null 2>&1 || { echo "Error: wasm-bindgen not found. Install with: cargo install wasm-bindgen-cli"; exit 1; }
 	@echo "Building WASM crate (lite)..."
-	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --no-default-features
+	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build --mode no-install . --target web --out-dir ../example/wasm --no-default-features
 	@echo "WASM lite build complete: web/example/wasm/"
 
 wasm-threaded:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
+	@command -v wasm-bindgen >/dev/null 2>&1 || { echo "Error: wasm-bindgen not found. Install with: cargo install wasm-bindgen-cli"; exit 1; }
 	@echo "Building WASM crate (threaded)..."
-	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features wasm-threads,gpu -Z build-std=std,panic_abort
+	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build --mode no-install . --target web --out-dir ../example/wasm --features wasm-threads,gpu -Z build-std=std,panic_abort
 	@echo "WASM threaded build complete: web/example/wasm/"
+
+wasm-ready:
+	@if [ "$(FORCE_WASM)" = "1" ] || [ ! -f "$(WASM_OUTPUT_MAIN)" ]; then \
+		$(MAKE) wasm; \
+	else \
+		echo "Using existing WASM build: $(WASM_OUTPUT_MAIN)"; \
+	fi
 
 # =============================================================================
 # Web Dev Server
@@ -477,7 +500,7 @@ SHEET_DIR := adapters/sheet
 SHEET_WASM_DIR := $(SHEET_DIR)/wasm
 WEB_JS_DIR := web/js
 
-sheet: wasm
+sheet: wasm-ready
 	@echo "Building VolvoxGrid JS package for Sheet adapter..."
 	cd "$(WEB_JS_DIR)" && npm install && npm run build
 	@echo "Linking WASM output into Sheet adapter..."
@@ -673,7 +696,7 @@ android-build:
 	@echo "Android build complete."
 
 android-plugin:
-	@echo "Building Android VolvoxGrid plugin shared libraries..."
+	@echo "Building Android VolvoxGrid plugin shared libraries (debug + debug AAR)..."
 	@set -e; \
 	SDK_DIR=""; \
 	if [ -n "$$ANDROID_HOME" ]; then \
@@ -767,6 +790,46 @@ android-plugin:
 		if [ "$$JNI_COPIED" -eq 0 ]; then \
 			echo "Error: libvolvoxgrid_jni.so not found after Gradle build."; \
 			exit 1; \
+		fi; \
+		echo "Packaging Android debug fat AAR..."; \
+		PACKAGE_MODE="full"; \
+		PACKAGE_GROUP_ID="$(AAR_GROUP_ID)"; \
+		PACKAGE_ARTIFACT_ID="$(AAR_DEBUG_ARTIFACT_ID)"; \
+		if [ "$(strip $(VOLVOXGRID_VARIANT))" = "lite" ]; then \
+			PACKAGE_MODE="lite"; \
+			PACKAGE_GROUP_ID="$(AAR_LITE_GROUP_ID)"; \
+			PACKAGE_ARTIFACT_ID="$(AAR_LITE_DEBUG_ARTIFACT_ID)"; \
+		fi; \
+		ANDROID_HOME="$$SDK_DIR" \
+		ANDROID_SDK_ROOT="$$SDK_DIR" \
+		ANDROID_NDK_HOME="$$NDK_DIR" \
+		VERSION="$(VOLVOXGRID_VERSION)" \
+		SYNURANG_VERSION="$${SYNURANG_VERSION:-$(patsubst v%,%,$(SYNURANG_VERSION))}" \
+		GROUP_ID="$$PACKAGE_GROUP_ID" \
+		ARTIFACT_ID="$$PACKAGE_ARTIFACT_ID" \
+		GIT_COMMIT="$(AAR_GIT_COMMIT)" \
+		BUILD_DATE="$(AAR_BUILD_DATE)" \
+		PLUGIN_BUILD_MODE="$$PACKAGE_MODE" \
+		AAR_BUILD_TYPE="debug" \
+		ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
+		BUILD_JOBS="$(BUILD_JOBS)" \
+		CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" \
+		GRADLE_MAX_WORKERS="$(GRADLE_MAX_WORKERS)" \
+		bash "$(CURRENT_DIR)/docker/build_android_aar.sh"; \
+		if [ "$(VOLVOXGRID_SOURCE_RESOLVED)" = "maven" ] && echo "$(VOLVOXGRID_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
+			if [ "$$PACKAGE_MODE" = "lite" ]; then \
+				$(MAKE) publish_local \
+					AAR_VERSION="$(VOLVOXGRID_VERSION)" \
+					AAR_ARTIFACT_ID="__skip__" \
+					AAR_LITE_ARTIFACT_ID="$(AAR_LITE_DEBUG_ARTIFACT_ID)" \
+					DESKTOP_VERSION=0; \
+			else \
+				$(MAKE) publish_local \
+					AAR_VERSION="$(VOLVOXGRID_VERSION)" \
+					AAR_ARTIFACT_ID="$(AAR_DEBUG_ARTIFACT_ID)" \
+					AAR_LITE_ARTIFACT_ID="__skip__" \
+					DESKTOP_VERSION=0; \
+			fi; \
 		fi
 	@echo "Android plugin build complete."
 
@@ -866,8 +929,7 @@ android-plugin-release:
 				echo "Error: libvolvoxgrid_jni.so not found after Gradle build."; \
 				exit 1; \
 			fi; \
-			if [ "$(VOLVOXGRID_SOURCE_RESOLVED)" = "maven" ] && echo "$(VOLVOXGRID_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
-				echo "Packaging Android SNAPSHOT AAR for mavenLocal..."; \
+				echo "Packaging Android release fat AAR..."; \
 				PACKAGE_MODE="full"; \
 				PACKAGE_GROUP_ID="$(AAR_GROUP_ID)"; \
 				PACKAGE_ARTIFACT_ID="$(AAR_ARTIFACT_ID)"; \
@@ -876,6 +938,9 @@ android-plugin-release:
 					PACKAGE_GROUP_ID="$(AAR_LITE_GROUP_ID)"; \
 					PACKAGE_ARTIFACT_ID="$(AAR_LITE_ARTIFACT_ID)"; \
 				fi; \
+				ANDROID_HOME="$$SDK_DIR" \
+				ANDROID_SDK_ROOT="$$SDK_DIR" \
+				ANDROID_NDK_HOME="$$NDK_DIR" \
 				VERSION="$(VOLVOXGRID_VERSION)" \
 				SYNURANG_VERSION="$${SYNURANG_VERSION:-$(patsubst v%,%,$(SYNURANG_VERSION))}" \
 				GROUP_ID="$$PACKAGE_GROUP_ID" \
@@ -883,25 +948,27 @@ android-plugin-release:
 				GIT_COMMIT="$(AAR_GIT_COMMIT)" \
 				BUILD_DATE="$(AAR_BUILD_DATE)" \
 				PLUGIN_BUILD_MODE="$$PACKAGE_MODE" \
+				AAR_BUILD_TYPE="release" \
 				ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
 				BUILD_JOBS="$(BUILD_JOBS)" \
 				CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" \
 				GRADLE_MAX_WORKERS="$(GRADLE_MAX_WORKERS)" \
 				bash "$(CURRENT_DIR)/docker/build_android_aar.sh"; \
-				if [ "$$PACKAGE_MODE" = "lite" ]; then \
-					$(MAKE) publish_local \
-						AAR_VERSION="$(VOLVOXGRID_VERSION)" \
-						AAR_ARTIFACT_ID="__skip__" \
-						AAR_LITE_ARTIFACT_ID="$(AAR_LITE_ARTIFACT_ID)" \
-						DESKTOP_VERSION=0; \
-				else \
-					$(MAKE) publish_local \
-						AAR_VERSION="$(VOLVOXGRID_VERSION)" \
-						AAR_ARTIFACT_ID="$(AAR_ARTIFACT_ID)" \
-						AAR_LITE_ARTIFACT_ID="__skip__" \
-						DESKTOP_VERSION=0; \
-				fi; \
-			fi
+				if [ "$(VOLVOXGRID_SOURCE_RESOLVED)" = "maven" ] && echo "$(VOLVOXGRID_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
+					if [ "$$PACKAGE_MODE" = "lite" ]; then \
+						$(MAKE) publish_local \
+							AAR_VERSION="$(VOLVOXGRID_VERSION)" \
+							AAR_ARTIFACT_ID="__skip__" \
+							AAR_LITE_ARTIFACT_ID="$(AAR_LITE_ARTIFACT_ID)" \
+							DESKTOP_VERSION=0; \
+					else \
+						$(MAKE) publish_local \
+							AAR_VERSION="$(VOLVOXGRID_VERSION)" \
+							AAR_ARTIFACT_ID="$(AAR_ARTIFACT_ID)" \
+							AAR_LITE_ARTIFACT_ID="__skip__" \
+							DESKTOP_VERSION=0; \
+					fi; \
+				fi
 	@echo "Android release plugin build complete."
 
 android-install: $(ANDROID_INSTALL_PREREQ)

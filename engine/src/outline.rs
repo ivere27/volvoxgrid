@@ -1,5 +1,6 @@
 use crate::grid::VolvoxGrid;
 use crate::proto::volvoxgrid::v1 as pb;
+use std::collections::BTreeSet;
 
 /// Scaled tree geometry constants for outline rendering, hit-testing, and text indent.
 /// All values are derived from `default_row_height` to look proportional on any DPI.
@@ -87,7 +88,7 @@ pub fn subtotal(
     back_color: u32,
     fore_color: u32,
     add_outline: bool,
-) {
+) -> Vec<i32> {
     subtotal_ex(
         grid,
         aggregate,
@@ -101,7 +102,36 @@ pub fn subtotal(
         false, // font_bold
         -1,    // match_from (-1 = from fixed_cols)
         false, // total_only
-    );
+    )
+}
+
+/// Insert subtotal rows with an optional generated-cell font patch.
+pub fn subtotal_with_font(
+    grid: &mut VolvoxGrid,
+    aggregate: i32,
+    group_on_col: i32,
+    aggregate_col: i32,
+    caption: &str,
+    back_color: u32,
+    fore_color: u32,
+    add_outline: bool,
+    font: Option<&crate::style::CellStylePatch>,
+) -> Vec<i32> {
+    subtotal_ex_with_font(
+        grid,
+        aggregate,
+        group_on_col,
+        aggregate_col,
+        caption,
+        back_color,
+        fore_color,
+        add_outline,
+        "",
+        false,
+        -1,
+        false,
+        font,
+    )
 }
 
 /// Extended subtotal with additional parameters.
@@ -125,18 +155,89 @@ pub fn subtotal_ex(
     font_bold: bool,
     match_from: i32,
     total_only: bool,
-) {
+) -> Vec<i32> {
+    subtotal_ex_with_font(
+        grid,
+        aggregate,
+        group_on_col,
+        aggregate_col,
+        caption,
+        back_color,
+        fore_color,
+        add_outline,
+        format,
+        font_bold,
+        match_from,
+        total_only,
+        None,
+    )
+}
+
+fn subtotal_generated_cell_style(
+    back_color: Option<u32>,
+    fore_color: Option<u32>,
+    default_bold: bool,
+    font: Option<&crate::style::CellStylePatch>,
+) -> crate::style::CellStylePatch {
+    let mut style = crate::style::CellStylePatch {
+        back_color,
+        fore_color,
+        font_bold: default_bold.then_some(true),
+        ..Default::default()
+    };
+    if let Some(font) = font {
+        if font.font_name.is_some() {
+            style.font_name = font.font_name.clone();
+        }
+        if font.font_size.is_some() {
+            style.font_size = font.font_size;
+        }
+        if font.font_bold.is_some() {
+            style.font_bold = font.font_bold;
+        }
+        if font.font_italic.is_some() {
+            style.font_italic = font.font_italic;
+        }
+        if font.font_underline.is_some() {
+            style.font_underline = font.font_underline;
+        }
+        if font.font_strikethrough.is_some() {
+            style.font_strikethrough = font.font_strikethrough;
+        }
+        if font.font_stretch.is_some() {
+            style.font_stretch = font.font_stretch;
+        }
+    }
+    style
+}
+
+#[allow(clippy::too_many_arguments)]
+fn subtotal_ex_with_font(
+    grid: &mut VolvoxGrid,
+    aggregate: i32,
+    group_on_col: i32,
+    aggregate_col: i32,
+    caption: &str,
+    back_color: u32,
+    fore_color: u32,
+    add_outline: bool,
+    format: &str,
+    font_bold: bool,
+    match_from: i32,
+    total_only: bool,
+    font: Option<&crate::style::CellStylePatch>,
+) -> Vec<i32> {
     if aggregate == pb::AggregateType::AggNone as i32 {
-        return;
+        return Vec::new();
     }
     if aggregate == pb::AggregateType::AggClear as i32 {
         clear_subtotals(grid);
-        return;
+        return Vec::new();
     }
 
     let first_data_row = grid.fixed_rows;
     if grid.rows <= first_data_row || grid.cols <= 0 {
-        return;
+        return Vec::new();
     }
 
     // Collect groups (group_value, start_row, end_row).
@@ -206,11 +307,63 @@ pub fn subtotal_ex(
     }
 
     if groups.is_empty() {
-        return;
+        return Vec::new();
     }
+
+    let mut affected_rows = BTreeSet::new();
+    let mut auto_resize_rows = BTreeSet::new();
+    let mut auto_resize_cols = BTreeSet::new();
 
     // Insert subtotal rows (from bottom to top to preserve indices)
     for (group_name, start, end) in groups.iter().rev() {
+        // multi_totals: reuse existing subtotal row if one exists for this group.
+        if grid.outline.multi_totals {
+            if let Some(reuse_row) = find_existing_subtotal_row(grid, group_on_col, *start, *end) {
+                let agg_value = compute_aggregate(grid, aggregate, *start, *end, aggregate_col);
+                let formatted_value = if !format.is_empty() {
+                    let raw = format_aggregate(agg_value);
+                    crate::grid::apply_col_format_public(&raw, format).unwrap_or_else(|| raw)
+                } else {
+                    format_aggregate(agg_value)
+                };
+                grid.cells
+                    .set_text(reuse_row, aggregate_col, formatted_value);
+
+                // Style the new aggregate cell consistently with the subtotal row.
+                let label_col = if group_on_col >= 0 && group_on_col < grid.cols {
+                    group_on_col
+                } else {
+                    0
+                };
+                let subtotal_bold = font_bold || aggregate != pb::AggregateType::AggNone as i32;
+                let apply_back = back_color != 0 && aggregate_col >= label_col;
+                let style = subtotal_generated_cell_style(
+                    if apply_back { Some(back_color) } else { None },
+                    if fore_color != 0 {
+                        Some(fore_color)
+                    } else {
+                        None
+                    },
+                    subtotal_bold,
+                    font,
+                );
+                if !style.is_empty() {
+                    grid.cell_styles.insert((reuse_row, aggregate_col), style);
+                }
+                let props = grid.row_props.entry(reuse_row).or_default();
+                props.is_subtotal = true;
+                props.subtotal_caption_col = label_col;
+                affected_rows.insert(reuse_row);
+                note_auto_resize_targets(
+                    &mut auto_resize_rows,
+                    &mut auto_resize_cols,
+                    reuse_row,
+                    [aggregate_col],
+                );
+                continue;
+            }
+        }
+
         let agg_value = compute_aggregate(grid, aggregate, *start, *end, aggregate_col);
         let insert_row = if grid.outline.group_total_position
             == pb::GroupTotalPosition::GroupTotalAbove as i32
@@ -220,10 +373,14 @@ pub fn subtotal_ex(
             *end + 1 // below
         };
 
+        shift_tracked_rows_down(&mut affected_rows, insert_row);
+        shift_tracked_rows_down(&mut auto_resize_rows, insert_row);
+
         // Insert row
         grid.cells.insert_row(insert_row);
         shift_row_metadata_down(grid, insert_row);
         grid.rows += 1;
+        affected_rows.insert(insert_row);
 
         // Set subtotal text
         let label = subtotal_caption(aggregate, caption, group_on_col, group_name);
@@ -285,10 +442,22 @@ pub fn subtotal_ex(
         grid.cells
             .set_text(insert_row, aggregate_col, formatted_value);
 
-        // Mark as subtotal row
-        grid.row_props.entry(insert_row).or_default().is_subtotal = true;
+        // Mark as subtotal row and tag its group depth.
+        // The level is always set so multi_totals can locate
+        // existing subtotal rows regardless of add_outline.
+        let new_subtotal_level = if group_on_col < 0 {
+            -1
+        } else {
+            group_on_col.max(0)
+        };
+        {
+            let props = grid.row_props.entry(insert_row).or_default();
+            props.is_subtotal = true;
+            props.outline_level = new_subtotal_level;
+            props.subtotal_caption_col = label_col;
+        }
 
-        // Set outline level
+        // Set outline levels on data rows (enables tree collapse/expand).
         if add_outline {
             let data_start = if grid.outline.group_total_position
                 == pb::GroupTotalPosition::GroupTotalAbove as i32
@@ -305,18 +474,6 @@ pub fn subtotal_ex(
                 *end
             };
 
-            // Outline depth for subtotal rows tracks the
-            // GroupOn column depth (0-based), not insertion order.
-            // Grand totals (GroupOn=-1) are subtotal rows but not
-            // tree nodes; they use outline level -1 (no +/- button).
-            let new_subtotal_level = if group_on_col < 0 {
-                -1
-            } else {
-                group_on_col.max(0)
-            };
-            grid.row_props.entry(insert_row).or_default().outline_level = new_subtotal_level;
-
-            // Data rows stay at level 0 for subtotal visuals.
             for r in data_start..=data_end {
                 if is_subtotal_row(grid, r) {
                     continue;
@@ -337,25 +494,32 @@ pub fn subtotal_ex(
                 // at the generated subtotal caption cell and continues to the right.
                 // Cells to the left (copied key columns) remain unfilled.
                 let apply_back_color = back_color != 0 && c >= label_col;
-                let style = crate::style::CellStylePatch {
-                    back_color: if apply_back_color {
+                let style = subtotal_generated_cell_style(
+                    if apply_back_color {
                         Some(back_color)
                     } else {
                         None
                     },
-                    fore_color: if fore_color != 0 {
+                    if fore_color != 0 {
                         Some(fore_color)
                     } else {
                         None
                     },
-                    font_bold: if bold_cell { Some(true) } else { None },
-                    ..Default::default()
-                };
+                    bold_cell,
+                    font,
+                );
                 if !style.is_empty() {
                     grid.cell_styles.insert((insert_row, c), style);
                 }
             }
         }
+
+        note_auto_resize_targets(
+            &mut auto_resize_rows,
+            &mut auto_resize_cols,
+            insert_row,
+            [label_col, aggregate_col],
+        );
     }
 
     // If total_only, hide detail rows
@@ -370,8 +534,10 @@ pub fn subtotal_ex(
 
     // Keep mapping consistent after row insertions.
     grid.row_positions = (0..grid.rows).collect();
+    auto_resize_tracked_subtotal_targets(grid, &auto_resize_rows, &auto_resize_cols);
     grid.layout.invalidate();
     grid.mark_dirty();
+    affected_rows.into_iter().collect()
 }
 
 /// Remove all subtotal rows
@@ -509,6 +675,58 @@ fn shift_row_metadata_down(grid: &mut VolvoxGrid, at: i32) {
     }
 }
 
+fn shift_tracked_rows_down(rows: &mut BTreeSet<i32>, at: i32) {
+    if rows.is_empty() {
+        return;
+    }
+    let shifted: Vec<i32> = rows.range(at..).copied().collect();
+    for row in shifted {
+        rows.remove(&row);
+        rows.insert(row + 1);
+    }
+}
+
+fn note_auto_resize_targets<const N: usize>(
+    rows: &mut BTreeSet<i32>,
+    cols: &mut BTreeSet<i32>,
+    row: i32,
+    touched_cols: [i32; N],
+) {
+    if row >= 0 {
+        rows.insert(row);
+    }
+    for col in touched_cols {
+        if col >= 0 {
+            cols.insert(col);
+        }
+    }
+}
+
+fn auto_resize_tracked_subtotal_targets(
+    grid: &mut VolvoxGrid,
+    rows: &BTreeSet<i32>,
+    cols: &BTreeSet<i32>,
+) {
+    if !grid.auto_resize {
+        return;
+    }
+
+    let resize_cols = grid.auto_size_mode == 0 || grid.auto_size_mode == 1;
+    let resize_rows = grid.auto_size_mode == 0 || grid.auto_size_mode == 2;
+
+    if resize_cols {
+        for &col in cols {
+            grid.auto_resize_col(col);
+        }
+    }
+
+    if resize_rows {
+        for &row in rows {
+            grid.auto_resize_row(row);
+        }
+    }
+}
+
 /// Shift all row-keyed metadata up by 1 for rows > `at` (after removing row `at`).
 fn shift_row_metadata_up(grid: &mut VolvoxGrid, at: i32) {
     let old_props = std::mem::take(&mut grid.row_props);
@@ -562,6 +780,63 @@ fn shift_row_metadata_up(grid: &mut VolvoxGrid, at: i32) {
 
 fn is_subtotal_row(grid: &VolvoxGrid, row: i32) -> bool {
     grid.row_props.get(&row).map_or(false, |rp| rp.is_subtotal)
+}
+
+/// When `multi_totals` is enabled, find an existing subtotal row for the given
+/// group that can be reused instead of inserting a new row.
+fn find_existing_subtotal_row(
+    grid: &VolvoxGrid,
+    group_on_col: i32,
+    group_start: i32,
+    group_end: i32,
+) -> Option<i32> {
+    let target_level = if group_on_col < 0 {
+        -1
+    } else {
+        group_on_col.max(0)
+    };
+
+    if group_on_col < 0 {
+        // Grand total: scan all data rows for an existing grand-total subtotal.
+        for r in grid.fixed_rows..grid.rows {
+            if is_subtotal_row(grid, r) {
+                let level = grid.row_props.get(&r).map_or(0, |p| p.outline_level);
+                if level == -1 {
+                    return Some(r);
+                }
+            }
+        }
+        return None;
+    }
+
+    if grid.outline.group_total_position == pb::GroupTotalPosition::GroupTotalAbove as i32 {
+        // Subtotals above: scan upward from group start.
+        let mut r = group_start - 1;
+        while r >= grid.fixed_rows {
+            if !is_subtotal_row(grid, r) {
+                break;
+            }
+            let level = grid.row_props.get(&r).map_or(0, |p| p.outline_level);
+            if level == target_level {
+                return Some(r);
+            }
+            r -= 1;
+        }
+    } else {
+        // Subtotals below: scan downward from group end.
+        let mut r = group_end + 1;
+        while r < grid.rows {
+            if !is_subtotal_row(grid, r) {
+                break;
+            }
+            let level = grid.row_props.get(&r).map_or(0, |p| p.outline_level);
+            if level == target_level {
+                return Some(r);
+            }
+            r += 1;
+        }
+    }
+    None
 }
 
 fn normalize_group_cell_text<'a>(text: &'a str, compare_mode: i32) -> std::borrow::Cow<'a, str> {
@@ -636,8 +911,9 @@ fn subtotal_caption(aggregate: i32, caption: &str, group_on_col: i32, group_name
 
 #[cfg(test)]
 mod tests {
-    use super::{subtotal, subtotal_ex};
+    use super::{subtotal, subtotal_ex, subtotal_with_font};
     use crate::grid::VolvoxGrid;
+    use crate::proto::volvoxgrid::v1 as pb;
     use crate::style::CellStylePatch;
 
     fn sample_grid() -> VolvoxGrid {
@@ -834,6 +1110,242 @@ mod tests {
             c1_group1.back_color.is_some(),
             "group_on=1 subtotal should color caption column"
         );
+    }
+
+    #[test]
+    fn subtotal_with_font_returns_final_affected_rows_in_ascending_order() {
+        let mut grid = sample_grid();
+        grid.outline.group_total_position = pb::GroupTotalPosition::GroupTotalBelow as i32;
+
+        let rows = subtotal_with_font(
+            &mut grid,
+            pb::AggregateType::AggSum as i32,
+            0,
+            2,
+            "Total",
+            0,
+            0,
+            true,
+            None,
+        );
+
+        assert_eq!(rows, vec![3, 6]);
+    }
+
+    #[test]
+    fn subtotal_with_font_applies_font_patch_to_generated_cells() {
+        let mut grid = sample_grid();
+        let font = CellStylePatch {
+            font_name: Some("Demo Sans".to_string()),
+            font_size: Some(18.0),
+            font_bold: Some(false),
+            font_italic: Some(true),
+            ..Default::default()
+        };
+
+        let rows = subtotal_with_font(
+            &mut grid,
+            pb::AggregateType::AggSum as i32,
+            0,
+            2,
+            "Total",
+            0,
+            0,
+            true,
+            Some(&font),
+        );
+        let subtotal_row = rows[0];
+        let caption_style = grid.get_cell_style(subtotal_row, 0);
+        let value_style = grid.get_cell_style(subtotal_row, 2);
+
+        assert_eq!(caption_style.font_name.as_deref(), Some("Demo Sans"));
+        assert_eq!(caption_style.font_size, Some(18.0));
+        assert_eq!(caption_style.font_bold, Some(false));
+        assert_eq!(caption_style.font_italic, Some(true));
+        assert_eq!(value_style.font_name.as_deref(), Some("Demo Sans"));
+        assert_eq!(value_style.font_size, Some(18.0));
+        assert_eq!(value_style.font_bold, Some(false));
+        assert_eq!(value_style.font_italic, Some(true));
+    }
+
+    #[test]
+    fn multi_totals_reuses_existing_subtotal_row() {
+        let mut grid = sample_grid();
+        // Add Cost values in col 3
+        grid.cells.set_text(1, 3, "5".to_string());
+        grid.cells.set_text(2, 3, "8".to_string());
+        grid.cells.set_text(3, 3, "12".to_string());
+        grid.cells.set_text(4, 3, "15".to_string());
+
+        grid.outline.multi_totals = true;
+
+        // First subtotal: SUM of Sales (col 2) grouped by Product (col 0)
+        subtotal(&mut grid, 2, 0, 2, "Total", 0x00D0E0F0, 0, true);
+        let rows_after_first = grid.rows;
+
+        // Second subtotal: SUM of Cost (col 3) grouped by Product (col 0)
+        subtotal(&mut grid, 2, 0, 3, "Total", 0x00D0E0F0, 0, true);
+
+        // Row count unchanged — subtotal rows were reused.
+        assert_eq!(grid.rows, rows_after_first);
+
+        // Both aggregate columns populated in the same subtotal row.
+        let row_a = (grid.fixed_rows..grid.rows)
+            .find(|&r| grid.cells.get_text(r, 0) == "Total A")
+            .expect("Total A row");
+        assert_eq!(grid.cells.get_text(row_a, 2), "30");
+        assert_eq!(grid.cells.get_text(row_a, 3), "13");
+
+        let row_b = (grid.fixed_rows..grid.rows)
+            .find(|&r| grid.cells.get_text(r, 0) == "Total B")
+            .expect("Total B row");
+        assert_eq!(grid.cells.get_text(row_b, 2), "70");
+        assert_eq!(grid.cells.get_text(row_b, 3), "27");
+    }
+
+    #[test]
+    fn multi_totals_reuses_grand_total_row() {
+        let mut grid = sample_grid();
+        grid.cells.set_text(1, 3, "5".to_string());
+        grid.cells.set_text(2, 3, "8".to_string());
+        grid.cells.set_text(3, 3, "12".to_string());
+        grid.cells.set_text(4, 3, "15".to_string());
+
+        grid.outline.multi_totals = true;
+
+        subtotal(&mut grid, 2, -1, 2, "", 0, 0, true);
+        let rows_after_first = grid.rows;
+
+        subtotal(&mut grid, 2, -1, 3, "", 0, 0, true);
+        assert_eq!(grid.rows, rows_after_first);
+
+        let grand = (grid.fixed_rows..grid.rows)
+            .find(|&r| grid.cells.get_text(r, 0) == "Grand Total")
+            .expect("grand total row");
+        assert_eq!(grid.cells.get_text(grand, 2), "100");
+        assert_eq!(grid.cells.get_text(grand, 3), "40");
+    }
+
+    #[test]
+    fn multi_totals_reuses_subtotal_row_below_position() {
+        let mut grid = sample_grid();
+        grid.cells.set_text(1, 3, "5".to_string());
+        grid.cells.set_text(2, 3, "8".to_string());
+        grid.cells.set_text(3, 3, "12".to_string());
+        grid.cells.set_text(4, 3, "15".to_string());
+
+        grid.outline.multi_totals = true;
+        grid.outline.group_total_position = 1; // GroupTotalBelow
+
+        subtotal(&mut grid, 2, 0, 2, "Total", 0, 0, true);
+        let rows_after_first = grid.rows;
+
+        subtotal(&mut grid, 2, 0, 3, "Total", 0, 0, true);
+        assert_eq!(grid.rows, rows_after_first);
+
+        let row_a = (grid.fixed_rows..grid.rows)
+            .find(|&r| grid.cells.get_text(r, 0) == "Total A")
+            .expect("Total A row");
+        assert_eq!(grid.cells.get_text(row_a, 2), "30");
+        assert_eq!(grid.cells.get_text(row_a, 3), "13");
+
+        let row_b = (grid.fixed_rows..grid.rows)
+            .find(|&r| grid.cells.get_text(r, 0) == "Total B")
+            .expect("Total B row");
+        assert_eq!(grid.cells.get_text(row_b, 2), "70");
+        assert_eq!(grid.cells.get_text(row_b, 3), "27");
+    }
+
+    #[test]
+    fn multi_totals_false_inserts_separate_rows() {
+        let mut grid = sample_grid();
+        grid.cells.set_text(1, 3, "5".to_string());
+        grid.cells.set_text(2, 3, "8".to_string());
+        grid.cells.set_text(3, 3, "12".to_string());
+        grid.cells.set_text(4, 3, "15".to_string());
+
+        // multi_totals defaults to false
+        assert!(!grid.outline.multi_totals);
+
+        subtotal(&mut grid, 2, 0, 2, "Total", 0, 0, true);
+        let rows_after_first = grid.rows;
+
+        subtotal(&mut grid, 2, 0, 3, "Total", 0, 0, true);
+        // Without multi_totals, new subtotal rows are inserted.
+        assert!(grid.rows > rows_after_first);
+    }
+
+    #[test]
+    fn multi_totals_reuses_grand_total_without_add_outline() {
+        let mut grid = sample_grid();
+        grid.cells.set_text(1, 3, "5".to_string());
+        grid.cells.set_text(2, 3, "8".to_string());
+        grid.cells.set_text(3, 3, "12".to_string());
+        grid.cells.set_text(4, 3, "15".to_string());
+
+        grid.outline.multi_totals = true;
+
+        // add_outline = false for all calls
+        subtotal(&mut grid, 2, 0, 2, "Total", 0, 0, false);
+        subtotal(&mut grid, 2, 0, 3, "Total", 0, 0, false);
+        subtotal(&mut grid, 2, -1, 2, "", 0, 0, false);
+        let rows_after = grid.rows;
+
+        subtotal(&mut grid, 2, -1, 3, "", 0, 0, false);
+        // Grand total row must be reused even without add_outline.
+        assert_eq!(grid.rows, rows_after);
+
+        let grand = (grid.fixed_rows..grid.rows)
+            .find(|&r| grid.cells.get_text(r, 0) == "Grand Total")
+            .expect("grand total row");
+        assert_eq!(grid.cells.get_text(grand, 2), "100");
+        assert_eq!(grid.cells.get_text(grand, 3), "40");
+    }
+
+    #[test]
+    fn multi_totals_reuse_recomputes_row_height_for_existing_subtotal_row() {
+        let mut grid = sample_grid();
+        grid.cells.set_text(1, 3, "5".to_string());
+        grid.cells.set_text(2, 3, "8".to_string());
+        grid.cells.set_text(3, 3, "12".to_string());
+        grid.cells.set_text(4, 3, "15".to_string());
+        grid.default_col_width = 24;
+        grid.default_row_height = 16;
+        grid.word_wrap = true;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 2;
+        grid.outline.multi_totals = true;
+
+        subtotal(
+            &mut grid,
+            2,
+            0,
+            2,
+            "Very long subtotal caption that should wrap",
+            0,
+            0,
+            false,
+        );
+
+        let row_a = (grid.fixed_rows..grid.rows)
+            .find(|&r| grid.cells.get_text(r, 0) == "Very long subtotal caption that should wrap")
+            .expect("subtotal row");
+        assert!(grid.get_row_height(row_a) > grid.default_row_height);
+
+        grid.set_row_height(row_a, grid.default_row_height);
+        subtotal(
+            &mut grid,
+            2,
+            0,
+            3,
+            "Very long subtotal caption that should wrap",
+            0,
+            0,
+            false,
+        );
+
+        assert_eq!(grid.rows, 7);
+        assert!(grid.get_row_height(row_a) > grid.default_row_height);
     }
 }
 

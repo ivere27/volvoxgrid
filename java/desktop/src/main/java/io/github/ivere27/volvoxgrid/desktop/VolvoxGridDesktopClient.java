@@ -26,6 +26,8 @@ import io.github.ivere27.volvoxgrid.ExportResponse;
 import io.github.ivere27.volvoxgrid.FindRequest;
 import io.github.ivere27.volvoxgrid.FindResponse;
 import io.github.ivere27.volvoxgrid.GetCellsRequest;
+import io.github.ivere27.volvoxgrid.GetDemoDataRequest;
+import io.github.ivere27.volvoxgrid.GetDemoDataResponse;
 import io.github.ivere27.volvoxgrid.GetMergedRangeRequest;
 import io.github.ivere27.volvoxgrid.GetNodeRequest;
 import io.github.ivere27.volvoxgrid.GridConfig;
@@ -107,6 +109,7 @@ public final class VolvoxGridDesktopClient {
     private static final String SET_REDRAW = "/volvoxgrid.v1.VolvoxGridService/SetRedraw";
     private static final String REFRESH = "/volvoxgrid.v1.VolvoxGridService/Refresh";
     private static final String LOAD_DEMO = "/volvoxgrid.v1.VolvoxGridService/LoadDemo";
+    private static final String GET_DEMO_DATA = "/volvoxgrid.v1.VolvoxGridService/GetDemoData";
 
     private static final String RENDER_SESSION = "/volvoxgrid.v1.VolvoxGridService/RenderSession";
     private static final String EVENT_STREAM = "/volvoxgrid.v1.VolvoxGridService/EventStream";
@@ -205,8 +208,8 @@ public final class VolvoxGridDesktopClient {
         return unary(SORT, request, Empty.parser());
     }
 
-    public Empty subtotal(SubtotalRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(SUBTOTAL, request, Empty.parser());
+    public SubtotalResult subtotal(SubtotalRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(SUBTOTAL, request, SubtotalResult.parser());
     }
 
     public Empty autoSize(AutoSizeRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
@@ -279,6 +282,11 @@ public final class VolvoxGridDesktopClient {
 
     public Empty loadDemo(LoadDemoRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         return unary(LOAD_DEMO, request, Empty.parser());
+    }
+
+    public GetDemoDataResponse getDemoData(GetDemoDataRequest request)
+        throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(GET_DEMO_DATA, request, GetDemoDataResponse.parser());
     }
 
     public RenderSession openRenderSession() throws SynurangDesktopBridge.SynurangBridgeException {

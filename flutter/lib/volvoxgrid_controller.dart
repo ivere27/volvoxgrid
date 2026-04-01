@@ -10,6 +10,7 @@
 library;
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
@@ -63,6 +64,7 @@ IndicatorsConfig _defaultIndicatorsConfig() => IndicatorsConfig()
   ..rowStart = (RowIndicatorConfig()
     ..visible = false
     ..width = 35
+    ..autoSize = true
     ..modeBits = _rowIndicatorModeBits([
       RowIndicatorMode.ROW_INDICATOR_CURRENT,
       RowIndicatorMode.ROW_INDICATOR_SELECTION,
@@ -175,16 +177,20 @@ class VolvoxGridController extends ChangeNotifier {
 
   // ── Internal helpers ────────────────────────────────────────────────────────
 
-  Future<void> _configure(GridConfig config) async {
+  Future<void> configure(GridConfig config) async {
     await VolvoxGridService.Configure(ConfigureRequest()
       ..gridId = _gridId
       ..config = config);
     notifyListeners();
   }
 
-  Future<GridConfig> _getConfig() {
+  Future<GridConfig> getConfig() {
     return VolvoxGridService.GetConfig(_handle);
   }
+
+  Future<void> _configure(GridConfig config) => configure(config);
+
+  Future<GridConfig> _getConfig() => getConfig();
 
   SelectRequest _buildSelectRequest(
     int activeRow,
@@ -344,6 +350,23 @@ class VolvoxGridController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> defineColumns(DefineColumnsRequest request) async {
+    await VolvoxGridService.DefineColumns(request..gridId = _gridId);
+    notifyListeners();
+  }
+
+  Future<void> defineRows(DefineRowsRequest request) async {
+    await VolvoxGridService.DefineRows(request..gridId = _gridId);
+    notifyListeners();
+  }
+
+  Future<WriteResult> updateCells(UpdateCellsRequest request) async {
+    final result =
+        await VolvoxGridService.UpdateCells(request..gridId = _gridId);
+    notifyListeners();
+    return result;
+  }
+
   /// Get the height of a specific row.
   Future<int> getRowHeight(int row) async {
     // Use GetConfig to read default; per-row heights require GetCells or
@@ -449,15 +472,20 @@ class VolvoxGridController extends ChangeNotifier {
         ..col2 = col
         ..includeStyle = true);
       final config = await _getConfig();
-      final cellFont = (resp.cells.isNotEmpty) ? resp.cells.first.style.font : null;
+      final cellFont =
+          (resp.cells.isNotEmpty) ? resp.cells.first.style.font : null;
       final gridFont = config.style.font;
       return EditCellStyle(
-        fontFamily: (cellFont != null && cellFont.hasFamily() && cellFont.family.isNotEmpty)
+        fontFamily: (cellFont != null &&
+                cellFont.hasFamily() &&
+                cellFont.family.isNotEmpty)
             ? cellFont.family
             : (gridFont.hasFamily() ? gridFont.family : null),
         fontSize: (cellFont != null && cellFont.hasSize() && cellFont.size > 0)
             ? cellFont.size.toDouble()
-            : (gridFont.hasSize() && gridFont.size > 0 ? gridFont.size.toDouble() : null),
+            : (gridFont.hasSize() && gridFont.size > 0
+                ? gridFont.size.toDouble()
+                : null),
         bold: (cellFont != null && cellFont.hasBold())
             ? cellFont.bold
             : (gridFont.hasBold() && gridFont.bold),
@@ -466,16 +494,25 @@ class VolvoxGridController extends ChangeNotifier {
             : (gridFont.hasItalic() && gridFont.italic),
         padLeft: (resp.cells.isNotEmpty && resp.cells.first.style.hasPadding())
             ? resp.cells.first.style.padding.left.toDouble()
-            : (config.style.hasCellPadding() ? config.style.cellPadding.left.toDouble() : 0),
+            : (config.style.hasCellPadding()
+                ? config.style.cellPadding.left.toDouble()
+                : 0),
         padTop: (resp.cells.isNotEmpty && resp.cells.first.style.hasPadding())
             ? resp.cells.first.style.padding.top.toDouble()
-            : (config.style.hasCellPadding() ? config.style.cellPadding.top.toDouble() : 0),
+            : (config.style.hasCellPadding()
+                ? config.style.cellPadding.top.toDouble()
+                : 0),
         padRight: (resp.cells.isNotEmpty && resp.cells.first.style.hasPadding())
             ? resp.cells.first.style.padding.right.toDouble()
-            : (config.style.hasCellPadding() ? config.style.cellPadding.right.toDouble() : 0),
-        padBottom: (resp.cells.isNotEmpty && resp.cells.first.style.hasPadding())
-            ? resp.cells.first.style.padding.bottom.toDouble()
-            : (config.style.hasCellPadding() ? config.style.cellPadding.bottom.toDouble() : 0),
+            : (config.style.hasCellPadding()
+                ? config.style.cellPadding.right.toDouble()
+                : 0),
+        padBottom:
+            (resp.cells.isNotEmpty && resp.cells.first.style.hasPadding())
+                ? resp.cells.first.style.padding.bottom.toDouble()
+                : (config.style.hasCellPadding()
+                    ? config.style.cellPadding.bottom.toDouble()
+                    : 0),
       );
     } catch (_) {}
     return null;
@@ -493,49 +530,6 @@ class VolvoxGridController extends ChangeNotifier {
     }
     await VolvoxGridService.UpdateCells(req);
     notifyListeners();
-  }
-
-  /// Fill a 2D matrix into the grid starting at [startRow]/[startCol].
-  ///
-  /// When [resizeGrid] is true, rows/cols are grown before applying data.
-  Future<void> setTableData(
-    List<List<String>> rows, {
-    int startRow = 0,
-    int startCol = 0,
-    bool resizeGrid = true,
-  }) async {
-    if (rows.isEmpty) return;
-    final maxCols =
-        rows.fold<int>(0, (m, row) => row.length > m ? row.length : m);
-    if (maxCols <= 0) return;
-
-    await withRedrawSuspended(() async {
-      if (resizeGrid) {
-        final neededRows = startRow + rows.length;
-        final neededCols = startCol + maxCols;
-        final currentRows = await rowCount();
-        final currentCols = await colCount();
-        if (neededRows > currentRows || neededCols > currentCols) {
-          final layout = LayoutConfig();
-          if (neededRows > currentRows) layout.rows = neededRows;
-          if (neededCols > currentCols) layout.cols = neededCols;
-          await _configure(GridConfig()..layout = layout);
-        }
-      }
-
-      final cells = <CellTextEntry>[];
-      for (var r = 0; r < rows.length; r++) {
-        final row = rows[r];
-        for (var c = 0; c < row.length; c++) {
-          cells.add(CellTextEntry(
-            row: startRow + r,
-            col: startCol + c,
-            text: row[c],
-          ));
-        }
-      }
-      await setCells(cells);
-    });
   }
 
   /// Load a row-major typed matrix in one RPC.
@@ -677,6 +671,18 @@ class VolvoxGridController extends ChangeNotifier {
         GridConfig()..selection = (SelectionConfig()..visibility = style));
   }
 
+  /// Set the selection highlight style.
+  Future<void> setSelectionStyle(HighlightStyle style) async {
+    await _configure(
+        GridConfig()..selection = (SelectionConfig()..style = style));
+  }
+
+  /// Set hover enablement and highlight styles.
+  Future<void> setHoverConfig(HoverConfig config) async {
+    await _configure(
+        GridConfig()..selection = (SelectionConfig()..hover = config));
+  }
+
   /// Set the active/current cell highlight style.
   Future<void> setActiveCellStyle(HighlightStyle style) async {
     await _configure(
@@ -760,7 +766,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Insert subtotal rows grouping on [groupOnCol] and aggregating
   /// [aggregateCol] with the specified [aggregate] function.
-  Future<void> subtotal(
+  Future<SubtotalResult> subtotal(
     AggregateType aggregate, {
     required int groupOnCol,
     required int aggregateCol,
@@ -768,8 +774,9 @@ class VolvoxGridController extends ChangeNotifier {
     int backColor = 0xFFE0E0E0,
     int foreColor = 0xFF000000,
     bool addOutline = true,
+    Font? font,
   }) async {
-    await VolvoxGridService.Subtotal(SubtotalRequest()
+    final req = SubtotalRequest()
       ..gridId = _gridId
       ..aggregate = aggregate
       ..groupOnCol = groupOnCol
@@ -777,8 +784,13 @@ class VolvoxGridController extends ChangeNotifier {
       ..caption = caption
       ..background = backColor
       ..foreground = foreColor
-      ..addOutline = addOutline);
+      ..addOutline = addOutline;
+    if (font != null) {
+      req.font = font;
+    }
+    final result = await VolvoxGridService.Subtotal(req);
     notifyListeners();
+    return result;
   }
 
   // ── Outline ───────────────────────────────────────────────────────────────
@@ -1378,6 +1390,13 @@ class VolvoxGridController extends ChangeNotifier {
       ..gridId = _gridId
       ..demo = demo);
     notifyListeners();
+  }
+
+  Future<Uint8List> getDemoData(String demo) async {
+    final response = await VolvoxGridService.GetDemoData(
+      GetDemoDataRequest()..demo = demo,
+    );
+    return Uint8List.fromList(response.data);
   }
 
   // ── Redraw Control ────────────────────────────────────────────────────────

@@ -1395,6 +1395,32 @@ class CellHitArea extends $pb.ProtobufEnum {
   const CellHitArea._(super.value, super.name);
 }
 
+/// ── Scrolling ──
+class PullToRefreshTheme extends $pb.ProtobufEnum {
+  static const PullToRefreshTheme PULL_TO_REFRESH_THEME_UNSPECIFIED =
+      PullToRefreshTheme._(
+          0, _omitEnumNames ? '' : 'PULL_TO_REFRESH_THEME_UNSPECIFIED');
+  static const PullToRefreshTheme PULL_TO_REFRESH_THEME_TOP_BAND =
+      PullToRefreshTheme._(
+          1, _omitEnumNames ? '' : 'PULL_TO_REFRESH_THEME_TOP_BAND');
+  static const PullToRefreshTheme PULL_TO_REFRESH_THEME_MATERIAL =
+      PullToRefreshTheme._(
+          2, _omitEnumNames ? '' : 'PULL_TO_REFRESH_THEME_MATERIAL');
+
+  static const $core.List<PullToRefreshTheme> values = <PullToRefreshTheme>[
+    PULL_TO_REFRESH_THEME_UNSPECIFIED,
+    PULL_TO_REFRESH_THEME_TOP_BAND,
+    PULL_TO_REFRESH_THEME_MATERIAL,
+  ];
+
+  static final $core.List<PullToRefreshTheme?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static PullToRefreshTheme? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const PullToRefreshTheme._(super.value, super.name);
+}
+
 /// ── Render layer bit positions (for render_layer_mask bitmask) ──
 class RenderLayerBit extends $pb.ProtobufEnum {
   static const RenderLayerBit RENDER_LAYER_OVERLAY_BANDS =
@@ -1447,8 +1473,10 @@ class RenderLayerBit extends $pb.ProtobufEnum {
       RenderLayerBit._(23, _omitEnumNames ? '' : 'RENDER_LAYER_SCROLL_BARS');
   static const RenderLayerBit RENDER_LAYER_FAST_SCROLL =
       RenderLayerBit._(24, _omitEnumNames ? '' : 'RENDER_LAYER_FAST_SCROLL');
+  static const RenderLayerBit RENDER_LAYER_PULL_TO_REFRESH = RenderLayerBit._(
+      25, _omitEnumNames ? '' : 'RENDER_LAYER_PULL_TO_REFRESH');
   static const RenderLayerBit RENDER_LAYER_DEBUG_OVERLAY =
-      RenderLayerBit._(25, _omitEnumNames ? '' : 'RENDER_LAYER_DEBUG_OVERLAY');
+      RenderLayerBit._(26, _omitEnumNames ? '' : 'RENDER_LAYER_DEBUG_OVERLAY');
 
   static const $core.List<RenderLayerBit> values = <RenderLayerBit>[
     RENDER_LAYER_OVERLAY_BANDS,
@@ -1476,11 +1504,12 @@ class RenderLayerBit extends $pb.ProtobufEnum {
     RENDER_LAYER_ACTIVE_DROPDOWN,
     RENDER_LAYER_SCROLL_BARS,
     RENDER_LAYER_FAST_SCROLL,
+    RENDER_LAYER_PULL_TO_REFRESH,
     RENDER_LAYER_DEBUG_OVERLAY,
   ];
 
   static final $core.List<RenderLayerBit?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 25);
+      $pb.ProtobufEnum.$_initByValueList(values, 26);
   static RenderLayerBit? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -1742,6 +1771,25 @@ class ErrorCode extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const ErrorCode._(super.value, super.name);
+}
+
+class DemoDataFormat extends $pb.ProtobufEnum {
+  static const DemoDataFormat DEMO_DATA_FORMAT_UNSPECIFIED =
+      DemoDataFormat._(0, _omitEnumNames ? '' : 'DEMO_DATA_FORMAT_UNSPECIFIED');
+  static const DemoDataFormat DEMO_DATA_FORMAT_JSON =
+      DemoDataFormat._(1, _omitEnumNames ? '' : 'DEMO_DATA_FORMAT_JSON');
+
+  static const $core.List<DemoDataFormat> values = <DemoDataFormat>[
+    DEMO_DATA_FORMAT_UNSPECIFIED,
+    DEMO_DATA_FORMAT_JSON,
+  ];
+
+  static final $core.List<DemoDataFormat?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 1);
+  static DemoDataFormat? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const DemoDataFormat._(super.value, super.name);
 }
 
 class ArchiveRequest_Action extends $pb.ProtobufEnum {

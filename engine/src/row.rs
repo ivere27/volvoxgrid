@@ -3,6 +3,7 @@
 pub struct RowProps {
     pub outline_level: i32,
     pub is_subtotal: bool,
+    pub subtotal_caption_col: i32,
     pub is_collapsed: bool,
     pub span: bool,  // span enabled for this row
     pub status: i32, // 0=unchanged, 1=added, 2=modified, 3=deleted
@@ -17,6 +18,7 @@ impl Default for RowProps {
         Self {
             outline_level: 0,
             is_subtotal: false,
+            subtotal_caption_col: -1,
             is_collapsed: false,
             span: false,
             status: 0,

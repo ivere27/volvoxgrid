@@ -1039,6 +1039,10 @@ fn resolve_col_hit(
         }
     }
 
+    if col >= 0 && grid.is_col_hidden(col) {
+        col = grid.visible_col_at_or_before(col).unwrap_or(-1);
+    }
+
     LocalColHit {
         col,
         effective_x,
@@ -1203,7 +1207,8 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
             let mut area = HitArea::IndicatorColTop;
             let mut hit_col = col_hit.col;
             if !col_hit.hit_pinned_col {
-                let (cx, _, cw, _) = layout.cell_rect(0, hit_col);
+                let (cx, _, cw, _) = crate::canvas::cell_rect(grid, 0, hit_col, &vp)
+                    .unwrap_or_else(|| layout.cell_rect(0, hit_col));
                 let col_left = cx;
                 let col_right = cx + cw;
                 let hit_half = header_resize_hit_half_width(grid);
@@ -1219,7 +1224,8 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
                 col: hit_col,
                 area,
                 x_in_cell: {
-                    let (cx, _, _, _) = layout.cell_rect(0, hit_col.max(0));
+                    let (cx, _, _, _) = crate::canvas::cell_rect(grid, 0, hit_col.max(0), &vp)
+                        .unwrap_or_else(|| layout.cell_rect(0, hit_col.max(0)));
                     local_x as f32 - cx as f32
                 },
                 y_in_cell: py,
@@ -1294,7 +1300,8 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
         if col_hit.hit_pinned_col {
             HitArea::FixedRow
         } else {
-            let (cx, _, cw, _) = layout.cell_rect(row, col);
+            let (cx, _, cw, _) = crate::canvas::cell_rect(grid, row, col, &vp)
+                .unwrap_or_else(|| layout.cell_rect(row, col));
             let col_left = cx;
             let col_right = cx + cw;
             let hit_half = header_resize_hit_half_width(grid);
@@ -1308,7 +1315,8 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
             }
         }
     } else if col_hit.in_fixed_col_area {
-        let (_, cy, _, ch) = layout.cell_rect(row, col);
+        let (_, cy, _, ch) = crate::canvas::cell_rect(grid, row, col, &vp)
+            .unwrap_or_else(|| layout.cell_rect(row, col));
         let row_top = cy;
         let row_bottom = cy + ch;
         if (effective_y - row_bottom).abs() <= 3 {
@@ -1323,7 +1331,8 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
         HitArea::Cell
     };
 
-    let (cx, cy, cw, ch) = layout.cell_rect(row, col);
+    let (cx, cy, cw, ch) =
+        crate::canvas::cell_rect(grid, row, col, &vp).unwrap_or_else(|| layout.cell_rect(row, col));
 
     if matches!(area, HitArea::Cell | HitArea::FixedRow | HitArea::FixedCol) {
         if let Some(rect) = button_picture_rect(grid, row, col, cx, cy, cw, ch) {
@@ -3049,6 +3058,10 @@ pub fn handle_scroll(grid: &mut VolvoxGrid, delta_x: f32, delta_y: f32) {
     let line_height = grid.default_row_height as f32;
     let dx = delta_x * line_height;
     let dy = delta_y * line_height;
+    if grid.handle_pull_to_refresh_scroll(dx, dy) {
+        grid.scroll.stop_fling();
+        return;
+    }
     let old_top_left =
         visible_top_left_for_scroll(grid, grid.scroll.scroll_x, grid.scroll.scroll_y);
 
@@ -3257,6 +3270,22 @@ mod tests {
         assert!(events
             .iter()
             .any(|e| matches!(e.data, GridEventData::AfterUserResize { row: -1, col: 0 })));
+    }
+
+    #[test]
+    fn hit_test_maps_extended_area_to_last_visible_column_when_trailing_column_is_hidden() {
+        let mut grid = VolvoxGrid::new(1, 300, 120, 3, 4, 1, 0);
+        grid.extend_last_col = true;
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cols_hidden.insert(3);
+        prime_layout(&mut grid);
+
+        let hit = hit_test(&mut grid, 250.0, 5.0);
+
+        assert_eq!(hit.area, HitArea::FixedRow);
+        assert_eq!(hit.col, 2);
     }
 
     #[test]

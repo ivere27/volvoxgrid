@@ -140,6 +140,10 @@ export enum CustomRenderMode {
   CUSTOM_RENDER_CELL = 1,
   CUSTOM_RENDER_ROW = 2,
 }
+export enum DemoDataFormat {
+  DEMO_DATA_FORMAT_UNSPECIFIED = 0,
+  DEMO_DATA_FORMAT_JSON = 1,
+}
 export enum DragMode {
   DRAG_NONE = 0,
   DRAG_MANUAL = 1,
@@ -289,6 +293,11 @@ export enum PrintOrientation {
   PRINT_PORTRAIT = 0,
   PRINT_LANDSCAPE = 1,
 }
+export enum PullToRefreshTheme {
+  PULL_TO_REFRESH_THEME_UNSPECIFIED = 0,
+  PULL_TO_REFRESH_THEME_TOP_BAND = 1,
+  PULL_TO_REFRESH_THEME_MATERIAL = 2,
+}
 export enum RenderLayerBit {
   RENDER_LAYER_OVERLAY_BANDS = 0,
   RENDER_LAYER_INDICATORS = 1,
@@ -315,7 +324,8 @@ export enum RenderLayerBit {
   RENDER_LAYER_ACTIVE_DROPDOWN = 22,
   RENDER_LAYER_SCROLL_BARS = 23,
   RENDER_LAYER_FAST_SCROLL = 24,
-  RENDER_LAYER_DEBUG_OVERLAY = 25,
+  RENDER_LAYER_PULL_TO_REFRESH = 25,
+  RENDER_LAYER_DEBUG_OVERLAY = 26,
 }
 export enum RendererMode {
   RENDERER_AUTO = 0,
@@ -971,7 +981,7 @@ export const FontFields = {
   "italic": 5,
   "underline": 6,
   "strikethrough": 7,
-  "width": 8,
+  "stretch": 8,
 } as const;
 export const FrameDoneFields = {
   "handle": 1,
@@ -1001,6 +1011,14 @@ export const GetCellsRequestFields = {
   "include_style": 6,
   "include_checked": 7,
   "include_typed": 8,
+} as const;
+export const GetDemoDataRequestFields = {
+  "demo": 1,
+} as const;
+export const GetDemoDataResponseFields = {
+  "demo": 1,
+  "format": 2,
+  "data": 3,
 } as const;
 export const GetHeaderRowEventFields = {
   "page": 1,
@@ -1101,6 +1119,8 @@ export const GridEventFields = {
   "before_page_break": 58,
   "start_page": 59,
   "get_header_row": 60,
+  "pull_to_refresh_triggered": 61,
+  "pull_to_refresh_canceled": 62,
 } as const;
 export const GridHandleFields = {
   "id": 1,
@@ -1442,6 +1462,16 @@ export const PrintRequestFields = {
 export const PrintResponseFields = {
   "pages": 1,
 } as const;
+export const PullToRefreshCanceledEventFields = {
+} as const;
+export const PullToRefreshConfigFields = {
+  "enabled": 1,
+  "theme": 2,
+  "text_pull": 3,
+  "text_release": 4,
+} as const;
+export const PullToRefreshTriggeredEventFields = {
+} as const;
 export const RegexQueryFields = {
   "pattern": 1,
 } as const;
@@ -1571,6 +1601,7 @@ export const ScrollConfigFields = {
   "pinch_zoom_enabled": 7,
   "fast_scroll": 8,
   "scrollbars": 9,
+  "pull_to_refresh": 10,
 } as const;
 export const ScrollEventFields = {
   "delta_x": 1,
@@ -1707,6 +1738,10 @@ export const SubtotalRequestFields = {
   "background": 6,
   "foreground": 7,
   "add_outline": 8,
+  "font": 9,
+} as const;
+export const SubtotalResultFields = {
+  "rows": 1,
 } as const;
 export const TextQueryFields = {
   "text": 1,
@@ -1806,6 +1841,7 @@ export const VolvoxGridServiceMethods = {
   SetRedraw: "/volvoxgrid.v1.VolvoxGridService/SetRedraw",
   Refresh: "/volvoxgrid.v1.VolvoxGridService/Refresh",
   LoadDemo: "/volvoxgrid.v1.VolvoxGridService/LoadDemo",
+  GetDemoData: "/volvoxgrid.v1.VolvoxGridService/GetDemoData",
   RenderSession: "/volvoxgrid.v1.VolvoxGridService/RenderSession",
   EventStream: "/volvoxgrid.v1.VolvoxGridService/EventStream",
 } as const;

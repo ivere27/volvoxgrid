@@ -229,6 +229,8 @@ pub enum GridEventData {
         text: String,
     },
     TypeAheadEnded,
+    PullToRefreshTriggered,
+    PullToRefreshCanceled,
     DataRefreshing,
     DataRefreshed,
     FilterData {

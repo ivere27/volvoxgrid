@@ -185,11 +185,11 @@ public class VolvoxGridServiceFfi
         return Empty.Parser.ParseFrom(result);
     }
 
-    public Empty Subtotal(SubtotalRequest request)
+    public SubtotalResult Subtotal(SubtotalRequest request)
     {
         byte[] data = request.ToByteArray();
         byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/Subtotal", data);
-        return Empty.Parser.ParseFrom(result);
+        return SubtotalResult.Parser.ParseFrom(result);
     }
 
     public Empty AutoSize(AutoSizeRequest request)
@@ -316,6 +316,13 @@ public class VolvoxGridServiceFfi
         byte[] data = request.ToByteArray();
         byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/LoadDemo", data);
         return Empty.Parser.ParseFrom(result);
+    }
+
+    public GetDemoDataResponse GetDemoData(GetDemoDataRequest request)
+    {
+        byte[] data = request.ToByteArray();
+        byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/GetDemoData", data);
+        return GetDemoDataResponse.Parser.ParseFrom(result);
     }
 
     public BidiStream<RenderInput, RenderOutput> RenderSession()

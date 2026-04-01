@@ -19,6 +19,7 @@ use crate::scrollbar::{
 use crate::selection::{HOVER_CELL, HOVER_COLUMN, HOVER_ROW};
 use crate::sort::{decode_sort_spec, merge_sort_spec};
 use crate::style;
+use std::collections::BTreeSet;
 
 const LEGACY_GRIDLINE_SOLID_HORIZONTAL: i32 = 4;
 const LEGACY_GRIDLINE_SOLID_VERTICAL: i32 = 5;
@@ -472,9 +473,9 @@ fn apply_grid_font_patch(target: &mut style::GridStyleState, patch: &v1::Font) {
     if let Some(v) = patch.strikethrough {
         target.font_strikethrough = v;
     }
-    if let Some(v) = patch.width {
+    if let Some(v) = patch.stretch {
         if v.is_finite() {
-            target.font_width = v;
+            target.font_stretch = v;
         }
     }
 }
@@ -490,7 +491,7 @@ fn grid_font_to_v1(target: &style::GridStyleState) -> v1::Font {
         italic: Some(target.font_italic),
         underline: Some(target.font_underline),
         strikethrough: Some(target.font_strikethrough),
-        width: Some(target.font_width),
+        stretch: Some(target.font_stretch),
     }
 }
 
@@ -553,7 +554,7 @@ fn font_to_v1(
         italic: font_italic,
         underline: None,
         strikethrough: None,
-        width: None,
+        stretch: None,
     }
 }
 
@@ -587,11 +588,17 @@ fn apply_cell_style_font_patch(target: &mut style::CellStylePatch, patch: &v1::F
     if let Some(v) = patch.strikethrough {
         target.font_strikethrough = Some(v);
     }
-    if let Some(v) = patch.width {
+    if let Some(v) = patch.stretch {
         if v.is_finite() {
-            target.font_width = Some(v);
+            target.font_stretch = Some(v);
         }
     }
+}
+
+pub fn v1_font_to_cell_style_patch(font: &v1::Font) -> style::CellStylePatch {
+    let mut patch = style::CellStylePatch::default();
+    apply_cell_style_font_patch(&mut patch, font);
+    patch
 }
 
 fn cell_style_font_to_v1(target: &style::CellStylePatch) -> Option<v1::Font> {
@@ -601,7 +608,7 @@ fn cell_style_font_to_v1(target: &style::CellStylePatch) -> Option<v1::Font> {
         && target.font_italic.is_none()
         && target.font_underline.is_none()
         && target.font_strikethrough.is_none()
-        && target.font_width.is_none()
+        && target.font_stretch.is_none()
     {
         return None;
     }
@@ -616,7 +623,7 @@ fn cell_style_font_to_v1(target: &style::CellStylePatch) -> Option<v1::Font> {
         italic: target.font_italic,
         underline: target.font_underline,
         strikethrough: target.font_strikethrough,
-        width: target.font_width,
+        stretch: target.font_stretch,
     })
 }
 
@@ -1585,6 +1592,26 @@ impl VolvoxGrid {
         if let Some(v) = sc.fast_scroll {
             self.fast_scroll_enabled = v;
         }
+        if let Some(ptr) = sc.pull_to_refresh.as_ref() {
+            if let Some(v) = ptr.enabled {
+                self.pull_to_refresh_enabled = v;
+                if !v {
+                    self.cancel_pull_to_refresh_contact(false);
+                    self.pull_to_refresh_state = crate::grid::PullToRefreshState::Idle;
+                    self.pull_to_refresh_reveal_px = 0.0;
+                    self.pull_to_refresh_target_reveal_px = 0.0;
+                }
+            }
+            if let Some(v) = ptr.theme {
+                self.pull_to_refresh_theme = VolvoxGrid::normalize_pull_to_refresh_theme(v);
+            }
+            if let Some(v) = &ptr.text_pull {
+                self.pull_to_refresh_text_pull = Some(v.clone());
+            }
+            if let Some(v) = &ptr.text_release {
+                self.pull_to_refresh_text_release = Some(v.clone());
+            }
+        }
         self.mark_dirty();
     }
 
@@ -1983,6 +2010,12 @@ impl VolvoxGrid {
             fling_friction: Some(self.fling_friction),
             pinch_zoom_enabled: Some(self.pinch_zoom_enabled),
             fast_scroll: Some(self.fast_scroll_enabled),
+            pull_to_refresh: Some(v1::PullToRefreshConfig {
+                enabled: Some(self.pull_to_refresh_enabled),
+                theme: Some(self.pull_to_refresh_theme()),
+                text_pull: self.pull_to_refresh_text_pull.clone(),
+                text_release: self.pull_to_refresh_text_release.clone(),
+            }),
             scroll_bar: Some(v1::ScrollBarConfig {
                 show_h: Some(self.scrollbar_show_h),
                 show_v: Some(self.scrollbar_show_v),
@@ -2089,12 +2122,15 @@ impl VolvoxGrid {
 
     /// Batch-set column properties. Only set (Some) fields per entry are applied.
     pub fn define_columns(&mut self, defs: &[v1::ColumnDef]) {
+        let mut auto_resize_cols = BTreeSet::new();
+
         for def in defs {
             let idx = def.index;
             if idx < 0 || idx >= self.cols {
                 continue;
             }
             let col = idx as usize;
+            let mut format_changed = false;
 
             // Width
             if let Some(w) = def.width {
@@ -2131,6 +2167,7 @@ impl VolvoxGrid {
                     cp.data_type = v;
                 }
                 if let Some(v) = &def.format {
+                    format_changed = cp.format != *v;
                     cp.format = v.clone();
                 }
                 if let Some(v) = &def.key {
@@ -2202,8 +2239,27 @@ impl VolvoxGrid {
                     self.set_col_sticky(idx, v);
                 }
             }
+
+            if format_changed {
+                auto_resize_cols.insert(idx);
+            }
         }
         self.layout.invalidate();
+        if self.auto_resize && !auto_resize_cols.is_empty() {
+            let resize_cols = self.auto_size_mode == 0 || self.auto_size_mode == 1;
+            let resize_rows = self.auto_size_mode == 0 || self.auto_size_mode == 2;
+
+            if resize_cols {
+                for &col in &auto_resize_cols {
+                    self.auto_resize_col(col);
+                }
+            }
+            if resize_cols && resize_rows && self.word_wrap {
+                for row in 0..self.rows {
+                    self.auto_resize_row(row);
+                }
+            }
+        }
         self.mark_dirty();
     }
 
@@ -2568,10 +2624,27 @@ impl VolvoxGrid {
             PlannedCellValueWrite::SetNull => {
                 self.cells.set_value(row, col, CellValueData::Empty);
                 self.cells.set_text(row, col, String::new());
+                if self
+                    .columns
+                    .get(col as usize)
+                    .map(|column| column.data_type == v1::ColumnDataType::ColumnDataBoolean as i32)
+                    .unwrap_or(false)
+                {
+                    self.cells.get_mut(row, col).extra_mut().checked =
+                        v1::CheckedState::CheckedUnchecked as i32;
+                }
             }
             PlannedCellValueWrite::Write { value, text } => {
                 self.cells.set_value(row, col, value.clone());
                 self.cells.set_text(row, col, text.clone());
+                if matches!(value, CellValueData::Bool(_)) {
+                    self.cells.get_mut(row, col).extra_mut().checked =
+                        if matches!(value, CellValueData::Bool(true)) {
+                            v1::CheckedState::CheckedChecked as i32
+                        } else {
+                            v1::CheckedState::CheckedUnchecked as i32
+                        };
+                }
             }
         }
     }
@@ -2589,6 +2662,16 @@ impl VolvoxGrid {
                     .entry((row, col))
                     .and_modify(|existing| existing.merge_from(&patch))
                     .or_insert(patch);
+            }
+            if s.progress.is_some() || s.progress_color.is_some() {
+                let cell = self.cells.get_mut(row, col);
+                let extra = cell.extra_mut();
+                if let Some(v) = s.progress {
+                    extra.progress_percent = v;
+                }
+                if let Some(v) = s.progress_color {
+                    extra.progress_color = v;
+                }
             }
         }
 
@@ -2754,6 +2837,7 @@ impl VolvoxGrid {
                 self.apply_value_plan(entry.update.row, entry.update.col, &entry.value_plan);
             }
         }
+        self.auto_resize_all();
         self.mark_dirty();
 
         v1::WriteResult {
@@ -2980,7 +3064,7 @@ pub fn v2_cell_style_to_engine(s: &v1::CellStyle) -> style::CellStylePatch {
         font_italic: None,
         font_underline: None,
         font_strikethrough: None,
-        font_width: None,
+        font_stretch: None,
         border,
         border_color,
         border_top,
@@ -3231,10 +3315,31 @@ mod tests {
     }
 
     #[test]
+    fn define_columns_format_change_auto_resizes_column_using_formatted_text() {
+        let mut grid = VolvoxGrid::new(1, 800, 600, 1, 1, 0, 0);
+        grid.default_col_width = 10;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 1;
+        grid.cells.set_text(0, 0, "1234567".to_string());
+
+        grid.auto_resize_col(0);
+        let before = grid.get_col_width(0);
+
+        grid.define_columns(&[v1::ColumnDef {
+            index: 0,
+            format: Some("#,##0".to_string()),
+            ..Default::default()
+        }]);
+
+        assert_eq!(grid.get_display_text(0, 0), "1,234,567");
+        assert!(grid.get_col_width(0) > before);
+    }
+
+    #[test]
     fn style_padding_partial_update() {
         let mut grid = test_grid();
-        assert_eq!(grid.style.cell_padding.left, 3);
-        assert_eq!(grid.style.cell_padding.right, 3);
+        assert_eq!(grid.style.cell_padding.left, 6);
+        assert_eq!(grid.style.cell_padding.right, 6);
 
         let config = v1::GridConfig {
             style: Some(v1::StyleConfig {
@@ -3249,9 +3354,9 @@ mod tests {
         grid.apply_config(&config);
 
         assert_eq!(grid.style.cell_padding.left, 12);
-        assert_eq!(grid.style.cell_padding.top, 0);
-        assert_eq!(grid.style.cell_padding.right, 3);
-        assert_eq!(grid.style.cell_padding.bottom, 0);
+        assert_eq!(grid.style.cell_padding.top, 2);
+        assert_eq!(grid.style.cell_padding.right, 6);
+        assert_eq!(grid.style.cell_padding.bottom, 2);
     }
 
     #[test]
@@ -3432,6 +3537,29 @@ mod tests {
                 value: Some(v1::cell_value::Value::Timestamp(v))
             }) if v == ts
         ));
+    }
+
+    #[test]
+    fn load_table_auto_resizes_columns_when_enabled() {
+        let mut grid = test_grid();
+        grid.default_col_width = 20;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 1;
+
+        let before = grid.get_col_width(0);
+        let result = grid.load_table(
+            1,
+            1,
+            &[v1::CellValue {
+                value: Some(v1::cell_value::Value::Text(
+                    "A much longer value".to_string(),
+                )),
+            }],
+            true,
+        );
+
+        assert_eq!(result.written_count, 1);
+        assert!(grid.get_col_width(0) > before);
     }
 
     #[test]
@@ -3765,6 +3893,29 @@ mod tests {
         assert_eq!(s.shrink_to_fit, Some(true));
     }
 
+    #[test]
+    fn apply_cell_style_progress_via_update_cells_updates_cell_extra() {
+        let mut grid = test_grid();
+        let updates = vec![v1::CellUpdate {
+            row: 1,
+            col: 1,
+            value: Some(v1::CellValue {
+                value: Some(v1::cell_value::Value::Number(42.0)),
+            }),
+            style: Some(v1::CellStyle {
+                progress: Some(0.42),
+                progress_color: Some(0xFF818CF8),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }];
+        grid.update_cells(&updates);
+
+        let cell = grid.cells.get(1, 1).expect("cell should exist");
+        assert!((cell.progress_percent() - 0.42).abs() < 1e-6);
+        assert_eq!(cell.progress_color(), 0xFF818CF8);
+    }
+
     // ── text_overflow + ellipsis interaction ────────────────────────
 
     #[test]
@@ -3781,5 +3932,59 @@ mod tests {
         grid.apply_config(&config);
         assert!(grid.text_overflow);
         assert_eq!(grid.ellipsis_mode, 1);
+    }
+
+    #[test]
+    fn pull_to_refresh_config_roundtrip() {
+        let mut grid = test_grid();
+        grid.pull_to_refresh_enabled = true;
+        grid.pull_to_refresh_theme = v1::PullToRefreshTheme::Material as i32;
+        grid.pull_to_refresh_text_pull = Some("Pull newer rows".to_string());
+        grid.pull_to_refresh_text_release = Some("Release now".to_string());
+
+        let config = grid.get_config();
+        let pull = config
+            .scrolling
+            .as_ref()
+            .and_then(|scrolling| scrolling.pull_to_refresh.as_ref())
+            .expect("pull_to_refresh config should be present");
+
+        assert_eq!(pull.enabled, Some(true));
+        assert_eq!(pull.theme, Some(v1::PullToRefreshTheme::Material as i32));
+        assert_eq!(pull.text_pull.as_deref(), Some("Pull newer rows"));
+        assert_eq!(pull.text_release.as_deref(), Some("Release now"));
+    }
+
+    #[test]
+    fn disabling_pull_to_refresh_resets_runtime_state() {
+        let mut grid = test_grid();
+        grid.pull_to_refresh_enabled = true;
+        grid.begin_pull_to_refresh_contact();
+        assert!(
+            grid.handle_pull_to_refresh_scroll(0.0, -(grid.pull_to_refresh_threshold_px() * 0.75),)
+        );
+        assert!(grid.pull_to_refresh_reveal_px > 0.0);
+
+        let config = v1::GridConfig {
+            scrolling: Some(v1::ScrollConfig {
+                pull_to_refresh: Some(v1::PullToRefreshConfig {
+                    enabled: Some(false),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        grid.apply_config(&config);
+
+        assert!(!grid.pull_to_refresh_enabled);
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            crate::grid::PullToRefreshState::Idle
+        ));
+        assert_eq!(grid.pull_to_refresh_reveal_px, 0.0);
+        assert_eq!(grid.pull_to_refresh_target_reveal_px, 0.0);
+        assert!(!grid.pull_to_refresh_contact_active);
     }
 }

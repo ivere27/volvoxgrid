@@ -12,7 +12,8 @@ wasm-opt = false
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["regex"]
+default = ["regex", "demo"]
+demo = ["volvoxgrid-engine/demo"]
 wasm-threads = ["dep:wasm-bindgen-rayon"]
 cosmic-text = ["volvoxgrid-engine/cosmic-text"]
 gpu = ["volvoxgrid-engine/gpu", "cosmic-text"]
@@ -20,7 +21,7 @@ rayon = ["volvoxgrid-engine/rayon"]
 regex = ["volvoxgrid-engine/regex"]
 
 [dependencies]
-volvoxgrid-engine = { path = "../../engine", default-features = false, features = ["demo", "proto"] }
+volvoxgrid-engine = { path = "../../engine", default-features = false, features = ["proto"] }
 prost = "0.12"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"

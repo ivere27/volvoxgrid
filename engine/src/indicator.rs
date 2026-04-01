@@ -50,7 +50,7 @@ impl Default for RowIndicatorState {
             fore_color: None,
             grid_lines: None,
             grid_color: None,
-            auto_size: false,
+            auto_size: true,
             allow_resize: false,
             allow_select: false,
             allow_reorder: false,

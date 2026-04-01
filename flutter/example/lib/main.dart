@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide Align;
 import 'package:flutter/services.dart';
 import 'package:volvoxgrid/volvoxgrid.dart' hide Padding;
+
+import 'sales_json_demo.dart';
+import 'hierarchy_json_demo.dart';
 
 const bool _forceFlingForDesktop = bool.fromEnvironment(
   'VG_ENABLE_FLING',
@@ -148,7 +153,13 @@ class _DemoPageState extends State<DemoPage> {
     await controller.setGridStyle(style);
     await controller.setRedraw(false);
     try {
-      await controller.loadDemo(mode.name);
+      if (mode == DemoMode.sales) {
+        await loadSalesJsonDemo(controller);
+      } else if (mode == DemoMode.hierarchy) {
+        await loadHierarchyJsonDemo(controller);
+      } else {
+        await controller.loadDemo(mode.name);
+      }
     } finally {
       await controller.setRedraw(true);
     }
@@ -218,6 +229,130 @@ class _DemoPageState extends State<DemoPage> {
         _statusText = 'Error: $e';
       });
     }
+  }
+
+  void _showGridDebugContextMenu(VolvoxGridContextMenuRequest request) {
+    final controller = _activeController;
+    final row = request.row;
+    final col = request.col;
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final anchor = overlay.globalToLocal(request.globalPosition);
+    final items = <PopupMenuEntry<String>>[];
+
+    if (row >= 0) {
+      final rowLabel = row + 1;
+      items.add(PopupMenuItem<String>(
+        value: 'pin_top',
+        child: Text('Pin Row $rowLabel to Top'),
+      ));
+      items.add(PopupMenuItem<String>(
+        value: 'pin_bottom',
+        child: Text('Pin Row $rowLabel to Bottom'),
+      ));
+      items.add(PopupMenuItem<String>(
+        value: 'unpin',
+        child: Text('Unpin Row $rowLabel'),
+      ));
+      items.add(const PopupMenuDivider());
+      items.add(PopupMenuItem<String>(
+        value: 'sticky_top',
+        child: Text('Sticky Row $rowLabel to Top'),
+      ));
+      items.add(PopupMenuItem<String>(
+        value: 'sticky_bottom',
+        child: Text('Sticky Row $rowLabel to Bottom'),
+      ));
+      items.add(PopupMenuItem<String>(
+        value: 'sticky_both',
+        child: Text('Sticky Row $rowLabel Both'),
+      ));
+      items.add(PopupMenuItem<String>(
+        value: 'unsticky_row',
+        child: Text('Unsticky Row $rowLabel'),
+      ));
+    }
+
+    if (col >= 0) {
+      if (items.isNotEmpty) {
+        items.add(const PopupMenuDivider());
+      }
+      items.add(PopupMenuItem<String>(
+        value: 'sticky_left',
+        child: Text('Sticky Col $col to Left'),
+      ));
+      items.add(PopupMenuItem<String>(
+        value: 'sticky_right',
+        child: Text('Sticky Col $col to Right'),
+      ));
+      items.add(PopupMenuItem<String>(
+        value: 'sticky_col_both',
+        child: Text('Sticky Col $col Both'),
+      ));
+      items.add(PopupMenuItem<String>(
+        value: 'unsticky_col',
+        child: Text('Unsticky Col $col'),
+      ));
+    }
+
+    if (items.isNotEmpty) {
+      items.add(const PopupMenuDivider());
+    }
+    items.add(const PopupMenuItem<String>(value: 'copy', child: Text('Copy')));
+
+    unawaited(showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        anchor.dx,
+        anchor.dy,
+        anchor.dx + 1,
+        anchor.dy + 1,
+      ),
+      items: items,
+    ).then((value) async {
+      if (value == null) {
+        return;
+      }
+      switch (value) {
+        case 'pin_top':
+          await controller.pinRow(row, PinPosition.PIN_TOP);
+          break;
+        case 'pin_bottom':
+          await controller.pinRow(row, PinPosition.PIN_BOTTOM);
+          break;
+        case 'unpin':
+          await controller.pinRow(row, PinPosition.PIN_NONE);
+          break;
+        case 'sticky_top':
+          await controller.setRowSticky(row, StickyEdge.STICKY_TOP);
+          break;
+        case 'sticky_bottom':
+          await controller.setRowSticky(row, StickyEdge.STICKY_BOTTOM);
+          break;
+        case 'sticky_both':
+          await controller.setRowSticky(row, StickyEdge.STICKY_BOTH);
+          break;
+        case 'unsticky_row':
+          await controller.setRowSticky(row, StickyEdge.STICKY_NONE);
+          break;
+        case 'sticky_left':
+          await controller.setColSticky(col, StickyEdge.STICKY_LEFT);
+          break;
+        case 'sticky_right':
+          await controller.setColSticky(col, StickyEdge.STICKY_RIGHT);
+          break;
+        case 'sticky_col_both':
+          await controller.setColSticky(col, StickyEdge.STICKY_BOTH);
+          break;
+        case 'unsticky_col':
+          await controller.setColSticky(col, StickyEdge.STICKY_NONE);
+          break;
+        case 'copy':
+          final resp = await controller.copy();
+          await Clipboard.setData(ClipboardData(text: resp.text));
+          break;
+      }
+      await controller.refresh();
+    }));
   }
 
   void _onSelectionChanged(SelectionUpdate sel) {
@@ -580,6 +715,7 @@ class _DemoPageState extends State<DemoPage> {
                 : VolvoxGridWidget(
                     controller: _activeController,
                     onSelectionChanged: _onSelectionChanged,
+                    onContextMenuRequest: _showGridDebugContextMenu,
                   ),
           ),
           // Status bar

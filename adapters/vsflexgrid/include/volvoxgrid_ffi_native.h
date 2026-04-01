@@ -193,6 +193,7 @@ uint8_t* volvox_grid_subtotal(
     uint32_t background,
     uint32_t foreground,
     int32_t add_outline,
+    const uint8_t* font, int32_t font_len,
     int32_t* out_len
 );
 
@@ -323,6 +324,12 @@ uint8_t* volvox_grid_refresh(
 /* LoadDemo */
 uint8_t* volvox_grid_load_demo(
     int64_t grid_id,
+    const uint8_t* demo, int32_t demo_len,
+    int32_t* out_len
+);
+
+/* GetDemoData */
+uint8_t* volvox_grid_get_demo_data(
     const uint8_t* demo, int32_t demo_len,
     int32_t* out_len
 );

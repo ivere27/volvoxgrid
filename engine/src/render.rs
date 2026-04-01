@@ -583,6 +583,78 @@ mod tests {
     }
 
     #[test]
+    fn render_merged_background_spans_sticky_and_scrollable_fragments() {
+        let merged_bg = 0xFFCC8844;
+        let mut grid = VolvoxGrid::new(1, 80, 60, 1, 4, 0, 0);
+        grid.style.grid_lines = pb::GridLineStyle::GridlineNone as i32;
+        grid.style.grid_lines_fixed = pb::GridLineStyle::GridlineNone as i32;
+        grid.style.back_color_bkg = 0xFFFFFFFF;
+        grid.auto_resize = false;
+        grid.selection.focus_border = pb::FocusBorderStyle::FocusBorderNone as i32;
+        grid.selection.selection_visibility = pb::SelectionVisibility::SelectionVisNone as i32;
+        for row in 0..grid.rows {
+            grid.set_row_height(row, 24);
+        }
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cell_styles.insert(
+            (0, 0),
+            crate::style::CellStylePatch {
+                back_color: Some(merged_bg),
+                ..Default::default()
+            },
+        );
+        grid.merge_cells(0, 0, 0, 2);
+        grid.set_col_sticky(1, 3);
+        grid.scroll.scroll_x = 41.0;
+        grid.ensure_layout();
+
+        let mut renderer = Renderer::with_custom_text_renderer(Box::new(SolidTextRenderer));
+        let mut buffer = vec![0u8; (80 * 60 * 4) as usize];
+        renderer.render(&grid, &mut buffer, 80, 60, 80 * 4);
+
+        assert_eq!(pixel_argb(&buffer, 80, 20, 10), merged_bg);
+        assert_eq!(pixel_argb(&buffer, 80, 60, 10), merged_bg);
+    }
+
+    #[test]
+    fn render_pinned_bottom_merged_background_survives_horizontal_scroll_with_sticky_col() {
+        let merged_bg = 0xFFCC8844;
+        let mut grid = VolvoxGrid::new(1, 80, 60, 2, 6, 0, 0);
+        grid.style.grid_lines = pb::GridLineStyle::GridlineNone as i32;
+        grid.style.grid_lines_fixed = pb::GridLineStyle::GridlineNone as i32;
+        grid.style.back_color_bkg = 0xFFFFFFFF;
+        grid.auto_resize = false;
+        grid.selection.focus_border = pb::FocusBorderStyle::FocusBorderNone as i32;
+        grid.selection.selection_visibility = pb::SelectionVisibility::SelectionVisNone as i32;
+        for row in 0..grid.rows {
+            grid.set_row_height(row, 24);
+        }
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cell_styles.insert(
+            (1, 0),
+            crate::style::CellStylePatch {
+                back_color: Some(merged_bg),
+                ..Default::default()
+            },
+        );
+        grid.merge_cells(1, 0, 1, 2);
+        grid.pin_row(1, 2);
+        grid.set_col_sticky(1, 3);
+        grid.scroll.scroll_x = 121.0;
+        grid.ensure_layout();
+
+        let mut renderer = Renderer::with_custom_text_renderer(Box::new(SolidTextRenderer));
+        let mut buffer = vec![0u8; (80 * 60 * 4) as usize];
+        renderer.render(&grid, &mut buffer, 80, 60, 80 * 4);
+
+        assert_eq!(pixel_argb(&buffer, 80, 20, 45), merged_bg);
+    }
+
+    #[test]
     fn render_corner_top_start_uses_same_bottom_border_as_col_indicator() {
         let mut grid = VolvoxGrid::new(1, 180, 80, 2, 2, 0, 0);
         grid.indicator_bands.row_start.visible = true;

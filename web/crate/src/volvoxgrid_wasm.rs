@@ -258,7 +258,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn set_left_col(&self, request: SetColRequest) -> Result<Empty, String>;
     fn edit(&self, request: EditCommand) -> Result<EditState, String>;
     fn sort(&self, request: SortRequest) -> Result<Empty, String>;
-    fn subtotal(&self, request: SubtotalRequest) -> Result<Empty, String>;
+    fn subtotal(&self, request: SubtotalRequest) -> Result<SubtotalResult, String>;
     fn auto_size(&self, request: AutoSizeRequest) -> Result<Empty, String>;
     fn outline(&self, request: OutlineRequest) -> Result<Empty, String>;
     fn get_node(&self, request: GetNodeRequest) -> Result<NodeInfo, String>;
@@ -277,6 +277,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn set_redraw(&self, request: SetRedrawRequest) -> Result<Empty, String>;
     fn refresh(&self, request: GridHandle) -> Result<Empty, String>;
     fn load_demo(&self, request: LoadDemoRequest) -> Result<Empty, String>;
+    fn get_demo_data(&self, request: GetDemoDataRequest) -> Result<GetDemoDataResponse, String>;
     fn render_session(
         &self,
         stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
@@ -1199,6 +1200,7 @@ pub fn volvox_grid_subtotal(
     background: u32,
     foreground: u32,
     add_outline: bool,
+    font: &[u8],
 ) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
@@ -1216,6 +1218,13 @@ pub fn volvox_grid_subtotal(
         background,
         foreground,
         add_outline,
+        font: match Font::decode(font) {
+            Ok(m) => Some(m),
+            Err(e) => {
+                set_last_error(format!("decode 'font': {}", e));
+                return Vec::new();
+            }
+        },
         ..Default::default()
     };
     match plugin.subtotal(req) {
@@ -1765,6 +1774,33 @@ pub fn volvox_grid_load_demo(grid_id: i64, demo: &str) -> Vec<u8> {
         ..Default::default()
     };
     match plugin.load_demo(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub fn volvox_grid_get_demo_data(demo: &str) -> Vec<u8> {
+    let plugin = match get_volvox_grid_service_plugin() {
+        Some(p) => p,
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = GetDemoDataRequest {
+        demo: demo.to_string(),
+        ..Default::default()
+    };
+    match plugin.get_demo_data(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();

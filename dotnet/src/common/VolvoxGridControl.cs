@@ -137,6 +137,86 @@ namespace VolvoxGrid.DotNet
             set { if (_config.Rendering.DebugOverlay != value) { _config.Rendering.DebugOverlay = value; ApplyEngineConfig(); } }
         }
 
+        public uint CellBackColor
+        {
+            get { return EnsureStyleConfig().Background ?? 0; }
+            set { var cfg = EnsureStyleConfig(); if (cfg.Background != value) { cfg.Background = value; ApplyEngineConfig(); } }
+        }
+
+        public uint CellForeColor
+        {
+            get { return EnsureStyleConfig().Foreground ?? 0; }
+            set { var cfg = EnsureStyleConfig(); if (cfg.Foreground != value) { cfg.Foreground = value; ApplyEngineConfig(); } }
+        }
+
+        public uint AlternateRowBackColor
+        {
+            get { return EnsureStyleConfig().AlternateBackground ?? 0; }
+            set { var cfg = EnsureStyleConfig(); if (cfg.AlternateBackground != value) { cfg.AlternateBackground = value; ApplyEngineConfig(); } }
+        }
+
+        public uint GridLineColor
+        {
+            get { return EnsureBodyGridLinesConfig().Color ?? 0; }
+            set
+            {
+                var cfg = EnsureBodyGridLinesConfig();
+                if (cfg.Color != value || cfg.Style != VolvoxGridLineStyle.Solid || cfg.Width != 1)
+                {
+                    cfg.Color = value;
+                    cfg.Style = VolvoxGridLineStyle.Solid;
+                    cfg.Width = 1;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public uint FixedCellBackColor
+        {
+            get { return EnsureFixedStyleConfig().Background ?? 0; }
+            set { var cfg = EnsureFixedStyleConfig(); if (cfg.Background != value) { cfg.Background = value; ApplyEngineConfig(); } }
+        }
+
+        public uint FixedCellForeColor
+        {
+            get { return EnsureFixedStyleConfig().Foreground ?? 0; }
+            set { var cfg = EnsureFixedStyleConfig(); if (cfg.Foreground != value) { cfg.Foreground = value; ApplyEngineConfig(); } }
+        }
+
+        public uint FixedGridLineColor
+        {
+            get { return EnsureFixedGridLinesConfig().Color ?? 0; }
+            set
+            {
+                var cfg = EnsureFixedGridLinesConfig();
+                if (cfg.Color != value || cfg.Style != VolvoxGridLineStyle.Solid || cfg.Width != 1)
+                {
+                    cfg.Color = value;
+                    cfg.Style = VolvoxGridLineStyle.Solid;
+                    cfg.Width = 1;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public uint SheetBackColor
+        {
+            get { return EnsureStyleConfig().SheetBackground ?? 0; }
+            set { var cfg = EnsureStyleConfig(); if (cfg.SheetBackground != value) { cfg.SheetBackground = value; ApplyEngineConfig(); } }
+        }
+
+        public uint SheetBorderColor
+        {
+            get { return EnsureStyleConfig().SheetBorder ?? 0; }
+            set { var cfg = EnsureStyleConfig(); if (cfg.SheetBorder != value) { cfg.SheetBorder = value; ApplyEngineConfig(); } }
+        }
+
+        public uint DefaultProgressColor
+        {
+            get { return EnsureStyleConfig().ProgressColor ?? 0; }
+            set { var cfg = EnsureStyleConfig(); if (cfg.ProgressColor != value) { cfg.ProgressColor = value; ApplyEngineConfig(); } }
+        }
+
         public bool ScrollBlitEnabled
         {
             get { return _config.Rendering.ScrollBlit ?? false; }
@@ -159,6 +239,33 @@ namespace VolvoxGrid.DotNet
         {
             get { return _config.Editing.EditTrigger != VolvoxEditTrigger.None; }
             set { var trigger = value ? VolvoxEditTrigger.KeyClick : VolvoxEditTrigger.None; if (_config.Editing.EditTrigger != trigger) { _config.Editing.EditTrigger = trigger; ApplyEngineConfig(); } }
+        }
+
+        public VolvoxGridDropdownTrigger DropdownTrigger
+        {
+            get { return (VolvoxGridDropdownTrigger)(_config.Editing.DropdownTrigger ?? VolvoxDropdownTrigger.Never); }
+            set
+            {
+                var mapped = (VolvoxDropdownTrigger)value;
+                if (_config.Editing.DropdownTrigger != mapped)
+                {
+                    _config.Editing.DropdownTrigger = mapped;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public bool DropdownSearch
+        {
+            get { return _config.Editing.DropdownSearch ?? false; }
+            set
+            {
+                if (_config.Editing.DropdownSearch != value)
+                {
+                    _config.Editing.DropdownSearch = value;
+                    ApplyEngineConfig();
+                }
+            }
         }
 
         public VolvoxGridSelectionMode SelectionMode
@@ -206,6 +313,46 @@ namespace VolvoxGrid.DotNet
         {
             get { return (_config.Selection.HoverMask ?? 0) != 0; }
             set { uint mask = value ? 7u : 0u; if (_config.Selection.HoverMask != mask) { _config.Selection.HoverMask = mask; ApplyEngineConfig(); } }
+        }
+
+        public void SetSelectionStyle(uint? backColor = null, uint? foreColor = null)
+        {
+            if (ApplyHighlightStyle(EnsureSelectionStyleConfig(), backColor, foreColor, null, null))
+            {
+                ApplyEngineConfig();
+            }
+        }
+
+        public void SetHoverRowStyle(uint? backColor = null, uint? foreColor = null, VolvoxGridBorderStyle? borderStyle = null, uint? borderColor = null)
+        {
+            if (ApplyHighlightStyle(EnsureHoverRowStyleConfig(), backColor, foreColor, borderStyle, borderColor))
+            {
+                ApplyEngineConfig();
+            }
+        }
+
+        public void SetHoverColumnStyle(uint? backColor = null, uint? foreColor = null, VolvoxGridBorderStyle? borderStyle = null, uint? borderColor = null)
+        {
+            if (ApplyHighlightStyle(EnsureHoverColumnStyleConfig(), backColor, foreColor, borderStyle, borderColor))
+            {
+                ApplyEngineConfig();
+            }
+        }
+
+        public void SetHoverCellStyle(uint? backColor = null, uint? foreColor = null, VolvoxGridBorderStyle? borderStyle = null, uint? borderColor = null)
+        {
+            if (ApplyHighlightStyle(EnsureHoverCellStyleConfig(), backColor, foreColor, borderStyle, borderColor))
+            {
+                ApplyEngineConfig();
+            }
+        }
+
+        public void SetActiveCellStyle(uint? backColor = null, uint? foreColor = null, VolvoxGridBorderStyle? borderStyle = null, uint? borderColor = null)
+        {
+            if (ApplyHighlightStyle(EnsureActiveCellStyleConfig(), backColor, foreColor, borderStyle, borderColor))
+            {
+                ApplyEngineConfig();
+            }
         }
 
         public bool FlingEnabled
@@ -339,6 +486,24 @@ namespace VolvoxGrid.DotNet
             }
         }
 
+        public uint ColumnHeaderBackColor
+        {
+            get { return EnsureColIndicatorTopConfig().BackColor ?? 0; }
+            set { var cfg = EnsureColIndicatorTopConfig(); if (cfg.BackColor != value) { cfg.BackColor = value; ApplyEngineConfig(); } }
+        }
+
+        public uint ColumnHeaderForeColor
+        {
+            get { return EnsureColIndicatorTopConfig().ForeColor ?? 0; }
+            set { var cfg = EnsureColIndicatorTopConfig(); if (cfg.ForeColor != value) { cfg.ForeColor = value; ApplyEngineConfig(); } }
+        }
+
+        public uint ColumnHeaderGridColor
+        {
+            get { return EnsureColIndicatorTopConfig().GridColor ?? 0; }
+            set { var cfg = EnsureColIndicatorTopConfig(); if (cfg.GridColor != value) { cfg.GridColor = value; ApplyEngineConfig(); } }
+        }
+
         public bool ShowRowIndicator
         {
             get { return EnsureRowIndicatorStartConfig().Visible ?? false; }
@@ -388,10 +553,48 @@ namespace VolvoxGrid.DotNet
             }
         }
 
+        public uint RowIndicatorBackColor
+        {
+            get { return EnsureRowIndicatorStartConfig().BackColor ?? 0; }
+            set { var cfg = EnsureRowIndicatorStartConfig(); if (cfg.BackColor != value) { cfg.BackColor = value; ApplyEngineConfig(); } }
+        }
+
+        public uint RowIndicatorForeColor
+        {
+            get { return EnsureRowIndicatorStartConfig().ForeColor ?? 0; }
+            set { var cfg = EnsureRowIndicatorStartConfig(); if (cfg.ForeColor != value) { cfg.ForeColor = value; ApplyEngineConfig(); } }
+        }
+
+        public uint RowIndicatorGridColor
+        {
+            get { return EnsureRowIndicatorStartConfig().GridColor ?? 0; }
+            set { var cfg = EnsureRowIndicatorStartConfig(); if (cfg.GridColor != value) { cfg.GridColor = value; ApplyEngineConfig(); } }
+        }
+
         public VolvoxGridTreeIndicatorStyle TreeIndicator
         {
             get { return (VolvoxGridTreeIndicatorStyle)(_config.Outline.TreeIndicator ?? VolvoxTreeIndicatorStyle.None); }
             set { var mapped = (VolvoxTreeIndicatorStyle)value; if (_config.Outline.TreeIndicator != mapped) { _config.Outline.TreeIndicator = mapped; ApplyEngineConfig(); } }
+        }
+
+        public bool MultiTotals
+        {
+            get { return _config.Outline.MultiTotals ?? false; }
+            set { if (_config.Outline.MultiTotals != value) { _config.Outline.MultiTotals = value; ApplyEngineConfig(); } }
+        }
+
+        public VolvoxGridGroupTotalPosition GroupTotalPosition
+        {
+            get { return (VolvoxGridGroupTotalPosition)(_config.Outline.GroupTotalPosition ?? VolvoxGroupTotalPosition.Above); }
+            set
+            {
+                var mapped = (VolvoxGroupTotalPosition)value;
+                if (_config.Outline.GroupTotalPosition != mapped)
+                {
+                    _config.Outline.GroupTotalPosition = mapped;
+                    ApplyEngineConfig();
+                }
+            }
         }
 
         public VolvoxGridCellSpanMode CellSpanMode
@@ -514,6 +717,109 @@ namespace VolvoxGrid.DotNet
             if (_config.Indicators == null) _config.Indicators = new VolvoxIndicatorsConfigData();
             if (_config.Indicators.RowIndicatorStart == null) _config.Indicators.RowIndicatorStart = new VolvoxRowIndicatorConfigData();
             return _config.Indicators.RowIndicatorStart;
+        }
+
+        private VolvoxStyleConfigData EnsureStyleConfig()
+        {
+            if (_config.Style == null) _config.Style = new VolvoxStyleConfigData();
+            return _config.Style;
+        }
+
+        private VolvoxSelectionConfigData EnsureSelectionConfig()
+        {
+            if (_config.Selection == null) _config.Selection = new VolvoxSelectionConfigData();
+            return _config.Selection;
+        }
+
+        private VolvoxRegionStyleData EnsureFixedStyleConfig()
+        {
+            var style = EnsureStyleConfig();
+            if (style.Fixed == null) style.Fixed = new VolvoxRegionStyleData();
+            return style.Fixed;
+        }
+
+        private VolvoxGridLinesData EnsureBodyGridLinesConfig()
+        {
+            var style = EnsureStyleConfig();
+            if (style.GridLines == null) style.GridLines = new VolvoxGridLinesData();
+            return style.GridLines;
+        }
+
+        private VolvoxGridLinesData EnsureFixedGridLinesConfig()
+        {
+            var style = EnsureFixedStyleConfig();
+            if (style.GridLines == null) style.GridLines = new VolvoxGridLinesData();
+            return style.GridLines;
+        }
+
+        private VolvoxHighlightStyleData EnsureSelectionStyleConfig()
+        {
+            var selection = EnsureSelectionConfig();
+            if (selection.SelectionStyle == null) selection.SelectionStyle = new VolvoxHighlightStyleData();
+            return selection.SelectionStyle;
+        }
+
+        private VolvoxHighlightStyleData EnsureHoverRowStyleConfig()
+        {
+            var selection = EnsureSelectionConfig();
+            if (selection.HoverRowStyle == null) selection.HoverRowStyle = new VolvoxHighlightStyleData();
+            return selection.HoverRowStyle;
+        }
+
+        private VolvoxHighlightStyleData EnsureHoverColumnStyleConfig()
+        {
+            var selection = EnsureSelectionConfig();
+            if (selection.HoverColumnStyle == null) selection.HoverColumnStyle = new VolvoxHighlightStyleData();
+            return selection.HoverColumnStyle;
+        }
+
+        private VolvoxHighlightStyleData EnsureHoverCellStyleConfig()
+        {
+            var selection = EnsureSelectionConfig();
+            if (selection.HoverCellStyle == null) selection.HoverCellStyle = new VolvoxHighlightStyleData();
+            return selection.HoverCellStyle;
+        }
+
+        private VolvoxHighlightStyleData EnsureActiveCellStyleConfig()
+        {
+            var selection = EnsureSelectionConfig();
+            if (selection.ActiveCellStyle == null) selection.ActiveCellStyle = new VolvoxHighlightStyleData();
+            return selection.ActiveCellStyle;
+        }
+
+        private static bool ApplyHighlightStyle(
+            VolvoxHighlightStyleData style,
+            uint? backColor,
+            uint? foreColor,
+            VolvoxGridBorderStyle? borderStyle,
+            uint? borderColor)
+        {
+            bool changed = false;
+            if (backColor.HasValue && style.Background != backColor.Value)
+            {
+                style.Background = backColor.Value;
+                changed = true;
+            }
+            if (foreColor.HasValue && style.Foreground != foreColor.Value)
+            {
+                style.Foreground = foreColor.Value;
+                changed = true;
+            }
+            if (borderStyle.HasValue)
+            {
+                var mapped = (VolvoxBorderStyle)borderStyle.Value;
+                if (style.BorderStyle != mapped)
+                {
+                    style.BorderStyle = mapped;
+                    changed = true;
+                }
+            }
+            if (borderColor.HasValue && style.BorderColor != borderColor.Value)
+            {
+                style.BorderColor = borderColor.Value;
+                changed = true;
+            }
+            return changed;
         }
 
         private VolvoxColIndicatorConfigData EnsureColIndicatorTopConfig()
@@ -845,6 +1151,20 @@ namespace VolvoxGrid.DotNet
             catch (Exception ex) { _lastError = ex.Message; }
         }
 
+        public void SetCellCheckedState(int row, int col, VolvoxGridCheckedState state)
+        {
+            if (row < 0 || col < 0 || !EnsureEngine()) return;
+            try
+            {
+                _client.UpdateCells(
+                    _gridId,
+                    new[] { new VolvoxCellUpdateData { Row = row, Col = col, Checked = (VolvoxCheckedState)state } },
+                    false);
+                _renderHost.RequestFrame();
+            }
+            catch (Exception ex) { _lastError = ex.Message; }
+        }
+
         public void SetCellText(int row, int col, string text)
         {
             if (row < 0 || col < 0 || !EnsureEngine()) return;
@@ -874,10 +1194,53 @@ namespace VolvoxGrid.DotNet
             if (_client == null || _gridId == 0 || row < 0 || col < 0) return string.Empty;
             try
             {
-                var cells = _client.GetCells(_gridId, row, col, row, col, false, false, true);
+                var cells = _client.GetCells(_gridId, row, col, row, col, false, false, false);
                 return cells.Count > 0 && cells[0].Value != null ? (cells[0].Value.TextValue ?? string.Empty) : string.Empty;
             }
             catch (Exception ex) { _lastError = ex.Message; return string.Empty; }
+        }
+
+        public VolvoxGridCheckedState GetCellCheckedState(int row, int col)
+        {
+            if (_client == null || _gridId == 0 || row < 0 || col < 0) return VolvoxGridCheckedState.Unchecked;
+            try
+            {
+                var cells = _client.GetCells(_gridId, row, col, row, col, false, true, false);
+                if (cells.Count > 0 && cells[0].Checked.HasValue)
+                {
+                    return (VolvoxGridCheckedState)cells[0].Checked.Value;
+                }
+            }
+            catch (Exception ex) { _lastError = ex.Message; }
+            return VolvoxGridCheckedState.Unchecked;
+        }
+
+        public void SetCellProgress(int row, int col, float percent, uint? colorArgb = null)
+        {
+            if (row < 0 || col < 0 || !EnsureEngine()) return;
+            if (float.IsNaN(percent) || float.IsInfinity(percent)) percent = 0f;
+            percent = Math.Max(0f, Math.Min(1f, percent));
+            try
+            {
+                _client.UpdateCells(
+                    _gridId,
+                    new[]
+                    {
+                        new VolvoxCellUpdateData
+                        {
+                            Row = row,
+                            Col = col,
+                            Style = new VolvoxCellStylePatch
+                            {
+                                ProgressPercent = percent,
+                                ProgressColor = colorArgb,
+                            }
+                        }
+                    },
+                    false);
+                _renderHost.RequestFrame();
+            }
+            catch (Exception ex) { _lastError = ex.Message; }
         }
 
         public void SetCells(IEnumerable<VolvoxGridCellText> cells)
@@ -1165,6 +1528,7 @@ namespace VolvoxGrid.DotNet
         {
             if (_client == null || _gridId == 0) return;
             _client.Subtotal(_gridId, (VolvoxAggregateType)agg, groupCol, aggCol, caption, backColor, foreColor, addOutline);
+            if (_engineManagedData) SyncRowCountFromEngine();
             _renderHost.RequestFrame();
         }
 
@@ -1293,6 +1657,17 @@ namespace VolvoxGrid.DotNet
             catch (Exception ex) { _lastError = ex.Message; return false; }
         }
 
+        public byte[] GetDemoData(string demo)
+        {
+            if (string.IsNullOrEmpty(demo) || !EnsureEngine()) return new byte[0];
+            try
+            {
+                _lastError = null;
+                return _client.GetDemoData(demo);
+            }
+            catch (Exception ex) { _lastError = ex.Message; return new byte[0]; }
+        }
+
         public void BeginEdit(int row, int col, bool? selectAll = null, bool? caretEnd = null, string seedText = null)
         {
             if (row < 0 || col < 0 || !EnsureEngine()) return;
@@ -1333,6 +1708,9 @@ namespace VolvoxGrid.DotNet
             try
             {
                 _client.LoadData(_gridId, data ?? new byte[0]);
+                _engineManagedData = true;
+                _tableModel = null;
+                SyncRowCountFromEngine();
                 _client.Refresh(_gridId);
                 _renderHost.RequestFrame();
             }
@@ -1721,6 +2099,7 @@ namespace VolvoxGrid.DotNet
                 var config = _client.GetConfig(_gridId);
                 if (config == null) return;
                 _config.Layout = config.Layout ?? new VolvoxLayoutConfigData();
+                _config.Style = config.Style ?? new VolvoxStyleConfigData();
                 _config.Selection = config.Selection ?? new VolvoxSelectionConfigData();
                 _config.Editing = config.Editing ?? new VolvoxEditConfigData();
                 _config.Scrolling = config.Scrolling ?? new VolvoxScrollConfigData();
@@ -1862,6 +2241,17 @@ namespace VolvoxGrid.DotNet
         private int ResolveDemoRowCountHint(string d)
         {
             switch ((d ?? "").ToLowerInvariant()) { case "stress": return 1000001; case "hierarchy": return 256; default: return 2048; }
+        }
+
+        private void SyncRowCountFromEngine()
+        {
+            try
+            {
+                var config = _client.GetConfig(_gridId);
+                if (config != null && config.Layout != null && config.Layout.Rows.HasValue)
+                    _engineRowCountHint = config.Layout.Rows.Value;
+            }
+            catch { /* best effort */ }
         }
 
         #endregion

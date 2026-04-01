@@ -1,4 +1,7 @@
+use flate2::{write::GzEncoder, Compression};
+use std::io::Write;
 use std::process::Command;
+use std::{fs, path::PathBuf};
 
 fn command_stdout(cmd: &mut Command) -> Option<String> {
     let output = cmd.output().ok()?;
@@ -55,6 +58,7 @@ fn emit_build_metadata() {
     println!("cargo:rerun-if-env-changed=VOLVOXGRID_VERSION");
     println!("cargo:rerun-if-env-changed=VOLVOXGRID_GIT_COMMIT");
     println!("cargo:rerun-if-env-changed=VOLVOXGRID_BUILD_DATE");
+    println!("cargo:rerun-if-env-changed=CARGO_FEATURE_DEMO");
     emit_git_rerun_hints();
 
     let version = resolve_env_or("VOLVOXGRID_VERSION", || {
@@ -72,8 +76,43 @@ fn emit_build_metadata() {
     println!("cargo:rustc-env=VOLVOXGRID_BUILD_DATE={build_date}");
 }
 
+fn repo_root() -> PathBuf {
+    PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").expect("manifest dir should exist"))
+        .parent()
+        .expect("engine crate should live under repo root")
+        .to_path_buf()
+}
+
+fn compress_demo_fixture(
+    out_dir: &std::path::Path,
+    fixture_name: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let source = repo_root().join("testdata").join(fixture_name);
+    println!("cargo:rerun-if-changed={}", source.display());
+    let bytes = fs::read(&source)?;
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::best());
+    encoder.write_all(&bytes)?;
+    let compressed = encoder.finish()?;
+    fs::write(out_dir.join(format!("{fixture_name}.gz")), compressed)?;
+    Ok(())
+}
+
+fn emit_demo_assets() -> Result<(), Box<dyn std::error::Error>> {
+    let out_dir = PathBuf::from(std::env::var("OUT_DIR")?);
+    compress_demo_fixture(&out_dir, "sales.json")?;
+    compress_demo_fixture(&out_dir, "hierarchy.json")?;
+    Ok(())
+}
+
+fn demo_feature_enabled() -> bool {
+    std::env::var_os("CARGO_FEATURE_DEMO").is_some()
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     emit_build_metadata();
+    if demo_feature_enabled() {
+        emit_demo_assets()?;
+    }
 
     let includes: &[&str] = &["../proto"];
     let protos: &[&str] = &["../proto/volvoxgrid.proto"];

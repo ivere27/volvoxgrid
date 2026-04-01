@@ -8,6 +8,7 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -204,6 +205,11 @@ class MainActivity : AppCompatActivity() {
                         updateStatus("Sorted on column ${event.afterSort.col}")
                     }
                 }
+            }
+        }
+        gridView.contextMenuRequestListener = object : VolvoxGridView.ContextMenuRequestListener {
+            override fun onContextMenuRequest(request: VolvoxGridView.ContextMenuRequest) {
+                showGridDebugContextMenu(request)
             }
         }
 
@@ -413,7 +419,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadDemoData(ctrl: VolvoxGridController, demo: String) {
-        ctrl.loadDemo(demo)
+        if (demo == "sales") {
+            SalesJsonDemo.load(ctrl)
+        } else if (demo == "hierarchy") {
+            HierarchyJsonDemo.load(ctrl)
+        } else {
+            ctrl.loadDemo(demo)
+        }
         ctrl.setEditable(editEnabled)
     }
 
@@ -621,6 +633,91 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateStatus(msg: String) {
         runOnUiThread { tvStatus.text = msg }
+    }
+
+    private fun showGridDebugContextMenu(request: VolvoxGridView.ContextMenuRequest) {
+        val ctrl = controller ?: return
+        val row = request.row
+        val col = request.col
+        if (row < 0 || col < 0) {
+            return
+        }
+
+        val anchor = View(this)
+        anchor.layoutParams = FrameLayout.LayoutParams(1, 1).apply {
+            leftMargin = request.localX.toInt()
+            topMargin = request.localY.toInt()
+        }
+        gridView.addView(anchor)
+
+        val popup = PopupMenu(this, anchor)
+        popup.setOnDismissListener { gridView.removeView(anchor) }
+        val menu = popup.menu
+        val rowLabel = row + 1
+
+        menu.add("Pin Row $rowLabel to Top").setOnMenuItemClickListener {
+            ctrl.pinRow(row, PinPosition.PIN_TOP)
+            gridView.requestFrame()
+            true
+        }
+        menu.add("Pin Row $rowLabel to Bottom").setOnMenuItemClickListener {
+            ctrl.pinRow(row, PinPosition.PIN_BOTTOM)
+            gridView.requestFrame()
+            true
+        }
+        menu.add("Unpin Row $rowLabel").setOnMenuItemClickListener {
+            ctrl.pinRow(row, PinPosition.PIN_NONE)
+            gridView.requestFrame()
+            true
+        }
+        menu.add("Sticky Row $rowLabel to Top").setOnMenuItemClickListener {
+            ctrl.setRowSticky(row, StickyEdge.STICKY_TOP)
+            gridView.requestFrame()
+            true
+        }
+        menu.add("Sticky Row $rowLabel to Bottom").setOnMenuItemClickListener {
+            ctrl.setRowSticky(row, StickyEdge.STICKY_BOTTOM)
+            gridView.requestFrame()
+            true
+        }
+        menu.add("Sticky Row $rowLabel Both").setOnMenuItemClickListener {
+            ctrl.setRowSticky(row, StickyEdge.STICKY_BOTH)
+            gridView.requestFrame()
+            true
+        }
+        menu.add("Unsticky Row $rowLabel").setOnMenuItemClickListener {
+            ctrl.setRowSticky(row, StickyEdge.STICKY_NONE)
+            gridView.requestFrame()
+            true
+        }
+        menu.add("Sticky Col $col to Left").setOnMenuItemClickListener {
+            ctrl.setColSticky(col, StickyEdge.STICKY_LEFT)
+            gridView.requestFrame()
+            true
+        }
+        menu.add("Sticky Col $col to Right").setOnMenuItemClickListener {
+            ctrl.setColSticky(col, StickyEdge.STICKY_RIGHT)
+            gridView.requestFrame()
+            true
+        }
+        menu.add("Sticky Col $col Both").setOnMenuItemClickListener {
+            ctrl.setColSticky(col, StickyEdge.STICKY_BOTH)
+            gridView.requestFrame()
+            true
+        }
+        menu.add("Unsticky Col $col").setOnMenuItemClickListener {
+            ctrl.setColSticky(col, StickyEdge.STICKY_NONE)
+            gridView.requestFrame()
+            true
+        }
+        menu.add("Copy").setOnMenuItemClickListener {
+            val resp = ctrl.copy()
+            val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("grid", resp.text))
+            true
+        }
+
+        popup.show()
     }
 
     private fun spToPx(sp: Float): Int {

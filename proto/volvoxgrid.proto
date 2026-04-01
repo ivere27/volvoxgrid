@@ -19,7 +19,9 @@ message Font {
   optional bool   italic        = 5;
   optional bool   underline     = 6;
   optional bool   strikethrough = 7;
-  optional float  width         = 8;  // font stretch
+  // Horizontal font stretch (condensed/expanded width of the glyphs).
+  // VSFlexGrid legacy `font_width` maps to this field.
+  optional float  stretch       = 8;
 }
 
 message Padding {
@@ -812,6 +814,19 @@ message EditConfig {
 }
 
 // ── Scrolling ──
+enum PullToRefreshTheme {
+  PULL_TO_REFRESH_THEME_UNSPECIFIED = 0;
+  PULL_TO_REFRESH_THEME_TOP_BAND    = 1;
+  PULL_TO_REFRESH_THEME_MATERIAL    = 2;
+}
+
+message PullToRefreshConfig {
+  optional bool               enabled      = 1;
+  optional PullToRefreshTheme theme        = 2;
+  optional string             text_pull    = 3;
+  optional string             text_release = 4;
+}
+
 message ScrollConfig {
   ScrollBarConfig         scroll_bar         = 1;
   optional bool           scroll_track       = 2;
@@ -822,6 +837,7 @@ message ScrollConfig {
   optional bool           pinch_zoom_enabled = 7;
   optional bool           fast_scroll        = 8;
   optional ScrollBarsMode scrollbars         = 9;
+  PullToRefreshConfig     pull_to_refresh    = 10;
 }
 
 // ── Outline / Tree ──
@@ -830,7 +846,7 @@ message OutlineConfig {
   optional int32              tree_column           = 2;
   optional uint32             tree_color            = 3;
   optional GroupTotalPosition group_total_position  = 4;
-  optional bool               multi_totals          = 5;
+  optional bool               multi_totals          = 5; // When true, repeated Subtotal() calls with the same group_on_col reuse existing subtotal rows instead of inserting new ones, allowing multiple aggregate columns (e.g. Sales + Cost) in a single row.
 }
 
 // ── Cell Span ──
@@ -849,6 +865,12 @@ message InteractionConfig {
   optional int32      type_ahead_delay = 4;
   optional bool       auto_size_mouse  = 5;
   optional AutoSizeMode auto_size_mode = 6;
+  // When true, bulk bind/load paths do a one-time auto-fit of row heights
+  // and/or column widths using `auto_size_mode`.
+  // Also enables the engine's per-cell auto-resize helper when an adapter
+  // explicitly calls it.
+  // Disable this for very large datasets (for example around 1M rows),
+  // because auto-fit may scan many or all cells to find the required size.
   optional bool       auto_resize      = 7;
   optional DragMode   drag_mode        = 8;
   optional DropMode   drop_mode        = 9;
@@ -882,7 +904,8 @@ enum RenderLayerBit {
   RENDER_LAYER_ACTIVE_DROPDOWN  = 22;
   RENDER_LAYER_SCROLL_BARS      = 23;
   RENDER_LAYER_FAST_SCROLL      = 24;
-  RENDER_LAYER_DEBUG_OVERLAY    = 25;
+  RENDER_LAYER_PULL_TO_REFRESH  = 25;
+  RENDER_LAYER_DEBUG_OVERLAY    = 26;
 }
 
 // ── Rendering ──
@@ -1364,6 +1387,11 @@ message SubtotalRequest {
   uint32        background    = 6;
   uint32        foreground    = 7;
   bool          add_outline   = 8;
+  Font          font          = 9;
+}
+
+message SubtotalResult {
+  repeated int32 rows = 1;
 }
 
 message AutoSizeRequest {
@@ -1616,6 +1644,21 @@ message LoadDemoRequest {
   string demo    = 2;
 }
 
+enum DemoDataFormat {
+  DEMO_DATA_FORMAT_UNSPECIFIED = 0;
+  DEMO_DATA_FORMAT_JSON        = 1;
+}
+
+message GetDemoDataRequest {
+  string demo = 1;
+}
+
+message GetDemoDataResponse {
+  string         demo   = 1;
+  DemoDataFormat format = 2;
+  bytes          data   = 3;
+}
+
 // ═══════════════════════════════════════════════════════════
 // Render Session (bidirectional stream)
 // ═══════════════════════════════════════════════════════════
@@ -1866,6 +1909,9 @@ message GridEvent {
     BeforePageBreakEvent    before_page_break     = 58;
     StartPageEvent          start_page            = 59;
     GetHeaderRowEvent       get_header_row        = 60;
+    // Pull to refresh
+    PullToRefreshTriggeredEvent pull_to_refresh_triggered = 61;
+    PullToRefreshCanceledEvent pull_to_refresh_canceled = 62;
   }
 }
 
@@ -1983,6 +2029,10 @@ message DataRefreshingEvent {}
 message DataRefreshedEvent  {}
 message FilterDataEvent { int32 row = 1; int32 col = 2; string text = 3; }
 
+// ── Pull to Refresh Events ──
+message PullToRefreshTriggeredEvent {}
+message PullToRefreshCanceledEvent {}
+
 // ── Error Events ──
 message ErrorEvent { int32 code = 1; string message = 2; }
 
@@ -2033,7 +2083,7 @@ service VolvoxGridService {
 
   // ── Actions ──
   rpc Sort(SortRequest)                   returns (Empty);
-  rpc Subtotal(SubtotalRequest)           returns (Empty);
+  rpc Subtotal(SubtotalRequest)           returns (SubtotalResult);
   rpc AutoSize(AutoSizeRequest)           returns (Empty);
   rpc Outline(OutlineRequest)             returns (Empty);
   rpc GetNode(GetNodeRequest)             returns (NodeInfo);
@@ -2060,6 +2110,7 @@ service VolvoxGridService {
 
   // ── Demo ──
   rpc LoadDemo(LoadDemoRequest)           returns (Empty);
+  rpc GetDemoData(GetDemoDataRequest)     returns (GetDemoDataResponse);
 
   // ── Streaming ──
   rpc RenderSession(stream RenderInput)   returns (stream RenderOutput);

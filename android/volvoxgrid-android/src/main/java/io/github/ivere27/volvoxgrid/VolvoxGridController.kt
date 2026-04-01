@@ -148,7 +148,7 @@ class VolvoxGridController(
     private fun selectionRanges(sel: SelectionState): Array<GridCellRange> =
         sel.rangesList.map { GridCellRange(it.row1, it.col1, it.row2, it.col2) }.toTypedArray()
 
-    private fun configure(config: GridConfig) {
+    fun configure(config: GridConfig) {
         service.Configure(
             ConfigureRequest.newBuilder()
                 .setGridId(gridId)
@@ -157,7 +157,7 @@ class VolvoxGridController(
         )
     }
 
-    private fun getConfig(): GridConfig {
+    fun getConfig(): GridConfig {
         return service.GetConfig(handle())
     }
 
@@ -431,49 +431,6 @@ class VolvoxGridController(
         )
     }
 
-    /**
-     * Fill a 2D matrix into the grid starting at [startRow]/[startCol].
-     *
-     * When [resizeGrid] is true (the default), the grid is enlarged if the
-     * data exceeds the current row/column count.  Redraw is suspended for
-     * the duration so only a single repaint occurs at the end.
-     */
-    override fun setTableData(
-        data: List<List<String>>,
-        startRow: Int,
-        startCol: Int,
-        resizeGrid: Boolean
-    ) {
-        if (data.isEmpty()) return
-        val maxCols = data.maxOf { it.size }
-        if (maxCols <= 0) return
-
-        withRedrawSuspended {
-            if (resizeGrid) {
-                val neededRows = startRow + data.size
-                val neededCols = startCol + maxCols
-                val currentRows = layoutRowCount
-                val currentCols = layoutColCount
-                if (neededRows > currentRows) layoutRowCount = neededRows
-                if (neededCols > currentCols) layoutColCount = neededCols
-            }
-
-            val builder = UpdateCellsRequest.newBuilder().setGridId(gridId)
-            for ((r, row) in data.withIndex()) {
-                for ((c, text) in row.withIndex()) {
-                    builder.addCells(
-                        CellUpdate.newBuilder()
-                            .setRow(startRow + r)
-                            .setCol(startCol + c)
-                            .setValue(CellValue.newBuilder().setText(text).build())
-                            .build()
-                    )
-                }
-            }
-            service.UpdateCells(builder.build())
-        }
-    }
-
     fun getText(): String {
         val sel = service.GetSelection(handle())
         return getCellText(sel.activeRow, sel.activeCol)
@@ -517,6 +474,18 @@ class VolvoxGridController(
                     .build())
                 .build()
         )
+    }
+
+    fun defineColumns(request: DefineColumnsRequest) {
+        service.DefineColumns(request.toBuilder().setGridId(gridId).build())
+    }
+
+    fun defineRows(request: DefineRowsRequest) {
+        service.DefineRows(request.toBuilder().setGridId(gridId).build())
+    }
+
+    fun updateCells(request: UpdateCellsRequest): WriteResult {
+        return service.UpdateCells(request.toBuilder().setGridId(gridId).build())
     }
 
     fun getRowHeight(row: Int): Int {
@@ -683,6 +652,12 @@ class VolvoxGridController(
     fun setSelectionStyle(style: HighlightStyle) {
         configure(GridConfig.newBuilder()
             .setSelection(SelectionConfig.newBuilder().setStyle(style).build())
+            .build())
+    }
+
+    fun setHoverConfig(config: HoverConfig) {
+        configure(GridConfig.newBuilder()
+            .setSelection(SelectionConfig.newBuilder().setHover(config).build())
             .build())
     }
 
@@ -856,20 +831,22 @@ class VolvoxGridController(
         caption: String = "",
         backColor: Long = 0xFFE0E0E0.toLong(),
         foreColor: Long = 0xFF000000.toLong(),
-        addOutline: Boolean = true
-    ) {
-        service.Subtotal(
-            SubtotalRequest.newBuilder()
-                .setGridId(gridId)
-                .setAggregate(aggregateType)
-                .setGroupOnCol(groupOnCol)
-                .setAggregateCol(aggregateCol)
-                .setCaption(caption)
-                .setBackground(backColor.toInt())
-                .setForeground(foreColor.toInt())
-                .setAddOutline(addOutline)
-                .build()
-        )
+        addOutline: Boolean = true,
+        font: Font? = null
+    ): SubtotalResult {
+        val builder = SubtotalRequest.newBuilder()
+            .setGridId(gridId)
+            .setAggregate(aggregateType)
+            .setGroupOnCol(groupOnCol)
+            .setAggregateCol(aggregateCol)
+            .setCaption(caption)
+            .setBackground(backColor.toInt())
+            .setForeground(foreColor.toInt())
+            .setAddOutline(addOutline)
+        if (font != null) {
+            builder.font = font
+        }
+        return service.Subtotal(builder.build())
     }
 
     fun setTreeIndicator(style: TreeIndicatorStyle) {
@@ -1532,5 +1509,13 @@ class VolvoxGridController(
                 .setDemo(demo)
                 .build()
         )
+    }
+
+    fun getDemoData(demo: String): ByteArray {
+        return service.GetDemoData(
+            GetDemoDataRequest.newBuilder()
+                .setDemo(demo)
+                .build()
+        ).data.toByteArray()
     }
 }

@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
@@ -13,7 +14,7 @@ use crate::control::CellControl;
 use crate::drag::DragState;
 use crate::edit::EditState;
 use crate::event::EventQueue;
-use crate::indicator::IndicatorBandsState;
+use crate::indicator::{ColIndicatorRowDefState, IndicatorBandsState};
 use crate::layout::LayoutCache;
 use crate::outline::OutlineState;
 use crate::proto::volvoxgrid::v1 as pb;
@@ -37,6 +38,13 @@ pub const DEFAULT_ROW_HEIGHT: i32 = 20;
 pub const DEFAULT_COL_WIDTH: i32 = 68;
 /// Default fixed-rate pacing fallback when no platform frame clock is available.
 pub const DEFAULT_TARGET_FRAME_RATE_HZ: i32 = 30;
+const DEFAULT_PULL_TO_REFRESH_THRESHOLD_PX: f32 = 72.0;
+const DEFAULT_PULL_TO_REFRESH_MAX_REVEAL_PX: f32 = 132.0;
+const DEFAULT_PULL_TO_REFRESH_CANCEL_SNAP_PX: f32 = 18.0;
+const DEFAULT_PULL_TO_REFRESH_TOUCH_SLOP_PX: f32 = 8.0;
+const DEFAULT_PULL_TO_REFRESH_SETTLE_SPEED_PX_PER_SEC: f32 = 480.0;
+const DEFAULT_PULL_TO_REFRESH_TEXT_PULL: &str = "Pull to refresh";
+const DEFAULT_PULL_TO_REFRESH_TEXT_RELEASE: &str = "Release to refresh";
 
 /// Minimum allowed row count.
 const MIN_ROWS: i32 = 1;
@@ -54,6 +62,14 @@ static VOLVOXGRID_BUILD_METADATA: &str = concat!(
     ";VOLVOXGRID_BUILD_DATE=",
     env!("VOLVOXGRID_BUILD_DATE")
 );
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PullToRefreshState {
+    Idle,
+    Pulling,
+    Armed,
+    Settling,
+}
 
 #[inline]
 fn heap_hash_map_bytes<K, V>(map: &HashMap<K, V>) -> usize {
@@ -86,6 +102,31 @@ fn usize_to_i32_saturating(value: usize) -> i32 {
     } else {
         value as i32
     }
+}
+
+fn grow_span_heights_to_fit(
+    heights: &mut [i32],
+    row1: usize,
+    row2: usize,
+    needed_total: i32,
+) -> bool {
+    if row1 > row2 || row2 >= heights.len() {
+        return false;
+    }
+    let current_total: i32 = heights[row1..=row2].iter().sum();
+    if needed_total <= current_total {
+        return false;
+    }
+
+    let extra = needed_total - current_total;
+    let span_len = row2 - row1 + 1;
+    let base = extra / span_len as i32;
+    let remainder = extra % span_len as i32;
+    for offset in 0..span_len {
+        let add = base + if (offset as i32) < remainder { 1 } else { 0 };
+        heights[row1 + offset] = heights[row1 + offset].saturating_add(add);
+    }
+    true
 }
 
 #[derive(Debug)]
@@ -236,7 +277,11 @@ pub struct VolvoxGrid {
     /// Configured text layout cache capacity, applied to `text_engine` on init.
     pub text_layout_cache_cap: usize,
     // ── Compatibility Properties ────────────────────────────────────
-    /// Whether rows/cols auto-resize when data changes.
+    /// Whether bulk bind/load writes auto-fit row heights / column widths.
+    ///
+    /// This also gates the per-cell auto-resize helper when callers opt into
+    /// it. Disable for very large datasets because auto-fit may scan many or
+    /// all cells.
     pub auto_resize: bool,
     /// Whether type-ahead is currently active.
     pub is_type_ahead_active: bool,
@@ -314,6 +359,14 @@ pub struct VolvoxGrid {
     pub fling_impulse_gain: f32,
     /// Exponential damping coefficient used by fling physics (higher = stops faster).
     pub fling_friction: f32,
+    /// Whether built-in pull-to-refresh is enabled.
+    pub pull_to_refresh_enabled: bool,
+    /// Pull-to-refresh theme selection.
+    pub pull_to_refresh_theme: i32,
+    /// Optional override for the pull-state label shown before arming.
+    pub pull_to_refresh_text_pull: Option<String>,
+    /// Optional override for the armed-state label shown before release.
+    pub pull_to_refresh_text_release: Option<String>,
     /// Tab key behavior: 0=move to next control, 1=move to next cell.
     pub tab_behavior: i32,
     /// Header features mode: controls sort glyphs and column drag in headers.
@@ -419,6 +472,8 @@ pub struct VolvoxGrid {
     text_meta_cache: RefCell<(u64, HashMap<(i32, i32), Arc<TextCellStaticMeta>>)>,
     /// Cached render context for frame-to-frame reuse (type-erased).
     pub(crate) render_ctx_cache: RefCell<Option<Box<dyn std::any::Any + Send>>>,
+    /// Cached signature for lazy row-indicator auto-size updates.
+    row_indicator_start_auto_size_sig: u64,
 
     // ── Mouse Tracking ────────────────────────────────────────────────────
     /// Row index currently under the mouse pointer (-1 if none).
@@ -517,6 +572,22 @@ pub struct VolvoxGrid {
     pub scrollbar_repeat_is_track: bool,
     /// Mouse pixel position of the track click (x for horizontal, y for vertical).
     pub scrollbar_repeat_mouse_pos: f32,
+
+    // ── Pull-to-Refresh Tracking ─────────────────────────────────────────
+    /// Current engine-owned pull-to-refresh state.
+    pub pull_to_refresh_state: PullToRefreshState,
+    /// Current reveal amount in pixels.
+    pub pull_to_refresh_reveal_px: f32,
+    /// Target reveal amount used by settle/refresh animations.
+    pub pull_to_refresh_target_reveal_px: f32,
+    /// Whether a touch-like pointer contact is currently active.
+    pub pull_to_refresh_contact_active: bool,
+    /// Accumulated horizontal gesture distance during the current contact.
+    pub pull_to_refresh_drag_accum_x_px: f32,
+    /// Accumulated vertical gesture distance during the current contact.
+    pub pull_to_refresh_drag_accum_y_px: f32,
+    /// Tracks whether the current contact ever revealed the affordance.
+    pub pull_to_refresh_had_reveal: bool,
 
     // ── Virtual Data Generation ─────────────────────────────────────────
     /// Optional function to generate cell text for rows that haven't been
@@ -711,6 +782,10 @@ impl VolvoxGrid {
             pinch_zoom_enabled: true,
             fling_impulse_gain: 30.0,
             fling_friction: 2.0,
+            pull_to_refresh_enabled: false,
+            pull_to_refresh_theme: pb::PullToRefreshTheme::TopBand as i32,
+            pull_to_refresh_text_pull: None,
+            pull_to_refresh_text_release: None,
             tab_behavior: 0,
             header_features: 0,
             custom_render: 0,
@@ -766,6 +841,7 @@ impl VolvoxGrid {
             text_meta_generation: 0,
             text_meta_cache: RefCell::new((0, HashMap::new())),
             render_ctx_cache: RefCell::new(None),
+            row_indicator_start_auto_size_sig: 0,
 
             // Mouse tracking
             mouse_row: -1,
@@ -820,6 +896,15 @@ impl VolvoxGrid {
             scrollbar_repeat_delay: 0.0,
             scrollbar_repeat_is_track: false,
             scrollbar_repeat_mouse_pos: 0.0,
+
+            // Pull-to-refresh tracking
+            pull_to_refresh_state: PullToRefreshState::Idle,
+            pull_to_refresh_reveal_px: 0.0,
+            pull_to_refresh_target_reveal_px: 0.0,
+            pull_to_refresh_contact_active: false,
+            pull_to_refresh_drag_accum_x_px: 0.0,
+            pull_to_refresh_drag_accum_y_px: 0.0,
+            pull_to_refresh_had_reveal: false,
 
             // Virtual data generation
             sort_value_generator: None,
@@ -905,6 +990,14 @@ impl VolvoxGrid {
         bytes += self.clip_col_separator.capacity();
         bytes += self.clip_row_separator.capacity();
         bytes += self.format_string.capacity();
+        bytes += self
+            .pull_to_refresh_text_pull
+            .as_ref()
+            .map_or(0, |v| v.capacity());
+        bytes += self
+            .pull_to_refresh_text_release
+            .as_ref()
+            .map_or(0, |v| v.capacity());
 
         bytes
     }
@@ -1326,11 +1419,258 @@ impl VolvoxGrid {
     /// Keeps dirty=true if an engine-driven visual animation is still in-flight
     /// so the host continues to re-render until the animation settles.
     pub fn clear_dirty(&mut self) {
-        if self.animation.active || self.background_loading || scrollbar_fade_animating(self) {
+        if self.animation.active
+            || self.background_loading
+            || scrollbar_fade_animating(self)
+            || self.pull_to_refresh_needs_frame()
+        {
             self.dirty = true;
         } else {
             self.dirty = false;
         }
+    }
+
+    pub fn normalize_pull_to_refresh_theme(theme: i32) -> i32 {
+        match theme {
+            x if x == pb::PullToRefreshTheme::TopBand as i32 => x,
+            x if x == pb::PullToRefreshTheme::Material as i32 => x,
+            _ => pb::PullToRefreshTheme::TopBand as i32,
+        }
+    }
+
+    pub fn pull_to_refresh_theme(&self) -> i32 {
+        Self::normalize_pull_to_refresh_theme(self.pull_to_refresh_theme)
+    }
+
+    pub fn pull_to_refresh_threshold_px(&self) -> f32 {
+        DEFAULT_PULL_TO_REFRESH_THRESHOLD_PX * self.scale.max(0.01)
+    }
+
+    pub fn pull_to_refresh_max_reveal_px(&self) -> f32 {
+        DEFAULT_PULL_TO_REFRESH_MAX_REVEAL_PX * self.scale.max(0.01)
+    }
+
+    pub fn pull_to_refresh_touch_slop_px(&self) -> f32 {
+        DEFAULT_PULL_TO_REFRESH_TOUCH_SLOP_PX * self.scale.max(0.01)
+    }
+
+    pub fn pull_to_refresh_cancel_snap_px(&self) -> f32 {
+        DEFAULT_PULL_TO_REFRESH_CANCEL_SNAP_PX * self.scale.max(0.01)
+    }
+
+    pub fn pull_to_refresh_progress(&self) -> f32 {
+        (self.pull_to_refresh_reveal_px / self.pull_to_refresh_threshold_px()).clamp(0.0, 1.0)
+    }
+
+    pub fn pull_to_refresh_label_pull(&self) -> &str {
+        self.pull_to_refresh_text_pull
+            .as_deref()
+            .unwrap_or(DEFAULT_PULL_TO_REFRESH_TEXT_PULL)
+    }
+
+    pub fn pull_to_refresh_label_release(&self) -> &str {
+        self.pull_to_refresh_text_release
+            .as_deref()
+            .unwrap_or(DEFAULT_PULL_TO_REFRESH_TEXT_RELEASE)
+    }
+
+    pub fn pull_to_refresh_is_visible(&self) -> bool {
+        self.pull_to_refresh_reveal_px > f32::EPSILON
+            || matches!(self.pull_to_refresh_state, PullToRefreshState::Settling)
+    }
+
+    pub fn pull_to_refresh_needs_frame(&self) -> bool {
+        (self.pull_to_refresh_reveal_px - self.pull_to_refresh_target_reveal_px).abs() > 0.5
+            || matches!(self.pull_to_refresh_state, PullToRefreshState::Settling)
+    }
+
+    fn reset_pull_to_refresh_contact_tracking(&mut self) {
+        self.pull_to_refresh_contact_active = false;
+        self.pull_to_refresh_drag_accum_x_px = 0.0;
+        self.pull_to_refresh_drag_accum_y_px = 0.0;
+        self.pull_to_refresh_had_reveal = false;
+    }
+
+    fn settle_pull_to_refresh_to(&mut self, target_px: f32, next_state: PullToRefreshState) {
+        self.pull_to_refresh_target_reveal_px =
+            target_px.clamp(0.0, self.pull_to_refresh_max_reveal_px());
+        self.pull_to_refresh_state = next_state;
+        self.mark_dirty_visual();
+    }
+
+    fn update_pull_to_refresh_visual_state(&mut self) {
+        if self.pull_to_refresh_reveal_px <= f32::EPSILON {
+            self.pull_to_refresh_reveal_px = 0.0;
+            if !self.pull_to_refresh_contact_active {
+                self.pull_to_refresh_target_reveal_px = 0.0;
+                self.pull_to_refresh_state = PullToRefreshState::Idle;
+            } else {
+                self.pull_to_refresh_state = PullToRefreshState::Pulling;
+            }
+            return;
+        }
+        self.pull_to_refresh_state =
+            if self.pull_to_refresh_reveal_px >= self.pull_to_refresh_threshold_px() {
+                PullToRefreshState::Armed
+            } else {
+                PullToRefreshState::Pulling
+            };
+    }
+
+    pub fn begin_pull_to_refresh_contact(&mut self) {
+        if !self.pull_to_refresh_enabled {
+            return;
+        }
+        self.pull_to_refresh_contact_active = true;
+        self.pull_to_refresh_drag_accum_x_px = 0.0;
+        self.pull_to_refresh_drag_accum_y_px = 0.0;
+        self.pull_to_refresh_had_reveal = false;
+    }
+
+    pub fn cancel_pull_to_refresh_contact(&mut self, emit_cancel_event: bool) {
+        let should_emit = emit_cancel_event && self.pull_to_refresh_had_reveal;
+        self.reset_pull_to_refresh_contact_tracking();
+        if should_emit {
+            self.events
+                .push(crate::event::GridEventData::PullToRefreshCanceled);
+        }
+        self.pull_to_refresh_target_reveal_px = 0.0;
+        if self.pull_to_refresh_reveal_px <= self.pull_to_refresh_cancel_snap_px() {
+            self.pull_to_refresh_reveal_px = 0.0;
+            self.pull_to_refresh_target_reveal_px = 0.0;
+            self.pull_to_refresh_state = PullToRefreshState::Idle;
+        } else {
+            self.pull_to_refresh_state = PullToRefreshState::Settling;
+        }
+        self.mark_dirty_visual();
+    }
+
+    pub fn end_pull_to_refresh_contact(&mut self) {
+        if !self.pull_to_refresh_enabled {
+            return;
+        }
+        self.pull_to_refresh_contact_active = false;
+        self.pull_to_refresh_drag_accum_x_px = 0.0;
+        self.pull_to_refresh_drag_accum_y_px = 0.0;
+        match self.pull_to_refresh_state {
+            PullToRefreshState::Armed => {
+                self.pull_to_refresh_had_reveal = false;
+                self.events
+                    .push(crate::event::GridEventData::PullToRefreshTriggered);
+                self.settle_pull_to_refresh_to(0.0, PullToRefreshState::Settling);
+            }
+            PullToRefreshState::Pulling => {
+                let should_emit = self.pull_to_refresh_had_reveal;
+                self.pull_to_refresh_had_reveal = false;
+                if should_emit {
+                    self.events
+                        .push(crate::event::GridEventData::PullToRefreshCanceled);
+                }
+                // Not armed — snap to invisible immediately (no settle animation).
+                self.pull_to_refresh_reveal_px = 0.0;
+                self.pull_to_refresh_target_reveal_px = 0.0;
+                self.pull_to_refresh_state = PullToRefreshState::Idle;
+            }
+            PullToRefreshState::Settling => {
+                self.pull_to_refresh_had_reveal = false;
+            }
+            PullToRefreshState::Idle => {
+                self.pull_to_refresh_had_reveal = false;
+            }
+        }
+        self.mark_dirty_visual();
+    }
+
+    pub fn handle_pull_to_refresh_scroll(&mut self, dx_px: f32, dy_px: f32) -> bool {
+        if !self.pull_to_refresh_enabled
+            || !self.pull_to_refresh_contact_active
+            || self.fast_scroll_active
+            || self.scrollbar_drag_active
+        {
+            return false;
+        }
+        if matches!(self.pull_to_refresh_state, PullToRefreshState::Settling)
+            && self.pull_to_refresh_reveal_px > f32::EPSILON
+        {
+            return true;
+        }
+
+        let was_revealed = self.pull_to_refresh_reveal_px > f32::EPSILON;
+        self.pull_to_refresh_drag_accum_x_px += dx_px.abs();
+        self.pull_to_refresh_drag_accum_y_px += dy_px.abs();
+
+        if !was_revealed {
+            let slop = self.pull_to_refresh_touch_slop_px();
+            if self.pull_to_refresh_drag_accum_y_px < slop
+                && self.pull_to_refresh_drag_accum_x_px < slop
+            {
+                return false;
+            }
+            let vertical_dominant =
+                self.pull_to_refresh_drag_accum_y_px >= self.pull_to_refresh_drag_accum_x_px * 1.15;
+            if !vertical_dominant || self.scroll.scroll_y > 0.5 || dy_px >= 0.0 {
+                return false;
+            }
+        }
+
+        let mut next_reveal = self.pull_to_refresh_reveal_px;
+        if dy_px < 0.0 {
+            let pull_delta = -dy_px;
+            let resistance =
+                (1.0 - (next_reveal / self.pull_to_refresh_max_reveal_px()) * 0.7).clamp(0.2, 1.0);
+            next_reveal = (next_reveal + pull_delta * resistance)
+                .clamp(0.0, self.pull_to_refresh_max_reveal_px());
+        } else if dy_px > 0.0 && next_reveal > 0.0 {
+            next_reveal = (next_reveal - dy_px).max(0.0);
+        }
+
+        let changed = (next_reveal - self.pull_to_refresh_reveal_px).abs() > f32::EPSILON;
+        self.pull_to_refresh_reveal_px = next_reveal;
+        self.pull_to_refresh_target_reveal_px = next_reveal;
+        if self.pull_to_refresh_reveal_px > f32::EPSILON {
+            self.pull_to_refresh_had_reveal = true;
+        }
+        self.update_pull_to_refresh_visual_state();
+        if changed {
+            self.mark_dirty_visual();
+        }
+        changed || was_revealed || self.pull_to_refresh_reveal_px > f32::EPSILON
+    }
+
+    pub fn tick_pull_to_refresh(&mut self, dt_seconds: f32) -> bool {
+        if !dt_seconds.is_finite() || dt_seconds <= 0.0 {
+            return false;
+        }
+        let prev_reveal = self.pull_to_refresh_reveal_px;
+        let target = self.pull_to_refresh_target_reveal_px;
+        let delta = target - self.pull_to_refresh_reveal_px;
+        if delta.abs() > 0.5 {
+            let step =
+                DEFAULT_PULL_TO_REFRESH_SETTLE_SPEED_PX_PER_SEC * self.scale.max(0.01) * dt_seconds;
+            if delta.abs() <= step {
+                self.pull_to_refresh_reveal_px = target;
+            } else {
+                self.pull_to_refresh_reveal_px += step.copysign(delta);
+            }
+        } else if self.pull_to_refresh_reveal_px != target {
+            self.pull_to_refresh_reveal_px = target;
+        }
+
+        if matches!(self.pull_to_refresh_state, PullToRefreshState::Settling)
+            && self.pull_to_refresh_reveal_px <= 0.5
+            && !self.pull_to_refresh_contact_active
+        {
+            self.pull_to_refresh_reveal_px = 0.0;
+            self.pull_to_refresh_target_reveal_px = 0.0;
+            self.pull_to_refresh_state = PullToRefreshState::Idle;
+        } else if matches!(
+            self.pull_to_refresh_state,
+            PullToRefreshState::Pulling | PullToRefreshState::Armed
+        ) {
+            self.update_pull_to_refresh_visual_state();
+        }
+
+        (self.pull_to_refresh_reveal_px - prev_reveal).abs() > f32::EPSILON
     }
 
     // ── Viewport ──────────────────────────────────────────────────────────
@@ -1676,7 +2016,7 @@ impl VolvoxGrid {
                 return control;
             }
         }
-        if !self.configured_dropdown_list(row, col).is_empty() {
+        if !self.active_dropdown_list(row, col).is_empty() {
             return CellControl::DropdownButton;
         }
         CellControl::None
@@ -1823,6 +2163,17 @@ impl VolvoxGrid {
     /// Returns true if the column is hidden.
     pub fn is_col_hidden(&self, col: i32) -> bool {
         self.cols_hidden.contains(&col)
+    }
+
+    /// Returns the last visible column index, if any.
+    pub fn last_visible_col_index(&self) -> Option<i32> {
+        (0..self.cols).rev().find(|&col| !self.is_col_hidden(col))
+    }
+
+    /// Returns the nearest visible column at or before `col`, if any.
+    pub fn visible_col_at_or_before(&self, col: i32) -> Option<i32> {
+        let upper = col.min(self.cols - 1);
+        (0..=upper).rev().find(|&idx| !self.is_col_hidden(idx))
     }
 
     /// Returns the column properties for a column, if it exists.
@@ -2125,6 +2476,161 @@ impl VolvoxGrid {
         String::new()
     }
 
+    fn resolve_text_measure_style<'a>(&'a self, row: i32, col: i32) -> (&'a str, f32, bool, bool) {
+        let style_override = self.cell_styles.get(&(row, col));
+        let font_name = style_override
+            .and_then(|style| style.font_name.as_deref())
+            .unwrap_or(&self.style.font_name);
+        let font_size = style_override
+            .and_then(|style| style.font_size)
+            .unwrap_or(self.style.font_size);
+        let font_bold = style_override
+            .and_then(|style| style.font_bold)
+            .unwrap_or(self.style.font_bold);
+        let font_italic = style_override
+            .and_then(|style| style.font_italic)
+            .unwrap_or(self.style.font_italic);
+        let font_size = if font_size > 0.0 { font_size } else { 13.0 };
+        (font_name, font_size, font_bold, font_italic)
+    }
+
+    fn resolve_header_text_measure_style<'a>(&'a self, col: i32) -> (&'a str, f32, bool, bool) {
+        if self.fixed_rows > 0 {
+            self.resolve_text_measure_style(0, col)
+        } else {
+            let font_size = if self.style.font_size > 0.0 {
+                self.style.font_size
+            } else {
+                13.0
+            };
+            (
+                &self.style.font_name,
+                font_size,
+                self.style.font_bold,
+                self.style.font_italic,
+            )
+        }
+    }
+
+    fn subtotal_caption_horizontal_merge(
+        &self,
+        row: i32,
+        col: i32,
+    ) -> Option<(i32, i32, i32, i32)> {
+        let props = self.row_props.get(&row)?;
+        if !props.is_subtotal || props.subtotal_caption_col != col {
+            return None;
+        }
+        let (r1, c1, r2, c2) = self.merged_regions.find_merge(row, col)?;
+        if r1 == row && r2 == row && c1 == col && c2 > c1 {
+            Some((r1, c1, r2, c2))
+        } else {
+            None
+        }
+    }
+
+    fn should_skip_cell_for_column_autosize(&self, row: i32, col: i32) -> bool {
+        self.subtotal_caption_horizontal_merge(row, col).is_some()
+    }
+
+    fn auto_resize_row_measure_width(&self, row: i32, col: i32, word_wrap: bool) -> Option<f32> {
+        if !word_wrap {
+            return None;
+        }
+        if let Some((_, c1, _, c2)) = self.subtotal_caption_horizontal_merge(row, col) {
+            let span_width: i32 = (c1..=c2).map(|span_col| self.get_col_width(span_col)).sum();
+            return Some(span_width.max(1) as f32);
+        }
+        Some(self.get_col_width(col).max(1) as f32)
+    }
+
+    fn row_indicator_start_auto_size_signature(&self) -> u64 {
+        let band = &self.indicator_bands.row_start;
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        band.visible.hash(&mut hasher);
+        band.auto_size.hash(&mut hasher);
+        band.width_px.hash(&mut hasher);
+        band.mode_bits.hash(&mut hasher);
+        self.rows.hash(&mut hasher);
+        self.fixed_rows.hash(&mut hasher);
+        self.default_row_height.hash(&mut hasher);
+        self.style.font_name.hash(&mut hasher);
+        self.style.font_size.to_bits().hash(&mut hasher);
+        for slot in &band.slots {
+            slot.kind.hash(&mut hasher);
+            slot.width_px.hash(&mut hasher);
+            slot.visible.hash(&mut hasher);
+            slot.custom_key.hash(&mut hasher);
+            slot.data.len().hash(&mut hasher);
+        }
+        hasher.finish()
+    }
+
+    fn sync_row_indicator_start_auto_width(&mut self) {
+        let sig = self.row_indicator_start_auto_size_signature();
+        if self.row_indicator_start_auto_size_sig == sig {
+            return;
+        }
+
+        let band = self.indicator_bands.row_start.clone();
+        if !band.visible || !band.auto_size || !band.slots.is_empty() {
+            self.row_indicator_start_auto_size_sig = sig;
+            return;
+        }
+
+        let font_name = self.style.font_name.clone();
+        let font_size = if self.style.font_size > 0.0 {
+            self.style.font_size
+        } else {
+            13.0
+        };
+        let mut labels: Vec<String> = Vec::new();
+
+        if band.has_mode(pb::RowIndicatorMode::RowIndicatorNumbers) {
+            labels.push((self.rows - self.fixed_rows).max(1).to_string());
+        } else {
+            if band.has_mode(pb::RowIndicatorMode::RowIndicatorCurrent) {
+                labels.push("▶".to_string());
+            }
+            if band.has_mode(pb::RowIndicatorMode::RowIndicatorSelection) {
+                labels.push("•".to_string());
+            }
+        }
+        if band.has_mode(pb::RowIndicatorMode::RowIndicatorHandle) {
+            labels.push("≡".to_string());
+        }
+        if band.has_mode(pb::RowIndicatorMode::RowIndicatorEditing) {
+            labels.push("✎".to_string());
+        }
+        if band.has_mode(pb::RowIndicatorMode::RowIndicatorExpander) {
+            labels.push("+".to_string());
+            labels.push("-".to_string());
+        }
+
+        if labels.is_empty() {
+            self.row_indicator_start_auto_size_sig = sig;
+            return;
+        }
+
+        self.ensure_text_engine();
+        let mut te = self.text_engine.take().unwrap();
+        let mut max_w = 0.0f32;
+        for label in &labels {
+            let (w, _) = te.measure_text(label, &font_name, font_size, false, false, None);
+            max_w = max_w.max(w);
+        }
+        self.text_engine = Some(te);
+
+        let needed_width =
+            (max_w.ceil() as i32 + 8).max(crate::indicator::DEFAULT_ROW_INDICATOR_WIDTH);
+        if self.indicator_bands.row_start.width_px != needed_width {
+            self.indicator_bands.row_start.width_px = needed_width;
+            self.dirty = true;
+        }
+
+        self.row_indicator_start_auto_size_sig = self.row_indicator_start_auto_size_signature();
+    }
+
     /// Resolve the active dropdown list for a cell.
     ///
     /// Cell-level dropdown list has priority over the column-level list.
@@ -2177,6 +2683,15 @@ impl VolvoxGrid {
             }
         }
 
+        if col >= 0 && (col as usize) < self.columns.len() {
+            let col_props = &self.columns[col as usize];
+            if col_props.data_type == pb::ColumnDataType::ColumnDataDate as i32 {
+                if let Some(formatted) = format_as_iso_date(raw) {
+                    return formatted;
+                }
+            }
+        }
+
         raw.to_string()
     }
 
@@ -2206,6 +2721,26 @@ impl VolvoxGrid {
 
     // ── Auto-Resize ─────────────────────────
 
+    pub(crate) fn column_header_text(&self, col: i32) -> String {
+        if col < 0 || (col as usize) >= self.columns.len() {
+            return String::new();
+        }
+        let cp = &self.columns[col as usize];
+        if !cp.caption.trim().is_empty() {
+            return cp.caption.clone();
+        }
+        if !cp.key.trim().is_empty() {
+            return cp.key.clone();
+        }
+        if self.fixed_rows > 0 {
+            let legacy = self.get_display_text(0, col);
+            if !legacy.trim().is_empty() {
+                return legacy;
+            }
+        }
+        String::new()
+    }
+
     /// Auto-resize a column width to fit its content.
     ///
     /// Measures text in all rows for the given column using the text engine
@@ -2214,31 +2749,32 @@ impl VolvoxGrid {
         if col < 0 || col >= self.cols {
             return;
         }
-        let font_name = self.style.font_name.clone();
-        let font_size = if self.style.font_size > 0.0 {
-            self.style.font_size
-        } else {
-            13.0
-        };
-        let bold = self.style.font_bold;
-        let italic = self.style.font_italic;
         let body_padding = self.resolve_column_padding(col, false).horizontal();
         let fixed_padding = self.resolve_column_padding(col, true).horizontal();
         let padding = body_padding.max(fixed_padding);
 
+        self.ensure_text_engine();
+        let mut te = self.text_engine.take().unwrap();
         let mut max_w: f32 = 0.0;
-        // Collect texts first to avoid borrow conflicts with ensure_text_engine
-        let texts: Vec<String> = (0..self.rows)
-            .map(|r| self.get_display_text(r, col))
-            .collect();
-
-        let te = self.ensure_text_engine();
-        for text in &texts {
+        for row in 0..self.rows {
+            if self.should_skip_cell_for_column_autosize(row, col) {
+                continue;
+            }
+            let text = self.get_display_text(row, col);
             if !text.is_empty() {
-                let (w, _) = te.measure_text(text, &font_name, font_size, bold, italic, None);
+                let (font_name, font_size, bold, italic) =
+                    self.resolve_text_measure_style(row, col);
+                let (w, _) = te.measure_text(&text, font_name, font_size, bold, italic, None);
                 max_w = max_w.max(w);
             }
         }
+        let header_text = self.column_header_text(col);
+        if !header_text.is_empty() {
+            let (font_name, font_size, bold, italic) = self.resolve_header_text_measure_style(col);
+            let (w, _) = te.measure_text(&header_text, font_name, font_size, bold, italic, None);
+            max_w = max_w.max(w);
+        }
+        self.text_engine = Some(te);
 
         let new_width = (max_w.ceil() as i32 + padding).max(self.default_col_width.min(20));
         self.set_col_width(col, new_width);
@@ -2252,39 +2788,224 @@ impl VolvoxGrid {
         if row < 0 || row >= self.rows {
             return;
         }
-        let font_name = self.style.font_name.clone();
-        let font_size = if self.style.font_size > 0.0 {
-            self.style.font_size
-        } else {
-            13.0
-        };
-        let bold = self.style.font_bold;
-        let italic = self.style.font_italic;
         let word_wrap = self.word_wrap;
         let body_padding = self.style.cell_padding.vertical();
         let fixed_padding = self.style.fixed_cell_padding.vertical();
         let padding = body_padding.max(fixed_padding);
 
-        let texts_and_widths: Vec<(String, i32)> = (0..self.cols)
-            .map(|c| {
-                let text = self.get_display_text(row, c);
-                let w = self.get_col_width(c);
-                (text, w)
-            })
-            .collect();
-
-        let te = self.ensure_text_engine();
+        self.ensure_text_engine();
+        let mut te = self.text_engine.take().unwrap();
         let mut max_h: f32 = 0.0;
-        for (text, col_w) in &texts_and_widths {
+        for col in 0..self.cols {
+            let text = self.get_display_text(row, col);
             if !text.is_empty() {
-                let max_width = if word_wrap { Some(*col_w as f32) } else { None };
-                let (_, h) = te.measure_text(text, &font_name, font_size, bold, italic, max_width);
+                let max_width = self.auto_resize_row_measure_width(row, col, word_wrap);
+                let (font_name, font_size, bold, italic) =
+                    self.resolve_text_measure_style(row, col);
+                let (_, h) = te.measure_text(&text, font_name, font_size, bold, italic, max_width);
                 max_h = max_h.max(h);
             }
         }
+        self.text_engine = Some(te);
 
         let new_height = (max_h.ceil() as i32 + padding).max(self.default_row_height.min(10));
         self.set_row_height(row, new_height);
+    }
+
+    fn auto_resize_col_top_header_rows(
+        &mut self,
+        te: &mut TextEngine,
+        font_name: &str,
+        font_size: f32,
+    ) {
+        let band = self.indicator_bands.col_top.clone();
+        if !band.visible {
+            return;
+        }
+
+        let row_count = band.row_count();
+        if row_count <= 0 {
+            return;
+        }
+
+        let mut heights: Vec<i32> = (0..row_count).map(|row| band.row_height_px(row)).collect();
+        let padding = self.style.fixed_cell_padding.vertical().max(2);
+        let header_mode = pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+        let mut changed = false;
+
+        if band.cells.is_empty()
+            && band.has_mode(pb::ColIndicatorCellMode::ColIndicatorCellHeaderText)
+        {
+            for col in 0..self.cols {
+                let text = self.column_header_text(col);
+                if text.is_empty() {
+                    continue;
+                }
+                let (_, h) = te.measure_text(&text, font_name, font_size, false, false, None);
+                let needed = h.ceil() as i32 + padding;
+                if needed > heights[0] {
+                    heights[0] = needed;
+                    changed = true;
+                }
+            }
+        }
+
+        for cell in &band.cells {
+            let row1 = cell.row1.max(0) as usize;
+            let row2 = cell.row2.max(cell.row1).max(0) as usize;
+            if row1 >= heights.len() || row2 >= heights.len() {
+                continue;
+            }
+            let mode_bits = if cell.mode_bits != 0 {
+                cell.mode_bits
+            } else {
+                band.mode_bits
+            };
+            let text = if !cell.text.trim().is_empty() {
+                cell.text.clone()
+            } else if cell.col1 == cell.col2 && (mode_bits & header_mode != 0) {
+                self.column_header_text(cell.col1)
+            } else {
+                String::new()
+            };
+            if text.is_empty() {
+                continue;
+            }
+
+            let (_, h) = te.measure_text(&text, font_name, font_size, false, false, None);
+            let needed = h.ceil() as i32 + padding;
+            if grow_span_heights_to_fit(&mut heights, row1, row2, needed) {
+                changed = true;
+            }
+        }
+
+        if !changed {
+            return;
+        }
+
+        self.indicator_bands.col_top.row_defs = heights
+            .into_iter()
+            .enumerate()
+            .map(|(index, height_px)| ColIndicatorRowDefState {
+                index: index as i32,
+                height_px: height_px.max(1),
+            })
+            .collect();
+        self.layout.invalidate();
+        self.dirty = true;
+    }
+
+    /// Auto-resize the full grid using the current `auto_size_mode`.
+    ///
+    /// Column auto-fit runs before row auto-fit so wrapped row-height
+    /// measurement can use the final column widths.
+    pub fn auto_resize_all(&mut self) {
+        if !self.auto_resize || self.rows <= 0 || self.cols <= 0 {
+            return;
+        }
+
+        let resize_cols = self.auto_size_mode == 0 || self.auto_size_mode == 1;
+        let resize_rows = self.auto_size_mode == 0 || self.auto_size_mode == 2;
+        if !resize_cols && !resize_rows {
+            return;
+        }
+
+        let grid_font_name = self.style.font_name.clone();
+        let grid_font_size = if self.style.font_size > 0.0 {
+            self.style.font_size
+        } else {
+            13.0
+        };
+        let word_wrap = self.word_wrap;
+        let default_col_min = self.default_col_width.min(20);
+        let default_row_min = self.default_row_height.min(10);
+        let row_padding = self
+            .style
+            .cell_padding
+            .vertical()
+            .max(self.style.fixed_cell_padding.vertical());
+
+        self.ensure_text_engine();
+        let mut te = self.text_engine.take().unwrap();
+
+        if resize_cols {
+            let col_padding: Vec<i32> = (0..self.cols)
+                .map(|col| {
+                    let body_padding = self.resolve_column_padding(col, false).horizontal();
+                    let fixed_padding = self.resolve_column_padding(col, true).horizontal();
+                    body_padding.max(fixed_padding)
+                })
+                .collect();
+            let mut max_widths = vec![0.0f32; self.cols as usize];
+
+            for row in 0..self.rows {
+                for col in 0..self.cols {
+                    if self.should_skip_cell_for_column_autosize(row, col) {
+                        continue;
+                    }
+                    let text = self.get_display_text(row, col);
+                    if text.is_empty() {
+                        continue;
+                    }
+                    let (font_name, font_size, bold, italic) =
+                        self.resolve_text_measure_style(row, col);
+                    let (w, _) = te.measure_text(&text, font_name, font_size, bold, italic, None);
+                    let idx = col as usize;
+                    max_widths[idx] = max_widths[idx].max(w);
+                }
+            }
+
+            for col in 0..self.cols {
+                let header_text = self.column_header_text(col);
+                if header_text.is_empty() {
+                    continue;
+                }
+                let (font_name, font_size, bold, italic) =
+                    self.resolve_header_text_measure_style(col);
+                let (w, _) =
+                    te.measure_text(&header_text, font_name, font_size, bold, italic, None);
+                let idx = col as usize;
+                max_widths[idx] = max_widths[idx].max(w);
+            }
+
+            for col in 0..self.cols {
+                let idx = col as usize;
+                let new_width =
+                    (max_widths[idx].ceil() as i32 + col_padding[idx]).max(default_col_min);
+                self.set_col_width(col, new_width);
+            }
+        }
+
+        if resize_rows {
+            let mut max_heights = vec![0.0f32; self.rows as usize];
+
+            for row in 0..self.rows {
+                for col in 0..self.cols {
+                    let text = self.get_display_text(row, col);
+                    if text.is_empty() {
+                        continue;
+                    }
+                    let (font_name, font_size, bold, italic) =
+                        self.resolve_text_measure_style(row, col);
+                    let max_width = self.auto_resize_row_measure_width(row, col, word_wrap);
+                    let (_, h) =
+                        te.measure_text(&text, font_name, font_size, bold, italic, max_width);
+                    let idx = row as usize;
+                    max_heights[idx] = max_heights[idx].max(h);
+                }
+            }
+
+            for row in 0..self.rows {
+                let idx = row as usize;
+                let new_height =
+                    (max_heights[idx].ceil() as i32 + row_padding).max(default_row_min);
+                self.set_row_height(row, new_height);
+            }
+
+            self.auto_resize_col_top_header_rows(&mut te, &grid_font_name, grid_font_size);
+        }
+
+        self.text_engine = Some(te);
     }
 
     /// Trigger auto-resize for the given cell's row and column if `auto_resize` is enabled.
@@ -2296,6 +3017,129 @@ impl VolvoxGrid {
         self.auto_resize_row(row);
     }
 
+    fn clear_region_bounds(&self, region: i32) -> (i32, i32, i32, i32) {
+        match region {
+            0 => (
+                self.fixed_rows,
+                self.fixed_cols,
+                self.rows - 1,
+                self.cols - 1,
+            ),
+            1 => (0, 0, self.fixed_rows - 1, self.cols - 1),
+            2 => (0, 0, self.rows - 1, self.fixed_cols - 1),
+            3 => (0, 0, self.fixed_rows - 1, self.fixed_cols - 1),
+            4..=6 => (0, 0, self.rows - 1, self.cols - 1),
+            _ => (
+                self.fixed_rows,
+                self.fixed_cols,
+                self.rows - 1,
+                self.cols - 1,
+            ),
+        }
+    }
+
+    fn clear_cell_styles_in_bounds(&mut self, r1: i32, c1: i32, r2: i32, c2: i32) {
+        if r1 > r2 || c1 > c2 {
+            return;
+        }
+        for row in r1..=r2 {
+            for col in c1..=c2 {
+                self.cell_styles.remove(&(row, col));
+            }
+        }
+    }
+
+    fn clear_everything_in_bounds(&mut self, r1: i32, c1: i32, r2: i32, c2: i32) {
+        if r1 > r2 || c1 > c2 {
+            return;
+        }
+
+        self.cells.clear_range(r1, c1, r2, c2);
+        self.clear_cell_styles_in_bounds(r1, c1, r2, c2);
+        self.merged_regions.remove_overlapping(r1, c1, r2, c2);
+        self.row_props.retain(|row, _| *row < r1 || *row > r2);
+        self.rows_hidden.retain(|row| *row < r1 || *row > r2);
+        self.cols_hidden.retain(|col| *col < c1 || *col > c2);
+        self.pinned_rows_top.retain(|&row| row < r1 || row > r2);
+        self.pinned_rows_bottom.retain(|&row| row < r1 || row > r2);
+        self.pinned_cols_left.retain(|&col| col < c1 || col > c2);
+        self.pinned_cols_right.retain(|&col| col < c1 || col > c2);
+        self.sticky_rows.retain(|row, _| *row < r1 || *row > r2);
+        self.sticky_cols.retain(|col, _| *col < c1 || *col > c2);
+        self.sticky_cells
+            .retain(|&(row, col), _| row < r1 || row > r2 || col < c1 || col > c2);
+        self.layout.invalidate();
+    }
+
+    pub fn clear_region(&mut self, scope: i32, region: i32) {
+        let (r1, c1, r2, c2) = self.clear_region_bounds(region);
+
+        match scope {
+            0 => self.clear_everything_in_bounds(r1, c1, r2, c2),
+            1 => self.clear_cell_styles_in_bounds(r1, c1, r2, c2),
+            2 => {
+                if r1 <= r2 && c1 <= c2 {
+                    self.cells.clear_range(r1, c1, r2, c2);
+                }
+            }
+            3 => {
+                for (sr1, sc1, sr2, sc2) in self.selection.all_ranges(self.rows, self.cols) {
+                    self.cells.clear_range(sr1, sc1, sr2, sc2);
+                    self.clear_cell_styles_in_bounds(sr1, sc1, sr2, sc2);
+                }
+            }
+            _ => {}
+        }
+
+        self.mark_dirty();
+    }
+
+    fn auto_resize_for_merge_change(&mut self, r1: i32, c1: i32, r2: i32, c2: i32) {
+        if !self.auto_resize || self.rows <= 0 || self.cols <= 0 {
+            return;
+        }
+
+        let row_lo = r1.min(r2).clamp(0, self.rows - 1);
+        let row_hi = r1.max(r2).clamp(0, self.rows - 1);
+        let col_lo = c1.min(c2).clamp(0, self.cols - 1);
+        let col_hi = c1.max(c2).clamp(0, self.cols - 1);
+
+        let resize_cols = self.auto_size_mode == 0 || self.auto_size_mode == 1;
+        let resize_rows = self.auto_size_mode == 0 || self.auto_size_mode == 2;
+
+        if resize_cols {
+            for col in col_lo..=col_hi {
+                self.auto_resize_col(col);
+            }
+        }
+
+        if resize_rows {
+            for row in row_lo..=row_hi {
+                self.auto_resize_row(row);
+            }
+        }
+    }
+
+    pub fn merge_cells(&mut self, r1: i32, c1: i32, r2: i32, c2: i32) {
+        let (row_lo, row_hi) = (r1.min(r2), r1.max(r2));
+        let (col_lo, col_hi) = (c1.min(c2), c1.max(c2));
+        self.merged_regions
+            .add_merge(row_lo, col_lo, row_hi, col_hi);
+        self.layout.invalidate();
+        self.auto_resize_for_merge_change(row_lo, col_lo, row_hi, col_hi);
+        self.mark_dirty();
+    }
+
+    pub fn unmerge_cells(&mut self, r1: i32, c1: i32, r2: i32, c2: i32) {
+        let (row_lo, row_hi) = (r1.min(r2), r1.max(r2));
+        let (col_lo, col_hi) = (c1.min(c2), c1.max(c2));
+        self.merged_regions
+            .remove_overlapping(row_lo, col_lo, row_hi, col_hi);
+        self.layout.invalidate();
+        self.auto_resize_for_merge_change(row_lo, col_lo, row_hi, col_hi);
+        self.mark_dirty();
+    }
+
     // ── Data Refresh ───────────────────────
 
     /// Trigger a data refresh cycle.
@@ -2303,6 +3147,11 @@ impl VolvoxGrid {
     /// Fires `DataRefreshing` and `DataRefreshed` events, invalidates
     /// layout, and marks the grid dirty for re-render.
     pub fn data_refresh(&mut self) {
+        self.cancel_pull_to_refresh_contact(false);
+        self.pull_to_refresh_state = crate::grid::PullToRefreshState::Idle;
+        self.pull_to_refresh_reveal_px = 0.0;
+        self.pull_to_refresh_target_reveal_px = 0.0;
+
         self.events
             .push(crate::event::GridEventData::DataRefreshing);
         self.layout.invalidate();
@@ -2704,13 +3553,13 @@ fn format_bool_string(raw: &str, true_str: &str, false_str: &str) -> String {
 
 /// Format a date string as MM/DD/YYYY (Short Date).
 fn format_as_short_date(raw: &str) -> Option<String> {
-    let (y, m, d) = parse_date_parts(raw)?;
+    let (y, m, d) = parse_date_value(raw)?;
     Some(format!("{:02}/{:02}/{:04}", m, d, y))
 }
 
 /// Format a date string as "Month DD, YYYY" (Long Date).
 fn format_as_long_date(raw: &str) -> Option<String> {
-    let (y, m, d) = parse_date_parts(raw)?;
+    let (y, m, d) = parse_date_value(raw)?;
     let month_name = match m {
         1 => "January",
         2 => "February",
@@ -2727,6 +3576,20 @@ fn format_as_long_date(raw: &str) -> Option<String> {
         _ => return None,
     };
     Some(format!("{} {:02}, {:04}", month_name, d, y))
+}
+
+/// Format a date string as YYYY-MM-DD (ISO Date).
+fn format_as_iso_date(raw: &str) -> Option<String> {
+    let (y, m, d) = parse_date_value(raw)?;
+    Some(format!("{:04}-{:02}-{:02}", y, m, d))
+}
+
+fn parse_date_value(raw: &str) -> Option<(i32, i32, i32)> {
+    parse_date_parts(raw).or_else(|| {
+        let millis = raw.trim().parse::<i64>().ok()?;
+        let days = millis.div_euclid(86_400_000);
+        Some(civil_from_days(days))
+    })
 }
 
 /// Parse common date formats into (year, month, day).
@@ -2758,6 +3621,20 @@ fn parse_date_parts(s: &str) -> Option<(i32, i32, i32)> {
         return None;
     }
     Some((y, m, d))
+}
+
+fn civil_from_days(days: i64) -> (i32, i32, i32) {
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = mp + if mp < 10 { 3 } else { -9 };
+    let year = y + if m <= 2 { 1 } else { 0 };
+    (year as i32, m as i32, d as i32)
 }
 
 /// Insert thousands separators into a formatted number string.
@@ -2804,6 +3681,7 @@ impl VolvoxGrid {
     /// This is the canonical entry point that avoids the self-referential
     /// borrow problem of calling `self.layout.rebuild(self)`.
     pub fn ensure_layout(&mut self) {
+        self.sync_row_indicator_start_auto_width();
         if !self.layout.valid {
             // Snapshot previous positions for animation diffing
             self.animation.save_prev(&self.layout);
@@ -3449,8 +4327,23 @@ fn truncate_chars(input: &str, max_chars: i32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::GridEventData;
     use crate::proto::volvoxgrid::v1 as pb;
     use std::time::Duration;
+
+    fn pull_to_refresh_test_grid() -> VolvoxGrid {
+        let mut grid = VolvoxGrid::new(1, 320, 240, 20, 4, 1, 0);
+        grid.pull_to_refresh_enabled = true;
+        grid
+    }
+
+    fn drain_event_data(grid: &mut VolvoxGrid) -> Vec<GridEventData> {
+        grid.events
+            .drain()
+            .into_iter()
+            .map(|event| event.data)
+            .collect()
+    }
 
     #[test]
     fn format_string_sets_columns() {
@@ -3499,6 +4392,72 @@ mod tests {
         grid.cells.set_text(1, 1, "1234.5".to_string());
         let display = grid.get_display_text(1, 1);
         assert_eq!(display, "$1,234.50");
+    }
+
+    #[test]
+    fn col_format_short_date_accepts_timestamp_millis() {
+        let result = apply_col_format("1764547200000", "short date");
+        assert_eq!(result, Some("12/01/2025".to_string()));
+    }
+
+    #[test]
+    fn date_columns_default_to_iso_display_for_timestamp_storage() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 2, 1, 0, 0);
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataDate as i32;
+        grid.cells.set_text(0, 0, "1764547200000".to_string());
+
+        assert_eq!(grid.get_display_text(0, 0), "2025-12-01");
+    }
+
+    #[test]
+    fn auto_resize_col_uses_cell_font_style_overrides() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        grid.default_col_width = 10;
+        grid.auto_resize = true;
+        grid.cells.set_text(0, 0, "1234567".to_string());
+
+        grid.auto_resize_col(0);
+        let before = grid.get_col_width(0);
+
+        grid.cell_styles.insert(
+            (0, 0),
+            crate::style::CellStylePatch {
+                font_bold: Some(true),
+                font_size: Some(24.0),
+                ..Default::default()
+            },
+        );
+
+        grid.auto_resize_col(0);
+
+        assert!(grid.get_col_width(0) > before);
+    }
+
+    #[test]
+    fn auto_resize_row_uses_cell_font_style_overrides() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        grid.default_col_width = 24;
+        grid.default_row_height = 16;
+        grid.word_wrap = true;
+        grid.auto_resize = true;
+        grid.cells
+            .set_text(0, 0, "wrapped text wrapped text wrapped text".to_string());
+
+        grid.auto_resize_row(0);
+        let before = grid.get_row_height(0);
+
+        grid.cell_styles.insert(
+            (0, 0),
+            crate::style::CellStylePatch {
+                font_bold: Some(true),
+                font_size: Some(24.0),
+                ..Default::default()
+            },
+        );
+
+        grid.auto_resize_row(0);
+
+        assert!(grid.get_row_height(0) > before);
     }
 
     #[test]
@@ -3567,6 +4526,40 @@ mod tests {
     }
 
     #[test]
+    fn clear_everything_scrollable_removes_in_range_pin_and_sticky_state() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 4, 1, 1);
+
+        grid.set_row_sticky(0, 1);
+        grid.set_col_sticky(0, 3);
+        grid.pin_row(1, 1);
+        grid.pin_row(2, 2);
+        grid.pin_col(1, 1);
+        grid.pin_col(2, 2);
+        grid.set_row_sticky(1, 1);
+        grid.set_row_sticky(2, 2);
+        grid.set_col_sticky(1, 3);
+        grid.set_col_sticky(2, 4);
+        grid.set_cell_sticky(1, 1, 1, 3);
+        grid.set_cell_sticky(2, 2, 2, 4);
+
+        grid.clear_region(0, 0);
+
+        assert_eq!(grid.effective_sticky_row(0, 0), 1);
+        assert_eq!(grid.effective_sticky_col(0, 0), 3);
+
+        assert_eq!(grid.is_row_pinned(1), 0);
+        assert_eq!(grid.is_row_pinned(2), 0);
+        assert_eq!(grid.is_col_pinned(1), 0);
+        assert_eq!(grid.is_col_pinned(2), 0);
+        assert_eq!(grid.effective_sticky_row(1, 1), 0);
+        assert_eq!(grid.effective_sticky_row(2, 2), 0);
+        assert_eq!(grid.effective_sticky_col(1, 1), 0);
+        assert_eq!(grid.effective_sticky_col(2, 2), 0);
+        assert!(!grid.sticky_cells.contains_key(&(1, 1)));
+        assert!(!grid.sticky_cells.contains_key(&(2, 2)));
+    }
+
+    #[test]
     fn active_dropdown_list_hidden_for_header_and_subtotal_rows() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 4, 2, 1, 0);
         grid.columns[1].dropdown_items = "A|B|C".to_string();
@@ -3598,6 +4591,20 @@ mod tests {
 
         grid.cells.get_mut(1, 0).extra_mut().control = Some(CellControl::None);
         assert_eq!(grid.resolved_cell_control(1, 0), CellControl::None);
+    }
+
+    #[test]
+    fn resolved_cell_control_hides_inferred_dropdown_for_header_and_subtotal_rows() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 1, 1, 0);
+        grid.columns[0].dropdown_items = "A|B|C".to_string();
+        grid.row_props.entry(2).or_default().is_subtotal = true;
+
+        assert_eq!(grid.resolved_cell_control(0, 0), CellControl::None);
+        assert_eq!(
+            grid.resolved_cell_control(1, 0),
+            CellControl::DropdownButton
+        );
+        assert_eq!(grid.resolved_cell_control(2, 0), CellControl::None);
     }
 
     #[test]
@@ -3735,6 +4742,46 @@ mod tests {
     }
 
     #[test]
+    fn cell_screen_rect_expands_horizontal_merge_for_pinned_bottom_row() {
+        let mut grid = VolvoxGrid::new(1, 240, 120, 4, 4, 0, 0);
+        for row in 0..grid.rows {
+            grid.set_row_height(row, 20);
+        }
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cells.set_text(3, 0, "Grand Total".to_string());
+        grid.merge_cells(3, 0, 3, 2);
+        grid.pin_row(3, 2);
+        grid.ensure_layout();
+
+        let anchor = grid.cell_screen_rect(3, 0).expect("anchor rect");
+        let middle = grid.cell_screen_rect(3, 1).expect("middle rect");
+        let tail = grid.cell_screen_rect(3, 2).expect("tail rect");
+
+        assert_eq!(anchor, middle);
+        assert_eq!(anchor, tail);
+        assert!(anchor.2 > grid.col_width(0));
+        assert!(anchor.3 > 0);
+    }
+
+    #[test]
+    fn cell_screen_rect_extends_last_visible_column_when_trailing_column_is_hidden() {
+        let mut grid = VolvoxGrid::new(1, 220, 120, 3, 4, 0, 0);
+        grid.extend_last_col = true;
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cols_hidden.insert(3);
+        grid.ensure_layout();
+
+        let rect = grid.cell_screen_rect(1, 2).expect("cell rect");
+
+        assert_eq!(rect.0, 80);
+        assert_eq!(rect.2, 140);
+    }
+
+    #[test]
     fn set_top_row_clamps_to_last_valid_viewport() {
         let mut grid = VolvoxGrid::new(1, 120, 30, 10, 3, 0, 0);
         grid.default_row_height = 10;
@@ -3817,5 +4864,317 @@ mod tests {
         assert_eq!(grid.scrollbar_fade_opacity, 1.0);
         assert_eq!(grid.scrollbar_fade_timer, 0.0);
         assert!(grid.scrollbar_fade_last_tick.is_none());
+    }
+
+    #[test]
+    fn auto_resize_all_expands_columns_when_enabled() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        grid.default_col_width = 20;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 1;
+        grid.cells.set_text(0, 0, "A much longer value".to_string());
+
+        let before = grid.get_col_width(0);
+        grid.auto_resize_all();
+
+        assert!(grid.get_col_width(0) > before);
+    }
+
+    #[test]
+    fn auto_resize_col_expands_for_caption_header_text() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        grid.default_col_width = 20;
+        grid.auto_resize = true;
+        grid.columns[0].caption = "A much longer header".to_string();
+
+        let before = grid.get_col_width(0);
+        grid.auto_resize_col(0);
+
+        assert!(grid.get_col_width(0) > before);
+    }
+
+    #[test]
+    fn auto_resize_all_can_expand_rows_in_row_height_mode() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        grid.default_col_width = 24;
+        grid.default_row_height = 16;
+        grid.word_wrap = true;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 2;
+        grid.cells
+            .set_text(0, 0, "wrapped text wrapped text wrapped text".to_string());
+
+        let before = grid.get_row_height(0);
+        grid.auto_resize_all();
+
+        assert!(grid.get_row_height(0) > before);
+    }
+
+    #[test]
+    fn auto_resize_all_skips_when_disabled() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        grid.default_col_width = 20;
+        grid.auto_resize = false;
+        grid.auto_size_mode = 1;
+        grid.cells.set_text(0, 0, "A much longer value".to_string());
+
+        let before = grid.get_col_width(0);
+        grid.auto_resize_all();
+
+        assert_eq!(grid.get_col_width(0), before);
+    }
+
+    #[test]
+    fn auto_resize_all_expands_col_top_header_height_for_caption_headers() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1, 2, 0, 0);
+        grid.auto_resize = true;
+        grid.auto_size_mode = 2;
+        grid.style.font_size = 40.0;
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.mode_bits =
+            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32;
+        grid.columns[0].caption = "품명".to_string();
+        grid.columns[1].caption = "고객명".to_string();
+
+        let before = grid.indicator_bands.col_top.row_height_px(0);
+        grid.auto_resize_all();
+
+        assert!(grid.indicator_bands.col_top.row_height_px(0) > before);
+    }
+
+    #[test]
+    fn ensure_layout_auto_sizes_row_indicator_width_by_default_for_row_numbers() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1200, 2, 0, 0);
+        grid.style.font_size = 28.0;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+
+        let before = grid.indicator_bands.row_start.width_px;
+        grid.ensure_layout();
+
+        assert!(grid.indicator_bands.row_start.width_px > before);
+    }
+
+    #[test]
+    fn ensure_layout_keeps_row_indicator_width_fixed_when_auto_size_is_disabled() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1200, 2, 0, 0);
+        grid.style.font_size = 28.0;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+
+        let before = grid.indicator_bands.row_start.width_px;
+        grid.ensure_layout();
+
+        assert_eq!(grid.indicator_bands.row_start.width_px, before);
+    }
+
+    #[test]
+    fn merge_cells_shrinks_merged_subtotal_caption_anchor_column() {
+        let mut grid = VolvoxGrid::new(1, 480, 240, 4, 3, 1, 0);
+        grid.default_col_width = 20;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 1;
+        grid.cells.set_text(0, 0, "ID".to_string());
+        grid.cells.set_text(0, 1, "Name".to_string());
+        grid.cells.set_text(0, 2, "Qty".to_string());
+        grid.cells.set_text(1, 0, "A".to_string());
+        grid.cells.set_text(1, 2, "1".to_string());
+        grid.cells.set_text(2, 0, "B".to_string());
+        grid.cells.set_text(2, 2, "2".to_string());
+        grid.cells.set_text(3, 0, "C".to_string());
+        grid.cells.set_text(3, 2, "3".to_string());
+
+        grid.auto_resize_all();
+        let detail_width = grid.get_col_width(0);
+
+        crate::outline::subtotal(
+            &mut grid,
+            pb::AggregateType::AggSum as i32,
+            -1,
+            2,
+            "Very long subtotal caption",
+            0,
+            0,
+            false,
+        );
+        let subtotal_row = grid.fixed_rows;
+        let widened = grid.get_col_width(0);
+        assert!(widened > detail_width);
+
+        grid.merge_cells(subtotal_row, 0, subtotal_row, 1);
+
+        assert_eq!(grid.get_col_width(0), detail_width);
+    }
+
+    #[test]
+    fn merge_cells_recomputes_subtotal_caption_row_height_using_merged_width() {
+        let mut grid = VolvoxGrid::new(1, 480, 240, 3, 3, 1, 0);
+        grid.default_col_width = 40;
+        grid.default_row_height = 16;
+        grid.word_wrap = true;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 2;
+        grid.cells.set_text(0, 0, "ID".to_string());
+        grid.cells.set_text(0, 1, "Desc".to_string());
+        grid.cells.set_text(0, 2, "Qty".to_string());
+        grid.cells.set_text(1, 0, "A".to_string());
+        grid.cells.set_text(1, 2, "1".to_string());
+        grid.cells.set_text(2, 0, "B".to_string());
+        grid.cells.set_text(2, 2, "2".to_string());
+
+        crate::outline::subtotal(
+            &mut grid,
+            pb::AggregateType::AggSum as i32,
+            -1,
+            2,
+            "Very long subtotal caption that should wrap less after merge",
+            0,
+            0,
+            false,
+        );
+        let subtotal_row = grid.fixed_rows;
+        let before_merge = grid.get_row_height(subtotal_row);
+
+        grid.merge_cells(subtotal_row, 0, subtotal_row, 1);
+
+        assert!(grid.get_row_height(subtotal_row) < before_merge);
+    }
+
+    #[test]
+    fn pull_to_refresh_below_threshold_cancels() {
+        let mut grid = pull_to_refresh_test_grid();
+
+        grid.begin_pull_to_refresh_contact();
+        assert!(
+            grid.handle_pull_to_refresh_scroll(0.0, -(grid.pull_to_refresh_threshold_px() * 0.5),)
+        );
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Pulling
+        ));
+
+        grid.end_pull_to_refresh_contact();
+
+        let events = drain_event_data(&mut grid);
+        assert!(events
+            .iter()
+            .any(|event| matches!(event, GridEventData::PullToRefreshCanceled)));
+        assert!(!events
+            .iter()
+            .any(|event| matches!(event, GridEventData::PullToRefreshTriggered)));
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Idle
+        ));
+        assert_eq!(grid.pull_to_refresh_reveal_px, 0.0);
+        assert_eq!(grid.pull_to_refresh_target_reveal_px, 0.0);
+    }
+
+    #[test]
+    fn pull_to_refresh_above_threshold_triggers_and_settles_immediately() {
+        let mut grid = pull_to_refresh_test_grid();
+
+        grid.begin_pull_to_refresh_contact();
+        assert!(
+            grid.handle_pull_to_refresh_scroll(0.0, -(grid.pull_to_refresh_threshold_px() * 1.5),)
+        );
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Armed
+        ));
+
+        grid.end_pull_to_refresh_contact();
+
+        let gesture_events = drain_event_data(&mut grid);
+        assert!(gesture_events
+            .iter()
+            .any(|event| matches!(event, GridEventData::PullToRefreshTriggered)));
+        assert!(!gesture_events.iter().any(|event| matches!(
+            event,
+            GridEventData::DataRefreshing | GridEventData::DataRefreshed
+        )));
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Settling
+        ));
+        assert_eq!(grid.pull_to_refresh_target_reveal_px, 0.0);
+
+        assert!(grid.tick_pull_to_refresh(1.0));
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Idle
+        ));
+        assert_eq!(grid.pull_to_refresh_reveal_px, 0.0);
+    }
+
+    #[test]
+    fn pull_to_refresh_ignores_non_top_or_horizontal_drag() {
+        let mut grid = pull_to_refresh_test_grid();
+        grid.scroll.scroll_y = 16.0;
+        grid.begin_pull_to_refresh_contact();
+
+        assert!(
+            !grid.handle_pull_to_refresh_scroll(0.0, -(grid.pull_to_refresh_threshold_px() * 1.1),)
+        );
+        assert_eq!(grid.pull_to_refresh_reveal_px, 0.0);
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Idle
+        ));
+
+        grid.cancel_pull_to_refresh_contact(false);
+
+        let mut grid = pull_to_refresh_test_grid();
+        grid.begin_pull_to_refresh_contact();
+
+        assert!(!grid.handle_pull_to_refresh_scroll(
+            grid.pull_to_refresh_touch_slop_px() * 2.0,
+            -(grid.pull_to_refresh_touch_slop_px() * 0.75),
+        ));
+        assert_eq!(grid.pull_to_refresh_reveal_px, 0.0);
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Idle
+        ));
+    }
+
+    #[test]
+    fn pull_to_refresh_ignores_fast_scroll_active() {
+        let mut grid = pull_to_refresh_test_grid();
+        grid.fast_scroll_active = true;
+        grid.begin_pull_to_refresh_contact();
+
+        assert!(
+            !grid.handle_pull_to_refresh_scroll(0.0, -(grid.pull_to_refresh_threshold_px() * 1.1),)
+        );
+        assert_eq!(grid.pull_to_refresh_reveal_px, 0.0);
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Idle
+        ));
+    }
+
+    #[test]
+    fn pull_to_refresh_tiny_cancel_snaps_closed() {
+        let mut grid = pull_to_refresh_test_grid();
+        let tiny_pull = (grid.pull_to_refresh_cancel_snap_px() * 0.5).max(2.0);
+
+        grid.begin_pull_to_refresh_contact();
+        assert!(grid.handle_pull_to_refresh_scroll(0.0, -tiny_pull));
+
+        grid.end_pull_to_refresh_contact();
+
+        let events = drain_event_data(&mut grid);
+        assert!(events
+            .iter()
+            .any(|event| matches!(event, GridEventData::PullToRefreshCanceled)));
+        assert!(matches!(
+            grid.pull_to_refresh_state,
+            PullToRefreshState::Idle
+        ));
+        assert_eq!(grid.pull_to_refresh_reveal_px, 0.0);
+        assert_eq!(grid.pull_to_refresh_target_reveal_px, 0.0);
     }
 }

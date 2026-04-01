@@ -83,6 +83,7 @@ impl From<&FfiError> for FfiError {
 struct StreamContext {
     send_queue: Mutex<Vec<Vec<u8>>>,      // host -> plugin
     recv_queue: Mutex<Vec<StreamResult>>, // plugin -> host
+    worker: Mutex<Option<std::thread::JoinHandle<()>>>,
     send_cv: std::sync::Condvar,
     recv_cv: std::sync::Condvar,
     closed: std::sync::atomic::AtomicBool,
@@ -99,6 +100,7 @@ impl StreamContext {
         Self {
             send_queue: Mutex::new(Vec::new()),
             recv_queue: Mutex::new(Vec::new()),
+            worker: Mutex::new(None),
             send_cv: std::sync::Condvar::new(),
             recv_cv: std::sync::Condvar::new(),
             closed: std::sync::atomic::AtomicBool::new(false),
@@ -150,6 +152,16 @@ impl StreamContext {
     fn is_closed(&self) -> bool {
         self.closed.load(Ordering::SeqCst)
     }
+
+    fn set_worker(&self, worker: std::thread::JoinHandle<()>) {
+        if let Ok(mut slot) = self.worker.lock() {
+            *slot = Some(worker);
+        }
+    }
+
+    fn take_worker(&self) -> Option<std::thread::JoinHandle<()>> {
+        self.worker.lock().ok()?.take()
+    }
 }
 
 static STREAMS: OnceLock<RwLock<HashMap<u64, Arc<StreamContext>>>> = OnceLock::new();
@@ -196,7 +208,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn set_left_col(&self, request: SetColRequest) -> Result<Empty, FfiError>;
     fn edit(&self, request: EditCommand) -> Result<EditState, FfiError>;
     fn sort(&self, request: SortRequest) -> Result<Empty, FfiError>;
-    fn subtotal(&self, request: SubtotalRequest) -> Result<Empty, FfiError>;
+    fn subtotal(&self, request: SubtotalRequest) -> Result<SubtotalResult, FfiError>;
     fn auto_size(&self, request: AutoSizeRequest) -> Result<Empty, FfiError>;
     fn outline(&self, request: OutlineRequest) -> Result<Empty, FfiError>;
     fn get_node(&self, request: GetNodeRequest) -> Result<NodeInfo, FfiError>;
@@ -215,6 +227,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn set_redraw(&self, request: SetRedrawRequest) -> Result<Empty, FfiError>;
     fn refresh(&self, request: GridHandle) -> Result<Empty, FfiError>;
     fn load_demo(&self, request: LoadDemoRequest) -> Result<Empty, FfiError>;
+    fn get_demo_data(&self, request: GetDemoDataRequest) -> Result<GetDemoDataResponse, FfiError>;
     fn render_session(
         &self,
         stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
@@ -1057,6 +1070,22 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
                 Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
             }
         }
+        "/volvoxgrid.v1.VolvoxGridService/GetDemoData" => {
+            match GetDemoDataRequest::decode(input.as_slice()) {
+                Ok(req) => match plugin.get_demo_data(req) {
+                    Ok(resp) => {
+                        let mut buf = Vec::new();
+                        if resp.encode(&mut buf).is_ok() {
+                            success_response(resp_len, &buf)
+                        } else {
+                            error_response(resp_len, "encode failed")
+                        }
+                    }
+                    Err(e) => error_response(resp_len, &e),
+                },
+                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+            }
+        }
         _ => error_response(resp_len, "unknown method"),
     }
 }
@@ -1088,7 +1117,7 @@ pub extern "C" fn Synurang_Stream_VolvoxGridService_Open(method: *const c_char) 
 
     // Start handler thread
     let ctx_clone = ctx.clone();
-    let _ = std::thread::spawn(move || {
+    let worker = std::thread::spawn(move || {
         match method_str.as_str() {
             "/volvoxgrid.v1.VolvoxGridService/RenderSession" => {
                 let bidi = StreamBidi::<RenderInput, RenderOutput> {
@@ -1145,6 +1174,7 @@ pub extern "C" fn Synurang_Stream_VolvoxGridService_Open(method: *const c_char) 
             }
         }
     });
+    ctx.set_worker(worker);
 
     handle
 }
@@ -1220,11 +1250,19 @@ pub extern "C" fn Synurang_Stream_CloseSend(handle: u64) {
 
 #[no_mangle]
 pub extern "C" fn Synurang_Stream_Close(handle: u64) {
-    if let Some(ctx) = get_stream(handle) {
+    let worker = if let Some(ctx) = get_stream(handle) {
         ctx.close(); // This now notifies all waiters
-    }
+        ctx.take_worker()
+    } else {
+        None
+    };
     if let Ok(mut streams) = streams().write() {
         streams.remove(&handle);
+    }
+    if let Some(worker) = worker {
+        if worker.thread().id() != std::thread::current().id() {
+            let _ = worker.join();
+        }
     }
 }
 

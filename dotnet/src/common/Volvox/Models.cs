@@ -171,10 +171,18 @@ namespace VolvoxGrid.DotNet.Internal
         public bool? FontItalic { get; set; }
         public bool? FontUnderline { get; set; }
         public bool? FontStrikethrough { get; set; }
-        public float? FontWidth { get; set; }
+        public float? FontStretch { get; set; }
         public uint? ProgressColor { get; set; }
         public float? ProgressPercent { get; set; }
         public VolvoxBorderStyle? Border { get; set; }
+        public uint? BorderColor { get; set; }
+    }
+
+    internal sealed class VolvoxHighlightStyleData
+    {
+        public uint? Background { get; set; }
+        public uint? Foreground { get; set; }
+        public VolvoxBorderStyle? BorderStyle { get; set; }
         public uint? BorderColor { get; set; }
     }
 
@@ -296,6 +304,13 @@ namespace VolvoxGrid.DotNet.Internal
         KeyClick = 2,
     }
 
+    internal enum VolvoxDropdownTrigger
+    {
+        Never = 0,
+        Always = 1,
+        OnEdit = 2,
+    }
+
     internal enum VolvoxHeaderFeatures
     {
         None = 0,
@@ -384,6 +399,12 @@ namespace VolvoxGrid.DotNet.Internal
         ArrowsLeaf = 2,
         Connectors = 3,
         ConnectorsLeaf = 4,
+    }
+
+    internal enum VolvoxGroupTotalPosition
+    {
+        Above = 0,
+        Below = 1,
     }
 
     internal enum VolvoxAggregateType
@@ -480,6 +501,14 @@ namespace VolvoxGrid.DotNet.Internal
         EngraveLight = 4,
     }
 
+    internal enum VolvoxGridLineStyle
+    {
+        None = 0,
+        Solid = 1,
+        Inset = 2,
+        Raised = 3,
+    }
+
     internal enum VolvoxCheckedState
     {
         Unchecked = 0,
@@ -542,6 +571,7 @@ namespace VolvoxGrid.DotNet.Internal
     internal sealed class VolvoxGridConfigData
     {
         public VolvoxLayoutConfigData Layout { get; set; } = new VolvoxLayoutConfigData();
+        public VolvoxStyleConfigData Style { get; set; } = new VolvoxStyleConfigData();
         public VolvoxSelectionConfigData Selection { get; set; } = new VolvoxSelectionConfigData();
         public VolvoxEditConfigData Editing { get; set; } = new VolvoxEditConfigData();
         public VolvoxScrollConfigData Scrolling { get; set; } = new VolvoxScrollConfigData();
@@ -564,17 +594,50 @@ namespace VolvoxGrid.DotNet.Internal
         public int? DefaultColWidth { get; set; }
     }
 
+    internal sealed class VolvoxGridLinesData
+    {
+        public VolvoxGridLineStyle? Style { get; set; }
+        public uint? Color { get; set; }
+        public int? Width { get; set; }
+    }
+
+    internal sealed class VolvoxRegionStyleData
+    {
+        public uint? Background { get; set; }
+        public uint? Foreground { get; set; }
+        public VolvoxGridLinesData GridLines { get; set; } = new VolvoxGridLinesData();
+    }
+
+    internal sealed class VolvoxStyleConfigData
+    {
+        public uint? Background { get; set; }
+        public uint? Foreground { get; set; }
+        public uint? AlternateBackground { get; set; }
+        public uint? ProgressColor { get; set; }
+        public VolvoxGridLinesData GridLines { get; set; } = new VolvoxGridLinesData();
+        public VolvoxRegionStyleData Fixed { get; set; } = new VolvoxRegionStyleData();
+        public uint? SheetBackground { get; set; }
+        public uint? SheetBorder { get; set; }
+    }
+
     internal sealed class VolvoxSelectionConfigData
     {
         public VolvoxSelectionMode? Mode { get; set; }
         public VolvoxSelectionVisibility? SelectionVisibility { get; set; }
         public bool? AllowSelection { get; set; }
         public uint? HoverMask { get; set; }
+        public VolvoxHighlightStyleData SelectionStyle { get; set; } = new VolvoxHighlightStyleData();
+        public VolvoxHighlightStyleData HoverRowStyle { get; set; } = new VolvoxHighlightStyleData();
+        public VolvoxHighlightStyleData HoverColumnStyle { get; set; } = new VolvoxHighlightStyleData();
+        public VolvoxHighlightStyleData HoverCellStyle { get; set; } = new VolvoxHighlightStyleData();
+        public VolvoxHighlightStyleData ActiveCellStyle { get; set; } = new VolvoxHighlightStyleData();
     }
 
     internal sealed class VolvoxEditConfigData
     {
         public VolvoxEditTrigger? EditTrigger { get; set; }
+        public VolvoxDropdownTrigger? DropdownTrigger { get; set; }
+        public bool? DropdownSearch { get; set; }
     }
 
     internal sealed class VolvoxScrollConfigData
@@ -590,6 +653,8 @@ namespace VolvoxGrid.DotNet.Internal
     {
         public VolvoxTreeIndicatorStyle? TreeIndicator { get; set; }
         public int? TreeColumn { get; set; }
+        public VolvoxGroupTotalPosition? GroupTotalPosition { get; set; }
+        public bool? MultiTotals { get; set; }
     }
 
     internal sealed class VolvoxSpanConfigData

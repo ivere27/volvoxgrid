@@ -10,7 +10,7 @@
  * so the host only provides platform glue.
  */
 
-import { VolvoxGrid } from "../js/src/volvoxgrid.js";
+import { VolvoxGrid, type VolvoxGridContextMenuRequest } from "../js/src/volvoxgrid.js";
 import { setupDefaultInput } from "../js/src/default-input.js";
 import { createCanvas2DTextRenderer } from "../js/src/canvas2d-text-renderer.js";
 import {
@@ -35,11 +35,14 @@ const STRESS_ROWS = 1_000_000;
 const STRESS_COLS = 12;
 const SALES_COLS = 10;
 const HIERARCHY_COLS = 6;
+const SALES_STATUS_ITEMS = "Active|Pending|Shipped|Returned|Cancelled";
 const GRID_EVENT_CLICK = GridEventFields["click"];
 const HIERARCHY_ACTION_COL = 5;
 const CELL_INTERACTION_UNSPECIFIED = CellInteraction.CELL_INTERACTION_UNSPECIFIED;
 const CELL_HIT_AREA_TEXT = CellHitArea.HIT_TEXT;
 const FONT_FETCH_TIMEOUT_MS = 5000;
+const PB_TEXT_ENCODER = new TextEncoder();
+const PB_TEXT_DECODER = new TextDecoder();
 const HOVER_NONE = 0;
 const HOVER_ROW = 1;
 const HOVER_COLUMN = 2;
@@ -50,6 +53,7 @@ const LAYER_NAMES = [
   "sort", "col_drag", "checkbox", "dropdown", "selection",
   "hover", "edit_hl", "focus", "fill_hnd", "outline",
   "frozen_bd", "editor", "dd_active", "scrollbar", "fast_scrl",
+  "pull_rfrsh",
   "debug_ovl",
 ] as const;
 const LAYER_MASK_ALL = (1 << LAYER_NAMES.length) - 1;
@@ -57,6 +61,55 @@ const DEMO_DEFAULT_HOVER_MODE: Record<StandardDemoMode, number> = {
   stress: HOVER_ROW,
   sales: HOVER_ROW | HOVER_COLUMN | HOVER_CELL,
   hierarchy: HOVER_CELL,
+};
+const SALES_COLUMN_SETUP = [
+  { caption: "Q", key: "Q", width: 40, align: 4, dataType: undefined, format: undefined, dropdownItems: undefined, span: true },
+  { caption: "Region", key: "Region", width: 80, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: true },
+  { caption: "Category", key: "Category", width: 100, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
+  { caption: "Product", key: "Product", width: 120, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
+  { caption: "Sales", key: "Sales", width: 90, align: 7, dataType: 4, format: "$#,##0", dropdownItems: undefined, span: false },
+  { caption: "Cost", key: "Cost", width: 90, align: 7, dataType: 4, format: "$#,##0", dropdownItems: undefined, span: false },
+  { caption: "Margin%", key: "Margin", width: 70, align: 4, dataType: 1, format: undefined, dropdownItems: undefined, span: false },
+  { caption: "Flag", key: "Flag", width: 56, align: 4, dataType: 3, format: undefined, dropdownItems: undefined, span: false },
+  { caption: "Status", key: "Status", width: 80, align: undefined, dataType: undefined, format: undefined, dropdownItems: SALES_STATUS_ITEMS, span: false },
+  { caption: "Notes", key: "Notes", width: 140, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
+] as const;
+const HIERARCHY_COLUMN_SETUP = [
+  { caption: "Name", key: "Name", width: 260, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
+  { caption: "Type", key: "Type", width: 80, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
+  { caption: "Size", key: "Size", width: 80, align: 7, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
+  { caption: "Modified", key: "Modified", width: 120, align: undefined, dataType: 2, format: "short date", dropdownItems: undefined, interaction: undefined },
+  { caption: "Permissions", key: "Permissions", width: 100, align: 4, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
+  { caption: "Action", key: "Action", width: 92, align: 4, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: CellInteraction.CELL_INTERACTION_TEXT_LINK },
+] as const;
+type DemoColumnSetup = {
+  caption: string;
+  key: string;
+  width: number;
+  align?: number;
+  dataType?: number;
+  format?: string;
+  dropdownItems?: string;
+  interaction?: number;
+  span?: boolean;
+};
+type HierarchyDemoRow = {
+  Name: string;
+  Type: string;
+  Size: string;
+  Modified: string;
+  Permissions: string;
+  Action: string;
+  _level: number;
+};
+
+type DemoCellUpdate = {
+  row: number;
+  col: number;
+  text?: string;
+  flag?: boolean;
+  checked?: number;
+  dropdownItems?: string;
 };
 type WasmModule = typeof import("./wasm/volvoxgrid_wasm.js");
 
@@ -231,6 +284,598 @@ function pbEncodeMessageField(field: number, payload: Uint8Array): number[] {
   ];
 }
 
+function pbEncodeBool(value: boolean): number[] {
+  return pbEncodeVarint(value ? 1n : 0n);
+}
+
+function pbEncodeInt32(value: number): number[] {
+  const i32 = BigInt.asIntN(32, BigInt(Math.trunc(value)));
+  return pbEncodeVarint(BigInt.asUintN(64, i32));
+}
+
+function pbEncodeStringField(field: number, value: string): number[] {
+  const bytes = PB_TEXT_ENCODER.encode(value);
+  return [
+    ...pbEncodeTag(field, 2),
+    ...pbEncodeVarint(BigInt(bytes.length)),
+    ...bytes,
+  ];
+}
+
+function pbEncodeInt32Field(field: number, value: number): number[] {
+  return [...pbEncodeTag(field, 0), ...pbEncodeInt32(value)];
+}
+
+function pbEncodeUint32Field(field: number, value: number): number[] {
+  return [...pbEncodeTag(field, 0), ...pbEncodeVarint(BigInt(value >>> 0))];
+}
+
+function pbEncodeFloatField(field: number, value: number): number[] {
+  const buf = new ArrayBuffer(4);
+  new DataView(buf).setFloat32(0, value, true);
+  return [...pbEncodeTag(field, 5), ...Array.from(new Uint8Array(buf))];
+}
+
+function pbEncodeBorder(style: number, color: number): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeInt32Field(1, style));
+  out.push(...pbEncodeUint32Field(2, color));
+  return new Uint8Array(out);
+}
+
+function pbEncodeBordersAll(style: number, color: number): Uint8Array {
+  return new Uint8Array(pbEncodeMessageField(1, pbEncodeBorder(style, color)));
+}
+
+function pbEncodeGridLinesPayload(color: number): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeInt32Field(1, 1));
+  out.push(...pbEncodeUint32Field(3, color));
+  return new Uint8Array(out);
+}
+
+function pbEncodeRegionStylePayload(background: number, foreground: number, gridColor: number): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeUint32Field(1, background));
+  out.push(...pbEncodeUint32Field(2, foreground));
+  out.push(...pbEncodeMessageField(4, pbEncodeGridLinesPayload(gridColor)));
+  return new Uint8Array(out);
+}
+
+function pbEncodeHeaderStylePayload(color: number): Uint8Array {
+  const separator: number[] = [];
+  separator.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
+  separator.push(...pbEncodeUint32Field(2, color));
+  separator.push(...pbEncodeInt32Field(3, 1));
+
+  const resizeHandle: number[] = [];
+  resizeHandle.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
+  resizeHandle.push(...pbEncodeUint32Field(2, color));
+  resizeHandle.push(...pbEncodeInt32Field(3, 1));
+  resizeHandle.push(...pbEncodeInt32Field(5, 6));
+
+  const out: number[] = [];
+  out.push(...pbEncodeMessageField(1, new Uint8Array(separator)));
+  out.push(...pbEncodeMessageField(2, new Uint8Array(resizeHandle)));
+  return new Uint8Array(out);
+}
+
+function pbEncodeHighlightStylePayload(options: {
+  background?: number;
+  foreground?: number;
+  borderStyle?: number;
+  borderColor?: number;
+  fillHandle?: number;
+  fillHandleColor?: number;
+}): Uint8Array {
+  const out: number[] = [];
+  if (options.background != null) {
+    out.push(...pbEncodeUint32Field(1, options.background));
+  }
+  if (options.foreground != null) {
+    out.push(...pbEncodeUint32Field(2, options.foreground));
+  }
+  if (options.borderStyle != null && options.borderColor != null) {
+    out.push(...pbEncodeMessageField(3, pbEncodeBordersAll(options.borderStyle, options.borderColor)));
+  }
+  if (options.fillHandle != null) {
+    out.push(...pbEncodeInt32Field(4, options.fillHandle));
+  }
+  if (options.fillHandleColor != null) {
+    out.push(...pbEncodeUint32Field(5, options.fillHandleColor));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeColumnDef(
+  index: number,
+  setup: DemoColumnSetup,
+): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeInt32Field(1, index));
+  out.push(...pbEncodeInt32Field(2, setup.width));
+  out.push(...pbEncodeStringField(5, setup.caption));
+  if (setup.align != null) {
+    out.push(...pbEncodeInt32Field(6, setup.align));
+  }
+  if (setup.dataType != null) {
+    out.push(...pbEncodeInt32Field(8, setup.dataType));
+  }
+  if (setup.format != null) {
+    out.push(...pbEncodeStringField(9, setup.format));
+  }
+  out.push(...pbEncodeStringField(10, setup.key));
+  if (setup.dropdownItems != null) {
+    out.push(...pbEncodeStringField(13, setup.dropdownItems));
+  }
+  if (setup.span != null) {
+    out.push(...pbEncodeTag(17, 0), ...pbEncodeBool(setup.span));
+  }
+  if (setup.interaction != null) {
+    out.push(...pbEncodeInt32Field(26, setup.interaction));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeDefineColumnsRequest(gridId: number, columns: readonly DemoColumnSetup[]): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeTag(1, 0), ...pbEncodeVarint(BigInt(gridId)));
+  columns.forEach((column, index) => {
+    out.push(...pbEncodeMessageField(2, pbEncodeColumnDef(index, column)));
+  });
+  return new Uint8Array(out);
+}
+
+function pbEncodeRowDef(index: number, outlineLevel: number, isSubtotal: boolean): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeInt32Field(1, index));
+  out.push(...pbEncodeTag(4, 0), ...pbEncodeBool(isSubtotal));
+  out.push(...pbEncodeInt32Field(5, outlineLevel));
+  return new Uint8Array(out);
+}
+
+function pbEncodeDefineRowsRequest(
+  gridId: number,
+  rows: ReadonlyArray<{ outlineLevel: number; isSubtotal: boolean }>,
+): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeTag(1, 0), ...pbEncodeVarint(BigInt(gridId)));
+  rows.forEach((row, index) => {
+    out.push(...pbEncodeMessageField(2, pbEncodeRowDef(index, row.outlineLevel, row.isSubtotal)));
+  });
+  return new Uint8Array(out);
+}
+
+function pbEncodeCellValueText(text: string): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeStringField(1, text));
+  return new Uint8Array(out);
+}
+
+function pbEncodeCellValueFlag(flag: boolean): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeTag(3, 0), ...pbEncodeBool(flag));
+  return new Uint8Array(out);
+}
+
+function pbEncodeCellUpdate(update: DemoCellUpdate): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeInt32Field(1, update.row));
+  out.push(...pbEncodeInt32Field(2, update.col));
+  if (update.text != null) {
+    out.push(...pbEncodeMessageField(3, pbEncodeCellValueText(update.text)));
+  } else if (update.flag != null) {
+    out.push(...pbEncodeMessageField(3, pbEncodeCellValueFlag(update.flag)));
+  }
+  if (update.checked != null) {
+    out.push(...pbEncodeInt32Field(5, update.checked));
+  }
+  if (update.dropdownItems != null) {
+    out.push(...pbEncodeStringField(9, update.dropdownItems));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeUpdateCellsRequest(gridId: number, updates: readonly DemoCellUpdate[]): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeTag(1, 0), ...pbEncodeVarint(BigInt(gridId)));
+  for (const update of updates) {
+    out.push(...pbEncodeMessageField(2, pbEncodeCellUpdate(update)));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeHierarchyOutlineConfig(): Uint8Array {
+  const layout: number[] = [];
+  layout.push(...pbEncodeInt32Field(3, 0));
+
+  const style: number[] = [];
+  style.push(...pbEncodeUint32Field(1, 0xFFFFFFFF));
+  style.push(...pbEncodeUint32Field(2, 0xFF1C1917));
+  style.push(...pbEncodeUint32Field(3, 0xFFF5F5F4));
+  style.push(...pbEncodeUint32Field(7, 0xFFF59E0B));
+  style.push(...pbEncodeMessageField(10, pbEncodeGridLinesPayload(0xFFE7E5E4)));
+  style.push(...pbEncodeMessageField(11, pbEncodeRegionStylePayload(0xFFF5F5F4, 0xFF44403C, 0xFFD6D3D1)));
+  style.push(...pbEncodeMessageField(12, pbEncodeRegionStylePayload(0xFFFFFFFF, 0xFF1C1917, 0xFFD6D3D1)));
+  style.push(...pbEncodeMessageField(13, pbEncodeHeaderStylePayload(0xFFD6D3D1)));
+  style.push(...pbEncodeUint32Field(20, 0xFFFAFAF9));
+  style.push(...pbEncodeUint32Field(21, 0xFFD6D3D1));
+
+  const selectionStyle = pbEncodeHighlightStylePayload({
+    background: 0xFFD97706,
+    foreground: 0xFFFFFFFF,
+    fillHandle: 0,
+    fillHandleColor: 0xFFF59E0B,
+  });
+  const activeCellStyle = pbEncodeHighlightStylePayload({
+    background: 0x22000000,
+    foreground: 0xFFFFFFFF,
+    borderStyle: 2,
+    borderColor: 0xFFF59E0B,
+  });
+  const hover: number[] = [];
+  hover.push(...pbEncodeTag(3, 0), ...pbEncodeBool(true));
+  hover.push(...pbEncodeMessageField(6, pbEncodeHighlightStylePayload({
+    background: 0x1AD97706,
+    borderStyle: 1,
+    borderColor: 0xFFF59E0B,
+  })));
+  const selection: number[] = [];
+  selection.push(...pbEncodeInt32Field(1, 0));
+  selection.push(...pbEncodeMessageField(6, selectionStyle));
+  selection.push(...pbEncodeMessageField(7, new Uint8Array(hover)));
+  selection.push(...pbEncodeMessageField(10, activeCellStyle));
+
+  const editing: number[] = [];
+  editing.push(...pbEncodeInt32Field(1, 0));
+  editing.push(...pbEncodeInt32Field(2, 1));
+  editing.push(...pbEncodeInt32Field(3, 0));
+
+  const scrolling: number[] = [];
+  scrolling.push(...pbEncodeInt32Field(9, 3));
+  scrolling.push(...pbEncodeTag(4, 0), ...pbEncodeBool(true));
+  scrolling.push(...pbEncodeFloatField(5, 220.0));
+  scrolling.push(...pbEncodeFloatField(6, 0.9));
+
+  const outline: number[] = [];
+  outline.push(...pbEncodeInt32Field(1, 2));
+  outline.push(...pbEncodeInt32Field(2, 0));
+  outline.push(...pbEncodeUint32Field(3, 0xFFA8A29E));
+
+  const resize: number[] = [];
+  resize.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
+  resize.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
+  const freeze: number[] = [];
+  freeze.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
+  freeze.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
+  const headerFeatures: number[] = [];
+  headerFeatures.push(...pbEncodeTag(1, 0), ...pbEncodeBool(false));
+  headerFeatures.push(...pbEncodeTag(2, 0), ...pbEncodeBool(false));
+  headerFeatures.push(...pbEncodeTag(3, 0), ...pbEncodeBool(false));
+  const interaction: number[] = [];
+  interaction.push(...pbEncodeMessageField(1, new Uint8Array(resize)));
+  interaction.push(...pbEncodeMessageField(2, new Uint8Array(freeze)));
+  interaction.push(...pbEncodeTag(5, 0), ...pbEncodeBool(true));
+  interaction.push(...pbEncodeMessageField(10, new Uint8Array(headerFeatures)));
+
+  const colTop: number[] = [];
+  colTop.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
+  colTop.push(...pbEncodeInt32Field(2, 28));
+  colTop.push(...pbEncodeInt32Field(3, 1));
+  colTop.push(...pbEncodeTag(4, 0), ...pbEncodeVarint(1n));
+  colTop.push(...pbEncodeUint32Field(5, 0xFFFAFAF9));
+  colTop.push(...pbEncodeUint32Field(6, 0xFF1C1917));
+  colTop.push(...pbEncodeUint32Field(8, 0xFFD6D3D1));
+  colTop.push(...pbEncodeTag(10, 0), ...pbEncodeBool(true));
+  const rowStart: number[] = [];
+  rowStart.push(...pbEncodeTag(1, 0), ...pbEncodeBool(false));
+  const indicators: number[] = [];
+  indicators.push(...pbEncodeMessageField(3, new Uint8Array(colTop)));
+  indicators.push(...pbEncodeMessageField(1, new Uint8Array(rowStart)));
+  const gridConfig: number[] = [];
+  gridConfig.push(...pbEncodeMessageField(1, new Uint8Array(layout)));
+  gridConfig.push(...pbEncodeMessageField(2, new Uint8Array(style)));
+  gridConfig.push(...pbEncodeMessageField(3, new Uint8Array(selection)));
+  gridConfig.push(...pbEncodeMessageField(4, new Uint8Array(editing)));
+  gridConfig.push(...pbEncodeMessageField(5, new Uint8Array(scrolling)));
+  gridConfig.push(...pbEncodeMessageField(6, new Uint8Array(outline)));
+  gridConfig.push(...pbEncodeMessageField(8, new Uint8Array(interaction)));
+  gridConfig.push(...pbEncodeMessageField(11, new Uint8Array(indicators)));
+  return new Uint8Array(gridConfig);
+}
+
+function pbEncodeSalesDemoConfig(): Uint8Array {
+  const layout: number[] = [];
+  layout.push(...pbEncodeInt32Field(3, 0));
+
+  const style: number[] = [];
+  style.push(...pbEncodeUint32Field(1, 0xFFFFFFFF));
+  style.push(...pbEncodeUint32Field(2, 0xFF111827));
+  style.push(...pbEncodeUint32Field(3, 0xFFF9FAFB));
+  style.push(...pbEncodeUint32Field(7, 0xFF818CF8));
+  style.push(...pbEncodeMessageField(10, pbEncodeGridLinesPayload(0xFFE5E7EB)));
+  style.push(...pbEncodeMessageField(11, pbEncodeRegionStylePayload(0xFFF3F4F6, 0xFF374151, 0xFFD1D5DB)));
+  style.push(...pbEncodeMessageField(12, pbEncodeRegionStylePayload(0xFFFFFFFF, 0xFF111827, 0xFFD1D5DB)));
+  style.push(...pbEncodeMessageField(13, pbEncodeHeaderStylePayload(0xFFD1D5DB)));
+  style.push(...pbEncodeUint32Field(20, 0xFFFAFAFB));
+  style.push(...pbEncodeUint32Field(21, 0xFFD1D5DB));
+
+  const selectionStyle = pbEncodeHighlightStylePayload({
+    background: 0xFF6366F1,
+    foreground: 0xFFFFFFFF,
+    fillHandle: 0,
+    fillHandleColor: 0xFF818CF8,
+  });
+  const activeCellStyle = pbEncodeHighlightStylePayload({
+    background: 0x22000000,
+    foreground: 0xFFFFFFFF,
+    borderStyle: 2,
+    borderColor: 0xFF818CF8,
+  });
+  const hover: number[] = [];
+  hover.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
+  hover.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
+  hover.push(...pbEncodeTag(3, 0), ...pbEncodeBool(true));
+  hover.push(...pbEncodeMessageField(4, pbEncodeHighlightStylePayload({ background: 0x106366F1 })));
+  hover.push(...pbEncodeMessageField(5, pbEncodeHighlightStylePayload({ background: 0x106366F1 })));
+  hover.push(...pbEncodeMessageField(6, pbEncodeHighlightStylePayload({
+    background: 0x1E818CF8,
+    borderStyle: 1,
+    borderColor: 0xFF818CF8,
+  })));
+  const selection: number[] = [];
+  selection.push(...pbEncodeInt32Field(1, 0));
+  selection.push(...pbEncodeMessageField(6, selectionStyle));
+  selection.push(...pbEncodeMessageField(7, new Uint8Array(hover)));
+  selection.push(...pbEncodeMessageField(10, activeCellStyle));
+
+  const editing: number[] = [];
+  editing.push(...pbEncodeInt32Field(1, 0));
+  editing.push(...pbEncodeInt32Field(2, 1));
+  editing.push(...pbEncodeInt32Field(3, 1));
+  editing.push(...pbEncodeTag(4, 0), ...pbEncodeBool(false));
+
+  const scrolling: number[] = [];
+  scrolling.push(...pbEncodeInt32Field(9, 3));
+  scrolling.push(...pbEncodeTag(4, 0), ...pbEncodeBool(true));
+  scrolling.push(...pbEncodeFloatField(5, 220.0));
+  scrolling.push(...pbEncodeFloatField(6, 0.9));
+
+  const outline: number[] = [];
+  outline.push(...pbEncodeInt32Field(1, 0));
+  outline.push(...pbEncodeInt32Field(4, 1));
+  outline.push(...pbEncodeTag(5, 0), ...pbEncodeBool(true));
+  outline.push(...pbEncodeUint32Field(3, 0xFF9CA3AF));
+
+  const span: number[] = [];
+  span.push(...pbEncodeInt32Field(1, 2));
+  span.push(...pbEncodeInt32Field(2, 0));
+  span.push(...pbEncodeInt32Field(3, 1));
+
+  const resize: number[] = [];
+  resize.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
+  resize.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
+  const freeze: number[] = [];
+  freeze.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
+  freeze.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
+  const headerFeatures: number[] = [];
+  headerFeatures.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
+  headerFeatures.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
+  headerFeatures.push(...pbEncodeTag(3, 0), ...pbEncodeBool(false));
+  const interaction: number[] = [];
+  interaction.push(...pbEncodeMessageField(1, new Uint8Array(resize)));
+  interaction.push(...pbEncodeMessageField(2, new Uint8Array(freeze)));
+  interaction.push(...pbEncodeTag(5, 0), ...pbEncodeBool(true));
+  interaction.push(...pbEncodeMessageField(10, new Uint8Array(headerFeatures)));
+
+  const rowStart: number[] = [];
+  rowStart.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
+  rowStart.push(...pbEncodeInt32Field(2, 40));
+  rowStart.push(...pbEncodeTag(3, 0), ...pbEncodeVarint(1n));
+  rowStart.push(...pbEncodeUint32Field(4, 0xFFF9FAFB));
+  rowStart.push(...pbEncodeUint32Field(5, 0xFF6B7280));
+  rowStart.push(...pbEncodeUint32Field(7, 0xFFD1D5DB));
+  rowStart.push(...pbEncodeTag(9, 0), ...pbEncodeBool(true));
+  const colTop: number[] = [];
+  colTop.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
+  colTop.push(...pbEncodeInt32Field(2, 28));
+  colTop.push(...pbEncodeInt32Field(3, 1));
+  colTop.push(...pbEncodeTag(4, 0), ...pbEncodeVarint(3n));
+  colTop.push(...pbEncodeUint32Field(5, 0xFFF9FAFB));
+  colTop.push(...pbEncodeUint32Field(6, 0xFF111827));
+  colTop.push(...pbEncodeUint32Field(8, 0xFFD1D5DB));
+  colTop.push(...pbEncodeTag(10, 0), ...pbEncodeBool(true));
+  const indicators: number[] = [];
+  indicators.push(...pbEncodeMessageField(1, new Uint8Array(rowStart)));
+  indicators.push(...pbEncodeMessageField(3, new Uint8Array(colTop)));
+  const gridConfig: number[] = [];
+  gridConfig.push(...pbEncodeMessageField(1, new Uint8Array(layout)));
+  gridConfig.push(...pbEncodeMessageField(2, new Uint8Array(style)));
+  gridConfig.push(...pbEncodeMessageField(3, new Uint8Array(selection)));
+  gridConfig.push(...pbEncodeMessageField(4, new Uint8Array(editing)));
+  gridConfig.push(...pbEncodeMessageField(5, new Uint8Array(scrolling)));
+  gridConfig.push(...pbEncodeMessageField(6, new Uint8Array(outline)));
+  gridConfig.push(...pbEncodeMessageField(7, new Uint8Array(span)));
+  gridConfig.push(...pbEncodeMessageField(8, new Uint8Array(interaction)));
+  gridConfig.push(...pbEncodeMessageField(11, new Uint8Array(indicators)));
+  return new Uint8Array(gridConfig);
+}
+
+function parseSalesMetric(text: string): number {
+  const value = Number.parseInt(text.trim().replaceAll(",", ""), 10);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function parseSalesFlag(text: string): boolean {
+  switch (text.trim().toLowerCase()) {
+    case "1":
+    case "true":
+    case "yes":
+    case "y":
+    case "on":
+    case "checked":
+      return true;
+    default:
+      return false;
+  }
+}
+
+function applySalesSubtotalDecorations(grid: VolvoxGrid, wasmModule: WasmModule): void {
+  const textUpdates: Array<{ row: number; col: number; text: string }> = [];
+  const cellUpdates: DemoCellUpdate[] = [];
+  for (let row = 0; row < grid.rowCount; row += 1) {
+    const product = grid.getCellText(row, 3);
+    const sales = grid.getCellText(row, 4);
+    const cost = grid.getCellText(row, 5);
+    const isSubtotal = product.length === 0 && (sales.length !== 0 || cost.length !== 0);
+    if (!isSubtotal) {
+      const flagged = parseSalesFlag(grid.getCellText(row, 7));
+      cellUpdates.push({
+        row,
+        col: 7,
+        flag: flagged,
+        checked: flagged ? 1 : 0,
+      });
+      cellUpdates.push({
+        row,
+        col: 8,
+        dropdownItems: SALES_STATUS_ITEMS,
+      });
+      continue;
+    }
+
+    if (sales.length === 0 && cost.length === 0) {
+      continue;
+    }
+
+    cellUpdates.push({
+      row,
+      col: 7,
+      flag: false,
+      checked: 2,
+    });
+    const salesValue = parseSalesMetric(sales);
+    const costValue = parseSalesMetric(cost);
+    const margin = salesValue > 0 ? ((salesValue - costValue) * 100.0) / salesValue : 0.0;
+    textUpdates.push({ row, col: 6, text: margin.toFixed(1) });
+
+    const node = grid.getNode(row);
+    if (node != null && node.level <= 0) {
+      grid.mergeCells(row, 0, row, 1);
+    }
+  }
+  if (cellUpdates.length > 0 && typeof wasmModule.volvox_grid_update_cells_pb === "function") {
+    wasmModule.volvox_grid_update_cells_pb(pbEncodeUpdateCellsRequest(grid.id, cellUpdates));
+  }
+  grid.setCells(textUpdates);
+}
+
+function setupSalesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: number): void {
+  const prevId = grid.id;
+  if (id !== prevId) {
+    grid.useGrid(id);
+  }
+
+  try {
+    const salesData = grid.getDemoData("sales");
+    if (salesData.length === 0) {
+      throw new Error("embedded sales demo data is empty");
+    }
+    const gridHandle = BigInt(id);
+    grid.colCount = SALES_COLS;
+    wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, SALES_COLUMN_SETUP));
+    const result = grid.loadData(salesData, { autoCreateColumns: false });
+    if (result.status === 2) {
+      throw new Error("LoadData failed for embedded sales demo");
+    }
+    wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, SALES_COLUMN_SETUP));
+    if (typeof wasmModule.volvox_grid_configure === "function") {
+      wasmModule.volvox_grid_configure(gridHandle, pbEncodeSalesDemoConfig());
+    }
+    grid.selectionMode = 0;
+    grid.dropdownTrigger = 1;
+    grid.dropdownSearch = false;
+    grid.setHeaderFeatures({ sort: true, reorder: true, chooser: false });
+    grid.setColFormat(4, "$#,##0");
+    grid.setColFormat(5, "$#,##0");
+    grid.setColProgressColor(6, 0xFF818CF8);
+    grid.setColDropdownItems(8, SALES_STATUS_ITEMS);
+    grid.flingImpulseGain = 220.0;
+    grid.flingFriction = 0.9;
+    const emptyFont = new Uint8Array();
+    wasmModule.volvox_grid_subtotal(gridHandle, 1, 0, 0, "", 0, 0, false, emptyFont);
+    wasmModule.volvox_grid_subtotal(gridHandle, 2, -1, 4, "Grand Total", 0xFFEEF2FF, 0xFF111827, true, emptyFont);
+    wasmModule.volvox_grid_subtotal(gridHandle, 2, 0, 4, "", 0xFFF5F3FF, 0xFF111827, true, emptyFont);
+    wasmModule.volvox_grid_subtotal(gridHandle, 2, 1, 4, "", 0xFFF8F7FF, 0xFF111827, true, emptyFont);
+    wasmModule.volvox_grid_subtotal(gridHandle, 2, -1, 5, "Grand Total", 0xFFEEF2FF, 0xFF111827, true, emptyFont);
+    wasmModule.volvox_grid_subtotal(gridHandle, 2, 0, 5, "", 0xFFF5F3FF, 0xFF111827, true, emptyFont);
+    wasmModule.volvox_grid_subtotal(gridHandle, 2, 1, 5, "", 0xFFF8F7FF, 0xFF111827, true, emptyFont);
+    applySalesSubtotalDecorations(grid, wasmModule);
+    grid.invalidate();
+  } finally {
+    if (id !== prevId) {
+      grid.useGrid(prevId);
+    }
+  }
+}
+
+function setupHierarchyJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: number): void {
+  const prevId = grid.id;
+  if (id !== prevId) {
+    grid.useGrid(id);
+  }
+
+  try {
+    const rawHierarchy = grid.getDemoData("hierarchy");
+    if (rawHierarchy.length === 0) {
+      throw new Error("embedded hierarchy demo data is empty");
+    }
+    const rawRows = JSON.parse(PB_TEXT_DECODER.decode(rawHierarchy)) as HierarchyDemoRow[];
+    const loadRows = rawRows.map(({ _level, ...row }) => row);
+    grid.colCount = HIERARCHY_COLS;
+    wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, HIERARCHY_COLUMN_SETUP));
+    const result = grid.loadData(PB_TEXT_ENCODER.encode(JSON.stringify(loadRows)), {
+      autoCreateColumns: false,
+    });
+    if (result.status === 2) {
+      throw new Error("LoadData failed for embedded hierarchy demo");
+    }
+    wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, HIERARCHY_COLUMN_SETUP));
+    wasmModule.volvox_grid_define_rows_pb(
+      pbEncodeDefineRowsRequest(
+        id,
+        rawRows.map((row) => ({
+          outlineLevel: Math.trunc(row._level),
+          isSubtotal: row.Type === "Folder",
+        })),
+      ),
+    );
+    if (typeof wasmModule.volvox_grid_configure === "function") {
+      wasmModule.volvox_grid_configure(BigInt(id), pbEncodeHierarchyOutlineConfig());
+    }
+
+    grid.selectionMode = 0;
+    grid.setHeaderFeatures({ sort: false, reorder: false, chooser: false });
+    grid.flingImpulseGain = 220.0;
+    grid.flingFriction = 0.9;
+    grid.editable = false;
+    rawRows.forEach((row, index) => {
+      grid.setCellStyle(index, 5, { foreground: 0xFF2563EB });
+      if (row.Type === "Folder") {
+        grid.setCellStyle(index, 0, {
+          foreground: 0xFF92400E,
+          font: { bold: true },
+        });
+      }
+    });
+    grid.invalidate();
+  } finally {
+    if (id !== prevId) {
+      grid.useGrid(prevId);
+    }
+  }
+}
+
 function pbEncodeSelectionHoverConfig(mode: number): Uint8Array {
   const nextMode = Number.isFinite(mode) ? (Math.max(0, Math.trunc(mode)) >>> 0) : 0;
   const hoverConfig: number[] = [];
@@ -313,8 +958,8 @@ function pbDecodeGridEventEnvelope(
 function pbDecodeClickEventPayload(
   data: Uint8Array,
 ): { row: number; col: number; hitArea: number; interaction: number } {
-  let row = -1;
-  let col = -1;
+  let row = 0;
+  let col = 0;
   let hitArea = 0;
   let interaction = CELL_INTERACTION_UNSPECIFIED;
   let offset = 0;
@@ -515,6 +1160,189 @@ async function main() {
   const resetDoomActionButtons: Array<() => void> = [];
   let switchToken = 0;
   let pendingHierarchyActionAlert = 0;
+  let contextMenuEl: HTMLDivElement | null = null;
+  let contextMenuDismissHandler: ((e: Event) => void) | null = null;
+  let contextMenuEscHandler: ((e: KeyboardEvent) => void) | null = null;
+
+  function dismissDebugContextMenu(): void {
+    if (contextMenuEl) {
+      contextMenuEl.remove();
+      contextMenuEl = null;
+    }
+    if (contextMenuDismissHandler) {
+      document.removeEventListener("pointerdown", contextMenuDismissHandler);
+      contextMenuDismissHandler = null;
+    }
+    if (contextMenuEscHandler) {
+      document.removeEventListener("keydown", contextMenuEscHandler);
+      contextMenuEscHandler = null;
+    }
+  }
+
+  function addDebugContextMenuItem(
+    menu: HTMLDivElement,
+    label: string,
+    action: () => void,
+  ): void {
+    const item = document.createElement("div");
+    item.textContent = label;
+    Object.assign(item.style, {
+      padding: "6px 16px",
+      cursor: "pointer",
+      whiteSpace: "nowrap",
+    });
+    item.addEventListener("pointerenter", () => {
+      item.style.background = "#f0f0f0";
+    });
+    item.addEventListener("pointerleave", () => {
+      item.style.background = "transparent";
+    });
+    item.addEventListener("click", () => {
+      action();
+      dismissDebugContextMenu();
+    });
+    menu.appendChild(item);
+  }
+
+  function addDebugContextMenuSeparator(menu: HTMLDivElement): void {
+    const last = menu.lastElementChild;
+    if (!last || (last as HTMLElement).dataset.separator === "1") {
+      return;
+    }
+    const sep = document.createElement("div");
+    sep.dataset.separator = "1";
+    Object.assign(sep.style, {
+      height: "1px",
+      background: "#e0e0e0",
+      margin: "4px 8px",
+    });
+    menu.appendChild(sep);
+  }
+
+  function showDebugContextMenu(request: VolvoxGridContextMenuRequest): void {
+    dismissDebugContextMenu();
+
+    const gridId = grid.id;
+    const row = request.row;
+    const col = request.col;
+    const fixedRows = typeof (wasmModule as any).get_fixed_rows === "function"
+      ? Number((wasmModule as any).get_fixed_rows(gridId))
+      : 0;
+    const fixedCols = typeof (wasmModule as any).get_fixed_cols === "function"
+      ? Number((wasmModule as any).get_fixed_cols(gridId))
+      : 0;
+    const isDataRow = row >= fixedRows;
+    const isDataCol = col >= fixedCols;
+    const rowLabel = isDataRow ? Math.max(1, row - fixedRows + 1) : row;
+
+    const menu = document.createElement("div");
+    Object.assign(menu.style, {
+      position: "fixed",
+      zIndex: "2147483647",
+      background: "#fff",
+      border: "1px solid #ccc",
+      borderRadius: "4px",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+      padding: "4px 0",
+      minWidth: "180px",
+      fontFamily: "system-ui, -apple-system, sans-serif",
+      fontSize: "13px",
+      color: "#222",
+      userSelect: "none",
+    });
+
+    addDebugContextMenuItem(menu, "Copy", () => {
+      const text = String((wasmModule as any).copy_selection(gridId));
+      if (text && navigator.clipboard) {
+        void navigator.clipboard.writeText(text);
+      }
+    });
+
+    if (isDataRow && row >= 0) {
+      addDebugContextMenuSeparator(menu);
+      const pinned = typeof (wasmModule as any).is_row_pinned === "function"
+        ? Number((wasmModule as any).is_row_pinned(gridId, row))
+        : 0;
+      if (pinned !== 1) {
+        addDebugContextMenuItem(menu, "Pin Row " + rowLabel + " to Top", () => grid.pinRow(row, 1));
+      }
+      if (pinned !== 2) {
+        addDebugContextMenuItem(menu, "Pin Row " + rowLabel + " to Bottom", () => grid.pinRow(row, 2));
+      }
+      addDebugContextMenuItem(menu, "Unpin Row " + rowLabel, () => grid.pinRow(row, 0));
+
+      addDebugContextMenuSeparator(menu);
+      const stickyRow = typeof (wasmModule as any).get_row_sticky === "function"
+        ? Number((wasmModule as any).get_row_sticky(gridId, row))
+        : 0;
+      if (stickyRow !== 1) {
+        addDebugContextMenuItem(menu, "Sticky Row " + rowLabel + " to Top", () => grid.setRowSticky(row, 1));
+      }
+      if (stickyRow !== 2) {
+        addDebugContextMenuItem(menu, "Sticky Row " + rowLabel + " to Bottom", () => grid.setRowSticky(row, 2));
+      }
+      if (stickyRow !== 5) {
+        addDebugContextMenuItem(menu, "Sticky Row " + rowLabel + " Both", () => grid.setRowSticky(row, 5));
+      }
+      addDebugContextMenuItem(menu, "Unsticky Row " + rowLabel, () => grid.setRowSticky(row, 0));
+    }
+
+    if (isDataCol && col >= 0) {
+      addDebugContextMenuSeparator(menu);
+      const stickyCol = typeof (wasmModule as any).get_col_sticky === "function"
+        ? Number((wasmModule as any).get_col_sticky(gridId, col))
+        : 0;
+      if (stickyCol !== 3) {
+        addDebugContextMenuItem(menu, `Sticky Col ${col} to Left`, () => grid.setColSticky(col, 3));
+      }
+      if (stickyCol !== 4) {
+        addDebugContextMenuItem(menu, `Sticky Col ${col} to Right`, () => grid.setColSticky(col, 4));
+      }
+      if (stickyCol !== 5) {
+        addDebugContextMenuItem(menu, `Sticky Col ${col} Both`, () => grid.setColSticky(col, 5));
+      }
+      addDebugContextMenuItem(menu, `Unsticky Col ${col}`, () => grid.setColSticky(col, 0));
+    }
+
+    contextMenuEl = menu;
+    document.body.appendChild(menu);
+
+    let x = request.clientX;
+    let y = request.clientY;
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    requestAnimationFrame(() => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const mw = menu.offsetWidth;
+      const mh = menu.offsetHeight;
+      if (x + mw > vw) {
+        x = Math.max(0, vw - mw - 4);
+      }
+      if (y + mh > vh) {
+        y = Math.max(0, vh - mh - 4);
+      }
+      menu.style.left = `${x}px`;
+      menu.style.top = `${y}px`;
+    });
+
+    window.setTimeout(() => {
+      contextMenuDismissHandler = (ev: Event) => {
+        if (!menu.contains(ev.target as Node)) {
+          dismissDebugContextMenu();
+        }
+      };
+      contextMenuEscHandler = (ev: KeyboardEvent) => {
+        if (ev.key === "Escape") {
+          dismissDebugContextMenu();
+        }
+      };
+      document.addEventListener("pointerdown", contextMenuDismissHandler);
+      document.addEventListener("keydown", contextMenuEscHandler);
+    }, 0);
+  }
+
+  grid.onContextMenuRequest = showDebugContextMenu;
 
   function drainHierarchyActionClickEvents(): void {
     if (currentDemo !== "hierarchy") {
@@ -1191,7 +2019,11 @@ async function main() {
     grid.selectionVisibility = 1;
     grid.focusBorder = 2;
     grid.selectionMode = 0;
-    grid.setHeaderFeatures({ sort: true, reorder: true, chooser: false });
+    grid.setHeaderFeatures(
+      mode === "hierarchy"
+        ? { sort: false, reorder: false, chooser: false }
+        : { sort: true, reorder: true, chooser: false },
+    );
   }
 
   function applyDoomGridLayout() {
@@ -1398,10 +2230,10 @@ async function main() {
         wasmModule.demo_setup_stress_grid(id);
         break;
       case "sales":
-        wasmModule.demo_setup_sales_demo(id);
+        setupSalesJsonDemo(grid, wasmModule, id);
         break;
       case "hierarchy":
-        wasmModule.demo_setup_hierarchy_demo(id);
+        setupHierarchyJsonDemo(grid, wasmModule, id);
         break;
     }
 
@@ -1590,11 +2422,19 @@ async function main() {
     void switchDemo("doom");
   });
 
-  // Resolution selector.
-  selDoomRes.addEventListener("change", () => {
+  function applySelectedDoomResolution(): boolean {
     const preset = DOOM_RESOLUTIONS[selDoomRes.value];
-    if (!preset) return;
+    if (!preset) {
+      return false;
+    }
     doomRuntime.setResolution(preset[0], preset[1]);
+    return true;
+  }
+
+  // Resolution selector.
+  applySelectedDoomResolution();
+  selDoomRes.addEventListener("change", () => {
+    if (!applySelectedDoomResolution()) return;
     doomGridId = null;
 
     if (currentDemo === "doom") {

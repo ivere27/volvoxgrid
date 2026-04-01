@@ -231,12 +231,19 @@ ctrl.setCells(Arrays.asList(
 // Bulk load a 2D array (row-major order)
 ctrl.loadArray(3, 2, Arrays.asList("a", "b", "c", "d", "e", "f"), false);
 
-// Fill a 2D matrix (auto-resizes grid if needed)
-ctrl.setTableData(Arrays.asList(
-    Arrays.asList("Name", "Price", "Qty"),
-    Arrays.asList("Widget A", "29.99", "150"),
-    Arrays.asList("Widget B", "49.99", "200")
-));
+// Load a matrix-shaped JSON payload
+LoadDataOptions matrixJson = LoadDataOptions.newBuilder()
+    .setJson(JsonOptions.newBuilder().build())
+    .setHeaderPolicy(HeaderPolicy.HEADER_NONE)
+    .build();
+ctrl.loadData(
+    """
+    [["Name","Price","Qty"],
+     ["Widget A","29.99","150"],
+     ["Widget B","49.99","200"]]
+    """.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+    matrixJson
+);
 ```
 
 #### Row & Column Sizing
@@ -484,9 +491,10 @@ ctrl.withRedrawSuspended(() -> {
 #### Built-in Demos
 
 ```java
-ctrl.loadDemo("sales");           // ~1000 rows with subtotals, merging, formats
-ctrl.loadDemo("hierarchy");       // ~200 rows with tree outline
 ctrl.loadDemo("stress");          // 1,000,000 rows for performance testing
+
+byte[] salesJson = ctrl.getDemoData("sales");           // pair with loadData + explicit setup
+byte[] hierarchyJson = ctrl.getDemoData("hierarchy");   // pair with loadData + explicit setup
 ```
 
 ## Multi-Grid Apps
@@ -527,12 +535,19 @@ ctrl.setCells(listOf(
 ))
 ctrl.loadArray(rows = 3, cols = 2, values = listOf("a", "b", "c", "d", "e", "f"))
 
-// Fill a 2D matrix (auto-resizes grid)
-ctrl.setTableData(listOf(
-    listOf("Name", "Price", "Qty"),
-    listOf("Widget A", "29.99", "150"),
-    listOf("Widget B", "49.99", "200"),
-))
+// Load a matrix-shaped JSON payload
+val matrixJson = """
+    [["Name","Price","Qty"],
+     ["Widget A","29.99","150"],
+     ["Widget B","49.99","200"]]
+""".trimIndent().toByteArray(Charsets.UTF_8)
+ctrl.loadData(
+    matrixJson,
+    LoadDataOptions.newBuilder()
+        .setJson(JsonOptions.newBuilder().build())
+        .setHeaderPolicy(HeaderPolicy.HEADER_NONE)
+        .build()
+)
 
 // Batch updates with suspended redraw
 ctrl.withRedrawSuspended {

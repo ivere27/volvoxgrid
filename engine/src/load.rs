@@ -302,6 +302,15 @@ pub fn load_data(
     let write_result = grid.write_cells(&updates, false);
     restore_request_modes(grid, &restore_modes);
 
+    // Clear any active pull-to-refresh settling animations now that data arrived.
+    // If we are settling, this snaps the UI immediately closed without event emission.
+    grid.cancel_pull_to_refresh_contact(false);
+    grid.pull_to_refresh_state = crate::grid::PullToRefreshState::Idle;
+    grid.pull_to_refresh_reveal_px = 0.0;
+    grid.pull_to_refresh_target_reveal_px = 0.0;
+
+    grid.auto_resize_all();
+
     pb::LoadDataResult {
         status: if write_result.rejected_count > 0 {
             pb::LoadDataStatus::LoadPartial as i32
@@ -1490,6 +1499,7 @@ fn days_from_civil(year: i32, month: i32, day: i32) -> i64 {
 mod tests {
     use super::load_data;
     use crate::grid::VolvoxGrid;
+    use crate::outline::subtotal;
     use crate::proto::volvoxgrid::v1 as pb;
 
     fn new_grid() -> VolvoxGrid {
@@ -1535,6 +1545,34 @@ mod tests {
         let cells = grid.get_cells(0, amount_col, 0, amount_col, false, false, true);
         let value = cells[0].value.as_ref().and_then(|cell| cell.value.as_ref());
         assert!(matches!(value, Some(pb::cell_value::Value::Number(_))));
+    }
+
+    #[test]
+    fn load_data_into_boolean_schema_syncs_checkbox_state() {
+        let mut grid = new_grid();
+        grid.set_cols(1);
+        grid.define_columns(&[pb::ColumnDef {
+            index: 0,
+            key: Some("flag".to_string()),
+            data_type: Some(pb::ColumnDataType::ColumnDataBoolean as i32),
+            ..Default::default()
+        }]);
+
+        let result = load_data(
+            &mut grid,
+            br#"[{"flag":true},{"flag":false}]"#,
+            Some(&json_options()),
+        );
+
+        assert_eq!(result.status, pb::LoadDataStatus::LoadOk as i32);
+        assert_eq!(
+            grid.cells.get(0, 0).map(|cell| cell.checked()),
+            Some(pb::CheckedState::CheckedChecked as i32)
+        );
+        assert_eq!(
+            grid.cells.get(1, 0).map(|cell| cell.checked()),
+            Some(pb::CheckedState::CheckedUnchecked as i32)
+        );
     }
 
     #[test]
@@ -1629,5 +1667,56 @@ mod tests {
             Some(pb::cell_value::Value::Number(number)) => assert_eq!(*number, 42.0),
             _ => panic!("existing value should remain after atomic failure"),
         }
+    }
+
+    #[test]
+    fn load_data_respects_disabled_auto_resize() {
+        let mut grid = new_grid();
+        grid.default_col_width = 20;
+        grid.auto_resize = false;
+        grid.auto_size_mode = 1;
+
+        let before = grid.get_col_width(0);
+        let result = load_data(
+            &mut grid,
+            br#"[{"value":"A much longer value"}]"#,
+            Some(&json_options()),
+        );
+
+        assert_eq!(result.status, pb::LoadDataStatus::LoadOk as i32);
+        assert_eq!(grid.get_col_width(0), before);
+    }
+
+    #[test]
+    fn load_data_then_subtotal_auto_resizes_inserted_subtotal_row_height() {
+        let mut grid = VolvoxGrid::new(1, 800, 600, 1, 2, 0, 0);
+        grid.default_col_width = 24;
+        grid.default_row_height = 16;
+        grid.word_wrap = true;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 2;
+
+        let result = load_data(
+            &mut grid,
+            br#"[{"group":"A","value":10},{"group":"A","value":20}]"#,
+            Some(&json_options()),
+        );
+        assert_eq!(result.status, pb::LoadDataStatus::LoadOk as i32);
+
+        subtotal(
+            &mut grid,
+            pb::AggregateType::AggSum as i32,
+            0,
+            1,
+            "Very long subtotal label that should wrap",
+            0,
+            0,
+            false,
+        );
+
+        let subtotal_row = (0..grid.rows)
+            .find(|&row| grid.cells.get_text(row, 0) == "Very long subtotal label that should wrap")
+            .expect("subtotal row");
+        assert!(grid.get_row_height(subtotal_row) > grid.default_row_height);
     }
 }

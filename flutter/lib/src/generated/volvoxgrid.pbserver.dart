@@ -66,7 +66,7 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
   $async.Future<$0.EditState> edit(
       $pb.ServerContext ctx, $0.EditCommand request);
   $async.Future<$0.Empty> sort($pb.ServerContext ctx, $0.SortRequest request);
-  $async.Future<$0.Empty> subtotal(
+  $async.Future<$0.SubtotalResult> subtotal(
       $pb.ServerContext ctx, $0.SubtotalRequest request);
   $async.Future<$0.Empty> autoSize(
       $pb.ServerContext ctx, $0.AutoSizeRequest request);
@@ -103,6 +103,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
   $async.Future<$0.Empty> refresh($pb.ServerContext ctx, $0.GridHandle request);
   $async.Future<$0.Empty> loadDemo(
       $pb.ServerContext ctx, $0.LoadDemoRequest request);
+  $async.Future<$0.GetDemoDataResponse> getDemoData(
+      $pb.ServerContext ctx, $0.GetDemoDataRequest request);
   $async.Future<$0.RenderOutput> renderSession(
       $pb.ServerContext ctx, $0.RenderInput request);
   $async.Future<$0.GridEvent> eventStream(
@@ -196,6 +198,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
         return $0.GridHandle();
       case 'LoadDemo':
         return $0.LoadDemoRequest();
+      case 'GetDemoData':
+        return $0.GetDemoDataRequest();
       case 'RenderSession':
         return $0.RenderInput();
       case 'EventStream':
@@ -294,6 +298,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
         return refresh(ctx, request as $0.GridHandle);
       case 'LoadDemo':
         return loadDemo(ctx, request as $0.LoadDemoRequest);
+      case 'GetDemoData':
+        return getDemoData(ctx, request as $0.GetDemoDataRequest);
       case 'RenderSession':
         return renderSession(ctx, request as $0.RenderInput);
       case 'EventStream':

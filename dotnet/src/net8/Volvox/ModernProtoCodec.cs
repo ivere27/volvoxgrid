@@ -273,8 +273,8 @@ namespace VolvoxGrid.DotNet.Internal
                 GroupOnCol = groupOnCol,
                 AggregateCol = aggregateCol,
                 Caption = caption ?? string.Empty,
-                BackColor = backColor,
-                ForeColor = foreColor,
+                Background = backColor,
+                Foreground = foreColor,
                 AddOutline = addOutline,
             }.ToByteArray();
         }
@@ -484,6 +484,16 @@ namespace VolvoxGrid.DotNet.Internal
             return new LoadDemoRequest { GridId = gridId, Demo = demo ?? string.Empty }.ToByteArray();
         }
 
+        public byte[] EncodeGetDemoDataRequest(string demo)
+        {
+            return new GetDemoDataRequest { Demo = demo ?? string.Empty }.ToByteArray();
+        }
+
+        public byte[] DecodeGetDemoDataResponse(byte[] payload)
+        {
+            return GetDemoDataResponse.Parser.ParseFrom(payload).Data.ToByteArray();
+        }
+
         public byte[] EncodeSetRedrawRequest(long gridId, bool enabled)
         {
             return new SetRedrawRequest { GridId = gridId, Enabled = enabled }.ToByteArray();
@@ -607,18 +617,74 @@ namespace VolvoxGrid.DotNet.Internal
                 if (config.Layout.DefaultRowHeight.HasValue) res.Layout.DefaultRowHeight = config.Layout.DefaultRowHeight.Value;
                 if (config.Layout.DefaultColWidth.HasValue) res.Layout.DefaultColWidth = config.Layout.DefaultColWidth.Value;
             }
+            if (config.Style != null)
+            {
+                res.Style = new StyleConfig();
+                if (config.Style.Background.HasValue) res.Style.Background = config.Style.Background.Value;
+                if (config.Style.Foreground.HasValue) res.Style.Foreground = config.Style.Foreground.Value;
+                if (config.Style.AlternateBackground.HasValue) res.Style.AlternateBackground = config.Style.AlternateBackground.Value;
+                if (config.Style.ProgressColor.HasValue) res.Style.ProgressColor = config.Style.ProgressColor.Value;
+                if (config.Style.SheetBackground.HasValue) res.Style.SheetBackground = config.Style.SheetBackground.Value;
+                if (config.Style.SheetBorder.HasValue) res.Style.SheetBorder = config.Style.SheetBorder.Value;
+                if (config.Style.GridLines != null
+                    && (config.Style.GridLines.Style.HasValue
+                        || config.Style.GridLines.Color.HasValue
+                        || config.Style.GridLines.Width.HasValue))
+                {
+                    res.Style.GridLines = new GridLines();
+                    if (config.Style.GridLines.Style.HasValue) res.Style.GridLines.Style = (GridLineStyle)config.Style.GridLines.Style.Value;
+                    if (config.Style.GridLines.Color.HasValue) res.Style.GridLines.Color = config.Style.GridLines.Color.Value;
+                    if (config.Style.GridLines.Width.HasValue) res.Style.GridLines.Width = config.Style.GridLines.Width.Value;
+                }
+                if (config.Style.Fixed != null
+                    && (config.Style.Fixed.Background.HasValue
+                        || config.Style.Fixed.Foreground.HasValue
+                        || (config.Style.Fixed.GridLines != null
+                            && (config.Style.Fixed.GridLines.Style.HasValue
+                                || config.Style.Fixed.GridLines.Color.HasValue
+                                || config.Style.Fixed.GridLines.Width.HasValue))))
+                {
+                    res.Style.Fixed = new RegionStyle();
+                    if (config.Style.Fixed.Background.HasValue) res.Style.Fixed.Background = config.Style.Fixed.Background.Value;
+                    if (config.Style.Fixed.Foreground.HasValue) res.Style.Fixed.Foreground = config.Style.Fixed.Foreground.Value;
+                    if (config.Style.Fixed.GridLines != null
+                        && (config.Style.Fixed.GridLines.Style.HasValue
+                            || config.Style.Fixed.GridLines.Color.HasValue
+                            || config.Style.Fixed.GridLines.Width.HasValue))
+                    {
+                        res.Style.Fixed.GridLines = new GridLines();
+                        if (config.Style.Fixed.GridLines.Style.HasValue) res.Style.Fixed.GridLines.Style = (GridLineStyle)config.Style.Fixed.GridLines.Style.Value;
+                        if (config.Style.Fixed.GridLines.Color.HasValue) res.Style.Fixed.GridLines.Color = config.Style.Fixed.GridLines.Color.Value;
+                        if (config.Style.Fixed.GridLines.Width.HasValue) res.Style.Fixed.GridLines.Width = config.Style.Fixed.GridLines.Width.Value;
+                    }
+                }
+            }
             if (config.Selection != null)
             {
                 res.Selection = new SelectionConfig();
                 if (config.Selection.Mode.HasValue) res.Selection.Mode = (SelectionMode)config.Selection.Mode.Value;
                 if (config.Selection.SelectionVisibility.HasValue) res.Selection.Visibility = (SelectionVisibility)config.Selection.SelectionVisibility.Value;
                 if (config.Selection.AllowSelection.HasValue) res.Selection.Allow = config.Selection.AllowSelection.Value;
-                if (config.Selection.HoverMask.HasValue) res.Selection.Hover = MapHoverConfig(config.Selection.HoverMask.Value);
+                if (HasHighlightStyle(config.Selection.SelectionStyle)) res.Selection.Style = MapHighlightStyle(config.Selection.SelectionStyle);
+                if (config.Selection.HoverMask.HasValue
+                    || HasHighlightStyle(config.Selection.HoverRowStyle)
+                    || HasHighlightStyle(config.Selection.HoverColumnStyle)
+                    || HasHighlightStyle(config.Selection.HoverCellStyle))
+                {
+                    var hover = MapHoverConfig(config.Selection.HoverMask ?? 0u);
+                    if (HasHighlightStyle(config.Selection.HoverRowStyle)) hover.RowStyle = MapHighlightStyle(config.Selection.HoverRowStyle);
+                    if (HasHighlightStyle(config.Selection.HoverColumnStyle)) hover.ColumnStyle = MapHighlightStyle(config.Selection.HoverColumnStyle);
+                    if (HasHighlightStyle(config.Selection.HoverCellStyle)) hover.CellStyle = MapHighlightStyle(config.Selection.HoverCellStyle);
+                    res.Selection.Hover = hover;
+                }
+                if (HasHighlightStyle(config.Selection.ActiveCellStyle)) res.Selection.ActiveCellStyle = MapHighlightStyle(config.Selection.ActiveCellStyle);
             }
             if (config.Editing != null)
             {
                 res.Editing = new EditConfig();
                 if (config.Editing.EditTrigger.HasValue) res.Editing.Trigger = (EditTrigger)config.Editing.EditTrigger.Value;
+                if (config.Editing.DropdownTrigger.HasValue) res.Editing.DropdownTrigger = (DropdownTrigger)config.Editing.DropdownTrigger.Value;
+                if (config.Editing.DropdownSearch.HasValue) res.Editing.DropdownSearch = config.Editing.DropdownSearch.Value;
             }
             if (config.Scrolling != null)
             {
@@ -634,6 +700,8 @@ namespace VolvoxGrid.DotNet.Internal
                 res.Outline = new OutlineConfig();
                 if (config.Outline.TreeIndicator.HasValue) res.Outline.TreeIndicator = (TreeIndicatorStyle)config.Outline.TreeIndicator.Value;
                 if (config.Outline.TreeColumn.HasValue) res.Outline.TreeColumn = config.Outline.TreeColumn.Value;
+                if (config.Outline.GroupTotalPosition.HasValue) res.Outline.GroupTotalPosition = (GroupTotalPosition)config.Outline.GroupTotalPosition.Value;
+                if (config.Outline.MultiTotals.HasValue) res.Outline.MultiTotals = config.Outline.MultiTotals.Value;
             }
             if (config.Span != null)
             {
@@ -675,14 +743,53 @@ namespace VolvoxGrid.DotNet.Internal
                 res.Layout.FrozenRows = c.Layout.FrozenRows; res.Layout.FrozenCols = c.Layout.FrozenCols;
                 res.Layout.DefaultRowHeight = c.Layout.DefaultRowHeight; res.Layout.DefaultColWidth = c.Layout.DefaultColWidth;
             }
+            if (c.Style != null)
+            {
+                if (c.Style.HasBackground) res.Style.Background = c.Style.Background;
+                if (c.Style.HasForeground) res.Style.Foreground = c.Style.Foreground;
+                if (c.Style.HasAlternateBackground) res.Style.AlternateBackground = c.Style.AlternateBackground;
+                if (c.Style.HasProgressColor) res.Style.ProgressColor = c.Style.ProgressColor;
+                if (c.Style.HasSheetBackground) res.Style.SheetBackground = c.Style.SheetBackground;
+                if (c.Style.HasSheetBorder) res.Style.SheetBorder = c.Style.SheetBorder;
+                if (c.Style.GridLines != null)
+                {
+                    if (c.Style.GridLines.HasStyle) res.Style.GridLines.Style = (VolvoxGridLineStyle)c.Style.GridLines.Style;
+                    if (c.Style.GridLines.HasColor) res.Style.GridLines.Color = c.Style.GridLines.Color;
+                    if (c.Style.GridLines.HasWidth) res.Style.GridLines.Width = c.Style.GridLines.Width;
+                }
+                if (c.Style.Fixed != null)
+                {
+                    if (c.Style.Fixed.HasBackground) res.Style.Fixed.Background = c.Style.Fixed.Background;
+                    if (c.Style.Fixed.HasForeground) res.Style.Fixed.Foreground = c.Style.Fixed.Foreground;
+                    if (c.Style.Fixed.GridLines != null)
+                    {
+                        if (c.Style.Fixed.GridLines.HasStyle) res.Style.Fixed.GridLines.Style = (VolvoxGridLineStyle)c.Style.Fixed.GridLines.Style;
+                        if (c.Style.Fixed.GridLines.HasColor) res.Style.Fixed.GridLines.Color = c.Style.Fixed.GridLines.Color;
+                        if (c.Style.Fixed.GridLines.HasWidth) res.Style.Fixed.GridLines.Width = c.Style.Fixed.GridLines.Width;
+                    }
+                }
+            }
             if (c.Selection != null)
             {
                 if (c.Selection.HasMode) res.Selection.Mode = (VolvoxSelectionMode)c.Selection.Mode;
                 if (c.Selection.HasVisibility) res.Selection.SelectionVisibility = (VolvoxSelectionVisibility)c.Selection.Visibility;
                 if (c.Selection.HasAllow) res.Selection.AllowSelection = c.Selection.Allow;
-                if (c.Selection.Hover != null) res.Selection.HoverMask = UnmapHoverConfig(c.Selection.Hover);
+                if (c.Selection.Style != null) res.Selection.SelectionStyle = UnmapHighlightStyle(c.Selection.Style);
+                if (c.Selection.Hover != null)
+                {
+                    res.Selection.HoverMask = UnmapHoverConfig(c.Selection.Hover);
+                    if (c.Selection.Hover.RowStyle != null) res.Selection.HoverRowStyle = UnmapHighlightStyle(c.Selection.Hover.RowStyle);
+                    if (c.Selection.Hover.ColumnStyle != null) res.Selection.HoverColumnStyle = UnmapHighlightStyle(c.Selection.Hover.ColumnStyle);
+                    if (c.Selection.Hover.CellStyle != null) res.Selection.HoverCellStyle = UnmapHighlightStyle(c.Selection.Hover.CellStyle);
+                }
+                if (c.Selection.ActiveCellStyle != null) res.Selection.ActiveCellStyle = UnmapHighlightStyle(c.Selection.ActiveCellStyle);
             }
-            if (c.Editing != null && c.Editing.HasTrigger) res.Editing.EditTrigger = (VolvoxEditTrigger)c.Editing.Trigger;
+            if (c.Editing != null)
+            {
+                if (c.Editing.HasTrigger) res.Editing.EditTrigger = (VolvoxEditTrigger)c.Editing.Trigger;
+                if (c.Editing.HasDropdownTrigger) res.Editing.DropdownTrigger = (VolvoxDropdownTrigger)c.Editing.DropdownTrigger;
+                if (c.Editing.HasDropdownSearch) res.Editing.DropdownSearch = c.Editing.DropdownSearch;
+            }
             if (c.Scrolling != null)
             {
                 res.Scrolling.Scrollbars = (VolvoxScrollBarsMode)c.Scrolling.Scrollbars;
@@ -695,6 +802,8 @@ namespace VolvoxGrid.DotNet.Internal
             {
                 res.Outline.TreeIndicator = (VolvoxTreeIndicatorStyle)c.Outline.TreeIndicator;
                 res.Outline.TreeColumn = c.Outline.TreeColumn;
+                if (c.Outline.HasGroupTotalPosition) res.Outline.GroupTotalPosition = (VolvoxGroupTotalPosition)c.Outline.GroupTotalPosition;
+                if (c.Outline.HasMultiTotals) res.Outline.MultiTotals = c.Outline.MultiTotals;
             }
             if (c.Span != null) res.Span.CellSpan = (VolvoxCellSpanMode)c.Span.CellSpan;
             if (c.Interaction != null)
@@ -945,6 +1054,43 @@ namespace VolvoxGrid.DotNet.Internal
             return mode;
         }
 
+        private static bool HasHighlightStyle(VolvoxHighlightStyleData style)
+        {
+            return style != null
+                && (style.Background.HasValue
+                    || style.Foreground.HasValue
+                    || style.BorderStyle.HasValue
+                    || style.BorderColor.HasValue);
+        }
+
+        private static HighlightStyle MapHighlightStyle(VolvoxHighlightStyleData style)
+        {
+            var res = new HighlightStyle();
+            if (style.Background.HasValue) res.Background = style.Background.Value;
+            if (style.Foreground.HasValue) res.Foreground = style.Foreground.Value;
+            if (style.BorderStyle.HasValue || style.BorderColor.HasValue)
+            {
+                res.Borders = new Borders { All = new Border() };
+                if (style.BorderStyle.HasValue) res.Borders.All.Style = (BorderStyle)style.BorderStyle.Value;
+                if (style.BorderColor.HasValue) res.Borders.All.Color = style.BorderColor.Value;
+            }
+            return res;
+        }
+
+        private static VolvoxHighlightStyleData UnmapHighlightStyle(HighlightStyle style)
+        {
+            var result = new VolvoxHighlightStyleData();
+            if (style.HasBackground) result.Background = style.Background;
+            if (style.HasForeground) result.Foreground = style.Foreground;
+            var border = UnmapFirstBorder(style.Borders);
+            if (border != null)
+            {
+                result.BorderStyle = border.HasStyle ? (VolvoxBorderStyle?)border.Style : null;
+                result.BorderColor = border.HasColor ? (uint?)border.Color : null;
+            }
+            return result;
+        }
+
         private static ResizePolicy MapResizePolicy(VolvoxResizePolicyMode mode)
         {
             bool columns;
@@ -1047,7 +1193,7 @@ namespace VolvoxGrid.DotNet.Internal
             if (s.TextEffect.HasValue) res.TextEffect = (TextEffect)s.TextEffect.Value;
             if (s.ProgressColor.HasValue) res.ProgressColor = s.ProgressColor.Value;
             if (s.ProgressPercent.HasValue) res.Progress = s.ProgressPercent.Value;
-            if (s.FontName != null || s.FontSize.HasValue || s.FontBold.HasValue || s.FontItalic.HasValue || s.FontUnderline.HasValue || s.FontStrikethrough.HasValue || s.FontWidth.HasValue)
+            if (s.FontName != null || s.FontSize.HasValue || s.FontBold.HasValue || s.FontItalic.HasValue || s.FontUnderline.HasValue || s.FontStrikethrough.HasValue || s.FontStretch.HasValue)
             {
                 var font = new Font();
                 if (s.FontName != null) font.Family = s.FontName;
@@ -1056,7 +1202,7 @@ namespace VolvoxGrid.DotNet.Internal
                 if (s.FontItalic.HasValue) font.Italic = s.FontItalic.Value;
                 if (s.FontUnderline.HasValue) font.Underline = s.FontUnderline.Value;
                 if (s.FontStrikethrough.HasValue) font.Strikethrough = s.FontStrikethrough.Value;
-                if (s.FontWidth.HasValue) font.Width = s.FontWidth.Value;
+                if (s.FontStretch.HasValue) font.Stretch = s.FontStretch.Value;
                 res.Font = font;
             }
             if (s.Border.HasValue || s.BorderColor.HasValue)
@@ -1083,7 +1229,7 @@ namespace VolvoxGrid.DotNet.Internal
                 FontItalic = s.Font != null && s.Font.HasItalic ? (bool?)s.Font.Italic : null,
                 FontUnderline = s.Font != null && s.Font.HasUnderline ? (bool?)s.Font.Underline : null,
                 FontStrikethrough = s.Font != null && s.Font.HasStrikethrough ? (bool?)s.Font.Strikethrough : null,
-                FontWidth = s.Font != null && s.Font.HasWidth ? (float?)s.Font.Width : null,
+                FontStretch = s.Font != null && s.Font.HasStretch ? (float?)s.Font.Stretch : null,
                 ProgressColor = s.HasProgressColor ? (uint?)s.ProgressColor : null,
                 ProgressPercent = s.HasProgress ? (float?)s.Progress : null,
             };

@@ -23,10 +23,6 @@ lazy_static::lazy_static! {
     static ref SHARED_GRID_MANAGER: GridManager = GridManager::new();
 }
 
-fn notify_all_event_waiters() {
-    SHARED_GRID_MANAGER.notify_all_event_waiters();
-}
-
 type PluginResult<T> = Result<T, FfiError>;
 
 const ERROR_UNKNOWN: i32 = 0;
@@ -173,6 +169,22 @@ struct ZoomGestureState {
     base_default_col_width: i32,
     base_row_heights: Vec<(i32, i32)>,
     base_col_widths: Vec<(i32, i32)>,
+    base_col_top_default_row_height: i32,
+    base_col_top_row_defs: Vec<(i32, i32)>,
+    base_col_bottom_default_row_height: i32,
+    base_col_bottom_row_defs: Vec<(i32, i32)>,
+    base_cell_padding: volvoxgrid_engine::style::Padding,
+    base_fixed_cell_padding: volvoxgrid_engine::style::Padding,
+    base_column_paddings: Vec<(
+        i32,
+        Option<volvoxgrid_engine::style::Padding>,
+        Option<volvoxgrid_engine::style::Padding>,
+    )>,
+    base_cell_style_metrics: Vec<(
+        (i32, i32),
+        Option<f32>,
+        Option<volvoxgrid_engine::style::Padding>,
+    )>,
     base_font_size: Option<f32>,
 }
 
@@ -450,6 +462,34 @@ fn quantize_zoom_font_size(size: f32) -> f32 {
     (size / step).round() * step
 }
 
+fn scale_indicator_extent_for_zoom(extent: i32, scale: f32) -> i32 {
+    ((extent as f32) * scale).round() as i32
+}
+
+fn indicator_row_defs_equal(
+    current: &[volvoxgrid_engine::indicator::ColIndicatorRowDefState],
+    next: &[volvoxgrid_engine::indicator::ColIndicatorRowDefState],
+) -> bool {
+    current.len() == next.len()
+        && current
+            .iter()
+            .zip(next.iter())
+            .all(|(a, b)| a.index == b.index && a.height_px == b.height_px)
+}
+
+fn scale_padding_for_zoom(
+    padding: volvoxgrid_engine::style::Padding,
+    scale: f32,
+) -> volvoxgrid_engine::style::Padding {
+    volvoxgrid_engine::style::Padding {
+        left: ((padding.left as f32) * scale).round() as i32,
+        top: ((padding.top as f32) * scale).round() as i32,
+        right: ((padding.right as f32) * scale).round() as i32,
+        bottom: ((padding.bottom as f32) * scale).round() as i32,
+    }
+    .clamped_non_negative()
+}
+
 fn capture_zoom_state(
     grid: &volvoxgrid_engine::grid::VolvoxGrid,
     defer_updates: bool,
@@ -468,6 +508,47 @@ fn capture_zoom_state(
         base_default_col_width: grid.default_col_width,
         base_row_heights: grid.row_heights.iter().map(|(r, h)| (*r, *h)).collect(),
         base_col_widths: grid.col_widths.iter().map(|(c, w)| (*c, *w)).collect(),
+        base_col_top_default_row_height: grid.indicator_bands.col_top.default_row_height_px,
+        base_col_top_row_defs: grid
+            .indicator_bands
+            .col_top
+            .row_defs
+            .iter()
+            .map(|row| (row.index, row.height_px))
+            .collect(),
+        base_col_bottom_default_row_height: grid.indicator_bands.col_bottom.default_row_height_px,
+        base_col_bottom_row_defs: grid
+            .indicator_bands
+            .col_bottom
+            .row_defs
+            .iter()
+            .map(|row| (row.index, row.height_px))
+            .collect(),
+        base_cell_padding: grid.style.cell_padding,
+        base_fixed_cell_padding: grid.style.fixed_cell_padding,
+        base_column_paddings: grid
+            .columns
+            .iter()
+            .enumerate()
+            .filter_map(|(index, column)| {
+                if column.cell_padding.is_none() && column.fixed_cell_padding.is_none() {
+                    None
+                } else {
+                    Some((index as i32, column.cell_padding, column.fixed_cell_padding))
+                }
+            })
+            .collect(),
+        base_cell_style_metrics: grid
+            .cell_styles
+            .iter()
+            .filter_map(|(&(row, col), style)| {
+                if style.font_size.is_none() && style.padding.is_none() {
+                    None
+                } else {
+                    Some(((row, col), style.font_size, style.padding))
+                }
+            })
+            .collect(),
         base_font_size: if grid.style.font_size > 0.0 {
             Some(grid.style.font_size)
         } else {
@@ -498,6 +579,66 @@ fn apply_zoom_scale(
     let next_default_col = scaled_default_col.max(1);
     if grid.default_col_width != next_default_col {
         grid.default_col_width = next_default_col;
+        changed = true;
+    }
+
+    let next_col_top_default_row =
+        scale_indicator_extent_for_zoom(state.base_col_top_default_row_height, scale).max(1);
+    if grid.indicator_bands.col_top.default_row_height_px != next_col_top_default_row {
+        grid.indicator_bands.col_top.default_row_height_px = next_col_top_default_row;
+        changed = true;
+    }
+    let next_col_top_row_defs = state
+        .base_col_top_row_defs
+        .iter()
+        .map(
+            |(index, height_px)| volvoxgrid_engine::indicator::ColIndicatorRowDefState {
+                index: *index,
+                height_px: scale_indicator_extent_for_zoom(*height_px, scale).max(1),
+            },
+        )
+        .collect::<Vec<_>>();
+    if !indicator_row_defs_equal(
+        &grid.indicator_bands.col_top.row_defs,
+        &next_col_top_row_defs,
+    ) {
+        grid.indicator_bands.col_top.row_defs = next_col_top_row_defs;
+        changed = true;
+    }
+
+    let next_col_bottom_default_row =
+        scale_indicator_extent_for_zoom(state.base_col_bottom_default_row_height, scale).max(1);
+    if grid.indicator_bands.col_bottom.default_row_height_px != next_col_bottom_default_row {
+        grid.indicator_bands.col_bottom.default_row_height_px = next_col_bottom_default_row;
+        changed = true;
+    }
+    let next_col_bottom_row_defs = state
+        .base_col_bottom_row_defs
+        .iter()
+        .map(
+            |(index, height_px)| volvoxgrid_engine::indicator::ColIndicatorRowDefState {
+                index: *index,
+                height_px: scale_indicator_extent_for_zoom(*height_px, scale).max(1),
+            },
+        )
+        .collect::<Vec<_>>();
+    if !indicator_row_defs_equal(
+        &grid.indicator_bands.col_bottom.row_defs,
+        &next_col_bottom_row_defs,
+    ) {
+        grid.indicator_bands.col_bottom.row_defs = next_col_bottom_row_defs;
+        changed = true;
+    }
+
+    let next_cell_padding = scale_padding_for_zoom(state.base_cell_padding, scale);
+    if grid.style.cell_padding != next_cell_padding {
+        grid.style.cell_padding = next_cell_padding;
+        changed = true;
+    }
+
+    let next_fixed_padding = scale_padding_for_zoom(state.base_fixed_cell_padding, scale);
+    if grid.style.fixed_cell_padding != next_fixed_padding {
+        grid.style.fixed_cell_padding = next_fixed_padding;
         changed = true;
     }
 
@@ -543,6 +684,51 @@ fn apply_zoom_scale(
         changed = true;
     }
 
+    for (col, base_padding, base_fixed_padding) in &state.base_column_paddings {
+        let Some(column) = grid.columns.get_mut(*col as usize) else {
+            continue;
+        };
+        let next_padding = base_padding.map(|padding| scale_padding_for_zoom(padding, scale));
+        if column.cell_padding != next_padding {
+            column.cell_padding = next_padding;
+            changed = true;
+        }
+        let next_fixed_padding =
+            base_fixed_padding.map(|padding| scale_padding_for_zoom(padding, scale));
+        if column.fixed_cell_padding != next_fixed_padding {
+            column.fixed_cell_padding = next_fixed_padding;
+            changed = true;
+        }
+    }
+
+    for ((row, col), base_font_size, base_padding) in &state.base_cell_style_metrics {
+        let Some(style) = grid.cell_styles.get_mut(&(*row, *col)) else {
+            continue;
+        };
+        if let Some(base_font_size) = base_font_size {
+            let next_font_size = if (scale - 1.0).abs() <= ZOOM_RESTORE_EPSILON as f32 {
+                base_font_size.clamp(4.0, 128.0)
+            } else {
+                quantize_zoom_font_size((base_font_size * scale).clamp(4.0, 128.0))
+            };
+            if style
+                .font_size
+                .map(|value| (value - next_font_size).abs() > 0.001)
+                .unwrap_or(true)
+            {
+                style.font_size = Some(next_font_size);
+                changed = true;
+            }
+        }
+        if let Some(base_padding) = base_padding {
+            let next_padding = scale_padding_for_zoom(*base_padding, scale);
+            if style.padding != Some(next_padding) {
+                style.padding = Some(next_padding);
+                changed = true;
+            }
+        }
+    }
+
     if let Some(base_font_size) = state.base_font_size {
         let next_font_size = if (scale - 1.0).abs() <= ZOOM_RESTORE_EPSILON as f32 {
             base_font_size.clamp(4.0, 128.0)
@@ -561,6 +747,114 @@ fn apply_zoom_scale(
         grid.mark_dirty();
     }
     changed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{apply_zoom_scale, capture_zoom_state};
+    use volvoxgrid_engine::style::{CellStylePatch, Padding};
+
+    #[test]
+    fn apply_zoom_scale_scales_padding_and_cell_style_metrics() {
+        let mut grid = volvoxgrid_engine::grid::VolvoxGrid::new(1, 320, 200, 2, 2, 0, 0);
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        grid.indicator_bands.col_top.row_defs =
+            vec![volvoxgrid_engine::indicator::ColIndicatorRowDefState {
+                index: 0,
+                height_px: 30,
+            }];
+        grid.style.cell_padding = Padding {
+            left: 6,
+            top: 2,
+            right: 6,
+            bottom: 2,
+        };
+        grid.style.fixed_cell_padding = Padding {
+            left: 8,
+            top: 4,
+            right: 8,
+            bottom: 4,
+        };
+        grid.columns[0].cell_padding = Some(Padding {
+            left: 4,
+            top: 2,
+            right: 4,
+            bottom: 2,
+        });
+        grid.columns[0].fixed_cell_padding = Some(Padding {
+            left: 10,
+            top: 4,
+            right: 10,
+            bottom: 4,
+        });
+        grid.cell_styles.insert(
+            (0, 0),
+            CellStylePatch {
+                font_size: Some(20.0),
+                padding: Some(Padding {
+                    left: 3,
+                    top: 1,
+                    right: 3,
+                    bottom: 1,
+                }),
+                ..Default::default()
+            },
+        );
+
+        let state = capture_zoom_state(&grid, false, true, 1.0);
+        assert!(apply_zoom_scale(&mut grid, &state, 0.5));
+
+        assert_eq!(
+            grid.style.cell_padding,
+            Padding {
+                left: 3,
+                top: 1,
+                right: 3,
+                bottom: 1,
+            }
+        );
+        assert_eq!(
+            grid.style.fixed_cell_padding,
+            Padding {
+                left: 4,
+                top: 2,
+                right: 4,
+                bottom: 2,
+            }
+        );
+        assert_eq!(
+            grid.columns[0].cell_padding,
+            Some(Padding {
+                left: 2,
+                top: 1,
+                right: 2,
+                bottom: 1,
+            })
+        );
+        assert_eq!(
+            grid.columns[0].fixed_cell_padding,
+            Some(Padding {
+                left: 5,
+                top: 2,
+                right: 5,
+                bottom: 2,
+            })
+        );
+        assert_eq!(grid.indicator_bands.col_top.default_row_height_px, 12);
+        assert_eq!(grid.indicator_bands.col_top.row_defs[0].height_px, 15);
+        let style = grid.cell_styles.get(&(0, 0)).unwrap();
+        assert_eq!(style.font_size, Some(10.0));
+        assert_eq!(
+            style.padding,
+            Some(Padding {
+                left: 2,
+                top: 1,
+                right: 2,
+                bottom: 1,
+            })
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -908,6 +1202,12 @@ fn engine_event_to_proto(
             }))
         }
         E::TypeAheadEnded => Some(grid_event::Event::TypeAheadEnded(TypeAheadEndedEvent {})),
+        E::PullToRefreshTriggered => Some(grid_event::Event::PullToRefreshTriggered(
+            PullToRefreshTriggeredEvent {},
+        )),
+        E::PullToRefreshCanceled => Some(grid_event::Event::PullToRefreshCanceled(
+            PullToRefreshCanceledEvent {},
+        )),
         E::DataRefreshing => Some(grid_event::Event::DataRefreshing(DataRefreshingEvent {})),
         E::DataRefreshed => Some(grid_event::Event::DataRefreshed(DataRefreshedEvent {})),
         E::FilterData { row, col, text } => Some(grid_event::Event::FilterData(FilterDataEvent {
@@ -1922,62 +2222,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
     fn clear(&self, request: ClearRequest) -> PluginResult<Empty> {
         self.with_grid(request.grid_id, |grid| {
-            let (r1, c1, r2, c2) = match request.region {
-                0 => (
-                    grid.fixed_rows,
-                    grid.fixed_cols,
-                    grid.rows - 1,
-                    grid.cols - 1,
-                ), // scrollable
-                1 => (0, 0, grid.fixed_rows - 1, grid.cols - 1), // fixed rows
-                2 => (0, 0, grid.rows - 1, grid.fixed_cols - 1), // fixed cols
-                3 => (0, 0, grid.fixed_rows - 1, grid.fixed_cols - 1), // fixed both
-                4 => (0, 0, grid.rows - 1, grid.cols - 1),       // all rows
-                5 => (0, 0, grid.rows - 1, grid.cols - 1),       // all cols
-                6 => (0, 0, grid.rows - 1, grid.cols - 1),       // all
-                _ => (
-                    grid.fixed_rows,
-                    grid.fixed_cols,
-                    grid.rows - 1,
-                    grid.cols - 1,
-                ),
-            };
-            match request.scope {
-                0 => {
-                    // CLEAR_EVERYTHING
-                    grid.cells.clear_range(r1, c1, r2, c2);
-                    for r in r1..=r2 {
-                        for c in c1..=c2 {
-                            grid.cell_styles.remove(&(r, c));
-                        }
-                    }
-                }
-                1 => {
-                    // CLEAR_FORMATTING
-                    for r in r1..=r2 {
-                        for c in c1..=c2 {
-                            grid.cell_styles.remove(&(r, c));
-                        }
-                    }
-                }
-                2 => {
-                    // CLEAR_DATA
-                    grid.cells.clear_range(r1, c1, r2, c2);
-                }
-                3 => {
-                    // CLEAR_SELECTION
-                    for (sr1, sc1, sr2, sc2) in selection_range_tuples(grid) {
-                        grid.cells.clear_range(sr1, sc1, sr2, sc2);
-                        for r in sr1..=sr2 {
-                            for c in sc1..=sc2 {
-                                grid.cell_styles.remove(&(r, c));
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-            grid.mark_dirty();
+            grid.clear_region(request.scope, request.region);
         })?;
         Ok(Empty {})
     }
@@ -2269,9 +2514,13 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(Empty {})
     }
 
-    fn subtotal(&self, request: SubtotalRequest) -> PluginResult<Empty> {
-        self.with_grid(request.grid_id, |grid| {
-            volvoxgrid_engine::outline::subtotal(
+    fn subtotal(&self, request: SubtotalRequest) -> PluginResult<SubtotalResult> {
+        let subtotal_font = request
+            .font
+            .as_ref()
+            .map(volvoxgrid_engine::config::v1_font_to_cell_style_patch);
+        let rows = self.with_grid(request.grid_id, |grid| {
+            volvoxgrid_engine::outline::subtotal_with_font(
                 grid,
                 request.aggregate,
                 request.group_on_col,
@@ -2280,9 +2529,10 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 request.background,
                 request.foreground,
                 request.add_outline,
-            );
+                subtotal_font.as_ref(),
+            )
         })?;
-        Ok(Empty {})
+        Ok(SubtotalResult { rows })
     }
 
     fn auto_size(&self, request: AutoSizeRequest) -> PluginResult<Empty> {
@@ -2583,14 +2833,24 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         {
             self.with_grid_result(request.grid_id, |grid| {
                 match request.demo.as_str() {
-                    "sales" => volvoxgrid_engine::demo::setup_sales_demo(grid),
-                    "hierarchy" => volvoxgrid_engine::demo::setup_hierarchy_demo(grid),
                     "stress" => volvoxgrid_engine::demo::setup_stress_demo(grid),
                     other => return Err(format!("unknown demo: {other}")),
                 }
                 Ok(())
             })?;
             Ok(Empty {})
+        }
+        #[cfg(not(feature = "demo"))]
+        {
+            let _ = request;
+            Err(not_implemented("demo feature is not enabled"))
+        }
+    }
+
+    fn get_demo_data(&self, request: GetDemoDataRequest) -> PluginResult<GetDemoDataResponse> {
+        #[cfg(feature = "demo")]
+        {
+            volvoxgrid_engine::demo::get_demo_data_response(&request.demo).map_err(Into::into)
         }
         #[cfg(not(feature = "demo"))]
         {
@@ -2651,7 +2911,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                     let result = self.with_grid(grid_id, |grid| {
                         let needs_fling_tick = grid.fling_enabled && grid.scroll.fling_active;
-                        if !grid.dirty && !needs_fling_tick {
+                        let needs_pull_tick = grid.pull_to_refresh_needs_frame();
+                        if !grid.dirty && !needs_fling_tick && !needs_pull_tick {
                             return (false, 0, 0, 0, 0);
                         }
 
@@ -2675,6 +2936,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             if grid.scroll.tick_fling(dt_seconds, grid.fling_friction) {
                                 grid.mark_dirty_visual();
                             }
+                        }
+                        if needs_pull_tick && grid.tick_pull_to_refresh(dt_seconds) {
+                            grid.mark_dirty_visual();
                         }
 
                         if !grid.dirty {
@@ -3026,7 +3290,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
                     let result = self.with_grid(grid_id, |grid| {
                         let needs_fling_tick = grid.fling_enabled && grid.scroll.fling_active;
-                        if !grid.dirty && !needs_fling_tick {
+                        let needs_pull_tick = grid.pull_to_refresh_needs_frame();
+                        if !grid.dirty && !needs_fling_tick && !needs_pull_tick {
                             return Ok((false, 0, 0, 0, 0));
                         }
 
@@ -3050,6 +3315,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             if grid.scroll.tick_fling(dt_seconds, grid.fling_friction) {
                                 grid.mark_dirty_visual();
                             }
+                        }
+                        if needs_pull_tick && grid.tick_pull_to_refresh(dt_seconds) {
+                            grid.mark_dirty_visual();
                         }
 
                         if !grid.dirty {
@@ -3183,6 +3451,18 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         match pe.r#type {
                             0 => {
                                 // DOWN
+                                let allow_pull_contact = pe.button == 0
+                                    && !matches!(
+                                        hit.as_ref().map(|h| h.area.clone()),
+                                        Some(volvoxgrid_engine::input::HitArea::FastScroll)
+                                            | Some(volvoxgrid_engine::input::HitArea::HScrollBar)
+                                            | Some(volvoxgrid_engine::input::HitArea::VScrollBar)
+                                    );
+                                if allow_pull_contact {
+                                    grid.begin_pull_to_refresh_contact();
+                                } else {
+                                    grid.cancel_pull_to_refresh_contact(false);
+                                }
                                 if decision_enabled {
                                     volvoxgrid_engine::input::handle_pointer_down_with_behavior(
                                         grid,
@@ -3273,6 +3553,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             }
                             1 => {
                                 // UP
+                                grid.end_pull_to_refresh_contact();
                                 volvoxgrid_engine::input::handle_pointer_up(
                                     grid,
                                     pe.x,
@@ -3485,6 +3766,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             ensure_layout(grid);
                         }
                         volvoxgrid_engine::input::handle_scroll(grid, se.delta_x, se.delta_y);
+                        if grid.pull_to_refresh_is_visible() {
+                            return None;
+                        }
                         if !grid.scroll_tips {
                             return None;
                         }
@@ -3512,6 +3796,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 }
 
                 Some(render_input::Input::Zoom(ze)) => {
+                    let _ = self.with_grid(grid_id, |grid| {
+                        grid.cancel_pull_to_refresh_contact(false);
+                    });
                     let zoom_enabled = self
                         .manager()
                         .with_grid(grid_id, |grid| grid.pinch_zoom_enabled)
@@ -3732,7 +4019,10 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                     && !destroyed.load(Ordering::SeqCst)
                     && !stream.is_cancelled()
                 {
-                    grid = event_cv.wait(grid).unwrap_or_else(|e| e.into_inner());
+                    let waited = event_cv
+                        .wait_timeout(grid, Duration::from_millis(50))
+                        .unwrap_or_else(|e| e.into_inner());
+                    grid = waited.0;
                 }
 
                 if destroyed.load(Ordering::SeqCst) || stream.is_cancelled() {

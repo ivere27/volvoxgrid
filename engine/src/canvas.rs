@@ -8,7 +8,7 @@
 //! (wgpu surface).
 
 use crate::control::CellControl;
-use crate::grid::VolvoxGrid;
+use crate::grid::{PullToRefreshState, VolvoxGrid};
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::scrollbar::{
     compute_scrollbar_geometry, normalize_scrollbar_appearance, normalize_scrollbar_mode,
@@ -17,7 +17,7 @@ use crate::scrollbar::{
 use crate::selection::{hover_mode_has, HOVER_CELL, HOVER_COLUMN, HOVER_NONE, HOVER_ROW};
 use crate::sort::{sort_order_is_ascending as sort_order_is_ascending_internal, SORT_NONE};
 use crate::style::{CellStylePatch, HeaderMarkHeight, HighlightStyle, IconSlotStyle};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -900,10 +900,50 @@ struct PreparedTextCell {
 pub(crate) struct RenderContext {
     vp: VisibleRange,
     vis_cells: Vec<VisibleCell>,
+    merged_visible_rects: std::collections::HashMap<CellKey, CellRect>,
     text_cells: Vec<PreparedTextCell>,
     zone_counts: [u32; 4],
     visible_row_rects: BTreeMap<i32, (i32, i32)>,
     visible_col_rects: BTreeMap<i32, (i32, i32)>,
+}
+
+fn build_merged_visible_rects(
+    vis_cells: &[VisibleCell],
+    has_merges: bool,
+) -> std::collections::HashMap<CellKey, CellRect> {
+    if !has_merges {
+        return std::collections::HashMap::new();
+    }
+
+    let mut rects = std::collections::HashMap::new();
+    for &cell in vis_cells {
+        if !cell.is_merged_span() {
+            continue;
+        }
+        rects
+            .entry(cell.source_key)
+            .and_modify(|rect: &mut CellRect| {
+                let right = (rect.x + rect.w).max(cell.rect.x + cell.rect.w);
+                let bottom = (rect.y + rect.h).max(cell.rect.y + cell.rect.h);
+                rect.x = rect.x.min(cell.rect.x);
+                rect.y = rect.y.min(cell.rect.y);
+                rect.w = (right - rect.x).max(1);
+                rect.h = (bottom - rect.y).max(1);
+            })
+            .or_insert(cell.rect);
+    }
+    rects
+}
+
+fn merged_visible_rect(
+    rects: &std::collections::HashMap<CellKey, CellRect>,
+    cell: VisibleCell,
+) -> CellRect {
+    if cell.is_merged_span() {
+        rects.get(&cell.source_key).copied().unwrap_or(cell.rect)
+    } else {
+        cell.rect
+    }
 }
 
 impl VisibleRange {
@@ -1160,14 +1200,12 @@ impl RenderContext {
             || grid.span.mode != 0
             || grid.span.mode_fixed != 0;
         // Pre-allocate with estimated visible cell count to avoid repeated reallocs.
-        let est_rows = (vp.scroll_row_end - vp.scroll_row_start
-            + grid.fixed_rows
-            + grid.frozen_rows)
-            .max(0) as usize;
-        let est_cols = (vp.scroll_col_end - vp.scroll_col_start
-            + grid.fixed_cols
-            + grid.frozen_cols)
-            .max(0) as usize;
+        let est_rows =
+            (vp.scroll_row_end - vp.scroll_row_start + grid.fixed_rows + grid.frozen_rows).max(0)
+                as usize;
+        let est_cols =
+            (vp.scroll_col_end - vp.scroll_col_start + grid.fixed_cols + grid.frozen_cols).max(0)
+                as usize;
         let mut vis_cells: Vec<VisibleCell> = Vec::with_capacity(est_rows * est_cols);
         let zone_counts =
             iter_visible_cells(grid, &vp, damage, |zone, row, col, cx, cy, cw, ch| {
@@ -1195,17 +1233,19 @@ impl RenderContext {
                     source_key,
                 });
             });
+        let merged_visible_rects = build_merged_visible_rects(&vis_cells, has_merges);
         let visible_row_rects = build_visible_row_rects(grid, &vp);
         let visible_col_rects = build_visible_col_rects(grid, &vp);
         // Skip text precomputation when the grid has no cell data at all.
         let text_cells = if grid.cells.len() == 0 {
             Vec::new()
         } else {
-            build_text_cells(grid, &vp, &vis_cells, has_merges)
+            build_text_cells(grid, &vp, &vis_cells, &merged_visible_rects, has_merges)
         };
         Self {
             vp,
             vis_cells,
+            merged_visible_rects,
             text_cells,
             zone_counts,
             visible_row_rects,
@@ -1285,6 +1325,21 @@ where
         (vp.scroll_col_start, vp.scroll_col_end),
         (0, vp.fixed_col_end),
     ];
+    let locked_row_cols = {
+        let mut cols = BTreeSet::new();
+        for (col_start, col_end) in col_ranges {
+            for col in col_start..col_end {
+                cols.insert(col);
+            }
+        }
+        for &col in &vp.sticky_left_cols {
+            cols.insert(col);
+        }
+        for &col in &vp.sticky_right_cols {
+            cols.insert(col);
+        }
+        cols.into_iter().collect::<Vec<_>>()
+    };
 
     // 1. Scrollable cells — skip pinned, sticky rows/cols (handled later)
     for row in vp.scroll_row_start..vp.scroll_row_end {
@@ -1335,33 +1390,24 @@ where
         .iter()
         .chain(vp.sticky_bottom_rows.iter())
     {
-        for (col_start, col_end) in col_ranges {
-            for col in col_start..col_end {
-                if grid.is_col_hidden(col) {
+        for &col in &locked_row_cols {
+            if grid.is_col_hidden(col) {
+                continue;
+            }
+            if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
+                let rect = CellRect {
+                    x: cx,
+                    y: cy,
+                    w: cw,
+                    h: ch,
+                };
+                if damage.is_some_and(|region| {
+                    !should_emit_partial_cell(vp, region, VisibleCellZone::Sticky, row, col, rect)
+                }) {
                     continue;
                 }
-                if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
-                    let rect = CellRect {
-                        x: cx,
-                        y: cy,
-                        w: cw,
-                        h: ch,
-                    };
-                    if damage.is_some_and(|region| {
-                        !should_emit_partial_cell(
-                            vp,
-                            region,
-                            VisibleCellZone::Sticky,
-                            row,
-                            col,
-                            rect,
-                        )
-                    }) {
-                        continue;
-                    }
-                    zone_counts[1] += 1;
-                    f(VisibleCellZone::Sticky, row, col, cx, cy, cw, ch);
-                }
+                zone_counts[1] += 1;
+                f(VisibleCellZone::Sticky, row, col, cx, cy, cw, ch);
             }
         }
     }
@@ -1422,33 +1468,24 @@ where
         if grid.is_row_hidden(row) {
             continue;
         }
-        for (col_start, col_end) in col_ranges {
-            for col in col_start..col_end {
-                if grid.is_col_hidden(col) {
+        for &col in &locked_row_cols {
+            if grid.is_col_hidden(col) {
+                continue;
+            }
+            if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
+                let rect = CellRect {
+                    x: cx,
+                    y: cy,
+                    w: cw,
+                    h: ch,
+                };
+                if damage.is_some_and(|region| {
+                    !should_emit_partial_cell(vp, region, VisibleCellZone::Pinned, row, col, rect)
+                }) {
                     continue;
                 }
-                if let Some((cx, cy, cw, ch)) = cell_rect(grid, row, col, vp) {
-                    let rect = CellRect {
-                        x: cx,
-                        y: cy,
-                        w: cw,
-                        h: ch,
-                    };
-                    if damage.is_some_and(|region| {
-                        !should_emit_partial_cell(
-                            vp,
-                            region,
-                            VisibleCellZone::Pinned,
-                            row,
-                            col,
-                            rect,
-                        )
-                    }) {
-                        continue;
-                    }
-                    zone_counts[2] += 1;
-                    f(VisibleCellZone::Pinned, row, col, cx, cy, cw, ch);
-                }
+                zone_counts[2] += 1;
+                f(VisibleCellZone::Pinned, row, col, cx, cy, cw, ch);
             }
         }
     }
@@ -1504,6 +1541,11 @@ pub(crate) fn cell_rect(
     col: i32,
     vp: &VisibleRange,
 ) -> Option<(i32, i32, i32, i32)> {
+    let extend_col = if grid.extend_last_col {
+        grid.last_visible_col_index()
+    } else {
+        None
+    };
     let mut x = grid.col_pos(col);
     let mut y = grid.row_pos(row);
     let mut w = grid.col_width(col);
@@ -1516,12 +1558,18 @@ pub(crate) fn cell_rect(
     // Check if this row is pinned — override y position
     let pin = grid.is_row_pinned(row);
     if pin != 0 {
+        let merged = grid
+            .get_merged_range(row, col)
+            .filter(|&(mr1, mc1, mr2, mc2)| mr1 != mr2 || mc1 != mc2);
+        let anchor_row = merged.map_or(row, |(mr1, _, _, _)| mr1);
+        let anchor_col = merged.map_or(col, |(_, mc1, _, _)| mc1);
+
         let fixed_bottom = grid.row_pos(grid.fixed_rows + grid.frozen_rows);
         if pin == 1 {
             // Top-pinned: stack below fixed/frozen area
             let mut pin_y = vp.data_y + fixed_bottom;
             for &r in &vp.pinned_top_rows {
-                if r == row {
+                if r == anchor_row {
                     break;
                 }
                 pin_y += grid.row_height(r);
@@ -1531,15 +1579,22 @@ pub(crate) fn cell_rect(
             // Bottom-pinned: stack from bottom of viewport upward
             let mut pin_y = vp.data_y + vp.data_h - vp.pinned_bottom_height;
             for &r in &vp.pinned_bottom_rows {
-                if r == row {
+                if r == anchor_row {
                     break;
                 }
                 pin_y += grid.row_height(r);
             }
             y = pin_y;
         }
+
+        if let Some((mr1, mc1, mr2, mc2)) = merged {
+            x = grid.col_pos(mc1);
+            w = (mc1..=mc2).map(|c| grid.col_width(c)).sum();
+            h = (mr1..=mr2).map(|r| grid.row_height(r)).sum();
+        }
+
         // Pinned rows don't scroll vertically, but do scroll horizontally
-        let is_col_scrollable = col >= grid.fixed_cols + grid.frozen_cols;
+        let is_col_scrollable = anchor_col >= grid.fixed_cols + grid.frozen_cols;
         if is_col_scrollable {
             x -= grid.scroll.scroll_x as i32;
         }
@@ -1548,8 +1603,22 @@ pub(crate) fn cell_rect(
         if vp.sticky_left_cols.contains(&col) {
             let fixed_right = vp.data_x + grid.col_pos(grid.fixed_cols + grid.frozen_cols);
             x = fixed_right;
+            for &sc in &vp.sticky_left_cols {
+                if sc == col {
+                    break;
+                }
+                x += grid.col_width(sc);
+            }
+            w = grid.col_width(col);
         } else if vp.sticky_right_cols.contains(&col) {
             x = vp.data_x + vp.data_w - w;
+            for &sc in vp.sticky_right_cols.iter().rev() {
+                if sc == col {
+                    break;
+                }
+                x -= grid.col_width(sc);
+            }
+            w = grid.col_width(col);
         } else if is_col_scrollable {
             // Clip scrollable cols against sticky area for pinned rows
             let clip_left =
@@ -1569,6 +1638,9 @@ pub(crate) fn cell_rect(
                     return None;
                 }
             }
+        }
+        if extend_col == Some(col) && x < vp.data_x + vp.data_w {
+            w = w.max(vp.data_x + vp.data_w - x);
         }
         if grid.right_to_left {
             x = vp.data_x + vp.data_w - ((x - vp.data_x) + w);
@@ -1728,7 +1800,7 @@ pub(crate) fn cell_rect(
         }
     }
 
-    if grid.extend_last_col && col == grid.cols - 1 && x < vp.data_x + vp.data_w {
+    if extend_col == Some(col) && x < vp.data_x + vp.data_w {
         w = w.max(vp.data_x + vp.data_w - x);
     }
 
@@ -1795,7 +1867,13 @@ fn original_cell_bounds(
         if mr1 != mr2 || mc1 != mc2 {
             let (ox, ow) = if need_orig_x {
                 let ox = grid.col_pos(mc1) - grid.scroll.scroll_x as i32 + vp.data_x;
-                let ow: i32 = (mc1..=mc2).map(|c| grid.col_width(c)).sum();
+                let mut ow: i32 = (mc1..=mc2).map(|c| grid.col_width(c)).sum();
+                if grid.extend_last_col
+                    && grid.last_visible_col_index() == Some(col)
+                    && ox < vp.data_x + vp.data_w
+                {
+                    ow = ow.max(vp.data_x + vp.data_w - ox);
+                }
                 (ox, ow)
             } else {
                 (cx, cw)
@@ -1815,7 +1893,14 @@ fn original_cell_bounds(
 
     let (ox, ow) = if need_orig_x {
         let ox = grid.col_pos(col) - grid.scroll.scroll_x as i32 + vp.data_x;
-        (ox, grid.col_width(col))
+        let mut ow = grid.col_width(col);
+        if grid.extend_last_col
+            && grid.last_visible_col_index() == Some(col)
+            && ox < vp.data_x + vp.data_w
+        {
+            ow = ow.max(vp.data_x + vp.data_w - ox);
+        }
+        (ox, ow)
     } else {
         (cx, cw)
     };
@@ -2227,9 +2312,10 @@ pub mod layer {
     pub const ACTIVE_DROPDOWN: u32 = 22;
     pub const SCROLL_BARS: u32 = 23;
     pub const FAST_SCROLL: u32 = 24;
-    pub const DEBUG_OVERLAY: u32 = 25;
+    pub const PULL_TO_REFRESH: u32 = 25;
+    pub const DEBUG_OVERLAY: u32 = 26;
 
-    pub const COUNT: usize = 26;
+    pub const COUNT: usize = 27;
     pub const ALL: u64 = (1u64 << COUNT) - 1;
 
     pub const NAMES: [&str; COUNT] = [
@@ -2258,6 +2344,7 @@ pub mod layer {
         "dd_active",
         "scrollbar",
         "fast_scrl",
+        "pull_rfrsh",
         "debug_ovl",
     ];
 }
@@ -2380,7 +2467,11 @@ fn build_or_reuse_ctx(
         .render_ctx_cache
         .borrow_mut()
         .take()
-        .and_then(|b| (b as Box<dyn std::any::Any>).downcast::<RenderCtxCached>().ok())
+        .and_then(|b| {
+            (b as Box<dyn std::any::Any>)
+                .downcast::<RenderCtxCached>()
+                .ok()
+        })
         .map(|b| *b);
 
     match cached {
@@ -2390,7 +2481,13 @@ fn build_or_reuse_ctx(
             let text_cells = if grid.cells.len() == 0 {
                 Vec::new()
             } else {
-                build_text_cells(grid, &prev.ctx.vp, &prev.ctx.vis_cells, false)
+                build_text_cells(
+                    grid,
+                    &prev.ctx.vp,
+                    &prev.ctx.vis_cells,
+                    &prev.ctx.merged_visible_rects,
+                    false,
+                )
             };
             RenderContext {
                 text_cells,
@@ -2403,8 +2500,6 @@ fn build_or_reuse_ctx(
         }
     }
 }
-
-
 
 fn render_grid_internal<C: Canvas>(
     grid: &VolvoxGrid,
@@ -2437,20 +2532,30 @@ fn render_grid_internal<C: Canvas>(
 
     grid.span.clear_span_cache();
 
-    let t_ctx = if profiling { Some(PortableInstant::now()) } else { None };
+    let t_ctx = if profiling {
+        Some(PortableInstant::now())
+    } else {
+        None
+    };
     let ctx = build_or_reuse_ctx(grid, w, h, damage);
     if let Some(t0) = t_ctx {
-        grid.debug_ctx_time_us.set(t0.elapsed().as_secs_f32() * 1_000_000.0);
+        grid.debug_ctx_time_us
+            .set(t0.elapsed().as_secs_f32() * 1_000_000.0);
     }
 
-    let t_clear = if profiling { Some(PortableInstant::now()) } else { None };
+    let t_clear = if profiling {
+        Some(PortableInstant::now())
+    } else {
+        None
+    };
     if let Some(damage) = damage {
         clear_partial_regions(grid, canvas, &ctx, damage);
     } else {
         canvas.clear(grid.style.back_color_bkg);
     }
     if let Some(t0) = t_clear {
-        grid.debug_clear_time_us.set(t0.elapsed().as_secs_f32() * 1_000_000.0);
+        grid.debug_clear_time_us
+            .set(t0.elapsed().as_secs_f32() * 1_000_000.0);
     }
 
     run_layer!(
@@ -2524,6 +2629,10 @@ fn render_grid_internal<C: Canvas>(
     run_layer!(layer::SCROLL_BARS, render_scroll_bars(grid, canvas));
     run_layer!(layer::FAST_SCROLL, render_fast_scroll(grid, canvas));
     run_layer!(
+        layer::PULL_TO_REFRESH,
+        render_pull_to_refresh_overlay(grid, canvas)
+    );
+    run_layer!(
         layer::DEBUG_OVERLAY,
         render_debug_overlay(grid, canvas, &ctx)
     );
@@ -2534,7 +2643,8 @@ fn render_grid_internal<C: Canvas>(
     // Only cache full renders (partial renders have filtered vis_cells).
     if damage.is_none() {
         let key = RenderCtxCacheKey { vp: ctx.vp.clone() };
-        *grid.render_ctx_cache.borrow_mut() = Some(Box::new(RenderCtxCached { key, ctx }) as Box<dyn std::any::Any + Send>);
+        *grid.render_ctx_cache.borrow_mut() =
+            Some(Box::new(RenderCtxCached { key, ctx }) as Box<dyn std::any::Any + Send>);
     }
 
     ((0, 0, w, h), times, zone_counts)
@@ -2991,6 +3101,14 @@ fn build_visible_col_rects(grid: &VolvoxGrid, vp: &VisibleRange) -> BTreeMap<i32
         sticky_right_x += col_w;
     }
 
+    if grid.extend_last_col {
+        if let Some(last_col) = grid.last_visible_col_index() {
+            if let Some((x, w)) = cols.get_mut(&last_col) {
+                *w = (*w).max((band_right - *x).max(0));
+            }
+        }
+    }
+
     if grid.right_to_left {
         let mut rtl_cols = BTreeMap::new();
         for (col, (x, w)) in cols {
@@ -3006,6 +3124,7 @@ fn build_text_cells(
     grid: &VolvoxGrid,
     vp: &VisibleRange,
     vis_cells: &[VisibleCell],
+    merged_visible_rects: &std::collections::HashMap<CellKey, CellRect>,
     has_merges: bool,
 ) -> Vec<PreparedTextCell> {
     let mut text_cells = Vec::new();
@@ -3029,7 +3148,8 @@ fn build_text_cells(
         // ── Fast pre-checks before expensive meta computation ──
         // Boolean columns suppress text in data rows.
         if let Some(cp) = grid.get_col_props(text_col) {
-            if cp.data_type == crate::proto::volvoxgrid::v1::ColumnDataType::ColumnDataBoolean as i32
+            if cp.data_type
+                == crate::proto::volvoxgrid::v1::ColumnDataType::ColumnDataBoolean as i32
                 && text_row >= grid.fixed_rows
             {
                 continue;
@@ -3044,10 +3164,11 @@ fn build_text_cells(
         }
 
         let vis_rect = if cell.is_merged_span() {
-            let vx = cell.rect.x.max(vp.data_x);
-            let vy = cell.rect.y.max(vp.data_y);
-            let vw = ((cell.rect.x + cell.rect.w).min(vp.data_x + vp.data_w) - vx).max(1);
-            let vh = ((cell.rect.y + cell.rect.h).min(vp.data_y + vp.data_h) - vy).max(1);
+            let merged_rect = merged_visible_rect(merged_visible_rects, cell);
+            let vx = merged_rect.x.max(vp.data_x);
+            let vy = merged_rect.y.max(vp.data_y);
+            let vw = ((merged_rect.x + merged_rect.w).min(vp.data_x + vp.data_w) - vx).max(1);
+            let vh = ((merged_rect.y + merged_rect.h).min(vp.data_y + vp.data_h) - vy).max(1);
             CellRect {
                 x: vx,
                 y: vy,
@@ -3210,23 +3331,7 @@ fn indicator_cell_rect_for_col(
 }
 
 fn column_header_text(grid: &VolvoxGrid, col: i32) -> String {
-    if col < 0 || (col as usize) >= grid.columns.len() {
-        return String::new();
-    }
-    let cp = &grid.columns[col as usize];
-    if !cp.caption.trim().is_empty() {
-        return cp.caption.clone();
-    }
-    if !cp.key.trim().is_empty() {
-        return cp.key.clone();
-    }
-    if grid.fixed_rows > 0 {
-        let legacy = grid.get_display_text(0, col);
-        if !legacy.trim().is_empty() {
-            return legacy;
-        }
-    }
-    String::new()
+    grid.column_header_text(col)
 }
 
 fn indicator_fore_color(color: Option<u32>, fallback: u32) -> u32 {
@@ -3786,7 +3891,7 @@ fn render_backgrounds<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Render
         std::collections::HashSet::new();
 
     for &cell in &ctx.vis_cells {
-        let (row, col, cx, cy, cw, ch) = cell.parts();
+        let (row, col, _cx, _cy, _cw, _ch) = cell.parts();
         // For merged/spanned cells, always resolve style from the anchor
         // cell (top-left of the merge).  This prevents "blinking" when a
         // merged cell spans both sticky and non-sticky columns: without
@@ -3802,6 +3907,7 @@ fn render_backgrounds<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Render
             }
             _ => (row, col),
         };
+        let rect = merged_visible_rect(&ctx.merged_visible_rects, cell);
 
         let is_fixed = style_row < grid.fixed_rows || style_col < grid.fixed_cols;
         let is_frozen = !is_fixed
@@ -3823,7 +3929,6 @@ fn render_backgrounds<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Render
             is_alternate,
             selection_back_color(grid),
         );
-
         // Pinned/sticky cells overlay scrolled content, so they MUST always
         // get an opaque background fill (even when bg == back_color_bkg).
         let is_overlay = grid.is_row_pinned(row) != 0
@@ -3831,20 +3936,41 @@ fn render_backgrounds<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Render
             || grid.sticky_cols.contains_key(&col)
             || grid.is_col_pinned(col) != 0;
         if bg != grid.style.back_color_bkg || is_overlay {
-            canvas.fill_rect(cx, cy, cw, ch, bg);
+            canvas.fill_rect(rect.x, rect.y, rect.w, rect.h, bg);
         }
 
         // Hover overlays are layered after base/selection backgrounds so row/column/cell
         // hover emphasis can stack (row -> column -> cell). Keep selected cells stable.
         if !is_selected && style_row >= grid.fixed_rows && style_col >= grid.fixed_cols {
             if hover_matches_row(grid, style_row) {
-                draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.hover_row_style);
+                draw_highlight_fill(
+                    canvas,
+                    rect.x,
+                    rect.y,
+                    rect.w,
+                    rect.h,
+                    &grid.selection.hover_row_style,
+                );
             }
             if hover_matches_column(grid, style_col) {
-                draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.hover_column_style);
+                draw_highlight_fill(
+                    canvas,
+                    rect.x,
+                    rect.y,
+                    rect.w,
+                    rect.h,
+                    &grid.selection.hover_column_style,
+                );
             }
             if hover_matches_cell(grid, style_row, style_col) {
-                draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.hover_cell_style);
+                draw_highlight_fill(
+                    canvas,
+                    rect.x,
+                    rect.y,
+                    rect.w,
+                    rect.h,
+                    &grid.selection.hover_cell_style,
+                );
             }
         }
     }
@@ -4076,13 +4202,14 @@ fn render_cell_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rende
         return;
     }
     for &cell in &ctx.vis_cells {
-        let (row, col, cx, cy, cw, ch) = cell.parts();
+        let (row, col, _cx, _cy, _cw, _ch) = cell.parts();
         // For merged cells, draw border once at the merge-origin cell.
         if let Some((mr1, mc1, _mr2, _mc2)) = cell.merge {
             if row != mr1 || col != mc1 {
                 continue;
             }
         }
+        let rect = merged_visible_rect(&ctx.merged_visible_rects, cell);
 
         let style_override = grid.get_cell_style(row, col);
         let all_style = style_override.border;
@@ -4102,7 +4229,7 @@ fn render_cell_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rende
                 continue;
             }
             let border_color = all_color.unwrap_or(grid.style.grid_color);
-            canvas.cell_border_style(cx, cy, cw, ch, border_style, border_color);
+            canvas.cell_border_style(rect.x, rect.y, rect.w, rect.h, border_style, border_color);
             continue;
         }
 
@@ -4137,7 +4264,7 @@ fn render_cell_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rende
                 continue;
             }
             let color = edge_color.or(all_color).unwrap_or(grid.style.grid_color);
-            canvas.cell_border_edge_style(cx, cy, cw, ch, edge, style, color);
+            canvas.cell_border_edge_style(rect.x, rect.y, rect.w, rect.h, edge, style, color);
         }
     }
 
@@ -5713,7 +5840,7 @@ fn render_selection<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
             std::collections::HashSet::new();
 
         for &cell in &ctx.vis_cells {
-            let (row, col, cx, cy, cw, ch) = cell.parts();
+            let (row, col, _cx, _cy, _cw, _ch) = cell.parts();
             let (style_row, style_col) = match cell.merge {
                 Some((mr1, mc1, mr2, mc2)) if cell.is_merged_span() => {
                     let merge_key = (mr1, mc1, mr2, mc2);
@@ -5729,7 +5856,15 @@ fn render_selection<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
                 continue;
             }
 
-            draw_highlight_fill(canvas, cx, cy, cw, ch, &grid.selection.selection_style);
+            let rect = merged_visible_rect(&ctx.merged_visible_rects, cell);
+            draw_highlight_fill(
+                canvas,
+                rect.x,
+                rect.y,
+                rect.w,
+                rect.h,
+                &grid.selection.selection_style,
+            );
         }
     }
 
@@ -7357,7 +7492,211 @@ fn render_fast_scroll<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
 }
 
 // ===========================================================================
-// Layer 14 -- Debug overlay
+// Layer 14 -- Pull-to-refresh overlay
+// ===========================================================================
+
+const PULL_TO_REFRESH_MATERIAL_ICON_FONTS: &[&str] = &["Material Icons", "MaterialIcons"];
+
+fn pull_to_refresh_label(grid: &VolvoxGrid) -> &str {
+    match grid.pull_to_refresh_state {
+        PullToRefreshState::Armed => grid.pull_to_refresh_label_release(),
+        _ => grid.pull_to_refresh_label_pull(),
+    }
+}
+
+fn pull_to_refresh_material_icon_ligature(grid: &VolvoxGrid) -> &'static str {
+    if matches!(grid.pull_to_refresh_state, PullToRefreshState::Armed) {
+        "arrow_upward"
+    } else {
+        "arrow_downward"
+    }
+}
+
+fn draw_pull_to_refresh_icon<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    size: i32,
+    color: u32,
+) {
+    if matches!(grid.pull_to_refresh_state, PullToRefreshState::Armed) {
+        canvas.draw_scroll_arrow_up(x, y, size, size, color);
+    } else {
+        canvas.draw_scroll_arrow_down(x, y, size, size, color);
+    }
+}
+
+fn draw_pull_to_refresh_material_icon<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    size: i32,
+    color: u32,
+) -> bool {
+    let ligature = pull_to_refresh_material_icon_ligature(grid);
+    let font_size = (size as f32).max(8.0);
+    for font_name in PULL_TO_REFRESH_MATERIAL_ICON_FONTS {
+        let (tw, th) = canvas.measure_text(ligature, font_name, font_size, false, false, None);
+        let text_w = tw.ceil() as i32;
+        let text_h = th.ceil() as i32;
+        // If the icon font is missing, the ligature usually measures like the literal
+        // "arrow_downward"/"arrow_upward" text; reject that and fall back to vector arrows.
+        if text_w <= size * 2 && text_h <= size * 2 && text_w > 0 && text_h > 0 {
+            let text_x = x + ((size - text_w).max(0) / 2);
+            let text_y = y + ((size as f32 - th) * 0.5).round() as i32;
+            canvas.draw_text(
+                text_x,
+                text_y,
+                ligature,
+                font_name,
+                font_size,
+                false,
+                false,
+                color,
+                x,
+                y,
+                size.max(text_w),
+                size.max(text_h),
+                None,
+            );
+            return true;
+        }
+    }
+    false
+}
+
+fn render_pull_to_refresh_top_band<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
+    let reveal = grid.pull_to_refresh_reveal_px.round() as i32;
+    if reveal <= 0 {
+        return;
+    }
+    let band_h = reveal.min(canvas.height().max(1));
+    let bg = scale_color_alpha(grid.style.back_color_fixed, 0.96);
+    let border = scale_color_alpha(grid.style.grid_color_fixed, 0.92);
+    let text_color = grid.style.fore_color_fixed;
+    canvas.blend_rect(0, 0, canvas.width(), band_h, bg);
+    if band_h > 1 {
+        canvas.hline(0, band_h - 1, canvas.width(), border);
+    }
+
+    let progress = grid.pull_to_refresh_progress();
+    if progress > 0.0 {
+        let progress_w = ((canvas.width() as f32) * progress).round() as i32;
+        if progress_w > 0 {
+            canvas.fill_rect(0, band_h.saturating_sub(3), progress_w, 3, border);
+        }
+    }
+
+    let icon_size = (16.0 * grid.scale.max(0.01)).round() as i32;
+    let font_size = (13.0 * grid.scale.max(0.01)).round();
+    let label = pull_to_refresh_label(grid);
+    let (text_w, text_h) =
+        canvas.measure_text(label, &grid.style.font_name, font_size, false, false, None);
+    let gap = (10.0 * grid.scale.max(0.01)).round() as i32;
+    let total_w = icon_size
+        + if label.is_empty() {
+            0
+        } else {
+            gap + text_w.ceil() as i32
+        };
+    let start_x = ((canvas.width() - total_w) / 2).max(8);
+    let icon_y = ((band_h - icon_size) / 2).max(4);
+    draw_pull_to_refresh_icon(grid, canvas, start_x, icon_y, icon_size, text_color);
+    if !label.is_empty() {
+        let text_x = start_x + icon_size + gap;
+        let text_y = ((band_h as f32 - text_h) * 0.5).round() as i32;
+        let clip_y = icon_y.saturating_sub(6);
+        let clip_h = (band_h - clip_y).max(1);
+        canvas.draw_text(
+            text_x,
+            text_y,
+            label,
+            &grid.style.font_name,
+            font_size,
+            false,
+            false,
+            text_color,
+            0,
+            clip_y,
+            canvas.width(),
+            clip_h,
+            None,
+        );
+    }
+}
+
+fn render_pull_to_refresh_material<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
+    let reveal = grid.pull_to_refresh_reveal_px.max(0.0);
+    if reveal <= f32::EPSILON {
+        return;
+    }
+    let scale = grid.scale.max(0.01);
+    let label = pull_to_refresh_label(grid);
+    let font_size = (13.0 * scale).round();
+    let icon_size = (18.0 * scale).round() as i32;
+    let padding_x = (12.0 * scale).round() as i32;
+    let padding_y = (8.0 * scale).round() as i32;
+    let gap = if label.is_empty() {
+        0
+    } else {
+        (10.0 * scale).round() as i32
+    };
+    let (text_w, text_h) = if label.is_empty() {
+        (0.0, 0.0)
+    } else {
+        canvas.measure_text(label, &grid.style.font_name, font_size, false, false, None)
+    };
+    let pill_w = icon_size + gap + text_w.ceil() as i32 + padding_x * 2;
+    let pill_h = icon_size.max(text_h.ceil() as i32) + padding_y * 2;
+    let x = ((canvas.width() - pill_w) / 2).max(8);
+    let y = ((reveal.round() as i32 - pill_h) / 2).max((6.0 * scale).round() as i32);
+    let bg_alpha = (0.45 + 0.45 * grid.pull_to_refresh_progress()).clamp(0.45, 0.9);
+    let bg = scale_color_alpha(0xFF202124, bg_alpha);
+    let radius = (pill_h / 2).max(8);
+    canvas.fill_rounded_rect(x, y, pill_w, pill_h, radius, bg);
+
+    let icon_x = x + padding_x;
+    let icon_y = y + (pill_h - icon_size) / 2;
+    if !draw_pull_to_refresh_material_icon(grid, canvas, icon_x, icon_y, icon_size, 0xFFFFFFFF) {
+        draw_pull_to_refresh_icon(grid, canvas, icon_x, icon_y, icon_size, 0xFFFFFFFF);
+    }
+    if !label.is_empty() {
+        let text_x = icon_x + icon_size + gap;
+        let text_y = y + ((pill_h as f32 - text_h) * 0.5).round() as i32;
+        canvas.draw_text(
+            text_x,
+            text_y,
+            label,
+            &grid.style.font_name,
+            font_size,
+            false,
+            false,
+            0xFFFFFFFF,
+            x,
+            y,
+            pill_w,
+            pill_h,
+            None,
+        );
+    }
+}
+
+fn render_pull_to_refresh_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
+    if !grid.pull_to_refresh_enabled || !grid.pull_to_refresh_is_visible() {
+        return;
+    }
+    match grid.pull_to_refresh_theme() {
+        x if x == pb::PullToRefreshTheme::Material as i32 => {
+            render_pull_to_refresh_material(grid, canvas);
+        }
+        _ => render_pull_to_refresh_top_band(grid, canvas),
+    }
+}
+
+// ===========================================================================
+// Layer 15 -- Debug overlay
 // ===========================================================================
 
 fn short_commit(commit: &str) -> String {
@@ -7709,7 +8048,7 @@ mod tests {
         cell_has_checkbox_visual, checkbox_box_size, checkbox_layer_needed,
         compose_preedit_display_text, dropdown_button_rect, dropdown_glyph_metrics,
         dropdown_layer_needed, parse_progress_percent, picture_layer_needed, progress_layer_needed,
-        sort_arrow_box_size, RenderContext,
+        show_dropdown_button_for_cell, sort_arrow_box_size, CellKey, RenderContext,
     };
     use crate::grid::VolvoxGrid;
 
@@ -7790,6 +8129,18 @@ mod tests {
     }
 
     #[test]
+    fn dropdown_button_hidden_for_header_and_subtotal_rows() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 1, 1, 0);
+        grid.dropdown_trigger = pb::DropdownTrigger::DropdownAlways as i32;
+        grid.columns[0].dropdown_items = "A|B".to_string();
+        grid.row_props.entry(2).or_default().is_subtotal = true;
+
+        assert!(!show_dropdown_button_for_cell(&grid, 0, 0));
+        assert!(show_dropdown_button_for_cell(&grid, 1, 0));
+        assert!(!show_dropdown_button_for_cell(&grid, 2, 0));
+    }
+
+    #[test]
     fn dropdown_button_rect_and_glyph_scale_with_row_height() {
         let small = dropdown_button_rect(0, 0, 120, 20).expect("small button");
         let large = dropdown_button_rect(0, 0, 120, 60).expect("large button");
@@ -7835,5 +8186,127 @@ mod tests {
             true,
             pb::CheckedState::CheckedChecked as i32,
         ));
+    }
+
+    #[test]
+    fn merged_text_rect_unions_sticky_and_scrollable_fragments() {
+        let mut grid = VolvoxGrid::new(1, 80, 60, 1, 3, 0, 0);
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cells.set_text(0, 0, "Grand Total".to_string());
+        grid.merge_cells(0, 0, 0, 2);
+        grid.set_col_sticky(1, 3);
+        grid.scroll.scroll_x = 40.0;
+        grid.ensure_layout();
+
+        let ctx = render_ctx(&grid);
+        let text_cell = ctx
+            .text_cells
+            .iter()
+            .find(|cell| cell.source_key == CellKey { row: 0, col: 0 })
+            .expect("merged text cell");
+
+        assert_eq!(text_cell.vis_rect.x, 0);
+        assert!(text_cell.vis_rect.w > grid.col_width(1));
+    }
+
+    #[test]
+    fn visible_col_rects_extend_last_visible_column_when_trailing_column_is_hidden() {
+        let mut grid = VolvoxGrid::new(1, 220, 60, 2, 4, 0, 0);
+        grid.extend_last_col = true;
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cols_hidden.insert(3);
+        grid.ensure_layout();
+
+        let ctx = render_ctx(&grid);
+        let (x, w) = ctx
+            .visible_col_rects
+            .get(&2)
+            .copied()
+            .expect("last visible col rect");
+
+        assert_eq!(x, 80);
+        assert_eq!(w, 140);
+        assert!(!ctx.visible_col_rects.contains_key(&3));
+    }
+
+    #[test]
+    fn text_cells_use_extended_last_column_width_for_right_alignment() {
+        let mut grid = VolvoxGrid::new(1, 220, 60, 1, 4, 0, 0);
+        grid.extend_last_col = true;
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cells.set_text(0, 3, "123".to_string());
+        grid.ensure_layout();
+
+        let ctx = render_ctx(&grid);
+        let text_cell = ctx
+            .text_cells
+            .iter()
+            .find(|cell| cell.source_key == CellKey { row: 0, col: 3 })
+            .expect("last column text cell");
+
+        assert_eq!(text_cell.meta.alignment, pb::Align::RightCenter as i32);
+        assert_eq!(text_cell.vis_rect.w, 100);
+        assert_eq!(text_cell.orig_rect.w, 100);
+    }
+
+    #[test]
+    fn text_cells_use_extended_last_visible_column_width_when_trailing_column_hidden() {
+        let mut grid = VolvoxGrid::new(1, 220, 60, 1, 4, 0, 0);
+        grid.extend_last_col = true;
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cols_hidden.insert(3);
+        grid.cells.set_text(0, 2, "123".to_string());
+        grid.ensure_layout();
+
+        let ctx = render_ctx(&grid);
+        let text_cell = ctx
+            .text_cells
+            .iter()
+            .find(|cell| cell.source_key == CellKey { row: 0, col: 2 })
+            .expect("last visible column text cell");
+
+        assert_eq!(text_cell.meta.alignment, pb::Align::RightCenter as i32);
+        assert_eq!(text_cell.vis_rect.w, 140);
+        assert_eq!(text_cell.orig_rect.w, 140);
+    }
+
+    #[test]
+    fn pinned_bottom_merged_text_survives_horizontal_scroll_with_sticky_col() {
+        let mut grid = VolvoxGrid::new(1, 80, 60, 2, 6, 0, 0);
+        grid.auto_resize = false;
+        for row in 0..grid.rows {
+            grid.set_row_height(row, 24);
+        }
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cells.set_text(1, 0, "Grand Total".to_string());
+        grid.merge_cells(1, 0, 1, 2);
+        grid.pin_row(1, 2);
+        grid.set_col_sticky(1, 3);
+        grid.scroll.scroll_x = 121.0;
+        grid.ensure_layout();
+
+        let ctx = render_ctx(&grid);
+        let text_cell = ctx
+            .text_cells
+            .iter()
+            .find(|cell| cell.source_key == CellKey { row: 1, col: 0 })
+            .expect("pinned merged text cell");
+
+        assert_eq!(text_cell.vis_rect.x, 0);
+        assert_eq!(text_cell.vis_rect.w, grid.col_width(1));
+        assert_eq!(
+            text_cell.vis_rect.y,
+            grid.viewport_height - grid.row_height(1)
+        );
     }
 }

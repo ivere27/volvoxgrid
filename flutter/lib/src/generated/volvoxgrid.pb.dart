@@ -31,7 +31,7 @@ class Font extends $pb.GeneratedMessage {
     $core.bool? italic,
     $core.bool? underline,
     $core.bool? strikethrough,
-    $core.double? width,
+    $core.double? stretch,
   }) {
     final result = create();
     if (family != null) result.family = family;
@@ -41,7 +41,7 @@ class Font extends $pb.GeneratedMessage {
     if (italic != null) result.italic = italic;
     if (underline != null) result.underline = underline;
     if (strikethrough != null) result.strikethrough = strikethrough;
-    if (width != null) result.width = width;
+    if (stretch != null) result.stretch = stretch;
     return result;
   }
 
@@ -65,7 +65,7 @@ class Font extends $pb.GeneratedMessage {
     ..aOB(5, _omitFieldNames ? '' : 'italic')
     ..aOB(6, _omitFieldNames ? '' : 'underline')
     ..aOB(7, _omitFieldNames ? '' : 'strikethrough')
-    ..aD(8, _omitFieldNames ? '' : 'width', fieldType: $pb.PbFieldType.OF)
+    ..aD(8, _omitFieldNames ? '' : 'stretch', fieldType: $pb.PbFieldType.OF)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -143,14 +143,16 @@ class Font extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearStrikethrough() => $_clearField(7);
 
+  /// Horizontal font stretch (condensed/expanded width of the glyphs).
+  /// VSFlexGrid legacy `font_width` maps to this field.
   @$pb.TagNumber(8)
-  $core.double get width => $_getN(7);
+  $core.double get stretch => $_getN(7);
   @$pb.TagNumber(8)
-  set width($core.double value) => $_setFloat(7, value);
+  set stretch($core.double value) => $_setFloat(7, value);
   @$pb.TagNumber(8)
-  $core.bool hasWidth() => $_has(7);
+  $core.bool hasStretch() => $_has(7);
   @$pb.TagNumber(8)
-  void clearWidth() => $_clearField(8);
+  void clearStretch() => $_clearField(8);
 }
 
 class Padding extends $pb.GeneratedMessage {
@@ -4248,7 +4250,97 @@ class EditConfig extends $pb.GeneratedMessage {
   void clearHostPointerDispatch() => $_clearField(8);
 }
 
-/// ── Scrolling ──
+class PullToRefreshConfig extends $pb.GeneratedMessage {
+  factory PullToRefreshConfig({
+    $core.bool? enabled,
+    PullToRefreshTheme? theme,
+    $core.String? textPull,
+    $core.String? textRelease,
+  }) {
+    final result = create();
+    if (enabled != null) result.enabled = enabled;
+    if (theme != null) result.theme = theme;
+    if (textPull != null) result.textPull = textPull;
+    if (textRelease != null) result.textRelease = textRelease;
+    return result;
+  }
+
+  PullToRefreshConfig._();
+
+  factory PullToRefreshConfig.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory PullToRefreshConfig.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PullToRefreshConfig',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'enabled')
+    ..aE<PullToRefreshTheme>(2, _omitFieldNames ? '' : 'theme',
+        enumValues: PullToRefreshTheme.values)
+    ..aOS(3, _omitFieldNames ? '' : 'textPull')
+    ..aOS(4, _omitFieldNames ? '' : 'textRelease')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullToRefreshConfig clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullToRefreshConfig copyWith(void Function(PullToRefreshConfig) updates) =>
+      super.copyWith((message) => updates(message as PullToRefreshConfig))
+          as PullToRefreshConfig;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static PullToRefreshConfig create() => PullToRefreshConfig._();
+  @$core.override
+  PullToRefreshConfig createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static PullToRefreshConfig getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PullToRefreshConfig>(create);
+  static PullToRefreshConfig? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get enabled => $_getBF(0);
+  @$pb.TagNumber(1)
+  set enabled($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEnabled() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEnabled() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  PullToRefreshTheme get theme => $_getN(1);
+  @$pb.TagNumber(2)
+  set theme(PullToRefreshTheme value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTheme() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTheme() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get textPull => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set textPull($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTextPull() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTextPull() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get textRelease => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set textRelease($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTextRelease() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTextRelease() => $_clearField(4);
+}
+
 class ScrollConfig extends $pb.GeneratedMessage {
   factory ScrollConfig({
     ScrollBarConfig? scrollBar,
@@ -4260,6 +4352,7 @@ class ScrollConfig extends $pb.GeneratedMessage {
     $core.bool? pinchZoomEnabled,
     $core.bool? fastScroll,
     ScrollBarsMode? scrollbars,
+    PullToRefreshConfig? pullToRefresh,
   }) {
     final result = create();
     if (scrollBar != null) result.scrollBar = scrollBar;
@@ -4271,6 +4364,7 @@ class ScrollConfig extends $pb.GeneratedMessage {
     if (pinchZoomEnabled != null) result.pinchZoomEnabled = pinchZoomEnabled;
     if (fastScroll != null) result.fastScroll = fastScroll;
     if (scrollbars != null) result.scrollbars = scrollbars;
+    if (pullToRefresh != null) result.pullToRefresh = pullToRefresh;
     return result;
   }
 
@@ -4300,6 +4394,8 @@ class ScrollConfig extends $pb.GeneratedMessage {
     ..aOB(8, _omitFieldNames ? '' : 'fastScroll')
     ..aE<ScrollBarsMode>(9, _omitFieldNames ? '' : 'scrollbars',
         enumValues: ScrollBarsMode.values)
+    ..aOM<PullToRefreshConfig>(10, _omitFieldNames ? '' : 'pullToRefresh',
+        subBuilder: PullToRefreshConfig.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4403,6 +4499,17 @@ class ScrollConfig extends $pb.GeneratedMessage {
   $core.bool hasScrollbars() => $_has(8);
   @$pb.TagNumber(9)
   void clearScrollbars() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  PullToRefreshConfig get pullToRefresh => $_getN(9);
+  @$pb.TagNumber(10)
+  set pullToRefresh(PullToRefreshConfig value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasPullToRefresh() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearPullToRefresh() => $_clearField(10);
+  @$pb.TagNumber(10)
+  PullToRefreshConfig ensurePullToRefresh() => $_ensure(9);
 }
 
 /// ── Outline / Tree ──
@@ -4740,6 +4847,12 @@ class InteractionConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearAutoSizeMode() => $_clearField(6);
 
+  /// When true, bulk bind/load paths do a one-time auto-fit of row heights
+  /// and/or column widths using `auto_size_mode`.
+  /// Also enables the engine's per-cell auto-resize helper when an adapter
+  /// explicitly calls it.
+  /// Disable this for very large datasets (for example around 1M rows),
+  /// because auto-fit may scan many or all cells to find the required size.
   @$pb.TagNumber(7)
   $core.bool get autoResize => $_getBF(6);
   @$pb.TagNumber(7)
@@ -9856,6 +9969,7 @@ class SubtotalRequest extends $pb.GeneratedMessage {
     $core.int? background,
     $core.int? foreground,
     $core.bool? addOutline,
+    Font? font,
   }) {
     final result = create();
     if (gridId != null) result.gridId = gridId;
@@ -9866,6 +9980,7 @@ class SubtotalRequest extends $pb.GeneratedMessage {
     if (background != null) result.background = background;
     if (foreground != null) result.foreground = foreground;
     if (addOutline != null) result.addOutline = addOutline;
+    if (font != null) result.font = font;
     return result;
   }
 
@@ -9891,6 +10006,7 @@ class SubtotalRequest extends $pb.GeneratedMessage {
     ..aI(6, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
     ..aI(7, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
     ..aOB(8, _omitFieldNames ? '' : 'addOutline')
+    ..aOM<Font>(9, _omitFieldNames ? '' : 'font', subBuilder: Font.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -9983,6 +10099,65 @@ class SubtotalRequest extends $pb.GeneratedMessage {
   $core.bool hasAddOutline() => $_has(7);
   @$pb.TagNumber(8)
   void clearAddOutline() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  Font get font => $_getN(8);
+  @$pb.TagNumber(9)
+  set font(Font value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasFont() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearFont() => $_clearField(9);
+  @$pb.TagNumber(9)
+  Font ensureFont() => $_ensure(8);
+}
+
+class SubtotalResult extends $pb.GeneratedMessage {
+  factory SubtotalResult({
+    $core.Iterable<$core.int>? rows,
+  }) {
+    final result = create();
+    if (rows != null) result.rows.addAll(rows);
+    return result;
+  }
+
+  SubtotalResult._();
+
+  factory SubtotalResult.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SubtotalResult.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SubtotalResult',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..p<$core.int>(1, _omitFieldNames ? '' : 'rows', $pb.PbFieldType.K3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SubtotalResult clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SubtotalResult copyWith(void Function(SubtotalResult) updates) =>
+      super.copyWith((message) => updates(message as SubtotalResult))
+          as SubtotalResult;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SubtotalResult create() => SubtotalResult._();
+  @$core.override
+  SubtotalResult createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SubtotalResult getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SubtotalResult>(create);
+  static SubtotalResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.int> get rows => $_getList(0);
 }
 
 class AutoSizeRequest extends $pb.GeneratedMessage {
@@ -13096,6 +13271,140 @@ class LoadDemoRequest extends $pb.GeneratedMessage {
   void clearDemo() => $_clearField(2);
 }
 
+class GetDemoDataRequest extends $pb.GeneratedMessage {
+  factory GetDemoDataRequest({
+    $core.String? demo,
+  }) {
+    final result = create();
+    if (demo != null) result.demo = demo;
+    return result;
+  }
+
+  GetDemoDataRequest._();
+
+  factory GetDemoDataRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetDemoDataRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetDemoDataRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'demo')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetDemoDataRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetDemoDataRequest copyWith(void Function(GetDemoDataRequest) updates) =>
+      super.copyWith((message) => updates(message as GetDemoDataRequest))
+          as GetDemoDataRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetDemoDataRequest create() => GetDemoDataRequest._();
+  @$core.override
+  GetDemoDataRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetDemoDataRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetDemoDataRequest>(create);
+  static GetDemoDataRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get demo => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set demo($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDemo() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDemo() => $_clearField(1);
+}
+
+class GetDemoDataResponse extends $pb.GeneratedMessage {
+  factory GetDemoDataResponse({
+    $core.String? demo,
+    DemoDataFormat? format,
+    $core.List<$core.int>? data,
+  }) {
+    final result = create();
+    if (demo != null) result.demo = demo;
+    if (format != null) result.format = format;
+    if (data != null) result.data = data;
+    return result;
+  }
+
+  GetDemoDataResponse._();
+
+  factory GetDemoDataResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetDemoDataResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetDemoDataResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'demo')
+    ..aE<DemoDataFormat>(2, _omitFieldNames ? '' : 'format',
+        enumValues: DemoDataFormat.values)
+    ..a<$core.List<$core.int>>(
+        3, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetDemoDataResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetDemoDataResponse copyWith(void Function(GetDemoDataResponse) updates) =>
+      super.copyWith((message) => updates(message as GetDemoDataResponse))
+          as GetDemoDataResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetDemoDataResponse create() => GetDemoDataResponse._();
+  @$core.override
+  GetDemoDataResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetDemoDataResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetDemoDataResponse>(create);
+  static GetDemoDataResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get demo => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set demo($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDemo() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDemo() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  DemoDataFormat get format => $_getN(1);
+  @$pb.TagNumber(2)
+  set format(DemoDataFormat value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasFormat() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearFormat() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.List<$core.int> get data => $_getN(2);
+  @$pb.TagNumber(3)
+  set data($core.List<$core.int> value) => $_setBytes(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasData() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearData() => $_clearField(3);
+}
+
 enum RenderInput_Input {
   viewport,
   pointer,
@@ -15120,6 +15429,8 @@ enum GridEvent_Event {
   beforePageBreak,
   startPage,
   getHeaderRow,
+  pullToRefreshTriggered,
+  pullToRefreshCanceled,
   notSet
 }
 
@@ -15184,6 +15495,8 @@ class GridEvent extends $pb.GeneratedMessage {
     BeforePageBreakEvent? beforePageBreak,
     StartPageEvent? startPage,
     GetHeaderRowEvent? getHeaderRow,
+    PullToRefreshTriggeredEvent? pullToRefreshTriggered,
+    PullToRefreshCanceledEvent? pullToRefreshCanceled,
     $fixnum.Int64? eventId,
   }) {
     final result = create();
@@ -15248,6 +15561,10 @@ class GridEvent extends $pb.GeneratedMessage {
     if (beforePageBreak != null) result.beforePageBreak = beforePageBreak;
     if (startPage != null) result.startPage = startPage;
     if (getHeaderRow != null) result.getHeaderRow = getHeaderRow;
+    if (pullToRefreshTriggered != null)
+      result.pullToRefreshTriggered = pullToRefreshTriggered;
+    if (pullToRefreshCanceled != null)
+      result.pullToRefreshCanceled = pullToRefreshCanceled;
     if (eventId != null) result.eventId = eventId;
     return result;
   }
@@ -15320,6 +15637,8 @@ class GridEvent extends $pb.GeneratedMessage {
     58: GridEvent_Event.beforePageBreak,
     59: GridEvent_Event.startPage,
     60: GridEvent_Event.getHeaderRow,
+    61: GridEvent_Event.pullToRefreshTriggered,
+    62: GridEvent_Event.pullToRefreshCanceled,
     0: GridEvent_Event.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -15384,7 +15703,9 @@ class GridEvent extends $pb.GeneratedMessage {
       57,
       58,
       59,
-      60
+      60,
+      61,
+      62
     ])
     ..aInt64(1, _omitFieldNames ? '' : 'gridId')
     ..aOM<CellFocusChangingEvent>(2, _omitFieldNames ? '' : 'cellFocusChanging',
@@ -15505,6 +15826,12 @@ class GridEvent extends $pb.GeneratedMessage {
         subBuilder: StartPageEvent.create)
     ..aOM<GetHeaderRowEvent>(60, _omitFieldNames ? '' : 'getHeaderRow',
         subBuilder: GetHeaderRowEvent.create)
+    ..aOM<PullToRefreshTriggeredEvent>(
+        61, _omitFieldNames ? '' : 'pullToRefreshTriggered',
+        subBuilder: PullToRefreshTriggeredEvent.create)
+    ..aOM<PullToRefreshCanceledEvent>(
+        62, _omitFieldNames ? '' : 'pullToRefreshCanceled',
+        subBuilder: PullToRefreshCanceledEvent.create)
     ..aInt64(100, _omitFieldNames ? '' : 'eventId')
     ..hasRequiredFields = false;
 
@@ -15584,6 +15911,8 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(58)
   @$pb.TagNumber(59)
   @$pb.TagNumber(60)
+  @$pb.TagNumber(61)
+  @$pb.TagNumber(62)
   GridEvent_Event whichEvent() => _GridEvent_EventByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(2)
   @$pb.TagNumber(3)
@@ -15643,6 +15972,8 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(58)
   @$pb.TagNumber(59)
   @$pb.TagNumber(60)
+  @$pb.TagNumber(61)
+  @$pb.TagNumber(62)
   void clearEvent() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -16310,12 +16641,37 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(60)
   GetHeaderRowEvent ensureGetHeaderRow() => $_ensure(58);
 
+  /// Pull to refresh
+  @$pb.TagNumber(61)
+  PullToRefreshTriggeredEvent get pullToRefreshTriggered => $_getN(59);
+  @$pb.TagNumber(61)
+  set pullToRefreshTriggered(PullToRefreshTriggeredEvent value) =>
+      $_setField(61, value);
+  @$pb.TagNumber(61)
+  $core.bool hasPullToRefreshTriggered() => $_has(59);
+  @$pb.TagNumber(61)
+  void clearPullToRefreshTriggered() => $_clearField(61);
+  @$pb.TagNumber(61)
+  PullToRefreshTriggeredEvent ensurePullToRefreshTriggered() => $_ensure(59);
+
+  @$pb.TagNumber(62)
+  PullToRefreshCanceledEvent get pullToRefreshCanceled => $_getN(60);
+  @$pb.TagNumber(62)
+  set pullToRefreshCanceled(PullToRefreshCanceledEvent value) =>
+      $_setField(62, value);
+  @$pb.TagNumber(62)
+  $core.bool hasPullToRefreshCanceled() => $_has(60);
+  @$pb.TagNumber(62)
+  void clearPullToRefreshCanceled() => $_clearField(62);
+  @$pb.TagNumber(62)
+  PullToRefreshCanceledEvent ensurePullToRefreshCanceled() => $_ensure(60);
+
   @$pb.TagNumber(100)
-  $fixnum.Int64 get eventId => $_getI64(59);
+  $fixnum.Int64 get eventId => $_getI64(61);
   @$pb.TagNumber(100)
-  set eventId($fixnum.Int64 value) => $_setInt64(59, value);
+  set eventId($fixnum.Int64 value) => $_setInt64(61, value);
   @$pb.TagNumber(100)
-  $core.bool hasEventId() => $_has(59);
+  $core.bool hasEventId() => $_has(61);
   @$pb.TagNumber(100)
   void clearEventId() => $_clearField(100);
 }
@@ -20117,6 +20473,88 @@ class FilterDataEvent extends $pb.GeneratedMessage {
   void clearText() => $_clearField(3);
 }
 
+/// ── Pull to Refresh Events ──
+class PullToRefreshTriggeredEvent extends $pb.GeneratedMessage {
+  factory PullToRefreshTriggeredEvent() => create();
+
+  PullToRefreshTriggeredEvent._();
+
+  factory PullToRefreshTriggeredEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory PullToRefreshTriggeredEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PullToRefreshTriggeredEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullToRefreshTriggeredEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullToRefreshTriggeredEvent copyWith(
+          void Function(PullToRefreshTriggeredEvent) updates) =>
+      super.copyWith(
+              (message) => updates(message as PullToRefreshTriggeredEvent))
+          as PullToRefreshTriggeredEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static PullToRefreshTriggeredEvent create() =>
+      PullToRefreshTriggeredEvent._();
+  @$core.override
+  PullToRefreshTriggeredEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static PullToRefreshTriggeredEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PullToRefreshTriggeredEvent>(create);
+  static PullToRefreshTriggeredEvent? _defaultInstance;
+}
+
+class PullToRefreshCanceledEvent extends $pb.GeneratedMessage {
+  factory PullToRefreshCanceledEvent() => create();
+
+  PullToRefreshCanceledEvent._();
+
+  factory PullToRefreshCanceledEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory PullToRefreshCanceledEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'PullToRefreshCanceledEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullToRefreshCanceledEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  PullToRefreshCanceledEvent copyWith(
+          void Function(PullToRefreshCanceledEvent) updates) =>
+      super.copyWith(
+              (message) => updates(message as PullToRefreshCanceledEvent))
+          as PullToRefreshCanceledEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static PullToRefreshCanceledEvent create() => PullToRefreshCanceledEvent._();
+  @$core.override
+  PullToRefreshCanceledEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static PullToRefreshCanceledEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<PullToRefreshCanceledEvent>(create);
+  static PullToRefreshCanceledEvent? _defaultInstance;
+}
+
 /// ── Error Events ──
 class ErrorEvent extends $pb.GeneratedMessage {
   factory ErrorEvent({
@@ -20454,10 +20892,10 @@ class VolvoxGridServiceApi {
   /// ── Actions ──
   $async.Future<Empty> sort($pb.ClientContext? ctx, SortRequest request) =>
       _client.invoke<Empty>(ctx, 'VolvoxGridService', 'Sort', request, Empty());
-  $async.Future<Empty> subtotal(
+  $async.Future<SubtotalResult> subtotal(
           $pb.ClientContext? ctx, SubtotalRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'Subtotal', request, Empty());
+      _client.invoke<SubtotalResult>(
+          ctx, 'VolvoxGridService', 'Subtotal', request, SubtotalResult());
   $async.Future<Empty> autoSize(
           $pb.ClientContext? ctx, AutoSizeRequest request) =>
       _client.invoke<Empty>(
@@ -20537,6 +20975,10 @@ class VolvoxGridServiceApi {
           $pb.ClientContext? ctx, LoadDemoRequest request) =>
       _client.invoke<Empty>(
           ctx, 'VolvoxGridService', 'LoadDemo', request, Empty());
+  $async.Future<GetDemoDataResponse> getDemoData(
+          $pb.ClientContext? ctx, GetDemoDataRequest request) =>
+      _client.invoke<GetDemoDataResponse>(ctx, 'VolvoxGridService',
+          'GetDemoData', request, GetDemoDataResponse());
 
   /// ── Streaming ──
   $async.Future<RenderOutput> renderSession(

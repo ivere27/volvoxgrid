@@ -64,6 +64,8 @@ namespace VolvoxGrid.DotNet.Internal
         VolvoxArchiveResponseData DecodeArchiveResponse(byte[] payload);
 
         byte[] EncodeLoadDemoRequest(long gridId, string demo);
+        byte[] EncodeGetDemoDataRequest(string demo);
+        byte[] DecodeGetDemoDataResponse(byte[] payload);
         byte[] EncodeSetRedrawRequest(long gridId, bool enabled);
         byte[] EncodeResizeViewportRequest(long gridId, int width, int height);
 

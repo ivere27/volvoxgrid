@@ -477,54 +477,6 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         client.loadTable(builder.build());
     }
 
-    /**
-     * Fill a 2D matrix into the grid starting at the given offset.
-     *
-     * <p>When {@code resizeGrid} is true (the default), the grid is enlarged
-     * if the data exceeds the current row/column count.  Redraw is suspended
-     * for the duration so only a single repaint occurs at the end.</p>
-     */
-    public void setTableData(List<List<String>> data, int startRow, int startCol, boolean resizeGrid) throws SynurangDesktopBridge.SynurangBridgeException {
-        if (data == null || data.isEmpty()) return;
-        int mc = 0;
-        for (List<String> row : data) {
-            if (row.size() > mc) mc = row.size();
-        }
-        if (mc <= 0) return;
-        final int maxCols = mc;
-
-        withRedrawSuspended(() -> {
-            if (resizeGrid) {
-                int neededRows = startRow + data.size();
-                int neededCols = startCol + maxCols;
-                if (neededRows > rowCount()) setRowCount(neededRows);
-                if (neededCols > colCount()) setColCount(neededCols);
-            }
-
-            UpdateCellsRequest.Builder builder = UpdateCellsRequest.newBuilder().setGridId(gridId);
-            for (int r = 0; r < data.size(); r++) {
-                List<String> row = data.get(r);
-                for (int c = 0; c < row.size(); c++) {
-                    builder.addCells(
-                        CellUpdate.newBuilder()
-                            .setRow(startRow + r)
-                            .setCol(startCol + c)
-                            .setValue(CellValue.newBuilder().setText(row.get(c)).build())
-                            .build()
-                    );
-                }
-            }
-            client.updateCells(builder.build());
-        });
-    }
-
-    /**
-     * Fill a 2D matrix into the grid starting at row 0, column 0, resizing as needed.
-     */
-    public void setTableData(List<List<String>> data) throws SynurangDesktopBridge.SynurangBridgeException {
-        setTableData(data, 0, 0, true);
-    }
-
     @Override
     public void setRowHeight(int row, int height) throws SynurangDesktopBridge.SynurangBridgeException {
         client.defineRows(
@@ -644,12 +596,12 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         return client.sort(request.toBuilder().setGridId(gridId).build());
     }
 
-    public Empty subtotal(SubtotalRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+    public SubtotalResult subtotal(SubtotalRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(request, "request");
         return client.subtotal(request.toBuilder().setGridId(gridId).build());
     }
 
-    public void subtotal(
+    public SubtotalResult subtotal(
         AggregateType aggregateType,
         int groupOnCol,
         int aggregateCol,
@@ -658,18 +610,41 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         long foreColor,
         boolean addOutline
     ) throws SynurangDesktopBridge.SynurangBridgeException {
-        client.subtotal(
-            SubtotalRequest.newBuilder()
-                .setGridId(gridId)
-                .setAggregate(aggregateType)
-                .setGroupOnCol(groupOnCol)
-                .setAggregateCol(aggregateCol)
-                .setCaption(caption == null ? "" : caption)
-                .setBackground((int) backColor)
-                .setForeground((int) foreColor)
-                .setAddOutline(addOutline)
-                .build()
+        return subtotal(
+            aggregateType,
+            groupOnCol,
+            aggregateCol,
+            caption,
+            backColor,
+            foreColor,
+            addOutline,
+            null
         );
+    }
+
+    public SubtotalResult subtotal(
+        AggregateType aggregateType,
+        int groupOnCol,
+        int aggregateCol,
+        String caption,
+        long backColor,
+        long foreColor,
+        boolean addOutline,
+        Font font
+    ) throws SynurangDesktopBridge.SynurangBridgeException {
+        SubtotalRequest.Builder builder = SubtotalRequest.newBuilder()
+            .setGridId(gridId)
+            .setAggregate(aggregateType)
+            .setGroupOnCol(groupOnCol)
+            .setAggregateCol(aggregateCol)
+            .setCaption(caption == null ? "" : caption)
+            .setBackground((int) backColor)
+            .setForeground((int) foreColor)
+            .setAddOutline(addOutline);
+        if (font != null) {
+            builder.setFont(font);
+        }
+        return client.subtotal(builder.build());
     }
 
     public Empty autoSize(AutoSizeRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
@@ -1167,6 +1142,20 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
                 .setDemo(demoName)
                 .build()
         );
+    }
+
+    public GetDemoDataResponse getDemoData(GetDemoDataRequest request)
+        throws SynurangDesktopBridge.SynurangBridgeException {
+        Objects.requireNonNull(request, "request");
+        return client.getDemoData(request);
+    }
+
+    public byte[] getDemoData(String demoName) throws SynurangDesktopBridge.SynurangBridgeException {
+        return client.getDemoData(
+            GetDemoDataRequest.newBuilder()
+                .setDemo(demoName)
+                .build()
+        ).getData().toByteArray();
     }
 
     public ClipboardResponse copy() throws SynurangDesktopBridge.SynurangBridgeException {

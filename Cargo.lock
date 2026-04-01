@@ -2021,6 +2021,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
 dependencies = [
  "serde_core",
+ "serde_derive",
 ]
 
 [[package]]
@@ -2049,6 +2050,7 @@ version = "1.0.149"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
 dependencies = [
+ "indexmap 2.13.0",
  "itoa",
  "memchr",
  "serde",
@@ -2731,6 +2733,7 @@ version = "0.4.0"
 dependencies = [
  "lazy_static",
  "prost 0.12.6",
+ "serde_json",
  "volvoxgrid-engine",
 ]
 
@@ -2740,6 +2743,7 @@ version = "0.4.0"
 dependencies = [
  "bytemuck",
  "cosmic-text",
+ "flate2",
  "hashbrown 0.16.1",
  "pollster",
  "prost 0.12.6",
@@ -2748,6 +2752,7 @@ dependencies = [
  "raw-window-handle",
  "rayon",
  "regex",
+ "serde",
  "serde_json",
  "tiny-skia",
  "tonic 0.11.0",
@@ -2766,6 +2771,8 @@ dependencies = [
  "libc",
  "prost 0.12.6",
  "prost-build",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
