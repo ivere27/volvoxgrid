@@ -208,7 +208,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn set_left_col(&self, request: SetColRequest) -> Result<Empty, FfiError>;
     fn edit(&self, request: EditCommand) -> Result<EditState, FfiError>;
     fn sort(&self, request: SortRequest) -> Result<Empty, FfiError>;
-    fn subtotal(&self, request: SubtotalRequest) -> Result<Empty, FfiError>;
+    fn subtotal(&self, request: SubtotalRequest) -> Result<SubtotalResult, FfiError>;
     fn auto_size(&self, request: AutoSizeRequest) -> Result<Empty, FfiError>;
     fn outline(&self, request: OutlineRequest) -> Result<Empty, FfiError>;
     fn get_node(&self, request: GetNodeRequest) -> Result<NodeInfo, FfiError>;

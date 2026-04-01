@@ -831,20 +831,22 @@ class VolvoxGridController(
         caption: String = "",
         backColor: Long = 0xFFE0E0E0.toLong(),
         foreColor: Long = 0xFF000000.toLong(),
-        addOutline: Boolean = true
-    ) {
-        service.Subtotal(
-            SubtotalRequest.newBuilder()
-                .setGridId(gridId)
-                .setAggregate(aggregateType)
-                .setGroupOnCol(groupOnCol)
-                .setAggregateCol(aggregateCol)
-                .setCaption(caption)
-                .setBackground(backColor.toInt())
-                .setForeground(foreColor.toInt())
-                .setAddOutline(addOutline)
-                .build()
-        )
+        addOutline: Boolean = true,
+        font: Font? = null
+    ): SubtotalResult {
+        val builder = SubtotalRequest.newBuilder()
+            .setGridId(gridId)
+            .setAggregate(aggregateType)
+            .setGroupOnCol(groupOnCol)
+            .setAggregateCol(aggregateCol)
+            .setCaption(caption)
+            .setBackground(backColor.toInt())
+            .setForeground(foreColor.toInt())
+            .setAddOutline(addOutline)
+        if (font != null) {
+            builder.font = font
+        }
+        return service.Subtotal(builder.build())
     }
 
     fun setTreeIndicator(style: TreeIndicatorStyle) {

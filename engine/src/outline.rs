@@ -88,7 +88,7 @@ pub fn subtotal(
     back_color: u32,
     fore_color: u32,
     add_outline: bool,
-) {
+) -> Vec<i32> {
     subtotal_ex(
         grid,
         aggregate,
@@ -102,7 +102,36 @@ pub fn subtotal(
         false, // font_bold
         -1,    // match_from (-1 = from fixed_cols)
         false, // total_only
-    );
+    )
+}
+
+/// Insert subtotal rows with an optional generated-cell font patch.
+pub fn subtotal_with_font(
+    grid: &mut VolvoxGrid,
+    aggregate: i32,
+    group_on_col: i32,
+    aggregate_col: i32,
+    caption: &str,
+    back_color: u32,
+    fore_color: u32,
+    add_outline: bool,
+    font: Option<&crate::style::CellStylePatch>,
+) -> Vec<i32> {
+    subtotal_ex_with_font(
+        grid,
+        aggregate,
+        group_on_col,
+        aggregate_col,
+        caption,
+        back_color,
+        fore_color,
+        add_outline,
+        "",
+        false,
+        -1,
+        false,
+        font,
+    )
 }
 
 /// Extended subtotal with additional parameters.
@@ -126,18 +155,89 @@ pub fn subtotal_ex(
     font_bold: bool,
     match_from: i32,
     total_only: bool,
-) {
+) -> Vec<i32> {
+    subtotal_ex_with_font(
+        grid,
+        aggregate,
+        group_on_col,
+        aggregate_col,
+        caption,
+        back_color,
+        fore_color,
+        add_outline,
+        format,
+        font_bold,
+        match_from,
+        total_only,
+        None,
+    )
+}
+
+fn subtotal_generated_cell_style(
+    back_color: Option<u32>,
+    fore_color: Option<u32>,
+    default_bold: bool,
+    font: Option<&crate::style::CellStylePatch>,
+) -> crate::style::CellStylePatch {
+    let mut style = crate::style::CellStylePatch {
+        back_color,
+        fore_color,
+        font_bold: default_bold.then_some(true),
+        ..Default::default()
+    };
+    if let Some(font) = font {
+        if font.font_name.is_some() {
+            style.font_name = font.font_name.clone();
+        }
+        if font.font_size.is_some() {
+            style.font_size = font.font_size;
+        }
+        if font.font_bold.is_some() {
+            style.font_bold = font.font_bold;
+        }
+        if font.font_italic.is_some() {
+            style.font_italic = font.font_italic;
+        }
+        if font.font_underline.is_some() {
+            style.font_underline = font.font_underline;
+        }
+        if font.font_strikethrough.is_some() {
+            style.font_strikethrough = font.font_strikethrough;
+        }
+        if font.font_stretch.is_some() {
+            style.font_stretch = font.font_stretch;
+        }
+    }
+    style
+}
+
+#[allow(clippy::too_many_arguments)]
+fn subtotal_ex_with_font(
+    grid: &mut VolvoxGrid,
+    aggregate: i32,
+    group_on_col: i32,
+    aggregate_col: i32,
+    caption: &str,
+    back_color: u32,
+    fore_color: u32,
+    add_outline: bool,
+    format: &str,
+    font_bold: bool,
+    match_from: i32,
+    total_only: bool,
+    font: Option<&crate::style::CellStylePatch>,
+) -> Vec<i32> {
     if aggregate == pb::AggregateType::AggNone as i32 {
-        return;
+        return Vec::new();
     }
     if aggregate == pb::AggregateType::AggClear as i32 {
         clear_subtotals(grid);
-        return;
+        return Vec::new();
     }
 
     let first_data_row = grid.fixed_rows;
     if grid.rows <= first_data_row || grid.cols <= 0 {
-        return;
+        return Vec::new();
     }
 
     // Collect groups (group_value, start_row, end_row).
@@ -207,9 +307,10 @@ pub fn subtotal_ex(
     }
 
     if groups.is_empty() {
-        return;
+        return Vec::new();
     }
 
+    let mut affected_rows = BTreeSet::new();
     let mut auto_resize_rows = BTreeSet::new();
     let mut auto_resize_cols = BTreeSet::new();
 
@@ -236,22 +337,23 @@ pub fn subtotal_ex(
                 };
                 let subtotal_bold = font_bold || aggregate != pb::AggregateType::AggNone as i32;
                 let apply_back = back_color != 0 && aggregate_col >= label_col;
-                let style = crate::style::CellStylePatch {
-                    back_color: if apply_back { Some(back_color) } else { None },
-                    fore_color: if fore_color != 0 {
+                let style = subtotal_generated_cell_style(
+                    if apply_back { Some(back_color) } else { None },
+                    if fore_color != 0 {
                         Some(fore_color)
                     } else {
                         None
                     },
-                    font_bold: if subtotal_bold { Some(true) } else { None },
-                    ..Default::default()
-                };
+                    subtotal_bold,
+                    font,
+                );
                 if !style.is_empty() {
                     grid.cell_styles.insert((reuse_row, aggregate_col), style);
                 }
                 let props = grid.row_props.entry(reuse_row).or_default();
                 props.is_subtotal = true;
                 props.subtotal_caption_col = label_col;
+                affected_rows.insert(reuse_row);
                 note_auto_resize_targets(
                     &mut auto_resize_rows,
                     &mut auto_resize_cols,
@@ -271,12 +373,14 @@ pub fn subtotal_ex(
             *end + 1 // below
         };
 
+        shift_tracked_rows_down(&mut affected_rows, insert_row);
         shift_tracked_rows_down(&mut auto_resize_rows, insert_row);
 
         // Insert row
         grid.cells.insert_row(insert_row);
         shift_row_metadata_down(grid, insert_row);
         grid.rows += 1;
+        affected_rows.insert(insert_row);
 
         // Set subtotal text
         let label = subtotal_caption(aggregate, caption, group_on_col, group_name);
@@ -390,20 +494,20 @@ pub fn subtotal_ex(
                 // at the generated subtotal caption cell and continues to the right.
                 // Cells to the left (copied key columns) remain unfilled.
                 let apply_back_color = back_color != 0 && c >= label_col;
-                let style = crate::style::CellStylePatch {
-                    back_color: if apply_back_color {
+                let style = subtotal_generated_cell_style(
+                    if apply_back_color {
                         Some(back_color)
                     } else {
                         None
                     },
-                    fore_color: if fore_color != 0 {
+                    if fore_color != 0 {
                         Some(fore_color)
                     } else {
                         None
                     },
-                    font_bold: if bold_cell { Some(true) } else { None },
-                    ..Default::default()
-                };
+                    bold_cell,
+                    font,
+                );
                 if !style.is_empty() {
                     grid.cell_styles.insert((insert_row, c), style);
                 }
@@ -433,6 +537,7 @@ pub fn subtotal_ex(
     auto_resize_tracked_subtotal_targets(grid, &auto_resize_rows, &auto_resize_cols);
     grid.layout.invalidate();
     grid.mark_dirty();
+    affected_rows.into_iter().collect()
 }
 
 /// Remove all subtotal rows
@@ -806,8 +911,9 @@ fn subtotal_caption(aggregate: i32, caption: &str, group_on_col: i32, group_name
 
 #[cfg(test)]
 mod tests {
-    use super::{subtotal, subtotal_ex};
+    use super::{subtotal, subtotal_ex, subtotal_with_font};
     use crate::grid::VolvoxGrid;
+    use crate::proto::volvoxgrid::v1 as pb;
     use crate::style::CellStylePatch;
 
     fn sample_grid() -> VolvoxGrid {
@@ -1004,6 +1110,62 @@ mod tests {
             c1_group1.back_color.is_some(),
             "group_on=1 subtotal should color caption column"
         );
+    }
+
+    #[test]
+    fn subtotal_with_font_returns_final_affected_rows_in_ascending_order() {
+        let mut grid = sample_grid();
+        grid.outline.group_total_position = pb::GroupTotalPosition::GroupTotalBelow as i32;
+
+        let rows = subtotal_with_font(
+            &mut grid,
+            pb::AggregateType::AggSum as i32,
+            0,
+            2,
+            "Total",
+            0,
+            0,
+            true,
+            None,
+        );
+
+        assert_eq!(rows, vec![3, 6]);
+    }
+
+    #[test]
+    fn subtotal_with_font_applies_font_patch_to_generated_cells() {
+        let mut grid = sample_grid();
+        let font = CellStylePatch {
+            font_name: Some("Demo Sans".to_string()),
+            font_size: Some(18.0),
+            font_bold: Some(false),
+            font_italic: Some(true),
+            ..Default::default()
+        };
+
+        let rows = subtotal_with_font(
+            &mut grid,
+            pb::AggregateType::AggSum as i32,
+            0,
+            2,
+            "Total",
+            0,
+            0,
+            true,
+            Some(&font),
+        );
+        let subtotal_row = rows[0];
+        let caption_style = grid.get_cell_style(subtotal_row, 0);
+        let value_style = grid.get_cell_style(subtotal_row, 2);
+
+        assert_eq!(caption_style.font_name.as_deref(), Some("Demo Sans"));
+        assert_eq!(caption_style.font_size, Some(18.0));
+        assert_eq!(caption_style.font_bold, Some(false));
+        assert_eq!(caption_style.font_italic, Some(true));
+        assert_eq!(value_style.font_name.as_deref(), Some("Demo Sans"));
+        assert_eq!(value_style.font_size, Some(18.0));
+        assert_eq!(value_style.font_bold, Some(false));
+        assert_eq!(value_style.font_italic, Some(true));
     }
 
     #[test]

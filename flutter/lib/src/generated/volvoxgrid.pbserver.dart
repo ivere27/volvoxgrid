@@ -66,7 +66,7 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
   $async.Future<$0.EditState> edit(
       $pb.ServerContext ctx, $0.EditCommand request);
   $async.Future<$0.Empty> sort($pb.ServerContext ctx, $0.SortRequest request);
-  $async.Future<$0.Empty> subtotal(
+  $async.Future<$0.SubtotalResult> subtotal(
       $pb.ServerContext ctx, $0.SubtotalRequest request);
   $async.Future<$0.Empty> autoSize(
       $pb.ServerContext ctx, $0.AutoSizeRequest request);

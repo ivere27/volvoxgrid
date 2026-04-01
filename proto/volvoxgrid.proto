@@ -1387,6 +1387,11 @@ message SubtotalRequest {
   uint32        background    = 6;
   uint32        foreground    = 7;
   bool          add_outline   = 8;
+  Font          font          = 9;
+}
+
+message SubtotalResult {
+  repeated int32 rows = 1;
 }
 
 message AutoSizeRequest {
@@ -2078,7 +2083,7 @@ service VolvoxGridService {
 
   // ── Actions ──
   rpc Sort(SortRequest)                   returns (Empty);
-  rpc Subtotal(SubtotalRequest)           returns (Empty);
+  rpc Subtotal(SubtotalRequest)           returns (SubtotalResult);
   rpc AutoSize(AutoSizeRequest)           returns (Empty);
   rpc Outline(OutlineRequest)             returns (Empty);
   rpc GetNode(GetNodeRequest)             returns (NodeInfo);

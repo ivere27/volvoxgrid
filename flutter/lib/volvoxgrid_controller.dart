@@ -766,7 +766,7 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Insert subtotal rows grouping on [groupOnCol] and aggregating
   /// [aggregateCol] with the specified [aggregate] function.
-  Future<void> subtotal(
+  Future<SubtotalResult> subtotal(
     AggregateType aggregate, {
     required int groupOnCol,
     required int aggregateCol,
@@ -774,8 +774,9 @@ class VolvoxGridController extends ChangeNotifier {
     int backColor = 0xFFE0E0E0,
     int foreColor = 0xFF000000,
     bool addOutline = true,
+    Font? font,
   }) async {
-    await VolvoxGridService.Subtotal(SubtotalRequest()
+    final req = SubtotalRequest()
       ..gridId = _gridId
       ..aggregate = aggregate
       ..groupOnCol = groupOnCol
@@ -783,8 +784,13 @@ class VolvoxGridController extends ChangeNotifier {
       ..caption = caption
       ..background = backColor
       ..foreground = foreColor
-      ..addOutline = addOutline);
+      ..addOutline = addOutline;
+    if (font != null) {
+      req.font = font;
+    }
+    final result = await VolvoxGridService.Subtotal(req);
     notifyListeners();
+    return result;
   }
 
   // ── Outline ───────────────────────────────────────────────────────────────

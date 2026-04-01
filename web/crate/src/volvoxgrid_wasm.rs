@@ -258,7 +258,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn set_left_col(&self, request: SetColRequest) -> Result<Empty, String>;
     fn edit(&self, request: EditCommand) -> Result<EditState, String>;
     fn sort(&self, request: SortRequest) -> Result<Empty, String>;
-    fn subtotal(&self, request: SubtotalRequest) -> Result<Empty, String>;
+    fn subtotal(&self, request: SubtotalRequest) -> Result<SubtotalResult, String>;
     fn auto_size(&self, request: AutoSizeRequest) -> Result<Empty, String>;
     fn outline(&self, request: OutlineRequest) -> Result<Empty, String>;
     fn get_node(&self, request: GetNodeRequest) -> Result<NodeInfo, String>;
@@ -1200,6 +1200,7 @@ pub fn volvox_grid_subtotal(
     background: u32,
     foreground: u32,
     add_outline: bool,
+    font: &[u8],
 ) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
@@ -1217,6 +1218,13 @@ pub fn volvox_grid_subtotal(
         background,
         foreground,
         add_outline,
+        font: match Font::decode(font) {
+            Ok(m) => Some(m),
+            Err(e) => {
+                set_last_error(format!("decode 'font': {}", e));
+                return Vec::new();
+            }
+        },
         ..Default::default()
     };
     match plugin.subtotal(req) {

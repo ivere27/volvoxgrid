@@ -2004,7 +2004,7 @@ impl VolvoxServiceClient {
         foreground: u32,
         add_outline: bool,
     ) -> Result<(), String> {
-        let _: pb::Empty = self.invoke(
+        let _: pb::SubtotalResult = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Subtotal",
             &pb::SubtotalRequest {
                 grid_id,
@@ -2015,6 +2015,7 @@ impl VolvoxServiceClient {
                 background,
                 foreground,
                 add_outline,
+                font: None,
             },
         )?;
         Ok(())

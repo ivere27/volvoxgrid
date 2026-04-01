@@ -802,13 +802,14 @@ function setupSalesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: number
     grid.setColDropdownItems(8, SALES_STATUS_ITEMS);
     grid.flingImpulseGain = 220.0;
     grid.flingFriction = 0.9;
-    wasmModule.volvox_grid_subtotal(gridHandle, 1, 0, 0, "", 0, 0, false);
-    wasmModule.volvox_grid_subtotal(gridHandle, 2, -1, 4, "Grand Total", 0xFFEEF2FF, 0xFF111827, true);
-    wasmModule.volvox_grid_subtotal(gridHandle, 2, 0, 4, "", 0xFFF5F3FF, 0xFF111827, true);
-    wasmModule.volvox_grid_subtotal(gridHandle, 2, 1, 4, "", 0xFFF8F7FF, 0xFF111827, true);
-    wasmModule.volvox_grid_subtotal(gridHandle, 2, -1, 5, "Grand Total", 0xFFEEF2FF, 0xFF111827, true);
-    wasmModule.volvox_grid_subtotal(gridHandle, 2, 0, 5, "", 0xFFF5F3FF, 0xFF111827, true);
-    wasmModule.volvox_grid_subtotal(gridHandle, 2, 1, 5, "", 0xFFF8F7FF, 0xFF111827, true);
+    const emptyFont = new Uint8Array();
+    wasmModule.volvox_grid_subtotal(gridHandle, 1, 0, 0, "", 0, 0, false, emptyFont);
+    wasmModule.volvox_grid_subtotal(gridHandle, 2, -1, 4, "Grand Total", 0xFFEEF2FF, 0xFF111827, true, emptyFont);
+    wasmModule.volvox_grid_subtotal(gridHandle, 2, 0, 4, "", 0xFFF5F3FF, 0xFF111827, true, emptyFont);
+    wasmModule.volvox_grid_subtotal(gridHandle, 2, 1, 4, "", 0xFFF8F7FF, 0xFF111827, true, emptyFont);
+    wasmModule.volvox_grid_subtotal(gridHandle, 2, -1, 5, "Grand Total", 0xFFEEF2FF, 0xFF111827, true, emptyFont);
+    wasmModule.volvox_grid_subtotal(gridHandle, 2, 0, 5, "", 0xFFF5F3FF, 0xFF111827, true, emptyFont);
+    wasmModule.volvox_grid_subtotal(gridHandle, 2, 1, 5, "", 0xFFF8F7FF, 0xFF111827, true, emptyFont);
     applySalesSubtotalDecorations(grid, wasmModule);
     grid.invalidate();
   } finally {

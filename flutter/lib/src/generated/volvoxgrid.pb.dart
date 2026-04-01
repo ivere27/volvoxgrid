@@ -9969,6 +9969,7 @@ class SubtotalRequest extends $pb.GeneratedMessage {
     $core.int? background,
     $core.int? foreground,
     $core.bool? addOutline,
+    Font? font,
   }) {
     final result = create();
     if (gridId != null) result.gridId = gridId;
@@ -9979,6 +9980,7 @@ class SubtotalRequest extends $pb.GeneratedMessage {
     if (background != null) result.background = background;
     if (foreground != null) result.foreground = foreground;
     if (addOutline != null) result.addOutline = addOutline;
+    if (font != null) result.font = font;
     return result;
   }
 
@@ -10004,6 +10006,7 @@ class SubtotalRequest extends $pb.GeneratedMessage {
     ..aI(6, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
     ..aI(7, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
     ..aOB(8, _omitFieldNames ? '' : 'addOutline')
+    ..aOM<Font>(9, _omitFieldNames ? '' : 'font', subBuilder: Font.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -10096,6 +10099,65 @@ class SubtotalRequest extends $pb.GeneratedMessage {
   $core.bool hasAddOutline() => $_has(7);
   @$pb.TagNumber(8)
   void clearAddOutline() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  Font get font => $_getN(8);
+  @$pb.TagNumber(9)
+  set font(Font value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasFont() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearFont() => $_clearField(9);
+  @$pb.TagNumber(9)
+  Font ensureFont() => $_ensure(8);
+}
+
+class SubtotalResult extends $pb.GeneratedMessage {
+  factory SubtotalResult({
+    $core.Iterable<$core.int>? rows,
+  }) {
+    final result = create();
+    if (rows != null) result.rows.addAll(rows);
+    return result;
+  }
+
+  SubtotalResult._();
+
+  factory SubtotalResult.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SubtotalResult.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SubtotalResult',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..p<$core.int>(1, _omitFieldNames ? '' : 'rows', $pb.PbFieldType.K3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SubtotalResult clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SubtotalResult copyWith(void Function(SubtotalResult) updates) =>
+      super.copyWith((message) => updates(message as SubtotalResult))
+          as SubtotalResult;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SubtotalResult create() => SubtotalResult._();
+  @$core.override
+  SubtotalResult createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SubtotalResult getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SubtotalResult>(create);
+  static SubtotalResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.int> get rows => $_getList(0);
 }
 
 class AutoSizeRequest extends $pb.GeneratedMessage {
@@ -20830,10 +20892,10 @@ class VolvoxGridServiceApi {
   /// ── Actions ──
   $async.Future<Empty> sort($pb.ClientContext? ctx, SortRequest request) =>
       _client.invoke<Empty>(ctx, 'VolvoxGridService', 'Sort', request, Empty());
-  $async.Future<Empty> subtotal(
+  $async.Future<SubtotalResult> subtotal(
           $pb.ClientContext? ctx, SubtotalRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'Subtotal', request, Empty());
+      _client.invoke<SubtotalResult>(
+          ctx, 'VolvoxGridService', 'Subtotal', request, SubtotalResult());
   $async.Future<Empty> autoSize(
           $pb.ClientContext? ctx, AutoSizeRequest request) =>
       _client.invoke<Empty>(

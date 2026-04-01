@@ -313,10 +313,11 @@ class VolvoxGridService {
         Empty.fromBuffer,
       );
 
-  static Future<Empty> Subtotal(SubtotalRequest request) => _invokeUnary(
+  static Future<SubtotalResult> Subtotal(SubtotalRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('Subtotal'),
         request,
-        Empty.fromBuffer,
+        SubtotalResult.fromBuffer,
       );
 
   static Future<Empty> AutoSize(AutoSizeRequest request) => _invokeUnary(
@@ -397,7 +398,8 @@ class VolvoxGridService {
         ExportResponse.fromBuffer,
       );
 
-  static Future<LoadDataResult> LoadData(LoadDataRequest request) => _invokeUnary(
+  static Future<LoadDataResult> LoadData(LoadDataRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('LoadData'),
         request,
         LoadDataResult.fromBuffer,

@@ -273,8 +273,8 @@ namespace VolvoxGrid.DotNet.Internal
                 GroupOnCol = groupOnCol,
                 AggregateCol = aggregateCol,
                 Caption = caption ?? string.Empty,
-                BackColor = backColor,
-                ForeColor = foreColor,
+                Background = backColor,
+                Foreground = foreColor,
                 AddOutline = addOutline,
             }.ToByteArray();
         }

@@ -3023,9 +3023,13 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             value: v,
         })
     }
-    fn subtotal(&self, r: SubtotalRequest) -> Result<Empty, String> {
-        GRID_MANAGER.with_grid(r.grid_id, |g| {
-            volvoxgrid_engine::outline::subtotal(
+    fn subtotal(&self, r: SubtotalRequest) -> Result<SubtotalResult, String> {
+        let subtotal_font = r
+            .font
+            .as_ref()
+            .map(volvoxgrid_engine::config::v1_font_to_cell_style_patch);
+        let rows = GRID_MANAGER.with_grid(r.grid_id, |g| {
+            volvoxgrid_engine::outline::subtotal_with_font(
                 g,
                 r.aggregate,
                 r.group_on_col,
@@ -3034,9 +3038,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 r.background,
                 r.foreground,
                 r.add_outline,
-            );
+                subtotal_font.as_ref(),
+            )
         })?;
-        Ok(Empty {})
+        Ok(SubtotalResult { rows })
     }
     fn set_subtotal_position(&self, r: SetSubtotalPositionRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| g.outline.group_total_position = r.position)?;
@@ -4115,9 +4120,13 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(Empty {})
     }
 
-    fn subtotal(&self, request: SubtotalRequest) -> Result<Empty, String> {
-        self.manager().with_grid(request.grid_id, |grid| {
-            volvoxgrid_engine::outline::subtotal(
+    fn subtotal(&self, request: SubtotalRequest) -> Result<SubtotalResult, String> {
+        let subtotal_font = request
+            .font
+            .as_ref()
+            .map(volvoxgrid_engine::config::v1_font_to_cell_style_patch);
+        let rows = self.manager().with_grid(request.grid_id, |grid| {
+            volvoxgrid_engine::outline::subtotal_with_font(
                 grid,
                 request.aggregate,
                 request.group_on_col,
@@ -4126,9 +4135,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 request.background,
                 request.foreground,
                 request.add_outline,
-            );
+                subtotal_font.as_ref(),
+            )
         })?;
-        Ok(Empty {})
+        Ok(SubtotalResult { rows })
     }
 
     fn auto_size(&self, request: AutoSizeRequest) -> Result<Empty, String> {

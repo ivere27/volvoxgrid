@@ -2514,9 +2514,13 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(Empty {})
     }
 
-    fn subtotal(&self, request: SubtotalRequest) -> PluginResult<Empty> {
-        self.with_grid(request.grid_id, |grid| {
-            volvoxgrid_engine::outline::subtotal(
+    fn subtotal(&self, request: SubtotalRequest) -> PluginResult<SubtotalResult> {
+        let subtotal_font = request
+            .font
+            .as_ref()
+            .map(volvoxgrid_engine::config::v1_font_to_cell_style_patch);
+        let rows = self.with_grid(request.grid_id, |grid| {
+            volvoxgrid_engine::outline::subtotal_with_font(
                 grid,
                 request.aggregate,
                 request.group_on_col,
@@ -2525,9 +2529,10 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 request.background,
                 request.foreground,
                 request.add_outline,
-            );
+                subtotal_font.as_ref(),
+            )
         })?;
-        Ok(Empty {})
+        Ok(SubtotalResult { rows })
     }
 
     fn auto_size(&self, request: AutoSizeRequest) -> PluginResult<Empty> {

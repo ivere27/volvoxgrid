@@ -595,6 +595,12 @@ fn apply_cell_style_font_patch(target: &mut style::CellStylePatch, patch: &v1::F
     }
 }
 
+pub fn v1_font_to_cell_style_patch(font: &v1::Font) -> style::CellStylePatch {
+    let mut patch = style::CellStylePatch::default();
+    apply_cell_style_font_patch(&mut patch, font);
+    patch
+}
+
 fn cell_style_font_to_v1(target: &style::CellStylePatch) -> Option<v1::Font> {
     if target.font_name.is_none()
         && target.font_size.is_none()

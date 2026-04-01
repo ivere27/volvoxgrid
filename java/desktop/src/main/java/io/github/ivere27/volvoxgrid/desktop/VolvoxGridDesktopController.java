@@ -596,12 +596,12 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         return client.sort(request.toBuilder().setGridId(gridId).build());
     }
 
-    public Empty subtotal(SubtotalRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+    public SubtotalResult subtotal(SubtotalRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(request, "request");
         return client.subtotal(request.toBuilder().setGridId(gridId).build());
     }
 
-    public void subtotal(
+    public SubtotalResult subtotal(
         AggregateType aggregateType,
         int groupOnCol,
         int aggregateCol,
@@ -610,18 +610,41 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         long foreColor,
         boolean addOutline
     ) throws SynurangDesktopBridge.SynurangBridgeException {
-        client.subtotal(
-            SubtotalRequest.newBuilder()
-                .setGridId(gridId)
-                .setAggregate(aggregateType)
-                .setGroupOnCol(groupOnCol)
-                .setAggregateCol(aggregateCol)
-                .setCaption(caption == null ? "" : caption)
-                .setBackground((int) backColor)
-                .setForeground((int) foreColor)
-                .setAddOutline(addOutline)
-                .build()
+        return subtotal(
+            aggregateType,
+            groupOnCol,
+            aggregateCol,
+            caption,
+            backColor,
+            foreColor,
+            addOutline,
+            null
         );
+    }
+
+    public SubtotalResult subtotal(
+        AggregateType aggregateType,
+        int groupOnCol,
+        int aggregateCol,
+        String caption,
+        long backColor,
+        long foreColor,
+        boolean addOutline,
+        Font font
+    ) throws SynurangDesktopBridge.SynurangBridgeException {
+        SubtotalRequest.Builder builder = SubtotalRequest.newBuilder()
+            .setGridId(gridId)
+            .setAggregate(aggregateType)
+            .setGroupOnCol(groupOnCol)
+            .setAggregateCol(aggregateCol)
+            .setCaption(caption == null ? "" : caption)
+            .setBackground((int) backColor)
+            .setForeground((int) foreColor)
+            .setAddOutline(addOutline);
+        if (font != null) {
+            builder.setFont(font);
+        }
+        return client.subtotal(builder.build());
     }
 
     public Empty autoSize(AutoSizeRequest request) throws SynurangDesktopBridge.SynurangBridgeException {

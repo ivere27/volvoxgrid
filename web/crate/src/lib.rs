@@ -5181,9 +5181,13 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         Ok(Empty {})
     }
 
-    fn subtotal(&self, request: SubtotalRequest) -> Result<Empty, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            volvoxgrid_engine::outline::subtotal(
+    fn subtotal(&self, request: SubtotalRequest) -> Result<SubtotalResult, String> {
+        let subtotal_font = request
+            .font
+            .as_ref()
+            .map(volvoxgrid_engine::config::v1_font_to_cell_style_patch);
+        let rows = wasm_with_grid(request.grid_id, |grid| {
+            volvoxgrid_engine::outline::subtotal_with_font(
                 grid,
                 request.aggregate,
                 request.group_on_col,
@@ -5192,9 +5196,10 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 request.background,
                 request.foreground,
                 request.add_outline,
-            );
+                subtotal_font.as_ref(),
+            )
         })?;
-        Ok(Empty {})
+        Ok(SubtotalResult { rows })
     }
 
     fn auto_size(&self, request: AutoSizeRequest) -> Result<Empty, String> {

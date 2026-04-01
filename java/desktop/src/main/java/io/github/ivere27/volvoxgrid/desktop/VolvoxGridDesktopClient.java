@@ -208,8 +208,8 @@ public final class VolvoxGridDesktopClient {
         return unary(SORT, request, Empty.parser());
     }
 
-    public Empty subtotal(SubtotalRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(SUBTOTAL, request, Empty.parser());
+    public SubtotalResult subtotal(SubtotalRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(SUBTOTAL, request, SubtotalResult.parser());
     }
 
     public Empty autoSize(AutoSizeRequest request) throws SynurangDesktopBridge.SynurangBridgeException {

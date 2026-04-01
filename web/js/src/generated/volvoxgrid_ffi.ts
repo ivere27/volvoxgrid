@@ -1738,6 +1738,10 @@ export const SubtotalRequestFields = {
   "background": 6,
   "foreground": 7,
   "add_outline": 8,
+  "font": 9,
+} as const;
+export const SubtotalResultFields = {
+  "rows": 1,
 } as const;
 export const TextQueryFields = {
   "text": 1,

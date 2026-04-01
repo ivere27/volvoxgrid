@@ -316,6 +316,8 @@ static int32_t volvox_grid_subtotal_compat(
         back_color,
         fore_color,
         add_outline,
+        NULL,
+        0,
         &out_len);
     return vfg_take_status_response(out);
 }

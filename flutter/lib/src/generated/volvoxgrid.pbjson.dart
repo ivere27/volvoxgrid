@@ -6097,6 +6097,14 @@ const SubtotalRequest$json = {
     {'1': 'background', '3': 6, '4': 1, '5': 13, '10': 'background'},
     {'1': 'foreground', '3': 7, '4': 1, '5': 13, '10': 'foreground'},
     {'1': 'add_outline', '3': 8, '4': 1, '5': 8, '10': 'addOutline'},
+    {
+      '1': 'font',
+      '3': 9,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.Font',
+      '10': 'font'
+    },
   ],
 };
 
@@ -6107,7 +6115,20 @@ final $typed_data.Uint8List subtotalRequestDescriptor = $convert.base64Decode(
     'X29uX2NvbBgDIAEoBVIKZ3JvdXBPbkNvbBIjCg1hZ2dyZWdhdGVfY29sGAQgASgFUgxhZ2dyZW'
     'dhdGVDb2wSGAoHY2FwdGlvbhgFIAEoCVIHY2FwdGlvbhIeCgpiYWNrZ3JvdW5kGAYgASgNUgpi'
     'YWNrZ3JvdW5kEh4KCmZvcmVncm91bmQYByABKA1SCmZvcmVncm91bmQSHwoLYWRkX291dGxpbm'
-    'UYCCABKAhSCmFkZE91dGxpbmU=');
+    'UYCCABKAhSCmFkZE91dGxpbmUSJwoEZm9udBgJIAEoCzITLnZvbHZveGdyaWQudjEuRm9udFIE'
+    'Zm9udA==');
+
+@$core.Deprecated('Use subtotalResultDescriptor instead')
+const SubtotalResult$json = {
+  '1': 'SubtotalResult',
+  '2': [
+    {'1': 'rows', '3': 1, '4': 3, '5': 5, '10': 'rows'},
+  ],
+};
+
+/// Descriptor for `SubtotalResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List subtotalResultDescriptor =
+    $convert.base64Decode('Cg5TdWJ0b3RhbFJlc3VsdBISCgRyb3dzGAEgAygFUgRyb3dz');
 
 @$core.Deprecated('Use autoSizeRequestDescriptor instead')
 const AutoSizeRequest$json = {
@@ -9193,7 +9214,7 @@ const $core.Map<$core.String, $core.dynamic> VolvoxGridServiceBase$json = {
     {
       '1': 'Subtotal',
       '2': '.volvoxgrid.v1.SubtotalRequest',
-      '3': '.volvoxgrid.v1.Empty'
+      '3': '.volvoxgrid.v1.SubtotalResult'
     },
     {
       '1': 'AutoSize',
@@ -9403,6 +9424,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.SortRequest': SortRequest$json,
   '.volvoxgrid.v1.SortColumn': SortColumn$json,
   '.volvoxgrid.v1.SubtotalRequest': SubtotalRequest$json,
+  '.volvoxgrid.v1.SubtotalResult': SubtotalResult$json,
   '.volvoxgrid.v1.AutoSizeRequest': AutoSizeRequest$json,
   '.volvoxgrid.v1.OutlineRequest': OutlineRequest$json,
   '.volvoxgrid.v1.GetNodeRequest': GetNodeRequest$json,
@@ -9552,32 +9574,33 @@ final $typed_data.Uint8List volvoxGridServiceDescriptor = $convert.base64Decode(
     'IcLnZvbHZveGdyaWQudjEuU2V0Q29sUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSPAoE'
     'RWRpdBIaLnZvbHZveGdyaWQudjEuRWRpdENvbW1hbmQaGC52b2x2b3hncmlkLnYxLkVkaXRTdG'
     'F0ZRI4CgRTb3J0Ehoudm9sdm94Z3JpZC52MS5Tb3J0UmVxdWVzdBoULnZvbHZveGdyaWQudjEu'
-    'RW1wdHkSQAoIU3VidG90YWwSHi52b2x2b3hncmlkLnYxLlN1YnRvdGFsUmVxdWVzdBoULnZvbH'
-    'ZveGdyaWQudjEuRW1wdHkSQAoIQXV0b1NpemUSHi52b2x2b3hncmlkLnYxLkF1dG9TaXplUmVx'
-    'dWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSPgoHT3V0bGluZRIdLnZvbHZveGdyaWQudjEuT3'
-    'V0bGluZVJlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5EkEKB0dldE5vZGUSHS52b2x2b3hn'
-    'cmlkLnYxLkdldE5vZGVSZXF1ZXN0Ghcudm9sdm94Z3JpZC52MS5Ob2RlSW5mbxI/CgRGaW5kEh'
-    'oudm9sdm94Z3JpZC52MS5GaW5kUmVxdWVzdBobLnZvbHZveGdyaWQudjEuRmluZFJlc3BvbnNl'
-    'Ek4KCUFnZ3JlZ2F0ZRIfLnZvbHZveGdyaWQudjEuQWdncmVnYXRlUmVxdWVzdBogLnZvbHZveG'
-    'dyaWQudjEuQWdncmVnYXRlUmVzcG9uc2USUAoOR2V0TWVyZ2VkUmFuZ2USJC52b2x2b3hncmlk'
-    'LnYxLkdldE1lcmdlZFJhbmdlUmVxdWVzdBoYLnZvbHZveGdyaWQudjEuQ2VsbFJhbmdlEkQKCk'
-    '1lcmdlQ2VsbHMSIC52b2x2b3hncmlkLnYxLk1lcmdlQ2VsbHNSZXF1ZXN0GhQudm9sdm94Z3Jp'
-    'ZC52MS5FbXB0eRJICgxVbm1lcmdlQ2VsbHMSIi52b2x2b3hncmlkLnYxLlVubWVyZ2VDZWxsc1'
-    'JlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5ElMKEEdldE1lcmdlZFJlZ2lvbnMSGS52b2x2'
-    'b3hncmlkLnYxLkdyaWRIYW5kbGUaJC52b2x2b3hncmlkLnYxLk1lcmdlZFJlZ2lvbnNSZXNwb2'
-    '5zZRJPCg5HZXRNZW1vcnlVc2FnZRIZLnZvbHZveGdyaWQudjEuR3JpZEhhbmRsZRoiLnZvbHZv'
-    'eGdyaWQudjEuTWVtb3J5VXNhZ2VSZXNwb25zZRJOCglDbGlwYm9hcmQSHy52b2x2b3hncmlkLn'
-    'YxLkNsaXBib2FyZENvbW1hbmQaIC52b2x2b3hncmlkLnYxLkNsaXBib2FyZFJlc3BvbnNlEkUK'
-    'BkV4cG9ydBIcLnZvbHZveGdyaWQudjEuRXhwb3J0UmVxdWVzdBodLnZvbHZveGdyaWQudjEuRX'
-    'hwb3J0UmVzcG9uc2USQgoFUHJpbnQSGy52b2x2b3hncmlkLnYxLlByaW50UmVxdWVzdBocLnZv'
-    'bHZveGdyaWQudjEuUHJpbnRSZXNwb25zZRJICgdBcmNoaXZlEh0udm9sdm94Z3JpZC52MS5Bcm'
-    'NoaXZlUmVxdWVzdBoeLnZvbHZveGdyaWQudjEuQXJjaGl2ZVJlc3BvbnNlEkwKDlJlc2l6ZVZp'
-    'ZXdwb3J0EiQudm9sdm94Z3JpZC52MS5SZXNpemVWaWV3cG9ydFJlcXVlc3QaFC52b2x2b3hncm'
-    'lkLnYxLkVtcHR5EkIKCVNldFJlZHJhdxIfLnZvbHZveGdyaWQudjEuU2V0UmVkcmF3UmVxdWVz'
-    'dBoULnZvbHZveGdyaWQudjEuRW1wdHkSOgoHUmVmcmVzaBIZLnZvbHZveGdyaWQudjEuR3JpZE'
-    'hhbmRsZRoULnZvbHZveGdyaWQudjEuRW1wdHkSQAoITG9hZERlbW8SHi52b2x2b3hncmlkLnYx'
-    'LkxvYWREZW1vUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSVAoLR2V0RGVtb0RhdGESIS'
-    '52b2x2b3hncmlkLnYxLkdldERlbW9EYXRhUmVxdWVzdBoiLnZvbHZveGdyaWQudjEuR2V0RGVt'
-    'b0RhdGFSZXNwb25zZRJMCg1SZW5kZXJTZXNzaW9uEhoudm9sdm94Z3JpZC52MS5SZW5kZXJJbn'
-    'B1dBobLnZvbHZveGdyaWQudjEuUmVuZGVyT3V0cHV0KAEwARJECgtFdmVudFN0cmVhbRIZLnZv'
-    'bHZveGdyaWQudjEuR3JpZEhhbmRsZRoYLnZvbHZveGdyaWQudjEuR3JpZEV2ZW50MAE=');
+    'RW1wdHkSSQoIU3VidG90YWwSHi52b2x2b3hncmlkLnYxLlN1YnRvdGFsUmVxdWVzdBodLnZvbH'
+    'ZveGdyaWQudjEuU3VidG90YWxSZXN1bHQSQAoIQXV0b1NpemUSHi52b2x2b3hncmlkLnYxLkF1'
+    'dG9TaXplUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSPgoHT3V0bGluZRIdLnZvbHZveG'
+    'dyaWQudjEuT3V0bGluZVJlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5EkEKB0dldE5vZGUS'
+    'HS52b2x2b3hncmlkLnYxLkdldE5vZGVSZXF1ZXN0Ghcudm9sdm94Z3JpZC52MS5Ob2RlSW5mbx'
+    'I/CgRGaW5kEhoudm9sdm94Z3JpZC52MS5GaW5kUmVxdWVzdBobLnZvbHZveGdyaWQudjEuRmlu'
+    'ZFJlc3BvbnNlEk4KCUFnZ3JlZ2F0ZRIfLnZvbHZveGdyaWQudjEuQWdncmVnYXRlUmVxdWVzdB'
+    'ogLnZvbHZveGdyaWQudjEuQWdncmVnYXRlUmVzcG9uc2USUAoOR2V0TWVyZ2VkUmFuZ2USJC52'
+    'b2x2b3hncmlkLnYxLkdldE1lcmdlZFJhbmdlUmVxdWVzdBoYLnZvbHZveGdyaWQudjEuQ2VsbF'
+    'JhbmdlEkQKCk1lcmdlQ2VsbHMSIC52b2x2b3hncmlkLnYxLk1lcmdlQ2VsbHNSZXF1ZXN0GhQu'
+    'dm9sdm94Z3JpZC52MS5FbXB0eRJICgxVbm1lcmdlQ2VsbHMSIi52b2x2b3hncmlkLnYxLlVubW'
+    'VyZ2VDZWxsc1JlcXVlc3QaFC52b2x2b3hncmlkLnYxLkVtcHR5ElMKEEdldE1lcmdlZFJlZ2lv'
+    'bnMSGS52b2x2b3hncmlkLnYxLkdyaWRIYW5kbGUaJC52b2x2b3hncmlkLnYxLk1lcmdlZFJlZ2'
+    'lvbnNSZXNwb25zZRJPCg5HZXRNZW1vcnlVc2FnZRIZLnZvbHZveGdyaWQudjEuR3JpZEhhbmRs'
+    'ZRoiLnZvbHZveGdyaWQudjEuTWVtb3J5VXNhZ2VSZXNwb25zZRJOCglDbGlwYm9hcmQSHy52b2'
+    'x2b3hncmlkLnYxLkNsaXBib2FyZENvbW1hbmQaIC52b2x2b3hncmlkLnYxLkNsaXBib2FyZFJl'
+    'c3BvbnNlEkUKBkV4cG9ydBIcLnZvbHZveGdyaWQudjEuRXhwb3J0UmVxdWVzdBodLnZvbHZveG'
+    'dyaWQudjEuRXhwb3J0UmVzcG9uc2USQgoFUHJpbnQSGy52b2x2b3hncmlkLnYxLlByaW50UmVx'
+    'dWVzdBocLnZvbHZveGdyaWQudjEuUHJpbnRSZXNwb25zZRJICgdBcmNoaXZlEh0udm9sdm94Z3'
+    'JpZC52MS5BcmNoaXZlUmVxdWVzdBoeLnZvbHZveGdyaWQudjEuQXJjaGl2ZVJlc3BvbnNlEkwK'
+    'DlJlc2l6ZVZpZXdwb3J0EiQudm9sdm94Z3JpZC52MS5SZXNpemVWaWV3cG9ydFJlcXVlc3QaFC'
+    '52b2x2b3hncmlkLnYxLkVtcHR5EkIKCVNldFJlZHJhdxIfLnZvbHZveGdyaWQudjEuU2V0UmVk'
+    'cmF3UmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSOgoHUmVmcmVzaBIZLnZvbHZveGdyaW'
+    'QudjEuR3JpZEhhbmRsZRoULnZvbHZveGdyaWQudjEuRW1wdHkSQAoITG9hZERlbW8SHi52b2x2'
+    'b3hncmlkLnYxLkxvYWREZW1vUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSVAoLR2V0RG'
+    'Vtb0RhdGESIS52b2x2b3hncmlkLnYxLkdldERlbW9EYXRhUmVxdWVzdBoiLnZvbHZveGdyaWQu'
+    'djEuR2V0RGVtb0RhdGFSZXNwb25zZRJMCg1SZW5kZXJTZXNzaW9uEhoudm9sdm94Z3JpZC52MS'
+    '5SZW5kZXJJbnB1dBobLnZvbHZveGdyaWQudjEuUmVuZGVyT3V0cHV0KAEwARJECgtFdmVudFN0'
+    'cmVhbRIZLnZvbHZveGdyaWQudjEuR3JpZEhhbmRsZRoYLnZvbHZveGdyaWQudjEuR3JpZEV2ZW'
+    '50MAE=');

@@ -150,10 +150,10 @@ class VolvoxGridServiceFfi {
     return Empty.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> Subtotal(SubtotalRequest request) async {
+  static Future<SubtotalResult> Subtotal(SubtotalRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/Subtotal', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return SubtotalResult.fromBuffer(resultBytes);
   }
 
   static Future<Empty> AutoSize(AutoSizeRequest request) async {
