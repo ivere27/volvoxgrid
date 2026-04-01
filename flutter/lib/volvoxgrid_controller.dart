@@ -10,6 +10,7 @@
 library;
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
@@ -175,16 +176,20 @@ class VolvoxGridController extends ChangeNotifier {
 
   // ── Internal helpers ────────────────────────────────────────────────────────
 
-  Future<void> _configure(GridConfig config) async {
+  Future<void> configure(GridConfig config) async {
     await VolvoxGridService.Configure(ConfigureRequest()
       ..gridId = _gridId
       ..config = config);
     notifyListeners();
   }
 
-  Future<GridConfig> _getConfig() {
+  Future<GridConfig> getConfig() {
     return VolvoxGridService.GetConfig(_handle);
   }
+
+  Future<void> _configure(GridConfig config) => configure(config);
+
+  Future<GridConfig> _getConfig() => getConfig();
 
   SelectRequest _buildSelectRequest(
     int activeRow,
@@ -342,6 +347,25 @@ class VolvoxGridController extends ChangeNotifier {
         ..index = col
         ..caption = caption));
     notifyListeners();
+  }
+
+  Future<void> defineColumns(DefineColumnsRequest request) async {
+    await VolvoxGridService.DefineColumns(request
+      ..gridId = _gridId);
+    notifyListeners();
+  }
+
+  Future<void> defineRows(DefineRowsRequest request) async {
+    await VolvoxGridService.DefineRows(request
+      ..gridId = _gridId);
+    notifyListeners();
+  }
+
+  Future<WriteResult> updateCells(UpdateCellsRequest request) async {
+    final result = await VolvoxGridService.UpdateCells(request
+      ..gridId = _gridId);
+    notifyListeners();
+    return result;
   }
 
   /// Get the height of a specific row.
@@ -632,6 +656,16 @@ class VolvoxGridController extends ChangeNotifier {
   Future<void> setSelectionVisibility(SelectionVisibility style) async {
     await _configure(
         GridConfig()..selection = (SelectionConfig()..visibility = style));
+  }
+
+  /// Set the selection highlight style.
+  Future<void> setSelectionStyle(HighlightStyle style) async {
+    await _configure(GridConfig()..selection = (SelectionConfig()..style = style));
+  }
+
+  /// Set hover enablement and highlight styles.
+  Future<void> setHoverConfig(HoverConfig config) async {
+    await _configure(GridConfig()..selection = (SelectionConfig()..hover = config));
   }
 
   /// Set the active/current cell highlight style.
@@ -1335,6 +1369,13 @@ class VolvoxGridController extends ChangeNotifier {
       ..gridId = _gridId
       ..demo = demo);
     notifyListeners();
+  }
+
+  Future<Uint8List> getDemoData(String demo) async {
+    final response = await VolvoxGridService.GetDemoData(
+      GetDemoDataRequest()..demo = demo,
+    );
+    return Uint8List.fromList(response.data);
   }
 
   // ── Redraw Control ────────────────────────────────────────────────────────

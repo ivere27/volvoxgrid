@@ -301,14 +301,14 @@ pub fn load_data(
     apply_request_modes(grid, final_cols, opts.coercion, opts.error_mode);
     let write_result = grid.write_cells(&updates, false);
     restore_request_modes(grid, &restore_modes);
-    
+
     // Clear any active pull-to-refresh settling animations now that data arrived.
     // If we are settling, this snaps the UI immediately closed without event emission.
     grid.cancel_pull_to_refresh_contact(false);
     grid.pull_to_refresh_state = crate::grid::PullToRefreshState::Idle;
     grid.pull_to_refresh_reveal_px = 0.0;
     grid.pull_to_refresh_target_reveal_px = 0.0;
-    
+
     grid.auto_resize_all();
 
     pb::LoadDataResult {
@@ -1545,6 +1545,34 @@ mod tests {
         let cells = grid.get_cells(0, amount_col, 0, amount_col, false, false, true);
         let value = cells[0].value.as_ref().and_then(|cell| cell.value.as_ref());
         assert!(matches!(value, Some(pb::cell_value::Value::Number(_))));
+    }
+
+    #[test]
+    fn load_data_into_boolean_schema_syncs_checkbox_state() {
+        let mut grid = new_grid();
+        grid.set_cols(1);
+        grid.define_columns(&[pb::ColumnDef {
+            index: 0,
+            key: Some("flag".to_string()),
+            data_type: Some(pb::ColumnDataType::ColumnDataBoolean as i32),
+            ..Default::default()
+        }]);
+
+        let result = load_data(
+            &mut grid,
+            br#"[{"flag":true},{"flag":false}]"#,
+            Some(&json_options()),
+        );
+
+        assert_eq!(result.status, pb::LoadDataStatus::LoadOk as i32);
+        assert_eq!(
+            grid.cells.get(0, 0).map(|cell| cell.checked()),
+            Some(pb::CheckedState::CheckedChecked as i32)
+        );
+        assert_eq!(
+            grid.cells.get(1, 0).map(|cell| cell.checked()),
+            Some(pb::CheckedState::CheckedUnchecked as i32)
+        );
     }
 
     #[test]

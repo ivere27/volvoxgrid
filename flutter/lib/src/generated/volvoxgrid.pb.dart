@@ -143,6 +143,8 @@ class Font extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearStrikethrough() => $_clearField(7);
 
+  /// Horizontal font stretch (condensed/expanded width of the glyphs).
+  /// VSFlexGrid legacy `font_width` maps to this field.
   @$pb.TagNumber(8)
   $core.double get stretch => $_getN(7);
   @$pb.TagNumber(8)
@@ -13207,6 +13209,140 @@ class LoadDemoRequest extends $pb.GeneratedMessage {
   void clearDemo() => $_clearField(2);
 }
 
+class GetDemoDataRequest extends $pb.GeneratedMessage {
+  factory GetDemoDataRequest({
+    $core.String? demo,
+  }) {
+    final result = create();
+    if (demo != null) result.demo = demo;
+    return result;
+  }
+
+  GetDemoDataRequest._();
+
+  factory GetDemoDataRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetDemoDataRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetDemoDataRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'demo')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetDemoDataRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetDemoDataRequest copyWith(void Function(GetDemoDataRequest) updates) =>
+      super.copyWith((message) => updates(message as GetDemoDataRequest))
+          as GetDemoDataRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetDemoDataRequest create() => GetDemoDataRequest._();
+  @$core.override
+  GetDemoDataRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetDemoDataRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetDemoDataRequest>(create);
+  static GetDemoDataRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get demo => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set demo($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDemo() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDemo() => $_clearField(1);
+}
+
+class GetDemoDataResponse extends $pb.GeneratedMessage {
+  factory GetDemoDataResponse({
+    $core.String? demo,
+    DemoDataFormat? format,
+    $core.List<$core.int>? data,
+  }) {
+    final result = create();
+    if (demo != null) result.demo = demo;
+    if (format != null) result.format = format;
+    if (data != null) result.data = data;
+    return result;
+  }
+
+  GetDemoDataResponse._();
+
+  factory GetDemoDataResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetDemoDataResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetDemoDataResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'demo')
+    ..aE<DemoDataFormat>(2, _omitFieldNames ? '' : 'format',
+        enumValues: DemoDataFormat.values)
+    ..a<$core.List<$core.int>>(
+        3, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetDemoDataResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetDemoDataResponse copyWith(void Function(GetDemoDataResponse) updates) =>
+      super.copyWith((message) => updates(message as GetDemoDataResponse))
+          as GetDemoDataResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetDemoDataResponse create() => GetDemoDataResponse._();
+  @$core.override
+  GetDemoDataResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetDemoDataResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetDemoDataResponse>(create);
+  static GetDemoDataResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get demo => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set demo($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDemo() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDemo() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  DemoDataFormat get format => $_getN(1);
+  @$pb.TagNumber(2)
+  set format(DemoDataFormat value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasFormat() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearFormat() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.List<$core.int> get data => $_getN(2);
+  @$pb.TagNumber(3)
+  set data($core.List<$core.int> value) => $_setBytes(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasData() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearData() => $_clearField(3);
+}
+
 enum RenderInput_Input {
   viewport,
   pointer,
@@ -20777,6 +20913,10 @@ class VolvoxGridServiceApi {
           $pb.ClientContext? ctx, LoadDemoRequest request) =>
       _client.invoke<Empty>(
           ctx, 'VolvoxGridService', 'LoadDemo', request, Empty());
+  $async.Future<GetDemoDataResponse> getDemoData(
+          $pb.ClientContext? ctx, GetDemoDataRequest request) =>
+      _client.invoke<GetDemoDataResponse>(ctx, 'VolvoxGridService',
+          'GetDemoData', request, GetDemoDataResponse());
 
   /// ── Streaming ──
   $async.Future<RenderOutput> renderSession(

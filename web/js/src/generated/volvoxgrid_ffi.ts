@@ -140,6 +140,10 @@ export enum CustomRenderMode {
   CUSTOM_RENDER_CELL = 1,
   CUSTOM_RENDER_ROW = 2,
 }
+export enum DemoDataFormat {
+  DEMO_DATA_FORMAT_UNSPECIFIED = 0,
+  DEMO_DATA_FORMAT_JSON = 1,
+}
 export enum DragMode {
   DRAG_NONE = 0,
   DRAG_MANUAL = 1,
@@ -320,7 +324,8 @@ export enum RenderLayerBit {
   RENDER_LAYER_ACTIVE_DROPDOWN = 22,
   RENDER_LAYER_SCROLL_BARS = 23,
   RENDER_LAYER_FAST_SCROLL = 24,
-  RENDER_LAYER_DEBUG_OVERLAY = 25,
+  RENDER_LAYER_PULL_TO_REFRESH = 25,
+  RENDER_LAYER_DEBUG_OVERLAY = 26,
 }
 export enum RendererMode {
   RENDERER_AUTO = 0,
@@ -1006,6 +1011,14 @@ export const GetCellsRequestFields = {
   "include_style": 6,
   "include_checked": 7,
   "include_typed": 8,
+} as const;
+export const GetDemoDataRequestFields = {
+  "demo": 1,
+} as const;
+export const GetDemoDataResponseFields = {
+  "demo": 1,
+  "format": 2,
+  "data": 3,
 } as const;
 export const GetHeaderRowEventFields = {
   "page": 1,
@@ -1824,6 +1837,7 @@ export const VolvoxGridServiceMethods = {
   SetRedraw: "/volvoxgrid.v1.VolvoxGridService/SetRedraw",
   Refresh: "/volvoxgrid.v1.VolvoxGridService/Refresh",
   LoadDemo: "/volvoxgrid.v1.VolvoxGridService/LoadDemo",
+  GetDemoData: "/volvoxgrid.v1.VolvoxGridService/GetDemoData",
   RenderSession: "/volvoxgrid.v1.VolvoxGridService/RenderSession",
   EventStream: "/volvoxgrid.v1.VolvoxGridService/EventStream",
 } as const;

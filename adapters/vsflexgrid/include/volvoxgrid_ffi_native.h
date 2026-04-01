@@ -327,6 +327,12 @@ uint8_t* volvox_grid_load_demo(
     int32_t* out_len
 );
 
+/* GetDemoData */
+uint8_t* volvox_grid_get_demo_data(
+    const uint8_t* demo, int32_t demo_len,
+    int32_t* out_len
+);
+
 
 /* ═══════════════════════════════════════════════════════════ */
 /* Memory Management & Error Retrieval                        */

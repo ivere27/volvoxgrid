@@ -73,6 +73,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn set_redraw(&self, request: SetRedrawRequest) -> Result<Empty, String>;
     fn refresh(&self, request: GridHandle) -> Result<Empty, String>;
     fn load_demo(&self, request: LoadDemoRequest) -> Result<Empty, String>;
+    fn get_demo_data(&self, request: GetDemoDataRequest) -> Result<GetDemoDataResponse, String>;
 }
 
 static PLUGIN_VOLVOX_GRID_SERVICE: OnceLock<Box<dyn VolvoxGridServicePlugin>> = OnceLock::new();
@@ -2440,6 +2441,66 @@ pub unsafe extern "C" fn volvox_grid_load_demo(
         ..Default::default()
     };
     match plugin.load_demo(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            if r.encode(&mut buf).is_ok() {
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
+                alloc_payload_with_header(buf)
+            } else {
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
+                std::ptr::null_mut()
+            }
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
+    }
+}
+
+/// GetDemoData
+#[no_mangle]
+pub unsafe extern "C" fn volvox_grid_get_demo_data(
+    demo: *const u8,
+    demo_len: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let plugin = match get_volvox_grid_service_plugin() {
+        Some(p) => p,
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
+    };
+    let req = GetDemoDataRequest {
+        demo: if !demo.is_null() && demo_len > 0 {
+            match std::str::from_utf8(std::slice::from_raw_parts(demo, demo_len as usize)) {
+                Ok(s) => s.to_string(),
+                Err(e) => {
+                    set_last_error(format!("invalid utf-8 in 'demo': {}", e));
+                    if !out_len.is_null() {
+                        *out_len = 0;
+                    }
+                    return std::ptr::null_mut();
+                }
+            }
+        } else {
+            String::new()
+        },
+        ..Default::default()
+    };
+    match plugin.get_demo_data(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();

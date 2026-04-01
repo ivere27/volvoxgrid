@@ -50,6 +50,13 @@ namespace VolvoxGrid.DotNet
         KeyClick = 2,
     }
 
+    public enum VolvoxGridDropdownTrigger
+    {
+        Never = 0,
+        Always = 1,
+        OnEdit = 2,
+    }
+
     public sealed class VolvoxGridHeaderFeatures
     {
         public bool Sort { get; set; }
@@ -115,6 +122,12 @@ namespace VolvoxGrid.DotNet
         ArrowsLeaf = 2,
         Connectors = 3,
         ConnectorsLeaf = 4,
+    }
+
+    public enum VolvoxGridGroupTotalPosition
+    {
+        Above = 0,
+        Below = 1,
     }
 
     public enum VolvoxGridAggregateType

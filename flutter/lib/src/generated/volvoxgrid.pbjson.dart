@@ -951,7 +951,8 @@ const RenderLayerBit$json = {
     {'1': 'RENDER_LAYER_ACTIVE_DROPDOWN', '2': 22},
     {'1': 'RENDER_LAYER_SCROLL_BARS', '2': 23},
     {'1': 'RENDER_LAYER_FAST_SCROLL', '2': 24},
-    {'1': 'RENDER_LAYER_DEBUG_OVERLAY', '2': 25},
+    {'1': 'RENDER_LAYER_PULL_TO_REFRESH', '2': 25},
+    {'1': 'RENDER_LAYER_DEBUG_OVERLAY', '2': 26},
   ],
 };
 
@@ -971,7 +972,8 @@ final $typed_data.Uint8List renderLayerBitDescriptor = $convert.base64Decode(
     'oUUkVOREVSX0xBWUVSX09VVExJTkUQExIfChtSRU5ERVJfTEFZRVJfRlJPWkVOX0JPUkRFUlMQ'
     'FBIeChpSRU5ERVJfTEFZRVJfQUNUSVZFX0VESVRPUhAVEiAKHFJFTkRFUl9MQVlFUl9BQ1RJVk'
     'VfRFJPUERPV04QFhIcChhSRU5ERVJfTEFZRVJfU0NST0xMX0JBUlMQFxIcChhSRU5ERVJfTEFZ'
-    'RVJfRkFTVF9TQ1JPTEwQGBIeChpSRU5ERVJfTEFZRVJfREVCVUdfT1ZFUkxBWRAZ');
+    'RVJfRkFTVF9TQ1JPTEwQGBIgChxSRU5ERVJfTEFZRVJfUFVMTF9UT19SRUZSRVNIEBkSHgoaUk'
+    'VOREVSX0xBWUVSX0RFQlVHX09WRVJMQVkQGg==');
 
 @$core.Deprecated('Use rowIndicatorSlotKindDescriptor instead')
 const RowIndicatorSlotKind$json = {
@@ -1112,6 +1114,20 @@ final $typed_data.Uint8List errorCodeDescriptor = $convert.base64Decode(
     'T1JfVFlQRV9WSU9MQVRJT04QBBIXChNFUlJPUl9ERUNPREVfRkFJTEVEEAUSFwoTRVJST1JfRU'
     '5DT0RFX0ZBSUxFRBAGEhkKFUVSUk9SX05PVF9JTVBMRU1FTlRFRBAHEhIKDkVSUk9SX0lOVEVS'
     'TkFMEAg=');
+
+@$core.Deprecated('Use demoDataFormatDescriptor instead')
+const DemoDataFormat$json = {
+  '1': 'DemoDataFormat',
+  '2': [
+    {'1': 'DEMO_DATA_FORMAT_UNSPECIFIED', '2': 0},
+    {'1': 'DEMO_DATA_FORMAT_JSON', '2': 1},
+  ],
+};
+
+/// Descriptor for `DemoDataFormat`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List demoDataFormatDescriptor = $convert.base64Decode(
+    'Cg5EZW1vRGF0YUZvcm1hdBIgChxERU1PX0RBVEFfRk9STUFUX1VOU1BFQ0lGSUVEEAASGQoVRE'
+    'VNT19EQVRBX0ZPUk1BVF9KU09OEAE=');
 
 @$core.Deprecated('Use fontDescriptor instead')
 const Font$json = {
@@ -6926,6 +6942,41 @@ final $typed_data.Uint8List loadDemoRequestDescriptor = $convert.base64Decode(
     'Cg9Mb2FkRGVtb1JlcXVlc3QSFwoHZ3JpZF9pZBgBIAEoA1IGZ3JpZElkEhIKBGRlbW8YAiABKA'
     'lSBGRlbW8=');
 
+@$core.Deprecated('Use getDemoDataRequestDescriptor instead')
+const GetDemoDataRequest$json = {
+  '1': 'GetDemoDataRequest',
+  '2': [
+    {'1': 'demo', '3': 1, '4': 1, '5': 9, '10': 'demo'},
+  ],
+};
+
+/// Descriptor for `GetDemoDataRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getDemoDataRequestDescriptor = $convert
+    .base64Decode('ChJHZXREZW1vRGF0YVJlcXVlc3QSEgoEZGVtbxgBIAEoCVIEZGVtbw==');
+
+@$core.Deprecated('Use getDemoDataResponseDescriptor instead')
+const GetDemoDataResponse$json = {
+  '1': 'GetDemoDataResponse',
+  '2': [
+    {'1': 'demo', '3': 1, '4': 1, '5': 9, '10': 'demo'},
+    {
+      '1': 'format',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.DemoDataFormat',
+      '10': 'format'
+    },
+    {'1': 'data', '3': 3, '4': 1, '5': 12, '10': 'data'},
+  ],
+};
+
+/// Descriptor for `GetDemoDataResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getDemoDataResponseDescriptor = $convert.base64Decode(
+    'ChNHZXREZW1vRGF0YVJlc3BvbnNlEhIKBGRlbW8YASABKAlSBGRlbW8SNQoGZm9ybWF0GAIgAS'
+    'gOMh0udm9sdm94Z3JpZC52MS5EZW1vRGF0YUZvcm1hdFIGZm9ybWF0EhIKBGRhdGEYAyABKAxS'
+    'BGRhdGE=');
+
 @$core.Deprecated('Use renderInputDescriptor instead')
 const RenderInput$json = {
   '1': 'RenderInput',
@@ -9235,6 +9286,11 @@ const $core.Map<$core.String, $core.dynamic> VolvoxGridServiceBase$json = {
       '3': '.volvoxgrid.v1.Empty'
     },
     {
+      '1': 'GetDemoData',
+      '2': '.volvoxgrid.v1.GetDemoDataRequest',
+      '3': '.volvoxgrid.v1.GetDemoDataResponse'
+    },
+    {
       '1': 'RenderSession',
       '2': '.volvoxgrid.v1.RenderInput',
       '3': '.volvoxgrid.v1.RenderOutput',
@@ -9378,6 +9434,8 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.ResizeViewportRequest': ResizeViewportRequest$json,
   '.volvoxgrid.v1.SetRedrawRequest': SetRedrawRequest$json,
   '.volvoxgrid.v1.LoadDemoRequest': LoadDemoRequest$json,
+  '.volvoxgrid.v1.GetDemoDataRequest': GetDemoDataRequest$json,
+  '.volvoxgrid.v1.GetDemoDataResponse': GetDemoDataResponse$json,
   '.volvoxgrid.v1.RenderInput': RenderInput$json,
   '.volvoxgrid.v1.ViewportState': ViewportState$json,
   '.volvoxgrid.v1.PointerEvent': PointerEvent$json,
@@ -9518,7 +9576,8 @@ final $typed_data.Uint8List volvoxGridServiceDescriptor = $convert.base64Decode(
     'lkLnYxLkVtcHR5EkIKCVNldFJlZHJhdxIfLnZvbHZveGdyaWQudjEuU2V0UmVkcmF3UmVxdWVz'
     'dBoULnZvbHZveGdyaWQudjEuRW1wdHkSOgoHUmVmcmVzaBIZLnZvbHZveGdyaWQudjEuR3JpZE'
     'hhbmRsZRoULnZvbHZveGdyaWQudjEuRW1wdHkSQAoITG9hZERlbW8SHi52b2x2b3hncmlkLnYx'
-    'LkxvYWREZW1vUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSTAoNUmVuZGVyU2Vzc2lvbh'
-    'IaLnZvbHZveGdyaWQudjEuUmVuZGVySW5wdXQaGy52b2x2b3hncmlkLnYxLlJlbmRlck91dHB1'
-    'dCgBMAESRAoLRXZlbnRTdHJlYW0SGS52b2x2b3hncmlkLnYxLkdyaWRIYW5kbGUaGC52b2x2b3'
-    'hncmlkLnYxLkdyaWRFdmVudDAB');
+    'LkxvYWREZW1vUmVxdWVzdBoULnZvbHZveGdyaWQudjEuRW1wdHkSVAoLR2V0RGVtb0RhdGESIS'
+    '52b2x2b3hncmlkLnYxLkdldERlbW9EYXRhUmVxdWVzdBoiLnZvbHZveGdyaWQudjEuR2V0RGVt'
+    'b0RhdGFSZXNwb25zZRJMCg1SZW5kZXJTZXNzaW9uEhoudm9sdm94Z3JpZC52MS5SZW5kZXJJbn'
+    'B1dBobLnZvbHZveGdyaWQudjEuUmVuZGVyT3V0cHV0KAEwARJECgtFdmVudFN0cmVhbRIZLnZv'
+    'bHZveGdyaWQudjEuR3JpZEhhbmRsZRoYLnZvbHZveGdyaWQudjEuR3JpZEV2ZW50MAE=');

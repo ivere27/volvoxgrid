@@ -904,7 +904,8 @@ enum RenderLayerBit {
   RENDER_LAYER_ACTIVE_DROPDOWN  = 22;
   RENDER_LAYER_SCROLL_BARS      = 23;
   RENDER_LAYER_FAST_SCROLL      = 24;
-  RENDER_LAYER_DEBUG_OVERLAY    = 25;
+  RENDER_LAYER_PULL_TO_REFRESH  = 25;
+  RENDER_LAYER_DEBUG_OVERLAY    = 26;
 }
 
 // ── Rendering ──
@@ -1638,6 +1639,21 @@ message LoadDemoRequest {
   string demo    = 2;
 }
 
+enum DemoDataFormat {
+  DEMO_DATA_FORMAT_UNSPECIFIED = 0;
+  DEMO_DATA_FORMAT_JSON        = 1;
+}
+
+message GetDemoDataRequest {
+  string demo = 1;
+}
+
+message GetDemoDataResponse {
+  string         demo   = 1;
+  DemoDataFormat format = 2;
+  bytes          data   = 3;
+}
+
 // ═══════════════════════════════════════════════════════════
 // Render Session (bidirectional stream)
 // ═══════════════════════════════════════════════════════════
@@ -2089,6 +2105,7 @@ service VolvoxGridService {
 
   // ── Demo ──
   rpc LoadDemo(LoadDemoRequest)           returns (Empty);
+  rpc GetDemoData(GetDemoDataRequest)     returns (GetDemoDataResponse);
 
   // ── Streaming ──
   rpc RenderSession(stream RenderInput)   returns (stream RenderOutput);

@@ -2581,6 +2581,15 @@ impl VolvoxGrid {
             }
         }
 
+        if col >= 0 && (col as usize) < self.columns.len() {
+            let col_props = &self.columns[col as usize];
+            if col_props.data_type == pb::ColumnDataType::ColumnDataDate as i32 {
+                if let Some(formatted) = format_as_iso_date(raw) {
+                    return formatted;
+                }
+            }
+        }
+
         raw.to_string()
     }
 
@@ -3442,13 +3451,13 @@ fn format_bool_string(raw: &str, true_str: &str, false_str: &str) -> String {
 
 /// Format a date string as MM/DD/YYYY (Short Date).
 fn format_as_short_date(raw: &str) -> Option<String> {
-    let (y, m, d) = parse_date_parts(raw)?;
+    let (y, m, d) = parse_date_value(raw)?;
     Some(format!("{:02}/{:02}/{:04}", m, d, y))
 }
 
 /// Format a date string as "Month DD, YYYY" (Long Date).
 fn format_as_long_date(raw: &str) -> Option<String> {
-    let (y, m, d) = parse_date_parts(raw)?;
+    let (y, m, d) = parse_date_value(raw)?;
     let month_name = match m {
         1 => "January",
         2 => "February",
@@ -3465,6 +3474,20 @@ fn format_as_long_date(raw: &str) -> Option<String> {
         _ => return None,
     };
     Some(format!("{} {:02}, {:04}", month_name, d, y))
+}
+
+/// Format a date string as YYYY-MM-DD (ISO Date).
+fn format_as_iso_date(raw: &str) -> Option<String> {
+    let (y, m, d) = parse_date_value(raw)?;
+    Some(format!("{:04}-{:02}-{:02}", y, m, d))
+}
+
+fn parse_date_value(raw: &str) -> Option<(i32, i32, i32)> {
+    parse_date_parts(raw).or_else(|| {
+        let millis = raw.trim().parse::<i64>().ok()?;
+        let days = millis.div_euclid(86_400_000);
+        Some(civil_from_days(days))
+    })
 }
 
 /// Parse common date formats into (year, month, day).
@@ -3496,6 +3519,20 @@ fn parse_date_parts(s: &str) -> Option<(i32, i32, i32)> {
         return None;
     }
     Some((y, m, d))
+}
+
+fn civil_from_days(days: i64) -> (i32, i32, i32) {
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = mp + if mp < 10 { 3 } else { -9 };
+    let year = y + if m <= 2 { 1 } else { 0 };
+    (year as i32, m as i32, d as i32)
 }
 
 /// Insert thousands separators into a formatted number string.
@@ -4252,6 +4289,21 @@ mod tests {
         grid.cells.set_text(1, 1, "1234.5".to_string());
         let display = grid.get_display_text(1, 1);
         assert_eq!(display, "$1,234.50");
+    }
+
+    #[test]
+    fn col_format_short_date_accepts_timestamp_millis() {
+        let result = apply_col_format("1764547200000", "short date");
+        assert_eq!(result, Some("12/01/2025".to_string()));
+    }
+
+    #[test]
+    fn date_columns_default_to_iso_display_for_timestamp_storage() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 2, 1, 0, 0);
+        grid.columns[0].data_type = pb::ColumnDataType::ColumnDataDate as i32;
+        grid.cells.set_text(0, 0, "1764547200000".to_string());
+
+        assert_eq!(grid.get_display_text(0, 0), "2025-12-01");
     }
 
     #[test]

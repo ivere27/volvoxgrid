@@ -2618,10 +2618,27 @@ impl VolvoxGrid {
             PlannedCellValueWrite::SetNull => {
                 self.cells.set_value(row, col, CellValueData::Empty);
                 self.cells.set_text(row, col, String::new());
+                if self
+                    .columns
+                    .get(col as usize)
+                    .map(|column| column.data_type == v1::ColumnDataType::ColumnDataBoolean as i32)
+                    .unwrap_or(false)
+                {
+                    self.cells.get_mut(row, col).extra_mut().checked =
+                        v1::CheckedState::CheckedUnchecked as i32;
+                }
             }
             PlannedCellValueWrite::Write { value, text } => {
                 self.cells.set_value(row, col, value.clone());
                 self.cells.set_text(row, col, text.clone());
+                if matches!(value, CellValueData::Bool(_)) {
+                    self.cells.get_mut(row, col).extra_mut().checked =
+                        if matches!(value, CellValueData::Bool(true)) {
+                            v1::CheckedState::CheckedChecked as i32
+                        } else {
+                            v1::CheckedState::CheckedUnchecked as i32
+                        };
+                }
             }
         }
     }
@@ -2639,6 +2656,16 @@ impl VolvoxGrid {
                     .entry((row, col))
                     .and_modify(|existing| existing.merge_from(&patch))
                     .or_insert(patch);
+            }
+            if s.progress.is_some() || s.progress_color.is_some() {
+                let cell = self.cells.get_mut(row, col);
+                let extra = cell.extra_mut();
+                if let Some(v) = s.progress {
+                    extra.progress_percent = v;
+                }
+                if let Some(v) = s.progress_color {
+                    extra.progress_color = v;
+                }
             }
         }
 
@@ -3858,6 +3885,29 @@ mod tests {
 
         let s = grid.get_cell_style(1, 1);
         assert_eq!(s.shrink_to_fit, Some(true));
+    }
+
+    #[test]
+    fn apply_cell_style_progress_via_update_cells_updates_cell_extra() {
+        let mut grid = test_grid();
+        let updates = vec![v1::CellUpdate {
+            row: 1,
+            col: 1,
+            value: Some(v1::CellValue {
+                value: Some(v1::cell_value::Value::Number(42.0)),
+            }),
+            style: Some(v1::CellStyle {
+                progress: Some(0.42),
+                progress_color: Some(0xFF818CF8),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }];
+        grid.update_cells(&updates);
+
+        let cell = grid.cells.get(1, 1).expect("cell should exist");
+        assert!((cell.progress_percent() - 0.42).abs() < 1e-6);
+        assert_eq!(cell.progress_color(), 0xFF818CF8);
     }
 
     // ── text_overflow + ellipsis interaction ────────────────────────

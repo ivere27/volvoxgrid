@@ -1121,6 +1121,20 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         );
     }
 
+    public GetDemoDataResponse getDemoData(GetDemoDataRequest request)
+        throws SynurangDesktopBridge.SynurangBridgeException {
+        Objects.requireNonNull(request, "request");
+        return client.getDemoData(request);
+    }
+
+    public byte[] getDemoData(String demoName) throws SynurangDesktopBridge.SynurangBridgeException {
+        return client.getDemoData(
+            GetDemoDataRequest.newBuilder()
+                .setDemo(demoName)
+                .build()
+        ).getData().toByteArray();
+    }
+
     public ClipboardResponse copy() throws SynurangDesktopBridge.SynurangBridgeException {
         return client.clipboard(
             ClipboardCommand.newBuilder()

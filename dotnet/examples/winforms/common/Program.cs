@@ -394,6 +394,7 @@ namespace VolvoxGrid.DotNet.Sample
         {
             AppLog.Info("SMOKE: controller-api checks begin");
             SmokeAssert(_grid.CurrentGridId != 0, "Grid session is active");
+            RunSalesDemoSmoke();
 
             _grid.Refresh();
             _grid.CancelFling();
@@ -506,8 +507,8 @@ namespace VolvoxGrid.DotNet.Sample
 
             var exportData = _grid.SaveGrid(VolvoxGridExportFormat.Binary, VolvoxGridExportScope.All);
             SmokeAssert(exportData != null && exportData.Data != null && exportData.Data.Length > 0, "SaveGrid");
-            _grid.LoadData(System.Text.Encoding.UTF8.GetBytes("Id,Name,Amount,Flag\n1,Reloaded,42,true\n2,Second,7,false\n3,Third,9,true"));
-            SmokeAssert(WaitForCellText(1, 1, "Reloaded"), "LoadData");
+            _grid.LoadData(System.Text.Encoding.UTF8.GetBytes("c0,c1,c2,c3\n1,Reloaded,42,true\n2,Second,7,false\n3,Third,9,true"));
+            SmokeAssert(WaitForCellText(0, 1, "Reloaded"), "LoadData");
 
             RunOptionalSmokeStep("Archive save/load/list/delete", delegate
             {
@@ -532,6 +533,57 @@ namespace VolvoxGrid.DotNet.Sample
             _grid.ClearSelection();
             _grid.Refresh();
             AppLog.Info("SMOKE: controller-api checks complete");
+        }
+
+        private void RunSalesDemoSmoke()
+        {
+            AppLog.Info("SMOKE: sales-demo checks begin");
+            _grid.Refresh();
+            _grid.CancelFling();
+
+            int rowCount = _grid.RowCount;
+            AppLog.Info("SMOKE: sales-demo rowCount=" + rowCount);
+
+            bool foundCheckedFlag = false;
+            bool foundMarginSubtotal = false;
+
+            for (int row = 0; row < rowCount; row++)
+            {
+                string product = _grid.GetCellText(row, 3);
+                string sales = _grid.GetCellText(row, 4);
+                string cost = _grid.GetCellText(row, 5);
+                string margin = _grid.GetCellText(row, 6);
+                string flagText = _grid.GetCellText(row, 7);
+                var checkedState = _grid.GetCellCheckedState(row, 7);
+                bool isSubtotal = string.IsNullOrEmpty(product) && (!string.IsNullOrEmpty(sales) || !string.IsNullOrEmpty(cost));
+
+                if (row < 8 || isSubtotal)
+                {
+                    AppLog.Info(
+                        "SMOKE: sales row=" + row
+                        + " product='" + product + "'"
+                        + " sales='" + sales + "'"
+                        + " cost='" + cost + "'"
+                        + " margin='" + margin + "'"
+                        + " flagText='" + flagText + "'"
+                        + " checked=" + checkedState
+                        + " subtotal=" + isSubtotal);
+                }
+
+                if (!isSubtotal && checkedState == VolvoxGridCheckedState.Checked)
+                {
+                    foundCheckedFlag = true;
+                }
+
+                if (isSubtotal && !string.IsNullOrWhiteSpace(margin))
+                {
+                    foundMarginSubtotal = true;
+                }
+            }
+
+            SmokeAssert(foundCheckedFlag, "Sales demo checked checkbox state");
+            SmokeAssert(foundMarginSubtotal, "Sales demo Margin% subtotal");
+            AppLog.Info("SMOKE: sales-demo checks complete");
         }
 
         private bool WaitForCellText(int row, int col, string expected)
@@ -639,17 +691,41 @@ namespace VolvoxGrid.DotNet.Sample
                     }
 
                     _grid.CancelFling();
-                    if (!_grid.LoadDemo(ToEngineDemoName(mode)))
+                    if (mode == DemoMode.Sales)
                     {
-                        string details = _grid.LastError;
-                        SetStatus("Engine demo load failed" + (string.IsNullOrEmpty(details) ? "." : ": " + details));
-                        return;
+                        SalesJsonDemo.Load(_grid);
+                    }
+                    else if (mode == DemoMode.Hierarchy)
+                    {
+                        HierarchyJsonDemo.Load(_grid);
+                    }
+                    else
+                    {
+                        _grid.GroupTotalPosition = VolvoxGridGroupTotalPosition.Above;
+                        _grid.MultiTotals = false;
+                        if (!_grid.LoadDemo(ToEngineDemoName(mode)))
+                        {
+                            string details = _grid.LastError;
+                            SetStatus("Engine demo load failed" + (string.IsNullOrEmpty(details) ? "." : ": " + details));
+                            return;
+                        }
                     }
 
                     _currentDemo = mode;
                     _demoLoaded = true;
                     HighlightDemoButton(mode);
-                    SetStatus("Loaded raw engine demo: " + ToEngineDemoName(mode) + " (gridId=" + cachedGridId + ").");
+                    if (mode == DemoMode.Sales)
+                    {
+                        SetStatus("Loaded JSON sales demo (gridId=" + cachedGridId + ").");
+                    }
+                    else if (mode == DemoMode.Hierarchy)
+                    {
+                        SetStatus("Loaded JSON hierarchy demo (gridId=" + cachedGridId + ").");
+                    }
+                    else
+                    {
+                        SetStatus("Loaded raw engine demo: " + ToEngineDemoName(mode) + " (gridId=" + cachedGridId + ").");
+                    }
                     return;
                 }
 
@@ -671,18 +747,41 @@ namespace VolvoxGrid.DotNet.Sample
                     }
                 }
 
-                if (_grid.LoadDemo(ToEngineDemoName(mode)))
+                if (mode == DemoMode.Sales)
                 {
+                    SalesJsonDemo.Load(_grid);
                     _demoGridIds[mode] = _grid.CurrentGridId != 0 ? _grid.CurrentGridId : newGridId;
                     _currentDemo = mode;
                     _demoLoaded = true;
                     HighlightDemoButton(mode);
-                    SetStatus("Loaded raw engine demo: " + ToEngineDemoName(mode) + " (gridId=" + _demoGridIds[mode] + ").");
+                    SetStatus("Loaded JSON sales demo (gridId=" + _demoGridIds[mode] + ").");
+                }
+                else if (mode == DemoMode.Hierarchy)
+                {
+                    HierarchyJsonDemo.Load(_grid);
+                    _demoGridIds[mode] = _grid.CurrentGridId != 0 ? _grid.CurrentGridId : newGridId;
+                    _currentDemo = mode;
+                    _demoLoaded = true;
+                    HighlightDemoButton(mode);
+                    SetStatus("Loaded JSON hierarchy demo (gridId=" + _demoGridIds[mode] + ").");
                 }
                 else
                 {
-                    string details = _grid.LastError;
-                    SetStatus("Engine demo load failed" + (string.IsNullOrEmpty(details) ? "." : ": " + details));
+                    _grid.GroupTotalPosition = VolvoxGridGroupTotalPosition.Above;
+                    _grid.MultiTotals = false;
+                    if (_grid.LoadDemo(ToEngineDemoName(mode)))
+                    {
+                        _demoGridIds[mode] = _grid.CurrentGridId != 0 ? _grid.CurrentGridId : newGridId;
+                        _currentDemo = mode;
+                        _demoLoaded = true;
+                        HighlightDemoButton(mode);
+                        SetStatus("Loaded raw engine demo: " + ToEngineDemoName(mode) + " (gridId=" + _demoGridIds[mode] + ").");
+                    }
+                    else
+                    {
+                        string details = _grid.LastError;
+                        SetStatus("Engine demo load failed" + (string.IsNullOrEmpty(details) ? "." : ": " + details));
+                    }
                 }
             }
             catch (Exception ex)
@@ -723,13 +822,10 @@ namespace VolvoxGrid.DotNet.Sample
         {
             switch (mode)
             {
-                case DemoMode.Hierarchy:
-                    return "hierarchy";
                 case DemoMode.Stress:
                     return "stress";
-                case DemoMode.Sales:
                 default:
-                    return "sales";
+                    throw new InvalidOperationException("This demo uses an explicit JSON loader.");
             }
         }
 

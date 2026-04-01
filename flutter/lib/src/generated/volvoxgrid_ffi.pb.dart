@@ -264,6 +264,12 @@ class VolvoxGridServiceFfi {
     return Empty.fromBuffer(resultBytes);
   }
 
+  static Future<GetDemoDataResponse> GetDemoData(GetDemoDataRequest request) async {
+    final bytes = request.writeToBuffer();
+    final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/GetDemoData', bytes);
+    return GetDemoDataResponse.fromBuffer(resultBytes);
+  }
+
   static Stream<RenderOutput> RenderSession(Stream<RenderInput> requests) {
     return synurang.invokeBackendBidiStream('/volvoxgrid.v1.VolvoxGridService/RenderSession',
         requests.map((r) => r.writeToBuffer()))

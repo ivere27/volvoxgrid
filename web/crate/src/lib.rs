@@ -59,6 +59,11 @@ static LOADED_FONTS: Mutex<Vec<Vec<u8>>> = Mutex::new(Vec::new());
 const DEBUG_MEM_SAMPLE_MS: f64 = 10_000.0;
 const DECISION_TIMEOUT: Duration = Duration::from_millis(250);
 
+#[cfg(not(feature = "demo"))]
+fn demo_feature_not_enabled() -> String {
+    "demo feature is not enabled".to_string()
+}
+
 #[derive(Clone, Debug)]
 enum PendingAction {
     BeginEdit {
@@ -4231,64 +4236,67 @@ where
 #[wasm_bindgen]
 pub fn demo_create_stress_grid(data_rows: i32, preload_rows: i32) -> i32 {
     ensure_manager();
-    let grid = volvoxgrid_engine::demo::create_stress_grid(0, 0, 0, data_rows, preload_rows);
-    let mgr = MANAGER.lock().unwrap();
-    let mgr = mgr.as_ref().unwrap();
-    let rows = grid.rows;
-    let cols = grid.cols;
-    let fr = grid.fixed_rows;
-    let fc = grid.fixed_cols;
-    let id = mgr.create_grid(0, 0, rows, cols, fr, fc, 1.0);
-    let _ = mgr.with_grid(id, |dest| {
-        *dest = grid;
-        dest.id = id;
-    });
-    id as i32
+    #[cfg(feature = "demo")]
+    {
+        let grid = volvoxgrid_engine::demo::create_stress_grid(0, 0, 0, data_rows, preload_rows);
+        let mgr = MANAGER.lock().unwrap();
+        let mgr = mgr.as_ref().unwrap();
+        let rows = grid.rows;
+        let cols = grid.cols;
+        let fr = grid.fixed_rows;
+        let fc = grid.fixed_cols;
+        let id = mgr.create_grid(0, 0, rows, cols, fr, fc, 1.0);
+        let _ = mgr.with_grid(id, |dest| {
+            *dest = grid;
+            dest.id = id;
+        });
+        id as i32
+    }
+    #[cfg(not(feature = "demo"))]
+    {
+        let _ = (data_rows, preload_rows);
+        0
+    }
 }
 
 /// Set up an existing grid as a stress test demo.
 #[wasm_bindgen]
 pub fn demo_setup_stress_grid(id: i32) {
+    #[cfg(feature = "demo")]
     with_grid(id, |grid| {
         volvoxgrid_engine::demo::setup_stress_demo(grid);
     });
-}
-
-/// Set up an existing grid as the sales showcase demo (~1000 rows).
-#[wasm_bindgen]
-pub fn demo_setup_sales_demo(id: i32) {
-    with_grid(id, |grid| {
-        volvoxgrid_engine::demo::setup_sales_demo(grid);
-    });
-}
-
-/// Set up an existing grid as the hierarchy showcase demo (~200 rows).
-#[wasm_bindgen]
-pub fn demo_setup_hierarchy_demo(id: i32) {
-    with_grid(id, |grid| {
-        volvoxgrid_engine::demo::setup_hierarchy_demo(grid);
-    });
+    #[cfg(not(feature = "demo"))]
+    let _ = id;
 }
 
 /// Materialize a single stress test data row.
 #[wasm_bindgen]
 pub fn demo_materialize_row(id: i32, row: i32) {
+    #[cfg(feature = "demo")]
     with_grid(id, |grid| {
         volvoxgrid_engine::demo::stress_materialize_row(grid, row);
     });
+    #[cfg(not(feature = "demo"))]
+    let _ = (id, row);
 }
 
 /// Materialize visible rows + padding for the stress test.
 #[wasm_bindgen]
 pub fn demo_materialize_visible_rows(id: i32, padding: i32) {
-    let pad = if padding <= 0 {
-        volvoxgrid_engine::demo::STRESS_MATERIALIZE_PADDING
-    } else {
-        padding
-    };
-    with_grid(id, |grid| {
-        volvoxgrid_engine::demo::stress_materialize_visible_rows(grid, pad);
-    });
+    #[cfg(feature = "demo")]
+    {
+        let pad = if padding <= 0 {
+            volvoxgrid_engine::demo::STRESS_MATERIALIZE_PADDING
+        } else {
+            padding
+        };
+        with_grid(id, |grid| {
+            volvoxgrid_engine::demo::stress_materialize_visible_rows(grid, pad);
+        });
+    }
+    #[cfg(not(feature = "demo"))]
+    let _ = (id, padding);
 }
 
 // ===========================================================================
@@ -5487,13 +5495,34 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
     }
 
     fn load_demo(&self, request: LoadDemoRequest) -> Result<Empty, String> {
-        wasm_with_grid(request.grid_id, |grid| match request.demo.as_str() {
-            "sales" => volvoxgrid_engine::demo::setup_sales_demo(grid),
-            "hierarchy" => volvoxgrid_engine::demo::setup_hierarchy_demo(grid),
-            "stress" => volvoxgrid_engine::demo::setup_stress_demo(grid),
-            _ => {}
-        })?;
-        Ok(Empty {})
+        #[cfg(feature = "demo")]
+        {
+            wasm_with_grid(request.grid_id, |grid| -> Result<(), String> {
+                match request.demo.as_str() {
+                    "stress" => volvoxgrid_engine::demo::setup_stress_demo(grid),
+                    other => return Err(format!("unknown demo: {other}")),
+                }
+                Ok(())
+            })??;
+            Ok(Empty {})
+        }
+        #[cfg(not(feature = "demo"))]
+        {
+            let _ = request;
+            Err(demo_feature_not_enabled())
+        }
+    }
+
+    fn get_demo_data(&self, request: GetDemoDataRequest) -> Result<GetDemoDataResponse, String> {
+        #[cfg(feature = "demo")]
+        {
+            volvoxgrid_engine::demo::get_demo_data_response(&request.demo)
+        }
+        #[cfg(not(feature = "demo"))]
+        {
+            let _ = request;
+            Err(demo_feature_not_enabled())
+        }
     }
 
     fn render_session(

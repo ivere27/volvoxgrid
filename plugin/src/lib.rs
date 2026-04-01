@@ -2828,14 +2828,24 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         {
             self.with_grid_result(request.grid_id, |grid| {
                 match request.demo.as_str() {
-                    "sales" => volvoxgrid_engine::demo::setup_sales_demo(grid),
-                    "hierarchy" => volvoxgrid_engine::demo::setup_hierarchy_demo(grid),
                     "stress" => volvoxgrid_engine::demo::setup_stress_demo(grid),
                     other => return Err(format!("unknown demo: {other}")),
                 }
                 Ok(())
             })?;
             Ok(Empty {})
+        }
+        #[cfg(not(feature = "demo"))]
+        {
+            let _ = request;
+            Err(not_implemented("demo feature is not enabled"))
+        }
+    }
+
+    fn get_demo_data(&self, request: GetDemoDataRequest) -> PluginResult<GetDemoDataResponse> {
+        #[cfg(feature = "demo")]
+        {
+            volvoxgrid_engine::demo::get_demo_data_response(&request.demo).map_err(Into::into)
         }
         #[cfg(not(feature = "demo"))]
         {

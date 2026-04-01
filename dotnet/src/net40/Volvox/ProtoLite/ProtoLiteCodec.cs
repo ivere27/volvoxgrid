@@ -81,6 +81,28 @@ namespace VolvoxGrid.DotNet.Internal
                     });
                 }
 
+                if (configDataOrDefault.Style != null)
+                {
+                    var style = configDataOrDefault.Style;
+                    cfg.WriteMessage(2, s =>
+                    {
+                        if (style.Background.HasValue) s.WriteInt32(1, unchecked((int)style.Background.Value));
+                        if (style.Foreground.HasValue) s.WriteInt32(2, unchecked((int)style.Foreground.Value));
+                        if (style.AlternateBackground.HasValue) s.WriteInt32(3, unchecked((int)style.AlternateBackground.Value));
+                        if (style.ProgressColor.HasValue) s.WriteInt32(7, unchecked((int)style.ProgressColor.Value));
+                        if (style.GridLines != null && (style.GridLines.Style.HasValue || style.GridLines.Color.HasValue || style.GridLines.Width.HasValue))
+                        {
+                            s.WriteMessage(10, g => EncodeGridLines(g, style.GridLines));
+                        }
+                        if (style.Fixed != null && (style.Fixed.Background.HasValue || style.Fixed.Foreground.HasValue || (style.Fixed.GridLines != null && (style.Fixed.GridLines.Style.HasValue || style.Fixed.GridLines.Color.HasValue || style.Fixed.GridLines.Width.HasValue))))
+                        {
+                            s.WriteMessage(11, r => EncodeRegionStyle(r, style.Fixed));
+                        }
+                        if (style.SheetBackground.HasValue) s.WriteInt32(20, unchecked((int)style.SheetBackground.Value));
+                        if (style.SheetBorder.HasValue) s.WriteInt32(21, unchecked((int)style.SheetBorder.Value));
+                    });
+                }
+
                 if (configDataOrDefault.Selection != null)
                 {
                     var sel = configDataOrDefault.Selection;
@@ -89,15 +111,38 @@ namespace VolvoxGrid.DotNet.Internal
                         if (sel.Mode.HasValue) s.WriteInt32(1, (int)sel.Mode.Value);
                         if (sel.SelectionVisibility.HasValue) s.WriteInt32(3, (int)sel.SelectionVisibility.Value);
                         if (sel.AllowSelection.HasValue) s.WriteBool(4, sel.AllowSelection.Value);
-                        if (sel.HoverMask.HasValue)
+                        if (HasHighlightStyle(sel.SelectionStyle))
                         {
-                            uint hoverMode = sel.HoverMask.Value;
+                            s.WriteMessage(6, styleWriter => EncodeHighlightStyle(styleWriter, sel.SelectionStyle));
+                        }
+                        if (sel.HoverMask.HasValue
+                            || HasHighlightStyle(sel.HoverRowStyle)
+                            || HasHighlightStyle(sel.HoverColumnStyle)
+                            || HasHighlightStyle(sel.HoverCellStyle))
+                        {
+                            uint hoverMode = sel.HoverMask ?? 0u;
                             s.WriteMessage(7, hover =>
                             {
                                 hover.WriteBool(1, (hoverMode & 1u) != 0);
                                 hover.WriteBool(2, (hoverMode & 2u) != 0);
                                 hover.WriteBool(3, (hoverMode & 4u) != 0);
+                                if (HasHighlightStyle(sel.HoverRowStyle))
+                                {
+                                    hover.WriteMessage(4, styleWriter => EncodeHighlightStyle(styleWriter, sel.HoverRowStyle));
+                                }
+                                if (HasHighlightStyle(sel.HoverColumnStyle))
+                                {
+                                    hover.WriteMessage(5, styleWriter => EncodeHighlightStyle(styleWriter, sel.HoverColumnStyle));
+                                }
+                                if (HasHighlightStyle(sel.HoverCellStyle))
+                                {
+                                    hover.WriteMessage(6, styleWriter => EncodeHighlightStyle(styleWriter, sel.HoverCellStyle));
+                                }
                             });
+                        }
+                        if (HasHighlightStyle(sel.ActiveCellStyle))
+                        {
+                            s.WriteMessage(10, styleWriter => EncodeHighlightStyle(styleWriter, sel.ActiveCellStyle));
                         }
                     });
                 }
@@ -108,6 +153,8 @@ namespace VolvoxGrid.DotNet.Internal
                     cfg.WriteMessage(4, e =>
                     {
                         if (edit.EditTrigger.HasValue) e.WriteInt32(1, (int)edit.EditTrigger.Value);
+                        if (edit.DropdownTrigger.HasValue) e.WriteInt32(3, (int)edit.DropdownTrigger.Value);
+                        if (edit.DropdownSearch.HasValue) e.WriteBool(4, edit.DropdownSearch.Value);
                     });
                 }
 
@@ -131,6 +178,8 @@ namespace VolvoxGrid.DotNet.Internal
                     {
                         if (outline.TreeIndicator.HasValue) o.WriteInt32(1, (int)outline.TreeIndicator.Value);
                         if (outline.TreeColumn.HasValue) o.WriteInt32(2, outline.TreeColumn.Value);
+                        if (outline.GroupTotalPosition.HasValue) o.WriteInt32(4, (int)outline.GroupTotalPosition.Value);
+                        if (outline.MultiTotals.HasValue) o.WriteBool(5, outline.MultiTotals.Value);
                     });
                 }
 
@@ -237,6 +286,9 @@ namespace VolvoxGrid.DotNet.Internal
                     case 1:
                         DecodeLayoutConfig(result.Layout, bytes);
                         break;
+                    case 2:
+                        DecodeStyleConfig(result.Style, bytes);
+                        break;
                     case 3:
                         DecodeSelectionConfig(result.Selection, bytes);
                         break;
@@ -264,6 +316,52 @@ namespace VolvoxGrid.DotNet.Internal
                 }
             }
             return result;
+        }
+
+        private static void EncodeGridLines(ProtoWriter writer, VolvoxGridLinesData lines)
+        {
+            if (lines == null) return;
+            if (lines.Style.HasValue) writer.WriteInt32(1, (int)lines.Style.Value);
+            if (lines.Color.HasValue) writer.WriteInt32(3, unchecked((int)lines.Color.Value));
+            if (lines.Width.HasValue) writer.WriteInt32(4, lines.Width.Value);
+        }
+
+        private static void EncodeRegionStyle(ProtoWriter writer, VolvoxRegionStyleData region)
+        {
+            if (region == null) return;
+            if (region.Background.HasValue) writer.WriteInt32(1, unchecked((int)region.Background.Value));
+            if (region.Foreground.HasValue) writer.WriteInt32(2, unchecked((int)region.Foreground.Value));
+            if (region.GridLines != null && (region.GridLines.Style.HasValue || region.GridLines.Color.HasValue || region.GridLines.Width.HasValue))
+            {
+                writer.WriteMessage(4, g => EncodeGridLines(g, region.GridLines));
+            }
+        }
+
+        private static bool HasHighlightStyle(VolvoxHighlightStyleData style)
+        {
+            return style != null
+                && (style.Background.HasValue
+                    || style.Foreground.HasValue
+                    || style.BorderStyle.HasValue
+                    || style.BorderColor.HasValue);
+        }
+
+        private static void EncodeHighlightStyle(ProtoWriter writer, VolvoxHighlightStyleData style)
+        {
+            var data = style ?? new VolvoxHighlightStyleData();
+            if (data.Background.HasValue) writer.WriteInt32(1, unchecked((int)data.Background.Value));
+            if (data.Foreground.HasValue) writer.WriteInt32(2, unchecked((int)data.Foreground.Value));
+            if (data.BorderStyle.HasValue || data.BorderColor.HasValue)
+            {
+                writer.WriteMessage(3, borders =>
+                {
+                    borders.WriteMessage(1, border =>
+                    {
+                        if (data.BorderStyle.HasValue) border.WriteInt32(1, (int)data.BorderStyle.Value);
+                        if (data.BorderColor.HasValue) border.WriteInt32(2, unchecked((int)data.BorderColor.Value));
+                    });
+                });
+            }
         }
 
         public byte[] EncodeConfigureRequest(
@@ -1166,6 +1264,29 @@ namespace VolvoxGrid.DotNet.Internal
             return writer.ToArray();
         }
 
+        public byte[] EncodeGetDemoDataRequest(string demo)
+        {
+            var writer = new ProtoWriter();
+            writer.WriteString(1, demo ?? string.Empty);
+            return writer.ToArray();
+        }
+
+        public byte[] DecodeGetDemoDataResponse(byte[] payload)
+        {
+            var reader = new ProtoReader(payload);
+            int field;
+            ProtoWireType wire;
+            while (reader.TryReadTag(out field, out wire))
+            {
+                if (field == 3 && wire == ProtoWireType.LengthDelimited)
+                {
+                    return reader.ReadLengthDelimited();
+                }
+                reader.SkipField(wire);
+            }
+            return new byte[0];
+        }
+
         public byte[] EncodeSetRedrawRequest(long gridId, bool enabled)
         {
             var writer = new ProtoWriter();
@@ -1994,15 +2115,130 @@ namespace VolvoxGrid.DotNet.Internal
                         if (wire == ProtoWireType.Varint) selection.AllowSelection = reader.ReadBool();
                         else reader.SkipField(wire);
                         break;
+                    case 6:
+                        if (wire == ProtoWireType.LengthDelimited) selection.SelectionStyle = DecodeHighlightStyle(reader.ReadLengthDelimited());
+                        else reader.SkipField(wire);
+                        break;
                     case 7:
                         if (wire == ProtoWireType.LengthDelimited)
                         {
-                            selection.HoverMask = DecodeHoverMask(reader.ReadLengthDelimited());
+                            DecodeHoverConfig(selection, reader.ReadLengthDelimited());
                         }
                         else
                         {
                             reader.SkipField(wire);
                         }
+                        break;
+                    case 10:
+                        if (wire == ProtoWireType.LengthDelimited) selection.ActiveCellStyle = DecodeHighlightStyle(reader.ReadLengthDelimited());
+                        else reader.SkipField(wire);
+                        break;
+                    default:
+                        reader.SkipField(wire);
+                        break;
+                }
+            }
+        }
+
+        private static void DecodeStyleConfig(VolvoxStyleConfigData style, byte[] payload)
+        {
+            if (style == null || payload == null) return;
+            var reader = new ProtoReader(payload);
+            int field;
+            ProtoWireType wire;
+            while (reader.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1:
+                        if (wire == ProtoWireType.Varint) style.Background = unchecked((uint)reader.ReadInt32());
+                        else reader.SkipField(wire);
+                        break;
+                    case 2:
+                        if (wire == ProtoWireType.Varint) style.Foreground = unchecked((uint)reader.ReadInt32());
+                        else reader.SkipField(wire);
+                        break;
+                    case 3:
+                        if (wire == ProtoWireType.Varint) style.AlternateBackground = unchecked((uint)reader.ReadInt32());
+                        else reader.SkipField(wire);
+                        break;
+                    case 7:
+                        if (wire == ProtoWireType.Varint) style.ProgressColor = unchecked((uint)reader.ReadInt32());
+                        else reader.SkipField(wire);
+                        break;
+                    case 10:
+                        if (wire == ProtoWireType.LengthDelimited) DecodeGridLines(style.GridLines, reader.ReadLengthDelimited());
+                        else reader.SkipField(wire);
+                        break;
+                    case 11:
+                        if (wire == ProtoWireType.LengthDelimited) DecodeRegionStyle(style.Fixed, reader.ReadLengthDelimited());
+                        else reader.SkipField(wire);
+                        break;
+                    case 20:
+                        if (wire == ProtoWireType.Varint) style.SheetBackground = unchecked((uint)reader.ReadInt32());
+                        else reader.SkipField(wire);
+                        break;
+                    case 21:
+                        if (wire == ProtoWireType.Varint) style.SheetBorder = unchecked((uint)reader.ReadInt32());
+                        else reader.SkipField(wire);
+                        break;
+                    default:
+                        reader.SkipField(wire);
+                        break;
+                }
+            }
+        }
+
+        private static void DecodeRegionStyle(VolvoxRegionStyleData region, byte[] payload)
+        {
+            if (region == null || payload == null) return;
+            var reader = new ProtoReader(payload);
+            int field;
+            ProtoWireType wire;
+            while (reader.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1:
+                        if (wire == ProtoWireType.Varint) region.Background = unchecked((uint)reader.ReadInt32());
+                        else reader.SkipField(wire);
+                        break;
+                    case 2:
+                        if (wire == ProtoWireType.Varint) region.Foreground = unchecked((uint)reader.ReadInt32());
+                        else reader.SkipField(wire);
+                        break;
+                    case 4:
+                        if (wire == ProtoWireType.LengthDelimited) DecodeGridLines(region.GridLines, reader.ReadLengthDelimited());
+                        else reader.SkipField(wire);
+                        break;
+                    default:
+                        reader.SkipField(wire);
+                        break;
+                }
+            }
+        }
+
+        private static void DecodeGridLines(VolvoxGridLinesData lines, byte[] payload)
+        {
+            if (lines == null || payload == null) return;
+            var reader = new ProtoReader(payload);
+            int field;
+            ProtoWireType wire;
+            while (reader.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1:
+                        if (wire == ProtoWireType.Varint) lines.Style = (VolvoxGridLineStyle)reader.ReadInt32();
+                        else reader.SkipField(wire);
+                        break;
+                    case 3:
+                        if (wire == ProtoWireType.Varint) lines.Color = unchecked((uint)reader.ReadInt32());
+                        else reader.SkipField(wire);
+                        break;
+                    case 4:
+                        if (wire == ProtoWireType.Varint) lines.Width = reader.ReadInt32();
+                        else reader.SkipField(wire);
                         break;
                     default:
                         reader.SkipField(wire);
@@ -2019,8 +2255,24 @@ namespace VolvoxGrid.DotNet.Internal
             ProtoWireType wire;
             while (reader.TryReadTag(out field, out wire))
             {
-                if (field == 1 && wire == ProtoWireType.Varint) editing.EditTrigger = (VolvoxEditTrigger)reader.ReadInt32();
-                else reader.SkipField(wire);
+                switch (field)
+                {
+                    case 1:
+                        if (wire == ProtoWireType.Varint) editing.EditTrigger = (VolvoxEditTrigger)reader.ReadInt32();
+                        else reader.SkipField(wire);
+                        break;
+                    case 3:
+                        if (wire == ProtoWireType.Varint) editing.DropdownTrigger = (VolvoxDropdownTrigger)reader.ReadInt32();
+                        else reader.SkipField(wire);
+                        break;
+                    case 4:
+                        if (wire == ProtoWireType.Varint) editing.DropdownSearch = reader.ReadBool();
+                        else reader.SkipField(wire);
+                        break;
+                    default:
+                        reader.SkipField(wire);
+                        break;
+                }
             }
         }
 
@@ -2077,6 +2329,14 @@ namespace VolvoxGrid.DotNet.Internal
                         break;
                     case 2:
                         if (wire == ProtoWireType.Varint) outline.TreeColumn = reader.ReadInt32();
+                        else reader.SkipField(wire);
+                        break;
+                    case 4:
+                        if (wire == ProtoWireType.Varint) outline.GroupTotalPosition = (VolvoxGroupTotalPosition)reader.ReadInt32();
+                        else reader.SkipField(wire);
+                        break;
+                    case 5:
+                        if (wire == ProtoWireType.Varint) outline.MultiTotals = reader.ReadBool();
                         else reader.SkipField(wire);
                         break;
                     default:
@@ -2218,6 +2478,102 @@ namespace VolvoxGrid.DotNet.Internal
             }
 
             return mode;
+        }
+
+        private static void DecodeHoverConfig(VolvoxSelectionConfigData selection, byte[] payload)
+        {
+            if (selection == null || payload == null) return;
+            selection.HoverMask = DecodeHoverMask(payload);
+            var reader = new ProtoReader(payload);
+            int field;
+            ProtoWireType wire;
+            while (reader.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 4:
+                        if (wire == ProtoWireType.LengthDelimited) selection.HoverRowStyle = DecodeHighlightStyle(reader.ReadLengthDelimited());
+                        else reader.SkipField(wire);
+                        break;
+                    case 5:
+                        if (wire == ProtoWireType.LengthDelimited) selection.HoverColumnStyle = DecodeHighlightStyle(reader.ReadLengthDelimited());
+                        else reader.SkipField(wire);
+                        break;
+                    case 6:
+                        if (wire == ProtoWireType.LengthDelimited) selection.HoverCellStyle = DecodeHighlightStyle(reader.ReadLengthDelimited());
+                        else reader.SkipField(wire);
+                        break;
+                    default:
+                        reader.SkipField(wire);
+                        break;
+                }
+            }
+        }
+
+        private static VolvoxHighlightStyleData DecodeHighlightStyle(byte[] payload)
+        {
+            var style = new VolvoxHighlightStyleData();
+            var reader = new ProtoReader(payload ?? new byte[0]);
+            int field;
+            ProtoWireType wire;
+            while (reader.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1:
+                        if (wire == ProtoWireType.Varint) style.Background = unchecked((uint)reader.ReadInt32());
+                        else reader.SkipField(wire);
+                        break;
+                    case 2:
+                        if (wire == ProtoWireType.Varint) style.Foreground = unchecked((uint)reader.ReadInt32());
+                        else reader.SkipField(wire);
+                        break;
+                    case 3:
+                        if (wire == ProtoWireType.LengthDelimited) DecodeHighlightStyleBorders(style, reader.ReadLengthDelimited());
+                        else reader.SkipField(wire);
+                        break;
+                    default:
+                        reader.SkipField(wire);
+                        break;
+                }
+            }
+            return style;
+        }
+
+        private static void DecodeHighlightStyleBorders(VolvoxHighlightStyleData style, byte[] payload)
+        {
+            var reader = new ProtoReader(payload ?? new byte[0]);
+            int field;
+            ProtoWireType wire;
+            while (reader.TryReadTag(out field, out wire))
+            {
+                if (field != 1 || wire != ProtoWireType.LengthDelimited)
+                {
+                    reader.SkipField(wire);
+                    continue;
+                }
+
+                var borderReader = new ProtoReader(reader.ReadLengthDelimited());
+                int borderField;
+                ProtoWireType borderWire;
+                while (borderReader.TryReadTag(out borderField, out borderWire))
+                {
+                    switch (borderField)
+                    {
+                        case 1:
+                            if (borderWire == ProtoWireType.Varint) style.BorderStyle = (VolvoxBorderStyle)borderReader.ReadInt32();
+                            else borderReader.SkipField(borderWire);
+                            break;
+                        case 2:
+                            if (borderWire == ProtoWireType.Varint) style.BorderColor = unchecked((uint)borderReader.ReadInt32());
+                            else borderReader.SkipField(borderWire);
+                            break;
+                        default:
+                            borderReader.SkipField(borderWire);
+                            break;
+                    }
+                }
+            }
         }
 
         private static VolvoxResizePolicyMode DecodeResizePolicy(byte[] payload)

@@ -270,7 +270,13 @@ public final class VolvoxGridDesktopExample {
 
             if (created) {
                 ctrl.setRedraw(false);
-                ctrl.loadDemo(demo);
+                if ("sales".equals(demo)) {
+                    SalesJsonDesktopDemo.load(ctrl);
+                } else if ("hierarchy".equals(demo)) {
+                    HierarchyJsonDesktopDemo.load(ctrl);
+                } else {
+                    ctrl.loadDemo(demo);
+                }
                 ctrl.setRedraw(true);
             }
 
@@ -372,6 +378,13 @@ public final class VolvoxGridDesktopExample {
         }
         // Desktop fling should primarily come from engine-side momentum.
         gridPanel.setHostFlingEnabled(false);
+
+        try {
+            ctrl.refresh();
+            gridPanel.requestFrame();
+        } catch (Exception e) {
+            updateStatus("Display refresh failed: " + e.getMessage());
+        }
     }
 
     private void cancelGridFling(VolvoxGridDesktopController ctrl) {

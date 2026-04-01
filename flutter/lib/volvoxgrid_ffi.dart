@@ -441,6 +441,13 @@ class VolvoxGridService {
         Empty.fromBuffer,
       );
 
+  static Future<GetDemoDataResponse> GetDemoData(GetDemoDataRequest request) =>
+      _invokeUnary(
+        _serviceMethodPath('GetDemoData'),
+        request,
+        GetDemoDataResponse.fromBuffer,
+      );
+
   static Stream<RenderOutput> RenderSession(Stream<RenderInput> requests) =>
       _invokeBidiStream(
         _serviceMethodPath('RenderSession'),

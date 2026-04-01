@@ -1,0 +1,1028 @@
+[
+  {
+    "Name": "Documents",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-12-01",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 1
+  },
+  {
+    "Name": "Reports",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-11-15",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 2
+  },
+  {
+    "Name": "Q1_Report.xlsx",
+    "Type": "File",
+    "Size": "245 KB",
+    "Modified": "2025-03-31",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Q2_Report.xlsx",
+    "Type": "File",
+    "Size": "312 KB",
+    "Modified": "2025-06-30",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Q3_Report.pdf",
+    "Type": "File",
+    "Size": "1.8 MB",
+    "Modified": "2025-09-30",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Q4_Report.docx",
+    "Type": "File",
+    "Size": "178 KB",
+    "Modified": "2025-12-15",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Annual_Summary.pdf",
+    "Type": "File",
+    "Size": "4.1 MB",
+    "Modified": "2025-12-20",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Invoices",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-12-10",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 2
+  },
+  {
+    "Name": "INV-001.pdf",
+    "Type": "File",
+    "Size": "89 KB",
+    "Modified": "2025-01-15",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "INV-002.pdf",
+    "Type": "File",
+    "Size": "92 KB",
+    "Modified": "2025-02-18",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "INV-003.pdf",
+    "Type": "File",
+    "Size": "76 KB",
+    "Modified": "2025-03-22",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "INV-004.pdf",
+    "Type": "File",
+    "Size": "134 KB",
+    "Modified": "2025-04-10",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "INV-005.pdf",
+    "Type": "File",
+    "Size": "98 KB",
+    "Modified": "2025-05-05",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "INV-006.pdf",
+    "Type": "File",
+    "Size": "112 KB",
+    "Modified": "2025-06-08",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "INV-007.pdf",
+    "Type": "File",
+    "Size": "87 KB",
+    "Modified": "2025-07-14",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "INV-008.pdf",
+    "Type": "File",
+    "Size": "145 KB",
+    "Modified": "2025-08-19",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "INV-009.pdf",
+    "Type": "File",
+    "Size": "93 KB",
+    "Modified": "2025-09-23",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "INV-010.pdf",
+    "Type": "File",
+    "Size": "101 KB",
+    "Modified": "2025-10-30",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "INV-011.pdf",
+    "Type": "File",
+    "Size": "88 KB",
+    "Modified": "2025-11-12",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "INV-012.pdf",
+    "Type": "File",
+    "Size": "156 KB",
+    "Modified": "2025-12-05",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Contracts",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-10-01",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 2
+  },
+  {
+    "Name": "Contract_Alpha.pdf",
+    "Type": "File",
+    "Size": "2.1 MB",
+    "Modified": "2025-01-20",
+    "Permissions": "rw-------",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Contract_Beta.pdf",
+    "Type": "File",
+    "Size": "1.8 MB",
+    "Modified": "2025-04-15",
+    "Permissions": "rw-------",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Contract_Gamma.docx",
+    "Type": "File",
+    "Size": "980 KB",
+    "Modified": "2025-07-01",
+    "Permissions": "rw-------",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "NDA_Template.docx",
+    "Type": "File",
+    "Size": "45 KB",
+    "Modified": "2025-02-10",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Presentations",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-11-20",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 2
+  },
+  {
+    "Name": "Roadmap_2025.pptx",
+    "Type": "File",
+    "Size": "8.3 MB",
+    "Modified": "2025-01-10",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Team_Kickoff.pptx",
+    "Type": "File",
+    "Size": "5.1 MB",
+    "Modified": "2025-03-01",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Client_Demo.pptx",
+    "Type": "File",
+    "Size": "12.1 MB",
+    "Modified": "2025-06-15",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Year_Review.pptx",
+    "Type": "File",
+    "Size": "9.6 MB",
+    "Modified": "2025-12-18",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Photos",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-11-30",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 1
+  },
+  {
+    "Name": "Vacation",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-08-20",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 2
+  },
+  {
+    "Name": "IMG_001.jpg",
+    "Type": "File",
+    "Size": "3.1 MB",
+    "Modified": "2025-08-01",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "IMG_002.jpg",
+    "Type": "File",
+    "Size": "2.7 MB",
+    "Modified": "2025-08-01",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "IMG_003.jpg",
+    "Type": "File",
+    "Size": "4.0 MB",
+    "Modified": "2025-08-02",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "IMG_004.jpg",
+    "Type": "File",
+    "Size": "3.5 MB",
+    "Modified": "2025-08-03",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "IMG_005.jpg",
+    "Type": "File",
+    "Size": "2.9 MB",
+    "Modified": "2025-08-04",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "IMG_006.jpg",
+    "Type": "File",
+    "Size": "5.0 MB",
+    "Modified": "2025-08-05",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "IMG_007.jpg",
+    "Type": "File",
+    "Size": "3.7 MB",
+    "Modified": "2025-08-06",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "IMG_008.jpg",
+    "Type": "File",
+    "Size": "4.1 MB",
+    "Modified": "2025-08-07",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Panoramas",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-08-10",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 3
+  },
+  {
+    "Name": "PANO_001.jpg",
+    "Type": "File",
+    "Size": "12.2 MB",
+    "Modified": "2025-08-02",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "PANO_002.jpg",
+    "Type": "File",
+    "Size": "14.8 MB",
+    "Modified": "2025-08-04",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "PANO_003.jpg",
+    "Type": "File",
+    "Size": "11.5 MB",
+    "Modified": "2025-08-06",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "Events",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-11-10",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 2
+  },
+  {
+    "Name": "Conference_01.jpg",
+    "Type": "File",
+    "Size": "2.3 MB",
+    "Modified": "2025-05-15",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Conference_02.jpg",
+    "Type": "File",
+    "Size": "3.0 MB",
+    "Modified": "2025-05-15",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Conference_03.jpg",
+    "Type": "File",
+    "Size": "2.6 MB",
+    "Modified": "2025-05-16",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "TeamDinner.jpg",
+    "Type": "File",
+    "Size": "4.4 MB",
+    "Modified": "2025-09-20",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Award_Ceremony.jpg",
+    "Type": "File",
+    "Size": "3.7 MB",
+    "Modified": "2025-11-05",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Screenshots",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-12-15",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 2
+  },
+  {
+    "Name": "Screen_001.png",
+    "Type": "File",
+    "Size": "890 KB",
+    "Modified": "2025-10-01",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Screen_002.png",
+    "Type": "File",
+    "Size": "1.2 MB",
+    "Modified": "2025-10-15",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Screen_003.png",
+    "Type": "File",
+    "Size": "780 KB",
+    "Modified": "2025-11-01",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Screen_004.png",
+    "Type": "File",
+    "Size": "950 KB",
+    "Modified": "2025-11-20",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Screen_005.png",
+    "Type": "File",
+    "Size": "1.1 MB",
+    "Modified": "2025-12-10",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Projects",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-12-18",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 1
+  },
+  {
+    "Name": "VolvoxGrid",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-12-18",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 2
+  },
+  {
+    "Name": "src",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-12-18",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 3
+  },
+  {
+    "Name": "main.rs",
+    "Type": "File",
+    "Size": "12 KB",
+    "Modified": "2025-12-18",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "lib.rs",
+    "Type": "File",
+    "Size": "45 KB",
+    "Modified": "2025-12-17",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "grid.rs",
+    "Type": "File",
+    "Size": "128 KB",
+    "Modified": "2025-12-16",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "render.rs",
+    "Type": "File",
+    "Size": "89 KB",
+    "Modified": "2025-12-15",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "cell.rs",
+    "Type": "File",
+    "Size": "34 KB",
+    "Modified": "2025-12-14",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "style.rs",
+    "Type": "File",
+    "Size": "22 KB",
+    "Modified": "2025-12-13",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "tests",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-12-10",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 3
+  },
+  {
+    "Name": "test_grid.rs",
+    "Type": "File",
+    "Size": "56 KB",
+    "Modified": "2025-12-10",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "test_render.rs",
+    "Type": "File",
+    "Size": "78 KB",
+    "Modified": "2025-12-09",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "test_edit.rs",
+    "Type": "File",
+    "Size": "34 KB",
+    "Modified": "2025-12-08",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "Cargo.toml",
+    "Type": "File",
+    "Size": "2 KB",
+    "Modified": "2025-12-15",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "README.md",
+    "Type": "File",
+    "Size": "8 KB",
+    "Modified": "2025-12-01",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "WebApp",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-11-25",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 2
+  },
+  {
+    "Name": "src",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-11-25",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 3
+  },
+  {
+    "Name": "index.ts",
+    "Type": "File",
+    "Size": "15 KB",
+    "Modified": "2025-11-25",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "app.ts",
+    "Type": "File",
+    "Size": "42 KB",
+    "Modified": "2025-11-24",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "style.css",
+    "Type": "File",
+    "Size": "18 KB",
+    "Modified": "2025-11-23",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "public",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-11-20",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 3
+  },
+  {
+    "Name": "index.html",
+    "Type": "File",
+    "Size": "3 KB",
+    "Modified": "2025-11-20",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "favicon.ico",
+    "Type": "File",
+    "Size": "4 KB",
+    "Modified": "2025-11-01",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "package.json",
+    "Type": "File",
+    "Size": "2 KB",
+    "Modified": "2025-11-15",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "tsconfig.json",
+    "Type": "File",
+    "Size": "1 KB",
+    "Modified": "2025-11-10",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "MobileApp",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-10-30",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 2
+  },
+  {
+    "Name": "android",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-10-30",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 3
+  },
+  {
+    "Name": "MainActivity.kt",
+    "Type": "File",
+    "Size": "28 KB",
+    "Modified": "2025-10-30",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "build.gradle.kts",
+    "Type": "File",
+    "Size": "5 KB",
+    "Modified": "2025-10-25",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "ios",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-10-28",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 3
+  },
+  {
+    "Name": "AppDelegate.swift",
+    "Type": "File",
+    "Size": "15 KB",
+    "Modified": "2025-10-28",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "ContentView.swift",
+    "Type": "File",
+    "Size": "22 KB",
+    "Modified": "2025-10-27",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 4
+  },
+  {
+    "Name": "Music",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-09-15",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 1
+  },
+  {
+    "Name": "Classical",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-06-01",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 2
+  },
+  {
+    "Name": "Bach_BWV1007.flac",
+    "Type": "File",
+    "Size": "43.9 MB",
+    "Modified": "2025-01-10",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Mozart_K545.flac",
+    "Type": "File",
+    "Size": "37.1 MB",
+    "Modified": "2025-02-15",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Beethoven_Op27.flac",
+    "Type": "File",
+    "Size": "50.8 MB",
+    "Modified": "2025-03-20",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Jazz",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-09-15",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 2
+  },
+  {
+    "Name": "Blue_Train.flac",
+    "Type": "File",
+    "Size": "59.6 MB",
+    "Modified": "2025-05-01",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Kind_of_Blue.flac",
+    "Type": "File",
+    "Size": "56.6 MB",
+    "Modified": "2025-06-10",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Mingus_Ah_Um.flac",
+    "Type": "File",
+    "Size": "47.9 MB",
+    "Modified": "2025-07-05",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Playlists",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-09-01",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 2
+  },
+  {
+    "Name": "WorkFocus.m3u",
+    "Type": "File",
+    "Size": "2 KB",
+    "Modified": "2025-08-01",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Relaxation.m3u",
+    "Type": "File",
+    "Size": "3 KB",
+    "Modified": "2025-08-15",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Running.m3u",
+    "Type": "File",
+    "Size": "2 KB",
+    "Modified": "2025-09-01",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 3
+  },
+  {
+    "Name": "Downloads",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-12-20",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 1
+  },
+  {
+    "Name": "setup_v3.2.exe",
+    "Type": "File",
+    "Size": "83.0 MB",
+    "Modified": "2025-12-01",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 2
+  },
+  {
+    "Name": "manual.pdf",
+    "Type": "File",
+    "Size": "12.1 MB",
+    "Modified": "2025-11-15",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 2
+  },
+  {
+    "Name": "data_export.csv",
+    "Type": "File",
+    "Size": "33.2 MB",
+    "Modified": "2025-12-10",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 2
+  },
+  {
+    "Name": "wallpaper.jpg",
+    "Type": "File",
+    "Size": "8.7 MB",
+    "Modified": "2025-10-20",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 2
+  },
+  {
+    "Name": "archive_2024.tar.gz",
+    "Type": "File",
+    "Size": "250.0 MB",
+    "Modified": "2025-01-05",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 2
+  },
+  {
+    "Name": "notes.txt",
+    "Type": "File",
+    "Size": "12 KB",
+    "Modified": "2025-12-20",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 2
+  },
+  {
+    "Name": "presentation_draft.pptx",
+    "Type": "File",
+    "Size": "15.2 MB",
+    "Modified": "2025-12-18",
+    "Permissions": "rw-r--r--",
+    "Action": "Open",
+    "_level": 2
+  },
+  {
+    "Name": "database_backup.sql",
+    "Type": "File",
+    "Size": "125.0 MB",
+    "Modified": "2025-12-15",
+    "Permissions": "rw-------",
+    "Action": "Open",
+    "_level": 2
+  },
+  {
+    "Name": "Recycle Bin",
+    "Type": "Folder",
+    "Size": "",
+    "Modified": "2025-12-19",
+    "Permissions": "rwxr-xr-x",
+    "Action": "Browse",
+    "_level": 1
+  },
+  {
+    "Name": "old_report.docx",
+    "Type": "File",
+    "Size": "340 KB",
+    "Modified": "2025-06-01",
+    "Permissions": "rw-------",
+    "Action": "Open",
+    "_level": 2
+  },
+  {
+    "Name": "temp_data.xlsx",
+    "Type": "File",
+    "Size": "890 KB",
+    "Modified": "2025-08-10",
+    "Permissions": "rw-------",
+    "Action": "Open",
+    "_level": 2
+  },
+  {
+    "Name": "draft_v1.txt",
+    "Type": "File",
+    "Size": "15 KB",
+    "Modified": "2025-09-22",
+    "Permissions": "rw-------",
+    "Action": "Open",
+    "_level": 2
+  }
+]

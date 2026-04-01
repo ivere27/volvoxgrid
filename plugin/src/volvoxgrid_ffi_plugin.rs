@@ -227,6 +227,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn set_redraw(&self, request: SetRedrawRequest) -> Result<Empty, FfiError>;
     fn refresh(&self, request: GridHandle) -> Result<Empty, FfiError>;
     fn load_demo(&self, request: LoadDemoRequest) -> Result<Empty, FfiError>;
+    fn get_demo_data(&self, request: GetDemoDataRequest) -> Result<GetDemoDataResponse, FfiError>;
     fn render_session(
         &self,
         stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
@@ -1056,6 +1057,22 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
         "/volvoxgrid.v1.VolvoxGridService/LoadDemo" => {
             match LoadDemoRequest::decode(input.as_slice()) {
                 Ok(req) => match plugin.load_demo(req) {
+                    Ok(resp) => {
+                        let mut buf = Vec::new();
+                        if resp.encode(&mut buf).is_ok() {
+                            success_response(resp_len, &buf)
+                        } else {
+                            error_response(resp_len, "encode failed")
+                        }
+                    }
+                    Err(e) => error_response(resp_len, &e),
+                },
+                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+            }
+        }
+        "/volvoxgrid.v1.VolvoxGridService/GetDemoData" => {
+            match GetDemoDataRequest::decode(input.as_slice()) {
+                Ok(req) => match plugin.get_demo_data(req) {
                     Ok(resp) => {
                         let mut buf = Vec::new();
                         if resp.encode(&mut buf).is_ok() {

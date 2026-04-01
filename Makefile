@@ -4,6 +4,7 @@
 # Usage:
 #   make              — build engine + host plugin
 #   make run          — build & run smoke test (Rust host loads host plugin, creates grid)
+#   make test_pixel   — run engine pixel regression tests
 #   make wasm         — build WASM crate
 #   make web          — build WASM + start web dev server
 #   make codegen      — regenerate FFI bindings for all languages
@@ -200,7 +201,7 @@ JAVA_DESKTOP_PLUGIN_RELEASE_ARG := --args="$(JAVA_DESKTOP_PLUGIN_RELEASE)"
 endif
 
 .PHONY: all build engine host-plugin java-host-plugin plugin engine-release host-plugin-release java-host-plugin-release release \
-                build_plugin run run-release test wasm wasm-lite wasm-threaded web web-lite doom-deps \
+                build_plugin run run-release test test_pixel wasm wasm-lite wasm-threaded web web-lite doom-deps \
         codegen \
         android android-build \
         android-plugin android-plugin-release android-install android-install-release android-run android-run-release flutter flutter-setup \
@@ -237,6 +238,7 @@ help:
 	@echo "  run            Build & run smoke test (debug)"
 	@echo "  run-release    Build & run smoke test (release)"
 	@echo "  test           Run engine unit tests"
+	@echo "  test_pixel     Run engine pixel regression tests"
 	@echo "  wasm           Build WASM crate (requires wasm-pack)"
 	@echo "  wasm-lite      Build WASM crate without cosmic-text/gpu (~1MB)"
 	@echo "  wasm-threaded  Build WASM crate with threads/atomics (requires COOP+COEP at runtime)"
@@ -360,6 +362,11 @@ test:
 	cd engine && cargo test $(CARGO_JOBS_FLAG) --features gpu
 	@echo "Tests complete."
 
+test_pixel:
+	@echo "Running engine pixel regression tests..."
+	cargo test $(CARGO_JOBS_FLAG) -p volvoxgrid-engine --features demo --test pixel_regression
+	@echo "Pixel regression tests complete."
+
 # =============================================================================
 # Smoke Test — Load plugin via Rust host, exercise basic RPCs
 # =============================================================================
@@ -440,23 +447,36 @@ dotnet-smoke-release: dotnet-build-release
 # =============================================================================
 # WASM
 # =============================================================================
+WASM_OUTPUT_DIR := web/example/wasm
+WASM_OUTPUT_MAIN := $(WASM_OUTPUT_DIR)/volvoxgrid_wasm_bg.wasm
+
 wasm:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
+	@command -v wasm-bindgen >/dev/null 2>&1 || { echo "Error: wasm-bindgen not found. Install with: cargo install wasm-bindgen-cli"; exit 1; }
 	@echo "Building WASM crate..."
-	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features gpu
+	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build --mode no-install . --target web --out-dir ../example/wasm --features gpu
 	@echo "WASM build complete: web/example/wasm/"
 
 wasm-lite:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
+	@command -v wasm-bindgen >/dev/null 2>&1 || { echo "Error: wasm-bindgen not found. Install with: cargo install wasm-bindgen-cli"; exit 1; }
 	@echo "Building WASM crate (lite)..."
-	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --no-default-features
+	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build --mode no-install . --target web --out-dir ../example/wasm --no-default-features
 	@echo "WASM lite build complete: web/example/wasm/"
 
 wasm-threaded:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
+	@command -v wasm-bindgen >/dev/null 2>&1 || { echo "Error: wasm-bindgen not found. Install with: cargo install wasm-bindgen-cli"; exit 1; }
 	@echo "Building WASM crate (threaded)..."
-	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features wasm-threads,gpu -Z build-std=std,panic_abort
+	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build --mode no-install . --target web --out-dir ../example/wasm --features wasm-threads,gpu -Z build-std=std,panic_abort
 	@echo "WASM threaded build complete: web/example/wasm/"
+
+wasm-ready:
+	@if [ "$(FORCE_WASM)" = "1" ] || [ ! -f "$(WASM_OUTPUT_MAIN)" ]; then \
+		$(MAKE) wasm; \
+	else \
+		echo "Using existing WASM build: $(WASM_OUTPUT_MAIN)"; \
+	fi
 
 # =============================================================================
 # Web Dev Server
@@ -480,7 +500,7 @@ SHEET_DIR := adapters/sheet
 SHEET_WASM_DIR := $(SHEET_DIR)/wasm
 WEB_JS_DIR := web/js
 
-sheet: wasm
+sheet: wasm-ready
 	@echo "Building VolvoxGrid JS package for Sheet adapter..."
 	cd "$(WEB_JS_DIR)" && npm install && npm run build
 	@echo "Linking WASM output into Sheet adapter..."

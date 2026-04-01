@@ -397,9 +397,10 @@ Cancelable `.NET` events currently cover `BeforeEdit`, `CellEditValidating`, and
 For quick validation during development:
 
 ```csharp
-grid.LoadDemo("sales");
-// or: "hierarchy"
-// or: "stress"
+grid.LoadDemo("stress");
+
+byte[] salesJson = grid.GetDemoData("sales");           // pair with LoadData + explicit setup
+byte[] hierarchyJson = grid.GetDemoData("hierarchy");   // pair with LoadData + explicit setup
 ```
 
 Useful diagnostics:

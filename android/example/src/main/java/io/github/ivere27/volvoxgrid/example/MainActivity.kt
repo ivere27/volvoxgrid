@@ -419,7 +419,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadDemoData(ctrl: VolvoxGridController, demo: String) {
-        ctrl.loadDemo(demo)
+        if (demo == "sales") {
+            SalesJsonDemo.load(ctrl)
+        } else if (demo == "hierarchy") {
+            HierarchyJsonDemo.load(ctrl)
+        } else {
+            ctrl.loadDemo(demo)
+        }
         ctrl.setEditable(editEnabled)
     }
 

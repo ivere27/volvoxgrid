@@ -277,6 +277,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn set_redraw(&self, request: SetRedrawRequest) -> Result<Empty, String>;
     fn refresh(&self, request: GridHandle) -> Result<Empty, String>;
     fn load_demo(&self, request: LoadDemoRequest) -> Result<Empty, String>;
+    fn get_demo_data(&self, request: GetDemoDataRequest) -> Result<GetDemoDataResponse, String>;
     fn render_session(
         &self,
         stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
@@ -1765,6 +1766,33 @@ pub fn volvox_grid_load_demo(grid_id: i64, demo: &str) -> Vec<u8> {
         ..Default::default()
     };
     match plugin.load_demo(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            let _ = r.encode(&mut buf);
+            buf
+        }
+        Err(e) => {
+            set_last_error(e);
+            return Vec::new();
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub fn volvox_grid_get_demo_data(demo: &str) -> Vec<u8> {
+    let plugin = match get_volvox_grid_service_plugin() {
+        Some(p) => p,
+        None => {
+            set_last_error("plugin not registered".into());
+            return Vec::new();
+        }
+    };
+    let req = GetDemoDataRequest {
+        demo: demo.to_string(),
+        ..Default::default()
+    };
+    match plugin.get_demo_data(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();

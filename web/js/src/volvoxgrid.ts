@@ -699,6 +699,18 @@ function pbEncodeMessageField(field: number, payload: Uint8Array): number[] {
   ];
 }
 
+function pbAppendBytes(out: number[], bytes: ArrayLike<number>): void {
+  for (let i = 0; i < bytes.length; i += 1) {
+    out.push(bytes[i] ?? 0);
+  }
+}
+
+function pbAppendMessageField(out: number[], field: number, payload: Uint8Array): void {
+  pbAppendBytes(out, pbEncodeTag(field, 2));
+  pbAppendBytes(out, pbEncodeVarint(BigInt(payload.length)));
+  pbAppendBytes(out, payload);
+}
+
 function pbEncodeInsertRowsRequest(
   gridId: number,
   index: number,
@@ -1110,11 +1122,11 @@ function pbEncodeLoadDataRequest(
 ): Uint8Array {
   const out: number[] = [];
   out.push(...pbEncodeTag(1, 0), ...pbEncodeInt64(BigInt(Math.trunc(gridId))));
-  out.push(...pbEncodeMessageField(2, data));
+  pbAppendMessageField(out, 2, data);
   if (options != null) {
     const encodedOptions = pbEncodeLoadDataOptions(options);
     if (encodedOptions.length > 0) {
-      out.push(...pbEncodeMessageField(3, encodedOptions));
+      pbAppendMessageField(out, 3, encodedOptions);
     }
   }
   return new Uint8Array(out);
@@ -1708,6 +1720,29 @@ function pbDecodePrintResponse(
     offset = pbSkipField(data, offset, wire);
   }
   return pages;
+}
+
+function pbDecodeGetDemoDataBytes(data: Uint8Array): Uint8Array {
+  let offset = 0;
+  let payload = new Uint8Array();
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (field === 3 && wire === 2) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      if (Number.isFinite(n) && n >= 0) {
+        const end = Math.min(data.length, len.next + n);
+        payload = data.slice(len.next, end);
+      }
+      offset = pbSkipField(data, offset, wire);
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  return payload;
 }
 
 function pbDecodeCellValue(data: Uint8Array): VolvoxGridLoadDataCellValue | undefined {
@@ -4528,12 +4563,21 @@ export class VolvoxGrid {
     this.setRenderResolution(width, height);
   }
 
-  /** Load a built-in demo by name ("sales", "hierarchy", "stress"). */
+  /** Load a built-in mutating demo by name ("stress"). */
   loadDemo(demo: string): void {
     if (typeof this.wasm.volvox_grid_load_demo === "function") {
       this.wasm.volvox_grid_load_demo(BigInt(this.gridId), demo);
       this.dirty = true;
     }
+  }
+
+  /** Fetch raw embedded demo data bytes. */
+  getDemoData(demo: string): Uint8Array {
+    if (typeof this.wasm.volvox_grid_get_demo_data === "function") {
+      const response = this.wasm.volvox_grid_get_demo_data(demo) as Uint8Array;
+      return pbDecodeGetDemoDataBytes(response);
+    }
+    return new Uint8Array();
   }
 
   /** Archive snapshots (0=save, 1=load, 2=delete, 3=list). */

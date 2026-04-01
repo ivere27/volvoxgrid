@@ -6,6 +6,9 @@ import 'package:flutter/material.dart' hide Align;
 import 'package:flutter/services.dart';
 import 'package:volvoxgrid/volvoxgrid.dart' hide Padding;
 
+import 'sales_json_demo.dart';
+import 'hierarchy_json_demo.dart';
+
 const bool _forceFlingForDesktop = bool.fromEnvironment(
   'VG_ENABLE_FLING',
   defaultValue: false,
@@ -150,7 +153,13 @@ class _DemoPageState extends State<DemoPage> {
     await controller.setGridStyle(style);
     await controller.setRedraw(false);
     try {
-      await controller.loadDemo(mode.name);
+      if (mode == DemoMode.sales) {
+        await loadSalesJsonDemo(controller);
+      } else if (mode == DemoMode.hierarchy) {
+        await loadHierarchyJsonDemo(controller);
+      } else {
+        await controller.loadDemo(mode.name);
+      }
     } finally {
       await controller.setRedraw(true);
     }

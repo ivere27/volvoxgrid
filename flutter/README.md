@@ -459,9 +459,10 @@ await controller.refresh();   // force full repaint
 #### Built-in Demos
 
 ```dart
-await controller.loadDemo('sales');       // ~1000 rows with subtotals, merging, formats
-await controller.loadDemo('hierarchy');   // ~200 rows with tree outline
 await controller.loadDemo('stress');      // 1,000,000 rows for performance testing
+
+final salesJson = await controller.getDemoData('sales');           // pair with loadData + explicit setup
+final hierarchyJson = await controller.getDemoData('hierarchy');   // pair with loadData + explicit setup
 ```
 
 ## Full Proto API Access

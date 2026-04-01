@@ -318,9 +318,10 @@ ctrl.resizeViewport(800, 600);
 #### Built-in Demos
 
 ```java
-ctrl.loadDemo("sales");       // ~1000 rows with subtotals, merging, formats
-ctrl.loadDemo("hierarchy");   // ~200 rows with tree outline
 ctrl.loadDemo("stress");      // 1,000,000 rows for performance testing
+
+byte[] salesJson = ctrl.getDemoData("sales");           // pair with loadData + explicit setup
+byte[] hierarchyJson = ctrl.getDemoData("hierarchy");   // pair with loadData + explicit setup
 ```
 
 ## Multi-Grid Apps

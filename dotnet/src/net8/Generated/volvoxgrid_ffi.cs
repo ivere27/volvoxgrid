@@ -318,6 +318,13 @@ public class VolvoxGridServiceFfi
         return Empty.Parser.ParseFrom(result);
     }
 
+    public GetDemoDataResponse GetDemoData(GetDemoDataRequest request)
+    {
+        byte[] data = request.ToByteArray();
+        byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/GetDemoData", data);
+        return GetDemoDataResponse.Parser.ParseFrom(result);
+    }
+
     public BidiStream<RenderInput, RenderOutput> RenderSession()
     {
         var stream = _host.OpenStream("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/RenderSession");

@@ -45,6 +45,7 @@ namespace VolvoxGrid.DotNet.Internal
         private const string PrintMethod = "/volvoxgrid.v1.VolvoxGridService/Print";
         private const string ArchiveMethod = "/volvoxgrid.v1.VolvoxGridService/Archive";
         private const string LoadDemoMethod = "/volvoxgrid.v1.VolvoxGridService/LoadDemo";
+        private const string GetDemoDataMethod = "/volvoxgrid.v1.VolvoxGridService/GetDemoData";
         private const string ResizeViewportMethod = "/volvoxgrid.v1.VolvoxGridService/ResizeViewport";
         private const string SetRedrawMethod = "/volvoxgrid.v1.VolvoxGridService/SetRedraw";
         private const string RefreshMethod = "/volvoxgrid.v1.VolvoxGridService/Refresh";
@@ -279,6 +280,12 @@ namespace VolvoxGrid.DotNet.Internal
         public void LoadDemo(long gridId, string demo)
         {
             InvokeUnary(LoadDemoMethod, _codec.EncodeLoadDemoRequest(gridId, demo));
+        }
+
+        public byte[] GetDemoData(string demo)
+        {
+            byte[] response = InvokeUnary(GetDemoDataMethod, _codec.EncodeGetDemoDataRequest(demo));
+            return _codec.DecodeGetDemoDataResponse(response);
         }
 
         public void ResizeViewport(long gridId, int width, int height)

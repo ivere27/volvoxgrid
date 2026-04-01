@@ -4,6 +4,7 @@
 // symbols defined in the generated volvoxgrid_ffi_native.rs. It is designed
 // to be linked into the VolvoxGrid.ocx ActiveX control.
 
+use serde_json::{Map, Value};
 use std::time::{Duration, Instant};
 use volvoxgrid_engine::cell::CellValueData;
 use volvoxgrid_engine::control::CellControl;
@@ -112,6 +113,663 @@ fn apply_array_data_to_grid(
     }
     grid.auto_resize_all();
     grid.mark_dirty();
+}
+
+#[cfg(feature = "demo")]
+fn demo_scale_px(scale: f32, px: i32) -> i32 {
+    if scale <= 1.001 {
+        px
+    } else {
+        (px as f32 * scale).round() as i32
+    }
+}
+
+#[cfg(feature = "demo")]
+fn reset_local_demo_grid(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
+    grid.cells.clear_all();
+    grid.rows = 0;
+    grid.cols = 0;
+    grid.row_positions.clear();
+    grid.col_positions.clear();
+    grid.row_heights.clear();
+    grid.col_widths.clear();
+    grid.row_props.clear();
+    grid.columns.clear();
+    grid.cell_styles.clear();
+
+    grid.edit.cancel();
+    grid.selection.select(0, 0, 0, 0, 0, 0);
+    grid.scroll.scroll_x = 0.0;
+    grid.scroll.scroll_y = 0.0;
+    grid.span = Default::default();
+    grid.outline = Default::default();
+    grid.sort_state = Default::default();
+    grid.sort_value_generator = None;
+    grid.indicator_bands = Default::default();
+
+    grid.fixed_rows = 0;
+    grid.fixed_cols = 0;
+    grid.frozen_rows = 0;
+    grid.frozen_cols = 0;
+    grid.style.back_color_alternate = 0;
+}
+
+#[cfg(feature = "demo")]
+fn apply_local_demo_scrollbar_style(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    appearance: i32,
+) {
+    fn normalize_scrollbar_appearance(appearance: i32) -> i32 {
+        match appearance {
+            a if a == ScrollBarAppearance::ScrollbarAppearanceClassic as i32 => a,
+            a if a == ScrollBarAppearance::ScrollbarAppearanceFlat as i32 => a,
+            a if a == ScrollBarAppearance::ScrollbarAppearanceModern as i32 => a,
+            a if a == ScrollBarAppearance::ScrollbarAppearanceOverlay as i32 => a,
+            _ => ScrollBarAppearance::ScrollbarAppearanceClassic as i32,
+        }
+    }
+
+    fn default_scrollbar_size(appearance: i32) -> i32 {
+        match normalize_scrollbar_appearance(appearance) {
+            a if a == ScrollBarAppearance::ScrollbarAppearanceModern as i32 => 8,
+            a if a == ScrollBarAppearance::ScrollbarAppearanceOverlay as i32 => 6,
+            _ => 16,
+        }
+    }
+
+    fn default_scrollbar_corner_radius(appearance: i32) -> i32 {
+        match normalize_scrollbar_appearance(appearance) {
+            a if a == ScrollBarAppearance::ScrollbarAppearanceModern as i32 => 4,
+            a if a == ScrollBarAppearance::ScrollbarAppearanceOverlay as i32 => 4,
+            _ => 0,
+        }
+    }
+
+    fn default_scrollbar_colors(appearance: i32) -> volvoxgrid_engine::scrollbar::ScrollBarColors {
+        match normalize_scrollbar_appearance(appearance) {
+            a if a == ScrollBarAppearance::ScrollbarAppearanceFlat as i32 => {
+                volvoxgrid_engine::scrollbar::ScrollBarColors {
+                    thumb: 0xFFB8B8B8,
+                    thumb_hover: 0xFFC7C7C7,
+                    thumb_active: 0xFF999999,
+                    track: 0xFFE3E3E3,
+                    arrow: 0xFF202020,
+                    border: 0xFF6C6C6C,
+                }
+            }
+            a if a == ScrollBarAppearance::ScrollbarAppearanceModern as i32 => {
+                volvoxgrid_engine::scrollbar::ScrollBarColors {
+                    thumb: 0xFF7A7A7A,
+                    thumb_hover: 0xFF666666,
+                    thumb_active: 0xFF505050,
+                    track: 0xFFE5E5E5,
+                    arrow: 0x00000000,
+                    border: 0xFFB8B8B8,
+                }
+            }
+            a if a == ScrollBarAppearance::ScrollbarAppearanceOverlay as i32 => {
+                volvoxgrid_engine::scrollbar::ScrollBarColors {
+                    thumb: 0xAA4E4E4E,
+                    thumb_hover: 0xCC404040,
+                    thumb_active: 0xEE303030,
+                    track: 0x22000000,
+                    arrow: 0x00000000,
+                    border: 0x44000000,
+                }
+            }
+            _ => volvoxgrid_engine::scrollbar::ScrollBarColors {
+                thumb: 0xFFC0C0C0,
+                thumb_hover: 0xFFD0D0D0,
+                thumb_active: 0xFFA8A8A8,
+                track: 0xFFD8D8D8,
+                arrow: 0xFF000000,
+                border: 0xFF606060,
+            },
+        }
+    }
+
+    fn reset_scrollbar_fade_state(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
+        grid.scrollbar_hover = false;
+        grid.scrollbar_fade_opacity = 1.0;
+        grid.scrollbar_fade_timer = if normalize_scrollbar_appearance(grid.scrollbar_appearance)
+            == ScrollBarAppearance::ScrollbarAppearanceOverlay as i32
+        {
+            (grid.scrollbar_fade_delay_ms.max(0) as f32) / 1000.0
+        } else {
+            0.0
+        };
+        grid.scrollbar_fade_last_tick = None;
+    }
+
+    grid.scrollbar_show_h = ScrollBarMode::ScrollbarModeAuto as i32;
+    grid.scrollbar_show_v = ScrollBarMode::ScrollbarModeAuto as i32;
+    grid.scrollbar_appearance = appearance;
+    grid.scrollbar_size = default_scrollbar_size(appearance);
+    grid.scrollbar_min_thumb = volvoxgrid_engine::scrollbar::DEFAULT_SCROLLBAR_MIN_THUMB;
+    grid.scrollbar_corner_radius = default_scrollbar_corner_radius(appearance);
+    grid.scrollbar_colors = default_scrollbar_colors(appearance);
+    grid.scrollbar_fade_delay_ms = volvoxgrid_engine::scrollbar::DEFAULT_SCROLLBAR_FADE_DELAY_MS;
+    grid.scrollbar_fade_duration_ms =
+        volvoxgrid_engine::scrollbar::DEFAULT_SCROLLBAR_FADE_DURATION_MS;
+    grid.scrollbar_margin = volvoxgrid_engine::scrollbar::DEFAULT_SCROLLBAR_MARGIN;
+    reset_scrollbar_fade_state(grid);
+}
+
+#[cfg(feature = "demo")]
+fn parse_sales_bool_text(raw: &str) -> Option<bool> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "true" | "1" | "yes" | "y" | "on" => Some(true),
+        "false" | "0" | "no" | "n" | "off" => Some(false),
+        _ => None,
+    }
+}
+
+#[cfg(feature = "demo")]
+fn set_local_sales_flag_cell(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    flagged: bool,
+) {
+    grid.cells
+        .set_text(row, 7, if flagged { "Yes" } else { "No" }.to_string());
+    let cell = grid.cells.get_mut(row, 7);
+    let extra = cell.extra_mut();
+    extra.value = CellValueData::Bool(flagged);
+    extra.checked = if flagged {
+        CheckedState::CheckedChecked as i32
+    } else {
+        CheckedState::CheckedUnchecked as i32
+    };
+}
+
+#[cfg(feature = "demo")]
+fn local_sales_flag_value(grid: &volvoxgrid_engine::grid::VolvoxGrid, row: i32) -> bool {
+    grid.cells
+        .get(row, 7)
+        .and_then(|cell| {
+            cell.extra.as_ref().and_then(|extra| match &extra.value {
+                CellValueData::Bool(value) => Some(*value),
+                _ => None,
+            })
+        })
+        .or_else(|| parse_sales_bool_text(grid.cells.get_text(row, 7)))
+        .unwrap_or(false)
+}
+
+#[cfg(feature = "demo")]
+fn apply_local_sales_subtotal_merges(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
+    if grid.cols < 2 {
+        return;
+    }
+
+    for row in grid.fixed_rows..grid.rows {
+        let Some(props) = grid.row_props.get(&row) else {
+            continue;
+        };
+        if props.is_subtotal && props.outline_level <= 0 {
+            grid.merge_cells(row, 0, row, 1);
+        }
+    }
+}
+
+#[cfg(feature = "demo")]
+fn sales_demo_column_defs_local(scale: f32) -> Vec<ColumnDef> {
+    let widths = [40, 80, 100, 120, 90, 90, 70, 56, 80, 140];
+    let keys = [
+        "Q", "Region", "Category", "Product", "Sales", "Cost", "Margin", "Flag", "Status", "Notes",
+    ];
+    let headers = [
+        "Q", "Region", "Category", "Product", "Sales", "Cost", "Margin%", "Flag", "Status", "Notes",
+    ];
+
+    let mut defs = Vec::with_capacity(headers.len());
+    for (index, (&key, &caption)) in keys.iter().zip(headers.iter()).enumerate() {
+        let mut def = ColumnDef {
+            index: index as i32,
+            width: Some(demo_scale_px(scale, widths[index])),
+            caption: Some(caption.to_string()),
+            key: Some(key.to_string()),
+            span: Some(matches!(index, 0 | 1)),
+            ..Default::default()
+        };
+        match index {
+            0 => def.align = Some(Align::CenterCenter as i32),
+            4 | 5 => {
+                def.align = Some(Align::RightCenter as i32);
+                def.data_type = Some(ColumnDataType::ColumnDataCurrency as i32);
+                def.format = Some("$#,##0".to_string());
+            }
+            6 => {
+                def.align = Some(Align::CenterCenter as i32);
+                def.data_type = Some(ColumnDataType::ColumnDataNumber as i32);
+            }
+            7 => {
+                def.align = Some(Align::CenterCenter as i32);
+                def.data_type = Some(ColumnDataType::ColumnDataBoolean as i32);
+            }
+            8 => {
+                def.dropdown_items = Some("Active|Pending|Shipped|Returned|Cancelled".to_string());
+            }
+            _ => {}
+        }
+        defs.push(def);
+    }
+    defs
+}
+
+#[cfg(feature = "demo")]
+fn apply_local_sales_demo_chrome(grid: &mut volvoxgrid_engine::grid::VolvoxGrid, scale: f32) {
+    grid.style.back_color = 0xFFFFFFFF;
+    grid.style.fore_color = 0xFF111827;
+    grid.style.back_color_fixed = 0xFFF3F4F6;
+    grid.style.fore_color_fixed = 0xFF374151;
+    grid.style.back_color_frozen = 0xFFFFFFFF;
+    grid.style.fore_color_frozen = 0xFF111827;
+    grid.style.back_color_bkg = 0xFFFAFAFB;
+    grid.style.back_color_alternate = 0xFFF9FAFB;
+    grid.style.grid_lines = GridLineStyle::GridlineSolid as i32;
+    grid.style.grid_lines_fixed = GridLineStyle::GridlineSolid as i32;
+    grid.style.grid_color = 0xFFE5E7EB;
+    grid.style.grid_color_fixed = 0xFFD1D5DB;
+    grid.style.sheet_border = 0xFFD1D5DB;
+    grid.style.progress_color = 0xFF818CF8;
+    grid.style.tree_color = 0xFF9CA3AF;
+    grid.style.header_separator.enabled = true;
+    grid.style.header_separator.color = 0xFFD1D5DB;
+    grid.style.header_separator.width_px = 1;
+    grid.style.header_resize_handle.enabled = true;
+    grid.style.header_resize_handle.color = 0xFFD1D5DB;
+    grid.style.header_resize_handle.width_px = 1;
+    grid.style.header_resize_handle.hit_width_px = 6;
+    grid.selection.selection_style = volvoxgrid_engine::style::HighlightStyle {
+        back_color: Some(0xFF6366F1),
+        fore_color: Some(0xFFFFFFFF),
+        fill_handle: Some(FillHandlePosition::FillHandleNone as i32),
+        fill_handle_color: Some(0xFF818CF8),
+        ..Default::default()
+    };
+    grid.selection.active_cell_style = volvoxgrid_engine::style::HighlightStyle {
+        back_color: Some(0x22000000),
+        fore_color: Some(0xFFFFFFFF),
+        border: Some(BorderStyle::BorderThick as i32),
+        border_color: Some(0xFF818CF8),
+        ..Default::default()
+    };
+
+    apply_local_demo_scrollbar_style(grid, ScrollBarAppearance::ScrollbarAppearanceClassic as i32);
+
+    grid.default_row_height = demo_scale_px(scale, volvoxgrid_engine::grid::DEFAULT_ROW_HEIGHT);
+    grid.indicator_bands.col_top.visible = true;
+    grid.indicator_bands.col_top.band_rows = 1;
+    grid.indicator_bands.col_top.default_row_height_px = demo_scale_px(scale, 28);
+    grid.indicator_bands.col_top.mode_bits = (ColIndicatorCellMode::ColIndicatorCellHeaderText
+        as u32)
+        | (ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32);
+    grid.indicator_bands.col_top.back_color = Some(0xFFF9FAFB);
+    grid.indicator_bands.col_top.fore_color = Some(0xFF111827);
+    grid.indicator_bands.col_top.grid_color = Some(0xFFD1D5DB);
+    grid.indicator_bands.col_top.allow_resize = true;
+    grid.indicator_bands.corner_top_start.visible = false;
+    grid.indicator_bands.corner_top_start.mode_bits = 0;
+    grid.indicator_bands.corner_top_start.custom_key.clear();
+    grid.indicator_bands.corner_top_start.data.clear();
+
+    grid.indicator_bands.row_start.visible = true;
+    grid.indicator_bands.row_start.width_px = demo_scale_px(
+        scale,
+        40.max(volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH),
+    );
+    grid.indicator_bands.row_start.mode_bits = RowIndicatorMode::RowIndicatorNumbers as u32;
+    grid.indicator_bands.row_start.back_color = Some(0xFFF9FAFB);
+    grid.indicator_bands.row_start.fore_color = Some(0xFF6B7280);
+    grid.indicator_bands.row_start.grid_color = Some(0xFFD1D5DB);
+    grid.indicator_bands.row_start.allow_resize = true;
+
+    grid.columns[6].progress_color = 0xFF818CF8;
+    grid.allow_user_resizing = 3;
+    grid.tab_behavior = 1;
+    grid.edit_trigger_mode = 0;
+    grid.dropdown_trigger = 1;
+    grid.dropdown_search = false;
+    grid.fling_enabled = true;
+    grid.fling_impulse_gain = 220.0;
+    grid.fling_friction = 0.9;
+    grid.header_features = 3;
+    grid.auto_size_mouse = true;
+    grid.allow_user_freezing = 3;
+    grid.selection.hover_mode = volvoxgrid_engine::selection::HOVER_ROW
+        | volvoxgrid_engine::selection::HOVER_COLUMN
+        | volvoxgrid_engine::selection::HOVER_CELL;
+    grid.selection.hover_row_style = volvoxgrid_engine::style::HighlightStyle {
+        back_color: Some(0x106366F1),
+        ..Default::default()
+    };
+    grid.selection.hover_column_style = volvoxgrid_engine::style::HighlightStyle {
+        back_color: Some(0x106366F1),
+        ..Default::default()
+    };
+    grid.selection.hover_cell_style = volvoxgrid_engine::style::HighlightStyle {
+        back_color: Some(0x1E818CF8),
+        border: Some(BorderStyle::BorderThin as i32),
+        border_color: Some(0xFF818CF8),
+        ..Default::default()
+    };
+}
+
+#[cfg(feature = "demo")]
+fn apply_local_sales_demo_subtotals(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
+    for row in grid.fixed_rows..grid.rows {
+        let flagged = local_sales_flag_value(grid, row);
+        set_local_sales_flag_cell(grid, row, flagged);
+    }
+
+    grid.outline.group_total_position = 1;
+    grid.outline.multi_totals = true;
+    volvoxgrid_engine::outline::subtotal(grid, 1, 0, 0, "", 0, 0, false);
+
+    volvoxgrid_engine::outline::subtotal(
+        grid,
+        2,
+        -1,
+        4,
+        "Grand Total",
+        0xFFEEF2FF,
+        0xFF111827,
+        true,
+    );
+    volvoxgrid_engine::outline::subtotal_ex(
+        grid, 2, 0, 4, "", 0xFFF5F3FF, 0xFF111827, true, "", false, 1, false,
+    );
+    volvoxgrid_engine::outline::subtotal_ex(
+        grid, 2, 1, 4, "", 0xFFF8F7FF, 0xFF111827, true, "", false, 1, false,
+    );
+
+    volvoxgrid_engine::outline::subtotal(
+        grid,
+        2,
+        -1,
+        5,
+        "Grand Total",
+        0xFFEEF2FF,
+        0xFF111827,
+        true,
+    );
+    volvoxgrid_engine::outline::subtotal_ex(
+        grid, 2, 0, 5, "", 0xFFF5F3FF, 0xFF111827, true, "", false, 1, false,
+    );
+    volvoxgrid_engine::outline::subtotal_ex(
+        grid, 2, 1, 5, "", 0xFFF8F7FF, 0xFF111827, true, "", false, 1, false,
+    );
+
+    let parse_i64 = |text: &str| -> i64 { text.parse::<i64>().unwrap_or(0) };
+    for row in grid.fixed_rows..grid.rows {
+        let Some(props) = grid.row_props.get(&row) else {
+            continue;
+        };
+        if !props.is_subtotal {
+            continue;
+        }
+
+        let cell = grid.cells.get_mut(row, 7);
+        let extra = cell.extra_mut();
+        extra.value = CellValueData::Bool(false);
+        extra.checked = CheckedState::CheckedGrayed as i32;
+
+        let sales_sum = parse_i64(grid.cells.get_text(row, 4));
+        let cost_sum = parse_i64(grid.cells.get_text(row, 5));
+        let margin = if sales_sum > 0 {
+            ((sales_sum - cost_sum) as f64 / sales_sum as f64) * 100.0
+        } else {
+            0.0
+        };
+        grid.cells.set_text(row, 6, format!("{margin:.1}"));
+    }
+
+    grid.span.mode = CellSpanMode::CellSpanByRow as i32;
+    grid.span.mode_fixed = 0;
+    grid.span.span_cols.clear();
+    grid.span.span_cols.insert(0, true);
+    grid.span.span_cols.insert(1, true);
+    grid.span.span_compare = 1;
+    apply_local_sales_subtotal_merges(grid);
+
+    grid.outline.tree_indicator = 0;
+    grid.outline.group_total_position = 1;
+    grid.layout.invalidate();
+    grid.mark_dirty();
+}
+
+#[cfg(feature = "demo")]
+fn setup_local_sales_demo(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    scale: f32,
+) -> Result<(), String> {
+    reset_local_demo_grid(grid);
+    let data = volvoxgrid_engine::demo::embedded_demo_data_bytes("sales")?;
+    let result = volvoxgrid_engine::load::load_data(grid, data, None);
+    if result.status != LoadDataStatus::LoadOk as i32 {
+        return Err("LoadData failed for embedded sales demo".to_string());
+    }
+
+    let columns = sales_demo_column_defs_local(scale);
+    grid.define_columns(&columns);
+    apply_local_sales_demo_chrome(grid, scale);
+    apply_local_sales_demo_subtotals(grid);
+    Ok(())
+}
+
+#[cfg(feature = "demo")]
+fn hierarchy_demo_column_defs_local(scale: f32) -> Vec<ColumnDef> {
+    let specs: [(
+        &str,
+        &str,
+        i32,
+        Option<i32>,
+        Option<i32>,
+        Option<&str>,
+        Option<i32>,
+    ); 6] = [
+        ("Name", "Name", 260, None, None, None, None),
+        ("Type", "Type", 80, None, None, None, None),
+        (
+            "Size",
+            "Size",
+            80,
+            Some(Align::RightCenter as i32),
+            None,
+            None,
+            None,
+        ),
+        (
+            "Modified",
+            "Modified",
+            120,
+            None,
+            Some(ColumnDataType::ColumnDataDate as i32),
+            Some("short date"),
+            None,
+        ),
+        (
+            "Permissions",
+            "Permissions",
+            100,
+            Some(Align::CenterCenter as i32),
+            None,
+            None,
+            None,
+        ),
+        (
+            "Action",
+            "Action",
+            92,
+            Some(Align::CenterCenter as i32),
+            None,
+            None,
+            Some(CellInteraction::TextLink as i32),
+        ),
+    ];
+
+    specs
+        .iter()
+        .enumerate()
+        .map(
+            |(index, (caption, key, width, align, data_type, format, interaction))| ColumnDef {
+                index: index as i32,
+                width: Some(demo_scale_px(scale, *width)),
+                caption: Some((*caption).to_string()),
+                key: Some((*key).to_string()),
+                align: *align,
+                data_type: *data_type,
+                format: format.map(|s| s.to_string()),
+                interaction: *interaction,
+                span: Some(false),
+                ..Default::default()
+            },
+        )
+        .collect()
+}
+
+#[cfg(feature = "demo")]
+fn apply_local_hierarchy_demo_chrome(grid: &mut volvoxgrid_engine::grid::VolvoxGrid, scale: f32) {
+    grid.style.back_color = 0xFFFFFFFF;
+    grid.style.fore_color = 0xFF1C1917;
+    grid.style.back_color_fixed = 0xFFF5F5F4;
+    grid.style.fore_color_fixed = 0xFF44403C;
+    grid.style.back_color_frozen = 0xFFFFFFFF;
+    grid.style.fore_color_frozen = 0xFF1C1917;
+    grid.style.back_color_bkg = 0xFFFAFAF9;
+    grid.style.back_color_alternate = 0xFFF5F5F4;
+    grid.style.grid_lines = GridLineStyle::GridlineSolid as i32;
+    grid.style.grid_lines_fixed = GridLineStyle::GridlineSolid as i32;
+    grid.style.grid_color = 0xFFE7E5E4;
+    grid.style.grid_color_fixed = 0xFFD6D3D1;
+    grid.style.sheet_border = 0xFFD6D3D1;
+    grid.style.progress_color = 0xFFF59E0B;
+    grid.style.tree_color = 0xFFA8A29E;
+    grid.style.header_separator.enabled = true;
+    grid.style.header_separator.color = 0xFFD6D3D1;
+    grid.style.header_separator.width_px = 1;
+    grid.style.header_resize_handle.enabled = true;
+    grid.style.header_resize_handle.color = 0xFFD6D3D1;
+    grid.style.header_resize_handle.width_px = 1;
+    grid.style.header_resize_handle.hit_width_px = 6;
+    grid.selection.selection_style = volvoxgrid_engine::style::HighlightStyle {
+        back_color: Some(0xFFD97706),
+        fore_color: Some(0xFFFFFFFF),
+        fill_handle: Some(FillHandlePosition::FillHandleNone as i32),
+        fill_handle_color: Some(0xFFF59E0B),
+        ..Default::default()
+    };
+    grid.selection.active_cell_style = volvoxgrid_engine::style::HighlightStyle {
+        back_color: Some(0x22000000),
+        fore_color: Some(0xFFFFFFFF),
+        border: Some(BorderStyle::BorderThick as i32),
+        border_color: Some(0xFFF59E0B),
+        ..Default::default()
+    };
+
+    apply_local_demo_scrollbar_style(grid, ScrollBarAppearance::ScrollbarAppearanceModern as i32);
+
+    grid.default_row_height = demo_scale_px(scale, volvoxgrid_engine::grid::DEFAULT_ROW_HEIGHT);
+    grid.indicator_bands.col_top.visible = true;
+    grid.indicator_bands.col_top.band_rows = 1;
+    grid.indicator_bands.col_top.default_row_height_px = demo_scale_px(scale, 28);
+    grid.indicator_bands.col_top.mode_bits = (ColIndicatorCellMode::ColIndicatorCellHeaderText
+        as u32)
+        | (ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32);
+    grid.indicator_bands.col_top.back_color = Some(0xFFFAFAF9);
+    grid.indicator_bands.col_top.fore_color = Some(0xFF1C1917);
+    grid.indicator_bands.col_top.grid_color = Some(0xFFD6D3D1);
+    grid.indicator_bands.col_top.allow_resize = true;
+    grid.indicator_bands.row_start.visible = false;
+
+    grid.allow_user_resizing = 3;
+    grid.tab_behavior = 1;
+    grid.edit_trigger_mode = 0;
+    grid.fling_enabled = true;
+    grid.fling_impulse_gain = 220.0;
+    grid.fling_friction = 0.9;
+    grid.header_features = 0;
+    grid.auto_size_mouse = true;
+    grid.selection.hover_mode = volvoxgrid_engine::selection::HOVER_CELL;
+    grid.selection.hover_row_style = Default::default();
+    grid.selection.hover_column_style = Default::default();
+    grid.selection.hover_cell_style = volvoxgrid_engine::style::HighlightStyle {
+        back_color: Some(0x1AD97706),
+        border: Some(BorderStyle::BorderThin as i32),
+        border_color: Some(0xFFF59E0B),
+        ..Default::default()
+    };
+    grid.outline.tree_indicator = 2;
+    grid.outline.tree_column = 0;
+}
+
+#[cfg(feature = "demo")]
+fn setup_local_hierarchy_demo(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    scale: f32,
+) -> Result<(), String> {
+    reset_local_demo_grid(grid);
+    let raw = volvoxgrid_engine::demo::embedded_demo_data_bytes("hierarchy")?;
+    let mut rows: Vec<Map<String, Value>> = serde_json::from_slice(raw)
+        .map_err(|err| format!("failed to parse hierarchy demo JSON: {err}"))?;
+
+    let mut row_defs = Vec::with_capacity(rows.len());
+    let mut row_kinds = Vec::with_capacity(rows.len());
+    for (index, row) in rows.iter_mut().enumerate() {
+        let outline_level = row
+            .remove("_level")
+            .and_then(|value| value.as_i64())
+            .unwrap_or(0) as i32;
+        let is_folder = row
+            .get("Type")
+            .and_then(Value::as_str)
+            .map(|kind| kind == "Folder")
+            .unwrap_or(false);
+        row_kinds.push(is_folder);
+        row_defs.push(RowDef {
+            index: index as i32,
+            is_subtotal: Some(is_folder),
+            outline_level: Some(outline_level),
+            ..Default::default()
+        });
+    }
+
+    let data = serde_json::to_vec(&rows)
+        .map_err(|err| format!("failed to encode hierarchy rows: {err}"))?;
+    let result = volvoxgrid_engine::load::load_data(grid, &data, None);
+    if result.status != LoadDataStatus::LoadOk as i32 {
+        return Err("LoadData failed for embedded hierarchy demo".to_string());
+    }
+
+    let columns = hierarchy_demo_column_defs_local(scale);
+    grid.define_columns(&columns);
+    grid.define_rows(&row_defs);
+    apply_local_hierarchy_demo_chrome(grid, scale);
+
+    for (index, is_folder) in row_kinds.into_iter().enumerate() {
+        grid.cell_styles.insert(
+            (index as i32, 5),
+            volvoxgrid_engine::style::CellStylePatch {
+                fore_color: Some(0xFF2563EB),
+                ..Default::default()
+            },
+        );
+        if is_folder {
+            grid.cell_styles.insert(
+                (index as i32, 0),
+                volvoxgrid_engine::style::CellStylePatch {
+                    fore_color: Some(0xFF92400E),
+                    font_bold: Some(true),
+                    ..Default::default()
+                },
+            );
+        }
+    }
+
+    grid.layout.invalidate();
+    grid.mark_dirty();
+    Ok(())
 }
 
 fn apply_picture_type_to_rgba(buf: &mut [u8], picture_type: i32) {
@@ -2962,37 +3620,31 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     fn load_demo(&self, r: LoadDemoRequest) -> Result<Empty, String> {
         #[cfg(feature = "demo")]
         {
-            GRID_MANAGER.with_grid(r.grid_id, |g| {
-                let scale = g.scale;
-                g.default_row_height = DEFAULT_ROW_HEIGHT;
-                g.default_col_width = DEFAULT_COL_WIDTH;
-                g.row_heights.clear();
-                g.col_widths.clear();
+            GRID_MANAGER.with_grid(r.grid_id, |g| -> Result<(), String> {
                 match r.demo.as_str() {
-                    "sales" => volvoxgrid_engine::demo::setup_sales_demo(g),
-                    "hierarchy" => volvoxgrid_engine::demo::setup_hierarchy_demo(g),
+                    "sales" => setup_local_sales_demo(g, g.scale)?,
+                    "hierarchy" => setup_local_hierarchy_demo(g, g.scale)?,
                     "stress" => volvoxgrid_engine::demo::setup_stress_demo(g),
                     _ => {}
                 }
-                if (scale - 1.0).abs() > 0.01 {
-                    let custom_row_heights: Vec<(i32, i32)> =
-                        g.row_heights.iter().map(|(r, h)| (*r, *h)).collect();
-                    let custom_col_widths: Vec<(i32, i32)> =
-                        g.col_widths.iter().map(|(c, w)| (*c, *w)).collect();
-                    g.default_row_height = (g.default_row_height as f32 * scale).round() as i32;
-                    for (r, h) in custom_row_heights {
-                        g.set_row_height(r, (h as f32 * scale).round() as i32);
-                    }
-                    g.default_col_width = (g.default_col_width as f32 * scale).round() as i32;
-                    for (c, w) in custom_col_widths {
-                        g.set_col_width(c, (w as f32 * scale).round() as i32);
-                    }
-                }
-            })?;
+                Ok(())
+            })??;
             return Ok(Empty {});
         }
         #[cfg(not(feature = "demo"))]
         Err("demo feature not enabled".to_string())
+    }
+
+    fn get_demo_data(&self, request: GetDemoDataRequest) -> Result<GetDemoDataResponse, String> {
+        #[cfg(feature = "demo")]
+        {
+            volvoxgrid_engine::demo::get_demo_data_response(&request.demo)
+        }
+        #[cfg(not(feature = "demo"))]
+        {
+            let _ = request;
+            Err("demo feature not enabled".to_string())
+        }
     }
 }
 
@@ -3773,14 +4425,26 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         {
             self.manager().with_grid(request.grid_id, |grid| {
                 match request.demo.as_str() {
-                    "sales" => volvoxgrid_engine::demo::setup_sales_demo(grid),
-                    "hierarchy" => volvoxgrid_engine::demo::setup_hierarchy_demo(grid),
+                    "sales" => setup_local_sales_demo(grid, grid.scale)?,
+                    "hierarchy" => setup_local_hierarchy_demo(grid, grid.scale)?,
                     "stress" => volvoxgrid_engine::demo::setup_stress_demo(grid),
                     other => return Err(format!("unknown demo: {other}")),
                 }
                 Ok(())
             })??;
             return Ok(Empty {});
+        }
+        #[cfg(not(feature = "demo"))]
+        {
+            let _ = request;
+            Err("demo feature not enabled".to_string())
+        }
+    }
+
+    fn get_demo_data(&self, request: GetDemoDataRequest) -> Result<GetDemoDataResponse, String> {
+        #[cfg(feature = "demo")]
+        {
+            volvoxgrid_engine::demo::get_demo_data_response(&request.demo)
         }
         #[cfg(not(feature = "demo"))]
         {
@@ -3928,6 +4592,28 @@ pub extern "C" fn volvox_grid_set_cols(grid_id: i64, cols: i32, out_len: *mut i3
         GRID_MANAGER.with_grid(grid_id, |g| {
             g.set_cols(cols);
         }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_auto_resize(
+    grid_id: i64,
+    value: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            g.auto_resize = value != 0;
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_auto_resize(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_i32(
+        GRID_MANAGER.with_grid(id, |g| if g.auto_resize { 1 } else { 0 }),
         out_len,
     )
 }

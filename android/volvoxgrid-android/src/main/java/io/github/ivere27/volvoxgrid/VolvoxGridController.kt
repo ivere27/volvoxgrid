@@ -148,7 +148,7 @@ class VolvoxGridController(
     private fun selectionRanges(sel: SelectionState): Array<GridCellRange> =
         sel.rangesList.map { GridCellRange(it.row1, it.col1, it.row2, it.col2) }.toTypedArray()
 
-    private fun configure(config: GridConfig) {
+    fun configure(config: GridConfig) {
         service.Configure(
             ConfigureRequest.newBuilder()
                 .setGridId(gridId)
@@ -157,7 +157,7 @@ class VolvoxGridController(
         )
     }
 
-    private fun getConfig(): GridConfig {
+    fun getConfig(): GridConfig {
         return service.GetConfig(handle())
     }
 
@@ -476,6 +476,18 @@ class VolvoxGridController(
         )
     }
 
+    fun defineColumns(request: DefineColumnsRequest) {
+        service.DefineColumns(request.toBuilder().setGridId(gridId).build())
+    }
+
+    fun defineRows(request: DefineRowsRequest) {
+        service.DefineRows(request.toBuilder().setGridId(gridId).build())
+    }
+
+    fun updateCells(request: UpdateCellsRequest): WriteResult {
+        return service.UpdateCells(request.toBuilder().setGridId(gridId).build())
+    }
+
     fun getRowHeight(row: Int): Int {
         return getConfig().layout.defaultRowHeight
     }
@@ -640,6 +652,12 @@ class VolvoxGridController(
     fun setSelectionStyle(style: HighlightStyle) {
         configure(GridConfig.newBuilder()
             .setSelection(SelectionConfig.newBuilder().setStyle(style).build())
+            .build())
+    }
+
+    fun setHoverConfig(config: HoverConfig) {
+        configure(GridConfig.newBuilder()
+            .setSelection(SelectionConfig.newBuilder().setHover(config).build())
             .build())
     }
 
@@ -1489,5 +1507,13 @@ class VolvoxGridController(
                 .setDemo(demo)
                 .build()
         )
+    }
+
+    fun getDemoData(demo: String): ByteArray {
+        return service.GetDemoData(
+            GetDemoDataRequest.newBuilder()
+                .setDemo(demo)
+                .build()
+        ).data.toByteArray()
     }
 }

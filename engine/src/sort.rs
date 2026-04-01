@@ -1005,35 +1005,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "demo")]
-    fn sort_hierarchy_demo_header_features_disabled() {
-        // Hierarchy demo disables header_features since flat sort is
-        // incompatible with tree structure.
-        let mut grid = VolvoxGrid::new(1, 800, 600, 2, 5, 1, 0);
-        crate::demo::setup_hierarchy_demo(&mut grid);
-        grid.ensure_layout();
-
-        assert_eq!(
-            grid.header_features, 0,
-            "header_features should be disabled for hierarchy"
-        );
-
-        // Clicking header should NOT trigger a sort
-        crate::input::handle_pointer_down(&mut grid, 10.0, 5.0, 0, 0, false);
-        crate::input::handle_pointer_up(&mut grid, 10.0, 5.0, 0, 0);
-
-        let events = grid.events.drain();
-        assert!(
-            !events.iter().any(|e| matches!(
-                e.data,
-                crate::event::GridEventData::BeforeSort { .. }
-                    | crate::event::GridEventData::AfterSort { .. }
-            )),
-            "no sort events should fire on hierarchy demo"
-        );
-    }
-
-    #[test]
     fn multi_sort_api_two_columns() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 5, 3, 1, 0);
         // Data: (col0=department, col1=name)
