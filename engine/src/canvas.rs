@@ -1541,6 +1541,11 @@ pub(crate) fn cell_rect(
     col: i32,
     vp: &VisibleRange,
 ) -> Option<(i32, i32, i32, i32)> {
+    let extend_col = if grid.extend_last_col {
+        grid.last_visible_col_index()
+    } else {
+        None
+    };
     let mut x = grid.col_pos(col);
     let mut y = grid.row_pos(row);
     let mut w = grid.col_width(col);
@@ -1633,6 +1638,9 @@ pub(crate) fn cell_rect(
                     return None;
                 }
             }
+        }
+        if extend_col == Some(col) && x < vp.data_x + vp.data_w {
+            w = w.max(vp.data_x + vp.data_w - x);
         }
         if grid.right_to_left {
             x = vp.data_x + vp.data_w - ((x - vp.data_x) + w);
@@ -1792,7 +1800,7 @@ pub(crate) fn cell_rect(
         }
     }
 
-    if grid.extend_last_col && col == grid.cols - 1 && x < vp.data_x + vp.data_w {
+    if extend_col == Some(col) && x < vp.data_x + vp.data_w {
         w = w.max(vp.data_x + vp.data_w - x);
     }
 
@@ -1859,7 +1867,13 @@ fn original_cell_bounds(
         if mr1 != mr2 || mc1 != mc2 {
             let (ox, ow) = if need_orig_x {
                 let ox = grid.col_pos(mc1) - grid.scroll.scroll_x as i32 + vp.data_x;
-                let ow: i32 = (mc1..=mc2).map(|c| grid.col_width(c)).sum();
+                let mut ow: i32 = (mc1..=mc2).map(|c| grid.col_width(c)).sum();
+                if grid.extend_last_col
+                    && grid.last_visible_col_index() == Some(col)
+                    && ox < vp.data_x + vp.data_w
+                {
+                    ow = ow.max(vp.data_x + vp.data_w - ox);
+                }
                 (ox, ow)
             } else {
                 (cx, cw)
@@ -1879,7 +1893,14 @@ fn original_cell_bounds(
 
     let (ox, ow) = if need_orig_x {
         let ox = grid.col_pos(col) - grid.scroll.scroll_x as i32 + vp.data_x;
-        (ox, grid.col_width(col))
+        let mut ow = grid.col_width(col);
+        if grid.extend_last_col
+            && grid.last_visible_col_index() == Some(col)
+            && ox < vp.data_x + vp.data_w
+        {
+            ow = ow.max(vp.data_x + vp.data_w - ox);
+        }
+        (ox, ow)
     } else {
         (cx, cw)
     };
@@ -3078,6 +3099,14 @@ fn build_visible_col_rects(grid: &VolvoxGrid, vp: &VisibleRange) -> BTreeMap<i32
         let col_w = grid.col_width(col);
         insert_visible_col_rect(&mut cols, col, sticky_right_x, col_w, band_left, band_right);
         sticky_right_x += col_w;
+    }
+
+    if grid.extend_last_col {
+        if let Some(last_col) = grid.last_visible_col_index() {
+            if let Some((x, w)) = cols.get_mut(&last_col) {
+                *w = (*w).max((band_right - *x).max(0));
+            }
+        }
     }
 
     if grid.right_to_left {
@@ -8180,6 +8209,73 @@ mod tests {
 
         assert_eq!(text_cell.vis_rect.x, 0);
         assert!(text_cell.vis_rect.w > grid.col_width(1));
+    }
+
+    #[test]
+    fn visible_col_rects_extend_last_visible_column_when_trailing_column_is_hidden() {
+        let mut grid = VolvoxGrid::new(1, 220, 60, 2, 4, 0, 0);
+        grid.extend_last_col = true;
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cols_hidden.insert(3);
+        grid.ensure_layout();
+
+        let ctx = render_ctx(&grid);
+        let (x, w) = ctx
+            .visible_col_rects
+            .get(&2)
+            .copied()
+            .expect("last visible col rect");
+
+        assert_eq!(x, 80);
+        assert_eq!(w, 140);
+        assert!(!ctx.visible_col_rects.contains_key(&3));
+    }
+
+    #[test]
+    fn text_cells_use_extended_last_column_width_for_right_alignment() {
+        let mut grid = VolvoxGrid::new(1, 220, 60, 1, 4, 0, 0);
+        grid.extend_last_col = true;
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cells.set_text(0, 3, "123".to_string());
+        grid.ensure_layout();
+
+        let ctx = render_ctx(&grid);
+        let text_cell = ctx
+            .text_cells
+            .iter()
+            .find(|cell| cell.source_key == CellKey { row: 0, col: 3 })
+            .expect("last column text cell");
+
+        assert_eq!(text_cell.meta.alignment, pb::Align::RightCenter as i32);
+        assert_eq!(text_cell.vis_rect.w, 100);
+        assert_eq!(text_cell.orig_rect.w, 100);
+    }
+
+    #[test]
+    fn text_cells_use_extended_last_visible_column_width_when_trailing_column_hidden() {
+        let mut grid = VolvoxGrid::new(1, 220, 60, 1, 4, 0, 0);
+        grid.extend_last_col = true;
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cols_hidden.insert(3);
+        grid.cells.set_text(0, 2, "123".to_string());
+        grid.ensure_layout();
+
+        let ctx = render_ctx(&grid);
+        let text_cell = ctx
+            .text_cells
+            .iter()
+            .find(|cell| cell.source_key == CellKey { row: 0, col: 2 })
+            .expect("last visible column text cell");
+
+        assert_eq!(text_cell.meta.alignment, pb::Align::RightCenter as i32);
+        assert_eq!(text_cell.vis_rect.w, 140);
+        assert_eq!(text_cell.orig_rect.w, 140);
     }
 
     #[test]

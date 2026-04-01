@@ -75,6 +75,7 @@ fn apply_default_indicator_bands(grid: &mut volvoxgrid_engine::grid::VolvoxGrid)
     grid.indicator_bands.row_start.visible = false;
     grid.indicator_bands.row_start.width_px =
         volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
+    grid.indicator_bands.row_start.auto_size = true;
     grid.indicator_bands.row_start.mode_bits = (RowIndicatorMode::RowIndicatorCurrent as u32)
         | (RowIndicatorMode::RowIndicatorSelection as u32);
 

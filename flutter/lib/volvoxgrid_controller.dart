@@ -64,6 +64,7 @@ IndicatorsConfig _defaultIndicatorsConfig() => IndicatorsConfig()
   ..rowStart = (RowIndicatorConfig()
     ..visible = false
     ..width = 35
+    ..autoSize = true
     ..modeBits = _rowIndicatorModeBits([
       RowIndicatorMode.ROW_INDICATOR_CURRENT,
       RowIndicatorMode.ROW_INDICATOR_SELECTION,
@@ -350,20 +351,18 @@ class VolvoxGridController extends ChangeNotifier {
   }
 
   Future<void> defineColumns(DefineColumnsRequest request) async {
-    await VolvoxGridService.DefineColumns(request
-      ..gridId = _gridId);
+    await VolvoxGridService.DefineColumns(request..gridId = _gridId);
     notifyListeners();
   }
 
   Future<void> defineRows(DefineRowsRequest request) async {
-    await VolvoxGridService.DefineRows(request
-      ..gridId = _gridId);
+    await VolvoxGridService.DefineRows(request..gridId = _gridId);
     notifyListeners();
   }
 
   Future<WriteResult> updateCells(UpdateCellsRequest request) async {
-    final result = await VolvoxGridService.UpdateCells(request
-      ..gridId = _gridId);
+    final result =
+        await VolvoxGridService.UpdateCells(request..gridId = _gridId);
     notifyListeners();
     return result;
   }
@@ -473,15 +472,20 @@ class VolvoxGridController extends ChangeNotifier {
         ..col2 = col
         ..includeStyle = true);
       final config = await _getConfig();
-      final cellFont = (resp.cells.isNotEmpty) ? resp.cells.first.style.font : null;
+      final cellFont =
+          (resp.cells.isNotEmpty) ? resp.cells.first.style.font : null;
       final gridFont = config.style.font;
       return EditCellStyle(
-        fontFamily: (cellFont != null && cellFont.hasFamily() && cellFont.family.isNotEmpty)
+        fontFamily: (cellFont != null &&
+                cellFont.hasFamily() &&
+                cellFont.family.isNotEmpty)
             ? cellFont.family
             : (gridFont.hasFamily() ? gridFont.family : null),
         fontSize: (cellFont != null && cellFont.hasSize() && cellFont.size > 0)
             ? cellFont.size.toDouble()
-            : (gridFont.hasSize() && gridFont.size > 0 ? gridFont.size.toDouble() : null),
+            : (gridFont.hasSize() && gridFont.size > 0
+                ? gridFont.size.toDouble()
+                : null),
         bold: (cellFont != null && cellFont.hasBold())
             ? cellFont.bold
             : (gridFont.hasBold() && gridFont.bold),
@@ -490,16 +494,25 @@ class VolvoxGridController extends ChangeNotifier {
             : (gridFont.hasItalic() && gridFont.italic),
         padLeft: (resp.cells.isNotEmpty && resp.cells.first.style.hasPadding())
             ? resp.cells.first.style.padding.left.toDouble()
-            : (config.style.hasCellPadding() ? config.style.cellPadding.left.toDouble() : 0),
+            : (config.style.hasCellPadding()
+                ? config.style.cellPadding.left.toDouble()
+                : 0),
         padTop: (resp.cells.isNotEmpty && resp.cells.first.style.hasPadding())
             ? resp.cells.first.style.padding.top.toDouble()
-            : (config.style.hasCellPadding() ? config.style.cellPadding.top.toDouble() : 0),
+            : (config.style.hasCellPadding()
+                ? config.style.cellPadding.top.toDouble()
+                : 0),
         padRight: (resp.cells.isNotEmpty && resp.cells.first.style.hasPadding())
             ? resp.cells.first.style.padding.right.toDouble()
-            : (config.style.hasCellPadding() ? config.style.cellPadding.right.toDouble() : 0),
-        padBottom: (resp.cells.isNotEmpty && resp.cells.first.style.hasPadding())
-            ? resp.cells.first.style.padding.bottom.toDouble()
-            : (config.style.hasCellPadding() ? config.style.cellPadding.bottom.toDouble() : 0),
+            : (config.style.hasCellPadding()
+                ? config.style.cellPadding.right.toDouble()
+                : 0),
+        padBottom:
+            (resp.cells.isNotEmpty && resp.cells.first.style.hasPadding())
+                ? resp.cells.first.style.padding.bottom.toDouble()
+                : (config.style.hasCellPadding()
+                    ? config.style.cellPadding.bottom.toDouble()
+                    : 0),
       );
     } catch (_) {}
     return null;
@@ -660,12 +673,14 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the selection highlight style.
   Future<void> setSelectionStyle(HighlightStyle style) async {
-    await _configure(GridConfig()..selection = (SelectionConfig()..style = style));
+    await _configure(
+        GridConfig()..selection = (SelectionConfig()..style = style));
   }
 
   /// Set hover enablement and highlight styles.
   Future<void> setHoverConfig(HoverConfig config) async {
-    await _configure(GridConfig()..selection = (SelectionConfig()..hover = config));
+    await _configure(
+        GridConfig()..selection = (SelectionConfig()..hover = config));
   }
 
   /// Set the active/current cell highlight style.

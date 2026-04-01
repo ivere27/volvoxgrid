@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
@@ -471,6 +472,8 @@ pub struct VolvoxGrid {
     text_meta_cache: RefCell<(u64, HashMap<(i32, i32), Arc<TextCellStaticMeta>>)>,
     /// Cached render context for frame-to-frame reuse (type-erased).
     pub(crate) render_ctx_cache: RefCell<Option<Box<dyn std::any::Any + Send>>>,
+    /// Cached signature for lazy row-indicator auto-size updates.
+    row_indicator_start_auto_size_sig: u64,
 
     // ── Mouse Tracking ────────────────────────────────────────────────────
     /// Row index currently under the mouse pointer (-1 if none).
@@ -838,6 +841,7 @@ impl VolvoxGrid {
             text_meta_generation: 0,
             text_meta_cache: RefCell::new((0, HashMap::new())),
             render_ctx_cache: RefCell::new(None),
+            row_indicator_start_auto_size_sig: 0,
 
             // Mouse tracking
             mouse_row: -1,
@@ -2161,6 +2165,17 @@ impl VolvoxGrid {
         self.cols_hidden.contains(&col)
     }
 
+    /// Returns the last visible column index, if any.
+    pub fn last_visible_col_index(&self) -> Option<i32> {
+        (0..self.cols).rev().find(|&col| !self.is_col_hidden(col))
+    }
+
+    /// Returns the nearest visible column at or before `col`, if any.
+    pub fn visible_col_at_or_before(&self, col: i32) -> Option<i32> {
+        let upper = col.min(self.cols - 1);
+        (0..=upper).rev().find(|&idx| !self.is_col_hidden(idx))
+    }
+
     /// Returns the column properties for a column, if it exists.
     pub fn get_col_props(&self, col: i32) -> Option<&ColumnProps> {
         if col < 0 || col >= self.cols {
@@ -2527,6 +2542,93 @@ impl VolvoxGrid {
             return Some(span_width.max(1) as f32);
         }
         Some(self.get_col_width(col).max(1) as f32)
+    }
+
+    fn row_indicator_start_auto_size_signature(&self) -> u64 {
+        let band = &self.indicator_bands.row_start;
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        band.visible.hash(&mut hasher);
+        band.auto_size.hash(&mut hasher);
+        band.width_px.hash(&mut hasher);
+        band.mode_bits.hash(&mut hasher);
+        self.rows.hash(&mut hasher);
+        self.fixed_rows.hash(&mut hasher);
+        self.default_row_height.hash(&mut hasher);
+        self.style.font_name.hash(&mut hasher);
+        self.style.font_size.to_bits().hash(&mut hasher);
+        for slot in &band.slots {
+            slot.kind.hash(&mut hasher);
+            slot.width_px.hash(&mut hasher);
+            slot.visible.hash(&mut hasher);
+            slot.custom_key.hash(&mut hasher);
+            slot.data.len().hash(&mut hasher);
+        }
+        hasher.finish()
+    }
+
+    fn sync_row_indicator_start_auto_width(&mut self) {
+        let sig = self.row_indicator_start_auto_size_signature();
+        if self.row_indicator_start_auto_size_sig == sig {
+            return;
+        }
+
+        let band = self.indicator_bands.row_start.clone();
+        if !band.visible || !band.auto_size || !band.slots.is_empty() {
+            self.row_indicator_start_auto_size_sig = sig;
+            return;
+        }
+
+        let font_name = self.style.font_name.clone();
+        let font_size = if self.style.font_size > 0.0 {
+            self.style.font_size
+        } else {
+            13.0
+        };
+        let mut labels: Vec<String> = Vec::new();
+
+        if band.has_mode(pb::RowIndicatorMode::RowIndicatorNumbers) {
+            labels.push((self.rows - self.fixed_rows).max(1).to_string());
+        } else {
+            if band.has_mode(pb::RowIndicatorMode::RowIndicatorCurrent) {
+                labels.push("▶".to_string());
+            }
+            if band.has_mode(pb::RowIndicatorMode::RowIndicatorSelection) {
+                labels.push("•".to_string());
+            }
+        }
+        if band.has_mode(pb::RowIndicatorMode::RowIndicatorHandle) {
+            labels.push("≡".to_string());
+        }
+        if band.has_mode(pb::RowIndicatorMode::RowIndicatorEditing) {
+            labels.push("✎".to_string());
+        }
+        if band.has_mode(pb::RowIndicatorMode::RowIndicatorExpander) {
+            labels.push("+".to_string());
+            labels.push("-".to_string());
+        }
+
+        if labels.is_empty() {
+            self.row_indicator_start_auto_size_sig = sig;
+            return;
+        }
+
+        self.ensure_text_engine();
+        let mut te = self.text_engine.take().unwrap();
+        let mut max_w = 0.0f32;
+        for label in &labels {
+            let (w, _) = te.measure_text(label, &font_name, font_size, false, false, None);
+            max_w = max_w.max(w);
+        }
+        self.text_engine = Some(te);
+
+        let needed_width =
+            (max_w.ceil() as i32 + 8).max(crate::indicator::DEFAULT_ROW_INDICATOR_WIDTH);
+        if self.indicator_bands.row_start.width_px != needed_width {
+            self.indicator_bands.row_start.width_px = needed_width;
+            self.dirty = true;
+        }
+
+        self.row_indicator_start_auto_size_sig = self.row_indicator_start_auto_size_signature();
     }
 
     /// Resolve the active dropdown list for a cell.
@@ -3579,6 +3681,7 @@ impl VolvoxGrid {
     /// This is the canonical entry point that avoids the self-referential
     /// borrow problem of calling `self.layout.rebuild(self)`.
     pub fn ensure_layout(&mut self) {
+        self.sync_row_indicator_start_auto_width();
         if !self.layout.valid {
             // Snapshot previous positions for animation diffing
             self.animation.save_prev(&self.layout);
@@ -4663,6 +4766,22 @@ mod tests {
     }
 
     #[test]
+    fn cell_screen_rect_extends_last_visible_column_when_trailing_column_is_hidden() {
+        let mut grid = VolvoxGrid::new(1, 220, 120, 3, 4, 0, 0);
+        grid.extend_last_col = true;
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cols_hidden.insert(3);
+        grid.ensure_layout();
+
+        let rect = grid.cell_screen_rect(1, 2).expect("cell rect");
+
+        assert_eq!(rect.0, 80);
+        assert_eq!(rect.2, 140);
+    }
+
+    #[test]
     fn set_top_row_clamps_to_last_valid_viewport() {
         let mut grid = VolvoxGrid::new(1, 120, 30, 10, 3, 0, 0);
         grid.default_row_height = 10;
@@ -4822,6 +4941,33 @@ mod tests {
         grid.auto_resize_all();
 
         assert!(grid.indicator_bands.col_top.row_height_px(0) > before);
+    }
+
+    #[test]
+    fn ensure_layout_auto_sizes_row_indicator_width_by_default_for_row_numbers() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1200, 2, 0, 0);
+        grid.style.font_size = 28.0;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+
+        let before = grid.indicator_bands.row_start.width_px;
+        grid.ensure_layout();
+
+        assert!(grid.indicator_bands.row_start.width_px > before);
+    }
+
+    #[test]
+    fn ensure_layout_keeps_row_indicator_width_fixed_when_auto_size_is_disabled() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1200, 2, 0, 0);
+        grid.style.font_size = 28.0;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+
+        let before = grid.indicator_bands.row_start.width_px;
+        grid.ensure_layout();
+
+        assert_eq!(grid.indicator_bands.row_start.width_px, before);
     }
 
     #[test]
