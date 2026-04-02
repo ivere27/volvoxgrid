@@ -6,6 +6,7 @@ using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
+using Volvoxgrid.V1;
 
 namespace VolvoxGrid.DotNet.Internal
 {
@@ -26,7 +27,7 @@ namespace VolvoxGrid.DotNet.Internal
 
         private VolvoxClient _client;
         private long _gridId;
-        private Func<VolvoxGridEventData, bool?> _eventHandler;
+        private Func<GridEvent, bool?> _eventHandler;
 
         private SynurangReflectionStream _renderStream;
         private SynurangReflectionStream _eventStream;
@@ -39,7 +40,7 @@ namespace VolvoxGrid.DotNet.Internal
         private bool _decisionChannelRequested;
         private bool _decisionChannelHandshakeSent;
         private int _followupScheduleSeq;
-        private VolvoxFramePacingMode _framePacingMode = VolvoxFramePacingMode.Auto;
+        private FramePacingMode _framePacingMode = FramePacingMode.FRAME_PACING_MODE_AUTO;
         private int _targetFrameRateHz = AutoFallbackFrameRateHz;
         private long _framePacingConfigLastRefreshTick;
 
@@ -50,14 +51,62 @@ namespace VolvoxGrid.DotNet.Internal
         private int _bufferWidth;
         private int _bufferHeight;
         private readonly List<RetiredBuffers> _retiredBuffers = new List<RetiredBuffers>();
-        private VolvoxSelectionMode _selectionMode = VolvoxSelectionMode.Free;
+        private Volvoxgrid.V1.SelectionMode _selectionMode = Volvoxgrid.V1.SelectionMode.SELECTION_FREE;
         private bool _engineEditing;
         private bool _multiRangeDragActive;
-        private readonly List<VolvoxCellRangeData> _multiRangeBaseRanges = new List<VolvoxCellRangeData>();
+        private readonly List<CellRange> _multiRangeBaseRanges = new List<CellRange>();
         private int _multiRangeAnchorRow = -1;
         private int _multiRangeAnchorCol = -1;
         private int _multiRangeDragRow = -1;
         private int _multiRangeDragCol = -1;
+
+        private static PointerEvent_Type PointerDownEvent
+        {
+            get
+            {
+                return PointerEvent_Type.DOWN;
+            }
+        }
+
+        private static PointerEvent_Type PointerUpEvent
+        {
+            get
+            {
+                return PointerEvent_Type.UP;
+            }
+        }
+
+        private static PointerEvent_Type PointerMoveEvent
+        {
+            get
+            {
+                return PointerEvent_Type.MOVE;
+            }
+        }
+
+        private static KeyEvent_Type KeyDownEvent
+        {
+            get
+            {
+                return KeyEvent_Type.KEY_DOWN;
+            }
+        }
+
+        private static KeyEvent_Type KeyUpEvent
+        {
+            get
+            {
+                return KeyEvent_Type.KEY_UP;
+            }
+        }
+
+        private static KeyEvent_Type KeyPressEvent
+        {
+            get
+            {
+                return KeyEvent_Type.KEY_PRESS;
+            }
+        }
 
         [DllImport("imm32.dll")]
         private static extern IntPtr ImmGetContext(IntPtr hWnd);
@@ -96,20 +145,20 @@ namespace VolvoxGrid.DotNet.Internal
             }
         }
 
-        public VolvoxSelectionMode SelectionMode
+        public Volvoxgrid.V1.SelectionMode SelectionMode
         {
             get { return _selectionMode; }
             set
             {
                 _selectionMode = value;
-                if (value != VolvoxSelectionMode.MultiRange)
+                if (value != Volvoxgrid.V1.SelectionMode.SELECTION_MULTI_RANGE)
                 {
                     ClearMultiRangeDrag();
                 }
             }
         }
 
-        public void Attach(VolvoxClient client, long gridId, Func<VolvoxGridEventData, bool?> eventHandler)
+        public void Attach(VolvoxClient client, long gridId, Func<GridEvent, bool?> eventHandler)
         {
             if (client == null)
             {
@@ -309,7 +358,7 @@ namespace VolvoxGrid.DotNet.Internal
                 RequestFrame();
                 return;
             }
-            SendPointer(VolvoxPointerType.Down, e, e.Clicks >= 2);
+            SendPointer(PointerDownEvent, e, e.Clicks >= 2);
             RequestFrame();
         }
 
@@ -323,7 +372,7 @@ namespace VolvoxGrid.DotNet.Internal
                 RequestFrame();
                 return;
             }
-            SendPointer(VolvoxPointerType.Up, e, false);
+            SendPointer(PointerUpEvent, e, false);
             RequestFrame();
         }
 
@@ -338,7 +387,7 @@ namespace VolvoxGrid.DotNet.Internal
                 }
                 return;
             }
-            SendPointer(VolvoxPointerType.Move, e, false);
+            SendPointer(PointerMoveEvent, e, false);
             RequestFrame();
         }
 
@@ -477,7 +526,7 @@ namespace VolvoxGrid.DotNet.Internal
         protected override void OnKeyDown(KeyEventArgs e)
         {
             base.OnKeyDown(e);
-            var payload = _client.EncodeRenderInputKey(_gridId, VolvoxKeyType.KeyDown, (int)e.KeyCode, GetModifiers(), string.Empty);
+            var payload = _client.EncodeRenderInputKey(_gridId, KeyDownEvent, (int)e.KeyCode, GetModifiers(), string.Empty);
             SendRenderInput(payload);
             RequestFrame();
         }
@@ -485,7 +534,7 @@ namespace VolvoxGrid.DotNet.Internal
         protected override void OnKeyUp(KeyEventArgs e)
         {
             base.OnKeyUp(e);
-            var payload = _client.EncodeRenderInputKey(_gridId, VolvoxKeyType.KeyUp, (int)e.KeyCode, GetModifiers(), string.Empty);
+            var payload = _client.EncodeRenderInputKey(_gridId, KeyUpEvent, (int)e.KeyCode, GetModifiers(), string.Empty);
             SendRenderInput(payload);
             RequestFrame();
         }
@@ -493,7 +542,7 @@ namespace VolvoxGrid.DotNet.Internal
         protected override void OnKeyPress(KeyPressEventArgs e)
         {
             base.OnKeyPress(e);
-            var payload = _client.EncodeRenderInputKey(_gridId, VolvoxKeyType.KeyPress, e.KeyChar, GetModifiers(), e.KeyChar.ToString());
+            var payload = _client.EncodeRenderInputKey(_gridId, KeyPressEvent, e.KeyChar, GetModifiers(), e.KeyChar.ToString());
             SendRenderInput(payload);
             RequestFrame();
         }
@@ -538,7 +587,7 @@ namespace VolvoxGrid.DotNet.Internal
                         break;
                     }
 
-                    VolvoxRenderOutputData output;
+                    RenderOutput output;
                     try
                     {
                         output = _client.DecodeRenderOutput(payload);
@@ -590,7 +639,7 @@ namespace VolvoxGrid.DotNet.Internal
                         break;
                     }
 
-                    VolvoxGridEventData evt;
+                    GridEvent evt;
                     try
                     {
                         evt = _client.DecodeGridEvent(payload);
@@ -613,13 +662,13 @@ namespace VolvoxGrid.DotNet.Internal
             _eventThread.Start();
         }
 
-        private bool? DispatchEvent(VolvoxGridEventData evt)
+        private bool? DispatchEvent(GridEvent evt)
         {
-            if (evt.Kind == VolvoxGridEventKind.StartEdit)
+            if (evt != null && evt.EventCase == GridEvent.EventOneofCase.StartEdit)
             {
                 _engineEditing = true;
             }
-            else if (evt.Kind == VolvoxGridEventKind.AfterEdit)
+            else if (evt != null && evt.EventCase == GridEvent.EventOneofCase.AfterEdit)
             {
                 _engineEditing = false;
             }
@@ -633,7 +682,7 @@ namespace VolvoxGrid.DotNet.Internal
             {
                 try
                 {
-                    return (bool?)Invoke(new Func<VolvoxGridEventData, bool?>(DispatchEvent), evt);
+                    return (bool?)Invoke(new Func<GridEvent, bool?>(DispatchEvent), evt);
                 }
                 catch
                 {
@@ -644,7 +693,7 @@ namespace VolvoxGrid.DotNet.Internal
             return _eventHandler(evt);
         }
 
-        private void HandleRenderOutput(VolvoxRenderOutputData output)
+        private void HandleRenderOutput(RenderOutput output)
         {
             if (output == null)
             {
@@ -710,13 +759,16 @@ namespace VolvoxGrid.DotNet.Internal
             try
             {
                 var config = _client.GetConfig(_gridId);
-                var rendering = config.Rendering ?? new VolvoxRenderConfigData();
-                _framePacingMode = rendering.FramePacingMode ?? VolvoxFramePacingMode.Auto;
-                _targetFrameRateHz = NormalizeTargetFrameRateHz(rendering.TargetFrameRateHz ?? AutoFallbackFrameRateHz);
+                var rendering = config.Rendering ?? new RenderConfig();
+                _framePacingMode = rendering.HasFramePacingMode
+                    ? rendering.FramePacingMode
+                    : FramePacingMode.FRAME_PACING_MODE_AUTO;
+                _targetFrameRateHz = NormalizeTargetFrameRateHz(
+                    rendering.HasTargetFrameRateHz ? rendering.TargetFrameRateHz : AutoFallbackFrameRateHz);
             }
             catch
             {
-                _framePacingMode = VolvoxFramePacingMode.Auto;
+                _framePacingMode = FramePacingMode.FRAME_PACING_MODE_AUTO;
                 _targetFrameRateHz = AutoFallbackFrameRateHz;
             }
             finally
@@ -753,13 +805,13 @@ namespace VolvoxGrid.DotNet.Internal
             }
 
             RefreshFramePacingConfigIfStale();
-            if (_framePacingMode == VolvoxFramePacingMode.Unlimited)
+            if (_framePacingMode == FramePacingMode.FRAME_PACING_MODE_UNLIMITED)
             {
                 RequestFrame();
                 return;
             }
 
-            int hz = _framePacingMode == VolvoxFramePacingMode.Fixed
+            int hz = _framePacingMode == FramePacingMode.FRAME_PACING_MODE_FIXED
                 ? NormalizeTargetFrameRateHz(_targetFrameRateHz)
                 : AutoFallbackFrameRateHz;
             int delayMs = Math.Max(1, (int)Math.Round(1000.0 / hz));
@@ -820,12 +872,12 @@ namespace VolvoxGrid.DotNet.Internal
             SendRenderInput(payload);
         }
 
-        private void SendPointer(VolvoxPointerType type, MouseEventArgs e, bool dblClick)
+        private void SendPointer(PointerEvent_Type type, MouseEventArgs e, bool dblClick)
         {
             SendPointer(type, e.X, e.Y, GetModifiers(), MapMouseButton(e), dblClick);
         }
 
-        private void SendPointer(VolvoxPointerType type, int x, int y, int modifier, int button, bool dblClick)
+        private void SendPointer(PointerEvent_Type type, int x, int y, int modifier, int button, bool dblClick)
         {
             if (_client == null || _gridId == 0)
             {
@@ -866,7 +918,7 @@ namespace VolvoxGrid.DotNet.Internal
 
             try
             {
-                VolvoxSelectionStateData state = UpdateMouseSelectionState(e);
+                SelectionState state = UpdateMouseSelectionState(e);
                 if (!HasValidMouseCell(state))
                 {
                     return false;
@@ -898,7 +950,7 @@ namespace VolvoxGrid.DotNet.Internal
 
             try
             {
-                VolvoxSelectionStateData state = UpdateMouseSelectionState(e);
+                SelectionState state = UpdateMouseSelectionState(e);
                 if (HasValidMouseCell(state))
                 {
                     _multiRangeDragRow = state.MouseRow;
@@ -916,25 +968,25 @@ namespace VolvoxGrid.DotNet.Internal
 
         private bool IsAdditiveMultiRangeGesture(MouseEventArgs e)
         {
-            return _selectionMode == VolvoxSelectionMode.MultiRange
+            return _selectionMode == Volvoxgrid.V1.SelectionMode.SELECTION_MULTI_RANGE
                 && (e.Button & MouseButtons.Left) == MouseButtons.Left
                 && (Control.ModifierKeys & Keys.Control) == Keys.Control;
         }
 
-        private VolvoxSelectionStateData UpdateMouseSelectionState(MouseEventArgs e)
+        private SelectionState UpdateMouseSelectionState(MouseEventArgs e)
         {
-            SendPointer(VolvoxPointerType.Move, e.X, e.Y, GetModifiers(), 0, false);
+            SendPointer(PointerMoveEvent, e.X, e.Y, GetModifiers(), 0, false);
             return _client.GetSelection(_gridId);
         }
 
-        private static bool HasValidMouseCell(VolvoxSelectionStateData state)
+        private static bool HasValidMouseCell(SelectionState state)
         {
             return state != null && state.MouseRow >= 0 && state.MouseCol >= 0;
         }
 
-        private static List<VolvoxCellRangeData> SnapshotMultiRangeBaseRanges(VolvoxSelectionStateData state, int anchorRow, int anchorCol)
+        private static List<CellRange> SnapshotMultiRangeBaseRanges(SelectionState state, int anchorRow, int anchorCol)
         {
-            var ranges = new List<VolvoxCellRangeData>();
+            var ranges = new List<CellRange>();
             if (state == null)
             {
                 return ranges;
@@ -944,7 +996,7 @@ namespace VolvoxGrid.DotNet.Internal
             {
                 if (state.ActiveRow >= 0 && state.ActiveCol >= 0)
                 {
-                    ranges.Add(new VolvoxCellRangeData
+                    ranges.Add(new CellRange
                     {
                         Row1 = state.ActiveRow,
                         Col1 = state.ActiveCol,
@@ -957,7 +1009,7 @@ namespace VolvoxGrid.DotNet.Internal
 
             for (int i = 0; i < state.Ranges.Count; i++)
             {
-                VolvoxCellRangeData range = state.Ranges[i];
+                CellRange range = state.Ranges[i];
                 if (range.Row1 == anchorRow
                     && range.Col1 == anchorCol
                     && range.Row2 == anchorRow
@@ -966,7 +1018,7 @@ namespace VolvoxGrid.DotNet.Internal
                     continue;
                 }
 
-                ranges.Add(new VolvoxCellRangeData
+                ranges.Add(new CellRange
                 {
                     Row1 = range.Row1,
                     Col1 = range.Col1,
@@ -985,11 +1037,11 @@ namespace VolvoxGrid.DotNet.Internal
                 return;
             }
 
-            var ranges = new List<VolvoxCellRangeData>(_multiRangeBaseRanges.Count + 1);
+            var ranges = new List<CellRange>(_multiRangeBaseRanges.Count + 1);
             for (int i = 0; i < _multiRangeBaseRanges.Count; i++)
             {
-                VolvoxCellRangeData range = _multiRangeBaseRanges[i];
-                ranges.Add(new VolvoxCellRangeData
+                CellRange range = _multiRangeBaseRanges[i];
+                ranges.Add(new CellRange
                 {
                     Row1 = range.Row1,
                     Col1 = range.Col1,
@@ -998,7 +1050,7 @@ namespace VolvoxGrid.DotNet.Internal
                 });
             }
 
-            var nextRange = new VolvoxCellRangeData
+            var nextRange = new CellRange
             {
                 Row1 = Math.Min(_multiRangeAnchorRow, targetRow),
                 Col1 = Math.Min(_multiRangeAnchorCol, targetCol),
@@ -1009,7 +1061,7 @@ namespace VolvoxGrid.DotNet.Internal
             bool exists = false;
             for (int i = 0; i < ranges.Count; i++)
             {
-                VolvoxCellRangeData range = ranges[i];
+                CellRange range = ranges[i];
                 if (range.Row1 == nextRange.Row1
                     && range.Col1 == nextRange.Col1
                     && range.Row2 == nextRange.Row2
@@ -1143,7 +1195,7 @@ namespace VolvoxGrid.DotNet.Internal
             }
         }
 
-        private void BlitFrame(VolvoxFrameDoneData frame)
+        private void BlitFrame(FrameDone frame)
         {
             bool blitted = false;
             lock (_frameLock)
@@ -1256,7 +1308,7 @@ namespace VolvoxGrid.DotNet.Internal
             }
         }
 
-        private void InvalidateDirty(VolvoxFrameDoneData frame)
+        private void InvalidateDirty(FrameDone frame)
         {
             if (frame == null)
             {

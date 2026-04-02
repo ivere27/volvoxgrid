@@ -133,13 +133,7 @@ namespace VolvoxGrid.DotNet.Internal
             }
 
             string pluginDir = Path.GetDirectoryName(pluginPath);
-            if (!string.IsNullOrEmpty(pluginDir))
-            {
-                // Ensure dependent DLLs next to the plugin can be resolved by LoadLibrary.
-                SetDllDirectory(pluginDir);
-            }
-
-            IntPtr module = LoadLibrary(pluginPath);
+            IntPtr module = LoadModule(pluginPath, pluginDir);
             if (module == IntPtr.Zero)
             {
                 throw new InvalidOperationException("Failed to load plugin library: " + pluginPath);
@@ -153,7 +147,7 @@ namespace VolvoxGrid.DotNet.Internal
                 IntPtr recvPtr = GetRequiredExport(module, "Synurang_Stream_Recv");
                 IntPtr closeSendPtr = GetRequiredExport(module, "Synurang_Stream_CloseSend");
                 IntPtr closePtr = GetRequiredExport(module, "Synurang_Stream_Close");
-                IntPtr setTextRendererPtr = GetProcAddress(module, "volvox_grid_set_text_renderer");
+                IntPtr setTextRendererPtr = GetExport(module, "volvox_grid_set_text_renderer");
                 IntPtr freePtr = GetRequiredExport(module, "Synurang_Free");
 
                 var invoke = (SynInvokeDelegate)Marshal.GetDelegateForFunctionPointer(invokePtr, typeof(SynInvokeDelegate));
@@ -171,7 +165,7 @@ namespace VolvoxGrid.DotNet.Internal
             }
             catch
             {
-                FreeLibrary(module);
+                FreeModule(module);
                 throw;
             }
         }
@@ -294,7 +288,7 @@ namespace VolvoxGrid.DotNet.Internal
             {
                 if (ShouldFreeLibraryOnDispose())
                 {
-                    FreeLibrary(_module);
+                    FreeModule(_module);
                 }
             }
         }
@@ -355,13 +349,66 @@ namespace VolvoxGrid.DotNet.Internal
 
         private static IntPtr GetRequiredExport(IntPtr module, string name)
         {
-            IntPtr proc = GetProcAddress(module, name);
+            IntPtr proc = GetExport(module, name);
             if (proc == IntPtr.Zero)
             {
                 throw new MissingMethodException("Missing required plugin export: " + name);
             }
 
             return proc;
+        }
+
+        private static IntPtr LoadModule(string pluginPath, string pluginDir)
+        {
+            if (IsWindowsRuntime())
+            {
+                if (!string.IsNullOrEmpty(pluginDir))
+                {
+                    // Ensure dependent DLLs next to the plugin can be resolved by LoadLibrary.
+                    SetDllDirectory(pluginDir);
+                }
+
+                return LoadLibrary(pluginPath);
+            }
+
+#if NET40
+            throw new PlatformNotSupportedException("Non-Windows native plugin loading requires .NET 8+.");
+#else
+            return NativeLibrary.Load(pluginPath);
+#endif
+        }
+
+        private static IntPtr GetExport(IntPtr module, string name)
+        {
+            if (IsWindowsRuntime())
+            {
+                return GetProcAddress(module, name);
+            }
+
+#if NET40
+            return IntPtr.Zero;
+#else
+            IntPtr proc;
+            return NativeLibrary.TryGetExport(module, name, out proc) ? proc : IntPtr.Zero;
+#endif
+        }
+
+        private static void FreeModule(IntPtr module)
+        {
+            if (module == IntPtr.Zero)
+            {
+                return;
+            }
+
+            if (IsWindowsRuntime())
+            {
+                FreeLibrary(module);
+                return;
+            }
+
+#if !NET40
+            NativeLibrary.Free(module);
+#endif
         }
 
         [DllImport("kernel32", CharSet = CharSet.Unicode, SetLastError = true)]
@@ -392,6 +439,15 @@ namespace VolvoxGrid.DotNet.Internal
         private static bool IsWineHosted()
         {
             return !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WINEPREFIX"));
+        }
+
+        private static bool IsWindowsRuntime()
+        {
+            PlatformID platform = Environment.OSVersion.Platform;
+            return platform == PlatformID.Win32NT
+                || platform == PlatformID.Win32S
+                || platform == PlatformID.Win32Windows
+                || platform == PlatformID.WinCE;
         }
 
         internal static SynurangFfiException DecodeFfiError(byte[] payload, string context)

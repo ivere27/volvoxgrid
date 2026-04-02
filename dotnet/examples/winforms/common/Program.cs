@@ -195,7 +195,7 @@ namespace VolvoxGrid.DotNet.Sample
             var chkEditable = new CheckBox
             {
                 Text = "Editable",
-                Checked = true,
+                Checked = false,
                 AutoSize = true,
                 Margin = new Padding(16, 6, 0, 0),
             };
@@ -264,7 +264,7 @@ namespace VolvoxGrid.DotNet.Sample
             _grid = new VolvoxGridControl
             {
                 Dock = DockStyle.Fill,
-                Editable = true,
+                Editable = false,
                 SelectionMode = VolvoxGridSelectionMode.Free,
                 HoverEnabled = true,
                 RendererMode = VolvoxGridRendererMode.Cpu,
