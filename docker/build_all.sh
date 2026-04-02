@@ -48,7 +48,7 @@ run_desktop() {
   echo "========================================"
   local desktop_group_id="${DESKTOP_GROUP_ID:-io.github.ivere27}"
   local desktop_artifact_id="${DESKTOP_ARTIFACT_ID:-volvoxgrid-desktop}"
-  local desktop_version="${DESKTOP_VERSION:-${VERSION:-0.4.0}}"
+  local desktop_version="${DESKTOP_VERSION:-${VERSION:-0.5.0}}"
   local desktop_git_commit="${DESKTOP_GIT_COMMIT:-${GIT_COMMIT:-unknown}}"
   local desktop_build_date="${DESKTOP_BUILD_DATE:-${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}}"
 
@@ -75,7 +75,7 @@ run_wasm() {
   local dist_lite_dir="${DIST_LITE_DIR:-${REPO_ROOT}/dist/wasm-lite}"
   local web_target="${WEB_DOCKER_TARGET:-all}"
   WEB_DIST_DIR="${WEB_DIST_DIR:-${REPO_ROOT}/dist/web}"
-  WEB_BUNDLE_VERSION="${WEB_BUNDLE_VERSION:-${VERSION:-0.4.0}}"
+  WEB_BUNDLE_VERSION="${WEB_BUNDLE_VERSION:-${VERSION:-0.5.0}}"
   if [[ -z "${WEB_DOCKER_TARGET:-}" && "${BUILD_TARGET}" == "wasm" ]]; then
     web_target="bundle"
   fi
