@@ -449,23 +449,20 @@ WASM_OUTPUT_MAIN := $(WASM_OUTPUT_DIR)/volvoxgrid_wasm_bg.wasm
 
 wasm:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
-	@command -v wasm-bindgen >/dev/null 2>&1 || { echo "Error: wasm-bindgen not found. Install with: cargo install wasm-bindgen-cli"; exit 1; }
 	@echo "Building WASM crate..."
-	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build --mode no-install . --target web --out-dir ../example/wasm --features gpu
+	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features gpu
 	@echo "WASM build complete: web/example/wasm/"
 
 wasm-lite:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
-	@command -v wasm-bindgen >/dev/null 2>&1 || { echo "Error: wasm-bindgen not found. Install with: cargo install wasm-bindgen-cli"; exit 1; }
 	@echo "Building WASM crate (lite)..."
-	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build --mode no-install . --target web --out-dir ../example/wasm --no-default-features
+	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --no-default-features
 	@echo "WASM lite build complete: web/example/wasm/"
 
 wasm-threaded:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
-	@command -v wasm-bindgen >/dev/null 2>&1 || { echo "Error: wasm-bindgen not found. Install with: cargo install wasm-bindgen-cli"; exit 1; }
 	@echo "Building WASM crate (threaded)..."
-	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build --mode no-install . --target web --out-dir ../example/wasm --features wasm-threads,gpu -Z build-std=std,panic_abort
+	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features wasm-threads,gpu -Z build-std=std,panic_abort
 	@echo "WASM threaded build complete: web/example/wasm/"
 
 wasm-ready:
