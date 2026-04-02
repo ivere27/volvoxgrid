@@ -242,6 +242,7 @@ object SalesJsonDemo {
             .setLayout(
                 LayoutConfig.newBuilder()
                     .setFixedRows(0)
+                    .setExtendLastCol(true)
                     .build()
             )
             .setStyle(

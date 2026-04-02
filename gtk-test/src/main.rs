@@ -3288,6 +3288,17 @@ fn process_ui_message(
                 }
                 st.event_count += 1;
                 st.last_event = grid_event_name(&event).to_string();
+                if is_hierarchy_action_text_click(&st, &event) {
+                    if let Some(pb::grid_event::Event::Click(click)) = event.event.as_ref() {
+                        st.status_note = format!(
+                            "Hierarchy action click: row {}, col {}, hit_area {}, interaction {}",
+                            click.row + 1,
+                            click.col,
+                            click.hit_area,
+                            click.interaction
+                        );
+                    }
+                }
                 // Track engine edit state for IME support.
                 match &event.event {
                     Some(pb::grid_event::Event::StartEdit(_)) => {
@@ -3892,6 +3903,22 @@ fn grid_event_name(event: &pb::GridEvent) -> &'static str {
         Some(pb::grid_event::Event::Error(_)) => "Error",
         Some(_) => "GridEvent",
         None => "GridEvent",
+    }
+}
+
+fn is_hierarchy_action_text_click(state: &State, event: &pb::GridEvent) -> bool {
+    if state.current_demo != DEMO_HIERARCHY {
+        return false;
+    }
+
+    match event.event.as_ref() {
+        Some(pb::grid_event::Event::Click(click)) => {
+            click.row >= 0
+                && click.col == 5
+                && click.hit_area == pb::CellHitArea::HitText as i32
+                && click.interaction == pb::CellInteraction::TextLink as i32
+        }
+        _ => false,
     }
 }
 

@@ -57,6 +57,25 @@ namespace VolvoxGrid.DotNet
         OnEdit = 2,
     }
 
+    public enum VolvoxGridCellHitArea
+    {
+        None = 0,
+        Cell = 1,
+        Text = 2,
+        Picture = 3,
+        ButtonPicture = 4,
+        Checkbox = 5,
+        Dropdown = 6,
+    }
+
+    public enum VolvoxGridCellInteraction
+    {
+        Unspecified = 0,
+        None = 1,
+        TextLink = 2,
+        Button = 3,
+    }
+
     public sealed class VolvoxGridHeaderFeatures
     {
         public bool Sort { get; set; }
@@ -291,6 +310,7 @@ namespace VolvoxGrid.DotNet
         public VolvoxGridAlign Alignment { get; set; }
         public VolvoxGridColumnDataType DataType { get; set; }
         public string Format { get; set; }
+        public VolvoxGridCellInteraction Interaction { get; set; }
 
         public VolvoxGridColumn()
         {
@@ -301,6 +321,7 @@ namespace VolvoxGrid.DotNet
             SortDirection = VolvoxGridSortDirection.None;
             Alignment = VolvoxGridAlign.General;
             DataType = VolvoxGridColumnDataType.String;
+            Interaction = VolvoxGridCellInteraction.Unspecified;
         }
     }
 
@@ -345,6 +366,29 @@ namespace VolvoxGrid.DotNet
         public VolvoxGridSelectionChangedEventArgs(int[] selectedRows)
         {
             SelectedRows = selectedRows ?? new int[0];
+        }
+    }
+
+    public sealed class VolvoxGridCellClickEventArgs : EventArgs
+    {
+        public int RowIndex { get; private set; }
+        public int ColumnIndex { get; private set; }
+        public string FieldName { get; private set; }
+        public VolvoxGridCellHitArea HitArea { get; private set; }
+        public VolvoxGridCellInteraction Interaction { get; private set; }
+
+        public VolvoxGridCellClickEventArgs(
+            int rowIndex,
+            int columnIndex,
+            string fieldName,
+            VolvoxGridCellHitArea hitArea,
+            VolvoxGridCellInteraction interaction)
+        {
+            RowIndex = rowIndex;
+            ColumnIndex = columnIndex;
+            FieldName = fieldName ?? string.Empty;
+            HitArea = hitArea;
+            Interaction = interaction;
         }
     }
 

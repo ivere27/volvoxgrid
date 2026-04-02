@@ -1003,6 +1003,7 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
         pb::GridConfig {
             layout: Some(pb::LayoutConfig {
                 fixed_rows: Some(0),
+                extend_last_col: Some(true),
                 ..Default::default()
             }),
             editing: Some(pb::EditConfig {

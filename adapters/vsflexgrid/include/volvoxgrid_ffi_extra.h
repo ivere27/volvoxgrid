@@ -90,7 +90,8 @@ typedef void (*volvox_grid_measure_text_fn)(
 
 typedef float (*volvox_grid_render_text_fn)(
     uint8_t* buffer, int32_t buf_width, int32_t buf_height, int32_t stride,
-    int32_t x, int32_t y, int32_t clip_w, int32_t clip_h,
+    int32_t x, int32_t y,
+    int32_t clip_x, int32_t clip_y, int32_t clip_w, int32_t clip_h,
     const uint8_t* text_ptr, int32_t text_len,
     const uint8_t* font_name_ptr, int32_t font_name_len,
     float font_size,

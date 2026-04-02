@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide Align;
 import 'package:flutter/services.dart';
 import 'package:volvoxgrid/volvoxgrid.dart' hide Padding;
+import 'package:volvoxgrid/src/generated/volvoxgrid.pb.dart' as pb;
 
 import 'sales_json_demo.dart';
 import 'hierarchy_json_demo.dart';
@@ -362,6 +363,39 @@ class _DemoPageState extends State<DemoPage> {
     });
   }
 
+  void _onGridEvent(pb.GridEvent event) {
+    if (_currentDemo != DemoMode.hierarchy || !event.hasClick()) {
+      return;
+    }
+    final click = event.click;
+    if (click.row < 0 ||
+        click.col != hierarchyActionColumn ||
+        click.hitArea != pb.CellHitArea.HIT_TEXT ||
+        click.interaction != pb.CellInteraction.CELL_INTERACTION_TEXT_LINK) {
+      return;
+    }
+    final message =
+        'Hierarchy action click: row ${click.row + 1}, col ${click.col}, '
+        'hit_area ${click.hitArea.value}, interaction ${click.interaction.value}';
+    setState(() {
+      _statusText = message;
+    });
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hierarchy Action'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _onSortAscending() async {
     if (_loading) return;
     final col = await _activeController.cursorCol();
@@ -714,6 +748,7 @@ class _DemoPageState extends State<DemoPage> {
                 ? const Center(child: CircularProgressIndicator())
                 : VolvoxGridWidget(
                     controller: _activeController,
+                    onGridEvent: _onGridEvent,
                     onSelectionChanged: _onSelectionChanged,
                     onContextMenuRequest: _showGridDebugContextMenu,
                   ),

@@ -272,6 +272,7 @@ namespace VolvoxGrid.DotNet.Sample
             _grid.FocusedCellChanged += OnFocusedCellChanged;
             _grid.CellValueChanged += OnCellValueChanged;
             _grid.SelectionChanged += OnSelectionChanged;
+            _grid.CellClick += OnCellClick;
 
             _selectionModeButton = new Button
             {
@@ -953,6 +954,33 @@ namespace VolvoxGrid.DotNet.Sample
         private void OnSelectionChanged(object sender, VolvoxGridSelectionChangedEventArgs args)
         {
             SetStatus("Selection changed: " + args.SelectedRows.Length + " row(s).");
+        }
+
+        private void OnCellClick(object sender, VolvoxGridCellClickEventArgs args)
+        {
+            if (_currentDemo != DemoMode.Hierarchy
+                || args.RowIndex < 0
+                || args.ColumnIndex != HierarchyJsonDemo.ActionColumnIndex
+                || args.HitArea != VolvoxGridCellHitArea.Text
+                || args.Interaction != VolvoxGridCellInteraction.TextLink)
+            {
+                return;
+            }
+
+            SetStatus(
+                "Hierarchy action click: row=" + (args.RowIndex + 1)
+                + ", column='" + GetColumnLabel(args.ColumnIndex, args.FieldName) + "'"
+                + ", hit_area=" + (int)args.HitArea
+                + ", interaction=" + (int)args.Interaction + ".");
+            MessageBox.Show(
+                this,
+                "Hierarchy action click: row=" + (args.RowIndex + 1)
+                    + ", column='" + GetColumnLabel(args.ColumnIndex, args.FieldName) + "'"
+                    + ", hit_area=" + (int)args.HitArea
+                    + ", interaction=" + (int)args.Interaction + ".",
+                "Hierarchy Action",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
         private void SetStatus(string message, bool append)

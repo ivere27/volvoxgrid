@@ -39,6 +39,7 @@ const SALES_STATUS_ITEMS = "Active|Pending|Shipped|Returned|Cancelled";
 const GRID_EVENT_CLICK = GridEventFields["click"];
 const HIERARCHY_ACTION_COL = 5;
 const CELL_INTERACTION_UNSPECIFIED = CellInteraction.CELL_INTERACTION_UNSPECIFIED;
+const CELL_INTERACTION_TEXT_LINK = CellInteraction.CELL_INTERACTION_TEXT_LINK;
 const CELL_HIT_AREA_TEXT = CellHitArea.HIT_TEXT;
 const FONT_FETCH_TIMEOUT_MS = 5000;
 const PB_TEXT_ENCODER = new TextEncoder();
@@ -587,6 +588,7 @@ function pbEncodeHierarchyOutlineConfig(): Uint8Array {
 function pbEncodeSalesDemoConfig(): Uint8Array {
   const layout: number[] = [];
   layout.push(...pbEncodeInt32Field(3, 0));
+  layout.push(...pbEncodeTag(10, 0), ...pbEncodeBool(true));
 
   const style: number[] = [];
   style.push(...pbEncodeUint32Field(1, 0xFFFFFFFF));
@@ -1159,7 +1161,6 @@ async function main() {
   let doomJoystickDirection: DoomDirectionCode | null = null;
   const resetDoomActionButtons: Array<() => void> = [];
   let switchToken = 0;
-  let pendingHierarchyActionAlert = 0;
   let contextMenuEl: HTMLDivElement | null = null;
   let contextMenuDismissHandler: ((e: Event) => void) | null = null;
   let contextMenuEscHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -1344,7 +1345,22 @@ async function main() {
 
   grid.onContextMenuRequest = showDebugContextMenu;
 
-  function drainHierarchyActionClickEvents(): void {
+  function handleHierarchyActionClick(click: {
+    row: number;
+    col: number;
+    hitArea: number;
+    interaction: number;
+  }): void {
+    const message =
+      "Action row " + (click.row + 1)
+      + " · col " + click.col
+      + " · hit_area " + click.hitArea
+      + " · interaction " + click.interaction;
+    updateStatus(message);
+    window.alert(message);
+  }
+
+  function drainHierarchyActionClickEvents(rawEvent: Uint8Array): void {
     if (currentDemo !== "hierarchy") {
       return;
     }
@@ -1353,39 +1369,24 @@ async function main() {
       return;
     }
     try {
-      const rawEvents = grid.drainEventStreamRaw(32);
-      for (const rawEvent of rawEvents) {
-        const decoded = pbDecodeGridEventEnvelope(rawEvent);
-        if (decoded == null || decoded.eventField !== GRID_EVENT_CLICK) {
-          continue;
-        }
-        const click = pbDecodeClickEventPayload(decoded.payload);
-        if (click.row < 0 || click.col !== HIERARCHY_ACTION_COL || click.hitArea !== CELL_HIT_AREA_TEXT) {
-          continue;
-        }
-        const rowLabel = click.row + 1;
-        window.alert(
-          "Hierarchy action click: row " + rowLabel
-            + ", col " + click.col
-            + ", hit_area " + click.hitArea
-            + ", interaction " + click.interaction,
-        );
-        break;
+      const decoded = pbDecodeGridEventEnvelope(rawEvent);
+      if (decoded == null || decoded.eventField !== GRID_EVENT_CLICK) {
+        return;
       }
+      const click = pbDecodeClickEventPayload(decoded.payload);
+      if (click.row < 0
+        || click.col !== HIERARCHY_ACTION_COL
+        || click.hitArea !== CELL_HIT_AREA_TEXT
+        || click.interaction !== CELL_INTERACTION_TEXT_LINK) {
+        return;
+      }
+      handleHierarchyActionClick(click);
     } catch (error) {
-      console.warn("VolvoxGrid demo: failed to drain click events", error);
+      console.warn("VolvoxGrid demo: failed to handle click event", error);
     }
   }
 
-  function scheduleHierarchyActionClickAlert(): void {
-    if (currentDemo !== "hierarchy" || pendingHierarchyActionAlert !== 0) {
-      return;
-    }
-    pendingHierarchyActionAlert = window.setTimeout(() => {
-      pendingHierarchyActionAlert = 0;
-      drainHierarchyActionClickEvents();
-    }, 0);
-  }
+  grid.onGridEventRaw = drainHierarchyActionClickEvents;
 
   function normalizeLayerMask(raw: number): number {
     if (!Number.isFinite(raw)) {
@@ -2394,10 +2395,6 @@ async function main() {
 
   setDoomOptionsVisible(false);
   updateDoomTouchControlsVisibility();
-
-  canvas.addEventListener("click", () => {
-    scheduleHierarchyActionClickAlert();
-  });
 
   rebuildCanvasResolutionOptions(false);
   selCanvasRes.addEventListener("change", () => {

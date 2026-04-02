@@ -428,6 +428,7 @@ fn apply_local_sales_demo_chrome(grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
 
     grid.columns[6].progress_color = 0xFF818CF8;
     grid.allow_user_resizing = 3;
+    grid.extend_last_col = true;
     grid.tab_behavior = 1;
     grid.edit_trigger_mode = 0;
     grid.dropdown_trigger = 1;
@@ -6075,6 +6076,7 @@ type VvMeasureTextFn = unsafe extern "C" fn(
 /// Parameters:
 ///   buffer/buf_width/buf_height/stride — target RGBA pixel buffer
 ///   x, y                    — draw position
+///   clip_x, clip_y          — absolute clip origin
 ///   clip_w, clip_h          — clip rectangle size
 ///   text_ptr/text_len       — UTF-8 text bytes
 ///   font_name_ptr/font_name_len — UTF-8 font family name
@@ -6090,6 +6092,8 @@ type VvRenderTextFn = unsafe extern "C" fn(
     stride: i32,
     x: i32,
     y: i32,
+    clip_x: i32,
+    clip_y: i32,
     clip_w: i32,
     clip_h: i32,
     text_ptr: *const u8,
@@ -6153,8 +6157,8 @@ impl volvoxgrid_engine::text::TextRenderer for FfiTextRenderer {
         stride: i32,
         x: i32,
         y: i32,
-        _clip_x: i32,
-        _clip_y: i32,
+        clip_x: i32,
+        clip_y: i32,
         clip_w: i32,
         clip_h: i32,
         text: &str,
@@ -6174,6 +6178,8 @@ impl volvoxgrid_engine::text::TextRenderer for FfiTextRenderer {
                 stride,
                 x,
                 y,
+                clip_x,
+                clip_y,
                 clip_w,
                 clip_h,
                 text.as_ptr(),
@@ -6254,4 +6260,121 @@ pub extern "C" fn volvox_grid_set_text_renderer(
         }
     });
     0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+    use volvoxgrid_engine::text::TextRenderer;
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    struct RecordedRenderArgs {
+        x: i32,
+        y: i32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+    }
+
+    static LAST_RENDER_ARGS: Mutex<Option<RecordedRenderArgs>> = Mutex::new(None);
+
+    unsafe extern "C" fn test_measure_text(
+        _text_ptr: *const u8,
+        _text_len: i32,
+        _font_name_ptr: *const u8,
+        _font_name_len: i32,
+        _font_size: f32,
+        _bold: i32,
+        _italic: i32,
+        _max_width: f32,
+        out_width: *mut f32,
+        out_height: *mut f32,
+        _user_data: *mut std::ffi::c_void,
+    ) {
+        if !out_width.is_null() {
+            *out_width = 0.0;
+        }
+        if !out_height.is_null() {
+            *out_height = 0.0;
+        }
+    }
+
+    unsafe extern "C" fn test_render_text(
+        _buffer: *mut u8,
+        _buf_width: i32,
+        _buf_height: i32,
+        _stride: i32,
+        x: i32,
+        y: i32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        _text_ptr: *const u8,
+        _text_len: i32,
+        _font_name_ptr: *const u8,
+        _font_name_len: i32,
+        _font_size: f32,
+        _bold: i32,
+        _italic: i32,
+        _color: u32,
+        _max_width: f32,
+        _user_data: *mut std::ffi::c_void,
+    ) -> f32 {
+        *LAST_RENDER_ARGS.lock().unwrap() = Some(RecordedRenderArgs {
+            x,
+            y,
+            clip_x,
+            clip_y,
+            clip_w,
+            clip_h,
+        });
+        0.0
+    }
+
+    #[test]
+    fn ffi_text_renderer_forwards_absolute_clip_origin() {
+        *LAST_RENDER_ARGS.lock().unwrap() = None;
+
+        let mut renderer = FfiTextRenderer {
+            measure_fn: test_measure_text,
+            render_fn: test_render_text,
+            user_data: std::ptr::null_mut(),
+        };
+        let mut buffer = vec![0u8; 64 * 32 * 4];
+
+        let _ = renderer.render_text(
+            &mut buffer,
+            64,
+            32,
+            64 * 4,
+            9,
+            7,
+            15,
+            3,
+            20,
+            11,
+            "demo",
+            "Arial",
+            12.0,
+            false,
+            false,
+            0xFF000000,
+            None,
+        );
+
+        assert_eq!(
+            *LAST_RENDER_ARGS.lock().unwrap(),
+            Some(RecordedRenderArgs {
+                x: 9,
+                y: 7,
+                clip_x: 15,
+                clip_y: 3,
+                clip_w: 20,
+                clip_h: 11,
+            })
+        );
+    }
 }

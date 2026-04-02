@@ -2019,6 +2019,7 @@ export class VolvoxGrid {
   private readonly cellBackColorBatchEncoder = new CellBackColorBatchEncoder();
   onZoomChange: ((scale: number) => void) | null = null;
   onContextMenuRequest: ((request: VolvoxGridContextMenuRequest) => void) | null = null;
+  private rawGridEventListener: ((rawEvent: Uint8Array) => void) | null = null;
   private beforeEditListener: ((details: VolvoxGridBeforeEditDetails) => void) | null = null;
   private cellEditValidatingListener:
     ((details: VolvoxGridCellEditValidatingDetails) => void) | null = null;
@@ -2121,6 +2122,15 @@ export class VolvoxGrid {
   set onBeforeSort(listener: ((details: VolvoxGridBeforeSortDetails) => void) | null) {
     this.beforeSortListener = listener;
     this.syncCancelableEventDecisionSupport();
+  }
+
+  /** Raw `GridEvent` stream hook for demo/sample hosts. */
+  get onGridEventRaw(): ((rawEvent: Uint8Array) => void) | null {
+    return this.rawGridEventListener;
+  }
+
+  set onGridEventRaw(listener: ((rawEvent: Uint8Array) => void) | null) {
+    this.rawGridEventListener = listener;
   }
 
   /**
@@ -4211,6 +4221,21 @@ export class VolvoxGrid {
     return this.flushCancelableEventDecisions();
   }
 
+  private dispatchRawGridEvents(maxEvents: number = 64): void {
+    if (this.rawGridEventListener == null) {
+      return;
+    }
+
+    try {
+      const events = this.drainEventStreamRaw(maxEvents);
+      for (const rawEvent of events) {
+        this.rawGridEventListener(rawEvent);
+      }
+    } catch (error) {
+      console.error("VolvoxGrid raw event listener failed", error);
+    }
+  }
+
   private flushCancelableEventDecisions(): boolean {
     if (typeof this.wasm.take_pending_decision_event !== "function"
       || typeof this.wasm.send_event_decision !== "function") {
@@ -5096,6 +5121,7 @@ export class VolvoxGrid {
       if (this.hasCancelableEventListeners()) {
         this.flushCancelableEventDecisions();
       }
+      this.dispatchRawGridEvents();
 
       if (this.dirty || this.wasm.is_dirty(this.gridId)) {
         this.render();

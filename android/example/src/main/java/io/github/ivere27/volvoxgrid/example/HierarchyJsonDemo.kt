@@ -4,6 +4,7 @@ import io.github.ivere27.volvoxgrid.Align
 import io.github.ivere27.volvoxgrid.Border
 import io.github.ivere27.volvoxgrid.BorderStyle
 import io.github.ivere27.volvoxgrid.Borders
+import io.github.ivere27.volvoxgrid.CellInteraction
 import io.github.ivere27.volvoxgrid.CellStyle
 import io.github.ivere27.volvoxgrid.ColIndicatorCellMode
 import io.github.ivere27.volvoxgrid.ColIndicatorConfig
@@ -43,6 +44,8 @@ import io.github.ivere27.volvoxgrid.TreeIndicatorStyle
 import io.github.ivere27.volvoxgrid.VolvoxGridController
 
 object HierarchyJsonDemo {
+    const val ACTION_COLUMN_INDEX = 5
+
     private val widths = intArrayOf(260, 80, 80, 120, 100, 92)
     private val captions = arrayOf("Name", "Type", "Size", "Modified", "Permissions", "Action")
     private val keys = arrayOf("Name", "Type", "Size", "Modified", "Permissions", "Action")
@@ -93,7 +96,13 @@ object HierarchyJsonDemo {
             val isFolder = row < types.size && types[row] == "Folder"
             controller.setRowOutlineLevel(row, levels[row])
             controller.setIsSubtotal(row, isFolder)
-            controller.setCellStyleRange(row, 5, row, 5, actionStyle)
+            controller.setCellStyleRange(
+                row,
+                ACTION_COLUMN_INDEX,
+                row,
+                ACTION_COLUMN_INDEX,
+                actionStyle
+            )
             if (isFolder) {
                 controller.setCellStyleRange(row, 0, row, 0, folderStyle)
             }
@@ -114,7 +123,10 @@ object HierarchyJsonDemo {
                     def.dataType = ColumnDataType.COLUMN_DATA_DATE
                     def.format = "short date"
                 }
-                4, 5 -> def.align = Align.ALIGN_CENTER_CENTER
+                4, ACTION_COLUMN_INDEX -> def.align = Align.ALIGN_CENTER_CENTER
+            }
+            if (col == ACTION_COLUMN_INDEX) {
+                def.interaction = CellInteraction.CELL_INTERACTION_TEXT_LINK
             }
             builder.addColumns(def.build())
         }

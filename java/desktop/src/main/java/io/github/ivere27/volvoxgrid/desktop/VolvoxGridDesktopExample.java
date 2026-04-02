@@ -1,7 +1,10 @@
 package io.github.ivere27.volvoxgrid.desktop;
 
+import io.github.ivere27.volvoxgrid.CellHitArea;
+import io.github.ivere27.volvoxgrid.CellInteraction;
 import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.CreateResponse;
+import io.github.ivere27.volvoxgrid.GridEvent;
 import io.github.ivere27.volvoxgrid.GridConfig;
 import io.github.ivere27.volvoxgrid.GridHandle;
 import io.github.ivere27.volvoxgrid.LayoutConfig;
@@ -28,6 +31,7 @@ import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
@@ -209,7 +213,21 @@ public final class VolvoxGridDesktopExample {
         });
 
         gridPanel.setGridEventListener(event -> {
-            if (event.hasCellFocusChanged()) {
+            if (isHierarchyActionTextClick(event)) {
+                final io.github.ivere27.volvoxgrid.ClickEvent click = event.getClick();
+                final String message =
+                    "Hierarchy action click: row " + (click.getRow() + 1)
+                        + ", col " + click.getCol()
+                        + ", hit_area " + click.getHitAreaValue()
+                        + ", interaction " + click.getInteractionValue();
+                updateStatus(message);
+                SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(
+                    frame,
+                    message,
+                    "Hierarchy Action",
+                    JOptionPane.INFORMATION_MESSAGE
+                ));
+            } else if (event.hasCellFocusChanged()) {
                 final io.github.ivere27.volvoxgrid.CellFocusChangedEvent focusChanged = event.getCellFocusChanged();
                 updateStatus("Cell: R" + focusChanged.getNewRow() + " C" + focusChanged.getNewCol());
             } else if (event.hasAfterEdit()) {
@@ -461,6 +479,17 @@ public final class VolvoxGridDesktopExample {
 
     private void updateStatus(String message) {
         SwingUtilities.invokeLater(() -> statusLabel.setText(message));
+    }
+
+    private boolean isHierarchyActionTextClick(GridEvent event) {
+        if (!"hierarchy".equals(currentDemo) || !event.hasClick()) {
+            return false;
+        }
+        final io.github.ivere27.volvoxgrid.ClickEvent click = event.getClick();
+        return click.getRow() >= 0
+            && click.getCol() == HierarchyJsonDesktopDemo.ACTION_COLUMN_INDEX
+            && click.getHitArea() == CellHitArea.HIT_TEXT
+            && click.getInteraction() == CellInteraction.CELL_INTERACTION_TEXT_LINK;
     }
 
     private void submit(Runnable task) {

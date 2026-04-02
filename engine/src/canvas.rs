@@ -2417,11 +2417,12 @@ fn clear_partial_regions<C: Canvas>(
 /// without having to enumerate individual config fields.
 struct RenderCtxCacheKey {
     vp: VisibleRange,
+    layout_generation: u64,
 }
 
 impl RenderCtxCacheKey {
-    fn matches(&self, other: &VisibleRange) -> bool {
-        self.vp == *other
+    fn matches(&self, other: &VisibleRange, layout_generation: u64) -> bool {
+        self.vp == *other && self.layout_generation == layout_generation
     }
 }
 
@@ -2461,6 +2462,7 @@ fn build_or_reuse_ctx(
     // Compute the VisibleRange first (cheap: binary searches + small vecs).
     // This encodes ALL structural inputs that affect the cell iteration.
     let current_vp = VisibleRange::compute(grid, w, h);
+    let current_layout_generation = grid.layout.generation;
 
     // Try to take the previous frame's cached context.
     let cached = grid
@@ -2475,7 +2477,7 @@ fn build_or_reuse_ctx(
         .map(|b| *b);
 
     match cached {
-        Some(prev) if prev.key.matches(&current_vp) => {
+        Some(prev) if prev.key.matches(&current_vp, current_layout_generation) => {
             // Structural hit — reuse vis_cells, row/col rects, zone_counts.
             // Only rebuild text_cells (content may have changed).
             let text_cells = if grid.cells.len() == 0 {
@@ -2642,7 +2644,10 @@ fn render_grid_internal<C: Canvas>(
     // Store structural parts back into the cache for next frame.
     // Only cache full renders (partial renders have filtered vis_cells).
     if damage.is_none() {
-        let key = RenderCtxCacheKey { vp: ctx.vp.clone() };
+        let key = RenderCtxCacheKey {
+            vp: ctx.vp.clone(),
+            layout_generation: grid.layout.generation,
+        };
         *grid.render_ctx_cache.borrow_mut() =
             Some(Box::new(RenderCtxCached { key, ctx }) as Box<dyn std::any::Any + Send>);
     }
@@ -8045,10 +8050,11 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
 mod tests {
     use super::pb;
     use super::{
-        cell_has_checkbox_visual, checkbox_box_size, checkbox_layer_needed,
+        build_or_reuse_ctx, cell_has_checkbox_visual, checkbox_box_size, checkbox_layer_needed,
         compose_preedit_display_text, dropdown_button_rect, dropdown_glyph_metrics,
-        dropdown_layer_needed, parse_progress_percent, picture_layer_needed, progress_layer_needed,
-        show_dropdown_button_for_cell, sort_arrow_box_size, CellKey, RenderContext,
+        dropdown_layer_needed, parse_progress_percent, picture_layer_needed,
+        progress_layer_needed, show_dropdown_button_for_cell, sort_arrow_box_size, CellKey,
+        RenderContext, RenderCtxCacheKey, RenderCtxCached,
     };
     use crate::grid::VolvoxGrid;
 
@@ -8276,6 +8282,40 @@ mod tests {
         assert_eq!(text_cell.meta.alignment, pb::Align::RightCenter as i32);
         assert_eq!(text_cell.vis_rect.w, 140);
         assert_eq!(text_cell.orig_rect.w, 140);
+    }
+
+    #[test]
+    fn render_ctx_cache_rebuilds_after_live_col_resize_patch() {
+        let mut grid = VolvoxGrid::new(1, 220, 60, 1, 4, 0, 0);
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.cells.set_text(0, 0, "A".to_string());
+        grid.ensure_layout();
+
+        let initial = build_or_reuse_ctx(&grid, grid.viewport_width, grid.viewport_height, None);
+        let initial_key = RenderCtxCacheKey {
+            vp: initial.vp.clone(),
+            layout_generation: grid.layout.generation,
+        };
+        *grid.render_ctx_cache.borrow_mut() =
+            Some(Box::new(RenderCtxCached {
+                key: initial_key,
+                ctx: initial,
+            }) as Box<dyn std::any::Any + Send>);
+
+        grid.col_widths.insert(0, 80);
+        grid.layout.patch_col_width(0, 80);
+        grid.mark_dirty();
+
+        let updated = build_or_reuse_ctx(&grid, grid.viewport_width, grid.viewport_height, None);
+        let resized = updated
+            .visible_col_rects
+            .get(&0)
+            .copied()
+            .expect("first column rect");
+
+        assert_eq!(resized, (0, 80));
     }
 
     #[test]

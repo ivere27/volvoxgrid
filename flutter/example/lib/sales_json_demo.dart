@@ -240,7 +240,9 @@ CellStyle _salesProgressStyle(double marginPercent) {
 
 GridConfig _salesThemeConfig() {
   return GridConfig()
-    ..layout = (LayoutConfig()..fixedRows = 0)
+    ..layout = (LayoutConfig()
+      ..fixedRows = 0
+      ..extendLastCol = true)
     ..style = (StyleConfig()
       ..background = _salesBodyBg
       ..foreground = _salesBodyFg

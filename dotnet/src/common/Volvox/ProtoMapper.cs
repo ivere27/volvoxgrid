@@ -458,6 +458,7 @@ namespace VolvoxGrid.DotNet.Internal
             if (source.HasSortOrder) clone.SortOrder = source.SortOrder;
             if (source.HasAlign) clone.Align = source.Align;
             if (source.HasDataType) clone.DataType = source.DataType;
+            if (source.HasInteraction) clone.Interaction = source.Interaction;
             if (source.HasFormat) clone.Format = source.Format;
             if (source.HasSticky) clone.Sticky = source.Sticky;
 

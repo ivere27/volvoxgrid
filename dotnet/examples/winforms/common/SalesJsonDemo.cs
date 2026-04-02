@@ -62,6 +62,7 @@ namespace VolvoxGrid.DotNet.Sample
             grid.DropdownTrigger = VolvoxGridDropdownTrigger.Always;
             grid.DropdownSearch = false;
             grid.HoverEnabled = true;
+            grid.ResizePolicy = new VolvoxGridResizePolicy { Columns = true, Rows = true, Uniform = false };
             grid.HeaderFeatures = new VolvoxGridHeaderFeatures { Sort = true, Reorder = true, Chooser = false };
             grid.ShowColumnHeaders = true;
             grid.ColumnIndicatorTopRowCount = 1;
@@ -97,6 +98,7 @@ namespace VolvoxGrid.DotNet.Sample
             grid.SetHoverCellStyle(HoverCellBackColor, null, VolvoxGridBorderStyle.Thin, MarginProgressColor);
             grid.CellSpanMode = VolvoxGridCellSpanMode.Adjacent;
             grid.GroupTotalPosition = VolvoxGridGroupTotalPosition.Below;
+            grid.ExtendLastCol = true;
             grid.MultiTotals = true;
             grid.SetSpanCol(0, true);
             grid.SetSpanCol(1, true);
