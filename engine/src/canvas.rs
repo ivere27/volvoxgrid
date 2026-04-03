@@ -8052,9 +8052,9 @@ mod tests {
     use super::{
         build_or_reuse_ctx, cell_has_checkbox_visual, checkbox_box_size, checkbox_layer_needed,
         compose_preedit_display_text, dropdown_button_rect, dropdown_glyph_metrics,
-        dropdown_layer_needed, parse_progress_percent, picture_layer_needed,
-        progress_layer_needed, show_dropdown_button_for_cell, sort_arrow_box_size, CellKey,
-        RenderContext, RenderCtxCacheKey, RenderCtxCached,
+        dropdown_layer_needed, parse_progress_percent, picture_layer_needed, progress_layer_needed,
+        show_dropdown_button_for_cell, sort_arrow_box_size, CellKey, RenderContext,
+        RenderCtxCacheKey, RenderCtxCached,
     };
     use crate::grid::VolvoxGrid;
 
@@ -8298,11 +8298,10 @@ mod tests {
             vp: initial.vp.clone(),
             layout_generation: grid.layout.generation,
         };
-        *grid.render_ctx_cache.borrow_mut() =
-            Some(Box::new(RenderCtxCached {
-                key: initial_key,
-                ctx: initial,
-            }) as Box<dyn std::any::Any + Send>);
+        *grid.render_ctx_cache.borrow_mut() = Some(Box::new(RenderCtxCached {
+            key: initial_key,
+            ctx: initial,
+        }) as Box<dyn std::any::Any + Send>);
 
         grid.col_widths.insert(0, 80);
         grid.layout.patch_col_width(0, 80);
