@@ -81,8 +81,7 @@ object SalesJsonDemo {
 
     fun load(controller: VolvoxGridController) {
         controller.setColCount(widths.size)
-        val columns = salesColumnRequest()
-        controller.defineColumns(columns)
+        controller.defineColumns(salesColumnRequest(includeWidths = true))
         val result = controller.loadData(
             controller.getDemoData("sales"),
             LoadDataOptions.newBuilder()
@@ -90,7 +89,7 @@ object SalesJsonDemo {
                 .build()
         )
         check(result.status != LoadDataStatus.LOAD_FAILED) { "LoadData failed for embedded sales demo" }
-        controller.defineColumns(columns)
+        controller.defineColumns(salesColumnRequest(includeWidths = false))
         controller.setColDropdownItems(8, SALES_STATUS_ITEMS)
 
         controller.configure(salesThemeConfig())
@@ -105,14 +104,16 @@ object SalesJsonDemo {
         applySalesSubtotalDecorations(controller)
     }
 
-    private fun salesColumnRequest(): DefineColumnsRequest {
+    private fun salesColumnRequest(includeWidths: Boolean): DefineColumnsRequest {
         val builder = DefineColumnsRequest.newBuilder()
         for (col in widths.indices) {
             val def = ColumnDef.newBuilder()
                 .setIndex(col)
                 .setCaption(captions[col])
                 .setKey(keys[col])
-                .setWidth(widths[col])
+            if (includeWidths) {
+                def.width = widths[col]
+            }
             when (col) {
                 0 -> def.align = Align.ALIGN_CENTER_CENTER
                 4, 5 -> {

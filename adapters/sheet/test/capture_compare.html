@@ -74,9 +74,8 @@ async function initWasm() {
   // Set up canvas2d glyph rasterizer
   if (typeof wasm.set_glyph_rasterizer === "function") {
     try {
-      // volvoxgrid package doesn't have exports map, use direct path
-      const mod = await import("volvoxgrid/dist/canvas2d-rasterizer.js");
-      wasm.set_glyph_rasterizer(mod.createCanvas2DRasterizer());
+      const { createCanvas2DRasterizer } = await import("volvoxgrid");
+      wasm.set_glyph_rasterizer(createCanvas2DRasterizer());
     } catch (_) { /* canvas2d rasterizer is optional */ }
   }
 

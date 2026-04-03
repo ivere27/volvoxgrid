@@ -155,19 +155,45 @@ Future<void> _applySalesSubtotalDecorations(VolvoxGridController controller) asy
   await controller.setSpanCol(0, true);
   await controller.setSpanCol(1, true);
 
+  final rowCount = await controller.rowCount();
+  if (rowCount <= 0) {
+    return;
+  }
+
+  final cells = await controller.getCellsRange(0, 3, rowCount - 1, 7);
+  final rowTexts = List<List<String>>.generate(
+    rowCount,
+    (_) => List<String>.filled(5, ''),
+  );
+  for (final cell in cells.cells) {
+    final row = cell.row;
+    final colOffset = cell.col - 3;
+    if (row < 0 ||
+        row >= rowCount ||
+        colOffset < 0 ||
+        colOffset >= rowTexts[row].length ||
+        !cell.hasValue() ||
+        !cell.value.hasText()) {
+      continue;
+    }
+    rowTexts[row][colOffset] = cell.value.text;
+  }
+
   final updates = UpdateCellsRequest();
-  for (var row = 0; row < await controller.rowCount(); row += 1) {
-    final product = await controller.getCellText(row, 3);
-    final sales = await controller.getCellText(row, 4);
-    final cost = await controller.getCellText(row, 5);
+  final rowsNeedingMergeCheck = <int>[];
+  for (var row = 0; row < rowCount; row += 1) {
+    final values = rowTexts[row];
+    final product = values[0];
+    final sales = values[1];
+    final cost = values[2];
     final isSubtotal = product.isEmpty && (sales.isNotEmpty || cost.isNotEmpty);
     if (!isSubtotal) {
-      final margin = _parseSalesMarginPercent(await controller.getCellText(row, 6));
+      final margin = _parseSalesMarginPercent(values[3]);
       updates.cells.add(CellUpdate()
         ..row = row
         ..col = 6
         ..style = _salesProgressStyle(margin));
-      final flagged = _parseSalesFlag(await controller.getCellText(row, 7));
+      final flagged = _parseSalesFlag(values[4]);
       updates.cells.add(CellUpdate()
         ..row = row
         ..col = 7
@@ -202,13 +228,17 @@ Future<void> _applySalesSubtotalDecorations(VolvoxGridController controller) asy
       ..value = (CellValue()..text = margin.toStringAsFixed(1))
       ..style = _salesProgressStyle(margin));
 
-    if ((await controller.getNode(row)).level <= 0) {
-      await controller.mergeCells(row, 0, row, 1);
-    }
+    rowsNeedingMergeCheck.add(row);
   }
 
   if (updates.cells.isNotEmpty) {
     await controller.updateCells(updates);
+  }
+
+  for (final row in rowsNeedingMergeCheck) {
+    if ((await controller.getNode(row)).level <= 0) {
+      await controller.mergeCells(row, 0, row, 1);
+    }
   }
 }
 

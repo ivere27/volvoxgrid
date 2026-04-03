@@ -1418,13 +1418,34 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       final cols = await widget.controller.colCount();
       final maxRows = math.max(0, math.min(rows, 200));
       final maxCols = math.max(0, math.min(cols, 16));
-      final snapshot = <List<String>>[];
+      if (maxRows == 0 || maxCols == 0) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _fallbackCells = const <List<String>>[];
+          _fallbackError = null;
+        });
+        return;
+      }
 
+      final resp =
+          await widget.controller.getCellsRange(0, 0, maxRows - 1, maxCols - 1);
+      final snapshot = <List<String>>[];
       for (var r = 0; r < maxRows; r++) {
-        final rowValues = await Future.wait(
-          List.generate(maxCols, (c) => widget.controller.getCellText(r, c)),
-        );
-        snapshot.add(rowValues);
+        snapshot.add(List<String>.filled(maxCols, ''));
+      }
+
+      for (final cell in resp.cells) {
+        if (cell.row < 0 ||
+            cell.row >= maxRows ||
+            cell.col < 0 ||
+            cell.col >= maxCols ||
+            !cell.hasValue() ||
+            !cell.value.hasText()) {
+          continue;
+        }
+        snapshot[cell.row][cell.col] = cell.value.text;
       }
 
       if (!mounted) {
