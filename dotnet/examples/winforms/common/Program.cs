@@ -546,10 +546,11 @@ namespace VolvoxGrid.DotNet.Sample
             AppLog.Info("SMOKE: sales-demo rowCount=" + rowCount);
 
             bool foundCheckedFlag = false;
-            bool foundMarginSubtotal = false;
+            bool foundGrandTotal = false;
 
             for (int row = 0; row < rowCount; row++)
             {
+                string grandLabel = _grid.GetCellText(row, 0);
                 string product = _grid.GetCellText(row, 3);
                 string sales = _grid.GetCellText(row, 4);
                 string cost = _grid.GetCellText(row, 5);
@@ -576,14 +577,17 @@ namespace VolvoxGrid.DotNet.Sample
                     foundCheckedFlag = true;
                 }
 
-                if (isSubtotal && !string.IsNullOrWhiteSpace(margin))
+                if (isSubtotal
+                    && string.Equals(grandLabel, "Grand Total", StringComparison.Ordinal)
+                    && !string.IsNullOrWhiteSpace(sales)
+                    && !string.IsNullOrWhiteSpace(cost))
                 {
-                    foundMarginSubtotal = true;
+                    foundGrandTotal = true;
                 }
             }
 
             SmokeAssert(foundCheckedFlag, "Sales demo checked checkbox state");
-            SmokeAssert(foundMarginSubtotal, "Sales demo Margin% subtotal");
+            SmokeAssert(foundGrandTotal, "Sales demo grand total");
             AppLog.Info("SMOKE: sales-demo checks complete");
         }
 

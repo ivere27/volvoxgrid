@@ -5120,8 +5120,30 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.FrameTimeMs = r.ReadFloat(); break;
                     case 2: msg.Fps = r.ReadFloat(); break;
-                    case 3: msg.LayerTimesUs.Add(r.ReadFloat()); break;
-                    case 4: msg.ZoneCellCounts.Add(unchecked((uint)r.ReadInt32())); break;
+                    case 3:
+                        if (wire == ProtoWireType.LengthDelimited)
+                        {
+                            var packed = new ProtoReader(r.ReadLengthDelimited());
+                            while (!packed.IsEof)
+                                msg.LayerTimesUs.Add(packed.ReadFloat());
+                        }
+                        else
+                        {
+                            msg.LayerTimesUs.Add(r.ReadFloat());
+                        }
+                        break;
+                    case 4:
+                        if (wire == ProtoWireType.LengthDelimited)
+                        {
+                            var packed = new ProtoReader(r.ReadLengthDelimited());
+                            while (!packed.IsEof)
+                                msg.ZoneCellCounts.Add(unchecked((uint)packed.ReadInt32()));
+                        }
+                        else
+                        {
+                            msg.ZoneCellCounts.Add(unchecked((uint)r.ReadInt32()));
+                        }
+                        break;
                     case 5: msg.InstanceCount = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
@@ -10948,7 +10970,18 @@ namespace Volvoxgrid.V1
             {
                 switch (field)
                 {
-                    case 1: msg.Rows.Add(r.ReadInt32()); break;
+                    case 1:
+                        if (wire == ProtoWireType.LengthDelimited)
+                        {
+                            var packed = new ProtoReader(r.ReadLengthDelimited());
+                            while (!packed.IsEof)
+                                msg.Rows.Add(packed.ReadInt32());
+                        }
+                        else
+                        {
+                            msg.Rows.Add(r.ReadInt32());
+                        }
+                        break;
                     default: r.SkipField(wire); break;
                 }
             }
