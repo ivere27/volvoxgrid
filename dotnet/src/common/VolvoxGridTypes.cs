@@ -310,6 +310,7 @@ namespace VolvoxGrid.DotNet
         public VolvoxGridAlign Alignment { get; set; }
         public VolvoxGridColumnDataType DataType { get; set; }
         public string Format { get; set; }
+        public uint ProgressColor { get; set; }
         public VolvoxGridCellInteraction Interaction { get; set; }
 
         public VolvoxGridColumn()

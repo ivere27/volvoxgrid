@@ -673,6 +673,8 @@ fn shift_row_metadata_down(grid: &mut VolvoxGrid, at: i32) {
             grid.cell_styles.insert((r, c), style);
         }
     }
+
+    grid.merged_regions.shift_rows_down(at);
 }
 
 fn shift_tracked_rows_down(rows: &mut BTreeSet<i32>, at: i32) {
@@ -776,6 +778,8 @@ fn shift_row_metadata_up(grid: &mut VolvoxGrid, at: i32) {
             grid.cell_styles.insert((r, c), style);
         }
     }
+
+    grid.merged_regions.shift_rows_up(at);
 }
 
 fn is_subtotal_row(grid: &VolvoxGrid, row: i32) -> bool {
@@ -916,6 +920,21 @@ mod tests {
     use crate::proto::volvoxgrid::v1 as pb;
     use crate::style::CellStylePatch;
 
+    fn merge_top_level_subtotal_rows(grid: &mut VolvoxGrid, rows: &[i32]) {
+        let mut unique_rows = rows.to_vec();
+        unique_rows.sort_unstable();
+        unique_rows.dedup();
+        for row in unique_rows {
+            let should_merge = grid
+                .row_props
+                .get(&row)
+                .map_or(false, |props| props.is_subtotal && props.outline_level <= 0);
+            if should_merge {
+                grid.merge_cells(row, 0, row, 1);
+            }
+        }
+    }
+
     fn sample_grid() -> VolvoxGrid {
         let mut grid = VolvoxGrid::new(1, 800, 600, 5, 4, 1, 0);
         grid.cells.set_text(0, 0, "Product".to_string());
@@ -970,6 +989,46 @@ mod tests {
                 assert_eq!(level, 0);
             }
         }
+    }
+
+    #[test]
+    fn explicit_subtotal_merges_follow_rows_after_nested_insertions() {
+        let mut grid = sample_grid();
+        grid.outline.group_total_position = pb::GroupTotalPosition::GroupTotalBelow as i32;
+        grid.outline.multi_totals = true;
+
+        let grand_rows = subtotal(&mut grid, 2, -1, 2, "Grand Total", 0, 0, true);
+        let grand_row_before = grand_rows[0];
+        merge_top_level_subtotal_rows(&mut grid, &grand_rows);
+
+        let product_rows = subtotal(&mut grid, 2, 0, 2, "", 0, 0, true);
+        let total_a_row_before = (grid.fixed_rows..grid.rows)
+            .find(|&row| grid.cells.get_text(row, 0) == "Total A")
+            .expect("product subtotal row for A");
+        merge_top_level_subtotal_rows(&mut grid, &product_rows);
+
+        let region_rows = subtotal(&mut grid, 2, 1, 2, "", 0, 0, true);
+        merge_top_level_subtotal_rows(&mut grid, &region_rows);
+
+        let total_a_row_after = (grid.fixed_rows..grid.rows)
+            .find(|&row| grid.cells.get_text(row, 0) == "Total A")
+            .expect("shifted product subtotal row for A");
+        let grand_row_after = (grid.fixed_rows..grid.rows)
+            .find(|&row| grid.cells.get_text(row, 0) == "Grand Total")
+            .expect("shifted grand total row");
+
+        assert!(total_a_row_after > total_a_row_before);
+        assert!(grand_row_after > grand_row_before);
+        assert_eq!(
+            grid.get_merged_range(total_a_row_after, 0),
+            Some((total_a_row_after, 0, total_a_row_after, 1))
+        );
+        assert_eq!(
+            grid.get_merged_range(grand_row_after, 0),
+            Some((grand_row_after, 0, grand_row_after, 1))
+        );
+        assert_eq!(grid.get_merged_range(total_a_row_before, 0), None);
+        assert_ne!(grid.cells.get_text(grand_row_before, 0), "Grand Total");
     }
 
     #[test]

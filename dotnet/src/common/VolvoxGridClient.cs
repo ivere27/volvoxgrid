@@ -171,10 +171,10 @@ namespace VolvoxGrid.DotNet
             _client.Sort(_gridId, sorts ?? new List<SortColumn>());
         }
 
-        public void Subtotal(AggregateType aggregate, int groupOnCol, int aggregateCol, string caption, uint backColor, uint foreColor, bool addOutline)
+        public SubtotalResult Subtotal(AggregateType aggregate, int groupOnCol, int aggregateCol, string caption, uint backColor, uint foreColor, bool addOutline)
         {
             EnsureNotDisposed();
-            _client.Subtotal(_gridId, aggregate, groupOnCol, aggregateCol, caption, backColor, foreColor, addOutline);
+            return _client.Subtotal(_gridId, aggregate, groupOnCol, aggregateCol, caption, backColor, foreColor, addOutline);
         }
 
         public void AutoSize(int colFrom, int colTo, bool equal, int maxWidth)

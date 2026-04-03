@@ -103,15 +103,6 @@ type HierarchyDemoRow = {
   Action: string;
   _level: number;
 };
-
-type DemoCellUpdate = {
-  row: number;
-  col: number;
-  text?: string;
-  flag?: boolean;
-  checked?: number;
-  dropdownItems?: string;
-};
 type WasmModule = typeof import("./wasm/volvoxgrid_wasm.js");
 
 async function fetchFontWithTimeout(url: string): Promise<Uint8Array | null> {
@@ -447,45 +438,6 @@ function pbEncodeDefineRowsRequest(
   return new Uint8Array(out);
 }
 
-function pbEncodeCellValueText(text: string): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeStringField(1, text));
-  return new Uint8Array(out);
-}
-
-function pbEncodeCellValueFlag(flag: boolean): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeTag(3, 0), ...pbEncodeBool(flag));
-  return new Uint8Array(out);
-}
-
-function pbEncodeCellUpdate(update: DemoCellUpdate): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeInt32Field(1, update.row));
-  out.push(...pbEncodeInt32Field(2, update.col));
-  if (update.text != null) {
-    out.push(...pbEncodeMessageField(3, pbEncodeCellValueText(update.text)));
-  } else if (update.flag != null) {
-    out.push(...pbEncodeMessageField(3, pbEncodeCellValueFlag(update.flag)));
-  }
-  if (update.checked != null) {
-    out.push(...pbEncodeInt32Field(5, update.checked));
-  }
-  if (update.dropdownItems != null) {
-    out.push(...pbEncodeStringField(9, update.dropdownItems));
-  }
-  return new Uint8Array(out);
-}
-
-function pbEncodeUpdateCellsRequest(gridId: number, updates: readonly DemoCellUpdate[]): Uint8Array {
-  const out: number[] = [];
-  out.push(...pbEncodeTag(1, 0), ...pbEncodeVarint(BigInt(gridId)));
-  for (const update of updates) {
-    out.push(...pbEncodeMessageField(2, pbEncodeCellUpdate(update)));
-  }
-  return new Uint8Array(out);
-}
-
 function pbEncodeHierarchyOutlineConfig(): Uint8Array {
   const layout: number[] = [];
   layout.push(...pbEncodeInt32Field(3, 0));
@@ -703,73 +655,14 @@ function pbEncodeSalesDemoConfig(): Uint8Array {
   return new Uint8Array(gridConfig);
 }
 
-function parseSalesMetric(text: string): number {
-  const value = Number.parseInt(text.trim().replaceAll(",", ""), 10);
-  return Number.isFinite(value) ? value : 0;
-}
-
-function parseSalesFlag(text: string): boolean {
-  switch (text.trim().toLowerCase()) {
-    case "1":
-    case "true":
-    case "yes":
-    case "y":
-    case "on":
-    case "checked":
-      return true;
-    default:
-      return false;
-  }
-}
-
-function applySalesSubtotalDecorations(grid: VolvoxGrid, wasmModule: WasmModule): void {
-  const textUpdates: Array<{ row: number; col: number; text: string }> = [];
-  const cellUpdates: DemoCellUpdate[] = [];
-  for (let row = 0; row < grid.rowCount; row += 1) {
-    const product = grid.getCellText(row, 3);
-    const sales = grid.getCellText(row, 4);
-    const cost = grid.getCellText(row, 5);
-    const isSubtotal = product.length === 0 && (sales.length !== 0 || cost.length !== 0);
-    if (!isSubtotal) {
-      const flagged = parseSalesFlag(grid.getCellText(row, 7));
-      cellUpdates.push({
-        row,
-        col: 7,
-        flag: flagged,
-        checked: flagged ? 1 : 0,
-      });
-      cellUpdates.push({
-        row,
-        col: 8,
-        dropdownItems: SALES_STATUS_ITEMS,
-      });
-      continue;
-    }
-
-    if (sales.length === 0 && cost.length === 0) {
-      continue;
-    }
-
-    cellUpdates.push({
-      row,
-      col: 7,
-      flag: false,
-      checked: 2,
-    });
-    const salesValue = parseSalesMetric(sales);
-    const costValue = parseSalesMetric(cost);
-    const margin = salesValue > 0 ? ((salesValue - costValue) * 100.0) / salesValue : 0.0;
-    textUpdates.push({ row, col: 6, text: margin.toFixed(1) });
-
+function applySalesSubtotalDecorations(grid: VolvoxGrid, subtotalRows: readonly number[]): void {
+  const uniqueRows = [...new Set(subtotalRows)].sort((a, b) => a - b);
+  for (const row of uniqueRows) {
     const node = grid.getNode(row);
     if (node != null && node.level <= 0) {
       grid.mergeCells(row, 0, row, 1);
     }
   }
-  if (cellUpdates.length > 0 && typeof wasmModule.volvox_grid_update_cells_pb === "function") {
-    wasmModule.volvox_grid_update_cells_pb(pbEncodeUpdateCellsRequest(grid.id, cellUpdates));
-  }
-  grid.setCells(textUpdates);
 }
 
 function setupSalesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: number): void {
@@ -804,15 +697,13 @@ function setupSalesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: number
     grid.setColDropdownItems(8, SALES_STATUS_ITEMS);
     grid.flingImpulseGain = 220.0;
     grid.flingFriction = 0.9;
-    const emptyFont = new Uint8Array();
-    wasmModule.volvox_grid_subtotal(gridHandle, 1, 0, 0, "", 0, 0, false, emptyFont);
-    wasmModule.volvox_grid_subtotal(gridHandle, 2, -1, 4, "Grand Total", 0xFFEEF2FF, 0xFF111827, true, emptyFont);
-    wasmModule.volvox_grid_subtotal(gridHandle, 2, 0, 4, "", 0xFFF5F3FF, 0xFF111827, true, emptyFont);
-    wasmModule.volvox_grid_subtotal(gridHandle, 2, 1, 4, "", 0xFFF8F7FF, 0xFF111827, true, emptyFont);
-    wasmModule.volvox_grid_subtotal(gridHandle, 2, -1, 5, "Grand Total", 0xFFEEF2FF, 0xFF111827, true, emptyFont);
-    wasmModule.volvox_grid_subtotal(gridHandle, 2, 0, 5, "", 0xFFF5F3FF, 0xFF111827, true, emptyFont);
-    wasmModule.volvox_grid_subtotal(gridHandle, 2, 1, 5, "", 0xFFF8F7FF, 0xFF111827, true, emptyFont);
-    applySalesSubtotalDecorations(grid, wasmModule);
+    grid.subtotal(1, 0, 0, "", 0, 0, false);
+    applySalesSubtotalDecorations(grid, grid.subtotal(2, -1, 4, "Grand Total", 0xFFEEF2FF, 0xFF111827, true).rows);
+    applySalesSubtotalDecorations(grid, grid.subtotal(2, 0, 4, "", 0xFFF5F3FF, 0xFF111827, true).rows);
+    applySalesSubtotalDecorations(grid, grid.subtotal(2, 1, 4, "", 0xFFF8F7FF, 0xFF111827, true).rows);
+    applySalesSubtotalDecorations(grid, grid.subtotal(2, -1, 5, "Grand Total", 0xFFEEF2FF, 0xFF111827, true).rows);
+    applySalesSubtotalDecorations(grid, grid.subtotal(2, 0, 5, "", 0xFFF5F3FF, 0xFF111827, true).rows);
+    applySalesSubtotalDecorations(grid, grid.subtotal(2, 1, 5, "", 0xFFF8F7FF, 0xFF111827, true).rows);
     grid.invalidate();
   } finally {
     if (id !== prevId) {

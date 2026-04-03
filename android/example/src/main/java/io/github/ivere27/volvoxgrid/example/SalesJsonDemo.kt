@@ -6,10 +6,6 @@ import io.github.ivere27.volvoxgrid.Border
 import io.github.ivere27.volvoxgrid.BorderStyle
 import io.github.ivere27.volvoxgrid.Borders
 import io.github.ivere27.volvoxgrid.CellSpanMode
-import io.github.ivere27.volvoxgrid.CellStyle
-import io.github.ivere27.volvoxgrid.CellUpdate
-import io.github.ivere27.volvoxgrid.CellValue
-import io.github.ivere27.volvoxgrid.CheckedState
 import io.github.ivere27.volvoxgrid.ColIndicatorCellMode
 import io.github.ivere27.volvoxgrid.ColumnDataType
 import io.github.ivere27.volvoxgrid.ColumnDef
@@ -47,9 +43,7 @@ import io.github.ivere27.volvoxgrid.SpanConfig
 import io.github.ivere27.volvoxgrid.StyleConfig
 import io.github.ivere27.volvoxgrid.TabBehavior
 import io.github.ivere27.volvoxgrid.TreeIndicatorStyle
-import io.github.ivere27.volvoxgrid.UpdateCellsRequest
 import io.github.ivere27.volvoxgrid.VolvoxGridController
-import java.util.Locale
 
 object SalesJsonDemo {
     private const val SALES_STATUS_ITEMS = "Active|Pending|Shipped|Returned|Cancelled"
@@ -95,13 +89,30 @@ object SalesJsonDemo {
         controller.configure(salesThemeConfig())
 
         controller.subtotal(AggregateType.AGG_CLEAR, 0, 0, "", 0, 0, false)
-        controller.subtotal(AggregateType.AGG_SUM, -1, 4, "Grand Total", 0xFFEEF2FF, 0xFF111827, true)
-        controller.subtotal(AggregateType.AGG_SUM, 0, 4, "", 0xFFF5F3FF, 0xFF111827, true)
-        controller.subtotal(AggregateType.AGG_SUM, 1, 4, "", 0xFFF8F7FF, 0xFF111827, true)
-        controller.subtotal(AggregateType.AGG_SUM, -1, 5, "Grand Total", 0xFFEEF2FF, 0xFF111827, true)
-        controller.subtotal(AggregateType.AGG_SUM, 0, 5, "", 0xFFF5F3FF, 0xFF111827, true)
-        controller.subtotal(AggregateType.AGG_SUM, 1, 5, "", 0xFFF8F7FF, 0xFF111827, true)
-        applySalesSubtotalDecorations(controller)
+        applySalesSubtotalDecorations(
+            controller,
+            controller.subtotal(AggregateType.AGG_SUM, -1, 4, "Grand Total", 0xFFEEF2FF, 0xFF111827, true).rowsList
+        )
+        applySalesSubtotalDecorations(
+            controller,
+            controller.subtotal(AggregateType.AGG_SUM, 0, 4, "", 0xFFF5F3FF, 0xFF111827, true).rowsList
+        )
+        applySalesSubtotalDecorations(
+            controller,
+            controller.subtotal(AggregateType.AGG_SUM, 1, 4, "", 0xFFF8F7FF, 0xFF111827, true).rowsList
+        )
+        applySalesSubtotalDecorations(
+            controller,
+            controller.subtotal(AggregateType.AGG_SUM, -1, 5, "Grand Total", 0xFFEEF2FF, 0xFF111827, true).rowsList
+        )
+        applySalesSubtotalDecorations(
+            controller,
+            controller.subtotal(AggregateType.AGG_SUM, 0, 5, "", 0xFFF5F3FF, 0xFF111827, true).rowsList
+        )
+        applySalesSubtotalDecorations(
+            controller,
+            controller.subtotal(AggregateType.AGG_SUM, 1, 5, "", 0xFFF8F7FF, 0xFF111827, true).rowsList
+        )
     }
 
     private fun salesColumnRequest(includeWidths: Boolean): DefineColumnsRequest {
@@ -124,6 +135,7 @@ object SalesJsonDemo {
                 6 -> {
                     def.align = Align.ALIGN_CENTER_CENTER
                     def.dataType = ColumnDataType.COLUMN_DATA_NUMBER
+                    def.progressColor = ACCENT
                 }
                 7 -> {
                     def.align = Align.ALIGN_CENTER_CENTER
@@ -139,103 +151,15 @@ object SalesJsonDemo {
         return builder.build()
     }
 
-    private fun applySalesSubtotalDecorations(controller: VolvoxGridController) {
+    private fun applySalesSubtotalDecorations(controller: VolvoxGridController, subtotalRows: List<Int>) {
         controller.setSpanCol(0, true)
         controller.setSpanCol(1, true)
 
-        val updates = UpdateCellsRequest.newBuilder()
-        for (row in 0 until controller.rowCount()) {
-            val product = controller.getCellText(row, 3)
-            val sales = controller.getCellText(row, 4)
-            val cost = controller.getCellText(row, 5)
-            val isSubtotal = product.isEmpty() && (sales.isNotEmpty() || cost.isNotEmpty())
-            if (!isSubtotal) {
-                val margin = parseSalesMarginPercent(controller.getCellText(row, 6))
-                updates.addCells(
-                    CellUpdate.newBuilder()
-                        .setRow(row)
-                        .setCol(6)
-                        .setStyle(salesProgressStyle(margin))
-                        .build()
-                )
-                val flagged = parseSalesFlag(controller.getCellText(row, 7))
-                updates.addCells(
-                    CellUpdate.newBuilder()
-                        .setRow(row)
-                        .setCol(7)
-                        .setValue(CellValue.newBuilder().setFlag(flagged).build())
-                        .setChecked(
-                            if (flagged) CheckedState.CHECKED_CHECKED else CheckedState.CHECKED_UNCHECKED
-                        )
-                        .build()
-                )
-                updates.addCells(
-                    CellUpdate.newBuilder()
-                        .setRow(row)
-                        .setCol(8)
-                        .setDropdownItems(SALES_STATUS_ITEMS)
-                        .build()
-                )
-                continue
-            }
-            if (sales.isEmpty() && cost.isEmpty()) {
-                continue
-            }
-
-            updates.addCells(
-                CellUpdate.newBuilder()
-                    .setRow(row)
-                    .setCol(7)
-                    .setValue(CellValue.newBuilder().setFlag(false).build())
-                    .setChecked(CheckedState.CHECKED_GRAYED)
-                    .build()
-            )
-
-            val salesValue = sales.trim().toLongOrNull() ?: 0L
-            val costValue = cost.trim().toLongOrNull() ?: 0L
-            val margin = if (salesValue > 0L) {
-                ((salesValue - costValue) * 100.0) / salesValue
-            } else {
-                0.0
-            }
-            updates.addCells(
-                CellUpdate.newBuilder()
-                    .setRow(row)
-                    .setCol(6)
-                    .setValue(
-                        CellValue.newBuilder()
-                            .setText(String.format(Locale.US, "%.1f", margin))
-                            .build()
-                    )
-                    .setStyle(salesProgressStyle(margin))
-                    .build()
-            )
-
+        for (row in subtotalRows.distinct().sorted()) {
             if (controller.getNode(row).level <= 0) {
                 controller.mergeCells(row, 0, row, 1)
             }
         }
-        if (updates.cellsCount > 0) {
-            controller.updateCells(updates.build())
-        }
-    }
-
-    private fun parseSalesFlag(text: String): Boolean {
-        return when (text.trim().lowercase(Locale.US)) {
-            "1", "true", "yes", "y", "on", "checked" -> true
-            else -> false
-        }
-    }
-
-    private fun parseSalesMarginPercent(text: String): Double {
-        return text.trim().replace(",", "").toDoubleOrNull() ?: 0.0
-    }
-
-    private fun salesProgressStyle(marginPercent: Double): CellStyle {
-        return CellStyle.newBuilder()
-            .setProgress((marginPercent / 100.0).coerceIn(0.0, 1.0).toFloat())
-            .setProgressColor(ACCENT)
-            .build()
     }
 
     private fun salesThemeConfig(): GridConfig {

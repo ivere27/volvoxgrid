@@ -3339,6 +3339,8 @@ impl VolvoxGrid {
             }
         }
 
+        self.merged_regions.shift_rows_down(insert_at);
+
         // Set tab-delimited text across columns
         let parts: Vec<&str> = text.split('\t').collect();
         for (i, part) in parts.iter().enumerate() {
@@ -3411,6 +3413,8 @@ impl VolvoxGrid {
                 self.cell_styles.insert((r, c), style);
             }
         }
+
+        self.merged_regions.shift_rows_up(row);
 
         // Clamp frozen rows, selection
         if self.fixed_rows + self.frozen_rows > self.rows {

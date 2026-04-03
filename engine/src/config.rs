@@ -2235,6 +2235,9 @@ impl VolvoxGrid {
                         v
                     };
                 }
+                if let Some(v) = def.progress_color {
+                    cp.progress_color = v;
+                }
                 if let Some(v) = sticky_to_apply {
                     self.set_col_sticky(idx, v);
                 }
@@ -2943,6 +2946,11 @@ impl VolvoxGrid {
                 } else {
                     None
                 },
+                progress_color: if cp.progress_color != 0 {
+                    Some(cp.progress_color)
+                } else {
+                    None
+                },
             });
         }
         v1::DefineColumnsRequest { grid_id, columns }
@@ -3312,6 +3320,22 @@ mod tests {
         assert_eq!(grid.columns[0].alignment, 4);
         assert_eq!(*grid.col_widths.get(&2).unwrap(), 200);
         assert_eq!(grid.columns[2].key, "revenue");
+    }
+
+    #[test]
+    fn define_columns_progress_color_updates_column_props() {
+        let mut grid = test_grid();
+        grid.define_columns(&[v1::ColumnDef {
+            index: 1,
+            progress_color: Some(0xFF818CF8),
+            ..Default::default()
+        }]);
+
+        assert_eq!(grid.columns[1].progress_color, 0xFF818CF8);
+        assert_eq!(
+            grid.get_schema(1).columns[1].progress_color,
+            Some(0xFF818CF8)
+        );
     }
 
     #[test]

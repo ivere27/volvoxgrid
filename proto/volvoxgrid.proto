@@ -1088,6 +1088,7 @@ message ColumnDef {
   optional CoercionMode   coercion_mode  = 24;
   optional WriteErrorMode error_mode     = 25;
   optional CellInteraction interaction   = 26;
+  optional uint32         progress_color = 27;
 }
 
 message DefineColumnsRequest {

@@ -6070,6 +6070,7 @@ class ColumnDef extends $pb.GeneratedMessage {
     CoercionMode? coercionMode,
     WriteErrorMode? errorMode,
     CellInteraction? interaction,
+    $core.int? progressColor,
   }) {
     final result = create();
     if (index != null) result.index = index;
@@ -6098,6 +6099,7 @@ class ColumnDef extends $pb.GeneratedMessage {
     if (coercionMode != null) result.coercionMode = coercionMode;
     if (errorMode != null) result.errorMode = errorMode;
     if (interaction != null) result.interaction = interaction;
+    if (progressColor != null) result.progressColor = progressColor;
     return result;
   }
 
@@ -6152,6 +6154,8 @@ class ColumnDef extends $pb.GeneratedMessage {
         enumValues: WriteErrorMode.values)
     ..aE<CellInteraction>(26, _omitFieldNames ? '' : 'interaction',
         enumValues: CellInteraction.values)
+    ..aI(27, _omitFieldNames ? '' : 'progressColor',
+        fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -6404,6 +6408,15 @@ class ColumnDef extends $pb.GeneratedMessage {
   $core.bool hasInteraction() => $_has(25);
   @$pb.TagNumber(26)
   void clearInteraction() => $_clearField(26);
+
+  @$pb.TagNumber(27)
+  $core.int get progressColor => $_getIZ(26);
+  @$pb.TagNumber(27)
+  set progressColor($core.int value) => $_setUnsignedInt32(26, value);
+  @$pb.TagNumber(27)
+  $core.bool hasProgressColor() => $_has(26);
+  @$pb.TagNumber(27)
+  void clearProgressColor() => $_clearField(27);
 }
 
 class DefineColumnsRequest extends $pb.GeneratedMessage {

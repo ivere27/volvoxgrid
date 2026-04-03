@@ -69,55 +69,72 @@ Future<void> loadSalesJsonDemo(VolvoxGridController controller) async {
     foreColor: 0,
     addOutline: false,
   );
-  await controller.subtotal(
-    AggregateType.AGG_SUM,
-    groupOnCol: -1,
-    aggregateCol: 4,
-    caption: 'Grand Total',
-    backColor: 0xFFEEF2FF,
-    foreColor: 0xFF111827,
+  await _applySalesSubtotalDecorations(
+    controller,
+    await controller.subtotal(
+      AggregateType.AGG_SUM,
+      groupOnCol: -1,
+      aggregateCol: 4,
+      caption: 'Grand Total',
+      backColor: 0xFFEEF2FF,
+      foreColor: 0xFF111827,
+    ),
   );
-  await controller.subtotal(
-    AggregateType.AGG_SUM,
-    groupOnCol: 0,
-    aggregateCol: 4,
-    caption: '',
-    backColor: 0xFFF5F3FF,
-    foreColor: 0xFF111827,
+  await _applySalesSubtotalDecorations(
+    controller,
+    await controller.subtotal(
+      AggregateType.AGG_SUM,
+      groupOnCol: 0,
+      aggregateCol: 4,
+      caption: '',
+      backColor: 0xFFF5F3FF,
+      foreColor: 0xFF111827,
+    ),
   );
-  await controller.subtotal(
-    AggregateType.AGG_SUM,
-    groupOnCol: 1,
-    aggregateCol: 4,
-    caption: '',
-    backColor: 0xFFF8F7FF,
-    foreColor: 0xFF111827,
+  await _applySalesSubtotalDecorations(
+    controller,
+    await controller.subtotal(
+      AggregateType.AGG_SUM,
+      groupOnCol: 1,
+      aggregateCol: 4,
+      caption: '',
+      backColor: 0xFFF8F7FF,
+      foreColor: 0xFF111827,
+    ),
   );
-  await controller.subtotal(
-    AggregateType.AGG_SUM,
-    groupOnCol: -1,
-    aggregateCol: 5,
-    caption: 'Grand Total',
-    backColor: 0xFFEEF2FF,
-    foreColor: 0xFF111827,
+  await _applySalesSubtotalDecorations(
+    controller,
+    await controller.subtotal(
+      AggregateType.AGG_SUM,
+      groupOnCol: -1,
+      aggregateCol: 5,
+      caption: 'Grand Total',
+      backColor: 0xFFEEF2FF,
+      foreColor: 0xFF111827,
+    ),
   );
-  await controller.subtotal(
-    AggregateType.AGG_SUM,
-    groupOnCol: 0,
-    aggregateCol: 5,
-    caption: '',
-    backColor: 0xFFF5F3FF,
-    foreColor: 0xFF111827,
+  await _applySalesSubtotalDecorations(
+    controller,
+    await controller.subtotal(
+      AggregateType.AGG_SUM,
+      groupOnCol: 0,
+      aggregateCol: 5,
+      caption: '',
+      backColor: 0xFFF5F3FF,
+      foreColor: 0xFF111827,
+    ),
   );
-  await controller.subtotal(
-    AggregateType.AGG_SUM,
-    groupOnCol: 1,
-    aggregateCol: 5,
-    caption: '',
-    backColor: 0xFFF8F7FF,
-    foreColor: 0xFF111827,
+  await _applySalesSubtotalDecorations(
+    controller,
+    await controller.subtotal(
+      AggregateType.AGG_SUM,
+      groupOnCol: 1,
+      aggregateCol: 5,
+      caption: '',
+      backColor: 0xFFF8F7FF,
+      foreColor: 0xFF111827,
+    ),
   );
-  await _applySalesSubtotalDecorations(controller);
 }
 
 DefineColumnsRequest _salesDefineColumnsRequest() {
@@ -137,6 +154,7 @@ DefineColumnsRequest _salesDefineColumnsRequest() {
     } else if (col == 6) {
       def.align = Align.ALIGN_CENTER_CENTER;
       def.dataType = ColumnDataType.COLUMN_DATA_NUMBER;
+      def.progressColor = _salesAccent;
     } else if (col == 7) {
       def.align = Align.ALIGN_CENTER_CENTER;
       def.dataType = ColumnDataType.COLUMN_DATA_BOOLEAN;
@@ -151,121 +169,19 @@ DefineColumnsRequest _salesDefineColumnsRequest() {
   return request;
 }
 
-Future<void> _applySalesSubtotalDecorations(VolvoxGridController controller) async {
+Future<void> _applySalesSubtotalDecorations(
+  VolvoxGridController controller,
+  SubtotalResult result,
+) async {
   await controller.setSpanCol(0, true);
   await controller.setSpanCol(1, true);
 
-  final rowCount = await controller.rowCount();
-  if (rowCount <= 0) {
-    return;
-  }
-
-  final cells = await controller.getCellsRange(0, 3, rowCount - 1, 7);
-  final rowTexts = List<List<String>>.generate(
-    rowCount,
-    (_) => List<String>.filled(5, ''),
-  );
-  for (final cell in cells.cells) {
-    final row = cell.row;
-    final colOffset = cell.col - 3;
-    if (row < 0 ||
-        row >= rowCount ||
-        colOffset < 0 ||
-        colOffset >= rowTexts[row].length ||
-        !cell.hasValue() ||
-        !cell.value.hasText()) {
-      continue;
-    }
-    rowTexts[row][colOffset] = cell.value.text;
-  }
-
-  final updates = UpdateCellsRequest();
-  final rowsNeedingMergeCheck = <int>[];
-  for (var row = 0; row < rowCount; row += 1) {
-    final values = rowTexts[row];
-    final product = values[0];
-    final sales = values[1];
-    final cost = values[2];
-    final isSubtotal = product.isEmpty && (sales.isNotEmpty || cost.isNotEmpty);
-    if (!isSubtotal) {
-      final margin = _parseSalesMarginPercent(values[3]);
-      updates.cells.add(CellUpdate()
-        ..row = row
-        ..col = 6
-        ..style = _salesProgressStyle(margin));
-      final flagged = _parseSalesFlag(values[4]);
-      updates.cells.add(CellUpdate()
-        ..row = row
-        ..col = 7
-        ..value = (CellValue()..flag = flagged)
-        ..checked = flagged
-            ? CheckedState.CHECKED_CHECKED
-            : CheckedState.CHECKED_UNCHECKED);
-      updates.cells.add(CellUpdate()
-        ..row = row
-        ..col = 8
-        ..dropdownItems = _salesStatusItems);
-      continue;
-    }
-    if (sales.isEmpty && cost.isEmpty) {
-      continue;
-    }
-
-    updates.cells.add(CellUpdate()
-      ..row = row
-      ..col = 7
-      ..value = (CellValue()..flag = false)
-      ..checked = CheckedState.CHECKED_GRAYED);
-
-    final salesValue = _parseSalesMetric(sales);
-    final costValue = _parseSalesMetric(cost);
-    final margin = salesValue > 0
-        ? ((salesValue - costValue) * 100.0) / salesValue
-        : 0.0;
-    updates.cells.add(CellUpdate()
-      ..row = row
-      ..col = 6
-      ..value = (CellValue()..text = margin.toStringAsFixed(1))
-      ..style = _salesProgressStyle(margin));
-
-    rowsNeedingMergeCheck.add(row);
-  }
-
-  if (updates.cells.isNotEmpty) {
-    await controller.updateCells(updates);
-  }
-
-  for (final row in rowsNeedingMergeCheck) {
+  final uniqueRows = result.rows.toSet().toList()..sort();
+  for (final row in uniqueRows) {
     if ((await controller.getNode(row)).level <= 0) {
       await controller.mergeCells(row, 0, row, 1);
     }
   }
-}
-
-int _parseSalesMetric(String text) =>
-    int.tryParse(text.trim().replaceAll(',', '')) ?? 0;
-
-double _parseSalesMarginPercent(String text) =>
-    double.tryParse(text.trim().replaceAll(',', '')) ?? 0.0;
-
-bool _parseSalesFlag(String text) {
-  switch (text.trim().toLowerCase()) {
-    case '1':
-    case 'true':
-    case 'yes':
-    case 'y':
-    case 'on':
-    case 'checked':
-      return true;
-    default:
-      return false;
-  }
-}
-
-CellStyle _salesProgressStyle(double marginPercent) {
-  return CellStyle()
-    ..progress = (marginPercent / 100.0).clamp(0.0, 1.0)
-    ..progressColor = _salesAccent;
 }
 
 GridConfig _salesThemeConfig() {

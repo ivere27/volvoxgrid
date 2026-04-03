@@ -2959,6 +2959,9 @@ namespace Volvoxgrid.V1
         private CellInteraction? _interaction;
         public CellInteraction Interaction { get { return _interaction.GetValueOrDefault(); } set { _interaction = value; } }
         public bool HasInteraction { get { return _interaction.HasValue; } }
+        private uint? _progressColor;
+        public uint ProgressColor { get { return _progressColor.GetValueOrDefault(); } set { _progressColor = value; } }
+        public bool HasProgressColor { get { return _progressColor.HasValue; } }
 
         // ── Serialization ──
 
@@ -3014,6 +3017,8 @@ namespace Volvoxgrid.V1
                 w.WriteInt32(25, (int)_errorMode.Value);
             if (_interaction.HasValue)
                 w.WriteInt32(26, (int)_interaction.Value);
+            if (_progressColor.HasValue)
+                w.WriteInt32(27, unchecked((int)_progressColor.Value));
             return w.ToArray();
         }
 
@@ -3057,6 +3062,7 @@ namespace Volvoxgrid.V1
                     case 24: msg.CoercionMode = (CoercionMode)r.ReadInt32(); break;
                     case 25: msg.ErrorMode = (WriteErrorMode)r.ReadInt32(); break;
                     case 26: msg.Interaction = (CellInteraction)r.ReadInt32(); break;
+                    case 27: msg.ProgressColor = unchecked((uint)r.ReadInt32()); break;
                     default: r.SkipField(wire); break;
                 }
             }

@@ -327,6 +327,10 @@ export interface VolvoxGridLoadDataResult {
   inferredColumns: VolvoxGridLoadDataColumn[];
 }
 
+export interface VolvoxGridSubtotalResult {
+  rows: number[];
+}
+
 type ResolvedHeaderSeparatorStyle = {
   enabled: boolean;
   colorArgb: number;
@@ -1950,6 +1954,40 @@ function pbDecodeLoadDataResult(data: Uint8Array): VolvoxGridLoadDataResult {
           if (column != null) {
             result.inferredColumns.push(column);
           }
+        }
+      }
+      offset = pbSkipField(data, offset, wire);
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  return result;
+}
+
+function pbDecodeSubtotalResult(data: Uint8Array): VolvoxGridSubtotalResult {
+  let offset = 0;
+  const result: VolvoxGridSubtotalResult = { rows: [] };
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (field === 1 && wire === 0) {
+      const value = pbReadVarint(data, offset);
+      offset = value.next;
+      result.rows.push(pbAsInt32(value.value));
+      continue;
+    }
+    if (field === 1 && wire === 2) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      if (Number.isFinite(n) && n >= 0) {
+        const end = Math.min(data.length, len.next + n);
+        let packedOffset = len.next;
+        while (packedOffset < end) {
+          const value = pbReadVarint(data, packedOffset);
+          packedOffset = value.next;
+          result.rows.push(pbAsInt32(value.value));
         }
       }
       offset = pbSkipField(data, offset, wire);
@@ -4281,6 +4319,38 @@ export class VolvoxGrid {
   sortMulti(cols: number[], orders: number[]): void {
     this.wasm.sort_multi(this.gridId, new Int32Array(cols), new Int32Array(orders));
     this.dirty = true;
+  }
+
+  subtotal(
+    aggregate: number,
+    groupOnCol: number,
+    aggregateCol: number,
+    caption: string = "",
+    background: number = 0xFFE0E0E0,
+    foreground: number = 0xFF000000,
+    addOutline: boolean = true,
+    font?: VolvoxGridFont,
+  ): VolvoxGridSubtotalResult {
+    if (typeof this.wasm.volvox_grid_subtotal !== "function") {
+      return { rows: [] };
+    }
+    const fontBytes = font == null ? new Uint8Array() : pbEncodeFont(font);
+    const response = this.wasm.volvox_grid_subtotal(
+      BigInt(this.gridId),
+      aggregate,
+      groupOnCol,
+      aggregateCol,
+      caption,
+      background >>> 0,
+      foreground >>> 0,
+      addOutline,
+      fontBytes,
+    ) as Uint8Array;
+    this.dirty = true;
+    if (!(response instanceof Uint8Array) || response.length === 0) {
+      return { rows: [] };
+    }
+    return pbDecodeSubtotalResult(response);
   }
 
   /** Expand/collapse tree rows to [level]. */

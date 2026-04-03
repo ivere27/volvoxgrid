@@ -460,6 +460,7 @@ namespace VolvoxGrid.DotNet.Internal
             if (source.HasDataType) clone.DataType = source.DataType;
             if (source.HasInteraction) clone.Interaction = source.Interaction;
             if (source.HasFormat) clone.Format = source.Format;
+            if (source.HasProgressColor) clone.ProgressColor = source.ProgressColor;
             if (source.HasSticky) clone.Sticky = source.Sticky;
 
             return clone;

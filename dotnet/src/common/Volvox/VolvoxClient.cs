@@ -226,7 +226,7 @@ namespace VolvoxGrid.DotNet.Internal
             InvokeUnary(SortMethod, req.ToByteArray());
         }
 
-        public void Subtotal(long gridId, AggregateType aggregate, int groupOnCol, int aggregateCol, string caption, uint backColor, uint foreColor, bool addOutline)
+        public SubtotalResult Subtotal(long gridId, AggregateType aggregate, int groupOnCol, int aggregateCol, string caption, uint backColor, uint foreColor, bool addOutline)
         {
             var req = new SubtotalRequest
             {
@@ -239,7 +239,8 @@ namespace VolvoxGrid.DotNet.Internal
                 Foreground = foreColor,
                 AddOutline = addOutline,
             };
-            InvokeUnary(SubtotalMethod, req.ToByteArray());
+            byte[] response = InvokeUnary(SubtotalMethod, req.ToByteArray());
+            return SubtotalResult.ParseFrom(response);
         }
 
         public void AutoSize(long gridId, int colFrom, int colTo, bool equal, int maxWidth)

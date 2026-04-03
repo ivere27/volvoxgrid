@@ -1424,6 +1424,7 @@ namespace VolvoxGrid.DotNet
             string format = null,
             string key = null,
             string dropdownItems = null,
+            uint? progressColor = null,
             bool? span = null,
             VolvoxGridStickyEdge? sticky = null)
         {
@@ -1440,6 +1441,7 @@ namespace VolvoxGrid.DotNet
                 if (format != null) def.Format = format;
                 if (!string.IsNullOrEmpty(key)) def.Key = key;
                 if (dropdownItems != null) def.DropdownItems = dropdownItems;
+                if (progressColor.HasValue) def.ProgressColor = progressColor.Value;
                 if (span.HasValue) def.Span = span.Value;
                 if (sticky.HasValue) def.Sticky = (StickyEdge)sticky.Value;
 
@@ -1455,6 +1457,7 @@ namespace VolvoxGrid.DotNet
                     if (dataType.HasValue) col.DataType = dataType.Value;
                     if (interaction.HasValue) col.Interaction = interaction.Value;
                     if (format != null) col.Format = format;
+                    if (progressColor.HasValue) col.ProgressColor = progressColor.Value;
                 }
                 _renderHost.RequestFrame();
             }
@@ -1966,12 +1969,13 @@ namespace VolvoxGrid.DotNet
             catch (Exception ex) { _lastError = ex.Message; }
         }
 
-        public void Subtotal(VolvoxGridAggregateType agg, int groupCol, int aggCol, string caption = "", uint backColor = 0xFFE0E0E0, uint foreColor = 0xFF000000, bool addOutline = true)
+        public SubtotalResult Subtotal(VolvoxGridAggregateType agg, int groupCol, int aggCol, string caption = "", uint backColor = 0xFFE0E0E0, uint foreColor = 0xFF000000, bool addOutline = true)
         {
-            if (_client == null || _gridId == 0) return;
-            _client.Subtotal(_gridId, (AggregateType)agg, groupCol, aggCol, caption, backColor, foreColor, addOutline);
+            if (_client == null || _gridId == 0) return new SubtotalResult();
+            SubtotalResult result = _client.Subtotal(_gridId, (AggregateType)agg, groupCol, aggCol, caption, backColor, foreColor, addOutline);
             if (_engineManagedData) SyncRowCountFromEngine();
             _renderHost.RequestFrame();
+            return result;
         }
 
         public new void AutoSize(int colFrom = 0, int colTo = -1, bool equal = false, int maxWidth = 0)
@@ -2505,7 +2509,7 @@ namespace VolvoxGrid.DotNet
             }
         }
 
-        private List<ColumnDef> BuildColumnDefinitions() => _columns.Select((c, i) => new ColumnDef { Index = i, Key = c.FieldName, Caption = c.Caption, Width = c.Width, Hidden = !c.Visible, SortOrder = (Volvoxgrid.V1.SortOrder)c.SortDirection, Align = (Align)c.Alignment, DataType = (ColumnDataType)c.DataType, Interaction = (CellInteraction)c.Interaction, Format = c.Format }).ToList();
+        private List<ColumnDef> BuildColumnDefinitions() => _columns.Select((c, i) => new ColumnDef { Index = i, Key = c.FieldName, Caption = c.Caption, Width = c.Width, Hidden = !c.Visible, SortOrder = (Volvoxgrid.V1.SortOrder)c.SortDirection, Align = (Align)c.Alignment, DataType = (ColumnDataType)c.DataType, Interaction = (CellInteraction)c.Interaction, Format = c.Format, ProgressColor = c.ProgressColor }).ToList();
 
         private List<SortColumn> BuildSortColumns() => _columns.Select((c, i) => new { c, i }).Where(x => x.c.SortDirection != VolvoxGridSortDirection.None).Select(x => new SortColumn { Col = x.i, Order = (Volvoxgrid.V1.SortOrder)x.c.SortDirection }).ToList();
 
@@ -2525,7 +2529,8 @@ namespace VolvoxGrid.DotNet
                     Alignment = s.HasAlign ? (VolvoxGridAlign)s.Align : VolvoxGridAlign.General,
                     DataType = s.HasDataType ? (VolvoxGridColumnDataType)s.DataType : VolvoxGridColumnDataType.String,
                     Interaction = s.HasInteraction ? (VolvoxGridCellInteraction)s.Interaction : VolvoxGridCellInteraction.Unspecified,
-                    Format = s.HasFormat ? s.Format : null
+                    Format = s.HasFormat ? s.Format : null,
+                    ProgressColor = s.HasProgressColor ? s.ProgressColor : 0
                 });
             }
         }
@@ -2671,7 +2676,7 @@ namespace VolvoxGrid.DotNet
             res.Add(new CellRange { Row1 = start, Col1 = col, Row2 = prev, Col2 = col }); return res;
         }
 
-        private VolvoxGridColumn CloneColumn(VolvoxGridColumn s) => new VolvoxGridColumn { FieldName = s.FieldName, Caption = s.Caption, Width = s.Width, Visible = s.Visible, AllowEdit = s.AllowEdit, ReadOnly = s.ReadOnly, SortDirection = s.SortDirection, Alignment = s.Alignment, DataType = s.DataType, Interaction = s.Interaction, Format = s.Format };
+        private VolvoxGridColumn CloneColumn(VolvoxGridColumn s) => new VolvoxGridColumn { FieldName = s.FieldName, Caption = s.Caption, Width = s.Width, Visible = s.Visible, AllowEdit = s.AllowEdit, ReadOnly = s.ReadOnly, SortDirection = s.SortDirection, Alignment = s.Alignment, DataType = s.DataType, Interaction = s.Interaction, Format = s.Format, ProgressColor = s.ProgressColor };
 
         private int ResolveDemoRowCountHint(string d)
         {

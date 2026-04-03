@@ -49,6 +49,35 @@ impl MergeRegistry {
         &self.ranges
     }
 
+    /// Shift merge row indices after inserting a row at `at`.
+    pub fn shift_rows_down(&mut self, at: i32) {
+        for (r1, _, r2, _) in &mut self.ranges {
+            if at <= *r1 {
+                *r1 += 1;
+                *r2 += 1;
+            } else if at <= *r2 {
+                *r2 += 1;
+            }
+        }
+    }
+
+    /// Shift merge row indices after removing row `at`.
+    pub fn shift_rows_up(&mut self, at: i32) {
+        let old_ranges = std::mem::take(&mut self.ranges);
+        for (mut r1, c1, mut r2, c2) in old_ranges {
+            if at < r1 {
+                r1 -= 1;
+                r2 -= 1;
+            } else if at <= r2 {
+                if r1 == r2 {
+                    continue;
+                }
+                r2 -= 1;
+            }
+            self.ranges.push((r1, c1, r2, c2));
+        }
+    }
+
     /// Approximate heap usage in bytes.
     pub fn heap_size_bytes(&self) -> usize {
         self.ranges.capacity() * std::mem::size_of::<(i32, i32, i32, i32)>()
@@ -81,6 +110,49 @@ mod tests {
         reg.add_merge(5, 5, 5, 5);
         assert_eq!(reg.find_merge(5, 5), None);
         assert!(reg.all_ranges().is_empty());
+    }
+
+    #[test]
+    fn shift_rows_down_moves_single_row_merge() {
+        let mut reg = MergeRegistry::new();
+        reg.add_merge(3, 0, 3, 1);
+
+        reg.shift_rows_down(3);
+
+        assert_eq!(reg.find_merge(4, 0), Some((4, 0, 4, 1)));
+        assert_eq!(reg.find_merge(3, 0), None);
+    }
+
+    #[test]
+    fn shift_rows_down_expands_merge_when_inserting_inside_range() {
+        let mut reg = MergeRegistry::new();
+        reg.add_merge(3, 0, 5, 1);
+
+        reg.shift_rows_down(4);
+
+        assert_eq!(reg.find_merge(3, 0), Some((3, 0, 6, 1)));
+        assert_eq!(reg.find_merge(6, 0), Some((3, 0, 6, 1)));
+    }
+
+    #[test]
+    fn shift_rows_up_removes_single_row_merge_on_deleted_row() {
+        let mut reg = MergeRegistry::new();
+        reg.add_merge(3, 0, 3, 1);
+
+        reg.shift_rows_up(3);
+
+        assert!(reg.all_ranges().is_empty());
+    }
+
+    #[test]
+    fn shift_rows_up_shrinks_merge_when_deleting_inside_range() {
+        let mut reg = MergeRegistry::new();
+        reg.add_merge(3, 0, 5, 1);
+
+        reg.shift_rows_up(4);
+
+        assert_eq!(reg.find_merge(3, 0), Some((3, 0, 4, 1)));
+        assert_eq!(reg.find_merge(5, 0), None);
     }
 
     #[test]

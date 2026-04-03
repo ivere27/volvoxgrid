@@ -707,10 +707,6 @@ impl VolvoxServiceClient {
         Ok(response.data)
     }
 
-    fn load_data(&self, grid_id: i64, data: Vec<u8>) -> Result<pb::LoadDataResult, String> {
-        self.load_data_with_options(grid_id, data, None)
-    }
-
     fn load_data_with_options(
         &self,
         grid_id: i64,
@@ -770,8 +766,8 @@ impl VolvoxServiceClient {
         background: u32,
         foreground: u32,
         add_outline: bool,
-    ) -> Result<(), String> {
-        let _: pb::SubtotalResult = self.invoke(
+    ) -> Result<pb::SubtotalResult, String> {
+        self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Subtotal",
             &pb::SubtotalRequest {
                 grid_id,
@@ -784,8 +780,7 @@ impl VolvoxServiceClient {
                 add_outline,
                 font: None,
             },
-        )?;
-        Ok(())
+        )
     }
 
     fn get_config(&self, grid_id: i64) -> Result<pb::GridConfig, String> {
@@ -793,36 +788,6 @@ impl VolvoxServiceClient {
             "/volvoxgrid.v1.VolvoxGridService/GetConfig",
             &pb::GridHandle { id: grid_id },
         )
-    }
-
-    fn get_cell_text(&self, grid_id: i64, row: i32, col: i32) -> Result<String, String> {
-        let response: pb::CellsResponse = self.invoke(
-            "/volvoxgrid.v1.VolvoxGridService/GetCells",
-            &pb::GetCellsRequest {
-                grid_id,
-                row1: row,
-                col1: col,
-                row2: row,
-                col2: col,
-                include_style: false,
-                include_checked: false,
-                include_typed: true,
-            },
-        )?;
-        Ok(response
-            .cells
-            .first()
-            .and_then(|cell| cell.value.as_ref())
-            .and_then(|value| match value.value.as_ref() {
-                Some(pb::cell_value::Value::Text(text)) => Some(text.clone()),
-                Some(pb::cell_value::Value::Number(number)) => Some(number.to_string()),
-                Some(pb::cell_value::Value::Flag(flag)) => {
-                    Some(if *flag { "true" } else { "false" }.to_string())
-                }
-                Some(pb::cell_value::Value::Timestamp(ts)) => Some(ts.to_string()),
-                _ => None,
-            })
-            .unwrap_or_default())
     }
 
     fn get_node(&self, grid_id: i64, row: i32) -> Result<pb::NodeInfo, String> {
@@ -958,6 +923,7 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
                 key: Some("Margin".to_string()),
                 align: Some(pb::Align::CenterCenter as i32),
                 data_type: Some(pb::ColumnDataType::ColumnDataNumber as i32),
+                progress_color: Some(0xFF818CF8),
                 ..Default::default()
             },
             pb::ColumnDef {
@@ -1066,213 +1032,107 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
     )?;
 
     client.subtotal(grid_id, pb::AggregateType::AggClear, 0, 0, "", 0, 0, false)?;
-    client.subtotal(
+    apply_sales_subtotal_decorations(
+        client,
         grid_id,
-        pb::AggregateType::AggSum,
-        -1,
-        4,
-        "Grand Total",
-        0xFFEEF2FF,
-        0xFF111827,
-        true,
+        &client.subtotal(
+            grid_id,
+            pb::AggregateType::AggSum,
+            -1,
+            4,
+            "Grand Total",
+            0xFFEEF2FF,
+            0xFF111827,
+            true,
+        )?,
     )?;
-    client.subtotal(
+    apply_sales_subtotal_decorations(
+        client,
         grid_id,
-        pb::AggregateType::AggSum,
-        0,
-        4,
-        "",
-        0xFFF5F3FF,
-        0xFF111827,
-        true,
+        &client.subtotal(
+            grid_id,
+            pb::AggregateType::AggSum,
+            0,
+            4,
+            "",
+            0xFFF5F3FF,
+            0xFF111827,
+            true,
+        )?,
     )?;
-    client.subtotal(
+    apply_sales_subtotal_decorations(
+        client,
         grid_id,
-        pb::AggregateType::AggSum,
-        1,
-        4,
-        "",
-        0xFFF8F7FF,
-        0xFF111827,
-        true,
+        &client.subtotal(
+            grid_id,
+            pb::AggregateType::AggSum,
+            1,
+            4,
+            "",
+            0xFFF8F7FF,
+            0xFF111827,
+            true,
+        )?,
     )?;
-    client.subtotal(
+    apply_sales_subtotal_decorations(
+        client,
         grid_id,
-        pb::AggregateType::AggSum,
-        -1,
-        5,
-        "Grand Total",
-        0xFFEEF2FF,
-        0xFF111827,
-        true,
+        &client.subtotal(
+            grid_id,
+            pb::AggregateType::AggSum,
+            -1,
+            5,
+            "Grand Total",
+            0xFFEEF2FF,
+            0xFF111827,
+            true,
+        )?,
     )?;
-    client.subtotal(
+    apply_sales_subtotal_decorations(
+        client,
         grid_id,
-        pb::AggregateType::AggSum,
-        0,
-        5,
-        "",
-        0xFFF5F3FF,
-        0xFF111827,
-        true,
+        &client.subtotal(
+            grid_id,
+            pb::AggregateType::AggSum,
+            0,
+            5,
+            "",
+            0xFFF5F3FF,
+            0xFF111827,
+            true,
+        )?,
     )?;
-    client.subtotal(
+    apply_sales_subtotal_decorations(
+        client,
         grid_id,
-        pb::AggregateType::AggSum,
-        1,
-        5,
-        "",
-        0xFFF8F7FF,
-        0xFF111827,
-        true,
+        &client.subtotal(
+            grid_id,
+            pb::AggregateType::AggSum,
+            1,
+            5,
+            "",
+            0xFFF8F7FF,
+            0xFF111827,
+            true,
+        )?,
     )?;
-    apply_sales_subtotal_decorations(client, grid_id)?;
     Ok(())
 }
 
 fn apply_sales_subtotal_decorations(
     client: &VolvoxServiceClient,
     grid_id: i64,
+    result: &pb::SubtotalResult,
 ) -> Result<(), String> {
-    const SALES_MARGIN_PROGRESS_COLOR: u32 = 0xFF818CF8;
-
-    let total_rows = client
-        .get_config(grid_id)?
-        .layout
-        .and_then(|layout| layout.rows)
-        .unwrap_or(0);
-    let mut updates = Vec::new();
-    for row in 0..total_rows {
-        let product = client.get_cell_text(grid_id, row, 3)?;
-        let sales = client.get_cell_text(grid_id, row, 4)?;
-        let cost = client.get_cell_text(grid_id, row, 5)?;
-        let is_subtotal = product.is_empty() && (!sales.is_empty() || !cost.is_empty());
-        if !is_subtotal {
-            let margin = parse_sales_margin_percent(&client.get_cell_text(grid_id, row, 6)?);
-            updates.push(pb::CellUpdate {
-                row,
-                col: 6,
-                value: None,
-                style: Some(pb::CellStyle {
-                    progress: Some((margin / 100.0).clamp(0.0, 1.0)),
-                    progress_color: Some(SALES_MARGIN_PROGRESS_COLOR),
-                    ..Default::default()
-                }),
-                checked: None,
-                picture: None,
-                picture_align: None,
-                button_picture: None,
-                dropdown_items: None,
-                sticky_row: None,
-                sticky_col: None,
-                interaction: None,
-            });
-            let flagged = parse_sales_flag(&client.get_cell_text(grid_id, row, 7)?);
-            updates.push(pb::CellUpdate {
-                row,
-                col: 7,
-                value: Some(pb::CellValue {
-                    value: Some(pb::cell_value::Value::Flag(flagged)),
-                }),
-                checked: Some(if flagged {
-                    pb::CheckedState::CheckedChecked as i32
-                } else {
-                    pb::CheckedState::CheckedUnchecked as i32
-                }),
-                style: None,
-                picture: None,
-                picture_align: None,
-                button_picture: None,
-                dropdown_items: None,
-                sticky_row: None,
-                sticky_col: None,
-                interaction: None,
-            });
-            updates.push(pb::CellUpdate {
-                row,
-                col: 8,
-                value: None,
-                checked: None,
-                style: None,
-                picture: None,
-                picture_align: None,
-                button_picture: None,
-                dropdown_items: Some(SALES_STATUS_ITEMS.to_string()),
-                sticky_row: None,
-                sticky_col: None,
-                interaction: None,
-            });
-            continue;
-        }
-        if sales.is_empty() && cost.is_empty() {
-            continue;
-        }
-
-        updates.push(pb::CellUpdate {
-            row,
-            col: 7,
-            value: Some(pb::CellValue {
-                value: Some(pb::cell_value::Value::Flag(false)),
-            }),
-            checked: Some(pb::CheckedState::CheckedGrayed as i32),
-            style: None,
-            picture: None,
-            picture_align: None,
-            button_picture: None,
-            dropdown_items: None,
-            sticky_row: None,
-            sticky_col: None,
-            interaction: None,
-        });
-
-        let sales_value = sales.trim().parse::<i64>().unwrap_or(0);
-        let cost_value = cost.trim().parse::<i64>().unwrap_or(0);
-        let margin = if sales_value > 0 {
-            ((sales_value - cost_value) as f64 * 100.0) / sales_value as f64
-        } else {
-            0.0
-        };
-        updates.push(pb::CellUpdate {
-            row,
-            col: 6,
-            value: Some(pb::CellValue {
-                value: Some(pb::cell_value::Value::Text(format!("{margin:.1}"))),
-            }),
-            style: Some(pb::CellStyle {
-                progress: Some(((margin / 100.0) as f32).clamp(0.0, 1.0)),
-                progress_color: Some(SALES_MARGIN_PROGRESS_COLOR),
-                ..Default::default()
-            }),
-            checked: None,
-            picture: None,
-            picture_align: None,
-            button_picture: None,
-            dropdown_items: None,
-            sticky_row: None,
-            sticky_col: None,
-            interaction: None,
-        });
-
+    let mut unique_rows = result.rows.clone();
+    unique_rows.sort_unstable();
+    unique_rows.dedup();
+    for row in unique_rows {
         if client.get_node(grid_id, row)?.level <= 0 {
             client.merge_cells(grid_id, row, 0, row, 1)?;
         }
     }
-
-    if !updates.is_empty() {
-        client.update_cells(grid_id, updates, false)?;
-    }
     Ok(())
-}
-
-fn parse_sales_flag(text: &str) -> bool {
-    matches!(
-        text.trim().to_ascii_lowercase().as_str(),
-        "1" | "true" | "yes" | "y" | "on" | "checked"
-    )
-}
-
-fn parse_sales_margin_percent(text: &str) -> f32 {
-    text.trim().replace(',', "").parse::<f32>().unwrap_or(0.0)
 }
 
 fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<(), String> {

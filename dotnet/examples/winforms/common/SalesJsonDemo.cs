@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Text;
-using System.Text.RegularExpressions;
 using VolvoxGrid.DotNet;
+using Volvoxgrid.V1;
 
 namespace VolvoxGrid.DotNet.Sample
 {
@@ -31,13 +29,10 @@ namespace VolvoxGrid.DotNet.Sample
         private const uint HoverCellBackColor = 0x1E818CF8u;
         private const uint ActiveCellBackColor = 0x22000000u;
         private const uint ActiveCellForeColor = 0xFFFFFFFFu;
-        private static readonly Regex SalesFlagRegex = new Regex("\"Flag\"\\s*:\\s*(true|false)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
         public static void Load(VolvoxGridControl grid)
         {
             if (grid == null) throw new ArgumentNullException("grid");
             byte[] salesData = grid.GetDemoData("sales");
-            IList<bool> salesFlags = ExtractSalesFlagValues(salesData);
 
             var columns = new[]
             {
@@ -47,7 +42,7 @@ namespace VolvoxGrid.DotNet.Sample
                 new VolvoxGridColumn { FieldName = "Product", Caption = "Product", Width = 120 },
                 new VolvoxGridColumn { FieldName = "Sales", Caption = "Sales", Width = 90, DataType = VolvoxGridColumnDataType.Currency, Alignment = VolvoxGridAlign.RightCenter, Format = "$#,##0" },
                 new VolvoxGridColumn { FieldName = "Cost", Caption = "Cost", Width = 90, DataType = VolvoxGridColumnDataType.Currency, Alignment = VolvoxGridAlign.RightCenter, Format = "$#,##0" },
-                new VolvoxGridColumn { FieldName = "Margin", Caption = "Margin%", Width = 70, DataType = VolvoxGridColumnDataType.Number, Alignment = VolvoxGridAlign.CenterCenter },
+                new VolvoxGridColumn { FieldName = "Margin", Caption = "Margin%", Width = 70, DataType = VolvoxGridColumnDataType.Number, Alignment = VolvoxGridAlign.CenterCenter, ProgressColor = MarginProgressColor },
                 new VolvoxGridColumn { FieldName = "Flag", Caption = "Flag", Width = 56, DataType = VolvoxGridColumnDataType.Boolean, Alignment = VolvoxGridAlign.CenterCenter },
                 new VolvoxGridColumn { FieldName = "Status", Caption = "Status", Width = 80 },
                 new VolvoxGridColumn { FieldName = "Notes", Caption = "Notes", Width = 140 },
@@ -106,53 +101,25 @@ namespace VolvoxGrid.DotNet.Sample
             grid.Editable = false;
 
             grid.Subtotal(VolvoxGridAggregateType.Clear, 0, 0, "", 0, 0, false);
-            grid.Subtotal(VolvoxGridAggregateType.Sum, -1, 4, "Grand Total", 0xFFEEF2FF, 0xFF111827, true);
-            grid.Subtotal(VolvoxGridAggregateType.Sum, 0, 4, "", 0xFFF5F3FF, 0xFF111827, true);
-            grid.Subtotal(VolvoxGridAggregateType.Sum, 1, 4, "", 0xFFF8F7FF, 0xFF111827, true);
-            grid.Subtotal(VolvoxGridAggregateType.Sum, -1, 5, "Grand Total", 0xFFEEF2FF, 0xFF111827, true);
-            grid.Subtotal(VolvoxGridAggregateType.Sum, 0, 5, "", 0xFFF5F3FF, 0xFF111827, true);
-            grid.Subtotal(VolvoxGridAggregateType.Sum, 1, 5, "", 0xFFF8F7FF, 0xFF111827, true);
-            ApplySalesSubtotalDecorations(grid, salesFlags);
+            ApplySalesSubtotalDecorations(grid, grid.Subtotal(VolvoxGridAggregateType.Sum, -1, 4, "Grand Total", 0xFFEEF2FF, 0xFF111827, true));
+            ApplySalesSubtotalDecorations(grid, grid.Subtotal(VolvoxGridAggregateType.Sum, 0, 4, "", 0xFFF5F3FF, 0xFF111827, true));
+            ApplySalesSubtotalDecorations(grid, grid.Subtotal(VolvoxGridAggregateType.Sum, 1, 4, "", 0xFFF8F7FF, 0xFF111827, true));
+            ApplySalesSubtotalDecorations(grid, grid.Subtotal(VolvoxGridAggregateType.Sum, -1, 5, "Grand Total", 0xFFEEF2FF, 0xFF111827, true));
+            ApplySalesSubtotalDecorations(grid, grid.Subtotal(VolvoxGridAggregateType.Sum, 0, 5, "", 0xFFF5F3FF, 0xFF111827, true));
+            ApplySalesSubtotalDecorations(grid, grid.Subtotal(VolvoxGridAggregateType.Sum, 1, 5, "", 0xFFF8F7FF, 0xFF111827, true));
         }
 
-        private static void ApplySalesSubtotalDecorations(VolvoxGridControl grid, IList<bool> salesFlags)
+        private static void ApplySalesSubtotalDecorations(VolvoxGridControl grid, SubtotalResult result)
         {
             grid.WithRedrawSuspended(delegate
             {
-                int rowCount = grid.RowCount;
-                int dataRowIndex = 0;
-                for (int row = 0; row < rowCount; row++)
+                var uniqueRows = new List<int>(result.Rows);
+                uniqueRows.Sort();
+                int previousRow = int.MinValue;
+                foreach (int row in uniqueRows)
                 {
-                    string product = grid.GetCellText(row, 3);
-                    double? salesValue = GetNumericCellValue(grid, row, "Sales");
-                    double? costValue = GetNumericCellValue(grid, row, "Cost");
-                    bool isSubtotal = string.IsNullOrEmpty(product)
-                        && (salesValue.HasValue || costValue.HasValue);
-
-                    if (!isSubtotal)
-                    {
-                        grid.SetCellProgress(row, 6, GetSalesMarginProgress(grid, row), MarginProgressColor);
-                        bool flagged = dataRowIndex < salesFlags.Count ? salesFlags[dataRowIndex] : GetSalesFlagValue(grid, row);
-                        grid.SetCellValue(row, "Flag", flagged);
-                        grid.SetCellCheckedState(row, 7,
-                            flagged ? VolvoxGridCheckedState.Checked : VolvoxGridCheckedState.Unchecked);
-                        grid.SetCellDropdownItems(row, 8, StatusItems);
-                        dataRowIndex++;
-                        continue;
-                    }
-                    if (!salesValue.HasValue && !costValue.HasValue)
-                        continue;
-
-                    grid.SetCellValue(row, "Flag", false);
-                    grid.SetCellCheckedState(row, 7, VolvoxGridCheckedState.Grayed);
-
-                    double salesNumber = salesValue ?? 0.0;
-                    double costNumber = costValue ?? 0.0;
-                    double margin = salesNumber > 0.0
-                        ? ((salesNumber - costNumber) * 100.0) / salesNumber
-                        : 0.0;
-                    grid.SetCellText(row, 6, margin.ToString("F1", CultureInfo.InvariantCulture));
-                    grid.SetCellProgress(row, 6, NormalizeMarginProgress((float)margin), MarginProgressColor);
+                    if (row == previousRow) continue;
+                    previousRow = row;
 
                     var node = grid.GetNode(row);
                     if (node != null && node.Level <= 0)
@@ -161,106 +128,6 @@ namespace VolvoxGrid.DotNet.Sample
                     }
                 }
             }, true);
-        }
-
-        private static bool ParseSalesFlag(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text)) return false;
-            switch (text.Trim().ToLowerInvariant())
-            {
-                case "1":
-                case "true":
-                case "yes":
-                case "y":
-                case "on":
-                case "checked":
-                    return true;
-                default:
-                    return false;
-            }
-        }
-
-        private static bool GetSalesFlagValue(VolvoxGridControl grid, int row)
-        {
-            object value = grid.GetCellValue(row, "Flag");
-            if (value is bool boolValue)
-            {
-                return boolValue;
-            }
-            return ParseSalesFlag(Convert.ToString(value, CultureInfo.InvariantCulture));
-        }
-
-        private static float GetSalesMarginProgress(VolvoxGridControl grid, int row)
-        {
-            object value = grid.GetCellValue(row, "Margin");
-            try
-            {
-                if (value is IConvertible)
-                {
-                    return NormalizeMarginProgress(Convert.ToSingle(value, CultureInfo.InvariantCulture));
-                }
-            }
-            catch
-            {
-            }
-            return ParseMarginProgress(Convert.ToString(value, CultureInfo.InvariantCulture));
-        }
-
-        private static double? GetNumericCellValue(VolvoxGridControl grid, int row, string fieldName)
-        {
-            object value = grid.GetCellValue(row, fieldName);
-            if (value == null) return null;
-
-            try
-            {
-                if (value is IConvertible)
-                {
-                    return Convert.ToDouble(value, CultureInfo.InvariantCulture);
-                }
-            }
-            catch
-            {
-            }
-
-            string text = Convert.ToString(value, CultureInfo.InvariantCulture);
-            if (string.IsNullOrWhiteSpace(text)) return null;
-
-            double parsed;
-            string normalized = text.Trim().Replace(",", "").Replace("$", "");
-            if (double.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out parsed))
-            {
-                return parsed;
-            }
-            return null;
-        }
-
-        private static float NormalizeMarginProgress(float margin)
-        {
-            if (float.IsNaN(margin) || float.IsInfinity(margin)) return 0f;
-            return Math.Max(0f, Math.Min(1f, margin / 100f));
-        }
-
-        private static IList<bool> ExtractSalesFlagValues(byte[] salesData)
-        {
-            var flags = new List<bool>();
-            if (salesData == null || salesData.Length == 0) return flags;
-
-            string json = Encoding.UTF8.GetString(salesData);
-            MatchCollection matches = SalesFlagRegex.Matches(json);
-            for (int i = 0; i < matches.Count; i++)
-            {
-                flags.Add(string.Equals(matches[i].Groups[1].Value, "true", StringComparison.OrdinalIgnoreCase));
-            }
-            return flags;
-        }
-
-        private static float ParseMarginProgress(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text)) return 0f;
-            float value;
-            if (!float.TryParse(text.Trim().Replace(",", ""), NumberStyles.Float, CultureInfo.InvariantCulture, out value))
-                return 0f;
-            return NormalizeMarginProgress(value);
         }
     }
 }

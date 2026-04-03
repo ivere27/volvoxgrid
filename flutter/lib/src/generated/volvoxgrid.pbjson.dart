@@ -4691,6 +4691,15 @@ const ColumnDef$json = {
       '10': 'interaction',
       '17': true
     },
+    {
+      '1': 'progress_color',
+      '3': 27,
+      '4': 1,
+      '5': 13,
+      '9': 22,
+      '10': 'progressColor',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_width'},
@@ -4715,6 +4724,7 @@ const ColumnDef$json = {
     {'1': '_coercion_mode'},
     {'1': '_error_mode'},
     {'1': '_interaction'},
+    {'1': '_progress_color'},
   ],
 };
 
@@ -4740,12 +4750,14 @@ final $typed_data.Uint8List columnDefDescriptor = $convert.base64Decode(
     'JsZYgBARJFCg1jb2VyY2lvbl9tb2RlGBggASgOMhsudm9sdm94Z3JpZC52MS5Db2VyY2lvbk1v'
     'ZGVIE1IMY29lcmNpb25Nb2RliAEBEkEKCmVycm9yX21vZGUYGSABKA4yHS52b2x2b3hncmlkLn'
     'YxLldyaXRlRXJyb3JNb2RlSBRSCWVycm9yTW9kZYgBARJFCgtpbnRlcmFjdGlvbhgaIAEoDjIe'
-    'LnZvbHZveGdyaWQudjEuQ2VsbEludGVyYWN0aW9uSBVSC2ludGVyYWN0aW9uiAEBQggKBl93aW'
-    'R0aEIMCgpfbWluX3dpZHRoQgwKCl9tYXhfd2lkdGhCCgoIX2NhcHRpb25CCAoGX2FsaWduQg4K'
-    'DF9maXhlZF9hbGlnbkIMCgpfZGF0YV90eXBlQgkKB19mb3JtYXRCBgoEX2tleUINCgtfc29ydF'
-    '9vcmRlckIMCgpfc29ydF90eXBlQhEKD19kcm9wZG93bl9pdGVtc0IMCgpfZWRpdF9tYXNrQgkK'
-    'B19pbmRlbnRCCQoHX2hpZGRlbkIHCgVfc3BhbkIHCgVfZGF0YUIJCgdfc3RpY2t5QgsKCV9udW'
-    'xsYWJsZUIQCg5fY29lcmNpb25fbW9kZUINCgtfZXJyb3JfbW9kZUIOCgxfaW50ZXJhY3Rpb24=');
+    'LnZvbHZveGdyaWQudjEuQ2VsbEludGVyYWN0aW9uSBVSC2ludGVyYWN0aW9uiAEBEioKDnByb2'
+    'dyZXNzX2NvbG9yGBsgASgNSBZSDXByb2dyZXNzQ29sb3KIAQFCCAoGX3dpZHRoQgwKCl9taW5f'
+    'd2lkdGhCDAoKX21heF93aWR0aEIKCghfY2FwdGlvbkIICgZfYWxpZ25CDgoMX2ZpeGVkX2FsaW'
+    'duQgwKCl9kYXRhX3R5cGVCCQoHX2Zvcm1hdEIGCgRfa2V5Qg0KC19zb3J0X29yZGVyQgwKCl9z'
+    'b3J0X3R5cGVCEQoPX2Ryb3Bkb3duX2l0ZW1zQgwKCl9lZGl0X21hc2tCCQoHX2luZGVudEIJCg'
+    'dfaGlkZGVuQgcKBV9zcGFuQgcKBV9kYXRhQgkKB19zdGlja3lCCwoJX251bGxhYmxlQhAKDl9j'
+    'b2VyY2lvbl9tb2RlQg0KC19lcnJvcl9tb2RlQg4KDF9pbnRlcmFjdGlvbkIRCg9fcHJvZ3Jlc3'
+    'NfY29sb3I=');
 
 @$core.Deprecated('Use defineColumnsRequestDescriptor instead')
 const DefineColumnsRequest$json = {
