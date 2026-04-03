@@ -300,10 +300,10 @@ packages:
     dependency: "direct main"
     description:
       name: synurang
-      sha256: "73141782ba9b699baf13b60de51811642b3f4ee6f43c1c24ee5aef9afbdc6af8"
+      sha256: "4bc3135b3109a0682ee33bba3d530ca0246cdebed71df6d5b972952839bb4093"
       url: "https://pub.dev"
     source: hosted
-    version: "0.5.6"
+    version: "0.5.10"
   term_glyph:
     dependency: transitive
     description:
