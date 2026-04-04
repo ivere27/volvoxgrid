@@ -3,15 +3,16 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Reflection;
+using Volvoxgrid.V1;
 
 namespace VolvoxGrid.DotNet.Internal
 {
     internal sealed class VolvoxTableModel
     {
-        public List<VolvoxColumnDefinition> Columns { get; private set; }
+        public List<ColumnDef> Columns { get; private set; }
         public List<object[]> Rows { get; private set; }
         public List<object> SourceRows { get; private set; }
-        public List<VolvoxCellValueData> FlatValues { get; private set; }
+        public List<CellValue> FlatValues { get; private set; }
 
         public int RowCount
         {
@@ -25,10 +26,10 @@ namespace VolvoxGrid.DotNet.Internal
 
         public VolvoxTableModel()
         {
-            Columns = new List<VolvoxColumnDefinition>();
+            Columns = new List<ColumnDef>();
             Rows = new List<object[]>();
             SourceRows = new List<object>();
-            FlatValues = new List<VolvoxCellValueData>();
+            FlatValues = new List<CellValue>();
         }
     }
 
@@ -40,7 +41,7 @@ namespace VolvoxGrid.DotNet.Internal
             public Func<object, object> ValueGetter;
         }
 
-        public VolvoxTableModel Materialize(object dataSource, IList<VolvoxColumnDefinition> configuredColumns)
+        public VolvoxTableModel Materialize(object dataSource, IList<ColumnDef> configuredColumns)
         {
             var model = new VolvoxTableModel();
             if (dataSource == null)
@@ -73,7 +74,7 @@ namespace VolvoxGrid.DotNet.Internal
                 for (int colIndex = 0; colIndex < selectedColumns.Count; colIndex++)
                 {
                     row[colIndex] = selectedColumns[colIndex].Extract(sourceRow);
-                    model.FlatValues.Add(VolvoxCellValueData.FromObject(row[colIndex]));
+                    model.FlatValues.Add(VolvoxClient.CellValueFromObject(row[colIndex]));
                 }
 
                 model.Rows.Add(row);
@@ -377,7 +378,7 @@ namespace VolvoxGrid.DotNet.Internal
             return output;
         }
 
-        private static List<ResolvedColumn> ResolveColumns(IList<VolvoxColumnDefinition> configuredColumns, List<SourceColumn> sourceColumns)
+        private static List<ResolvedColumn> ResolveColumns(IList<ColumnDef> configuredColumns, List<SourceColumn> sourceColumns)
         {
             var resolved = new List<ResolvedColumn>();
             var sourceLookup = new Dictionary<string, SourceColumn>(StringComparer.OrdinalIgnoreCase);
@@ -422,14 +423,14 @@ namespace VolvoxGrid.DotNet.Internal
                 var source = sourceColumns[i];
                 resolved.Add(new ResolvedColumn
                 {
-                    Definition = new VolvoxColumnDefinition
+                    Definition = new ColumnDef
                     {
                         Index = i,
                         Key = source.Key,
                         Caption = source.Key,
                         Width = 120,
                         Hidden = false,
-                        SortOrder = VolvoxSortOrder.None,
+                        SortOrder = DefaultSortOrder(),
                     },
                     Extract = source.ValueGetter,
                 });
@@ -438,17 +439,31 @@ namespace VolvoxGrid.DotNet.Internal
             return resolved;
         }
 
-        private static VolvoxColumnDefinition CloneColumn(VolvoxColumnDefinition source, int index)
+        private static SortOrder DefaultSortOrder()
         {
-            return new VolvoxColumnDefinition
+            return SortOrder.SORT_NONE;
+        }
+
+        private static ColumnDef CloneColumn(ColumnDef source, int index)
+        {
+            var clone = new ColumnDef
             {
                 Index = index,
                 Key = source.Key,
                 Caption = source.Caption,
-                Width = source.Width,
-                Hidden = source.Hidden,
-                SortOrder = source.SortOrder,
             };
+
+            if (source.HasWidth) clone.Width = source.Width;
+            if (source.HasHidden) clone.Hidden = source.Hidden;
+            if (source.HasSortOrder) clone.SortOrder = source.SortOrder;
+            if (source.HasAlign) clone.Align = source.Align;
+            if (source.HasDataType) clone.DataType = source.DataType;
+            if (source.HasInteraction) clone.Interaction = source.Interaction;
+            if (source.HasFormat) clone.Format = source.Format;
+            if (source.HasProgressColor) clone.ProgressColor = source.ProgressColor;
+            if (source.HasSticky) clone.Sticky = source.Sticky;
+
+            return clone;
         }
 
         private static bool IsSimple(Type type)
@@ -465,7 +480,7 @@ namespace VolvoxGrid.DotNet.Internal
 
         private sealed class ResolvedColumn
         {
-            public VolvoxColumnDefinition Definition;
+            public ColumnDef Definition;
             public Func<object, object> Extract;
         }
     }

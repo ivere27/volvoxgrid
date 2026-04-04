@@ -20,6 +20,7 @@ const List<String> _hierarchyKeys = [
   'Permissions',
   'Action',
 ];
+const int hierarchyActionColumn = 5;
 
 final RegExp _levelPattern = RegExp(r'"_level"\s*:\s*(-?\d+)');
 final RegExp _typePattern = RegExp(r'"Type"\s*:\s*"([^"]+)"');
@@ -74,7 +75,13 @@ Future<void> loadHierarchyJsonDemo(VolvoxGridController controller) async {
     final isFolder = row < types.length && types[row] == 'Folder';
     await controller.setRowOutlineLevel(row, levels[row]);
     await controller.setIsSubtotal(row, isFolder);
-    await controller.setCellStyleRange(row, 5, row, 5, actionStyle);
+    await controller.setCellStyleRange(
+      row,
+      hierarchyActionColumn,
+      row,
+      hierarchyActionColumn,
+      actionStyle,
+    );
     if (isFolder) {
       await controller.setCellStyleRange(row, 0, row, 0, folderStyle);
     }
@@ -94,10 +101,10 @@ DefineColumnsRequest _hierarchyDefineColumnsRequest() {
     } else if (col == 3) {
       def.dataType = ColumnDataType.COLUMN_DATA_DATE;
       def.format = 'short date';
-    } else if (col == 4 || col == 5) {
+    } else if (col == 4 || col == hierarchyActionColumn) {
       def.align = Align.ALIGN_CENTER_CENTER;
     }
-    if (col == 5) {
+    if (col == hierarchyActionColumn) {
       def.interaction = CellInteraction.CELL_INTERACTION_TEXT_LINK;
     }
     request.columns.add(def);

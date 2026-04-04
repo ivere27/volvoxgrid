@@ -4547,7 +4547,8 @@ static void gdi_measure_text(
 
 static float gdi_render_text(
     uint8_t *buffer, int32_t buf_width, int32_t buf_height, int32_t stride,
-    int32_t x, int32_t y, int32_t clip_w, int32_t clip_h,
+    int32_t x, int32_t y,
+    int32_t clip_x, int32_t clip_y, int32_t clip_w, int32_t clip_h,
     const uint8_t *text_ptr, int32_t text_len,
     const uint8_t *font_name_ptr, int32_t font_name_len,
     float font_size, int32_t bold, int32_t italic,
@@ -4569,12 +4570,27 @@ static float gdi_render_text(
     uint8_t src_a = (uint8_t)((color >> 24) & 0xFF);
     if (src_a == 0) return 0.0f;
 
-    int dw = clip_w;
-    int dh = clip_h;
-    int rw = dw;
-    int rh = dh;
+    int clip_left = clip_x;
+    int clip_top = clip_y;
+    int clip_right = clip_x + clip_w;
+    int clip_bottom = y + clip_h;
+    int wrap_w = (max_width >= 0.0f) ? (int)(max_width + 0.5f) : 0;
+    if (wrap_w < 0) wrap_w = 0;
+
+    int surf_left = (x < clip_left) ? x : clip_left;
+    int surf_top = (y < clip_top) ? y : clip_top;
+    int surf_right = clip_right;
+    int surf_bottom = clip_bottom;
+    if (x + 1 > surf_right) surf_right = x + 1;
+    if (y + 1 > surf_bottom) surf_bottom = y + 1;
+    if (wrap_w > 0 && x + wrap_w > surf_right) surf_right = x + wrap_w;
+
+    int rw = surf_right - surf_left;
+    int rh = surf_bottom - surf_top;
     if (rw < 1) rw = 1;
     if (rh < 1) rh = 1;
+    int draw_x = x - surf_left;
+    int draw_y = y - surf_top;
 
     HFONT hfont = gdi_create_font(font_name_ptr, font_name_len,
                                   font_size,
@@ -4610,15 +4626,22 @@ static float gdi_render_text(
     SetBkMode(hdc, TRANSPARENT);
     SetTextColor(hdc, RGB(255, 255, 255));
 
-    RECT rc = { 0, 0, rw, rh };
+    RECT rc = { draw_x, draw_y, rw, rh };
+    if (wrap_w > 0) {
+        rc.right = draw_x + wrap_w;
+        if (rc.right > rw) rc.right = rw;
+        if (rc.right <= rc.left) rc.right = rc.left + 1;
+    }
     DrawTextW(hdc, wtext, wlen, &rc, fmt);
     if (bold && gdi_is_wine()) {
-        RECT rc_bold = { 1, 0, rw + 1, rh };
+        RECT rc_bold = rc;
+        rc_bold.left += 1;
+        rc_bold.right += 1;
         DrawTextW(hdc, wtext, wlen, &rc_bold, fmt);
     }
 
     /* Measure the rendered width */
-    RECT mrc = { 0, 0, rw, rh };
+    RECT mrc = rc;
     DrawTextW(hdc, wtext, wlen, &mrc, fmt | DT_CALCRECT);
     float rendered_w = (float)(mrc.right - mrc.left);
     if (bold && gdi_is_wine()) rendered_w += 1.0f;
@@ -4647,37 +4670,19 @@ static float gdi_render_text(
 
     /* Composite into the target RGBA buffer.
      * DIB readback is BGRA (B at byte 0), target is RGBA (R at byte 0). */
-    for (int py = 0; py < dh; py++) {
-        int by = y + py;
-        if (by < 0 || by >= buf_height) continue;
-        for (int px = 0; px < dw; px++) {
-            int bx = x + px;
-            if (bx < 0 || bx >= buf_width) continue;
+    int dst_left = gdi_clamp_int(clip_left, 0, buf_width);
+    int dst_top = gdi_clamp_int(clip_top, 0, buf_height);
+    int dst_right = gdi_clamp_int(clip_right, 0, buf_width);
+    int dst_bottom = gdi_clamp_int(clip_bottom, 0, buf_height);
 
-            /* Resample source alpha back to destination size (1:1 currently). */
-            double src_x = ((double)px + 0.5) - 0.5;
-            double src_y = ((double)py + 0.5) - 0.5;
-            if (src_x < 0.0) src_x = 0.0;
-            if (src_y < 0.0) src_y = 0.0;
-            if (src_x > (double)(rw - 1)) src_x = (double)(rw - 1);
-            if (src_y > (double)(rh - 1)) src_y = (double)(rh - 1);
+    for (int by = dst_top; by < dst_bottom; by++) {
+        int sy = by - surf_top;
+        if (sy < 0 || sy >= rh) continue;
+        for (int bx = dst_left; bx < dst_right; bx++) {
+            int sx = bx - surf_left;
+            if (sx < 0 || sx >= rw) continue;
 
-            int sx0 = (int)src_x;
-            int sy0 = (int)src_y;
-            int sx1 = (sx0 + 1 < rw) ? (sx0 + 1) : sx0;
-            int sy1 = (sy0 + 1 < rh) ? (sy0 + 1) : sy0;
-            double wx = src_x - (double)sx0;
-            double wy = src_y - (double)sy0;
-
-            uint32_t a00 = gdi_dib_green_at(dib, dib_stride, rw, rh, sx0, sy0);
-            uint32_t a10 = gdi_dib_green_at(dib, dib_stride, rw, rh, sx1, sy0);
-            uint32_t a01 = gdi_dib_green_at(dib, dib_stride, rw, rh, sx0, sy1);
-            uint32_t a11 = gdi_dib_green_at(dib, dib_stride, rw, rh, sx1, sy1);
-            double alpha_f = ((double)a00 * (1.0 - wx) * (1.0 - wy)) +
-                             ((double)a10 * wx * (1.0 - wy)) +
-                             ((double)a01 * (1.0 - wx) * wy) +
-                             ((double)a11 * wx * wy);
-            uint32_t alpha = (uint32_t)(alpha_f + 0.5);
+            uint32_t alpha = gdi_dib_green_at(dib, dib_stride, rw, rh, sx, sy);
             if (alpha == 0) continue;
 
             /* Scale by source alpha */

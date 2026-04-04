@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Volvoxgrid.V1;
 
 namespace VolvoxGrid.DotNet.Internal
 {
@@ -12,7 +13,9 @@ namespace VolvoxGrid.DotNet.Internal
         private const string DestroyMethod = "/volvoxgrid.v1.VolvoxGridService/Destroy";
         private const string ConfigureMethod = "/volvoxgrid.v1.VolvoxGridService/Configure";
         private const string GetConfigMethod = "/volvoxgrid.v1.VolvoxGridService/GetConfig";
+        private const string LoadFontDataMethod = "/volvoxgrid.v1.VolvoxGridService/LoadFontData";
         private const string DefineColumnsMethod = "/volvoxgrid.v1.VolvoxGridService/DefineColumns";
+        private const string GetSchemaMethod = "/volvoxgrid.v1.VolvoxGridService/GetSchema";
         private const string DefineRowsMethod = "/volvoxgrid.v1.VolvoxGridService/DefineRows";
         private const string InsertRowsMethod = "/volvoxgrid.v1.VolvoxGridService/InsertRows";
         private const string RemoveRowsMethod = "/volvoxgrid.v1.VolvoxGridService/RemoveRows";
@@ -55,252 +58,384 @@ namespace VolvoxGrid.DotNet.Internal
 
         private readonly object _invokeLock = new object();
         private readonly SynurangReflectionHost _host;
-        private readonly IProtoCodec _codec;
 
         public VolvoxClient(string pluginPath)
         {
             string resolved = ResolvePluginPath(pluginPath);
             _host = SynurangReflectionHost.Load(resolved);
-            _codec = ProtoCodecFactory.Create();
         }
 
         public long CreateGrid(int viewportWidth, int viewportHeight, float scale)
         {
-            byte[] request = _codec.EncodeCreateRequest(viewportWidth, viewportHeight, scale);
-            byte[] response = InvokeUnary(CreateMethod, request);
-            return _codec.DecodeGridHandle(response);
+            var req = new CreateRequest
+            {
+                ViewportWidth = viewportWidth,
+                ViewportHeight = viewportHeight,
+                Scale = scale,
+            };
+            byte[] response = InvokeUnary(CreateMethod, req.ToByteArray());
+            var resp = CreateResponse.ParseFrom(response);
+            return resp.Handle != null ? resp.Handle.Id : 0;
         }
 
         public void DestroyGrid(long gridId)
         {
-            InvokeUnary(DestroyMethod, _codec.EncodeGridHandle(gridId));
+            InvokeUnary(DestroyMethod, new GridHandle { Id = gridId }.ToByteArray());
         }
 
-        public void ConfigureGrid(long gridId, VolvoxGridConfigData config)
+        public void ConfigureGrid(long gridId, GridConfig config)
         {
-            InvokeUnary(ConfigureMethod, _codec.EncodeConfigureRequest(gridId, config));
+            var req = new ConfigureRequest { GridId = gridId, Config = config };
+            InvokeUnary(ConfigureMethod, req.ToByteArray());
         }
 
-        public VolvoxGridConfigData GetConfig(long gridId)
+        public GridConfig GetConfig(long gridId)
         {
-            byte[] response = InvokeUnary(GetConfigMethod, _codec.EncodeGetConfigRequest(gridId));
-            return _codec.DecodeGridConfig(response);
+            byte[] response = InvokeUnary(GetConfigMethod, new GridHandle { Id = gridId }.ToByteArray());
+            return GridConfig.ParseFrom(response);
         }
 
-        public void DefineColumns(long gridId, IList<VolvoxColumnDefinition> columns)
+        public void DefineColumns(long gridId, IList<ColumnDef> columns)
         {
-            InvokeUnary(DefineColumnsMethod, _codec.EncodeDefineColumnsRequest(gridId, columns));
+            var req = new DefineColumnsRequest { GridId = gridId };
+            for (int i = 0; i < columns.Count; i++)
+                req.Columns.Add(columns[i]);
+            InvokeUnary(DefineColumnsMethod, req.ToByteArray());
         }
 
-        public void DefineRows(long gridId, IList<VolvoxRowDefinition> rows)
+        public void DefineRows(long gridId, IList<RowDef> rows)
         {
-            InvokeUnary(DefineRowsMethod, _codec.EncodeDefineRowsRequest(gridId, rows));
+            var req = new DefineRowsRequest { GridId = gridId };
+            for (int i = 0; i < rows.Count; i++)
+                req.Rows.Add(rows[i]);
+            InvokeUnary(DefineRowsMethod, req.ToByteArray());
         }
 
         public void InsertRows(long gridId, int index, int count, IList<string> text)
         {
-            InvokeUnary(InsertRowsMethod, _codec.EncodeInsertRowsRequest(gridId, index, count, text));
+            var req = new InsertRowsRequest { GridId = gridId, Index = index, Count = count };
+            if (text != null)
+            {
+                for (int i = 0; i < text.Count; i++)
+                    req.Text.Add(text[i] ?? string.Empty);
+            }
+            InvokeUnary(InsertRowsMethod, req.ToByteArray());
         }
 
         public void RemoveRows(long gridId, int index, int count)
         {
-            InvokeUnary(RemoveRowsMethod, _codec.EncodeRemoveRowsRequest(gridId, index, count));
+            var req = new RemoveRowsRequest { GridId = gridId, Index = index, Count = count };
+            InvokeUnary(RemoveRowsMethod, req.ToByteArray());
         }
 
         public void MoveColumn(long gridId, int col, int position)
         {
-            InvokeUnary(MoveColumnMethod, _codec.EncodeMoveColumnRequest(gridId, col, position));
+            var req = new MoveColumnRequest { GridId = gridId, Col = col, Position = position };
+            InvokeUnary(MoveColumnMethod, req.ToByteArray());
         }
 
         public void MoveRow(long gridId, int row, int position)
         {
-            InvokeUnary(MoveRowMethod, _codec.EncodeMoveRowRequest(gridId, row, position));
+            var req = new MoveRowRequest { GridId = gridId, Row = row, Position = position };
+            InvokeUnary(MoveRowMethod, req.ToByteArray());
         }
 
-        public void LoadTable(long gridId, int rows, int cols, IList<VolvoxCellValueData> values, bool atomic)
+        public void LoadTable(long gridId, int rows, int cols, IList<CellValue> values, bool atomic)
         {
-            InvokeUnary(LoadTableMethod, _codec.EncodeLoadTableRequest(gridId, rows, cols, values, atomic));
+            var req = new LoadTableRequest { GridId = gridId, Rows = rows, Cols = cols, Atomic = atomic };
+            if (values != null)
+            {
+                for (int i = 0; i < values.Count; i++)
+                    req.Values.Add(values[i]);
+            }
+            InvokeUnary(LoadTableMethod, req.ToByteArray());
         }
 
-        public void UpdateCells(long gridId, IList<VolvoxCellUpdateData> updates, bool atomic)
+        public void UpdateCells(long gridId, IList<CellUpdate> updates, bool atomic)
         {
-            InvokeUnary(UpdateCellsMethod, _codec.EncodeUpdateCellsRequest(gridId, updates, atomic));
+            var req = new UpdateCellsRequest { GridId = gridId, Atomic = atomic };
+            for (int i = 0; i < updates.Count; i++)
+                req.Cells.Add(updates[i]);
+            InvokeUnary(UpdateCellsMethod, req.ToByteArray());
         }
 
-        public List<VolvoxCellUpdateData> GetCells(long gridId, int row1, int col1, int row2, int col2, bool includeStyle, bool includeChecked, bool includeTyped)
+        public List<CellData> GetCells(long gridId, int row1, int col1, int row2, int col2, bool includeStyle, bool includeChecked, bool includeTyped)
         {
-            byte[] response = InvokeUnary(GetCellsMethod, _codec.EncodeGetCellsRequest(gridId, row1, col1, row2, col2, includeStyle, includeChecked, includeTyped));
-            return _codec.DecodeCellsResponse(response);
+            var req = new GetCellsRequest
+            {
+                GridId = gridId,
+                Row1 = row1,
+                Col1 = col1,
+                Row2 = row2,
+                Col2 = col2,
+                IncludeStyle = includeStyle,
+                IncludeChecked = includeChecked,
+                IncludeTyped = includeTyped,
+            };
+            byte[] response = InvokeUnary(GetCellsMethod, req.ToByteArray());
+            return CopyList(CellsResponse.ParseFrom(response).Cells);
         }
 
-        public void Clear(long gridId, VolvoxClearScope scope, VolvoxClearRegion region)
+        public void Clear(long gridId, ClearScope scope, ClearRegion region)
         {
-            InvokeUnary(ClearMethod, _codec.EncodeClearRequest(gridId, scope, region));
+            var req = new ClearRequest { GridId = gridId, Scope = scope, Region = region };
+            InvokeUnary(ClearMethod, req.ToByteArray());
         }
 
-        public void Select(long gridId, int row, int col, IList<VolvoxCellRangeData> ranges, bool? show)
+        public void Select(long gridId, int row, int col, IList<CellRange> ranges, bool? show)
         {
-            InvokeUnary(SelectMethod, _codec.EncodeSelectRequest(gridId, row, col, ranges, show));
+            var req = new SelectRequest { GridId = gridId, ActiveRow = row, ActiveCol = col };
+            if (ranges != null)
+            {
+                for (int i = 0; i < ranges.Count; i++)
+                    req.Ranges.Add(ranges[i]);
+            }
+            if (show.HasValue) req.Show = show.Value;
+            InvokeUnary(SelectMethod, req.ToByteArray());
         }
 
-        public VolvoxSelectionStateData GetSelection(long gridId)
+        public SelectionState GetSelection(long gridId)
         {
-            byte[] response = InvokeUnary(GetSelectionMethod, _codec.EncodeGridHandle(gridId));
-            return _codec.DecodeSelectionState(response);
+            byte[] response = InvokeUnary(GetSelectionMethod, new GridHandle { Id = gridId }.ToByteArray());
+            return SelectionState.ParseFrom(response);
         }
 
         public void ShowCell(long gridId, int row, int col)
         {
-            InvokeUnary(ShowCellMethod, _codec.EncodeShowCellRequest(gridId, row, col));
+            var req = new ShowCellRequest { GridId = gridId, Row = row, Col = col };
+            InvokeUnary(ShowCellMethod, req.ToByteArray());
         }
 
         public void SetTopRow(long gridId, int row)
         {
-            InvokeUnary(SetTopRowMethod, _codec.EncodeSetTopRowRequest(gridId, row));
+            var req = new SetRowRequest { GridId = gridId, Row = row };
+            InvokeUnary(SetTopRowMethod, req.ToByteArray());
         }
 
         public void SetLeftCol(long gridId, int col)
         {
-            InvokeUnary(SetLeftColMethod, _codec.EncodeSetLeftColRequest(gridId, col));
+            var req = new SetColRequest { GridId = gridId, Col = col };
+            InvokeUnary(SetLeftColMethod, req.ToByteArray());
         }
 
-        public void Sort(long gridId, IList<VolvoxSortColumn> sorts)
+        public void Sort(long gridId, IList<SortColumn> sorts)
         {
-            InvokeUnary(SortMethod, _codec.EncodeSortRequest(gridId, sorts));
+            var req = new SortRequest { GridId = gridId };
+            for (int i = 0; i < sorts.Count; i++)
+                req.SortColumns.Add(sorts[i]);
+            InvokeUnary(SortMethod, req.ToByteArray());
         }
 
-        public void Subtotal(long gridId, VolvoxAggregateType aggregate, int groupOnCol, int aggregateCol, string caption, uint backColor, uint foreColor, bool addOutline)
+        public SubtotalResult Subtotal(long gridId, AggregateType aggregate, int groupOnCol, int aggregateCol, string caption, uint backColor, uint foreColor, bool addOutline)
         {
-            InvokeUnary(SubtotalMethod, _codec.EncodeSubtotalRequest(gridId, aggregate, groupOnCol, aggregateCol, caption, backColor, foreColor, addOutline));
+            var req = new SubtotalRequest
+            {
+                GridId = gridId,
+                Aggregate = aggregate,
+                GroupOnCol = groupOnCol,
+                AggregateCol = aggregateCol,
+                Caption = caption ?? string.Empty,
+                Background = backColor,
+                Foreground = foreColor,
+                AddOutline = addOutline,
+            };
+            byte[] response = InvokeUnary(SubtotalMethod, req.ToByteArray());
+            return SubtotalResult.ParseFrom(response);
         }
 
         public void AutoSize(long gridId, int colFrom, int colTo, bool equal, int maxWidth)
         {
-            InvokeUnary(AutoSizeMethod, _codec.EncodeAutoSizeRequest(gridId, colFrom, colTo, equal, maxWidth));
+            var req = new AutoSizeRequest { GridId = gridId, ColFrom = colFrom, ColTo = colTo, Equal = equal, MaxWidth = maxWidth };
+            InvokeUnary(AutoSizeMethod, req.ToByteArray());
         }
 
         public void Outline(long gridId, int level)
         {
-            InvokeUnary(OutlineMethod, _codec.EncodeOutlineRequest(gridId, level));
+            InvokeUnary(OutlineMethod, new OutlineRequest { GridId = gridId, Level = level }.ToByteArray());
         }
 
-        public VolvoxNodeInfoData GetNode(long gridId, int row, VolvoxNodeRelation? relation)
+        public NodeInfo GetNode(long gridId, int row, NodeRelation? relation)
         {
-            byte[] response = InvokeUnary(GetNodeMethod, _codec.EncodeGetNodeRequest(gridId, row, relation));
-            return _codec.DecodeNodeInfo(response);
+            var req = new GetNodeRequest { GridId = gridId, Row = row };
+            if (relation.HasValue) req.Relation = relation.Value;
+            byte[] response = InvokeUnary(GetNodeMethod, req.ToByteArray());
+            return NodeInfo.ParseFrom(response);
         }
 
         public int Find(long gridId, int col, int startRow, string text, bool caseSensitive, bool fullMatch, string regex)
         {
-            byte[] response = InvokeUnary(FindMethod, _codec.EncodeFindRequest(gridId, col, startRow, text, caseSensitive, fullMatch, regex));
-            return _codec.DecodeFindResponse(response);
+            var req = new FindRequest { GridId = gridId, Col = col };
+            if (!string.IsNullOrEmpty(regex))
+            {
+                req.RegexQuery = new RegexQuery { Pattern = regex };
+            }
+            else
+            {
+                req.TextQuery = new TextQuery { Text = text ?? string.Empty, CaseSensitive = caseSensitive, FullMatch = fullMatch };
+            }
+            byte[] response = InvokeUnary(FindMethod, req.ToByteArray());
+            return FindResponse.ParseFrom(response).Row;
         }
 
-        public double Aggregate(long gridId, VolvoxAggregateType aggregate, int row1, int col1, int row2, int col2)
+        public double Aggregate(long gridId, AggregateType aggregate, int row1, int col1, int row2, int col2)
         {
-            byte[] response = InvokeUnary(AggregateMethod, _codec.EncodeAggregateRequest(gridId, aggregate, row1, col1, row2, col2));
-            return _codec.DecodeAggregateResponse(response);
+            var req = new AggregateRequest
+            {
+                GridId = gridId,
+                Aggregate = aggregate,
+                Row1 = row1,
+                Col1 = col1,
+                Row2 = row2,
+                Col2 = col2,
+            };
+            byte[] response = InvokeUnary(AggregateMethod, req.ToByteArray());
+            return AggregateResponse.ParseFrom(response).Value;
         }
 
-        public VolvoxCellRangeData GetMergedRange(long gridId, int row, int col)
+        public CellRange GetMergedRange(long gridId, int row, int col)
         {
-            byte[] response = InvokeUnary(GetMergedRangeMethod, _codec.EncodeGetMergedRangeRequest(gridId, row, col));
-            return _codec.DecodeCellRange(response);
+            var req = new GetMergedRangeRequest { GridId = gridId, Row = row, Col = col };
+            byte[] response = InvokeUnary(GetMergedRangeMethod, req.ToByteArray());
+            return CellRange.ParseFrom(response);
         }
 
-        public void MergeCells(long gridId, VolvoxCellRangeData range)
+        public void MergeCells(long gridId, CellRange range)
         {
-            InvokeUnary(MergeCellsMethod, _codec.EncodeMergeCellsRequest(gridId, range));
+            var req = new MergeCellsRequest { GridId = gridId, Range = range };
+            InvokeUnary(MergeCellsMethod, req.ToByteArray());
         }
 
-        public void UnmergeCells(long gridId, VolvoxCellRangeData range)
+        public void UnmergeCells(long gridId, CellRange range)
         {
-            InvokeUnary(UnmergeCellsMethod, _codec.EncodeUnmergeCellsRequest(gridId, range));
+            var req = new UnmergeCellsRequest { GridId = gridId, Range = range };
+            InvokeUnary(UnmergeCellsMethod, req.ToByteArray());
         }
 
-        public List<VolvoxCellRangeData> GetMergedRegions(long gridId)
+        public List<CellRange> GetMergedRegions(long gridId)
         {
-            byte[] response = InvokeUnary(GetMergedRegionsMethod, _codec.EncodeGridHandle(gridId));
-            return _codec.DecodeMergedRegionsResponse(response);
+            byte[] response = InvokeUnary(GetMergedRegionsMethod, new GridHandle { Id = gridId }.ToByteArray());
+            return CopyList(MergedRegionsResponse.ParseFrom(response).Ranges);
         }
 
         public void EditStart(long gridId, int row, int col, bool? selectAll, bool? caretEnd, string seedText)
         {
-            InvokeUnary(EditMethod, _codec.EncodeEditCommandStart(gridId, row, col, selectAll, caretEnd, seedText));
+            var start = new Volvoxgrid.V1.EditStart { Row = row, Col = col };
+            if (selectAll.HasValue) start.SelectAll = selectAll.Value;
+            if (caretEnd.HasValue) start.CaretEnd = caretEnd.Value;
+            if (seedText != null) start.SeedText = seedText;
+            var cmd = new EditCommand { GridId = gridId, Start = start };
+            InvokeUnary(EditMethod, cmd.ToByteArray());
         }
 
         public void EditCommit(long gridId, string text)
         {
-            InvokeUnary(EditMethod, _codec.EncodeEditCommandCommit(gridId, text));
+            var commit = new Volvoxgrid.V1.EditCommit();
+            if (text != null) commit.Text = text;
+            var cmd = new EditCommand { GridId = gridId, Commit = commit };
+            InvokeUnary(EditMethod, cmd.ToByteArray());
         }
 
         public void EditCancel(long gridId)
         {
-            InvokeUnary(EditMethod, _codec.EncodeEditCommandCancel(gridId));
+            var cmd = new EditCommand { GridId = gridId, Cancel = new Volvoxgrid.V1.EditCancel() };
+            InvokeUnary(EditMethod, cmd.ToByteArray());
         }
 
         public void EditSetPreedit(long gridId, string text, int cursor, bool commit)
         {
-            InvokeUnary(EditMethod, _codec.EncodeEditCommandSetPreedit(gridId, text, cursor, commit));
+            var preedit = new Volvoxgrid.V1.EditSetPreedit { Text = text ?? string.Empty, Cursor = cursor, Commit = commit };
+            var cmd = new EditCommand { GridId = gridId, SetPreedit = preedit };
+            InvokeUnary(EditMethod, cmd.ToByteArray());
         }
 
         public void EditSetText(long gridId, string text)
         {
-            InvokeUnary(EditMethod, _codec.EncodeEditCommandSetText(gridId, text));
+            var cmd = new EditCommand { GridId = gridId, SetText = new Volvoxgrid.V1.EditSetText { Text = text ?? string.Empty } };
+            InvokeUnary(EditMethod, cmd.ToByteArray());
         }
 
-        public VolvoxClipboardResponseData Clipboard(long gridId, string action, string pasteText)
+        public ClipboardResponse Clipboard(long gridId, string action, string pasteText)
         {
-            byte[] response = InvokeUnary(ClipboardMethod, _codec.EncodeClipboardRequest(gridId, action, pasteText));
-            return _codec.DecodeClipboardResponse(response);
+            var cmd = new ClipboardCommand { GridId = gridId };
+            switch (action)
+            {
+                case "copy": cmd.Copy = new ClipboardCopy(); break;
+                case "cut": cmd.Cut = new ClipboardCut(); break;
+                case "paste": cmd.Paste = new ClipboardPaste { Text = pasteText ?? string.Empty }; break;
+                case "delete": cmd.Delete = new ClipboardDelete(); break;
+            }
+            byte[] response = InvokeUnary(ClipboardMethod, cmd.ToByteArray());
+            return ClipboardResponse.ParseFrom(response);
         }
 
-        public VolvoxExportResponseData Export(long gridId, VolvoxExportFormat format, VolvoxExportScope scope)
+        public ExportResponse Export(long gridId, ExportFormat format, ExportScope scope)
         {
-            byte[] response = InvokeUnary(ExportMethod, _codec.EncodeExportRequest(gridId, format, scope));
-            return _codec.DecodeExportResponse(response);
+            var req = new ExportRequest { GridId = gridId, Format = format, Scope = scope };
+            byte[] response = InvokeUnary(ExportMethod, req.ToByteArray());
+            return ExportResponse.ParseFrom(response);
         }
 
         public void LoadData(long gridId, byte[] data)
         {
-            InvokeUnary(LoadDataMethod, _codec.EncodeLoadDataRequest(gridId, data));
+            var req = new LoadDataRequest { GridId = gridId, Data = WrapBytes(data) };
+            InvokeUnary(LoadDataMethod, req.ToByteArray());
         }
 
         public void Print(long gridId, bool landscape, int marginL, int marginT, int marginR, int marginB, string header, string footer, bool showPageNumbers)
         {
-            InvokeUnary(PrintMethod, _codec.EncodePrintRequest(gridId, landscape, marginL, marginT, marginR, marginB, header, footer, showPageNumbers));
+            var req = new PrintRequest
+            {
+                GridId = gridId,
+                Orientation = GetPrintOrientation(landscape),
+                MarginLeft = marginL,
+                MarginTop = marginT,
+                MarginRight = marginR,
+                MarginBottom = marginB,
+            };
+            if (header != null) req.Header = header;
+            if (footer != null) req.Footer = footer;
+            if (showPageNumbers) req.ShowPageNumbers = true;
+            InvokeUnary(PrintMethod, req.ToByteArray());
         }
 
-        public VolvoxArchiveResponseData Archive(long gridId, VolvoxArchiveAction action, string name, byte[] data)
+        public ArchiveResponse Archive(long gridId, ArchiveRequest_Action action, string name, byte[] data)
         {
-            byte[] response = InvokeUnary(ArchiveMethod, _codec.EncodeArchiveRequest(gridId, action, name, data));
-            return _codec.DecodeArchiveResponse(response);
+            var req = new ArchiveRequest
+            {
+                GridId = gridId,
+                Action = action,
+                Name = name ?? string.Empty,
+            };
+            if (data != null) req.Data = WrapBytes(data);
+            byte[] response = InvokeUnary(ArchiveMethod, req.ToByteArray());
+            return ArchiveResponse.ParseFrom(response);
         }
 
         public void LoadDemo(long gridId, string demo)
         {
-            InvokeUnary(LoadDemoMethod, _codec.EncodeLoadDemoRequest(gridId, demo));
+            InvokeUnary(LoadDemoMethod, new LoadDemoRequest { GridId = gridId, Demo = demo ?? string.Empty }.ToByteArray());
         }
 
         public byte[] GetDemoData(string demo)
         {
-            byte[] response = InvokeUnary(GetDemoDataMethod, _codec.EncodeGetDemoDataRequest(demo));
-            return _codec.DecodeGetDemoDataResponse(response);
+            byte[] response = InvokeUnary(GetDemoDataMethod, new GetDemoDataRequest { Demo = demo ?? string.Empty }.ToByteArray());
+            return UnwrapBytes(GetDemoDataResponse.ParseFrom(response).Data);
         }
 
         public void ResizeViewport(long gridId, int width, int height)
         {
-            InvokeUnary(ResizeViewportMethod, _codec.EncodeResizeViewportRequest(gridId, width, height));
+            var req = new ResizeViewportRequest { GridId = gridId, Width = width, Height = height };
+            InvokeUnary(ResizeViewportMethod, req.ToByteArray());
         }
 
         public void SetRedraw(long gridId, bool enabled)
         {
-            InvokeUnary(SetRedrawMethod, _codec.EncodeSetRedrawRequest(gridId, enabled));
+            InvokeUnary(SetRedrawMethod, new SetRedrawRequest { GridId = gridId, Enabled = enabled }.ToByteArray());
         }
 
         public void Refresh(long gridId)
         {
-            InvokeUnary(RefreshMethod, _codec.EncodeGridHandle(gridId));
+            InvokeUnary(RefreshMethod, new GridHandle { Id = gridId }.ToByteArray());
         }
 
         public SynurangReflectionStream OpenRenderSession()
@@ -311,7 +446,7 @@ namespace VolvoxGrid.DotNet.Internal
         public SynurangReflectionStream OpenEventStream(long gridId)
         {
             var stream = _host.OpenStream(ServiceName, EventStreamMethod);
-            stream.Send(_codec.EncodeGridHandle(gridId));
+            stream.Send(new GridHandle { Id = gridId }.ToByteArray());
             stream.CloseSend();
             return stream;
         }
@@ -334,40 +469,120 @@ namespace VolvoxGrid.DotNet.Internal
             _host.SetTextRenderer(gridId, null, null, IntPtr.Zero);
         }
 
+        // ── Render input encoding ──
+
         public byte[] EncodeRenderInputBufferReady(long gridId, long handle, int stride, int width, int height)
         {
-            return _codec.EncodeRenderInputBufferReady(gridId, handle, stride, width, height);
+            return new RenderInput
+            {
+                GridId = gridId,
+                Buffer = new BufferReady { Handle = handle, Stride = stride, Width = width, Height = height },
+            }.ToByteArray();
         }
 
-        public byte[] EncodeRenderInputPointer(long gridId, VolvoxPointerType type, float x, float y, int modifier, int button, bool dblClick)
+        public byte[] EncodeRenderInputPointer(long gridId, PointerEvent_Type type, float x, float y, int modifier, int button, bool dblClick)
         {
-            return _codec.EncodeRenderInputPointer(gridId, type, x, y, modifier, button, dblClick);
+            return new RenderInput
+            {
+                GridId = gridId,
+                Pointer = new PointerEvent { Type = type, X = x, Y = y, Modifier = modifier, Button = button, DblClick = dblClick },
+            }.ToByteArray();
         }
 
-        public byte[] EncodeRenderInputKey(long gridId, VolvoxKeyType type, int keyCode, int modifier, string character)
+        public byte[] EncodeRenderInputKey(long gridId, KeyEvent_Type type, int keyCode, int modifier, string character)
         {
-            return _codec.EncodeRenderInputKey(gridId, type, keyCode, modifier, character);
+            return new RenderInput
+            {
+                GridId = gridId,
+                Key = new KeyEvent { Type = type, KeyCode = keyCode, Modifier = modifier, Character = character ?? string.Empty },
+            }.ToByteArray();
         }
 
         public byte[] EncodeRenderInputScroll(long gridId, float deltaX, float deltaY)
         {
-            return _codec.EncodeRenderInputScroll(gridId, deltaX, deltaY);
+            return new RenderInput
+            {
+                GridId = gridId,
+                Scroll = new ScrollEvent { DeltaX = deltaX, DeltaY = deltaY },
+            }.ToByteArray();
         }
 
         public byte[] EncodeRenderInputEventDecision(long gridId, long eventId, bool cancel)
         {
-            return _codec.EncodeRenderInputEventDecision(gridId, eventId, cancel);
+            return new RenderInput
+            {
+                GridId = gridId,
+                EventDecision = new EventDecision { GridId = gridId, EventId = eventId, Cancel = cancel },
+            }.ToByteArray();
         }
 
-        public VolvoxRenderOutputData DecodeRenderOutput(byte[] payload)
+        // ── Render output / event decoding ──
+
+        public RenderOutput DecodeRenderOutput(byte[] payload)
         {
-            return _codec.DecodeRenderOutput(payload);
+            return RenderOutput.ParseFrom(payload);
         }
 
-        public VolvoxGridEventData DecodeGridEvent(byte[] payload)
+        public GridEvent DecodeGridEvent(byte[] payload)
         {
-            return _codec.DecodeGridEvent(payload);
+            return GridEvent.ParseFrom(payload);
         }
+
+        // ── Cell value helper ──
+
+        public static CellValue CellValueFromObject(object value)
+        {
+            if (value == null || value == DBNull.Value)
+            {
+                return new CellValue { Text = string.Empty };
+            }
+
+            if (value is string text)
+            {
+                return new CellValue { Text = text };
+            }
+
+            if (value is bool flag)
+            {
+                return new CellValue { Flag = flag };
+            }
+
+            if (value is byte[] bytes)
+            {
+                return new CellValue { Raw = WrapBytes(bytes) };
+            }
+
+            if (value is DateTime dt)
+            {
+                var epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                var utc = dt.Kind == DateTimeKind.Utc ? dt : dt.ToUniversalTime();
+                var ms = (long)(utc - epoch).TotalMilliseconds;
+                return new CellValue { Timestamp = ms };
+            }
+
+            if (value is DateTimeOffset dto)
+            {
+                var epoch = new DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero);
+                var ms = (long)(dto.ToUniversalTime() - epoch).TotalMilliseconds;
+                return new CellValue { Timestamp = ms };
+            }
+
+            if (value is IConvertible)
+            {
+                try
+                {
+                    return new CellValue { Number = Convert.ToDouble(value) };
+                }
+                catch
+                {
+                    // Fall through to text conversion.
+                }
+            }
+
+            return new CellValue { Text = Convert.ToString(value) ?? string.Empty };
+        }
+
+        // ── Infrastructure ──
 
         public void Dispose()
         {
@@ -380,6 +595,34 @@ namespace VolvoxGrid.DotNet.Internal
             {
                 return _host.Invoke(ServiceName, methodPath, request ?? new byte[0]);
             }
+        }
+
+        private static List<T> CopyList<T>(IEnumerable<T> values)
+        {
+            var list = new List<T>();
+            if (values != null)
+            {
+                foreach (T value in values)
+                {
+                    list.Add(value);
+                }
+            }
+            return list;
+        }
+
+        private static byte[] WrapBytes(byte[] data)
+        {
+            return data ?? new byte[0];
+        }
+
+        private static byte[] UnwrapBytes(byte[] data)
+        {
+            return data ?? new byte[0];
+        }
+
+        private static PrintOrientation GetPrintOrientation(bool landscape)
+        {
+            return landscape ? PrintOrientation.PRINT_LANDSCAPE : PrintOrientation.PRINT_PORTRAIT;
         }
 
         private static string ResolvePluginPath(string explicitPath)

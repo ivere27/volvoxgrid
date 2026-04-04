@@ -1207,8 +1207,7 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
             let mut area = HitArea::IndicatorColTop;
             let mut hit_col = col_hit.col;
             if !col_hit.hit_pinned_col {
-                let (cx, _, cw, _) = crate::canvas::cell_rect(grid, 0, hit_col, &vp)
-                    .unwrap_or_else(|| layout.cell_rect(0, hit_col));
+                let (cx, _, cw, _) = layout.cell_rect(0, hit_col);
                 let col_left = cx;
                 let col_right = cx + cw;
                 let hit_half = header_resize_hit_half_width(grid);
@@ -1224,8 +1223,7 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
                 col: hit_col,
                 area,
                 x_in_cell: {
-                    let (cx, _, _, _) = crate::canvas::cell_rect(grid, 0, hit_col.max(0), &vp)
-                        .unwrap_or_else(|| layout.cell_rect(0, hit_col.max(0)));
+                    let (cx, _, _, _) = layout.cell_rect(0, hit_col.max(0));
                     local_x as f32 - cx as f32
                 },
                 y_in_cell: py,
@@ -1300,8 +1298,7 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
         if col_hit.hit_pinned_col {
             HitArea::FixedRow
         } else {
-            let (cx, _, cw, _) = crate::canvas::cell_rect(grid, row, col, &vp)
-                .unwrap_or_else(|| layout.cell_rect(row, col));
+            let (cx, _, cw, _) = layout.cell_rect(row, col);
             let col_left = cx;
             let col_right = cx + cw;
             let hit_half = header_resize_hit_half_width(grid);
@@ -1336,7 +1333,7 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
 
     if matches!(area, HitArea::Cell | HitArea::FixedRow | HitArea::FixedCol) {
         if let Some(rect) = button_picture_rect(grid, row, col, cx, cy, cw, ch) {
-            if point_in_rect(effective_x, effective_y, rect) {
+            if point_in_rect(px_i, py_i, rect) {
                 area = HitArea::CellButtonPicture;
             }
         }
@@ -1355,7 +1352,7 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
                         img_h,
                         cell.picture_alignment(),
                     ) {
-                        if point_in_rect(effective_x, effective_y, rect) {
+                        if point_in_rect(px_i, py_i, rect) {
                             area = HitArea::CellPicture;
                         }
                     }
@@ -1366,7 +1363,7 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
 
     if matches!(area, HitArea::Cell | HitArea::FixedRow | HitArea::FixedCol) {
         if let Some(rect) = text_content_rect(grid, row, col, cx, cy, cw, ch) {
-            if point_in_rect(effective_x, effective_y, rect) {
+            if point_in_rect(px_i, py_i, rect) {
                 area = HitArea::CellText;
             }
         }
@@ -1376,7 +1373,7 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
         && show_dropdown_button_for_cell(grid, row, col)
     {
         if let Some(rect) = dropdown_button_rect(cx, cy, cw, ch) {
-            if point_in_rect(effective_x, effective_y, rect) {
+            if point_in_rect(px_i, py_i, rect) {
                 area = HitArea::DropdownButton;
             }
         }
@@ -1413,11 +1410,7 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
                 let mid_y = cy + ch / 2;
                 let bx = line_x - tg.btn_size / 2;
                 let by = mid_y - tg.btn_size / 2;
-                if effective_x >= bx
-                    && effective_x < bx + tg.btn_size
-                    && effective_y >= by
-                    && effective_y < by + tg.btn_size
-                {
+                if px_i >= bx && px_i < bx + tg.btn_size && py_i >= by && py_i < by + tg.btn_size {
                     area = HitArea::OutlineButton;
                 }
             }
@@ -1428,8 +1421,8 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
         row,
         col,
         area,
-        x_in_cell: effective_x as f32 - cx as f32,
-        y_in_cell: effective_y as f32 - cy as f32,
+        x_in_cell: px_i as f32 - cx as f32,
+        y_in_cell: py_i as f32 - cy as f32,
     }
 }
 
@@ -3300,6 +3293,23 @@ mod tests {
     }
 
     #[test]
+    fn hit_test_detects_header_col_border_with_row_indicator_offset() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 3, 0, 0);
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.width_px = 40;
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        prime_layout(&mut grid);
+
+        let header_border_x = grid.indicator_bands.row_start.resolved_width_px() + grid.col_pos(1);
+        let hit = hit_test(&mut grid, header_border_x as f32, 5.0);
+
+        assert_eq!(hit.area, HitArea::ColBorder);
+        assert_eq!(hit.col, 0);
+    }
+
+    #[test]
     fn auto_start_editing_on_keypress() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
         grid.edit_trigger_mode = 1; // keyboard-edit
@@ -3456,6 +3466,81 @@ mod tests {
 
         handle_pointer_move(&mut grid, hover_x, hover_y, 0, 0);
 
+        assert_eq!(grid.cursor_style, 5);
+    }
+
+    #[test]
+    fn center_aligned_text_link_uses_pointer_cursor_on_hover() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
+        grid.columns[0].interaction = pb::CellInteraction::TextLink as i32;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.cells.set_text(1, 0, "Browse".to_string());
+        prime_layout(&mut grid);
+
+        let (cx, cy, cw, ch) = grid.cell_screen_rect(1, 0).expect("cell rect");
+        let (tx, ty, tw, th) =
+            text_content_rect(&mut grid, 1, 0, cx, cy, cw, ch).expect("text rect");
+        let hover_x = tx as f32 + tw as f32 * 0.5;
+        let hover_y = ty as f32 + th as f32 * 0.5;
+
+        handle_pointer_move(&mut grid, hover_x, hover_y, 0, 0);
+
+        assert_eq!(grid.cursor_style, 5);
+    }
+
+    #[test]
+    fn center_aligned_text_link_click_reports_text_hit() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
+        grid.columns[0].interaction = pb::CellInteraction::TextLink as i32;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.cells.set_text(1, 0, "Open".to_string());
+        prime_layout(&mut grid);
+
+        let (cx, cy, cw, ch) = grid.cell_screen_rect(1, 0).expect("cell rect");
+        let (tx, ty, tw, th) =
+            text_content_rect(&mut grid, 1, 0, cx, cy, cw, ch).expect("text rect");
+        let click_x = tx as f32 + tw as f32 * 0.5;
+        let click_y = ty as f32 + th as f32 * 0.5;
+
+        handle_pointer_down(&mut grid, click_x, click_y, 0, 0, false);
+        handle_pointer_up(&mut grid, click_x, click_y, 0, 0);
+
+        let events = grid.events.drain();
+        assert!(events.iter().any(|e| matches!(
+            e.data,
+            GridEventData::Click {
+                row: 1,
+                col: 0,
+                hit_area,
+                interaction,
+            } if hit_area == pb::CellHitArea::HitText as i32
+                && interaction == pb::CellInteraction::TextLink as i32
+        )));
+    }
+
+    #[test]
+    fn center_aligned_text_link_hit_test_respects_top_indicator_offset() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
+        grid.columns[0].interaction = pb::CellInteraction::TextLink as i32;
+        grid.columns[0].alignment = pb::Align::CenterCenter as i32;
+        grid.cells.set_text(1, 0, "Browse".to_string());
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 28;
+        prime_layout(&mut grid);
+
+        let (cx, cy, cw, ch) = grid.cell_screen_rect(1, 0).expect("cell rect");
+        let (tx, ty, tw, th) =
+            text_content_rect(&mut grid, 1, 0, cx, cy, cw, ch).expect("text rect");
+        let hover_x = tx as f32 + tw as f32 * 0.5;
+        let hover_y = ty as f32 + th as f32 * 0.5;
+
+        assert_eq!(
+            hit_test(&mut grid, hover_x, hover_y).area,
+            HitArea::CellText
+        );
+
+        handle_pointer_move(&mut grid, hover_x, hover_y, 0, 0);
         assert_eq!(grid.cursor_style, 5);
     }
 

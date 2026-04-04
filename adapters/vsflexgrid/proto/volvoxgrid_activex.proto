@@ -6,6 +6,7 @@ option java_package = "io.github.ivere27.volvoxgrid";
 option java_multiple_files = true;
 
 import "activex.proto";
+import "volvoxgrid.proto";
 
 // ═══════════════════════════════════════════════════════════
 // Enums
@@ -1040,6 +1041,7 @@ message SubtotalRequest {
   uint32        back_color       = 6;
   uint32        fore_color       = 7;
   bool          add_outline      = 8;
+  volvoxgrid.v1.Font font        = 9;
 }
 
 message SetSubtotalPositionRequest {

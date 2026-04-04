@@ -5,8 +5,8 @@
 #   ./dotnet/run_sample.sh [release]
 #
 # Environment:
-#   DOTNET_TFM=net40|net8.0-windows   (default: net40)
-#   DOTNET_ARCH=x64|x86               (default: x64)
+#   DOTNET_TFM=net40|net8.0|net8.0-windows   (default: net40)
+#   DOTNET_ARCH=x64|x86                      (default: x64, WinForms builds only)
 
 set -euo pipefail
 
@@ -14,8 +14,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 PROFILE="debug"
-DOTNET_TFM="${DOTNET_TFM:-net40}"
-DOTNET_ARCH="${DOTNET_ARCH:-x64}"
+TARGET_TFM="${DOTNET_TFM:-net40}"
+TARGET_ARCH="${DOTNET_ARCH:-x64}"
+unset DOTNET_TFM DOTNET_ARCH
 MONO_VERSION="${WINE_MONO_VERSION:-6.0.0}"
 BOOTSTRAP_STAMP_NAME=".volvoxgrid_wine_bootstrap_v2"
 LOG_HASHES="${VOLVOXGRID_LOG_HASHES:-0}"
@@ -31,54 +32,139 @@ normalize_arch() {
     printf '%s\n' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
+sample_kind_for_tfm() {
+    local tfm="$1"
+    if [ "$tfm" = "net40" ] || [[ "$tfm" == *"-windows"* ]]; then
+        printf 'winforms\n'
+    else
+        printf 'console\n'
+    fi
+}
+
+sample_basename_for_kind() {
+    local kind="$1"
+    case "$kind" in
+        winforms)
+            printf 'VolvoxGrid.WinFormsSample\n'
+            ;;
+        console)
+            printf 'VolvoxGrid.ConsoleSample\n'
+            ;;
+        *)
+            echo "ERROR: unknown sample kind '$kind'" >&2
+            exit 1
+            ;;
+    esac
+}
+
+native_plugin_basename() {
+    local tfm="$1"
+    if [ "$tfm" = "net40" ] || [[ "$tfm" == *"-windows"* ]]; then
+        printf 'volvoxgrid_plugin.dll\n'
+        return
+    fi
+
+    case "$(uname -s 2>/dev/null || echo unknown)" in
+        Darwin)
+            printf 'libvolvoxgrid_plugin.dylib\n'
+            ;;
+        MINGW*|MSYS*|CYGWIN*)
+            printf 'volvoxgrid_plugin.dll\n'
+            ;;
+        *)
+            printf 'libvolvoxgrid_plugin.so\n'
+            ;;
+    esac
+}
+
 resolve_stage_dir() {
     local profile="$1"
     local tfm="$2"
     local arch="$3"
+    local sample_kind="$4"
     local base=""
-    if [ "$tfm" = "net40" ]; then
-        base="$ROOT_DIR/target/dotnet/winforms_${profile}"
-    else
-        base="$ROOT_DIR/target/dotnet/winforms_${profile}_$(normalize_tfm_for_path "$tfm")"
-    fi
 
-    if [ "$arch" != "x64" ]; then
-        base="${base}_${arch}"
-    fi
+    case "$sample_kind" in
+        winforms)
+            if [ "$tfm" = "net40" ]; then
+                base="$ROOT_DIR/target/dotnet/winforms_${profile}"
+            else
+                base="$ROOT_DIR/target/dotnet/winforms_${profile}_$(normalize_tfm_for_path "$tfm")"
+            fi
+            if [ "$arch" != "x64" ]; then
+                base="${base}_${arch}"
+            fi
+            ;;
+        console)
+            base="$ROOT_DIR/target/dotnet/console_${profile}_$(normalize_tfm_for_path "$tfm")"
+            ;;
+        *)
+            echo "ERROR: unknown sample kind '$sample_kind'" >&2
+            exit 1
+            ;;
+    esac
 
     printf '%s\n' "$base"
 }
 
-for arg in "$@"; do
-    case "$arg" in
+while [ "$#" -gt 0 ]; do
+    case "$1" in
         release|--release)
             PROFILE="release"
+            shift
+            ;;
+        --tfm)
+            TARGET_TFM="${2:-}"
+            if [ -z "$TARGET_TFM" ]; then
+                echo "ERROR: --tfm requires a value." >&2
+                exit 1
+            fi
+            shift 2
+            ;;
+        --arch)
+            TARGET_ARCH="${2:-}"
+            if [ -z "$TARGET_ARCH" ]; then
+                echo "ERROR: --arch requires a value." >&2
+                exit 1
+            fi
+            shift 2
+            ;;
+        *)
+            echo "ERROR: unknown argument '$1'." >&2
+            exit 1
             ;;
     esac
 done
 
-DOTNET_ARCH="$(normalize_arch "$DOTNET_ARCH")"
-case "$DOTNET_ARCH" in
+TARGET_ARCH="$(normalize_arch "$TARGET_ARCH")"
+case "$TARGET_ARCH" in
     x64|amd64)
-        DOTNET_ARCH="x64"
+        TARGET_ARCH="x64"
         ;;
     x86|i386|i686)
-        DOTNET_ARCH="x86"
+        TARGET_ARCH="x86"
         ;;
     *)
-        echo "ERROR: unsupported DOTNET_ARCH='$DOTNET_ARCH'. Use x64 or x86." >&2
+        echo "ERROR: unsupported DOTNET_ARCH='$TARGET_ARCH'. Use x64 or x86." >&2
         exit 1
         ;;
 esac
 
-STAGE_DIR="$(resolve_stage_dir "$PROFILE" "$DOTNET_TFM" "$DOTNET_ARCH")"
-ENTRY_NAME="VolvoxGrid.WinFormsSample.exe"
-if [ "$DOTNET_TFM" != "net40" ]; then
-    ENTRY_NAME="VolvoxGrid.WinFormsSample.dll"
+SAMPLE_KIND="$(sample_kind_for_tfm "$TARGET_TFM")"
+SAMPLE_BASENAME="$(sample_basename_for_kind "$SAMPLE_KIND")"
+PLUGIN_BASENAME="$(native_plugin_basename "$TARGET_TFM")"
+STAGE_DIR="$(resolve_stage_dir "$PROFILE" "$TARGET_TFM" "$TARGET_ARCH" "$SAMPLE_KIND")"
+ENTRY_NAME="${SAMPLE_BASENAME}.dll"
+if [ "$TARGET_TFM" = "net40" ]; then
+    ENTRY_NAME="${SAMPLE_BASENAME}.exe"
 fi
 
 if [ ! -f "$STAGE_DIR/$ENTRY_NAME" ]; then
-    DOTNET_TFM="$DOTNET_TFM" DOTNET_ARCH="$DOTNET_ARCH" "$SCRIPT_DIR/build_dotnet.sh" "$PROFILE"
+    if [ "$PROFILE" = "release" ]; then
+        "$SCRIPT_DIR/build_dotnet.sh" --tfm "$TARGET_TFM" --arch "$TARGET_ARCH" release
+    else
+        "$SCRIPT_DIR/build_dotnet.sh" --tfm "$TARGET_TFM" --arch "$TARGET_ARCH"
+    fi
 fi
 
 require_stage_file() {
@@ -156,8 +242,6 @@ prepare_wine_prefix() {
     wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontSubstitutes" /v "MS Shell Dlg" /t REG_SZ /d "DejaVu Sans" /f >/dev/null 2>&1 || true
     wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\FontSubstitutes" /v "MS Shell Dlg 2" /t REG_SZ /d "DejaVu Sans" /f >/dev/null 2>&1 || true
 
-    # CJK font fallback: copy host Noto CJK font into the Wine prefix under
-    # the Windows font names the engine expects (msyh.ttc, msjh.ttc, malgun.ttf).
     local cjk_src=""
     local cjk_candidates=(
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
@@ -190,10 +274,10 @@ is_windows_host() {
     [ "${OS:-}" = "Windows_NT" ]
 }
 
-rm -f "$STAGE_DIR/VolvoxGrid.WinFormsSample.log"
+rm -f "$STAGE_DIR/${SAMPLE_BASENAME}.log"
 
-if [ "$DOTNET_TFM" = "net40" ]; then
-    if [ "$DOTNET_ARCH" = "x86" ]; then
+if [ "$TARGET_TFM" = "net40" ]; then
+    if [ "$TARGET_ARCH" = "x86" ]; then
         export WINEPREFIX="${WINEPREFIX:-$ROOT_DIR/target/dotnet/wineprefix_x86}"
         export WINEARCH="${WINEARCH:-win32}"
     else
@@ -201,20 +285,20 @@ if [ "$DOTNET_TFM" = "net40" ]; then
         export WINEARCH="${WINEARCH:-win64}"
     fi
 
-    require_stage_file "VolvoxGrid.WinFormsSample.exe"
+    require_stage_file "${SAMPLE_BASENAME}.exe"
     require_stage_file "VolvoxGrid.DotNet.dll"
-    require_stage_file "volvoxgrid_plugin.dll"
+    require_stage_file "$PLUGIN_BASENAME"
 
-    echo "Running sample: $STAGE_DIR/VolvoxGrid.WinFormsSample.exe"
-    echo "Arch=$DOTNET_ARCH"
+    echo "Running sample: $STAGE_DIR/${SAMPLE_BASENAME}.exe"
+    echo "Arch=$TARGET_ARCH"
     echo "WINEPREFIX=$WINEPREFIX"
     prepare_wine_prefix
 
     echo "Using staged binaries:"
     for name in \
-        "VolvoxGrid.WinFormsSample.exe" \
+        "${SAMPLE_BASENAME}.exe" \
         "VolvoxGrid.DotNet.dll" \
-        "volvoxgrid_plugin.dll"
+        "$PLUGIN_BASENAME"
     do
         path="$STAGE_DIR/$name"
         wine_path="$(to_wine_path "$path")"
@@ -237,9 +321,9 @@ if [ "$DOTNET_TFM" = "net40" ]; then
     cd "$STAGE_DIR"
     if [ "${VOLVOXGRID_SMOKE_MODE:-0}" = "1" ]; then
         smoke_timeout="${VOLVOXGRID_SMOKE_TIMEOUT_SEC:-90}"
-        smoke_log="$STAGE_DIR/VolvoxGrid.WinFormsSample.log"
+        smoke_log="$STAGE_DIR/${SAMPLE_BASENAME}.log"
         echo "Smoke mode enabled (timeout=${smoke_timeout}s). Waiting for SMOKE RESULT marker..."
-        wine VolvoxGrid.WinFormsSample.exe &
+        wine "${SAMPLE_BASENAME}.exe" &
         wine_pid=$!
         deadline=$((SECONDS + smoke_timeout))
         smoke_result=""
@@ -281,21 +365,21 @@ if [ "$DOTNET_TFM" = "net40" ]; then
         esac
     fi
 
-    wine VolvoxGrid.WinFormsSample.exe
+    wine "${SAMPLE_BASENAME}.exe"
     exit 0
 fi
 
-require_stage_file "VolvoxGrid.WinFormsSample.dll"
-require_stage_file "VolvoxGrid.WinFormsSample.deps.json"
-require_stage_file "VolvoxGrid.WinFormsSample.runtimeconfig.json"
+require_stage_file "${SAMPLE_BASENAME}.dll"
+require_stage_file "${SAMPLE_BASENAME}.deps.json"
+require_stage_file "${SAMPLE_BASENAME}.runtimeconfig.json"
 require_stage_file "VolvoxGrid.DotNet.dll"
-require_stage_file "volvoxgrid_plugin.dll"
+require_stage_file "$PLUGIN_BASENAME"
 
-if [[ "$DOTNET_TFM" == *"-windows"* ]] && ! is_windows_host; then
-    echo "ERROR: DOTNET_TFM=$DOTNET_TFM requires Windows runtime."
+if [[ "$TARGET_TFM" == *"-windows"* ]] && ! is_windows_host; then
+    echo "ERROR: DOTNET_TFM=$TARGET_TFM requires Windows runtime."
     echo "Build artifacts are staged at: $STAGE_DIR"
     echo "Run on Windows with:"
-    echo "  dotnet \"$STAGE_DIR/VolvoxGrid.WinFormsSample.dll\""
+    echo "  dotnet \"$STAGE_DIR/${SAMPLE_BASENAME}.dll\""
     exit 1
 fi
 
@@ -304,15 +388,15 @@ if ! command -v dotnet >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "Running sample: $STAGE_DIR/VolvoxGrid.WinFormsSample.dll"
-echo "TFM=$DOTNET_TFM"
+echo "Running sample: $STAGE_DIR/${SAMPLE_BASENAME}.dll"
+echo "TFM=$TARGET_TFM"
 echo "Using staged binaries:"
 for name in \
-    "VolvoxGrid.WinFormsSample.dll" \
-    "VolvoxGrid.WinFormsSample.deps.json" \
-    "VolvoxGrid.WinFormsSample.runtimeconfig.json" \
+    "${SAMPLE_BASENAME}.dll" \
+    "${SAMPLE_BASENAME}.deps.json" \
+    "${SAMPLE_BASENAME}.runtimeconfig.json" \
     "VolvoxGrid.DotNet.dll" \
-    "volvoxgrid_plugin.dll"
+    "$PLUGIN_BASENAME"
 do
     path="$STAGE_DIR/$name"
     size_bytes="$(wc -c < "$path" | tr -d '[:space:]')"
@@ -330,4 +414,4 @@ do
 done
 
 cd "$STAGE_DIR"
-dotnet VolvoxGrid.WinFormsSample.dll
+dotnet "${SAMPLE_BASENAME}.dll"

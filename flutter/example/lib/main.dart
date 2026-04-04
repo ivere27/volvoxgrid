@@ -4,7 +4,9 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide Align;
 import 'package:flutter/services.dart';
+import 'package:synurang/synurang.dart' as synurang;
 import 'package:volvoxgrid/volvoxgrid.dart' hide Padding;
+import 'package:volvoxgrid/src/generated/volvoxgrid.pb.dart' as pb;
 
 import 'sales_json_demo.dart';
 import 'hierarchy_json_demo.dart';
@@ -13,18 +15,30 @@ const bool _forceFlingForDesktop = bool.fromEnvironment(
   'VG_ENABLE_FLING',
   defaultValue: false,
 );
+const int _diagnosticSynurangPoolSize = 12;
+
+void _debugLog(String Function() messageBuilder) {
+  if (kDebugMode) {
+    debugPrint(messageBuilder());
+  }
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  synurang.configurePoolSize(_diagnosticSynurangPoolSize);
+  _debugLog(
+    () => 'Synurang pool configured: requested=$_diagnosticSynurangPoolSize '
+        'effective=${synurang.getPoolSize()}',
+  );
   await initVolvoxGrid();
 
   // Verify plugin connectivity
   try {
     const channel = MethodChannel('io.github.ivere27.volvoxgrid');
     final version = await channel.invokeMethod('getPlatformVersion');
-    debugPrint('VolvoxGrid Plugin active: $version');
+    _debugLog(() => 'VolvoxGrid Plugin active: $version');
   } catch (e) {
-    debugPrint('VolvoxGrid Plugin error: $e');
+    _debugLog(() => 'VolvoxGrid Plugin error: $e');
   }
 
   runApp(const VolvoxGridDemoApp());
@@ -121,9 +135,14 @@ class _DemoPageState extends State<DemoPage> {
 
   bool get _loading => _switching || !_initializedModes.contains(_currentDemo);
 
+  void _logSynurangPoolStats(String reason) {
+    _debugLog(() => 'Synurang pool [$reason]: ${synurang.getPoolStats()}');
+  }
+
   Future<void> _initializeController(DemoMode mode) async {
     final controller = _controllers[mode]!;
     final dpr = _dpr;
+    _logSynurangPoolStats('initialize start ${mode.name}');
     await controller.create(
       rows: 2,
       cols: 2,
@@ -166,6 +185,7 @@ class _DemoPageState extends State<DemoPage> {
     await controller.setEditable(_editEnabled);
     await controller.refresh();
     _initializedModes.add(mode);
+    _logSynurangPoolStats('initialize done ${mode.name}');
   }
 
   Future<void> _applyDisplayToggles(VolvoxGridController controller) async {
@@ -202,11 +222,15 @@ class _DemoPageState extends State<DemoPage> {
     final token = ++_switchToken;
     final needsInitialization = !_initializedModes.contains(mode);
     try {
+      _logSynurangPoolStats('switch begin ${mode.name}');
       setState(() {
         _currentDemo = mode;
         _switching = needsInitialization;
         _statusText = 'Loading ${mode.name} demo...';
       });
+      // Let the keyed VolvoxGridWidget dispose the old controller streams
+      // before the next controller starts driving new render/event traffic.
+      await Future<void>.delayed(Duration.zero);
       await _ensureInitialized(mode);
       if (!mounted || token != _switchToken) {
         return;
@@ -220,6 +244,7 @@ class _DemoPageState extends State<DemoPage> {
         _switching = false;
         _statusText = 'Loaded ${mode.name} demo';
       });
+      _logSynurangPoolStats('switch done ${mode.name}');
     } catch (e) {
       if (!mounted || token != _switchToken) {
         return;
@@ -228,6 +253,7 @@ class _DemoPageState extends State<DemoPage> {
         _switching = false;
         _statusText = 'Error: $e';
       });
+      _logSynurangPoolStats('switch error ${mode.name}');
     }
   }
 
@@ -360,6 +386,39 @@ class _DemoPageState extends State<DemoPage> {
       _statusText =
           'Row: ${sel.activeRow}  Col: ${sel.activeCol}  |  ${_currentDemo.name}';
     });
+  }
+
+  void _onGridEvent(pb.GridEvent event) {
+    if (_currentDemo != DemoMode.hierarchy || !event.hasClick()) {
+      return;
+    }
+    final click = event.click;
+    if (click.row < 0 ||
+        click.col != hierarchyActionColumn ||
+        click.hitArea != pb.CellHitArea.HIT_TEXT ||
+        click.interaction != pb.CellInteraction.CELL_INTERACTION_TEXT_LINK) {
+      return;
+    }
+    final message =
+        'Hierarchy action click: row ${click.row + 1}, col ${click.col}, '
+        'hit_area ${click.hitArea.value}, interaction ${click.interaction.value}';
+    setState(() {
+      _statusText = message;
+    });
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hierarchy Action'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _onSortAscending() async {
@@ -713,7 +772,9 @@ class _DemoPageState extends State<DemoPage> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : VolvoxGridWidget(
+                    key: ValueKey<DemoMode>(_currentDemo),
                     controller: _activeController,
+                    onGridEvent: _onGridEvent,
                     onSelectionChanged: _onSelectionChanged,
                     onContextMenuRequest: _showGridDebugContextMenu,
                   ),

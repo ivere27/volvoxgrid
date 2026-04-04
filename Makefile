@@ -18,11 +18,8 @@
 # Variables
 # =============================================================================
 SYNURANG_MODULE ?= github.com/ivere27/synurang
-SYNURANG_VERSION ?= v0.5.6
-PROTOC_PLUGIN ?= $(shell command -v protoc-gen-synurang-ffi 2>/dev/null)
-ifeq ($(strip $(PROTOC_PLUGIN)),)
-PROTOC_PLUGIN := $(shell go env GOPATH 2>/dev/null)/bin/protoc-gen-synurang-ffi
-endif
+SYNURANG_VERSION ?= v0.5.10
+PROTOC_PLUGIN ?= $(shell gobin=$$(go env GOBIN 2>/dev/null); if [ -n "$$gobin" ]; then printf '%s/protoc-gen-synurang-ffi' "$$gobin"; else printf '%s/bin/protoc-gen-synurang-ffi' "$$(go env GOPATH 2>/dev/null)"; fi)
 PROTOC_PLUGIN_FLAG = --plugin=protoc-gen-synurang-ffi=$(PROTOC_PLUGIN)
 ANDROID_PROJECT_DIR := android
 ANDROID_GRADLEW := $(ANDROID_PROJECT_DIR)/gradlew
@@ -228,7 +225,7 @@ all: build
 help:
 	@echo "VolvoxGrid Makefile targets:"
 	@echo ""
-	@echo "  build_plugin   Install protoc-gen-synurang-ffi from GitHub (requires Go)"
+	@echo "  build_plugin   Install protoc-gen-synurang-ffi from GitHub ($(SYNURANG_VERSION))"
 	@echo "  build          Build engine + host-plugin (debug)"
 	@echo "  release        Build engine + host-plugin (release, optimized)"
 	@echo "  host-plugin    Build host (desktop) plugin crate (debug)"
@@ -266,7 +263,7 @@ help:
 	@echo "  java-desktop-run    Run Java desktop Android-style example"
 	@echo "  java-desktop-run-release  Run Java desktop Android-style example with release plugin"
 	@echo "  java-desktop-run-simple  Run Java desktop minimal demo"
-	@echo "  java-desktop-smoke  Run headless Java desktop smoke test with local synurang-desktop jars"
+	@echo "  java-desktop-smoke  Run headless Java desktop smoke test"
 	@echo "  dotnet-build  Build VolvoxGrid .NET wrapper + sample (debug)"
 	@echo "  dotnet-build-release  Build VolvoxGrid .NET wrapper + sample (release)"
 	@echo "  dotnet-run    Run .NET sample (debug)"
@@ -301,9 +298,9 @@ help:
 	@echo "  publish_web               Copy dist/web -> public (clean), then run firebase deploy"
 	@echo ""
 	@echo "Example dependency source flags (default is local):"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.4.0"
-	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.4.0"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.4.0"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.5.0"
+	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.5.0"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.5.0"
 	@echo "  (maven mode skips local plugin build for the example targets)"
 	@echo "  Flutter defaults to maven when VOLVOXGRID_SOURCE is omitted."
 	@echo "  VOLVOXGRID_SOURCE=local builds from source."
@@ -406,22 +403,22 @@ java-desktop-smoke: $(JAVA_DESKTOP_SMOKE_PREREQ)
 
 dotnet-build:
 	@echo "Building VolvoxGrid .NET wrapper + sample (debug, $(DOTNET_TFM), $(DOTNET_ARCH))..."
-	DOTNET_TFM="$(DOTNET_TFM)" DOTNET_ARCH="$(DOTNET_ARCH)" ./dotnet/build_dotnet.sh
+	./dotnet/build_dotnet.sh --tfm "$(DOTNET_TFM)" --arch "$(DOTNET_ARCH)"
 	@echo ""
 
 dotnet-build-release:
 	@echo "Building VolvoxGrid .NET wrapper + sample (release, $(DOTNET_TFM), $(DOTNET_ARCH))..."
-	DOTNET_TFM="$(DOTNET_TFM)" DOTNET_ARCH="$(DOTNET_ARCH)" ./dotnet/build_dotnet.sh release
+	./dotnet/build_dotnet.sh --tfm "$(DOTNET_TFM)" --arch "$(DOTNET_ARCH)" release
 	@echo ""
 
 dotnet-run: dotnet-build
 	@echo "Running .NET sample (debug, $(DOTNET_TFM), $(DOTNET_ARCH))..."
-	DOTNET_TFM="$(DOTNET_TFM)" DOTNET_ARCH="$(DOTNET_ARCH)" ./dotnet/run_sample.sh
+	./dotnet/run_sample.sh --tfm "$(DOTNET_TFM)" --arch "$(DOTNET_ARCH)"
 	@echo ""
 
 dotnet-run-release: dotnet-build-release
 	@echo "Running .NET sample (release, $(DOTNET_TFM), $(DOTNET_ARCH))..."
-	DOTNET_TFM="$(DOTNET_TFM)" DOTNET_ARCH="$(DOTNET_ARCH)" ./dotnet/run_sample.sh release
+	./dotnet/run_sample.sh --tfm "$(DOTNET_TFM)" --arch "$(DOTNET_ARCH)" release
 	@echo ""
 
 activex-run: activex
@@ -436,12 +433,12 @@ activex-run-release: activex-release
 
 dotnet-smoke: dotnet-build
 	@echo "Running .NET controller smoke checks (debug, $(DOTNET_TFM), $(DOTNET_ARCH))..."
-	VOLVOXGRID_SMOKE_MODE=1 VOLVOXGRID_SMOKE_EXIT=1 DOTNET_TFM="$(DOTNET_TFM)" DOTNET_ARCH="$(DOTNET_ARCH)" ./dotnet/run_sample.sh
+	VOLVOXGRID_SMOKE_MODE=1 VOLVOXGRID_SMOKE_EXIT=1 ./dotnet/run_sample.sh --tfm "$(DOTNET_TFM)" --arch "$(DOTNET_ARCH)"
 	@echo ""
 
 dotnet-smoke-release: dotnet-build-release
 	@echo "Running .NET controller smoke checks (release, $(DOTNET_TFM), $(DOTNET_ARCH))..."
-	VOLVOXGRID_SMOKE_MODE=1 VOLVOXGRID_SMOKE_EXIT=1 DOTNET_TFM="$(DOTNET_TFM)" DOTNET_ARCH="$(DOTNET_ARCH)" ./dotnet/run_sample.sh release
+	VOLVOXGRID_SMOKE_MODE=1 VOLVOXGRID_SMOKE_EXIT=1 ./dotnet/run_sample.sh --tfm "$(DOTNET_TFM)" --arch "$(DOTNET_ARCH)" release
 	@echo ""
 
 # =============================================================================
@@ -452,23 +449,20 @@ WASM_OUTPUT_MAIN := $(WASM_OUTPUT_DIR)/volvoxgrid_wasm_bg.wasm
 
 wasm:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
-	@command -v wasm-bindgen >/dev/null 2>&1 || { echo "Error: wasm-bindgen not found. Install with: cargo install wasm-bindgen-cli"; exit 1; }
 	@echo "Building WASM crate..."
-	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build --mode no-install . --target web --out-dir ../example/wasm --features gpu
+	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features gpu
 	@echo "WASM build complete: web/example/wasm/"
 
 wasm-lite:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
-	@command -v wasm-bindgen >/dev/null 2>&1 || { echo "Error: wasm-bindgen not found. Install with: cargo install wasm-bindgen-cli"; exit 1; }
 	@echo "Building WASM crate (lite)..."
-	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build --mode no-install . --target web --out-dir ../example/wasm --no-default-features
+	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --no-default-features
 	@echo "WASM lite build complete: web/example/wasm/"
 
 wasm-threaded:
 	@command -v wasm-pack >/dev/null 2>&1 || { echo "Error: wasm-pack not found. Install with: cargo install wasm-pack"; exit 1; }
-	@command -v wasm-bindgen >/dev/null 2>&1 || { echo "Error: wasm-bindgen not found. Install with: cargo install wasm-bindgen-cli"; exit 1; }
 	@echo "Building WASM crate (threaded)..."
-	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build --mode no-install . --target web --out-dir ../example/wasm --features wasm-threads,gpu -Z build-std=std,panic_abort
+	cd web/crate && CARGO_BUILD_JOBS="$(CARGO_BUILD_JOBS)" RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . --target web --out-dir ../example/wasm --features wasm-threads,gpu -Z build-std=std,panic_abort
 	@echo "WASM threaded build complete: web/example/wasm/"
 
 wasm-ready:
@@ -568,17 +562,17 @@ doom-deps:
 # Codegen — Regenerate FFI bindings
 # =============================================================================
 VSFLEXGRID_DIR := adapters/vsflexgrid
-DOTNET_CODEGEN_DIR := dotnet/src/net8/Generated
+DOTNET_COMMON_CODEGEN_DIR := dotnet/src/common/Generated
 WEB_TS_CODEGEN_DIR := web/js/src/generated
 PROTO_INCLUDES := -Iproto -I$(VSFLEXGRID_DIR)/proto
 PROTO3_OPT := --experimental_allow_proto3_optional
 
 codegen: build_plugin
-	@test -n "$(PROTOC_PLUGIN)" || { echo "Error: protoc-gen-synurang-ffi not found in PATH"; exit 1; }
+	@test -x "$(PROTOC_PLUGIN)" || { echo "Error: protoc-gen-synurang-ffi not found at $(PROTOC_PLUGIN)"; exit 1; }
 	@command -v protoc-gen-dart >/dev/null 2>&1 || { echo "Error: protoc-gen-dart not found in PATH."; exit 1; }
 	@echo "Generating v1 runtime FFI bindings..."
 	@mkdir -p codegen
-	@mkdir -p $(DOTNET_CODEGEN_DIR)
+	@mkdir -p $(DOTNET_COMMON_CODEGEN_DIR)
 	@mkdir -p $(WEB_TS_CODEGEN_DIR)
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_PLUGIN_FLAG) \
@@ -605,13 +599,10 @@ codegen: build_plugin
 		$(PROTOC_PLUGIN_FLAG) \
 		--synurang-ffi_out=$(WEB_TS_CODEGEN_DIR) --synurang-ffi_opt=lang=typescript \
 		proto/volvoxgrid.proto
-	# .NET protobuf + Synurang FFI stubs
-	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
-		--csharp_out=$(DOTNET_CODEGEN_DIR) \
-		proto/volvoxgrid.proto
+	# .NET lite protobuf + FFI stubs (shared)
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_PLUGIN_FLAG) \
-		--synurang-ffi_out=$(DOTNET_CODEGEN_DIR) --synurang-ffi_opt=lang=csharp \
+		--synurang-ffi_out=$(DOTNET_COMMON_CODEGEN_DIR) --synurang-ffi_opt=lang=csharp,mode=lite \
 		proto/volvoxgrid.proto
 	# Plugin server trait + dispatcher
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
@@ -654,7 +645,7 @@ codegen: build_plugin
 		plugin/src/volvoxgrid_ffi_plugin.rs \
 		web/crate/src/volvoxgrid_wasm.rs \
 		$(VSFLEXGRID_DIR)/crate/src/volvoxgrid_ffi_native.rs
-	@echo "Codegen complete: codegen/ + $(DOTNET_CODEGEN_DIR)/ + $(WEB_TS_CODEGEN_DIR)/ + plugin/ + web/ + $(VSFLEXGRID_DIR)/"
+	@echo "Codegen complete: codegen/ + $(DOTNET_COMMON_CODEGEN_DIR)/ + $(WEB_TS_CODEGEN_DIR)/ + plugin/ + web/ + $(VSFLEXGRID_DIR)/"
 
 # =============================================================================
 # Android

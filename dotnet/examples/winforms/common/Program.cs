@@ -195,7 +195,7 @@ namespace VolvoxGrid.DotNet.Sample
             var chkEditable = new CheckBox
             {
                 Text = "Editable",
-                Checked = true,
+                Checked = false,
                 AutoSize = true,
                 Margin = new Padding(16, 6, 0, 0),
             };
@@ -264,7 +264,7 @@ namespace VolvoxGrid.DotNet.Sample
             _grid = new VolvoxGridControl
             {
                 Dock = DockStyle.Fill,
-                Editable = true,
+                Editable = false,
                 SelectionMode = VolvoxGridSelectionMode.Free,
                 HoverEnabled = true,
                 RendererMode = VolvoxGridRendererMode.Cpu,
@@ -272,6 +272,7 @@ namespace VolvoxGrid.DotNet.Sample
             _grid.FocusedCellChanged += OnFocusedCellChanged;
             _grid.CellValueChanged += OnCellValueChanged;
             _grid.SelectionChanged += OnSelectionChanged;
+            _grid.CellClick += OnCellClick;
 
             _selectionModeButton = new Button
             {
@@ -545,10 +546,11 @@ namespace VolvoxGrid.DotNet.Sample
             AppLog.Info("SMOKE: sales-demo rowCount=" + rowCount);
 
             bool foundCheckedFlag = false;
-            bool foundMarginSubtotal = false;
+            bool foundGrandTotal = false;
 
             for (int row = 0; row < rowCount; row++)
             {
+                string grandLabel = _grid.GetCellText(row, 0);
                 string product = _grid.GetCellText(row, 3);
                 string sales = _grid.GetCellText(row, 4);
                 string cost = _grid.GetCellText(row, 5);
@@ -575,14 +577,17 @@ namespace VolvoxGrid.DotNet.Sample
                     foundCheckedFlag = true;
                 }
 
-                if (isSubtotal && !string.IsNullOrWhiteSpace(margin))
+                if (isSubtotal
+                    && string.Equals(grandLabel, "Grand Total", StringComparison.Ordinal)
+                    && !string.IsNullOrWhiteSpace(sales)
+                    && !string.IsNullOrWhiteSpace(cost))
                 {
-                    foundMarginSubtotal = true;
+                    foundGrandTotal = true;
                 }
             }
 
             SmokeAssert(foundCheckedFlag, "Sales demo checked checkbox state");
-            SmokeAssert(foundMarginSubtotal, "Sales demo Margin% subtotal");
+            SmokeAssert(foundGrandTotal, "Sales demo grand total");
             AppLog.Info("SMOKE: sales-demo checks complete");
         }
 
@@ -953,6 +958,33 @@ namespace VolvoxGrid.DotNet.Sample
         private void OnSelectionChanged(object sender, VolvoxGridSelectionChangedEventArgs args)
         {
             SetStatus("Selection changed: " + args.SelectedRows.Length + " row(s).");
+        }
+
+        private void OnCellClick(object sender, VolvoxGridCellClickEventArgs args)
+        {
+            if (_currentDemo != DemoMode.Hierarchy
+                || args.RowIndex < 0
+                || args.ColumnIndex != HierarchyJsonDemo.ActionColumnIndex
+                || args.HitArea != VolvoxGridCellHitArea.Text
+                || args.Interaction != VolvoxGridCellInteraction.TextLink)
+            {
+                return;
+            }
+
+            SetStatus(
+                "Hierarchy action click: row=" + (args.RowIndex + 1)
+                + ", column='" + GetColumnLabel(args.ColumnIndex, args.FieldName) + "'"
+                + ", hit_area=" + (int)args.HitArea
+                + ", interaction=" + (int)args.Interaction + ".");
+            MessageBox.Show(
+                this,
+                "Hierarchy action click: row=" + (args.RowIndex + 1)
+                    + ", column='" + GetColumnLabel(args.ColumnIndex, args.FieldName) + "'"
+                    + ", hit_area=" + (int)args.HitArea
+                    + ", interaction=" + (int)args.Interaction + ".",
+                "Hierarchy Action",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
         private void SetStatus(string message, bool append)

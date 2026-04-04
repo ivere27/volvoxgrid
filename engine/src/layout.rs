@@ -410,6 +410,7 @@ impl LayoutCache {
             self.col_positions[i] += delta;
         }
         self.total_width += delta;
+        self.generation = self.generation.wrapping_add(1);
     }
 
     /// Patch row positions after a single row height change.
@@ -453,6 +454,7 @@ impl LayoutCache {
             self.row_positions[i] += delta;
         }
         self.total_height += delta;
+        self.generation = self.generation.wrapping_add(1);
     }
 }
 

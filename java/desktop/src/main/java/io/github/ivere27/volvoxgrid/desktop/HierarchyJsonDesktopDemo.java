@@ -54,6 +54,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class HierarchyJsonDesktopDemo {
+    static final int ACTION_COLUMN_INDEX = 5;
+
     private static final int[] COL_WIDTHS = {260, 80, 80, 120, 100, 92};
     private static final String[] CAPTIONS = {
         "Name", "Type", "Size", "Modified", "Permissions", "Action",
@@ -95,7 +97,7 @@ final class HierarchyJsonDesktopDemo {
                 .addColumns(column(2, Align.ALIGN_RIGHT_CENTER).build())
                 .addColumns(column(3, null).build())
                 .addColumns(column(4, Align.ALIGN_CENTER_CENTER).build())
-                .addColumns(column(5, Align.ALIGN_CENTER_CENTER)
+                .addColumns(column(ACTION_COLUMN_INDEX, Align.ALIGN_CENTER_CENTER)
                     .setInteraction(io.github.ivere27.volvoxgrid.CellInteraction.CELL_INTERACTION_TEXT_LINK)
                     .build())
                 .build()
@@ -126,7 +128,7 @@ final class HierarchyJsonDesktopDemo {
             styles.addCells(
                 CellUpdate.newBuilder()
                     .setRow(row)
-                    .setCol(5)
+                    .setCol(ACTION_COLUMN_INDEX)
                     .setValue(CellValue.newBuilder().setText(isFolder ? "Browse" : "Open").build())
                     .setStyle(
                         CellStyle.newBuilder()

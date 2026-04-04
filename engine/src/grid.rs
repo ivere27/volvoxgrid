@@ -2533,6 +2533,17 @@ impl VolvoxGrid {
         self.subtotal_caption_horizontal_merge(row, col).is_some()
     }
 
+    fn auto_resize_col_button_reserve(&self, row: i32, col: i32) -> f32 {
+        if !crate::canvas::show_dropdown_button_for_cell(self, row, col) {
+            return 0.0;
+        }
+        let row_height = self.get_row_height(row);
+        // Measure with an unconstrained cell width so autosize always reserves
+        // the full button width instead of whatever the current column width is.
+        crate::canvas::dropdown_button_rect(0, 0, i32::MAX, row_height)
+            .map_or(0, |(_, _, bw, _)| bw + 2) as f32
+    }
+
     fn auto_resize_row_measure_width(&self, row: i32, col: i32, word_wrap: bool) -> Option<f32> {
         if !word_wrap {
             return None;
@@ -2761,12 +2772,14 @@ impl VolvoxGrid {
                 continue;
             }
             let text = self.get_display_text(row, col);
+            let mut cell_w = self.auto_resize_col_button_reserve(row, col);
             if !text.is_empty() {
                 let (font_name, font_size, bold, italic) =
                     self.resolve_text_measure_style(row, col);
                 let (w, _) = te.measure_text(&text, font_name, font_size, bold, italic, None);
-                max_w = max_w.max(w);
+                cell_w += w;
             }
+            max_w = max_w.max(cell_w);
         }
         let header_text = self.column_header_text(col);
         if !header_text.is_empty() {
@@ -2944,14 +2957,16 @@ impl VolvoxGrid {
                         continue;
                     }
                     let text = self.get_display_text(row, col);
-                    if text.is_empty() {
-                        continue;
-                    }
-                    let (font_name, font_size, bold, italic) =
-                        self.resolve_text_measure_style(row, col);
-                    let (w, _) = te.measure_text(&text, font_name, font_size, bold, italic, None);
                     let idx = col as usize;
-                    max_widths[idx] = max_widths[idx].max(w);
+                    let mut cell_w = self.auto_resize_col_button_reserve(row, col);
+                    if !text.is_empty() {
+                        let (font_name, font_size, bold, italic) =
+                            self.resolve_text_measure_style(row, col);
+                        let (w, _) =
+                            te.measure_text(&text, font_name, font_size, bold, italic, None);
+                        cell_w += w;
+                    }
+                    max_widths[idx] = max_widths[idx].max(cell_w);
                 }
             }
 
@@ -3324,6 +3339,8 @@ impl VolvoxGrid {
             }
         }
 
+        self.merged_regions.shift_rows_down(insert_at);
+
         // Set tab-delimited text across columns
         let parts: Vec<&str> = text.split('\t').collect();
         for (i, part) in parts.iter().enumerate() {
@@ -3396,6 +3413,8 @@ impl VolvoxGrid {
                 self.cell_styles.insert((r, c), style);
             }
         }
+
+        self.merged_regions.shift_rows_up(row);
 
         // Clamp frozen rows, selection
         if self.fixed_rows + self.frozen_rows > self.rows {
@@ -4891,6 +4910,42 @@ mod tests {
         grid.auto_resize_col(0);
 
         assert!(grid.get_col_width(0) > before);
+    }
+
+    #[test]
+    fn auto_resize_col_reserves_dropdown_button_width() {
+        let mut plain = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        plain.default_col_width = 10;
+        plain.auto_resize = true;
+        plain.auto_resize_col(0);
+
+        let mut dropdown = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        dropdown.default_col_width = 10;
+        dropdown.auto_resize = true;
+        dropdown.dropdown_trigger = pb::DropdownTrigger::DropdownAlways as i32;
+        dropdown.columns[0].dropdown_items = "A|B|C".to_string();
+        dropdown.auto_resize_col(0);
+
+        assert!(dropdown.get_col_width(0) > plain.get_col_width(0));
+    }
+
+    #[test]
+    fn auto_resize_all_reserves_dropdown_button_width() {
+        let mut plain = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        plain.default_col_width = 10;
+        plain.auto_resize = true;
+        plain.auto_size_mode = 1;
+        plain.auto_resize_all();
+
+        let mut dropdown = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        dropdown.default_col_width = 10;
+        dropdown.auto_resize = true;
+        dropdown.auto_size_mode = 1;
+        dropdown.dropdown_trigger = pb::DropdownTrigger::DropdownAlways as i32;
+        dropdown.columns[0].dropdown_items = "A|B|C".to_string();
+        dropdown.auto_resize_all();
+
+        assert!(dropdown.get_col_width(0) > plain.get_col_width(0));
     }
 
     #[test]

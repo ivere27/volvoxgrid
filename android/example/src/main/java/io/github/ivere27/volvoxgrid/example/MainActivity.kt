@@ -31,6 +31,9 @@ import kotlin.math.roundToInt
  * 3. Stress Test (1,000,000 rows) -- varied column types for performance
  */
 class MainActivity : AppCompatActivity() {
+    companion object {
+        private const val HIERARCHY_ACTION_COLUMN_INDEX = HierarchyJsonDemo.ACTION_COLUMN_INDEX
+    }
 
     private lateinit var gridView: VolvoxGridView
     private lateinit var tvStatus: TextView
@@ -189,6 +192,20 @@ class MainActivity : AppCompatActivity() {
         gridView.eventListener = object : VolvoxGridView.GridEventListener {
             override fun onGridEvent(event: GridEvent) {
                 when {
+                    isHierarchyActionTextClick(event) -> {
+                        val click = event.click
+                        val message =
+                            "Hierarchy action click: row ${click.row + 1}, col ${click.col}, " +
+                                "hit_area ${click.hitArea.number}, interaction ${click.interaction.number}"
+                        updateStatus(message)
+                        runOnUiThread {
+                            AlertDialog.Builder(this@MainActivity)
+                                .setTitle("Hierarchy Action")
+                                .setMessage(message)
+                                .setPositiveButton(android.R.string.ok, null)
+                                .show()
+                        }
+                    }
                     event.hasCellFocusChanging() -> {
                         val e = event.cellFocusChanging
                         updateStatus("Cell: R${e.newRow} C${e.newCol}")
@@ -633,6 +650,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateStatus(msg: String) {
         runOnUiThread { tvStatus.text = msg }
+    }
+
+    private fun isHierarchyActionTextClick(event: GridEvent): Boolean {
+        if (currentDemo != "hierarchy" || !event.hasClick()) {
+            return false
+        }
+        val click = event.click
+        return click.row >= 0 &&
+            click.col == HIERARCHY_ACTION_COLUMN_INDEX &&
+            click.hitArea == CellHitArea.HIT_TEXT &&
+            click.interaction == CellInteraction.CELL_INTERACTION_TEXT_LINK
     }
 
     private fun showGridDebugContextMenu(request: VolvoxGridView.ContextMenuRequest) {

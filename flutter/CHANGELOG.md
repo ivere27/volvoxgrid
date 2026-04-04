@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0
+
+- Added pull-to-refresh support and moved context menu handling to the app side.
+- Expanded subtotal support with `Font`, multi-total fixes, and dropdown/icon behavior fixes.
+- Improved auto-resize behavior for row numbers, last-column extension, and default sizing.
+- Fixed web and stream-dispose behavior and moved demo examples out of the core crate.
+
 ## 0.4.0
 
 - Improved rendering performance with GTK/Linux GPU surface work and CPU/GPU scroll blitting.

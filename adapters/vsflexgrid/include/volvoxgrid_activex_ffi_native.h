@@ -1157,6 +1157,7 @@ uint8_t* volvox_grid_subtotal(
     uint32_t back_color,
     uint32_t fore_color,
     int32_t add_outline,
+    const uint8_t* font, int32_t font_len,
     int32_t* out_len
 );
 

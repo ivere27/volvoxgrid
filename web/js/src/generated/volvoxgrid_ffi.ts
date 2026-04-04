@@ -757,6 +757,7 @@ export const ColumnDefFields = {
   "coercion_mode": 24,
   "error_mode": 25,
   "interaction": 26,
+  "progress_color": 27,
 } as const;
 export const CompareEventFields = {
   "row1": 1,

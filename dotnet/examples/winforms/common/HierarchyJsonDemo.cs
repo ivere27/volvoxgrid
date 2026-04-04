@@ -9,6 +9,7 @@ namespace VolvoxGrid.DotNet.Sample
     internal static class HierarchyJsonDemo
     {
         private const int HierarchyColumnCount = 6;
+        internal const int ActionColumnIndex = 5;
         private static readonly Regex LevelRegex = new Regex("\"_level\"\\s*:\\s*(-?\\d+)", RegexOptions.Compiled);
         private static readonly Regex TypeRegex = new Regex("\"Type\"\\s*:\\s*\"([^\"]+)\"", RegexOptions.Compiled);
         private static readonly Regex HelperFieldRegex = new Regex(",\\s*\"_level\"\\s*:\\s*-?\\d+", RegexOptions.Compiled);
@@ -29,11 +30,12 @@ namespace VolvoxGrid.DotNet.Sample
                 new VolvoxGridColumn { FieldName = "Size", Caption = "Size", Width = 80, Alignment = VolvoxGridAlign.RightCenter },
                 new VolvoxGridColumn { FieldName = "Modified", Caption = "Modified", Width = 120, DataType = VolvoxGridColumnDataType.Date, Format = "short date" },
                 new VolvoxGridColumn { FieldName = "Permissions", Caption = "Permissions", Width = 100, Alignment = VolvoxGridAlign.CenterCenter },
-                new VolvoxGridColumn { FieldName = "Action", Caption = "Action", Width = 92, Alignment = VolvoxGridAlign.CenterCenter },
+                new VolvoxGridColumn { FieldName = "Action", Caption = "Action", Width = 92, Alignment = VolvoxGridAlign.CenterCenter, Interaction = VolvoxGridCellInteraction.TextLink },
             });
             grid.LoadData(Encoding.UTF8.GetBytes(HelperFieldRegex.Replace(rawJson, string.Empty)));
             grid.SelectionMode = VolvoxGridSelectionMode.Free;
             grid.HoverEnabled = true;
+            grid.ResizePolicy = new VolvoxGridResizePolicy { Columns = true, Rows = true, Uniform = false };
             grid.HeaderFeatures = new VolvoxGridHeaderFeatures { Sort = false, Reorder = false, Chooser = false };
             grid.ShowColumnHeaders = true;
             grid.ColumnIndicatorTopRowCount = 1;

@@ -36,6 +36,12 @@ import 'src/generated/volvoxgrid.pb.dart' as pb;
 export 'volvoxgrid_controller.dart';
 export 'volvoxgrid_ffi.dart';
 
+void _debugLog(String Function() messageBuilder) {
+  if (kDebugMode) {
+    debugPrint(messageBuilder());
+  }
+}
+
 class VolvoxGridBeforeEditDetails {
   final pb.GridEvent rawEvent;
   final int row;
@@ -508,6 +514,11 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   void didUpdateWidget(covariant VolvoxGridWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
+      _debugLog(
+        () =>
+            'VolvoxGrid controller swap: oldGrid=${oldWidget.controller.gridId} '
+            'newGrid=${widget.controller.gridId}',
+      );
       _closeRenderSession(controller: oldWidget.controller);
       oldWidget.controller.removeListener(_onControllerChanged);
       widget.controller.addListener(_onControllerChanged);
@@ -577,6 +588,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   void _ensureRenderSession() {
     if (_inputController != null) return;
     if (!widget.controller.isCreated) return;
+    _debugLog(
+      () => 'VolvoxGrid render session open: grid=${widget.controller.gridId} '
+          'gpuTextureId=${widget.controller.gpuTextureId}',
+    );
     unawaited(
       _setFlingEnabledBestEffort(
           widget.controller, _isMobilePlatform || _flingOverrideEnabled),
@@ -591,9 +606,19 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     _outputSubscription = outputStream.listen(
       _handleRenderOutput,
       onError: (Object e) {
-        debugPrint('VolvoxGrid render session error: $e');
+        _debugLog(
+          () =>
+              'VolvoxGrid render session error: grid=${widget.controller.gridId} '
+              '$e',
+        );
+        _resetRenderFlowState();
       },
       onDone: () {
+        _debugLog(
+          () =>
+              'VolvoxGrid render session done: grid=${widget.controller.gridId}',
+        );
+        _resetRenderFlowState();
         _inputController = null;
         _outputSubscription = null;
       },
@@ -612,6 +637,12 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   }
 
   void _closeRenderSession({VolvoxGridController? controller}) {
+    if (_outputSubscription != null || _inputController != null) {
+      _debugLog(
+        () => 'VolvoxGrid render session close: '
+            'grid=${controller?.gridId ?? widget.controller.gridId}',
+      );
+    }
     if (controller != null) {
       unawaited(_setFlingEnabledBestEffort(controller, false));
     }
@@ -619,6 +650,26 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     _outputSubscription = null;
     _inputController?.close();
     _inputController = null;
+    _resetRenderFlowState();
+    _pendingViewportWidth = 0;
+    _pendingViewportHeight = 0;
+    _pendingViewportDpr = 1.0;
+    _viewportDispatchScheduled = false;
+    _stagedBufferWidth = 0;
+    _stagedBufferHeight = 0;
+    _decisionChannelEnabled = false;
+    _imeProxyRevealTimer?.cancel();
+    _imeProxyRevealTimer = null;
+    _deferredEditRequest = null;
+    _deferOverlayWhileImeProxyActive = false;
+    _imeProxySessionActive = false;
+    _editOverlayPendingReveal = false;
+    _imeProxyCommittedText = '';
+    _suppressedPlainProxyText = null;
+    _suppressImeProxyChanges = false;
+  }
+
+  void _resetRenderFlowState() {
     _pendingFrame = false;
     _needsFollowupRender = false;
     _decodeInFlight = false;
@@ -643,22 +694,6 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     _gesturePreviewPan = Offset.zero;
     _gesturePreviewFocal = Offset.zero;
     _clearGesturePreviewOnNextFrame = false;
-    _pendingViewportWidth = 0;
-    _pendingViewportHeight = 0;
-    _pendingViewportDpr = 1.0;
-    _viewportDispatchScheduled = false;
-    _stagedBufferWidth = 0;
-    _stagedBufferHeight = 0;
-    _decisionChannelEnabled = false;
-    _imeProxyRevealTimer?.cancel();
-    _imeProxyRevealTimer = null;
-    _deferredEditRequest = null;
-    _deferOverlayWhileImeProxyActive = false;
-    _imeProxySessionActive = false;
-    _editOverlayPendingReveal = false;
-    _imeProxyCommittedText = '';
-    _suppressedPlainProxyText = null;
-    _suppressImeProxyChanges = false;
   }
 
   Future<void> _setFlingEnabledBestEffort(
@@ -719,12 +754,22 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     if (_eventSubscription != null) {
       return;
     }
+    _debugLog(
+      () => 'VolvoxGrid event stream open: grid=${widget.controller.gridId}',
+    );
     _eventSubscription = widget.controller.eventStream().listen(
       _handleGridEvent,
       onError: (Object e) {
-        debugPrint('VolvoxGrid event stream error: $e');
+        _debugLog(
+          () =>
+              'VolvoxGrid event stream error: grid=${widget.controller.gridId} $e',
+        );
       },
       onDone: () {
+        _debugLog(
+          () =>
+              'VolvoxGrid event stream done: grid=${widget.controller.gridId}',
+        );
         _eventSubscription = null;
         _decisionChannelEnabled = false;
       },
@@ -732,6 +777,11 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   }
 
   void _closeEventStream() {
+    if (_eventSubscription != null) {
+      _debugLog(
+        () => 'VolvoxGrid event stream close: grid=${widget.controller.gridId}',
+      );
+    }
     _eventSubscription?.cancel();
     _eventSubscription = null;
     _decisionChannelEnabled = false;
@@ -1418,13 +1468,34 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       final cols = await widget.controller.colCount();
       final maxRows = math.max(0, math.min(rows, 200));
       final maxCols = math.max(0, math.min(cols, 16));
-      final snapshot = <List<String>>[];
+      if (maxRows == 0 || maxCols == 0) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _fallbackCells = const <List<String>>[];
+          _fallbackError = null;
+        });
+        return;
+      }
 
+      final resp =
+          await widget.controller.getCellsRange(0, 0, maxRows - 1, maxCols - 1);
+      final snapshot = <List<String>>[];
       for (var r = 0; r < maxRows; r++) {
-        final rowValues = await Future.wait(
-          List.generate(maxCols, (c) => widget.controller.getCellText(r, c)),
-        );
-        snapshot.add(rowValues);
+        snapshot.add(List<String>.filled(maxCols, ''));
+      }
+
+      for (final cell in resp.cells) {
+        if (cell.row < 0 ||
+            cell.row >= maxRows ||
+            cell.col < 0 ||
+            cell.col >= maxCols ||
+            !cell.hasValue() ||
+            !cell.value.hasText()) {
+          continue;
+        }
+        snapshot[cell.row][cell.col] = cell.value.text;
       }
 
       if (!mounted) {

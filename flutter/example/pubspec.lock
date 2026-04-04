@@ -244,10 +244,10 @@ packages:
     dependency: transitive
     description:
       name: synurang
-      sha256: a64cd94382f04f74479658dc1909f55e4f4010ff921449b2f1fc1ad16348942e
+      sha256: "4bc3135b3109a0682ee33bba3d530ca0246cdebed71df6d5b972952839bb4093"
       url: "https://pub.dev"
     source: hosted
-    version: "0.5.4"
+    version: "0.5.10"
   term_glyph:
     dependency: transitive
     description:
@@ -294,7 +294,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.4.0"
+    version: "0.5.0"
   web:
     dependency: transitive
     description:

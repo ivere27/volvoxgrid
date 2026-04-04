@@ -1,16 +1,17 @@
 #!/bin/bash
-# build_dotnet.sh — Build VolvoxGrid .NET wrapper + sample artifacts for Wine/Windows.
+# build_dotnet.sh — Build VolvoxGrid .NET samples for WinForms/Wine or native .NET 8.
 #
 # Usage:
 #   ./dotnet/build_dotnet.sh [release]
 #
 # Environment:
-#   DOTNET_TFM=net40|net8.0-windows   (default: net40)
-#   DOTNET_ARCH=x64|x86               (default: x64)
+#   DOTNET_TFM=net40|net8.0|net8.0-windows   (default: net40)
+#   DOTNET_ARCH=x64|x86                      (default: x64, WinForms builds only)
 #
 # Produces:
 #   target/<windows-target-triple>/{debug|release}/volvoxgrid_plugin.dll
-#   target/dotnet/winforms_{debug|release}[/_<tfm>]/*
+#   target/{debug|release}/libvolvoxgrid_plugin.{so|dylib}
+#   target/dotnet/{winforms|console}_{debug|release}[_<tfm>]/*
 
 set -euo pipefail
 
@@ -21,12 +22,14 @@ PROFILE="debug"
 DOTNET_CFG="Debug"
 CARGO_FLAGS=""
 TARGET_DIR="debug"
-DOTNET_TFM="${DOTNET_TFM:-net40}"
-DOTNET_ARCH="${DOTNET_ARCH:-x64}"
+TARGET_TFM="${DOTNET_TFM:-net40}"
+TARGET_ARCH="${DOTNET_ARCH:-x64}"
+unset DOTNET_TFM DOTNET_ARCH
 PLUGIN_FEATURES="${VOLVOXGRID_DOTNET_PLUGIN_FEATURES:-gpu}"
 PLUGIN_FEATURE_ARGS=()
 RUST_WINDOWS_TARGET=""
 DOTNET_PLATFORM_TARGET=""
+MSBUILD_ARCH_ROOT="default"
 
 normalize_tfm_for_path() {
     local tfm="$1"
@@ -37,6 +40,67 @@ normalize_tfm_for_path() {
 
 normalize_arch() {
     printf '%s\n' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+sample_kind_for_tfm() {
+    local tfm="$1"
+    if [ "$tfm" = "net40" ] || [[ "$tfm" == *"-windows"* ]]; then
+        printf 'winforms\n'
+    else
+        printf 'console\n'
+    fi
+}
+
+sample_project_for_kind() {
+    local kind="$1"
+    case "$kind" in
+        winforms)
+            printf '%s\n' "$ROOT_DIR/dotnet/examples/winforms/VolvoxGrid.WinFormsSample.csproj"
+            ;;
+        console)
+            printf '%s\n' "$ROOT_DIR/dotnet/examples/console/VolvoxGrid.ConsoleSample.csproj"
+            ;;
+        *)
+            echo "ERROR: unknown sample kind '$kind'" >&2
+            exit 1
+            ;;
+    esac
+}
+
+sample_basename_for_kind() {
+    local kind="$1"
+    case "$kind" in
+        winforms)
+            printf 'VolvoxGrid.WinFormsSample\n'
+            ;;
+        console)
+            printf 'VolvoxGrid.ConsoleSample\n'
+            ;;
+        *)
+            echo "ERROR: unknown sample kind '$kind'" >&2
+            exit 1
+            ;;
+    esac
+}
+
+native_plugin_basename() {
+    local tfm="$1"
+    if [ "$tfm" = "net40" ] || [[ "$tfm" == *"-windows"* ]]; then
+        printf 'volvoxgrid_plugin.dll\n'
+        return
+    fi
+
+    case "$(uname -s 2>/dev/null || echo unknown)" in
+        Darwin)
+            printf 'libvolvoxgrid_plugin.dylib\n'
+            ;;
+        MINGW*|MSYS*|CYGWIN*)
+            printf 'volvoxgrid_plugin.dll\n'
+            ;;
+        *)
+            printf 'libvolvoxgrid_plugin.so\n'
+            ;;
+    esac
 }
 
 has_windowsdesktop_sdk() {
@@ -54,7 +118,7 @@ has_windowsdesktop_sdk() {
 }
 
 restore_sample_project() {
-    if [ "$DOTNET_TFM" = "net40" ]; then
+    if [ "$TARGET_TFM" = "net40" ]; then
         OFFLINE_NUPKG="${HOME:-}/.nuget/packages/microsoft.netframework.referenceassemblies.net40/1.0.3/microsoft.netframework.referenceassemblies.net40.1.0.3.nupkg"
         if [ -f "$OFFLINE_NUPKG" ]; then
             OFFLINE_FEED="$ROOT_DIR/target/dotnet/nuget-offline"
@@ -82,16 +146,28 @@ resolve_stage_dir() {
     local profile="$1"
     local tfm="$2"
     local arch="$3"
+    local sample_kind="$4"
     local base=""
-    if [ "$tfm" = "net40" ]; then
-        base="$ROOT_DIR/target/dotnet/winforms_${profile}"
-    else
-        base="$ROOT_DIR/target/dotnet/winforms_${profile}_$(normalize_tfm_for_path "$tfm")"
-    fi
 
-    if [ "$arch" != "x64" ]; then
-        base="${base}_${arch}"
-    fi
+    case "$sample_kind" in
+        winforms)
+            if [ "$tfm" = "net40" ]; then
+                base="$ROOT_DIR/target/dotnet/winforms_${profile}"
+            else
+                base="$ROOT_DIR/target/dotnet/winforms_${profile}_$(normalize_tfm_for_path "$tfm")"
+            fi
+            if [ "$arch" != "x64" ]; then
+                base="${base}_${arch}"
+            fi
+            ;;
+        console)
+            base="$ROOT_DIR/target/dotnet/console_${profile}_$(normalize_tfm_for_path "$tfm")"
+            ;;
+        *)
+            echo "ERROR: unknown sample kind '$sample_kind'" >&2
+            exit 1
+            ;;
+    esac
 
     printf '%s\n' "$base"
 }
@@ -109,61 +185,102 @@ if [ -n "$PLUGIN_FEATURES" ]; then
     PLUGIN_FEATURE_ARGS=(--features "$PLUGIN_FEATURES")
 fi
 
-DOTNET_ARCH="$(normalize_arch "$DOTNET_ARCH")"
-case "$DOTNET_ARCH" in
+TARGET_ARCH="$(normalize_arch "$TARGET_ARCH")"
+case "$TARGET_ARCH" in
     x64|amd64)
-        DOTNET_ARCH="x64"
-        DOTNET_PLATFORM_TARGET="x64"
+        TARGET_ARCH="x64"
         RUST_WINDOWS_TARGET="x86_64-pc-windows-gnu"
         ;;
     x86|i386|i686)
-        DOTNET_ARCH="x86"
-        DOTNET_PLATFORM_TARGET="x86"
+        TARGET_ARCH="x86"
         RUST_WINDOWS_TARGET="i686-pc-windows-gnu"
         ;;
     *)
-        echo "ERROR: unsupported DOTNET_ARCH='$DOTNET_ARCH'. Use x64 or x86." >&2
+        echo "ERROR: unsupported DOTNET_ARCH='$TARGET_ARCH'. Use x64 or x86." >&2
         exit 1
         ;;
 esac
 
-for arg in "$@"; do
-    case "$arg" in
+while [ "$#" -gt 0 ]; do
+    case "$1" in
         release|--release)
             PROFILE="release"
             DOTNET_CFG="Release"
             CARGO_FLAGS="--release"
             TARGET_DIR="release"
+            shift
+            ;;
+        --tfm)
+            TARGET_TFM="${2:-}"
+            if [ -z "$TARGET_TFM" ]; then
+                echo "ERROR: --tfm requires a value." >&2
+                exit 1
+            fi
+            shift 2
+            ;;
+        --arch)
+            TARGET_ARCH="${2:-}"
+            if [ -z "$TARGET_ARCH" ]; then
+                echo "ERROR: --arch requires a value." >&2
+                exit 1
+            fi
+            shift 2
+            ;;
+        *)
+            echo "ERROR: unknown argument '$1'." >&2
+            exit 1
             ;;
     esac
 done
 
-echo "=== VolvoxGrid .NET Build (${PROFILE}, ${DOTNET_TFM}, ${DOTNET_ARCH}) ==="
+SAMPLE_KIND="$(sample_kind_for_tfm "$TARGET_TFM")"
+SAMPLE_PROJECT="$(sample_project_for_kind "$SAMPLE_KIND")"
+SAMPLE_BASENAME="$(sample_basename_for_kind "$SAMPLE_KIND")"
+PLUGIN_BASENAME="$(native_plugin_basename "$TARGET_TFM")"
 
-echo "[plugin] cargo build --target ${RUST_WINDOWS_TARGET} ${CARGO_FLAGS} ${PLUGIN_FEATURE_ARGS[*]}"
-cargo build --manifest-path "$ROOT_DIR/plugin/Cargo.toml" --target "$RUST_WINDOWS_TARGET" -p volvoxgrid-plugin $CARGO_FLAGS "${PLUGIN_FEATURE_ARGS[@]}"
+if [ "$SAMPLE_KIND" = "winforms" ]; then
+    DOTNET_PLATFORM_TARGET="$TARGET_ARCH"
+    MSBUILD_ARCH_ROOT="$TARGET_ARCH"
+fi
 
-SAMPLE_PROJECT="$ROOT_DIR/dotnet/examples/winforms/VolvoxGrid.WinFormsSample.csproj"
-DOTNET_PROPS=(
-    -p:PlatformTarget="$DOTNET_PLATFORM_TARGET"
-    -p:EnableWindowsTargeting=true
-    -p:TargetFramework="$DOTNET_TFM"
-)
+echo "=== VolvoxGrid .NET Build (${PROFILE}, ${TARGET_TFM}, ${TARGET_ARCH}, ${SAMPLE_KIND}) ==="
 
-if [ "$DOTNET_TFM" = "net40" ]; then
+if [ "$SAMPLE_KIND" = "winforms" ]; then
+    echo "[plugin] cargo build --target ${RUST_WINDOWS_TARGET} ${CARGO_FLAGS} ${PLUGIN_FEATURE_ARGS[*]}"
+    cargo build --manifest-path "$ROOT_DIR/plugin/Cargo.toml" --target "$RUST_WINDOWS_TARGET" -p volvoxgrid-plugin $CARGO_FLAGS "${PLUGIN_FEATURE_ARGS[@]}"
+    PLUGIN_ARTIFACT="$ROOT_DIR/target/${RUST_WINDOWS_TARGET}/${TARGET_DIR}/volvoxgrid_plugin.dll"
+else
+    echo "[plugin] cargo build ${CARGO_FLAGS} ${PLUGIN_FEATURE_ARGS[*]}"
+    cargo build --manifest-path "$ROOT_DIR/plugin/Cargo.toml" -p volvoxgrid-plugin $CARGO_FLAGS "${PLUGIN_FEATURE_ARGS[@]}"
+    PLUGIN_ARTIFACT="$ROOT_DIR/target/${TARGET_DIR}/${PLUGIN_BASENAME}"
+fi
+
+DOTNET_PROPS=()
+
+if [ -n "$DOTNET_PLATFORM_TARGET" ]; then
+    DOTNET_PROPS+=(-p:PlatformTarget="$DOTNET_PLATFORM_TARGET")
+fi
+
+if [[ "$TARGET_TFM" == *"-windows"* ]]; then
+    DOTNET_PROPS+=(-p:IncludeWindowsDesktopTarget=true)
+    DOTNET_PROPS+=(-p:EnableWindowsTargeting=true)
+fi
+
+if [ "$TARGET_TFM" = "net40" ]; then
     DOTNET_PROPS+=(-p:VolvoxGridLegacyOnly=true)
 fi
 
-if [[ "$DOTNET_TFM" == *"-windows"* ]] && ! has_windowsdesktop_sdk; then
-    echo "ERROR: DOTNET_TFM=$DOTNET_TFM requires Microsoft.NET.Sdk.WindowsDesktop, but it is not installed in this dotnet SDK." >&2
+if [[ "$TARGET_TFM" == *"-windows"* ]] && ! has_windowsdesktop_sdk; then
+    echo "ERROR: DOTNET_TFM=$TARGET_TFM requires Microsoft.NET.Sdk.WindowsDesktop, but it is not installed in this dotnet SDK." >&2
     echo "This is expected on most Linux dotnet installations." >&2
     echo "Use one of these paths:" >&2
     echo "  1) Build/run net40 on Linux: make dotnet-run-release" >&2
-    echo "  2) Build/run $DOTNET_TFM on Windows with .NET 8 SDK (Windows Desktop support)." >&2
+    echo "  2) Build/run net8.0 on Linux: make dotnet-run-release DOTNET_TFM=net8.0" >&2
+    echo "  3) Build/run $TARGET_TFM on Windows with .NET 8 SDK (Windows Desktop support)." >&2
     exit 1
 fi
 
-if [ "$DOTNET_TFM" = "net40" ]; then
+if [ "$TARGET_TFM" = "net40" ]; then
     NET40_REF_MSCORLIB="${HOME:-}/.nuget/packages/microsoft.netframework.referenceassemblies.net40/1.0.3/build/.NETFramework/v4.0/mscorlib.dll"
     if [ ! -f "$NET40_REF_MSCORLIB" ]; then
         echo "[dotnet] net40 reference assemblies not found in NuGet cache; restoring first"
@@ -171,20 +288,19 @@ if [ "$DOTNET_TFM" = "net40" ]; then
     fi
 fi
 
-echo "[dotnet] build sample (${DOTNET_CFG}, ${DOTNET_TFM}, ${DOTNET_PLATFORM_TARGET}, --no-restore)"
-if ! dotnet build "$SAMPLE_PROJECT" -c "$DOTNET_CFG" -f "$DOTNET_TFM" "${DOTNET_PROPS[@]}" --no-restore; then
+echo "[dotnet] build sample (${DOTNET_CFG}, ${TARGET_TFM}, ${DOTNET_PLATFORM_TARGET:-default}, --no-restore)"
+if ! dotnet build "$SAMPLE_PROJECT" -c "$DOTNET_CFG" -f "$TARGET_TFM" "${DOTNET_PROPS[@]}" --no-restore; then
     echo "[dotnet] no-restore build failed; attempting restore + rebuild"
     restore_sample_project
-    dotnet build "$SAMPLE_PROJECT" -c "$DOTNET_CFG" -f "$DOTNET_TFM" "${DOTNET_PROPS[@]}" --no-restore
+    dotnet build "$SAMPLE_PROJECT" -c "$DOTNET_CFG" -f "$TARGET_TFM" "${DOTNET_PROPS[@]}" --no-restore
 fi
 
-PLUGIN_DLL="$ROOT_DIR/target/${RUST_WINDOWS_TARGET}/${TARGET_DIR}/volvoxgrid_plugin.dll"
-MSBUILD_BIN_ROOT="$ROOT_DIR/target/dotnet/msbuild/bin/${DOTNET_ARCH}"
-MSBUILD_OBJ_ROOT="$ROOT_DIR/target/dotnet/msbuild/obj/${DOTNET_ARCH}"
-SAMPLE_DIR="$MSBUILD_BIN_ROOT/VolvoxGrid.WinFormsSample/${DOTNET_CFG}/${DOTNET_TFM}"
-SAMPLE_OBJ_DIR="$MSBUILD_OBJ_ROOT/VolvoxGrid.WinFormsSample/${DOTNET_CFG}/${DOTNET_TFM}"
-WRAPPER_OBJ_DIR="$MSBUILD_OBJ_ROOT/VolvoxGrid.DotNet/${DOTNET_CFG}/${DOTNET_TFM}"
-STAGE_DIR="$(resolve_stage_dir "$PROFILE" "$DOTNET_TFM" "$DOTNET_ARCH")"
+MSBUILD_BIN_ROOT="$ROOT_DIR/target/dotnet/msbuild/bin/${MSBUILD_ARCH_ROOT}"
+MSBUILD_OBJ_ROOT="$ROOT_DIR/target/dotnet/msbuild/obj/${MSBUILD_ARCH_ROOT}"
+SAMPLE_DIR="$MSBUILD_BIN_ROOT/${SAMPLE_BASENAME}/${DOTNET_CFG}/${TARGET_TFM}"
+SAMPLE_OBJ_DIR="$MSBUILD_OBJ_ROOT/${SAMPLE_BASENAME}/${DOTNET_CFG}/${TARGET_TFM}"
+WRAPPER_OBJ_DIR="$MSBUILD_OBJ_ROOT/VolvoxGrid.DotNet/${DOTNET_CFG}/${TARGET_TFM}"
+STAGE_DIR="$(resolve_stage_dir "$PROFILE" "$TARGET_TFM" "$TARGET_ARCH" "$SAMPLE_KIND")"
 
 if [ ! -d "$SAMPLE_DIR" ]; then
     echo "ERROR: sample output directory not found: $SAMPLE_DIR" >&2
@@ -192,35 +308,29 @@ if [ ! -d "$SAMPLE_DIR" ]; then
 fi
 
 mkdir -p "$STAGE_DIR"
-rm -f "$STAGE_DIR/VolvoxGrid.Common.dll"
 
-if [ ! -f "$PLUGIN_DLL" ]; then
-    echo "ERROR: missing build artifact: $PLUGIN_DLL" >&2
+if [ ! -f "$PLUGIN_ARTIFACT" ]; then
+    echo "ERROR: missing build artifact: $PLUGIN_ARTIFACT" >&2
     exit 1
 fi
-cp -f "$PLUGIN_DLL" "$STAGE_DIR/volvoxgrid_plugin.dll"
 
-if [ "$DOTNET_TFM" = "net40" ]; then
+cp -f "$PLUGIN_ARTIFACT" "$STAGE_DIR/$PLUGIN_BASENAME"
+
+if [ "$TARGET_TFM" = "net40" ]; then
     # net40 authoritative compile outputs are under obj/, while bin/ may keep stale arch copies.
-    copy_required_artifact "$SAMPLE_OBJ_DIR/VolvoxGrid.WinFormsSample.exe"
-    copy_required_artifact "$SAMPLE_DIR/VolvoxGrid.WinFormsSample.exe.config"
+    copy_required_artifact "$SAMPLE_OBJ_DIR/${SAMPLE_BASENAME}.exe"
+    copy_required_artifact "$SAMPLE_DIR/${SAMPLE_BASENAME}.exe.config"
     copy_required_artifact "$WRAPPER_OBJ_DIR/VolvoxGrid.DotNet.dll"
-    SAMPLE_ENTRY="$SAMPLE_OBJ_DIR/VolvoxGrid.WinFormsSample.exe"
+    SAMPLE_ENTRY="$SAMPLE_OBJ_DIR/${SAMPLE_BASENAME}.exe"
 else
-    copy_required_artifact "$SAMPLE_DIR/VolvoxGrid.WinFormsSample.dll"
-    copy_required_artifact "$SAMPLE_DIR/VolvoxGrid.WinFormsSample.deps.json"
-    copy_required_artifact "$SAMPLE_DIR/VolvoxGrid.WinFormsSample.runtimeconfig.json"
-    copy_required_artifact "$SAMPLE_DIR/VolvoxGrid.DotNet.dll"
-    if [ -f "$SAMPLE_DIR/VolvoxGrid.WinFormsSample.exe" ]; then
-        cp -f "$SAMPLE_DIR/VolvoxGrid.WinFormsSample.exe" "$STAGE_DIR/VolvoxGrid.WinFormsSample.exe"
-    fi
-    SAMPLE_ENTRY="$SAMPLE_DIR/VolvoxGrid.WinFormsSample.dll"
+    find "$SAMPLE_DIR" -maxdepth 1 -type f -exec cp -f {} "$STAGE_DIR/" \;
+    SAMPLE_ENTRY="$SAMPLE_DIR/${SAMPLE_BASENAME}.dll"
 fi
 
 echo ""
 echo "=== Build Complete ==="
-echo "TFM:    $DOTNET_TFM"
-echo "Arch:   $DOTNET_ARCH"
-echo "Plugin: $PLUGIN_DLL"
+echo "TFM:    $TARGET_TFM"
+echo "Arch:   ${DOTNET_PLATFORM_TARGET:-default}"
+echo "Plugin: $PLUGIN_ARTIFACT"
 echo "Sample: $SAMPLE_ENTRY"
 echo "Stage:  $STAGE_DIR"

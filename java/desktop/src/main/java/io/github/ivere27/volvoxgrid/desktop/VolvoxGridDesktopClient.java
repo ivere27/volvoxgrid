@@ -58,6 +58,7 @@ import io.github.ivere27.volvoxgrid.SetRowRequest;
 import io.github.ivere27.volvoxgrid.ShowCellRequest;
 import io.github.ivere27.volvoxgrid.SortRequest;
 import io.github.ivere27.volvoxgrid.SubtotalRequest;
+import io.github.ivere27.volvoxgrid.SubtotalResult;
 import io.github.ivere27.volvoxgrid.UpdateCellsRequest;
 import io.github.ivere27.volvoxgrid.WriteResult;
 import java.util.Objects;

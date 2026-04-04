@@ -257,57 +257,19 @@ fn apply_local_demo_scrollbar_style(
 }
 
 #[cfg(feature = "demo")]
-fn parse_sales_bool_text(raw: &str) -> Option<bool> {
-    match raw.trim().to_ascii_lowercase().as_str() {
-        "true" | "1" | "yes" | "y" | "on" => Some(true),
-        "false" | "0" | "no" | "n" | "off" => Some(false),
-        _ => None,
-    }
-}
-
-#[cfg(feature = "demo")]
-fn set_local_sales_flag_cell(
-    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    flagged: bool,
-) {
-    grid.cells
-        .set_text(row, 7, if flagged { "Yes" } else { "No" }.to_string());
-    let cell = grid.cells.get_mut(row, 7);
-    let extra = cell.extra_mut();
-    extra.value = CellValueData::Bool(flagged);
-    extra.checked = if flagged {
-        CheckedState::CheckedChecked as i32
-    } else {
-        CheckedState::CheckedUnchecked as i32
-    };
-}
-
-#[cfg(feature = "demo")]
-fn local_sales_flag_value(grid: &volvoxgrid_engine::grid::VolvoxGrid, row: i32) -> bool {
-    grid.cells
-        .get(row, 7)
-        .and_then(|cell| {
-            cell.extra.as_ref().and_then(|extra| match &extra.value {
-                CellValueData::Bool(value) => Some(*value),
-                _ => None,
-            })
-        })
-        .or_else(|| parse_sales_bool_text(grid.cells.get_text(row, 7)))
-        .unwrap_or(false)
-}
-
-#[cfg(feature = "demo")]
-fn apply_local_sales_subtotal_merges(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
+fn apply_local_sales_subtotal_merges(grid: &mut volvoxgrid_engine::grid::VolvoxGrid, rows: &[i32]) {
     if grid.cols < 2 {
         return;
     }
 
-    for row in grid.fixed_rows..grid.rows {
+    let mut unique_rows = rows.to_vec();
+    unique_rows.sort_unstable();
+    unique_rows.dedup();
+    for row in unique_rows {
         let Some(props) = grid.row_props.get(&row) else {
             continue;
         };
-        if props.is_subtotal && props.outline_level <= 0 {
+        if props.outline_level <= 0 {
             grid.merge_cells(row, 0, row, 1);
         }
     }
@@ -428,6 +390,7 @@ fn apply_local_sales_demo_chrome(grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
 
     grid.columns[6].progress_color = 0xFF818CF8;
     grid.allow_user_resizing = 3;
+    grid.extend_last_col = true;
     grid.tab_behavior = 1;
     grid.edit_trigger_mode = 0;
     grid.dropdown_trigger = 1;
@@ -459,72 +422,35 @@ fn apply_local_sales_demo_chrome(grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
 
 #[cfg(feature = "demo")]
 fn apply_local_sales_demo_subtotals(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
-    for row in grid.fixed_rows..grid.rows {
-        let flagged = local_sales_flag_value(grid, row);
-        set_local_sales_flag_cell(grid, row, flagged);
-    }
-
     grid.outline.group_total_position = 1;
     grid.outline.multi_totals = true;
     volvoxgrid_engine::outline::subtotal(grid, 1, 0, 0, "", 0, 0, false);
 
-    volvoxgrid_engine::outline::subtotal(
-        grid,
-        2,
-        -1,
-        4,
-        "Grand Total",
-        0xFFEEF2FF,
-        0xFF111827,
-        true,
+    let rows = volvoxgrid_engine::outline::subtotal(
+        grid, 2, -1, 4, "Grand Total", 0xFFEEF2FF, 0xFF111827, true,
     );
-    volvoxgrid_engine::outline::subtotal_ex(
+    apply_local_sales_subtotal_merges(grid, &rows);
+    let rows = volvoxgrid_engine::outline::subtotal_ex(
         grid, 2, 0, 4, "", 0xFFF5F3FF, 0xFF111827, true, "", false, 1, false,
     );
-    volvoxgrid_engine::outline::subtotal_ex(
+    apply_local_sales_subtotal_merges(grid, &rows);
+    let rows = volvoxgrid_engine::outline::subtotal_ex(
         grid, 2, 1, 4, "", 0xFFF8F7FF, 0xFF111827, true, "", false, 1, false,
     );
+    apply_local_sales_subtotal_merges(grid, &rows);
 
-    volvoxgrid_engine::outline::subtotal(
-        grid,
-        2,
-        -1,
-        5,
-        "Grand Total",
-        0xFFEEF2FF,
-        0xFF111827,
-        true,
+    let rows = volvoxgrid_engine::outline::subtotal(
+        grid, 2, -1, 5, "Grand Total", 0xFFEEF2FF, 0xFF111827, true,
     );
-    volvoxgrid_engine::outline::subtotal_ex(
+    apply_local_sales_subtotal_merges(grid, &rows);
+    let rows = volvoxgrid_engine::outline::subtotal_ex(
         grid, 2, 0, 5, "", 0xFFF5F3FF, 0xFF111827, true, "", false, 1, false,
     );
-    volvoxgrid_engine::outline::subtotal_ex(
+    apply_local_sales_subtotal_merges(grid, &rows);
+    let rows = volvoxgrid_engine::outline::subtotal_ex(
         grid, 2, 1, 5, "", 0xFFF8F7FF, 0xFF111827, true, "", false, 1, false,
     );
-
-    let parse_i64 = |text: &str| -> i64 { text.parse::<i64>().unwrap_or(0) };
-    for row in grid.fixed_rows..grid.rows {
-        let Some(props) = grid.row_props.get(&row) else {
-            continue;
-        };
-        if !props.is_subtotal {
-            continue;
-        }
-
-        let cell = grid.cells.get_mut(row, 7);
-        let extra = cell.extra_mut();
-        extra.value = CellValueData::Bool(false);
-        extra.checked = CheckedState::CheckedGrayed as i32;
-
-        let sales_sum = parse_i64(grid.cells.get_text(row, 4));
-        let cost_sum = parse_i64(grid.cells.get_text(row, 5));
-        let margin = if sales_sum > 0 {
-            ((sales_sum - cost_sum) as f64 / sales_sum as f64) * 100.0
-        } else {
-            0.0
-        };
-        grid.cells.set_text(row, 6, format!("{margin:.1}"));
-    }
+    apply_local_sales_subtotal_merges(grid, &rows);
 
     grid.span.mode = CellSpanMode::CellSpanByRow as i32;
     grid.span.mode_fixed = 0;
@@ -532,7 +458,6 @@ fn apply_local_sales_demo_subtotals(grid: &mut volvoxgrid_engine::grid::VolvoxGr
     grid.span.span_cols.insert(0, true);
     grid.span.span_cols.insert(1, true);
     grid.span.span_compare = 1;
-    apply_local_sales_subtotal_merges(grid);
 
     grid.outline.tree_indicator = 0;
     grid.outline.group_total_position = 1;
@@ -6075,6 +6000,7 @@ type VvMeasureTextFn = unsafe extern "C" fn(
 /// Parameters:
 ///   buffer/buf_width/buf_height/stride — target RGBA pixel buffer
 ///   x, y                    — draw position
+///   clip_x, clip_y          — absolute clip origin
 ///   clip_w, clip_h          — clip rectangle size
 ///   text_ptr/text_len       — UTF-8 text bytes
 ///   font_name_ptr/font_name_len — UTF-8 font family name
@@ -6090,6 +6016,8 @@ type VvRenderTextFn = unsafe extern "C" fn(
     stride: i32,
     x: i32,
     y: i32,
+    clip_x: i32,
+    clip_y: i32,
     clip_w: i32,
     clip_h: i32,
     text_ptr: *const u8,
@@ -6153,8 +6081,8 @@ impl volvoxgrid_engine::text::TextRenderer for FfiTextRenderer {
         stride: i32,
         x: i32,
         y: i32,
-        _clip_x: i32,
-        _clip_y: i32,
+        clip_x: i32,
+        clip_y: i32,
         clip_w: i32,
         clip_h: i32,
         text: &str,
@@ -6174,6 +6102,8 @@ impl volvoxgrid_engine::text::TextRenderer for FfiTextRenderer {
                 stride,
                 x,
                 y,
+                clip_x,
+                clip_y,
                 clip_w,
                 clip_h,
                 text.as_ptr(),
@@ -6254,4 +6184,121 @@ pub extern "C" fn volvox_grid_set_text_renderer(
         }
     });
     0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+    use volvoxgrid_engine::text::TextRenderer;
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    struct RecordedRenderArgs {
+        x: i32,
+        y: i32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+    }
+
+    static LAST_RENDER_ARGS: Mutex<Option<RecordedRenderArgs>> = Mutex::new(None);
+
+    unsafe extern "C" fn test_measure_text(
+        _text_ptr: *const u8,
+        _text_len: i32,
+        _font_name_ptr: *const u8,
+        _font_name_len: i32,
+        _font_size: f32,
+        _bold: i32,
+        _italic: i32,
+        _max_width: f32,
+        out_width: *mut f32,
+        out_height: *mut f32,
+        _user_data: *mut std::ffi::c_void,
+    ) {
+        if !out_width.is_null() {
+            *out_width = 0.0;
+        }
+        if !out_height.is_null() {
+            *out_height = 0.0;
+        }
+    }
+
+    unsafe extern "C" fn test_render_text(
+        _buffer: *mut u8,
+        _buf_width: i32,
+        _buf_height: i32,
+        _stride: i32,
+        x: i32,
+        y: i32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        _text_ptr: *const u8,
+        _text_len: i32,
+        _font_name_ptr: *const u8,
+        _font_name_len: i32,
+        _font_size: f32,
+        _bold: i32,
+        _italic: i32,
+        _color: u32,
+        _max_width: f32,
+        _user_data: *mut std::ffi::c_void,
+    ) -> f32 {
+        *LAST_RENDER_ARGS.lock().unwrap() = Some(RecordedRenderArgs {
+            x,
+            y,
+            clip_x,
+            clip_y,
+            clip_w,
+            clip_h,
+        });
+        0.0
+    }
+
+    #[test]
+    fn ffi_text_renderer_forwards_absolute_clip_origin() {
+        *LAST_RENDER_ARGS.lock().unwrap() = None;
+
+        let mut renderer = FfiTextRenderer {
+            measure_fn: test_measure_text,
+            render_fn: test_render_text,
+            user_data: std::ptr::null_mut(),
+        };
+        let mut buffer = vec![0u8; 64 * 32 * 4];
+
+        let _ = renderer.render_text(
+            &mut buffer,
+            64,
+            32,
+            64 * 4,
+            9,
+            7,
+            15,
+            3,
+            20,
+            11,
+            "demo",
+            "Arial",
+            12.0,
+            false,
+            false,
+            0xFF000000,
+            None,
+        );
+
+        assert_eq!(
+            *LAST_RENDER_ARGS.lock().unwrap(),
+            Some(RecordedRenderArgs {
+                x: 9,
+                y: 7,
+                clip_x: 15,
+                clip_y: 3,
+                clip_w: 20,
+                clip_h: 11,
+            })
+        );
+    }
 }

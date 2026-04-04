@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks Condition="'$(VolvoxGridLegacyOnly)' != 'true'">net8.0-windows;net40</TargetFrameworks>
+    <TargetFrameworks Condition="'$(VolvoxGridLegacyOnly)' != 'true' and ('$(OS)' == 'Windows_NT' or '$(IncludeWindowsDesktopTarget)' == 'true')">net8.0;net8.0-windows;net40</TargetFrameworks>
+    <TargetFrameworks Condition="'$(VolvoxGridLegacyOnly)' != 'true' and '$(TargetFrameworks)' == ''">net8.0;net40</TargetFrameworks>
     <TargetFrameworks Condition="'$(VolvoxGridLegacyOnly)' == 'true'">net40</TargetFrameworks>
-    <EnableWindowsTargeting Condition="'$(OS)' != 'Windows_NT'">true</EnableWindowsTargeting>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <LangVersion>latest</LangVersion>
@@ -12,15 +12,16 @@
     <RootNamespace>VolvoxGrid.DotNet</RootNamespace>
     <NoWarn>1591</NoWarn>
     <PackageId>VolvoxGrid.DotNet</PackageId>
-    <Description>WinForms wrapper for VolvoxGrid.</Description>
-    <PackageTags>volvoxgrid;datagrid;winforms;dotnet</PackageTags>
+    <Description>VolvoxGrid .NET bindings with WinForms and cross-platform controller support.</Description>
+    <PackageTags>volvoxgrid;datagrid;winforms;dotnet;cross-platform</PackageTags>
     <RepositoryUrl>https://github.com/ivere27/volvoxgrid</RepositoryUrl>
     <PackageProjectUrl>https://github.com/ivere27/volvoxgrid</PackageProjectUrl>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(TargetFramework)' != 'net40'">
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-windows'">
     <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting Condition="'$(OS)' != 'Windows_NT'">true</EnableWindowsTargeting>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(TargetFramework)' == 'net40'">
@@ -49,17 +50,14 @@
     <None Remove="net8/**" />
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
     <Compile Include="common/**/*.cs" Exclude="common/obj/**/*.cs" />
+    <Compile Remove="common/VolvoxGridControl.cs" />
+    <Compile Remove="common/Volvox/RenderHostCpu.cs" />
+    <Compile Remove="common/Volvox/GdiTextRendererBridge.cs" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net40'">
-    <Compile Include="net40/**/*.cs" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(TargetFramework)' != 'net40'">
-    <Compile Include="net8/Volvox/**/*.cs" />
-    <Compile Include="net8/Generated/Volvoxgrid.cs" />
-    <PackageReference Include="Google.Protobuf" Version="3.25.1" />
+  <ItemGroup Condition="'$(TargetFramework)' != 'net8.0'">
+    <Compile Include="common/**/*.cs" Exclude="common/obj/**/*.cs" />
   </ItemGroup>
 </Project>

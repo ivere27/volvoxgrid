@@ -442,14 +442,30 @@ class VolvoxGridController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Get a rectangular range of cells in a single native round-trip.
+  Future<CellsResponse> getCellsRange(
+    int row1,
+    int col1,
+    int row2,
+    int col2, {
+    bool includeStyle = false,
+    bool includeChecked = false,
+    bool includeTyped = false,
+  }) {
+    return VolvoxGridService.GetCells(GetCellsRequest()
+      ..gridId = _gridId
+      ..row1 = row1
+      ..col1 = col1
+      ..row2 = row2
+      ..col2 = col2
+      ..includeStyle = includeStyle
+      ..includeChecked = includeChecked
+      ..includeTyped = includeTyped);
+  }
+
   /// Get the text of a cell at the given [row] and [col].
   Future<String> getCellText(int row, int col) async {
-    final resp = await VolvoxGridService.GetCells(GetCellsRequest()
-      ..gridId = _gridId
-      ..row1 = row
-      ..col1 = col
-      ..row2 = row
-      ..col2 = col);
+    final resp = await getCellsRange(row, col, row, col);
     if (resp.cells.isNotEmpty) {
       final v = resp.cells.first.value;
       if (v.hasText()) return v.text;
@@ -464,13 +480,13 @@ class VolvoxGridController extends ChangeNotifier {
   Future<EditCellStyle?> getEditCellStyle(int row, int col) async {
     if (!isCreated) return null;
     try {
-      final resp = await VolvoxGridService.GetCells(GetCellsRequest()
-        ..gridId = _gridId
-        ..row1 = row
-        ..col1 = col
-        ..row2 = row
-        ..col2 = col
-        ..includeStyle = true);
+      final resp = await getCellsRange(
+        row,
+        col,
+        row,
+        col,
+        includeStyle: true,
+      );
       final config = await _getConfig();
       final cellFont =
           (resp.cells.isNotEmpty) ? resp.cells.first.style.font : null;

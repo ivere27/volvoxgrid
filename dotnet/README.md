@@ -1,32 +1,42 @@
-# VolvoxGrid for .NET WinForms
+# VolvoxGrid for .NET
 
-`VolvoxGrid.DotNet` is a WinForms `UserControl` for displaying and editing tabular data.
+`VolvoxGrid.DotNet` provides two managed entry points:
+
+- `VolvoxGridControl` for WinForms applications
+- `VolvoxGridClient` for cross-platform `.NET 8` controller/headless use
+
 From a .NET developer's point of view, you work with:
 
 - one managed assembly: `VolvoxGrid.DotNet.dll`
-- one control: `VolvoxGridControl`
-- one native runtime dependency: `volvoxgrid_plugin.dll`
+- either `VolvoxGridControl` or `VolvoxGridClient`
+- one native runtime dependency: the `volvoxgrid_plugin` dynamic library for your platform
 
-It is intended for WinForms apps that want a grid control with selection, editing, sorting, merged cells, clipboard support, import/export, and large-data scenarios.
+It is intended for apps that want VolvoxGrid selection, editing, sorting, merged cells, clipboard support, import/export, and large-data scenarios. The WinForms UI remains Windows-only; the controller API runs on native `.NET 8` platforms.
 
 ## Supported Targets
 
 | Target framework | Status | Notes |
 |---|---|---|
+| `net8.0` | Supported | Cross-platform controller/headless API via `VolvoxGridClient` |
 | `net8.0-windows` | Recommended | Best choice for new WinForms applications |
 | `net40` | Supported | For legacy WinForms applications |
 
 Runtime notes:
 
-- WinForms only
-- `volvoxgrid_plugin.dll` is required at runtime
-- The plugin architecture must match your process architecture (`x64` or `x86`)
-- Linux/Wine sample runs use the built-in `cosmic-text` engine by default. Set `VOLVOXGRID_DOTNET_USE_HOST_TEXT_RENDERER=1` to opt into the host GDI text bridge.
+- `net8.0-windows` and `net40` are WinForms-only
+- `net8.0` is the non-UI controller API
+- the native plugin is required at runtime:
+  - Windows: `volvoxgrid_plugin.dll`
+  - Linux: `libvolvoxgrid_plugin.so`
+  - macOS: `libvolvoxgrid_plugin.dylib`
+- the plugin architecture must match your process architecture
+- Linux/Wine WinForms runs use the built-in `cosmic-text` engine by default. Set `VOLVOXGRID_DOTNET_USE_HOST_TEXT_RENDERER=1` to opt into the host GDI text bridge.
 
 ## Main Types
 
 - Namespace: `VolvoxGrid.DotNet`
 - Main control: `VolvoxGridControl`
+- Cross-platform client: `VolvoxGridClient`
 - Column model: `VolvoxGridColumn`
 - Cell batch model: `VolvoxGridCellText`
 - Selection model: `VolvoxGridSelectionState`
@@ -65,13 +75,16 @@ Package ID:
 
 - `VolvoxGrid.DotNet`
 
-No matter how you reference the managed wrapper, you still need to deploy `volvoxgrid_plugin.dll` with your application.
+No matter how you reference the managed wrapper, you still need to deploy the native plugin with your application.
 
 ## Deploy the Native Plugin
 
 Recommended deployment:
 
-- copy `volvoxgrid_plugin.dll` beside your application `.exe`
+- copy the native plugin beside your application:
+  - Windows: `volvoxgrid_plugin.dll`
+  - Linux: `libvolvoxgrid_plugin.so`
+  - macOS: `libvolvoxgrid_plugin.dylib`
 
 You can also provide the plugin location explicitly:
 
@@ -98,7 +111,7 @@ If the control cannot create the native grid session, inspect:
 
 ## Quick Start
 
-### Bind a `DataTable`
+### WinForms: Bind a `DataTable`
 
 ```csharp
 using System;
@@ -184,7 +197,31 @@ public sealed class MainForm : Form
 }
 ```
 
-### Populate the grid without a bound data source
+### Cross-platform `.NET 8`: Use `VolvoxGridClient`
+
+```csharp
+using System;
+using VolvoxGrid.DotNet;
+using Volvoxgrid.V1;
+
+using var grid = new VolvoxGridClient();
+
+grid.DefineColumns(new[]
+{
+    new ColumnDef { Index = 0, Key = "id", Caption = "ID", Width = 90, DataType = ColumnDataType.Number, Align = Align.RightCenter },
+    new ColumnDef { Index = 1, Key = "name", Caption = "Name", Width = 180 },
+});
+
+grid.LoadTable(2, 2, new object[]
+{
+    1, "Alpha",
+    2, "Beta",
+}, atomic: true);
+
+Console.WriteLine(grid.FindByText("Beta", 1, 0, false, true));
+```
+
+### WinForms: Populate the grid without a bound data source
 
 ```csharp
 var grid = new VolvoxGridControl
