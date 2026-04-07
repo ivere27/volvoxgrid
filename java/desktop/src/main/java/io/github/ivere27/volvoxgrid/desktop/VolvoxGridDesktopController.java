@@ -808,6 +808,10 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         client.select(buildSingleRangeSelectRequest(row1, col1, row2, col2, false));
     }
 
+    public void selectCell(int row, int col, boolean show) throws SynurangDesktopBridge.SynurangBridgeException {
+        client.select(buildSingleRangeSelectRequest(row, col, row, col, show));
+    }
+
     @Override
     public void selectRanges(List<GridCellRange> ranges) throws SynurangDesktopBridge.SynurangBridgeException {
         VolvoxGridController.super.selectRanges(ranges);
@@ -833,6 +837,14 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     public EditState edit(EditCommand request) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(request, "request");
         return client.edit(request.toBuilder().setGridId(gridId).build());
+    }
+
+    public EditState getEditState() throws SynurangDesktopBridge.SynurangBridgeException {
+        return client.edit(
+            EditCommand.newBuilder()
+                .setGridId(gridId)
+                .build()
+        );
     }
 
     public Empty clear(ClearRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
@@ -987,6 +999,16 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
             GridConfig.newBuilder()
                 .setRendering(
                     RenderConfig.newBuilder().setRendererMode(RendererMode.RENDERER_CPU).build()
+                )
+                .build()
+        );
+    }
+
+    public void setRendererModeTui() throws SynurangDesktopBridge.SynurangBridgeException {
+        configure(
+            GridConfig.newBuilder()
+                .setRendering(
+                    RenderConfig.newBuilder().setRendererMode(RendererMode.RENDERER_TUI).build()
                 )
                 .build()
         );
@@ -1266,6 +1288,12 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
 
     public VolvoxGridDesktopClient.RenderSession renderSession() throws SynurangDesktopBridge.SynurangBridgeException {
         return openRenderSession();
+    }
+
+    public VolvoxGridDesktopTerminalSession openTerminalSession()
+        throws SynurangDesktopBridge.SynurangBridgeException {
+        setRendererModeTui();
+        return new VolvoxGridDesktopTerminalSession(client, gridId);
     }
 
     public VolvoxGridDesktopClient.EventStream openEventStream() throws SynurangDesktopBridge.SynurangBridgeException {

@@ -9,6 +9,7 @@ VolvoxGrid renders grids directly to RGBA pixel buffers, giving you full control
 - **Pixel-perfect rendering** -- CPU (tiny-skia) and GPU (wgpu/WebGPU) backends
 - **Cross-platform** -- Flutter, Web (WASM), Android, Java Desktop, ActiveX (Windows), GTK4 plugin host (Linux)
 - **Protobuf API** -- All FFI communication uses Protocol Buffers for type-safe, language-agnostic bindings
+- **Thin-host TUI path** -- `RenderSession` can target host-owned `TuiCell` buffers so Rust, .NET, and other languages can build terminal shells over the same Synurang API
 - **Rich grid functionality**:
   - Cell editing with validation and cancelable events
   - Multi-mode selection (free, row, column, listbox)
@@ -82,7 +83,7 @@ volvoxgrid/
 ├── java/
 │   ├── common/       # Shared Java controller + proto bindings
 │   └── desktop/      # Java Desktop host (Swing panel) + demos
-├── dotnet/           # .NET WinForms wrapper library + sample
+├── dotnet/           # .NET bindings + WinForms/controller/terminal samples
 ├── adapters/
 │   ├── aggrid/       # AG Grid-compatible adapter (TypeScript, npm: @volvoxgrid/ag-grid)
 │   ├── sheet/        # Sheet spreadsheet UI (TypeScript, npm: @volvoxgrid/sheet)
@@ -191,6 +192,12 @@ make java-desktop-run
 # Run minimal demo
 make java-desktop-run-simple
 
+# Run Java terminal TUI sample
+make java-tui-run
+
+# Run Java terminal TUI sample against the release plugin
+make java-tui-run-release
+
 # Use published Maven JAR in the desktop example (default is local)
 make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.5.0
 ```
@@ -212,11 +219,40 @@ Direct scripts:
 ./dotnet/run_sample.sh
 ```
 
+### .NET TUI Sample
+
+```bash
+# Build the .NET 8 TUI sample
+make dotnet-tui-build
+
+# Run the interactive .NET 8 TUI sample
+make dotnet-tui-run
+
+# Run non-interactive TUI smoke checks
+make dotnet-tui-smoke
+```
+
+### Go TUI Sample
+
+```bash
+# Build the Go TUI sample
+make go-tui-build
+
+# Run the interactive Go TUI sample
+make go-tui-run
+
+# Run non-interactive Go TUI smoke checks
+make go-tui-smoke
+```
+
 ### GTK4 Plugin Host
 
 ```bash
 make gtk-test
 ```
+
+The supported terminal host path is the thin `.NET` sample. The cross-language
+terminal contract is described in [TUI_HOSTING.md](TUI_HOSTING.md).
 
 ## Adapters
 

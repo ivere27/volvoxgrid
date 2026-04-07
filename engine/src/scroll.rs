@@ -158,6 +158,14 @@ impl ScrollState {
         self.clamp();
     }
 
+    pub fn quantize_to_cells(&mut self) {
+        self.max_scroll_x = self.max_scroll_x.round().max(0.0);
+        self.max_scroll_y = self.max_scroll_y.round().max(0.0);
+        self.scroll_x = self.scroll_x.round();
+        self.scroll_y = self.scroll_y.round();
+        self.clamp();
+    }
+
     fn clamp(&mut self) {
         self.scroll_x = self.scroll_x.clamp(0.0, self.max_scroll_x);
         self.scroll_y = self.scroll_y.clamp(0.0, self.max_scroll_y);

@@ -4,6 +4,7 @@
 # Usage:
 #   make              — build engine + host plugin
 #   make run          — build & run smoke test (Rust host loads host plugin, creates grid)
+#   make dotnet-tui-run — build & run .NET 8 terminal example
 #   make test_pixel   — run engine pixel regression tests
 #   make wasm         — build WASM crate
 #   make web          — build WASM + start web dev server
@@ -40,11 +41,13 @@ WEB_HOST ?= 0.0.0.0
 WEB_SCALE ?= 1.0
 WEB_HOVER ?= false
 DOTNET_TFM ?= net40
+DOTNET_TUI_TFM ?= net8.0
 DOTNET_ARCH ?= x64
 ACTIVEX_ARCH ?= x86_64
 GTK_BENCH_RUNS ?= 5
 GTK_BENCH_ARGS ?=
 JAVA_DESKTOP_PROJECT_DIR := java/desktop
+GO_PROJECT_DIR := go
 ROOT_DIR := $(patsubst %/,%,$(abspath $(dir $(lastword $(MAKEFILE_LIST)))))
 UNAME_S := $(shell uname -s 2>/dev/null)
 ifeq ($(UNAME_S),Darwin)
@@ -204,7 +207,10 @@ endif
         android-plugin android-plugin-release android-install android-install-release android-run android-run-release flutter flutter-setup \
         flutter-run flutter-run-release flutter-linux \
         java-desktop-run java-desktop-run-release java-desktop-run-simple java-desktop-smoke \
+        java-tui-run java-tui-run-release java-tui-smoke java-tui-smoke-release \
+        go-tui-build go-tui-build-release go-tui-run go-tui-run-release go-tui-smoke go-tui-smoke-release \
         dotnet-build dotnet-build-release dotnet-run dotnet-run-release dotnet-smoke dotnet-smoke-release \
+        dotnet-tui-build dotnet-tui-build-release dotnet-tui-run dotnet-tui-run-release dotnet-tui-smoke dotnet-tui-smoke-release \
         sheet sheet-lite sheet-build \
         report report-build \
         activex activex-release activex-run activex-run-release activex-lite activex-lite-release \
@@ -264,14 +270,31 @@ help:
 	@echo "  java-desktop-run-release  Run Java desktop Android-style example with release plugin"
 	@echo "  java-desktop-run-simple  Run Java desktop minimal demo"
 	@echo "  java-desktop-smoke  Run headless Java desktop smoke test"
+	@echo "  java-tui-run    Run Java terminal TUI sample"
+	@echo "  java-tui-run-release  Run Java terminal TUI sample with release plugin"
+	@echo "  java-tui-smoke  Run Java terminal TUI smoke checks"
+	@echo "  java-tui-smoke-release  Run Java terminal TUI smoke checks with release plugin"
+	@echo "  go-tui-build  Build Go terminal TUI sample (debug binary)"
+	@echo "  go-tui-build-release  Build Go terminal TUI sample (release-style binary)"
+	@echo "  go-tui-run  Run Go terminal TUI sample (debug plugin)"
+	@echo "  go-tui-run-release  Run Go terminal TUI sample (release plugin)"
+	@echo "  go-tui-smoke  Run Go terminal TUI smoke checks (debug plugin)"
+	@echo "  go-tui-smoke-release  Run Go terminal TUI smoke checks (release plugin)"
 	@echo "  dotnet-build  Build VolvoxGrid .NET wrapper + sample (debug)"
 	@echo "  dotnet-build-release  Build VolvoxGrid .NET wrapper + sample (release)"
 	@echo "  dotnet-run    Run .NET sample (debug)"
 	@echo "  dotnet-run-release  Run .NET sample (release)"
 	@echo "  dotnet-smoke  Run automated .NET controller smoke checks (debug)"
 	@echo "  dotnet-smoke-release  Run automated .NET controller smoke checks (release)"
+	@echo "  dotnet-tui-build  Build .NET 8 terminal sample (debug)"
+	@echo "  dotnet-tui-build-release  Build .NET 8 terminal sample (release)"
+	@echo "  dotnet-tui-run  Run .NET 8 terminal sample (debug)"
+	@echo "  dotnet-tui-run-release  Run .NET 8 terminal sample (release)"
+	@echo "  dotnet-tui-smoke  Run non-interactive .NET 8 terminal sample smoke checks (debug)"
+	@echo "  dotnet-tui-smoke-release  Run non-interactive .NET 8 terminal sample smoke checks (release)"
 	@echo "    (set DOTNET_TFM=net8.0-windows to switch target; default: net40)"
 	@echo "    (set DOTNET_ARCH=x86 to build 32-bit; default: x64)"
+	@echo "    (TUI sample uses DOTNET_TUI_TFM=$(DOTNET_TUI_TFM))"
 	@echo "  sheet          Build WASM + start Sheet adapter Vite dev server"
 	@echo "  sheet-lite     Build WASM lite + start Sheet adapter Vite dev server"
 	@echo "  sheet-build    Build Sheet adapter npm package only"
@@ -401,6 +424,68 @@ java-desktop-smoke: $(JAVA_DESKTOP_SMOKE_PREREQ)
 	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) runSmoke $(JAVA_DESKTOP_PLUGIN_ARG)
 	@echo ""
 
+java-tui-run: $(JAVA_DESKTOP_RUN_PREREQ)
+	@echo "Running Java terminal TUI sample..."
+	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) installTuiDist
+	"$(JAVA_DESKTOP_PROJECT_DIR)/build/install/volvoxgrid-desktop-tui/bin/volvoxgrid-desktop-tui" "$(JAVA_DESKTOP_PLUGIN)"
+	@echo ""
+
+java-tui-run-release: $(JAVA_DESKTOP_RUN_RELEASE_PREREQ)
+	@echo "Running Java terminal TUI sample (release plugin)..."
+	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) installTuiDist
+	"$(JAVA_DESKTOP_PROJECT_DIR)/build/install/volvoxgrid-desktop-tui/bin/volvoxgrid-desktop-tui" "$(JAVA_DESKTOP_PLUGIN_RELEASE)"
+	@echo ""
+
+java-tui-smoke: $(JAVA_DESKTOP_SMOKE_PREREQ)
+	@echo "Running Java terminal TUI smoke test..."
+	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) installTuiDist
+	VOLVOXGRID_DESKTOP_TUI_OPTS='-Dvolvoxgrid.tui.smoke=true' \
+		"$(JAVA_DESKTOP_PROJECT_DIR)/build/install/volvoxgrid-desktop-tui/bin/volvoxgrid-desktop-tui" "$(JAVA_DESKTOP_PLUGIN)"
+	@echo ""
+
+java-tui-smoke-release: $(JAVA_DESKTOP_RUN_RELEASE_PREREQ)
+	@echo "Running Java terminal TUI smoke test (release plugin)..."
+	./android/gradlew -p "$(JAVA_DESKTOP_PROJECT_DIR)" $(JAVA_DESKTOP_GRADLE_PROPS) --no-daemon $(GRADLE_JOBS_FLAG) installTuiDist
+	VOLVOXGRID_DESKTOP_TUI_OPTS='-Dvolvoxgrid.tui.smoke=true' \
+		"$(JAVA_DESKTOP_PROJECT_DIR)/build/install/volvoxgrid-desktop-tui/bin/volvoxgrid-desktop-tui" "$(JAVA_DESKTOP_PLUGIN_RELEASE)"
+	@echo ""
+
+GO_TUI_BINARY := $(abspath target/go/volvoxgrid-go-tui)
+GO_TUI_BINARY_RELEASE := $(abspath target/go/volvoxgrid-go-tui-release)
+GO_TUI_BUILD_ENV := GOCACHE=/tmp/volvoxgrid-go-build
+
+go-tui-build:
+	@echo "Building Go terminal TUI sample..."
+	@mkdir -p target/go
+	cd "$(GO_PROJECT_DIR)" && $(GO_TUI_BUILD_ENV) go build -o "$(GO_TUI_BINARY)" ./examples/tui
+	@echo ""
+
+go-tui-build-release:
+	@echo "Building Go terminal TUI sample (release-style binary)..."
+	@mkdir -p target/go
+	cd "$(GO_PROJECT_DIR)" && $(GO_TUI_BUILD_ENV) go build -trimpath -ldflags='-s -w' -o "$(GO_TUI_BINARY_RELEASE)" ./examples/tui
+	@echo ""
+
+go-tui-run: host-plugin go-tui-build
+	@echo "Running Go terminal TUI sample (debug plugin)..."
+	"$(GO_TUI_BINARY)" "$(JAVA_DESKTOP_PLUGIN)"
+	@echo ""
+
+go-tui-run-release: host-plugin-release go-tui-build-release
+	@echo "Running Go terminal TUI sample (release plugin)..."
+	"$(GO_TUI_BINARY_RELEASE)" "$(JAVA_DESKTOP_PLUGIN_RELEASE)"
+	@echo ""
+
+go-tui-smoke: host-plugin go-tui-build
+	@echo "Running Go terminal TUI smoke test (debug plugin)..."
+	VOLVOXGRID_GO_TUI_SMOKE_MODE=1 "$(GO_TUI_BINARY)" "$(JAVA_DESKTOP_PLUGIN)"
+	@echo ""
+
+go-tui-smoke-release: host-plugin-release go-tui-build-release
+	@echo "Running Go terminal TUI smoke test (release plugin)..."
+	VOLVOXGRID_GO_TUI_SMOKE_MODE=1 "$(GO_TUI_BINARY_RELEASE)" "$(JAVA_DESKTOP_PLUGIN_RELEASE)"
+	@echo ""
+
 dotnet-build:
 	@echo "Building VolvoxGrid .NET wrapper + sample (debug, $(DOTNET_TFM), $(DOTNET_ARCH))..."
 	./dotnet/build_dotnet.sh --tfm "$(DOTNET_TFM)" --arch "$(DOTNET_ARCH)"
@@ -439,6 +524,36 @@ dotnet-smoke: dotnet-build
 dotnet-smoke-release: dotnet-build-release
 	@echo "Running .NET controller smoke checks (release, $(DOTNET_TFM), $(DOTNET_ARCH))..."
 	VOLVOXGRID_SMOKE_MODE=1 VOLVOXGRID_SMOKE_EXIT=1 ./dotnet/run_sample.sh --tfm "$(DOTNET_TFM)" --arch "$(DOTNET_ARCH)" release
+	@echo ""
+
+dotnet-tui-build:
+	@echo "Building VolvoxGrid .NET TUI sample (debug, $(DOTNET_TUI_TFM))..."
+	./dotnet/build_dotnet.sh --sample tui --tfm "$(DOTNET_TUI_TFM)" --arch "$(DOTNET_ARCH)"
+	@echo ""
+
+dotnet-tui-build-release:
+	@echo "Building VolvoxGrid .NET TUI sample (release, $(DOTNET_TUI_TFM))..."
+	./dotnet/build_dotnet.sh --sample tui --tfm "$(DOTNET_TUI_TFM)" --arch "$(DOTNET_ARCH)" release
+	@echo ""
+
+dotnet-tui-run: dotnet-tui-build
+	@echo "Running .NET TUI sample (debug, $(DOTNET_TUI_TFM))..."
+	./dotnet/run_sample.sh --sample tui --tfm "$(DOTNET_TUI_TFM)" --arch "$(DOTNET_ARCH)"
+	@echo ""
+
+dotnet-tui-run-release: dotnet-tui-build-release
+	@echo "Running .NET TUI sample (release, $(DOTNET_TUI_TFM))..."
+	./dotnet/run_sample.sh --sample tui --tfm "$(DOTNET_TUI_TFM)" --arch "$(DOTNET_ARCH)" release
+	@echo ""
+
+dotnet-tui-smoke: dotnet-tui-build
+	@echo "Running .NET TUI sample smoke checks (debug, $(DOTNET_TUI_TFM))..."
+	VOLVOXGRID_TUI_SMOKE_MODE=1 ./dotnet/run_sample.sh --sample tui --tfm "$(DOTNET_TUI_TFM)" --arch "$(DOTNET_ARCH)"
+	@echo ""
+
+dotnet-tui-smoke-release: dotnet-tui-build-release
+	@echo "Running .NET TUI sample smoke checks (release, $(DOTNET_TUI_TFM))..."
+	VOLVOXGRID_TUI_SMOKE_MODE=1 ./dotnet/run_sample.sh --sample tui --tfm "$(DOTNET_TUI_TFM)" --arch "$(DOTNET_ARCH)" release
 	@echo ""
 
 # =============================================================================
@@ -570,10 +685,17 @@ PROTO3_OPT := --experimental_allow_proto3_optional
 codegen: build_plugin
 	@test -x "$(PROTOC_PLUGIN)" || { echo "Error: protoc-gen-synurang-ffi not found at $(PROTOC_PLUGIN)"; exit 1; }
 	@command -v protoc-gen-dart >/dev/null 2>&1 || { echo "Error: protoc-gen-dart not found in PATH."; exit 1; }
+	@command -v protoc-gen-go >/dev/null 2>&1 || { echo "Error: protoc-gen-go not found in PATH."; exit 1; }
+	@command -v protoc-gen-go-grpc >/dev/null 2>&1 || { echo "Error: protoc-gen-go-grpc not found in PATH."; exit 1; }
 	@echo "Generating v1 runtime FFI bindings..."
 	@mkdir -p codegen
 	@mkdir -p $(DOTNET_COMMON_CODEGEN_DIR)
 	@mkdir -p $(WEB_TS_CODEGEN_DIR)
+	@mkdir -p $(GO_PROJECT_DIR)/api/v1
+	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
+		--go_out=$(GO_PROJECT_DIR) --go_opt=module=github.com/ivere27/volvoxgrid \
+		--go-grpc_out=$(GO_PROJECT_DIR) --go-grpc_opt=module=github.com/ivere27/volvoxgrid \
+		proto/volvoxgrid.proto
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_PLUGIN_FLAG) \
 		--synurang-ffi_out=codegen --synurang-ffi_opt=lang=java \

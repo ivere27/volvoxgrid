@@ -27,6 +27,7 @@ rayon = { version = "1.10", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 flate2 = "1"
+unicode-width = "0.2"
 wgpu = { version = "24", optional = true }
 bytemuck = { version = "1", features = ["derive"], optional = true }
 raw-window-handle = { version = "0.6", optional = true }

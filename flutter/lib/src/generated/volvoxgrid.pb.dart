@@ -13427,6 +13427,10 @@ enum RenderInput_Input {
   eventDecision,
   zoom,
   gpuSurface,
+  terminalInput,
+  terminalCapabilities,
+  terminalViewport,
+  terminalCommand,
   notSet
 }
 
@@ -13441,6 +13445,10 @@ class RenderInput extends $pb.GeneratedMessage {
     EventDecision? eventDecision,
     ZoomEvent? zoom,
     GpuSurfaceReady? gpuSurface,
+    TerminalInputBytes? terminalInput,
+    TerminalCapabilities? terminalCapabilities,
+    TerminalViewport? terminalViewport,
+    TerminalCommand? terminalCommand,
   }) {
     final result = create();
     if (gridId != null) result.gridId = gridId;
@@ -13452,6 +13460,11 @@ class RenderInput extends $pb.GeneratedMessage {
     if (eventDecision != null) result.eventDecision = eventDecision;
     if (zoom != null) result.zoom = zoom;
     if (gpuSurface != null) result.gpuSurface = gpuSurface;
+    if (terminalInput != null) result.terminalInput = terminalInput;
+    if (terminalCapabilities != null)
+      result.terminalCapabilities = terminalCapabilities;
+    if (terminalViewport != null) result.terminalViewport = terminalViewport;
+    if (terminalCommand != null) result.terminalCommand = terminalCommand;
     return result;
   }
 
@@ -13474,13 +13487,17 @@ class RenderInput extends $pb.GeneratedMessage {
     7: RenderInput_Input.eventDecision,
     8: RenderInput_Input.zoom,
     9: RenderInput_Input.gpuSurface,
+    10: RenderInput_Input.terminalInput,
+    11: RenderInput_Input.terminalCapabilities,
+    12: RenderInput_Input.terminalViewport,
+    13: RenderInput_Input.terminalCommand,
     0: RenderInput_Input.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'RenderInput',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..oo(0, [2, 3, 4, 5, 6, 7, 8, 9])
+    ..oo(0, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
     ..aInt64(1, _omitFieldNames ? '' : 'gridId')
     ..aOM<ViewportState>(2, _omitFieldNames ? '' : 'viewport',
         subBuilder: ViewportState.create)
@@ -13498,6 +13515,15 @@ class RenderInput extends $pb.GeneratedMessage {
         subBuilder: ZoomEvent.create)
     ..aOM<GpuSurfaceReady>(9, _omitFieldNames ? '' : 'gpuSurface',
         subBuilder: GpuSurfaceReady.create)
+    ..aOM<TerminalInputBytes>(10, _omitFieldNames ? '' : 'terminalInput',
+        subBuilder: TerminalInputBytes.create)
+    ..aOM<TerminalCapabilities>(
+        11, _omitFieldNames ? '' : 'terminalCapabilities',
+        subBuilder: TerminalCapabilities.create)
+    ..aOM<TerminalViewport>(12, _omitFieldNames ? '' : 'terminalViewport',
+        subBuilder: TerminalViewport.create)
+    ..aOM<TerminalCommand>(13, _omitFieldNames ? '' : 'terminalCommand',
+        subBuilder: TerminalCommand.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -13527,6 +13553,10 @@ class RenderInput extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   @$pb.TagNumber(8)
   @$pb.TagNumber(9)
+  @$pb.TagNumber(10)
+  @$pb.TagNumber(11)
+  @$pb.TagNumber(12)
+  @$pb.TagNumber(13)
   RenderInput_Input whichInput() => _RenderInput_InputByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(2)
   @$pb.TagNumber(3)
@@ -13536,6 +13566,10 @@ class RenderInput extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   @$pb.TagNumber(8)
   @$pb.TagNumber(9)
+  @$pb.TagNumber(10)
+  @$pb.TagNumber(11)
+  @$pb.TagNumber(12)
+  @$pb.TagNumber(13)
   void clearInput() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -13634,6 +13668,50 @@ class RenderInput extends $pb.GeneratedMessage {
   void clearGpuSurface() => $_clearField(9);
   @$pb.TagNumber(9)
   GpuSurfaceReady ensureGpuSurface() => $_ensure(8);
+
+  @$pb.TagNumber(10)
+  TerminalInputBytes get terminalInput => $_getN(9);
+  @$pb.TagNumber(10)
+  set terminalInput(TerminalInputBytes value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasTerminalInput() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearTerminalInput() => $_clearField(10);
+  @$pb.TagNumber(10)
+  TerminalInputBytes ensureTerminalInput() => $_ensure(9);
+
+  @$pb.TagNumber(11)
+  TerminalCapabilities get terminalCapabilities => $_getN(10);
+  @$pb.TagNumber(11)
+  set terminalCapabilities(TerminalCapabilities value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasTerminalCapabilities() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearTerminalCapabilities() => $_clearField(11);
+  @$pb.TagNumber(11)
+  TerminalCapabilities ensureTerminalCapabilities() => $_ensure(10);
+
+  @$pb.TagNumber(12)
+  TerminalViewport get terminalViewport => $_getN(11);
+  @$pb.TagNumber(12)
+  set terminalViewport(TerminalViewport value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasTerminalViewport() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearTerminalViewport() => $_clearField(12);
+  @$pb.TagNumber(12)
+  TerminalViewport ensureTerminalViewport() => $_ensure(11);
+
+  @$pb.TagNumber(13)
+  TerminalCommand get terminalCommand => $_getN(12);
+  @$pb.TagNumber(13)
+  set terminalCommand(TerminalCommand value) => $_setField(13, value);
+  @$pb.TagNumber(13)
+  $core.bool hasTerminalCommand() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearTerminalCommand() => $_clearField(13);
+  @$pb.TagNumber(13)
+  TerminalCommand ensureTerminalCommand() => $_ensure(12);
 }
 
 class ViewportState extends $pb.GeneratedMessage {
@@ -14093,12 +14171,14 @@ class BufferReady extends $pb.GeneratedMessage {
     $core.int? stride,
     $core.int? width,
     $core.int? height,
+    $core.int? capacity,
   }) {
     final result = create();
     if (handle != null) result.handle = handle;
     if (stride != null) result.stride = stride;
     if (width != null) result.width = width;
     if (height != null) result.height = height;
+    if (capacity != null) result.capacity = capacity;
     return result;
   }
 
@@ -14119,6 +14199,7 @@ class BufferReady extends $pb.GeneratedMessage {
     ..aI(2, _omitFieldNames ? '' : 'stride')
     ..aI(3, _omitFieldNames ? '' : 'width')
     ..aI(4, _omitFieldNames ? '' : 'height')
+    ..aI(5, _omitFieldNames ? '' : 'capacity')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -14175,6 +14256,318 @@ class BufferReady extends $pb.GeneratedMessage {
   $core.bool hasHeight() => $_has(3);
   @$pb.TagNumber(4)
   void clearHeight() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get capacity => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set capacity($core.int value) => $_setSignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCapacity() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCapacity() => $_clearField(5);
+}
+
+class TerminalInputBytes extends $pb.GeneratedMessage {
+  factory TerminalInputBytes({
+    $core.List<$core.int>? data,
+  }) {
+    final result = create();
+    if (data != null) result.data = data;
+    return result;
+  }
+
+  TerminalInputBytes._();
+
+  factory TerminalInputBytes.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TerminalInputBytes.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TerminalInputBytes',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..a<$core.List<$core.int>>(
+        1, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TerminalInputBytes clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TerminalInputBytes copyWith(void Function(TerminalInputBytes) updates) =>
+      super.copyWith((message) => updates(message as TerminalInputBytes))
+          as TerminalInputBytes;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TerminalInputBytes create() => TerminalInputBytes._();
+  @$core.override
+  TerminalInputBytes createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TerminalInputBytes getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TerminalInputBytes>(create);
+  static TerminalInputBytes? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.List<$core.int> get data => $_getN(0);
+  @$pb.TagNumber(1)
+  set data($core.List<$core.int> value) => $_setBytes(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasData() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearData() => $_clearField(1);
+}
+
+class TerminalCapabilities extends $pb.GeneratedMessage {
+  factory TerminalCapabilities({
+    TerminalColorLevel? colorLevel,
+    $core.bool? sgrMouse,
+    $core.bool? focusEvents,
+    $core.bool? bracketedPaste,
+  }) {
+    final result = create();
+    if (colorLevel != null) result.colorLevel = colorLevel;
+    if (sgrMouse != null) result.sgrMouse = sgrMouse;
+    if (focusEvents != null) result.focusEvents = focusEvents;
+    if (bracketedPaste != null) result.bracketedPaste = bracketedPaste;
+    return result;
+  }
+
+  TerminalCapabilities._();
+
+  factory TerminalCapabilities.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TerminalCapabilities.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TerminalCapabilities',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aE<TerminalColorLevel>(1, _omitFieldNames ? '' : 'colorLevel',
+        enumValues: TerminalColorLevel.values)
+    ..aOB(2, _omitFieldNames ? '' : 'sgrMouse')
+    ..aOB(3, _omitFieldNames ? '' : 'focusEvents')
+    ..aOB(4, _omitFieldNames ? '' : 'bracketedPaste')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TerminalCapabilities clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TerminalCapabilities copyWith(void Function(TerminalCapabilities) updates) =>
+      super.copyWith((message) => updates(message as TerminalCapabilities))
+          as TerminalCapabilities;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TerminalCapabilities create() => TerminalCapabilities._();
+  @$core.override
+  TerminalCapabilities createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TerminalCapabilities getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TerminalCapabilities>(create);
+  static TerminalCapabilities? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  TerminalColorLevel get colorLevel => $_getN(0);
+  @$pb.TagNumber(1)
+  set colorLevel(TerminalColorLevel value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasColorLevel() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearColorLevel() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get sgrMouse => $_getBF(1);
+  @$pb.TagNumber(2)
+  set sgrMouse($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSgrMouse() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSgrMouse() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get focusEvents => $_getBF(2);
+  @$pb.TagNumber(3)
+  set focusEvents($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFocusEvents() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFocusEvents() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get bracketedPaste => $_getBF(3);
+  @$pb.TagNumber(4)
+  set bracketedPaste($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasBracketedPaste() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearBracketedPaste() => $_clearField(4);
+}
+
+class TerminalViewport extends $pb.GeneratedMessage {
+  factory TerminalViewport({
+    $core.int? originX,
+    $core.int? originY,
+    $core.int? width,
+    $core.int? height,
+    $core.bool? fullscreen,
+  }) {
+    final result = create();
+    if (originX != null) result.originX = originX;
+    if (originY != null) result.originY = originY;
+    if (width != null) result.width = width;
+    if (height != null) result.height = height;
+    if (fullscreen != null) result.fullscreen = fullscreen;
+    return result;
+  }
+
+  TerminalViewport._();
+
+  factory TerminalViewport.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TerminalViewport.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TerminalViewport',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'originX')
+    ..aI(2, _omitFieldNames ? '' : 'originY')
+    ..aI(3, _omitFieldNames ? '' : 'width')
+    ..aI(4, _omitFieldNames ? '' : 'height')
+    ..aOB(5, _omitFieldNames ? '' : 'fullscreen')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TerminalViewport clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TerminalViewport copyWith(void Function(TerminalViewport) updates) =>
+      super.copyWith((message) => updates(message as TerminalViewport))
+          as TerminalViewport;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TerminalViewport create() => TerminalViewport._();
+  @$core.override
+  TerminalViewport createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TerminalViewport getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TerminalViewport>(create);
+  static TerminalViewport? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get originX => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set originX($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasOriginX() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearOriginX() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get originY => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set originY($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasOriginY() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOriginY() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get width => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set width($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasWidth() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearWidth() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get height => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set height($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasHeight() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearHeight() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get fullscreen => $_getBF(4);
+  @$pb.TagNumber(5)
+  set fullscreen($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasFullscreen() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearFullscreen() => $_clearField(5);
+}
+
+class TerminalCommand extends $pb.GeneratedMessage {
+  factory TerminalCommand({
+    TerminalCommand_Kind? kind,
+  }) {
+    final result = create();
+    if (kind != null) result.kind = kind;
+    return result;
+  }
+
+  TerminalCommand._();
+
+  factory TerminalCommand.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TerminalCommand.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TerminalCommand',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aE<TerminalCommand_Kind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: TerminalCommand_Kind.values)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TerminalCommand clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TerminalCommand copyWith(void Function(TerminalCommand) updates) =>
+      super.copyWith((message) => updates(message as TerminalCommand))
+          as TerminalCommand;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TerminalCommand create() => TerminalCommand._();
+  @$core.override
+  TerminalCommand createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TerminalCommand getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TerminalCommand>(create);
+  static TerminalCommand? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  TerminalCommand_Kind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(TerminalCommand_Kind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
 }
 
 class GpuSurfaceReady extends $pb.GeneratedMessage {
@@ -14540,6 +14933,9 @@ class FrameDone extends $pb.GeneratedMessage {
     $core.int? dirtyW,
     $core.int? dirtyH,
     FrameMetrics? metrics,
+    $core.int? bytesWritten,
+    $core.int? requiredCapacity,
+    FrameKind? frameKind,
   }) {
     final result = create();
     if (handle != null) result.handle = handle;
@@ -14548,6 +14944,9 @@ class FrameDone extends $pb.GeneratedMessage {
     if (dirtyW != null) result.dirtyW = dirtyW;
     if (dirtyH != null) result.dirtyH = dirtyH;
     if (metrics != null) result.metrics = metrics;
+    if (bytesWritten != null) result.bytesWritten = bytesWritten;
+    if (requiredCapacity != null) result.requiredCapacity = requiredCapacity;
+    if (frameKind != null) result.frameKind = frameKind;
     return result;
   }
 
@@ -14571,6 +14970,10 @@ class FrameDone extends $pb.GeneratedMessage {
     ..aI(5, _omitFieldNames ? '' : 'dirtyH')
     ..aOM<FrameMetrics>(6, _omitFieldNames ? '' : 'metrics',
         subBuilder: FrameMetrics.create)
+    ..aI(7, _omitFieldNames ? '' : 'bytesWritten')
+    ..aI(8, _omitFieldNames ? '' : 'requiredCapacity')
+    ..aE<FrameKind>(9, _omitFieldNames ? '' : 'frameKind',
+        enumValues: FrameKind.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -14646,6 +15049,33 @@ class FrameDone extends $pb.GeneratedMessage {
   void clearMetrics() => $_clearField(6);
   @$pb.TagNumber(6)
   FrameMetrics ensureMetrics() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  $core.int get bytesWritten => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set bytesWritten($core.int value) => $_setSignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasBytesWritten() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearBytesWritten() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get requiredCapacity => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set requiredCapacity($core.int value) => $_setSignedInt32(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasRequiredCapacity() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearRequiredCapacity() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  FrameKind get frameKind => $_getN(8);
+  @$pb.TagNumber(9)
+  set frameKind(FrameKind value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasFrameKind() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearFrameKind() => $_clearField(9);
 }
 
 class GpuFrameDone extends $pb.GeneratedMessage {

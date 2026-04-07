@@ -14,6 +14,7 @@ pub mod canvas;
 pub mod canvas_cpu;
 #[cfg(feature = "gpu")]
 pub mod canvas_gpu;
+pub mod canvas_tui;
 pub mod cell;
 pub mod clipboard;
 pub mod column;

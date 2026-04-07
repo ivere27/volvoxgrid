@@ -17,6 +17,7 @@ namespace VolvoxGrid.DotNet
         Gpu = 2,
         GpuVulkan = 3,
         GpuGles = 4,
+        Tui = 5,
     }
 
     public enum VolvoxFramePacingMode

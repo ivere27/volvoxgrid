@@ -5632,6 +5632,17 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                         break;
                     }
                 }
+                Some(render_input::Input::TerminalInput(_))
+                | Some(render_input::Input::TerminalCapabilities(_))
+                | Some(render_input::Input::TerminalViewport(_))
+                | Some(render_input::Input::TerminalCommand(_)) => {
+                    if !stream.send(RenderOutput {
+                        rendered: false,
+                        event: None,
+                    }) {
+                        break;
+                    }
+                }
                 Some(render_input::Input::Buffer(buf)) => {
                     let rendered = render(grid_id, buf.width, buf.height) != 0;
                     let (dirty_x, dirty_y, dirty_w, dirty_h) = *RENDER_DIRTY_RECT.lock().unwrap();
@@ -5651,6 +5662,10 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                             dirty_w,
                             dirty_h,
                             metrics,
+                            bytes_written: 0,
+                            required_capacity: 0,
+                            frame_kind: volvoxgrid_engine::proto::volvoxgrid::v1::FrameKind::Frame
+                                as i32,
                         })),
                     }) {
                         break;

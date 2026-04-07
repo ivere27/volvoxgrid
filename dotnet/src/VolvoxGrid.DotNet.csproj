@@ -57,7 +57,12 @@
     <Compile Remove="common/Volvox/GdiTextRendererBridge.cs" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' != 'net8.0'">
+  <ItemGroup Condition="'$(TargetFramework)' == 'net40'">
+    <Compile Include="common/**/*.cs" Exclude="common/obj/**/*.cs" />
+    <Compile Remove="common/VolvoxGridTerminalHost.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' != 'net8.0' and '$(TargetFramework)' != 'net40'">
     <Compile Include="common/**/*.cs" Exclude="common/obj/**/*.cs" />
   </ItemGroup>
 </Project>

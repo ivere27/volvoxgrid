@@ -7,6 +7,7 @@
 # Environment:
 #   DOTNET_TFM=net40|net8.0|net8.0-windows   (default: net40)
 #   DOTNET_ARCH=x64|x86                      (default: x64, WinForms builds only)
+#   DOTNET_SAMPLE=auto|winforms|console|tui  (default: auto)
 
 set -euo pipefail
 
@@ -16,10 +17,45 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROFILE="debug"
 TARGET_TFM="${DOTNET_TFM:-net40}"
 TARGET_ARCH="${DOTNET_ARCH:-x64}"
+TARGET_SAMPLE="${DOTNET_SAMPLE:-}"
 unset DOTNET_TFM DOTNET_ARCH
 MONO_VERSION="${WINE_MONO_VERSION:-6.0.0}"
 BOOTSTRAP_STAMP_NAME=".volvoxgrid_wine_bootstrap_v2"
 LOG_HASHES="${VOLVOXGRID_LOG_HASHES:-0}"
+SAVED_TTY_STATE=""
+TTY_RESTORE_INSTALLED=0
+
+restore_tty_state() {
+    if [ "$TTY_RESTORE_INSTALLED" != "1" ]; then
+        return
+    fi
+
+    if [ -n "$SAVED_TTY_STATE" ] && [ -t 0 ]; then
+        stty "$SAVED_TTY_STATE" >/dev/null 2>&1 || true
+    fi
+}
+
+install_tty_restore_trap() {
+    if [ "$SAMPLE_KIND" != "tui" ] || [ "$TTY_RESTORE_INSTALLED" = "1" ]; then
+        return
+    fi
+
+    if ! [ -t 0 ]; then
+        return
+    fi
+
+    if ! command -v stty >/dev/null 2>&1; then
+        return
+    fi
+
+    SAVED_TTY_STATE="$(stty -g 2>/dev/null || true)"
+    if [ -z "$SAVED_TTY_STATE" ]; then
+        return
+    fi
+
+    TTY_RESTORE_INSTALLED=1
+    trap restore_tty_state EXIT HUP INT TERM
+}
 
 normalize_tfm_for_path() {
     local tfm="$1"
@@ -49,6 +85,9 @@ sample_basename_for_kind() {
             ;;
         console)
             printf 'VolvoxGrid.ConsoleSample\n'
+            ;;
+        tui)
+            printf 'VolvoxGrid.TuiSample\n'
             ;;
         *)
             echo "ERROR: unknown sample kind '$kind'" >&2
@@ -98,6 +137,9 @@ resolve_stage_dir() {
         console)
             base="$ROOT_DIR/target/dotnet/console_${profile}_$(normalize_tfm_for_path "$tfm")"
             ;;
+        tui)
+            base="$ROOT_DIR/target/dotnet/tui_${profile}_$(normalize_tfm_for_path "$tfm")"
+            ;;
         *)
             echo "ERROR: unknown sample kind '$sample_kind'" >&2
             exit 1
@@ -129,6 +171,14 @@ while [ "$#" -gt 0 ]; do
             fi
             shift 2
             ;;
+        --sample)
+            TARGET_SAMPLE="${2:-}"
+            if [ -z "$TARGET_SAMPLE" ]; then
+                echo "ERROR: --sample requires a value." >&2
+                exit 1
+            fi
+            shift 2
+            ;;
         *)
             echo "ERROR: unknown argument '$1'." >&2
             exit 1
@@ -150,7 +200,11 @@ case "$TARGET_ARCH" in
         ;;
 esac
 
-SAMPLE_KIND="$(sample_kind_for_tfm "$TARGET_TFM")"
+if [ -z "$TARGET_SAMPLE" ] || [ "$TARGET_SAMPLE" = "auto" ]; then
+    SAMPLE_KIND="$(sample_kind_for_tfm "$TARGET_TFM")"
+else
+    SAMPLE_KIND="$TARGET_SAMPLE"
+fi
 SAMPLE_BASENAME="$(sample_basename_for_kind "$SAMPLE_KIND")"
 PLUGIN_BASENAME="$(native_plugin_basename "$TARGET_TFM")"
 STAGE_DIR="$(resolve_stage_dir "$PROFILE" "$TARGET_TFM" "$TARGET_ARCH" "$SAMPLE_KIND")"
@@ -161,10 +215,15 @@ fi
 
 if [ ! -f "$STAGE_DIR/$ENTRY_NAME" ]; then
     if [ "$PROFILE" = "release" ]; then
-        "$SCRIPT_DIR/build_dotnet.sh" --tfm "$TARGET_TFM" --arch "$TARGET_ARCH" release
+        "$SCRIPT_DIR/build_dotnet.sh" --tfm "$TARGET_TFM" --arch "$TARGET_ARCH" --sample "$SAMPLE_KIND" release
     else
-        "$SCRIPT_DIR/build_dotnet.sh" --tfm "$TARGET_TFM" --arch "$TARGET_ARCH"
+        "$SCRIPT_DIR/build_dotnet.sh" --tfm "$TARGET_TFM" --arch "$TARGET_ARCH" --sample "$SAMPLE_KIND"
     fi
+fi
+
+if [ "$SAMPLE_KIND" = "tui" ] && [ "$TARGET_TFM" != "net8.0" ]; then
+    echo "ERROR: the TUI sample requires DOTNET_TFM=net8.0." >&2
+    exit 1
 fi
 
 require_stage_file() {
@@ -414,4 +473,5 @@ do
 done
 
 cd "$STAGE_DIR"
+install_tty_restore_trap
 dotnet "${SAMPLE_BASENAME}.dll"

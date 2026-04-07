@@ -2,6 +2,9 @@
 target/
 **/*.rs.bk
 
+# Golang
+go/tui
+
 # Flutter
 .dart_tool/
 .flutter-plugins

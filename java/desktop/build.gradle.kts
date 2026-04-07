@@ -265,6 +265,46 @@ tasks.register<JavaExec>("runSimpleDemo") {
     mainClass.set("io.github.ivere27.volvoxgrid.desktop.VolvoxGridDesktopDemo")
 }
 
+tasks.register<JavaExec>("runTuiDemo") {
+    group = "application"
+    description = "Run the terminal TUI demo."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("io.github.ivere27.volvoxgrid.desktop.VolvoxGridDesktopTuiExample")
+}
+
+tasks.register<JavaExec>("runTuiSmoke") {
+    group = "application"
+    description = "Run non-interactive terminal TUI smoke checks."
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("io.github.ivere27.volvoxgrid.desktop.VolvoxGridDesktopTuiExample")
+    systemProperty("volvoxgrid.tui.smoke", "true")
+}
+
+val tuiStartScripts = tasks.register<org.gradle.jvm.application.tasks.CreateStartScripts>("tuiStartScripts") {
+    group = "application"
+    description = "Create start scripts for the terminal TUI demo."
+    applicationName = "volvoxgrid-desktop-tui"
+    mainClass.set("io.github.ivere27.volvoxgrid.desktop.VolvoxGridDesktopTuiExample")
+    classpath = files(tasks.named("jar"), configurations.runtimeClasspath)
+    outputDir = layout.buildDirectory.dir("tui-start-scripts").get().asFile
+}
+
+tasks.register<Sync>("installTuiDist") {
+    group = "application"
+    description = "Install the terminal TUI demo distribution."
+    dependsOn(tasks.named("jar"), tuiStartScripts)
+    into(layout.buildDirectory.dir("install/volvoxgrid-desktop-tui"))
+    from(tuiStartScripts) {
+        into("bin")
+    }
+    from(tasks.named("jar")) {
+        into("lib")
+    }
+    from(configurations.runtimeClasspath) {
+        into("lib")
+    }
+}
+
 tasks.withType<JavaExec>().configureEach {
     if (synurangDesktopSource == "local" && synurangNativeLibPath.isNotBlank()) {
         val nativeLibFile = file(synurangNativeLibPath)

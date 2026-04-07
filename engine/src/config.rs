@@ -942,6 +942,11 @@ fn cell_value_to_text(value: &CellValueData) -> String {
 impl VolvoxGrid {
     /// Apply a partial `GridConfig`. Only set sub-messages are dispatched.
     pub fn apply_config(&mut self, config: &v1::GridConfig) {
+        if let Some(rc) = &config.rendering {
+            if let Some(renderer_mode) = rc.renderer_mode {
+                self.set_renderer_mode(renderer_mode);
+            }
+        }
         if let Some(lc) = &config.layout {
             self.apply_layout_config(lc);
         }
@@ -1020,7 +1025,11 @@ impl VolvoxGrid {
             self.frozen_cols = fc.max(0).min(self.cols - self.fixed_cols);
         }
         if let Some(h) = lc.default_row_height {
-            self.default_row_height = h.max(1);
+            self.default_row_height = if self.is_tui_mode() {
+                crate::grid::DEFAULT_TUI_ROW_HEIGHT
+            } else {
+                h.max(1)
+            };
             self.layout.invalidate();
         }
         if let Some(w) = lc.default_col_width {
@@ -1707,9 +1716,6 @@ impl VolvoxGrid {
     }
 
     fn apply_render_config(&mut self, rc: &v1::RenderConfig) {
-        if let Some(v) = rc.renderer_mode {
-            self.renderer_mode = v;
-        }
         if let Some(v) = rc.debug_overlay {
             self.debug_overlay = v;
             if rc.layer_profiling.is_none() {
@@ -3170,6 +3176,64 @@ mod tests {
         assert_eq!(grid.style.back_color, 0xFF112233);
         assert_ne!(old_back, grid.style.back_color);
         assert_eq!(grid.style.fore_color, 0xFF000000); // unchanged
+    }
+
+    #[test]
+    fn renderer_mode_tui_applies_runtime_tui_defaults() {
+        let mut grid = test_grid();
+
+        grid.apply_config(&v1::GridConfig {
+            rendering: Some(v1::RenderConfig {
+                renderer_mode: Some(v1::RendererMode::RendererTui as i32),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+
+        assert!(grid.is_tui_mode());
+        assert_eq!(grid.default_row_height, crate::grid::DEFAULT_TUI_ROW_HEIGHT);
+        assert_eq!(grid.default_col_width, crate::grid::DEFAULT_TUI_COL_WIDTH);
+        assert!(!grid.animation.enabled);
+        assert!(!grid.fling_enabled);
+        assert!(!grid.pinch_zoom_enabled);
+        assert_eq!(
+            grid.scrollbar_show_h,
+            v1::ScrollBarMode::ScrollbarModeNever as i32
+        );
+        assert_eq!(
+            grid.scrollbar_show_v,
+            v1::ScrollBarMode::ScrollbarModeAuto as i32
+        );
+    }
+
+    #[test]
+    fn renderer_mode_tui_defaults_remain_overrideable_in_same_config() {
+        let mut grid = test_grid();
+
+        grid.apply_config(&v1::GridConfig {
+            scrolling: Some(v1::ScrollConfig {
+                fling_enabled: Some(true),
+                scroll_bar: Some(v1::ScrollBarConfig {
+                    show_v: Some(v1::ScrollBarMode::ScrollbarModeAlways as i32),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            rendering: Some(v1::RenderConfig {
+                renderer_mode: Some(v1::RendererMode::RendererTui as i32),
+                animation_enabled: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+
+        assert!(grid.is_tui_mode());
+        assert!(grid.animation.enabled);
+        assert!(grid.fling_enabled);
+        assert_eq!(
+            grid.scrollbar_show_v,
+            v1::ScrollBarMode::ScrollbarModeAlways as i32
+        );
     }
 
     #[test]

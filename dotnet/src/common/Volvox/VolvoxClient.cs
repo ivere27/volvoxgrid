@@ -264,7 +264,7 @@ namespace VolvoxGrid.DotNet.Internal
 
         public int Find(long gridId, int col, int startRow, string text, bool caseSensitive, bool fullMatch, string regex)
         {
-            var req = new FindRequest { GridId = gridId, Col = col };
+            var req = new FindRequest { GridId = gridId, Col = col, StartRow = startRow };
             if (!string.IsNullOrEmpty(regex))
             {
                 req.RegexQuery = new RegexQuery { Pattern = regex };
@@ -354,6 +354,13 @@ namespace VolvoxGrid.DotNet.Internal
             InvokeUnary(EditMethod, cmd.ToByteArray());
         }
 
+        public EditState GetEditState(long gridId)
+        {
+            var cmd = new EditCommand { GridId = gridId };
+            byte[] response = InvokeUnary(EditMethod, cmd.ToByteArray());
+            return EditState.ParseFrom(response);
+        }
+
         public ClipboardResponse Clipboard(long gridId, string action, string pasteText)
         {
             var cmd = new ClipboardCommand { GridId = gridId };
@@ -375,10 +382,21 @@ namespace VolvoxGrid.DotNet.Internal
             return ExportResponse.ParseFrom(response);
         }
 
+        public LoadDataResult LoadData(long gridId, byte[] data, LoadDataOptions options)
+        {
+            var req = new LoadDataRequest
+            {
+                GridId = gridId,
+                Data = WrapBytes(data),
+                Options = options,
+            };
+            byte[] response = InvokeUnary(LoadDataMethod, req.ToByteArray());
+            return LoadDataResult.ParseFrom(response);
+        }
+
         public void LoadData(long gridId, byte[] data)
         {
-            var req = new LoadDataRequest { GridId = gridId, Data = WrapBytes(data) };
-            InvokeUnary(LoadDataMethod, req.ToByteArray());
+            LoadData(gridId, data, null);
         }
 
         public void Print(long gridId, bool landscape, int marginL, int marginT, int marginR, int marginB, string header, string footer, bool showPageNumbers)

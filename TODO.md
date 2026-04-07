@@ -11,6 +11,20 @@
 - [ ] **Cache or short-circuit `get_display_text` in overflow scanning** (`engine/src/canvas.rs:2425,2443`, `engine/src/grid.rs:1817-1854`): Neighbor overflow scans still call full `get_display_text()` (dropdown translation + format application). Short-circuit with `cells.get_text(row, c).is_empty()` before expensive display-text work, and/or memoize row display strings during render.
 - [ ] **Out-of-Bounds / Panic Risks (Rust)** (`engine/src/layout.rs`, `engine/src/grid.rs`, `web/crate/src/lib.rs`): Unsafe use of `.last().unwrap()` and `.as_mut().unwrap()` will panic and crash the app if the layout is empty or values are `None`. Fix: Handle `None` gracefully instead of unwrapping.
 
+## TUI
+
+- [ ] **Expose the shared TUI navigation/edit policy as configurable API, not just plugin behavior** (`plugin/src/lib.rs`, `plugin/src/terminal_tui.rs`, `proto/volvoxgrid.proto`, `engine/src/input.rs`): Terminal TUI hosts now share navigation-first editing with `Enter`/`F2`/`i` and an `Insert` toggle for sticky auto-start edit. The remaining work is to surface that as a first-class config/API instead of a hard-wired terminal-session policy.
+- [ ] **Promote search from sample-only behavior to a first-class TUI feature** (`go/examples/tui/terminal.go`, `dotnet/examples/tui/ThinHost.cs`, `java/desktop/src/main/java/io/github/ivere27/volvoxgrid/desktop/VolvoxGridDesktopTuiExample.java`, `proto/volvoxgrid.proto`, `engine/src/search.rs`): Current `/` + `n/N` flow now lives in the sample controllers for Go, .NET, and Java. Move the keymap/prompt/search session model into the reusable TUI layer or engine-facing API so every host gets the same behavior by default.
+- [ ] **Search highlighting + status UX in TUI** (`engine/src/canvas_tui.rs`, `engine/src/search.rs`): Highlight the current hit (and optionally all visible hits), show wrap status and hit counters, and make search prompt/results feel integrated rather than footer-only.
+- [ ] **Engine-level filter/search workflow for TUI** (`proto/volvoxgrid.proto`, `engine/src/search.rs`, `plugin/src/lib.rs`): Add row filtering, match navigation, and visible filtered-state feedback instead of only point search.
+- [ ] **Structured TUI column sizing modes** (`proto/volvoxgrid.proto`, `engine/src/grid.rs`, `engine/src/canvas_tui.rs`): Add explicit `FIT_TO_WIDTH`, content-driven `AUTO`, and per-column priority rules instead of only basic viewport fill of already-visible columns.
+- [ ] **Responsive narrow-terminal column strategy** (`engine/src/canvas_tui.rs`, `engine/src/grid.rs`): When the terminal gets tight, shrink intelligently and/or hide low-priority columns before forcing disorienting horizontal scroll.
+- [ ] **Horizontal scrollbar in TUI renderer** (`engine/src/canvas_tui.rs`, `plugin/src/lib.rs`): Vertical scrollbar exists; horizontal position is still invisible for wide grids.
+- [ ] **Semantic TUI themes** (`proto/volvoxgrid.proto`, `engine/src/canvas_tui.rs`, `plugin/src/terminal_tui.rs`): Add named themes such as `dark`, `light`, `16-color`, and `monochrome` instead of relying only on raw color values plus transparent background mode.
+- [ ] **Windows terminal host support** (`go/pkg/volvoxgrid/tui/terminal.go`, `go/pkg/volvoxgrid/tui/app.go`): Replace Unix-only `stty` / `ioctl` assumptions with Win32 console handling for Windows Terminal and modern VT-capable consoles.
+- [ ] **TUI clipboard support** (`go/pkg/volvoxgrid/tui/terminal.go`, host adapters): Add OSC 52 and/or platform clipboard integration for copy workflows.
+- [ ] **Backward search scalability for very large datasets** (`go/examples/tui/terminal.go`, `engine/src/search.rs`): Sample `N` navigation currently composes around the existing forward-only find primitive; add an efficient reverse-find path so 1M-row search stays responsive.
+
 ## Wasm
 
 - [ ] font style support in wasm: italic, bold, and strike-through.

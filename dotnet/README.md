@@ -5,6 +5,18 @@
 - `VolvoxGridControl` for WinForms applications
 - `VolvoxGridClient` for cross-platform `.NET 8` controller/headless use
 
+It also exposes a thin terminal-host surface for Synurang `RenderSession`
+rendering:
+
+- `VolvoxGridTerminalSession`
+- `VolvoxGridTerminalFrame`
+- `VolvoxGridTerminalCapabilities`
+
+Repo examples:
+
+- `dotnet/examples/console` for controller/headless smoke checks
+- `dotnet/examples/tui` for the interactive `net8.0` terminal host
+
 From a .NET developer's point of view, you work with:
 
 - one managed assembly: `VolvoxGrid.DotNet.dll`
@@ -37,6 +49,7 @@ Runtime notes:
 - Namespace: `VolvoxGrid.DotNet`
 - Main control: `VolvoxGridControl`
 - Cross-platform client: `VolvoxGridClient`
+- Cross-platform terminal session: `VolvoxGridTerminalSession`
 - Column model: `VolvoxGridColumn`
 - Cell batch model: `VolvoxGridCellText`
 - Selection model: `VolvoxGridSelectionState`
@@ -220,6 +233,77 @@ grid.LoadTable(2, 2, new object[]
 
 Console.WriteLine(grid.FindByText("Beta", 1, 0, false, true));
 ```
+
+### Cross-platform `.NET 8`: Open a TUI Session
+
+```csharp
+using VolvoxGrid.DotNet;
+using Volvoxgrid.V1;
+
+using var grid = new VolvoxGridClient(viewportWidth: 80, viewportHeight: 24);
+
+grid.Configure(new GridConfig
+{
+    Indicators = new IndicatorsConfig
+    {
+        RowStart = new RowIndicatorConfig { Visible = false },
+        ColTop = new ColIndicatorConfig { Visible = true, BandRows = 1 },
+    },
+});
+
+grid.DefineColumns(new[]
+{
+    new ColumnDef { Index = 0, Key = "id", Caption = "ID", Width = 4, DataType = ColumnDataType.COLUMN_DATA_NUMBER, Align = Align.ALIGN_RIGHT_CENTER },
+    new ColumnDef { Index = 1, Key = "name", Caption = "Name", Width = 6 },
+});
+
+grid.LoadTable(2, 2, new object[]
+{
+    10, "Alpha",
+    20, "Beta",
+}, atomic: true);
+
+using var terminal = grid.OpenTerminalSession();
+terminal.SetCapabilities(new VolvoxGridTerminalCapabilities
+{
+    ColorLevel = VolvoxGridTerminalColorLevel.Truecolor,
+});
+terminal.SetViewport(0, 0, 20, 6, fullscreen: false);
+VolvoxGridTerminalFrame frame = terminal.Render();
+
+Console.OpenStandardOutput().Write(frame.Buffer, 0, frame.BytesWritten);
+
+byte[] arrowDown = new byte[] { 0x1b, (byte)'[', (byte)'B' };
+terminal.SendInputBytes(arrowDown, arrowDown.Length);
+```
+
+Notes:
+
+- `OpenTerminalSession()` forces the grid into the TUI renderer mode before opening the streams.
+- `Render()` writes terminal bytes into a host-owned buffer and returns `BytesWritten`.
+- the host forwards raw stdin bytes; the plugin owns terminal escape parsing and ANSI encoding.
+- viewport coordinates stay local to the reserved grid rectangle.
+
+### Run The Interactive TUI Example
+
+From this repo:
+
+```bash
+make dotnet-tui-run
+```
+
+Non-interactive smoke:
+
+```bash
+make dotnet-tui-smoke
+```
+
+Current runtime notes for the sample:
+
+- the sample target is `net8.0`
+- the sample uses ANSI alternate-screen rendering
+- keyboard works on all `net8.0` hosts
+- mouse reporting is currently enabled for Unix-style terminals where the sample can switch stdin into raw mode
 
 ### WinForms: Populate the grid without a bound data source
 

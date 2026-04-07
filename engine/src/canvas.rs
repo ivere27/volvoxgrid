@@ -7792,6 +7792,7 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
                 "AUTO(CPU)".to_string()
             }
         }
+        m if m == pb::RendererMode::RendererTui as i32 => "TUI".to_string(),
         m if m >= pb::RendererMode::RendererGpu as i32 => {
             if !grid.debug_gpu_backend.is_empty() {
                 let pm = if !grid.debug_gpu_present_mode.is_empty() {

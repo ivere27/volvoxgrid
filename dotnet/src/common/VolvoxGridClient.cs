@@ -141,6 +141,26 @@ namespace VolvoxGrid.DotNet
             _client.Select(_gridId, activeRow, activeCol, ranges, show);
         }
 
+        public void SelectCell(int row, int col, bool? show)
+        {
+            EnsureNotDisposed();
+            _client.Select(
+                _gridId,
+                row,
+                col,
+                new[]
+                {
+                    new CellRange
+                    {
+                        Row1 = row,
+                        Col1 = col,
+                        Row2 = row,
+                        Col2 = col,
+                    },
+                },
+                show);
+        }
+
         public SelectionState GetSelection()
         {
             EnsureNotDisposed();
@@ -255,6 +275,12 @@ namespace VolvoxGrid.DotNet
             _client.EditCancel(_gridId);
         }
 
+        public EditState GetEditState()
+        {
+            EnsureNotDisposed();
+            return _client.GetEditState(_gridId);
+        }
+
         public void SetPreedit(string text, int cursor, bool commit)
         {
             EnsureNotDisposed();
@@ -283,6 +309,12 @@ namespace VolvoxGrid.DotNet
         {
             EnsureNotDisposed();
             _client.LoadData(_gridId, data);
+        }
+
+        public LoadDataResult LoadData(byte[] data, LoadDataOptions options)
+        {
+            EnsureNotDisposed();
+            return _client.LoadData(_gridId, data, options);
         }
 
         public void Print(bool landscape, int marginLeft, int marginTop, int marginRight, int marginBottom, string header, string footer, bool showPageNumbers)
@@ -325,6 +357,36 @@ namespace VolvoxGrid.DotNet
         {
             EnsureNotDisposed();
             _client.Refresh(_gridId);
+        }
+
+        public VolvoxGridTuiSession OpenTuiSession()
+        {
+            EnsureNotDisposed();
+            _client.ConfigureGrid(
+                _gridId,
+                new GridConfig
+                {
+                    Rendering = new RenderConfig
+                    {
+                        RendererMode = (RendererMode)VolvoxGridTuiSession.RendererModeValue,
+                    },
+            });
+            return new VolvoxGridTuiSession(_client, _gridId);
+        }
+
+        public VolvoxGridTerminalSession OpenTerminalSession()
+        {
+            EnsureNotDisposed();
+            _client.ConfigureGrid(
+                _gridId,
+                new GridConfig
+                {
+                    Rendering = new RenderConfig
+                    {
+                        RendererMode = (RendererMode)VolvoxGridRendererMode.Tui,
+                    },
+                });
+            return new VolvoxGridTerminalSession(_client, _gridId);
         }
 
         public static CellValue ToCellValue(object value)

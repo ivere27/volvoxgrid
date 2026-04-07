@@ -206,6 +206,11 @@ export enum FocusBorderStyle {
   FOCUS_BORDER_INSET = 3,
   FOCUS_BORDER_RAISED = 4,
 }
+export enum FrameKind {
+  FRAME_KIND_FRAME = 0,
+  FRAME_KIND_SESSION_START = 1,
+  FRAME_KIND_SESSION_END = 2,
+}
 export enum FramePacingMode {
   FRAME_PACING_MODE_AUTO = 0,
   FRAME_PACING_MODE_PLATFORM = 1,
@@ -333,6 +338,7 @@ export enum RendererMode {
   RENDERER_GPU = 2,
   RENDERER_GPU_VULKAN = 3,
   RENDERER_GPU_GLES = 4,
+  RENDERER_TUI = 5,
 }
 export enum RowIndicatorMode {
   ROW_INDICATOR_NONE = 0,
@@ -420,6 +426,16 @@ export enum StickyEdge {
 export enum TabBehavior {
   TAB_CONTROLS = 0,
   TAB_CELLS = 1,
+}
+export enum TerminalColorLevel {
+  TERMINAL_COLOR_LEVEL_AUTO = 0,
+  TERMINAL_COLOR_LEVEL_TRUECOLOR = 1,
+  TERMINAL_COLOR_LEVEL_256 = 2,
+  TERMINAL_COLOR_LEVEL_16 = 3,
+}
+export enum TerminalCommand_Kind {
+  TERMINAL_COMMAND_NONE = 0,
+  TERMINAL_COMMAND_EXIT = 1,
 }
 export enum TextEffect {
   TEXT_EFFECT_NONE = 0,
@@ -583,6 +599,7 @@ export const BufferReadyFields = {
   "stride": 2,
   "width": 3,
   "height": 4,
+  "capacity": 5,
 } as const;
 export const CellChangedEventFields = {
   "row": 1,
@@ -991,6 +1008,9 @@ export const FrameDoneFields = {
   "dirty_w": 4,
   "dirty_h": 5,
   "metrics": 6,
+  "bytes_written": 7,
+  "required_capacity": 8,
+  "frame_kind": 9,
 } as const;
 export const FrameMetricsFields = {
   "frame_time_ms": 1,
@@ -1513,6 +1533,10 @@ export const RenderInputFields = {
   "event_decision": 7,
   "zoom": 8,
   "gpu_surface": 9,
+  "terminal_input": 10,
+  "terminal_capabilities": 11,
+  "terminal_viewport": 12,
+  "terminal_command": 13,
 } as const;
 export const RenderOutputFields = {
   "rendered": 1,
@@ -1743,6 +1767,25 @@ export const SubtotalRequestFields = {
 } as const;
 export const SubtotalResultFields = {
   "rows": 1,
+} as const;
+export const TerminalCapabilitiesFields = {
+  "color_level": 1,
+  "sgr_mouse": 2,
+  "focus_events": 3,
+  "bracketed_paste": 4,
+} as const;
+export const TerminalCommandFields = {
+  "kind": 1,
+} as const;
+export const TerminalInputBytesFields = {
+  "data": 1,
+} as const;
+export const TerminalViewportFields = {
+  "origin_x": 1,
+  "origin_y": 2,
+  "width": 3,
+  "height": 4,
+  "fullscreen": 5,
 } as const;
 export const TextQueryFields = {
   "text": 1,

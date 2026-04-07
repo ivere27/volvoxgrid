@@ -82,6 +82,9 @@ impl Default for InputBehavior {
 const HEADER_REORDER_LONG_PRESS_MS: u128 = 350;
 
 fn header_resize_hit_half_width(grid: &VolvoxGrid) -> i32 {
+    if grid.is_tui_mode() {
+        return 1;
+    }
     let w = grid.style.header_resize_handle.hit_width_px.max(1);
     // Symmetric tolerance around the border center line.
     (w + 1) / 2
@@ -144,6 +147,9 @@ fn scroll_by_with_events(grid: &mut VolvoxGrid, dx: f32, dy: f32) -> bool {
 
     let mut next_scroll = grid.scroll.clone();
     next_scroll.scroll_by(dx, dy);
+    if grid.is_tui_mode() {
+        next_scroll.quantize_to_cells();
+    }
     let predicted = visible_top_left_for_scroll(grid, next_scroll.scroll_x, next_scroll.scroll_y);
     if old != predicted {
         grid.events.push(GridEventData::BeforeScroll {
@@ -155,6 +161,7 @@ fn scroll_by_with_events(grid: &mut VolvoxGrid, dx: f32, dy: f32) -> bool {
     }
 
     grid.scroll.scroll_by(dx, dy);
+    grid.normalize_scroll_for_mode();
 
     let actual = visible_top_left_for_scroll(grid, grid.scroll.scroll_x, grid.scroll.scroll_y);
     if old != actual {
@@ -176,6 +183,9 @@ fn scroll_to_with_events(grid: &mut VolvoxGrid, x: f32, y: f32) -> bool {
 
     let mut next_scroll = grid.scroll.clone();
     next_scroll.scroll_to(x, y);
+    if grid.is_tui_mode() {
+        next_scroll.quantize_to_cells();
+    }
     let predicted = visible_top_left_for_scroll(grid, next_scroll.scroll_x, next_scroll.scroll_y);
     if old != predicted {
         grid.events.push(GridEventData::BeforeScroll {
@@ -187,6 +197,7 @@ fn scroll_to_with_events(grid: &mut VolvoxGrid, x: f32, y: f32) -> bool {
     }
 
     grid.scroll.scroll_to(x, y);
+    grid.normalize_scroll_for_mode();
 
     let actual = visible_top_left_for_scroll(grid, grid.scroll.scroll_x, grid.scroll.scroll_y);
     if old != actual {
@@ -200,6 +211,10 @@ fn scroll_to_with_events(grid: &mut VolvoxGrid, x: f32, y: f32) -> bool {
     } else {
         false
     }
+}
+
+pub fn scroll_to(grid: &mut VolvoxGrid, x: f32, y: f32) -> bool {
+    scroll_to_with_events(grid, x, y)
 }
 
 fn begin_edit_from_input_with_options(grid: &mut VolvoxGrid, row: i32, col: i32, caret_end: bool) {
@@ -284,9 +299,28 @@ fn commit_active_edit(grid: &mut VolvoxGrid) -> bool {
     }
 }
 
+pub fn commit_dropdown_item_click(grid: &mut VolvoxGrid, idx: i32) -> bool {
+    if idx < 0 || idx >= grid.edit.dropdown_count() {
+        return false;
+    }
+
+    grid.edit.set_dropdown_index(idx);
+    grid.edit.clear_dropdown_search();
+    let text = grid.edit.get_dropdown_item(idx).to_string();
+    grid.edit.update_text(text.clone());
+    grid.events.push(GridEventData::CellEditChange { text });
+
+    grid.dropdown_click_active = true;
+    grid.commit_edit();
+    grid.mark_dirty();
+    true
+}
+
 fn move_selection_after_edit_commit(grid: &mut VolvoxGrid, row: i32, col: i32) {
     let old_row = grid.selection.row;
     let old_col = grid.selection.col;
+    let old_row_end = grid.selection.row_end;
+    let old_col_end = grid.selection.col_end;
     grid.selection.set_cursor(
         row,
         col,
@@ -296,7 +330,11 @@ fn move_selection_after_edit_commit(grid: &mut VolvoxGrid, row: i32, col: i32) {
         grid.fixed_cols,
     );
 
-    if grid.selection.row != old_row || grid.selection.col != old_col {
+    let cursor_changed = grid.selection.row != old_row || grid.selection.col != old_col;
+    let extent_changed =
+        grid.selection.row_end != old_row_end || grid.selection.col_end != old_col_end;
+
+    if cursor_changed {
         grid.events.push(GridEventData::CellFocusChanged {
             old_row,
             old_col,
@@ -306,6 +344,19 @@ fn move_selection_after_edit_commit(grid: &mut VolvoxGrid, row: i32, col: i32) {
         grid.scroll.show_cell(
             grid.selection.row,
             grid.selection.col,
+            &grid.layout,
+            grid.data_viewport_width(),
+            grid.data_viewport_height(),
+            grid.fixed_rows,
+            grid.fixed_cols,
+            grid.pinned_top_height() + grid.pinned_bottom_height(),
+            grid.pinned_left_width() + grid.pinned_right_width(),
+        );
+        grid.mark_dirty();
+    } else if extent_changed {
+        grid.scroll.show_cell(
+            grid.selection.row_end,
+            grid.selection.col_end,
             &grid.layout,
             grid.data_viewport_width(),
             grid.data_viewport_height(),
@@ -1504,18 +1555,7 @@ pub fn handle_pointer_down_with_behavior(
     match hit.area {
         HitArea::DropdownList => {
             if let Some(idx) = grid.dropdown_hit_index(x, y) {
-                grid.edit.set_dropdown_index(idx);
-                grid.edit.clear_dropdown_search();
-                // Update text to match selection
-                let text = grid.edit.get_dropdown_item(idx).to_string();
-                grid.edit.update_text(text.clone());
-                grid.events.push(GridEventData::CellEditChange { text });
-
-                // Consume the rest of this pointer gesture after committing so
-                // the closing popup does not leak into grid selection.
-                grid.dropdown_click_active = true;
-                grid.commit_edit();
-                grid.mark_dirty();
+                commit_dropdown_item_click(grid, idx);
             }
         }
         HitArea::DropdownButton => {
@@ -2574,6 +2614,8 @@ pub fn handle_key_down_with_behavior(
 
     let old_row = grid.selection.row;
     let old_col = grid.selection.col;
+    let old_row_end = grid.selection.row_end;
+    let old_col_end = grid.selection.col_end;
 
     match key_code {
         // Arrow keys
@@ -2819,8 +2861,11 @@ pub fn handle_key_down_with_behavior(
         _ => {}
     }
 
-    // Fire events if cursor moved
-    if grid.selection.row != old_row || grid.selection.col != old_col {
+    let cursor_changed = grid.selection.row != old_row || grid.selection.col != old_col;
+    let extent_changed =
+        grid.selection.row_end != old_row_end || grid.selection.col_end != old_col_end;
+
+    if cursor_changed {
         grid.events.push(GridEventData::CellFocusChanged {
             old_row,
             old_col,
@@ -2831,6 +2876,19 @@ pub fn handle_key_down_with_behavior(
         grid.scroll.show_cell(
             grid.selection.row,
             grid.selection.col,
+            &grid.layout,
+            grid.data_viewport_width(),
+            grid.data_viewport_height(),
+            grid.fixed_rows,
+            grid.fixed_cols,
+            grid.pinned_top_height() + grid.pinned_bottom_height(),
+            grid.pinned_left_width() + grid.pinned_right_width(),
+        );
+        grid.mark_dirty();
+    } else if extent_changed {
+        grid.scroll.show_cell(
+            grid.selection.row_end,
+            grid.selection.col_end,
             &grid.layout,
             grid.data_viewport_width(),
             grid.data_viewport_height(),
@@ -3048,7 +3106,11 @@ pub fn handle_scroll(grid: &mut VolvoxGrid, delta_x: f32, delta_y: f32) {
         let _ = bump_scrollbar_fade(grid);
     }
 
-    let line_height = grid.default_row_height as f32;
+    let line_height = if grid.is_tui_mode() {
+        1.0
+    } else {
+        grid.default_row_height as f32
+    };
     let dx = delta_x * line_height;
     let dy = delta_y * line_height;
     if grid.handle_pull_to_refresh_scroll(dx, dy) {
@@ -3060,6 +3122,9 @@ pub fn handle_scroll(grid: &mut VolvoxGrid, delta_x: f32, delta_y: f32) {
 
     let mut next_scroll = grid.scroll.clone();
     next_scroll.scroll_by(dx, dy);
+    if grid.is_tui_mode() {
+        next_scroll.quantize_to_cells();
+    }
     let predicted_top_left =
         visible_top_left_for_scroll(grid, next_scroll.scroll_x, next_scroll.scroll_y);
     if old_top_left != predicted_top_left {
@@ -3072,10 +3137,11 @@ pub fn handle_scroll(grid: &mut VolvoxGrid, delta_x: f32, delta_y: f32) {
     }
 
     grid.scroll.scroll_by(dx, dy);
+    grid.normalize_scroll_for_mode();
     let new_top_left =
         visible_top_left_for_scroll(grid, grid.scroll.scroll_x, grid.scroll.scroll_y);
     let scrolled = old_top_left != new_top_left;
-    if grid.fling_enabled {
+    if grid.fling_enabled && !grid.is_tui_mode() {
         // Convert wheel/touch delta into an inertial velocity impulse.
         let impulse_gain = grid.fling_impulse_gain.max(0.0);
         grid.scroll
