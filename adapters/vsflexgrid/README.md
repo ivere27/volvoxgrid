@@ -5,6 +5,10 @@ FlexGrid OCX controls. It packages the VolvoxGrid Rust engine as a standard
 COM/OLE control (`.ocx`) for VB6, VBA, VBScript, C++, or any COM-aware host,
 so teams can identify current VolvoxGrid gaps and prioritize improvements.
 
+## Screenshot
+
+<img src="../../screenshots/activex.png" alt="VolvoxGrid ActiveX demo running under Wine on Ubuntu" width="100%">
+
 ## Architecture
 
 ```

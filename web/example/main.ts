@@ -64,16 +64,16 @@ const DEMO_DEFAULT_HOVER_MODE: Record<StandardDemoMode, number> = {
   hierarchy: HOVER_CELL,
 };
 const SALES_COLUMN_SETUP = [
-  { caption: "Q", key: "Q", width: 40, align: 4, dataType: undefined, format: undefined, dropdownItems: undefined, span: true },
-  { caption: "Region", key: "Region", width: 80, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: true },
-  { caption: "Category", key: "Category", width: 100, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
-  { caption: "Product", key: "Product", width: 120, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
-  { caption: "Sales", key: "Sales", width: 90, align: 7, dataType: 4, format: "$#,##0", dropdownItems: undefined, span: false },
-  { caption: "Cost", key: "Cost", width: 90, align: 7, dataType: 4, format: "$#,##0", dropdownItems: undefined, span: false },
-  { caption: "Margin%", key: "Margin", width: 70, align: 4, dataType: 1, format: undefined, dropdownItems: undefined, span: false },
-  { caption: "Flag", key: "Flag", width: 56, align: 4, dataType: 3, format: undefined, dropdownItems: undefined, span: false },
-  { caption: "Status", key: "Status", width: 80, align: undefined, dataType: undefined, format: undefined, dropdownItems: SALES_STATUS_ITEMS, span: false },
-  { caption: "Notes", key: "Notes", width: 140, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
+  { caption: "Q", key: "Q", align: 4, dataType: undefined, format: undefined, dropdownItems: undefined, span: true },
+  { caption: "Region", key: "Region", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: true },
+  { caption: "Category", key: "Category", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
+  { caption: "Product", key: "Product", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
+  { caption: "Sales", key: "Sales", align: 7, dataType: 4, format: "$#,##0", dropdownItems: undefined, span: false },
+  { caption: "Cost", key: "Cost", align: 7, dataType: 4, format: "$#,##0", dropdownItems: undefined, span: false },
+  { caption: "Margin%", key: "Margin", align: 4, dataType: 1, format: undefined, dropdownItems: undefined, span: false },
+  { caption: "Flag", key: "Flag", align: 4, dataType: 3, format: undefined, dropdownItems: undefined, span: false },
+  { caption: "Status", key: "Status", align: undefined, dataType: undefined, format: undefined, dropdownItems: SALES_STATUS_ITEMS, span: false },
+  { caption: "Notes", key: "Notes", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
 ] as const;
 const HIERARCHY_COLUMN_SETUP = [
   { caption: "Name", key: "Name", width: 260, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
@@ -86,7 +86,7 @@ const HIERARCHY_COLUMN_SETUP = [
 type DemoColumnSetup = {
   caption: string;
   key: string;
-  width: number;
+  width?: number;
   align?: number;
   dataType?: number;
   format?: string;
@@ -385,7 +385,9 @@ function pbEncodeColumnDef(
 ): Uint8Array {
   const out: number[] = [];
   out.push(...pbEncodeInt32Field(1, index));
-  out.push(...pbEncodeInt32Field(2, setup.width));
+  if (setup.width != null) {
+    out.push(...pbEncodeInt32Field(2, setup.width));
+  }
   out.push(...pbEncodeStringField(5, setup.caption));
   if (setup.align != null) {
     out.push(...pbEncodeInt32Field(6, setup.align));

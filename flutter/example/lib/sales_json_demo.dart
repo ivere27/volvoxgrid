@@ -1,6 +1,5 @@
 import 'package:volvoxgrid/volvoxgrid.dart' hide Padding;
 
-const List<int> _salesColWidths = [40, 80, 100, 120, 90, 90, 70, 56, 80, 140];
 const List<String> _salesCaptions = [
   'Q',
   'Region',
@@ -46,7 +45,7 @@ const int _salesHoverBandBg = 0x106366F1;
 const int _salesHoverCellBg = 0x1E818CF8;
 
 Future<void> loadSalesJsonDemo(VolvoxGridController controller) async {
-  await controller.setColCount(_salesColWidths.length);
+  await controller.setColCount(_salesKeys.length);
   final columns = _salesDefineColumnsRequest();
   await controller.defineColumns(columns);
   final result = await controller.loadData(
@@ -139,12 +138,11 @@ Future<void> loadSalesJsonDemo(VolvoxGridController controller) async {
 
 DefineColumnsRequest _salesDefineColumnsRequest() {
   final request = DefineColumnsRequest();
-  for (var col = 0; col < _salesColWidths.length; col += 1) {
+  for (var col = 0; col < _salesKeys.length; col += 1) {
     final def = ColumnDef()
       ..index = col
       ..caption = _salesCaptions[col]
-      ..key = _salesKeys[col]
-      ..width = _salesColWidths[col];
+      ..key = _salesKeys[col];
     if (col == 0) {
       def.align = Align.ALIGN_CENTER_CENTER;
     } else if (col == 4 || col == 5) {

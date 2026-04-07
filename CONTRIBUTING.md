@@ -2,6 +2,8 @@
 
 Thank you for your interest in contributing to VolvoxGrid! This document provides guidelines and information for contributors.
 
+For repo architecture, local build commands, and development workflow, see [ARCHITECTURE.md](ARCHITECTURE.md). This file stays focused on contribution policy and review expectations.
+
 ## Contributor License Agreement (CLA)
 
 By submitting a pull request or patch to this repository, you agree to the following terms:
@@ -67,8 +69,10 @@ Examples:
 - **Rust**: Latest stable version (via `rustup`).
 - **Flutter**: Latest stable version (if working on Flutter components).
 - **Protobuf Compiler**: `protoc` (if modifying `.proto` files).
+- **Go**: 1.22+ (for `protoc-gen-synurang-ffi` codegen and the Go TUI host).
 - **Android SDK/NDK**: For Android/Flutter builds.
-- **Node.js/npm**: For Web builds.
+- **Node.js/npm**: For web and adapter package builds.
+- **.NET SDK**: For `.NET` wrapper builds.
 
 ### Build & Run
 
@@ -95,24 +99,54 @@ make flutter-run
 
 # Run GTK4 Plugin-Host Visual Test (Linux)
 make gtk-test
+
+# Run Go TUI Example
+make go-tui-run
+
+# Run .NET TUI Example
+make dotnet-tui-run
+
+# Run Java TUI Example
+make java-tui-run
 ```
 
 ## Project Structure
 
 ```
 volvoxgrid/
-├── engine/        # Core grid logic (Rust)
-├── plugin/        # Synurang FFI plugin wrapper (Rust)
-├── flutter/       # Flutter plugin & example app
-├── web/           # WebAssembly crate & JS bindings
-├── proto/         # Protobuf definitions
-├── codegen/       # Generated FFI bindings
-├── android/       # Android-specific build configurations
-├── adapters/
-│   └── vsflexgrid/ # ActiveX control (Windows)
-├── gtk-test/      # GTK4 plugin-host visual test harness
-├── smoke-test/    # CLI smoke test
-└── scripts/       # Utility scripts
+├── engine/          # Core grid logic (Rust)
+├── plugin/          # Synurang FFI plugin wrapper (Rust)
+├── proto/           # Protobuf definitions
+├── codegen/         # Generated FFI bindings
+├── flutter/         # Flutter plugin & example app
+├── android/         # Android wrapper & example
+├── java/            # Java desktop wrapper & TUI example
+│   ├── common/
+│   └── desktop/
+├── dotnet/          # .NET wrapper (WinForms, client, TUI)
+│   ├── src/
+│   └── examples/
+├── go/              # Go TUI host & client API
+│   ├── pkg/
+│   └── examples/
+├── web/             # WebAssembly crate & JS/TS bindings
+│   ├── crate/
+│   ├── js/
+│   └── example/
+├── adapters/        # Compatibility layers
+│   ├── aggrid/      # AG Grid API adapter (npm)
+│   ├── sheet/       # Sheet API adapter (npm)
+│   ├── sfdatagrid/  # SfDataGrid comparison tests
+│   ├── vsflexgrid/  # ActiveX control (Windows)
+│   ├── xtragrid/    # XtraGrid adapter
+│   └── report/      # Report adapter
+├── gtk-test/        # GTK4 plugin-host visual test harness
+├── smoke-test/      # CLI smoke test
+├── docker/          # Reproducible packaging
+├── scripts/         # Build and utility scripts
+├── dist/            # Packaged distribution artifacts
+├── public/          # Static assets
+└── testdata/        # Test fixture data
 ```
 
 ## Testing

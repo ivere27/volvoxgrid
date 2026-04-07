@@ -316,7 +316,7 @@ help:
 	@echo "  docker_all_image          Build unified Docker image (all toolchains)"
 	@echo "  docker_all                Build all platform artifacts via unified Docker image (Android full+lite), auto-install SNAPSHOT to mavenLocal"
 	@echo "  publish_maven             Upload Android AAR + Android lite AAR + desktop JAR to Maven Central"
-	@echo "  publish_github            Upload all artifacts (xcframework, AAR, JAR, web zips) to GitHub release"
+	@echo "  publish_github            Upload all artifacts (xcframework, AAR, JAR, .NET, ActiveX, web zips) to GitHub release"
 	@echo "  publish_local             Install built SNAPSHOT artifacts from dist/maven into ~/.m2/repository"
 	@echo "  publish_web               Copy dist/web -> public (clean), then run firebase deploy"
 	@echo ""
@@ -1599,6 +1599,58 @@ publish_github:
 	    echo "Skip web bundle: $$f not found."; \
 	  fi; \
 	done; \
+	DOTNET_X64_DIR="$(CURRENT_DIR)/dist/dotnet/winforms_release"; \
+	DOTNET_X86_DIR="$(CURRENT_DIR)/dist/dotnet/winforms_release_x86"; \
+	if [ ! -d "$$DOTNET_X64_DIR" ]; then DOTNET_X64_DIR="$(CURRENT_DIR)/target/dotnet/winforms_release"; fi; \
+	if [ ! -d "$$DOTNET_X86_DIR" ]; then DOTNET_X86_DIR="$(CURRENT_DIR)/target/dotnet/winforms_release_x86"; fi; \
+	for entry in \
+	  "x64:$$DOTNET_X64_DIR" \
+	  "x86:$$DOTNET_X86_DIR"; \
+	do \
+	  arch="$${entry%%:*}"; \
+	  dir="$${entry#*:}"; \
+	  if [ -d "$$dir" ]; then \
+	    stage_dir=$$(mktemp -d); \
+	    top_dir="volvoxgrid-dotnet-winforms-$(VOLVOXGRID_VERSION)-$$arch"; \
+	    zip_path="/tmp/$${top_dir}.zip"; \
+	    mkdir -p "$$stage_dir/$$top_dir"; \
+	    cp -a "$$dir/." "$$stage_dir/$$top_dir/"; \
+	    find "$$stage_dir/$$top_dir" -maxdepth 1 -type f -name '*.log' -delete; \
+	    (cd "$$stage_dir" && zip -qr "$$zip_path" "$$top_dir") || { rm -rf "$$stage_dir" "$$zip_path"; exit 1; }; \
+	    echo "Uploading $$(basename "$$zip_path") to $$TAG..."; \
+	    gh release upload "$$TAG" "$$zip_path" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+	    rm -rf "$$stage_dir" "$$zip_path"; \
+	  else \
+	    echo "Skip .NET $$arch bundle: $$dir not found."; \
+	  fi; \
+	done; \
+	OCX_DIR="$(CURRENT_DIR)/dist/desktop/ocx"; \
+	if [ ! -d "$$OCX_DIR" ]; then OCX_DIR="$(CURRENT_DIR)/target/ocx"; fi; \
+	if [ -d "$$OCX_DIR" ]; then \
+	  found_ocx=0; \
+	  ocx_stage_dir=$$(mktemp -d); \
+	  ocx_top_dir="volvoxgrid-activex-$(VOLVOXGRID_VERSION)"; \
+	  ocx_zip="/tmp/$${ocx_top_dir}.zip"; \
+	  mkdir -p "$$ocx_stage_dir/$$ocx_top_dir"; \
+	  for f in "$$OCX_DIR"/*.ocx; \
+	  do \
+	    if [ -f "$$f" ]; then \
+	      found_ocx=1; \
+	      cp -a "$$f" "$$ocx_stage_dir/$$ocx_top_dir/"; \
+	    fi; \
+	  done; \
+	  if [ "$$found_ocx" = "0" ]; then \
+	    rm -rf "$$ocx_stage_dir" "$$ocx_zip"; \
+	    echo "Skip ActiveX OCX: no .ocx files found in $$OCX_DIR."; \
+	  else \
+	    (cd "$$ocx_stage_dir" && zip -qr "$$ocx_zip" "$$ocx_top_dir") || { rm -rf "$$ocx_stage_dir" "$$ocx_zip"; exit 1; }; \
+	    echo "Uploading $$(basename "$$ocx_zip") to $$TAG..."; \
+	    gh release upload "$$TAG" "$$ocx_zip" --repo "$(IOS_GITHUB_REPO)" --clobber; \
+	    rm -rf "$$ocx_stage_dir" "$$ocx_zip"; \
+	  fi; \
+	else \
+	  echo "Skip ActiveX OCX: no OCX output directory found."; \
+	fi; \
 	echo "All artifacts uploaded to $$TAG"
 
 publish_web:

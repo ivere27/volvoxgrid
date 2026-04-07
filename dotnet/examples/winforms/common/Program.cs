@@ -141,8 +141,8 @@ namespace VolvoxGrid.DotNet.Sample
         public DemoForm()
         {
             Text = "VolvoxGrid .NET Wrapper Demo";
-            Width = 1160;
-            Height = 760;
+            Width = 1200;
+            Height = 800;
             StartPosition = FormStartPosition.CenterScreen;
 
             var topBar = new FlowLayoutPanel
