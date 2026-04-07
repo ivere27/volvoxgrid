@@ -315,6 +315,13 @@ namespace Volvoxgrid.V1
         FOCUS_BORDER_RAISED = 4,
     }
 
+    public enum FrameKind
+    {
+        FRAME_KIND_FRAME = 0,
+        FRAME_KIND_SESSION_START = 1,
+        FRAME_KIND_SESSION_END = 2,
+    }
+
     public enum FramePacingMode
     {
         FRAME_PACING_MODE_AUTO = 0,
@@ -477,6 +484,7 @@ namespace Volvoxgrid.V1
         RENDERER_GPU = 2,
         RENDERER_GPU_VULKAN = 3,
         RENDERER_GPU_GLES = 4,
+        RENDERER_TUI = 5,
     }
 
     public enum RowIndicatorMode
@@ -586,6 +594,20 @@ namespace Volvoxgrid.V1
     {
         TAB_CONTROLS = 0,
         TAB_CELLS = 1,
+    }
+
+    public enum TerminalColorLevel
+    {
+        TERMINAL_COLOR_LEVEL_AUTO = 0,
+        TERMINAL_COLOR_LEVEL_TRUECOLOR = 1,
+        TERMINAL_COLOR_LEVEL_256 = 2,
+        TERMINAL_COLOR_LEVEL_16 = 3,
+    }
+
+    public enum TerminalCommand_Kind
+    {
+        TERMINAL_COMMAND_NONE = 0,
+        TERMINAL_COMMAND_EXIT = 1,
     }
 
     public enum TextEffect
@@ -1622,6 +1644,7 @@ namespace Volvoxgrid.V1
         public int Stride { get; set; }
         public int Width { get; set; }
         public int Height { get; set; }
+        public int Capacity { get; set; }
 
         // ── Serialization ──
 
@@ -1632,6 +1655,7 @@ namespace Volvoxgrid.V1
             if (Stride != 0) w.WriteInt32(2, Stride);
             if (Width != 0) w.WriteInt32(3, Width);
             if (Height != 0) w.WriteInt32(4, Height);
+            if (Capacity != 0) w.WriteInt32(5, Capacity);
             return w.ToArray();
         }
 
@@ -1653,6 +1677,7 @@ namespace Volvoxgrid.V1
                     case 2: msg.Stride = r.ReadInt32(); break;
                     case 3: msg.Width = r.ReadInt32(); break;
                     case 4: msg.Height = r.ReadInt32(); break;
+                    case 5: msg.Capacity = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -5039,6 +5064,9 @@ namespace Volvoxgrid.V1
         public int DirtyW { get; set; }
         public int DirtyH { get; set; }
         public FrameMetrics Metrics { get; set; }
+        public int BytesWritten { get; set; }
+        public int RequiredCapacity { get; set; }
+        public FrameKind FrameKind { get; set; }
 
         // ── Serialization ──
 
@@ -5051,6 +5079,9 @@ namespace Volvoxgrid.V1
             if (DirtyW != 0) w.WriteInt32(4, DirtyW);
             if (DirtyH != 0) w.WriteInt32(5, DirtyH);
             if (Metrics != null) w.WriteMessageBytes(6, Metrics.ToByteArray());
+            if (BytesWritten != 0) w.WriteInt32(7, BytesWritten);
+            if (RequiredCapacity != 0) w.WriteInt32(8, RequiredCapacity);
+            if (FrameKind != 0) w.WriteInt32(9, (int)FrameKind);
             return w.ToArray();
         }
 
@@ -5074,6 +5105,9 @@ namespace Volvoxgrid.V1
                     case 4: msg.DirtyW = r.ReadInt32(); break;
                     case 5: msg.DirtyH = r.ReadInt32(); break;
                     case 6: msg.Metrics = FrameMetrics.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 7: msg.BytesWritten = r.ReadInt32(); break;
+                    case 8: msg.RequiredCapacity = r.ReadInt32(); break;
+                    case 9: msg.FrameKind = (FrameKind)r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -9093,6 +9127,10 @@ namespace Volvoxgrid.V1
             EventDecision = 7,
             Zoom = 8,
             GpuSurface = 9,
+            TerminalInput = 10,
+            TerminalCapabilities = 11,
+            TerminalViewport = 12,
+            TerminalCommand = 13,
         }
         public InputOneofCase InputCase { get; set; }
 
@@ -9112,6 +9150,14 @@ namespace Volvoxgrid.V1
         public ZoomEvent Zoom { get { return InputCase == InputOneofCase.Zoom ? _zoom : null; } set { _zoom = value; InputCase = InputOneofCase.Zoom; } }
         private GpuSurfaceReady _gpuSurface;
         public GpuSurfaceReady GpuSurface { get { return InputCase == InputOneofCase.GpuSurface ? _gpuSurface : null; } set { _gpuSurface = value; InputCase = InputOneofCase.GpuSurface; } }
+        private TerminalInputBytes _terminalInput;
+        public TerminalInputBytes TerminalInput { get { return InputCase == InputOneofCase.TerminalInput ? _terminalInput : null; } set { _terminalInput = value; InputCase = InputOneofCase.TerminalInput; } }
+        private TerminalCapabilities _terminalCapabilities;
+        public TerminalCapabilities TerminalCapabilities { get { return InputCase == InputOneofCase.TerminalCapabilities ? _terminalCapabilities : null; } set { _terminalCapabilities = value; InputCase = InputOneofCase.TerminalCapabilities; } }
+        private TerminalViewport _terminalViewport;
+        public TerminalViewport TerminalViewport { get { return InputCase == InputOneofCase.TerminalViewport ? _terminalViewport : null; } set { _terminalViewport = value; InputCase = InputOneofCase.TerminalViewport; } }
+        private TerminalCommand _terminalCommand;
+        public TerminalCommand TerminalCommand { get { return InputCase == InputOneofCase.TerminalCommand ? _terminalCommand : null; } set { _terminalCommand = value; InputCase = InputOneofCase.TerminalCommand; } }
         public long GridId { get; set; }
 
         // ── Serialization ──
@@ -9146,6 +9192,18 @@ namespace Volvoxgrid.V1
                 case InputOneofCase.GpuSurface:
                     if (_gpuSurface != null) w.WriteMessageBytes(9, _gpuSurface.ToByteArray());
                     break;
+                case InputOneofCase.TerminalInput:
+                    if (_terminalInput != null) w.WriteMessageBytes(10, _terminalInput.ToByteArray());
+                    break;
+                case InputOneofCase.TerminalCapabilities:
+                    if (_terminalCapabilities != null) w.WriteMessageBytes(11, _terminalCapabilities.ToByteArray());
+                    break;
+                case InputOneofCase.TerminalViewport:
+                    if (_terminalViewport != null) w.WriteMessageBytes(12, _terminalViewport.ToByteArray());
+                    break;
+                case InputOneofCase.TerminalCommand:
+                    if (_terminalCommand != null) w.WriteMessageBytes(13, _terminalCommand.ToByteArray());
+                    break;
             }
             return w.ToArray();
         }
@@ -9173,6 +9231,10 @@ namespace Volvoxgrid.V1
                     case 7: msg.EventDecision = EventDecision.ParseFrom(r.ReadLengthDelimited()); break;
                     case 8: msg.Zoom = ZoomEvent.ParseFrom(r.ReadLengthDelimited()); break;
                     case 9: msg.GpuSurface = GpuSurfaceReady.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 10: msg.TerminalInput = TerminalInputBytes.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 11: msg.TerminalCapabilities = TerminalCapabilities.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 12: msg.TerminalViewport = TerminalViewport.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 13: msg.TerminalCommand = TerminalCommand.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -10982,6 +11044,167 @@ namespace Volvoxgrid.V1
                             msg.Rows.Add(r.ReadInt32());
                         }
                         break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class TerminalCapabilities
+    {
+        public TerminalColorLevel ColorLevel { get; set; }
+        public bool SgrMouse { get; set; }
+        public bool FocusEvents { get; set; }
+        public bool BracketedPaste { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (ColorLevel != 0) w.WriteInt32(1, (int)ColorLevel);
+            if (SgrMouse) w.WriteBool(2, SgrMouse);
+            if (FocusEvents) w.WriteBool(3, FocusEvents);
+            if (BracketedPaste) w.WriteBool(4, BracketedPaste);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<TerminalCapabilities> Parser = new MessageParser<TerminalCapabilities>(data => ParseFrom(data));
+
+        public static TerminalCapabilities ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new TerminalCapabilities();
+            var r = new ProtoReader(data);
+            var msg = new TerminalCapabilities();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.ColorLevel = (TerminalColorLevel)r.ReadInt32(); break;
+                    case 2: msg.SgrMouse = r.ReadBool(); break;
+                    case 3: msg.FocusEvents = r.ReadBool(); break;
+                    case 4: msg.BracketedPaste = r.ReadBool(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class TerminalCommand
+    {
+        public TerminalCommand_Kind Kind { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Kind != 0) w.WriteInt32(1, (int)Kind);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<TerminalCommand> Parser = new MessageParser<TerminalCommand>(data => ParseFrom(data));
+
+        public static TerminalCommand ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new TerminalCommand();
+            var r = new ProtoReader(data);
+            var msg = new TerminalCommand();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Kind = (TerminalCommand_Kind)r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class TerminalInputBytes
+    {
+        public byte[] Data { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Data != null && Data.Length > 0) w.WriteBytes(1, Data);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<TerminalInputBytes> Parser = new MessageParser<TerminalInputBytes>(data => ParseFrom(data));
+
+        public static TerminalInputBytes ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new TerminalInputBytes();
+            var r = new ProtoReader(data);
+            var msg = new TerminalInputBytes();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Data = r.ReadLengthDelimited(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class TerminalViewport
+    {
+        public int OriginX { get; set; }
+        public int OriginY { get; set; }
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public bool Fullscreen { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (OriginX != 0) w.WriteInt32(1, OriginX);
+            if (OriginY != 0) w.WriteInt32(2, OriginY);
+            if (Width != 0) w.WriteInt32(3, Width);
+            if (Height != 0) w.WriteInt32(4, Height);
+            if (Fullscreen) w.WriteBool(5, Fullscreen);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<TerminalViewport> Parser = new MessageParser<TerminalViewport>(data => ParseFrom(data));
+
+        public static TerminalViewport ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new TerminalViewport();
+            var r = new ProtoReader(data);
+            var msg = new TerminalViewport();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.OriginX = r.ReadInt32(); break;
+                    case 2: msg.OriginY = r.ReadInt32(); break;
+                    case 3: msg.Width = r.ReadInt32(); break;
+                    case 4: msg.Height = r.ReadInt32(); break;
+                    case 5: msg.Fullscreen = r.ReadBool(); break;
                     default: r.SkipField(wire); break;
                 }
             }

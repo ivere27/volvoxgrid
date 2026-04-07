@@ -35,8 +35,8 @@
 #define ID_MENU_SELECTION_BY_COLUMN  1103
 #define ID_MENU_SELECTION_LISTBOX    1104
 
-#define WINDOW_WIDTH            1160
-#define WINDOW_HEIGHT            760
+#define WINDOW_WIDTH            1200
+#define WINDOW_HEIGHT            800
 #define TOOLBAR_HEIGHT            44
 #define STATUS_HEIGHT             28
 #define MARGIN                     8

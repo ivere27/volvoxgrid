@@ -2,6 +2,13 @@
 
 A high-performance datagrid panel for Java Swing applications. Renders directly to pixel buffers with CPU rendering. Supports cell editing, sorting, merged cells, scrolling, and more.
 
+The repo also includes a Unix-oriented terminal sample that uses the thin TUI byte-stream path:
+
+```bash
+make java-tui-run
+make java-tui-smoke
+```
+
 ## Installation
 
 Add the Maven dependency to your `build.gradle.kts`:
@@ -12,7 +19,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.5.0")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.6.0")
 }
 ```
 

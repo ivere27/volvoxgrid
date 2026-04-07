@@ -728,6 +728,7 @@ const RendererMode$json = {
     {'1': 'RENDERER_GPU', '2': 2},
     {'1': 'RENDERER_GPU_VULKAN', '2': 3},
     {'1': 'RENDERER_GPU_GLES', '2': 4},
+    {'1': 'RENDERER_TUI', '2': 5},
   ],
 };
 
@@ -735,7 +736,7 @@ const RendererMode$json = {
 final $typed_data.Uint8List rendererModeDescriptor = $convert.base64Decode(
     'CgxSZW5kZXJlck1vZGUSEQoNUkVOREVSRVJfQVVUTxAAEhAKDFJFTkRFUkVSX0NQVRABEhAKDF'
     'JFTkRFUkVSX0dQVRACEhcKE1JFTkRFUkVSX0dQVV9WVUxLQU4QAxIVChFSRU5ERVJFUl9HUFVf'
-    'R0xFUxAE');
+    'R0xFUxAEEhAKDFJFTkRFUkVSX1RVSRAF');
 
 @$core.Deprecated('Use presentModeDescriptor instead')
 const PresentMode$json = {
@@ -1128,6 +1129,38 @@ const DemoDataFormat$json = {
 final $typed_data.Uint8List demoDataFormatDescriptor = $convert.base64Decode(
     'Cg5EZW1vRGF0YUZvcm1hdBIgChxERU1PX0RBVEFfRk9STUFUX1VOU1BFQ0lGSUVEEAASGQoVRE'
     'VNT19EQVRBX0ZPUk1BVF9KU09OEAE=');
+
+@$core.Deprecated('Use terminalColorLevelDescriptor instead')
+const TerminalColorLevel$json = {
+  '1': 'TerminalColorLevel',
+  '2': [
+    {'1': 'TERMINAL_COLOR_LEVEL_AUTO', '2': 0},
+    {'1': 'TERMINAL_COLOR_LEVEL_TRUECOLOR', '2': 1},
+    {'1': 'TERMINAL_COLOR_LEVEL_256', '2': 2},
+    {'1': 'TERMINAL_COLOR_LEVEL_16', '2': 3},
+  ],
+};
+
+/// Descriptor for `TerminalColorLevel`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List terminalColorLevelDescriptor = $convert.base64Decode(
+    'ChJUZXJtaW5hbENvbG9yTGV2ZWwSHQoZVEVSTUlOQUxfQ09MT1JfTEVWRUxfQVVUTxAAEiIKHl'
+    'RFUk1JTkFMX0NPTE9SX0xFVkVMX1RSVUVDT0xPUhABEhwKGFRFUk1JTkFMX0NPTE9SX0xFVkVM'
+    'XzI1NhACEhsKF1RFUk1JTkFMX0NPTE9SX0xFVkVMXzE2EAM=');
+
+@$core.Deprecated('Use frameKindDescriptor instead')
+const FrameKind$json = {
+  '1': 'FrameKind',
+  '2': [
+    {'1': 'FRAME_KIND_FRAME', '2': 0},
+    {'1': 'FRAME_KIND_SESSION_START', '2': 1},
+    {'1': 'FRAME_KIND_SESSION_END', '2': 2},
+  ],
+};
+
+/// Descriptor for `FrameKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List frameKindDescriptor = $convert.base64Decode(
+    'CglGcmFtZUtpbmQSFAoQRlJBTUVfS0lORF9GUkFNRRAAEhwKGEZSQU1FX0tJTkRfU0VTU0lPTl'
+    '9TVEFSVBABEhoKFkZSQU1FX0tJTkRfU0VTU0lPTl9FTkQQAg==');
 
 @$core.Deprecated('Use fontDescriptor instead')
 const Font$json = {
@@ -7087,6 +7120,42 @@ const RenderInput$json = {
       '9': 0,
       '10': 'gpuSurface'
     },
+    {
+      '1': 'terminal_input',
+      '3': 10,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.TerminalInputBytes',
+      '9': 0,
+      '10': 'terminalInput'
+    },
+    {
+      '1': 'terminal_capabilities',
+      '3': 11,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.TerminalCapabilities',
+      '9': 0,
+      '10': 'terminalCapabilities'
+    },
+    {
+      '1': 'terminal_viewport',
+      '3': 12,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.TerminalViewport',
+      '9': 0,
+      '10': 'terminalViewport'
+    },
+    {
+      '1': 'terminal_command',
+      '3': 13,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.TerminalCommand',
+      '9': 0,
+      '10': 'terminalCommand'
+    },
   ],
   '8': [
     {'1': 'input'},
@@ -7103,8 +7172,13 @@ final $typed_data.Uint8List renderInputDescriptor = $convert.base64Decode(
     '94Z3JpZC52MS5TY3JvbGxFdmVudEgAUgZzY3JvbGwSRQoOZXZlbnRfZGVjaXNpb24YByABKAsy'
     'HC52b2x2b3hncmlkLnYxLkV2ZW50RGVjaXNpb25IAFINZXZlbnREZWNpc2lvbhIuCgR6b29tGA'
     'ggASgLMhgudm9sdm94Z3JpZC52MS5ab29tRXZlbnRIAFIEem9vbRJBCgtncHVfc3VyZmFjZRgJ'
-    'IAEoCzIeLnZvbHZveGdyaWQudjEuR3B1U3VyZmFjZVJlYWR5SABSCmdwdVN1cmZhY2VCBwoFaW'
-    '5wdXQ=');
+    'IAEoCzIeLnZvbHZveGdyaWQudjEuR3B1U3VyZmFjZVJlYWR5SABSCmdwdVN1cmZhY2USSgoOdG'
+    'VybWluYWxfaW5wdXQYCiABKAsyIS52b2x2b3hncmlkLnYxLlRlcm1pbmFsSW5wdXRCeXRlc0gA'
+    'Ug10ZXJtaW5hbElucHV0EloKFXRlcm1pbmFsX2NhcGFiaWxpdGllcxgLIAEoCzIjLnZvbHZveG'
+    'dyaWQudjEuVGVybWluYWxDYXBhYmlsaXRpZXNIAFIUdGVybWluYWxDYXBhYmlsaXRpZXMSTgoR'
+    'dGVybWluYWxfdmlld3BvcnQYDCABKAsyHy52b2x2b3hncmlkLnYxLlRlcm1pbmFsVmlld3Bvcn'
+    'RIAFIQdGVybWluYWxWaWV3cG9ydBJLChB0ZXJtaW5hbF9jb21tYW5kGA0gASgLMh4udm9sdm94'
+    'Z3JpZC52MS5UZXJtaW5hbENvbW1hbmRIAFIPdGVybWluYWxDb21tYW5kQgcKBWlucHV0');
 
 @$core.Deprecated('Use viewportStateDescriptor instead')
 const ViewportState$json = {
@@ -7255,13 +7329,101 @@ const BufferReady$json = {
     {'1': 'stride', '3': 2, '4': 1, '5': 5, '10': 'stride'},
     {'1': 'width', '3': 3, '4': 1, '5': 5, '10': 'width'},
     {'1': 'height', '3': 4, '4': 1, '5': 5, '10': 'height'},
+    {'1': 'capacity', '3': 5, '4': 1, '5': 5, '10': 'capacity'},
   ],
 };
 
 /// Descriptor for `BufferReady`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List bufferReadyDescriptor = $convert.base64Decode(
     'CgtCdWZmZXJSZWFkeRIWCgZoYW5kbGUYASABKANSBmhhbmRsZRIWCgZzdHJpZGUYAiABKAVSBn'
-    'N0cmlkZRIUCgV3aWR0aBgDIAEoBVIFd2lkdGgSFgoGaGVpZ2h0GAQgASgFUgZoZWlnaHQ=');
+    'N0cmlkZRIUCgV3aWR0aBgDIAEoBVIFd2lkdGgSFgoGaGVpZ2h0GAQgASgFUgZoZWlnaHQSGgoI'
+    'Y2FwYWNpdHkYBSABKAVSCGNhcGFjaXR5');
+
+@$core.Deprecated('Use terminalInputBytesDescriptor instead')
+const TerminalInputBytes$json = {
+  '1': 'TerminalInputBytes',
+  '2': [
+    {'1': 'data', '3': 1, '4': 1, '5': 12, '10': 'data'},
+  ],
+};
+
+/// Descriptor for `TerminalInputBytes`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List terminalInputBytesDescriptor = $convert
+    .base64Decode('ChJUZXJtaW5hbElucHV0Qnl0ZXMSEgoEZGF0YRgBIAEoDFIEZGF0YQ==');
+
+@$core.Deprecated('Use terminalCapabilitiesDescriptor instead')
+const TerminalCapabilities$json = {
+  '1': 'TerminalCapabilities',
+  '2': [
+    {
+      '1': 'color_level',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.TerminalColorLevel',
+      '10': 'colorLevel'
+    },
+    {'1': 'sgr_mouse', '3': 2, '4': 1, '5': 8, '10': 'sgrMouse'},
+    {'1': 'focus_events', '3': 3, '4': 1, '5': 8, '10': 'focusEvents'},
+    {'1': 'bracketed_paste', '3': 4, '4': 1, '5': 8, '10': 'bracketedPaste'},
+  ],
+};
+
+/// Descriptor for `TerminalCapabilities`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List terminalCapabilitiesDescriptor = $convert.base64Decode(
+    'ChRUZXJtaW5hbENhcGFiaWxpdGllcxJCCgtjb2xvcl9sZXZlbBgBIAEoDjIhLnZvbHZveGdyaW'
+    'QudjEuVGVybWluYWxDb2xvckxldmVsUgpjb2xvckxldmVsEhsKCXNncl9tb3VzZRgCIAEoCFII'
+    'c2dyTW91c2USIQoMZm9jdXNfZXZlbnRzGAMgASgIUgtmb2N1c0V2ZW50cxInCg9icmFja2V0ZW'
+    'RfcGFzdGUYBCABKAhSDmJyYWNrZXRlZFBhc3Rl');
+
+@$core.Deprecated('Use terminalViewportDescriptor instead')
+const TerminalViewport$json = {
+  '1': 'TerminalViewport',
+  '2': [
+    {'1': 'origin_x', '3': 1, '4': 1, '5': 5, '10': 'originX'},
+    {'1': 'origin_y', '3': 2, '4': 1, '5': 5, '10': 'originY'},
+    {'1': 'width', '3': 3, '4': 1, '5': 5, '10': 'width'},
+    {'1': 'height', '3': 4, '4': 1, '5': 5, '10': 'height'},
+    {'1': 'fullscreen', '3': 5, '4': 1, '5': 8, '10': 'fullscreen'},
+  ],
+};
+
+/// Descriptor for `TerminalViewport`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List terminalViewportDescriptor = $convert.base64Decode(
+    'ChBUZXJtaW5hbFZpZXdwb3J0EhkKCG9yaWdpbl94GAEgASgFUgdvcmlnaW5YEhkKCG9yaWdpbl'
+    '95GAIgASgFUgdvcmlnaW5ZEhQKBXdpZHRoGAMgASgFUgV3aWR0aBIWCgZoZWlnaHQYBCABKAVS'
+    'BmhlaWdodBIeCgpmdWxsc2NyZWVuGAUgASgIUgpmdWxsc2NyZWVu');
+
+@$core.Deprecated('Use terminalCommandDescriptor instead')
+const TerminalCommand$json = {
+  '1': 'TerminalCommand',
+  '2': [
+    {
+      '1': 'kind',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.TerminalCommand.Kind',
+      '10': 'kind'
+    },
+  ],
+  '4': [TerminalCommand_Kind$json],
+};
+
+@$core.Deprecated('Use terminalCommandDescriptor instead')
+const TerminalCommand_Kind$json = {
+  '1': 'Kind',
+  '2': [
+    {'1': 'TERMINAL_COMMAND_NONE', '2': 0},
+    {'1': 'TERMINAL_COMMAND_EXIT', '2': 1},
+  ],
+};
+
+/// Descriptor for `TerminalCommand`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List terminalCommandDescriptor = $convert.base64Decode(
+    'Cg9UZXJtaW5hbENvbW1hbmQSNwoEa2luZBgBIAEoDjIjLnZvbHZveGdyaWQudjEuVGVybWluYW'
+    'xDb21tYW5kLktpbmRSBGtpbmQiPAoES2luZBIZChVURVJNSU5BTF9DT01NQU5EX05PTkUQABIZ'
+    'ChVURVJNSU5BTF9DT01NQU5EX0VYSVQQAQ==');
 
 @$core.Deprecated('Use gpuSurfaceReadyDescriptor instead')
 const GpuSurfaceReady$json = {
@@ -7397,6 +7559,22 @@ const FrameDone$json = {
       '6': '.volvoxgrid.v1.FrameMetrics',
       '10': 'metrics'
     },
+    {'1': 'bytes_written', '3': 7, '4': 1, '5': 5, '10': 'bytesWritten'},
+    {
+      '1': 'required_capacity',
+      '3': 8,
+      '4': 1,
+      '5': 5,
+      '10': 'requiredCapacity'
+    },
+    {
+      '1': 'frame_kind',
+      '3': 9,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.FrameKind',
+      '10': 'frameKind'
+    },
   ],
 };
 
@@ -7405,7 +7583,9 @@ final $typed_data.Uint8List frameDoneDescriptor = $convert.base64Decode(
     'CglGcmFtZURvbmUSFgoGaGFuZGxlGAEgASgDUgZoYW5kbGUSFwoHZGlydHlfeBgCIAEoBVIGZG'
     'lydHlYEhcKB2RpcnR5X3kYAyABKAVSBmRpcnR5WRIXCgdkaXJ0eV93GAQgASgFUgZkaXJ0eVcS'
     'FwoHZGlydHlfaBgFIAEoBVIGZGlydHlIEjUKB21ldHJpY3MYBiABKAsyGy52b2x2b3hncmlkLn'
-    'YxLkZyYW1lTWV0cmljc1IHbWV0cmljcw==');
+    'YxLkZyYW1lTWV0cmljc1IHbWV0cmljcxIjCg1ieXRlc193cml0dGVuGAcgASgFUgxieXRlc1dy'
+    'aXR0ZW4SKwoRcmVxdWlyZWRfY2FwYWNpdHkYCCABKAVSEHJlcXVpcmVkQ2FwYWNpdHkSNwoKZn'
+    'JhbWVfa2luZBgJIAEoDjIYLnZvbHZveGdyaWQudjEuRnJhbWVLaW5kUglmcmFtZUtpbmQ=');
 
 @$core.Deprecated('Use gpuFrameDoneDescriptor instead')
 const GpuFrameDone$json = {
@@ -9479,6 +9659,10 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.EventDecision': EventDecision$json,
   '.volvoxgrid.v1.ZoomEvent': ZoomEvent$json,
   '.volvoxgrid.v1.GpuSurfaceReady': GpuSurfaceReady$json,
+  '.volvoxgrid.v1.TerminalInputBytes': TerminalInputBytes$json,
+  '.volvoxgrid.v1.TerminalCapabilities': TerminalCapabilities$json,
+  '.volvoxgrid.v1.TerminalViewport': TerminalViewport$json,
+  '.volvoxgrid.v1.TerminalCommand': TerminalCommand$json,
   '.volvoxgrid.v1.RenderOutput': RenderOutput$json,
   '.volvoxgrid.v1.FrameDone': FrameDone$json,
   '.volvoxgrid.v1.FrameMetrics': FrameMetrics$json,

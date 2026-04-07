@@ -61,6 +61,7 @@ import io.github.ivere27.volvoxgrid.SubtotalRequest;
 import io.github.ivere27.volvoxgrid.SubtotalResult;
 import io.github.ivere27.volvoxgrid.UpdateCellsRequest;
 import io.github.ivere27.volvoxgrid.WriteResult;
+import java.nio.ByteBuffer;
 import java.util.Objects;
 
 /**
@@ -299,6 +300,10 @@ public final class VolvoxGridDesktopClient {
         stream.send(request.toByteArray());
         stream.closeSend();
         return new EventStream(stream);
+    }
+
+    long getDirectBufferAddress(ByteBuffer buffer) throws SynurangDesktopBridge.SynurangBridgeException {
+        return bridge.getDirectBufferAddress(buffer);
     }
 
     private <T extends MessageLite> T unary(

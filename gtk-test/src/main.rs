@@ -3361,6 +3361,7 @@ fn request_frame(state: &mut State) -> Result<(), String> {
         grid_id: state.grid_id,
         input: Some(pb::render_input::Input::Buffer(pb::BufferReady {
             handle,
+            capacity: stride * height,
             stride,
             width,
             height,

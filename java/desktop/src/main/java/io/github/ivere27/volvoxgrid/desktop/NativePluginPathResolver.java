@@ -50,10 +50,16 @@ final class NativePluginPathResolver {
         if (args == null || args.length == 0) {
             return null;
         }
-        if (isBlank(args[0])) {
-            return null;
+        for (String arg : args) {
+            if (isBlank(arg)) {
+                continue;
+            }
+            if (arg.startsWith("--")) {
+                continue;
+            }
+            return arg;
         }
-        return args[0];
+        return null;
     }
 
     private static boolean isBlank(String value) {

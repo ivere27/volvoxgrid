@@ -4,6 +4,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
+use unicode_width::UnicodeWidthStr;
 #[cfg(target_arch = "wasm32")]
 use web_time::Instant;
 
@@ -21,9 +22,9 @@ use crate::proto::volvoxgrid::v1 as pb;
 use crate::row::RowProps;
 use crate::scroll::ScrollState;
 use crate::scrollbar::{
-    scrollbar_fade_animating, scrollbar_overlays_content, ScrollBarColors,
-    DEFAULT_SCROLLBAR_FADE_DELAY_MS, DEFAULT_SCROLLBAR_FADE_DURATION_MS, DEFAULT_SCROLLBAR_MARGIN,
-    DEFAULT_SCROLLBAR_MIN_THUMB,
+    reset_scrollbar_fade_state, scrollbar_fade_animating, scrollbar_overlays_content,
+    ScrollBarColors, DEFAULT_SCROLLBAR_FADE_DELAY_MS, DEFAULT_SCROLLBAR_FADE_DURATION_MS,
+    DEFAULT_SCROLLBAR_MARGIN, DEFAULT_SCROLLBAR_MIN_THUMB,
 };
 use crate::selection::SelectionState;
 use crate::sort::SortState;
@@ -36,6 +37,8 @@ pub const DEFAULT_ROW_HEIGHT: i32 = 20;
 
 /// Default column width in pixels.
 pub const DEFAULT_COL_WIDTH: i32 = 68;
+pub const DEFAULT_TUI_ROW_HEIGHT: i32 = 1;
+pub const DEFAULT_TUI_COL_WIDTH: i32 = 15;
 /// Default fixed-rate pacing fallback when no platform frame clock is available.
 pub const DEFAULT_TARGET_FRAME_RATE_HZ: i32 = 30;
 const DEFAULT_PULL_TO_REFRESH_THRESHOLD_PX: f32 = 72.0;
@@ -416,7 +419,9 @@ pub struct VolvoxGrid {
     pub picture_type: i32,
 
     // ── Renderer Mode ──────────────────────────────────────────────────
-    /// 0 = AUTO, 1 = CPU, 2 = GPU, 3 = Vulkan, 4 = GLES.
+    /// Whether grid geometry should be interpreted in character cells.
+    pub tui_mode: bool,
+    /// 0 = AUTO, 1 = CPU, 2 = GPU, 3 = Vulkan, 4 = GLES, 5 = TUI.
     pub renderer_mode: i32,
     /// 0 = Auto (Fifo), 1 = Fifo, 2 = Mailbox, 3 = Immediate.
     pub present_mode: i32,
@@ -807,7 +812,8 @@ impl VolvoxGrid {
             format_string: String::new(),
             picture_type: 0,
 
-            // Renderer mode (0=AUTO, 1=CPU, 2=GPU, 3=Vulkan, 4=GLES)
+            // Renderer mode (0=AUTO, 1=CPU, 2=GPU, 3=Vulkan, 4=GLES, 5=TUI)
+            tui_mode: false,
             renderer_mode: 0,
             // Present mode (0=Auto, 1=Fifo, 2=Mailbox, 3=Immediate)
             present_mode: 0,
@@ -1238,6 +1244,11 @@ impl VolvoxGrid {
     /// - `height = -1`: resets the row to the default height (removes custom override).
     /// - Otherwise stores a custom height for the given row.
     pub fn set_row_height(&mut self, row: i32, height: i32) {
+        let height = if self.is_tui_mode() && height != -1 {
+            DEFAULT_TUI_ROW_HEIGHT
+        } else {
+            height
+        };
         if row == -1 {
             // Set all rows
             if height == -1 {
@@ -1264,6 +1275,13 @@ impl VolvoxGrid {
 
     /// Clamps a row height to the configured min/max range.
     fn clamp_row_height(&self, height: i32) -> i32 {
+        if self.is_tui_mode() {
+            return if height <= 0 {
+                0
+            } else {
+                DEFAULT_TUI_ROW_HEIGHT
+            };
+        }
         let mut h = height;
         if self.row_height_min > 0 && h < self.row_height_min {
             h = self.row_height_min;
@@ -1419,9 +1437,9 @@ impl VolvoxGrid {
     /// Keeps dirty=true if an engine-driven visual animation is still in-flight
     /// so the host continues to re-render until the animation settles.
     pub fn clear_dirty(&mut self) {
-        if self.animation.active
+        if (!self.is_tui_mode() && self.animation.active)
             || self.background_loading
-            || scrollbar_fade_animating(self)
+            || (!self.is_tui_mode() && scrollbar_fade_animating(self))
             || self.pull_to_refresh_needs_frame()
         {
             self.dirty = true;
@@ -1685,6 +1703,61 @@ impl VolvoxGrid {
         // on the next ensure_layout call (which is cheap when layout is
         // already valid — it just calls update_bounds).
         self.dirty = true;
+    }
+
+    pub fn is_tui_mode(&self) -> bool {
+        self.tui_mode || self.renderer_mode == pb::RendererMode::RendererTui as i32
+    }
+
+    fn apply_tui_mode_defaults(&mut self) {
+        self.default_row_height = DEFAULT_TUI_ROW_HEIGHT;
+        if self.default_col_width <= 0 || self.default_col_width == DEFAULT_COL_WIDTH {
+            self.default_col_width = DEFAULT_TUI_COL_WIDTH;
+        }
+        self.animation.clear();
+        self.animation.enabled = false;
+        self.fling_enabled = false;
+        self.scroll.stop_fling();
+        self.pinch_zoom_enabled = false;
+        self.scrollbar_show_h = pb::ScrollBarMode::ScrollbarModeNever as i32;
+        if self.scrollbar_show_v == pb::ScrollBarMode::ScrollbarModeNever as i32 {
+            self.scrollbar_show_v = pb::ScrollBarMode::ScrollbarModeAuto as i32;
+        }
+        self.normalize_scroll_for_mode();
+    }
+
+    pub fn set_renderer_mode(&mut self, mode: i32) {
+        self.renderer_mode = mode;
+        let enable_tui = mode == pb::RendererMode::RendererTui as i32;
+        if self.tui_mode == enable_tui {
+            if enable_tui {
+                self.apply_tui_mode_defaults();
+            }
+            return;
+        }
+
+        self.tui_mode = enable_tui;
+        if enable_tui {
+            self.apply_tui_mode_defaults();
+        }
+        reset_scrollbar_fade_state(self);
+        self.layout.invalidate();
+        self.mark_dirty();
+    }
+
+    pub fn normalize_scroll_for_mode(&mut self) {
+        if self.is_tui_mode() {
+            self.scroll.quantize_to_cells();
+        }
+    }
+
+    fn tui_text_width(text: &str) -> i32 {
+        let width = UnicodeWidthStr::width(text);
+        if width > i32::MAX as usize {
+            i32::MAX
+        } else {
+            width as i32
+        }
     }
 
     // ── Computed Helpers ──────────────────────────────────────────────────
@@ -2760,6 +2833,25 @@ impl VolvoxGrid {
         if col < 0 || col >= self.cols {
             return;
         }
+        if self.is_tui_mode() {
+            let mut max_w = 0i32;
+            for row in 0..self.rows {
+                if self.should_skip_cell_for_column_autosize(row, col) {
+                    continue;
+                }
+                let text = self.get_display_text(row, col);
+                if !text.is_empty() {
+                    max_w = max_w.max(Self::tui_text_width(&text));
+                }
+            }
+            let header_text = self.column_header_text(col);
+            if !header_text.is_empty() {
+                max_w = max_w.max(Self::tui_text_width(&header_text));
+            }
+            let new_width = max_w.max(self.default_col_width.min(20)).saturating_add(1);
+            self.set_col_width(col, new_width);
+            return;
+        }
         let body_padding = self.resolve_column_padding(col, false).horizontal();
         let fixed_padding = self.resolve_column_padding(col, true).horizontal();
         let padding = body_padding.max(fixed_padding);
@@ -2801,6 +2893,10 @@ impl VolvoxGrid {
         if row < 0 || row >= self.rows {
             return;
         }
+        if self.is_tui_mode() {
+            self.set_row_height(row, DEFAULT_TUI_ROW_HEIGHT);
+            return;
+        }
         let word_wrap = self.word_wrap;
         let body_padding = self.style.cell_padding.vertical();
         let fixed_padding = self.style.fixed_cell_padding.vertical();
@@ -2831,6 +2927,27 @@ impl VolvoxGrid {
         font_name: &str,
         font_size: f32,
     ) {
+        if self.is_tui_mode() {
+            let row_count = self.indicator_bands.col_top.row_count();
+            if row_count <= 0 {
+                return;
+            }
+            let changed =
+                (0..row_count).any(|row| self.indicator_bands.col_top.row_height_px(row) != 1);
+            if !changed {
+                return;
+            }
+            self.indicator_bands.col_top.row_defs = (0..row_count)
+                .map(|index| ColIndicatorRowDefState {
+                    index,
+                    height_px: 1,
+                })
+                .collect();
+            self.layout.invalidate();
+            self.dirty = true;
+            return;
+        }
+
         let band = self.indicator_bands.col_top.clone();
         if !band.visible {
             return;
@@ -2937,6 +3054,55 @@ impl VolvoxGrid {
             .cell_padding
             .vertical()
             .max(self.style.fixed_cell_padding.vertical());
+
+        if self.is_tui_mode() {
+            if resize_cols {
+                let mut max_widths = vec![0i32; self.cols as usize];
+
+                for row in 0..self.rows {
+                    for col in 0..self.cols {
+                        if self.should_skip_cell_for_column_autosize(row, col) {
+                            continue;
+                        }
+                        let text = self.get_display_text(row, col);
+                        if text.is_empty() {
+                            continue;
+                        }
+                        let idx = col as usize;
+                        max_widths[idx] = max_widths[idx].max(Self::tui_text_width(&text));
+                    }
+                }
+
+                for col in 0..self.cols {
+                    let header_text = self.column_header_text(col);
+                    if header_text.is_empty() {
+                        continue;
+                    }
+                    let idx = col as usize;
+                    max_widths[idx] = max_widths[idx].max(Self::tui_text_width(&header_text));
+                }
+
+                for col in 0..self.cols {
+                    let idx = col as usize;
+                    let new_width = max_widths[idx].max(default_col_min).saturating_add(1);
+                    self.set_col_width(col, new_width);
+                }
+            }
+
+            if resize_rows {
+                for row in 0..self.rows {
+                    let new_height =
+                        DEFAULT_TUI_ROW_HEIGHT.max(default_row_min.min(DEFAULT_TUI_ROW_HEIGHT));
+                    self.set_row_height(row, new_height);
+                }
+                self.auto_resize_col_top_header_rows(
+                    &mut TextEngine::new(),
+                    &grid_font_name,
+                    grid_font_size,
+                );
+            }
+            return;
+        }
 
         self.ensure_text_engine();
         let mut te = self.text_engine.take().unwrap();
@@ -3791,6 +3957,13 @@ impl VolvoxGrid {
             pinned_h,
             pinned_w,
         );
+        self.normalize_scroll_for_mode();
+
+        if self.is_tui_mode() {
+            self.animation.clear();
+            let _ = self.tick_scrollbar_fade(0.0);
+            return;
+        }
 
         // Tick animation offsets and keep dirty while animating
         if self.animation.tick() {
@@ -3848,6 +4021,7 @@ impl VolvoxGrid {
         self.scroll.max_scroll_x = max_scroll_x;
         self.scroll.max_scroll_y = max_scroll_y;
         self.scroll.scroll_y = target_scroll_y.min(max_scroll_y);
+        self.normalize_scroll_for_mode();
         self.mark_dirty_visual();
     }
 
@@ -3909,6 +4083,7 @@ impl VolvoxGrid {
         self.scroll.max_scroll_x = max_scroll_x;
         self.scroll.max_scroll_y = max_scroll_y;
         self.scroll.scroll_x = target_scroll_x.min(max_scroll_x);
+        self.normalize_scroll_for_mode();
         self.mark_dirty_visual();
     }
 
@@ -3961,6 +4136,7 @@ impl VolvoxGrid {
                 edit_text: committed.clone(),
             });
         self.cells.set_text(row, col, committed.clone());
+        self.sync_explicit_progress_from_text(row, col);
         if old_text != committed {
             self.events.push(crate::event::GridEventData::AfterEdit {
                 row,
@@ -3982,6 +4158,22 @@ impl VolvoxGrid {
         }
         self.mark_dirty();
         true
+    }
+
+    /// If a cell already carries explicit progress metadata, keep the visual
+    /// progress fill synchronized with the committed text users edit.
+    pub fn sync_explicit_progress_from_text(&mut self, row: i32, col: i32) {
+        let should_sync = self
+            .cells
+            .get(row, col)
+            .is_some_and(|cell| cell.progress_percent() > 0.0 || cell.progress_color() != 0);
+        if !should_sync {
+            return;
+        }
+
+        let percent =
+            crate::canvas::parse_progress_percent(self.cells.get_text(row, col)).clamp(0.0, 1.0);
+        self.cells.get_mut(row, col).extra_mut().progress_percent = percent;
     }
 
     /// Cancel the active edit and emit DropdownClosed if applicable.
@@ -4297,6 +4489,9 @@ impl VolvoxGrid {
     /// Returns the dropdown item index if the point is inside the dropdown,
     /// or `None` if outside or no dropdown is active.
     pub fn dropdown_hit_index(&self, px: f32, py: f32) -> Option<i32> {
+        if self.is_tui_mode() {
+            return None;
+        }
         if !self.edit.is_active() {
             return None;
         }
@@ -4593,6 +4788,17 @@ mod tests {
     }
 
     #[test]
+    fn dropdown_hit_index_is_disabled_in_tui_mode() {
+        let mut grid = VolvoxGrid::new(1, 20, 6, 2, 1, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.columns[0].dropdown_items = "A|B|C".to_string();
+        grid.cells.set_text(0, 0, "A".to_string());
+        grid.begin_edit(0, 0);
+
+        assert_eq!(grid.dropdown_hit_index(5.0, 3.0), None);
+    }
+
+    #[test]
     fn resolved_cell_control_prefers_explicit_metadata_over_dropdown_inference() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
         grid.columns[0].dropdown_items = "A|B|C".to_string();
@@ -4673,6 +4879,27 @@ mod tests {
 
         grid.begin_edit(1, 1);
         assert!(!grid.is_editing());
+    }
+
+    #[test]
+    fn commit_edit_resyncs_explicit_progress_from_text() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 2, 1, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.cells.set_text(1, 0, "25".to_string());
+        {
+            let extra = grid.cells.get_mut(1, 0).extra_mut();
+            extra.progress_percent = 0.25;
+            extra.progress_color = 0xFF22C55E;
+        }
+
+        grid.begin_edit(1, 0);
+        grid.edit.edit_text = "80".to_string();
+
+        assert!(grid.commit_edit());
+        let cell = grid.cells.get(1, 0).unwrap();
+        assert_eq!(cell.text, "80");
+        assert!((cell.progress_percent() - 0.8).abs() < 1e-6);
+        assert_eq!(cell.progress_color(), 0xFF22C55E);
     }
 
     #[test]

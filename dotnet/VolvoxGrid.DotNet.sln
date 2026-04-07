@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VolvoxGrid.WinFormsSample",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VolvoxGrid.ConsoleSample", "examples\\console\\VolvoxGrid.ConsoleSample.csproj", "{A96E1247-CBB9-4A3C-B1AC-445D92C6FA60}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VolvoxGrid.TuiSample", "examples\\tui\\VolvoxGrid.TuiSample.csproj", "{A34E6F8B-7FAD-4F72-A7A4-4F05FBD7C2A2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,6 +28,10 @@ Global
 		{A96E1247-CBB9-4A3C-B1AC-445D92C6FA60}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A96E1247-CBB9-4A3C-B1AC-445D92C6FA60}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A96E1247-CBB9-4A3C-B1AC-445D92C6FA60}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A34E6F8B-7FAD-4F72-A7A4-4F05FBD7C2A2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A34E6F8B-7FAD-4F72-A7A4-4F05FBD7C2A2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A34E6F8B-7FAD-4F72-A7A4-4F05FBD7C2A2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A34E6F8B-7FAD-4F72-A7A4-4F05FBD7C2A2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

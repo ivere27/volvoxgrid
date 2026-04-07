@@ -1445,6 +1445,7 @@ impl BenchSession {
                 grid_id: self.grid_id,
                 input: Some(pb::render_input::Input::Buffer(pb::BufferReady {
                     handle: buffer.as_mut_ptr() as i64,
+                    capacity: buffer.len() as i32,
                     stride: *width * 4,
                     width: *width,
                     height: *height,
@@ -1454,6 +1455,7 @@ impl BenchSession {
                 grid_id: self.grid_id,
                 input: Some(pb::render_input::Input::Buffer(pb::BufferReady {
                     handle: host.render_handle(),
+                    capacity: host.stride() * host.height(),
                     stride: host.stride(),
                     width: host.width(),
                     height: host.height(),

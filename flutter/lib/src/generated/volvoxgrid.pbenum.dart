@@ -1113,6 +1113,8 @@ class RendererMode extends $pb.ProtobufEnum {
       RendererMode._(3, _omitEnumNames ? '' : 'RENDERER_GPU_VULKAN');
   static const RendererMode RENDERER_GPU_GLES =
       RendererMode._(4, _omitEnumNames ? '' : 'RENDERER_GPU_GLES');
+  static const RendererMode RENDERER_TUI =
+      RendererMode._(5, _omitEnumNames ? '' : 'RENDERER_TUI');
 
   static const $core.List<RendererMode> values = <RendererMode>[
     RENDERER_AUTO,
@@ -1120,10 +1122,11 @@ class RendererMode extends $pb.ProtobufEnum {
     RENDERER_GPU,
     RENDERER_GPU_VULKAN,
     RENDERER_GPU_GLES,
+    RENDERER_TUI,
   ];
 
   static final $core.List<RendererMode?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 4);
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
   static RendererMode? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -1792,6 +1795,55 @@ class DemoDataFormat extends $pb.ProtobufEnum {
   const DemoDataFormat._(super.value, super.name);
 }
 
+class TerminalColorLevel extends $pb.ProtobufEnum {
+  static const TerminalColorLevel TERMINAL_COLOR_LEVEL_AUTO =
+      TerminalColorLevel._(
+          0, _omitEnumNames ? '' : 'TERMINAL_COLOR_LEVEL_AUTO');
+  static const TerminalColorLevel TERMINAL_COLOR_LEVEL_TRUECOLOR =
+      TerminalColorLevel._(
+          1, _omitEnumNames ? '' : 'TERMINAL_COLOR_LEVEL_TRUECOLOR');
+  static const TerminalColorLevel TERMINAL_COLOR_LEVEL_256 =
+      TerminalColorLevel._(2, _omitEnumNames ? '' : 'TERMINAL_COLOR_LEVEL_256');
+  static const TerminalColorLevel TERMINAL_COLOR_LEVEL_16 =
+      TerminalColorLevel._(3, _omitEnumNames ? '' : 'TERMINAL_COLOR_LEVEL_16');
+
+  static const $core.List<TerminalColorLevel> values = <TerminalColorLevel>[
+    TERMINAL_COLOR_LEVEL_AUTO,
+    TERMINAL_COLOR_LEVEL_TRUECOLOR,
+    TERMINAL_COLOR_LEVEL_256,
+    TERMINAL_COLOR_LEVEL_16,
+  ];
+
+  static final $core.List<TerminalColorLevel?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static TerminalColorLevel? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const TerminalColorLevel._(super.value, super.name);
+}
+
+class FrameKind extends $pb.ProtobufEnum {
+  static const FrameKind FRAME_KIND_FRAME =
+      FrameKind._(0, _omitEnumNames ? '' : 'FRAME_KIND_FRAME');
+  static const FrameKind FRAME_KIND_SESSION_START =
+      FrameKind._(1, _omitEnumNames ? '' : 'FRAME_KIND_SESSION_START');
+  static const FrameKind FRAME_KIND_SESSION_END =
+      FrameKind._(2, _omitEnumNames ? '' : 'FRAME_KIND_SESSION_END');
+
+  static const $core.List<FrameKind> values = <FrameKind>[
+    FRAME_KIND_FRAME,
+    FRAME_KIND_SESSION_START,
+    FRAME_KIND_SESSION_END,
+  ];
+
+  static final $core.List<FrameKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static FrameKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const FrameKind._(super.value, super.name);
+}
+
 class ArchiveRequest_Action extends $pb.ProtobufEnum {
   static const ArchiveRequest_Action SAVE =
       ArchiveRequest_Action._(0, _omitEnumNames ? '' : 'SAVE');
@@ -1882,6 +1934,25 @@ class KeyEvent_Type extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const KeyEvent_Type._(super.value, super.name);
+}
+
+class TerminalCommand_Kind extends $pb.ProtobufEnum {
+  static const TerminalCommand_Kind TERMINAL_COMMAND_NONE =
+      TerminalCommand_Kind._(0, _omitEnumNames ? '' : 'TERMINAL_COMMAND_NONE');
+  static const TerminalCommand_Kind TERMINAL_COMMAND_EXIT =
+      TerminalCommand_Kind._(1, _omitEnumNames ? '' : 'TERMINAL_COMMAND_EXIT');
+
+  static const $core.List<TerminalCommand_Kind> values = <TerminalCommand_Kind>[
+    TERMINAL_COMMAND_NONE,
+    TERMINAL_COMMAND_EXIT,
+  ];
+
+  static final $core.List<TerminalCommand_Kind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 1);
+  static TerminalCommand_Kind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const TerminalCommand_Kind._(super.value, super.name);
 }
 
 class CursorChange_CursorType extends $pb.ProtobufEnum {

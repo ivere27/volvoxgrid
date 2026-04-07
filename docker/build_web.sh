@@ -33,7 +33,7 @@ snapshot_current_wasm() {
 build_js() {
   (
     cd "${REPO_ROOT}/web/js"
-    npm ci
+    npm install
     npm run build
   )
 }
@@ -175,7 +175,7 @@ build_sheet_dist() {
   ln -sf "${REPO_ROOT}/web/example/wasm/"* "${REPO_ROOT}/adapters/sheet/wasm/"
   (
     cd "${REPO_ROOT}/adapters/sheet"
-    npm ci
+    npm install
     npm run build
   )
   copy_dir_clean "${REPO_ROOT}/adapters/sheet/dist" "${out_dir}"
@@ -195,7 +195,7 @@ build_report_dist() {
   ln -sf "${REPO_ROOT}/web/example/wasm/"* "${REPO_ROOT}/adapters/report/wasm/"
   (
     cd "${REPO_ROOT}/adapters/report"
-    npm ci
+    npm install
     npm run build -- --base /demos/report/
   )
   copy_dir_clean "${REPO_ROOT}/adapters/report/dist" "${WEB_DIST_ROOT}/demos/report"

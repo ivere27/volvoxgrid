@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0
+
+- Version bump for project-wide 0.6.0 release.
+
 ## 0.5.0
 
 - Added pull-to-refresh support and moved context menu handling to the app side.

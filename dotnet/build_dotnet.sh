@@ -1,5 +1,5 @@
 #!/bin/bash
-# build_dotnet.sh — Build VolvoxGrid .NET samples for WinForms/Wine or native .NET 8.
+# build_dotnet.sh — Build VolvoxGrid .NET samples for WinForms/Wine, controller console, or TUI.
 #
 # Usage:
 #   ./dotnet/build_dotnet.sh [release]
@@ -7,6 +7,7 @@
 # Environment:
 #   DOTNET_TFM=net40|net8.0|net8.0-windows   (default: net40)
 #   DOTNET_ARCH=x64|x86                      (default: x64, WinForms builds only)
+#   DOTNET_SAMPLE=auto|winforms|console|tui  (default: auto)
 #
 # Produces:
 #   target/<windows-target-triple>/{debug|release}/volvoxgrid_plugin.dll
@@ -24,6 +25,7 @@ CARGO_FLAGS=""
 TARGET_DIR="debug"
 TARGET_TFM="${DOTNET_TFM:-net40}"
 TARGET_ARCH="${DOTNET_ARCH:-x64}"
+TARGET_SAMPLE="${DOTNET_SAMPLE:-}"
 unset DOTNET_TFM DOTNET_ARCH
 PLUGIN_FEATURES="${VOLVOXGRID_DOTNET_PLUGIN_FEATURES:-gpu}"
 PLUGIN_FEATURE_ARGS=()
@@ -60,6 +62,9 @@ sample_project_for_kind() {
         console)
             printf '%s\n' "$ROOT_DIR/dotnet/examples/console/VolvoxGrid.ConsoleSample.csproj"
             ;;
+        tui)
+            printf '%s\n' "$ROOT_DIR/dotnet/examples/tui/VolvoxGrid.TuiSample.csproj"
+            ;;
         *)
             echo "ERROR: unknown sample kind '$kind'" >&2
             exit 1
@@ -75,6 +80,9 @@ sample_basename_for_kind() {
             ;;
         console)
             printf 'VolvoxGrid.ConsoleSample\n'
+            ;;
+        tui)
+            printf 'VolvoxGrid.TuiSample\n'
             ;;
         *)
             echo "ERROR: unknown sample kind '$kind'" >&2
@@ -134,12 +142,20 @@ restore_sample_project() {
   </packageSources>
 </configuration>
 EOF_OFFLINE_NUGET
-            dotnet restore "$SAMPLE_PROJECT" "${DOTNET_PROPS[@]}" --configfile "$OFFLINE_CONFIG"
+            if [ "${#DOTNET_PROPS[@]}" -gt 0 ]; then
+                dotnet restore "$SAMPLE_PROJECT" "${DOTNET_PROPS[@]}" --configfile "$OFFLINE_CONFIG"
+            else
+                dotnet restore "$SAMPLE_PROJECT" --configfile "$OFFLINE_CONFIG"
+            fi
             return
         fi
     fi
 
-    dotnet restore "$SAMPLE_PROJECT" "${DOTNET_PROPS[@]}"
+    if [ "${#DOTNET_PROPS[@]}" -gt 0 ]; then
+        dotnet restore "$SAMPLE_PROJECT" "${DOTNET_PROPS[@]}"
+    else
+        dotnet restore "$SAMPLE_PROJECT"
+    fi
 }
 
 resolve_stage_dir() {
@@ -162,6 +178,9 @@ resolve_stage_dir() {
             ;;
         console)
             base="$ROOT_DIR/target/dotnet/console_${profile}_$(normalize_tfm_for_path "$tfm")"
+            ;;
+        tui)
+            base="$ROOT_DIR/target/dotnet/tui_${profile}_$(normalize_tfm_for_path "$tfm")"
             ;;
         *)
             echo "ERROR: unknown sample kind '$sample_kind'" >&2
@@ -226,6 +245,14 @@ while [ "$#" -gt 0 ]; do
             fi
             shift 2
             ;;
+        --sample)
+            TARGET_SAMPLE="${2:-}"
+            if [ -z "$TARGET_SAMPLE" ]; then
+                echo "ERROR: --sample requires a value." >&2
+                exit 1
+            fi
+            shift 2
+            ;;
         *)
             echo "ERROR: unknown argument '$1'." >&2
             exit 1
@@ -233,10 +260,19 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-SAMPLE_KIND="$(sample_kind_for_tfm "$TARGET_TFM")"
+if [ -z "$TARGET_SAMPLE" ] || [ "$TARGET_SAMPLE" = "auto" ]; then
+    SAMPLE_KIND="$(sample_kind_for_tfm "$TARGET_TFM")"
+else
+    SAMPLE_KIND="$TARGET_SAMPLE"
+fi
 SAMPLE_PROJECT="$(sample_project_for_kind "$SAMPLE_KIND")"
 SAMPLE_BASENAME="$(sample_basename_for_kind "$SAMPLE_KIND")"
 PLUGIN_BASENAME="$(native_plugin_basename "$TARGET_TFM")"
+
+if [ "$SAMPLE_KIND" = "tui" ] && [ "$TARGET_TFM" != "net8.0" ]; then
+    echo "ERROR: the TUI sample requires DOTNET_TFM=net8.0." >&2
+    exit 1
+fi
 
 if [ "$SAMPLE_KIND" = "winforms" ]; then
     DOTNET_PLATFORM_TARGET="$TARGET_ARCH"
@@ -288,11 +324,22 @@ if [ "$TARGET_TFM" = "net40" ]; then
     fi
 fi
 
-echo "[dotnet] build sample (${DOTNET_CFG}, ${TARGET_TFM}, ${DOTNET_PLATFORM_TARGET:-default}, --no-restore)"
-if ! dotnet build "$SAMPLE_PROJECT" -c "$DOTNET_CFG" -f "$TARGET_TFM" "${DOTNET_PROPS[@]}" --no-restore; then
+#
+# MSBuild can flake in multi-node project-reference discovery immediately after
+# the cargo plugin build in this wrapper flow. Force single-node mode here so
+# `make dotnet-*` stays deterministic across console/TUI samples.
+DOTNET_BUILD_ARGS=(-m:1)
+
+echo "[dotnet] build sample (${DOTNET_CFG}, ${TARGET_TFM}, ${DOTNET_PLATFORM_TARGET:-default}, --no-restore, ${DOTNET_BUILD_ARGS[*]})"
+if [ "${#DOTNET_PROPS[@]}" -gt 0 ]; then
+    BUILD_CMD=(dotnet build "$SAMPLE_PROJECT" -c "$DOTNET_CFG" -f "$TARGET_TFM" "${DOTNET_BUILD_ARGS[@]}" "${DOTNET_PROPS[@]}" --no-restore)
+else
+    BUILD_CMD=(dotnet build "$SAMPLE_PROJECT" -c "$DOTNET_CFG" -f "$TARGET_TFM" "${DOTNET_BUILD_ARGS[@]}" --no-restore)
+fi
+if ! "${BUILD_CMD[@]}"; then
     echo "[dotnet] no-restore build failed; attempting restore + rebuild"
     restore_sample_project
-    dotnet build "$SAMPLE_PROJECT" -c "$DOTNET_CFG" -f "$TARGET_TFM" "${DOTNET_PROPS[@]}" --no-restore
+    "${BUILD_CMD[@]}"
 fi
 
 MSBUILD_BIN_ROOT="$ROOT_DIR/target/dotnet/msbuild/bin/${MSBUILD_ARCH_ROOT}"

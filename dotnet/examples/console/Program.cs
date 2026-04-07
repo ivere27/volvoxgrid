@@ -57,10 +57,19 @@ namespace VolvoxGrid.DotNet.ConsoleSample
                 string cell = GetCellText(grid, 1, 1);
                 int found = grid.FindByText("Gamma", 1, 0, false, true);
                 byte[] salesData = grid.GetDemoData("sales");
+                string tuiHeader;
+
+                using (var tuiGrid = new VolvoxGridClient(viewportWidth: 80, viewportHeight: 24, scale: 1.0f))
+                using (var tui = OpenSmokeTuiSession(tuiGrid))
+                {
+                    var frame = tui.Render(20, 6);
+                    tuiHeader = frame.GetRowText(0).TrimEnd();
+                }
 
                 Log("INFO", "Summary: rows=5 cols=4 sampleCell=" + Quote(cell), null);
                 Log("INFO", "Summary: find(Gamma) row=" + found, null);
                 Log("INFO", "Summary: sales demo bytes=" + (salesData == null ? 0 : salesData.Length), null);
+                Log("INFO", "Summary: tui header row=" + Quote(tuiHeader), null);
             }
         }
 
@@ -132,6 +141,7 @@ namespace VolvoxGrid.DotNet.ConsoleSample
                 SmokeAssert(grid.GetCells(0, 0, 3, 3, false, false, false).Count > 0, "LoadDemo/GetCells");
 
                 grid.Refresh();
+                RunTuiSmoke();
                 Log("INFO", "SMOKE: controller-api checks complete", null);
             }
         }
@@ -147,6 +157,15 @@ namespace VolvoxGrid.DotNet.ConsoleSample
             };
         }
 
+        private static List<ColumnDef> BuildTuiColumns()
+        {
+            return new List<ColumnDef>
+            {
+                new ColumnDef { Index = 0, Key = "id", Caption = "ID", Width = 4, DataType = ColumnDataType.COLUMN_DATA_NUMBER, Align = Align.ALIGN_RIGHT_CENTER },
+                new ColumnDef { Index = 1, Key = "name", Caption = "Name", Width = 6 },
+            };
+        }
+
         private static object[] BuildSmokeTable()
         {
             return new object[]
@@ -157,6 +176,141 @@ namespace VolvoxGrid.DotNet.ConsoleSample
                 4, "Delta", 40, false,
                 5, "Epsilon", 50, true,
             };
+        }
+
+        private static object[] BuildTuiTable()
+        {
+            return new object[]
+            {
+                10, "Alpha",
+                20, "Beta",
+                30, "Gamma",
+                40, "Delta",
+            };
+        }
+
+        private static VolvoxGridTuiSession OpenSmokeTuiSession(VolvoxGridClient grid)
+        {
+            grid.Configure(
+                new GridConfig
+                {
+                    Indicators = new IndicatorsConfig
+                    {
+                        RowStart = new RowIndicatorConfig
+                        {
+                            Visible = false,
+                        },
+                        ColTop = new ColIndicatorConfig
+                        {
+                            Visible = true,
+                            BandRows = 1,
+                        },
+                    },
+                    Rendering = new RenderConfig
+                    {
+                        RendererMode = (RendererMode)VolvoxGridTuiSession.RendererModeValue,
+                    },
+                });
+            grid.DefineColumns(BuildTuiColumns());
+            grid.LoadTable(4, 2, BuildTuiTable(), true);
+            return grid.OpenTuiSession();
+        }
+
+        private static void RunTuiSmoke()
+        {
+            using (var grid = new VolvoxGridClient(viewportWidth: 80, viewportHeight: 24, scale: 1.0f))
+            using (var tui = OpenSmokeTuiSession(grid))
+            {
+                SmokeAssert(VolvoxGridTuiCell.ByteSize == 13, "TuiCell ABI size");
+
+                var frame = tui.Render(20, 6);
+                Log(
+                    "INFO",
+                    "TUI rows: "
+                    + Quote(frame.GetRowText(0))
+                    + " | "
+                    + Quote(frame.GetRowText(1))
+                    + " | "
+                    + Quote(frame.GetRowText(2)),
+                    null);
+                SmokeAssert(frame != null && frame.Cells != null && frame.Cells.Length == 120, "TUI frame dimensions");
+                SmokeAssert(FrameContainsText(frame, "ID"), "TUI header render");
+                SmokeAssert(FrameHasBodyText(frame), "TUI body render");
+                SmokeAssert(FrameHasResetBackground(frame), "TUI transparent background");
+
+                tui.SendPointer(PointerEvent_Type.DOWN, 18.0f, 2.0f, 0, 0, false);
+                tui.SendPointer(PointerEvent_Type.UP, 18.0f, 2.0f, 0, 0, false);
+                tui.Render(20, 6);
+
+                SelectionState selection = grid.GetSelection();
+                Log(
+                    "INFO",
+                    "TUI selection: row="
+                    + (selection == null ? -1 : selection.ActiveRow)
+                    + " col="
+                    + (selection == null ? -1 : selection.ActiveCol),
+                    null);
+                SmokeAssert(
+                    selection != null
+                    && selection.ActiveRow == 1
+                    && selection.ActiveCol == 1,
+                    "TUI pointer selection");
+            }
+        }
+
+        private static bool FrameContainsText(VolvoxGridTuiFrame frame, string needle)
+        {
+            if (frame == null || string.IsNullOrEmpty(needle))
+            {
+                return false;
+            }
+
+            for (int row = 0; row < frame.Height; row += 1)
+            {
+                string text = frame.GetRowText(row);
+                if (text.IndexOf(needle, StringComparison.Ordinal) >= 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool FrameHasResetBackground(VolvoxGridTuiFrame frame)
+        {
+            if (frame == null || frame.Cells == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < frame.Cells.Length; i += 1)
+            {
+                if (frame.Cells[i].Background == VolvoxGridTuiCell.ResetBackground)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool FrameHasBodyText(VolvoxGridTuiFrame frame)
+        {
+            if (frame == null)
+            {
+                return false;
+            }
+
+            for (int row = 1; row < frame.Height; row += 1)
+            {
+                if ((frame.GetRowText(row) ?? string.Empty).Trim().Length > 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static string GetCellText(VolvoxGridClient grid, int row, int col)

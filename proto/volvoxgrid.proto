@@ -445,6 +445,7 @@ enum RendererMode {
   RENDERER_GPU        = 2;
   RENDERER_GPU_VULKAN = 3;
   RENDERER_GPU_GLES   = 4;
+  RENDERER_TUI        = 5;
 }
 
 enum PresentMode {
@@ -1675,6 +1676,10 @@ message RenderInput {
     EventDecision   event_decision = 7;
     ZoomEvent       zoom           = 8;
     GpuSurfaceReady gpu_surface    = 9;
+    TerminalInputBytes terminal_input        = 10;
+    TerminalCapabilities terminal_capabilities = 11;
+    TerminalViewport terminal_viewport       = 12;
+    TerminalCommand terminal_command         = 13;
   }
 }
 
@@ -1721,6 +1726,42 @@ message BufferReady {
   int32 stride = 2;
   int32 width  = 3;
   int32 height = 4;
+  int32 capacity = 5;
+}
+
+enum TerminalColorLevel {
+  TERMINAL_COLOR_LEVEL_AUTO      = 0;
+  TERMINAL_COLOR_LEVEL_TRUECOLOR = 1;
+  TERMINAL_COLOR_LEVEL_256       = 2;
+  TERMINAL_COLOR_LEVEL_16        = 3;
+}
+
+message TerminalInputBytes {
+  bytes data = 1;
+}
+
+message TerminalCapabilities {
+  TerminalColorLevel color_level    = 1;
+  bool               sgr_mouse      = 2;
+  bool               focus_events   = 3;
+  bool               bracketed_paste = 4;
+}
+
+message TerminalViewport {
+  int32 origin_x   = 1;
+  int32 origin_y   = 2;
+  int32 width      = 3;
+  int32 height     = 4;
+  bool  fullscreen = 5;
+}
+
+message TerminalCommand {
+  enum Kind {
+    TERMINAL_COMMAND_NONE = 0;
+    TERMINAL_COMMAND_EXIT = 1;
+  }
+
+  Kind kind = 1;
 }
 
 message GpuSurfaceReady {
@@ -1755,6 +1796,15 @@ message FrameDone {
   int32 dirty_w = 4;
   int32 dirty_h = 5;
   FrameMetrics metrics = 6;
+  int32 bytes_written    = 7;
+  int32 required_capacity = 8;
+  FrameKind frame_kind   = 9;
+}
+
+enum FrameKind {
+  FRAME_KIND_FRAME         = 0;
+  FRAME_KIND_SESSION_START = 1;
+  FRAME_KIND_SESSION_END   = 2;
 }
 
 message GpuFrameDone {

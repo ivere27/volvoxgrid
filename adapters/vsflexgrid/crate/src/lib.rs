@@ -427,7 +427,14 @@ fn apply_local_sales_demo_subtotals(grid: &mut volvoxgrid_engine::grid::VolvoxGr
     volvoxgrid_engine::outline::subtotal(grid, 1, 0, 0, "", 0, 0, false);
 
     let rows = volvoxgrid_engine::outline::subtotal(
-        grid, 2, -1, 4, "Grand Total", 0xFFEEF2FF, 0xFF111827, true,
+        grid,
+        2,
+        -1,
+        4,
+        "Grand Total",
+        0xFFEEF2FF,
+        0xFF111827,
+        true,
     );
     apply_local_sales_subtotal_merges(grid, &rows);
     let rows = volvoxgrid_engine::outline::subtotal_ex(
@@ -440,7 +447,14 @@ fn apply_local_sales_demo_subtotals(grid: &mut volvoxgrid_engine::grid::VolvoxGr
     apply_local_sales_subtotal_merges(grid, &rows);
 
     let rows = volvoxgrid_engine::outline::subtotal(
-        grid, 2, -1, 5, "Grand Total", 0xFFEEF2FF, 0xFF111827, true,
+        grid,
+        2,
+        -1,
+        5,
+        "Grand Total",
+        0xFFEEF2FF,
+        0xFF111827,
+        true,
     );
     apply_local_sales_subtotal_merges(grid, &rows);
     let rows = volvoxgrid_engine::outline::subtotal_ex(
