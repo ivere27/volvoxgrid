@@ -219,7 +219,7 @@ endif
         docker_android_aar_image docker_android docker_desktop_image docker_desktop \
         docker_web_image docker_web \
         docker_ios_image docker_ios docker_all_image docker_all publish_maven \
-        publish_local publish_github publish_web \
+        publish_local publish_github publish_web publish_npm \
         gtk-test gtk-test-release gtk-bench clean clean-all help
 
 # =============================================================================
@@ -319,11 +319,12 @@ help:
 	@echo "  publish_github            Upload all artifacts (xcframework, AAR, JAR, .NET, ActiveX, web zips) to GitHub release"
 	@echo "  publish_local             Install built SNAPSHOT artifacts from dist/maven into ~/.m2/repository"
 	@echo "  publish_web               Copy dist/web -> public (clean), then run firebase deploy"
+	@echo "  publish_npm               Publish volvoxgrid + adapter npm packages from dist/web zip"
 	@echo ""
 	@echo "Example dependency source flags (default is local):"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.5.0"
-	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.5.0"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.5.0"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.6.0"
+	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.6.0"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.6.0"
 	@echo "  (maven mode skips local plugin build for the example targets)"
 	@echo "  Flutter defaults to maven when VOLVOXGRID_SOURCE is omitted."
 	@echo "  VOLVOXGRID_SOURCE=local builds from source."
@@ -1666,6 +1667,45 @@ publish_web:
 	@cp -a "$(WEB_BUNDLE_DIR)/." "$(FIREBASE_PUBLIC_DIR)/"
 	@echo "Running Firebase deploy..."
 	firebase deploy
+
+publish_npm:
+	@command -v npm >/dev/null 2>&1 || { echo "Error: npm not found in PATH."; exit 1; }
+	@ZIP="$(CURRENT_DIR)/dist/web/volvoxgrid-web-$(VOLVOXGRID_VERSION).zip"; \
+	if [ ! -f "$$ZIP" ]; then \
+		echo "Error: $$ZIP not found."; \
+		echo "Build web artifacts first (for example: make docker_web)."; \
+		exit 1; \
+	fi; \
+	STAGE=$$(mktemp -d); \
+	trap 'rm -rf "$$STAGE"' EXIT; \
+	echo "Extracting $$ZIP..."; \
+	unzip -q "$$ZIP" -d "$$STAGE"; \
+	JS_DIR="$$STAGE/volvoxgrid-web/js"; \
+	WASM_DIR="$$STAGE/volvoxgrid-web/wasm"; \
+	if [ ! -d "$$JS_DIR" ] || [ ! -d "$$WASM_DIR" ]; then \
+		echo "Error: unexpected zip layout (expected volvoxgrid-web/js and volvoxgrid-web/wasm)."; \
+		exit 1; \
+	fi; \
+	PKG_DIR="$$STAGE/pkg"; \
+	mkdir -p "$$PKG_DIR/dist" "$$PKG_DIR/wasm"; \
+	cp -a "$$JS_DIR/"*.js "$$JS_DIR/"*.d.ts "$$JS_DIR/"*.map "$$PKG_DIR/dist/" 2>/dev/null || true; \
+	if [ -d "$$JS_DIR/generated" ]; then cp -a "$$JS_DIR/generated" "$$PKG_DIR/dist/"; fi; \
+	cp -a "$$WASM_DIR/"* "$$PKG_DIR/wasm/"; \
+	rm -f "$$PKG_DIR/wasm/package.json"; \
+	cp "$(CURRENT_DIR)/web/js/package.json" "$$PKG_DIR/package.json"; \
+	echo "Publishing volvoxgrid@$(VOLVOXGRID_VERSION) to npm..."; \
+	(cd "$$PKG_DIR" && npm publish --access public); \
+	echo ""; \
+	for adapter_dir in $(CURRENT_DIR)/adapters/aggrid $(CURRENT_DIR)/adapters/sheet; do \
+		if [ -d "$$adapter_dir/dist" ] && [ -f "$$adapter_dir/package.json" ]; then \
+			name=$$(node -p "require('$$adapter_dir/package.json').name"); \
+			echo "Publishing $$name@$(VOLVOXGRID_VERSION) to npm..."; \
+			(cd "$$adapter_dir" && npm publish --access public); \
+		else \
+			echo "Skip $$(basename $$adapter_dir): dist/ not found (run npm run build first)."; \
+		fi; \
+	done; \
+	echo "npm publish complete."
 
 # =============================================================================
 # Flutter

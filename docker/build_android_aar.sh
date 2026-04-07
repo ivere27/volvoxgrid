@@ -8,12 +8,12 @@ set -euo pipefail
 # then merges volvoxgrid-java-common classes into classes.jar (fat AAR).
 # Outputs Maven-ready artifacts: AAR, POM, sources.jar, javadoc.jar.
 #
-# Usage (inside Docker): VERSION=0.5.0 /opt/volvoxgrid/build_android_aar.sh
+# Usage (inside Docker): VERSION=0.6.0 /opt/volvoxgrid/build_android_aar.sh
 # Optional: PLUGIN_BUILD_MODE=lite (default: full), AAR_BUILD_TYPE=debug|release (default: release)
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}"
-VERSION="${VERSION:-0.5.0}"
+VERSION="${VERSION:-0.6.0}"
 SYNURANG_VERSION="${SYNURANG_VERSION:-0.5.4}"
 GROUP_ID="${GROUP_ID:-io.github.ivere27}"
 ARTIFACT_ID="${ARTIFACT_ID:-volvoxgrid-android}"

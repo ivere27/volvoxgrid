@@ -4,8 +4,8 @@ set -euo pipefail
 usage() {
   echo "Usage: $0 <expected-version> <artifact-or-dir> [more...]" >&2
   echo "Examples:" >&2
-  echo "  $0 0.5.0-SNAPSHOT dist/maven/volvoxgrid-desktop-0.5.0-SNAPSHOT.jar" >&2
-  echo "  $0 0.5.0-SNAPSHOT dist/ios/VolvoxGridPlugin.xcframework" >&2
+  echo "  $0 0.6.0-SNAPSHOT dist/maven/volvoxgrid-desktop-0.6.0-SNAPSHOT.jar" >&2
+  echo "  $0 0.6.0-SNAPSHOT dist/ios/VolvoxGridPlugin.xcframework" >&2
   exit 2
 }
 
