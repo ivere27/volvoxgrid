@@ -10,14 +10,15 @@
 #   DOTNET_SAMPLE=auto|winforms|console|tui  (default: auto)
 #
 # Produces:
-#   target/<windows-target-triple>/{debug|release}/volvoxgrid_plugin.dll
-#   target/{debug|release}/libvolvoxgrid_plugin.{so|dylib}
+#   ${CARGO_TARGET_DIR:-target}/<windows-target-triple>/{debug|release}/volvoxgrid_plugin.dll
+#   ${CARGO_TARGET_DIR:-target}/{debug|release}/libvolvoxgrid_plugin.{so|dylib}
 #   target/dotnet/{winforms|console}_{debug|release}[_<tfm>]/*
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+CARGO_ARTIFACT_ROOT="${CARGO_TARGET_DIR:-$ROOT_DIR/target}"
 
 PROFILE="debug"
 DOTNET_CFG="Debug"
@@ -284,11 +285,11 @@ echo "=== VolvoxGrid .NET Build (${PROFILE}, ${TARGET_TFM}, ${TARGET_ARCH}, ${SA
 if [ "$SAMPLE_KIND" = "winforms" ]; then
     echo "[plugin] cargo build --target ${RUST_WINDOWS_TARGET} ${CARGO_FLAGS} ${PLUGIN_FEATURE_ARGS[*]}"
     cargo build --manifest-path "$ROOT_DIR/plugin/Cargo.toml" --target "$RUST_WINDOWS_TARGET" -p volvoxgrid-plugin $CARGO_FLAGS "${PLUGIN_FEATURE_ARGS[@]}"
-    PLUGIN_ARTIFACT="$ROOT_DIR/target/${RUST_WINDOWS_TARGET}/${TARGET_DIR}/volvoxgrid_plugin.dll"
+    PLUGIN_ARTIFACT="$CARGO_ARTIFACT_ROOT/${RUST_WINDOWS_TARGET}/${TARGET_DIR}/volvoxgrid_plugin.dll"
 else
     echo "[plugin] cargo build ${CARGO_FLAGS} ${PLUGIN_FEATURE_ARGS[*]}"
     cargo build --manifest-path "$ROOT_DIR/plugin/Cargo.toml" -p volvoxgrid-plugin $CARGO_FLAGS "${PLUGIN_FEATURE_ARGS[@]}"
-    PLUGIN_ARTIFACT="$ROOT_DIR/target/${TARGET_DIR}/${PLUGIN_BASENAME}"
+    PLUGIN_ARTIFACT="$CARGO_ARTIFACT_ROOT/${TARGET_DIR}/${PLUGIN_BASENAME}"
 fi
 
 DOTNET_PROPS=()

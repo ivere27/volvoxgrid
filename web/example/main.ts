@@ -42,6 +42,7 @@ const CELL_INTERACTION_UNSPECIFIED = CellInteraction.CELL_INTERACTION_UNSPECIFIE
 const CELL_INTERACTION_TEXT_LINK = CellInteraction.CELL_INTERACTION_TEXT_LINK;
 const CELL_HIT_AREA_TEXT = CellHitArea.HIT_TEXT;
 const FONT_FETCH_TIMEOUT_MS = 5000;
+const DEMO_DEFAULT_FONT_FAMILY = "Roboto";
 const PB_TEXT_ENCODER = new TextEncoder();
 const PB_TEXT_DECODER = new TextDecoder();
 const HOVER_NONE = 0;
@@ -94,6 +95,10 @@ type DemoColumnSetup = {
   interaction?: number;
   span?: boolean;
 };
+type DemoFontAsset = {
+  label: string;
+  url: string;
+};
 type HierarchyDemoRow = {
   Name: string;
   Type: string;
@@ -121,33 +126,213 @@ async function fetchFontWithTimeout(url: string): Promise<Uint8Array | null> {
   }
 }
 
-function loadDemoFontsInBackground(
-  wasmModule: WasmModule,
-  onFontLoaded: () => void,
+function browserLocaleHints(): string[] {
+  if (typeof navigator === "undefined") {
+    return [];
+  }
+  const locales = Array.isArray(navigator.languages) && navigator.languages.length > 0
+    ? navigator.languages
+    : [navigator.language];
+  return locales
+    .map((value) => value?.trim())
+    .filter((value): value is string => typeof value === "string" && value.length > 0);
+}
+
+function appendDemoFontIfMissing(
+  fonts: DemoFontAsset[],
+  seenUrls: Set<string>,
+  label: string,
+  url: string,
 ): void {
-  const fonts = [
+  if (seenUrls.has(url)) {
+    return;
+  }
+  seenUrls.add(url);
+  fonts.push({ label, url });
+}
+
+function appendDemoFontsForLocale(
+  locale: string,
+  fonts: DemoFontAsset[],
+  seenUrls: Set<string>,
+): void {
+  const normalized = locale.trim().toLowerCase();
+  if (normalized === "") {
+    return;
+  }
+
+  if (/^ko(?:-|$)/i.test(normalized)) {
+    appendDemoFontIfMissing(
+      fonts,
+      seenUrls,
+      "Noto Sans KR (ko)",
+      "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/SubsetOTF/KR/NotoSansKR-Regular.otf",
+    );
+    return;
+  }
+  if (/^ja(?:-|$)/i.test(normalized)) {
+    appendDemoFontIfMissing(
+      fonts,
+      seenUrls,
+      "Noto Sans JP (ja)",
+      "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/SubsetOTF/JP/NotoSansJP-Regular.otf",
+    );
+    return;
+  }
+  if (/^zh(?:-|$)/i.test(normalized)) {
+    const traditional = /(?:^|[-_])(hant|tw|hk|mo)(?:[-_]|$)/i.test(normalized);
+    appendDemoFontIfMissing(
+      fonts,
+      seenUrls,
+      traditional ? "Noto Sans TC (zh-Hant)" : "Noto Sans SC (zh-Hans)",
+      traditional
+        ? "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/SubsetOTF/TC/NotoSansTC-Regular.otf"
+        : "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/SubsetOTF/SC/NotoSansSC-Regular.otf",
+    );
+    return;
+  }
+  if (/^th(?:-|$)/i.test(normalized)) {
+    appendDemoFontIfMissing(
+      fonts,
+      seenUrls,
+      "Noto Sans Thai (th)",
+      "https://cdn.jsdelivr.net/gh/notofonts/noto-fonts@main/hinted/ttf/NotoSansThai/NotoSansThai-Regular.ttf",
+    );
+    return;
+  }
+  if (/^ar(?:-|$)/i.test(normalized)) {
+    appendDemoFontIfMissing(
+      fonts,
+      seenUrls,
+      "Noto Sans Arabic (ar)",
+      "https://cdn.jsdelivr.net/gh/notofonts/noto-fonts@main/hinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf",
+    );
+    return;
+  }
+  if (/^(?:he|iw)(?:-|$)/i.test(normalized)) {
+    appendDemoFontIfMissing(
+      fonts,
+      seenUrls,
+      "Noto Sans Hebrew (he)",
+      "https://cdn.jsdelivr.net/gh/notofonts/noto-fonts@main/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf",
+    );
+    return;
+  }
+  if (/^(?:hi|mr|ne)(?:-|$)/i.test(normalized)) {
+    appendDemoFontIfMissing(
+      fonts,
+      seenUrls,
+      "Noto Sans Devanagari",
+      "https://cdn.jsdelivr.net/gh/notofonts/noto-fonts@main/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Regular.ttf",
+    );
+    return;
+  }
+  if (/^bn(?:-|$)/i.test(normalized)) {
+    appendDemoFontIfMissing(
+      fonts,
+      seenUrls,
+      "Noto Sans Bengali (bn)",
+      "https://cdn.jsdelivr.net/gh/notofonts/noto-fonts@main/hinted/ttf/NotoSansBengali/NotoSansBengali-Regular.ttf",
+    );
+    return;
+  }
+  if (/^ta(?:-|$)/i.test(normalized)) {
+    appendDemoFontIfMissing(
+      fonts,
+      seenUrls,
+      "Noto Sans Tamil (ta)",
+      "https://cdn.jsdelivr.net/gh/notofonts/noto-fonts@main/hinted/ttf/NotoSansTamil/NotoSansTamil-Regular.ttf",
+    );
+    return;
+  }
+  if (/^te(?:-|$)/i.test(normalized)) {
+    appendDemoFontIfMissing(
+      fonts,
+      seenUrls,
+      "Noto Sans Telugu (te)",
+      "https://cdn.jsdelivr.net/gh/notofonts/noto-fonts@main/hinted/ttf/NotoSansTelugu/NotoSansTelugu-Regular.ttf",
+    );
+    return;
+  }
+  if (/^ml(?:-|$)/i.test(normalized)) {
+    appendDemoFontIfMissing(
+      fonts,
+      seenUrls,
+      "Noto Sans Malayalam (ml)",
+      "https://cdn.jsdelivr.net/gh/notofonts/noto-fonts@main/hinted/ttf/NotoSansMalayalam/NotoSansMalayalam-Regular.ttf",
+    );
+    return;
+  }
+  if (/^kn(?:-|$)/i.test(normalized)) {
+    appendDemoFontIfMissing(
+      fonts,
+      seenUrls,
+      "Noto Sans Kannada (kn)",
+      "https://cdn.jsdelivr.net/gh/notofonts/noto-fonts@main/hinted/ttf/NotoSansKannada/NotoSansKannada-Regular.ttf",
+    );
+    return;
+  }
+  if (/^gu(?:-|$)/i.test(normalized)) {
+    appendDemoFontIfMissing(
+      fonts,
+      seenUrls,
+      "Noto Sans Gujarati (gu)",
+      "https://cdn.jsdelivr.net/gh/notofonts/noto-fonts@main/hinted/ttf/NotoSansGujarati/NotoSansGujarati-Regular.ttf",
+    );
+    return;
+  }
+  if (/^pa(?:-|$)/i.test(normalized)) {
+    appendDemoFontIfMissing(
+      fonts,
+      seenUrls,
+      "Noto Sans Gurmukhi (pa)",
+      "https://cdn.jsdelivr.net/gh/notofonts/noto-fonts@main/hinted/ttf/NotoSansGurmukhi/NotoSansGurmukhi-Regular.ttf",
+    );
+    return;
+  }
+  if (/^or(?:-|$)/i.test(normalized)) {
+    appendDemoFontIfMissing(
+      fonts,
+      seenUrls,
+      "Noto Sans Oriya (or)",
+      "https://cdn.jsdelivr.net/gh/notofonts/noto-fonts@main/hinted/ttf/NotoSansOriya/NotoSansOriya-Regular.ttf",
+    );
+  }
+}
+
+function demoFontAssetsForLocales(locales: readonly string[]): DemoFontAsset[] {
+  const fonts: DemoFontAsset[] = [
     {
-      url: "https://cdn.jsdelivr.net/gh/googlefonts/roboto-2@main/src/hinted/Roboto-Regular.ttf",
       label: "Roboto (Latin)",
-    },
-    {
-      url: "https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/SubsetOTF/KR/NotoSansKR-Regular.otf",
-      label: "Noto Sans KR (CJK)",
+      url: "https://cdn.jsdelivr.net/gh/googlefonts/roboto-2@main/src/hinted/Roboto-Regular.ttf",
     },
   ];
+  const seenUrls = new Set<string>(fonts.map((font) => font.url));
+  for (const locale of locales) {
+    appendDemoFontsForLocale(locale, fonts, seenUrls);
+  }
+  return fonts;
+}
 
-  void (async () => {
-    for (const font of fonts) {
+function loadDemoFontsInBackground(
+  wasmModule: WasmModule,
+): Promise<boolean> {
+  const fonts = demoFontAssetsForLocales(browserLocaleHints());
+
+  return Promise.all(
+    fonts.map(async (font) => {
       const fontData = await fetchFontWithTimeout(font.url);
       if (fontData) {
         wasmModule.load_font(fontData);
         console.info(`Loaded demo font: ${font.label}`);
-        onFontLoaded();
+        return true;
       } else {
         console.warn(`Could not load ${font.label} - some glyphs may be missing`);
+        return false;
       }
-    }
-  })();
+    }),
+  )
+    .then((results) => results.some(Boolean));
 }
 
 /**
@@ -913,7 +1098,8 @@ async function main() {
 
   installAtomicsWaitAsyncGuard();
 
-  const wasmModule = await import("./wasm/volvoxgrid_wasm.js");
+  const wasmUrl = env.VITE_WASM_URL || "./wasm/volvoxgrid_wasm.js";
+  const wasmModule = await import(/* @vite-ignore */ wasmUrl);
   await wasmModule.default();
   if (typeof wasmModule.init_v1_plugin === "function") {
     try {
@@ -1009,6 +1195,9 @@ async function main() {
   };
 
   const applyAndroidLikeDemoStyle = (id: number): void => {
+    if (typeof (wasmModule as any).set_font_name === "function") {
+      (wasmModule as any).set_font_name(id, DEMO_DEFAULT_FONT_FAMILY);
+    }
     if (typeof (wasmModule as any).set_font_size === "function") {
       (wasmModule as any).set_font_size(id, 14.0 * currentRenderDpiScale);
     }
@@ -1027,9 +1216,7 @@ async function main() {
   if (typeof (wasmModule as any).get_render_layer_mask_lo === "function") {
     layerMask = normalizeLayerMask(Number((wasmModule as any).get_render_layer_mask_lo(grid.id)));
   }
-  loadDemoFontsInBackground(wasmModule, () => {
-    grid.invalidate();
-  });
+  const demoFontsReady = loadDemoFontsInBackground(wasmModule);
 
   // PresentMode (proto): 0=AUTO, 1=FIFO, 2=MAILBOX, 3=IMMEDIATE.
   // Prefer MAILBOX for lower-latency GPU presentation when available.
@@ -2296,6 +2483,7 @@ async function main() {
   applyCanvasResolutionPreset(selCanvasRes.value);
 
   // Initial demo.
+  await demoFontsReady;
   await switchDemo("sales");
 
   // Demo switch buttons.
