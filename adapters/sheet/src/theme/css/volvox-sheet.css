@@ -171,10 +171,8 @@
 }
 
 .vx-tb-dropdown-menu {
-  position: absolute;
-  top: calc(100% + 2px);
-  left: 0;
-  z-index: 9999;
+  position: fixed;
+  z-index: 10000;
   min-width: 180px;
   background: #ffffff;
   border: 1px solid #e0e0e0;

@@ -62,6 +62,13 @@ export class Toolbar {
 
   private undoBtn: HTMLButtonElement | null = null;
   private redoBtn: HTMLButtonElement | null = null;
+  private openDropdownMenu: HTMLDivElement | null = null;
+  private openDropdownButton: HTMLButtonElement | null = null;
+  private dropdownDismissHandler: ((e: Event) => void) | null = null;
+  private dropdownEscapeHandler: ((e: KeyboardEvent) => void) | null = null;
+  private readonly dropdownViewportHandler = () => {
+    this.closeDropdown();
+  };
 
   constructor() {
     this.element = document.createElement("div");
@@ -215,9 +222,25 @@ export class Toolbar {
     arrow.textContent = "\u25BC";
     btn.appendChild(arrow);
 
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (this.openDropdownButton === btn) {
+        this.closeDropdown();
+      } else {
+        this.openDropdown(btn, items);
+      }
+    });
+
+    wrapper.appendChild(btn);
+    this.element.appendChild(wrapper);
+  }
+
+  private openDropdown(btn: HTMLButtonElement, items: DropdownItemDef[]): void {
+    this.closeDropdown();
+
     const menu = document.createElement("div");
     menu.className = "vx-tb-dropdown-menu";
-    menu.style.display = "none";
 
     for (const item of items) {
       const el = document.createElement("div");
@@ -234,31 +257,72 @@ export class Toolbar {
       el.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        menu.style.display = "none";
+        this.closeDropdown();
         if (this.onAction) this.onAction(item.action);
       });
       menu.appendChild(el);
     }
 
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const isOpen = menu.style.display !== "none";
-      menu.style.display = isOpen ? "none" : "block";
-      if (!isOpen) {
-        const dismiss = (ev: Event) => {
-          if (!wrapper.contains(ev.target as Node)) {
-            menu.style.display = "none";
-            document.removeEventListener("pointerdown", dismiss);
-          }
-        };
-        setTimeout(() => document.addEventListener("pointerdown", dismiss), 0);
-      }
-    });
+    const rect = btn.getBoundingClientRect();
+    menu.style.left = `${rect.left}px`;
+    menu.style.top = `${rect.bottom + 2}px`;
 
-    wrapper.appendChild(btn);
-    wrapper.appendChild(menu);
-    this.element.appendChild(wrapper);
+    document.body.appendChild(menu);
+    this.openDropdownMenu = menu;
+    this.openDropdownButton = btn;
+    btn.setAttribute("aria-expanded", "true");
+
+    const menuRect = menu.getBoundingClientRect();
+    if (menuRect.right > window.innerWidth) {
+      menu.style.left = `${Math.max(4, window.innerWidth - menuRect.width - 4)}px`;
+    }
+    if (menuRect.bottom > window.innerHeight) {
+      menu.style.top = `${Math.max(4, rect.top - menuRect.height - 2)}px`;
+    }
+
+    this.dropdownDismissHandler = (e: Event) => {
+      const path = typeof e.composedPath === "function" ? e.composedPath() : [];
+      if (path.includes(btn) || path.includes(menu)) {
+        return;
+      }
+      this.closeDropdown();
+    };
+    this.dropdownEscapeHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        this.closeDropdown();
+      }
+    };
+
+    setTimeout(() => {
+      if (!this.openDropdownMenu) {
+        return;
+      }
+      document.addEventListener("pointerdown", this.dropdownDismissHandler!, true);
+      document.addEventListener("keydown", this.dropdownEscapeHandler!);
+      document.addEventListener("scroll", this.dropdownViewportHandler, true);
+      window.addEventListener("resize", this.dropdownViewportHandler);
+    }, 0);
+  }
+
+  private closeDropdown(): void {
+    if (this.openDropdownButton) {
+      this.openDropdownButton.setAttribute("aria-expanded", "false");
+      this.openDropdownButton = null;
+    }
+    if (this.openDropdownMenu) {
+      this.openDropdownMenu.remove();
+      this.openDropdownMenu = null;
+    }
+    if (this.dropdownDismissHandler) {
+      document.removeEventListener("pointerdown", this.dropdownDismissHandler, true);
+      this.dropdownDismissHandler = null;
+    }
+    if (this.dropdownEscapeHandler) {
+      document.removeEventListener("keydown", this.dropdownEscapeHandler);
+      this.dropdownEscapeHandler = null;
+    }
+    document.removeEventListener("scroll", this.dropdownViewportHandler, true);
+    window.removeEventListener("resize", this.dropdownViewportHandler);
   }
 
   private addSeparator(): void {
@@ -268,6 +332,7 @@ export class Toolbar {
   }
 
   destroy(): void {
+    this.closeDropdown();
     this.element.remove();
   }
 }
