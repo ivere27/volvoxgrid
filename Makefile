@@ -308,13 +308,13 @@ help:
 	@echo "  docker_android_aar_image  Build Docker image for Android AAR"
 	@echo "  docker_android            Build Android AAR + Android lite AAR via Docker, auto-install SNAPSHOT to mavenLocal"
 	@echo "  docker_desktop_image      Build Docker image for desktop JAR"
-	@echo "  docker_desktop            Build desktop JAR + .NET artifacts via Docker (+ ActiveX OCX release/release-lite), auto-install SNAPSHOT to mavenLocal"
+	@echo "  docker_desktop            Build desktop JAR + .NET WinForms x64+x86 artifacts via Docker (+ ActiveX OCX release/release-lite), auto-install SNAPSHOT to mavenLocal"
 	@echo "  docker_web_image          Build Docker image for web dist/bundle tasks"
 	@echo "  docker_web                Build in Docker (default WEB_DOCKER_TARGET=all): WEB_DOCKER_TARGET={all|bundle|web|sheet|sheet-lite|report|wasm|wasm-lite|wasm-threaded}"
 	@echo "  docker_ios_image          Build Docker image for iOS"
 	@echo "  docker_ios                Build iOS XCFramework via Docker"
 	@echo "  docker_all_image          Build unified Docker image (all toolchains)"
-	@echo "  docker_all                Build all platform artifacts via unified Docker image (Android full+lite), auto-install SNAPSHOT to mavenLocal"
+	@echo "  docker_all                Build all platform artifacts via unified Docker image (Android full+lite, .NET WinForms x64+x86), auto-install SNAPSHOT to mavenLocal"
 	@echo "  publish_maven             Upload Android AAR + Android lite AAR + desktop JAR to Maven Central"
 	@echo "  publish_github            Upload all artifacts (xcframework, AAR, JAR, .NET, ActiveX, web zips) to GitHub release"
 	@echo "  publish_local             Install built SNAPSHOT artifacts from dist/maven into ~/.m2/repository"
@@ -1298,7 +1298,7 @@ docker_desktop: docker_desktop_image
 	@if [ "$(DESKTOP_BUILD_DOTNET)" = "0" ]; then \
 		echo ".NET artifacts: skipped (set DESKTOP_BUILD_DOTNET=1 to enable)"; \
 	else \
-		echo ".NET artifacts: dist/dotnet/winforms_release/ (set DESKTOP_BUILD_DOTNET=0 to skip)"; \
+		echo ".NET artifacts: dist/dotnet/winforms_release/ and dist/dotnet/winforms_release_x86/ (set DESKTOP_BUILD_DOTNET=0 to skip)"; \
 	fi
 	@if echo "$(DESKTOP_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
 		$(MAKE) publish_local; \
@@ -1370,8 +1370,8 @@ docker_all_image:
 
 docker_all: docker_all_image
 	@echo "Building all platform artifacts via unified image..."
-	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS), build_date=$(ALL_BUILD_DATE), desktop_ocx=$(ALL_BUILD_OCX))"
-	@mkdir -p dist/maven dist/ios dist/wasm dist/wasm-lite dist/web
+	@echo "Using BUILD_JOBS=$(BUILD_JOBS) (cargo=$(CARGO_BUILD_JOBS), gradle=$(GRADLE_MAX_WORKERS), dotnet=$(DESKTOP_BUILD_DOTNET), build_date=$(ALL_BUILD_DATE), desktop_ocx=$(ALL_BUILD_OCX))"
+	@mkdir -p dist/maven dist/dotnet dist/ios dist/wasm dist/wasm-lite dist/web
 	docker run --rm \
 		--entrypoint /bin/bash \
 		-v "$(DOCKER_GO_BUILD_CACHE_VOLUME):$(DOCKER_GO_BUILD_CACHE_DIR)" \
@@ -1395,6 +1395,7 @@ docker_all: docker_all_image
 		-e BUILD_DATE="$(ALL_BUILD_DATE)" \
 		-e WEB_BUNDLE_VERSION="$(VOLVOXGRID_VERSION)" \
 		-e BUILD_OCX="$(ALL_BUILD_OCX)" \
+		-e BUILD_DOTNET="$(DESKTOP_BUILD_DOTNET)" \
 		-e BUILD_ANDROID_INCLUDE_LITE=1 \
 		-e GROUP_ID="$(AAR_GROUP_ID)" \
 		-e ARTIFACT_ID="$(AAR_ARTIFACT_ID)" \
@@ -1408,6 +1409,11 @@ docker_all: docker_all_image
 		-e ANDROID_ABIS="$(AAR_ANDROID_ABIS)" \
 		"$(ALL_DOCKER_IMAGE)"
 	@echo "All platform artifacts built."
+	@if [ "$(DESKTOP_BUILD_DOTNET)" = "0" ]; then \
+		echo ".NET artifacts: skipped (set DESKTOP_BUILD_DOTNET=1 to enable)"; \
+	else \
+		echo ".NET artifacts: dist/dotnet/winforms_release/ and dist/dotnet/winforms_release_x86/"; \
+	fi
 	@if echo "$(AAR_VERSION)" | grep -q -- '-SNAPSHOT$$' || echo "$(DESKTOP_VERSION)" | grep -q -- '-SNAPSHOT$$'; then \
 		$(MAKE) publish_local; \
 	else \
@@ -1695,6 +1701,24 @@ publish_npm:
 	cp "$(CURRENT_DIR)/web/js/package.json" "$$PKG_DIR/package.json"; \
 	echo "Publishing volvoxgrid@$(VOLVOXGRID_VERSION) to npm..."; \
 	(cd "$$PKG_DIR" && npm publish --access public); \
+	echo ""; \
+	LITE_ZIP="$(CURRENT_DIR)/dist/web/volvoxgrid-web-lite-$(VOLVOXGRID_VERSION).zip"; \
+	if [ -f "$$LITE_ZIP" ]; then \
+		LITE_STAGE=$$(mktemp -d); \
+		echo "Extracting $$LITE_ZIP..."; \
+		unzip -q "$$LITE_ZIP" -d "$$LITE_STAGE"; \
+		LITE_WASM_DIR="$$LITE_STAGE/volvoxgrid-web-lite/wasm"; \
+		LITE_PKG_DIR="$$LITE_STAGE/pkg"; \
+		mkdir -p "$$LITE_PKG_DIR/wasm"; \
+		cp -a "$$LITE_WASM_DIR/"* "$$LITE_PKG_DIR/wasm/"; \
+		rm -f "$$LITE_PKG_DIR/wasm/package.json"; \
+		cp "$(CURRENT_DIR)/web/js/package-lite.json" "$$LITE_PKG_DIR/package.json"; \
+		echo "Publishing volvoxgrid-lite@$(VOLVOXGRID_VERSION) to npm..."; \
+		(cd "$$LITE_PKG_DIR" && npm publish --access public); \
+		rm -rf "$$LITE_STAGE"; \
+	else \
+		echo "Skip volvoxgrid-lite: $$LITE_ZIP not found."; \
+	fi; \
 	echo ""; \
 	for adapter_dir in $(CURRENT_DIR)/adapters/aggrid $(CURRENT_DIR)/adapters/sheet; do \
 		if [ -d "$$adapter_dir/dist" ] && [ -f "$$adapter_dir/package.json" ]; then \

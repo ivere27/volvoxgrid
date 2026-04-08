@@ -10,6 +10,9 @@ VERSION="${VOLVOXGRID_VERSION:-${VERSION:-0.1.0}}"
 WASM_DIST_ROOT="${REPO_ROOT}/dist/wasm"
 WASM_LITE_DIST_ROOT="${REPO_ROOT}/dist/wasm-lite"
 WEB_DIST_ROOT="${REPO_ROOT}/dist/web"
+CDN_BASE="https://cdn.jsdelivr.net/npm"
+WASM_CDN_URL="${CDN_BASE}/volvoxgrid@${VERSION}/wasm/volvoxgrid_wasm.js"
+WASM_LITE_CDN_URL="${CDN_BASE}/volvoxgrid-lite@${VERSION}/wasm/volvoxgrid_wasm.js"
 TMP_ROOT="$(mktemp -d /tmp/volvoxgrid-web-build-XXXXXX)"
 trap 'rm -rf "${TMP_ROOT}"' EXIT
 
@@ -41,6 +44,21 @@ build_js() {
 write_sheet_demo_index() {
   local out_dir="$1"
   local title="$2"
+  local cdn_base="${3:-}"  # e.g. "https://cdn.jsdelivr.net/npm"
+  local wasm_pkg="${4:-volvoxgrid}"  # "volvoxgrid" or "volvoxgrid-lite"
+
+  local css_url="./assets/sheet.css"
+  local importmap_vg="./volvoxgrid/index.js"
+  local wasm_url="./wasm/volvoxgrid_wasm.js"
+  local sheet_url="./volvox-sheet.js"
+
+  if [[ -n "${cdn_base}" ]]; then
+    css_url="${cdn_base}/@volvoxgrid/sheet@${VERSION}/dist/assets/sheet.css"
+    importmap_vg="${cdn_base}/volvoxgrid@${VERSION}/dist/index.js"
+    wasm_url="${cdn_base}/${wasm_pkg}@${VERSION}/wasm/volvoxgrid_wasm.js"
+    sheet_url="${cdn_base}/@volvoxgrid/sheet@${VERSION}/dist/volvox-sheet.js"
+  fi
+
   cat > "${out_dir}/index.html" <<EOF
 <!DOCTYPE html>
 <html lang="en">
@@ -48,7 +66,7 @@ write_sheet_demo_index() {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${title}</title>
-  <link rel="stylesheet" href="./assets/sheet.css" />
+  <link rel="stylesheet" href="${css_url}" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; height: 100%; overflow: hidden; }
@@ -57,7 +75,7 @@ write_sheet_demo_index() {
   <script type="importmap">
   {
     "imports": {
-      "volvoxgrid": "./volvoxgrid/index.js"
+      "volvoxgrid": "${importmap_vg}"
     }
   }
   </script>
@@ -65,9 +83,9 @@ write_sheet_demo_index() {
 <body>
   <div id="app"></div>
   <script type="module">
-    import init from "./wasm/volvoxgrid_wasm.js";
-    import * as wasm from "./wasm/volvoxgrid_wasm.js";
-    import { VolvoxSheet } from "./volvox-sheet.js";
+    import init from "${wasm_url}";
+    import * as wasm from "${wasm_url}";
+    import { VolvoxSheet } from "${sheet_url}";
 
     async function main() {
       await init();
@@ -150,7 +168,7 @@ build_web_dist() {
   (
     cd "${REPO_ROOT}/web/example"
     npm ci
-    VITE_VG_INITIAL_SCALE="${WEB_SCALE:-1.0}" npm run build -- --base /demos/web/
+    VITE_WASM_URL="${WASM_CDN_URL}" VITE_VG_INITIAL_SCALE="${WEB_SCALE:-1.0}" npm run build -- --base /demos/web/
   )
   copy_dir_clean "${REPO_ROOT}/web/example/dist" "${WEB_DIST_ROOT}/demos/web"
   copy_dir_clean "${REPO_ROOT}/web/example/wasm" "${WEB_DIST_ROOT}/demos/web/wasm"
@@ -163,8 +181,10 @@ build_web_dist() {
 build_sheet_dist() {
   local mode="${1:-gpu}" # gpu|lite
   local out_dir="${WEB_DIST_ROOT}/demos/sheet"
+  local wasm_pkg="volvoxgrid"
   if [[ "${mode}" == "lite" ]]; then
     out_dir="${WEB_DIST_ROOT}/demos/sheet-lite"
+    wasm_pkg="volvoxgrid-lite"
     make wasm-lite
   else
     make wasm
@@ -178,13 +198,12 @@ build_sheet_dist() {
     npm install
     npm run build
   )
-  copy_dir_clean "${REPO_ROOT}/adapters/sheet/dist" "${out_dir}"
-  copy_dir_clean "${REPO_ROOT}/web/example/wasm" "${out_dir}/wasm"
-  copy_dir_clean "${REPO_ROOT}/web/js/dist" "${out_dir}/volvoxgrid"
+  # Only index.html goes to Firebase; all other assets served from CDN
+  mkdir -p "${out_dir}"
   if [[ "${mode}" == "lite" ]]; then
-    write_sheet_demo_index "${out_dir}" "VolvoxSheet Lite"
+    write_sheet_demo_index "${out_dir}" "VolvoxSheet Lite" "${CDN_BASE}" "${wasm_pkg}"
   else
-    write_sheet_demo_index "${out_dir}" "VolvoxSheet"
+    write_sheet_demo_index "${out_dir}" "VolvoxSheet" "${CDN_BASE}" "${wasm_pkg}"
   fi
   echo "Built sheet dist: ${out_dir}"
 }

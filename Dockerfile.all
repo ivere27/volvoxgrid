@@ -31,6 +31,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 
+# Install .NET SDK (used for dotnet wrapper/sample build in docker_all flow)
+ENV DOTNET_VERSION=8.0.124
+ENV DOTNET_ROOT=/opt/dotnet
+ENV PATH=${DOTNET_ROOT}:${PATH}
+RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh && \
+    bash /tmp/dotnet-install.sh --version "${DOTNET_VERSION}" --install-dir "${DOTNET_ROOT}" --no-path && \
+    rm -f /tmp/dotnet-install.sh && \
+    chmod -R a+rX "${DOTNET_ROOT}"
+
 # Install modern Gradle
 ENV GRADLE_VERSION=8.12
 ENV GRADLE_HOME=/opt/gradle/gradle-${GRADLE_VERSION}
