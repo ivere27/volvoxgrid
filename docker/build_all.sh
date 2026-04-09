@@ -75,7 +75,7 @@ run_wasm() {
   local dist_lite_dir="${DIST_LITE_DIR:-${REPO_ROOT}/dist/wasm-lite}"
   local web_target="${WEB_DOCKER_TARGET:-all}"
   WEB_DIST_DIR="${WEB_DIST_DIR:-${REPO_ROOT}/dist/web}"
-  WEB_BUNDLE_VERSION="${WEB_BUNDLE_VERSION:-${VERSION:-0.6.0}}"
+  WEB_BUNDLE_VERSION="${WEB_BUNDLE_VERSION:-${VERSION:-0.6.1}}"
   if [[ -z "${WEB_DOCKER_TARGET:-}" && "${BUILD_TARGET}" == "wasm" ]]; then
     web_target="bundle"
   fi
