@@ -1,3 +1,64 @@
+// VolvoxGrid Protocol Contract
+//
+// This file is the single source of truth for VolvoxGrid's public API.
+// Every host — Flutter, Android, Java, .NET, Go, Web — communicates with
+// the Rust grid engine through the messages and service defined here.
+//
+// ─── Design principles ───
+//
+// 1. One retained grid model.
+//    The engine (engine/src/grid.rs) owns a single VolvoxGrid state object
+//    per grid: rows, columns, cells, layout, selection, scrolling, editing,
+//    sorting, spans, outline, animations, and pending events. Hosts never
+//    own grid logic — they forward input and present rendered output.
+//
+// 2. Partial-update semantics.
+//    All configuration messages use `optional` fields. Only fields that are
+//    explicitly set are applied; unset fields leave the current value
+//    unchanged. This is implemented in engine/src/config.rs via
+//    `if let Some(v) = field { apply(v) }` for every optional field.
+//    This lets hosts send sparse updates without knowing or restating
+//    the full current configuration.
+//
+// 3. Two streaming interfaces.
+//    - RenderSession: bidirectional stream for the real-time render loop.
+//      The host sends input (viewport, pointer, key, buffer) and receives
+//      immediate render-coupled outputs (FrameDone, EditRequest, CursorChange).
+//    - EventStream: server-streaming for semantic grid events (selection
+//      changed, before/after edit, sort, scroll, etc.).
+//    The split ensures that frame-rate-sensitive rendering is never blocked
+//    by application-level event handling.
+//
+// 4. Cancelable events via EventDecision.
+//    Events with a non-zero `event_id` in GridEvent are cancelable.
+//    The host sends an EventDecision on the RenderSession with `cancel=true`
+//    to veto the action. The engine waits up to 250 ms for a decision;
+//    if none arrives, the event proceeds (cancel=false).
+//    Events with `event_id=0` are informational and cannot be canceled.
+//
+// 5. Language-agnostic transport.
+//    Native hosts use Synurang FFI to load `libvolvoxgrid_plugin` and
+//    exchange these protobuf messages. Web hosts use wasm-bindgen.
+//    Any language that can load a shared library and speak protobuf can
+//    become a VolvoxGrid host without engine changes.
+//
+// ─── Color format ───
+//
+// All `uint32` color fields use ARGB format:
+//   bits 24–31 = alpha, 16–23 = red, 8–15 = green, 0–7 = blue.
+// Example: 0xFFFF0000 = opaque red, 0x80000000 = 50% transparent black.
+// The CPU render buffer uses RGBA byte order in memory (R at offset+0,
+// G at offset+1, B at offset+2, A at offset+3). The engine converts
+// ARGB→RGBA during rendering (see engine/src/canvas_cpu.rs fill_rect).
+//
+// ─── Modifier bitmask ───
+//
+// The `modifier` field on PointerEvent, KeyEvent, and mouse/keyboard
+// GridEvent messages uses a bitmask:
+//   0x01 = Shift, 0x02 = Ctrl, 0x04 = Alt, 0x08 = Meta.
+// Verified in flutter/lib/volvoxgrid.dart and adapters/sheet/src/volvox-sheet.ts.
+//
+
 syntax = "proto3";
 package volvoxgrid.v1;
 
@@ -9,12 +70,15 @@ option java_multiple_files = true;
 // Building Blocks
 //
 // Reusable primitives composed throughout the API.
+// All color fields are ARGB uint32 (see file header).
 // ═══════════════════════════════════════════════════════════
 
+// Font specification. Engine default: platform-default family, size 11.0,
+// all decorations off. (engine/src/style.rs GridStyleState defaults)
 message Font {
   optional string family        = 1;
   repeated string families      = 2;  // CSS-style fallback chain
-  optional float  size          = 3;
+  optional float  size          = 3;  // points; engine default 11.0
   optional bool   bold          = 4;
   optional bool   italic        = 5;
   optional bool   underline     = 6;
@@ -24,6 +88,8 @@ message Font {
   optional float  stretch       = 8;
 }
 
+// Cell padding in pixels.
+// Engine default: left=6, top=2, right=6, bottom=2 (engine/src/style.rs).
 message Padding {
   optional int32 left   = 1;
   optional int32 top    = 2;
@@ -33,7 +99,7 @@ message Padding {
 
 message Border {
   optional BorderStyle style = 1;
-  optional uint32      color = 2;
+  optional uint32      color = 2;  // ARGB
 }
 
 // Per-edge borders with a shorthand `all` field.
@@ -46,11 +112,13 @@ message Borders {
   Border left   = 5;
 }
 
+// Engine defaults: style=GRIDLINE_SOLID for data cells, GRIDLINE_INSET
+// for fixed cells; color=0xFFC0C0C0; width=1px.
 message GridLines {
   optional GridLineStyle     style     = 1;
   optional GridLineDirection direction = 2;
-  optional uint32            color     = 3;
-  optional int32             width     = 4;
+  optional uint32            color     = 3;  // ARGB
+  optional int32             width     = 4;  // pixels
 }
 
 message Separator {
@@ -77,13 +145,18 @@ message CellRange {
   int32 col2 = 4;
 }
 
+// Typed cell value. Maps to CellValueData in engine/src/cell.rs:
+//   text → Text(String), number → Number(f64), flag → Bool(bool),
+//   raw → Bytes(Vec<u8>), timestamp → Timestamp(i64).
+// Unset means Empty (sparse storage — only non-empty cells exist in the
+// engine's HashMap<(i32,i32), CellData>).
 message CellValue {
   oneof value {
     string text      = 1;
     double number    = 2;
     bool   flag      = 3;
     bytes  raw       = 4;
-    int64  timestamp = 5;  // epoch-ms
+    int64  timestamp = 5;  // epoch-ms (UTC)
   }
 }
 
@@ -143,6 +216,11 @@ enum TextHintingMode {
   TEXT_HINT_FULL   = 3;
 }
 
+// Cell text alignment: "horizontal_vertical".
+// ALIGN_GENERAL (9) is the engine default for data cells. It renders as
+// left-center for text and right-center for numeric-looking values.
+// The engine uses a heuristic (canvas.rs text_looks_numeric()) to decide
+// at render time whether the cell content looks numeric.
 enum Align {
   ALIGN_LEFT_TOP      = 0;
   ALIGN_LEFT_CENTER   = 1;
@@ -153,7 +231,7 @@ enum Align {
   ALIGN_RIGHT_TOP     = 6;
   ALIGN_RIGHT_CENTER  = 7;
   ALIGN_RIGHT_BOTTOM  = 8;
-  ALIGN_GENERAL       = 9;
+  ALIGN_GENERAL       = 9;  // left for text, right for numbers
 }
 
 enum ImageAlignment {
@@ -195,6 +273,10 @@ enum ColumnDataType {
   COLUMN_DATA_CURRENCY = 4;
 }
 
+// Type coercion strategy during cell writes and data loading.
+//   STRICT (1):   Rejects if type doesn't match column's declared type.
+//   FLEXIBLE (2): Attempts conversion (e.g. "123" → Number 123).
+//   PARSE_ONLY (3): Parses but doesn't convert (stores original text).
 enum CoercionMode {
   COERCION_UNSPECIFIED = 0;
   COERCION_STRICT      = 1;
@@ -202,6 +284,10 @@ enum CoercionMode {
   COERCION_PARSE_ONLY  = 3;
 }
 
+// What happens when a cell write fails type validation.
+//   REJECT (1):   Cell not written; reported in WriteResult.violations.
+//   SET_NULL (2): Clears cell value.
+//   SKIP (3):     Keeps old value, no error report.
 enum WriteErrorMode {
   WRITE_ERROR_UNSPECIFIED = 0;
   WRITE_ERROR_REJECT     = 1;
@@ -216,18 +302,30 @@ enum CellInteraction {
   CELL_INTERACTION_BUTTON      = 3;
 }
 
+// How the first row of loaded data is interpreted.
+//   AUTO (0):      JSON objects use keys as headers; CSV tries to detect.
+//   NONE (1):      No headers — uses generic column names (Column 1, 2, …).
+//   FIRST_ROW (2): Unconditionally treats first row as column headers.
 enum HeaderPolicy {
   HEADER_AUTO      = 0;
   HEADER_NONE      = 1;
   HEADER_FIRST_ROW = 2;
 }
 
+// Column type inference strategy during data loading.
+//   AUTO_DETECT (0): Scans values to infer type — all numbers → Number,
+//                    all true/false → Boolean, all dates → Date, else String.
+//   ALL_STRING (1):  Everything stays as text.
+//   FROM_SCHEMA (2): Uses existing column data types from grid.
 enum TypePolicy {
   TYPE_AUTO_DETECT = 0;
   TYPE_ALL_STRING  = 1;
   TYPE_FROM_SCHEMA = 2;
 }
 
+// Data loading mode.
+//   REPLACE (0): Clears all cells and resets to new dimensions.
+//   APPEND (1):  Inserts data after existing rows; preserves current schema.
 enum LoadMode {
   LOAD_REPLACE = 0;
   LOAD_APPEND  = 1;
@@ -242,6 +340,19 @@ enum LoadDataStatus {
 
 // ── Selection ──
 
+// How user selection is interpreted. See engine/src/selection.rs.
+//
+// FREE (0):        Standard rectangular cell-range selection.
+//                  Single contiguous range (row, col, row_end, col_end).
+// BY_ROW (1):      Any click selects the entire row. Internally the
+//                  selection range spans col 0..i32::MAX.
+// BY_COLUMN (2):   Any click selects the entire column. Range spans
+//                  row 0..i32::MAX.
+// LISTBOX (3):     Row-based toggle selection. Tracks selected rows in a
+//                  HashSet<i32>. Plain click selects one row, Ctrl+Click
+//                  toggles, Shift+Click extends from anchor.
+// MULTI_RANGE (4): Multiple independent rectangular ranges. The primary
+//                  range plus extra_ranges: Vec<(i32,i32,i32,i32)>.
 enum SelectionMode {
   SELECTION_FREE        = 0;
   SELECTION_BY_ROW      = 1;
@@ -266,6 +377,11 @@ enum SelectionVisibility {
 
 // ── Editing ──
 
+// Controls how cell editing is activated. See engine/src/input.rs.
+//   NONE (0):      Editing disabled.
+//   KEY (1):       Enter/F2 starts editing. Character keys auto-start.
+//   KEY_CLICK (2): Same as KEY, plus double-click and dropdown click
+//                  also start editing.
 enum EditTrigger {
   EDIT_TRIGGER_NONE      = 0;
   EDIT_TRIGGER_KEY       = 1;
@@ -285,6 +401,9 @@ enum TabBehavior {
 
 // ── Sort ──
 // Direction and comparison type are orthogonal — separate enums.
+// Multi-column sort is supported: pass multiple SortColumn entries to
+// Sort(). The engine stores sort_keys: Vec<(col, order)> and compares
+// by the first differing key column. See engine/src/sort.rs.
 
 enum SortOrder {
   SORT_NONE       = 0;
@@ -292,6 +411,13 @@ enum SortOrder {
   SORT_DESCENDING = 2;
 }
 
+// Comparison strategy for sorting.
+//   AUTO (0):           Tries date, then number, then case-insensitive string.
+//   NUMERIC (1):        Parses as f64; non-numeric values sort to the end.
+//   STRING (2):         Lexicographic, case-sensitive.
+//   STRING_NO_CASE (3): Lexicographic, case-insensitive.
+//   CUSTOM (4):         Fires CompareEvent on EventStream so the host can
+//                       provide its own ordering logic.
 enum SortType {
   SORT_TYPE_AUTO           = 0;
   SORT_TYPE_NUMERIC        = 1;
@@ -315,6 +441,18 @@ enum GroupTotalPosition {
   GROUP_TOTAL_BELOW = 1;
 }
 
+// Aggregate functions for Subtotal() and Aggregate() RPCs.
+// Numeric parsing strips $, commas, and spaces before computing.
+//   NONE (0):    No-op.
+//   CLEAR (1):   Removes all existing subtotal rows.
+//   SUM (2):     Sum of numeric values.
+//   PERCENT (3): 100.0 if sum ≠ 0, else 0.0.
+//   COUNT (4):   Count of numeric cells.
+//   AVERAGE (5): Arithmetic mean.
+//   MAX (6):     Maximum value.
+//   MIN (7):     Minimum value.
+//   STD_DEV (8): Sample standard deviation (N−1 denominator).
+//   VAR (9):     Sample variance (N−1 denominator).
 enum AggregateType {
   AGG_NONE    = 0;
   AGG_CLEAR   = 1;
@@ -330,6 +468,19 @@ enum AggregateType {
 
 // ── Cell Span ──
 
+// Content-based cell merging. The engine compares adjacent cell values
+// and visually merges cells with identical content. See engine/src/span.rs.
+// Spans never cross fixed/frozen/pinned boundaries or subtotal rows.
+//
+//   NONE (0):        No spanning.
+//   FREE (1):        Expand in all directions (up/down/left/right).
+//   BY_ROW (2):      Vertical spanning only. Left-column dependency:
+//                    adjacent left cells must also match.
+//   BY_COLUMN (3):   Horizontal spanning only. No above-cell dependency.
+//   ADJACENT (4):    Either row OR column spanning (whichever matches).
+//   HEADER_ONLY (5): Only span in fixed/frozen cells, not data cells.
+//   SPILL (6):       Text spills right into empty adjacent cells.
+//   GROUP (7):       Like SPILL but only on subtotal rows.
 enum CellSpanMode {
   CELL_SPAN_NONE        = 0;
   CELL_SPAN_FREE        = 1;
@@ -402,6 +553,12 @@ enum StickyEdge {
   STICKY_BOTH   = 5;
 }
 
+// Type-ahead (incremental search) mode. See engine/src/search.rs.
+// The engine buffers keystrokes and searches for matching cell text.
+//   NONE (0):        Disabled.
+//   FROM_START (1):  Search from the first data row.
+//   FROM_CURSOR (2): Search from the current cursor row.
+// Default type_ahead_delay: 2000 ms.
 enum TypeAheadMode {
   TYPE_AHEAD_NONE        = 0;
   TYPE_AHEAD_FROM_START  = 1;
@@ -439,6 +596,12 @@ enum ApplyScope {
 
 // ── Rendering ──
 
+// Rendering backend selection. See GUI.md and TUI.md.
+//   AUTO (0): Engine picks CPU or GPU based on host capabilities.
+//   CPU (1):  Renders into a host-owned RGBA buffer (most portable).
+//   GPU (2):  Renders via wgpu to a host-provided native surface.
+//   TUI (5):  Terminal mode — renders ANSI escape sequences.
+// If GPU initialization fails, the engine falls back to CPU silently.
 enum RendererMode {
   RENDERER_AUTO       = 0;
   RENDERER_CPU        = 1;
@@ -481,6 +644,15 @@ enum ClearRegion {
   CLEAR_ALL_BOTH    = 6;
 }
 
+// Export formats. See engine/src/save.rs.
+//   BINARY (0):    FXGD binary — header "FXGD" + dimensions + cell data +
+//                  styles + column/row properties. Preserves full fidelity.
+//   TSV (1):       Tab-separated values. Text only.
+//   CSV (2):       Comma-separated values. Quotes cells containing
+//                  separator, newline, or quote characters.
+//   DELIMITED (3): Uses the grid's clip_col_separator (default "\t").
+//   XLSX (4):      SpreadsheetML XML (Excel 2003 .xml format). Applies
+//                  bold to fixed rows, auto-detects numeric cells.
 enum ExportFormat {
   EXPORT_BINARY    = 0;
   EXPORT_TSV       = 1;
@@ -518,6 +690,9 @@ enum IconAlign {
   ICON_ALIGN_CENTER       = 4;
 }
 
+// Which sub-element of a cell was hit. Used in ClickEvent to tell the
+// host what the user actually clicked on. Maps to HitArea variants in
+// engine/src/input.rs.
 enum CellHitArea {
   HIT_CELL     = 0;
   HIT_TEXT     = 1;
@@ -531,7 +706,8 @@ enum CellHitArea {
 // Style Composites
 //
 // Built from building blocks; used in GridConfig, CellStyle,
-// HighlightStyle.
+// HighlightStyle. All use partial-update semantics — only set
+// fields override inherited defaults.
 // ═══════════════════════════════════════════════════════════
 
 // Override style for a region (fixed rows, frozen rows, etc.).
@@ -561,12 +737,15 @@ message CellStyle {
 }
 
 // Selection / hover highlight appearance.
+// Engine defaults (engine/src/selection.rs):
+//   selection background = 0xFF000080 (dark blue)
+//   selection foreground = 0xFFFFFFFF (white)
 message HighlightStyle {
-  optional uint32             background       = 1;
-  optional uint32             foreground       = 2;
+  optional uint32             background       = 1;  // ARGB
+  optional uint32             foreground       = 2;  // ARGB
   Borders                     borders          = 3;
   optional FillHandlePosition fill_handle      = 4;
-  optional uint32             fill_handle_color = 5;
+  optional uint32             fill_handle_color = 5; // ARGB
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -580,20 +759,23 @@ message HeaderMarkSize {
   }
 }
 
+// Engine defaults (engine/src/style.rs):
+//   color = 0xFFC9D2DE, width = 1px.
 message HeaderSeparator {
   optional bool     enabled     = 1;
-  optional uint32   color       = 2;
-  optional int32    width       = 3;
+  optional uint32   color       = 2;  // ARGB
+  optional int32    width       = 3;  // pixels
   HeaderMarkSize    height      = 4;
   optional bool     skip_merged = 5;
 }
 
+// Engine default: hit_width = 6px (engine/src/style.rs).
 message HeaderResizeHandle {
   optional bool     enabled                  = 1;
-  optional uint32   color                    = 2;
-  optional int32    width                    = 3;
+  optional uint32   color                    = 2;  // ARGB
+  optional int32    width                    = 3;  // visual width, pixels
   HeaderMarkSize    height                   = 4;
-  optional int32    hit_width                = 5;
+  optional int32    hit_width                = 5;  // pointer hit area, pixels; default 6
   optional bool     show_only_when_resizable = 6;
 }
 
@@ -670,10 +852,13 @@ message IconTheme {
 // Hover Config
 // ═══════════════════════════════════════════════════════════
 
+// Hover highlight configuration.
+// Internally tracked as a bitmask in engine/src/selection.rs:
+//   HOVER_ROW=1, HOVER_COLUMN=2, HOVER_CELL=4.
 message HoverConfig {
-  optional bool  row    = 1;
-  optional bool  column = 2;
-  optional bool  cell   = 3;
+  optional bool  row    = 1;  // highlight entire row on mouse hover
+  optional bool  column = 2;  // highlight entire column on mouse hover
+  optional bool  cell   = 3;  // highlight individual cell on mouse hover
   HighlightStyle row_style    = 4;
   HighlightStyle column_style = 5;
   HighlightStyle cell_style   = 6;
@@ -707,6 +892,14 @@ message HeaderFeatures {
 //
 // All scalar fields are optional — set fields are applied,
 // unset fields are left unchanged (partial-update semantics).
+//
+// Implementation: engine/src/config.rs apply_config() checks each
+// sub-message with `if let Some(...)`, and each field within with
+// `if let Some(v) = field { apply(v) }`. Prost `optional` fields
+// map to `Option<T>`, giving perfect partial-update semantics.
+//
+// This means you can send a Configure() RPC with only the fields
+// you want to change — everything else stays as-is.
 // ═══════════════════════════════════════════════════════════
 
 message GridConfig {
@@ -725,35 +918,60 @@ message GridConfig {
 
 // ── Layout ──
 // Pure structural dimensions. Text defaults moved to StyleConfig.
+//
+// Fixed vs Frozen (engine/src/grid.rs):
+//   fixed_rows/cols  = non-scrollable header rows/columns. Always rendered
+//                      at the top/left edge. Used for column headers.
+//   frozen_rows/cols = non-scrollable DATA rows/columns that appear below/right
+//                      of fixed rows/cols. Used for "pinned" data sections.
+// Scrollable data starts at row (fixed_rows + frozen_rows) and
+// col (fixed_cols + frozen_cols).
+//
+// Engine defaults: default_row_height=20px, default_col_width=68px.
+// TUI mode defaults: row_height=1, col_width=15 (character cells).
 message LayoutConfig {
-  optional int32 rows               = 1;
-  optional int32 cols               = 2;
-  optional int32 fixed_rows         = 3;
-  optional int32 fixed_cols         = 4;
-  optional int32 frozen_rows        = 5;
-  optional int32 frozen_cols        = 6;
-  optional int32 default_row_height = 7;
-  optional int32 default_col_width  = 8;
+  optional int32 rows               = 1;  // total rows (including fixed)
+  optional int32 cols               = 2;  // total cols (including fixed)
+  optional int32 fixed_rows         = 3;  // clamped to 0..rows
+  optional int32 fixed_cols         = 4;  // clamped to 0..cols
+  optional int32 frozen_rows        = 5;  // clamped to 0..(rows - fixed_rows)
+  optional int32 frozen_cols        = 6;  // clamped to 0..(cols - fixed_cols)
+  optional int32 default_row_height = 7;  // pixels; engine default 20
+  optional int32 default_col_width  = 8;  // pixels; engine default 68
   optional bool  right_to_left      = 9;
-  optional bool  extend_last_col    = 10;
+  optional bool  extend_last_col    = 10; // last column fills remaining viewport width
 }
 
 // ── Style ──
 // Nested by region. Building blocks eliminate flat field sprawl.
+//
+// Style resolution priority (engine/src/grid.rs resolve_cell_padding):
+//   1. Per-cell override (CellStyle via UpdateCells)
+//   2. Per-column override (ColumnDef.padding)
+//   3. Region override (StyleConfig.fixed / StyleConfig.frozen)
+//   4. Grid-level default (this message)
+//
+// Engine color defaults (engine/src/style.rs GridStyleState):
+//   background      = 0xFFFFFFFF (white)
+//   foreground      = 0xFF000000 (black)
+//   fixed back      = 0xFFC0C0C0 (light gray)
+//   grid line color = 0xFFC0C0C0
+//   alternate_background = 0x00000000 (transparent = disabled)
 message StyleConfig {
   // Cell defaults
-  optional uint32      background           = 1;
-  optional uint32      foreground           = 2;
-  optional uint32      alternate_background = 3;
+  optional uint32      background           = 1;  // ARGB; default 0xFFFFFFFF
+  optional uint32      foreground           = 2;  // ARGB; default 0xFF000000
+  optional uint32      alternate_background = 3;  // ARGB; 0x00000000 = off
   Font                 font                 = 4;
   Padding              cell_padding         = 5;
   optional TextEffect  text_effect          = 6;
-  optional uint32      progress_color       = 7;
+  optional uint32      progress_color       = 7;  // ARGB
 
   // Grid lines (scrollable area)
   GridLines            grid_lines           = 10;
 
-  // Region overrides — only set fields override the defaults above
+  // Region overrides — only set fields override the defaults above.
+  // Fixed default: back=0xFFC0C0C0, grid_lines=GRIDLINE_INSET.
   RegionStyle          fixed                = 11;
   RegionStyle          frozen               = 12;
 
@@ -803,14 +1021,25 @@ message SelectionConfig {
 }
 
 // ── Editing ──
+// The engine maintains a full edit state machine (engine/src/edit.rs).
+// Two UI modes exist:
+//   EnterMode (default): Enter commits and moves cursor down.
+//     Character keys auto-replace cell content and start editing.
+//   EditMode (F2):       Caret placed at end. Escape cancels.
+//     Enter commits. Arrow keys move caret within text.
 message EditConfig {
   optional EditTrigger     trigger              = 1;
   optional TabBehavior     tab_behavior         = 2;
   optional DropdownTrigger dropdown_trigger      = 3;
+  // When true, typing in a dropdown cell searches the list items.
   optional bool            dropdown_search       = 4;
-  optional int32           max_length            = 5;
-  optional string          mask                  = 6;
+  optional int32           max_length            = 5;  // 0 = unlimited
+  optional string          mask                  = 6;  // global edit mask, e.g. "(999) 999-9999"
+  // When true, the engine stops handling edit-action keys; the host
+  // adapter drives editing via RPC (EditCommand) instead.
   optional bool            host_key_dispatch     = 7;
+  // When true, the engine stops handling pointer-driven selection/edit;
+  // the host adapter drives via RPC.
   optional bool            host_pointer_dispatch = 8;
 }
 
@@ -828,32 +1057,50 @@ message PullToRefreshConfig {
   optional string             text_release = 4;
 }
 
+// Engine fling physics (engine/src/scroll.rs):
+//   Velocity blending: 35% old + 65% new on each impulse.
+//   Damping: velocity *= exp(−friction × dt). Stops at <8.0 px/s.
+//   Defaults: fling_impulse_gain=30.0, fling_friction=2.0.
 message ScrollConfig {
   ScrollBarConfig         scroll_bar         = 1;
+  // If false, fling stops on next user input (no inertial carry-over).
   optional bool           scroll_track       = 2;
   optional bool           scroll_tips        = 3;
-  optional bool           fling_enabled      = 4;
-  optional float          fling_impulse_gain = 5;
-  optional float          fling_friction     = 6;
-  optional bool           pinch_zoom_enabled = 7;
-  optional bool           fast_scroll        = 8;
+  optional bool           fling_enabled      = 4;  // default true
+  optional float          fling_impulse_gain = 5;  // default 30.0
+  optional float          fling_friction     = 6;  // default 2.0
+  optional bool           pinch_zoom_enabled = 7;  // default true
+  optional bool           fast_scroll        = 8;  // mobile fast-scroll overlay
   optional ScrollBarsMode scrollbars         = 9;
   PullToRefreshConfig     pull_to_refresh    = 10;
 }
 
 // ── Outline / Tree ──
+// See engine/src/outline.rs. Subtotal inserts aggregate rows that group
+// data by a column's value. Outline levels control tree expand/collapse.
+//   outline_level = -1: grand total row
+//   outline_level = 0+: nested group levels
 message OutlineConfig {
   optional TreeIndicatorStyle tree_indicator       = 1;
-  optional int32              tree_column           = 2;
-  optional uint32             tree_color            = 3;
-  optional GroupTotalPosition group_total_position  = 4;
-  optional bool               multi_totals          = 5; // When true, repeated Subtotal() calls with the same group_on_col reuse existing subtotal rows instead of inserting new ones, allowing multiple aggregate columns (e.g. Sales + Cost) in a single row.
+  optional int32              tree_column           = 2;  // column index for tree indicators
+  optional uint32             tree_color            = 3;  // ARGB; default 0xFF808080
+  optional GroupTotalPosition group_total_position  = 4;  // ABOVE or BELOW the group
+  // When true, repeated Subtotal() calls with the same group_on_col
+  // reuse existing subtotal rows instead of inserting new ones, allowing
+  // multiple aggregate columns (e.g. Sales + Cost) in a single row.
+  optional bool               multi_totals          = 5;
 }
 
 // ── Cell Span ──
+// Controls content-based cell merging. See engine/src/span.rs.
 message SpanConfig {
-  optional CellSpanMode cell_span         = 1;
-  optional CellSpanMode cell_span_fixed   = 2;
+  optional CellSpanMode cell_span         = 1;  // span mode for data cells
+  optional CellSpanMode cell_span_fixed   = 2;  // span mode for fixed/frozen cells
+  // How cells are compared for equality during spanning:
+  //   0 = exact match
+  //   1 = case-insensitive
+  //   2 = trim + case-insensitive
+  //   3 = include nulls (empty cells span too)
   optional int32        cell_span_compare = 3;
   optional int32        group_span_compare = 4;
 }
@@ -867,11 +1114,10 @@ message InteractionConfig {
   optional bool       auto_size_mouse  = 5;
   optional AutoSizeMode auto_size_mode = 6;
   // When true, bulk bind/load paths do a one-time auto-fit of row heights
-  // and/or column widths using `auto_size_mode`.
-  // Also enables the engine's per-cell auto-resize helper when an adapter
-  // explicitly calls it.
-  // Disable this for very large datasets (for example around 1M rows),
-  // because auto-fit may scan many or all cells to find the required size.
+  // and/or column widths using `auto_size_mode`. Also triggered after
+  // Subtotal() insertion (engine/src/outline.rs note_auto_resize_targets).
+  // Disable this for very large datasets (e.g. ~1M rows), because
+  // auto-fit scans many or all cells to measure text width/height.
   optional bool       auto_resize      = 7;
   optional DragMode   drag_mode        = 8;
   optional DropMode   drop_mode        = 9;
@@ -879,6 +1125,9 @@ message InteractionConfig {
 }
 
 // ── Render layer bit positions (for render_layer_mask bitmask) ──
+// The engine renders through 27 independent layers (engine/src/canvas.rs
+// layer module). Each layer is guarded by its bit in render_layer_mask.
+// Setting bit i enables layer i. Set all bits (-1) to render everything.
 enum RenderLayerBit {
   RENDER_LAYER_OVERLAY_BANDS    = 0;
   RENDER_LAYER_INDICATORS       = 1;
@@ -910,17 +1159,24 @@ enum RenderLayerBit {
 }
 
 // ── Rendering ──
+// The engine renders through 27 independent layers (engine/src/canvas.rs).
+// Each layer can be individually toggled via render_layer_mask.
 message RenderConfig {
   optional RendererMode    renderer_mode         = 1;
-  optional bool            debug_overlay         = 2;
+  optional bool            debug_overlay         = 2;   // shows FPS, cell counts, memory
   optional bool            animation_enabled     = 3;
   optional int32           animation_duration_ms = 4;
-  optional int32           text_layout_cache_cap = 5;
-  optional PresentMode     present_mode          = 6;
+  optional int32           text_layout_cache_cap = 5;   // max entries in text layout cache
+  optional PresentMode     present_mode          = 6;   // GPU V-Sync strategy
   optional FramePacingMode frame_pacing_mode     = 7;
-  optional int32           target_frame_rate_hz  = 8;
-  optional int64           render_layer_mask     = 9;   // bitmask using RenderLayerBit; -1 = all on
-  optional bool            layer_profiling       = 10;  // collect per-layer timings without requiring debug overlay
+  optional int32           target_frame_rate_hz  = 8;   // for FIXED pacing; default 30
+  // Bitmask using RenderLayerBit positions. Set bit i to enable layer i.
+  // -1 (all bits set) = all layers on. 0 = no layers rendered.
+  optional int64           render_layer_mask     = 9;
+  optional bool            layer_profiling       = 10;  // per-layer timing in FrameMetrics
+  // CPU scroll-blit optimization: reuses previously-rendered pixels
+  // when only scroll position changes. Only valid when no animation,
+  // no editing, no background image, and not right-to-left.
   optional bool            scroll_blit           = 11;
 }
 
@@ -1059,6 +1315,10 @@ message IndicatorsConfig {
 
 // ═══════════════════════════════════════════════════════════
 // Column & Row Definitions
+//
+// Sent via DefineColumns() / DefineRows() to configure
+// per-column/row properties. Uses partial-update semantics —
+// only set fields override existing properties.
 // ═══════════════════════════════════════════════════════════
 
 message ColumnDef {
@@ -1074,7 +1334,11 @@ message ColumnDef {
   optional string         key            = 10;
   optional SortOrder      sort_order     = 11;
   optional SortType       sort_type      = 12;
-  // Pipe-delimited dropdown items; prefix with `|` to make the list editable.
+  // Pipe-delimited dropdown items. See engine/src/edit.rs parse_dropdown_entries.
+  // Format: "item1|item2|item3" (read-only dropdown)
+  //         "|item1|item2"      (leading `|` = editable, allows free-form text)
+  // Optional translation: "#id;Display Text" stores `id` but shows Display Text.
+  // Optional multi-column: "*1;col1\tcol2" selects display column.
   optional string         dropdown_items = 13;
   optional string         edit_mask      = 14;
   optional int32          indent         = 15;
@@ -1099,16 +1363,16 @@ message DefineColumnsRequest {
 
 message RowDef {
   int32                index         = 1;
-  optional int32       height        = 2;
-  optional bool        hidden        = 3;
-  optional bool        is_subtotal   = 4;
-  optional int32       outline_level = 5;
-  optional bool        is_collapsed  = 6;
-  optional bytes       data          = 7;
-  optional int32       status        = 8;
-  optional bool        span          = 9;
-  optional PinPosition pin           = 10;
-  optional StickyEdge  sticky        = 11;
+  optional int32       height        = 2;   // pixels; 0 or negative = use default
+  optional bool        hidden        = 3;   // zero visual height when true
+  optional bool        is_subtotal   = 4;   // marks row as aggregate subtotal
+  optional int32       outline_level = 5;   // -1 = grand total, 0+ = nesting level
+  optional bool        is_collapsed  = 6;   // whether subtree below is collapsed
+  optional bytes       data          = 7;   // application-specific row data
+  optional int32       status        = 8;   // host-defined row status code
+  optional bool        span          = 9;   // enable spanning for this row
+  optional PinPosition pin           = 10;  // pin to TOP or BOTTOM of viewport
+  optional StickyEdge  sticky        = 11;  // stick to edge during scroll
 }
 
 message DefineRowsRequest {
@@ -1118,6 +1382,15 @@ message DefineRowsRequest {
 
 // ═══════════════════════════════════════════════════════════
 // Cell Data
+//
+// Cells are stored sparsely in the engine: HashMap<(i32,i32), CellData>
+// where CellData = { text: String, extra: Option<Box<CellExtra>> }.
+// Only non-empty cells consume memory. The slim CellData layout is
+// 32 bytes; rarely-used properties (picture, progress, dropdown, etc.)
+// are boxed in CellExtra to avoid bloating every cell.
+//
+// Display-row to logical-row mapping (row_map/col_map in CellStore)
+// enables O(1) post-sort access without physically moving cell data.
 // ═══════════════════════════════════════════════════════════
 
 message CellUpdate {
@@ -1139,6 +1412,8 @@ message CellUpdate {
 message UpdateCellsRequest {
   int64               grid_id = 1;
   repeated CellUpdate cells   = 2;
+  // When true, writes to a preview grid first; if any type violations
+  // occur the original grid is untouched and WriteResult.rejected_count > 0.
   bool                atomic  = 3;
 }
 
@@ -1180,11 +1455,13 @@ message WriteResult {
   repeated TypeViolation violations     = 3;
 }
 
+// Bulk-load a table from a flat array of values.
+// Values are row-major: element at index (r * cols + c) goes to cell (r, c).
 message LoadTableRequest {
   int64              grid_id = 1;
   int32              rows    = 2;
   int32              cols    = 3;
-  repeated CellValue values  = 4;
+  repeated CellValue values  = 4;  // length must equal rows × cols
   bool               atomic  = 5;
 }
 
@@ -1226,9 +1503,16 @@ message LoadDataOptions {
   optional int32          max_rows            = 21;
 }
 
+// Load structured data (CSV or JSON) into the grid.
+// The engine parses the data, infers types, validates values, and
+// populates cells. See engine/src/load.rs.
+//
+// JSON supports 5 shapes: array of objects, array of arrays,
+// {columns,data}, object with all-array values, or single object.
+// JSONPath navigation via JsonOptions.data_path (e.g. "results.items").
 message LoadDataRequest {
   int64                    grid_id = 1;
-  bytes                    data    = 2;
+  bytes                    data    = 2;  // UTF-8 CSV or JSON bytes
   optional LoadDataOptions options = 3;
 }
 
@@ -1348,20 +1632,27 @@ message EditSetSelection { int32 start = 1; int32 length = 2; }
 message EditSetPreedit { string text = 1; int32 cursor = 2; bool commit = 3; }
 message EditFinish  {}
 
+// Edit UI mode. See engine/src/edit.rs EditUiMode.
+//   ENTER (0): Spreadsheet-style. Enter commits and moves cursor down.
+//              Character keys replace cell content. Up/Down commit and move.
+//   EDIT (1):  F2 mode. Caret placed at end of existing text.
+//              Escape cancels and restores original value.
+//              Arrow keys move caret within text, not the grid cursor.
 enum EditUiMode {
   EDIT_UI_MODE_ENTER = 0;
   EDIT_UI_MODE_EDIT  = 1;
 }
 
+// Returned by Edit() RPC. Reflects the engine's current edit state.
 message EditState {
-  bool       active       = 1;
-  int32      row          = 2;
-  int32      col          = 3;
-  string     text         = 4;
-  int32      sel_start    = 5;
-  int32      sel_length   = 6;
-  bool       composing    = 7;
-  string     preedit_text = 8;
+  bool       active       = 1;   // true if a cell is being edited
+  int32      row          = 2;   // row being edited
+  int32      col          = 3;   // column being edited
+  string     text         = 4;   // current editor text
+  int32      sel_start    = 5;   // caret/selection start position
+  int32      sel_length   = 6;   // selection length (0 = caret only)
+  bool       composing    = 7;   // true during IME composition
+  string     preedit_text = 8;   // IME preedit string
   EditUiMode ui_mode      = 9;
 }
 
@@ -1375,20 +1666,28 @@ message SortColumn {
   optional SortType  type  = 3;
 }
 
+// Multi-column sort. The engine builds sort_keys from sort_columns
+// and compares by the first differing key column. Subtotal rows are
+// excluded from sort — each group between subtotal boundaries is
+// sorted independently to preserve outline structure.
 message SortRequest {
   int64               grid_id      = 1;
   repeated SortColumn sort_columns = 2;
 }
 
+// Insert aggregate subtotal rows. See engine/src/outline.rs.
+// Detects group boundaries by comparing cell values in group_on_col.
+// Set group_on_col=-1 for a grand total only (no grouping).
+// Use AGG_CLEAR to remove all subtotal rows.
 message SubtotalRequest {
   int64         grid_id       = 1;
   AggregateType aggregate     = 2;
-  int32         group_on_col  = 3;
-  int32         aggregate_col = 4;
-  string        caption       = 5;
-  uint32        background    = 6;
-  uint32        foreground    = 7;
-  bool          add_outline   = 8;
+  int32         group_on_col  = 3;   // column to group/break on; -1 = grand total only
+  int32         aggregate_col = 4;   // column to compute aggregate on
+  string        caption       = 5;   // label for subtotal rows
+  uint32        background    = 6;   // ARGB for subtotal row background
+  uint32        foreground    = 7;   // ARGB for subtotal row foreground
+  bool          add_outline   = 8;   // set outline_level for tree expand/collapse
   Font          font          = 9;
 }
 
@@ -1468,6 +1767,9 @@ message GetMergedRangeRequest {
   int32 col     = 3;
 }
 
+// Explicit user-initiated cell merge (spreadsheet-style).
+// Separate from content-based spans (CellSpanMode).
+// Overlapping merges discard the older range. See engine/src/merge_registry.rs.
 message MergeCellsRequest {
   int64     grid_id = 1;
   CellRange range   = 2;
@@ -1501,6 +1803,12 @@ message MemoryUsageResponse {
 
 // ═══════════════════════════════════════════════════════════
 // Clipboard
+//
+// See engine/src/clipboard.rs.
+// Copy/Cut produce tab-separated text (configurable via
+// clip_col_separator/clip_row_separator on the grid).
+// Paste splits input by those separators and writes starting
+// at the current cursor position. Cut = Copy + Delete.
 // ═══════════════════════════════════════════════════════════
 
 message ClipboardCommand {
@@ -1552,19 +1860,28 @@ message PrintRequest {
 
 message PrintResponse { repeated PrintPage pages = 1; }
 
+// Each page is a PNG-encoded RGBA image. See engine/src/print.rs.
+// Page dimensions at 96 DPI: portrait 816×1056 px, landscape 1056×816 px.
+// Header/footer placeholders: &P = page number, &N = total pages.
 message PrintPage {
-  int32 page_number = 1;
-  bytes image_data  = 2;
-  int32 width       = 3;
-  int32 height      = 4;
+  int32 page_number = 1;  // 1-based
+  bytes image_data  = 2;  // PNG-encoded RGBA buffer
+  int32 width       = 3;  // pixels
+  int32 height      = 4;  // pixels
 }
 
+// Named grid snapshots using the FXAR1 archive format.
+// See engine/src/save.rs.
+//   SAVE:   Serializes grid into a named entry in the archive blob.
+//   LOAD:   Deserializes a named entry back into the grid.
+//   DELETE: Removes a named entry from the archive.
+//   LIST:   Returns the list of entry names without loading.
 message ArchiveRequest {
   int64 grid_id = 1;
   string name   = 2;
   enum Action { SAVE = 0; LOAD = 1; DELETE = 2; LIST = 3; }
   Action action = 3;
-  bytes  data   = 4;
+  bytes  data   = 4;  // archive blob (FXAR1 format)
 }
 
 message ArchiveResponse {
@@ -1591,11 +1908,13 @@ enum ErrorCode {
   ERROR_INTERNAL         = 8;
 }
 
+// Create a new grid instance. Returns a GridHandle used by all subsequent RPCs.
+// The engine allocates a VolvoxGrid with the given viewport and optional config.
 message CreateRequest {
-  int32      viewport_width  = 1;
-  int32      viewport_height = 2;
-  float      scale           = 3;
-  GridConfig config          = 4;
+  int32      viewport_width  = 1;  // pixels
+  int32      viewport_height = 2;  // pixels
+  float      scale           = 3;  // DPI scale factor (1.0 = no scaling)
+  GridConfig config          = 4;  // optional initial configuration
 }
 
 message CreateResponse {
@@ -1625,6 +1944,10 @@ message SetColRequest {
   int32 col     = 2;
 }
 
+// Enable/disable rendering. When transitioning from disabled to enabled,
+// the engine suppresses the next animation frame and forces an immediate
+// dirty repaint (plugin/src/lib.rs SetRedraw). Useful for batching many
+// mutations without intermediate renders.
 message SetRedrawRequest {
   int64 grid_id = 1;
   bool  enabled = 2;
@@ -1663,6 +1986,24 @@ message GetDemoDataResponse {
 
 // ═══════════════════════════════════════════════════════════
 // Render Session (bidirectional stream)
+//
+// The render session is the real-time render loop between host and engine.
+// See plugin/src/lib.rs render_session().
+//
+// Typical CPU host flow:
+//   1. Host opens RenderSession stream
+//   2. Host sends ViewportState on resize
+//   3. Host allocates RGBA buffer, sends BufferReady
+//   4. Engine renders into buffer, returns FrameDone with dirty rect
+//   5. Host blits dirty rect to screen
+//   6. Host forwards pointer/key/scroll events as they occur
+//   7. Engine returns EditRequest/DropdownRequest/CursorChange as needed
+//
+// GPU flow replaces step 3-4: host sends GpuSurfaceReady, engine
+// renders via wgpu directly to the native surface.
+//
+// The session also carries EventDecision responses from the host
+// (see file header, "Cancelable events via EventDecision").
 // ═══════════════════════════════════════════════════════════
 
 message RenderInput {
@@ -1693,9 +2034,11 @@ message ViewportState {
 message PointerEvent {
   enum Type { DOWN = 0; UP = 1; MOVE = 2; }
   Type  type      = 1;
-  float x         = 2;
-  float y         = 3;
+  float x         = 2;  // viewport-local X coordinate
+  float y         = 3;  // viewport-local Y coordinate
+  // Modifier bitmask: 0x01=Shift, 0x02=Ctrl, 0x04=Alt, 0x08=Meta.
   int32 modifier  = 4;
+  // Button bitmask: 0x01=primary (left), 0x02=secondary (right).
   int32 button    = 5;
   bool  dbl_click = 6;
 }
@@ -1713,20 +2056,30 @@ message ZoomEvent {
   float focal_y_px = 4;
 }
 
+// Key codes use web/Windows virtual key values:
+//   13=Enter, 27=Escape, 9=Tab, 32=Space, 8=Backspace, 46=Delete,
+//   37/38/39/40=Arrow Left/Up/Right/Down, 33/34=PageUp/PageDown,
+//   36/35=Home/End, 113=F2, 65=A, 67=C, 86=V, 88=X.
+// KEY_PRESS carries the character for text input; KEY_DOWN/UP carry key_code.
 message KeyEvent {
   enum Type { KEY_DOWN = 0; KEY_UP = 1; KEY_PRESS = 2; }
   Type   type      = 1;
   int32  key_code  = 2;
+  // Modifier bitmask: 0x01=Shift, 0x02=Ctrl, 0x04=Alt, 0x08=Meta.
   int32  modifier  = 3;
-  string character = 4;
+  string character = 4;  // for KEY_PRESS: the typed character
 }
 
+// CPU rendering: host provides an RGBA buffer for the engine to render into.
+// The engine writes pixels in RGBA byte order (R at offset+0, G+1, B+2, A+3).
+// The plugin maps the buffer via `handle` as a raw pointer and calls the CPU
+// renderer. See plugin/src/lib.rs BufferReady handling.
 message BufferReady {
-  int64 handle = 1;
-  int32 stride = 2;
-  int32 width  = 3;
-  int32 height = 4;
-  int32 capacity = 5;
+  int64 handle = 1;    // platform-specific shared memory handle (cast to *mut u8)
+  int32 stride = 2;    // bytes per row (≥ width × 4)
+  int32 width  = 3;    // buffer width in pixels
+  int32 height = 4;    // buffer height in pixels
+  int32 capacity = 5;  // total buffer size in bytes
 }
 
 enum TerminalColorLevel {
@@ -1764,19 +2117,39 @@ message TerminalCommand {
   Kind kind = 1;
 }
 
+// GPU rendering: host provides a native surface for wgpu.
+// handle=0 means surface destroyed. See plugin/src/lib.rs GpuSurfaceReady.
+// If GPU initialization fails, the plugin falls back to CPU mode silently.
 message GpuSurfaceReady {
-  int64 surface_handle = 1;
-  int32 width          = 2;
-  int32 height         = 3;
+  int64 surface_handle = 1;  // platform-specific native surface (0 = destroyed)
+  int32 width          = 2;  // surface width in pixels
+  int32 height         = 3;  // surface height in pixels
 }
 
+// Response to a cancelable GridEvent. Sent on the RenderSession stream.
+//
+// The engine waits up to 250 ms for this message (DECISION_TIMEOUT in
+// plugin/src/lib.rs). If no decision arrives, the event auto-proceeds
+// with cancel=false. Expired actions are resolved at the start of each
+// render_session loop iteration.
+//
+// Cancelable events: BeforeEdit, CellEditValidate, BeforeSort,
+// CellFocusChanging, SelectionChanging, BeforeNodeToggle,
+// BeforeUserResize, BeforeMoveColumn, BeforeMoveRow.
 message EventDecision {
   int64 grid_id  = 1;
-  int64 event_id = 2;
-  bool  cancel   = 3;
+  int64 event_id = 2;  // must match the event_id from GridEvent
+  bool  cancel   = 3;  // true = veto the action, false = allow
 }
 
+// Immediate render-coupled output from the engine.
+// These are NOT the same as semantic GridEvent messages — they exist so
+// the host can react immediately to render-time UI needs (cursor shape,
+// edit overlay position, selection feedback, frame completion).
 message RenderOutput {
+  // true if pixels were actually painted this frame.
+  // false if grid was clean (no changes). Hosts can skip compositing
+  // when rendered=false.
   bool rendered = 1;
   oneof event {
     FrameDone       frame_done       = 2;
@@ -1789,15 +2162,18 @@ message RenderOutput {
   }
 }
 
+// CPU frame completion. The dirty rect tells the host which region
+// of the RGBA buffer was modified — the host only needs to blit this
+// rectangle to screen, not the full buffer.
 message FrameDone {
-  int64 handle  = 1;
-  int32 dirty_x = 2;
-  int32 dirty_y = 3;
-  int32 dirty_w = 4;
-  int32 dirty_h = 5;
+  int64 handle  = 1;  // echoed from BufferReady.handle
+  int32 dirty_x = 2;  // dirty region origin X (pixels)
+  int32 dirty_y = 3;  // dirty region origin Y (pixels)
+  int32 dirty_w = 4;  // dirty region width (0 if nothing changed)
+  int32 dirty_h = 5;  // dirty region height (0 if nothing changed)
   FrameMetrics metrics = 6;
   int32 bytes_written    = 7;
-  int32 required_capacity = 8;
+  int32 required_capacity = 8;  // if buffer was too small
   FrameKind frame_kind   = 9;
 }
 
@@ -1816,11 +2192,12 @@ message GpuFrameDone {
 }
 
 message FrameMetrics {
-  float frame_time_ms = 1;
-  float fps = 2;
-  repeated float layer_times_us = 3;
+  float frame_time_ms = 1;          // total frame render time
+  float fps = 2;                    // smoothed FPS (exponential moving average)
+  repeated float layer_times_us = 3;   // per-layer microseconds (27 entries if layer_profiling on)
+  // Cell counts by zone: [scrollable, sticky, pinned, fixed].
   repeated uint32 zone_cell_counts = 4;
-  int32 instance_count = 5;
+  int32 instance_count = 5;         // GPU draw calls or CPU region count
 }
 
 message SelectionUpdate {
@@ -1841,18 +2218,24 @@ message CursorChange {
   CursorType cursor = 1;
 }
 
+// Emitted on RenderOutput when the engine wants the host to show an
+// edit overlay. The host should position a native text input at (x,y)
+// with the given dimensions and pre-fill it with current_value.
+// See plugin/src/lib.rs build_edit_request().
 message EditRequest {
   int32      row           = 1;
   int32      col           = 2;
-  float      x             = 3;
-  float      y             = 4;
-  float      width         = 5;
-  float      height        = 6;
-  string     current_value = 7;
-  string     edit_mask     = 8;
-  int32      max_length    = 9;
-  int32      sel_start     = 10;
-  int32      sel_length    = 11;
+  float      x             = 3;   // viewport-local cell rect X
+  float      y             = 4;   // viewport-local cell rect Y
+  float      width         = 5;   // cell rect width
+  float      height        = 6;   // cell rect height
+  string     current_value = 7;   // text to pre-fill
+  string     edit_mask     = 8;   // format mask, e.g. "(999) 999-9999"
+  int32      max_length    = 9;   // 0 = unlimited
+  int32      sel_start     = 10;  // text selection start (caret position)
+  int32      sel_length    = 11;  // text selection length
+  // ENTER (0): Enter commits and moves cursor. Character keys replace content.
+  // EDIT (1):  F2 mode. Caret at end. Escape cancels.
   EditUiMode ui_mode       = 12;
 }
 
@@ -1878,12 +2261,22 @@ message TooltipRequest {
 // ═══════════════════════════════════════════════════════════
 // Event Stream
 //
-// `cancel` fields removed from event messages.
-// Use EventDecision channel to cancel cancelable events.
+// Semantic grid events delivered via EventStream(). The engine
+// maintains a FIFO EventQueue (VecDeque<QueuedGridEvent>) and
+// the plugin drains it with a 50 ms poll interval.
+//
+// event_id = 0: informational, cannot be canceled.
+// event_id > 0: cancelable — host must send EventDecision on
+//               RenderSession within 250 ms or the event auto-proceeds.
+//
+// `cancel` fields were removed from event messages. Use EventDecision
+// on the RenderSession to cancel cancelable events.
 // ═══════════════════════════════════════════════════════════
 
 message GridEvent {
   int64 grid_id  = 1;
+  // 0 = non-cancelable (informational only).
+  // Non-zero = cancelable — send EventDecision with this ID to allow/veto.
   int64 event_id = 100;
   oneof event {
     // Navigation
@@ -1967,21 +2360,21 @@ message GridEvent {
 }
 
 // ── Navigation Events ──
-message CellFocusChangingEvent {
+message CellFocusChangingEvent {  // cancelable
   int32 old_row = 1; int32 old_col = 2;
   int32 new_row = 3; int32 new_col = 4;
 }
-message CellFocusChangedEvent {
+message CellFocusChangedEvent {  // informational
   int32 old_row = 1; int32 old_col = 2;
   int32 new_row = 3; int32 new_col = 4;
 }
-message SelectionChangingEvent {
+message SelectionChangingEvent {  // cancelable
   repeated CellRange old_ranges = 1;
   repeated CellRange new_ranges = 2;
   int32              active_row = 3;
   int32              active_col = 4;
 }
-message SelectionChangedEvent {
+message SelectionChangedEvent {  // informational
   repeated CellRange old_ranges = 1;
   repeated CellRange new_ranges = 2;
   int32              active_row = 3;
@@ -1991,11 +2384,11 @@ message EnterCellEvent { int32 row = 1; int32 col = 2; }
 message LeaveCellEvent { int32 row = 1; int32 col = 2; }
 
 // ── Edit Events ──
-message BeforeEditEvent   { int32 row = 1; int32 col = 2; }
-message StartEditEvent    { int32 row = 1; int32 col = 2; }
-message AfterEditEvent    { int32 row = 1; int32 col = 2; string old_text = 3; string new_text = 4; }
-message CellEditValidateEvent { int32 row = 1; int32 col = 2; string edit_text = 3; }
-message CellEditChangeEvent   { string text = 1; }
+message BeforeEditEvent   { int32 row = 1; int32 col = 2; }  // cancelable
+message StartEditEvent    { int32 row = 1; int32 col = 2; }  // informational
+message AfterEditEvent    { int32 row = 1; int32 col = 2; string old_text = 3; string new_text = 4; }  // informational; old_text==new_text on cancel
+message CellEditValidateEvent { int32 row = 1; int32 col = 2; string edit_text = 3; }  // cancelable: cancel keeps editor open
+message CellEditChangeEvent   { string text = 1; }  // fired on every character insert
 message KeyDownEditEvent  { int32 key_code = 1; int32 modifier = 2; }
 message KeyPressEditEvent { int32 key_ascii = 1; }
 message KeyUpEditEvent    { int32 key_code = 1; int32 modifier = 2; }
@@ -2009,13 +2402,14 @@ message CellChangedEvent     { int32 row = 1; int32 col = 2; string old_text = 3
 message RowStatusChangeEvent { int32 row = 1; int32 status = 2; }
 
 // ── Sort Events ──
-message BeforeSortEvent { int32 col = 1; }
-message AfterSortEvent  { int32 col = 1; }
+message BeforeSortEvent { int32 col = 1; }  // cancelable
+message AfterSortEvent  { int32 col = 1; }  // informational
+// Fired for SORT_TYPE_CUSTOM: host returns comparison result.
 message CompareEvent    { int32 row1 = 1; int32 row2 = 2; int32 col = 3; int32 result = 4; }
 
 // ── Outline Events ──
-message BeforeNodeToggleEvent { int32 row = 1; bool collapse = 2; }
-message AfterNodeToggleEvent  { int32 row = 1; bool collapse = 2; }
+message BeforeNodeToggleEvent { int32 row = 1; bool collapse = 2; }  // cancelable
+message AfterNodeToggleEvent  { int32 row = 1; bool collapse = 2; }  // informational
 
 // ── Scroll Events ──
 message BeforeScrollEvent {
@@ -2040,6 +2434,8 @@ message BeforeMoveRowEvent    { int32 row = 1; int32 new_position = 2; }
 message AfterMoveRowEvent     { int32 row = 1; int32 old_position = 2; }
 
 // ── Mouse Events ──
+// button: 0x01=primary, 0x02=secondary.
+// modifier: 0x01=Shift, 0x02=Ctrl, 0x04=Alt, 0x08=Meta.
 message BeforeMouseDownEvent { int32 row = 1; int32 col = 2; }
 message MouseDownEvent  { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
 message MouseUpEvent    { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
@@ -2048,6 +2444,7 @@ message ClickEvent      { int32 row = 1; int32 col = 2; CellHitArea hit_area = 3
 message DblClickEvent   { int32 row = 1; int32 col = 2; }
 
 // ── Keyboard Events ──
+// modifier: 0x01=Shift, 0x02=Ctrl, 0x04=Alt, 0x08=Meta.
 message KeyDownEvent  { int32 key_code = 1; int32 modifier = 2; }
 message KeyPressEvent { int32 key_ascii = 1; }
 message KeyUpEvent    { int32 key_code = 1; int32 modifier = 2; }
@@ -2094,6 +2491,21 @@ message GetHeaderRowEvent    { int32 page = 1; }
 
 // ═══════════════════════════════════════════════════════════
 // Service
+//
+// The protobuf service exposed by the native plugin over Synurang FFI
+// (or directly via wasm-bindgen for web hosts).
+//
+// Typical host lifecycle:
+//   1. Create()          — allocate a grid with initial viewport and config
+//   2. Configure()       — apply additional settings (partial-update)
+//   3. DefineColumns()   — set column properties
+//   4. UpdateCells() or LoadData() — populate data
+//   5. RenderSession()   — open bidirectional stream for real-time rendering
+//   6. EventStream()     — open server stream for semantic events
+//   7. … interact …
+//   8. Destroy()         — release the grid
+//
+// All RPCs except RenderSession/EventStream are unary request-response.
 // ═══════════════════════════════════════════════════════════
 
 service VolvoxGridService {
@@ -2164,6 +2576,10 @@ service VolvoxGridService {
   rpc GetDemoData(GetDemoDataRequest)     returns (GetDemoDataResponse);
 
   // ── Streaming ──
+  // Bidirectional: host sends input (pointer, key, buffer, event decisions),
+  // engine returns render-coupled output (frames, edit/dropdown requests).
   rpc RenderSession(stream RenderInput)   returns (stream RenderOutput);
+  // Server-streaming: engine pushes semantic grid events.
+  // The plugin polls the engine's EventQueue with a 50 ms interval.
   rpc EventStream(GridHandle)             returns (stream GridEvent);
 }

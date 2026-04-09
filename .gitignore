@@ -36,6 +36,8 @@ java/desktop/bin/
 # .NET adapter build artifacts and local IDE state
 dotnet/**/bin/
 dotnet/**/obj/
+adapters/xtragrid/test/runner/obj/
+adapters/xtragrid/test/runner/bin/
 .vs/
 *.suo
 *.user

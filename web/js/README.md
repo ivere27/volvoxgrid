@@ -21,8 +21,6 @@ const grid = new VolvoxGrid(document.getElementById("grid"), {
   colCount: 5,
 });
 
-await grid.loaded;
-
 grid.setColumnCaption(0, "Name");
 grid.setColumnCaption(1, "Price");
 grid.setCellText(0, 0, "Widget A");
@@ -62,6 +60,70 @@ The custom element creates a shadow DOM canvas and initializes VolvoxGrid automa
 | `volvoxgrid` | Main entry: `VolvoxGrid`, `VolvoxGridElement`, types |
 | `volvoxgrid/generated/volvoxgrid_ffi.js` | Generated low-level FFI bindings |
 | `volvoxgrid/default-input.js` | Default keyboard/mouse input helpers |
+
+## Data Operations
+
+#### LoadData
+
+Parse CSV or JSON bytes into the grid:
+
+```js
+// CSV
+grid.loadData("Name,Price,Qty\nWidget A,29.99,150\nWidget B,49.99,200");
+
+// JSON matrix with options
+grid.loadData(
+  JSON.stringify([["Name", "Price"], ["Alpha", "10"]]),
+  { format: "json", headerPolicy: "none" },
+);
+```
+
+#### UpdateCells
+
+Batch update cells:
+
+```js
+grid.setCells([
+  { row: 0, col: 0, text: "Alpha" },
+  { row: 0, col: 1, text: "29.99" },
+  { row: 1, col: 0, text: "Beta" },
+  { row: 1, col: 1, text: "49.99" },
+]);
+```
+
+#### GetCells
+
+Read cell values:
+
+```js
+const text = grid.getCellText(0, 0);
+const price = grid.getCellText(0, 1);
+```
+
+#### Clear
+
+```js
+// Clear everything
+grid.clear();
+
+// Clear only data (keep formatting)
+grid.clear(/* scope */ 2, /* region */ 0);
+// Scopes: 0 = EVERYTHING, 1 = FORMATTING, 2 = DATA, 3 = SELECTION
+// Regions: 0 = SCROLLABLE, 1 = FIXED_ROWS, 2 = FIXED_COLS, 5 = ALL_REGIONS
+
+// Clear a specific cell range
+grid.clearCellRange(0, 0, 9, 4);
+```
+
+#### LoadTable
+
+`loadTable` bulk-loads a row-major flat array of values in a single call:
+
+```js
+grid.loadTable(2, 3, ["Widget A", 29.99, 150, "Widget B", 49.99, 200]);
+```
+
+Values are coerced to strings internally. For typed `CellValue` payloads (text, number, boolean, bytes, timestamp), use the generated FFI bindings in `volvoxgrid/generated/volvoxgrid_ffi.js`. For the full `LoadTableRequest` schema, see [`proto/volvoxgrid.proto`](../../proto/volvoxgrid.proto).
 
 ## Adapter Packages
 

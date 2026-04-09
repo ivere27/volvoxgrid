@@ -17,10 +17,11 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(TargetFramework)' == 'net40'">
-    <NuGetPackageRoot Condition="'$(NuGetPackageRoot)' == '' and '$(NUGET_PACKAGES)' != ''">$(NUGET_PACKAGES)</NuGetPackageRoot>
-    <NuGetPackageRoot Condition="'$(NuGetPackageRoot)' == '' and '$(HOME)' != ''">$(HOME)/.nuget/packages/</NuGetPackageRoot>
-    <NuGetPackageRoot Condition="'$(NuGetPackageRoot)' == '' and '$(USERPROFILE)' != ''">$(USERPROFILE)\\.nuget\\packages\\</NuGetPackageRoot>
-    <FrameworkPathOverride>$(NuGetPackageRoot)microsoft.netframework.referenceassemblies.net40/1.0.3/build/.NETFramework/v4.0/</FrameworkPathOverride>
+    <VolvoxGridNuGetPackageRoot Condition="'$(VolvoxGridNuGetPackageRoot)' == '' and '$(NuGetPackageRoot)' != ''">$([MSBuild]::EnsureTrailingSlash('$(NuGetPackageRoot)'))</VolvoxGridNuGetPackageRoot>
+    <VolvoxGridNuGetPackageRoot Condition="'$(VolvoxGridNuGetPackageRoot)' == '' and '$(NUGET_PACKAGES)' != ''">$([MSBuild]::EnsureTrailingSlash('$(NUGET_PACKAGES)'))</VolvoxGridNuGetPackageRoot>
+    <VolvoxGridNuGetPackageRoot Condition="'$(VolvoxGridNuGetPackageRoot)' == '' and '$(HOME)' != ''">$([MSBuild]::EnsureTrailingSlash('$(HOME)/.nuget/packages'))</VolvoxGridNuGetPackageRoot>
+    <VolvoxGridNuGetPackageRoot Condition="'$(VolvoxGridNuGetPackageRoot)' == '' and '$(USERPROFILE)' != ''">$([MSBuild]::EnsureTrailingSlash('$(USERPROFILE)/.nuget/packages'))</VolvoxGridNuGetPackageRoot>
+    <FrameworkPathOverride>$(VolvoxGridNuGetPackageRoot)microsoft.netframework.referenceassemblies.net40/1.0.3/build/.NETFramework/v4.0/</FrameworkPathOverride>
     <VolvoxGridLegacyOnly>true</VolvoxGridLegacyOnly>
   </PropertyGroup>
 

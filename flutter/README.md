@@ -184,16 +184,31 @@ await controller.loadData(
     ..headerPolicy = HeaderPolicy.HEADER_NONE,
 );
 
-// Bulk load a row-major typed table
+// Clear all data
+await controller.clear();
+
+// Clear only data (keep formatting)
+await controller.clear(scope: ClearScope.CLEAR_DATA);
+// Scopes: CLEAR_EVERYTHING, CLEAR_FORMATTING, CLEAR_DATA, CLEAR_SELECTION
+// Regions: CLEAR_SCROLLABLE, CLEAR_FIXED_ROWS, CLEAR_FIXED_COLS, CLEAR_ALL_REGIONS
+```
+
+#### LoadTable
+
+`loadTable` bulk-loads a row-major flat array of typed `CellValue` entries. It replaces the grid contents in a single RPC call, making it efficient for large datasets.
+
+```dart
 await controller.loadTable(3, 2, [
   CellValue()..text = 'a',
   CellValue()..text = 'b',
-  CellValue()..text = 'c',
-  CellValue()..text = 'd',
-  CellValue()..text = 'e',
-  CellValue()..text = 'f',
+  CellValue()..number = 1.0,
+  CellValue()..number = 2.0,
+  CellValue()..flag = true,
+  CellValue()..flag = false,
 ]);
 ```
+
+`CellValue` supports `text`, `number`, `flag` (boolean), `raw` (bytes), and `timestamp` (epoch-ms). For the full `LoadTableRequest` schema, see [`proto/volvoxgrid.proto`](../proto/volvoxgrid.proto) and the generated FFI client in `volvoxgrid_ffi.dart`.
 
 #### Row & Column Sizing
 
@@ -265,8 +280,8 @@ int col = sel.activeCol;
 List<CellRange> ranges = sel.ranges;
 
 // Selection mode
-await controller.setSelectionMode(SelectionMode.BY_ROW);
-// Modes: FREE, BY_ROW, BY_COLUMN, LISTBOX, MULTI_RANGE
+await controller.setSelectionMode(SelectionMode.SELECTION_BY_ROW);
+// Modes: SELECTION_FREE, SELECTION_BY_ROW, SELECTION_BY_COLUMN, SELECTION_LISTBOX, SELECTION_MULTI_RANGE
 
 // Scroll to make a cell visible
 await controller.showCell(10, 3);
@@ -320,7 +335,7 @@ await controller.setColAlignment(1, Align.ALIGN_RIGHT_CENTER);
 //         ALIGN_RIGHT_TOP, ALIGN_RIGHT_CENTER, ALIGN_RIGHT_BOTTOM, ALIGN_GENERAL
 
 // Column data type and format
-await controller.setColDataType(1, ColumnDataType.NUMBER);
+await controller.setColDataType(1, ColumnDataType.COLUMN_DATA_NUMBER);
 await controller.setColFormat(1, '#,##0.00');
 
 // Apply style to a range

@@ -84,7 +84,7 @@ If you are evaluating the rendering paths themselves, read [GUI.md](GUI.md) and 
 
 ### Adapters
 
-- Compatibility adapters for [AG Grid](adapters/aggrid), [Sheet](adapters/sheet), [SfDataGrid](adapters/sfdatagrid), and [VSFlexGrid](adapters/vsflexgrid) APIs
+- Compatibility adapters for [AG Grid](adapters/aggrid), [Sheet](adapters/sheet), [SfDataGrid](adapters/sfdatagrid), [VSFlexGrid](adapters/vsflexgrid), [XtraGrid](adapters/xtragrid), and [Report](adapters/report) APIs
 
 ## Quick Start
 

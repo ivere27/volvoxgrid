@@ -1232,6 +1232,8 @@ async function main() {
     sales: grid.id,
   };
   const demoInitialized: Partial<Record<StandardDemoMode, boolean>> = {};
+  let demoFontsResolved = false;
+  const hierarchyFontAutosizedGridIds = new Set<number>();
   let activeRendererMode = 1; // CPU
   let scrollBlitEnabled = false;
   let editEnabled = false;
@@ -1493,6 +1495,47 @@ async function main() {
     }
     return Array.from(ids);
   }
+
+  function autoSizeHierarchyAfterFonts(id: number): void {
+    if (!demoFontsResolved || !demoInitialized.hierarchy || hierarchyFontAutosizedGridIds.has(id)) {
+      return;
+    }
+
+    const autoSizeGrid = (wasmModule as any).volvox_grid_auto_size as
+      | ((gridId: bigint, colFrom: number, colTo: number, equal: boolean, maxWidth: number) => Uint8Array)
+      | undefined;
+    if (typeof autoSizeGrid === "function") {
+      autoSizeGrid(BigInt(id), 0, HIERARCHY_COLS - 1, false, 0);
+      if (grid.id === id) {
+        grid.invalidate();
+      }
+      hierarchyFontAutosizedGridIds.add(id);
+      return;
+    }
+
+    const prevId = grid.id;
+    if (id !== prevId) {
+      grid.useGrid(id);
+    }
+
+    try {
+      grid.autoSize(0, HIERARCHY_COLS - 1);
+      grid.invalidate();
+      hierarchyFontAutosizedGridIds.add(id);
+    } finally {
+      if (id !== prevId) {
+        grid.useGrid(prevId);
+      }
+    }
+  }
+
+  void demoFontsReady.then(() => {
+    demoFontsResolved = true;
+    const hierarchyId = demoGridIds.hierarchy;
+    if (typeof hierarchyId === "number" && hierarchyId > 0) {
+      autoSizeHierarchyAfterFonts(hierarchyId);
+    }
+  });
 
   function applyRenderLayerMaskToGrid(id: number): void {
     const setRenderLayerMask = (wasmModule as any).set_render_layer_mask as
@@ -2324,6 +2367,9 @@ async function main() {
     setGridEditable(id, editEnabled);
     grid.invalidate();
     demoInitialized[mode] = true;
+    if (mode === "hierarchy") {
+      autoSizeHierarchyAfterFonts(id);
+    }
 
     if (id !== prevId) {
       grid.useGrid(prevId);

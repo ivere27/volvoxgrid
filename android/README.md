@@ -228,9 +228,6 @@ ctrl.setCells(Arrays.asList(
     new GridCellText(1, 0, "C")
 ));
 
-// Bulk load a 2D array (row-major order)
-ctrl.loadArray(3, 2, Arrays.asList("a", "b", "c", "d", "e", "f"), false);
-
 // Load a matrix-shaped JSON payload
 LoadDataOptions matrixJson = LoadDataOptions.newBuilder()
     .setJson(JsonOptions.newBuilder().build())
@@ -244,7 +241,31 @@ ctrl.loadData(
     """.getBytes(java.nio.charset.StandardCharsets.UTF_8),
     matrixJson
 );
+
+// Clear all data
+ctrl.clear();
+
+// Clear only data (keep formatting)
+ctrl.clear(ClearScope.CLEAR_DATA, ClearRegion.CLEAR_SCROLLABLE);
+// Scopes: CLEAR_EVERYTHING, CLEAR_FORMATTING, CLEAR_DATA, CLEAR_SELECTION
 ```
+
+#### LoadTable
+
+`loadTable` bulk-loads a row-major flat array of typed `CellValue` entries in a single RPC call.
+
+```java
+ctrl.loadTable(2, 3, Arrays.asList(
+    CellValue.newBuilder().setText("Widget A").build(),
+    CellValue.newBuilder().setNumber(29.99).build(),
+    CellValue.newBuilder().setNumber(150).build(),
+    CellValue.newBuilder().setText("Widget B").build(),
+    CellValue.newBuilder().setNumber(49.99).build(),
+    CellValue.newBuilder().setNumber(200).build()
+), true /* atomic */);
+```
+
+`CellValue` supports `text`, `number`, `flag` (boolean), `raw` (bytes), and `timestamp` (epoch-ms). For the full `LoadTableRequest` schema, see [`proto/volvoxgrid.proto`](../proto/volvoxgrid.proto) and the generated protobuf classes.
 
 #### Row & Column Sizing
 
@@ -324,8 +345,8 @@ int colEnd = sel.getColEnd();
 GridCellRange[] ranges = sel.getRanges();
 
 // Selection mode
-ctrl.setSelectionMode(SelectionMode.BY_ROW);
-// Modes: FREE, BY_ROW, BY_COLUMN, LISTBOX, MULTI_RANGE
+ctrl.setSelectionMode(SelectionMode.SELECTION_BY_ROW);
+// Modes: SELECTION_FREE, SELECTION_BY_ROW, SELECTION_BY_COLUMN, SELECTION_LISTBOX, SELECTION_MULTI_RANGE
 ```
 
 #### Cell Merging
@@ -340,7 +361,7 @@ MergedRegionsResponse regions = ctrl.getMergedRegions();
 #### Cell Spanning
 
 ```java
-ctrl.setCellSpan(CellSpanMode.CELL_SPAN_BY_ROW);
+ctrl.setCellSpanMode(CellSpanMode.CELL_SPAN_BY_ROW);
 // Modes: CELL_SPAN_NONE, CELL_SPAN_FREE, CELL_SPAN_BY_ROW, CELL_SPAN_BY_COLUMN,
 //        CELL_SPAN_ADJACENT, CELL_SPAN_HEADER_ONLY, CELL_SPAN_SPILL, CELL_SPAN_GROUP
 ```
@@ -365,9 +386,9 @@ ctrl.setColAlignment(1, Align.ALIGN_RIGHT_CENTER);
 //         ALIGN_RIGHT_TOP, ALIGN_RIGHT_CENTER, ALIGN_RIGHT_BOTTOM, ALIGN_GENERAL
 
 // Column data type and format
-ctrl.setColDataType(1, ColumnDataType.NUMBER);
+ctrl.setColDataType(1, ColumnDataType.COLUMN_DATA_NUMBER);
 ctrl.setColFormat(1, "#,##0.00");
-// Data types: STRING, NUMBER, DATE, BOOLEAN, CURRENCY
+// Data types: COLUMN_DATA_STRING, COLUMN_DATA_NUMBER, COLUMN_DATA_DATE, COLUMN_DATA_BOOLEAN, COLUMN_DATA_CURRENCY
 
 // Word wrap and ellipsis
 ctrl.setWordWrap(true);
@@ -533,7 +554,6 @@ ctrl.setCells(listOf(
     GridCellText(0, 0, "A"),
     GridCellText(0, 1, "B"),
 ))
-ctrl.loadArray(rows = 3, cols = 2, values = listOf("a", "b", "c", "d", "e", "f"))
 
 // Load a matrix-shaped JSON payload
 val matrixJson = """
@@ -548,6 +568,22 @@ ctrl.loadData(
         .setHeaderPolicy(HeaderPolicy.HEADER_NONE)
         .build()
 )
+
+// Clear all data
+ctrl.clear()
+
+// Clear only data (keep formatting)
+ctrl.clear(ClearScope.CLEAR_DATA, ClearRegion.CLEAR_SCROLLABLE)
+
+// Bulk load typed values
+ctrl.loadTable(2, 3, listOf(
+    CellValue.newBuilder().setText("Widget A").build(),
+    CellValue.newBuilder().setNumber(29.99).build(),
+    CellValue.newBuilder().setNumber(150.0).build(),
+    CellValue.newBuilder().setText("Widget B").build(),
+    CellValue.newBuilder().setNumber(49.99).build(),
+    CellValue.newBuilder().setNumber(200.0).build(),
+))
 
 // Batch updates with suspended redraw
 ctrl.withRedrawSuspended {
