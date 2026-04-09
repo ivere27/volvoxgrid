@@ -23,7 +23,7 @@ dependencies {
 }
 ```
 
-The JAR bundles native libraries for Linux (x86_64), macOS (x86_64, aarch64), and Windows (x86_64).
+The JAR bundles native libraries for Linux (x86, x86_64, armv7, aarch64), macOS (x86_64, aarch64), and Windows (x86, x86_64).
 
 **Requirements:** Java 8+
 
@@ -179,7 +179,39 @@ ctrl.setCells(List.of(
     new GridCellText(0, 1, "B"),
     new GridCellText(1, 0, "C")
 ));
+
+// Read a range of cells via proto
+CellsResponse resp = ctrl.getCells(GetCellsRequest.newBuilder()
+    .setRow1(0).setCol1(0).setRow2(1).setCol2(2)
+    .build());
+for (CellData cell : resp.getCellsList()) {
+    System.out.println(cell.getRow() + "," + cell.getCol() + " = " + cell.getValue().getText());
+}
+
+// Clear all data
+ctrl.clear(ClearScope.CLEAR_EVERYTHING, ClearRegion.CLEAR_SCROLLABLE);
+
+// Clear only data (keep formatting)
+ctrl.clear(ClearScope.CLEAR_DATA, ClearRegion.CLEAR_SCROLLABLE);
+// Scopes: CLEAR_EVERYTHING, CLEAR_FORMATTING, CLEAR_DATA, CLEAR_SELECTION
 ```
+
+#### LoadTable
+
+`loadTable` bulk-loads a row-major flat array of typed `CellValue` entries in a single RPC call.
+
+```java
+ctrl.loadTable(2, 3, List.of(
+    CellValue.newBuilder().setText("Widget A").build(),
+    CellValue.newBuilder().setNumber(29.99).build(),
+    CellValue.newBuilder().setNumber(150).build(),
+    CellValue.newBuilder().setText("Widget B").build(),
+    CellValue.newBuilder().setNumber(49.99).build(),
+    CellValue.newBuilder().setNumber(200).build()
+), true /* atomic */);
+```
+
+`CellValue` supports `text`, `number`, `flag` (boolean), `raw` (bytes), and `timestamp` (epoch-ms). For the full `LoadTableRequest` schema, see [`proto/volvoxgrid.proto`](../proto/volvoxgrid.proto) and the generated protobuf classes.
 
 #### Row & Column Sizing
 

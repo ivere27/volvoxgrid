@@ -457,6 +457,72 @@ grid.SelectRanges(
 );
 ```
 
+### Data Operations
+
+#### LoadData
+
+Parse CSV or JSON bytes and load them into the grid:
+
+```csharp
+// CSV
+grid.LoadData(System.Text.Encoding.UTF8.GetBytes("Name,Price,Qty\nWidget A,29.99,150\nWidget B,49.99,200"));
+
+// JSON matrix with options
+using Volvoxgrid.V1;
+grid.LoadData(
+    System.Text.Encoding.UTF8.GetBytes("[[\"Name\",\"Price\"],[\"Alpha\",\"10\"]]"),
+    new LoadDataOptions { Json = new JsonOptions(), HeaderPolicy = HeaderPolicy.HeaderNone }
+);
+```
+
+#### UpdateCells
+
+Batch update cells:
+
+```csharp
+grid.SetCells(new[]
+{
+    new VolvoxGridCellText(0, 0, "Alpha"),
+    new VolvoxGridCellText(0, 1, "29.99"),
+    new VolvoxGridCellText(1, 0, "Beta"),
+    new VolvoxGridCellText(1, 1, "49.99"),
+});
+```
+
+#### GetCells
+
+Read cell values:
+
+```csharp
+string text = grid.GetCellText(0, 0);
+
+// Read a range via the client API (VolvoxGridClient)
+using var client = new VolvoxGridClient();
+// ... (create/load data) ...
+var cells = client.GetCells(0, 0, 1, 2,
+    includeStyle: false, includeChecked: false, includeTyped: false);
+foreach (var cell in cells)
+{
+    Console.WriteLine($"{cell.Row},{cell.Col} = {cell.Value.Text}");
+}
+```
+
+#### Clear
+
+```csharp
+// Clear everything
+grid.Clear();
+
+// Clear only data (keep formatting)
+grid.Clear(VolvoxGridClearScope.Data, VolvoxGridClearRegion.Scrollable);
+// Scopes: Everything, Formatting, Data, Selection
+// Regions: Scrollable, FixedRows, FixedCols, AllRegions
+```
+
+#### LoadTable
+
+`LoadTable` bulk-loads a row-major flat array of typed values in a single RPC call. `CellValue` supports `text`, `number`, `flag` (boolean), `raw` (bytes), and `timestamp` (epoch-ms). For the full `LoadTableRequest` schema, see [`proto/volvoxgrid.proto`](../proto/volvoxgrid.proto) and the `VolvoxGridClient` / `VolvoxGridControl` API.
+
 ## Events
 
 | Event | Purpose |
