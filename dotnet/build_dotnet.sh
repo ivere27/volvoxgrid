@@ -45,6 +45,24 @@ normalize_arch() {
     printf '%s\n' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
+configure_target_arch() {
+    TARGET_ARCH="$(normalize_arch "$TARGET_ARCH")"
+    case "$TARGET_ARCH" in
+        x64|amd64)
+            TARGET_ARCH="x64"
+            RUST_WINDOWS_TARGET="x86_64-pc-windows-gnu"
+            ;;
+        x86|i386|i686)
+            TARGET_ARCH="x86"
+            RUST_WINDOWS_TARGET="i686-pc-windows-gnu"
+            ;;
+        *)
+            echo "ERROR: unsupported DOTNET_ARCH='$TARGET_ARCH'. Use x64 or x86." >&2
+            exit 1
+            ;;
+    esac
+}
+
 sample_kind_for_tfm() {
     local tfm="$1"
     if [ "$tfm" = "net40" ] || [[ "$tfm" == *"-windows"* ]]; then
@@ -126,14 +144,122 @@ has_windowsdesktop_sdk() {
     [ -f "${base_path%/}/Sdks/Microsoft.NET.Sdk.WindowsDesktop/targets/Microsoft.NET.Sdk.WindowsDesktop.targets" ]
 }
 
+NUGET_ROOT_CANDIDATES=()
+
+append_nuget_root_candidate() {
+    local candidate="${1:-}"
+    local existing=""
+
+    if [ -z "$candidate" ]; then
+        return 0
+    fi
+
+    candidate="${candidate%/}"
+    candidate="${candidate%\\}"
+    if [ -z "$candidate" ]; then
+        return 0
+    fi
+
+    for existing in "${NUGET_ROOT_CANDIDATES[@]}"; do
+        if [ "$existing" = "$candidate" ]; then
+            return 0
+        fi
+    done
+
+    NUGET_ROOT_CANDIDATES+=("$candidate")
+}
+
+collect_nuget_root_candidates() {
+    local dotnet_global_packages=""
+
+    NUGET_ROOT_CANDIDATES=()
+    append_nuget_root_candidate "${NUGET_PACKAGES:-}"
+
+    if command -v dotnet >/dev/null 2>&1; then
+        dotnet_global_packages="$(dotnet nuget locals global-packages --list 2>/dev/null | sed -n 's/^global-packages: //p' | head -n 1)"
+        append_nuget_root_candidate "$dotnet_global_packages"
+    fi
+
+    if [ -n "${HOME:-}" ]; then
+        append_nuget_root_candidate "$HOME/.nuget/packages"
+    fi
+}
+
+find_reference_root() {
+    local ref_relative_path="$1"
+    local candidate=""
+
+    collect_nuget_root_candidates
+    for candidate in "${NUGET_ROOT_CANDIDATES[@]}"; do
+        if [ -f "$candidate/$ref_relative_path" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+prefer_nuget_packages_root_for_ref() {
+    local ref_relative_path="$1"
+    local reason="$2"
+    local candidate=""
+
+    if candidate="$(find_reference_root "$ref_relative_path")"; then
+        if [ "${NUGET_PACKAGES:-}" != "$candidate" ]; then
+            export NUGET_PACKAGES="$candidate"
+            echo "[dotnet] using NuGet package cache for ${reason}: $candidate"
+        fi
+        return 0
+    fi
+
+    return 1
+}
+
+find_reference_nupkg() {
+    local nupkg_name="$1"
+    local package_relative_path="$2"
+    local candidate=""
+    local offline_candidate="$ROOT_DIR/target/dotnet/nuget-offline/$nupkg_name"
+
+    if [ -f "$offline_candidate" ]; then
+        printf '%s\n' "$offline_candidate"
+        return 0
+    fi
+
+    collect_nuget_root_candidates
+    for candidate in "${NUGET_ROOT_CANDIDATES[@]}"; do
+        if [ -f "$candidate/$package_relative_path" ]; then
+            printf '%s\n' "$candidate/$package_relative_path"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 restore_sample_project() {
+    local restore_props=("${DOTNET_PROPS[@]}" -p:TargetFramework="$TARGET_TFM" -p:TargetFrameworks="$TARGET_TFM")
+
     if [ "$TARGET_TFM" = "net40" ]; then
-        OFFLINE_NUPKG="${HOME:-}/.nuget/packages/microsoft.netframework.referenceassemblies.net40/1.0.3/microsoft.netframework.referenceassemblies.net40.1.0.3.nupkg"
-        if [ -f "$OFFLINE_NUPKG" ]; then
+        OFFLINE_NUPKG_NAME="microsoft.netframework.referenceassemblies.net40.1.0.3.nupkg"
+        OFFLINE_NUPKG_RELATIVE_PATH="microsoft.netframework.referenceassemblies.net40/1.0.3/${OFFLINE_NUPKG_NAME}"
+        OFFLINE_META_NUPKG_NAME="microsoft.netframework.referenceassemblies.1.0.3.nupkg"
+        OFFLINE_META_NUPKG_RELATIVE_PATH="microsoft.netframework.referenceassemblies/1.0.3/${OFFLINE_META_NUPKG_NAME}"
+        OFFLINE_NUPKG=""
+        if OFFLINE_NUPKG="$(find_reference_nupkg "$OFFLINE_NUPKG_NAME" "$OFFLINE_NUPKG_RELATIVE_PATH")"; then
             OFFLINE_FEED="$ROOT_DIR/target/dotnet/nuget-offline"
             OFFLINE_CONFIG="$OFFLINE_FEED/nuget.config"
+            OFFLINE_META_NUPKG=""
             mkdir -p "$OFFLINE_FEED"
-            cp -f "$OFFLINE_NUPKG" "$OFFLINE_FEED/"
+            if [ "$OFFLINE_NUPKG" != "$OFFLINE_FEED/$OFFLINE_NUPKG_NAME" ]; then
+                cp -f "$OFFLINE_NUPKG" "$OFFLINE_FEED/"
+            fi
+            if OFFLINE_META_NUPKG="$(find_reference_nupkg "$OFFLINE_META_NUPKG_NAME" "$OFFLINE_META_NUPKG_RELATIVE_PATH")"; then
+                if [ "$OFFLINE_META_NUPKG" != "$OFFLINE_FEED/$OFFLINE_META_NUPKG_NAME" ]; then
+                    cp -f "$OFFLINE_META_NUPKG" "$OFFLINE_FEED/"
+                fi
+            fi
             cat > "$OFFLINE_CONFIG" <<EOF_OFFLINE_NUGET
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
@@ -143,8 +269,8 @@ restore_sample_project() {
   </packageSources>
 </configuration>
 EOF_OFFLINE_NUGET
-            if [ "${#DOTNET_PROPS[@]}" -gt 0 ]; then
-                dotnet restore "$SAMPLE_PROJECT" "${DOTNET_PROPS[@]}" --configfile "$OFFLINE_CONFIG"
+            if [ "${#restore_props[@]}" -gt 0 ]; then
+                dotnet restore "$SAMPLE_PROJECT" "${restore_props[@]}" --configfile "$OFFLINE_CONFIG"
             else
                 dotnet restore "$SAMPLE_PROJECT" --configfile "$OFFLINE_CONFIG"
             fi
@@ -152,8 +278,8 @@ EOF_OFFLINE_NUGET
         fi
     fi
 
-    if [ "${#DOTNET_PROPS[@]}" -gt 0 ]; then
-        dotnet restore "$SAMPLE_PROJECT" "${DOTNET_PROPS[@]}"
+    if [ "${#restore_props[@]}" -gt 0 ]; then
+        dotnet restore "$SAMPLE_PROJECT" "${restore_props[@]}"
     else
         dotnet restore "$SAMPLE_PROJECT"
     fi
@@ -205,22 +331,6 @@ if [ -n "$PLUGIN_FEATURES" ]; then
     PLUGIN_FEATURE_ARGS=(--features "$PLUGIN_FEATURES")
 fi
 
-TARGET_ARCH="$(normalize_arch "$TARGET_ARCH")"
-case "$TARGET_ARCH" in
-    x64|amd64)
-        TARGET_ARCH="x64"
-        RUST_WINDOWS_TARGET="x86_64-pc-windows-gnu"
-        ;;
-    x86|i386|i686)
-        TARGET_ARCH="x86"
-        RUST_WINDOWS_TARGET="i686-pc-windows-gnu"
-        ;;
-    *)
-        echo "ERROR: unsupported DOTNET_ARCH='$TARGET_ARCH'. Use x64 or x86." >&2
-        exit 1
-        ;;
-esac
-
 while [ "$#" -gt 0 ]; do
     case "$1" in
         release|--release)
@@ -260,6 +370,8 @@ while [ "$#" -gt 0 ]; do
             ;;
     esac
 done
+
+configure_target_arch
 
 if [ -z "$TARGET_SAMPLE" ] || [ "$TARGET_SAMPLE" = "auto" ]; then
     SAMPLE_KIND="$(sample_kind_for_tfm "$TARGET_TFM")"
@@ -318,7 +430,10 @@ if [[ "$TARGET_TFM" == *"-windows"* ]] && ! has_windowsdesktop_sdk; then
 fi
 
 if [ "$TARGET_TFM" = "net40" ]; then
-    NET40_REF_MSCORLIB="${HOME:-}/.nuget/packages/microsoft.netframework.referenceassemblies.net40/1.0.3/build/.NETFramework/v4.0/mscorlib.dll"
+    NET40_REF_MSCORLIB_RELATIVE_PATH="microsoft.netframework.referenceassemblies.net40/1.0.3/build/.NETFramework/v4.0/mscorlib.dll"
+    prefer_nuget_packages_root_for_ref "$NET40_REF_MSCORLIB_RELATIVE_PATH" "net40 reference assemblies" || true
+    NET40_REF_MSCORLIB="${NUGET_PACKAGES:-}"
+    NET40_REF_MSCORLIB="${NET40_REF_MSCORLIB%/}/$NET40_REF_MSCORLIB_RELATIVE_PATH"
     if [ ! -f "$NET40_REF_MSCORLIB" ]; then
         echo "[dotnet] net40 reference assemblies not found in NuGet cache; restoring first"
         restore_sample_project
