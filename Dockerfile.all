@@ -41,7 +41,7 @@ RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh &&
     chmod -R a+rX "${DOTNET_ROOT}"
 
 # Install modern Gradle
-ENV GRADLE_VERSION=8.12
+ENV GRADLE_VERSION=8.13
 ENV GRADLE_HOME=/opt/gradle/gradle-${GRADLE_VERSION}
 ENV PATH=${GRADLE_HOME}/bin:${PATH}
 RUN mkdir -p /opt/gradle && \
@@ -102,11 +102,11 @@ RUN mkdir -p ${ANDROID_SDK_ROOT}/cmdline-tools && \
 
 RUN yes | sdkmanager --licenses >/dev/null && \
     sdkmanager \
-      "build-tools;34.0.0" \
+      "build-tools;36.0.0" \
       "cmake;3.22.1" \
       "ndk;28.2.13676358" \
       "platform-tools" \
-      "platforms;android-34"
+      "platforms;android-36"
 
 ENV ANDROID_NDK_HOME=/opt/android-sdk/ndk/28.2.13676358
 
@@ -125,10 +125,9 @@ RUN chmod +x /opt/volvoxgrid/build_android_aar.sh \
              /opt/volvoxgrid/build_ios.sh \
              /opt/volvoxgrid/build_all.sh
 
-# Allow non-root users (docker run -u) to write to Rust tool caches. The
-# Android SDK/NDK is read-only during builds and is already installed with
-# usable read/execute permissions, so avoid an expensive recursive chmod.
-RUN chmod -R a+w /opt/cargo /opt/rustup
+# Allow non-root users (docker run -u) to write to Rust caches and any SDK
+# components AGP may provision on demand.
+RUN chmod -R a+w /opt/cargo /opt/rustup /opt/android-sdk
 
 WORKDIR /workspace/volvoxgrid
 ENTRYPOINT ["/opt/volvoxgrid/build_all.sh"]

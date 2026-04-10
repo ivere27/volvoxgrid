@@ -81,6 +81,31 @@ export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-/opt/android-sdk}"
 export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"
 export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-${ANDROID_SDK_ROOT}/ndk/28.2.13676358}"
 
+ANDROID_LOCAL_PROPERTIES="${REPO_ROOT}/android/local.properties"
+ANDROID_LOCAL_PROPERTIES_BACKUP=""
+
+restore_android_local_properties() {
+  if [[ -n "${ANDROID_LOCAL_PROPERTIES_BACKUP}" && -f "${ANDROID_LOCAL_PROPERTIES_BACKUP}" ]]; then
+    cp "${ANDROID_LOCAL_PROPERTIES_BACKUP}" "${ANDROID_LOCAL_PROPERTIES}"
+    rm -f "${ANDROID_LOCAL_PROPERTIES_BACKUP}"
+    return
+  fi
+
+  rm -f "${ANDROID_LOCAL_PROPERTIES}"
+}
+
+prepare_android_local_properties() {
+  if [[ -f "${ANDROID_LOCAL_PROPERTIES}" ]]; then
+    ANDROID_LOCAL_PROPERTIES_BACKUP="$(mktemp /tmp/volvoxgrid-android-local-properties-XXXXXX)"
+    cp "${ANDROID_LOCAL_PROPERTIES}" "${ANDROID_LOCAL_PROPERTIES_BACKUP}"
+  fi
+
+  printf 'sdk.dir=%s\n' "${ANDROID_SDK_ROOT}" > "${ANDROID_LOCAL_PROPERTIES}"
+}
+
+trap restore_android_local_properties EXIT
+prepare_android_local_properties
+
 for required in \
   "${REPO_ROOT}/plugin/Cargo.toml" \
   "${REPO_ROOT}/android/gradlew" \

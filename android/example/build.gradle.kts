@@ -54,12 +54,13 @@ val isVolvoxgridSnapshot = volvoxgridVersion.endsWith("-SNAPSHOT")
 
 android {
     namespace = "io.github.ivere27.volvoxgrid.example"
-    compileSdk = 34
+    buildToolsVersion = "36.0.0"
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "io.github.ivere27.volvoxgrid.example"
         minSdk = 21
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
