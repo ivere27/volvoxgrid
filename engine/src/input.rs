@@ -3407,6 +3407,24 @@ mod tests {
     }
 
     #[test]
+    fn tab_moves_selection_horizontally_by_default() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 4, 1, 0);
+        grid.selection
+            .set_cursor(2, 1, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+        prime_layout(&mut grid);
+
+        assert_eq!(grid.tab_behavior, pb::TabBehavior::TabCells as i32);
+
+        handle_key_down(&mut grid, 9, 0);
+        assert_eq!(grid.selection.row, 2);
+        assert_eq!(grid.selection.col, 2);
+
+        handle_key_down(&mut grid, 9, 1);
+        assert_eq!(grid.selection.row, 2);
+        assert_eq!(grid.selection.col, 1);
+    }
+
+    #[test]
     fn dropdown_keyboard_commit_does_not_shrink_row_height() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
         grid.edit_trigger_mode = 1;

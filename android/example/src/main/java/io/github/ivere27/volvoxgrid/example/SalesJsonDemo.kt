@@ -41,7 +41,6 @@ import io.github.ivere27.volvoxgrid.SelectionConfig
 import io.github.ivere27.volvoxgrid.SelectionMode
 import io.github.ivere27.volvoxgrid.SpanConfig
 import io.github.ivere27.volvoxgrid.StyleConfig
-import io.github.ivere27.volvoxgrid.TabBehavior
 import io.github.ivere27.volvoxgrid.TreeIndicatorStyle
 import io.github.ivere27.volvoxgrid.VolvoxGridController
 
@@ -295,7 +294,6 @@ object SalesJsonDemo {
                     .setTrigger(EditTrigger.EDIT_TRIGGER_NONE)
                     .setDropdownTrigger(DropdownTrigger.DROPDOWN_ALWAYS)
                     .setDropdownSearch(false)
-                    .setTabBehavior(TabBehavior.TAB_CELLS)
                     .build()
             )
             .setScrolling(

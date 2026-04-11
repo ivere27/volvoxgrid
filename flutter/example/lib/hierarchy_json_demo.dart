@@ -171,8 +171,7 @@ GridConfig _hierarchyThemeConfig() {
               ..color = _hierAccent)))))
     ..editing = (EditConfig()
       ..trigger = EditTrigger.EDIT_TRIGGER_NONE
-      ..dropdownTrigger = DropdownTrigger.DROPDOWN_NEVER
-      ..tabBehavior = TabBehavior.TAB_CELLS)
+      ..dropdownTrigger = DropdownTrigger.DROPDOWN_NEVER)
     ..scrolling = (ScrollConfig()
       ..scrollbars = ScrollBarsMode.SCROLLBAR_BOTH
       ..flingEnabled = true

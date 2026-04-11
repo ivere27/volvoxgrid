@@ -299,6 +299,26 @@ namespace VolvoxGrid.DotNet
             }
         }
 
+        public VolvoxGridTabBehavior TabBehavior
+        {
+            get
+            {
+                return _config.Editing != null && _config.Editing.HasTabBehavior
+                    ? (VolvoxGridTabBehavior)_config.Editing.TabBehavior
+                    : VolvoxGridTabBehavior.Cells;
+            }
+            set
+            {
+                var cfg = EnsureEditConfig();
+                var mapped = (Volvoxgrid.V1.TabBehavior)value;
+                if (!cfg.HasTabBehavior || cfg.TabBehavior != mapped)
+                {
+                    cfg.TabBehavior = mapped;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
         public VolvoxGridSelectionMode SelectionMode
         {
             get { return _config.Selection != null && _config.Selection.HasMode ? (VolvoxGridSelectionMode)_config.Selection.Mode : VolvoxGridSelectionMode.Free; }

@@ -2221,7 +2221,6 @@ export class VolvoxGrid {
     } else {
       this.wasm.set_combo_search(this.gridId, 1);
     }
-    this.wasm.set_tab_behavior(this.gridId, 1); // Tab moves to next cell
     if (typeof this.wasm.set_host_dropdown_overlay === "function") {
       this.wasm.set_host_dropdown_overlay(this.gridId, 0);
     } else {

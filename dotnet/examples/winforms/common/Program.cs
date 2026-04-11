@@ -415,7 +415,7 @@ namespace VolvoxGrid.DotNet.Sample
             _grid.AnimationEnabled = true;
             _grid.AnimationDurationMs = 120;
             _grid.TextLayoutCacheCap = 4096;
-            SmokeAssert(_grid.AllowSelection, "Config property roundtrip");
+            SmokeAssert(_grid.AllowSelection && _grid.TabBehavior == VolvoxGridTabBehavior.Cells, "Config property roundtrip");
 
             _grid.SetColumns(new[]
             {

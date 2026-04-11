@@ -342,7 +342,6 @@ func buildSalesTuiConfig(rows, cols int) *pb.GridConfig {
 		},
 		Editing: &pb.EditConfig{
 			Trigger:         ptr(pb.EditTrigger_EDIT_TRIGGER_KEY_CLICK),
-			TabBehavior:     ptr(pb.TabBehavior_TAB_CELLS),
 			DropdownTrigger: ptr(pb.DropdownTrigger_DROPDOWN_ALWAYS),
 		},
 		Outline: &pb.OutlineConfig{
@@ -383,7 +382,6 @@ func buildHierarchyTuiConfig(rows, cols int) *pb.GridConfig {
 		},
 		Editing: &pb.EditConfig{
 			Trigger:         ptr(pb.EditTrigger_EDIT_TRIGGER_KEY_CLICK),
-			TabBehavior:     ptr(pb.TabBehavior_TAB_CELLS),
 			DropdownTrigger: ptr(pb.DropdownTrigger_DROPDOWN_NEVER),
 		},
 		Outline: &pb.OutlineConfig{
@@ -409,7 +407,6 @@ func buildStressTuiConfig(rows, cols int) *pb.GridConfig {
 		},
 		Editing: &pb.EditConfig{
 			Trigger:     ptr(pb.EditTrigger_EDIT_TRIGGER_KEY_CLICK),
-			TabBehavior: ptr(pb.TabBehavior_TAB_CELLS),
 		},
 		Interaction: &pb.InteractionConfig{
 			HeaderFeatures: &pb.HeaderFeatures{

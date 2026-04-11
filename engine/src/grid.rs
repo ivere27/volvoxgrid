@@ -791,7 +791,7 @@ impl VolvoxGrid {
             pull_to_refresh_theme: pb::PullToRefreshTheme::TopBand as i32,
             pull_to_refresh_text_pull: None,
             pull_to_refresh_text_release: None,
-            tab_behavior: 0,
+            tab_behavior: pb::TabBehavior::TabCells as i32,
             header_features: 0,
             custom_render: 0,
             word_wrap: false,
