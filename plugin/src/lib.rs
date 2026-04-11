@@ -1954,7 +1954,7 @@ fn build_edit_request(
     row: i32,
     col: i32,
 ) -> Option<EditRequest> {
-    let (x, y, w, h) = grid.edit_cell_rect(row, col)?;
+    let (x, y, w, h) = grid.cell_screen_rect(row, col)?;
     let (current_value, sel_start, sel_length, ui_mode) =
         if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
             (

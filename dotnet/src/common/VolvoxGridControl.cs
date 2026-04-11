@@ -81,6 +81,8 @@ namespace VolvoxGrid.DotNet
             {
                 Dock = DockStyle.Fill,
             };
+            _renderHost.ResolveEditAlignment = ResolveHostEditAlignment;
+            _renderHost.ResolveEditPadding = ResolveHostEditPadding;
             SyncRenderHostSelectionMode();
             Controls.Add(_renderHost);
         }
@@ -2404,6 +2406,92 @@ namespace VolvoxGrid.DotNet
                     break;
             }
             return null;
+        }
+
+        private HorizontalAlignment ResolveHostEditAlignment(int row, int col)
+        {
+            if (col < 0 || col >= _columns.Count)
+            {
+                return HorizontalAlignment.Left;
+            }
+
+            VolvoxGridColumn column = _columns[col];
+            VolvoxGridAlign alignment = column.Alignment;
+            if (alignment == VolvoxGridAlign.General)
+            {
+                switch (column.DataType)
+                {
+                    case VolvoxGridColumnDataType.Number:
+                    case VolvoxGridColumnDataType.Date:
+                    case VolvoxGridColumnDataType.Currency:
+                        alignment = VolvoxGridAlign.RightCenter;
+                        break;
+                    case VolvoxGridColumnDataType.Boolean:
+                        alignment = VolvoxGridAlign.CenterCenter;
+                        break;
+                    default:
+                        alignment = VolvoxGridAlign.LeftCenter;
+                        break;
+                }
+            }
+
+            switch (alignment)
+            {
+                case VolvoxGridAlign.CenterTop:
+                case VolvoxGridAlign.CenterCenter:
+                case VolvoxGridAlign.CenterBottom:
+                    return HorizontalAlignment.Center;
+                case VolvoxGridAlign.RightTop:
+                case VolvoxGridAlign.RightCenter:
+                case VolvoxGridAlign.RightBottom:
+                    return HorizontalAlignment.Right;
+                default:
+                    return HorizontalAlignment.Left;
+            }
+        }
+
+        private System.Windows.Forms.Padding ResolveHostEditPadding(int row, int col)
+        {
+            StyleConfig style = _config.Style;
+            if (style == null)
+            {
+                return System.Windows.Forms.Padding.Empty;
+            }
+
+            bool isFixed = false;
+            LayoutConfig layout = _config.Layout;
+            if (layout != null)
+            {
+                isFixed =
+                    (layout.HasFixedRows && row >= 0 && row < layout.FixedRows) ||
+                    (layout.HasFixedCols && col >= 0 && col < layout.FixedCols);
+            }
+
+            Volvoxgrid.V1.Padding padding = null;
+            if (isFixed && style.Fixed != null && style.Fixed.CellPadding != null)
+            {
+                padding = style.Fixed.CellPadding;
+            }
+            else if (style.CellPadding != null)
+            {
+                padding = style.CellPadding;
+            }
+
+            return ToWinFormsPadding(padding);
+        }
+
+        private static System.Windows.Forms.Padding ToWinFormsPadding(Volvoxgrid.V1.Padding padding)
+        {
+            if (padding == null)
+            {
+                return System.Windows.Forms.Padding.Empty;
+            }
+
+            return new System.Windows.Forms.Padding(
+                Math.Max(0, padding.Left),
+                Math.Max(0, padding.Top),
+                Math.Max(0, padding.Right),
+                Math.Max(0, padding.Bottom));
         }
 
         private void EnableCancelableEventChannel()

@@ -6517,6 +6517,40 @@ pub(crate) fn compose_preedit_display_text(
     format!("{}{}{}", &text[..before_byte], preedit, &text[after_byte..])
 }
 
+fn aligned_editor_draw_x(
+    clip_x: i32,
+    clip_w: i32,
+    text_w: i32,
+    caret_px: i32,
+    halign: i32,
+    scroll_margin: i32,
+) -> i32 {
+    let clip_w = clip_w.max(1);
+    let text_w = text_w.max(0);
+    let caret_px = caret_px.max(0);
+    let mut draw_x = match halign {
+        1 => clip_x + (clip_w - text_w) / 2,
+        2 => clip_x + clip_w - text_w,
+        _ => clip_x,
+    };
+
+    let margin = if text_w > clip_w {
+        scroll_margin.min(clip_w.saturating_sub(1))
+    } else {
+        0
+    };
+    let min_caret_x = clip_x + margin;
+    let max_caret_x = clip_x + clip_w - margin;
+    let caret_x = draw_x + caret_px;
+    if caret_x < min_caret_x {
+        draw_x += min_caret_x - caret_x;
+    } else if caret_x > max_caret_x {
+        draw_x -= caret_x - max_caret_x;
+    }
+
+    draw_x
+}
+
 fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
     let vp = &ctx.vp;
     if !grid.edit.is_active() {
@@ -6594,6 +6628,7 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
     let clip_w = (edit_w - left_padding - right_padding).max(1);
     let clip_h = inner_h;
     let scroll_margin = 2; // pixels of margin to keep between caret and clip edge
+    let halign = grid.edit_horizontal_alignment();
 
     if composing {
         // IME composition mode: preview the preedit text replacing any active selection.
@@ -6601,7 +6636,7 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
         let before_preedit_byte = byte_index_at_char(text, sel_start);
         let composite = compose_preedit_display_text(text, sel_start, sel_end, preedit);
 
-        let (_, th) = canvas.measure_text(
+        let (tw, th) = canvas.measure_text(
             &composite,
             font_name,
             font_size,
@@ -6637,12 +6672,14 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
             None,
         );
         let caret_px = before_w.ceil() as i32 + cursor_w.ceil() as i32;
-        let scroll_offset = if caret_px + scroll_margin > clip_w {
-            caret_px + scroll_margin - clip_w
-        } else {
-            0
-        };
-        let draw_x = text_x - scroll_offset;
+        let draw_x = aligned_editor_draw_x(
+            text_x,
+            clip_w,
+            tw.ceil() as i32,
+            caret_px,
+            halign,
+            scroll_margin,
+        );
 
         // Draw the full composite string.
         canvas.draw_text_styled_fast(
@@ -6682,7 +6719,8 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
         let prefix = &text[..byte_index_at_char(text, sel_start)];
         let selected =
             &text[byte_index_at_char(text, sel_start)..byte_index_at_char(text, sel_end)];
-        let (_, th) = canvas.measure_text(text, font_name, font_size, font_bold, font_italic, None);
+        let (tw, th) =
+            canvas.measure_text(text, font_name, font_size, font_bold, font_italic, None);
         let text_y = cy + top_padding + ((inner_h - th.ceil() as i32) / 2).max(0);
 
         // Compute scroll offset to keep the caret (or selection end) visible.
@@ -6701,12 +6739,14 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
             None,
         );
         let caret_px = caret_prefix_w.ceil() as i32;
-        let scroll_offset = if caret_px + scroll_margin > clip_w {
-            caret_px + scroll_margin - clip_w
-        } else {
-            0
-        };
-        let draw_x = text_x - scroll_offset;
+        let draw_x = aligned_editor_draw_x(
+            text_x,
+            clip_w,
+            tw.ceil() as i32,
+            caret_px,
+            halign,
+            scroll_margin,
+        );
 
         // Selection highlight
         if sel_end > sel_start {
@@ -8051,11 +8091,11 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
 mod tests {
     use super::pb;
     use super::{
-        build_or_reuse_ctx, cell_has_checkbox_visual, checkbox_box_size, checkbox_layer_needed,
-        compose_preedit_display_text, dropdown_button_rect, dropdown_glyph_metrics,
-        dropdown_layer_needed, parse_progress_percent, picture_layer_needed, progress_layer_needed,
-        show_dropdown_button_for_cell, sort_arrow_box_size, CellKey, RenderContext,
-        RenderCtxCacheKey, RenderCtxCached,
+        aligned_editor_draw_x, build_or_reuse_ctx, cell_has_checkbox_visual, checkbox_box_size,
+        checkbox_layer_needed, compose_preedit_display_text, dropdown_button_rect,
+        dropdown_glyph_metrics, dropdown_layer_needed, parse_progress_percent,
+        picture_layer_needed, progress_layer_needed, show_dropdown_button_for_cell,
+        sort_arrow_box_size, CellKey, RenderContext, RenderCtxCacheKey, RenderCtxCached,
     };
     use crate::grid::VolvoxGrid;
 
@@ -8099,6 +8139,16 @@ mod tests {
         assert_eq!(compose_preedit_display_text("abcd", 0, 4, "우"), "우");
         assert_eq!(compose_preedit_display_text("abcd", 1, 3, "우"), "a우d");
         assert_eq!(compose_preedit_display_text("abcd", 4, 4, "우"), "abcd우");
+    }
+
+    #[test]
+    fn aligned_editor_draw_x_keeps_right_aligned_text_at_right_edge() {
+        assert_eq!(aligned_editor_draw_x(10, 100, 40, 40, 2, 2), 70);
+    }
+
+    #[test]
+    fn aligned_editor_draw_x_scrolls_right_aligned_text_to_show_start_caret() {
+        assert_eq!(aligned_editor_draw_x(10, 100, 140, 0, 2, 2), 12);
     }
 
     #[test]
