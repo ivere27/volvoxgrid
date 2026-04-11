@@ -4485,6 +4485,27 @@ impl VolvoxGrid {
         char_count
     }
 
+    /// Resolve the active editor's horizontal alignment.
+    ///
+    /// Returns 0 for left, 1 for center, 2 for right.
+    pub fn edit_horizontal_alignment(&self) -> i32 {
+        if !self.edit.is_active() {
+            return 0;
+        }
+
+        let row = self.edit.edit_row;
+        let col = self.edit.edit_col;
+        if row < 0 || row >= self.rows || col < 0 || col >= self.cols {
+            return 0;
+        }
+
+        let style_override = self.get_cell_style(row, col);
+        let alignment =
+            crate::canvas::resolve_alignment(self, row, col, &style_override, &self.edit.edit_text);
+        let (halign, _) = crate::canvas::alignment_components(alignment);
+        halign
+    }
+
     /// Hit-test a pixel coordinate against the active dropdown.
     /// Returns the dropdown item index if the point is inside the dropdown,
     /// or `None` if outside or no dropdown is active.
@@ -4573,6 +4594,19 @@ mod tests {
         assert_eq!(grid.columns[1].alignment, 7); // RIGHT_CENTER
         assert_eq!(grid.columns[2].alignment, 4); // CENTER_CENTER
         assert_eq!(grid.get_col_width(1), 120);
+    }
+
+    #[test]
+    fn edit_horizontal_alignment_tracks_effective_cell_alignment() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.columns[0].alignment = pb::Align::RightCenter as i32;
+        grid.cells.set_text(1, 0, "123".to_string());
+
+        grid.begin_edit(1, 0);
+
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit_horizontal_alignment(), 2);
     }
 
     #[test]
