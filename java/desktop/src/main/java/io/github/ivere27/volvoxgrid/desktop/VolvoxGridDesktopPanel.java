@@ -5,8 +5,12 @@ import io.github.ivere27.volvoxgrid.ConfigureRequest;
 import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.CreateResponse;
 import io.github.ivere27.volvoxgrid.CellRange;
+import io.github.ivere27.volvoxgrid.ClipboardResponse;
 import io.github.ivere27.volvoxgrid.EditCommand;
+import io.github.ivere27.volvoxgrid.EditSetSelection;
+import io.github.ivere27.volvoxgrid.EditSetText;
 import io.github.ivere27.volvoxgrid.EditRequest;
+import io.github.ivere27.volvoxgrid.EditState;
 import io.github.ivere27.volvoxgrid.EventDecision;
 import io.github.ivere27.volvoxgrid.FramePacingMode;
 import io.github.ivere27.volvoxgrid.FrameDone;
@@ -30,6 +34,8 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Toolkit;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.InputEvent;
@@ -50,8 +56,10 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -244,6 +252,10 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private volatile EditRequestListener editRequestListener;
     private volatile boolean decisionChannelEnabled = false;
     private volatile boolean engineEditing = false;
+    private volatile boolean imeCompositionActive = false;
+    private volatile int editSelectionAnchor = -1;
+    private volatile int editSelectionRow = -1;
+    private volatile int editSelectionCol = -1;
 
     private volatile RendererBackend rendererBackend = RendererBackend.CPU;
     private volatile boolean hostFlingEnabled = false;
@@ -261,6 +273,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private volatile int targetFrameRateHz = AUTO_FALLBACK_FRAME_RATE_HZ;
     private volatile long framePacingConfigLastRefreshNanos = 0L;
     private volatile Timer followupRenderTimer;
+    private final Set<Integer> suppressedKeyUps = new HashSet<Integer>();
 
     public VolvoxGridDesktopPanel() {
         setBackground(Color.WHITE);
@@ -355,6 +368,9 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         shutdownStreams(false);
         this.gridId = 0L;
         clearMultiRangeDrag();
+        imeCompositionActive = false;
+        resetEditSelectionAnchor();
+        suppressedKeyUps.clear();
         clearImage();
     }
 
@@ -378,6 +394,9 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         ownsPlugin = false;
         gridId = 0L;
         clearMultiRangeDrag();
+        imeCompositionActive = false;
+        resetEditSelectionAnchor();
+        suppressedKeyUps.clear();
         clearImage();
     }
 
@@ -559,6 +578,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             @Override
             public void mousePressed(MouseEvent e) {
                 stopHostFling();
+                resetEditSelectionAnchor();
                 requestFocusInWindow();
                 if (SwingUtilities.isRightMouseButton(e)) {
                     sendPointer(
@@ -624,6 +644,14 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(java.awt.event.KeyEvent e) {
+                if (handleHostShortcut(e)) {
+                    suppressedKeyUps.add(Integer.valueOf(e.getKeyCode()));
+                    e.consume();
+                    return;
+                }
+                if (engineEditing && !isPureModifierKey(e.getKeyCode())) {
+                    resetEditSelectionAnchor();
+                }
                 sendKey(io.github.ivere27.volvoxgrid.KeyEvent.Type.KEY_DOWN, e, printableChar(e));
                 requestFrame();
             }
@@ -639,6 +667,10 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
             @Override
             public void keyReleased(java.awt.event.KeyEvent e) {
+                if (suppressedKeyUps.remove(Integer.valueOf(e.getKeyCode()))) {
+                    e.consume();
+                    return;
+                }
                 sendKey(io.github.ivere27.volvoxgrid.KeyEvent.Type.KEY_UP, e, "");
                 requestFrame();
             }
@@ -707,11 +739,11 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
         AttributedCharacterIterator text = e.getText();
         int committedCount = e.getCommittedCharacterCount();
+        StringBuilder committed = new StringBuilder();
+        StringBuilder composing = new StringBuilder();
 
         if (text != null) {
             // Extract committed text
-            StringBuilder committed = new StringBuilder();
-            StringBuilder composing = new StringBuilder();
             text.first();
             for (int i = 0; i < committedCount && text.getIndex() < text.getEndIndex(); i++) {
                 committed.append(text.current());
@@ -748,9 +780,10 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                                 .setText(committed.toString())
                                 .setCursor(committed.length())
                                 .setCommit(true)
-                                .build())
+                            .build())
                             .build());
                     }
+                    imeCompositionActive = false;
                 }
 
                 if (composing.length() > 0) {
@@ -762,7 +795,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                             .setGridId(gridId)
                             .setSetText(io.github.ivere27.volvoxgrid.EditSetText.newBuilder()
                                 .setText("")
-                                .build())
+                            .build())
                             .build());
                         engineEditing = true;
                     }
@@ -774,24 +807,36 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                             .setCommit(false)
                             .build())
                         .build());
-                } else if (committed.length() > 0) {
-                    // Composition ended — clear preedit
-                    c.edit(EditCommand.newBuilder()
-                        .setGridId(gridId)
-                        .setSetPreedit(io.github.ivere27.volvoxgrid.EditSetPreedit.newBuilder()
-                            .setText("")
-                            .setCursor(0)
-                            .setCommit(false)
-                            .build())
-                        .build());
+                    imeCompositionActive = true;
+                } else if (imeCompositionActive) {
+                    clearImePreedit(c);
                 }
             } catch (Exception ex) {
                 LOG.log(Level.FINER, "IME edit failed", ex);
+            }
+        } else if (imeCompositionActive) {
+            try {
+                clearImePreedit(c);
+            } catch (Exception ex) {
+                LOG.log(Level.FINER, "IME preedit clear failed", ex);
             }
         }
 
         requestFrame();
         e.consume();
+    }
+
+    private void clearImePreedit(VolvoxGridDesktopClient client)
+        throws SynurangDesktopBridge.SynurangBridgeException {
+        client.edit(EditCommand.newBuilder()
+            .setGridId(gridId)
+            .setSetPreedit(io.github.ivere27.volvoxgrid.EditSetPreedit.newBuilder()
+                .setText("")
+                .setCursor(0)
+                .setCommit(false)
+                .build())
+            .build());
+        imeCompositionActive = false;
     }
 
     private void sendKeyDirect(
@@ -824,6 +869,312 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             return String.valueOf(ch);
         }
         return "";
+    }
+
+    private boolean handleHostShortcut(java.awt.event.KeyEvent e) {
+        if (e == null || gridId == 0L || client == null) {
+            return false;
+        }
+
+        if (engineEditing && handleEditSelectionShortcut(e)) {
+            return true;
+        }
+
+        if (!isShortcutModifierDown(e) || e.isAltDown()) {
+            return false;
+        }
+
+        switch (e.getKeyCode()) {
+            case java.awt.event.KeyEvent.VK_C:
+                return handleCopyShortcut();
+            case java.awt.event.KeyEvent.VK_X:
+                return handleCutShortcut();
+            case java.awt.event.KeyEvent.VK_V:
+                return handlePasteShortcut();
+            default:
+                return false;
+        }
+    }
+
+    private boolean handleEditSelectionShortcut(java.awt.event.KeyEvent e) {
+        if (!e.isShiftDown() || e.isControlDown() || e.isMetaDown() || e.isAltDown()) {
+            return false;
+        }
+
+        final int keyCode = e.getKeyCode();
+        if (keyCode != java.awt.event.KeyEvent.VK_LEFT
+            && keyCode != java.awt.event.KeyEvent.VK_RIGHT
+            && keyCode != java.awt.event.KeyEvent.VK_UP
+            && keyCode != java.awt.event.KeyEvent.VK_DOWN) {
+            return false;
+        }
+
+        EditState state = getCurrentEditState();
+        if (state == null || !state.getActive()) {
+            return false;
+        }
+
+        String text = state.getText();
+        int textLength = codePointLength(text);
+        int anchor = resolveEditSelectionAnchor(state, textLength);
+        int caret = resolveEditCaret(state, anchor, textLength);
+        int targetCaret = caret;
+        switch (keyCode) {
+            case java.awt.event.KeyEvent.VK_LEFT:
+                targetCaret = Math.max(0, caret - 1);
+                break;
+            case java.awt.event.KeyEvent.VK_RIGHT:
+                targetCaret = Math.min(textLength, caret + 1);
+                break;
+            case java.awt.event.KeyEvent.VK_UP:
+                targetCaret = 0;
+                break;
+            case java.awt.event.KeyEvent.VK_DOWN:
+                targetCaret = textLength;
+                break;
+            default:
+                return false;
+        }
+
+        applyEditSelection(Math.min(anchor, targetCaret), Math.abs(targetCaret - anchor));
+        if (targetCaret == anchor) {
+            editSelectionAnchor = targetCaret;
+        }
+        requestFrame();
+        return true;
+    }
+
+    private boolean handleCopyShortcut() {
+        EditState state = engineEditing ? getCurrentEditState() : null;
+        if (state != null && state.getActive()) {
+            if (state.getSelLength() <= 0) {
+                return true;
+            }
+            setSystemClipboardText(extractSelectionText(state.getText(), state.getSelStart(), state.getSelLength()));
+            return true;
+        }
+
+        try {
+            ClipboardResponse response = createController().copy();
+            setSystemClipboardText(response.getText());
+            return true;
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "Copy shortcut failed", ex);
+            return false;
+        }
+    }
+
+    private boolean handleCutShortcut() {
+        EditState state = engineEditing ? getCurrentEditState() : null;
+        if (state != null && state.getActive()) {
+            if (state.getSelLength() <= 0) {
+                return true;
+            }
+            setSystemClipboardText(extractSelectionText(state.getText(), state.getSelStart(), state.getSelLength()));
+            applyEditText(editTextWithoutSelection(state));
+            applyEditSelection(clampCodePointIndex(state.getText(), state.getSelStart()), 0);
+            resetEditSelectionAnchor();
+            requestFrame();
+            return true;
+        }
+
+        try {
+            ClipboardResponse response = createController().cut();
+            setSystemClipboardText(response.getText());
+            requestFrame();
+            return true;
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "Cut shortcut failed", ex);
+            return false;
+        }
+    }
+
+    private boolean handlePasteShortcut() {
+        String clipboardText = getSystemClipboardText();
+        if (clipboardText == null) {
+            return true;
+        }
+
+        EditState state = engineEditing ? getCurrentEditState() : null;
+        if (state != null && state.getActive()) {
+            applyEditText(replaceEditSelection(state, clipboardText));
+            applyEditSelection(
+                clampCodePointIndex(state.getText(), state.getSelStart()) + codePointLength(clipboardText),
+                0
+            );
+            resetEditSelectionAnchor();
+            requestFrame();
+            return true;
+        }
+
+        try {
+            createController().paste(clipboardText);
+            requestFrame();
+            return true;
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "Paste shortcut failed", ex);
+            return false;
+        }
+    }
+
+    private EditState getCurrentEditState() {
+        VolvoxGridDesktopClient c = client;
+        long id = gridId;
+        if (c == null || id == 0L) {
+            return null;
+        }
+        try {
+            EditState state = c.edit(EditCommand.newBuilder().setGridId(id).build());
+            if (!state.getActive()) {
+                resetEditSelectionAnchor();
+            }
+            return state;
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "GetEditState failed", ex);
+            return null;
+        }
+    }
+
+    private void applyEditText(String text) {
+        VolvoxGridDesktopClient c = client;
+        long id = gridId;
+        if (c == null || id == 0L) {
+            return;
+        }
+        try {
+            c.edit(
+                EditCommand.newBuilder()
+                    .setGridId(id)
+                    .setSetText(EditSetText.newBuilder().setText(text == null ? "" : text).build())
+                    .build()
+            );
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "EditSetText failed", ex);
+        }
+    }
+
+    private void applyEditSelection(int start, int length) {
+        VolvoxGridDesktopClient c = client;
+        long id = gridId;
+        if (c == null || id == 0L) {
+            return;
+        }
+        try {
+            c.edit(
+                EditCommand.newBuilder()
+                    .setGridId(id)
+                    .setSetSelection(
+                        EditSetSelection.newBuilder()
+                            .setStart(Math.max(0, start))
+                            .setLength(Math.max(0, length))
+                            .build()
+                    )
+                    .build()
+            );
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "EditSetSelection failed", ex);
+        }
+    }
+
+    private int resolveEditSelectionAnchor(EditState state, int textLength) {
+        if (editSelectionRow != state.getRow() || editSelectionCol != state.getCol()) {
+            editSelectionAnchor = -1;
+            editSelectionRow = state.getRow();
+            editSelectionCol = state.getCol();
+        }
+        if (editSelectionAnchor < 0) {
+            editSelectionAnchor = clampCodePointIndex(state.getText(), state.getSelStart());
+        } else {
+            editSelectionAnchor = Math.max(0, Math.min(editSelectionAnchor, textLength));
+        }
+        return editSelectionAnchor;
+    }
+
+    private int resolveEditCaret(EditState state, int anchor, int textLength) {
+        int selStart = clampCodePointIndex(state.getText(), state.getSelStart());
+        int selEnd = Math.min(textLength, selStart + Math.max(0, state.getSelLength()));
+        if (state.getSelLength() <= 0) {
+            return selStart;
+        }
+        if (anchor <= selStart) {
+            return selEnd;
+        }
+        return selStart;
+    }
+
+    private static boolean isShortcutModifierDown(java.awt.event.KeyEvent e) {
+        return e.isControlDown() || e.isMetaDown();
+    }
+
+    private static boolean isPureModifierKey(int keyCode) {
+        return keyCode == java.awt.event.KeyEvent.VK_SHIFT
+            || keyCode == java.awt.event.KeyEvent.VK_CONTROL
+            || keyCode == java.awt.event.KeyEvent.VK_META
+            || keyCode == java.awt.event.KeyEvent.VK_ALT;
+    }
+
+    private void resetEditSelectionAnchor() {
+        editSelectionAnchor = -1;
+        editSelectionRow = -1;
+        editSelectionCol = -1;
+    }
+
+    private static int codePointLength(String text) {
+        String safe = text == null ? "" : text;
+        return safe.codePointCount(0, safe.length());
+    }
+
+    private static int clampCodePointIndex(String text, int index) {
+        return Math.max(0, Math.min(index, codePointLength(text)));
+    }
+
+    private static int utf16Index(String text, int codePointIndex) {
+        String safe = text == null ? "" : text;
+        int normalized = clampCodePointIndex(safe, codePointIndex);
+        return safe.offsetByCodePoints(0, normalized);
+    }
+
+    private static String extractSelectionText(String text, int start, int length) {
+        String safe = text == null ? "" : text;
+        int normalizedStart = clampCodePointIndex(safe, start);
+        int normalizedEnd = clampCodePointIndex(safe, normalizedStart + Math.max(0, length));
+        return safe.substring(utf16Index(safe, normalizedStart), utf16Index(safe, normalizedEnd));
+    }
+
+    private static String editTextWithoutSelection(EditState state) {
+        String text = state.getText();
+        int start = clampCodePointIndex(text, state.getSelStart());
+        int end = clampCodePointIndex(text, start + Math.max(0, state.getSelLength()));
+        String safe = text == null ? "" : text;
+        return safe.substring(0, utf16Index(safe, start)) + safe.substring(utf16Index(safe, end));
+    }
+
+    private static String replaceEditSelection(EditState state, String insertedText) {
+        String text = state.getText();
+        int start = clampCodePointIndex(text, state.getSelStart());
+        int end = clampCodePointIndex(text, start + Math.max(0, state.getSelLength()));
+        String safe = text == null ? "" : text;
+        String replacement = insertedText == null ? "" : insertedText;
+        return safe.substring(0, utf16Index(safe, start))
+            + replacement
+            + safe.substring(utf16Index(safe, end));
+    }
+
+    private static void setSystemClipboardText(String text) {
+        Toolkit.getDefaultToolkit()
+            .getSystemClipboard()
+            .setContents(new StringSelection(text == null ? "" : text), null);
+    }
+
+    private static String getSystemClipboardText() {
+        try {
+            Object data = Toolkit.getDefaultToolkit()
+                .getSystemClipboard()
+                .getData(DataFlavor.stringFlavor);
+            return data instanceof String ? (String) data : null;
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     private void sendPointer(PointerEvent.Type type, MouseEvent e, boolean dblClick) {
@@ -1417,8 +1768,12 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private void handleGridEvent(GridEvent event) {
         if (event.hasStartEdit()) {
             engineEditing = true;
+            imeCompositionActive = false;
+            resetEditSelectionAnchor();
         } else if (event.hasAfterEdit()) {
             engineEditing = false;
+            imeCompositionActive = false;
+            resetEditSelectionAnchor();
         }
 
         if (decisionChannelEnabled && isCancelableGridEvent(event)) {

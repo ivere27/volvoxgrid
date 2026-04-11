@@ -53,6 +53,7 @@ public final class VolvoxGridDesktopExample {
     private volatile boolean scrollBlitEnabled = false;
     private volatile boolean scrollbarsEnabled = true;
     private volatile boolean flingEnabled = true;
+    private volatile boolean editableEnabled = false;
     private volatile SelectionMode selectionMode = SelectionMode.SELECTION_FREE;
 
     private JFrame frame;
@@ -65,6 +66,7 @@ public final class VolvoxGridDesktopExample {
     private JButton btnSortDesc;
     private JCheckBox cbGpu;
     private JCheckBox cbDebug;
+    private JCheckBox cbEdit;
     private JCheckBox cbScrollBlit;
     private JCheckBox cbScrollbars;
     private JCheckBox cbFling;
@@ -123,6 +125,7 @@ public final class VolvoxGridDesktopExample {
         btnSortDesc = new JButton("Sort Desc");
         cbGpu = new JCheckBox("GPU (stub)");
         cbDebug = new JCheckBox("Debug");
+        cbEdit = new JCheckBox("Edit", editableEnabled);
         cbScrollBlit = new JCheckBox("Scroll Blit", scrollBlitEnabled);
         cbScrollbars = new JCheckBox("Scrollbars", scrollbarsEnabled);
         cbFling = new JCheckBox("Fling", flingEnabled);
@@ -145,6 +148,7 @@ public final class VolvoxGridDesktopExample {
         row1.add(selectionModeBox);
         row1.add(cbGpu);
         row1.add(cbDebug);
+        row1.add(cbEdit);
         row1.add(cbScrollBlit);
         row1.add(cbScrollbars);
         row1.add(cbFling);
@@ -180,6 +184,13 @@ public final class VolvoxGridDesktopExample {
             submit(() -> {
                 debugOverlayEnabled = selected;
                 applyDisplayToggles();
+            });
+        });
+        cbEdit.addActionListener(e -> {
+            boolean selected = cbEdit.isSelected();
+            submit(() -> {
+                editableEnabled = selected;
+                applyEditableToggle();
             });
         });
         cbScrollBlit.addActionListener(e -> {
@@ -299,6 +310,7 @@ public final class VolvoxGridDesktopExample {
             }
 
             applyDisplayToggles();
+            applyEditableToggle(false);
             applySelectionMode();
             ctrl.refresh();
             gridPanel.requestFrame();
@@ -341,6 +353,27 @@ public final class VolvoxGridDesktopExample {
                 .build()
         );
         return response.getHandle().getId();
+    }
+
+    private void applyEditableToggle() {
+        applyEditableToggle(true);
+    }
+
+    private void applyEditableToggle(boolean refreshAfter) {
+        VolvoxGridDesktopController ctrl = controller;
+        if (ctrl == null) {
+            return;
+        }
+
+        try {
+            ctrl.setEditable(editableEnabled);
+            if (refreshAfter) {
+                ctrl.refresh();
+                gridPanel.requestFrame();
+            }
+        } catch (Exception e) {
+            updateStatus("Edit toggle failed: " + e.getMessage());
+        }
     }
 
     private void applyDisplayToggles() {
@@ -461,6 +494,7 @@ public final class VolvoxGridDesktopExample {
             btnSortDesc.setEnabled(enabled);
             cbGpu.setEnabled(enabled);
             cbDebug.setEnabled(enabled);
+            cbEdit.setEnabled(enabled);
             cbScrollBlit.setEnabled(enabled);
             cbScrollbars.setEnabled(enabled);
             cbFling.setEnabled(enabled);
