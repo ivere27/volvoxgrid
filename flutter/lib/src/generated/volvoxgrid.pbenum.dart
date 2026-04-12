@@ -192,6 +192,11 @@ class TextHintingMode extends $pb.ProtobufEnum {
   const TextHintingMode._(super.value, super.name);
 }
 
+/// Cell text alignment: "horizontal_vertical".
+/// ALIGN_GENERAL (9) is the engine default for data cells. It renders as
+/// left-center for text and right-center for numeric-looking values.
+/// The engine uses a heuristic (canvas.rs text_looks_numeric()) to decide
+/// at render time whether the cell content looks numeric.
 class Align extends $pb.ProtobufEnum {
   static const Align ALIGN_LEFT_TOP =
       Align._(0, _omitEnumNames ? '' : 'ALIGN_LEFT_TOP');
@@ -362,6 +367,10 @@ class ColumnDataType extends $pb.ProtobufEnum {
   const ColumnDataType._(super.value, super.name);
 }
 
+/// Type coercion strategy during cell writes and data loading.
+///   STRICT (1):   Rejects if type doesn't match column's declared type.
+///   FLEXIBLE (2): Attempts conversion (e.g. "123" → Number 123).
+///   PARSE_ONLY (3): Parses but doesn't convert (stores original text).
 class CoercionMode extends $pb.ProtobufEnum {
   static const CoercionMode COERCION_UNSPECIFIED =
       CoercionMode._(0, _omitEnumNames ? '' : 'COERCION_UNSPECIFIED');
@@ -387,6 +396,10 @@ class CoercionMode extends $pb.ProtobufEnum {
   const CoercionMode._(super.value, super.name);
 }
 
+/// What happens when a cell write fails type validation.
+///   REJECT (1):   Cell not written; reported in WriteResult.violations.
+///   SET_NULL (2): Clears cell value.
+///   SKIP (3):     Keeps old value, no error report.
 class WriteErrorMode extends $pb.ProtobufEnum {
   static const WriteErrorMode WRITE_ERROR_UNSPECIFIED =
       WriteErrorMode._(0, _omitEnumNames ? '' : 'WRITE_ERROR_UNSPECIFIED');
@@ -437,6 +450,10 @@ class CellInteraction extends $pb.ProtobufEnum {
   const CellInteraction._(super.value, super.name);
 }
 
+/// How the first row of loaded data is interpreted.
+///   AUTO (0):      JSON objects use keys as headers; CSV tries to detect.
+///   NONE (1):      No headers — uses generic column names (Column 1, 2, …).
+///   FIRST_ROW (2): Unconditionally treats first row as column headers.
 class HeaderPolicy extends $pb.ProtobufEnum {
   static const HeaderPolicy HEADER_AUTO =
       HeaderPolicy._(0, _omitEnumNames ? '' : 'HEADER_AUTO');
@@ -459,6 +476,11 @@ class HeaderPolicy extends $pb.ProtobufEnum {
   const HeaderPolicy._(super.value, super.name);
 }
 
+/// Column type inference strategy during data loading.
+///   AUTO_DETECT (0): Scans values to infer type — all numbers → Number,
+///                    all true/false → Boolean, all dates → Date, else String.
+///   ALL_STRING (1):  Everything stays as text.
+///   FROM_SCHEMA (2): Uses existing column data types from grid.
 class TypePolicy extends $pb.ProtobufEnum {
   static const TypePolicy TYPE_AUTO_DETECT =
       TypePolicy._(0, _omitEnumNames ? '' : 'TYPE_AUTO_DETECT');
@@ -481,6 +503,9 @@ class TypePolicy extends $pb.ProtobufEnum {
   const TypePolicy._(super.value, super.name);
 }
 
+/// Data loading mode.
+///   REPLACE (0): Clears all cells and resets to new dimensions.
+///   APPEND (1):  Inserts data after existing rows; preserves current schema.
 class LoadMode extends $pb.ProtobufEnum {
   static const LoadMode LOAD_REPLACE =
       LoadMode._(0, _omitEnumNames ? '' : 'LOAD_REPLACE');
@@ -522,6 +547,19 @@ class LoadDataStatus extends $pb.ProtobufEnum {
   const LoadDataStatus._(super.value, super.name);
 }
 
+/// How user selection is interpreted. See engine/src/selection.rs.
+///
+/// FREE (0):        Standard rectangular cell-range selection.
+///                  Single contiguous range (row, col, row_end, col_end).
+/// BY_ROW (1):      Any click selects the entire row. Internally the
+///                  selection range spans col 0..i32::MAX.
+/// BY_COLUMN (2):   Any click selects the entire column. Range spans
+///                  row 0..i32::MAX.
+/// LISTBOX (3):     Row-based toggle selection. Tracks selected rows in a
+///                  HashSet<i32>. Plain click selects one row, Ctrl+Click
+///                  toggles, Shift+Click extends from anchor.
+/// MULTI_RANGE (4): Multiple independent rectangular ranges. The primary
+///                  range plus extra_ranges: Vec<(i32,i32,i32,i32)>.
 class SelectionMode extends $pb.ProtobufEnum {
   static const SelectionMode SELECTION_FREE =
       SelectionMode._(0, _omitEnumNames ? '' : 'SELECTION_FREE');
@@ -601,6 +639,11 @@ class SelectionVisibility extends $pb.ProtobufEnum {
   const SelectionVisibility._(super.value, super.name);
 }
 
+/// Controls how cell editing is activated. See engine/src/input.rs.
+///   NONE (0):      Editing disabled.
+///   KEY (1):       Enter/F2 starts editing. Character keys auto-start.
+///   KEY_CLICK (2): Same as KEY, plus double-click and dropdown click
+///                  also start editing.
 class EditTrigger extends $pb.ProtobufEnum {
   static const EditTrigger EDIT_TRIGGER_NONE =
       EditTrigger._(0, _omitEnumNames ? '' : 'EDIT_TRIGGER_NONE');
@@ -686,6 +729,13 @@ class SortOrder extends $pb.ProtobufEnum {
   const SortOrder._(super.value, super.name);
 }
 
+/// Comparison strategy for sorting.
+///   AUTO (0):           Tries date, then number, then case-insensitive string.
+///   NUMERIC (1):        Parses as f64; non-numeric values sort to the end.
+///   STRING (2):         Lexicographic, case-sensitive.
+///   STRING_NO_CASE (3): Lexicographic, case-insensitive.
+///   CUSTOM (4):         Fires CompareEvent on EventStream so the host can
+///                       provide its own ordering logic.
 class SortType extends $pb.ProtobufEnum {
   static const SortType SORT_TYPE_AUTO =
       SortType._(0, _omitEnumNames ? '' : 'SORT_TYPE_AUTO');
@@ -764,6 +814,18 @@ class GroupTotalPosition extends $pb.ProtobufEnum {
   const GroupTotalPosition._(super.value, super.name);
 }
 
+/// Aggregate functions for Subtotal() and Aggregate() RPCs.
+/// Numeric parsing strips $, commas, and spaces before computing.
+///   NONE (0):    No-op.
+///   CLEAR (1):   Removes all existing subtotal rows.
+///   SUM (2):     Sum of numeric values.
+///   PERCENT (3): 100.0 if sum ≠ 0, else 0.0.
+///   COUNT (4):   Count of numeric cells.
+///   AVERAGE (5): Arithmetic mean.
+///   MAX (6):     Maximum value.
+///   MIN (7):     Minimum value.
+///   STD_DEV (8): Sample standard deviation (N−1 denominator).
+///   VAR (9):     Sample variance (N−1 denominator).
 class AggregateType extends $pb.ProtobufEnum {
   static const AggregateType AGG_NONE =
       AggregateType._(0, _omitEnumNames ? '' : 'AGG_NONE');
@@ -807,6 +869,19 @@ class AggregateType extends $pb.ProtobufEnum {
   const AggregateType._(super.value, super.name);
 }
 
+/// Content-based cell merging. The engine compares adjacent cell values
+/// and visually merges cells with identical content. See engine/src/span.rs.
+/// Spans never cross fixed/frozen/pinned boundaries or subtotal rows.
+///
+///   NONE (0):        No spanning.
+///   FREE (1):        Expand in all directions (up/down/left/right).
+///   BY_ROW (2):      Vertical spanning only. Left-column dependency:
+///                    adjacent left cells must also match.
+///   BY_COLUMN (3):   Horizontal spanning only. No above-cell dependency.
+///   ADJACENT (4):    Either row OR column spanning (whichever matches).
+///   HEADER_ONLY (5): Only span in fixed/frozen cells, not data cells.
+///   SPILL (6):       Text spills right into empty adjacent cells.
+///   GROUP (7):       Like SPILL but only on subtotal rows.
 class CellSpanMode extends $pb.ProtobufEnum {
   static const CellSpanMode CELL_SPAN_NONE =
       CellSpanMode._(0, _omitEnumNames ? '' : 'CELL_SPAN_NONE');
@@ -973,6 +1048,12 @@ class StickyEdge extends $pb.ProtobufEnum {
   const StickyEdge._(super.value, super.name);
 }
 
+/// Type-ahead (incremental search) mode. See engine/src/search.rs.
+/// The engine buffers keystrokes and searches for matching cell text.
+///   NONE (0):        Disabled.
+///   FROM_START (1):  Search from the first data row.
+///   FROM_CURSOR (2): Search from the current cursor row.
+/// Default type_ahead_delay: 2000 ms.
 class TypeAheadMode extends $pb.ProtobufEnum {
   static const TypeAheadMode TYPE_AHEAD_NONE =
       TypeAheadMode._(0, _omitEnumNames ? '' : 'TYPE_AHEAD_NONE');
@@ -1102,6 +1183,12 @@ class ApplyScope extends $pb.ProtobufEnum {
   const ApplyScope._(super.value, super.name);
 }
 
+/// Rendering backend selection. See GUI.md and TUI.md.
+///   AUTO (0): Engine picks CPU or GPU based on host capabilities.
+///   CPU (1):  Renders into a host-owned RGBA buffer (most portable).
+///   GPU (2):  Renders via wgpu to a host-provided native surface.
+///   TUI (5):  Terminal mode — renders ANSI escape sequences.
+/// If GPU initialization fails, the engine falls back to CPU silently.
 class RendererMode extends $pb.ProtobufEnum {
   static const RendererMode RENDERER_AUTO =
       RendererMode._(0, _omitEnumNames ? '' : 'RENDERER_AUTO');
@@ -1242,6 +1329,15 @@ class ClearRegion extends $pb.ProtobufEnum {
   const ClearRegion._(super.value, super.name);
 }
 
+/// Export formats. See engine/src/save.rs.
+///   BINARY (0):    FXGD binary — header "FXGD" + dimensions + cell data +
+///                  styles + column/row properties. Preserves full fidelity.
+///   TSV (1):       Tab-separated values. Text only.
+///   CSV (2):       Comma-separated values. Quotes cells containing
+///                  separator, newline, or quote characters.
+///   DELIMITED (3): Uses the grid's clip_col_separator (default "\t").
+///   XLSX (4):      SpreadsheetML XML (Excel 2003 .xml format). Applies
+///                  bold to fixed rows, auto-detects numeric cells.
 class ExportFormat extends $pb.ProtobufEnum {
   static const ExportFormat EXPORT_BINARY =
       ExportFormat._(0, _omitEnumNames ? '' : 'EXPORT_BINARY');
@@ -1367,6 +1463,9 @@ class IconAlign extends $pb.ProtobufEnum {
   const IconAlign._(super.value, super.name);
 }
 
+/// Which sub-element of a cell was hit. Used in ClickEvent to tell the
+/// host what the user actually clicked on. Maps to HitArea variants in
+/// engine/src/input.rs.
 class CellHitArea extends $pb.ProtobufEnum {
   static const CellHitArea HIT_CELL =
       CellHitArea._(0, _omitEnumNames ? '' : 'HIT_CELL');
@@ -1425,6 +1524,9 @@ class PullToRefreshTheme extends $pb.ProtobufEnum {
 }
 
 /// ── Render layer bit positions (for render_layer_mask bitmask) ──
+/// The engine renders through 27 independent layers (engine/src/canvas.rs
+/// layer module). Each layer is guarded by its bit in render_layer_mask.
+/// Setting bit i enables layer i. Set all bits (-1) to render everything.
 class RenderLayerBit extends $pb.ProtobufEnum {
   static const RenderLayerBit RENDER_LAYER_OVERLAY_BANDS =
       RenderLayerBit._(0, _omitEnumNames ? '' : 'RENDER_LAYER_OVERLAY_BANDS');
@@ -1717,6 +1819,37 @@ class ColIndicatorCellMode extends $pb.ProtobufEnum {
   const ColIndicatorCellMode._(super.value, super.name);
 }
 
+class ComposeMethod extends $pb.ProtobufEnum {
+  static const ComposeMethod COMPOSE_METHOD_NONE =
+      ComposeMethod._(0, _omitEnumNames ? '' : 'COMPOSE_METHOD_NONE');
+  static const ComposeMethod COMPOSE_METHOD_HANGUL =
+      ComposeMethod._(1, _omitEnumNames ? '' : 'COMPOSE_METHOD_HANGUL');
+  static const ComposeMethod COMPOSE_METHOD_DEAD_KEY =
+      ComposeMethod._(2, _omitEnumNames ? '' : 'COMPOSE_METHOD_DEAD_KEY');
+  static const ComposeMethod COMPOSE_METHOD_TELEX =
+      ComposeMethod._(3, _omitEnumNames ? '' : 'COMPOSE_METHOD_TELEX');
+
+  static const $core.List<ComposeMethod> values = <ComposeMethod>[
+    COMPOSE_METHOD_NONE,
+    COMPOSE_METHOD_HANGUL,
+    COMPOSE_METHOD_DEAD_KEY,
+    COMPOSE_METHOD_TELEX,
+  ];
+
+  static final $core.List<ComposeMethod?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static ComposeMethod? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const ComposeMethod._(super.value, super.name);
+}
+
+/// Edit UI mode. See engine/src/edit.rs EditUiMode.
+///   ENTER (0): Spreadsheet-style. Enter commits and moves cursor down.
+///              Character keys replace cell content. Up/Down commit and move.
+///   EDIT (1):  F2 mode. Caret placed at end of existing text.
+///              Escape cancels and restores original value.
+///              Arrow keys move caret within text, not the grid cursor.
 class EditUiMode extends $pb.ProtobufEnum {
   static const EditUiMode EDIT_UI_MODE_ENTER =
       EditUiMode._(0, _omitEnumNames ? '' : 'EDIT_UI_MODE_ENTER');

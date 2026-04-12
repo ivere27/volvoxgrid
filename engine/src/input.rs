@@ -1,4 +1,5 @@
 use crate::canvas::VisibleRange;
+use crate::compose::ComposeResult;
 use crate::control::CellControl;
 use crate::event::GridEventData;
 use crate::grid::VolvoxGrid;
@@ -237,6 +238,10 @@ fn begin_edit_from_input_with_options(grid: &mut VolvoxGrid, row: i32, col: i32,
     } else {
         grid.edit.start_edit(row, col, &display_text);
     }
+    grid.edit.configure_compose(
+        grid.effective_engine_compose_enabled(),
+        grid.effective_compose_method(),
+    );
     grid.edit.parse_dropdown_items(&dropdown_list);
     // Initialize dropdown index from stored translated value (preferred), or display text.
     if !dropdown_list.is_empty() {
@@ -297,6 +302,69 @@ fn commit_active_edit(grid: &mut VolvoxGrid) -> bool {
     } else {
         false
     }
+}
+
+fn apply_compose_result(grid: &mut VolvoxGrid, result: ComposeResult) -> bool {
+    let before_text = grid.edit.edit_text.clone();
+    match result {
+        ComposeResult::Pending { preedit, cursor } => {
+            if preedit.is_empty() {
+                grid.edit.cancel_preedit();
+            } else {
+                grid.edit.set_preedit(&preedit, cursor);
+            }
+        }
+        ComposeResult::Commit { text } => {
+            if !text.is_empty() {
+                grid.edit.commit_preedit(&text);
+            } else {
+                grid.edit.cancel_preedit();
+            }
+        }
+        ComposeResult::CommitPending {
+            commit,
+            preedit,
+            cursor,
+        } => {
+            if !commit.is_empty() {
+                grid.edit.commit_preedit(&commit);
+            }
+            if preedit.is_empty() {
+                grid.edit.cancel_preedit();
+            } else {
+                grid.edit.set_preedit(&preedit, cursor);
+            }
+        }
+        ComposeResult::Pass => return false,
+    }
+
+    if grid.edit.edit_text != before_text {
+        grid.events.push(GridEventData::CellEditChange {
+            text: grid.edit.edit_text.clone(),
+        });
+    }
+    grid.mark_dirty();
+    true
+}
+
+fn flush_engine_compose(grid: &mut VolvoxGrid) -> bool {
+    if !grid.edit.is_engine_composing() {
+        return false;
+    }
+
+    let before_text = grid.edit.edit_text.clone();
+    grid.edit.flush_preedit();
+    if grid.edit.edit_text != before_text {
+        grid.events.push(GridEventData::CellEditChange {
+            text: grid.edit.edit_text.clone(),
+        });
+    }
+    grid.mark_dirty();
+    true
+}
+
+fn should_flush_engine_compose_on_key_down(key_code: i32, ctrl: bool) -> bool {
+    matches!(key_code, 9 | 13 | 27 | 35 | 36 | 37 | 38 | 39 | 40 | 46) || (ctrl && key_code == 65)
 }
 
 pub fn commit_dropdown_item_click(grid: &mut VolvoxGrid, idx: i32) -> bool {
@@ -2475,7 +2543,7 @@ pub fn handle_key_down_with_behavior(
 
     // During IME composition, suppress all grid key handling.
     // The IME owns the keyboard until composition ends.
-    if grid.edit.composing {
+    if grid.edit.composing && !grid.edit.is_engine_composing() {
         grid.events
             .push(GridEventData::KeyDown { key_code, modifier });
         return;
@@ -2496,6 +2564,18 @@ pub fn handle_key_down_with_behavior(
 
     // Handle keys during active editing
     if grid.is_editing() {
+        if key_code == 8 && grid.edit.is_engine_composing() {
+            let result = grid.edit.compose_backspace();
+            if apply_compose_result(grid, result) {
+                grid.events
+                    .push(GridEventData::KeyDownEdit { key_code, modifier });
+                return;
+            }
+        }
+        if should_flush_engine_compose_on_key_down(key_code, ctrl) {
+            flush_engine_compose(grid);
+        }
+
         match key_code {
             27 if !grid.host_key_dispatch => {
                 // Escape: cancel edit (skipped when host drives dispatch)
@@ -2924,6 +3004,9 @@ pub fn handle_key_press_with_behavior(
     };
 
     if grid.is_editing() {
+        if grid.edit.composing && !grid.edit.is_engine_composing() {
+            return;
+        }
         if !grid.edit.dropdown_items.is_empty() && !grid.edit.dropdown_editable {
             if grid.dropdown_search
                 && grid
@@ -2963,6 +3046,18 @@ pub fn handle_key_press_with_behavior(
             && grid.edit.edit_text.chars().count() as i32 >= grid.edit_max_length
         {
             return;
+        }
+
+        if grid.edit.engine_compose_enabled() {
+            if grid.edit.is_engine_composing() && !grid.edit.compose_should_handle(ch) {
+                flush_engine_compose(grid);
+            }
+            if grid.edit.compose_should_handle(ch) {
+                let result = grid.edit.compose_feed(ch);
+                if apply_compose_result(grid, result) {
+                    return;
+                }
+            }
         }
 
         // Insert character into active editor
@@ -3079,13 +3174,27 @@ pub fn handle_key_press_with_behavior(
 
             if grid.is_editing() {
                 // Clear old text and type the new character (VSVolvoxGrid8 behavior)
-                grid.edit.update_text(String::from(ch));
-                grid.edit.sel_start = 1;
+                grid.edit.update_text(String::new());
+                grid.edit.sel_start = 0;
                 grid.edit.sel_length = 0;
-                grid.events.push(GridEventData::CellEditChange {
-                    text: grid.edit.edit_text.clone(),
-                });
-                grid.mark_dirty();
+                if grid.edit.engine_compose_enabled() && grid.edit.compose_should_handle(ch) {
+                    let result = grid.edit.compose_feed(ch);
+                    if apply_compose_result(grid, result) {
+                        // compose result already pushed state updates
+                    } else {
+                        grid.edit.insert_char(ch);
+                        grid.events.push(GridEventData::CellEditChange {
+                            text: grid.edit.edit_text.clone(),
+                        });
+                        grid.mark_dirty();
+                    }
+                } else {
+                    grid.edit.insert_char(ch);
+                    grid.events.push(GridEventData::CellEditChange {
+                        text: grid.edit.edit_text.clone(),
+                    });
+                    grid.mark_dirty();
+                }
             }
         }
     }
@@ -4262,6 +4371,46 @@ mod tests {
         // Delete: delete 'c'
         handle_key_down(&mut grid, 46, 0);
         assert_eq!(grid.edit.edit_text, "a");
+    }
+
+    #[test]
+    fn keypress_auto_start_uses_engine_compose_for_first_character() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.engine_compose = true;
+        grid.engine_compose_configured = true;
+        grid.compose_method = pb::ComposeMethod::Hangul as i32;
+        grid.compose_method_configured = true;
+        prime_layout(&mut grid);
+
+        handle_key_press(&mut grid, 'r' as u32);
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.edit_text, "");
+        assert_eq!(grid.edit.preedit_text, "ㄱ");
+        assert!(grid.edit.composing);
+
+        handle_key_press(&mut grid, 'k' as u32);
+        assert_eq!(grid.edit.preedit_text, "가");
+    }
+
+    #[test]
+    fn engine_compose_backspace_unwinds_preedit_before_edit_text() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.engine_compose = true;
+        grid.engine_compose_configured = true;
+        grid.compose_method = pb::ComposeMethod::Hangul as i32;
+        grid.compose_method_configured = true;
+        prime_layout(&mut grid);
+
+        handle_key_press(&mut grid, 'r' as u32);
+        handle_key_press(&mut grid, 'k' as u32);
+        handle_key_press(&mut grid, 's' as u32);
+        assert_eq!(grid.edit.preedit_text, "간");
+
+        handle_key_down(&mut grid, 8, 0);
+        assert_eq!(grid.edit.preedit_text, "가");
+        assert_eq!(grid.edit.edit_text, "");
     }
 
     #[test]

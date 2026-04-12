@@ -127,6 +127,12 @@ export enum ColumnDataType {
   COLUMN_DATA_BOOLEAN = 3,
   COLUMN_DATA_CURRENCY = 4,
 }
+export enum ComposeMethod {
+  COMPOSE_METHOD_NONE = 0,
+  COMPOSE_METHOD_HANGUL = 1,
+  COMPOSE_METHOD_DEAD_KEY = 2,
+  COMPOSE_METHOD_TELEX = 3,
+}
 export enum CursorChange_CursorType {
   DEFAULT = 0,
   RESIZE_COL = 1,
@@ -896,6 +902,8 @@ export const EditConfigFields = {
   "mask": 6,
   "host_key_dispatch": 7,
   "host_pointer_dispatch": 8,
+  "engine_compose": 9,
+  "compose_method": 10,
 } as const;
 export const EditFinishFields = {
 } as const;

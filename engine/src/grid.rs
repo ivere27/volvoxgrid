@@ -408,6 +408,14 @@ pub struct VolvoxGrid {
     /// Engine-rendered UI (resize, scrollbar, fast-scroll, freeze drag) remains
     /// engine-handled.
     pub host_pointer_dispatch: bool,
+    /// When true, keypresses in edit mode route through the engine-side compose layer.
+    pub engine_compose: bool,
+    /// Tracks whether `engine_compose` was explicitly configured.
+    pub engine_compose_configured: bool,
+    /// Selected engine-side compose method.
+    pub compose_method: i32,
+    /// Tracks whether `compose_method` was explicitly configured.
+    pub compose_method_configured: bool,
     /// Column separator for clipboard operations (default: "\t").
     pub clip_col_separator: String,
     /// Row separator for clipboard operations (default: "\n").
@@ -807,6 +815,10 @@ impl VolvoxGrid {
             edit_max_length: 0,
             host_key_dispatch: false,
             host_pointer_dispatch: false,
+            engine_compose: false,
+            engine_compose_configured: false,
+            compose_method: pb::ComposeMethod::None as i32,
+            compose_method_configured: false,
             clip_col_separator: "\t".to_string(),
             clip_row_separator: "\n".to_string(),
             format_string: String::new(),
@@ -1707,6 +1719,24 @@ impl VolvoxGrid {
 
     pub fn is_tui_mode(&self) -> bool {
         self.tui_mode || self.renderer_mode == pb::RendererMode::RendererTui as i32
+    }
+
+    pub fn effective_engine_compose_enabled(&self) -> bool {
+        if self.engine_compose_configured {
+            self.engine_compose
+        } else {
+            self.is_tui_mode()
+        }
+    }
+
+    pub fn effective_compose_method(&self) -> i32 {
+        if self.compose_method_configured {
+            self.compose_method
+        } else if self.is_tui_mode() {
+            pb::ComposeMethod::DeadKey as i32
+        } else {
+            self.compose_method
+        }
     }
 
     fn apply_tui_mode_defaults(&mut self) {

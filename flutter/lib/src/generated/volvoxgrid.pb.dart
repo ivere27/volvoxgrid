@@ -22,6 +22,8 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'volvoxgrid.pbenum.dart';
 
+/// Font specification. Engine default: platform-default family, size 11.0,
+/// all decorations off. (engine/src/style.rs GridStyleState defaults)
 class Font extends $pb.GeneratedMessage {
   factory Font({
     $core.String? family,
@@ -155,6 +157,8 @@ class Font extends $pb.GeneratedMessage {
   void clearStretch() => $_clearField(8);
 }
 
+/// Cell padding in pixels.
+/// Engine default: left=6, top=2, right=6, bottom=2 (engine/src/style.rs).
 class Padding extends $pb.GeneratedMessage {
   factory Padding({
     $core.int? left,
@@ -423,6 +427,8 @@ class Borders extends $pb.GeneratedMessage {
   Border ensureLeft() => $_ensure(4);
 }
 
+/// Engine defaults: style=GRIDLINE_SOLID for data cells, GRIDLINE_INSET
+/// for fixed cells; color=0xFFC0C0C0; width=1px.
 class GridLines extends $pb.GeneratedMessage {
   factory GridLines({
     GridLineStyle? style,
@@ -828,6 +834,11 @@ class CellRange extends $pb.GeneratedMessage {
 
 enum CellValue_Value { text, number, flag, raw, timestamp, notSet }
 
+/// Typed cell value. Maps to CellValueData in engine/src/cell.rs:
+///   text → Text(String), number → Number(f64), flag → Bool(bool),
+///   raw → Bytes(Vec<u8>), timestamp → Timestamp(i64).
+/// Unset means Empty (sparse storage — only non-empty cells exist in the
+/// engine's HashMap<(i32,i32), CellData>).
 class CellValue extends $pb.GeneratedMessage {
   factory CellValue({
     $core.String? text,
@@ -1548,6 +1559,9 @@ class CellStyle extends $pb.GeneratedMessage {
 }
 
 /// Selection / hover highlight appearance.
+/// Engine defaults (engine/src/selection.rs):
+///   selection background = 0xFF000080 (dark blue)
+///   selection foreground = 0xFFFFFFFF (white)
 class HighlightStyle extends $pb.GeneratedMessage {
   factory HighlightStyle({
     $core.int? background,
@@ -1738,6 +1752,8 @@ class HeaderMarkSize extends $pb.GeneratedMessage {
   void clearPx() => $_clearField(2);
 }
 
+/// Engine defaults (engine/src/style.rs):
+///   color = 0xFFC9D2DE, width = 1px.
 class HeaderSeparator extends $pb.GeneratedMessage {
   factory HeaderSeparator({
     $core.bool? enabled,
@@ -1843,6 +1859,7 @@ class HeaderSeparator extends $pb.GeneratedMessage {
   void clearSkipMerged() => $_clearField(5);
 }
 
+/// Engine default: hit_width = 6px (engine/src/style.rs).
 class HeaderResizeHandle extends $pb.GeneratedMessage {
   factory HeaderResizeHandle({
     $core.bool? enabled,
@@ -2814,6 +2831,9 @@ class IconTheme extends $pb.GeneratedMessage {
   IconPictures ensurePictures() => $_ensure(3);
 }
 
+/// Hover highlight configuration.
+/// Internally tracked as a bitmask in engine/src/selection.rs:
+///   HOVER_ROW=1, HOVER_COLUMN=2, HOVER_CELL=4.
 class HoverConfig extends $pb.GeneratedMessage {
   factory HoverConfig({
     $core.bool? row,
@@ -3364,6 +3384,17 @@ class GridConfig extends $pb.GeneratedMessage {
 
 /// ── Layout ──
 /// Pure structural dimensions. Text defaults moved to StyleConfig.
+///
+/// Fixed vs Frozen (engine/src/grid.rs):
+///   fixed_rows/cols  = non-scrollable header rows/columns. Always rendered
+///                      at the top/left edge. Used for column headers.
+///   frozen_rows/cols = non-scrollable DATA rows/columns that appear below/right
+///                      of fixed rows/cols. Used for "pinned" data sections.
+/// Scrollable data starts at row (fixed_rows + frozen_rows) and
+/// col (fixed_cols + frozen_cols).
+///
+/// Engine defaults: default_row_height=20px, default_col_width=68px.
+/// TUI mode defaults: row_height=1, col_width=15 (character cells).
 class LayoutConfig extends $pb.GeneratedMessage {
   factory LayoutConfig({
     $core.int? rows,
@@ -3528,6 +3559,19 @@ class LayoutConfig extends $pb.GeneratedMessage {
 
 /// ── Style ──
 /// Nested by region. Building blocks eliminate flat field sprawl.
+///
+/// Style resolution priority (engine/src/grid.rs resolve_cell_padding):
+///   1. Per-cell override (CellStyle via UpdateCells)
+///   2. Per-column override (ColumnDef.padding)
+///   3. Region override (StyleConfig.fixed / StyleConfig.frozen)
+///   4. Grid-level default (this message)
+///
+/// Engine color defaults (engine/src/style.rs GridStyleState):
+///   background      = 0xFFFFFFFF (white)
+///   foreground      = 0xFF000000 (black)
+///   fixed back      = 0xFFC0C0C0 (light gray)
+///   grid line color = 0xFFC0C0C0
+///   alternate_background = 0x00000000 (transparent = disabled)
 class StyleConfig extends $pb.GeneratedMessage {
   factory StyleConfig({
     $core.int? background,
@@ -3746,7 +3790,8 @@ class StyleConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   GridLines ensureGridLines() => $_ensure(7);
 
-  /// Region overrides — only set fields override the defaults above
+  /// Region overrides — only set fields override the defaults above.
+  /// Fixed default: back=0xFFC0C0C0, grid_lines=GRIDLINE_INSET.
   @$pb.TagNumber(11)
   RegionStyle get fixed => $_getN(8);
   @$pb.TagNumber(11)
@@ -4109,6 +4154,12 @@ class SelectionConfig extends $pb.GeneratedMessage {
 }
 
 /// ── Editing ──
+/// The engine maintains a full edit state machine (engine/src/edit.rs).
+/// Two UI modes exist:
+///   EnterMode (default): Enter commits and moves cursor down.
+///     Character keys auto-replace cell content and start editing.
+///   EditMode (F2):       Caret placed at end. Escape cancels.
+///     Enter commits. Arrow keys move caret within text.
 class EditConfig extends $pb.GeneratedMessage {
   factory EditConfig({
     EditTrigger? trigger,
@@ -4119,6 +4170,8 @@ class EditConfig extends $pb.GeneratedMessage {
     $core.String? mask,
     $core.bool? hostKeyDispatch,
     $core.bool? hostPointerDispatch,
+    $core.bool? engineCompose,
+    ComposeMethod? composeMethod,
   }) {
     final result = create();
     if (trigger != null) result.trigger = trigger;
@@ -4130,6 +4183,8 @@ class EditConfig extends $pb.GeneratedMessage {
     if (hostKeyDispatch != null) result.hostKeyDispatch = hostKeyDispatch;
     if (hostPointerDispatch != null)
       result.hostPointerDispatch = hostPointerDispatch;
+    if (engineCompose != null) result.engineCompose = engineCompose;
+    if (composeMethod != null) result.composeMethod = composeMethod;
     return result;
   }
 
@@ -4157,6 +4212,9 @@ class EditConfig extends $pb.GeneratedMessage {
     ..aOS(6, _omitFieldNames ? '' : 'mask')
     ..aOB(7, _omitFieldNames ? '' : 'hostKeyDispatch')
     ..aOB(8, _omitFieldNames ? '' : 'hostPointerDispatch')
+    ..aOB(9, _omitFieldNames ? '' : 'engineCompose')
+    ..aE<ComposeMethod>(10, _omitFieldNames ? '' : 'composeMethod',
+        enumValues: ComposeMethod.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4204,6 +4262,7 @@ class EditConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearDropdownTrigger() => $_clearField(3);
 
+  /// When true, typing in a dropdown cell searches the list items.
   @$pb.TagNumber(4)
   $core.bool get dropdownSearch => $_getBF(3);
   @$pb.TagNumber(4)
@@ -4231,6 +4290,8 @@ class EditConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearMask() => $_clearField(6);
 
+  /// When true, the engine stops handling edit-action keys; the host
+  /// adapter drives editing via RPC (EditCommand) instead.
   @$pb.TagNumber(7)
   $core.bool get hostKeyDispatch => $_getBF(6);
   @$pb.TagNumber(7)
@@ -4240,6 +4301,8 @@ class EditConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearHostKeyDispatch() => $_clearField(7);
 
+  /// When true, the engine stops handling pointer-driven selection/edit;
+  /// the host adapter drives via RPC.
   @$pb.TagNumber(8)
   $core.bool get hostPointerDispatch => $_getBF(7);
   @$pb.TagNumber(8)
@@ -4248,6 +4311,26 @@ class EditConfig extends $pb.GeneratedMessage {
   $core.bool hasHostPointerDispatch() => $_has(7);
   @$pb.TagNumber(8)
   void clearHostPointerDispatch() => $_clearField(8);
+
+  /// Enables engine-side compose for platforms without a host IME.
+  @$pb.TagNumber(9)
+  $core.bool get engineCompose => $_getBF(8);
+  @$pb.TagNumber(9)
+  set engineCompose($core.bool value) => $_setBool(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasEngineCompose() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearEngineCompose() => $_clearField(9);
+
+  /// Selects the active engine-side compose algorithm.
+  @$pb.TagNumber(10)
+  ComposeMethod get composeMethod => $_getN(9);
+  @$pb.TagNumber(10)
+  set composeMethod(ComposeMethod value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasComposeMethod() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearComposeMethod() => $_clearField(10);
 }
 
 class PullToRefreshConfig extends $pb.GeneratedMessage {
@@ -4341,6 +4424,10 @@ class PullToRefreshConfig extends $pb.GeneratedMessage {
   void clearTextRelease() => $_clearField(4);
 }
 
+/// Engine fling physics (engine/src/scroll.rs):
+///   Velocity blending: 35% old + 65% new on each impulse.
+///   Damping: velocity *= exp(−friction × dt). Stops at <8.0 px/s.
+///   Defaults: fling_impulse_gain=30.0, fling_friction=2.0.
 class ScrollConfig extends $pb.GeneratedMessage {
   factory ScrollConfig({
     ScrollBarConfig? scrollBar,
@@ -4428,6 +4515,7 @@ class ScrollConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   ScrollBarConfig ensureScrollBar() => $_ensure(0);
 
+  /// If false, fling stops on next user input (no inertial carry-over).
   @$pb.TagNumber(2)
   $core.bool get scrollTrack => $_getBF(1);
   @$pb.TagNumber(2)
@@ -4513,6 +4601,10 @@ class ScrollConfig extends $pb.GeneratedMessage {
 }
 
 /// ── Outline / Tree ──
+/// See engine/src/outline.rs. Subtotal inserts aggregate rows that group
+/// data by a column's value. Outline levels control tree expand/collapse.
+///   outline_level = -1: grand total row
+///   outline_level = 0+: nested group levels
 class OutlineConfig extends $pb.GeneratedMessage {
   factory OutlineConfig({
     TreeIndicatorStyle? treeIndicator,
@@ -4608,6 +4700,9 @@ class OutlineConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearGroupTotalPosition() => $_clearField(4);
 
+  /// When true, repeated Subtotal() calls with the same group_on_col
+  /// reuse existing subtotal rows instead of inserting new ones, allowing
+  /// multiple aggregate columns (e.g. Sales + Cost) in a single row.
   @$pb.TagNumber(5)
   $core.bool get multiTotals => $_getBF(4);
   @$pb.TagNumber(5)
@@ -4619,6 +4714,7 @@ class OutlineConfig extends $pb.GeneratedMessage {
 }
 
 /// ── Cell Span ──
+/// Controls content-based cell merging. See engine/src/span.rs.
 class SpanConfig extends $pb.GeneratedMessage {
   factory SpanConfig({
     CellSpanMode? cellSpan,
@@ -4691,6 +4787,11 @@ class SpanConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearCellSpanFixed() => $_clearField(2);
 
+  /// How cells are compared for equality during spanning:
+  ///   0 = exact match
+  ///   1 = case-insensitive
+  ///   2 = trim + case-insensitive
+  ///   3 = include nulls (empty cells span too)
   @$pb.TagNumber(3)
   $core.int get cellSpanCompare => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -4848,11 +4949,10 @@ class InteractionConfig extends $pb.GeneratedMessage {
   void clearAutoSizeMode() => $_clearField(6);
 
   /// When true, bulk bind/load paths do a one-time auto-fit of row heights
-  /// and/or column widths using `auto_size_mode`.
-  /// Also enables the engine's per-cell auto-resize helper when an adapter
-  /// explicitly calls it.
-  /// Disable this for very large datasets (for example around 1M rows),
-  /// because auto-fit may scan many or all cells to find the required size.
+  /// and/or column widths using `auto_size_mode`. Also triggered after
+  /// Subtotal() insertion (engine/src/outline.rs note_auto_resize_targets).
+  /// Disable this for very large datasets (e.g. ~1M rows), because
+  /// auto-fit scans many or all cells to measure text width/height.
   @$pb.TagNumber(7)
   $core.bool get autoResize => $_getBF(6);
   @$pb.TagNumber(7)
@@ -4893,6 +4993,8 @@ class InteractionConfig extends $pb.GeneratedMessage {
 }
 
 /// ── Rendering ──
+/// The engine renders through 27 independent layers (engine/src/canvas.rs).
+/// Each layer can be individually toggled via render_layer_mask.
 class RenderConfig extends $pb.GeneratedMessage {
   factory RenderConfig({
     RendererMode? rendererMode,
@@ -5044,6 +5146,8 @@ class RenderConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   void clearTargetFrameRateHz() => $_clearField(8);
 
+  /// Bitmask using RenderLayerBit positions. Set bit i to enable layer i.
+  /// -1 (all bits set) = all layers on. 0 = no layers rendered.
   @$pb.TagNumber(9)
   $fixnum.Int64 get renderLayerMask => $_getI64(8);
   @$pb.TagNumber(9)
@@ -5062,6 +5166,9 @@ class RenderConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   void clearLayerProfiling() => $_clearField(10);
 
+  /// CPU scroll-blit optimization: reuses previously-rendered pixels
+  /// when only scroll position changes. Only valid when no animation,
+  /// no editing, no background image, and not right-to-left.
   @$pb.TagNumber(11)
   $core.bool get scrollBlit => $_getBF(10);
   @$pb.TagNumber(11)
@@ -6284,7 +6391,11 @@ class ColumnDef extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   void clearSortType() => $_clearField(12);
 
-  /// Pipe-delimited dropdown items; prefix with `|` to make the list editable.
+  /// Pipe-delimited dropdown items. See engine/src/edit.rs parse_dropdown_entries.
+  /// Format: "item1|item2|item3" (read-only dropdown)
+  ///         "|item1|item2"      (leading `|` = editable, allows free-form text)
+  /// Optional translation: "#id;Display Text" stores `id` but shows Display Text.
+  /// Optional multi-column: "*1;col1\tcol2" selects display column.
   @$pb.TagNumber(13)
   $core.String get dropdownItems => $_getSZ(12);
   @$pb.TagNumber(13)
@@ -6982,6 +7093,8 @@ class UpdateCellsRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   $pb.PbList<CellUpdate> get cells => $_getList(1);
 
+  /// When true, writes to a preview grid first; if any type violations
+  /// occur the original grid is untouched and WriteResult.rejected_count > 0.
   @$pb.TagNumber(3)
   $core.bool get atomic => $_getBF(2);
   @$pb.TagNumber(3)
@@ -7479,6 +7592,8 @@ class WriteResult extends $pb.GeneratedMessage {
   $pb.PbList<TypeViolation> get violations => $_getList(2);
 }
 
+/// Bulk-load a table from a flat array of values.
+/// Values are row-major: element at index (r * cols + c) goes to cell (r, c).
 class LoadTableRequest extends $pb.GeneratedMessage {
   factory LoadTableRequest({
     $fixnum.Int64? gridId,
@@ -8035,6 +8150,13 @@ class LoadDataOptions extends $pb.GeneratedMessage {
   void clearMaxRows() => $_clearField(21);
 }
 
+/// Load structured data (CSV or JSON) into the grid.
+/// The engine parses the data, infers types, validates values, and
+/// populates cells. See engine/src/load.rs.
+///
+/// JSON supports 5 shapes: array of objects, array of arrays,
+/// {columns,data}, object with all-array values, or single object.
+/// JSONPath navigation via JsonOptions.data_path (e.g. "results.items").
 class LoadDataRequest extends $pb.GeneratedMessage {
   factory LoadDataRequest({
     $fixnum.Int64? gridId,
@@ -9682,6 +9804,7 @@ class EditFinish extends $pb.GeneratedMessage {
   static EditFinish? _defaultInstance;
 }
 
+/// Returned by Edit() RPC. Reflects the engine's current edit state.
 class EditState extends $pb.GeneratedMessage {
   factory EditState({
     $core.bool? active,
@@ -9911,6 +10034,10 @@ class SortColumn extends $pb.GeneratedMessage {
   void clearType() => $_clearField(3);
 }
 
+/// Multi-column sort. The engine builds sort_keys from sort_columns
+/// and compares by the first differing key column. Subtotal rows are
+/// excluded from sort — each group between subtotal boundaries is
+/// sorted independently to preserve outline structure.
 class SortRequest extends $pb.GeneratedMessage {
   factory SortRequest({
     $fixnum.Int64? gridId,
@@ -9972,6 +10099,10 @@ class SortRequest extends $pb.GeneratedMessage {
   $pb.PbList<SortColumn> get sortColumns => $_getList(1);
 }
 
+/// Insert aggregate subtotal rows. See engine/src/outline.rs.
+/// Detects group boundaries by comparing cell values in group_on_col.
+/// Set group_on_col=-1 for a grand total only (no grouping).
+/// Use AGG_CLEAR to remove all subtotal rows.
 class SubtotalRequest extends $pb.GeneratedMessage {
   factory SubtotalRequest({
     $fixnum.Int64? gridId,
@@ -11101,6 +11232,9 @@ class GetMergedRangeRequest extends $pb.GeneratedMessage {
   void clearCol() => $_clearField(3);
 }
 
+/// Explicit user-initiated cell merge (spreadsheet-style).
+/// Separate from content-based spans (CellSpanMode).
+/// Overlapping merges discard the older range. See engine/src/merge_registry.rs.
 class MergeCellsRequest extends $pb.GeneratedMessage {
   factory MergeCellsRequest({
     $fixnum.Int64? gridId,
@@ -12232,6 +12366,9 @@ class PrintResponse extends $pb.GeneratedMessage {
   $pb.PbList<PrintPage> get pages => $_getList(0);
 }
 
+/// Each page is a PNG-encoded RGBA image. See engine/src/print.rs.
+/// Page dimensions at 96 DPI: portrait 816×1056 px, landscape 1056×816 px.
+/// Header/footer placeholders: &P = page number, &N = total pages.
 class PrintPage extends $pb.GeneratedMessage {
   factory PrintPage({
     $core.int? pageNumber,
@@ -12322,6 +12459,12 @@ class PrintPage extends $pb.GeneratedMessage {
   void clearHeight() => $_clearField(4);
 }
 
+/// Named grid snapshots using the FXAR1 archive format.
+/// See engine/src/save.rs.
+///   SAVE:   Serializes grid into a named entry in the archive blob.
+///   LOAD:   Deserializes a named entry back into the grid.
+///   DELETE: Removes a named entry from the archive.
+///   LIST:   Returns the list of entry names without loading.
 class ArchiveRequest extends $pb.GeneratedMessage {
   factory ArchiveRequest({
     $fixnum.Int64? gridId,
@@ -12565,6 +12708,8 @@ class GridHandle extends $pb.GeneratedMessage {
   void clearId() => $_clearField(1);
 }
 
+/// Create a new grid instance. Returns a GridHandle used by all subsequent RPCs.
+/// The engine allocates a VolvoxGrid with the given viewport and optional config.
 class CreateRequest extends $pb.GeneratedMessage {
   factory CreateRequest({
     $core.int? viewportWidth,
@@ -13010,6 +13155,10 @@ class SetColRequest extends $pb.GeneratedMessage {
   void clearCol() => $_clearField(2);
 }
 
+/// Enable/disable rendering. When transitioning from disabled to enabled,
+/// the engine suppresses the next animation frame and forces an immediate
+/// dirty repaint (plugin/src/lib.rs SetRedraw). Useful for batching many
+/// mutations without intermediate renders.
 class SetRedrawRequest extends $pb.GeneratedMessage {
   factory SetRedrawRequest({
     $fixnum.Int64? gridId,
@@ -13891,6 +14040,7 @@ class PointerEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearY() => $_clearField(3);
 
+  /// Modifier bitmask: 0x01=Shift, 0x02=Ctrl, 0x04=Alt, 0x08=Meta.
   @$pb.TagNumber(4)
   $core.int get modifier => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -13900,6 +14050,7 @@ class PointerEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearModifier() => $_clearField(4);
 
+  /// Button bitmask: 0x01=primary (left), 0x02=secondary (right).
   @$pb.TagNumber(5)
   $core.int get button => $_getIZ(4);
   @$pb.TagNumber(5)
@@ -14075,6 +14226,11 @@ class ZoomEvent extends $pb.GeneratedMessage {
   void clearFocalYPx() => $_clearField(4);
 }
 
+/// Key codes use web/Windows virtual key values:
+///   13=Enter, 27=Escape, 9=Tab, 32=Space, 8=Backspace, 46=Delete,
+///   37/38/39/40=Arrow Left/Up/Right/Down, 33/34=PageUp/PageDown,
+///   36/35=Home/End, 113=F2, 65=A, 67=C, 86=V, 88=X.
+/// KEY_PRESS carries the character for text input; KEY_DOWN/UP carry key_code.
 class KeyEvent extends $pb.GeneratedMessage {
   factory KeyEvent({
     KeyEvent_Type? type,
@@ -14146,6 +14302,7 @@ class KeyEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearKeyCode() => $_clearField(2);
 
+  /// Modifier bitmask: 0x01=Shift, 0x02=Ctrl, 0x04=Alt, 0x08=Meta.
   @$pb.TagNumber(3)
   $core.int get modifier => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -14165,6 +14322,10 @@ class KeyEvent extends $pb.GeneratedMessage {
   void clearCharacter() => $_clearField(4);
 }
 
+/// CPU rendering: host provides an RGBA buffer for the engine to render into.
+/// The engine writes pixels in RGBA byte order (R at offset+0, G+1, B+2, A+3).
+/// The plugin maps the buffer via `handle` as a raw pointer and calls the CPU
+/// renderer. See plugin/src/lib.rs BufferReady handling.
 class BufferReady extends $pb.GeneratedMessage {
   factory BufferReady({
     $fixnum.Int64? handle,
@@ -14570,6 +14731,9 @@ class TerminalCommand extends $pb.GeneratedMessage {
   void clearKind() => $_clearField(1);
 }
 
+/// GPU rendering: host provides a native surface for wgpu.
+/// handle=0 means surface destroyed. See plugin/src/lib.rs GpuSurfaceReady.
+/// If GPU initialization fails, the plugin falls back to CPU mode silently.
 class GpuSurfaceReady extends $pb.GeneratedMessage {
   factory GpuSurfaceReady({
     $fixnum.Int64? surfaceHandle,
@@ -14648,6 +14812,16 @@ class GpuSurfaceReady extends $pb.GeneratedMessage {
   void clearHeight() => $_clearField(3);
 }
 
+/// Response to a cancelable GridEvent. Sent on the RenderSession stream.
+///
+/// The engine waits up to 250 ms for this message (DECISION_TIMEOUT in
+/// plugin/src/lib.rs). If no decision arrives, the event auto-proceeds
+/// with cancel=false. Expired actions are resolved at the start of each
+/// render_session loop iteration.
+///
+/// Cancelable events: BeforeEdit, CellEditValidate, BeforeSort,
+/// CellFocusChanging, SelectionChanging, BeforeNodeToggle,
+/// BeforeUserResize, BeforeMoveColumn, BeforeMoveRow.
 class EventDecision extends $pb.GeneratedMessage {
   factory EventDecision({
     $fixnum.Int64? gridId,
@@ -14737,6 +14911,10 @@ enum RenderOutput_Event {
   notSet
 }
 
+/// Immediate render-coupled output from the engine.
+/// These are NOT the same as semantic GridEvent messages — they exist so
+/// the host can react immediately to render-time UI needs (cursor shape,
+/// edit overlay position, selection feedback, frame completion).
 class RenderOutput extends $pb.GeneratedMessage {
   factory RenderOutput({
     $core.bool? rendered,
@@ -14838,6 +15016,9 @@ class RenderOutput extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   void clearEvent() => $_clearField($_whichOneof(0));
 
+  /// true if pixels were actually painted this frame.
+  /// false if grid was clean (no changes). Hosts can skip compositing
+  /// when rendered=false.
   @$pb.TagNumber(1)
   $core.bool get rendered => $_getBF(0);
   @$pb.TagNumber(1)
@@ -14925,6 +15106,9 @@ class RenderOutput extends $pb.GeneratedMessage {
   GpuFrameDone ensureGpuFrameDone() => $_ensure(7);
 }
 
+/// CPU frame completion. The dirty rect tells the host which region
+/// of the RGBA buffer was modified — the host only needs to blit this
+/// rectangle to screen, not the full buffer.
 class FrameDone extends $pb.GeneratedMessage {
   factory FrameDone({
     $fixnum.Int64? handle,
@@ -15262,6 +15446,7 @@ class FrameMetrics extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   $pb.PbList<$core.double> get layerTimesUs => $_getList(2);
 
+  /// Cell counts by zone: [scrollable, sticky, pinned, fixed].
   @$pb.TagNumber(4)
   $pb.PbList<$core.int> get zoneCellCounts => $_getList(3);
 
@@ -15403,6 +15588,10 @@ class CursorChange extends $pb.GeneratedMessage {
   void clearCursor() => $_clearField(1);
 }
 
+/// Emitted on RenderOutput when the engine wants the host to show an
+/// edit overlay. The host should position a native text input at (x,y)
+/// with the given dimensions and pre-fill it with current_value.
+/// See plugin/src/lib.rs build_edit_request().
 class EditRequest extends $pb.GeneratedMessage {
   factory EditRequest({
     $core.int? row,
@@ -15580,6 +15769,8 @@ class EditRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   void clearSelLength() => $_clearField(11);
 
+  /// ENTER (0): Enter commits and moves cursor. Character keys replace content.
+  /// EDIT (1):  F2 mode. Caret at end. Escape cancels.
   @$pb.TagNumber(12)
   EditUiMode get uiMode => $_getN(11);
   @$pb.TagNumber(12)
@@ -17109,6 +17300,8 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(62)
   PullToRefreshCanceledEvent ensurePullToRefreshCanceled() => $_ensure(60);
 
+  /// 0 = non-cancelable (informational only).
+  /// Non-zero = cancelable — send EventDecision with this ID to allow/veto.
   @$pb.TagNumber(100)
   $fixnum.Int64 get eventId => $_getI64(61);
   @$pb.TagNumber(100)
@@ -18618,6 +18811,7 @@ class AfterSortEvent extends $pb.GeneratedMessage {
   void clearCol() => $_clearField(1);
 }
 
+/// Fired for SORT_TYPE_CUSTOM: host returns comparison result.
 class CompareEvent extends $pb.GeneratedMessage {
   factory CompareEvent({
     $core.int? row1,
@@ -19544,6 +19738,8 @@ class AfterMoveRowEvent extends $pb.GeneratedMessage {
 }
 
 /// ── Mouse Events ──
+/// button: 0x01=primary, 0x02=secondary.
+/// modifier: 0x01=Shift, 0x02=Ctrl, 0x04=Alt, 0x08=Meta.
 class BeforeMouseDownEvent extends $pb.GeneratedMessage {
   factory BeforeMouseDownEvent({
     $core.int? row,
@@ -20038,6 +20234,7 @@ class DblClickEvent extends $pb.GeneratedMessage {
 }
 
 /// ── Keyboard Events ──
+/// modifier: 0x01=Shift, 0x02=Ctrl, 0x04=Alt, 0x08=Meta.
 class KeyDownEvent extends $pb.GeneratedMessage {
   factory KeyDownEvent({
     $core.int? keyCode,
@@ -21424,10 +21621,15 @@ class VolvoxGridServiceApi {
           'GetDemoData', request, GetDemoDataResponse());
 
   /// ── Streaming ──
+  /// Bidirectional: host sends input (pointer, key, buffer, event decisions),
+  /// engine returns render-coupled output (frames, edit/dropdown requests).
   $async.Future<RenderOutput> renderSession(
           $pb.ClientContext? ctx, RenderInput request) =>
       _client.invoke<RenderOutput>(
           ctx, 'VolvoxGridService', 'RenderSession', request, RenderOutput());
+
+  /// Server-streaming: engine pushes semantic grid events.
+  /// The plugin polls the engine's EventQueue with a 50 ms interval.
   $async.Future<GridEvent> eventStream(
           $pb.ClientContext? ctx, GridHandle request) =>
       _client.invoke<GridEvent>(

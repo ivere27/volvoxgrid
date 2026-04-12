@@ -1041,6 +1041,10 @@ message EditConfig {
   // When true, the engine stops handling pointer-driven selection/edit;
   // the host adapter drives via RPC.
   optional bool            host_pointer_dispatch = 8;
+  // Enables engine-side compose for platforms without a host IME.
+  optional bool            engine_compose        = 9;
+  // Selects the active engine-side compose algorithm.
+  optional ComposeMethod   compose_method        = 10;
 }
 
 // ── Scrolling ──
@@ -1632,6 +1636,13 @@ message EditSetSelection { int32 start = 1; int32 length = 2; }
 message EditSetPreedit { string text = 1; int32 cursor = 2; bool commit = 3; }
 message EditFinish  {}
 
+enum ComposeMethod {
+  COMPOSE_METHOD_NONE     = 0;
+  COMPOSE_METHOD_HANGUL   = 1;
+  COMPOSE_METHOD_DEAD_KEY = 2;
+  COMPOSE_METHOD_TELEX    = 3;
+}
+
 // Edit UI mode. See engine/src/edit.rs EditUiMode.
 //   ENTER (0): Spreadsheet-style. Enter commits and moves cursor down.
 //              Character keys replace cell content. Up/Down commit and move.
@@ -1654,6 +1665,11 @@ message EditState {
   bool       composing    = 7;   // true during IME composition
   string     preedit_text = 8;   // IME preedit string
   EditUiMode ui_mode      = 9;
+  float      x            = 10;  // viewport-local cell rect X
+  float      y            = 11;  // viewport-local cell rect Y
+  float      width        = 12;  // cell rect width
+  float      height       = 13;  // cell rect height
+  int32      max_length   = 14;  // 0 = unlimited
 }
 
 // ═══════════════════════════════════════════════════════════

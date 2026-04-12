@@ -1,3 +1,4 @@
+use crate::compose::{ActiveCompose, ComposeResult};
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::style::HighlightStyle;
 use std::time::Instant;
@@ -165,6 +166,7 @@ pub struct EditState {
     pub editing: bool,
     pub edit_row: i32,
     pub edit_col: i32,
+    pub session_serial: u64,
     pub edit_text: String,
     pub original_text: String,
     pub formula_mode: bool,
@@ -193,6 +195,8 @@ pub struct EditState {
     pub preedit_text: String,
     /// Cursor position within the preedit text.
     pub preedit_cursor: i32,
+    /// Selected engine-side compose method and its in-flight state.
+    pub compose: ActiveCompose,
 }
 
 impl Default for EditState {
@@ -201,6 +205,7 @@ impl Default for EditState {
             editing: false,
             edit_row: -1,
             edit_col: -1,
+            session_serial: 0,
             edit_text: String::new(),
             original_text: String::new(),
             formula_mode: false,
@@ -217,6 +222,7 @@ impl Default for EditState {
             composing: false,
             preedit_text: String::new(),
             preedit_cursor: 0,
+            compose: ActiveCompose::None,
         }
     }
 }
@@ -238,6 +244,7 @@ impl EditState {
         bytes += self.edit_text.capacity();
         bytes += self.original_text.capacity();
         bytes += self.preedit_text.capacity();
+        bytes += self.compose.heap_size_bytes();
         bytes += self.dropdown_search_text.capacity();
         bytes += self.formula_highlights.capacity() * std::mem::size_of::<EditHighlightRegion>();
 
@@ -264,9 +271,12 @@ impl EditState {
     /// Sets `editing = true`, records the cell coordinates, and saves
     /// both the original text (for cancel) and the current edit text.
     pub fn start_edit(&mut self, row: i32, col: i32, current_text: &str) {
+        self.cancel_preedit();
+        self.compose.reset();
         self.editing = true;
         self.edit_row = row;
         self.edit_col = col;
+        self.session_serial = self.session_serial.wrapping_add(1);
         self.original_text = current_text.to_string();
         self.ui_mode = EditUiMode::EnterMode;
         self.edit_text = current_text.to_string();
@@ -293,9 +303,12 @@ impl EditState {
         seed_text: Option<&str>,
         formula_mode: Option<bool>,
     ) {
+        self.cancel_preedit();
+        self.compose.reset();
         self.editing = true;
         self.edit_row = row;
         self.edit_col = col;
+        self.session_serial = self.session_serial.wrapping_add(1);
         self.original_text = current_text.to_string();
         self.ui_mode = if caret_end == Some(true) {
             EditUiMode::EditMode
@@ -339,6 +352,7 @@ impl EditState {
         if self.composing && !self.preedit_text.is_empty() {
             let preedit = self.preedit_text.clone();
             self.commit_preedit(&preedit);
+            self.compose.reset();
         }
     }
 
@@ -365,6 +379,7 @@ impl EditState {
         self.formula_mode = false;
         self.formula_highlights.clear();
         self.clear_dropdown_search();
+        self.compose.reset();
         self.cancel_preedit();
         Some(result)
     }
@@ -383,6 +398,7 @@ impl EditState {
         self.formula_mode = false;
         self.formula_highlights.clear();
         self.clear_dropdown_search();
+        self.compose.reset();
         self.cancel_preedit();
         Some(result)
     }
@@ -406,6 +422,47 @@ impl EditState {
     pub fn update_text(&mut self, text: String) {
         self.edit_text = text;
         self.sync_formula_mode_from_text();
+    }
+
+    pub fn configure_compose(&mut self, enabled: bool, method: i32) {
+        let was_engine_composing = self.is_engine_composing();
+        let next_method = if enabled {
+            method
+        } else {
+            pb::ComposeMethod::None as i32
+        };
+        if self.compose.method() != next_method {
+            self.compose = ActiveCompose::for_method(next_method);
+        } else {
+            self.compose.reset();
+        }
+        if was_engine_composing {
+            self.cancel_preedit();
+        }
+    }
+
+    pub fn engine_compose_enabled(&self) -> bool {
+        !matches!(self.compose, ActiveCompose::None)
+    }
+
+    pub fn is_engine_composing(&self) -> bool {
+        self.compose.is_active() && self.composing && !self.preedit_text.is_empty()
+    }
+
+    pub fn compose_should_handle(&self, ch: char) -> bool {
+        self.compose.should_handle(ch)
+    }
+
+    pub fn compose_feed(&mut self, ch: char) -> ComposeResult {
+        self.compose.feed(ch)
+    }
+
+    pub fn compose_backspace(&mut self) -> ComposeResult {
+        self.compose.backspace()
+    }
+
+    pub fn reset_compose_state(&mut self) {
+        self.compose.reset();
     }
 
     // ── Editor Selection (EditSelStart/Length/Text) ──────────────────

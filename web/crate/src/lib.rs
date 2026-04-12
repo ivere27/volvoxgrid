@@ -5156,6 +5156,11 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                     volvoxgrid_engine::edit::EditUiMode::EnterMode => EditUiMode::Enter as i32,
                     volvoxgrid_engine::edit::EditUiMode::EditMode => EditUiMode::Edit as i32,
                 },
+                x: 0.0,
+                y: 0.0,
+                width: 0.0,
+                height: 0.0,
+                max_length: grid.edit_max_length,
             }
         })
     }
