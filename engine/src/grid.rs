@@ -545,6 +545,10 @@ pub struct VolvoxGrid {
     /// Set after a dropdown item click commits, to consume the rest of the
     /// same pointer gesture so it does not leak into grid selection.
     pub dropdown_click_active: bool,
+    /// True while dragging a text selection inside the active editor.
+    pub edit_pointer_select_active: bool,
+    /// Anchor caret position for the active editor pointer-selection drag.
+    pub edit_pointer_select_anchor: i32,
     /// Whether a dropdown button is currently shown pressed.
     pub dropdown_button_pressed: bool,
     /// Cell row for the active dropdown button press.
@@ -891,6 +895,8 @@ impl VolvoxGrid {
             // Outline button click
             outline_click_active: false,
             dropdown_click_active: false,
+            edit_pointer_select_active: false,
+            edit_pointer_select_anchor: 0,
             dropdown_button_pressed: false,
             dropdown_button_pressed_row: -1,
             dropdown_button_pressed_col: -1,

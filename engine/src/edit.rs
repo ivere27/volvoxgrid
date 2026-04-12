@@ -39,6 +39,18 @@ impl EditHighlightRegion {
     }
 }
 
+fn byte_index_at_char(text: &str, char_index: i32) -> usize {
+    let target = char_index.max(0) as usize;
+    text.char_indices()
+        .nth(target)
+        .map(|(idx, _)| idx)
+        .unwrap_or(text.len())
+}
+
+fn is_word_char(ch: char) -> bool {
+    ch.is_alphanumeric() || ch == '_'
+}
+
 fn parse_dropdown_entries(list: &str) -> Vec<ParsedDropdownItem> {
     if list.is_empty() {
         return Vec::new();
@@ -177,6 +189,8 @@ pub struct EditState {
     pub sel_start: i32,
     /// Length of selected text in editor (EditSelLength).
     pub sel_length: i32,
+    /// Active caret edge within the selection; equal to `sel_start` when collapsed.
+    pub sel_caret: i32,
     /// Currently selected dropdown item index (DropdownIndex).
     pub dropdown_index: i32,
     /// Parsed dropdown list display values for the current editing cell.
@@ -213,6 +227,7 @@ impl Default for EditState {
             ui_mode: EditUiMode::EnterMode,
             sel_start: 0,
             sel_length: 0,
+            sel_caret: 0,
             dropdown_index: -1,
             dropdown_items: Vec::new(),
             dropdown_data: Vec::new(),
@@ -228,6 +243,97 @@ impl Default for EditState {
 }
 
 impl EditState {
+    fn text_chars(&self) -> Vec<char> {
+        self.edit_text.chars().collect()
+    }
+
+    fn text_char_len(&self) -> i32 {
+        self.edit_text.chars().count() as i32
+    }
+
+    fn selection_bounds(&self) -> (i32, i32) {
+        let total = self.text_char_len();
+        let start = self.sel_start.clamp(0, total);
+        let end = (start + self.sel_length.max(0)).clamp(start, total);
+        (start, end)
+    }
+
+    fn current_caret(&self) -> i32 {
+        let (start, end) = self.selection_bounds();
+        if end > start && (self.sel_caret == start || self.sel_caret == end) {
+            self.sel_caret
+        } else {
+            end
+        }
+    }
+
+    pub(crate) fn current_caret_char(&self) -> i32 {
+        self.current_caret()
+    }
+
+    fn selection_anchor(&self) -> i32 {
+        let (start, end) = self.selection_bounds();
+        let caret = self.current_caret();
+        if end > start {
+            if caret == start { end } else { start }
+        } else {
+            start
+        }
+    }
+
+    fn set_selection_from_anchor_and_caret(&mut self, anchor: i32, caret: i32) {
+        let total = self.text_char_len();
+        let anchor = anchor.clamp(0, total);
+        let caret = caret.clamp(0, total);
+        self.sel_start = anchor.min(caret);
+        self.sel_length = (anchor - caret).abs();
+        self.sel_caret = caret;
+    }
+
+    pub fn set_selection_anchor_and_caret(&mut self, anchor: i32, caret: i32) {
+        self.set_selection_from_anchor_and_caret(anchor, caret);
+    }
+
+    fn prev_word_boundary(&self, caret: i32) -> i32 {
+        let chars = self.text_chars();
+        let mut idx = caret.clamp(0, chars.len() as i32) as usize;
+
+        while idx > 0 && !is_word_char(chars[idx - 1]) {
+            idx -= 1;
+        }
+        if idx == 0 {
+            return 0;
+        }
+
+        while idx > 0 && is_word_char(chars[idx - 1]) {
+            idx -= 1;
+        }
+
+        idx as i32
+    }
+
+    fn next_word_boundary(&self, caret: i32) -> i32 {
+        let chars = self.text_chars();
+        let len = chars.len();
+        let mut idx = caret.clamp(0, len as i32) as usize;
+
+        if idx >= len {
+            return len as i32;
+        }
+
+        if is_word_char(chars[idx]) {
+            while idx < len && is_word_char(chars[idx]) {
+                idx += 1;
+            }
+        }
+
+        while idx < len && !is_word_char(chars[idx]) {
+            idx += 1;
+        }
+
+        idx as i32
+    }
+
     fn sync_formula_mode_from_text(&mut self) {
         self.formula_mode = self.edit_text.trim_start().starts_with('=');
         if !self.formula_mode {
@@ -285,7 +391,8 @@ impl EditState {
         self.clear_dropdown_search();
         // Select all text when entering edit mode.
         self.sel_start = 0;
-        self.sel_length = self.edit_text.chars().count() as i32;
+        self.sel_length = self.text_char_len();
+        self.sel_caret = self.sel_length;
     }
 
     /// Begin editing with extended options for host-driven key dispatch.
@@ -319,18 +426,21 @@ impl EditState {
         if let Some(seed) = seed_text {
             // seed_text: replace cell text with seed, caret at end
             self.edit_text = seed.to_string();
-            self.sel_start = self.edit_text.chars().count() as i32;
+            self.sel_start = self.text_char_len();
             self.sel_length = 0;
+            self.sel_caret = self.sel_start;
         } else if caret_end == Some(true) {
             // caret_end: keep value, caret at end, no selection
             self.edit_text = current_text.to_string();
-            self.sel_start = self.edit_text.chars().count() as i32;
+            self.sel_start = self.text_char_len();
             self.sel_length = 0;
+            self.sel_caret = self.sel_start;
         } else {
             // default / select_all: keep value, select all
             self.edit_text = current_text.to_string();
             self.sel_start = 0;
-            self.sel_length = self.edit_text.chars().count() as i32;
+            self.sel_length = self.text_char_len();
+            self.sel_caret = self.sel_length;
         }
         self.formula_mode =
             formula_mode.unwrap_or_else(|| self.edit_text.trim_start().starts_with('='));
@@ -342,7 +452,8 @@ impl EditState {
     /// Select all text in the editor.
     pub fn select_all(&mut self) {
         self.sel_start = 0;
-        self.sel_length = self.edit_text.chars().count() as i32;
+        self.sel_length = self.text_char_len();
+        self.sel_caret = self.sel_length;
     }
 
     /// If an IME preedit is active, commit it into `edit_text` so the
@@ -469,29 +580,36 @@ impl EditState {
 
     /// Set the start position of selected text in the editor.
     pub fn set_sel_start(&mut self, pos: i32) {
-        let max = self.edit_text.len() as i32;
+        let max = self.text_char_len();
         self.sel_start = pos.max(0).min(max);
         // Clamp sel_length so it doesn't extend past end of text
         if self.sel_start + self.sel_length > max {
             self.sel_length = (max - self.sel_start).max(0);
         }
+        self.sel_caret = if self.sel_length > 0 {
+            self.sel_start + self.sel_length
+        } else {
+            self.sel_start
+        };
     }
 
     /// Set the length of selected text in the editor.
     pub fn set_sel_length(&mut self, len: i32) {
-        let max = self.edit_text.len() as i32;
+        let max = self.text_char_len();
         self.sel_length = len.max(0).min(max - self.sel_start);
+        self.sel_caret = if self.sel_length > 0 {
+            self.sel_start + self.sel_length
+        } else {
+            self.sel_start
+        };
     }
 
     /// Get the currently selected text in the editor.
     pub fn get_sel_text(&self) -> &str {
-        let start = self.sel_start.max(0) as usize;
-        let end = (self.sel_start + self.sel_length).max(0) as usize;
-        let len = self.edit_text.len();
-        if start >= len {
-            return "";
-        }
-        &self.edit_text[start..end.min(len)]
+        let (start, end) = self.selection_bounds();
+        let start_byte = byte_index_at_char(&self.edit_text, start);
+        let end_byte = byte_index_at_char(&self.edit_text, end);
+        &self.edit_text[start_byte..end_byte]
     }
 
     // ── Dropdown List Parsing (DropdownIndex/Count/Item) ──────────────────
@@ -578,6 +696,7 @@ impl EditState {
         self.edit_text = result.into_iter().collect();
         self.sel_start = sel_start + 1;
         self.sel_length = 0;
+        self.sel_caret = self.sel_start;
         self.sync_formula_mode_from_text();
     }
 
@@ -595,6 +714,7 @@ impl EditState {
             result.extend_from_slice(&chars[sel_end as usize..]);
             self.edit_text = result.into_iter().collect();
             self.sel_length = 0;
+            self.sel_caret = self.sel_start;
             self.sync_formula_mode_from_text();
         } else if sel_start > 0 {
             // Delete char before cursor
@@ -604,6 +724,7 @@ impl EditState {
             self.edit_text = result.into_iter().collect();
             self.sel_start = sel_start - 1;
             self.sel_length = 0;
+            self.sel_caret = self.sel_start;
             self.sync_formula_mode_from_text();
         }
     }
@@ -622,6 +743,7 @@ impl EditState {
             result.extend_from_slice(&chars[sel_end as usize..]);
             self.edit_text = result.into_iter().collect();
             self.sel_length = 0;
+            self.sel_caret = self.sel_start;
             self.sync_formula_mode_from_text();
         } else if (sel_start as usize) < chars.len() {
             // Delete char at cursor
@@ -630,6 +752,7 @@ impl EditState {
             result.extend_from_slice(&chars[(sel_start + 1) as usize..]);
             self.edit_text = result.into_iter().collect();
             self.sel_length = 0;
+            self.sel_caret = self.sel_start;
             self.sync_formula_mode_from_text();
         }
     }
@@ -639,20 +762,24 @@ impl EditState {
         if self.sel_length > 0 {
             // Collapse selection to left edge
             self.sel_length = 0;
+            self.sel_caret = self.sel_start;
         } else if self.sel_start > 0 {
             self.sel_start -= 1;
+            self.sel_caret = self.sel_start;
         }
     }
 
     /// Move cursor right by one character.
     pub fn move_right(&mut self) {
-        let total = self.edit_text.chars().count() as i32;
+        let total = self.text_char_len();
         if self.sel_length > 0 {
             // Collapse selection to right edge
             self.sel_start = (self.sel_start + self.sel_length).min(total);
             self.sel_length = 0;
+            self.sel_caret = self.sel_start;
         } else if self.sel_start < total {
             self.sel_start += 1;
+            self.sel_caret = self.sel_start;
         }
     }
 
@@ -660,12 +787,70 @@ impl EditState {
     pub fn move_home(&mut self) {
         self.sel_start = 0;
         self.sel_length = 0;
+        self.sel_caret = 0;
     }
 
     /// Move cursor to the end of the text.
     pub fn move_end(&mut self) {
-        self.sel_start = self.edit_text.chars().count() as i32;
+        self.sel_start = self.text_char_len();
         self.sel_length = 0;
+        self.sel_caret = self.sel_start;
+    }
+
+    /// Move cursor to the previous word boundary.
+    pub fn move_word_left(&mut self) {
+        let caret = self.prev_word_boundary(self.current_caret());
+        self.sel_start = caret;
+        self.sel_length = 0;
+        self.sel_caret = caret;
+    }
+
+    /// Move cursor to the next word boundary.
+    pub fn move_word_right(&mut self) {
+        let caret = self.next_word_boundary(self.current_caret());
+        self.sel_start = caret;
+        self.sel_length = 0;
+        self.sel_caret = caret;
+    }
+
+    /// Extend or shrink the selection one character to the left.
+    pub fn select_left(&mut self) {
+        let anchor = self.selection_anchor();
+        let caret = (self.current_caret() - 1).max(0);
+        self.set_selection_from_anchor_and_caret(anchor, caret);
+    }
+
+    /// Extend or shrink the selection one character to the right.
+    pub fn select_right(&mut self) {
+        let anchor = self.selection_anchor();
+        let caret = (self.current_caret() + 1).min(self.text_char_len());
+        self.set_selection_from_anchor_and_caret(anchor, caret);
+    }
+
+    /// Extend or shrink the selection to the beginning of the text.
+    pub fn select_home(&mut self) {
+        let anchor = self.selection_anchor();
+        self.set_selection_from_anchor_and_caret(anchor, 0);
+    }
+
+    /// Extend or shrink the selection to the end of the text.
+    pub fn select_end(&mut self) {
+        let anchor = self.selection_anchor();
+        self.set_selection_from_anchor_and_caret(anchor, self.text_char_len());
+    }
+
+    /// Extend or shrink the selection to the previous word boundary.
+    pub fn select_word_left(&mut self) {
+        let anchor = self.selection_anchor();
+        let caret = self.prev_word_boundary(self.current_caret());
+        self.set_selection_from_anchor_and_caret(anchor, caret);
+    }
+
+    /// Extend or shrink the selection to the next word boundary.
+    pub fn select_word_right(&mut self) {
+        let anchor = self.selection_anchor();
+        let caret = self.next_word_boundary(self.current_caret());
+        self.set_selection_from_anchor_and_caret(anchor, caret);
     }
 
     // ── IME Preedit (composition) ────────────────────────────────────
@@ -690,6 +875,7 @@ impl EditState {
             result.extend_from_slice(&chars[end..]);
             self.edit_text = result.into_iter().collect();
             self.sel_length = 0;
+            self.sel_caret = self.sel_start;
         }
         self.preedit_text = text.to_string();
         self.preedit_cursor = cursor;
@@ -713,6 +899,7 @@ impl EditState {
         self.edit_text = result.into_iter().collect();
         self.sel_start = sel_start + committed_chars.len() as i32;
         self.sel_length = 0;
+        self.sel_caret = self.sel_start;
         self.composing = false;
         self.preedit_text.clear();
         self.preedit_cursor = 0;
@@ -994,6 +1181,77 @@ mod tests {
         assert_eq!(edit.sel_start, 3);
         edit.move_home();
         assert_eq!(edit.sel_start, 0);
+    }
+
+    #[test]
+    fn shift_selection_tracks_caret_edge() {
+        let mut edit = EditState::default();
+        edit.start_edit(1, 0, "abcd");
+        edit.move_end();
+
+        edit.select_left();
+        assert_eq!(edit.sel_start, 3);
+        assert_eq!(edit.sel_length, 1);
+
+        edit.select_left();
+        assert_eq!(edit.sel_start, 2);
+        assert_eq!(edit.sel_length, 2);
+
+        edit.select_right();
+        assert_eq!(edit.sel_start, 3);
+        assert_eq!(edit.sel_length, 1);
+
+        edit.select_right();
+        assert_eq!(edit.sel_start, 4);
+        assert_eq!(edit.sel_length, 0);
+    }
+
+    #[test]
+    fn selected_text_uses_char_offsets() {
+        let mut edit = EditState::default();
+        edit.start_edit(1, 0, "가나다");
+        edit.set_sel_start(1);
+        edit.set_sel_length(1);
+
+        assert_eq!(edit.get_sel_text(), "나");
+    }
+
+    #[test]
+    fn move_word_left_right_uses_word_boundaries() {
+        let mut edit = EditState::default();
+        edit.start_edit(1, 0, "abc def! ghi");
+        edit.move_end();
+
+        edit.move_word_left();
+        assert_eq!(edit.sel_start, 9);
+
+        edit.move_word_left();
+        assert_eq!(edit.sel_start, 4);
+
+        edit.move_word_right();
+        assert_eq!(edit.sel_start, 9);
+
+        edit.move_word_right();
+        assert_eq!(edit.sel_start, 12);
+    }
+
+    #[test]
+    fn shift_word_selection_tracks_active_caret_edge() {
+        let mut edit = EditState::default();
+        edit.start_edit(1, 0, "abc def ghi");
+        edit.move_end();
+
+        edit.select_word_left();
+        assert_eq!(edit.sel_start, 8);
+        assert_eq!(edit.sel_length, 3);
+
+        edit.select_word_left();
+        assert_eq!(edit.sel_start, 4);
+        assert_eq!(edit.sel_length, 7);
+
+        edit.select_word_right();
+        assert_eq!(edit.sel_start, 8);
+        assert_eq!(edit.sel_length, 3);
     }
 
     #[test]
