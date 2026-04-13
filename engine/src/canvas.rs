@@ -8089,10 +8089,11 @@ mod tests {
     use super::pb;
     use super::{
         aligned_editor_draw_x, build_or_reuse_ctx, cell_has_checkbox_visual, cell_rect,
-        checkbox_box_size, checkbox_layer_needed, compose_preedit_display_text, dropdown_button_rect,
-        dropdown_glyph_metrics, dropdown_layer_needed, parse_progress_percent,
-        picture_layer_needed, progress_layer_needed, render_grid, show_dropdown_button_for_cell,
-        sort_arrow_box_size, CellKey, RenderContext, RenderCtxCacheKey, RenderCtxCached,
+        checkbox_box_size, checkbox_layer_needed, compose_preedit_display_text,
+        dropdown_button_rect, dropdown_glyph_metrics, dropdown_layer_needed,
+        parse_progress_percent, picture_layer_needed, progress_layer_needed, render_grid,
+        show_dropdown_button_for_cell, sort_arrow_box_size, CellKey, RenderContext,
+        RenderCtxCacheKey, RenderCtxCached,
     };
     use crate::canvas_cpu::CpuCanvas;
     use crate::grid::VolvoxGrid;

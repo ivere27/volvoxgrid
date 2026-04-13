@@ -275,7 +275,11 @@ impl EditState {
         let (start, end) = self.selection_bounds();
         let caret = self.current_caret();
         if end > start {
-            if caret == start { end } else { start }
+            if caret == start {
+                end
+            } else {
+                start
+            }
         } else {
             start
         }

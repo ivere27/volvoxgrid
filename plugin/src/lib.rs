@@ -2087,7 +2087,10 @@ fn current_edit_session_serial(
 ) -> Option<u64> {
     plugin
         .with_grid(grid_id, |grid| {
-            if grid.edit.is_active() && grid.edit.edit_row == req.row && grid.edit.edit_col == req.col {
+            if grid.edit.is_active()
+                && grid.edit.edit_row == req.row
+                && grid.edit.edit_col == req.col
+            {
                 Some(grid.edit.session_serial)
             } else {
                 None
@@ -3631,7 +3634,13 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
             let grid_id = input.grid_id;
             for output in self.resolve_expired_actions(grid_id) {
                 if !terminal_session.suppress_aux_outputs() {
-                    send_render_output_tracked(self, stream, &mut sent_edit_requests, grid_id, output);
+                    send_render_output_tracked(
+                        self,
+                        stream,
+                        &mut sent_edit_requests,
+                        grid_id,
+                        output,
+                    );
                 }
             }
 
