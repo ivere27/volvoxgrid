@@ -92,6 +92,7 @@
 #define DISPID_VG_SETHOVERMODE  91
 #define DISPID_VG_SETDEBUGOVERLAY  92
 #define DISPID_VG_SETSCROLLBLIT  93
+#define DISPID_VG_IMECOMPOSITION  94
 
 /* ═══════ Section 2: Name Table ═══════ */
 typedef struct { const wchar_t *name; int id; } VG_NameEntry;
@@ -183,6 +184,7 @@ static const VG_NameEntry vg_activex_names[] = {
     { L"SetHoverMode", DISPID_VG_SETHOVERMODE },
     { L"SetDebugOverlay", DISPID_VG_SETDEBUGOVERLAY },
     { L"SetScrollBlit", DISPID_VG_SETSCROLLBLIT },
+    { L"ImeComposition", DISPID_VG_IMECOMPOSITION },
     { NULL, 0 }
 };
 

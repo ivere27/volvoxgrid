@@ -1563,6 +1563,56 @@ static int32_t vfg_set_edit_text_compat(int64_t grid_id, const char *utf8, int32
     return vfg_take_status_response(out);
 }
 
+static int32_t vfg_set_preedit_compat(
+    int64_t grid_id,
+    const char *utf8,
+    int32_t utf8len,
+    int32_t cursor,
+    int32_t commit)
+{
+    uint8_t *buf;
+    int pos = 0;
+    int32_t out_len = 0;
+    uint8_t *out;
+    int capacity;
+    int inner_len;
+
+    if (!utf8) {
+        utf8 = "";
+        utf8len = 0;
+    }
+    if (utf8len < 0) return -1;
+    if (cursor < 0) cursor = 0;
+    commit = commit ? 1 : 0;
+
+    inner_len =
+        1 + vfg_varint_len((uint64_t)utf8len) + utf8len +
+        1 + vfg_varint_len((uint64_t)(uint32_t)cursor) +
+        1 + vfg_varint_len((uint64_t)(uint32_t)commit);
+    capacity = inner_len + 32;
+    buf = (uint8_t *)HeapAlloc(GetProcessHeap(), 0, (SIZE_T)capacity);
+    if (!buf) return -1;
+
+    buf[pos++] = 0x08;
+    pos += vfg_write_varint(buf + pos, (uint64_t)grid_id);
+    buf[pos++] = 0x4A;
+    pos += vfg_write_varint(buf + pos, (uint64_t)inner_len);
+    buf[pos++] = 0x0A;
+    pos += vfg_write_varint(buf + pos, (uint64_t)utf8len);
+    if (utf8len > 0) {
+        memcpy(buf + pos, utf8, (size_t)utf8len);
+        pos += utf8len;
+    }
+    buf[pos++] = 0x10;
+    pos += vfg_write_varint(buf + pos, (uint64_t)(uint32_t)cursor);
+    buf[pos++] = 0x18;
+    pos += vfg_write_varint(buf + pos, (uint64_t)(uint32_t)commit);
+
+    out = volvox_grid_edit_pb(buf, pos, &out_len);
+    HeapFree(GetProcessHeap(), 0, buf);
+    return vfg_take_status_response(out);
+}
+
 static char *vfg_get_edit_text_utf8(int64_t grid_id, int *out_len) {
     return vfg_query_edit_state_string_field(grid_id, 4, out_len);
 }
@@ -4876,6 +4926,39 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
         }
         break;
 
+    case DISPID_VG_IMECOMPOSITION:
+        if (wFlags & DISPATCH_METHOD) {
+            BSTR text = NULL;
+            VARIANT vtext;
+            int32_t cursor = 0;
+            int32_t commit = 0;
+            int32_t status;
+            int utf8len = 0;
+            char *utf8;
+
+            VariantInit(&vtext);
+            if (pDispParams->cArgs >= 1) text = variant_to_bstr(ARG(0), &vtext);
+            if (pDispParams->cArgs >= 2) variant_to_i4(ARG(1), &cursor);
+            if (pDispParams->cArgs >= 3) variant_to_i4(ARG(2), &commit);
+
+            if (!commit && text && SysStringLen(text) > 0 && !vfg_query_edit_active(gid)) {
+                int32_t row = volvox_grid_get_row(gid);
+                int32_t col = volvox_grid_get_col(gid);
+                status = volvox_grid_edit_cell(gid, row, col);
+                if (status != 0) {
+                    VariantClear(&vtext);
+                    return E_FAIL;
+                }
+            }
+
+            utf8 = bstr_to_utf8(text, &utf8len);
+            status = vfg_set_preedit_compat(gid, utf8, utf8len, cursor, commit);
+            if (utf8) HeapFree(GetProcessHeap(), 0, utf8);
+            VariantClear(&vtext);
+            return status == 0 ? S_OK : E_FAIL;
+        }
+        break;
+
     case DISPID_VG_SETHOVERMODE:
         if (wFlags & DISPATCH_METHOD) {
             int32_t mode = 0;
@@ -5067,6 +5150,17 @@ static int utf8_to_wchar(const uint8_t *u8, int u8_len,
     return n;
 }
 
+/* Wine memory-DC text rendering can miss visual bold weight.
+ * Detect Wine once and synthesize a subtle bold pass only there. */
+static BOOL gdi_is_wine(void) {
+    static int cached = -1;
+    if (cached >= 0) return cached ? TRUE : FALSE;
+    HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+    FARPROC wine_get_version = ntdll ? GetProcAddress(ntdll, "wine_get_version") : NULL;
+    cached = wine_get_version ? 1 : 0;
+    return cached ? TRUE : FALSE;
+}
+
 /* Create a GDI HFONT matching the engine parameters. */
 static HFONT gdi_create_font(const uint8_t *font_name_ptr, int font_name_len,
                              float font_size, int bold, int italic) {
@@ -5086,17 +5180,6 @@ static HFONT gdi_create_font(const uint8_t *font_name_ptr, int font_name_len,
         DEFAULT_PITCH | FF_DONTCARE,
         face[0] ? face : L"Arial"
     );
-}
-
-/* Wine memory-DC text rendering can miss visual bold weight.
- * Detect Wine once and synthesize a subtle bold pass only there. */
-static BOOL gdi_is_wine(void) {
-    static int cached = -1;
-    if (cached >= 0) return cached ? TRUE : FALSE;
-    HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
-    FARPROC wine_get_version = ntdll ? GetProcAddress(ntdll, "wine_get_version") : NULL;
-    cached = wine_get_version ? 1 : 0;
-    return cached ? TRUE : FALSE;
 }
 
 static int gdi_clamp_int(int v, int lo, int hi) {
@@ -5132,6 +5215,12 @@ static void gdi_measure_text(
     HDC hdc = CreateCompatibleDC(NULL);
     HFONT hfont = gdi_create_font(font_name_ptr, font_name_len,
                                   font_size, bold, italic);
+    if (!hdc || !hfont) {
+        if (hfont) DeleteObject(hfont);
+        if (hdc) DeleteDC(hdc);
+        *out_height = font_size * 1.2f;
+        return;
+    }
     HFONT old = (HFONT)SelectObject(hdc, hfont);
 
     if (max_width < 0) {
@@ -5203,10 +5292,6 @@ static float gdi_render_text(
     int draw_x = x - surf_left;
     int draw_y = y - surf_top;
 
-    HFONT hfont = gdi_create_font(font_name_ptr, font_name_len,
-                                  font_size,
-                                  bold, italic);
-
     UINT fmt = DT_NOPREFIX | DT_EXPANDTABS;
     if (max_width >= 0)
         fmt |= DT_WORDBREAK;
@@ -5221,9 +5306,13 @@ static float gdi_render_text(
     HDC hdc = CreateCompatibleDC(screen_dc);
     HBITMAP hbmp = CreateCompatibleBitmap(screen_dc, rw, rh);
     ReleaseDC(NULL, screen_dc);
-    if (!hbmp) {
-        DeleteDC(hdc);
-        DeleteObject(hfont);
+    HFONT hfont = gdi_create_font(font_name_ptr, font_name_len,
+                                  font_size,
+                                  bold, italic);
+    if (!hdc || !hbmp || !hfont) {
+        if (hbmp) DeleteObject(hbmp);
+        if (hfont) DeleteObject(hfont);
+        if (hdc) DeleteDC(hdc);
         return 0.0f;
     }
 

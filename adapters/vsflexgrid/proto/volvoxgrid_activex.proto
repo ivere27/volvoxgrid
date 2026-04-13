@@ -1838,6 +1838,7 @@ service VolvoxGridService {
     properties: { dispid: 91  name: "SetHoverMode"     custom: true }
     properties: { dispid: 92  name: "SetDebugOverlay"  custom: true }
     properties: { dispid: 93  name: "SetScrollBlit"    custom: true }
+    properties: { dispid: 94  name: "ImeComposition"   custom: true }
   };
 
   // Lifecycle

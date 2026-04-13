@@ -283,18 +283,20 @@ Relevant files:
 - `adapters/vsflexgrid/crate/src/lib.rs`
 - `adapters/vsflexgrid/src/VolvoxGridCtrl.cpp`
 - `adapters/vsflexgrid/mingw/volvoxgrid_ocx.c`
+- `adapters/vsflexgrid/mingw/activex_demo_host.c`
 
 Current status:
 
 - the Rust adapter core understands `EditSetPreedit` and `preedit_text`
-- the public ATL and raw OCX wrappers currently expose keyboard forwarding through `WM_KEYDOWN` and `WM_CHAR`
-- there is no explicit `WM_IME_*` handling in the current wrapper layers
+- the windowless OCX now exposes `ImeComposition(text, cursor, commit)` and encodes `EditSetPreedit` through the existing native edit protobuf path
+- the MinGW demo host forwards `WM_IME_STARTCOMPOSITION`, `WM_IME_COMPOSITION`, `WM_IME_ENDCOMPOSITION`, and suppresses `WM_IME_CHAR` duplicates
+- `WM_IME_COMPOSITION` reads `GCS_RESULTSTR` and `GCS_COMPSTR` through IMM32 and forwards them to the OCX DISPID bridge
 
 Interpretation:
 
-- engine-side preedit support exists below the wrapper
-- host-side IME capture is not wired to the same level as WinForms, Swing, Android, or web
-- treat IME support in this adapter as incomplete until the wrapper adds real IME message handling or a native editor control
+- host wrappers can now drive the engine preedit API through the ActiveX dispatch surface instead of falling back to plain `WM_CHAR`
+- the shipped demo host has functional CJK/dead-key composition support, including inline preedit and commit without duplicate `WM_IME_CHAR` insertion
+- because the OCX is windowless, any other ActiveX container still needs to forward `WM_IME_*` messages from its host window to `ImeComposition`
 
 ### XtraGrid Adapter
 
