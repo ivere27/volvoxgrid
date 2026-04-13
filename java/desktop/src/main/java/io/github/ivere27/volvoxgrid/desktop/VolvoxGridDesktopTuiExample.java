@@ -46,7 +46,6 @@ import io.github.ivere27.volvoxgrid.SelectionConfig;
 import io.github.ivere27.volvoxgrid.SelectionMode;
 import io.github.ivere27.volvoxgrid.SelectionState;
 import io.github.ivere27.volvoxgrid.SpanConfig;
-import io.github.ivere27.volvoxgrid.TabBehavior;
 import io.github.ivere27.volvoxgrid.TreeIndicatorStyle;
 import io.github.ivere27.volvoxgrid.UpdateCellsRequest;
 import java.io.ByteArrayOutputStream;
@@ -445,7 +444,6 @@ public final class VolvoxGridDesktopTuiExample {
             .setEditing(
                 EditConfig.newBuilder()
                     .setTrigger(EditTrigger.EDIT_TRIGGER_KEY_CLICK)
-                    .setTabBehavior(TabBehavior.TAB_CELLS)
                     .setDropdownTrigger(DropdownTrigger.DROPDOWN_ALWAYS)
                     .setDropdownSearch(false)
                     .build()
@@ -661,7 +659,6 @@ public final class VolvoxGridDesktopTuiExample {
             .setEditing(
                 EditConfig.newBuilder()
                     .setTrigger(EditTrigger.EDIT_TRIGGER_KEY_CLICK)
-                    .setTabBehavior(TabBehavior.TAB_CELLS)
                     .setDropdownTrigger(DropdownTrigger.DROPDOWN_NEVER)
                     .build()
             )
@@ -759,7 +756,6 @@ public final class VolvoxGridDesktopTuiExample {
             .setEditing(
                 EditConfig.newBuilder()
                     .setTrigger(EditTrigger.EDIT_TRIGGER_KEY_CLICK)
-                    .setTabBehavior(TabBehavior.TAB_CELLS)
                     .build()
             )
             .setScrolling(

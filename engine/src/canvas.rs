@@ -6517,6 +6517,40 @@ pub(crate) fn compose_preedit_display_text(
     format!("{}{}{}", &text[..before_byte], preedit, &text[after_byte..])
 }
 
+fn aligned_editor_draw_x(
+    clip_x: i32,
+    clip_w: i32,
+    text_w: i32,
+    caret_px: i32,
+    halign: i32,
+    scroll_margin: i32,
+) -> i32 {
+    let clip_w = clip_w.max(1);
+    let text_w = text_w.max(0);
+    let caret_px = caret_px.max(0);
+    let mut draw_x = match halign {
+        1 => clip_x + (clip_w - text_w) / 2,
+        2 => clip_x + clip_w - text_w,
+        _ => clip_x,
+    };
+
+    let margin = if text_w > clip_w {
+        scroll_margin.min(clip_w.saturating_sub(1))
+    } else {
+        0
+    };
+    let min_caret_x = clip_x + margin;
+    let max_caret_x = clip_x + clip_w - margin;
+    let caret_x = draw_x + caret_px;
+    if caret_x < min_caret_x {
+        draw_x += min_caret_x - caret_x;
+    } else if caret_x > max_caret_x {
+        draw_x -= caret_x - max_caret_x;
+    }
+
+    draw_x
+}
+
 fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
     let vp = &ctx.vp;
     if !grid.edit.is_active() {
@@ -6591,9 +6625,11 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
     let sel_end = (grid.edit.sel_start + grid.edit.sel_length).clamp(0, text_char_count);
 
     let text_x = cx + left_padding;
+    let text_clip_y = cy + top_padding;
     let clip_w = (edit_w - left_padding - right_padding).max(1);
     let clip_h = inner_h;
     let scroll_margin = 2; // pixels of margin to keep between caret and clip edge
+    let halign = grid.edit_horizontal_alignment();
 
     if composing {
         // IME composition mode: preview the preedit text replacing any active selection.
@@ -6601,7 +6637,7 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
         let before_preedit_byte = byte_index_at_char(text, sel_start);
         let composite = compose_preedit_display_text(text, sel_start, sel_end, preedit);
 
-        let (_, th) = canvas.measure_text(
+        let (tw, th) = canvas.measure_text(
             &composite,
             font_name,
             font_size,
@@ -6637,12 +6673,14 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
             None,
         );
         let caret_px = before_w.ceil() as i32 + cursor_w.ceil() as i32;
-        let scroll_offset = if caret_px + scroll_margin > clip_w {
-            caret_px + scroll_margin - clip_w
-        } else {
-            0
-        };
-        let draw_x = text_x - scroll_offset;
+        let draw_x = aligned_editor_draw_x(
+            text_x,
+            clip_w,
+            tw.ceil() as i32,
+            caret_px,
+            halign,
+            scroll_margin,
+        );
 
         // Draw the full composite string.
         canvas.draw_text_styled_fast(
@@ -6655,7 +6693,7 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
             font_italic,
             fore,
             text_x,
-            0,
+            text_clip_y,
             clip_w,
             clip_h,
             text_style,
@@ -6682,15 +6720,12 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
         let prefix = &text[..byte_index_at_char(text, sel_start)];
         let selected =
             &text[byte_index_at_char(text, sel_start)..byte_index_at_char(text, sel_end)];
-        let (_, th) = canvas.measure_text(text, font_name, font_size, font_bold, font_italic, None);
+        let (tw, th) =
+            canvas.measure_text(text, font_name, font_size, font_bold, font_italic, None);
         let text_y = cy + top_padding + ((inner_h - th.ceil() as i32) / 2).max(0);
 
         // Compute scroll offset to keep the caret (or selection end) visible.
-        let caret_char = if sel_end > sel_start {
-            sel_end
-        } else {
-            sel_start
-        };
+        let caret_char = grid.edit.current_caret_char().clamp(sel_start, sel_end);
         let caret_prefix = &text[..byte_index_at_char(text, caret_char)];
         let (caret_prefix_w, _) = canvas.measure_text(
             caret_prefix,
@@ -6701,12 +6736,14 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
             None,
         );
         let caret_px = caret_prefix_w.ceil() as i32;
-        let scroll_offset = if caret_px + scroll_margin > clip_w {
-            caret_px + scroll_margin - clip_w
-        } else {
-            0
-        };
-        let draw_x = text_x - scroll_offset;
+        let draw_x = aligned_editor_draw_x(
+            text_x,
+            clip_w,
+            tw.ceil() as i32,
+            caret_px,
+            halign,
+            scroll_margin,
+        );
 
         // Selection highlight
         if sel_end > sel_start {
@@ -6740,7 +6777,7 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
             font_italic,
             fore,
             text_x,
-            0,
+            text_clip_y,
             clip_w,
             clip_h,
             text_style,
@@ -6761,8 +6798,8 @@ fn render_active_editor<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
                 font_bold,
                 font_italic,
                 0xFF000000,
-                sel_x,
-                0,
+                text_x,
+                text_clip_y,
                 clip_w,
                 clip_h,
                 text_style,
@@ -8051,16 +8088,89 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
 mod tests {
     use super::pb;
     use super::{
-        build_or_reuse_ctx, cell_has_checkbox_visual, checkbox_box_size, checkbox_layer_needed,
-        compose_preedit_display_text, dropdown_button_rect, dropdown_glyph_metrics,
-        dropdown_layer_needed, parse_progress_percent, picture_layer_needed, progress_layer_needed,
+        aligned_editor_draw_x, build_or_reuse_ctx, cell_has_checkbox_visual, cell_rect,
+        checkbox_box_size, checkbox_layer_needed, compose_preedit_display_text,
+        dropdown_button_rect, dropdown_glyph_metrics, dropdown_layer_needed,
+        parse_progress_percent, picture_layer_needed, progress_layer_needed, render_grid,
         show_dropdown_button_for_cell, sort_arrow_box_size, CellKey, RenderContext,
         RenderCtxCacheKey, RenderCtxCached,
     };
+    use crate::canvas_cpu::CpuCanvas;
     use crate::grid::VolvoxGrid;
+    use crate::text::TextRenderer;
 
     fn render_ctx(grid: &VolvoxGrid) -> RenderContext {
         RenderContext::new(grid, grid.viewport_width, grid.viewport_height, None)
+    }
+
+    fn pixel_argb(buffer: &[u8], width: i32, x: i32, y: i32) -> u32 {
+        let off = ((y * width + x) * 4) as usize;
+        ((buffer[off + 3] as u32) << 24)
+            | ((buffer[off] as u32) << 16)
+            | ((buffer[off + 1] as u32) << 8)
+            | (buffer[off + 2] as u32)
+    }
+
+    struct SolidTextRenderer;
+
+    impl TextRenderer for SolidTextRenderer {
+        fn measure_text(
+            &mut self,
+            text: &str,
+            _font_name: &str,
+            _font_size: f32,
+            _bold: bool,
+            _italic: bool,
+            _max_width: Option<f32>,
+        ) -> (f32, f32) {
+            ((text.chars().count().max(1) as f32) * 6.0, 8.0)
+        }
+
+        fn render_text(
+            &mut self,
+            buffer_pixels: &mut [u8],
+            _buf_width: i32,
+            _buf_height: i32,
+            stride: i32,
+            x: i32,
+            y: i32,
+            clip_x: i32,
+            clip_y: i32,
+            clip_w: i32,
+            clip_h: i32,
+            text: &str,
+            _font_name: &str,
+            _font_size: f32,
+            _bold: bool,
+            _italic: bool,
+            color: u32,
+            _max_width: Option<f32>,
+        ) -> f32 {
+            let draw_w = (text.chars().count().max(1) as i32) * 6;
+            let draw_h = 8;
+            let x0 = x.max(clip_x).max(0);
+            let y0 = y.max(clip_y).max(0);
+            let x1 = (x + draw_w).min(clip_x + clip_w);
+            let y1 = (y + draw_h).min(clip_y + clip_h);
+            if x1 <= x0 || y1 <= y0 {
+                return draw_w as f32;
+            }
+
+            let r = ((color >> 16) & 0xFF) as u8;
+            let g = ((color >> 8) & 0xFF) as u8;
+            let b = (color & 0xFF) as u8;
+            let a = ((color >> 24) & 0xFF) as u8;
+            for py in y0..y1 {
+                for px in x0..x1 {
+                    let off = (py * stride + px * 4) as usize;
+                    buffer_pixels[off] = r;
+                    buffer_pixels[off + 1] = g;
+                    buffer_pixels[off + 2] = b;
+                    buffer_pixels[off + 3] = a;
+                }
+            }
+            draw_w as f32
+        }
     }
 
     #[test]
@@ -8099,6 +8209,72 @@ mod tests {
         assert_eq!(compose_preedit_display_text("abcd", 0, 4, "우"), "우");
         assert_eq!(compose_preedit_display_text("abcd", 1, 3, "우"), "a우d");
         assert_eq!(compose_preedit_display_text("abcd", 4, 4, "우"), "abcd우");
+    }
+
+    #[test]
+    fn aligned_editor_draw_x_keeps_right_aligned_text_at_right_edge() {
+        assert_eq!(aligned_editor_draw_x(10, 100, 40, 40, 2, 2), 70);
+    }
+
+    #[test]
+    fn aligned_editor_draw_x_scrolls_right_aligned_text_to_show_start_caret() {
+        assert_eq!(aligned_editor_draw_x(10, 100, 140, 0, 2, 2), 12);
+    }
+
+    #[test]
+    fn active_editor_selection_repaint_stays_inside_cell_bounds() {
+        let width = 180;
+        let height = 24;
+        let stride = width * 4;
+        let make_grid = || {
+            let mut grid = VolvoxGrid::new(1, width, height, 1, 3, 0, 0);
+            grid.style.grid_lines = pb::GridLineStyle::GridlineNone as i32;
+            grid.style.grid_lines_fixed = pb::GridLineStyle::GridlineNone as i32;
+            grid.set_col_width(0, 60);
+            grid.set_col_width(1, 60);
+            grid.set_col_width(2, 60);
+            grid.set_row_height(0, 24);
+            grid.selection
+                .set_cursor(0, 1, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+            grid
+        };
+
+        let mut base = make_grid();
+        let mut grid = make_grid();
+        grid.edit.start_edit_with_options(
+            0,
+            1,
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+            None,
+            Some(true),
+            None,
+            None,
+        );
+        grid.edit.set_sel_start(10);
+        grid.edit.set_sel_length(10);
+        base.ensure_layout();
+        grid.ensure_layout();
+
+        let mut text = SolidTextRenderer;
+        let mut baseline = vec![0u8; (stride * height) as usize];
+        let mut baseline_canvas = CpuCanvas::new(&mut baseline, width, height, stride, &mut text);
+        render_grid(&base, &mut baseline_canvas);
+
+        let mut buffer = vec![0u8; (stride * height) as usize];
+        let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+        render_grid(&grid, &mut canvas);
+
+        let ctx = render_ctx(&grid);
+        let (left_x, left_y, left_w, left_h) = cell_rect(&grid, 0, 0, &ctx.vp).expect("left cell");
+        for y in (left_y + 4)..(left_y + left_h - 4) {
+            for x in (left_x + left_w - 14)..(left_x + left_w - 6) {
+                assert_eq!(
+                    pixel_argb(&buffer, width, x, y),
+                    pixel_argb(&baseline, width, x, y),
+                    "selection repaint spilled into left neighbor at ({x},{y})"
+                );
+            }
+        }
     }
 
     #[test]

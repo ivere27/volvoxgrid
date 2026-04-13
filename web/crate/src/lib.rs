@@ -2793,6 +2793,11 @@ pub fn get_edit_cell_padding(id: i32) -> Vec<i32> {
     .unwrap_or_else(|| vec![0, 0, 0, 0])
 }
 
+#[wasm_bindgen]
+pub fn get_edit_halign(id: i32) -> i32 {
+    with_grid(id, |grid| grid.edit_horizontal_alignment()).unwrap_or(0)
+}
+
 /// Screen-space rect (x, y, w, h) for any cell, accounting for scroll offset.
 #[wasm_bindgen]
 pub fn get_cell_screen_x(id: i32, row: i32, col: i32) -> i32 {
@@ -5151,6 +5156,11 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                     volvoxgrid_engine::edit::EditUiMode::EnterMode => EditUiMode::Enter as i32,
                     volvoxgrid_engine::edit::EditUiMode::EditMode => EditUiMode::Edit as i32,
                 },
+                x: 0.0,
+                y: 0.0,
+                width: 0.0,
+                height: 0.0,
+                max_length: grid.edit_max_length,
             }
         })
     }

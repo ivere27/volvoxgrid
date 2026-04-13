@@ -106,6 +106,29 @@ static int32_t vfg_decode_field2_i32(const uint8_t *data, int32_t len, int32_t f
     return fallback;
 }
 
+static int32_t vfg_decode_i32_field(
+    const uint8_t *data, int32_t len, uint32_t target_field, int32_t fallback)
+{
+    int32_t pos = 0;
+    if (!data || len < 0) return fallback;
+
+    while (pos < len) {
+        uint64_t key = 0;
+        uint64_t value = 0;
+        uint32_t field_no;
+        uint32_t wire_type;
+        if (!vfg_read_varint(data, len, &pos, &key)) return fallback;
+        field_no = (uint32_t)(key >> 3);
+        wire_type = (uint32_t)(key & 0x7);
+        if (field_no == target_field && wire_type == 0) {
+            if (!vfg_read_varint(data, len, &pos, &value)) return fallback;
+            return (int32_t)value;
+        }
+        if (!vfg_skip_wire(data, len, &pos, wire_type)) return fallback;
+    }
+    return fallback;
+}
+
 static int32_t vfg_take_status_response(uint8_t *data) {
     if (!data) return -1;
     volvox_grid_free(data, 0);
@@ -244,7 +267,9 @@ static int32_t vfg_engine_auto_resize_enabled(int64_t grid_id, int32_t fallback)
     return value != 0;
 }
 
-/* Forward-declare protobuf-based Sort (generated header may be stale). */
+/* Forward-declare protobuf-based helpers (generated header may be stale). */
+uint8_t* volvox_grid_clipboard_pb(const uint8_t* data, int32_t data_len, int32_t* out_len);
+uint8_t* volvox_grid_edit_pb(const uint8_t* data, int32_t data_len, int32_t* out_len);
 uint8_t* volvox_grid_sort_pb(const uint8_t* data, int32_t data_len, int32_t* out_len);
 int32_t volvox_grid_set_grid_color_fixed(int64_t id, uint32_t color);
 
@@ -256,6 +281,15 @@ static int vfg_write_varint(uint8_t *buf, uint64_t v) {
         v >>= 7;
     }
     buf[n++] = (uint8_t)v;
+    return n;
+}
+
+static int vfg_varint_len(uint64_t v) {
+    int n = 1;
+    while (v > 0x7F) {
+        v >>= 7;
+        n++;
+    }
     return n;
 }
 
@@ -1177,6 +1211,609 @@ static int utf8_append_bytes(char **buf, int *len, int *cap, const char *src, in
     *len += n;
     (*buf)[*len] = '\0';
     return 1;
+}
+
+static int vfg_decode_bool_field(
+    const uint8_t *data, int32_t len, uint32_t target_field, int fallback)
+{
+    int32_t pos = 0;
+
+    if (!data || len <= 0) return fallback;
+    while (pos < len) {
+        uint64_t key = 0;
+        uint64_t value = 0;
+        uint32_t field_no;
+        uint32_t wire_type;
+
+        if (!vfg_read_varint(data, len, &pos, &key)) return fallback;
+        field_no = (uint32_t)(key >> 3);
+        wire_type = (uint32_t)(key & 0x7);
+        if (field_no == target_field && wire_type == 0) {
+            if (!vfg_read_varint(data, len, &pos, &value)) return fallback;
+            return value != 0 ? 1 : 0;
+        }
+        if (!vfg_skip_wire(data, len, &pos, wire_type)) return fallback;
+    }
+    return fallback;
+}
+
+static int vfg_decode_bytes_field(
+    const uint8_t *data,
+    int32_t len,
+    uint32_t target_field,
+    const uint8_t **out_ptr,
+    int32_t *out_len)
+{
+    int32_t pos = 0;
+
+    if (out_ptr) *out_ptr = NULL;
+    if (out_len) *out_len = 0;
+    if (!data || len <= 0) return 0;
+
+    while (pos < len) {
+        uint64_t key = 0;
+        uint64_t field_len = 0;
+        uint32_t field_no;
+        uint32_t wire_type;
+
+        if (!vfg_read_varint(data, len, &pos, &key)) return 0;
+        field_no = (uint32_t)(key >> 3);
+        wire_type = (uint32_t)(key & 0x7);
+        if (field_no == target_field && wire_type == 2) {
+            if (!vfg_read_varint(data, len, &pos, &field_len)) return 0;
+            if (field_len > (uint64_t)(len - pos)) return 0;
+            if (out_ptr) *out_ptr = data + pos;
+            if (out_len) *out_len = (int32_t)field_len;
+            return 1;
+        }
+        if (!vfg_skip_wire(data, len, &pos, wire_type)) return 0;
+    }
+    return 0;
+}
+
+static char *vfg_take_string_field_response(uint8_t *data, int32_t len, uint32_t field_no, int *out_len) {
+    char *copy;
+    const uint8_t *field_ptr = NULL;
+    int32_t field_len = 0;
+
+    if (out_len) *out_len = 0;
+    if (!data) return NULL;
+
+    if (!vfg_decode_bytes_field(data, len, field_no, &field_ptr, &field_len)) {
+        field_ptr = (const uint8_t *)"";
+        field_len = 0;
+    }
+
+    copy = (char *)HeapAlloc(GetProcessHeap(), 0, (SIZE_T)field_len + 1);
+    if (!copy) {
+        volvox_grid_free(data, 0);
+        return NULL;
+    }
+
+    if (field_len > 0) {
+        memcpy(copy, field_ptr, (size_t)field_len);
+    }
+    copy[field_len] = '\0';
+    if (out_len) *out_len = field_len;
+    volvox_grid_free(data, 0);
+    return copy;
+}
+
+static int vfg_take_bool_field_response(uint8_t *data, int32_t len, uint32_t field_no, int fallback) {
+    int value = fallback;
+    if (data) {
+        value = vfg_decode_bool_field(data, len, field_no, fallback);
+        volvox_grid_free(data, 0);
+    }
+    return value;
+}
+
+static int vfg_utf8_char_size(unsigned char lead) {
+    if ((lead & 0x80) == 0x00) return 1;
+    if ((lead & 0xE0) == 0xC0) return 2;
+    if ((lead & 0xF0) == 0xE0) return 3;
+    if ((lead & 0xF8) == 0xF0) return 4;
+    return 1;
+}
+
+static int32_t vfg_utf8_char_count(const char *utf8, int32_t len) {
+    int32_t pos = 0;
+    int32_t count = 0;
+
+    if (!utf8 || len <= 0) return 0;
+    while (pos < len) {
+        int step = vfg_utf8_char_size((unsigned char)utf8[pos]);
+        if (step <= 0 || pos + step > len) step = 1;
+        pos += step;
+        count++;
+    }
+    return count;
+}
+
+static int32_t vfg_utf8_byte_offset_for_char_index(const char *utf8, int32_t len, int32_t char_index) {
+    int32_t pos = 0;
+    int32_t count = 0;
+
+    if (!utf8 || len <= 0 || char_index <= 0) return 0;
+    while (pos < len && count < char_index) {
+        int step = vfg_utf8_char_size((unsigned char)utf8[pos]);
+        if (step <= 0 || pos + step > len) step = 1;
+        pos += step;
+        count++;
+    }
+    return pos;
+}
+
+static char *vfg_utf8_replace_range(
+    const char *base,
+    int32_t base_len,
+    int32_t start_chars,
+    int32_t remove_chars,
+    const char *insert,
+    int32_t insert_len,
+    int32_t *out_len)
+{
+    int32_t total_chars;
+    int32_t start_char;
+    int32_t end_char;
+    int32_t start_byte;
+    int32_t end_byte;
+    int32_t next_len;
+    char *next;
+
+    if (out_len) *out_len = 0;
+    if (!base) {
+        base = "";
+        base_len = 0;
+    }
+    if (!insert) {
+        insert = "";
+        insert_len = 0;
+    }
+
+    total_chars = vfg_utf8_char_count(base, base_len);
+    start_char = start_chars < 0 ? 0 : start_chars;
+    if (start_char > total_chars) start_char = total_chars;
+    end_char = start_char + (remove_chars < 0 ? 0 : remove_chars);
+    if (end_char > total_chars) end_char = total_chars;
+
+    start_byte = vfg_utf8_byte_offset_for_char_index(base, base_len, start_char);
+    end_byte = vfg_utf8_byte_offset_for_char_index(base, base_len, end_char);
+    next_len = start_byte + insert_len + (base_len - end_byte);
+    next = (char *)HeapAlloc(GetProcessHeap(), 0, (SIZE_T)next_len + 1);
+    if (!next) return NULL;
+
+    if (start_byte > 0) {
+        memcpy(next, base, (size_t)start_byte);
+    }
+    if (insert_len > 0) {
+        memcpy(next + start_byte, insert, (size_t)insert_len);
+    }
+    if (base_len - end_byte > 0) {
+        memcpy(next + start_byte + insert_len, base + end_byte, (size_t)(base_len - end_byte));
+    }
+    next[next_len] = '\0';
+    if (out_len) *out_len = next_len;
+    return next;
+}
+
+static BOOL vfg_set_system_clipboard_utf8(const char *utf8, int utf8len) {
+    BOOL ok = FALSE;
+    BSTR wide = utf8_to_bstr(utf8, utf8len);
+    HGLOBAL mem = NULL;
+    WCHAR *dst = NULL;
+    SIZE_T bytes;
+
+    if (!wide) return FALSE;
+    bytes = ((SIZE_T)SysStringLen(wide) + 1) * sizeof(WCHAR);
+    mem = GlobalAlloc(GMEM_MOVEABLE, bytes);
+    if (!mem) goto done;
+
+    dst = (WCHAR *)GlobalLock(mem);
+    if (!dst) goto done;
+    memcpy(dst, wide, bytes);
+    GlobalUnlock(mem);
+    dst = NULL;
+
+    if (!OpenClipboard(NULL)) goto done;
+    if (!EmptyClipboard()) {
+        CloseClipboard();
+        goto done;
+    }
+    if (!SetClipboardData(CF_UNICODETEXT, mem)) {
+        CloseClipboard();
+        goto done;
+    }
+    CloseClipboard();
+    mem = NULL;
+    ok = TRUE;
+
+done:
+    if (dst) GlobalUnlock(mem);
+    if (mem) GlobalFree(mem);
+    SysFreeString(wide);
+    return ok;
+}
+
+static char *vfg_get_system_clipboard_utf8(int *out_len) {
+    char *utf8 = NULL;
+    HANDLE handle = NULL;
+    const WCHAR *src = NULL;
+    int wide_len;
+    int needed;
+
+    if (out_len) *out_len = 0;
+    if (!IsClipboardFormatAvailable(CF_UNICODETEXT)) return NULL;
+    if (!OpenClipboard(NULL)) return NULL;
+
+    handle = GetClipboardData(CF_UNICODETEXT);
+    if (!handle) {
+        CloseClipboard();
+        return NULL;
+    }
+
+    src = (const WCHAR *)GlobalLock(handle);
+    if (!src) {
+        CloseClipboard();
+        return NULL;
+    }
+
+    wide_len = lstrlenW(src);
+    needed = WideCharToMultiByte(CP_UTF8, 0, src, wide_len, NULL, 0, NULL, NULL);
+    utf8 = (char *)HeapAlloc(GetProcessHeap(), 0, (SIZE_T)needed + 1);
+    if (utf8 && needed > 0) {
+        WideCharToMultiByte(CP_UTF8, 0, src, wide_len, utf8, needed, NULL, NULL);
+    }
+    if (utf8) utf8[needed] = '\0';
+    GlobalUnlock(handle);
+    CloseClipboard();
+
+    if (out_len) *out_len = needed;
+    return utf8;
+}
+
+static uint8_t *vfg_query_edit_state_payload(int64_t grid_id, int32_t *out_len) {
+    uint8_t buf[16];
+    int pos = 0;
+
+    buf[pos++] = 0x08;
+    pos += vfg_write_varint(buf + pos, (uint64_t)grid_id);
+    return volvox_grid_edit_pb(buf, pos, out_len);
+}
+
+static int32_t vfg_query_edit_state_i32_field(int64_t grid_id, uint32_t field_no, int32_t fallback) {
+    int32_t out_len = 0;
+    int32_t value = fallback;
+    uint8_t *out = vfg_query_edit_state_payload(grid_id, &out_len);
+    if (out) {
+        value = vfg_decode_i32_field(out, out_len, field_no, fallback);
+        volvox_grid_free(out, 0);
+    }
+    return value;
+}
+
+static char *vfg_query_edit_state_string_field(int64_t grid_id, uint32_t field_no, int *out_len) {
+    int32_t resp_len = 0;
+    uint8_t *out = vfg_query_edit_state_payload(grid_id, &resp_len);
+    return vfg_take_string_field_response(out, resp_len, field_no, out_len);
+}
+
+static int32_t vfg_get_edit_sel_start_compat(int64_t grid_id) {
+    return vfg_query_edit_state_i32_field(grid_id, 5, 0);
+}
+
+static int32_t vfg_get_edit_sel_length_compat(int64_t grid_id) {
+    return vfg_query_edit_state_i32_field(grid_id, 6, 0);
+}
+
+static int32_t vfg_set_edit_selection_compat(int64_t grid_id, int32_t start, int32_t length) {
+    uint8_t buf[32];
+    uint8_t inner[16];
+    int pos = 0;
+    int ilen = 0;
+    int32_t out_len = 0;
+    uint8_t *out;
+
+    buf[pos++] = 0x08;
+    pos += vfg_write_varint(buf + pos, (uint64_t)grid_id);
+    inner[ilen++] = 0x08;
+    ilen += vfg_write_varint(inner + ilen, (uint64_t)(uint32_t)start);
+    inner[ilen++] = 0x10;
+    ilen += vfg_write_varint(inner + ilen, (uint64_t)(uint32_t)length);
+    buf[pos++] = 0x32;
+    pos += vfg_write_varint(buf + pos, (uint64_t)ilen);
+    memcpy(buf + pos, inner, (size_t)ilen);
+    pos += ilen;
+
+    out = volvox_grid_edit_pb(buf, pos, &out_len);
+    return vfg_take_status_response(out);
+}
+
+static int32_t vfg_set_edit_text_compat(int64_t grid_id, const char *utf8, int32_t utf8len) {
+    uint8_t *buf;
+    int pos = 0;
+    int32_t out_len = 0;
+    uint8_t *out;
+    int capacity;
+    int inner_len;
+
+    if (!utf8) {
+        utf8 = "";
+        utf8len = 0;
+    }
+
+    inner_len = 1 + vfg_varint_len((uint64_t)utf8len) + utf8len;
+    capacity = utf8len + 32;
+    buf = (uint8_t *)HeapAlloc(GetProcessHeap(), 0, (SIZE_T)capacity);
+    if (!buf) return -1;
+
+    buf[pos++] = 0x08;
+    pos += vfg_write_varint(buf + pos, (uint64_t)grid_id);
+    buf[pos++] = 0x2A;
+    pos += vfg_write_varint(buf + pos, (uint64_t)inner_len);
+    buf[pos++] = 0x0A;
+    pos += vfg_write_varint(buf + pos, (uint64_t)utf8len);
+    if (utf8len > 0) {
+        memcpy(buf + pos, utf8, (size_t)utf8len);
+        pos += utf8len;
+    }
+
+    out = volvox_grid_edit_pb(buf, pos, &out_len);
+    HeapFree(GetProcessHeap(), 0, buf);
+    return vfg_take_status_response(out);
+}
+
+static int32_t vfg_set_preedit_compat(
+    int64_t grid_id,
+    const char *utf8,
+    int32_t utf8len,
+    int32_t cursor,
+    int32_t commit)
+{
+    uint8_t *buf;
+    int pos = 0;
+    int32_t out_len = 0;
+    uint8_t *out;
+    int capacity;
+    int inner_len;
+
+    if (!utf8) {
+        utf8 = "";
+        utf8len = 0;
+    }
+    if (utf8len < 0) return -1;
+    if (cursor < 0) cursor = 0;
+    commit = commit ? 1 : 0;
+
+    inner_len =
+        1 + vfg_varint_len((uint64_t)utf8len) + utf8len +
+        1 + vfg_varint_len((uint64_t)(uint32_t)cursor) +
+        1 + vfg_varint_len((uint64_t)(uint32_t)commit);
+    capacity = inner_len + 32;
+    buf = (uint8_t *)HeapAlloc(GetProcessHeap(), 0, (SIZE_T)capacity);
+    if (!buf) return -1;
+
+    buf[pos++] = 0x08;
+    pos += vfg_write_varint(buf + pos, (uint64_t)grid_id);
+    buf[pos++] = 0x4A;
+    pos += vfg_write_varint(buf + pos, (uint64_t)inner_len);
+    buf[pos++] = 0x0A;
+    pos += vfg_write_varint(buf + pos, (uint64_t)utf8len);
+    if (utf8len > 0) {
+        memcpy(buf + pos, utf8, (size_t)utf8len);
+        pos += utf8len;
+    }
+    buf[pos++] = 0x10;
+    pos += vfg_write_varint(buf + pos, (uint64_t)(uint32_t)cursor);
+    buf[pos++] = 0x18;
+    pos += vfg_write_varint(buf + pos, (uint64_t)(uint32_t)commit);
+
+    out = volvox_grid_edit_pb(buf, pos, &out_len);
+    HeapFree(GetProcessHeap(), 0, buf);
+    return vfg_take_status_response(out);
+}
+
+static char *vfg_get_edit_text_utf8(int64_t grid_id, int *out_len) {
+    return vfg_query_edit_state_string_field(grid_id, 4, out_len);
+}
+
+static char *vfg_get_edit_sel_text_utf8(int64_t grid_id, int *out_len) {
+    int edit_len = 0;
+    int sel_start;
+    int sel_length;
+    int start_byte;
+    int end_byte;
+    int selected_len;
+    char *edit_text = vfg_get_edit_text_utf8(grid_id, &edit_len);
+    char *selected;
+
+    if (out_len) *out_len = 0;
+    if (!edit_text) return NULL;
+
+    sel_start = vfg_get_edit_sel_start_compat(grid_id);
+    sel_length = vfg_get_edit_sel_length_compat(grid_id);
+    start_byte = vfg_utf8_byte_offset_for_char_index(edit_text, edit_len, sel_start);
+    end_byte = vfg_utf8_byte_offset_for_char_index(edit_text, edit_len, sel_start + sel_length);
+    if (end_byte < start_byte) end_byte = start_byte;
+    selected_len = end_byte - start_byte;
+    selected = (char *)HeapAlloc(GetProcessHeap(), 0, (SIZE_T)selected_len + 1);
+    if (!selected) {
+        HeapFree(GetProcessHeap(), 0, edit_text);
+        return NULL;
+    }
+    if (selected_len > 0) {
+        memcpy(selected, edit_text + start_byte, (size_t)selected_len);
+    }
+    selected[selected_len] = '\0';
+    if (out_len) *out_len = selected_len;
+    HeapFree(GetProcessHeap(), 0, edit_text);
+    return selected;
+}
+
+static int vfg_query_edit_active(int64_t grid_id) {
+    int32_t out_len = 0;
+    uint8_t *out = vfg_query_edit_state_payload(grid_id, &out_len);
+    return vfg_take_bool_field_response(out, out_len, 1, 0);
+}
+
+static int32_t vfg_copy_or_cut_grid_selection(int64_t grid_id, BOOL cut) {
+    uint8_t buf[16];
+    int pos = 0;
+    int32_t out_len = 0;
+    int text_len = 0;
+    uint8_t *out;
+    char *text;
+    int32_t status = 0;
+
+    buf[pos++] = 0x08;
+    pos += vfg_write_varint(buf + pos, (uint64_t)grid_id);
+    buf[pos++] = cut ? 0x1A : 0x12;
+    buf[pos++] = 0x00;
+    out = volvox_grid_clipboard_pb(buf, pos, &out_len);
+    text = vfg_take_string_field_response(out, out_len, 1, &text_len);
+
+    if (!text) return -1;
+    if (!vfg_set_system_clipboard_utf8(text, text_len)) {
+        status = -1;
+    }
+    HeapFree(GetProcessHeap(), 0, text);
+    return status;
+}
+
+static int32_t vfg_paste_grid_selection_from_clipboard(int64_t grid_id) {
+    uint8_t *buf;
+    int clip_len = 0;
+    int pos = 0;
+    int32_t out_len = 0;
+    uint8_t *out;
+    char *clip = vfg_get_system_clipboard_utf8(&clip_len);
+    int32_t status;
+    int capacity;
+    int inner_len;
+
+    if (!clip) return -1;
+    inner_len = 1 + vfg_varint_len((uint64_t)clip_len) + clip_len;
+    capacity = clip_len + 32;
+    buf = (uint8_t *)HeapAlloc(GetProcessHeap(), 0, (SIZE_T)capacity);
+    if (!buf) {
+        HeapFree(GetProcessHeap(), 0, clip);
+        return -1;
+    }
+
+    buf[pos++] = 0x08;
+    pos += vfg_write_varint(buf + pos, (uint64_t)grid_id);
+    buf[pos++] = 0x22;
+    pos += vfg_write_varint(buf + pos, (uint64_t)inner_len);
+    buf[pos++] = 0x0A;
+    pos += vfg_write_varint(buf + pos, (uint64_t)clip_len);
+    if (clip_len > 0) {
+        memcpy(buf + pos, clip, (size_t)clip_len);
+        pos += clip_len;
+    }
+
+    out = volvox_grid_clipboard_pb(buf, pos, &out_len);
+    status = vfg_take_status_response(out);
+    HeapFree(GetProcessHeap(), 0, buf);
+    HeapFree(GetProcessHeap(), 0, clip);
+    return status;
+}
+
+static int32_t vfg_copy_or_cut_active_edit(int64_t grid_id, BOOL cut) {
+    int sel_start;
+    int sel_length;
+    int selected_len = 0;
+    int edit_len = 0;
+    int next_len = 0;
+    char *selected = NULL;
+    char *edit_text = NULL;
+    char *next_text = NULL;
+    int32_t status = 0;
+
+    sel_start = vfg_get_edit_sel_start_compat(grid_id);
+    sel_length = vfg_get_edit_sel_length_compat(grid_id);
+    selected = vfg_get_edit_sel_text_utf8(grid_id, &selected_len);
+    if (!selected) return -1;
+
+    if (sel_length <= 0 || selected_len <= 0) {
+        HeapFree(GetProcessHeap(), 0, selected);
+        return 0;
+    }
+
+    if (!vfg_set_system_clipboard_utf8(selected, selected_len)) {
+        HeapFree(GetProcessHeap(), 0, selected);
+        return -1;
+    }
+
+    if (!cut) {
+        HeapFree(GetProcessHeap(), 0, selected);
+        return 0;
+    }
+
+    edit_text = vfg_get_edit_text_utf8(grid_id, &edit_len);
+    if (!edit_text) {
+        HeapFree(GetProcessHeap(), 0, selected);
+        return -1;
+    }
+
+    next_text = vfg_utf8_replace_range(edit_text, edit_len, sel_start, sel_length, "", 0, &next_len);
+    if (!next_text) {
+        HeapFree(GetProcessHeap(), 0, edit_text);
+        HeapFree(GetProcessHeap(), 0, selected);
+        return -1;
+    }
+
+    status = vfg_set_edit_text_compat(grid_id, next_text, next_len);
+    if (status == 0) status = vfg_set_edit_selection_compat(grid_id, sel_start, 0);
+
+    HeapFree(GetProcessHeap(), 0, next_text);
+    HeapFree(GetProcessHeap(), 0, edit_text);
+    HeapFree(GetProcessHeap(), 0, selected);
+    return status;
+}
+
+static int32_t vfg_paste_active_edit_from_clipboard(int64_t grid_id) {
+    int clip_len = 0;
+    int edit_len = 0;
+    int next_len = 0;
+    int sel_start;
+    int sel_length;
+    int caret_chars;
+    int32_t status = 0;
+    char *clip = vfg_get_system_clipboard_utf8(&clip_len);
+    char *edit_text = NULL;
+    char *next_text = NULL;
+
+    if (!clip) return -1;
+
+    sel_start = vfg_get_edit_sel_start_compat(grid_id);
+    sel_length = vfg_get_edit_sel_length_compat(grid_id);
+    edit_text = vfg_get_edit_text_utf8(grid_id, &edit_len);
+    if (!edit_text) {
+        edit_text = (char *)HeapAlloc(GetProcessHeap(), 0, 1);
+        if (!edit_text) {
+            HeapFree(GetProcessHeap(), 0, clip);
+            return -1;
+        }
+        edit_text[0] = '\0';
+        edit_len = 0;
+    }
+
+    next_text =
+        vfg_utf8_replace_range(edit_text, edit_len, sel_start, sel_length, clip, clip_len, &next_len);
+    if (!next_text) {
+        HeapFree(GetProcessHeap(), 0, edit_text);
+        HeapFree(GetProcessHeap(), 0, clip);
+        return -1;
+    }
+
+    caret_chars = sel_start + vfg_utf8_char_count(clip, clip_len);
+    status = vfg_set_edit_text_compat(grid_id, next_text, next_len);
+    if (status == 0) status = vfg_set_edit_selection_compat(grid_id, caret_chars, 0);
+
+    HeapFree(GetProcessHeap(), 0, next_text);
+    HeapFree(GetProcessHeap(), 0, edit_text);
+    HeapFree(GetProcessHeap(), 0, clip);
+    return status;
 }
 
 
@@ -4251,8 +4888,32 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
     case DISPID_VG_KEYDOWN:
         if (wFlags & DISPATCH_METHOD) {
             int32_t key_code = 0, modifier = 0;
+            int32_t status = 0;
+            int editing_active = 0;
             if (pDispParams->cArgs >= 1) variant_to_i4(ARG(0), &key_code);
             if (pDispParams->cArgs >= 2) variant_to_i4(ARG(1), &modifier);
+            if ((modifier & 2) && !(modifier & 4)) {
+                editing_active = vfg_query_edit_active(gid);
+                switch (key_code) {
+                case 67:
+                    status = editing_active
+                        ? vfg_copy_or_cut_active_edit(gid, FALSE)
+                        : vfg_copy_or_cut_grid_selection(gid, FALSE);
+                    return status == 0 ? S_OK : E_FAIL;
+                case 88:
+                    status = editing_active
+                        ? vfg_copy_or_cut_active_edit(gid, TRUE)
+                        : vfg_copy_or_cut_grid_selection(gid, TRUE);
+                    return status == 0 ? S_OK : E_FAIL;
+                case 86:
+                    status = editing_active
+                        ? vfg_paste_active_edit_from_clipboard(gid)
+                        : vfg_paste_grid_selection_from_clipboard(gid);
+                    return status == 0 ? S_OK : E_FAIL;
+                default:
+                    break;
+                }
+            }
             return volvox_grid_key_down_native(gid, key_code, modifier) == 0 ? S_OK : E_FAIL;
         }
         break;
@@ -4262,6 +4923,39 @@ static HRESULT STDMETHODCALLTYPE VFG_Invoke(
             int32_t char_code = 0;
             if (pDispParams->cArgs >= 1) variant_to_i4(ARG(0), &char_code);
             return volvox_grid_key_press_native(gid, (uint32_t)char_code) == 0 ? S_OK : E_FAIL;
+        }
+        break;
+
+    case DISPID_VG_IMECOMPOSITION:
+        if (wFlags & DISPATCH_METHOD) {
+            BSTR text = NULL;
+            VARIANT vtext;
+            int32_t cursor = 0;
+            int32_t commit = 0;
+            int32_t status;
+            int utf8len = 0;
+            char *utf8;
+
+            VariantInit(&vtext);
+            if (pDispParams->cArgs >= 1) text = variant_to_bstr(ARG(0), &vtext);
+            if (pDispParams->cArgs >= 2) variant_to_i4(ARG(1), &cursor);
+            if (pDispParams->cArgs >= 3) variant_to_i4(ARG(2), &commit);
+
+            if (!commit && text && SysStringLen(text) > 0 && !vfg_query_edit_active(gid)) {
+                int32_t row = volvox_grid_get_row(gid);
+                int32_t col = volvox_grid_get_col(gid);
+                status = volvox_grid_edit_cell(gid, row, col);
+                if (status != 0) {
+                    VariantClear(&vtext);
+                    return E_FAIL;
+                }
+            }
+
+            utf8 = bstr_to_utf8(text, &utf8len);
+            status = vfg_set_preedit_compat(gid, utf8, utf8len, cursor, commit);
+            if (utf8) HeapFree(GetProcessHeap(), 0, utf8);
+            VariantClear(&vtext);
+            return status == 0 ? S_OK : E_FAIL;
         }
         break;
 
@@ -4456,6 +5150,17 @@ static int utf8_to_wchar(const uint8_t *u8, int u8_len,
     return n;
 }
 
+/* Wine memory-DC text rendering can miss visual bold weight.
+ * Detect Wine once and synthesize a subtle bold pass only there. */
+static BOOL gdi_is_wine(void) {
+    static int cached = -1;
+    if (cached >= 0) return cached ? TRUE : FALSE;
+    HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+    FARPROC wine_get_version = ntdll ? GetProcAddress(ntdll, "wine_get_version") : NULL;
+    cached = wine_get_version ? 1 : 0;
+    return cached ? TRUE : FALSE;
+}
+
 /* Create a GDI HFONT matching the engine parameters. */
 static HFONT gdi_create_font(const uint8_t *font_name_ptr, int font_name_len,
                              float font_size, int bold, int italic) {
@@ -4475,17 +5180,6 @@ static HFONT gdi_create_font(const uint8_t *font_name_ptr, int font_name_len,
         DEFAULT_PITCH | FF_DONTCARE,
         face[0] ? face : L"Arial"
     );
-}
-
-/* Wine memory-DC text rendering can miss visual bold weight.
- * Detect Wine once and synthesize a subtle bold pass only there. */
-static BOOL gdi_is_wine(void) {
-    static int cached = -1;
-    if (cached >= 0) return cached ? TRUE : FALSE;
-    HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
-    FARPROC wine_get_version = ntdll ? GetProcAddress(ntdll, "wine_get_version") : NULL;
-    cached = wine_get_version ? 1 : 0;
-    return cached ? TRUE : FALSE;
 }
 
 static int gdi_clamp_int(int v, int lo, int hi) {
@@ -4521,6 +5215,12 @@ static void gdi_measure_text(
     HDC hdc = CreateCompatibleDC(NULL);
     HFONT hfont = gdi_create_font(font_name_ptr, font_name_len,
                                   font_size, bold, italic);
+    if (!hdc || !hfont) {
+        if (hfont) DeleteObject(hfont);
+        if (hdc) DeleteDC(hdc);
+        *out_height = font_size * 1.2f;
+        return;
+    }
     HFONT old = (HFONT)SelectObject(hdc, hfont);
 
     if (max_width < 0) {
@@ -4592,10 +5292,6 @@ static float gdi_render_text(
     int draw_x = x - surf_left;
     int draw_y = y - surf_top;
 
-    HFONT hfont = gdi_create_font(font_name_ptr, font_name_len,
-                                  font_size,
-                                  bold, italic);
-
     UINT fmt = DT_NOPREFIX | DT_EXPANDTABS;
     if (max_width >= 0)
         fmt |= DT_WORDBREAK;
@@ -4610,9 +5306,13 @@ static float gdi_render_text(
     HDC hdc = CreateCompatibleDC(screen_dc);
     HBITMAP hbmp = CreateCompatibleBitmap(screen_dc, rw, rh);
     ReleaseDC(NULL, screen_dc);
-    if (!hbmp) {
-        DeleteDC(hdc);
-        DeleteObject(hfont);
+    HFONT hfont = gdi_create_font(font_name_ptr, font_name_len,
+                                  font_size,
+                                  bold, italic);
+    if (!hdc || !hbmp || !hfont) {
+        if (hbmp) DeleteObject(hbmp);
+        if (hfont) DeleteObject(hfont);
+        if (hdc) DeleteDC(hdc);
         return 0.0f;
     }
 

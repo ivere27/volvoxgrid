@@ -2221,7 +2221,6 @@ export class VolvoxGrid {
     } else {
       this.wasm.set_combo_search(this.gridId, 1);
     }
-    this.wasm.set_tab_behavior(this.gridId, 1); // Tab moves to next cell
     if (typeof this.wasm.set_host_dropdown_overlay === "function") {
       this.wasm.set_host_dropdown_overlay(this.gridId, 0);
     } else {
@@ -5505,7 +5504,7 @@ export class VolvoxGrid {
     if (this.activeEditor !== "none" && !hostPointerDispatch) {
       const editingWithHostEditor = this.wasm.is_editing(this.gridId) !== 0;
       if (editingWithHostEditor) {
-        this.commitEditFromHost(false, 0);
+        this.commitEditFromHost();
         if (this.wasm.is_editing(this.gridId) !== 0) {
           this.dirty = true;
           return;
@@ -5990,12 +5989,23 @@ export class VolvoxGrid {
       }
       if (e.key === "Tab") {
         e.preventDefault();
-        this.commitEditFromHost(true, this.modifierBits(e));
+        this.commitEditFromHost(9, this.modifierBits(e));
+        return;
+      }
+      const isArrow = e.key === "ArrowLeft" || e.key === "ArrowRight"
+        || e.key === "ArrowUp" || e.key === "ArrowDown";
+      if (!(e as any).isComposing && isArrow && this.getEditUiMode() !== "edit") {
+        e.preventDefault();
+        const navigateKeyCode = e.key === "ArrowLeft" ? 37
+          : e.key === "ArrowUp" ? 38
+          : e.key === "ArrowRight" ? 39
+          : 40;
+        this.commitEditFromHost(navigateKeyCode, 0);
         return;
       }
       if (e.key === "Enter" && !(e as any).isComposing) {
         e.preventDefault();
-        this.commitEditFromHost(false, 0);
+        this.commitEditFromHost(e.shiftKey ? 38 : 40, 0);
       }
     });
     this.editInput.addEventListener("blur", () => {
@@ -6007,7 +6017,7 @@ export class VolvoxGrid {
         return;
       }
       if (this.activeEditor === "text" || this.activeEditor === "combo-input") {
-        this.commitEditFromHost(false, 0);
+        this.commitEditFromHost();
       }
     });
 
@@ -6017,7 +6027,7 @@ export class VolvoxGrid {
       if (idx >= 0) {
         this.wasm.set_edit_dropdown_index(this.gridId, idx);
       }
-      this.commitEditFromHost(false, 0);
+      this.commitEditFromHost();
     });
     this.editSelect.addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -6027,18 +6037,18 @@ export class VolvoxGrid {
       }
       if (e.key === "Tab") {
         e.preventDefault();
-        this.commitEditFromHost(true, this.modifierBits(e));
+        this.commitEditFromHost(9, this.modifierBits(e));
         return;
       }
       if (e.key === "Enter") {
         e.preventDefault();
-        this.commitEditFromHost(false, 0);
+        this.commitEditFromHost(e.shiftKey ? 38 : 40, 0);
       }
     });
     this.editSelect.addEventListener("blur", () => {
       if (this.suppressBlurCommit) return;
       if (this.activeEditor === "combo-select") {
-        this.commitEditFromHost(false, 0);
+        this.commitEditFromHost();
       }
     });
 
@@ -6239,6 +6249,7 @@ export class VolvoxGrid {
       el.style.fontWeight = fontBold ? "bold" : "normal";
       el.style.fontStyle = fontItalic ? "italic" : "normal";
       el.style.padding = `${padT}px ${padR}px ${padB}px ${padL}px`;
+      el.style.textAlign = this.getEditTextAlign();
     };
 
     const comboCount = Number(this.wasm.get_edit_dropdown_count(this.gridId));
@@ -6407,7 +6418,28 @@ export class VolvoxGrid {
     }
   }
 
-  private commitEditFromHost(moveWithTab: boolean, tabModifier: number): void {
+  private getEditUiMode(): "enter" | "edit" {
+    if (typeof this.wasm.get_edit_ui_mode === "function"
+      && this.wasm.is_editing(this.gridId) !== 0) {
+      return Number(this.wasm.get_edit_ui_mode(this.gridId)) === 1 ? "edit" : "enter";
+    }
+    return "enter";
+  }
+
+  private getEditTextAlign(): "left" | "center" | "right" {
+    if (typeof this.wasm.get_edit_halign === "function"
+      && this.wasm.is_editing(this.gridId) !== 0) {
+      const halign = Number(this.wasm.get_edit_halign(this.gridId));
+      if (halign === 1) return "center";
+      if (halign === 2) return "right";
+    }
+    return "left";
+  }
+
+  private commitEditFromHost(
+    navigateKeyCode: number | null = null,
+    navigateModifier: number = 0,
+  ): void {
     let canceled = false;
     if (this.wasm.is_editing(this.gridId)) {
       if (this.activeEditor === "combo-select") {
@@ -6422,8 +6454,8 @@ export class VolvoxGrid {
       canceled = this.flushCancelableEventDecisions();
     }
 
-    if (moveWithTab && !canceled && this.wasm.is_editing(this.gridId) === 0) {
-      this.wasm.handle_key_down(this.gridId, 9, tabModifier);
+    if (navigateKeyCode !== null && !canceled && this.wasm.is_editing(this.gridId) === 0) {
+      this.wasm.handle_key_down(this.gridId, navigateKeyCode, navigateModifier);
       this.flushCancelableEventDecisions();
     }
     if (this.wasm.is_editing(this.gridId)) {

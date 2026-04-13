@@ -51,6 +51,12 @@ namespace VolvoxGrid.DotNet
         KeyClick = 2,
     }
 
+    public enum VolvoxGridTabBehavior
+    {
+        Controls = 0,
+        Cells = 1,
+    }
+
     public enum VolvoxGridDropdownTrigger
     {
         Never = 0,

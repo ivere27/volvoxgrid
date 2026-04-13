@@ -1508,6 +1508,18 @@ impl VolvoxGrid {
         if let Some(v) = ec.host_pointer_dispatch {
             self.host_pointer_dispatch = v;
         }
+        if let Some(v) = ec.engine_compose {
+            self.engine_compose = v;
+            self.engine_compose_configured = true;
+        }
+        if let Some(v) = ec.compose_method {
+            self.compose_method = v;
+            self.compose_method_configured = true;
+        }
+        self.edit.configure_compose(
+            self.effective_engine_compose_enabled(),
+            self.effective_compose_method(),
+        );
         self.mark_dirty();
     }
 
@@ -2003,6 +2015,8 @@ impl VolvoxGrid {
             mask: Some(self.edit_mask.clone()),
             host_key_dispatch: Some(self.host_key_dispatch),
             host_pointer_dispatch: Some(self.host_pointer_dispatch),
+            engine_compose: Some(self.effective_engine_compose_enabled()),
+            compose_method: Some(self.effective_compose_method()),
         }
     }
 
@@ -3233,6 +3247,25 @@ mod tests {
         assert_eq!(
             grid.scrollbar_show_v,
             v1::ScrollBarMode::ScrollbarModeAlways as i32
+        );
+    }
+
+    #[test]
+    fn tui_mode_defaults_engine_compose_to_dead_key() {
+        let mut grid = test_grid();
+
+        grid.apply_config(&v1::GridConfig {
+            rendering: Some(v1::RenderConfig {
+                renderer_mode: Some(v1::RendererMode::RendererTui as i32),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+
+        assert!(grid.effective_engine_compose_enabled());
+        assert_eq!(
+            grid.effective_compose_method(),
+            v1::ComposeMethod::DeadKey as i32
         );
     }
 

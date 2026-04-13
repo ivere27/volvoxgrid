@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Drawing.Text;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
@@ -21,6 +22,26 @@ namespace VolvoxGrid.DotNet.Internal
         private const int GcsResultStr = 0x0800;
         private const int AutoFallbackFrameRateHz = 30;
         private const long FramePacingConfigRefreshMs = 250;
+        private static readonly Color EditOverlayBorderColor = Color.FromArgb(0x2D, 0x6C, 0xDF);
+        private static readonly string[] ImeFriendlyFontFamilies = new[]
+        {
+            "Noto Sans CJK KR",
+            "Noto Sans CJK JP",
+            "Noto Sans CJK SC",
+            "Noto Sans CJK TC",
+            "Noto Sans CJK HK",
+            "NanumGothic",
+            "Malgun Gothic",
+            "Microsoft YaHei UI",
+            "Microsoft YaHei",
+            "Meiryo UI",
+            "Meiryo",
+            "Droid Sans Fallback",
+            "Arial Unicode MS",
+            "DejaVu Sans",
+        };
+        private static readonly object InstalledFontFamiliesSync = new object();
+        private static HashSet<string> _installedFontFamilies;
 
         private readonly object _sendLock = new object();
         private readonly object _frameLock = new object();
@@ -51,14 +72,29 @@ namespace VolvoxGrid.DotNet.Internal
         private int _bufferWidth;
         private int _bufferHeight;
         private readonly List<RetiredBuffers> _retiredBuffers = new List<RetiredBuffers>();
+        private readonly Panel _editOverlayHost;
+        private readonly TextBox _editOverlay;
         private Volvoxgrid.V1.SelectionMode _selectionMode = Volvoxgrid.V1.SelectionMode.SELECTION_FREE;
         private bool _engineEditing;
+        private bool _suppressEditOverlayTextChanged;
+        private bool _suppressEditOverlayCommit;
+        private int _editOverlayRow = -1;
+        private int _editOverlayCol = -1;
+        private EditUiMode _editOverlayUiMode = EditUiMode.EDIT_UI_MODE_ENTER;
         private bool _multiRangeDragActive;
         private readonly List<CellRange> _multiRangeBaseRanges = new List<CellRange>();
         private int _multiRangeAnchorRow = -1;
         private int _multiRangeAnchorCol = -1;
         private int _multiRangeDragRow = -1;
         private int _multiRangeDragCol = -1;
+        private System.Drawing.Font _editOverlayResolvedFont;
+        private string _editOverlayResolvedFontFamily = string.Empty;
+        private float _editOverlayResolvedFontSize;
+        private FontStyle _editOverlayResolvedFontStyle;
+        private GraphicsUnit _editOverlayResolvedFontUnit;
+
+        internal Func<int, int, HorizontalAlignment> ResolveEditAlignment { get; set; }
+        internal Func<int, int, System.Windows.Forms.Padding> ResolveEditPadding { get; set; }
 
         private static PointerEvent_Type PointerDownEvent
         {
@@ -122,6 +158,36 @@ namespace VolvoxGrid.DotNet.Internal
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint, true);
             TabStop = true;
             BackColor = Color.White;
+
+            _editOverlayHost = new Panel
+            {
+                Visible = false,
+                BackColor = Color.White,
+                Margin = System.Windows.Forms.Padding.Empty,
+                Padding = System.Windows.Forms.Padding.Empty,
+                TabStop = false,
+            };
+            _editOverlayHost.Paint += EditOverlayHost_Paint;
+
+            _editOverlay = new TextBox
+            {
+                Visible = true,
+                Multiline = false,
+                AutoSize = false,
+                BorderStyle = System.Windows.Forms.BorderStyle.None,
+                AcceptsReturn = false,
+                AcceptsTab = false,
+                ShortcutsEnabled = true,
+                ImeMode = ImeMode.On,
+                Margin = System.Windows.Forms.Padding.Empty,
+            };
+            _editOverlay.TextChanged += EditOverlay_TextChanged;
+            _editOverlay.KeyDown += EditOverlay_KeyDown;
+            _editOverlay.KeyUp += EditOverlay_SelectionChanged;
+            _editOverlay.MouseUp += EditOverlay_SelectionChanged;
+            _editOverlay.LostFocus += EditOverlay_LostFocus;
+            _editOverlayHost.Controls.Add(_editOverlay);
+            Controls.Add(_editOverlayHost);
         }
 
         protected override bool IsInputKey(Keys keyData)
@@ -252,6 +318,7 @@ namespace VolvoxGrid.DotNet.Internal
             _renderThread = null;
             _eventThread = null;
             _eventHandler = null;
+            HideEditOverlay(false);
             return renderStopped && eventStopped;
         }
 
@@ -319,6 +386,7 @@ namespace VolvoxGrid.DotNet.Internal
             {
                 Detach();
                 ReleaseBuffers();
+                ResetEditOverlayResolvedFont();
             }
 
             base.Dispose(disposing);
@@ -424,6 +492,11 @@ namespace VolvoxGrid.DotNet.Internal
 
             if (m.Msg == WmImeStartComposition)
             {
+                if (_editOverlayHost.Visible)
+                {
+                    base.WndProc(ref m);
+                    return;
+                }
                 if (_client != null && _gridId != 0 && !_engineEditing)
                 {
                     TryBeginImeEdit();
@@ -434,6 +507,11 @@ namespace VolvoxGrid.DotNet.Internal
 
             if (m.Msg == WmImeComposition)
             {
+                if (_editOverlayHost.Visible)
+                {
+                    base.WndProc(ref m);
+                    return;
+                }
                 if (_client != null && _gridId != 0)
                 {
                     IntPtr hImc = ImmGetContext(Handle);
@@ -472,6 +550,11 @@ namespace VolvoxGrid.DotNet.Internal
 
             if (m.Msg == WmImeEndComposition)
             {
+                if (_editOverlayHost.Visible)
+                {
+                    base.WndProc(ref m);
+                    return;
+                }
                 if (_client != null && _gridId != 0)
                 {
                     // Clear preedit state
@@ -484,6 +567,11 @@ namespace VolvoxGrid.DotNet.Internal
 
             if (m.Msg == WmImeChar)
             {
+                if (_editOverlayHost.Visible)
+                {
+                    base.WndProc(ref m);
+                    return;
+                }
                 // Suppress WM_IME_CHAR — committed text is handled via WM_IME_COMPOSITION GCS_RESULTSTR.
                 // Without this, WM_CHAR would fire for each committed character, causing duplicate input.
                 return;
@@ -525,6 +613,11 @@ namespace VolvoxGrid.DotNet.Internal
 
         protected override void OnKeyDown(KeyEventArgs e)
         {
+            if (_editOverlayHost.Visible)
+            {
+                base.OnKeyDown(e);
+                return;
+            }
             base.OnKeyDown(e);
             var payload = _client.EncodeRenderInputKey(_gridId, KeyDownEvent, (int)e.KeyCode, GetModifiers(), string.Empty);
             SendRenderInput(payload);
@@ -533,6 +626,11 @@ namespace VolvoxGrid.DotNet.Internal
 
         protected override void OnKeyUp(KeyEventArgs e)
         {
+            if (_editOverlayHost.Visible)
+            {
+                base.OnKeyUp(e);
+                return;
+            }
             base.OnKeyUp(e);
             var payload = _client.EncodeRenderInputKey(_gridId, KeyUpEvent, (int)e.KeyCode, GetModifiers(), string.Empty);
             SendRenderInput(payload);
@@ -541,6 +639,11 @@ namespace VolvoxGrid.DotNet.Internal
 
         protected override void OnKeyPress(KeyPressEventArgs e)
         {
+            if (_editOverlayHost.Visible)
+            {
+                base.OnKeyPress(e);
+                return;
+            }
             base.OnKeyPress(e);
             var payload = _client.EncodeRenderInputKey(_gridId, KeyPressEvent, e.KeyChar, GetModifiers(), e.KeyChar.ToString());
             SendRenderInput(payload);
@@ -671,6 +774,7 @@ namespace VolvoxGrid.DotNet.Internal
             else if (evt != null && evt.EventCase == GridEvent.EventOneofCase.AfterEdit)
             {
                 _engineEditing = false;
+                BeginInvokeHideEditOverlay(false);
             }
 
             if (_eventHandler == null)
@@ -698,6 +802,15 @@ namespace VolvoxGrid.DotNet.Internal
             if (output == null)
             {
                 return;
+            }
+
+            if (output.EditRequest != null)
+            {
+                BeginInvokeShowEditOverlay(output.EditRequest);
+            }
+            else if (output.DropdownRequest != null)
+            {
+                BeginInvokeHideEditOverlay(false);
             }
 
             if (output.Rendered && output.FrameDone != null)
@@ -1394,6 +1507,486 @@ namespace VolvoxGrid.DotNet.Internal
             }
         }
 
+        private void BeginInvokeShowEditOverlay(EditRequest request)
+        {
+            if (request == null || !IsHandleCreated)
+            {
+                return;
+            }
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(new MethodInvoker(() => ShowEditOverlay(request)));
+            }
+            else
+            {
+                ShowEditOverlay(request);
+            }
+        }
+
+        private void BeginInvokeHideEditOverlay(bool focusHost)
+        {
+            if (!IsHandleCreated)
+            {
+                return;
+            }
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(new MethodInvoker(() => HideEditOverlay(focusHost)));
+            }
+            else
+            {
+                HideEditOverlay(focusHost);
+            }
+        }
+
+        private void ShowEditOverlay(EditRequest request)
+        {
+            if (request == null || _client == null || _gridId == 0)
+            {
+                return;
+            }
+
+            int x = Math.Max(0, (int)Math.Round(request.X));
+            int y = Math.Max(0, (int)Math.Round(request.Y));
+            int w = Math.Max(1, (int)Math.Round(request.Width));
+            int h = Math.Max(1, (int)Math.Round(request.Height));
+            bool sameCell = _editOverlayHost.Visible && _editOverlayRow == request.Row && _editOverlayCol == request.Col;
+            System.Windows.Forms.Padding editPadding = ResolveEditPadding != null
+                ? ResolveEditPadding(request.Row, request.Col)
+                : System.Windows.Forms.Padding.Empty;
+            editPadding = new System.Windows.Forms.Padding(
+                Math.Max(0, editPadding.Left),
+                Math.Max(0, editPadding.Top),
+                Math.Max(0, editPadding.Right),
+                Math.Max(0, editPadding.Bottom));
+            int innerX = editPadding.Left;
+            int innerY = editPadding.Top;
+            int innerW = Math.Max(1, w - editPadding.Left - editPadding.Right);
+            int innerH = Math.Max(1, h - editPadding.Top - editPadding.Bottom);
+
+            _editOverlayRow = request.Row;
+            _editOverlayCol = request.Col;
+            _editOverlayUiMode = request.UiMode;
+            _editOverlay.Font = ResolveEditOverlayFont(Font);
+            _editOverlayHost.Bounds = new Rectangle(x, y, w, h);
+            _editOverlay.Bounds = new Rectangle(innerX, innerY, innerW, innerH);
+            _editOverlay.MaxLength = request.MaxLength > 0 ? request.MaxLength : 0;
+            _editOverlay.TextAlign = ResolveEditAlignment != null
+                ? ResolveEditAlignment(request.Row, request.Col)
+                : HorizontalAlignment.Left;
+
+            if (!sameCell)
+            {
+                string text = request.CurrentValue ?? string.Empty;
+                int start = ScalarIndexToCodeUnitIndex(text, request.SelStart);
+                int end = ScalarIndexToCodeUnitIndex(text, request.SelStart + request.SelLength);
+                start = Math.Max(0, Math.Min(text.Length, start));
+                end = Math.Max(start, Math.Min(text.Length, end));
+
+                _suppressEditOverlayTextChanged = true;
+                try
+                {
+                    _editOverlay.Text = text;
+                    _editOverlay.SelectionStart = start;
+                    _editOverlay.SelectionLength = end - start;
+                }
+                finally
+                {
+                    _suppressEditOverlayTextChanged = false;
+                }
+            }
+
+            if (!_editOverlayHost.Visible)
+            {
+                _editOverlayHost.Show();
+            }
+            _editOverlayHost.BringToFront();
+            if (!_editOverlay.Focused)
+            {
+                _editOverlay.Focus();
+            }
+            SyncEditOverlaySelectionToEngine();
+        }
+
+        private void EditOverlayHost_Paint(object sender, PaintEventArgs e)
+        {
+            Rectangle borderRect = _editOverlayHost.ClientRectangle;
+            if (borderRect.Width <= 0 || borderRect.Height <= 0)
+            {
+                return;
+            }
+
+            ControlPaint.DrawBorder(
+                e.Graphics,
+                borderRect,
+                EditOverlayBorderColor,
+                ButtonBorderStyle.Solid);
+        }
+
+        private void HideEditOverlay(bool focusHost)
+        {
+            _suppressEditOverlayCommit = true;
+            try
+            {
+                if (_editOverlayHost.Visible)
+                {
+                    _editOverlayHost.Hide();
+                }
+                _editOverlayRow = -1;
+                _editOverlayCol = -1;
+                _editOverlayUiMode = EditUiMode.EDIT_UI_MODE_ENTER;
+            }
+            finally
+            {
+                _suppressEditOverlayCommit = false;
+            }
+
+            if (focusHost && IsHandleCreated)
+            {
+                Focus();
+            }
+        }
+
+        private void EditOverlay_TextChanged(object sender, EventArgs e)
+        {
+            if (_suppressEditOverlayTextChanged || _client == null || _gridId == 0 || !_editOverlayHost.Visible)
+            {
+                return;
+            }
+
+            try
+            {
+                _client.EditSetText(_gridId, _editOverlay.Text);
+                SyncEditOverlaySelectionToEngine();
+                RequestFrame();
+            }
+            catch
+            {
+            }
+        }
+
+        private void EditOverlay_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (_client == null || _gridId == 0 || !_editOverlayHost.Visible)
+            {
+                return;
+            }
+
+            switch (e.KeyCode)
+            {
+                case Keys.Escape:
+                    e.SuppressKeyPress = true;
+                    e.Handled = true;
+                    CancelEditOverlay();
+                    return;
+                case Keys.Tab:
+                    e.SuppressKeyPress = true;
+                    e.Handled = true;
+                    CommitEditOverlay((int)Keys.Tab, GetModifierBits(e));
+                    return;
+                case Keys.Enter:
+                    e.SuppressKeyPress = true;
+                    e.Handled = true;
+                    CommitEditOverlay(e.Shift ? (int)Keys.Up : (int)Keys.Down, 0);
+                    return;
+                case Keys.Left:
+                case Keys.Right:
+                case Keys.Up:
+                case Keys.Down:
+                    if (_editOverlayUiMode != EditUiMode.EDIT_UI_MODE_EDIT)
+                    {
+                        e.SuppressKeyPress = true;
+                        e.Handled = true;
+                        CommitEditOverlay((int)e.KeyCode, 0);
+                        return;
+                    }
+                    if (e.KeyCode == Keys.Up)
+                    {
+                        e.SuppressKeyPress = true;
+                        e.Handled = true;
+                        _editOverlay.SelectionStart = 0;
+                        _editOverlay.SelectionLength = 0;
+                        SyncEditOverlaySelectionToEngine();
+                        return;
+                    }
+                    if (e.KeyCode == Keys.Down)
+                    {
+                        e.SuppressKeyPress = true;
+                        e.Handled = true;
+                        int end = (_editOverlay.Text ?? string.Empty).Length;
+                        _editOverlay.SelectionStart = end;
+                        _editOverlay.SelectionLength = 0;
+                        SyncEditOverlaySelectionToEngine();
+                        return;
+                    }
+                    break;
+            }
+        }
+
+        private void EditOverlay_SelectionChanged(object sender, EventArgs e)
+        {
+            SyncEditOverlaySelectionToEngine();
+        }
+
+        private void EditOverlay_LostFocus(object sender, EventArgs e)
+        {
+            if (_suppressEditOverlayCommit || !_editOverlayHost.Visible)
+            {
+                return;
+            }
+            CommitEditOverlay(null, 0);
+        }
+
+        private void CommitEditOverlay(int? navigateKeyCode, int navigateModifier)
+        {
+            if (_client == null || _gridId == 0 || !_editOverlayHost.Visible)
+            {
+                return;
+            }
+
+            bool stillEditing = true;
+            try
+            {
+                _client.EditCommit(_gridId, _editOverlay.Text);
+                RequestFrame();
+                EditState state = _client.GetEditState(_gridId);
+                stillEditing = state != null && state.Active;
+            }
+            catch
+            {
+                stillEditing = true;
+            }
+
+            if (stillEditing)
+            {
+                _engineEditing = true;
+                if (!_editOverlay.Focused)
+                {
+                    _editOverlay.Focus();
+                }
+                return;
+            }
+
+            _engineEditing = false;
+            HideEditOverlay(false);
+            if (navigateKeyCode.HasValue)
+            {
+                Focus();
+                SendSyntheticKey(navigateKeyCode.Value, navigateModifier);
+                RequestFrame();
+            }
+            else
+            {
+                Focus();
+            }
+        }
+
+        private void CancelEditOverlay()
+        {
+            if (_client == null || _gridId == 0 || !_editOverlayHost.Visible)
+            {
+                return;
+            }
+
+            bool stillEditing = false;
+            try
+            {
+                _client.EditCancel(_gridId);
+                RequestFrame();
+                EditState state = _client.GetEditState(_gridId);
+                stillEditing = state != null && state.Active;
+            }
+            catch
+            {
+                stillEditing = false;
+            }
+
+            _engineEditing = stillEditing;
+            if (stillEditing)
+            {
+                if (!_editOverlay.Focused)
+                {
+                    _editOverlay.Focus();
+                }
+                return;
+            }
+
+            HideEditOverlay(true);
+        }
+
+        private void SyncEditOverlaySelectionToEngine()
+        {
+            if (_client == null || _gridId == 0 || !_editOverlayHost.Visible)
+            {
+                return;
+            }
+
+            try
+            {
+                string text = _editOverlay.Text ?? string.Empty;
+                int startUnits = Math.Max(0, Math.Min(text.Length, _editOverlay.SelectionStart));
+                int endUnits = Math.Max(startUnits, Math.Min(text.Length, startUnits + _editOverlay.SelectionLength));
+                int start = CodeUnitIndexToScalarIndex(text, startUnits);
+                int end = CodeUnitIndexToScalarIndex(text, endUnits);
+                _client.EditSetSelection(_gridId, start, Math.Max(0, end - start));
+            }
+            catch
+            {
+            }
+        }
+
+        private void SendSyntheticKey(int keyCode, int modifier)
+        {
+            if (_client == null || _gridId == 0)
+            {
+                return;
+            }
+
+            SendRenderInput(_client.EncodeRenderInputKey(_gridId, KeyDownEvent, keyCode, modifier, string.Empty));
+            SendRenderInput(_client.EncodeRenderInputKey(_gridId, KeyUpEvent, keyCode, modifier, string.Empty));
+        }
+
+        private static int GetModifierBits(KeyEventArgs e)
+        {
+            int mod = 0;
+            if (e.Shift) mod |= 1;
+            if (e.Control) mod |= 2;
+            if (e.Alt) mod |= 4;
+            return mod;
+        }
+
+        private static bool IsWineProcess()
+        {
+            return !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WINEPREFIX"));
+        }
+
+        private static HashSet<string> GetInstalledFontFamilies()
+        {
+            lock (InstalledFontFamiliesSync)
+            {
+                if (_installedFontFamilies != null)
+                {
+                    return _installedFontFamilies;
+                }
+
+                var families = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                try
+                {
+                    var collection = new InstalledFontCollection();
+                    foreach (FontFamily family in collection.Families)
+                    {
+                        if (family != null && !string.IsNullOrEmpty(family.Name))
+                        {
+                            families.Add(family.Name);
+                        }
+                    }
+                }
+                catch
+                {
+                }
+
+                if (families.Count == 0)
+                {
+                    families.Add(SystemFonts.DefaultFont.FontFamily.Name);
+                }
+
+                _installedFontFamilies = families;
+                return _installedFontFamilies;
+            }
+        }
+
+        private static string ResolveEditOverlayFontFamily(System.Drawing.Font baseFont)
+        {
+            string preferred = baseFont != null && baseFont.FontFamily != null
+                ? baseFont.FontFamily.Name
+                : string.Empty;
+            HashSet<string> installed = GetInstalledFontFamilies();
+
+            if (IsWineProcess())
+            {
+                for (int i = 0; i < ImeFriendlyFontFamilies.Length; i++)
+                {
+                    string candidate = ImeFriendlyFontFamilies[i];
+                    if (installed.Contains(candidate))
+                    {
+                        return candidate;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(preferred) && installed.Contains(preferred))
+            {
+                return preferred;
+            }
+
+            for (int i = 0; i < ImeFriendlyFontFamilies.Length; i++)
+            {
+                string candidate = ImeFriendlyFontFamilies[i];
+                if (installed.Contains(candidate))
+                {
+                    return candidate;
+                }
+            }
+
+            return SystemFonts.DefaultFont.FontFamily.Name;
+        }
+
+        private System.Drawing.Font ResolveEditOverlayFont(System.Drawing.Font baseFont)
+        {
+            System.Drawing.Font fallbackBaseFont = baseFont ?? SystemFonts.DefaultFont;
+            string resolvedFamily = ResolveEditOverlayFontFamily(fallbackBaseFont);
+            if (string.Equals(resolvedFamily, fallbackBaseFont.FontFamily.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return fallbackBaseFont;
+            }
+
+            if (_editOverlayResolvedFont != null
+                && string.Equals(_editOverlayResolvedFontFamily, resolvedFamily, StringComparison.OrdinalIgnoreCase)
+                && Math.Abs(_editOverlayResolvedFontSize - fallbackBaseFont.Size) < 0.01f
+                && _editOverlayResolvedFontStyle == fallbackBaseFont.Style
+                && _editOverlayResolvedFontUnit == fallbackBaseFont.Unit)
+            {
+                return _editOverlayResolvedFont;
+            }
+
+            ResetEditOverlayResolvedFont();
+            try
+            {
+                _editOverlayResolvedFont = new System.Drawing.Font(
+                    resolvedFamily,
+                    fallbackBaseFont.Size,
+                    fallbackBaseFont.Style,
+                    fallbackBaseFont.Unit,
+                    fallbackBaseFont.GdiCharSet,
+                    fallbackBaseFont.GdiVerticalFont);
+                _editOverlayResolvedFontFamily = resolvedFamily;
+                _editOverlayResolvedFontSize = fallbackBaseFont.Size;
+                _editOverlayResolvedFontStyle = fallbackBaseFont.Style;
+                _editOverlayResolvedFontUnit = fallbackBaseFont.Unit;
+                return _editOverlayResolvedFont;
+            }
+            catch
+            {
+                ResetEditOverlayResolvedFont();
+                return fallbackBaseFont;
+            }
+        }
+
+        private void ResetEditOverlayResolvedFont()
+        {
+            if (_editOverlayResolvedFont != null)
+            {
+                _editOverlayResolvedFont.Dispose();
+                _editOverlayResolvedFont = null;
+            }
+            _editOverlayResolvedFontFamily = string.Empty;
+            _editOverlayResolvedFontSize = 0f;
+            _editOverlayResolvedFontStyle = FontStyle.Regular;
+            _editOverlayResolvedFontUnit = GraphicsUnit.World;
+        }
+
         private static int GetModifiers()
         {
             int mod = 0;
@@ -1414,6 +2007,47 @@ namespace VolvoxGrid.DotNet.Internal
             }
 
             return mod;
+        }
+
+        private static int ScalarIndexToCodeUnitIndex(string text, int scalarIndex)
+        {
+            string value = text ?? string.Empty;
+            int remaining = Math.Max(0, scalarIndex);
+            int i = 0;
+            while (i < value.Length && remaining > 0)
+            {
+                if (char.IsHighSurrogate(value, i) && i + 1 < value.Length && char.IsLowSurrogate(value, i + 1))
+                {
+                    i += 2;
+                }
+                else
+                {
+                    i += 1;
+                }
+                remaining--;
+            }
+            return i;
+        }
+
+        private static int CodeUnitIndexToScalarIndex(string text, int codeUnitIndex)
+        {
+            string value = text ?? string.Empty;
+            int limit = Math.Max(0, Math.Min(value.Length, codeUnitIndex));
+            int i = 0;
+            int scalars = 0;
+            while (i < limit)
+            {
+                if (char.IsHighSurrogate(value, i) && i + 1 < limit && char.IsLowSurrogate(value, i + 1))
+                {
+                    i += 2;
+                }
+                else
+                {
+                    i += 1;
+                }
+                scalars++;
+            }
+            return scalars;
         }
 
         private static void FreeRetiredBuffers(RetiredBuffers retired)

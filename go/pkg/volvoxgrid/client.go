@@ -116,6 +116,16 @@ func (g *Grid) LoadData(data []byte, options *pb.LoadDataOptions) (*pb.LoadDataR
 	})
 }
 
+func (g *Grid) LoadTable(rows, cols int32, values []*pb.CellValue, atomic bool) (*pb.WriteResult, error) {
+	return g.client.client.LoadTable(context.Background(), &pb.LoadTableRequest{
+		GridId: g.ID,
+		Rows:   rows,
+		Cols:   cols,
+		Values: values,
+		Atomic: atomic,
+	})
+}
+
 func (g *Grid) LoadDemo(name string) error {
 	_, err := g.client.client.LoadDemo(context.Background(), &pb.LoadDemoRequest{
 		GridId: g.ID,
@@ -178,6 +188,15 @@ func (g *Grid) Refresh() error {
 	return err
 }
 
+func (g *Grid) Clear(scope pb.ClearScope, region pb.ClearRegion) error {
+	_, err := g.client.client.Clear(context.Background(), &pb.ClearRequest{
+		GridId: g.ID,
+		Scope:  scope,
+		Region: region,
+	})
+	return err
+}
+
 func (g *Grid) CancelEdit() error {
 	_, err := g.client.client.Edit(context.Background(), &pb.EditCommand{
 		GridId: g.ID,
@@ -214,6 +233,27 @@ func (g *Grid) GetConfig() (*pb.GridConfig, error) {
 
 func (g *Grid) GetSelection() (*pb.SelectionState, error) {
 	return g.client.client.GetSelection(context.Background(), &pb.GridHandle{Id: g.ID})
+}
+
+func (g *Grid) GetCells(
+	row1,
+	col1,
+	row2,
+	col2 int32,
+	includeStyle,
+	includeChecked,
+	includeTyped bool,
+) (*pb.CellsResponse, error) {
+	return g.client.client.GetCells(context.Background(), &pb.GetCellsRequest{
+		GridId:         g.ID,
+		Row1:           row1,
+		Col1:           col1,
+		Row2:           row2,
+		Col2:           col2,
+		IncludeStyle:   includeStyle,
+		IncludeChecked: includeChecked,
+		IncludeTyped:   includeTyped,
+	})
 }
 
 func (g *Grid) SelectCell(row, col int32, show bool) error {

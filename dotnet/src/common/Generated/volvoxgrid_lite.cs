@@ -210,6 +210,14 @@ namespace Volvoxgrid.V1
         COLUMN_DATA_CURRENCY = 4,
     }
 
+    public enum ComposeMethod
+    {
+        COMPOSE_METHOD_NONE = 0,
+        COMPOSE_METHOD_HANGUL = 1,
+        COMPOSE_METHOD_DEAD_KEY = 2,
+        COMPOSE_METHOD_TELEX = 3,
+    }
+
     public enum CursorChange_CursorType
     {
         DEFAULT = 0,
@@ -4127,6 +4135,12 @@ namespace Volvoxgrid.V1
         private bool? _hostPointerDispatch;
         public bool HostPointerDispatch { get { return _hostPointerDispatch.GetValueOrDefault(); } set { _hostPointerDispatch = value; } }
         public bool HasHostPointerDispatch { get { return _hostPointerDispatch.HasValue; } }
+        private bool? _engineCompose;
+        public bool EngineCompose { get { return _engineCompose.GetValueOrDefault(); } set { _engineCompose = value; } }
+        public bool HasEngineCompose { get { return _engineCompose.HasValue; } }
+        private ComposeMethod? _composeMethod;
+        public ComposeMethod ComposeMethod { get { return _composeMethod.GetValueOrDefault(); } set { _composeMethod = value; } }
+        public bool HasComposeMethod { get { return _composeMethod.HasValue; } }
 
         // ── Serialization ──
 
@@ -4149,6 +4163,10 @@ namespace Volvoxgrid.V1
                 w.WriteBool(7, _hostKeyDispatch.Value);
             if (_hostPointerDispatch.HasValue)
                 w.WriteBool(8, _hostPointerDispatch.Value);
+            if (_engineCompose.HasValue)
+                w.WriteBool(9, _engineCompose.Value);
+            if (_composeMethod.HasValue)
+                w.WriteInt32(10, (int)_composeMethod.Value);
             return w.ToArray();
         }
 
@@ -4174,6 +4192,8 @@ namespace Volvoxgrid.V1
                     case 6: msg.Mask = r.ReadString(); break;
                     case 7: msg.HostKeyDispatch = r.ReadBool(); break;
                     case 8: msg.HostPointerDispatch = r.ReadBool(); break;
+                    case 9: msg.EngineCompose = r.ReadBool(); break;
+                    case 10: msg.ComposeMethod = (ComposeMethod)r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }

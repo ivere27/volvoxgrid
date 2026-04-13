@@ -923,6 +923,7 @@ fn render_data_row(
         } else {
             String::new()
         };
+        let mut fitted_text = None;
         let mut cursor_x = None;
         let is_editing = show_text
             && grid.edit.is_active()
@@ -930,12 +931,14 @@ fn render_data_row(
             && grid.edit.edit_col == style_col;
         if is_editing {
             text = grid.edit.edit_text.clone();
-            cursor_x = Some(aligned_cursor_offset(
+            let (visible_text, visible_cursor_x) = fit_edit_text(
                 &text,
                 render_column.full_width,
                 halign,
-                grid.edit.sel_start.max(0) as usize,
-            ));
+                grid.edit.current_caret_char().max(0) as usize,
+            );
+            fitted_text = Some(visible_text);
+            cursor_x = Some(visible_cursor_x);
         } else {
             let is_boolean_col = grid.get_col_props(style_col).map_or(false, |cp| {
                 cp.data_type == pb::ColumnDataType::ColumnDataBoolean as i32
@@ -969,7 +972,11 @@ fn render_data_row(
             && grid.resolved_cell_control(style_row, style_col) == CellControl::DropdownButton;
         let text_column = text_render_column(render_column, show_dropdown);
 
-        write_cell_text(surface, text_column, y, &text, fg, bg, attr, halign);
+        if let Some(fitted_text) = fitted_text.as_deref() {
+            write_fitted_cell_text(surface, text_column, y, fitted_text, fg, bg, attr);
+        } else {
+            write_cell_text(surface, text_column, y, &text, fg, bg, attr, halign);
+        }
         apply_progress_fill(
             grid,
             surface,
@@ -1448,24 +1455,38 @@ fn caret_attr(attr: u8) -> u8 {
     }
 }
 
-fn aligned_cursor_offset(text: &str, width: i32, halign: i32, cursor_chars: usize) -> i32 {
+fn fit_edit_text(text: &str, width: i32, halign: i32, cursor_chars: usize) -> (String, i32) {
     if width <= 0 {
-        return 0;
+        return (String::new(), 0);
     }
 
-    let trimmed = truncate_to_width(text, width as usize);
-    let trimmed_chars = trimmed.chars().count();
-    let cursor_chars = cursor_chars.min(trimmed_chars);
-    let text_width = UnicodeWidthStr::width(trimmed.as_str());
-    let total_width = width.max(0) as usize;
-    let pad = total_width.saturating_sub(text_width);
-    let left_pad = match halign {
-        1 => pad / 2,
-        2 => pad,
+    let text_width = UnicodeWidthStr::width(text) as i32;
+    let cursor_chars = cursor_chars.min(text.chars().count());
+    let caret_x = prefix_width(text, cursor_chars) as i32;
+    let mut draw_x = match halign {
+        1 => (width - text_width) / 2,
+        2 => width - text_width,
         _ => 0,
     };
-    let offset = left_pad + prefix_width(trimmed.as_str(), cursor_chars);
-    offset.min(width.saturating_sub(1).max(0) as usize) as i32
+    let min_caret_x = 0;
+    let max_caret_x = width;
+    let caret_screen_x = draw_x + caret_x;
+    if caret_screen_x < min_caret_x {
+        draw_x += min_caret_x - caret_screen_x;
+    } else if caret_screen_x > max_caret_x {
+        draw_x -= caret_screen_x - max_caret_x;
+    }
+
+    let fitted = if draw_x > 0 {
+        let mut padded = String::with_capacity(draw_x as usize + text.len());
+        padded.push_str(&" ".repeat(draw_x as usize));
+        padded.push_str(text);
+        display_window(&padded, 0, width)
+    } else {
+        display_window(text, -draw_x, width)
+    };
+    let cursor_x = (draw_x + caret_x).clamp(0, width - 1);
+    (fitted, cursor_x)
 }
 
 fn readable_popup_fg(fg: u32, bg: u32, fallback: u32) -> u32 {
@@ -1487,7 +1508,19 @@ fn write_cell_text(
     halign: i32,
 ) {
     let fitted = fit_text(text, column.full_width, halign);
-    let visible = display_window(&fitted, column.crop, column.width);
+    write_fitted_cell_text(surface, column, y, &fitted, fg, bg, attr);
+}
+
+fn write_fitted_cell_text(
+    surface: &mut Surface<'_>,
+    column: RenderColumn,
+    y: i32,
+    fitted: &str,
+    fg: u32,
+    bg: u32,
+    attr: u8,
+) {
+    let visible = display_window(fitted, column.crop, column.width);
     write_display_text(surface, column, y, &visible, fg, bg, attr);
 }
 
@@ -2062,6 +2095,33 @@ mod tests {
             .collect();
         assert_eq!(caret_positions.len(), 1);
         assert!(caret_positions[0] >= 4);
+    }
+
+    #[test]
+    fn render_grid_tui_scrolls_long_edit_text_with_caret() {
+        let mut grid = VolvoxGrid::new(1, 8, 3, 1, 1, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.columns[0].caption = "Value".to_string();
+        grid.set_col_width(0, 4);
+        grid.cells.set_text(0, 0, "abcdef".to_string());
+        grid.edit.start_edit(0, 0, "abcdef");
+
+        grid.edit.sel_start = 0;
+        grid.edit.sel_length = 0;
+        grid.edit.sel_caret = 0;
+        let mut start_buffer = vec![TuiCell::default(); 8 * 3];
+        render_grid_tui(&mut grid, &mut start_buffer, 8, 3, 8);
+        let start_visible: String = start_buffer[8..12].iter().map(|cell| cell.ch()).collect();
+
+        grid.edit.sel_start = 6;
+        grid.edit.sel_length = 0;
+        grid.edit.sel_caret = 6;
+        let mut end_buffer = vec![TuiCell::default(); 8 * 3];
+        render_grid_tui(&mut grid, &mut end_buffer, 8, 3, 8);
+        let end_visible: String = end_buffer[8..12].iter().map(|cell| cell.ch()).collect();
+
+        assert_eq!(start_visible, "abcd");
+        assert_eq!(end_visible, "cdef");
     }
 
     #[test]

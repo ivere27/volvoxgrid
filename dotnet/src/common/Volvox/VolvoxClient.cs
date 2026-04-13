@@ -354,6 +354,20 @@ namespace VolvoxGrid.DotNet.Internal
             InvokeUnary(EditMethod, cmd.ToByteArray());
         }
 
+        public void EditSetSelection(long gridId, int start, int length)
+        {
+            var cmd = new EditCommand
+            {
+                GridId = gridId,
+                SetSelection = new Volvoxgrid.V1.EditSetSelection
+                {
+                    Start = start,
+                    Length = length,
+                },
+            };
+            InvokeUnary(EditMethod, cmd.ToByteArray());
+        }
+
         public EditState GetEditState(long gridId)
         {
             var cmd = new EditCommand { GridId = gridId };

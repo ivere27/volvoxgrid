@@ -305,7 +305,7 @@ fn handle_tui_terminal_pointer_event(
 fn handle_pointer_render_input(
     plugin: &VolvoxGridPlugin,
     stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
-    sent_edit_requests: &mut HashMap<i64, EditRequest>,
+    sent_edit_requests: &mut HashMap<i64, SentEditRequest>,
     grid_id: i64,
     pe: PointerEvent,
     terminal_session: Option<&mut terminal_tui::TerminalTuiSession>,
@@ -544,7 +544,7 @@ fn handle_pointer_render_input(
             });
         }
         if let Some(output) = editor_output {
-            send_render_output_tracked(stream, sent_edit_requests, grid_id, output);
+            send_render_output_tracked(plugin, stream, sent_edit_requests, grid_id, output);
         }
     }
 }
@@ -552,7 +552,7 @@ fn handle_pointer_render_input(
 fn handle_key_render_input(
     plugin: &VolvoxGridPlugin,
     stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
-    sent_edit_requests: &mut HashMap<i64, EditRequest>,
+    sent_edit_requests: &mut HashMap<i64, SentEditRequest>,
     grid_id: i64,
     ke: KeyEvent,
     emit_aux_outputs: bool,
@@ -563,9 +563,25 @@ fn handle_key_render_input(
             ensure_layout(grid);
         }
         let decision_enabled = plugin.decision_channel_enabled(grid_id);
+        if let Some(session) = terminal_session.as_deref_mut() {
+            let compose_default = if grid.engine_compose_configured {
+                grid.engine_compose
+            } else {
+                true
+            };
+            session.ensure_compose_default(compose_default);
+            grid.engine_compose = session.compose_enabled();
+            grid.engine_compose_configured = true;
+        }
         let was_editing = grid.edit.is_active();
         let prev_edit_row = grid.edit.edit_row;
         let prev_edit_col = grid.edit.edit_col;
+        if was_editing {
+            grid.edit.configure_compose(
+                grid.effective_engine_compose_enabled(),
+                grid.effective_compose_method(),
+            );
+        }
         let terminal_policy = terminal_session
             .as_deref_mut()
             .map(|session| session.apply_navigation_edit_policy(&ke, was_editing))
@@ -601,6 +617,15 @@ fn handle_key_render_input(
                             None,
                         );
                     }
+                }
+            }
+            terminal_tui::TerminalKeyPolicyDecision::ToggleCompose { enabled } => {
+                grid.engine_compose = enabled;
+                grid.engine_compose_configured = true;
+                if grid.edit.is_active() {
+                    grid.edit
+                        .configure_compose(enabled, grid.effective_compose_method());
+                    grid.mark_dirty();
                 }
             }
             terminal_tui::TerminalKeyPolicyDecision::RemapKeyDown { key_code, modifier } => {
@@ -728,7 +753,7 @@ fn handle_key_render_input(
             })),
         });
         if let Some(output) = editor_output {
-            send_render_output_tracked(stream, sent_edit_requests, grid_id, output);
+            send_render_output_tracked(plugin, stream, sent_edit_requests, grid_id, output);
         }
     }
 }
@@ -1954,7 +1979,7 @@ fn build_edit_request(
     row: i32,
     col: i32,
 ) -> Option<EditRequest> {
-    let (x, y, w, h) = grid.edit_cell_rect(row, col)?;
+    let (x, y, w, h) = grid.cell_screen_rect(row, col)?;
     let (current_value, sel_start, sel_length, ui_mode) =
         if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
             (
@@ -2049,30 +2074,65 @@ fn same_edit_request_geometry(lhs: &EditRequest, rhs: &EditRequest) -> bool {
         && lhs.height.to_bits() == rhs.height.to_bits()
 }
 
+#[derive(Clone)]
+struct SentEditRequest {
+    request: EditRequest,
+    session_serial: u64,
+}
+
+fn current_edit_session_serial(
+    plugin: &VolvoxGridPlugin,
+    grid_id: i64,
+    req: &EditRequest,
+) -> Option<u64> {
+    plugin
+        .with_grid(grid_id, |grid| {
+            if grid.edit.is_active()
+                && grid.edit.edit_row == req.row
+                && grid.edit.edit_col == req.col
+            {
+                Some(grid.edit.session_serial)
+            } else {
+                None
+            }
+        })
+        .ok()
+        .flatten()
+}
+
 fn track_sent_edit_request(
-    sent_edit_requests: &mut HashMap<i64, EditRequest>,
+    plugin: &VolvoxGridPlugin,
+    sent_edit_requests: &mut HashMap<i64, SentEditRequest>,
     grid_id: i64,
     output: &RenderOutput,
 ) {
     if let Some(render_output::Event::EditRequest(req)) = output.event.as_ref() {
-        sent_edit_requests.insert(grid_id, req.clone());
+        let session_serial = current_edit_session_serial(plugin, grid_id, req).unwrap_or(0);
+        sent_edit_requests.insert(
+            grid_id,
+            SentEditRequest {
+                request: req.clone(),
+                session_serial,
+            },
+        );
     }
 }
 
 fn send_render_output_tracked(
+    plugin: &VolvoxGridPlugin,
     stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
-    sent_edit_requests: &mut HashMap<i64, EditRequest>,
+    sent_edit_requests: &mut HashMap<i64, SentEditRequest>,
     grid_id: i64,
     output: RenderOutput,
 ) {
-    track_sent_edit_request(sent_edit_requests, grid_id, &output);
+    track_sent_edit_request(plugin, sent_edit_requests, grid_id, &output);
     stream.send(output);
 }
 
 fn maybe_send_refreshed_edit_request(
     plugin: &VolvoxGridPlugin,
     stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
-    sent_edit_requests: &mut HashMap<i64, EditRequest>,
+    sent_edit_requests: &mut HashMap<i64, SentEditRequest>,
     grid_id: i64,
 ) {
     let output = plugin
@@ -2093,11 +2153,19 @@ fn maybe_send_refreshed_edit_request(
         return;
     };
 
-    let should_send = sent_edit_requests
-        .get(&grid_id)
-        .map_or(true, |prev| !same_edit_request_geometry(prev, req));
+    let current_session_serial = current_edit_session_serial(plugin, grid_id, req).unwrap_or(0);
+    let should_send = sent_edit_requests.get(&grid_id).map_or(true, |prev| {
+        prev.session_serial != current_session_serial
+            || !same_edit_request_geometry(&prev.request, req)
+    });
     if should_send {
-        sent_edit_requests.insert(grid_id, req.clone());
+        sent_edit_requests.insert(
+            grid_id,
+            SentEditRequest {
+                request: req.clone(),
+                session_serial: current_session_serial,
+            },
+        );
         stream.send(output);
     }
 }
@@ -2165,6 +2233,10 @@ fn begin_edit_session_core_opts(
         caret_end,
         seed_text.as_deref(),
         formula_mode,
+    );
+    grid.edit.configure_compose(
+        grid.effective_engine_compose_enabled(),
+        grid.effective_compose_method(),
     );
     grid.edit.parse_dropdown_items(&combo_list);
     if !combo_list.is_empty() {
@@ -3132,6 +3204,17 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 None => {}
             }
 
+            if grid.edit.is_active() && !grid.layout.valid {
+                ensure_layout(grid);
+            }
+            let (x, y, width, height) = if grid.edit.is_active() {
+                grid.cell_screen_rect(grid.edit.edit_row, grid.edit.edit_col)
+                    .map(|(x, y, w, h)| (x as f32, y as f32, w as f32, h as f32))
+                    .unwrap_or((0.0, 0.0, 0.0, 0.0))
+            } else {
+                (0.0, 0.0, 0.0, 0.0)
+            };
+
             EditState {
                 active: grid.edit.is_active(),
                 row: grid.edit.edit_row,
@@ -3145,6 +3228,11 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                     volvoxgrid_engine::edit::EditUiMode::EnterMode => EditUiMode::Enter as i32,
                     volvoxgrid_engine::edit::EditUiMode::EditMode => EditUiMode::Edit as i32,
                 },
+                x,
+                y,
+                width,
+                height,
+                max_length: grid.edit_max_length,
             }
         })?;
         Ok(state)
@@ -3539,14 +3627,20 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         let mut last_present_mode: i32 = -1;
         let mut last_fling_tick: Option<std::time::Instant> = None;
         let mut last_mem_calc: HashMap<i64, Instant> = HashMap::new();
-        let mut sent_edit_requests: HashMap<i64, EditRequest> = HashMap::new();
+        let mut sent_edit_requests: HashMap<i64, SentEditRequest> = HashMap::new();
         let mut zoom_sessions: HashMap<i64, ZoomGestureState> = HashMap::new();
 
         while let Some(input) = stream.recv() {
             let grid_id = input.grid_id;
             for output in self.resolve_expired_actions(grid_id) {
                 if !terminal_session.suppress_aux_outputs() {
-                    send_render_output_tracked(stream, &mut sent_edit_requests, grid_id, output);
+                    send_render_output_tracked(
+                        self,
+                        stream,
+                        &mut sent_edit_requests,
+                        grid_id,
+                        output,
+                    );
                 }
             }
 
@@ -4477,6 +4571,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         decision.cancel,
                     ) {
                         send_render_output_tracked(
+                            self,
                             stream,
                             &mut sent_edit_requests,
                             decision_grid_id,

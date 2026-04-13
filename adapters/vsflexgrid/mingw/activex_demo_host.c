@@ -11,6 +11,7 @@
 
 #include <windows.h>
 #include <windowsx.h>
+#include <imm.h>
 #include <ole2.h>
 #include <oleauto.h>
 #include <olectl.h>
@@ -73,6 +74,7 @@ typedef struct DemoApp {
     BOOL hover_enabled;
     BOOL debug_overlay;
     BOOL scroll_blit_enabled;
+    WCHAR initial_font_name[128];
 } DemoApp;
 
 static void copy_wstr(WCHAR *dst, size_t cap, const WCHAR *src) {
@@ -206,6 +208,38 @@ static HRESULT put_i4_property(IDispatch *disp, LPCOLESTR name, LONG value) {
         NULL);
 }
 
+static HRESULT put_bstr_property(IDispatch *disp, LPCOLESTR name, LPCWSTR value) {
+    DISPID dispid;
+    DISPID putid = DISPID_PROPERTYPUT;
+    VARIANT arg;
+    DISPPARAMS dp;
+    HRESULT hr;
+
+    hr = get_dispid(disp, name, &dispid);
+    if (FAILED(hr)) return hr;
+
+    VariantInit(&arg);
+    V_VT(&arg) = VT_BSTR;
+    V_BSTR(&arg) = SysAllocString(value ? value : L"");
+    if (!V_BSTR(&arg)) return E_OUTOFMEMORY;
+    dp.rgvarg = &arg;
+    dp.rgdispidNamedArgs = &putid;
+    dp.cArgs = 1;
+    dp.cNamedArgs = 1;
+    hr = disp->lpVtbl->Invoke(
+        disp,
+        dispid,
+        &IID_NULL,
+        LOCALE_USER_DEFAULT,
+        DISPATCH_PROPERTYPUT,
+        &dp,
+        NULL,
+        NULL,
+        NULL);
+    VariantClear(&arg);
+    return hr;
+}
+
 static HRESULT invoke_method_variants(IDispatch *disp, LPCOLESTR name, VARIANT *args, UINT argc) {
     DISPID dispid;
     DISPPARAMS dp;
@@ -263,6 +297,24 @@ static HRESULT invoke_method_i4_2(IDispatch *disp, LPCOLESTR name, LONG a0, LONG
     V_VT(&args[0]) = VT_I4;
     V_I4(&args[0]) = a1;
     return invoke_method_variants(disp, name, args, 2);
+}
+
+static HRESULT invoke_method_bstr_i4_i4(IDispatch *disp, LPCOLESTR name, BSTR text, LONG cursor, LONG commit) {
+    VARIANT args[3];
+    HRESULT hr;
+    VariantInit(&args[0]);
+    VariantInit(&args[1]);
+    VariantInit(&args[2]);
+    V_VT(&args[2]) = VT_BSTR;
+    V_BSTR(&args[2]) = SysAllocStringLen(text ? text : L"", text ? SysStringLen(text) : 0);
+    if (!V_BSTR(&args[2])) return E_OUTOFMEMORY;
+    V_VT(&args[1]) = VT_I4;
+    V_I4(&args[1]) = cursor;
+    V_VT(&args[0]) = VT_I4;
+    V_I4(&args[0]) = commit;
+    hr = invoke_method_variants(disp, name, args, 3);
+    VariantClear(&args[2]);
+    return hr;
 }
 
 static HRESULT invoke_method_i4_4(
@@ -426,8 +478,16 @@ static HRESULT sync_scroll_blit(DemoApp *app) {
     return invoke_method_i4_1(app->grid, L"SetScrollBlit", app->scroll_blit_enabled ? 1 : 0);
 }
 
+static HRESULT sync_font_name(DemoApp *app) {
+    if (!app || !app->grid) return E_POINTER;
+    if (!app->initial_font_name[0]) return S_OK;
+    return put_bstr_property(app->grid, L"FontName", app->initial_font_name);
+}
+
 static HRESULT apply_runtime_options(DemoApp *app) {
     HRESULT hr;
+    hr = sync_font_name(app);
+    if (FAILED(hr)) return hr;
     hr = sync_editable(app);
     if (FAILED(hr)) return hr;
     hr = sync_selection_mode(app);
@@ -800,6 +860,75 @@ static void handle_key_press(DemoApp *app, WPARAM wp) {
     }
 }
 
+static BSTR get_ime_string_bstr(HIMC hImc, DWORD index) {
+    LONG byte_len;
+    UINT char_len;
+    BSTR text;
+
+    if (!hImc) return NULL;
+
+    byte_len = ImmGetCompositionStringW(hImc, index, NULL, 0);
+    if (byte_len < 0) return NULL;
+    if (byte_len == 0) return SysAllocStringLen(L"", 0);
+
+    char_len = (UINT)(byte_len / (LONG)sizeof(WCHAR));
+    text = SysAllocStringLen(NULL, char_len);
+    if (!text) return NULL;
+
+    if (ImmGetCompositionStringW(hImc, index, text, byte_len) < 0) {
+        SysFreeString(text);
+        return NULL;
+    }
+    text[char_len] = L'\0';
+    return text;
+}
+
+static void handle_ime_composition(DemoApp *app, HWND hwnd, LPARAM lp) {
+    HIMC hImc;
+    HRESULT hr;
+    BOOL updated = FALSE;
+
+    if (!app || !app->grid) return;
+
+    hImc = ImmGetContext(hwnd);
+    if (!hImc) return;
+
+    if (lp & GCS_RESULTSTR) {
+        BSTR result = get_ime_string_bstr(hImc, GCS_RESULTSTR);
+        if (result) {
+            if (SysStringLen(result) > 0) {
+                hr = invoke_method_bstr_i4_i4(app->grid, L"ImeComposition", result, (LONG)SysStringLen(result), 1);
+                if (SUCCEEDED(hr)) {
+                    updated = TRUE;
+                } else {
+                    set_statusf(app, L"ImeComposition commit failed: 0x%08lx", (unsigned long)hr);
+                }
+            }
+            SysFreeString(result);
+        }
+    }
+
+    if (lp & GCS_COMPSTR) {
+        BSTR comp = get_ime_string_bstr(hImc, GCS_COMPSTR);
+        if (comp) {
+            hr = invoke_method_bstr_i4_i4(app->grid, L"ImeComposition", comp, (LONG)SysStringLen(comp), 0);
+            if (SUCCEEDED(hr)) {
+                updated = TRUE;
+            } else {
+                set_statusf(app, L"ImeComposition preedit failed: 0x%08lx", (unsigned long)hr);
+            }
+            SysFreeString(comp);
+        }
+    }
+
+    ImmReleaseContext(hwnd, hImc);
+
+    if (updated) {
+        invalidate_view(app);
+        set_focus_status(app, L"");
+    }
+}
+
 static void sort_focused_column(DemoApp *app, BOOL ascending) {
     LONG col = 0;
     HRESULT hr;
@@ -971,6 +1100,26 @@ static LRESULT CALLBACK view_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_CHAR:
         handle_key_press(app, wp);
+        return 0;
+    case WM_IME_STARTCOMPOSITION:
+        return DefWindowProcW(hwnd, msg, wp, lp);
+    case WM_IME_COMPOSITION:
+        handle_ime_composition(app, hwnd, lp);
+        return DefWindowProcW(hwnd, msg, wp, lp);
+    case WM_IME_ENDCOMPOSITION: {
+        HRESULT hr = S_OK;
+        if (app && app->grid) {
+            hr = invoke_method_bstr_i4_i4(app->grid, L"ImeComposition", NULL, 0, 0);
+            if (SUCCEEDED(hr)) {
+                invalidate_view(app);
+                set_focus_status(app, L"");
+            } else {
+                set_statusf(app, L"ImeComposition clear failed: 0x%08lx", (unsigned long)hr);
+            }
+        }
+        return DefWindowProcW(hwnd, msg, wp, lp);
+    }
+    case WM_IME_CHAR:
         return 0;
     default:
         return DefWindowProcW(hwnd, msg, wp, lp);
@@ -1191,6 +1340,79 @@ static BOOL register_window_class(const WCHAR *name, WNDPROC proc, HBRUSH brush,
     return GetLastError() == ERROR_CLASS_ALREADY_EXISTS;
 }
 
+static const char *skip_cli_ws(const char *p) {
+    while (p && (*p == ' ' || *p == '\t')) ++p;
+    return p;
+}
+
+static const char *scan_cli_token(const char *p) {
+    int quoted = 0;
+    while (p && *p) {
+        if (*p == '"') {
+            quoted = !quoted;
+            ++p;
+            continue;
+        }
+        if (!quoted && (*p == ' ' || *p == '\t')) break;
+        ++p;
+    }
+    return p;
+}
+
+static BOOL parse_font_name_arg(const char *cmdline, WCHAR *out, size_t out_cap) {
+    const char *p = cmdline;
+    const char *value;
+    const char *end;
+    char tmp[256];
+    int len;
+    int wlen;
+
+    if (!out || out_cap == 0) return FALSE;
+    out[0] = L'\0';
+    if (!p) return FALSE;
+
+    for (;;) {
+        p = skip_cli_ws(p);
+        if (!*p) return FALSE;
+        if (strncmp(p, "--font-name=", 12) == 0) {
+            value = p + 12;
+        } else if (strncmp(p, "--font-name", 11) == 0 &&
+                   (p[11] == '\0' || p[11] == ' ' || p[11] == '\t')) {
+            p = skip_cli_ws(p + 11);
+            if (!*p) return FALSE;
+            value = p;
+        } else {
+            p = scan_cli_token(p);
+            continue;
+        }
+
+        value = skip_cli_ws(value);
+        if (*value == '"') {
+            ++value;
+            end = value;
+            while (*end && *end != '"') ++end;
+        } else {
+            end = scan_cli_token(value);
+        }
+
+        len = (int)(end - value);
+        if (len <= 0) return FALSE;
+        if (len >= (int)sizeof(tmp)) len = (int)sizeof(tmp) - 1;
+        memcpy(tmp, value, (size_t)len);
+        tmp[len] = '\0';
+        wlen = MultiByteToWideChar(CP_UTF8, 0, tmp, -1, out, (int)out_cap);
+        if (wlen <= 0) {
+            wlen = MultiByteToWideChar(CP_ACP, 0, tmp, -1, out, (int)out_cap);
+        }
+        if (wlen <= 0) {
+            out[0] = L'\0';
+            return FALSE;
+        }
+        out[out_cap - 1] = L'\0';
+        return TRUE;
+    }
+}
+
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev, LPSTR cmdline, int show) {
     DemoApp *app;
     HWND hwnd;
@@ -1227,6 +1449,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE prev, LPSTR cmdline, int show) 
     app->hover_enabled = TRUE;
     app->debug_overlay = FALSE;
     app->scroll_blit_enabled = FALSE;
+    parse_font_name_arg(cmdline, app->initial_font_name, sizeof(app->initial_font_name) / sizeof(app->initial_font_name[0]));
 
     rc.left = 0;
     rc.top = 0;

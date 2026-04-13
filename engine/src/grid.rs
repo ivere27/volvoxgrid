@@ -408,6 +408,14 @@ pub struct VolvoxGrid {
     /// Engine-rendered UI (resize, scrollbar, fast-scroll, freeze drag) remains
     /// engine-handled.
     pub host_pointer_dispatch: bool,
+    /// When true, keypresses in edit mode route through the engine-side compose layer.
+    pub engine_compose: bool,
+    /// Tracks whether `engine_compose` was explicitly configured.
+    pub engine_compose_configured: bool,
+    /// Selected engine-side compose method.
+    pub compose_method: i32,
+    /// Tracks whether `compose_method` was explicitly configured.
+    pub compose_method_configured: bool,
     /// Column separator for clipboard operations (default: "\t").
     pub clip_col_separator: String,
     /// Row separator for clipboard operations (default: "\n").
@@ -537,6 +545,10 @@ pub struct VolvoxGrid {
     /// Set after a dropdown item click commits, to consume the rest of the
     /// same pointer gesture so it does not leak into grid selection.
     pub dropdown_click_active: bool,
+    /// True while dragging a text selection inside the active editor.
+    pub edit_pointer_select_active: bool,
+    /// Anchor caret position for the active editor pointer-selection drag.
+    pub edit_pointer_select_anchor: i32,
     /// Whether a dropdown button is currently shown pressed.
     pub dropdown_button_pressed: bool,
     /// Cell row for the active dropdown button press.
@@ -791,7 +803,7 @@ impl VolvoxGrid {
             pull_to_refresh_theme: pb::PullToRefreshTheme::TopBand as i32,
             pull_to_refresh_text_pull: None,
             pull_to_refresh_text_release: None,
-            tab_behavior: 0,
+            tab_behavior: pb::TabBehavior::TabCells as i32,
             header_features: 0,
             custom_render: 0,
             word_wrap: false,
@@ -807,6 +819,10 @@ impl VolvoxGrid {
             edit_max_length: 0,
             host_key_dispatch: false,
             host_pointer_dispatch: false,
+            engine_compose: false,
+            engine_compose_configured: false,
+            compose_method: pb::ComposeMethod::None as i32,
+            compose_method_configured: false,
             clip_col_separator: "\t".to_string(),
             clip_row_separator: "\n".to_string(),
             format_string: String::new(),
@@ -879,6 +895,8 @@ impl VolvoxGrid {
             // Outline button click
             outline_click_active: false,
             dropdown_click_active: false,
+            edit_pointer_select_active: false,
+            edit_pointer_select_anchor: 0,
             dropdown_button_pressed: false,
             dropdown_button_pressed_row: -1,
             dropdown_button_pressed_col: -1,
@@ -1707,6 +1725,24 @@ impl VolvoxGrid {
 
     pub fn is_tui_mode(&self) -> bool {
         self.tui_mode || self.renderer_mode == pb::RendererMode::RendererTui as i32
+    }
+
+    pub fn effective_engine_compose_enabled(&self) -> bool {
+        if self.engine_compose_configured {
+            self.engine_compose
+        } else {
+            self.is_tui_mode()
+        }
+    }
+
+    pub fn effective_compose_method(&self) -> i32 {
+        if self.compose_method_configured {
+            self.compose_method
+        } else if self.is_tui_mode() {
+            pb::ComposeMethod::DeadKey as i32
+        } else {
+            self.compose_method
+        }
     }
 
     fn apply_tui_mode_defaults(&mut self) {
@@ -4485,6 +4521,27 @@ impl VolvoxGrid {
         char_count
     }
 
+    /// Resolve the active editor's horizontal alignment.
+    ///
+    /// Returns 0 for left, 1 for center, 2 for right.
+    pub fn edit_horizontal_alignment(&self) -> i32 {
+        if !self.edit.is_active() {
+            return 0;
+        }
+
+        let row = self.edit.edit_row;
+        let col = self.edit.edit_col;
+        if row < 0 || row >= self.rows || col < 0 || col >= self.cols {
+            return 0;
+        }
+
+        let style_override = self.get_cell_style(row, col);
+        let alignment =
+            crate::canvas::resolve_alignment(self, row, col, &style_override, &self.edit.edit_text);
+        let (halign, _) = crate::canvas::alignment_components(alignment);
+        halign
+    }
+
     /// Hit-test a pixel coordinate against the active dropdown.
     /// Returns the dropdown item index if the point is inside the dropdown,
     /// or `None` if outside or no dropdown is active.
@@ -4573,6 +4630,19 @@ mod tests {
         assert_eq!(grid.columns[1].alignment, 7); // RIGHT_CENTER
         assert_eq!(grid.columns[2].alignment, 4); // CENTER_CENTER
         assert_eq!(grid.get_col_width(1), 120);
+    }
+
+    #[test]
+    fn edit_horizontal_alignment_tracks_effective_cell_alignment() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.columns[0].alignment = pb::Align::RightCenter as i32;
+        grid.cells.set_text(1, 0, "123".to_string());
+
+        grid.begin_edit(1, 0);
+
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit_horizontal_alignment(), 2);
     }
 
     #[test]

@@ -81,7 +81,8 @@ plugins {
 
 android {
     namespace = "io.github.ivere27.volvoxgrid"
-    compileSdk = 34
+    buildToolsVersion = "36.0.0"
+    compileSdk = 36
     ndkVersion = "28.2.13676358"
 
     buildFeatures {

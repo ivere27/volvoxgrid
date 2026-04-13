@@ -39,7 +39,6 @@ import io.github.ivere27.volvoxgrid.ScrollConfig
 import io.github.ivere27.volvoxgrid.SelectionConfig
 import io.github.ivere27.volvoxgrid.SelectionMode
 import io.github.ivere27.volvoxgrid.StyleConfig
-import io.github.ivere27.volvoxgrid.TabBehavior
 import io.github.ivere27.volvoxgrid.TreeIndicatorStyle
 import io.github.ivere27.volvoxgrid.VolvoxGridController
 
@@ -252,7 +251,6 @@ object HierarchyJsonDemo {
                 EditConfig.newBuilder()
                     .setTrigger(EditTrigger.EDIT_TRIGGER_NONE)
                     .setDropdownTrigger(DropdownTrigger.DROPDOWN_NEVER)
-                    .setTabBehavior(TabBehavior.TAB_CELLS)
                     .build()
             )
             .setScrolling(

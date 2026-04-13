@@ -1,4 +1,5 @@
 use crate::canvas::VisibleRange;
+use crate::compose::ComposeResult;
 use crate::control::CellControl;
 use crate::event::GridEventData;
 use crate::grid::VolvoxGrid;
@@ -237,6 +238,10 @@ fn begin_edit_from_input_with_options(grid: &mut VolvoxGrid, row: i32, col: i32,
     } else {
         grid.edit.start_edit(row, col, &display_text);
     }
+    grid.edit.configure_compose(
+        grid.effective_engine_compose_enabled(),
+        grid.effective_compose_method(),
+    );
     grid.edit.parse_dropdown_items(&dropdown_list);
     // Initialize dropdown index from stored translated value (preferred), or display text.
     if !dropdown_list.is_empty() {
@@ -260,13 +265,59 @@ fn begin_edit_from_input(grid: &mut VolvoxGrid, row: i32, col: i32) {
     begin_edit_from_input_with_options(grid, row, col, false);
 }
 
-fn begin_edit_from_pointer_double_click(grid: &mut VolvoxGrid, row: i32, col: i32, x_in_cell: f32) {
-    let caret = grid.caret_index_from_display_click(row, col, x_in_cell);
-    begin_edit_from_input_with_options(grid, row, col, true);
+fn active_edit_caret_from_pointer_x_in_cell(
+    grid: &mut VolvoxGrid,
+    row: i32,
+    col: i32,
+    x_in_cell: f32,
+) -> Option<i32> {
     if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
-        grid.edit.sel_start = caret;
-        grid.edit.sel_length = 0;
-        grid.mark_dirty();
+        Some(grid.caret_index_from_display_click(row, col, x_in_cell))
+    } else {
+        None
+    }
+}
+
+fn place_active_edit_caret_from_pointer_click(
+    grid: &mut VolvoxGrid,
+    row: i32,
+    col: i32,
+    x_in_cell: f32,
+) -> Option<i32> {
+    let caret = active_edit_caret_from_pointer_x_in_cell(grid, row, col, x_in_cell)?;
+    grid.edit.set_selection_anchor_and_caret(caret, caret);
+    grid.mark_dirty();
+    Some(caret)
+}
+
+fn update_active_edit_pointer_selection(grid: &mut VolvoxGrid, x: f32) -> bool {
+    if !grid.edit_pointer_select_active || !grid.edit.is_active() {
+        return false;
+    }
+
+    let row = grid.edit.edit_row;
+    let col = grid.edit.edit_col;
+    let Some((cx, _, _, _)) = grid.cell_screen_rect(row, col) else {
+        grid.edit_pointer_select_active = false;
+        return false;
+    };
+    let x_in_cell = x - cx as f32;
+    let Some(caret) = active_edit_caret_from_pointer_x_in_cell(grid, row, col, x_in_cell) else {
+        grid.edit_pointer_select_active = false;
+        return false;
+    };
+
+    grid.edit
+        .set_selection_anchor_and_caret(grid.edit_pointer_select_anchor, caret);
+    grid.mark_dirty();
+    true
+}
+
+fn begin_edit_from_pointer_double_click(grid: &mut VolvoxGrid, row: i32, col: i32, x_in_cell: f32) {
+    begin_edit_from_input_with_options(grid, row, col, true);
+    if let Some(anchor) = place_active_edit_caret_from_pointer_click(grid, row, col, x_in_cell) {
+        grid.edit_pointer_select_active = true;
+        grid.edit_pointer_select_anchor = anchor;
     }
 }
 
@@ -297,6 +348,69 @@ fn commit_active_edit(grid: &mut VolvoxGrid) -> bool {
     } else {
         false
     }
+}
+
+fn apply_compose_result(grid: &mut VolvoxGrid, result: ComposeResult) -> bool {
+    let before_text = grid.edit.edit_text.clone();
+    match result {
+        ComposeResult::Pending { preedit, cursor } => {
+            if preedit.is_empty() {
+                grid.edit.cancel_preedit();
+            } else {
+                grid.edit.set_preedit(&preedit, cursor);
+            }
+        }
+        ComposeResult::Commit { text } => {
+            if !text.is_empty() {
+                grid.edit.commit_preedit(&text);
+            } else {
+                grid.edit.cancel_preedit();
+            }
+        }
+        ComposeResult::CommitPending {
+            commit,
+            preedit,
+            cursor,
+        } => {
+            if !commit.is_empty() {
+                grid.edit.commit_preedit(&commit);
+            }
+            if preedit.is_empty() {
+                grid.edit.cancel_preedit();
+            } else {
+                grid.edit.set_preedit(&preedit, cursor);
+            }
+        }
+        ComposeResult::Pass => return false,
+    }
+
+    if grid.edit.edit_text != before_text {
+        grid.events.push(GridEventData::CellEditChange {
+            text: grid.edit.edit_text.clone(),
+        });
+    }
+    grid.mark_dirty();
+    true
+}
+
+fn flush_engine_compose(grid: &mut VolvoxGrid) -> bool {
+    if !grid.edit.is_engine_composing() {
+        return false;
+    }
+
+    let before_text = grid.edit.edit_text.clone();
+    grid.edit.flush_preedit();
+    if grid.edit.edit_text != before_text {
+        grid.events.push(GridEventData::CellEditChange {
+            text: grid.edit.edit_text.clone(),
+        });
+    }
+    grid.mark_dirty();
+    true
+}
+
+fn should_flush_engine_compose_on_key_down(key_code: i32, ctrl: bool) -> bool {
+    matches!(key_code, 9 | 13 | 27 | 35 | 36 | 37 | 38 | 39 | 40 | 46) || (ctrl && key_code == 65)
 }
 
 pub fn commit_dropdown_item_click(grid: &mut VolvoxGrid, idx: i32) -> bool {
@@ -1508,6 +1622,7 @@ pub fn handle_pointer_down_with_behavior(
 ) {
     grid.scroll.stop_fling();
     clear_col_drag_pending(grid);
+    grid.edit_pointer_select_active = false;
     if grid.type_ahead_mode != pb::TypeAheadMode::TypeAheadNone as i32 {
         clear_type_ahead_buffer(grid, true);
     }
@@ -1515,6 +1630,14 @@ pub fn handle_pointer_down_with_behavior(
     if hit.area != HitArea::DropdownButton && clear_dropdown_button_pressed(grid) {
         grid.mark_dirty();
     }
+
+    let hit_active_edit_cell = grid.is_editing()
+        && hit.row == grid.edit.edit_row
+        && hit.col == grid.edit.edit_col
+        && matches!(
+            hit.area,
+            HitArea::Cell | HitArea::CellText | HitArea::FixedRow | HitArea::FixedCol
+        );
 
     // Click-away behavior: if editing, and click is not on the active dropdown or
     // active dropdown button, close the editor.
@@ -1531,7 +1654,7 @@ pub fn handle_pointer_down_with_behavior(
             && hit.row == grid.edit.edit_row
             && hit.col == grid.edit.edit_col;
 
-        if !is_active_btn {
+        if !is_active_btn && !hit_active_edit_cell {
             if grid.edit.dropdown_items.is_empty() {
                 grid.commit_edit();
             } else {
@@ -1544,6 +1667,16 @@ pub fn handle_pointer_down_with_behavior(
     grid.mouse_col = hit.col;
     let shift = modifier & 1 != 0;
     let ctrl = modifier & 2 != 0;
+
+    if !dbl_click && !grid.host_pointer_dispatch && hit_active_edit_cell {
+        if let Some(anchor) =
+            place_active_edit_caret_from_pointer_click(grid, hit.row, hit.col, hit.x_in_cell)
+        {
+            grid.edit_pointer_select_active = true;
+            grid.edit_pointer_select_anchor = anchor;
+        }
+        return;
+    }
 
     if dbl_click && hit.row >= 0 && hit.col >= 0 && hit.area != HitArea::DropdownList {
         grid.events.push(GridEventData::DblClick {
@@ -2131,6 +2264,16 @@ pub fn handle_pointer_down_with_behavior(
 
 /// Handle pointer move event
 pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, _modifier: i32) {
+    if grid.edit_pointer_select_active && button & 1 == 0 {
+        grid.edit_pointer_select_active = false;
+    }
+
+    if grid.edit_pointer_select_active {
+        if update_active_edit_pointer_selection(grid, x) {
+            return;
+        }
+    }
+
     // Handle active fast scroll gesture
     if grid.fast_scroll_active {
         update_fast_scroll_target(grid, y);
@@ -2357,6 +2500,11 @@ pub fn handle_pointer_up(grid: &mut VolvoxGrid, x: f32, y: f32, _button: i32, _m
         return;
     }
 
+    if grid.edit_pointer_select_active {
+        grid.edit_pointer_select_active = false;
+        return;
+    }
+
     // Complete resize drag — also do a full layout invalidate since the
     // incremental patching during drag doesn't update scroll bounds.
     if grid.resize_active {
@@ -2475,7 +2623,7 @@ pub fn handle_key_down_with_behavior(
 
     // During IME composition, suppress all grid key handling.
     // The IME owns the keyboard until composition ends.
-    if grid.edit.composing {
+    if grid.edit.composing && !grid.edit.is_engine_composing() {
         grid.events
             .push(GridEventData::KeyDown { key_code, modifier });
         return;
@@ -2496,6 +2644,18 @@ pub fn handle_key_down_with_behavior(
 
     // Handle keys during active editing
     if grid.is_editing() {
+        if key_code == 8 && grid.edit.is_engine_composing() {
+            let result = grid.edit.compose_backspace();
+            if apply_compose_result(grid, result) {
+                grid.events
+                    .push(GridEventData::KeyDownEdit { key_code, modifier });
+                return;
+            }
+        }
+        if should_flush_engine_compose_on_key_down(key_code, ctrl) {
+            flush_engine_compose(grid);
+        }
+
         match key_code {
             27 if !grid.host_key_dispatch => {
                 // Escape: cancel edit (skipped when host drives dispatch)
@@ -2546,22 +2706,46 @@ pub fn handle_key_down_with_behavior(
             }
             37 => {
                 // Left arrow
-                grid.edit.move_left();
+                if ctrl && shift {
+                    grid.edit.select_word_left();
+                } else if ctrl {
+                    grid.edit.move_word_left();
+                } else if shift {
+                    grid.edit.select_left();
+                } else {
+                    grid.edit.move_left();
+                }
                 grid.mark_dirty();
             }
             39 => {
                 // Right arrow
-                grid.edit.move_right();
+                if ctrl && shift {
+                    grid.edit.select_word_right();
+                } else if ctrl {
+                    grid.edit.move_word_right();
+                } else if shift {
+                    grid.edit.select_right();
+                } else {
+                    grid.edit.move_right();
+                }
                 grid.mark_dirty();
             }
             36 => {
                 // Home
-                grid.edit.move_home();
+                if shift {
+                    grid.edit.select_home();
+                } else {
+                    grid.edit.move_home();
+                }
                 grid.mark_dirty();
             }
             35 => {
                 // End
-                grid.edit.move_end();
+                if shift {
+                    grid.edit.select_end();
+                } else {
+                    grid.edit.move_end();
+                }
                 grid.mark_dirty();
             }
             38 => {
@@ -2573,7 +2757,11 @@ pub fn handle_key_down_with_behavior(
                     grid.mark_dirty();
                 } else if grid.edit.ui_mode == crate::edit::EditUiMode::EditMode {
                     // F2 edit mode: Up moves caret to the start.
-                    grid.edit.move_home();
+                    if shift {
+                        grid.edit.select_home();
+                    } else {
+                        grid.edit.move_home();
+                    }
                     grid.mark_dirty();
                 } else if !grid.host_key_dispatch {
                     // Enter mode: commit and move to the cell above.
@@ -2594,7 +2782,11 @@ pub fn handle_key_down_with_behavior(
                     grid.mark_dirty();
                 } else if grid.edit.ui_mode == crate::edit::EditUiMode::EditMode {
                     // F2 edit mode: Down moves caret to the end.
-                    grid.edit.move_end();
+                    if shift {
+                        grid.edit.select_end();
+                    } else {
+                        grid.edit.move_end();
+                    }
                     grid.mark_dirty();
                 } else if !grid.host_key_dispatch {
                     // Enter mode: commit and move to the cell below.
@@ -2924,6 +3116,9 @@ pub fn handle_key_press_with_behavior(
     };
 
     if grid.is_editing() {
+        if grid.edit.composing && !grid.edit.is_engine_composing() {
+            return;
+        }
         if !grid.edit.dropdown_items.is_empty() && !grid.edit.dropdown_editable {
             if grid.dropdown_search
                 && grid
@@ -2963,6 +3158,18 @@ pub fn handle_key_press_with_behavior(
             && grid.edit.edit_text.chars().count() as i32 >= grid.edit_max_length
         {
             return;
+        }
+
+        if grid.edit.engine_compose_enabled() {
+            if grid.edit.is_engine_composing() && !grid.edit.compose_should_handle(ch) {
+                flush_engine_compose(grid);
+            }
+            if grid.edit.compose_should_handle(ch) {
+                let result = grid.edit.compose_feed(ch);
+                if apply_compose_result(grid, result) {
+                    return;
+                }
+            }
         }
 
         // Insert character into active editor
@@ -3079,13 +3286,27 @@ pub fn handle_key_press_with_behavior(
 
             if grid.is_editing() {
                 // Clear old text and type the new character (VSVolvoxGrid8 behavior)
-                grid.edit.update_text(String::from(ch));
-                grid.edit.sel_start = 1;
+                grid.edit.update_text(String::new());
+                grid.edit.sel_start = 0;
                 grid.edit.sel_length = 0;
-                grid.events.push(GridEventData::CellEditChange {
-                    text: grid.edit.edit_text.clone(),
-                });
-                grid.mark_dirty();
+                if grid.edit.engine_compose_enabled() && grid.edit.compose_should_handle(ch) {
+                    let result = grid.edit.compose_feed(ch);
+                    if apply_compose_result(grid, result) {
+                        // compose result already pushed state updates
+                    } else {
+                        grid.edit.insert_char(ch);
+                        grid.events.push(GridEventData::CellEditChange {
+                            text: grid.edit.edit_text.clone(),
+                        });
+                        grid.mark_dirty();
+                    }
+                } else {
+                    grid.edit.insert_char(ch);
+                    grid.events.push(GridEventData::CellEditChange {
+                        text: grid.edit.edit_text.clone(),
+                    });
+                    grid.mark_dirty();
+                }
             }
         }
     }
@@ -3407,6 +3628,24 @@ mod tests {
     }
 
     #[test]
+    fn tab_moves_selection_horizontally_by_default() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 4, 1, 0);
+        grid.selection
+            .set_cursor(2, 1, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+        prime_layout(&mut grid);
+
+        assert_eq!(grid.tab_behavior, pb::TabBehavior::TabCells as i32);
+
+        handle_key_down(&mut grid, 9, 0);
+        assert_eq!(grid.selection.row, 2);
+        assert_eq!(grid.selection.col, 2);
+
+        handle_key_down(&mut grid, 9, 1);
+        assert_eq!(grid.selection.row, 2);
+        assert_eq!(grid.selection.col, 1);
+    }
+
+    #[test]
     fn dropdown_keyboard_commit_does_not_shrink_row_height() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 3, 1, 1, 0);
         grid.edit_trigger_mode = 1;
@@ -3486,6 +3725,197 @@ mod tests {
         assert_eq!(grid.edit.ui_mode, crate::edit::EditUiMode::EditMode);
         assert_eq!(grid.edit.sel_start, 2);
         assert_eq!(grid.edit.sel_length, 0);
+    }
+
+    #[test]
+    fn single_click_in_active_edit_cell_moves_caret_without_ending_edit() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.selection.row = 1;
+        grid.selection.col = 0;
+        grid.cells.set_text(1, 0, "abcd".to_string());
+        prime_layout(&mut grid);
+
+        handle_key_down(&mut grid, 113, 0);
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.sel_start, 4);
+        assert_eq!(grid.edit.sel_length, 0);
+
+        let style_override = grid.get_cell_style(1, 0);
+        let padding = grid.resolve_cell_padding(1, 0, &style_override);
+        let font_name = style_override
+            .font_name
+            .clone()
+            .unwrap_or_else(|| grid.style.font_name.clone());
+        let font_size = style_override.font_size.unwrap_or(grid.style.font_size);
+        let font_bold = style_override.font_bold.unwrap_or(grid.style.font_bold);
+        let font_italic = style_override.font_italic.unwrap_or(grid.style.font_italic);
+        let te = grid.ensure_text_engine();
+        let mut measure = |sample: &str| -> f32 {
+            if te.has_fonts() {
+                te.measure_text(sample, &font_name, font_size, font_bold, font_italic, None)
+                    .0
+            } else {
+                sample.chars().count() as f32 * font_size * 0.6
+            }
+        };
+        let ab_w = measure("ab");
+        let (cx, cy, _, ch) = grid.cell_screen_rect(1, 0).expect("cell rect");
+        let click_x = cx as f32 + padding.left as f32 + ab_w;
+        let click_y = cy as f32 + (ch as f32 * 0.5);
+
+        handle_pointer_down(&mut grid, click_x, click_y, 0, 0, false);
+
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.edit_row, 1);
+        assert_eq!(grid.edit.edit_col, 0);
+        assert_eq!(grid.edit.sel_start, 2);
+        assert_eq!(grid.edit.sel_length, 0);
+        assert_eq!(grid.cells.get_text(1, 0), "abcd");
+    }
+
+    #[test]
+    fn drag_in_active_edit_cell_selects_text_without_grid_selection() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.selection.row = 1;
+        grid.selection.col = 0;
+        grid.cells.set_text(1, 0, "abcd".to_string());
+        prime_layout(&mut grid);
+
+        handle_key_down(&mut grid, 113, 0);
+        assert!(grid.is_editing());
+
+        let style_override = grid.get_cell_style(1, 0);
+        let padding = grid.resolve_cell_padding(1, 0, &style_override);
+        let font_name = style_override
+            .font_name
+            .clone()
+            .unwrap_or_else(|| grid.style.font_name.clone());
+        let font_size = style_override.font_size.unwrap_or(grid.style.font_size);
+        let font_bold = style_override.font_bold.unwrap_or(grid.style.font_bold);
+        let font_italic = style_override.font_italic.unwrap_or(grid.style.font_italic);
+        let te = grid.ensure_text_engine();
+        let mut measure = |sample: &str| -> f32 {
+            if te.has_fonts() {
+                te.measure_text(sample, &font_name, font_size, font_bold, font_italic, None)
+                    .0
+            } else {
+                sample.chars().count() as f32 * font_size * 0.6
+            }
+        };
+        let a_w = measure("a");
+        let abc_w = measure("abc");
+        let (cx, cy, _, ch) = grid.cell_screen_rect(1, 0).expect("cell rect");
+        let down_x = cx as f32 + padding.left as f32 + a_w;
+        let move_x = cx as f32 + padding.left as f32 + abc_w;
+        let pointer_y = cy as f32 + (ch as f32 * 0.5);
+
+        handle_pointer_down(&mut grid, down_x, pointer_y, 0, 0, false);
+        handle_pointer_move(&mut grid, move_x, pointer_y, 1, 0);
+
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.sel_start, 1);
+        assert_eq!(grid.edit.sel_length, 2);
+        assert_eq!(grid.selection.row, 1);
+        assert_eq!(grid.selection.col, 0);
+        assert_eq!(grid.selection.row_end, 1);
+        assert_eq!(grid.selection.col_end, 0);
+    }
+
+    #[test]
+    fn drag_from_active_edit_cell_past_cell_bounds_clamps_text_selection() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.selection.row = 1;
+        grid.selection.col = 0;
+        grid.cells.set_text(1, 0, "abcd".to_string());
+        prime_layout(&mut grid);
+
+        handle_key_down(&mut grid, 113, 0);
+        assert!(grid.is_editing());
+
+        let style_override = grid.get_cell_style(1, 0);
+        let padding = grid.resolve_cell_padding(1, 0, &style_override);
+        let font_name = style_override
+            .font_name
+            .clone()
+            .unwrap_or_else(|| grid.style.font_name.clone());
+        let font_size = style_override.font_size.unwrap_or(grid.style.font_size);
+        let font_bold = style_override.font_bold.unwrap_or(grid.style.font_bold);
+        let font_italic = style_override.font_italic.unwrap_or(grid.style.font_italic);
+        let te = grid.ensure_text_engine();
+        let mut measure = |sample: &str| -> f32 {
+            if te.has_fonts() {
+                te.measure_text(sample, &font_name, font_size, font_bold, font_italic, None)
+                    .0
+            } else {
+                sample.chars().count() as f32 * font_size * 0.6
+            }
+        };
+        let a_w = measure("a");
+        let (cx, cy, _, ch) = grid.cell_screen_rect(1, 0).expect("cell rect");
+        let down_x = cx as f32 + padding.left as f32 + a_w;
+        let pointer_y = cy as f32 + (ch as f32 * 0.5);
+        let (other_x, _, _, _) = grid.cell_screen_rect(1, 1).expect("other cell rect");
+
+        handle_pointer_down(&mut grid, down_x, pointer_y, 0, 0, false);
+        handle_pointer_move(&mut grid, (other_x + 12) as f32, pointer_y, 1, 0);
+
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.sel_start, 1);
+        assert_eq!(grid.edit.sel_length, 3);
+        assert_eq!(grid.selection.row, 1);
+        assert_eq!(grid.selection.col, 0);
+        assert_eq!(grid.selection.row_end, 1);
+        assert_eq!(grid.selection.col_end, 0);
+    }
+
+    #[test]
+    fn double_click_drag_enters_edit_and_selects_text() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 2;
+        grid.selection.row = 1;
+        grid.selection.col = 0;
+        grid.cells.set_text(1, 0, "abcd".to_string());
+        prime_layout(&mut grid);
+
+        let style_override = grid.get_cell_style(1, 0);
+        let padding = grid.resolve_cell_padding(1, 0, &style_override);
+        let font_name = style_override
+            .font_name
+            .clone()
+            .unwrap_or_else(|| grid.style.font_name.clone());
+        let font_size = style_override.font_size.unwrap_or(grid.style.font_size);
+        let font_bold = style_override.font_bold.unwrap_or(grid.style.font_bold);
+        let font_italic = style_override.font_italic.unwrap_or(grid.style.font_italic);
+        let te = grid.ensure_text_engine();
+        let mut measure = |sample: &str| -> f32 {
+            if te.has_fonts() {
+                te.measure_text(sample, &font_name, font_size, font_bold, font_italic, None)
+                    .0
+            } else {
+                sample.chars().count() as f32 * font_size * 0.6
+            }
+        };
+        let a_w = measure("a");
+        let abc_w = measure("abc");
+        let (cx, cy, _, ch) = grid.cell_screen_rect(1, 0).expect("cell rect");
+        let down_x = cx as f32 + padding.left as f32 + a_w;
+        let move_x = cx as f32 + padding.left as f32 + abc_w;
+        let pointer_y = cy as f32 + (ch as f32 * 0.5);
+
+        handle_pointer_down(&mut grid, down_x, pointer_y, 0, 0, true);
+        handle_pointer_move(&mut grid, move_x, pointer_y, 1, 0);
+
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.ui_mode, crate::edit::EditUiMode::EditMode);
+        assert_eq!(grid.edit.sel_start, 1);
+        assert_eq!(grid.edit.sel_length, 2);
+        assert_eq!(grid.selection.row, 1);
+        assert_eq!(grid.selection.col, 0);
+        assert_eq!(grid.selection.row_end, 1);
+        assert_eq!(grid.selection.col_end, 0);
     }
 
     #[test]
@@ -4205,6 +4635,100 @@ mod tests {
     }
 
     #[test]
+    fn editing_shift_arrow_selects_and_shrinks_text() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        prime_layout(&mut grid);
+
+        handle_key_down(&mut grid, 13, 0);
+        assert!(grid.is_editing());
+        grid.edit.edit_text = "abcd".to_string();
+        grid.edit.move_end();
+
+        handle_key_down(&mut grid, 37, 1);
+        assert_eq!(grid.edit.sel_start, 3);
+        assert_eq!(grid.edit.sel_length, 1);
+
+        handle_key_down(&mut grid, 37, 1);
+        assert_eq!(grid.edit.sel_start, 2);
+        assert_eq!(grid.edit.sel_length, 2);
+
+        handle_key_down(&mut grid, 39, 1);
+        assert_eq!(grid.edit.sel_start, 3);
+        assert_eq!(grid.edit.sel_length, 1);
+
+        handle_key_down(&mut grid, 39, 1);
+        assert_eq!(grid.edit.sel_start, 4);
+        assert_eq!(grid.edit.sel_length, 0);
+    }
+
+    #[test]
+    fn editing_shift_down_selects_to_end_in_f2_mode() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        prime_layout(&mut grid);
+
+        handle_key_down(&mut grid, 113, 0);
+        assert!(grid.is_editing());
+        grid.edit.edit_text = "abcdef".to_string();
+        grid.edit.sel_start = 2;
+        grid.edit.sel_length = 0;
+        grid.edit.sel_caret = 2;
+
+        handle_key_down(&mut grid, 40, 1);
+        assert_eq!(grid.edit.sel_start, 2);
+        assert_eq!(grid.edit.sel_length, 4);
+    }
+
+    #[test]
+    fn editing_ctrl_arrow_jumps_by_word() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        prime_layout(&mut grid);
+
+        handle_key_down(&mut grid, 13, 0);
+        assert!(grid.is_editing());
+        grid.edit.edit_text = "abc def ghi".to_string();
+        grid.edit.move_home();
+
+        handle_key_down(&mut grid, 39, 2);
+        assert_eq!(grid.edit.sel_start, 4);
+        assert_eq!(grid.edit.sel_length, 0);
+
+        handle_key_down(&mut grid, 39, 2);
+        assert_eq!(grid.edit.sel_start, 8);
+        assert_eq!(grid.edit.sel_length, 0);
+
+        handle_key_down(&mut grid, 37, 2);
+        assert_eq!(grid.edit.sel_start, 4);
+        assert_eq!(grid.edit.sel_length, 0);
+    }
+
+    #[test]
+    fn editing_ctrl_shift_arrow_selects_by_word() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        prime_layout(&mut grid);
+
+        handle_key_down(&mut grid, 13, 0);
+        assert!(grid.is_editing());
+        grid.edit.edit_text = "abc def ghi".to_string();
+        grid.edit.move_end();
+
+        handle_key_down(&mut grid, 37, 3);
+        assert_eq!(grid.edit.sel_start, 8);
+        assert_eq!(grid.edit.sel_length, 3);
+
+        handle_key_down(&mut grid, 37, 3);
+        assert_eq!(grid.edit.sel_start, 4);
+        assert_eq!(grid.edit.sel_length, 7);
+
+        handle_key_down(&mut grid, 39, 3);
+        assert_eq!(grid.edit.sel_start, 8);
+        assert_eq!(grid.edit.sel_length, 3);
+    }
+
+    #[test]
     fn editing_escape_cancels() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
         grid.edit_trigger_mode = 1;
@@ -4244,6 +4768,46 @@ mod tests {
         // Delete: delete 'c'
         handle_key_down(&mut grid, 46, 0);
         assert_eq!(grid.edit.edit_text, "a");
+    }
+
+    #[test]
+    fn keypress_auto_start_uses_engine_compose_for_first_character() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.engine_compose = true;
+        grid.engine_compose_configured = true;
+        grid.compose_method = pb::ComposeMethod::Hangul as i32;
+        grid.compose_method_configured = true;
+        prime_layout(&mut grid);
+
+        handle_key_press(&mut grid, 'r' as u32);
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.edit_text, "");
+        assert_eq!(grid.edit.preedit_text, "ㄱ");
+        assert!(grid.edit.composing);
+
+        handle_key_press(&mut grid, 'k' as u32);
+        assert_eq!(grid.edit.preedit_text, "가");
+    }
+
+    #[test]
+    fn engine_compose_backspace_unwinds_preedit_before_edit_text() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.engine_compose = true;
+        grid.engine_compose_configured = true;
+        grid.compose_method = pb::ComposeMethod::Hangul as i32;
+        grid.compose_method_configured = true;
+        prime_layout(&mut grid);
+
+        handle_key_press(&mut grid, 'r' as u32);
+        handle_key_press(&mut grid, 'k' as u32);
+        handle_key_press(&mut grid, 's' as u32);
+        assert_eq!(grid.edit.preedit_text, "간");
+
+        handle_key_down(&mut grid, 8, 0);
+        assert_eq!(grid.edit.preedit_text, "가");
+        assert_eq!(grid.edit.edit_text, "");
     }
 
     #[test]

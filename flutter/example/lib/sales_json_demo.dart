@@ -248,8 +248,7 @@ GridConfig _salesThemeConfig() {
     ..editing = (EditConfig()
       ..trigger = EditTrigger.EDIT_TRIGGER_NONE
       ..dropdownTrigger = DropdownTrigger.DROPDOWN_ALWAYS
-      ..dropdownSearch = false
-      ..tabBehavior = TabBehavior.TAB_CELLS)
+      ..dropdownSearch = false)
     ..scrolling = (ScrollConfig()
       ..scrollbars = ScrollBarsMode.SCROLLBAR_BOTH
       ..flingEnabled = true

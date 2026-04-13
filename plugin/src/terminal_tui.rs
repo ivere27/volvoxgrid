@@ -28,6 +28,7 @@ pub enum TerminalKeyPolicyDecision {
     Forward,
     Consume,
     StartEdit { caret_end: bool },
+    ToggleCompose { enabled: bool },
     RemapKeyDown { key_code: i32, modifier: i32 },
 }
 
@@ -114,6 +115,8 @@ pub struct TerminalTuiSession {
     viewport: Option<TerminalViewportState>,
     parser: TerminalInputParser,
     auto_start_edit: bool,
+    compose_enabled: bool,
+    compose_initialized: bool,
     cells: Vec<TuiCell>,
     previous_cells: Vec<TuiCell>,
     previous_viewport: Option<TerminalViewportState>,
@@ -138,6 +141,8 @@ impl Default for TerminalTuiSession {
             viewport: None,
             parser: TerminalInputParser::default(),
             auto_start_edit: false,
+            compose_enabled: true,
+            compose_initialized: false,
             cells: Vec::new(),
             previous_cells: Vec::new(),
             previous_viewport: None,
@@ -283,11 +288,33 @@ impl TerminalTuiSession {
         self.auto_start_edit
     }
 
+    pub fn ensure_compose_default(&mut self, enabled: bool) {
+        if self.compose_initialized {
+            return;
+        }
+        self.compose_enabled = enabled;
+        self.compose_initialized = true;
+    }
+
+    pub fn compose_enabled(&self) -> bool {
+        self.compose_enabled
+    }
+
     pub fn apply_navigation_edit_policy(
         &mut self,
         key: &pb::KeyEvent,
         editing: bool,
     ) -> TerminalKeyPolicyDecision {
+        if key.key_code == 32 && key.modifier == 2 {
+            if key.r#type == pb::key_event::Type::KeyDown as i32 {
+                self.compose_enabled = !self.compose_enabled;
+                self.compose_initialized = true;
+            }
+            return TerminalKeyPolicyDecision::ToggleCompose {
+                enabled: self.compose_enabled,
+            };
+        }
+
         if editing {
             return TerminalKeyPolicyDecision::Forward;
         }
@@ -1365,6 +1392,26 @@ mod tests {
             decision,
             TerminalKeyPolicyDecision::StartEdit { caret_end: false }
         );
+    }
+
+    #[test]
+    fn navigation_policy_toggles_compose_on_ctrl_space() {
+        let mut session = TerminalTuiSession::new();
+        session.ensure_compose_default(true);
+        let decision = session.apply_navigation_edit_policy(
+            &pb::KeyEvent {
+                r#type: pb::key_event::Type::KeyDown as i32,
+                key_code: 32,
+                modifier: 2,
+                character: String::new(),
+            },
+            false,
+        );
+        assert_eq!(
+            decision,
+            TerminalKeyPolicyDecision::ToggleCompose { enabled: false }
+        );
+        assert!(!session.compose_enabled());
     }
 
     #[test]

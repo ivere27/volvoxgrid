@@ -18,6 +18,7 @@ pub mod canvas_tui;
 pub mod cell;
 pub mod clipboard;
 pub mod column;
+pub mod compose;
 pub mod config;
 pub mod control;
 pub mod debug_font;

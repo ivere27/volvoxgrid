@@ -344,7 +344,6 @@ namespace VolvoxGrid.DotNet.TuiSample
                     Editing = new EditConfig
                     {
                         Trigger = EditTrigger.EDIT_TRIGGER_KEY_CLICK,
-                        TabBehavior = TabBehavior.TAB_CELLS,
                         DropdownTrigger = DropdownTrigger.DROPDOWN_ALWAYS,
                         DropdownSearch = false,
                     },
@@ -422,7 +421,6 @@ namespace VolvoxGrid.DotNet.TuiSample
                     Editing = new EditConfig
                     {
                         Trigger = EditTrigger.EDIT_TRIGGER_KEY_CLICK,
-                        TabBehavior = TabBehavior.TAB_CELLS,
                         DropdownTrigger = DropdownTrigger.DROPDOWN_NEVER,
                     },
                     Scrolling = new ScrollConfig
@@ -487,7 +485,6 @@ namespace VolvoxGrid.DotNet.TuiSample
                     Editing = new EditConfig
                     {
                         Trigger = EditTrigger.EDIT_TRIGGER_KEY_CLICK,
-                        TabBehavior = TabBehavior.TAB_CELLS,
                     },
                     Scrolling = new ScrollConfig
                     {

@@ -27,7 +27,7 @@ normalize_arch() {
 }
 
 prepare_wine_prefix() {
-    local stamp_path="$WINEPREFIX/.volvoxgrid_activex_demo_bootstrap_v2"
+    local stamp_path="$WINEPREFIX/.volvoxgrid_activex_demo_bootstrap_v4"
     local host_font=""
     local cjk_src=""
     local fonts_dir=""
@@ -68,21 +68,26 @@ prepare_wine_prefix() {
         echo "WARNING: DejaVuSans.ttf not found on host; classic font fallback may be rough." >&2
     fi
 
-    for candidate in \
-        /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc \
-        /usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc \
-        /usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc
-    do
-        if [[ -f "$candidate" ]]; then
-            cjk_src="$candidate"
-            break
-        fi
-    done
+    if [[ "$PROFILE" == "release" ]]; then
+        for candidate in \
+            /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc \
+            /usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc \
+            /usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc
+        do
+            if [[ -f "$candidate" ]]; then
+                cjk_src="$candidate"
+                break
+            fi
+        done
 
-    if [[ -n "$cjk_src" ]]; then
-        cp -f "$cjk_src" "$fonts_dir/msyh.ttc"
-        cp -f "$cjk_src" "$fonts_dir/msjh.ttc"
-        cp -f "$cjk_src" "$fonts_dir/malgun.ttf"
+        if [[ -n "$cjk_src" ]]; then
+            cp -f "$cjk_src" "$fonts_dir/NotoSansCJK-Regular.ttc"
+            wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts" /v "Noto Sans CJK HK (TrueType)" /t REG_SZ /d NotoSansCJK-Regular.ttc /f >/dev/null 2>&1 || true
+            wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts" /v "Noto Sans CJK JP (TrueType)" /t REG_SZ /d NotoSansCJK-Regular.ttc /f >/dev/null 2>&1 || true
+            wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts" /v "Noto Sans CJK KR (TrueType)" /t REG_SZ /d NotoSansCJK-Regular.ttc /f >/dev/null 2>&1 || true
+            wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts" /v "Noto Sans CJK SC (TrueType)" /t REG_SZ /d NotoSansCJK-Regular.ttc /f >/dev/null 2>&1 || true
+            wine reg add "HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts" /v "Noto Sans CJK TC (TrueType)" /t REG_SZ /d NotoSansCJK-Regular.ttc /f >/dev/null 2>&1 || true
+        fi
     fi
 
     date -u +"%Y-%m-%dT%H:%M:%SZ" > "$stamp_path"
@@ -153,4 +158,7 @@ echo "  arch:    $ACTIVEX_ARCH"
 echo "  prefix:  $WINEPREFIX"
 
 cd "$(dirname "$HOST_EXE")"
+if [[ "$PROFILE" == "release" && -f "$WINEPREFIX/drive_c/windows/Fonts/NotoSansCJK-Regular.ttc" ]]; then
+    exec env WINEDEBUG=-all wine "./$(basename "$HOST_EXE")" --font-name "Noto Sans CJK KR"
+fi
 exec env WINEDEBUG=-all wine "./$(basename "$HOST_EXE")"

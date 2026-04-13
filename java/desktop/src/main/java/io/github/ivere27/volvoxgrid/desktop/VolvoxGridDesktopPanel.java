@@ -5,8 +5,15 @@ import io.github.ivere27.volvoxgrid.ConfigureRequest;
 import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.CreateResponse;
 import io.github.ivere27.volvoxgrid.CellRange;
+import io.github.ivere27.volvoxgrid.ClipboardResponse;
+import io.github.ivere27.volvoxgrid.EditCancel;
 import io.github.ivere27.volvoxgrid.EditCommand;
+import io.github.ivere27.volvoxgrid.EditCommit;
+import io.github.ivere27.volvoxgrid.EditSetSelection;
+import io.github.ivere27.volvoxgrid.EditSetText;
+import io.github.ivere27.volvoxgrid.EditUiMode;
 import io.github.ivere27.volvoxgrid.EditRequest;
+import io.github.ivere27.volvoxgrid.EditState;
 import io.github.ivere27.volvoxgrid.EventDecision;
 import io.github.ivere27.volvoxgrid.FramePacingMode;
 import io.github.ivere27.volvoxgrid.FrameDone;
@@ -30,10 +37,13 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Toolkit;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.awt.event.InputEvent;
-import java.awt.Rectangle;
 import java.awt.event.InputMethodEvent;
 import java.awt.event.InputMethodListener;
 import java.awt.event.KeyAdapter;
@@ -42,22 +52,32 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
-import java.awt.font.TextHitInfo;
-import java.awt.im.InputMethodRequests;
 import java.awt.image.BufferedImage;
-import java.text.AttributedCharacterIterator;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.text.AttributedCharacterIterator;
+import javax.swing.BorderFactory;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
+import javax.swing.JTextField;
 import javax.swing.Timer;
+import javax.swing.event.CaretEvent;
+import javax.swing.event.CaretListener;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
 
 /**
  * Swing-based VolvoxGrid host with CPU shared-buffer rendering.
@@ -244,6 +264,27 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private volatile EditRequestListener editRequestListener;
     private volatile boolean decisionChannelEnabled = false;
     private volatile boolean engineEditing = false;
+    private volatile int editSelectionAnchor = -1;
+    private volatile int editSelectionRow = -1;
+    private volatile int editSelectionCol = -1;
+    private final JPanel editOverlayHost;
+    private final JTextField editOverlay;
+    private volatile boolean suppressEditOverlayTextChanged = false;
+    private volatile boolean suppressEditOverlayCommit = false;
+    private volatile int editOverlayRow = -1;
+    private volatile int editOverlayCol = -1;
+    private volatile int editOverlayMaxLength = 0;
+    private volatile EditUiMode editOverlayUiMode = EditUiMode.EDIT_UI_MODE_ENTER;
+    private volatile boolean editOverlayDisplayed = false;
+    private volatile boolean overlayImeComposing = false;
+    private volatile boolean overlayImeDocumentManaged = false;
+    private volatile long overlayImeSyncSerial = 0L;
+    private volatile boolean discardNextProxyImeCommit = false;
+    private volatile boolean discardNextHiddenProxyDocumentMutation = false;
+    private volatile boolean pendingHostEditOverlayStart = false;
+    private volatile String pendingHostEditOverlayText;
+    private volatile String pendingHostEditOverlaySuppressedText = "";
+    private volatile boolean pendingHostEditOverlayPreserveFieldState = false;
 
     private volatile RendererBackend rendererBackend = RendererBackend.CPU;
     private volatile boolean hostFlingEnabled = false;
@@ -261,15 +302,117 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private volatile int targetFrameRateHz = AUTO_FALLBACK_FRAME_RATE_HZ;
     private volatile long framePacingConfigLastRefreshNanos = 0L;
     private volatile Timer followupRenderTimer;
+    private final Set<Integer> suppressedKeyUps = new HashSet<Integer>();
 
     public VolvoxGridDesktopPanel() {
         setBackground(Color.WHITE);
         setPreferredSize(new Dimension(960, 600));
+        setLayout(null);
         setFocusable(true);
         setFocusTraversalKeysEnabled(false);
-        enableInputMethods(true);
+        enableInputMethods(false);
+
+        editOverlayHost = new JPanel(null);
+        editOverlayHost.setVisible(true);
+        editOverlayHost.setFocusable(false);
+
+        editOverlay = new JTextField();
+        editOverlay.enableInputMethods(true);
+        editOverlay.setBorder(BorderFactory.createEmptyBorder(0, 3, 0, 3));
+        ((AbstractDocument) editOverlay.getDocument()).setDocumentFilter(new DocumentFilter() {
+            @Override
+            public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr)
+                throws BadLocationException {
+                if (consumeHiddenProxyDocumentMutation()) {
+                    return;
+                }
+                super.insertString(fb, offset, string, attr);
+            }
+
+            @Override
+            public void remove(FilterBypass fb, int offset, int length) throws BadLocationException {
+                if (consumeHiddenProxyDocumentMutation()) {
+                    return;
+                }
+                super.remove(fb, offset, length);
+            }
+
+            @Override
+            public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs)
+                throws BadLocationException {
+                if (consumeHiddenProxyDocumentMutation()) {
+                    return;
+                }
+                super.replace(fb, offset, length, text, attrs);
+            }
+        });
+        editOverlay.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                handleEditOverlayTextChanged();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                handleEditOverlayTextChanged();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                handleEditOverlayTextChanged();
+            }
+        });
+        editOverlay.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(java.awt.event.KeyEvent e) {
+                handleEditOverlayKeyPressed(e);
+            }
+
+            @Override
+            public void keyTyped(java.awt.event.KeyEvent e) {
+                handleEditOverlayKeyTyped(e);
+            }
+
+            @Override
+            public void keyReleased(java.awt.event.KeyEvent e) {
+                handleEditOverlayKeyReleased(e);
+            }
+        });
+        editOverlay.addCaretListener(new CaretListener() {
+            @Override
+            public void caretUpdate(CaretEvent e) {
+                syncEditOverlaySelectionToEngine();
+            }
+        });
+        editOverlay.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusLost(FocusEvent e) {
+                handleEditOverlayFocusLost();
+            }
+        });
+        editOverlay.addInputMethodListener(new InputMethodListener() {
+            @Override
+            public void inputMethodTextChanged(InputMethodEvent event) {
+                handleOverlayInputMethodTextChanged(event);
+            }
+
+            @Override
+            public void caretPositionChanged(InputMethodEvent event) {
+                handleOverlayInputMethodTextChanged(event);
+            }
+        });
+        editOverlayHost.add(editOverlay);
+        add(editOverlayHost);
+        enterEditOverlayProxyMode(false);
 
         installInputHandlers();
+
+        addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                focusEditOverlayProxyLater();
+            }
+        });
 
         addComponentListener(new ComponentAdapter() {
             @Override
@@ -355,6 +498,9 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         shutdownStreams(false);
         this.gridId = 0L;
         clearMultiRangeDrag();
+        hideEditOverlay(false);
+        resetEditSelectionAnchor();
+        suppressedKeyUps.clear();
         clearImage();
     }
 
@@ -378,6 +524,9 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         ownsPlugin = false;
         gridId = 0L;
         clearMultiRangeDrag();
+        hideEditOverlay(false);
+        resetEditSelectionAnchor();
+        suppressedKeyUps.clear();
         clearImage();
     }
 
@@ -559,6 +708,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             @Override
             public void mousePressed(MouseEvent e) {
                 stopHostFling();
+                resetEditSelectionAnchor();
                 requestFocusInWindow();
                 if (SwingUtilities.isRightMouseButton(e)) {
                     sendPointer(
@@ -624,14 +774,55 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(java.awt.event.KeyEvent e) {
+                if (editOverlayDisplayed) {
+                    return;
+                }
+                if (handleHostShortcut(e)) {
+                    suppressedKeyUps.add(Integer.valueOf(e.getKeyCode()));
+                    e.consume();
+                    return;
+                }
+                if (!engineEditing && shouldStartHostEditOverlayOnKeyPressed(e)) {
+                    if (beginHostEditOverlay(null)) {
+                        e.consume();
+                        return;
+                    }
+                }
+                if (pendingHostEditOverlayStart) {
+                    e.consume();
+                    return;
+                }
+                if (engineEditing && !isPureModifierKey(e.getKeyCode())) {
+                    resetEditSelectionAnchor();
+                }
                 sendKey(io.github.ivere27.volvoxgrid.KeyEvent.Type.KEY_DOWN, e, printableChar(e));
                 requestFrame();
             }
 
             @Override
             public void keyTyped(java.awt.event.KeyEvent e) {
+                if (editOverlayDisplayed) {
+                    return;
+                }
                 char ch = e.getKeyChar();
                 if (ch >= 0x20 && ch != 0x7F) {
+                    if (pendingHostEditOverlayStart) {
+                        String typed = String.valueOf(ch);
+                        if (!pendingHostEditOverlaySuppressedText.isEmpty()
+                            && pendingHostEditOverlaySuppressedText.startsWith(typed)) {
+                            pendingHostEditOverlaySuppressedText =
+                                pendingHostEditOverlaySuppressedText.substring(typed.length());
+                            e.consume();
+                            return;
+                        }
+                        appendPendingHostEditOverlayText(String.valueOf(ch));
+                        e.consume();
+                        return;
+                    }
+                    if (!engineEditing && beginHostEditOverlay(String.valueOf(ch))) {
+                        e.consume();
+                        return;
+                    }
                     sendKey(io.github.ivere27.volvoxgrid.KeyEvent.Type.KEY_PRESS, e, String.valueOf(ch));
                     requestFrame();
                 }
@@ -639,159 +830,467 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
             @Override
             public void keyReleased(java.awt.event.KeyEvent e) {
+                if (editOverlayDisplayed) {
+                    return;
+                }
+                if (!engineEditing && shouldStartHostEditOverlayOnKeyPressed(e)) {
+                    if (beginHostEditOverlay(null)) {
+                        e.consume();
+                        return;
+                    }
+                }
+                if (pendingHostEditOverlayStart) {
+                    e.consume();
+                    return;
+                }
+                if (suppressedKeyUps.remove(Integer.valueOf(e.getKeyCode()))) {
+                    e.consume();
+                    return;
+                }
                 sendKey(io.github.ivere27.volvoxgrid.KeyEvent.Type.KEY_UP, e, "");
                 requestFrame();
             }
         });
 
-        addInputMethodListener(new InputMethodListener() {
-            @Override
-            public void inputMethodTextChanged(InputMethodEvent e) {
-                handleInputMethodTextChanged(e);
-            }
-
-            @Override
-            public void caretPositionChanged(InputMethodEvent e) {
-                e.consume();
-            }
-        });
     }
 
-    @Override
-    public InputMethodRequests getInputMethodRequests() {
-        return new InputMethodRequests() {
-            @Override
-            public Rectangle getTextLocation(TextHitInfo offset) {
-                java.awt.Point loc = getLocationOnScreen();
-                return new Rectangle(loc.x, loc.y, 0, getHeight());
-            }
-
-            @Override
-            public TextHitInfo getLocationOffset(int x, int y) {
-                return null;
-            }
-
-            @Override
-            public int getInsertPositionOffset() {
-                return 0;
-            }
-
-            @Override
-            public AttributedCharacterIterator getCommittedText(int beginIndex, int endIndex, AttributedCharacterIterator.Attribute[] attributes) {
-                return new java.text.AttributedString("").getIterator();
-            }
-
-            @Override
-            public int getCommittedTextLength() {
-                return 0;
-            }
-
-            @Override
-            public AttributedCharacterIterator cancelLatestCommittedText(AttributedCharacterIterator.Attribute[] attributes) {
-                return null;
-            }
-
-            @Override
-            public AttributedCharacterIterator getSelectedText(AttributedCharacterIterator.Attribute[] attributes) {
-                return null;
-            }
-        };
-    }
-
-    private void handleInputMethodTextChanged(InputMethodEvent e) {
+    private void showEditOverlay(EditRequest request) {
         VolvoxGridDesktopClient c = client;
-        if (c == null) {
-            e.consume();
+        long id = gridId;
+        if (request == null || c == null || id == 0L) {
             return;
         }
 
-        AttributedCharacterIterator text = e.getText();
-        int committedCount = e.getCommittedCharacterCount();
+        int x = Math.max(0, Math.round(request.getX()));
+        int y = Math.max(0, Math.round(request.getY()));
+        int w = Math.max(1, Math.round(request.getWidth()));
+        int h = Math.max(1, Math.round(request.getHeight()));
+        boolean sameCell = editOverlayDisplayed
+            && editOverlayRow == request.getRow()
+            && editOverlayCol == request.getCol();
+        boolean preserveFieldState = pendingHostEditOverlayStart && pendingHostEditOverlayPreserveFieldState;
 
-        if (text != null) {
-            // Extract committed text
-            StringBuilder committed = new StringBuilder();
-            StringBuilder composing = new StringBuilder();
-            text.first();
-            for (int i = 0; i < committedCount && text.getIndex() < text.getEndIndex(); i++) {
-                committed.append(text.current());
-                text.next();
+        editOverlayRow = request.getRow();
+        editOverlayCol = request.getCol();
+        editOverlayMaxLength = request.getMaxLength();
+        editOverlayUiMode = request.getUiMode();
+        editOverlayDisplayed = true;
+        applyDisplayedEditOverlayStyle();
+        editOverlayHost.setBounds(x, y, w, h);
+        editOverlay.setBounds(1, 1, Math.max(1, w - 2), Math.max(1, h - 2));
+        editOverlay.setFont(getFont());
+        editOverlay.setColumns(0);
+
+        if (!sameCell && !preserveFieldState) {
+            String text = request.getCurrentValue();
+            int selStart = request.getSelStart();
+            int selLength = request.getSelLength();
+
+            // The EditRequest snapshot may be stale — characters typed between
+            // its creation and this invokeLater may already be in the engine.
+            // Read the engine's current state to avoid losing them.
+            EditState currentState = getCurrentEditState();
+            if (currentState != null && currentState.getActive()
+                && currentState.getRow() == request.getRow()
+                && currentState.getCol() == request.getCol()) {
+                text = currentState.getText();
+                selStart = currentState.getSelStart();
+                selLength = currentState.getSelLength();
             }
-            while (text.getIndex() < text.getEndIndex()) {
-                composing.append(text.current());
-                text.next();
+            String pendingText = pendingHostEditOverlayText;
+            boolean seededFromPendingText = pendingHostEditOverlayStart && pendingText != null;
+            if (seededFromPendingText) {
+                text = pendingText;
+                selStart = codePointLength(text);
+                selLength = 0;
             }
 
+            int start = utf16Index(text, selStart);
+            int end = utf16Index(text, selStart + selLength);
+
+            suppressEditOverlayTextChanged = true;
             try {
-                if (committed.length() > 0) {
-                    if (!engineEditing) {
-                        // Start editing: first char via KeyPress to trigger auto-edit
-                        String first = String.valueOf(committed.charAt(0));
-                        sendKeyDirect(io.github.ivere27.volvoxgrid.KeyEvent.Type.KEY_PRESS, 0, 0, first);
-                        engineEditing = true;
-                        // Remaining committed chars via preedit commit
-                        if (committed.length() > 1) {
-                            String rest = committed.substring(1);
-                            c.edit(EditCommand.newBuilder()
-                                .setGridId(gridId)
-                                .setSetPreedit(io.github.ivere27.volvoxgrid.EditSetPreedit.newBuilder()
-                                    .setText(rest)
-                                    .setCursor(rest.length())
-                                    .setCommit(true)
-                                    .build())
-                                .build());
-                        }
-                    } else {
-                        c.edit(EditCommand.newBuilder()
-                            .setGridId(gridId)
-                            .setSetPreedit(io.github.ivere27.volvoxgrid.EditSetPreedit.newBuilder()
-                                .setText(committed.toString())
-                                .setCursor(committed.length())
-                                .setCommit(true)
-                                .build())
-                            .build());
-                    }
-                }
-
-                if (composing.length() > 0) {
-                    if (!engineEditing) {
-                        // Start editing with empty text, then set preedit
-                        sendKeyDirect(io.github.ivere27.volvoxgrid.KeyEvent.Type.KEY_PRESS, 0, 0, " ");
-                        // Replace the space with empty text via edit command
-                        c.edit(EditCommand.newBuilder()
-                            .setGridId(gridId)
-                            .setSetText(io.github.ivere27.volvoxgrid.EditSetText.newBuilder()
-                                .setText("")
-                                .build())
-                            .build());
-                        engineEditing = true;
-                    }
-                    c.edit(EditCommand.newBuilder()
-                        .setGridId(gridId)
-                        .setSetPreedit(io.github.ivere27.volvoxgrid.EditSetPreedit.newBuilder()
-                            .setText(composing.toString())
-                            .setCursor(composing.length())
-                            .setCommit(false)
-                            .build())
-                        .build());
-                } else if (committed.length() > 0) {
-                    // Composition ended — clear preedit
-                    c.edit(EditCommand.newBuilder()
-                        .setGridId(gridId)
-                        .setSetPreedit(io.github.ivere27.volvoxgrid.EditSetPreedit.newBuilder()
-                            .setText("")
-                            .setCursor(0)
-                            .setCommit(false)
-                            .build())
-                        .build());
-                }
-            } catch (Exception ex) {
-                LOG.log(Level.FINER, "IME edit failed", ex);
+                editOverlay.setText(text == null ? "" : text);
+                editOverlay.setSelectionStart(Math.max(0, Math.min(editOverlay.getText().length(), start)));
+                editOverlay.setSelectionEnd(Math.max(0, Math.min(editOverlay.getText().length(), end)));
+            } finally {
+                suppressEditOverlayTextChanged = false;
             }
         }
 
+        editOverlayHost.repaint();
+        editOverlayHost.revalidate();
+        editOverlayHost.setComponentZOrder(editOverlay, 0);
+        setComponentZOrder(editOverlayHost, 0);
+        editOverlayHost.repaint();
+        editOverlay.requestFocusInWindow();
+        if (!overlayImeComposing) {
+            syncEditOverlaySelectionToEngine();
+            if (pendingHostEditOverlayStart && (pendingHostEditOverlayText != null || preserveFieldState)) {
+                applyEditText(editOverlay.getText());
+                requestFrame();
+            }
+        }
+        schedulePendingHostEditOverlayStartClear();
+    }
+
+    private void hideEditOverlay(boolean focusHost) {
+        suppressEditOverlayCommit = true;
+        try {
+            editOverlayRow = -1;
+            editOverlayCol = -1;
+            editOverlayMaxLength = 0;
+            editOverlayUiMode = EditUiMode.EDIT_UI_MODE_ENTER;
+            editOverlayDisplayed = false;
+        } finally {
+            suppressEditOverlayCommit = false;
+        }
+
+        enterEditOverlayProxyMode(focusHost);
+        if (focusHost) {
+            focusEditOverlayProxyLater();
+        }
+        overlayImeComposing = false;
+        overlayImeDocumentManaged = false;
+        overlayImeSyncSerial = 0L;
+        clearPendingHostEditOverlayStart();
+    }
+
+    private void handleEditOverlayTextChanged() {
+        if (suppressEditOverlayTextChanged || !editOverlayDisplayed) {
+            return;
+        }
+        if (overlayImeDocumentManaged) {
+            return;
+        }
+
+        if (editOverlayMaxLength > 0) {
+            String text = editOverlay.getText();
+            if (codePointLength(text) > editOverlayMaxLength) {
+                int caret = codePointIndexAtUtf16(text, editOverlay.getSelectionStart());
+                String truncated = truncateToCodePointLength(text, editOverlayMaxLength);
+                int nextCaret = utf16Index(truncated, Math.min(caret, editOverlayMaxLength));
+                suppressEditOverlayTextChanged = true;
+                try {
+                    editOverlay.setText(truncated);
+                    editOverlay.setSelectionStart(nextCaret);
+                    editOverlay.setSelectionEnd(nextCaret);
+                } finally {
+                    suppressEditOverlayTextChanged = false;
+                }
+            }
+        }
+
+        applyEditText(editOverlay.getText());
+        syncEditOverlaySelectionToEngine();
+        requestFrame();
+    }
+
+    private void applyDisplayedEditOverlayStyle() {
+        editOverlayHost.setOpaque(true);
+        editOverlayHost.setBackground(Color.WHITE);
+        editOverlayHost.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+        editOverlay.setOpaque(true);
+        editOverlay.setBackground(Color.WHITE);
+        editOverlay.setForeground(Color.BLACK);
+        editOverlay.setCaretColor(Color.BLACK);
+    }
+
+    private void enterEditOverlayProxyMode(boolean requestFocus) {
+        suppressEditOverlayTextChanged = true;
+        try {
+            editOverlay.setText("");
+            editOverlay.setSelectionStart(0);
+            editOverlay.setSelectionEnd(0);
+        } finally {
+            suppressEditOverlayTextChanged = false;
+        }
+        editOverlayHost.setOpaque(false);
+        editOverlayHost.setBackground(new Color(0, 0, 0, 0));
+        editOverlayHost.setBorder(BorderFactory.createEmptyBorder());
+        editOverlayHost.setBounds(0, 0, 1, 1);
+        editOverlay.setBounds(0, 0, 1, 1);
+        editOverlay.setOpaque(false);
+        editOverlay.setBackground(new Color(0, 0, 0, 0));
+        editOverlay.setForeground(new Color(0, 0, 0, 0));
+        editOverlay.setCaretColor(new Color(0, 0, 0, 0));
+        editOverlayHost.repaint();
+        editOverlayHost.revalidate();
+        if (requestFocus) {
+            editOverlay.requestFocusInWindow();
+        }
+    }
+
+    private void focusEditOverlayProxyLater() {
+        if (editOverlayDisplayed || !isShowing()) {
+            return;
+        }
+        if (editOverlay.requestFocusInWindow()) {
+            return;
+        }
+        SwingUtilities.invokeLater(() -> {
+            if (editOverlayDisplayed || !isShowing()) {
+                return;
+            }
+            editOverlay.requestFocusInWindow();
+        });
+    }
+
+    private void handleEditOverlayKeyPressed(java.awt.event.KeyEvent e) {
+        if (!editOverlayDisplayed) {
+            handleEditOverlayProxyKeyPressed(e);
+            return;
+        }
+
+        switch (e.getKeyCode()) {
+            case java.awt.event.KeyEvent.VK_ESCAPE:
+                e.consume();
+                if (overlayImeComposing || overlayImeDocumentManaged) {
+                    armDiscardNextProxyImeCommit();
+                }
+                endEditOverlayComposition();
+                cancelEditOverlay();
+                return;
+            case java.awt.event.KeyEvent.VK_TAB:
+                e.consume();
+                endEditOverlayComposition();
+                commitEditOverlay(
+                    Integer.valueOf(9),
+                    mapModifierFlags(e.getModifiersEx())
+                );
+                return;
+            case java.awt.event.KeyEvent.VK_ENTER:
+                e.consume();
+                endEditOverlayComposition();
+                commitEditOverlay(
+                    Integer.valueOf(e.isShiftDown() ? 38 : 40),
+                    0
+                );
+                return;
+            case java.awt.event.KeyEvent.VK_LEFT:
+            case java.awt.event.KeyEvent.VK_RIGHT:
+            case java.awt.event.KeyEvent.VK_UP:
+            case java.awt.event.KeyEvent.VK_DOWN:
+                if (editOverlayUiMode != EditUiMode.EDIT_UI_MODE_EDIT) {
+                    e.consume();
+                    endEditOverlayComposition();
+                    commitEditOverlay(Integer.valueOf(mapKeyCode(e)), 0);
+                    return;
+                }
+                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_UP) {
+                    e.consume();
+                    editOverlay.setSelectionStart(0);
+                    editOverlay.setSelectionEnd(0);
+                    syncEditOverlaySelectionToEngine();
+                    return;
+                }
+                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_DOWN) {
+                    e.consume();
+                    int end = editOverlay.getText() == null ? 0 : editOverlay.getText().length();
+                    editOverlay.setSelectionStart(end);
+                    editOverlay.setSelectionEnd(end);
+                    syncEditOverlaySelectionToEngine();
+                    return;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void handleEditOverlayKeyTyped(java.awt.event.KeyEvent e) {
+        if (editOverlayDisplayed) {
+            return;
+        }
+
+        char ch = e.getKeyChar();
+        if (ch < 0x20 || ch == 0x7F) {
+            return;
+        }
+        if (pendingHostEditOverlayStart) {
+            return;
+        }
+
+        sendKey(io.github.ivere27.volvoxgrid.KeyEvent.Type.KEY_PRESS, e, String.valueOf(ch));
         requestFrame();
         e.consume();
+    }
+
+    private void handleEditOverlayKeyReleased(java.awt.event.KeyEvent e) {
+        if (editOverlayDisplayed) {
+            suppressedKeyUps.remove(Integer.valueOf(e.getKeyCode()));
+            return;
+        }
+        if (suppressedKeyUps.remove(Integer.valueOf(e.getKeyCode()))) {
+            e.consume();
+            return;
+        }
+        if (pendingHostEditOverlayStart) {
+            e.consume();
+            return;
+        }
+        sendKey(io.github.ivere27.volvoxgrid.KeyEvent.Type.KEY_UP, e, "");
+        requestFrame();
+        e.consume();
+    }
+
+    private void handleEditOverlayProxyKeyPressed(java.awt.event.KeyEvent e) {
+        clearDiscardedProxyImeCommit();
+        if (handleHostShortcut(e)) {
+            suppressedKeyUps.add(Integer.valueOf(e.getKeyCode()));
+            e.consume();
+            return;
+        }
+        if (!engineEditing && shouldStartHostEditOverlayOnKeyPressed(e)) {
+            if (beginHostEditOverlay(null, true)) {
+                suppressedKeyUps.add(Integer.valueOf(e.getKeyCode()));
+                return;
+            }
+        }
+        if (engineEditing && !isPureModifierKey(e.getKeyCode())) {
+            resetEditSelectionAnchor();
+        }
+        sendKey(io.github.ivere27.volvoxgrid.KeyEvent.Type.KEY_DOWN, e, printableChar(e));
+        requestFrame();
+        e.consume();
+    }
+
+    private void endEditOverlayComposition() {
+        java.awt.im.InputContext ic = editOverlay.getInputContext();
+        if (ic != null) {
+            ic.endComposition();
+        }
+    }
+
+    private void handleOverlayInputMethodTextChanged(InputMethodEvent event) {
+        String committed = committedInputMethodText(event);
+        String composed = composedInputMethodText(event);
+        int cursor = inputMethodCursor(composed, event);
+        if (!editOverlayDisplayed) {
+            if (committed.isEmpty() && composed.isEmpty()) {
+                return;
+            }
+            if (shouldDiscardPostCancelProxyImeCommit(committed, composed)) {
+                clearProxyEditOverlayText();
+                discardNextProxyImeCommit = false;
+                discardNextHiddenProxyDocumentMutation = true;
+                event.consume();
+                return;
+            }
+            overlayImeComposing = !composed.isEmpty();
+            overlayImeDocumentManaged = true;
+            beginHostEditOverlay(null, true);
+            return;
+        }
+        overlayImeComposing = !composed.isEmpty();
+        overlayImeDocumentManaged = true;
+
+        scheduleOverlayImeDocumentSync();
+    }
+
+    private void scheduleOverlayImeDocumentSync() {
+        final long serial = ++overlayImeSyncSerial;
+        SwingUtilities.invokeLater(() -> {
+            if (serial != overlayImeSyncSerial || !editOverlayDisplayed) {
+                return;
+            }
+            if (overlayImeComposing) {
+                return;
+            }
+            overlayImeDocumentManaged = false;
+            applyEditText(editOverlay.getText());
+            syncEditOverlaySelectionToEngine();
+            requestFrame();
+        });
+    }
+
+    private void handleEditOverlayFocusLost() {
+        if (suppressEditOverlayCommit || !editOverlayDisplayed) {
+            return;
+        }
+        commitEditOverlay(null, 0);
+    }
+
+    private void commitEditOverlay(Integer navigateKeyCode, int navigateModifier) {
+        VolvoxGridDesktopClient c = client;
+        long id = gridId;
+        if (c == null || id == 0L || !editOverlayDisplayed) {
+            return;
+        }
+        boolean stillEditing = true;
+        try {
+            EditState state = c.edit(
+                EditCommand.newBuilder()
+                    .setGridId(id)
+                    .setCommit(EditCommit.newBuilder().setText(editOverlay.getText()).build())
+                    .build()
+            );
+            requestFrame();
+            stillEditing = state != null && state.getActive();
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "Edit commit failed", ex);
+            stillEditing = true;
+        }
+
+        if (stillEditing) {
+            engineEditing = true;
+            editOverlay.requestFocusInWindow();
+            return;
+        }
+
+        engineEditing = false;
+        hideEditOverlay(false);
+        if (navigateKeyCode != null) {
+            sendSyntheticKey(navigateKeyCode.intValue(), navigateModifier);
+            requestFrame();
+        }
+    }
+
+    private void cancelEditOverlay() {
+        VolvoxGridDesktopClient c = client;
+        long id = gridId;
+        if (c == null || id == 0L || !editOverlayDisplayed) {
+            return;
+        }
+        boolean stillEditing = false;
+        try {
+            EditState state = c.edit(
+                EditCommand.newBuilder()
+                    .setGridId(id)
+                    .setCancel(EditCancel.newBuilder().build())
+                    .build()
+            );
+            requestFrame();
+            stillEditing = state != null && state.getActive();
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "Edit cancel failed", ex);
+            stillEditing = false;
+        }
+
+        engineEditing = stillEditing;
+        if (stillEditing) {
+            editOverlay.requestFocusInWindow();
+            return;
+        }
+
+        hideEditOverlay(true);
+    }
+
+    private void syncEditOverlaySelectionToEngine() {
+        if (!editOverlayDisplayed) {
+            return;
+        }
+        String text = editOverlay.getText();
+        int startUtf16 = Math.max(0, Math.min(text == null ? 0 : text.length(), editOverlay.getSelectionStart()));
+        int endUtf16 = Math.max(startUtf16, Math.min(text == null ? 0 : text.length(), editOverlay.getSelectionEnd()));
+        int start = codePointIndexAtUtf16(text, startUtf16);
+        int end = codePointIndexAtUtf16(text, endUtf16);
+        applyEditSelection(start, Math.max(0, end - start));
+    }
+
+    private void sendSyntheticKey(int keyCode, int modifier) {
+        sendKeyDirect(io.github.ivere27.volvoxgrid.KeyEvent.Type.KEY_DOWN, keyCode, modifier, "");
+        sendKeyDirect(io.github.ivere27.volvoxgrid.KeyEvent.Type.KEY_UP, keyCode, modifier, "");
     }
 
     private void sendKeyDirect(
@@ -824,6 +1323,424 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             return String.valueOf(ch);
         }
         return "";
+    }
+
+    private boolean handleHostShortcut(java.awt.event.KeyEvent e) {
+        if (e == null || gridId == 0L || client == null) {
+            return false;
+        }
+
+        if (engineEditing && handleEditSelectionShortcut(e)) {
+            return true;
+        }
+
+        if (!isShortcutModifierDown(e) || e.isAltDown()) {
+            return false;
+        }
+
+        switch (e.getKeyCode()) {
+            case java.awt.event.KeyEvent.VK_C:
+                return handleCopyShortcut();
+            case java.awt.event.KeyEvent.VK_X:
+                return handleCutShortcut();
+            case java.awt.event.KeyEvent.VK_V:
+                return handlePasteShortcut();
+            default:
+                return false;
+        }
+    }
+
+    private boolean handleEditSelectionShortcut(java.awt.event.KeyEvent e) {
+        if (!e.isShiftDown() || e.isControlDown() || e.isMetaDown() || e.isAltDown()) {
+            return false;
+        }
+
+        final int keyCode = e.getKeyCode();
+        if (keyCode != java.awt.event.KeyEvent.VK_LEFT
+            && keyCode != java.awt.event.KeyEvent.VK_RIGHT
+            && keyCode != java.awt.event.KeyEvent.VK_UP
+            && keyCode != java.awt.event.KeyEvent.VK_DOWN) {
+            return false;
+        }
+
+        EditState state = getCurrentEditState();
+        if (state == null || !state.getActive()) {
+            return false;
+        }
+
+        String text = state.getText();
+        int textLength = codePointLength(text);
+        int anchor = resolveEditSelectionAnchor(state, textLength);
+        int caret = resolveEditCaret(state, anchor, textLength);
+        int targetCaret = caret;
+        switch (keyCode) {
+            case java.awt.event.KeyEvent.VK_LEFT:
+                targetCaret = Math.max(0, caret - 1);
+                break;
+            case java.awt.event.KeyEvent.VK_RIGHT:
+                targetCaret = Math.min(textLength, caret + 1);
+                break;
+            case java.awt.event.KeyEvent.VK_UP:
+                targetCaret = 0;
+                break;
+            case java.awt.event.KeyEvent.VK_DOWN:
+                targetCaret = textLength;
+                break;
+            default:
+                return false;
+        }
+
+        applyEditSelection(Math.min(anchor, targetCaret), Math.abs(targetCaret - anchor));
+        if (targetCaret == anchor) {
+            editSelectionAnchor = targetCaret;
+        }
+        requestFrame();
+        return true;
+    }
+
+    private boolean handleCopyShortcut() {
+        EditState state = engineEditing ? getCurrentEditState() : null;
+        if (state != null && state.getActive()) {
+            if (state.getSelLength() <= 0) {
+                return true;
+            }
+            setSystemClipboardText(extractSelectionText(state.getText(), state.getSelStart(), state.getSelLength()));
+            return true;
+        }
+
+        try {
+            ClipboardResponse response = createController().copy();
+            setSystemClipboardText(response.getText());
+            return true;
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "Copy shortcut failed", ex);
+            return false;
+        }
+    }
+
+    private boolean handleCutShortcut() {
+        EditState state = engineEditing ? getCurrentEditState() : null;
+        if (state != null && state.getActive()) {
+            if (state.getSelLength() <= 0) {
+                return true;
+            }
+            setSystemClipboardText(extractSelectionText(state.getText(), state.getSelStart(), state.getSelLength()));
+            applyEditText(editTextWithoutSelection(state));
+            applyEditSelection(clampCodePointIndex(state.getText(), state.getSelStart()), 0);
+            resetEditSelectionAnchor();
+            requestFrame();
+            return true;
+        }
+
+        try {
+            ClipboardResponse response = createController().cut();
+            setSystemClipboardText(response.getText());
+            requestFrame();
+            return true;
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "Cut shortcut failed", ex);
+            return false;
+        }
+    }
+
+    private boolean handlePasteShortcut() {
+        String clipboardText = getSystemClipboardText();
+        if (clipboardText == null) {
+            return true;
+        }
+
+        EditState state = engineEditing ? getCurrentEditState() : null;
+        if (state != null && state.getActive()) {
+            applyEditText(replaceEditSelection(state, clipboardText));
+            applyEditSelection(
+                clampCodePointIndex(state.getText(), state.getSelStart()) + codePointLength(clipboardText),
+                0
+            );
+            resetEditSelectionAnchor();
+            requestFrame();
+            return true;
+        }
+
+        try {
+            createController().paste(clipboardText);
+            requestFrame();
+            return true;
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "Paste shortcut failed", ex);
+            return false;
+        }
+    }
+
+    private EditState getCurrentEditState() {
+        VolvoxGridDesktopClient c = client;
+        long id = gridId;
+        if (c == null || id == 0L) {
+            return null;
+        }
+        try {
+            EditState state = c.edit(EditCommand.newBuilder().setGridId(id).build());
+            if (!state.getActive()) {
+                resetEditSelectionAnchor();
+            }
+            return state;
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "GetEditState failed", ex);
+            return null;
+        }
+    }
+
+    private void applyEditText(String text) {
+        VolvoxGridDesktopClient c = client;
+        long id = gridId;
+        if (c == null || id == 0L) {
+            return;
+        }
+        try {
+            c.edit(
+                EditCommand.newBuilder()
+                    .setGridId(id)
+                    .setSetText(EditSetText.newBuilder().setText(text == null ? "" : text).build())
+                    .build()
+            );
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "EditSetText failed", ex);
+        }
+    }
+
+    private void applyEditSelection(int start, int length) {
+        VolvoxGridDesktopClient c = client;
+        long id = gridId;
+        if (c == null || id == 0L) {
+            return;
+        }
+        try {
+            c.edit(
+                EditCommand.newBuilder()
+                    .setGridId(id)
+                    .setSetSelection(
+                        EditSetSelection.newBuilder()
+                            .setStart(Math.max(0, start))
+                            .setLength(Math.max(0, length))
+                            .build()
+                    )
+                    .build()
+            );
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "EditSetSelection failed", ex);
+        }
+    }
+
+    private EditState ensureImeEditSessionStarted() {
+        if (engineEditing) {
+            EditState state = getCurrentEditState();
+            return state != null && state.getActive() ? state : null;
+        }
+
+        VolvoxGridDesktopClient c = client;
+        long id = gridId;
+        if (c == null || id == 0L) {
+            return null;
+        }
+
+        try {
+            SelectionState selection = c.getSelection(GridHandle.newBuilder().setId(id).build());
+            if (selection == null || selection.getActiveRow() < 0 || selection.getActiveCol() < 0) {
+                return null;
+            }
+            EditState state = c.edit(
+                EditCommand.newBuilder()
+                    .setGridId(id)
+                    .setStart(
+                        io.github.ivere27.volvoxgrid.EditStart.newBuilder()
+                            .setRow(selection.getActiveRow())
+                            .setCol(selection.getActiveCol())
+                            .build()
+                    )
+                    .build()
+            );
+            engineEditing = state != null && state.getActive();
+            return engineEditing ? state : null;
+        } catch (Exception ex) {
+            LOG.log(Level.FINER, "IME begin edit failed", ex);
+            return null;
+        }
+    }
+
+    private boolean beginHostEditOverlay(String pendingText) {
+        return beginHostEditOverlay(pendingText, false);
+    }
+
+    private boolean beginHostEditOverlay(String pendingText, boolean preserveFieldState) {
+        if (editOverlayDisplayed) {
+            return true;
+        }
+        if (pendingHostEditOverlayStart) {
+            appendPendingHostEditOverlayText(pendingText);
+            pendingHostEditOverlayPreserveFieldState = pendingHostEditOverlayPreserveFieldState || preserveFieldState;
+            return true;
+        }
+        EditState state = ensureImeEditSessionStarted();
+        if (state == null || !state.getActive()) {
+            return false;
+        }
+        pendingHostEditOverlayStart = true;
+        pendingHostEditOverlayText = pendingText;
+        pendingHostEditOverlayPreserveFieldState = preserveFieldState;
+        EditRequest immediateRequest = immediateEditRequestFromState(state);
+        if (immediateRequest != null) {
+            SwingUtilities.invokeLater(() -> showEditOverlay(immediateRequest));
+        }
+        requestFrameImmediate();
+        return true;
+    }
+
+    private int resolveEditSelectionAnchor(EditState state, int textLength) {
+        if (editSelectionRow != state.getRow() || editSelectionCol != state.getCol()) {
+            editSelectionAnchor = -1;
+            editSelectionRow = state.getRow();
+            editSelectionCol = state.getCol();
+        }
+        if (editSelectionAnchor < 0) {
+            editSelectionAnchor = clampCodePointIndex(state.getText(), state.getSelStart());
+        } else {
+            editSelectionAnchor = Math.max(0, Math.min(editSelectionAnchor, textLength));
+        }
+        return editSelectionAnchor;
+    }
+
+    private int resolveEditCaret(EditState state, int anchor, int textLength) {
+        int selStart = clampCodePointIndex(state.getText(), state.getSelStart());
+        int selEnd = Math.min(textLength, selStart + Math.max(0, state.getSelLength()));
+        if (state.getSelLength() <= 0) {
+            return selStart;
+        }
+        if (anchor <= selStart) {
+            return selEnd;
+        }
+        return selStart;
+    }
+
+    private static boolean isShortcutModifierDown(java.awt.event.KeyEvent e) {
+        return e.isControlDown() || e.isMetaDown();
+    }
+
+    private static boolean isPureModifierKey(int keyCode) {
+        return keyCode == java.awt.event.KeyEvent.VK_SHIFT
+            || keyCode == java.awt.event.KeyEvent.VK_CONTROL
+            || keyCode == java.awt.event.KeyEvent.VK_META
+            || keyCode == java.awt.event.KeyEvent.VK_ALT;
+    }
+
+    private static boolean shouldStartHostEditOverlayOnKeyPressed(java.awt.event.KeyEvent e) {
+        if (e == null || isPureModifierKey(e.getKeyCode())) {
+            return false;
+        }
+        if (isShortcutModifierDown(e) || e.isAltDown()) {
+            return false;
+        }
+
+        switch (e.getKeyCode()) {
+            case java.awt.event.KeyEvent.VK_ESCAPE:
+            case java.awt.event.KeyEvent.VK_TAB:
+            case java.awt.event.KeyEvent.VK_ENTER:
+            case java.awt.event.KeyEvent.VK_BACK_SPACE:
+            case java.awt.event.KeyEvent.VK_DELETE:
+            case java.awt.event.KeyEvent.VK_LEFT:
+            case java.awt.event.KeyEvent.VK_RIGHT:
+            case java.awt.event.KeyEvent.VK_UP:
+            case java.awt.event.KeyEvent.VK_DOWN:
+            case java.awt.event.KeyEvent.VK_HOME:
+            case java.awt.event.KeyEvent.VK_END:
+            case java.awt.event.KeyEvent.VK_PAGE_UP:
+            case java.awt.event.KeyEvent.VK_PAGE_DOWN:
+                return false;
+            default:
+                break;
+        }
+
+        return !e.isActionKey();
+    }
+
+    private void resetEditSelectionAnchor() {
+        editSelectionAnchor = -1;
+        editSelectionRow = -1;
+        editSelectionCol = -1;
+    }
+
+    private static int codePointLength(String text) {
+        String safe = text == null ? "" : text;
+        return safe.codePointCount(0, safe.length());
+    }
+
+    private static int clampCodePointIndex(String text, int index) {
+        return Math.max(0, Math.min(index, codePointLength(text)));
+    }
+
+    private static int utf16Index(String text, int codePointIndex) {
+        String safe = text == null ? "" : text;
+        int normalized = clampCodePointIndex(safe, codePointIndex);
+        return safe.offsetByCodePoints(0, normalized);
+    }
+
+    private static int codePointIndexAtUtf16(String text, int utf16Index) {
+        String safe = text == null ? "" : text;
+        int normalized = Math.max(0, Math.min(utf16Index, safe.length()));
+        if (normalized > 0
+            && normalized < safe.length()
+            && Character.isLowSurrogate(safe.charAt(normalized))
+            && Character.isHighSurrogate(safe.charAt(normalized - 1))) {
+            normalized -= 1;
+        }
+        return safe.codePointCount(0, normalized);
+    }
+
+    private static String extractSelectionText(String text, int start, int length) {
+        String safe = text == null ? "" : text;
+        int normalizedStart = clampCodePointIndex(safe, start);
+        int normalizedEnd = clampCodePointIndex(safe, normalizedStart + Math.max(0, length));
+        return safe.substring(utf16Index(safe, normalizedStart), utf16Index(safe, normalizedEnd));
+    }
+
+    private static String truncateToCodePointLength(String text, int maxLength) {
+        String safe = text == null ? "" : text;
+        int limited = Math.max(0, Math.min(maxLength, codePointLength(safe)));
+        return safe.substring(0, utf16Index(safe, limited));
+    }
+
+    private static String editTextWithoutSelection(EditState state) {
+        String text = state.getText();
+        int start = clampCodePointIndex(text, state.getSelStart());
+        int end = clampCodePointIndex(text, start + Math.max(0, state.getSelLength()));
+        String safe = text == null ? "" : text;
+        return safe.substring(0, utf16Index(safe, start)) + safe.substring(utf16Index(safe, end));
+    }
+
+    private static String replaceEditSelection(EditState state, String insertedText) {
+        String text = state.getText();
+        int start = clampCodePointIndex(text, state.getSelStart());
+        int end = clampCodePointIndex(text, start + Math.max(0, state.getSelLength()));
+        String safe = text == null ? "" : text;
+        String replacement = insertedText == null ? "" : insertedText;
+        return safe.substring(0, utf16Index(safe, start))
+            + replacement
+            + safe.substring(utf16Index(safe, end));
+    }
+
+    private static void setSystemClipboardText(String text) {
+        Toolkit.getDefaultToolkit()
+            .getSystemClipboard()
+            .setContents(new StringSelection(text == null ? "" : text), null);
+    }
+
+    private static String getSystemClipboardText() {
+        try {
+            Object data = Toolkit.getDefaultToolkit()
+                .getSystemClipboard()
+                .getData(DataFlavor.stringFlavor);
+            return data instanceof String ? (String) data : null;
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     private void sendPointer(PointerEvent.Type type, MouseEvent e, boolean dblClick) {
@@ -1326,6 +2243,39 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         requestFrame();
     }
 
+    private void clearProxyEditOverlayText() {
+        suppressEditOverlayTextChanged = true;
+        try {
+            editOverlay.setText("");
+            editOverlay.setSelectionStart(0);
+            editOverlay.setSelectionEnd(0);
+        } finally {
+            suppressEditOverlayTextChanged = false;
+        }
+    }
+
+    private boolean consumeHiddenProxyDocumentMutation() {
+        if (editOverlayDisplayed || !discardNextHiddenProxyDocumentMutation) {
+            return false;
+        }
+        discardNextHiddenProxyDocumentMutation = false;
+        return true;
+    }
+
+    private void armDiscardNextProxyImeCommit() {
+        discardNextProxyImeCommit = true;
+        discardNextHiddenProxyDocumentMutation = false;
+    }
+
+    private void clearDiscardedProxyImeCommit() {
+        discardNextProxyImeCommit = false;
+        discardNextHiddenProxyDocumentMutation = false;
+    }
+
+    private boolean shouldDiscardPostCancelProxyImeCommit(String committed, String composed) {
+        return discardNextProxyImeCommit && !committed.isEmpty() && composed.isEmpty();
+    }
+
     private void startRenderSession() {
         VolvoxGridDesktopClient c = client;
         if (c == null) {
@@ -1417,8 +2367,12 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private void handleGridEvent(GridEvent event) {
         if (event.hasStartEdit()) {
             engineEditing = true;
+            resetEditSelectionAnchor();
         } else if (event.hasAfterEdit()) {
             engineEditing = false;
+            clearPendingHostEditOverlayStart();
+            resetEditSelectionAnchor();
+            SwingUtilities.invokeLater(() -> hideEditOverlay(false));
         }
 
         if (decisionChannelEnabled && isCancelableGridEvent(event)) {
@@ -1574,10 +2528,13 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             }
         } else if (output.hasEditRequest()) {
             EditRequest request = output.getEditRequest();
+            SwingUtilities.invokeLater(() -> showEditOverlay(request));
             EditRequestListener listener = editRequestListener;
             if (listener != null) {
                 SwingUtilities.invokeLater(() -> listener.onEditRequest(request));
             }
+        } else if (output.hasDropdownRequest()) {
+            SwingUtilities.invokeLater(() -> hideEditOverlay(false));
         } else if (output.hasTooltipRequest()) {
             String text = output.getTooltipRequest().getText();
             SwingUtilities.invokeLater(() -> setToolTipText(text));
@@ -1845,4 +2802,107 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         }
         repaint();
     }
+
+    private void clearPendingHostEditOverlayStart() {
+        pendingHostEditOverlayStart = false;
+        pendingHostEditOverlayText = null;
+        pendingHostEditOverlaySuppressedText = "";
+        pendingHostEditOverlayPreserveFieldState = false;
+    }
+
+    private void schedulePendingHostEditOverlayStartClear() {
+        SwingUtilities.invokeLater(() -> {
+            if (editOverlayDisplayed) {
+                clearPendingHostEditOverlayStart();
+            }
+        });
+    }
+
+    private void appendPendingHostEditOverlayText(String text) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        pendingHostEditOverlayText = pendingHostEditOverlayText == null
+            ? text
+            : pendingHostEditOverlayText + text;
+    }
+
+    private void rememberPendingHostEditOverlaySuppressedText(String text) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        pendingHostEditOverlaySuppressedText = pendingHostEditOverlaySuppressedText + text;
+    }
+
+    private static EditRequest immediateEditRequestFromState(EditState state) {
+        if (state == null || !state.getActive()) {
+            return null;
+        }
+        if (state.getWidth() <= 0f || state.getHeight() <= 0f) {
+            return null;
+        }
+        return EditRequest.newBuilder()
+            .setRow(state.getRow())
+            .setCol(state.getCol())
+            .setX(state.getX())
+            .setY(state.getY())
+            .setWidth(state.getWidth())
+            .setHeight(state.getHeight())
+            .setCurrentValue(state.getText())
+            .setSelStart(state.getSelStart())
+            .setSelLength(state.getSelLength())
+            .setUiMode(state.getUiMode())
+            .setMaxLength(state.getMaxLength())
+            .build();
+    }
+
+    private static String committedInputMethodText(InputMethodEvent event) {
+        return inputMethodSubstring(event.getText(), 0, event.getCommittedCharacterCount());
+    }
+
+    private static String composedInputMethodText(InputMethodEvent event) {
+        AttributedCharacterIterator text = event.getText();
+        int committed = Math.max(0, event.getCommittedCharacterCount());
+        int total = iteratorCharCount(text);
+        return inputMethodSubstring(text, committed, Math.max(committed, total));
+    }
+
+    private static int inputMethodCursor(String composedText, InputMethodEvent event) {
+        if (composedText == null || composedText.isEmpty() || event.getCaret() == null) {
+            return codePointLength(composedText);
+        }
+        int index = event.getCaret().getInsertionIndex();
+        return Math.max(0, Math.min(codePointLength(composedText), index));
+    }
+
+    private static int iteratorCharCount(AttributedCharacterIterator iterator) {
+        if (iterator == null) {
+            return 0;
+        }
+        int count = 0;
+        for (char ch = iterator.first(); ch != AttributedCharacterIterator.DONE; ch = iterator.next()) {
+            count++;
+        }
+        return count;
+    }
+
+    private static String inputMethodSubstring(AttributedCharacterIterator iterator, int start, int end) {
+        if (iterator == null) {
+            return "";
+        }
+        int safeStart = Math.max(0, start);
+        int safeEnd = Math.max(safeStart, end);
+        StringBuilder sb = new StringBuilder();
+        int index = 0;
+        for (char ch = iterator.first(); ch != AttributedCharacterIterator.DONE; ch = iterator.next(), index++) {
+            if (index >= safeEnd) {
+                break;
+            }
+            if (index >= safeStart) {
+                sb.append(ch);
+            }
+        }
+        return sb.toString();
+    }
+
 }

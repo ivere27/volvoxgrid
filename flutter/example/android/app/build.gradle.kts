@@ -7,6 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.volvoxgrid_example"
+    buildToolsVersion = "36.0.0"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 

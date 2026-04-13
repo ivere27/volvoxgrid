@@ -1078,6 +1078,23 @@ final $typed_data.Uint8List colIndicatorCellModeDescriptor = $convert.base64Deco
     'TEVDVF9BTEwQgAgSIwoeQ09MX0lORElDQVRPUl9DRUxMX1NUQVRVU19JQ09OEIAQEh4KGUNPTF'
     '9JTkRJQ0FUT1JfQ0VMTF9DVVNUT00QgCA=');
 
+@$core.Deprecated('Use composeMethodDescriptor instead')
+const ComposeMethod$json = {
+  '1': 'ComposeMethod',
+  '2': [
+    {'1': 'COMPOSE_METHOD_NONE', '2': 0},
+    {'1': 'COMPOSE_METHOD_HANGUL', '2': 1},
+    {'1': 'COMPOSE_METHOD_DEAD_KEY', '2': 2},
+    {'1': 'COMPOSE_METHOD_TELEX', '2': 3},
+  ],
+};
+
+/// Descriptor for `ComposeMethod`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List composeMethodDescriptor = $convert.base64Decode(
+    'Cg1Db21wb3NlTWV0aG9kEhcKE0NPTVBPU0VfTUVUSE9EX05PTkUQABIZChVDT01QT1NFX01FVE'
+    'hPRF9IQU5HVUwQARIbChdDT01QT1NFX01FVEhPRF9ERUFEX0tFWRACEhgKFENPTVBPU0VfTUVU'
+    'SE9EX1RFTEVYEAM=');
+
 @$core.Deprecated('Use editUiModeDescriptor instead')
 const EditUiMode$json = {
   '1': 'EditUiMode',
@@ -3351,6 +3368,25 @@ const EditConfig$json = {
       '10': 'hostPointerDispatch',
       '17': true
     },
+    {
+      '1': 'engine_compose',
+      '3': 9,
+      '4': 1,
+      '5': 8,
+      '9': 8,
+      '10': 'engineCompose',
+      '17': true
+    },
+    {
+      '1': 'compose_method',
+      '3': 10,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.ComposeMethod',
+      '9': 9,
+      '10': 'composeMethod',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_trigger'},
@@ -3361,6 +3397,8 @@ const EditConfig$json = {
     {'1': '_mask'},
     {'1': '_host_key_dispatch'},
     {'1': '_host_pointer_dispatch'},
+    {'1': '_engine_compose'},
+    {'1': '_compose_method'},
   ],
 };
 
@@ -3373,10 +3411,13 @@ final $typed_data.Uint8List editConfigDescriptor = $convert.base64Decode(
     'D2Ryb3Bkb3duX3NlYXJjaBgEIAEoCEgDUg5kcm9wZG93blNlYXJjaIgBARIiCgptYXhfbGVuZ3'
     'RoGAUgASgFSARSCW1heExlbmd0aIgBARIXCgRtYXNrGAYgASgJSAVSBG1hc2uIAQESLwoRaG9z'
     'dF9rZXlfZGlzcGF0Y2gYByABKAhIBlIPaG9zdEtleURpc3BhdGNoiAEBEjcKFWhvc3RfcG9pbn'
-    'Rlcl9kaXNwYXRjaBgIIAEoCEgHUhNob3N0UG9pbnRlckRpc3BhdGNoiAEBQgoKCF90cmlnZ2Vy'
-    'Qg8KDV90YWJfYmVoYXZpb3JCEwoRX2Ryb3Bkb3duX3RyaWdnZXJCEgoQX2Ryb3Bkb3duX3NlYX'
-    'JjaEINCgtfbWF4X2xlbmd0aEIHCgVfbWFza0IUChJfaG9zdF9rZXlfZGlzcGF0Y2hCGAoWX2hv'
-    'c3RfcG9pbnRlcl9kaXNwYXRjaA==');
+    'Rlcl9kaXNwYXRjaBgIIAEoCEgHUhNob3N0UG9pbnRlckRpc3BhdGNoiAEBEioKDmVuZ2luZV9j'
+    'b21wb3NlGAkgASgISAhSDWVuZ2luZUNvbXBvc2WIAQESSAoOY29tcG9zZV9tZXRob2QYCiABKA'
+    '4yHC52b2x2b3hncmlkLnYxLkNvbXBvc2VNZXRob2RICVINY29tcG9zZU1ldGhvZIgBAUIKCghf'
+    'dHJpZ2dlckIPCg1fdGFiX2JlaGF2aW9yQhMKEV9kcm9wZG93bl90cmlnZ2VyQhIKEF9kcm9wZG'
+    '93bl9zZWFyY2hCDQoLX21heF9sZW5ndGhCBwoFX21hc2tCFAoSX2hvc3Rfa2V5X2Rpc3BhdGNo'
+    'QhgKFl9ob3N0X3BvaW50ZXJfZGlzcGF0Y2hCEQoPX2VuZ2luZV9jb21wb3NlQhEKD19jb21wb3'
+    'NlX21ldGhvZA==');
 
 @$core.Deprecated('Use pullToRefreshConfigDescriptor instead')
 const PullToRefreshConfig$json = {

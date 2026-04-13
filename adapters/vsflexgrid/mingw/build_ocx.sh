@@ -160,7 +160,7 @@ build_arch() {
     echo "  Build volvoxgrid_demo_host_${ARCH}.exe..."
     $CC $CFLAGS -o "${OUT_DIR}/volvoxgrid_demo_host_${ARCH}.exe" \
         activex_demo_host.c \
-        -lole32 -loleaut32 -luuid -lgdi32 \
+        -lole32 -loleaut32 -luuid -lgdi32 -limm32 \
         -mwindows -static-libgcc
     echo "  Done: ${OUT_DIR}/volvoxgrid_demo_host_${ARCH}.exe"
 
