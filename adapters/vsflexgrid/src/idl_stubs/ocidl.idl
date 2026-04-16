@@ -1,0 +1,19 @@
+import "oaidl.idl";
+
+[
+    uuid(B196B284-BAB4-101A-B69C-00AA00341D07),
+    object,
+    pointer_default(unique)
+]
+interface IProvideClassInfo : IUnknown {
+    HRESULT GetClassInfo([out] ITypeInfo **ppTI);
+};
+
+[
+    uuid(A6BC3AC0-DBAA-11CE-9DE3-00AA004BB851),
+    object,
+    pointer_default(unique)
+]
+interface IProvideClassInfo2 : IProvideClassInfo {
+    HRESULT GetGUID([in] DWORD dwGuidKind, [out] GUID *pGUID);
+};

@@ -1,0 +1,63 @@
+typedef unsigned char BYTE;
+typedef unsigned short WORD;
+typedef unsigned short WCHAR;
+typedef unsigned int UINT;
+typedef unsigned long ULONG;
+typedef unsigned long DWORD;
+typedef long LONG;
+typedef long HRESULT;
+typedef short VARIANT_BOOL;
+typedef unsigned short VARTYPE;
+typedef unsigned long LCID;
+typedef WCHAR OLECHAR;
+typedef [string] OLECHAR *LPOLESTR;
+typedef [string] OLECHAR *BSTR;
+typedef DWORD OLE_COLOR;
+
+typedef struct _GUID {
+    DWORD Data1;
+    WORD Data2;
+    WORD Data3;
+    BYTE Data4[8];
+} GUID;
+
+typedef GUID IID;
+typedef GUID CLSID;
+typedef [unique] GUID *REFGUID;
+typedef [unique] IID *REFIID;
+typedef LONG DISPID;
+
+struct tagVARIANT;
+typedef struct tagVARIANT VARIANT;
+typedef VARIANT VARIANTARG;
+
+typedef struct tagEXCEPINFO {
+    WORD wCode;
+    WORD wReserved;
+    BSTR bstrSource;
+    BSTR bstrDescription;
+    BSTR bstrHelpFile;
+    DWORD dwHelpContext;
+    ULONG pvReserved;
+    ULONG pfnDeferredFillIn;
+    HRESULT scode;
+} EXCEPINFO;
+
+typedef struct tagDISPPARAMS {
+    VARIANTARG *rgvarg;
+    DISPID *rgdispidNamedArgs;
+    UINT cArgs;
+    UINT cNamedArgs;
+} DISPPARAMS;
+
+struct tagVARIANT {
+    VARTYPE vt;
+    WORD wReserved1;
+    WORD wReserved2;
+    WORD wReserved3;
+    [switch_is(vt)] union {
+        [case(3)] LONG lVal;
+        [case(8)] BSTR bstrVal;
+        [case(11)] VARIANT_BOOL boolVal;
+    } u;
+};

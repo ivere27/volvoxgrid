@@ -1,0 +1,8 @@
+call_method2_i4 EditCell 2 1
+sleep 120
+key ENTER
+sleep 120
+call_method2_i4 EditCell 3 1
+sleep 120
+key ENTER
+sleep 120

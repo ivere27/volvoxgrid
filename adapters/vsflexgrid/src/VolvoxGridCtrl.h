@@ -271,7 +271,8 @@ public:
     void Fire_BeforeRowColChange(long oldRow, long oldCol,
                                  long newRow, long newCol,
                                  VARIANT_BOOL* cancel);
-    void Fire_AfterRowColChange();
+    void Fire_AfterRowColChange(long oldRow, long oldCol,
+                                long newRow, long newCol);
     void Fire_BeforeEdit(long row, long col, VARIANT_BOOL* cancel);
     void Fire_AfterEdit(long row, long col);
     void Fire_BeforeSort(long col, VARIANT_BOOL* cancel);

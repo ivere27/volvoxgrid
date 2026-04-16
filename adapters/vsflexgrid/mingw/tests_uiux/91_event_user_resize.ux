@@ -1,0 +1,4 @@
+set_indexed_prop_i4 ColWidth 1 1800
+sleep 120
+set_indexed_prop_i4 ColWidth 1 2200
+sleep 120

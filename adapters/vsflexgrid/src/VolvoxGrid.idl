@@ -470,7 +470,9 @@ dispinterface _DVolvoxGridEvents
         [in, out] VARIANT_BOOL* cancel);
 
     [id(2), helpstring("Fired after the current cell changes")]
-    void AfterRowColChange();
+    void AfterRowColChange(
+        [in] long oldRow, [in] long oldCol,
+        [in] long newRow, [in] long newCol);
 
     [id(3), helpstring("Fired before a cell enters edit mode")]
     void BeforeEdit(
@@ -546,6 +548,14 @@ dispinterface _DVolvoxGridEvents
 
     [id(23), helpstring("Fired after bound data is refreshed")]
     void AfterDataRefresh();
+
+    [id(63), helpstring("Fired when a cell enters edit mode")]
+    void StartEdit(
+        [in] long row, [in] long col,
+        [in, out] VARIANT_BOOL* cancel);
+
+    [id(64), helpstring("Fired when a cell button is clicked")]
+    void CellButtonClick([in] long row, [in] long col);
 };
 
 // ═══════════════════════════════════════════════════════════════════

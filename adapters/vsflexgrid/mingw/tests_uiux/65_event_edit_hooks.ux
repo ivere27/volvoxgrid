@@ -16,3 +16,5 @@ dblclick_cell 4 2
 sleep 80
 key ENTER
 sleep 120
+click_combo 4 5
+sleep 120

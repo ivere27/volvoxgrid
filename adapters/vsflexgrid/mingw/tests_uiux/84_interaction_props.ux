@@ -1,0 +1,6 @@
+# UI+UX interaction script for test 84.
+# Verifies that the hosted control consumes TAB and moves to the next cell.
+click_cell 2 0
+sleep 80
+key TAB
+sleep 120

@@ -4,7 +4,7 @@
 //! `TexturedInstance` data that the GPU renderer later uploads and draws
 //! in a single batched render pass.
 
-use crate::canvas::Canvas;
+use crate::canvas::{adjusted_text_max_width, normalize_font_stretch_scale, Canvas};
 use std::hash::{Hash, Hasher};
 
 use crate::glyph_atlas::{layout_text_glyphs, GlyphAtlas, GlyphEntry};
@@ -95,6 +95,146 @@ impl<'a> GpuCanvas<'a> {
             self.textured_instances
         }
     }
+
+    #[allow(clippy::too_many_arguments)]
+    fn draw_text_internal(
+        &mut self,
+        x: i32,
+        y: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        stretch: f32,
+        color: u32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        max_width: Option<f32>,
+    ) -> f32 {
+        if text.is_empty() || clip_w <= 0 || clip_h <= 0 || !self.text_engine.has_fonts() {
+            return 0.0;
+        }
+
+        let scale = normalize_font_stretch_scale(stretch);
+        let adjusted_max_width = adjusted_text_max_width(max_width, stretch);
+
+        let cache_key = glyph_cache_hash(text, font_name, font_size, bold, italic);
+        if let Some(cached) = self.glyph_pos_cache.get(&cache_key) {
+            self.glyph_buf.clear();
+            self.glyph_buf.extend_from_slice(cached);
+        } else {
+            let layout_res = crate::text::TextEngine::get_or_shape_buffer(
+                &mut self.text_engine.layout_cache,
+                &mut self.text_engine.layout_fifo,
+                self.text_engine.layout_cache_cap,
+                &mut self.text_engine.font_system,
+                text,
+                font_name,
+                font_size,
+                bold,
+                italic,
+                adjusted_max_width,
+            );
+            let buffer = if let Some(r) = &layout_res {
+                &r.layout().buffer
+            } else {
+                return 0.0;
+            };
+
+            let font_system = &mut self.text_engine.font_system;
+            let swash_cache = &mut self.text_engine.swash_cache;
+
+            layout_text_glyphs(
+                self.glyph_atlas,
+                font_system,
+                swash_cache,
+                buffer,
+                text,
+                font_name,
+                font_size,
+                bold,
+                italic,
+                0.0,
+                0.0,
+                &mut *self.glyph_buf,
+            );
+
+            if self.glyph_pos_cache.len() >= 8192 {
+                self.glyph_pos_cache.clear();
+            }
+            self.glyph_pos_cache
+                .insert(cache_key, self.glyph_buf.clone());
+        }
+
+        let color_f32 = color_to_f32(color);
+        let mut rendered_width: f32 = 0.0;
+        let clip_x_max = clip_x as f32 + clip_w as f32;
+        let clip_y_max = y as f32 + clip_h as f32;
+        let clip_x_min = clip_x as f32;
+        let clip_y_min = (clip_y.max(0)) as f32;
+        let xf = x as f32;
+        let yf = y as f32;
+
+        for i in 0..self.glyph_buf.len() {
+            let (entry, dx, dy) = self.glyph_buf[i];
+            rendered_width = rendered_width.max((dx + entry.width as f32) * scale);
+            if entry.width == 0 || entry.height == 0 {
+                continue;
+            }
+
+            let gx = xf + dx * scale;
+            let gy = yf + dy;
+            let gw = entry.width as f32 * scale;
+            let gh = entry.height as f32;
+
+            let inst = if gx >= clip_x_min
+                && gy >= clip_y_min
+                && gx + gw <= clip_x_max
+                && gy + gh <= clip_y_max
+            {
+                TexturedInstance {
+                    rect: [gx, gy, gw, gh],
+                    uv_rect: entry.uv,
+                    color: color_f32,
+                    flags: [0.0, entry.page as f32],
+                }
+            } else {
+                let left = gx.max(clip_x_min);
+                let top = gy.max(clip_y_min);
+                let right = (gx + gw).min(clip_x_max);
+                let bottom = (gy + gh).min(clip_y_max);
+
+                if left >= right || top >= bottom {
+                    continue;
+                }
+
+                let u_min = entry.uv[0];
+                let v_min = entry.uv[1];
+                let u_max = entry.uv[2];
+                let v_max = entry.uv[3];
+                let u_range = u_max - u_min;
+                let v_range = v_max - v_min;
+
+                let new_u_min = u_min + u_range * ((left - gx) / gw);
+                let new_v_min = v_min + v_range * ((top - gy) / gh);
+                let new_u_max = u_max - u_range * ((gx + gw - right) / gw);
+                let new_v_max = v_max - v_range * ((gy + gh - bottom) / gh);
+
+                TexturedInstance {
+                    rect: [left, top, right - left, bottom - top],
+                    uv_rect: [new_u_min, new_v_min, new_u_max, new_v_max],
+                    color: color_f32,
+                    flags: [0.0, entry.page as f32],
+                }
+            };
+            self.texts().push(inst);
+        }
+
+        rendered_width
+    }
 }
 
 impl<'a> Canvas for GpuCanvas<'a> {
@@ -175,137 +315,33 @@ impl<'a> Canvas for GpuCanvas<'a> {
         clip_h: i32,
         max_width: Option<f32>,
     ) -> f32 {
-        if text.is_empty() || clip_w <= 0 || clip_h <= 0 || !self.text_engine.has_fonts() {
-            return 0.0;
-        }
+        self.draw_text_internal(
+            x, y, text, font_name, font_size, bold, italic, 0.0, color, clip_x, clip_y, clip_w,
+            clip_h, max_width,
+        )
+    }
 
-        // Check the glyph position cache first — avoids both
-        // get_or_shape_buffer AND layout_text_glyphs on repeat calls.
-        let cache_key = glyph_cache_hash(text, font_name, font_size, bold, italic);
-        if let Some(cached) = self.glyph_pos_cache.get(&cache_key) {
-            // Cache hit — copy into glyph_buf (cheap memcpy, capacity reused).
-            self.glyph_buf.clear();
-            self.glyph_buf.extend_from_slice(cached);
-        } else {
-            // Cache miss — shape the text buffer and compute glyph positions.
-            let layout_res = crate::text::TextEngine::get_or_shape_buffer(
-                &mut self.text_engine.layout_cache,
-                &mut self.text_engine.layout_fifo,
-                self.text_engine.layout_cache_cap,
-                &mut self.text_engine.font_system,
-                text,
-                font_name,
-                font_size,
-                bold,
-                italic,
-                max_width,
-            );
-            let buffer = if let Some(r) = &layout_res {
-                &r.layout().buffer
-            } else {
-                return 0.0;
-            };
-
-            let font_system = &mut self.text_engine.font_system;
-            let swash_cache = &mut self.text_engine.swash_cache;
-
-            layout_text_glyphs(
-                self.glyph_atlas,
-                font_system,
-                swash_cache,
-                buffer,
-                text,
-                font_name,
-                font_size,
-                bold,
-                italic,
-                0.0,
-                0.0,
-                &mut *self.glyph_buf,
-            );
-
-            // Store in cache (cap at 8192 entries to bound memory)
-            if self.glyph_pos_cache.len() >= 8192 {
-                self.glyph_pos_cache.clear();
-            }
-            self.glyph_pos_cache
-                .insert(cache_key, self.glyph_buf.clone());
-        }
-
-        let color_f32 = color_to_f32(color);
-        let mut rendered_width: f32 = 0.0;
-
-        // Clip boundary in pixel coords
-        let clip_x_max = clip_x as f32 + clip_w as f32;
-        let clip_y_max = y as f32 + clip_h as f32;
-        let clip_x_min = clip_x as f32;
-        let clip_y_min = (clip_y.max(0)) as f32;
-
-        let xf = x as f32;
-        let yf = y as f32;
-
-        for i in 0..self.glyph_buf.len() {
-            let (entry, dx, dy) = self.glyph_buf[i];
-            rendered_width = rendered_width.max(dx + entry.width as f32);
-            if entry.width == 0 || entry.height == 0 {
-                continue;
-            }
-
-            // Glyph quad in pixel coords
-            let gx = xf + dx;
-            let gy = yf + dy;
-            let gw = entry.width as f32;
-            let gh = entry.height as f32;
-
-            let inst;
-
-            // Fast path: glyph fully inside clip region — skip UV recalculation
-            if gx >= clip_x_min
-                && gy >= clip_y_min
-                && gx + gw <= clip_x_max
-                && gy + gh <= clip_y_max
-            {
-                inst = TexturedInstance {
-                    rect: [gx, gy, gw, gh],
-                    uv_rect: entry.uv,
-                    color: color_f32,
-                    flags: [0.0, entry.page as f32],
-                };
-            } else {
-                // Clip the glyph quad against the cell boundary
-                let left = gx.max(clip_x_min);
-                let top = gy.max(clip_y_min);
-                let right = (gx + gw).min(clip_x_max);
-                let bottom = (gy + gh).min(clip_y_max);
-
-                if left >= right || top >= bottom {
-                    continue; // fully clipped
-                }
-
-                // Adjust UV coordinates proportionally to the clipped region
-                let u_min = entry.uv[0];
-                let v_min = entry.uv[1];
-                let u_max = entry.uv[2];
-                let v_max = entry.uv[3];
-                let u_range = u_max - u_min;
-                let v_range = v_max - v_min;
-
-                let new_u_min = u_min + u_range * ((left - gx) / gw);
-                let new_v_min = v_min + v_range * ((top - gy) / gh);
-                let new_u_max = u_max - u_range * ((gx + gw - right) / gw);
-                let new_v_max = v_max - v_range * ((gy + gh - bottom) / gh);
-
-                inst = TexturedInstance {
-                    rect: [left, top, right - left, bottom - top],
-                    uv_rect: [new_u_min, new_v_min, new_u_max, new_v_max],
-                    color: color_f32,
-                    flags: [0.0, entry.page as f32],
-                };
-            }
-            self.texts().push(inst);
-        }
-
-        rendered_width
+    fn draw_text_stretched(
+        &mut self,
+        x: i32,
+        y: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        stretch: f32,
+        color: u32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        max_width: Option<f32>,
+    ) -> f32 {
+        self.draw_text_internal(
+            x, y, text, font_name, font_size, bold, italic, stretch, color, clip_x, clip_y, clip_w,
+            clip_h, max_width,
+        )
     }
 
     fn measure_text(
@@ -320,6 +356,28 @@ impl<'a> Canvas for GpuCanvas<'a> {
         // Use the shared TextEngine for measurement — identical to CPU path.
         self.text_engine
             .measure_text(text, font_name, font_size, bold, italic, max_width)
+    }
+
+    fn measure_text_stretched(
+        &mut self,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        stretch: f32,
+        max_width: Option<f32>,
+    ) -> (f32, f32) {
+        let scale = normalize_font_stretch_scale(stretch);
+        let (w, h) = self.text_engine.measure_text(
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            adjusted_text_max_width(max_width, stretch),
+        );
+        (w * scale, h)
     }
 
     fn blit_image(

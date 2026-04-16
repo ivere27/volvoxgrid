@@ -284,7 +284,7 @@ void CVolvoxGridCtrl::ProcessRenderOutput(const RenderOutput& output)
     }
     if (output.has_selection()) {
         const auto& sel = output.selection();
-        Fire_AfterRowColChange();
+        Fire_AfterRowColChange(sel.row(), sel.col(), sel.row(), sel.col());
     }
 }
 
@@ -316,7 +316,10 @@ void CVolvoxGridCtrl::StartEventThread()
                             e.new_row(), e.new_col(), &cancel);
                     }
                     else if (evt.has_after_row_col_change()) {
-                        Fire_AfterRowColChange();
+                        auto& e = evt.after_row_col_change();
+                        Fire_AfterRowColChange(
+                            e.old_row(), e.old_col(),
+                            e.new_row(), e.new_col());
                     }
                     else if (evt.has_before_edit()) {
                         auto& e = evt.before_edit();
@@ -1619,7 +1622,8 @@ void CVolvoxGridCtrl::Fire_BeforeRowColChange(
     }
 }
 
-void CVolvoxGridCtrl::Fire_AfterRowColChange()
+void CVolvoxGridCtrl::Fire_AfterRowColChange(long oldRow, long oldCol,
+                                              long newRow, long newCol)
 {
     IConnectionPointImpl<CVolvoxGridCtrl, &DIID__DVolvoxGridEvents>* pCP = this;
     int nConnections = pCP->m_vec.GetSize();
@@ -1630,7 +1634,15 @@ void CVolvoxGridCtrl::Fire_AfterRowColChange()
         pUnk->QueryInterface(IID_IDispatch, (void**)&pDisp);
         if (!pDisp) continue;
 
-        DISPPARAMS dp = { nullptr, nullptr, 0, 0 };
+        // IDL order: AfterRowColChange(oldRow, oldCol, newRow, newCol)
+        // DISPPARAMS stores args in reverse order
+        VARIANT args[4];
+        VariantInit(&args[3]); args[3].vt = VT_I4; args[3].lVal = oldRow;
+        VariantInit(&args[2]); args[2].vt = VT_I4; args[2].lVal = oldCol;
+        VariantInit(&args[1]); args[1].vt = VT_I4; args[1].lVal = newRow;
+        VariantInit(&args[0]); args[0].vt = VT_I4; args[0].lVal = newCol;
+
+        DISPPARAMS dp = { args, nullptr, 4, 0 };
         pDisp->Invoke(2, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &dp, nullptr, nullptr, nullptr);
     }
 }

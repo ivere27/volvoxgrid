@@ -4,7 +4,9 @@
 //! existing pixel-level helpers in `render.rs`.  The buffer is typically a
 //! shared-memory region provided by the platform shell.
 
-use crate::canvas::Canvas;
+use crate::canvas::{
+    adjusted_text_max_width, normalize_font_stretch_scale, Canvas, TEXT_LINE_HEIGHT_FACTOR,
+};
 use crate::text::TextRenderer;
 
 /// CPU-side canvas that writes directly to an RGBA pixel buffer.
@@ -53,6 +55,158 @@ impl<'a> CpuCanvas<'a> {
         let (x0, x1) = Self::clip_span(x, w, self.width)?;
         let (y0, y1) = Self::clip_span(y, h, self.height)?;
         Some((x0, y0, x1, y1))
+    }
+
+    fn blend_scaled_rgba_clipped(
+        &mut self,
+        dx: i32,
+        dy: i32,
+        dw: i32,
+        dh: i32,
+        src: &[u8],
+        src_w: i32,
+        src_h: i32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+    ) {
+        if dw <= 0 || dh <= 0 || src_w <= 0 || src_h <= 0 || clip_w <= 0 || clip_h <= 0 {
+            return;
+        }
+
+        let vis_left = dx.max(clip_x).max(0);
+        let vis_top = dy.max(clip_y).max(0);
+        let vis_right = (dx + dw).min(clip_x + clip_w).min(self.width);
+        let vis_bottom = (dy + dh).min(clip_y + clip_h).min(self.height);
+        if vis_left >= vis_right || vis_top >= vis_bottom {
+            return;
+        }
+
+        for by in vis_top..vis_bottom {
+            let py = by - dy;
+            let sy = ((py as i64 * src_h as i64) / dh as i64) as i32;
+            let dst_row = (by * self.stride) as usize;
+            for bx in vis_left..vis_right {
+                let px = bx - dx;
+                let sx = ((px as i64 * src_w as i64) / dw as i64) as i32;
+                let src_off = ((sy * src_w + sx) * 4) as usize;
+                if src_off + 3 >= src.len() {
+                    continue;
+                }
+                let src_a = src[src_off + 3] as u32;
+                if src_a == 0 {
+                    continue;
+                }
+                let dst_off = dst_row + (bx * 4) as usize;
+                if dst_off + 3 >= self.buf.len() {
+                    continue;
+                }
+                if src_a == 255 {
+                    self.buf[dst_off] = src[src_off];
+                    self.buf[dst_off + 1] = src[src_off + 1];
+                    self.buf[dst_off + 2] = src[src_off + 2];
+                    self.buf[dst_off + 3] = 255;
+                } else {
+                    let inv_a = 255 - src_a;
+                    let sr = src[src_off] as u32;
+                    let sg = src[src_off + 1] as u32;
+                    let sb = src[src_off + 2] as u32;
+                    let dr = self.buf[dst_off] as u32;
+                    let dg = self.buf[dst_off + 1] as u32;
+                    let db = self.buf[dst_off + 2] as u32;
+                    self.buf[dst_off] = ((sr * src_a + dr * inv_a + 128) >> 8) as u8;
+                    self.buf[dst_off + 1] = ((sg * src_a + dg * inv_a + 128) >> 8) as u8;
+                    self.buf[dst_off + 2] = ((sb * src_a + db * inv_a + 128) >> 8) as u8;
+                    self.buf[dst_off + 3] = 255;
+                }
+            }
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn draw_text_stretched_impl(
+        &mut self,
+        x: i32,
+        y: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        stretch: f32,
+        color: u32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        max_width: Option<f32>,
+    ) -> f32 {
+        if text.is_empty() || clip_w <= 0 || clip_h <= 0 {
+            return 0.0;
+        }
+
+        let scale = normalize_font_stretch_scale(stretch);
+        let adjusted_max_width = adjusted_text_max_width(max_width, stretch);
+        if (scale - 1.0).abs() < f32::EPSILON {
+            return self.text_renderer.render_text(
+                self.buf,
+                self.width,
+                self.height,
+                self.stride,
+                x,
+                y,
+                clip_x,
+                clip_y,
+                clip_w,
+                clip_h,
+                text,
+                font_name,
+                font_size,
+                bold,
+                italic,
+                color,
+                adjusted_max_width,
+            );
+        }
+
+        let (measured_w, measured_h) = self.text_renderer.measure_text(
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            adjusted_max_width,
+        );
+        // +2 padding accounts for anti-alias bleed at glyph edges
+        let src_w = measured_w.ceil().max(1.0) as i32 + 2;
+        let src_h = measured_h.ceil().max((font_size * TEXT_LINE_HEIGHT_FACTOR).ceil()) as i32 + 2;
+        let mut temp = vec![0u8; (src_w * src_h * 4) as usize];
+        let rendered_w = self.text_renderer.render_text(
+            &mut temp,
+            src_w,
+            src_h,
+            src_w * 4,
+            0,
+            0,
+            0,
+            0,
+            src_w,
+            src_h,
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            color,
+            adjusted_max_width,
+        );
+        let logical_w = rendered_w.max(measured_w).max(1.0);
+        let dest_w = (logical_w * scale).ceil().max(1.0) as i32;
+        self.blend_scaled_rgba_clipped(
+            x, y, dest_w, src_h, &temp, src_w, src_h, clip_x, clip_y, clip_w, clip_h,
+        );
+        logical_w * scale
     }
 }
 
@@ -279,6 +433,52 @@ impl<'a> Canvas for CpuCanvas<'a> {
         );
     }
 
+    fn draw_text_stretched(
+        &mut self,
+        x: i32,
+        y: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        stretch: f32,
+        color: u32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        max_width: Option<f32>,
+    ) -> f32 {
+        self.draw_text_stretched_impl(
+            x, y, text, font_name, font_size, bold, italic, stretch, color, clip_x, clip_y, clip_w,
+            clip_h, max_width,
+        )
+    }
+
+    fn draw_text_stretched_fast(
+        &mut self,
+        x: i32,
+        y: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        stretch: f32,
+        color: u32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        max_width: Option<f32>,
+    ) {
+        let _ = self.draw_text_stretched_impl(
+            x, y, text, font_name, font_size, bold, italic, stretch, color, clip_x, clip_y, clip_w,
+            clip_h, max_width,
+        );
+    }
+
     fn measure_text(
         &mut self,
         text: &str,
@@ -290,6 +490,28 @@ impl<'a> Canvas for CpuCanvas<'a> {
     ) -> (f32, f32) {
         self.text_renderer
             .measure_text(text, font_name, font_size, bold, italic, max_width)
+    }
+
+    fn measure_text_stretched(
+        &mut self,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        stretch: f32,
+        max_width: Option<f32>,
+    ) -> (f32, f32) {
+        let scale = normalize_font_stretch_scale(stretch);
+        let (w, h) = self.text_renderer.measure_text(
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            adjusted_text_max_width(max_width, stretch),
+        );
+        (w * scale, h)
     }
 
     fn blit_image(

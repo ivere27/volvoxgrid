@@ -50,7 +50,10 @@ XVFB_SCREEN="${XVFB_SCREEN:-1920x1080x24}"
 JOBS=0
 JOBS_SET=0
 WORKER_TIMEOUT_SEC="${WORKER_TIMEOUT_SEC:-60}"
-PARALLEL_UNSAFE_TESTS="${PARALLEL_UNSAFE_TESTS:-}"
+SQL_COMPARE_TESTS="${SQL_COMPARE_TESTS:-84-103}"
+# SQL-backed compare tests hang when multiple Wine/ADO workers run at once.
+DEFAULT_PARALLEL_UNSAFE_TESTS="${DEFAULT_PARALLEL_UNSAFE_TESTS:-$SQL_COMPARE_TESTS}"
+PARALLEL_UNSAFE_TESTS="${PARALLEL_UNSAFE_TESTS-$DEFAULT_PARALLEL_UNSAFE_TESTS}"
 DEFAULT_NATIVE_WINEPREFIX="${DEFAULT_NATIVE_WINEPREFIX:-$HOME/.wine}"
 DEFAULT_NATIVE_WINEDLLOVERRIDES="${DEFAULT_NATIVE_WINEDLLOVERRIDES:-msado15,msadce,msadco,msdart,msdaps,msdatl3,oledb32,msdadc,msdaenum,msdaer,msdasql,sqloledb,sqlsrv32,mtxdm,odbc32,odbccp32=n,b}"
 
@@ -135,6 +138,43 @@ filter_includes_threshold() {
     return 1
 }
 
+filters_overlap() {
+    local filter_a="$1"
+    local filter_b="$2"
+    local tok a b t
+    local IFS=","
+    local tokens=()
+
+    [ -n "$filter_a" ] || return 1
+    [ -n "$filter_b" ] || return 1
+
+    read -ra tokens <<< "$filter_b"
+    for tok in "${tokens[@]}"; do
+        tok="${tok//[[:space:]]/}"
+        [ -z "$tok" ] && continue
+        if [[ "$tok" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+            a="${BASH_REMATCH[1]}"
+            b="${BASH_REMATCH[2]}"
+            if [ "$a" -gt "$b" ]; then
+                t="$a"
+                a="$b"
+                b="$t"
+            fi
+            for ((t=a; t<=b; t++)); do
+                if filter_includes_test "$filter_a" "$t"; then
+                    return 0
+                fi
+            done
+        elif [[ "$tok" =~ ^[0-9]+$ ]]; then
+            if filter_includes_test "$filter_a" "$tok"; then
+                return 0
+            fi
+        fi
+    done
+
+    return 1
+}
+
 run_compare_worker() {
     if [ "$WORKER_TIMEOUT_SEC" -gt 0 ] && command -v timeout >/dev/null 2>&1; then
         timeout --signal=TERM --kill-after=5s "${WORKER_TIMEOUT_SEC}s" \
@@ -144,16 +184,81 @@ run_compare_worker() {
     fi
 }
 
+run_logged_compare_worker() {
+    local wlog="$1"
+    local worker_id="$2"
+    local test_desc="$3"
+    local start_ts start_human end_ts end_human elapsed rc
+
+    shift 3
+
+    start_ts="$(date +%s)"
+    start_human="$(date '+%Y-%m-%d %H:%M:%S')"
+    {
+        echo "=== worker ${worker_id} START pid=$$ tests=${test_desc} at ${start_human} ==="
+    } > "$wlog"
+
+    set +e
+    WINEDEBUG=-all run_compare_worker "$@" 2>/dev/null >> "$wlog"
+    rc=$?
+    if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+        echo "=== worker ${worker_id} TIMEOUT limit=${WORKER_TIMEOUT_SEC}s ===" >> "$wlog"
+    fi
+    set -e
+
+    end_ts="$(date +%s)"
+    end_human="$(date '+%Y-%m-%d %H:%M:%S')"
+    elapsed=$((end_ts - start_ts))
+    {
+        echo "=== worker ${worker_id} END rc=${rc} elapsed=${elapsed}s at ${end_human} ==="
+    } >> "$wlog"
+
+    return "$rc"
+}
+
+sql_server_target() {
+    printf '%s\n' "${VFG_SQL_SERVER:-127.0.0.1,1433}"
+}
+
+sql_server_host() {
+    local target
+
+    target="$(sql_server_target)"
+    printf '%s\n' "${target%%,*}"
+}
+
+sql_server_port() {
+    local target port
+
+    target="$(sql_server_target)"
+    if [[ "$target" == *,* ]]; then
+        port="${target#*,}"
+    else
+        port="1433"
+    fi
+
+    [[ "$port" =~ ^[0-9]+$ ]] || return 1
+    printf '%s\n' "$port"
+}
+
+sql_server_reachable() {
+    local host port
+
+    host="$(sql_server_host)"
+    port="$(sql_server_port)" || return 1
+
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 2 bash -c 'exec 3<>"/dev/tcp/$1/$2"' _ "$host" "$port" >/dev/null 2>&1
+    else
+        bash -c 'exec 3<>"/dev/tcp/$1/$2"' _ "$host" "$port" >/dev/null 2>&1
+    fi
+}
+
 parallel_test_is_serial_only() {
     local test_id="$1"
 
-    case ",${PARALLEL_UNSAFE_TESTS}," in
-        *,"${test_id}",*)
-            return 0
-            ;;
-    esac
-
-    return 1
+    [ -n "$PARALLEL_UNSAFE_TESTS" ] || return 1
+    filter_includes_test "$PARALLEL_UNSAFE_TESTS" "$test_id"
 }
 
 selected_tests_require_sql_client() {
@@ -161,58 +266,6 @@ selected_tests_require_sql_client() {
     local a
     local only_test=""
     local test_filter=""
-
-    while [ "$i" -lt "${#ARGS[@]}" ]; do
-        a="${ARGS[$i]}"
-        case "$a" in
-            --test)
-                if [ $((i + 1)) -lt "${#ARGS[@]}" ]; then
-                    only_test="${ARGS[$((i + 1))]}"
-                fi
-                i=$((i + 2))
-                ;;
-            --test=*)
-                only_test="${a#--test=}"
-                i=$((i + 1))
-                ;;
-            --tests)
-                if [ $((i + 1)) -lt "${#ARGS[@]}" ]; then
-                    test_filter="${ARGS[$((i + 1))]}"
-                fi
-                i=$((i + 2))
-                ;;
-            --tests=*)
-                test_filter="${a#--tests=}"
-                i=$((i + 1))
-                ;;
-            *)
-                i=$((i + 1))
-                ;;
-        esac
-    done
-
-    if [ -n "$only_test" ]; then
-        [[ "$only_test" =~ ^[0-9]+$ ]] && [ "$only_test" -ge 84 ]
-        return $?
-    fi
-
-    if [ -z "$test_filter" ]; then
-        return 1
-    fi
-
-    filter_includes_threshold "$test_filter" 84
-}
-
-selected_tests_include_parallel_unsafe() {
-    local i=0
-    local a
-    local only_test=""
-    local test_filter=""
-    local serial_test
-    local IFS=","
-    local serial_tests=()
-
-    read -ra serial_tests <<< "${PARALLEL_UNSAFE_TESTS}"
 
     while [ "$i" -lt "${#ARGS[@]}" ]; do
         a="${ARGS[$i]}"
@@ -252,13 +305,54 @@ selected_tests_include_parallel_unsafe() {
         return 1
     fi
 
-    for serial_test in "${serial_tests[@]}"; do
-        if filter_includes_test "$test_filter" "$serial_test"; then
-            return 0
-        fi
+    filters_overlap "$SQL_COMPARE_TESTS" "$test_filter"
+}
+
+selected_tests_include_parallel_unsafe() {
+    local i=0
+    local a
+    local only_test=""
+    local test_filter=""
+
+    while [ "$i" -lt "${#ARGS[@]}" ]; do
+        a="${ARGS[$i]}"
+        case "$a" in
+            --test)
+                if [ $((i + 1)) -lt "${#ARGS[@]}" ]; then
+                    only_test="${ARGS[$((i + 1))]}"
+                fi
+                i=$((i + 2))
+                ;;
+            --test=*)
+                only_test="${a#--test=}"
+                i=$((i + 1))
+                ;;
+            --tests)
+                if [ $((i + 1)) -lt "${#ARGS[@]}" ]; then
+                    test_filter="${ARGS[$((i + 1))]}"
+                fi
+                i=$((i + 2))
+                ;;
+            --tests=*)
+                test_filter="${a#--tests=}"
+                i=$((i + 1))
+                ;;
+            *)
+                i=$((i + 1))
+                ;;
+        esac
     done
 
-    return 1
+    if [ -n "$only_test" ]; then
+        parallel_test_is_serial_only "$only_test"
+        return $?
+    fi
+
+    if [ -z "$test_filter" ]; then
+        return 1
+    fi
+
+    filters_overlap "$PARALLEL_UNSAFE_TESTS" "$test_filter"
 }
 
 while [ "$#" -gt 0 ]; do
@@ -423,10 +517,23 @@ if [ "$HAS_FILTER" -eq 0 ]; then
 fi
 
 if [ "$TESTS_MODE" = "ui" ] && selected_tests_require_sql_client; then
+    SQL_SERVER_HOST="$(sql_server_host)"
+    if ! SQL_SERVER_PORT="$(sql_server_port)"; then
+        echo "ERROR: unsupported VFG_SQL_SERVER format: $(sql_server_target)"
+        echo "Use host or host,port (for example 127.0.0.1,1433)."
+        exit 1
+    fi
     echo "[preflight] Verifying MDAC/MSSQL client setup for live SQL compare tests..."
     if ! WINEPREFIX="$WINEPREFIX" WINEDLLOVERRIDES="$WINEDLLOVERRIDES" "$SCRIPT_DIR/setup_mdac28.sh" --verify --sql; then
         echo "ERROR: live SQL compare prerequisites are not ready in $WINEPREFIX"
         echo "Run: $SCRIPT_DIR/setup_mdac28.sh /path/to/MDAC_TYP.EXE"
+        exit 1
+    fi
+    if ! sql_server_reachable; then
+        echo "ERROR: SQL compare tests are selected, but SQL Server is not reachable at ${SQL_SERVER_HOST}:${SQL_SERVER_PORT}"
+        echo "Start the test server first, for example:"
+        echo "  docker run -e \"ACCEPT_EULA=Y\" -e \"MSSQL_SA_PASSWORD=sapassword12#$%\" -e \"MSSQL_PID=Express\" -p 1433:1433 -d mcr.microsoft.com/mssql/server:2017-latest"
+        echo "Or skip the live SQL compare cases with: --tests 1-83"
         exit 1
     fi
 fi
@@ -467,12 +574,7 @@ ln -sfn "$(realpath "$TESTS_DIR")" "$OUT_DIR/tests"
 pushd "$OUT_DIR" > /dev/null
 find . -maxdepth 1 -type f \( -name "test_*_lg.bmp" -o -name "test_*_vv.bmp" -o -name "test_*_diff.bmp" -o -name "test_*_lg.png" -o -name "test_*_vv.png" -o -name "test_*_diff.png" -o -name "test_*_cells.diff.txt" -o -name "compare_output.worker*.log" \) -delete
 COMPARE_LOG="compare_output.log"
-FORCE_SERIAL_JOBS=0
-if [ "$JOBS" -gt 1 ] && selected_tests_include_parallel_unsafe; then
-    FORCE_SERIAL_JOBS=1
-    echo "  INFO: running sequentially because tests ${PARALLEL_UNSAFE_TESTS} hang under parallel Wine/ADO compare"
-fi
-if [ "$JOBS" -le 1 ] || [ "$FORCE_SERIAL_JOBS" -eq 1 ]; then
+if [ "$JOBS" -le 1 ]; then
     WINEDEBUG=-all run_compare_worker "${ARGS[@]:-}" 2>/dev/null | tee "$COMPARE_LOG" || true
 else
     declare -A TEST_SET=()
@@ -480,6 +582,8 @@ else
     ONLY_TEST=""
     BASE_ARGS=()
     TEST_LIST=()
+    PARALLEL_TEST_LIST=()
+    SERIAL_ONLY_TEST_LIST=()
     CHUNKS=()
     PIDS=()
     WORKER_IDS=()
@@ -548,70 +652,78 @@ else
         WINEDEBUG=-all run_compare_worker "${ARGS[@]:-}" 2>/dev/null | tee "$COMPARE_LOG" || true
     else
         mapfile -t TEST_LIST < <(printf "%s\n" "${!TEST_SET[@]}" | sort -n)
-        if [ "$JOBS" -gt "${#TEST_LIST[@]}" ]; then
-            JOBS="${#TEST_LIST[@]}"
+        for t in "${TEST_LIST[@]}"; do
+            if parallel_test_is_serial_only "$t"; then
+                SERIAL_ONLY_TEST_LIST+=("$t")
+            else
+                PARALLEL_TEST_LIST+=("$t")
+            fi
+        done
+
+        if [ "${#PARALLEL_TEST_LIST[@]}" -gt 0 ]; then
+            PARALLEL_JOBS="$JOBS"
+            if [ "$PARALLEL_JOBS" -gt "${#PARALLEL_TEST_LIST[@]}" ]; then
+                PARALLEL_JOBS="${#PARALLEL_TEST_LIST[@]}"
+            fi
+
+            for ((w=0; w<PARALLEL_JOBS; w++)); do
+                CHUNKS[w]=""
+            done
+            for idx in "${!PARALLEL_TEST_LIST[@]}"; do
+                w=$((idx % PARALLEL_JOBS))
+                t="${PARALLEL_TEST_LIST[$idx]}"
+                if [ -n "${CHUNKS[$w]}" ]; then
+                    CHUNKS[$w]="${CHUNKS[$w]},${t}"
+                else
+                    CHUNKS[$w]="${t}"
+                fi
+            done
+
+            echo "  Running in parallel with $PARALLEL_JOBS workers"
+            for chunk in "${CHUNKS[@]}"; do
+                [ -z "$chunk" ] && continue
+                WORKER_IDX=$((WORKER_IDX + 1))
+                wlog="compare_output.worker${WORKER_IDX}.log"
+                WORKER_LOGS+=("$wlog")
+                echo "    worker ${WORKER_IDX}: tests ${chunk} (log: ${wlog})"
+                (
+                    run_logged_compare_worker "$wlog" "$WORKER_IDX" "$chunk" "${BASE_ARGS[@]}" --tests "$chunk"
+                ) &
+                pid="$!"
+                PIDS+=("$pid")
+                WORKER_IDS+=("$WORKER_IDX")
+                WORKER_CHUNKS+=("$chunk")
+                echo "      -> worker ${WORKER_IDX} started (pid=${pid})"
+            done
+
+            for idx in "${!PIDS[@]}"; do
+                pid="${PIDS[$idx]}"
+                wid="${WORKER_IDS[$idx]}"
+                chunk="${WORKER_CHUNKS[$idx]}"
+                if wait "$pid"; then
+                    echo "      <- worker ${wid} done (pid=${pid}, tests=${chunk})"
+                else
+                    WORKER_FAILS=$((WORKER_FAILS + 1))
+                    echo "      <- worker ${wid} FAILED (pid=${pid}, tests=${chunk})"
+                fi
+            done
         fi
 
-        for ((w=0; w<JOBS; w++)); do
-            CHUNKS[w]=""
-        done
-        for idx in "${!TEST_LIST[@]}"; do
-            w=$((idx % JOBS))
-            t="${TEST_LIST[$idx]}"
-            if [ -n "${CHUNKS[$w]}" ]; then
-                CHUNKS[$w]="${CHUNKS[$w]},${t}"
-            else
-                CHUNKS[$w]="${t}"
-            fi
-        done
-
-        echo "  Running in parallel with $JOBS workers"
-        for chunk in "${CHUNKS[@]}"; do
-            [ -z "$chunk" ] && continue
-            WORKER_IDX=$((WORKER_IDX + 1))
-            wlog="compare_output.worker${WORKER_IDX}.log"
-            WORKER_LOGS+=("$wlog")
-            echo "    worker ${WORKER_IDX}: tests ${chunk} (log: ${wlog})"
-            (
-                start_ts="$(date +%s)"
-                start_human="$(date '+%Y-%m-%d %H:%M:%S')"
-                {
-                    echo "=== worker ${WORKER_IDX} START pid=$$ tests=${chunk} at ${start_human} ==="
-                } > "$wlog"
-                set +e
-                WINEDEBUG=-all run_compare_worker "${BASE_ARGS[@]}" --tests "$chunk" \
-                    2>/dev/null >> "$wlog"
-                rc=$?
-                if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
-                    echo "=== worker ${WORKER_IDX} TIMEOUT limit=${WORKER_TIMEOUT_SEC}s ===" >> "$wlog"
+        if [ "${#SERIAL_ONLY_TEST_LIST[@]}" -gt 0 ]; then
+            echo "  INFO: running tests $(IFS=,; echo "${SERIAL_ONLY_TEST_LIST[*]}") as isolated workers because tests ${PARALLEL_UNSAFE_TESTS} hang under parallel Wine/ADO compare"
+            for test_id in "${SERIAL_ONLY_TEST_LIST[@]}"; do
+                WORKER_IDX=$((WORKER_IDX + 1))
+                wlog="compare_output.worker${WORKER_IDX}.log"
+                WORKER_LOGS+=("$wlog")
+                echo "    worker ${WORKER_IDX}: tests ${test_id} (log: ${wlog})"
+                if run_logged_compare_worker "$wlog" "$WORKER_IDX" "$test_id" "${BASE_ARGS[@]}" --test "$test_id"; then
+                    echo "      <- worker ${WORKER_IDX} done (tests=${test_id})"
+                else
+                    WORKER_FAILS=$((WORKER_FAILS + 1))
+                    echo "      <- worker ${WORKER_IDX} FAILED (tests=${test_id})"
                 fi
-                set -e
-                end_ts="$(date +%s)"
-                end_human="$(date '+%Y-%m-%d %H:%M:%S')"
-                elapsed=$((end_ts - start_ts))
-                {
-                    echo "=== worker ${WORKER_IDX} END rc=${rc} elapsed=${elapsed}s at ${end_human} ==="
-                } >> "$wlog"
-                exit "$rc"
-            ) &
-            pid="$!"
-            PIDS+=("$pid")
-            WORKER_IDS+=("$WORKER_IDX")
-            WORKER_CHUNKS+=("$chunk")
-            echo "      -> worker ${WORKER_IDX} started (pid=${pid})"
-        done
-
-        for idx in "${!PIDS[@]}"; do
-            pid="${PIDS[$idx]}"
-            wid="${WORKER_IDS[$idx]}"
-            chunk="${WORKER_CHUNKS[$idx]}"
-            if wait "$pid"; then
-                echo "      <- worker ${wid} done (pid=${pid}, tests=${chunk})"
-            else
-                WORKER_FAILS=$((WORKER_FAILS + 1))
-                echo "      <- worker ${wid} FAILED (pid=${pid}, tests=${chunk})"
-            fi
-        done
+            done
+        fi
 
         : > "$COMPARE_LOG"
         for wlog in "${WORKER_LOGS[@]}"; do
