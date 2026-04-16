@@ -1,4 +1,5 @@
 use std::cmp;
+use std::time::{Duration, Instant};
 
 use volvoxgrid_engine::canvas_tui::{
     TuiCell, TuiRenderer, TUI_ATTR_BOLD, TUI_ATTR_ITALIC, TUI_ATTR_REVERSE, TUI_ATTR_UNDERLINE,
@@ -6,6 +7,8 @@ use volvoxgrid_engine::canvas_tui::{
 };
 use volvoxgrid_engine::grid::VolvoxGrid;
 use volvoxgrid_engine::proto::volvoxgrid::v1 as pb;
+
+const TERMINAL_DOUBLE_CLICK_MAX_INTERVAL: Duration = Duration::from_millis(500);
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct TerminalViewportState {
@@ -77,6 +80,13 @@ struct MousePoint {
     modifiers: i32,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct LastTerminalClick {
+    point: MousePoint,
+    button: i32,
+    at: Instant,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ParsedTerminalEvent {
     Key {
@@ -127,6 +137,7 @@ pub struct TerminalTuiSession {
     tui_scrollbar_drag_start_y: i32,
     tui_scrollbar_drag_start_top_row: i32,
     tui_scrollbar_drag_start_thumb: i32,
+    last_terminal_click: Option<LastTerminalClick>,
 }
 
 impl Default for TerminalTuiSession {
@@ -153,6 +164,7 @@ impl Default for TerminalTuiSession {
             tui_scrollbar_drag_start_y: 0,
             tui_scrollbar_drag_start_top_row: 0,
             tui_scrollbar_drag_start_thumb: 0,
+            last_terminal_click: None,
         }
     }
 }
@@ -256,13 +268,14 @@ impl TerminalTuiSession {
                     event_type,
                     button,
                 } => translate_pointer_event(viewport, point).map(|(x, y)| {
+                    let dbl_click = self.detect_terminal_double_click(point, event_type, button);
                     TerminalEvent::Pointer(pb::PointerEvent {
                         r#type: event_type,
                         x,
                         y,
                         modifier: point.modifiers,
                         button,
-                        dbl_click: false,
+                        dbl_click,
                     })
                 }),
                 ParsedTerminalEvent::Scroll {
@@ -282,6 +295,34 @@ impl TerminalTuiSession {
             })
             .flat_map(expand_key_event)
             .collect()
+    }
+
+    fn detect_terminal_double_click(
+        &mut self,
+        point: MousePoint,
+        event_type: i32,
+        button: i32,
+    ) -> bool {
+        if event_type != pb::pointer_event::Type::Down as i32 || button != 0 {
+            return false;
+        }
+
+        let now = Instant::now();
+        let dbl_click = self.last_terminal_click.map_or(false, |last| {
+            last.button == button
+                && last.point == point
+                && now.saturating_duration_since(last.at) <= TERMINAL_DOUBLE_CLICK_MAX_INTERVAL
+        });
+        self.last_terminal_click = if dbl_click {
+            None
+        } else {
+            Some(LastTerminalClick {
+                point,
+                button,
+                at: now,
+            })
+        };
+        dbl_click
     }
 
     pub fn auto_start_edit_enabled(&self) -> bool {
@@ -1334,6 +1375,34 @@ mod tests {
                 assert_eq!(point.y, 4);
             }
             _ => panic!("expected scroll"),
+        }
+    }
+
+    #[test]
+    fn session_marks_second_terminal_click_as_double_click() {
+        let mut session = TerminalTuiSession::new();
+        session.update_viewport(&pb::TerminalViewport {
+            origin_x: 0,
+            origin_y: 0,
+            width: 20,
+            height: 10,
+            fullscreen: false,
+        });
+
+        let first = session.drain_input(b"\x1b[<0;3;2M");
+        let second = session.drain_input(b"\x1b[<0;3;2M");
+
+        match first.as_slice() {
+            [super::TerminalEvent::Pointer(pe)] => assert!(!pe.dbl_click),
+            other => panic!("expected one pointer event, got {other:?}"),
+        }
+        match second.as_slice() {
+            [super::TerminalEvent::Pointer(pe)] => {
+                assert!(pe.dbl_click);
+                assert_eq!(pe.x, 2.0);
+                assert_eq!(pe.y, 1.0);
+            }
+            other => panic!("expected one pointer event, got {other:?}"),
         }
     }
 

@@ -79,6 +79,14 @@ pub struct TuiScrollbarGeometry {
     pub max_scroll_y: f32,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TuiMouseXTranslation {
+    pub hit_test_x: i32,
+    pub col: i32,
+    pub x_in_cell: i32,
+    pub cell_width: i32,
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct TuiDropdownPopupGeometry {
     pub x: i32,
@@ -464,15 +472,30 @@ pub fn translate_tui_mouse_x(
     viewport_height: i32,
     x: i32,
 ) -> i32 {
+    translate_tui_mouse_x_for_hit(grid, viewport_width, viewport_height, x).hit_test_x
+}
+
+pub fn translate_tui_mouse_x_for_hit(
+    grid: &mut VolvoxGrid,
+    viewport_width: i32,
+    viewport_height: i32,
+    x: i32,
+) -> TuiMouseXTranslation {
+    let fallback = TuiMouseXTranslation {
+        hit_test_x: x,
+        col: -1,
+        x_in_cell: 0,
+        cell_width: 0,
+    };
     if x < 0 || viewport_width <= 0 {
-        return x;
+        return fallback;
     }
 
     grid.ensure_layout();
 
     let rendered_indicator_width = tui_row_indicator_width(grid);
     if rendered_indicator_width > 0 && x < rendered_indicator_width {
-        return x;
+        return fallback;
     }
 
     let show_scrollbar = tui_show_scrollbar(
@@ -482,38 +505,103 @@ pub fn translate_tui_mouse_x(
         rendered_indicator_width,
     );
     if show_scrollbar && x >= viewport_width - 1 {
-        return viewport_width - 1;
+        return TuiMouseXTranslation {
+            hit_test_x: viewport_width - 1,
+            ..fallback
+        };
     }
 
     let content_x = rendered_indicator_width;
     let content_width = (viewport_width - content_x - if show_scrollbar { 1 } else { 0 }).max(0);
     if content_width <= 0 || x < content_x {
-        return x;
+        return fallback;
     }
 
     let columns = collect_columns(grid, content_x, content_width);
     let virtual_data_x = rendered_indicator_width;
+    let fixed_col_end = (grid.fixed_cols + grid.frozen_cols).clamp(0, grid.cols);
+    let scroll_x = grid.scroll.scroll_x as i32;
+    let pinned_left_w = grid.pinned_left_width();
+    let hit_test_x_for_effective_x = |col: i32, effective_x: i32| -> i32 {
+        let local_x = if col < fixed_col_end {
+            effective_x
+        } else {
+            effective_x - scroll_x + pinned_left_w
+        };
+        virtual_data_x + local_x
+    };
     for (index, column) in columns.iter().enumerate() {
         if x >= column.x && x < column.x + column.width {
             let local_x = x - column.x;
-            let effective_x = grid.layout.col_pos(column.col) + column.crop + local_x;
-            return virtual_data_x + effective_x;
+            let source_visible_width = (grid.col_width(column.col).max(1) - column.crop).max(1);
+            let logical_local_x = local_x.min(source_visible_width - 1);
+            let effective_x = grid.layout.col_pos(column.col) + column.crop + logical_local_x;
+            return TuiMouseXTranslation {
+                hit_test_x: hit_test_x_for_effective_x(column.col, effective_x),
+                col: column.col,
+                x_in_cell: column.crop + local_x,
+                cell_width: column.full_width.max(column.width),
+            };
         }
 
         if let Some(next) = columns.get(index + 1) {
             let separator_x = column.x + column.width;
             if x == separator_x {
-                let boundary_x = grid.layout.col_pos(column.col) + column.full_width;
-                return virtual_data_x + boundary_x;
+                let boundary_x = grid.layout.col_pos(next.col);
+                return TuiMouseXTranslation {
+                    hit_test_x: hit_test_x_for_effective_x(next.col, boundary_x),
+                    col: next.col,
+                    x_in_cell: next.crop,
+                    cell_width: next.full_width.max(next.width),
+                };
             }
 
             if x > separator_x && x < next.x {
-                return virtual_data_x + grid.layout.col_pos(next.col);
+                return TuiMouseXTranslation {
+                    hit_test_x: hit_test_x_for_effective_x(next.col, grid.layout.col_pos(next.col)),
+                    col: next.col,
+                    x_in_cell: next.crop,
+                    cell_width: next.full_width.max(next.width),
+                };
             }
         }
     }
 
-    x
+    fallback
+}
+
+pub fn tui_caret_index_from_display_click(
+    grid: &VolvoxGrid,
+    row: i32,
+    col: i32,
+    x_in_cell: i32,
+    cell_width: i32,
+) -> i32 {
+    if row < 0 || row >= grid.rows || col < 0 || col >= grid.cols || cell_width <= 0 {
+        return 0;
+    }
+
+    let text = grid.get_display_text(row, col);
+    if text.is_empty() {
+        return 0;
+    }
+
+    let style = grid.get_cell_style(row, col);
+    let (halign, _) = alignment_components(resolve_alignment(grid, row, col, &style, ""));
+    let show_dropdown = grid.resolved_cell_control(row, col) == CellControl::DropdownButton;
+    let text_column = text_render_column(
+        RenderColumn {
+            col,
+            x: 0,
+            width: cell_width,
+            full_width: cell_width,
+            crop: 0,
+        },
+        show_dropdown,
+    );
+    let text_width = text_column.full_width.max(1);
+    let x = x_in_cell.clamp(0, text_width - 1);
+    caret_index_for_tui_text(&text, x, text_width, halign)
 }
 
 fn collect_columns(grid: &VolvoxGrid, start_x: i32, content_width: i32) -> Vec<RenderColumn> {
@@ -627,6 +715,7 @@ fn expand_columns_to_fill(columns: &mut [RenderColumn], content_right: i32) {
             (remaining_extra * weight) / remaining_weight
         };
         column.width += add;
+        column.full_width = column.full_width.max(column.width);
         remaining_extra -= add;
         remaining_weight -= weight;
     }
@@ -871,7 +960,11 @@ fn render_data_row(
         let show_text = merge_rows.map_or(true, |(mr1, mr2)| {
             row == merged_text_row(visible_rows, mr1, mr2, valign)
         });
-        let is_selected = should_highlight_cell(grid, style_row, style_col);
+        let is_editing = show_text
+            && grid.edit.is_active()
+            && grid.edit.edit_row == style_row
+            && grid.edit.edit_col == style_col;
+        let is_selected = should_highlight_cell(grid, style_row, style_col) && !is_editing;
         let is_active =
             show_text && style_row == grid.selection.row && style_col == grid.selection.col;
         let is_fixed = style_row < grid.fixed_rows || style_col < grid.fixed_cols;
@@ -896,7 +989,7 @@ fn render_data_row(
         );
         let mut attr = style_attr(grid, &style, is_selected);
 
-        if is_active {
+        if is_active && !is_editing {
             if let Some(active_fg) = grid.selection.active_cell_style.fore_color {
                 fg = rgb24(active_fg);
             }
@@ -923,22 +1016,15 @@ fn render_data_row(
         } else {
             String::new()
         };
-        let mut fitted_text = None;
-        let mut cursor_x = None;
-        let is_editing = show_text
-            && grid.edit.is_active()
-            && grid.edit.edit_row == style_row
-            && grid.edit.edit_col == style_col;
+        let mut fitted_edit_text = None;
         if is_editing {
             text = grid.edit.edit_text.clone();
-            let (visible_text, visible_cursor_x) = fit_edit_text(
+            fitted_edit_text = Some(fit_edit_text(
                 &text,
                 render_column.full_width,
                 halign,
                 grid.edit.current_caret_char().max(0) as usize,
-            );
-            fitted_text = Some(visible_text);
-            cursor_x = Some(visible_cursor_x);
+            ));
         } else {
             let is_boolean_col = grid.get_col_props(style_col).map_or(false, |cp| {
                 cp.data_type == pb::ColumnDataType::ColumnDataBoolean as i32
@@ -972,8 +1058,18 @@ fn render_data_row(
             && grid.resolved_cell_control(style_row, style_col) == CellControl::DropdownButton;
         let text_column = text_render_column(render_column, show_dropdown);
 
-        if let Some(fitted_text) = fitted_text.as_deref() {
-            write_fitted_cell_text(surface, text_column, y, fitted_text, fg, bg, attr);
+        if let Some(fitted) = fitted_edit_text.as_ref() {
+            write_fitted_cell_text(surface, text_column, y, &fitted.text, fg, bg, attr);
+            write_edit_selection(
+                surface,
+                text_column,
+                y,
+                &text,
+                fitted.draw_x,
+                grid.edit.sel_start,
+                grid.edit.sel_length,
+                attr | TUI_ATTR_REVERSE,
+            );
         } else {
             write_cell_text(surface, text_column, y, &text, fg, bg, attr, halign);
         }
@@ -997,19 +1093,21 @@ fn render_data_row(
                 attr,
             );
         }
-        if let Some(cursor_x) = cursor_x {
-            let visible_x = cursor_x - text_column.crop;
-            if visible_x >= 0 && visible_x < text_column.width {
-                let cell_x = text_column.x + visible_x;
-                if let Some(cell) = surface.get(cell_x, y) {
-                    surface.put(
-                        cell_x,
-                        y,
-                        cell.ch(),
-                        cell.fg,
-                        cell.bg,
-                        caret_attr(cell.attr),
-                    );
+        if grid.edit.sel_length <= 0 {
+            if let Some(fitted) = fitted_edit_text.as_ref() {
+                let visible_x = fitted.cursor_x - text_column.crop;
+                if visible_x >= 0 && visible_x < text_column.width {
+                    let cell_x = text_column.x + visible_x;
+                    if let Some(cell) = surface.get(cell_x, y) {
+                        surface.put(
+                            cell_x,
+                            y,
+                            cell.ch(),
+                            cell.fg,
+                            cell.bg,
+                            caret_attr(cell.attr),
+                        );
+                    }
                 }
             }
         }
@@ -1455,9 +1553,16 @@ fn caret_attr(attr: u8) -> u8 {
     }
 }
 
-fn fit_edit_text(text: &str, width: i32, halign: i32, cursor_chars: usize) -> (String, i32) {
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct FittedEditText {
+    text: String,
+    cursor_x: i32,
+    draw_x: i32,
+}
+
+fn fit_edit_text(text: &str, width: i32, halign: i32, cursor_chars: usize) -> FittedEditText {
     if width <= 0 {
-        return (String::new(), 0);
+        return FittedEditText::default();
     }
 
     let text_width = UnicodeWidthStr::width(text) as i32;
@@ -1486,7 +1591,51 @@ fn fit_edit_text(text: &str, width: i32, halign: i32, cursor_chars: usize) -> (S
         display_window(text, -draw_x, width)
     };
     let cursor_x = (draw_x + caret_x).clamp(0, width - 1);
-    (fitted, cursor_x)
+    FittedEditText {
+        text: fitted,
+        cursor_x,
+        draw_x,
+    }
+}
+
+fn write_edit_selection(
+    surface: &mut Surface<'_>,
+    column: RenderColumn,
+    y: i32,
+    text: &str,
+    draw_x: i32,
+    sel_start: i32,
+    sel_length: i32,
+    selection_attr: u8,
+) {
+    if sel_length <= 0 || column.width <= 0 {
+        return;
+    }
+
+    let total_chars = text.chars().count() as i32;
+    let start = sel_start.clamp(0, total_chars);
+    let end = (start + sel_length).clamp(start, total_chars);
+    if end <= start {
+        return;
+    }
+
+    let mut text_x = 0i32;
+    for (index, ch) in text.chars().enumerate() {
+        let ch_width = display_width_char(sanitize_char(ch)).max(1) as i32;
+        let char_index = index as i32;
+        if char_index >= start && char_index < end {
+            for dx in 0..ch_width {
+                let visible_x = draw_x + text_x + dx - column.crop;
+                if visible_x >= 0 && visible_x < column.width {
+                    let cell_x = column.x + visible_x;
+                    if let Some(cell) = surface.get(cell_x, y) {
+                        surface.put(cell_x, y, cell.ch(), cell.fg, cell.bg, selection_attr);
+                    }
+                }
+            }
+        }
+        text_x += ch_width;
+    }
 }
 
 fn readable_popup_fg(fg: u32, bg: u32, fallback: u32) -> u32 {
@@ -1872,6 +2021,49 @@ fn fit_text(text: &str, width: i32, halign: i32) -> String {
     out
 }
 
+fn caret_index_for_tui_text(text: &str, x: i32, width: i32, halign: i32) -> i32 {
+    if width <= 0 || text.is_empty() {
+        return 0;
+    }
+
+    let visible_text = truncate_to_width(text, width as usize);
+    let text_width = UnicodeWidthStr::width(visible_text.as_str()) as i32;
+    if text_width <= 0 {
+        return 0;
+    }
+
+    let pad = width.saturating_sub(text_width);
+    let left_pad = match halign {
+        1 => pad / 2,
+        2 => pad,
+        _ => 0,
+    };
+    let relative_x = x - left_pad;
+    if relative_x <= 0 {
+        return 0;
+    }
+    if relative_x >= text_width {
+        return visible_text.chars().count() as i32;
+    }
+
+    let mut display_x = 0i32;
+    let mut index = 0i32;
+    for ch in visible_text.chars() {
+        let char_width = display_width_char(ch).max(1) as i32;
+        let next_x = display_x + char_width;
+        if relative_x < next_x {
+            if relative_x - display_x < next_x - relative_x {
+                return index;
+            }
+            return index + 1;
+        }
+        display_x = next_x;
+        index += 1;
+    }
+
+    index
+}
+
 fn display_window(text: &str, skip: i32, take: i32) -> String {
     if take <= 0 {
         return String::new();
@@ -2029,6 +2221,20 @@ mod tests {
     }
 
     #[test]
+    fn render_grid_tui_uses_expanded_visual_width_for_cell_text() {
+        let mut grid = VolvoxGrid::new(1, 8, 3, 1, 1, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.columns[0].caption = "Value".to_string();
+        grid.set_col_width(0, 4);
+        grid.cells.set_text(0, 0, "abcdef".to_string());
+
+        let mut buffer = vec![TuiCell::default(); 8 * 3];
+        render_grid_tui(&mut grid, &mut buffer, 8, 3, 8);
+
+        assert_eq!(row_text(&buffer, 8, 1, 8), "abcdef  ");
+    }
+
+    #[test]
     fn render_grid_tui_marks_edit_cursor() {
         let mut grid = VolvoxGrid::new(1, 12, 3, 2, 1, 1, 0);
         grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
@@ -2037,6 +2243,8 @@ mod tests {
         grid.edit.start_edit(1, 0, "seed");
         grid.edit.edit_text = "edit".to_string();
         grid.edit.sel_start = 2;
+        grid.edit.sel_length = 0;
+        grid.edit.sel_caret = 2;
 
         let mut buffer = vec![TuiCell::default(); 12 * 3];
         render_grid_tui(&mut grid, &mut buffer, 12, 3, 12);
@@ -2048,6 +2256,33 @@ mod tests {
         assert!(edited_row
             .iter()
             .any(|cell| cell.attr & TUI_ATTR_REVERSE == 0));
+    }
+
+    #[test]
+    fn render_grid_tui_highlights_edit_selection_text_without_padding() {
+        let mut grid = VolvoxGrid::new(1, 12, 3, 2, 1, 1, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.columns[0].caption = "Value".to_string();
+        grid.cells.set_text(1, 0, "edit".to_string());
+        grid.selection.row = 1;
+        grid.selection.col = 0;
+        grid.edit.start_edit(1, 0, "edit");
+
+        let mut buffer = vec![TuiCell::default(); 12 * 3];
+        render_grid_tui(&mut grid, &mut buffer, 12, 3, 12);
+
+        let edited_row = &buffer[12..24];
+        let selected_positions: Vec<usize> = edited_row
+            .iter()
+            .enumerate()
+            .filter_map(|(index, cell)| (cell.attr & TUI_ATTR_REVERSE != 0).then_some(index))
+            .collect();
+
+        assert!(!selected_positions.is_empty());
+        assert!(selected_positions.iter().all(|&index| index < 4));
+        assert!(edited_row[4..]
+            .iter()
+            .all(|cell| cell.attr & TUI_ATTR_REVERSE == 0));
     }
 
     #[test]
@@ -2083,18 +2318,20 @@ mod tests {
         grid.cells.set_text(0, 0, "12".to_string());
         grid.edit.start_edit(0, 0, "12");
         grid.edit.sel_start = 0;
+        grid.edit.sel_length = 0;
+        grid.edit.sel_caret = 0;
 
         let mut buffer = vec![TuiCell::default(); 16 * 3];
         render_grid_tui(&mut grid, &mut buffer, 16, 3, 16);
 
-        let edited_cell = &buffer[16..22];
+        let edited_cell = &buffer[16..32];
         let caret_positions: Vec<usize> = edited_cell
             .iter()
             .enumerate()
-            .filter_map(|(index, cell)| (cell.attr & TUI_ATTR_REVERSE == 0).then_some(index))
+            .filter_map(|(index, cell)| (cell.attr & TUI_ATTR_REVERSE != 0).then_some(index))
             .collect();
         assert_eq!(caret_positions.len(), 1);
-        assert!(caret_positions[0] >= 4);
+        assert!(caret_positions[0] >= 14);
     }
 
     #[test]
@@ -2103,25 +2340,25 @@ mod tests {
         grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
         grid.columns[0].caption = "Value".to_string();
         grid.set_col_width(0, 4);
-        grid.cells.set_text(0, 0, "abcdef".to_string());
-        grid.edit.start_edit(0, 0, "abcdef");
+        grid.cells.set_text(0, 0, "abcdefghijkl".to_string());
+        grid.edit.start_edit(0, 0, "abcdefghijkl");
 
         grid.edit.sel_start = 0;
         grid.edit.sel_length = 0;
         grid.edit.sel_caret = 0;
         let mut start_buffer = vec![TuiCell::default(); 8 * 3];
         render_grid_tui(&mut grid, &mut start_buffer, 8, 3, 8);
-        let start_visible: String = start_buffer[8..12].iter().map(|cell| cell.ch()).collect();
+        let start_visible: String = start_buffer[8..16].iter().map(|cell| cell.ch()).collect();
 
-        grid.edit.sel_start = 6;
+        grid.edit.sel_start = 12;
         grid.edit.sel_length = 0;
-        grid.edit.sel_caret = 6;
+        grid.edit.sel_caret = 12;
         let mut end_buffer = vec![TuiCell::default(); 8 * 3];
         render_grid_tui(&mut grid, &mut end_buffer, 8, 3, 8);
-        let end_visible: String = end_buffer[8..12].iter().map(|cell| cell.ch()).collect();
+        let end_visible: String = end_buffer[8..16].iter().map(|cell| cell.ch()).collect();
 
-        assert_eq!(start_visible, "abcd");
-        assert_eq!(end_visible, "cdef");
+        assert_eq!(start_visible, "abcdefgh");
+        assert_eq!(end_visible, "efghijkl");
     }
 
     #[test]
@@ -2424,6 +2661,42 @@ mod tests {
         assert_eq!(translate_tui_mouse_x(&mut grid, 18, 4, 7), 7);
         assert_eq!(translate_tui_mouse_x(&mut grid, 18, 4, 8), 7);
         assert_eq!(translate_tui_mouse_x(&mut grid, 18, 4, 9), 8);
+    }
+
+    #[test]
+    fn translate_tui_mouse_x_keeps_expanded_cell_body_on_source_column() {
+        let mut grid = VolvoxGrid::new(1, 16, 4, 2, 2, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.default_row_height_px = 1;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.set_col_width(0, 4);
+        grid.set_col_width(1, 4);
+        grid.cells.set_text(0, 0, "abcdef".to_string());
+        grid.ensure_layout();
+
+        let columns = collect_columns(&grid, 0, 16);
+        assert_eq!(columns.len(), 2);
+        assert!(columns[0].width > grid.col_width(0));
+
+        let terminal_x = columns[0].x + columns[0].width - 1;
+        let translation = translate_tui_mouse_x_for_hit(&mut grid, 16, 4, terminal_x);
+        let hit = crate::input::hit_test(&mut grid, translation.hit_test_x as f32, 1.0);
+
+        assert_eq!(hit.row, 0);
+        assert_eq!(hit.col, 0);
+        assert_eq!(translation.col, 0);
+        assert!(translation.x_in_cell >= grid.col_width(0));
+        assert_eq!(
+            tui_caret_index_from_display_click(
+                &grid,
+                hit.row,
+                hit.col,
+                translation.x_in_cell,
+                translation.cell_width,
+            ),
+            6
+        );
     }
 
     #[test]

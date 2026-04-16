@@ -302,6 +302,22 @@ fn handle_tui_terminal_pointer_event(
     }
 }
 
+fn should_request_pointer_header_sort(
+    grid: &volvoxgrid_engine::grid::VolvoxGrid,
+    hit: &volvoxgrid_engine::input::HitTestResult,
+    is_combo_cell: bool,
+) -> bool {
+    if hit.col < 0 || is_combo_cell || grid.header_features & 1 == 0 {
+        return false;
+    }
+
+    if hit.area == volvoxgrid_engine::input::HitArea::FixedRow {
+        return hit.row >= 0 && hit.row < grid.fixed_rows;
+    }
+
+    grid.is_tui_mode() && hit.area == volvoxgrid_engine::input::HitArea::IndicatorColTop
+}
+
 fn handle_pointer_render_input(
     plugin: &VolvoxGridPlugin,
     stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
@@ -330,22 +346,31 @@ fn handle_pointer_render_input(
                 }
             }
 
-            let pointer_x = if grid.is_tui_mode() {
-                volvoxgrid_engine::canvas_tui::translate_tui_mouse_x(
-                    grid,
-                    grid.viewport_width,
-                    grid.viewport_height,
-                    pe.x as i32,
-                ) as f32
+            let tui_mouse_x = if grid.is_tui_mode() {
+                Some(
+                    volvoxgrid_engine::canvas_tui::translate_tui_mouse_x_for_hit(
+                        grid,
+                        grid.viewport_width,
+                        grid.viewport_height,
+                        pe.x as i32,
+                    ),
+                )
             } else {
-                pe.x
+                None
             };
+            let pointer_x = tui_mouse_x.map_or(pe.x, |translation| translation.hit_test_x as f32);
             let pointer_y = pe.y;
 
             let decision_enabled = plugin.decision_channel_enabled(grid_id);
+            let manual_edit_policy = decision_enabled || grid.is_tui_mode();
             let was_editing = grid.edit.is_active();
             let prev_edit_row = grid.edit.edit_row;
             let prev_edit_col = grid.edit.edit_col;
+            let prev_edit_selection = (
+                grid.edit.sel_start,
+                grid.edit.sel_length,
+                grid.edit.sel_caret,
+            );
             let prev_sel = (
                 grid.selection.row,
                 grid.selection.col,
@@ -383,6 +408,40 @@ fn handle_pointer_render_input(
                 .as_ref()
                 .map(|h| h.area == volvoxgrid_engine::input::HitArea::DropdownButton)
                 .unwrap_or(false);
+            let tui_hit_caret = hit.as_ref().and_then(|hit| {
+                tui_mouse_x
+                    .filter(|translation| translation.col == hit.col)
+                    .map(|translation| {
+                        volvoxgrid_engine::canvas_tui::tui_caret_index_from_display_click(
+                            grid,
+                            hit.row,
+                            hit.col,
+                            translation.x_in_cell,
+                            translation.cell_width,
+                        )
+                    })
+            });
+            let active_tui_edit_click_caret = if pe.r#type == 0 && !pe.dbl_click && pe.button == 0 {
+                hit.as_ref().and_then(|hit| {
+                    let hit_active_edit_cell = was_editing
+                        && hit.row == prev_edit_row
+                        && hit.col == prev_edit_col
+                        && matches!(
+                            hit.area,
+                            volvoxgrid_engine::input::HitArea::Cell
+                                | volvoxgrid_engine::input::HitArea::CellText
+                                | volvoxgrid_engine::input::HitArea::FixedRow
+                                | volvoxgrid_engine::input::HitArea::FixedCol
+                        );
+                    if hit_active_edit_cell {
+                        tui_hit_caret
+                    } else {
+                        None
+                    }
+                })
+            } else {
+                None
+            };
 
             match pe.r#type {
                 0 => {
@@ -398,7 +457,7 @@ fn handle_pointer_render_input(
                     } else {
                         grid.cancel_pull_to_refresh_contact(false);
                     }
-                    if decision_enabled {
+                    if manual_edit_policy {
                         volvoxgrid_engine::input::handle_pointer_down_with_behavior(
                             grid,
                             pointer_x,
@@ -411,8 +470,20 @@ fn handle_pointer_render_input(
                                 allow_header_sort: false,
                             },
                         );
+                        if let Some(caret) = active_tui_edit_click_caret {
+                            if grid.edit.is_active()
+                                && grid.edit.edit_row == prev_edit_row
+                                && grid.edit.edit_col == prev_edit_col
+                            {
+                                grid.edit.set_selection_anchor_and_caret(caret, caret);
+                                grid.edit_pointer_select_active = true;
+                                grid.edit_pointer_select_anchor = caret;
+                                grid.mark_dirty();
+                            }
+                        }
 
                         if let Some(hit) = hit.as_ref() {
+                            let mut is_combo_cell = false;
                             if hit.row >= 0 && hit.col >= 0 {
                                 let is_cell_like = hit.area
                                     == volvoxgrid_engine::input::HitArea::Cell
@@ -423,7 +494,7 @@ fn handle_pointer_render_input(
                                 } else {
                                     String::new()
                                 };
-                                let is_combo_cell = !combo_list.is_empty();
+                                is_combo_cell = !combo_list.is_empty();
 
                                 if hit.area == volvoxgrid_engine::input::HitArea::DropdownButton {
                                     if !(grid.edit.is_active()
@@ -440,11 +511,13 @@ fn handle_pointer_render_input(
                                         || is_combo_cell)
                                 {
                                     let click_caret = if pe.dbl_click {
-                                        Some(grid.caret_index_from_display_click(
-                                            hit.row,
-                                            hit.col,
-                                            hit.x_in_cell,
-                                        ))
+                                        tui_hit_caret.or_else(|| {
+                                            Some(grid.caret_index_from_display_click(
+                                                hit.row,
+                                                hit.col,
+                                                hit.x_in_cell,
+                                            ))
+                                        })
                                     } else {
                                         None
                                     };
@@ -460,14 +533,10 @@ fn handle_pointer_render_input(
                                         if pe.dbl_click { Some(true) } else { None },
                                     );
                                 }
+                            }
 
-                                if hit.area == volvoxgrid_engine::input::HitArea::FixedRow
-                                    && hit.row < grid.fixed_rows
-                                    && !is_combo_cell
-                                    && grid.header_features > 0
-                                {
-                                    plugin.request_before_sort(grid_id, grid, hit.col);
-                                }
+                            if should_request_pointer_header_sort(grid, hit, is_combo_cell) {
+                                plugin.request_before_sort(grid_id, grid, hit.col);
                             }
                         }
                     } else {
@@ -508,7 +577,15 @@ fn handle_pointer_render_input(
                 let started_or_changed = !was_editing
                     || grid.edit.edit_row != prev_edit_row
                     || grid.edit.edit_col != prev_edit_col;
-                if started_or_changed || prefer_combo {
+                let edit_selection_changed = was_editing
+                    && grid.edit.edit_row == prev_edit_row
+                    && grid.edit.edit_col == prev_edit_col
+                    && (
+                        grid.edit.sel_start,
+                        grid.edit.sel_length,
+                        grid.edit.sel_caret,
+                    ) != prev_edit_selection;
+                if started_or_changed || prefer_combo || edit_selection_changed {
                     editor_output = maybe_render_editor_output(grid, prefer_combo);
                 }
             }
@@ -589,9 +666,11 @@ fn handle_key_render_input(
 
         match terminal_policy {
             terminal_tui::TerminalKeyPolicyDecision::Consume => {}
-            terminal_tui::TerminalKeyPolicyDecision::StartEdit { caret_end } => {
+            terminal_tui::TerminalKeyPolicyDecision::StartEdit { caret_end: _ } => {
+                // TUI: always start in Edit mode with select-all so the user
+                // can type to replace or press arrows to deselect and edit.
                 if !was_editing && !grid.host_key_dispatch && grid.edit_trigger_mode >= 1 {
-                    let caret_end = caret_end.then_some(true);
+                    let caret_end = Some(true);
                     if decision_enabled {
                         let _ = plugin.request_before_edit(
                             grid_id,
@@ -604,6 +683,10 @@ fn handle_key_render_input(
                             None,
                             caret_end,
                         );
+                        if grid.is_editing() {
+                            grid.edit.select_all();
+                            grid.mark_dirty();
+                        }
                     } else {
                         begin_edit_session_core_opts(
                             grid,
@@ -616,6 +699,9 @@ fn handle_key_render_input(
                             None,
                             None,
                         );
+                        if grid.is_editing() {
+                            grid.edit.select_all();
+                        }
                     }
                 }
             }
@@ -1432,7 +1518,9 @@ fn apply_zoom_scale(
 
 #[cfg(test)]
 mod tests {
-    use super::{apply_zoom_scale, capture_zoom_state};
+    use super::{apply_zoom_scale, capture_zoom_state, should_request_pointer_header_sort};
+    use volvoxgrid_engine::input::{HitArea, HitTestResult};
+    use volvoxgrid_engine::proto::volvoxgrid::v1 as pb;
     use volvoxgrid_engine::style::{CellStylePatch, Padding};
 
     #[test]
@@ -1535,6 +1623,35 @@ mod tests {
                 bottom: 1,
             })
         );
+    }
+
+    #[test]
+    fn tui_top_indicator_header_hit_can_request_sort() {
+        let mut grid = volvoxgrid_engine::grid::VolvoxGrid::new(1, 80, 24, 3, 2, 1, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.header_features = 1;
+
+        let hit = HitTestResult {
+            row: -1,
+            col: 1,
+            area: HitArea::IndicatorColTop,
+            x_in_cell: 2.0,
+            y_in_cell: 0.0,
+        };
+        assert!(should_request_pointer_header_sort(&grid, &hit, false));
+
+        let border_hit = HitTestResult {
+            area: HitArea::ColBorder,
+            ..hit.clone()
+        };
+        assert!(!should_request_pointer_header_sort(
+            &grid,
+            &border_hit,
+            false
+        ));
+
+        grid.header_features = 0;
+        assert!(!should_request_pointer_header_sort(&grid, &hit, false));
     }
 }
 
