@@ -2,6 +2,10 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
+## 0.7.0
+
+- Version bump for project-wide 0.7.0 release.
+
 ## 0.6.0
 
 - Added TUI (terminal) rendering: Go, `.NET`, and Java terminal hosts with interactive and smoke-test examples.

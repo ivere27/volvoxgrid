@@ -232,9 +232,15 @@ fn begin_edit_from_input_with_options(grid: &mut VolvoxGrid, row: i32, col: i32,
     let stored_text = grid.cells.get_text(row, col).to_string();
     let display_text = grid.get_display_text(row, col);
 
-    if caret_end {
+    if caret_end || grid.is_tui_mode() {
+        // Edit mode: caret positioned for in-place editing.
+        // TUI: always use Edit mode with select-all so the user can type to
+        // replace or press arrows to deselect and edit in place.
         grid.edit
             .start_edit_with_options(row, col, &display_text, None, Some(true), None, None);
+        if !caret_end && grid.is_tui_mode() {
+            grid.edit.select_all();
+        }
     } else {
         grid.edit.start_edit(row, col, &display_text);
     }

@@ -1,6 +1,6 @@
 {
   "name": "@volvoxgrid/ag-grid",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "license": "Apache-2.0",
   "description": "AG Grid-compatible VIEW adapter for VolvoxGrid",
   "type": "module",
@@ -13,7 +13,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "peerDependencies": {
-    "volvoxgrid": "^0.6.1"
+    "volvoxgrid": "^0.7.0"
   },
   "devDependencies": {
     "ag-grid-community": "^32.0.0",

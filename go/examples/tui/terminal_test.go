@@ -75,3 +75,26 @@ func TestHandleHostInputSearchPromptClearsPreviousQuery(t *testing.T) {
 		t.Fatalf("expected local prompt handling, got %+v", result)
 	}
 }
+
+func TestStressTuiConfigUsesTerminalCellHeaderMetrics(t *testing.T) {
+	config := buildStressTuiConfig(stressDataRows, len(stressColumnWidths))
+	if config.GetRendering().GetRendererMode() != pb.RendererMode_RENDERER_TUI {
+		t.Fatalf("expected TUI renderer mode")
+	}
+
+	rowStart := config.GetIndicators().GetRowStart()
+	if rowStart.GetWidth() != tuiNumberRowIndicatorWidth(stressDataRows) {
+		t.Fatalf("unexpected row indicator width %d", rowStart.GetWidth())
+	}
+	if rowStart.GetAutoSize() {
+		t.Fatalf("expected fixed row indicator width")
+	}
+
+	colTop := config.GetIndicators().GetColTop()
+	if colTop.GetBandRows() != 1 {
+		t.Fatalf("expected one TUI header row, got %d", colTop.GetBandRows())
+	}
+	if colTop.GetDefaultRowHeight() != 1 {
+		t.Fatalf("expected one terminal-cell header height, got %d", colTop.GetDefaultRowHeight())
+	}
+}

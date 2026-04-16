@@ -335,6 +335,19 @@ func finalizeTuiConfig(config *pb.GridConfig, rows, cols int) *pb.GridConfig {
 	return result
 }
 
+func tuiNumberRowIndicatorWidth(rows int) int32 {
+	if rows < 1 {
+		rows = 1
+	}
+	width := len(fmt.Sprintf("%d", rows)) + 1
+	if width < 3 {
+		width = 3
+	} else if width > 10 {
+		width = 10
+	}
+	return int32(width)
+}
+
 func buildSalesTuiConfig(rows, cols int) *pb.GridConfig {
 	return finalizeTuiConfig(&pb.GridConfig{
 		Selection: &pb.SelectionConfig{
@@ -361,15 +374,21 @@ func buildSalesTuiConfig(rows, cols int) *pb.GridConfig {
 		},
 		Indicators: &pb.IndicatorsConfig{
 			RowStart: &pb.RowIndicatorConfig{
-				Visible:  ptr(true),
-				ModeBits: ptr(uint32(pb.RowIndicatorMode_ROW_INDICATOR_NUMBERS)),
+				Visible:     ptr(true),
+				Width:       ptr(tuiNumberRowIndicatorWidth(rows)),
+				ModeBits:    ptr(uint32(pb.RowIndicatorMode_ROW_INDICATOR_NUMBERS)),
+				AutoSize:    ptr(false),
+				AllowResize: ptr(false),
 			},
 			ColTop: &pb.ColIndicatorConfig{
-				Visible: ptr(true),
+				Visible:          ptr(true),
+				BandRows:         ptr(int32(1)),
+				DefaultRowHeight: ptr(int32(1)),
 				ModeBits: ptr(
 					uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT) |
 						uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_SORT_GLYPH),
 				),
+				AllowResize: ptr(false),
 			},
 		},
 	}, rows, cols)
@@ -393,8 +412,11 @@ func buildHierarchyTuiConfig(rows, cols int) *pb.GridConfig {
 				Visible: ptr(false),
 			},
 			ColTop: &pb.ColIndicatorConfig{
-				Visible:  ptr(true),
-				ModeBits: ptr(uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT)),
+				Visible:          ptr(true),
+				BandRows:         ptr(int32(1)),
+				DefaultRowHeight: ptr(int32(1)),
+				ModeBits:         ptr(uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT)),
+				AllowResize:      ptr(false),
 			},
 		},
 	}, rows, cols)
@@ -406,7 +428,7 @@ func buildStressTuiConfig(rows, cols int) *pb.GridConfig {
 			Mode: ptr(pb.SelectionMode_SELECTION_FREE),
 		},
 		Editing: &pb.EditConfig{
-			Trigger:     ptr(pb.EditTrigger_EDIT_TRIGGER_KEY_CLICK),
+			Trigger: ptr(pb.EditTrigger_EDIT_TRIGGER_KEY_CLICK),
 		},
 		Interaction: &pb.InteractionConfig{
 			HeaderFeatures: &pb.HeaderFeatures{
@@ -415,15 +437,21 @@ func buildStressTuiConfig(rows, cols int) *pb.GridConfig {
 		},
 		Indicators: &pb.IndicatorsConfig{
 			RowStart: &pb.RowIndicatorConfig{
-				Visible:  ptr(true),
-				ModeBits: ptr(uint32(pb.RowIndicatorMode_ROW_INDICATOR_NUMBERS)),
+				Visible:     ptr(true),
+				Width:       ptr(tuiNumberRowIndicatorWidth(rows)),
+				ModeBits:    ptr(uint32(pb.RowIndicatorMode_ROW_INDICATOR_NUMBERS)),
+				AutoSize:    ptr(false),
+				AllowResize: ptr(false),
 			},
 			ColTop: &pb.ColIndicatorConfig{
-				Visible: ptr(true),
+				Visible:          ptr(true),
+				BandRows:         ptr(int32(1)),
+				DefaultRowHeight: ptr(int32(1)),
 				ModeBits: ptr(
 					uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT) |
 						uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_SORT_GLYPH),
 				),
+				AllowResize: ptr(false),
 			},
 		},
 	}, rows, cols)

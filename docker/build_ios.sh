@@ -11,7 +11,7 @@ set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}"
-VERSION="${VERSION:-0.6.0}"
+VERSION="${VERSION:-0.7.0}"
 GIT_COMMIT="${GIT_COMMIT:-$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)}"
 BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 DIST_DIR="${DIST_DIR:-${REPO_ROOT}/dist/ios}"
