@@ -35,6 +35,9 @@ int32_t volvox_grid_pointer_up_native(
 int32_t volvox_grid_scroll_native(int64_t id, float delta_x, float delta_y);
 int32_t volvox_grid_key_down_native(int64_t id, int32_t key_code, int32_t modifier);
 int32_t volvox_grid_key_press_native(int64_t id, uint32_t char_code);
+int32_t volvox_grid_set_event_decision_enabled_native(int64_t id, int32_t enabled);
+uint8_t* volvox_grid_take_next_event_native(int64_t id, int32_t* out_len);
+int32_t volvox_grid_send_event_decision_native(int64_t id, int64_t event_id, int32_t cancel);
 int32_t volvox_grid_set_hover_mode_native(int64_t id, uint32_t mode);
 int32_t volvox_grid_set_debug_overlay_native(int64_t id, int32_t enabled);
 int32_t volvox_grid_set_scroll_blit_native(int64_t id, int32_t enabled);
@@ -58,18 +61,86 @@ int32_t  volvox_grid_set_back_color_alternate(int64_t id, uint32_t color);
 uint32_t volvox_grid_get_back_color_alternate(int64_t id);
 int32_t  volvox_grid_set_tree_color_native(int64_t id, uint32_t color);
 uint32_t volvox_grid_get_tree_color(int64_t id);
+int32_t  volvox_grid_set_sheet_border_native(int64_t id, uint32_t color);
+uint32_t volvox_grid_get_sheet_border_native(int64_t id);
 
 /* Grid lines */
+int32_t volvox_grid_set_appearance_native(int64_t id, int32_t value);
+int32_t volvox_grid_get_appearance_native(int64_t id);
 int32_t volvox_grid_set_grid_lines_native(int64_t id, int32_t value);
 int32_t volvox_grid_get_grid_lines(int64_t id);
 int32_t volvox_grid_set_grid_lines_fixed_native(int64_t id, int32_t value);
 int32_t volvox_grid_get_grid_lines_fixed(int64_t id);
+int32_t volvox_grid_set_grid_line_width_native(int64_t id, int32_t value);
+int32_t volvox_grid_get_grid_line_width_native(int64_t id);
+int32_t volvox_grid_set_allow_user_freezing_native(int64_t id, int32_t mode);
 
 /* Font */
 int32_t volvox_grid_set_font_size(int64_t id, float size);
 float   volvox_grid_get_font_size(int64_t id);
 int32_t volvox_grid_set_font_name(int64_t id, const uint8_t* name, int32_t len);
 uint8_t* volvox_grid_get_font_name(int64_t id, int32_t* out_len);
+int32_t volvox_grid_set_font_bold_native(int64_t id, int32_t value);
+int32_t volvox_grid_get_font_bold_native(int64_t id);
+int32_t volvox_grid_set_font_italic_native(int64_t id, int32_t value);
+int32_t volvox_grid_get_font_italic_native(int64_t id);
+int32_t volvox_grid_set_font_underline_native(int64_t id, int32_t value);
+int32_t volvox_grid_get_font_underline_native(int64_t id);
+int32_t volvox_grid_set_font_strikethrough_native(int64_t id, int32_t value);
+int32_t volvox_grid_get_font_strikethrough_native(int64_t id);
+int32_t volvox_grid_set_font_width_native(int64_t id, int32_t value);
+int32_t volvox_grid_get_font_width_native(int64_t id);
+int32_t volvox_grid_get_cursor_style_native(int64_t id);
+
+/* Legacy VSFlexGrid compatibility helpers */
+uint8_t* volvox_grid_set_cell_picture_range_native(
+    int64_t grid_id,
+    int32_t row1,
+    int32_t col1,
+    int32_t row2,
+    int32_t col2,
+    const uint8_t* image,
+    int32_t image_len,
+    int32_t* out_len
+);
+uint8_t* volvox_grid_get_cell_picture_native(
+    int64_t grid_id,
+    int32_t row,
+    int32_t col,
+    int32_t* out_len
+);
+uint8_t* volvox_grid_set_cell_picture_alignment_range_native(
+    int64_t grid_id,
+    int32_t row1,
+    int32_t col1,
+    int32_t row2,
+    int32_t col2,
+    int32_t alignment,
+    int32_t* out_len
+);
+int32_t volvox_grid_get_cell_picture_alignment_native(int64_t grid_id, int32_t row, int32_t col);
+uint8_t* volvox_grid_set_cell_back_color_range(
+    int64_t grid_id,
+    int32_t row1,
+    int32_t col1,
+    int32_t row2,
+    int32_t col2,
+    uint32_t color,
+    int32_t* out_len
+);
+uint32_t volvox_grid_get_cell_back_color(int64_t grid_id, int32_t row, int32_t col);
+uint8_t* volvox_grid_set_cell_font_bold_range(
+    int64_t grid_id,
+    int32_t row1,
+    int32_t col1,
+    int32_t row2,
+    int32_t col2,
+    int32_t bold,
+    int32_t* out_len
+);
+int32_t volvox_grid_get_cell_font_bold(int64_t grid_id, int32_t row, int32_t col);
+int32_t volvox_grid_get_row_display_position(int64_t grid_id, int32_t row);
+int32_t volvox_grid_get_col_display_position(int64_t grid_id, int32_t col);
 
 /*
  * Text/font_name are passed as (const uint8_t*, int32_t len) UTF-8 byte pairs

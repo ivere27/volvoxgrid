@@ -1,0 +1,4 @@
+set_indexed_prop_i4 IsCollapsed 2 2
+sleep 120
+set_indexed_prop_i4 IsCollapsed 7 2
+sleep 120

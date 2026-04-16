@@ -1,0 +1,4 @@
+set_indexed_prop_i4 ColPosition 2 1
+sleep 120
+set_indexed_prop_i4 ColPosition 2 3
+sleep 120

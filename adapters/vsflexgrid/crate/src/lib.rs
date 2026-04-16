@@ -4,10 +4,14 @@
 // symbols defined in the generated volvoxgrid_ffi_native.rs. It is designed
 // to be linked into the VolvoxGrid.ocx ActiveX control.
 
+use prost::Message;
 use serde_json::{Map, Value};
+use std::collections::{HashMap, HashSet};
+use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 use volvoxgrid_engine::cell::CellValueData;
 use volvoxgrid_engine::control::CellControl;
+use volvoxgrid_engine::input::{self, HitArea, InputBehavior};
 use volvoxgrid_engine::proto::volvoxgrid::v1::*;
 use volvoxgrid_engine::GridManager;
 
@@ -27,6 +31,34 @@ lazy_static::lazy_static! {
 // Match classic LegacyGrid's baseline footprint more closely in ActiveX mode.
 const ACTIVEX_DEFAULT_ROW_HEIGHT: i32 = 19;
 const ACTIVEX_DEFAULT_COL_WIDTH: i32 = 76;
+const DECISION_TIMEOUT: Duration = Duration::from_millis(250);
+
+#[derive(Clone, Debug)]
+enum PendingAction {
+    BeginEdit {
+        row: i32,
+        col: i32,
+        force: bool,
+        seed_text: Option<String>,
+        click_caret: Option<i32>,
+        caret_end: Option<bool>,
+    },
+    BeforeSort {
+        col: i32,
+    },
+}
+
+#[derive(Clone, Debug)]
+struct PendingActionEntry {
+    created_at: Instant,
+    action: PendingAction,
+}
+
+static NEXT_EVENT_ID: LazyLock<Mutex<i64>> = LazyLock::new(|| Mutex::new(1));
+static DECISION_ENABLED: LazyLock<Mutex<HashSet<i64>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
+static PENDING_ACTIONS: LazyLock<Mutex<HashMap<(i64, i64), PendingActionEntry>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 // ---------------------------------------------------------------------------
 // Helpers (ported from plugin/src/lib.rs, without streaming/zoom/events)
@@ -1118,6 +1150,26 @@ fn set_cell_property(
     grid.mark_dirty();
 }
 
+fn normalized_cell_range(
+    grid: &volvoxgrid_engine::grid::VolvoxGrid,
+    row1: i32,
+    col1: i32,
+    row2: i32,
+    col2: i32,
+) -> Option<(i32, i32, i32, i32)> {
+    if grid.rows <= 0 || grid.cols <= 0 {
+        return None;
+    }
+    let r_lo = row1.min(row2).max(0);
+    let r_hi = row1.max(row2).min(grid.rows - 1);
+    let c_lo = col1.min(col2).max(0);
+    let c_hi = col1.max(col2).min(grid.cols - 1);
+    if r_lo > r_hi || c_lo > c_hi {
+        return None;
+    }
+    Some((r_lo, c_lo, r_hi, c_hi))
+}
+
 fn get_cell_property(
     grid: &volvoxgrid_engine::grid::VolvoxGrid,
     row: i32,
@@ -1303,6 +1355,34 @@ fn truncate_to_char_count(s: &str, max_chars: i32) -> String {
     s.chars().take(max).collect()
 }
 
+fn next_event_id() -> i64 {
+    let mut next = NEXT_EVENT_ID.lock().unwrap();
+    let event_id = *next;
+    *next += 1;
+    event_id
+}
+
+fn decision_channel_enabled(grid_id: i64) -> bool {
+    DECISION_ENABLED.lock().unwrap().contains(&grid_id)
+}
+
+fn set_decision_channel_enabled(grid_id: i64, enabled: bool) {
+    let mut channels = DECISION_ENABLED.lock().unwrap();
+    if enabled {
+        channels.insert(grid_id);
+    } else {
+        channels.remove(&grid_id);
+    }
+}
+
+fn clear_grid_decision_state(grid_id: i64) {
+    DECISION_ENABLED.lock().unwrap().remove(&grid_id);
+    PENDING_ACTIONS
+        .lock()
+        .unwrap()
+        .retain(|(pending_grid, _), _| *pending_grid != grid_id);
+}
+
 fn is_legacy_ellipsis_button_list(list: &str) -> bool {
     list.trim() == "..."
 }
@@ -1352,18 +1432,24 @@ fn sync_legacy_button_metadata_for_cell(
     }
 }
 
-fn begin_edit_session(
+fn begin_edit_session_core(
     grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
     row: i32,
     col: i32,
     force: bool,
+    emit_before_event: bool,
+    seed_text: Option<String>,
+    click_caret: Option<i32>,
+    caret_end: Option<bool>,
 ) {
     if !grid.can_begin_edit(row, col, force) {
         return;
     }
     let combo_list = grid.active_dropdown_list(row, col);
-    grid.events
-        .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
+    if emit_before_event {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
+    }
     let stored_text = grid.cells.get_text(row, col).to_string();
     let display_text = grid.get_display_text(row, col);
     grid.edit.start_edit(row, col, &display_text);
@@ -1380,9 +1466,59 @@ fn begin_edit_session(
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::DropdownOpened);
     }
+    if let Some(seed) = seed_text {
+        if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
+            grid.edit.edit_text = seed.clone();
+            grid.edit.sel_start = seed.chars().count() as i32;
+            grid.edit.sel_length = 0;
+            grid.events
+                .push(volvoxgrid_engine::event::GridEventData::CellEditChange { text: seed });
+        }
+    }
+    if let Some(caret) = click_caret {
+        if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
+            grid.edit.sel_start = caret;
+            grid.edit.sel_length = 0;
+        }
+    } else if caret_end == Some(true) {
+        if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
+            grid.edit.sel_start = grid.edit.edit_text.chars().count() as i32;
+            grid.edit.sel_length = 0;
+        }
+    }
     grid.events
         .push(volvoxgrid_engine::event::GridEventData::StartEdit { row, col });
     grid.mark_dirty();
+}
+
+fn begin_edit_session(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    force: bool,
+) {
+    begin_edit_session_core(grid, row, col, force, true, None, None, None);
+}
+
+fn begin_edit_session_after_before(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    force: bool,
+    seed_text: Option<String>,
+    click_caret: Option<i32>,
+    caret_end: Option<bool>,
+) {
+    begin_edit_session_core(
+        grid,
+        row,
+        col,
+        force,
+        false,
+        seed_text,
+        click_caret,
+        caret_end,
+    );
 }
 
 fn normalize_committed_edit_text(
@@ -1418,6 +1554,15 @@ fn apply_committed_edit_text(
     committed: String,
 ) {
     grid.cells.set_text(row, col, committed.clone());
+    if old_text != committed {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::CellChanged {
+                row,
+                col,
+                old_text: old_text.clone(),
+                new_text: committed.clone(),
+            });
+    }
     grid.events
         .push(volvoxgrid_engine::event::GridEventData::AfterEdit {
             row,
@@ -1425,6 +1570,177 @@ fn apply_committed_edit_text(
             old_text,
             new_text: committed,
         });
+    let active_combo = grid.active_dropdown_list(row, col);
+    if !active_combo.is_empty() {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::DropdownClosed);
+    }
+    grid.mark_dirty();
+}
+
+fn apply_before_sort(grid: &mut volvoxgrid_engine::grid::VolvoxGrid, col: i32) {
+    let old_sort_keys = grid.sort_state.sort_keys.clone();
+    volvoxgrid_engine::sort::handle_header_click(grid, col);
+    if grid.sort_state.sort_keys != old_sort_keys {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::AfterSort { col });
+    }
+}
+
+fn request_before_edit(
+    grid_id: i64,
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    force: bool,
+    seed_text: Option<String>,
+    click_caret: Option<i32>,
+    caret_end: Option<bool>,
+) {
+    if !grid.can_begin_edit(row, col, force) {
+        return;
+    }
+
+    if !decision_channel_enabled(grid_id) {
+        begin_edit_session_core(
+            grid,
+            row,
+            col,
+            force,
+            true,
+            seed_text,
+            click_caret,
+            caret_end,
+        );
+        return;
+    }
+
+    let event_id = next_event_id();
+    PENDING_ACTIONS.lock().unwrap().insert(
+        (grid_id, event_id),
+        PendingActionEntry {
+            created_at: Instant::now(),
+            action: PendingAction::BeginEdit {
+                row,
+                col,
+                force,
+                seed_text,
+                click_caret,
+                caret_end,
+            },
+        },
+    );
+    grid.events.push_with_id(
+        event_id,
+        volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col },
+    );
+}
+
+fn request_before_sort(grid_id: i64, grid: &mut volvoxgrid_engine::grid::VolvoxGrid, col: i32) {
+    if !decision_channel_enabled(grid_id) {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::BeforeSort { col });
+        apply_before_sort(grid, col);
+        return;
+    }
+
+    let event_id = next_event_id();
+    PENDING_ACTIONS.lock().unwrap().insert(
+        (grid_id, event_id),
+        PendingActionEntry {
+            created_at: Instant::now(),
+            action: PendingAction::BeforeSort { col },
+        },
+    );
+    grid.events.push_with_id(
+        event_id,
+        volvoxgrid_engine::event::GridEventData::BeforeSort { col },
+    );
+}
+
+fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
+    let _ = GRID_MANAGER.with_grid(grid_id, |grid| match action {
+        PendingAction::BeginEdit {
+            row,
+            col,
+            force,
+            seed_text,
+            click_caret,
+            caret_end,
+        } => {
+            if cancel {
+                return;
+            }
+            begin_edit_session_after_before(
+                grid,
+                row,
+                col,
+                force,
+                seed_text,
+                click_caret,
+                caret_end,
+            );
+        }
+        PendingAction::BeforeSort { col } => {
+            if cancel {
+                return;
+            }
+            apply_before_sort(grid, col);
+        }
+    });
+}
+
+fn resolve_event_decision(grid_id: i64, event_id: i64, cancel: bool) {
+    if event_id <= 0 {
+        return;
+    }
+    let pending = PENDING_ACTIONS.lock().unwrap().remove(&(grid_id, event_id));
+    if let Some(entry) = pending {
+        apply_pending_action(grid_id, entry.action, cancel);
+    }
+}
+
+fn resolve_expired_actions(grid_id: i64) {
+    let now = Instant::now();
+    let expired: Vec<PendingAction> = {
+        let mut pending = PENDING_ACTIONS.lock().unwrap();
+        let expired_keys: Vec<(i64, i64)> = pending
+            .iter()
+            .filter_map(|(key, entry)| {
+                if key.0 == grid_id && now.duration_since(entry.created_at) >= DECISION_TIMEOUT {
+                    Some(*key)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        expired_keys
+            .into_iter()
+            .filter_map(|key| pending.remove(&key).map(|entry| entry.action))
+            .collect()
+    };
+
+    for action in expired {
+        apply_pending_action(grid_id, action, false);
+    }
+}
+
+fn resolve_all_pending_actions(grid_id: i64, cancel: bool) {
+    let actions: Vec<PendingAction> = {
+        let mut pending = PENDING_ACTIONS.lock().unwrap();
+        let keys: Vec<(i64, i64)> = pending
+            .keys()
+            .copied()
+            .filter(|(pending_grid, _)| *pending_grid == grid_id)
+            .collect();
+        keys.into_iter()
+            .filter_map(|key| pending.remove(&key).map(|entry| entry.action))
+            .collect()
+    };
+
+    for action in actions {
+        apply_pending_action(grid_id, action, cancel);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -2388,6 +2704,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             let row = g.selection.row;
             let col = g.selection.col;
+            if row < 0 || row >= g.rows || col < 0 || col >= g.cols {
+                return;
+            }
             let cell = g.cells.get_mut(row, col);
             cell.extra_mut().dropdown_items = r.list.clone();
             sync_legacy_button_metadata_for_cell(g, row, col, &r.list);
@@ -3631,6 +3950,14 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             g.style.back_color_fixed = 0xFFD4D0C8;
             g.style.grid_color = g.style.back_color_fixed;
             g.style.grid_color_fixed = g.style.back_color_fixed;
+            g.style.cell_padding.left = 3;
+            g.style.cell_padding.right = 3;
+            g.style.cell_padding.top = 1;
+            g.style.cell_padding.bottom = 3;
+            g.style.fixed_cell_padding.left = 3;
+            g.style.fixed_cell_padding.right = 3;
+            g.style.fixed_cell_padding.top = 1;
+            g.style.fixed_cell_padding.bottom = 3;
             g.default_row_height = ACTIVEX_DEFAULT_ROW_HEIGHT;
             g.default_col_width = ACTIVEX_DEFAULT_COL_WIDTH;
             g.indicator_bands.col_top.default_row_height_px = ACTIVEX_DEFAULT_ROW_HEIGHT;
@@ -4451,6 +4778,15 @@ fn compat_alloc_bytes_response(payload: Vec<u8>, out_len: *mut i32) -> *mut u8 {
     alloc_payload_with_header(payload)
 }
 
+fn compat_alloc_bytes_field_response(field_no: u32, bytes: Vec<u8>, out_len: *mut i32) -> *mut u8 {
+    let mut payload = Vec::with_capacity(bytes.len() + 8);
+    compat_push_varint(((field_no as u64) << 3) | 2, &mut payload);
+    compat_push_varint(bytes.len() as u64, &mut payload);
+    payload.extend_from_slice(&bytes);
+    compat_set_out_len(out_len, payload.len());
+    alloc_payload_with_header(payload)
+}
+
 fn compat_status(result: Result<(), String>, out_len: *mut i32) -> *mut u8 {
     match result {
         Ok(()) => compat_alloc_empty_response(out_len),
@@ -4469,6 +4805,252 @@ fn compat_i32(result: Result<i32, String>, out_len: *mut i32) -> *mut u8 {
             std::ptr::null_mut()
         }
     }
+}
+
+fn engine_event_to_proto(
+    grid_id: i64,
+    event_id: i64,
+    evt: volvoxgrid_engine::event::GridEventData,
+) -> GridEvent {
+    use volvoxgrid_engine::event::GridEventData as E;
+
+    let event = match evt {
+        E::CellFocusChanging {
+            old_row,
+            old_col,
+            new_row,
+            new_col,
+        } => Some(grid_event::Event::CellFocusChanging(
+            CellFocusChangingEvent {
+                old_row,
+                old_col,
+                new_row,
+                new_col,
+            },
+        )),
+        E::CellFocusChanged {
+            old_row,
+            old_col,
+            new_row,
+            new_col,
+        } => Some(grid_event::Event::CellFocusChanged(CellFocusChangedEvent {
+            old_row,
+            old_col,
+            new_row,
+            new_col,
+        })),
+        E::BeforeEdit { row, col } => {
+            Some(grid_event::Event::BeforeEdit(BeforeEditEvent { row, col }))
+        }
+        E::StartEdit { row, col } => {
+            Some(grid_event::Event::StartEdit(StartEditEvent { row, col }))
+        }
+        E::AfterEdit {
+            row,
+            col,
+            old_text,
+            new_text,
+        } => Some(grid_event::Event::AfterEdit(AfterEditEvent {
+            row,
+            col,
+            old_text,
+            new_text,
+        })),
+        E::CellEditValidate {
+            row,
+            col,
+            edit_text,
+        } => Some(grid_event::Event::CellEditValidate(CellEditValidateEvent {
+            row,
+            col,
+            edit_text,
+        })),
+        E::CellEditChange { text } => {
+            Some(grid_event::Event::CellEditChange(CellEditChangeEvent {
+                text,
+            }))
+        }
+        E::DropdownClosed => Some(grid_event::Event::DropdownClosed(DropdownClosedEvent {})),
+        E::DropdownOpened => Some(grid_event::Event::DropdownOpened(DropdownOpenedEvent {})),
+        E::CellChanged {
+            row,
+            col,
+            old_text,
+            new_text,
+        } => Some(grid_event::Event::CellChanged(CellChangedEvent {
+            row,
+            col,
+            old_text,
+            new_text,
+        })),
+        E::BeforeSort { col } => Some(grid_event::Event::BeforeSort(BeforeSortEvent { col })),
+        E::AfterSort { col } => Some(grid_event::Event::AfterSort(AfterSortEvent { col })),
+        E::BeforeNodeToggle { row, collapse } => {
+            Some(grid_event::Event::BeforeNodeToggle(BeforeNodeToggleEvent {
+                row,
+                collapse,
+            }))
+        }
+        E::AfterNodeToggle { row, collapse } => {
+            Some(grid_event::Event::AfterNodeToggle(AfterNodeToggleEvent {
+                row,
+                collapse,
+            }))
+        }
+        E::BeforeScroll {
+            old_top_row,
+            old_left_col,
+            new_top_row,
+            new_left_col,
+        } => Some(grid_event::Event::BeforeScroll(BeforeScrollEvent {
+            old_top_row,
+            old_left_col,
+            new_top_row,
+            new_left_col,
+        })),
+        E::AfterScroll {
+            old_top_row,
+            old_left_col,
+            new_top_row,
+            new_left_col,
+        } => Some(grid_event::Event::AfterScroll(AfterScrollEvent {
+            old_top_row,
+            old_left_col,
+            new_top_row,
+            new_left_col,
+        })),
+        E::ScrollTooltip { text } => {
+            Some(grid_event::Event::ScrollTooltip(ScrollTooltipEvent { text }))
+        }
+        E::BeforeUserResize { row, col } => {
+            Some(grid_event::Event::BeforeUserResize(BeforeUserResizeEvent {
+                row,
+                col,
+            }))
+        }
+        E::AfterUserResize { row, col } => {
+            Some(grid_event::Event::AfterUserResize(AfterUserResizeEvent {
+                row,
+                col,
+            }))
+        }
+        E::AfterUserFreeze {
+            frozen_rows,
+            frozen_cols,
+        } => Some(grid_event::Event::AfterUserFreeze(AfterUserFreezeEvent {
+            frozen_rows,
+            frozen_cols,
+        })),
+        E::BeforeMoveColumn { col, new_position } => {
+            Some(grid_event::Event::BeforeMoveColumn(BeforeMoveColumnEvent {
+                col,
+                new_position,
+            }))
+        }
+        E::AfterMoveColumn { col, old_position } => {
+            Some(grid_event::Event::AfterMoveColumn(AfterMoveColumnEvent {
+                col,
+                old_position,
+            }))
+        }
+        E::BeforeMoveRow { row, new_position } => {
+            Some(grid_event::Event::BeforeMoveRow(BeforeMoveRowEvent {
+                row,
+                new_position,
+            }))
+        }
+        E::AfterMoveRow { row, old_position } => {
+            Some(grid_event::Event::AfterMoveRow(AfterMoveRowEvent {
+                row,
+                old_position,
+            }))
+        }
+        E::BeforeMouseDown { row, col } => {
+            Some(grid_event::Event::BeforeMouseDown(BeforeMouseDownEvent {
+                row,
+                col,
+            }))
+        }
+        E::MouseDown {
+            button,
+            modifier,
+            x,
+            y,
+        } => Some(grid_event::Event::MouseDown(MouseDownEvent {
+            button,
+            modifier,
+            x,
+            y,
+        })),
+        E::MouseUp {
+            button,
+            modifier,
+            x,
+            y,
+        } => Some(grid_event::Event::MouseUp(MouseUpEvent {
+            button,
+            modifier,
+            x,
+            y,
+        })),
+        E::MouseMove {
+            button,
+            modifier,
+            x,
+            y,
+        } => Some(grid_event::Event::MouseMove(MouseMoveEvent {
+            button,
+            modifier,
+            x,
+            y,
+        })),
+        E::Click {
+            row,
+            col,
+            hit_area,
+            interaction,
+        } => Some(grid_event::Event::Click(ClickEvent {
+            row,
+            col,
+            hit_area,
+            interaction,
+        })),
+        E::DblClick { row, col } => Some(grid_event::Event::DblClick(DblClickEvent { row, col })),
+        E::KeyDown { key_code, modifier } => Some(grid_event::Event::KeyDown(KeyDownEvent {
+            key_code,
+            modifier,
+        })),
+        E::KeyPress { key_ascii } => Some(grid_event::Event::KeyPress(KeyPressEvent { key_ascii })),
+        E::KeyUp { key_code, modifier } => {
+            Some(grid_event::Event::KeyUp(KeyUpEvent { key_code, modifier }))
+        }
+        E::BeforePageBreak { row } => {
+            Some(grid_event::Event::BeforePageBreak(BeforePageBreakEvent { row }))
+        }
+        E::DataRefreshing => Some(grid_event::Event::DataRefreshing(DataRefreshingEvent {})),
+        E::DataRefreshed => Some(grid_event::Event::DataRefreshed(DataRefreshedEvent {})),
+        _ => None,
+    };
+
+    GridEvent {
+        grid_id,
+        event_id,
+        event,
+    }
+}
+
+fn compat_blob(result: Result<Vec<u8>, String>, out_len: *mut i32) -> *mut u8 {
+    match result {
+        Ok(bytes) => compat_alloc_bytes_response(bytes, out_len),
+        Err(_) => {
+            compat_set_out_len(out_len, 0);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+fn compat_string(result: Result<String, String>, out_len: *mut i32) -> *mut u8 {
+    compat_blob(result.map(|s| s.into_bytes()), out_len)
 }
 
 fn compat_utf8(ptr: *const u8, len: i32) -> String {
@@ -4491,6 +5073,14 @@ fn apply_activex_defaults(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
     grid.style.font_size = 10.0 * 96.0 / 72.0; // 10pt @ 96 DPI
     grid.style.back_color_bkg = 0xFF808080;
     grid.style.back_color_fixed = 0xFFD4D0C8;
+    grid.style.cell_padding.left = 3;
+    grid.style.cell_padding.right = 3;
+    grid.style.cell_padding.top = 1;
+    grid.style.cell_padding.bottom = 3;
+    grid.style.fixed_cell_padding.left = 3;
+    grid.style.fixed_cell_padding.right = 3;
+    grid.style.fixed_cell_padding.top = 1;
+    grid.style.fixed_cell_padding.bottom = 3;
     grid.default_row_height = ACTIVEX_DEFAULT_ROW_HEIGHT;
     grid.default_col_width = ACTIVEX_DEFAULT_COL_WIDTH;
     grid.indicator_bands.col_top.default_row_height_px = ACTIVEX_DEFAULT_ROW_HEIGHT;
@@ -4527,6 +5117,7 @@ pub extern "C" fn volvox_grid_destroy_grid(id: i64, out_len: *mut i32) -> *mut u
     RENDERERS.with(|rc| {
         rc.borrow_mut().remove(&id);
     });
+    clear_grid_decision_state(id);
     GRID_MANAGER.destroy_grid(id);
     compat_alloc_empty_response(out_len)
 }
@@ -4581,6 +5172,17 @@ pub extern "C" fn volvox_grid_get_rows(id: i64, out_len: *mut i32) -> *mut u8 {
 #[no_mangle]
 pub extern "C" fn volvox_grid_get_cols(id: i64, out_len: *mut i32) -> *mut u8 {
     compat_i32(GRID_MANAGER.with_grid(id, |g| g.cols), out_len)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_cancel_edit(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(id, |g| {
+            g.edit.cancel();
+            g.mark_dirty();
+        }),
+        out_len,
+    )
 }
 
 #[no_mangle]
@@ -4830,8 +5432,30 @@ pub extern "C" fn volvox_grid_get_top_row(id: i64, out_len: *mut i32) -> *mut u8
 }
 
 #[no_mangle]
+pub extern "C" fn volvox_grid_get_bottom_row(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_i32(
+        GRID_MANAGER.with_grid(id, |g| {
+            ensure_layout(g);
+            g.bottom_row()
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
 pub extern "C" fn volvox_grid_get_left_col(id: i64, out_len: *mut i32) -> *mut u8 {
     compat_i32(GRID_MANAGER.with_grid(id, |g| g.left_col()), out_len)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_right_col(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_i32(
+        GRID_MANAGER.with_grid(id, |g| {
+            ensure_layout(g);
+            g.right_col()
+        }),
+        out_len,
+    )
 }
 
 #[no_mangle]
@@ -4896,6 +5520,100 @@ pub extern "C" fn volvox_grid_select(
         }),
         out_len,
     )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_row_pos(grid_id: i64, index: i32, out_len: *mut i32) -> *mut u8 {
+    compat_i32(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            ensure_layout(g);
+            g.row_pos(index)
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_col_pos(grid_id: i64, index: i32, out_len: *mut i32) -> *mut u8 {
+    compat_i32(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            ensure_layout(g);
+            g.col_pos(index)
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_row_position(
+    grid_id: i64,
+    row: i32,
+    position: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            let source_pos = g.row_display_position(row);
+            if source_pos < 0 || position < 0 || position >= g.rows || source_pos == position {
+                return;
+            }
+            let moving = g.row_positions.remove(source_pos as usize);
+            let insert_at = if position > source_pos {
+                position - 1
+            } else {
+                position
+            };
+            g.row_positions.insert(insert_at as usize, moving);
+            g.layout.invalidate();
+            g.mark_dirty();
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_col_position(
+    grid_id: i64,
+    col: i32,
+    position: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            let source_pos = g.col_display_position(col);
+            if source_pos < 0 || position < 0 || position >= g.cols || source_pos == position {
+                return;
+            }
+            let len = g.col_positions.len() as i32;
+            if source_pos >= len || position >= len {
+                return;
+            }
+            let insert_at = if position > source_pos {
+                position - 1
+            } else {
+                position
+            };
+            let moving = g.col_positions.remove(source_pos as usize);
+            g.col_positions.insert(insert_at as usize, moving);
+            g.layout.invalidate();
+            g.mark_dirty();
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_row_display_position(grid_id: i64, row: i32) -> i32 {
+    GRID_MANAGER
+        .with_grid(grid_id, |g| g.row_display_position(row))
+        .unwrap_or(-1)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_col_display_position(grid_id: i64, col: i32) -> i32 {
+    GRID_MANAGER
+        .with_grid(grid_id, |g| g.col_display_position(col))
+        .unwrap_or(-1)
 }
 
 #[no_mangle]
@@ -5111,7 +5829,11 @@ pub extern "C" fn volvox_grid_edit_cell(
 ) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
-            begin_edit_session(g, row, col, true);
+            if decision_channel_enabled(grid_id) {
+                request_before_edit(grid_id, g, row, col, true, None, None, None);
+            } else {
+                begin_edit_session(g, row, col, true);
+            }
         }),
         out_len,
     )
@@ -5218,6 +5940,9 @@ pub extern "C" fn volvox_grid_set_cell_flood(
 ) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
+            if row < 0 || row >= g.rows || col < 0 || col >= g.cols {
+                return;
+            }
             let cell = g.cells.get_mut(row, col);
             let extra = cell.extra_mut();
             extra.progress_color = color;
@@ -5226,6 +5951,177 @@ pub extern "C" fn volvox_grid_set_cell_flood(
         }),
         out_len,
     )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_cell_picture_range_native(
+    grid_id: i64,
+    row1: i32,
+    col1: i32,
+    row2: i32,
+    col2: i32,
+    image: *const u8,
+    image_len: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let picture = compat_bytes(image, image_len);
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, move |g| {
+            let Some((r_lo, c_lo, r_hi, c_hi)) = normalized_cell_range(g, row1, col1, row2, col2)
+            else {
+                return;
+            };
+            let picture = if picture.is_empty() {
+                None
+            } else {
+                Some(picture)
+            };
+            for row in r_lo..=r_hi {
+                for col in c_lo..=c_hi {
+                    g.cells.get_mut(row, col).extra_mut().picture = picture.clone();
+                }
+            }
+            g.mark_dirty();
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_cell_picture_native(
+    grid_id: i64,
+    row: i32,
+    col: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_blob(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            g.cells
+                .get(row, col)
+                .and_then(|cell| cell.picture().map(|picture| picture.to_vec()))
+                .unwrap_or_default()
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_cell_picture_alignment_range_native(
+    grid_id: i64,
+    row1: i32,
+    col1: i32,
+    row2: i32,
+    col2: i32,
+    alignment: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            let Some((r_lo, c_lo, r_hi, c_hi)) = normalized_cell_range(g, row1, col1, row2, col2)
+            else {
+                return;
+            };
+            for row in r_lo..=r_hi {
+                for col in c_lo..=c_hi {
+                    g.cells.get_mut(row, col).extra_mut().picture_alignment = alignment;
+                }
+            }
+            g.mark_dirty();
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_cell_picture_alignment_native(
+    grid_id: i64,
+    row: i32,
+    col: i32,
+) -> i32 {
+    GRID_MANAGER
+        .with_grid(grid_id, |g| {
+            g.cells
+                .get(row, col)
+                .map_or(0, |cell| cell.picture_alignment())
+        })
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_cell_back_color_range(
+    grid_id: i64,
+    row1: i32,
+    col1: i32,
+    row2: i32,
+    col2: i32,
+    color: u32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            let Some((r_lo, c_lo, r_hi, c_hi)) = normalized_cell_range(g, row1, col1, row2, col2)
+            else {
+                return;
+            };
+            for row in r_lo..=r_hi {
+                for col in c_lo..=c_hi {
+                    g.cell_styles.entry((row, col)).or_default().back_color = Some(color);
+                }
+            }
+            g.mark_dirty();
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_cell_back_color(grid_id: i64, row: i32, col: i32) -> u32 {
+    GRID_MANAGER
+        .with_grid(grid_id, |g| {
+            g.get_cell_style(row, col).back_color.unwrap_or(0)
+        })
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_cell_font_bold_range(
+    grid_id: i64,
+    row1: i32,
+    col1: i32,
+    row2: i32,
+    col2: i32,
+    bold: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            let Some((r_lo, c_lo, r_hi, c_hi)) = normalized_cell_range(g, row1, col1, row2, col2)
+            else {
+                return;
+            };
+            let bold = bold != 0;
+            for row in r_lo..=r_hi {
+                for col in c_lo..=c_hi {
+                    g.cell_styles.entry((row, col)).or_default().font_bold = Some(bold);
+                }
+            }
+            g.mark_dirty();
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_cell_font_bold(grid_id: i64, row: i32, col: i32) -> i32 {
+    GRID_MANAGER
+        .with_grid(grid_id, |g| {
+            if g.get_cell_style(row, col).font_bold.unwrap_or(false) {
+                1
+            } else {
+                0
+            }
+        })
+        .unwrap_or(0)
 }
 
 #[no_mangle]
@@ -5238,6 +6134,9 @@ pub extern "C" fn volvox_grid_set_cell_checked(
 ) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
+            if row < 0 || row >= g.rows || col < 0 || col >= g.cols {
+                return;
+            }
             g.cells.get_mut(row, col).extra_mut().checked = state;
             g.mark_dirty();
         }),
@@ -5617,8 +6516,73 @@ pub extern "C" fn volvox_grid_pointer_down_native(
     modifier: i32,
     dbl_click: i32,
 ) -> i32 {
+    resolve_expired_actions(id);
     match GRID_MANAGER.with_grid(id, |g| {
-        volvoxgrid_engine::input::handle_pointer_down(g, x, y, button, modifier, dbl_click != 0);
+        ensure_layout(g);
+        if decision_channel_enabled(id) {
+            let hit = input::hit_test(g, x, y);
+            input::handle_pointer_down_with_behavior(
+                g,
+                x,
+                y,
+                button,
+                modifier,
+                dbl_click != 0,
+                InputBehavior {
+                    allow_begin_edit: false,
+                    allow_header_sort: false,
+                },
+            );
+
+            if hit.row >= 0 && hit.col >= 0 {
+                let area = hit.area.clone();
+                let is_cell_like =
+                    area == HitArea::Cell || area == HitArea::FixedRow || area == HitArea::FixedCol;
+                let combo_list = if is_cell_like {
+                    g.active_dropdown_list(hit.row, hit.col)
+                } else {
+                    String::new()
+                };
+                let is_combo_cell = !combo_list.is_empty();
+
+                if area == HitArea::DropdownButton {
+                    if !(g.edit.is_active()
+                        && g.edit.edit_row == hit.row
+                        && g.edit.edit_col == hit.col)
+                    {
+                        request_before_edit(id, g, hit.row, hit.col, false, None, None, None);
+                    }
+                } else if is_cell_like
+                    && ((dbl_click != 0 && g.edit_trigger_mode >= 2) || is_combo_cell)
+                {
+                    let click_caret = if dbl_click != 0 {
+                        Some(g.caret_index_from_display_click(hit.row, hit.col, hit.x_in_cell))
+                    } else {
+                        None
+                    };
+                    request_before_edit(
+                        id,
+                        g,
+                        hit.row,
+                        hit.col,
+                        false,
+                        None,
+                        click_caret,
+                        if dbl_click != 0 { Some(true) } else { None },
+                    );
+                }
+
+                if area == HitArea::FixedRow
+                    && hit.row < g.fixed_rows
+                    && !is_combo_cell
+                    && g.header_features > 0
+                {
+                    request_before_sort(id, g, hit.col);
+                }
+            }
+        } else {
+            input::handle_pointer_down(g, x, y, button, modifier, dbl_click != 0);
+        }
     }) {
         Ok(()) => 0,
         Err(_) => -1,
@@ -5634,7 +6598,7 @@ pub extern "C" fn volvox_grid_pointer_move_native(
     modifier: i32,
 ) -> i32 {
     match GRID_MANAGER.with_grid(id, |g| {
-        volvoxgrid_engine::input::handle_pointer_move(g, x, y, button, modifier);
+        input::handle_pointer_move(g, x, y, button, modifier);
     }) {
         Ok(()) => 0,
         Err(_) => -1,
@@ -5650,7 +6614,7 @@ pub extern "C" fn volvox_grid_pointer_up_native(
     modifier: i32,
 ) -> i32 {
     match GRID_MANAGER.with_grid(id, |g| {
-        volvoxgrid_engine::input::handle_pointer_up(g, x, y, button, modifier);
+        input::handle_pointer_up(g, x, y, button, modifier);
     }) {
         Ok(()) => 0,
         Err(_) => -1,
@@ -5660,7 +6624,7 @@ pub extern "C" fn volvox_grid_pointer_up_native(
 #[no_mangle]
 pub extern "C" fn volvox_grid_scroll_native(id: i64, delta_x: f32, delta_y: f32) -> i32 {
     match GRID_MANAGER.with_grid(id, |g| {
-        volvoxgrid_engine::input::handle_scroll(g, delta_x, delta_y);
+        input::handle_scroll(g, delta_x, delta_y);
     }) {
         Ok(()) => 0,
         Err(_) => -1,
@@ -5669,8 +6633,38 @@ pub extern "C" fn volvox_grid_scroll_native(id: i64, delta_x: f32, delta_y: f32)
 
 #[no_mangle]
 pub extern "C" fn volvox_grid_key_down_native(id: i64, key_code: i32, modifier: i32) -> i32 {
+    resolve_expired_actions(id);
     match GRID_MANAGER.with_grid(id, |g| {
-        volvoxgrid_engine::input::handle_key_down(g, key_code, modifier);
+        if decision_channel_enabled(id) {
+            let was_editing = g.edit.is_active();
+            input::handle_key_down_with_behavior(
+                g,
+                key_code,
+                modifier,
+                InputBehavior {
+                    allow_begin_edit: false,
+                    allow_header_sort: true,
+                },
+            );
+            if (key_code == 13 || key_code == 113)
+                && !g.host_key_dispatch
+                && g.edit_trigger_mode >= 1
+                && !was_editing
+            {
+                request_before_edit(
+                    id,
+                    g,
+                    g.selection.row,
+                    g.selection.col,
+                    false,
+                    None,
+                    None,
+                    if key_code == 113 { Some(true) } else { None },
+                );
+            }
+        } else {
+            input::handle_key_down(g, key_code, modifier);
+        }
     }) {
         Ok(()) => 0,
         Err(_) => -1,
@@ -5679,12 +6673,90 @@ pub extern "C" fn volvox_grid_key_down_native(id: i64, key_code: i32, modifier: 
 
 #[no_mangle]
 pub extern "C" fn volvox_grid_key_press_native(id: i64, char_code: u32) -> i32 {
+    resolve_expired_actions(id);
     match GRID_MANAGER.with_grid(id, |g| {
-        volvoxgrid_engine::input::handle_key_press(g, char_code);
+        if decision_channel_enabled(id) {
+            let was_editing = g.edit.is_active();
+            input::handle_key_press_with_behavior(
+                g,
+                char_code,
+                InputBehavior {
+                    allow_begin_edit: false,
+                    allow_header_sort: true,
+                },
+            );
+            if !was_editing
+                && !g.host_key_dispatch
+                && g.edit_trigger_mode >= 1
+                && g.type_ahead_mode == 0
+            {
+                if let Some(seed) = char::from_u32(char_code).map(|c| c.to_string()) {
+                    if !seed.is_empty() {
+                        request_before_edit(
+                            id,
+                            g,
+                            g.selection.row,
+                            g.selection.col,
+                            false,
+                            Some(seed),
+                            None,
+                            None,
+                        );
+                    }
+                }
+            }
+        } else {
+            input::handle_key_press(g, char_code);
+        }
     }) {
         Ok(()) => 0,
         Err(_) => -1,
     }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_event_decision_enabled_native(id: i64, enabled: i32) -> i32 {
+    if enabled != 0 {
+        set_decision_channel_enabled(id, true);
+    } else {
+        resolve_all_pending_actions(id, false);
+        set_decision_channel_enabled(id, false);
+    }
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_take_next_event_native(id: i64, out_len: *mut i32) -> *mut u8 {
+    resolve_expired_actions(id);
+    match GRID_MANAGER.with_grid(id, |g| loop {
+        let Some(evt) = g.events.pop() else {
+            return None;
+        };
+        let proto_evt = engine_event_to_proto(id, evt.event_id, evt.data);
+        if proto_evt.event.is_some() {
+            return Some(proto_evt.encode_to_vec());
+        }
+    }) {
+        Ok(Some(bytes)) => compat_alloc_bytes_response(bytes, out_len),
+        Ok(None) => {
+            compat_set_out_len(out_len, 0);
+            std::ptr::null_mut()
+        }
+        Err(_) => {
+            compat_set_out_len(out_len, 0);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_send_event_decision_native(
+    id: i64,
+    event_id: i64,
+    cancel: i32,
+) -> i32 {
+    resolve_event_decision(id, event_id, cancel != 0);
+    0
 }
 
 #[no_mangle]
@@ -5867,6 +6939,11 @@ style_color_accessors!(
     volvox_grid_get_tree_color,
     tree_color
 );
+style_color_accessors!(
+    volvox_grid_set_sheet_border_native,
+    volvox_grid_get_sheet_border_native,
+    sheet_border
+);
 
 #[no_mangle]
 pub extern "C" fn volvox_grid_set_back_color_sel(id: i64, color: u32) -> i32 {
@@ -5923,6 +7000,32 @@ macro_rules! style_i32_accessors {
     };
 }
 
+macro_rules! style_bool_accessors {
+    ($set_name:ident, $get_name:ident, $field:ident) => {
+        #[no_mangle]
+        pub extern "C" fn $set_name(id: i64, value: i32) -> i32 {
+            match GRID_MANAGER.with_grid(id, |g| {
+                g.style.$field = value != 0;
+                g.mark_dirty();
+            }) {
+                Ok(()) => 0,
+                Err(_) => -1,
+            }
+        }
+        #[no_mangle]
+        pub extern "C" fn $get_name(id: i64) -> i32 {
+            GRID_MANAGER
+                .with_grid(id, |g| if g.style.$field { 1 } else { 0 })
+                .unwrap_or(0)
+        }
+    };
+}
+
+style_i32_accessors!(
+    volvox_grid_set_appearance_native,
+    volvox_grid_get_appearance_native,
+    appearance
+);
 style_i32_accessors!(
     volvox_grid_set_grid_lines_native,
     volvox_grid_get_grid_lines,
@@ -5933,6 +7036,54 @@ style_i32_accessors!(
     volvox_grid_get_grid_lines_fixed,
     grid_lines_fixed
 );
+style_i32_accessors!(
+    volvox_grid_set_grid_line_width_native,
+    volvox_grid_get_grid_line_width_native,
+    grid_line_width
+);
+
+style_bool_accessors!(
+    volvox_grid_set_font_bold_native,
+    volvox_grid_get_font_bold_native,
+    font_bold
+);
+style_bool_accessors!(
+    volvox_grid_set_font_italic_native,
+    volvox_grid_get_font_italic_native,
+    font_italic
+);
+style_bool_accessors!(
+    volvox_grid_set_font_underline_native,
+    volvox_grid_get_font_underline_native,
+    font_underline
+);
+style_bool_accessors!(
+    volvox_grid_set_font_strikethrough_native,
+    volvox_grid_get_font_strikethrough_native,
+    font_strikethrough
+);
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_allow_user_freezing_native(id: i64, mode: i32) -> i32 {
+    match GRID_MANAGER.with_grid(id, |g| {
+        g.allow_user_freezing = mode;
+        g.mark_dirty();
+    }) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_scroll_tips_native(id: i64, value: i32) -> i32 {
+    match GRID_MANAGER.with_grid(id, |g| {
+        g.scroll_tips = value != 0;
+        g.mark_dirty();
+    }) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
 
 #[no_mangle]
 pub extern "C" fn volvox_grid_set_font_size(id: i64, size: f32) -> i32 {
@@ -5982,6 +7133,29 @@ pub extern "C" fn volvox_grid_get_font_name(id: i64, out_len: *mut i32) -> *mut 
         }
     }
     alloc_payload_with_header(bytes)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_font_width_native(id: i64, value: i32) -> i32 {
+    match GRID_MANAGER.with_grid(id, |g| {
+        g.style.font_stretch = value as f32;
+        g.mark_dirty();
+    }) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_font_width_native(id: i64) -> i32 {
+    GRID_MANAGER
+        .with_grid(id, |g| g.style.font_stretch.round() as i32)
+        .unwrap_or(0)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_cursor_style_native(id: i64) -> i32 {
+    GRID_MANAGER.with_grid(id, |g| g.cursor_style).unwrap_or(0)
 }
 
 // ---------------------------------------------------------------------------
@@ -6140,8 +7314,570 @@ impl volvoxgrid_engine::text::TextRenderer for FfiTextRenderer {
     }
 }
 
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_format_string(
+    grid_id: i64,
+    format_string: *const u8,
+    format_string_len: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let format_string = compat_utf8(format_string, format_string_len);
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            g.format_string = format_string.clone();
+            g.apply_format_string();
+            g.mark_dirty();
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_mouse_row(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_i32(GRID_MANAGER.with_grid(id, |g| g.mouse_row), out_len)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_mouse_col(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_i32(GRID_MANAGER.with_grid(id, |g| g.mouse_col), out_len)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_is_selected(
+    grid_id: i64,
+    index: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_i32(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            if g.is_cell_selected(index, g.selection.col) {
+                1
+            } else {
+                0
+            }
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_selected_row(
+    grid_id: i64,
+    index: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_i32(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            if g.selection.is_selected(index, g.fixed_cols, g.cols) {
+                1
+            } else {
+                0
+            }
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_selected_rows(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_i32(
+        GRID_MANAGER.with_grid(id, |g| g.selection.selected_row_count()),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_clip(
+    grid_id: i64,
+    clip: *const u8,
+    clip_len: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let clip = compat_utf8(clip, clip_len);
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            volvoxgrid_engine::clipboard::paste(g, &clip);
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_clip(grid_id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_string(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            let (text, _) = volvoxgrid_engine::clipboard::copy(g);
+            text
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_clip_separators(
+    grid_id: i64,
+    col_separator: *const u8,
+    col_separator_len: i32,
+    row_separator: *const u8,
+    row_separator_len: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let col_separator = compat_utf8(col_separator, col_separator_len);
+    let row_separator = compat_utf8(row_separator, row_separator_len);
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            g.clip_col_separator = col_separator.clone();
+            g.clip_row_separator = row_separator.clone();
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_finish_editing(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(id, |g| {
+            if let Some((row, col, old_text, new_text)) = g.edit.commit() {
+                let committed = normalize_committed_edit_text(g, row, col, &new_text);
+                apply_committed_edit_text(g, row, col, old_text, committed);
+            }
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_save_grid(
+    grid_id: i64,
+    format: i32,
+    scope: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    match GRID_MANAGER.with_grid(grid_id, |g| {
+        volvoxgrid_engine::save::save_grid(g, format, scope)
+    }) {
+        Ok(data) => compat_alloc_bytes_field_response(1, data, out_len),
+        Err(_) => {
+            compat_set_out_len(out_len, 0);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_load_grid(
+    grid_id: i64,
+    data: *const u8,
+    data_len: i32,
+    format: i32,
+    scope: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let data = compat_bytes(data, data_len);
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            volvoxgrid_engine::save::load_grid(g, &data, format, scope)
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_load_grid_url(
+    grid_id: i64,
+    url: *const u8,
+    url_len: i32,
+    data: *const u8,
+    data_len: i32,
+    format: i32,
+    scope: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let url = compat_utf8(url, url_len);
+    let data = compat_bytes(data, data_len);
+    match GRID_MANAGER.with_grid(grid_id, |g| {
+        volvoxgrid_engine::save::load_grid_url(g, &url, &data, format, scope)
+    }) {
+        Ok(true) => compat_alloc_empty_response(out_len),
+        Ok(false) => {
+            compat_set_out_len(out_len, 0);
+            std::ptr::null_mut()
+        }
+        Err(_) => {
+            compat_set_out_len(out_len, 0);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_delete(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(id, |g| volvoxgrid_engine::clipboard::delete_selection(g)),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_scroll_tip_text(
+    grid_id: i64,
+    value: *const u8,
+    value_len: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let value = compat_utf8(value, value_len);
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            g.scroll_tooltip_text = value.clone();
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_scroll_tip_text(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_string(
+        GRID_MANAGER.with_grid(id, |g| g.scroll_tooltip_text.clone()),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_flags(grid_id: i64, flags: i32, out_len: *mut i32) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            g.flags = flags as u32;
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_flags(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_i32(GRID_MANAGER.with_grid(id, |g| g.flags as i32), out_len)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_version(_id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_string(Ok("1.0.0".to_string()), out_len)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_client_width(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_i32(GRID_MANAGER.with_grid(id, |g| g.viewport_width), out_len)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_client_height(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_i32(GRID_MANAGER.with_grid(id, |g| g.viewport_height), out_len)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_is_searching(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_i32(GRID_MANAGER.with_grid(id, |_g| 0), out_len)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_value_matrix(
+    grid_id: i64,
+    row: i32,
+    col: i32,
+    value: *const u8,
+    value_len: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let value = compat_utf8(value, value_len);
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            g.cells.set_text(row, col, value.clone());
+            g.mark_dirty();
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_col_edit_mask(
+    grid_id: i64,
+    col: i32,
+    mask: *const u8,
+    mask_len: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let mask = compat_utf8(mask, mask_len);
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            if col == -1 {
+                for column in &mut g.columns {
+                    column.edit_mask = mask.clone();
+                }
+            } else if col >= 0 && (col as usize) < g.columns.len() {
+                g.columns[col as usize].edit_mask = mask.clone();
+            }
+            g.mark_dirty();
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_tab_behavior(
+    grid_id: i64,
+    behavior: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            g.tab_behavior = behavior;
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_edit_text(
+    grid_id: i64,
+    value: *const u8,
+    value_len: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let value = compat_utf8(value, value_len);
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            if !g.edit.is_active() {
+                return;
+            }
+            let next = truncate_to_char_count(&value, g.edit_max_length);
+            if next == g.edit.edit_text {
+                return;
+            }
+            g.edit.edit_text = next.clone();
+            g.edit.sel_start = next.chars().count() as i32;
+            g.edit.sel_length = 0;
+            g.events
+                .push(volvoxgrid_engine::event::GridEventData::CellEditChange { text: next });
+            g.mark_dirty();
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_edit_text(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_string(
+        GRID_MANAGER.with_grid(id, |g| {
+            if g.edit.is_active() {
+                g.edit.edit_text.clone()
+            } else {
+                String::new()
+            }
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_edit_max_length(
+    grid_id: i64,
+    value: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            g.edit_max_length = value;
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_edit_max_length(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_i32(GRID_MANAGER.with_grid(id, |g| g.edit_max_length), out_len)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_col_format(
+    grid_id: i64,
+    col: i32,
+    format: *const u8,
+    format_len: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let format = compat_utf8(format, format_len);
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            if col >= 0 && (col as usize) < g.columns.len() {
+                g.columns[col as usize].format = format.clone();
+                g.mark_dirty();
+            }
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_col_key(
+    grid_id: i64,
+    col: i32,
+    key: *const u8,
+    key_len: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let key = compat_utf8(key, key_len);
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            if col >= 0 && (col as usize) < g.columns.len() {
+                g.columns[col as usize].key = key.clone();
+            }
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_col_data(
+    grid_id: i64,
+    col: i32,
+    data: *const u8,
+    data_len: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let data = compat_bytes(data, data_len);
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            if col >= 0 && (col as usize) < g.columns.len() {
+                g.columns[col as usize].user_data = if data.is_empty() {
+                    None
+                } else {
+                    Some(data.clone())
+                };
+            }
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_col_data(grid_id: i64, col: i32, out_len: *mut i32) -> *mut u8 {
+    compat_blob(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            if col >= 0 && (col as usize) < g.columns.len() {
+                g.columns[col as usize]
+                    .user_data
+                    .clone()
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            }
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_combo_count(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_i32(
+        GRID_MANAGER.with_grid(id, |g| g.edit.dropdown_count()),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_combo_index(id: i64, out_len: *mut i32) -> *mut u8 {
+    compat_i32(
+        GRID_MANAGER.with_grid(id, |g| g.edit.dropdown_index),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_combo_index(
+    grid_id: i64,
+    value: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            g.edit.set_dropdown_index(value);
+            g.mark_dirty();
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_combo_item(
+    grid_id: i64,
+    index: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_string(
+        GRID_MANAGER.with_grid(grid_id, |g| g.edit.get_dropdown_item(index).to_string()),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_get_combo_data(
+    grid_id: i64,
+    index: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_string(
+        GRID_MANAGER.with_grid(grid_id, |g| g.edit.get_dropdown_data(index).to_string()),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_row_height_min(
+    grid_id: i64,
+    value: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            g.row_height_min = value;
+            g.mark_dirty();
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_col_width_min(
+    grid_id: i64,
+    col: i32,
+    value: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            if col >= 0 && (col as usize) < g.columns.len() {
+                g.col_width_min.insert(col, value);
+                g.mark_dirty();
+            }
+        }),
+        out_len,
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_explorer_bar(
+    grid_id: i64,
+    mode: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    compat_status(
+        GRID_MANAGER.with_grid(grid_id, |g| {
+            g.header_features = mode;
+            g.mark_dirty();
+        }),
+        out_len,
+    )
+}
+
 use std::cell::RefCell;
-use std::collections::HashMap;
 
 thread_local! {
     /// Per-grid `Renderer` instances.  Stored in thread-local storage because
@@ -6319,5 +8055,76 @@ mod tests {
                 clip_h: 11,
             })
         );
+    }
+
+    #[test]
+    fn compat_style_accessors_round_trip() {
+        let grid_id = volvox_grid_create_grid(160, 80, 3, 2, 1, 0, 1.0);
+
+        assert_eq!(volvox_grid_set_appearance_native(grid_id, 1), 0);
+        assert_eq!(volvox_grid_get_appearance_native(grid_id), 1);
+
+        assert_eq!(volvox_grid_set_grid_line_width_native(grid_id, 3), 0);
+        assert_eq!(volvox_grid_get_grid_line_width_native(grid_id), 3);
+
+        assert_eq!(volvox_grid_set_sheet_border_native(grid_id, 0xFF336699), 0);
+        assert_eq!(volvox_grid_get_sheet_border_native(grid_id), 0xFF336699);
+
+        assert_eq!(volvox_grid_set_font_bold_native(grid_id, 1), 0);
+        assert_eq!(volvox_grid_get_font_bold_native(grid_id), 1);
+
+        assert_eq!(volvox_grid_set_font_italic_native(grid_id, 1), 0);
+        assert_eq!(volvox_grid_get_font_italic_native(grid_id), 1);
+
+        assert_eq!(volvox_grid_set_font_underline_native(grid_id, 1), 0);
+        assert_eq!(volvox_grid_get_font_underline_native(grid_id), 1);
+
+        assert_eq!(volvox_grid_set_font_strikethrough_native(grid_id, 1), 0);
+        assert_eq!(volvox_grid_get_font_strikethrough_native(grid_id), 1);
+
+        assert_eq!(volvox_grid_set_font_width_native(grid_id, 75), 0);
+        assert_eq!(volvox_grid_get_font_width_native(grid_id), 75);
+
+        GRID_MANAGER
+            .with_grid(grid_id, |g| {
+                g.cursor_style = 5;
+            })
+            .unwrap();
+        assert_eq!(volvox_grid_get_cursor_style_native(grid_id), 5);
+
+        let out = volvox_grid_destroy_grid(grid_id, std::ptr::null_mut());
+        if !out.is_null() {
+            unsafe {
+                volvox_grid_free(out);
+            }
+        }
+    }
+
+    #[test]
+    fn print_grid_smoke_returns_png_pages() {
+        let grid_id = volvox_grid_create_grid(240, 120, 6, 2, 1, 0, 1.0);
+
+        let pages = GRID_MANAGER
+            .with_grid(grid_id, |g| {
+                g.text_engine = Some(volvoxgrid_engine::text::TextEngine::new());
+                g.cells.set_text(0, 0, "Header".to_string());
+                g.cells.set_text(1, 0, "Alpha".to_string());
+                g.cells.set_text(2, 0, "Beta".to_string());
+                ensure_layout(g);
+                volvoxgrid_engine::print::print_grid(g, 0, 24, 24, 24, 24, "", "", false)
+            })
+            .unwrap();
+
+        assert!(!pages.is_empty());
+        assert!(pages[0]
+            .image_data
+            .starts_with(&[137, 80, 78, 71, 13, 10, 26, 10]));
+
+        let out = volvox_grid_destroy_grid(grid_id, std::ptr::null_mut());
+        if !out.is_null() {
+            unsafe {
+                volvox_grid_free(out);
+            }
+        }
     }
 }

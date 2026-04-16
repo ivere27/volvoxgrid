@@ -2,7 +2,8 @@
  *
  * Unlike grid_compare_test.c (offscreen IViewObject::Draw), this harness hosts
  * each control in a real in-place ActiveX window, pumps messages, replays
- * optional UI actions, and captures screenshots from the live screen region.
+ * optional UI actions, and captures hosted controls from the live screen
+ * region. Dispatch-only controls fall back to IViewObject::Draw.
  *
  * Build with MinGW:
  *   i686-w64-mingw32-gcc -O2 -o grid_compare_ux_test.exe grid_compare_ux_test.c \
@@ -18,6 +19,8 @@
  * Supported action commands (one per line):
  *   set_cell <row> <col>
  *   click_cell <row> <col>
+ *   drag_cell <from_row> <from_col> <to_row> <to_col>
+ *   drag_cell_edge <from_row> <from_col> <edge> <to_row> <to_col>
  *   click_combo <row> <col>
  *   key <VK_NAME|number>   (F2,F4,SPACE,ENTER,ESC,UP,DOWN,LEFT,RIGHT,TAB)
  *   sleep <ms>
@@ -114,6 +117,157 @@ static int get_indexed_int(IDispatch *pDisp, LPCOLESTR name, int index, int fall
     }
 }
 
+static char *dup_utf8_string(const char *src) {
+    size_t len;
+    char *copy;
+    if (!src) src = "";
+    len = strlen(src);
+    copy = (char *)malloc(len + 1);
+    if (!copy) return NULL;
+    memcpy(copy, src, len + 1);
+    return copy;
+}
+
+static char *get_text_matrix_utf8_alloc(IDispatch *pDisp, int row, int col) {
+    DISPID dispid;
+    LPOLESTR name = L"TextMatrix";
+    VARIANT args[2];
+    DISPPARAMS dp;
+    VARIANT vr;
+    VARIANT tmp;
+    HRESULT hr;
+    int wlen;
+    int n;
+    char *out;
+
+    if (!pDisp) return NULL;
+    if (FAILED(pDisp->lpVtbl->GetIDsOfNames(pDisp, &IID_NULL, &name, 1, 0, &dispid))) {
+        return NULL;
+    }
+
+    VariantInit(&args[0]);
+    VariantInit(&args[1]);
+    args[0].vt = VT_I4;
+    args[0].lVal = col;
+    args[1].vt = VT_I4;
+    args[1].lVal = row;
+    dp.rgvarg = args;
+    dp.rgdispidNamedArgs = NULL;
+    dp.cArgs = 2;
+    dp.cNamedArgs = 0;
+
+    VariantInit(&vr);
+    hr = pDisp->lpVtbl->Invoke(
+        pDisp, dispid, &IID_NULL, 0, DISPATCH_PROPERTYGET, &dp, &vr, NULL, NULL);
+    if (FAILED(hr)) {
+        VariantClear(&vr);
+        return NULL;
+    }
+
+    VariantInit(&tmp);
+    hr = VariantChangeType(&tmp, &vr, 0, VT_BSTR);
+    VariantClear(&vr);
+    if (FAILED(hr)) {
+        VariantClear(&tmp);
+        return NULL;
+    }
+
+    if (!tmp.bstrVal) {
+        VariantClear(&tmp);
+        return dup_utf8_string("");
+    }
+
+    wlen = SysStringLen(tmp.bstrVal);
+    if (wlen <= 0) {
+        VariantClear(&tmp);
+        return dup_utf8_string("");
+    }
+
+    n = WideCharToMultiByte(CP_UTF8, 0, tmp.bstrVal, wlen, NULL, 0, NULL, NULL);
+    if (n <= 0) {
+        VariantClear(&tmp);
+        return NULL;
+    }
+
+    out = (char *)malloc((size_t)n + 1);
+    if (!out) {
+        VariantClear(&tmp);
+        return NULL;
+    }
+
+    if (WideCharToMultiByte(CP_UTF8, 0, tmp.bstrVal, wlen, out, n, NULL, NULL) <= 0) {
+        VariantClear(&tmp);
+        free(out);
+        return NULL;
+    }
+
+    out[n] = '\0';
+    VariantClear(&tmp);
+    return out;
+}
+
+static char *get_bstr_prop_utf8_alloc(IDispatch *pDisp, LPCOLESTR name) {
+    DISPID dispid;
+    DISPPARAMS dp;
+    VARIANT vr;
+    VARIANT tmp;
+    HRESULT hr;
+    int wlen;
+    int n;
+    char *out;
+
+    if (!pDisp || !name) return NULL;
+    if (FAILED(pDisp->lpVtbl->GetIDsOfNames(pDisp, &IID_NULL, (LPOLESTR *)&name, 1, 0, &dispid))) {
+        return NULL;
+    }
+
+    memset(&dp, 0, sizeof(dp));
+    VariantInit(&vr);
+    hr = pDisp->lpVtbl->Invoke(
+        pDisp, dispid, &IID_NULL, 0, DISPATCH_PROPERTYGET, &dp, &vr, NULL, NULL);
+    if (FAILED(hr)) return NULL;
+
+    VariantInit(&tmp);
+    hr = VariantChangeType(&tmp, &vr, 0, VT_BSTR);
+    VariantClear(&vr);
+    if (FAILED(hr) || !tmp.bstrVal) {
+        VariantClear(&tmp);
+        return NULL;
+    }
+
+    wlen = SysStringLen(tmp.bstrVal);
+    n = WideCharToMultiByte(CP_UTF8, 0, tmp.bstrVal, wlen, NULL, 0, NULL, NULL);
+    out = (char *)malloc((size_t)n + 1);
+    if (!out) {
+        VariantClear(&tmp);
+        return NULL;
+    }
+    WideCharToMultiByte(CP_UTF8, 0, tmp.bstrVal, wlen, out, n, NULL, NULL);
+    out[n] = '\0';
+    VariantClear(&tmp);
+    return out;
+}
+
+static void dump_top_row_snapshot(IDispatch *pDisp, const char *tag, int test_no) {
+    int cols;
+    int limit;
+    int c;
+
+    if (!pDisp) return;
+    cols = get_int(pDisp, L"Cols", 0);
+    if (cols <= 0) return;
+    limit = cols;
+    if (limit > 6) limit = 6;
+
+    printf("  Snapshot[%s][%02d]:", tag, test_no);
+    for (c = 0; c < limit; ++c) {
+        char *text = get_text_matrix_utf8_alloc(pDisp, 0, c);
+        printf(" %s%s", c == 0 ? "" : " |", text ? text : "");
+        free(text);
+    }
+    printf("\n");
+}
+
 static HRESULT put_int(IDispatch *pDisp, LPCOLESTR name, int val) {
     DISPID dispid;
     if (FAILED(get_dispid(pDisp, name, &dispid))) return DISP_E_MEMBERNOTFOUND;
@@ -134,6 +288,62 @@ static HRESULT put_int(IDispatch *pDisp, LPCOLESTR name, int val) {
         pDisp, dispid, &IID_NULL, 0, DISPATCH_PROPERTYPUT, &dp, NULL, NULL, NULL);
 }
 
+static void utf8_to_wchar_buf(const char *src, WCHAR *dst, int dst_cap) {
+    if (!dst || dst_cap <= 0) return;
+    if (!src) {
+        dst[0] = L'\0';
+        return;
+    }
+    if (MultiByteToWideChar(CP_UTF8, 0, src, -1, dst, dst_cap) <= 0) {
+        dst[0] = L'\0';
+    }
+}
+
+static HRESULT put_int_named_utf8(IDispatch *pDisp, const char *name_utf8, int val) {
+    WCHAR wname[96];
+    utf8_to_wchar_buf(name_utf8, wname, (int)(sizeof(wname) / sizeof(wname[0])));
+    if (!wname[0]) return E_INVALIDARG;
+    return put_int(pDisp, wname, val);
+}
+
+static HRESULT put_indexed_int_named_utf8(IDispatch *pDisp, const char *name_utf8, int index, int val) {
+    WCHAR wname[96];
+    DISPID dispid;
+    VARIANT args[2];
+    DISPID putid = DISPID_PROPERTYPUT;
+    DISPPARAMS dp;
+
+    utf8_to_wchar_buf(name_utf8, wname, (int)(sizeof(wname) / sizeof(wname[0])));
+    if (!wname[0]) return E_INVALIDARG;
+    if (FAILED(get_dispid(pDisp, wname, &dispid))) return DISP_E_MEMBERNOTFOUND;
+
+    VariantInit(&args[0]);
+    VariantInit(&args[1]);
+    args[1].vt = VT_I4; args[1].lVal = index;
+    args[0].vt = VT_I4; args[0].lVal = val;
+
+    dp.rgvarg = args;
+    dp.rgdispidNamedArgs = &putid;
+    dp.cArgs = 2;
+    dp.cNamedArgs = 1;
+    return pDisp->lpVtbl->Invoke(
+        pDisp, dispid, &IID_NULL, 0, DISPATCH_PROPERTYPUT, &dp, NULL, NULL, NULL);
+}
+
+static HRESULT call_method0_named_utf8(IDispatch *pDisp, const char *name_utf8) {
+    WCHAR wname[96];
+    DISPID dispid;
+    DISPPARAMS dp;
+
+    utf8_to_wchar_buf(name_utf8, wname, (int)(sizeof(wname) / sizeof(wname[0])));
+    if (!wname[0]) return E_INVALIDARG;
+    if (FAILED(get_dispid(pDisp, wname, &dispid))) return DISP_E_MEMBERNOTFOUND;
+
+    memset(&dp, 0, sizeof(dp));
+    return pDisp->lpVtbl->Invoke(
+        pDisp, dispid, &IID_NULL, 0, DISPATCH_METHOD, &dp, NULL, NULL, NULL);
+}
+
 static HRESULT call_method2_i4(IDispatch *pDisp, LPCOLESTR name, int arg0, int arg1) {
     DISPID dispid;
     VARIANT args[2];
@@ -150,6 +360,62 @@ static HRESULT call_method2_i4(IDispatch *pDisp, LPCOLESTR name, int arg0, int a
     dp.rgvarg = args;
     dp.rgdispidNamedArgs = NULL;
     dp.cArgs = 2;
+    dp.cNamedArgs = 0;
+
+    return pDisp->lpVtbl->Invoke(
+        pDisp, dispid, &IID_NULL, 0, DISPATCH_METHOD, &dp, NULL, NULL, NULL);
+}
+
+static HRESULT call_method2_r4_named_utf8(
+    IDispatch *pDisp, const char *name_utf8, float arg0, float arg1)
+{
+    WCHAR wname[96];
+    DISPID dispid;
+    VARIANT args[2];
+    DISPPARAMS dp;
+
+    utf8_to_wchar_buf(name_utf8, wname, (int)(sizeof(wname) / sizeof(wname[0])));
+    if (!wname[0]) return E_INVALIDARG;
+    if (FAILED(get_dispid(pDisp, wname, &dispid))) return DISP_E_MEMBERNOTFOUND;
+
+    VariantInit(&args[0]);
+    VariantInit(&args[1]);
+    args[1].vt = VT_R4; args[1].fltVal = arg0;
+    args[0].vt = VT_R4; args[0].fltVal = arg1;
+
+    dp.rgvarg = args;
+    dp.rgdispidNamedArgs = NULL;
+    dp.cArgs = 2;
+    dp.cNamedArgs = 0;
+
+    return pDisp->lpVtbl->Invoke(
+        pDisp, dispid, &IID_NULL, 0, DISPATCH_METHOD, &dp, NULL, NULL, NULL);
+}
+
+static HRESULT call_method4_r4_r4_i4_i4_named_utf8(
+    IDispatch *pDisp, const char *name_utf8, float arg0, float arg1, int arg2, int arg3)
+{
+    WCHAR wname[96];
+    DISPID dispid;
+    VARIANT args[4];
+    DISPPARAMS dp;
+
+    utf8_to_wchar_buf(name_utf8, wname, (int)(sizeof(wname) / sizeof(wname[0])));
+    if (!wname[0]) return E_INVALIDARG;
+    if (FAILED(get_dispid(pDisp, wname, &dispid))) return DISP_E_MEMBERNOTFOUND;
+
+    VariantInit(&args[0]);
+    VariantInit(&args[1]);
+    VariantInit(&args[2]);
+    VariantInit(&args[3]);
+    args[3].vt = VT_R4; args[3].fltVal = arg0;
+    args[2].vt = VT_R4; args[2].fltVal = arg1;
+    args[1].vt = VT_I4; args[1].lVal = arg2;
+    args[0].vt = VT_I4; args[0].lVal = arg3;
+
+    dp.rgvarg = args;
+    dp.rgdispidNamedArgs = NULL;
+    dp.cArgs = 4;
     dp.cNamedArgs = 0;
 
     return pDisp->lpVtbl->Invoke(
@@ -747,7 +1013,542 @@ typedef struct {
     int dispatch_only;   /* 1 if control lacks IOleObject (e.g. VolvoxGrid) */
     int render_width;    /* save for IViewObject fallback capture */
     int render_height;
+    struct EventProbe *event_probe;
 } HostedGrid;
+
+typedef enum {
+    EVT_BEFORE_EDIT = 0,
+    EVT_START_EDIT,
+    EVT_AFTER_EDIT,
+    EVT_BEFORE_ROW_COL_CHANGE,
+    EVT_AFTER_ROW_COL_CHANGE,
+    EVT_BEFORE_SEL_CHANGE,
+    EVT_AFTER_SEL_CHANGE,
+    EVT_BEFORE_SORT,
+    EVT_AFTER_SORT,
+    EVT_BEFORE_COLLAPSE,
+    EVT_AFTER_COLLAPSE,
+    EVT_BEFORE_SCROLL,
+    EVT_AFTER_SCROLL,
+    EVT_BEFORE_SCROLL_TIP,
+    EVT_BEFORE_USER_RESIZE,
+    EVT_AFTER_USER_RESIZE,
+    EVT_AFTER_USER_FREEZE,
+    EVT_BEFORE_MOVE_COLUMN,
+    EVT_AFTER_MOVE_COLUMN,
+    EVT_BEFORE_MOVE_ROW,
+    EVT_AFTER_MOVE_ROW,
+    EVT_BEFORE_MOUSE_DOWN,
+    EVT_BEFORE_DATA_REFRESH,
+    EVT_AFTER_DATA_REFRESH,
+    EVT_BEFORE_PAGE_BREAK,
+    EVT_CLICK,
+    EVT_DBLCLICK,
+    EVT_CELL_BUTTON_CLICK,
+    EVT_COUNT
+} EventId;
+
+typedef enum {
+    PROBE_MUTATION_NONE = 0,
+    PROBE_MUTATION_BOOL,
+    PROBE_MUTATION_I2,
+    PROBE_MUTATION_I4
+} ProbeMutationKind;
+
+typedef struct {
+    const WCHAR *name;
+    DISPID dispid;
+    DISPID script_dispid;
+    int count;
+    int mutate_on_count;
+    ProbeMutationKind mutate_kind;
+    LONG mutate_value;
+} EventSlot;
+
+typedef struct EventProbe {
+    IDispatchVtbl *lpVtbl;
+    LONG ref;
+    IConnectionPoint *cp;
+    ITypeInfo *typeinfo;
+    IDispatch *script_dispatch;
+    DWORD cookie;
+    EventSlot slots[EVT_COUNT];
+} EventProbe;
+
+static const WCHAR *g_event_slot_names[EVT_COUNT] = {
+    L"BeforeEdit",
+    L"StartEdit",
+    L"AfterEdit",
+    L"BeforeRowColChange",
+    L"AfterRowColChange",
+    L"BeforeSelChange",
+    L"AfterSelChange",
+    L"BeforeSort",
+    L"AfterSort",
+    L"BeforeCollapse",
+    L"AfterCollapse",
+    L"BeforeScroll",
+    L"AfterScroll",
+    L"BeforeScrollTip",
+    L"BeforeUserResize",
+    L"AfterUserResize",
+    L"AfterUserFreeze",
+    L"BeforeMoveColumn",
+    L"AfterMoveColumn",
+    L"BeforeMoveRow",
+    L"AfterMoveRow",
+    L"BeforeMouseDown",
+    L"BeforeDataRefresh",
+    L"AfterDataRefresh",
+    L"BeforePageBreak",
+    L"Click",
+    L"DblClick",
+    L"CellButtonClick"
+};
+
+static void event_probe_init_slots(EventProbe *probe) {
+    int i;
+    if (!probe) return;
+    for (i = 0; i < EVT_COUNT; ++i) {
+        probe->slots[i].name = g_event_slot_names[i];
+        probe->slots[i].dispid = DISPID_UNKNOWN;
+        probe->slots[i].script_dispid = DISPID_UNKNOWN;
+        probe->slots[i].count = 0;
+        probe->slots[i].mutate_on_count = 0;
+        probe->slots[i].mutate_kind = PROBE_MUTATION_NONE;
+        probe->slots[i].mutate_value = 0;
+    }
+}
+
+static EventSlot *event_probe_slot_by_dispid(EventProbe *probe, DISPID dispid) {
+    int i;
+    if (!probe) return NULL;
+    for (i = 0; i < EVT_COUNT; ++i) {
+        if (probe->slots[i].dispid == dispid) return &probe->slots[i];
+    }
+    return NULL;
+}
+
+static void event_probe_reset(EventProbe *probe) {
+    int i;
+    if (!probe) return;
+    for (i = 0; i < EVT_COUNT; ++i) {
+        probe->slots[i].count = 0;
+        probe->slots[i].mutate_on_count = 0;
+        probe->slots[i].mutate_kind = PROBE_MUTATION_NONE;
+        probe->slots[i].mutate_value = 0;
+    }
+}
+
+static int event_probe_count(const EventProbe *probe, EventId id) {
+    if (!probe || id < 0 || id >= EVT_COUNT) return 0;
+    return probe->slots[id].count;
+}
+
+static int event_probe_has_event(const EventProbe *probe, EventId id) {
+    if (!probe || id < 0 || id >= EVT_COUNT) return 0;
+    return probe->slots[id].dispid != DISPID_UNKNOWN;
+}
+
+static void event_probe_apply_mutation(EventSlot *slot, DISPPARAMS *pDispParams) {
+    VARIANT *arg;
+    if (!slot || !pDispParams || pDispParams->cArgs < 1) return;
+    if (slot->mutate_on_count <= 0 || slot->count != slot->mutate_on_count) return;
+    arg = &pDispParams->rgvarg[0];
+    switch (slot->mutate_kind) {
+    case PROBE_MUTATION_BOOL:
+        if (arg->vt == (VT_BYREF | VT_BOOL) && arg->pboolVal) {
+            *arg->pboolVal = (VARIANT_BOOL)slot->mutate_value;
+        }
+        break;
+    case PROBE_MUTATION_I2:
+        if (arg->vt == (VT_BYREF | VT_I2) && arg->piVal) {
+            *arg->piVal = (short)slot->mutate_value;
+        }
+        break;
+    case PROBE_MUTATION_I4:
+        if (arg->vt == (VT_BYREF | VT_I4) && arg->plVal) {
+            *arg->plVal = slot->mutate_value;
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+static void event_probe_bind_script_dispatch(
+    EventProbe *probe, IDispatch *script_dispatch, const WCHAR *prefix)
+{
+    int i;
+
+    if (!probe) return;
+
+    if (probe->script_dispatch) {
+        probe->script_dispatch->lpVtbl->Release(probe->script_dispatch);
+        probe->script_dispatch = NULL;
+    }
+    for (i = 0; i < EVT_COUNT; ++i) {
+        probe->slots[i].script_dispid = DISPID_UNKNOWN;
+    }
+
+    if (!script_dispatch || !prefix || !*prefix) return;
+
+    probe->script_dispatch = script_dispatch;
+    probe->script_dispatch->lpVtbl->AddRef(probe->script_dispatch);
+
+    for (i = 0; i < EVT_COUNT; ++i) {
+        WCHAR handler[96];
+        LPOLESTR names[1];
+        HRESULT hr;
+
+        handler[0] = L'\0';
+        lstrcpynW(handler, prefix, (int)(sizeof(handler) / sizeof(handler[0])));
+        lstrcpynW(
+            handler + lstrlenW(handler),
+            probe->slots[i].name,
+            (int)(sizeof(handler) / sizeof(handler[0])) - lstrlenW(handler));
+        names[0] = handler;
+        hr = probe->script_dispatch->lpVtbl->GetIDsOfNames(
+            probe->script_dispatch, &IID_NULL, names, 1, LOCALE_USER_DEFAULT,
+            &probe->slots[i].script_dispid);
+        if (FAILED(hr)) {
+            probe->slots[i].script_dispid = DISPID_UNKNOWN;
+        }
+    }
+}
+
+static void event_probe_invoke_script_handler(
+    EventProbe *probe, EventSlot *slot, DISPPARAMS *pDispParams)
+{
+    DISPPARAMS dp_local;
+    VARIANT args_copy[8];
+    VARIANT scratch[8];
+    int wrapped[8];
+    UINT i;
+    EXCEPINFO ei;
+    UINT arg_err = 0;
+    HRESULT hr;
+
+    if (!probe || !slot || !probe->script_dispatch) return;
+    if (slot->script_dispid == DISPID_UNKNOWN) return;
+    if (!pDispParams || pDispParams->cArgs > 8) return;
+
+    memset(wrapped, 0, sizeof(wrapped));
+    memset(&dp_local, 0, sizeof(dp_local));
+    for (i = 0; i < pDispParams->cArgs; ++i) {
+        VARIANT *src = &pDispParams->rgvarg[i];
+        VariantInit(&args_copy[i]);
+        VariantInit(&scratch[i]);
+        switch (src->vt) {
+        case VT_BYREF | VT_BOOL:
+            if (src->pboolVal) {
+                scratch[i].vt = VT_BOOL;
+                scratch[i].boolVal = *src->pboolVal;
+                args_copy[i].vt = VT_BYREF | VT_VARIANT;
+                args_copy[i].pvarVal = &scratch[i];
+                wrapped[i] = 1;
+            }
+            break;
+        case VT_BYREF | VT_I2:
+            if (src->piVal) {
+                scratch[i].vt = VT_I2;
+                scratch[i].iVal = *src->piVal;
+                args_copy[i].vt = VT_BYREF | VT_VARIANT;
+                args_copy[i].pvarVal = &scratch[i];
+                wrapped[i] = 1;
+            }
+            break;
+        case VT_BYREF | VT_I4:
+            if (src->plVal) {
+                scratch[i].vt = VT_I4;
+                scratch[i].lVal = *src->plVal;
+                args_copy[i].vt = VT_BYREF | VT_VARIANT;
+                args_copy[i].pvarVal = &scratch[i];
+                wrapped[i] = 1;
+            }
+            break;
+        default:
+            VariantCopy(&args_copy[i], src);
+            break;
+        }
+    }
+
+    dp_local = *pDispParams;
+    dp_local.rgvarg = args_copy;
+
+    memset(&ei, 0, sizeof(ei));
+    hr = probe->script_dispatch->lpVtbl->Invoke(
+        probe->script_dispatch,
+        slot->script_dispid,
+        &IID_NULL,
+        LOCALE_USER_DEFAULT,
+        DISPATCH_METHOD,
+        &dp_local,
+        NULL,
+        &ei,
+        &arg_err);
+    for (i = 0; i < pDispParams->cArgs; ++i) {
+        VARIANT *src = &pDispParams->rgvarg[i];
+        if (wrapped[i]) {
+            VARIANT converted;
+            VariantInit(&converted);
+            if (src->vt == (VT_BYREF | VT_BOOL) && src->pboolVal &&
+                SUCCEEDED(VariantChangeType(&converted, &scratch[i], 0, VT_BOOL))) {
+                *src->pboolVal = converted.boolVal;
+            } else if (src->vt == (VT_BYREF | VT_I2) && src->piVal &&
+                SUCCEEDED(VariantChangeType(&converted, &scratch[i], 0, VT_I2))) {
+                *src->piVal = converted.iVal;
+            } else if (src->vt == (VT_BYREF | VT_I4) && src->plVal &&
+                SUCCEEDED(VariantChangeType(&converted, &scratch[i], 0, VT_I4))) {
+                *src->plVal = converted.lVal;
+            }
+            VariantClear(&converted);
+        }
+        VariantClear(&args_copy[i]);
+        VariantClear(&scratch[i]);
+    }
+    if (FAILED(hr) && ei.bstrDescription) {
+        printf("  Script handler %ls failed: %ls\n", slot->name, ei.bstrDescription);
+    }
+    SysFreeString(ei.bstrSource);
+    SysFreeString(ei.bstrDescription);
+    SysFreeString(ei.bstrHelpFile);
+}
+
+static HRESULT STDMETHODCALLTYPE eps_qi(IDispatch *This, REFIID riid, void **ppv) {
+    if (IsEqualGUID(riid, &IID_IUnknown) || IsEqualGUID(riid, &IID_IDispatch)) {
+        *ppv = This;
+        This->lpVtbl->AddRef(This);
+        return S_OK;
+    }
+    *ppv = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG STDMETHODCALLTYPE eps_addref(IDispatch *This) {
+    return InterlockedIncrement(&((EventProbe *)This)->ref);
+}
+
+static ULONG STDMETHODCALLTYPE eps_release(IDispatch *This) {
+    return InterlockedDecrement(&((EventProbe *)This)->ref);
+}
+
+static HRESULT STDMETHODCALLTYPE eps_get_type_info_count(IDispatch *This, UINT *pctinfo) {
+    (void)This;
+    if (pctinfo) *pctinfo = 0;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE eps_get_type_info(IDispatch *This, UINT iTInfo, LCID lcid, ITypeInfo **ppTInfo) {
+    (void)This;
+    (void)iTInfo;
+    (void)lcid;
+    if (ppTInfo) *ppTInfo = NULL;
+    return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE eps_get_ids_of_names(
+    IDispatch *This, REFIID riid, LPOLESTR *rgszNames, UINT cNames, LCID lcid, DISPID *rgDispId)
+{
+    (void)This;
+    (void)riid;
+    (void)rgszNames;
+    (void)cNames;
+    (void)lcid;
+    (void)rgDispId;
+    return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE eps_invoke(
+    IDispatch *This, DISPID dispIdMember, REFIID riid, LCID lcid, WORD wFlags,
+    DISPPARAMS *pDispParams, VARIANT *pVarResult, EXCEPINFO *pExcepInfo, UINT *puArgErr)
+{
+    EventProbe *probe = (EventProbe *)This;
+    EventSlot *slot = event_probe_slot_by_dispid(probe, dispIdMember);
+    (void)riid;
+    (void)lcid;
+    (void)wFlags;
+    if (pVarResult) VariantInit(pVarResult);
+    if (pExcepInfo) memset(pExcepInfo, 0, sizeof(*pExcepInfo));
+    if (puArgErr) *puArgErr = 0;
+
+    if (slot) {
+        slot->count++;
+        event_probe_apply_mutation(slot, pDispParams);
+        event_probe_invoke_script_handler(probe, slot, pDispParams);
+    }
+    return S_OK;
+}
+
+static IDispatchVtbl g_event_probe_vtbl = {
+    eps_qi,
+    eps_addref,
+    eps_release,
+    eps_get_type_info_count,
+    eps_get_type_info,
+    eps_get_ids_of_names,
+    eps_invoke
+};
+
+static void event_probe_lookup_dispid(EventProbe *probe, LPCOLESTR name, DISPID *pDispid) {
+    HRESULT hr;
+    LPOLESTR names[1];
+    if (!pDispid) return;
+    *pDispid = DISPID_UNKNOWN;
+    if (!probe || !probe->typeinfo || !name) return;
+    names[0] = (LPOLESTR)name;
+    hr = probe->typeinfo->lpVtbl->GetIDsOfNames(probe->typeinfo, names, 1, pDispid);
+    if (FAILED(hr)) *pDispid = DISPID_UNKNOWN;
+}
+
+static EventProbe *event_probe_attach(IDispatch *disp) {
+    IProvideClassInfo2 *pci2 = NULL;
+    IProvideClassInfo *pci = NULL;
+    ITypeInfo *class_info = NULL;
+    ITypeLib *type_lib = NULL;
+    IConnectionPointContainer *cpc = NULL;
+    IEnumConnectionPoints *enum_cp = NULL;
+    IConnectionPoint *cp = NULL;
+    EventProbe *probe = NULL;
+    GUID source_guid;
+    UINT type_index = 0;
+    ULONG fetched = 0;
+    HRESULT hr;
+
+    if (!disp) return NULL;
+
+    memset(&source_guid, 0, sizeof(source_guid));
+    hr = disp->lpVtbl->QueryInterface(disp, &IID_IConnectionPointContainer, (void **)&cpc);
+    if (FAILED(hr) || !cpc) goto done;
+
+    hr = disp->lpVtbl->QueryInterface(disp, &IID_IProvideClassInfo2, (void **)&pci2);
+    if (SUCCEEDED(hr) && pci2) {
+        hr = pci2->lpVtbl->GetGUID(pci2, GUIDKIND_DEFAULT_SOURCE_DISP_IID, &source_guid);
+    }
+
+    if (FAILED(hr) || IsEqualGUID(&source_guid, &GUID_NULL)) {
+        hr = cpc->lpVtbl->EnumConnectionPoints(cpc, &enum_cp);
+        if (SUCCEEDED(hr) && enum_cp) {
+            hr = enum_cp->lpVtbl->Next(enum_cp, 1, &cp, &fetched);
+            if (hr == S_OK && cp && fetched == 1) {
+                hr = cp->lpVtbl->GetConnectionInterface(cp, &source_guid);
+            }
+        }
+    }
+    if (FAILED(hr) || IsEqualGUID(&source_guid, &GUID_NULL)) goto done;
+
+    if (pci2) {
+        hr = pci2->lpVtbl->QueryInterface(pci2, &IID_IProvideClassInfo, (void **)&pci);
+    } else {
+        hr = disp->lpVtbl->QueryInterface(disp, &IID_IProvideClassInfo, (void **)&pci);
+    }
+    if (SUCCEEDED(hr) && pci) {
+        hr = pci->lpVtbl->GetClassInfo(pci, &class_info);
+        if (SUCCEEDED(hr) && class_info) {
+            hr = class_info->lpVtbl->GetContainingTypeLib(class_info, &type_lib, &type_index);
+        }
+    }
+
+    probe = (EventProbe *)calloc(1, sizeof(*probe));
+    if (!probe) goto done;
+    probe->lpVtbl = &g_event_probe_vtbl;
+    probe->ref = 1;
+    event_probe_init_slots(probe);
+    if (type_lib) {
+        hr = type_lib->lpVtbl->GetTypeInfoOfGuid(type_lib, &source_guid, &probe->typeinfo);
+        if (FAILED(hr)) probe->typeinfo = NULL;
+    }
+
+    {
+        int i;
+        for (i = 0; i < EVT_COUNT; ++i) {
+            event_probe_lookup_dispid(probe, probe->slots[i].name, &probe->slots[i].dispid);
+        }
+    }
+
+    if (!cp) {
+        hr = cpc->lpVtbl->FindConnectionPoint(cpc, &source_guid, &cp);
+        if (FAILED(hr) || !cp) goto done;
+    }
+    hr = cp->lpVtbl->Advise(cp, (IUnknown *)probe, &probe->cookie);
+    if (FAILED(hr)) goto done;
+    probe->cp = cp;
+    cp = NULL;
+
+done:
+    if (cp) cp->lpVtbl->Release(cp);
+    if (enum_cp) enum_cp->lpVtbl->Release(enum_cp);
+    if (cpc) cpc->lpVtbl->Release(cpc);
+    if (type_lib) type_lib->lpVtbl->Release(type_lib);
+    if (class_info) class_info->lpVtbl->Release(class_info);
+    if (pci) pci->lpVtbl->Release(pci);
+    if (pci2) pci2->lpVtbl->Release(pci2);
+    if (probe && !probe->cp) {
+        if (probe->typeinfo) probe->typeinfo->lpVtbl->Release(probe->typeinfo);
+        free(probe);
+        probe = NULL;
+    }
+    return probe;
+}
+
+static void event_probe_detach(EventProbe **ppProbe) {
+    EventProbe *probe;
+    if (!ppProbe || !*ppProbe) return;
+    probe = *ppProbe;
+    if (probe->cp && probe->cookie) {
+        probe->cp->lpVtbl->Unadvise(probe->cp, probe->cookie);
+    }
+    if (probe->cp) {
+        probe->cp->lpVtbl->Release(probe->cp);
+    }
+    if (probe->script_dispatch) {
+        probe->script_dispatch->lpVtbl->Release(probe->script_dispatch);
+    }
+    if (probe->typeinfo) {
+        probe->typeinfo->lpVtbl->Release(probe->typeinfo);
+    }
+    free(probe);
+    *ppProbe = NULL;
+}
+
+static void dump_event_probe_snapshot(const EventProbe *probe, const char *tag, int test_no) {
+    if (!probe) return;
+    printf(
+        "  EventProbe[%s][%02d]: "
+        "BE=%d |SE=%d |AE=%d |BRC=%d |ARC=%d |BSC=%d |ASC=%d |BS=%d |AS=%d |"
+        "BC=%d |AC=%d |BSCr=%d |ASCr=%d |BST=%d |BUR=%d |AUR=%d |AUF=%d |"
+        "BMC=%d |AMC=%d |BMR=%d |AMR=%d |BMD=%d |BDR=%d |ADR=%d |BPB=%d |CLK=%d |DBL=%d |CBC=%d\n",
+        tag,
+        test_no,
+        event_probe_count(probe, EVT_BEFORE_EDIT),
+        event_probe_count(probe, EVT_START_EDIT),
+        event_probe_count(probe, EVT_AFTER_EDIT),
+        event_probe_count(probe, EVT_BEFORE_ROW_COL_CHANGE),
+        event_probe_count(probe, EVT_AFTER_ROW_COL_CHANGE),
+        event_probe_count(probe, EVT_BEFORE_SEL_CHANGE),
+        event_probe_count(probe, EVT_AFTER_SEL_CHANGE),
+        event_probe_count(probe, EVT_BEFORE_SORT),
+        event_probe_count(probe, EVT_AFTER_SORT),
+        event_probe_count(probe, EVT_BEFORE_COLLAPSE),
+        event_probe_count(probe, EVT_AFTER_COLLAPSE),
+        event_probe_count(probe, EVT_BEFORE_SCROLL),
+        event_probe_count(probe, EVT_AFTER_SCROLL),
+        event_probe_count(probe, EVT_BEFORE_SCROLL_TIP),
+        event_probe_count(probe, EVT_BEFORE_USER_RESIZE),
+        event_probe_count(probe, EVT_AFTER_USER_RESIZE),
+        event_probe_count(probe, EVT_AFTER_USER_FREEZE),
+        event_probe_count(probe, EVT_BEFORE_MOVE_COLUMN),
+        event_probe_count(probe, EVT_AFTER_MOVE_COLUMN),
+        event_probe_count(probe, EVT_BEFORE_MOVE_ROW),
+        event_probe_count(probe, EVT_AFTER_MOVE_ROW),
+        event_probe_count(probe, EVT_BEFORE_MOUSE_DOWN),
+        event_probe_count(probe, EVT_BEFORE_DATA_REFRESH),
+        event_probe_count(probe, EVT_AFTER_DATA_REFRESH),
+        event_probe_count(probe, EVT_BEFORE_PAGE_BREAK),
+        event_probe_count(probe, EVT_CLICK),
+        event_probe_count(probe, EVT_DBLCLICK),
+        event_probe_count(probe, EVT_CELL_BUTTON_CLICK));
+}
 
 static HWND find_visible_combo_popup_window(void) {
     HWND hwnd = NULL;
@@ -757,26 +1558,121 @@ static HWND find_visible_combo_popup_window(void) {
     return NULL;
 }
 
-/* Render grid via IViewObject, then overlay a visible ComboLBox popup
- * (if any) from the live desktop so dropdown lists are included. */
+static int blit_host_client_from_screen(const HostedGrid *hg, HDC hdcMem, int w, int h) {
+    HDC hdcScreen;
+    POINT origin = {0, 0};
+    HWND hwndTarget;
+    BOOL ok;
+
+    if (!hg || !hdcMem || !hg->hwnd_host || !IsWindow(hg->hwnd_host)) return -1;
+
+    hwndTarget = (hg->hwnd_ctrl && IsWindow(hg->hwnd_ctrl)) ? hg->hwnd_ctrl : hg->hwnd_host;
+    SetForegroundWindow(hg->hwnd_host);
+    BringWindowToTop(hg->hwnd_host);
+    SetFocus(hwndTarget);
+    RedrawWindow(
+        hg->hwnd_host,
+        NULL,
+        NULL,
+        RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN | RDW_FRAME);
+    pump_messages_ms(80);
+
+    if (!ClientToScreen(hg->hwnd_host, &origin)) return -1;
+
+    hdcScreen = GetDC(NULL);
+    if (!hdcScreen) return -1;
+
+    ok = BitBlt(hdcMem, 0, 0, w, h, hdcScreen, origin.x, origin.y, SRCCOPY | CAPTUREBLT);
+    if (!ok) ok = BitBlt(hdcMem, 0, 0, w, h, hdcScreen, origin.x, origin.y, SRCCOPY);
+    ReleaseDC(NULL, hdcScreen);
+
+    if (ok) return 0;
+
+    ok = PrintWindow(hwndTarget, hdcMem, PW_CLIENTONLY);
+    if (!ok && hwndTarget != hg->hwnd_host) {
+        ok = PrintWindow(hg->hwnd_host, hdcMem, PW_CLIENTONLY);
+    }
+    if (!ok && hwndTarget != hg->hwnd_host) {
+        ok = PrintWindow(hg->hwnd_host, hdcMem, 0);
+    }
+
+    return ok ? 0 : -1;
+}
+
+static void overlay_visible_combo_popup(HDC hdcMem, const HostedGrid *hg) {
+    HDC hdcScreen;
+    HWND popup;
+
+    if (!hdcMem || !hg || !hg->hwnd_host || !IsWindow(hg->hwnd_host)) return;
+
+    popup = find_visible_combo_popup_window();
+    if (!popup) return;
+
+    hdcScreen = GetDC(NULL);
+    if (!hdcScreen) return;
+
+    {
+        RECT pr;
+        POINT origin = {0, 0};
+        if (GetWindowRect(popup, &pr) && ClientToScreen(hg->hwnd_host, &origin)) {
+            int dx = pr.left - origin.x;
+            int dy = pr.top - origin.y;
+            int pw = pr.right - pr.left;
+            int ph = pr.bottom - pr.top;
+            if (pw > 0 && ph > 0) {
+                HDC hdcPopup = CreateCompatibleDC(hdcMem);
+                HBITMAP hbmPopup = CreateCompatibleBitmap(hdcMem, pw, ph);
+                HGDIOBJ hOldPopup = NULL;
+                BOOL drawn = FALSE;
+
+                if (hdcPopup && hbmPopup) {
+                    RECT z = {0, 0, pw, ph};
+                    HBRUSH b = CreateSolidBrush(RGB(255, 255, 255));
+                    hOldPopup = SelectObject(hdcPopup, hbmPopup);
+                    FillRect(hdcPopup, &z, b);
+                    DeleteObject(b);
+                }
+
+                if (hdcPopup && hbmPopup && hOldPopup) {
+                    drawn = PrintWindow(popup, hdcPopup, PW_CLIENTONLY);
+                    if (!drawn) drawn = PrintWindow(popup, hdcPopup, 0);
+                }
+
+                if (drawn) {
+                    BitBlt(hdcMem, dx, dy, pw, ph, hdcPopup, 0, 0, SRCCOPY);
+                } else {
+                    if (!BitBlt(hdcMem, dx, dy, pw, ph, hdcScreen, pr.left, pr.top, SRCCOPY | CAPTUREBLT)) {
+                        BitBlt(hdcMem, dx, dy, pw, ph, hdcScreen, pr.left, pr.top, SRCCOPY);
+                    }
+                }
+
+                if (hOldPopup) SelectObject(hdcPopup, hOldPopup);
+                if (hbmPopup) DeleteObject(hbmPopup);
+                if (hdcPopup) DeleteDC(hdcPopup);
+            }
+        }
+    }
+
+    ReleaseDC(NULL, hdcScreen);
+}
+
+/* Capture the live hosted control client area, then overlay a visible
+ * ComboLBox popup (if any) from the desktop so dropdown lists are included.
+ * Falls back to IViewObject::Draw if the live capture path is unavailable. */
 static int render_to_bmp_with_popup(
     IDispatch *pGrid, const HostedGrid *hg, const char *filename, int w, int h)
 {
-    IViewObject *pView = NULL;
-    HRESULT hr = pGrid->lpVtbl->QueryInterface(pGrid, &IID_IViewObject, (void **)&pView);
     HDC hdcScreen, hdcMem;
     HBITMAP hbm;
     HGDIOBJ hOld;
     RECT rc;
     HBRUSH hBrush;
-    RECTL rcl;
-
-    if (FAILED(hr) || !pView) {
-        printf("  QueryInterface(IViewObject) failed: 0x%08lx\n", hr);
-        return -1;
-    }
+    int rc_capture;
 
     hdcScreen = GetDC(NULL);
+    if (!hdcScreen) {
+        return render_to_bmp(pGrid, filename, w, h);
+    }
     hdcMem = CreateCompatibleDC(hdcScreen);
     hbm = CreateCompatibleBitmap(hdcScreen, w, h);
     hOld = SelectObject(hdcMem, hbm);
@@ -786,67 +1682,31 @@ static int render_to_bmp_with_popup(
     FillRect(hdcMem, &rc, hBrush);
     DeleteObject(hBrush);
 
-    rcl.left = 0; rcl.top = 0; rcl.right = w; rcl.bottom = h;
-    hr = pView->lpVtbl->Draw(pView, DVASPECT_CONTENT, -1, NULL, NULL,
-                              NULL, hdcMem, &rcl, NULL, NULL, 0);
-    if (FAILED(hr)) {
-        printf("  IViewObject::Draw failed: 0x%08lx\n", hr);
+    rc_capture = blit_host_client_from_screen(hg, hdcMem, w, h);
+    if (rc_capture == 0) {
+        overlay_visible_combo_popup(hdcMem, hg);
+        save_bmp(hdcMem, hbm, w, h, filename);
+
+        SelectObject(hdcMem, hOld);
+        DeleteObject(hbm);
+        DeleteDC(hdcMem);
+        ReleaseDC(NULL, hdcScreen);
+        return 0;
     }
-
-    if (SUCCEEDED(hr) && hg && hg->hwnd_host) {
-        HWND popup = find_visible_combo_popup_window();
-        if (popup) {
-            RECT pr;
-            POINT origin = {0, 0};
-            if (GetWindowRect(popup, &pr) && ClientToScreen(hg->hwnd_host, &origin)) {
-                int dx = pr.left - origin.x;
-                int dy = pr.top - origin.y;
-                int pw = pr.right - pr.left;
-                int ph = pr.bottom - pr.top;
-                if (pw > 0 && ph > 0) {
-                    HDC hdcPopup = CreateCompatibleDC(hdcMem);
-                    HBITMAP hbmPopup = CreateCompatibleBitmap(hdcMem, pw, ph);
-                    HGDIOBJ hOldPopup = SelectObject(hdcPopup, hbmPopup);
-                    BOOL drawn = FALSE;
-
-                    if (hdcPopup && hbmPopup && hOldPopup) {
-                        RECT z = {0, 0, pw, ph};
-                        HBRUSH b = CreateSolidBrush(RGB(255, 255, 255));
-                        FillRect(hdcPopup, &z, b);
-                        DeleteObject(b);
-
-                        drawn = PrintWindow(popup, hdcPopup, PW_CLIENTONLY);
-                        if (!drawn) drawn = PrintWindow(popup, hdcPopup, 0);
-                    }
-
-                    if (drawn) {
-                        BitBlt(hdcMem, dx, dy, pw, ph, hdcPopup, 0, 0, SRCCOPY);
-                    } else {
-                        if (!BitBlt(hdcMem, dx, dy, pw, ph, hdcScreen, pr.left, pr.top, SRCCOPY | CAPTUREBLT)) {
-                            BitBlt(hdcMem, dx, dy, pw, ph, hdcScreen, pr.left, pr.top, SRCCOPY);
-                        }
-                    }
-
-                    if (hOldPopup) SelectObject(hdcPopup, hOldPopup);
-                    if (hbmPopup) DeleteObject(hbmPopup);
-                    if (hdcPopup) DeleteDC(hdcPopup);
-                }
-            }
-        }
-    }
-
-    save_bmp(hdcMem, hbm, w, h, filename);
 
     SelectObject(hdcMem, hOld);
     DeleteObject(hbm);
     DeleteDC(hdcMem);
     ReleaseDC(NULL, hdcScreen);
-    pView->lpVtbl->Release(pView);
-    return SUCCEEDED(hr) ? 0 : -1;
+    return render_to_bmp(pGrid, filename, w, h);
 }
 
 static void hosted_grid_destroy(HostedGrid *hg) {
     if (!hg) return;
+
+    if (hg->event_probe) {
+        event_probe_detach(&hg->event_probe);
+    }
 
     /* Properly deactivate in-place before releasing interfaces.
      * Without this, the control's Release triggers cleanup that calls back
@@ -929,6 +1789,7 @@ static int hosted_grid_create(HostedGrid *hg, const WCHAR *progid, const WCHAR *
             hosted_grid_destroy(hg);
             return -1;
         }
+        hg->event_probe = event_probe_attach(hg->disp);
         hg->dispatch_only = 1;
         hg->render_width = width;
         hg->render_height = height;
@@ -966,6 +1827,7 @@ static int hosted_grid_create(HostedGrid *hg, const WCHAR *progid, const WCHAR *
         hosted_grid_destroy(hg);
         return -1;
     }
+    hg->event_probe = event_probe_attach(hg->disp);
 
     hr = hg->ole_obj->lpVtbl->QueryInterface(hg->ole_obj, &IID_IOleWindow, (void **)&ole_window);
     if (SUCCEEDED(hr) && ole_window) {
@@ -994,7 +1856,139 @@ typedef struct {
     IActiveScriptSiteVtbl *lpVtbl;
     LONG ref;
     IDispatch *grid;
+    IDispatch *host_object;
+    ITypeInfo *typeinfo;
 } ScriptSite;
+
+typedef struct {
+    ScriptSite site;
+    IActiveScript *script;
+    IActiveScriptParse *parser;
+    IDispatch *script_disp;
+    EventProbe *event_probe;
+} ScriptRuntime;
+
+typedef struct {
+    IDispatchVtbl *lpVtbl;
+    LONG ref;
+} ScriptHostHelper;
+
+#define DISPID_HOST_CREATEOBJECT 1
+
+static HRESULT STDMETHODCALLTYPE sh_qi(IDispatch *This, REFIID riid, void **ppv) {
+    if (IsEqualGUID(riid, &IID_IUnknown) || IsEqualGUID(riid, &IID_IDispatch)) {
+        *ppv = This;
+        This->lpVtbl->AddRef(This);
+        return S_OK;
+    }
+    *ppv = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG STDMETHODCALLTYPE sh_addref(IDispatch *This) {
+    return InterlockedIncrement(&((ScriptHostHelper *)This)->ref);
+}
+
+static ULONG STDMETHODCALLTYPE sh_release(IDispatch *This) {
+    ULONG ref = InterlockedDecrement(&((ScriptHostHelper *)This)->ref);
+    if (ref == 0) free(This);
+    return ref;
+}
+
+static HRESULT STDMETHODCALLTYPE sh_get_type_info_count(IDispatch *This, UINT *pctinfo) {
+    (void)This;
+    if (pctinfo) *pctinfo = 0;
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE sh_get_type_info(
+    IDispatch *This, UINT iTInfo, LCID lcid, ITypeInfo **ppTInfo)
+{
+    (void)This;
+    (void)iTInfo;
+    (void)lcid;
+    if (ppTInfo) *ppTInfo = NULL;
+    return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE sh_get_ids_of_names(
+    IDispatch *This, REFIID riid, LPOLESTR *rgszNames, UINT cNames, LCID lcid, DISPID *rgDispId)
+{
+    UINT i;
+    (void)This;
+    (void)riid;
+    (void)lcid;
+    if (!rgszNames || !rgDispId) return E_POINTER;
+    for (i = 0; i < cNames; ++i) {
+        if (lstrcmpiW(rgszNames[i], L"CreateObject") == 0) {
+            rgDispId[i] = DISPID_HOST_CREATEOBJECT;
+        } else {
+            rgDispId[i] = DISPID_UNKNOWN;
+            return DISP_E_UNKNOWNNAME;
+        }
+    }
+    return S_OK;
+}
+
+static HRESULT STDMETHODCALLTYPE sh_invoke(
+    IDispatch *This, DISPID dispIdMember, REFIID riid, LCID lcid, WORD wFlags,
+    DISPPARAMS *pDispParams, VARIANT *pVarResult, EXCEPINFO *pExcepInfo, UINT *puArgErr)
+{
+    VARIANT arg_bstr;
+    BSTR progid = NULL;
+    CLSID clsid;
+    IDispatch *disp = NULL;
+    HRESULT hr;
+
+    (void)This;
+    (void)riid;
+    (void)lcid;
+    if (pVarResult) VariantInit(pVarResult);
+    if (pExcepInfo) memset(pExcepInfo, 0, sizeof(*pExcepInfo));
+    if (puArgErr) *puArgErr = 0;
+
+    if (dispIdMember != DISPID_HOST_CREATEOBJECT || !(wFlags & DISPATCH_METHOD)) {
+        return DISP_E_MEMBERNOTFOUND;
+    }
+    if (!pDispParams || pDispParams->cArgs < 1) return DISP_E_BADPARAMCOUNT;
+
+    VariantInit(&arg_bstr);
+    hr = VariantChangeType(&arg_bstr, &pDispParams->rgvarg[0], 0, VT_BSTR);
+    if (FAILED(hr)) return hr;
+    progid = V_BSTR(&arg_bstr);
+
+    hr = CLSIDFromProgID(progid, &clsid);
+    if (SUCCEEDED(hr)) {
+        hr = CoCreateInstance(&clsid, NULL, CLSCTX_INPROC_SERVER, &IID_IDispatch, (void **)&disp);
+    }
+    if (SUCCEEDED(hr) && pVarResult) {
+        V_VT(pVarResult) = VT_DISPATCH;
+        V_DISPATCH(pVarResult) = disp;
+        disp = NULL;
+    }
+
+    if (disp) disp->lpVtbl->Release(disp);
+    VariantClear(&arg_bstr);
+    return hr;
+}
+
+static IDispatchVtbl g_script_host_helper_vtbl = {
+    sh_qi,
+    sh_addref,
+    sh_release,
+    sh_get_type_info_count,
+    sh_get_type_info,
+    sh_get_ids_of_names,
+    sh_invoke
+};
+
+static IDispatch *script_host_helper_create(void) {
+    ScriptHostHelper *helper = (ScriptHostHelper *)calloc(1, sizeof(*helper));
+    if (!helper) return NULL;
+    helper->lpVtbl = &g_script_host_helper_vtbl;
+    helper->ref = 1;
+    return (IDispatch *)helper;
+}
 
 static HRESULT STDMETHODCALLTYPE ss_qi(IActiveScriptSite *This, REFIID riid, void **ppv) {
     if (IsEqualGUID(riid, &IID_IUnknown) || IsEqualGUID(riid, &IID_IActiveScriptSite)) {
@@ -1027,6 +2021,17 @@ static HRESULT STDMETHODCALLTYPE ss_getiteminfo(
         if ((mask & SCRIPTINFO_IUNKNOWN) && ppUnk) {
             *ppUnk = (IUnknown *)ss->grid;
             ss->grid->lpVtbl->AddRef(ss->grid);
+        }
+        if ((mask & SCRIPTINFO_ITYPEINFO) && ppTI && ss->typeinfo) {
+            *ppTI = ss->typeinfo;
+            ss->typeinfo->lpVtbl->AddRef(ss->typeinfo);
+        }
+        return S_OK;
+    }
+    if (wcscmp(name, L"host") == 0) {
+        if ((mask & SCRIPTINFO_IUNKNOWN) && ppUnk && ss->host_object) {
+            *ppUnk = (IUnknown *)ss->host_object;
+            ss->host_object->lpVtbl->AddRef(ss->host_object);
         }
         return S_OK;
     }
@@ -1071,6 +2076,24 @@ static IActiveScriptSiteVtbl g_ss_vtbl = {
     ss_onterm, ss_onstate, ss_onerror,
     ss_enter, ss_leave
 };
+
+static HRESULT get_named_item_typeinfo(IDispatch *disp, ITypeInfo **ppTI) {
+    IProvideClassInfo *pci = NULL;
+    HRESULT hr;
+
+    if (!ppTI) return E_POINTER;
+    *ppTI = NULL;
+    if (!disp) return E_INVALIDARG;
+
+    hr = disp->lpVtbl->QueryInterface(disp, &IID_IProvideClassInfo, (void **)&pci);
+    if (SUCCEEDED(hr) && pci) {
+        hr = pci->lpVtbl->GetClassInfo(pci, ppTI);
+        pci->lpVtbl->Release(pci);
+        if (SUCCEEDED(hr) && *ppTI) return hr;
+    }
+
+    return disp->lpVtbl->GetTypeInfo(disp, 0, LOCALE_USER_DEFAULT, ppTI);
+}
 
 /* VBS preamble: defines helper arrays and compatibility helpers. */
 static const WCHAR g_vbs_preamble[] =
@@ -1222,59 +2245,99 @@ static int save_utf8_from_wide(const char *path, const WCHAR *text) {
     return 0;
 }
 
-static HRESULT run_vbs(IDispatch *grid, const WCHAR *code) {
-    ScriptSite site;
-    IActiveScript *pAS = NULL;
-    IActiveScriptParse *pASP = NULL;
+static void close_script_runtime(ScriptRuntime *rt) {
+    if (!rt) return;
+    if (rt->event_probe) {
+        event_probe_bind_script_dispatch(rt->event_probe, NULL, NULL);
+        rt->event_probe = NULL;
+    }
+    if (rt->script_disp) {
+        rt->script_disp->lpVtbl->Release(rt->script_disp);
+        rt->script_disp = NULL;
+    }
+    if (rt->site.typeinfo) {
+        rt->site.typeinfo->lpVtbl->Release(rt->site.typeinfo);
+        rt->site.typeinfo = NULL;
+    }
+    if (rt->site.host_object) {
+        rt->site.host_object->lpVtbl->Release(rt->site.host_object);
+        rt->site.host_object = NULL;
+    }
+    if (rt->script) {
+        rt->script->lpVtbl->Close(rt->script);
+    }
+    if (rt->parser) {
+        rt->parser->lpVtbl->Release(rt->parser);
+        rt->parser = NULL;
+    }
+    if (rt->script) {
+        rt->script->lpVtbl->Release(rt->script);
+        rt->script = NULL;
+    }
+}
+
+static HRESULT start_vbs_runtime(ScriptRuntime *rt, const HostedGrid *hg, const WCHAR *code) {
     HRESULT hr;
     WCHAR *full;
+    IDispatch *grid = hg ? hg->disp : NULL;
 
-    site.lpVtbl = &g_ss_vtbl;
-    site.ref = 1;
-    site.grid = grid;
+    if (!rt) return E_POINTER;
+    memset(rt, 0, sizeof(*rt));
+
+    rt->site.lpVtbl = &g_ss_vtbl;
+    rt->site.ref = 1;
+    rt->site.grid = grid;
+    rt->site.host_object = script_host_helper_create();
+    get_named_item_typeinfo(grid, &rt->site.typeinfo);
 
     hr = CoCreateInstance(&CLSID_VBScript, NULL, CLSCTX_INPROC_SERVER,
-                                   &IID_IActiveScript, (void **)&pAS);
+                                   &IID_IActiveScript, (void **)&rt->script);
     if (FAILED(hr)) {
         printf("  CoCreateInstance(VBScript) failed: 0x%08lx\n", hr);
         return hr;
     }
 
-    hr = pAS->lpVtbl->QueryInterface(pAS, &MY_IID_IActiveScriptParse, (void **)&pASP);
+    hr = rt->script->lpVtbl->QueryInterface(rt->script, &MY_IID_IActiveScriptParse, (void **)&rt->parser);
     if (FAILED(hr)) {
         printf("  QI(IActiveScriptParse) failed: 0x%08lx\n", hr);
-        pAS->lpVtbl->Release(pAS);
+        close_script_runtime(rt);
         return hr;
     }
 
-    pASP->lpVtbl->InitNew(pASP);
-    pAS->lpVtbl->SetScriptSite(pAS, (IActiveScriptSite *)&site);
-    pAS->lpVtbl->AddNamedItem(pAS, L"fg", SCRIPTITEM_ISVISIBLE | SCRIPTITEM_ISSOURCE);
+    rt->parser->lpVtbl->InitNew(rt->parser);
+    rt->script->lpVtbl->SetScriptSite(rt->script, (IActiveScriptSite *)&rt->site);
+    rt->script->lpVtbl->AddNamedItem(rt->script, L"fg", SCRIPTITEM_ISVISIBLE | SCRIPTITEM_ISSOURCE);
+    rt->script->lpVtbl->AddNamedItem(rt->script, L"host", SCRIPTITEM_ISVISIBLE);
 
     full = build_full_vbs(code);
     if (!full) {
-        pAS->lpVtbl->Close(pAS);
-        pASP->lpVtbl->Release(pASP);
-        pAS->lpVtbl->Release(pAS);
+        close_script_runtime(rt);
         return E_OUTOFMEMORY;
     }
 
     {
         EXCEPINFO ei;
         memset(&ei, 0, sizeof(ei));
-        hr = pASP->lpVtbl->ParseScriptText(pASP, full, NULL, NULL, NULL,
+        hr = rt->parser->lpVtbl->ParseScriptText(rt->parser, full, NULL, NULL, NULL,
                                            0, 0, 0, NULL, &ei);
     }
 
     free(full);
 
     if (SUCCEEDED(hr)) {
-        pAS->lpVtbl->SetScriptState(pAS, SCRIPTSTATE_CONNECTED);
+        rt->script->lpVtbl->SetScriptState(rt->script, SCRIPTSTATE_CONNECTED);
+        if (hg && hg->event_probe) {
+            hr = rt->script->lpVtbl->GetScriptDispatch(rt->script, NULL, &rt->script_disp);
+            if (SUCCEEDED(hr) && rt->script_disp) {
+                rt->event_probe = hg->event_probe;
+                event_probe_bind_script_dispatch(rt->event_probe, rt->script_disp, L"fg_");
+            } else {
+                rt->script_disp = NULL;
+            }
+        }
+    } else {
+        close_script_runtime(rt);
     }
-
-    pAS->lpVtbl->Close(pAS);
-    pASP->lpVtbl->Release(pASP);
-    pAS->lpVtbl->Release(pAS);
 
     return hr;
 }
@@ -1371,6 +2434,21 @@ static TestCase g_tests[] = {
     { "ado_external_delete_ops", 840, 400 },
     { "ado_bound_additem_ops", 840, 400 },
     { "ado_bound_removeitem_ops", 840, 400 },
+    { "interaction_props", 780, 320 },
+    { "event_rowcolchange", 820, 320 },
+    { "event_selchange", 820, 320 },
+    { "event_edit", 820, 360 },
+    { "event_sort", 820, 320 },
+    { "event_collapse", 820, 360 },
+    { "event_scroll", 820, 360 },
+    { "event_user_resize", 820, 320 },
+    { "event_move_column", 820, 320 },
+    { "event_move_row", 820, 340 },
+    { "event_mouse_down", 820, 320 },
+    { "event_data_refresh", 840, 380 },
+    { "event_scroll_tip", 820, 360 },
+    { "event_user_freeze", 820, 320 },
+    { "event_page_break", 840, 420 },
     { NULL, 0, 0 }
 };
 
@@ -1620,6 +2698,154 @@ static void click_host_client_point(const HostedGrid *hg, int x_host, int y_host
     }
 }
 
+typedef struct {
+    HWND owner;
+    DWORD timeout_ms;
+    volatile LONG done;
+} AutoDialogOkContext;
+
+static HWND find_visible_dialog_window(HWND owner) {
+    HWND hwnd = NULL;
+    while ((hwnd = FindWindowExW(NULL, hwnd, L"#32770", NULL)) != NULL) {
+        HWND hwnd_owner;
+        if (!IsWindowVisible(hwnd)) continue;
+        if (!owner) return hwnd;
+        hwnd_owner = GetWindow(hwnd, GW_OWNER);
+        if (hwnd_owner == owner || hwnd == GetLastActivePopup(owner)) {
+            return hwnd;
+        }
+    }
+    return NULL;
+}
+
+static DWORD WINAPI auto_dialog_ok_thread(LPVOID param) {
+    AutoDialogOkContext *ctx = (AutoDialogOkContext *)param;
+    DWORD start = GetTickCount();
+
+    if (!ctx) return 0;
+
+    while (InterlockedCompareExchange(&ctx->done, 0, 0) == 0) {
+        HWND hwnd = find_visible_dialog_window(ctx->owner);
+        if (hwnd) {
+            HWND ok = GetDlgItem(hwnd, IDOK);
+            if (ok) {
+                SendMessageW(ok, BM_CLICK, 0, 0);
+                break;
+            }
+            PostMessageW(hwnd, WM_COMMAND, MAKEWPARAM(IDOK, BN_CLICKED), 0);
+            break;
+        }
+        if (GetTickCount() - start >= ctx->timeout_ms) {
+            break;
+        }
+        Sleep(50);
+    }
+    return 0;
+}
+
+static HRESULT call_method0_named_utf8_auto_dialog_ok(
+    IDispatch *pDisp, const char *name_utf8, HWND owner, DWORD timeout_ms)
+{
+    AutoDialogOkContext ctx;
+    HANDLE thread = NULL;
+    HRESULT hr;
+
+    ZeroMemory(&ctx, sizeof(ctx));
+    ctx.owner = owner;
+    ctx.timeout_ms = timeout_ms > 0 ? timeout_ms : 3000;
+    ctx.done = 0;
+
+    thread = CreateThread(NULL, 0, auto_dialog_ok_thread, &ctx, 0, NULL);
+    hr = call_method0_named_utf8(pDisp, name_utf8);
+    InterlockedExchange(&ctx.done, 1);
+    if (thread) {
+        WaitForSingleObject(thread, ctx.timeout_ms);
+        CloseHandle(thread);
+    }
+    return hr;
+}
+
+static void drag_host_client_points(
+    const HostedGrid *hg, int x1_host, int y1_host, int x2_host, int y2_host, int steps)
+{
+    HWND hwndTarget = hg->hwnd_ctrl ? hg->hwnd_ctrl : hg->hwnd_host;
+    POINT pt1;
+    POINT pt2;
+    int i;
+
+    if (!hwndTarget) return;
+    if (steps < 1) steps = 1;
+
+    pt1.x = x1_host;
+    pt1.y = y1_host;
+    pt2.x = x2_host;
+    pt2.y = y2_host;
+    MapWindowPoints(hg->hwnd_host, hwndTarget, &pt1, 1);
+    MapWindowPoints(hg->hwnd_host, hwndTarget, &pt2, 1);
+
+    SetForegroundWindow(hg->hwnd_host);
+    SetFocus(hwndTarget);
+
+    PostMessage(hwndTarget, WM_MOUSEMOVE, 0, MAKELPARAM(pt1.x, pt1.y));
+    PostMessage(hwndTarget, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM(pt1.x, pt1.y));
+    pump_messages_ms(50);
+
+    for (i = 1; i <= steps; i++) {
+        int xi = pt1.x + ((pt2.x - pt1.x) * i) / steps;
+        int yi = pt1.y + ((pt2.y - pt1.y) * i) / steps;
+        PostMessage(hwndTarget, WM_MOUSEMOVE, MK_LBUTTON, MAKELPARAM(xi, yi));
+        pump_messages_ms(30);
+    }
+
+    PostMessage(hwndTarget, WM_LBUTTONUP, 0, MAKELPARAM(pt2.x, pt2.y));
+    pump_messages_ms(80);
+}
+
+static void drag_internal_points(
+    IDispatch *disp, int x1, int y1, int x2, int y2, int steps)
+{
+    int i;
+    if (!disp) return;
+    if (steps < 1) steps = 1;
+
+    call_method4_r4_r4_i4_i4_named_utf8(
+        disp, "PointerDown", (float)x1, (float)y1, 1, 0);
+    pump_messages_ms(50);
+
+    for (i = 1; i <= steps; ++i) {
+        int xi = x1 + ((x2 - x1) * i) / steps;
+        int yi = y1 + ((y2 - y1) * i) / steps;
+        call_method4_r4_r4_i4_i4_named_utf8(
+            disp, "PointerMove", (float)xi, (float)yi, 1, 0);
+        pump_messages_ms(30);
+    }
+
+    call_method4_r4_r4_i4_i4_named_utf8(
+        disp, "PointerUp", (float)x2, (float)y2, 1, 0);
+    pump_messages_ms(80);
+}
+
+static int cell_anchor_point_px(const RECT *rc, const char *anchor, int *out_x, int *out_y) {
+    if (!rc || !anchor || !out_x || !out_y) return -1;
+
+    *out_x = (rc->left + rc->right) / 2;
+    *out_y = (rc->top + rc->bottom) / 2;
+
+    if (_stricmp(anchor, "left") == 0) {
+        *out_x = rc->left + 1;
+    } else if (_stricmp(anchor, "right") == 0) {
+        *out_x = rc->right - 2;
+    } else if (_stricmp(anchor, "top") == 0) {
+        *out_y = rc->top + 1;
+    } else if (_stricmp(anchor, "bottom") == 0) {
+        *out_y = rc->bottom - 2;
+    } else if (_stricmp(anchor, "center") != 0) {
+        return -1;
+    }
+
+    return 0;
+}
+
 static void apply_ux_actions(const HostedGrid *hg, IDispatch *disp, int test_no, const char *test_name) {
     char path[320];
     FILE *f;
@@ -1664,6 +2890,74 @@ static void apply_ux_actions(const HostedGrid *hg, IDispatch *disp, int test_no,
             continue;
         }
 
+        if (_stricmp(cmd, "set_prop_i4") == 0) {
+            char *name_s = strtok(NULL, " \t");
+            char *val_s = strtok(NULL, " \t");
+            if (name_s && val_s) {
+                put_int_named_utf8(disp, name_s, atoi(val_s));
+                pump_messages_ms(80);
+            }
+            continue;
+        }
+
+        if (_stricmp(cmd, "set_indexed_prop_i4") == 0) {
+            char *name_s = strtok(NULL, " \t");
+            char *idx_s = strtok(NULL, " \t");
+            char *val_s = strtok(NULL, " \t");
+            if (name_s && idx_s && val_s) {
+                put_indexed_int_named_utf8(disp, name_s, atoi(idx_s), atoi(val_s));
+                pump_messages_ms(80);
+            }
+            continue;
+        }
+
+        if (_stricmp(cmd, "call_method0") == 0) {
+            char *name_s = strtok(NULL, " \t");
+            if (name_s) {
+                call_method0_named_utf8(disp, name_s);
+                pump_messages_ms(80);
+            }
+            continue;
+        }
+
+        if (_stricmp(cmd, "call_method0_autodialog_ok") == 0) {
+            char *name_s = strtok(NULL, " \t");
+            char *timeout_s = strtok(NULL, " \t");
+            DWORD timeout_ms = timeout_s ? (DWORD)atoi(timeout_s) : 3000;
+            if (name_s) {
+                call_method0_named_utf8_auto_dialog_ok(
+                    disp, name_s, hg ? hg->hwnd_host : NULL, timeout_ms);
+                pump_messages_ms(120);
+            }
+            continue;
+        }
+
+        if (_stricmp(cmd, "call_method2_i4") == 0) {
+            char *name_s = strtok(NULL, " \t");
+            char *arg0_s = strtok(NULL, " \t");
+            char *arg1_s = strtok(NULL, " \t");
+            if (name_s && arg0_s && arg1_s) {
+                WCHAR wname[128];
+                if (MultiByteToWideChar(CP_UTF8, 0, name_s, -1, wname, 128) > 0) {
+                    call_method2_i4(disp, wname, atoi(arg0_s), atoi(arg1_s));
+                    pump_messages_ms(80);
+                }
+            }
+            continue;
+        }
+
+        if (_stricmp(cmd, "call_method2_r4") == 0) {
+            char *name_s = strtok(NULL, " \t");
+            char *arg0_s = strtok(NULL, " \t");
+            char *arg1_s = strtok(NULL, " \t");
+            if (name_s && arg0_s && arg1_s) {
+                call_method2_r4_named_utf8(
+                    disp, name_s, (float)atof(arg0_s), (float)atof(arg1_s));
+                pump_messages_ms(80);
+            }
+            continue;
+        }
+
         if (_stricmp(cmd, "click_cell") == 0 || _stricmp(cmd, "dblclick_cell") == 0 || _stricmp(cmd, "click_combo") == 0) {
             char *r_s = strtok(NULL, " \t");
             char *c_s = strtok(NULL, " \t");
@@ -1699,6 +2993,111 @@ static void apply_ux_actions(const HostedGrid *hg, IDispatch *disp, int test_no,
             continue;
         }
 
+        if (_stricmp(cmd, "drag_cell") == 0) {
+            char *r1_s = strtok(NULL, " \t");
+            char *c1_s = strtok(NULL, " \t");
+            char *r2_s = strtok(NULL, " \t");
+            char *c2_s = strtok(NULL, " \t");
+            RECT rc1;
+            RECT rc2;
+
+            if (r1_s && c1_s && r2_s && c2_s) {
+                int r1 = atoi(r1_s);
+                int c1 = atoi(c1_s);
+                int r2 = atoi(r2_s);
+                int c2 = atoi(c2_s);
+                if (hg->dispatch_only) {
+                    put_int(disp, L"Row", r2);
+                    put_int(disp, L"Col", c2);
+                    pump_messages_ms(120);
+                    continue;
+                }
+                if (grid_cell_rect_px(disp, r1, c1, &rc1) == 0 &&
+                    grid_cell_rect_px(disp, r2, c2, &rc2) == 0) {
+                    drag_host_client_points(
+                        hg,
+                        (rc1.left + rc1.right) / 2,
+                        (rc1.top + rc1.bottom) / 2,
+                        (rc2.left + rc2.right) / 2,
+                        (rc2.top + rc2.bottom) / 2,
+                        8);
+                }
+            }
+            continue;
+        }
+
+        if (_stricmp(cmd, "drag_cell_edge") == 0) {
+            char *r1_s = strtok(NULL, " \t");
+            char *c1_s = strtok(NULL, " \t");
+            char *edge_s = strtok(NULL, " \t");
+            char *r2_s = strtok(NULL, " \t");
+            char *c2_s = strtok(NULL, " \t");
+            RECT rc1;
+            RECT rc2;
+
+            if (r1_s && c1_s && edge_s && r2_s && c2_s) {
+                int r1 = atoi(r1_s);
+                int c1 = atoi(c1_s);
+                int r2 = atoi(r2_s);
+                int c2 = atoi(c2_s);
+                int x1 = 0;
+                int y1 = 0;
+
+                if (hg->dispatch_only) {
+                    put_int(disp, L"Row", r2);
+                    put_int(disp, L"Col", c2);
+                    pump_messages_ms(120);
+                    continue;
+                }
+                if (grid_cell_rect_px(disp, r1, c1, &rc1) == 0 &&
+                    grid_cell_rect_px(disp, r2, c2, &rc2) == 0 &&
+                    cell_anchor_point_px(&rc1, edge_s, &x1, &y1) == 0) {
+                    drag_host_client_points(
+                        hg,
+                        x1,
+                        y1,
+                        (rc2.left + rc2.right) / 2,
+                        (rc2.top + rc2.bottom) / 2,
+                        8);
+                }
+            }
+            continue;
+        }
+
+        if (_stricmp(cmd, "drag_cell_edge_internal") == 0) {
+            char *r1_s = strtok(NULL, " \t");
+            char *c1_s = strtok(NULL, " \t");
+            char *edge_s = strtok(NULL, " \t");
+            char *r2_s = strtok(NULL, " \t");
+            char *c2_s = strtok(NULL, " \t");
+            char *steps_s = strtok(NULL, " \t");
+            RECT rc1;
+            RECT rc2;
+
+            if (r1_s && c1_s && edge_s && r2_s && c2_s) {
+                int r1 = atoi(r1_s);
+                int c1 = atoi(c1_s);
+                int r2 = atoi(r2_s);
+                int c2 = atoi(c2_s);
+                int x1 = 0;
+                int y1 = 0;
+                int steps = steps_s ? atoi(steps_s) : 8;
+
+                if (grid_cell_rect_px(disp, r1, c1, &rc1) == 0 &&
+                    grid_cell_rect_px(disp, r2, c2, &rc2) == 0 &&
+                    cell_anchor_point_px(&rc1, edge_s, &x1, &y1) == 0) {
+                    drag_internal_points(
+                        disp,
+                        x1,
+                        y1,
+                        (rc2.left + rc2.right) / 2,
+                        (rc2.top + rc2.bottom) / 2,
+                        steps);
+                }
+            }
+            continue;
+        }
+
         if (_stricmp(cmd, "key") == 0) {
             char *tok = strtok(NULL, " \t");
             int vk = parse_vk_token(tok);
@@ -1725,6 +3124,176 @@ static int has_ux_actions(int test_no, const char *test_name) {
     char path[320];
     snprintf(path, sizeof(path), "tests/%02d_%s.ux", test_no, test_name);
     return file_exists(path);
+}
+
+static int is_event_test_name(const char *name) {
+    return name && strncmp(name, "event_", 6) == 0;
+}
+
+static void configure_event_probe_for_test(EventProbe *probe, const char *name) {
+    (void)probe;
+    (void)name;
+}
+
+static int event_expect_min(
+    const EventProbe *probe, EventId id, int min_count, const char *label, int *ok)
+{
+    int count = event_probe_count(probe, id);
+    if (!event_probe_has_event(probe, id)) {
+        printf("  ASSERT FAIL: %s is not exposed by the source interface\n", label);
+        *ok = 0;
+        return count;
+    }
+    if (count < min_count) {
+        printf("  ASSERT FAIL: %s count=%d expected >= %d\n", label, count, min_count);
+        *ok = 0;
+    }
+    return count;
+}
+
+static int event_expect_eq(
+    const EventProbe *probe, EventId id, int exact_count, const char *label, int *ok)
+{
+    int count = event_probe_count(probe, id);
+    if (!event_probe_has_event(probe, id)) {
+        printf("  ASSERT FAIL: %s is not exposed by the source interface\n", label);
+        *ok = 0;
+        return count;
+    }
+    if (count != exact_count) {
+        printf("  ASSERT FAIL: %s count=%d expected %d\n", label, count, exact_count);
+        *ok = 0;
+    }
+    return count;
+}
+
+static int evaluate_event_test(const HostedGrid *hg, IDispatch *disp, int test_no, const char *name) {
+    int ok = 1;
+    EventProbe *probe;
+
+    (void)test_no;
+    if (!hg || !disp || !name || !is_event_test_name(name)) return 1;
+    probe = hg->event_probe;
+    if (!probe) {
+        printf("  ASSERT FAIL: missing event probe\n");
+        return 0;
+    }
+
+    if (strcmp(name, "event_rowcolchange") == 0) {
+        int row = get_int(disp, L"Row", -1);
+        int col = get_int(disp, L"Col", -1);
+        event_expect_min(probe, EVT_BEFORE_ROW_COL_CHANGE, 2, "BeforeRowColChange", &ok);
+        event_expect_eq(probe, EVT_AFTER_ROW_COL_CHANGE, 1, "AfterRowColChange", &ok);
+        if (row != 2 || col != 1) {
+            printf("  ASSERT FAIL: final cell=%d,%d expected 2,1\n", row, col);
+            ok = 0;
+        }
+    } else if (strcmp(name, "event_selchange") == 0) {
+        int row = get_int(disp, L"Row", -1);
+        int col = get_int(disp, L"Col", -1);
+        int row_sel = get_int(disp, L"RowSel", -1);
+        int col_sel = get_int(disp, L"ColSel", -1);
+        event_expect_min(probe, EVT_BEFORE_SEL_CHANGE, 2, "BeforeSelChange", &ok);
+        event_expect_eq(probe, EVT_AFTER_SEL_CHANGE, 1, "AfterSelChange", &ok);
+        if (row != 1 || col != 1 || row_sel != 2 || col_sel != 1) {
+            printf(
+                "  ASSERT FAIL: cursor=%d,%d sel=%d,%d expected cursor 1,1 sel 2,1\n",
+                row, col, row_sel, col_sel);
+            ok = 0;
+        }
+    } else if (strcmp(name, "event_edit") == 0) {
+        event_expect_min(probe, EVT_BEFORE_EDIT, 2, "BeforeEdit", &ok);
+        event_expect_eq(probe, EVT_AFTER_EDIT, 1, "AfterEdit", &ok);
+    } else if (strcmp(name, "event_sort") == 0) {
+        char *cell = get_text_matrix_utf8_alloc(disp, 1, 1);
+        event_expect_min(probe, EVT_BEFORE_SORT, 2, "BeforeSort", &ok);
+        event_expect_min(probe, EVT_AFTER_SORT, 2, "AfterSort", &ok);
+        if (!cell || strcmp(cell, "C") != 0) {
+            printf("  ASSERT FAIL: first sorted value=%s expected C\n", cell ? cell : "(null)");
+            ok = 0;
+        }
+        free(cell);
+    } else if (strcmp(name, "event_collapse") == 0) {
+        event_expect_min(probe, EVT_BEFORE_COLLAPSE, 2, "BeforeCollapse", &ok);
+        event_expect_eq(probe, EVT_AFTER_COLLAPSE, 1, "AfterCollapse", &ok);
+    } else if (strcmp(name, "event_scroll") == 0) {
+        int top = get_int(disp, L"TopRow", -1);
+        event_expect_min(probe, EVT_BEFORE_SCROLL, 2, "BeforeScroll", &ok);
+        event_expect_eq(probe, EVT_AFTER_SCROLL, 1, "AfterScroll", &ok);
+        if (top != 4) {
+            printf("  ASSERT FAIL: TopRow=%d expected 4\n", top);
+            ok = 0;
+        }
+    } else if (strcmp(name, "event_scroll_tip") == 0) {
+        char *tip = get_bstr_prop_utf8_alloc(disp, L"ScrollTipText");
+        event_expect_min(probe, EVT_BEFORE_SCROLL_TIP, 1, "BeforeScrollTip", &ok);
+        if (!tip || !*tip) {
+            printf("  ASSERT FAIL: ScrollTipText is empty\n");
+            ok = 0;
+        }
+        free(tip);
+    } else if (strcmp(name, "event_user_resize") == 0) {
+        event_expect_min(probe, EVT_BEFORE_USER_RESIZE, 2, "BeforeUserResize", &ok);
+        event_expect_eq(probe, EVT_AFTER_USER_RESIZE, 1, "AfterUserResize", &ok);
+    } else if (strcmp(name, "event_user_freeze") == 0) {
+        int frozen_cols = get_int(disp, L"FrozenCols", -1);
+        event_expect_min(probe, EVT_AFTER_USER_FREEZE, 1, "AfterUserFreeze", &ok);
+        if (frozen_cols != 2) {
+            printf("  ASSERT FAIL: FrozenCols=%d expected 2\n", frozen_cols);
+            ok = 0;
+        }
+    } else if (strcmp(name, "event_move_column") == 0) {
+        int pos = get_indexed_int(disp, L"ColPosition", 2, -1);
+        event_expect_min(probe, EVT_BEFORE_MOVE_COLUMN, 2, "BeforeMoveColumn", &ok);
+        event_expect_min(probe, EVT_AFTER_MOVE_COLUMN, 2, "AfterMoveColumn", &ok);
+        if (pos != 0) {
+            printf("  ASSERT FAIL: ColPosition(2)=%d expected 0\n", pos);
+            ok = 0;
+        }
+    } else if (strcmp(name, "event_move_row") == 0) {
+        int pos = get_indexed_int(disp, L"RowPosition", 4, -1);
+        event_expect_min(probe, EVT_BEFORE_MOVE_ROW, 2, "BeforeMoveRow", &ok);
+        event_expect_min(probe, EVT_AFTER_MOVE_ROW, 2, "AfterMoveRow", &ok);
+        if (pos != 1) {
+            printf("  ASSERT FAIL: RowPosition(4)=%d expected 1\n", pos);
+            ok = 0;
+        }
+    } else if (strcmp(name, "event_mouse_down") == 0) {
+        int row = get_int(disp, L"Row", -1);
+        int col = get_int(disp, L"Col", -1);
+        event_expect_min(probe, EVT_BEFORE_MOUSE_DOWN, 2, "BeforeMouseDown", &ok);
+        if (row != 3 || col != 1) {
+            printf("  ASSERT FAIL: final cell=%d,%d expected 3,1\n", row, col);
+            ok = 0;
+        }
+    } else if (strcmp(name, "event_data_refresh") == 0) {
+        char *cell0 = get_text_matrix_utf8_alloc(disp, 0, 0);
+        if (cell0 && strcmp(cell0, "ERR") == 0) {
+            char *err_code = get_text_matrix_utf8_alloc(disp, 0, 1);
+            char *err_desc = get_text_matrix_utf8_alloc(disp, 1, 1);
+            printf("  ASSERT SKIP: ADO unavailable in this environment\n");
+            if (err_code || err_desc) {
+                printf(
+                    "  ADO detail: code=%s desc=%s\n",
+                    err_code ? err_code : "(null)",
+                    err_desc ? err_desc : "(null)");
+            }
+            free(err_code);
+            free(err_desc);
+            free(cell0);
+            return 1;
+        }
+        free(cell0);
+        event_expect_min(probe, EVT_BEFORE_DATA_REFRESH, 2, "BeforeDataRefresh", &ok);
+        event_expect_eq(probe, EVT_AFTER_DATA_REFRESH, 1, "AfterDataRefresh", &ok);
+    } else if (strcmp(name, "event_page_break") == 0) {
+        event_expect_min(probe, EVT_BEFORE_PAGE_BREAK, 1, "BeforePageBreak", &ok);
+    }
+
+    if (ok) {
+        printf("  ASSERT PASS: %s\n", name);
+    }
+    return ok;
 }
 
 static int test_selected(int test_no, int only_test, const char *test_filter) {
@@ -1848,15 +3417,21 @@ int main(int argc, char *argv[]) {
         if (!only_vv) {
             HostedGrid lg;
             if (hosted_grid_create(&lg, g_ref_progid, L"FlexGrid Host", tc->width, tc->height, 0) == 0) {
-                run_vbs(lg.disp, vbs_code);
+                ScriptRuntime lg_script;
+                start_vbs_runtime(&lg_script, &lg, vbs_code);
                 pump_messages_ms(120);
                 apply_ux_actions(&lg, lg.disp, i + 1, tc->name);
                 pump_messages_ms(120);
-                if (!lg.dispatch_only && has_ux_actions(i + 1, tc->name)) {
+                if (has_ux_actions(i + 1, tc->name)) {
+                    dump_top_row_snapshot(lg.disp, "LG", i + 1);
+                    dump_event_probe_snapshot(lg.event_probe, "LG", i + 1);
+                }
+                if (!lg.dispatch_only) {
                     render_to_bmp_with_popup(lg.disp, &lg, bmp_lg, lg.render_width, lg.render_height);
                 } else {
                     render_to_bmp(lg.disp, bmp_lg, lg.render_width, lg.render_height);
                 }
+                close_script_runtime(&lg_script);
                 hosted_grid_destroy(&lg);
                 has_lg = 1;
             } else {
@@ -1867,17 +3442,33 @@ int main(int argc, char *argv[]) {
         {
             HostedGrid vv;
             if (hosted_grid_create(&vv, PROGID_VOLVOXGRID, L"VolvoxGrid Host", tc->width, tc->height, 80) == 0) {
-                run_vbs(vv.disp, vbs_code);
+                ScriptRuntime vv_script;
+                int vv_ok = 1;
+                start_vbs_runtime(&vv_script, &vv, vbs_code);
                 pump_messages_ms(120);
+                event_probe_reset(vv.event_probe);
+                configure_event_probe_for_test(vv.event_probe, tc->name);
                 apply_ux_actions(&vv, vv.disp, i + 1, tc->name);
                 pump_messages_ms(120);
-                if (!vv.dispatch_only && has_ux_actions(i + 1, tc->name)) {
+                if (has_ux_actions(i + 1, tc->name)) {
+                    dump_top_row_snapshot(vv.disp, "VV", i + 1);
+                    dump_event_probe_snapshot(vv.event_probe, "VV", i + 1);
+                }
+                if (is_event_test_name(tc->name)) {
+                    vv_ok = evaluate_event_test(&vv, vv.disp, i + 1, tc->name);
+                }
+                if (!vv.dispatch_only) {
                     render_to_bmp_with_popup(vv.disp, &vv, bmp_vv, vv.render_width, vv.render_height);
                 } else {
                     render_to_bmp(vv.disp, bmp_vv, vv.render_width, vv.render_height);
                 }
+                close_script_runtime(&vv_script);
                 hosted_grid_destroy(&vv);
-                pass++;
+                if (vv_ok) {
+                    pass++;
+                } else {
+                    fail++;
+                }
 
                 if (has_lg && !skip_diff) {
                     double sim = compare_bmps(bmp_lg, bmp_vv, bmp_diff);

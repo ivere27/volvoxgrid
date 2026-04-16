@@ -18,14 +18,17 @@
 extern void volvox_grid_init(void);
 extern void volvox_grid_shutdown(void);
 
-/* Forward declaration — implemented in volvoxgrid_ocx.c */
+/* Forward declarations — implemented in volvoxgrid_ocx.c */
 extern HRESULT VolvoxGrid_CreateInstance(IUnknown *pOuter, REFIID riid, void **ppv);
+extern void vfg_init_object_registry(void);
+extern void vfg_shutdown_object_registry(void);
 
 static LONG g_cLocks = 0;
 static HMODULE g_hModule = NULL;
 
-/* CLSID as string */
+/* VolvoxGrid COM identity. */
 static const char CLSID_STR[] = "{A7E3B4D1-5C2F-4E8A-B9D6-1F3C7E2A4B5D}";
+static const char LIBID_STR[] = "{C9A5D6F3-7E4B-4A0C-B1F8-3B5E9A4C6D7F}";
 
 /* ════════════════════════════════════════════════════════════════ */
 /* Class Factory                                                   */
@@ -106,6 +109,8 @@ static void delete_reg_tree(HKEY hRoot, const char *subkey) {
     RegDeleteKeyA(hRoot, buf);
     snprintf(buf, sizeof(buf), "%s\\VersionIndependentProgID", subkey);
     RegDeleteKeyA(hRoot, buf);
+    snprintf(buf, sizeof(buf), "%s\\TypeLib", subkey);
+    RegDeleteKeyA(hRoot, buf);
     snprintf(buf, sizeof(buf), "%s\\Control", subkey);
     RegDeleteKeyA(hRoot, buf);
     snprintf(buf, sizeof(buf), "%s\\MiscStatus\\1", subkey);
@@ -113,6 +118,67 @@ static void delete_reg_tree(HKEY hRoot, const char *subkey) {
     snprintf(buf, sizeof(buf), "%s\\MiscStatus", subkey);
     RegDeleteKeyA(hRoot, buf);
     RegDeleteKeyA(hRoot, subkey);
+}
+
+static void build_typelib_path(char *dst, size_t dst_cap) {
+    char modulePath[MAX_PATH];
+    const char *slash;
+    size_t prefix_len;
+
+    if (!dst || dst_cap == 0) return;
+    dst[0] = '\0';
+    GetModuleFileNameA(g_hModule, modulePath, MAX_PATH);
+    slash = strrchr(modulePath, '\\');
+    if (!slash) slash = strrchr(modulePath, '/');
+    prefix_len = slash ? (size_t)(slash - modulePath + 1) : 0;
+    if (prefix_len >= dst_cap) prefix_len = dst_cap - 1;
+    memcpy(dst, modulePath, prefix_len);
+    dst[prefix_len] = '\0';
+    strncat(dst, "VolvoxGrid.tlb", dst_cap - strlen(dst) - 1);
+}
+
+static HRESULT register_adjacent_typelib(void) {
+    char tlbPathA[MAX_PATH];
+    WCHAR tlbPathW[MAX_PATH];
+    ITypeLib *typeLib = NULL;
+    HRESULT hr;
+
+    build_typelib_path(tlbPathA, sizeof(tlbPathA));
+    MultiByteToWideChar(CP_ACP, 0, tlbPathA, -1, tlbPathW, MAX_PATH);
+    hr = LoadTypeLibEx(tlbPathW, REGKIND_REGISTER, &typeLib);
+    if (SUCCEEDED(hr) && typeLib) {
+        ITypeLib_Release(typeLib);
+    }
+    return hr;
+}
+
+static void unregister_adjacent_typelib(void) {
+#if defined(_WIN64)
+    SYSKIND syskind = SYS_WIN64;
+#else
+    SYSKIND syskind = SYS_WIN32;
+#endif
+    char tlbPathA[MAX_PATH];
+    WCHAR tlbPathW[MAX_PATH];
+    ITypeLib *typeLib = NULL;
+    TLIBATTR *typeAttr = NULL;
+
+    build_typelib_path(tlbPathA, sizeof(tlbPathA));
+    MultiByteToWideChar(CP_ACP, 0, tlbPathA, -1, tlbPathW, MAX_PATH);
+    if (SUCCEEDED(LoadTypeLibEx(tlbPathW, REGKIND_NONE, &typeLib)) && typeLib) {
+        if (SUCCEEDED(ITypeLib_GetLibAttr(typeLib, &typeAttr)) && typeAttr) {
+            UnRegisterTypeLib(
+                &typeAttr->guid,
+                typeAttr->wMajorVerNum,
+                typeAttr->wMinorVerNum,
+                LOCALE_NEUTRAL,
+                syskind);
+            ITypeLib_ReleaseTLibAttr(typeLib, typeAttr);
+        }
+        ITypeLib_Release(typeLib);
+        return;
+    }
+    UnRegisterTypeLib(&LIBID_VolvoxGridLib, 1, 0, LOCALE_NEUTRAL, syskind);
 }
 
 /* ════════════════════════════════════════════════════════════════ */
@@ -125,10 +191,12 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
     case DLL_PROCESS_ATTACH:
         g_hModule = hinstDLL;
         DisableThreadLibraryCalls(hinstDLL);
+        vfg_init_object_registry();
         volvox_grid_init();
         break;
     case DLL_PROCESS_DETACH:
         volvox_grid_shutdown();
+        vfg_shutdown_object_registry();
         break;
     }
     return TRUE;
@@ -181,6 +249,10 @@ STDAPI DllRegisterServer(void) {
     hr = set_reg_key(HKEY_CLASSES_ROOT, key, NULL, "VolvoxGrid.VolvoxGridCtrl");
     if (FAILED(hr)) return hr;
 
+    snprintf(key, sizeof(key), "CLSID\\%s\\TypeLib", CLSID_STR);
+    hr = set_reg_key(HKEY_CLASSES_ROOT, key, NULL, LIBID_STR);
+    if (FAILED(hr)) return hr;
+
     /* Control marker */
     snprintf(key, sizeof(key), "CLSID\\%s\\Control", CLSID_STR);
     hr = set_reg_key(HKEY_CLASSES_ROOT, key, NULL, "");
@@ -191,7 +263,7 @@ STDAPI DllRegisterServer(void) {
     hr = set_reg_key(HKEY_CLASSES_ROOT, key, NULL, "0");
     if (FAILED(hr)) return hr;
     snprintf(key, sizeof(key), "CLSID\\%s\\MiscStatus\\1", CLSID_STR);
-    hr = set_reg_key(HKEY_CLASSES_ROOT, key, NULL, "131473");  /* OLEMISC flags */
+    hr = set_reg_key(HKEY_CLASSES_ROOT, key, NULL, "131473");
     if (FAILED(hr)) return hr;
 
     /* ProgID → CLSID mapping */
@@ -208,6 +280,8 @@ STDAPI DllRegisterServer(void) {
                      "VolvoxGrid.VolvoxGridCtrl.1");
     if (FAILED(hr)) return hr;
 
+    hr = register_adjacent_typelib();
+    if (FAILED(hr)) return hr;
     return S_OK;
 }
 
@@ -218,6 +292,7 @@ STDAPI DllUnregisterServer(void) {
     delete_reg_tree(HKEY_CLASSES_ROOT, key);
     delete_reg_tree(HKEY_CLASSES_ROOT, "VolvoxGrid.VolvoxGridCtrl.1");
     delete_reg_tree(HKEY_CLASSES_ROOT, "VolvoxGrid.VolvoxGridCtrl");
+    unregister_adjacent_typelib();
 
     return S_OK;
 }

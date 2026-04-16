@@ -368,7 +368,7 @@ popd > /dev/null
 echo "  Done."
 
 # ── Convert BMP → PNG ──────────────────────────────────────
-echo "[4/5] Converting BMPs to PNG..."
+echo "[4/5] Converting BMPs to PNG (keeping BMPs)..."
 BMP_COUNT=0
 if command -v convert >/dev/null 2>&1; then
     BMP_FILES=()
@@ -387,7 +387,7 @@ if command -v convert >/dev/null 2>&1; then
         if [ "$CONVERT_JOBS" -le 1 ]; then
             for bmp in "${BMP_FILES[@]}"; do
                 png="${bmp%.bmp}.png"
-                convert "$bmp" "$png" 2>/dev/null && rm -f "$bmp"
+                convert "$bmp" "$png" 2>/dev/null
             done
         else
             echo "  Converting in parallel with $CONVERT_JOBS workers"
@@ -396,7 +396,6 @@ if command -v convert >/dev/null 2>&1; then
                 bmp="$1"
                 png="${bmp%.bmp}.png"
                 if convert "$bmp" "$png" 2>/dev/null; then
-                    rm -f "$bmp"
                     exit 0
                 fi
                 exit 1
@@ -408,7 +407,7 @@ if command -v convert >/dev/null 2>&1; then
             fi
         fi
     fi
-    echo "  Converted $BMP_COUNT images."
+    echo "  Converted $BMP_COUNT images and kept the source BMPs."
 else
     echo "  ImageMagick not found — keeping BMPs."
 fi

@@ -1,0 +1,4 @@
+set_prop_i4 Sort 1
+sleep 120
+set_prop_i4 Sort 1
+sleep 120

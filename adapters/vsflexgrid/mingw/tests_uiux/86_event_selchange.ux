@@ -1,0 +1,4 @@
+set_prop_i4 RowSel 2
+sleep 100
+set_prop_i4 ColSel 2
+sleep 100

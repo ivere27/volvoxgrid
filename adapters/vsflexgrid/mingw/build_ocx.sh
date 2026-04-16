@@ -65,9 +65,18 @@ fi
 CRATE_DIR="../crate"
 INCLUDE_DIR="../include"
 OUT_DIR="../../../target/ocx"
+TYPELIB_OUT="${OUT_DIR}/VolvoxGrid.tlb"
+TYPELIB_CONTRACT_SRC="../src/VolvoxGrid_contract.tlb"
 # Resolve cargo target directory for finding the static lib (respects .cargo/config.toml target-dir)
 CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$(cargo metadata --format-version 1 --no-deps --manifest-path "$CRATE_DIR/Cargo.toml" 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin)['target_directory'])" 2>/dev/null || echo "../../../target")}"
 mkdir -p "$OUT_DIR"
+
+echo "=== Installing VolvoxGrid type library ==="
+if [ ! -f "$TYPELIB_CONTRACT_SRC" ]; then
+    echo "ERROR: missing checked-in typelib contract: $TYPELIB_CONTRACT_SRC" >&2
+    exit 1
+fi
+install -m 0644 "$TYPELIB_CONTRACT_SRC" "$TYPELIB_OUT"
 
 echo "=== Building VolvoxGrid.ocx ($PROFILE) ==="
 echo "Using BUILD_JOBS=${BUILD_JOBS} (cpu=${CPU_COUNT}, cargo=${CARGO_BUILD_JOBS})"
@@ -122,7 +131,7 @@ build_arch() {
         "${OUT_DIR}/xp_compat_${ARCH}.o" \
         "$STATIC_LIB" \
         VolvoxGrid.def \
-        -lole32 -loleaut32 -luuid -ladvapi32 -lws2_32 -luserenv -lbcrypt \
+        -lole32 -loleaut32 -luuid -lcomdlg32 -lurlmon -lgdiplus -ladvapi32 -lws2_32 -luserenv -lbcrypt \
         -lgdi32 -lntdll \
         -static-libgcc \
         -Wl,--enable-stdcall-fixup,--allow-multiple-definition

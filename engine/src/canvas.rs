@@ -42,6 +42,23 @@ const LEGACY_GRIDLINE_INSET_VERTICAL: i32 = 7;
 const LEGACY_GRIDLINE_RAISED_HORIZONTAL: i32 = 8;
 const LEGACY_GRIDLINE_RAISED_VERTICAL: i32 = 9;
 
+/// Multiplier to approximate line height from font size (ascent + descent + leading).
+pub(crate) const TEXT_LINE_HEIGHT_FACTOR: f32 = 1.2;
+
+pub(crate) fn normalize_font_stretch_scale(stretch: f32) -> f32 {
+    if stretch.is_finite() && stretch > 0.0 {
+        (stretch / 100.0).clamp(0.25, 4.0)
+    } else {
+        1.0
+    }
+}
+
+pub(crate) fn adjusted_text_max_width(max_width: Option<f32>, stretch: f32) -> Option<f32> {
+    let scale = normalize_font_stretch_scale(stretch);
+    // scale is always >= 0.25 from normalize_font_stretch_scale
+    max_width.map(|w| (w / scale).max(1.0))
+}
+
 // ===========================================================================
 // Canvas trait
 // ===========================================================================
@@ -175,6 +192,75 @@ pub trait Canvas {
         );
     }
 
+    /// Draw text with a horizontal stretch applied to glyph advances.
+    fn draw_text_stretched(
+        &mut self,
+        x: i32,
+        y: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        stretch: f32,
+        color: u32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        max_width: Option<f32>,
+    ) -> f32 {
+        let scale = normalize_font_stretch_scale(stretch);
+        let tw = self.draw_text(
+            x,
+            y,
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            color,
+            clip_x,
+            clip_y,
+            clip_w,
+            clip_h,
+            adjusted_text_max_width(max_width, stretch),
+        );
+        tw * scale
+    }
+
+    /// Draw stretched text when the caller does not need the rendered width.
+    fn draw_text_stretched_fast(
+        &mut self,
+        x: i32,
+        y: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        stretch: f32,
+        color: u32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        max_width: Option<f32>,
+    ) {
+        let scale = normalize_font_stretch_scale(stretch);
+        if (scale - 1.0).abs() < f32::EPSILON {
+            self.draw_text_fast(
+                x, y, text, font_name, font_size, bold, italic, color, clip_x, clip_y, clip_w,
+                clip_h, max_width,
+            );
+        } else {
+            let _ = self.draw_text_stretched(
+                x, y, text, font_name, font_size, bold, italic, stretch, color, clip_x, clip_y,
+                clip_w, clip_h, max_width,
+            );
+        }
+    }
+
     /// Measure text dimensions (width, height).
     fn measure_text(
         &mut self,
@@ -185,6 +271,29 @@ pub trait Canvas {
         italic: bool,
         max_width: Option<f32>,
     ) -> (f32, f32);
+
+    /// Measure text with a horizontal stretch applied to glyph advances.
+    fn measure_text_stretched(
+        &mut self,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        stretch: f32,
+        max_width: Option<f32>,
+    ) -> (f32, f32) {
+        let scale = normalize_font_stretch_scale(stretch);
+        let (w, h) = self.measure_text(
+            text,
+            font_name,
+            font_size,
+            bold,
+            italic,
+            adjusted_text_max_width(max_width, stretch),
+        );
+        (w * scale, h)
+    }
 
     /// Blit RGBA image data stretched to fill (dx, dy, dw, dh).
     fn blit_image(&mut self, dx: i32, dy: i32, dw: i32, dh: i32, data: &[u8], iw: i32, ih: i32);
@@ -583,7 +692,7 @@ pub trait Canvas {
             max_width,
         );
         // text_style bit 0 = underline, bit 1 = strikethrough
-        let line_height = (font_size * 1.2).ceil() as i32;
+        let line_height = (font_size * TEXT_LINE_HEIGHT_FACTOR).ceil() as i32;
         if text_style & 1 != 0 {
             // Underline
             let uy = y + line_height - 2;
@@ -593,6 +702,45 @@ pub trait Canvas {
         }
         if text_style & 2 != 0 {
             // Strikethrough
+            let sy = y + line_height / 2;
+            let line_start = x.max(clip_x);
+            let sw = (tw.ceil() as i32).min(clip_x + clip_w - line_start);
+            self.hline(line_start, sy, sw.max(0), color);
+        }
+        tw
+    }
+
+    /// Draw text with style decorations and horizontal stretch.
+    fn draw_text_styled_stretched(
+        &mut self,
+        x: i32,
+        y: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        stretch: f32,
+        color: u32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        text_style: i32,
+        max_width: Option<f32>,
+    ) -> f32 {
+        let tw = self.draw_text_stretched(
+            x, y, text, font_name, font_size, bold, italic, stretch, color, clip_x, clip_y, clip_w,
+            clip_h, max_width,
+        );
+        let line_height = (font_size * TEXT_LINE_HEIGHT_FACTOR).ceil() as i32;
+        if text_style & 1 != 0 {
+            let uy = y + line_height - 2;
+            let line_start = x.max(clip_x);
+            let uw = (tw.ceil() as i32).min(clip_x + clip_w - line_start);
+            self.hline(line_start, uy, uw.max(0), color);
+        }
+        if text_style & 2 != 0 {
             let sy = y + line_height / 2;
             let line_start = x.max(clip_x);
             let sw = (tw.ceil() as i32).min(clip_x + clip_w - line_start);
@@ -628,6 +776,38 @@ pub trait Canvas {
             let _ = self.draw_text_styled(
                 x, y, text, font_name, font_size, bold, italic, color, clip_x, clip_y, clip_w,
                 clip_h, text_style, max_width,
+            );
+        }
+    }
+
+    /// Draw stretched styled text when the caller does not need the rendered width.
+    fn draw_text_styled_stretched_fast(
+        &mut self,
+        x: i32,
+        y: i32,
+        text: &str,
+        font_name: &str,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+        stretch: f32,
+        color: u32,
+        clip_x: i32,
+        clip_y: i32,
+        clip_w: i32,
+        clip_h: i32,
+        text_style: i32,
+        max_width: Option<f32>,
+    ) {
+        if text_style & 3 == 0 {
+            self.draw_text_stretched_fast(
+                x, y, text, font_name, font_size, bold, italic, stretch, color, clip_x, clip_y,
+                clip_w, clip_h, max_width,
+            );
+        } else {
+            let _ = self.draw_text_styled_stretched(
+                x, y, text, font_name, font_size, bold, italic, stretch, color, clip_x, clip_y,
+                clip_w, clip_h, text_style, max_width,
             );
         }
     }
@@ -699,6 +879,46 @@ pub trait Canvas {
             for dy in 0..=span {
                 self.set_pixel(cx + dx, cy + dy, color);
             }
+        }
+    }
+}
+
+fn draw_text_decorations<C: Canvas>(
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    text_w: f32,
+    font_size: f32,
+    color: u32,
+    clip_x: i32,
+    clip_y: i32,
+    clip_w: i32,
+    clip_h: i32,
+    underline: bool,
+    strikethrough: bool,
+) {
+    if (!underline && !strikethrough) || clip_w <= 0 || clip_h <= 0 {
+        return;
+    }
+
+    let line_start = x.max(clip_x);
+    let line_end = (x + text_w.ceil() as i32).min(clip_x + clip_w);
+    let line_w = (line_end - line_start).max(0);
+    if line_w <= 0 {
+        return;
+    }
+
+    let line_height = (font_size * TEXT_LINE_HEIGHT_FACTOR).ceil() as i32;
+    if underline {
+        let underline_y = y + line_height - 2;
+        if underline_y >= clip_y && underline_y < clip_y + clip_h {
+            canvas.hline(line_start, underline_y, line_w, color);
+        }
+    }
+    if strikethrough {
+        let strike_y = y + line_height / 2;
+        if strike_y >= clip_y && strike_y < clip_y + clip_h {
+            canvas.hline(line_start, strike_y, line_w, color);
         }
     }
 }
@@ -4103,6 +4323,7 @@ fn draw_grid_lines_for_zone<C: Canvas>(
 
     let buf_w = canvas.width();
     let buf_h = canvas.height();
+    let line_width = grid.style.grid_line_width.max(1);
 
     for &cell in vis_cells {
         let (row, col, cx, cy, cw, ch) = cell.parts();
@@ -4114,21 +4335,47 @@ fn draw_grid_lines_for_zone<C: Canvas>(
         let right = cx + cw;
         let bottom = cy + ch;
 
-        if draw_vert && right >= 0 && right < buf_w {
+        if draw_vert && right + line_width > 0 && right - line_width < buf_w {
             if is_3d {
-                canvas.vline(right - 1, cy, ch, color_light);
-                canvas.vline(right, cy, ch, color_dark);
+                for offset in 0..line_width {
+                    let light_x = right - 1 - offset;
+                    let dark_x = right + offset;
+                    if light_x >= 0 && light_x < buf_w {
+                        canvas.vline(light_x, cy, ch, color_light);
+                    }
+                    if dark_x >= 0 && dark_x < buf_w {
+                        canvas.vline(dark_x, cy, ch, color_dark);
+                    }
+                }
             } else {
-                canvas.vline(right - 1, cy, ch, color);
+                for offset in 0..line_width {
+                    let x = right - line_width + offset;
+                    if x >= 0 && x < buf_w {
+                        canvas.vline(x, cy, ch, color);
+                    }
+                }
             }
         }
 
-        if draw_horz && bottom >= 0 && bottom < buf_h {
+        if draw_horz && bottom + line_width > 0 && bottom - line_width < buf_h {
             if is_3d {
-                canvas.hline(cx, bottom - 1, cw, color_light);
-                canvas.hline(cx, bottom, cw, color_dark);
+                for offset in 0..line_width {
+                    let light_y = bottom - 1 - offset;
+                    let dark_y = bottom + offset;
+                    if light_y >= 0 && light_y < buf_h {
+                        canvas.hline(cx, light_y, cw, color_light);
+                    }
+                    if dark_y >= 0 && dark_y < buf_h {
+                        canvas.hline(cx, dark_y, cw, color_dark);
+                    }
+                }
             } else {
-                canvas.hline(cx, bottom - 1, cw, color);
+                for offset in 0..line_width {
+                    let y = bottom - line_width + offset;
+                    if y >= 0 && y < buf_h {
+                        canvas.hline(cx, y, cw, color);
+                    }
+                }
             }
         }
     }
@@ -4202,78 +4449,152 @@ fn cell_borders_needed(grid: &VolvoxGrid) -> bool {
     })
 }
 
+fn sheet_border_visual(grid: &VolvoxGrid) -> Option<(i32, u32)> {
+    let appearance = grid.style.appearance;
+    let mut color = grid.style.sheet_border;
+    if color == 0 && appearance != 0 {
+        color = grid.style.grid_color_fixed;
+    }
+    if color == 0 {
+        return None;
+    }
+
+    let border_style = if appearance == 1 || appearance == 2 {
+        if appearance == 2 {
+            color = lighten(color, 112);
+        }
+        LEGACY_BORDER_RAISED
+    } else {
+        pb::BorderStyle::BorderThin as i32
+    };
+    Some((border_style, color))
+}
+
+fn sheet_border_rect(ctx: &RenderContext, canvas_w: i32, canvas_h: i32) -> Option<CellRect> {
+    if ctx.vis_cells.is_empty() || canvas_w <= 0 || canvas_h <= 0 {
+        return None;
+    }
+
+    let mut left = i32::MAX;
+    let mut top = i32::MAX;
+    let mut right = i32::MIN;
+    let mut bottom = i32::MIN;
+    for &cell in &ctx.vis_cells {
+        let (_row, _col, cx, cy, cw, ch) = cell.parts();
+        left = left.min(cx);
+        top = top.min(cy);
+        right = right.max(cx + cw);
+        bottom = bottom.max(cy + ch);
+    }
+
+    let x = left.max(0);
+    let y = top.max(0);
+    let right = right.min(canvas_w);
+    let bottom = bottom.min(canvas_h);
+    let w = (right - x).max(0);
+    let h = (bottom - y).max(0);
+    if w <= 0 || h <= 0 {
+        return None;
+    }
+    Some(CellRect { x, y, w, h })
+}
+
+fn render_sheet_border<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
+    let Some((border_style, border_color)) = sheet_border_visual(grid) else {
+        return;
+    };
+    let Some(rect) = sheet_border_rect(ctx, canvas.width(), canvas.height()) else {
+        return;
+    };
+    canvas.cell_border_style(rect.x, rect.y, rect.w, rect.h, border_style, border_color);
+}
+
 fn render_cell_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
-    if !cell_borders_needed(grid) {
+    let has_selection_highlight =
+        is_selection_layer_enabled(grid) && has_highlight_border(&grid.selection.active_cell_style);
+    if !cell_borders_needed(grid) && sheet_border_visual(grid).is_none() && !has_selection_highlight
+    {
         return;
     }
-    for &cell in &ctx.vis_cells {
-        let (row, col, _cx, _cy, _cw, _ch) = cell.parts();
-        // For merged cells, draw border once at the merge-origin cell.
-        if let Some((mr1, mc1, _mr2, _mc2)) = cell.merge {
-            if row != mr1 || col != mc1 {
+    if cell_borders_needed(grid) {
+        for &cell in &ctx.vis_cells {
+            let (row, col, _cx, _cy, _cw, _ch) = cell.parts();
+            // For merged cells, draw border once at the merge-origin cell.
+            if let Some((mr1, mc1, _mr2, _mc2)) = cell.merge {
+                if row != mr1 || col != mc1 {
+                    continue;
+                }
+            }
+            let rect = merged_visible_rect(&ctx.merged_visible_rects, cell);
+
+            let style_override = grid.get_cell_style(row, col);
+            let all_style = style_override.border;
+            let all_color = style_override.border_color;
+            let has_edge_styles = style_override.border_top.is_some()
+                || style_override.border_right.is_some()
+                || style_override.border_bottom.is_some()
+                || style_override.border_left.is_some();
+            let has_edge_colors = style_override.border_top_color.is_some()
+                || style_override.border_right_color.is_some()
+                || style_override.border_bottom_color.is_some()
+                || style_override.border_left_color.is_some();
+
+            if !has_edge_styles && !has_edge_colors {
+                let border_style = all_style.unwrap_or(pb::BorderStyle::BorderNone as i32);
+                if border_style == pb::BorderStyle::BorderNone as i32 {
+                    continue;
+                }
+                let border_color = all_color.unwrap_or(grid.style.grid_color);
+                canvas.cell_border_style(
+                    rect.x,
+                    rect.y,
+                    rect.w,
+                    rect.h,
+                    border_style,
+                    border_color,
+                );
                 continue;
             }
-        }
-        let rect = merged_visible_rect(&ctx.merged_visible_rects, cell);
 
-        let style_override = grid.get_cell_style(row, col);
-        let all_style = style_override.border;
-        let all_color = style_override.border_color;
-        let has_edge_styles = style_override.border_top.is_some()
-            || style_override.border_right.is_some()
-            || style_override.border_bottom.is_some()
-            || style_override.border_left.is_some();
-        let has_edge_colors = style_override.border_top_color.is_some()
-            || style_override.border_right_color.is_some()
-            || style_override.border_bottom_color.is_some()
-            || style_override.border_left_color.is_some();
+            let edge_specs = [
+                (
+                    BorderEdge::Top,
+                    style_override.border_top,
+                    style_override.border_top_color,
+                ),
+                (
+                    BorderEdge::Right,
+                    style_override.border_right,
+                    style_override.border_right_color,
+                ),
+                (
+                    BorderEdge::Bottom,
+                    style_override.border_bottom,
+                    style_override.border_bottom_color,
+                ),
+                (
+                    BorderEdge::Left,
+                    style_override.border_left,
+                    style_override.border_left_color,
+                ),
+            ];
 
-        if !has_edge_styles && !has_edge_colors {
-            let border_style = all_style.unwrap_or(pb::BorderStyle::BorderNone as i32);
-            if border_style == pb::BorderStyle::BorderNone as i32 {
-                continue;
+            for (edge, edge_style, edge_color) in edge_specs {
+                let style = edge_style
+                    .or(all_style)
+                    .unwrap_or(pb::BorderStyle::BorderNone as i32);
+                if style == pb::BorderStyle::BorderNone as i32 {
+                    continue;
+                }
+                let color = edge_color.or(all_color).unwrap_or(grid.style.grid_color);
+                canvas.cell_border_edge_style(rect.x, rect.y, rect.w, rect.h, edge, style, color);
             }
-            let border_color = all_color.unwrap_or(grid.style.grid_color);
-            canvas.cell_border_style(rect.x, rect.y, rect.w, rect.h, border_style, border_color);
-            continue;
-        }
-
-        let edge_specs = [
-            (
-                BorderEdge::Top,
-                style_override.border_top,
-                style_override.border_top_color,
-            ),
-            (
-                BorderEdge::Right,
-                style_override.border_right,
-                style_override.border_right_color,
-            ),
-            (
-                BorderEdge::Bottom,
-                style_override.border_bottom,
-                style_override.border_bottom_color,
-            ),
-            (
-                BorderEdge::Left,
-                style_override.border_left,
-                style_override.border_left_color,
-            ),
-        ];
-
-        for (edge, edge_style, edge_color) in edge_specs {
-            let style = edge_style
-                .or(all_style)
-                .unwrap_or(pb::BorderStyle::BorderNone as i32);
-            if style == pb::BorderStyle::BorderNone as i32 {
-                continue;
-            }
-            let color = edge_color.or(all_color).unwrap_or(grid.style.grid_color);
-            canvas.cell_border_edge_style(rect.x, rect.y, rect.w, rect.h, edge, style, color);
         }
     }
 
-    if is_selection_layer_enabled(grid) && has_highlight_border(&grid.selection.active_cell_style) {
+    render_sheet_border(grid, canvas, ctx);
+
+    if has_selection_highlight {
         if let Some((cx, cy, cw, ch)) =
             cell_rect(grid, grid.selection.row, grid.selection.col, &ctx.vp)
         {
@@ -4339,6 +4660,15 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
         let font_size = style_override.font_size.unwrap_or(grid.style.font_size);
         let font_bold = style_override.font_bold.unwrap_or(grid.style.font_bold);
         let font_italic = style_override.font_italic.unwrap_or(grid.style.font_italic);
+        let font_underline = style_override
+            .font_underline
+            .unwrap_or(grid.style.font_underline);
+        let font_strikethrough = style_override
+            .font_strikethrough
+            .unwrap_or(grid.style.font_strikethrough);
+        let font_stretch = style_override
+            .font_stretch
+            .unwrap_or(grid.style.font_stretch);
         let text_style = if is_fixed {
             style_override
                 .text_effect
@@ -4363,7 +4693,7 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
         // Compute text position based on alignment, centered in the
         // visible portion of the (possibly merged) cell.
         let (halign, valign) = alignment_components(alignment);
-        let default_line_h = (font_size * 1.2).ceil();
+        let default_line_h = (font_size * TEXT_LINE_HEIGHT_FACTOR).ceil();
         let ellipsis_mode = grid.ellipsis_mode;
 
         // Indent text in the outline column
@@ -4426,12 +4756,13 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
             || (shrink_to_fit && !grid.word_wrap)
             || (grid.text_overflow && !grid.word_wrap && !shrink_to_fit && !is_merged_cell);
         let (tw, th) = if needs_measure {
-            canvas.measure_text(
+            canvas.measure_text_stretched(
                 display_text,
                 font_name,
                 font_size,
                 font_bold,
                 font_italic,
+                font_stretch,
                 wrap_width,
             )
         } else {
@@ -4443,12 +4774,13 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
             if shrink_to_fit && !grid.word_wrap && tw > inner_w as f32 && inner_w > 0 {
                 let scale = inner_w as f32 / tw;
                 let shrunk = (font_size * scale).floor().max(6.0);
-                let (stw, sth) = canvas.measure_text(
+                let (stw, sth) = canvas.measure_text_stretched(
                     display_text,
                     font_name,
                     shrunk,
                     font_bold,
                     font_italic,
+                    font_stretch,
                     None,
                 );
                 (shrunk, stw, sth)
@@ -4582,7 +4914,7 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
                     inner_w as f32,
                 )
             };
-            canvas.draw_text_styled_fast(
+            canvas.draw_text_styled_stretched_fast(
                 text_x,
                 text_y,
                 &ellipsis_text,
@@ -4590,6 +4922,7 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
                 effective_font_size,
                 font_bold,
                 font_italic,
+                font_stretch,
                 fore,
                 clip_x,
                 clip_y_cell,
@@ -4598,8 +4931,33 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
                 text_style,
                 wrap_width,
             );
+            let ellipsis_width = canvas
+                .measure_text_stretched(
+                    &ellipsis_text,
+                    font_name,
+                    effective_font_size,
+                    font_bold,
+                    font_italic,
+                    font_stretch,
+                    wrap_width,
+                )
+                .0;
+            draw_text_decorations(
+                canvas,
+                text_x,
+                text_y,
+                ellipsis_width,
+                effective_font_size,
+                fore,
+                clip_x,
+                clip_y_cell,
+                clip_w,
+                clip_h,
+                font_underline,
+                font_strikethrough,
+            );
         } else {
-            canvas.draw_text_styled_fast(
+            canvas.draw_text_styled_stretched_fast(
                 text_x,
                 text_y,
                 display_text,
@@ -4607,6 +4965,7 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
                 effective_font_size,
                 font_bold,
                 font_italic,
+                font_stretch,
                 fore,
                 clip_x,
                 clip_y_cell,
@@ -4614,6 +4973,39 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
                 clip_h,
                 text_style,
                 wrap_width,
+            );
+            let draw_width = if font_underline || font_strikethrough {
+                if needs_measure {
+                    tw
+                } else {
+                    canvas
+                        .measure_text_stretched(
+                            display_text,
+                            font_name,
+                            effective_font_size,
+                            font_bold,
+                            font_italic,
+                            font_stretch,
+                            wrap_width,
+                        )
+                        .0
+                }
+            } else {
+                0.0
+            };
+            draw_text_decorations(
+                canvas,
+                text_x,
+                text_y,
+                draw_width,
+                effective_font_size,
+                fore,
+                clip_x,
+                clip_y_cell,
+                clip_w,
+                clip_h,
+                font_underline,
+                font_strikethrough,
             );
         }
     }
@@ -8173,6 +8565,45 @@ mod tests {
         }
     }
 
+    struct MeasureOnlyTextRenderer;
+
+    impl TextRenderer for MeasureOnlyTextRenderer {
+        fn measure_text(
+            &mut self,
+            text: &str,
+            _font_name: &str,
+            _font_size: f32,
+            _bold: bool,
+            _italic: bool,
+            _max_width: Option<f32>,
+        ) -> (f32, f32) {
+            ((text.chars().count().max(1) as f32) * 6.0, 8.0)
+        }
+
+        fn render_text(
+            &mut self,
+            _buffer_pixels: &mut [u8],
+            _buf_width: i32,
+            _buf_height: i32,
+            _stride: i32,
+            _x: i32,
+            _y: i32,
+            _clip_x: i32,
+            _clip_y: i32,
+            _clip_w: i32,
+            _clip_h: i32,
+            text: &str,
+            _font_name: &str,
+            _font_size: f32,
+            _bold: bool,
+            _italic: bool,
+            _color: u32,
+            _max_width: Option<f32>,
+        ) -> f32 {
+            (text.chars().count().max(1) as f32) * 6.0
+        }
+    }
+
     #[test]
     fn parse_progress_percent_treats_one_as_one_percent() {
         assert!((parse_progress_percent("1") - 0.01).abs() < 1e-6);
@@ -8275,6 +8706,164 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn grid_line_width_thickens_flat_grid_lines() {
+        let width = 40;
+        let height = 20;
+        let stride = width * 4;
+        let mut grid = VolvoxGrid::new(1, width, height, 1, 2, 0, 0);
+        grid.style.back_color_bkg = 0xFFFFFFFF;
+        grid.style.grid_color = 0xFFFF0000;
+        grid.style.grid_lines = pb::GridLineStyle::GridlineSolid as i32;
+        grid.style.grid_lines_fixed = pb::GridLineStyle::GridlineNone as i32;
+        grid.style.grid_line_width = 3;
+        grid.set_col_width(0, 20);
+        grid.set_col_width(1, 20);
+        grid.set_row_height(0, 20);
+        grid.ensure_layout();
+
+        let mut text = SolidTextRenderer;
+        let mut buffer = vec![0u8; (stride * height) as usize];
+        let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+        render_grid(&grid, &mut canvas);
+
+        assert_eq!(pixel_argb(&buffer, width, 17, 5), 0xFFFF0000);
+        assert_eq!(pixel_argb(&buffer, width, 18, 5), 0xFFFF0000);
+        assert_eq!(pixel_argb(&buffer, width, 19, 5), 0xFFFF0000);
+        assert_ne!(pixel_argb(&buffer, width, 16, 5), 0xFFFF0000);
+    }
+
+    #[test]
+    fn sheet_border_draws_flat_outer_border() {
+        let width = 24;
+        let height = 20;
+        let stride = width * 4;
+        let mut grid = VolvoxGrid::new(1, width, height, 1, 1, 0, 0);
+        grid.style.back_color_bkg = 0xFFFFFFFF;
+        grid.style.grid_lines = pb::GridLineStyle::GridlineNone as i32;
+        grid.style.grid_lines_fixed = pb::GridLineStyle::GridlineNone as i32;
+        grid.style.sheet_border = 0xFF00AAFF;
+        grid.style.appearance = 0;
+        grid.set_col_width(0, width);
+        grid.set_row_height(0, height);
+        grid.ensure_layout();
+
+        let mut text = SolidTextRenderer;
+        let mut buffer = vec![0u8; (stride * height) as usize];
+        let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+        render_grid(&grid, &mut canvas);
+
+        assert_eq!(pixel_argb(&buffer, width, 0, 0), 0xFF00AAFF);
+        assert_eq!(
+            pixel_argb(&buffer, width, width - 1, height - 1),
+            0xFF00AAFF
+        );
+    }
+
+    #[test]
+    fn global_font_underline_and_strikethrough_draw_even_without_text_effect() {
+        let width = 60;
+        let height = 20;
+        let stride = width * 4;
+        let build_grid = |underline: bool, strikethrough: bool| {
+            let mut grid = VolvoxGrid::new(1, width, height, 1, 2, 0, 0);
+            grid.style.back_color_bkg = 0xFFFFFFFF;
+            grid.style.fore_color = 0xFFFF0000;
+            grid.style.grid_lines = pb::GridLineStyle::GridlineNone as i32;
+            grid.style.grid_lines_fixed = pb::GridLineStyle::GridlineNone as i32;
+            grid.style.font_size = 10.0;
+            grid.style.font_underline = underline;
+            grid.style.font_strikethrough = strikethrough;
+            grid.selection.selection_style.back_color = None;
+            grid.selection.selection_style.fore_color = None;
+            grid.columns[1].alignment = pb::Align::LeftTop as i32;
+            grid.cells.set_text(0, 1, "Demo".to_string());
+            grid.set_col_width(0, width / 2);
+            grid.set_col_width(1, width / 2);
+            grid.set_row_height(0, height);
+            grid.ensure_layout();
+            grid
+        };
+
+        let baseline_grid = build_grid(false, false);
+        let decorated_grid = build_grid(true, true);
+
+        let mut baseline_text = MeasureOnlyTextRenderer;
+        let mut baseline = vec![0u8; (stride * height) as usize];
+        let mut baseline_canvas =
+            CpuCanvas::new(&mut baseline, width, height, stride, &mut baseline_text);
+        render_grid(&baseline_grid, &mut baseline_canvas);
+
+        let mut decorated_text = MeasureOnlyTextRenderer;
+        let mut decorated = vec![0u8; (stride * height) as usize];
+        let mut decorated_canvas =
+            CpuCanvas::new(&mut decorated, width, height, stride, &mut decorated_text);
+        render_grid(&decorated_grid, &mut decorated_canvas);
+
+        let baseline_red = baseline
+            .chunks_exact(4)
+            .filter(|px| px[0] == 0xFF && px[1] == 0x00 && px[2] == 0x00 && px[3] == 0xFF)
+            .count();
+        let decorated_red = decorated
+            .chunks_exact(4)
+            .filter(|px| px[0] == 0xFF && px[1] == 0x00 && px[2] == 0x00 && px[3] == 0xFF)
+            .count();
+
+        assert_eq!(baseline_red, 0);
+        assert!(decorated_red > 0);
+    }
+
+    #[test]
+    fn global_font_width_condenses_text_rendering() {
+        let width = 80;
+        let height = 20;
+        let stride = width * 4;
+        let build_grid = |font_stretch: f32| {
+            let mut grid = VolvoxGrid::new(1, width, height, 1, 2, 0, 0);
+            grid.style.back_color_bkg = 0xFFFFFFFF;
+            grid.style.fore_color = 0xFFFF0000;
+            grid.style.grid_lines = pb::GridLineStyle::GridlineNone as i32;
+            grid.style.grid_lines_fixed = pb::GridLineStyle::GridlineNone as i32;
+            grid.style.font_size = 10.0;
+            grid.style.font_stretch = font_stretch;
+            grid.selection.selection_style.back_color = None;
+            grid.selection.selection_style.fore_color = None;
+            grid.columns[1].alignment = pb::Align::LeftTop as i32;
+            grid.cells.set_text(0, 1, "Width".to_string());
+            grid.set_col_width(0, width / 2);
+            grid.set_col_width(1, width / 2);
+            grid.set_row_height(0, height);
+            grid.ensure_layout();
+            grid
+        };
+
+        let baseline_grid = build_grid(0.0);
+        let condensed_grid = build_grid(50.0);
+
+        let mut baseline_text = SolidTextRenderer;
+        let mut baseline = vec![0u8; (stride * height) as usize];
+        let mut baseline_canvas =
+            CpuCanvas::new(&mut baseline, width, height, stride, &mut baseline_text);
+        render_grid(&baseline_grid, &mut baseline_canvas);
+
+        let mut condensed_text = SolidTextRenderer;
+        let mut condensed = vec![0u8; (stride * height) as usize];
+        let mut condensed_canvas =
+            CpuCanvas::new(&mut condensed, width, height, stride, &mut condensed_text);
+        render_grid(&condensed_grid, &mut condensed_canvas);
+
+        let baseline_red = baseline
+            .chunks_exact(4)
+            .filter(|px| px[0] == 0xFF && px[1] == 0x00 && px[2] == 0x00 && px[3] == 0xFF)
+            .count();
+        let condensed_red = condensed
+            .chunks_exact(4)
+            .filter(|px| px[0] == 0xFF && px[1] == 0x00 && px[2] == 0x00 && px[3] == 0xFF)
+            .count();
+
+        assert!(condensed_red < baseline_red);
     }
 
     #[test]

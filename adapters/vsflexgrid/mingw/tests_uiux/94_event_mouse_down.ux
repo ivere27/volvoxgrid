@@ -1,0 +1,4 @@
+click_cell 2 1
+sleep 120
+click_cell 3 1
+sleep 120

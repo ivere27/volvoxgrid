@@ -1,0 +1,4 @@
+set_cell 2 1
+sleep 100
+set_cell 3 1
+sleep 100

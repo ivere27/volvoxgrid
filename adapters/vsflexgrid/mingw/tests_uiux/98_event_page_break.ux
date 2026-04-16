@@ -1,0 +1,2 @@
+call_method0_autodialog_ok PrintGrid 4000
+sleep 160

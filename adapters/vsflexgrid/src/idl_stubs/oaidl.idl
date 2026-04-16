@@ -1,0 +1,32 @@
+import "wtypes.idl";
+import "unknwn.idl";
+
+[
+    uuid(00020401-0000-0000-C000-000000000046),
+    object,
+    pointer_default(unique)
+]
+interface ITypeInfo : IUnknown {
+};
+
+[
+    uuid(00020402-0000-0000-C000-000000000046),
+    object,
+    pointer_default(unique)
+]
+interface ITypeLib : IUnknown {
+};
+
+[
+    uuid(00020400-0000-0000-C000-000000000046),
+    object,
+    dual,
+    oleautomation,
+    pointer_default(unique)
+]
+interface IDispatch : IUnknown {
+    HRESULT GetTypeInfoCount([out] UINT *pctinfo);
+    HRESULT GetTypeInfo([in] UINT iTInfo, [in] LCID lcid, [out] ITypeInfo **ppTInfo);
+    HRESULT GetIDsOfNames([in] REFIID riid, [in, size_is(cNames)] LPOLESTR *rgszNames, [in] UINT cNames, [in] LCID lcid, [out, size_is(cNames)] DISPID *rgDispId);
+    HRESULT Invoke([in] DISPID dispIdMember, [in] REFIID riid, [in] LCID lcid, [in] WORD wFlags, [in, out] DISPPARAMS *pDispParams, [out] VARIANT *pVarResult, [out] EXCEPINFO *pExcepInfo, [out] UINT *puArgErr);
+};

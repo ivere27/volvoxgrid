@@ -84,28 +84,6 @@ static int get_int(IDispatch *pDisp, LPCOLESTR name, int fallback) {
     return out;
 }
 
-static HRESULT call_resize_viewport(IDispatch *pDisp, int width, int height) {
-    DISPID dispid;
-    VARIANT args[2];
-    DISPPARAMS dp;
-
-    if (FAILED(get_dispid(pDisp, L"ResizeViewport", &dispid))) return DISP_E_MEMBERNOTFOUND;
-
-    VariantInit(&args[0]);
-    VariantInit(&args[1]);
-    args[0].vt = VT_I4;
-    args[0].lVal = height;
-    args[1].vt = VT_I4;
-    args[1].lVal = width;
-
-    dp.rgvarg = args;
-    dp.rgdispidNamedArgs = NULL;
-    dp.cArgs = 2;
-    dp.cNamedArgs = 0;
-    return pDisp->lpVtbl->Invoke(
-        pDisp, dispid, &IID_NULL, 0, DISPATCH_METHOD, &dp, NULL, NULL, NULL);
-}
-
 static double get_double(IDispatch *pDisp, LPCOLESTR name, double fallback) {
     DISPID dispid;
     if (FAILED(get_dispid(pDisp, name, &dispid))) return fallback;
@@ -2004,6 +1982,8 @@ static TestCase g_tests[] = {
     { "sql_unbind", 840, 400 },
     { "sql_rebind", 840, 400 },
     { "sql_error_handling", 840, 400 },
+    { "interaction_props", 780, 320 },
+    { "compat_style_props", 640, 260 },
     { NULL, 0, 0 }
 };
 
@@ -2472,13 +2452,10 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        /* VolvoxGrid */
+        /* VolvoxGrid: use the same non-hosted IDispatch-style creation
+         * shape as the legacy compare path and avoid VolvoxGrid-only APIs. */
         IDispatch *pVV = create_grid(PROGID_VOLVOXGRID, "VV");
         if (pVV) {
-            HRESULT resize_hr = call_resize_viewport(pVV, tc->width, tc->height);
-            if (FAILED(resize_hr)) {
-                printf("  VV: ResizeViewport failed: 0x%08lx\n", resize_hr);
-            }
             run_vbs(pVV, vbs_code);
             capture_grid_snapshot(pVV, &vv_snapshot);
             if (dump_test == (i + 1)) {
