@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.1
+
+- Version bump for project-wide 0.7.1 release.
+
 ## 0.7.0
 
 - Version bump for project-wide 0.7.0 release.
