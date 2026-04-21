@@ -235,48 +235,54 @@ impl<Req: Message + Default, Resp: Message + Default> PluginStreamBidi<Req, Resp
 
 pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn create(&self, request: CreateRequest) -> Result<CreateResponse, String>;
-    fn destroy(&self, request: GridHandle) -> Result<Empty, String>;
-    fn configure(&self, request: ConfigureRequest) -> Result<Empty, String>;
+    fn destroy(&self, request: GridHandle) -> Result<DestroyResponse, String>;
+    fn configure(&self, request: ConfigureRequest) -> Result<ConfigureResponse, String>;
     fn get_config(&self, request: GridHandle) -> Result<GridConfig, String>;
-    fn load_font_data(&self, request: LoadFontDataRequest) -> Result<Empty, String>;
-    fn define_columns(&self, request: DefineColumnsRequest) -> Result<Empty, String>;
+    fn load_font_data(&self, request: LoadFontDataRequest) -> Result<LoadFontDataResponse, String>;
+    fn define_columns(
+        &self,
+        request: DefineColumnsRequest,
+    ) -> Result<DefineColumnsResponse, String>;
     fn get_schema(&self, request: GridHandle) -> Result<DefineColumnsRequest, String>;
-    fn define_rows(&self, request: DefineRowsRequest) -> Result<Empty, String>;
-    fn insert_rows(&self, request: InsertRowsRequest) -> Result<Empty, String>;
-    fn remove_rows(&self, request: RemoveRowsRequest) -> Result<Empty, String>;
-    fn move_column(&self, request: MoveColumnRequest) -> Result<Empty, String>;
-    fn move_row(&self, request: MoveRowRequest) -> Result<Empty, String>;
+    fn define_rows(&self, request: DefineRowsRequest) -> Result<DefineRowsResponse, String>;
+    fn insert_rows(&self, request: InsertRowsRequest) -> Result<InsertRowsResponse, String>;
+    fn remove_rows(&self, request: RemoveRowsRequest) -> Result<RemoveRowsResponse, String>;
+    fn move_column(&self, request: MoveColumnRequest) -> Result<MoveColumnResponse, String>;
+    fn move_row(&self, request: MoveRowRequest) -> Result<MoveRowResponse, String>;
     fn update_cells(&self, request: UpdateCellsRequest) -> Result<WriteResult, String>;
     fn get_cells(&self, request: GetCellsRequest) -> Result<CellsResponse, String>;
     fn load_table(&self, request: LoadTableRequest) -> Result<WriteResult, String>;
     fn load_data(&self, request: LoadDataRequest) -> Result<LoadDataResult, String>;
-    fn clear(&self, request: ClearRequest) -> Result<Empty, String>;
-    fn select(&self, request: SelectRequest) -> Result<Empty, String>;
+    fn clear(&self, request: ClearRequest) -> Result<ClearResponse, String>;
+    fn select(&self, request: SelectRequest) -> Result<SelectResponse, String>;
     fn get_selection(&self, request: GridHandle) -> Result<SelectionState, String>;
-    fn show_cell(&self, request: ShowCellRequest) -> Result<Empty, String>;
-    fn set_top_row(&self, request: SetRowRequest) -> Result<Empty, String>;
-    fn set_left_col(&self, request: SetColRequest) -> Result<Empty, String>;
+    fn show_cell(&self, request: ShowCellRequest) -> Result<ShowCellResponse, String>;
+    fn set_top_row(&self, request: SetRowRequest) -> Result<SetTopRowResponse, String>;
+    fn set_left_col(&self, request: SetColRequest) -> Result<SetLeftColResponse, String>;
     fn edit(&self, request: EditCommand) -> Result<EditState, String>;
-    fn sort(&self, request: SortRequest) -> Result<Empty, String>;
+    fn sort(&self, request: SortRequest) -> Result<SortResponse, String>;
     fn subtotal(&self, request: SubtotalRequest) -> Result<SubtotalResult, String>;
-    fn auto_size(&self, request: AutoSizeRequest) -> Result<Empty, String>;
-    fn outline(&self, request: OutlineRequest) -> Result<Empty, String>;
+    fn auto_size(&self, request: AutoSizeRequest) -> Result<AutoSizeResponse, String>;
+    fn outline(&self, request: OutlineRequest) -> Result<OutlineResponse, String>;
     fn get_node(&self, request: GetNodeRequest) -> Result<NodeInfo, String>;
     fn find(&self, request: FindRequest) -> Result<FindResponse, String>;
     fn aggregate(&self, request: AggregateRequest) -> Result<AggregateResponse, String>;
     fn get_merged_range(&self, request: GetMergedRangeRequest) -> Result<CellRange, String>;
-    fn merge_cells(&self, request: MergeCellsRequest) -> Result<Empty, String>;
-    fn unmerge_cells(&self, request: UnmergeCellsRequest) -> Result<Empty, String>;
+    fn merge_cells(&self, request: MergeCellsRequest) -> Result<MergeCellsResponse, String>;
+    fn unmerge_cells(&self, request: UnmergeCellsRequest) -> Result<UnmergeCellsResponse, String>;
     fn get_merged_regions(&self, request: GridHandle) -> Result<MergedRegionsResponse, String>;
     fn get_memory_usage(&self, request: GridHandle) -> Result<MemoryUsageResponse, String>;
     fn clipboard(&self, request: ClipboardCommand) -> Result<ClipboardResponse, String>;
     fn export(&self, request: ExportRequest) -> Result<ExportResponse, String>;
     fn print(&self, request: PrintRequest) -> Result<PrintResponse, String>;
     fn archive(&self, request: ArchiveRequest) -> Result<ArchiveResponse, String>;
-    fn resize_viewport(&self, request: ResizeViewportRequest) -> Result<Empty, String>;
-    fn set_redraw(&self, request: SetRedrawRequest) -> Result<Empty, String>;
-    fn refresh(&self, request: GridHandle) -> Result<Empty, String>;
-    fn load_demo(&self, request: LoadDemoRequest) -> Result<Empty, String>;
+    fn resize_viewport(
+        &self,
+        request: ResizeViewportRequest,
+    ) -> Result<ResizeViewportResponse, String>;
+    fn set_redraw(&self, request: SetRedrawRequest) -> Result<SetRedrawResponse, String>;
+    fn refresh(&self, request: GridHandle) -> Result<RefreshResponse, String>;
+    fn load_demo(&self, request: LoadDemoRequest) -> Result<LoadDemoResponse, String>;
     fn get_demo_data(&self, request: GetDemoDataRequest) -> Result<GetDemoDataResponse, String>;
     fn render_session(
         &self,

@@ -12,16 +12,16 @@ class VolvoxGridServiceFfi {
     return CreateResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> Destroy(GridHandle request) async {
+  static Future<DestroyResponse> Destroy(GridHandle request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/Destroy', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return DestroyResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> Configure(ConfigureRequest request) async {
+  static Future<ConfigureResponse> Configure(ConfigureRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/Configure', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return ConfigureResponse.fromBuffer(resultBytes);
   }
 
   static Future<GridConfig> GetConfig(GridHandle request) async {
@@ -30,16 +30,16 @@ class VolvoxGridServiceFfi {
     return GridConfig.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> LoadFontData(LoadFontDataRequest request) async {
+  static Future<LoadFontDataResponse> LoadFontData(LoadFontDataRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/LoadFontData', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return LoadFontDataResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> DefineColumns(DefineColumnsRequest request) async {
+  static Future<DefineColumnsResponse> DefineColumns(DefineColumnsRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/DefineColumns', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return DefineColumnsResponse.fromBuffer(resultBytes);
   }
 
   static Future<DefineColumnsRequest> GetSchema(GridHandle request) async {
@@ -48,34 +48,34 @@ class VolvoxGridServiceFfi {
     return DefineColumnsRequest.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> DefineRows(DefineRowsRequest request) async {
+  static Future<DefineRowsResponse> DefineRows(DefineRowsRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/DefineRows', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return DefineRowsResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> InsertRows(InsertRowsRequest request) async {
+  static Future<InsertRowsResponse> InsertRows(InsertRowsRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/InsertRows', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return InsertRowsResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> RemoveRows(RemoveRowsRequest request) async {
+  static Future<RemoveRowsResponse> RemoveRows(RemoveRowsRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/RemoveRows', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return RemoveRowsResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> MoveColumn(MoveColumnRequest request) async {
+  static Future<MoveColumnResponse> MoveColumn(MoveColumnRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/MoveColumn', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return MoveColumnResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> MoveRow(MoveRowRequest request) async {
+  static Future<MoveRowResponse> MoveRow(MoveRowRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/MoveRow', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return MoveRowResponse.fromBuffer(resultBytes);
   }
 
   static Future<WriteResult> UpdateCells(UpdateCellsRequest request) async {
@@ -102,16 +102,16 @@ class VolvoxGridServiceFfi {
     return LoadDataResult.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> Clear(ClearRequest request) async {
+  static Future<ClearResponse> Clear(ClearRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/Clear', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return ClearResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> Select(SelectRequest request) async {
+  static Future<SelectResponse> Select(SelectRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/Select', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return SelectResponse.fromBuffer(resultBytes);
   }
 
   static Future<SelectionState> GetSelection(GridHandle request) async {
@@ -120,22 +120,22 @@ class VolvoxGridServiceFfi {
     return SelectionState.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> ShowCell(ShowCellRequest request) async {
+  static Future<ShowCellResponse> ShowCell(ShowCellRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/ShowCell', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return ShowCellResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> SetTopRow(SetRowRequest request) async {
+  static Future<SetTopRowResponse> SetTopRow(SetRowRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/SetTopRow', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return SetTopRowResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> SetLeftCol(SetColRequest request) async {
+  static Future<SetLeftColResponse> SetLeftCol(SetColRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/SetLeftCol', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return SetLeftColResponse.fromBuffer(resultBytes);
   }
 
   static Future<EditState> Edit(EditCommand request) async {
@@ -144,10 +144,10 @@ class VolvoxGridServiceFfi {
     return EditState.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> Sort(SortRequest request) async {
+  static Future<SortResponse> Sort(SortRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/Sort', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return SortResponse.fromBuffer(resultBytes);
   }
 
   static Future<SubtotalResult> Subtotal(SubtotalRequest request) async {
@@ -156,16 +156,16 @@ class VolvoxGridServiceFfi {
     return SubtotalResult.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> AutoSize(AutoSizeRequest request) async {
+  static Future<AutoSizeResponse> AutoSize(AutoSizeRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/AutoSize', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return AutoSizeResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> Outline(OutlineRequest request) async {
+  static Future<OutlineResponse> Outline(OutlineRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/Outline', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return OutlineResponse.fromBuffer(resultBytes);
   }
 
   static Future<NodeInfo> GetNode(GetNodeRequest request) async {
@@ -192,16 +192,16 @@ class VolvoxGridServiceFfi {
     return CellRange.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> MergeCells(MergeCellsRequest request) async {
+  static Future<MergeCellsResponse> MergeCells(MergeCellsRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/MergeCells', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return MergeCellsResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> UnmergeCells(UnmergeCellsRequest request) async {
+  static Future<UnmergeCellsResponse> UnmergeCells(UnmergeCellsRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/UnmergeCells', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return UnmergeCellsResponse.fromBuffer(resultBytes);
   }
 
   static Future<MergedRegionsResponse> GetMergedRegions(GridHandle request) async {
@@ -240,28 +240,28 @@ class VolvoxGridServiceFfi {
     return ArchiveResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> ResizeViewport(ResizeViewportRequest request) async {
+  static Future<ResizeViewportResponse> ResizeViewport(ResizeViewportRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/ResizeViewport', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return ResizeViewportResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> SetRedraw(SetRedrawRequest request) async {
+  static Future<SetRedrawResponse> SetRedraw(SetRedrawRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/SetRedraw', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return SetRedrawResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> Refresh(GridHandle request) async {
+  static Future<RefreshResponse> Refresh(GridHandle request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/Refresh', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return RefreshResponse.fromBuffer(resultBytes);
   }
 
-  static Future<Empty> LoadDemo(LoadDemoRequest request) async {
+  static Future<LoadDemoResponse> LoadDemo(LoadDemoRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/LoadDemo', bytes);
-    return Empty.fromBuffer(resultBytes);
+    return LoadDemoResponse.fromBuffer(resultBytes);
   }
 
   static Future<GetDemoDataResponse> GetDemoData(GetDemoDataRequest request) async {

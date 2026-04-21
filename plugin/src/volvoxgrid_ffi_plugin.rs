@@ -185,48 +185,58 @@ fn get_stream(handle: u64) -> Option<Arc<StreamContext>> {
 
 pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn create(&self, request: CreateRequest) -> Result<CreateResponse, FfiError>;
-    fn destroy(&self, request: GridHandle) -> Result<Empty, FfiError>;
-    fn configure(&self, request: ConfigureRequest) -> Result<Empty, FfiError>;
+    fn destroy(&self, request: GridHandle) -> Result<DestroyResponse, FfiError>;
+    fn configure(&self, request: ConfigureRequest) -> Result<ConfigureResponse, FfiError>;
     fn get_config(&self, request: GridHandle) -> Result<GridConfig, FfiError>;
-    fn load_font_data(&self, request: LoadFontDataRequest) -> Result<Empty, FfiError>;
-    fn define_columns(&self, request: DefineColumnsRequest) -> Result<Empty, FfiError>;
+    fn load_font_data(
+        &self,
+        request: LoadFontDataRequest,
+    ) -> Result<LoadFontDataResponse, FfiError>;
+    fn define_columns(
+        &self,
+        request: DefineColumnsRequest,
+    ) -> Result<DefineColumnsResponse, FfiError>;
     fn get_schema(&self, request: GridHandle) -> Result<DefineColumnsRequest, FfiError>;
-    fn define_rows(&self, request: DefineRowsRequest) -> Result<Empty, FfiError>;
-    fn insert_rows(&self, request: InsertRowsRequest) -> Result<Empty, FfiError>;
-    fn remove_rows(&self, request: RemoveRowsRequest) -> Result<Empty, FfiError>;
-    fn move_column(&self, request: MoveColumnRequest) -> Result<Empty, FfiError>;
-    fn move_row(&self, request: MoveRowRequest) -> Result<Empty, FfiError>;
+    fn define_rows(&self, request: DefineRowsRequest) -> Result<DefineRowsResponse, FfiError>;
+    fn insert_rows(&self, request: InsertRowsRequest) -> Result<InsertRowsResponse, FfiError>;
+    fn remove_rows(&self, request: RemoveRowsRequest) -> Result<RemoveRowsResponse, FfiError>;
+    fn move_column(&self, request: MoveColumnRequest) -> Result<MoveColumnResponse, FfiError>;
+    fn move_row(&self, request: MoveRowRequest) -> Result<MoveRowResponse, FfiError>;
     fn update_cells(&self, request: UpdateCellsRequest) -> Result<WriteResult, FfiError>;
     fn get_cells(&self, request: GetCellsRequest) -> Result<CellsResponse, FfiError>;
     fn load_table(&self, request: LoadTableRequest) -> Result<WriteResult, FfiError>;
     fn load_data(&self, request: LoadDataRequest) -> Result<LoadDataResult, FfiError>;
-    fn clear(&self, request: ClearRequest) -> Result<Empty, FfiError>;
-    fn select(&self, request: SelectRequest) -> Result<Empty, FfiError>;
+    fn clear(&self, request: ClearRequest) -> Result<ClearResponse, FfiError>;
+    fn select(&self, request: SelectRequest) -> Result<SelectResponse, FfiError>;
     fn get_selection(&self, request: GridHandle) -> Result<SelectionState, FfiError>;
-    fn show_cell(&self, request: ShowCellRequest) -> Result<Empty, FfiError>;
-    fn set_top_row(&self, request: SetRowRequest) -> Result<Empty, FfiError>;
-    fn set_left_col(&self, request: SetColRequest) -> Result<Empty, FfiError>;
+    fn show_cell(&self, request: ShowCellRequest) -> Result<ShowCellResponse, FfiError>;
+    fn set_top_row(&self, request: SetRowRequest) -> Result<SetTopRowResponse, FfiError>;
+    fn set_left_col(&self, request: SetColRequest) -> Result<SetLeftColResponse, FfiError>;
     fn edit(&self, request: EditCommand) -> Result<EditState, FfiError>;
-    fn sort(&self, request: SortRequest) -> Result<Empty, FfiError>;
+    fn sort(&self, request: SortRequest) -> Result<SortResponse, FfiError>;
     fn subtotal(&self, request: SubtotalRequest) -> Result<SubtotalResult, FfiError>;
-    fn auto_size(&self, request: AutoSizeRequest) -> Result<Empty, FfiError>;
-    fn outline(&self, request: OutlineRequest) -> Result<Empty, FfiError>;
+    fn auto_size(&self, request: AutoSizeRequest) -> Result<AutoSizeResponse, FfiError>;
+    fn outline(&self, request: OutlineRequest) -> Result<OutlineResponse, FfiError>;
     fn get_node(&self, request: GetNodeRequest) -> Result<NodeInfo, FfiError>;
     fn find(&self, request: FindRequest) -> Result<FindResponse, FfiError>;
     fn aggregate(&self, request: AggregateRequest) -> Result<AggregateResponse, FfiError>;
     fn get_merged_range(&self, request: GetMergedRangeRequest) -> Result<CellRange, FfiError>;
-    fn merge_cells(&self, request: MergeCellsRequest) -> Result<Empty, FfiError>;
-    fn unmerge_cells(&self, request: UnmergeCellsRequest) -> Result<Empty, FfiError>;
+    fn merge_cells(&self, request: MergeCellsRequest) -> Result<MergeCellsResponse, FfiError>;
+    fn unmerge_cells(&self, request: UnmergeCellsRequest)
+        -> Result<UnmergeCellsResponse, FfiError>;
     fn get_merged_regions(&self, request: GridHandle) -> Result<MergedRegionsResponse, FfiError>;
     fn get_memory_usage(&self, request: GridHandle) -> Result<MemoryUsageResponse, FfiError>;
     fn clipboard(&self, request: ClipboardCommand) -> Result<ClipboardResponse, FfiError>;
     fn export(&self, request: ExportRequest) -> Result<ExportResponse, FfiError>;
     fn print(&self, request: PrintRequest) -> Result<PrintResponse, FfiError>;
     fn archive(&self, request: ArchiveRequest) -> Result<ArchiveResponse, FfiError>;
-    fn resize_viewport(&self, request: ResizeViewportRequest) -> Result<Empty, FfiError>;
-    fn set_redraw(&self, request: SetRedrawRequest) -> Result<Empty, FfiError>;
-    fn refresh(&self, request: GridHandle) -> Result<Empty, FfiError>;
-    fn load_demo(&self, request: LoadDemoRequest) -> Result<Empty, FfiError>;
+    fn resize_viewport(
+        &self,
+        request: ResizeViewportRequest,
+    ) -> Result<ResizeViewportResponse, FfiError>;
+    fn set_redraw(&self, request: SetRedrawRequest) -> Result<SetRedrawResponse, FfiError>;
+    fn refresh(&self, request: GridHandle) -> Result<RefreshResponse, FfiError>;
+    fn load_demo(&self, request: LoadDemoRequest) -> Result<LoadDemoResponse, FfiError>;
     fn get_demo_data(&self, request: GetDemoDataRequest) -> Result<GetDemoDataResponse, FfiError>;
     fn render_session(
         &self,

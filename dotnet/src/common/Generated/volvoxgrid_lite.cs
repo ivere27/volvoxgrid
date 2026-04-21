@@ -1213,6 +1213,38 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class AutoSizeResponse
+    {
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<AutoSizeResponse> Parser = new MessageParser<AutoSizeResponse>(data => ParseFrom(data));
+
+        public static AutoSizeResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new AutoSizeResponse();
+            var r = new ProtoReader(data);
+            var msg = new AutoSizeResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class BeforeEditEvent
     {
         public int Row { get; set; }
@@ -2396,6 +2428,41 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class ClearResponse
+    {
+        public int ClearedCount { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (ClearedCount != 0) w.WriteInt32(1, ClearedCount);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<ClearResponse> Parser = new MessageParser<ClearResponse>(data => ParseFrom(data));
+
+        public static ClearResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new ClearResponse();
+            var r = new ProtoReader(data);
+            var msg = new ClearResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.ClearedCount = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class ClickEvent
     {
         public int Row { get; set; }
@@ -3185,6 +3252,38 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class ConfigureResponse
+    {
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<ConfigureResponse> Parser = new MessageParser<ConfigureResponse>(data => ParseFrom(data));
+
+        public static ConfigureResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new ConfigureResponse();
+            var r = new ProtoReader(data);
+            var msg = new ConfigureResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class CornerIndicatorConfig
     {
         private bool? _visible;
@@ -3621,6 +3720,38 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class DefineColumnsResponse
+    {
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<DefineColumnsResponse> Parser = new MessageParser<DefineColumnsResponse>(data => ParseFrom(data));
+
+        public static DefineColumnsResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new DefineColumnsResponse();
+            var r = new ProtoReader(data);
+            var msg = new DefineColumnsResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class DefineRowsRequest
     {
         public long GridId { get; set; }
@@ -3653,6 +3784,70 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.GridId = r.ReadInt64(); break;
                     case 2: msg.Rows.Add(RowDef.ParseFrom(r.ReadLengthDelimited())); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class DefineRowsResponse
+    {
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<DefineRowsResponse> Parser = new MessageParser<DefineRowsResponse>(data => ParseFrom(data));
+
+        public static DefineRowsResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new DefineRowsResponse();
+            var r = new ProtoReader(data);
+            var msg = new DefineRowsResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class DestroyResponse
+    {
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<DestroyResponse> Parser = new MessageParser<DestroyResponse>(data => ParseFrom(data));
+
+        public static DestroyResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new DestroyResponse();
+            var r = new ProtoReader(data);
+            var msg = new DestroyResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
                     default: r.SkipField(wire); break;
                 }
             }
@@ -4524,6 +4719,11 @@ namespace Volvoxgrid.V1
         public bool Composing { get; set; }
         public string PreeditText { get; set; } = "";
         public EditUiMode UiMode { get; set; }
+        public float X { get; set; }
+        public float Y { get; set; }
+        public float Width { get; set; }
+        public float Height { get; set; }
+        public int MaxLength { get; set; }
 
         // ── Serialization ──
 
@@ -4539,6 +4739,11 @@ namespace Volvoxgrid.V1
             if (Composing) w.WriteBool(7, Composing);
             if (PreeditText != null && PreeditText.Length > 0) w.WriteString(8, PreeditText);
             if (UiMode != 0) w.WriteInt32(9, (int)UiMode);
+            if (X != 0f) w.WriteFloat(10, X);
+            if (Y != 0f) w.WriteFloat(11, Y);
+            if (Width != 0f) w.WriteFloat(12, Width);
+            if (Height != 0f) w.WriteFloat(13, Height);
+            if (MaxLength != 0) w.WriteInt32(14, MaxLength);
             return w.ToArray();
         }
 
@@ -4565,38 +4770,11 @@ namespace Volvoxgrid.V1
                     case 7: msg.Composing = r.ReadBool(); break;
                     case 8: msg.PreeditText = r.ReadString(); break;
                     case 9: msg.UiMode = (EditUiMode)r.ReadInt32(); break;
-                    default: r.SkipField(wire); break;
-                }
-            }
-            return msg;
-        }
-    }
-
-    public sealed class Empty
-    {
-
-        // ── Serialization ──
-
-        public byte[] ToByteArray()
-        {
-            var w = new ProtoWriter();
-            return w.ToArray();
-        }
-
-        // ── Deserialization ──
-
-        public static readonly MessageParser<Empty> Parser = new MessageParser<Empty>(data => ParseFrom(data));
-
-        public static Empty ParseFrom(byte[] data)
-        {
-            if (data == null || data.Length == 0) return new Empty();
-            var r = new ProtoReader(data);
-            var msg = new Empty();
-            int field; ProtoWireType wire;
-            while (r.TryReadTag(out field, out wire))
-            {
-                switch (field)
-                {
+                    case 10: msg.X = r.ReadFloat(); break;
+                    case 11: msg.Y = r.ReadFloat(); break;
+                    case 12: msg.Width = r.ReadFloat(); break;
+                    case 13: msg.Height = r.ReadFloat(); break;
+                    case 14: msg.MaxLength = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -7124,6 +7302,47 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class InsertRowsResponse
+    {
+        public int InsertedCount { get; set; }
+        public int NewRowCount { get; set; }
+        public int FirstRow { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (InsertedCount != 0) w.WriteInt32(1, InsertedCount);
+            if (NewRowCount != 0) w.WriteInt32(2, NewRowCount);
+            if (FirstRow != 0) w.WriteInt32(3, FirstRow);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<InsertRowsResponse> Parser = new MessageParser<InsertRowsResponse>(data => ParseFrom(data));
+
+        public static InsertRowsResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new InsertRowsResponse();
+            var r = new ProtoReader(data);
+            var msg = new InsertRowsResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.InsertedCount = r.ReadInt32(); break;
+                    case 2: msg.NewRowCount = r.ReadInt32(); break;
+                    case 3: msg.FirstRow = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class InteractionConfig
     {
         public ResizePolicy Resize { get; set; }
@@ -7904,6 +8123,38 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class LoadDemoResponse
+    {
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<LoadDemoResponse> Parser = new MessageParser<LoadDemoResponse>(data => ParseFrom(data));
+
+        public static LoadDemoResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new LoadDemoResponse();
+            var r = new ProtoReader(data);
+            var msg = new LoadDemoResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class LoadFontDataRequest
     {
         public byte[] Data { get; set; }
@@ -7939,6 +8190,38 @@ namespace Volvoxgrid.V1
                     case 1: msg.Data = r.ReadLengthDelimited(); break;
                     case 2: msg.FontName = r.ReadString(); break;
                     case 3: msg.FontNames.Add(r.ReadString()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class LoadFontDataResponse
+    {
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<LoadFontDataResponse> Parser = new MessageParser<LoadFontDataResponse>(data => ParseFrom(data));
+
+        public static LoadFontDataResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new LoadFontDataResponse();
+            var r = new ProtoReader(data);
+            var msg = new LoadFontDataResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
                     default: r.SkipField(wire); break;
                 }
             }
@@ -8099,6 +8382,41 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.GridId = r.ReadInt64(); break;
                     case 2: msg.Range = CellRange.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class MergeCellsResponse
+    {
+        public CellRange Merged { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Merged != null) w.WriteMessageBytes(1, Merged.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<MergeCellsResponse> Parser = new MessageParser<MergeCellsResponse>(data => ParseFrom(data));
+
+        public static MergeCellsResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new MergeCellsResponse();
+            var r = new ProtoReader(data);
+            var msg = new MergeCellsResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Merged = CellRange.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -8315,6 +8633,38 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class MoveColumnResponse
+    {
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<MoveColumnResponse> Parser = new MessageParser<MoveColumnResponse>(data => ParseFrom(data));
+
+        public static MoveColumnResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new MoveColumnResponse();
+            var r = new ProtoReader(data);
+            var msg = new MoveColumnResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class MoveRowRequest
     {
         public long GridId { get; set; }
@@ -8349,6 +8699,38 @@ namespace Volvoxgrid.V1
                     case 1: msg.GridId = r.ReadInt64(); break;
                     case 2: msg.Row = r.ReadInt32(); break;
                     case 3: msg.Position = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class MoveRowResponse
+    {
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<MoveRowResponse> Parser = new MessageParser<MoveRowResponse>(data => ParseFrom(data));
+
+        public static MoveRowResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new MoveRowResponse();
+            var r = new ProtoReader(data);
+            var msg = new MoveRowResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
                     default: r.SkipField(wire); break;
                 }
             }
@@ -8502,6 +8884,38 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.GridId = r.ReadInt64(); break;
                     case 2: msg.Level = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class OutlineResponse
+    {
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<OutlineResponse> Parser = new MessageParser<OutlineResponse>(data => ParseFrom(data));
+
+        public static OutlineResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new OutlineResponse();
+            var r = new ProtoReader(data);
+            var msg = new OutlineResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
                     default: r.SkipField(wire); break;
                 }
             }
@@ -8898,6 +9312,38 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class RefreshResponse
+    {
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<RefreshResponse> Parser = new MessageParser<RefreshResponse>(data => ParseFrom(data));
+
+        public static RefreshResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new RefreshResponse();
+            var r = new ProtoReader(data);
+            var msg = new RefreshResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class RegexQuery
     {
         public string Pattern { get; set; } = "";
@@ -9029,6 +9475,44 @@ namespace Volvoxgrid.V1
                     case 1: msg.GridId = r.ReadInt64(); break;
                     case 2: msg.Index = r.ReadInt32(); break;
                     case 3: msg.Count = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class RemoveRowsResponse
+    {
+        public int RemovedCount { get; set; }
+        public int NewRowCount { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (RemovedCount != 0) w.WriteInt32(1, RemovedCount);
+            if (NewRowCount != 0) w.WriteInt32(2, NewRowCount);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<RemoveRowsResponse> Parser = new MessageParser<RemoveRowsResponse>(data => ParseFrom(data));
+
+        public static RemoveRowsResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new RemoveRowsResponse();
+            var r = new ProtoReader(data);
+            var msg = new RemoveRowsResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.RemovedCount = r.ReadInt32(); break;
+                    case 2: msg.NewRowCount = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -9439,6 +9923,44 @@ namespace Volvoxgrid.V1
                     case 1: msg.GridId = r.ReadInt64(); break;
                     case 2: msg.Width = r.ReadInt32(); break;
                     case 3: msg.Height = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class ResizeViewportResponse
+    {
+        public int ViewportWidth { get; set; }
+        public int ViewportHeight { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (ViewportWidth != 0) w.WriteInt32(1, ViewportWidth);
+            if (ViewportHeight != 0) w.WriteInt32(2, ViewportHeight);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<ResizeViewportResponse> Parser = new MessageParser<ResizeViewportResponse>(data => ParseFrom(data));
+
+        public static ResizeViewportResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new ResizeViewportResponse();
+            var r = new ProtoReader(data);
+            var msg = new ResizeViewportResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.ViewportWidth = r.ReadInt32(); break;
+                    case 2: msg.ViewportHeight = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -10110,6 +10632,41 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class SelectResponse
+    {
+        public SelectionState Selection { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Selection != null) w.WriteMessageBytes(1, Selection.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<SelectResponse> Parser = new MessageParser<SelectResponse>(data => ParseFrom(data));
+
+        public static SelectResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new SelectResponse();
+            var r = new ProtoReader(data);
+            var msg = new SelectResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Selection = SelectionState.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class SelectionChangedEvent
     {
         public List<CellRange> OldRanges { get; private set; } = new List<CellRange>();
@@ -10469,6 +11026,41 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class SetLeftColResponse
+    {
+        public int LeftCol { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (LeftCol != 0) w.WriteInt32(1, LeftCol);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<SetLeftColResponse> Parser = new MessageParser<SetLeftColResponse>(data => ParseFrom(data));
+
+        public static SetLeftColResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new SetLeftColResponse();
+            var r = new ProtoReader(data);
+            var msg = new SetLeftColResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.LeftCol = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class SetRedrawRequest
     {
         public long GridId { get; set; }
@@ -10500,6 +11092,38 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.GridId = r.ReadInt64(); break;
                     case 2: msg.Enabled = r.ReadBool(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class SetRedrawResponse
+    {
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<SetRedrawResponse> Parser = new MessageParser<SetRedrawResponse>(data => ParseFrom(data));
+
+        public static SetRedrawResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new SetRedrawResponse();
+            var r = new ProtoReader(data);
+            var msg = new SetRedrawResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
                     default: r.SkipField(wire); break;
                 }
             }
@@ -10545,6 +11169,41 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class SetTopRowResponse
+    {
+        public int TopRow { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (TopRow != 0) w.WriteInt32(1, TopRow);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<SetTopRowResponse> Parser = new MessageParser<SetTopRowResponse>(data => ParseFrom(data));
+
+        public static SetTopRowResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new SetTopRowResponse();
+            var r = new ProtoReader(data);
+            var msg = new SetTopRowResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.TopRow = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class ShowCellRequest
     {
         public long GridId { get; set; }
@@ -10579,6 +11238,44 @@ namespace Volvoxgrid.V1
                     case 1: msg.GridId = r.ReadInt64(); break;
                     case 2: msg.Row = r.ReadInt32(); break;
                     case 3: msg.Col = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class ShowCellResponse
+    {
+        public int TopRow { get; set; }
+        public int LeftCol { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (TopRow != 0) w.WriteInt32(1, TopRow);
+            if (LeftCol != 0) w.WriteInt32(2, LeftCol);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<ShowCellResponse> Parser = new MessageParser<ShowCellResponse>(data => ParseFrom(data));
+
+        public static ShowCellResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new ShowCellResponse();
+            var r = new ProtoReader(data);
+            var msg = new ShowCellResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.TopRow = r.ReadInt32(); break;
+                    case 2: msg.LeftCol = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -10665,6 +11362,38 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.GridId = r.ReadInt64(); break;
                     case 2: msg.SortColumns.Add(SortColumn.ParseFrom(r.ReadLengthDelimited())); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class SortResponse
+    {
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<SortResponse> Parser = new MessageParser<SortResponse>(data => ParseFrom(data));
+
+        public static SortResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new SortResponse();
+            var r = new ProtoReader(data);
+            var msg = new SortResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
                     default: r.SkipField(wire); break;
                 }
             }
@@ -11519,6 +12248,41 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class UnmergeCellsResponse
+    {
+        public int UnmergedCount { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (UnmergedCount != 0) w.WriteInt32(1, UnmergedCount);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<UnmergeCellsResponse> Parser = new MessageParser<UnmergeCellsResponse>(data => ParseFrom(data));
+
+        public static UnmergeCellsResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new UnmergeCellsResponse();
+            var r = new ProtoReader(data);
+            var msg = new UnmergeCellsResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.UnmergedCount = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class UpdateCellsRequest
     {
         public long GridId { get; set; }
@@ -11711,18 +12475,18 @@ namespace Volvoxgrid.V1
             return CreateResponse.ParseFrom(result);
         }
 
-        public Empty Destroy(GridHandle request)
+        public DestroyResponse Destroy(GridHandle request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/Destroy", data);
-            return Empty.ParseFrom(result);
+            return DestroyResponse.ParseFrom(result);
         }
 
-        public Empty Configure(ConfigureRequest request)
+        public ConfigureResponse Configure(ConfigureRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/Configure", data);
-            return Empty.ParseFrom(result);
+            return ConfigureResponse.ParseFrom(result);
         }
 
         public GridConfig GetConfig(GridHandle request)
@@ -11732,18 +12496,18 @@ namespace Volvoxgrid.V1
             return GridConfig.ParseFrom(result);
         }
 
-        public Empty LoadFontData(LoadFontDataRequest request)
+        public LoadFontDataResponse LoadFontData(LoadFontDataRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/LoadFontData", data);
-            return Empty.ParseFrom(result);
+            return LoadFontDataResponse.ParseFrom(result);
         }
 
-        public Empty DefineColumns(DefineColumnsRequest request)
+        public DefineColumnsResponse DefineColumns(DefineColumnsRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/DefineColumns", data);
-            return Empty.ParseFrom(result);
+            return DefineColumnsResponse.ParseFrom(result);
         }
 
         public DefineColumnsRequest GetSchema(GridHandle request)
@@ -11753,39 +12517,39 @@ namespace Volvoxgrid.V1
             return DefineColumnsRequest.ParseFrom(result);
         }
 
-        public Empty DefineRows(DefineRowsRequest request)
+        public DefineRowsResponse DefineRows(DefineRowsRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/DefineRows", data);
-            return Empty.ParseFrom(result);
+            return DefineRowsResponse.ParseFrom(result);
         }
 
-        public Empty InsertRows(InsertRowsRequest request)
+        public InsertRowsResponse InsertRows(InsertRowsRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/InsertRows", data);
-            return Empty.ParseFrom(result);
+            return InsertRowsResponse.ParseFrom(result);
         }
 
-        public Empty RemoveRows(RemoveRowsRequest request)
+        public RemoveRowsResponse RemoveRows(RemoveRowsRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/RemoveRows", data);
-            return Empty.ParseFrom(result);
+            return RemoveRowsResponse.ParseFrom(result);
         }
 
-        public Empty MoveColumn(MoveColumnRequest request)
+        public MoveColumnResponse MoveColumn(MoveColumnRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/MoveColumn", data);
-            return Empty.ParseFrom(result);
+            return MoveColumnResponse.ParseFrom(result);
         }
 
-        public Empty MoveRow(MoveRowRequest request)
+        public MoveRowResponse MoveRow(MoveRowRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/MoveRow", data);
-            return Empty.ParseFrom(result);
+            return MoveRowResponse.ParseFrom(result);
         }
 
         public WriteResult UpdateCells(UpdateCellsRequest request)
@@ -11816,18 +12580,18 @@ namespace Volvoxgrid.V1
             return LoadDataResult.ParseFrom(result);
         }
 
-        public Empty Clear(ClearRequest request)
+        public ClearResponse Clear(ClearRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/Clear", data);
-            return Empty.ParseFrom(result);
+            return ClearResponse.ParseFrom(result);
         }
 
-        public Empty Select(SelectRequest request)
+        public SelectResponse Select(SelectRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/Select", data);
-            return Empty.ParseFrom(result);
+            return SelectResponse.ParseFrom(result);
         }
 
         public SelectionState GetSelection(GridHandle request)
@@ -11837,25 +12601,25 @@ namespace Volvoxgrid.V1
             return SelectionState.ParseFrom(result);
         }
 
-        public Empty ShowCell(ShowCellRequest request)
+        public ShowCellResponse ShowCell(ShowCellRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/ShowCell", data);
-            return Empty.ParseFrom(result);
+            return ShowCellResponse.ParseFrom(result);
         }
 
-        public Empty SetTopRow(SetRowRequest request)
+        public SetTopRowResponse SetTopRow(SetRowRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/SetTopRow", data);
-            return Empty.ParseFrom(result);
+            return SetTopRowResponse.ParseFrom(result);
         }
 
-        public Empty SetLeftCol(SetColRequest request)
+        public SetLeftColResponse SetLeftCol(SetColRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/SetLeftCol", data);
-            return Empty.ParseFrom(result);
+            return SetLeftColResponse.ParseFrom(result);
         }
 
         public EditState Edit(EditCommand request)
@@ -11865,11 +12629,11 @@ namespace Volvoxgrid.V1
             return EditState.ParseFrom(result);
         }
 
-        public Empty Sort(SortRequest request)
+        public SortResponse Sort(SortRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/Sort", data);
-            return Empty.ParseFrom(result);
+            return SortResponse.ParseFrom(result);
         }
 
         public SubtotalResult Subtotal(SubtotalRequest request)
@@ -11879,18 +12643,18 @@ namespace Volvoxgrid.V1
             return SubtotalResult.ParseFrom(result);
         }
 
-        public Empty AutoSize(AutoSizeRequest request)
+        public AutoSizeResponse AutoSize(AutoSizeRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/AutoSize", data);
-            return Empty.ParseFrom(result);
+            return AutoSizeResponse.ParseFrom(result);
         }
 
-        public Empty Outline(OutlineRequest request)
+        public OutlineResponse Outline(OutlineRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/Outline", data);
-            return Empty.ParseFrom(result);
+            return OutlineResponse.ParseFrom(result);
         }
 
         public NodeInfo GetNode(GetNodeRequest request)
@@ -11921,18 +12685,18 @@ namespace Volvoxgrid.V1
             return CellRange.ParseFrom(result);
         }
 
-        public Empty MergeCells(MergeCellsRequest request)
+        public MergeCellsResponse MergeCells(MergeCellsRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/MergeCells", data);
-            return Empty.ParseFrom(result);
+            return MergeCellsResponse.ParseFrom(result);
         }
 
-        public Empty UnmergeCells(UnmergeCellsRequest request)
+        public UnmergeCellsResponse UnmergeCells(UnmergeCellsRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/UnmergeCells", data);
-            return Empty.ParseFrom(result);
+            return UnmergeCellsResponse.ParseFrom(result);
         }
 
         public MergedRegionsResponse GetMergedRegions(GridHandle request)
@@ -11977,32 +12741,32 @@ namespace Volvoxgrid.V1
             return ArchiveResponse.ParseFrom(result);
         }
 
-        public Empty ResizeViewport(ResizeViewportRequest request)
+        public ResizeViewportResponse ResizeViewport(ResizeViewportRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/ResizeViewport", data);
-            return Empty.ParseFrom(result);
+            return ResizeViewportResponse.ParseFrom(result);
         }
 
-        public Empty SetRedraw(SetRedrawRequest request)
+        public SetRedrawResponse SetRedraw(SetRedrawRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/SetRedraw", data);
-            return Empty.ParseFrom(result);
+            return SetRedrawResponse.ParseFrom(result);
         }
 
-        public Empty Refresh(GridHandle request)
+        public RefreshResponse Refresh(GridHandle request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/Refresh", data);
-            return Empty.ParseFrom(result);
+            return RefreshResponse.ParseFrom(result);
         }
 
-        public Empty LoadDemo(LoadDemoRequest request)
+        public LoadDemoResponse LoadDemo(LoadDemoRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/LoadDemo", data);
-            return Empty.ParseFrom(result);
+            return LoadDemoResponse.ParseFrom(result);
         }
 
         public GetDemoDataResponse GetDemoData(GetDemoDataRequest request)

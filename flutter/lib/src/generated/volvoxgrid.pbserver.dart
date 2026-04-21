@@ -23,26 +23,27 @@ export 'volvoxgrid.pb.dart';
 abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
   $async.Future<$0.CreateResponse> create(
       $pb.ServerContext ctx, $0.CreateRequest request);
-  $async.Future<$0.Empty> destroy($pb.ServerContext ctx, $0.GridHandle request);
-  $async.Future<$0.Empty> configure(
+  $async.Future<$0.DestroyResponse> destroy(
+      $pb.ServerContext ctx, $0.GridHandle request);
+  $async.Future<$0.ConfigureResponse> configure(
       $pb.ServerContext ctx, $0.ConfigureRequest request);
   $async.Future<$0.GridConfig> getConfig(
       $pb.ServerContext ctx, $0.GridHandle request);
-  $async.Future<$0.Empty> loadFontData(
+  $async.Future<$0.LoadFontDataResponse> loadFontData(
       $pb.ServerContext ctx, $0.LoadFontDataRequest request);
-  $async.Future<$0.Empty> defineColumns(
+  $async.Future<$0.DefineColumnsResponse> defineColumns(
       $pb.ServerContext ctx, $0.DefineColumnsRequest request);
   $async.Future<$0.DefineColumnsRequest> getSchema(
       $pb.ServerContext ctx, $0.GridHandle request);
-  $async.Future<$0.Empty> defineRows(
+  $async.Future<$0.DefineRowsResponse> defineRows(
       $pb.ServerContext ctx, $0.DefineRowsRequest request);
-  $async.Future<$0.Empty> insertRows(
+  $async.Future<$0.InsertRowsResponse> insertRows(
       $pb.ServerContext ctx, $0.InsertRowsRequest request);
-  $async.Future<$0.Empty> removeRows(
+  $async.Future<$0.RemoveRowsResponse> removeRows(
       $pb.ServerContext ctx, $0.RemoveRowsRequest request);
-  $async.Future<$0.Empty> moveColumn(
+  $async.Future<$0.MoveColumnResponse> moveColumn(
       $pb.ServerContext ctx, $0.MoveColumnRequest request);
-  $async.Future<$0.Empty> moveRow(
+  $async.Future<$0.MoveRowResponse> moveRow(
       $pb.ServerContext ctx, $0.MoveRowRequest request);
   $async.Future<$0.WriteResult> updateCells(
       $pb.ServerContext ctx, $0.UpdateCellsRequest request);
@@ -52,25 +53,27 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $0.LoadTableRequest request);
   $async.Future<$0.LoadDataResult> loadData(
       $pb.ServerContext ctx, $0.LoadDataRequest request);
-  $async.Future<$0.Empty> clear($pb.ServerContext ctx, $0.ClearRequest request);
-  $async.Future<$0.Empty> select(
+  $async.Future<$0.ClearResponse> clear(
+      $pb.ServerContext ctx, $0.ClearRequest request);
+  $async.Future<$0.SelectResponse> select(
       $pb.ServerContext ctx, $0.SelectRequest request);
   $async.Future<$0.SelectionState> getSelection(
       $pb.ServerContext ctx, $0.GridHandle request);
-  $async.Future<$0.Empty> showCell(
+  $async.Future<$0.ShowCellResponse> showCell(
       $pb.ServerContext ctx, $0.ShowCellRequest request);
-  $async.Future<$0.Empty> setTopRow(
+  $async.Future<$0.SetTopRowResponse> setTopRow(
       $pb.ServerContext ctx, $0.SetRowRequest request);
-  $async.Future<$0.Empty> setLeftCol(
+  $async.Future<$0.SetLeftColResponse> setLeftCol(
       $pb.ServerContext ctx, $0.SetColRequest request);
   $async.Future<$0.EditState> edit(
       $pb.ServerContext ctx, $0.EditCommand request);
-  $async.Future<$0.Empty> sort($pb.ServerContext ctx, $0.SortRequest request);
+  $async.Future<$0.SortResponse> sort(
+      $pb.ServerContext ctx, $0.SortRequest request);
   $async.Future<$0.SubtotalResult> subtotal(
       $pb.ServerContext ctx, $0.SubtotalRequest request);
-  $async.Future<$0.Empty> autoSize(
+  $async.Future<$0.AutoSizeResponse> autoSize(
       $pb.ServerContext ctx, $0.AutoSizeRequest request);
-  $async.Future<$0.Empty> outline(
+  $async.Future<$0.OutlineResponse> outline(
       $pb.ServerContext ctx, $0.OutlineRequest request);
   $async.Future<$0.NodeInfo> getNode(
       $pb.ServerContext ctx, $0.GetNodeRequest request);
@@ -80,9 +83,9 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $0.AggregateRequest request);
   $async.Future<$0.CellRange> getMergedRange(
       $pb.ServerContext ctx, $0.GetMergedRangeRequest request);
-  $async.Future<$0.Empty> mergeCells(
+  $async.Future<$0.MergeCellsResponse> mergeCells(
       $pb.ServerContext ctx, $0.MergeCellsRequest request);
-  $async.Future<$0.Empty> unmergeCells(
+  $async.Future<$0.UnmergeCellsResponse> unmergeCells(
       $pb.ServerContext ctx, $0.UnmergeCellsRequest request);
   $async.Future<$0.MergedRegionsResponse> getMergedRegions(
       $pb.ServerContext ctx, $0.GridHandle request);
@@ -96,12 +99,13 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $0.PrintRequest request);
   $async.Future<$0.ArchiveResponse> archive(
       $pb.ServerContext ctx, $0.ArchiveRequest request);
-  $async.Future<$0.Empty> resizeViewport(
+  $async.Future<$0.ResizeViewportResponse> resizeViewport(
       $pb.ServerContext ctx, $0.ResizeViewportRequest request);
-  $async.Future<$0.Empty> setRedraw(
+  $async.Future<$0.SetRedrawResponse> setRedraw(
       $pb.ServerContext ctx, $0.SetRedrawRequest request);
-  $async.Future<$0.Empty> refresh($pb.ServerContext ctx, $0.GridHandle request);
-  $async.Future<$0.Empty> loadDemo(
+  $async.Future<$0.RefreshResponse> refresh(
+      $pb.ServerContext ctx, $0.GridHandle request);
+  $async.Future<$0.LoadDemoResponse> loadDemo(
       $pb.ServerContext ctx, $0.LoadDemoRequest request);
   $async.Future<$0.GetDemoDataResponse> getDemoData(
       $pb.ServerContext ctx, $0.GetDemoDataRequest request);

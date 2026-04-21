@@ -4716,6 +4716,21 @@ fn selection_ranges_proto(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Vec<Cel
     proto_ranges_from_tuples(&ranges)
 }
 
+fn selection_state_proto(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) -> SelectionState {
+    ensure_layout(grid);
+    SelectionState {
+        active_row: grid.selection.row,
+        active_col: grid.selection.col,
+        ranges: selection_ranges_proto(grid),
+        top_row: grid.top_row(),
+        left_col: grid.left_col(),
+        bottom_row: grid.bottom_row(),
+        right_col: grid.right_col(),
+        mouse_row: grid.mouse_row,
+        mouse_col: grid.mouse_col,
+    }
+}
+
 impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
     fn create(&self, request: CreateRequest) -> Result<CreateResponse, String> {
         ensure_manager();
@@ -4776,29 +4791,29 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         })
     }
 
-    fn destroy(&self, request: GridHandle) -> Result<Empty, String> {
+    fn destroy(&self, request: GridHandle) -> Result<DestroyResponse, String> {
         let mgr = MANAGER.lock().unwrap();
         if let Some(mgr) = mgr.as_ref() {
             mgr.destroy_grid(request.id);
         }
         LAST_MEM_CALC_MS.lock().unwrap().remove(&request.id);
-        Ok(Empty {})
+        Ok(DestroyResponse {})
     }
 
-    fn configure(&self, request: ConfigureRequest) -> Result<Empty, String> {
+    fn configure(&self, request: ConfigureRequest) -> Result<ConfigureResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
             if let Some(config) = &request.config {
                 grid.apply_config(config);
             }
         })?;
-        Ok(Empty {})
+        Ok(ConfigureResponse {})
     }
 
     fn get_config(&self, request: GridHandle) -> Result<GridConfig, String> {
         wasm_with_grid(request.id, |grid| grid.get_config())
     }
 
-    fn load_font_data(&self, request: LoadFontDataRequest) -> Result<Empty, String> {
+    fn load_font_data(&self, request: LoadFontDataRequest) -> Result<LoadFontDataResponse, String> {
         if request.data.is_empty() {
             return Err("font data is empty".to_string());
         }
@@ -4812,30 +4827,40 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
             .collect();
 
         load_font(request.data.as_slice());
-        Ok(Empty {})
+        Ok(LoadFontDataResponse {})
     }
 
-    fn define_columns(&self, request: DefineColumnsRequest) -> Result<Empty, String> {
+    fn define_columns(
+        &self,
+        request: DefineColumnsRequest,
+    ) -> Result<DefineColumnsResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
             grid.define_columns(&request.columns);
         })?;
-        Ok(Empty {})
+        Ok(DefineColumnsResponse {})
     }
 
     fn get_schema(&self, request: GridHandle) -> Result<DefineColumnsRequest, String> {
         wasm_with_grid(request.id, |grid| grid.get_schema(request.id))
     }
 
-    fn define_rows(&self, request: DefineRowsRequest) -> Result<Empty, String> {
+    fn define_rows(&self, request: DefineRowsRequest) -> Result<DefineRowsResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
             grid.define_rows(&request.rows);
         })?;
-        Ok(Empty {})
+        Ok(DefineRowsResponse {})
     }
 
-    fn insert_rows(&self, request: InsertRowsRequest) -> Result<Empty, String> {
+    fn insert_rows(&self, request: InsertRowsRequest) -> Result<InsertRowsResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
-            for i in 0..request.count.max(1) {
+            let old_rows = grid.rows;
+            let count = request.count.max(1);
+            let first_row = if request.index < 0 || request.index >= old_rows {
+                old_rows
+            } else {
+                request.index
+            };
+            for i in 0..count {
                 let text = request
                     .text
                     .get(i as usize)
@@ -4843,29 +4868,37 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                     .unwrap_or("");
                 grid.add_item(text, request.index);
             }
-        })?;
-        Ok(Empty {})
+            InsertRowsResponse {
+                inserted_count: count,
+                new_row_count: grid.rows,
+                first_row,
+            }
+        })
     }
 
-    fn remove_rows(&self, request: RemoveRowsRequest) -> Result<Empty, String> {
+    fn remove_rows(&self, request: RemoveRowsRequest) -> Result<RemoveRowsResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
+            let old_rows = grid.rows;
             for i in (0..request.count.max(1)).rev() {
                 grid.remove_item(request.index + i);
             }
-        })?;
-        Ok(Empty {})
+            RemoveRowsResponse {
+                removed_count: old_rows.saturating_sub(grid.rows),
+                new_row_count: grid.rows,
+            }
+        })
     }
 
-    fn move_column(&self, request: MoveColumnRequest) -> Result<Empty, String> {
+    fn move_column(&self, request: MoveColumnRequest) -> Result<MoveColumnResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
             grid.move_col_by_positions(request.col, request.position);
         })?;
-        Ok(Empty {})
+        Ok(MoveColumnResponse {})
     }
 
-    fn move_row(&self, _request: MoveRowRequest) -> Result<Empty, String> {
+    fn move_row(&self, _request: MoveRowRequest) -> Result<MoveRowResponse, String> {
         // move_row not yet implemented in engine
-        Ok(Empty {})
+        Ok(MoveRowResponse {})
     }
 
     fn update_cells(&self, request: UpdateCellsRequest) -> Result<WriteResult, String> {
@@ -4900,8 +4933,9 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         })
     }
 
-    fn clear(&self, request: ClearRequest) -> Result<Empty, String> {
+    fn clear(&self, request: ClearRequest) -> Result<ClearResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
+            let before = grid.cells.len() as i32;
             let (r1, c1, r2, c2) = match request.region {
                 0 => (
                     grid.fixed_rows,
@@ -4949,11 +4983,14 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 _ => {}
             }
             grid.mark_dirty();
-        })?;
-        Ok(Empty {})
+            let after = grid.cells.len() as i32;
+            ClearResponse {
+                cleared_count: before.saturating_sub(after),
+            }
+        })
     }
 
-    fn select(&self, request: SelectRequest) -> Result<Empty, String> {
+    fn select(&self, request: SelectRequest) -> Result<SelectResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
             let active_row = request.active_row;
             let active_col = request.active_col;
@@ -4995,25 +5032,14 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 );
             }
             grid.mark_dirty();
-        })?;
-        Ok(Empty {})
+            SelectResponse {
+                selection: Some(selection_state_proto(grid)),
+            }
+        })
     }
 
     fn get_selection(&self, request: GridHandle) -> Result<SelectionState, String> {
-        wasm_with_grid(request.id, |grid| {
-            ensure_layout(grid);
-            SelectionState {
-                active_row: grid.selection.row,
-                active_col: grid.selection.col,
-                ranges: selection_ranges_proto(grid),
-                top_row: grid.top_row(),
-                left_col: grid.left_col(),
-                bottom_row: grid.bottom_row(),
-                right_col: grid.right_col(),
-                mouse_row: grid.mouse_row,
-                mouse_col: grid.mouse_col,
-            }
-        })
+        wasm_with_grid(request.id, selection_state_proto)
     }
 
     fn edit(&self, request: EditCommand) -> Result<EditState, String> {
@@ -5165,7 +5191,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         })
     }
 
-    fn sort(&self, request: SortRequest) -> Result<Empty, String> {
+    fn sort(&self, request: SortRequest) -> Result<SortResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
             if request.sort_columns.is_empty() {
                 grid.sort_state.clear();
@@ -5188,7 +5214,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 volvoxgrid_engine::sort::sort_grid_all_multi(grid);
             }
         })?;
-        Ok(Empty {})
+        Ok(SortResponse {})
     }
 
     fn subtotal(&self, request: SubtotalRequest) -> Result<SubtotalResult, String> {
@@ -5212,7 +5238,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         Ok(SubtotalResult { rows })
     }
 
-    fn auto_size(&self, request: AutoSizeRequest) -> Result<Empty, String> {
+    fn auto_size(&self, request: AutoSizeRequest) -> Result<AutoSizeResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
             ensure_layout(grid);
             let c1 = request.col_from.max(0).min(grid.cols - 1);
@@ -5239,14 +5265,14 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 }
             }
         })?;
-        Ok(Empty {})
+        Ok(AutoSizeResponse {})
     }
 
-    fn outline(&self, request: OutlineRequest) -> Result<Empty, String> {
+    fn outline(&self, request: OutlineRequest) -> Result<OutlineResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
             volvoxgrid_engine::outline::outline(grid, request.level);
         })?;
-        Ok(Empty {})
+        Ok(OutlineResponse {})
     }
 
     fn get_node(&self, request: GetNodeRequest) -> Result<NodeInfo, String> {
@@ -5327,26 +5353,38 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         })
     }
 
-    fn merge_cells(&self, request: MergeCellsRequest) -> Result<Empty, String> {
+    fn merge_cells(&self, request: MergeCellsRequest) -> Result<MergeCellsResponse, String> {
         let range = request.range.unwrap_or_default();
         wasm_with_grid(request.grid_id, |grid| {
-            grid.merged_regions
-                .add_merge(range.row1, range.col1, range.row2, range.col2);
+            let (row1, row2) = (range.row1.min(range.row2), range.row1.max(range.row2));
+            let (col1, col2) = (range.col1.min(range.col2), range.col1.max(range.col2));
+            grid.merged_regions.add_merge(row1, col1, row2, col2);
             grid.layout.invalidate();
             grid.mark_dirty();
-        })?;
-        Ok(Empty {})
+            MergeCellsResponse {
+                merged: Some(CellRange {
+                    row1,
+                    col1,
+                    row2,
+                    col2,
+                }),
+            }
+        })
     }
 
-    fn unmerge_cells(&self, request: UnmergeCellsRequest) -> Result<Empty, String> {
+    fn unmerge_cells(&self, request: UnmergeCellsRequest) -> Result<UnmergeCellsResponse, String> {
         let range = request.range.unwrap_or_default();
         wasm_with_grid(request.grid_id, |grid| {
+            let before = grid.merged_regions.all_ranges().len() as i32;
             grid.merged_regions
                 .remove_overlapping(range.row1, range.col1, range.row2, range.col2);
             grid.layout.invalidate();
             grid.mark_dirty();
-        })?;
-        Ok(Empty {})
+            let after = grid.merged_regions.all_ranges().len() as i32;
+            UnmergeCellsResponse {
+                unmerged_count: before.saturating_sub(after),
+            }
+        })
     }
 
     fn get_merged_regions(&self, request: GridHandle) -> Result<MergedRegionsResponse, String> {
@@ -5451,7 +5489,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         })
     }
 
-    fn show_cell(&self, request: ShowCellRequest) -> Result<Empty, String> {
+    fn show_cell(&self, request: ShowCellRequest) -> Result<ShowCellResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
             ensure_layout(grid);
             grid.scroll.show_cell(
@@ -5466,51 +5504,64 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 grid.pinned_left_width() + grid.pinned_right_width(),
             );
             grid.mark_dirty_visual();
-        })?;
-        Ok(Empty {})
+            ShowCellResponse {
+                top_row: grid.top_row(),
+                left_col: grid.left_col(),
+            }
+        })
     }
 
-    fn set_top_row(&self, request: SetRowRequest) -> Result<Empty, String> {
+    fn set_top_row(&self, request: SetRowRequest) -> Result<SetTopRowResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
             grid.set_top_row(request.row);
-        })?;
-        Ok(Empty {})
+            SetTopRowResponse {
+                top_row: grid.top_row(),
+            }
+        })
     }
 
-    fn set_left_col(&self, request: SetColRequest) -> Result<Empty, String> {
+    fn set_left_col(&self, request: SetColRequest) -> Result<SetLeftColResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
             grid.set_left_col(request.col);
-        })?;
-        Ok(Empty {})
+            SetLeftColResponse {
+                left_col: grid.left_col(),
+            }
+        })
     }
 
-    fn resize_viewport(&self, request: ResizeViewportRequest) -> Result<Empty, String> {
+    fn resize_viewport(
+        &self,
+        request: ResizeViewportRequest,
+    ) -> Result<ResizeViewportResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
             grid.viewport_width = request.width;
             grid.viewport_height = request.height;
             grid.mark_dirty();
-        })?;
-        Ok(Empty {})
+            ResizeViewportResponse {
+                viewport_width: grid.viewport_width,
+                viewport_height: grid.viewport_height,
+            }
+        })
     }
 
-    fn set_redraw(&self, request: SetRedrawRequest) -> Result<Empty, String> {
+    fn set_redraw(&self, request: SetRedrawRequest) -> Result<SetRedrawResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
             grid.redraw = request.enabled;
             if request.enabled {
                 grid.mark_dirty();
             }
         })?;
-        Ok(Empty {})
+        Ok(SetRedrawResponse {})
     }
 
-    fn refresh(&self, request: GridHandle) -> Result<Empty, String> {
+    fn refresh(&self, request: GridHandle) -> Result<RefreshResponse, String> {
         wasm_with_grid(request.id, |grid| {
             grid.mark_dirty();
         })?;
-        Ok(Empty {})
+        Ok(RefreshResponse {})
     }
 
-    fn load_demo(&self, request: LoadDemoRequest) -> Result<Empty, String> {
+    fn load_demo(&self, request: LoadDemoRequest) -> Result<LoadDemoResponse, String> {
         #[cfg(feature = "demo")]
         {
             wasm_with_grid(request.grid_id, |grid| -> Result<(), String> {
@@ -5520,7 +5571,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 }
                 Ok(())
             })??;
-            Ok(Empty {})
+            Ok(LoadDemoResponse {})
         }
         #[cfg(not(feature = "demo"))]
         {
