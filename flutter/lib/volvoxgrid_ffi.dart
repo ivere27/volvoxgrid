@@ -174,16 +174,17 @@ class VolvoxGridService {
         CreateResponse.fromBuffer,
       );
 
-  static Future<Empty> Destroy(GridHandle request) => _invokeUnary(
+  static Future<DestroyResponse> Destroy(GridHandle request) => _invokeUnary(
         _serviceMethodPath('Destroy'),
         request,
-        Empty.fromBuffer,
+        DestroyResponse.fromBuffer,
       );
 
-  static Future<Empty> Configure(ConfigureRequest request) => _invokeUnary(
+  static Future<ConfigureResponse> Configure(ConfigureRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('Configure'),
         request,
-        Empty.fromBuffer,
+        ConfigureResponse.fromBuffer,
       );
 
   static Future<GridConfig> GetConfig(GridHandle request) => _invokeUnary(
@@ -192,18 +193,20 @@ class VolvoxGridService {
         GridConfig.fromBuffer,
       );
 
-  static Future<Empty> LoadFontData(LoadFontDataRequest request) =>
+  static Future<LoadFontDataResponse> LoadFontData(
+          LoadFontDataRequest request) =>
       _invokeUnary(
         _serviceMethodPath('LoadFontData'),
         request,
-        Empty.fromBuffer,
+        LoadFontDataResponse.fromBuffer,
       );
 
-  static Future<Empty> DefineColumns(DefineColumnsRequest request) =>
+  static Future<DefineColumnsResponse> DefineColumns(
+          DefineColumnsRequest request) =>
       _invokeUnary(
         _serviceMethodPath('DefineColumns'),
         request,
-        Empty.fromBuffer,
+        DefineColumnsResponse.fromBuffer,
       );
 
   static Future<DefineColumnsRequest> GetSchema(GridHandle request) =>
@@ -213,34 +216,39 @@ class VolvoxGridService {
         DefineColumnsRequest.fromBuffer,
       );
 
-  static Future<Empty> DefineRows(DefineRowsRequest request) => _invokeUnary(
+  static Future<DefineRowsResponse> DefineRows(DefineRowsRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('DefineRows'),
         request,
-        Empty.fromBuffer,
+        DefineRowsResponse.fromBuffer,
       );
 
-  static Future<Empty> InsertRows(InsertRowsRequest request) => _invokeUnary(
+  static Future<InsertRowsResponse> InsertRows(InsertRowsRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('InsertRows'),
         request,
-        Empty.fromBuffer,
+        InsertRowsResponse.fromBuffer,
       );
 
-  static Future<Empty> RemoveRows(RemoveRowsRequest request) => _invokeUnary(
+  static Future<RemoveRowsResponse> RemoveRows(RemoveRowsRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('RemoveRows'),
         request,
-        Empty.fromBuffer,
+        RemoveRowsResponse.fromBuffer,
       );
 
-  static Future<Empty> MoveColumn(MoveColumnRequest request) => _invokeUnary(
+  static Future<MoveColumnResponse> MoveColumn(MoveColumnRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('MoveColumn'),
         request,
-        Empty.fromBuffer,
+        MoveColumnResponse.fromBuffer,
       );
 
-  static Future<Empty> MoveRow(MoveRowRequest request) => _invokeUnary(
+  static Future<MoveRowResponse> MoveRow(MoveRowRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('MoveRow'),
         request,
-        Empty.fromBuffer,
+        MoveRowResponse.fromBuffer,
       );
 
   static Future<WriteResult> UpdateCells(UpdateCellsRequest request) =>
@@ -264,16 +272,16 @@ class VolvoxGridService {
         WriteResult.fromBuffer,
       );
 
-  static Future<Empty> Clear(ClearRequest request) => _invokeUnary(
+  static Future<ClearResponse> Clear(ClearRequest request) => _invokeUnary(
         _serviceMethodPath('Clear'),
         request,
-        Empty.fromBuffer,
+        ClearResponse.fromBuffer,
       );
 
-  static Future<Empty> Select(SelectRequest request) => _invokeUnary(
+  static Future<SelectResponse> Select(SelectRequest request) => _invokeUnary(
         _serviceMethodPath('Select'),
         request,
-        Empty.fromBuffer,
+        SelectResponse.fromBuffer,
       );
 
   static Future<SelectionState> GetSelection(GridHandle request) =>
@@ -283,22 +291,25 @@ class VolvoxGridService {
         SelectionState.fromBuffer,
       );
 
-  static Future<Empty> ShowCell(ShowCellRequest request) => _invokeUnary(
+  static Future<ShowCellResponse> ShowCell(ShowCellRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('ShowCell'),
         request,
-        Empty.fromBuffer,
+        ShowCellResponse.fromBuffer,
       );
 
-  static Future<Empty> SetTopRow(SetRowRequest request) => _invokeUnary(
+  static Future<SetTopRowResponse> SetTopRow(SetRowRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('SetTopRow'),
         request,
-        Empty.fromBuffer,
+        SetTopRowResponse.fromBuffer,
       );
 
-  static Future<Empty> SetLeftCol(SetColRequest request) => _invokeUnary(
+  static Future<SetLeftColResponse> SetLeftCol(SetColRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('SetLeftCol'),
         request,
-        Empty.fromBuffer,
+        SetLeftColResponse.fromBuffer,
       );
 
   static Future<EditState> Edit(EditCommand request) => _invokeUnary(
@@ -307,10 +318,10 @@ class VolvoxGridService {
         EditState.fromBuffer,
       );
 
-  static Future<Empty> Sort(SortRequest request) => _invokeUnary(
+  static Future<SortResponse> Sort(SortRequest request) => _invokeUnary(
         _serviceMethodPath('Sort'),
         request,
-        Empty.fromBuffer,
+        SortResponse.fromBuffer,
       );
 
   static Future<SubtotalResult> Subtotal(SubtotalRequest request) =>
@@ -320,16 +331,18 @@ class VolvoxGridService {
         SubtotalResult.fromBuffer,
       );
 
-  static Future<Empty> AutoSize(AutoSizeRequest request) => _invokeUnary(
+  static Future<AutoSizeResponse> AutoSize(AutoSizeRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('AutoSize'),
         request,
-        Empty.fromBuffer,
+        AutoSizeResponse.fromBuffer,
       );
 
-  static Future<Empty> Outline(OutlineRequest request) => _invokeUnary(
+  static Future<OutlineResponse> Outline(OutlineRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('Outline'),
         request,
-        Empty.fromBuffer,
+        OutlineResponse.fromBuffer,
       );
 
   static Future<NodeInfo> GetNode(GetNodeRequest request) => _invokeUnary(
@@ -358,17 +371,19 @@ class VolvoxGridService {
         CellRange.fromBuffer,
       );
 
-  static Future<Empty> MergeCells(MergeCellsRequest request) => _invokeUnary(
+  static Future<MergeCellsResponse> MergeCells(MergeCellsRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('MergeCells'),
         request,
-        Empty.fromBuffer,
+        MergeCellsResponse.fromBuffer,
       );
 
-  static Future<Empty> UnmergeCells(UnmergeCellsRequest request) =>
+  static Future<UnmergeCellsResponse> UnmergeCells(
+          UnmergeCellsRequest request) =>
       _invokeUnary(
         _serviceMethodPath('UnmergeCells'),
         request,
-        Empty.fromBuffer,
+        UnmergeCellsResponse.fromBuffer,
       );
 
   static Future<MergedRegionsResponse> GetMergedRegions(GridHandle request) =>
@@ -418,29 +433,32 @@ class VolvoxGridService {
         ArchiveResponse.fromBuffer,
       );
 
-  static Future<Empty> ResizeViewport(ResizeViewportRequest request) =>
+  static Future<ResizeViewportResponse> ResizeViewport(
+          ResizeViewportRequest request) =>
       _invokeUnary(
         _serviceMethodPath('ResizeViewport'),
         request,
-        Empty.fromBuffer,
+        ResizeViewportResponse.fromBuffer,
       );
 
-  static Future<Empty> SetRedraw(SetRedrawRequest request) => _invokeUnary(
+  static Future<SetRedrawResponse> SetRedraw(SetRedrawRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('SetRedraw'),
         request,
-        Empty.fromBuffer,
+        SetRedrawResponse.fromBuffer,
       );
 
-  static Future<Empty> Refresh(GridHandle request) => _invokeUnary(
+  static Future<RefreshResponse> Refresh(GridHandle request) => _invokeUnary(
         _serviceMethodPath('Refresh'),
         request,
-        Empty.fromBuffer,
+        RefreshResponse.fromBuffer,
       );
 
-  static Future<Empty> LoadDemo(LoadDemoRequest request) => _invokeUnary(
+  static Future<LoadDemoResponse> LoadDemo(LoadDemoRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('LoadDemo'),
         request,
-        Empty.fromBuffer,
+        LoadDemoResponse.fromBuffer,
       );
 
   static Future<GetDemoDataResponse> GetDemoData(GetDemoDataRequest request) =>

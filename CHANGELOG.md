@@ -2,6 +2,12 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
+## 0.7.1
+
+- Removed the shared `Empty` response from the API and added explicit response types for mutating RPCs.
+- Added operation summaries to row, selection, scroll, merge, clear, and viewport responses.
+- Regenerated Flutter, Go, Java, Web, .NET, plugin, and ActiveX bindings for the updated protocol.
+
 ## 0.7.0
 
 - Version bump for project-wide 0.7.0 release.

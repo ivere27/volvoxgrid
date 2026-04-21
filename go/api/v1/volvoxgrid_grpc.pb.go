@@ -134,44 +134,44 @@ const (
 type VolvoxGridServiceClient interface {
 	// ── Lifecycle ──
 	Create(ctx context.Context, in *CreateRequest, opts ...grpc.CallOption) (*CreateResponse, error)
-	Destroy(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*Empty, error)
+	Destroy(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*DestroyResponse, error)
 	// ── Configuration ──
-	Configure(ctx context.Context, in *ConfigureRequest, opts ...grpc.CallOption) (*Empty, error)
+	Configure(ctx context.Context, in *ConfigureRequest, opts ...grpc.CallOption) (*ConfigureResponse, error)
 	GetConfig(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*GridConfig, error)
-	LoadFontData(ctx context.Context, in *LoadFontDataRequest, opts ...grpc.CallOption) (*Empty, error)
+	LoadFontData(ctx context.Context, in *LoadFontDataRequest, opts ...grpc.CallOption) (*LoadFontDataResponse, error)
 	// ── Structure ──
-	DefineColumns(ctx context.Context, in *DefineColumnsRequest, opts ...grpc.CallOption) (*Empty, error)
+	DefineColumns(ctx context.Context, in *DefineColumnsRequest, opts ...grpc.CallOption) (*DefineColumnsResponse, error)
 	GetSchema(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*DefineColumnsRequest, error)
-	DefineRows(ctx context.Context, in *DefineRowsRequest, opts ...grpc.CallOption) (*Empty, error)
-	InsertRows(ctx context.Context, in *InsertRowsRequest, opts ...grpc.CallOption) (*Empty, error)
-	RemoveRows(ctx context.Context, in *RemoveRowsRequest, opts ...grpc.CallOption) (*Empty, error)
-	MoveColumn(ctx context.Context, in *MoveColumnRequest, opts ...grpc.CallOption) (*Empty, error)
-	MoveRow(ctx context.Context, in *MoveRowRequest, opts ...grpc.CallOption) (*Empty, error)
+	DefineRows(ctx context.Context, in *DefineRowsRequest, opts ...grpc.CallOption) (*DefineRowsResponse, error)
+	InsertRows(ctx context.Context, in *InsertRowsRequest, opts ...grpc.CallOption) (*InsertRowsResponse, error)
+	RemoveRows(ctx context.Context, in *RemoveRowsRequest, opts ...grpc.CallOption) (*RemoveRowsResponse, error)
+	MoveColumn(ctx context.Context, in *MoveColumnRequest, opts ...grpc.CallOption) (*MoveColumnResponse, error)
+	MoveRow(ctx context.Context, in *MoveRowRequest, opts ...grpc.CallOption) (*MoveRowResponse, error)
 	// ── Data ──
 	UpdateCells(ctx context.Context, in *UpdateCellsRequest, opts ...grpc.CallOption) (*WriteResult, error)
 	GetCells(ctx context.Context, in *GetCellsRequest, opts ...grpc.CallOption) (*CellsResponse, error)
 	LoadTable(ctx context.Context, in *LoadTableRequest, opts ...grpc.CallOption) (*WriteResult, error)
 	LoadData(ctx context.Context, in *LoadDataRequest, opts ...grpc.CallOption) (*LoadDataResult, error)
-	Clear(ctx context.Context, in *ClearRequest, opts ...grpc.CallOption) (*Empty, error)
+	Clear(ctx context.Context, in *ClearRequest, opts ...grpc.CallOption) (*ClearResponse, error)
 	// ── Selection ──
-	Select(ctx context.Context, in *SelectRequest, opts ...grpc.CallOption) (*Empty, error)
+	Select(ctx context.Context, in *SelectRequest, opts ...grpc.CallOption) (*SelectResponse, error)
 	GetSelection(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*SelectionState, error)
-	ShowCell(ctx context.Context, in *ShowCellRequest, opts ...grpc.CallOption) (*Empty, error)
-	SetTopRow(ctx context.Context, in *SetRowRequest, opts ...grpc.CallOption) (*Empty, error)
-	SetLeftCol(ctx context.Context, in *SetColRequest, opts ...grpc.CallOption) (*Empty, error)
+	ShowCell(ctx context.Context, in *ShowCellRequest, opts ...grpc.CallOption) (*ShowCellResponse, error)
+	SetTopRow(ctx context.Context, in *SetRowRequest, opts ...grpc.CallOption) (*SetTopRowResponse, error)
+	SetLeftCol(ctx context.Context, in *SetColRequest, opts ...grpc.CallOption) (*SetLeftColResponse, error)
 	// ── Editing ──
 	Edit(ctx context.Context, in *EditCommand, opts ...grpc.CallOption) (*EditState, error)
 	// ── Actions ──
-	Sort(ctx context.Context, in *SortRequest, opts ...grpc.CallOption) (*Empty, error)
+	Sort(ctx context.Context, in *SortRequest, opts ...grpc.CallOption) (*SortResponse, error)
 	Subtotal(ctx context.Context, in *SubtotalRequest, opts ...grpc.CallOption) (*SubtotalResult, error)
-	AutoSize(ctx context.Context, in *AutoSizeRequest, opts ...grpc.CallOption) (*Empty, error)
-	Outline(ctx context.Context, in *OutlineRequest, opts ...grpc.CallOption) (*Empty, error)
+	AutoSize(ctx context.Context, in *AutoSizeRequest, opts ...grpc.CallOption) (*AutoSizeResponse, error)
+	Outline(ctx context.Context, in *OutlineRequest, opts ...grpc.CallOption) (*OutlineResponse, error)
 	GetNode(ctx context.Context, in *GetNodeRequest, opts ...grpc.CallOption) (*NodeInfo, error)
 	Find(ctx context.Context, in *FindRequest, opts ...grpc.CallOption) (*FindResponse, error)
 	Aggregate(ctx context.Context, in *AggregateRequest, opts ...grpc.CallOption) (*AggregateResponse, error)
 	GetMergedRange(ctx context.Context, in *GetMergedRangeRequest, opts ...grpc.CallOption) (*CellRange, error)
-	MergeCells(ctx context.Context, in *MergeCellsRequest, opts ...grpc.CallOption) (*Empty, error)
-	UnmergeCells(ctx context.Context, in *UnmergeCellsRequest, opts ...grpc.CallOption) (*Empty, error)
+	MergeCells(ctx context.Context, in *MergeCellsRequest, opts ...grpc.CallOption) (*MergeCellsResponse, error)
+	UnmergeCells(ctx context.Context, in *UnmergeCellsRequest, opts ...grpc.CallOption) (*UnmergeCellsResponse, error)
 	GetMergedRegions(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*MergedRegionsResponse, error)
 	GetMemoryUsage(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*MemoryUsageResponse, error)
 	// ── Clipboard ──
@@ -181,11 +181,11 @@ type VolvoxGridServiceClient interface {
 	Print(ctx context.Context, in *PrintRequest, opts ...grpc.CallOption) (*PrintResponse, error)
 	Archive(ctx context.Context, in *ArchiveRequest, opts ...grpc.CallOption) (*ArchiveResponse, error)
 	// ── Render Control ──
-	ResizeViewport(ctx context.Context, in *ResizeViewportRequest, opts ...grpc.CallOption) (*Empty, error)
-	SetRedraw(ctx context.Context, in *SetRedrawRequest, opts ...grpc.CallOption) (*Empty, error)
-	Refresh(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*Empty, error)
+	ResizeViewport(ctx context.Context, in *ResizeViewportRequest, opts ...grpc.CallOption) (*ResizeViewportResponse, error)
+	SetRedraw(ctx context.Context, in *SetRedrawRequest, opts ...grpc.CallOption) (*SetRedrawResponse, error)
+	Refresh(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*RefreshResponse, error)
 	// ── Demo ──
-	LoadDemo(ctx context.Context, in *LoadDemoRequest, opts ...grpc.CallOption) (*Empty, error)
+	LoadDemo(ctx context.Context, in *LoadDemoRequest, opts ...grpc.CallOption) (*LoadDemoResponse, error)
 	GetDemoData(ctx context.Context, in *GetDemoDataRequest, opts ...grpc.CallOption) (*GetDemoDataResponse, error)
 	// ── Streaming ──
 	// Bidirectional: host sends input (pointer, key, buffer, event decisions),
@@ -214,9 +214,9 @@ func (c *volvoxGridServiceClient) Create(ctx context.Context, in *CreateRequest,
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) Destroy(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) Destroy(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*DestroyResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(DestroyResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_Destroy_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -224,9 +224,9 @@ func (c *volvoxGridServiceClient) Destroy(ctx context.Context, in *GridHandle, o
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) Configure(ctx context.Context, in *ConfigureRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) Configure(ctx context.Context, in *ConfigureRequest, opts ...grpc.CallOption) (*ConfigureResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(ConfigureResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_Configure_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -244,9 +244,9 @@ func (c *volvoxGridServiceClient) GetConfig(ctx context.Context, in *GridHandle,
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) LoadFontData(ctx context.Context, in *LoadFontDataRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) LoadFontData(ctx context.Context, in *LoadFontDataRequest, opts ...grpc.CallOption) (*LoadFontDataResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(LoadFontDataResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_LoadFontData_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -254,9 +254,9 @@ func (c *volvoxGridServiceClient) LoadFontData(ctx context.Context, in *LoadFont
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) DefineColumns(ctx context.Context, in *DefineColumnsRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) DefineColumns(ctx context.Context, in *DefineColumnsRequest, opts ...grpc.CallOption) (*DefineColumnsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(DefineColumnsResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_DefineColumns_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -274,9 +274,9 @@ func (c *volvoxGridServiceClient) GetSchema(ctx context.Context, in *GridHandle,
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) DefineRows(ctx context.Context, in *DefineRowsRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) DefineRows(ctx context.Context, in *DefineRowsRequest, opts ...grpc.CallOption) (*DefineRowsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(DefineRowsResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_DefineRows_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -284,9 +284,9 @@ func (c *volvoxGridServiceClient) DefineRows(ctx context.Context, in *DefineRows
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) InsertRows(ctx context.Context, in *InsertRowsRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) InsertRows(ctx context.Context, in *InsertRowsRequest, opts ...grpc.CallOption) (*InsertRowsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(InsertRowsResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_InsertRows_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -294,9 +294,9 @@ func (c *volvoxGridServiceClient) InsertRows(ctx context.Context, in *InsertRows
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) RemoveRows(ctx context.Context, in *RemoveRowsRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) RemoveRows(ctx context.Context, in *RemoveRowsRequest, opts ...grpc.CallOption) (*RemoveRowsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(RemoveRowsResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_RemoveRows_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -304,9 +304,9 @@ func (c *volvoxGridServiceClient) RemoveRows(ctx context.Context, in *RemoveRows
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) MoveColumn(ctx context.Context, in *MoveColumnRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) MoveColumn(ctx context.Context, in *MoveColumnRequest, opts ...grpc.CallOption) (*MoveColumnResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(MoveColumnResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_MoveColumn_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -314,9 +314,9 @@ func (c *volvoxGridServiceClient) MoveColumn(ctx context.Context, in *MoveColumn
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) MoveRow(ctx context.Context, in *MoveRowRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) MoveRow(ctx context.Context, in *MoveRowRequest, opts ...grpc.CallOption) (*MoveRowResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(MoveRowResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_MoveRow_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -364,9 +364,9 @@ func (c *volvoxGridServiceClient) LoadData(ctx context.Context, in *LoadDataRequ
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) Clear(ctx context.Context, in *ClearRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) Clear(ctx context.Context, in *ClearRequest, opts ...grpc.CallOption) (*ClearResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(ClearResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_Clear_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -374,9 +374,9 @@ func (c *volvoxGridServiceClient) Clear(ctx context.Context, in *ClearRequest, o
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) Select(ctx context.Context, in *SelectRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) Select(ctx context.Context, in *SelectRequest, opts ...grpc.CallOption) (*SelectResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(SelectResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_Select_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -394,9 +394,9 @@ func (c *volvoxGridServiceClient) GetSelection(ctx context.Context, in *GridHand
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) ShowCell(ctx context.Context, in *ShowCellRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) ShowCell(ctx context.Context, in *ShowCellRequest, opts ...grpc.CallOption) (*ShowCellResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(ShowCellResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_ShowCell_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -404,9 +404,9 @@ func (c *volvoxGridServiceClient) ShowCell(ctx context.Context, in *ShowCellRequ
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) SetTopRow(ctx context.Context, in *SetRowRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) SetTopRow(ctx context.Context, in *SetRowRequest, opts ...grpc.CallOption) (*SetTopRowResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(SetTopRowResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_SetTopRow_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -414,9 +414,9 @@ func (c *volvoxGridServiceClient) SetTopRow(ctx context.Context, in *SetRowReque
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) SetLeftCol(ctx context.Context, in *SetColRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) SetLeftCol(ctx context.Context, in *SetColRequest, opts ...grpc.CallOption) (*SetLeftColResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(SetLeftColResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_SetLeftCol_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -434,9 +434,9 @@ func (c *volvoxGridServiceClient) Edit(ctx context.Context, in *EditCommand, opt
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) Sort(ctx context.Context, in *SortRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) Sort(ctx context.Context, in *SortRequest, opts ...grpc.CallOption) (*SortResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(SortResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_Sort_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -454,9 +454,9 @@ func (c *volvoxGridServiceClient) Subtotal(ctx context.Context, in *SubtotalRequ
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) AutoSize(ctx context.Context, in *AutoSizeRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) AutoSize(ctx context.Context, in *AutoSizeRequest, opts ...grpc.CallOption) (*AutoSizeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(AutoSizeResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_AutoSize_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -464,9 +464,9 @@ func (c *volvoxGridServiceClient) AutoSize(ctx context.Context, in *AutoSizeRequ
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) Outline(ctx context.Context, in *OutlineRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) Outline(ctx context.Context, in *OutlineRequest, opts ...grpc.CallOption) (*OutlineResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(OutlineResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_Outline_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -514,9 +514,9 @@ func (c *volvoxGridServiceClient) GetMergedRange(ctx context.Context, in *GetMer
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) MergeCells(ctx context.Context, in *MergeCellsRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) MergeCells(ctx context.Context, in *MergeCellsRequest, opts ...grpc.CallOption) (*MergeCellsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(MergeCellsResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_MergeCells_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -524,9 +524,9 @@ func (c *volvoxGridServiceClient) MergeCells(ctx context.Context, in *MergeCells
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) UnmergeCells(ctx context.Context, in *UnmergeCellsRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) UnmergeCells(ctx context.Context, in *UnmergeCellsRequest, opts ...grpc.CallOption) (*UnmergeCellsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(UnmergeCellsResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_UnmergeCells_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -594,9 +594,9 @@ func (c *volvoxGridServiceClient) Archive(ctx context.Context, in *ArchiveReques
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) ResizeViewport(ctx context.Context, in *ResizeViewportRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) ResizeViewport(ctx context.Context, in *ResizeViewportRequest, opts ...grpc.CallOption) (*ResizeViewportResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(ResizeViewportResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_ResizeViewport_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -604,9 +604,9 @@ func (c *volvoxGridServiceClient) ResizeViewport(ctx context.Context, in *Resize
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) SetRedraw(ctx context.Context, in *SetRedrawRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) SetRedraw(ctx context.Context, in *SetRedrawRequest, opts ...grpc.CallOption) (*SetRedrawResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(SetRedrawResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_SetRedraw_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -614,9 +614,9 @@ func (c *volvoxGridServiceClient) SetRedraw(ctx context.Context, in *SetRedrawRe
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) Refresh(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) Refresh(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*RefreshResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(RefreshResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_Refresh_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -624,9 +624,9 @@ func (c *volvoxGridServiceClient) Refresh(ctx context.Context, in *GridHandle, o
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) LoadDemo(ctx context.Context, in *LoadDemoRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *volvoxGridServiceClient) LoadDemo(ctx context.Context, in *LoadDemoRequest, opts ...grpc.CallOption) (*LoadDemoResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Empty)
+	out := new(LoadDemoResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_LoadDemo_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -682,44 +682,44 @@ type VolvoxGridService_EventStreamClient = grpc.ServerStreamingClient[GridEvent]
 type VolvoxGridServiceServer interface {
 	// ── Lifecycle ──
 	Create(context.Context, *CreateRequest) (*CreateResponse, error)
-	Destroy(context.Context, *GridHandle) (*Empty, error)
+	Destroy(context.Context, *GridHandle) (*DestroyResponse, error)
 	// ── Configuration ──
-	Configure(context.Context, *ConfigureRequest) (*Empty, error)
+	Configure(context.Context, *ConfigureRequest) (*ConfigureResponse, error)
 	GetConfig(context.Context, *GridHandle) (*GridConfig, error)
-	LoadFontData(context.Context, *LoadFontDataRequest) (*Empty, error)
+	LoadFontData(context.Context, *LoadFontDataRequest) (*LoadFontDataResponse, error)
 	// ── Structure ──
-	DefineColumns(context.Context, *DefineColumnsRequest) (*Empty, error)
+	DefineColumns(context.Context, *DefineColumnsRequest) (*DefineColumnsResponse, error)
 	GetSchema(context.Context, *GridHandle) (*DefineColumnsRequest, error)
-	DefineRows(context.Context, *DefineRowsRequest) (*Empty, error)
-	InsertRows(context.Context, *InsertRowsRequest) (*Empty, error)
-	RemoveRows(context.Context, *RemoveRowsRequest) (*Empty, error)
-	MoveColumn(context.Context, *MoveColumnRequest) (*Empty, error)
-	MoveRow(context.Context, *MoveRowRequest) (*Empty, error)
+	DefineRows(context.Context, *DefineRowsRequest) (*DefineRowsResponse, error)
+	InsertRows(context.Context, *InsertRowsRequest) (*InsertRowsResponse, error)
+	RemoveRows(context.Context, *RemoveRowsRequest) (*RemoveRowsResponse, error)
+	MoveColumn(context.Context, *MoveColumnRequest) (*MoveColumnResponse, error)
+	MoveRow(context.Context, *MoveRowRequest) (*MoveRowResponse, error)
 	// ── Data ──
 	UpdateCells(context.Context, *UpdateCellsRequest) (*WriteResult, error)
 	GetCells(context.Context, *GetCellsRequest) (*CellsResponse, error)
 	LoadTable(context.Context, *LoadTableRequest) (*WriteResult, error)
 	LoadData(context.Context, *LoadDataRequest) (*LoadDataResult, error)
-	Clear(context.Context, *ClearRequest) (*Empty, error)
+	Clear(context.Context, *ClearRequest) (*ClearResponse, error)
 	// ── Selection ──
-	Select(context.Context, *SelectRequest) (*Empty, error)
+	Select(context.Context, *SelectRequest) (*SelectResponse, error)
 	GetSelection(context.Context, *GridHandle) (*SelectionState, error)
-	ShowCell(context.Context, *ShowCellRequest) (*Empty, error)
-	SetTopRow(context.Context, *SetRowRequest) (*Empty, error)
-	SetLeftCol(context.Context, *SetColRequest) (*Empty, error)
+	ShowCell(context.Context, *ShowCellRequest) (*ShowCellResponse, error)
+	SetTopRow(context.Context, *SetRowRequest) (*SetTopRowResponse, error)
+	SetLeftCol(context.Context, *SetColRequest) (*SetLeftColResponse, error)
 	// ── Editing ──
 	Edit(context.Context, *EditCommand) (*EditState, error)
 	// ── Actions ──
-	Sort(context.Context, *SortRequest) (*Empty, error)
+	Sort(context.Context, *SortRequest) (*SortResponse, error)
 	Subtotal(context.Context, *SubtotalRequest) (*SubtotalResult, error)
-	AutoSize(context.Context, *AutoSizeRequest) (*Empty, error)
-	Outline(context.Context, *OutlineRequest) (*Empty, error)
+	AutoSize(context.Context, *AutoSizeRequest) (*AutoSizeResponse, error)
+	Outline(context.Context, *OutlineRequest) (*OutlineResponse, error)
 	GetNode(context.Context, *GetNodeRequest) (*NodeInfo, error)
 	Find(context.Context, *FindRequest) (*FindResponse, error)
 	Aggregate(context.Context, *AggregateRequest) (*AggregateResponse, error)
 	GetMergedRange(context.Context, *GetMergedRangeRequest) (*CellRange, error)
-	MergeCells(context.Context, *MergeCellsRequest) (*Empty, error)
-	UnmergeCells(context.Context, *UnmergeCellsRequest) (*Empty, error)
+	MergeCells(context.Context, *MergeCellsRequest) (*MergeCellsResponse, error)
+	UnmergeCells(context.Context, *UnmergeCellsRequest) (*UnmergeCellsResponse, error)
 	GetMergedRegions(context.Context, *GridHandle) (*MergedRegionsResponse, error)
 	GetMemoryUsage(context.Context, *GridHandle) (*MemoryUsageResponse, error)
 	// ── Clipboard ──
@@ -729,11 +729,11 @@ type VolvoxGridServiceServer interface {
 	Print(context.Context, *PrintRequest) (*PrintResponse, error)
 	Archive(context.Context, *ArchiveRequest) (*ArchiveResponse, error)
 	// ── Render Control ──
-	ResizeViewport(context.Context, *ResizeViewportRequest) (*Empty, error)
-	SetRedraw(context.Context, *SetRedrawRequest) (*Empty, error)
-	Refresh(context.Context, *GridHandle) (*Empty, error)
+	ResizeViewport(context.Context, *ResizeViewportRequest) (*ResizeViewportResponse, error)
+	SetRedraw(context.Context, *SetRedrawRequest) (*SetRedrawResponse, error)
+	Refresh(context.Context, *GridHandle) (*RefreshResponse, error)
 	// ── Demo ──
-	LoadDemo(context.Context, *LoadDemoRequest) (*Empty, error)
+	LoadDemo(context.Context, *LoadDemoRequest) (*LoadDemoResponse, error)
 	GetDemoData(context.Context, *GetDemoDataRequest) (*GetDemoDataResponse, error)
 	// ── Streaming ──
 	// Bidirectional: host sends input (pointer, key, buffer, event decisions),
@@ -755,37 +755,37 @@ type UnimplementedVolvoxGridServiceServer struct{}
 func (UnimplementedVolvoxGridServiceServer) Create(context.Context, *CreateRequest) (*CreateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Create not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) Destroy(context.Context, *GridHandle) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) Destroy(context.Context, *GridHandle) (*DestroyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Destroy not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) Configure(context.Context, *ConfigureRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) Configure(context.Context, *ConfigureRequest) (*ConfigureResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Configure not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) GetConfig(context.Context, *GridHandle) (*GridConfig, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetConfig not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) LoadFontData(context.Context, *LoadFontDataRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) LoadFontData(context.Context, *LoadFontDataRequest) (*LoadFontDataResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method LoadFontData not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) DefineColumns(context.Context, *DefineColumnsRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) DefineColumns(context.Context, *DefineColumnsRequest) (*DefineColumnsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DefineColumns not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) GetSchema(context.Context, *GridHandle) (*DefineColumnsRequest, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSchema not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) DefineRows(context.Context, *DefineRowsRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) DefineRows(context.Context, *DefineRowsRequest) (*DefineRowsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DefineRows not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) InsertRows(context.Context, *InsertRowsRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) InsertRows(context.Context, *InsertRowsRequest) (*InsertRowsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InsertRows not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) RemoveRows(context.Context, *RemoveRowsRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) RemoveRows(context.Context, *RemoveRowsRequest) (*RemoveRowsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveRows not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) MoveColumn(context.Context, *MoveColumnRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) MoveColumn(context.Context, *MoveColumnRequest) (*MoveColumnResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method MoveColumn not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) MoveRow(context.Context, *MoveRowRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) MoveRow(context.Context, *MoveRowRequest) (*MoveRowResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method MoveRow not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) UpdateCells(context.Context, *UpdateCellsRequest) (*WriteResult, error) {
@@ -800,37 +800,37 @@ func (UnimplementedVolvoxGridServiceServer) LoadTable(context.Context, *LoadTabl
 func (UnimplementedVolvoxGridServiceServer) LoadData(context.Context, *LoadDataRequest) (*LoadDataResult, error) {
 	return nil, status.Error(codes.Unimplemented, "method LoadData not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) Clear(context.Context, *ClearRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) Clear(context.Context, *ClearRequest) (*ClearResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Clear not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) Select(context.Context, *SelectRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) Select(context.Context, *SelectRequest) (*SelectResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Select not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) GetSelection(context.Context, *GridHandle) (*SelectionState, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSelection not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) ShowCell(context.Context, *ShowCellRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) ShowCell(context.Context, *ShowCellRequest) (*ShowCellResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ShowCell not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) SetTopRow(context.Context, *SetRowRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) SetTopRow(context.Context, *SetRowRequest) (*SetTopRowResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetTopRow not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) SetLeftCol(context.Context, *SetColRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) SetLeftCol(context.Context, *SetColRequest) (*SetLeftColResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetLeftCol not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) Edit(context.Context, *EditCommand) (*EditState, error) {
 	return nil, status.Error(codes.Unimplemented, "method Edit not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) Sort(context.Context, *SortRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) Sort(context.Context, *SortRequest) (*SortResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Sort not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) Subtotal(context.Context, *SubtotalRequest) (*SubtotalResult, error) {
 	return nil, status.Error(codes.Unimplemented, "method Subtotal not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) AutoSize(context.Context, *AutoSizeRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) AutoSize(context.Context, *AutoSizeRequest) (*AutoSizeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AutoSize not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) Outline(context.Context, *OutlineRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) Outline(context.Context, *OutlineRequest) (*OutlineResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Outline not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) GetNode(context.Context, *GetNodeRequest) (*NodeInfo, error) {
@@ -845,10 +845,10 @@ func (UnimplementedVolvoxGridServiceServer) Aggregate(context.Context, *Aggregat
 func (UnimplementedVolvoxGridServiceServer) GetMergedRange(context.Context, *GetMergedRangeRequest) (*CellRange, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMergedRange not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) MergeCells(context.Context, *MergeCellsRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) MergeCells(context.Context, *MergeCellsRequest) (*MergeCellsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method MergeCells not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) UnmergeCells(context.Context, *UnmergeCellsRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) UnmergeCells(context.Context, *UnmergeCellsRequest) (*UnmergeCellsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UnmergeCells not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) GetMergedRegions(context.Context, *GridHandle) (*MergedRegionsResponse, error) {
@@ -869,16 +869,16 @@ func (UnimplementedVolvoxGridServiceServer) Print(context.Context, *PrintRequest
 func (UnimplementedVolvoxGridServiceServer) Archive(context.Context, *ArchiveRequest) (*ArchiveResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Archive not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) ResizeViewport(context.Context, *ResizeViewportRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) ResizeViewport(context.Context, *ResizeViewportRequest) (*ResizeViewportResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResizeViewport not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) SetRedraw(context.Context, *SetRedrawRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) SetRedraw(context.Context, *SetRedrawRequest) (*SetRedrawResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetRedraw not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) Refresh(context.Context, *GridHandle) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) Refresh(context.Context, *GridHandle) (*RefreshResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Refresh not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) LoadDemo(context.Context, *LoadDemoRequest) (*Empty, error) {
+func (UnimplementedVolvoxGridServiceServer) LoadDemo(context.Context, *LoadDemoRequest) (*LoadDemoResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method LoadDemo not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) GetDemoData(context.Context, *GetDemoDataRequest) (*GetDemoDataResponse, error) {

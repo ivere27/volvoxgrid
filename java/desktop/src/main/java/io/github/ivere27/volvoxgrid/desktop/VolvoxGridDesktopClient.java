@@ -3,6 +3,7 @@ package io.github.ivere27.volvoxgrid.desktop;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MessageLite;
 import com.google.protobuf.Parser;
+import io.github.ivere27.volvoxgrid.*;
 import io.github.ivere27.volvoxgrid.ClearRequest;
 import io.github.ivere27.volvoxgrid.CellRange;
 import io.github.ivere27.volvoxgrid.ClipboardCommand;
@@ -14,7 +15,6 @@ import io.github.ivere27.volvoxgrid.DefineColumnsRequest;
 import io.github.ivere27.volvoxgrid.DefineRowsRequest;
 import io.github.ivere27.volvoxgrid.EditCommand;
 import io.github.ivere27.volvoxgrid.EditState;
-import io.github.ivere27.volvoxgrid.Empty;
 import io.github.ivere27.volvoxgrid.AggregateRequest;
 import io.github.ivere27.volvoxgrid.AggregateResponse;
 import io.github.ivere27.volvoxgrid.ArchiveRequest;
@@ -126,40 +126,40 @@ public final class VolvoxGridDesktopClient {
         return unary(CREATE, request, CreateResponse.parser());
     }
 
-    public Empty destroy(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(DESTROY, request, Empty.parser());
+    public DestroyResponse destroy(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(DESTROY, request, DestroyResponse.parser());
     }
 
-    public Empty configure(ConfigureRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(CONFIGURE, request, Empty.parser());
+    public ConfigureResponse configure(ConfigureRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(CONFIGURE, request, ConfigureResponse.parser());
     }
 
     public GridConfig getConfig(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
         return unary(GET_CONFIG, request, GridConfig.parser());
     }
 
-    public Empty defineColumns(DefineColumnsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(DEFINE_COLUMNS, request, Empty.parser());
+    public DefineColumnsResponse defineColumns(DefineColumnsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(DEFINE_COLUMNS, request, DefineColumnsResponse.parser());
     }
 
-    public Empty defineRows(DefineRowsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(DEFINE_ROWS, request, Empty.parser());
+    public DefineRowsResponse defineRows(DefineRowsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(DEFINE_ROWS, request, DefineRowsResponse.parser());
     }
 
-    public Empty insertRows(InsertRowsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(INSERT_ROWS, request, Empty.parser());
+    public InsertRowsResponse insertRows(InsertRowsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(INSERT_ROWS, request, InsertRowsResponse.parser());
     }
 
-    public Empty removeRows(RemoveRowsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(REMOVE_ROWS, request, Empty.parser());
+    public RemoveRowsResponse removeRows(RemoveRowsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(REMOVE_ROWS, request, RemoveRowsResponse.parser());
     }
 
-    public Empty moveColumn(MoveColumnRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(MOVE_COLUMN, request, Empty.parser());
+    public MoveColumnResponse moveColumn(MoveColumnRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(MOVE_COLUMN, request, MoveColumnResponse.parser());
     }
 
-    public Empty moveRow(MoveRowRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(MOVE_ROW, request, Empty.parser());
+    public MoveRowResponse moveRow(MoveRowRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(MOVE_ROW, request, MoveRowResponse.parser());
     }
 
     public WriteResult updateCells(UpdateCellsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
@@ -178,48 +178,48 @@ public final class VolvoxGridDesktopClient {
         return unary(LOAD_TABLE, request, WriteResult.parser());
     }
 
-    public Empty clear(ClearRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(CLEAR, request, Empty.parser());
+    public ClearResponse clear(ClearRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(CLEAR, request, ClearResponse.parser());
     }
 
-    public Empty select(io.github.ivere27.volvoxgrid.SelectRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(SELECT, request, Empty.parser());
+    public SelectResponse select(io.github.ivere27.volvoxgrid.SelectRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(SELECT, request, SelectResponse.parser());
     }
 
     public SelectionState getSelection(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
         return unary(GET_SELECTION, request, SelectionState.parser());
     }
 
-    public Empty showCell(ShowCellRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(SHOW_CELL, request, Empty.parser());
+    public ShowCellResponse showCell(ShowCellRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(SHOW_CELL, request, ShowCellResponse.parser());
     }
 
-    public Empty setTopRow(SetRowRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(SET_TOP_ROW, request, Empty.parser());
+    public SetTopRowResponse setTopRow(SetRowRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(SET_TOP_ROW, request, SetTopRowResponse.parser());
     }
 
-    public Empty setLeftCol(SetColRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(SET_LEFT_COL, request, Empty.parser());
+    public SetLeftColResponse setLeftCol(SetColRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(SET_LEFT_COL, request, SetLeftColResponse.parser());
     }
 
     public EditState edit(EditCommand request) throws SynurangDesktopBridge.SynurangBridgeException {
         return unary(EDIT, request, EditState.parser());
     }
 
-    public Empty sort(SortRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(SORT, request, Empty.parser());
+    public SortResponse sort(SortRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(SORT, request, SortResponse.parser());
     }
 
     public SubtotalResult subtotal(SubtotalRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         return unary(SUBTOTAL, request, SubtotalResult.parser());
     }
 
-    public Empty autoSize(AutoSizeRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(AUTO_SIZE, request, Empty.parser());
+    public AutoSizeResponse autoSize(AutoSizeRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(AUTO_SIZE, request, AutoSizeResponse.parser());
     }
 
-    public Empty outline(OutlineRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(OUTLINE, request, Empty.parser());
+    public OutlineResponse outline(OutlineRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(OUTLINE, request, OutlineResponse.parser());
     }
 
     public NodeInfo getNode(GetNodeRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
@@ -238,12 +238,12 @@ public final class VolvoxGridDesktopClient {
         return unary(GET_MERGED_RANGE, request, CellRange.parser());
     }
 
-    public Empty mergeCells(MergeCellsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(MERGE_CELLS, request, Empty.parser());
+    public MergeCellsResponse mergeCells(MergeCellsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(MERGE_CELLS, request, MergeCellsResponse.parser());
     }
 
-    public Empty unmergeCells(UnmergeCellsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(UNMERGE_CELLS, request, Empty.parser());
+    public UnmergeCellsResponse unmergeCells(UnmergeCellsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(UNMERGE_CELLS, request, UnmergeCellsResponse.parser());
     }
 
     public MergedRegionsResponse getMergedRegions(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
@@ -270,20 +270,20 @@ public final class VolvoxGridDesktopClient {
         return unary(ARCHIVE, request, ArchiveResponse.parser());
     }
 
-    public Empty resizeViewport(ResizeViewportRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(RESIZE_VIEWPORT, request, Empty.parser());
+    public ResizeViewportResponse resizeViewport(ResizeViewportRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(RESIZE_VIEWPORT, request, ResizeViewportResponse.parser());
     }
 
-    public Empty setRedraw(SetRedrawRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(SET_REDRAW, request, Empty.parser());
+    public SetRedrawResponse setRedraw(SetRedrawRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(SET_REDRAW, request, SetRedrawResponse.parser());
     }
 
-    public Empty refresh(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(REFRESH, request, Empty.parser());
+    public RefreshResponse refresh(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(REFRESH, request, RefreshResponse.parser());
     }
 
-    public Empty loadDemo(LoadDemoRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(LOAD_DEMO, request, Empty.parser());
+    public LoadDemoResponse loadDemo(LoadDemoRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(LOAD_DEMO, request, LoadDemoResponse.parser());
     }
 
     public GetDemoDataResponse getDemoData(GetDemoDataRequest request)

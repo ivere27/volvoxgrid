@@ -553,6 +553,8 @@ export const AutoSizeRequestFields = {
   "equal": 4,
   "max_width": 5,
 } as const;
+export const AutoSizeResponseFields = {
+} as const;
 export const BeforeEditEventFields = {
   "row": 1,
   "col": 2,
@@ -696,6 +698,9 @@ export const ClearRequestFields = {
   "scope": 2,
   "region": 3,
 } as const;
+export const ClearResponseFields = {
+  "cleared_count": 1,
+} as const;
 export const ClickEventFields = {
   "row": 1,
   "col": 2,
@@ -792,6 +797,8 @@ export const ConfigureRequestFields = {
   "grid_id": 1,
   "config": 2,
 } as const;
+export const ConfigureResponseFields = {
+} as const;
 export const CornerIndicatorConfigFields = {
   "visible": 1,
   "mode_bits": 2,
@@ -841,9 +848,15 @@ export const DefineColumnsRequestFields = {
   "grid_id": 1,
   "columns": 2,
 } as const;
+export const DefineColumnsResponseFields = {
+} as const;
 export const DefineRowsRequestFields = {
   "grid_id": 1,
   "rows": 2,
+} as const;
+export const DefineRowsResponseFields = {
+} as const;
+export const DestroyResponseFields = {
 } as const;
 export const DragCompleteEventFields = {
   "success": 1,
@@ -954,8 +967,11 @@ export const EditStateFields = {
   "composing": 7,
   "preedit_text": 8,
   "ui_mode": 9,
-} as const;
-export const EmptyFields = {
+  "x": 10,
+  "y": 11,
+  "width": 12,
+  "height": 13,
+  "max_length": 14,
 } as const;
 export const EnterCellEventFields = {
   "row": 1,
@@ -1281,6 +1297,11 @@ export const InsertRowsRequestFields = {
   "count": 3,
   "text": 4,
 } as const;
+export const InsertRowsResponseFields = {
+  "inserted_count": 1,
+  "new_row_count": 2,
+  "first_row": 3,
+} as const;
 export const InteractionConfigFields = {
   "resize": 1,
   "freeze": 2,
@@ -1374,10 +1395,14 @@ export const LoadDemoRequestFields = {
   "grid_id": 1,
   "demo": 2,
 } as const;
+export const LoadDemoResponseFields = {
+} as const;
 export const LoadFontDataRequestFields = {
   "data": 1,
   "font_name": 2,
   "font_names": 3,
+} as const;
+export const LoadFontDataResponseFields = {
 } as const;
 export const LoadTableRequestFields = {
   "grid_id": 1,
@@ -1406,6 +1431,9 @@ export const MergeCellsRequestFields = {
   "grid_id": 1,
   "range": 2,
 } as const;
+export const MergeCellsResponseFields = {
+  "merged": 1,
+} as const;
 export const MergedRegionsResponseFields = {
   "ranges": 1,
 } as const;
@@ -1432,10 +1460,14 @@ export const MoveColumnRequestFields = {
   "col": 2,
   "position": 3,
 } as const;
+export const MoveColumnResponseFields = {
+} as const;
 export const MoveRowRequestFields = {
   "grid_id": 1,
   "row": 2,
   "position": 3,
+} as const;
+export const MoveRowResponseFields = {
 } as const;
 export const NodeInfoFields = {
   "row": 1,
@@ -1456,6 +1488,8 @@ export const OutlineConfigFields = {
 export const OutlineRequestFields = {
   "grid_id": 1,
   "level": 2,
+} as const;
+export const OutlineResponseFields = {
 } as const;
 export const PaddingFields = {
   "left": 1,
@@ -1501,6 +1535,8 @@ export const PullToRefreshConfigFields = {
 } as const;
 export const PullToRefreshTriggeredEventFields = {
 } as const;
+export const RefreshResponseFields = {
+} as const;
 export const RegexQueryFields = {
   "pattern": 1,
 } as const;
@@ -1517,6 +1553,10 @@ export const RemoveRowsRequestFields = {
   "grid_id": 1,
   "index": 2,
   "count": 3,
+} as const;
+export const RemoveRowsResponseFields = {
+  "removed_count": 1,
+  "new_row_count": 2,
 } as const;
 export const RenderConfigFields = {
   "renderer_mode": 1,
@@ -1565,6 +1605,10 @@ export const ResizeViewportRequestFields = {
   "grid_id": 1,
   "width": 2,
   "height": 3,
+} as const;
+export const ResizeViewportResponseFields = {
+  "viewport_width": 1,
+  "viewport_height": 2,
 } as const;
 export const RowDefFields = {
   "index": 1,
@@ -1650,6 +1694,9 @@ export const SelectRequestFields = {
   "ranges": 4,
   "show": 5,
 } as const;
+export const SelectResponseFields = {
+  "selection": 1,
+} as const;
 export const SelectionChangedEventFields = {
   "old_ranges": 1,
   "new_ranges": 2,
@@ -1699,18 +1746,30 @@ export const SetColRequestFields = {
   "grid_id": 1,
   "col": 2,
 } as const;
+export const SetLeftColResponseFields = {
+  "left_col": 1,
+} as const;
 export const SetRedrawRequestFields = {
   "grid_id": 1,
   "enabled": 2,
+} as const;
+export const SetRedrawResponseFields = {
 } as const;
 export const SetRowRequestFields = {
   "grid_id": 1,
   "row": 2,
 } as const;
+export const SetTopRowResponseFields = {
+  "top_row": 1,
+} as const;
 export const ShowCellRequestFields = {
   "grid_id": 1,
   "row": 2,
   "col": 3,
+} as const;
+export const ShowCellResponseFields = {
+  "top_row": 1,
+  "left_col": 2,
 } as const;
 export const SortColumnFields = {
   "col": 1,
@@ -1720,6 +1779,8 @@ export const SortColumnFields = {
 export const SortRequestFields = {
   "grid_id": 1,
   "sort_columns": 2,
+} as const;
+export const SortResponseFields = {
 } as const;
 export const SpanConfigFields = {
   "cell_span": 1,
@@ -1826,6 +1887,9 @@ export const TypeViolationFields = {
 export const UnmergeCellsRequestFields = {
   "grid_id": 1,
   "range": 2,
+} as const;
+export const UnmergeCellsResponseFields = {
+  "unmerged_count": 1,
 } as const;
 export const UpdateCellsRequestFields = {
   "grid_id": 1,

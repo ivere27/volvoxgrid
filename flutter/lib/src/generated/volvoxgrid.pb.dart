@@ -9816,6 +9816,11 @@ class EditState extends $pb.GeneratedMessage {
     $core.bool? composing,
     $core.String? preeditText,
     EditUiMode? uiMode,
+    $core.double? x,
+    $core.double? y,
+    $core.double? width,
+    $core.double? height,
+    $core.int? maxLength,
   }) {
     final result = create();
     if (active != null) result.active = active;
@@ -9827,6 +9832,11 @@ class EditState extends $pb.GeneratedMessage {
     if (composing != null) result.composing = composing;
     if (preeditText != null) result.preeditText = preeditText;
     if (uiMode != null) result.uiMode = uiMode;
+    if (x != null) result.x = x;
+    if (y != null) result.y = y;
+    if (width != null) result.width = width;
+    if (height != null) result.height = height;
+    if (maxLength != null) result.maxLength = maxLength;
     return result;
   }
 
@@ -9853,6 +9863,11 @@ class EditState extends $pb.GeneratedMessage {
     ..aOS(8, _omitFieldNames ? '' : 'preeditText')
     ..aE<EditUiMode>(9, _omitFieldNames ? '' : 'uiMode',
         enumValues: EditUiMode.values)
+    ..aD(10, _omitFieldNames ? '' : 'x', fieldType: $pb.PbFieldType.OF)
+    ..aD(11, _omitFieldNames ? '' : 'y', fieldType: $pb.PbFieldType.OF)
+    ..aD(12, _omitFieldNames ? '' : 'width', fieldType: $pb.PbFieldType.OF)
+    ..aD(13, _omitFieldNames ? '' : 'height', fieldType: $pb.PbFieldType.OF)
+    ..aI(14, _omitFieldNames ? '' : 'maxLength')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -9953,6 +9968,51 @@ class EditState extends $pb.GeneratedMessage {
   $core.bool hasUiMode() => $_has(8);
   @$pb.TagNumber(9)
   void clearUiMode() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.double get x => $_getN(9);
+  @$pb.TagNumber(10)
+  set x($core.double value) => $_setFloat(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasX() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearX() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.double get y => $_getN(10);
+  @$pb.TagNumber(11)
+  set y($core.double value) => $_setFloat(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasY() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearY() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.double get width => $_getN(11);
+  @$pb.TagNumber(12)
+  set width($core.double value) => $_setFloat(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasWidth() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearWidth() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.double get height => $_getN(12);
+  @$pb.TagNumber(13)
+  set height($core.double value) => $_setFloat(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasHeight() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearHeight() => $_clearField(13);
+
+  @$pb.TagNumber(14)
+  $core.int get maxLength => $_getIZ(13);
+  @$pb.TagNumber(14)
+  set maxLength($core.int value) => $_setSignedInt32(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasMaxLength() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearMaxLength() => $_clearField(14);
 }
 
 class SortColumn extends $pb.GeneratedMessage {
@@ -12618,43 +12678,6 @@ class ArchiveResponse extends $pb.GeneratedMessage {
   $pb.PbList<$core.String> get names => $_getList(1);
 }
 
-class Empty extends $pb.GeneratedMessage {
-  factory Empty() => create();
-
-  Empty._();
-
-  factory Empty.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory Empty.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'Empty',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
-      createEmptyInstance: create)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  Empty clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  Empty copyWith(void Function(Empty) updates) =>
-      super.copyWith((message) => updates(message as Empty)) as Empty;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static Empty create() => Empty._();
-  @$core.override
-  Empty createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static Empty getDefault() =>
-      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Empty>(create);
-  static Empty? _defaultInstance;
-}
-
 class GridHandle extends $pb.GeneratedMessage {
   factory GridHandle({
     $fixnum.Int64? id,
@@ -13565,6 +13588,1108 @@ class GetDemoDataResponse extends $pb.GeneratedMessage {
   $core.bool hasData() => $_has(2);
   @$pb.TagNumber(3)
   void clearData() => $_clearField(3);
+}
+
+class DestroyResponse extends $pb.GeneratedMessage {
+  factory DestroyResponse() => create();
+
+  DestroyResponse._();
+
+  factory DestroyResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DestroyResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DestroyResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DestroyResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DestroyResponse copyWith(void Function(DestroyResponse) updates) =>
+      super.copyWith((message) => updates(message as DestroyResponse))
+          as DestroyResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DestroyResponse create() => DestroyResponse._();
+  @$core.override
+  DestroyResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DestroyResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DestroyResponse>(create);
+  static DestroyResponse? _defaultInstance;
+}
+
+class ConfigureResponse extends $pb.GeneratedMessage {
+  factory ConfigureResponse() => create();
+
+  ConfigureResponse._();
+
+  factory ConfigureResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ConfigureResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ConfigureResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ConfigureResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ConfigureResponse copyWith(void Function(ConfigureResponse) updates) =>
+      super.copyWith((message) => updates(message as ConfigureResponse))
+          as ConfigureResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ConfigureResponse create() => ConfigureResponse._();
+  @$core.override
+  ConfigureResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ConfigureResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ConfigureResponse>(create);
+  static ConfigureResponse? _defaultInstance;
+}
+
+class LoadFontDataResponse extends $pb.GeneratedMessage {
+  factory LoadFontDataResponse() => create();
+
+  LoadFontDataResponse._();
+
+  factory LoadFontDataResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LoadFontDataResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LoadFontDataResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoadFontDataResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoadFontDataResponse copyWith(void Function(LoadFontDataResponse) updates) =>
+      super.copyWith((message) => updates(message as LoadFontDataResponse))
+          as LoadFontDataResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LoadFontDataResponse create() => LoadFontDataResponse._();
+  @$core.override
+  LoadFontDataResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static LoadFontDataResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LoadFontDataResponse>(create);
+  static LoadFontDataResponse? _defaultInstance;
+}
+
+class DefineColumnsResponse extends $pb.GeneratedMessage {
+  factory DefineColumnsResponse() => create();
+
+  DefineColumnsResponse._();
+
+  factory DefineColumnsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DefineColumnsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DefineColumnsResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DefineColumnsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DefineColumnsResponse copyWith(
+          void Function(DefineColumnsResponse) updates) =>
+      super.copyWith((message) => updates(message as DefineColumnsResponse))
+          as DefineColumnsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DefineColumnsResponse create() => DefineColumnsResponse._();
+  @$core.override
+  DefineColumnsResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DefineColumnsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DefineColumnsResponse>(create);
+  static DefineColumnsResponse? _defaultInstance;
+}
+
+class DefineRowsResponse extends $pb.GeneratedMessage {
+  factory DefineRowsResponse() => create();
+
+  DefineRowsResponse._();
+
+  factory DefineRowsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DefineRowsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DefineRowsResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DefineRowsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DefineRowsResponse copyWith(void Function(DefineRowsResponse) updates) =>
+      super.copyWith((message) => updates(message as DefineRowsResponse))
+          as DefineRowsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DefineRowsResponse create() => DefineRowsResponse._();
+  @$core.override
+  DefineRowsResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DefineRowsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DefineRowsResponse>(create);
+  static DefineRowsResponse? _defaultInstance;
+}
+
+class InsertRowsResponse extends $pb.GeneratedMessage {
+  factory InsertRowsResponse({
+    $core.int? insertedCount,
+    $core.int? newRowCount,
+    $core.int? firstRow,
+  }) {
+    final result = create();
+    if (insertedCount != null) result.insertedCount = insertedCount;
+    if (newRowCount != null) result.newRowCount = newRowCount;
+    if (firstRow != null) result.firstRow = firstRow;
+    return result;
+  }
+
+  InsertRowsResponse._();
+
+  factory InsertRowsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory InsertRowsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'InsertRowsResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'insertedCount')
+    ..aI(2, _omitFieldNames ? '' : 'newRowCount')
+    ..aI(3, _omitFieldNames ? '' : 'firstRow')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  InsertRowsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  InsertRowsResponse copyWith(void Function(InsertRowsResponse) updates) =>
+      super.copyWith((message) => updates(message as InsertRowsResponse))
+          as InsertRowsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static InsertRowsResponse create() => InsertRowsResponse._();
+  @$core.override
+  InsertRowsResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static InsertRowsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<InsertRowsResponse>(create);
+  static InsertRowsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get insertedCount => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set insertedCount($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasInsertedCount() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearInsertedCount() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get newRowCount => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set newRowCount($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNewRowCount() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNewRowCount() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get firstRow => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set firstRow($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFirstRow() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFirstRow() => $_clearField(3);
+}
+
+class RemoveRowsResponse extends $pb.GeneratedMessage {
+  factory RemoveRowsResponse({
+    $core.int? removedCount,
+    $core.int? newRowCount,
+  }) {
+    final result = create();
+    if (removedCount != null) result.removedCount = removedCount;
+    if (newRowCount != null) result.newRowCount = newRowCount;
+    return result;
+  }
+
+  RemoveRowsResponse._();
+
+  factory RemoveRowsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RemoveRowsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RemoveRowsResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'removedCount')
+    ..aI(2, _omitFieldNames ? '' : 'newRowCount')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RemoveRowsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RemoveRowsResponse copyWith(void Function(RemoveRowsResponse) updates) =>
+      super.copyWith((message) => updates(message as RemoveRowsResponse))
+          as RemoveRowsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RemoveRowsResponse create() => RemoveRowsResponse._();
+  @$core.override
+  RemoveRowsResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RemoveRowsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RemoveRowsResponse>(create);
+  static RemoveRowsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get removedCount => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set removedCount($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRemovedCount() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRemovedCount() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get newRowCount => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set newRowCount($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNewRowCount() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNewRowCount() => $_clearField(2);
+}
+
+class MoveColumnResponse extends $pb.GeneratedMessage {
+  factory MoveColumnResponse() => create();
+
+  MoveColumnResponse._();
+
+  factory MoveColumnResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory MoveColumnResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MoveColumnResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MoveColumnResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MoveColumnResponse copyWith(void Function(MoveColumnResponse) updates) =>
+      super.copyWith((message) => updates(message as MoveColumnResponse))
+          as MoveColumnResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static MoveColumnResponse create() => MoveColumnResponse._();
+  @$core.override
+  MoveColumnResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static MoveColumnResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<MoveColumnResponse>(create);
+  static MoveColumnResponse? _defaultInstance;
+}
+
+class MoveRowResponse extends $pb.GeneratedMessage {
+  factory MoveRowResponse() => create();
+
+  MoveRowResponse._();
+
+  factory MoveRowResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory MoveRowResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MoveRowResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MoveRowResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MoveRowResponse copyWith(void Function(MoveRowResponse) updates) =>
+      super.copyWith((message) => updates(message as MoveRowResponse))
+          as MoveRowResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static MoveRowResponse create() => MoveRowResponse._();
+  @$core.override
+  MoveRowResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static MoveRowResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<MoveRowResponse>(create);
+  static MoveRowResponse? _defaultInstance;
+}
+
+class ClearResponse extends $pb.GeneratedMessage {
+  factory ClearResponse({
+    $core.int? clearedCount,
+  }) {
+    final result = create();
+    if (clearedCount != null) result.clearedCount = clearedCount;
+    return result;
+  }
+
+  ClearResponse._();
+
+  factory ClearResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ClearResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ClearResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'clearedCount')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ClearResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ClearResponse copyWith(void Function(ClearResponse) updates) =>
+      super.copyWith((message) => updates(message as ClearResponse))
+          as ClearResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ClearResponse create() => ClearResponse._();
+  @$core.override
+  ClearResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ClearResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ClearResponse>(create);
+  static ClearResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get clearedCount => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set clearedCount($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasClearedCount() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearClearedCount() => $_clearField(1);
+}
+
+class SelectResponse extends $pb.GeneratedMessage {
+  factory SelectResponse({
+    SelectionState? selection,
+  }) {
+    final result = create();
+    if (selection != null) result.selection = selection;
+    return result;
+  }
+
+  SelectResponse._();
+
+  factory SelectResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SelectResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SelectResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOM<SelectionState>(1, _omitFieldNames ? '' : 'selection',
+        subBuilder: SelectionState.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SelectResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SelectResponse copyWith(void Function(SelectResponse) updates) =>
+      super.copyWith((message) => updates(message as SelectResponse))
+          as SelectResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SelectResponse create() => SelectResponse._();
+  @$core.override
+  SelectResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SelectResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SelectResponse>(create);
+  static SelectResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  SelectionState get selection => $_getN(0);
+  @$pb.TagNumber(1)
+  set selection(SelectionState value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSelection() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSelection() => $_clearField(1);
+  @$pb.TagNumber(1)
+  SelectionState ensureSelection() => $_ensure(0);
+}
+
+class ShowCellResponse extends $pb.GeneratedMessage {
+  factory ShowCellResponse({
+    $core.int? topRow,
+    $core.int? leftCol,
+  }) {
+    final result = create();
+    if (topRow != null) result.topRow = topRow;
+    if (leftCol != null) result.leftCol = leftCol;
+    return result;
+  }
+
+  ShowCellResponse._();
+
+  factory ShowCellResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ShowCellResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ShowCellResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'topRow')
+    ..aI(2, _omitFieldNames ? '' : 'leftCol')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ShowCellResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ShowCellResponse copyWith(void Function(ShowCellResponse) updates) =>
+      super.copyWith((message) => updates(message as ShowCellResponse))
+          as ShowCellResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ShowCellResponse create() => ShowCellResponse._();
+  @$core.override
+  ShowCellResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ShowCellResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ShowCellResponse>(create);
+  static ShowCellResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get topRow => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set topRow($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTopRow() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTopRow() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get leftCol => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set leftCol($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasLeftCol() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLeftCol() => $_clearField(2);
+}
+
+class SetTopRowResponse extends $pb.GeneratedMessage {
+  factory SetTopRowResponse({
+    $core.int? topRow,
+  }) {
+    final result = create();
+    if (topRow != null) result.topRow = topRow;
+    return result;
+  }
+
+  SetTopRowResponse._();
+
+  factory SetTopRowResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SetTopRowResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SetTopRowResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'topRow')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetTopRowResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetTopRowResponse copyWith(void Function(SetTopRowResponse) updates) =>
+      super.copyWith((message) => updates(message as SetTopRowResponse))
+          as SetTopRowResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SetTopRowResponse create() => SetTopRowResponse._();
+  @$core.override
+  SetTopRowResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SetTopRowResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SetTopRowResponse>(create);
+  static SetTopRowResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get topRow => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set topRow($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasTopRow() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTopRow() => $_clearField(1);
+}
+
+class SetLeftColResponse extends $pb.GeneratedMessage {
+  factory SetLeftColResponse({
+    $core.int? leftCol,
+  }) {
+    final result = create();
+    if (leftCol != null) result.leftCol = leftCol;
+    return result;
+  }
+
+  SetLeftColResponse._();
+
+  factory SetLeftColResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SetLeftColResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SetLeftColResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'leftCol')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetLeftColResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetLeftColResponse copyWith(void Function(SetLeftColResponse) updates) =>
+      super.copyWith((message) => updates(message as SetLeftColResponse))
+          as SetLeftColResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SetLeftColResponse create() => SetLeftColResponse._();
+  @$core.override
+  SetLeftColResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SetLeftColResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SetLeftColResponse>(create);
+  static SetLeftColResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get leftCol => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set leftCol($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasLeftCol() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearLeftCol() => $_clearField(1);
+}
+
+class SortResponse extends $pb.GeneratedMessage {
+  factory SortResponse() => create();
+
+  SortResponse._();
+
+  factory SortResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SortResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SortResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SortResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SortResponse copyWith(void Function(SortResponse) updates) =>
+      super.copyWith((message) => updates(message as SortResponse))
+          as SortResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SortResponse create() => SortResponse._();
+  @$core.override
+  SortResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SortResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SortResponse>(create);
+  static SortResponse? _defaultInstance;
+}
+
+class AutoSizeResponse extends $pb.GeneratedMessage {
+  factory AutoSizeResponse() => create();
+
+  AutoSizeResponse._();
+
+  factory AutoSizeResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory AutoSizeResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'AutoSizeResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AutoSizeResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AutoSizeResponse copyWith(void Function(AutoSizeResponse) updates) =>
+      super.copyWith((message) => updates(message as AutoSizeResponse))
+          as AutoSizeResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static AutoSizeResponse create() => AutoSizeResponse._();
+  @$core.override
+  AutoSizeResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static AutoSizeResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<AutoSizeResponse>(create);
+  static AutoSizeResponse? _defaultInstance;
+}
+
+class OutlineResponse extends $pb.GeneratedMessage {
+  factory OutlineResponse() => create();
+
+  OutlineResponse._();
+
+  factory OutlineResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory OutlineResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'OutlineResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  OutlineResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  OutlineResponse copyWith(void Function(OutlineResponse) updates) =>
+      super.copyWith((message) => updates(message as OutlineResponse))
+          as OutlineResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static OutlineResponse create() => OutlineResponse._();
+  @$core.override
+  OutlineResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static OutlineResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<OutlineResponse>(create);
+  static OutlineResponse? _defaultInstance;
+}
+
+class MergeCellsResponse extends $pb.GeneratedMessage {
+  factory MergeCellsResponse({
+    CellRange? merged,
+  }) {
+    final result = create();
+    if (merged != null) result.merged = merged;
+    return result;
+  }
+
+  MergeCellsResponse._();
+
+  factory MergeCellsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory MergeCellsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MergeCellsResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOM<CellRange>(1, _omitFieldNames ? '' : 'merged',
+        subBuilder: CellRange.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MergeCellsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MergeCellsResponse copyWith(void Function(MergeCellsResponse) updates) =>
+      super.copyWith((message) => updates(message as MergeCellsResponse))
+          as MergeCellsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static MergeCellsResponse create() => MergeCellsResponse._();
+  @$core.override
+  MergeCellsResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static MergeCellsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<MergeCellsResponse>(create);
+  static MergeCellsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  CellRange get merged => $_getN(0);
+  @$pb.TagNumber(1)
+  set merged(CellRange value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMerged() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMerged() => $_clearField(1);
+  @$pb.TagNumber(1)
+  CellRange ensureMerged() => $_ensure(0);
+}
+
+class UnmergeCellsResponse extends $pb.GeneratedMessage {
+  factory UnmergeCellsResponse({
+    $core.int? unmergedCount,
+  }) {
+    final result = create();
+    if (unmergedCount != null) result.unmergedCount = unmergedCount;
+    return result;
+  }
+
+  UnmergeCellsResponse._();
+
+  factory UnmergeCellsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory UnmergeCellsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'UnmergeCellsResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'unmergedCount')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnmergeCellsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  UnmergeCellsResponse copyWith(void Function(UnmergeCellsResponse) updates) =>
+      super.copyWith((message) => updates(message as UnmergeCellsResponse))
+          as UnmergeCellsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static UnmergeCellsResponse create() => UnmergeCellsResponse._();
+  @$core.override
+  UnmergeCellsResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static UnmergeCellsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<UnmergeCellsResponse>(create);
+  static UnmergeCellsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get unmergedCount => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set unmergedCount($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasUnmergedCount() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUnmergedCount() => $_clearField(1);
+}
+
+class ResizeViewportResponse extends $pb.GeneratedMessage {
+  factory ResizeViewportResponse({
+    $core.int? viewportWidth,
+    $core.int? viewportHeight,
+  }) {
+    final result = create();
+    if (viewportWidth != null) result.viewportWidth = viewportWidth;
+    if (viewportHeight != null) result.viewportHeight = viewportHeight;
+    return result;
+  }
+
+  ResizeViewportResponse._();
+
+  factory ResizeViewportResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ResizeViewportResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ResizeViewportResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'viewportWidth')
+    ..aI(2, _omitFieldNames ? '' : 'viewportHeight')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ResizeViewportResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ResizeViewportResponse copyWith(
+          void Function(ResizeViewportResponse) updates) =>
+      super.copyWith((message) => updates(message as ResizeViewportResponse))
+          as ResizeViewportResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ResizeViewportResponse create() => ResizeViewportResponse._();
+  @$core.override
+  ResizeViewportResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ResizeViewportResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ResizeViewportResponse>(create);
+  static ResizeViewportResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get viewportWidth => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set viewportWidth($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasViewportWidth() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearViewportWidth() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get viewportHeight => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set viewportHeight($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasViewportHeight() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearViewportHeight() => $_clearField(2);
+}
+
+class SetRedrawResponse extends $pb.GeneratedMessage {
+  factory SetRedrawResponse() => create();
+
+  SetRedrawResponse._();
+
+  factory SetRedrawResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SetRedrawResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SetRedrawResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetRedrawResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SetRedrawResponse copyWith(void Function(SetRedrawResponse) updates) =>
+      super.copyWith((message) => updates(message as SetRedrawResponse))
+          as SetRedrawResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SetRedrawResponse create() => SetRedrawResponse._();
+  @$core.override
+  SetRedrawResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SetRedrawResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SetRedrawResponse>(create);
+  static SetRedrawResponse? _defaultInstance;
+}
+
+class RefreshResponse extends $pb.GeneratedMessage {
+  factory RefreshResponse() => create();
+
+  RefreshResponse._();
+
+  factory RefreshResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RefreshResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RefreshResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RefreshResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RefreshResponse copyWith(void Function(RefreshResponse) updates) =>
+      super.copyWith((message) => updates(message as RefreshResponse))
+          as RefreshResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RefreshResponse create() => RefreshResponse._();
+  @$core.override
+  RefreshResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RefreshResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RefreshResponse>(create);
+  static RefreshResponse? _defaultInstance;
+}
+
+class LoadDemoResponse extends $pb.GeneratedMessage {
+  factory LoadDemoResponse() => create();
+
+  LoadDemoResponse._();
+
+  factory LoadDemoResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LoadDemoResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LoadDemoResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoadDemoResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LoadDemoResponse copyWith(void Function(LoadDemoResponse) updates) =>
+      super.copyWith((message) => updates(message as LoadDemoResponse))
+          as LoadDemoResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LoadDemoResponse create() => LoadDemoResponse._();
+  @$core.override
+  LoadDemoResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static LoadDemoResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<LoadDemoResponse>(create);
+  static LoadDemoResponse? _defaultInstance;
 }
 
 enum RenderInput_Input {
@@ -21434,53 +22559,54 @@ class VolvoxGridServiceApi {
           $pb.ClientContext? ctx, CreateRequest request) =>
       _client.invoke<CreateResponse>(
           ctx, 'VolvoxGridService', 'Create', request, CreateResponse());
-  $async.Future<Empty> destroy($pb.ClientContext? ctx, GridHandle request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'Destroy', request, Empty());
+  $async.Future<DestroyResponse> destroy(
+          $pb.ClientContext? ctx, GridHandle request) =>
+      _client.invoke<DestroyResponse>(
+          ctx, 'VolvoxGridService', 'Destroy', request, DestroyResponse());
 
   /// ── Configuration ──
-  $async.Future<Empty> configure(
+  $async.Future<ConfigureResponse> configure(
           $pb.ClientContext? ctx, ConfigureRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'Configure', request, Empty());
+      _client.invoke<ConfigureResponse>(
+          ctx, 'VolvoxGridService', 'Configure', request, ConfigureResponse());
   $async.Future<GridConfig> getConfig(
           $pb.ClientContext? ctx, GridHandle request) =>
       _client.invoke<GridConfig>(
           ctx, 'VolvoxGridService', 'GetConfig', request, GridConfig());
-  $async.Future<Empty> loadFontData(
+  $async.Future<LoadFontDataResponse> loadFontData(
           $pb.ClientContext? ctx, LoadFontDataRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'LoadFontData', request, Empty());
+      _client.invoke<LoadFontDataResponse>(ctx, 'VolvoxGridService',
+          'LoadFontData', request, LoadFontDataResponse());
 
   /// ── Structure ──
-  $async.Future<Empty> defineColumns(
+  $async.Future<DefineColumnsResponse> defineColumns(
           $pb.ClientContext? ctx, DefineColumnsRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'DefineColumns', request, Empty());
+      _client.invoke<DefineColumnsResponse>(ctx, 'VolvoxGridService',
+          'DefineColumns', request, DefineColumnsResponse());
   $async.Future<DefineColumnsRequest> getSchema(
           $pb.ClientContext? ctx, GridHandle request) =>
       _client.invoke<DefineColumnsRequest>(ctx, 'VolvoxGridService',
           'GetSchema', request, DefineColumnsRequest());
-  $async.Future<Empty> defineRows(
+  $async.Future<DefineRowsResponse> defineRows(
           $pb.ClientContext? ctx, DefineRowsRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'DefineRows', request, Empty());
-  $async.Future<Empty> insertRows(
+      _client.invoke<DefineRowsResponse>(ctx, 'VolvoxGridService', 'DefineRows',
+          request, DefineRowsResponse());
+  $async.Future<InsertRowsResponse> insertRows(
           $pb.ClientContext? ctx, InsertRowsRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'InsertRows', request, Empty());
-  $async.Future<Empty> removeRows(
+      _client.invoke<InsertRowsResponse>(ctx, 'VolvoxGridService', 'InsertRows',
+          request, InsertRowsResponse());
+  $async.Future<RemoveRowsResponse> removeRows(
           $pb.ClientContext? ctx, RemoveRowsRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'RemoveRows', request, Empty());
-  $async.Future<Empty> moveColumn(
+      _client.invoke<RemoveRowsResponse>(ctx, 'VolvoxGridService', 'RemoveRows',
+          request, RemoveRowsResponse());
+  $async.Future<MoveColumnResponse> moveColumn(
           $pb.ClientContext? ctx, MoveColumnRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'MoveColumn', request, Empty());
-  $async.Future<Empty> moveRow(
+      _client.invoke<MoveColumnResponse>(ctx, 'VolvoxGridService', 'MoveColumn',
+          request, MoveColumnResponse());
+  $async.Future<MoveRowResponse> moveRow(
           $pb.ClientContext? ctx, MoveRowRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'MoveRow', request, Empty());
+      _client.invoke<MoveRowResponse>(
+          ctx, 'VolvoxGridService', 'MoveRow', request, MoveRowResponse());
 
   /// ── Data ──
   $async.Future<WriteResult> updateCells(
@@ -21499,30 +22625,32 @@ class VolvoxGridServiceApi {
           $pb.ClientContext? ctx, LoadDataRequest request) =>
       _client.invoke<LoadDataResult>(
           ctx, 'VolvoxGridService', 'LoadData', request, LoadDataResult());
-  $async.Future<Empty> clear_($pb.ClientContext? ctx, ClearRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'Clear', request, Empty());
+  $async.Future<ClearResponse> clear_(
+          $pb.ClientContext? ctx, ClearRequest request) =>
+      _client.invoke<ClearResponse>(
+          ctx, 'VolvoxGridService', 'Clear', request, ClearResponse());
 
   /// ── Selection ──
-  $async.Future<Empty> select($pb.ClientContext? ctx, SelectRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'Select', request, Empty());
+  $async.Future<SelectResponse> select(
+          $pb.ClientContext? ctx, SelectRequest request) =>
+      _client.invoke<SelectResponse>(
+          ctx, 'VolvoxGridService', 'Select', request, SelectResponse());
   $async.Future<SelectionState> getSelection(
           $pb.ClientContext? ctx, GridHandle request) =>
       _client.invoke<SelectionState>(
           ctx, 'VolvoxGridService', 'GetSelection', request, SelectionState());
-  $async.Future<Empty> showCell(
+  $async.Future<ShowCellResponse> showCell(
           $pb.ClientContext? ctx, ShowCellRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'ShowCell', request, Empty());
-  $async.Future<Empty> setTopRow(
+      _client.invoke<ShowCellResponse>(
+          ctx, 'VolvoxGridService', 'ShowCell', request, ShowCellResponse());
+  $async.Future<SetTopRowResponse> setTopRow(
           $pb.ClientContext? ctx, SetRowRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'SetTopRow', request, Empty());
-  $async.Future<Empty> setLeftCol(
+      _client.invoke<SetTopRowResponse>(
+          ctx, 'VolvoxGridService', 'SetTopRow', request, SetTopRowResponse());
+  $async.Future<SetLeftColResponse> setLeftCol(
           $pb.ClientContext? ctx, SetColRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'SetLeftCol', request, Empty());
+      _client.invoke<SetLeftColResponse>(ctx, 'VolvoxGridService', 'SetLeftCol',
+          request, SetLeftColResponse());
 
   /// ── Editing ──
   $async.Future<EditState> edit($pb.ClientContext? ctx, EditCommand request) =>
@@ -21530,20 +22658,22 @@ class VolvoxGridServiceApi {
           ctx, 'VolvoxGridService', 'Edit', request, EditState());
 
   /// ── Actions ──
-  $async.Future<Empty> sort($pb.ClientContext? ctx, SortRequest request) =>
-      _client.invoke<Empty>(ctx, 'VolvoxGridService', 'Sort', request, Empty());
+  $async.Future<SortResponse> sort(
+          $pb.ClientContext? ctx, SortRequest request) =>
+      _client.invoke<SortResponse>(
+          ctx, 'VolvoxGridService', 'Sort', request, SortResponse());
   $async.Future<SubtotalResult> subtotal(
           $pb.ClientContext? ctx, SubtotalRequest request) =>
       _client.invoke<SubtotalResult>(
           ctx, 'VolvoxGridService', 'Subtotal', request, SubtotalResult());
-  $async.Future<Empty> autoSize(
+  $async.Future<AutoSizeResponse> autoSize(
           $pb.ClientContext? ctx, AutoSizeRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'AutoSize', request, Empty());
-  $async.Future<Empty> outline(
+      _client.invoke<AutoSizeResponse>(
+          ctx, 'VolvoxGridService', 'AutoSize', request, AutoSizeResponse());
+  $async.Future<OutlineResponse> outline(
           $pb.ClientContext? ctx, OutlineRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'Outline', request, Empty());
+      _client.invoke<OutlineResponse>(
+          ctx, 'VolvoxGridService', 'Outline', request, OutlineResponse());
   $async.Future<NodeInfo> getNode(
           $pb.ClientContext? ctx, GetNodeRequest request) =>
       _client.invoke<NodeInfo>(
@@ -21560,14 +22690,14 @@ class VolvoxGridServiceApi {
           $pb.ClientContext? ctx, GetMergedRangeRequest request) =>
       _client.invoke<CellRange>(
           ctx, 'VolvoxGridService', 'GetMergedRange', request, CellRange());
-  $async.Future<Empty> mergeCells(
+  $async.Future<MergeCellsResponse> mergeCells(
           $pb.ClientContext? ctx, MergeCellsRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'MergeCells', request, Empty());
-  $async.Future<Empty> unmergeCells(
+      _client.invoke<MergeCellsResponse>(ctx, 'VolvoxGridService', 'MergeCells',
+          request, MergeCellsResponse());
+  $async.Future<UnmergeCellsResponse> unmergeCells(
           $pb.ClientContext? ctx, UnmergeCellsRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'UnmergeCells', request, Empty());
+      _client.invoke<UnmergeCellsResponse>(ctx, 'VolvoxGridService',
+          'UnmergeCells', request, UnmergeCellsResponse());
   $async.Future<MergedRegionsResponse> getMergedRegions(
           $pb.ClientContext? ctx, GridHandle request) =>
       _client.invoke<MergedRegionsResponse>(ctx, 'VolvoxGridService',
@@ -21598,23 +22728,24 @@ class VolvoxGridServiceApi {
           ctx, 'VolvoxGridService', 'Archive', request, ArchiveResponse());
 
   /// ── Render Control ──
-  $async.Future<Empty> resizeViewport(
+  $async.Future<ResizeViewportResponse> resizeViewport(
           $pb.ClientContext? ctx, ResizeViewportRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'ResizeViewport', request, Empty());
-  $async.Future<Empty> setRedraw(
+      _client.invoke<ResizeViewportResponse>(ctx, 'VolvoxGridService',
+          'ResizeViewport', request, ResizeViewportResponse());
+  $async.Future<SetRedrawResponse> setRedraw(
           $pb.ClientContext? ctx, SetRedrawRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'SetRedraw', request, Empty());
-  $async.Future<Empty> refresh($pb.ClientContext? ctx, GridHandle request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'Refresh', request, Empty());
+      _client.invoke<SetRedrawResponse>(
+          ctx, 'VolvoxGridService', 'SetRedraw', request, SetRedrawResponse());
+  $async.Future<RefreshResponse> refresh(
+          $pb.ClientContext? ctx, GridHandle request) =>
+      _client.invoke<RefreshResponse>(
+          ctx, 'VolvoxGridService', 'Refresh', request, RefreshResponse());
 
   /// ── Demo ──
-  $async.Future<Empty> loadDemo(
+  $async.Future<LoadDemoResponse> loadDemo(
           $pb.ClientContext? ctx, LoadDemoRequest request) =>
-      _client.invoke<Empty>(
-          ctx, 'VolvoxGridService', 'LoadDemo', request, Empty());
+      _client.invoke<LoadDemoResponse>(
+          ctx, 'VolvoxGridService', 'LoadDemo', request, LoadDemoResponse());
   $async.Future<GetDemoDataResponse> getDemoData(
           $pb.ClientContext? ctx, GetDemoDataRequest request) =>
       _client.invoke<GetDemoDataResponse>(ctx, 'VolvoxGridService',

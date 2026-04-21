@@ -1909,7 +1909,6 @@ message ArchiveResponse {
 // Lifecycle & Viewport
 // ═══════════════════════════════════════════════════════════
 
-message Empty {}
 message GridHandle { int64 id = 1; }
 
 enum ErrorCode {
@@ -1999,6 +1998,76 @@ message GetDemoDataResponse {
   DemoDataFormat format = 2;
   bytes          data   = 3;
 }
+
+// ═══════════════════════════════════════════════════════════
+// RPC Response Wrappers
+//
+// Mutator responses carry operation summaries. Use GetConfig/GetSchema/
+// GetSelection for full-state snapshots and EventStream for async change
+// notifications.
+// ═══════════════════════════════════════════════════════════
+
+message DestroyResponse {}
+message ConfigureResponse {}
+message LoadFontDataResponse {}
+message DefineColumnsResponse {}
+message DefineRowsResponse {}
+
+message InsertRowsResponse {
+  int32 inserted_count = 1;
+  int32 new_row_count  = 2;
+  int32 first_row      = 3;  // inserted range [first_row, first_row+inserted_count)
+}
+
+message RemoveRowsResponse {
+  int32 removed_count = 1;
+  int32 new_row_count = 2;
+}
+
+message MoveColumnResponse {}
+message MoveRowResponse {}
+
+message ClearResponse {
+  int32 cleared_count = 1;  // cells cleared
+}
+
+message SelectResponse {
+  SelectionState selection = 1;  // post-clamp/validate snapshot
+}
+
+message ShowCellResponse {
+  int32 top_row  = 1;  // post-scroll clamped values
+  int32 left_col = 2;
+}
+
+message SetTopRowResponse {
+  int32 top_row = 1;  // clamped
+}
+
+message SetLeftColResponse {
+  int32 left_col = 1;  // clamped
+}
+
+message SortResponse {}
+message AutoSizeResponse {}
+message OutlineResponse {}
+
+message MergeCellsResponse {
+  CellRange merged = 1;
+}
+
+message UnmergeCellsResponse {
+  int32 unmerged_count = 1;
+}
+
+message ResizeViewportResponse {
+  int32 viewport_width  = 1;
+  int32 viewport_height = 2;
+}
+
+message SetRedrawResponse {}
+message RefreshResponse {}
+message LoadDemoResponse {}
 
 // ═══════════════════════════════════════════════════════════
 // Render Session (bidirectional stream)
@@ -2522,55 +2591,57 @@ message GetHeaderRowEvent    { int32 page = 1; }
 //   8. Destroy()         — release the grid
 //
 // All RPCs except RenderSession/EventStream are unary request-response.
+// Mutator responses carry operation summaries; use GetConfig/GetSchema/
+// GetSelection for full snapshots and EventStream for async notifications.
 // ═══════════════════════════════════════════════════════════
 
 service VolvoxGridService {
   // ── Lifecycle ──
   rpc Create(CreateRequest)               returns (CreateResponse);
-  rpc Destroy(GridHandle)                 returns (Empty);
+  rpc Destroy(GridHandle)                 returns (DestroyResponse);
 
   // ── Configuration ──
-  rpc Configure(ConfigureRequest)         returns (Empty);
+  rpc Configure(ConfigureRequest)         returns (ConfigureResponse);
   rpc GetConfig(GridHandle)               returns (GridConfig);
-  rpc LoadFontData(LoadFontDataRequest)   returns (Empty);
+  rpc LoadFontData(LoadFontDataRequest)   returns (LoadFontDataResponse);
 
   // ── Structure ──
-  rpc DefineColumns(DefineColumnsRequest) returns (Empty);
+  rpc DefineColumns(DefineColumnsRequest) returns (DefineColumnsResponse);
   rpc GetSchema(GridHandle)               returns (DefineColumnsRequest);
-  rpc DefineRows(DefineRowsRequest)       returns (Empty);
-  rpc InsertRows(InsertRowsRequest)       returns (Empty);
-  rpc RemoveRows(RemoveRowsRequest)       returns (Empty);
-  rpc MoveColumn(MoveColumnRequest)       returns (Empty);
-  rpc MoveRow(MoveRowRequest)             returns (Empty);
+  rpc DefineRows(DefineRowsRequest)       returns (DefineRowsResponse);
+  rpc InsertRows(InsertRowsRequest)       returns (InsertRowsResponse);
+  rpc RemoveRows(RemoveRowsRequest)       returns (RemoveRowsResponse);
+  rpc MoveColumn(MoveColumnRequest)       returns (MoveColumnResponse);
+  rpc MoveRow(MoveRowRequest)             returns (MoveRowResponse);
 
   // ── Data ──
   rpc UpdateCells(UpdateCellsRequest)     returns (WriteResult);
   rpc GetCells(GetCellsRequest)           returns (CellsResponse);
   rpc LoadTable(LoadTableRequest)         returns (WriteResult);
   rpc LoadData(LoadDataRequest)           returns (LoadDataResult);
-  rpc Clear(ClearRequest)                 returns (Empty);
+  rpc Clear(ClearRequest)                 returns (ClearResponse);
 
   // ── Selection ──
-  rpc Select(SelectRequest)               returns (Empty);
+  rpc Select(SelectRequest)               returns (SelectResponse);
   rpc GetSelection(GridHandle)            returns (SelectionState);
-  rpc ShowCell(ShowCellRequest)           returns (Empty);
-  rpc SetTopRow(SetRowRequest)            returns (Empty);
-  rpc SetLeftCol(SetColRequest)           returns (Empty);
+  rpc ShowCell(ShowCellRequest)           returns (ShowCellResponse);
+  rpc SetTopRow(SetRowRequest)            returns (SetTopRowResponse);
+  rpc SetLeftCol(SetColRequest)           returns (SetLeftColResponse);
 
   // ── Editing ──
   rpc Edit(EditCommand)                   returns (EditState);
 
   // ── Actions ──
-  rpc Sort(SortRequest)                   returns (Empty);
+  rpc Sort(SortRequest)                   returns (SortResponse);
   rpc Subtotal(SubtotalRequest)           returns (SubtotalResult);
-  rpc AutoSize(AutoSizeRequest)           returns (Empty);
-  rpc Outline(OutlineRequest)             returns (Empty);
+  rpc AutoSize(AutoSizeRequest)           returns (AutoSizeResponse);
+  rpc Outline(OutlineRequest)             returns (OutlineResponse);
   rpc GetNode(GetNodeRequest)             returns (NodeInfo);
   rpc Find(FindRequest)                   returns (FindResponse);
   rpc Aggregate(AggregateRequest)         returns (AggregateResponse);
   rpc GetMergedRange(GetMergedRangeRequest) returns (CellRange);
-  rpc MergeCells(MergeCellsRequest)       returns (Empty);
-  rpc UnmergeCells(UnmergeCellsRequest)   returns (Empty);
+  rpc MergeCells(MergeCellsRequest)       returns (MergeCellsResponse);
+  rpc UnmergeCells(UnmergeCellsRequest)   returns (UnmergeCellsResponse);
   rpc GetMergedRegions(GridHandle)        returns (MergedRegionsResponse);
   rpc GetMemoryUsage(GridHandle)          returns (MemoryUsageResponse);
 
@@ -2583,12 +2654,12 @@ service VolvoxGridService {
   rpc Archive(ArchiveRequest)             returns (ArchiveResponse);
 
   // ── Render Control ──
-  rpc ResizeViewport(ResizeViewportRequest) returns (Empty);
-  rpc SetRedraw(SetRedrawRequest)         returns (Empty);
-  rpc Refresh(GridHandle)                 returns (Empty);
+  rpc ResizeViewport(ResizeViewportRequest) returns (ResizeViewportResponse);
+  rpc SetRedraw(SetRedrawRequest)         returns (SetRedrawResponse);
+  rpc Refresh(GridHandle)                 returns (RefreshResponse);
 
   // ── Demo ──
-  rpc LoadDemo(LoadDemoRequest)           returns (Empty);
+  rpc LoadDemo(LoadDemoRequest)           returns (LoadDemoResponse);
   rpc GetDemoData(GetDemoDataRequest)     returns (GetDemoDataResponse);
 
   // ── Streaming ──

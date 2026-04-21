@@ -676,7 +676,7 @@ impl VolvoxServiceClient {
     }
 
     fn configure(&self, grid_id: i64, config: pb::GridConfig) -> Result<(), String> {
-        let _: pb::Empty = self.invoke(
+        let _: pb::ConfigureResponse = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Configure",
             &pb::ConfigureRequest {
                 grid_id,
@@ -687,7 +687,7 @@ impl VolvoxServiceClient {
     }
 
     fn load_demo(&self, grid_id: i64, demo: &str) -> Result<(), String> {
-        let _: pb::Empty = self.invoke(
+        let _: pb::LoadDemoResponse = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/LoadDemo",
             &pb::LoadDemoRequest {
                 grid_id,
@@ -724,7 +724,7 @@ impl VolvoxServiceClient {
     }
 
     fn define_columns(&self, grid_id: i64, columns: Vec<pb::ColumnDef>) -> Result<(), String> {
-        let _: pb::Empty = self.invoke(
+        let _: pb::DefineColumnsResponse = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/DefineColumns",
             &pb::DefineColumnsRequest { grid_id, columns },
         )?;
@@ -732,7 +732,7 @@ impl VolvoxServiceClient {
     }
 
     fn define_rows(&self, grid_id: i64, rows: Vec<pb::RowDef>) -> Result<(), String> {
-        let _: pb::Empty = self.invoke(
+        let _: pb::DefineRowsResponse = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/DefineRows",
             &pb::DefineRowsRequest { grid_id, rows },
         )?;
@@ -809,7 +809,7 @@ impl VolvoxServiceClient {
         row2: i32,
         col2: i32,
     ) -> Result<(), String> {
-        let _: pb::Empty = self.invoke(
+        let _: pb::MergeCellsResponse = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/MergeCells",
             &pb::MergeCellsRequest {
                 grid_id,
@@ -825,7 +825,7 @@ impl VolvoxServiceClient {
     }
 
     fn resize_viewport(&self, grid_id: i64, width: i32, height: i32) -> Result<(), String> {
-        let _: pb::Empty = self.invoke(
+        let _: pb::ResizeViewportResponse = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/ResizeViewport",
             &pb::ResizeViewportRequest {
                 grid_id,
