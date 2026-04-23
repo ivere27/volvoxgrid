@@ -286,6 +286,195 @@ class ImageAlignment extends $pb.ProtobufEnum {
   const ImageAlignment._(super.value, super.name);
 }
 
+class BarcodeSymbology extends $pb.ProtobufEnum {
+  static const BarcodeSymbology BARCODE_NONE =
+      BarcodeSymbology._(0, _omitEnumNames ? '' : 'BARCODE_NONE');
+  static const BarcodeSymbology BARCODE_QR =
+      BarcodeSymbology._(1, _omitEnumNames ? '' : 'BARCODE_QR');
+  static const BarcodeSymbology BARCODE_CODE128 =
+      BarcodeSymbology._(10, _omitEnumNames ? '' : 'BARCODE_CODE128');
+  static const BarcodeSymbology BARCODE_CODE39 =
+      BarcodeSymbology._(11, _omitEnumNames ? '' : 'BARCODE_CODE39');
+  static const BarcodeSymbology BARCODE_CODE93 =
+      BarcodeSymbology._(12, _omitEnumNames ? '' : 'BARCODE_CODE93');
+  static const BarcodeSymbology BARCODE_CODE11 =
+      BarcodeSymbology._(13, _omitEnumNames ? '' : 'BARCODE_CODE11');
+  static const BarcodeSymbology BARCODE_EAN13 =
+      BarcodeSymbology._(20, _omitEnumNames ? '' : 'BARCODE_EAN13');
+  static const BarcodeSymbology BARCODE_EAN8 =
+      BarcodeSymbology._(21, _omitEnumNames ? '' : 'BARCODE_EAN8');
+  static const BarcodeSymbology BARCODE_UPC_A =
+      BarcodeSymbology._(22, _omitEnumNames ? '' : 'BARCODE_UPC_A');
+  static const BarcodeSymbology BARCODE_UPC_E =
+      BarcodeSymbology._(23, _omitEnumNames ? '' : 'BARCODE_UPC_E');
+  static const BarcodeSymbology BARCODE_EAN_SUPP =
+      BarcodeSymbology._(24, _omitEnumNames ? '' : 'BARCODE_EAN_SUPP');
+  static const BarcodeSymbology BARCODE_ITF =
+      BarcodeSymbology._(30, _omitEnumNames ? '' : 'BARCODE_ITF');
+  static const BarcodeSymbology BARCODE_STF =
+      BarcodeSymbology._(31, _omitEnumNames ? '' : 'BARCODE_STF');
+  static const BarcodeSymbology BARCODE_CODABAR =
+      BarcodeSymbology._(32, _omitEnumNames ? '' : 'BARCODE_CODABAR');
+
+  static const $core.List<BarcodeSymbology> values = <BarcodeSymbology>[
+    BARCODE_NONE,
+    BARCODE_QR,
+    BARCODE_CODE128,
+    BARCODE_CODE39,
+    BARCODE_CODE93,
+    BARCODE_CODE11,
+    BARCODE_EAN13,
+    BARCODE_EAN8,
+    BARCODE_UPC_A,
+    BARCODE_UPC_E,
+    BARCODE_EAN_SUPP,
+    BARCODE_ITF,
+    BARCODE_STF,
+    BARCODE_CODABAR,
+  ];
+
+  static final $core.Map<$core.int, BarcodeSymbology> _byValue =
+      $pb.ProtobufEnum.initByValue(values);
+  static BarcodeSymbology? valueOf($core.int value) => _byValue[value];
+
+  const BarcodeSymbology._(super.value, super.name);
+}
+
+class BarcodeCaptionPosition extends $pb.ProtobufEnum {
+  static const BarcodeCaptionPosition CAPTION_NONE =
+      BarcodeCaptionPosition._(0, _omitEnumNames ? '' : 'CAPTION_NONE');
+  static const BarcodeCaptionPosition CAPTION_BOTTOM =
+      BarcodeCaptionPosition._(1, _omitEnumNames ? '' : 'CAPTION_BOTTOM');
+  static const BarcodeCaptionPosition CAPTION_TOP =
+      BarcodeCaptionPosition._(2, _omitEnumNames ? '' : 'CAPTION_TOP');
+
+  static const $core.List<BarcodeCaptionPosition> values =
+      <BarcodeCaptionPosition>[
+    CAPTION_NONE,
+    CAPTION_BOTTOM,
+    CAPTION_TOP,
+  ];
+
+  static final $core.List<BarcodeCaptionPosition?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static BarcodeCaptionPosition? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const BarcodeCaptionPosition._(super.value, super.name);
+}
+
+class BarcodeCheckDigitMode extends $pb.ProtobufEnum {
+  /// Symbology default. Mandatory checks are handled by the encoder; optional
+  /// check digits are not added unless CHECK_DIGIT_GENERATE is set.
+  static const BarcodeCheckDigitMode CHECK_DIGIT_DEFAULT =
+      BarcodeCheckDigitMode._(0, _omitEnumNames ? '' : 'CHECK_DIGIT_DEFAULT');
+  static const BarcodeCheckDigitMode CHECK_DIGIT_NONE =
+      BarcodeCheckDigitMode._(1, _omitEnumNames ? '' : 'CHECK_DIGIT_NONE');
+  static const BarcodeCheckDigitMode CHECK_DIGIT_GENERATE =
+      BarcodeCheckDigitMode._(2, _omitEnumNames ? '' : 'CHECK_DIGIT_GENERATE');
+
+  static const $core.List<BarcodeCheckDigitMode> values =
+      <BarcodeCheckDigitMode>[
+    CHECK_DIGIT_DEFAULT,
+    CHECK_DIGIT_NONE,
+    CHECK_DIGIT_GENERATE,
+  ];
+
+  static final $core.List<BarcodeCheckDigitMode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static BarcodeCheckDigitMode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const BarcodeCheckDigitMode._(super.value, super.name);
+}
+
+class BarcodeTextEncoding extends $pb.ProtobufEnum {
+  static const BarcodeTextEncoding BARCODE_TEXT_AUTO =
+      BarcodeTextEncoding._(0, _omitEnumNames ? '' : 'BARCODE_TEXT_AUTO');
+  static const BarcodeTextEncoding BARCODE_TEXT_ASCII =
+      BarcodeTextEncoding._(1, _omitEnumNames ? '' : 'BARCODE_TEXT_ASCII');
+  static const BarcodeTextEncoding BARCODE_TEXT_UTF8 =
+      BarcodeTextEncoding._(2, _omitEnumNames ? '' : 'BARCODE_TEXT_UTF8');
+  static const BarcodeTextEncoding BARCODE_TEXT_GS1 =
+      BarcodeTextEncoding._(3, _omitEnumNames ? '' : 'BARCODE_TEXT_GS1');
+
+  static const $core.List<BarcodeTextEncoding> values = <BarcodeTextEncoding>[
+    BARCODE_TEXT_AUTO,
+    BARCODE_TEXT_ASCII,
+    BARCODE_TEXT_UTF8,
+    BARCODE_TEXT_GS1,
+  ];
+
+  static final $core.List<BarcodeTextEncoding?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static BarcodeTextEncoding? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const BarcodeTextEncoding._(super.value, super.name);
+}
+
+class BarcodeQrErrorCorrection extends $pb.ProtobufEnum {
+  static const BarcodeQrErrorCorrection QR_ECC_DEFAULT =
+      BarcodeQrErrorCorrection._(0, _omitEnumNames ? '' : 'QR_ECC_DEFAULT');
+  static const BarcodeQrErrorCorrection QR_ECC_LOW =
+      BarcodeQrErrorCorrection._(1, _omitEnumNames ? '' : 'QR_ECC_LOW');
+  static const BarcodeQrErrorCorrection QR_ECC_MEDIUM =
+      BarcodeQrErrorCorrection._(2, _omitEnumNames ? '' : 'QR_ECC_MEDIUM');
+  static const BarcodeQrErrorCorrection QR_ECC_QUARTILE =
+      BarcodeQrErrorCorrection._(3, _omitEnumNames ? '' : 'QR_ECC_QUARTILE');
+  static const BarcodeQrErrorCorrection QR_ECC_HIGH =
+      BarcodeQrErrorCorrection._(4, _omitEnumNames ? '' : 'QR_ECC_HIGH');
+
+  static const $core.List<BarcodeQrErrorCorrection> values =
+      <BarcodeQrErrorCorrection>[
+    QR_ECC_DEFAULT,
+    QR_ECC_LOW,
+    QR_ECC_MEDIUM,
+    QR_ECC_QUARTILE,
+    QR_ECC_HIGH,
+  ];
+
+  static final $core.List<BarcodeQrErrorCorrection?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
+  static BarcodeQrErrorCorrection? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const BarcodeQrErrorCorrection._(super.value, super.name);
+}
+
+class BarcodeRenderStatus extends $pb.ProtobufEnum {
+  static const BarcodeRenderStatus BARCODE_RENDER_STATUS_UNSPECIFIED =
+      BarcodeRenderStatus._(
+          0, _omitEnumNames ? '' : 'BARCODE_RENDER_STATUS_UNSPECIFIED');
+  static const BarcodeRenderStatus BARCODE_RENDER_STATUS_OK =
+      BarcodeRenderStatus._(
+          1, _omitEnumNames ? '' : 'BARCODE_RENDER_STATUS_OK');
+  static const BarcodeRenderStatus BARCODE_RENDER_STATUS_EMPTY_PAYLOAD =
+      BarcodeRenderStatus._(
+          2, _omitEnumNames ? '' : 'BARCODE_RENDER_STATUS_EMPTY_PAYLOAD');
+  static const BarcodeRenderStatus BARCODE_RENDER_STATUS_INVALID_PAYLOAD =
+      BarcodeRenderStatus._(
+          3, _omitEnumNames ? '' : 'BARCODE_RENDER_STATUS_INVALID_PAYLOAD');
+  static const BarcodeRenderStatus BARCODE_RENDER_STATUS_UNSUPPORTED_SYMBOLOGY =
+      BarcodeRenderStatus._(4,
+          _omitEnumNames ? '' : 'BARCODE_RENDER_STATUS_UNSUPPORTED_SYMBOLOGY');
+
+  static const $core.List<BarcodeRenderStatus> values = <BarcodeRenderStatus>[
+    BARCODE_RENDER_STATUS_UNSPECIFIED,
+    BARCODE_RENDER_STATUS_OK,
+    BARCODE_RENDER_STATUS_EMPTY_PAYLOAD,
+    BARCODE_RENDER_STATUS_INVALID_PAYLOAD,
+    BARCODE_RENDER_STATUS_UNSUPPORTED_SYMBOLOGY,
+  ];
+
+  static final $core.List<BarcodeRenderStatus?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
+  static BarcodeRenderStatus? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const BarcodeRenderStatus._(super.value, super.name);
+}
+
 class CheckedState extends $pb.ProtobufEnum {
   static const CheckedState CHECKED_UNCHECKED =
       CheckedState._(0, _omitEnumNames ? '' : 'CHECKED_UNCHECKED');
@@ -1524,7 +1713,7 @@ class PullToRefreshTheme extends $pb.ProtobufEnum {
 }
 
 /// ── Render layer bit positions (for render_layer_mask bitmask) ──
-/// The engine renders through 27 independent layers (engine/src/canvas.rs
+/// The engine renders through 28 independent layers (engine/src/canvas.rs
 /// layer module). Each layer is guarded by its bit in render_layer_mask.
 /// Setting bit i enables layer i. Set all bits (-1) to render everything.
 class RenderLayerBit extends $pb.ProtobufEnum {
@@ -1582,6 +1771,8 @@ class RenderLayerBit extends $pb.ProtobufEnum {
       25, _omitEnumNames ? '' : 'RENDER_LAYER_PULL_TO_REFRESH');
   static const RenderLayerBit RENDER_LAYER_DEBUG_OVERLAY =
       RenderLayerBit._(26, _omitEnumNames ? '' : 'RENDER_LAYER_DEBUG_OVERLAY');
+  static const RenderLayerBit RENDER_LAYER_BARCODES =
+      RenderLayerBit._(27, _omitEnumNames ? '' : 'RENDER_LAYER_BARCODES');
 
   static const $core.List<RenderLayerBit> values = <RenderLayerBit>[
     RENDER_LAYER_OVERLAY_BANDS,
@@ -1611,10 +1802,11 @@ class RenderLayerBit extends $pb.ProtobufEnum {
     RENDER_LAYER_FAST_SCROLL,
     RENDER_LAYER_PULL_TO_REFRESH,
     RENDER_LAYER_DEBUG_OVERLAY,
+    RENDER_LAYER_BARCODES,
   ];
 
   static final $core.List<RenderLayerBit?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 26);
+      $pb.ProtobufEnum.$_initByValueList(values, 27);
   static RenderLayerBit? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

@@ -101,6 +101,7 @@ fn emit_demo_assets() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = PathBuf::from(std::env::var("OUT_DIR")?);
     compress_demo_fixture(&out_dir, "sales.json")?;
     compress_demo_fixture(&out_dir, "hierarchy.json")?;
+    compress_demo_fixture(&out_dir, "barcodes.json")?;
     Ok(())
 }
 

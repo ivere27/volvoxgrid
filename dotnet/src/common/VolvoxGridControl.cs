@@ -482,6 +482,37 @@ namespace VolvoxGrid.DotNet
             set { RendererMode = value; }
         }
 
+        public long RenderLayerMask
+        {
+            get { return _config.Rendering != null && _config.Rendering.HasRenderLayerMask ? _config.Rendering.RenderLayerMask : -1L; }
+            set
+            {
+                var cfg = EnsureRenderConfig();
+                if (!cfg.HasRenderLayerMask || cfg.RenderLayerMask != value)
+                {
+                    cfg.RenderLayerMask = value;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public bool IsRenderLayerEnabled(RenderLayerBit layer)
+        {
+            long bit = RenderLayerFlag(layer);
+            return (RenderLayerMask & bit) != 0L;
+        }
+
+        public void SetRenderLayerEnabled(RenderLayerBit layer, bool enabled)
+        {
+            long mask = RenderLayerMask;
+            long bit = RenderLayerFlag(layer);
+            long next = enabled ? (mask | bit) : (mask & ~bit);
+            if (next != mask)
+            {
+                RenderLayerMask = next;
+            }
+        }
+
         public VolvoxFramePacingMode FramePacingMode
         {
             get { return _config.Rendering != null && _config.Rendering.HasFramePacingMode ? (VolvoxFramePacingMode)_config.Rendering.FramePacingMode : VolvoxFramePacingMode.Auto; }
@@ -1256,6 +1287,16 @@ namespace VolvoxGrid.DotNet
             if (source.HasLayerProfiling) copy.LayerProfiling = source.LayerProfiling;
             if (source.HasScrollBlit) copy.ScrollBlit = source.ScrollBlit;
             return copy;
+        }
+
+        private static long RenderLayerFlag(RenderLayerBit layer)
+        {
+            int bit = (int)layer;
+            if (bit < 0 || bit >= 63)
+            {
+                throw new ArgumentOutOfRangeException("layer");
+            }
+            return 1L << bit;
         }
 
         private static bool ResizePoliciesEqual(Volvoxgrid.V1.ResizePolicy left, Volvoxgrid.V1.ResizePolicy right)

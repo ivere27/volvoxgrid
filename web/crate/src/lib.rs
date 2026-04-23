@@ -4917,6 +4917,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 request.include_style,
                 request.include_checked,
                 request.include_typed,
+                request.include_barcode_status,
             ),
         })
     }
@@ -5565,11 +5566,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         #[cfg(feature = "demo")]
         {
             wasm_with_grid(request.grid_id, |grid| -> Result<(), String> {
-                match request.demo.as_str() {
-                    "stress" => volvoxgrid_engine::demo::setup_stress_demo(grid),
-                    other => return Err(format!("unknown demo: {other}")),
-                }
-                Ok(())
+                volvoxgrid_engine::demo::setup_named_demo(grid, &request.demo)
             })??;
             Ok(LoadDemoResponse {})
         }

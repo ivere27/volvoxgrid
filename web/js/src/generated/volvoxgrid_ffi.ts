@@ -41,6 +41,52 @@ export enum AutoSizeMode {
   AUTOSIZE_COL_WIDTH = 1,
   AUTOSIZE_ROW_HEIGHT = 2,
 }
+export enum BarcodeCaptionPosition {
+  CAPTION_NONE = 0,
+  CAPTION_BOTTOM = 1,
+  CAPTION_TOP = 2,
+}
+export enum BarcodeCheckDigitMode {
+  CHECK_DIGIT_DEFAULT = 0,
+  CHECK_DIGIT_NONE = 1,
+  CHECK_DIGIT_GENERATE = 2,
+}
+export enum BarcodeQrErrorCorrection {
+  QR_ECC_DEFAULT = 0,
+  QR_ECC_LOW = 1,
+  QR_ECC_MEDIUM = 2,
+  QR_ECC_QUARTILE = 3,
+  QR_ECC_HIGH = 4,
+}
+export enum BarcodeRenderStatus {
+  BARCODE_RENDER_STATUS_UNSPECIFIED = 0,
+  BARCODE_RENDER_STATUS_OK = 1,
+  BARCODE_RENDER_STATUS_EMPTY_PAYLOAD = 2,
+  BARCODE_RENDER_STATUS_INVALID_PAYLOAD = 3,
+  BARCODE_RENDER_STATUS_UNSUPPORTED_SYMBOLOGY = 4,
+}
+export enum BarcodeSymbology {
+  BARCODE_NONE = 0,
+  BARCODE_QR = 1,
+  BARCODE_CODE128 = 10,
+  BARCODE_CODE39 = 11,
+  BARCODE_CODE93 = 12,
+  BARCODE_CODE11 = 13,
+  BARCODE_EAN13 = 20,
+  BARCODE_EAN8 = 21,
+  BARCODE_UPC_A = 22,
+  BARCODE_UPC_E = 23,
+  BARCODE_EAN_SUPP = 24,
+  BARCODE_ITF = 30,
+  BARCODE_STF = 31,
+  BARCODE_CODABAR = 32,
+}
+export enum BarcodeTextEncoding {
+  BARCODE_TEXT_AUTO = 0,
+  BARCODE_TEXT_ASCII = 1,
+  BARCODE_TEXT_UTF8 = 2,
+  BARCODE_TEXT_GS1 = 3,
+}
 export enum BorderAppearance {
   BORDER_APPEARANCE_FLAT = 0,
   BORDER_APPEARANCE_RAISED = 1,
@@ -337,6 +383,7 @@ export enum RenderLayerBit {
   RENDER_LAYER_FAST_SCROLL = 24,
   RENDER_LAYER_PULL_TO_REFRESH = 25,
   RENDER_LAYER_DEBUG_OVERLAY = 26,
+  RENDER_LAYER_BARCODES = 27,
 }
 export enum RendererMode {
   RENDERER_AUTO = 0,
@@ -555,6 +602,36 @@ export const AutoSizeRequestFields = {
 } as const;
 export const AutoSizeResponseFields = {
 } as const;
+export const BarcodeCaptionOptionsFields = {
+  "position": 1,
+  "text": 2,
+  "color": 3,
+  "font_size": 4,
+} as const;
+export const BarcodeDataFields = {
+  "symbology": 1,
+  "value": 2,
+  "encoding": 3,
+  "render": 4,
+  "caption": 5,
+} as const;
+export const BarcodeEncodingOptionsFields = {
+  "check_digit": 1,
+  "text_encoding": 2,
+  "qr_ecc": 3,
+} as const;
+export const BarcodeRenderOptionsFields = {
+  "foreground": 1,
+  "background": 2,
+  "alignment": 3,
+  "module_size": 4,
+  "quiet_zone": 5,
+  "bar_height": 10,
+  "narrow_bar_width": 11,
+  "show_size_warning": 12,
+  "size_warning_color": 13,
+  "use_full_rect": 14,
+} as const;
 export const BeforeEditEventFields = {
   "row": 1,
   "col": 2,
@@ -622,6 +699,8 @@ export const CellDataFields = {
   "style": 4,
   "checked": 5,
   "interaction": 6,
+  "barcode": 7,
+  "barcode_status": 8,
 } as const;
 export const CellEditChangeEventFields = {
   "text": 1,
@@ -682,6 +761,7 @@ export const CellUpdateFields = {
   "sticky_row": 10,
   "sticky_col": 11,
   "interaction": 12,
+  "barcode": 13,
 } as const;
 export const CellValueFields = {
   "text": 1,
@@ -1056,6 +1136,7 @@ export const GetCellsRequestFields = {
   "include_style": 6,
   "include_checked": 7,
   "include_typed": 8,
+  "include_barcode_status": 9,
 } as const;
 export const GetDemoDataRequestFields = {
   "demo": 1,

@@ -29,6 +29,61 @@ impl CellValueData {
 
 static EMPTY_VALUE: CellValueData = CellValueData::Empty;
 
+#[derive(Clone, Debug)]
+pub struct BarcodeSpec {
+    pub symbology: i32,
+    pub value: String,
+    pub check_digit: i32,
+    pub text_encoding: i32,
+    pub qr_ecc: i32,
+    pub foreground: Option<u32>,
+    pub background: Option<u32>,
+    pub alignment: i32,
+    pub caption_position: Option<i32>,
+    pub caption_text: Option<String>,
+    pub caption_color: Option<u32>,
+    pub caption_font_size: Option<f32>,
+    pub module_size: u32,
+    pub quiet_zone: u32,
+    pub bar_height: u32,
+    pub narrow_bar_width: u32,
+    pub show_size_warning: bool,
+    pub size_warning_color: Option<u32>,
+    pub use_full_rect: bool,
+}
+
+impl Default for BarcodeSpec {
+    fn default() -> Self {
+        Self {
+            symbology: 0,
+            value: String::new(),
+            check_digit: 0,
+            text_encoding: 0,
+            qr_ecc: 0,
+            foreground: None,
+            background: None,
+            alignment: crate::proto::volvoxgrid::v1::ImageAlignment::ImgAlignStretch as i32,
+            caption_position: None,
+            caption_text: None,
+            caption_color: None,
+            caption_font_size: None,
+            module_size: 0,
+            quiet_zone: 0,
+            bar_height: 0,
+            narrow_bar_width: 0,
+            show_size_warning: false,
+            size_warning_color: None,
+            use_full_rect: false,
+        }
+    }
+}
+
+impl BarcodeSpec {
+    pub fn heap_size_bytes(&self) -> usize {
+        self.value.capacity() + self.caption_text.as_ref().map_or(0, String::capacity)
+    }
+}
+
 /// Rarely-used cell properties, boxed to keep `CellData` small.
 #[derive(Clone, Debug)]
 pub struct CellExtra {
@@ -50,6 +105,7 @@ pub struct CellExtra {
     pub interaction: Option<i32>,
     // Explicit per-cell control override. None means inherit column/default inference.
     pub control: Option<CellControl>,
+    pub barcode: Option<Box<BarcodeSpec>>,
 }
 
 impl Default for CellExtra {
@@ -69,6 +125,7 @@ impl Default for CellExtra {
             button_picture_format: String::new(),
             interaction: None,
             control: None,
+            barcode: None,
         }
     }
 }
@@ -84,6 +141,10 @@ impl CellExtra {
         bytes += self.user_data.as_ref().map_or(0, Vec::capacity);
         bytes += self.button_picture.as_ref().map_or(0, Vec::capacity);
         bytes += self.button_picture_format.capacity();
+        if let Some(barcode) = self.barcode.as_ref() {
+            bytes += std::mem::size_of::<BarcodeSpec>();
+            bytes += barcode.heap_size_bytes();
+        }
         bytes
     }
 }
@@ -169,6 +230,10 @@ impl CellData {
         self.extra
             .as_ref()
             .map_or("", |e| e.dropdown_items.as_str())
+    }
+
+    pub fn barcode(&self) -> Option<&BarcodeSpec> {
+        self.extra.as_ref().and_then(|e| e.barcode.as_deref())
     }
 
     pub fn interaction_override(&self) -> Option<i32> {

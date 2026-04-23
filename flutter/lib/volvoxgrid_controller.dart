@@ -1452,6 +1452,31 @@ class VolvoxGridController extends ChangeNotifier {
         GridConfig()..rendering = (RenderConfig()..renderLayerMask = mask));
   }
 
+  /// Get the current render layer visibility bitmask.
+  Future<Int64> renderLayerMask() async {
+    final config = await _getConfig();
+    final rendering = config.rendering;
+    return rendering.hasRenderLayerMask()
+        ? rendering.renderLayerMask
+        : Int64(-1);
+  }
+
+  /// Enable or disable a single render layer.
+  Future<void> setRenderLayerEnabled(RenderLayerBit layer, bool enabled) async {
+    final current = await renderLayerMask();
+    final bit = Int64(1) << layer.value;
+    final next = enabled ? (current | bit) : (current & ~bit);
+    if (next != current) {
+      await setRenderLayerMask(next);
+    }
+  }
+
+  /// Check whether a render layer is enabled in the current mask.
+  Future<bool> isRenderLayerEnabled(RenderLayerBit layer) async {
+    final mask = await renderLayerMask();
+    return (mask & (Int64(1) << layer.value)) != Int64.ZERO;
+  }
+
   /// Set the text layout cache capacity (0 = disabled).
   Future<void> setTextLayoutCacheCap(int cap) async {
     final safeCap = cap < 0 ? 0 : cap;

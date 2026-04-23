@@ -37,12 +37,15 @@ const WHEEL_SCROLL_GAIN: f32 = 3.0;
 const DEMO_STRESS: &str = "stress";
 const DEMO_SALES: &str = "sales";
 const DEMO_HIERARCHY: &str = "hierarchy";
+const DEMO_BARCODES: &str = "barcodes";
 const SALES_DEMO_COLS: i32 = 10;
 const HIERARCHY_DEMO_COLS: i32 = 6;
+const BARCODE_DEMO_COLS: i32 = 5;
 const SALES_STATUS_ITEMS: &str = "Active|Pending|Shipped|Returned|Cancelled";
 const SELECTION_MODE_LABELS: [&str; 5] = ["Free", "ByRow", "ByCol", "Listbox", "MultiRange"];
 const FRAME_PACING_LABELS: [&str; 4] = ["Auto", "Platform", "Unlimited", "Fixed"];
-const LAYER_COUNT: usize = 27;
+const LAYER_COUNT: usize = 28;
+const ALL_LAYER_MASK: u64 = (1u64 << LAYER_COUNT) - 1;
 const LAYER_LABELS: [&str; LAYER_COUNT] = [
     "Overlay Bands",
     "Indicators",
@@ -71,6 +74,7 @@ const LAYER_LABELS: [&str; LAYER_COUNT] = [
     "Fast Scroll",
     "Pull To Refresh",
     "Debug Overlay",
+    "Barcodes",
 ];
 const INLINE_EDITOR_CSS: &str = r#"
 entry.volvox-inline-editor,
@@ -127,6 +131,37 @@ struct HierarchyJsonRow {
     action: String,
     #[serde(rename = "_level")]
     level: i32,
+}
+
+#[derive(Debug, Deserialize)]
+struct BarcodeJsonRow {
+    #[serde(rename = "Symbology")]
+    symbology: String,
+    #[serde(rename = "Value")]
+    value: String,
+    #[serde(rename = "Label")]
+    label: String,
+    #[serde(rename = "Notes")]
+    notes: String,
+}
+
+struct BarcodeDemoPlan {
+    symbology: i32,
+    check_digit: i32,
+    text_encoding: i32,
+    qr_ecc: i32,
+    foreground: u32,
+    background: u32,
+    alignment: i32,
+    module_size: u32,
+    quiet_zone: u32,
+    bar_height: u32,
+    narrow_bar_width: u32,
+    caption_position: i32,
+    caption_color: u32,
+    caption_font_size: f32,
+    row_height: i32,
+    options_text: &'static str,
 }
 
 #[derive(Serialize)]
@@ -498,7 +533,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         suppress_entry_changed: false,
         suppress_combo_changed: false,
         edit_overlay_cell: None,
-        render_layer_mask: u64::MAX,
+        render_layer_mask: ALL_LAYER_MASK,
         engine_editing: false,
     };
 
@@ -552,6 +587,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     let btn_demo_sales = Button::with_label("Sales");
     let btn_demo_hierarchy = Button::with_label("Hierarchy");
     let btn_demo_stress = Button::with_label("Stress");
+    let btn_demo_barcodes = Button::with_label("Barcodes");
     let selection_mode = DropDown::from_strings(&SELECTION_MODE_LABELS);
     selection_mode.set_selected(0);
     let chk_debug = CheckButton::with_label("Debug");
@@ -595,6 +631,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     toolbar_row1.append(&btn_demo_sales);
     toolbar_row1.append(&btn_demo_hierarchy);
     toolbar_row1.append(&btn_demo_stress);
+    toolbar_row1.append(&btn_demo_barcodes);
     toolbar_row1.append(&Separator::new(Orientation::Vertical));
     toolbar_row1.append(&selection_mode);
     toolbar_row1.append(&chk_debug);
@@ -648,6 +685,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     set_demo_button_active(&btn_demo_sales, true);
     set_demo_button_active(&btn_demo_hierarchy, false);
     set_demo_button_active(&btn_demo_stress, false);
+    set_demo_button_active(&btn_demo_barcodes, false);
 
     drawing_area.set_draw_func({
         let state = Rc::clone(&state);
@@ -1190,6 +1228,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         btn_demo_sales.clone(),
         btn_demo_hierarchy.clone(),
         btn_demo_stress.clone(),
+        btn_demo_barcodes.clone(),
         DEMO_SALES,
     );
     connect_demo_button(
@@ -1203,6 +1242,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         btn_demo_sales.clone(),
         btn_demo_hierarchy.clone(),
         btn_demo_stress.clone(),
+        btn_demo_barcodes.clone(),
         DEMO_HIERARCHY,
     );
     connect_demo_button(
@@ -1216,7 +1256,22 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
         btn_demo_sales.clone(),
         btn_demo_hierarchy.clone(),
         btn_demo_stress.clone(),
+        btn_demo_barcodes.clone(),
         DEMO_STRESS,
+    );
+    connect_demo_button(
+        &btn_demo_barcodes,
+        Rc::clone(&state),
+        drawing_area.clone(),
+        status_label.clone(),
+        edit_entry.clone(),
+        dropdown_combo.clone(),
+        dropdown_combo_editable.clone(),
+        btn_demo_sales.clone(),
+        btn_demo_hierarchy.clone(),
+        btn_demo_stress.clone(),
+        btn_demo_barcodes.clone(),
+        DEMO_BARCODES,
     );
 
     {
@@ -1500,7 +1555,7 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
                 chk.set_active(true);
             }
             run_action(&state, &area, &status, |st| {
-                st.render_layer_mask = u64::MAX;
+                st.render_layer_mask = ALL_LAYER_MASK;
                 apply_host_runtime_config(st, st.grid_id)?;
                 Ok("All layers enabled".to_string())
             });
@@ -2891,6 +2946,317 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
     Ok(())
 }
 
+fn barcode_key(value: &str) -> String {
+    value
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .flat_map(|ch| ch.to_uppercase())
+        .collect()
+}
+
+fn barcode_demo_plan(record: &BarcodeJsonRow) -> Result<BarcodeDemoPlan, String> {
+    let mut plan = BarcodeDemoPlan {
+        symbology: pb::BarcodeSymbology::BarcodeNone as i32,
+        check_digit: pb::BarcodeCheckDigitMode::CheckDigitDefault as i32,
+        text_encoding: pb::BarcodeTextEncoding::BarcodeTextAuto as i32,
+        qr_ecc: pb::BarcodeQrErrorCorrection::QrEccDefault as i32,
+        foreground: 0xFF111827,
+        background: 0xFFFFFFFF,
+        alignment: pb::ImageAlignment::ImgAlignCenterCenter as i32,
+        module_size: 0,
+        quiet_zone: 0,
+        bar_height: 0,
+        narrow_bar_width: 0,
+        caption_position: pb::BarcodeCaptionPosition::CaptionBottom as i32,
+        caption_color: 0xFF334155,
+        caption_font_size: 11.0,
+        row_height: 96,
+        options_text: "auto",
+    };
+
+    match barcode_key(&record.symbology).as_str() {
+        "QR" | "QRCODE" => {
+            plan.symbology = pb::BarcodeSymbology::BarcodeQr as i32;
+            plan.text_encoding = pb::BarcodeTextEncoding::BarcodeTextUtf8 as i32;
+            plan.qr_ecc = pb::BarcodeQrErrorCorrection::QrEccHigh as i32;
+            plan.background = 0xFFF8FAFC;
+            plan.alignment = pb::ImageAlignment::ImgAlignCenterCenter as i32;
+            plan.quiet_zone = 3;
+            plan.row_height = 150;
+            plan.caption_color = 0xFF1D4ED8;
+            plan.options_text = "text=UTF8, qr_ecc=HIGH, quiet=3, size=auto";
+        }
+        "CODE128" => {
+            plan.symbology = pb::BarcodeSymbology::BarcodeCode128 as i32;
+            plan.text_encoding = pb::BarcodeTextEncoding::BarcodeTextGs1 as i32;
+            plan.background = 0xFFECFDF5;
+            plan.alignment = pb::ImageAlignment::ImgAlignStretch as i32;
+            plan.quiet_zone = 10;
+            plan.caption_color = 0xFF047857;
+            plan.options_text = "text=GS1, check=AUTO, quiet=10, size=auto";
+        }
+        "CODE39" => {
+            plan.symbology = pb::BarcodeSymbology::BarcodeCode39 as i32;
+            plan.check_digit = pb::BarcodeCheckDigitMode::CheckDigitGenerate as i32;
+            plan.foreground = 0xFF7C2D12;
+            plan.background = 0xFFFFF7ED;
+            plan.quiet_zone = 8;
+            plan.caption_position = pb::BarcodeCaptionPosition::CaptionTop as i32;
+            plan.caption_color = 0xFFC2410C;
+            plan.options_text = "check=GENERATE, quiet=8, size=auto, caption=TOP";
+        }
+        "CODE93" => {
+            plan.symbology = pb::BarcodeSymbology::BarcodeCode93 as i32;
+            plan.text_encoding = pb::BarcodeTextEncoding::BarcodeTextAscii as i32;
+            plan.foreground = 0xFF312E81;
+            plan.background = 0xFFEEF2FF;
+            plan.quiet_zone = 8;
+            plan.options_text = "text=ASCII, quiet=8, size=auto";
+        }
+        "CODE11" => {
+            plan.symbology = pb::BarcodeSymbology::BarcodeCode11 as i32;
+            plan.foreground = 0xFF3F3F46;
+            plan.background = 0xFFF4F4F5;
+            plan.alignment = pb::ImageAlignment::ImgAlignStretch as i32;
+            plan.quiet_zone = 10;
+            plan.options_text = "quiet=10, size=auto";
+        }
+        "EAN13" => {
+            plan.symbology = pb::BarcodeSymbology::BarcodeEan13 as i32;
+            plan.foreground = 0xFF1F2937;
+            plan.quiet_zone = 12;
+            plan.options_text = "check=AUTO, quiet=12, size=auto";
+        }
+        "EAN8" => {
+            plan.symbology = pb::BarcodeSymbology::BarcodeEan8 as i32;
+            plan.foreground = 0xFF164E63;
+            plan.background = 0xFFECFEFF;
+            plan.quiet_zone = 10;
+            plan.options_text = "check=AUTO, quiet=10, size=auto";
+        }
+        "UPCA" => {
+            plan.symbology = pb::BarcodeSymbology::BarcodeUpcA as i32;
+            plan.foreground = 0xFF365314;
+            plan.background = 0xFFF7FEE7;
+            plan.quiet_zone = 12;
+            plan.options_text = "check=AUTO, quiet=12, size=auto";
+        }
+        "UPCE" => {
+            plan.symbology = pb::BarcodeSymbology::BarcodeUpcE as i32;
+            plan.foreground = 0xFF7F1D1D;
+            plan.background = 0xFFFEF2F2;
+            plan.quiet_zone = 10;
+            plan.options_text = "check=AUTO, quiet=10, size=auto";
+        }
+        "EANSUPP" | "EANSUPPLEMENT" | "EANSUPPLEMENTAL" => {
+            plan.symbology = pb::BarcodeSymbology::BarcodeEanSupp as i32;
+            plan.foreground = 0xFF581C87;
+            plan.background = 0xFFFAF5FF;
+            plan.quiet_zone = 8;
+            plan.options_text = "quiet=8, size=auto";
+        }
+        "ITF" => {
+            plan.symbology = pb::BarcodeSymbology::BarcodeItf as i32;
+            plan.check_digit = pb::BarcodeCheckDigitMode::CheckDigitNone as i32;
+            plan.foreground = 0xFF0F766E;
+            plan.background = 0xFFF0FDFA;
+            plan.alignment = pb::ImageAlignment::ImgAlignStretch as i32;
+            plan.quiet_zone = 12;
+            plan.options_text = "check=NONE, quiet=12, size=auto";
+        }
+        "STF" => {
+            plan.symbology = pb::BarcodeSymbology::BarcodeStf as i32;
+            plan.foreground = 0xFF854D0E;
+            plan.background = 0xFFFEFCE8;
+            plan.alignment = pb::ImageAlignment::ImgAlignStretch as i32;
+            plan.quiet_zone = 10;
+            plan.options_text = "quiet=10, size=auto";
+        }
+        "CODABAR" => {
+            plan.symbology = pb::BarcodeSymbology::BarcodeCodabar as i32;
+            plan.foreground = 0xFFBE123C;
+            plan.background = 0xFFFFF1F2;
+            plan.quiet_zone = 10;
+            plan.caption_position = pb::BarcodeCaptionPosition::CaptionNone as i32;
+            plan.options_text = "quiet=10, size=auto, caption=NONE";
+        }
+        _ => return Err(format!("unknown barcode symbology: {}", record.symbology)),
+    }
+
+    Ok(plan)
+}
+
+fn load_barcodes_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<(), String> {
+    client.configure(
+        grid_id,
+        pb::GridConfig {
+            layout: Some(pb::LayoutConfig {
+                cols: Some(BARCODE_DEMO_COLS),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    )?;
+    client.define_columns(
+        grid_id,
+        vec![
+            pb::ColumnDef {
+                index: 0,
+                caption: Some("Symbology".to_string()),
+                key: Some("Symbology".to_string()),
+                align: Some(pb::Align::CenterCenter as i32),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 1,
+                caption: Some("Payload".to_string()),
+                key: Some("Value".to_string()),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 2,
+                caption: Some("Settings".to_string()),
+                key: Some("Label".to_string()),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 3,
+                caption: Some("Barcode".to_string()),
+                key: Some("Barcode".to_string()),
+                align: Some(pb::Align::CenterCenter as i32),
+                ..Default::default()
+            },
+            pb::ColumnDef {
+                index: 4,
+                caption: Some("Notes".to_string()),
+                key: Some("Notes".to_string()),
+                ..Default::default()
+            },
+        ],
+    )?;
+
+    let raw_json = client.get_demo_data(DEMO_BARCODES)?;
+    let records: Vec<BarcodeJsonRow> = serde_json::from_slice(&raw_json)
+        .map_err(|err| format!("embedded barcodes demo parse failed: {err}"))?;
+    let result = client.load_data_with_options(
+        grid_id,
+        raw_json,
+        Some(pb::LoadDataOptions {
+            auto_create_columns: Some(false),
+            ..Default::default()
+        }),
+    )?;
+    if result.status == pb::LoadDataStatus::LoadFailed as i32 {
+        return Err("LoadData failed for embedded barcodes demo".to_string());
+    }
+
+    client.configure(grid_id, sales_theme_config())?;
+    client.define_rows(
+        grid_id,
+        records
+            .iter()
+            .enumerate()
+            .map(|(index, record)| {
+                barcode_demo_plan(record).map(|plan| pb::RowDef {
+                    index: index as i32,
+                    height: Some(plan.row_height),
+                    ..Default::default()
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+    )?;
+
+    let small_text_style = pb::CellStyle {
+        foreground: Some(0xFF475569),
+        font: Some(pb::Font {
+            size: Some(11.0),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    let mut cells = Vec::with_capacity(records.len() * 3);
+    for (index, record) in records.iter().enumerate() {
+        let row = index as i32;
+        let plan = barcode_demo_plan(record)?;
+        cells.push(pb::CellUpdate {
+            row,
+            col: 2,
+            value: Some(pb::CellValue {
+                value: Some(pb::cell_value::Value::Text(format!(
+                    "{}\n{}",
+                    record.label, plan.options_text
+                ))),
+            }),
+            style: Some(small_text_style.clone()),
+            ..Default::default()
+        });
+        cells.push(pb::CellUpdate {
+            row,
+            col: 3,
+            value: Some(pb::CellValue {
+                value: Some(pb::cell_value::Value::Text(record.value.clone())),
+            }),
+            style: Some(pb::CellStyle {
+                background: Some(plan.background),
+                align: Some(pb::Align::CenterCenter as i32),
+                padding: Some(pb::Padding {
+                    left: Some(4),
+                    top: Some(4),
+                    right: Some(4),
+                    bottom: Some(4),
+                }),
+                borders: Some(pb::Borders {
+                    all: Some(pb::Border {
+                        style: Some(pb::BorderStyle::BorderThin as i32),
+                        color: Some(0xFFD1D5DB),
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            barcode: Some(pb::BarcodeData {
+                symbology: plan.symbology,
+                value: String::new(),
+                encoding: Some(pb::BarcodeEncodingOptions {
+                    check_digit: plan.check_digit,
+                    text_encoding: plan.text_encoding,
+                    qr_ecc: plan.qr_ecc,
+                }),
+                render: Some(pb::BarcodeRenderOptions {
+                    foreground: Some(plan.foreground),
+                    background: Some(plan.background),
+                    alignment: Some(plan.alignment),
+                    module_size: plan.module_size,
+                    quiet_zone: plan.quiet_zone,
+                    bar_height: plan.bar_height,
+                    narrow_bar_width: plan.narrow_bar_width,
+                    show_size_warning: Some(true),
+                    size_warning_color: None,
+                    use_full_rect: Some(true),
+                }),
+                caption: Some(pb::BarcodeCaptionOptions {
+                    position: Some(plan.caption_position),
+                    text: Some(record.label.clone()),
+                    color: Some(plan.caption_color),
+                    font_size: Some(plan.caption_font_size),
+                }),
+            }),
+            ..Default::default()
+        });
+        cells.push(pb::CellUpdate {
+            row,
+            col: 4,
+            value: Some(pb::CellValue {
+                value: Some(pb::cell_value::Value::Text(record.notes.clone())),
+            }),
+            style: Some(small_text_style.clone()),
+            ..Default::default()
+        });
+    }
+    client.update_cells(grid_id, cells, true)?;
+    Ok(())
+}
+
 fn ensure_demo_grid(state: &mut State, demo: &str) -> Result<(i64, bool), String> {
     if let Some(&grid_id) = state.grid_sessions.get(demo) {
         return Ok((grid_id, false));
@@ -2960,6 +3326,7 @@ fn switch_demo_session(
     btn_sales: &Button,
     btn_hierarchy: &Button,
     btn_stress: &Button,
+    btn_barcodes: &Button,
 ) -> Result<String, String> {
     if state.current_demo == demo {
         return Ok(format!("Already on {demo} demo"));
@@ -2974,6 +3341,8 @@ fn switch_demo_session(
             load_sales_json_demo(&state.client, grid_id)?;
         } else if demo == DEMO_HIERARCHY {
             load_hierarchy_json_demo(&state.client, grid_id)?;
+        } else if demo == DEMO_BARCODES {
+            load_barcodes_json_demo(&state.client, grid_id)?;
         } else {
             state.client.load_demo(grid_id, demo)?;
         }
@@ -2987,6 +3356,7 @@ fn switch_demo_session(
     set_demo_button_active(btn_sales, demo == DEMO_SALES);
     set_demo_button_active(btn_hierarchy, demo == DEMO_HIERARCHY);
     set_demo_button_active(btn_stress, demo == DEMO_STRESS);
+    set_demo_button_active(btn_barcodes, demo == DEMO_BARCODES);
 
     Ok(if created {
         format!("Created {demo} demo (grid {grid_id})")
@@ -3666,12 +4036,20 @@ fn connect_demo_button(
     btn_sales: Button,
     btn_hierarchy: Button,
     btn_stress: Button,
+    btn_barcodes: Button,
     demo: &'static str,
 ) {
     button.connect_clicked(move |_| {
         hide_host_editors(&edit_entry, &dropdown_combo, &dropdown_combo_editable);
         run_action(&state, &area, &status, |st| {
-            switch_demo_session(st, demo, &btn_sales, &btn_hierarchy, &btn_stress)
+            switch_demo_session(
+                st,
+                demo,
+                &btn_sales,
+                &btn_hierarchy,
+                &btn_stress,
+                &btn_barcodes,
+            )
         });
     });
 }

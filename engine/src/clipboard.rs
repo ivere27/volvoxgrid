@@ -120,6 +120,7 @@ pub fn delete_selection(grid: &mut VolvoxGrid) {
         let c2 = c2.max(0).min(grid.cols - 1);
         grid.cells.clear_range(r1, c1, r2, c2);
     }
+    grid.recompute_barcode_presence();
     grid.mark_dirty();
 }
 

@@ -1,10 +1,11 @@
 /**
- * VolvoxGrid Web Demo -- Four runtime-switchable scenarios.
+ * VolvoxGrid Web Demo -- Five runtime-switchable scenarios.
  *
  * 1. Stress Test (1M rows)
  * 2. Sales Showcase (~1000 rows, subtotals, merge, combos)
  * 3. Hierarchy Showcase (~200 rows, directory tree with outline)
- * 4. DOOM (optional; local `make doom-deps` assets or remote fallback)
+ * 4. Barcode Showcase (QR and common 1D symbologies)
+ * 5. DOOM (optional; local `make doom-deps` assets or remote fallback)
  *
  * Demo data setup is handled by the engine's demo module (via WASM exports),
  * so the host only provides platform glue.
@@ -14,9 +15,18 @@ import { VolvoxGrid, type VolvoxGridContextMenuRequest } from "../js/src/volvoxg
 import { setupDefaultInput } from "../js/src/default-input.js";
 import { createCanvas2DTextRenderer } from "../js/src/canvas2d-text-renderer.js";
 import {
+  Align,
+  BarcodeCaptionPosition,
+  BarcodeCheckDigitMode,
+  BarcodeQrErrorCorrection,
+  BarcodeSymbology,
+  BarcodeTextEncoding,
+  BorderStyle,
   CellHitArea,
   CellInteraction,
   GridEventFields,
+  ImageAlignment,
+  RenderLayerBit,
 } from "../js/src/generated/volvoxgrid_ffi.js";
 import {
   DoomRuntime,
@@ -26,7 +36,7 @@ import {
   type DoomAssetSource,
 } from "./doom.js";
 
-type DemoMode = "stress" | "sales" | "hierarchy" | "doom";
+type DemoMode = "stress" | "sales" | "hierarchy" | "barcodes" | "doom";
 type StandardDemoMode = Exclude<DemoMode, "doom">;
 type DoomDirectionCode = "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight";
 type DoomTouchActionCode = "ControlLeft" | "Space" | "Enter";
@@ -35,6 +45,7 @@ const STRESS_ROWS = 1_000_000;
 const STRESS_COLS = 12;
 const SALES_COLS = 10;
 const HIERARCHY_COLS = 6;
+const BARCODE_COLS = 5;
 const SALES_STATUS_ITEMS = "Active|Pending|Shipped|Returned|Cancelled";
 const GRID_EVENT_CLICK = GridEventFields["click"];
 const HIERARCHY_ACTION_COL = 5;
@@ -49,20 +60,19 @@ const HOVER_NONE = 0;
 const HOVER_ROW = 1;
 const HOVER_COLUMN = 2;
 const HOVER_CELL = 4;
-const LAYER_NAMES = [
-  "bands", "indicators", "bkgrounds", "progress", "gridlines",
-  "hdr_marks", "bg_image", "borders", "text", "pictures",
-  "sort", "col_drag", "checkbox", "dropdown", "selection",
-  "hover", "edit_hl", "focus", "fill_hnd", "outline",
-  "frozen_bd", "editor", "dd_active", "scrollbar", "fast_scrl",
-  "pull_rfrsh",
-  "debug_ovl",
-] as const;
-const LAYER_MASK_ALL = (1 << LAYER_NAMES.length) - 1;
+const RENDER_LAYER_PREFIX = "RENDER_LAYER_";
+type RenderLayerOption = { bit: number; label: string };
+const LAYER_OPTIONS: RenderLayerOption[] = Object.entries(RenderLayerBit)
+  .filter((entry): entry is [string, number] =>
+    entry[0].startsWith(RENDER_LAYER_PREFIX) && typeof entry[1] === "number")
+  .map(([name, bit]) => ({ bit, label: name.slice(RENDER_LAYER_PREFIX.length) }))
+  .sort((a, b) => a.bit - b.bit);
+const LAYER_MASK_ALL = LAYER_OPTIONS.reduce((mask, layer) => mask + 2 ** layer.bit, 0);
 const DEMO_DEFAULT_HOVER_MODE: Record<StandardDemoMode, number> = {
   stress: HOVER_ROW,
   sales: HOVER_ROW | HOVER_COLUMN | HOVER_CELL,
   hierarchy: HOVER_CELL,
+  barcodes: HOVER_ROW | HOVER_COLUMN | HOVER_CELL,
 };
 const SALES_COLUMN_SETUP = [
   { caption: "Q", key: "Q", align: 4, dataType: undefined, format: undefined, dropdownItems: undefined, span: true },
@@ -83,6 +93,13 @@ const HIERARCHY_COLUMN_SETUP = [
   { caption: "Modified", key: "Modified", width: 120, align: undefined, dataType: 2, format: "short date", dropdownItems: undefined, interaction: undefined },
   { caption: "Permissions", key: "Permissions", width: 100, align: 4, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
   { caption: "Action", key: "Action", width: 92, align: 4, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: CellInteraction.CELL_INTERACTION_TEXT_LINK },
+] as const;
+const BARCODE_COLUMN_SETUP = [
+  { caption: "Symbology", key: "Symbology", align: Align.ALIGN_CENTER_CENTER },
+  { caption: "Payload", key: "Value" },
+  { caption: "Settings", key: "Label" },
+  { caption: "Barcode", key: "Barcode", align: Align.ALIGN_CENTER_CENTER },
+  { caption: "Notes", key: "Notes" },
 ] as const;
 type DemoColumnSetup = {
   caption: string;
@@ -107,6 +124,54 @@ type HierarchyDemoRow = {
   Permissions: string;
   Action: string;
   _level: number;
+};
+type BarcodeJsonRow = {
+  Symbology: string;
+  Value: string;
+  Label: string;
+  Notes: string;
+};
+type DemoRowSetup = {
+  height?: number;
+  outlineLevel?: number;
+  isSubtotal?: boolean;
+};
+type DemoFontSpec = {
+  size?: number;
+  bold?: boolean;
+};
+type DemoCellStyleSpec = {
+  background?: number;
+  foreground?: number;
+  align?: number;
+  font?: DemoFontSpec;
+  padding?: {
+    left?: number;
+    top?: number;
+    right?: number;
+    bottom?: number;
+  };
+  borderAll?: {
+    style: number;
+    color: number;
+  };
+};
+type BarcodeDemoPlan = {
+  symbology: number;
+  checkDigit: number;
+  textEncoding: number;
+  qrEcc: number;
+  foreground: number;
+  background: number;
+  alignment: number;
+  moduleSize: number;
+  quietZone: number;
+  barHeight: number;
+  narrowBarWidth: number;
+  captionPosition: number;
+  captionColor: number;
+  rowHeight: number;
+  optionsText: string;
 };
 type WasmModule = typeof import("./wasm/volvoxgrid_wasm.js");
 
@@ -504,6 +569,174 @@ function pbEncodeBordersAll(style: number, color: number): Uint8Array {
   return new Uint8Array(pbEncodeMessageField(1, pbEncodeBorder(style, color)));
 }
 
+function pbEncodeFontPayload(font: DemoFontSpec): Uint8Array {
+  const out: number[] = [];
+  if (font.size != null) {
+    out.push(...pbEncodeFloatField(3, font.size));
+  }
+  if (font.bold != null) {
+    out.push(...pbEncodeTag(4, 0), ...pbEncodeBool(font.bold));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodePaddingPayload(padding: DemoCellStyleSpec["padding"]): Uint8Array {
+  const out: number[] = [];
+  if (padding?.left != null) {
+    out.push(...pbEncodeInt32Field(1, padding.left));
+  }
+  if (padding?.top != null) {
+    out.push(...pbEncodeInt32Field(2, padding.top));
+  }
+  if (padding?.right != null) {
+    out.push(...pbEncodeInt32Field(3, padding.right));
+  }
+  if (padding?.bottom != null) {
+    out.push(...pbEncodeInt32Field(4, padding.bottom));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeCellStylePayload(style: DemoCellStyleSpec): Uint8Array {
+  const out: number[] = [];
+  if (style.background != null) {
+    out.push(...pbEncodeUint32Field(1, style.background));
+  }
+  if (style.foreground != null) {
+    out.push(...pbEncodeUint32Field(2, style.foreground));
+  }
+  if (style.align != null) {
+    out.push(...pbEncodeInt32Field(3, style.align));
+  }
+  if (style.font != null) {
+    const font = pbEncodeFontPayload(style.font);
+    if (font.length > 0) {
+      out.push(...pbEncodeMessageField(4, font));
+    }
+  }
+  if (style.padding != null) {
+    const padding = pbEncodePaddingPayload(style.padding);
+    if (padding.length > 0) {
+      out.push(...pbEncodeMessageField(5, padding));
+    }
+  }
+  if (style.borderAll != null) {
+    out.push(...pbEncodeMessageField(6, pbEncodeBordersAll(style.borderAll.style, style.borderAll.color)));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeCellValueText(text: string): Uint8Array {
+  return new Uint8Array(pbEncodeStringField(1, text));
+}
+
+function pbEncodeBarcodeEncodingOptions(plan: BarcodeDemoPlan): Uint8Array {
+  const out: number[] = [];
+  if (plan.checkDigit !== BarcodeCheckDigitMode.CHECK_DIGIT_DEFAULT) {
+    out.push(...pbEncodeInt32Field(1, plan.checkDigit));
+  }
+  if (plan.textEncoding !== BarcodeTextEncoding.BARCODE_TEXT_AUTO) {
+    out.push(...pbEncodeInt32Field(2, plan.textEncoding));
+  }
+  if (plan.qrEcc !== BarcodeQrErrorCorrection.QR_ECC_DEFAULT) {
+    out.push(...pbEncodeInt32Field(3, plan.qrEcc));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeBarcodeRenderOptions(plan: BarcodeDemoPlan): Uint8Array {
+  const out: number[] = [];
+  if (plan.foreground !== 0) {
+    out.push(...pbEncodeUint32Field(1, plan.foreground));
+  }
+  if (plan.background !== 0) {
+    out.push(...pbEncodeUint32Field(2, plan.background));
+  }
+  if (plan.alignment !== ImageAlignment.IMG_ALIGN_STRETCH) {
+    out.push(...pbEncodeInt32Field(3, plan.alignment));
+  }
+  if (plan.moduleSize !== 0) {
+    out.push(...pbEncodeUint32Field(4, plan.moduleSize));
+  }
+  if (plan.quietZone !== 0) {
+    out.push(...pbEncodeUint32Field(5, plan.quietZone));
+  }
+  if (plan.barHeight !== 0) {
+    out.push(...pbEncodeUint32Field(10, plan.barHeight));
+  }
+  if (plan.narrowBarWidth !== 0) {
+    out.push(...pbEncodeUint32Field(11, plan.narrowBarWidth));
+  }
+  out.push(...pbEncodeTag(12, 0), ...pbEncodeBool(true));
+  out.push(...pbEncodeTag(14, 0), ...pbEncodeBool(true));
+  return new Uint8Array(out);
+}
+
+function pbEncodeBarcodeCaptionOptions(record: BarcodeJsonRow, plan: BarcodeDemoPlan): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeInt32Field(1, plan.captionPosition));
+  out.push(...pbEncodeStringField(2, record.Label));
+  out.push(...pbEncodeUint32Field(3, plan.captionColor));
+  return new Uint8Array(out);
+}
+
+function pbEncodeBarcodeData(record: BarcodeJsonRow, plan: BarcodeDemoPlan): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeInt32Field(1, plan.symbology));
+  const encoding = pbEncodeBarcodeEncodingOptions(plan);
+  if (encoding.length > 0) {
+    out.push(...pbEncodeMessageField(3, encoding));
+  }
+  const render = pbEncodeBarcodeRenderOptions(plan);
+  if (render.length > 0) {
+    out.push(...pbEncodeMessageField(4, render));
+  }
+  const caption = pbEncodeBarcodeCaptionOptions(record, plan);
+  if (caption.length > 0) {
+    out.push(...pbEncodeMessageField(5, caption));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeCellUpdate(options: {
+  row: number;
+  col: number;
+  valueText?: string;
+  style?: DemoCellStyleSpec;
+  barcode?: Uint8Array;
+}): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeInt32Field(1, options.row));
+  out.push(...pbEncodeInt32Field(2, options.col));
+  if (options.valueText != null) {
+    out.push(...pbEncodeMessageField(3, pbEncodeCellValueText(options.valueText)));
+  }
+  if (options.style != null) {
+    const style = pbEncodeCellStylePayload(options.style);
+    if (style.length > 0) {
+      out.push(...pbEncodeMessageField(4, style));
+    }
+  }
+  if (options.barcode != null) {
+    out.push(...pbEncodeMessageField(13, options.barcode));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeUpdateCellsRequest(
+  gridId: number,
+  cells: readonly Uint8Array[],
+  atomic: boolean,
+): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeTag(1, 0), ...pbEncodeVarint(BigInt(Math.trunc(gridId))));
+  for (const cell of cells) {
+    out.push(...pbEncodeMessageField(2, cell));
+  }
+  out.push(...pbEncodeTag(3, 0), ...pbEncodeBool(atomic));
+  return new Uint8Array(out);
+}
+
 function pbEncodeGridLinesPayload(color: number): Uint8Array {
   const out: number[] = [];
   out.push(...pbEncodeInt32Field(1, 1));
@@ -605,22 +838,29 @@ function pbEncodeDefineColumnsRequest(gridId: number, columns: readonly DemoColu
   return new Uint8Array(out);
 }
 
-function pbEncodeRowDef(index: number, outlineLevel: number, isSubtotal: boolean): Uint8Array {
+function pbEncodeRowDef(index: number, row: DemoRowSetup): Uint8Array {
   const out: number[] = [];
   out.push(...pbEncodeInt32Field(1, index));
-  out.push(...pbEncodeTag(4, 0), ...pbEncodeBool(isSubtotal));
-  out.push(...pbEncodeInt32Field(5, outlineLevel));
+  if (row.height != null) {
+    out.push(...pbEncodeInt32Field(2, row.height));
+  }
+  if (row.isSubtotal != null) {
+    out.push(...pbEncodeTag(4, 0), ...pbEncodeBool(row.isSubtotal));
+  }
+  if (row.outlineLevel != null) {
+    out.push(...pbEncodeInt32Field(5, row.outlineLevel));
+  }
   return new Uint8Array(out);
 }
 
 function pbEncodeDefineRowsRequest(
   gridId: number,
-  rows: ReadonlyArray<{ outlineLevel: number; isSubtotal: boolean }>,
+  rows: ReadonlyArray<DemoRowSetup>,
 ): Uint8Array {
   const out: number[] = [];
   out.push(...pbEncodeTag(1, 0), ...pbEncodeVarint(BigInt(gridId)));
   rows.forEach((row, index) => {
-    out.push(...pbEncodeMessageField(2, pbEncodeRowDef(index, row.outlineLevel, row.isSubtotal)));
+    out.push(...pbEncodeMessageField(2, pbEncodeRowDef(index, row)));
   });
   return new Uint8Array(out);
 }
@@ -948,6 +1188,231 @@ function setupHierarchyJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: nu
         });
       }
     });
+    grid.invalidate();
+  } finally {
+    if (id !== prevId) {
+      grid.useGrid(prevId);
+    }
+  }
+}
+
+function barcodeKey(value: string): string {
+  return value.replace(/[^0-9a-z]/gi, "").toUpperCase();
+}
+
+function barcodeDemoPlan(record: BarcodeJsonRow): BarcodeDemoPlan {
+  const plan: BarcodeDemoPlan = {
+    symbology: BarcodeSymbology.BARCODE_NONE,
+    checkDigit: BarcodeCheckDigitMode.CHECK_DIGIT_DEFAULT,
+    textEncoding: BarcodeTextEncoding.BARCODE_TEXT_AUTO,
+    qrEcc: BarcodeQrErrorCorrection.QR_ECC_DEFAULT,
+    foreground: 0xFF111827,
+    background: 0xFFFFFFFF,
+    alignment: ImageAlignment.IMG_ALIGN_CENTER_CENTER,
+    moduleSize: 0,
+    quietZone: 0,
+    barHeight: 0,
+    narrowBarWidth: 0,
+    captionPosition: BarcodeCaptionPosition.CAPTION_BOTTOM,
+    captionColor: 0xFF334155,
+    rowHeight: 96,
+    optionsText: "auto",
+  };
+
+  switch (barcodeKey(record.Symbology)) {
+    case "QR":
+    case "QRCODE":
+      plan.symbology = BarcodeSymbology.BARCODE_QR;
+      plan.textEncoding = BarcodeTextEncoding.BARCODE_TEXT_UTF8;
+      plan.qrEcc = BarcodeQrErrorCorrection.QR_ECC_HIGH;
+      plan.background = 0xFFF8FAFC;
+      plan.alignment = ImageAlignment.IMG_ALIGN_CENTER_CENTER;
+      plan.quietZone = 3;
+      plan.rowHeight = 150;
+      plan.captionColor = 0xFF1D4ED8;
+      plan.optionsText = "text=UTF8, qr_ecc=HIGH, quiet=3, size=auto";
+      break;
+    case "CODE128":
+      plan.symbology = BarcodeSymbology.BARCODE_CODE128;
+      plan.textEncoding = BarcodeTextEncoding.BARCODE_TEXT_GS1;
+      plan.background = 0xFFECFDF5;
+      plan.alignment = ImageAlignment.IMG_ALIGN_STRETCH;
+      plan.quietZone = 10;
+      plan.captionColor = 0xFF047857;
+      plan.optionsText = "text=GS1, check=AUTO, quiet=10, size=auto";
+      break;
+    case "CODE39":
+      plan.symbology = BarcodeSymbology.BARCODE_CODE39;
+      plan.checkDigit = BarcodeCheckDigitMode.CHECK_DIGIT_GENERATE;
+      plan.foreground = 0xFF7C2D12;
+      plan.background = 0xFFFFF7ED;
+      plan.quietZone = 8;
+      plan.captionPosition = BarcodeCaptionPosition.CAPTION_TOP;
+      plan.captionColor = 0xFFC2410C;
+      plan.optionsText = "check=GENERATE, quiet=8, size=auto, caption=TOP";
+      break;
+    case "CODE93":
+      plan.symbology = BarcodeSymbology.BARCODE_CODE93;
+      plan.textEncoding = BarcodeTextEncoding.BARCODE_TEXT_ASCII;
+      plan.foreground = 0xFF312E81;
+      plan.background = 0xFFEEF2FF;
+      plan.quietZone = 8;
+      plan.optionsText = "text=ASCII, quiet=8, size=auto";
+      break;
+    case "CODE11":
+      plan.symbology = BarcodeSymbology.BARCODE_CODE11;
+      plan.foreground = 0xFF3F3F46;
+      plan.background = 0xFFF4F4F5;
+      plan.alignment = ImageAlignment.IMG_ALIGN_STRETCH;
+      plan.quietZone = 10;
+      plan.optionsText = "quiet=10, size=auto";
+      break;
+    case "EAN13":
+      plan.symbology = BarcodeSymbology.BARCODE_EAN13;
+      plan.foreground = 0xFF1F2937;
+      plan.quietZone = 12;
+      plan.optionsText = "check=AUTO, quiet=12, size=auto";
+      break;
+    case "EAN8":
+      plan.symbology = BarcodeSymbology.BARCODE_EAN8;
+      plan.foreground = 0xFF164E63;
+      plan.background = 0xFFECFEFF;
+      plan.quietZone = 10;
+      plan.optionsText = "check=AUTO, quiet=10, size=auto";
+      break;
+    case "UPCA":
+      plan.symbology = BarcodeSymbology.BARCODE_UPC_A;
+      plan.foreground = 0xFF365314;
+      plan.background = 0xFFF7FEE7;
+      plan.quietZone = 12;
+      plan.optionsText = "check=AUTO, quiet=12, size=auto";
+      break;
+    case "UPCE":
+      plan.symbology = BarcodeSymbology.BARCODE_UPC_E;
+      plan.foreground = 0xFF7F1D1D;
+      plan.background = 0xFFFEF2F2;
+      plan.quietZone = 10;
+      plan.optionsText = "check=AUTO, quiet=10, size=auto";
+      break;
+    case "EANSUPP":
+    case "EANSUPPLEMENT":
+    case "EANSUPPLEMENTAL":
+      plan.symbology = BarcodeSymbology.BARCODE_EAN_SUPP;
+      plan.foreground = 0xFF581C87;
+      plan.background = 0xFFFAF5FF;
+      plan.quietZone = 8;
+      plan.optionsText = "quiet=8, size=auto";
+      break;
+    case "ITF":
+      plan.symbology = BarcodeSymbology.BARCODE_ITF;
+      plan.checkDigit = BarcodeCheckDigitMode.CHECK_DIGIT_NONE;
+      plan.foreground = 0xFF0F766E;
+      plan.background = 0xFFF0FDFA;
+      plan.alignment = ImageAlignment.IMG_ALIGN_STRETCH;
+      plan.quietZone = 12;
+      plan.optionsText = "check=NONE, quiet=12, size=auto";
+      break;
+    case "STF":
+      plan.symbology = BarcodeSymbology.BARCODE_STF;
+      plan.foreground = 0xFF854D0E;
+      plan.background = 0xFFFEFCE8;
+      plan.alignment = ImageAlignment.IMG_ALIGN_STRETCH;
+      plan.quietZone = 10;
+      plan.optionsText = "quiet=10, size=auto";
+      break;
+    case "CODABAR":
+      plan.symbology = BarcodeSymbology.BARCODE_CODABAR;
+      plan.foreground = 0xFFBE123C;
+      plan.background = 0xFFFFF1F2;
+      plan.quietZone = 10;
+      plan.captionPosition = BarcodeCaptionPosition.CAPTION_NONE;
+      plan.optionsText = "quiet=10, size=auto, caption=NONE";
+      break;
+    default:
+      throw new Error(`unknown barcode symbology: ${record.Symbology}`);
+  }
+
+  return plan;
+}
+
+function setupBarcodesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: number): void {
+  const prevId = grid.id;
+  if (id !== prevId) {
+    grid.useGrid(id);
+  }
+
+  try {
+    const barcodeData = grid.getDemoData("barcodes");
+    if (barcodeData.length === 0) {
+      throw new Error("embedded barcodes demo data is empty");
+    }
+    const records = JSON.parse(PB_TEXT_DECODER.decode(barcodeData)) as BarcodeJsonRow[];
+    const plans = records.map((record) => barcodeDemoPlan(record));
+
+    grid.colCount = BARCODE_COLS;
+    wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, BARCODE_COLUMN_SETUP));
+    const result = grid.loadData(barcodeData, { autoCreateColumns: false });
+    if (result.status === 2) {
+      throw new Error("LoadData failed for embedded barcodes demo");
+    }
+    wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, BARCODE_COLUMN_SETUP));
+    if (typeof wasmModule.volvox_grid_configure === "function") {
+      wasmModule.volvox_grid_configure(BigInt(id), pbEncodeSalesDemoConfig());
+    }
+    wasmModule.volvox_grid_define_rows_pb(
+      pbEncodeDefineRowsRequest(
+        id,
+        plans.map((plan) => ({ height: plan.rowHeight })),
+      ),
+    );
+
+    const smallTextStyle: DemoCellStyleSpec = {
+      foreground: 0xFF475569,
+    };
+    const cells: Uint8Array[] = [];
+    records.forEach((record, index) => {
+      const plan = plans[index];
+      cells.push(pbEncodeCellUpdate({
+        row: index,
+        col: 2,
+        valueText: `${record.Label}\n${plan.optionsText}`,
+        style: smallTextStyle,
+      }));
+      cells.push(pbEncodeCellUpdate({
+        row: index,
+        col: 3,
+        valueText: record.Value,
+        style: {
+          background: plan.background,
+          align: Align.ALIGN_CENTER_CENTER,
+          padding: { left: 4, top: 4, right: 4, bottom: 4 },
+          borderAll: {
+            style: BorderStyle.BORDER_THIN,
+            color: 0xFFD1D5DB,
+          },
+        },
+        barcode: pbEncodeBarcodeData(record, plan),
+      }));
+      cells.push(pbEncodeCellUpdate({
+        row: index,
+        col: 4,
+        valueText: record.Notes,
+        style: smallTextStyle,
+      }));
+    });
+
+    const updateCells = (wasmModule as any).volvox_grid_update_cells_pb as
+      | ((request: Uint8Array) => Uint8Array)
+      | undefined;
+    if (typeof updateCells !== "function") {
+      throw new Error("volvox_grid_update_cells_pb is not available");
+    }
+    updateCells(pbEncodeUpdateCellsRequest(id, cells, true));
+
+    grid.selectionMode = 0;
+    grid.setHeaderFeatures({ sort: true, reorder: true, chooser: false });
+    grid.flingImpulseGain = 220.0;
+    grid.flingFriction = 0.9;
     grid.invalidate();
   } finally {
     if (id !== prevId) {
@@ -1474,11 +1939,33 @@ async function main() {
     if (!Number.isFinite(raw)) {
       return LAYER_MASK_ALL;
     }
-    return Math.trunc(raw) & LAYER_MASK_ALL;
+    const mask = Math.trunc(raw);
+    if (mask < 0) {
+      return LAYER_MASK_ALL;
+    }
+    return LAYER_OPTIONS.reduce(
+      (normalized, layer) =>
+        isLayerEnabled(mask, layer.bit) ? normalized + 2 ** layer.bit : normalized,
+      0,
+    );
   }
 
   function isLayerEnabled(mask: number, bit: number): boolean {
-    return ((mask >>> bit) & 1) === 1;
+    if (mask < 0) {
+      return true;
+    }
+    const flag = 2 ** bit;
+    return Math.floor(mask / flag) % 2 === 1;
+  }
+
+  function setLayerBit(mask: number, bit: number, enabled: boolean): number {
+    const normalized = normalizeLayerMask(mask);
+    const flag = 2 ** bit;
+    const currentlyEnabled = isLayerEnabled(normalized, bit);
+    if (currentlyEnabled === enabled) {
+      return normalized;
+    }
+    return enabled ? normalized + flag : normalized - flag;
   }
 
   function knownGridIds(): number[] {
@@ -1555,7 +2042,7 @@ async function main() {
 
   function syncLayerCheckboxes(): void {
     for (let i = 0; i < layerCheckboxes.length; i += 1) {
-      layerCheckboxes[i].checked = isLayerEnabled(layerMask, i);
+      layerCheckboxes[i].checked = isLayerEnabled(layerMask, LAYER_OPTIONS[i].bit);
     }
   }
 
@@ -1574,20 +2061,19 @@ async function main() {
   function buildLayerPanel(): void {
     layerPanelOptions.replaceChildren();
     layerCheckboxes.length = 0;
-    for (let i = 0; i < LAYER_NAMES.length; i += 1) {
+    for (const layer of LAYER_OPTIONS) {
       const option = document.createElement("label");
       option.className = "layer-option";
 
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
-      checkbox.checked = isLayerEnabled(layerMask, i);
+      checkbox.checked = isLayerEnabled(layerMask, layer.bit);
       checkbox.addEventListener("change", () => {
-        const bit = 1 << i;
-        commitLayerMask(checkbox.checked ? (layerMask | bit) : (layerMask & ~bit));
+        commitLayerMask(setLayerBit(layerMask, layer.bit, checkbox.checked));
       });
 
       const label = document.createElement("span");
-      label.textContent = LAYER_NAMES[i];
+      label.textContent = layer.label;
 
       option.append(checkbox, label);
       layerPanelOptions.append(option);
@@ -1796,6 +2282,7 @@ async function main() {
       case "stress": return STRESS_COLS;
       case "sales": return SALES_COLS;
       case "hierarchy": return HIERARCHY_COLS;
+      case "barcodes": return BARCODE_COLS;
       default: return 0;
     }
   }
@@ -1823,6 +2310,7 @@ async function main() {
     stress: document.getElementById("btn-demo-stress")!,
     sales: document.getElementById("btn-demo-sales")!,
     hierarchy: document.getElementById("btn-demo-hierarchy")!,
+    barcodes: document.getElementById("btn-demo-barcodes")!,
     doom: document.getElementById("btn-demo-doom")!,
   };
   buildLayerPanel();
@@ -2132,12 +2620,14 @@ async function main() {
         return SALES_COLS;
       case "hierarchy":
         return HIERARCHY_COLS;
+      case "barcodes":
+        return BARCODE_COLS;
     }
   }
 
   function applyDemoViewDefaults(mode: StandardDemoMode) {
     grid.frozenRowCount = 0;
-    grid.frozenColCount = mode === "hierarchy" ? 0 : 1;
+    grid.frozenColCount = mode === "sales" || mode === "stress" ? 1 : 0;
     grid.showColumnHeaders = true;
     grid.columnIndicatorTopRowCount = 1;
     grid.selectionVisibility = 1;
@@ -2359,6 +2849,9 @@ async function main() {
       case "hierarchy":
         setupHierarchyJsonDemo(grid, wasmModule, id);
         break;
+      case "barcodes":
+        setupBarcodesJsonDemo(grid, wasmModule, id);
+        break;
     }
 
     setGridHoverMode(id, chkHover.checked ? hoverModeForDemo(mode) : HOVER_NONE);
@@ -2494,7 +2987,7 @@ async function main() {
     currentDemo = mode;
     syncEditToggleEnabledState();
     highlightDemoBtn(mode);
-    dataRows = Math.max(0, grid.rowCount - 1);
+    dataRows = Math.max(0, grid.rowCount - (mode === "barcodes" ? 0 : 1));
 
     switch (mode) {
       case "stress": {
@@ -2509,6 +3002,11 @@ async function main() {
       }
       case "hierarchy": {
         status.textContent = "Loading Hierarchy demo...";
+        applyDemoViewDefaults(mode);
+        break;
+      }
+      case "barcodes": {
+        status.textContent = "Loading Barcodes demo...";
         applyDemoViewDefaults(mode);
         break;
       }
@@ -2541,6 +3039,9 @@ async function main() {
   });
   demoBtns.hierarchy.addEventListener("click", () => {
     void switchDemo("hierarchy");
+  });
+  demoBtns.barcodes.addEventListener("click", () => {
+    void switchDemo("barcodes");
   });
   demoBtns.doom.addEventListener("click", () => {
     void switchDemo("doom");

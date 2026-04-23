@@ -57,34 +57,9 @@ class MainActivity : AppCompatActivity() {
     private val textCacheCapOptions = intArrayOf(8192, 4096, 1024, 256, 0)
     private val rendererModeOptions = arrayOf("AUTO", "CPU", "GPU", "GPU (Vulk)", "GPU (GLES)")
     private val rendererModeValues = intArrayOf(0, 1, 2, 3, 4)
-    private val renderLayerNames = arrayOf(
-        "Overlay Bands",
-        "Indicators",
-        "Backgrounds",
-        "Progress Bars",
-        "Grid Lines",
-        "Header Marks",
-        "Background Image",
-        "Cell Borders",
-        "Cell Text",
-        "Cell Pictures",
-        "Sort Glyphs",
-        "Col Drag Marker",
-        "Checkboxes",
-        "Dropdown Buttons",
-        "Selection",
-        "Hover Highlight",
-        "Edit Highlights",
-        "Focus Rect",
-        "Fill Handle",
-        "Outline",
-        "Frozen Borders",
-        "Active Editor",
-        "Active Dropdown",
-        "Scroll Bars",
-        "Fast Scroll",
-        "Debug Overlay",
-    )
+    private val renderLayers = RenderLayerBit.values()
+        .filter { it != RenderLayerBit.UNRECOGNIZED && it.name.startsWith("RENDER_LAYER_") }
+        .sortedBy { it.number }
 
     @Volatile private var controller: VolvoxGridController? = null
     @Volatile private var currentDemo: String = ""
@@ -549,12 +524,12 @@ class MainActivity : AppCompatActivity() {
         val scrollView = ScrollView(this).apply {
             addView(listLayout)
         }
-        val checkBoxes = renderLayerNames.mapIndexed { index, label ->
+        val checkBoxes = renderLayers.map { layer ->
+            val bit = 1L shl layer.number
             CheckBox(this).apply {
-                text = label
-                isChecked = draftMask and (1L shl index) != 0L
+                text = layer.name.removePrefix("RENDER_LAYER_")
+                isChecked = (draftMask and bit) != 0L
                 setOnCheckedChangeListener { _, isChecked ->
-                    val bit = 1L shl index
                     draftMask = if (isChecked) {
                         draftMask or bit
                     } else {
@@ -566,7 +541,8 @@ class MainActivity : AppCompatActivity() {
         fun updateChecks(mask: Long) {
             draftMask = mask
             checkBoxes.forEachIndexed { index, checkBox ->
-                val checked = mask and (1L shl index) != 0L
+                val bit = 1L shl renderLayers[index].number
+                val checked = (mask and bit) != 0L
                 if (checkBox.isChecked != checked) {
                     checkBox.isChecked = checked
                 }

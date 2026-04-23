@@ -4141,6 +4141,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 request.include_style,
                 request.include_checked,
                 request.include_typed,
+                request.include_barcode_status,
             )
         })?;
         Ok(CellsResponse { cells })

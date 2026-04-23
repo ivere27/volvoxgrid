@@ -62,9 +62,12 @@ const STRESS_THEME: DemoTheme = DemoTheme {
 const EMBEDDED_SALES_JSON_GZ: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/sales.json.gz"));
 const EMBEDDED_HIERARCHY_JSON_GZ: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/hierarchy.json.gz"));
+const EMBEDDED_BARCODES_JSON_GZ: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/barcodes.json.gz"));
 
 static EMBEDDED_SALES_JSON_BYTES: OnceLock<Vec<u8>> = OnceLock::new();
 static EMBEDDED_HIERARCHY_JSON_BYTES: OnceLock<Vec<u8>> = OnceLock::new();
+static EMBEDDED_BARCODES_JSON_BYTES: OnceLock<Vec<u8>> = OnceLock::new();
 
 /// Scale a logical-pixel value by the grid's DPI scale factor.
 fn sp(grid: &VolvoxGrid, px: i32) -> i32 {
@@ -235,6 +238,7 @@ fn stress_text_col_width_px(grid: &mut VolvoxGrid) -> i32 {
 fn reset_grid(grid: &mut VolvoxGrid) {
     // Clear all data
     grid.cells.clear_all();
+    grid.clear_barcode_presence_tracking();
     grid.rows = 0;
     grid.cols = 0;
     grid.row_positions.clear();
@@ -298,6 +302,9 @@ pub fn embedded_demo_data_bytes(demo: &str) -> Result<&'static [u8], String> {
         "hierarchy" => Ok(EMBEDDED_HIERARCHY_JSON_BYTES
             .get_or_init(|| inflate_embedded_demo_bytes(EMBEDDED_HIERARCHY_JSON_GZ))
             .as_slice()),
+        "barcodes" => Ok(EMBEDDED_BARCODES_JSON_BYTES
+            .get_or_init(|| inflate_embedded_demo_bytes(EMBEDDED_BARCODES_JSON_GZ))
+            .as_slice()),
         "stress" => Err("embedded demo data is not available for procedural demo: stress".into()),
         other => Err(format!("unknown demo: {other}")),
     }
@@ -310,6 +317,16 @@ pub fn get_demo_data_response(demo: &str) -> Result<pb::GetDemoDataResponse, Str
         format: pb::DemoDataFormat::Json as i32,
         data: data.to_vec(),
     })
+}
+
+pub fn setup_named_demo(grid: &mut VolvoxGrid, demo: &str) -> Result<(), String> {
+    match demo {
+        "stress" => {
+            setup_stress_demo(grid);
+            Ok(())
+        }
+        other => Err(format!("unknown demo: {other}")),
+    }
 }
 
 // =====================================================================
@@ -816,8 +833,10 @@ mod tests {
     fn embedded_demo_data_matches_json_fixtures() {
         let sales_path = super::demo_fixture_path("sales.json");
         let hierarchy_path = super::demo_fixture_path("hierarchy.json");
+        let barcodes_path = super::demo_fixture_path("barcodes.json");
         let sales_expected = fs::read(&sales_path).expect("sales fixture should exist");
         let hierarchy_expected = fs::read(&hierarchy_path).expect("hierarchy fixture should exist");
+        let barcodes_expected = fs::read(&barcodes_path).expect("barcodes fixture should exist");
 
         assert_eq!(
             embedded_demo_data_bytes("sales").expect("sales embedded data should exist"),
@@ -826,6 +845,10 @@ mod tests {
         assert_eq!(
             embedded_demo_data_bytes("hierarchy").expect("hierarchy embedded data should exist"),
             hierarchy_expected.as_slice()
+        );
+        assert_eq!(
+            embedded_demo_data_bytes("barcodes").expect("barcodes embedded data should exist"),
+            barcodes_expected.as_slice()
         );
     }
 }

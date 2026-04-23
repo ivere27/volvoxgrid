@@ -743,6 +743,478 @@ class ImageData extends $pb.GeneratedMessage {
   void clearFormat() => $_clearField(2);
 }
 
+class BarcodeEncodingOptions extends $pb.GeneratedMessage {
+  factory BarcodeEncodingOptions({
+    BarcodeCheckDigitMode? checkDigit,
+    BarcodeTextEncoding? textEncoding,
+    BarcodeQrErrorCorrection? qrEcc,
+  }) {
+    final result = create();
+    if (checkDigit != null) result.checkDigit = checkDigit;
+    if (textEncoding != null) result.textEncoding = textEncoding;
+    if (qrEcc != null) result.qrEcc = qrEcc;
+    return result;
+  }
+
+  BarcodeEncodingOptions._();
+
+  factory BarcodeEncodingOptions.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory BarcodeEncodingOptions.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BarcodeEncodingOptions',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aE<BarcodeCheckDigitMode>(1, _omitFieldNames ? '' : 'checkDigit',
+        enumValues: BarcodeCheckDigitMode.values)
+    ..aE<BarcodeTextEncoding>(2, _omitFieldNames ? '' : 'textEncoding',
+        enumValues: BarcodeTextEncoding.values)
+    ..aE<BarcodeQrErrorCorrection>(3, _omitFieldNames ? '' : 'qrEcc',
+        enumValues: BarcodeQrErrorCorrection.values)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BarcodeEncodingOptions clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BarcodeEncodingOptions copyWith(
+          void Function(BarcodeEncodingOptions) updates) =>
+      super.copyWith((message) => updates(message as BarcodeEncodingOptions))
+          as BarcodeEncodingOptions;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static BarcodeEncodingOptions create() => BarcodeEncodingOptions._();
+  @$core.override
+  BarcodeEncodingOptions createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static BarcodeEncodingOptions getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BarcodeEncodingOptions>(create);
+  static BarcodeEncodingOptions? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  BarcodeCheckDigitMode get checkDigit => $_getN(0);
+  @$pb.TagNumber(1)
+  set checkDigit(BarcodeCheckDigitMode value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasCheckDigit() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearCheckDigit() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  BarcodeTextEncoding get textEncoding => $_getN(1);
+  @$pb.TagNumber(2)
+  set textEncoding(BarcodeTextEncoding value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTextEncoding() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTextEncoding() => $_clearField(2);
+
+  /// QR-only. Ignored for 1D symbologies.
+  @$pb.TagNumber(3)
+  BarcodeQrErrorCorrection get qrEcc => $_getN(2);
+  @$pb.TagNumber(3)
+  set qrEcc(BarcodeQrErrorCorrection value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasQrEcc() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearQrEcc() => $_clearField(3);
+}
+
+class BarcodeRenderOptions extends $pb.GeneratedMessage {
+  factory BarcodeRenderOptions({
+    $core.int? foreground,
+    $core.int? background,
+    ImageAlignment? alignment,
+    $core.int? moduleSize,
+    $core.int? quietZone,
+    $core.int? barHeight,
+    $core.int? narrowBarWidth,
+    $core.bool? showSizeWarning,
+    $core.int? sizeWarningColor,
+    $core.bool? useFullRect,
+  }) {
+    final result = create();
+    if (foreground != null) result.foreground = foreground;
+    if (background != null) result.background = background;
+    if (alignment != null) result.alignment = alignment;
+    if (moduleSize != null) result.moduleSize = moduleSize;
+    if (quietZone != null) result.quietZone = quietZone;
+    if (barHeight != null) result.barHeight = barHeight;
+    if (narrowBarWidth != null) result.narrowBarWidth = narrowBarWidth;
+    if (showSizeWarning != null) result.showSizeWarning = showSizeWarning;
+    if (sizeWarningColor != null) result.sizeWarningColor = sizeWarningColor;
+    if (useFullRect != null) result.useFullRect = useFullRect;
+    return result;
+  }
+
+  BarcodeRenderOptions._();
+
+  factory BarcodeRenderOptions.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory BarcodeRenderOptions.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BarcodeRenderOptions',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
+    ..aE<ImageAlignment>(3, _omitFieldNames ? '' : 'alignment',
+        enumValues: ImageAlignment.values)
+    ..aI(4, _omitFieldNames ? '' : 'moduleSize', fieldType: $pb.PbFieldType.OU3)
+    ..aI(5, _omitFieldNames ? '' : 'quietZone', fieldType: $pb.PbFieldType.OU3)
+    ..aI(10, _omitFieldNames ? '' : 'barHeight', fieldType: $pb.PbFieldType.OU3)
+    ..aI(11, _omitFieldNames ? '' : 'narrowBarWidth',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOB(12, _omitFieldNames ? '' : 'showSizeWarning')
+    ..aI(13, _omitFieldNames ? '' : 'sizeWarningColor',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOB(14, _omitFieldNames ? '' : 'useFullRect')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BarcodeRenderOptions clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BarcodeRenderOptions copyWith(void Function(BarcodeRenderOptions) updates) =>
+      super.copyWith((message) => updates(message as BarcodeRenderOptions))
+          as BarcodeRenderOptions;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static BarcodeRenderOptions create() => BarcodeRenderOptions._();
+  @$core.override
+  BarcodeRenderOptions createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static BarcodeRenderOptions getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BarcodeRenderOptions>(create);
+  static BarcodeRenderOptions? _defaultInstance;
+
+  /// Unset means engine default; foreground defaults to resolved cell foreground,
+  /// background defaults to transparent.
+  @$pb.TagNumber(1)
+  $core.int get foreground => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set foreground($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasForeground() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearForeground() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get background => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set background($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasBackground() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBackground() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  ImageAlignment get alignment => $_getN(2);
+  @$pb.TagNumber(3)
+  set alignment(ImageAlignment value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasAlignment() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAlignment() => $_clearField(3);
+
+  /// QR/linear module size. 0 = auto; explicit values are clamped to [1, 16].
+  @$pb.TagNumber(4)
+  $core.int get moduleSize => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set moduleSize($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasModuleSize() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearModuleSize() => $_clearField(4);
+
+  /// Quiet zone modules. 0 = default; explicit values are clamped to [0, 64]
+  /// for QR and [0, 128] for 1D symbologies.
+  @$pb.TagNumber(5)
+  $core.int get quietZone => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set quietZone($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasQuietZone() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearQuietZone() => $_clearField(5);
+
+  /// 1D-only bar height in pixels. Ignored for QR. 0 = auto.
+  @$pb.TagNumber(10)
+  $core.int get barHeight => $_getIZ(5);
+  @$pb.TagNumber(10)
+  set barHeight($core.int value) => $_setUnsignedInt32(5, value);
+  @$pb.TagNumber(10)
+  $core.bool hasBarHeight() => $_has(5);
+  @$pb.TagNumber(10)
+  void clearBarHeight() => $_clearField(10);
+
+  /// 1D narrow bar width in pixels. Ignored for QR. 0 = auto; explicit values
+  /// are clamped to [1, 32].
+  @$pb.TagNumber(11)
+  $core.int get narrowBarWidth => $_getIZ(6);
+  @$pb.TagNumber(11)
+  set narrowBarWidth($core.int value) => $_setUnsignedInt32(6, value);
+  @$pb.TagNumber(11)
+  $core.bool hasNarrowBarWidth() => $_has(6);
+  @$pb.TagNumber(11)
+  void clearNarrowBarWidth() => $_clearField(11);
+
+  /// Default false. When enabled, the engine draws a warning mark over the
+  /// symbol if the cell is too small for a faithful minimum-size render.
+  @$pb.TagNumber(12)
+  $core.bool get showSizeWarning => $_getBF(7);
+  @$pb.TagNumber(12)
+  set showSizeWarning($core.bool value) => $_setBool(7, value);
+  @$pb.TagNumber(12)
+  $core.bool hasShowSizeWarning() => $_has(7);
+  @$pb.TagNumber(12)
+  void clearShowSizeWarning() => $_clearField(12);
+
+  /// ARGB warning color. Unset means opaque red.
+  @$pb.TagNumber(13)
+  $core.int get sizeWarningColor => $_getIZ(8);
+  @$pb.TagNumber(13)
+  set sizeWarningColor($core.int value) => $_setUnsignedInt32(8, value);
+  @$pb.TagNumber(13)
+  $core.bool hasSizeWarningColor() => $_has(8);
+  @$pb.TagNumber(13)
+  void clearSizeWarningColor() => $_clearField(13);
+
+  /// Default false. In automatic sizing, distribute modules across the full
+  /// available barcode rectangle instead of centering an integer-pixel module
+  /// render that can leave extra side/bottom space.
+  @$pb.TagNumber(14)
+  $core.bool get useFullRect => $_getBF(9);
+  @$pb.TagNumber(14)
+  set useFullRect($core.bool value) => $_setBool(9, value);
+  @$pb.TagNumber(14)
+  $core.bool hasUseFullRect() => $_has(9);
+  @$pb.TagNumber(14)
+  void clearUseFullRect() => $_clearField(14);
+}
+
+class BarcodeCaptionOptions extends $pb.GeneratedMessage {
+  factory BarcodeCaptionOptions({
+    BarcodeCaptionPosition? position,
+    $core.String? text,
+    $core.int? color,
+    $core.double? fontSize,
+  }) {
+    final result = create();
+    if (position != null) result.position = position;
+    if (text != null) result.text = text;
+    if (color != null) result.color = color;
+    if (fontSize != null) result.fontSize = fontSize;
+    return result;
+  }
+
+  BarcodeCaptionOptions._();
+
+  factory BarcodeCaptionOptions.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory BarcodeCaptionOptions.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BarcodeCaptionOptions',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aE<BarcodeCaptionPosition>(1, _omitFieldNames ? '' : 'position',
+        enumValues: BarcodeCaptionPosition.values)
+    ..aOS(2, _omitFieldNames ? '' : 'text')
+    ..aI(3, _omitFieldNames ? '' : 'color', fieldType: $pb.PbFieldType.OU3)
+    ..aD(4, _omitFieldNames ? '' : 'fontSize', fieldType: $pb.PbFieldType.OF)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BarcodeCaptionOptions clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BarcodeCaptionOptions copyWith(
+          void Function(BarcodeCaptionOptions) updates) =>
+      super.copyWith((message) => updates(message as BarcodeCaptionOptions))
+          as BarcodeCaptionOptions;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static BarcodeCaptionOptions create() => BarcodeCaptionOptions._();
+  @$core.override
+  BarcodeCaptionOptions createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static BarcodeCaptionOptions getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BarcodeCaptionOptions>(create);
+  static BarcodeCaptionOptions? _defaultInstance;
+
+  /// Default BOTTOM for 1D, NONE for QR.
+  @$pb.TagNumber(1)
+  BarcodeCaptionPosition get position => $_getN(0);
+  @$pb.TagNumber(1)
+  set position(BarcodeCaptionPosition value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPosition() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPosition() => $_clearField(1);
+
+  /// Empty/unset means use encoded payload.
+  @$pb.TagNumber(2)
+  $core.String get text => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set text($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasText() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearText() => $_clearField(2);
+
+  /// Unset means use barcode/cell foreground.
+  @$pb.TagNumber(3)
+  $core.int get color => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set color($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasColor() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearColor() => $_clearField(3);
+
+  /// Unset/0 means inherit cell font size.
+  @$pb.TagNumber(4)
+  $core.double get fontSize => $_getN(3);
+  @$pb.TagNumber(4)
+  set fontSize($core.double value) => $_setFloat(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasFontSize() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearFontSize() => $_clearField(4);
+}
+
+class BarcodeData extends $pb.GeneratedMessage {
+  factory BarcodeData({
+    BarcodeSymbology? symbology,
+    $core.String? value,
+    BarcodeEncodingOptions? encoding,
+    BarcodeRenderOptions? render,
+    BarcodeCaptionOptions? caption,
+  }) {
+    final result = create();
+    if (symbology != null) result.symbology = symbology;
+    if (value != null) result.value = value;
+    if (encoding != null) result.encoding = encoding;
+    if (render != null) result.render = render;
+    if (caption != null) result.caption = caption;
+    return result;
+  }
+
+  BarcodeData._();
+
+  factory BarcodeData.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory BarcodeData.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BarcodeData',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aE<BarcodeSymbology>(1, _omitFieldNames ? '' : 'symbology',
+        enumValues: BarcodeSymbology.values)
+    ..aOS(2, _omitFieldNames ? '' : 'value')
+    ..aOM<BarcodeEncodingOptions>(3, _omitFieldNames ? '' : 'encoding',
+        subBuilder: BarcodeEncodingOptions.create)
+    ..aOM<BarcodeRenderOptions>(4, _omitFieldNames ? '' : 'render',
+        subBuilder: BarcodeRenderOptions.create)
+    ..aOM<BarcodeCaptionOptions>(5, _omitFieldNames ? '' : 'caption',
+        subBuilder: BarcodeCaptionOptions.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BarcodeData clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BarcodeData copyWith(void Function(BarcodeData) updates) =>
+      super.copyWith((message) => updates(message as BarcodeData))
+          as BarcodeData;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static BarcodeData create() => BarcodeData._();
+  @$core.override
+  BarcodeData createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static BarcodeData getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BarcodeData>(create);
+  static BarcodeData? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  BarcodeSymbology get symbology => $_getN(0);
+  @$pb.TagNumber(1)
+  set symbology(BarcodeSymbology value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSymbology() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSymbology() => $_clearField(1);
+
+  /// Encoded payload. If empty, the engine falls back to the cell's text value.
+  /// Text/string payloads only; raw binary QR/Code128 byte mode is not exposed.
+  @$pb.TagNumber(2)
+  $core.String get value => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set value($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasValue() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearValue() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  BarcodeEncodingOptions get encoding => $_getN(2);
+  @$pb.TagNumber(3)
+  set encoding(BarcodeEncodingOptions value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasEncoding() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearEncoding() => $_clearField(3);
+  @$pb.TagNumber(3)
+  BarcodeEncodingOptions ensureEncoding() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  BarcodeRenderOptions get render => $_getN(3);
+  @$pb.TagNumber(4)
+  set render(BarcodeRenderOptions value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasRender() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRender() => $_clearField(4);
+  @$pb.TagNumber(4)
+  BarcodeRenderOptions ensureRender() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  BarcodeCaptionOptions get caption => $_getN(4);
+  @$pb.TagNumber(5)
+  set caption(BarcodeCaptionOptions value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasCaption() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCaption() => $_clearField(5);
+  @$pb.TagNumber(5)
+  BarcodeCaptionOptions ensureCaption() => $_ensure(4);
+}
+
 class CellRange extends $pb.GeneratedMessage {
   factory CellRange({
     $core.int? row1,
@@ -4993,7 +5465,7 @@ class InteractionConfig extends $pb.GeneratedMessage {
 }
 
 /// ── Rendering ──
-/// The engine renders through 27 independent layers (engine/src/canvas.rs).
+/// The engine renders through 28 independent layers (engine/src/canvas.rs).
 /// Each layer can be individually toggled via render_layer_mask.
 class RenderConfig extends $pb.GeneratedMessage {
   factory RenderConfig({
@@ -6841,6 +7313,7 @@ class CellUpdate extends $pb.GeneratedMessage {
     StickyEdge? stickyRow,
     StickyEdge? stickyCol,
     CellInteraction? interaction,
+    BarcodeData? barcode,
   }) {
     final result = create();
     if (row != null) result.row = row;
@@ -6855,6 +7328,7 @@ class CellUpdate extends $pb.GeneratedMessage {
     if (stickyRow != null) result.stickyRow = stickyRow;
     if (stickyCol != null) result.stickyCol = stickyCol;
     if (interaction != null) result.interaction = interaction;
+    if (barcode != null) result.barcode = barcode;
     return result;
   }
 
@@ -6892,6 +7366,8 @@ class CellUpdate extends $pb.GeneratedMessage {
         enumValues: StickyEdge.values)
     ..aE<CellInteraction>(12, _omitFieldNames ? '' : 'interaction',
         enumValues: CellInteraction.values)
+    ..aOM<BarcodeData>(13, _omitFieldNames ? '' : 'barcode',
+        subBuilder: BarcodeData.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7028,6 +7504,19 @@ class CellUpdate extends $pb.GeneratedMessage {
   $core.bool hasInteraction() => $_has(11);
   @$pb.TagNumber(12)
   void clearInteraction() => $_clearField(12);
+
+  /// Full replacement, not a sparse barcode patch. Send `symbology` every time;
+  /// `BARCODE_NONE` clears an existing barcode.
+  @$pb.TagNumber(13)
+  BarcodeData get barcode => $_getN(12);
+  @$pb.TagNumber(13)
+  set barcode(BarcodeData value) => $_setField(13, value);
+  @$pb.TagNumber(13)
+  $core.bool hasBarcode() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearBarcode() => $_clearField(13);
+  @$pb.TagNumber(13)
+  BarcodeData ensureBarcode() => $_ensure(12);
 }
 
 class UpdateCellsRequest extends $pb.GeneratedMessage {
@@ -7115,6 +7604,7 @@ class GetCellsRequest extends $pb.GeneratedMessage {
     $core.bool? includeStyle,
     $core.bool? includeChecked,
     $core.bool? includeTyped,
+    $core.bool? includeBarcodeStatus,
   }) {
     final result = create();
     if (gridId != null) result.gridId = gridId;
@@ -7125,6 +7615,8 @@ class GetCellsRequest extends $pb.GeneratedMessage {
     if (includeStyle != null) result.includeStyle = includeStyle;
     if (includeChecked != null) result.includeChecked = includeChecked;
     if (includeTyped != null) result.includeTyped = includeTyped;
+    if (includeBarcodeStatus != null)
+      result.includeBarcodeStatus = includeBarcodeStatus;
     return result;
   }
 
@@ -7149,6 +7641,7 @@ class GetCellsRequest extends $pb.GeneratedMessage {
     ..aOB(6, _omitFieldNames ? '' : 'includeStyle')
     ..aOB(7, _omitFieldNames ? '' : 'includeChecked')
     ..aOB(8, _omitFieldNames ? '' : 'includeTyped')
+    ..aOB(9, _omitFieldNames ? '' : 'includeBarcodeStatus')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7241,6 +7734,17 @@ class GetCellsRequest extends $pb.GeneratedMessage {
   $core.bool hasIncludeTyped() => $_has(7);
   @$pb.TagNumber(8)
   void clearIncludeTyped() => $_clearField(8);
+
+  /// Opt-in: run the per-cell barcode encode probe and populate
+  /// `CellData.barcode_status`. Off by default because encoding is not free.
+  @$pb.TagNumber(9)
+  $core.bool get includeBarcodeStatus => $_getBF(8);
+  @$pb.TagNumber(9)
+  set includeBarcodeStatus($core.bool value) => $_setBool(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasIncludeBarcodeStatus() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearIncludeBarcodeStatus() => $_clearField(9);
 }
 
 class CellData extends $pb.GeneratedMessage {
@@ -7251,6 +7755,8 @@ class CellData extends $pb.GeneratedMessage {
     CellStyle? style,
     CheckedState? checked,
     CellInteraction? interaction,
+    BarcodeData? barcode,
+    BarcodeRenderStatus? barcodeStatus,
   }) {
     final result = create();
     if (row != null) result.row = row;
@@ -7259,6 +7765,8 @@ class CellData extends $pb.GeneratedMessage {
     if (style != null) result.style = style;
     if (checked != null) result.checked = checked;
     if (interaction != null) result.interaction = interaction;
+    if (barcode != null) result.barcode = barcode;
+    if (barcodeStatus != null) result.barcodeStatus = barcodeStatus;
     return result;
   }
 
@@ -7285,6 +7793,10 @@ class CellData extends $pb.GeneratedMessage {
         enumValues: CheckedState.values)
     ..aE<CellInteraction>(6, _omitFieldNames ? '' : 'interaction',
         enumValues: CellInteraction.values)
+    ..aOM<BarcodeData>(7, _omitFieldNames ? '' : 'barcode',
+        subBuilder: BarcodeData.create)
+    ..aE<BarcodeRenderStatus>(8, _omitFieldNames ? '' : 'barcodeStatus',
+        enumValues: BarcodeRenderStatus.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7362,6 +7874,30 @@ class CellData extends $pb.GeneratedMessage {
   $core.bool hasInteraction() => $_has(5);
   @$pb.TagNumber(6)
   void clearInteraction() => $_clearField(6);
+
+  /// Readback counterpart of `CellUpdate.barcode = 13`.
+  @$pb.TagNumber(7)
+  BarcodeData get barcode => $_getN(6);
+  @$pb.TagNumber(7)
+  set barcode(BarcodeData value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasBarcode() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearBarcode() => $_clearField(7);
+  @$pb.TagNumber(7)
+  BarcodeData ensureBarcode() => $_ensure(6);
+
+  /// Readback/probe status for `barcode`. Present only when the request sets
+  /// `include_barcode_status`. Field 8 is intentionally independent from
+  /// `CellUpdate.barcode = 13`; the messages have different purposes.
+  @$pb.TagNumber(8)
+  BarcodeRenderStatus get barcodeStatus => $_getN(7);
+  @$pb.TagNumber(8)
+  set barcodeStatus(BarcodeRenderStatus value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasBarcodeStatus() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearBarcodeStatus() => $_clearField(8);
 }
 
 class CellsResponse extends $pb.GeneratedMessage {

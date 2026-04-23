@@ -7,6 +7,7 @@
 //! Concrete backends live in `canvas_cpu` (pixel-buffer) and `canvas_gpu`
 //! (wgpu surface).
 
+use crate::cell::BarcodeSpec;
 use crate::control::CellControl;
 use crate::grid::{PullToRefreshState, VolvoxGrid};
 use crate::proto::volvoxgrid::v1 as pb;
@@ -17,7 +18,7 @@ use crate::scrollbar::{
 use crate::selection::{hover_mode_has, HOVER_CELL, HOVER_COLUMN, HOVER_NONE, HOVER_ROW};
 use crate::sort::{sort_order_is_ascending as sort_order_is_ascending_internal, SORT_NONE};
 use crate::style::{CellStylePatch, HeaderMarkHeight, HighlightStyle, IconSlotStyle};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -2534,8 +2535,9 @@ pub mod layer {
     pub const FAST_SCROLL: u32 = 24;
     pub const PULL_TO_REFRESH: u32 = 25;
     pub const DEBUG_OVERLAY: u32 = 26;
+    pub const BARCODES: u32 = 27;
 
-    pub const COUNT: usize = 27;
+    pub const COUNT: usize = 28;
     pub const ALL: u64 = (1u64 << COUNT) - 1;
 
     pub const NAMES: [&str; COUNT] = [
@@ -2566,6 +2568,7 @@ pub mod layer {
         "fast_scrl",
         "pull_rfrsh",
         "debug_ovl",
+        "barcode",
     ];
 }
 
@@ -2811,6 +2814,7 @@ fn render_grid_internal<C: Canvas>(
         layer::CELL_PICTURES,
         render_cell_pictures(grid, canvas, &ctx)
     );
+    run_layer!(layer::BARCODES, render_barcodes(grid, canvas, &ctx));
     run_layer!(layer::SORT_GLYPHS, render_sort_glyphs(grid, canvas, &ctx));
     run_layer!(
         layer::COL_DRAG_MARKER,
@@ -4636,6 +4640,14 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
             h: orig_h,
         } = text_cell.orig_rect;
         let display_text = meta.display_text.as_ref();
+        if grid
+            .cells
+            .get(text_row, text_col)
+            .and_then(|cell| cell.barcode())
+            .is_some()
+        {
+            continue;
+        }
         let is_fixed = text_row < grid.fixed_rows || text_col < grid.fixed_cols;
         let is_frozen = !is_fixed
             && (text_row < grid.fixed_rows + grid.frozen_rows
@@ -5082,6 +5094,1224 @@ fn render_cell_pictures<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
         };
 
         canvas.blit_image_at(px, py, &img_rgba, img_w, img_h);
+    }
+}
+
+// ===========================================================================
+// Layer 4.6 -- Barcodes and QR codes
+// ===========================================================================
+
+#[derive(Clone, Copy)]
+struct BarcodeDrawRect {
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+}
+
+impl BarcodeDrawRect {
+    fn inset(self, px: i32) -> Self {
+        let inset = px.max(0).min(self.w / 2).min(self.h / 2);
+        Self {
+            x: self.x + inset,
+            y: self.y + inset,
+            w: (self.w - inset * 2).max(0),
+            h: (self.h - inset * 2).max(0),
+        }
+    }
+
+    fn intersect(self, other: Self) -> Option<Self> {
+        let x1 = self.x.max(other.x);
+        let y1 = self.y.max(other.y);
+        let x2 = self
+            .x
+            .saturating_add(self.w)
+            .min(other.x.saturating_add(other.w));
+        let y2 = self
+            .y
+            .saturating_add(self.h)
+            .min(other.y.saturating_add(other.h));
+        (x2 > x1 && y2 > y1).then_some(Self {
+            x: x1,
+            y: y1,
+            w: x2 - x1,
+            h: y2 - y1,
+        })
+    }
+}
+
+fn fill_barcode_rect_clipped<C: Canvas>(
+    canvas: &mut C,
+    rect: BarcodeDrawRect,
+    clip: BarcodeDrawRect,
+    color: u32,
+) {
+    if let Some(rect) = rect.intersect(clip) {
+        canvas.fill_rect(rect.x, rect.y, rect.w, rect.h, color);
+    }
+}
+
+const DEFAULT_BARCODE_SIZE_WARNING_COLOR: u32 = 0xFFFF0000;
+
+fn barcode_size_warning_color(spec: &BarcodeSpec) -> u32 {
+    spec.size_warning_color
+        .unwrap_or(DEFAULT_BARCODE_SIZE_WARNING_COLOR)
+}
+
+fn draw_barcode_warning_line<C: Canvas>(
+    canvas: &mut C,
+    x0: i32,
+    y0: i32,
+    x1: i32,
+    y1: i32,
+    thickness: i32,
+    clip: BarcodeDrawRect,
+    color: u32,
+) {
+    let thickness = thickness.max(1);
+    let dx = (x1 - x0) as f32;
+    let dy = (y1 - y0) as f32;
+    let steps = dx.abs().max(dy.abs()).round() as i32;
+    if steps <= 0 {
+        fill_barcode_rect_clipped(
+            canvas,
+            BarcodeDrawRect {
+                x: x0 - thickness / 2,
+                y: y0 - thickness / 2,
+                w: thickness,
+                h: thickness,
+            },
+            clip,
+            color,
+        );
+        return;
+    }
+
+    for step in 0..=steps {
+        let t = step as f32 / steps as f32;
+        let px = (x0 as f32 + dx * t).round() as i32 - thickness / 2;
+        let py = (y0 as f32 + dy * t).round() as i32 - thickness / 2;
+        fill_barcode_rect_clipped(
+            canvas,
+            BarcodeDrawRect {
+                x: px,
+                y: py,
+                w: thickness,
+                h: thickness,
+            },
+            clip,
+            color,
+        );
+    }
+}
+
+fn draw_barcode_size_warning<C: Canvas>(
+    canvas: &mut C,
+    spec: &BarcodeSpec,
+    rect: BarcodeDrawRect,
+    clip: BarcodeDrawRect,
+) {
+    if !spec.show_size_warning {
+        return;
+    }
+    if rect.w <= 0 || rect.h <= 0 || rect.intersect(clip).is_none() {
+        return;
+    }
+    let color = barcode_size_warning_color(spec);
+    let thickness = 1;
+    let x0 = rect.x;
+    let y0 = rect.y;
+    let x1 = rect.x + rect.w - 1;
+    let y1 = rect.y + rect.h - 1;
+    draw_barcode_warning_line(canvas, x0, y0, x1, y1, thickness, clip, color);
+    draw_barcode_warning_line(canvas, x0, y1, x1, y0, thickness, clip, color);
+}
+
+fn barcode_centered_square_rect(rect: BarcodeDrawRect) -> BarcodeDrawRect {
+    let side = rect.w.min(rect.h);
+    BarcodeDrawRect {
+        x: rect.x + (rect.w - side) / 2,
+        y: rect.y + (rect.h - side) / 2,
+        w: side,
+        h: side,
+    }
+}
+
+fn barcode_layer_needed(grid: &VolvoxGrid, ctx: &RenderContext) -> bool {
+    if !grid.barcode_cells_maybe_present {
+        return false;
+    }
+    any_visible_cell(ctx, |row, col| {
+        grid.cells.get(row, col).is_some_and(|cell| {
+            cell.barcode()
+                .is_some_and(|spec| spec.symbology != pb::BarcodeSymbology::BarcodeNone as i32)
+        })
+    })
+}
+
+fn barcode_is_qr(symbology: i32) -> bool {
+    symbology == pb::BarcodeSymbology::BarcodeQr as i32
+}
+
+fn barcode_payload<'a>(spec: &'a BarcodeSpec, cell_text: &'a str) -> &'a str {
+    if spec.value.is_empty() {
+        cell_text
+    } else {
+        spec.value.as_str()
+    }
+}
+
+fn barcode_caption<'a>(spec: &'a BarcodeSpec, payload: &'a str) -> &'a str {
+    spec.caption_text
+        .as_deref()
+        .filter(|caption| !caption.is_empty())
+        .unwrap_or(payload)
+}
+
+fn barcode_caption_position(spec: &BarcodeSpec, is_qr: bool) -> i32 {
+    spec.caption_position.unwrap_or_else(|| {
+        if is_qr {
+            pb::BarcodeCaptionPosition::CaptionNone as i32
+        } else {
+            pb::BarcodeCaptionPosition::CaptionBottom as i32
+        }
+    })
+}
+
+fn barcode_fore_color(
+    grid: &VolvoxGrid,
+    row: i32,
+    col: i32,
+    spec: &BarcodeSpec,
+    style_override: &CellStylePatch,
+) -> u32 {
+    if let Some(foreground) = spec.foreground {
+        return foreground;
+    }
+    let is_fixed = row < grid.fixed_rows || col < grid.fixed_cols;
+    let is_frozen = !is_fixed
+        && (row < grid.fixed_rows + grid.frozen_rows || col < grid.fixed_cols + grid.frozen_cols);
+    style_override.resolve_fore_color(
+        &grid.style,
+        is_fixed,
+        is_frozen,
+        should_highlight_cell(grid, row, col),
+        selection_fore_color(grid),
+    )
+}
+
+fn image_aligned_rect(
+    outer: BarcodeDrawRect,
+    natural_w: i32,
+    natural_h: i32,
+    align: i32,
+) -> BarcodeDrawRect {
+    if align == pb::ImageAlignment::ImgAlignStretch as i32 || natural_w <= 0 || natural_h <= 0 {
+        return outer;
+    }
+    let w = natural_w.min(outer.w).max(1);
+    let h = natural_h.min(outer.h).max(1);
+    let x = match align {
+        a if a == pb::ImageAlignment::ImgAlignRightTop as i32
+            || a == pb::ImageAlignment::ImgAlignRightCenter as i32
+            || a == pb::ImageAlignment::ImgAlignRightBottom as i32 =>
+        {
+            outer.x + outer.w - w
+        }
+        a if a == pb::ImageAlignment::ImgAlignCenterTop as i32
+            || a == pb::ImageAlignment::ImgAlignCenterCenter as i32
+            || a == pb::ImageAlignment::ImgAlignCenterBottom as i32 =>
+        {
+            outer.x + (outer.w - w) / 2
+        }
+        _ => outer.x,
+    };
+    let y = match align {
+        a if a == pb::ImageAlignment::ImgAlignLeftBottom as i32
+            || a == pb::ImageAlignment::ImgAlignCenterBottom as i32
+            || a == pb::ImageAlignment::ImgAlignRightBottom as i32 =>
+        {
+            outer.y + outer.h - h
+        }
+        a if a == pb::ImageAlignment::ImgAlignLeftCenter as i32
+            || a == pb::ImageAlignment::ImgAlignCenterCenter as i32
+            || a == pb::ImageAlignment::ImgAlignRightCenter as i32 =>
+        {
+            outer.y + (outer.h - h) / 2
+        }
+        _ => outer.y,
+    };
+    BarcodeDrawRect { x, y, w, h }
+}
+
+fn split_barcode_rect<C: Canvas>(
+    canvas: &mut C,
+    grid: &VolvoxGrid,
+    spec: &BarcodeSpec,
+    rect: BarcodeDrawRect,
+    caption_position: i32,
+    caption: &str,
+    style_override: &CellStylePatch,
+) -> (BarcodeDrawRect, Option<BarcodeDrawRect>) {
+    if caption.is_empty() || caption_position == pb::BarcodeCaptionPosition::CaptionNone as i32 {
+        return (rect, None);
+    }
+
+    let font_name = style_override
+        .font_name
+        .as_deref()
+        .unwrap_or(&grid.style.font_name);
+    let font_size = spec
+        .caption_font_size
+        .filter(|size| size.is_finite() && *size > 0.0)
+        .unwrap_or_else(|| style_override.font_size.unwrap_or(grid.style.font_size));
+    let font_bold = style_override.font_bold.unwrap_or(grid.style.font_bold);
+    let font_italic = style_override.font_italic.unwrap_or(grid.style.font_italic);
+    let measured_h = canvas
+        .measure_text(caption, font_name, font_size, font_bold, font_italic, None)
+        .1
+        .ceil() as i32;
+    let caption_h = (measured_h + 3).max(10).min((rect.h / 2).max(0));
+    if caption_h <= 0 || rect.h - caption_h <= 0 {
+        return (rect, None);
+    }
+
+    if caption_position == pb::BarcodeCaptionPosition::CaptionTop as i32 {
+        (
+            BarcodeDrawRect {
+                x: rect.x,
+                y: rect.y + caption_h,
+                w: rect.w,
+                h: rect.h - caption_h,
+            },
+            Some(BarcodeDrawRect {
+                x: rect.x,
+                y: rect.y,
+                w: rect.w,
+                h: caption_h,
+            }),
+        )
+    } else {
+        (
+            BarcodeDrawRect {
+                x: rect.x,
+                y: rect.y,
+                w: rect.w,
+                h: rect.h - caption_h,
+            },
+            Some(BarcodeDrawRect {
+                x: rect.x,
+                y: rect.y + rect.h - caption_h,
+                w: rect.w,
+                h: caption_h,
+            }),
+        )
+    }
+}
+
+fn draw_barcode_caption<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    row: i32,
+    col: i32,
+    caption: &str,
+    rect: BarcodeDrawRect,
+    clip: BarcodeDrawRect,
+    fore: u32,
+    spec: &BarcodeSpec,
+    style_override: &CellStylePatch,
+) {
+    if caption.is_empty() || rect.w <= 0 || rect.h <= 0 {
+        return;
+    }
+    let Some(clip) = rect.intersect(clip) else {
+        return;
+    };
+    let fore = spec.caption_color.unwrap_or(fore);
+    let font_name = style_override
+        .font_name
+        .as_deref()
+        .unwrap_or(&grid.style.font_name);
+    let font_size = spec
+        .caption_font_size
+        .filter(|size| size.is_finite() && *size > 0.0)
+        .unwrap_or_else(|| style_override.font_size.unwrap_or(grid.style.font_size));
+    let font_bold = style_override.font_bold.unwrap_or(grid.style.font_bold);
+    let font_italic = style_override.font_italic.unwrap_or(grid.style.font_italic);
+    let font_stretch = style_override
+        .font_stretch
+        .unwrap_or(grid.style.font_stretch);
+    let text_style = if row < grid.fixed_rows || col < grid.fixed_cols {
+        style_override
+            .text_effect
+            .unwrap_or(grid.style.text_effect_fixed)
+    } else {
+        style_override.text_effect.unwrap_or(grid.style.text_effect)
+    };
+    let (tw, th) = canvas.measure_text_stretched(
+        caption,
+        font_name,
+        font_size,
+        font_bold,
+        font_italic,
+        font_stretch,
+        Some(rect.w as f32),
+    );
+    let text_x = rect.x + ((rect.w - tw.ceil() as i32) / 2).max(0);
+    let text_y = rect.y + ((rect.h - th.ceil() as i32) / 2).max(0);
+    canvas.draw_text_styled_stretched_fast(
+        text_x,
+        text_y,
+        caption,
+        font_name,
+        font_size,
+        font_bold,
+        font_italic,
+        font_stretch,
+        fore,
+        clip.x,
+        clip.y,
+        clip.w,
+        clip.h,
+        text_style,
+        Some(rect.w as f32),
+    );
+}
+
+fn fit_module_px(
+    available_w: i32,
+    available_h: i32,
+    modules_w: i32,
+    modules_h: i32,
+) -> Option<i32> {
+    if available_w <= 0 || available_h <= 0 || modules_w <= 0 || modules_h <= 0 {
+        return None;
+    }
+    let fit = (available_w / modules_w).min(available_h / modules_h);
+    (fit > 0).then_some(fit)
+}
+
+fn requested_module_px(spec: &BarcodeSpec, fit: i32) -> i32 {
+    if spec.module_size == 0 {
+        fit
+    } else {
+        (spec.module_size as i32).clamp(1, 16).min(fit)
+    }
+}
+
+fn requested_linear_module_px(spec: &BarcodeSpec, fit: i32) -> i32 {
+    if spec.narrow_bar_width != 0 {
+        (spec.narrow_bar_width as i32).clamp(1, 32).min(fit)
+    } else {
+        requested_module_px(spec, fit)
+    }
+}
+
+fn barcode_uses_full_qr_rect(spec: &BarcodeSpec) -> bool {
+    spec.use_full_rect && spec.module_size == 0
+}
+
+fn barcode_uses_full_linear_rect(spec: &BarcodeSpec) -> bool {
+    spec.use_full_rect && spec.module_size == 0 && spec.narrow_bar_width == 0
+}
+
+fn proportional_module_range(
+    origin: i32,
+    extent: i32,
+    start_module: i32,
+    end_module: i32,
+    total_modules: i32,
+) -> Option<(i32, i32)> {
+    if extent <= 0
+        || total_modules <= 0
+        || start_module < 0
+        || end_module <= start_module
+        || end_module > total_modules
+    {
+        return None;
+    }
+
+    let start = origin + ((start_module as i64 * extent as i64) / total_modules as i64) as i32;
+    let end = origin + ((end_module as i64 * extent as i64) / total_modules as i64) as i32;
+    (end > start).then_some((start, end - start))
+}
+
+fn qr_ecc(spec: &BarcodeSpec) -> qrcodegen::QrCodeEcc {
+    match spec.qr_ecc {
+        x if x == pb::BarcodeQrErrorCorrection::QrEccLow as i32 => qrcodegen::QrCodeEcc::Low,
+        x if x == pb::BarcodeQrErrorCorrection::QrEccQuartile as i32 => {
+            qrcodegen::QrCodeEcc::Quartile
+        }
+        x if x == pb::BarcodeQrErrorCorrection::QrEccHigh as i32 => qrcodegen::QrCodeEcc::High,
+        _ => qrcodegen::QrCodeEcc::Medium,
+    }
+}
+
+#[derive(Hash, PartialEq, Eq)]
+struct BarcodeEncodeKey {
+    symbology: i32,
+    qr_ecc: i32,
+    text_encoding: i32,
+    check_digit: i32,
+    payload: String,
+}
+
+enum BarcodeEncoded {
+    Qr(qrcodegen::QrCode),
+    Linear(Vec<u8>),
+    Failed,
+}
+
+fn barcode_encode_key(spec: &BarcodeSpec, payload: &str) -> BarcodeEncodeKey {
+    BarcodeEncodeKey {
+        symbology: spec.symbology,
+        qr_ecc: spec.qr_ecc,
+        text_encoding: spec.text_encoding,
+        check_digit: spec.check_digit,
+        payload: payload.to_string(),
+    }
+}
+
+fn encode_barcode_for_render(spec: &BarcodeSpec, payload: &str, is_qr: bool) -> BarcodeEncoded {
+    if is_qr {
+        qrcodegen::QrCode::encode_text(payload, qr_ecc(spec))
+            .map(BarcodeEncoded::Qr)
+            .unwrap_or(BarcodeEncoded::Failed)
+    } else {
+        encode_linear_barcode(spec, payload)
+            .map(BarcodeEncoded::Linear)
+            .unwrap_or(BarcodeEncoded::Failed)
+    }
+}
+
+fn cached_barcode_encoded<'a>(
+    cache: &'a mut HashMap<BarcodeEncodeKey, BarcodeEncoded>,
+    spec: &BarcodeSpec,
+    payload: &str,
+    is_qr: bool,
+) -> &'a BarcodeEncoded {
+    cache
+        .entry(barcode_encode_key(spec, payload))
+        .or_insert_with(|| encode_barcode_for_render(spec, payload, is_qr))
+}
+
+#[cfg(test)]
+fn draw_qr_barcode<C: Canvas>(
+    canvas: &mut C,
+    spec: &BarcodeSpec,
+    payload: &str,
+    rect: BarcodeDrawRect,
+    clip: BarcodeDrawRect,
+    fore: u32,
+) {
+    let encoded = encode_barcode_for_render(spec, payload, true);
+    draw_qr_barcode_encoded(canvas, spec, payload, rect, clip, fore, &encoded);
+}
+
+fn draw_qr_barcode_encoded<C: Canvas>(
+    canvas: &mut C,
+    spec: &BarcodeSpec,
+    payload: &str,
+    rect: BarcodeDrawRect,
+    clip: BarcodeDrawRect,
+    fore: u32,
+    encoded: &BarcodeEncoded,
+) {
+    if payload.is_empty() || rect.w <= 0 || rect.h <= 0 {
+        return;
+    }
+    if rect.intersect(clip).is_none() {
+        return;
+    }
+    let BarcodeEncoded::Qr(qr) = encoded else {
+        return;
+    };
+    let qr_size = qr.size();
+    let quiet = if spec.quiet_zone == 0 {
+        4
+    } else {
+        spec.quiet_zone.min(64) as i32
+    };
+    let total = qr_size + quiet * 2;
+    let Some(fit) = fit_module_px(rect.w, rect.h, total, total) else {
+        draw_barcode_size_warning(canvas, spec, barcode_centered_square_rect(rect), clip);
+        return;
+    };
+
+    if barcode_uses_full_qr_rect(spec) {
+        for y in 0..qr_size {
+            let Some((py, ph)) =
+                proportional_module_range(rect.y, rect.h, y + quiet, y + quiet + 1, total)
+            else {
+                continue;
+            };
+            for x in 0..qr_size {
+                if qr.get_module(x, y) {
+                    let Some((px, pw)) =
+                        proportional_module_range(rect.x, rect.w, x + quiet, x + quiet + 1, total)
+                    else {
+                        continue;
+                    };
+                    fill_barcode_rect_clipped(
+                        canvas,
+                        BarcodeDrawRect {
+                            x: px,
+                            y: py,
+                            w: pw,
+                            h: ph,
+                        },
+                        clip,
+                        fore,
+                    );
+                }
+            }
+        }
+        return;
+    }
+
+    let module_px = requested_module_px(spec, fit);
+    let draw_size = total * module_px;
+    let start_x = rect.x + (rect.w - draw_size) / 2;
+    let start_y = rect.y + (rect.h - draw_size) / 2;
+
+    for y in 0..qr_size {
+        let py = start_y + (y + quiet) * module_px;
+        for x in 0..qr_size {
+            if qr.get_module(x, y) {
+                fill_barcode_rect_clipped(
+                    canvas,
+                    BarcodeDrawRect {
+                        x: start_x + (x + quiet) * module_px,
+                        y: py,
+                        w: module_px,
+                        h: module_px,
+                    },
+                    clip,
+                    fore,
+                );
+            }
+        }
+    }
+}
+
+fn normalized_code128_payload(payload: &str, text_encoding: i32) -> String {
+    let starts_with_charset = payload
+        .chars()
+        .next()
+        .is_some_and(|ch| matches!(ch, '\u{00C0}' | '\u{0181}' | '\u{0106}'));
+    if text_encoding == pb::BarcodeTextEncoding::BarcodeTextGs1 as i32 {
+        let fnc1 = '\u{0179}';
+        if starts_with_charset {
+            let mut chars = payload.chars();
+            let start = chars.next().unwrap_or('\u{0181}');
+            let rest: String = chars.collect();
+            return format!("{start}{fnc1}{rest}");
+        }
+        if payload.len() >= 4
+            && payload.len() % 2 == 0
+            && payload.bytes().all(|b| b.is_ascii_digit())
+        {
+            format!("\u{0106}{fnc1}{payload}")
+        } else {
+            format!("\u{0181}{fnc1}{payload}")
+        }
+    } else if starts_with_charset {
+        payload.to_string()
+    } else if payload.len() >= 4
+        && payload.len() % 2 == 0
+        && payload.bytes().all(|b| b.is_ascii_digit())
+    {
+        format!("\u{0106}{payload}")
+    } else {
+        format!("\u{0181}{payload}")
+    }
+}
+
+fn barcode_payload_matches_encoding(spec: &BarcodeSpec, payload: &str) -> bool {
+    if spec.text_encoding == pb::BarcodeTextEncoding::BarcodeTextAscii as i32 {
+        payload.is_ascii()
+    } else {
+        true
+    }
+}
+
+fn barcode_is_supported_linear_symbology(symbology: i32) -> bool {
+    matches!(
+        symbology,
+        s if s == pb::BarcodeSymbology::BarcodeCode128 as i32
+            || s == pb::BarcodeSymbology::BarcodeCode39 as i32
+            || s == pb::BarcodeSymbology::BarcodeCode93 as i32
+            || s == pb::BarcodeSymbology::BarcodeCode11 as i32
+            || s == pb::BarcodeSymbology::BarcodeEan13 as i32
+            || s == pb::BarcodeSymbology::BarcodeEan8 as i32
+            || s == pb::BarcodeSymbology::BarcodeUpcA as i32
+            || s == pb::BarcodeSymbology::BarcodeUpcE as i32
+            || s == pb::BarcodeSymbology::BarcodeEanSupp as i32
+            || s == pb::BarcodeSymbology::BarcodeItf as i32
+            || s == pb::BarcodeSymbology::BarcodeStf as i32
+            || s == pb::BarcodeSymbology::BarcodeCodabar as i32
+    )
+}
+
+pub(crate) fn barcode_render_status(spec: &BarcodeSpec, payload: &str) -> i32 {
+    if spec.symbology == pb::BarcodeSymbology::BarcodeNone as i32 {
+        return pb::BarcodeRenderStatus::Unspecified as i32;
+    }
+    let is_qr = barcode_is_qr(spec.symbology);
+    if !is_qr && !barcode_is_supported_linear_symbology(spec.symbology) {
+        return pb::BarcodeRenderStatus::UnsupportedSymbology as i32;
+    }
+    if payload.is_empty() {
+        return pb::BarcodeRenderStatus::EmptyPayload as i32;
+    }
+    if is_qr {
+        return if qrcodegen::QrCode::encode_text(payload, qr_ecc(spec)).is_ok() {
+            pb::BarcodeRenderStatus::Ok as i32
+        } else {
+            pb::BarcodeRenderStatus::InvalidPayload as i32
+        };
+    }
+    if encode_linear_barcode(spec, payload).is_some() {
+        pb::BarcodeRenderStatus::Ok as i32
+    } else {
+        pb::BarcodeRenderStatus::InvalidPayload as i32
+    }
+}
+
+fn encode_linear_barcode(spec: &BarcodeSpec, payload: &str) -> Option<Vec<u8>> {
+    if payload.is_empty() || !barcode_payload_matches_encoding(spec, payload) {
+        return None;
+    }
+    match spec.symbology {
+        s if s == pb::BarcodeSymbology::BarcodeCode128 as i32 => {
+            let data = normalized_code128_payload(payload, spec.text_encoding);
+            barcoders::sym::code128::Code128::new(data)
+                .ok()
+                .map(|code| code.encode())
+        }
+        s if s == pb::BarcodeSymbology::BarcodeCode39 as i32 => {
+            let code = if spec.check_digit == pb::BarcodeCheckDigitMode::CheckDigitGenerate as i32 {
+                barcoders::sym::code39::Code39::with_checksum(payload)
+            } else {
+                barcoders::sym::code39::Code39::new(payload)
+            };
+            code.ok().map(|code| code.encode())
+        }
+        s if s == pb::BarcodeSymbology::BarcodeCode93 as i32 => {
+            barcoders::sym::code93::Code93::new(payload)
+                .ok()
+                .map(|code| code.encode())
+        }
+        s if s == pb::BarcodeSymbology::BarcodeCode11 as i32 => {
+            barcoders::sym::code11::Code11::new(payload)
+                .ok()
+                .map(|code| code.encode())
+        }
+        s if s == pb::BarcodeSymbology::BarcodeEan13 as i32 => {
+            barcoders::sym::ean13::EAN13::new(payload)
+                .ok()
+                .map(|code| code.encode())
+        }
+        s if s == pb::BarcodeSymbology::BarcodeEan8 as i32 => {
+            barcoders::sym::ean8::EAN8::new(payload)
+                .ok()
+                .map(|code| code.encode())
+        }
+        s if s == pb::BarcodeSymbology::BarcodeUpcA as i32 => {
+            barcoders::sym::ean13::UPCA::new(payload)
+                .ok()
+                .map(|code| code.encode())
+        }
+        s if s == pb::BarcodeSymbology::BarcodeUpcE as i32 => encode_upce(payload),
+        s if s == pb::BarcodeSymbology::BarcodeEanSupp as i32 => {
+            barcoders::sym::ean_supp::EANSUPP::new(payload)
+                .ok()
+                .map(|code| code.encode())
+        }
+        s if s == pb::BarcodeSymbology::BarcodeItf as i32 => {
+            if spec.check_digit == pb::BarcodeCheckDigitMode::CheckDigitNone as i32
+                && payload.len() % 2 != 0
+            {
+                return None;
+            }
+            barcoders::sym::tf::TF::interleaved(payload)
+                .ok()
+                .map(|code| code.encode())
+        }
+        s if s == pb::BarcodeSymbology::BarcodeStf as i32 => {
+            if spec.check_digit == pb::BarcodeCheckDigitMode::CheckDigitNone as i32
+                && payload.len() % 2 != 0
+            {
+                return None;
+            }
+            barcoders::sym::tf::TF::standard(payload)
+                .ok()
+                .map(|code| code.encode())
+        }
+        s if s == pb::BarcodeSymbology::BarcodeCodabar as i32 => {
+            barcoders::sym::codabar::Codabar::new(payload)
+                .ok()
+                .map(|code| code.encode())
+        }
+        _ => None,
+    }
+}
+
+const UPC_E_ODD: [[u8; 7]; 10] = [
+    *b"0001101",
+    *b"0011001",
+    *b"0010011",
+    *b"0111101",
+    *b"0100011",
+    *b"0110001",
+    *b"0101111",
+    *b"0111011",
+    *b"0110111",
+    *b"0001011",
+];
+const UPC_E_EVEN: [[u8; 7]; 10] = [
+    *b"0100111",
+    *b"0110011",
+    *b"0011011",
+    *b"0100001",
+    *b"0011101",
+    *b"0111001",
+    *b"0000101",
+    *b"0010001",
+    *b"0001001",
+    *b"0010111",
+];
+const UPC_E_PARITY_NS0: [[bool; 6]; 10] = [
+    [true, true, true, false, false, false],
+    [true, true, false, true, false, false],
+    [true, true, false, false, true, false],
+    [true, true, false, false, false, true],
+    [true, false, true, true, false, false],
+    [true, false, false, true, true, false],
+    [true, false, false, false, true, true],
+    [true, false, true, false, true, false],
+    [true, false, true, false, false, true],
+    [true, false, false, true, false, true],
+];
+const UPC_E_PARITY_NS1: [[bool; 6]; 10] = [
+    [false, false, false, true, true, true],
+    [false, false, true, false, true, true],
+    [false, false, true, true, false, true],
+    [false, false, true, true, true, false],
+    [false, true, false, false, true, true],
+    [false, true, true, false, false, true],
+    [false, true, true, true, false, false],
+    [false, true, false, true, false, true],
+    [false, true, false, true, true, false],
+    [false, true, true, false, true, false],
+];
+
+fn upce_check_digit(digits: &[u8; 6]) -> u8 {
+    let odd_sum = digits[5] + digits[3] + digits[1];
+    let even_sum = digits[4] + digits[2] + digits[0];
+    let sum = odd_sum as u32 * 3 + even_sum as u32;
+    ((10 - (sum % 10)) % 10) as u8
+}
+
+fn parse_upce_payload(payload: &str) -> Option<(u8, [u8; 6])> {
+    if !payload.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let digits: Vec<u8> = payload.bytes().map(|b| b - b'0').collect();
+    match digits.len() {
+        6 => Some((0, digits.as_slice().try_into().ok()?)),
+        7 if digits[0] <= 1 => Some((digits[0], digits[1..7].try_into().ok()?)),
+        7 => Some((0, digits[0..6].try_into().ok()?)),
+        8 if digits[0] <= 1 => Some((digits[0], digits[1..7].try_into().ok()?)),
+        _ => None,
+    }
+}
+
+fn push_bits_from_ascii(out: &mut Vec<u8>, bits: &[u8]) {
+    out.extend(bits.iter().map(|bit| if *bit == b'1' { 1 } else { 0 }));
+}
+
+fn encode_upce(payload: &str) -> Option<Vec<u8>> {
+    let (number_system, digits) = parse_upce_payload(payload)?;
+    let check = upce_check_digit(&digits) as usize;
+    let parity = if number_system == 0 {
+        &UPC_E_PARITY_NS0[check]
+    } else {
+        &UPC_E_PARITY_NS1[check]
+    };
+    let mut bits = Vec::with_capacity(51);
+    push_bits_from_ascii(&mut bits, b"101");
+    for (idx, digit) in digits.iter().enumerate() {
+        let pattern = if parity[idx] {
+            &UPC_E_EVEN[*digit as usize]
+        } else {
+            &UPC_E_ODD[*digit as usize]
+        };
+        push_bits_from_ascii(&mut bits, pattern);
+    }
+    push_bits_from_ascii(&mut bits, b"010101");
+    Some(bits)
+}
+
+#[cfg(test)]
+fn draw_linear_barcode<C: Canvas>(
+    canvas: &mut C,
+    spec: &BarcodeSpec,
+    payload: &str,
+    rect: BarcodeDrawRect,
+    clip: BarcodeDrawRect,
+    fore: u32,
+) {
+    let encoded = encode_barcode_for_render(spec, payload, false);
+    draw_linear_barcode_encoded(canvas, spec, payload, rect, clip, fore, &encoded);
+}
+
+fn draw_linear_barcode_encoded<C: Canvas>(
+    canvas: &mut C,
+    spec: &BarcodeSpec,
+    payload: &str,
+    rect: BarcodeDrawRect,
+    clip: BarcodeDrawRect,
+    fore: u32,
+    encoded: &BarcodeEncoded,
+) {
+    if payload.is_empty() || rect.w <= 0 || rect.h <= 0 {
+        return;
+    }
+    if rect.intersect(clip).is_none() {
+        return;
+    }
+    let BarcodeEncoded::Linear(bits) = encoded else {
+        return;
+    };
+    if bits.is_empty() {
+        return;
+    }
+    let quiet = if spec.quiet_zone == 0 {
+        10
+    } else {
+        spec.quiet_zone.min(128) as i32
+    };
+    let total_modules = bits.len() as i32 + quiet * 2;
+    let bar_h = if spec.bar_height == 0 {
+        rect.h
+    } else {
+        (spec.bar_height as i32).clamp(1, rect.h)
+    };
+    let bar_y = rect.y + (rect.h - bar_h) / 2;
+    let Some(fit) = fit_module_px(rect.w, rect.h, total_modules, 1) else {
+        let Some(preview_rect) = linear_barcode_preview_rect(total_modules, rect, bar_h) else {
+            return;
+        };
+        draw_linear_barcode_preview(
+            canvas,
+            &bits,
+            quiet,
+            total_modules,
+            preview_rect,
+            clip,
+            fore,
+        );
+        draw_barcode_size_warning(canvas, spec, preview_rect, clip);
+        return;
+    };
+
+    if barcode_uses_full_linear_rect(spec) {
+        let mut run_start: Option<i32> = None;
+        for (idx, bit) in bits.iter().enumerate() {
+            if *bit == 1 {
+                if run_start.is_none() {
+                    run_start = Some(idx as i32);
+                }
+            } else if let Some(start) = run_start.take() {
+                if let Some((x, w)) = proportional_module_range(
+                    rect.x,
+                    rect.w,
+                    quiet + start,
+                    quiet + idx as i32,
+                    total_modules,
+                ) {
+                    fill_barcode_rect_clipped(
+                        canvas,
+                        BarcodeDrawRect {
+                            x,
+                            y: bar_y,
+                            w,
+                            h: bar_h,
+                        },
+                        clip,
+                        fore,
+                    );
+                }
+            }
+        }
+        if let Some(start) = run_start {
+            if let Some((x, w)) = proportional_module_range(
+                rect.x,
+                rect.w,
+                quiet + start,
+                quiet + bits.len() as i32,
+                total_modules,
+            ) {
+                fill_barcode_rect_clipped(
+                    canvas,
+                    BarcodeDrawRect {
+                        x,
+                        y: bar_y,
+                        w,
+                        h: bar_h,
+                    },
+                    clip,
+                    fore,
+                );
+            }
+        }
+        return;
+    }
+
+    let module_px = requested_linear_module_px(spec, fit);
+    let draw_w = total_modules * module_px;
+    let start_x = rect.x + (rect.w - draw_w) / 2 + quiet * module_px;
+
+    let mut run_start: Option<i32> = None;
+    for (idx, bit) in bits.iter().enumerate() {
+        if *bit == 1 {
+            if run_start.is_none() {
+                run_start = Some(idx as i32);
+            }
+        } else if let Some(start) = run_start.take() {
+            let len = idx as i32 - start;
+            fill_barcode_rect_clipped(
+                canvas,
+                BarcodeDrawRect {
+                    x: start_x + start * module_px,
+                    y: bar_y,
+                    w: len * module_px,
+                    h: bar_h,
+                },
+                clip,
+                fore,
+            );
+        }
+    }
+    if let Some(start) = run_start {
+        let len = bits.len() as i32 - start;
+        fill_barcode_rect_clipped(
+            canvas,
+            BarcodeDrawRect {
+                x: start_x + start * module_px,
+                y: bar_y,
+                w: len * module_px,
+                h: bar_h,
+            },
+            clip,
+            fore,
+        );
+    }
+}
+
+fn linear_barcode_preview_rect(
+    total_modules: i32,
+    rect: BarcodeDrawRect,
+    bar_h: i32,
+) -> Option<BarcodeDrawRect> {
+    if rect.w <= 0 || rect.h <= 0 || total_modules <= 0 || bar_h <= 0 {
+        return None;
+    }
+    let preview_h = ((bar_h as i64 * rect.w as i64 + total_modules as i64 - 1)
+        / total_modules as i64)
+        .clamp(1, bar_h as i64) as i32;
+    Some(BarcodeDrawRect {
+        x: rect.x,
+        y: rect.y + (rect.h - preview_h) / 2,
+        w: rect.w,
+        h: preview_h,
+    })
+}
+
+fn draw_linear_barcode_preview<C: Canvas>(
+    canvas: &mut C,
+    bits: &[u8],
+    quiet: i32,
+    total_modules: i32,
+    rect: BarcodeDrawRect,
+    clip: BarcodeDrawRect,
+    fore: u32,
+) {
+    if rect.w <= 0 || rect.h <= 0 || total_modules <= 0 || bits.is_empty() {
+        return;
+    }
+
+    let mut run_start: Option<i32> = None;
+    for px in 0..rect.w {
+        let module_start = (px * total_modules) / rect.w;
+        let module_end = (((px + 1) * total_modules + rect.w - 1) / rect.w).min(total_modules);
+        let mut black = false;
+        for module in module_start..module_end {
+            let idx = module - quiet;
+            if idx >= 0 && (idx as usize) < bits.len() && bits[idx as usize] == 1 {
+                black = true;
+                break;
+            }
+        }
+
+        if black {
+            if run_start.is_none() {
+                run_start = Some(px);
+            }
+        } else if let Some(start) = run_start.take() {
+            fill_barcode_rect_clipped(
+                canvas,
+                BarcodeDrawRect {
+                    x: rect.x + start,
+                    y: rect.y,
+                    w: px - start,
+                    h: rect.h,
+                },
+                clip,
+                fore,
+            );
+        }
+    }
+    if let Some(start) = run_start {
+        fill_barcode_rect_clipped(
+            canvas,
+            BarcodeDrawRect {
+                x: rect.x + start,
+                y: rect.y,
+                w: rect.w - start,
+                h: rect.h,
+            },
+            clip,
+            fore,
+        );
+    }
+}
+
+fn barcode_natural_size_encoded(
+    spec: &BarcodeSpec,
+    is_qr: bool,
+    encoded: &BarcodeEncoded,
+) -> Option<(i32, i32)> {
+    let module_px = if is_qr {
+        (spec.module_size != 0).then_some((spec.module_size as i32).clamp(1, 16))?
+    } else if spec.narrow_bar_width != 0 {
+        (spec.narrow_bar_width as i32).clamp(1, 32)
+    } else {
+        (spec.module_size != 0).then_some((spec.module_size as i32).clamp(1, 16))?
+    };
+    if is_qr {
+        let BarcodeEncoded::Qr(qr) = encoded else {
+            return None;
+        };
+        let quiet = if spec.quiet_zone == 0 {
+            4
+        } else {
+            spec.quiet_zone.min(64) as i32
+        };
+        let size = (qr.size() + quiet * 2) * module_px;
+        Some((size, size))
+    } else {
+        let BarcodeEncoded::Linear(bits) = encoded else {
+            return None;
+        };
+        let quiet = if spec.quiet_zone == 0 {
+            10
+        } else {
+            spec.quiet_zone.min(128) as i32
+        };
+        Some(((bits.len() as i32 + quiet * 2) * module_px, 0))
+    }
+}
+
+fn render_barcodes<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
+    if !barcode_layer_needed(grid, ctx) {
+        return;
+    }
+    let vp = &ctx.vp;
+    let mut encode_cache: HashMap<BarcodeEncodeKey, BarcodeEncoded> = HashMap::new();
+    for &visible in &ctx.vis_cells {
+        let (row, col, cx, cy, cw, ch) = visible.parts();
+        let visible_rect = merged_visible_rect(&ctx.merged_visible_rects, visible);
+        let clip = BarcodeDrawRect {
+            x: visible_rect.x,
+            y: visible_rect.y,
+            w: visible_rect.w,
+            h: visible_rect.h,
+        };
+        let cell = match grid.cells.get(row, col) {
+            Some(cell) => cell,
+            None => continue,
+        };
+        let Some(spec) = cell.barcode() else {
+            continue;
+        };
+        if spec.symbology == pb::BarcodeSymbology::BarcodeNone as i32 {
+            continue;
+        }
+        let payload = barcode_payload(spec, cell.display_text());
+        if payload.is_empty() {
+            continue;
+        }
+
+        let style_override = grid.get_cell_style(row, col);
+        let fore = barcode_fore_color(grid, row, col, spec, &style_override);
+        let is_qr = barcode_is_qr(spec.symbology);
+        let encoded = cached_barcode_encoded(&mut encode_cache, spec, payload, is_qr);
+        let caption = barcode_caption(spec, payload);
+        let caption_pos = barcode_caption_position(spec, is_qr);
+        let (ox, oy, ow, oh) = original_cell_bounds(grid, row, col, cx, cy, cw, ch, vp);
+        let outer = BarcodeDrawRect {
+            x: ox,
+            y: oy,
+            w: ow,
+            h: oh,
+        }
+        .inset(2);
+        if outer.w <= 0 || outer.h <= 0 {
+            continue;
+        }
+
+        let natural = barcode_natural_size_encoded(spec, is_qr, encoded).unwrap_or((0, 0));
+        let block = if natural.0 > 0 {
+            let natural_h = if natural.1 > 0 { natural.1 } else { outer.h };
+            image_aligned_rect(outer, natural.0, natural_h, spec.alignment)
+        } else {
+            outer
+        };
+        if let Some(background) = spec.background {
+            fill_barcode_rect_clipped(canvas, block, clip, background);
+        }
+
+        let (symbol_rect, caption_rect) = split_barcode_rect(
+            canvas,
+            grid,
+            spec,
+            block,
+            caption_pos,
+            caption,
+            &style_override,
+        );
+        let symbol_rect = symbol_rect.inset(1);
+        if is_qr {
+            draw_qr_barcode_encoded(canvas, spec, payload, symbol_rect, clip, fore, encoded);
+        } else {
+            draw_linear_barcode_encoded(canvas, spec, payload, symbol_rect, clip, fore, encoded);
+        }
+        if let Some(caption_rect) = caption_rect {
+            draw_barcode_caption(
+                grid,
+                canvas,
+                row,
+                col,
+                caption,
+                caption_rect,
+                clip,
+                fore,
+                spec,
+                &style_override,
+            );
+        }
     }
 }
 
@@ -8357,8 +9587,8 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
     let ctx_us = grid.debug_ctx_time_us.get();
     let clear_us = grid.debug_clear_time_us.get();
     let grand_us = ctx_us + clear_us + total_us;
-    // Layer grid: 2 columns, ceil(26/2)=13 rows + 1 title + 1 summary
-    let layer_rows = if profiling { (layer::COUNT + 1) / 2 } else { 0 }; // 13
+    // Layer grid: 2 columns, ceil(layer count / 2) rows + 1 title + 1 summary
+    let layer_rows = if profiling { (layer::COUNT + 1) / 2 } else { 0 };
     let layer_extra = if profiling { 2 + layer_rows as i32 } else { 0 };
 
     // Column layout for layer grid:
@@ -8480,12 +9710,15 @@ fn render_debug_overlay<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rend
 mod tests {
     use super::pb;
     use super::{
-        aligned_editor_draw_x, build_or_reuse_ctx, cell_has_checkbox_visual, cell_rect,
+        aligned_editor_draw_x, barcode_centered_square_rect, barcode_layer_needed,
+        barcode_render_status, build_or_reuse_ctx, cell_has_checkbox_visual, cell_rect,
         checkbox_box_size, checkbox_layer_needed, compose_preedit_display_text,
-        dropdown_button_rect, dropdown_glyph_metrics, dropdown_layer_needed,
-        parse_progress_percent, picture_layer_needed, progress_layer_needed, render_grid,
-        show_dropdown_button_for_cell, sort_arrow_box_size, CellKey, RenderContext,
-        RenderCtxCacheKey, RenderCtxCached,
+        draw_linear_barcode, draw_qr_barcode, dropdown_button_rect, dropdown_glyph_metrics,
+        dropdown_layer_needed, encode_linear_barcode, linear_barcode_preview_rect,
+        normalized_code128_payload, parse_progress_percent, picture_layer_needed,
+        progress_layer_needed, render_grid, show_dropdown_button_for_cell, sort_arrow_box_size,
+        BarcodeDrawRect, CellKey, RenderContext, RenderCtxCacheKey, RenderCtxCached,
+        DEFAULT_BARCODE_SIZE_WARNING_COLOR,
     };
     use crate::canvas_cpu::CpuCanvas;
     use crate::grid::VolvoxGrid;
@@ -8501,6 +9734,29 @@ mod tests {
             | ((buffer[off] as u32) << 16)
             | ((buffer[off + 1] as u32) << 8)
             | (buffer[off + 2] as u32)
+    }
+
+    fn color_bounds(buffer: &[u8], width: i32, height: i32, color: u32) -> Option<BarcodeDrawRect> {
+        let mut min_x = width;
+        let mut min_y = height;
+        let mut max_x = -1;
+        let mut max_y = -1;
+        for y in 0..height {
+            for x in 0..width {
+                if pixel_argb(buffer, width, x, y) == color {
+                    min_x = min_x.min(x);
+                    min_y = min_y.min(y);
+                    max_x = max_x.max(x);
+                    max_y = max_y.max(y);
+                }
+            }
+        }
+        (max_x >= min_x && max_y >= min_y).then_some(BarcodeDrawRect {
+            x: min_x,
+            y: min_y,
+            w: max_x - min_x + 1,
+            h: max_y - min_y + 1,
+        })
     }
 
     struct SolidTextRenderer;
@@ -8633,6 +9889,556 @@ mod tests {
 
         grid.cells.get_mut(1, 0).extra_mut().picture = Some(vec![1, 2, 3]);
         assert!(picture_layer_needed(&grid, &render_ctx(&grid)));
+    }
+
+    #[test]
+    fn barcode_layer_guard_is_viewport_aware() {
+        let mut grid = VolvoxGrid::new(1, 68, 160, 3, 12, 1, 0);
+        grid.cells.get_mut(1, 10).extra_mut().barcode = Some(Box::new(crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeQr as i32,
+            value: "offscreen".to_string(),
+            ..Default::default()
+        }));
+        grid.barcode_cells_maybe_present = true;
+        assert!(!barcode_layer_needed(&grid, &render_ctx(&grid)));
+
+        grid.cells.get_mut(1, 0).extra_mut().barcode = Some(Box::new(crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeQr as i32,
+            value: "visible".to_string(),
+            ..Default::default()
+        }));
+        assert!(barcode_layer_needed(&grid, &render_ctx(&grid)));
+    }
+
+    #[test]
+    fn upce_encoder_emits_compact_symbol_bits() {
+        let spec = crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeUpcE as i32,
+            ..Default::default()
+        };
+        let bits = encode_linear_barcode(&spec, "901258").expect("valid UPC-E payload");
+        assert_eq!(bits.len(), 51);
+        assert_eq!(&bits[0..3], &[1, 0, 1]);
+        assert_eq!(&bits[45..51], &[0, 1, 0, 1, 0, 1]);
+    }
+
+    fn assert_linear_barcode_encodes(symbology: pb::BarcodeSymbology, payload: &str) {
+        let spec = crate::cell::BarcodeSpec {
+            symbology: symbology as i32,
+            ..Default::default()
+        };
+        let bits = encode_linear_barcode(&spec, payload).expect("valid barcode payload");
+        assert!(!bits.is_empty());
+    }
+
+    #[test]
+    fn ean13_encodes_valid_payload() {
+        assert_linear_barcode_encodes(pb::BarcodeSymbology::BarcodeEan13, "590123412345");
+    }
+
+    #[test]
+    fn ean8_encodes_valid_payload() {
+        assert_linear_barcode_encodes(pb::BarcodeSymbology::BarcodeEan8, "5512345");
+    }
+
+    #[test]
+    fn upca_encodes_valid_payload() {
+        assert_linear_barcode_encodes(pb::BarcodeSymbology::BarcodeUpcA, "042100005264");
+    }
+
+    #[test]
+    fn ean_supp_encodes_valid_payload() {
+        assert_linear_barcode_encodes(pb::BarcodeSymbology::BarcodeEanSupp, "90000");
+    }
+
+    #[test]
+    fn itf_encodes_even_length_payload() {
+        let spec = crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeItf as i32,
+            check_digit: pb::BarcodeCheckDigitMode::CheckDigitNone as i32,
+            ..Default::default()
+        };
+        let bits = encode_linear_barcode(&spec, "12345670").expect("valid ITF payload");
+        assert!(!bits.is_empty());
+    }
+
+    #[test]
+    fn stf_encodes_even_length_payload() {
+        let spec = crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeStf as i32,
+            check_digit: pb::BarcodeCheckDigitMode::CheckDigitNone as i32,
+            ..Default::default()
+        };
+        let bits = encode_linear_barcode(&spec, "135790").expect("valid STF payload");
+        assert!(!bits.is_empty());
+    }
+
+    #[test]
+    fn codabar_encodes_with_start_stop() {
+        assert_linear_barcode_encodes(pb::BarcodeSymbology::BarcodeCodabar, "A12345B");
+    }
+
+    #[test]
+    fn code93_encodes_ascii_payload() {
+        assert_linear_barcode_encodes(pb::BarcodeSymbology::BarcodeCode93, "CODE93-42");
+    }
+
+    #[test]
+    fn code11_encodes_digit_payload() {
+        assert_linear_barcode_encodes(pb::BarcodeSymbology::BarcodeCode11, "12345-678");
+    }
+
+    #[test]
+    fn two_of_five_odd_length_without_check_digit_is_rejected() {
+        for symbology in [
+            pb::BarcodeSymbology::BarcodeItf,
+            pb::BarcodeSymbology::BarcodeStf,
+        ] {
+            let spec = crate::cell::BarcodeSpec {
+                symbology: symbology as i32,
+                check_digit: pb::BarcodeCheckDigitMode::CheckDigitNone as i32,
+                ..Default::default()
+            };
+            assert!(encode_linear_barcode(&spec, "12345").is_none());
+        }
+    }
+
+    #[test]
+    fn barcode_ascii_encoding_rejects_non_ascii_payload() {
+        let spec = crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeCode128 as i32,
+            text_encoding: pb::BarcodeTextEncoding::BarcodeTextAscii as i32,
+            ..Default::default()
+        };
+        assert!(encode_linear_barcode(&spec, "ABC123").is_some());
+        assert!(encode_linear_barcode(&spec, "한글").is_none());
+    }
+
+    #[test]
+    fn barcode_render_status_reports_invalid_payloads() {
+        let valid = crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeCode128 as i32,
+            ..Default::default()
+        };
+        assert_eq!(
+            barcode_render_status(&valid, "ABC123"),
+            pb::BarcodeRenderStatus::Ok as i32
+        );
+
+        let ascii_only = crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeCode128 as i32,
+            text_encoding: pb::BarcodeTextEncoding::BarcodeTextAscii as i32,
+            ..Default::default()
+        };
+        assert_eq!(
+            barcode_render_status(&ascii_only, "한글"),
+            pb::BarcodeRenderStatus::InvalidPayload as i32
+        );
+
+        assert_eq!(
+            barcode_render_status(&valid, ""),
+            pb::BarcodeRenderStatus::EmptyPayload as i32
+        );
+
+        // Unknown/unsupported symbology wins over payload emptiness so wrappers
+        // can diagnose the root cause.
+        let unsupported_empty = crate::cell::BarcodeSpec {
+            symbology: 9999,
+            ..Default::default()
+        };
+        assert_eq!(
+            barcode_render_status(&unsupported_empty, ""),
+            pb::BarcodeRenderStatus::UnsupportedSymbology as i32
+        );
+        assert_eq!(
+            barcode_render_status(&unsupported_empty, "ABC123"),
+            pb::BarcodeRenderStatus::UnsupportedSymbology as i32
+        );
+    }
+
+    #[test]
+    fn code128_gs1_payload_inserts_fnc1_after_start_code() {
+        let payload = normalized_code128_payload(
+            "0101234567890128",
+            pb::BarcodeTextEncoding::BarcodeTextGs1 as i32,
+        );
+        let chars: Vec<char> = payload.chars().take(2).collect();
+        assert_eq!(chars, vec!['\u{0106}', '\u{0179}']);
+    }
+
+    #[test]
+    fn code39_check_digit_generate_appends_symbol() {
+        let plain = crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeCode39 as i32,
+            ..Default::default()
+        };
+        let checked = crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeCode39 as i32,
+            check_digit: pb::BarcodeCheckDigitMode::CheckDigitGenerate as i32,
+            ..Default::default()
+        };
+        let plain_bits = encode_linear_barcode(&plain, "ABC123").expect("valid Code39 payload");
+        let checked_bits = encode_linear_barcode(&checked, "ABC123").expect("valid Code39 payload");
+        assert!(checked_bits.len() > plain_bits.len());
+    }
+
+    #[test]
+    fn linear_barcode_draws_compressed_preview_when_too_narrow() {
+        let width = 24;
+        let height = 24;
+        let stride = width * 4;
+        let mut buffer = vec![0u8; (stride * height) as usize];
+        let mut text = MeasureOnlyTextRenderer;
+        let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+        let spec = crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeCode39 as i32,
+            quiet_zone: 10,
+            ..Default::default()
+        };
+
+        let rect = BarcodeDrawRect {
+            x: 0,
+            y: 0,
+            w: width,
+            h: height,
+        };
+        draw_linear_barcode(&mut canvas, &spec, "ABC123", rect, rect, 0xFF000000);
+
+        assert!(buffer.chunks_exact(4).any(|px| px[3] != 0));
+        let drawn_rows = (0..height)
+            .filter(|&y| {
+                (0..width).any(|x| {
+                    let alpha = (y * stride + x * 4 + 3) as usize;
+                    buffer[alpha] != 0
+                })
+            })
+            .count();
+        assert!(drawn_rows > 0);
+        assert!(drawn_rows < height as usize);
+    }
+
+    #[test]
+    fn linear_barcode_auto_sizing_uses_full_width_when_enabled() {
+        let height = 28;
+        let quiet = 10;
+        let mut spec = crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeCode39 as i32,
+            quiet_zone: quiet,
+            use_full_rect: true,
+            ..Default::default()
+        };
+        let bits = encode_linear_barcode(&spec, "ABC123").expect("valid Code39 payload");
+        let total_modules = bits.len() as i32 + quiet as i32 * 2;
+        let width = total_modules + 37;
+        let rect = BarcodeDrawRect {
+            x: 0,
+            y: 0,
+            w: width,
+            h: height,
+        };
+
+        let mut full_buffer = vec![0u8; (width * height * 4) as usize];
+        let mut full_text = MeasureOnlyTextRenderer;
+        let mut full_canvas =
+            CpuCanvas::new(&mut full_buffer, width, height, width * 4, &mut full_text);
+        draw_linear_barcode(&mut full_canvas, &spec, "ABC123", rect, rect, 0xFF000000);
+        let full_bounds =
+            color_bounds(&full_buffer, width, height, 0xFF000000).expect("full barcode drawn");
+
+        spec.use_full_rect = false;
+        let mut stepped_buffer = vec![0u8; (width * height * 4) as usize];
+        let mut stepped_text = MeasureOnlyTextRenderer;
+        let mut stepped_canvas = CpuCanvas::new(
+            &mut stepped_buffer,
+            width,
+            height,
+            width * 4,
+            &mut stepped_text,
+        );
+        draw_linear_barcode(&mut stepped_canvas, &spec, "ABC123", rect, rect, 0xFF000000);
+        let stepped_bounds = color_bounds(&stepped_buffer, width, height, 0xFF000000)
+            .expect("stepped barcode drawn");
+
+        assert!(full_bounds.x < stepped_bounds.x);
+        assert!(full_bounds.x + full_bounds.w > stepped_bounds.x + stepped_bounds.w);
+    }
+
+    #[test]
+    fn qr_barcode_auto_sizing_uses_full_rect_when_enabled() {
+        let width = 93;
+        let height = 77;
+        let rect = BarcodeDrawRect {
+            x: 0,
+            y: 0,
+            w: width,
+            h: height,
+        };
+        let mut spec = crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeQr as i32,
+            use_full_rect: true,
+            ..Default::default()
+        };
+
+        let mut full_buffer = vec![0u8; (width * height * 4) as usize];
+        let mut full_text = MeasureOnlyTextRenderer;
+        let mut full_canvas =
+            CpuCanvas::new(&mut full_buffer, width, height, width * 4, &mut full_text);
+        draw_qr_barcode(
+            &mut full_canvas,
+            &spec,
+            "QR-FULL-RECT",
+            rect,
+            rect,
+            0xFF000000,
+        );
+        let full_bounds =
+            color_bounds(&full_buffer, width, height, 0xFF000000).expect("full QR drawn");
+
+        spec.use_full_rect = false;
+        let mut stepped_buffer = vec![0u8; (width * height * 4) as usize];
+        let mut stepped_text = MeasureOnlyTextRenderer;
+        let mut stepped_canvas = CpuCanvas::new(
+            &mut stepped_buffer,
+            width,
+            height,
+            width * 4,
+            &mut stepped_text,
+        );
+        draw_qr_barcode(
+            &mut stepped_canvas,
+            &spec,
+            "QR-FULL-RECT",
+            rect,
+            rect,
+            0xFF000000,
+        );
+        let stepped_bounds =
+            color_bounds(&stepped_buffer, width, height, 0xFF000000).expect("stepped QR drawn");
+
+        assert!(full_bounds.w > stepped_bounds.w);
+        assert!(full_bounds.h > stepped_bounds.h);
+    }
+
+    #[test]
+    fn barcode_render_uses_resized_col_width_after_cached_frame() {
+        let width = 260;
+        let height = 90;
+        let stride = width * 4;
+        let mut grid = VolvoxGrid::new(1, width, height, 1, 2, 0, 0);
+        grid.default_col_width = 120;
+        grid.default_row_height = 80;
+        grid.style.back_color_bkg = 0xFFFFFFFF;
+        grid.render_layer_mask = 1u64 << super::layer::BARCODES;
+        grid.cells.get_mut(0, 0).extra_mut().barcode = Some(Box::new(crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeUpcE as i32,
+            value: "042526".to_string(),
+            caption_position: Some(pb::BarcodeCaptionPosition::CaptionNone as i32),
+            quiet_zone: 10,
+            use_full_rect: true,
+            ..Default::default()
+        }));
+        grid.barcode_cells_maybe_present = true;
+        grid.ensure_layout();
+
+        let mut text = MeasureOnlyTextRenderer;
+        let mut initial = vec![0u8; (stride * height) as usize];
+        let mut initial_canvas = CpuCanvas::new(&mut initial, width, height, stride, &mut text);
+        render_grid(&grid, &mut initial_canvas);
+        let initial_bounds =
+            color_bounds(&initial, width, height, 0xFF000000).expect("initial barcode drawn");
+
+        grid.col_widths.insert(0, 180);
+        grid.layout.patch_col_width(0, 180);
+        grid.mark_dirty();
+
+        let mut resized = vec![0u8; (stride * height) as usize];
+        let mut resized_canvas = CpuCanvas::new(&mut resized, width, height, stride, &mut text);
+        render_grid(&grid, &mut resized_canvas);
+        let resized_bounds =
+            color_bounds(&resized, width, height, 0xFF000000).expect("resized barcode drawn");
+
+        assert!(resized_bounds.w > initial_bounds.w + 20);
+    }
+
+    #[test]
+    fn linear_barcode_size_warning_defaults_off_and_can_be_enabled() {
+        let width = 24;
+        let height = 24;
+        let stride = width * 4;
+        let rect = BarcodeDrawRect {
+            x: 0,
+            y: 0,
+            w: width,
+            h: height,
+        };
+
+        let mut default_buffer = vec![0u8; (stride * height) as usize];
+        let mut default_text = MeasureOnlyTextRenderer;
+        let mut default_canvas = CpuCanvas::new(
+            &mut default_buffer,
+            width,
+            height,
+            stride,
+            &mut default_text,
+        );
+        let default_spec = crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeCode39 as i32,
+            quiet_zone: 10,
+            ..Default::default()
+        };
+        draw_linear_barcode(
+            &mut default_canvas,
+            &default_spec,
+            "ABC123",
+            rect,
+            rect,
+            0xFF000000,
+        );
+        assert!(!(0..height).any(|y| (0..width).any(|x| {
+            pixel_argb(&default_buffer, width, x, y) == DEFAULT_BARCODE_SIZE_WARNING_COLOR
+        })));
+
+        let mut warned_buffer = vec![0u8; (stride * height) as usize];
+        let mut warned_text = MeasureOnlyTextRenderer;
+        let mut warned_canvas =
+            CpuCanvas::new(&mut warned_buffer, width, height, stride, &mut warned_text);
+        let warned_spec = crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeCode39 as i32,
+            quiet_zone: 10,
+            show_size_warning: true,
+            ..Default::default()
+        };
+        draw_linear_barcode(
+            &mut warned_canvas,
+            &warned_spec,
+            "ABC123",
+            rect,
+            rect,
+            0xFF000000,
+        );
+        assert!((0..height).any(|y| (0..width).any(|x| {
+            pixel_argb(&warned_buffer, width, x, y) == DEFAULT_BARCODE_SIZE_WARNING_COLOR
+        })));
+        let bits = encode_linear_barcode(&warned_spec, "ABC123").expect("valid Code39 payload");
+        let quiet = warned_spec.quiet_zone.min(128) as i32;
+        let preview_rect =
+            linear_barcode_preview_rect(bits.len() as i32 + quiet * 2, rect, height).unwrap();
+        let mut red_count = 0usize;
+        for y in 0..height {
+            for x in 0..width {
+                if pixel_argb(&warned_buffer, width, x, y) == DEFAULT_BARCODE_SIZE_WARNING_COLOR {
+                    red_count += 1;
+                    assert!(x >= preview_rect.x && x < preview_rect.x + preview_rect.w);
+                    assert!(y >= preview_rect.y && y < preview_rect.y + preview_rect.h);
+                }
+            }
+        }
+        assert!(red_count > 0);
+        let max_red_pixels_per_column = (0..width)
+            .map(|x| {
+                (0..height)
+                    .filter(|&y| {
+                        pixel_argb(&warned_buffer, width, x, y)
+                            == DEFAULT_BARCODE_SIZE_WARNING_COLOR
+                    })
+                    .count()
+            })
+            .max()
+            .unwrap_or(0);
+        assert!(max_red_pixels_per_column <= 2);
+
+        let mut quiet_buffer = vec![0u8; (stride * height) as usize];
+        let mut quiet_text = MeasureOnlyTextRenderer;
+        let mut quiet_canvas =
+            CpuCanvas::new(&mut quiet_buffer, width, height, stride, &mut quiet_text);
+        let quiet_spec = crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeCode39 as i32,
+            quiet_zone: 10,
+            show_size_warning: false,
+            ..Default::default()
+        };
+        draw_linear_barcode(
+            &mut quiet_canvas,
+            &quiet_spec,
+            "ABC123",
+            rect,
+            rect,
+            0xFF000000,
+        );
+        assert!(!(0..height).any(|y| (0..width).any(|x| {
+            pixel_argb(&quiet_buffer, width, x, y) == DEFAULT_BARCODE_SIZE_WARNING_COLOR
+        })));
+    }
+
+    #[test]
+    fn qr_barcode_size_warning_draws_when_too_small() {
+        let width = 14;
+        let height = 8;
+        let stride = width * 4;
+        let mut buffer = vec![0u8; (stride * height) as usize];
+        let mut text = MeasureOnlyTextRenderer;
+        let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+        let spec = crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeQr as i32,
+            show_size_warning: true,
+            ..Default::default()
+        };
+        let rect = BarcodeDrawRect {
+            x: 0,
+            y: 0,
+            w: width,
+            h: height,
+        };
+
+        draw_qr_barcode(&mut canvas, &spec, "too-small", rect, rect, 0xFF000000);
+
+        let warning_rect = barcode_centered_square_rect(rect);
+        let mut red_count = 0usize;
+        for y in 0..height {
+            for x in 0..width {
+                if pixel_argb(&buffer, width, x, y) == DEFAULT_BARCODE_SIZE_WARNING_COLOR {
+                    red_count += 1;
+                    assert!(x >= warning_rect.x && x < warning_rect.x + warning_rect.w);
+                    assert!(y >= warning_rect.y && y < warning_rect.y + warning_rect.h);
+                }
+            }
+        }
+        assert!(red_count > 0);
+    }
+
+    #[test]
+    fn barcode_layer_clips_scrolled_body_cell_below_fixed_header() {
+        let width = 120;
+        let height = 80;
+        let stride = width * 4;
+        let mut grid = VolvoxGrid::new(1, width, height, 3, 1, 1, 0);
+        grid.render_layer_mask = 1u64 << super::layer::BARCODES;
+        grid.set_row_height(0, 20);
+        grid.set_row_height(1, 60);
+        grid.set_col_width(0, 100);
+        grid.scroll.scroll_y = 30.0;
+        grid.cells.get_mut(1, 0).extra_mut().barcode = Some(Box::new(crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeCode39 as i32,
+            value: "ABC123".to_string(),
+            foreground: Some(0xFFFF0000),
+            caption_position: Some(pb::BarcodeCaptionPosition::CaptionNone as i32),
+            ..Default::default()
+        }));
+        grid.barcode_cells_maybe_present = true;
+        grid.ensure_layout();
+
+        let mut buffer = vec![0u8; (stride * height) as usize];
+        let mut text = MeasureOnlyTextRenderer;
+        let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+        render_grid(&grid, &mut canvas);
+
+        let fixed_bottom = grid.row_pos(grid.fixed_rows);
+        let has_red_in_header = (0..fixed_bottom)
+            .any(|y| (0..width).any(|x| pixel_argb(&buffer, width, x, y) == 0xFFFF0000));
+        let has_red_in_body = (fixed_bottom..height)
+            .any(|y| (0..width).any(|x| pixel_argb(&buffer, width, x, y) == 0xFFFF0000));
+        assert!(!has_red_in_header);
+        assert!(has_red_in_body);
     }
 
     #[test]

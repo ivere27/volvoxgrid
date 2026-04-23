@@ -71,35 +71,16 @@ class DemoPage extends StatefulWidget {
 
 class _DemoPageState extends State<DemoPage> {
   static const List<int> _textCacheCapOptions = [8192, 4096, 1024, 256, 0];
-  static const int _layerCount = 26;
-  static const List<String> _layerNames = [
-    'Overlay Bands',
-    'Indicators',
-    'Backgrounds',
-    'Progress Bars',
-    'Grid Lines',
-    'Header Marks',
-    'Background Image',
-    'Cell Borders',
-    'Cell Text',
-    'Cell Pictures',
-    'Sort Glyphs',
-    'Col Drag Marker',
-    'Checkboxes',
-    'Dropdown Buttons',
-    'Selection',
-    'Hover Highlight',
-    'Edit Highlights',
-    'Focus Rect',
-    'Fill Handle',
-    'Outline',
-    'Frozen Borders',
-    'Active Editor',
-    'Active Dropdown',
-    'Scroll Bars',
-    'Fast Scroll',
-    'Debug Overlay',
-  ];
+  static final List<pb.RenderLayerBit> _renderLayers = () {
+    final layers = pb.RenderLayerBit.values
+        .where((layer) => layer.name.startsWith('RENDER_LAYER_'))
+        .toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+    return List<pb.RenderLayerBit>.unmodifiable(layers);
+  }();
+
+  static String _renderLayerLabel(pb.RenderLayerBit layer) =>
+      layer.name.replaceFirst('RENDER_LAYER_', '');
 
   final Map<DemoMode, VolvoxGridController> _controllers = {
     for (final mode in DemoMode.values) mode: VolvoxGridController(),
@@ -489,18 +470,19 @@ class _DemoPageState extends State<DemoPage> {
                       ],
                     ),
                     const Divider(height: 1),
-                    for (var i = 0; i < _layerCount; i++)
+                    for (final layer in _renderLayers)
                       CheckboxListTile(
                         dense: true,
-                        title: Text(_layerNames[i],
+                        title: Text(_renderLayerLabel(layer),
                             style: const TextStyle(fontSize: 13)),
-                        value: mask & (1 << i) != 0,
+                        value: mask & (1 << layer.value) != 0,
                         onChanged: (val) {
                           setDialogState(() {
+                            final bit = 1 << layer.value;
                             if (val == true) {
-                              mask |= 1 << i;
+                              mask |= bit;
                             } else {
-                              mask &= ~(1 << i);
+                              mask &= ~bit;
                             }
                           });
                         },
@@ -671,27 +653,28 @@ class _DemoPageState extends State<DemoPage> {
                 case 'sort_desc':
                   await _onSortDescending();
                   return;
-                case 'scroll_blit': {
-                  final previous = _scrollBlitEnabled;
-                  final nextValue = !previous;
-                  setState(() {
-                    _scrollBlitEnabled = nextValue;
-                    _statusText = nextValue
-                        ? 'Scroll blit enabled'
-                        : 'Scroll blit disabled';
-                  });
-                  try {
-                    await _activeController.setScrollBlit(nextValue);
-                    await _activeController.refresh();
-                  } catch (e) {
-                    if (!mounted) return;
+                case 'scroll_blit':
+                  {
+                    final previous = _scrollBlitEnabled;
+                    final nextValue = !previous;
                     setState(() {
-                      _scrollBlitEnabled = previous;
-                      _statusText = 'Scroll blit toggle failed: $e';
+                      _scrollBlitEnabled = nextValue;
+                      _statusText = nextValue
+                          ? 'Scroll blit enabled'
+                          : 'Scroll blit disabled';
                     });
+                    try {
+                      await _activeController.setScrollBlit(nextValue);
+                      await _activeController.refresh();
+                    } catch (e) {
+                      if (!mounted) return;
+                      setState(() {
+                        _scrollBlitEnabled = previous;
+                        _statusText = 'Scroll blit toggle failed: $e';
+                      });
+                    }
+                    return;
                   }
-                  return;
-                }
                 case 'edit':
                   await _setEditEnabled(!_editEnabled);
                   return;

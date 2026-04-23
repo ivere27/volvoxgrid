@@ -9,7 +9,7 @@ use unicode_width::UnicodeWidthStr;
 use web_time::Instant;
 
 use crate::animation::AnimationState;
-use crate::cell::CellStore;
+use crate::cell::{BarcodeSpec, CellStore};
 use crate::column::ColumnProps;
 use crate::control::CellControl;
 use crate::drag::DragState;
@@ -212,6 +212,12 @@ pub struct VolvoxGrid {
     // ── Cell Storage ──────────────────────────────────────────────────────
     /// Sparse cell data store holding text, values, and per-cell properties.
     pub cells: CellStore,
+    /// Fast guard for render/autosize paths that need to look for barcode
+    /// cells. Normal write paths keep it exact via `barcode_cell_count`; callers
+    /// still re-check each cell because this only records possible presence.
+    pub(crate) barcode_cells_maybe_present: bool,
+    /// Exact count behind `barcode_cells_maybe_present` for API-managed mutations.
+    pub(crate) barcode_cell_count: usize,
 
     // ── Column Properties ─────────────────────────────────────────────────
     /// Per-column properties (alignment, format, data type, key, dropdown list, etc.).
@@ -709,6 +715,8 @@ impl VolvoxGrid {
 
             // Cell storage
             cells: CellStore::new(),
+            barcode_cells_maybe_present: false,
+            barcode_cell_count: 0,
 
             // Column and row properties
             columns,
@@ -952,6 +960,43 @@ impl VolvoxGrid {
             sticky_cols: HashMap::new(),
             sticky_cells: HashMap::new(),
         }
+    }
+
+    pub(crate) fn clear_barcode_presence_tracking(&mut self) {
+        self.barcode_cell_count = 0;
+        self.barcode_cells_maybe_present = false;
+    }
+
+    pub(crate) fn update_barcode_presence_for_cell(
+        &mut self,
+        had_barcode: bool,
+        has_barcode: bool,
+    ) {
+        match (had_barcode, has_barcode) {
+            (false, true) => {
+                self.barcode_cell_count = self.barcode_cell_count.saturating_add(1);
+            }
+            (true, false) => {
+                self.barcode_cell_count = self.barcode_cell_count.saturating_sub(1);
+            }
+            (true, true) if self.barcode_cell_count == 0 => {
+                self.barcode_cell_count = 1;
+            }
+            _ => {}
+        }
+        self.barcode_cells_maybe_present = self.barcode_cell_count > 0;
+    }
+
+    pub(crate) fn recompute_barcode_presence(&mut self) {
+        self.barcode_cell_count = self
+            .cells
+            .iter()
+            .filter(|(_, cell)| {
+                cell.barcode()
+                    .is_some_and(|spec| spec.symbology != pb::BarcodeSymbology::BarcodeNone as i32)
+            })
+            .count();
+        self.barcode_cells_maybe_present = self.barcode_cell_count > 0;
     }
 
     fn style_heap_size_bytes(&self) -> usize {
@@ -2653,6 +2698,205 @@ impl VolvoxGrid {
             .map_or(0, |(_, _, bw, _)| bw + 2) as f32
     }
 
+    fn barcode_payload_for_autosize<'a>(
+        &self,
+        spec: &'a BarcodeSpec,
+        cell_text: &'a str,
+    ) -> &'a str {
+        if spec.value.is_empty() {
+            cell_text
+        } else {
+            spec.value.as_str()
+        }
+    }
+
+    fn barcode_caption_for_autosize<'a>(
+        &self,
+        spec: &'a BarcodeSpec,
+        payload: &'a str,
+    ) -> Option<&'a str> {
+        let is_qr = spec.symbology == pb::BarcodeSymbology::BarcodeQr as i32;
+        let caption_position = spec.caption_position.unwrap_or_else(|| {
+            if is_qr {
+                pb::BarcodeCaptionPosition::CaptionNone as i32
+            } else {
+                pb::BarcodeCaptionPosition::CaptionBottom as i32
+            }
+        });
+        if caption_position == pb::BarcodeCaptionPosition::CaptionNone as i32 {
+            return None;
+        }
+        spec.caption_text
+            .as_deref()
+            .filter(|caption| !caption.is_empty())
+            .or_else(|| (!payload.is_empty()).then_some(payload))
+    }
+
+    fn barcode_quiet_zone_modules(spec: &BarcodeSpec, is_qr: bool) -> i32 {
+        if spec.quiet_zone != 0 {
+            return spec.quiet_zone.min(if is_qr { 64 } else { 128 }) as i32;
+        }
+        if is_qr {
+            4
+        } else {
+            10
+        }
+    }
+
+    fn barcode_target_module_px(spec: &BarcodeSpec, is_qr: bool) -> i32 {
+        if !is_qr && spec.narrow_bar_width != 0 {
+            (spec.narrow_bar_width as i32).clamp(1, 32)
+        } else if spec.module_size != 0 {
+            (spec.module_size as i32).clamp(1, 16)
+        } else {
+            2
+        }
+    }
+
+    fn code128_data_codewords_for_autosize(spec: &BarcodeSpec, payload: &str) -> i32 {
+        // Estimator only; actual encoded length depends on barcoders mode-shift
+        // decisions. Used for column sizing, not for wire encoding.
+        let byte_len = payload.len() as i32;
+        let all_digits = payload.bytes().all(|b| b.is_ascii_digit());
+        let compact_numeric = byte_len >= 4 && byte_len % 2 == 0 && all_digits;
+        let mut codewords = if compact_numeric {
+            byte_len / 2
+        } else {
+            payload.chars().count() as i32
+        };
+        if spec.text_encoding == pb::BarcodeTextEncoding::BarcodeTextGs1 as i32 {
+            codewords += 1;
+        }
+        codewords.max(1)
+    }
+
+    fn estimated_linear_barcode_modules(spec: &BarcodeSpec, payload: &str) -> Option<i32> {
+        let payload_len = payload.chars().count() as i32;
+        if payload_len <= 0 {
+            return None;
+        }
+        let body_modules = match spec.symbology {
+            s if s == pb::BarcodeSymbology::BarcodeCode128 as i32 => {
+                let data = Self::code128_data_codewords_for_autosize(spec, payload);
+                // Start + data + checksum are 11 modules each; stop is 13.
+                11 * (data + 2) + 13
+            }
+            s if s == pb::BarcodeSymbology::BarcodeCode39 as i32 => {
+                let check = (spec.check_digit
+                    == pb::BarcodeCheckDigitMode::CheckDigitGenerate as i32)
+                    as i32;
+                ((payload_len + check + 2) * 16).saturating_sub(1)
+            }
+            s if s == pb::BarcodeSymbology::BarcodeCode93 as i32 => {
+                // Includes start, two checksums, and stop with a conservative
+                // one-module separator allowance.
+                (payload_len + 4) * 10
+            }
+            s if s == pb::BarcodeSymbology::BarcodeCode11 as i32 => {
+                let check =
+                    (spec.check_digit != pb::BarcodeCheckDigitMode::CheckDigitNone as i32) as i32;
+                (payload_len + check + 2) * 8
+            }
+            s if s == pb::BarcodeSymbology::BarcodeEan13 as i32
+                || s == pb::BarcodeSymbology::BarcodeUpcA as i32 =>
+            {
+                95
+            }
+            s if s == pb::BarcodeSymbology::BarcodeEan8 as i32 => 67,
+            s if s == pb::BarcodeSymbology::BarcodeUpcE as i32 => 51,
+            s if s == pb::BarcodeSymbology::BarcodeEanSupp as i32 => {
+                if payload_len <= 2 {
+                    20
+                } else {
+                    47
+                }
+            }
+            s if s == pb::BarcodeSymbology::BarcodeItf as i32
+                || s == pb::BarcodeSymbology::BarcodeStf as i32 =>
+            {
+                ((payload_len + 1) / 2) * 18 + 8
+            }
+            s if s == pb::BarcodeSymbology::BarcodeCodabar as i32 => {
+                let has_start_stop = payload_len >= 2;
+                let encoded_chars = if has_start_stop {
+                    payload_len
+                } else {
+                    payload_len + 2
+                };
+                encoded_chars * 12
+            }
+            _ => return None,
+        };
+        let quiet = Self::barcode_quiet_zone_modules(spec, false);
+        Some(body_modules.saturating_add(quiet.saturating_mul(2)))
+    }
+
+    fn estimated_qr_modules_for_autosize(spec: &BarcodeSpec, payload: &str) -> i32 {
+        let bytes_per_version = match spec.qr_ecc {
+            x if x == pb::BarcodeQrErrorCorrection::QrEccLow as i32 => 14,
+            x if x == pb::BarcodeQrErrorCorrection::QrEccQuartile as i32 => 8,
+            x if x == pb::BarcodeQrErrorCorrection::QrEccHigh as i32 => 6,
+            _ => 10,
+        };
+        let version_index = (payload.len() as i32).saturating_sub(1) / bytes_per_version;
+        (21 + version_index * 4).min(177)
+    }
+
+    fn estimated_barcode_symbol_width_px(
+        &self,
+        row: i32,
+        spec: &BarcodeSpec,
+        payload: &str,
+    ) -> Option<i32> {
+        if payload.is_empty() || spec.symbology == pb::BarcodeSymbology::BarcodeNone as i32 {
+            return None;
+        }
+        const MAX_BARCODE_AUTO_WIDTH_PX: i32 = 480;
+        let is_qr = spec.symbology == pb::BarcodeSymbology::BarcodeQr as i32;
+        let required_modules = if is_qr {
+            Self::estimated_qr_modules_for_autosize(spec, payload)
+                + Self::barcode_quiet_zone_modules(spec, true) * 2
+        } else {
+            Self::estimated_linear_barcode_modules(spec, payload)?
+        };
+        let ideal_width = if is_qr && spec.module_size == 0 {
+            self.get_row_height(row).max(required_modules)
+        } else {
+            required_modules.saturating_mul(Self::barcode_target_module_px(spec, is_qr))
+        };
+        let readable_min = required_modules.min(MAX_BARCODE_AUTO_WIDTH_PX);
+        Some(ideal_width.min(MAX_BARCODE_AUTO_WIDTH_PX).max(readable_min))
+    }
+
+    fn barcode_auto_resize_width_without_padding(
+        &self,
+        row: i32,
+        col: i32,
+        spec: &BarcodeSpec,
+        cell_text: &str,
+        padding: i32,
+        text_engine: &mut TextEngine,
+    ) -> f32 {
+        let payload = self.barcode_payload_for_autosize(spec, cell_text);
+        let mut width = 0.0f32;
+        if let Some(symbol_w) = self.estimated_barcode_symbol_width_px(row, spec, payload) {
+            const BARCODE_RENDER_HORIZONTAL_INSET_PX: i32 = 6;
+            let cell_w = symbol_w.saturating_add(BARCODE_RENDER_HORIZONTAL_INSET_PX);
+            width = width.max(cell_w.saturating_sub(padding.max(0)) as f32);
+        }
+        if let Some(caption) = self.barcode_caption_for_autosize(spec, payload) {
+            let (font_name, font_size, bold, italic) = self.resolve_text_measure_style(row, col);
+            let font_size = spec
+                .caption_font_size
+                .filter(|size| size.is_finite() && *size > 0.0)
+                .unwrap_or(font_size);
+            let (caption_w, _) =
+                text_engine.measure_text(caption, font_name, font_size, bold, italic, None);
+            width = width.max(caption_w);
+        }
+        width
+    }
+
     fn auto_resize_row_measure_width(&self, row: i32, col: i32, word_wrap: bool) -> Option<f32> {
         if !word_wrap {
             return None;
@@ -2891,6 +3135,7 @@ impl VolvoxGrid {
         let body_padding = self.resolve_column_padding(col, false).horizontal();
         let fixed_padding = self.resolve_column_padding(col, true).horizontal();
         let padding = body_padding.max(fixed_padding);
+        let check_barcodes = self.barcode_cells_maybe_present;
 
         self.ensure_text_engine();
         let mut te = self.text_engine.take().unwrap();
@@ -2901,7 +3146,14 @@ impl VolvoxGrid {
             }
             let text = self.get_display_text(row, col);
             let mut cell_w = self.auto_resize_col_button_reserve(row, col);
-            if !text.is_empty() {
+            if let Some(barcode) = check_barcodes
+                .then(|| self.cells.get(row, col).and_then(|cell| cell.barcode()))
+                .flatten()
+            {
+                cell_w += self.barcode_auto_resize_width_without_padding(
+                    row, col, barcode, &text, padding, &mut te,
+                );
+            } else if !text.is_empty() {
                 let (font_name, font_size, bold, italic) =
                     self.resolve_text_measure_style(row, col);
                 let (w, _) = te.measure_text(&text, font_name, font_size, bold, italic, None);
@@ -3152,6 +3404,7 @@ impl VolvoxGrid {
                 })
                 .collect();
             let mut max_widths = vec![0.0f32; self.cols as usize];
+            let check_barcodes = self.barcode_cells_maybe_present;
 
             for row in 0..self.rows {
                 for col in 0..self.cols {
@@ -3161,7 +3414,19 @@ impl VolvoxGrid {
                     let text = self.get_display_text(row, col);
                     let idx = col as usize;
                     let mut cell_w = self.auto_resize_col_button_reserve(row, col);
-                    if !text.is_empty() {
+                    if let Some(barcode) = check_barcodes
+                        .then(|| self.cells.get(row, col).and_then(|cell| cell.barcode()))
+                        .flatten()
+                    {
+                        cell_w += self.barcode_auto_resize_width_without_padding(
+                            row,
+                            col,
+                            barcode,
+                            &text,
+                            col_padding[idx],
+                            &mut te,
+                        );
+                    } else if !text.is_empty() {
                         let (font_name, font_size, bold, italic) =
                             self.resolve_text_measure_style(row, col);
                         let (w, _) =
@@ -3272,6 +3537,7 @@ impl VolvoxGrid {
         }
 
         self.cells.clear_range(r1, c1, r2, c2);
+        self.recompute_barcode_presence();
         self.clear_cell_styles_in_bounds(r1, c1, r2, c2);
         self.merged_regions.remove_overlapping(r1, c1, r2, c2);
         self.row_props.retain(|row, _| *row < r1 || *row > r2);
@@ -3297,6 +3563,7 @@ impl VolvoxGrid {
             2 => {
                 if r1 <= r2 && c1 <= c2 {
                     self.cells.clear_range(r1, c1, r2, c2);
+                    self.recompute_barcode_presence();
                 }
             }
             3 => {
@@ -3304,6 +3571,7 @@ impl VolvoxGrid {
                     self.cells.clear_range(sr1, sc1, sr2, sc2);
                     self.clear_cell_styles_in_bounds(sr1, sc1, sr2, sc2);
                 }
+                self.recompute_barcode_presence();
             }
             _ => {}
         }
@@ -3570,6 +3838,7 @@ impl VolvoxGrid {
         let h = self.get_row_height(row);
         self.animation.notify_rows_removed(row, 1, h);
         self.cells.remove_row(row);
+        self.recompute_barcode_presence();
         self.rows -= 1;
 
         // Preserve existing display-to-logical mapping:
@@ -5207,6 +5476,27 @@ mod tests {
         grid.auto_resize_col(0);
 
         assert!(grid.get_col_width(0) > before);
+    }
+
+    #[test]
+    fn auto_resize_col_expands_for_barcode_without_cell_text() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 1, 1, 0, 0);
+        grid.default_col_width = 20;
+        grid.auto_resize = true;
+        grid.cells.get_mut(0, 0).extra_mut().barcode = Some(Box::new(BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeCode128 as i32,
+            value: "0101234567890128".to_string(),
+            text_encoding: pb::BarcodeTextEncoding::BarcodeTextGs1 as i32,
+            caption_position: Some(pb::BarcodeCaptionPosition::CaptionNone as i32),
+            ..Default::default()
+        }));
+        grid.barcode_cells_maybe_present = true;
+
+        let before = grid.get_col_width(0);
+        grid.auto_resize_col(0);
+
+        assert!(grid.get_col_width(0) > before);
+        assert!(grid.get_col_width(0) >= 300);
     }
 
     #[test]
