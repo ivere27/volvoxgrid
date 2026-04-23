@@ -3078,6 +3078,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 request.include_style,
                 request.include_checked,
                 request.include_typed,
+                request.include_barcode_status,
             )
         })?;
         Ok(CellsResponse { cells })
@@ -3741,11 +3742,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         #[cfg(feature = "demo")]
         {
             self.with_grid_result(request.grid_id, |grid| {
-                match request.demo.as_str() {
-                    "stress" => volvoxgrid_engine::demo::setup_stress_demo(grid),
-                    other => return Err(format!("unknown demo: {other}")),
-                }
-                Ok(())
+                volvoxgrid_engine::demo::setup_named_demo(grid, &request.demo)
             })?;
             Ok(LoadDemoResponse {})
         }

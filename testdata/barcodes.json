@@ -1,0 +1,254 @@
+[
+  {
+    "Symbology": "QR",
+    "Value": "https://github.com/ivere27/volvoxgrid",
+    "Label": "QR high ECC",
+    "Notes": "2D QR sample."
+  },
+  {
+    "Symbology": "QR",
+    "Value": "WIFI:T:WPA;S:VolvoxGrid Lab;P:grid-demo-2026;;",
+    "Label": "QR Wi-Fi payload",
+    "Notes": "Structured Wi-Fi text payload."
+  },
+  {
+    "Symbology": "QR",
+    "Value": "BEGIN:VCARD\nVERSION:3.0\nFN:Volvox Grid\nORG:VolvoxGrid\nEND:VCARD",
+    "Label": "QR vCard text",
+    "Notes": "Multi-line contact-style QR payload."
+  },
+  {
+    "Symbology": "QR",
+    "Value": "ORDER:VG-2026-0001;AMT=149.95;CUR=USD",
+    "Label": "QR order token",
+    "Notes": "Compact structured ASCII payload."
+  },
+  {
+    "Symbology": "CODE128",
+    "Value": "0101234567890128",
+    "Label": "GS1 Code 128",
+    "Notes": "Code 128 payload for GS1 mode."
+  },
+  {
+    "Symbology": "CODE128",
+    "Value": "01123456789012311726043010LOT42",
+    "Label": "GS1 lot + expiry",
+    "Notes": "Application-identifier style Code 128 payload."
+  },
+  {
+    "Symbology": "CODE128",
+    "Value": "SHIP-2026-000042",
+    "Label": "Code 128 shipping",
+    "Notes": "Mixed alphanumeric logistics identifier."
+  },
+  {
+    "Symbology": "CODE128",
+    "Value": "SN:VG-AX7-0091",
+    "Label": "Code 128 serial",
+    "Notes": "Serial number with punctuation."
+  },
+  {
+    "Symbology": "CODE39",
+    "Value": "ABC123",
+    "Label": "Code 39 checksum",
+    "Notes": "Code 39 alphanumeric payload."
+  },
+  {
+    "Symbology": "CODE39",
+    "Value": "HELLO-42",
+    "Label": "Code 39 dash",
+    "Notes": "Uppercase payload with generated checksum."
+  },
+  {
+    "Symbology": "CODE39",
+    "Value": "DATA/2026",
+    "Label": "Code 39 slash",
+    "Notes": "Code 39 payload using slash."
+  },
+  {
+    "Symbology": "CODE39",
+    "Value": "INV 1042",
+    "Label": "Code 39 space",
+    "Notes": "Code 39 payload using a space."
+  },
+  {
+    "Symbology": "CODE93",
+    "Value": "CODE93-42",
+    "Label": "Code 93",
+    "Notes": "Dense 1D alphanumeric sample."
+  },
+  {
+    "Symbology": "CODE93",
+    "Value": "PALLET/7+OK",
+    "Label": "Code 93 symbols",
+    "Notes": "Code 93 payload with slash and plus."
+  },
+  {
+    "Symbology": "CODE93",
+    "Value": "ASSET-2026",
+    "Label": "Code 93 asset",
+    "Notes": "Asset tracking payload."
+  },
+  {
+    "Symbology": "CODE11",
+    "Value": "12345-678",
+    "Label": "Code 11",
+    "Notes": "Numeric barcode with dash support."
+  },
+  {
+    "Symbology": "CODE11",
+    "Value": "001-234567",
+    "Label": "Code 11 account",
+    "Notes": "Longer numeric payload with dash."
+  },
+  {
+    "Symbology": "CODE11",
+    "Value": "9876543210",
+    "Label": "Code 11 numeric",
+    "Notes": "Plain numeric Code 11 payload."
+  },
+  {
+    "Symbology": "EAN13",
+    "Value": "590123412345",
+    "Label": "EAN-13",
+    "Notes": "Retail EAN-13 sample."
+  },
+  {
+    "Symbology": "EAN13",
+    "Value": "400638133393",
+    "Label": "EAN-13 generated check",
+    "Notes": "Twelve-digit input; checksum is generated."
+  },
+  {
+    "Symbology": "EAN13",
+    "Value": "978020137962",
+    "Label": "EAN-13 ISBN-style",
+    "Notes": "ISBN-style EAN payload without final check digit."
+  },
+  {
+    "Symbology": "EAN8",
+    "Value": "5512345",
+    "Label": "EAN-8",
+    "Notes": "Compact EAN sample."
+  },
+  {
+    "Symbology": "EAN8",
+    "Value": "9638507",
+    "Label": "EAN-8 generated check",
+    "Notes": "Seven-digit input; checksum is generated."
+  },
+  {
+    "Symbology": "EAN8",
+    "Value": "1234567",
+    "Label": "EAN-8 compact",
+    "Notes": "Short retail payload."
+  },
+  {
+    "Symbology": "UPC_A",
+    "Value": "042100005264",
+    "Label": "UPC-A",
+    "Notes": "UPC-A retail symbol."
+  },
+  {
+    "Symbology": "UPC_A",
+    "Value": "036000291452",
+    "Label": "UPC-A grocery",
+    "Notes": "Common UPC-A shaped payload."
+  },
+  {
+    "Symbology": "UPC_A",
+    "Value": "012345678905",
+    "Label": "UPC-A numeric",
+    "Notes": "Twelve-digit UPC-A sample."
+  },
+  {
+    "Symbology": "UPC_E",
+    "Value": "042526",
+    "Label": "UPC-E",
+    "Notes": "Compressed UPC sample."
+  },
+  {
+    "Symbology": "UPC_E",
+    "Value": "901258",
+    "Label": "UPC-E alternate",
+    "Notes": "Six-digit UPC-E payload."
+  },
+  {
+    "Symbology": "UPC_E",
+    "Value": "123456",
+    "Label": "UPC-E compact",
+    "Notes": "Another compact UPC-E payload."
+  },
+  {
+    "Symbology": "EAN_SUPP",
+    "Value": "12",
+    "Label": "EAN supplemental",
+    "Notes": "Two-digit EAN supplement."
+  },
+  {
+    "Symbology": "EAN_SUPP",
+    "Value": "05",
+    "Label": "EAN supplement issue",
+    "Notes": "Two-digit issue-number supplement."
+  },
+  {
+    "Symbology": "EAN_SUPP",
+    "Value": "90000",
+    "Label": "EAN supplement price",
+    "Notes": "Five-digit supplemental EAN payload."
+  },
+  {
+    "Symbology": "ITF",
+    "Value": "12345670",
+    "Label": "Interleaved 2 of 5",
+    "Notes": "Even-length numeric ITF sample."
+  },
+  {
+    "Symbology": "ITF",
+    "Value": "001234567890",
+    "Label": "ITF carton",
+    "Notes": "Longer even-length numeric ITF payload."
+  },
+  {
+    "Symbology": "ITF",
+    "Value": "9876543210",
+    "Label": "ITF sequence",
+    "Notes": "Ten-digit Interleaved 2 of 5 sample."
+  },
+  {
+    "Symbology": "STF",
+    "Value": "24680",
+    "Label": "Standard 2 of 5",
+    "Notes": "Standard 2-of-5 sample."
+  },
+  {
+    "Symbology": "STF",
+    "Value": "135790",
+    "Label": "Standard 2 of 5 even",
+    "Notes": "Even-length Standard 2 of 5 payload."
+  },
+  {
+    "Symbology": "STF",
+    "Value": "31415926",
+    "Label": "Standard 2 of 5 pi",
+    "Notes": "Numeric Standard 2 of 5 sample."
+  },
+  {
+    "Symbology": "CODABAR",
+    "Value": "A12345B",
+    "Label": "Codabar",
+    "Notes": "Codabar with start and stop characters."
+  },
+  {
+    "Symbology": "CODABAR",
+    "Value": "C40156D",
+    "Label": "Codabar C-D",
+    "Notes": "Codabar with alternate start and stop characters."
+  },
+  {
+    "Symbology": "CODABAR",
+    "Value": "A12-34/56B",
+    "Label": "Codabar symbols",
+    "Notes": "Codabar payload using dash and slash."
+  }
+]

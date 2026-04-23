@@ -180,7 +180,10 @@ impl<'a> CpuCanvas<'a> {
         );
         // +2 padding accounts for anti-alias bleed at glyph edges
         let src_w = measured_w.ceil().max(1.0) as i32 + 2;
-        let src_h = measured_h.ceil().max((font_size * TEXT_LINE_HEIGHT_FACTOR).ceil()) as i32 + 2;
+        let src_h = measured_h
+            .ceil()
+            .max((font_size * TEXT_LINE_HEIGHT_FACTOR).ceil()) as i32
+            + 2;
         let mut temp = vec![0u8; (src_w * src_h * 4) as usize];
         let rendered_w = self.text_renderer.render_text(
             &mut temp,

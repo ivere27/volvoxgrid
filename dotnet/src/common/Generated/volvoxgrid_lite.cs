@@ -102,6 +102,64 @@ namespace Volvoxgrid.V1
         AUTOSIZE_ROW_HEIGHT = 2,
     }
 
+    public enum BarcodeCaptionPosition
+    {
+        CAPTION_NONE = 0,
+        CAPTION_BOTTOM = 1,
+        CAPTION_TOP = 2,
+    }
+
+    public enum BarcodeCheckDigitMode
+    {
+        CHECK_DIGIT_DEFAULT = 0,
+        CHECK_DIGIT_NONE = 1,
+        CHECK_DIGIT_GENERATE = 2,
+    }
+
+    public enum BarcodeQrErrorCorrection
+    {
+        QR_ECC_DEFAULT = 0,
+        QR_ECC_LOW = 1,
+        QR_ECC_MEDIUM = 2,
+        QR_ECC_QUARTILE = 3,
+        QR_ECC_HIGH = 4,
+    }
+
+    public enum BarcodeRenderStatus
+    {
+        BARCODE_RENDER_STATUS_UNSPECIFIED = 0,
+        BARCODE_RENDER_STATUS_OK = 1,
+        BARCODE_RENDER_STATUS_EMPTY_PAYLOAD = 2,
+        BARCODE_RENDER_STATUS_INVALID_PAYLOAD = 3,
+        BARCODE_RENDER_STATUS_UNSUPPORTED_SYMBOLOGY = 4,
+    }
+
+    public enum BarcodeSymbology
+    {
+        BARCODE_NONE = 0,
+        BARCODE_QR = 1,
+        BARCODE_CODE128 = 10,
+        BARCODE_CODE39 = 11,
+        BARCODE_CODE93 = 12,
+        BARCODE_CODE11 = 13,
+        BARCODE_EAN13 = 20,
+        BARCODE_EAN8 = 21,
+        BARCODE_UPC_A = 22,
+        BARCODE_UPC_E = 23,
+        BARCODE_EAN_SUPP = 24,
+        BARCODE_ITF = 30,
+        BARCODE_STF = 31,
+        BARCODE_CODABAR = 32,
+    }
+
+    public enum BarcodeTextEncoding
+    {
+        BARCODE_TEXT_AUTO = 0,
+        BARCODE_TEXT_ASCII = 1,
+        BARCODE_TEXT_UTF8 = 2,
+        BARCODE_TEXT_GS1 = 3,
+    }
+
     public enum BorderAppearance
     {
         BORDER_APPEARANCE_FLAT = 0,
@@ -483,6 +541,7 @@ namespace Volvoxgrid.V1
         RENDER_LAYER_FAST_SCROLL = 24,
         RENDER_LAYER_PULL_TO_REFRESH = 25,
         RENDER_LAYER_DEBUG_OVERLAY = 26,
+        RENDER_LAYER_BARCODES = 27,
     }
 
     public enum RendererMode
@@ -1245,6 +1304,230 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class BarcodeCaptionOptions
+    {
+        private BarcodeCaptionPosition? _position;
+        public BarcodeCaptionPosition Position { get { return _position.GetValueOrDefault(); } set { _position = value; } }
+        public bool HasPosition { get { return _position.HasValue; } }
+        private string _text;
+        public string Text { get { return _text; } set { _text = value; } }
+        public bool HasText { get { return _text != null; } }
+        private uint? _color;
+        public uint Color { get { return _color.GetValueOrDefault(); } set { _color = value; } }
+        public bool HasColor { get { return _color.HasValue; } }
+        private float? _fontSize;
+        public float FontSize { get { return _fontSize.GetValueOrDefault(); } set { _fontSize = value; } }
+        public bool HasFontSize { get { return _fontSize.HasValue; } }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (_position.HasValue)
+                w.WriteInt32(1, (int)_position.Value);
+            if (_text != null)
+                w.WriteString(2, _text);
+            if (_color.HasValue)
+                w.WriteInt32(3, unchecked((int)_color.Value));
+            if (_fontSize.HasValue)
+                w.WriteFloat(4, _fontSize.Value);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<BarcodeCaptionOptions> Parser = new MessageParser<BarcodeCaptionOptions>(data => ParseFrom(data));
+
+        public static BarcodeCaptionOptions ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new BarcodeCaptionOptions();
+            var r = new ProtoReader(data);
+            var msg = new BarcodeCaptionOptions();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Position = (BarcodeCaptionPosition)r.ReadInt32(); break;
+                    case 2: msg.Text = r.ReadString(); break;
+                    case 3: msg.Color = unchecked((uint)r.ReadInt32()); break;
+                    case 4: msg.FontSize = r.ReadFloat(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class BarcodeData
+    {
+        public BarcodeSymbology Symbology { get; set; }
+        public string Value { get; set; } = "";
+        public BarcodeEncodingOptions Encoding { get; set; }
+        public BarcodeRenderOptions Render { get; set; }
+        public BarcodeCaptionOptions Caption { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Symbology != 0) w.WriteInt32(1, (int)Symbology);
+            if (Value != null && Value.Length > 0) w.WriteString(2, Value);
+            if (Encoding != null) w.WriteMessageBytes(3, Encoding.ToByteArray());
+            if (Render != null) w.WriteMessageBytes(4, Render.ToByteArray());
+            if (Caption != null) w.WriteMessageBytes(5, Caption.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<BarcodeData> Parser = new MessageParser<BarcodeData>(data => ParseFrom(data));
+
+        public static BarcodeData ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new BarcodeData();
+            var r = new ProtoReader(data);
+            var msg = new BarcodeData();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Symbology = (BarcodeSymbology)r.ReadInt32(); break;
+                    case 2: msg.Value = r.ReadString(); break;
+                    case 3: msg.Encoding = BarcodeEncodingOptions.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 4: msg.Render = BarcodeRenderOptions.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 5: msg.Caption = BarcodeCaptionOptions.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class BarcodeEncodingOptions
+    {
+        public BarcodeCheckDigitMode CheckDigit { get; set; }
+        public BarcodeTextEncoding TextEncoding { get; set; }
+        public BarcodeQrErrorCorrection QrEcc { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (CheckDigit != 0) w.WriteInt32(1, (int)CheckDigit);
+            if (TextEncoding != 0) w.WriteInt32(2, (int)TextEncoding);
+            if (QrEcc != 0) w.WriteInt32(3, (int)QrEcc);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<BarcodeEncodingOptions> Parser = new MessageParser<BarcodeEncodingOptions>(data => ParseFrom(data));
+
+        public static BarcodeEncodingOptions ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new BarcodeEncodingOptions();
+            var r = new ProtoReader(data);
+            var msg = new BarcodeEncodingOptions();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.CheckDigit = (BarcodeCheckDigitMode)r.ReadInt32(); break;
+                    case 2: msg.TextEncoding = (BarcodeTextEncoding)r.ReadInt32(); break;
+                    case 3: msg.QrEcc = (BarcodeQrErrorCorrection)r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class BarcodeRenderOptions
+    {
+        private uint? _foreground;
+        public uint Foreground { get { return _foreground.GetValueOrDefault(); } set { _foreground = value; } }
+        public bool HasForeground { get { return _foreground.HasValue; } }
+        private uint? _background;
+        public uint Background { get { return _background.GetValueOrDefault(); } set { _background = value; } }
+        public bool HasBackground { get { return _background.HasValue; } }
+        private ImageAlignment? _alignment;
+        public ImageAlignment Alignment { get { return _alignment.GetValueOrDefault(); } set { _alignment = value; } }
+        public bool HasAlignment { get { return _alignment.HasValue; } }
+        public uint ModuleSize { get; set; }
+        public uint QuietZone { get; set; }
+        public uint BarHeight { get; set; }
+        public uint NarrowBarWidth { get; set; }
+        private bool? _showSizeWarning;
+        public bool ShowSizeWarning { get { return _showSizeWarning.GetValueOrDefault(); } set { _showSizeWarning = value; } }
+        public bool HasShowSizeWarning { get { return _showSizeWarning.HasValue; } }
+        private uint? _sizeWarningColor;
+        public uint SizeWarningColor { get { return _sizeWarningColor.GetValueOrDefault(); } set { _sizeWarningColor = value; } }
+        public bool HasSizeWarningColor { get { return _sizeWarningColor.HasValue; } }
+        private bool? _useFullRect;
+        public bool UseFullRect { get { return _useFullRect.GetValueOrDefault(); } set { _useFullRect = value; } }
+        public bool HasUseFullRect { get { return _useFullRect.HasValue; } }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (_foreground.HasValue)
+                w.WriteInt32(1, unchecked((int)_foreground.Value));
+            if (_background.HasValue)
+                w.WriteInt32(2, unchecked((int)_background.Value));
+            if (_alignment.HasValue)
+                w.WriteInt32(3, (int)_alignment.Value);
+            if (ModuleSize != 0u) w.WriteInt32(4, unchecked((int)ModuleSize));
+            if (QuietZone != 0u) w.WriteInt32(5, unchecked((int)QuietZone));
+            if (BarHeight != 0u) w.WriteInt32(10, unchecked((int)BarHeight));
+            if (NarrowBarWidth != 0u) w.WriteInt32(11, unchecked((int)NarrowBarWidth));
+            if (_showSizeWarning.HasValue)
+                w.WriteBool(12, _showSizeWarning.Value);
+            if (_sizeWarningColor.HasValue)
+                w.WriteInt32(13, unchecked((int)_sizeWarningColor.Value));
+            if (_useFullRect.HasValue)
+                w.WriteBool(14, _useFullRect.Value);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<BarcodeRenderOptions> Parser = new MessageParser<BarcodeRenderOptions>(data => ParseFrom(data));
+
+        public static BarcodeRenderOptions ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new BarcodeRenderOptions();
+            var r = new ProtoReader(data);
+            var msg = new BarcodeRenderOptions();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Foreground = unchecked((uint)r.ReadInt32()); break;
+                    case 2: msg.Background = unchecked((uint)r.ReadInt32()); break;
+                    case 3: msg.Alignment = (ImageAlignment)r.ReadInt32(); break;
+                    case 4: msg.ModuleSize = unchecked((uint)r.ReadInt32()); break;
+                    case 5: msg.QuietZone = unchecked((uint)r.ReadInt32()); break;
+                    case 10: msg.BarHeight = unchecked((uint)r.ReadInt32()); break;
+                    case 11: msg.NarrowBarWidth = unchecked((uint)r.ReadInt32()); break;
+                    case 12: msg.ShowSizeWarning = r.ReadBool(); break;
+                    case 13: msg.SizeWarningColor = unchecked((uint)r.ReadInt32()); break;
+                    case 14: msg.UseFullRect = r.ReadBool(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class BeforeEditEvent
     {
         public int Row { get; set; }
@@ -1779,6 +2062,12 @@ namespace Volvoxgrid.V1
         private CellInteraction? _interaction;
         public CellInteraction Interaction { get { return _interaction.GetValueOrDefault(); } set { _interaction = value; } }
         public bool HasInteraction { get { return _interaction.HasValue; } }
+        private BarcodeData _barcode;
+        public BarcodeData Barcode { get { return _barcode; } set { _barcode = value; } }
+        public bool HasBarcode { get { return _barcode != null; } }
+        private BarcodeRenderStatus? _barcodeStatus;
+        public BarcodeRenderStatus BarcodeStatus { get { return _barcodeStatus.GetValueOrDefault(); } set { _barcodeStatus = value; } }
+        public bool HasBarcodeStatus { get { return _barcodeStatus.HasValue; } }
 
         // ── Serialization ──
 
@@ -1792,6 +2081,10 @@ namespace Volvoxgrid.V1
             if (Checked != 0) w.WriteInt32(5, (int)Checked);
             if (_interaction.HasValue)
                 w.WriteInt32(6, (int)_interaction.Value);
+            if (_barcode != null)
+                w.WriteMessageBytes(7, _barcode.ToByteArray());
+            if (_barcodeStatus.HasValue)
+                w.WriteInt32(8, (int)_barcodeStatus.Value);
             return w.ToArray();
         }
 
@@ -1815,6 +2108,8 @@ namespace Volvoxgrid.V1
                     case 4: msg.Style = CellStyle.ParseFrom(r.ReadLengthDelimited()); break;
                     case 5: msg.Checked = (CheckedState)r.ReadInt32(); break;
                     case 6: msg.Interaction = (CellInteraction)r.ReadInt32(); break;
+                    case 7: msg.Barcode = BarcodeData.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 8: msg.BarcodeStatus = (BarcodeRenderStatus)r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -2215,6 +2510,9 @@ namespace Volvoxgrid.V1
         private CellInteraction? _interaction;
         public CellInteraction Interaction { get { return _interaction.GetValueOrDefault(); } set { _interaction = value; } }
         public bool HasInteraction { get { return _interaction.HasValue; } }
+        private BarcodeData _barcode;
+        public BarcodeData Barcode { get { return _barcode; } set { _barcode = value; } }
+        public bool HasBarcode { get { return _barcode != null; } }
 
         // ── Serialization ──
 
@@ -2239,6 +2537,8 @@ namespace Volvoxgrid.V1
                 w.WriteInt32(11, (int)_stickyCol.Value);
             if (_interaction.HasValue)
                 w.WriteInt32(12, (int)_interaction.Value);
+            if (_barcode != null)
+                w.WriteMessageBytes(13, _barcode.ToByteArray());
             return w.ToArray();
         }
 
@@ -2268,6 +2568,7 @@ namespace Volvoxgrid.V1
                     case 10: msg.StickyRow = (StickyEdge)r.ReadInt32(); break;
                     case 11: msg.StickyCol = (StickyEdge)r.ReadInt32(); break;
                     case 12: msg.Interaction = (CellInteraction)r.ReadInt32(); break;
+                    case 13: msg.Barcode = BarcodeData.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -5438,6 +5739,7 @@ namespace Volvoxgrid.V1
         public bool IncludeStyle { get; set; }
         public bool IncludeChecked { get; set; }
         public bool IncludeTyped { get; set; }
+        public bool IncludeBarcodeStatus { get; set; }
 
         // ── Serialization ──
 
@@ -5452,6 +5754,7 @@ namespace Volvoxgrid.V1
             if (IncludeStyle) w.WriteBool(6, IncludeStyle);
             if (IncludeChecked) w.WriteBool(7, IncludeChecked);
             if (IncludeTyped) w.WriteBool(8, IncludeTyped);
+            if (IncludeBarcodeStatus) w.WriteBool(9, IncludeBarcodeStatus);
             return w.ToArray();
         }
 
@@ -5477,6 +5780,7 @@ namespace Volvoxgrid.V1
                     case 6: msg.IncludeStyle = r.ReadBool(); break;
                     case 7: msg.IncludeChecked = r.ReadBool(); break;
                     case 8: msg.IncludeTyped = r.ReadBool(); break;
+                    case 9: msg.IncludeBarcodeStatus = r.ReadBool(); break;
                     default: r.SkipField(wire); break;
                 }
             }

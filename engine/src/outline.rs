@@ -555,6 +555,7 @@ fn clear_subtotals(grid: &mut VolvoxGrid) {
         shift_row_metadata_up(grid, row);
         grid.rows -= 1;
     }
+    grid.recompute_barcode_presence();
 
     // Reset row positions
     grid.row_positions = (0..grid.rows).collect();

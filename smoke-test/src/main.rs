@@ -219,6 +219,7 @@ fn main() {
         include_style: false,
         include_checked: false,
         include_typed: false,
+        include_barcode_status: false,
     };
     let resp_bytes = invoke(
         &plugin,
@@ -263,6 +264,7 @@ fn main() {
         include_style: false,
         include_checked: false,
         include_typed: false,
+        include_barcode_status: false,
     };
     let resp_bytes = invoke(
         &plugin,

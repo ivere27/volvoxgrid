@@ -1072,6 +1072,21 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         );
     }
 
+    @Override
+    public long renderLayerMask() throws SynurangDesktopBridge.SynurangBridgeException {
+        RenderConfig rendering = getConfig().getRendering();
+        return rendering.hasRenderLayerMask() ? rendering.getRenderLayerMask() : -1L;
+    }
+
+    @Override
+    public void setRenderLayerMask(long mask) throws SynurangDesktopBridge.SynurangBridgeException {
+        configure(
+            GridConfig.newBuilder()
+                .setRendering(RenderConfig.newBuilder().setRenderLayerMask(mask).build())
+                .build()
+        );
+    }
+
     public void setScrollBars(ScrollBarsMode mode) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(mode, "mode");
         configure(

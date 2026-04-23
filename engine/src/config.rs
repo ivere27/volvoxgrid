@@ -4,7 +4,7 @@
 //! `Option<T>`, giving perfect partial-update semantics. Only set fields are
 //! applied; unset fields leave the engine state unchanged.
 
-use crate::cell::CellValueData;
+use crate::cell::{BarcodeSpec, CellValueData};
 use crate::grid::VolvoxGrid;
 use crate::indicator::{
     ColIndicatorCellState, ColIndicatorRowDefState, CornerIndicatorState, RowIndicatorSlotState,
@@ -2737,6 +2737,23 @@ impl VolvoxGrid {
             cell.extra_mut().dropdown_items = cl.clone();
         }
 
+        if let Some(barcode) = &u.barcode {
+            let had_barcode = self
+                .cells
+                .get(row, col)
+                .and_then(|cell| cell.barcode())
+                .is_some_and(|spec| spec.symbology != v1::BarcodeSymbology::BarcodeNone as i32);
+            let has_barcode = barcode.symbology != v1::BarcodeSymbology::BarcodeNone as i32;
+            let cell = self.cells.get_mut(row, col);
+            let extra = cell.extra_mut();
+            if has_barcode {
+                extra.barcode = Some(Box::new(barcode_proto_to_spec(barcode)));
+            } else {
+                extra.barcode = None;
+            }
+            self.update_barcode_presence_for_cell(had_barcode, has_barcode);
+        }
+
         if let Some(v) = u.interaction {
             let cell = self.cells.get_mut(row, col);
             if v == v1::CellInteraction::Unspecified as i32 {
@@ -2768,30 +2785,54 @@ impl VolvoxGrid {
         }
 
         let mut applied_any = false;
+        let mut barcode_auto_resize_cols = BTreeSet::new();
+        let barcode_col_resize_enabled =
+            self.auto_resize && (self.auto_size_mode == 0 || self.auto_size_mode == 1);
         for entry in &plan.entries {
             if !entry.in_bounds {
                 continue;
             }
             self.apply_value_plan(entry.update.row, entry.update.col, &entry.value_plan);
-            if matches!(
+            let value_changed = matches!(
                 entry.value_plan,
                 PlannedCellValueWrite::Write { .. } | PlannedCellValueWrite::SetNull
-            ) {
+            );
+            if value_changed {
                 applied_any = true;
             }
             self.apply_non_value_update(&entry.update);
+            if barcode_col_resize_enabled {
+                if entry.update.barcode.is_some() {
+                    barcode_auto_resize_cols.insert(entry.update.col);
+                } else if self.barcode_cells_maybe_present
+                    && (value_changed || entry.update.style.is_some())
+                {
+                    let cell_has_barcode = self
+                        .cells
+                        .get(entry.update.row, entry.update.col)
+                        .and_then(|cell| cell.barcode())
+                        .is_some();
+                    if cell_has_barcode {
+                        barcode_auto_resize_cols.insert(entry.update.col);
+                    }
+                }
+            }
             if entry.update.style.is_some()
                 || entry.update.checked.is_some()
                 || entry.update.picture.is_some()
                 || entry.update.picture_align.is_some()
                 || entry.update.button_picture.is_some()
                 || entry.update.dropdown_items.is_some()
+                || entry.update.barcode.is_some()
                 || entry.update.interaction.is_some()
                 || entry.update.sticky_row.is_some()
                 || entry.update.sticky_col.is_some()
             {
                 applied_any = true;
             }
+        }
+        for col in barcode_auto_resize_cols {
+            self.auto_resize_col(col);
         }
         if applied_any {
             self.mark_dirty();
@@ -2839,6 +2880,7 @@ impl VolvoxGrid {
                     sticky_row: None,
                     sticky_col: None,
                     interaction: None,
+                    barcode: None,
                 }
             })
             .collect();
@@ -2855,6 +2897,7 @@ impl VolvoxGrid {
         self.set_rows(rows);
         self.set_cols(cols);
         self.cells.clear_all();
+        self.clear_barcode_presence_tracking();
         for entry in &plan.entries {
             if entry.in_bounds {
                 self.apply_value_plan(entry.update.row, entry.update.col, &entry.value_plan);
@@ -2986,6 +3029,7 @@ impl VolvoxGrid {
         include_style: bool,
         include_checked: bool,
         include_typed: bool,
+        include_barcode_status: bool,
     ) -> Vec<v1::CellData> {
         let r1 = row1.max(0).min(self.rows - 1);
         let r2 = row2.max(0).min(self.rows - 1);
@@ -2996,6 +3040,7 @@ impl VolvoxGrid {
         for row in r1..=r2 {
             for col in c1..=c2 {
                 let text = self.cells.get_text(row, col).to_string();
+                let cell_ref = self.cells.get(row, col);
                 let typed_value = if include_typed {
                     match self.cells.get_value(row, col) {
                         CellValueData::Text(v) => Some(v1::CellValue {
@@ -3040,7 +3085,7 @@ impl VolvoxGrid {
                 };
 
                 let checked = if include_checked {
-                    self.cells.get(row, col).map_or(0, |cd| cd.checked())
+                    cell_ref.map_or(0, |cd| cd.checked())
                 } else {
                     0
                 };
@@ -3049,7 +3094,23 @@ impl VolvoxGrid {
                     x if x == v1::CellInteraction::None as i32 => None,
                     x => Some(x),
                 };
-
+                let barcode_status = if include_barcode_status {
+                    cell_ref.and_then(|cd| {
+                        cd.barcode().map(|spec| {
+                            let payload = if spec.value.is_empty() {
+                                cd.display_text()
+                            } else {
+                                spec.value.as_str()
+                            };
+                            crate::canvas::barcode_render_status(spec, payload)
+                        })
+                    })
+                } else {
+                    None
+                };
+                let barcode = cell_ref
+                    .and_then(|cd| cd.barcode())
+                    .map(barcode_spec_to_proto);
                 result.push(v1::CellData {
                     row,
                     col,
@@ -3057,6 +3118,8 @@ impl VolvoxGrid {
                     style,
                     checked,
                     interaction,
+                    barcode,
+                    barcode_status,
                 });
             }
         }
@@ -3067,6 +3130,92 @@ impl VolvoxGrid {
 // ═══════════════════════════════════════════════════════════════════════════
 // Conversion helpers: proto ↔ engine types
 // ═══════════════════════════════════════════════════════════════════════════
+
+fn barcode_proto_to_spec(b: &v1::BarcodeData) -> BarcodeSpec {
+    let encoding = b.encoding.as_ref();
+    let render = b.render.as_ref();
+    let caption = b.caption.as_ref();
+    BarcodeSpec {
+        symbology: b.symbology,
+        value: b.value.clone(),
+        check_digit: encoding.map_or(v1::BarcodeCheckDigitMode::CheckDigitDefault as i32, |e| {
+            e.check_digit
+        }),
+        text_encoding: encoding.map_or(v1::BarcodeTextEncoding::BarcodeTextAuto as i32, |e| {
+            e.text_encoding
+        }),
+        qr_ecc: encoding.map_or(v1::BarcodeQrErrorCorrection::QrEccDefault as i32, |e| {
+            e.qr_ecc
+        }),
+        foreground: render.and_then(|r| r.foreground),
+        background: render.and_then(|r| r.background),
+        alignment: render
+            .and_then(|r| r.alignment)
+            .unwrap_or(v1::ImageAlignment::ImgAlignStretch as i32),
+        caption_position: caption.and_then(|c| c.position),
+        caption_text: caption.and_then(|c| c.text.clone()),
+        caption_color: caption.and_then(|c| c.color),
+        caption_font_size: caption.and_then(|c| c.font_size),
+        module_size: render.map_or(0, |r| r.module_size),
+        quiet_zone: render.map_or(0, |r| r.quiet_zone),
+        bar_height: render.map_or(0, |r| r.bar_height),
+        narrow_bar_width: render.map_or(0, |r| r.narrow_bar_width),
+        show_size_warning: render.and_then(|r| r.show_size_warning).unwrap_or(false),
+        size_warning_color: render.and_then(|r| r.size_warning_color),
+        use_full_rect: render.and_then(|r| r.use_full_rect).unwrap_or(false),
+    }
+}
+
+fn barcode_spec_to_proto(b: &BarcodeSpec) -> v1::BarcodeData {
+    let encoding = (b.check_digit != v1::BarcodeCheckDigitMode::CheckDigitDefault as i32
+        || b.text_encoding != v1::BarcodeTextEncoding::BarcodeTextAuto as i32
+        || b.qr_ecc != v1::BarcodeQrErrorCorrection::QrEccDefault as i32)
+        .then(|| v1::BarcodeEncodingOptions {
+            check_digit: b.check_digit,
+            text_encoding: b.text_encoding,
+            qr_ecc: b.qr_ecc,
+        });
+    let render = (b.foreground.is_some()
+        || b.background.is_some()
+        || b.alignment != v1::ImageAlignment::ImgAlignStretch as i32
+        || b.module_size != 0
+        || b.quiet_zone != 0
+        || b.bar_height != 0
+        || b.narrow_bar_width != 0
+        || b.show_size_warning
+        || b.size_warning_color.is_some()
+        || b.use_full_rect)
+        .then(|| v1::BarcodeRenderOptions {
+            foreground: b.foreground,
+            background: b.background,
+            alignment: (b.alignment != v1::ImageAlignment::ImgAlignStretch as i32)
+                .then_some(b.alignment),
+            module_size: b.module_size,
+            quiet_zone: b.quiet_zone,
+            bar_height: b.bar_height,
+            narrow_bar_width: b.narrow_bar_width,
+            show_size_warning: b.show_size_warning.then_some(true),
+            size_warning_color: b.size_warning_color,
+            use_full_rect: b.use_full_rect.then_some(true),
+        });
+    let caption = (b.caption_position.is_some()
+        || b.caption_text.is_some()
+        || b.caption_color.is_some()
+        || b.caption_font_size.is_some())
+    .then(|| v1::BarcodeCaptionOptions {
+        position: b.caption_position,
+        text: b.caption_text.clone(),
+        color: b.caption_color,
+        font_size: b.caption_font_size,
+    });
+    v1::BarcodeData {
+        symbology: b.symbology,
+        value: b.value.clone(),
+        encoding,
+        render,
+        caption,
+    }
+}
 
 pub fn v2_cell_style_to_engine(s: &v1::CellStyle) -> style::CellStylePatch {
     let (
@@ -3651,7 +3800,7 @@ mod tests {
         assert_eq!(result.written_count, 1);
         assert_eq!(result.rejected_count, 0);
 
-        let cells = grid.get_cells(0, 0, 0, 0, false, false, true);
+        let cells = grid.get_cells(0, 0, 0, 0, false, false, true, false);
         assert!(matches!(
             cells.first().and_then(|c| c.value.clone()),
             Some(v1::CellValue {
@@ -3690,7 +3839,7 @@ mod tests {
         grid.cells.set_text(1, 2, "B".to_string());
         grid.cells.set_text(2, 1, "C".to_string());
 
-        let cells = grid.get_cells(1, 1, 2, 2, false, false, false);
+        let cells = grid.get_cells(1, 1, 2, 2, false, false, false, false);
         assert_eq!(cells.len(), 4); // 2x2 range
 
         let a = cells.iter().find(|c| c.row == 1 && c.col == 1).unwrap();
@@ -3722,11 +3871,12 @@ mod tests {
                 sticky_row: None,
                 sticky_col: None,
                 interaction: Some(v1::CellInteraction::Button as i32),
+                barcode: None,
             }],
             false,
         );
 
-        let button_cell = grid.get_cells(1, 1, 1, 1, false, false, false);
+        let button_cell = grid.get_cells(1, 1, 1, 1, false, false, false, false);
         assert_eq!(
             button_cell.first().and_then(|c| c.interaction),
             Some(v1::CellInteraction::Button as i32)
@@ -3746,11 +3896,12 @@ mod tests {
                 sticky_row: None,
                 sticky_col: None,
                 interaction: Some(v1::CellInteraction::Unspecified as i32),
+                barcode: None,
             }],
             false,
         );
 
-        let link_cell = grid.get_cells(1, 1, 1, 1, false, false, false);
+        let link_cell = grid.get_cells(1, 1, 1, 1, false, false, false, false);
         assert_eq!(
             link_cell.first().and_then(|c| c.interaction),
             Some(v1::CellInteraction::TextLink as i32)
@@ -4035,6 +4186,130 @@ mod tests {
         let cell = grid.cells.get(1, 1).expect("cell should exist");
         assert!((cell.progress_percent() - 0.42).abs() < 1e-6);
         assert_eq!(cell.progress_color(), 0xFF818CF8);
+    }
+
+    #[test]
+    fn update_cells_applies_barcode_extra_and_readback() {
+        let mut grid = test_grid();
+        let barcode = v1::BarcodeData {
+            symbology: v1::BarcodeSymbology::BarcodeQr as i32,
+            value: "SKU-42".to_string(),
+            encoding: Some(v1::BarcodeEncodingOptions {
+                check_digit: v1::BarcodeCheckDigitMode::CheckDigitDefault as i32,
+                text_encoding: v1::BarcodeTextEncoding::BarcodeTextUtf8 as i32,
+                qr_ecc: v1::BarcodeQrErrorCorrection::QrEccHigh as i32,
+            }),
+            render: Some(v1::BarcodeRenderOptions {
+                foreground: Some(0xFF111111),
+                background: Some(0xFFFFFFFF),
+                alignment: Some(v1::ImageAlignment::ImgAlignCenterCenter as i32),
+                module_size: 4,
+                quiet_zone: 2,
+                bar_height: 0,
+                narrow_bar_width: 0,
+                show_size_warning: Some(true),
+                size_warning_color: None,
+                use_full_rect: Some(true),
+            }),
+            caption: Some(v1::BarcodeCaptionOptions {
+                position: Some(v1::BarcodeCaptionPosition::CaptionBottom as i32),
+                text: Some("SKU 42".to_string()),
+                color: Some(0xFF222222),
+                font_size: Some(9.0),
+            }),
+        };
+        grid.update_cells(&[v1::CellUpdate {
+            row: 1,
+            col: 1,
+            barcode: Some(barcode.clone()),
+            ..Default::default()
+        }]);
+        assert!(grid.barcode_cells_maybe_present);
+        assert_eq!(grid.barcode_cell_count, 1);
+
+        let cell = grid.cells.get(1, 1).expect("barcode cell should exist");
+        let spec = cell.barcode().expect("barcode should be stored");
+        assert_eq!(spec.symbology, v1::BarcodeSymbology::BarcodeQr as i32);
+        assert_eq!(spec.value, "SKU-42");
+        assert_eq!(
+            spec.text_encoding,
+            v1::BarcodeTextEncoding::BarcodeTextUtf8 as i32
+        );
+        assert_eq!(spec.qr_ecc, v1::BarcodeQrErrorCorrection::QrEccHigh as i32);
+        assert_eq!(spec.foreground, Some(0xFF111111));
+        assert_eq!(spec.background, Some(0xFFFFFFFF));
+        assert_eq!(
+            spec.alignment,
+            v1::ImageAlignment::ImgAlignCenterCenter as i32
+        );
+        assert_eq!(
+            spec.caption_position,
+            Some(v1::BarcodeCaptionPosition::CaptionBottom as i32)
+        );
+        assert_eq!(spec.caption_text.as_deref(), Some("SKU 42"));
+        assert_eq!(spec.caption_color, Some(0xFF222222));
+        assert_eq!(spec.caption_font_size, Some(9.0));
+        assert!(spec.show_size_warning);
+        assert!(spec.use_full_rect);
+
+        let cells = grid.get_cells(1, 1, 1, 1, false, false, false, true);
+        assert_eq!(
+            cells.first().and_then(|c| c.barcode.as_ref()),
+            Some(&barcode)
+        );
+        assert_eq!(
+            cells.first().and_then(|c| c.barcode_status),
+            Some(v1::BarcodeRenderStatus::Ok as i32)
+        );
+
+        // Without opt-in the status field stays absent.
+        let cells_no_status = grid.get_cells(1, 1, 1, 1, false, false, false, false);
+        assert_eq!(cells_no_status.first().and_then(|c| c.barcode_status), None);
+
+        grid.update_cells(&[v1::CellUpdate {
+            row: 1,
+            col: 1,
+            barcode: Some(v1::BarcodeData {
+                symbology: v1::BarcodeSymbology::BarcodeNone as i32,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }]);
+        assert!(grid.cells.get(1, 1).and_then(|c| c.barcode()).is_none());
+        assert!(!grid.barcode_cells_maybe_present);
+        assert_eq!(grid.barcode_cell_count, 0);
+    }
+
+    #[test]
+    fn update_cells_auto_resizes_barcode_column_when_enabled() {
+        let mut grid = test_grid();
+        grid.default_col_width = 20;
+        grid.auto_resize = true;
+        grid.auto_size_mode = v1::AutoSizeMode::AutosizeColWidth as i32;
+        let before = grid.get_col_width(1);
+
+        grid.update_cells(&[v1::CellUpdate {
+            row: 1,
+            col: 1,
+            barcode: Some(v1::BarcodeData {
+                symbology: v1::BarcodeSymbology::BarcodeCode128 as i32,
+                value: "0101234567890128".to_string(),
+                encoding: Some(v1::BarcodeEncodingOptions {
+                    check_digit: v1::BarcodeCheckDigitMode::CheckDigitDefault as i32,
+                    text_encoding: v1::BarcodeTextEncoding::BarcodeTextGs1 as i32,
+                    qr_ecc: v1::BarcodeQrErrorCorrection::QrEccDefault as i32,
+                }),
+                caption: Some(v1::BarcodeCaptionOptions {
+                    position: Some(v1::BarcodeCaptionPosition::CaptionNone as i32),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }]);
+
+        assert!(grid.get_col_width(1) > before);
+        assert!(grid.get_col_width(1) >= 300);
     }
 
     // ── text_overflow + ellipsis interaction ────────────────────────

@@ -6,7 +6,8 @@ pub struct LayoutCache {
     pub total_width: i32,
     pub total_height: i32,
     pub valid: bool,
-    /// Monotonically increasing counter, bumped on every `invalidate()`.
+    /// Monotonically increasing counter, bumped whenever cached geometry
+    /// is invalidated or incrementally patched.
     /// Used as a cache key for render context reuse.
     pub generation: u64,
     pub rows: i32,
@@ -395,6 +396,7 @@ impl LayoutCache {
             self.total_width = *self.col_positions.last().unwrap_or(&0);
             self.uniform_cols = false;
             self.uniform_col_width = 0;
+            self.generation = self.generation.wrapping_add(1);
             return;
         }
         let c = col as usize;
@@ -439,6 +441,7 @@ impl LayoutCache {
             self.total_height = *self.row_positions.last().unwrap_or(&0);
             self.uniform_rows = false;
             self.uniform_row_height = 0;
+            self.generation = self.generation.wrapping_add(1);
             return;
         }
         let r = row as usize;

@@ -872,6 +872,7 @@ pub fn volvox_grid_get_cells(
     include_style: bool,
     include_checked: bool,
     include_typed: bool,
+    include_barcode_status: bool,
 ) -> Vec<u8> {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
@@ -889,6 +890,7 @@ pub fn volvox_grid_get_cells(
         include_style,
         include_checked,
         include_typed,
+        include_barcode_status,
         ..Default::default()
     };
     match plugin.get_cells(req) {

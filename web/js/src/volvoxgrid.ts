@@ -5,7 +5,7 @@
  * lives inside WASM memory; this class manages the render loop, the
  * HTML canvas, and event forwarding.
  */
-import { GridEventFields } from "./generated/volvoxgrid_ffi.js";
+import { GridEventFields, RenderLayerBit } from "./generated/volvoxgrid_ffi.js";
 
 export interface VolvoxGridCellRange {
   row1: number;
@@ -2008,6 +2008,15 @@ export class VolvoxGrid {
   private static readonly ZOOM_STEP_MIN_SCALE = 1 / 32;
   private static readonly ZOOM_STEP_MAX_SCALE = 32;
   private static readonly ZOOM_STEP_NOISE_EPSILON = 0.001;
+
+  private static renderLayerBitNumber(layer: RenderLayerBit | number): number {
+    const bit = Math.trunc(Number(layer));
+    if (!Number.isFinite(bit) || bit < 0 || bit >= 32) {
+      throw new RangeError("Render layer bit must be between 0 and 31");
+    }
+    return bit;
+  }
+
   private wasm: any;
   private gridId: number;
   private canvas: HTMLCanvasElement;
@@ -4610,6 +4619,78 @@ export class VolvoxGrid {
     if (typeof this.wasm.set_redraw === "function") {
       this.wasm.set_redraw(this.gridId, on);
     }
+  }
+
+  /** Render layer visibility bitmask. -1 means all layers enabled. */
+  get renderLayerMask(): number {
+    const getLo = this.wasm.get_render_layer_mask_lo as
+      | ((gridId: number) => number)
+      | undefined;
+    if (typeof getLo !== "function") {
+      return -1;
+    }
+    const loSigned = Number(getLo(this.gridId));
+    const lo = loSigned >>> 0;
+    const getHi = this.wasm.get_render_layer_mask_hi as
+      | ((gridId: number) => number)
+      | undefined;
+    if (typeof getHi !== "function") {
+      return loSigned;
+    }
+    const hi = Number(getHi(this.gridId)) | 0;
+    if (hi === -1 && lo === 0xffffffff) {
+      return -1;
+    }
+    return hi === 0 ? lo : hi * 0x100000000 + lo;
+  }
+
+  set renderLayerMask(mask: number) {
+    const setMask = this.wasm.set_render_layer_mask as
+      | ((gridId: number, maskHi: number, maskLo: number) => void)
+      | undefined;
+    if (typeof setMask !== "function") {
+      return;
+    }
+    const normalized = Math.trunc(mask);
+    if (!Number.isFinite(normalized)) {
+      return;
+    }
+    let hi = 0;
+    let lo = 0;
+    if (normalized < 0) {
+      hi = -1;
+      lo = -1;
+    } else {
+      hi = Math.trunc(normalized / 0x100000000);
+      const loUnsigned = normalized >>> 0;
+      lo = loUnsigned > 0x7fffffff ? loUnsigned - 0x100000000 : loUnsigned;
+    }
+    setMask(this.gridId, hi, lo);
+    this.dirty = true;
+  }
+
+  /** Check whether a render layer is enabled in the current mask. */
+  isRenderLayerEnabled(layer: RenderLayerBit | number): boolean {
+    const bit = VolvoxGrid.renderLayerBitNumber(layer);
+    const mask = this.renderLayerMask;
+    if (mask < 0) {
+      return true;
+    }
+    const flag = 2 ** bit;
+    return Math.floor(mask / flag) % 2 === 1;
+  }
+
+  /** Enable or disable one render layer while preserving the other bits. */
+  setRenderLayerEnabled(layer: RenderLayerBit | number, enabled: boolean): void {
+    const bit = VolvoxGrid.renderLayerBitNumber(layer);
+    const flag = 2 ** bit;
+    const mask = this.renderLayerMask;
+    const baseMask = mask < 0 ? 0xffffffff : mask;
+    const currentlyEnabled = mask < 0 || Math.floor(baseMask / flag) % 2 === 1;
+    if (currentlyEnabled === enabled) {
+      return;
+    }
+    this.renderLayerMask = enabled ? baseMask + flag : baseMask - flag;
   }
 
   get scrollBars(): number {

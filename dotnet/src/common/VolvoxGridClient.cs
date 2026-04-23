@@ -42,6 +42,43 @@ namespace VolvoxGrid.DotNet
             _client.ConfigureGrid(_gridId, config ?? new GridConfig());
         }
 
+        public long GetRenderLayerMask()
+        {
+            EnsureNotDisposed();
+            var rendering = GetConfig().Rendering;
+            return rendering != null && rendering.HasRenderLayerMask ? rendering.RenderLayerMask : -1L;
+        }
+
+        public void SetRenderLayerMask(long mask)
+        {
+            EnsureNotDisposed();
+            Configure(
+                new GridConfig
+                {
+                    Rendering = new RenderConfig
+                    {
+                        RenderLayerMask = mask,
+                    },
+                });
+        }
+
+        public bool IsRenderLayerEnabled(RenderLayerBit layer)
+        {
+            long bit = RenderLayerFlag(layer);
+            return (GetRenderLayerMask() & bit) != 0L;
+        }
+
+        public void SetRenderLayerEnabled(RenderLayerBit layer, bool enabled)
+        {
+            long mask = GetRenderLayerMask();
+            long bit = RenderLayerFlag(layer);
+            long next = enabled ? (mask | bit) : (mask & ~bit);
+            if (next != mask)
+            {
+                SetRenderLayerMask(next);
+            }
+        }
+
         public void DefineColumns(IList<ColumnDef> columns)
         {
             EnsureNotDisposed();
@@ -392,6 +429,16 @@ namespace VolvoxGrid.DotNet
         public static CellValue ToCellValue(object value)
         {
             return Internal.VolvoxClient.CellValueFromObject(value);
+        }
+
+        private static long RenderLayerFlag(RenderLayerBit layer)
+        {
+            int bit = (int)layer;
+            if (bit < 0 || bit >= 63)
+            {
+                throw new ArgumentOutOfRangeException("layer");
+            }
+            return 1L << bit;
         }
 
         public void Dispose()

@@ -138,6 +138,65 @@ message ImageData {
   string format = 2;  // "png", "bmp", etc.
 }
 
+message BarcodeEncodingOptions {
+  BarcodeCheckDigitMode    check_digit   = 1;
+  BarcodeTextEncoding      text_encoding = 2;
+  // QR-only. Ignored for 1D symbologies.
+  BarcodeQrErrorCorrection qr_ecc        = 3;
+}
+
+message BarcodeRenderOptions {
+  // Unset means engine default; foreground defaults to resolved cell foreground,
+  // background defaults to transparent.
+  optional uint32 foreground = 1;
+  optional uint32 background = 2;
+  optional ImageAlignment alignment = 3;
+
+  // QR/linear module size. 0 = auto; explicit values are clamped to [1, 16].
+  uint32 module_size = 4;
+  // Quiet zone modules. 0 = default; explicit values are clamped to [0, 64]
+  // for QR and [0, 128] for 1D symbologies.
+  uint32 quiet_zone  = 5;
+
+  // 1D-only bar height in pixels. Ignored for QR. 0 = auto.
+  uint32 bar_height = 10;
+  // 1D narrow bar width in pixels. Ignored for QR. 0 = auto; explicit values
+  // are clamped to [1, 32].
+  uint32 narrow_bar_width = 11;
+
+  // Default false. When enabled, the engine draws a warning mark over the
+  // symbol if the cell is too small for a faithful minimum-size render.
+  optional bool show_size_warning = 12;
+  // ARGB warning color. Unset means opaque red.
+  optional uint32 size_warning_color = 13;
+
+  // Default false. In automatic sizing, distribute modules across the full
+  // available barcode rectangle instead of centering an integer-pixel module
+  // render that can leave extra side/bottom space.
+  optional bool use_full_rect = 14;
+}
+
+message BarcodeCaptionOptions {
+  // Default BOTTOM for 1D, NONE for QR.
+  optional BarcodeCaptionPosition position = 1;
+  // Empty/unset means use encoded payload.
+  optional string text = 2;
+  // Unset means use barcode/cell foreground.
+  optional uint32 color = 3;
+  // Unset/0 means inherit cell font size.
+  optional float font_size = 4;
+}
+
+message BarcodeData {
+  BarcodeSymbology symbology = 1;
+  // Encoded payload. If empty, the engine falls back to the cell's text value.
+  // Text/string payloads only; raw binary QR/Code128 byte mode is not exposed.
+  string value = 2;
+  BarcodeEncodingOptions encoding = 3;
+  BarcodeRenderOptions   render   = 4;
+  BarcodeCaptionOptions  caption  = 5;
+}
+
 message CellRange {
   int32 row1 = 1;
   int32 col1 = 2;
@@ -246,6 +305,60 @@ enum ImageAlignment {
   IMG_ALIGN_RIGHT_BOTTOM  = 8;
   IMG_ALIGN_STRETCH       = 9;
   IMG_ALIGN_TILE          = 10;
+}
+
+enum BarcodeSymbology {
+  BARCODE_NONE     = 0;
+  BARCODE_QR       = 1;
+  BARCODE_CODE128  = 10;
+  BARCODE_CODE39   = 11;
+  BARCODE_CODE93   = 12;
+  BARCODE_CODE11   = 13;
+  BARCODE_EAN13    = 20;
+  BARCODE_EAN8     = 21;
+  BARCODE_UPC_A    = 22;
+  BARCODE_UPC_E    = 23;
+  BARCODE_EAN_SUPP = 24;
+  BARCODE_ITF      = 30;
+  BARCODE_STF      = 31;
+  BARCODE_CODABAR  = 32;
+}
+
+enum BarcodeCaptionPosition {
+  CAPTION_NONE   = 0;
+  CAPTION_BOTTOM = 1;
+  CAPTION_TOP    = 2;
+}
+
+enum BarcodeCheckDigitMode {
+  // Symbology default. Mandatory checks are handled by the encoder; optional
+  // check digits are not added unless CHECK_DIGIT_GENERATE is set.
+  CHECK_DIGIT_DEFAULT  = 0;
+  CHECK_DIGIT_NONE     = 1;
+  CHECK_DIGIT_GENERATE = 2;
+}
+
+enum BarcodeTextEncoding {
+  BARCODE_TEXT_AUTO  = 0;
+  BARCODE_TEXT_ASCII = 1;
+  BARCODE_TEXT_UTF8  = 2;
+  BARCODE_TEXT_GS1   = 3;
+}
+
+enum BarcodeQrErrorCorrection {
+  QR_ECC_DEFAULT  = 0;
+  QR_ECC_LOW      = 1;
+  QR_ECC_MEDIUM   = 2;
+  QR_ECC_QUARTILE = 3;
+  QR_ECC_HIGH     = 4;
+}
+
+enum BarcodeRenderStatus {
+  BARCODE_RENDER_STATUS_UNSPECIFIED          = 0;
+  BARCODE_RENDER_STATUS_OK                   = 1;
+  BARCODE_RENDER_STATUS_EMPTY_PAYLOAD        = 2;
+  BARCODE_RENDER_STATUS_INVALID_PAYLOAD      = 3;
+  BARCODE_RENDER_STATUS_UNSUPPORTED_SYMBOLOGY = 4;
 }
 
 enum CheckedState {
@@ -1129,7 +1242,7 @@ message InteractionConfig {
 }
 
 // ── Render layer bit positions (for render_layer_mask bitmask) ──
-// The engine renders through 27 independent layers (engine/src/canvas.rs
+// The engine renders through 28 independent layers (engine/src/canvas.rs
 // layer module). Each layer is guarded by its bit in render_layer_mask.
 // Setting bit i enables layer i. Set all bits (-1) to render everything.
 enum RenderLayerBit {
@@ -1160,10 +1273,11 @@ enum RenderLayerBit {
   RENDER_LAYER_FAST_SCROLL      = 24;
   RENDER_LAYER_PULL_TO_REFRESH  = 25;
   RENDER_LAYER_DEBUG_OVERLAY    = 26;
+  RENDER_LAYER_BARCODES         = 27;
 }
 
 // ── Rendering ──
-// The engine renders through 27 independent layers (engine/src/canvas.rs).
+// The engine renders through 28 independent layers (engine/src/canvas.rs).
 // Each layer can be individually toggled via render_layer_mask.
 message RenderConfig {
   optional RendererMode    renderer_mode         = 1;
@@ -1411,6 +1525,9 @@ message CellUpdate {
   optional StickyEdge    sticky_row     = 10;
   optional StickyEdge    sticky_col     = 11;
   optional CellInteraction interaction  = 12;
+  // Full replacement, not a sparse barcode patch. Send `symbology` every time;
+  // `BARCODE_NONE` clears an existing barcode.
+  optional BarcodeData   barcode        = 13;
 }
 
 message UpdateCellsRequest {
@@ -1430,6 +1547,9 @@ message GetCellsRequest {
   bool  include_style = 6;
   bool  include_checked = 7;
   bool  include_typed = 8;
+  // Opt-in: run the per-cell barcode encode probe and populate
+  // `CellData.barcode_status`. Off by default because encoding is not free.
+  bool  include_barcode_status = 9;
 }
 
 message CellData {
@@ -1439,6 +1559,12 @@ message CellData {
   CellStyle               style       = 4;
   CheckedState            checked     = 5;
   optional CellInteraction interaction = 6;
+  // Readback counterpart of `CellUpdate.barcode = 13`.
+  optional BarcodeData    barcode     = 7;
+  // Readback/probe status for `barcode`. Present only when the request sets
+  // `include_barcode_status`. Field 8 is intentionally independent from
+  // `CellUpdate.barcode = 13`; the messages have different purposes.
+  optional BarcodeRenderStatus barcode_status = 8;
 }
 
 message CellsResponse {
@@ -2279,7 +2405,7 @@ message GpuFrameDone {
 message FrameMetrics {
   float frame_time_ms = 1;          // total frame render time
   float fps = 2;                    // smoothed FPS (exponential moving average)
-  repeated float layer_times_us = 3;   // per-layer microseconds (27 entries if layer_profiling on)
+  repeated float layer_times_us = 3;   // per-layer microseconds (28 entries if layer_profiling on)
   // Cell counts by zone: [scrollable, sticky, pinned, fixed].
   repeated uint32 zone_cell_counts = 4;
   int32 instance_count = 5;         // GPU draw calls or CPU region count

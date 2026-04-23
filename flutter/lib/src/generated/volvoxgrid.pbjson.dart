@@ -183,6 +183,122 @@ final $typed_data.Uint8List imageAlignmentDescriptor = $convert.base64Decode(
     'X0NFTlRFUhAHEhoKFklNR19BTElHTl9SSUdIVF9CT1RUT00QCBIVChFJTUdfQUxJR05fU1RSRV'
     'RDSBAJEhIKDklNR19BTElHTl9USUxFEAo=');
 
+@$core.Deprecated('Use barcodeSymbologyDescriptor instead')
+const BarcodeSymbology$json = {
+  '1': 'BarcodeSymbology',
+  '2': [
+    {'1': 'BARCODE_NONE', '2': 0},
+    {'1': 'BARCODE_QR', '2': 1},
+    {'1': 'BARCODE_CODE128', '2': 10},
+    {'1': 'BARCODE_CODE39', '2': 11},
+    {'1': 'BARCODE_CODE93', '2': 12},
+    {'1': 'BARCODE_CODE11', '2': 13},
+    {'1': 'BARCODE_EAN13', '2': 20},
+    {'1': 'BARCODE_EAN8', '2': 21},
+    {'1': 'BARCODE_UPC_A', '2': 22},
+    {'1': 'BARCODE_UPC_E', '2': 23},
+    {'1': 'BARCODE_EAN_SUPP', '2': 24},
+    {'1': 'BARCODE_ITF', '2': 30},
+    {'1': 'BARCODE_STF', '2': 31},
+    {'1': 'BARCODE_CODABAR', '2': 32},
+  ],
+};
+
+/// Descriptor for `BarcodeSymbology`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List barcodeSymbologyDescriptor = $convert.base64Decode(
+    'ChBCYXJjb2RlU3ltYm9sb2d5EhAKDEJBUkNPREVfTk9ORRAAEg4KCkJBUkNPREVfUVIQARITCg'
+    '9CQVJDT0RFX0NPREUxMjgQChISCg5CQVJDT0RFX0NPREUzORALEhIKDkJBUkNPREVfQ09ERTkz'
+    'EAwSEgoOQkFSQ09ERV9DT0RFMTEQDRIRCg1CQVJDT0RFX0VBTjEzEBQSEAoMQkFSQ09ERV9FQU'
+    '44EBUSEQoNQkFSQ09ERV9VUENfQRAWEhEKDUJBUkNPREVfVVBDX0UQFxIUChBCQVJDT0RFX0VB'
+    'Tl9TVVBQEBgSDwoLQkFSQ09ERV9JVEYQHhIPCgtCQVJDT0RFX1NURhAfEhMKD0JBUkNPREVfQ0'
+    '9EQUJBUhAg');
+
+@$core.Deprecated('Use barcodeCaptionPositionDescriptor instead')
+const BarcodeCaptionPosition$json = {
+  '1': 'BarcodeCaptionPosition',
+  '2': [
+    {'1': 'CAPTION_NONE', '2': 0},
+    {'1': 'CAPTION_BOTTOM', '2': 1},
+    {'1': 'CAPTION_TOP', '2': 2},
+  ],
+};
+
+/// Descriptor for `BarcodeCaptionPosition`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List barcodeCaptionPositionDescriptor =
+    $convert.base64Decode(
+        'ChZCYXJjb2RlQ2FwdGlvblBvc2l0aW9uEhAKDENBUFRJT05fTk9ORRAAEhIKDkNBUFRJT05fQk'
+        '9UVE9NEAESDwoLQ0FQVElPTl9UT1AQAg==');
+
+@$core.Deprecated('Use barcodeCheckDigitModeDescriptor instead')
+const BarcodeCheckDigitMode$json = {
+  '1': 'BarcodeCheckDigitMode',
+  '2': [
+    {'1': 'CHECK_DIGIT_DEFAULT', '2': 0},
+    {'1': 'CHECK_DIGIT_NONE', '2': 1},
+    {'1': 'CHECK_DIGIT_GENERATE', '2': 2},
+  ],
+};
+
+/// Descriptor for `BarcodeCheckDigitMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List barcodeCheckDigitModeDescriptor = $convert.base64Decode(
+    'ChVCYXJjb2RlQ2hlY2tEaWdpdE1vZGUSFwoTQ0hFQ0tfRElHSVRfREVGQVVMVBAAEhQKEENIRU'
+    'NLX0RJR0lUX05PTkUQARIYChRDSEVDS19ESUdJVF9HRU5FUkFURRAC');
+
+@$core.Deprecated('Use barcodeTextEncodingDescriptor instead')
+const BarcodeTextEncoding$json = {
+  '1': 'BarcodeTextEncoding',
+  '2': [
+    {'1': 'BARCODE_TEXT_AUTO', '2': 0},
+    {'1': 'BARCODE_TEXT_ASCII', '2': 1},
+    {'1': 'BARCODE_TEXT_UTF8', '2': 2},
+    {'1': 'BARCODE_TEXT_GS1', '2': 3},
+  ],
+};
+
+/// Descriptor for `BarcodeTextEncoding`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List barcodeTextEncodingDescriptor = $convert.base64Decode(
+    'ChNCYXJjb2RlVGV4dEVuY29kaW5nEhUKEUJBUkNPREVfVEVYVF9BVVRPEAASFgoSQkFSQ09ERV'
+    '9URVhUX0FTQ0lJEAESFQoRQkFSQ09ERV9URVhUX1VURjgQAhIUChBCQVJDT0RFX1RFWFRfR1Mx'
+    'EAM=');
+
+@$core.Deprecated('Use barcodeQrErrorCorrectionDescriptor instead')
+const BarcodeQrErrorCorrection$json = {
+  '1': 'BarcodeQrErrorCorrection',
+  '2': [
+    {'1': 'QR_ECC_DEFAULT', '2': 0},
+    {'1': 'QR_ECC_LOW', '2': 1},
+    {'1': 'QR_ECC_MEDIUM', '2': 2},
+    {'1': 'QR_ECC_QUARTILE', '2': 3},
+    {'1': 'QR_ECC_HIGH', '2': 4},
+  ],
+};
+
+/// Descriptor for `BarcodeQrErrorCorrection`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List barcodeQrErrorCorrectionDescriptor = $convert.base64Decode(
+    'ChhCYXJjb2RlUXJFcnJvckNvcnJlY3Rpb24SEgoOUVJfRUNDX0RFRkFVTFQQABIOCgpRUl9FQ0'
+    'NfTE9XEAESEQoNUVJfRUNDX01FRElVTRACEhMKD1FSX0VDQ19RVUFSVElMRRADEg8KC1FSX0VD'
+    'Q19ISUdIEAQ=');
+
+@$core.Deprecated('Use barcodeRenderStatusDescriptor instead')
+const BarcodeRenderStatus$json = {
+  '1': 'BarcodeRenderStatus',
+  '2': [
+    {'1': 'BARCODE_RENDER_STATUS_UNSPECIFIED', '2': 0},
+    {'1': 'BARCODE_RENDER_STATUS_OK', '2': 1},
+    {'1': 'BARCODE_RENDER_STATUS_EMPTY_PAYLOAD', '2': 2},
+    {'1': 'BARCODE_RENDER_STATUS_INVALID_PAYLOAD', '2': 3},
+    {'1': 'BARCODE_RENDER_STATUS_UNSUPPORTED_SYMBOLOGY', '2': 4},
+  ],
+};
+
+/// Descriptor for `BarcodeRenderStatus`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List barcodeRenderStatusDescriptor = $convert.base64Decode(
+    'ChNCYXJjb2RlUmVuZGVyU3RhdHVzEiUKIUJBUkNPREVfUkVOREVSX1NUQVRVU19VTlNQRUNJRk'
+    'lFRBAAEhwKGEJBUkNPREVfUkVOREVSX1NUQVRVU19PSxABEicKI0JBUkNPREVfUkVOREVSX1NU'
+    'QVRVU19FTVBUWV9QQVlMT0FEEAISKQolQkFSQ09ERV9SRU5ERVJfU1RBVFVTX0lOVkFMSURfUE'
+    'FZTE9BRBADEi8KK0JBUkNPREVfUkVOREVSX1NUQVRVU19VTlNVUFBPUlRFRF9TWU1CT0xPR1kQ'
+    'BA==');
+
 @$core.Deprecated('Use checkedStateDescriptor instead')
 const CheckedState$json = {
   '1': 'CheckedState',
@@ -954,6 +1070,7 @@ const RenderLayerBit$json = {
     {'1': 'RENDER_LAYER_FAST_SCROLL', '2': 24},
     {'1': 'RENDER_LAYER_PULL_TO_REFRESH', '2': 25},
     {'1': 'RENDER_LAYER_DEBUG_OVERLAY', '2': 26},
+    {'1': 'RENDER_LAYER_BARCODES', '2': 27},
   ],
 };
 
@@ -974,7 +1091,7 @@ final $typed_data.Uint8List renderLayerBitDescriptor = $convert.base64Decode(
     'FBIeChpSRU5ERVJfTEFZRVJfQUNUSVZFX0VESVRPUhAVEiAKHFJFTkRFUl9MQVlFUl9BQ1RJVk'
     'VfRFJPUERPV04QFhIcChhSRU5ERVJfTEFZRVJfU0NST0xMX0JBUlMQFxIcChhSRU5ERVJfTEFZ'
     'RVJfRkFTVF9TQ1JPTEwQGBIgChxSRU5ERVJfTEFZRVJfUFVMTF9UT19SRUZSRVNIEBkSHgoaUk'
-    'VOREVSX0xBWUVSX0RFQlVHX09WRVJMQVkQGg==');
+    'VOREVSX0xBWUVSX0RFQlVHX09WRVJMQVkQGhIZChVSRU5ERVJfTEFZRVJfQkFSQ09ERVMQGw==');
 
 @$core.Deprecated('Use rowIndicatorSlotKindDescriptor instead')
 const RowIndicatorSlotKind$json = {
@@ -1475,6 +1592,223 @@ const ImageData$json = {
 final $typed_data.Uint8List imageDataDescriptor = $convert.base64Decode(
     'CglJbWFnZURhdGESEgoEZGF0YRgBIAEoDFIEZGF0YRIWCgZmb3JtYXQYAiABKAlSBmZvcm1hdA'
     '==');
+
+@$core.Deprecated('Use barcodeEncodingOptionsDescriptor instead')
+const BarcodeEncodingOptions$json = {
+  '1': 'BarcodeEncodingOptions',
+  '2': [
+    {
+      '1': 'check_digit',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.BarcodeCheckDigitMode',
+      '10': 'checkDigit'
+    },
+    {
+      '1': 'text_encoding',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.BarcodeTextEncoding',
+      '10': 'textEncoding'
+    },
+    {
+      '1': 'qr_ecc',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.BarcodeQrErrorCorrection',
+      '10': 'qrEcc'
+    },
+  ],
+};
+
+/// Descriptor for `BarcodeEncodingOptions`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List barcodeEncodingOptionsDescriptor = $convert.base64Decode(
+    'ChZCYXJjb2RlRW5jb2RpbmdPcHRpb25zEkUKC2NoZWNrX2RpZ2l0GAEgASgOMiQudm9sdm94Z3'
+    'JpZC52MS5CYXJjb2RlQ2hlY2tEaWdpdE1vZGVSCmNoZWNrRGlnaXQSRwoNdGV4dF9lbmNvZGlu'
+    'ZxgCIAEoDjIiLnZvbHZveGdyaWQudjEuQmFyY29kZVRleHRFbmNvZGluZ1IMdGV4dEVuY29kaW'
+    '5nEj4KBnFyX2VjYxgDIAEoDjInLnZvbHZveGdyaWQudjEuQmFyY29kZVFyRXJyb3JDb3JyZWN0'
+    'aW9uUgVxckVjYw==');
+
+@$core.Deprecated('Use barcodeRenderOptionsDescriptor instead')
+const BarcodeRenderOptions$json = {
+  '1': 'BarcodeRenderOptions',
+  '2': [
+    {
+      '1': 'foreground',
+      '3': 1,
+      '4': 1,
+      '5': 13,
+      '9': 0,
+      '10': 'foreground',
+      '17': true
+    },
+    {
+      '1': 'background',
+      '3': 2,
+      '4': 1,
+      '5': 13,
+      '9': 1,
+      '10': 'background',
+      '17': true
+    },
+    {
+      '1': 'alignment',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.ImageAlignment',
+      '9': 2,
+      '10': 'alignment',
+      '17': true
+    },
+    {'1': 'module_size', '3': 4, '4': 1, '5': 13, '10': 'moduleSize'},
+    {'1': 'quiet_zone', '3': 5, '4': 1, '5': 13, '10': 'quietZone'},
+    {'1': 'bar_height', '3': 10, '4': 1, '5': 13, '10': 'barHeight'},
+    {'1': 'narrow_bar_width', '3': 11, '4': 1, '5': 13, '10': 'narrowBarWidth'},
+    {
+      '1': 'show_size_warning',
+      '3': 12,
+      '4': 1,
+      '5': 8,
+      '9': 3,
+      '10': 'showSizeWarning',
+      '17': true
+    },
+    {
+      '1': 'size_warning_color',
+      '3': 13,
+      '4': 1,
+      '5': 13,
+      '9': 4,
+      '10': 'sizeWarningColor',
+      '17': true
+    },
+    {
+      '1': 'use_full_rect',
+      '3': 14,
+      '4': 1,
+      '5': 8,
+      '9': 5,
+      '10': 'useFullRect',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_foreground'},
+    {'1': '_background'},
+    {'1': '_alignment'},
+    {'1': '_show_size_warning'},
+    {'1': '_size_warning_color'},
+    {'1': '_use_full_rect'},
+  ],
+};
+
+/// Descriptor for `BarcodeRenderOptions`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List barcodeRenderOptionsDescriptor = $convert.base64Decode(
+    'ChRCYXJjb2RlUmVuZGVyT3B0aW9ucxIjCgpmb3JlZ3JvdW5kGAEgASgNSABSCmZvcmVncm91bm'
+    'SIAQESIwoKYmFja2dyb3VuZBgCIAEoDUgBUgpiYWNrZ3JvdW5kiAEBEkAKCWFsaWdubWVudBgD'
+    'IAEoDjIdLnZvbHZveGdyaWQudjEuSW1hZ2VBbGlnbm1lbnRIAlIJYWxpZ25tZW50iAEBEh8KC2'
+    '1vZHVsZV9zaXplGAQgASgNUgptb2R1bGVTaXplEh0KCnF1aWV0X3pvbmUYBSABKA1SCXF1aWV0'
+    'Wm9uZRIdCgpiYXJfaGVpZ2h0GAogASgNUgliYXJIZWlnaHQSKAoQbmFycm93X2Jhcl93aWR0aB'
+    'gLIAEoDVIObmFycm93QmFyV2lkdGgSLwoRc2hvd19zaXplX3dhcm5pbmcYDCABKAhIA1IPc2hv'
+    'd1NpemVXYXJuaW5niAEBEjEKEnNpemVfd2FybmluZ19jb2xvchgNIAEoDUgEUhBzaXplV2Fybm'
+    'luZ0NvbG9yiAEBEicKDXVzZV9mdWxsX3JlY3QYDiABKAhIBVILdXNlRnVsbFJlY3SIAQFCDQoL'
+    'X2ZvcmVncm91bmRCDQoLX2JhY2tncm91bmRCDAoKX2FsaWdubWVudEIUChJfc2hvd19zaXplX3'
+    'dhcm5pbmdCFQoTX3NpemVfd2FybmluZ19jb2xvckIQCg5fdXNlX2Z1bGxfcmVjdA==');
+
+@$core.Deprecated('Use barcodeCaptionOptionsDescriptor instead')
+const BarcodeCaptionOptions$json = {
+  '1': 'BarcodeCaptionOptions',
+  '2': [
+    {
+      '1': 'position',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.BarcodeCaptionPosition',
+      '9': 0,
+      '10': 'position',
+      '17': true
+    },
+    {'1': 'text', '3': 2, '4': 1, '5': 9, '9': 1, '10': 'text', '17': true},
+    {'1': 'color', '3': 3, '4': 1, '5': 13, '9': 2, '10': 'color', '17': true},
+    {
+      '1': 'font_size',
+      '3': 4,
+      '4': 1,
+      '5': 2,
+      '9': 3,
+      '10': 'fontSize',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_position'},
+    {'1': '_text'},
+    {'1': '_color'},
+    {'1': '_font_size'},
+  ],
+};
+
+/// Descriptor for `BarcodeCaptionOptions`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List barcodeCaptionOptionsDescriptor = $convert.base64Decode(
+    'ChVCYXJjb2RlQ2FwdGlvbk9wdGlvbnMSRgoIcG9zaXRpb24YASABKA4yJS52b2x2b3hncmlkLn'
+    'YxLkJhcmNvZGVDYXB0aW9uUG9zaXRpb25IAFIIcG9zaXRpb26IAQESFwoEdGV4dBgCIAEoCUgB'
+    'UgR0ZXh0iAEBEhkKBWNvbG9yGAMgASgNSAJSBWNvbG9yiAEBEiAKCWZvbnRfc2l6ZRgEIAEoAk'
+    'gDUghmb250U2l6ZYgBAUILCglfcG9zaXRpb25CBwoFX3RleHRCCAoGX2NvbG9yQgwKCl9mb250'
+    'X3NpemU=');
+
+@$core.Deprecated('Use barcodeDataDescriptor instead')
+const BarcodeData$json = {
+  '1': 'BarcodeData',
+  '2': [
+    {
+      '1': 'symbology',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.BarcodeSymbology',
+      '10': 'symbology'
+    },
+    {'1': 'value', '3': 2, '4': 1, '5': 9, '10': 'value'},
+    {
+      '1': 'encoding',
+      '3': 3,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.BarcodeEncodingOptions',
+      '10': 'encoding'
+    },
+    {
+      '1': 'render',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.BarcodeRenderOptions',
+      '10': 'render'
+    },
+    {
+      '1': 'caption',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.BarcodeCaptionOptions',
+      '10': 'caption'
+    },
+  ],
+};
+
+/// Descriptor for `BarcodeData`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List barcodeDataDescriptor = $convert.base64Decode(
+    'CgtCYXJjb2RlRGF0YRI9CglzeW1ib2xvZ3kYASABKA4yHy52b2x2b3hncmlkLnYxLkJhcmNvZG'
+    'VTeW1ib2xvZ3lSCXN5bWJvbG9neRIUCgV2YWx1ZRgCIAEoCVIFdmFsdWUSQQoIZW5jb2RpbmcY'
+    'AyABKAsyJS52b2x2b3hncmlkLnYxLkJhcmNvZGVFbmNvZGluZ09wdGlvbnNSCGVuY29kaW5nEj'
+    'sKBnJlbmRlchgEIAEoCzIjLnZvbHZveGdyaWQudjEuQmFyY29kZVJlbmRlck9wdGlvbnNSBnJl'
+    'bmRlchI+CgdjYXB0aW9uGAUgASgLMiQudm9sdm94Z3JpZC52MS5CYXJjb2RlQ2FwdGlvbk9wdG'
+    'lvbnNSB2NhcHRpb24=');
 
 @$core.Deprecated('Use cellRangeDescriptor instead')
 const CellRange$json = {
@@ -5057,6 +5391,16 @@ const CellUpdate$json = {
       '10': 'interaction',
       '17': true
     },
+    {
+      '1': 'barcode',
+      '3': 13,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.BarcodeData',
+      '9': 6,
+      '10': 'barcode',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_checked'},
@@ -5065,6 +5409,7 @@ const CellUpdate$json = {
     {'1': '_sticky_row'},
     {'1': '_sticky_col'},
     {'1': '_interaction'},
+    {'1': '_barcode'},
   ],
 };
 
@@ -5081,9 +5426,10 @@ final $typed_data.Uint8List cellUpdateDescriptor = $convert.base64Decode(
     'aWNreV9yb3cYCiABKA4yGS52b2x2b3hncmlkLnYxLlN0aWNreUVkZ2VIA1IJc3RpY2t5Um93iA'
     'EBEj0KCnN0aWNreV9jb2wYCyABKA4yGS52b2x2b3hncmlkLnYxLlN0aWNreUVkZ2VIBFIJc3Rp'
     'Y2t5Q29siAEBEkUKC2ludGVyYWN0aW9uGAwgASgOMh4udm9sdm94Z3JpZC52MS5DZWxsSW50ZX'
-    'JhY3Rpb25IBVILaW50ZXJhY3Rpb26IAQFCCgoIX2NoZWNrZWRCEAoOX3BpY3R1cmVfYWxpZ25C'
-    'EQoPX2Ryb3Bkb3duX2l0ZW1zQg0KC19zdGlja3lfcm93Qg0KC19zdGlja3lfY29sQg4KDF9pbn'
-    'RlcmFjdGlvbg==');
+    'JhY3Rpb25IBVILaW50ZXJhY3Rpb26IAQESOQoHYmFyY29kZRgNIAEoCzIaLnZvbHZveGdyaWQu'
+    'djEuQmFyY29kZURhdGFIBlIHYmFyY29kZYgBAUIKCghfY2hlY2tlZEIQCg5fcGljdHVyZV9hbG'
+    'lnbkIRCg9fZHJvcGRvd25faXRlbXNCDQoLX3N0aWNreV9yb3dCDQoLX3N0aWNreV9jb2xCDgoM'
+    'X2ludGVyYWN0aW9uQgoKCF9iYXJjb2Rl');
 
 @$core.Deprecated('Use updateCellsRequestDescriptor instead')
 const UpdateCellsRequest$json = {
@@ -5120,6 +5466,13 @@ const GetCellsRequest$json = {
     {'1': 'include_style', '3': 6, '4': 1, '5': 8, '10': 'includeStyle'},
     {'1': 'include_checked', '3': 7, '4': 1, '5': 8, '10': 'includeChecked'},
     {'1': 'include_typed', '3': 8, '4': 1, '5': 8, '10': 'includeTyped'},
+    {
+      '1': 'include_barcode_status',
+      '3': 9,
+      '4': 1,
+      '5': 8,
+      '10': 'includeBarcodeStatus'
+    },
   ],
 };
 
@@ -5129,7 +5482,8 @@ final $typed_data.Uint8List getCellsRequestDescriptor = $convert.base64Decode(
     'VSBHJvdzESEgoEY29sMRgDIAEoBVIEY29sMRISCgRyb3cyGAQgASgFUgRyb3cyEhIKBGNvbDIY'
     'BSABKAVSBGNvbDISIwoNaW5jbHVkZV9zdHlsZRgGIAEoCFIMaW5jbHVkZVN0eWxlEicKD2luY2'
     'x1ZGVfY2hlY2tlZBgHIAEoCFIOaW5jbHVkZUNoZWNrZWQSIwoNaW5jbHVkZV90eXBlZBgIIAEo'
-    'CFIMaW5jbHVkZVR5cGVk');
+    'CFIMaW5jbHVkZVR5cGVkEjQKFmluY2x1ZGVfYmFyY29kZV9zdGF0dXMYCSABKAhSFGluY2x1ZG'
+    'VCYXJjb2RlU3RhdHVz');
 
 @$core.Deprecated('Use cellDataDescriptor instead')
 const CellData$json = {
@@ -5171,9 +5525,31 @@ const CellData$json = {
       '10': 'interaction',
       '17': true
     },
+    {
+      '1': 'barcode',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.BarcodeData',
+      '9': 1,
+      '10': 'barcode',
+      '17': true
+    },
+    {
+      '1': 'barcode_status',
+      '3': 8,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.BarcodeRenderStatus',
+      '9': 2,
+      '10': 'barcodeStatus',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_interaction'},
+    {'1': '_barcode'},
+    {'1': '_barcode_status'},
   ],
 };
 
@@ -5183,8 +5559,11 @@ final $typed_data.Uint8List cellDataDescriptor = $convert.base64Decode(
     'gDIAEoCzIYLnZvbHZveGdyaWQudjEuQ2VsbFZhbHVlUgV2YWx1ZRIuCgVzdHlsZRgEIAEoCzIY'
     'LnZvbHZveGdyaWQudjEuQ2VsbFN0eWxlUgVzdHlsZRI1CgdjaGVja2VkGAUgASgOMhsudm9sdm'
     '94Z3JpZC52MS5DaGVja2VkU3RhdGVSB2NoZWNrZWQSRQoLaW50ZXJhY3Rpb24YBiABKA4yHi52'
-    'b2x2b3hncmlkLnYxLkNlbGxJbnRlcmFjdGlvbkgAUgtpbnRlcmFjdGlvbogBAUIOCgxfaW50ZX'
-    'JhY3Rpb24=');
+    'b2x2b3hncmlkLnYxLkNlbGxJbnRlcmFjdGlvbkgAUgtpbnRlcmFjdGlvbogBARI5CgdiYXJjb2'
+    'RlGAcgASgLMhoudm9sdm94Z3JpZC52MS5CYXJjb2RlRGF0YUgBUgdiYXJjb2RliAEBEk4KDmJh'
+    'cmNvZGVfc3RhdHVzGAggASgOMiIudm9sdm94Z3JpZC52MS5CYXJjb2RlUmVuZGVyU3RhdHVzSA'
+    'JSDWJhcmNvZGVTdGF0dXOIAQFCDgoMX2ludGVyYWN0aW9uQgoKCF9iYXJjb2RlQhEKD19iYXJj'
+    'b2RlX3N0YXR1cw==');
 
 @$core.Deprecated('Use cellsResponseDescriptor instead')
 const CellsResponse$json = {
@@ -9896,6 +10275,10 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.CellUpdate': CellUpdate$json,
   '.volvoxgrid.v1.CellValue': CellValue$json,
   '.volvoxgrid.v1.CellStyle': CellStyle$json,
+  '.volvoxgrid.v1.BarcodeData': BarcodeData$json,
+  '.volvoxgrid.v1.BarcodeEncodingOptions': BarcodeEncodingOptions$json,
+  '.volvoxgrid.v1.BarcodeRenderOptions': BarcodeRenderOptions$json,
+  '.volvoxgrid.v1.BarcodeCaptionOptions': BarcodeCaptionOptions$json,
   '.volvoxgrid.v1.WriteResult': WriteResult$json,
   '.volvoxgrid.v1.TypeViolation': TypeViolation$json,
   '.volvoxgrid.v1.GetCellsRequest': GetCellsRequest$json,

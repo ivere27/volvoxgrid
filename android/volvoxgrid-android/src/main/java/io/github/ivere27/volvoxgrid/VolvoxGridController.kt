@@ -1208,7 +1208,7 @@ class VolvoxGridController(
         return getConfig().rendering.rendererModeValue
     }
 
-    fun setRenderLayerMask(mask: Long) {
+    override fun setRenderLayerMask(mask: Long) {
         configure(GridConfig.newBuilder()
             .setRendering(
                 RenderConfig.newBuilder()
@@ -1218,8 +1218,22 @@ class VolvoxGridController(
             .build())
     }
 
-    fun renderLayerMask(): Long {
+    override fun renderLayerMask(): Long {
         return getConfig().rendering.renderLayerMask
+    }
+
+    override fun isRenderLayerEnabled(layer: RenderLayerBit): Boolean {
+        val bit = 1L shl layer.number
+        return (renderLayerMask() and bit) != 0L
+    }
+
+    override fun setRenderLayerEnabled(layer: RenderLayerBit, enabled: Boolean) {
+        val mask = renderLayerMask()
+        val bit = 1L shl layer.number
+        val next = if (enabled) mask or bit else mask and bit.inv()
+        if (next != mask) {
+            setRenderLayerMask(next)
+        }
     }
 
     override fun setRendererBackend(backend: RendererBackend) {

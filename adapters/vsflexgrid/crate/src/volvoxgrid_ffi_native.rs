@@ -846,6 +846,7 @@ pub unsafe extern "C" fn volvox_grid_get_cells(
     include_style: i32,
     include_checked: i32,
     include_typed: i32,
+    include_barcode_status: i32,
     out_len: *mut i32,
 ) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
@@ -867,6 +868,7 @@ pub unsafe extern "C" fn volvox_grid_get_cells(
         include_style: include_style != 0,
         include_checked: include_checked != 0,
         include_typed: include_typed != 0,
+        include_barcode_status: include_barcode_status != 0,
         ..Default::default()
     };
     match plugin.get_cells(req) {

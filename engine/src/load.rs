@@ -252,6 +252,7 @@ pub fn load_data(
                 sticky_row: None,
                 sticky_col: None,
                 interaction: None,
+                barcode: None,
             });
         }
     }
@@ -293,6 +294,7 @@ pub fn load_data(
         grid.set_rows(final_rows);
         grid.set_cols(final_cols);
         grid.cells.clear_all();
+        grid.clear_barcode_presence_tracking();
     } else {
         grid.set_cols(final_cols);
         grid.set_rows(final_rows);
@@ -1542,7 +1544,7 @@ mod tests {
             .iter()
             .position(|column| column.key == "amount")
             .expect("amount column should exist") as i32;
-        let cells = grid.get_cells(0, amount_col, 0, amount_col, false, false, true);
+        let cells = grid.get_cells(0, amount_col, 0, amount_col, false, false, true, false);
         let value = cells[0].value.as_ref().and_then(|cell| cell.value.as_ref());
         assert!(matches!(value, Some(pb::cell_value::Value::Number(_))));
     }
@@ -1617,7 +1619,7 @@ mod tests {
 
         assert_eq!(result.status, pb::LoadDataStatus::LoadOk as i32);
         assert_eq!(grid.rows, 2);
-        let cells = grid.get_cells(1, 1, 1, 1, false, false, true);
+        let cells = grid.get_cells(1, 1, 1, 1, false, false, true, false);
         let value = cells[0].value.as_ref().and_then(|cell| cell.value.as_ref());
         assert!(matches!(value, Some(pb::cell_value::Value::Number(_))));
     }
@@ -1648,6 +1650,7 @@ mod tests {
                 sticky_row: None,
                 sticky_col: None,
                 interaction: None,
+                barcode: None,
             }],
             false,
         );
@@ -1661,7 +1664,7 @@ mod tests {
 
         assert_eq!(result.status, pb::LoadDataStatus::LoadFailed as i32);
         assert_eq!(result.rejected, 1);
-        let cells = grid.get_cells(0, 0, 0, 0, false, false, true);
+        let cells = grid.get_cells(0, 0, 0, 0, false, false, true, false);
         let value = cells[0].value.as_ref().and_then(|cell| cell.value.as_ref());
         match value {
             Some(pb::cell_value::Value::Number(number)) => assert_eq!(*number, 42.0),
