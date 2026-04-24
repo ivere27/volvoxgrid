@@ -213,7 +213,7 @@ fn handle_tui_terminal_pointer_event(
     let pointer_x = pe.x as i32;
     let pointer_y = pe.y as i32;
     match pe.r#type {
-        0 => {
+        t if t == pb::pointer_event::Type::Down as i32 => {
             terminal_session.stop_tui_scrollbar_drag();
 
             if pe.button != 0 {
@@ -260,14 +260,14 @@ fn handle_tui_terminal_pointer_event(
 
             false
         }
-        1 => {
+        t if t == pb::pointer_event::Type::Up as i32 => {
             if terminal_session.is_tui_scrollbar_dragging() {
                 terminal_session.stop_tui_scrollbar_drag();
                 return true;
             }
             false
         }
-        2 => {
+        t if t == pb::pointer_event::Type::Move as i32 => {
             let Some((start_y, start_top_row, start_thumb)) =
                 terminal_session.tui_scrollbar_drag_origin()
             else {
@@ -376,7 +376,7 @@ fn handle_pointer_render_input(
                 grid.selection.col,
                 selection_range_tuples(grid),
             );
-            if pe.r#type == 0
+            if pe.r#type == pb::pointer_event::Type::Down as i32
                 && pe.button == 0
                 && grid.is_tui_mode()
                 && volvoxgrid_engine::canvas_tui::tui_dropdown_hit_index(
@@ -397,7 +397,7 @@ fn handle_pointer_render_input(
                     None,
                 );
             }
-            let hit = if pe.r#type == 0 {
+            let hit = if pe.r#type == pb::pointer_event::Type::Down as i32 {
                 Some(volvoxgrid_engine::input::hit_test(
                     grid, pointer_x, pointer_y,
                 ))
@@ -421,7 +421,10 @@ fn handle_pointer_render_input(
                         )
                     })
             });
-            let active_tui_edit_click_caret = if pe.r#type == 0 && !pe.dbl_click && pe.button == 0 {
+            let active_tui_edit_click_caret = if pe.r#type == pb::pointer_event::Type::Down as i32
+                && !pe.dbl_click
+                && pe.button == 0
+            {
                 hit.as_ref().and_then(|hit| {
                     let hit_active_edit_cell = was_editing
                         && hit.row == prev_edit_row
@@ -444,7 +447,7 @@ fn handle_pointer_render_input(
             };
 
             match pe.r#type {
-                0 => {
+                t if t == pb::pointer_event::Type::Down as i32 => {
                     let allow_pull_contact = pe.button == 0
                         && !matches!(
                             hit.as_ref().map(|h| h.area.clone()),
@@ -605,7 +608,7 @@ fn handle_pointer_render_input(
                         );
                     }
                 }
-                1 => {
+                t if t == pb::pointer_event::Type::Up as i32 => {
                     grid.end_pull_to_refresh_contact();
                     if decision_enabled {
                         if let Some((col, new_position)) =
@@ -635,7 +638,7 @@ fn handle_pointer_render_input(
                         );
                     }
                 }
-                2 => {
+                t if t == pb::pointer_event::Type::Move as i32 => {
                     volvoxgrid_engine::input::handle_pointer_move(
                         grid,
                         pointer_x,
@@ -685,7 +688,7 @@ fn handle_pointer_render_input(
         return;
     }
     if let Ok((selection_changed, row, col, ranges, editor_output)) = sel_and_editor {
-        if pe.r#type != 2 || selection_changed {
+        if pe.r#type != pb::pointer_event::Type::Move as i32 || selection_changed {
             stream.send(RenderOutput {
                 rendered: false,
                 event: Some(render_output::Event::Selection(SelectionUpdate {
@@ -802,7 +805,7 @@ fn handle_key_render_input(
                 );
             }
             terminal_tui::TerminalKeyPolicyDecision::Forward => match ke.r#type {
-                0 => {
+                t if t == pb::key_event::Type::KeyDown as i32 => {
                     if decision_enabled {
                         volvoxgrid_engine::input::handle_key_down_with_behavior(
                             grid,
@@ -835,14 +838,14 @@ fn handle_key_render_input(
                         volvoxgrid_engine::input::handle_key_down(grid, ke.key_code, ke.modifier);
                     }
                 }
-                1 => {
+                t if t == pb::key_event::Type::KeyUp as i32 => {
                     grid.events
                         .push(volvoxgrid_engine::event::GridEventData::KeyUp {
                             key_code: ke.key_code,
                             modifier: ke.modifier,
                         });
                 }
-                2 => {
+                t if t == pb::key_event::Type::KeyPress as i32 => {
                     if decision_enabled {
                         volvoxgrid_engine::input::handle_key_press_with_behavior(
                             grid,
@@ -5937,8 +5940,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                     }
 
                     match ze.phase {
-                        0 => {
-                            // ZOOM_BEGIN
+                        p if p == pb::zoom_event::Phase::ZoomBegin as i32 => {
                             let base_zoom_scale = self.current_zoom_scale(grid_id);
                             if let Ok(state) = self.with_grid(grid_id, |grid| {
                                 if !grid.layout.valid {
@@ -5958,8 +5960,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                 zoom_sessions.insert(grid_id, state);
                             }
                         }
-                        1 => {
-                            // ZOOM_UPDATE
+                        p if p == pb::zoom_event::Phase::ZoomUpdate as i32 => {
                             let mut step_scale = if ze.scale.is_finite() && ze.scale > 0.0 {
                                 (ze.scale as f64).clamp(ZOOM_STEP_MIN_SCALE, ZOOM_STEP_MAX_SCALE)
                             } else {
@@ -6047,8 +6048,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                 }
                             }
                         }
-                        2 => {
-                            // ZOOM_END
+                        p if p == pb::zoom_event::Phase::ZoomEnd as i32 => {
                             if let Some(state) = zoom_sessions.remove(&grid_id) {
                                 let final_scale = snap_zoom_restore_scale(clamp_zoom_scale(
                                     state.base_zoom_scale * state.cumulative_scale,

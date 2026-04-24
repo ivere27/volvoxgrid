@@ -90,9 +90,10 @@ impl EffectiveLoadOptions {
                 })
                 .unwrap_or('.'),
             auto_create_columns: options.and_then(|o| o.auto_create_columns).unwrap_or(true),
-            mode: options
-                .and_then(|o| o.mode)
-                .unwrap_or(pb::LoadMode::LoadReplace as i32),
+            mode: match options {
+                Some(options) => options.mode.unwrap_or(pb::LoadMode::Unspecified as i32),
+                None => pb::LoadMode::LoadReplace as i32,
+            },
             atomic: options.and_then(|o| o.atomic).unwrap_or(false),
             skip_rows: options.and_then(|o| o.skip_rows).unwrap_or(0).max(0) as usize,
             max_rows: options
@@ -132,6 +133,16 @@ pub fn load_data(
     options: Option<&pb::LoadDataOptions>,
 ) -> pb::LoadDataResult {
     let opts = EffectiveLoadOptions::from_proto(data, options);
+    if opts.mode == pb::LoadMode::Unspecified as i32 {
+        return failed_result(
+            "LoadDataOptions.mode must be set to LOAD_REPLACE or LOAD_APPEND".to_string(),
+        );
+    }
+    if opts.mode != pb::LoadMode::LoadReplace as i32 && opts.mode != pb::LoadMode::LoadAppend as i32
+    {
+        return failed_result(format!("Unsupported LoadDataOptions.mode: {}", opts.mode));
+    }
+
     let mut table = match parse_input(data, &opts) {
         Ok(table) => table,
         Err(message) => return failed_result(message),
@@ -1513,6 +1524,7 @@ mod tests {
             format: Some(pb::load_data_options::Format::Json(pb::JsonOptions {
                 data_path: None,
             })),
+            mode: Some(pb::LoadMode::LoadReplace as i32),
             ..Default::default()
         }
     }
@@ -1524,6 +1536,7 @@ mod tests {
                 quote_char: None,
                 trim_whitespace: None,
             })),
+            mode: Some(pb::LoadMode::LoadReplace as i32),
             ..Default::default()
         }
     }
@@ -1547,6 +1560,22 @@ mod tests {
         let cells = grid.get_cells(0, amount_col, 0, amount_col, false, false, true, false);
         let value = cells[0].value.as_ref().and_then(|cell| cell.value.as_ref());
         assert!(matches!(value, Some(pb::cell_value::Value::Number(_))));
+    }
+
+    #[test]
+    fn load_data_options_requires_explicit_mode() {
+        let mut grid = new_grid();
+        let mut options = json_options();
+        options.mode = None;
+
+        let result = load_data(&mut grid, br#"[{"value":"kept out"}]"#, Some(&options));
+
+        assert_eq!(result.status, pb::LoadDataStatus::LoadFailed as i32);
+        assert!(result
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("LoadDataOptions.mode")));
+        assert_eq!(grid.cells.len(), 0);
     }
 
     #[test]

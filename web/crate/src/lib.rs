@@ -5376,7 +5376,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 ),
             };
             match request.scope {
-                0 => {
+                s if s == ClearScope::ClearEverything as i32 => {
                     grid.cells.clear_range(r1, c1, r2, c2);
                     for r in r1..=r2 {
                         for c in c1..=c2 {
@@ -5384,17 +5384,17 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                         }
                     }
                 }
-                1 => {
+                s if s == ClearScope::ClearFormatting as i32 => {
                     for r in r1..=r2 {
                         for c in c1..=c2 {
                             grid.cell_styles.remove(&(r, c));
                         }
                     }
                 }
-                2 => {
+                s if s == ClearScope::ClearData as i32 => {
                     grid.cells.clear_range(r1, c1, r2, c2);
                 }
-                3 => {
+                s if s == ClearScope::ClearSelection as i32 => {
                     for (sr1, sc1, sr2, sc2) in selection_range_tuples(grid) {
                         grid.cells.clear_range(sr1, sc1, sr2, sc2);
                         for r in sr1..=sr2 {
@@ -6040,7 +6040,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 }
                 Some(render_input::Input::Pointer(p)) => {
                     match p.r#type {
-                        0 => handle_pointer_down(
+                        t if t == pointer_event::Type::Down as i32 => handle_pointer_down(
                             grid_id,
                             p.x,
                             p.y,
@@ -6048,8 +6048,12 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                             p.modifier,
                             p.dbl_click,
                         ),
-                        1 => handle_pointer_up(grid_id, p.x, p.y, p.button),
-                        2 => handle_pointer_move(grid_id, p.x, p.y, p.button, p.modifier),
+                        t if t == pointer_event::Type::Up as i32 => {
+                            handle_pointer_up(grid_id, p.x, p.y, p.button)
+                        }
+                        t if t == pointer_event::Type::Move as i32 => {
+                            handle_pointer_move(grid_id, p.x, p.y, p.button, p.modifier)
+                        }
                         _ => {}
                     }
                     if !stream.send(RenderOutput {
@@ -6061,9 +6065,11 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 }
                 Some(render_input::Input::Key(k)) => {
                     match k.r#type {
-                        0 => handle_key_down(grid_id, k.key_code, k.modifier),
-                        1 => {}
-                        2 => {
+                        t if t == key_event::Type::KeyDown as i32 => {
+                            handle_key_down(grid_id, k.key_code, k.modifier)
+                        }
+                        t if t == key_event::Type::KeyUp as i32 => {}
+                        t if t == key_event::Type::KeyPress as i32 => {
                             let ch = k.character.chars().next().unwrap_or('\0') as u32;
                             if ch != 0 {
                                 handle_key_press(grid_id, ch);

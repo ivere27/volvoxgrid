@@ -957,6 +957,7 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
         client.get_demo_data(DEMO_SALES)?,
         Some(pb::LoadDataOptions {
             auto_create_columns: Some(false),
+            mode: Some(pb::LoadMode::LoadReplace as i32),
             ..Default::default()
         }),
     )?;
@@ -1220,6 +1221,7 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
         load_data,
         Some(pb::LoadDataOptions {
             auto_create_columns: Some(false),
+            mode: Some(pb::LoadMode::LoadReplace as i32),
             ..Default::default()
         }),
     )?;

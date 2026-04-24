@@ -2954,7 +2954,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 _ => (g.fixed_rows, g.fixed_cols, g.rows - 1, g.cols - 1),
             };
             match r.scope {
-                0 => {
+                s if s == ClearScope::ClearEverything as i32 => {
                     g.cells.clear_range(r1, c1, r2, c2);
                     for row in r1..=r2 {
                         for col in c1..=c2 {
@@ -2962,17 +2962,17 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                         }
                     }
                 }
-                1 => {
+                s if s == ClearScope::ClearFormatting as i32 => {
                     for row in r1..=r2 {
                         for col in c1..=c2 {
                             g.cell_styles.remove(&(row, col));
                         }
                     }
                 }
-                2 => {
+                s if s == ClearScope::ClearData as i32 => {
                     g.cells.clear_range(r1, c1, r2, c2);
                 }
-                3 => {
+                s if s == ClearScope::ClearSelection as i32 => {
                     g.selection.row_end = g.selection.row;
                     g.selection.col_end = g.selection.col;
                     g.selection.selected_rows.clear();
@@ -4516,7 +4516,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 ),
             };
             match request.scope {
-                0 => {
+                s if s == ClearScope::ClearEverything as i32 => {
                     grid.cells.clear_range(r1, c1, r2, c2);
                     for r in r1..=r2 {
                         for c in c1..=c2 {
@@ -4524,17 +4524,17 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                         }
                     }
                 }
-                1 => {
+                s if s == ClearScope::ClearFormatting as i32 => {
                     for r in r1..=r2 {
                         for c in c1..=c2 {
                             grid.cell_styles.remove(&(r, c));
                         }
                     }
                 }
-                2 => {
+                s if s == ClearScope::ClearData as i32 => {
                     grid.cells.clear_range(r1, c1, r2, c2);
                 }
-                3 => {
+                s if s == ClearScope::ClearSelection as i32 => {
                     let sr1 = grid.selection.row.min(grid.selection.row_end);
                     let sr2 = grid.selection.row.max(grid.selection.row_end);
                     let sc1 = grid.selection.col.min(grid.selection.col_end);

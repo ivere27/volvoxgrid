@@ -5,7 +5,12 @@
  * lives inside WASM memory; this class manages the render loop, the
  * HTML canvas, and event forwarding.
  */
-import { GridEventFields, RenderLayerBit } from "./generated/volvoxgrid_ffi.js";
+import {
+  ArchiveRequest_Action,
+  ClearScope,
+  GridEventFields,
+  RenderLayerBit,
+} from "./generated/volvoxgrid_ffi.js";
 
 export interface VolvoxGridCellRange {
   row1: number;
@@ -3338,10 +3343,10 @@ export class VolvoxGrid {
   static readonly STICKY_BOTH = 5;
 
   /** Archive action constants. */
-  static readonly ARCHIVE_SAVE = 0;
-  static readonly ARCHIVE_LOAD = 1;
-  static readonly ARCHIVE_DELETE = 2;
-  static readonly ARCHIVE_LIST = 3;
+  static readonly ARCHIVE_SAVE = ArchiveRequest_Action.SAVE;
+  static readonly ARCHIVE_LOAD = ArchiveRequest_Action.LOAD;
+  static readonly ARCHIVE_DELETE = ArchiveRequest_Action.DELETE;
+  static readonly ARCHIVE_LIST = ArchiveRequest_Action.LIST;
 
   /** Pin a row to the top or bottom section, or unpin it (0=none, 1=top, 2=bottom). */
   pinRow(row: number, pin: number): void {
@@ -4379,7 +4384,7 @@ export class VolvoxGrid {
   }
 
   /** Proto clear API (scope/region enums). */
-  clear(scope: number = 0, region: number = 0): void {
+  clear(scope: number = ClearScope.CLEAR_EVERYTHING, region: number = 0): void {
     if (typeof this.wasm.volvox_grid_clear === "function") {
       this.wasm.volvox_grid_clear(BigInt(this.gridId), scope, region);
       this.dirty = true;

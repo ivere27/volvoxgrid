@@ -5,17 +5,21 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Save grid data to a byte vector in the specified format.
 ///
 /// `format`:
-/// - 0 = binary (FXGD)
-/// - 1 = tab-separated text
-/// - 2 = comma-separated (CSV)
-/// - 3 = custom separator (uses `grid.clip_col_separator`)
-/// - 4 = Excel SpreadsheetML XML
+/// - 1 = binary (FXGD)
+/// - 2 = tab-separated text
+/// - 3 = comma-separated (CSV)
+/// - 4 = custom separator (uses `grid.clip_col_separator`)
+/// - 5 = Excel SpreadsheetML XML
 ///
 /// `scope`:
-/// - 0 = data + format
-/// - 1 = data only
-/// - 2 = format only
+/// - 1 = data + format
+/// - 2 = data only
+/// - 3 = format only
 pub fn save_grid(grid: &VolvoxGrid, format: i32, scope: i32) -> Vec<u8> {
+    if !export_scope_is_valid(scope) {
+        return Vec::new();
+    }
+
     match format {
         f if f == pb::ExportFormat::ExportBinary as i32 => save_binary(grid, scope),
         f if f == pb::ExportFormat::ExportTsv as i32 => save_text(grid, "\t", scope),
@@ -31,13 +35,17 @@ pub fn save_grid(grid: &VolvoxGrid, format: i32, scope: i32) -> Vec<u8> {
 /// Load grid data from a byte slice in the specified format.
 ///
 /// `format`:
-/// - 0 = binary (FXGD)
-/// - 1 = tab-separated text
-/// - 2 = comma-separated (CSV)
-/// - 3 = custom separator (uses `grid.clip_col_separator`)
+/// - 1 = binary (FXGD)
+/// - 2 = tab-separated text
+/// - 3 = comma-separated (CSV)
+/// - 4 = custom separator (uses `grid.clip_col_separator`)
 ///
 /// `scope`: same as `save_grid`.
 pub fn load_grid(grid: &mut VolvoxGrid, data: &[u8], format: i32, scope: i32) {
+    if !export_scope_is_valid(scope) {
+        return;
+    }
+
     match format {
         f if f == pb::ExportFormat::ExportBinary as i32 => load_binary(grid, data, scope),
         f if f == pb::ExportFormat::ExportTsv as i32 => load_text(grid, data, "\t", scope),
@@ -67,6 +75,18 @@ pub fn load_grid(grid: &mut VolvoxGrid, data: &[u8], format: i32, scope: i32) {
     }
 }
 
+fn export_includes_data(scope: i32) -> bool {
+    scope == pb::ExportScope::ExportAll as i32 || scope == pb::ExportScope::ExportDataOnly as i32
+}
+
+fn export_includes_format(scope: i32) -> bool {
+    scope == pb::ExportScope::ExportAll as i32 || scope == pb::ExportScope::ExportFormatOnly as i32
+}
+
+fn export_scope_is_valid(scope: i32) -> bool {
+    export_includes_data(scope) || export_includes_format(scope)
+}
+
 fn save_binary(grid: &VolvoxGrid, scope: i32) -> Vec<u8> {
     let mut out = Vec::new();
     // Header: magic + version
@@ -79,8 +99,7 @@ fn save_binary(grid: &VolvoxGrid, scope: i32) -> Vec<u8> {
     out.extend_from_slice(&grid.fixed_rows.to_le_bytes());
     out.extend_from_slice(&grid.fixed_cols.to_le_bytes());
 
-    if scope == pb::ExportScope::ExportAll as i32 || scope == pb::ExportScope::ExportDataOnly as i32
-    {
+    if export_includes_data(scope) {
         // Data: write each cell text
         for r in 0..grid.rows {
             for c in 0..grid.cols {
@@ -92,9 +111,7 @@ fn save_binary(grid: &VolvoxGrid, scope: i32) -> Vec<u8> {
         }
     }
 
-    if scope == pb::ExportScope::ExportAll as i32
-        || scope == pb::ExportScope::ExportFormatOnly as i32
-    {
+    if export_includes_format(scope) {
         // Format section
 
         // Row heights
@@ -207,8 +224,7 @@ fn load_binary(grid: &mut VolvoxGrid, data: &[u8], scope: i32) {
     grid.fixed_rows = fixed_rows;
     grid.fixed_cols = fixed_cols;
 
-    if scope == pb::ExportScope::ExportAll as i32 || scope == pb::ExportScope::ExportDataOnly as i32
-    {
+    if export_includes_data(scope) {
         for r in 0..rows {
             for c in 0..cols {
                 if pos + 4 > data.len() {
@@ -225,9 +241,7 @@ fn load_binary(grid: &mut VolvoxGrid, data: &[u8], scope: i32) {
         }
     }
 
-    if scope == pb::ExportScope::ExportAll as i32
-        || scope == pb::ExportScope::ExportFormatOnly as i32
-    {
+    if export_includes_format(scope) {
         // Row heights
         if pos + 4 > data.len() {
             grid.layout.invalidate();
@@ -409,8 +423,8 @@ fn read_f32(data: &[u8], pos: &mut usize) -> f32 {
 }
 
 fn save_text(grid: &VolvoxGrid, separator: &str, scope: i32) -> Vec<u8> {
-    if scope == pb::ExportScope::ExportFormatOnly as i32 {
-        return Vec::new(); // format only - no text data
+    if !export_includes_data(scope) {
+        return Vec::new();
     }
 
     let mut out = String::new();
@@ -441,7 +455,7 @@ fn save_text(grid: &VolvoxGrid, separator: &str, scope: i32) -> Vec<u8> {
 }
 
 fn load_text(grid: &mut VolvoxGrid, data: &[u8], separator: &str, scope: i32) {
-    if scope == pb::ExportScope::ExportFormatOnly as i32 {
+    if !export_includes_data(scope) {
         return;
     }
 
@@ -586,7 +600,7 @@ fn save_excel(grid: &VolvoxGrid, scope: i32) -> Vec<u8> {
     ));
     xml.push_str(">\n");
 
-    if scope != 2 {
+    if export_includes_data(scope) {
         // Write column widths
         for c in 0..grid.cols {
             let w = grid.get_col_width(c);
@@ -672,10 +686,10 @@ fn xml_escape(s: &str) -> String {
 /// Determine the grid format from a URL file extension.
 ///
 /// Returns a format code compatible with `load_grid()`:
-/// - 0 = binary (FXGD)
-/// - 1 = tab-separated text (.txt, .tab)
-/// - 2 = comma-separated (.csv)
-/// - 4 = Excel (.xls, .xlsx)
+/// - 1 = binary (FXGD)
+/// - 2 = tab-separated text (.txt, .tab)
+/// - 3 = comma-separated (.csv)
+/// - 5 = Excel (.xls, .xlsx)
 /// - -1 = unknown
 pub fn format_from_url(url: &str) -> i32 {
     let lower = url.to_lowercase();
@@ -722,10 +736,10 @@ pub fn load_grid_url(
 /// Archive operations for saving/loading named grid snapshots.
 ///
 /// `action`:
-/// - 0 = SAVE: upsert the named entry and return the updated archive blob
-/// - 1 = LOAD: deserialize the named entry from the provided archive blob
-/// - 2 = DELETE: remove the named entry and return the updated archive blob
-/// - 3 = LIST: return the entry names in the provided archive blob
+/// - 1 = SAVE: upsert the named entry and return the updated archive blob
+/// - 2 = LOAD: deserialize the named entry from the provided archive blob
+/// - 3 = DELETE: remove the named entry and return the updated archive blob
+/// - 4 = LIST: return the entry names in the provided archive blob
 ///
 /// Returns `(data_bytes, name_list)`.
 pub fn archive(
@@ -739,9 +753,7 @@ pub fn archive(
     let norm_name = if name.is_empty() { "grid" } else { name };
 
     match action {
-        // ArchiveRequest.Action enum numeric values are stable in proto/v1:
-        // 0=Save, 1=Load, 2=Delete, 3=List.
-        0 => {
+        a if a == pb::archive_request::Action::Save as i32 => {
             let grid_data = save_grid(
                 grid,
                 pb::ExportFormat::ExportBinary as i32,
@@ -772,7 +784,7 @@ pub fn archive(
             let names = entries.iter().map(|e| e.name.clone()).collect();
             (serialize_archive_blob(&entries), names)
         }
-        1 => {
+        a if a == pb::archive_request::Action::Load as i32 => {
             let maybe_entry = if requested_name.is_empty() {
                 entries.first()
             } else {
@@ -797,12 +809,12 @@ pub fn archive(
             let names = entries.iter().map(|e| e.name.clone()).collect();
             (Vec::new(), names)
         }
-        2 => {
+        a if a == pb::archive_request::Action::Delete as i32 => {
             entries.retain(|e| e.name != norm_name);
             let names = entries.iter().map(|e| e.name.clone()).collect();
             (serialize_archive_blob(&entries), names)
         }
-        3 => {
+        a if a == pb::archive_request::Action::List as i32 => {
             let names = entries.iter().map(|e| e.name.clone()).collect();
             (Vec::new(), names)
         }
@@ -918,4 +930,48 @@ fn read_i64_checked(data: &[u8], pos: &mut usize) -> Option<i64> {
     let v = i64::from_le_bytes(data[*pos..*pos + 8].try_into().ok()?);
     *pos += 8;
     Some(v)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn grid_with_cell() -> VolvoxGrid {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 1, 1, 0, 0);
+        grid.cells.set_text(0, 0, "value".to_string());
+        grid
+    }
+
+    #[test]
+    fn save_grid_rejects_unspecified_format_or_scope() {
+        let grid = grid_with_cell();
+
+        assert!(save_grid(
+            &grid,
+            pb::ExportFormat::Unspecified as i32,
+            pb::ExportScope::ExportAll as i32,
+        )
+        .is_empty());
+        assert!(save_grid(
+            &grid,
+            pb::ExportFormat::ExportBinary as i32,
+            pb::ExportScope::Unspecified as i32,
+        )
+        .is_empty());
+    }
+
+    #[test]
+    fn archive_unspecified_action_does_not_save() {
+        let mut grid = grid_with_cell();
+
+        let (data, names) = archive(
+            &mut grid,
+            "snapshot",
+            pb::archive_request::Action::Unspecified as i32,
+            &[],
+        );
+
+        assert!(data.is_empty());
+        assert!(names.is_empty());
+    }
 }

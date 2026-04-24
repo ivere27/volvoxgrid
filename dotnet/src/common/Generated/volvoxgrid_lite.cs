@@ -89,10 +89,11 @@ namespace Volvoxgrid.V1
 
     public enum ArchiveRequest_Action
     {
-        SAVE = 0,
-        LOAD = 1,
-        DELETE = 2,
-        LIST = 3,
+        ACTION_UNSPECIFIED = 0,
+        SAVE = 1,
+        LOAD = 2,
+        DELETE = 3,
+        LIST = 4,
     }
 
     public enum AutoSizeMode
@@ -227,10 +228,11 @@ namespace Volvoxgrid.V1
 
     public enum ClearScope
     {
-        CLEAR_EVERYTHING = 0,
-        CLEAR_FORMATTING = 1,
-        CLEAR_DATA = 2,
-        CLEAR_SELECTION = 3,
+        CLEAR_SCOPE_UNSPECIFIED = 0,
+        CLEAR_EVERYTHING = 1,
+        CLEAR_FORMATTING = 2,
+        CLEAR_DATA = 3,
+        CLEAR_SELECTION = 4,
     }
 
     public enum CoercionMode
@@ -348,18 +350,20 @@ namespace Volvoxgrid.V1
 
     public enum ExportFormat
     {
-        EXPORT_BINARY = 0,
-        EXPORT_TSV = 1,
-        EXPORT_CSV = 2,
-        EXPORT_DELIMITED = 3,
-        EXPORT_XLSX = 4,
+        EXPORT_FORMAT_UNSPECIFIED = 0,
+        EXPORT_BINARY = 1,
+        EXPORT_TSV = 2,
+        EXPORT_CSV = 3,
+        EXPORT_DELIMITED = 4,
+        EXPORT_XLSX = 5,
     }
 
     public enum ExportScope
     {
-        EXPORT_ALL = 0,
-        EXPORT_DATA_ONLY = 1,
-        EXPORT_FORMAT_ONLY = 2,
+        EXPORT_SCOPE_UNSPECIFIED = 0,
+        EXPORT_ALL = 1,
+        EXPORT_DATA_ONLY = 2,
+        EXPORT_FORMAT_ONLY = 3,
     }
 
     public enum FillHandlePosition
@@ -450,9 +454,10 @@ namespace Volvoxgrid.V1
 
     public enum KeyEvent_Type
     {
-        KEY_DOWN = 0,
-        KEY_UP = 1,
-        KEY_PRESS = 2,
+        KEY_TYPE_UNSPECIFIED = 0,
+        KEY_DOWN = 1,
+        KEY_UP = 2,
+        KEY_PRESS = 3,
     }
 
     public enum LoadDataStatus
@@ -464,8 +469,9 @@ namespace Volvoxgrid.V1
 
     public enum LoadMode
     {
-        LOAD_REPLACE = 0,
-        LOAD_APPEND = 1,
+        LOAD_MODE_UNSPECIFIED = 0,
+        LOAD_REPLACE = 1,
+        LOAD_APPEND = 2,
     }
 
     public enum NodeRelation
@@ -486,9 +492,10 @@ namespace Volvoxgrid.V1
 
     public enum PointerEvent_Type
     {
-        DOWN = 0,
-        UP = 1,
-        MOVE = 2,
+        TYPE_UNSPECIFIED = 0,
+        DOWN = 1,
+        UP = 2,
+        MOVE = 3,
     }
 
     public enum PresentMode
@@ -735,9 +742,10 @@ namespace Volvoxgrid.V1
 
     public enum ZoomEvent_Phase
     {
-        ZOOM_BEGIN = 0,
-        ZOOM_UPDATE = 1,
-        ZOOM_END = 2,
+        ZOOM_PHASE_UNSPECIFIED = 0,
+        ZOOM_BEGIN = 1,
+        ZOOM_UPDATE = 2,
+        ZOOM_END = 3,
     }
 
     // =========================================================================

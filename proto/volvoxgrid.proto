@@ -437,11 +437,13 @@ enum TypePolicy {
 }
 
 // Data loading mode.
-//   REPLACE (0): Clears all cells and resets to new dimensions.
-//   APPEND (1):  Inserts data after existing rows; preserves current schema.
+//   UNSPECIFIED (0): Invalid in LoadDataOptions.mode.
+//   REPLACE (1):     Clears all cells and resets to new dimensions.
+//   APPEND (2):      Inserts data after existing rows; preserves current schema.
 enum LoadMode {
-  LOAD_REPLACE = 0;
-  LOAD_APPEND  = 1;
+  LOAD_MODE_UNSPECIFIED = 0;
+  LOAD_REPLACE          = 1;
+  LOAD_APPEND           = 2;
 }
 
 enum LoadDataStatus {
@@ -744,10 +746,11 @@ enum FramePacingMode {
 // ── Clear / Export / Print ──
 
 enum ClearScope {
-  CLEAR_EVERYTHING  = 0;
-  CLEAR_FORMATTING  = 1;
-  CLEAR_DATA        = 2;
-  CLEAR_SELECTION   = 3;
+  CLEAR_SCOPE_UNSPECIFIED = 0;
+  CLEAR_EVERYTHING        = 1;
+  CLEAR_FORMATTING        = 2;
+  CLEAR_DATA              = 3;
+  CLEAR_SELECTION         = 4;
 }
 
 enum ClearRegion {
@@ -761,26 +764,29 @@ enum ClearRegion {
 }
 
 // Export formats. See engine/src/save.rs.
-//   BINARY (0):    FXGD binary — header "FXGD" + dimensions + cell data +
+//   UNSPECIFIED (0): Invalid in ExportRequest.format.
+//   BINARY (1):    FXGD binary — header "FXGD" + dimensions + cell data +
 //                  styles + column/row properties. Preserves full fidelity.
-//   TSV (1):       Tab-separated values. Text only.
-//   CSV (2):       Comma-separated values. Quotes cells containing
+//   TSV (2):       Tab-separated values. Text only.
+//   CSV (3):       Comma-separated values. Quotes cells containing
 //                  separator, newline, or quote characters.
-//   DELIMITED (3): Uses the grid's clip_col_separator (default "\t").
-//   XLSX (4):      SpreadsheetML XML (Excel 2003 .xml format). Applies
+//   DELIMITED (4): Uses the grid's clip_col_separator (default "\t").
+//   XLSX (5):      SpreadsheetML XML (Excel 2003 .xml format). Applies
 //                  bold to fixed rows, auto-detects numeric cells.
 enum ExportFormat {
-  EXPORT_BINARY    = 0;
-  EXPORT_TSV       = 1;
-  EXPORT_CSV       = 2;
-  EXPORT_DELIMITED = 3;
-  EXPORT_XLSX      = 4;
+  EXPORT_FORMAT_UNSPECIFIED = 0;
+  EXPORT_BINARY             = 1;
+  EXPORT_TSV                = 2;
+  EXPORT_CSV                = 3;
+  EXPORT_DELIMITED          = 4;
+  EXPORT_XLSX               = 5;
 }
 
 enum ExportScope {
-  EXPORT_ALL         = 0;
-  EXPORT_DATA_ONLY   = 1;
-  EXPORT_FORMAT_ONLY = 2;
+  EXPORT_SCOPE_UNSPECIFIED = 0;
+  EXPORT_ALL               = 1;
+  EXPORT_DATA_ONLY         = 2;
+  EXPORT_FORMAT_ONLY       = 3;
 }
 
 enum PrintOrientation {
@@ -2017,14 +2023,15 @@ message PrintPage {
 
 // Named grid snapshots using the FXAR1 archive format.
 // See engine/src/save.rs.
-//   SAVE:   Serializes grid into a named entry in the archive blob.
-//   LOAD:   Deserializes a named entry back into the grid.
-//   DELETE: Removes a named entry from the archive.
-//   LIST:   Returns the list of entry names without loading.
+//   ACTION_UNSPECIFIED: Invalid.
+//   SAVE:               Serializes grid into a named entry in the archive blob.
+//   LOAD:               Deserializes a named entry back into the grid.
+//   DELETE:             Removes a named entry from the archive.
+//   LIST:               Returns the list of entry names without loading.
 message ArchiveRequest {
   int64 grid_id = 1;
   string name   = 2;
-  enum Action { SAVE = 0; LOAD = 1; DELETE = 2; LIST = 3; }
+  enum Action { ACTION_UNSPECIFIED = 0; SAVE = 1; LOAD = 2; DELETE = 3; LIST = 4; }
   Action action = 3;
   bytes  data   = 4;  // archive blob (FXAR1 format)
 }
@@ -2256,7 +2263,7 @@ message ViewportState {
 }
 
 message PointerEvent {
-  enum Type { DOWN = 0; UP = 1; MOVE = 2; }
+  enum Type { TYPE_UNSPECIFIED = 0; DOWN = 1; UP = 2; MOVE = 3; }
   Type  type      = 1;
   float x         = 2;  // viewport-local X coordinate
   float y         = 3;  // viewport-local Y coordinate
@@ -2273,7 +2280,7 @@ message ScrollEvent {
 }
 
 message ZoomEvent {
-  enum Phase { ZOOM_BEGIN = 0; ZOOM_UPDATE = 1; ZOOM_END = 2; }
+  enum Phase { ZOOM_PHASE_UNSPECIFIED = 0; ZOOM_BEGIN = 1; ZOOM_UPDATE = 2; ZOOM_END = 3; }
   Phase phase      = 1;
   float scale      = 2;
   float focal_x_px = 3;
@@ -2286,7 +2293,7 @@ message ZoomEvent {
 //   36/35=Home/End, 113=F2, 65=A, 67=C, 86=V, 88=X.
 // KEY_PRESS carries the character for text input; KEY_DOWN/UP carry key_code.
 message KeyEvent {
-  enum Type { KEY_DOWN = 0; KEY_UP = 1; KEY_PRESS = 2; }
+  enum Type { KEY_TYPE_UNSPECIFIED = 0; KEY_DOWN = 1; KEY_UP = 2; KEY_PRESS = 3; }
   Type   type      = 1;
   int32  key_code  = 2;
   // Modifier bitmask: 0x01=Shift, 0x02=Ctrl, 0x04=Alt, 0x08=Meta.

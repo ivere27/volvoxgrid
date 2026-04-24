@@ -36,6 +36,7 @@ import io.github.ivere27.volvoxgrid.LayoutConfig;
 import io.github.ivere27.volvoxgrid.LoadDataResult;
 import io.github.ivere27.volvoxgrid.LoadDataStatus;
 import io.github.ivere27.volvoxgrid.LoadDataOptions;
+import io.github.ivere27.volvoxgrid.LoadMode;
 import io.github.ivere27.volvoxgrid.NodeInfo;
 import io.github.ivere27.volvoxgrid.OutlineConfig;
 import io.github.ivere27.volvoxgrid.RegionStyle;
@@ -117,6 +118,7 @@ final class SalesJsonDesktopDemo {
             ctrl.getDemoData("sales"),
             LoadDataOptions.newBuilder()
                 .setAutoCreateColumns(false)
+                .setMode(LoadMode.LOAD_REPLACE)
                 .build()
         );
         if (result.getStatus() == LoadDataStatus.LOAD_FAILED) {

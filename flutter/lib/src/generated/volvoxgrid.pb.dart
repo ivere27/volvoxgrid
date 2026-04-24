@@ -13057,10 +13057,11 @@ class PrintPage extends $pb.GeneratedMessage {
 
 /// Named grid snapshots using the FXAR1 archive format.
 /// See engine/src/save.rs.
-///   SAVE:   Serializes grid into a named entry in the archive blob.
-///   LOAD:   Deserializes a named entry back into the grid.
-///   DELETE: Removes a named entry from the archive.
-///   LIST:   Returns the list of entry names without loading.
+///   ACTION_UNSPECIFIED: Invalid.
+///   SAVE:               Serializes grid into a named entry in the archive blob.
+///   LOAD:               Deserializes a named entry back into the grid.
+///   DELETE:             Removes a named entry from the archive.
+///   LIST:               Returns the list of entry names without loading.
 class ArchiveRequest extends $pb.GeneratedMessage {
   factory ArchiveRequest({
     $fixnum.Int64? gridId,

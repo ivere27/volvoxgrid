@@ -181,7 +181,8 @@ await controller.loadData(
   ])),
   LoadDataOptions()
     ..json = (JsonOptions())
-    ..headerPolicy = HeaderPolicy.HEADER_NONE,
+    ..headerPolicy = HeaderPolicy.HEADER_NONE
+    ..mode = LoadMode.LOAD_REPLACE,
 );
 
 // Clear all data

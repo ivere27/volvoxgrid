@@ -436,14 +436,16 @@ final $typed_data.Uint8List typePolicyDescriptor = $convert.base64Decode(
 const LoadMode$json = {
   '1': 'LoadMode',
   '2': [
-    {'1': 'LOAD_REPLACE', '2': 0},
-    {'1': 'LOAD_APPEND', '2': 1},
+    {'1': 'LOAD_MODE_UNSPECIFIED', '2': 0},
+    {'1': 'LOAD_REPLACE', '2': 1},
+    {'1': 'LOAD_APPEND', '2': 2},
   ],
 };
 
 /// Descriptor for `LoadMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List loadModeDescriptor = $convert.base64Decode(
-    'CghMb2FkTW9kZRIQCgxMT0FEX1JFUExBQ0UQABIPCgtMT0FEX0FQUEVORBAB');
+    'CghMb2FkTW9kZRIZChVMT0FEX01PREVfVU5TUEVDSUZJRUQQABIQCgxMT0FEX1JFUExBQ0UQAR'
+    'IPCgtMT0FEX0FQUEVORBAC');
 
 @$core.Deprecated('Use loadDataStatusDescriptor instead')
 const LoadDataStatus$json = {
@@ -891,17 +893,19 @@ final $typed_data.Uint8List framePacingModeDescriptor = $convert.base64Decode(
 const ClearScope$json = {
   '1': 'ClearScope',
   '2': [
-    {'1': 'CLEAR_EVERYTHING', '2': 0},
-    {'1': 'CLEAR_FORMATTING', '2': 1},
-    {'1': 'CLEAR_DATA', '2': 2},
-    {'1': 'CLEAR_SELECTION', '2': 3},
+    {'1': 'CLEAR_SCOPE_UNSPECIFIED', '2': 0},
+    {'1': 'CLEAR_EVERYTHING', '2': 1},
+    {'1': 'CLEAR_FORMATTING', '2': 2},
+    {'1': 'CLEAR_DATA', '2': 3},
+    {'1': 'CLEAR_SELECTION', '2': 4},
   ],
 };
 
 /// Descriptor for `ClearScope`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List clearScopeDescriptor = $convert.base64Decode(
-    'CgpDbGVhclNjb3BlEhQKEENMRUFSX0VWRVJZVEhJTkcQABIUChBDTEVBUl9GT1JNQVRUSU5HEA'
-    'ESDgoKQ0xFQVJfREFUQRACEhMKD0NMRUFSX1NFTEVDVElPThAD');
+    'CgpDbGVhclNjb3BlEhsKF0NMRUFSX1NDT1BFX1VOU1BFQ0lGSUVEEAASFAoQQ0xFQVJfRVZFUl'
+    'lUSElORxABEhQKEENMRUFSX0ZPUk1BVFRJTkcQAhIOCgpDTEVBUl9EQVRBEAMSEwoPQ0xFQVJf'
+    'U0VMRUNUSU9OEAQ=');
 
 @$core.Deprecated('Use clearRegionDescriptor instead')
 const ClearRegion$json = {
@@ -927,33 +931,36 @@ final $typed_data.Uint8List clearRegionDescriptor = $convert.base64Decode(
 const ExportFormat$json = {
   '1': 'ExportFormat',
   '2': [
-    {'1': 'EXPORT_BINARY', '2': 0},
-    {'1': 'EXPORT_TSV', '2': 1},
-    {'1': 'EXPORT_CSV', '2': 2},
-    {'1': 'EXPORT_DELIMITED', '2': 3},
-    {'1': 'EXPORT_XLSX', '2': 4},
+    {'1': 'EXPORT_FORMAT_UNSPECIFIED', '2': 0},
+    {'1': 'EXPORT_BINARY', '2': 1},
+    {'1': 'EXPORT_TSV', '2': 2},
+    {'1': 'EXPORT_CSV', '2': 3},
+    {'1': 'EXPORT_DELIMITED', '2': 4},
+    {'1': 'EXPORT_XLSX', '2': 5},
   ],
 };
 
 /// Descriptor for `ExportFormat`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List exportFormatDescriptor = $convert.base64Decode(
-    'CgxFeHBvcnRGb3JtYXQSEQoNRVhQT1JUX0JJTkFSWRAAEg4KCkVYUE9SVF9UU1YQARIOCgpFWF'
-    'BPUlRfQ1NWEAISFAoQRVhQT1JUX0RFTElNSVRFRBADEg8KC0VYUE9SVF9YTFNYEAQ=');
+    'CgxFeHBvcnRGb3JtYXQSHQoZRVhQT1JUX0ZPUk1BVF9VTlNQRUNJRklFRBAAEhEKDUVYUE9SVF'
+    '9CSU5BUlkQARIOCgpFWFBPUlRfVFNWEAISDgoKRVhQT1JUX0NTVhADEhQKEEVYUE9SVF9ERUxJ'
+    'TUlURUQQBBIPCgtFWFBPUlRfWExTWBAF');
 
 @$core.Deprecated('Use exportScopeDescriptor instead')
 const ExportScope$json = {
   '1': 'ExportScope',
   '2': [
-    {'1': 'EXPORT_ALL', '2': 0},
-    {'1': 'EXPORT_DATA_ONLY', '2': 1},
-    {'1': 'EXPORT_FORMAT_ONLY', '2': 2},
+    {'1': 'EXPORT_SCOPE_UNSPECIFIED', '2': 0},
+    {'1': 'EXPORT_ALL', '2': 1},
+    {'1': 'EXPORT_DATA_ONLY', '2': 2},
+    {'1': 'EXPORT_FORMAT_ONLY', '2': 3},
   ],
 };
 
 /// Descriptor for `ExportScope`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List exportScopeDescriptor = $convert.base64Decode(
-    'CgtFeHBvcnRTY29wZRIOCgpFWFBPUlRfQUxMEAASFAoQRVhQT1JUX0RBVEFfT05MWRABEhYKEk'
-    'VYUE9SVF9GT1JNQVRfT05MWRAC');
+    'CgtFeHBvcnRTY29wZRIcChhFWFBPUlRfU0NPUEVfVU5TUEVDSUZJRUQQABIOCgpFWFBPUlRfQU'
+    'xMEAESFAoQRVhQT1JUX0RBVEFfT05MWRACEhYKEkVYUE9SVF9GT1JNQVRfT05MWRAD');
 
 @$core.Deprecated('Use printOrientationDescriptor instead')
 const PrintOrientation$json = {
@@ -7218,10 +7225,11 @@ const ArchiveRequest$json = {
 const ArchiveRequest_Action$json = {
   '1': 'Action',
   '2': [
-    {'1': 'SAVE', '2': 0},
-    {'1': 'LOAD', '2': 1},
-    {'1': 'DELETE', '2': 2},
-    {'1': 'LIST', '2': 3},
+    {'1': 'ACTION_UNSPECIFIED', '2': 0},
+    {'1': 'SAVE', '2': 1},
+    {'1': 'LOAD', '2': 2},
+    {'1': 'DELETE', '2': 3},
+    {'1': 'LIST', '2': 4},
   ],
 };
 
@@ -7229,8 +7237,8 @@ const ArchiveRequest_Action$json = {
 final $typed_data.Uint8List archiveRequestDescriptor = $convert.base64Decode(
     'Cg5BcmNoaXZlUmVxdWVzdBIXCgdncmlkX2lkGAEgASgDUgZncmlkSWQSEgoEbmFtZRgCIAEoCV'
     'IEbmFtZRI8CgZhY3Rpb24YAyABKA4yJC52b2x2b3hncmlkLnYxLkFyY2hpdmVSZXF1ZXN0LkFj'
-    'dGlvblIGYWN0aW9uEhIKBGRhdGEYBCABKAxSBGRhdGEiMgoGQWN0aW9uEggKBFNBVkUQABIICg'
-    'RMT0FEEAESCgoGREVMRVRFEAISCAoETElTVBAD');
+    'dGlvblIGYWN0aW9uEhIKBGRhdGEYBCABKAxSBGRhdGEiSgoGQWN0aW9uEhYKEkFDVElPTl9VTl'
+    'NQRUNJRklFRBAAEggKBFNBVkUQARIICgRMT0FEEAISCgoGREVMRVRFEAMSCAoETElTVBAE');
 
 @$core.Deprecated('Use archiveResponseDescriptor instead')
 const ArchiveResponse$json = {
@@ -7931,9 +7939,10 @@ const PointerEvent$json = {
 const PointerEvent_Type$json = {
   '1': 'Type',
   '2': [
-    {'1': 'DOWN', '2': 0},
-    {'1': 'UP', '2': 1},
-    {'1': 'MOVE', '2': 2},
+    {'1': 'TYPE_UNSPECIFIED', '2': 0},
+    {'1': 'DOWN', '2': 1},
+    {'1': 'UP', '2': 2},
+    {'1': 'MOVE', '2': 3},
   ],
 };
 
@@ -7942,7 +7951,8 @@ final $typed_data.Uint8List pointerEventDescriptor = $convert.base64Decode(
     'CgxQb2ludGVyRXZlbnQSNAoEdHlwZRgBIAEoDjIgLnZvbHZveGdyaWQudjEuUG9pbnRlckV2ZW'
     '50LlR5cGVSBHR5cGUSDAoBeBgCIAEoAlIBeBIMCgF5GAMgASgCUgF5EhoKCG1vZGlmaWVyGAQg'
     'ASgFUghtb2RpZmllchIWCgZidXR0b24YBSABKAVSBmJ1dHRvbhIbCglkYmxfY2xpY2sYBiABKA'
-    'hSCGRibENsaWNrIiIKBFR5cGUSCAoERE9XThAAEgYKAlVQEAESCAoETU9WRRAC');
+    'hSCGRibENsaWNrIjgKBFR5cGUSFAoQVFlQRV9VTlNQRUNJRklFRBAAEggKBERPV04QARIGCgJV'
+    'UBACEggKBE1PVkUQAw==');
 
 @$core.Deprecated('Use scrollEventDescriptor instead')
 const ScrollEvent$json = {
@@ -7981,9 +7991,10 @@ const ZoomEvent$json = {
 const ZoomEvent_Phase$json = {
   '1': 'Phase',
   '2': [
-    {'1': 'ZOOM_BEGIN', '2': 0},
-    {'1': 'ZOOM_UPDATE', '2': 1},
-    {'1': 'ZOOM_END', '2': 2},
+    {'1': 'ZOOM_PHASE_UNSPECIFIED', '2': 0},
+    {'1': 'ZOOM_BEGIN', '2': 1},
+    {'1': 'ZOOM_UPDATE', '2': 2},
+    {'1': 'ZOOM_END', '2': 3},
   ],
 };
 
@@ -7991,8 +8002,9 @@ const ZoomEvent_Phase$json = {
 final $typed_data.Uint8List zoomEventDescriptor = $convert.base64Decode(
     'Cglab29tRXZlbnQSNAoFcGhhc2UYASABKA4yHi52b2x2b3hncmlkLnYxLlpvb21FdmVudC5QaG'
     'FzZVIFcGhhc2USFAoFc2NhbGUYAiABKAJSBXNjYWxlEhwKCmZvY2FsX3hfcHgYAyABKAJSCGZv'
-    'Y2FsWFB4EhwKCmZvY2FsX3lfcHgYBCABKAJSCGZvY2FsWVB4IjYKBVBoYXNlEg4KClpPT01fQk'
-    'VHSU4QABIPCgtaT09NX1VQREFURRABEgwKCFpPT01fRU5EEAI=');
+    'Y2FsWFB4EhwKCmZvY2FsX3lfcHgYBCABKAJSCGZvY2FsWVB4IlIKBVBoYXNlEhoKFlpPT01fUE'
+    'hBU0VfVU5TUEVDSUZJRUQQABIOCgpaT09NX0JFR0lOEAESDwoLWk9PTV9VUERBVEUQAhIMCgha'
+    'T09NX0VORBAD');
 
 @$core.Deprecated('Use keyEventDescriptor instead')
 const KeyEvent$json = {
@@ -8017,9 +8029,10 @@ const KeyEvent$json = {
 const KeyEvent_Type$json = {
   '1': 'Type',
   '2': [
-    {'1': 'KEY_DOWN', '2': 0},
-    {'1': 'KEY_UP', '2': 1},
-    {'1': 'KEY_PRESS', '2': 2},
+    {'1': 'KEY_TYPE_UNSPECIFIED', '2': 0},
+    {'1': 'KEY_DOWN', '2': 1},
+    {'1': 'KEY_UP', '2': 2},
+    {'1': 'KEY_PRESS', '2': 3},
   ],
 };
 
@@ -8027,8 +8040,8 @@ const KeyEvent_Type$json = {
 final $typed_data.Uint8List keyEventDescriptor = $convert.base64Decode(
     'CghLZXlFdmVudBIwCgR0eXBlGAEgASgOMhwudm9sdm94Z3JpZC52MS5LZXlFdmVudC5UeXBlUg'
     'R0eXBlEhkKCGtleV9jb2RlGAIgASgFUgdrZXlDb2RlEhoKCG1vZGlmaWVyGAMgASgFUghtb2Rp'
-    'ZmllchIcCgljaGFyYWN0ZXIYBCABKAlSCWNoYXJhY3RlciIvCgRUeXBlEgwKCEtFWV9ET1dOEA'
-    'ASCgoGS0VZX1VQEAESDQoJS0VZX1BSRVNTEAI=');
+    'ZmllchIcCgljaGFyYWN0ZXIYBCABKAlSCWNoYXJhY3RlciJJCgRUeXBlEhgKFEtFWV9UWVBFX1'
+    'VOU1BFQ0lGSUVEEAASDAoIS0VZX0RPV04QARIKCgZLRVlfVVAQAhINCglLRVlfUFJFU1MQAw==');
 
 @$core.Deprecated('Use bufferReadyDescriptor instead')
 const BufferReady$json = {

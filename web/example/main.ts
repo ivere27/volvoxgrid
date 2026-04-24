@@ -26,6 +26,7 @@ import {
   CellInteraction,
   GridEventFields,
   ImageAlignment,
+  LoadMode,
   RenderLayerBit,
 } from "../js/src/generated/volvoxgrid_ffi.js";
 import {
@@ -1106,7 +1107,10 @@ function setupSalesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: number
     const gridHandle = BigInt(id);
     grid.colCount = SALES_COLS;
     wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, SALES_COLUMN_SETUP));
-    const result = grid.loadData(salesData, { autoCreateColumns: false });
+    const result = grid.loadData(salesData, {
+      autoCreateColumns: false,
+      mode: LoadMode.LOAD_REPLACE,
+    });
     if (result.status === 2) {
       throw new Error("LoadData failed for embedded sales demo");
     }
@@ -1156,6 +1160,7 @@ function setupHierarchyJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: nu
     wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, HIERARCHY_COLUMN_SETUP));
     const result = grid.loadData(PB_TEXT_ENCODER.encode(JSON.stringify(loadRows)), {
       autoCreateColumns: false,
+      mode: LoadMode.LOAD_REPLACE,
     });
     if (result.status === 2) {
       throw new Error("LoadData failed for embedded hierarchy demo");
@@ -1351,7 +1356,10 @@ function setupBarcodesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: num
 
     grid.colCount = BARCODE_COLS;
     wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, BARCODE_COLUMN_SETUP));
-    const result = grid.loadData(barcodeData, { autoCreateColumns: false });
+    const result = grid.loadData(barcodeData, {
+      autoCreateColumns: false,
+      mode: LoadMode.LOAD_REPLACE,
+    });
     if (result.status === 2) {
       throw new Error("LoadData failed for embedded barcodes demo");
     }

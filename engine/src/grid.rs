@@ -3565,15 +3565,19 @@ impl VolvoxGrid {
         let (r1, c1, r2, c2) = self.clear_region_bounds(region);
 
         match scope {
-            0 => self.clear_everything_in_bounds(r1, c1, r2, c2),
-            1 => self.clear_cell_styles_in_bounds(r1, c1, r2, c2),
-            2 => {
+            s if s == pb::ClearScope::ClearEverything as i32 => {
+                self.clear_everything_in_bounds(r1, c1, r2, c2)
+            }
+            s if s == pb::ClearScope::ClearFormatting as i32 => {
+                self.clear_cell_styles_in_bounds(r1, c1, r2, c2)
+            }
+            s if s == pb::ClearScope::ClearData as i32 => {
                 if r1 <= r2 && c1 <= c2 {
                     self.cells.clear_range(r1, c1, r2, c2);
                     self.recompute_barcode_presence();
                 }
             }
-            3 => {
+            s if s == pb::ClearScope::ClearSelection as i32 => {
                 for (sr1, sc1, sr2, sc2) in self.selection.all_ranges(self.rows, self.cols) {
                     self.cells.clear_range(sr1, sc1, sr2, sc2);
                     self.clear_cell_styles_in_bounds(sr1, sc1, sr2, sc2);
@@ -5102,7 +5106,10 @@ mod tests {
         grid.set_cell_sticky(1, 1, 1, 3);
         grid.set_cell_sticky(2, 2, 2, 4);
 
-        grid.clear_region(0, 0);
+        grid.clear_region(
+            pb::ClearScope::ClearEverything as i32,
+            pb::ClearRegion::ClearScrollable as i32,
+        );
 
         assert_eq!(grid.effective_sticky_row(0, 0), 1);
         assert_eq!(grid.effective_sticky_col(0, 0), 3);
@@ -5117,6 +5124,27 @@ mod tests {
         assert_eq!(grid.effective_sticky_col(2, 2), 0);
         assert!(!grid.sticky_cells.contains_key(&(1, 1)));
         assert!(!grid.sticky_cells.contains_key(&(2, 2)));
+    }
+
+    #[test]
+    fn clear_unspecified_scope_does_not_mutate_cells_or_styles() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 3, 1, 1);
+        grid.cells.set_text(1, 1, "keep".to_string());
+        grid.cell_styles.insert(
+            (1, 1),
+            CellStylePatch {
+                back_color: Some(0xFF00FF00),
+                ..Default::default()
+            },
+        );
+
+        grid.clear_region(
+            pb::ClearScope::Unspecified as i32,
+            pb::ClearRegion::ClearScrollable as i32,
+        );
+
+        assert_eq!(grid.cells.get_text(1, 1), "keep");
+        assert!(grid.cell_styles.contains_key(&(1, 1)));
     }
 
     #[test]

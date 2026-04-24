@@ -471,7 +471,7 @@ grid.LoadData(System.Text.Encoding.UTF8.GetBytes("Name,Price,Qty\nWidget A,29.99
 using Volvoxgrid.V1;
 grid.LoadData(
     System.Text.Encoding.UTF8.GetBytes("[[\"Name\",\"Price\"],[\"Alpha\",\"10\"]]"),
-    new LoadDataOptions { Json = new JsonOptions(), HeaderPolicy = HeaderPolicy.HeaderNone }
+    new LoadDataOptions { Json = new JsonOptions(), HeaderPolicy = HeaderPolicy.HeaderNone, Mode = LoadMode.LOAD_REPLACE }
 );
 ```
 

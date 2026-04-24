@@ -1380,24 +1380,28 @@ func (TypePolicy) EnumDescriptor() ([]byte, []int) {
 
 // Data loading mode.
 //
-//	REPLACE (0): Clears all cells and resets to new dimensions.
-//	APPEND (1):  Inserts data after existing rows; preserves current schema.
+//	UNSPECIFIED (0): Invalid in LoadDataOptions.mode.
+//	REPLACE (1):     Clears all cells and resets to new dimensions.
+//	APPEND (2):      Inserts data after existing rows; preserves current schema.
 type LoadMode int32
 
 const (
-	LoadMode_LOAD_REPLACE LoadMode = 0
-	LoadMode_LOAD_APPEND  LoadMode = 1
+	LoadMode_LOAD_MODE_UNSPECIFIED LoadMode = 0
+	LoadMode_LOAD_REPLACE          LoadMode = 1
+	LoadMode_LOAD_APPEND           LoadMode = 2
 )
 
 // Enum value maps for LoadMode.
 var (
 	LoadMode_name = map[int32]string{
-		0: "LOAD_REPLACE",
-		1: "LOAD_APPEND",
+		0: "LOAD_MODE_UNSPECIFIED",
+		1: "LOAD_REPLACE",
+		2: "LOAD_APPEND",
 	}
 	LoadMode_value = map[string]int32{
-		"LOAD_REPLACE": 0,
-		"LOAD_APPEND":  1,
+		"LOAD_MODE_UNSPECIFIED": 0,
+		"LOAD_REPLACE":          1,
+		"LOAD_APPEND":           2,
 	}
 )
 
@@ -2916,25 +2920,28 @@ func (FramePacingMode) EnumDescriptor() ([]byte, []int) {
 type ClearScope int32
 
 const (
-	ClearScope_CLEAR_EVERYTHING ClearScope = 0
-	ClearScope_CLEAR_FORMATTING ClearScope = 1
-	ClearScope_CLEAR_DATA       ClearScope = 2
-	ClearScope_CLEAR_SELECTION  ClearScope = 3
+	ClearScope_CLEAR_SCOPE_UNSPECIFIED ClearScope = 0
+	ClearScope_CLEAR_EVERYTHING        ClearScope = 1
+	ClearScope_CLEAR_FORMATTING        ClearScope = 2
+	ClearScope_CLEAR_DATA              ClearScope = 3
+	ClearScope_CLEAR_SELECTION         ClearScope = 4
 )
 
 // Enum value maps for ClearScope.
 var (
 	ClearScope_name = map[int32]string{
-		0: "CLEAR_EVERYTHING",
-		1: "CLEAR_FORMATTING",
-		2: "CLEAR_DATA",
-		3: "CLEAR_SELECTION",
+		0: "CLEAR_SCOPE_UNSPECIFIED",
+		1: "CLEAR_EVERYTHING",
+		2: "CLEAR_FORMATTING",
+		3: "CLEAR_DATA",
+		4: "CLEAR_SELECTION",
 	}
 	ClearScope_value = map[string]int32{
-		"CLEAR_EVERYTHING": 0,
-		"CLEAR_FORMATTING": 1,
-		"CLEAR_DATA":       2,
-		"CLEAR_SELECTION":  3,
+		"CLEAR_SCOPE_UNSPECIFIED": 0,
+		"CLEAR_EVERYTHING":        1,
+		"CLEAR_FORMATTING":        2,
+		"CLEAR_DATA":              3,
+		"CLEAR_SELECTION":         4,
 	}
 )
 
@@ -3028,39 +3035,43 @@ func (ClearRegion) EnumDescriptor() ([]byte, []int) {
 
 // Export formats. See engine/src/save.rs.
 //
-//	BINARY (0):    FXGD binary — header "FXGD" + dimensions + cell data +
+//	UNSPECIFIED (0): Invalid in ExportRequest.format.
+//	BINARY (1):    FXGD binary — header "FXGD" + dimensions + cell data +
 //	               styles + column/row properties. Preserves full fidelity.
-//	TSV (1):       Tab-separated values. Text only.
-//	CSV (2):       Comma-separated values. Quotes cells containing
+//	TSV (2):       Tab-separated values. Text only.
+//	CSV (3):       Comma-separated values. Quotes cells containing
 //	               separator, newline, or quote characters.
-//	DELIMITED (3): Uses the grid's clip_col_separator (default "\t").
-//	XLSX (4):      SpreadsheetML XML (Excel 2003 .xml format). Applies
+//	DELIMITED (4): Uses the grid's clip_col_separator (default "\t").
+//	XLSX (5):      SpreadsheetML XML (Excel 2003 .xml format). Applies
 //	               bold to fixed rows, auto-detects numeric cells.
 type ExportFormat int32
 
 const (
-	ExportFormat_EXPORT_BINARY    ExportFormat = 0
-	ExportFormat_EXPORT_TSV       ExportFormat = 1
-	ExportFormat_EXPORT_CSV       ExportFormat = 2
-	ExportFormat_EXPORT_DELIMITED ExportFormat = 3
-	ExportFormat_EXPORT_XLSX      ExportFormat = 4
+	ExportFormat_EXPORT_FORMAT_UNSPECIFIED ExportFormat = 0
+	ExportFormat_EXPORT_BINARY             ExportFormat = 1
+	ExportFormat_EXPORT_TSV                ExportFormat = 2
+	ExportFormat_EXPORT_CSV                ExportFormat = 3
+	ExportFormat_EXPORT_DELIMITED          ExportFormat = 4
+	ExportFormat_EXPORT_XLSX               ExportFormat = 5
 )
 
 // Enum value maps for ExportFormat.
 var (
 	ExportFormat_name = map[int32]string{
-		0: "EXPORT_BINARY",
-		1: "EXPORT_TSV",
-		2: "EXPORT_CSV",
-		3: "EXPORT_DELIMITED",
-		4: "EXPORT_XLSX",
+		0: "EXPORT_FORMAT_UNSPECIFIED",
+		1: "EXPORT_BINARY",
+		2: "EXPORT_TSV",
+		3: "EXPORT_CSV",
+		4: "EXPORT_DELIMITED",
+		5: "EXPORT_XLSX",
 	}
 	ExportFormat_value = map[string]int32{
-		"EXPORT_BINARY":    0,
-		"EXPORT_TSV":       1,
-		"EXPORT_CSV":       2,
-		"EXPORT_DELIMITED": 3,
-		"EXPORT_XLSX":      4,
+		"EXPORT_FORMAT_UNSPECIFIED": 0,
+		"EXPORT_BINARY":             1,
+		"EXPORT_TSV":                2,
+		"EXPORT_CSV":                3,
+		"EXPORT_DELIMITED":          4,
+		"EXPORT_XLSX":               5,
 	}
 )
 
@@ -3094,22 +3105,25 @@ func (ExportFormat) EnumDescriptor() ([]byte, []int) {
 type ExportScope int32
 
 const (
-	ExportScope_EXPORT_ALL         ExportScope = 0
-	ExportScope_EXPORT_DATA_ONLY   ExportScope = 1
-	ExportScope_EXPORT_FORMAT_ONLY ExportScope = 2
+	ExportScope_EXPORT_SCOPE_UNSPECIFIED ExportScope = 0
+	ExportScope_EXPORT_ALL               ExportScope = 1
+	ExportScope_EXPORT_DATA_ONLY         ExportScope = 2
+	ExportScope_EXPORT_FORMAT_ONLY       ExportScope = 3
 )
 
 // Enum value maps for ExportScope.
 var (
 	ExportScope_name = map[int32]string{
-		0: "EXPORT_ALL",
-		1: "EXPORT_DATA_ONLY",
-		2: "EXPORT_FORMAT_ONLY",
+		0: "EXPORT_SCOPE_UNSPECIFIED",
+		1: "EXPORT_ALL",
+		2: "EXPORT_DATA_ONLY",
+		3: "EXPORT_FORMAT_ONLY",
 	}
 	ExportScope_value = map[string]int32{
-		"EXPORT_ALL":         0,
-		"EXPORT_DATA_ONLY":   1,
-		"EXPORT_FORMAT_ONLY": 2,
+		"EXPORT_SCOPE_UNSPECIFIED": 0,
+		"EXPORT_ALL":               1,
+		"EXPORT_DATA_ONLY":         2,
+		"EXPORT_FORMAT_ONLY":       3,
 	}
 )
 
@@ -4109,25 +4123,28 @@ func (FrameKind) EnumDescriptor() ([]byte, []int) {
 type ArchiveRequest_Action int32
 
 const (
-	ArchiveRequest_SAVE   ArchiveRequest_Action = 0
-	ArchiveRequest_LOAD   ArchiveRequest_Action = 1
-	ArchiveRequest_DELETE ArchiveRequest_Action = 2
-	ArchiveRequest_LIST   ArchiveRequest_Action = 3
+	ArchiveRequest_ACTION_UNSPECIFIED ArchiveRequest_Action = 0
+	ArchiveRequest_SAVE               ArchiveRequest_Action = 1
+	ArchiveRequest_LOAD               ArchiveRequest_Action = 2
+	ArchiveRequest_DELETE             ArchiveRequest_Action = 3
+	ArchiveRequest_LIST               ArchiveRequest_Action = 4
 )
 
 // Enum value maps for ArchiveRequest_Action.
 var (
 	ArchiveRequest_Action_name = map[int32]string{
-		0: "SAVE",
-		1: "LOAD",
-		2: "DELETE",
-		3: "LIST",
+		0: "ACTION_UNSPECIFIED",
+		1: "SAVE",
+		2: "LOAD",
+		3: "DELETE",
+		4: "LIST",
 	}
 	ArchiveRequest_Action_value = map[string]int32{
-		"SAVE":   0,
-		"LOAD":   1,
-		"DELETE": 2,
-		"LIST":   3,
+		"ACTION_UNSPECIFIED": 0,
+		"SAVE":               1,
+		"LOAD":               2,
+		"DELETE":             3,
+		"LIST":               4,
 	}
 )
 
@@ -4161,22 +4178,25 @@ func (ArchiveRequest_Action) EnumDescriptor() ([]byte, []int) {
 type PointerEvent_Type int32
 
 const (
-	PointerEvent_DOWN PointerEvent_Type = 0
-	PointerEvent_UP   PointerEvent_Type = 1
-	PointerEvent_MOVE PointerEvent_Type = 2
+	PointerEvent_TYPE_UNSPECIFIED PointerEvent_Type = 0
+	PointerEvent_DOWN             PointerEvent_Type = 1
+	PointerEvent_UP               PointerEvent_Type = 2
+	PointerEvent_MOVE             PointerEvent_Type = 3
 )
 
 // Enum value maps for PointerEvent_Type.
 var (
 	PointerEvent_Type_name = map[int32]string{
-		0: "DOWN",
-		1: "UP",
-		2: "MOVE",
+		0: "TYPE_UNSPECIFIED",
+		1: "DOWN",
+		2: "UP",
+		3: "MOVE",
 	}
 	PointerEvent_Type_value = map[string]int32{
-		"DOWN": 0,
-		"UP":   1,
-		"MOVE": 2,
+		"TYPE_UNSPECIFIED": 0,
+		"DOWN":             1,
+		"UP":               2,
+		"MOVE":             3,
 	}
 )
 
@@ -4210,22 +4230,25 @@ func (PointerEvent_Type) EnumDescriptor() ([]byte, []int) {
 type ZoomEvent_Phase int32
 
 const (
-	ZoomEvent_ZOOM_BEGIN  ZoomEvent_Phase = 0
-	ZoomEvent_ZOOM_UPDATE ZoomEvent_Phase = 1
-	ZoomEvent_ZOOM_END    ZoomEvent_Phase = 2
+	ZoomEvent_ZOOM_PHASE_UNSPECIFIED ZoomEvent_Phase = 0
+	ZoomEvent_ZOOM_BEGIN             ZoomEvent_Phase = 1
+	ZoomEvent_ZOOM_UPDATE            ZoomEvent_Phase = 2
+	ZoomEvent_ZOOM_END               ZoomEvent_Phase = 3
 )
 
 // Enum value maps for ZoomEvent_Phase.
 var (
 	ZoomEvent_Phase_name = map[int32]string{
-		0: "ZOOM_BEGIN",
-		1: "ZOOM_UPDATE",
-		2: "ZOOM_END",
+		0: "ZOOM_PHASE_UNSPECIFIED",
+		1: "ZOOM_BEGIN",
+		2: "ZOOM_UPDATE",
+		3: "ZOOM_END",
 	}
 	ZoomEvent_Phase_value = map[string]int32{
-		"ZOOM_BEGIN":  0,
-		"ZOOM_UPDATE": 1,
-		"ZOOM_END":    2,
+		"ZOOM_PHASE_UNSPECIFIED": 0,
+		"ZOOM_BEGIN":             1,
+		"ZOOM_UPDATE":            2,
+		"ZOOM_END":               3,
 	}
 )
 
@@ -4259,22 +4282,25 @@ func (ZoomEvent_Phase) EnumDescriptor() ([]byte, []int) {
 type KeyEvent_Type int32
 
 const (
-	KeyEvent_KEY_DOWN  KeyEvent_Type = 0
-	KeyEvent_KEY_UP    KeyEvent_Type = 1
-	KeyEvent_KEY_PRESS KeyEvent_Type = 2
+	KeyEvent_KEY_TYPE_UNSPECIFIED KeyEvent_Type = 0
+	KeyEvent_KEY_DOWN             KeyEvent_Type = 1
+	KeyEvent_KEY_UP               KeyEvent_Type = 2
+	KeyEvent_KEY_PRESS            KeyEvent_Type = 3
 )
 
 // Enum value maps for KeyEvent_Type.
 var (
 	KeyEvent_Type_name = map[int32]string{
-		0: "KEY_DOWN",
-		1: "KEY_UP",
-		2: "KEY_PRESS",
+		0: "KEY_TYPE_UNSPECIFIED",
+		1: "KEY_DOWN",
+		2: "KEY_UP",
+		3: "KEY_PRESS",
 	}
 	KeyEvent_Type_value = map[string]int32{
-		"KEY_DOWN":  0,
-		"KEY_UP":    1,
-		"KEY_PRESS": 2,
+		"KEY_TYPE_UNSPECIFIED": 0,
+		"KEY_DOWN":             1,
+		"KEY_UP":               2,
+		"KEY_PRESS":            3,
 	}
 )
 
@@ -10630,7 +10656,7 @@ func (x *LoadDataOptions) GetMode() LoadMode {
 	if x != nil && x.Mode != nil {
 		return *x.Mode
 	}
-	return LoadMode_LOAD_REPLACE
+	return LoadMode_LOAD_MODE_UNSPECIFIED
 }
 
 func (x *LoadDataOptions) GetAtomic() bool {
@@ -10879,7 +10905,7 @@ func (x *ClearRequest) GetScope() ClearScope {
 	if x != nil {
 		return x.Scope
 	}
-	return ClearScope_CLEAR_EVERYTHING
+	return ClearScope_CLEAR_SCOPE_UNSPECIFIED
 }
 
 func (x *ClearRequest) GetRegion() ClearRegion {
@@ -13809,14 +13835,14 @@ func (x *ExportRequest) GetFormat() ExportFormat {
 	if x != nil {
 		return x.Format
 	}
-	return ExportFormat_EXPORT_BINARY
+	return ExportFormat_EXPORT_FORMAT_UNSPECIFIED
 }
 
 func (x *ExportRequest) GetScope() ExportScope {
 	if x != nil {
 		return x.Scope
 	}
-	return ExportScope_EXPORT_ALL
+	return ExportScope_EXPORT_SCOPE_UNSPECIFIED
 }
 
 type ExportResponse struct {
@@ -13868,7 +13894,7 @@ func (x *ExportResponse) GetFormat() ExportFormat {
 	if x != nil {
 		return x.Format
 	}
-	return ExportFormat_EXPORT_BINARY
+	return ExportFormat_EXPORT_FORMAT_UNSPECIFIED
 }
 
 type PrintRequest struct {
@@ -14097,10 +14123,11 @@ func (x *PrintPage) GetHeight() int32 {
 // Named grid snapshots using the FXAR1 archive format.
 // See engine/src/save.rs.
 //
-//	SAVE:   Serializes grid into a named entry in the archive blob.
-//	LOAD:   Deserializes a named entry back into the grid.
-//	DELETE: Removes a named entry from the archive.
-//	LIST:   Returns the list of entry names without loading.
+//	ACTION_UNSPECIFIED: Invalid.
+//	SAVE:               Serializes grid into a named entry in the archive blob.
+//	LOAD:               Deserializes a named entry back into the grid.
+//	DELETE:             Removes a named entry from the archive.
+//	LIST:               Returns the list of entry names without loading.
 type ArchiveRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	GridId        int64                  `protobuf:"varint,1,opt,name=grid_id,json=gridId,proto3" json:"grid_id,omitempty"`
@@ -14159,7 +14186,7 @@ func (x *ArchiveRequest) GetAction() ArchiveRequest_Action {
 	if x != nil {
 		return x.Action
 	}
-	return ArchiveRequest_SAVE
+	return ArchiveRequest_ACTION_UNSPECIFIED
 }
 
 func (x *ArchiveRequest) GetData() []byte {
@@ -16320,7 +16347,7 @@ func (x *PointerEvent) GetType() PointerEvent_Type {
 	if x != nil {
 		return x.Type
 	}
-	return PointerEvent_DOWN
+	return PointerEvent_TYPE_UNSPECIFIED
 }
 
 func (x *PointerEvent) GetX() float32 {
@@ -16454,7 +16481,7 @@ func (x *ZoomEvent) GetPhase() ZoomEvent_Phase {
 	if x != nil {
 		return x.Phase
 	}
-	return ZoomEvent_ZOOM_BEGIN
+	return ZoomEvent_ZOOM_PHASE_UNSPECIFIED
 }
 
 func (x *ZoomEvent) GetScale() float32 {
@@ -16530,7 +16557,7 @@ func (x *KeyEvent) GetType() KeyEvent_Type {
 	if x != nil {
 		return x.Type
 	}
-	return KeyEvent_KEY_DOWN
+	return KeyEvent_KEY_TYPE_UNSPECIFIED
 }
 
 func (x *KeyEvent) GetKeyCode() int32 {
@@ -23422,18 +23449,19 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\n" +
 	"image_data\x18\x02 \x01(\fR\timageData\x12\x14\n" +
 	"\x05width\x18\x03 \x01(\x05R\x05width\x12\x16\n" +
-	"\x06height\x18\x04 \x01(\x05R\x06height\"\xc3\x01\n" +
+	"\x06height\x18\x04 \x01(\x05R\x06height\"\xdb\x01\n" +
 	"\x0eArchiveRequest\x12\x17\n" +
 	"\agrid_id\x18\x01 \x01(\x03R\x06gridId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12<\n" +
 	"\x06action\x18\x03 \x01(\x0e2$.volvoxgrid.v1.ArchiveRequest.ActionR\x06action\x12\x12\n" +
-	"\x04data\x18\x04 \x01(\fR\x04data\"2\n" +
-	"\x06Action\x12\b\n" +
-	"\x04SAVE\x10\x00\x12\b\n" +
-	"\x04LOAD\x10\x01\x12\n" +
+	"\x04data\x18\x04 \x01(\fR\x04data\"J\n" +
+	"\x06Action\x12\x16\n" +
+	"\x12ACTION_UNSPECIFIED\x10\x00\x12\b\n" +
+	"\x04SAVE\x10\x01\x12\b\n" +
+	"\x04LOAD\x10\x02\x12\n" +
 	"\n" +
-	"\x06DELETE\x10\x02\x12\b\n" +
-	"\x04LIST\x10\x03\";\n" +
+	"\x06DELETE\x10\x03\x12\b\n" +
+	"\x04LIST\x10\x04\";\n" +
 	"\x0fArchiveResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x14\n" +
 	"\x05names\x18\x02 \x03(\tR\x05names\"\x1c\n" +
@@ -23546,43 +23574,46 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\bscroll_x\x18\x01 \x01(\x02R\ascrollX\x12\x19\n" +
 	"\bscroll_y\x18\x02 \x01(\x02R\ascrollY\x12\x14\n" +
 	"\x05width\x18\x03 \x01(\x05R\x05width\x12\x16\n" +
-	"\x06height\x18\x04 \x01(\x05R\x06height\"\xd5\x01\n" +
+	"\x06height\x18\x04 \x01(\x05R\x06height\"\xeb\x01\n" +
 	"\fPointerEvent\x124\n" +
 	"\x04type\x18\x01 \x01(\x0e2 .volvoxgrid.v1.PointerEvent.TypeR\x04type\x12\f\n" +
 	"\x01x\x18\x02 \x01(\x02R\x01x\x12\f\n" +
 	"\x01y\x18\x03 \x01(\x02R\x01y\x12\x1a\n" +
 	"\bmodifier\x18\x04 \x01(\x05R\bmodifier\x12\x16\n" +
 	"\x06button\x18\x05 \x01(\x05R\x06button\x12\x1b\n" +
-	"\tdbl_click\x18\x06 \x01(\bR\bdblClick\"\"\n" +
-	"\x04Type\x12\b\n" +
-	"\x04DOWN\x10\x00\x12\x06\n" +
-	"\x02UP\x10\x01\x12\b\n" +
-	"\x04MOVE\x10\x02\"?\n" +
+	"\tdbl_click\x18\x06 \x01(\bR\bdblClick\"8\n" +
+	"\x04Type\x12\x14\n" +
+	"\x10TYPE_UNSPECIFIED\x10\x00\x12\b\n" +
+	"\x04DOWN\x10\x01\x12\x06\n" +
+	"\x02UP\x10\x02\x12\b\n" +
+	"\x04MOVE\x10\x03\"?\n" +
 	"\vScrollEvent\x12\x17\n" +
 	"\adelta_x\x18\x01 \x01(\x02R\x06deltaX\x12\x17\n" +
-	"\adelta_y\x18\x02 \x01(\x02R\x06deltaY\"\xcb\x01\n" +
+	"\adelta_y\x18\x02 \x01(\x02R\x06deltaY\"\xe7\x01\n" +
 	"\tZoomEvent\x124\n" +
 	"\x05phase\x18\x01 \x01(\x0e2\x1e.volvoxgrid.v1.ZoomEvent.PhaseR\x05phase\x12\x14\n" +
 	"\x05scale\x18\x02 \x01(\x02R\x05scale\x12\x1c\n" +
 	"\n" +
 	"focal_x_px\x18\x03 \x01(\x02R\bfocalXPx\x12\x1c\n" +
 	"\n" +
-	"focal_y_px\x18\x04 \x01(\x02R\bfocalYPx\"6\n" +
-	"\x05Phase\x12\x0e\n" +
+	"focal_y_px\x18\x04 \x01(\x02R\bfocalYPx\"R\n" +
+	"\x05Phase\x12\x1a\n" +
+	"\x16ZOOM_PHASE_UNSPECIFIED\x10\x00\x12\x0e\n" +
 	"\n" +
-	"ZOOM_BEGIN\x10\x00\x12\x0f\n" +
-	"\vZOOM_UPDATE\x10\x01\x12\f\n" +
-	"\bZOOM_END\x10\x02\"\xc2\x01\n" +
+	"ZOOM_BEGIN\x10\x01\x12\x0f\n" +
+	"\vZOOM_UPDATE\x10\x02\x12\f\n" +
+	"\bZOOM_END\x10\x03\"\xdc\x01\n" +
 	"\bKeyEvent\x120\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x1c.volvoxgrid.v1.KeyEvent.TypeR\x04type\x12\x19\n" +
 	"\bkey_code\x18\x02 \x01(\x05R\akeyCode\x12\x1a\n" +
 	"\bmodifier\x18\x03 \x01(\x05R\bmodifier\x12\x1c\n" +
-	"\tcharacter\x18\x04 \x01(\tR\tcharacter\"/\n" +
-	"\x04Type\x12\f\n" +
-	"\bKEY_DOWN\x10\x00\x12\n" +
+	"\tcharacter\x18\x04 \x01(\tR\tcharacter\"I\n" +
+	"\x04Type\x12\x18\n" +
+	"\x14KEY_TYPE_UNSPECIFIED\x10\x00\x12\f\n" +
+	"\bKEY_DOWN\x10\x01\x12\n" +
 	"\n" +
-	"\x06KEY_UP\x10\x01\x12\r\n" +
-	"\tKEY_PRESS\x10\x02\"\x87\x01\n" +
+	"\x06KEY_UP\x10\x02\x12\r\n" +
+	"\tKEY_PRESS\x10\x03\"\x87\x01\n" +
 	"\vBufferReady\x12\x16\n" +
 	"\x06handle\x18\x01 \x01(\x03R\x06handle\x12\x16\n" +
 	"\x06stride\x18\x02 \x01(\x05R\x06stride\x12\x14\n" +
@@ -24132,10 +24163,11 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"TypePolicy\x12\x14\n" +
 	"\x10TYPE_AUTO_DETECT\x10\x00\x12\x13\n" +
 	"\x0fTYPE_ALL_STRING\x10\x01\x12\x14\n" +
-	"\x10TYPE_FROM_SCHEMA\x10\x02*-\n" +
-	"\bLoadMode\x12\x10\n" +
-	"\fLOAD_REPLACE\x10\x00\x12\x0f\n" +
-	"\vLOAD_APPEND\x10\x01*@\n" +
+	"\x10TYPE_FROM_SCHEMA\x10\x02*H\n" +
+	"\bLoadMode\x12\x19\n" +
+	"\x15LOAD_MODE_UNSPECIFIED\x10\x00\x12\x10\n" +
+	"\fLOAD_REPLACE\x10\x01\x12\x0f\n" +
+	"\vLOAD_APPEND\x10\x02*@\n" +
 	"\x0eLoadDataStatus\x12\v\n" +
 	"\aLOAD_OK\x10\x00\x12\x10\n" +
 	"\fLOAD_PARTIAL\x10\x01\x12\x0f\n" +
@@ -24274,14 +24306,15 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x16FRAME_PACING_MODE_AUTO\x10\x00\x12\x1e\n" +
 	"\x1aFRAME_PACING_MODE_PLATFORM\x10\x01\x12\x1f\n" +
 	"\x1bFRAME_PACING_MODE_UNLIMITED\x10\x02\x12\x1b\n" +
-	"\x17FRAME_PACING_MODE_FIXED\x10\x03*]\n" +
+	"\x17FRAME_PACING_MODE_FIXED\x10\x03*z\n" +
 	"\n" +
-	"ClearScope\x12\x14\n" +
-	"\x10CLEAR_EVERYTHING\x10\x00\x12\x14\n" +
-	"\x10CLEAR_FORMATTING\x10\x01\x12\x0e\n" +
+	"ClearScope\x12\x1b\n" +
+	"\x17CLEAR_SCOPE_UNSPECIFIED\x10\x00\x12\x14\n" +
+	"\x10CLEAR_EVERYTHING\x10\x01\x12\x14\n" +
+	"\x10CLEAR_FORMATTING\x10\x02\x12\x0e\n" +
 	"\n" +
-	"CLEAR_DATA\x10\x02\x12\x13\n" +
-	"\x0fCLEAR_SELECTION\x10\x03*\xa1\x01\n" +
+	"CLEAR_DATA\x10\x03\x12\x13\n" +
+	"\x0fCLEAR_SELECTION\x10\x04*\xa1\x01\n" +
 	"\vClearRegion\x12\x14\n" +
 	"\x10CLEAR_SCROLLABLE\x10\x00\x12\x14\n" +
 	"\x10CLEAR_FIXED_ROWS\x10\x01\x12\x14\n" +
@@ -24289,20 +24322,22 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x10CLEAR_FIXED_BOTH\x10\x03\x12\x12\n" +
 	"\x0eCLEAR_ALL_ROWS\x10\x04\x12\x12\n" +
 	"\x0eCLEAR_ALL_COLS\x10\x05\x12\x12\n" +
-	"\x0eCLEAR_ALL_BOTH\x10\x06*h\n" +
-	"\fExportFormat\x12\x11\n" +
-	"\rEXPORT_BINARY\x10\x00\x12\x0e\n" +
+	"\x0eCLEAR_ALL_BOTH\x10\x06*\x87\x01\n" +
+	"\fExportFormat\x12\x1d\n" +
+	"\x19EXPORT_FORMAT_UNSPECIFIED\x10\x00\x12\x11\n" +
+	"\rEXPORT_BINARY\x10\x01\x12\x0e\n" +
 	"\n" +
-	"EXPORT_TSV\x10\x01\x12\x0e\n" +
+	"EXPORT_TSV\x10\x02\x12\x0e\n" +
 	"\n" +
-	"EXPORT_CSV\x10\x02\x12\x14\n" +
-	"\x10EXPORT_DELIMITED\x10\x03\x12\x0f\n" +
-	"\vEXPORT_XLSX\x10\x04*K\n" +
-	"\vExportScope\x12\x0e\n" +
+	"EXPORT_CSV\x10\x03\x12\x14\n" +
+	"\x10EXPORT_DELIMITED\x10\x04\x12\x0f\n" +
+	"\vEXPORT_XLSX\x10\x05*i\n" +
+	"\vExportScope\x12\x1c\n" +
+	"\x18EXPORT_SCOPE_UNSPECIFIED\x10\x00\x12\x0e\n" +
 	"\n" +
-	"EXPORT_ALL\x10\x00\x12\x14\n" +
-	"\x10EXPORT_DATA_ONLY\x10\x01\x12\x16\n" +
-	"\x12EXPORT_FORMAT_ONLY\x10\x02*;\n" +
+	"EXPORT_ALL\x10\x01\x12\x14\n" +
+	"\x10EXPORT_DATA_ONLY\x10\x02\x12\x16\n" +
+	"\x12EXPORT_FORMAT_ONLY\x10\x03*;\n" +
 	"\x10PrintOrientation\x12\x12\n" +
 	"\x0ePRINT_PORTRAIT\x10\x00\x12\x13\n" +
 	"\x0fPRINT_LANDSCAPE\x10\x01*x\n" +
