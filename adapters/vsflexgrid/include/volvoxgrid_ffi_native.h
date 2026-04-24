@@ -27,7 +27,7 @@ uint8_t* volvox_grid_create(
 
 /* Destroy */
 uint8_t* volvox_grid_destroy(
-    int64_t id,
+    int64_t grid_id,
     int32_t* out_len
 );
 
@@ -40,7 +40,7 @@ uint8_t* volvox_grid_configure(
 
 /* GetConfig */
 uint8_t* volvox_grid_get_config(
-    int64_t id,
+    int64_t grid_id,
     int32_t* out_len
 );
 
@@ -58,7 +58,7 @@ uint8_t* volvox_grid_define_columns_pb(
 
 /* GetSchema */
 uint8_t* volvox_grid_get_schema(
-    int64_t id,
+    int64_t grid_id,
     int32_t* out_len
 );
 
@@ -146,7 +146,7 @@ uint8_t* volvox_grid_select_pb(
 
 /* GetSelection */
 uint8_t* volvox_grid_get_selection(
-    int64_t id,
+    int64_t grid_id,
     int32_t* out_len
 );
 
@@ -262,13 +262,13 @@ uint8_t* volvox_grid_unmerge_cells(
 
 /* GetMergedRegions */
 uint8_t* volvox_grid_get_merged_regions(
-    int64_t id,
+    int64_t grid_id,
     int32_t* out_len
 );
 
 /* GetMemoryUsage */
 uint8_t* volvox_grid_get_memory_usage(
-    int64_t id,
+    int64_t grid_id,
     int32_t* out_len
 );
 
@@ -318,7 +318,7 @@ uint8_t* volvox_grid_set_redraw(
 
 /* Refresh */
 uint8_t* volvox_grid_refresh(
-    int64_t id,
+    int64_t grid_id,
     int32_t* out_len
 );
 

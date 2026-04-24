@@ -141,7 +141,7 @@ gridView.initialize(pluginHost, existingGridId);
 | Method | Description |
 |---|---|
 | `createController()` | Create a `VolvoxGridController` for this grid |
-| `getGridId()` | Get the native grid handle ID |
+| `getGridId()` | Get the native grid ID |
 | `getService()` | Get the underlying FFI service client |
 | `detachGrid()` | Stop render/event session but keep the grid alive |
 | `release()` | Clean up all resources |

@@ -475,10 +475,10 @@ fn build_ui_inner(app: &Application) -> Result<ApplicationWindow, String> {
     let (tx, rx) = create_ui_message_channel()?;
     let client = VolvoxServiceClient::load_default()?;
     let create = client.create_grid(DEFAULT_WIDTH, DEFAULT_HEIGHT)?;
-    let sales_grid_id = create
-        .handle
-        .map(|handle| handle.id)
-        .ok_or_else(|| "plugin returned no grid handle".to_string())?;
+    let sales_grid_id = create.grid_id;
+    if sales_grid_id <= 0 {
+        return Err("plugin returned no grid id".to_string());
+    }
     apply_initial_config_for_grid(&client, sales_grid_id, false)?;
     load_sales_json_demo(&client, sales_grid_id)?;
 
@@ -1747,7 +1747,7 @@ impl VolvoxServiceClient {
     fn refresh(&self, grid_id: i64) -> Result<(), String> {
         let _: pb::RefreshResponse = self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/Refresh",
-            &pb::GridHandle { id: grid_id },
+            &pb::RefreshRequest { grid_id },
         )?;
         Ok(())
     }
@@ -1761,7 +1761,7 @@ impl VolvoxServiceClient {
         let stream = self
             .plugin
             .open_stream("/volvoxgrid.v1.VolvoxGridService/EventStream")?;
-        let request = pb::GridHandle { id: grid_id };
+        let request = pb::EventStreamRequest { grid_id };
         stream.send_raw(&request.encode_to_vec())?;
         stream.close_send();
         Ok(stream)
@@ -2136,7 +2136,7 @@ impl VolvoxServiceClient {
     fn get_memory_usage(&self, grid_id: i64) -> Result<pb::MemoryUsageResponse, String> {
         self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/GetMemoryUsage",
-            &pb::GridHandle { id: grid_id },
+            &pb::GetMemoryUsageRequest { grid_id },
         )
     }
 
@@ -3276,10 +3276,10 @@ fn ensure_demo_grid(state: &mut State, demo: &str) -> Result<(i64, bool), String
         DEFAULT_HEIGHT
     };
     let create = state.client.create_grid(width, height)?;
-    let grid_id = create
-        .handle
-        .map(|handle| handle.id)
-        .ok_or_else(|| "plugin returned no grid handle".to_string())?;
+    let grid_id = create.grid_id;
+    if grid_id <= 0 {
+        return Err("plugin returned no grid id".to_string());
+    }
     apply_initial_config_for_grid(&state.client, grid_id, state.scroll_blit_enabled)?;
     state.grid_sessions.insert(demo.to_string(), grid_id);
     Ok((grid_id, true))

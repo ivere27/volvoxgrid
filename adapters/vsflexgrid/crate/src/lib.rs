@@ -4341,17 +4341,20 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         }
 
         Ok(CreateResponse {
-            handle: Some(GridHandle { id }),
+            grid_id: id,
             warnings: Vec::new(),
         })
     }
 
-    fn destroy(&self, request: GridHandle) -> Result<DestroyResponse, String> {
+    fn destroy(&self, request: DestroyRequest) -> Result<DestroyResponse, String> {
         RENDERERS.with(|rc| {
-            rc.borrow_mut().remove(&request.id);
+            rc.borrow_mut().remove(&request.grid_id);
         });
-        CUSTOM_COMPARE_CALLBACKS.lock().unwrap().remove(&request.id);
-        self.manager().destroy_grid(request.id);
+        CUSTOM_COMPARE_CALLBACKS
+            .lock()
+            .unwrap()
+            .remove(&request.grid_id);
+        self.manager().destroy_grid(request.grid_id);
         Ok(DestroyResponse {})
     }
 
@@ -4364,9 +4367,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(ConfigureResponse {})
     }
 
-    fn get_config(&self, request: GridHandle) -> Result<GridConfig, String> {
+    fn get_config(&self, request: GetConfigRequest) -> Result<GridConfig, String> {
         self.manager()
-            .with_grid(request.id, |grid| grid.get_config())
+            .with_grid(request.grid_id, |grid| grid.get_config())
     }
 
     fn load_font_data(
@@ -4387,9 +4390,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(DefineColumnsResponse {})
     }
 
-    fn get_schema(&self, request: GridHandle) -> Result<DefineColumnsRequest, String> {
+    fn get_schema(&self, request: GetSchemaRequest) -> Result<DefineColumnsRequest, String> {
         self.manager()
-            .with_grid(request.id, |grid| grid.get_schema(request.id))
+            .with_grid(request.grid_id, |grid| grid.get_schema(request.grid_id))
     }
 
     fn define_rows(&self, request: DefineRowsRequest) -> Result<DefineRowsResponse, String> {
@@ -4588,8 +4591,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         })
     }
 
-    fn get_selection(&self, request: GridHandle) -> Result<SelectionState, String> {
-        self.manager().with_grid(request.id, selection_state_proto)
+    fn get_selection(&self, request: GetSelectionRequest) -> Result<SelectionState, String> {
+        self.manager()
+            .with_grid(request.grid_id, selection_state_proto)
     }
 
     fn show_cell(&self, request: ShowCellRequest) -> Result<ShowCellResponse, String> {
@@ -4949,9 +4953,12 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         })
     }
 
-    fn get_merged_regions(&self, request: GridHandle) -> Result<MergedRegionsResponse, String> {
+    fn get_merged_regions(
+        &self,
+        request: GetMergedRegionsRequest,
+    ) -> Result<MergedRegionsResponse, String> {
         self.manager()
-            .with_grid(request.id, |grid| MergedRegionsResponse {
+            .with_grid(request.grid_id, |grid| MergedRegionsResponse {
                 ranges: grid
                     .merged_regions
                     .all_ranges()
@@ -4966,9 +4973,12 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             })
     }
 
-    fn get_memory_usage(&self, request: GridHandle) -> Result<MemoryUsageResponse, String> {
+    fn get_memory_usage(
+        &self,
+        request: GetMemoryUsageRequest,
+    ) -> Result<MemoryUsageResponse, String> {
         self.manager()
-            .with_grid(request.id, |grid| grid.memory_usage())
+            .with_grid(request.grid_id, |grid| grid.memory_usage())
     }
 
     fn clipboard(&self, request: ClipboardCommand) -> Result<ClipboardResponse, String> {
@@ -5096,8 +5106,8 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(SetRedrawResponse {})
     }
 
-    fn refresh(&self, request: GridHandle) -> Result<RefreshResponse, String> {
-        self.manager().with_grid(request.id, |grid| {
+    fn refresh(&self, request: RefreshRequest) -> Result<RefreshResponse, String> {
+        self.manager().with_grid(request.grid_id, |grid| {
             grid.layout.invalidate();
             grid.mark_dirty();
         })?;

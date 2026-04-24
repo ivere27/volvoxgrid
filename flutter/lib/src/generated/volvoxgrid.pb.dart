@@ -13215,60 +13215,7 @@ class ArchiveResponse extends $pb.GeneratedMessage {
   $pb.PbList<$core.String> get names => $_getList(1);
 }
 
-class GridHandle extends $pb.GeneratedMessage {
-  factory GridHandle({
-    $fixnum.Int64? id,
-  }) {
-    final result = create();
-    if (id != null) result.id = id;
-    return result;
-  }
-
-  GridHandle._();
-
-  factory GridHandle.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory GridHandle.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'GridHandle',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
-      createEmptyInstance: create)
-    ..aInt64(1, _omitFieldNames ? '' : 'id')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  GridHandle clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  GridHandle copyWith(void Function(GridHandle) updates) =>
-      super.copyWith((message) => updates(message as GridHandle)) as GridHandle;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static GridHandle create() => GridHandle._();
-  @$core.override
-  GridHandle createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static GridHandle getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<GridHandle>(create);
-  static GridHandle? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $fixnum.Int64 get id => $_getI64(0);
-  @$pb.TagNumber(1)
-  set id($fixnum.Int64 value) => $_setInt64(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearId() => $_clearField(1);
-}
-
-/// Create a new grid instance. Returns a GridHandle used by all subsequent RPCs.
+/// Create a new grid instance. Returns a grid id used by all subsequent RPCs.
 /// The engine allocates a VolvoxGrid with the given viewport and optional config.
 class CreateRequest extends $pb.GeneratedMessage {
   factory CreateRequest({
@@ -13365,11 +13312,11 @@ class CreateRequest extends $pb.GeneratedMessage {
 
 class CreateResponse extends $pb.GeneratedMessage {
   factory CreateResponse({
-    GridHandle? handle,
+    $fixnum.Int64? gridId,
     $core.Iterable<$core.String>? warnings,
   }) {
     final result = create();
-    if (handle != null) result.handle = handle;
+    if (gridId != null) result.gridId = gridId;
     if (warnings != null) result.warnings.addAll(warnings);
     return result;
   }
@@ -13387,8 +13334,7 @@ class CreateResponse extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'CreateResponse',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aOM<GridHandle>(1, _omitFieldNames ? '' : 'handle',
-        subBuilder: GridHandle.create)
+    ..aInt64(1, _omitFieldNames ? '' : 'gridId')
     ..pPS(2, _omitFieldNames ? '' : 'warnings')
     ..hasRequiredFields = false;
 
@@ -13412,18 +13358,450 @@ class CreateResponse extends $pb.GeneratedMessage {
   static CreateResponse? _defaultInstance;
 
   @$pb.TagNumber(1)
-  GridHandle get handle => $_getN(0);
+  $fixnum.Int64 get gridId => $_getI64(0);
   @$pb.TagNumber(1)
-  set handle(GridHandle value) => $_setField(1, value);
+  set gridId($fixnum.Int64 value) => $_setInt64(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasHandle() => $_has(0);
+  $core.bool hasGridId() => $_has(0);
   @$pb.TagNumber(1)
-  void clearHandle() => $_clearField(1);
-  @$pb.TagNumber(1)
-  GridHandle ensureHandle() => $_ensure(0);
+  void clearGridId() => $_clearField(1);
 
   @$pb.TagNumber(2)
   $pb.PbList<$core.String> get warnings => $_getList(1);
+}
+
+class DestroyRequest extends $pb.GeneratedMessage {
+  factory DestroyRequest({
+    $fixnum.Int64? gridId,
+  }) {
+    final result = create();
+    if (gridId != null) result.gridId = gridId;
+    return result;
+  }
+
+  DestroyRequest._();
+
+  factory DestroyRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DestroyRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DestroyRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'gridId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DestroyRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DestroyRequest copyWith(void Function(DestroyRequest) updates) =>
+      super.copyWith((message) => updates(message as DestroyRequest))
+          as DestroyRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DestroyRequest create() => DestroyRequest._();
+  @$core.override
+  DestroyRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DestroyRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DestroyRequest>(create);
+  static DestroyRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get gridId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set gridId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasGridId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearGridId() => $_clearField(1);
+}
+
+class GetConfigRequest extends $pb.GeneratedMessage {
+  factory GetConfigRequest({
+    $fixnum.Int64? gridId,
+  }) {
+    final result = create();
+    if (gridId != null) result.gridId = gridId;
+    return result;
+  }
+
+  GetConfigRequest._();
+
+  factory GetConfigRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetConfigRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetConfigRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'gridId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetConfigRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetConfigRequest copyWith(void Function(GetConfigRequest) updates) =>
+      super.copyWith((message) => updates(message as GetConfigRequest))
+          as GetConfigRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetConfigRequest create() => GetConfigRequest._();
+  @$core.override
+  GetConfigRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetConfigRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetConfigRequest>(create);
+  static GetConfigRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get gridId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set gridId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasGridId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearGridId() => $_clearField(1);
+}
+
+class GetSchemaRequest extends $pb.GeneratedMessage {
+  factory GetSchemaRequest({
+    $fixnum.Int64? gridId,
+  }) {
+    final result = create();
+    if (gridId != null) result.gridId = gridId;
+    return result;
+  }
+
+  GetSchemaRequest._();
+
+  factory GetSchemaRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetSchemaRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetSchemaRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'gridId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetSchemaRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetSchemaRequest copyWith(void Function(GetSchemaRequest) updates) =>
+      super.copyWith((message) => updates(message as GetSchemaRequest))
+          as GetSchemaRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetSchemaRequest create() => GetSchemaRequest._();
+  @$core.override
+  GetSchemaRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetSchemaRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetSchemaRequest>(create);
+  static GetSchemaRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get gridId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set gridId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasGridId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearGridId() => $_clearField(1);
+}
+
+class GetSelectionRequest extends $pb.GeneratedMessage {
+  factory GetSelectionRequest({
+    $fixnum.Int64? gridId,
+  }) {
+    final result = create();
+    if (gridId != null) result.gridId = gridId;
+    return result;
+  }
+
+  GetSelectionRequest._();
+
+  factory GetSelectionRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetSelectionRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetSelectionRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'gridId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetSelectionRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetSelectionRequest copyWith(void Function(GetSelectionRequest) updates) =>
+      super.copyWith((message) => updates(message as GetSelectionRequest))
+          as GetSelectionRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetSelectionRequest create() => GetSelectionRequest._();
+  @$core.override
+  GetSelectionRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetSelectionRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetSelectionRequest>(create);
+  static GetSelectionRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get gridId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set gridId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasGridId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearGridId() => $_clearField(1);
+}
+
+class GetMergedRegionsRequest extends $pb.GeneratedMessage {
+  factory GetMergedRegionsRequest({
+    $fixnum.Int64? gridId,
+  }) {
+    final result = create();
+    if (gridId != null) result.gridId = gridId;
+    return result;
+  }
+
+  GetMergedRegionsRequest._();
+
+  factory GetMergedRegionsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetMergedRegionsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetMergedRegionsRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'gridId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMergedRegionsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMergedRegionsRequest copyWith(
+          void Function(GetMergedRegionsRequest) updates) =>
+      super.copyWith((message) => updates(message as GetMergedRegionsRequest))
+          as GetMergedRegionsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetMergedRegionsRequest create() => GetMergedRegionsRequest._();
+  @$core.override
+  GetMergedRegionsRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetMergedRegionsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetMergedRegionsRequest>(create);
+  static GetMergedRegionsRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get gridId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set gridId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasGridId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearGridId() => $_clearField(1);
+}
+
+class GetMemoryUsageRequest extends $pb.GeneratedMessage {
+  factory GetMemoryUsageRequest({
+    $fixnum.Int64? gridId,
+  }) {
+    final result = create();
+    if (gridId != null) result.gridId = gridId;
+    return result;
+  }
+
+  GetMemoryUsageRequest._();
+
+  factory GetMemoryUsageRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GetMemoryUsageRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetMemoryUsageRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'gridId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMemoryUsageRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMemoryUsageRequest copyWith(
+          void Function(GetMemoryUsageRequest) updates) =>
+      super.copyWith((message) => updates(message as GetMemoryUsageRequest))
+          as GetMemoryUsageRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GetMemoryUsageRequest create() => GetMemoryUsageRequest._();
+  @$core.override
+  GetMemoryUsageRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GetMemoryUsageRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetMemoryUsageRequest>(create);
+  static GetMemoryUsageRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get gridId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set gridId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasGridId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearGridId() => $_clearField(1);
+}
+
+class RefreshRequest extends $pb.GeneratedMessage {
+  factory RefreshRequest({
+    $fixnum.Int64? gridId,
+  }) {
+    final result = create();
+    if (gridId != null) result.gridId = gridId;
+    return result;
+  }
+
+  RefreshRequest._();
+
+  factory RefreshRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RefreshRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RefreshRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'gridId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RefreshRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RefreshRequest copyWith(void Function(RefreshRequest) updates) =>
+      super.copyWith((message) => updates(message as RefreshRequest))
+          as RefreshRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RefreshRequest create() => RefreshRequest._();
+  @$core.override
+  RefreshRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RefreshRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<RefreshRequest>(create);
+  static RefreshRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get gridId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set gridId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasGridId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearGridId() => $_clearField(1);
+}
+
+class EventStreamRequest extends $pb.GeneratedMessage {
+  factory EventStreamRequest({
+    $fixnum.Int64? gridId,
+  }) {
+    final result = create();
+    if (gridId != null) result.gridId = gridId;
+    return result;
+  }
+
+  EventStreamRequest._();
+
+  factory EventStreamRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory EventStreamRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EventStreamRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'gridId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EventStreamRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EventStreamRequest copyWith(void Function(EventStreamRequest) updates) =>
+      super.copyWith((message) => updates(message as EventStreamRequest))
+          as EventStreamRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EventStreamRequest create() => EventStreamRequest._();
+  @$core.override
+  EventStreamRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static EventStreamRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<EventStreamRequest>(create);
+  static EventStreamRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get gridId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set gridId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasGridId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearGridId() => $_clearField(1);
 }
 
 class ResizeViewportRequest extends $pb.GeneratedMessage {
@@ -23189,7 +23567,7 @@ class VolvoxGridServiceApi {
       _client.invoke<CreateResponse>(
           ctx, 'VolvoxGridService', 'Create', request, CreateResponse());
   $async.Future<DestroyResponse> destroy(
-          $pb.ClientContext? ctx, GridHandle request) =>
+          $pb.ClientContext? ctx, DestroyRequest request) =>
       _client.invoke<DestroyResponse>(
           ctx, 'VolvoxGridService', 'Destroy', request, DestroyResponse());
 
@@ -23199,7 +23577,7 @@ class VolvoxGridServiceApi {
       _client.invoke<ConfigureResponse>(
           ctx, 'VolvoxGridService', 'Configure', request, ConfigureResponse());
   $async.Future<GridConfig> getConfig(
-          $pb.ClientContext? ctx, GridHandle request) =>
+          $pb.ClientContext? ctx, GetConfigRequest request) =>
       _client.invoke<GridConfig>(
           ctx, 'VolvoxGridService', 'GetConfig', request, GridConfig());
   $async.Future<LoadFontDataResponse> loadFontData(
@@ -23213,7 +23591,7 @@ class VolvoxGridServiceApi {
       _client.invoke<DefineColumnsResponse>(ctx, 'VolvoxGridService',
           'DefineColumns', request, DefineColumnsResponse());
   $async.Future<DefineColumnsRequest> getSchema(
-          $pb.ClientContext? ctx, GridHandle request) =>
+          $pb.ClientContext? ctx, GetSchemaRequest request) =>
       _client.invoke<DefineColumnsRequest>(ctx, 'VolvoxGridService',
           'GetSchema', request, DefineColumnsRequest());
   $async.Future<DefineRowsResponse> defineRows(
@@ -23265,7 +23643,7 @@ class VolvoxGridServiceApi {
       _client.invoke<SelectResponse>(
           ctx, 'VolvoxGridService', 'Select', request, SelectResponse());
   $async.Future<SelectionState> getSelection(
-          $pb.ClientContext? ctx, GridHandle request) =>
+          $pb.ClientContext? ctx, GetSelectionRequest request) =>
       _client.invoke<SelectionState>(
           ctx, 'VolvoxGridService', 'GetSelection', request, SelectionState());
   $async.Future<ShowCellResponse> showCell(
@@ -23328,11 +23706,11 @@ class VolvoxGridServiceApi {
       _client.invoke<UnmergeCellsResponse>(ctx, 'VolvoxGridService',
           'UnmergeCells', request, UnmergeCellsResponse());
   $async.Future<MergedRegionsResponse> getMergedRegions(
-          $pb.ClientContext? ctx, GridHandle request) =>
+          $pb.ClientContext? ctx, GetMergedRegionsRequest request) =>
       _client.invoke<MergedRegionsResponse>(ctx, 'VolvoxGridService',
           'GetMergedRegions', request, MergedRegionsResponse());
   $async.Future<MemoryUsageResponse> getMemoryUsage(
-          $pb.ClientContext? ctx, GridHandle request) =>
+          $pb.ClientContext? ctx, GetMemoryUsageRequest request) =>
       _client.invoke<MemoryUsageResponse>(ctx, 'VolvoxGridService',
           'GetMemoryUsage', request, MemoryUsageResponse());
 
@@ -23366,7 +23744,7 @@ class VolvoxGridServiceApi {
       _client.invoke<SetRedrawResponse>(
           ctx, 'VolvoxGridService', 'SetRedraw', request, SetRedrawResponse());
   $async.Future<RefreshResponse> refresh(
-          $pb.ClientContext? ctx, GridHandle request) =>
+          $pb.ClientContext? ctx, RefreshRequest request) =>
       _client.invoke<RefreshResponse>(
           ctx, 'VolvoxGridService', 'Refresh', request, RefreshResponse());
 
@@ -23391,7 +23769,7 @@ class VolvoxGridServiceApi {
   /// Server-streaming: engine pushes semantic grid events.
   /// The plugin polls the engine's EventQueue with a 50 ms interval.
   $async.Future<GridEvent> eventStream(
-          $pb.ClientContext? ctx, GridHandle request) =>
+          $pb.ClientContext? ctx, EventStreamRequest request) =>
       _client.invoke<GridEvent>(
           ctx, 'VolvoxGridService', 'EventStream', request, GridEvent());
 }

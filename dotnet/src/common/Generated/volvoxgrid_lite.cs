@@ -3745,7 +3745,7 @@ namespace Volvoxgrid.V1
 
     public sealed class CreateResponse
     {
-        public GridHandle Handle { get; set; }
+        public long GridId { get; set; }
         public List<string> Warnings { get; private set; } = new List<string>();
 
         // ── Serialization ──
@@ -3753,7 +3753,7 @@ namespace Volvoxgrid.V1
         public byte[] ToByteArray()
         {
             var w = new ProtoWriter();
-            if (Handle != null) w.WriteMessageBytes(1, Handle.ToByteArray());
+            if (GridId != 0L) w.WriteInt64(1, GridId);
             foreach (var item in Warnings)
                 w.WriteString(2, item);
             return w.ToArray();
@@ -3773,7 +3773,7 @@ namespace Volvoxgrid.V1
             {
                 switch (field)
                 {
-                    case 1: msg.Handle = GridHandle.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 1: msg.GridId = r.ReadInt64(); break;
                     case 2: msg.Warnings.Add(r.ReadString()); break;
                     default: r.SkipField(wire); break;
                 }
@@ -4163,6 +4163,41 @@ namespace Volvoxgrid.V1
             {
                 switch (field)
                 {
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class DestroyRequest
+    {
+        public long GridId { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (GridId != 0L) w.WriteInt64(1, GridId);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<DestroyRequest> Parser = new MessageParser<DestroyRequest>(data => ParseFrom(data));
+
+        public static DestroyRequest ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new DestroyRequest();
+            var r = new ProtoReader(data);
+            var msg = new DestroyRequest();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.GridId = r.ReadInt64(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -5246,6 +5281,41 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class EventStreamRequest
+    {
+        public long GridId { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (GridId != 0L) w.WriteInt64(1, GridId);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<EventStreamRequest> Parser = new MessageParser<EventStreamRequest>(data => ParseFrom(data));
+
+        public static EventStreamRequest ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new EventStreamRequest();
+            var r = new ProtoReader(data);
+            var msg = new EventStreamRequest();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.GridId = r.ReadInt64(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class ExportRequest
     {
         public long GridId { get; set; }
@@ -5834,6 +5904,41 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class GetConfigRequest
+    {
+        public long GridId { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (GridId != 0L) w.WriteInt64(1, GridId);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<GetConfigRequest> Parser = new MessageParser<GetConfigRequest>(data => ParseFrom(data));
+
+        public static GetConfigRequest ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new GetConfigRequest();
+            var r = new ProtoReader(data);
+            var msg = new GetConfigRequest();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.GridId = r.ReadInt64(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class GetDemoDataRequest
     {
         public string Demo { get; set; } = "";
@@ -5945,6 +6050,41 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class GetMemoryUsageRequest
+    {
+        public long GridId { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (GridId != 0L) w.WriteInt64(1, GridId);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<GetMemoryUsageRequest> Parser = new MessageParser<GetMemoryUsageRequest>(data => ParseFrom(data));
+
+        public static GetMemoryUsageRequest ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new GetMemoryUsageRequest();
+            var r = new ProtoReader(data);
+            var msg = new GetMemoryUsageRequest();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.GridId = r.ReadInt64(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class GetMergedRangeRequest
     {
         public long GridId { get; set; }
@@ -5979,6 +6119,41 @@ namespace Volvoxgrid.V1
                     case 1: msg.GridId = r.ReadInt64(); break;
                     case 2: msg.Row = r.ReadInt32(); break;
                     case 3: msg.Col = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class GetMergedRegionsRequest
+    {
+        public long GridId { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (GridId != 0L) w.WriteInt64(1, GridId);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<GetMergedRegionsRequest> Parser = new MessageParser<GetMergedRegionsRequest>(data => ParseFrom(data));
+
+        public static GetMergedRegionsRequest ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new GetMergedRegionsRequest();
+            var r = new ProtoReader(data);
+            var msg = new GetMergedRegionsRequest();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.GridId = r.ReadInt64(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -6023,6 +6198,76 @@ namespace Volvoxgrid.V1
                     case 1: msg.GridId = r.ReadInt64(); break;
                     case 2: msg.Row = r.ReadInt32(); break;
                     case 3: msg.Relation = (NodeRelation)r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class GetSchemaRequest
+    {
+        public long GridId { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (GridId != 0L) w.WriteInt64(1, GridId);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<GetSchemaRequest> Parser = new MessageParser<GetSchemaRequest>(data => ParseFrom(data));
+
+        public static GetSchemaRequest ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new GetSchemaRequest();
+            var r = new ProtoReader(data);
+            var msg = new GetSchemaRequest();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.GridId = r.ReadInt64(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class GetSelectionRequest
+    {
+        public long GridId { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (GridId != 0L) w.WriteInt64(1, GridId);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<GetSelectionRequest> Parser = new MessageParser<GetSelectionRequest>(data => ParseFrom(data));
+
+        public static GetSelectionRequest ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new GetSelectionRequest();
+            var r = new ProtoReader(data);
+            var msg = new GetSelectionRequest();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.GridId = r.ReadInt64(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -6643,41 +6888,6 @@ namespace Volvoxgrid.V1
                     case 60: msg.GetHeaderRow = GetHeaderRowEvent.ParseFrom(r.ReadLengthDelimited()); break;
                     case 61: msg.PullToRefreshTriggered = PullToRefreshTriggeredEvent.ParseFrom(r.ReadLengthDelimited()); break;
                     case 62: msg.PullToRefreshCanceled = PullToRefreshCanceledEvent.ParseFrom(r.ReadLengthDelimited()); break;
-                    default: r.SkipField(wire); break;
-                }
-            }
-            return msg;
-        }
-    }
-
-    public sealed class GridHandle
-    {
-        public long Id { get; set; }
-
-        // ── Serialization ──
-
-        public byte[] ToByteArray()
-        {
-            var w = new ProtoWriter();
-            if (Id != 0L) w.WriteInt64(1, Id);
-            return w.ToArray();
-        }
-
-        // ── Deserialization ──
-
-        public static readonly MessageParser<GridHandle> Parser = new MessageParser<GridHandle>(data => ParseFrom(data));
-
-        public static GridHandle ParseFrom(byte[] data)
-        {
-            if (data == null || data.Length == 0) return new GridHandle();
-            var r = new ProtoReader(data);
-            var msg = new GridHandle();
-            int field; ProtoWireType wire;
-            while (r.TryReadTag(out field, out wire))
-            {
-                switch (field)
-                {
-                    case 1: msg.Id = r.ReadInt64(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -9655,6 +9865,41 @@ namespace Volvoxgrid.V1
             {
                 switch (field)
                 {
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class RefreshRequest
+    {
+        public long GridId { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (GridId != 0L) w.WriteInt64(1, GridId);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<RefreshRequest> Parser = new MessageParser<RefreshRequest>(data => ParseFrom(data));
+
+        public static RefreshRequest ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new RefreshRequest();
+            var r = new ProtoReader(data);
+            var msg = new RefreshRequest();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.GridId = r.ReadInt64(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -12832,7 +13077,7 @@ namespace Volvoxgrid.V1
             return CreateResponse.ParseFrom(result);
         }
 
-        public DestroyResponse Destroy(GridHandle request)
+        public DestroyResponse Destroy(DestroyRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/Destroy", data);
@@ -12846,7 +13091,7 @@ namespace Volvoxgrid.V1
             return ConfigureResponse.ParseFrom(result);
         }
 
-        public GridConfig GetConfig(GridHandle request)
+        public GridConfig GetConfig(GetConfigRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/GetConfig", data);
@@ -12867,7 +13112,7 @@ namespace Volvoxgrid.V1
             return DefineColumnsResponse.ParseFrom(result);
         }
 
-        public DefineColumnsRequest GetSchema(GridHandle request)
+        public DefineColumnsRequest GetSchema(GetSchemaRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/GetSchema", data);
@@ -12951,7 +13196,7 @@ namespace Volvoxgrid.V1
             return SelectResponse.ParseFrom(result);
         }
 
-        public SelectionState GetSelection(GridHandle request)
+        public SelectionState GetSelection(GetSelectionRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/GetSelection", data);
@@ -13056,14 +13301,14 @@ namespace Volvoxgrid.V1
             return UnmergeCellsResponse.ParseFrom(result);
         }
 
-        public MergedRegionsResponse GetMergedRegions(GridHandle request)
+        public MergedRegionsResponse GetMergedRegions(GetMergedRegionsRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/GetMergedRegions", data);
             return MergedRegionsResponse.ParseFrom(result);
         }
 
-        public MemoryUsageResponse GetMemoryUsage(GridHandle request)
+        public MemoryUsageResponse GetMemoryUsage(GetMemoryUsageRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/GetMemoryUsage", data);
@@ -13112,7 +13357,7 @@ namespace Volvoxgrid.V1
             return SetRedrawResponse.ParseFrom(result);
         }
 
-        public RefreshResponse Refresh(GridHandle request)
+        public RefreshResponse Refresh(RefreshRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/Refresh", data);
@@ -13142,7 +13387,7 @@ namespace Volvoxgrid.V1
                 recv => RenderOutput.ParseFrom(recv));
         }
 
-        public IEnumerable<GridEvent> EventStream(GridHandle request)
+        public IEnumerable<GridEvent> EventStream(EventStreamRequest request)
         {
             var stream = _host.OpenStream("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/EventStream");
             stream.Send(request.ToByteArray());

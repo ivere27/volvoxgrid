@@ -732,7 +732,7 @@ class VolvoxGridView @JvmOverloads constructor(
                     .build())
                 .build()
         )
-        gridId = response.handle.id
+        gridId = response.gridId
 
         maybeRegisterExternalTextRenderer()
         applyAndroidScrollDefaults()
@@ -829,7 +829,7 @@ class VolvoxGridView @JvmOverloads constructor(
     /** Get the underlying FFI client for direct API calls. */
     fun getService(): VolvoxGridServiceFfi? = ffiClient
 
-    /** Get the grid handle ID for use with the controller or direct FFI calls. */
+    /** Get the grid ID for use with the controller or direct FFI calls. */
     fun getGridId(): Long = gridId
 
     /** Create a [VolvoxGridController] wrapping this view's FFI client and grid ID. */
@@ -957,7 +957,7 @@ class VolvoxGridView @JvmOverloads constructor(
             clearExternalTextRenderer(gridId)
             usingExternalTextRenderer = false
             try {
-                ffiClient?.Destroy(GridHandle.newBuilder().setId(gridId).build())
+                ffiClient?.Destroy(DestroyRequest.newBuilder().setGridId(gridId).build())
             } catch (_: Exception) {}
             gridId = 0
         }
@@ -1442,8 +1442,8 @@ class VolvoxGridView @JvmOverloads constructor(
         if (gridId == 0L) return
         try {
             val config = client.GetConfig(
-                GridHandle.newBuilder()
-                    .setId(gridId)
+                GetConfigRequest.newBuilder()
+                    .setGridId(gridId)
                     .build()
             )
             knownRows = config.layout.rows
@@ -2471,7 +2471,7 @@ class VolvoxGridView @JvmOverloads constructor(
                     .build()
             )
             val config = client.GetConfig(
-                GridHandle.newBuilder().setId(gridId).build()
+                GetConfigRequest.newBuilder().setGridId(gridId).build()
             )
             val cellFont = if (resp.cellsCount > 0) resp.getCells(0).style.font else null
             val gridFont = config.style.font
@@ -2652,10 +2652,10 @@ class VolvoxGridView @JvmOverloads constructor(
 
     private fun startEventStream() {
         val host = plugin ?: return
-        val handle = GridHandle.newBuilder().setId(gridId).build()
+        val request = EventStreamRequest.newBuilder().setGridId(gridId).build()
         val stream = host.openStream("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/EventStream")
         try {
-            stream.send(handle.toByteArray())
+            stream.send(request.toByteArray())
             stream.closeSend()
         } catch (e: Exception) {
             try { stream.close() } catch (_: Exception) {}

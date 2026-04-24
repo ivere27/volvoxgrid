@@ -805,7 +805,7 @@ function pbEncodeGetNodeRequest(gridId: number, row: number, relation?: number):
   return new Uint8Array(out);
 }
 
-function pbEncodeGridHandleRequest(gridId: number): Uint8Array {
+function pbEncodeGridIdRequest(gridId: number): Uint8Array {
   const out: number[] = [];
   out.push(...pbEncodeTag(1, 0), ...pbEncodeInt64(BigInt(Math.trunc(gridId))));
   return new Uint8Array(out);
@@ -4182,7 +4182,7 @@ export class VolvoxGrid {
     }
 
     try {
-      const request = pbEncodeGridHandleRequest(this.gridId);
+      const request = pbEncodeGridIdRequest(this.gridId);
       const sendStatus = Number(this.wasm.volvox_grid_stream_send(handle, request));
       if (sendStatus !== 0) {
         return [];

@@ -57,7 +57,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         Objects.requireNonNull(client, "client");
         Objects.requireNonNull(request, "request");
         CreateResponse response = client.create(request);
-        return new VolvoxGridDesktopController(client, response.getHandle().getId());
+        return new VolvoxGridDesktopController(client, response.getGridId());
     }
 
     public VolvoxGridDesktopController(VolvoxGridDesktopClient client, long gridId) {
@@ -70,7 +70,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     public void destroy() throws SynurangDesktopBridge.SynurangBridgeException {
-        client.destroy(handle());
+        client.destroy(DestroyRequest.newBuilder().setGridId(gridId).build());
     }
 
     private int readRowCount() throws SynurangDesktopBridge.SynurangBridgeException {
@@ -457,7 +457,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     public DefineColumnsRequest getSchema() throws SynurangDesktopBridge.SynurangBridgeException {
-        return client.getSchema(handle());
+        return client.getSchema(GetSchemaRequest.newBuilder().setGridId(gridId).build());
     }
 
     public WriteResult loadTable(LoadTableRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
@@ -797,8 +797,8 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
 
     public MergedRegionsResponse getMergedRegions() throws SynurangDesktopBridge.SynurangBridgeException {
         return client.getMergedRegions(
-            GridHandle.newBuilder()
-                .setId(gridId)
+            GetMergedRegionsRequest.newBuilder()
+                .setGridId(gridId)
                 .build()
         );
     }
@@ -908,7 +908,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     public SelectionState selectionState() throws SynurangDesktopBridge.SynurangBridgeException {
-        return client.getSelection(handle());
+        return client.getSelection(GetSelectionRequest.newBuilder().setGridId(gridId).build());
     }
 
     public SelectionMode getSelectionMode() throws SynurangDesktopBridge.SynurangBridgeException {
@@ -1149,7 +1149,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
 
     @Override
     public void refresh() throws SynurangDesktopBridge.SynurangBridgeException {
-        client.refresh(handle());
+        client.refresh(RefreshRequest.newBuilder().setGridId(gridId).build());
     }
 
     /**
@@ -1325,7 +1325,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     public VolvoxGridDesktopClient.EventStream openEventStream() throws SynurangDesktopBridge.SynurangBridgeException {
-        return client.openEventStream(handle());
+        return client.openEventStream(EventStreamRequest.newBuilder().setGridId(gridId).build());
     }
 
     public VolvoxGridDesktopClient.EventStream eventStream() throws SynurangDesktopBridge.SynurangBridgeException {
@@ -1333,11 +1333,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     public GridConfig getConfig() throws SynurangDesktopBridge.SynurangBridgeException {
-        return client.getConfig(handle());
-    }
-
-    private GridHandle handle() {
-        return GridHandle.newBuilder().setId(gridId).build();
+        return client.getConfig(GetConfigRequest.newBuilder().setGridId(gridId).build());
     }
 
     private SelectRequest buildSingleRangeSelectRequest(

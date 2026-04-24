@@ -2045,8 +2045,6 @@ message ArchiveResponse {
 // Lifecycle & Viewport
 // ═══════════════════════════════════════════════════════════
 
-message GridHandle { int64 id = 1; }
-
 enum ErrorCode {
   ERROR_UNKNOWN          = 0;
   ERROR_INVALID_ARGUMENT = 1;
@@ -2059,7 +2057,7 @@ enum ErrorCode {
   ERROR_INTERNAL         = 8;
 }
 
-// Create a new grid instance. Returns a GridHandle used by all subsequent RPCs.
+// Create a new grid instance. Returns a grid id used by all subsequent RPCs.
 // The engine allocates a VolvoxGrid with the given viewport and optional config.
 message CreateRequest {
   int32      viewport_width  = 1;  // pixels
@@ -2069,9 +2067,25 @@ message CreateRequest {
 }
 
 message CreateResponse {
-  GridHandle      handle   = 1;
+  int64           grid_id  = 1;
   repeated string warnings = 2;
 }
+
+message DestroyRequest { int64 grid_id = 1; }
+
+message GetConfigRequest { int64 grid_id = 1; }
+
+message GetSchemaRequest { int64 grid_id = 1; }
+
+message GetSelectionRequest { int64 grid_id = 1; }
+
+message GetMergedRegionsRequest { int64 grid_id = 1; }
+
+message GetMemoryUsageRequest { int64 grid_id = 1; }
+
+message RefreshRequest { int64 grid_id = 1; }
+
+message EventStreamRequest { int64 grid_id = 1; }
 
 message ResizeViewportRequest {
   int64 grid_id = 1;
@@ -2748,16 +2762,16 @@ message GetHeaderRowEvent    { int32 page = 1; }
 service VolvoxGridService {
   // ── Lifecycle ──
   rpc Create(CreateRequest)               returns (CreateResponse);
-  rpc Destroy(GridHandle)                 returns (DestroyResponse);
+  rpc Destroy(DestroyRequest)             returns (DestroyResponse);
 
   // ── Configuration ──
   rpc Configure(ConfigureRequest)         returns (ConfigureResponse);
-  rpc GetConfig(GridHandle)               returns (GridConfig);
+  rpc GetConfig(GetConfigRequest)         returns (GridConfig);
   rpc LoadFontData(LoadFontDataRequest)   returns (LoadFontDataResponse);
 
   // ── Structure ──
   rpc DefineColumns(DefineColumnsRequest) returns (DefineColumnsResponse);
-  rpc GetSchema(GridHandle)               returns (DefineColumnsRequest);
+  rpc GetSchema(GetSchemaRequest)         returns (DefineColumnsRequest);
   rpc DefineRows(DefineRowsRequest)       returns (DefineRowsResponse);
   rpc InsertRows(InsertRowsRequest)       returns (InsertRowsResponse);
   rpc RemoveRows(RemoveRowsRequest)       returns (RemoveRowsResponse);
@@ -2773,7 +2787,7 @@ service VolvoxGridService {
 
   // ── Selection ──
   rpc Select(SelectRequest)               returns (SelectResponse);
-  rpc GetSelection(GridHandle)            returns (SelectionState);
+  rpc GetSelection(GetSelectionRequest)   returns (SelectionState);
   rpc ShowCell(ShowCellRequest)           returns (ShowCellResponse);
   rpc SetTopRow(SetRowRequest)            returns (SetTopRowResponse);
   rpc SetLeftCol(SetColRequest)           returns (SetLeftColResponse);
@@ -2792,8 +2806,8 @@ service VolvoxGridService {
   rpc GetMergedRange(GetMergedRangeRequest) returns (CellRange);
   rpc MergeCells(MergeCellsRequest)       returns (MergeCellsResponse);
   rpc UnmergeCells(UnmergeCellsRequest)   returns (UnmergeCellsResponse);
-  rpc GetMergedRegions(GridHandle)        returns (MergedRegionsResponse);
-  rpc GetMemoryUsage(GridHandle)          returns (MemoryUsageResponse);
+  rpc GetMergedRegions(GetMergedRegionsRequest) returns (MergedRegionsResponse);
+  rpc GetMemoryUsage(GetMemoryUsageRequest) returns (MemoryUsageResponse);
 
   // ── Clipboard ──
   rpc Clipboard(ClipboardCommand)         returns (ClipboardResponse);
@@ -2806,7 +2820,7 @@ service VolvoxGridService {
   // ── Render Control ──
   rpc ResizeViewport(ResizeViewportRequest) returns (ResizeViewportResponse);
   rpc SetRedraw(SetRedrawRequest)         returns (SetRedrawResponse);
-  rpc Refresh(GridHandle)                 returns (RefreshResponse);
+  rpc Refresh(RefreshRequest)             returns (RefreshResponse);
 
   // ── Demo ──
   rpc LoadDemo(LoadDemoRequest)           returns (LoadDemoResponse);
@@ -2818,5 +2832,5 @@ service VolvoxGridService {
   rpc RenderSession(stream RenderInput)   returns (stream RenderOutput);
   // Server-streaming: engine pushes semantic grid events.
   // The plugin polls the engine's EventQueue with a 50 ms interval.
-  rpc EventStream(GridHandle)             returns (stream GridEvent);
+  rpc EventStream(EventStreamRequest)     returns (stream GridEvent);
 }

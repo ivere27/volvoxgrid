@@ -1856,7 +1856,7 @@ mod tests {
             let stream_ref = &stream;
             let handle = scope.spawn(move || {
                 plugin_for_stream
-                    .event_stream(pb::GridHandle { id: grid_id }, stream_ref)
+                    .event_stream(pb::EventStreamRequest { grid_id }, stream_ref)
                     .expect("event stream should exit cleanly");
             });
 
@@ -1922,7 +1922,7 @@ mod tests {
             let stream_ref = &stream;
             let handle = scope.spawn(move || {
                 plugin_for_stream
-                    .event_stream(pb::GridHandle { id: grid_id }, stream_ref)
+                    .event_stream(pb::EventStreamRequest { grid_id }, stream_ref)
                     .expect("event stream should exit cleanly");
             });
 
@@ -2015,7 +2015,7 @@ mod tests {
             let stream_ref = &stream;
             let handle = scope.spawn(move || {
                 plugin_for_stream
-                    .event_stream(pb::GridHandle { id: grid_id }, stream_ref)
+                    .event_stream(pb::EventStreamRequest { grid_id }, stream_ref)
                     .expect("event stream should exit cleanly");
             });
 
@@ -4270,14 +4270,14 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         }
 
         Ok(CreateResponse {
-            handle: Some(GridHandle { id }),
+            grid_id: id,
             warnings: Vec::new(),
         })
     }
 
-    fn destroy(&self, request: GridHandle) -> PluginResult<DestroyResponse> {
-        self.clear_grid_state(request.id);
-        self.manager().destroy_grid(request.id);
+    fn destroy(&self, request: DestroyRequest) -> PluginResult<DestroyResponse> {
+        self.clear_grid_state(request.grid_id);
+        self.manager().destroy_grid(request.grid_id);
         Ok(DestroyResponse {})
     }
 
@@ -4292,8 +4292,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(ConfigureResponse {})
     }
 
-    fn get_config(&self, request: GridHandle) -> PluginResult<GridConfig> {
-        self.with_grid(request.id, |grid| grid.get_config())
+    fn get_config(&self, request: GetConfigRequest) -> PluginResult<GridConfig> {
+        self.with_grid(request.grid_id, |grid| grid.get_config())
     }
 
     fn load_font_data(&self, request: LoadFontDataRequest) -> PluginResult<LoadFontDataResponse> {
@@ -4332,8 +4332,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(DefineColumnsResponse {})
     }
 
-    fn get_schema(&self, request: GridHandle) -> PluginResult<DefineColumnsRequest> {
-        self.with_grid(request.id, |grid| grid.get_schema(request.id))
+    fn get_schema(&self, request: GetSchemaRequest) -> PluginResult<DefineColumnsRequest> {
+        self.with_grid(request.grid_id, |grid| grid.get_schema(request.grid_id))
     }
 
     fn define_rows(&self, request: DefineRowsRequest) -> PluginResult<DefineRowsResponse> {
@@ -4505,8 +4505,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         })
     }
 
-    fn get_selection(&self, request: GridHandle) -> PluginResult<SelectionState> {
-        self.with_grid(request.id, selection_state_proto)
+    fn get_selection(&self, request: GetSelectionRequest) -> PluginResult<SelectionState> {
+        self.with_grid(request.grid_id, selection_state_proto)
     }
 
     fn show_cell(&self, request: ShowCellRequest) -> PluginResult<ShowCellResponse> {
@@ -4942,8 +4942,11 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         })
     }
 
-    fn get_merged_regions(&self, request: GridHandle) -> PluginResult<MergedRegionsResponse> {
-        self.with_grid(request.id, |grid| MergedRegionsResponse {
+    fn get_merged_regions(
+        &self,
+        request: GetMergedRegionsRequest,
+    ) -> PluginResult<MergedRegionsResponse> {
+        self.with_grid(request.grid_id, |grid| MergedRegionsResponse {
             ranges: grid
                 .merged_regions
                 .all_ranges()
@@ -4958,8 +4961,11 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         })
     }
 
-    fn get_memory_usage(&self, request: GridHandle) -> PluginResult<MemoryUsageResponse> {
-        self.with_grid(request.id, |grid| grid.memory_usage())
+    fn get_memory_usage(
+        &self,
+        request: GetMemoryUsageRequest,
+    ) -> PluginResult<MemoryUsageResponse> {
+        self.with_grid(request.grid_id, |grid| grid.memory_usage())
     }
 
     // ── Clipboard ──
@@ -5089,8 +5095,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(SetRedrawResponse {})
     }
 
-    fn refresh(&self, request: GridHandle) -> PluginResult<RefreshResponse> {
-        self.with_grid(request.id, |grid| {
+    fn refresh(&self, request: RefreshRequest) -> PluginResult<RefreshResponse> {
+        self.with_grid(request.grid_id, |grid| {
             grid.layout.invalidate();
             grid.mark_dirty();
         })?;
@@ -6137,10 +6143,10 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
     fn event_stream(
         &self,
-        request: GridHandle,
+        request: EventStreamRequest,
         stream: &dyn PluginStreamSender<GridEvent>,
     ) -> PluginResult<()> {
-        let grid_id = request.id;
+        let grid_id = request.grid_id;
         let (grid_arc, _event_cv, destroyed) = self
             .manager()
             .get_grid_waiter(grid_id)

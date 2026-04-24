@@ -75,12 +75,12 @@ namespace VolvoxGrid.DotNet.Internal
             };
             byte[] response = InvokeUnary(CreateMethod, req.ToByteArray());
             var resp = CreateResponse.ParseFrom(response);
-            return resp.Handle != null ? resp.Handle.Id : 0;
+            return resp.GridId;
         }
 
         public void DestroyGrid(long gridId)
         {
-            InvokeUnary(DestroyMethod, new GridHandle { Id = gridId }.ToByteArray());
+            InvokeUnary(DestroyMethod, new DestroyRequest { GridId = gridId }.ToByteArray());
         }
 
         public void ConfigureGrid(long gridId, GridConfig config)
@@ -91,7 +91,7 @@ namespace VolvoxGrid.DotNet.Internal
 
         public GridConfig GetConfig(long gridId)
         {
-            byte[] response = InvokeUnary(GetConfigMethod, new GridHandle { Id = gridId }.ToByteArray());
+            byte[] response = InvokeUnary(GetConfigMethod, new GetConfigRequest { GridId = gridId }.ToByteArray());
             return GridConfig.ParseFrom(response);
         }
 
@@ -196,7 +196,7 @@ namespace VolvoxGrid.DotNet.Internal
 
         public SelectionState GetSelection(long gridId)
         {
-            byte[] response = InvokeUnary(GetSelectionMethod, new GridHandle { Id = gridId }.ToByteArray());
+            byte[] response = InvokeUnary(GetSelectionMethod, new GetSelectionRequest { GridId = gridId }.ToByteArray());
             return SelectionState.ParseFrom(response);
         }
 
@@ -313,7 +313,7 @@ namespace VolvoxGrid.DotNet.Internal
 
         public List<CellRange> GetMergedRegions(long gridId)
         {
-            byte[] response = InvokeUnary(GetMergedRegionsMethod, new GridHandle { Id = gridId }.ToByteArray());
+            byte[] response = InvokeUnary(GetMergedRegionsMethod, new GetMergedRegionsRequest { GridId = gridId }.ToByteArray());
             return CopyList(MergedRegionsResponse.ParseFrom(response).Ranges);
         }
 
@@ -467,7 +467,7 @@ namespace VolvoxGrid.DotNet.Internal
 
         public void Refresh(long gridId)
         {
-            InvokeUnary(RefreshMethod, new GridHandle { Id = gridId }.ToByteArray());
+            InvokeUnary(RefreshMethod, new RefreshRequest { GridId = gridId }.ToByteArray());
         }
 
         public SynurangReflectionStream OpenRenderSession()
@@ -478,7 +478,7 @@ namespace VolvoxGrid.DotNet.Internal
         public SynurangReflectionStream OpenEventStream(long gridId)
         {
             var stream = _host.OpenStream(ServiceName, EventStreamMethod);
-            stream.Send(new GridHandle { Id = gridId }.ToByteArray());
+            stream.Send(new EventStreamRequest { GridId = gridId }.ToByteArray());
             stream.CloseSend();
             return stream;
         }

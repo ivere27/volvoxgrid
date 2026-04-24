@@ -24,17 +24,17 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
   $async.Future<$0.CreateResponse> create(
       $pb.ServerContext ctx, $0.CreateRequest request);
   $async.Future<$0.DestroyResponse> destroy(
-      $pb.ServerContext ctx, $0.GridHandle request);
+      $pb.ServerContext ctx, $0.DestroyRequest request);
   $async.Future<$0.ConfigureResponse> configure(
       $pb.ServerContext ctx, $0.ConfigureRequest request);
   $async.Future<$0.GridConfig> getConfig(
-      $pb.ServerContext ctx, $0.GridHandle request);
+      $pb.ServerContext ctx, $0.GetConfigRequest request);
   $async.Future<$0.LoadFontDataResponse> loadFontData(
       $pb.ServerContext ctx, $0.LoadFontDataRequest request);
   $async.Future<$0.DefineColumnsResponse> defineColumns(
       $pb.ServerContext ctx, $0.DefineColumnsRequest request);
   $async.Future<$0.DefineColumnsRequest> getSchema(
-      $pb.ServerContext ctx, $0.GridHandle request);
+      $pb.ServerContext ctx, $0.GetSchemaRequest request);
   $async.Future<$0.DefineRowsResponse> defineRows(
       $pb.ServerContext ctx, $0.DefineRowsRequest request);
   $async.Future<$0.InsertRowsResponse> insertRows(
@@ -58,7 +58,7 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
   $async.Future<$0.SelectResponse> select(
       $pb.ServerContext ctx, $0.SelectRequest request);
   $async.Future<$0.SelectionState> getSelection(
-      $pb.ServerContext ctx, $0.GridHandle request);
+      $pb.ServerContext ctx, $0.GetSelectionRequest request);
   $async.Future<$0.ShowCellResponse> showCell(
       $pb.ServerContext ctx, $0.ShowCellRequest request);
   $async.Future<$0.SetTopRowResponse> setTopRow(
@@ -88,9 +88,9 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
   $async.Future<$0.UnmergeCellsResponse> unmergeCells(
       $pb.ServerContext ctx, $0.UnmergeCellsRequest request);
   $async.Future<$0.MergedRegionsResponse> getMergedRegions(
-      $pb.ServerContext ctx, $0.GridHandle request);
+      $pb.ServerContext ctx, $0.GetMergedRegionsRequest request);
   $async.Future<$0.MemoryUsageResponse> getMemoryUsage(
-      $pb.ServerContext ctx, $0.GridHandle request);
+      $pb.ServerContext ctx, $0.GetMemoryUsageRequest request);
   $async.Future<$0.ClipboardResponse> clipboard(
       $pb.ServerContext ctx, $0.ClipboardCommand request);
   $async.Future<$0.ExportResponse> export(
@@ -104,7 +104,7 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
   $async.Future<$0.SetRedrawResponse> setRedraw(
       $pb.ServerContext ctx, $0.SetRedrawRequest request);
   $async.Future<$0.RefreshResponse> refresh(
-      $pb.ServerContext ctx, $0.GridHandle request);
+      $pb.ServerContext ctx, $0.RefreshRequest request);
   $async.Future<$0.LoadDemoResponse> loadDemo(
       $pb.ServerContext ctx, $0.LoadDemoRequest request);
   $async.Future<$0.GetDemoDataResponse> getDemoData(
@@ -112,24 +112,24 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
   $async.Future<$0.RenderOutput> renderSession(
       $pb.ServerContext ctx, $0.RenderInput request);
   $async.Future<$0.GridEvent> eventStream(
-      $pb.ServerContext ctx, $0.GridHandle request);
+      $pb.ServerContext ctx, $0.EventStreamRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
       case 'Create':
         return $0.CreateRequest();
       case 'Destroy':
-        return $0.GridHandle();
+        return $0.DestroyRequest();
       case 'Configure':
         return $0.ConfigureRequest();
       case 'GetConfig':
-        return $0.GridHandle();
+        return $0.GetConfigRequest();
       case 'LoadFontData':
         return $0.LoadFontDataRequest();
       case 'DefineColumns':
         return $0.DefineColumnsRequest();
       case 'GetSchema':
-        return $0.GridHandle();
+        return $0.GetSchemaRequest();
       case 'DefineRows':
         return $0.DefineRowsRequest();
       case 'InsertRows':
@@ -153,7 +153,7 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       case 'Select':
         return $0.SelectRequest();
       case 'GetSelection':
-        return $0.GridHandle();
+        return $0.GetSelectionRequest();
       case 'ShowCell':
         return $0.ShowCellRequest();
       case 'SetTopRow':
@@ -183,9 +183,9 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       case 'UnmergeCells':
         return $0.UnmergeCellsRequest();
       case 'GetMergedRegions':
-        return $0.GridHandle();
+        return $0.GetMergedRegionsRequest();
       case 'GetMemoryUsage':
-        return $0.GridHandle();
+        return $0.GetMemoryUsageRequest();
       case 'Clipboard':
         return $0.ClipboardCommand();
       case 'Export':
@@ -199,7 +199,7 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       case 'SetRedraw':
         return $0.SetRedrawRequest();
       case 'Refresh':
-        return $0.GridHandle();
+        return $0.RefreshRequest();
       case 'LoadDemo':
         return $0.LoadDemoRequest();
       case 'GetDemoData':
@@ -207,7 +207,7 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       case 'RenderSession':
         return $0.RenderInput();
       case 'EventStream':
-        return $0.GridHandle();
+        return $0.EventStreamRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -219,17 +219,17 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       case 'Create':
         return create(ctx, request as $0.CreateRequest);
       case 'Destroy':
-        return destroy(ctx, request as $0.GridHandle);
+        return destroy(ctx, request as $0.DestroyRequest);
       case 'Configure':
         return configure(ctx, request as $0.ConfigureRequest);
       case 'GetConfig':
-        return getConfig(ctx, request as $0.GridHandle);
+        return getConfig(ctx, request as $0.GetConfigRequest);
       case 'LoadFontData':
         return loadFontData(ctx, request as $0.LoadFontDataRequest);
       case 'DefineColumns':
         return defineColumns(ctx, request as $0.DefineColumnsRequest);
       case 'GetSchema':
-        return getSchema(ctx, request as $0.GridHandle);
+        return getSchema(ctx, request as $0.GetSchemaRequest);
       case 'DefineRows':
         return defineRows(ctx, request as $0.DefineRowsRequest);
       case 'InsertRows':
@@ -253,7 +253,7 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       case 'Select':
         return select(ctx, request as $0.SelectRequest);
       case 'GetSelection':
-        return getSelection(ctx, request as $0.GridHandle);
+        return getSelection(ctx, request as $0.GetSelectionRequest);
       case 'ShowCell':
         return showCell(ctx, request as $0.ShowCellRequest);
       case 'SetTopRow':
@@ -283,9 +283,9 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       case 'UnmergeCells':
         return unmergeCells(ctx, request as $0.UnmergeCellsRequest);
       case 'GetMergedRegions':
-        return getMergedRegions(ctx, request as $0.GridHandle);
+        return getMergedRegions(ctx, request as $0.GetMergedRegionsRequest);
       case 'GetMemoryUsage':
-        return getMemoryUsage(ctx, request as $0.GridHandle);
+        return getMemoryUsage(ctx, request as $0.GetMemoryUsageRequest);
       case 'Clipboard':
         return clipboard(ctx, request as $0.ClipboardCommand);
       case 'Export':
@@ -299,7 +299,7 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       case 'SetRedraw':
         return setRedraw(ctx, request as $0.SetRedrawRequest);
       case 'Refresh':
-        return refresh(ctx, request as $0.GridHandle);
+        return refresh(ctx, request as $0.RefreshRequest);
       case 'LoadDemo':
         return loadDemo(ctx, request as $0.LoadDemoRequest);
       case 'GetDemoData':
@@ -307,7 +307,7 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       case 'RenderSession':
         return renderSession(ctx, request as $0.RenderInput);
       case 'EventStream':
-        return eventStream(ctx, request as $0.GridHandle);
+        return eventStream(ctx, request as $0.EventStreamRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

@@ -786,7 +786,7 @@ impl VolvoxServiceClient {
     fn get_config(&self, grid_id: i64) -> Result<pb::GridConfig, String> {
         self.invoke(
             "/volvoxgrid.v1.VolvoxGridService/GetConfig",
-            &pb::GridHandle { id: grid_id },
+            &pb::GetConfigRequest { grid_id },
         )
     }
 
@@ -1338,11 +1338,10 @@ impl BenchSession {
         let height = host.height();
         let client = VolvoxServiceClient::load_default()?;
         let create = client.create_grid(width, height, case.renderer, case.scroll_blit)?;
-        let grid_id = create
-            .handle
-            .as_ref()
-            .map(|h| h.id)
-            .ok_or_else(|| "create_grid returned no handle".to_string())?;
+        let grid_id = create.grid_id;
+        if grid_id <= 0 {
+            return Err("create_grid returned no grid id".to_string());
+        }
 
         apply_initial_config_for_grid(&client, grid_id, case.renderer, case.scroll_blit)?;
         client.resize_viewport(grid_id, width, height)?;

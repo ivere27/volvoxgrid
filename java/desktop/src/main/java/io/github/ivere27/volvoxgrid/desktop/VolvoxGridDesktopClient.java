@@ -35,7 +35,6 @@ import io.github.ivere27.volvoxgrid.MergeCellsRequest;
 import io.github.ivere27.volvoxgrid.UnmergeCellsRequest;
 import io.github.ivere27.volvoxgrid.MergedRegionsResponse;
 import io.github.ivere27.volvoxgrid.GridEvent;
-import io.github.ivere27.volvoxgrid.GridHandle;
 import io.github.ivere27.volvoxgrid.LoadDataRequest;
 import io.github.ivere27.volvoxgrid.LoadDataResult;
 import io.github.ivere27.volvoxgrid.InsertRowsRequest;
@@ -126,7 +125,7 @@ public final class VolvoxGridDesktopClient {
         return unary(CREATE, request, CreateResponse.parser());
     }
 
-    public DestroyResponse destroy(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
+    public DestroyResponse destroy(DestroyRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         return unary(DESTROY, request, DestroyResponse.parser());
     }
 
@@ -134,7 +133,7 @@ public final class VolvoxGridDesktopClient {
         return unary(CONFIGURE, request, ConfigureResponse.parser());
     }
 
-    public GridConfig getConfig(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
+    public GridConfig getConfig(GetConfigRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         return unary(GET_CONFIG, request, GridConfig.parser());
     }
 
@@ -166,7 +165,7 @@ public final class VolvoxGridDesktopClient {
         return unary(UPDATE_CELLS, request, WriteResult.parser());
     }
 
-    public DefineColumnsRequest getSchema(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
+    public DefineColumnsRequest getSchema(GetSchemaRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         return unary(GET_SCHEMA, request, DefineColumnsRequest.parser());
     }
 
@@ -186,7 +185,7 @@ public final class VolvoxGridDesktopClient {
         return unary(SELECT, request, SelectResponse.parser());
     }
 
-    public SelectionState getSelection(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
+    public SelectionState getSelection(GetSelectionRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         return unary(GET_SELECTION, request, SelectionState.parser());
     }
 
@@ -246,7 +245,7 @@ public final class VolvoxGridDesktopClient {
         return unary(UNMERGE_CELLS, request, UnmergeCellsResponse.parser());
     }
 
-    public MergedRegionsResponse getMergedRegions(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
+    public MergedRegionsResponse getMergedRegions(GetMergedRegionsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         return unary(GET_MERGED_REGIONS, request, MergedRegionsResponse.parser());
     }
 
@@ -278,7 +277,7 @@ public final class VolvoxGridDesktopClient {
         return unary(SET_REDRAW, request, SetRedrawResponse.parser());
     }
 
-    public RefreshResponse refresh(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
+    public RefreshResponse refresh(RefreshRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         return unary(REFRESH, request, RefreshResponse.parser());
     }
 
@@ -295,7 +294,7 @@ public final class VolvoxGridDesktopClient {
         return new RenderSession(bridge.openStream(SERVICE, RENDER_SESSION));
     }
 
-    public EventStream openEventStream(GridHandle request) throws SynurangDesktopBridge.SynurangBridgeException {
+    public EventStream openEventStream(EventStreamRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         SynurangDesktopBridge.PluginStreamBridge stream = bridge.openStream(SERVICE, EVENT_STREAM);
         stream.send(request.toByteArray());
         stream.closeSend();

@@ -7,6 +7,7 @@ import io.github.ivere27.volvoxgrid.CreateResponse;
 import io.github.ivere27.volvoxgrid.CellRange;
 import io.github.ivere27.volvoxgrid.ClipboardResponse;
 import io.github.ivere27.volvoxgrid.CompareResponse;
+import io.github.ivere27.volvoxgrid.DestroyRequest;
 import io.github.ivere27.volvoxgrid.EditCancel;
 import io.github.ivere27.volvoxgrid.EditCommand;
 import io.github.ivere27.volvoxgrid.EditCommit;
@@ -18,9 +19,11 @@ import io.github.ivere27.volvoxgrid.EditState;
 import io.github.ivere27.volvoxgrid.EventDecision;
 import io.github.ivere27.volvoxgrid.FramePacingMode;
 import io.github.ivere27.volvoxgrid.FrameDone;
+import io.github.ivere27.volvoxgrid.EventStreamRequest;
+import io.github.ivere27.volvoxgrid.GetConfigRequest;
+import io.github.ivere27.volvoxgrid.GetSelectionRequest;
 import io.github.ivere27.volvoxgrid.GridConfig;
 import io.github.ivere27.volvoxgrid.GridEvent;
-import io.github.ivere27.volvoxgrid.GridHandle;
 import io.github.ivere27.volvoxgrid.LayoutConfig;
 import io.github.ivere27.volvoxgrid.PointerEvent;
 import io.github.ivere27.volvoxgrid.RenderConfig;
@@ -511,7 +514,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                 .setConfig(config)
                 .build()
         );
-        this.gridId = response.getHandle().getId();
+        this.gridId = response.getGridId();
 
         displayTarget = createFrameTarget(w, h);
         safeResizeViewport(w, h);
@@ -1594,7 +1597,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         }
 
         try {
-            SelectionState selection = c.getSelection(GridHandle.newBuilder().setId(id).build());
+            SelectionState selection = c.getSelection(GetSelectionRequest.newBuilder().setGridId(id).build());
             if (selection == null || selection.getActiveRow() < 0 || selection.getActiveCol() < 0) {
                 return null;
             }
@@ -1905,7 +1908,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
     private SelectionState updateMouseSelectionState(MouseEvent e) throws SynurangDesktopBridge.SynurangBridgeException {
         sendPointer(PointerEvent.Type.MOVE, e.getX(), e.getY(), mapModifierFlags(e.getModifiersEx()), 0, false);
-        return client.getSelection(GridHandle.newBuilder().setId(gridId).build());
+        return client.getSelection(GetSelectionRequest.newBuilder().setGridId(gridId).build());
     }
 
     private boolean hasValidMouseCell(SelectionState state) {
@@ -2383,7 +2386,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         Thread t = new Thread(() -> {
             VolvoxGridDesktopClient.EventStream stream = null;
             try {
-                stream = c.openEventStream(GridHandle.newBuilder().setId(gridId).build());
+                stream = c.openEventStream(EventStreamRequest.newBuilder().setGridId(gridId).build());
                 eventStream = stream;
 
                 while (running.get()) {
@@ -2668,7 +2671,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
             return;
         }
         try {
-            GridConfig config = c.getConfig(GridHandle.newBuilder().setId(id).build());
+            GridConfig config = c.getConfig(GetConfigRequest.newBuilder().setGridId(id).build());
             RenderConfig rendering = config.getRendering();
             framePacingModeValue = rendering.hasFramePacingMode()
                 ? rendering.getFramePacingModeValue()
@@ -2880,7 +2883,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
         if (destroyGrid && gridId != 0L && client != null) {
             try {
-                client.destroy(GridHandle.newBuilder().setId(gridId).build());
+                client.destroy(DestroyRequest.newBuilder().setGridId(gridId).build());
             } catch (Exception e) {
                 LOG.log(Level.FINER, "Destroy grid failed", e);
             }

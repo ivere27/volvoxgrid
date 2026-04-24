@@ -162,7 +162,7 @@ class _DeferredPointerCompletion {
 /// Requires a [VolvoxGridController] that has already been created via
 /// [VolvoxGridController.create].
 class VolvoxGridWidget extends StatefulWidget {
-  /// Controller that owns the native grid handle.
+  /// Controller that owns the native grid id.
   final VolvoxGridController controller;
 
   /// Optional callback invoked whenever the active cell selection changes.

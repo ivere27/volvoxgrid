@@ -5207,17 +5207,17 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         }
         let _ = mgr.with_grid(id, replay_loaded_fonts_into_grid);
         Ok(CreateResponse {
-            handle: Some(GridHandle { id }),
+            grid_id: id,
             warnings: Vec::new(),
         })
     }
 
-    fn destroy(&self, request: GridHandle) -> Result<DestroyResponse, String> {
+    fn destroy(&self, request: DestroyRequest) -> Result<DestroyResponse, String> {
         let mgr = MANAGER.lock().unwrap();
         if let Some(mgr) = mgr.as_ref() {
-            mgr.destroy_grid(request.id);
+            mgr.destroy_grid(request.grid_id);
         }
-        LAST_MEM_CALC_MS.lock().unwrap().remove(&request.id);
+        LAST_MEM_CALC_MS.lock().unwrap().remove(&request.grid_id);
         Ok(DestroyResponse {})
     }
 
@@ -5230,8 +5230,8 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         Ok(ConfigureResponse {})
     }
 
-    fn get_config(&self, request: GridHandle) -> Result<GridConfig, String> {
-        wasm_with_grid(request.id, |grid| grid.get_config())
+    fn get_config(&self, request: GetConfigRequest) -> Result<GridConfig, String> {
+        wasm_with_grid(request.grid_id, |grid| grid.get_config())
     }
 
     fn load_font_data(&self, request: LoadFontDataRequest) -> Result<LoadFontDataResponse, String> {
@@ -5261,8 +5261,8 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         Ok(DefineColumnsResponse {})
     }
 
-    fn get_schema(&self, request: GridHandle) -> Result<DefineColumnsRequest, String> {
-        wasm_with_grid(request.id, |grid| grid.get_schema(request.id))
+    fn get_schema(&self, request: GetSchemaRequest) -> Result<DefineColumnsRequest, String> {
+        wasm_with_grid(request.grid_id, |grid| grid.get_schema(request.grid_id))
     }
 
     fn define_rows(&self, request: DefineRowsRequest) -> Result<DefineRowsResponse, String> {
@@ -5462,8 +5462,8 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         })
     }
 
-    fn get_selection(&self, request: GridHandle) -> Result<SelectionState, String> {
-        wasm_with_grid(request.id, selection_state_proto)
+    fn get_selection(&self, request: GetSelectionRequest) -> Result<SelectionState, String> {
+        wasm_with_grid(request.grid_id, selection_state_proto)
     }
 
     fn edit(&self, request: EditCommand) -> Result<EditState, String> {
@@ -5818,8 +5818,11 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         })
     }
 
-    fn get_merged_regions(&self, request: GridHandle) -> Result<MergedRegionsResponse, String> {
-        wasm_with_grid(request.id, |grid| MergedRegionsResponse {
+    fn get_merged_regions(
+        &self,
+        request: GetMergedRegionsRequest,
+    ) -> Result<MergedRegionsResponse, String> {
+        wasm_with_grid(request.grid_id, |grid| MergedRegionsResponse {
             ranges: grid
                 .merged_regions
                 .all_ranges()
@@ -5834,8 +5837,11 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         })
     }
 
-    fn get_memory_usage(&self, request: GridHandle) -> Result<MemoryUsageResponse, String> {
-        wasm_with_grid(request.id, |grid| grid.memory_usage())
+    fn get_memory_usage(
+        &self,
+        request: GetMemoryUsageRequest,
+    ) -> Result<MemoryUsageResponse, String> {
+        wasm_with_grid(request.grid_id, |grid| grid.memory_usage())
     }
 
     fn clipboard(&self, request: ClipboardCommand) -> Result<ClipboardResponse, String> {
@@ -5985,8 +5991,8 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         Ok(SetRedrawResponse {})
     }
 
-    fn refresh(&self, request: GridHandle) -> Result<RefreshResponse, String> {
-        wasm_with_grid(request.id, |grid| {
+    fn refresh(&self, request: RefreshRequest) -> Result<RefreshResponse, String> {
+        wasm_with_grid(request.grid_id, |grid| {
             grid.mark_dirty();
         })?;
         Ok(RefreshResponse {})
@@ -6179,12 +6185,13 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
 
     fn event_stream(
         &self,
-        request: GridHandle,
+        request: EventStreamRequest,
         stream: &dyn volvoxgrid_wasm::PluginStreamSender<GridEvent>,
     ) -> Result<(), String> {
-        let events = wasm_with_grid(request.id, |grid| grid.events.drain())?;
+        let grid_id = request.grid_id;
+        let events = wasm_with_grid(grid_id, |grid| grid.events.drain())?;
         for evt in events {
-            let proto_evt = engine_event_to_proto(request.id, evt.event_id, evt.data);
+            let proto_evt = engine_event_to_proto(grid_id, evt.event_id, evt.data);
             if proto_evt.event.is_none() {
                 continue;
             }

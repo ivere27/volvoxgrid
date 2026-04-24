@@ -284,7 +284,7 @@ public final class VolvoxGridDesktopTuiExample {
                 .setConfig(config)
                 .build()
         );
-        return new VolvoxGridDesktopController(client, response.getHandle().getId());
+        return new VolvoxGridDesktopController(client, response.getGridId());
     }
 
     private static void loadDemo(VolvoxGridDesktopController controller, DemoKind demo)

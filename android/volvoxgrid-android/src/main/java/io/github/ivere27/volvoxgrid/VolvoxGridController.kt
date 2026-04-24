@@ -87,11 +87,24 @@ class VolvoxGridController(
                 )
                 .build()
             val response = service.Create(req)
-            return VolvoxGridController(service, response.handle.id)
+            return VolvoxGridController(service, response.gridId)
         }
     }
 
-    private fun handle(): GridHandle = GridHandle.newBuilder().setId(gridId).build()
+    private fun destroyRequest(): DestroyRequest =
+        DestroyRequest.newBuilder().setGridId(gridId).build()
+
+    private fun getConfigRequest(): GetConfigRequest =
+        GetConfigRequest.newBuilder().setGridId(gridId).build()
+
+    private fun getSelectionRequest(): GetSelectionRequest =
+        GetSelectionRequest.newBuilder().setGridId(gridId).build()
+
+    private fun refreshRequest(): RefreshRequest =
+        RefreshRequest.newBuilder().setGridId(gridId).build()
+
+    private fun eventStreamRequest(): EventStreamRequest =
+        EventStreamRequest.newBuilder().setGridId(gridId).build()
 
     private fun buildSingleRangeSelectRequest(
         activeRow: Int,
@@ -158,11 +171,11 @@ class VolvoxGridController(
     }
 
     fun getConfig(): GridConfig {
-        return service.GetConfig(handle())
+        return service.GetConfig(getConfigRequest())
     }
 
     fun destroy() {
-        service.Destroy(handle())
+        service.Destroy(destroyRequest())
     }
 
     // =========================================================================
@@ -415,7 +428,7 @@ class VolvoxGridController(
     }
 
     fun setText(text: String) {
-        val sel = service.GetSelection(handle())
+        val sel = service.GetSelection(getSelectionRequest())
         setCellText(sel.activeRow, sel.activeCol, text)
     }
 
@@ -432,7 +445,7 @@ class VolvoxGridController(
     }
 
     fun getText(): String {
-        val sel = service.GetSelection(handle())
+        val sel = service.GetSelection(getSelectionRequest())
         return getCellText(sel.activeRow, sel.activeCol)
     }
 
@@ -545,22 +558,22 @@ class VolvoxGridController(
     // Selection
     // =========================================================================
 
-    override fun cursorRow(): Int = service.GetSelection(handle()).activeRow
+    override fun cursorRow(): Int = service.GetSelection(getSelectionRequest()).activeRow
 
     override fun setCursorRow(value: Int) {
         val currentCol = try {
-            service.GetSelection(handle()).activeCol
+            service.GetSelection(getSelectionRequest()).activeCol
         } catch (_: Exception) {
             0
         }
         service.Select(buildSingleRangeSelectRequest(value, currentCol, value, currentCol))
     }
 
-    override fun cursorCol(): Int = service.GetSelection(handle()).activeCol
+    override fun cursorCol(): Int = service.GetSelection(getSelectionRequest()).activeCol
 
     override fun setCursorCol(value: Int) {
         val currentRow = try {
-            service.GetSelection(handle()).activeRow
+            service.GetSelection(getSelectionRequest()).activeRow
         } catch (_: Exception) {
             0
         }
@@ -594,7 +607,7 @@ class VolvoxGridController(
     }
 
     fun selectionState(): SelectionState {
-        return service.GetSelection(handle())
+        return service.GetSelection(getSelectionRequest())
     }
 
     override fun getSelection(): GridSelection {
@@ -683,7 +696,7 @@ class VolvoxGridController(
     }
 
     override fun topRow(): Int {
-        return service.GetSelection(handle()).topRow
+        return service.GetSelection(getSelectionRequest()).topRow
     }
 
     override fun setLeftCol(value: Int) {
@@ -696,7 +709,7 @@ class VolvoxGridController(
     }
 
     override fun leftCol(): Int {
-        return service.GetSelection(handle()).leftCol
+        return service.GetSelection(getSelectionRequest()).leftCol
     }
 
     // =========================================================================
@@ -820,8 +833,8 @@ class VolvoxGridController(
 
     fun getMergedRegions(): MergedRegionsResponse {
         return service.GetMergedRegions(
-            GridHandle.newBuilder()
-                .setId(gridId)
+            GetMergedRegionsRequest.newBuilder()
+                .setGridId(gridId)
                 .build()
         )
     }
@@ -1259,7 +1272,7 @@ class VolvoxGridController(
     }
 
     override fun refresh() {
-        service.Refresh(handle())
+        service.Refresh(refreshRequest())
     }
 
     // =========================================================================
@@ -1501,7 +1514,7 @@ class VolvoxGridController(
     }
 
     fun eventStream(): Iterator<GridEvent> {
-        return service.EventStream(handle())
+        return service.EventStream(eventStreamRequest())
     }
 
     // =========================================================================

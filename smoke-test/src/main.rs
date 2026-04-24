@@ -56,7 +56,7 @@ fn main() {
     let plugin = PluginHost::load(&plugin_path).expect("Failed to load plugin");
     println!("Plugin loaded successfully.");
 
-    // 1. Create — returns CreateResponse with GridHandle
+    // 1. Create — returns CreateResponse with grid_id
     let req = CreateRequest {
         viewport_width: 800,
         viewport_height: 600,
@@ -99,15 +99,16 @@ fn main() {
         &req.encode_to_vec(),
     );
     let create = CreateResponse::decode(resp_bytes.as_slice()).expect("decode CreateResponse");
-    let grid_id = create.handle.expect("create handle should be present").id;
+    let grid_id = create.grid_id;
+    assert!(grid_id > 0, "create should return a positive grid_id");
     println!("Created grid: id={}", grid_id);
 
     // 2. GetConfig — verify rows/cols
-    let handle = GridHandle { id: grid_id };
+    let get_config = GetConfigRequest { grid_id };
     let resp_bytes = invoke(
         &plugin,
         "/volvoxgrid.v1.VolvoxGridService/GetConfig",
-        &handle.encode_to_vec(),
+        &get_config.encode_to_vec(),
     );
     let config = GridConfig::decode(resp_bytes.as_slice()).unwrap();
     let layout = config.layout.expect("layout should be present");
@@ -317,11 +318,11 @@ fn main() {
     println!("Selection set: rows 2-5.");
 
     // 10. Destroy
-    let handle = GridHandle { id: grid_id };
+    let destroy = DestroyRequest { grid_id };
     invoke(
         &plugin,
         "/volvoxgrid.v1.VolvoxGridService/Destroy",
-        &handle.encode_to_vec(),
+        &destroy.encode_to_vec(),
     );
     println!("Grid destroyed.");
 

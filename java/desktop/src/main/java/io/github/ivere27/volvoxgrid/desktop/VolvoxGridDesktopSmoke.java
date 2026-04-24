@@ -5,9 +5,9 @@ import io.github.ivere27.volvoxgrid.CellValue;
 import io.github.ivere27.volvoxgrid.CellsResponse;
 import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.CreateResponse;
+import io.github.ivere27.volvoxgrid.DestroyRequest;
 import io.github.ivere27.volvoxgrid.GetCellsRequest;
 import io.github.ivere27.volvoxgrid.GridConfig;
-import io.github.ivere27.volvoxgrid.GridHandle;
 import io.github.ivere27.volvoxgrid.LayoutConfig;
 import io.github.ivere27.volvoxgrid.UpdateCellsRequest;
 
@@ -53,7 +53,7 @@ public final class VolvoxGridDesktopSmoke {
                     .setConfig(config)
                     .build()
             );
-            gridId = response.getHandle().getId();
+            gridId = response.getGridId();
 
             client.updateCells(
                 UpdateCellsRequest.newBuilder()
@@ -86,7 +86,7 @@ public final class VolvoxGridDesktopSmoke {
                 throw new IllegalStateException("Unexpected cell text: " + text);
             }
 
-            client.destroy(GridHandle.newBuilder().setId(gridId).build());
+            client.destroy(DestroyRequest.newBuilder().setGridId(gridId).build());
             gridId = 0L;
             bridge.close();
             bridge = null;
@@ -99,7 +99,7 @@ public final class VolvoxGridDesktopSmoke {
             try {
                 if (gridId != 0L && bridge != null) {
                     VolvoxGridDesktopClient client = new VolvoxGridDesktopClient(bridge);
-                    client.destroy(GridHandle.newBuilder().setId(gridId).build());
+                    client.destroy(DestroyRequest.newBuilder().setGridId(gridId).build());
                 }
             } catch (Exception ignored) {
                 // best effort

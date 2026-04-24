@@ -489,7 +489,9 @@ final hierarchyJson = await controller.getDemoData('hierarchy');   // pair with 
 import 'package:volvoxgrid/volvoxgrid_ffi.dart';
 
 // All generated protobuf messages and VolvoxGridServiceFfi are available.
-final resp = await VolvoxGridServiceFfi.GetConfig(handle);
+final resp = await VolvoxGridServiceFfi.GetConfig(
+  GetConfigRequest()..gridId = controller.gridId,
+);
 ```
 
 ## License

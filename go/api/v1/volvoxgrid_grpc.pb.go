@@ -134,14 +134,14 @@ const (
 type VolvoxGridServiceClient interface {
 	// ── Lifecycle ──
 	Create(ctx context.Context, in *CreateRequest, opts ...grpc.CallOption) (*CreateResponse, error)
-	Destroy(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*DestroyResponse, error)
+	Destroy(ctx context.Context, in *DestroyRequest, opts ...grpc.CallOption) (*DestroyResponse, error)
 	// ── Configuration ──
 	Configure(ctx context.Context, in *ConfigureRequest, opts ...grpc.CallOption) (*ConfigureResponse, error)
-	GetConfig(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*GridConfig, error)
+	GetConfig(ctx context.Context, in *GetConfigRequest, opts ...grpc.CallOption) (*GridConfig, error)
 	LoadFontData(ctx context.Context, in *LoadFontDataRequest, opts ...grpc.CallOption) (*LoadFontDataResponse, error)
 	// ── Structure ──
 	DefineColumns(ctx context.Context, in *DefineColumnsRequest, opts ...grpc.CallOption) (*DefineColumnsResponse, error)
-	GetSchema(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*DefineColumnsRequest, error)
+	GetSchema(ctx context.Context, in *GetSchemaRequest, opts ...grpc.CallOption) (*DefineColumnsRequest, error)
 	DefineRows(ctx context.Context, in *DefineRowsRequest, opts ...grpc.CallOption) (*DefineRowsResponse, error)
 	InsertRows(ctx context.Context, in *InsertRowsRequest, opts ...grpc.CallOption) (*InsertRowsResponse, error)
 	RemoveRows(ctx context.Context, in *RemoveRowsRequest, opts ...grpc.CallOption) (*RemoveRowsResponse, error)
@@ -155,7 +155,7 @@ type VolvoxGridServiceClient interface {
 	Clear(ctx context.Context, in *ClearRequest, opts ...grpc.CallOption) (*ClearResponse, error)
 	// ── Selection ──
 	Select(ctx context.Context, in *SelectRequest, opts ...grpc.CallOption) (*SelectResponse, error)
-	GetSelection(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*SelectionState, error)
+	GetSelection(ctx context.Context, in *GetSelectionRequest, opts ...grpc.CallOption) (*SelectionState, error)
 	ShowCell(ctx context.Context, in *ShowCellRequest, opts ...grpc.CallOption) (*ShowCellResponse, error)
 	SetTopRow(ctx context.Context, in *SetRowRequest, opts ...grpc.CallOption) (*SetTopRowResponse, error)
 	SetLeftCol(ctx context.Context, in *SetColRequest, opts ...grpc.CallOption) (*SetLeftColResponse, error)
@@ -172,8 +172,8 @@ type VolvoxGridServiceClient interface {
 	GetMergedRange(ctx context.Context, in *GetMergedRangeRequest, opts ...grpc.CallOption) (*CellRange, error)
 	MergeCells(ctx context.Context, in *MergeCellsRequest, opts ...grpc.CallOption) (*MergeCellsResponse, error)
 	UnmergeCells(ctx context.Context, in *UnmergeCellsRequest, opts ...grpc.CallOption) (*UnmergeCellsResponse, error)
-	GetMergedRegions(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*MergedRegionsResponse, error)
-	GetMemoryUsage(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*MemoryUsageResponse, error)
+	GetMergedRegions(ctx context.Context, in *GetMergedRegionsRequest, opts ...grpc.CallOption) (*MergedRegionsResponse, error)
+	GetMemoryUsage(ctx context.Context, in *GetMemoryUsageRequest, opts ...grpc.CallOption) (*MemoryUsageResponse, error)
 	// ── Clipboard ──
 	Clipboard(ctx context.Context, in *ClipboardCommand, opts ...grpc.CallOption) (*ClipboardResponse, error)
 	// ── Export / Print / Archive ──
@@ -183,7 +183,7 @@ type VolvoxGridServiceClient interface {
 	// ── Render Control ──
 	ResizeViewport(ctx context.Context, in *ResizeViewportRequest, opts ...grpc.CallOption) (*ResizeViewportResponse, error)
 	SetRedraw(ctx context.Context, in *SetRedrawRequest, opts ...grpc.CallOption) (*SetRedrawResponse, error)
-	Refresh(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*RefreshResponse, error)
+	Refresh(ctx context.Context, in *RefreshRequest, opts ...grpc.CallOption) (*RefreshResponse, error)
 	// ── Demo ──
 	LoadDemo(ctx context.Context, in *LoadDemoRequest, opts ...grpc.CallOption) (*LoadDemoResponse, error)
 	GetDemoData(ctx context.Context, in *GetDemoDataRequest, opts ...grpc.CallOption) (*GetDemoDataResponse, error)
@@ -193,7 +193,7 @@ type VolvoxGridServiceClient interface {
 	RenderSession(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[RenderInput, RenderOutput], error)
 	// Server-streaming: engine pushes semantic grid events.
 	// The plugin polls the engine's EventQueue with a 50 ms interval.
-	EventStream(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GridEvent], error)
+	EventStream(ctx context.Context, in *EventStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GridEvent], error)
 }
 
 type volvoxGridServiceClient struct {
@@ -214,7 +214,7 @@ func (c *volvoxGridServiceClient) Create(ctx context.Context, in *CreateRequest,
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) Destroy(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*DestroyResponse, error) {
+func (c *volvoxGridServiceClient) Destroy(ctx context.Context, in *DestroyRequest, opts ...grpc.CallOption) (*DestroyResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DestroyResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_Destroy_FullMethodName, in, out, cOpts...)
@@ -234,7 +234,7 @@ func (c *volvoxGridServiceClient) Configure(ctx context.Context, in *ConfigureRe
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) GetConfig(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*GridConfig, error) {
+func (c *volvoxGridServiceClient) GetConfig(ctx context.Context, in *GetConfigRequest, opts ...grpc.CallOption) (*GridConfig, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GridConfig)
 	err := c.cc.Invoke(ctx, VolvoxGridService_GetConfig_FullMethodName, in, out, cOpts...)
@@ -264,7 +264,7 @@ func (c *volvoxGridServiceClient) DefineColumns(ctx context.Context, in *DefineC
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) GetSchema(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*DefineColumnsRequest, error) {
+func (c *volvoxGridServiceClient) GetSchema(ctx context.Context, in *GetSchemaRequest, opts ...grpc.CallOption) (*DefineColumnsRequest, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DefineColumnsRequest)
 	err := c.cc.Invoke(ctx, VolvoxGridService_GetSchema_FullMethodName, in, out, cOpts...)
@@ -384,7 +384,7 @@ func (c *volvoxGridServiceClient) Select(ctx context.Context, in *SelectRequest,
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) GetSelection(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*SelectionState, error) {
+func (c *volvoxGridServiceClient) GetSelection(ctx context.Context, in *GetSelectionRequest, opts ...grpc.CallOption) (*SelectionState, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SelectionState)
 	err := c.cc.Invoke(ctx, VolvoxGridService_GetSelection_FullMethodName, in, out, cOpts...)
@@ -534,7 +534,7 @@ func (c *volvoxGridServiceClient) UnmergeCells(ctx context.Context, in *UnmergeC
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) GetMergedRegions(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*MergedRegionsResponse, error) {
+func (c *volvoxGridServiceClient) GetMergedRegions(ctx context.Context, in *GetMergedRegionsRequest, opts ...grpc.CallOption) (*MergedRegionsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(MergedRegionsResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_GetMergedRegions_FullMethodName, in, out, cOpts...)
@@ -544,7 +544,7 @@ func (c *volvoxGridServiceClient) GetMergedRegions(ctx context.Context, in *Grid
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) GetMemoryUsage(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*MemoryUsageResponse, error) {
+func (c *volvoxGridServiceClient) GetMemoryUsage(ctx context.Context, in *GetMemoryUsageRequest, opts ...grpc.CallOption) (*MemoryUsageResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(MemoryUsageResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_GetMemoryUsage_FullMethodName, in, out, cOpts...)
@@ -614,7 +614,7 @@ func (c *volvoxGridServiceClient) SetRedraw(ctx context.Context, in *SetRedrawRe
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) Refresh(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (*RefreshResponse, error) {
+func (c *volvoxGridServiceClient) Refresh(ctx context.Context, in *RefreshRequest, opts ...grpc.CallOption) (*RefreshResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RefreshResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_Refresh_FullMethodName, in, out, cOpts...)
@@ -657,13 +657,13 @@ func (c *volvoxGridServiceClient) RenderSession(ctx context.Context, opts ...grp
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type VolvoxGridService_RenderSessionClient = grpc.BidiStreamingClient[RenderInput, RenderOutput]
 
-func (c *volvoxGridServiceClient) EventStream(ctx context.Context, in *GridHandle, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GridEvent], error) {
+func (c *volvoxGridServiceClient) EventStream(ctx context.Context, in *EventStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GridEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &VolvoxGridService_ServiceDesc.Streams[1], VolvoxGridService_EventStream_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[GridHandle, GridEvent]{ClientStream: stream}
+	x := &grpc.GenericClientStream[EventStreamRequest, GridEvent]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -682,14 +682,14 @@ type VolvoxGridService_EventStreamClient = grpc.ServerStreamingClient[GridEvent]
 type VolvoxGridServiceServer interface {
 	// ── Lifecycle ──
 	Create(context.Context, *CreateRequest) (*CreateResponse, error)
-	Destroy(context.Context, *GridHandle) (*DestroyResponse, error)
+	Destroy(context.Context, *DestroyRequest) (*DestroyResponse, error)
 	// ── Configuration ──
 	Configure(context.Context, *ConfigureRequest) (*ConfigureResponse, error)
-	GetConfig(context.Context, *GridHandle) (*GridConfig, error)
+	GetConfig(context.Context, *GetConfigRequest) (*GridConfig, error)
 	LoadFontData(context.Context, *LoadFontDataRequest) (*LoadFontDataResponse, error)
 	// ── Structure ──
 	DefineColumns(context.Context, *DefineColumnsRequest) (*DefineColumnsResponse, error)
-	GetSchema(context.Context, *GridHandle) (*DefineColumnsRequest, error)
+	GetSchema(context.Context, *GetSchemaRequest) (*DefineColumnsRequest, error)
 	DefineRows(context.Context, *DefineRowsRequest) (*DefineRowsResponse, error)
 	InsertRows(context.Context, *InsertRowsRequest) (*InsertRowsResponse, error)
 	RemoveRows(context.Context, *RemoveRowsRequest) (*RemoveRowsResponse, error)
@@ -703,7 +703,7 @@ type VolvoxGridServiceServer interface {
 	Clear(context.Context, *ClearRequest) (*ClearResponse, error)
 	// ── Selection ──
 	Select(context.Context, *SelectRequest) (*SelectResponse, error)
-	GetSelection(context.Context, *GridHandle) (*SelectionState, error)
+	GetSelection(context.Context, *GetSelectionRequest) (*SelectionState, error)
 	ShowCell(context.Context, *ShowCellRequest) (*ShowCellResponse, error)
 	SetTopRow(context.Context, *SetRowRequest) (*SetTopRowResponse, error)
 	SetLeftCol(context.Context, *SetColRequest) (*SetLeftColResponse, error)
@@ -720,8 +720,8 @@ type VolvoxGridServiceServer interface {
 	GetMergedRange(context.Context, *GetMergedRangeRequest) (*CellRange, error)
 	MergeCells(context.Context, *MergeCellsRequest) (*MergeCellsResponse, error)
 	UnmergeCells(context.Context, *UnmergeCellsRequest) (*UnmergeCellsResponse, error)
-	GetMergedRegions(context.Context, *GridHandle) (*MergedRegionsResponse, error)
-	GetMemoryUsage(context.Context, *GridHandle) (*MemoryUsageResponse, error)
+	GetMergedRegions(context.Context, *GetMergedRegionsRequest) (*MergedRegionsResponse, error)
+	GetMemoryUsage(context.Context, *GetMemoryUsageRequest) (*MemoryUsageResponse, error)
 	// ── Clipboard ──
 	Clipboard(context.Context, *ClipboardCommand) (*ClipboardResponse, error)
 	// ── Export / Print / Archive ──
@@ -731,7 +731,7 @@ type VolvoxGridServiceServer interface {
 	// ── Render Control ──
 	ResizeViewport(context.Context, *ResizeViewportRequest) (*ResizeViewportResponse, error)
 	SetRedraw(context.Context, *SetRedrawRequest) (*SetRedrawResponse, error)
-	Refresh(context.Context, *GridHandle) (*RefreshResponse, error)
+	Refresh(context.Context, *RefreshRequest) (*RefreshResponse, error)
 	// ── Demo ──
 	LoadDemo(context.Context, *LoadDemoRequest) (*LoadDemoResponse, error)
 	GetDemoData(context.Context, *GetDemoDataRequest) (*GetDemoDataResponse, error)
@@ -741,7 +741,7 @@ type VolvoxGridServiceServer interface {
 	RenderSession(grpc.BidiStreamingServer[RenderInput, RenderOutput]) error
 	// Server-streaming: engine pushes semantic grid events.
 	// The plugin polls the engine's EventQueue with a 50 ms interval.
-	EventStream(*GridHandle, grpc.ServerStreamingServer[GridEvent]) error
+	EventStream(*EventStreamRequest, grpc.ServerStreamingServer[GridEvent]) error
 	mustEmbedUnimplementedVolvoxGridServiceServer()
 }
 
@@ -755,13 +755,13 @@ type UnimplementedVolvoxGridServiceServer struct{}
 func (UnimplementedVolvoxGridServiceServer) Create(context.Context, *CreateRequest) (*CreateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Create not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) Destroy(context.Context, *GridHandle) (*DestroyResponse, error) {
+func (UnimplementedVolvoxGridServiceServer) Destroy(context.Context, *DestroyRequest) (*DestroyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Destroy not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) Configure(context.Context, *ConfigureRequest) (*ConfigureResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Configure not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) GetConfig(context.Context, *GridHandle) (*GridConfig, error) {
+func (UnimplementedVolvoxGridServiceServer) GetConfig(context.Context, *GetConfigRequest) (*GridConfig, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetConfig not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) LoadFontData(context.Context, *LoadFontDataRequest) (*LoadFontDataResponse, error) {
@@ -770,7 +770,7 @@ func (UnimplementedVolvoxGridServiceServer) LoadFontData(context.Context, *LoadF
 func (UnimplementedVolvoxGridServiceServer) DefineColumns(context.Context, *DefineColumnsRequest) (*DefineColumnsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DefineColumns not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) GetSchema(context.Context, *GridHandle) (*DefineColumnsRequest, error) {
+func (UnimplementedVolvoxGridServiceServer) GetSchema(context.Context, *GetSchemaRequest) (*DefineColumnsRequest, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSchema not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) DefineRows(context.Context, *DefineRowsRequest) (*DefineRowsResponse, error) {
@@ -806,7 +806,7 @@ func (UnimplementedVolvoxGridServiceServer) Clear(context.Context, *ClearRequest
 func (UnimplementedVolvoxGridServiceServer) Select(context.Context, *SelectRequest) (*SelectResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Select not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) GetSelection(context.Context, *GridHandle) (*SelectionState, error) {
+func (UnimplementedVolvoxGridServiceServer) GetSelection(context.Context, *GetSelectionRequest) (*SelectionState, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSelection not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) ShowCell(context.Context, *ShowCellRequest) (*ShowCellResponse, error) {
@@ -851,10 +851,10 @@ func (UnimplementedVolvoxGridServiceServer) MergeCells(context.Context, *MergeCe
 func (UnimplementedVolvoxGridServiceServer) UnmergeCells(context.Context, *UnmergeCellsRequest) (*UnmergeCellsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UnmergeCells not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) GetMergedRegions(context.Context, *GridHandle) (*MergedRegionsResponse, error) {
+func (UnimplementedVolvoxGridServiceServer) GetMergedRegions(context.Context, *GetMergedRegionsRequest) (*MergedRegionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMergedRegions not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) GetMemoryUsage(context.Context, *GridHandle) (*MemoryUsageResponse, error) {
+func (UnimplementedVolvoxGridServiceServer) GetMemoryUsage(context.Context, *GetMemoryUsageRequest) (*MemoryUsageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMemoryUsage not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) Clipboard(context.Context, *ClipboardCommand) (*ClipboardResponse, error) {
@@ -875,7 +875,7 @@ func (UnimplementedVolvoxGridServiceServer) ResizeViewport(context.Context, *Res
 func (UnimplementedVolvoxGridServiceServer) SetRedraw(context.Context, *SetRedrawRequest) (*SetRedrawResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetRedraw not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) Refresh(context.Context, *GridHandle) (*RefreshResponse, error) {
+func (UnimplementedVolvoxGridServiceServer) Refresh(context.Context, *RefreshRequest) (*RefreshResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Refresh not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) LoadDemo(context.Context, *LoadDemoRequest) (*LoadDemoResponse, error) {
@@ -887,7 +887,7 @@ func (UnimplementedVolvoxGridServiceServer) GetDemoData(context.Context, *GetDem
 func (UnimplementedVolvoxGridServiceServer) RenderSession(grpc.BidiStreamingServer[RenderInput, RenderOutput]) error {
 	return status.Error(codes.Unimplemented, "method RenderSession not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) EventStream(*GridHandle, grpc.ServerStreamingServer[GridEvent]) error {
+func (UnimplementedVolvoxGridServiceServer) EventStream(*EventStreamRequest, grpc.ServerStreamingServer[GridEvent]) error {
 	return status.Error(codes.Unimplemented, "method EventStream not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) mustEmbedUnimplementedVolvoxGridServiceServer() {}
@@ -930,7 +930,7 @@ func _VolvoxGridService_Create_Handler(srv interface{}, ctx context.Context, dec
 }
 
 func _VolvoxGridService_Destroy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GridHandle)
+	in := new(DestroyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -942,7 +942,7 @@ func _VolvoxGridService_Destroy_Handler(srv interface{}, ctx context.Context, de
 		FullMethod: VolvoxGridService_Destroy_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VolvoxGridServiceServer).Destroy(ctx, req.(*GridHandle))
+		return srv.(VolvoxGridServiceServer).Destroy(ctx, req.(*DestroyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -966,7 +966,7 @@ func _VolvoxGridService_Configure_Handler(srv interface{}, ctx context.Context, 
 }
 
 func _VolvoxGridService_GetConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GridHandle)
+	in := new(GetConfigRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -978,7 +978,7 @@ func _VolvoxGridService_GetConfig_Handler(srv interface{}, ctx context.Context, 
 		FullMethod: VolvoxGridService_GetConfig_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VolvoxGridServiceServer).GetConfig(ctx, req.(*GridHandle))
+		return srv.(VolvoxGridServiceServer).GetConfig(ctx, req.(*GetConfigRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1020,7 +1020,7 @@ func _VolvoxGridService_DefineColumns_Handler(srv interface{}, ctx context.Conte
 }
 
 func _VolvoxGridService_GetSchema_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GridHandle)
+	in := new(GetSchemaRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -1032,7 +1032,7 @@ func _VolvoxGridService_GetSchema_Handler(srv interface{}, ctx context.Context, 
 		FullMethod: VolvoxGridService_GetSchema_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VolvoxGridServiceServer).GetSchema(ctx, req.(*GridHandle))
+		return srv.(VolvoxGridServiceServer).GetSchema(ctx, req.(*GetSchemaRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1236,7 +1236,7 @@ func _VolvoxGridService_Select_Handler(srv interface{}, ctx context.Context, dec
 }
 
 func _VolvoxGridService_GetSelection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GridHandle)
+	in := new(GetSelectionRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -1248,7 +1248,7 @@ func _VolvoxGridService_GetSelection_Handler(srv interface{}, ctx context.Contex
 		FullMethod: VolvoxGridService_GetSelection_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VolvoxGridServiceServer).GetSelection(ctx, req.(*GridHandle))
+		return srv.(VolvoxGridServiceServer).GetSelection(ctx, req.(*GetSelectionRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1506,7 +1506,7 @@ func _VolvoxGridService_UnmergeCells_Handler(srv interface{}, ctx context.Contex
 }
 
 func _VolvoxGridService_GetMergedRegions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GridHandle)
+	in := new(GetMergedRegionsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -1518,13 +1518,13 @@ func _VolvoxGridService_GetMergedRegions_Handler(srv interface{}, ctx context.Co
 		FullMethod: VolvoxGridService_GetMergedRegions_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VolvoxGridServiceServer).GetMergedRegions(ctx, req.(*GridHandle))
+		return srv.(VolvoxGridServiceServer).GetMergedRegions(ctx, req.(*GetMergedRegionsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _VolvoxGridService_GetMemoryUsage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GridHandle)
+	in := new(GetMemoryUsageRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -1536,7 +1536,7 @@ func _VolvoxGridService_GetMemoryUsage_Handler(srv interface{}, ctx context.Cont
 		FullMethod: VolvoxGridService_GetMemoryUsage_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VolvoxGridServiceServer).GetMemoryUsage(ctx, req.(*GridHandle))
+		return srv.(VolvoxGridServiceServer).GetMemoryUsage(ctx, req.(*GetMemoryUsageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1650,7 +1650,7 @@ func _VolvoxGridService_SetRedraw_Handler(srv interface{}, ctx context.Context, 
 }
 
 func _VolvoxGridService_Refresh_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GridHandle)
+	in := new(RefreshRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -1662,7 +1662,7 @@ func _VolvoxGridService_Refresh_Handler(srv interface{}, ctx context.Context, de
 		FullMethod: VolvoxGridService_Refresh_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VolvoxGridServiceServer).Refresh(ctx, req.(*GridHandle))
+		return srv.(VolvoxGridServiceServer).Refresh(ctx, req.(*RefreshRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1711,11 +1711,11 @@ func _VolvoxGridService_RenderSession_Handler(srv interface{}, stream grpc.Serve
 type VolvoxGridService_RenderSessionServer = grpc.BidiStreamingServer[RenderInput, RenderOutput]
 
 func _VolvoxGridService_EventStream_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(GridHandle)
+	m := new(EventStreamRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(VolvoxGridServiceServer).EventStream(m, &grpc.GenericServerStream[GridHandle, GridEvent]{ServerStream: stream})
+	return srv.(VolvoxGridServiceServer).EventStream(m, &grpc.GenericServerStream[EventStreamRequest, GridEvent]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.

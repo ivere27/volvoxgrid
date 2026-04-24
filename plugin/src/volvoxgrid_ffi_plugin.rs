@@ -185,9 +185,9 @@ fn get_stream(handle: u64) -> Option<Arc<StreamContext>> {
 
 pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn create(&self, request: CreateRequest) -> Result<CreateResponse, FfiError>;
-    fn destroy(&self, request: GridHandle) -> Result<DestroyResponse, FfiError>;
+    fn destroy(&self, request: DestroyRequest) -> Result<DestroyResponse, FfiError>;
     fn configure(&self, request: ConfigureRequest) -> Result<ConfigureResponse, FfiError>;
-    fn get_config(&self, request: GridHandle) -> Result<GridConfig, FfiError>;
+    fn get_config(&self, request: GetConfigRequest) -> Result<GridConfig, FfiError>;
     fn load_font_data(
         &self,
         request: LoadFontDataRequest,
@@ -196,7 +196,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
         &self,
         request: DefineColumnsRequest,
     ) -> Result<DefineColumnsResponse, FfiError>;
-    fn get_schema(&self, request: GridHandle) -> Result<DefineColumnsRequest, FfiError>;
+    fn get_schema(&self, request: GetSchemaRequest) -> Result<DefineColumnsRequest, FfiError>;
     fn define_rows(&self, request: DefineRowsRequest) -> Result<DefineRowsResponse, FfiError>;
     fn insert_rows(&self, request: InsertRowsRequest) -> Result<InsertRowsResponse, FfiError>;
     fn remove_rows(&self, request: RemoveRowsRequest) -> Result<RemoveRowsResponse, FfiError>;
@@ -208,7 +208,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn load_data(&self, request: LoadDataRequest) -> Result<LoadDataResult, FfiError>;
     fn clear(&self, request: ClearRequest) -> Result<ClearResponse, FfiError>;
     fn select(&self, request: SelectRequest) -> Result<SelectResponse, FfiError>;
-    fn get_selection(&self, request: GridHandle) -> Result<SelectionState, FfiError>;
+    fn get_selection(&self, request: GetSelectionRequest) -> Result<SelectionState, FfiError>;
     fn show_cell(&self, request: ShowCellRequest) -> Result<ShowCellResponse, FfiError>;
     fn set_top_row(&self, request: SetRowRequest) -> Result<SetTopRowResponse, FfiError>;
     fn set_left_col(&self, request: SetColRequest) -> Result<SetLeftColResponse, FfiError>;
@@ -224,8 +224,14 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn merge_cells(&self, request: MergeCellsRequest) -> Result<MergeCellsResponse, FfiError>;
     fn unmerge_cells(&self, request: UnmergeCellsRequest)
         -> Result<UnmergeCellsResponse, FfiError>;
-    fn get_merged_regions(&self, request: GridHandle) -> Result<MergedRegionsResponse, FfiError>;
-    fn get_memory_usage(&self, request: GridHandle) -> Result<MemoryUsageResponse, FfiError>;
+    fn get_merged_regions(
+        &self,
+        request: GetMergedRegionsRequest,
+    ) -> Result<MergedRegionsResponse, FfiError>;
+    fn get_memory_usage(
+        &self,
+        request: GetMemoryUsageRequest,
+    ) -> Result<MemoryUsageResponse, FfiError>;
     fn clipboard(&self, request: ClipboardCommand) -> Result<ClipboardResponse, FfiError>;
     fn export(&self, request: ExportRequest) -> Result<ExportResponse, FfiError>;
     fn print(&self, request: PrintRequest) -> Result<PrintResponse, FfiError>;
@@ -235,7 +241,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
         request: ResizeViewportRequest,
     ) -> Result<ResizeViewportResponse, FfiError>;
     fn set_redraw(&self, request: SetRedrawRequest) -> Result<SetRedrawResponse, FfiError>;
-    fn refresh(&self, request: GridHandle) -> Result<RefreshResponse, FfiError>;
+    fn refresh(&self, request: RefreshRequest) -> Result<RefreshResponse, FfiError>;
     fn load_demo(&self, request: LoadDemoRequest) -> Result<LoadDemoResponse, FfiError>;
     fn get_demo_data(&self, request: GetDemoDataRequest) -> Result<GetDemoDataResponse, FfiError>;
     fn render_session(
@@ -244,7 +250,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     ) -> Result<(), FfiError>;
     fn event_stream(
         &self,
-        request: GridHandle,
+        request: EventStreamRequest,
         stream: &dyn PluginStreamSender<GridEvent>,
     ) -> Result<(), FfiError>;
 }
@@ -422,20 +428,22 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
                 Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
             }
         }
-        "/volvoxgrid.v1.VolvoxGridService/Destroy" => match GridHandle::decode(input.as_slice()) {
-            Ok(req) => match plugin.destroy(req) {
-                Ok(resp) => {
-                    let mut buf = Vec::new();
-                    if resp.encode(&mut buf).is_ok() {
-                        success_response(resp_len, &buf)
-                    } else {
-                        error_response(resp_len, "encode failed")
+        "/volvoxgrid.v1.VolvoxGridService/Destroy" => {
+            match DestroyRequest::decode(input.as_slice()) {
+                Ok(req) => match plugin.destroy(req) {
+                    Ok(resp) => {
+                        let mut buf = Vec::new();
+                        if resp.encode(&mut buf).is_ok() {
+                            success_response(resp_len, &buf)
+                        } else {
+                            error_response(resp_len, "encode failed")
+                        }
                     }
-                }
-                Err(e) => error_response(resp_len, &e),
-            },
-            Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
-        },
+                    Err(e) => error_response(resp_len, &e),
+                },
+                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+            }
+        }
         "/volvoxgrid.v1.VolvoxGridService/Configure" => {
             match ConfigureRequest::decode(input.as_slice()) {
                 Ok(req) => match plugin.configure(req) {
@@ -453,7 +461,7 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
             }
         }
         "/volvoxgrid.v1.VolvoxGridService/GetConfig" => {
-            match GridHandle::decode(input.as_slice()) {
+            match GetConfigRequest::decode(input.as_slice()) {
                 Ok(req) => match plugin.get_config(req) {
                     Ok(resp) => {
                         let mut buf = Vec::new();
@@ -501,7 +509,7 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
             }
         }
         "/volvoxgrid.v1.VolvoxGridService/GetSchema" => {
-            match GridHandle::decode(input.as_slice()) {
+            match GetSchemaRequest::decode(input.as_slice()) {
                 Ok(req) => match plugin.get_schema(req) {
                     Ok(resp) => {
                         let mut buf = Vec::new();
@@ -691,7 +699,7 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
             }
         }
         "/volvoxgrid.v1.VolvoxGridService/GetSelection" => {
-            match GridHandle::decode(input.as_slice()) {
+            match GetSelectionRequest::decode(input.as_slice()) {
                 Ok(req) => match plugin.get_selection(req) {
                     Ok(resp) => {
                         let mut buf = Vec::new();
@@ -925,7 +933,7 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
             }
         }
         "/volvoxgrid.v1.VolvoxGridService/GetMergedRegions" => {
-            match GridHandle::decode(input.as_slice()) {
+            match GetMergedRegionsRequest::decode(input.as_slice()) {
                 Ok(req) => match plugin.get_merged_regions(req) {
                     Ok(resp) => {
                         let mut buf = Vec::new();
@@ -941,7 +949,7 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
             }
         }
         "/volvoxgrid.v1.VolvoxGridService/GetMemoryUsage" => {
-            match GridHandle::decode(input.as_slice()) {
+            match GetMemoryUsageRequest::decode(input.as_slice()) {
                 Ok(req) => match plugin.get_memory_usage(req) {
                     Ok(resp) => {
                         let mut buf = Vec::new();
@@ -1050,20 +1058,22 @@ pub extern "C" fn Synurang_Invoke_VolvoxGridService(
                 Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
             }
         }
-        "/volvoxgrid.v1.VolvoxGridService/Refresh" => match GridHandle::decode(input.as_slice()) {
-            Ok(req) => match plugin.refresh(req) {
-                Ok(resp) => {
-                    let mut buf = Vec::new();
-                    if resp.encode(&mut buf).is_ok() {
-                        success_response(resp_len, &buf)
-                    } else {
-                        error_response(resp_len, "encode failed")
+        "/volvoxgrid.v1.VolvoxGridService/Refresh" => {
+            match RefreshRequest::decode(input.as_slice()) {
+                Ok(req) => match plugin.refresh(req) {
+                    Ok(resp) => {
+                        let mut buf = Vec::new();
+                        if resp.encode(&mut buf).is_ok() {
+                            success_response(resp_len, &buf)
+                        } else {
+                            error_response(resp_len, "encode failed")
+                        }
                     }
-                }
-                Err(e) => error_response(resp_len, &e),
-            },
-            Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
-        },
+                    Err(e) => error_response(resp_len, &e),
+                },
+                Err(e) => error_response(resp_len, &format!("decode failed: {}", e)),
+            }
+        }
         "/volvoxgrid.v1.VolvoxGridService/LoadDemo" => {
             match LoadDemoRequest::decode(input.as_slice()) {
                 Ok(req) => match plugin.load_demo(req) {
@@ -1165,7 +1175,7 @@ pub extern "C" fn Synurang_Stream_VolvoxGridService_Open(method: *const c_char) 
                         };
                     }
                 };
-                if let Ok(req) = GridHandle::decode(data.as_slice()) {
+                if let Ok(req) = EventStreamRequest::decode(data.as_slice()) {
                     let sender = StreamSender::<GridEvent> {
                         ctx: ctx_clone.clone(),
                         _marker: std::marker::PhantomData,

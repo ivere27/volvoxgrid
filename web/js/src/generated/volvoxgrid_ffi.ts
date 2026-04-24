@@ -906,7 +906,7 @@ export const CreateRequestFields = {
   "config": 4,
 } as const;
 export const CreateResponseFields = {
-  "handle": 1,
+  "grid_id": 1,
   "warnings": 2,
 } as const;
 export const CsvOptionsFields = {
@@ -947,6 +947,9 @@ export const DefineRowsRequestFields = {
   "rows": 2,
 } as const;
 export const DefineRowsResponseFields = {
+} as const;
+export const DestroyRequestFields = {
+  "grid_id": 1,
 } as const;
 export const DestroyResponseFields = {
 } as const;
@@ -1078,6 +1081,9 @@ export const EventDecisionFields = {
   "event_id": 2,
   "cancel": 3,
 } as const;
+export const EventStreamRequestFields = {
+  "grid_id": 1,
+} as const;
 export const ExportRequestFields = {
   "grid_id": 1,
   "format": 2,
@@ -1150,6 +1156,9 @@ export const GetCellsRequestFields = {
   "include_typed": 8,
   "include_barcode_status": 9,
 } as const;
+export const GetConfigRequestFields = {
+  "grid_id": 1,
+} as const;
 export const GetDemoDataRequestFields = {
   "demo": 1,
 } as const;
@@ -1161,15 +1170,27 @@ export const GetDemoDataResponseFields = {
 export const GetHeaderRowEventFields = {
   "page": 1,
 } as const;
+export const GetMemoryUsageRequestFields = {
+  "grid_id": 1,
+} as const;
 export const GetMergedRangeRequestFields = {
   "grid_id": 1,
   "row": 2,
   "col": 3,
 } as const;
+export const GetMergedRegionsRequestFields = {
+  "grid_id": 1,
+} as const;
 export const GetNodeRequestFields = {
   "grid_id": 1,
   "row": 2,
   "relation": 3,
+} as const;
+export const GetSchemaRequestFields = {
+  "grid_id": 1,
+} as const;
+export const GetSelectionRequestFields = {
+  "grid_id": 1,
 } as const;
 export const GpuFrameDoneFields = {
   "dirty_x": 1,
@@ -1259,9 +1280,6 @@ export const GridEventFields = {
   "get_header_row": 60,
   "pull_to_refresh_triggered": 61,
   "pull_to_refresh_canceled": 62,
-} as const;
-export const GridHandleFields = {
-  "id": 1,
 } as const;
 export const GridLinesFields = {
   "style": 1,
@@ -1627,6 +1645,9 @@ export const PullToRefreshConfigFields = {
   "text_release": 4,
 } as const;
 export const PullToRefreshTriggeredEventFields = {
+} as const;
+export const RefreshRequestFields = {
+  "grid_id": 1,
 } as const;
 export const RefreshResponseFields = {
 } as const;
