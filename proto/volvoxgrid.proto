@@ -2345,8 +2345,9 @@ message GpuSurfaceReady {
 // render_session loop iteration.
 //
 // Cancelable events: BeforeEdit, CellEditValidate, BeforeSort,
-// CellFocusChanging, SelectionChanging, BeforeNodeToggle,
-// BeforeUserResize, BeforeMoveColumn, BeforeMoveRow.
+// BeforeNodeToggle, BeforeScroll, BeforeUserResize, BeforeMoveColumn,
+// BeforeMoveRow, BeforeMouseDown. Print-only BeforePageBreak is emitted
+// during synchronous rendering and is informational in this API.
 message EventDecision {
   int64 grid_id  = 1;
   int64 event_id = 2;  // must match the event_id from GridEvent
@@ -2626,7 +2627,7 @@ message AfterNodeToggleEvent  { int32 row = 1; bool collapse = 2; }  // informat
 message BeforeScrollEvent {
   int32 old_top_row  = 1; int32 old_left_col = 2;
   int32 new_top_row  = 3; int32 new_left_col = 4;
-}
+}  // cancelable
 message AfterScrollEvent {
   int32 old_top_row  = 1; int32 old_left_col = 2;
   int32 new_top_row  = 3; int32 new_left_col = 4;
@@ -2634,20 +2635,20 @@ message AfterScrollEvent {
 message ScrollTooltipEvent { string text = 1; }
 
 // ── Resize & Freeze Events ──
-message BeforeUserResizeEvent { int32 row = 1; int32 col = 2; }
+message BeforeUserResizeEvent { int32 row = 1; int32 col = 2; }  // cancelable
 message AfterUserResizeEvent  { int32 row = 1; int32 col = 2; }
 message AfterUserFreezeEvent  { int32 frozen_rows = 1; int32 frozen_cols = 2; }
 
 // ── Move Events ──
-message BeforeMoveColumnEvent { int32 col = 1; int32 new_position = 2; }
+message BeforeMoveColumnEvent { int32 col = 1; int32 new_position = 2; }  // cancelable
 message AfterMoveColumnEvent  { int32 col = 1; int32 old_position = 2; }
-message BeforeMoveRowEvent    { int32 row = 1; int32 new_position = 2; }
+message BeforeMoveRowEvent    { int32 row = 1; int32 new_position = 2; }  // cancelable
 message AfterMoveRowEvent     { int32 row = 1; int32 old_position = 2; }
 
 // ── Mouse Events ──
 // button: 0x01=primary, 0x02=secondary.
 // modifier: 0x01=Shift, 0x02=Ctrl, 0x04=Alt, 0x08=Meta.
-message BeforeMouseDownEvent { int32 row = 1; int32 col = 2; }
+message BeforeMouseDownEvent { int32 row = 1; int32 col = 2; }  // cancelable
 message MouseDownEvent  { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
 message MouseUpEvent    { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
 message MouseMoveEvent  { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
@@ -2696,7 +2697,7 @@ message PullToRefreshCanceledEvent {}
 message ErrorEvent { int32 code = 1; string message = 2; }
 
 // ── Print Events ──
-message BeforePageBreakEvent { int32 row = 1; }
+message BeforePageBreakEvent { int32 row = 1; }  // print notification
 message StartPageEvent       { int32 page = 1; }
 message GetHeaderRowEvent    { int32 page = 1; }
 

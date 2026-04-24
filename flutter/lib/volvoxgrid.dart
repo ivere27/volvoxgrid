@@ -788,7 +788,14 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   }
 
   bool _isCancelableGridEvent(pb.GridEvent event) {
-    if (event.hasBeforeEdit() || event.hasBeforeSort()) {
+    if (event.hasBeforeEdit() ||
+        event.hasBeforeSort() ||
+        event.hasBeforeNodeToggle() ||
+        event.hasBeforeScroll() ||
+        event.hasBeforeUserResize() ||
+        event.hasBeforeMoveColumn() ||
+        event.hasBeforeMoveRow() ||
+        event.hasBeforeMouseDown()) {
       return true;
     }
     return _tryGetCellEditValidatingPayload(event) != null;
@@ -2644,8 +2651,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     if (!mounted) {
       return;
     }
-    final row = selection.mouseRow >= 0 ? selection.mouseRow : selection.activeRow;
-    final col = selection.mouseCol >= 0 ? selection.mouseCol : selection.activeCol;
+    final row =
+        selection.mouseRow >= 0 ? selection.mouseRow : selection.activeRow;
+    final col =
+        selection.mouseCol >= 0 ? selection.mouseCol : selection.activeCol;
     onContextMenuRequest(
       VolvoxGridContextMenuRequest(
         trigger: trigger,
