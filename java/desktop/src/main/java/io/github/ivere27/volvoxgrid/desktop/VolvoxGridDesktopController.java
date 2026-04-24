@@ -1100,6 +1100,16 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         );
     }
 
+    public boolean isRenderLayerEnabled(RenderLayerBit layer) throws SynurangDesktopBridge.SynurangBridgeException {
+        Objects.requireNonNull(layer, "layer");
+        return VolvoxGridController.super.isRenderLayerEnabled(layer.getNumber());
+    }
+
+    public void setRenderLayerEnabled(RenderLayerBit layer, boolean enabled) throws SynurangDesktopBridge.SynurangBridgeException {
+        Objects.requireNonNull(layer, "layer");
+        VolvoxGridController.super.setRenderLayerEnabled(layer.getNumber(), enabled);
+    }
+
     public void setScrollBars(ScrollBarsMode mode) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(mode, "mode");
         configure(

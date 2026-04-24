@@ -37,6 +37,13 @@ internal fun defaultIndicatorsConfig(): IndicatorsConfig =
         .setColTop(defaultColIndicatorTopConfig())
         .build()
 
+private fun renderLayerFlag(layer: Int): Long {
+    require(layer in 0 until java.lang.Long.SIZE) {
+        "render layer bit out of range: $layer"
+    }
+    return 1L shl layer
+}
+
 /**
  * High-level Kotlin API wrapping the VolvoxGrid FFI calls.
  *
@@ -1241,18 +1248,26 @@ class VolvoxGridController(
         return getConfig().rendering.renderLayerMask
     }
 
-    override fun isRenderLayerEnabled(layer: RenderLayerBit): Boolean {
-        val bit = 1L shl layer.number
+    override fun isRenderLayerEnabled(layer: Int): Boolean {
+        val bit = renderLayerFlag(layer)
         return (renderLayerMask() and bit) != 0L
     }
 
-    override fun setRenderLayerEnabled(layer: RenderLayerBit, enabled: Boolean) {
+    override fun setRenderLayerEnabled(layer: Int, enabled: Boolean) {
         val mask = renderLayerMask()
-        val bit = 1L shl layer.number
+        val bit = renderLayerFlag(layer)
         val next = if (enabled) mask or bit else mask and bit.inv()
         if (next != mask) {
             setRenderLayerMask(next)
         }
+    }
+
+    fun isRenderLayerEnabled(layer: RenderLayerBit): Boolean {
+        return isRenderLayerEnabled(layer.number)
+    }
+
+    fun setRenderLayerEnabled(layer: RenderLayerBit, enabled: Boolean) {
+        setRenderLayerEnabled(layer.number, enabled)
     }
 
     override fun setRendererBackend(backend: RendererBackend) {

@@ -1,5 +1,5 @@
 package io.github.ivere27.volvoxgrid.common;
-import io.github.ivere27.volvoxgrid.RenderLayerBit;
+
 import java.util.List;
 
 /**
@@ -74,15 +74,22 @@ public interface VolvoxGridController {
     long renderLayerMask();
     void setRenderLayerMask(long mask);
 
-    default boolean isRenderLayerEnabled(RenderLayerBit layer) {
-        long bit = 1L << layer.getNumber();
+    default boolean isRenderLayerEnabled(int layer) {
+        long bit = renderLayerFlag(layer);
         return (renderLayerMask() & bit) != 0L;
     }
 
-    default void setRenderLayerEnabled(RenderLayerBit layer, boolean enabled) {
+    default void setRenderLayerEnabled(int layer, boolean enabled) {
         long mask = renderLayerMask();
-        long bit = 1L << layer.getNumber();
+        long bit = renderLayerFlag(layer);
         setRenderLayerMask(enabled ? (mask | bit) : (mask & ~bit));
+    }
+
+    static long renderLayerFlag(int layer) {
+        if (layer < 0 || layer >= Long.SIZE) {
+            throw new IllegalArgumentException("render layer bit out of range: " + layer);
+        }
+        return 1L << layer;
     }
 
     void setRedraw(boolean enabled);
