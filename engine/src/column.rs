@@ -12,6 +12,7 @@ pub struct ColumnProps {
     pub indent: i32,
     pub key: String,
     pub sort_order: i32,
+    pub sort_type: i32,
     /// True when sort metadata was explicitly set through ColumnDef.sort.
     pub sort_defined: bool,
     pub edit_mask: String,
@@ -56,6 +57,7 @@ impl Default for ColumnProps {
             indent: 0,
             key: String::new(),
             sort_order: 0,
+            sort_type: 0,
             sort_defined: false,
             edit_mask: String::new(),
             dropdown_items: String::new(),

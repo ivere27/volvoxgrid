@@ -321,6 +321,8 @@ class VolvoxGridView @JvmOverloads constructor(
             }
         }
 
+    var compareListener: CompareListener? = null
+
     /** Listener for edit commit/cancel from the inline EditText overlay. */
     var editListener: EditCommitListener? = null
 
@@ -341,6 +343,10 @@ class VolvoxGridView @JvmOverloads constructor(
 
     interface BeforeSortListener {
         fun onBeforeSort(details: BeforeSortDetails)
+    }
+
+    interface CompareListener {
+        fun onCompare(details: CompareDetails)
     }
 
     interface EditCommitListener {
@@ -390,6 +396,14 @@ class VolvoxGridView @JvmOverloads constructor(
         val rawEvent: GridEvent,
         val col: Int,
         var cancel: Boolean = false
+    )
+
+    data class CompareDetails(
+        val rawEvent: GridEvent,
+        val row1: Int,
+        val row2: Int,
+        val col: Int,
+        var result: Int = 0
     )
 
     init {
@@ -2693,7 +2707,10 @@ class VolvoxGridView @JvmOverloads constructor(
             }
         }
 
-        if (decisionChannelEnabled && isCancelableGridEvent(event)) {
+        if (event.hasCompare()) {
+            val result = dispatchCompareEvent(event)
+            sendCompareResponse(event.compare.requestId, result)
+        } else if (decisionChannelEnabled && isCancelableGridEvent(event)) {
             val cancel = dispatchCancelableGridEvent(event)
             sendEventDecision(event.eventId, cancel)
         }
@@ -2755,6 +2772,64 @@ class VolvoxGridView @JvmOverloads constructor(
         } catch (_: Exception) {
             // Best-effort; a closed stream will be reopened by the next session attach.
         }
+    }
+
+    private fun sendCompareResponse(requestId: Long, result: Int) {
+        if (gridId == 0L || requestId == 0L) {
+            return
+        }
+        try {
+            sendRenderInput(
+                RenderInput.newBuilder()
+                    .setGridId(gridId)
+                    .setCompareResponse(
+                        CompareResponse.newBuilder()
+                            .setRequestId(requestId)
+                            .setResult(result)
+                            .build()
+                    )
+                    .build()
+            )
+        } catch (_: Exception) {
+            // Best-effort; a closed stream will be reopened by the next session attach.
+        }
+    }
+
+    private fun dispatchCompareEvent(event: GridEvent): Int {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return dispatchCompareEventOnMain(event)
+        }
+
+        val latch = CountDownLatch(1)
+        val resultRef = intArrayOf(0)
+        if (!post {
+                try {
+                    resultRef[0] = dispatchCompareEventOnMain(event)
+                } finally {
+                    latch.countDown()
+                }
+            }) {
+            return 0
+        }
+
+        return try {
+            latch.await(200, TimeUnit.MILLISECONDS)
+            resultRef[0]
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            0
+        }
+    }
+
+    private fun dispatchCompareEventOnMain(event: GridEvent): Int {
+        val details = CompareDetails(
+            rawEvent = event,
+            row1 = event.compare.row1,
+            row2 = event.compare.row2,
+            col = event.compare.col,
+        )
+        compareListener?.onCompare(details)
+        return details.result
     }
 
     private fun dispatchCancelableGridEvent(event: GridEvent): Boolean {

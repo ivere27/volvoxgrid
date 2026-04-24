@@ -529,8 +529,11 @@ enum SortOrder {
 //   NUMERIC (1):        Parses as f64; non-numeric values sort to the end.
 //   STRING (2):         Lexicographic, case-sensitive.
 //   STRING_NO_CASE (3): Lexicographic, case-insensitive.
-//   CUSTOM (4):         Fires CompareEvent on EventStream so the host can
-//                       provide its own ordering logic.
+//   CUSTOM (4):         Engine emits CompareEvent on EventStream; host
+//                       replies with CompareResponse on RenderSession input
+//                       (-1/0/1). Falls back to the generic/date path if no
+//                       EventStream subscriber is active or the host does
+//                       not reply within 250 ms.
 enum SortType {
   SORT_TYPE_AUTO           = 0;
   SORT_TYPE_NUMERIC        = 1;
@@ -2214,7 +2217,8 @@ message LoadDemoResponse {}
 // renders via wgpu directly to the native surface.
 //
 // The session also carries EventDecision responses from the host
-// (see file header, "Cancelable events via EventDecision").
+// (see file header, "Cancelable events via EventDecision") and
+// CompareResponse answers for SORT_TYPE_CUSTOM (see CompareEvent).
 // ═══════════════════════════════════════════════════════════
 
 message RenderInput {
@@ -2232,7 +2236,16 @@ message RenderInput {
     TerminalCapabilities terminal_capabilities = 11;
     TerminalViewport terminal_viewport       = 12;
     TerminalCommand terminal_command         = 13;
+    CompareResponse compare_response         = 14;
   }
+}
+
+// Host response to a CompareEvent emitted on EventStream during
+// SORT_TYPE_CUSTOM. result: <0 = row1 before row2, 0 = equal,
+// >0 = row1 after row2. request_id must echo the CompareEvent.
+message CompareResponse {
+  int64 request_id = 1;
+  int32 result     = 2;
 }
 
 message ViewportState {
@@ -2616,8 +2629,11 @@ message RowStatusChangeEvent { int32 row = 1; int32 status = 2; }
 // ── Sort Events ──
 message BeforeSortEvent { int32 col = 1; }  // cancelable
 message AfterSortEvent  { int32 col = 1; }  // informational
-// Fired for SORT_TYPE_CUSTOM: host returns comparison result.
-message CompareEvent    { int32 row1 = 1; int32 row2 = 2; int32 col = 3; int32 result = 4; }
+// Synchronous request for SORT_TYPE_CUSTOM. The host must reply on
+// the RenderSession with a CompareResponse echoing request_id.
+// The engine waits up to 250 ms; on timeout the comparison falls
+// back to the generic/date path used by SORT_TYPE_AUTO.
+message CompareEvent    { int64 request_id = 1; int32 row1 = 2; int32 row2 = 3; int32 col = 4; }
 
 // ── Outline Events ──
 message BeforeNodeToggleEvent { int32 row = 1; bool collapse = 2; }  // cancelable

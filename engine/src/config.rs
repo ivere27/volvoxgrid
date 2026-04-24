@@ -2194,7 +2194,17 @@ impl VolvoxGrid {
                     cp.key = v.clone();
                 }
                 if def.sort_order.is_some() || def.sort_type.is_some() {
-                    cp.sort_order = merge_sort_spec(cp.sort_order, def.sort_order, def.sort_type);
+                    if let Some(v) = def.sort_type {
+                        cp.sort_type = v;
+                    }
+                    let sort_type = def.sort_type.or_else(|| {
+                        if cp.sort_defined {
+                            Some(cp.sort_type)
+                        } else {
+                            None
+                        }
+                    });
+                    cp.sort_order = merge_sort_spec(cp.sort_order, def.sort_order, sort_type);
                     cp.sort_defined = true;
                 }
                 if let Some(v) = &def.dropdown_items {
@@ -2923,7 +2933,13 @@ impl VolvoxGrid {
                 .cloned()
                 .unwrap_or_else(crate::column::ColumnProps::default);
             let (sort_order, sort_type) = if cp.sort_defined {
-                decode_sort_spec(cp.sort_order)
+                let (sort_order, inferred_type) = decode_sort_spec(cp.sort_order);
+                let sort_type = if cp.sort_type != 0 {
+                    Some(cp.sort_type)
+                } else {
+                    inferred_type
+                };
+                (sort_order, sort_type)
             } else {
                 (None, None)
             };

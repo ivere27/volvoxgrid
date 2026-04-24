@@ -99,10 +99,10 @@ pub enum GridEventData {
         col: i32,
     },
     Compare {
+        request_id: i64,
         row1: i32,
         row2: i32,
         col: i32,
-        result: i32,
     },
     BeforeNodeToggle {
         row: i32,

@@ -49,6 +49,7 @@ namespace VolvoxGrid.DotNet.Internal
         private VolvoxClient _client;
         private long _gridId;
         private Func<GridEvent, bool?> _eventHandler;
+        private Func<GridEvent, int?> _compareHandler;
 
         private SynurangReflectionStream _renderStream;
         private SynurangReflectionStream _eventStream;
@@ -224,7 +225,11 @@ namespace VolvoxGrid.DotNet.Internal
             }
         }
 
-        public void Attach(VolvoxClient client, long gridId, Func<GridEvent, bool?> eventHandler)
+        public void Attach(
+            VolvoxClient client,
+            long gridId,
+            Func<GridEvent, bool?> eventHandler,
+            Func<GridEvent, int?> compareHandler = null)
         {
             if (client == null)
             {
@@ -236,6 +241,7 @@ namespace VolvoxGrid.DotNet.Internal
             _client = client;
             _gridId = gridId;
             _eventHandler = eventHandler;
+            _compareHandler = compareHandler;
 
             ResizeBuffers(Math.Max(1, ClientSize.Width), Math.Max(1, ClientSize.Height));
 
@@ -318,6 +324,7 @@ namespace VolvoxGrid.DotNet.Internal
             _renderThread = null;
             _eventThread = null;
             _eventHandler = null;
+            _compareHandler = null;
             HideEditOverlay(false);
             return renderStopped && eventStopped;
         }
@@ -361,6 +368,17 @@ namespace VolvoxGrid.DotNet.Internal
             var payload = _client.EncodeRenderInputEventDecision(_gridId, eventId, cancel);
             SendRenderInput(payload);
             RequestFrame();
+        }
+
+        public void SendCompareResponse(long requestId, int result)
+        {
+            if (!_running || _client == null || _renderStream == null || _gridId == 0 || requestId == 0)
+            {
+                return;
+            }
+
+            var payload = _client.EncodeRenderInputCompareResponse(_gridId, requestId, result);
+            SendRenderInput(payload);
         }
 
         private void EnsureDecisionChannelEnabled()
@@ -753,6 +771,16 @@ namespace VolvoxGrid.DotNet.Internal
                         continue;
                     }
 
+                    if (evt.EventCase == GridEvent.EventOneofCase.Compare)
+                    {
+                        int result = DispatchCompareEvent(evt).GetValueOrDefault(0);
+                        if (evt.Compare != null)
+                        {
+                            SendCompareResponse(evt.Compare.RequestId, result);
+                        }
+                        continue;
+                    }
+
                     bool? cancel = DispatchEvent(evt);
                     if (cancel.HasValue && evt.EventId != 0)
                     {
@@ -795,6 +823,28 @@ namespace VolvoxGrid.DotNet.Internal
             }
 
             return _eventHandler(evt);
+        }
+
+        private int? DispatchCompareEvent(GridEvent evt)
+        {
+            if (_compareHandler == null)
+            {
+                return 0;
+            }
+
+            if (IsHandleCreated && InvokeRequired)
+            {
+                try
+                {
+                    return (int?)Invoke(new Func<GridEvent, int?>(DispatchCompareEvent), evt);
+                }
+                catch
+                {
+                    return 0;
+                }
+            }
+
+            return _compareHandler(evt);
         }
 
         private void HandleRenderOutput(RenderOutput output)

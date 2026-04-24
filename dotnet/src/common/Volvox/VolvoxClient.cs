@@ -548,6 +548,15 @@ namespace VolvoxGrid.DotNet.Internal
             }.ToByteArray();
         }
 
+        public byte[] EncodeRenderInputCompareResponse(long gridId, long requestId, int result)
+        {
+            return new RenderInput
+            {
+                GridId = gridId,
+                CompareResponse = new CompareResponse { RequestId = requestId, Result = result },
+            }.ToByteArray();
+        }
+
         // ── Render output / event decoding ──
 
         public RenderOutput DecodeRenderOutput(byte[] payload)

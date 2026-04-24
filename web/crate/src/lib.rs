@@ -1,5 +1,6 @@
 use js_sys::Array;
 use prost::Message;
+use std::cell::RefCell;
 use wasm_bindgen::prelude::*;
 #[cfg(feature = "gpu")]
 use wasm_bindgen_futures::future_to_promise;
@@ -37,6 +38,11 @@ static PENDING_ACTIONS: LazyLock<Mutex<HashMap<(i64, i64), PendingActionEntry>>>
     LazyLock::new(|| Mutex::new(HashMap::new()));
 static PENDING_DECISION_EVENTS: LazyLock<Mutex<HashMap<i64, VecDeque<PendingDecisionEvent>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
+
+thread_local! {
+    static CUSTOM_COMPARE_CALLBACKS: RefCell<HashMap<i32, js_sys::Function>> =
+        RefCell::new(HashMap::new());
+}
 
 // GPU renderer globals (opt-in via `gpu` feature).
 // On wasm32 the wgpu WebGPU backend types contain JsValue which is !Send/!Sync.
@@ -449,9 +455,53 @@ fn apply_committed_edit_text(
     grid.mark_dirty();
 }
 
-fn apply_before_sort(grid: &mut volvoxgrid_engine::grid::VolvoxGrid, col: i32) {
+fn has_custom_compare_callback(grid_id: i32) -> bool {
+    CUSTOM_COMPARE_CALLBACKS.with(|callbacks| callbacks.borrow().contains_key(&grid_id))
+}
+
+fn call_custom_compare_callback(grid_id: i32, row1: i32, row2: i32, col: i32) -> Option<i32> {
+    CUSTOM_COMPARE_CALLBACKS.with(|callbacks| {
+        let callbacks = callbacks.borrow();
+        let callback = callbacks.get(&grid_id)?;
+        let result = callback
+            .call3(
+                &JsValue::NULL,
+                &JsValue::from_f64(row1 as f64),
+                &JsValue::from_f64(row2 as f64),
+                &JsValue::from_f64(col as f64),
+            )
+            .ok()?;
+        let value = result.as_f64()?;
+        if !value.is_finite() {
+            return None;
+        }
+        Some(if value < 0.0 {
+            -1
+        } else if value > 0.0 {
+            1
+        } else {
+            0
+        })
+    })
+}
+
+fn custom_compare_for_grid(grid_id: i32) -> Option<Box<volvoxgrid_engine::grid::CustomCompareFn>> {
+    if !has_custom_compare_callback(grid_id) {
+        return None;
+    }
+    Some(Box::new(move |row1, row2, col| {
+        call_custom_compare_callback(grid_id, row1, row2, col)
+    }))
+}
+
+fn apply_before_sort(grid_id: i64, grid: &mut volvoxgrid_engine::grid::VolvoxGrid, col: i32) {
     let old_sort_keys = grid.sort_state.sort_keys.clone();
+    let next_order = volvoxgrid_engine::sort::header_click_next_sort_order(grid, col);
+    if volvoxgrid_engine::sort::sort_order_is_custom(next_order) {
+        grid.custom_compare = custom_compare_for_grid(grid_id as i32);
+    }
     volvoxgrid_engine::sort::handle_header_click(grid, col);
+    grid.custom_compare = None;
     if grid.sort_state.sort_keys != old_sort_keys {
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::AfterSort { col });
@@ -560,7 +610,7 @@ fn request_before_sort(grid_id: i64, grid: &mut volvoxgrid_engine::grid::VolvoxG
     if !decision_channel_enabled(grid_id) {
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::BeforeSort { col });
-        apply_before_sort(grid, col);
+        apply_before_sort(grid_id, grid, col);
         return;
     }
 
@@ -812,7 +862,7 @@ fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
             if cancel {
                 return;
             }
-            apply_before_sort(grid, col);
+            apply_before_sort(grid_id, grid, col);
         }
         PendingAction::BeforeNodeToggle { row, collapse } => {
             if cancel {
@@ -3568,12 +3618,35 @@ pub fn get_group_compare(id: i32) -> i32 {
 // Sort
 // ---------------------------------------------------------------------------
 
+/// Register a synchronous JS comparator for SORT_TYPE_CUSTOM.
+///
+/// Callback signature: `(row1, row2, col) -> number`, where negative means
+/// row1 sorts before row2, positive means row1 sorts after row2, and zero means
+/// equal.
+#[wasm_bindgen]
+pub fn set_custom_compare(id: i32, callback: js_sys::Function) {
+    CUSTOM_COMPARE_CALLBACKS.with(|callbacks| {
+        callbacks.borrow_mut().insert(id, callback);
+    });
+}
+
+#[wasm_bindgen]
+pub fn clear_custom_compare(id: i32) {
+    CUSTOM_COMPARE_CALLBACKS.with(|callbacks| {
+        callbacks.borrow_mut().remove(&id);
+    });
+}
+
 /// Sort the grid by a column (single-column convenience).
 /// order: 0=none, 1=asc generic, 2=desc generic, 3=asc numeric, 4=desc numeric, etc.
 #[wasm_bindgen]
 pub fn sort(id: i32, order: i32, col: i32) {
     with_grid(id, |grid| {
+        if volvoxgrid_engine::sort::sort_order_is_custom(order) {
+            grid.custom_compare = custom_compare_for_grid(id);
+        }
         sort::sort_grid(grid, order, col);
+        grid.custom_compare = None;
     });
 }
 
@@ -3593,8 +3666,15 @@ pub fn sort_multi(id: i32, cols: &[i32], orders: &[i32]) {
             .zip(orders.iter())
             .map(|(&c, &o)| (c, o))
             .collect();
+        if sort_keys
+            .iter()
+            .any(|&(_, order)| volvoxgrid_engine::sort::sort_order_is_custom(order))
+        {
+            grid.custom_compare = custom_compare_for_grid(id);
+        }
         grid.sort_state.sort_keys = sort_keys;
         sort::sort_grid_all_multi(grid);
+        grid.custom_compare = None;
     });
 }
 
@@ -4815,15 +4895,15 @@ fn engine_event_to_proto(
         E::BeforeSort { col } => Some(grid_event::Event::BeforeSort(BeforeSortEvent { col })),
         E::AfterSort { col } => Some(grid_event::Event::AfterSort(AfterSortEvent { col })),
         E::Compare {
+            request_id,
             row1,
             row2,
             col,
-            result,
         } => Some(grid_event::Event::Compare(CompareEvent {
+            request_id,
             row1,
             row2,
             col,
-            result,
         })),
         E::BeforeNodeToggle { row, collapse } => {
             Some(grid_event::Event::BeforeNodeToggle(BeforeNodeToggleEvent {
@@ -5554,8 +5634,15 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                         (merged != volvoxgrid_engine::sort::SORT_NONE).then_some((sc.col, merged))
                     })
                     .collect();
+                if sort_keys
+                    .iter()
+                    .any(|&(_, order)| volvoxgrid_engine::sort::sort_order_is_custom(order))
+                {
+                    grid.custom_compare = custom_compare_for_grid(request.grid_id as i32);
+                }
                 grid.sort_state.sort_keys = sort_keys;
                 volvoxgrid_engine::sort::sort_grid_all_multi(grid);
+                grid.custom_compare = None;
             }
         })?;
         Ok(SortResponse {})
@@ -6059,6 +6146,14 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                             frame_kind: volvoxgrid_engine::proto::volvoxgrid::v1::FrameKind::Frame
                                 as i32,
                         })),
+                    }) {
+                        break;
+                    }
+                }
+                Some(render_input::Input::CompareResponse(_)) => {
+                    if !stream.send(RenderOutput {
+                        rendered: false,
+                        event: None,
                     }) {
                         break;
                     }

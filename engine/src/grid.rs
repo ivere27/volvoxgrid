@@ -143,6 +143,8 @@ pub(crate) struct TextCellStaticMeta {
     pub shrink_to_fit: bool,
 }
 
+pub type CustomCompareFn = dyn Fn(i32, i32, i32) -> Option<i32> + Send + Sync;
+
 /// The main VolvoxGrid struct holding all grid state for a single grid instance.
 ///
 /// This is the central data structure of the pixel-rendering datagrid engine.
@@ -618,6 +620,10 @@ pub struct VolvoxGrid {
     /// Used by the sort system to compare unmaterialized rows.
     /// Signature: fn(source_row: i32, col: i32) -> String
     pub sort_value_generator: Option<fn(i32, i32) -> String>,
+    /// Optional host-provided comparison function for SORT_TYPE_CUSTOM.
+    /// Called synchronously during sort: fn(row1, row2, col) -> -1, 0, or 1.
+    /// Returning None falls back to the engine's generic/date comparison.
+    pub custom_compare: Option<Box<CustomCompareFn>>,
 
     // ── Focus State ──────────────────────────────────────────────────────
     /// Whether the grid currently has keyboard/input focus.
@@ -940,6 +946,7 @@ impl VolvoxGrid {
 
             // Virtual data generation
             sort_value_generator: None,
+            custom_compare: None,
 
             // Focus state
             has_focus: false,

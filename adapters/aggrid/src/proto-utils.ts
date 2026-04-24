@@ -342,6 +342,28 @@ export function encodeDefineColumnAlignmentsRequest(args: {
   return new Uint8Array(out);
 }
 
+export function encodeDefineColumnSortTypesRequest(args: {
+  gridId: number;
+  columns: Array<{ index: number; sortType: number }>;
+}): Uint8Array {
+  const out: number[] = [];
+  out.push(...encodeTag(DefineColumnsRequestFields.grid_id, 0), ...encodeInt64(args.gridId));
+
+  for (const column of args.columns) {
+    const colDef: number[] = [];
+    colDef.push(...encodeTag(ColumnDefFields.index, 0), ...encodeInt32(column.index));
+    colDef.push(...encodeTag(ColumnDefFields.sort_type, 0), ...encodeInt32(column.sortType));
+
+    out.push(
+      ...encodeTag(DefineColumnsRequestFields.columns, 2),
+      ...encodeVarintUnsigned(BigInt(colDef.length)),
+      ...colDef,
+    );
+  }
+
+  return new Uint8Array(out);
+}
+
 export function encodeUpdateCheckedCellsRequest(args: {
   gridId: number;
   updates: Array<{ row: number; col: number; checked: number }>;

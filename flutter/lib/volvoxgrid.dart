@@ -42,6 +42,8 @@ void _debugLog(String Function() messageBuilder) {
   }
 }
 
+typedef VolvoxGridCompareCallback = int Function(pb.CompareEvent request);
+
 class VolvoxGridBeforeEditDetails {
   final pb.GridEvent rawEvent;
   final int row;
@@ -206,6 +208,12 @@ class VolvoxGridWidget extends StatefulWidget {
   /// Legacy alias for draw-cell events.
   final ValueChanged<Object>? onDrawCell;
 
+  /// Optional callback used for SORT_TYPE_CUSTOM comparisons.
+  ///
+  /// Return a negative value when row1 should sort before row2, zero for equal,
+  /// or a positive value when row1 should sort after row2.
+  final VolvoxGridCompareCallback? onCompare;
+
   /// Legacy raw callback for cancelable events.
   ///
   /// Prefer [onBeforeEdit], [onCellEditValidating], and [onBeforeSort] for a
@@ -223,6 +231,7 @@ class VolvoxGridWidget extends StatefulWidget {
     this.onContextMenuRequest,
     this.onCustomRenderCell,
     this.onDrawCell,
+    this.onCompare,
     this.onCancelableEvent,
     super.key,
   });
@@ -545,7 +554,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
         oldWidget.onBeforeSort != widget.onBeforeSort ||
         oldWidget.onCustomRenderCell != widget.onCustomRenderCell ||
         oldWidget.onDrawCell != widget.onDrawCell ||
-        oldWidget.onCancelableEvent != widget.onCancelableEvent) {
+        oldWidget.onCancelableEvent != widget.onCancelableEvent ||
+        oldWidget.onCompare != widget.onCompare) {
       _syncEventStreamSubscription();
     }
   }
@@ -731,7 +741,8 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
       widget.onBeforeSort != null ||
       widget.onCustomRenderCell != null ||
       widget.onDrawCell != null ||
-      widget.onCancelableEvent != null;
+      widget.onCancelableEvent != null ||
+      widget.onCompare != null;
 
   bool get _wantsCancelableGridEvents =>
       widget.onBeforeEdit != null ||
@@ -883,6 +894,11 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   void _handleGridEvent(pb.GridEvent event) {
     widget.onGridEvent?.call(event);
     _dispatchCustomRenderCell(event);
+
+    if (event.hasCompare()) {
+      _handleCompareRequest(event.compare);
+      return;
+    }
 
     if (!_wantsCancelableGridEvents || !_isCancelableGridEvent(event)) {
       return;
@@ -1400,6 +1416,36 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     if (output.rendered) {
       _sendBufferReady();
     }
+  }
+
+  void _handleCompareRequest(pb.CompareEvent request) {
+    final compare = widget.onCompare;
+    if (compare == null) {
+      return;
+    }
+
+    int result;
+    try {
+      result = compare(request);
+    } catch (error, stackTrace) {
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'volvoxgrid',
+        context: ErrorDescription('while handling a custom sort comparison'),
+      ));
+      return;
+    }
+
+    _inputController?.add(pb.RenderInput()
+      ..gridId = widget.controller.gridId
+      ..compareResponse = (pb.CompareResponse()
+        ..requestId = request.requestId
+        ..result = result < 0
+            ? -1
+            : result > 0
+                ? 1
+                : 0));
   }
 
   void _decodeFrame(pb.FrameDone frame) {

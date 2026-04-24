@@ -7840,6 +7840,15 @@ const RenderInput$json = {
       '9': 0,
       '10': 'terminalCommand'
     },
+    {
+      '1': 'compare_response',
+      '3': 14,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.CompareResponse',
+      '9': 0,
+      '10': 'compareResponse'
+    },
   ],
   '8': [
     {'1': 'input'},
@@ -7862,7 +7871,23 @@ final $typed_data.Uint8List renderInputDescriptor = $convert.base64Decode(
     'dyaWQudjEuVGVybWluYWxDYXBhYmlsaXRpZXNIAFIUdGVybWluYWxDYXBhYmlsaXRpZXMSTgoR'
     'dGVybWluYWxfdmlld3BvcnQYDCABKAsyHy52b2x2b3hncmlkLnYxLlRlcm1pbmFsVmlld3Bvcn'
     'RIAFIQdGVybWluYWxWaWV3cG9ydBJLChB0ZXJtaW5hbF9jb21tYW5kGA0gASgLMh4udm9sdm94'
-    'Z3JpZC52MS5UZXJtaW5hbENvbW1hbmRIAFIPdGVybWluYWxDb21tYW5kQgcKBWlucHV0');
+    'Z3JpZC52MS5UZXJtaW5hbENvbW1hbmRIAFIPdGVybWluYWxDb21tYW5kEksKEGNvbXBhcmVfcm'
+    'VzcG9uc2UYDiABKAsyHi52b2x2b3hncmlkLnYxLkNvbXBhcmVSZXNwb25zZUgAUg9jb21wYXJl'
+    'UmVzcG9uc2VCBwoFaW5wdXQ=');
+
+@$core.Deprecated('Use compareResponseDescriptor instead')
+const CompareResponse$json = {
+  '1': 'CompareResponse',
+  '2': [
+    {'1': 'request_id', '3': 1, '4': 1, '5': 3, '10': 'requestId'},
+    {'1': 'result', '3': 2, '4': 1, '5': 5, '10': 'result'},
+  ],
+};
+
+/// Descriptor for `CompareResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List compareResponseDescriptor = $convert.base64Decode(
+    'Cg9Db21wYXJlUmVzcG9uc2USHQoKcmVxdWVzdF9pZBgBIAEoA1IJcmVxdWVzdElkEhYKBnJlc3'
+    'VsdBgCIAEoBVIGcmVzdWx0');
 
 @$core.Deprecated('Use viewportStateDescriptor instead')
 const ViewportState$json = {
@@ -9425,17 +9450,17 @@ final $typed_data.Uint8List afterSortEventDescriptor =
 const CompareEvent$json = {
   '1': 'CompareEvent',
   '2': [
-    {'1': 'row1', '3': 1, '4': 1, '5': 5, '10': 'row1'},
-    {'1': 'row2', '3': 2, '4': 1, '5': 5, '10': 'row2'},
-    {'1': 'col', '3': 3, '4': 1, '5': 5, '10': 'col'},
-    {'1': 'result', '3': 4, '4': 1, '5': 5, '10': 'result'},
+    {'1': 'request_id', '3': 1, '4': 1, '5': 3, '10': 'requestId'},
+    {'1': 'row1', '3': 2, '4': 1, '5': 5, '10': 'row1'},
+    {'1': 'row2', '3': 3, '4': 1, '5': 5, '10': 'row2'},
+    {'1': 'col', '3': 4, '4': 1, '5': 5, '10': 'col'},
   ],
 };
 
 /// Descriptor for `CompareEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List compareEventDescriptor = $convert.base64Decode(
-    'CgxDb21wYXJlRXZlbnQSEgoEcm93MRgBIAEoBVIEcm93MRISCgRyb3cyGAIgASgFUgRyb3cyEh'
-    'AKA2NvbBgDIAEoBVIDY29sEhYKBnJlc3VsdBgEIAEoBVIGcmVzdWx0');
+    'CgxDb21wYXJlRXZlbnQSHQoKcmVxdWVzdF9pZBgBIAEoA1IJcmVxdWVzdElkEhIKBHJvdzEYAi'
+    'ABKAVSBHJvdzESEgoEcm93MhgDIAEoBVIEcm93MhIQCgNjb2wYBCABKAVSA2NvbA==');
 
 @$core.Deprecated('Use beforeNodeToggleEventDescriptor instead')
 const BeforeNodeToggleEvent$json = {
@@ -10373,6 +10398,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.TerminalCapabilities': TerminalCapabilities$json,
   '.volvoxgrid.v1.TerminalViewport': TerminalViewport$json,
   '.volvoxgrid.v1.TerminalCommand': TerminalCommand$json,
+  '.volvoxgrid.v1.CompareResponse': CompareResponse$json,
   '.volvoxgrid.v1.RenderOutput': RenderOutput$json,
   '.volvoxgrid.v1.FrameDone': FrameDone$json,
   '.volvoxgrid.v1.FrameMetrics': FrameMetrics$json,

@@ -3473,20 +3473,20 @@ namespace Volvoxgrid.V1
 
     public sealed class CompareEvent
     {
+        public long RequestId { get; set; }
         public int Row1 { get; set; }
         public int Row2 { get; set; }
         public int Col { get; set; }
-        public int Result { get; set; }
 
         // ── Serialization ──
 
         public byte[] ToByteArray()
         {
             var w = new ProtoWriter();
-            if (Row1 != 0) w.WriteInt32(1, Row1);
-            if (Row2 != 0) w.WriteInt32(2, Row2);
-            if (Col != 0) w.WriteInt32(3, Col);
-            if (Result != 0) w.WriteInt32(4, Result);
+            if (RequestId != 0L) w.WriteInt64(1, RequestId);
+            if (Row1 != 0) w.WriteInt32(2, Row1);
+            if (Row2 != 0) w.WriteInt32(3, Row2);
+            if (Col != 0) w.WriteInt32(4, Col);
             return w.ToArray();
         }
 
@@ -3504,10 +3504,48 @@ namespace Volvoxgrid.V1
             {
                 switch (field)
                 {
-                    case 1: msg.Row1 = r.ReadInt32(); break;
-                    case 2: msg.Row2 = r.ReadInt32(); break;
-                    case 3: msg.Col = r.ReadInt32(); break;
-                    case 4: msg.Result = r.ReadInt32(); break;
+                    case 1: msg.RequestId = r.ReadInt64(); break;
+                    case 2: msg.Row1 = r.ReadInt32(); break;
+                    case 3: msg.Row2 = r.ReadInt32(); break;
+                    case 4: msg.Col = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class CompareResponse
+    {
+        public long RequestId { get; set; }
+        public int Result { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (RequestId != 0L) w.WriteInt64(1, RequestId);
+            if (Result != 0) w.WriteInt32(2, Result);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<CompareResponse> Parser = new MessageParser<CompareResponse>(data => ParseFrom(data));
+
+        public static CompareResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new CompareResponse();
+            var r = new ProtoReader(data);
+            var msg = new CompareResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.RequestId = r.ReadInt64(); break;
+                    case 2: msg.Result = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -9939,6 +9977,7 @@ namespace Volvoxgrid.V1
             TerminalCapabilities = 11,
             TerminalViewport = 12,
             TerminalCommand = 13,
+            CompareResponse = 14,
         }
         public InputOneofCase InputCase { get; set; }
 
@@ -9966,6 +10005,8 @@ namespace Volvoxgrid.V1
         public TerminalViewport TerminalViewport { get { return InputCase == InputOneofCase.TerminalViewport ? _terminalViewport : null; } set { _terminalViewport = value; InputCase = InputOneofCase.TerminalViewport; } }
         private TerminalCommand _terminalCommand;
         public TerminalCommand TerminalCommand { get { return InputCase == InputOneofCase.TerminalCommand ? _terminalCommand : null; } set { _terminalCommand = value; InputCase = InputOneofCase.TerminalCommand; } }
+        private CompareResponse _compareResponse;
+        public CompareResponse CompareResponse { get { return InputCase == InputOneofCase.CompareResponse ? _compareResponse : null; } set { _compareResponse = value; InputCase = InputOneofCase.CompareResponse; } }
         public long GridId { get; set; }
 
         // ── Serialization ──
@@ -10012,6 +10053,9 @@ namespace Volvoxgrid.V1
                 case InputOneofCase.TerminalCommand:
                     if (_terminalCommand != null) w.WriteMessageBytes(13, _terminalCommand.ToByteArray());
                     break;
+                case InputOneofCase.CompareResponse:
+                    if (_compareResponse != null) w.WriteMessageBytes(14, _compareResponse.ToByteArray());
+                    break;
             }
             return w.ToArray();
         }
@@ -10043,6 +10087,7 @@ namespace Volvoxgrid.V1
                     case 11: msg.TerminalCapabilities = TerminalCapabilities.ParseFrom(r.ReadLengthDelimited()); break;
                     case 12: msg.TerminalViewport = TerminalViewport.ParseFrom(r.ReadLengthDelimited()); break;
                     case 13: msg.TerminalCommand = TerminalCommand.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 14: msg.CompareResponse = CompareResponse.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }

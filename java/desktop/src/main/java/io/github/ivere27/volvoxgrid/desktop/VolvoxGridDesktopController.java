@@ -583,10 +583,18 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     public void sort(SortOrder order, int col) throws SynurangDesktopBridge.SynurangBridgeException {
+        sort(order, col, null);
+    }
+
+    public void sort(SortOrder order, int col, SortType type) throws SynurangDesktopBridge.SynurangBridgeException {
+        SortColumn.Builder sortColumn = SortColumn.newBuilder().setCol(col).setOrder(order);
+        if (type != null) {
+            sortColumn.setType(type);
+        }
         client.sort(
             SortRequest.newBuilder()
                 .setGridId(gridId)
-                .addSortColumns(SortColumn.newBuilder().setCol(col).setOrder(order))
+                .addSortColumns(sortColumn)
                 .build()
         );
     }
@@ -797,9 +805,14 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
 
     @Override
     public void sort(int col, boolean ascending) throws SynurangDesktopBridge.SynurangBridgeException {
+        sort(col, ascending, null);
+    }
+
+    public void sort(int col, boolean ascending, SortType type) throws SynurangDesktopBridge.SynurangBridgeException {
         sort(
             ascending ? SortOrder.SORT_ASCENDING : SortOrder.SORT_DESCENDING,
-            col
+            col,
+            type
         );
     }
 

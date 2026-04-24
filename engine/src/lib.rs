@@ -111,6 +111,7 @@ impl GridManager {
 
     pub fn destroy_grid(&self, id: i64) {
         if let Some(slot) = self.grids.lock().unwrap().remove(&id) {
+            let _grid = slot.grid.lock().unwrap();
             slot.destroyed.store(true, Ordering::SeqCst);
             slot.event_cv.notify_all();
         }

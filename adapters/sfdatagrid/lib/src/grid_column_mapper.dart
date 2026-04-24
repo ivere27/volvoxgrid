@@ -64,6 +64,7 @@ Future<void> applyGridColumns(
   required int footerFrozenColumnsCount,
   required bool allowSorting,
   required List<SortColumnDetails> sortedColumns,
+  required DataGridSource source,
 }) async {
   final defineReq = vg.DefineColumnsRequest()..gridId = controller.gridId;
   final sortOrderByName = <String, vg.SortOrder>{};
@@ -103,7 +104,9 @@ Future<void> applyGridColumns(
     if (allowSorting && col.allowSorting) {
       columnDef.sortOrder =
           sortOrderByName[col.columnName] ?? vg.SortOrder.SORT_NONE;
-      columnDef.sortType = vg.SortType.SORT_TYPE_AUTO;
+      columnDef.sortType = source.usesCustomSort(col.columnName)
+          ? vg.SortType.SORT_TYPE_CUSTOM
+          : vg.SortType.SORT_TYPE_AUTO;
     }
 
     defineReq.columns.add(columnDef);

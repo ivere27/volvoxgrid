@@ -868,10 +868,14 @@ export const ColumnDefFields = {
   "progress_color": 27,
 } as const;
 export const CompareEventFields = {
-  "row1": 1,
-  "row2": 2,
-  "col": 3,
-  "result": 4,
+  "request_id": 1,
+  "row1": 2,
+  "row2": 3,
+  "col": 4,
+} as const;
+export const CompareResponseFields = {
+  "request_id": 1,
+  "result": 2,
 } as const;
 export const ConfigureRequestFields = {
   "grid_id": 1,
@@ -1666,6 +1670,7 @@ export const RenderInputFields = {
   "terminal_capabilities": 11,
   "terminal_viewport": 12,
   "terminal_command": 13,
+  "compare_response": 14,
 } as const;
 export const RenderOutputFields = {
   "rendered": 1,

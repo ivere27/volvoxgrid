@@ -81,6 +81,14 @@ export interface VolvoxGridBeforeSortDetails {
   cancel: boolean;
 }
 
+export interface VolvoxGridCompareDetails {
+  row1: number;
+  row2: number;
+  col: number;
+}
+
+export type VolvoxGridCompareCallback = (details: VolvoxGridCompareDetails) => number;
+
 export interface VolvoxGridHeaderFeatures {
   sort?: boolean;
   reorder?: boolean;
@@ -2017,6 +2025,31 @@ export class VolvoxGrid {
     return bit;
   }
 
+  private static engineSortOrder(order: number, type?: number): number {
+    const rawOrder = Math.trunc(Number(order));
+    if (!Number.isFinite(rawOrder) || rawOrder === 0) {
+      return 0;
+    }
+    if (type == null) {
+      return rawOrder;
+    }
+
+    const rawType = Math.trunc(Number(type));
+    const ascending = rawOrder !== 2;
+    switch (rawType) {
+      case 1:
+        return ascending ? 3 : 4;
+      case 3:
+        return ascending ? 5 : 6;
+      case 2:
+        return ascending ? 7 : 8;
+      case 4:
+        return ascending ? 9 : 11;
+      default:
+        return ascending ? 1 : 2;
+    }
+  }
+
   private wasm: any;
   private gridId: number;
   private canvas: HTMLCanvasElement;
@@ -2071,6 +2104,7 @@ export class VolvoxGrid {
   private cellEditValidatingListener:
     ((details: VolvoxGridCellEditValidatingDetails) => void) | null = null;
   private beforeSortListener: ((details: VolvoxGridBeforeSortDetails) => void) | null = null;
+  private compareListener: VolvoxGridCompareCallback | null = null;
   private manualEventDecisionEnabled: boolean = false;
   private dpr: number = 1;
   private dprX: number = 1;
@@ -2169,6 +2203,16 @@ export class VolvoxGrid {
   set onBeforeSort(listener: ((details: VolvoxGridBeforeSortDetails) => void) | null) {
     this.beforeSortListener = listener;
     this.syncCancelableEventDecisionSupport();
+  }
+
+  /** Synchronous comparator used by SORT_TYPE_CUSTOM sorts. */
+  get onCompare(): VolvoxGridCompareCallback | null {
+    return this.compareListener;
+  }
+
+  set onCompare(listener: VolvoxGridCompareCallback | null) {
+    this.compareListener = listener;
+    this.syncCustomCompareCallback();
   }
 
   /** Raw `GridEvent` stream hook for demo/sample hosts. */
@@ -4191,6 +4235,33 @@ export class VolvoxGrid {
     this.wasm.set_event_decision_enabled(this.gridId, this.decisionChannelRequested());
   }
 
+  private syncCustomCompareCallback(): void {
+    if (this.compareListener == null) {
+      if (typeof this.wasm.clear_custom_compare === "function") {
+        this.wasm.clear_custom_compare(this.gridId);
+      }
+      return;
+    }
+    if (typeof this.wasm.set_custom_compare !== "function") {
+      return;
+    }
+    this.wasm.set_custom_compare(this.gridId, (row1: number, row2: number, col: number) => {
+      const compare = this.compareListener;
+      if (compare == null) {
+        return 0;
+      }
+      const result = Number(compare({
+        row1: Number(row1),
+        row2: Number(row2),
+        col: Number(col),
+      }));
+      if (!Number.isFinite(result)) {
+        return 0;
+      }
+      return result;
+    });
+  }
+
   /** Send a decision for a cancelable raw event by event id. */
   sendEventDecision(eventId: bigint, cancel: boolean): boolean {
     if (typeof this.wasm.send_event_decision !== "function") {
@@ -4319,13 +4390,16 @@ export class VolvoxGrid {
 
   // ── Sort ─────────────────────────────────────────────────────────────
 
-  sort(order: number, col: number): void {
-    this.wasm.sort(this.gridId, order, col);
+  sort(order: number, col: number, type?: number): void {
+    this.wasm.sort(this.gridId, VolvoxGrid.engineSortOrder(order, type), col);
     this.dirty = true;
   }
 
-  sortMulti(cols: number[], orders: number[]): void {
-    this.wasm.sort_multi(this.gridId, new Int32Array(cols), new Int32Array(orders));
+  sortMulti(cols: number[], orders: number[], types?: number[]): void {
+    const mergedOrders = orders.map((order, index) =>
+      VolvoxGrid.engineSortOrder(order, types?.[index])
+    );
+    this.wasm.sort_multi(this.gridId, new Int32Array(cols), new Int32Array(mergedOrders));
     this.dirty = true;
   }
 
@@ -4867,6 +4941,9 @@ export class VolvoxGrid {
     if (typeof this.wasm.set_event_decision_enabled === "function") {
       this.wasm.set_event_decision_enabled(this.gridId, false);
     }
+    if (typeof this.wasm.clear_custom_compare === "function") {
+      this.wasm.clear_custom_compare(this.gridId);
+    }
     if (this.wasm.is_editing(this.gridId)) {
       this.wasm.cancel_edit(this.gridId);
     }
@@ -4884,6 +4961,7 @@ export class VolvoxGrid {
       this.wasm.set_fling_enabled(this.gridId, 1);
     }
     this.syncCancelableEventDecisionSupport();
+    this.syncCustomCompareCallback();
     this.dirty = true;
   }
 
@@ -4891,6 +4969,9 @@ export class VolvoxGrid {
     this.destroyed = true;
     if (typeof this.wasm.set_event_decision_enabled === "function") {
       this.wasm.set_event_decision_enabled(this.gridId, false);
+    }
+    if (typeof this.wasm.clear_custom_compare === "function") {
+      this.wasm.clear_custom_compare(this.gridId);
     }
     if (this.animFrame) {
       cancelAnimationFrame(this.animFrame);

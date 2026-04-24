@@ -750,23 +750,36 @@ class VolvoxGridController extends ChangeNotifier {
   /// Sort the grid by one or more columns.
   ///
   /// Single-column: `sort(SortOrder.SORT_ASCENDING, col: 0)`
+  /// Custom:        `sort(SortOrder.SORT_ASCENDING, col: 0, type: SortType.SORT_TYPE_CUSTOM)`
   /// Multi-column:  `sortMulti([(0, SortOrder.SORT_ASCENDING), (2, SortOrder.SORT_DESCENDING)])`
-  Future<void> sort(SortOrder order, {int col = -1}) async {
+  Future<void> sort(SortOrder order, {int col = -1, SortType? type}) async {
+    final sortColumn = SortColumn()
+      ..col = col
+      ..order = order;
+    if (type != null) {
+      sortColumn.type = type;
+    }
     await VolvoxGridService.Sort(SortRequest()
       ..gridId = _gridId
-      ..sortColumns.add(SortColumn()
-        ..col = col
-        ..order = order));
+      ..sortColumns.add(sortColumn));
     notifyListeners();
   }
 
   /// Sort the grid by multiple columns.
-  Future<void> sortMulti(List<(int, SortOrder)> columns) async {
+  Future<void> sortMulti(
+    List<(int, SortOrder)> columns, {
+    Map<int, SortType>? types,
+  }) async {
     final req = SortRequest()..gridId = _gridId;
     for (final (col, order) in columns) {
-      req.sortColumns.add(SortColumn()
+      final sortColumn = SortColumn()
         ..col = col
-        ..order = order);
+        ..order = order;
+      final type = types?[col];
+      if (type != null) {
+        sortColumn.type = type;
+      }
+      req.sortColumns.add(sortColumn);
     }
     await VolvoxGridService.Sort(req);
     notifyListeners();

@@ -24,6 +24,14 @@ declare module "volvoxgrid" {
 
   export type VolvoxGridHeaderResizeHandleStyle = VolvoxGridHeaderResizeHandle;
 
+  export interface VolvoxGridCompareDetails {
+    row1: number;
+    row2: number;
+    col: number;
+  }
+
+  export type VolvoxGridCompareCallback = (details: VolvoxGridCompareDetails) => number;
+
   export interface VolvoxGridIconSlots {
     sortAscending?: string;
     sortDescending?: string;
@@ -300,8 +308,9 @@ declare module "volvoxgrid" {
     pinCol(col: number, pin: number): void;
     isColPinned(col: number): number;
 
-    sort(order: number, col: number): void;
-    sortMulti(cols: number[], orders: number[]): void;
+    onCompare: VolvoxGridCompareCallback | null;
+    sort(order: number, col: number, type?: number): void;
+    sortMulti(cols: number[], orders: number[], types?: number[]): void;
     autoSize(colFrom?: number, colTo?: number, equal?: boolean, maxWidth?: number): void;
     moveColumn(col: number, position: number): void;
     setEventDecisionEnabled(enabled: boolean): void;

@@ -7,6 +7,7 @@
 use prost::Message;
 use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
+use std::ffi::c_void;
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 use volvoxgrid_engine::cell::CellValueData;
@@ -86,6 +87,17 @@ static NEXT_EVENT_ID: LazyLock<Mutex<i64>> = LazyLock::new(|| Mutex::new(1));
 static DECISION_ENABLED: LazyLock<Mutex<HashSet<i64>>> =
     LazyLock::new(|| Mutex::new(HashSet::new()));
 static PENDING_ACTIONS: LazyLock<Mutex<HashMap<(i64, i64), PendingActionEntry>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+pub type CustomCompareCallback = unsafe extern "C" fn(*mut c_void, i32, i32, i32) -> i32;
+
+#[derive(Clone, Copy)]
+struct CustomCompareRegistration {
+    callback: CustomCompareCallback,
+    user_data: usize,
+}
+
+static CUSTOM_COMPARE_CALLBACKS: LazyLock<Mutex<HashMap<i64, CustomCompareRegistration>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 // ---------------------------------------------------------------------------
@@ -795,16 +807,11 @@ fn expand_sort_request_columns(
     let mut sort_keys = Vec::new();
 
     for sc in sort_columns {
-        let merged = volvoxgrid_engine::sort::merge_sort_spec(
-            volvoxgrid_engine::sort::SORT_NONE,
-            sc.order,
-            sc.r#type,
-        );
-        if merged == volvoxgrid_engine::sort::SORT_NONE {
-            continue;
-        }
         if sc.col >= 0 && sc.col < grid.cols {
-            sort_keys.push((sc.col, merged));
+            let merged = sort_request_order_for_col(grid, sc, sc.col);
+            if merged != volvoxgrid_engine::sort::SORT_NONE {
+                sort_keys.push((sc.col, merged));
+            }
             continue;
         }
 
@@ -819,11 +826,68 @@ fn expand_sort_request_columns(
         }
 
         for col in lo..=hi {
-            sort_keys.push((col, merged));
+            let merged = sort_request_order_for_col(grid, sc, col);
+            if merged != volvoxgrid_engine::sort::SORT_NONE {
+                sort_keys.push((col, merged));
+            }
         }
     }
 
     sort_keys
+}
+
+fn sort_request_order_for_col(
+    grid: &volvoxgrid_engine::grid::VolvoxGrid,
+    sc: &SortColumn,
+    col: i32,
+) -> i32 {
+    if sc.r#type.is_none() {
+        if let Some(order) = sc.order {
+            if order == volvoxgrid_engine::sort::SORT_USE_COLUMN {
+                return if col >= 0 && (col as usize) < grid.columns.len() {
+                    grid.columns[col as usize].sort_order
+                } else {
+                    volvoxgrid_engine::sort::SORT_NONE
+                };
+            }
+            if (volvoxgrid_engine::sort::SORT_NONE
+                ..=volvoxgrid_engine::sort::SORT_DESCENDING_CUSTOM)
+                .contains(&order)
+            {
+                return order;
+            }
+        }
+    }
+
+    volvoxgrid_engine::sort::merge_sort_spec(
+        volvoxgrid_engine::sort::SORT_NONE,
+        sc.order,
+        sc.r#type,
+    )
+}
+
+fn install_custom_compare_callback(
+    grid_id: i64,
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+) -> bool {
+    let registration = CUSTOM_COMPARE_CALLBACKS
+        .lock()
+        .unwrap()
+        .get(&grid_id)
+        .copied();
+
+    if let Some(registration) = registration {
+        grid.custom_compare = Some(Box::new(move |row1, row2, col| {
+            let result = unsafe {
+                (registration.callback)(registration.user_data as *mut c_void, row1, row2, col)
+            };
+            Some(result.clamp(-1, 1))
+        }));
+        true
+    } else {
+        grid.custom_compare = None;
+        false
+    }
 }
 
 fn capture_grid_picture(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) -> ImageData {
@@ -1621,9 +1685,16 @@ fn apply_committed_edit_text(
     grid.mark_dirty();
 }
 
-fn apply_before_sort(grid: &mut volvoxgrid_engine::grid::VolvoxGrid, col: i32) {
+fn apply_before_sort(grid_id: i64, grid: &mut volvoxgrid_engine::grid::VolvoxGrid, col: i32) {
     let old_sort_keys = grid.sort_state.sort_keys.clone();
+    let next_order = volvoxgrid_engine::sort::header_click_next_sort_order(grid, col);
+    if volvoxgrid_engine::sort::sort_order_is_custom(next_order) {
+        install_custom_compare_callback(grid_id, grid);
+    } else {
+        grid.custom_compare = None;
+    }
     volvoxgrid_engine::sort::handle_header_click(grid, col);
+    grid.custom_compare = None;
     if grid.sort_state.sort_keys != old_sort_keys {
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::AfterSort { col });
@@ -1683,7 +1754,7 @@ fn request_before_sort(grid_id: i64, grid: &mut volvoxgrid_engine::grid::VolvoxG
     if !decision_channel_enabled(grid_id) {
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::BeforeSort { col });
-        apply_before_sort(grid, col);
+        apply_before_sort(grid_id, grid, col);
         return;
     }
 
@@ -1924,7 +1995,7 @@ fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
             if cancel {
                 return;
             }
-            apply_before_sort(grid, col);
+            apply_before_sort(grid_id, grid, col);
         }
         PendingAction::BeforeNodeToggle { row, collapse } => {
             if cancel {
@@ -4279,6 +4350,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         RENDERERS.with(|rc| {
             rc.borrow_mut().remove(&request.id);
         });
+        CUSTOM_COMPARE_CALLBACKS.lock().unwrap().remove(&request.id);
         self.manager().destroy_grid(request.id);
         Ok(DestroyResponse {})
     }
@@ -4678,6 +4750,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
 
     fn sort(&self, request: SortRequest) -> Result<SortResponse, String> {
         self.manager().with_grid(request.grid_id, |grid| {
+            grid.custom_compare = None;
             if request.sort_columns.is_empty() {
                 grid.sort_state.clear();
                 grid.layout.invalidate();
@@ -4687,8 +4760,15 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 if sort_keys.is_empty() {
                     return;
                 }
+                if sort_keys
+                    .iter()
+                    .any(|&(_, order)| volvoxgrid_engine::sort::sort_order_is_custom(order))
+                {
+                    install_custom_compare_callback(request.grid_id, grid);
+                }
                 grid.sort_state.sort_keys = sort_keys;
                 volvoxgrid_engine::sort::sort_grid_all_multi(grid);
+                grid.custom_compare = None;
             }
         })?;
         Ok(SortResponse {})
@@ -5441,9 +5521,31 @@ pub extern "C" fn volvox_grid_destroy_grid(id: i64, out_len: *mut i32) -> *mut u
     RENDERERS.with(|rc| {
         rc.borrow_mut().remove(&id);
     });
+    CUSTOM_COMPARE_CALLBACKS.lock().unwrap().remove(&id);
     clear_grid_decision_state(id);
     GRID_MANAGER.destroy_grid(id);
     compat_alloc_empty_response(out_len)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_custom_compare_native(
+    id: i64,
+    callback: Option<CustomCompareCallback>,
+    user_data: *mut c_void,
+) -> i32 {
+    let mut callbacks = CUSTOM_COMPARE_CALLBACKS.lock().unwrap();
+    if let Some(callback) = callback {
+        callbacks.insert(
+            id,
+            CustomCompareRegistration {
+                callback,
+                user_data: user_data as usize,
+            },
+        );
+    } else {
+        callbacks.remove(&id);
+    }
+    0
 }
 
 #[no_mangle]
@@ -8346,6 +8448,22 @@ mod tests {
 
     static LAST_RENDER_ARGS: Mutex<Option<RecordedRenderArgs>> = Mutex::new(None);
 
+    struct CompareFixture {
+        lengths: [i32; 4],
+        calls: i32,
+    }
+
+    unsafe extern "C" fn test_custom_compare(
+        user_data: *mut c_void,
+        row1: i32,
+        row2: i32,
+        _col: i32,
+    ) -> i32 {
+        let fixture = unsafe { &mut *(user_data as *mut CompareFixture) };
+        fixture.calls += 1;
+        fixture.lengths[row1 as usize].cmp(&fixture.lengths[row2 as usize]) as i32
+    }
+
     unsafe extern "C" fn test_measure_text(
         _text_ptr: *const u8,
         _text_len: i32,
@@ -8398,6 +8516,113 @@ mod tests {
             clip_h,
         });
         0.0
+    }
+
+    #[test]
+    fn activex_custom_sort_uses_registered_compare_callback() {
+        let plugin = ActiveXPlugin;
+        let grid_id = volvox_grid_create_grid(160, 80, 4, 1, 1, 0, 1.0);
+        let mut fixture = CompareFixture {
+            lengths: [0, 4, 1, 2],
+            calls: 0,
+        };
+
+        GRID_MANAGER
+            .with_grid(grid_id, |g| {
+                g.cells.set_text(1, 0, "dddd".to_string());
+                g.cells.set_text(2, 0, "a".to_string());
+                g.cells.set_text(3, 0, "bb".to_string());
+            })
+            .unwrap();
+
+        assert_eq!(
+            volvox_grid_set_custom_compare_native(
+                grid_id,
+                Some(test_custom_compare),
+                (&mut fixture as *mut CompareFixture).cast::<c_void>(),
+            ),
+            0
+        );
+
+        plugin
+            .sort(SortRequest {
+                grid_id,
+                sort_columns: vec![SortColumn {
+                    col: 0,
+                    order: Some(volvoxgrid_engine::sort::SORT_ASCENDING_CUSTOM),
+                    r#type: None,
+                }],
+            })
+            .unwrap();
+
+        let got = GRID_MANAGER
+            .with_grid(grid_id, |g| {
+                (1..=3)
+                    .map(|row| g.cells.get_text(row, 0).to_string())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap();
+        assert_eq!(got, vec!["a", "bb", "dddd"]);
+        assert!(fixture.calls > 0);
+
+        let out = volvox_grid_destroy_grid(grid_id, std::ptr::null_mut());
+        if !out.is_null() {
+            unsafe {
+                volvox_grid_free(out);
+            }
+        }
+    }
+
+    #[test]
+    fn activex_header_custom_sort_uses_registered_compare_callback() {
+        let grid_id = volvox_grid_create_grid(160, 80, 4, 1, 1, 0, 1.0);
+        let mut fixture = CompareFixture {
+            lengths: [0, 4, 1, 2],
+            calls: 0,
+        };
+
+        GRID_MANAGER
+            .with_grid(grid_id, |g| {
+                g.cells.set_text(1, 0, "dddd".to_string());
+                g.cells.set_text(2, 0, "a".to_string());
+                g.cells.set_text(3, 0, "bb".to_string());
+                g.header_features = 1;
+                g.columns[0].sort_order = volvoxgrid_engine::sort::SORT_NONE;
+                g.columns[0].sort_type =
+                    volvoxgrid_engine::proto::volvoxgrid::v1::SortType::Custom as i32;
+                g.columns[0].sort_defined = true;
+            })
+            .unwrap();
+
+        assert_eq!(
+            volvox_grid_set_custom_compare_native(
+                grid_id,
+                Some(test_custom_compare),
+                (&mut fixture as *mut CompareFixture).cast::<c_void>(),
+            ),
+            0
+        );
+
+        GRID_MANAGER
+            .with_grid(grid_id, |g| apply_before_sort(grid_id, g, 0))
+            .unwrap();
+
+        let got = GRID_MANAGER
+            .with_grid(grid_id, |g| {
+                (1..=3)
+                    .map(|row| g.cells.get_text(row, 0).to_string())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap();
+        assert_eq!(got, vec!["a", "bb", "dddd"]);
+        assert!(fixture.calls > 0);
+
+        let out = volvox_grid_destroy_grid(grid_id, std::ptr::null_mut());
+        if !out.is_null() {
+            unsafe {
+                volvox_grid_free(out);
+            }
+        }
     }
 
     #[test]

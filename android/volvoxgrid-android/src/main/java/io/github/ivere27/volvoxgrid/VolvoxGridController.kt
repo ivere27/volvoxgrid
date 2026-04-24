@@ -703,20 +703,26 @@ class VolvoxGridController(
     // Sorting
     // =========================================================================
 
-    fun sort(order: SortOrder, col: Int = 0) {
+    fun sort(order: SortOrder, col: Int = 0, type: SortType? = null) {
+        val sortColumn = SortColumn.newBuilder().setCol(col).setOrder(order)
+        if (type != null) {
+            sortColumn.type = type
+        }
         service.Sort(
             SortRequest.newBuilder()
                 .setGridId(gridId)
-                .addSortColumns(SortColumn.newBuilder().setCol(col).setOrder(order))
+                .addSortColumns(sortColumn)
                 .build()
         )
     }
 
     /** Sort by multiple columns. */
-    fun sortMulti(columns: List<Pair<Int, SortOrder>>) {
+    fun sortMulti(columns: List<Pair<Int, SortOrder>>, types: Map<Int, SortType> = emptyMap()) {
         val req = SortRequest.newBuilder().setGridId(gridId)
         for ((col, order) in columns) {
-            req.addSortColumns(SortColumn.newBuilder().setCol(col).setOrder(order))
+            val sortColumn = SortColumn.newBuilder().setCol(col).setOrder(order)
+            types[col]?.let { sortColumn.type = it }
+            req.addSortColumns(sortColumn)
         }
         service.Sort(req.build())
     }

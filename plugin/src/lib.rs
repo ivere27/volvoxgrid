@@ -1,7 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{
     atomic::{AtomicI64, Ordering},
-    Mutex,
+    mpsc, Arc, Condvar, Mutex,
 };
 use std::time::{Duration, Instant};
 
@@ -974,8 +974,100 @@ struct VolvoxGridPlugin {
     next_event_id: AtomicI64,
     decision_enabled: Mutex<HashSet<i64>>,
     pending_actions: Mutex<HashMap<(i64, i64), PendingActionEntry>>,
+    compare_channels: Mutex<HashMap<i64, Arc<CompareChannel>>>,
+    active_render_sessions: Mutex<HashMap<i64, usize>>,
     zoom_levels: Mutex<HashMap<i64, f64>>,
     loaded_font_data: Mutex<Vec<Vec<u8>>>,
+}
+
+struct PendingCompare {
+    request_id: i64,
+    row1: i32,
+    row2: i32,
+    col: i32,
+}
+
+struct CompareChannel {
+    next_request_id: AtomicI64,
+    pending_cv: Condvar,
+    pending: Mutex<VecDeque<PendingCompare>>,
+    responses: Mutex<HashMap<i64, mpsc::Sender<i32>>>,
+}
+
+impl CompareChannel {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            next_request_id: AtomicI64::new(1),
+            pending_cv: Condvar::new(),
+            pending: Mutex::new(VecDeque::new()),
+            responses: Mutex::new(HashMap::new()),
+        })
+    }
+
+    fn compare(&self, row1: i32, row2: i32, col: i32, timeout: Duration) -> Option<i32> {
+        let request_id = self.next_request_id.fetch_add(1, Ordering::Relaxed);
+        let (response_tx, response_rx) = mpsc::channel();
+        self.responses
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(request_id, response_tx);
+
+        self.pending
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push_back(PendingCompare {
+                request_id,
+                row1,
+                row2,
+                col,
+            });
+        self.pending_cv.notify_all();
+
+        match response_rx.recv_timeout(timeout) {
+            Ok(result) => Some(result.signum()),
+            Err(_) => {
+                self.responses
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .remove(&request_id);
+                None
+            }
+        }
+    }
+
+    fn drain_pending(&self) -> Vec<PendingCompare> {
+        let mut q = self.pending.lock().unwrap_or_else(|e| e.into_inner());
+        q.drain(..).collect()
+    }
+
+    fn has_pending(&self) -> bool {
+        !self
+            .pending
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .is_empty()
+    }
+
+    fn wait_for_pending_timeout(&self, timeout: Duration) {
+        let q = self.pending.lock().unwrap_or_else(|e| e.into_inner());
+        if q.is_empty() {
+            let _guard = self
+                .pending_cv
+                .wait_timeout(q, timeout)
+                .unwrap_or_else(|e| e.into_inner());
+        }
+    }
+
+    fn deliver_response(&self, request_id: i64, result: i32) -> bool {
+        let response_tx = self
+            .responses
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&request_id);
+        response_tx
+            .map(|tx| tx.send(result.signum()).is_ok())
+            .unwrap_or(false)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -1067,12 +1159,16 @@ struct ZoomGestureState {
 
 impl VolvoxGridPlugin {
     const DECISION_TIMEOUT: Duration = Duration::from_millis(250);
+    const COMPARE_RESPONSE_TIMEOUT: Duration = Duration::from_millis(250);
+    const EVENT_STREAM_IDLE_POLL: Duration = Duration::from_millis(10);
 
     fn new() -> Self {
         Self {
             next_event_id: AtomicI64::new(1),
             decision_enabled: Mutex::new(HashSet::new()),
             pending_actions: Mutex::new(HashMap::new()),
+            compare_channels: Mutex::new(HashMap::new()),
+            active_render_sessions: Mutex::new(HashMap::new()),
             zoom_levels: Mutex::new(HashMap::new()),
             loaded_font_data: Mutex::new(Vec::new()),
         }
@@ -1629,13 +1725,70 @@ fn apply_zoom_scale(
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_zoom_scale, capture_zoom_state, should_request_pointer_header_sort, VolvoxGridPlugin,
+        apply_zoom_scale, capture_zoom_state, should_request_pointer_header_sort,
+        PluginStreamSender, VolvoxGridPlugin, VolvoxGridServicePlugin,
     };
+    use std::collections::{HashMap, HashSet};
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    };
+    use std::time::Duration;
     use volvoxgrid_engine::event::GridEventData;
     use volvoxgrid_engine::grid::VolvoxGrid;
     use volvoxgrid_engine::input::{HitArea, HitTestResult};
     use volvoxgrid_engine::proto::volvoxgrid::v1 as pb;
     use volvoxgrid_engine::style::{CellStylePatch, Padding};
+
+    struct AutoCompareEventStream {
+        plugin: Arc<VolvoxGridPlugin>,
+        grid_id: i64,
+        compare: Arc<dyn Fn(&pb::CompareEvent) -> i32 + Send + Sync>,
+        events: Mutex<Vec<pb::GridEvent>>,
+        cancelled: AtomicBool,
+    }
+
+    impl AutoCompareEventStream {
+        fn new(
+            plugin: Arc<VolvoxGridPlugin>,
+            grid_id: i64,
+            compare: Arc<dyn Fn(&pb::CompareEvent) -> i32 + Send + Sync>,
+        ) -> Self {
+            Self {
+                plugin,
+                grid_id,
+                compare,
+                events: Mutex::new(Vec::new()),
+                cancelled: AtomicBool::new(false),
+            }
+        }
+
+        fn cancel(&self) {
+            self.cancelled.store(true, Ordering::SeqCst);
+        }
+    }
+
+    impl PluginStreamSender<pb::GridEvent> for AutoCompareEventStream {
+        fn send(&self, msg: pb::GridEvent) -> bool {
+            if self.is_cancelled() {
+                return false;
+            }
+            if let Some(pb::grid_event::Event::Compare(compare)) = msg.event.as_ref() {
+                let result = (self.compare)(compare);
+                self.plugin
+                    .deliver_compare_response(self.grid_id, compare.request_id, result);
+            }
+            self.events
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(msg);
+            true
+        }
+
+        fn is_cancelled(&self) -> bool {
+            self.cancelled.load(Ordering::SeqCst)
+        }
+    }
 
     fn plugin_with_decision_grid(rows: i32, cols: i32) -> (VolvoxGridPlugin, i64) {
         let plugin = VolvoxGridPlugin::new();
@@ -1680,6 +1833,226 @@ mod tests {
     fn destroy_test_grid(plugin: &VolvoxGridPlugin, grid_id: i64) {
         plugin.clear_grid_state(grid_id);
         plugin.manager().destroy_grid(grid_id);
+    }
+
+    #[test]
+    fn compare_event_stream_emits_while_grid_lock_is_held() {
+        let plugin = Arc::new(VolvoxGridPlugin::new());
+        let grid_id = plugin.manager().create_grid(320, 160, 3, 1, 1, 0, 1.0);
+        let mut session_grid_ids = HashSet::new();
+        plugin.register_render_session_grid(grid_id, &mut session_grid_ids);
+        let compare = plugin
+            .install_compare_channel(grid_id)
+            .expect("compare channel should install with an active render session");
+        let grid_arc = plugin.manager().get_grid(grid_id).expect("grid exists");
+        let grid_guard = grid_arc.lock().unwrap_or_else(|e| e.into_inner());
+        let stream = AutoCompareEventStream::new(Arc::clone(&plugin), grid_id, Arc::new(|_| -1));
+
+        std::thread::scope(|scope| {
+            let plugin_for_stream = Arc::clone(&plugin);
+            let stream_ref = &stream;
+            let handle = scope.spawn(move || {
+                plugin_for_stream
+                    .event_stream(pb::GridHandle { id: grid_id }, stream_ref)
+                    .expect("event stream should exit cleanly");
+            });
+
+            std::thread::sleep(Duration::from_millis(30));
+            let result = compare(2, 1, 0);
+            stream.cancel();
+            drop(grid_guard);
+            handle.join().expect("event stream thread should not panic");
+
+            assert_eq!(result, Some(-1));
+        });
+
+        let events = stream.events.lock().unwrap_or_else(|e| e.into_inner());
+        assert!(events.iter().any(|event| matches!(
+            event.event.as_ref(),
+            Some(pb::grid_event::Event::Compare(_))
+        )));
+        drop(events);
+        destroy_test_grid(&plugin, grid_id);
+    }
+
+    #[test]
+    fn sort_custom_uses_compare_event_stream_responses() {
+        let plugin = Arc::new(VolvoxGridPlugin::new());
+        let grid_id = plugin.manager().create_grid(320, 160, 6, 1, 1, 0, 1.0);
+        let values = ["dddd", "a", "ccc", "bb", "eeeee"];
+        let mut lengths = HashMap::new();
+        plugin
+            .with_grid(grid_id, |grid| {
+                for (i, value) in values.iter().enumerate() {
+                    let row = (i as i32) + 1;
+                    grid.cells.set_text(row, 0, (*value).to_string());
+                    lengths.insert(row, value.len());
+                }
+            })
+            .unwrap();
+
+        let mut session_grid_ids = HashSet::new();
+        plugin.register_render_session_grid(grid_id, &mut session_grid_ids);
+        let compare_lengths = Arc::new(lengths);
+        let stream = AutoCompareEventStream::new(
+            Arc::clone(&plugin),
+            grid_id,
+            Arc::new(move |event| {
+                let a = compare_lengths
+                    .get(&event.row1)
+                    .copied()
+                    .unwrap_or_default();
+                let b = compare_lengths
+                    .get(&event.row2)
+                    .copied()
+                    .unwrap_or_default();
+                match a.cmp(&b) {
+                    std::cmp::Ordering::Less => -1,
+                    std::cmp::Ordering::Equal => 0,
+                    std::cmp::Ordering::Greater => 1,
+                }
+            }),
+        );
+
+        std::thread::scope(|scope| {
+            let plugin_for_stream = Arc::clone(&plugin);
+            let stream_ref = &stream;
+            let handle = scope.spawn(move || {
+                plugin_for_stream
+                    .event_stream(pb::GridHandle { id: grid_id }, stream_ref)
+                    .expect("event stream should exit cleanly");
+            });
+
+            plugin
+                .sort(pb::SortRequest {
+                    grid_id,
+                    sort_columns: vec![pb::SortColumn {
+                        col: 0,
+                        order: Some(pb::SortOrder::SortAscending as i32),
+                        r#type: Some(pb::SortType::Custom as i32),
+                    }],
+                })
+                .expect("custom sort should complete");
+            stream.cancel();
+            handle.join().expect("event stream thread should not panic");
+        });
+
+        plugin
+            .with_grid(grid_id, |grid| {
+                let got: Vec<String> = (1..=5)
+                    .map(|row| grid.cells.get_text(row, 0).to_string())
+                    .collect();
+                assert_eq!(got, vec!["a", "bb", "ccc", "dddd", "eeeee"]);
+            })
+            .unwrap();
+
+        let compare_count = stream
+            .events
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event.event.as_ref(),
+                    Some(pb::grid_event::Event::Compare(_))
+                )
+            })
+            .count();
+        assert!(
+            compare_count > 0,
+            "custom sort must ask the host to compare"
+        );
+        destroy_test_grid(&plugin, grid_id);
+    }
+
+    #[test]
+    fn header_click_custom_uses_compare_event_stream_responses() {
+        let plugin = Arc::new(VolvoxGridPlugin::new());
+        let grid_id = plugin.manager().create_grid(320, 160, 6, 1, 1, 0, 1.0);
+        let values = ["dddd", "a", "ccc", "bb", "eeeee"];
+        let mut lengths = HashMap::new();
+        plugin
+            .with_grid(grid_id, |grid| {
+                grid.header_features = 1;
+                grid.columns[0].sort_order = volvoxgrid_engine::sort::SORT_ASCENDING_CUSTOM;
+                grid.columns[0].sort_defined = true;
+                for (i, value) in values.iter().enumerate() {
+                    let row = (i as i32) + 1;
+                    grid.cells.set_text(row, 0, (*value).to_string());
+                    lengths.insert(row, value.len());
+                }
+            })
+            .unwrap();
+
+        let mut session_grid_ids = HashSet::new();
+        plugin.register_render_session_grid(grid_id, &mut session_grid_ids);
+        let compare_lengths = Arc::new(lengths);
+        let stream = AutoCompareEventStream::new(
+            Arc::clone(&plugin),
+            grid_id,
+            Arc::new(move |event| {
+                let a = compare_lengths
+                    .get(&event.row1)
+                    .copied()
+                    .unwrap_or_default();
+                let b = compare_lengths
+                    .get(&event.row2)
+                    .copied()
+                    .unwrap_or_default();
+                match a.cmp(&b) {
+                    std::cmp::Ordering::Less => -1,
+                    std::cmp::Ordering::Equal => 0,
+                    std::cmp::Ordering::Greater => 1,
+                }
+            }),
+        );
+
+        std::thread::scope(|scope| {
+            let plugin_for_stream = Arc::clone(&plugin);
+            let stream_ref = &stream;
+            let handle = scope.spawn(move || {
+                plugin_for_stream
+                    .event_stream(pb::GridHandle { id: grid_id }, stream_ref)
+                    .expect("event stream should exit cleanly");
+            });
+
+            plugin
+                .with_grid(grid_id, |grid| plugin.request_before_sort(grid_id, grid, 0))
+                .expect("header custom sort should complete");
+            stream.cancel();
+            handle.join().expect("event stream thread should not panic");
+        });
+
+        plugin
+            .with_grid(grid_id, |grid| {
+                let got: Vec<String> = (1..=5)
+                    .map(|row| grid.cells.get_text(row, 0).to_string())
+                    .collect();
+                assert_eq!(got, vec!["a", "bb", "ccc", "dddd", "eeeee"]);
+                assert_eq!(
+                    grid.sort_state.sort_keys,
+                    vec![(0, volvoxgrid_engine::sort::SORT_ASCENDING_CUSTOM)]
+                );
+            })
+            .unwrap();
+
+        let compare_count = stream
+            .events
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event.event.as_ref(),
+                    Some(pb::grid_event::Event::Compare(_))
+                )
+            })
+            .count();
+        assert!(
+            compare_count > 0,
+            "header custom sort must ask the host to compare"
+        );
+        destroy_test_grid(&plugin, grid_id);
     }
 
     #[test]
@@ -2284,15 +2657,15 @@ fn engine_event_to_proto(
         E::BeforeSort { col } => Some(grid_event::Event::BeforeSort(BeforeSortEvent { col })),
         E::AfterSort { col } => Some(grid_event::Event::AfterSort(AfterSortEvent { col })),
         E::Compare {
+            request_id,
             row1,
             row2,
             col,
-            result,
         } => Some(grid_event::Event::Compare(CompareEvent {
+            request_id,
             row1,
             row2,
             col,
-            result,
         })),
         E::BeforeNodeToggle { row, collapse } => {
             Some(grid_event::Event::BeforeNodeToggle(BeforeNodeToggleEvent {
@@ -2941,15 +3314,6 @@ fn apply_committed_edit_text(
     grid.mark_dirty();
 }
 
-fn apply_before_sort(grid: &mut volvoxgrid_engine::grid::VolvoxGrid, col: i32) {
-    let old_sort_keys = grid.sort_state.sort_keys.clone();
-    volvoxgrid_engine::sort::handle_header_click(grid, col);
-    if grid.sort_state.sort_keys != old_sort_keys {
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::AfterSort { col });
-    }
-}
-
 fn expand_sort_request_columns(
     grid: &volvoxgrid_engine::grid::VolvoxGrid,
     sort_columns: &[SortColumn],
@@ -3010,6 +3374,122 @@ impl VolvoxGridPlugin {
             .insert(grid_id);
     }
 
+    fn register_render_session_grid(&self, grid_id: i64, session_grid_ids: &mut HashSet<i64>) {
+        if grid_id <= 0 || !session_grid_ids.insert(grid_id) {
+            return;
+        }
+        let mut sessions = self
+            .active_render_sessions
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        *sessions.entry(grid_id).or_insert(0) += 1;
+    }
+
+    fn unregister_render_session_grids(&self, session_grid_ids: &HashSet<i64>) {
+        if session_grid_ids.is_empty() {
+            return;
+        }
+        let mut sessions = self
+            .active_render_sessions
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        for grid_id in session_grid_ids {
+            let remove = if let Some(count) = sessions.get_mut(grid_id) {
+                if *count > 1 {
+                    *count -= 1;
+                    false
+                } else {
+                    true
+                }
+            } else {
+                false
+            };
+            if remove {
+                sessions.remove(grid_id);
+            }
+        }
+    }
+
+    fn compare_session_active(&self, grid_id: i64) -> bool {
+        self.active_render_sessions
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&grid_id)
+            .copied()
+            .unwrap_or(0)
+            > 0
+    }
+
+    fn install_compare_channel(
+        &self,
+        grid_id: i64,
+    ) -> Option<Box<volvoxgrid_engine::grid::CustomCompareFn>> {
+        if !self.compare_session_active(grid_id) {
+            return None;
+        }
+
+        let channel = CompareChannel::new();
+        self.compare_channels
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(grid_id, Arc::clone(&channel));
+
+        let timeout = Self::COMPARE_RESPONSE_TIMEOUT;
+        Some(Box::new(move |row1, row2, col| {
+            channel.compare(row1, row2, col, timeout)
+        }))
+    }
+
+    fn clear_compare_channel(&self, grid_id: i64) {
+        self.compare_channels
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&grid_id);
+    }
+
+    fn apply_before_sort_with_compare(
+        &self,
+        grid_id: i64,
+        grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+        col: i32,
+    ) {
+        let old_sort_keys = grid.sort_state.sort_keys.clone();
+        let next_order = volvoxgrid_engine::sort::header_click_next_sort_order(grid, col);
+        self.clear_compare_channel(grid_id);
+        if volvoxgrid_engine::sort::sort_order_is_custom(next_order) {
+            grid.custom_compare = self.install_compare_channel(grid_id);
+        }
+
+        volvoxgrid_engine::sort::handle_header_click(grid, col);
+        grid.custom_compare = None;
+        self.clear_compare_channel(grid_id);
+
+        if grid.sort_state.sort_keys != old_sort_keys {
+            grid.events
+                .push(volvoxgrid_engine::event::GridEventData::AfterSort { col });
+        }
+    }
+
+    fn lookup_compare_channel(&self, grid_id: i64) -> Option<Arc<CompareChannel>> {
+        self.compare_channels
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&grid_id)
+            .cloned()
+    }
+
+    fn deliver_compare_response(&self, grid_id: i64, request_id: i64, result: i32) -> bool {
+        let channel = self
+            .compare_channels
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&grid_id)
+            .cloned();
+        channel
+            .map(|channel| channel.deliver_response(request_id, result))
+            .unwrap_or(false)
+    }
+
     fn clear_grid_state(&self, grid_id: i64) {
         self.decision_enabled
             .lock()
@@ -3019,6 +3499,11 @@ impl VolvoxGridPlugin {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .retain(|(pending_grid, _), _| *pending_grid != grid_id);
+        self.clear_compare_channel(grid_id);
+        self.active_render_sessions
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&grid_id);
         self.zoom_levels
             .lock()
             .unwrap_or_else(|e| e.into_inner())
@@ -3166,7 +3651,7 @@ impl VolvoxGridPlugin {
         if !self.decision_channel_enabled(grid_id) {
             grid.events
                 .push(volvoxgrid_engine::event::GridEventData::BeforeSort { col });
-            apply_before_sort(grid, col);
+            self.apply_before_sort_with_compare(grid_id, grid, col);
             return;
         }
 
@@ -3597,7 +4082,7 @@ impl VolvoxGridPlugin {
                     return None;
                 }
                 let _ = self.manager().with_grid(grid_id, |grid| {
-                    apply_before_sort(grid, col);
+                    self.apply_before_sort_with_compare(grid_id, grid, col);
                 });
                 None
             }
@@ -4248,7 +4733,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
     // ── Actions ──
 
     fn sort(&self, request: SortRequest) -> PluginResult<SortResponse> {
-        self.with_grid(request.grid_id, |grid| {
+        self.clear_compare_channel(request.grid_id);
+        let sort_result = self.with_grid(request.grid_id, |grid| {
             if request.sort_columns.is_empty() {
                 // No columns — clear sort state
                 grid.sort_state.clear();
@@ -4259,10 +4745,20 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 if sort_keys.is_empty() {
                     return;
                 }
+                let has_custom = sort_keys.iter().any(|&(_, order)| {
+                    order == volvoxgrid_engine::sort::SORT_ASCENDING_CUSTOM
+                        || order == volvoxgrid_engine::sort::SORT_DESCENDING_CUSTOM
+                });
+                if has_custom {
+                    grid.custom_compare = self.install_compare_channel(request.grid_id);
+                }
                 grid.sort_state.sort_keys = sort_keys;
                 volvoxgrid_engine::sort::sort_grid_all_multi(grid);
+                grid.custom_compare = None;
             }
-        })?;
+        });
+        self.clear_compare_channel(request.grid_id);
+        sort_result?;
         Ok(SortResponse {})
     }
 
@@ -4650,18 +5146,30 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         let mut last_mem_calc: HashMap<i64, Instant> = HashMap::new();
         let mut sent_edit_requests: HashMap<i64, SentEditRequest> = HashMap::new();
         let mut zoom_sessions: HashMap<i64, ZoomGestureState> = HashMap::new();
+        let mut session_grid_ids: HashSet<i64> = HashSet::new();
 
-        while let Some(input) = stream.recv() {
+        loop {
+            let input = match stream.recv() {
+                Some(input) => input,
+                None => break,
+            };
             let grid_id = input.grid_id;
-            for output in self.resolve_expired_actions(grid_id) {
-                if !terminal_session.suppress_aux_outputs() {
-                    send_render_output_tracked(
-                        self,
-                        stream,
-                        &mut sent_edit_requests,
-                        grid_id,
-                        output,
-                    );
+            self.register_render_session_grid(grid_id, &mut session_grid_ids);
+            let is_compare_response = matches!(
+                input.input.as_ref(),
+                Some(render_input::Input::CompareResponse(_))
+            );
+            if !is_compare_response {
+                for output in self.resolve_expired_actions(grid_id) {
+                    if !terminal_session.suppress_aux_outputs() {
+                        send_render_output_tracked(
+                            self,
+                            stream,
+                            &mut sent_edit_requests,
+                            grid_id,
+                            output,
+                        );
+                    }
                 }
             }
 
@@ -5605,6 +6113,14 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                     });
                 }
 
+                Some(render_input::Input::CompareResponse(response)) => {
+                    self.deliver_compare_response(grid_id, response.request_id, response.result);
+                    stream.send(RenderOutput {
+                        rendered: false,
+                        event: None,
+                    });
+                }
+
                 None => {
                     stream.send(RenderOutput {
                         rendered: false,
@@ -5613,6 +6129,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 }
             }
         }
+        self.unregister_render_session_grids(&session_grid_ids);
         Ok(())
     }
 
@@ -5624,29 +6141,43 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         stream: &dyn PluginStreamSender<GridEvent>,
     ) -> PluginResult<()> {
         let grid_id = request.id;
-        let (grid_arc, event_cv, destroyed) = self
+        let (grid_arc, _event_cv, destroyed) = self
             .manager()
             .get_grid_waiter(grid_id)
             .map_err(map_plugin_error)?;
 
         loop {
-            let event_list = {
-                let mut grid = grid_arc.lock().unwrap_or_else(|e| e.into_inner());
-                while grid.events.is_empty()
-                    && !destroyed.load(Ordering::SeqCst)
-                    && !stream.is_cancelled()
-                {
-                    let waited = event_cv
-                        .wait_timeout(grid, Duration::from_millis(50))
-                        .unwrap_or_else(|e| e.into_inner());
-                    grid = waited.0;
-                }
+            if destroyed.load(Ordering::SeqCst) || stream.is_cancelled() {
+                return Ok(());
+            }
 
-                if destroyed.load(Ordering::SeqCst) || stream.is_cancelled() {
+            for pending in self
+                .lookup_compare_channel(grid_id)
+                .map(|c| c.drain_pending())
+                .unwrap_or_default()
+            {
+                let proto_evt = GridEvent {
+                    grid_id,
+                    event_id: 0,
+                    event: Some(grid_event::Event::Compare(CompareEvent {
+                        request_id: pending.request_id,
+                        row1: pending.row1,
+                        row2: pending.row2,
+                        col: pending.col,
+                    })),
+                };
+                if !stream.send(proto_evt) {
                     return Ok(());
                 }
+            }
 
-                grid.events.drain()
+            let event_list = match grid_arc.try_lock() {
+                Ok(mut grid) => grid.events.drain(),
+                Err(std::sync::TryLockError::Poisoned(poisoned)) => {
+                    let mut grid = poisoned.into_inner();
+                    grid.events.drain()
+                }
+                Err(std::sync::TryLockError::WouldBlock) => Vec::new(),
             };
 
             for evt in event_list {
@@ -5654,6 +6185,18 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 if proto_evt.event.is_some() && !stream.send(proto_evt) {
                     return Ok(());
                 }
+            }
+
+            if destroyed.load(Ordering::SeqCst) || stream.is_cancelled() {
+                return Ok(());
+            }
+
+            if let Some(channel) = self.lookup_compare_channel(grid_id) {
+                if !channel.has_pending() {
+                    channel.wait_for_pending_timeout(Self::EVENT_STREAM_IDLE_POLL);
+                }
+            } else {
+                std::thread::sleep(Self::EVENT_STREAM_IDLE_POLL);
             }
         }
     }

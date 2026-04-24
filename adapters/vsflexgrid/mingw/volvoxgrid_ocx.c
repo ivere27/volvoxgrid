@@ -369,16 +369,81 @@ static int vfg_varint_len(uint64_t v) {
     return n;
 }
 
+static void vfg_map_sort_spec(int32_t spec, int32_t *order, int32_t *type, int *has_type) {
+    if (order) *order = spec;
+    if (type) *type = 0;
+    if (has_type) *has_type = 0;
+
+    switch (spec) {
+    case 0:
+        if (order) *order = 0;
+        break;
+    case 1:
+        if (order) *order = 1;
+        break;
+    case 2:
+        if (order) *order = 2;
+        break;
+    case 3:
+        if (order) *order = 1;
+        if (type) *type = 1;
+        if (has_type) *has_type = 1;
+        break;
+    case 4:
+        if (order) *order = 2;
+        if (type) *type = 1;
+        if (has_type) *has_type = 1;
+        break;
+    case 5:
+        if (order) *order = 1;
+        if (type) *type = 3;
+        if (has_type) *has_type = 1;
+        break;
+    case 6:
+        if (order) *order = 2;
+        if (type) *type = 3;
+        if (has_type) *has_type = 1;
+        break;
+    case 7:
+        if (order) *order = 1;
+        if (type) *type = 2;
+        if (has_type) *has_type = 1;
+        break;
+    case 8:
+        if (order) *order = 2;
+        if (type) *type = 2;
+        if (has_type) *has_type = 1;
+        break;
+    case 9:
+        if (order) *order = 1;
+        if (type) *type = 4;
+        if (has_type) *has_type = 1;
+        break;
+    case 11:
+        if (order) *order = 2;
+        if (type) *type = 4;
+        if (has_type) *has_type = 1;
+        break;
+    default:
+        break;
+    }
+}
+
 /* Sort now uses protobuf-encoded SortRequest (repeated SortColumn). */
 static int32_t volvox_grid_sort_compat(int64_t grid_id, int32_t order, int32_t col) {
     /*  SortRequest {
      *    int64 grid_id      = 1;  // varint
      *    repeated SortColumn sort_columns = 2;  // length-delimited
-     *      SortColumn { int32 col = 1; FlexSortSpec order = 2; }
+     *      SortColumn { int32 col = 1; optional SortOrder order = 2; optional SortType type = 3; }
      *  }
      */
     uint8_t buf[64];
     int pos = 0;
+    int32_t proto_order = order;
+    int32_t proto_type = 0;
+    int has_type = 0;
+
+    vfg_map_sort_spec(order, &proto_order, &proto_type, &has_type);
 
     /* field 1: grid_id (varint, tag = 0x08) */
     buf[pos++] = 0x08;
@@ -391,9 +456,14 @@ static int32_t volvox_grid_sort_compat(int64_t grid_id, int32_t order, int32_t c
     inner[ilen++] = 0x08;
     ilen += vfg_write_varint(inner + ilen, (uint64_t)(uint32_t)col);
     /* SortColumn.order (field 2, varint, tag = 0x10) */
-    if (order != 0) {
+    if (proto_order != 0) {
         inner[ilen++] = 0x10;
-        ilen += vfg_write_varint(inner + ilen, (uint64_t)(uint32_t)order);
+        ilen += vfg_write_varint(inner + ilen, (uint64_t)(uint32_t)proto_order);
+    }
+    /* SortColumn.type (field 3, varint, tag = 0x18) */
+    if (has_type) {
+        inner[ilen++] = 0x18;
+        ilen += vfg_write_varint(inner + ilen, (uint64_t)(uint32_t)proto_type);
     }
     buf[pos++] = 0x12;
     pos += vfg_write_varint(buf + pos, (uint64_t)ilen);
@@ -496,6 +566,8 @@ static HRESULT vfg_rebind_ado_source(VolvoxGridObject *obj);
 static int32_t vfg_bound_selector_cols(VolvoxGridObject *obj);
 static int32_t vfg_bound_allows_zero_fixed_cols(VolvoxGridObject *obj);
 static HRESULT vfg_fire_event(VolvoxGridObject *obj, DISPID dispid, VARIANT *args, UINT cArgs);
+static int32_t vfg_custom_compare_callback(
+    void *user_data, int32_t row1, int32_t row2, int32_t col);
 
 
 static uint8_t *vfg_native_set_rows(int64_t grid_id, int32_t rows, int32_t *out_len) {
@@ -2232,6 +2304,7 @@ static ULONG STDMETHODCALLTYPE VFG_Release(IDispatch *This) {
         if (obj->host_app_name) SysFreeString(obj->host_app_name);
         if (obj->host_obj_name) SysFreeString(obj->host_obj_name);
         if (obj->grid_id >= 0) {
+            volvox_grid_set_custom_compare_native(obj->grid_id, NULL, NULL);
             volvox_grid_destroy_grid(obj->grid_id);
         }
         HeapFree(GetProcessHeap(), 0, obj);
@@ -3729,6 +3802,26 @@ static HRESULT vfg_fire_before_sort_event(
     VariantInit(&args[1]); args[1].vt = VT_I4; args[1].lVal = col;
     VariantInit(&args[0]); args[0].vt = VT_BYREF | VT_I2; args[0].piVal = order_io;
     return vfg_fire_event(obj, DISPID_VFG_EVT_BEFORESORT, args, 2);
+}
+
+static int32_t vfg_custom_compare_callback(
+    void *user_data, int32_t row1, int32_t row2, int32_t col)
+{
+    VolvoxGridObject *obj = (VolvoxGridObject *)user_data;
+    short cmp = 0;
+    VARIANT args[3];
+    (void)col;
+
+    if (!obj) return 0;
+
+    VariantInit(&args[2]); args[2].vt = VT_I4; args[2].lVal = row1;
+    VariantInit(&args[1]); args[1].vt = VT_I4; args[1].lVal = row2;
+    VariantInit(&args[0]); args[0].vt = VT_BYREF | VT_I2; args[0].piVal = &cmp;
+    vfg_fire_event(obj, DISPID_VFG_EVT_COMPARE, args, 3);
+
+    if (cmp < 0) return -1;
+    if (cmp > 0) return 1;
+    return 0;
 }
 
 static HRESULT vfg_fire_before_data_refresh_event(
@@ -11462,6 +11555,10 @@ HRESULT VolvoxGrid_CreateInstance(IUnknown *pOuter, REFIID riid, void **ppv) {
     /* Match the legacy control's fresh-instance default geometry. */
     obj->grid_id = volvox_grid_create_grid(640, 480, 50, 10, 1, 1, 1.0f);
     vfg_register_object(obj);
+    volvox_grid_set_custom_compare_native(
+        obj->grid_id,
+        vfg_custom_compare_callback,
+        obj);
     vfg_sync_selection_cache_from_cursor(obj);
 
     /* Register GDI text renderer for pixel-perfect Windows text */

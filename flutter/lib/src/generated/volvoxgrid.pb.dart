@@ -15241,6 +15241,7 @@ enum RenderInput_Input {
   terminalCapabilities,
   terminalViewport,
   terminalCommand,
+  compareResponse,
   notSet
 }
 
@@ -15259,6 +15260,7 @@ class RenderInput extends $pb.GeneratedMessage {
     TerminalCapabilities? terminalCapabilities,
     TerminalViewport? terminalViewport,
     TerminalCommand? terminalCommand,
+    CompareResponse? compareResponse,
   }) {
     final result = create();
     if (gridId != null) result.gridId = gridId;
@@ -15275,6 +15277,7 @@ class RenderInput extends $pb.GeneratedMessage {
       result.terminalCapabilities = terminalCapabilities;
     if (terminalViewport != null) result.terminalViewport = terminalViewport;
     if (terminalCommand != null) result.terminalCommand = terminalCommand;
+    if (compareResponse != null) result.compareResponse = compareResponse;
     return result;
   }
 
@@ -15301,13 +15304,14 @@ class RenderInput extends $pb.GeneratedMessage {
     11: RenderInput_Input.terminalCapabilities,
     12: RenderInput_Input.terminalViewport,
     13: RenderInput_Input.terminalCommand,
+    14: RenderInput_Input.compareResponse,
     0: RenderInput_Input.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'RenderInput',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..oo(0, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
+    ..oo(0, [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
     ..aInt64(1, _omitFieldNames ? '' : 'gridId')
     ..aOM<ViewportState>(2, _omitFieldNames ? '' : 'viewport',
         subBuilder: ViewportState.create)
@@ -15334,6 +15338,8 @@ class RenderInput extends $pb.GeneratedMessage {
         subBuilder: TerminalViewport.create)
     ..aOM<TerminalCommand>(13, _omitFieldNames ? '' : 'terminalCommand',
         subBuilder: TerminalCommand.create)
+    ..aOM<CompareResponse>(14, _omitFieldNames ? '' : 'compareResponse',
+        subBuilder: CompareResponse.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -15367,6 +15373,7 @@ class RenderInput extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
+  @$pb.TagNumber(14)
   RenderInput_Input whichInput() => _RenderInput_InputByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(2)
   @$pb.TagNumber(3)
@@ -15380,6 +15387,7 @@ class RenderInput extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   @$pb.TagNumber(12)
   @$pb.TagNumber(13)
+  @$pb.TagNumber(14)
   void clearInput() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -15522,6 +15530,86 @@ class RenderInput extends $pb.GeneratedMessage {
   void clearTerminalCommand() => $_clearField(13);
   @$pb.TagNumber(13)
   TerminalCommand ensureTerminalCommand() => $_ensure(12);
+
+  @$pb.TagNumber(14)
+  CompareResponse get compareResponse => $_getN(13);
+  @$pb.TagNumber(14)
+  set compareResponse(CompareResponse value) => $_setField(14, value);
+  @$pb.TagNumber(14)
+  $core.bool hasCompareResponse() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearCompareResponse() => $_clearField(14);
+  @$pb.TagNumber(14)
+  CompareResponse ensureCompareResponse() => $_ensure(13);
+}
+
+/// Host response to a CompareEvent emitted on EventStream during
+/// SORT_TYPE_CUSTOM. result: <0 = row1 before row2, 0 = equal,
+/// >0 = row1 after row2. request_id must echo the CompareEvent.
+class CompareResponse extends $pb.GeneratedMessage {
+  factory CompareResponse({
+    $fixnum.Int64? requestId,
+    $core.int? result,
+  }) {
+    final result$ = create();
+    if (requestId != null) result$.requestId = requestId;
+    if (result != null) result$.result = result;
+    return result$;
+  }
+
+  CompareResponse._();
+
+  factory CompareResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CompareResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CompareResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'requestId')
+    ..aI(2, _omitFieldNames ? '' : 'result')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CompareResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CompareResponse copyWith(void Function(CompareResponse) updates) =>
+      super.copyWith((message) => updates(message as CompareResponse))
+          as CompareResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CompareResponse create() => CompareResponse._();
+  @$core.override
+  CompareResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CompareResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CompareResponse>(create);
+  static CompareResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get requestId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set requestId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get result => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set result($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasResult() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearResult() => $_clearField(2);
 }
 
 class ViewportState extends $pb.GeneratedMessage {
@@ -16481,8 +16569,9 @@ class GpuSurfaceReady extends $pb.GeneratedMessage {
 /// render_session loop iteration.
 ///
 /// Cancelable events: BeforeEdit, CellEditValidate, BeforeSort,
-/// CellFocusChanging, SelectionChanging, BeforeNodeToggle,
-/// BeforeUserResize, BeforeMoveColumn, BeforeMoveRow.
+/// BeforeNodeToggle, BeforeScroll, BeforeUserResize, BeforeMoveColumn,
+/// BeforeMoveRow, BeforeMouseDown. Print-only BeforePageBreak is emitted
+/// during synchronous rendering and is informational in this API.
 class EventDecision extends $pb.GeneratedMessage {
   factory EventDecision({
     $fixnum.Int64? gridId,
@@ -20472,20 +20561,23 @@ class AfterSortEvent extends $pb.GeneratedMessage {
   void clearCol() => $_clearField(1);
 }
 
-/// Fired for SORT_TYPE_CUSTOM: host returns comparison result.
+/// Synchronous request for SORT_TYPE_CUSTOM. The host must reply on
+/// the RenderSession with a CompareResponse echoing request_id.
+/// The engine waits up to 250 ms; on timeout the comparison falls
+/// back to the generic/date path used by SORT_TYPE_AUTO.
 class CompareEvent extends $pb.GeneratedMessage {
   factory CompareEvent({
+    $fixnum.Int64? requestId,
     $core.int? row1,
     $core.int? row2,
     $core.int? col,
-    $core.int? result,
   }) {
-    final result$ = create();
-    if (row1 != null) result$.row1 = row1;
-    if (row2 != null) result$.row2 = row2;
-    if (col != null) result$.col = col;
-    if (result != null) result$.result = result;
-    return result$;
+    final result = create();
+    if (requestId != null) result.requestId = requestId;
+    if (row1 != null) result.row1 = row1;
+    if (row2 != null) result.row2 = row2;
+    if (col != null) result.col = col;
+    return result;
   }
 
   CompareEvent._();
@@ -20501,10 +20593,10 @@ class CompareEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'CompareEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'row1')
-    ..aI(2, _omitFieldNames ? '' : 'row2')
-    ..aI(3, _omitFieldNames ? '' : 'col')
-    ..aI(4, _omitFieldNames ? '' : 'result')
+    ..aInt64(1, _omitFieldNames ? '' : 'requestId')
+    ..aI(2, _omitFieldNames ? '' : 'row1')
+    ..aI(3, _omitFieldNames ? '' : 'row2')
+    ..aI(4, _omitFieldNames ? '' : 'col')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -20527,40 +20619,40 @@ class CompareEvent extends $pb.GeneratedMessage {
   static CompareEvent? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.int get row1 => $_getIZ(0);
+  $fixnum.Int64 get requestId => $_getI64(0);
   @$pb.TagNumber(1)
-  set row1($core.int value) => $_setSignedInt32(0, value);
+  set requestId($fixnum.Int64 value) => $_setInt64(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasRow1() => $_has(0);
+  $core.bool hasRequestId() => $_has(0);
   @$pb.TagNumber(1)
-  void clearRow1() => $_clearField(1);
+  void clearRequestId() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get row2 => $_getIZ(1);
+  $core.int get row1 => $_getIZ(1);
   @$pb.TagNumber(2)
-  set row2($core.int value) => $_setSignedInt32(1, value);
+  set row1($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasRow2() => $_has(1);
+  $core.bool hasRow1() => $_has(1);
   @$pb.TagNumber(2)
-  void clearRow2() => $_clearField(2);
+  void clearRow1() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.int get col => $_getIZ(2);
+  $core.int get row2 => $_getIZ(2);
   @$pb.TagNumber(3)
-  set col($core.int value) => $_setSignedInt32(2, value);
+  set row2($core.int value) => $_setSignedInt32(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasCol() => $_has(2);
+  $core.bool hasRow2() => $_has(2);
   @$pb.TagNumber(3)
-  void clearCol() => $_clearField(3);
+  void clearRow2() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.int get result => $_getIZ(3);
+  $core.int get col => $_getIZ(3);
   @$pb.TagNumber(4)
-  set result($core.int value) => $_setSignedInt32(3, value);
+  set col($core.int value) => $_setSignedInt32(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasResult() => $_has(3);
+  $core.bool hasCol() => $_has(3);
   @$pb.TagNumber(4)
-  void clearResult() => $_clearField(4);
+  void clearCol() => $_clearField(4);
 }
 
 /// ── Outline Events ──
