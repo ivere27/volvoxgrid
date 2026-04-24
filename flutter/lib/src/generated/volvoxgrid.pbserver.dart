@@ -33,7 +33,7 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $0.LoadFontDataRequest request);
   $async.Future<$0.DefineColumnsResponse> defineColumns(
       $pb.ServerContext ctx, $0.DefineColumnsRequest request);
-  $async.Future<$0.DefineColumnsRequest> getSchema(
+  $async.Future<$0.SchemaResponse> getSchema(
       $pb.ServerContext ctx, $0.GetSchemaRequest request);
   $async.Future<$0.DefineRowsResponse> defineRows(
       $pb.ServerContext ctx, $0.DefineRowsRequest request);

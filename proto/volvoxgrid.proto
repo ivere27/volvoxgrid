@@ -1488,6 +1488,10 @@ message DefineColumnsRequest {
   repeated ColumnDef columns = 2;
 }
 
+message SchemaResponse {
+  repeated ColumnDef columns = 1;
+}
+
 message RowDef {
   int32                index         = 1;
   optional int32       height        = 2;   // pixels; 0 or negative = use default
@@ -2771,7 +2775,7 @@ service VolvoxGridService {
 
   // ── Structure ──
   rpc DefineColumns(DefineColumnsRequest) returns (DefineColumnsResponse);
-  rpc GetSchema(GetSchemaRequest)         returns (DefineColumnsRequest);
+  rpc GetSchema(GetSchemaRequest)         returns (SchemaResponse);
   rpc DefineRows(DefineRowsRequest)       returns (DefineRowsResponse);
   rpc InsertRows(InsertRowsRequest)       returns (InsertRowsResponse);
   rpc RemoveRows(RemoveRowsRequest)       returns (RemoveRowsResponse);

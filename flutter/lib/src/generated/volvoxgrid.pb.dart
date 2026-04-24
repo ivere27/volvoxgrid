@@ -7063,6 +7063,55 @@ class DefineColumnsRequest extends $pb.GeneratedMessage {
   $pb.PbList<ColumnDef> get columns => $_getList(1);
 }
 
+class SchemaResponse extends $pb.GeneratedMessage {
+  factory SchemaResponse({
+    $core.Iterable<ColumnDef>? columns,
+  }) {
+    final result = create();
+    if (columns != null) result.columns.addAll(columns);
+    return result;
+  }
+
+  SchemaResponse._();
+
+  factory SchemaResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory SchemaResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'SchemaResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..pPM<ColumnDef>(1, _omitFieldNames ? '' : 'columns',
+        subBuilder: ColumnDef.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SchemaResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  SchemaResponse copyWith(void Function(SchemaResponse) updates) =>
+      super.copyWith((message) => updates(message as SchemaResponse))
+          as SchemaResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SchemaResponse create() => SchemaResponse._();
+  @$core.override
+  SchemaResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static SchemaResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<SchemaResponse>(create);
+  static SchemaResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<ColumnDef> get columns => $_getList(0);
+}
+
 class RowDef extends $pb.GeneratedMessage {
   factory RowDef({
     $core.int? index,
@@ -23590,10 +23639,10 @@ class VolvoxGridServiceApi {
           $pb.ClientContext? ctx, DefineColumnsRequest request) =>
       _client.invoke<DefineColumnsResponse>(ctx, 'VolvoxGridService',
           'DefineColumns', request, DefineColumnsResponse());
-  $async.Future<DefineColumnsRequest> getSchema(
+  $async.Future<SchemaResponse> getSchema(
           $pb.ClientContext? ctx, GetSchemaRequest request) =>
-      _client.invoke<DefineColumnsRequest>(ctx, 'VolvoxGridService',
-          'GetSchema', request, DefineColumnsRequest());
+      _client.invoke<SchemaResponse>(
+          ctx, 'VolvoxGridService', 'GetSchema', request, SchemaResponse());
   $async.Future<DefineRowsResponse> defineRows(
           $pb.ClientContext? ctx, DefineRowsRequest request) =>
       _client.invoke<DefineRowsResponse>(ctx, 'VolvoxGridService', 'DefineRows',

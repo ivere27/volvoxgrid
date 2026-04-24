@@ -196,7 +196,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
         &self,
         request: DefineColumnsRequest,
     ) -> Result<DefineColumnsResponse, FfiError>;
-    fn get_schema(&self, request: GetSchemaRequest) -> Result<DefineColumnsRequest, FfiError>;
+    fn get_schema(&self, request: GetSchemaRequest) -> Result<SchemaResponse, FfiError>;
     fn define_rows(&self, request: DefineRowsRequest) -> Result<DefineRowsResponse, FfiError>;
     fn insert_rows(&self, request: InsertRowsRequest) -> Result<InsertRowsResponse, FfiError>;
     fn remove_rows(&self, request: RemoveRowsRequest) -> Result<RemoveRowsResponse, FfiError>;

@@ -10867,6 +10867,42 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class SchemaResponse
+    {
+        public List<ColumnDef> Columns { get; private set; } = new List<ColumnDef>();
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            foreach (var item in Columns)
+                w.WriteMessageBytes(1, item.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<SchemaResponse> Parser = new MessageParser<SchemaResponse>(data => ParseFrom(data));
+
+        public static SchemaResponse ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new SchemaResponse();
+            var r = new ProtoReader(data);
+            var msg = new SchemaResponse();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Columns.Add(ColumnDef.ParseFrom(r.ReadLengthDelimited())); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class ScrollBarColors
     {
         private uint? _thumb;
@@ -13112,11 +13148,11 @@ namespace Volvoxgrid.V1
             return DefineColumnsResponse.ParseFrom(result);
         }
 
-        public DefineColumnsRequest GetSchema(GetSchemaRequest request)
+        public SchemaResponse GetSchema(GetSchemaRequest request)
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/GetSchema", data);
-            return DefineColumnsRequest.ParseFrom(result);
+            return SchemaResponse.ParseFrom(result);
         }
 
         public DefineRowsResponse DefineRows(DefineRowsRequest request)

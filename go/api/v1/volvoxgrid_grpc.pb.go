@@ -141,7 +141,7 @@ type VolvoxGridServiceClient interface {
 	LoadFontData(ctx context.Context, in *LoadFontDataRequest, opts ...grpc.CallOption) (*LoadFontDataResponse, error)
 	// ── Structure ──
 	DefineColumns(ctx context.Context, in *DefineColumnsRequest, opts ...grpc.CallOption) (*DefineColumnsResponse, error)
-	GetSchema(ctx context.Context, in *GetSchemaRequest, opts ...grpc.CallOption) (*DefineColumnsRequest, error)
+	GetSchema(ctx context.Context, in *GetSchemaRequest, opts ...grpc.CallOption) (*SchemaResponse, error)
 	DefineRows(ctx context.Context, in *DefineRowsRequest, opts ...grpc.CallOption) (*DefineRowsResponse, error)
 	InsertRows(ctx context.Context, in *InsertRowsRequest, opts ...grpc.CallOption) (*InsertRowsResponse, error)
 	RemoveRows(ctx context.Context, in *RemoveRowsRequest, opts ...grpc.CallOption) (*RemoveRowsResponse, error)
@@ -264,9 +264,9 @@ func (c *volvoxGridServiceClient) DefineColumns(ctx context.Context, in *DefineC
 	return out, nil
 }
 
-func (c *volvoxGridServiceClient) GetSchema(ctx context.Context, in *GetSchemaRequest, opts ...grpc.CallOption) (*DefineColumnsRequest, error) {
+func (c *volvoxGridServiceClient) GetSchema(ctx context.Context, in *GetSchemaRequest, opts ...grpc.CallOption) (*SchemaResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DefineColumnsRequest)
+	out := new(SchemaResponse)
 	err := c.cc.Invoke(ctx, VolvoxGridService_GetSchema_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -689,7 +689,7 @@ type VolvoxGridServiceServer interface {
 	LoadFontData(context.Context, *LoadFontDataRequest) (*LoadFontDataResponse, error)
 	// ── Structure ──
 	DefineColumns(context.Context, *DefineColumnsRequest) (*DefineColumnsResponse, error)
-	GetSchema(context.Context, *GetSchemaRequest) (*DefineColumnsRequest, error)
+	GetSchema(context.Context, *GetSchemaRequest) (*SchemaResponse, error)
 	DefineRows(context.Context, *DefineRowsRequest) (*DefineRowsResponse, error)
 	InsertRows(context.Context, *InsertRowsRequest) (*InsertRowsResponse, error)
 	RemoveRows(context.Context, *RemoveRowsRequest) (*RemoveRowsResponse, error)
@@ -770,7 +770,7 @@ func (UnimplementedVolvoxGridServiceServer) LoadFontData(context.Context, *LoadF
 func (UnimplementedVolvoxGridServiceServer) DefineColumns(context.Context, *DefineColumnsRequest) (*DefineColumnsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DefineColumns not implemented")
 }
-func (UnimplementedVolvoxGridServiceServer) GetSchema(context.Context, *GetSchemaRequest) (*DefineColumnsRequest, error) {
+func (UnimplementedVolvoxGridServiceServer) GetSchema(context.Context, *GetSchemaRequest) (*SchemaResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSchema not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) DefineRows(context.Context, *DefineRowsRequest) (*DefineRowsResponse, error) {

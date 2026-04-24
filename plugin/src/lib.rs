@@ -4332,8 +4332,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(DefineColumnsResponse {})
     }
 
-    fn get_schema(&self, request: GetSchemaRequest) -> PluginResult<DefineColumnsRequest> {
-        self.with_grid(request.grid_id, |grid| grid.get_schema(request.grid_id))
+    fn get_schema(&self, request: GetSchemaRequest) -> PluginResult<SchemaResponse> {
+        self.with_grid(request.grid_id, |grid| grid.get_schema())
     }
 
     fn define_rows(&self, request: DefineRowsRequest) -> PluginResult<DefineRowsResponse> {

@@ -1763,6 +1763,9 @@ export const RowStatusChangeEventFields = {
   "row": 1,
   "status": 2,
 } as const;
+export const SchemaResponseFields = {
+  "columns": 1,
+} as const;
 export const ScrollBarColorsFields = {
   "thumb": 1,
   "thumb_hover": 2,

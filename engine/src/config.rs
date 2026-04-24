@@ -2924,7 +2924,7 @@ impl VolvoxGrid {
     }
 
     /// Export effective column definitions as schema.
-    pub fn get_schema(&self, grid_id: i64) -> v1::DefineColumnsRequest {
+    pub fn get_schema(&self) -> v1::SchemaResponse {
         let mut columns = Vec::with_capacity(self.cols.max(0) as usize);
         for col in 0..self.cols {
             let cp = self
@@ -3032,7 +3032,7 @@ impl VolvoxGrid {
                 },
             });
         }
-        v1::DefineColumnsRequest { grid_id, columns }
+        v1::SchemaResponse { columns }
     }
 
     /// Read cell data for a range.
@@ -3595,7 +3595,7 @@ mod tests {
 
         assert_eq!(grid.columns[1].progress_color, 0xFF818CF8);
         assert_eq!(
-            grid.get_schema(1).columns[1].progress_color,
+            grid.get_schema().columns[1].progress_color,
             Some(0xFF818CF8)
         );
     }

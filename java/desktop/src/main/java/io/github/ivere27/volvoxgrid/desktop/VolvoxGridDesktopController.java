@@ -456,7 +456,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         return client.getCells(request.toBuilder().setGridId(gridId).build());
     }
 
-    public DefineColumnsRequest getSchema() throws SynurangDesktopBridge.SynurangBridgeException {
+    public SchemaResponse getSchema() throws SynurangDesktopBridge.SynurangBridgeException {
         return client.getSchema(GetSchemaRequest.newBuilder().setGridId(gridId).build());
     }
 

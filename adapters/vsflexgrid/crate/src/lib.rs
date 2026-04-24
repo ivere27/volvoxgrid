@@ -4390,9 +4390,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(DefineColumnsResponse {})
     }
 
-    fn get_schema(&self, request: GetSchemaRequest) -> Result<DefineColumnsRequest, String> {
+    fn get_schema(&self, request: GetSchemaRequest) -> Result<SchemaResponse, String> {
         self.manager()
-            .with_grid(request.grid_id, |grid| grid.get_schema(request.grid_id))
+            .with_grid(request.grid_id, |grid| grid.get_schema())
     }
 
     fn define_rows(&self, request: DefineRowsRequest) -> Result<DefineRowsResponse, String> {

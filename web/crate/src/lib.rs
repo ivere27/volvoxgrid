@@ -5261,8 +5261,8 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         Ok(DefineColumnsResponse {})
     }
 
-    fn get_schema(&self, request: GetSchemaRequest) -> Result<DefineColumnsRequest, String> {
-        wasm_with_grid(request.grid_id, |grid| grid.get_schema(request.grid_id))
+    fn get_schema(&self, request: GetSchemaRequest) -> Result<SchemaResponse, String> {
+        wasm_with_grid(request.grid_id, |grid| grid.get_schema())
     }
 
     fn define_rows(&self, request: DefineRowsRequest) -> Result<DefineRowsResponse, String> {

@@ -50,6 +50,7 @@ import io.github.ivere27.volvoxgrid.RenderInput;
 import io.github.ivere27.volvoxgrid.RenderOutput;
 import io.github.ivere27.volvoxgrid.RemoveRowsRequest;
 import io.github.ivere27.volvoxgrid.ResizeViewportRequest;
+import io.github.ivere27.volvoxgrid.SchemaResponse;
 import io.github.ivere27.volvoxgrid.SelectionState;
 import io.github.ivere27.volvoxgrid.SetColRequest;
 import io.github.ivere27.volvoxgrid.SetRedrawRequest;
@@ -165,8 +166,8 @@ public final class VolvoxGridDesktopClient {
         return unary(UPDATE_CELLS, request, WriteResult.parser());
     }
 
-    public DefineColumnsRequest getSchema(GetSchemaRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
-        return unary(GET_SCHEMA, request, DefineColumnsRequest.parser());
+    public SchemaResponse getSchema(GetSchemaRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(GET_SCHEMA, request, SchemaResponse.parser());
     }
 
     public CellsResponse getCells(GetCellsRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
