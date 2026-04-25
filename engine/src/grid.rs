@@ -143,6 +143,8 @@ pub(crate) struct TextCellStaticMeta {
     pub shrink_to_fit: bool,
 }
 
+pub type CustomCompareFn = dyn Fn(i32, i32, i32) -> Option<i32> + Send + Sync;
+
 /// The main VolvoxGrid struct holding all grid state for a single grid instance.
 ///
 /// This is the central data structure of the pixel-rendering datagrid engine.
@@ -618,6 +620,10 @@ pub struct VolvoxGrid {
     /// Used by the sort system to compare unmaterialized rows.
     /// Signature: fn(source_row: i32, col: i32) -> String
     pub sort_value_generator: Option<fn(i32, i32) -> String>,
+    /// Optional host-provided comparison function for SORT_TYPE_CUSTOM.
+    /// Called synchronously during sort: fn(row1, row2, col) -> -1, 0, or 1.
+    /// Returning None falls back to the engine's generic/date comparison.
+    pub custom_compare: Option<Box<CustomCompareFn>>,
 
     // ── Focus State ──────────────────────────────────────────────────────
     /// Whether the grid currently has keyboard/input focus.
@@ -940,6 +946,7 @@ impl VolvoxGrid {
 
             // Virtual data generation
             sort_value_generator: None,
+            custom_compare: None,
 
             // Focus state
             has_focus: false,
@@ -2170,7 +2177,9 @@ impl VolvoxGrid {
                 return control;
             }
         }
-        if !self.active_dropdown_list(row, col).is_empty() {
+        if self.active_dropdown(row, col).is_some()
+            || !self.active_dropdown_list(row, col).is_empty()
+        {
             return CellControl::DropdownButton;
         }
         CellControl::None
@@ -2366,13 +2375,13 @@ impl VolvoxGrid {
         props.user_data = data;
     }
 
-    /// Returns row status (`RowStatus`), defaulting to 0.
-    pub fn get_row_status(&self, row: i32) -> i32 {
-        self.get_row_props(row).map_or(0, |rp| rp.status)
+    /// Returns row status.
+    pub fn get_row_status(&self, row: i32) -> Option<&crate::row::RowStatus> {
+        self.get_row_props(row).map(|rp| &rp.status)
     }
 
-    /// Sets row status (`RowStatus`).
-    pub fn set_row_status(&mut self, row: i32, status: i32) {
+    /// Sets row status.
+    pub fn set_row_status(&mut self, row: i32, status: crate::row::RowStatus) {
         let Some(props) = self.row_props_mut(row) else {
             return;
         };
@@ -2628,6 +2637,37 @@ impl VolvoxGrid {
             return self.columns[col as usize].dropdown_items.clone();
         }
         String::new()
+    }
+
+    /// Resolve the configured typed dropdown for a cell without applying editability rules.
+    ///
+    /// Cell-level dropdown config has priority over the column-level config.
+    pub fn configured_dropdown(&self, row: i32, col: i32) -> Option<pb::Dropdown> {
+        if let Some(cell) = self.cells.get(row, col) {
+            if let Some(dropdown) = cell.dropdown() {
+                if dropdown_has_items(dropdown) {
+                    return Some(dropdown.clone());
+                }
+            }
+            let legacy = cell.dropdown_items();
+            if !legacy.is_empty() {
+                return Some(crate::edit::legacy_dropdown_items_to_dropdown(legacy));
+            }
+        }
+        if col >= 0 && (col as usize) < self.columns.len() {
+            let column = &self.columns[col as usize];
+            if let Some(dropdown) = &column.dropdown {
+                if dropdown_has_items(dropdown) {
+                    return Some(dropdown.clone());
+                }
+            }
+            if !column.dropdown_items.is_empty() {
+                return Some(crate::edit::legacy_dropdown_items_to_dropdown(
+                    &column.dropdown_items,
+                ));
+            }
+        }
+        None
     }
 
     fn resolve_text_measure_style<'a>(&'a self, row: i32, col: i32) -> (&'a str, f32, bool, bool) {
@@ -3003,7 +3043,23 @@ impl VolvoxGrid {
         if !self.can_begin_edit(row, col, true) {
             return String::new();
         }
+        if let Some(dropdown) = self.configured_dropdown(row, col) {
+            return crate::edit::dropdown_to_legacy_items(&dropdown);
+        }
         self.configured_dropdown_list(row, col)
+    }
+
+    pub fn active_dropdown(&self, row: i32, col: i32) -> Option<pb::Dropdown> {
+        if !self.can_begin_edit(row, col, true) {
+            return None;
+        }
+        self.configured_dropdown(row, col)
+    }
+
+    pub fn effective_dropdown_search(&self, row: i32, col: i32) -> bool {
+        self.configured_dropdown(row, col)
+            .and_then(|dropdown| dropdown.searchable)
+            .unwrap_or(self.dropdown_search)
     }
 
     /// Returns display text for a cell, applying dropdown list value translation
@@ -3017,8 +3073,14 @@ impl VolvoxGrid {
             return String::new();
         }
 
-        // Dropdown list translation
-        if col >= 0 && (col as usize) < self.columns.len() {
+        // Dropdown value translation
+        if let Some(dropdown) = self.configured_dropdown(row, col) {
+            if let Some(display) =
+                crate::edit::translate_dropdown_value_to_display_typed(&dropdown, raw)
+            {
+                return display;
+            }
+        } else if col >= 0 && (col as usize) < self.columns.len() {
             let list = &self.columns[col as usize].dropdown_items;
             if !list.is_empty() {
                 if let Some(display) = crate::edit::translate_dropdown_value_to_display(list, raw) {
@@ -3558,15 +3620,19 @@ impl VolvoxGrid {
         let (r1, c1, r2, c2) = self.clear_region_bounds(region);
 
         match scope {
-            0 => self.clear_everything_in_bounds(r1, c1, r2, c2),
-            1 => self.clear_cell_styles_in_bounds(r1, c1, r2, c2),
-            2 => {
+            s if s == pb::ClearScope::ClearEverything as i32 => {
+                self.clear_everything_in_bounds(r1, c1, r2, c2)
+            }
+            s if s == pb::ClearScope::ClearFormatting as i32 => {
+                self.clear_cell_styles_in_bounds(r1, c1, r2, c2)
+            }
+            s if s == pb::ClearScope::ClearData as i32 => {
                 if r1 <= r2 && c1 <= c2 {
                     self.cells.clear_range(r1, c1, r2, c2);
                     self.recompute_barcode_presence();
                 }
             }
-            3 => {
+            s if s == pb::ClearScope::ClearSelection as i32 => {
                 for (sr1, sc1, sr2, sc2) in self.selection.all_ranges(self.rows, self.cols) {
                     self.cells.clear_range(sr1, sc1, sr2, sc2);
                     self.clear_cell_styles_in_bounds(sr1, sc1, sr2, sc2);
@@ -4417,12 +4483,13 @@ impl VolvoxGrid {
 
         // Normalize: truncate, translate dropdown display→value.
         let mut committed = truncate_chars(&new_text, self.edit_max_length);
-        let cell_dropdown = self
-            .cells
-            .get(row, col)
-            .map(|c| c.dropdown_items().to_string())
-            .unwrap_or_default();
-        if cell_dropdown.is_empty() && col >= 0 && (col as usize) < self.columns.len() {
+        if let Some(dropdown) = self.configured_dropdown(row, col) {
+            if let Some(mapped) =
+                crate::edit::translate_dropdown_display_to_value_typed(&dropdown, &committed)
+            {
+                committed = mapped;
+            }
+        } else if col >= 0 && (col as usize) < self.columns.len() {
             let col_list = &self.columns[col as usize].dropdown_items;
             if !col_list.is_empty() {
                 if let Some(mapped) =
@@ -4502,16 +4569,22 @@ impl VolvoxGrid {
             return;
         }
 
-        let dropdown_list = self.active_dropdown_list(row, col);
+        let dropdown = self.active_dropdown(row, col);
+        let has_dropdown = dropdown.as_ref().is_some_and(dropdown_has_items);
         self.events
             .push(crate::event::GridEventData::BeforeEdit { row, col });
 
         let stored_text = self.cells.get_text(row, col).to_string();
         let display_text = self.get_display_text(row, col);
         self.edit.start_edit(row, col, &display_text);
-        self.edit.parse_dropdown_items(&dropdown_list);
+        if let Some(dropdown) = dropdown.as_ref() {
+            self.edit.parse_dropdown(dropdown);
+        } else {
+            let dropdown_list = self.active_dropdown_list(row, col);
+            self.edit.parse_dropdown_items(&dropdown_list);
+        }
 
-        if !dropdown_list.is_empty() {
+        if has_dropdown {
             for i in 0..self.edit.dropdown_count() {
                 if (!stored_text.is_empty() && self.edit.get_dropdown_data(i) == stored_text)
                     || self.edit.get_dropdown_item(i) == display_text
@@ -4520,6 +4593,9 @@ impl VolvoxGrid {
                     break;
                 }
             }
+            if let Some(event) = self.before_dropdown_open_event(row, col) {
+                self.events.push(event);
+            }
             self.events
                 .push(crate::event::GridEventData::DropdownOpened);
         }
@@ -4527,6 +4603,32 @@ impl VolvoxGrid {
         self.events
             .push(crate::event::GridEventData::StartEdit { row, col });
         self.mark_dirty();
+    }
+
+    pub fn before_dropdown_open_event(
+        &self,
+        row: i32,
+        col: i32,
+    ) -> Option<crate::event::GridEventData> {
+        let dropdown = self.active_dropdown(row, col)?;
+        let (x, y, width, height) = self.cell_screen_rect(row, col).unwrap_or((0, 0, 0, 0));
+        let selected_index =
+            if self.edit.is_active() && self.edit.edit_row == row && self.edit.edit_col == col {
+                self.edit.dropdown_index
+            } else {
+                -1
+            };
+        Some(crate::event::GridEventData::BeforeDropdownOpen {
+            row,
+            col,
+            x: x as f32,
+            y: y as f32,
+            width: width as f32,
+            height: height as f32,
+            dropdown,
+            current_value: self.cells.get_text(row, col).to_string(),
+            selected_index,
+        })
     }
 
     /// Get the screen-space rectangle for a cell, accounting for scroll
@@ -4856,6 +4958,15 @@ impl VolvoxGrid {
     }
 }
 
+fn dropdown_has_items(dropdown: &pb::Dropdown) -> bool {
+    dropdown.items.iter().any(|item| {
+        !item.disabled
+            && (item.value.as_deref().is_some_and(|v| !v.is_empty())
+                || item.label.as_deref().is_some_and(|v| !v.is_empty())
+                || item.details.iter().any(|v| !v.is_empty()))
+    })
+}
+
 /// Truncate a string to at most `max_chars` characters.
 fn truncate_chars(input: &str, max_chars: i32) -> String {
     if max_chars <= 0 {
@@ -5095,7 +5206,10 @@ mod tests {
         grid.set_cell_sticky(1, 1, 1, 3);
         grid.set_cell_sticky(2, 2, 2, 4);
 
-        grid.clear_region(0, 0);
+        grid.clear_region(
+            pb::ClearScope::ClearEverything as i32,
+            pb::ClearRegion::ClearScrollable as i32,
+        );
 
         assert_eq!(grid.effective_sticky_row(0, 0), 1);
         assert_eq!(grid.effective_sticky_col(0, 0), 3);
@@ -5110,6 +5224,27 @@ mod tests {
         assert_eq!(grid.effective_sticky_col(2, 2), 0);
         assert!(!grid.sticky_cells.contains_key(&(1, 1)));
         assert!(!grid.sticky_cells.contains_key(&(2, 2)));
+    }
+
+    #[test]
+    fn clear_unspecified_scope_does_not_mutate_cells_or_styles() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 3, 1, 1);
+        grid.cells.set_text(1, 1, "keep".to_string());
+        grid.cell_styles.insert(
+            (1, 1),
+            CellStylePatch {
+                back_color: Some(0xFF00FF00),
+                ..Default::default()
+            },
+        );
+
+        grid.clear_region(
+            pb::ClearScope::Unspecified as i32,
+            pb::ClearRegion::ClearScrollable as i32,
+        );
+
+        assert_eq!(grid.cells.get_text(1, 1), "keep");
+        assert!(grid.cell_styles.contains_key(&(1, 1)));
     }
 
     #[test]

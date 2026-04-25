@@ -7,6 +7,7 @@
 use prost::Message;
 use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
+use std::ffi::c_void;
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 use volvoxgrid_engine::cell::CellValueData;
@@ -43,8 +44,44 @@ enum PendingAction {
         click_caret: Option<i32>,
         caret_end: Option<bool>,
     },
+    BeforeDropdownOpen {
+        row: i32,
+        col: i32,
+        force: bool,
+        seed_text: Option<String>,
+        click_caret: Option<i32>,
+        caret_end: Option<bool>,
+    },
     BeforeSort {
         col: i32,
+    },
+    BeforeNodeToggle {
+        row: i32,
+        collapse: bool,
+    },
+    BeforeUserResize {
+        row: i32,
+        col: i32,
+        start_pos: f32,
+    },
+    BeforeMoveColumn {
+        col: i32,
+        new_position: i32,
+    },
+    BeforeMoveRow {
+        row: i32,
+        new_position: i32,
+    },
+    BeforeMouseDown {
+        x: f32,
+        y: f32,
+        button: i32,
+        modifier: i32,
+        dbl_click: bool,
+    },
+    BeforeScroll {
+        delta_x: f32,
+        delta_y: f32,
     },
 }
 
@@ -58,6 +95,17 @@ static NEXT_EVENT_ID: LazyLock<Mutex<i64>> = LazyLock::new(|| Mutex::new(1));
 static DECISION_ENABLED: LazyLock<Mutex<HashSet<i64>>> =
     LazyLock::new(|| Mutex::new(HashSet::new()));
 static PENDING_ACTIONS: LazyLock<Mutex<HashMap<(i64, i64), PendingActionEntry>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+pub type CustomCompareCallback = unsafe extern "C" fn(*mut c_void, i32, i32, i32) -> i32;
+
+#[derive(Clone, Copy)]
+struct CustomCompareRegistration {
+    callback: CustomCompareCallback,
+    user_data: usize,
+}
+
+static CUSTOM_COMPARE_CALLBACKS: LazyLock<Mutex<HashMap<i64, CustomCompareRegistration>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 // ---------------------------------------------------------------------------
@@ -343,7 +391,9 @@ fn sales_demo_column_defs_local(scale: f32) -> Vec<ColumnDef> {
                 def.data_type = Some(ColumnDataType::ColumnDataBoolean as i32);
             }
             8 => {
-                def.dropdown_items = Some("Active|Pending|Shipped|Returned|Cancelled".to_string());
+                def.dropdown = Some(volvoxgrid_engine::edit::legacy_dropdown_items_to_dropdown(
+                    "Active|Pending|Shipped|Returned|Cancelled",
+                ));
             }
             _ => {}
         }
@@ -503,7 +553,7 @@ fn apply_local_sales_demo_subtotals(grid: &mut volvoxgrid_engine::grid::VolvoxGr
     grid.span.span_cols.clear();
     grid.span.span_cols.insert(0, true);
     grid.span.span_cols.insert(1, true);
-    grid.span.span_compare = 1;
+    grid.span.span_compare = SpanCompareMode::SpanCompareNoCase as i32;
 
     grid.outline.tree_indicator = 0;
     grid.outline.group_total_position = 1;
@@ -767,16 +817,11 @@ fn expand_sort_request_columns(
     let mut sort_keys = Vec::new();
 
     for sc in sort_columns {
-        let merged = volvoxgrid_engine::sort::merge_sort_spec(
-            volvoxgrid_engine::sort::SORT_NONE,
-            sc.order,
-            sc.r#type,
-        );
-        if merged == volvoxgrid_engine::sort::SORT_NONE {
-            continue;
-        }
         if sc.col >= 0 && sc.col < grid.cols {
-            sort_keys.push((sc.col, merged));
+            let merged = sort_request_order_for_col(grid, sc, sc.col);
+            if merged != volvoxgrid_engine::sort::SORT_NONE {
+                sort_keys.push((sc.col, merged));
+            }
             continue;
         }
 
@@ -791,11 +836,68 @@ fn expand_sort_request_columns(
         }
 
         for col in lo..=hi {
-            sort_keys.push((col, merged));
+            let merged = sort_request_order_for_col(grid, sc, col);
+            if merged != volvoxgrid_engine::sort::SORT_NONE {
+                sort_keys.push((col, merged));
+            }
         }
     }
 
     sort_keys
+}
+
+fn sort_request_order_for_col(
+    grid: &volvoxgrid_engine::grid::VolvoxGrid,
+    sc: &SortColumn,
+    col: i32,
+) -> i32 {
+    if sc.r#type.is_none() {
+        if let Some(order) = sc.order {
+            if order == volvoxgrid_engine::sort::SORT_USE_COLUMN {
+                return if col >= 0 && (col as usize) < grid.columns.len() {
+                    grid.columns[col as usize].sort_order
+                } else {
+                    volvoxgrid_engine::sort::SORT_NONE
+                };
+            }
+            if (volvoxgrid_engine::sort::SORT_NONE
+                ..=volvoxgrid_engine::sort::SORT_DESCENDING_CUSTOM)
+                .contains(&order)
+            {
+                return order;
+            }
+        }
+    }
+
+    volvoxgrid_engine::sort::merge_sort_spec(
+        volvoxgrid_engine::sort::SORT_NONE,
+        sc.order,
+        sc.r#type,
+    )
+}
+
+fn install_custom_compare_callback(
+    grid_id: i64,
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+) -> bool {
+    let registration = CUSTOM_COMPARE_CALLBACKS
+        .lock()
+        .unwrap()
+        .get(&grid_id)
+        .copied();
+
+    if let Some(registration) = registration {
+        grid.custom_compare = Some(Box::new(move |row1, row2, col| {
+            let result = unsafe {
+                (registration.callback)(registration.user_data as *mut c_void, row1, row2, col)
+            };
+            Some(result.clamp(-1, 1))
+        }));
+        true
+    } else {
+        grid.custom_compare = None;
+        false
+    }
 }
 
 fn capture_grid_picture(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) -> ImageData {
@@ -1453,6 +1555,7 @@ fn begin_edit_session_core(
     col: i32,
     force: bool,
     emit_before_event: bool,
+    emit_dropdown_event: bool,
     seed_text: Option<String>,
     click_caret: Option<i32>,
     caret_end: Option<bool>,
@@ -1460,7 +1563,8 @@ fn begin_edit_session_core(
     if !grid.can_begin_edit(row, col, force) {
         return;
     }
-    let combo_list = grid.active_dropdown_list(row, col);
+    let dropdown = grid.active_dropdown(row, col);
+    let has_dropdown = dropdown.is_some();
     if emit_before_event {
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
@@ -1468,14 +1572,24 @@ fn begin_edit_session_core(
     let stored_text = grid.cells.get_text(row, col).to_string();
     let display_text = grid.get_display_text(row, col);
     grid.edit.start_edit(row, col, &display_text);
-    grid.edit.parse_dropdown_items(&combo_list);
-    if !combo_list.is_empty() {
+    if let Some(dropdown) = dropdown.as_ref() {
+        grid.edit.parse_dropdown(dropdown);
+    } else {
+        let combo_list = grid.active_dropdown_list(row, col);
+        grid.edit.parse_dropdown_items(&combo_list);
+    }
+    if has_dropdown {
         for i in 0..grid.edit.dropdown_count() {
             if (!stored_text.is_empty() && grid.edit.get_dropdown_data(i) == stored_text)
                 || grid.edit.get_dropdown_item(i) == display_text
             {
                 grid.edit.set_dropdown_index(i);
                 break;
+            }
+        }
+        if emit_dropdown_event {
+            if let Some(event) = grid.before_dropdown_open_event(row, col) {
+                grid.events.push(event);
             }
         }
         grid.events
@@ -1512,7 +1626,7 @@ fn begin_edit_session(
     col: i32,
     force: bool,
 ) {
-    begin_edit_session_core(grid, row, col, force, true, None, None, None);
+    begin_edit_session_core(grid, row, col, force, true, true, None, None, None);
 }
 
 fn begin_edit_session_after_before(
@@ -1530,6 +1644,29 @@ fn begin_edit_session_after_before(
         col,
         force,
         false,
+        true,
+        seed_text,
+        click_caret,
+        caret_end,
+    );
+}
+
+fn begin_edit_session_after_dropdown_before(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    force: bool,
+    seed_text: Option<String>,
+    click_caret: Option<i32>,
+    caret_end: Option<bool>,
+) {
+    begin_edit_session_core(
+        grid,
+        row,
+        col,
+        force,
+        false,
+        false,
         seed_text,
         click_caret,
         caret_end,
@@ -1543,12 +1680,13 @@ fn normalize_committed_edit_text(
     new_text: &str,
 ) -> String {
     let mut committed = truncate_to_char_count(new_text, grid.edit_max_length);
-    let cell_combo = grid
-        .cells
-        .get(row, col)
-        .map(|c| c.dropdown_items().to_string())
-        .unwrap_or_default();
-    if cell_combo.is_empty() && col >= 0 && (col as usize) < grid.columns.len() {
+    if let Some(dropdown) = grid.configured_dropdown(row, col) {
+        if let Some(mapped) = volvoxgrid_engine::edit::translate_dropdown_display_to_value_typed(
+            &dropdown, &committed,
+        ) {
+            committed = mapped;
+        }
+    } else if col >= 0 && (col as usize) < grid.columns.len() {
         let col_list = &grid.columns[col as usize].dropdown_items;
         if !col_list.is_empty() {
             if let Some(mapped) =
@@ -1593,9 +1731,16 @@ fn apply_committed_edit_text(
     grid.mark_dirty();
 }
 
-fn apply_before_sort(grid: &mut volvoxgrid_engine::grid::VolvoxGrid, col: i32) {
+fn apply_before_sort(grid_id: i64, grid: &mut volvoxgrid_engine::grid::VolvoxGrid, col: i32) {
     let old_sort_keys = grid.sort_state.sort_keys.clone();
+    let next_order = volvoxgrid_engine::sort::header_click_next_sort_order(grid, col);
+    if volvoxgrid_engine::sort::sort_order_is_custom(next_order) {
+        install_custom_compare_callback(grid_id, grid);
+    } else {
+        grid.custom_compare = None;
+    }
     volvoxgrid_engine::sort::handle_header_click(grid, col);
+    grid.custom_compare = None;
     if grid.sort_state.sort_keys != old_sort_keys {
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::AfterSort { col });
@@ -1622,6 +1767,7 @@ fn request_before_edit(
             row,
             col,
             force,
+            true,
             true,
             seed_text,
             click_caret,
@@ -1651,11 +1797,43 @@ fn request_before_edit(
     );
 }
 
+fn request_before_dropdown_open(
+    grid_id: i64,
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    force: bool,
+    seed_text: Option<String>,
+    click_caret: Option<i32>,
+    caret_end: Option<bool>,
+) -> bool {
+    let Some(event) = grid.before_dropdown_open_event(row, col) else {
+        return false;
+    };
+    let event_id = next_event_id();
+    PENDING_ACTIONS.lock().unwrap().insert(
+        (grid_id, event_id),
+        PendingActionEntry {
+            created_at: Instant::now(),
+            action: PendingAction::BeforeDropdownOpen {
+                row,
+                col,
+                force,
+                seed_text,
+                click_caret,
+                caret_end,
+            },
+        },
+    );
+    grid.events.push_with_id(event_id, event);
+    true
+}
+
 fn request_before_sort(grid_id: i64, grid: &mut volvoxgrid_engine::grid::VolvoxGrid, col: i32) {
     if !decision_channel_enabled(grid_id) {
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::BeforeSort { col });
-        apply_before_sort(grid, col);
+        apply_before_sort(grid_id, grid, col);
         return;
     }
 
@@ -1673,6 +1851,202 @@ fn request_before_sort(grid_id: i64, grid: &mut volvoxgrid_engine::grid::VolvoxG
     );
 }
 
+fn request_before_node_toggle(
+    grid_id: i64,
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    collapse: bool,
+) {
+    if !decision_channel_enabled(grid_id) {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::BeforeNodeToggle { row, collapse });
+        input::apply_node_toggle_after_before(grid, row, collapse);
+        return;
+    }
+
+    let event_id = next_event_id();
+    PENDING_ACTIONS.lock().unwrap().insert(
+        (grid_id, event_id),
+        PendingActionEntry {
+            created_at: Instant::now(),
+            action: PendingAction::BeforeNodeToggle { row, collapse },
+        },
+    );
+    grid.events.push_with_id(
+        event_id,
+        volvoxgrid_engine::event::GridEventData::BeforeNodeToggle { row, collapse },
+    );
+}
+
+fn request_before_user_resize(
+    grid_id: i64,
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    start_pos: f32,
+) {
+    if !decision_channel_enabled(grid_id) {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::BeforeUserResize { row, col });
+        input::begin_user_resize_after_before(grid, row, col, start_pos);
+        return;
+    }
+
+    let event_id = next_event_id();
+    PENDING_ACTIONS.lock().unwrap().insert(
+        (grid_id, event_id),
+        PendingActionEntry {
+            created_at: Instant::now(),
+            action: PendingAction::BeforeUserResize {
+                row,
+                col,
+                start_pos,
+            },
+        },
+    );
+    grid.events.push_with_id(
+        event_id,
+        volvoxgrid_engine::event::GridEventData::BeforeUserResize { row, col },
+    );
+}
+
+fn request_before_move_column(
+    grid_id: i64,
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    col: i32,
+    new_position: i32,
+) {
+    if !decision_channel_enabled(grid_id) {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::BeforeMoveColumn { col, new_position });
+        input::apply_move_column_after_before(grid, col, new_position);
+        return;
+    }
+
+    let event_id = next_event_id();
+    PENDING_ACTIONS.lock().unwrap().insert(
+        (grid_id, event_id),
+        PendingActionEntry {
+            created_at: Instant::now(),
+            action: PendingAction::BeforeMoveColumn { col, new_position },
+        },
+    );
+    grid.events.push_with_id(
+        event_id,
+        volvoxgrid_engine::event::GridEventData::BeforeMoveColumn { col, new_position },
+    );
+}
+
+fn request_before_move_row(
+    grid_id: i64,
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    new_position: i32,
+) {
+    if !decision_channel_enabled(grid_id) {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::BeforeMoveRow { row, new_position });
+        input::apply_move_row_after_before(grid, row, new_position);
+        return;
+    }
+
+    let event_id = next_event_id();
+    PENDING_ACTIONS.lock().unwrap().insert(
+        (grid_id, event_id),
+        PendingActionEntry {
+            created_at: Instant::now(),
+            action: PendingAction::BeforeMoveRow { row, new_position },
+        },
+    );
+    grid.events.push_with_id(
+        event_id,
+        volvoxgrid_engine::event::GridEventData::BeforeMoveRow { row, new_position },
+    );
+}
+
+fn request_before_mouse_down(
+    grid_id: i64,
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    x: f32,
+    y: f32,
+    button: i32,
+    modifier: i32,
+    dbl_click: bool,
+) {
+    if !decision_channel_enabled(grid_id) {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::BeforeMouseDown { row, col });
+        handle_pointer_down_after_before_mouse(grid_id, grid, x, y, button, modifier, dbl_click);
+        return;
+    }
+
+    let event_id = next_event_id();
+    PENDING_ACTIONS.lock().unwrap().insert(
+        (grid_id, event_id),
+        PendingActionEntry {
+            created_at: Instant::now(),
+            action: PendingAction::BeforeMouseDown {
+                x,
+                y,
+                button,
+                modifier,
+                dbl_click,
+            },
+        },
+    );
+    grid.events.push_with_id(
+        event_id,
+        volvoxgrid_engine::event::GridEventData::BeforeMouseDown { row, col },
+    );
+}
+
+fn request_before_scroll(
+    grid_id: i64,
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    delta_x: f32,
+    delta_y: f32,
+) {
+    let Some((old_top_row, old_left_col, new_top_row, new_left_col)) =
+        input::preview_wheel_scroll_event(grid, delta_x, delta_y)
+    else {
+        input::handle_scroll_with_behavior(
+            grid,
+            delta_x,
+            delta_y,
+            InputBehavior {
+                allow_before_scroll: false,
+                ..InputBehavior::default()
+            },
+        );
+        return;
+    };
+
+    if !decision_channel_enabled(grid_id) {
+        input::handle_scroll(grid, delta_x, delta_y);
+        return;
+    }
+
+    let event_id = next_event_id();
+    PENDING_ACTIONS.lock().unwrap().insert(
+        (grid_id, event_id),
+        PendingActionEntry {
+            created_at: Instant::now(),
+            action: PendingAction::BeforeScroll { delta_x, delta_y },
+        },
+    );
+    grid.events.push_with_id(
+        event_id,
+        volvoxgrid_engine::event::GridEventData::BeforeScroll {
+            old_top_row,
+            old_left_col,
+            new_top_row,
+            new_left_col,
+        },
+    );
+}
+
 fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
     let _ = GRID_MANAGER.with_grid(grid_id, |grid| match action {
         PendingAction::BeginEdit {
@@ -1686,7 +2060,42 @@ fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
             if cancel {
                 return;
             }
+            if grid.active_dropdown(row, col).is_some()
+                && request_before_dropdown_open(
+                    grid_id,
+                    grid,
+                    row,
+                    col,
+                    force,
+                    seed_text.clone(),
+                    click_caret,
+                    caret_end,
+                )
+            {
+                return;
+            }
             begin_edit_session_after_before(
+                grid,
+                row,
+                col,
+                force,
+                seed_text,
+                click_caret,
+                caret_end,
+            );
+        }
+        PendingAction::BeforeDropdownOpen {
+            row,
+            col,
+            force,
+            seed_text,
+            click_caret,
+            caret_end,
+        } => {
+            if cancel {
+                return;
+            }
+            begin_edit_session_after_dropdown_before(
                 grid,
                 row,
                 col,
@@ -1700,7 +2109,63 @@ fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
             if cancel {
                 return;
             }
-            apply_before_sort(grid, col);
+            apply_before_sort(grid_id, grid, col);
+        }
+        PendingAction::BeforeNodeToggle { row, collapse } => {
+            if cancel {
+                return;
+            }
+            input::apply_node_toggle_after_before(grid, row, collapse);
+        }
+        PendingAction::BeforeUserResize {
+            row,
+            col,
+            start_pos,
+        } => {
+            if cancel {
+                return;
+            }
+            input::begin_user_resize_after_before(grid, row, col, start_pos);
+        }
+        PendingAction::BeforeMoveColumn { col, new_position } => {
+            if cancel {
+                return;
+            }
+            input::apply_move_column_after_before(grid, col, new_position);
+        }
+        PendingAction::BeforeMoveRow { row, new_position } => {
+            if cancel {
+                return;
+            }
+            input::apply_move_row_after_before(grid, row, new_position);
+        }
+        PendingAction::BeforeMouseDown {
+            x,
+            y,
+            button,
+            modifier,
+            dbl_click,
+        } => {
+            if cancel {
+                return;
+            }
+            handle_pointer_down_after_before_mouse(
+                grid_id, grid, x, y, button, modifier, dbl_click,
+            );
+        }
+        PendingAction::BeforeScroll { delta_x, delta_y } => {
+            if cancel {
+                return;
+            }
+            input::handle_scroll_with_behavior(
+                grid,
+                delta_x,
+                delta_y,
+                InputBehavior {
+                    allow_before_scroll: false,
+                    ..InputBehavior::default()
+                },
+            );
         }
     });
 }
@@ -2603,7 +3068,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 _ => (g.fixed_rows, g.fixed_cols, g.rows - 1, g.cols - 1),
             };
             match r.scope {
-                0 => {
+                s if s == ClearScope::ClearEverything as i32 => {
                     g.cells.clear_range(r1, c1, r2, c2);
                     for row in r1..=r2 {
                         for col in c1..=c2 {
@@ -2611,17 +3076,17 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                         }
                     }
                 }
-                1 => {
+                s if s == ClearScope::ClearFormatting as i32 => {
                     for row in r1..=r2 {
                         for col in c1..=c2 {
                             g.cell_styles.remove(&(row, col));
                         }
                     }
                 }
-                2 => {
+                s if s == ClearScope::ClearData as i32 => {
                     g.cells.clear_range(r1, c1, r2, c2);
                 }
-                3 => {
+                s if s == ClearScope::ClearSelection as i32 => {
                     g.selection.row_end = g.selection.row;
                     g.selection.col_end = g.selection.col;
                     g.selection.selected_rows.clear();
@@ -3093,13 +3558,13 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn set_group_compare(&self, r: SetMergeCompareRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            g.span.span_compare = r.value;
+            g.span.group_span_compare = r.value;
             g.mark_dirty();
         })?;
         Ok(Empty {})
     }
     fn get_group_compare(&self, r: GridHandle) -> Result<Int32Value, String> {
-        let v = GRID_MANAGER.with_grid(r.id, |g| g.span.span_compare)?;
+        let v = GRID_MANAGER.with_grid(r.id, |g| g.span.group_span_compare)?;
         Ok(Int32Value {
             grid_id: r.id,
             value: v,
@@ -3758,7 +4223,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             let row = r.col;
             if row >= 0 && row < g.rows {
-                g.set_row_status(row, r.value);
+                g.set_row_status(
+                    row,
+                    volvoxgrid_engine::row::RowStatus::new("vsflexgrid", r.value),
+                );
             }
         })?;
         Ok(Empty {})
@@ -3766,7 +4234,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     fn get_row_status(&self, r: RowColIndex) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.grid_id, |g| {
             if r.index >= 0 && r.index < g.rows {
-                g.get_row_status(r.index)
+                g.get_row_status(r.index).map_or(0, |status| status.code)
             } else {
                 0
             }
@@ -3990,16 +4458,20 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         }
 
         Ok(CreateResponse {
-            handle: Some(GridHandle { id }),
+            grid_id: id,
             warnings: Vec::new(),
         })
     }
 
-    fn destroy(&self, request: GridHandle) -> Result<DestroyResponse, String> {
+    fn destroy(&self, request: DestroyRequest) -> Result<DestroyResponse, String> {
         RENDERERS.with(|rc| {
-            rc.borrow_mut().remove(&request.id);
+            rc.borrow_mut().remove(&request.grid_id);
         });
-        self.manager().destroy_grid(request.id);
+        CUSTOM_COMPARE_CALLBACKS
+            .lock()
+            .unwrap()
+            .remove(&request.grid_id);
+        self.manager().destroy_grid(request.grid_id);
         Ok(DestroyResponse {})
     }
 
@@ -4012,9 +4484,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(ConfigureResponse {})
     }
 
-    fn get_config(&self, request: GridHandle) -> Result<GridConfig, String> {
+    fn get_config(&self, request: GetConfigRequest) -> Result<GridConfig, String> {
         self.manager()
-            .with_grid(request.id, |grid| grid.get_config())
+            .with_grid(request.grid_id, |grid| grid.get_config())
     }
 
     fn load_font_data(
@@ -4035,9 +4507,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(DefineColumnsResponse {})
     }
 
-    fn get_schema(&self, request: GridHandle) -> Result<DefineColumnsRequest, String> {
+    fn get_schema(&self, request: GetSchemaRequest) -> Result<SchemaResponse, String> {
         self.manager()
-            .with_grid(request.id, |grid| grid.get_schema(request.id))
+            .with_grid(request.grid_id, |grid| grid.get_schema())
     }
 
     fn define_rows(&self, request: DefineRowsRequest) -> Result<DefineRowsResponse, String> {
@@ -4107,20 +4579,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
 
     fn move_row(&self, request: MoveRowRequest) -> Result<MoveRowResponse, String> {
         self.manager().with_grid(request.grid_id, |grid| {
-            if request.row >= grid.fixed_rows
-                && request.row < grid.rows
-                && request.position >= grid.fixed_rows
-                && request.position < grid.rows
-            {
-                let src = request.row;
-                let dst = request.position;
-                if src != dst && !grid.row_positions.is_empty() {
-                    let val = grid.row_positions.remove(src as usize);
-                    grid.row_positions.insert(dst as usize, val);
-                    grid.layout.invalidate();
-                    grid.mark_dirty();
-                }
-            }
+            request_before_move_row(request.grid_id, grid, request.row, request.position);
         })?;
         Ok(MoveRowResponse {})
     }
@@ -4177,7 +4636,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 ),
             };
             match request.scope {
-                0 => {
+                s if s == ClearScope::ClearEverything as i32 => {
                     grid.cells.clear_range(r1, c1, r2, c2);
                     for r in r1..=r2 {
                         for c in c1..=c2 {
@@ -4185,17 +4644,17 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                         }
                     }
                 }
-                1 => {
+                s if s == ClearScope::ClearFormatting as i32 => {
                     for r in r1..=r2 {
                         for c in c1..=c2 {
                             grid.cell_styles.remove(&(r, c));
                         }
                     }
                 }
-                2 => {
+                s if s == ClearScope::ClearData as i32 => {
                     grid.cells.clear_range(r1, c1, r2, c2);
                 }
-                3 => {
+                s if s == ClearScope::ClearSelection as i32 => {
                     let sr1 = grid.selection.row.min(grid.selection.row_end);
                     let sr2 = grid.selection.row.max(grid.selection.row_end);
                     let sc1 = grid.selection.col.min(grid.selection.col_end);
@@ -4249,8 +4708,9 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         })
     }
 
-    fn get_selection(&self, request: GridHandle) -> Result<SelectionState, String> {
-        self.manager().with_grid(request.id, selection_state_proto)
+    fn get_selection(&self, request: GetSelectionRequest) -> Result<SelectionState, String> {
+        self.manager()
+            .with_grid(request.grid_id, selection_state_proto)
     }
 
     fn show_cell(&self, request: ShowCellRequest) -> Result<ShowCellResponse, String> {
@@ -4411,6 +4871,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
 
     fn sort(&self, request: SortRequest) -> Result<SortResponse, String> {
         self.manager().with_grid(request.grid_id, |grid| {
+            grid.custom_compare = None;
             if request.sort_columns.is_empty() {
                 grid.sort_state.clear();
                 grid.layout.invalidate();
@@ -4420,8 +4881,15 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
                 if sort_keys.is_empty() {
                     return;
                 }
+                if sort_keys
+                    .iter()
+                    .any(|&(_, order)| volvoxgrid_engine::sort::sort_order_is_custom(order))
+                {
+                    install_custom_compare_callback(request.grid_id, grid);
+                }
                 grid.sort_state.sort_keys = sort_keys;
                 volvoxgrid_engine::sort::sort_grid_all_multi(grid);
+                grid.custom_compare = None;
             }
         })?;
         Ok(SortResponse {})
@@ -4602,9 +5070,12 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         })
     }
 
-    fn get_merged_regions(&self, request: GridHandle) -> Result<MergedRegionsResponse, String> {
+    fn get_merged_regions(
+        &self,
+        request: GetMergedRegionsRequest,
+    ) -> Result<MergedRegionsResponse, String> {
         self.manager()
-            .with_grid(request.id, |grid| MergedRegionsResponse {
+            .with_grid(request.grid_id, |grid| MergedRegionsResponse {
                 ranges: grid
                     .merged_regions
                     .all_ranges()
@@ -4619,9 +5090,12 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
             })
     }
 
-    fn get_memory_usage(&self, request: GridHandle) -> Result<MemoryUsageResponse, String> {
+    fn get_memory_usage(
+        &self,
+        request: GetMemoryUsageRequest,
+    ) -> Result<MemoryUsageResponse, String> {
         self.manager()
-            .with_grid(request.id, |grid| grid.memory_usage())
+            .with_grid(request.grid_id, |grid| grid.memory_usage())
     }
 
     fn clipboard(&self, request: ClipboardCommand) -> Result<ClipboardResponse, String> {
@@ -4749,8 +5223,8 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         Ok(SetRedrawResponse {})
     }
 
-    fn refresh(&self, request: GridHandle) -> Result<RefreshResponse, String> {
-        self.manager().with_grid(request.id, |grid| {
+    fn refresh(&self, request: RefreshRequest) -> Result<RefreshResponse, String> {
+        self.manager().with_grid(request.grid_id, |grid| {
             grid.layout.invalidate();
             grid.mark_dirty();
         })?;
@@ -4925,6 +5399,29 @@ fn engine_event_to_proto(
                 text,
             }))
         }
+        E::BeforeDropdownOpen {
+            row,
+            col,
+            x,
+            y,
+            width,
+            height,
+            dropdown,
+            current_value,
+            selected_index,
+        } => Some(grid_event::Event::BeforeDropdownOpen(
+            BeforeDropdownOpenEvent {
+                row,
+                col,
+                x,
+                y,
+                width,
+                height,
+                dropdown: Some(dropdown),
+                current_value,
+                selected_index,
+            },
+        )),
         E::DropdownClosed => Some(grid_event::Event::DropdownClosed(DropdownClosedEvent {})),
         E::DropdownOpened => Some(grid_event::Event::DropdownOpened(DropdownOpenedEvent {})),
         E::CellChanged {
@@ -5174,9 +5671,31 @@ pub extern "C" fn volvox_grid_destroy_grid(id: i64, out_len: *mut i32) -> *mut u
     RENDERERS.with(|rc| {
         rc.borrow_mut().remove(&id);
     });
+    CUSTOM_COMPARE_CALLBACKS.lock().unwrap().remove(&id);
     clear_grid_decision_state(id);
     GRID_MANAGER.destroy_grid(id);
     compat_alloc_empty_response(out_len)
+}
+
+#[no_mangle]
+pub extern "C" fn volvox_grid_set_custom_compare_native(
+    id: i64,
+    callback: Option<CustomCompareCallback>,
+    user_data: *mut c_void,
+) -> i32 {
+    let mut callbacks = CUSTOM_COMPARE_CALLBACKS.lock().unwrap();
+    if let Some(callback) = callback {
+        callbacks.insert(
+            id,
+            CustomCompareRegistration {
+                callback,
+                user_data: user_data as usize,
+            },
+        );
+    } else {
+        callbacks.remove(&id);
+    }
+    0
 }
 
 #[no_mangle]
@@ -6564,6 +7083,91 @@ pub extern "C" fn volvox_grid_resize_viewport_native(id: i64, w: i32, h: i32) ->
     }
 }
 
+fn handle_pointer_down_after_before_mouse(
+    grid_id: i64,
+    g: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    x: f32,
+    y: f32,
+    button: i32,
+    modifier: i32,
+    dbl_click: bool,
+) {
+    ensure_layout(g);
+    let hit = input::hit_test(g, x, y);
+    input::handle_pointer_down_with_behavior(
+        g,
+        x,
+        y,
+        button,
+        modifier,
+        dbl_click,
+        InputBehavior {
+            allow_begin_edit: false,
+            allow_header_sort: false,
+            allow_node_toggle: false,
+            allow_user_resize: false,
+            allow_before_mouse_down: false,
+            ..InputBehavior::default()
+        },
+    );
+
+    if hit.area == HitArea::ColBorder && hit.col >= 0 && !dbl_click {
+        request_before_user_resize(grid_id, g, -1, hit.col, x);
+    } else if hit.area == HitArea::RowBorder && hit.row >= 0 && !dbl_click {
+        request_before_user_resize(grid_id, g, hit.row, -1, y);
+    }
+
+    if hit.row >= 0 && hit.col >= 0 {
+        let area = hit.area.clone();
+        if area == HitArea::OutlineButton {
+            let collapsing = !g
+                .row_props
+                .get(&hit.row)
+                .map_or(false, |rp| rp.is_collapsed);
+            request_before_node_toggle(grid_id, g, hit.row, collapsing);
+        }
+
+        let is_cell_like =
+            area == HitArea::Cell || area == HitArea::FixedRow || area == HitArea::FixedCol;
+        let combo_list = if is_cell_like {
+            g.active_dropdown_list(hit.row, hit.col)
+        } else {
+            String::new()
+        };
+        let is_combo_cell = !combo_list.is_empty();
+
+        if area == HitArea::DropdownButton {
+            if !(g.edit.is_active() && g.edit.edit_row == hit.row && g.edit.edit_col == hit.col) {
+                request_before_edit(grid_id, g, hit.row, hit.col, false, None, None, None);
+            }
+        } else if is_cell_like && ((dbl_click && g.edit_trigger_mode >= 2) || is_combo_cell) {
+            let click_caret = if dbl_click {
+                Some(g.caret_index_from_display_click(hit.row, hit.col, hit.x_in_cell))
+            } else {
+                None
+            };
+            request_before_edit(
+                grid_id,
+                g,
+                hit.row,
+                hit.col,
+                false,
+                None,
+                click_caret,
+                if dbl_click { Some(true) } else { None },
+            );
+        }
+
+        if area == HitArea::FixedRow
+            && hit.row < g.fixed_rows
+            && !is_combo_cell
+            && g.header_features > 0
+        {
+            request_before_sort(grid_id, g, hit.col);
+        }
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn volvox_grid_pointer_down_native(
     id: i64,
@@ -6578,64 +7182,18 @@ pub extern "C" fn volvox_grid_pointer_down_native(
         ensure_layout(g);
         if decision_channel_enabled(id) {
             let hit = input::hit_test(g, x, y);
-            input::handle_pointer_down_with_behavior(
-                g,
-                x,
-                y,
-                button,
-                modifier,
-                dbl_click != 0,
-                InputBehavior {
-                    allow_begin_edit: false,
-                    allow_header_sort: false,
-                },
-            );
-
-            if hit.row >= 0 && hit.col >= 0 {
-                let area = hit.area.clone();
-                let is_cell_like =
-                    area == HitArea::Cell || area == HitArea::FixedRow || area == HitArea::FixedCol;
-                let combo_list = if is_cell_like {
-                    g.active_dropdown_list(hit.row, hit.col)
-                } else {
-                    String::new()
-                };
-                let is_combo_cell = !combo_list.is_empty();
-
-                if area == HitArea::DropdownButton {
-                    if !(g.edit.is_active()
-                        && g.edit.edit_row == hit.row
-                        && g.edit.edit_col == hit.col)
-                    {
-                        request_before_edit(id, g, hit.row, hit.col, false, None, None, None);
-                    }
-                } else if is_cell_like
-                    && ((dbl_click != 0 && g.edit_trigger_mode >= 2) || is_combo_cell)
-                {
-                    let click_caret = if dbl_click != 0 {
-                        Some(g.caret_index_from_display_click(hit.row, hit.col, hit.x_in_cell))
-                    } else {
-                        None
-                    };
-                    request_before_edit(
-                        id,
-                        g,
-                        hit.row,
-                        hit.col,
-                        false,
-                        None,
-                        click_caret,
-                        if dbl_click != 0 { Some(true) } else { None },
-                    );
-                }
-
-                if area == HitArea::FixedRow
-                    && hit.row < g.fixed_rows
-                    && !is_combo_cell
-                    && g.header_features > 0
-                {
-                    request_before_sort(id, g, hit.col);
-                }
+            if dbl_click == 0 && hit.row >= 0 && hit.col >= 0 && hit.area != HitArea::DropdownList {
+                request_before_mouse_down(id, g, hit.row, hit.col, x, y, button, modifier, false);
+            } else {
+                handle_pointer_down_after_before_mouse(
+                    id,
+                    g,
+                    x,
+                    y,
+                    button,
+                    modifier,
+                    dbl_click != 0,
+                );
             }
         } else {
             input::handle_pointer_down(g, x, y, button, modifier, dbl_click != 0);
@@ -6671,7 +7229,25 @@ pub extern "C" fn volvox_grid_pointer_up_native(
     modifier: i32,
 ) -> i32 {
     match GRID_MANAGER.with_grid(id, |g| {
-        input::handle_pointer_up(g, x, y, button, modifier);
+        if decision_channel_enabled(id) {
+            if let Some((col, new_position)) = input::take_column_drag_move(g) {
+                request_before_move_column(id, g, col, new_position);
+            } else {
+                input::handle_pointer_up_with_behavior(
+                    g,
+                    x,
+                    y,
+                    button,
+                    modifier,
+                    InputBehavior {
+                        allow_header_sort: false,
+                        ..InputBehavior::default()
+                    },
+                );
+            }
+        } else {
+            input::handle_pointer_up(g, x, y, button, modifier);
+        }
     }) {
         Ok(()) => 0,
         Err(_) => -1,
@@ -6681,7 +7257,11 @@ pub extern "C" fn volvox_grid_pointer_up_native(
 #[no_mangle]
 pub extern "C" fn volvox_grid_scroll_native(id: i64, delta_x: f32, delta_y: f32) -> i32 {
     match GRID_MANAGER.with_grid(id, |g| {
-        input::handle_scroll(g, delta_x, delta_y);
+        if decision_channel_enabled(id) {
+            request_before_scroll(id, g, delta_x, delta_y);
+        } else {
+            input::handle_scroll(g, delta_x, delta_y);
+        }
     }) {
         Ok(()) => 0,
         Err(_) => -1,
@@ -6701,6 +7281,7 @@ pub extern "C" fn volvox_grid_key_down_native(id: i64, key_code: i32, modifier: 
                 InputBehavior {
                     allow_begin_edit: false,
                     allow_header_sort: true,
+                    ..InputBehavior::default()
                 },
             );
             if (key_code == 13 || key_code == 113)
@@ -6740,6 +7321,7 @@ pub extern "C" fn volvox_grid_key_press_native(id: i64, char_code: u32) -> i32 {
                 InputBehavior {
                     allow_begin_edit: false,
                     allow_header_sort: true,
+                    ..InputBehavior::default()
                 },
             );
             if !was_editing
@@ -8016,6 +8598,22 @@ mod tests {
 
     static LAST_RENDER_ARGS: Mutex<Option<RecordedRenderArgs>> = Mutex::new(None);
 
+    struct CompareFixture {
+        lengths: [i32; 4],
+        calls: i32,
+    }
+
+    unsafe extern "C" fn test_custom_compare(
+        user_data: *mut c_void,
+        row1: i32,
+        row2: i32,
+        _col: i32,
+    ) -> i32 {
+        let fixture = unsafe { &mut *(user_data as *mut CompareFixture) };
+        fixture.calls += 1;
+        fixture.lengths[row1 as usize].cmp(&fixture.lengths[row2 as usize]) as i32
+    }
+
     unsafe extern "C" fn test_measure_text(
         _text_ptr: *const u8,
         _text_len: i32,
@@ -8068,6 +8666,113 @@ mod tests {
             clip_h,
         });
         0.0
+    }
+
+    #[test]
+    fn activex_custom_sort_uses_registered_compare_callback() {
+        let plugin = ActiveXPlugin;
+        let grid_id = volvox_grid_create_grid(160, 80, 4, 1, 1, 0, 1.0);
+        let mut fixture = CompareFixture {
+            lengths: [0, 4, 1, 2],
+            calls: 0,
+        };
+
+        GRID_MANAGER
+            .with_grid(grid_id, |g| {
+                g.cells.set_text(1, 0, "dddd".to_string());
+                g.cells.set_text(2, 0, "a".to_string());
+                g.cells.set_text(3, 0, "bb".to_string());
+            })
+            .unwrap();
+
+        assert_eq!(
+            volvox_grid_set_custom_compare_native(
+                grid_id,
+                Some(test_custom_compare),
+                (&mut fixture as *mut CompareFixture).cast::<c_void>(),
+            ),
+            0
+        );
+
+        plugin
+            .sort(SortRequest {
+                grid_id,
+                sort_columns: vec![SortColumn {
+                    col: 0,
+                    order: Some(volvoxgrid_engine::sort::SORT_ASCENDING_CUSTOM),
+                    r#type: None,
+                }],
+            })
+            .unwrap();
+
+        let got = GRID_MANAGER
+            .with_grid(grid_id, |g| {
+                (1..=3)
+                    .map(|row| g.cells.get_text(row, 0).to_string())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap();
+        assert_eq!(got, vec!["a", "bb", "dddd"]);
+        assert!(fixture.calls > 0);
+
+        let out = volvox_grid_destroy_grid(grid_id, std::ptr::null_mut());
+        if !out.is_null() {
+            unsafe {
+                volvox_grid_free(out);
+            }
+        }
+    }
+
+    #[test]
+    fn activex_header_custom_sort_uses_registered_compare_callback() {
+        let grid_id = volvox_grid_create_grid(160, 80, 4, 1, 1, 0, 1.0);
+        let mut fixture = CompareFixture {
+            lengths: [0, 4, 1, 2],
+            calls: 0,
+        };
+
+        GRID_MANAGER
+            .with_grid(grid_id, |g| {
+                g.cells.set_text(1, 0, "dddd".to_string());
+                g.cells.set_text(2, 0, "a".to_string());
+                g.cells.set_text(3, 0, "bb".to_string());
+                g.header_features = 1;
+                g.columns[0].sort_order = volvoxgrid_engine::sort::SORT_NONE;
+                g.columns[0].sort_type =
+                    volvoxgrid_engine::proto::volvoxgrid::v1::SortType::Custom as i32;
+                g.columns[0].sort_defined = true;
+            })
+            .unwrap();
+
+        assert_eq!(
+            volvox_grid_set_custom_compare_native(
+                grid_id,
+                Some(test_custom_compare),
+                (&mut fixture as *mut CompareFixture).cast::<c_void>(),
+            ),
+            0
+        );
+
+        GRID_MANAGER
+            .with_grid(grid_id, |g| apply_before_sort(grid_id, g, 0))
+            .unwrap();
+
+        let got = GRID_MANAGER
+            .with_grid(grid_id, |g| {
+                (1..=3)
+                    .map(|row| g.cells.get_text(row, 0).to_string())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap();
+        assert_eq!(got, vec!["a", "bb", "dddd"]);
+        assert!(fixture.calls > 0);
+
+        let out = volvox_grid_destroy_grid(grid_id, std::ptr::null_mut());
+        if !out.is_null() {
+            unsafe {
+                volvox_grid_free(out);
+            }
+        }
     }
 
     #[test]

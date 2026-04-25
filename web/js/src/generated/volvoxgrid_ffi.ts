@@ -13,6 +13,10 @@ export enum AggregateType {
   AGG_MIN = 7,
   AGG_STD_DEV = 8,
   AGG_VAR = 9,
+  AGG_RANGE = 10,
+  AGG_COUNT_ALL = 11,
+  AGG_MEDIAN = 12,
+  AGG_COUNT_DISTINCT = 13,
 }
 export enum Align {
   ALIGN_LEFT_TOP = 0,
@@ -31,10 +35,11 @@ export enum ApplyScope {
   APPLY_SELECTION = 1,
 }
 export enum ArchiveRequest_Action {
-  SAVE = 0,
-  LOAD = 1,
-  DELETE = 2,
-  LIST = 3,
+  ACTION_UNSPECIFIED = 0,
+  SAVE = 1,
+  LOAD = 2,
+  DELETE = 3,
+  LIST = 4,
 }
 export enum AutoSizeMode {
   AUTOSIZE_BOTH = 0,
@@ -139,10 +144,11 @@ export enum ClearRegion {
   CLEAR_ALL_BOTH = 6,
 }
 export enum ClearScope {
-  CLEAR_EVERYTHING = 0,
-  CLEAR_FORMATTING = 1,
-  CLEAR_DATA = 2,
-  CLEAR_SELECTION = 3,
+  CLEAR_SCOPE_UNSPECIFIED = 0,
+  CLEAR_EVERYTHING = 1,
+  CLEAR_FORMATTING = 2,
+  CLEAR_DATA = 3,
+  CLEAR_SELECTION = 4,
 }
 export enum CoercionMode {
   COERCION_UNSPECIFIED = 0,
@@ -206,6 +212,12 @@ export enum DropMode {
   DROP_MANUAL = 1,
   DROP_AUTOMATIC = 2,
 }
+export enum DropdownItemLayout {
+  DROPDOWN_ITEM_AUTO = 0,
+  DROPDOWN_ITEM_LABEL = 1,
+  DROPDOWN_ITEM_VALUE_LABEL = 2,
+  DROPDOWN_ITEM_LABEL_DETAILS = 3,
+}
 export enum DropdownTrigger {
   DROPDOWN_NEVER = 0,
   DROPDOWN_ALWAYS = 1,
@@ -232,16 +244,18 @@ export enum ErrorCode {
   ERROR_INTERNAL = 8,
 }
 export enum ExportFormat {
-  EXPORT_BINARY = 0,
-  EXPORT_TSV = 1,
-  EXPORT_CSV = 2,
-  EXPORT_DELIMITED = 3,
-  EXPORT_XLSX = 4,
+  EXPORT_FORMAT_UNSPECIFIED = 0,
+  EXPORT_BINARY = 1,
+  EXPORT_TSV = 2,
+  EXPORT_CSV = 3,
+  EXPORT_DELIMITED = 4,
+  EXPORT_XLSX = 5,
 }
 export enum ExportScope {
-  EXPORT_ALL = 0,
-  EXPORT_DATA_ONLY = 1,
-  EXPORT_FORMAT_ONLY = 2,
+  EXPORT_SCOPE_UNSPECIFIED = 0,
+  EXPORT_ALL = 1,
+  EXPORT_DATA_ONLY = 2,
+  EXPORT_FORMAT_ONLY = 3,
 }
 export enum FillHandlePosition {
   FILL_HANDLE_NONE = 0,
@@ -310,9 +324,10 @@ export enum ImageAlignment {
   IMG_ALIGN_TILE = 10,
 }
 export enum KeyEvent_Type {
-  KEY_DOWN = 0,
-  KEY_UP = 1,
-  KEY_PRESS = 2,
+  KEY_TYPE_UNSPECIFIED = 0,
+  KEY_DOWN = 1,
+  KEY_UP = 2,
+  KEY_PRESS = 3,
 }
 export enum LoadDataStatus {
   LOAD_OK = 0,
@@ -320,8 +335,9 @@ export enum LoadDataStatus {
   LOAD_FAILED = 2,
 }
 export enum LoadMode {
-  LOAD_REPLACE = 0,
-  LOAD_APPEND = 1,
+  LOAD_MODE_UNSPECIFIED = 0,
+  LOAD_REPLACE = 1,
+  LOAD_APPEND = 2,
 }
 export enum NodeRelation {
   NODE_PARENT = 0,
@@ -336,9 +352,10 @@ export enum PinPosition {
   PIN_BOTTOM = 2,
 }
 export enum PointerEvent_Type {
-  DOWN = 0,
-  UP = 1,
-  MOVE = 2,
+  TYPE_UNSPECIFIED = 0,
+  DOWN = 1,
+  UP = 2,
+  MOVE = 3,
 }
 export enum PresentMode {
   PRESENT_AUTO = 0,
@@ -468,6 +485,12 @@ export enum SortType {
   SORT_TYPE_STRING_NO_CASE = 3,
   SORT_TYPE_CUSTOM = 4,
 }
+export enum SpanCompareMode {
+  SPAN_COMPARE_EXACT = 0,
+  SPAN_COMPARE_NO_CASE = 1,
+  SPAN_COMPARE_TRIM_NO_CASE = 2,
+  SPAN_COMPARE_INCLUDE_NULLS = 3,
+}
 export enum StickyEdge {
   STICKY_NONE = 0,
   STICKY_TOP = 1,
@@ -533,9 +556,10 @@ export enum WriteErrorMode {
   WRITE_ERROR_SKIP = 3,
 }
 export enum ZoomEvent_Phase {
-  ZOOM_BEGIN = 0,
-  ZOOM_UPDATE = 1,
-  ZOOM_END = 2,
+  ZOOM_PHASE_UNSPECIFIED = 0,
+  ZOOM_BEGIN = 1,
+  ZOOM_UPDATE = 2,
+  ZOOM_END = 3,
 }
 export const AfterEditEventFields = {
   "row": 1,
@@ -631,6 +655,17 @@ export const BarcodeRenderOptionsFields = {
   "show_size_warning": 12,
   "size_warning_color": 13,
   "use_full_rect": 14,
+} as const;
+export const BeforeDropdownOpenEventFields = {
+  "row": 1,
+  "col": 2,
+  "x": 3,
+  "y": 4,
+  "width": 5,
+  "height": 6,
+  "dropdown": 7,
+  "current_value": 8,
+  "selected_index": 9,
 } as const;
 export const BeforeEditEventFields = {
   "row": 1,
@@ -757,7 +792,7 @@ export const CellUpdateFields = {
   "picture": 6,
   "picture_align": 7,
   "button_picture": 8,
-  "dropdown_items": 9,
+  "dropdown": 9,
   "sticky_row": 10,
   "sticky_col": 11,
   "interaction": 12,
@@ -851,7 +886,7 @@ export const ColumnDefFields = {
   "key": 10,
   "sort_order": 11,
   "sort_type": 12,
-  "dropdown_items": 13,
+  "dropdown": 13,
   "edit_mask": 14,
   "indent": 15,
   "hidden": 16,
@@ -868,10 +903,14 @@ export const ColumnDefFields = {
   "progress_color": 27,
 } as const;
 export const CompareEventFields = {
-  "row1": 1,
-  "row2": 2,
-  "col": 3,
-  "result": 4,
+  "request_id": 1,
+  "row1": 2,
+  "row2": 3,
+  "col": 4,
+} as const;
+export const CompareResponseFields = {
+  "request_id": 1,
+  "result": 2,
 } as const;
 export const ConfigureRequestFields = {
   "grid_id": 1,
@@ -894,7 +933,7 @@ export const CreateRequestFields = {
   "config": 4,
 } as const;
 export const CreateResponseFields = {
-  "handle": 1,
+  "grid_id": 1,
   "warnings": 2,
 } as const;
 export const CsvOptionsFields = {
@@ -936,6 +975,9 @@ export const DefineRowsRequestFields = {
 } as const;
 export const DefineRowsResponseFields = {
 } as const;
+export const DestroyRequestFields = {
+  "grid_id": 1,
+} as const;
 export const DestroyResponseFields = {
 } as const;
 export const DragCompleteEventFields = {
@@ -955,7 +997,19 @@ export const DragStartEventFields = {
   "row": 1,
   "col": 2,
 } as const;
+export const DropdownFields = {
+  "items": 1,
+  "allow_custom_value": 2,
+  "item_layout": 3,
+  "searchable": 4,
+} as const;
 export const DropdownClosedEventFields = {
+} as const;
+export const DropdownItemFields = {
+  "value": 1,
+  "label": 2,
+  "details": 3,
+  "disabled": 4,
 } as const;
 export const DropdownOpenedEventFields = {
 } as const;
@@ -1066,6 +1120,9 @@ export const EventDecisionFields = {
   "event_id": 2,
   "cancel": 3,
 } as const;
+export const EventStreamRequestFields = {
+  "grid_id": 1,
+} as const;
 export const ExportRequestFields = {
   "grid_id": 1,
   "format": 2,
@@ -1138,6 +1195,9 @@ export const GetCellsRequestFields = {
   "include_typed": 8,
   "include_barcode_status": 9,
 } as const;
+export const GetConfigRequestFields = {
+  "grid_id": 1,
+} as const;
 export const GetDemoDataRequestFields = {
   "demo": 1,
 } as const;
@@ -1149,15 +1209,27 @@ export const GetDemoDataResponseFields = {
 export const GetHeaderRowEventFields = {
   "page": 1,
 } as const;
+export const GetMemoryUsageRequestFields = {
+  "grid_id": 1,
+} as const;
 export const GetMergedRangeRequestFields = {
   "grid_id": 1,
   "row": 2,
   "col": 3,
 } as const;
+export const GetMergedRegionsRequestFields = {
+  "grid_id": 1,
+} as const;
 export const GetNodeRequestFields = {
   "grid_id": 1,
   "row": 2,
   "relation": 3,
+} as const;
+export const GetSchemaRequestFields = {
+  "grid_id": 1,
+} as const;
+export const GetSelectionRequestFields = {
+  "grid_id": 1,
 } as const;
 export const GpuFrameDoneFields = {
   "dirty_x": 1,
@@ -1247,9 +1319,7 @@ export const GridEventFields = {
   "get_header_row": 60,
   "pull_to_refresh_triggered": 61,
   "pull_to_refresh_canceled": 62,
-} as const;
-export const GridHandleFields = {
-  "id": 1,
+  "before_dropdown_open": 63,
 } as const;
 export const GridLinesFields = {
   "style": 1,
@@ -1616,6 +1686,9 @@ export const PullToRefreshConfigFields = {
 } as const;
 export const PullToRefreshTriggeredEventFields = {
 } as const;
+export const RefreshRequestFields = {
+  "grid_id": 1,
+} as const;
 export const RefreshResponseFields = {
 } as const;
 export const RegexQueryFields = {
@@ -1666,6 +1739,7 @@ export const RenderInputFields = {
   "terminal_capabilities": 11,
   "terminal_viewport": 12,
   "terminal_command": 13,
+  "compare_response": 14,
 } as const;
 export const RenderOutputFields = {
   "rendered": 1,
@@ -1725,9 +1799,16 @@ export const RowIndicatorSlotFields = {
   "custom_key": 4,
   "data": 5,
 } as const;
+export const RowStatusFields = {
+  "domain": 1,
+  "code": 2,
+} as const;
 export const RowStatusChangeEventFields = {
   "row": 1,
   "status": 2,
+} as const;
+export const SchemaResponseFields = {
+  "columns": 1,
 } as const;
 export const ScrollBarColorsFields = {
   "thumb": 1,

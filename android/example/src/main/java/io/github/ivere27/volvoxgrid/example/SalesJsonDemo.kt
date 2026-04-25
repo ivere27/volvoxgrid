@@ -30,6 +30,7 @@ import io.github.ivere27.volvoxgrid.InteractionConfig
 import io.github.ivere27.volvoxgrid.LayoutConfig
 import io.github.ivere27.volvoxgrid.LoadDataStatus
 import io.github.ivere27.volvoxgrid.LoadDataOptions
+import io.github.ivere27.volvoxgrid.LoadMode
 import io.github.ivere27.volvoxgrid.OutlineConfig
 import io.github.ivere27.volvoxgrid.RegionStyle
 import io.github.ivere27.volvoxgrid.ResizePolicy
@@ -39,6 +40,7 @@ import io.github.ivere27.volvoxgrid.ScrollBarsMode
 import io.github.ivere27.volvoxgrid.ScrollConfig
 import io.github.ivere27.volvoxgrid.SelectionConfig
 import io.github.ivere27.volvoxgrid.SelectionMode
+import io.github.ivere27.volvoxgrid.SpanCompareMode
 import io.github.ivere27.volvoxgrid.SpanConfig
 import io.github.ivere27.volvoxgrid.StyleConfig
 import io.github.ivere27.volvoxgrid.TreeIndicatorStyle
@@ -79,6 +81,7 @@ object SalesJsonDemo {
             controller.getDemoData("sales"),
             LoadDataOptions.newBuilder()
                 .setAutoCreateColumns(false)
+                .setMode(LoadMode.LOAD_REPLACE)
                 .build()
         )
         check(result.status != LoadDataStatus.LOAD_FAILED) { "LoadData failed for embedded sales demo" }
@@ -316,7 +319,7 @@ object SalesJsonDemo {
                 SpanConfig.newBuilder()
                     .setCellSpan(CellSpanMode.CELL_SPAN_ADJACENT)
                     .setCellSpanFixed(CellSpanMode.CELL_SPAN_NONE)
-                    .setCellSpanCompare(1)
+                    .setCellSpanCompare(SpanCompareMode.SPAN_COMPARE_NO_CASE)
                     .build()
             )
             .setInteraction(

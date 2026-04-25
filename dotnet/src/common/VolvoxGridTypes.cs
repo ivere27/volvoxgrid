@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using Volvoxgrid.V1;
 
 namespace VolvoxGrid.DotNet
 {
@@ -8,6 +9,15 @@ namespace VolvoxGrid.DotNet
         None = 0,
         Ascending = 1,
         Descending = 2,
+    }
+
+    public enum VolvoxGridSortType
+    {
+        Auto = 0,
+        Numeric = 1,
+        String = 2,
+        StringNoCase = 3,
+        Custom = 4,
     }
 
     public enum VolvoxGridRendererMode
@@ -314,6 +324,7 @@ namespace VolvoxGrid.DotNet
         public bool AllowEdit { get; set; }
         public bool ReadOnly { get; set; }
         public VolvoxGridSortDirection SortDirection { get; set; }
+        public VolvoxGridSortType SortType { get; set; }
         public VolvoxGridAlign Alignment { get; set; }
         public VolvoxGridColumnDataType DataType { get; set; }
         public string Format { get; set; }
@@ -327,6 +338,7 @@ namespace VolvoxGrid.DotNet
             AllowEdit = true;
             ReadOnly = false;
             SortDirection = VolvoxGridSortDirection.None;
+            SortType = VolvoxGridSortType.Auto;
             Alignment = VolvoxGridAlign.General;
             DataType = VolvoxGridColumnDataType.String;
             Interaction = VolvoxGridCellInteraction.Unspecified;
@@ -414,6 +426,44 @@ namespace VolvoxGrid.DotNet
         }
     }
 
+    public sealed class VolvoxGridBeforeDropdownOpenEventArgs : CancelEventArgs
+    {
+        public int RowIndex { get; private set; }
+        public int ColumnIndex { get; private set; }
+        public string FieldName { get; private set; }
+        public float X { get; private set; }
+        public float Y { get; private set; }
+        public float Width { get; private set; }
+        public float Height { get; private set; }
+        public Dropdown Dropdown { get; private set; }
+        public string CurrentValue { get; private set; }
+        public int SelectedIndex { get; private set; }
+
+        public VolvoxGridBeforeDropdownOpenEventArgs(
+            int rowIndex,
+            int columnIndex,
+            string fieldName,
+            float x,
+            float y,
+            float width,
+            float height,
+            Dropdown dropdown,
+            string currentValue,
+            int selectedIndex)
+        {
+            RowIndex = rowIndex;
+            ColumnIndex = columnIndex;
+            FieldName = fieldName ?? string.Empty;
+            X = x;
+            Y = y;
+            Width = width;
+            Height = height;
+            Dropdown = dropdown ?? new Dropdown();
+            CurrentValue = currentValue ?? string.Empty;
+            SelectedIndex = selectedIndex;
+        }
+    }
+
     public sealed class VolvoxGridCellEditValidatingEventArgs : CancelEventArgs
     {
         public int RowIndex { get; private set; }
@@ -443,6 +493,24 @@ namespace VolvoxGrid.DotNet
         {
             ColumnIndex = columnIndex;
             FieldName = fieldName ?? string.Empty;
+        }
+    }
+
+    public sealed class VolvoxGridCompareEventArgs : EventArgs
+    {
+        public int Row1 { get; private set; }
+        public int Row2 { get; private set; }
+        public int ColumnIndex { get; private set; }
+        public string FieldName { get; private set; }
+        public int Result { get; set; }
+
+        public VolvoxGridCompareEventArgs(int row1, int row2, int columnIndex, string fieldName)
+        {
+            Row1 = row1;
+            Row2 = row2;
+            ColumnIndex = columnIndex;
+            FieldName = fieldName ?? string.Empty;
+            Result = 0;
         }
     }
 

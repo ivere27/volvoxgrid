@@ -5,7 +5,15 @@
  * lives inside WASM memory; this class manages the render loop, the
  * HTML canvas, and event forwarding.
  */
-import { GridEventFields, RenderLayerBit } from "./generated/volvoxgrid_ffi.js";
+import {
+  ArchiveRequest_Action,
+  ClearScope,
+  DropdownItemLayout,
+  GridEventFields,
+  RenderLayerBit,
+} from "./generated/volvoxgrid_ffi.js";
+
+export { DropdownItemLayout } from "./generated/volvoxgrid_ffi.js";
 
 export interface VolvoxGridCellRange {
   row1: number;
@@ -65,6 +73,35 @@ export interface VolvoxGridBeforeEditDetails {
   cancel: boolean;
 }
 
+export interface VolvoxGridDropdownItem {
+  value?: string;
+  label?: string;
+  details?: string[];
+  disabled?: boolean;
+}
+
+export interface VolvoxGridDropdown {
+  items: VolvoxGridDropdownItem[];
+  allowCustomValue?: boolean;
+  itemLayout?: DropdownItemLayout;
+  searchable?: boolean;
+}
+
+export interface VolvoxGridBeforeDropdownOpenDetails {
+  eventId: bigint;
+  rawEvent: Uint8Array;
+  row: number;
+  col: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  dropdown: VolvoxGridDropdown;
+  currentValue: string;
+  selectedIndex: number;
+  cancel: boolean;
+}
+
 export interface VolvoxGridCellEditValidatingDetails {
   eventId: bigint;
   rawEvent: Uint8Array;
@@ -80,6 +117,14 @@ export interface VolvoxGridBeforeSortDetails {
   col: number;
   cancel: boolean;
 }
+
+export interface VolvoxGridCompareDetails {
+  row1: number;
+  row2: number;
+  col: number;
+}
+
+export type VolvoxGridCompareCallback = (details: VolvoxGridCompareDetails) => number;
 
 export interface VolvoxGridHeaderFeatures {
   sort?: boolean;
@@ -307,6 +352,7 @@ export interface VolvoxGridLoadDataColumn {
   key?: string;
   sortOrder?: number;
   sortType?: number;
+  dropdown?: VolvoxGridDropdown;
   dropdownItems?: string;
   editMask?: string;
   indent?: number;
@@ -419,6 +465,7 @@ const PB_TEXT_DECODER = new TextDecoder();
 const GRID_EVENT_BEFORE_EDIT = GridEventFields["before_edit"];
 const GRID_EVENT_CELL_EDIT_VALIDATE = GridEventFields["cell_edit_validate"];
 const GRID_EVENT_BEFORE_SORT = GridEventFields["before_sort"];
+const GRID_EVENT_BEFORE_DROPDOWN_OPEN = GridEventFields["before_dropdown_open"];
 const STREAM_STATUS_DATA = 0;
 const STREAM_STATUS_EOF = 1;
 const STREAM_STATUS_PENDING = 2;
@@ -703,6 +750,73 @@ function pbEncodeMessageField(field: number, payload: Uint8Array): number[] {
   ];
 }
 
+function pbEncodeDropdownItem(item: VolvoxGridDropdownItem): Uint8Array {
+  const out: number[] = [];
+  if (item.value != null) {
+    out.push(...pbEncodeStringField(1, item.value));
+  }
+  if (item.label != null) {
+    out.push(...pbEncodeStringField(2, item.label));
+  }
+  for (const detail of item.details ?? []) {
+    out.push(...pbEncodeStringField(3, detail));
+  }
+  if (item.disabled === true) {
+    out.push(...pbEncodeTag(4, 0), ...pbEncodeBool(true));
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeDropdown(dropdown: VolvoxGridDropdown): Uint8Array {
+  const out: number[] = [];
+  for (const item of dropdown.items ?? []) {
+    out.push(...pbEncodeMessageField(1, pbEncodeDropdownItem(item)));
+  }
+  if (dropdown.allowCustomValue === true) {
+    out.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
+  }
+  if (dropdown.itemLayout != null && dropdown.itemLayout !== DropdownItemLayout.DROPDOWN_ITEM_AUTO) {
+    out.push(...pbEncodeTag(3, 0), ...pbEncodeInt32(dropdown.itemLayout));
+  }
+  if (dropdown.searchable != null) {
+    out.push(...pbEncodeTag(4, 0), ...pbEncodeBool(dropdown.searchable));
+  }
+  return new Uint8Array(out);
+}
+
+function dropdownFromLegacyItems(items: string): VolvoxGridDropdown {
+  const dropdown: VolvoxGridDropdown = {
+    items: [],
+    allowCustomValue: items.startsWith("|"),
+  };
+  const source = dropdown.allowCustomValue ? items.slice(1) : items;
+  for (const raw of source.split("|")) {
+    if (!raw) continue;
+    let value: string | undefined;
+    let label = raw;
+    const semi = raw.indexOf(";");
+    if (raw.startsWith("#") && semi > 1) {
+      value = raw.slice(1, semi);
+      label = raw.slice(semi + 1);
+    }
+    dropdown.items.push(value == null ? { label } : { value, label });
+  }
+  return dropdown;
+}
+
+function dropdownToLegacyItems(dropdown: VolvoxGridDropdown): string {
+  const labels = (dropdown.items ?? [])
+    .map((item) => {
+      const label = item.label ?? item.value ?? "";
+      if (item.value != null && item.value !== label) {
+        return `#${item.value};${label}`;
+      }
+      return label;
+    })
+    .filter((label) => label.length > 0);
+  return `${dropdown.allowCustomValue === true ? "|" : ""}${labels.join("|")}`;
+}
+
 function pbAppendBytes(out: number[], bytes: ArrayLike<number>): void {
   for (let i = 0; i < bytes.length; i += 1) {
     out.push(bytes[i] ?? 0);
@@ -792,7 +906,7 @@ function pbEncodeGetNodeRequest(gridId: number, row: number, relation?: number):
   return new Uint8Array(out);
 }
 
-function pbEncodeGridHandleRequest(gridId: number): Uint8Array {
+function pbEncodeGridIdRequest(gridId: number): Uint8Array {
   const out: number[] = [];
   out.push(...pbEncodeTag(1, 0), ...pbEncodeInt64(BigInt(Math.trunc(gridId))));
   return new Uint8Array(out);
@@ -1489,7 +1603,7 @@ function pbDecodeGridEventEnvelope(
       continue;
     }
 
-    if (wire === 2 && field >= 2 && field <= 60) {
+    if (wire === 2 && field >= 2 && field <= 63) {
       const len = pbReadVarint(data, offset);
       const n = Number(len.value);
       if (!Number.isFinite(n) || n < 0) {
@@ -1585,6 +1699,144 @@ function pbDecodeBeforeSortPayload(data: Uint8Array): { col: number } {
     offset = pbSkipField(data, offset, wire);
   }
   return { col };
+}
+
+function pbDecodeBeforeDropdownOpenPayload(data: Uint8Array): {
+  row: number;
+  col: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  dropdown: VolvoxGridDropdown;
+  currentValue: string;
+  selectedIndex: number;
+} {
+  let row = 0;
+  let col = 0;
+  let x = 0;
+  let y = 0;
+  let width = 0;
+  let height = 0;
+  let dropdown: VolvoxGridDropdown = { items: [] };
+  let currentValue = "";
+  let selectedIndex = -1;
+  let offset = 0;
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (wire === 0) {
+      const value = pbReadVarint(data, offset);
+      const n = pbAsInt32(value.value);
+      offset = value.next;
+      if (field === 1) row = n;
+      else if (field === 2) col = n;
+      else if (field === 9) selectedIndex = n;
+      continue;
+    }
+    if (wire === 5 && offset + 4 <= data.length) {
+      const n = new DataView(data.buffer, data.byteOffset + offset, 4).getFloat32(0, true);
+      offset += 4;
+      if (field === 3) x = n;
+      else if (field === 4) y = n;
+      else if (field === 5) width = n;
+      else if (field === 6) height = n;
+      continue;
+    }
+    if (wire === 2 && field === 8) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      const start = len.next;
+      const end = Math.min(data.length, start + n);
+      currentValue = PB_TEXT_DECODER.decode(data.slice(start, end));
+      offset = end;
+      continue;
+    }
+    if (wire === 2 && field === 7) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      const start = len.next;
+      const end = Math.min(data.length, start + n);
+      dropdown = pbDecodeDropdown(data.slice(start, end));
+      offset = end;
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  return { row, col, x, y, width, height, dropdown, currentValue, selectedIndex };
+}
+
+function pbDecodeDropdown(data: Uint8Array): VolvoxGridDropdown {
+  const dropdown: VolvoxGridDropdown = { items: [] };
+  let offset = 0;
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (field === 1 && wire === 2) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      const start = len.next;
+      const end = Math.min(data.length, start + n);
+      dropdown.items.push(pbDecodeDropdownItem(data.slice(start, end)));
+      offset = end;
+      continue;
+    }
+    if (field === 2 && wire === 0) {
+      const value = pbReadVarint(data, offset);
+      dropdown.allowCustomValue = value.value !== 0n;
+      offset = value.next;
+      continue;
+    }
+    if (field === 3 && wire === 0) {
+      const value = pbReadVarint(data, offset);
+      dropdown.itemLayout = pbAsInt32(value.value);
+      offset = value.next;
+      continue;
+    }
+    if (field === 4 && wire === 0) {
+      const value = pbReadVarint(data, offset);
+      dropdown.searchable = value.value !== 0n;
+      offset = value.next;
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  return dropdown;
+}
+
+function pbDecodeDropdownItem(data: Uint8Array): VolvoxGridDropdownItem {
+  const item: VolvoxGridDropdownItem = {};
+  let offset = 0;
+  while (offset < data.length) {
+    const tag = pbReadVarint(data, offset);
+    offset = tag.next;
+    const field = Number(tag.value >> 3n);
+    const wire = Number(tag.value & 0x7n);
+    if (wire === 2 && (field === 1 || field === 2 || field === 3)) {
+      const len = pbReadVarint(data, offset);
+      const n = Number(len.value);
+      const start = len.next;
+      const end = Math.min(data.length, start + n);
+      const text = PB_TEXT_DECODER.decode(data.slice(start, end));
+      if (field === 1) item.value = text;
+      else if (field === 2) item.label = text;
+      else item.details = [...(item.details ?? []), text];
+      offset = end;
+      continue;
+    }
+    if (field === 4 && wire === 0) {
+      const value = pbReadVarint(data, offset);
+      item.disabled = value.value !== 0n;
+      offset = value.next;
+      continue;
+    }
+    offset = pbSkipField(data, offset, wire);
+  }
+  return item;
 }
 
 function pbDecodeFrameDoneRect(
@@ -1890,11 +2142,18 @@ function pbDecodeLoadDataColumn(data: Uint8Array): VolvoxGridLoadDataColumn | nu
       const n = Number(len.value);
       if (Number.isFinite(n) && n >= 0) {
         const end = Math.min(data.length, len.next + n);
+        if (field === 13) {
+          const dropdown = pbDecodeDropdown(data.slice(len.next, end));
+          column.dropdown = dropdown;
+          column.dropdownItems = dropdownToLegacyItems(dropdown);
+          offset = end;
+          seenField = true;
+          continue;
+        }
         const value = PB_TEXT_DECODER.decode(data.slice(len.next, end));
         if (field === 5) column.caption = value;
         else if (field === 9) column.format = value;
         else if (field === 10) column.key = value;
-        else if (field === 13) column.dropdownItems = value;
         else if (field === 14) column.editMask = value;
         else {
           offset = pbSkipField(data, offset, wire);
@@ -2017,6 +2276,31 @@ export class VolvoxGrid {
     return bit;
   }
 
+  private static engineSortOrder(order: number, type?: number): number {
+    const rawOrder = Math.trunc(Number(order));
+    if (!Number.isFinite(rawOrder) || rawOrder === 0) {
+      return 0;
+    }
+    if (type == null) {
+      return rawOrder;
+    }
+
+    const rawType = Math.trunc(Number(type));
+    const ascending = rawOrder !== 2;
+    switch (rawType) {
+      case 1:
+        return ascending ? 3 : 4;
+      case 3:
+        return ascending ? 5 : 6;
+      case 2:
+        return ascending ? 7 : 8;
+      case 4:
+        return ascending ? 9 : 11;
+      default:
+        return ascending ? 1 : 2;
+    }
+  }
+
   private wasm: any;
   private gridId: number;
   private canvas: HTMLCanvasElement;
@@ -2068,9 +2352,12 @@ export class VolvoxGrid {
   onContextMenuRequest: ((request: VolvoxGridContextMenuRequest) => void) | null = null;
   private rawGridEventListener: ((rawEvent: Uint8Array) => void) | null = null;
   private beforeEditListener: ((details: VolvoxGridBeforeEditDetails) => void) | null = null;
+  private beforeDropdownOpenListener:
+    ((details: VolvoxGridBeforeDropdownOpenDetails) => void) | null = null;
   private cellEditValidatingListener:
     ((details: VolvoxGridCellEditValidatingDetails) => void) | null = null;
   private beforeSortListener: ((details: VolvoxGridBeforeSortDetails) => void) | null = null;
+  private compareListener: VolvoxGridCompareCallback | null = null;
   private manualEventDecisionEnabled: boolean = false;
   private dpr: number = 1;
   private dprX: number = 1;
@@ -2149,6 +2436,19 @@ export class VolvoxGrid {
     this.syncCancelableEventDecisionSupport();
   }
 
+  /** Cancelable dropdown-open hook. Set cancel=true to render a host picker. */
+  get onBeforeDropdownOpen():
+    ((details: VolvoxGridBeforeDropdownOpenDetails) => void) | null {
+    return this.beforeDropdownOpenListener;
+  }
+
+  set onBeforeDropdownOpen(
+    listener: ((details: VolvoxGridBeforeDropdownOpenDetails) => void) | null,
+  ) {
+    this.beforeDropdownOpenListener = listener;
+    this.syncCancelableEventDecisionSupport();
+  }
+
   /** Cancelable edit-commit validation hook for the web canvas host. */
   get onCellEditValidating(): ((details: VolvoxGridCellEditValidatingDetails) => void) | null {
     return this.cellEditValidatingListener;
@@ -2169,6 +2469,16 @@ export class VolvoxGrid {
   set onBeforeSort(listener: ((details: VolvoxGridBeforeSortDetails) => void) | null) {
     this.beforeSortListener = listener;
     this.syncCancelableEventDecisionSupport();
+  }
+
+  /** Synchronous comparator used by SORT_TYPE_CUSTOM sorts. */
+  get onCompare(): VolvoxGridCompareCallback | null {
+    return this.compareListener;
+  }
+
+  set onCompare(listener: VolvoxGridCompareCallback | null) {
+    this.compareListener = listener;
+    this.syncCustomCompareCallback();
   }
 
   /** Raw `GridEvent` stream hook for demo/sample hosts. */
@@ -3294,10 +3604,10 @@ export class VolvoxGrid {
   static readonly STICKY_BOTH = 5;
 
   /** Archive action constants. */
-  static readonly ARCHIVE_SAVE = 0;
-  static readonly ARCHIVE_LOAD = 1;
-  static readonly ARCHIVE_DELETE = 2;
-  static readonly ARCHIVE_LIST = 3;
+  static readonly ARCHIVE_SAVE = ArchiveRequest_Action.SAVE;
+  static readonly ARCHIVE_LOAD = ArchiveRequest_Action.LOAD;
+  static readonly ARCHIVE_DELETE = ArchiveRequest_Action.DELETE;
+  static readonly ARCHIVE_LIST = ArchiveRequest_Action.LIST;
 
   /** Pin a row to the top or bottom section, or unpin it (0=none, 1=top, 2=bottom). */
   pinRow(row: number, pin: number): void {
@@ -3776,7 +4086,22 @@ export class VolvoxGrid {
     return this.getIconSlots();
   }
 
-  setColDropdownItems(col: number, items: string): void {
+  setColDropdown(col: number, dropdown: VolvoxGridDropdown): void {
+    if (typeof this.wasm.volvox_grid_define_columns_pb === "function") {
+      const colDef: number[] = [];
+      colDef.push(...pbEncodeTag(1, 0), ...pbEncodeInt32(col));
+      colDef.push(...pbEncodeMessageField(13, pbEncodeDropdown(dropdown)));
+
+      const request: number[] = [];
+      request.push(...pbEncodeTag(1, 0), ...pbEncodeInt64(BigInt(this.gridId)));
+      request.push(...pbEncodeMessageField(2, new Uint8Array(colDef)));
+
+      this.wasm.volvox_grid_define_columns_pb(new Uint8Array(request));
+      this.dirty = true;
+      return;
+    }
+
+    const items = dropdownToLegacyItems(dropdown);
     if (typeof this.wasm.set_col_dropdown_items === "function") {
       this.wasm.set_col_dropdown_items(this.gridId, col, items);
     } else {
@@ -3785,17 +4110,41 @@ export class VolvoxGrid {
     this.dirty = true;
   }
 
+  setColDropdownItems(col: number, items: string): void {
+    this.setColDropdown(col, dropdownFromLegacyItems(items));
+  }
+
   setColComboList(col: number, list: string): void {
     this.setColDropdownItems(col, list);
   }
 
-  setCellDropdownItems(row: number, col: number, items: string): void {
+  setCellDropdown(row: number, col: number, dropdown: VolvoxGridDropdown): void {
+    if (typeof this.wasm.volvox_grid_update_cells_pb === "function") {
+      const cellUpdate: number[] = [];
+      cellUpdate.push(...pbEncodeTag(1, 0), ...pbEncodeInt32(row));
+      cellUpdate.push(...pbEncodeTag(2, 0), ...pbEncodeInt32(col));
+      cellUpdate.push(...pbEncodeMessageField(9, pbEncodeDropdown(dropdown)));
+
+      const request: number[] = [];
+      request.push(...pbEncodeTag(1, 0), ...pbEncodeInt64(BigInt(this.gridId)));
+      request.push(...pbEncodeMessageField(2, new Uint8Array(cellUpdate)));
+
+      this.wasm.volvox_grid_update_cells_pb(new Uint8Array(request));
+      this.dirty = true;
+      return;
+    }
+
+    const items = dropdownToLegacyItems(dropdown);
     if (typeof this.wasm.set_cell_dropdown_items === "function") {
       this.wasm.set_cell_dropdown_items(this.gridId, row, col, items);
     } else {
       this.wasm.set_cell_combo_list(this.gridId, row, col, items);
     }
     this.dirty = true;
+  }
+
+  setCellDropdownItems(row: number, col: number, items: string): void {
+    this.setCellDropdown(row, col, dropdownFromLegacyItems(items));
   }
 
   setCellComboList(row: number, col: number, list: string): void {
@@ -4133,7 +4482,7 @@ export class VolvoxGrid {
     }
 
     try {
-      const request = pbEncodeGridHandleRequest(this.gridId);
+      const request = pbEncodeGridIdRequest(this.gridId);
       const sendStatus = Number(this.wasm.volvox_grid_stream_send(handle, request));
       if (sendStatus !== 0) {
         return [];
@@ -4170,6 +4519,7 @@ export class VolvoxGrid {
 
   private hasCancelableEventListeners(): boolean {
     return this.beforeEditListener != null
+      || this.beforeDropdownOpenListener != null
       || this.cellEditValidatingListener != null
       || this.beforeSortListener != null;
   }
@@ -4189,6 +4539,33 @@ export class VolvoxGrid {
       return;
     }
     this.wasm.set_event_decision_enabled(this.gridId, this.decisionChannelRequested());
+  }
+
+  private syncCustomCompareCallback(): void {
+    if (this.compareListener == null) {
+      if (typeof this.wasm.clear_custom_compare === "function") {
+        this.wasm.clear_custom_compare(this.gridId);
+      }
+      return;
+    }
+    if (typeof this.wasm.set_custom_compare !== "function") {
+      return;
+    }
+    this.wasm.set_custom_compare(this.gridId, (row1: number, row2: number, col: number) => {
+      const compare = this.compareListener;
+      if (compare == null) {
+        return 0;
+      }
+      const result = Number(compare({
+        row1: Number(row1),
+        row2: Number(row2),
+        col: Number(col),
+      }));
+      if (!Number.isFinite(result)) {
+        return 0;
+      }
+      return result;
+    });
   }
 
   /** Send a decision for a cancelable raw event by event id. */
@@ -4241,6 +4618,26 @@ export class VolvoxGrid {
           cancel: false,
         };
         this.cellEditValidatingListener?.(details);
+        return details.cancel;
+      }
+
+      if (decoded.eventField === GRID_EVENT_BEFORE_DROPDOWN_OPEN) {
+        const payload = pbDecodeBeforeDropdownOpenPayload(decoded.payload);
+        const details: VolvoxGridBeforeDropdownOpenDetails = {
+          eventId: decoded.eventId,
+          rawEvent,
+          row: payload.row,
+          col: payload.col,
+          x: payload.x,
+          y: payload.y,
+          width: payload.width,
+          height: payload.height,
+          dropdown: payload.dropdown,
+          currentValue: payload.currentValue,
+          selectedIndex: payload.selectedIndex,
+          cancel: false,
+        };
+        this.beforeDropdownOpenListener?.(details);
         return details.cancel;
       }
 
@@ -4308,7 +4705,7 @@ export class VolvoxGrid {
   }
 
   /** Proto clear API (scope/region enums). */
-  clear(scope: number = 0, region: number = 0): void {
+  clear(scope: number = ClearScope.CLEAR_EVERYTHING, region: number = 0): void {
     if (typeof this.wasm.volvox_grid_clear === "function") {
       this.wasm.volvox_grid_clear(BigInt(this.gridId), scope, region);
       this.dirty = true;
@@ -4319,13 +4716,16 @@ export class VolvoxGrid {
 
   // ── Sort ─────────────────────────────────────────────────────────────
 
-  sort(order: number, col: number): void {
-    this.wasm.sort(this.gridId, order, col);
+  sort(order: number, col: number, type?: number): void {
+    this.wasm.sort(this.gridId, VolvoxGrid.engineSortOrder(order, type), col);
     this.dirty = true;
   }
 
-  sortMulti(cols: number[], orders: number[]): void {
-    this.wasm.sort_multi(this.gridId, new Int32Array(cols), new Int32Array(orders));
+  sortMulti(cols: number[], orders: number[], types?: number[]): void {
+    const mergedOrders = orders.map((order, index) =>
+      VolvoxGrid.engineSortOrder(order, types?.[index])
+    );
+    this.wasm.sort_multi(this.gridId, new Int32Array(cols), new Int32Array(mergedOrders));
     this.dirty = true;
   }
 
@@ -4466,16 +4866,24 @@ export class VolvoxGrid {
       return pbDecodeAggregateValue(resp);
     }
 
-    let count = 0;
     let sum = 0;
+    let count = 0;
+    let countAll = 0;
     let min = Number.POSITIVE_INFINITY;
     let max = Number.NEGATIVE_INFINITY;
+    const values: number[] = [];
+    const distinctValues = new Set<string>();
     for (let r = row1; r <= row2; r += 1) {
       for (let c = col1; c <= col2; c += 1) {
-        const n = Number(this.getCellText(r, c));
+        countAll += 1;
+        const text = this.getCellText(r, c);
+        const trimmed = text.trim();
+        if (trimmed.length > 0) distinctValues.add(trimmed);
+        const n = Number(text.replace(/[,$\s]/g, ""));
         if (!Number.isFinite(n)) continue;
         count += 1;
         sum += n;
+        values.push(n);
         if (n < min) min = n;
         if (n > max) max = n;
       }
@@ -4485,6 +4893,18 @@ export class VolvoxGrid {
     if (type === 5) return count > 0 ? sum / count : Number.NaN; // AGG_AVERAGE
     if (type === 6) return count > 0 ? max : Number.NaN; // AGG_MAX
     if (type === 7) return count > 0 ? min : Number.NaN; // AGG_MIN
+    if (type === 10) return count > 0 ? max - min : Number.NaN; // AGG_RANGE
+    if (type === 11) return countAll; // AGG_COUNT_ALL
+    if (type === 12) {
+      // AGG_MEDIAN
+      if (count === 0) return Number.NaN;
+      values.sort((a, b) => a - b);
+      const mid = Math.floor(values.length / 2);
+      return values.length % 2 === 0
+        ? (values[mid - 1] + values[mid]) / 2
+        : values[mid];
+    }
+    if (type === 13) return distinctValues.size; // AGG_COUNT_DISTINCT
     return Number.NaN;
   }
 
@@ -4867,6 +5287,9 @@ export class VolvoxGrid {
     if (typeof this.wasm.set_event_decision_enabled === "function") {
       this.wasm.set_event_decision_enabled(this.gridId, false);
     }
+    if (typeof this.wasm.clear_custom_compare === "function") {
+      this.wasm.clear_custom_compare(this.gridId);
+    }
     if (this.wasm.is_editing(this.gridId)) {
       this.wasm.cancel_edit(this.gridId);
     }
@@ -4884,6 +5307,7 @@ export class VolvoxGrid {
       this.wasm.set_fling_enabled(this.gridId, 1);
     }
     this.syncCancelableEventDecisionSupport();
+    this.syncCustomCompareCallback();
     this.dirty = true;
   }
 
@@ -4891,6 +5315,9 @@ export class VolvoxGrid {
     this.destroyed = true;
     if (typeof this.wasm.set_event_decision_enabled === "function") {
       this.wasm.set_event_decision_enabled(this.gridId, false);
+    }
+    if (typeof this.wasm.clear_custom_compare === "function") {
+      this.wasm.clear_custom_compare(this.gridId);
     }
     if (this.animFrame) {
       cancelAnimationFrame(this.animFrame);

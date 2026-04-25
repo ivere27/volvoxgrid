@@ -31,15 +31,15 @@ fn clear_last_error() {
 
 pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn create(&self, request: CreateRequest) -> Result<CreateResponse, String>;
-    fn destroy(&self, request: GridHandle) -> Result<DestroyResponse, String>;
+    fn destroy(&self, request: DestroyRequest) -> Result<DestroyResponse, String>;
     fn configure(&self, request: ConfigureRequest) -> Result<ConfigureResponse, String>;
-    fn get_config(&self, request: GridHandle) -> Result<GridConfig, String>;
+    fn get_config(&self, request: GetConfigRequest) -> Result<GridConfig, String>;
     fn load_font_data(&self, request: LoadFontDataRequest) -> Result<LoadFontDataResponse, String>;
     fn define_columns(
         &self,
         request: DefineColumnsRequest,
     ) -> Result<DefineColumnsResponse, String>;
-    fn get_schema(&self, request: GridHandle) -> Result<DefineColumnsRequest, String>;
+    fn get_schema(&self, request: GetSchemaRequest) -> Result<SchemaResponse, String>;
     fn define_rows(&self, request: DefineRowsRequest) -> Result<DefineRowsResponse, String>;
     fn insert_rows(&self, request: InsertRowsRequest) -> Result<InsertRowsResponse, String>;
     fn remove_rows(&self, request: RemoveRowsRequest) -> Result<RemoveRowsResponse, String>;
@@ -51,7 +51,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn load_data(&self, request: LoadDataRequest) -> Result<LoadDataResult, String>;
     fn clear(&self, request: ClearRequest) -> Result<ClearResponse, String>;
     fn select(&self, request: SelectRequest) -> Result<SelectResponse, String>;
-    fn get_selection(&self, request: GridHandle) -> Result<SelectionState, String>;
+    fn get_selection(&self, request: GetSelectionRequest) -> Result<SelectionState, String>;
     fn show_cell(&self, request: ShowCellRequest) -> Result<ShowCellResponse, String>;
     fn set_top_row(&self, request: SetRowRequest) -> Result<SetTopRowResponse, String>;
     fn set_left_col(&self, request: SetColRequest) -> Result<SetLeftColResponse, String>;
@@ -66,8 +66,14 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn get_merged_range(&self, request: GetMergedRangeRequest) -> Result<CellRange, String>;
     fn merge_cells(&self, request: MergeCellsRequest) -> Result<MergeCellsResponse, String>;
     fn unmerge_cells(&self, request: UnmergeCellsRequest) -> Result<UnmergeCellsResponse, String>;
-    fn get_merged_regions(&self, request: GridHandle) -> Result<MergedRegionsResponse, String>;
-    fn get_memory_usage(&self, request: GridHandle) -> Result<MemoryUsageResponse, String>;
+    fn get_merged_regions(
+        &self,
+        request: GetMergedRegionsRequest,
+    ) -> Result<MergedRegionsResponse, String>;
+    fn get_memory_usage(
+        &self,
+        request: GetMemoryUsageRequest,
+    ) -> Result<MemoryUsageResponse, String>;
     fn clipboard(&self, request: ClipboardCommand) -> Result<ClipboardResponse, String>;
     fn export(&self, request: ExportRequest) -> Result<ExportResponse, String>;
     fn print(&self, request: PrintRequest) -> Result<PrintResponse, String>;
@@ -77,7 +83,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
         request: ResizeViewportRequest,
     ) -> Result<ResizeViewportResponse, String>;
     fn set_redraw(&self, request: SetRedrawRequest) -> Result<SetRedrawResponse, String>;
-    fn refresh(&self, request: GridHandle) -> Result<RefreshResponse, String>;
+    fn refresh(&self, request: RefreshRequest) -> Result<RefreshResponse, String>;
     fn load_demo(&self, request: LoadDemoRequest) -> Result<LoadDemoResponse, String>;
     fn get_demo_data(&self, request: GetDemoDataRequest) -> Result<GetDemoDataResponse, String>;
 }
@@ -206,7 +212,7 @@ pub unsafe extern "C" fn volvox_grid_create(
 
 /// Destroy
 #[no_mangle]
-pub unsafe extern "C" fn volvox_grid_destroy(id: i64, out_len: *mut i32) -> *mut u8 {
+pub unsafe extern "C" fn volvox_grid_destroy(grid_id: i64, out_len: *mut i32) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
         None => {
@@ -217,8 +223,8 @@ pub unsafe extern "C" fn volvox_grid_destroy(id: i64, out_len: *mut i32) -> *mut
             return std::ptr::null_mut();
         }
     };
-    let req = GridHandle {
-        id,
+    let req = DestroyRequest {
+        grid_id,
         ..Default::default()
     };
     match plugin.destroy(req) {
@@ -311,7 +317,7 @@ pub unsafe extern "C" fn volvox_grid_configure(
 
 /// GetConfig
 #[no_mangle]
-pub unsafe extern "C" fn volvox_grid_get_config(id: i64, out_len: *mut i32) -> *mut u8 {
+pub unsafe extern "C" fn volvox_grid_get_config(grid_id: i64, out_len: *mut i32) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
         None => {
@@ -322,8 +328,8 @@ pub unsafe extern "C" fn volvox_grid_get_config(id: i64, out_len: *mut i32) -> *
             return std::ptr::null_mut();
         }
     };
-    let req = GridHandle {
-        id,
+    let req = GetConfigRequest {
+        grid_id,
         ..Default::default()
     };
     match plugin.get_config(req) {
@@ -470,7 +476,7 @@ pub unsafe extern "C" fn volvox_grid_define_columns_pb(
 
 /// GetSchema
 #[no_mangle]
-pub unsafe extern "C" fn volvox_grid_get_schema(id: i64, out_len: *mut i32) -> *mut u8 {
+pub unsafe extern "C" fn volvox_grid_get_schema(grid_id: i64, out_len: *mut i32) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
         None => {
@@ -481,8 +487,8 @@ pub unsafe extern "C" fn volvox_grid_get_schema(id: i64, out_len: *mut i32) -> *
             return std::ptr::null_mut();
         }
     };
-    let req = GridHandle {
-        id,
+    let req = GetSchemaRequest {
+        grid_id,
         ..Default::default()
     };
     match plugin.get_schema(req) {
@@ -1123,7 +1129,7 @@ pub unsafe extern "C" fn volvox_grid_select_pb(
 
 /// GetSelection
 #[no_mangle]
-pub unsafe extern "C" fn volvox_grid_get_selection(id: i64, out_len: *mut i32) -> *mut u8 {
+pub unsafe extern "C" fn volvox_grid_get_selection(grid_id: i64, out_len: *mut i32) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
         None => {
@@ -1134,8 +1140,8 @@ pub unsafe extern "C" fn volvox_grid_get_selection(id: i64, out_len: *mut i32) -
             return std::ptr::null_mut();
         }
     };
-    let req = GridHandle {
-        id,
+    let req = GetSelectionRequest {
+        grid_id,
         ..Default::default()
     };
     match plugin.get_selection(req) {
@@ -1966,7 +1972,10 @@ pub unsafe extern "C" fn volvox_grid_unmerge_cells(
 
 /// GetMergedRegions
 #[no_mangle]
-pub unsafe extern "C" fn volvox_grid_get_merged_regions(id: i64, out_len: *mut i32) -> *mut u8 {
+pub unsafe extern "C" fn volvox_grid_get_merged_regions(
+    grid_id: i64,
+    out_len: *mut i32,
+) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
         None => {
@@ -1977,8 +1986,8 @@ pub unsafe extern "C" fn volvox_grid_get_merged_regions(id: i64, out_len: *mut i
             return std::ptr::null_mut();
         }
     };
-    let req = GridHandle {
-        id,
+    let req = GetMergedRegionsRequest {
+        grid_id,
         ..Default::default()
     };
     match plugin.get_merged_regions(req) {
@@ -2009,7 +2018,7 @@ pub unsafe extern "C" fn volvox_grid_get_merged_regions(id: i64, out_len: *mut i
 
 /// GetMemoryUsage
 #[no_mangle]
-pub unsafe extern "C" fn volvox_grid_get_memory_usage(id: i64, out_len: *mut i32) -> *mut u8 {
+pub unsafe extern "C" fn volvox_grid_get_memory_usage(grid_id: i64, out_len: *mut i32) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
         None => {
@@ -2020,8 +2029,8 @@ pub unsafe extern "C" fn volvox_grid_get_memory_usage(id: i64, out_len: *mut i32
             return std::ptr::null_mut();
         }
     };
-    let req = GridHandle {
-        id,
+    let req = GetMemoryUsageRequest {
+        grid_id,
         ..Default::default()
     };
     match plugin.get_memory_usage(req) {
@@ -2387,7 +2396,7 @@ pub unsafe extern "C" fn volvox_grid_set_redraw(
 
 /// Refresh
 #[no_mangle]
-pub unsafe extern "C" fn volvox_grid_refresh(id: i64, out_len: *mut i32) -> *mut u8 {
+pub unsafe extern "C" fn volvox_grid_refresh(grid_id: i64, out_len: *mut i32) -> *mut u8 {
     let plugin = match get_volvox_grid_service_plugin() {
         Some(p) => p,
         None => {
@@ -2398,8 +2407,8 @@ pub unsafe extern "C" fn volvox_grid_refresh(id: i64, out_len: *mut i32) -> *mut
             return std::ptr::null_mut();
         }
     };
-    let req = GridHandle {
-        id,
+    let req = RefreshRequest {
+        grid_id,
         ..Default::default()
     };
     match plugin.refresh(req) {

@@ -4,9 +4,9 @@ import io.github.ivere27.volvoxgrid.CellHitArea;
 import io.github.ivere27.volvoxgrid.CellInteraction;
 import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.CreateResponse;
+import io.github.ivere27.volvoxgrid.DestroyRequest;
 import io.github.ivere27.volvoxgrid.GridEvent;
 import io.github.ivere27.volvoxgrid.GridConfig;
-import io.github.ivere27.volvoxgrid.GridHandle;
 import io.github.ivere27.volvoxgrid.LayoutConfig;
 import io.github.ivere27.volvoxgrid.RenderConfig;
 import io.github.ivere27.volvoxgrid.RendererMode;
@@ -352,7 +352,7 @@ public final class VolvoxGridDesktopExample {
                 .setConfig(config)
                 .build()
         );
-        return response.getHandle().getId();
+        return response.getGridId();
     }
 
     private void applyEditableToggle() {
@@ -557,7 +557,7 @@ public final class VolvoxGridDesktopExample {
         if (svc != null) {
             for (long id : gridMap.values()) {
                 try {
-                    svc.destroy(GridHandle.newBuilder().setId(id).build());
+                    svc.destroy(DestroyRequest.newBuilder().setGridId(id).build());
                 } catch (Exception ignored) {
                     // best effort
                 }

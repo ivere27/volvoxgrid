@@ -166,7 +166,9 @@ fn sales_demo_column_defs(scale: f32) -> Vec<pb::ColumnDef> {
                 def.data_type = Some(pb::ColumnDataType::ColumnDataBoolean as i32);
             }
             8 => {
-                def.dropdown_items = Some("Active|Pending|Shipped|Returned|Cancelled".to_string());
+                def.dropdown = Some(volvoxgrid_engine::edit::legacy_dropdown_items_to_dropdown(
+                    "Active|Pending|Shipped|Returned|Cancelled",
+                ));
             }
             _ => {}
         }
@@ -402,7 +404,7 @@ fn apply_sales_demo_subtotals(grid: &mut VolvoxGrid) {
     grid.span.span_cols.clear();
     grid.span.span_cols.insert(0, true);
     grid.span.span_cols.insert(1, true);
-    grid.span.span_compare = 1;
+    grid.span.span_compare = pb::SpanCompareMode::SpanCompareNoCase as i32;
     apply_sales_subtotal_merges(grid);
 
     grid.outline.tree_indicator = 0;

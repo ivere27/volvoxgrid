@@ -37,6 +37,13 @@ internal fun defaultIndicatorsConfig(): IndicatorsConfig =
         .setColTop(defaultColIndicatorTopConfig())
         .build()
 
+private fun renderLayerFlag(layer: Int): Long {
+    require(layer in 0 until java.lang.Long.SIZE) {
+        "render layer bit out of range: $layer"
+    }
+    return 1L shl layer
+}
+
 /**
  * High-level Kotlin API wrapping the VolvoxGrid FFI calls.
  *
@@ -87,11 +94,24 @@ class VolvoxGridController(
                 )
                 .build()
             val response = service.Create(req)
-            return VolvoxGridController(service, response.handle.id)
+            return VolvoxGridController(service, response.gridId)
         }
     }
 
-    private fun handle(): GridHandle = GridHandle.newBuilder().setId(gridId).build()
+    private fun destroyRequest(): DestroyRequest =
+        DestroyRequest.newBuilder().setGridId(gridId).build()
+
+    private fun getConfigRequest(): GetConfigRequest =
+        GetConfigRequest.newBuilder().setGridId(gridId).build()
+
+    private fun getSelectionRequest(): GetSelectionRequest =
+        GetSelectionRequest.newBuilder().setGridId(gridId).build()
+
+    private fun refreshRequest(): RefreshRequest =
+        RefreshRequest.newBuilder().setGridId(gridId).build()
+
+    private fun eventStreamRequest(): EventStreamRequest =
+        EventStreamRequest.newBuilder().setGridId(gridId).build()
 
     private fun buildSingleRangeSelectRequest(
         activeRow: Int,
@@ -158,11 +178,11 @@ class VolvoxGridController(
     }
 
     fun getConfig(): GridConfig {
-        return service.GetConfig(handle())
+        return service.GetConfig(getConfigRequest())
     }
 
     fun destroy() {
-        service.Destroy(handle())
+        service.Destroy(destroyRequest())
     }
 
     // =========================================================================
@@ -415,7 +435,7 @@ class VolvoxGridController(
     }
 
     fun setText(text: String) {
-        val sel = service.GetSelection(handle())
+        val sel = service.GetSelection(getSelectionRequest())
         setCellText(sel.activeRow, sel.activeCol, text)
     }
 
@@ -432,7 +452,7 @@ class VolvoxGridController(
     }
 
     fun getText(): String {
-        val sel = service.GetSelection(handle())
+        val sel = service.GetSelection(getSelectionRequest())
         return getCellText(sel.activeRow, sel.activeCol)
     }
 
@@ -545,22 +565,22 @@ class VolvoxGridController(
     // Selection
     // =========================================================================
 
-    override fun cursorRow(): Int = service.GetSelection(handle()).activeRow
+    override fun cursorRow(): Int = service.GetSelection(getSelectionRequest()).activeRow
 
     override fun setCursorRow(value: Int) {
         val currentCol = try {
-            service.GetSelection(handle()).activeCol
+            service.GetSelection(getSelectionRequest()).activeCol
         } catch (_: Exception) {
             0
         }
         service.Select(buildSingleRangeSelectRequest(value, currentCol, value, currentCol))
     }
 
-    override fun cursorCol(): Int = service.GetSelection(handle()).activeCol
+    override fun cursorCol(): Int = service.GetSelection(getSelectionRequest()).activeCol
 
     override fun setCursorCol(value: Int) {
         val currentRow = try {
-            service.GetSelection(handle()).activeRow
+            service.GetSelection(getSelectionRequest()).activeRow
         } catch (_: Exception) {
             0
         }
@@ -594,7 +614,7 @@ class VolvoxGridController(
     }
 
     fun selectionState(): SelectionState {
-        return service.GetSelection(handle())
+        return service.GetSelection(getSelectionRequest())
     }
 
     override fun getSelection(): GridSelection {
@@ -683,7 +703,7 @@ class VolvoxGridController(
     }
 
     override fun topRow(): Int {
-        return service.GetSelection(handle()).topRow
+        return service.GetSelection(getSelectionRequest()).topRow
     }
 
     override fun setLeftCol(value: Int) {
@@ -696,27 +716,33 @@ class VolvoxGridController(
     }
 
     override fun leftCol(): Int {
-        return service.GetSelection(handle()).leftCol
+        return service.GetSelection(getSelectionRequest()).leftCol
     }
 
     // =========================================================================
     // Sorting
     // =========================================================================
 
-    fun sort(order: SortOrder, col: Int = 0) {
+    fun sort(order: SortOrder, col: Int = 0, type: SortType? = null) {
+        val sortColumn = SortColumn.newBuilder().setCol(col).setOrder(order)
+        if (type != null) {
+            sortColumn.type = type
+        }
         service.Sort(
             SortRequest.newBuilder()
                 .setGridId(gridId)
-                .addSortColumns(SortColumn.newBuilder().setCol(col).setOrder(order))
+                .addSortColumns(sortColumn)
                 .build()
         )
     }
 
     /** Sort by multiple columns. */
-    fun sortMulti(columns: List<Pair<Int, SortOrder>>) {
+    fun sortMulti(columns: List<Pair<Int, SortOrder>>, types: Map<Int, SortType> = emptyMap()) {
         val req = SortRequest.newBuilder().setGridId(gridId)
         for ((col, order) in columns) {
-            req.addSortColumns(SortColumn.newBuilder().setCol(col).setOrder(order))
+            val sortColumn = SortColumn.newBuilder().setCol(col).setOrder(order)
+            types[col]?.let { sortColumn.type = it }
+            req.addSortColumns(sortColumn)
         }
         service.Sort(req.build())
     }
@@ -814,8 +840,8 @@ class VolvoxGridController(
 
     fun getMergedRegions(): MergedRegionsResponse {
         return service.GetMergedRegions(
-            GridHandle.newBuilder()
-                .setId(gridId)
+            GetMergedRegionsRequest.newBuilder()
+                .setGridId(gridId)
                 .build()
         )
     }
@@ -1222,18 +1248,26 @@ class VolvoxGridController(
         return getConfig().rendering.renderLayerMask
     }
 
-    override fun isRenderLayerEnabled(layer: RenderLayerBit): Boolean {
-        val bit = 1L shl layer.number
+    override fun isRenderLayerEnabled(layer: Int): Boolean {
+        val bit = renderLayerFlag(layer)
         return (renderLayerMask() and bit) != 0L
     }
 
-    override fun setRenderLayerEnabled(layer: RenderLayerBit, enabled: Boolean) {
+    override fun setRenderLayerEnabled(layer: Int, enabled: Boolean) {
         val mask = renderLayerMask()
-        val bit = 1L shl layer.number
+        val bit = renderLayerFlag(layer)
         val next = if (enabled) mask or bit else mask and bit.inv()
         if (next != mask) {
             setRenderLayerMask(next)
         }
+    }
+
+    fun isRenderLayerEnabled(layer: RenderLayerBit): Boolean {
+        return isRenderLayerEnabled(layer.number)
+    }
+
+    fun setRenderLayerEnabled(layer: RenderLayerBit, enabled: Boolean) {
+        setRenderLayerEnabled(layer.number, enabled)
     }
 
     override fun setRendererBackend(backend: RendererBackend) {
@@ -1253,7 +1287,7 @@ class VolvoxGridController(
     }
 
     override fun refresh() {
-        service.Refresh(handle())
+        service.Refresh(refreshRequest())
     }
 
     // =========================================================================
@@ -1495,7 +1529,7 @@ class VolvoxGridController(
     }
 
     fun eventStream(): Iterator<GridEvent> {
-        return service.EventStream(handle())
+        return service.EventStream(eventStreamRequest())
     }
 
     // =========================================================================

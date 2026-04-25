@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using VolvoxGrid.DotNet;
-using Volvoxgrid.V1;
+using Dropdown = Volvoxgrid.V1.Dropdown;
+using DropdownItem = Volvoxgrid.V1.DropdownItem;
+using SubtotalResult = Volvoxgrid.V1.SubtotalResult;
 
 namespace VolvoxGrid.DotNet.Sample
 {
@@ -52,7 +54,7 @@ namespace VolvoxGrid.DotNet.Sample
             grid.LoadData(salesData);
             grid.SetColCount(SalesColumnCount);
             grid.SetColumns(columns);
-            grid.SetColDropdownItems(8, StatusItems);
+            grid.SetColDropdown(8, DropdownFromLabels(StatusItems));
             grid.SelectionMode = VolvoxGridSelectionMode.Free;
             grid.DropdownTrigger = VolvoxGridDropdownTrigger.Always;
             grid.DropdownSearch = false;
@@ -128,6 +130,17 @@ namespace VolvoxGrid.DotNet.Sample
                     }
                 }
             }, true);
+        }
+
+        private static Dropdown DropdownFromLabels(string items)
+        {
+            var dropdown = new Dropdown();
+            foreach (var label in items.Split('|'))
+            {
+                if (label.Length == 0) continue;
+                dropdown.Items.Add(new DropdownItem { Label = label });
+            }
+            return dropdown;
         }
     }
 }

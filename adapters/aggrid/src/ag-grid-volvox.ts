@@ -10,6 +10,7 @@ import {
   BorderStyle,
   CheckedState,
   SortOrder,
+  SortType,
 } from "volvoxgrid/generated/volvoxgrid_ffi.js";
 import {
   normalizeColumnDefs,
@@ -28,6 +29,7 @@ import {
   encodeLoadTableRequest,
   encodeDefineColumnAlignmentsRequest,
   encodeDefineBooleanColumnsRequest,
+  encodeDefineColumnSortTypesRequest,
   encodeUpdateCellBordersRequest,
   encodeUpdateCheckedCellsRequest,
   type CellBorderUpdate,
@@ -1009,6 +1011,8 @@ export class AgGridVolvox<TData extends RowData = RowData> {
 
     this.applyPinnedRows();
     this.applyColumnDefinitions();
+    this.applyColumnSortTypes();
+    this.configureCustomCompare();
     this.applyFlexColumns();
     this.applyInitialSorts();
     this.applyHeaderBold();
@@ -1329,6 +1333,57 @@ export class AgGridVolvox<TData extends RowData = RowData> {
     }
   }
 
+  private applyColumnSortTypes(): void {
+    const rawWasm = this.wasm as {
+      volvox_grid_define_columns_pb?: (data: Uint8Array) => Uint8Array;
+      volvox_grid_last_error?: () => string;
+    };
+    if (typeof rawWasm.volvox_grid_define_columns_pb !== "function" || this.columns.length === 0) {
+      return;
+    }
+
+    const request = encodeDefineColumnSortTypesRequest({
+      gridId: this.grid.id,
+      columns: this.columns.map((col) => ({
+        index: col.index,
+        sortType:
+          typeof col.def.comparator === "function"
+            ? SortType.SORT_TYPE_CUSTOM
+            : SortType.SORT_TYPE_AUTO,
+      })),
+    });
+    rawWasm.volvox_grid_define_columns_pb(request);
+    this.logPbError(rawWasm, "column sort type update");
+  }
+
+  private configureCustomCompare(): void {
+    if (!this.columns.some((col) => typeof col.def.comparator === "function")) {
+      this.grid.onCompare = null;
+      return;
+    }
+
+    this.grid.onCompare = ({ row1, row2, col }) => {
+      const column = this.columns[col];
+      const comparator = column?.def.comparator;
+      if (typeof comparator !== "function") {
+        return 0;
+      }
+
+      const valueA = this.grid.getCellText(row1, col);
+      const valueB = this.grid.getCellText(row2, col);
+      const dataA = this.shadowRows[row1];
+      const dataB = this.shadowRows[row2];
+      const result = Number(comparator(
+        valueA,
+        valueB,
+        { data: dataA, rowIndex: row1 },
+        { data: dataB, rowIndex: row2 },
+        false,
+      ));
+      return Number.isFinite(result) ? result : 0;
+    };
+  }
+
   private applyFlexColumns(): void {
     if (this.columns.length === 0) {
       return;
@@ -1377,17 +1432,28 @@ export class AgGridVolvox<TData extends RowData = RowData> {
   private applyInitialSorts(): void {
     const cols: number[] = [];
     const orders: number[] = [];
+    const types: number[] = [];
     for (const col of this.columns) {
       if (col.def.sort === "asc") {
         cols.push(col.index);
         orders.push(SortOrder.SORT_ASCENDING);
+        types.push(
+          typeof col.def.comparator === "function"
+            ? SortType.SORT_TYPE_CUSTOM
+            : SortType.SORT_TYPE_AUTO,
+        );
       } else if (col.def.sort === "desc") {
         cols.push(col.index);
         orders.push(SortOrder.SORT_DESCENDING);
+        types.push(
+          typeof col.def.comparator === "function"
+            ? SortType.SORT_TYPE_CUSTOM
+            : SortType.SORT_TYPE_AUTO,
+        );
       }
     }
     if (cols.length > 0) {
-      this.grid.sortMulti(cols, orders);
+      this.grid.sortMulti(cols, orders, types);
     }
   }
 

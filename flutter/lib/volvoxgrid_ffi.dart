@@ -174,7 +174,8 @@ class VolvoxGridService {
         CreateResponse.fromBuffer,
       );
 
-  static Future<DestroyResponse> Destroy(GridHandle request) => _invokeUnary(
+  static Future<DestroyResponse> Destroy(DestroyRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('Destroy'),
         request,
         DestroyResponse.fromBuffer,
@@ -187,7 +188,7 @@ class VolvoxGridService {
         ConfigureResponse.fromBuffer,
       );
 
-  static Future<GridConfig> GetConfig(GridHandle request) => _invokeUnary(
+  static Future<GridConfig> GetConfig(GetConfigRequest request) => _invokeUnary(
         _serviceMethodPath('GetConfig'),
         request,
         GridConfig.fromBuffer,
@@ -209,11 +210,11 @@ class VolvoxGridService {
         DefineColumnsResponse.fromBuffer,
       );
 
-  static Future<DefineColumnsRequest> GetSchema(GridHandle request) =>
+  static Future<SchemaResponse> GetSchema(GetSchemaRequest request) =>
       _invokeUnary(
         _serviceMethodPath('GetSchema'),
         request,
-        DefineColumnsRequest.fromBuffer,
+        SchemaResponse.fromBuffer,
       );
 
   static Future<DefineRowsResponse> DefineRows(DefineRowsRequest request) =>
@@ -284,7 +285,7 @@ class VolvoxGridService {
         SelectResponse.fromBuffer,
       );
 
-  static Future<SelectionState> GetSelection(GridHandle request) =>
+  static Future<SelectionState> GetSelection(GetSelectionRequest request) =>
       _invokeUnary(
         _serviceMethodPath('GetSelection'),
         request,
@@ -386,14 +387,16 @@ class VolvoxGridService {
         UnmergeCellsResponse.fromBuffer,
       );
 
-  static Future<MergedRegionsResponse> GetMergedRegions(GridHandle request) =>
+  static Future<MergedRegionsResponse> GetMergedRegions(
+          GetMergedRegionsRequest request) =>
       _invokeUnary(
         _serviceMethodPath('GetMergedRegions'),
         request,
         MergedRegionsResponse.fromBuffer,
       );
 
-  static Future<MemoryUsageResponse> GetMemoryUsage(GridHandle request) =>
+  static Future<MemoryUsageResponse> GetMemoryUsage(
+          GetMemoryUsageRequest request) =>
       _invokeUnary(
         _serviceMethodPath('GetMemoryUsage'),
         request,
@@ -448,7 +451,8 @@ class VolvoxGridService {
         SetRedrawResponse.fromBuffer,
       );
 
-  static Future<RefreshResponse> Refresh(GridHandle request) => _invokeUnary(
+  static Future<RefreshResponse> Refresh(RefreshRequest request) =>
+      _invokeUnary(
         _serviceMethodPath('Refresh'),
         request,
         RefreshResponse.fromBuffer,
@@ -475,7 +479,7 @@ class VolvoxGridService {
         RenderOutput.fromBuffer,
       );
 
-  static Stream<GridEvent> EventStream(GridHandle request) =>
+  static Stream<GridEvent> EventStream(EventStreamRequest request) =>
       _invokeServerStream(
         _serviceMethodPath('EventStream'),
         request,

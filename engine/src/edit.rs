@@ -134,6 +134,77 @@ fn parse_dropdown_entries(list: &str) -> Vec<ParsedDropdownItem> {
     entries
 }
 
+fn dropdown_item_label(item: &pb::DropdownItem) -> String {
+    item.label
+        .clone()
+        .or_else(|| item.value.clone())
+        .or_else(|| item.details.first().cloned())
+        .unwrap_or_default()
+}
+
+fn dropdown_entries(dropdown: &pb::Dropdown) -> Vec<ParsedDropdownItem> {
+    dropdown
+        .items
+        .iter()
+        .filter(|item| !item.disabled)
+        .map(|item| ParsedDropdownItem {
+            display: dropdown_item_label(item),
+            data: item.value.clone().unwrap_or_default(),
+        })
+        .filter(|entry| !entry.display.is_empty() || !entry.data.is_empty())
+        .collect()
+}
+
+pub fn legacy_dropdown_items_to_dropdown(list: &str) -> pb::Dropdown {
+    let mut dropdown = pb::Dropdown {
+        items: Vec::new(),
+        allow_custom_value: list.starts_with('|'),
+        item_layout: pb::DropdownItemLayout::DropdownItemAuto as i32,
+        searchable: None,
+    };
+
+    for entry in parse_dropdown_entries(list) {
+        dropdown.items.push(pb::DropdownItem {
+            value: if entry.data.is_empty() {
+                None
+            } else {
+                Some(entry.data)
+            },
+            label: if entry.display.is_empty() {
+                None
+            } else {
+                Some(entry.display)
+            },
+            details: Vec::new(),
+            disabled: false,
+        });
+    }
+
+    dropdown
+}
+
+pub fn dropdown_to_legacy_items(dropdown: &pb::Dropdown) -> String {
+    let mut parts = Vec::new();
+    if dropdown.allow_custom_value {
+        parts.push(String::new());
+    }
+    for item in &dropdown.items {
+        if item.disabled {
+            continue;
+        }
+        let label = dropdown_item_label(item);
+        if label.is_empty() && item.value.as_deref().unwrap_or("").is_empty() {
+            continue;
+        }
+        if let Some(value) = item.value.as_deref().filter(|v| !v.is_empty()) {
+            parts.push(format!("#{value};{label}"));
+        } else {
+            parts.push(label);
+        }
+    }
+    parts.join("|")
+}
+
 /// Resolve display text for a stored translated dropdown value.
 ///
 /// Returns `Some(display_text)` if the dropdown list contains a translated entry
@@ -150,6 +221,21 @@ pub fn translate_dropdown_value_to_display(list: &str, stored_value: &str) -> Op
     None
 }
 
+pub fn translate_dropdown_value_to_display_typed(
+    dropdown: &pb::Dropdown,
+    stored_value: &str,
+) -> Option<String> {
+    if stored_value.is_empty() {
+        return None;
+    }
+    for entry in dropdown_entries(dropdown) {
+        if !entry.data.is_empty() && entry.data == stored_value {
+            return Some(entry.display);
+        }
+    }
+    None
+}
+
 /// Resolve translated storage value for a display string.
 ///
 /// Returns `Some(id)` when the dropdown list defines translated values (`#id;`)
@@ -159,6 +245,21 @@ pub fn translate_dropdown_display_to_value(list: &str, display_value: &str) -> O
         return None;
     }
     for entry in parse_dropdown_entries(list) {
+        if !entry.data.is_empty() && entry.display == display_value {
+            return Some(entry.data);
+        }
+    }
+    None
+}
+
+pub fn translate_dropdown_display_to_value_typed(
+    dropdown: &pb::Dropdown,
+    display_value: &str,
+) -> Option<String> {
+    if display_value.is_empty() {
+        return None;
+    }
+    for entry in dropdown_entries(dropdown) {
         if !entry.data.is_empty() && entry.display == display_value {
             return Some(entry.data);
         }
@@ -636,6 +737,20 @@ impl EditState {
         }
 
         for entry in parse_dropdown_entries(list) {
+            self.dropdown_items.push(entry.display);
+            self.dropdown_data.push(entry.data);
+        }
+        self.dropdown_index = -1;
+    }
+
+    /// Parse a typed dropdown into the active edit list.
+    pub fn parse_dropdown(&mut self, dropdown: &pb::Dropdown) {
+        self.dropdown_items.clear();
+        self.dropdown_data.clear();
+        self.dropdown_editable = dropdown.allow_custom_value;
+        self.clear_dropdown_search();
+
+        for entry in dropdown_entries(dropdown) {
             self.dropdown_items.push(entry.display);
             self.dropdown_data.push(entry.data);
         }

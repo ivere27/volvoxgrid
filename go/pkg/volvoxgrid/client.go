@@ -59,9 +59,9 @@ func (c *Client) NewGrid(width, height int) (*Grid, error) {
 	if err != nil {
 		return nil, err
 	}
-	gridID := resp.GetHandle().GetId()
+	gridID := resp.GetGridId()
 	if gridID == 0 {
-		return nil, errors.New("create grid returned zero handle")
+		return nil, errors.New("create grid returned zero grid id")
 	}
 	return &Grid{
 		client: c,
@@ -184,7 +184,7 @@ func (g *Grid) SetRedraw(enabled bool) error {
 }
 
 func (g *Grid) Refresh() error {
-	_, err := g.client.client.Refresh(context.Background(), &pb.GridHandle{Id: g.ID})
+	_, err := g.client.client.Refresh(context.Background(), &pb.RefreshRequest{GridId: g.ID})
 	return err
 }
 
@@ -228,11 +228,11 @@ func (g *Grid) GetEditState() (*pb.EditState, error) {
 }
 
 func (g *Grid) GetConfig() (*pb.GridConfig, error) {
-	return g.client.client.GetConfig(context.Background(), &pb.GridHandle{Id: g.ID})
+	return g.client.client.GetConfig(context.Background(), &pb.GetConfigRequest{GridId: g.ID})
 }
 
 func (g *Grid) GetSelection() (*pb.SelectionState, error) {
-	return g.client.client.GetSelection(context.Background(), &pb.GridHandle{Id: g.ID})
+	return g.client.client.GetSelection(context.Background(), &pb.GetSelectionRequest{GridId: g.ID})
 }
 
 func (g *Grid) GetCells(
@@ -311,7 +311,7 @@ func (g *Grid) Destroy() error {
 		return nil
 	}
 	g.destroyed = true
-	_, err := g.client.client.Destroy(context.Background(), &pb.GridHandle{Id: g.ID})
+	_, err := g.client.client.Destroy(context.Background(), &pb.DestroyRequest{GridId: g.ID})
 	return err
 }
 

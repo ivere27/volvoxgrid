@@ -15,6 +15,8 @@ import io.github.ivere27.volvoxgrid.ColIndicatorConfig;
 import io.github.ivere27.volvoxgrid.ColumnDataType;
 import io.github.ivere27.volvoxgrid.ColumnDef;
 import io.github.ivere27.volvoxgrid.DefineColumnsRequest;
+import io.github.ivere27.volvoxgrid.Dropdown;
+import io.github.ivere27.volvoxgrid.DropdownItem;
 import io.github.ivere27.volvoxgrid.DropdownTrigger;
 import io.github.ivere27.volvoxgrid.EditConfig;
 import io.github.ivere27.volvoxgrid.EditTrigger;
@@ -36,6 +38,7 @@ import io.github.ivere27.volvoxgrid.LayoutConfig;
 import io.github.ivere27.volvoxgrid.LoadDataResult;
 import io.github.ivere27.volvoxgrid.LoadDataStatus;
 import io.github.ivere27.volvoxgrid.LoadDataOptions;
+import io.github.ivere27.volvoxgrid.LoadMode;
 import io.github.ivere27.volvoxgrid.NodeInfo;
 import io.github.ivere27.volvoxgrid.OutlineConfig;
 import io.github.ivere27.volvoxgrid.RegionStyle;
@@ -47,6 +50,7 @@ import io.github.ivere27.volvoxgrid.ScrollConfig;
 import io.github.ivere27.volvoxgrid.SelectionConfig;
 import io.github.ivere27.volvoxgrid.SelectionMode;
 import io.github.ivere27.volvoxgrid.SpanConfig;
+import io.github.ivere27.volvoxgrid.SpanCompareMode;
 import io.github.ivere27.volvoxgrid.StyleConfig;
 import io.github.ivere27.volvoxgrid.TreeIndicatorStyle;
 import io.github.ivere27.volvoxgrid.UpdateCellsRequest;
@@ -105,7 +109,7 @@ final class SalesJsonDesktopDemo {
                     .setCaption("Status")
                     .setKey("Status")
                     .setWidth(COL_WIDTHS[8])
-                    .setDropdownItems(SALES_STATUS_ITEMS)
+                    .setDropdown(dropdownFromLabels(SALES_STATUS_ITEMS))
                     .build())
                 .addColumns(column(1, null).build())
                 .addColumns(column(2, null).build())
@@ -117,6 +121,7 @@ final class SalesJsonDesktopDemo {
             ctrl.getDemoData("sales"),
             LoadDataOptions.newBuilder()
                 .setAutoCreateColumns(false)
+                .setMode(LoadMode.LOAD_REPLACE)
                 .build()
         );
         if (result.getStatus() == LoadDataStatus.LOAD_FAILED) {
@@ -166,7 +171,7 @@ final class SalesJsonDesktopDemo {
                     CellUpdate.newBuilder()
                         .setRow(row)
                         .setCol(8)
-                        .setDropdownItems(SALES_STATUS_ITEMS)
+                        .setDropdown(dropdownFromLabels(SALES_STATUS_ITEMS))
                         .build()
                 );
                 continue;
@@ -210,6 +215,16 @@ final class SalesJsonDesktopDemo {
         if (updates.getCellsCount() > 0) {
             ctrl.updateCells(updates.build());
         }
+    }
+
+    private static Dropdown dropdownFromLabels(String items) {
+        Dropdown.Builder dropdown = Dropdown.newBuilder();
+        for (String label : items.split("\\|")) {
+            if (!label.isEmpty()) {
+                dropdown.addItems(DropdownItem.newBuilder().setLabel(label));
+            }
+        }
+        return dropdown.build();
     }
 
     private static boolean parseSalesFlag(String text) {
@@ -399,7 +414,7 @@ final class SalesJsonDesktopDemo {
                 SpanConfig.newBuilder()
                     .setCellSpan(CellSpanMode.CELL_SPAN_ADJACENT)
                     .setCellSpanFixed(CellSpanMode.CELL_SPAN_NONE)
-                    .setCellSpanCompare(1)
+                    .setCellSpanCompare(SpanCompareMode.SPAN_COMPARE_NO_CASE)
                     .build()
             )
             .setInteraction(

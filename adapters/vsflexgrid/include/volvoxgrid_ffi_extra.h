@@ -183,6 +183,23 @@ int32_t volvox_grid_set_text_renderer(
     void* user_data
 );
 
+typedef int32_t (*volvox_grid_custom_compare_fn)(
+    void* user_data,
+    int32_t row1,
+    int32_t row2,
+    int32_t col
+);
+
+/* Register or clear a synchronous custom sort comparator for ActiveX.
+ * The callback is invoked during flexSortCustom and should return
+ * -1, 0, or 1 for row1 before/equal/after row2.
+ */
+int32_t volvox_grid_set_custom_compare_native(
+    int64_t grid_id,
+    volvox_grid_custom_compare_fn compare_fn,
+    void* user_data
+);
+
 #ifdef __cplusplus
 }
 #endif

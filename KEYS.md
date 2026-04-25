@@ -62,7 +62,7 @@ Key codes use web/Windows virtual key values. The common codes used by the engin
 
 ```protobuf
 message KeyEvent {
-  enum Type { KEY_DOWN = 0; KEY_UP = 1; KEY_PRESS = 2; }
+  enum Type { KEY_TYPE_UNSPECIFIED = 0; KEY_DOWN = 1; KEY_UP = 2; KEY_PRESS = 3; }
   Type   type      = 1;
   int32  key_code  = 2;
   int32  modifier  = 3;   // bitmask: 0x01=Shift, 0x02=Ctrl, 0x04=Alt, 0x08=Meta
@@ -176,7 +176,7 @@ Dropdown-specific overrides in ENTER mode:
 
 ```protobuf
 message PointerEvent {
-  enum Type { DOWN = 0; UP = 1; MOVE = 2; }
+  enum Type { TYPE_UNSPECIFIED = 0; DOWN = 1; UP = 2; MOVE = 3; }
   Type  type      = 1;
   float x         = 2;   // viewport-local X coordinate
   float y         = 3;   // viewport-local Y coordinate

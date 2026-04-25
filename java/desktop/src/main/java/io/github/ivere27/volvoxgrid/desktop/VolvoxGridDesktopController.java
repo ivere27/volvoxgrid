@@ -57,7 +57,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         Objects.requireNonNull(client, "client");
         Objects.requireNonNull(request, "request");
         CreateResponse response = client.create(request);
-        return new VolvoxGridDesktopController(client, response.getHandle().getId());
+        return new VolvoxGridDesktopController(client, response.getGridId());
     }
 
     public VolvoxGridDesktopController(VolvoxGridDesktopClient client, long gridId) {
@@ -70,7 +70,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     public void destroy() throws SynurangDesktopBridge.SynurangBridgeException {
-        client.destroy(handle());
+        client.destroy(DestroyRequest.newBuilder().setGridId(gridId).build());
     }
 
     private int readRowCount() throws SynurangDesktopBridge.SynurangBridgeException {
@@ -456,8 +456,8 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         return client.getCells(request.toBuilder().setGridId(gridId).build());
     }
 
-    public DefineColumnsRequest getSchema() throws SynurangDesktopBridge.SynurangBridgeException {
-        return client.getSchema(handle());
+    public SchemaResponse getSchema() throws SynurangDesktopBridge.SynurangBridgeException {
+        return client.getSchema(GetSchemaRequest.newBuilder().setGridId(gridId).build());
     }
 
     public WriteResult loadTable(LoadTableRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
@@ -583,10 +583,18 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     public void sort(SortOrder order, int col) throws SynurangDesktopBridge.SynurangBridgeException {
+        sort(order, col, null);
+    }
+
+    public void sort(SortOrder order, int col, SortType type) throws SynurangDesktopBridge.SynurangBridgeException {
+        SortColumn.Builder sortColumn = SortColumn.newBuilder().setCol(col).setOrder(order);
+        if (type != null) {
+            sortColumn.setType(type);
+        }
         client.sort(
             SortRequest.newBuilder()
                 .setGridId(gridId)
-                .addSortColumns(SortColumn.newBuilder().setCol(col).setOrder(order))
+                .addSortColumns(sortColumn)
                 .build()
         );
     }
@@ -789,17 +797,22 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
 
     public MergedRegionsResponse getMergedRegions() throws SynurangDesktopBridge.SynurangBridgeException {
         return client.getMergedRegions(
-            GridHandle.newBuilder()
-                .setId(gridId)
+            GetMergedRegionsRequest.newBuilder()
+                .setGridId(gridId)
                 .build()
         );
     }
 
     @Override
     public void sort(int col, boolean ascending) throws SynurangDesktopBridge.SynurangBridgeException {
+        sort(col, ascending, null);
+    }
+
+    public void sort(int col, boolean ascending, SortType type) throws SynurangDesktopBridge.SynurangBridgeException {
         sort(
             ascending ? SortOrder.SORT_ASCENDING : SortOrder.SORT_DESCENDING,
-            col
+            col,
+            type
         );
     }
 
@@ -895,7 +908,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     public SelectionState selectionState() throws SynurangDesktopBridge.SynurangBridgeException {
-        return client.getSelection(handle());
+        return client.getSelection(GetSelectionRequest.newBuilder().setGridId(gridId).build());
     }
 
     public SelectionMode getSelectionMode() throws SynurangDesktopBridge.SynurangBridgeException {
@@ -1087,6 +1100,16 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         );
     }
 
+    public boolean isRenderLayerEnabled(RenderLayerBit layer) throws SynurangDesktopBridge.SynurangBridgeException {
+        Objects.requireNonNull(layer, "layer");
+        return VolvoxGridController.super.isRenderLayerEnabled(layer.getNumber());
+    }
+
+    public void setRenderLayerEnabled(RenderLayerBit layer, boolean enabled) throws SynurangDesktopBridge.SynurangBridgeException {
+        Objects.requireNonNull(layer, "layer");
+        VolvoxGridController.super.setRenderLayerEnabled(layer.getNumber(), enabled);
+    }
+
     public void setScrollBars(ScrollBarsMode mode) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(mode, "mode");
         configure(
@@ -1136,7 +1159,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
 
     @Override
     public void refresh() throws SynurangDesktopBridge.SynurangBridgeException {
-        client.refresh(handle());
+        client.refresh(RefreshRequest.newBuilder().setGridId(gridId).build());
     }
 
     /**
@@ -1312,7 +1335,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     public VolvoxGridDesktopClient.EventStream openEventStream() throws SynurangDesktopBridge.SynurangBridgeException {
-        return client.openEventStream(handle());
+        return client.openEventStream(EventStreamRequest.newBuilder().setGridId(gridId).build());
     }
 
     public VolvoxGridDesktopClient.EventStream eventStream() throws SynurangDesktopBridge.SynurangBridgeException {
@@ -1320,11 +1343,7 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     }
 
     public GridConfig getConfig() throws SynurangDesktopBridge.SynurangBridgeException {
-        return client.getConfig(handle());
-    }
-
-    private GridHandle handle() {
-        return GridHandle.newBuilder().setId(gridId).build();
+        return client.getConfig(GetConfigRequest.newBuilder().setGridId(gridId).build());
     }
 
     private SelectRequest buildSingleRangeSelectRequest(

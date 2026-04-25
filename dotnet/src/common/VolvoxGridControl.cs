@@ -42,8 +42,10 @@ namespace VolvoxGrid.DotNet
         private bool _cancelableEventChannelRequested;
 
         private EventHandler<VolvoxGridBeforeEditEventArgs> _beforeEdit;
+        private EventHandler<VolvoxGridBeforeDropdownOpenEventArgs> _beforeDropdownOpen;
         private EventHandler<VolvoxGridCellEditValidatingEventArgs> _cellEditValidating;
         private EventHandler<VolvoxGridBeforeSortEventArgs> _beforeSort;
+        private EventHandler<VolvoxGridCompareEventArgs> _compare;
 
         public VolvoxGridControl()
         {
@@ -101,6 +103,16 @@ namespace VolvoxGrid.DotNet
             remove { _beforeEdit -= value; }
         }
 
+        public event EventHandler<VolvoxGridBeforeDropdownOpenEventArgs> BeforeDropdownOpen
+        {
+            add
+            {
+                _beforeDropdownOpen += value;
+                EnableCancelableEventChannel();
+            }
+            remove { _beforeDropdownOpen -= value; }
+        }
+
         public event EventHandler<VolvoxGridCellEditValidatingEventArgs> CellEditValidating
         {
             add
@@ -119,6 +131,12 @@ namespace VolvoxGrid.DotNet
                 EnableCancelableEventChannel();
             }
             remove { _beforeSort -= value; }
+        }
+
+        public event EventHandler<VolvoxGridCompareEventArgs> Compare
+        {
+            add { _compare += value; }
+            remove { _compare -= value; }
         }
 
         #region Public Properties
@@ -1361,7 +1379,7 @@ namespace VolvoxGrid.DotNet
             try
             {
                 RegisterHostTextRenderer(gridId);
-                _renderHost.Attach(_client, gridId, OnGridEvent);
+                _renderHost.Attach(_client, gridId, OnGridEvent, OnCompare);
                 _gridId = gridId;
                 _focusedRowIndex = -1;
                 _focusedColIndex = 0;
@@ -1481,6 +1499,7 @@ namespace VolvoxGrid.DotNet
             int? width = null,
             bool? hidden = null,
             VolvoxGridSortDirection? sortDirection = null,
+            VolvoxGridSortType? sortType = null,
             VolvoxGridAlign? alignment = null,
             VolvoxGridColumnDataType? dataType = null,
             VolvoxGridCellInteraction? interaction = null,
@@ -1489,7 +1508,8 @@ namespace VolvoxGrid.DotNet
             string dropdownItems = null,
             uint? progressColor = null,
             bool? span = null,
-            VolvoxGridStickyEdge? sticky = null)
+            VolvoxGridStickyEdge? sticky = null,
+            Dropdown dropdown = null)
         {
             if (!EnsureEngine()) return;
             try
@@ -1498,12 +1518,14 @@ namespace VolvoxGrid.DotNet
                 if (width.HasValue) def.Width = width.Value;
                 if (hidden.HasValue) def.Hidden = hidden.Value;
                 if (sortDirection.HasValue) def.SortOrder = (Volvoxgrid.V1.SortOrder)sortDirection.Value;
+                if (sortType.HasValue) def.SortType = (SortType)sortType.Value;
                 if (alignment.HasValue) def.Align = (Align)alignment.Value;
                 if (dataType.HasValue) def.DataType = (ColumnDataType)dataType.Value;
                 if (interaction.HasValue) def.Interaction = (CellInteraction)interaction.Value;
                 if (format != null) def.Format = format;
                 if (!string.IsNullOrEmpty(key)) def.Key = key;
-                if (dropdownItems != null) def.DropdownItems = dropdownItems;
+                if (dropdown != null) def.Dropdown = dropdown;
+                else if (dropdownItems != null) def.Dropdown = DropdownFromLegacyItems(dropdownItems);
                 if (progressColor.HasValue) def.ProgressColor = progressColor.Value;
                 if (span.HasValue) def.Span = span.Value;
                 if (sticky.HasValue) def.Sticky = (StickyEdge)sticky.Value;
@@ -1516,6 +1538,7 @@ namespace VolvoxGrid.DotNet
                     if (width.HasValue) col.Width = width.Value;
                     if (hidden.HasValue) col.Visible = !hidden.Value;
                     if (sortDirection.HasValue) col.SortDirection = sortDirection.Value;
+                    if (sortType.HasValue) col.SortType = sortType.Value;
                     if (alignment.HasValue) col.Alignment = alignment.Value;
                     if (dataType.HasValue) col.DataType = dataType.Value;
                     if (interaction.HasValue) col.Interaction = interaction.Value;
@@ -1590,6 +1613,11 @@ namespace VolvoxGrid.DotNet
             DefineColumns(col, dropdownItems: items ?? string.Empty);
         }
 
+        public void SetColDropdown(int col, Dropdown dropdown)
+        {
+            DefineColumns(col, dropdown: dropdown ?? new Dropdown());
+        }
+
         public void SetColAlignment(int col, VolvoxGridAlign alignment)
         {
             DefineColumns(col, alignment: alignment);
@@ -1610,9 +1638,12 @@ namespace VolvoxGrid.DotNet
             DefineColumns(col, interaction: interaction);
         }
 
-        public void SetColSort(int col, VolvoxGridSortDirection direction)
+        public void SetColSort(
+            int col,
+            VolvoxGridSortDirection direction,
+            VolvoxGridSortType sortType = VolvoxGridSortType.Auto)
         {
-            DefineColumns(col, sortDirection: direction);
+            DefineColumns(col, sortDirection: direction, sortType: sortType);
         }
 
         #endregion
@@ -1656,11 +1687,53 @@ namespace VolvoxGrid.DotNet
             {
                 _client.UpdateCells(
                     _gridId,
-                    new[] { new CellUpdate { Row = row, Col = col, DropdownItems = items ?? string.Empty } },
+                    new[] { new CellUpdate { Row = row, Col = col, Dropdown = DropdownFromLegacyItems(items ?? string.Empty) } },
                     false);
                 _renderHost.RequestFrame();
             }
             catch (Exception ex) { _lastError = ex.Message; }
+        }
+
+        public void SetCellDropdown(int row, int col, Dropdown dropdown)
+        {
+            if (row < 0 || col < 0 || !EnsureEngine()) return;
+            try
+            {
+                _client.UpdateCells(
+                    _gridId,
+                    new[] { new CellUpdate { Row = row, Col = col, Dropdown = dropdown ?? new Dropdown() } },
+                    false);
+                _renderHost.RequestFrame();
+            }
+            catch (Exception ex) { _lastError = ex.Message; }
+        }
+
+        private static Dropdown DropdownFromLegacyItems(string items)
+        {
+            var dropdown = new Dropdown();
+            if (items == null) return dropdown;
+            if (items.StartsWith("|", StringComparison.Ordinal))
+            {
+                dropdown.AllowCustomValue = true;
+                items = items.Substring(1);
+            }
+            foreach (var raw in items.Split('|'))
+            {
+                if (string.IsNullOrEmpty(raw)) continue;
+                string value = null;
+                var label = raw;
+                if (raw.StartsWith("#", StringComparison.Ordinal))
+                {
+                    var semi = raw.IndexOf(';');
+                    if (semi > 1)
+                    {
+                        value = raw.Substring(1, semi - 1);
+                        label = raw.Substring(semi + 1);
+                    }
+                }
+                dropdown.Items.Add(new DropdownItem { Value = value, Label = label });
+            }
+            return dropdown;
         }
 
         public void SetCellCheckedState(int row, int col, VolvoxGridCheckedState state)
@@ -2003,28 +2076,30 @@ namespace VolvoxGrid.DotNet
 
         #region Public Methods - Actions (Sort, Subtotal, Outline, etc.)
 
-        public bool Sort(string fieldName, VolvoxGridSortDirection direction)
+        public bool Sort(string fieldName, VolvoxGridSortDirection direction, VolvoxGridSortType sortType = VolvoxGridSortType.Auto)
         {
             int col = GetColumnIndex(fieldName);
             if (col < 0 || !EnsureEngine()) return false;
             foreach (var c in _columns) c.SortDirection = VolvoxGridSortDirection.None;
             _columns[col].SortDirection = direction;
+            _columns[col].SortType = sortType;
             var sorts = BuildSortColumns();
             try { _client.Sort(_gridId, sorts); _client.Refresh(_gridId); _renderHost.RequestFrame(); return true; }
             catch (Exception ex) { _lastError = ex.Message; return false; }
         }
 
-        public void Sort(int col, bool ascending)
+        public void Sort(int col, bool ascending, VolvoxGridSortType sortType = VolvoxGridSortType.Auto)
         {
             if (col < 0 || !EnsureEngine()) return;
             try
             {
                 var order = ascending ? Volvoxgrid.V1.SortOrder.SORT_ASCENDING : Volvoxgrid.V1.SortOrder.SORT_DESCENDING;
-                _client.Sort(_gridId, new[] { new SortColumn { Col = col, Order = order } });
+                _client.Sort(_gridId, new[] { new SortColumn { Col = col, Order = order, Type = (SortType)sortType } });
                 if (col < _columns.Count)
                 {
                     foreach (var c in _columns) c.SortDirection = VolvoxGridSortDirection.None;
                     _columns[col].SortDirection = ascending ? VolvoxGridSortDirection.Ascending : VolvoxGridSortDirection.Descending;
+                    _columns[col].SortType = sortType;
                 }
                 _client.Refresh(_gridId);
                 _renderHost.RequestFrame();
@@ -2205,10 +2280,48 @@ namespace VolvoxGrid.DotNet
             if (_client == null || _gridId == 0) return new VolvoxGridExportData();
             try
             {
-                var response = _client.Export(_gridId, (ExportFormat)format, (ExportScope)scope);
-                return new VolvoxGridExportData { Data = response.Data ?? new byte[0], Format = (VolvoxGridExportFormat)response.Format };
+                var response = _client.Export(_gridId, ToProtoExportFormat(format), ToProtoExportScope(scope));
+                return new VolvoxGridExportData { Data = response.Data ?? new byte[0], Format = FromProtoExportFormat(response.Format) };
             }
             catch (Exception ex) { _lastError = ex.Message; return new VolvoxGridExportData(); }
+        }
+
+        private static ExportFormat ToProtoExportFormat(VolvoxGridExportFormat format)
+        {
+            switch (format)
+            {
+                case VolvoxGridExportFormat.Binary: return ExportFormat.EXPORT_BINARY;
+                case VolvoxGridExportFormat.Tsv: return ExportFormat.EXPORT_TSV;
+                case VolvoxGridExportFormat.Csv: return ExportFormat.EXPORT_CSV;
+                case VolvoxGridExportFormat.Delimited: return ExportFormat.EXPORT_DELIMITED;
+                case VolvoxGridExportFormat.Xlsx: return ExportFormat.EXPORT_XLSX;
+                default: return ExportFormat.EXPORT_BINARY;
+            }
+        }
+
+        private static ExportScope ToProtoExportScope(VolvoxGridExportScope scope)
+        {
+            switch (scope)
+            {
+                case VolvoxGridExportScope.All: return ExportScope.EXPORT_ALL;
+                case VolvoxGridExportScope.DataOnly: return ExportScope.EXPORT_DATA_ONLY;
+                case VolvoxGridExportScope.FormatOnly: return ExportScope.EXPORT_FORMAT_ONLY;
+                default: return ExportScope.EXPORT_ALL;
+            }
+        }
+
+        private static VolvoxGridExportFormat FromProtoExportFormat(ExportFormat format)
+        {
+            switch (format)
+            {
+                case ExportFormat.EXPORT_TSV: return VolvoxGridExportFormat.Tsv;
+                case ExportFormat.EXPORT_CSV: return VolvoxGridExportFormat.Csv;
+                case ExportFormat.EXPORT_DELIMITED: return VolvoxGridExportFormat.Delimited;
+                case ExportFormat.EXPORT_XLSX: return VolvoxGridExportFormat.Xlsx;
+                case ExportFormat.EXPORT_BINARY:
+                default:
+                    return VolvoxGridExportFormat.Binary;
+            }
         }
 
         public void LoadData(byte[] data)
@@ -2341,7 +2454,7 @@ namespace VolvoxGrid.DotNet
                 _ownedGridIds.Add(_gridId);
                 RegisterHostTextRenderer(_gridId);
                 ApplyEngineConfig();
-                _renderHost.Attach(_client, _gridId, OnGridEvent);
+                _renderHost.Attach(_client, _gridId, OnGridEvent, OnCompare);
                 _renderHost.RequestFrame();
                 _lastError = null; return true;
             }
@@ -2438,6 +2551,8 @@ namespace VolvoxGrid.DotNet
             {
                 case GridEvent.EventOneofCase.BeforeEdit:
                     return OnBeforeEdit(evt);
+                case GridEvent.EventOneofCase.BeforeDropdownOpen:
+                    return OnBeforeDropdownOpen(evt);
                 case GridEvent.EventOneofCase.CellEditValidate:
                     return OnCellEditValidating(evt);
                 case GridEvent.EventOneofCase.BeforeSort:
@@ -2578,6 +2693,29 @@ namespace VolvoxGrid.DotNet
             return args.Cancel;
         }
 
+        private bool? OnBeforeDropdownOpen(GridEvent evt)
+        {
+            if (_beforeDropdownOpen == null)
+            {
+                return _cancelableEventChannelRequested ? (bool?)false : null;
+            }
+
+            var before = evt.BeforeDropdownOpen;
+            var args = new VolvoxGridBeforeDropdownOpenEventArgs(
+                before.Row,
+                before.Col,
+                GetFieldName(before.Col),
+                before.X,
+                before.Y,
+                before.Width,
+                before.Height,
+                before.Dropdown,
+                before.CurrentValue,
+                before.SelectedIndex);
+            _beforeDropdownOpen.Invoke(this, args);
+            return args.Cancel;
+        }
+
         private bool? OnCellEditValidating(GridEvent evt)
         {
             if (_cellEditValidating == null)
@@ -2604,6 +2742,22 @@ namespace VolvoxGrid.DotNet
             var args = new VolvoxGridBeforeSortEventArgs(evt.BeforeSort.Col, GetFieldName(evt.BeforeSort.Col));
             _beforeSort.Invoke(this, args);
             return args.Cancel;
+        }
+
+        private int? OnCompare(GridEvent evt)
+        {
+            if (evt == null || evt.Compare == null || _compare == null)
+            {
+                return 0;
+            }
+
+            var args = new VolvoxGridCompareEventArgs(
+                evt.Compare.Row1,
+                evt.Compare.Row2,
+                evt.Compare.Col,
+                GetFieldName(evt.Compare.Col));
+            _compare.Invoke(this, args);
+            return args.Result;
         }
 
         private void UpdateSelectionFromEngine()
@@ -2658,9 +2812,9 @@ namespace VolvoxGrid.DotNet
             }
         }
 
-        private List<ColumnDef> BuildColumnDefinitions() => _columns.Select((c, i) => new ColumnDef { Index = i, Key = c.FieldName, Caption = c.Caption, Width = c.Width, Hidden = !c.Visible, SortOrder = (Volvoxgrid.V1.SortOrder)c.SortDirection, Align = (Align)c.Alignment, DataType = (ColumnDataType)c.DataType, Interaction = (CellInteraction)c.Interaction, Format = c.Format, ProgressColor = c.ProgressColor }).ToList();
+        private List<ColumnDef> BuildColumnDefinitions() => _columns.Select((c, i) => new ColumnDef { Index = i, Key = c.FieldName, Caption = c.Caption, Width = c.Width, Hidden = !c.Visible, SortOrder = (Volvoxgrid.V1.SortOrder)c.SortDirection, SortType = (SortType)c.SortType, Align = (Align)c.Alignment, DataType = (ColumnDataType)c.DataType, Interaction = (CellInteraction)c.Interaction, Format = c.Format, ProgressColor = c.ProgressColor }).ToList();
 
-        private List<SortColumn> BuildSortColumns() => _columns.Select((c, i) => new { c, i }).Where(x => x.c.SortDirection != VolvoxGridSortDirection.None).Select(x => new SortColumn { Col = x.i, Order = (Volvoxgrid.V1.SortOrder)x.c.SortDirection }).ToList();
+        private List<SortColumn> BuildSortColumns() => _columns.Select((c, i) => new { c, i }).Where(x => x.c.SortDirection != VolvoxGridSortDirection.None).Select(x => new SortColumn { Col = x.i, Order = (Volvoxgrid.V1.SortOrder)x.c.SortDirection, Type = (SortType)x.c.SortType }).ToList();
 
         private void PopulateColumnsFromModel(IList<ColumnDef> modelCols)
         {
@@ -2675,6 +2829,7 @@ namespace VolvoxGrid.DotNet
                     Width = s.HasWidth ? s.Width : 120,
                     Visible = !s.HasHidden || !s.Hidden,
                     SortDirection = s.HasSortOrder ? (VolvoxGridSortDirection)s.SortOrder : VolvoxGridSortDirection.None,
+                    SortType = s.HasSortType ? (VolvoxGridSortType)s.SortType : VolvoxGridSortType.Auto,
                     Alignment = s.HasAlign ? (VolvoxGridAlign)s.Align : VolvoxGridAlign.General,
                     DataType = s.HasDataType ? (VolvoxGridColumnDataType)s.DataType : VolvoxGridColumnDataType.String,
                     Interaction = s.HasInteraction ? (VolvoxGridCellInteraction)s.Interaction : VolvoxGridCellInteraction.Unspecified,
@@ -2825,7 +2980,7 @@ namespace VolvoxGrid.DotNet
             res.Add(new CellRange { Row1 = start, Col1 = col, Row2 = prev, Col2 = col }); return res;
         }
 
-        private VolvoxGridColumn CloneColumn(VolvoxGridColumn s) => new VolvoxGridColumn { FieldName = s.FieldName, Caption = s.Caption, Width = s.Width, Visible = s.Visible, AllowEdit = s.AllowEdit, ReadOnly = s.ReadOnly, SortDirection = s.SortDirection, Alignment = s.Alignment, DataType = s.DataType, Interaction = s.Interaction, Format = s.Format, ProgressColor = s.ProgressColor };
+        private VolvoxGridColumn CloneColumn(VolvoxGridColumn s) => new VolvoxGridColumn { FieldName = s.FieldName, Caption = s.Caption, Width = s.Width, Visible = s.Visible, AllowEdit = s.AllowEdit, ReadOnly = s.ReadOnly, SortDirection = s.SortDirection, SortType = s.SortType, Alignment = s.Alignment, DataType = s.DataType, Interaction = s.Interaction, Format = s.Format, ProgressColor = s.ProgressColor };
 
         private int ResolveDemoRowCountHint(string d)
         {

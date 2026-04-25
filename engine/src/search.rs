@@ -1,4 +1,6 @@
 use crate::grid::VolvoxGrid;
+use crate::proto::volvoxgrid::v1 as pb;
+use std::collections::BTreeSet;
 
 /// Find the first row (starting at `start_row`) where the cell in `col`
 /// matches `text`.
@@ -197,10 +199,12 @@ pub fn type_ahead_clear_buffer(grid: &mut VolvoxGrid) {
 /// | 7    | Minimum                         |
 /// | 8    | Standard deviation (sample)     |
 /// | 9    | Variance (sample)               |
-/// | 10   | Standard deviation (population) |
-/// | 11   | Variance (population)           |
+/// | 10   | Range (maximum - minimum)       |
+/// | 11   | Count all cells                 |
+/// | 12   | Median                          |
+/// | 13   | Count distinct non-empty cells  |
 ///
-/// Returns 0.0 for unknown codes or when no numeric values exist.
+/// Returns 0.0 for unknown codes or when no applicable values exist.
 pub fn aggregate(
     grid: &VolvoxGrid,
     agg_type: i32,
@@ -209,24 +213,39 @@ pub fn aggregate(
     row2: i32,
     col2: i32,
 ) -> f64 {
-    let mut values: Vec<f64> = Vec::new();
+    if row1 > row2 || col1 > col2 || grid.rows <= 0 || grid.cols <= 0 {
+        return 0.0;
+    }
 
-    for r in row1..=row2.min(grid.rows - 1) {
-        for c in col1..=col2.min(grid.cols - 1) {
+    let mut values: Vec<f64> = Vec::new();
+    let mut count_all = 0usize;
+    let mut distinct_values = BTreeSet::new();
+
+    let start_row = row1.max(0);
+    let end_row = row2.min(grid.rows - 1);
+    let start_col = col1.max(0);
+    let end_col = col2.min(grid.cols - 1);
+    if start_row > end_row || start_col > end_col {
+        return 0.0;
+    }
+
+    for r in start_row..=end_row {
+        for c in start_col..=end_col {
+            count_all += 1;
             let text = grid.cells.get_text(r, c);
+            let trimmed = text.trim();
+            if !trimmed.is_empty() {
+                distinct_values.insert(trimmed.to_string());
+            }
             if let Ok(v) = text.replace([',', '$', ' '], "").parse::<f64>() {
                 values.push(v);
             }
         }
     }
 
-    if values.is_empty() {
-        return 0.0;
-    }
-
     match agg_type {
-        2 => values.iter().sum(),
-        3 => {
+        a if a == pb::AggregateType::AggSum as i32 => values.iter().sum(),
+        a if a == pb::AggregateType::AggPercent as i32 => {
             let total: f64 = values.iter().sum();
             if total != 0.0 {
                 100.0
@@ -234,11 +253,26 @@ pub fn aggregate(
                 0.0
             }
         }
-        4 => values.len() as f64,
-        5 => values.iter().sum::<f64>() / values.len() as f64,
-        6 => values.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
-        7 => values.iter().cloned().fold(f64::INFINITY, f64::min),
-        8 => {
+        a if a == pb::AggregateType::AggCount as i32 => values.len() as f64,
+        a if a == pb::AggregateType::AggAverage as i32 => {
+            if values.is_empty() {
+                return 0.0;
+            }
+            values.iter().sum::<f64>() / values.len() as f64
+        }
+        a if a == pb::AggregateType::AggMax as i32 => {
+            if values.is_empty() {
+                return 0.0;
+            }
+            values.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
+        }
+        a if a == pb::AggregateType::AggMin as i32 => {
+            if values.is_empty() {
+                return 0.0;
+            }
+            values.iter().cloned().fold(f64::INFINITY, f64::min)
+        }
+        a if a == pb::AggregateType::AggStdDev as i32 => {
             // Sample standard deviation (N-1)
             if values.len() < 2 {
                 return 0.0;
@@ -248,7 +282,7 @@ pub fn aggregate(
                 values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
             var.sqrt()
         }
-        9 => {
+        a if a == pb::AggregateType::AggVar as i32 => {
             // Sample variance (N-1)
             if values.len() < 2 {
                 return 0.0;
@@ -256,17 +290,69 @@ pub fn aggregate(
             let mean = values.iter().sum::<f64>() / values.len() as f64;
             values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / (values.len() - 1) as f64
         }
-        10 => {
-            // Population standard deviation (N)
-            let mean = values.iter().sum::<f64>() / values.len() as f64;
-            let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
-            var.sqrt()
+        a if a == pb::AggregateType::AggRange as i32 => {
+            if values.is_empty() {
+                return 0.0;
+            }
+            let min = values.iter().cloned().fold(f64::INFINITY, f64::min);
+            let max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            max - min
         }
-        11 => {
-            // Population variance (N)
-            let mean = values.iter().sum::<f64>() / values.len() as f64;
-            values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64
+        a if a == pb::AggregateType::AggCountAll as i32 => count_all as f64,
+        a if a == pb::AggregateType::AggMedian as i32 => {
+            if values.is_empty() {
+                return 0.0;
+            }
+            values.sort_by(|a, b| a.total_cmp(b));
+            let mid = values.len() / 2;
+            if values.len() % 2 == 0 {
+                (values[mid - 1] + values[mid]) / 2.0
+            } else {
+                values[mid]
+            }
         }
+        a if a == pb::AggregateType::AggCountDistinct as i32 => distinct_values.len() as f64,
         _ => 0.0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::aggregate;
+    use crate::grid::VolvoxGrid;
+    use crate::proto::volvoxgrid::v1 as pb;
+
+    #[test]
+    fn aggregate_supports_range_count_all_median_and_distinct() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 3, 2, 0, 0);
+        grid.cells.set_text(0, 0, "10".to_string());
+        grid.cells.set_text(0, 1, "20".to_string());
+        grid.cells.set_text(1, 0, "30".to_string());
+        grid.cells.set_text(1, 1, "x".to_string());
+        grid.cells.set_text(2, 0, "10".to_string());
+
+        assert_eq!(
+            aggregate(&grid, pb::AggregateType::AggRange as i32, 0, 0, 2, 1),
+            20.0
+        );
+        assert_eq!(
+            aggregate(&grid, pb::AggregateType::AggCountAll as i32, 0, 0, 2, 1),
+            6.0
+        );
+        assert_eq!(
+            aggregate(&grid, pb::AggregateType::AggMedian as i32, 0, 0, 2, 1),
+            15.0
+        );
+        assert_eq!(
+            aggregate(
+                &grid,
+                pb::AggregateType::AggCountDistinct as i32,
+                0,
+                0,
+                2,
+                1
+            ),
+            4.0
+        );
     }
 }

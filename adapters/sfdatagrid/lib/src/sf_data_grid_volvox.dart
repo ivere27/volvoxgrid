@@ -298,6 +298,7 @@ class _SfDataGridVolvoxState extends State<SfDataGridVolvox> {
       footerFrozenColumnsCount: math.max(0, widget.footerFrozenColumnsCount),
       allowSorting: widget.allowSorting,
       sortedColumns: widget.source.sortedColumns,
+      source: widget.source,
     );
 
     final values = List<vg.CellValue>.generate(totalRows * totalCols, (_) {
@@ -385,6 +386,7 @@ class _SfDataGridVolvoxState extends State<SfDataGridVolvox> {
       return;
     }
     final columns = <(int, vg.SortOrder)>[];
+    final types = <int, vg.SortType>{};
     for (final sort in widget.source.sortedColumns) {
       final colIndex = _columnMapping.indexByName[sort.name];
       if (colIndex == null) {
@@ -395,11 +397,14 @@ class _SfDataGridVolvoxState extends State<SfDataGridVolvox> {
         continue;
       }
       columns.add((colIndex, mapSortDirection(sort.sortDirection)));
+      if (widget.source.usesCustomSort(sort.name)) {
+        types[colIndex] = vg.SortType.SORT_TYPE_CUSTOM;
+      }
     }
     if (columns.isEmpty) {
       return;
     }
-    await _controller.sortMulti(columns);
+    await _controller.sortMulti(columns, types: types);
   }
 
   void _onGridEvent(vg.GridEvent event) {
@@ -408,6 +413,31 @@ class _SfDataGridVolvoxState extends State<SfDataGridVolvox> {
 
   bool _onCancelableEvent(vg.GridEvent event) {
     return _eventMapper.onCancelableGridEvent(event);
+  }
+
+  int _onCompare(vg.CompareEvent event) {
+    if (event.col < 0 || event.col >= _columnMapping.columns.length) {
+      return 0;
+    }
+    final mapped = _columnMapping.columns[event.col];
+    if (!widget.source.usesCustomSort(mapped.source.columnName)) {
+      return 0;
+    }
+    final row1 = event.row1 >= 0 && event.row1 < _shadowRows.length
+        ? _shadowRows[event.row1]
+        : null;
+    final row2 = event.row2 >= 0 && event.row2 < _shadowRows.length
+        ? _shadowRows[event.row2]
+        : null;
+    final result = widget.source.compare(
+      row1,
+      row2,
+      SortColumnDetails(
+        name: mapped.source.columnName,
+        sortDirection: SortDirection.ascending,
+      ),
+    );
+    return result ?? 0;
   }
 
   @override
@@ -420,6 +450,7 @@ class _SfDataGridVolvoxState extends State<SfDataGridVolvox> {
       controller: _controller,
       onGridEvent: _onGridEvent,
       onCancelableEvent: _onCancelableEvent,
+      onCompare: _onCompare,
     );
   }
 }

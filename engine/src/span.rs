@@ -6,7 +6,8 @@ use std::collections::HashMap;
 pub struct SpanState {
     pub mode: i32,                                       // CellSpanMode enum
     pub mode_fixed: i32,                                 // CellSpanMode for fixed cells
-    pub span_compare: i32,                               // comparison type
+    pub span_compare: i32,                               // SpanCompareMode enum
+    pub group_span_compare: i32,                         // SpanCompareMode for group keys
     pub span_rows: std::collections::HashMap<i32, bool>, // per-row span enable
     pub span_cols: std::collections::HashMap<i32, bool>, // per-col span enable
     cache: RefCell<HashMap<(i32, i32), (i32, i32, i32, i32)>>,
@@ -18,6 +19,7 @@ impl Clone for SpanState {
             mode: self.mode,
             mode_fixed: self.mode_fixed,
             span_compare: self.span_compare,
+            group_span_compare: self.group_span_compare,
             span_rows: self.span_rows.clone(),
             span_cols: self.span_cols.clone(),
             cache: RefCell::new(HashMap::new()),
@@ -31,6 +33,7 @@ impl std::fmt::Debug for SpanState {
             .field("mode", &self.mode)
             .field("mode_fixed", &self.mode_fixed)
             .field("span_compare", &self.span_compare)
+            .field("group_span_compare", &self.group_span_compare)
             .field("span_rows", &self.span_rows)
             .field("span_cols", &self.span_cols)
             .finish()
@@ -42,7 +45,8 @@ impl Default for SpanState {
         Self {
             mode: pb::CellSpanMode::CellSpanNone as i32,
             mode_fixed: pb::CellSpanMode::CellSpanNone as i32,
-            span_compare: 0, // SpanCompareMode (not in proto)
+            span_compare: pb::SpanCompareMode::SpanCompareExact as i32,
+            group_span_compare: pb::SpanCompareMode::SpanCompareExact as i32,
             span_rows: std::collections::HashMap::new(),
             span_cols: std::collections::HashMap::new(),
             cache: RefCell::new(HashMap::new()),
@@ -75,7 +79,7 @@ impl SpanState {
     }
 
     fn normalize_for_compare<'a>(&self, s: &'a str) -> &'a str {
-        if self.span_compare == 2 {
+        if self.span_compare == pb::SpanCompareMode::SpanCompareTrimNoCase as i32 {
             s.trim()
         } else {
             s
@@ -87,8 +91,10 @@ impl SpanState {
     }
 
     fn text_matches(&self, a: &str, b: &str) -> bool {
-        // SpanCompare mode 3 (IncludeNulls): span empty cells as well.
-        if self.span_compare == 3 && self.is_empty_for_compare(a) && self.is_empty_for_compare(b) {
+        if self.span_compare == pb::SpanCompareMode::SpanCompareIncludeNulls as i32
+            && self.is_empty_for_compare(a)
+            && self.is_empty_for_compare(b)
+        {
             return true;
         }
 
@@ -100,8 +106,12 @@ impl SpanState {
         let na = self.normalize_for_compare(a);
         let nb = self.normalize_for_compare(b);
         match self.span_compare {
-            1 | 2 => na.eq_ignore_ascii_case(nb), // case-insensitive / trim+case-insensitive
-            _ => na == nb,                        // exact match (+ fallback)
+            m if m == pb::SpanCompareMode::SpanCompareNoCase as i32
+                || m == pb::SpanCompareMode::SpanCompareTrimNoCase as i32 =>
+            {
+                na.eq_ignore_ascii_case(nb)
+            }
+            _ => na == nb,
         }
     }
 
@@ -286,7 +296,9 @@ impl SpanState {
         }
 
         // Non-spill span modes do not span blank cells unless IncludeNulls is set.
-        if self.is_empty_for_compare(text) && self.span_compare != 3 {
+        if self.is_empty_for_compare(text)
+            && self.span_compare != pb::SpanCompareMode::SpanCompareIncludeNulls as i32
+        {
             return (row, col, row, col);
         }
 
@@ -436,7 +448,7 @@ mod tests {
         grid.span.mode = 1; // free
         grid.span.span_cols.insert(-1, true);
         grid.span.span_rows.insert(-1, true);
-        grid.span.span_compare = 2; // trim + nocase
+        grid.span.span_compare = pb::SpanCompareMode::SpanCompareTrimNoCase as i32;
 
         let (r1, _c1, r2, _c2) = grid.span.get_merged_range(&grid, 1, 0);
         assert_eq!((r1, r2), (1, 2));

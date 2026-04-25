@@ -321,6 +321,8 @@ class VolvoxGridView @JvmOverloads constructor(
             }
         }
 
+    var compareListener: CompareListener? = null
+
     /** Listener for edit commit/cancel from the inline EditText overlay. */
     var editListener: EditCommitListener? = null
 
@@ -341,6 +343,10 @@ class VolvoxGridView @JvmOverloads constructor(
 
     interface BeforeSortListener {
         fun onBeforeSort(details: BeforeSortDetails)
+    }
+
+    interface CompareListener {
+        fun onCompare(details: CompareDetails)
     }
 
     interface EditCommitListener {
@@ -390,6 +396,14 @@ class VolvoxGridView @JvmOverloads constructor(
         val rawEvent: GridEvent,
         val col: Int,
         var cancel: Boolean = false
+    )
+
+    data class CompareDetails(
+        val rawEvent: GridEvent,
+        val row1: Int,
+        val row2: Int,
+        val col: Int,
+        var result: Int = 0
     )
 
     init {
@@ -718,7 +732,7 @@ class VolvoxGridView @JvmOverloads constructor(
                     .build())
                 .build()
         )
-        gridId = response.handle.id
+        gridId = response.gridId
 
         maybeRegisterExternalTextRenderer()
         applyAndroidScrollDefaults()
@@ -815,7 +829,7 @@ class VolvoxGridView @JvmOverloads constructor(
     /** Get the underlying FFI client for direct API calls. */
     fun getService(): VolvoxGridServiceFfi? = ffiClient
 
-    /** Get the grid handle ID for use with the controller or direct FFI calls. */
+    /** Get the grid ID for use with the controller or direct FFI calls. */
     fun getGridId(): Long = gridId
 
     /** Create a [VolvoxGridController] wrapping this view's FFI client and grid ID. */
@@ -943,7 +957,7 @@ class VolvoxGridView @JvmOverloads constructor(
             clearExternalTextRenderer(gridId)
             usingExternalTextRenderer = false
             try {
-                ffiClient?.Destroy(GridHandle.newBuilder().setId(gridId).build())
+                ffiClient?.Destroy(DestroyRequest.newBuilder().setGridId(gridId).build())
             } catch (_: Exception) {}
             gridId = 0
         }
@@ -1428,8 +1442,8 @@ class VolvoxGridView @JvmOverloads constructor(
         if (gridId == 0L) return
         try {
             val config = client.GetConfig(
-                GridHandle.newBuilder()
-                    .setId(gridId)
+                GetConfigRequest.newBuilder()
+                    .setGridId(gridId)
                     .build()
             )
             knownRows = config.layout.rows
@@ -2457,7 +2471,7 @@ class VolvoxGridView @JvmOverloads constructor(
                     .build()
             )
             val config = client.GetConfig(
-                GridHandle.newBuilder().setId(gridId).build()
+                GetConfigRequest.newBuilder().setGridId(gridId).build()
             )
             val cellFont = if (resp.cellsCount > 0) resp.getCells(0).style.font else null
             val gridFont = config.style.font
@@ -2638,10 +2652,10 @@ class VolvoxGridView @JvmOverloads constructor(
 
     private fun startEventStream() {
         val host = plugin ?: return
-        val handle = GridHandle.newBuilder().setId(gridId).build()
+        val request = EventStreamRequest.newBuilder().setGridId(gridId).build()
         val stream = host.openStream("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/EventStream")
         try {
-            stream.send(handle.toByteArray())
+            stream.send(request.toByteArray())
             stream.closeSend()
         } catch (e: Exception) {
             try { stream.close() } catch (_: Exception) {}
@@ -2693,7 +2707,10 @@ class VolvoxGridView @JvmOverloads constructor(
             }
         }
 
-        if (decisionChannelEnabled && isCancelableGridEvent(event)) {
+        if (event.hasCompare()) {
+            val result = dispatchCompareEvent(event)
+            sendCompareResponse(event.compare.requestId, result)
+        } else if (decisionChannelEnabled && isCancelableGridEvent(event)) {
             val cancel = dispatchCancelableGridEvent(event)
             sendEventDecision(event.eventId, cancel)
         }
@@ -2755,6 +2772,64 @@ class VolvoxGridView @JvmOverloads constructor(
         } catch (_: Exception) {
             // Best-effort; a closed stream will be reopened by the next session attach.
         }
+    }
+
+    private fun sendCompareResponse(requestId: Long, result: Int) {
+        if (gridId == 0L || requestId == 0L) {
+            return
+        }
+        try {
+            sendRenderInput(
+                RenderInput.newBuilder()
+                    .setGridId(gridId)
+                    .setCompareResponse(
+                        CompareResponse.newBuilder()
+                            .setRequestId(requestId)
+                            .setResult(result)
+                            .build()
+                    )
+                    .build()
+            )
+        } catch (_: Exception) {
+            // Best-effort; a closed stream will be reopened by the next session attach.
+        }
+    }
+
+    private fun dispatchCompareEvent(event: GridEvent): Int {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return dispatchCompareEventOnMain(event)
+        }
+
+        val latch = CountDownLatch(1)
+        val resultRef = intArrayOf(0)
+        if (!post {
+                try {
+                    resultRef[0] = dispatchCompareEventOnMain(event)
+                } finally {
+                    latch.countDown()
+                }
+            }) {
+            return 0
+        }
+
+        return try {
+            latch.await(200, TimeUnit.MILLISECONDS)
+            resultRef[0]
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            0
+        }
+    }
+
+    private fun dispatchCompareEventOnMain(event: GridEvent): Int {
+        val details = CompareDetails(
+            rawEvent = event,
+            row1 = event.compare.row1,
+            row2 = event.compare.row2,
+            col = event.compare.col,
+        )
+        compareListener?.onCompare(details)
+        return details.result
     }
 
     private fun dispatchCancelableGridEvent(event: GridEvent): Boolean {

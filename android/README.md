@@ -141,7 +141,7 @@ gridView.initialize(pluginHost, existingGridId);
 | Method | Description |
 |---|---|
 | `createController()` | Create a `VolvoxGridController` for this grid |
-| `getGridId()` | Get the native grid handle ID |
+| `getGridId()` | Get the native grid ID |
 | `getService()` | Get the underlying FFI service client |
 | `detachGrid()` | Stop render/event session but keep the grid alive |
 | `release()` | Clean up all resources |
@@ -232,6 +232,7 @@ ctrl.setCells(Arrays.asList(
 LoadDataOptions matrixJson = LoadDataOptions.newBuilder()
     .setJson(JsonOptions.newBuilder().build())
     .setHeaderPolicy(HeaderPolicy.HEADER_NONE)
+    .setMode(LoadMode.LOAD_REPLACE)
     .build();
 ctrl.loadData(
     """
@@ -407,7 +408,8 @@ ctrl.setGridStyle(styleConfig);
 // Add subtotal rows grouped by column 0, aggregating column 2
 ctrl.subtotal(AggregateType.AGG_SUM, 0, 2);
 // Aggregate types: AGG_SUM, AGG_COUNT, AGG_AVERAGE, AGG_MAX, AGG_MIN,
-//                  AGG_STD_DEV, AGG_VAR, AGG_PERCENT, AGG_CLEAR
+//                  AGG_STD_DEV, AGG_VAR, AGG_RANGE, AGG_COUNT_ALL,
+//                  AGG_MEDIAN, AGG_COUNT_DISTINCT, AGG_PERCENT, AGG_CLEAR
 
 // Outline levels for tree-style grouping
 ctrl.setRowOutlineLevel(5, 1);
@@ -566,6 +568,7 @@ ctrl.loadData(
     LoadDataOptions.newBuilder()
         .setJson(JsonOptions.newBuilder().build())
         .setHeaderPolicy(HeaderPolicy.HEADER_NONE)
+        .setMode(LoadMode.LOAD_REPLACE)
         .build()
 )
 

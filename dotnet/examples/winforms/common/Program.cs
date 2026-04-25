@@ -5,6 +5,8 @@ using System.IO;
 using System.Threading;
 using System.Windows.Forms;
 using VolvoxGrid.DotNet;
+using Dropdown = Volvoxgrid.V1.Dropdown;
+using DropdownItem = Volvoxgrid.V1.DropdownItem;
 
 namespace VolvoxGrid.DotNet.Sample
 {
@@ -456,7 +458,7 @@ namespace VolvoxGrid.DotNet.Sample
             _grid.SetColSticky(0, VolvoxGridStickyEdge.Left);
             _grid.SetSpanRow(0, false);
             _grid.SetSpanCol(1, false);
-            _grid.SetColDropdownItems(1, "Alpha|Beta|Gamma|Delta");
+            _grid.SetColDropdown(1, DropdownFromLabels("Alpha|Beta|Gamma|Delta"));
             _grid.SetColSort(2, VolvoxGridSortDirection.Descending);
             SmokeAssert(true, "Column/row definition APIs");
 
@@ -996,6 +998,17 @@ namespace VolvoxGrid.DotNet.Sample
             }
 
             _status.Text = _status.Text + " | " + message;
+        }
+
+        private static Dropdown DropdownFromLabels(string items)
+        {
+            var dropdown = new Dropdown();
+            foreach (var label in items.Split('|'))
+            {
+                if (label.Length == 0) continue;
+                dropdown.Items.Add(new DropdownItem { Label = label });
+            }
+            return dropdown;
         }
 
         private void SetStatus(string message)

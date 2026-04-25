@@ -47,10 +47,8 @@ Future<void> loadHierarchyJsonDemo(VolvoxGridController controller) async {
       .allMatches(rawJson)
       .map((match) => int.parse(match.group(1)!))
       .toList();
-  final types = _typePattern
-      .allMatches(rawJson)
-      .map((match) => match.group(1)!)
-      .toList();
+  final types =
+      _typePattern.allMatches(rawJson).map((match) => match.group(1)!).toList();
   final sanitized = Uint8List.fromList(
     utf8.encode(rawJson.replaceAll(_helperFieldPattern, '')),
   );
@@ -58,7 +56,9 @@ Future<void> loadHierarchyJsonDemo(VolvoxGridController controller) async {
   await controller.defineColumns(_hierarchyDefineColumnsRequest());
   final result = await controller.loadData(
     sanitized,
-    options: (LoadDataOptions()..autoCreateColumns = false),
+    options: (LoadDataOptions()
+      ..autoCreateColumns = false
+      ..mode = LoadMode.LOAD_REPLACE),
   );
   if (result.status == LoadDataStatus.LOAD_FAILED) {
     throw StateError('LoadData failed for embedded hierarchy demo');

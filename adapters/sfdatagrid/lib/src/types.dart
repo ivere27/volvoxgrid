@@ -35,6 +35,15 @@ abstract class DataGridSource extends ChangeNotifier {
   List<DataGridRow> get rows;
 
   List<SortColumnDetails> get sortedColumns => const <SortColumnDetails>[];
+
+  bool usesCustomSort(String columnName) => false;
+
+  int? compare(
+    DataGridRow? row1,
+    DataGridRow? row2,
+    SortColumnDetails sortColumn,
+  ) =>
+      null;
 }
 
 class GridColumn {
@@ -98,16 +107,16 @@ class ColumnResizeUpdateDetails {
   });
 }
 
-typedef SelectionChangingCallback =
-    bool Function(List<DataGridRow> addedRows, List<DataGridRow> removedRows);
+typedef SelectionChangingCallback = bool Function(
+    List<DataGridRow> addedRows, List<DataGridRow> removedRows);
 
-typedef SelectionChangedCallback =
-    void Function(List<DataGridRow> addedRows, List<DataGridRow> removedRows);
+typedef SelectionChangedCallback = void Function(
+    List<DataGridRow> addedRows, List<DataGridRow> removedRows);
 
 typedef CellTapCallback = void Function(DataGridCellTapDetails details);
 
-typedef ColumnResizeStartCallback =
-    bool Function(ColumnResizeStartDetails details);
+typedef ColumnResizeStartCallback = bool Function(
+    ColumnResizeStartDetails details);
 
-typedef ColumnResizeUpdateCallback =
-    bool Function(ColumnResizeUpdateDetails details);
+typedef ColumnResizeUpdateCallback = bool Function(
+    ColumnResizeUpdateDetails details);

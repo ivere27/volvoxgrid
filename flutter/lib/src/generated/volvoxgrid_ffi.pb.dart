@@ -12,7 +12,7 @@ class VolvoxGridServiceFfi {
     return CreateResponse.fromBuffer(resultBytes);
   }
 
-  static Future<DestroyResponse> Destroy(GridHandle request) async {
+  static Future<DestroyResponse> Destroy(DestroyRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/Destroy', bytes);
     return DestroyResponse.fromBuffer(resultBytes);
@@ -24,7 +24,7 @@ class VolvoxGridServiceFfi {
     return ConfigureResponse.fromBuffer(resultBytes);
   }
 
-  static Future<GridConfig> GetConfig(GridHandle request) async {
+  static Future<GridConfig> GetConfig(GetConfigRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/GetConfig', bytes);
     return GridConfig.fromBuffer(resultBytes);
@@ -42,10 +42,10 @@ class VolvoxGridServiceFfi {
     return DefineColumnsResponse.fromBuffer(resultBytes);
   }
 
-  static Future<DefineColumnsRequest> GetSchema(GridHandle request) async {
+  static Future<SchemaResponse> GetSchema(GetSchemaRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/GetSchema', bytes);
-    return DefineColumnsRequest.fromBuffer(resultBytes);
+    return SchemaResponse.fromBuffer(resultBytes);
   }
 
   static Future<DefineRowsResponse> DefineRows(DefineRowsRequest request) async {
@@ -114,7 +114,7 @@ class VolvoxGridServiceFfi {
     return SelectResponse.fromBuffer(resultBytes);
   }
 
-  static Future<SelectionState> GetSelection(GridHandle request) async {
+  static Future<SelectionState> GetSelection(GetSelectionRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/GetSelection', bytes);
     return SelectionState.fromBuffer(resultBytes);
@@ -204,13 +204,13 @@ class VolvoxGridServiceFfi {
     return UnmergeCellsResponse.fromBuffer(resultBytes);
   }
 
-  static Future<MergedRegionsResponse> GetMergedRegions(GridHandle request) async {
+  static Future<MergedRegionsResponse> GetMergedRegions(GetMergedRegionsRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/GetMergedRegions', bytes);
     return MergedRegionsResponse.fromBuffer(resultBytes);
   }
 
-  static Future<MemoryUsageResponse> GetMemoryUsage(GridHandle request) async {
+  static Future<MemoryUsageResponse> GetMemoryUsage(GetMemoryUsageRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/GetMemoryUsage', bytes);
     return MemoryUsageResponse.fromBuffer(resultBytes);
@@ -252,7 +252,7 @@ class VolvoxGridServiceFfi {
     return SetRedrawResponse.fromBuffer(resultBytes);
   }
 
-  static Future<RefreshResponse> Refresh(GridHandle request) async {
+  static Future<RefreshResponse> Refresh(RefreshRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/Refresh', bytes);
     return RefreshResponse.fromBuffer(resultBytes);
@@ -276,7 +276,7 @@ class VolvoxGridServiceFfi {
         .map((data) => RenderOutput.fromBuffer(data));
   }
 
-  static Stream<GridEvent> EventStream(GridHandle request) {
+  static Stream<GridEvent> EventStream(EventStreamRequest request) {
     final bytes = request.writeToBuffer();
     return synurang.invokeBackendServerStream('/volvoxgrid.v1.VolvoxGridService/EventStream', bytes)
         .map((data) => GridEvent.fromBuffer(data));

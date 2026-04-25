@@ -121,8 +121,10 @@ func buildSalesDemo(host *volvoxgrid.Client, width, height int) (*demoInstance, 
 		return nil, err
 	}
 
+	loadMode := pb.LoadMode_LOAD_REPLACE
 	load, err := grid.LoadData(data, &pb.LoadDataOptions{
 		AutoCreateColumns: ptr(false),
+		Mode:              &loadMode,
 	})
 	if err != nil {
 		return nil, err
@@ -192,8 +194,10 @@ func buildHierarchyDemo(host *volvoxgrid.Client, width, height int) (*demoInstan
 		return nil, err
 	}
 
+	loadMode := pb.LoadMode_LOAD_REPLACE
 	load, err := grid.LoadData(loadData, &pb.LoadDataOptions{
 		AutoCreateColumns: ptr(false),
+		Mode:              &loadMode,
 	})
 	if err != nil {
 		return nil, err
@@ -365,7 +369,7 @@ func buildSalesTuiConfig(rows, cols int) *pb.GridConfig {
 		Span: &pb.SpanConfig{
 			CellSpan:        ptr(pb.CellSpanMode_CELL_SPAN_ADJACENT),
 			CellSpanFixed:   ptr(pb.CellSpanMode_CELL_SPAN_NONE),
-			CellSpanCompare: ptr(int32(1)),
+			CellSpanCompare: ptr(pb.SpanCompareMode_SPAN_COMPARE_NO_CASE),
 		},
 		Interaction: &pb.InteractionConfig{
 			HeaderFeatures: &pb.HeaderFeatures{
@@ -536,9 +540,20 @@ func buildSalesColumns() []*pb.ColumnDef {
 		{Index: 5, Width: ptr(int32(12)), Caption: ptr("Cost"), Key: ptr("Cost"), Align: ptr(pb.Align_ALIGN_RIGHT_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_CURRENCY), Format: ptr("$#,##0")},
 		{Index: 6, Width: ptr(int32(10)), Caption: ptr("Margin%"), Key: ptr("Margin"), Align: ptr(pb.Align_ALIGN_CENTER_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_NUMBER), ProgressColor: ptr(uint32(0xFF818CF8))},
 		{Index: 7, Width: ptr(int32(5)), Caption: ptr("Flag"), Key: ptr("Flag"), Align: ptr(pb.Align_ALIGN_CENTER_CENTER), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_BOOLEAN)},
-		{Index: 8, Width: ptr(int32(10)), Caption: ptr("Status"), Key: ptr("Status"), DropdownItems: ptr(salesStatusItems)},
+		{Index: 8, Width: ptr(int32(10)), Caption: ptr("Status"), Key: ptr("Status"), Dropdown: dropdownFromLabels(salesStatusItems)},
 		{Index: 9, Width: ptr(int32(18)), Caption: ptr("Notes"), Key: ptr("Notes")},
 	}
+}
+
+func dropdownFromLabels(items string) *pb.Dropdown {
+	dd := &pb.Dropdown{}
+	for _, label := range strings.Split(items, "|") {
+		if label == "" {
+			continue
+		}
+		dd.Items = append(dd.Items, &pb.DropdownItem{Label: ptr(label)})
+	}
+	return dd
 }
 
 func buildHierarchyColumns() []*pb.ColumnDef {

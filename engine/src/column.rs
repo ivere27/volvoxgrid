@@ -1,4 +1,5 @@
 use crate::control::CellControl;
+use crate::proto::volvoxgrid::v1 as pb;
 use crate::style::Padding;
 
 /// Per-column properties
@@ -12,9 +13,11 @@ pub struct ColumnProps {
     pub indent: i32,
     pub key: String,
     pub sort_order: i32,
+    pub sort_type: i32,
     /// True when sort metadata was explicitly set through ColumnDef.sort.
     pub sort_defined: bool,
     pub edit_mask: String,
+    pub dropdown: Option<pb::Dropdown>,
     pub dropdown_items: String,
     pub image_list: Vec<Vec<u8>>,
     pub span: bool,
@@ -56,8 +59,10 @@ impl Default for ColumnProps {
             indent: 0,
             key: String::new(),
             sort_order: 0,
+            sort_type: 0,
             sort_defined: false,
             edit_mask: String::new(),
+            dropdown: None,
             dropdown_items: String::new(),
             image_list: Vec::new(),
             span: false,
@@ -89,6 +94,9 @@ impl ColumnProps {
         bytes += self.format.capacity();
         bytes += self.key.capacity();
         bytes += self.edit_mask.capacity();
+        if let Some(dropdown) = &self.dropdown {
+            bytes += dropdown_heap_size_bytes(dropdown);
+        }
         bytes += self.dropdown_items.capacity();
         bytes += self.image_list.capacity() * std::mem::size_of::<Vec<u8>>();
         for image in &self.image_list {
@@ -99,4 +107,17 @@ impl ColumnProps {
         }
         bytes
     }
+}
+
+fn dropdown_heap_size_bytes(dropdown: &pb::Dropdown) -> usize {
+    let mut bytes = dropdown.items.capacity() * std::mem::size_of::<pb::DropdownItem>();
+    for item in &dropdown.items {
+        bytes += item.value.as_ref().map_or(0, String::capacity);
+        bytes += item.label.as_ref().map_or(0, String::capacity);
+        bytes += item.details.capacity() * std::mem::size_of::<String>();
+        for detail in &item.details {
+            bytes += detail.capacity();
+        }
+    }
+    bytes
 }

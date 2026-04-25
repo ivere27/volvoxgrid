@@ -45,6 +45,13 @@ export interface ColDef<TData extends RowData = RowData> {
   pinned?: PinnedDirection;
   valueGetter?: (params: ValueGetterParams<TData>) => unknown;
   valueFormatter?: (params: ValueFormatterParams<TData>) => unknown;
+  comparator?: (
+    valueA: unknown,
+    valueB: unknown,
+    nodeA?: { data?: TData; rowIndex: number },
+    nodeB?: { data?: TData; rowIndex: number },
+    isDescending?: boolean,
+  ) => number;
   cellStyle?: CellStyle | ((params: CellStyleParams<TData>) => CellStyle | undefined);
   hide?: boolean;
   children?: ColDef<TData>[];

@@ -47,6 +47,10 @@ pub fn sort_order_is_none(order: i32) -> bool {
     order == SORT_NONE
 }
 
+pub fn sort_order_is_custom(order: i32) -> bool {
+    order == SORT_ASCENDING_CUSTOM || order == SORT_DESCENDING_CUSTOM
+}
+
 pub fn decode_sort_spec(order: i32) -> (Option<i32>, Option<i32>) {
     match order {
         SORT_NONE => (Some(pb::SortOrder::SortNone as i32), None),
@@ -356,6 +360,11 @@ fn sort_range_impl(
                 col_infos[0].0,
                 col_infos[0].1,
             );
+        } else if col_infos
+            .iter()
+            .any(|&(order, _)| sort_order_is_custom(order))
+        {
+            sort_multi_key_indices_with_custom(grid, group, &mut indices, key_cols, &col_infos);
         } else {
             // Pre-extract sort keys for all rows in this group so the
             // parallel comparator only touches plain &str slices.
@@ -466,6 +475,71 @@ fn compare_f64(a: f64, b: f64) -> std::cmp::Ordering {
     a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal)
 }
 
+fn auto_compare_for_data_type(a: &str, b: &str, data_type: i32) -> std::cmp::Ordering {
+    if data_type == pb::ColumnDataType::ColumnDataDate as i32 {
+        date_compare(a, b)
+    } else {
+        generic_compare(a, b)
+    }
+}
+
+fn sort_auto_single_key_texts(
+    indices: &mut Vec<usize>,
+    texts: &[&str],
+    order: i32,
+    data_type: i32,
+) {
+    if data_type == pb::ColumnDataType::ColumnDataDate as i32 {
+        // Date path: if both values parse as dates compare by parsed key,
+        // otherwise fall back to case-insensitive string compare.
+        let parsed: Vec<Option<i64>> = texts.iter().map(|s| parse_date_key(s)).collect();
+        let all_dates = parsed.iter().all(|v| v.is_some());
+
+        if all_dates {
+            let keys: Vec<i64> = parsed.into_iter().map(|v| v.unwrap_or(0)).collect();
+            sort_indices!(indices, |&ia, &ib| {
+                apply_sort_direction(keys[ia].cmp(&keys[ib]), order)
+            });
+        } else {
+            let lower: Vec<Box<str>> = texts
+                .iter()
+                .map(|s| s.to_lowercase().into_boxed_str())
+                .collect();
+            sort_indices!(indices, |&ia, &ib| {
+                let cmp = match (parsed[ia], parsed[ib]) {
+                    (Some(a), Some(b)) => a.cmp(&b),
+                    _ => lower[ia].cmp(&lower[ib]),
+                };
+                apply_sort_direction(cmp, order)
+            });
+        }
+    } else {
+        // Generic path: if both values parse as numbers compare numerically,
+        // otherwise compare case-insensitive text.
+        let parsed: Vec<Option<f64>> = texts.iter().map(|s| parse_number(s)).collect();
+        let all_numeric = parsed.iter().all(|v| v.is_some());
+
+        if all_numeric {
+            let keys: Vec<f64> = parsed.into_iter().map(|v| v.unwrap_or(0.0)).collect();
+            sort_indices!(indices, |&ia, &ib| {
+                apply_sort_direction(compare_f64(keys[ia], keys[ib]), order)
+            });
+        } else {
+            let lower: Vec<Box<str>> = texts
+                .iter()
+                .map(|s| s.to_lowercase().into_boxed_str())
+                .collect();
+            sort_indices!(indices, |&ia, &ib| {
+                let cmp = match (parsed[ia], parsed[ib]) {
+                    (Some(a), Some(b)) => compare_f64(a, b),
+                    _ => lower[ia].cmp(&lower[ib]),
+                };
+                apply_sort_direction(cmp, order)
+            });
+        }
+    }
+}
+
 fn sort_single_key_indices(
     grid: &VolvoxGrid,
     group: &[i32],
@@ -513,66 +587,34 @@ fn sort_single_key_indices(
                 apply_sort_direction(keys[ia].cmp(keys[ib]), order)
             });
         }
-        // Generic / date-generic
-        o if o == SORT_ASCENDING_AUTO
-            || o == SORT_DESCENDING_AUTO
-            || o == SORT_ASCENDING_CUSTOM
-            || o == SORT_DESCENDING_CUSTOM =>
-        {
+        // Custom compare supplied by the host. Missing/no-response comparisons
+        // fall back to the same generic/date path used by SORT_TYPE_AUTO.
+        o if o == SORT_ASCENDING_CUSTOM || o == SORT_DESCENDING_CUSTOM => {
             let texts: Vec<&str> = group
                 .iter()
                 .map(|&row| grid.cells.get_text(row, col))
                 .collect();
-
-            if data_type == pb::ColumnDataType::ColumnDataDate as i32 {
-                // Date path: if both values parse as dates compare by parsed key,
-                // otherwise fall back to case-insensitive string compare.
-                let parsed: Vec<Option<i64>> = texts.iter().map(|s| parse_date_key(s)).collect();
-                let all_dates = parsed.iter().all(|v| v.is_some());
-
-                if all_dates {
-                    let keys: Vec<i64> = parsed.into_iter().map(|v| v.unwrap_or(0)).collect();
-                    sort_indices!(indices, |&ia, &ib| {
-                        apply_sort_direction(keys[ia].cmp(&keys[ib]), order)
-                    });
-                } else {
-                    let lower: Vec<Box<str>> = texts
-                        .iter()
-                        .map(|s| s.to_lowercase().into_boxed_str())
-                        .collect();
-                    sort_indices!(indices, |&ia, &ib| {
-                        let cmp = match (parsed[ia], parsed[ib]) {
-                            (Some(a), Some(b)) => a.cmp(&b),
-                            _ => lower[ia].cmp(&lower[ib]),
-                        };
-                        apply_sort_direction(cmp, order)
-                    });
-                }
+            if let Some(cmp_fn) = grid.custom_compare.as_ref() {
+                sort_indices!(indices, |&ia, &ib| {
+                    let cmp = match cmp_fn(group[ia], group[ib], col) {
+                        Some(r) if r < 0 => std::cmp::Ordering::Less,
+                        Some(r) if r > 0 => std::cmp::Ordering::Greater,
+                        Some(_) => std::cmp::Ordering::Equal,
+                        None => auto_compare_for_data_type(texts[ia], texts[ib], data_type),
+                    };
+                    apply_sort_direction(cmp, order)
+                });
             } else {
-                // Generic path: if both values parse as numbers compare numerically,
-                // otherwise compare case-insensitive text.
-                let parsed: Vec<Option<f64>> = texts.iter().map(|s| parse_number(s)).collect();
-                let all_numeric = parsed.iter().all(|v| v.is_some());
-
-                if all_numeric {
-                    let keys: Vec<f64> = parsed.into_iter().map(|v| v.unwrap_or(0.0)).collect();
-                    sort_indices!(indices, |&ia, &ib| {
-                        apply_sort_direction(compare_f64(keys[ia], keys[ib]), order)
-                    });
-                } else {
-                    let lower: Vec<Box<str>> = texts
-                        .iter()
-                        .map(|s| s.to_lowercase().into_boxed_str())
-                        .collect();
-                    sort_indices!(indices, |&ia, &ib| {
-                        let cmp = match (parsed[ia], parsed[ib]) {
-                            (Some(a), Some(b)) => compare_f64(a, b),
-                            _ => lower[ia].cmp(&lower[ib]),
-                        };
-                        apply_sort_direction(cmp, order)
-                    });
-                }
+                sort_auto_single_key_texts(indices, &texts, order, data_type);
             }
+        }
+        // Generic / date-generic
+        o if o == SORT_ASCENDING_AUTO || o == SORT_DESCENDING_AUTO => {
+            let texts: Vec<&str> = group
+                .iter()
+                .map(|&row| grid.cells.get_text(row, col))
+                .collect();
+            sort_auto_single_key_texts(indices, &texts, order, data_type);
         }
         _ => {}
     }
@@ -610,7 +652,7 @@ fn compare_extracted(
                 string_compare(text_a, text_b)
             }
             o if o == SORT_ASCENDING_CUSTOM || o == SORT_DESCENDING_CUSTOM => {
-                generic_compare(text_a, text_b)
+                auto_compare_for_data_type(text_a, text_b, data_type)
             }
             _ => std::cmp::Ordering::Equal,
         };
@@ -624,6 +666,57 @@ fn compare_extracted(
         }
     }
     std::cmp::Ordering::Equal
+}
+
+fn sort_multi_key_indices_with_custom(
+    grid: &VolvoxGrid,
+    group: &[i32],
+    indices: &mut Vec<usize>,
+    key_cols: &[i32],
+    col_infos: &[(i32, i32)],
+) {
+    indices.sort_unstable_by(|&ia, &ib| {
+        for (i, &(order, data_type)) in col_infos.iter().enumerate() {
+            if order == SORT_NONE {
+                continue;
+            }
+            let col = key_cols[i];
+            let text_a = grid.cells.get_text(group[ia], col);
+            let text_b = grid.cells.get_text(group[ib], col);
+            let cmp = match order {
+                o if o == SORT_ASCENDING_AUTO || o == SORT_DESCENDING_AUTO => {
+                    auto_compare_for_data_type(text_a, text_b, data_type)
+                }
+                o if o == SORT_ASCENDING_NUMERIC || o == SORT_DESCENDING_NUMERIC => {
+                    numeric_compare(text_a, text_b)
+                }
+                o if o == SORT_ASCENDING_STRING_NO_CASE || o == SORT_DESCENDING_STRING_NO_CASE => {
+                    string_nocase_compare(text_a, text_b)
+                }
+                o if o == SORT_ASCENDING_STRING || o == SORT_DESCENDING_STRING => {
+                    string_compare(text_a, text_b)
+                }
+                o if o == SORT_ASCENDING_CUSTOM || o == SORT_DESCENDING_CUSTOM => {
+                    if let Some(cmp_fn) = grid.custom_compare.as_ref() {
+                        match cmp_fn(group[ia], group[ib], col) {
+                            Some(r) if r < 0 => std::cmp::Ordering::Less,
+                            Some(r) if r > 0 => std::cmp::Ordering::Greater,
+                            Some(_) => std::cmp::Ordering::Equal,
+                            None => auto_compare_for_data_type(text_a, text_b, data_type),
+                        }
+                    } else {
+                        auto_compare_for_data_type(text_a, text_b, data_type)
+                    }
+                }
+                _ => std::cmp::Ordering::Equal,
+            };
+            let cmp = apply_sort_direction(cmp, order);
+            if cmp != std::cmp::Ordering::Equal {
+                return cmp;
+            }
+        }
+        std::cmp::Ordering::Equal
+    });
 }
 
 fn generic_compare(a: &str, b: &str) -> std::cmp::Ordering {
@@ -810,6 +903,53 @@ fn apply_row_remap(grid: &mut VolvoxGrid, row_remap: &HashMap<i32, i32>) {
 }
 
 /// Handle header click on a fixed row column header (single-column sort toggle).
+pub fn header_click_next_sort_order(grid: &VolvoxGrid, col: i32) -> i32 {
+    let current_order = grid
+        .sort_state
+        .sort_keys
+        .iter()
+        .find(|&&(c, _)| c == col)
+        .map(|&(_, o)| o)
+        .unwrap_or(SORT_NONE);
+
+    if current_order != SORT_NONE {
+        let (_, current_type) = decode_sort_spec(current_order);
+        let sort_type = current_type.unwrap_or(pb::SortType::Auto as i32);
+        if sort_order_is_ascending(current_order) {
+            merge_sort_spec(
+                SORT_NONE,
+                Some(pb::SortOrder::SortDescending as i32),
+                Some(sort_type),
+            )
+        } else {
+            SORT_NONE
+        }
+    } else {
+        let sort_type = if col >= 0 && (col as usize) < grid.columns.len() {
+            let cp = &grid.columns[col as usize];
+            if cp.sort_defined {
+                if cp.sort_type != 0 {
+                    cp.sort_type
+                } else {
+                    decode_sort_spec(cp.sort_order)
+                        .1
+                        .unwrap_or(pb::SortType::Auto as i32)
+                }
+            } else {
+                pb::SortType::Auto as i32
+            }
+        } else {
+            pb::SortType::Auto as i32
+        };
+        merge_sort_spec(
+            SORT_NONE,
+            Some(pb::SortOrder::SortAscending as i32),
+            Some(sort_type),
+        )
+    }
+}
+
+/// Handle header click on a fixed row column header (single-column sort toggle).
 pub fn handle_header_click(grid: &mut VolvoxGrid, col: i32) {
     if grid.header_features == 0 {
         return;
@@ -819,20 +959,8 @@ pub fn handle_header_click(grid: &mut VolvoxGrid, col: i32) {
     let _can_move = grid.header_features & 2 != 0; // HEADER_MOVE
 
     if can_sort {
-        // Toggle sort direction (single-column — clears any multi-sort)
-        let current_order = grid
-            .sort_state
-            .sort_keys
-            .iter()
-            .find(|&&(c, _)| c == col)
-            .map(|&(_, o)| o)
-            .unwrap_or(SORT_NONE);
-
-        let new_order = match current_order {
-            o if o == SORT_ASCENDING_AUTO => SORT_DESCENDING_AUTO,
-            o if o == SORT_DESCENDING_AUTO => SORT_NONE,
-            _ => SORT_ASCENDING_AUTO,
-        };
+        // Toggle sort direction (single-column — clears any multi-sort).
+        let new_order = header_click_next_sort_order(grid, col);
 
         // Header click always resets to single-column sort.
         grid.sort_state.sort_keys.clear();
@@ -850,9 +978,13 @@ pub fn handle_header_click(grid: &mut VolvoxGrid, col: i32) {
 mod tests {
     use super::{
         date_compare, generic_compare, handle_header_click, sort_grid, sort_grid_all,
-        sort_grid_all_multi, SORT_ASCENDING_AUTO,
+        sort_grid_all_multi, SORT_ASCENDING_AUTO, SORT_ASCENDING_CUSTOM, SORT_DESCENDING_CUSTOM,
+        SORT_NONE,
     };
     use crate::grid::VolvoxGrid;
+    use crate::proto::volvoxgrid::v1 as pb;
+    use std::collections::HashMap;
+    use std::sync::{Arc, Mutex};
 
     #[test]
     fn sort_uses_selected_key_columns_left_to_right() {
@@ -950,6 +1082,90 @@ mod tests {
         expected.sort_by(|a, b| date_compare(a, b));
 
         assert_eq!(got, expected);
+    }
+
+    #[test]
+    fn sort_custom_compare_callback() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 6, 1, 1, 0);
+        let values = vec!["dddd", "a", "ccc", "bb", "eeeee"];
+        let mut lengths = HashMap::new();
+        for (i, value) in values.iter().enumerate() {
+            let row = (i as i32) + 1;
+            grid.cells.set_text(row, 0, (*value).to_string());
+            lengths.insert(row, value.len());
+        }
+
+        grid.custom_compare = Some(Box::new(move |row1, row2, _col| {
+            let a = lengths.get(&row1).copied().unwrap_or_default();
+            let b = lengths.get(&row2).copied().unwrap_or_default();
+            Some(match a.cmp(&b) {
+                std::cmp::Ordering::Less => -1,
+                std::cmp::Ordering::Equal => 0,
+                std::cmp::Ordering::Greater => 1,
+            })
+        }));
+
+        sort_grid_all(&mut grid, SORT_ASCENDING_CUSTOM, 0);
+
+        let got: Vec<String> = (1..=5)
+            .map(|r| grid.cells.get_text(r, 0).to_string())
+            .collect();
+        assert_eq!(got, vec!["a", "bb", "ccc", "dddd", "eeeee"]);
+    }
+
+    #[test]
+    fn sort_custom_compare_fallback_when_none() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 6, 1, 1, 0);
+        let values = vec!["2", "A", "10", "b", "-1"];
+        for (i, value) in values.iter().enumerate() {
+            grid.cells.set_text((i as i32) + 1, 0, (*value).to_string());
+        }
+
+        sort_grid_all(&mut grid, SORT_ASCENDING_CUSTOM, 0);
+
+        let got: Vec<String> = (1..=5)
+            .map(|r| grid.cells.get_text(r, 0).to_string())
+            .collect();
+
+        let mut expected: Vec<String> = values.iter().map(|s| (*s).to_string()).collect();
+        expected.sort_by(|a, b| generic_compare(a, b));
+
+        assert_eq!(got, expected);
+    }
+
+    #[test]
+    fn multi_sort_custom_compare_callback() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 5, 2, 1, 0);
+        let values = vec![
+            (1, "a", "2"),
+            (2, "bb", "1"),
+            (3, "c", "1"),
+            (4, "ddd", "0"),
+        ];
+        let mut lengths = HashMap::new();
+        for (row, value, tie) in values {
+            grid.cells.set_text(row, 0, value.to_string());
+            grid.cells.set_text(row, 1, tie.to_string());
+            lengths.insert(row, value.len());
+        }
+
+        grid.custom_compare = Some(Box::new(move |row1, row2, _col| {
+            let a = lengths.get(&row1).copied().unwrap_or_default();
+            let b = lengths.get(&row2).copied().unwrap_or_default();
+            Some(match a.cmp(&b) {
+                std::cmp::Ordering::Less => -1,
+                std::cmp::Ordering::Equal => 0,
+                std::cmp::Ordering::Greater => 1,
+            })
+        }));
+
+        grid.sort_state.sort_keys = vec![(0, SORT_ASCENDING_CUSTOM), (1, SORT_ASCENDING_AUTO)];
+        sort_grid_all_multi(&mut grid);
+
+        let got: Vec<String> = (1..=4)
+            .map(|r| format!("{}{}", grid.cells.get_text(r, 0), grid.cells.get_text(r, 1)))
+            .collect();
+        assert_eq!(got, vec!["c1", "a2", "bb1", "ddd0"]);
     }
 
     #[test]
@@ -1066,5 +1282,56 @@ mod tests {
         handle_header_click(&mut grid, 1);
         assert_eq!(grid.sort_state.sort_keys.len(), 1);
         assert_eq!(grid.sort_state.sort_keys[0].0, 1); // col 1
+    }
+
+    #[test]
+    fn header_click_uses_column_custom_sort_type() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 5, 1, 1, 0);
+        grid.header_features = 1; // HEADER_SORT
+        let values = vec!["dddd", "a", "ccc", "bb"];
+        let lengths = Arc::new(Mutex::new(HashMap::new()));
+        for (i, value) in values.iter().enumerate() {
+            let row = (i as i32) + 1;
+            grid.cells.set_text(row, 0, (*value).to_string());
+            lengths.lock().unwrap().insert(row, value.len());
+        }
+        grid.columns[0].sort_order = SORT_NONE;
+        grid.columns[0].sort_type = pb::SortType::Custom as i32;
+        grid.columns[0].sort_defined = true;
+        let compare_lengths = Arc::clone(&lengths);
+        grid.custom_compare = Some(Box::new(move |row1, row2, _col| {
+            let lengths = compare_lengths.lock().unwrap();
+            let a = lengths.get(&row1).copied().unwrap_or_default();
+            let b = lengths.get(&row2).copied().unwrap_or_default();
+            Some(match a.cmp(&b) {
+                std::cmp::Ordering::Less => -1,
+                std::cmp::Ordering::Equal => 0,
+                std::cmp::Ordering::Greater => 1,
+            })
+        }));
+
+        handle_header_click(&mut grid, 0);
+        assert_eq!(grid.sort_state.sort_keys, vec![(0, SORT_ASCENDING_CUSTOM)]);
+        let asc: Vec<String> = (1..=4)
+            .map(|r| grid.cells.get_text(r, 0).to_string())
+            .collect();
+        assert_eq!(asc, vec!["a", "bb", "ccc", "dddd"]);
+
+        {
+            let mut current_lengths = lengths.lock().unwrap();
+            current_lengths.clear();
+            for row in 1..=4 {
+                current_lengths.insert(row, grid.cells.get_text(row, 0).len());
+            }
+        }
+        handle_header_click(&mut grid, 0);
+        assert_eq!(grid.sort_state.sort_keys, vec![(0, SORT_DESCENDING_CUSTOM)]);
+        let desc: Vec<String> = (1..=4)
+            .map(|r| grid.cells.get_text(r, 0).to_string())
+            .collect();
+        assert_eq!(desc, vec!["dddd", "ccc", "bb", "a"]);
+
+        handle_header_click(&mut grid, 0);
+        assert!(grid.sort_state.sort_keys.is_empty());
     }
 }

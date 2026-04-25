@@ -182,7 +182,7 @@ The plugin is the bridge between platform hosts and the engine.
 It exposes two important streaming interfaces:
 
 - `RenderSession(stream RenderInput) returns (stream RenderOutput)`
-- `EventStream(GridHandle) returns (stream GridEvent)`
+- `EventStream(EventStreamRequest) returns (stream GridEvent)`
 
 ### Render session responsibilities
 

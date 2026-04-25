@@ -437,11 +437,13 @@ enum TypePolicy {
 }
 
 // Data loading mode.
-//   REPLACE (0): Clears all cells and resets to new dimensions.
-//   APPEND (1):  Inserts data after existing rows; preserves current schema.
+//   UNSPECIFIED (0): Invalid in LoadDataOptions.mode.
+//   REPLACE (1):     Clears all cells and resets to new dimensions.
+//   APPEND (2):      Inserts data after existing rows; preserves current schema.
 enum LoadMode {
-  LOAD_REPLACE = 0;
-  LOAD_APPEND  = 1;
+  LOAD_MODE_UNSPECIFIED = 0;
+  LOAD_REPLACE          = 1;
+  LOAD_APPEND           = 2;
 }
 
 enum LoadDataStatus {
@@ -507,6 +509,32 @@ enum DropdownTrigger {
   DROPDOWN_ON_EDIT = 2;
 }
 
+enum DropdownItemLayout {
+  DROPDOWN_ITEM_AUTO          = 0;
+  DROPDOWN_ITEM_LABEL         = 1;
+  DROPDOWN_ITEM_VALUE_LABEL   = 2;
+  DROPDOWN_ITEM_LABEL_DETAILS = 3;
+}
+
+message Dropdown {
+  repeated DropdownItem items = 1;
+  // When true, the user may type/commit a value not present in `items`.
+  bool allow_custom_value = 2;
+  DropdownItemLayout item_layout = 3;
+  // Unset = use grid/global default; false/true override for this dropdown.
+  optional bool searchable = 4;
+}
+
+message DropdownItem {
+  // Value committed into the cell. If unset, commit `label`.
+  optional string value = 1;
+  // Text shown to the user.
+  optional string label = 2;
+  // Optional secondary/detail strings for richer host layouts.
+  repeated string details = 3;
+  bool disabled = 4;
+}
+
 enum TabBehavior {
   TAB_CONTROLS = 0;
   TAB_CELLS    = 1;
@@ -529,8 +557,11 @@ enum SortOrder {
 //   NUMERIC (1):        Parses as f64; non-numeric values sort to the end.
 //   STRING (2):         Lexicographic, case-sensitive.
 //   STRING_NO_CASE (3): Lexicographic, case-insensitive.
-//   CUSTOM (4):         Fires CompareEvent on EventStream so the host can
-//                       provide its own ordering logic.
+//   CUSTOM (4):         Engine emits CompareEvent on EventStream; host
+//                       replies with CompareResponse on RenderSession input
+//                       (-1/0/1). Falls back to the generic/date path if no
+//                       EventStream subscriber is active or the host does
+//                       not reply within 250 ms.
 enum SortType {
   SORT_TYPE_AUTO           = 0;
   SORT_TYPE_NUMERIC        = 1;
@@ -566,17 +597,25 @@ enum GroupTotalPosition {
 //   MIN (7):     Minimum value.
 //   STD_DEV (8): Sample standard deviation (N−1 denominator).
 //   VAR (9):     Sample variance (N−1 denominator).
+//   RANGE (10):  Maximum minus minimum numeric value.
+//   COUNT_ALL (11): Count all cells, including non-numeric and empty cells.
+//   MEDIAN (12): Median numeric value.
+//   COUNT_DISTINCT (13): Count distinct non-empty cell values.
 enum AggregateType {
-  AGG_NONE    = 0;
-  AGG_CLEAR   = 1;
-  AGG_SUM     = 2;
-  AGG_PERCENT = 3;
-  AGG_COUNT   = 4;
-  AGG_AVERAGE = 5;
-  AGG_MAX     = 6;
-  AGG_MIN     = 7;
-  AGG_STD_DEV = 8;
-  AGG_VAR     = 9;
+  AGG_NONE           = 0;
+  AGG_CLEAR          = 1;
+  AGG_SUM            = 2;
+  AGG_PERCENT        = 3;
+  AGG_COUNT          = 4;
+  AGG_AVERAGE        = 5;
+  AGG_MAX            = 6;
+  AGG_MIN            = 7;
+  AGG_STD_DEV        = 8;
+  AGG_VAR            = 9;
+  AGG_RANGE          = 10;
+  AGG_COUNT_ALL      = 11;
+  AGG_MEDIAN         = 12;
+  AGG_COUNT_DISTINCT = 13;
 }
 
 // ── Cell Span ──
@@ -603,6 +642,15 @@ enum CellSpanMode {
   CELL_SPAN_HEADER_ONLY = 5;
   CELL_SPAN_SPILL       = 6;
   CELL_SPAN_GROUP       = 7;
+}
+
+// Text normalization used when comparing cells for content-based spans
+// and subtotal/group keys.
+enum SpanCompareMode {
+  SPAN_COMPARE_EXACT        = 0;
+  SPAN_COMPARE_NO_CASE      = 1;
+  SPAN_COMPARE_TRIM_NO_CASE = 2;
+  SPAN_COMPARE_INCLUDE_NULLS = 3;
 }
 
 // ── Scrolling ──
@@ -741,10 +789,11 @@ enum FramePacingMode {
 // ── Clear / Export / Print ──
 
 enum ClearScope {
-  CLEAR_EVERYTHING  = 0;
-  CLEAR_FORMATTING  = 1;
-  CLEAR_DATA        = 2;
-  CLEAR_SELECTION   = 3;
+  CLEAR_SCOPE_UNSPECIFIED = 0;
+  CLEAR_EVERYTHING        = 1;
+  CLEAR_FORMATTING        = 2;
+  CLEAR_DATA              = 3;
+  CLEAR_SELECTION         = 4;
 }
 
 enum ClearRegion {
@@ -758,26 +807,29 @@ enum ClearRegion {
 }
 
 // Export formats. See engine/src/save.rs.
-//   BINARY (0):    FXGD binary — header "FXGD" + dimensions + cell data +
+//   UNSPECIFIED (0): Invalid in ExportRequest.format.
+//   BINARY (1):    FXGD binary — header "FXGD" + dimensions + cell data +
 //                  styles + column/row properties. Preserves full fidelity.
-//   TSV (1):       Tab-separated values. Text only.
-//   CSV (2):       Comma-separated values. Quotes cells containing
+//   TSV (2):       Tab-separated values. Text only.
+//   CSV (3):       Comma-separated values. Quotes cells containing
 //                  separator, newline, or quote characters.
-//   DELIMITED (3): Uses the grid's clip_col_separator (default "\t").
-//   XLSX (4):      SpreadsheetML XML (Excel 2003 .xml format). Applies
+//   DELIMITED (4): Uses the grid's clip_col_separator (default "\t").
+//   XLSX (5):      SpreadsheetML XML (Excel 2003 .xml format). Applies
 //                  bold to fixed rows, auto-detects numeric cells.
 enum ExportFormat {
-  EXPORT_BINARY    = 0;
-  EXPORT_TSV       = 1;
-  EXPORT_CSV       = 2;
-  EXPORT_DELIMITED = 3;
-  EXPORT_XLSX      = 4;
+  EXPORT_FORMAT_UNSPECIFIED = 0;
+  EXPORT_BINARY             = 1;
+  EXPORT_TSV                = 2;
+  EXPORT_CSV                = 3;
+  EXPORT_DELIMITED          = 4;
+  EXPORT_XLSX               = 5;
 }
 
 enum ExportScope {
-  EXPORT_ALL         = 0;
-  EXPORT_DATA_ONLY   = 1;
-  EXPORT_FORMAT_ONLY = 2;
+  EXPORT_SCOPE_UNSPECIFIED = 0;
+  EXPORT_ALL               = 1;
+  EXPORT_DATA_ONLY         = 2;
+  EXPORT_FORMAT_ONLY       = 3;
 }
 
 enum PrintOrientation {
@@ -1213,13 +1265,8 @@ message OutlineConfig {
 message SpanConfig {
   optional CellSpanMode cell_span         = 1;  // span mode for data cells
   optional CellSpanMode cell_span_fixed   = 2;  // span mode for fixed/frozen cells
-  // How cells are compared for equality during spanning:
-  //   0 = exact match
-  //   1 = case-insensitive
-  //   2 = trim + case-insensitive
-  //   3 = include nulls (empty cells span too)
-  optional int32        cell_span_compare = 3;
-  optional int32        group_span_compare = 4;
+  optional SpanCompareMode cell_span_compare  = 3;
+  optional SpanCompareMode group_span_compare = 4;
 }
 
 // ── Interaction ──
@@ -1452,12 +1499,7 @@ message ColumnDef {
   optional string         key            = 10;
   optional SortOrder      sort_order     = 11;
   optional SortType       sort_type      = 12;
-  // Pipe-delimited dropdown items. See engine/src/edit.rs parse_dropdown_entries.
-  // Format: "item1|item2|item3" (read-only dropdown)
-  //         "|item1|item2"      (leading `|` = editable, allows free-form text)
-  // Optional translation: "#id;Display Text" stores `id` but shows Display Text.
-  // Optional multi-column: "*1;col1\tcol2" selects display column.
-  optional string         dropdown_items = 13;
+  optional Dropdown       dropdown      = 13;
   optional string         edit_mask      = 14;
   optional int32          indent         = 15;
   optional bool           hidden         = 16;
@@ -1479,6 +1521,10 @@ message DefineColumnsRequest {
   repeated ColumnDef columns = 2;
 }
 
+message SchemaResponse {
+  repeated ColumnDef columns = 1;
+}
+
 message RowDef {
   int32                index         = 1;
   optional int32       height        = 2;   // pixels; 0 or negative = use default
@@ -1487,10 +1533,18 @@ message RowDef {
   optional int32       outline_level = 5;   // -1 = grand total, 0+ = nesting level
   optional bool        is_collapsed  = 6;   // whether subtree below is collapsed
   optional bytes       data          = 7;   // application-specific row data
-  optional int32       status        = 8;   // host-defined row status code
+  RowStatus            status        = 8;
   optional bool        span          = 9;   // enable spanning for this row
   optional PinPosition pin           = 10;  // pin to TOP or BOTTOM of viewport
   optional StickyEdge  sticky        = 11;  // stick to edge during scroll
+}
+
+// Host-defined row status with an explicit namespace/discriminator.
+// `code` is interpreted only within `domain`; the engine assigns no
+// built-in meaning to row status values.
+message RowStatus {
+  string domain = 1;
+  int32  code   = 2;
 }
 
 message DefineRowsRequest {
@@ -1520,8 +1574,7 @@ message CellUpdate {
   ImageData              picture        = 6;
   optional ImageAlignment picture_align = 7;
   ImageData              button_picture = 8;
-  // Pipe-delimited dropdown items; prefix with `|` to make the list editable.
-  optional string        dropdown_items = 9;
+  optional Dropdown      dropdown       = 9;
   optional StickyEdge    sticky_row     = 10;
   optional StickyEdge    sticky_col     = 11;
   optional CellInteraction interaction  = 12;
@@ -2014,14 +2067,15 @@ message PrintPage {
 
 // Named grid snapshots using the FXAR1 archive format.
 // See engine/src/save.rs.
-//   SAVE:   Serializes grid into a named entry in the archive blob.
-//   LOAD:   Deserializes a named entry back into the grid.
-//   DELETE: Removes a named entry from the archive.
-//   LIST:   Returns the list of entry names without loading.
+//   ACTION_UNSPECIFIED: Invalid.
+//   SAVE:               Serializes grid into a named entry in the archive blob.
+//   LOAD:               Deserializes a named entry back into the grid.
+//   DELETE:             Removes a named entry from the archive.
+//   LIST:               Returns the list of entry names without loading.
 message ArchiveRequest {
   int64 grid_id = 1;
   string name   = 2;
-  enum Action { SAVE = 0; LOAD = 1; DELETE = 2; LIST = 3; }
+  enum Action { ACTION_UNSPECIFIED = 0; SAVE = 1; LOAD = 2; DELETE = 3; LIST = 4; }
   Action action = 3;
   bytes  data   = 4;  // archive blob (FXAR1 format)
 }
@@ -2035,8 +2089,6 @@ message ArchiveResponse {
 // Lifecycle & Viewport
 // ═══════════════════════════════════════════════════════════
 
-message GridHandle { int64 id = 1; }
-
 enum ErrorCode {
   ERROR_UNKNOWN          = 0;
   ERROR_INVALID_ARGUMENT = 1;
@@ -2049,7 +2101,7 @@ enum ErrorCode {
   ERROR_INTERNAL         = 8;
 }
 
-// Create a new grid instance. Returns a GridHandle used by all subsequent RPCs.
+// Create a new grid instance. Returns a grid id used by all subsequent RPCs.
 // The engine allocates a VolvoxGrid with the given viewport and optional config.
 message CreateRequest {
   int32      viewport_width  = 1;  // pixels
@@ -2059,9 +2111,25 @@ message CreateRequest {
 }
 
 message CreateResponse {
-  GridHandle      handle   = 1;
+  int64           grid_id  = 1;
   repeated string warnings = 2;
 }
+
+message DestroyRequest { int64 grid_id = 1; }
+
+message GetConfigRequest { int64 grid_id = 1; }
+
+message GetSchemaRequest { int64 grid_id = 1; }
+
+message GetSelectionRequest { int64 grid_id = 1; }
+
+message GetMergedRegionsRequest { int64 grid_id = 1; }
+
+message GetMemoryUsageRequest { int64 grid_id = 1; }
+
+message RefreshRequest { int64 grid_id = 1; }
+
+message EventStreamRequest { int64 grid_id = 1; }
 
 message ResizeViewportRequest {
   int64 grid_id = 1;
@@ -2214,7 +2282,8 @@ message LoadDemoResponse {}
 // renders via wgpu directly to the native surface.
 //
 // The session also carries EventDecision responses from the host
-// (see file header, "Cancelable events via EventDecision").
+// (see file header, "Cancelable events via EventDecision") and
+// CompareResponse answers for SORT_TYPE_CUSTOM (see CompareEvent).
 // ═══════════════════════════════════════════════════════════
 
 message RenderInput {
@@ -2232,7 +2301,16 @@ message RenderInput {
     TerminalCapabilities terminal_capabilities = 11;
     TerminalViewport terminal_viewport       = 12;
     TerminalCommand terminal_command         = 13;
+    CompareResponse compare_response         = 14;
   }
+}
+
+// Host response to a CompareEvent emitted on EventStream during
+// SORT_TYPE_CUSTOM. result: <0 = row1 before row2, 0 = equal,
+// >0 = row1 after row2. request_id must echo the CompareEvent.
+message CompareResponse {
+  int64 request_id = 1;
+  int32 result     = 2;
 }
 
 message ViewportState {
@@ -2243,7 +2321,7 @@ message ViewportState {
 }
 
 message PointerEvent {
-  enum Type { DOWN = 0; UP = 1; MOVE = 2; }
+  enum Type { TYPE_UNSPECIFIED = 0; DOWN = 1; UP = 2; MOVE = 3; }
   Type  type      = 1;
   float x         = 2;  // viewport-local X coordinate
   float y         = 3;  // viewport-local Y coordinate
@@ -2260,7 +2338,7 @@ message ScrollEvent {
 }
 
 message ZoomEvent {
-  enum Phase { ZOOM_BEGIN = 0; ZOOM_UPDATE = 1; ZOOM_END = 2; }
+  enum Phase { ZOOM_PHASE_UNSPECIFIED = 0; ZOOM_BEGIN = 1; ZOOM_UPDATE = 2; ZOOM_END = 3; }
   Phase phase      = 1;
   float scale      = 2;
   float focal_x_px = 3;
@@ -2273,7 +2351,7 @@ message ZoomEvent {
 //   36/35=Home/End, 113=F2, 65=A, 67=C, 86=V, 88=X.
 // KEY_PRESS carries the character for text input; KEY_DOWN/UP carry key_code.
 message KeyEvent {
-  enum Type { KEY_DOWN = 0; KEY_UP = 1; KEY_PRESS = 2; }
+  enum Type { KEY_TYPE_UNSPECIFIED = 0; KEY_DOWN = 1; KEY_UP = 2; KEY_PRESS = 3; }
   Type   type      = 1;
   int32  key_code  = 2;
   // Modifier bitmask: 0x01=Shift, 0x02=Ctrl, 0x04=Alt, 0x08=Meta.
@@ -2344,9 +2422,10 @@ message GpuSurfaceReady {
 // with cancel=false. Expired actions are resolved at the start of each
 // render_session loop iteration.
 //
-// Cancelable events: BeforeEdit, CellEditValidate, BeforeSort,
-// CellFocusChanging, SelectionChanging, BeforeNodeToggle,
-// BeforeUserResize, BeforeMoveColumn, BeforeMoveRow.
+// Cancelable events: BeforeEdit, BeforeDropdownOpen, CellEditValidate, BeforeSort,
+// BeforeNodeToggle, BeforeScroll, BeforeUserResize, BeforeMoveColumn,
+// BeforeMoveRow, BeforeMouseDown. Print-only BeforePageBreak is emitted
+// during synchronous rendering and is informational in this API.
 message EventDecision {
   int64 grid_id  = 1;
   int64 event_id = 2;  // must match the event_id from GridEvent
@@ -2473,8 +2552,10 @@ message TooltipRequest {
 // Event Stream
 //
 // Semantic grid events delivered via EventStream(). The engine
-// maintains a FIFO EventQueue (VecDeque<QueuedGridEvent>) and
-// the plugin drains it with a 50 ms poll interval.
+// maintains a FIFO EventQueue (VecDeque<QueuedGridEvent>). The
+// plugin drains it on push: every enqueue, destroy, and stream
+// cancel wakes a per-grid condvar, so delivery is sub-millisecond
+// and idle streams consume no CPU.
 //
 // event_id = 0: informational, cannot be canceled.
 // event_id > 0: cancelable — host must send EventDecision on
@@ -2567,6 +2648,7 @@ message GridEvent {
     // Pull to refresh
     PullToRefreshTriggeredEvent pull_to_refresh_triggered = 61;
     PullToRefreshCanceledEvent pull_to_refresh_canceled = 62;
+    BeforeDropdownOpenEvent before_dropdown_open = 63;
   }
 }
 
@@ -2605,18 +2687,34 @@ message KeyPressEditEvent { int32 key_ascii = 1; }
 message KeyUpEditEvent    { int32 key_code = 1; int32 modifier = 2; }
 message CellEditConfigureStyleEvent  { int32 row = 1; int32 col = 2; }
 message CellEditConfigureWindowEvent { int32 row = 1; int32 col = 2; }
+message BeforeDropdownOpenEvent {
+  int32 row = 1;
+  int32 col = 2;
+  // Viewport-local cell rect. Hosts can use this when canceling the
+  // engine list and opening their own positioned popup.
+  float x = 3;
+  float y = 4;
+  float width = 5;
+  float height = 6;
+  Dropdown dropdown = 7;
+  string current_value = 8;
+  int32 selected_index = 9;
+}  // cancelable
 message DropdownClosedEvent {}
 message DropdownOpenedEvent {}
 
 // ── Data Events ──
 message CellChangedEvent     { int32 row = 1; int32 col = 2; string old_text = 3; string new_text = 4; }
-message RowStatusChangeEvent { int32 row = 1; int32 status = 2; }
+message RowStatusChangeEvent { int32 row = 1; RowStatus status = 2; }
 
 // ── Sort Events ──
 message BeforeSortEvent { int32 col = 1; }  // cancelable
 message AfterSortEvent  { int32 col = 1; }  // informational
-// Fired for SORT_TYPE_CUSTOM: host returns comparison result.
-message CompareEvent    { int32 row1 = 1; int32 row2 = 2; int32 col = 3; int32 result = 4; }
+// Synchronous request for SORT_TYPE_CUSTOM. The host must reply on
+// the RenderSession with a CompareResponse echoing request_id.
+// The engine waits up to 250 ms; on timeout the comparison falls
+// back to the generic/date path used by SORT_TYPE_AUTO.
+message CompareEvent    { int64 request_id = 1; int32 row1 = 2; int32 row2 = 3; int32 col = 4; }
 
 // ── Outline Events ──
 message BeforeNodeToggleEvent { int32 row = 1; bool collapse = 2; }  // cancelable
@@ -2626,7 +2724,7 @@ message AfterNodeToggleEvent  { int32 row = 1; bool collapse = 2; }  // informat
 message BeforeScrollEvent {
   int32 old_top_row  = 1; int32 old_left_col = 2;
   int32 new_top_row  = 3; int32 new_left_col = 4;
-}
+}  // cancelable
 message AfterScrollEvent {
   int32 old_top_row  = 1; int32 old_left_col = 2;
   int32 new_top_row  = 3; int32 new_left_col = 4;
@@ -2634,20 +2732,20 @@ message AfterScrollEvent {
 message ScrollTooltipEvent { string text = 1; }
 
 // ── Resize & Freeze Events ──
-message BeforeUserResizeEvent { int32 row = 1; int32 col = 2; }
+message BeforeUserResizeEvent { int32 row = 1; int32 col = 2; }  // cancelable
 message AfterUserResizeEvent  { int32 row = 1; int32 col = 2; }
 message AfterUserFreezeEvent  { int32 frozen_rows = 1; int32 frozen_cols = 2; }
 
 // ── Move Events ──
-message BeforeMoveColumnEvent { int32 col = 1; int32 new_position = 2; }
+message BeforeMoveColumnEvent { int32 col = 1; int32 new_position = 2; }  // cancelable
 message AfterMoveColumnEvent  { int32 col = 1; int32 old_position = 2; }
-message BeforeMoveRowEvent    { int32 row = 1; int32 new_position = 2; }
+message BeforeMoveRowEvent    { int32 row = 1; int32 new_position = 2; }  // cancelable
 message AfterMoveRowEvent     { int32 row = 1; int32 old_position = 2; }
 
 // ── Mouse Events ──
 // button: 0x01=primary, 0x02=secondary.
 // modifier: 0x01=Shift, 0x02=Ctrl, 0x04=Alt, 0x08=Meta.
-message BeforeMouseDownEvent { int32 row = 1; int32 col = 2; }
+message BeforeMouseDownEvent { int32 row = 1; int32 col = 2; }  // cancelable
 message MouseDownEvent  { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
 message MouseUpEvent    { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
 message MouseMoveEvent  { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
@@ -2696,7 +2794,7 @@ message PullToRefreshCanceledEvent {}
 message ErrorEvent { int32 code = 1; string message = 2; }
 
 // ── Print Events ──
-message BeforePageBreakEvent { int32 row = 1; }
+message BeforePageBreakEvent { int32 row = 1; }  // print notification
 message StartPageEvent       { int32 page = 1; }
 message GetHeaderRowEvent    { int32 page = 1; }
 
@@ -2724,16 +2822,16 @@ message GetHeaderRowEvent    { int32 page = 1; }
 service VolvoxGridService {
   // ── Lifecycle ──
   rpc Create(CreateRequest)               returns (CreateResponse);
-  rpc Destroy(GridHandle)                 returns (DestroyResponse);
+  rpc Destroy(DestroyRequest)             returns (DestroyResponse);
 
   // ── Configuration ──
   rpc Configure(ConfigureRequest)         returns (ConfigureResponse);
-  rpc GetConfig(GridHandle)               returns (GridConfig);
+  rpc GetConfig(GetConfigRequest)         returns (GridConfig);
   rpc LoadFontData(LoadFontDataRequest)   returns (LoadFontDataResponse);
 
   // ── Structure ──
   rpc DefineColumns(DefineColumnsRequest) returns (DefineColumnsResponse);
-  rpc GetSchema(GridHandle)               returns (DefineColumnsRequest);
+  rpc GetSchema(GetSchemaRequest)         returns (SchemaResponse);
   rpc DefineRows(DefineRowsRequest)       returns (DefineRowsResponse);
   rpc InsertRows(InsertRowsRequest)       returns (InsertRowsResponse);
   rpc RemoveRows(RemoveRowsRequest)       returns (RemoveRowsResponse);
@@ -2749,7 +2847,7 @@ service VolvoxGridService {
 
   // ── Selection ──
   rpc Select(SelectRequest)               returns (SelectResponse);
-  rpc GetSelection(GridHandle)            returns (SelectionState);
+  rpc GetSelection(GetSelectionRequest)   returns (SelectionState);
   rpc ShowCell(ShowCellRequest)           returns (ShowCellResponse);
   rpc SetTopRow(SetRowRequest)            returns (SetTopRowResponse);
   rpc SetLeftCol(SetColRequest)           returns (SetLeftColResponse);
@@ -2768,8 +2866,8 @@ service VolvoxGridService {
   rpc GetMergedRange(GetMergedRangeRequest) returns (CellRange);
   rpc MergeCells(MergeCellsRequest)       returns (MergeCellsResponse);
   rpc UnmergeCells(UnmergeCellsRequest)   returns (UnmergeCellsResponse);
-  rpc GetMergedRegions(GridHandle)        returns (MergedRegionsResponse);
-  rpc GetMemoryUsage(GridHandle)          returns (MemoryUsageResponse);
+  rpc GetMergedRegions(GetMergedRegionsRequest) returns (MergedRegionsResponse);
+  rpc GetMemoryUsage(GetMemoryUsageRequest) returns (MemoryUsageResponse);
 
   // ── Clipboard ──
   rpc Clipboard(ClipboardCommand)         returns (ClipboardResponse);
@@ -2782,7 +2880,7 @@ service VolvoxGridService {
   // ── Render Control ──
   rpc ResizeViewport(ResizeViewportRequest) returns (ResizeViewportResponse);
   rpc SetRedraw(SetRedrawRequest)         returns (SetRedrawResponse);
-  rpc Refresh(GridHandle)                 returns (RefreshResponse);
+  rpc Refresh(RefreshRequest)             returns (RefreshResponse);
 
   // ── Demo ──
   rpc LoadDemo(LoadDemoRequest)           returns (LoadDemoResponse);
@@ -2793,6 +2891,7 @@ service VolvoxGridService {
   // engine returns render-coupled output (frames, edit/dropdown requests).
   rpc RenderSession(stream RenderInput)   returns (stream RenderOutput);
   // Server-streaming: engine pushes semantic grid events.
-  // The plugin polls the engine's EventQueue with a 50 ms interval.
-  rpc EventStream(GridHandle)             returns (stream GridEvent);
+  // Delivery is fully event-driven — every enqueue/destroy/cancel
+  // wakes a per-grid condvar; no polling, no idle CPU cost.
+  rpc EventStream(EventStreamRequest)     returns (stream GridEvent);
 }

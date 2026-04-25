@@ -42,6 +42,8 @@ void _debugLog(String Function() messageBuilder) {
   }
 }
 
+typedef VolvoxGridCompareCallback = int Function(pb.CompareEvent request);
+
 class VolvoxGridBeforeEditDetails {
   final pb.GridEvent rawEvent;
   final int row;
@@ -52,6 +54,34 @@ class VolvoxGridBeforeEditDetails {
     required this.rawEvent,
     required this.row,
     required this.col,
+    this.cancel = false,
+  });
+}
+
+class VolvoxGridBeforeDropdownOpenDetails {
+  final pb.GridEvent rawEvent;
+  final int row;
+  final int col;
+  final double x;
+  final double y;
+  final double width;
+  final double height;
+  final pb.Dropdown dropdown;
+  final String currentValue;
+  final int selectedIndex;
+  bool cancel;
+
+  VolvoxGridBeforeDropdownOpenDetails({
+    required this.rawEvent,
+    required this.row,
+    required this.col,
+    required this.x,
+    required this.y,
+    required this.width,
+    required this.height,
+    required this.dropdown,
+    required this.currentValue,
+    required this.selectedIndex,
     this.cancel = false,
   });
 }
@@ -160,7 +190,7 @@ class _DeferredPointerCompletion {
 /// Requires a [VolvoxGridController] that has already been created via
 /// [VolvoxGridController.create].
 class VolvoxGridWidget extends StatefulWidget {
-  /// Controller that owns the native grid handle.
+  /// Controller that owns the native grid id.
   final VolvoxGridController controller;
 
   /// Optional callback invoked whenever the active cell selection changes.
@@ -175,6 +205,12 @@ class VolvoxGridWidget extends StatefulWidget {
   ///
   /// This is one of the currently supported cancelable widget hooks.
   final ValueChanged<VolvoxGridBeforeEditDetails>? onBeforeEdit;
+
+  /// Optional callback fired before the engine opens a dropdown list.
+  ///
+  /// Set [VolvoxGridBeforeDropdownOpenDetails.cancel] to true to suppress the
+  /// engine list and render a host picker instead.
+  final ValueChanged<VolvoxGridBeforeDropdownOpenDetails>? onBeforeDropdownOpen;
 
   /// Optional callback fired before an edited value is committed.
   ///
@@ -206,6 +242,12 @@ class VolvoxGridWidget extends StatefulWidget {
   /// Legacy alias for draw-cell events.
   final ValueChanged<Object>? onDrawCell;
 
+  /// Optional callback used for SORT_TYPE_CUSTOM comparisons.
+  ///
+  /// Return a negative value when row1 should sort before row2, zero for equal,
+  /// or a positive value when row1 should sort after row2.
+  final VolvoxGridCompareCallback? onCompare;
+
   /// Legacy raw callback for cancelable events.
   ///
   /// Prefer [onBeforeEdit], [onCellEditValidating], and [onBeforeSort] for a
@@ -218,11 +260,13 @@ class VolvoxGridWidget extends StatefulWidget {
     this.onSelectionChanged,
     this.onGridEvent,
     this.onBeforeEdit,
+    this.onBeforeDropdownOpen,
     this.onCellEditValidating,
     this.onBeforeSort,
     this.onContextMenuRequest,
     this.onCustomRenderCell,
     this.onDrawCell,
+    this.onCompare,
     this.onCancelableEvent,
     super.key,
   });
@@ -541,11 +585,13 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     }
     if (oldWidget.onGridEvent != widget.onGridEvent ||
         oldWidget.onBeforeEdit != widget.onBeforeEdit ||
+        oldWidget.onBeforeDropdownOpen != widget.onBeforeDropdownOpen ||
         oldWidget.onCellEditValidating != widget.onCellEditValidating ||
         oldWidget.onBeforeSort != widget.onBeforeSort ||
         oldWidget.onCustomRenderCell != widget.onCustomRenderCell ||
         oldWidget.onDrawCell != widget.onDrawCell ||
-        oldWidget.onCancelableEvent != widget.onCancelableEvent) {
+        oldWidget.onCancelableEvent != widget.onCancelableEvent ||
+        oldWidget.onCompare != widget.onCompare) {
       _syncEventStreamSubscription();
     }
   }
@@ -727,14 +773,17 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   bool get _wantsGridEvents =>
       widget.onGridEvent != null ||
       widget.onBeforeEdit != null ||
+      widget.onBeforeDropdownOpen != null ||
       widget.onCellEditValidating != null ||
       widget.onBeforeSort != null ||
       widget.onCustomRenderCell != null ||
       widget.onDrawCell != null ||
-      widget.onCancelableEvent != null;
+      widget.onCancelableEvent != null ||
+      widget.onCompare != null;
 
   bool get _wantsCancelableGridEvents =>
       widget.onBeforeEdit != null ||
+      widget.onBeforeDropdownOpen != null ||
       widget.onCellEditValidating != null ||
       widget.onBeforeSort != null ||
       widget.onCancelableEvent != null;
@@ -788,7 +837,15 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   }
 
   bool _isCancelableGridEvent(pb.GridEvent event) {
-    if (event.hasBeforeEdit() || event.hasBeforeSort()) {
+    if (event.hasBeforeEdit() ||
+        event.hasBeforeDropdownOpen() ||
+        event.hasBeforeSort() ||
+        event.hasBeforeNodeToggle() ||
+        event.hasBeforeScroll() ||
+        event.hasBeforeUserResize() ||
+        event.hasBeforeMoveColumn() ||
+        event.hasBeforeMoveRow() ||
+        event.hasBeforeMouseDown()) {
       return true;
     }
     return _tryGetCellEditValidatingPayload(event) != null;
@@ -877,6 +934,11 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     widget.onGridEvent?.call(event);
     _dispatchCustomRenderCell(event);
 
+    if (event.hasCompare()) {
+      _handleCompareRequest(event.compare);
+      return;
+    }
+
     if (!_wantsCancelableGridEvents || !_isCancelableGridEvent(event)) {
       return;
     }
@@ -907,6 +969,24 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
         col: event.beforeEdit.col,
       );
       widget.onBeforeEdit?.call(details);
+      cancel = cancel || details.cancel;
+    }
+
+    if (event.hasBeforeDropdownOpen()) {
+      final before = event.beforeDropdownOpen;
+      final details = VolvoxGridBeforeDropdownOpenDetails(
+        rawEvent: event,
+        row: before.row,
+        col: before.col,
+        x: before.x,
+        y: before.y,
+        width: before.width,
+        height: before.height,
+        dropdown: before.hasDropdown() ? before.dropdown : pb.Dropdown(),
+        currentValue: before.currentValue,
+        selectedIndex: before.selectedIndex,
+      );
+      widget.onBeforeDropdownOpen?.call(details);
       cancel = cancel || details.cancel;
     }
 
@@ -1393,6 +1473,36 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     if (output.rendered) {
       _sendBufferReady();
     }
+  }
+
+  void _handleCompareRequest(pb.CompareEvent request) {
+    final compare = widget.onCompare;
+    if (compare == null) {
+      return;
+    }
+
+    int result;
+    try {
+      result = compare(request);
+    } catch (error, stackTrace) {
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'volvoxgrid',
+        context: ErrorDescription('while handling a custom sort comparison'),
+      ));
+      return;
+    }
+
+    _inputController?.add(pb.RenderInput()
+      ..gridId = widget.controller.gridId
+      ..compareResponse = (pb.CompareResponse()
+        ..requestId = request.requestId
+        ..result = result < 0
+            ? -1
+            : result > 0
+                ? 1
+                : 0));
   }
 
   void _decodeFrame(pb.FrameDone frame) {
@@ -2644,8 +2754,10 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     if (!mounted) {
       return;
     }
-    final row = selection.mouseRow >= 0 ? selection.mouseRow : selection.activeRow;
-    final col = selection.mouseCol >= 0 ? selection.mouseCol : selection.activeCol;
+    final row =
+        selection.mouseRow >= 0 ? selection.mouseRow : selection.activeRow;
+    final col =
+        selection.mouseCol >= 0 ? selection.mouseCol : selection.activeCol;
     onContextMenuRequest(
       VolvoxGridContextMenuRequest(
         trigger: trigger,

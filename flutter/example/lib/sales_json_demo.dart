@@ -44,19 +44,26 @@ const int _salesTreeColor = 0xFF9CA3AF;
 const int _salesHoverBandBg = 0x106366F1;
 const int _salesHoverCellBg = 0x1E818CF8;
 
+Dropdown _salesStatusDropdown() => Dropdown()
+  ..items.addAll(_salesStatusItems
+      .split('|')
+      .map((label) => DropdownItem()..label = label));
+
 Future<void> loadSalesJsonDemo(VolvoxGridController controller) async {
   await controller.setColCount(_salesKeys.length);
   final columns = _salesDefineColumnsRequest();
   await controller.defineColumns(columns);
   final result = await controller.loadData(
     await controller.getDemoData('sales'),
-    options: (LoadDataOptions()..autoCreateColumns = false),
+    options: (LoadDataOptions()
+      ..autoCreateColumns = false
+      ..mode = LoadMode.LOAD_REPLACE),
   );
   if (result.status == LoadDataStatus.LOAD_FAILED) {
     throw StateError('LoadData failed for embedded sales demo');
   }
   await controller.defineColumns(columns);
-  await controller.setColDropdownItems(8, _salesStatusItems);
+  await controller.setColDropdown(8, _salesStatusDropdown());
   await controller.configure(_salesThemeConfig());
 
   await controller.subtotal(
@@ -157,7 +164,7 @@ DefineColumnsRequest _salesDefineColumnsRequest() {
       def.align = Align.ALIGN_CENTER_CENTER;
       def.dataType = ColumnDataType.COLUMN_DATA_BOOLEAN;
     } else if (col == 8) {
-      def.dropdownItems = _salesStatusItems;
+      def.dropdown = _salesStatusDropdown();
     }
     if (col == 0 || col == 1) {
       def.span = true;
@@ -262,7 +269,7 @@ GridConfig _salesThemeConfig() {
     ..span = (SpanConfig()
       ..cellSpan = CellSpanMode.CELL_SPAN_ADJACENT
       ..cellSpanFixed = CellSpanMode.CELL_SPAN_NONE
-      ..cellSpanCompare = 1)
+      ..cellSpanCompare = SpanCompareMode.SPAN_COMPARE_NO_CASE)
     ..interaction = (InteractionConfig()
       ..resize = (ResizePolicy()
         ..columns = true

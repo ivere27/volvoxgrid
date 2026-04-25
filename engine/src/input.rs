@@ -69,6 +69,11 @@ struct LocalColHit {
 pub struct InputBehavior {
     pub allow_begin_edit: bool,
     pub allow_header_sort: bool,
+    pub allow_column_drag: bool,
+    pub allow_node_toggle: bool,
+    pub allow_user_resize: bool,
+    pub allow_before_mouse_down: bool,
+    pub allow_before_scroll: bool,
 }
 
 impl Default for InputBehavior {
@@ -76,6 +81,11 @@ impl Default for InputBehavior {
         Self {
             allow_begin_edit: true,
             allow_header_sort: true,
+            allow_column_drag: true,
+            allow_node_toggle: true,
+            allow_user_resize: true,
+            allow_before_mouse_down: true,
+            allow_before_scroll: true,
         }
     }
 }
@@ -140,7 +150,7 @@ fn visible_top_left_for_scroll(grid: &mut VolvoxGrid, scroll_x: f32, scroll_y: f
     (top_row, left_col)
 }
 
-fn scroll_by_with_events(grid: &mut VolvoxGrid, dx: f32, dy: f32) -> bool {
+fn scroll_by_with_options(grid: &mut VolvoxGrid, dx: f32, dy: f32, emit_before: bool) -> bool {
     if dx != 0.0 || dy != 0.0 {
         let _ = bump_scrollbar_fade(grid);
     }
@@ -152,7 +162,7 @@ fn scroll_by_with_events(grid: &mut VolvoxGrid, dx: f32, dy: f32) -> bool {
         next_scroll.quantize_to_cells();
     }
     let predicted = visible_top_left_for_scroll(grid, next_scroll.scroll_x, next_scroll.scroll_y);
-    if old != predicted {
+    if emit_before && old != predicted {
         grid.events.push(GridEventData::BeforeScroll {
             old_top_row: old.0,
             old_left_col: old.1,
@@ -178,7 +188,11 @@ fn scroll_by_with_events(grid: &mut VolvoxGrid, dx: f32, dy: f32) -> bool {
     }
 }
 
-fn scroll_to_with_events(grid: &mut VolvoxGrid, x: f32, y: f32) -> bool {
+fn scroll_by_with_events(grid: &mut VolvoxGrid, dx: f32, dy: f32) -> bool {
+    scroll_by_with_options(grid, dx, dy, true)
+}
+
+fn scroll_to_with_options(grid: &mut VolvoxGrid, x: f32, y: f32, emit_before: bool) -> bool {
     let _ = bump_scrollbar_fade(grid);
     let old = visible_top_left_for_scroll(grid, grid.scroll.scroll_x, grid.scroll.scroll_y);
 
@@ -188,7 +202,7 @@ fn scroll_to_with_events(grid: &mut VolvoxGrid, x: f32, y: f32) -> bool {
         next_scroll.quantize_to_cells();
     }
     let predicted = visible_top_left_for_scroll(grid, next_scroll.scroll_x, next_scroll.scroll_y);
-    if old != predicted {
+    if emit_before && old != predicted {
         grid.events.push(GridEventData::BeforeScroll {
             old_top_row: old.0,
             old_left_col: old.1,
@@ -214,6 +228,112 @@ fn scroll_to_with_events(grid: &mut VolvoxGrid, x: f32, y: f32) -> bool {
     }
 }
 
+fn scroll_to_with_events(grid: &mut VolvoxGrid, x: f32, y: f32) -> bool {
+    scroll_to_with_options(grid, x, y, true)
+}
+
+pub fn apply_node_toggle_after_before(grid: &mut VolvoxGrid, row: i32, collapse: bool) {
+    if row < grid.fixed_rows || row >= grid.rows {
+        return;
+    }
+    crate::outline::toggle_collapse(grid, row);
+    grid.events
+        .push(GridEventData::AfterNodeToggle { row, collapse });
+    grid.mark_dirty();
+}
+
+pub fn begin_user_resize_after_before(grid: &mut VolvoxGrid, row: i32, col: i32, start_pos: f32) {
+    if col >= 0 && col < grid.cols && matches!(grid.allow_user_resizing, 1 | 3 | 4 | 6) {
+        grid.resize_active = true;
+        grid.resize_is_col = true;
+        grid.resize_index = col;
+        grid.resize_start_pos = start_pos;
+        grid.resize_start_size = grid.get_col_width(col);
+    } else if row >= 0 && row < grid.rows && matches!(grid.allow_user_resizing, 2 | 3 | 5 | 6) {
+        grid.resize_active = true;
+        grid.resize_is_col = false;
+        grid.resize_index = row;
+        grid.resize_start_pos = start_pos;
+        grid.resize_start_size = grid.get_row_height(row);
+    }
+}
+
+pub fn apply_move_column_after_before(grid: &mut VolvoxGrid, col: i32, new_position: i32) -> bool {
+    let Some(old_position) = grid.col_positions.iter().position(|&c| c == col) else {
+        return false;
+    };
+    let new_position = new_position.clamp(0, grid.cols.saturating_sub(1)) as usize;
+    if new_position == old_position {
+        return false;
+    }
+    if grid.move_col_by_positions(old_position as i32, new_position as i32) {
+        grid.events.push(GridEventData::AfterMoveColumn {
+            col,
+            old_position: old_position as i32,
+        });
+        grid.mark_dirty();
+        true
+    } else {
+        false
+    }
+}
+
+pub fn apply_move_row_after_before(grid: &mut VolvoxGrid, row: i32, new_position: i32) -> bool {
+    if row < grid.fixed_rows || row >= grid.rows {
+        return false;
+    }
+    if new_position < grid.fixed_rows || new_position >= grid.rows {
+        return false;
+    }
+    if row == new_position {
+        return false;
+    }
+    if grid.row_positions.is_empty() {
+        grid.row_positions = (0..grid.rows).collect();
+    }
+
+    let moving = grid.row_positions.remove(row as usize);
+    grid.row_positions.insert(new_position as usize, moving);
+    grid.cells.set_row_map(grid.row_positions.clone());
+    grid.layout.invalidate();
+    grid.events.push(GridEventData::AfterMoveRow {
+        row,
+        old_position: row,
+    });
+    grid.mark_dirty();
+    true
+}
+
+pub fn preview_wheel_scroll_event(
+    grid: &mut VolvoxGrid,
+    delta_x: f32,
+    delta_y: f32,
+) -> Option<(i32, i32, i32, i32)> {
+    if grid.col_drag_active || grid.col_drag_pending {
+        return None;
+    }
+
+    let line_height = if grid.is_tui_mode() {
+        1.0
+    } else {
+        grid.default_row_height as f32
+    };
+    let dx = delta_x * line_height;
+    let dy = delta_y * line_height;
+    if dx == 0.0 && dy == 0.0 {
+        return None;
+    }
+
+    let old = visible_top_left_for_scroll(grid, grid.scroll.scroll_x, grid.scroll.scroll_y);
+    let mut next_scroll = grid.scroll.clone();
+    next_scroll.scroll_by(dx, dy);
+    if grid.is_tui_mode() {
+        next_scroll.quantize_to_cells();
+    }
+    let predicted = visible_top_left_for_scroll(grid, next_scroll.scroll_x, next_scroll.scroll_y);
+    (old != predicted).then_some((old.0, old.1, predicted.0, predicted.1))
+}
+
 pub fn scroll_to(grid: &mut VolvoxGrid, x: f32, y: f32) -> bool {
     scroll_to_with_events(grid, x, y)
 }
@@ -226,7 +346,8 @@ fn begin_edit_from_input_with_options(grid: &mut VolvoxGrid, row: i32, col: i32,
         return;
     }
 
-    let dropdown_list = grid.active_dropdown_list(row, col);
+    let dropdown = grid.active_dropdown(row, col);
+    let has_dropdown = dropdown.is_some();
     grid.events.push(GridEventData::BeforeEdit { row, col });
 
     let stored_text = grid.cells.get_text(row, col).to_string();
@@ -248,9 +369,14 @@ fn begin_edit_from_input_with_options(grid: &mut VolvoxGrid, row: i32, col: i32,
         grid.effective_engine_compose_enabled(),
         grid.effective_compose_method(),
     );
-    grid.edit.parse_dropdown_items(&dropdown_list);
+    if let Some(dropdown) = dropdown.as_ref() {
+        grid.edit.parse_dropdown(dropdown);
+    } else {
+        let dropdown_list = grid.active_dropdown_list(row, col);
+        grid.edit.parse_dropdown_items(&dropdown_list);
+    }
     // Initialize dropdown index from stored translated value (preferred), or display text.
-    if !dropdown_list.is_empty() {
+    if has_dropdown {
         for i in 0..grid.edit.dropdown_count() {
             if (!stored_text.is_empty() && grid.edit.get_dropdown_data(i) == stored_text)
                 || grid.edit.get_dropdown_item(i) == display_text
@@ -260,7 +386,10 @@ fn begin_edit_from_input_with_options(grid: &mut VolvoxGrid, row: i32, col: i32,
             }
         }
     }
-    if !dropdown_list.is_empty() {
+    if has_dropdown {
+        if let Some(event) = grid.before_dropdown_open_event(row, col) {
+            grid.events.push(event);
+        }
         grid.events.push(GridEventData::DropdownOpened);
     }
     grid.events.push(GridEventData::StartEdit { row, col });
@@ -601,6 +730,30 @@ fn clear_col_drag_pending(grid: &mut VolvoxGrid) {
 fn clear_col_drag_state(grid: &mut VolvoxGrid) {
     clear_col_drag_active(grid);
     clear_col_drag_pending(grid);
+}
+
+pub fn take_column_drag_move(grid: &mut VolvoxGrid) -> Option<(i32, i32)> {
+    if !grid.col_drag_active {
+        return None;
+    }
+
+    let source = grid.col_drag_source;
+    let insert_before = grid.col_drag_insert_pos;
+    clear_col_drag_active(grid);
+
+    if source < 0 || insert_before < 0 {
+        return None;
+    }
+
+    let src_pos = grid.col_positions.iter().position(|&c| c == source)?;
+    let desired_gap = insert_before.clamp(0, grid.cols) as usize;
+    let mut insert_pos = desired_gap;
+    if insert_pos > src_pos {
+        insert_pos -= 1;
+    }
+    insert_pos = insert_pos.min(grid.col_positions.len());
+
+    (insert_pos != src_pos).then_some((source, insert_pos as i32))
 }
 
 fn col_drag_pending_elapsed_ms(grid: &VolvoxGrid) -> u128 {
@@ -1690,6 +1843,20 @@ pub fn handle_pointer_down_with_behavior(
             col: hit.col,
         });
     }
+    if !dbl_click && hit.row >= 0 && hit.col >= 0 && hit.area != HitArea::DropdownList {
+        if behavior.allow_before_mouse_down {
+            grid.events.push(GridEventData::BeforeMouseDown {
+                row: hit.row,
+                col: hit.col,
+            });
+        }
+        grid.events.push(GridEventData::MouseDown {
+            button: _button,
+            modifier,
+            x,
+            y,
+        });
+    }
 
     match hit.area {
         HitArea::DropdownList => {
@@ -1739,6 +1906,9 @@ pub fn handle_pointer_down_with_behavior(
                         && grid.edit.edit_row == hit.row
                         && grid.edit.edit_col == hit.col
                     {
+                        if let Some(event) = grid.before_dropdown_open_event(hit.row, hit.col) {
+                            grid.events.push(event);
+                        }
                         grid.events.push(GridEventData::DropdownOpened);
                     } else if behavior.allow_begin_edit {
                         begin_edit_from_input(grid, hit.row, hit.col);
@@ -1796,16 +1966,13 @@ pub fn handle_pointer_down_with_behavior(
                     .row_props
                     .get(&hit.row)
                     .map_or(false, |rp| rp.is_collapsed);
-                grid.events.push(GridEventData::BeforeNodeToggle {
-                    row: hit.row,
-                    collapse: collapsing,
-                });
-                crate::outline::toggle_collapse(grid, hit.row);
-                grid.events.push(GridEventData::AfterNodeToggle {
-                    row: hit.row,
-                    collapse: collapsing,
-                });
-                grid.mark_dirty();
+                if behavior.allow_node_toggle {
+                    grid.events.push(GridEventData::BeforeNodeToggle {
+                        row: hit.row,
+                        collapse: collapsing,
+                    });
+                    apply_node_toggle_after_before(grid, hit.row, collapsing);
+                }
             }
         }
         HitArea::IndicatorColTop => {
@@ -1829,15 +1996,17 @@ pub fn handle_pointer_down_with_behavior(
                     return;
                 }
 
-                if grid.header_features > 0 && behavior.allow_header_sort {
-                    let can_move = grid.header_features & 2 != 0;
+                if grid.header_features > 0
+                    && (behavior.allow_header_sort || behavior.allow_column_drag)
+                {
+                    let can_move = behavior.allow_column_drag && grid.header_features & 2 != 0;
                     let can_sort = grid.header_features & 1 != 0;
                     if can_move && !dbl_click {
                         grid.col_drag_pending = true;
                         grid.col_drag_pending_source = hit.col;
                         grid.col_drag_pending_can_sort = can_sort;
                         grid.col_drag_pending_since = Some(Instant::now());
-                    } else if can_sort {
+                    } else if can_sort && behavior.allow_header_sort {
                         grid.events.push(GridEventData::BeforeSort { col: hit.col });
                         let old_sort_keys = grid.sort_state.sort_keys.clone();
                         crate::sort::handle_header_click(grid, hit.col);
@@ -2039,9 +2208,9 @@ pub fn handle_pointer_down_with_behavior(
                     && hit.row < grid.fixed_rows
                     && !is_dropdown
                     && grid.header_features > 0
-                    && behavior.allow_header_sort
+                    && (behavior.allow_header_sort || behavior.allow_column_drag)
                 {
-                    let can_move = grid.header_features & 2 != 0;
+                    let can_move = behavior.allow_column_drag && grid.header_features & 2 != 0;
                     let can_sort = grid.header_features & 1 != 0;
 
                     if can_move && !dbl_click {
@@ -2051,7 +2220,7 @@ pub fn handle_pointer_down_with_behavior(
                         grid.col_drag_pending_source = hit.col;
                         grid.col_drag_pending_can_sort = can_sort;
                         grid.col_drag_pending_since = Some(Instant::now());
-                    } else if can_sort {
+                    } else if can_sort && behavior.allow_header_sort {
                         grid.events.push(GridEventData::BeforeSort { col: hit.col });
                         let old_sort_keys = grid.sort_state.sort_keys.clone();
                         crate::sort::handle_header_click(grid, hit.col);
@@ -2094,16 +2263,12 @@ pub fn handle_pointer_down_with_behavior(
                 if can_resize_cols {
                     if dbl_click && grid.auto_size_mouse {
                         grid.auto_resize_col(hit.col);
-                    } else {
+                    } else if behavior.allow_user_resize {
                         grid.events.push(GridEventData::BeforeUserResize {
                             row: -1,
                             col: hit.col,
                         });
-                        grid.resize_active = true;
-                        grid.resize_is_col = true;
-                        grid.resize_index = hit.col;
-                        grid.resize_start_pos = x;
-                        grid.resize_start_size = grid.get_col_width(hit.col);
+                        begin_user_resize_after_before(grid, -1, hit.col, x);
                     }
                 }
             }
@@ -2111,16 +2276,12 @@ pub fn handle_pointer_down_with_behavior(
         HitArea::RowBorder => {
             if hit.row >= 0 && hit.row < grid.rows {
                 let can_resize_rows = matches!(grid.allow_user_resizing, 2 | 3 | 5 | 6);
-                if can_resize_rows {
+                if can_resize_rows && behavior.allow_user_resize {
                     grid.events.push(GridEventData::BeforeUserResize {
                         row: hit.row,
                         col: -1,
                     });
-                    grid.resize_active = true;
-                    grid.resize_is_col = false;
-                    grid.resize_index = hit.row;
-                    grid.resize_start_pos = y;
-                    grid.resize_start_size = grid.get_row_height(hit.row);
+                    begin_user_resize_after_before(grid, hit.row, -1, y);
                 }
             }
         }
@@ -2468,6 +2629,17 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, _
 
 /// Handle pointer up event
 pub fn handle_pointer_up(grid: &mut VolvoxGrid, x: f32, y: f32, _button: i32, _modifier: i32) {
+    handle_pointer_up_with_behavior(grid, x, y, _button, _modifier, InputBehavior::default());
+}
+
+pub fn handle_pointer_up_with_behavior(
+    grid: &mut VolvoxGrid,
+    x: f32,
+    y: f32,
+    _button: i32,
+    _modifier: i32,
+    behavior: InputBehavior,
+) {
     // Clear scrollbar auto-repeat on any pointer up
     grid.scrollbar_repeat_active = false;
 
@@ -2541,7 +2713,11 @@ pub fn handle_pointer_up(grid: &mut VolvoxGrid, x: f32, y: f32, _button: i32, _m
         let elapsed = col_drag_pending_elapsed_ms(grid);
         clear_col_drag_pending(grid);
 
-        if source >= 0 && can_sort && elapsed < HEADER_REORDER_LONG_PRESS_MS {
+        if source >= 0
+            && can_sort
+            && behavior.allow_header_sort
+            && elapsed < HEADER_REORDER_LONG_PRESS_MS
+        {
             grid.events.push(GridEventData::BeforeSort { col: source });
             let old_sort_keys = grid.sort_state.sort_keys.clone();
             crate::sort::handle_header_click(grid, source);
@@ -2556,34 +2732,13 @@ pub fn handle_pointer_up(grid: &mut VolvoxGrid, x: f32, y: f32, _button: i32, _m
 
     // Complete column drag/reorder
     if grid.col_drag_active {
-        let source = grid.col_drag_source;
-        let insert_before = grid.col_drag_insert_pos;
-        clear_col_drag_active(grid);
-
-        if source >= 0 && insert_before >= 0 {
-            let src_pos = grid.col_positions.iter().position(|&c| c == source);
-            if let Some(sp) = src_pos {
-                let desired_gap = insert_before.clamp(0, grid.cols) as usize;
-                let mut insert_pos = desired_gap;
-                if insert_pos > sp {
-                    insert_pos -= 1;
-                }
-                insert_pos = insert_pos.min(grid.col_positions.len());
-
-                if insert_pos != sp {
-                    // Actual reorder happened.
-                    let new_position = insert_pos as i32;
-                    grid.events.push(GridEventData::BeforeMoveColumn {
-                        col: source,
-                        new_position,
-                    });
-                    if grid.move_col_by_positions(sp as i32, insert_pos as i32) {
-                        grid.events.push(GridEventData::AfterMoveColumn {
-                            col: source,
-                            old_position: sp as i32,
-                        });
-                    }
-                }
+        if let Some((source, new_position)) = take_column_drag_move(grid) {
+            if behavior.allow_column_drag {
+                grid.events.push(GridEventData::BeforeMoveColumn {
+                    col: source,
+                    new_position,
+                });
+                apply_move_column_after_before(grid, source, new_position);
             }
         }
         grid.mark_dirty();
@@ -3126,7 +3281,7 @@ pub fn handle_key_press_with_behavior(
             return;
         }
         if !grid.edit.dropdown_items.is_empty() && !grid.edit.dropdown_editable {
-            if grid.dropdown_search
+            if grid.effective_dropdown_search(grid.edit.edit_row, grid.edit.edit_col)
                 && grid
                     .edit
                     .select_readonly_dropdown_char(ch, type_ahead_delay_ms(grid))
@@ -3182,7 +3337,9 @@ pub fn handle_key_press_with_behavior(
         grid.edit.insert_char(ch);
 
         // DropdownSearch: type-ahead dropdown list
-        if grid.dropdown_search && !grid.edit.dropdown_items.is_empty() {
+        if grid.effective_dropdown_search(grid.edit.edit_row, grid.edit.edit_col)
+            && !grid.edit.dropdown_items.is_empty()
+        {
             let idx = grid.edit.search_dropdown(&grid.edit.edit_text.clone());
             if idx >= 0 {
                 grid.edit.dropdown_index = idx;
@@ -3272,7 +3429,7 @@ pub fn handle_key_press_with_behavior(
         let readonly_dropdown = !dropdown_list.is_empty() && !dropdown_list.starts_with('|');
 
         if readonly_dropdown {
-            if grid.dropdown_search {
+            if grid.effective_dropdown_search(row, col) {
                 begin_edit_from_input(grid, row, col);
                 if grid.is_editing()
                     && grid
@@ -3324,6 +3481,15 @@ pub fn handle_key_press_with_behavior(
 
 /// Handle scroll event
 pub fn handle_scroll(grid: &mut VolvoxGrid, delta_x: f32, delta_y: f32) {
+    handle_scroll_with_behavior(grid, delta_x, delta_y, InputBehavior::default());
+}
+
+pub fn handle_scroll_with_behavior(
+    grid: &mut VolvoxGrid,
+    delta_x: f32,
+    delta_y: f32,
+    behavior: InputBehavior,
+) {
     // During header drag-reorder, touch hosts may still emit coalesced scroll
     // deltas; ignore them so reorder remains stable.
     if grid.col_drag_active || grid.col_drag_pending {
@@ -3354,7 +3520,7 @@ pub fn handle_scroll(grid: &mut VolvoxGrid, delta_x: f32, delta_y: f32) {
     }
     let predicted_top_left =
         visible_top_left_for_scroll(grid, next_scroll.scroll_x, next_scroll.scroll_y);
-    if old_top_left != predicted_top_left {
+    if behavior.allow_before_scroll && old_top_left != predicted_top_left {
         grid.events.push(GridEventData::BeforeScroll {
             old_top_row: old_top_left.0,
             old_left_col: old_top_left.1,
@@ -3513,6 +3679,20 @@ mod tests {
         }
         grid.layout.total_width = *grid.layout.col_positions.last().unwrap_or(&0);
         grid.layout.valid = true;
+    }
+
+    fn typed_dropdown(labels: &[&str], searchable: Option<bool>) -> pb::Dropdown {
+        pb::Dropdown {
+            items: labels
+                .iter()
+                .map(|label| pb::DropdownItem {
+                    label: Some((*label).to_string()),
+                    ..Default::default()
+                })
+                .collect(),
+            searchable,
+            ..Default::default()
+        }
     }
 
     fn force_pending_header_long_press(grid: &mut VolvoxGrid) {
@@ -4437,6 +4617,46 @@ mod tests {
     }
 
     #[test]
+    fn typed_dropdown_searchable_true_overrides_global_disabled() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.dropdown_search = false;
+        grid.columns[0].dropdown = Some(typed_dropdown(
+            &["Active", "Pending", "Shipped"],
+            Some(true),
+        ));
+        grid.cells.set_text(1, 0, "Pending".to_string());
+        prime_layout(&mut grid);
+
+        begin_edit_from_input(&mut grid, 1, 0);
+        assert!(grid.is_editing());
+
+        handle_key_press(&mut grid, 'S' as u32);
+        assert_eq!(grid.edit.dropdown_index, 2);
+        assert_eq!(grid.edit.edit_text, "Shipped");
+    }
+
+    #[test]
+    fn typed_dropdown_searchable_false_overrides_global_enabled() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.dropdown_search = true;
+        grid.columns[0].dropdown = Some(typed_dropdown(
+            &["Active", "Pending", "Shipped"],
+            Some(false),
+        ));
+        grid.cells.set_text(1, 0, "Pending".to_string());
+        prime_layout(&mut grid);
+
+        begin_edit_from_input(&mut grid, 1, 0);
+        assert!(grid.is_editing());
+
+        handle_key_press(&mut grid, 'S' as u32);
+        assert_eq!(grid.edit.dropdown_index, 1);
+        assert_eq!(grid.edit.edit_text, "Pending");
+    }
+
+    #[test]
     fn readonly_dropdown_keypress_does_not_begin_freeform_edit_when_search_disabled() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
         grid.edit_trigger_mode = 1;
@@ -4832,6 +5052,7 @@ mod tests {
             InputBehavior {
                 allow_begin_edit: false,
                 allow_header_sort: true,
+                ..InputBehavior::default()
             },
         );
 
@@ -4864,6 +5085,7 @@ mod tests {
             InputBehavior {
                 allow_begin_edit: true,
                 allow_header_sort: false,
+                ..InputBehavior::default()
             },
         );
         assert_eq!(grid.cells.get_text(1, 0), "B");

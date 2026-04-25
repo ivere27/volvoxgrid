@@ -354,7 +354,7 @@ class MainActivity : AppCompatActivity() {
                         .build())
                     .build()
             )
-            val id = response.handle.id
+            val id = response.gridId
             
             // Attach view to this new grid
             runOnUiThread {

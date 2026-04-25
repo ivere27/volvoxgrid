@@ -16,6 +16,8 @@ import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.CreateResponse;
 import io.github.ivere27.volvoxgrid.DefineColumnsRequest;
 import io.github.ivere27.volvoxgrid.DefineRowsRequest;
+import io.github.ivere27.volvoxgrid.Dropdown;
+import io.github.ivere27.volvoxgrid.DropdownItem;
 import io.github.ivere27.volvoxgrid.DropdownTrigger;
 import io.github.ivere27.volvoxgrid.EditConfig;
 import io.github.ivere27.volvoxgrid.EditTrigger;
@@ -32,6 +34,7 @@ import io.github.ivere27.volvoxgrid.LayoutConfig;
 import io.github.ivere27.volvoxgrid.LoadDataOptions;
 import io.github.ivere27.volvoxgrid.LoadDataResult;
 import io.github.ivere27.volvoxgrid.LoadDataStatus;
+import io.github.ivere27.volvoxgrid.LoadMode;
 import io.github.ivere27.volvoxgrid.NodeInfo;
 import io.github.ivere27.volvoxgrid.OutlineConfig;
 import io.github.ivere27.volvoxgrid.RenderConfig;
@@ -46,6 +49,7 @@ import io.github.ivere27.volvoxgrid.SelectionConfig;
 import io.github.ivere27.volvoxgrid.SelectionMode;
 import io.github.ivere27.volvoxgrid.SelectionState;
 import io.github.ivere27.volvoxgrid.SpanConfig;
+import io.github.ivere27.volvoxgrid.SpanCompareMode;
 import io.github.ivere27.volvoxgrid.TreeIndicatorStyle;
 import io.github.ivere27.volvoxgrid.UpdateCellsRequest;
 import java.io.ByteArrayOutputStream;
@@ -283,7 +287,7 @@ public final class VolvoxGridDesktopTuiExample {
                 .setConfig(config)
                 .build()
         );
-        return new VolvoxGridDesktopController(client, response.getHandle().getId());
+        return new VolvoxGridDesktopController(client, response.getGridId());
     }
 
     private static void loadDemo(VolvoxGridDesktopController controller, DemoKind demo)
@@ -314,6 +318,7 @@ public final class VolvoxGridDesktopTuiExample {
             controller.getDemoData("sales"),
             LoadDataOptions.newBuilder()
                 .setAutoCreateColumns(false)
+                .setMode(LoadMode.LOAD_REPLACE)
                 .build()
         );
         if (result.getStatus() == LoadDataStatus.LOAD_FAILED) {
@@ -420,7 +425,7 @@ public final class VolvoxGridDesktopTuiExample {
                     .setWidth(10)
                     .setCaption("Status")
                     .setKey("Status")
-                    .setDropdownItems(SALES_STATUS_ITEMS)
+                    .setDropdown(dropdownFromLabels(SALES_STATUS_ITEMS))
                     .build()
             )
             .addColumns(
@@ -432,6 +437,16 @@ public final class VolvoxGridDesktopTuiExample {
                     .build()
             )
             .build();
+    }
+
+    private static Dropdown dropdownFromLabels(String items) {
+        Dropdown.Builder dropdown = Dropdown.newBuilder();
+        for (String label : items.split("\\|")) {
+            if (!label.isEmpty()) {
+                dropdown.addItems(DropdownItem.newBuilder().setLabel(label));
+            }
+        }
+        return dropdown.build();
     }
 
     private static GridConfig buildSalesTuiConfig(int rowIndicatorWidth) {
@@ -465,7 +480,7 @@ public final class VolvoxGridDesktopTuiExample {
                 SpanConfig.newBuilder()
                     .setCellSpan(CellSpanMode.CELL_SPAN_ADJACENT)
                     .setCellSpanFixed(CellSpanMode.CELL_SPAN_NONE)
-                    .setCellSpanCompare(1)
+                    .setCellSpanCompare(SpanCompareMode.SPAN_COMPARE_NO_CASE)
                     .build()
             )
             .setInteraction(
@@ -558,6 +573,7 @@ public final class VolvoxGridDesktopTuiExample {
             HELPER_FIELD_PATTERN.matcher(rawJson).replaceAll("").getBytes(StandardCharsets.UTF_8),
             LoadDataOptions.newBuilder()
                 .setAutoCreateColumns(false)
+                .setMode(LoadMode.LOAD_REPLACE)
                 .build()
         );
         if (result.getStatus() == LoadDataStatus.LOAD_FAILED) {

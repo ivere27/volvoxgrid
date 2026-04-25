@@ -693,21 +693,25 @@ class TypePolicy extends $pb.ProtobufEnum {
 }
 
 /// Data loading mode.
-///   REPLACE (0): Clears all cells and resets to new dimensions.
-///   APPEND (1):  Inserts data after existing rows; preserves current schema.
+///   UNSPECIFIED (0): Invalid in LoadDataOptions.mode.
+///   REPLACE (1):     Clears all cells and resets to new dimensions.
+///   APPEND (2):      Inserts data after existing rows; preserves current schema.
 class LoadMode extends $pb.ProtobufEnum {
+  static const LoadMode LOAD_MODE_UNSPECIFIED =
+      LoadMode._(0, _omitEnumNames ? '' : 'LOAD_MODE_UNSPECIFIED');
   static const LoadMode LOAD_REPLACE =
-      LoadMode._(0, _omitEnumNames ? '' : 'LOAD_REPLACE');
+      LoadMode._(1, _omitEnumNames ? '' : 'LOAD_REPLACE');
   static const LoadMode LOAD_APPEND =
-      LoadMode._(1, _omitEnumNames ? '' : 'LOAD_APPEND');
+      LoadMode._(2, _omitEnumNames ? '' : 'LOAD_APPEND');
 
   static const $core.List<LoadMode> values = <LoadMode>[
+    LOAD_MODE_UNSPECIFIED,
     LOAD_REPLACE,
     LOAD_APPEND,
   ];
 
   static final $core.List<LoadMode?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 1);
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
   static LoadMode? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -877,6 +881,33 @@ class DropdownTrigger extends $pb.ProtobufEnum {
   const DropdownTrigger._(super.value, super.name);
 }
 
+class DropdownItemLayout extends $pb.ProtobufEnum {
+  static const DropdownItemLayout DROPDOWN_ITEM_AUTO =
+      DropdownItemLayout._(0, _omitEnumNames ? '' : 'DROPDOWN_ITEM_AUTO');
+  static const DropdownItemLayout DROPDOWN_ITEM_LABEL =
+      DropdownItemLayout._(1, _omitEnumNames ? '' : 'DROPDOWN_ITEM_LABEL');
+  static const DropdownItemLayout DROPDOWN_ITEM_VALUE_LABEL =
+      DropdownItemLayout._(
+          2, _omitEnumNames ? '' : 'DROPDOWN_ITEM_VALUE_LABEL');
+  static const DropdownItemLayout DROPDOWN_ITEM_LABEL_DETAILS =
+      DropdownItemLayout._(
+          3, _omitEnumNames ? '' : 'DROPDOWN_ITEM_LABEL_DETAILS');
+
+  static const $core.List<DropdownItemLayout> values = <DropdownItemLayout>[
+    DROPDOWN_ITEM_AUTO,
+    DROPDOWN_ITEM_LABEL,
+    DROPDOWN_ITEM_VALUE_LABEL,
+    DROPDOWN_ITEM_LABEL_DETAILS,
+  ];
+
+  static final $core.List<DropdownItemLayout?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static DropdownItemLayout? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const DropdownItemLayout._(super.value, super.name);
+}
+
 class TabBehavior extends $pb.ProtobufEnum {
   static const TabBehavior TAB_CONTROLS =
       TabBehavior._(0, _omitEnumNames ? '' : 'TAB_CONTROLS');
@@ -923,8 +954,11 @@ class SortOrder extends $pb.ProtobufEnum {
 ///   NUMERIC (1):        Parses as f64; non-numeric values sort to the end.
 ///   STRING (2):         Lexicographic, case-sensitive.
 ///   STRING_NO_CASE (3): Lexicographic, case-insensitive.
-///   CUSTOM (4):         Fires CompareEvent on EventStream so the host can
-///                       provide its own ordering logic.
+///   CUSTOM (4):         Engine emits CompareEvent on EventStream; host
+///                       replies with CompareResponse on RenderSession input
+///                       (-1/0/1). Falls back to the generic/date path if no
+///                       EventStream subscriber is active or the host does
+///                       not reply within 250 ms.
 class SortType extends $pb.ProtobufEnum {
   static const SortType SORT_TYPE_AUTO =
       SortType._(0, _omitEnumNames ? '' : 'SORT_TYPE_AUTO');
@@ -1015,6 +1049,10 @@ class GroupTotalPosition extends $pb.ProtobufEnum {
 ///   MIN (7):     Minimum value.
 ///   STD_DEV (8): Sample standard deviation (N−1 denominator).
 ///   VAR (9):     Sample variance (N−1 denominator).
+///   RANGE (10):  Maximum minus minimum numeric value.
+///   COUNT_ALL (11): Count all cells, including non-numeric and empty cells.
+///   MEDIAN (12): Median numeric value.
+///   COUNT_DISTINCT (13): Count distinct non-empty cell values.
 class AggregateType extends $pb.ProtobufEnum {
   static const AggregateType AGG_NONE =
       AggregateType._(0, _omitEnumNames ? '' : 'AGG_NONE');
@@ -1036,6 +1074,14 @@ class AggregateType extends $pb.ProtobufEnum {
       AggregateType._(8, _omitEnumNames ? '' : 'AGG_STD_DEV');
   static const AggregateType AGG_VAR =
       AggregateType._(9, _omitEnumNames ? '' : 'AGG_VAR');
+  static const AggregateType AGG_RANGE =
+      AggregateType._(10, _omitEnumNames ? '' : 'AGG_RANGE');
+  static const AggregateType AGG_COUNT_ALL =
+      AggregateType._(11, _omitEnumNames ? '' : 'AGG_COUNT_ALL');
+  static const AggregateType AGG_MEDIAN =
+      AggregateType._(12, _omitEnumNames ? '' : 'AGG_MEDIAN');
+  static const AggregateType AGG_COUNT_DISTINCT =
+      AggregateType._(13, _omitEnumNames ? '' : 'AGG_COUNT_DISTINCT');
 
   static const $core.List<AggregateType> values = <AggregateType>[
     AGG_NONE,
@@ -1048,10 +1094,14 @@ class AggregateType extends $pb.ProtobufEnum {
     AGG_MIN,
     AGG_STD_DEV,
     AGG_VAR,
+    AGG_RANGE,
+    AGG_COUNT_ALL,
+    AGG_MEDIAN,
+    AGG_COUNT_DISTINCT,
   ];
 
   static final $core.List<AggregateType?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 9);
+      $pb.ProtobufEnum.$_initByValueList(values, 13);
   static AggregateType? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -1106,6 +1156,33 @@ class CellSpanMode extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const CellSpanMode._(super.value, super.name);
+}
+
+/// Text normalization used when comparing cells for content-based spans
+/// and subtotal/group keys.
+class SpanCompareMode extends $pb.ProtobufEnum {
+  static const SpanCompareMode SPAN_COMPARE_EXACT =
+      SpanCompareMode._(0, _omitEnumNames ? '' : 'SPAN_COMPARE_EXACT');
+  static const SpanCompareMode SPAN_COMPARE_NO_CASE =
+      SpanCompareMode._(1, _omitEnumNames ? '' : 'SPAN_COMPARE_NO_CASE');
+  static const SpanCompareMode SPAN_COMPARE_TRIM_NO_CASE =
+      SpanCompareMode._(2, _omitEnumNames ? '' : 'SPAN_COMPARE_TRIM_NO_CASE');
+  static const SpanCompareMode SPAN_COMPARE_INCLUDE_NULLS =
+      SpanCompareMode._(3, _omitEnumNames ? '' : 'SPAN_COMPARE_INCLUDE_NULLS');
+
+  static const $core.List<SpanCompareMode> values = <SpanCompareMode>[
+    SPAN_COMPARE_EXACT,
+    SPAN_COMPARE_NO_CASE,
+    SPAN_COMPARE_TRIM_NO_CASE,
+    SPAN_COMPARE_INCLUDE_NULLS,
+  ];
+
+  static final $core.List<SpanCompareMode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static SpanCompareMode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const SpanCompareMode._(super.value, super.name);
 }
 
 class ScrollBarsMode extends $pb.ProtobufEnum {
@@ -1460,16 +1537,19 @@ class FramePacingMode extends $pb.ProtobufEnum {
 }
 
 class ClearScope extends $pb.ProtobufEnum {
+  static const ClearScope CLEAR_SCOPE_UNSPECIFIED =
+      ClearScope._(0, _omitEnumNames ? '' : 'CLEAR_SCOPE_UNSPECIFIED');
   static const ClearScope CLEAR_EVERYTHING =
-      ClearScope._(0, _omitEnumNames ? '' : 'CLEAR_EVERYTHING');
+      ClearScope._(1, _omitEnumNames ? '' : 'CLEAR_EVERYTHING');
   static const ClearScope CLEAR_FORMATTING =
-      ClearScope._(1, _omitEnumNames ? '' : 'CLEAR_FORMATTING');
+      ClearScope._(2, _omitEnumNames ? '' : 'CLEAR_FORMATTING');
   static const ClearScope CLEAR_DATA =
-      ClearScope._(2, _omitEnumNames ? '' : 'CLEAR_DATA');
+      ClearScope._(3, _omitEnumNames ? '' : 'CLEAR_DATA');
   static const ClearScope CLEAR_SELECTION =
-      ClearScope._(3, _omitEnumNames ? '' : 'CLEAR_SELECTION');
+      ClearScope._(4, _omitEnumNames ? '' : 'CLEAR_SELECTION');
 
   static const $core.List<ClearScope> values = <ClearScope>[
+    CLEAR_SCOPE_UNSPECIFIED,
     CLEAR_EVERYTHING,
     CLEAR_FORMATTING,
     CLEAR_DATA,
@@ -1477,7 +1557,7 @@ class ClearScope extends $pb.ProtobufEnum {
   ];
 
   static final $core.List<ClearScope?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
   static ClearScope? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -1519,27 +1599,31 @@ class ClearRegion extends $pb.ProtobufEnum {
 }
 
 /// Export formats. See engine/src/save.rs.
-///   BINARY (0):    FXGD binary — header "FXGD" + dimensions + cell data +
+///   UNSPECIFIED (0): Invalid in ExportRequest.format.
+///   BINARY (1):    FXGD binary — header "FXGD" + dimensions + cell data +
 ///                  styles + column/row properties. Preserves full fidelity.
-///   TSV (1):       Tab-separated values. Text only.
-///   CSV (2):       Comma-separated values. Quotes cells containing
+///   TSV (2):       Tab-separated values. Text only.
+///   CSV (3):       Comma-separated values. Quotes cells containing
 ///                  separator, newline, or quote characters.
-///   DELIMITED (3): Uses the grid's clip_col_separator (default "\t").
-///   XLSX (4):      SpreadsheetML XML (Excel 2003 .xml format). Applies
+///   DELIMITED (4): Uses the grid's clip_col_separator (default "\t").
+///   XLSX (5):      SpreadsheetML XML (Excel 2003 .xml format). Applies
 ///                  bold to fixed rows, auto-detects numeric cells.
 class ExportFormat extends $pb.ProtobufEnum {
+  static const ExportFormat EXPORT_FORMAT_UNSPECIFIED =
+      ExportFormat._(0, _omitEnumNames ? '' : 'EXPORT_FORMAT_UNSPECIFIED');
   static const ExportFormat EXPORT_BINARY =
-      ExportFormat._(0, _omitEnumNames ? '' : 'EXPORT_BINARY');
+      ExportFormat._(1, _omitEnumNames ? '' : 'EXPORT_BINARY');
   static const ExportFormat EXPORT_TSV =
-      ExportFormat._(1, _omitEnumNames ? '' : 'EXPORT_TSV');
+      ExportFormat._(2, _omitEnumNames ? '' : 'EXPORT_TSV');
   static const ExportFormat EXPORT_CSV =
-      ExportFormat._(2, _omitEnumNames ? '' : 'EXPORT_CSV');
+      ExportFormat._(3, _omitEnumNames ? '' : 'EXPORT_CSV');
   static const ExportFormat EXPORT_DELIMITED =
-      ExportFormat._(3, _omitEnumNames ? '' : 'EXPORT_DELIMITED');
+      ExportFormat._(4, _omitEnumNames ? '' : 'EXPORT_DELIMITED');
   static const ExportFormat EXPORT_XLSX =
-      ExportFormat._(4, _omitEnumNames ? '' : 'EXPORT_XLSX');
+      ExportFormat._(5, _omitEnumNames ? '' : 'EXPORT_XLSX');
 
   static const $core.List<ExportFormat> values = <ExportFormat>[
+    EXPORT_FORMAT_UNSPECIFIED,
     EXPORT_BINARY,
     EXPORT_TSV,
     EXPORT_CSV,
@@ -1548,7 +1632,7 @@ class ExportFormat extends $pb.ProtobufEnum {
   ];
 
   static final $core.List<ExportFormat?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 4);
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
   static ExportFormat? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -1556,21 +1640,24 @@ class ExportFormat extends $pb.ProtobufEnum {
 }
 
 class ExportScope extends $pb.ProtobufEnum {
+  static const ExportScope EXPORT_SCOPE_UNSPECIFIED =
+      ExportScope._(0, _omitEnumNames ? '' : 'EXPORT_SCOPE_UNSPECIFIED');
   static const ExportScope EXPORT_ALL =
-      ExportScope._(0, _omitEnumNames ? '' : 'EXPORT_ALL');
+      ExportScope._(1, _omitEnumNames ? '' : 'EXPORT_ALL');
   static const ExportScope EXPORT_DATA_ONLY =
-      ExportScope._(1, _omitEnumNames ? '' : 'EXPORT_DATA_ONLY');
+      ExportScope._(2, _omitEnumNames ? '' : 'EXPORT_DATA_ONLY');
   static const ExportScope EXPORT_FORMAT_ONLY =
-      ExportScope._(2, _omitEnumNames ? '' : 'EXPORT_FORMAT_ONLY');
+      ExportScope._(3, _omitEnumNames ? '' : 'EXPORT_FORMAT_ONLY');
 
   static const $core.List<ExportScope> values = <ExportScope>[
+    EXPORT_SCOPE_UNSPECIFIED,
     EXPORT_ALL,
     EXPORT_DATA_ONLY,
     EXPORT_FORMAT_ONLY,
   ];
 
   static final $core.List<ExportScope?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
   static ExportScope? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -2170,17 +2257,20 @@ class FrameKind extends $pb.ProtobufEnum {
 }
 
 class ArchiveRequest_Action extends $pb.ProtobufEnum {
+  static const ArchiveRequest_Action ACTION_UNSPECIFIED =
+      ArchiveRequest_Action._(0, _omitEnumNames ? '' : 'ACTION_UNSPECIFIED');
   static const ArchiveRequest_Action SAVE =
-      ArchiveRequest_Action._(0, _omitEnumNames ? '' : 'SAVE');
+      ArchiveRequest_Action._(1, _omitEnumNames ? '' : 'SAVE');
   static const ArchiveRequest_Action LOAD =
-      ArchiveRequest_Action._(1, _omitEnumNames ? '' : 'LOAD');
+      ArchiveRequest_Action._(2, _omitEnumNames ? '' : 'LOAD');
   static const ArchiveRequest_Action DELETE =
-      ArchiveRequest_Action._(2, _omitEnumNames ? '' : 'DELETE');
+      ArchiveRequest_Action._(3, _omitEnumNames ? '' : 'DELETE');
   static const ArchiveRequest_Action LIST =
-      ArchiveRequest_Action._(3, _omitEnumNames ? '' : 'LIST');
+      ArchiveRequest_Action._(4, _omitEnumNames ? '' : 'LIST');
 
   static const $core.List<ArchiveRequest_Action> values =
       <ArchiveRequest_Action>[
+    ACTION_UNSPECIFIED,
     SAVE,
     LOAD,
     DELETE,
@@ -2188,7 +2278,7 @@ class ArchiveRequest_Action extends $pb.ProtobufEnum {
   ];
 
   static final $core.List<ArchiveRequest_Action?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
   static ArchiveRequest_Action? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -2196,21 +2286,24 @@ class ArchiveRequest_Action extends $pb.ProtobufEnum {
 }
 
 class PointerEvent_Type extends $pb.ProtobufEnum {
+  static const PointerEvent_Type TYPE_UNSPECIFIED =
+      PointerEvent_Type._(0, _omitEnumNames ? '' : 'TYPE_UNSPECIFIED');
   static const PointerEvent_Type DOWN =
-      PointerEvent_Type._(0, _omitEnumNames ? '' : 'DOWN');
+      PointerEvent_Type._(1, _omitEnumNames ? '' : 'DOWN');
   static const PointerEvent_Type UP =
-      PointerEvent_Type._(1, _omitEnumNames ? '' : 'UP');
+      PointerEvent_Type._(2, _omitEnumNames ? '' : 'UP');
   static const PointerEvent_Type MOVE =
-      PointerEvent_Type._(2, _omitEnumNames ? '' : 'MOVE');
+      PointerEvent_Type._(3, _omitEnumNames ? '' : 'MOVE');
 
   static const $core.List<PointerEvent_Type> values = <PointerEvent_Type>[
+    TYPE_UNSPECIFIED,
     DOWN,
     UP,
     MOVE,
   ];
 
   static final $core.List<PointerEvent_Type?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
   static PointerEvent_Type? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -2218,21 +2311,24 @@ class PointerEvent_Type extends $pb.ProtobufEnum {
 }
 
 class ZoomEvent_Phase extends $pb.ProtobufEnum {
+  static const ZoomEvent_Phase ZOOM_PHASE_UNSPECIFIED =
+      ZoomEvent_Phase._(0, _omitEnumNames ? '' : 'ZOOM_PHASE_UNSPECIFIED');
   static const ZoomEvent_Phase ZOOM_BEGIN =
-      ZoomEvent_Phase._(0, _omitEnumNames ? '' : 'ZOOM_BEGIN');
+      ZoomEvent_Phase._(1, _omitEnumNames ? '' : 'ZOOM_BEGIN');
   static const ZoomEvent_Phase ZOOM_UPDATE =
-      ZoomEvent_Phase._(1, _omitEnumNames ? '' : 'ZOOM_UPDATE');
+      ZoomEvent_Phase._(2, _omitEnumNames ? '' : 'ZOOM_UPDATE');
   static const ZoomEvent_Phase ZOOM_END =
-      ZoomEvent_Phase._(2, _omitEnumNames ? '' : 'ZOOM_END');
+      ZoomEvent_Phase._(3, _omitEnumNames ? '' : 'ZOOM_END');
 
   static const $core.List<ZoomEvent_Phase> values = <ZoomEvent_Phase>[
+    ZOOM_PHASE_UNSPECIFIED,
     ZOOM_BEGIN,
     ZOOM_UPDATE,
     ZOOM_END,
   ];
 
   static final $core.List<ZoomEvent_Phase?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
   static ZoomEvent_Phase? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
@@ -2240,21 +2336,24 @@ class ZoomEvent_Phase extends $pb.ProtobufEnum {
 }
 
 class KeyEvent_Type extends $pb.ProtobufEnum {
+  static const KeyEvent_Type KEY_TYPE_UNSPECIFIED =
+      KeyEvent_Type._(0, _omitEnumNames ? '' : 'KEY_TYPE_UNSPECIFIED');
   static const KeyEvent_Type KEY_DOWN =
-      KeyEvent_Type._(0, _omitEnumNames ? '' : 'KEY_DOWN');
+      KeyEvent_Type._(1, _omitEnumNames ? '' : 'KEY_DOWN');
   static const KeyEvent_Type KEY_UP =
-      KeyEvent_Type._(1, _omitEnumNames ? '' : 'KEY_UP');
+      KeyEvent_Type._(2, _omitEnumNames ? '' : 'KEY_UP');
   static const KeyEvent_Type KEY_PRESS =
-      KeyEvent_Type._(2, _omitEnumNames ? '' : 'KEY_PRESS');
+      KeyEvent_Type._(3, _omitEnumNames ? '' : 'KEY_PRESS');
 
   static const $core.List<KeyEvent_Type> values = <KeyEvent_Type>[
+    KEY_TYPE_UNSPECIFIED,
     KEY_DOWN,
     KEY_UP,
     KEY_PRESS,
   ];
 
   static final $core.List<KeyEvent_Type?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
   static KeyEvent_Type? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

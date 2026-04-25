@@ -569,18 +569,21 @@ fn compute_aggregate(grid: &VolvoxGrid, agg_type: i32, row1: i32, row2: i32, col
         return 0.0;
     }
     let mut values: Vec<f64> = Vec::new();
+    let mut count_all = 0usize;
+    let mut distinct_values = BTreeSet::new();
     for r in row1..=row2 {
         if is_subtotal_row(grid, r) {
             continue;
         }
+        count_all += 1;
         let text = grid.cells.get_text(r, col);
+        let trimmed = text.trim();
+        if !trimmed.is_empty() {
+            distinct_values.insert(trimmed.to_string());
+        }
         if let Ok(v) = text.replace([',', '$', ' '], "").parse::<f64>() {
             values.push(v);
         }
-    }
-
-    if values.is_empty() {
-        return 0.0;
     }
 
     match agg_type {
@@ -595,12 +598,21 @@ fn compute_aggregate(grid: &VolvoxGrid, agg_type: i32, row1: i32, row2: i32, col
         }
         a if a == pb::AggregateType::AggCount as i32 => values.len() as f64,
         a if a == pb::AggregateType::AggAverage as i32 => {
+            if values.is_empty() {
+                return 0.0;
+            }
             values.iter().sum::<f64>() / values.len() as f64
         }
         a if a == pb::AggregateType::AggMax as i32 => {
+            if values.is_empty() {
+                return 0.0;
+            }
             values.iter().cloned().fold(f64::NEG_INFINITY, f64::max)
         }
         a if a == pb::AggregateType::AggMin as i32 => {
+            if values.is_empty() {
+                return 0.0;
+            }
             values.iter().cloned().fold(f64::INFINITY, f64::min)
         }
         a if a == pb::AggregateType::AggStdDev as i32 => {
@@ -621,18 +633,28 @@ fn compute_aggregate(grid: &VolvoxGrid, agg_type: i32, row1: i32, row2: i32, col
             let mean = values.iter().sum::<f64>() / values.len() as f64;
             values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / (values.len() - 1) as f64
         }
-        10 => {
-            // AGG_STD_DEV_POP (population, N) — not in proto
-            let mean = values.iter().sum::<f64>() / values.len() as f64;
-            let variance =
-                values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
-            variance.sqrt()
+        a if a == pb::AggregateType::AggRange as i32 => {
+            if values.is_empty() {
+                return 0.0;
+            }
+            let min = values.iter().cloned().fold(f64::INFINITY, f64::min);
+            let max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            max - min
         }
-        11 => {
-            // AGG_VAR_POP (population, N) — not in proto
-            let mean = values.iter().sum::<f64>() / values.len() as f64;
-            values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64
+        a if a == pb::AggregateType::AggCountAll as i32 => count_all as f64,
+        a if a == pb::AggregateType::AggMedian as i32 => {
+            if values.is_empty() {
+                return 0.0;
+            }
+            values.sort_by(|a, b| a.total_cmp(b));
+            let mid = values.len() / 2;
+            if values.len() % 2 == 0 {
+                (values[mid - 1] + values[mid]) / 2.0
+            } else {
+                values[mid]
+            }
         }
+        a if a == pb::AggregateType::AggCountDistinct as i32 => distinct_values.len() as f64,
         _ => 0.0,
     }
 }
@@ -846,17 +868,18 @@ fn find_existing_subtotal_row(
 
 fn normalize_group_cell_text<'a>(text: &'a str, compare_mode: i32) -> std::borrow::Cow<'a, str> {
     match compare_mode {
-        // Case-insensitive
-        1 => std::borrow::Cow::Owned(text.to_lowercase()),
-        // Trim + case-insensitive
-        2 => std::borrow::Cow::Owned(text.trim().to_lowercase()),
-        // Default/exact
+        m if m == pb::SpanCompareMode::SpanCompareNoCase as i32 => {
+            std::borrow::Cow::Owned(text.to_lowercase())
+        }
+        m if m == pb::SpanCompareMode::SpanCompareTrimNoCase as i32 => {
+            std::borrow::Cow::Owned(text.trim().to_lowercase())
+        }
         _ => std::borrow::Cow::Borrowed(text),
     }
 }
 
 fn build_group_key(grid: &VolvoxGrid, row: i32, col_lo: i32, col_hi: i32) -> String {
-    let compare_mode = grid.span.span_compare;
+    let compare_mode = grid.span.group_span_compare;
     let mut key = String::new();
     for c in col_lo..=col_hi {
         if c > col_lo {
@@ -878,6 +901,10 @@ fn subtotal_caption(aggregate: i32, caption: &str, group_on_col: i32, group_name
         a if a == pb::AggregateType::AggMin as i32 => "Min %s",
         a if a == pb::AggregateType::AggStdDev as i32 => "StdDev %s",
         a if a == pb::AggregateType::AggVar as i32 => "Variance %s",
+        a if a == pb::AggregateType::AggRange as i32 => "Range %s",
+        a if a == pb::AggregateType::AggCountAll as i32 => "Count All %s",
+        a if a == pb::AggregateType::AggMedian as i32 => "Median %s",
+        a if a == pb::AggregateType::AggCountDistinct as i32 => "Distinct Count %s",
         _ => "Total %s",
     };
 
@@ -1102,11 +1129,73 @@ mod tests {
     }
 
     #[test]
+    fn subtotal_supports_range_count_all_median_and_distinct() {
+        let mut grid = sample_grid();
+        let rows = subtotal(
+            &mut grid,
+            pb::AggregateType::AggRange as i32,
+            -1,
+            2,
+            "",
+            0,
+            0,
+            false,
+        );
+        assert_eq!(grid.cells.get_text(rows[0], 0), "Grand Range");
+        assert_eq!(grid.cells.get_text(rows[0], 2), "30");
+
+        let mut grid = sample_grid();
+        let rows = subtotal(
+            &mut grid,
+            pb::AggregateType::AggMedian as i32,
+            -1,
+            2,
+            "",
+            0,
+            0,
+            false,
+        );
+        assert_eq!(grid.cells.get_text(rows[0], 0), "Grand Median");
+        assert_eq!(grid.cells.get_text(rows[0], 2), "25");
+
+        let mut grid = sample_grid();
+        let rows = subtotal(
+            &mut grid,
+            pb::AggregateType::AggCountAll as i32,
+            -1,
+            3,
+            "",
+            0,
+            0,
+            false,
+        );
+        assert_eq!(grid.cells.get_text(rows[0], 0), "Grand Count All");
+        assert_eq!(grid.cells.get_text(rows[0], 3), "4");
+
+        let mut grid = sample_grid();
+        grid.cells.set_text(1, 3, "red".to_string());
+        grid.cells.set_text(2, 3, "red".to_string());
+        grid.cells.set_text(3, 3, "blue".to_string());
+        let rows = subtotal(
+            &mut grid,
+            pb::AggregateType::AggCountDistinct as i32,
+            -1,
+            3,
+            "",
+            0,
+            0,
+            false,
+        );
+        assert_eq!(grid.cells.get_text(rows[0], 0), "Grand Distinct Count");
+        assert_eq!(grid.cells.get_text(rows[0], 3), "2");
+    }
+
+    #[test]
     fn subtotal_clear_restores_row_keyed_metadata_alignment() {
         let mut grid = sample_grid();
         grid.row_heights.insert(3, 42);
         grid.rows_hidden.insert(3);
-        grid.row_props.entry(3).or_default().status = 2;
+        grid.row_props.entry(3).or_default().status = crate::row::RowStatus::new("test", 2);
         grid.cell_styles.insert(
             (3, 1),
             CellStylePatch {
@@ -1122,7 +1211,7 @@ mod tests {
         assert_eq!(grid.row_heights.get(&3), Some(&42));
         assert!(grid.rows_hidden.contains(&3));
         assert!(grid.cell_styles.contains_key(&(3, 1)));
-        assert_eq!(grid.row_props.get(&3).map(|p| p.status), Some(2));
+        assert_eq!(grid.row_props.get(&3).map(|p| p.status.code), Some(2));
     }
 
     #[test]

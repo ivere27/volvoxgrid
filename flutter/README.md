@@ -181,7 +181,8 @@ await controller.loadData(
   ])),
   LoadDataOptions()
     ..json = (JsonOptions())
-    ..headerPolicy = HeaderPolicy.HEADER_NONE,
+    ..headerPolicy = HeaderPolicy.HEADER_NONE
+    ..mode = LoadMode.LOAD_REPLACE,
 );
 
 // Clear all data
@@ -359,7 +360,8 @@ await controller.subtotal(
   aggregateCol: 2,
 );
 // Aggregate types: AGG_SUM, AGG_COUNT, AGG_AVERAGE, AGG_MAX, AGG_MIN,
-//                  AGG_STD_DEV, AGG_VAR, AGG_PERCENT, AGG_CLEAR
+//                  AGG_STD_DEV, AGG_VAR, AGG_RANGE, AGG_COUNT_ALL,
+//                  AGG_MEDIAN, AGG_COUNT_DISTINCT, AGG_PERCENT, AGG_CLEAR
 
 // Outline levels for tree-style grouping
 await controller.setRowOutlineLevel(5, 1);
@@ -488,7 +490,9 @@ final hierarchyJson = await controller.getDemoData('hierarchy');   // pair with 
 import 'package:volvoxgrid/volvoxgrid_ffi.dart';
 
 // All generated protobuf messages and VolvoxGridServiceFfi are available.
-final resp = await VolvoxGridServiceFfi.GetConfig(handle);
+final resp = await VolvoxGridServiceFfi.GetConfig(
+  GetConfigRequest()..gridId = controller.gridId,
+);
 ```
 
 ## License

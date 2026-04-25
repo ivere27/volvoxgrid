@@ -10,6 +10,7 @@ use crate::indicator::{
     ColIndicatorCellState, ColIndicatorRowDefState, CornerIndicatorState, RowIndicatorSlotState,
 };
 use crate::proto::volvoxgrid::v1;
+use crate::row::RowStatus;
 use crate::scrollbar::{
     default_scrollbar_colors, default_scrollbar_corner_radius, default_scrollbar_size,
     merge_scrollbar_colors, normalize_scrollbar_appearance, normalize_scrollbar_mode,
@@ -1666,7 +1667,7 @@ impl VolvoxGrid {
             self.span.span_compare = v;
         }
         if let Some(v) = sc.group_span_compare {
-            self.span.span_compare = v;
+            self.span.group_span_compare = v;
         }
         self.mark_dirty();
     }
@@ -2066,7 +2067,7 @@ impl VolvoxGrid {
             cell_span: Some(self.span.mode),
             cell_span_fixed: Some(self.span.mode_fixed),
             cell_span_compare: Some(self.span.span_compare),
-            group_span_compare: None,
+            group_span_compare: Some(self.span.group_span_compare),
         }
     }
 
@@ -2194,11 +2195,22 @@ impl VolvoxGrid {
                     cp.key = v.clone();
                 }
                 if def.sort_order.is_some() || def.sort_type.is_some() {
-                    cp.sort_order = merge_sort_spec(cp.sort_order, def.sort_order, def.sort_type);
+                    if let Some(v) = def.sort_type {
+                        cp.sort_type = v;
+                    }
+                    let sort_type = def.sort_type.or_else(|| {
+                        if cp.sort_defined {
+                            Some(cp.sort_type)
+                        } else {
+                            None
+                        }
+                    });
+                    cp.sort_order = merge_sort_spec(cp.sort_order, def.sort_order, sort_type);
                     cp.sort_defined = true;
                 }
-                if let Some(v) = &def.dropdown_items {
-                    cp.dropdown_items = v.clone();
+                if let Some(v) = &def.dropdown {
+                    cp.dropdown = Some(v.clone());
+                    cp.dropdown_items = crate::edit::dropdown_to_legacy_items(v);
                 }
                 if let Some(v) = &def.edit_mask {
                     cp.edit_mask = v.clone();
@@ -2335,8 +2347,8 @@ impl VolvoxGrid {
                 if let Some(v) = &def.data {
                     rp.user_data = if v.is_empty() { None } else { Some(v.clone()) };
                 }
-                if let Some(v) = def.status {
-                    rp.status = v;
+                if let Some(v) = &def.status {
+                    rp.status = RowStatus::from_proto(v);
                 }
                 if let Some(v) = def.span {
                     rp.span = v;
@@ -2732,9 +2744,11 @@ impl VolvoxGrid {
             }
         }
 
-        if let Some(cl) = &u.dropdown_items {
+        if let Some(dropdown) = &u.dropdown {
             let cell = self.cells.get_mut(row, col);
-            cell.extra_mut().dropdown_items = cl.clone();
+            let extra = cell.extra_mut();
+            extra.dropdown = Some(dropdown.clone());
+            extra.dropdown_items = crate::edit::dropdown_to_legacy_items(dropdown);
         }
 
         if let Some(barcode) = &u.barcode {
@@ -2822,7 +2836,7 @@ impl VolvoxGrid {
                 || entry.update.picture.is_some()
                 || entry.update.picture_align.is_some()
                 || entry.update.button_picture.is_some()
-                || entry.update.dropdown_items.is_some()
+                || entry.update.dropdown.is_some()
                 || entry.update.barcode.is_some()
                 || entry.update.interaction.is_some()
                 || entry.update.sticky_row.is_some()
@@ -2876,7 +2890,7 @@ impl VolvoxGrid {
                     picture: None,
                     picture_align: None,
                     button_picture: None,
-                    dropdown_items: None,
+                    dropdown: None,
                     sticky_row: None,
                     sticky_col: None,
                     interaction: None,
@@ -2914,7 +2928,7 @@ impl VolvoxGrid {
     }
 
     /// Export effective column definitions as schema.
-    pub fn get_schema(&self, grid_id: i64) -> v1::DefineColumnsRequest {
+    pub fn get_schema(&self) -> v1::SchemaResponse {
         let mut columns = Vec::with_capacity(self.cols.max(0) as usize);
         for col in 0..self.cols {
             let cp = self
@@ -2923,7 +2937,13 @@ impl VolvoxGrid {
                 .cloned()
                 .unwrap_or_else(crate::column::ColumnProps::default);
             let (sort_order, sort_type) = if cp.sort_defined {
-                decode_sort_spec(cp.sort_order)
+                let (sort_order, inferred_type) = decode_sort_spec(cp.sort_order);
+                let sort_type = if cp.sort_type != 0 {
+                    Some(cp.sort_type)
+                } else {
+                    inferred_type
+                };
+                (sort_order, sort_type)
             } else {
                 (None, None)
             };
@@ -2960,11 +2980,7 @@ impl VolvoxGrid {
                 },
                 sort_order,
                 sort_type,
-                dropdown_items: if cp.dropdown_items.is_empty() {
-                    None
-                } else {
-                    Some(cp.dropdown_items)
-                },
+                dropdown: cp.dropdown,
                 edit_mask: if cp.edit_mask.is_empty() {
                     None
                 } else {
@@ -3016,7 +3032,7 @@ impl VolvoxGrid {
                 },
             });
         }
-        v1::DefineColumnsRequest { grid_id, columns }
+        v1::SchemaResponse { columns }
     }
 
     /// Read cell data for a range.
@@ -3579,7 +3595,7 @@ mod tests {
 
         assert_eq!(grid.columns[1].progress_color, 0xFF818CF8);
         assert_eq!(
-            grid.get_schema(1).columns[1].progress_color,
+            grid.get_schema().columns[1].progress_color,
             Some(0xFF818CF8)
         );
     }
@@ -3665,6 +3681,10 @@ mod tests {
             height: Some(40),
             is_subtotal: Some(true),
             outline_level: Some(1),
+            status: Some(v1::RowStatus {
+                domain: "host/order".to_string(),
+                code: 42,
+            }),
             ..Default::default()
         }];
         grid.define_rows(&defs);
@@ -3673,6 +3693,41 @@ mod tests {
         let rp = grid.row_props.get(&3).unwrap();
         assert!(rp.is_subtotal);
         assert_eq!(rp.outline_level, 1);
+        assert_eq!(rp.status.domain, "host/order");
+        assert_eq!(rp.status.code, 42);
+    }
+
+    #[test]
+    fn span_config_keeps_cell_and_group_compare_separate() {
+        let mut grid = test_grid();
+        grid.apply_config(&v1::GridConfig {
+            span: Some(v1::SpanConfig {
+                cell_span_compare: Some(v1::SpanCompareMode::SpanCompareNoCase as i32),
+                group_span_compare: Some(v1::SpanCompareMode::SpanCompareTrimNoCase as i32),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+
+        assert_eq!(
+            grid.span.span_compare,
+            v1::SpanCompareMode::SpanCompareNoCase as i32
+        );
+        assert_eq!(
+            grid.span.group_span_compare,
+            v1::SpanCompareMode::SpanCompareTrimNoCase as i32
+        );
+
+        let config = grid.get_config();
+        let span = config.span.unwrap();
+        assert_eq!(
+            span.cell_span_compare,
+            Some(v1::SpanCompareMode::SpanCompareNoCase as i32)
+        );
+        assert_eq!(
+            span.group_span_compare,
+            Some(v1::SpanCompareMode::SpanCompareTrimNoCase as i32)
+        );
     }
 
     #[test]
@@ -3867,7 +3922,7 @@ mod tests {
                 picture: None,
                 picture_align: None,
                 button_picture: None,
-                dropdown_items: None,
+                dropdown: None,
                 sticky_row: None,
                 sticky_col: None,
                 interaction: Some(v1::CellInteraction::Button as i32),
@@ -3892,7 +3947,7 @@ mod tests {
                 picture: None,
                 picture_align: None,
                 button_picture: None,
-                dropdown_items: None,
+                dropdown: None,
                 sticky_row: None,
                 sticky_col: None,
                 interaction: Some(v1::CellInteraction::Unspecified as i32),
