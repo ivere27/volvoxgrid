@@ -2,6 +2,7 @@ use std::cell::Cell;
 use std::collections::HashMap;
 
 use crate::control::CellControl;
+use crate::proto::volvoxgrid::v1 as pb;
 
 /// Value stored in a cell
 #[derive(Clone, Debug)]
@@ -95,6 +96,7 @@ pub struct CellExtra {
     pub progress_color: u32,
     pub progress_percent: f32,
     pub custom_format: String,
+    pub dropdown: Option<pb::Dropdown>,
     pub dropdown_items: String,
     pub user_data: Option<Vec<u8>>,
     /// Picture for cell button (distinct from cell picture).
@@ -119,6 +121,7 @@ impl Default for CellExtra {
             progress_color: 0,
             progress_percent: 0.0,
             custom_format: String::new(),
+            dropdown: None,
             dropdown_items: String::new(),
             user_data: None,
             button_picture: None,
@@ -137,6 +140,9 @@ impl CellExtra {
         bytes += self.picture.as_ref().map_or(0, Vec::capacity);
         bytes += self.picture_format.capacity();
         bytes += self.custom_format.capacity();
+        if let Some(dropdown) = &self.dropdown {
+            bytes += dropdown_heap_size_bytes(dropdown);
+        }
         bytes += self.dropdown_items.capacity();
         bytes += self.user_data.as_ref().map_or(0, Vec::capacity);
         bytes += self.button_picture.as_ref().map_or(0, Vec::capacity);
@@ -232,6 +238,10 @@ impl CellData {
             .map_or("", |e| e.dropdown_items.as_str())
     }
 
+    pub fn dropdown(&self) -> Option<&pb::Dropdown> {
+        self.extra.as_ref().and_then(|e| e.dropdown.as_ref())
+    }
+
     pub fn barcode(&self) -> Option<&BarcodeSpec> {
         self.extra.as_ref().and_then(|e| e.barcode.as_deref())
     }
@@ -249,6 +259,19 @@ impl CellData {
         self.extra
             .get_or_insert_with(|| Box::new(CellExtra::default()))
     }
+}
+
+fn dropdown_heap_size_bytes(dropdown: &pb::Dropdown) -> usize {
+    let mut bytes = dropdown.items.capacity() * std::mem::size_of::<pb::DropdownItem>();
+    for item in &dropdown.items {
+        bytes += item.value.as_ref().map_or(0, String::capacity);
+        bytes += item.label.as_ref().map_or(0, String::capacity);
+        bytes += item.details.capacity() * std::mem::size_of::<String>();
+        for detail in &item.details {
+            bytes += detail.capacity();
+        }
+    }
+    bytes
 }
 
 /// Sparse cell storage - only stores cells that have been set.

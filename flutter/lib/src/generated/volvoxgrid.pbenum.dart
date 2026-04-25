@@ -881,6 +881,33 @@ class DropdownTrigger extends $pb.ProtobufEnum {
   const DropdownTrigger._(super.value, super.name);
 }
 
+class DropdownItemLayout extends $pb.ProtobufEnum {
+  static const DropdownItemLayout DROPDOWN_ITEM_AUTO =
+      DropdownItemLayout._(0, _omitEnumNames ? '' : 'DROPDOWN_ITEM_AUTO');
+  static const DropdownItemLayout DROPDOWN_ITEM_LABEL =
+      DropdownItemLayout._(1, _omitEnumNames ? '' : 'DROPDOWN_ITEM_LABEL');
+  static const DropdownItemLayout DROPDOWN_ITEM_VALUE_LABEL =
+      DropdownItemLayout._(
+          2, _omitEnumNames ? '' : 'DROPDOWN_ITEM_VALUE_LABEL');
+  static const DropdownItemLayout DROPDOWN_ITEM_LABEL_DETAILS =
+      DropdownItemLayout._(
+          3, _omitEnumNames ? '' : 'DROPDOWN_ITEM_LABEL_DETAILS');
+
+  static const $core.List<DropdownItemLayout> values = <DropdownItemLayout>[
+    DROPDOWN_ITEM_AUTO,
+    DROPDOWN_ITEM_LABEL,
+    DROPDOWN_ITEM_VALUE_LABEL,
+    DROPDOWN_ITEM_LABEL_DETAILS,
+  ];
+
+  static final $core.List<DropdownItemLayout?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static DropdownItemLayout? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const DropdownItemLayout._(super.value, super.name);
+}
+
 class TabBehavior extends $pb.ProtobufEnum {
   static const TabBehavior TAB_CONTROLS =
       TabBehavior._(0, _omitEnumNames ? '' : 'TAB_CONTROLS');

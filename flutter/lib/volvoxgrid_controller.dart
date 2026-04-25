@@ -905,24 +905,56 @@ class VolvoxGridController extends ChangeNotifier {
 
   // ── Column Combo Lists ──────────────────────────────────────────────────
 
-  /// Set the dropdown items for a column (pipe-delimited, e.g. "A|B|C").
-  Future<void> setColDropdownItems(int col, String items) async {
+  Dropdown _dropdownFromLegacyItems(String items) {
+    final dropdown = Dropdown()..allowCustomValue = items.startsWith('|');
+    final source = dropdown.allowCustomValue ? items.substring(1) : items;
+    for (final raw in source.split('|')) {
+      if (raw.isEmpty) continue;
+      String? value;
+      var label = raw;
+      final semi = raw.indexOf(';');
+      if (semi > 1 && raw.startsWith('#')) {
+        value = raw.substring(1, semi);
+        label = raw.substring(semi + 1);
+      }
+      dropdown.items.add(DropdownItem()
+        ..label = label
+        ..value = (value ?? ''));
+      if (value == null) {
+        dropdown.items.last.clearValue();
+      }
+    }
+    return dropdown;
+  }
+
+  /// Set the typed dropdown for a column.
+  Future<void> setColDropdown(int col, Dropdown dropdown) async {
     await VolvoxGridService.DefineColumns(DefineColumnsRequest()
       ..gridId = _gridId
       ..columns.add(ColumnDef()
         ..index = col
-        ..dropdownItems = items));
+        ..dropdown = dropdown));
   }
 
-  /// Set dropdown items for an individual cell.
-  Future<void> setCellDropdownItems(int row, int col, String items) async {
+  /// Set the dropdown items for a column (pipe-delimited, e.g. "A|B|C").
+  Future<void> setColDropdownItems(int col, String items) async {
+    await setColDropdown(col, _dropdownFromLegacyItems(items));
+  }
+
+  /// Set the typed dropdown for an individual cell.
+  Future<void> setCellDropdown(int row, int col, Dropdown dropdown) async {
     await VolvoxGridService.UpdateCells(UpdateCellsRequest()
       ..gridId = _gridId
       ..cells.add(CellUpdate()
         ..row = row
         ..col = col
-        ..dropdownItems = items));
+        ..dropdown = dropdown));
     notifyListeners();
+  }
+
+  /// Set dropdown items for an individual cell.
+  Future<void> setCellDropdownItems(int row, int col, String items) async {
+    await setCellDropdown(row, col, _dropdownFromLegacyItems(items));
   }
 
   // ── Editing ───────────────────────────────────────────────────────────────

@@ -543,6 +543,23 @@ final $typed_data.Uint8List dropdownTriggerDescriptor = $convert.base64Decode(
     'Cg9Ecm9wZG93blRyaWdnZXISEgoORFJPUERPV05fTkVWRVIQABITCg9EUk9QRE9XTl9BTFdBWV'
     'MQARIUChBEUk9QRE9XTl9PTl9FRElUEAI=');
 
+@$core.Deprecated('Use dropdownItemLayoutDescriptor instead')
+const DropdownItemLayout$json = {
+  '1': 'DropdownItemLayout',
+  '2': [
+    {'1': 'DROPDOWN_ITEM_AUTO', '2': 0},
+    {'1': 'DROPDOWN_ITEM_LABEL', '2': 1},
+    {'1': 'DROPDOWN_ITEM_VALUE_LABEL', '2': 2},
+    {'1': 'DROPDOWN_ITEM_LABEL_DETAILS', '2': 3},
+  ],
+};
+
+/// Descriptor for `DropdownItemLayout`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List dropdownItemLayoutDescriptor = $convert.base64Decode(
+    'ChJEcm9wZG93bkl0ZW1MYXlvdXQSFgoSRFJPUERPV05fSVRFTV9BVVRPEAASFwoTRFJPUERPV0'
+    '5fSVRFTV9MQUJFTBABEh0KGURST1BET1dOX0lURU1fVkFMVUVfTEFCRUwQAhIfChtEUk9QRE9X'
+    'Tl9JVEVNX0xBQkVMX0RFVEFJTFMQAw==');
+
 @$core.Deprecated('Use tabBehaviorDescriptor instead')
 const TabBehavior$json = {
   '1': 'TabBehavior',
@@ -1870,6 +1887,77 @@ final $typed_data.Uint8List cellValueDescriptor = $convert.base64Decode(
     'CglDZWxsVmFsdWUSFAoEdGV4dBgBIAEoCUgAUgR0ZXh0EhgKBm51bWJlchgCIAEoAUgAUgZudW'
     '1iZXISFAoEZmxhZxgDIAEoCEgAUgRmbGFnEhIKA3JhdxgEIAEoDEgAUgNyYXcSHgoJdGltZXN0'
     'YW1wGAUgASgDSABSCXRpbWVzdGFtcEIHCgV2YWx1ZQ==');
+
+@$core.Deprecated('Use dropdownDescriptor instead')
+const Dropdown$json = {
+  '1': 'Dropdown',
+  '2': [
+    {
+      '1': 'items',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.volvoxgrid.v1.DropdownItem',
+      '10': 'items'
+    },
+    {
+      '1': 'allow_custom_value',
+      '3': 2,
+      '4': 1,
+      '5': 8,
+      '10': 'allowCustomValue'
+    },
+    {
+      '1': 'item_layout',
+      '3': 3,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.DropdownItemLayout',
+      '10': 'itemLayout'
+    },
+    {
+      '1': 'searchable',
+      '3': 4,
+      '4': 1,
+      '5': 8,
+      '9': 0,
+      '10': 'searchable',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_searchable'},
+  ],
+};
+
+/// Descriptor for `Dropdown`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List dropdownDescriptor = $convert.base64Decode(
+    'CghEcm9wZG93bhIxCgVpdGVtcxgBIAMoCzIbLnZvbHZveGdyaWQudjEuRHJvcGRvd25JdGVtUg'
+    'VpdGVtcxIsChJhbGxvd19jdXN0b21fdmFsdWUYAiABKAhSEGFsbG93Q3VzdG9tVmFsdWUSQgoL'
+    'aXRlbV9sYXlvdXQYAyABKA4yIS52b2x2b3hncmlkLnYxLkRyb3Bkb3duSXRlbUxheW91dFIKaX'
+    'RlbUxheW91dBIjCgpzZWFyY2hhYmxlGAQgASgISABSCnNlYXJjaGFibGWIAQFCDQoLX3NlYXJj'
+    'aGFibGU=');
+
+@$core.Deprecated('Use dropdownItemDescriptor instead')
+const DropdownItem$json = {
+  '1': 'DropdownItem',
+  '2': [
+    {'1': 'value', '3': 1, '4': 1, '5': 9, '9': 0, '10': 'value', '17': true},
+    {'1': 'label', '3': 2, '4': 1, '5': 9, '9': 1, '10': 'label', '17': true},
+    {'1': 'details', '3': 3, '4': 3, '5': 9, '10': 'details'},
+    {'1': 'disabled', '3': 4, '4': 1, '5': 8, '10': 'disabled'},
+  ],
+  '8': [
+    {'1': '_value'},
+    {'1': '_label'},
+  ],
+};
+
+/// Descriptor for `DropdownItem`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List dropdownItemDescriptor = $convert.base64Decode(
+    'CgxEcm9wZG93bkl0ZW0SGQoFdmFsdWUYASABKAlIAFIFdmFsdWWIAQESGQoFbGFiZWwYAiABKA'
+    'lIAVIFbGFiZWyIAQESGAoHZGV0YWlscxgDIAMoCVIHZGV0YWlscxIaCghkaXNhYmxlZBgEIAEo'
+    'CFIIZGlzYWJsZWRCCAoGX3ZhbHVlQggKBl9sYWJlbA==');
 
 @$core.Deprecated('Use scrollBarColorsDescriptor instead')
 const ScrollBarColors$json = {
@@ -5017,12 +5105,13 @@ const ColumnDef$json = {
       '17': true
     },
     {
-      '1': 'dropdown_items',
+      '1': 'dropdown',
       '3': 13,
       '4': 1,
-      '5': 9,
+      '5': 11,
+      '6': '.volvoxgrid.v1.Dropdown',
       '9': 11,
-      '10': 'dropdownItems',
+      '10': 'dropdown',
       '17': true
     },
     {
@@ -5149,7 +5238,7 @@ const ColumnDef$json = {
     {'1': '_key'},
     {'1': '_sort_order'},
     {'1': '_sort_type'},
-    {'1': '_dropdown_items'},
+    {'1': '_dropdown'},
     {'1': '_edit_mask'},
     {'1': '_indent'},
     {'1': '_hidden'},
@@ -5175,25 +5264,25 @@ final $typed_data.Uint8List columnDefDescriptor = $convert.base64Decode(
     'EhsKBmZvcm1hdBgJIAEoCUgHUgZmb3JtYXSIAQESFQoDa2V5GAogASgJSAhSA2tleYgBARI8Cg'
     'pzb3J0X29yZGVyGAsgASgOMhgudm9sdm94Z3JpZC52MS5Tb3J0T3JkZXJICVIJc29ydE9yZGVy'
     'iAEBEjkKCXNvcnRfdHlwZRgMIAEoDjIXLnZvbHZveGdyaWQudjEuU29ydFR5cGVIClIIc29ydF'
-    'R5cGWIAQESKgoOZHJvcGRvd25faXRlbXMYDSABKAlIC1INZHJvcGRvd25JdGVtc4gBARIgCgll'
-    'ZGl0X21hc2sYDiABKAlIDFIIZWRpdE1hc2uIAQESGwoGaW5kZW50GA8gASgFSA1SBmluZGVudI'
-    'gBARIbCgZoaWRkZW4YECABKAhIDlIGaGlkZGVuiAEBEhcKBHNwYW4YESABKAhID1IEc3BhbogB'
-    'ARI3CgppbWFnZV9saXN0GBIgAygLMhgudm9sdm94Z3JpZC52MS5JbWFnZURhdGFSCWltYWdlTG'
-    'lzdBIXCgRkYXRhGBMgASgMSBBSBGRhdGGIAQESNgoGc3RpY2t5GBQgASgOMhkudm9sdm94Z3Jp'
-    'ZC52MS5TdGlja3lFZGdlSBFSBnN0aWNreYgBARIwCgdwYWRkaW5nGBUgASgLMhYudm9sdm94Z3'
-    'JpZC52MS5QYWRkaW5nUgdwYWRkaW5nEjsKDWZpeGVkX3BhZGRpbmcYFiABKAsyFi52b2x2b3hn'
-    'cmlkLnYxLlBhZGRpbmdSDGZpeGVkUGFkZGluZxIfCghudWxsYWJsZRgXIAEoCEgSUghudWxsYW'
-    'JsZYgBARJFCg1jb2VyY2lvbl9tb2RlGBggASgOMhsudm9sdm94Z3JpZC52MS5Db2VyY2lvbk1v'
-    'ZGVIE1IMY29lcmNpb25Nb2RliAEBEkEKCmVycm9yX21vZGUYGSABKA4yHS52b2x2b3hncmlkLn'
-    'YxLldyaXRlRXJyb3JNb2RlSBRSCWVycm9yTW9kZYgBARJFCgtpbnRlcmFjdGlvbhgaIAEoDjIe'
-    'LnZvbHZveGdyaWQudjEuQ2VsbEludGVyYWN0aW9uSBVSC2ludGVyYWN0aW9uiAEBEioKDnByb2'
-    'dyZXNzX2NvbG9yGBsgASgNSBZSDXByb2dyZXNzQ29sb3KIAQFCCAoGX3dpZHRoQgwKCl9taW5f'
-    'd2lkdGhCDAoKX21heF93aWR0aEIKCghfY2FwdGlvbkIICgZfYWxpZ25CDgoMX2ZpeGVkX2FsaW'
-    'duQgwKCl9kYXRhX3R5cGVCCQoHX2Zvcm1hdEIGCgRfa2V5Qg0KC19zb3J0X29yZGVyQgwKCl9z'
-    'b3J0X3R5cGVCEQoPX2Ryb3Bkb3duX2l0ZW1zQgwKCl9lZGl0X21hc2tCCQoHX2luZGVudEIJCg'
-    'dfaGlkZGVuQgcKBV9zcGFuQgcKBV9kYXRhQgkKB19zdGlja3lCCwoJX251bGxhYmxlQhAKDl9j'
-    'b2VyY2lvbl9tb2RlQg0KC19lcnJvcl9tb2RlQg4KDF9pbnRlcmFjdGlvbkIRCg9fcHJvZ3Jlc3'
-    'NfY29sb3I=');
+    'R5cGWIAQESOAoIZHJvcGRvd24YDSABKAsyFy52b2x2b3hncmlkLnYxLkRyb3Bkb3duSAtSCGRy'
+    'b3Bkb3duiAEBEiAKCWVkaXRfbWFzaxgOIAEoCUgMUghlZGl0TWFza4gBARIbCgZpbmRlbnQYDy'
+    'ABKAVIDVIGaW5kZW50iAEBEhsKBmhpZGRlbhgQIAEoCEgOUgZoaWRkZW6IAQESFwoEc3BhbhgR'
+    'IAEoCEgPUgRzcGFuiAEBEjcKCmltYWdlX2xpc3QYEiADKAsyGC52b2x2b3hncmlkLnYxLkltYW'
+    'dlRGF0YVIJaW1hZ2VMaXN0EhcKBGRhdGEYEyABKAxIEFIEZGF0YYgBARI2CgZzdGlja3kYFCAB'
+    'KA4yGS52b2x2b3hncmlkLnYxLlN0aWNreUVkZ2VIEVIGc3RpY2t5iAEBEjAKB3BhZGRpbmcYFS'
+    'ABKAsyFi52b2x2b3hncmlkLnYxLlBhZGRpbmdSB3BhZGRpbmcSOwoNZml4ZWRfcGFkZGluZxgW'
+    'IAEoCzIWLnZvbHZveGdyaWQudjEuUGFkZGluZ1IMZml4ZWRQYWRkaW5nEh8KCG51bGxhYmxlGB'
+    'cgASgISBJSCG51bGxhYmxliAEBEkUKDWNvZXJjaW9uX21vZGUYGCABKA4yGy52b2x2b3hncmlk'
+    'LnYxLkNvZXJjaW9uTW9kZUgTUgxjb2VyY2lvbk1vZGWIAQESQQoKZXJyb3JfbW9kZRgZIAEoDj'
+    'IdLnZvbHZveGdyaWQudjEuV3JpdGVFcnJvck1vZGVIFFIJZXJyb3JNb2RliAEBEkUKC2ludGVy'
+    'YWN0aW9uGBogASgOMh4udm9sdm94Z3JpZC52MS5DZWxsSW50ZXJhY3Rpb25IFVILaW50ZXJhY3'
+    'Rpb26IAQESKgoOcHJvZ3Jlc3NfY29sb3IYGyABKA1IFlINcHJvZ3Jlc3NDb2xvcogBAUIICgZf'
+    'd2lkdGhCDAoKX21pbl93aWR0aEIMCgpfbWF4X3dpZHRoQgoKCF9jYXB0aW9uQggKBl9hbGlnbk'
+    'IOCgxfZml4ZWRfYWxpZ25CDAoKX2RhdGFfdHlwZUIJCgdfZm9ybWF0QgYKBF9rZXlCDQoLX3Nv'
+    'cnRfb3JkZXJCDAoKX3NvcnRfdHlwZUILCglfZHJvcGRvd25CDAoKX2VkaXRfbWFza0IJCgdfaW'
+    '5kZW50QgkKB19oaWRkZW5CBwoFX3NwYW5CBwoFX2RhdGFCCQoHX3N0aWNreUILCglfbnVsbGFi'
+    'bGVCEAoOX2NvZXJjaW9uX21vZGVCDQoLX2Vycm9yX21vZGVCDgoMX2ludGVyYWN0aW9uQhEKD1'
+    '9wcm9ncmVzc19jb2xvcg==');
 
 @$core.Deprecated('Use defineColumnsRequestDescriptor instead')
 const DefineColumnsRequest$json = {
@@ -5421,12 +5510,13 @@ const CellUpdate$json = {
       '10': 'buttonPicture'
     },
     {
-      '1': 'dropdown_items',
+      '1': 'dropdown',
       '3': 9,
       '4': 1,
-      '5': 9,
+      '5': 11,
+      '6': '.volvoxgrid.v1.Dropdown',
       '9': 2,
-      '10': 'dropdownItems',
+      '10': 'dropdown',
       '17': true
     },
     {
@@ -5473,7 +5563,7 @@ const CellUpdate$json = {
   '8': [
     {'1': '_checked'},
     {'1': '_picture_align'},
-    {'1': '_dropdown_items'},
+    {'1': '_dropdown'},
     {'1': '_sticky_row'},
     {'1': '_sticky_col'},
     {'1': '_interaction'},
@@ -5490,14 +5580,14 @@ final $typed_data.Uint8List cellUpdateDescriptor = $convert.base64Decode(
     'GC52b2x2b3hncmlkLnYxLkltYWdlRGF0YVIHcGljdHVyZRJHCg1waWN0dXJlX2FsaWduGAcgAS'
     'gOMh0udm9sdm94Z3JpZC52MS5JbWFnZUFsaWdubWVudEgBUgxwaWN0dXJlQWxpZ26IAQESPwoO'
     'YnV0dG9uX3BpY3R1cmUYCCABKAsyGC52b2x2b3hncmlkLnYxLkltYWdlRGF0YVINYnV0dG9uUG'
-    'ljdHVyZRIqCg5kcm9wZG93bl9pdGVtcxgJIAEoCUgCUg1kcm9wZG93bkl0ZW1ziAEBEj0KCnN0'
-    'aWNreV9yb3cYCiABKA4yGS52b2x2b3hncmlkLnYxLlN0aWNreUVkZ2VIA1IJc3RpY2t5Um93iA'
-    'EBEj0KCnN0aWNreV9jb2wYCyABKA4yGS52b2x2b3hncmlkLnYxLlN0aWNreUVkZ2VIBFIJc3Rp'
-    'Y2t5Q29siAEBEkUKC2ludGVyYWN0aW9uGAwgASgOMh4udm9sdm94Z3JpZC52MS5DZWxsSW50ZX'
-    'JhY3Rpb25IBVILaW50ZXJhY3Rpb26IAQESOQoHYmFyY29kZRgNIAEoCzIaLnZvbHZveGdyaWQu'
-    'djEuQmFyY29kZURhdGFIBlIHYmFyY29kZYgBAUIKCghfY2hlY2tlZEIQCg5fcGljdHVyZV9hbG'
-    'lnbkIRCg9fZHJvcGRvd25faXRlbXNCDQoLX3N0aWNreV9yb3dCDQoLX3N0aWNreV9jb2xCDgoM'
-    'X2ludGVyYWN0aW9uQgoKCF9iYXJjb2Rl');
+    'ljdHVyZRI4Cghkcm9wZG93bhgJIAEoCzIXLnZvbHZveGdyaWQudjEuRHJvcGRvd25IAlIIZHJv'
+    'cGRvd26IAQESPQoKc3RpY2t5X3JvdxgKIAEoDjIZLnZvbHZveGdyaWQudjEuU3RpY2t5RWRnZU'
+    'gDUglzdGlja3lSb3eIAQESPQoKc3RpY2t5X2NvbBgLIAEoDjIZLnZvbHZveGdyaWQudjEuU3Rp'
+    'Y2t5RWRnZUgEUglzdGlja3lDb2yIAQESRQoLaW50ZXJhY3Rpb24YDCABKA4yHi52b2x2b3hncm'
+    'lkLnYxLkNlbGxJbnRlcmFjdGlvbkgFUgtpbnRlcmFjdGlvbogBARI5CgdiYXJjb2RlGA0gASgL'
+    'Mhoudm9sdm94Z3JpZC52MS5CYXJjb2RlRGF0YUgGUgdiYXJjb2RliAEBQgoKCF9jaGVja2VkQh'
+    'AKDl9waWN0dXJlX2FsaWduQgsKCV9kcm9wZG93bkINCgtfc3RpY2t5X3Jvd0INCgtfc3RpY2t5'
+    'X2NvbEIOCgxfaW50ZXJhY3Rpb25CCgoIX2JhcmNvZGU=');
 
 @$core.Deprecated('Use updateCellsRequestDescriptor instead')
 const UpdateCellsRequest$json = {
@@ -9174,6 +9264,15 @@ const GridEvent$json = {
       '9': 0,
       '10': 'pullToRefreshCanceled'
     },
+    {
+      '1': 'before_dropdown_open',
+      '3': 63,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.BeforeDropdownOpenEvent',
+      '9': 0,
+      '10': 'beforeDropdownOpen'
+    },
   ],
   '8': [
     {'1': 'event'},
@@ -9263,8 +9362,9 @@ final $typed_data.Uint8List gridEventDescriptor = $convert.base64Decode(
     'dEhlYWRlclJvdxJnChlwdWxsX3RvX3JlZnJlc2hfdHJpZ2dlcmVkGD0gASgLMioudm9sdm94Z3'
     'JpZC52MS5QdWxsVG9SZWZyZXNoVHJpZ2dlcmVkRXZlbnRIAFIWcHVsbFRvUmVmcmVzaFRyaWdn'
     'ZXJlZBJkChhwdWxsX3RvX3JlZnJlc2hfY2FuY2VsZWQYPiABKAsyKS52b2x2b3hncmlkLnYxLl'
-    'B1bGxUb1JlZnJlc2hDYW5jZWxlZEV2ZW50SABSFXB1bGxUb1JlZnJlc2hDYW5jZWxlZEIHCgVl'
-    'dmVudA==');
+    'B1bGxUb1JlZnJlc2hDYW5jZWxlZEV2ZW50SABSFXB1bGxUb1JlZnJlc2hDYW5jZWxlZBJaChRi'
+    'ZWZvcmVfZHJvcGRvd25fb3Blbhg/IAEoCzImLnZvbHZveGdyaWQudjEuQmVmb3JlRHJvcGRvd2'
+    '5PcGVuRXZlbnRIAFISYmVmb3JlRHJvcGRvd25PcGVuQgcKBWV2ZW50');
 
 @$core.Deprecated('Use cellFocusChangingEventDescriptor instead')
 const CellFocusChangingEvent$json = {
@@ -9528,6 +9628,37 @@ final $typed_data.Uint8List cellEditConfigureWindowEventDescriptor =
     $convert.base64Decode(
         'ChxDZWxsRWRpdENvbmZpZ3VyZVdpbmRvd0V2ZW50EhAKA3JvdxgBIAEoBVIDcm93EhAKA2NvbB'
         'gCIAEoBVIDY29s');
+
+@$core.Deprecated('Use beforeDropdownOpenEventDescriptor instead')
+const BeforeDropdownOpenEvent$json = {
+  '1': 'BeforeDropdownOpenEvent',
+  '2': [
+    {'1': 'row', '3': 1, '4': 1, '5': 5, '10': 'row'},
+    {'1': 'col', '3': 2, '4': 1, '5': 5, '10': 'col'},
+    {'1': 'x', '3': 3, '4': 1, '5': 2, '10': 'x'},
+    {'1': 'y', '3': 4, '4': 1, '5': 2, '10': 'y'},
+    {'1': 'width', '3': 5, '4': 1, '5': 2, '10': 'width'},
+    {'1': 'height', '3': 6, '4': 1, '5': 2, '10': 'height'},
+    {
+      '1': 'dropdown',
+      '3': 7,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.Dropdown',
+      '10': 'dropdown'
+    },
+    {'1': 'current_value', '3': 8, '4': 1, '5': 9, '10': 'currentValue'},
+    {'1': 'selected_index', '3': 9, '4': 1, '5': 5, '10': 'selectedIndex'},
+  ],
+};
+
+/// Descriptor for `BeforeDropdownOpenEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List beforeDropdownOpenEventDescriptor = $convert.base64Decode(
+    'ChdCZWZvcmVEcm9wZG93bk9wZW5FdmVudBIQCgNyb3cYASABKAVSA3JvdxIQCgNjb2wYAiABKA'
+    'VSA2NvbBIMCgF4GAMgASgCUgF4EgwKAXkYBCABKAJSAXkSFAoFd2lkdGgYBSABKAJSBXdpZHRo'
+    'EhYKBmhlaWdodBgGIAEoAlIGaGVpZ2h0EjMKCGRyb3Bkb3duGAcgASgLMhcudm9sdm94Z3JpZC'
+    '52MS5Ecm9wZG93blIIZHJvcGRvd24SIwoNY3VycmVudF92YWx1ZRgIIAEoCVIMY3VycmVudFZh'
+    'bHVlEiUKDnNlbGVjdGVkX2luZGV4GAkgASgFUg1zZWxlY3RlZEluZGV4');
 
 @$core.Deprecated('Use dropdownClosedEventDescriptor instead')
 const DropdownClosedEvent$json = {
@@ -10447,6 +10578,8 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.LoadFontDataResponse': LoadFontDataResponse$json,
   '.volvoxgrid.v1.DefineColumnsRequest': DefineColumnsRequest$json,
   '.volvoxgrid.v1.ColumnDef': ColumnDef$json,
+  '.volvoxgrid.v1.Dropdown': Dropdown$json,
+  '.volvoxgrid.v1.DropdownItem': DropdownItem$json,
   '.volvoxgrid.v1.DefineColumnsResponse': DefineColumnsResponse$json,
   '.volvoxgrid.v1.GetSchemaRequest': GetSchemaRequest$json,
   '.volvoxgrid.v1.SchemaResponse': SchemaResponse$json,
@@ -10643,6 +10776,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.PullToRefreshTriggeredEvent':
       PullToRefreshTriggeredEvent$json,
   '.volvoxgrid.v1.PullToRefreshCanceledEvent': PullToRefreshCanceledEvent$json,
+  '.volvoxgrid.v1.BeforeDropdownOpenEvent': BeforeDropdownOpenEvent$json,
 };
 
 /// Descriptor for `VolvoxGridService`. Decode as a `google.protobuf.ServiceDescriptorProto`.

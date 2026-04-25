@@ -509,6 +509,32 @@ enum DropdownTrigger {
   DROPDOWN_ON_EDIT = 2;
 }
 
+enum DropdownItemLayout {
+  DROPDOWN_ITEM_AUTO          = 0;
+  DROPDOWN_ITEM_LABEL         = 1;
+  DROPDOWN_ITEM_VALUE_LABEL   = 2;
+  DROPDOWN_ITEM_LABEL_DETAILS = 3;
+}
+
+message Dropdown {
+  repeated DropdownItem items = 1;
+  // When true, the user may type/commit a value not present in `items`.
+  bool allow_custom_value = 2;
+  DropdownItemLayout item_layout = 3;
+  // Unset = use grid/global default; false/true override for this dropdown.
+  optional bool searchable = 4;
+}
+
+message DropdownItem {
+  // Value committed into the cell. If unset, commit `label`.
+  optional string value = 1;
+  // Text shown to the user.
+  optional string label = 2;
+  // Optional secondary/detail strings for richer host layouts.
+  repeated string details = 3;
+  bool disabled = 4;
+}
+
 enum TabBehavior {
   TAB_CONTROLS = 0;
   TAB_CELLS    = 1;
@@ -1465,12 +1491,7 @@ message ColumnDef {
   optional string         key            = 10;
   optional SortOrder      sort_order     = 11;
   optional SortType       sort_type      = 12;
-  // Pipe-delimited dropdown items. See engine/src/edit.rs parse_dropdown_entries.
-  // Format: "item1|item2|item3" (read-only dropdown)
-  //         "|item1|item2"      (leading `|` = editable, allows free-form text)
-  // Optional translation: "#id;Display Text" stores `id` but shows Display Text.
-  // Optional multi-column: "*1;col1\tcol2" selects display column.
-  optional string         dropdown_items = 13;
+  optional Dropdown       dropdown      = 13;
   optional string         edit_mask      = 14;
   optional int32          indent         = 15;
   optional bool           hidden         = 16;
@@ -1545,8 +1566,7 @@ message CellUpdate {
   ImageData              picture        = 6;
   optional ImageAlignment picture_align = 7;
   ImageData              button_picture = 8;
-  // Pipe-delimited dropdown items; prefix with `|` to make the list editable.
-  optional string        dropdown_items = 9;
+  optional Dropdown      dropdown       = 9;
   optional StickyEdge    sticky_row     = 10;
   optional StickyEdge    sticky_col     = 11;
   optional CellInteraction interaction  = 12;
@@ -2394,7 +2414,7 @@ message GpuSurfaceReady {
 // with cancel=false. Expired actions are resolved at the start of each
 // render_session loop iteration.
 //
-// Cancelable events: BeforeEdit, CellEditValidate, BeforeSort,
+// Cancelable events: BeforeEdit, BeforeDropdownOpen, CellEditValidate, BeforeSort,
 // BeforeNodeToggle, BeforeScroll, BeforeUserResize, BeforeMoveColumn,
 // BeforeMoveRow, BeforeMouseDown. Print-only BeforePageBreak is emitted
 // during synchronous rendering and is informational in this API.
@@ -2620,6 +2640,7 @@ message GridEvent {
     // Pull to refresh
     PullToRefreshTriggeredEvent pull_to_refresh_triggered = 61;
     PullToRefreshCanceledEvent pull_to_refresh_canceled = 62;
+    BeforeDropdownOpenEvent before_dropdown_open = 63;
   }
 }
 
@@ -2658,6 +2679,19 @@ message KeyPressEditEvent { int32 key_ascii = 1; }
 message KeyUpEditEvent    { int32 key_code = 1; int32 modifier = 2; }
 message CellEditConfigureStyleEvent  { int32 row = 1; int32 col = 2; }
 message CellEditConfigureWindowEvent { int32 row = 1; int32 col = 2; }
+message BeforeDropdownOpenEvent {
+  int32 row = 1;
+  int32 col = 2;
+  // Viewport-local cell rect. Hosts can use this when canceling the
+  // engine list and opening their own positioned popup.
+  float x = 3;
+  float y = 4;
+  float width = 5;
+  float height = 6;
+  Dropdown dropdown = 7;
+  string current_value = 8;
+  int32 selected_index = 9;
+}  // cancelable
 message DropdownClosedEvent {}
 message DropdownOpenedEvent {}
 

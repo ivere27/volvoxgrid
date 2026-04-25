@@ -166,7 +166,9 @@ fn sales_demo_column_defs(scale: f32) -> Vec<pb::ColumnDef> {
                 def.data_type = Some(pb::ColumnDataType::ColumnDataBoolean as i32);
             }
             8 => {
-                def.dropdown_items = Some("Active|Pending|Shipped|Returned|Cancelled".to_string());
+                def.dropdown = Some(volvoxgrid_engine::edit::legacy_dropdown_items_to_dropdown(
+                    "Active|Pending|Shipped|Returned|Cancelled",
+                ));
             }
             _ => {}
         }

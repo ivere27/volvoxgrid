@@ -15,6 +15,8 @@ import io.github.ivere27.volvoxgrid.ColIndicatorConfig;
 import io.github.ivere27.volvoxgrid.ColumnDataType;
 import io.github.ivere27.volvoxgrid.ColumnDef;
 import io.github.ivere27.volvoxgrid.DefineColumnsRequest;
+import io.github.ivere27.volvoxgrid.Dropdown;
+import io.github.ivere27.volvoxgrid.DropdownItem;
 import io.github.ivere27.volvoxgrid.DropdownTrigger;
 import io.github.ivere27.volvoxgrid.EditConfig;
 import io.github.ivere27.volvoxgrid.EditTrigger;
@@ -107,7 +109,7 @@ final class SalesJsonDesktopDemo {
                     .setCaption("Status")
                     .setKey("Status")
                     .setWidth(COL_WIDTHS[8])
-                    .setDropdownItems(SALES_STATUS_ITEMS)
+                    .setDropdown(dropdownFromLabels(SALES_STATUS_ITEMS))
                     .build())
                 .addColumns(column(1, null).build())
                 .addColumns(column(2, null).build())
@@ -169,7 +171,7 @@ final class SalesJsonDesktopDemo {
                     CellUpdate.newBuilder()
                         .setRow(row)
                         .setCol(8)
-                        .setDropdownItems(SALES_STATUS_ITEMS)
+                        .setDropdown(dropdownFromLabels(SALES_STATUS_ITEMS))
                         .build()
                 );
                 continue;
@@ -213,6 +215,16 @@ final class SalesJsonDesktopDemo {
         if (updates.getCellsCount() > 0) {
             ctrl.updateCells(updates.build());
         }
+    }
+
+    private static Dropdown dropdownFromLabels(String items) {
+        Dropdown.Builder dropdown = Dropdown.newBuilder();
+        for (String label : items.split("\\|")) {
+            if (!label.isEmpty()) {
+                dropdown.addItems(DropdownItem.newBuilder().setLabel(label));
+            }
+        }
+        return dropdown.build();
     }
 
     private static boolean parseSalesFlag(String text) {

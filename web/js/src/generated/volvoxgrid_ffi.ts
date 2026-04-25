@@ -208,6 +208,12 @@ export enum DropMode {
   DROP_MANUAL = 1,
   DROP_AUTOMATIC = 2,
 }
+export enum DropdownItemLayout {
+  DROPDOWN_ITEM_AUTO = 0,
+  DROPDOWN_ITEM_LABEL = 1,
+  DROPDOWN_ITEM_VALUE_LABEL = 2,
+  DROPDOWN_ITEM_LABEL_DETAILS = 3,
+}
 export enum DropdownTrigger {
   DROPDOWN_NEVER = 0,
   DROPDOWN_ALWAYS = 1,
@@ -646,6 +652,17 @@ export const BarcodeRenderOptionsFields = {
   "size_warning_color": 13,
   "use_full_rect": 14,
 } as const;
+export const BeforeDropdownOpenEventFields = {
+  "row": 1,
+  "col": 2,
+  "x": 3,
+  "y": 4,
+  "width": 5,
+  "height": 6,
+  "dropdown": 7,
+  "current_value": 8,
+  "selected_index": 9,
+} as const;
 export const BeforeEditEventFields = {
   "row": 1,
   "col": 2,
@@ -771,7 +788,7 @@ export const CellUpdateFields = {
   "picture": 6,
   "picture_align": 7,
   "button_picture": 8,
-  "dropdown_items": 9,
+  "dropdown": 9,
   "sticky_row": 10,
   "sticky_col": 11,
   "interaction": 12,
@@ -865,7 +882,7 @@ export const ColumnDefFields = {
   "key": 10,
   "sort_order": 11,
   "sort_type": 12,
-  "dropdown_items": 13,
+  "dropdown": 13,
   "edit_mask": 14,
   "indent": 15,
   "hidden": 16,
@@ -976,7 +993,19 @@ export const DragStartEventFields = {
   "row": 1,
   "col": 2,
 } as const;
+export const DropdownFields = {
+  "items": 1,
+  "allow_custom_value": 2,
+  "item_layout": 3,
+  "searchable": 4,
+} as const;
 export const DropdownClosedEventFields = {
+} as const;
+export const DropdownItemFields = {
+  "value": 1,
+  "label": 2,
+  "details": 3,
+  "disabled": 4,
 } as const;
 export const DropdownOpenedEventFields = {
 } as const;
@@ -1286,6 +1315,7 @@ export const GridEventFields = {
   "get_header_row": 60,
   "pull_to_refresh_triggered": 61,
   "pull_to_refresh_canceled": 62,
+  "before_dropdown_open": 63,
 } as const;
 export const GridLinesFields = {
   "style": 1,

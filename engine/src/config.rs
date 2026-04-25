@@ -2208,8 +2208,9 @@ impl VolvoxGrid {
                     cp.sort_order = merge_sort_spec(cp.sort_order, def.sort_order, sort_type);
                     cp.sort_defined = true;
                 }
-                if let Some(v) = &def.dropdown_items {
-                    cp.dropdown_items = v.clone();
+                if let Some(v) = &def.dropdown {
+                    cp.dropdown = Some(v.clone());
+                    cp.dropdown_items = crate::edit::dropdown_to_legacy_items(v);
                 }
                 if let Some(v) = &def.edit_mask {
                     cp.edit_mask = v.clone();
@@ -2743,9 +2744,11 @@ impl VolvoxGrid {
             }
         }
 
-        if let Some(cl) = &u.dropdown_items {
+        if let Some(dropdown) = &u.dropdown {
             let cell = self.cells.get_mut(row, col);
-            cell.extra_mut().dropdown_items = cl.clone();
+            let extra = cell.extra_mut();
+            extra.dropdown = Some(dropdown.clone());
+            extra.dropdown_items = crate::edit::dropdown_to_legacy_items(dropdown);
         }
 
         if let Some(barcode) = &u.barcode {
@@ -2833,7 +2836,7 @@ impl VolvoxGrid {
                 || entry.update.picture.is_some()
                 || entry.update.picture_align.is_some()
                 || entry.update.button_picture.is_some()
-                || entry.update.dropdown_items.is_some()
+                || entry.update.dropdown.is_some()
                 || entry.update.barcode.is_some()
                 || entry.update.interaction.is_some()
                 || entry.update.sticky_row.is_some()
@@ -2887,7 +2890,7 @@ impl VolvoxGrid {
                     picture: None,
                     picture_align: None,
                     button_picture: None,
-                    dropdown_items: None,
+                    dropdown: None,
                     sticky_row: None,
                     sticky_col: None,
                     interaction: None,
@@ -2977,11 +2980,7 @@ impl VolvoxGrid {
                 },
                 sort_order,
                 sort_type,
-                dropdown_items: if cp.dropdown_items.is_empty() {
-                    None
-                } else {
-                    Some(cp.dropdown_items)
-                },
+                dropdown: cp.dropdown,
                 edit_mask: if cp.edit_mask.is_empty() {
                     None
                 } else {
@@ -3923,7 +3922,7 @@ mod tests {
                 picture: None,
                 picture_align: None,
                 button_picture: None,
-                dropdown_items: None,
+                dropdown: None,
                 sticky_row: None,
                 sticky_col: None,
                 interaction: Some(v1::CellInteraction::Button as i32),
@@ -3948,7 +3947,7 @@ mod tests {
                 picture: None,
                 picture_align: None,
                 button_picture: None,
-                dropdown_items: None,
+                dropdown: None,
                 sticky_row: None,
                 sticky_col: None,
                 interaction: Some(v1::CellInteraction::Unspecified as i32),

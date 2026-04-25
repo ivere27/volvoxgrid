@@ -131,6 +131,42 @@ declare module "volvoxgrid" {
     cancel: boolean;
   }
 
+  export enum DropdownItemLayout {
+    DROPDOWN_ITEM_AUTO = 0,
+    DROPDOWN_ITEM_LABEL = 1,
+    DROPDOWN_ITEM_VALUE_LABEL = 2,
+    DROPDOWN_ITEM_LABEL_DETAILS = 3,
+  }
+
+  export interface VolvoxGridDropdownItem {
+    value?: string;
+    label?: string;
+    details?: string[];
+    disabled?: boolean;
+  }
+
+  export interface VolvoxGridDropdown {
+    items: VolvoxGridDropdownItem[];
+    allowCustomValue?: boolean;
+    itemLayout?: DropdownItemLayout;
+    searchable?: boolean;
+  }
+
+  export interface VolvoxGridBeforeDropdownOpenDetails {
+    eventId: bigint;
+    rawEvent: Uint8Array;
+    row: number;
+    col: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    dropdown: VolvoxGridDropdown;
+    currentValue: string;
+    selectedIndex: number;
+    cancel: boolean;
+  }
+
   export interface VolvoxGridCellEditValidatingDetails {
     eventId: bigint;
     rawEvent: Uint8Array;
@@ -237,6 +273,7 @@ declare module "volvoxgrid" {
     get cursorCol(): number;
     set cursorCol(value: number);
     onBeforeEdit: ((details: VolvoxGridBeforeEditDetails) => void) | null;
+    onBeforeDropdownOpen: ((details: VolvoxGridBeforeDropdownOpenDetails) => void) | null;
     onCellEditValidating: ((details: VolvoxGridCellEditValidatingDetails) => void) | null;
     onBeforeSort: ((details: VolvoxGridBeforeSortDetails) => void) | null;
     getSelection(): VolvoxGridSelection;

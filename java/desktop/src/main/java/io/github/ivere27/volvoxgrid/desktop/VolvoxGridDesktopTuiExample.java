@@ -16,6 +16,8 @@ import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.CreateResponse;
 import io.github.ivere27.volvoxgrid.DefineColumnsRequest;
 import io.github.ivere27.volvoxgrid.DefineRowsRequest;
+import io.github.ivere27.volvoxgrid.Dropdown;
+import io.github.ivere27.volvoxgrid.DropdownItem;
 import io.github.ivere27.volvoxgrid.DropdownTrigger;
 import io.github.ivere27.volvoxgrid.EditConfig;
 import io.github.ivere27.volvoxgrid.EditTrigger;
@@ -423,7 +425,7 @@ public final class VolvoxGridDesktopTuiExample {
                     .setWidth(10)
                     .setCaption("Status")
                     .setKey("Status")
-                    .setDropdownItems(SALES_STATUS_ITEMS)
+                    .setDropdown(dropdownFromLabels(SALES_STATUS_ITEMS))
                     .build()
             )
             .addColumns(
@@ -435,6 +437,16 @@ public final class VolvoxGridDesktopTuiExample {
                     .build()
             )
             .build();
+    }
+
+    private static Dropdown dropdownFromLabels(String items) {
+        Dropdown.Builder dropdown = Dropdown.newBuilder();
+        for (String label : items.split("\\|")) {
+            if (!label.isEmpty()) {
+                dropdown.addItems(DropdownItem.newBuilder().setLabel(label));
+            }
+        }
+        return dropdown.build();
     }
 
     private static GridConfig buildSalesTuiConfig(int rowIndicatorWidth) {

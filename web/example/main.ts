@@ -11,7 +11,7 @@
  * so the host only provides platform glue.
  */
 
-import { VolvoxGrid, type VolvoxGridContextMenuRequest } from "../js/src/volvoxgrid.js";
+import { VolvoxGrid, type VolvoxGridContextMenuRequest, type VolvoxGridDropdown } from "../js/src/volvoxgrid.js";
 import { setupDefaultInput } from "../js/src/default-input.js";
 import { createCanvas2DTextRenderer } from "../js/src/canvas2d-text-renderer.js";
 import {
@@ -819,7 +819,7 @@ function pbEncodeColumnDef(
   }
   out.push(...pbEncodeStringField(10, setup.key));
   if (setup.dropdownItems != null) {
-    out.push(...pbEncodeStringField(13, setup.dropdownItems));
+    out.push(...pbEncodeMessageField(13, pbEncodeDropdownFromLabels(setup.dropdownItems)));
   }
   if (setup.span != null) {
     out.push(...pbEncodeTag(17, 0), ...pbEncodeBool(setup.span));
@@ -828,6 +828,36 @@ function pbEncodeColumnDef(
     out.push(...pbEncodeInt32Field(26, setup.interaction));
   }
   return new Uint8Array(out);
+}
+
+function pbEncodeDropdownFromLabels(items: string): Uint8Array {
+  const out: number[] = [];
+  let source = items;
+  if (source.startsWith("|")) {
+    out.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
+    source = source.slice(1);
+  }
+  for (const label of source.split("|")) {
+    if (!label) continue;
+    out.push(...pbEncodeMessageField(1, new Uint8Array(pbEncodeStringField(2, label))));
+  }
+  return new Uint8Array(out);
+}
+
+function dropdownFromLabels(items: string): VolvoxGridDropdown {
+  let source = items;
+  const dropdown: VolvoxGridDropdown = {
+    items: [],
+    allowCustomValue: source.startsWith("|"),
+  };
+  if (dropdown.allowCustomValue) {
+    source = source.slice(1);
+  }
+  for (const label of source.split("|")) {
+    if (!label) continue;
+    dropdown.items.push({ label });
+  }
+  return dropdown;
 }
 
 function pbEncodeDefineColumnsRequest(gridId: number, columns: readonly DemoColumnSetup[]): Uint8Array {
@@ -1125,7 +1155,7 @@ function setupSalesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: number
     grid.setColFormat(4, "$#,##0");
     grid.setColFormat(5, "$#,##0");
     grid.setColProgressColor(6, 0xFF818CF8);
-    grid.setColDropdownItems(8, SALES_STATUS_ITEMS);
+    grid.setColDropdown(8, dropdownFromLabels(SALES_STATUS_ITEMS));
     grid.flingImpulseGain = 220.0;
     grid.flingFriction = 0.9;
     grid.subtotal(1, 0, 0, "", 0, 0, false);

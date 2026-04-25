@@ -772,6 +772,7 @@ fn handle_key_render_input(
                             grid.selection.col,
                             false,
                             true,
+                            true,
                             None,
                             caret_end,
                             None,
@@ -1073,6 +1074,15 @@ impl CompareChannel {
 #[derive(Clone, Debug)]
 enum PendingAction {
     BeginEdit {
+        row: i32,
+        col: i32,
+        force: bool,
+        prefer_combo: bool,
+        seed_text: Option<String>,
+        click_caret: Option<i32>,
+        caret_end: Option<bool>,
+    },
+    BeforeDropdownOpen {
         row: i32,
         col: i32,
         force: bool,
@@ -2661,6 +2671,29 @@ fn engine_event_to_proto(
         E::CellEditConfigureWindow { row, col } => Some(
             grid_event::Event::CellEditConfigureWindow(CellEditConfigureWindowEvent { row, col }),
         ),
+        E::BeforeDropdownOpen {
+            row,
+            col,
+            x,
+            y,
+            width,
+            height,
+            dropdown,
+            current_value,
+            selected_index,
+        } => Some(grid_event::Event::BeforeDropdownOpen(
+            BeforeDropdownOpenEvent {
+                row,
+                col,
+                x,
+                y,
+                width,
+                height,
+                dropdown: Some(dropdown),
+                current_value,
+                selected_index,
+            },
+        )),
         E::DropdownClosed => Some(grid_event::Event::DropdownClosed(DropdownClosedEvent {})),
         E::DropdownOpened => Some(grid_event::Event::DropdownOpened(DropdownOpenedEvent {})),
         E::CellChanged {
@@ -3186,6 +3219,7 @@ fn begin_edit_session_core(
         col,
         force,
         emit_before_event,
+        true,
         None,
         None,
         None,
@@ -3199,6 +3233,7 @@ fn begin_edit_session_core_opts(
     col: i32,
     force: bool,
     emit_before_event: bool,
+    emit_dropdown_event: bool,
     select_all: Option<bool>,
     caret_end: Option<bool>,
     seed_text: Option<String>,
@@ -3220,7 +3255,8 @@ fn begin_edit_session_core_opts(
         return;
     }
 
-    let combo_list = grid.active_dropdown_list(row, col);
+    let dropdown = grid.active_dropdown(row, col);
+    let has_dropdown = dropdown.is_some();
     if emit_before_event {
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
@@ -3241,8 +3277,13 @@ fn begin_edit_session_core_opts(
         grid.effective_engine_compose_enabled(),
         grid.effective_compose_method(),
     );
-    grid.edit.parse_dropdown_items(&combo_list);
-    if !combo_list.is_empty() {
+    if let Some(dropdown) = dropdown.as_ref() {
+        grid.edit.parse_dropdown(dropdown);
+    } else {
+        let combo_list = grid.active_dropdown_list(row, col);
+        grid.edit.parse_dropdown_items(&combo_list);
+    }
+    if has_dropdown {
         for i in 0..grid.edit.dropdown_count() {
             if (!stored_text.is_empty() && grid.edit.get_dropdown_data(i) == stored_text)
                 || grid.edit.get_dropdown_item(i) == display_text
@@ -3253,7 +3294,12 @@ fn begin_edit_session_core_opts(
         }
     }
 
-    if !combo_list.is_empty() {
+    if has_dropdown {
+        if emit_dropdown_event {
+            if let Some(event) = grid.before_dropdown_open_event(row, col) {
+                grid.events.push(event);
+            }
+        }
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::DropdownOpened);
     }
@@ -3279,6 +3325,15 @@ fn begin_edit_session_after_before(
     begin_edit_session_core(grid, row, col, force, false);
 }
 
+fn begin_edit_session_after_dropdown_before(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    force: bool,
+) {
+    begin_edit_session_core_opts(grid, row, col, force, false, false, None, None, None, None);
+}
+
 fn normalize_committed_edit_text(
     grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
     row: i32,
@@ -3287,12 +3342,13 @@ fn normalize_committed_edit_text(
 ) -> String {
     let mut committed = truncate_to_char_count(new_text, grid.edit_max_length);
 
-    let cell_combo = grid
-        .cells
-        .get(row, col)
-        .map(|c| c.dropdown_items().to_string())
-        .unwrap_or_default();
-    if cell_combo.is_empty() && col >= 0 && (col as usize) < grid.columns.len() {
+    if let Some(dropdown) = grid.configured_dropdown(row, col) {
+        if let Some(mapped) = volvoxgrid_engine::edit::translate_dropdown_display_to_value_typed(
+            &dropdown, &committed,
+        ) {
+            committed = mapped;
+        }
+    } else if col >= 0 && (col as usize) < grid.columns.len() {
         let col_list = &grid.columns[col as usize].dropdown_items;
         if !col_list.is_empty() {
             if let Some(mapped) =
@@ -3575,6 +3631,7 @@ impl VolvoxGridPlugin {
                 col,
                 force,
                 true,
+                true,
                 None,
                 caret_end,
                 seed_text.clone(),
@@ -3621,6 +3678,44 @@ impl VolvoxGridPlugin {
             volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col },
         );
         None
+    }
+
+    fn request_before_dropdown_open(
+        &self,
+        grid_id: i64,
+        grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+        row: i32,
+        col: i32,
+        force: bool,
+        prefer_combo: bool,
+        seed_text: Option<String>,
+        click_caret: Option<i32>,
+        caret_end: Option<bool>,
+    ) -> bool {
+        let Some(event) = grid.before_dropdown_open_event(row, col) else {
+            return false;
+        };
+        let event_id = self.next_event_id();
+        self.pending_actions
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(
+                (grid_id, event_id),
+                PendingActionEntry {
+                    created_at: Instant::now(),
+                    action: PendingAction::BeforeDropdownOpen {
+                        row,
+                        col,
+                        force,
+                        prefer_combo,
+                        seed_text,
+                        click_caret,
+                        caret_end,
+                    },
+                },
+            );
+        grid.events.push_with_id(event_id, event);
+        true
     }
 
     fn request_validate_edit(
@@ -4041,11 +4136,79 @@ impl VolvoxGridPlugin {
                 }
                 self.manager()
                     .with_grid(grid_id, |grid| {
+                        if grid.active_dropdown(row, col).is_some()
+                            && self.request_before_dropdown_open(
+                                grid_id,
+                                grid,
+                                row,
+                                col,
+                                force,
+                                prefer_combo,
+                                seed_text.clone(),
+                                click_caret,
+                                caret_end,
+                            )
+                        {
+                            return None;
+                        }
                         begin_edit_session_core_opts(
                             grid,
                             row,
                             col,
                             force,
+                            false,
+                            true,
+                            None,
+                            caret_end,
+                            seed_text.clone(),
+                            None,
+                        );
+                        if let Some(seed) = seed_text {
+                            if grid.edit.is_active()
+                                && grid.edit.edit_row == row
+                                && grid.edit.edit_col == col
+                            {
+                                grid.events.push(
+                                    volvoxgrid_engine::event::GridEventData::CellEditChange {
+                                        text: seed,
+                                    },
+                                );
+                            }
+                        }
+                        if let Some(caret) = click_caret {
+                            if grid.edit.is_active()
+                                && grid.edit.edit_row == row
+                                && grid.edit.edit_col == col
+                            {
+                                grid.edit.sel_start = caret;
+                                grid.edit.sel_length = 0;
+                            }
+                        }
+                        maybe_render_editor_output(grid, prefer_combo)
+                    })
+                    .ok()
+                    .flatten()
+            }
+            PendingAction::BeforeDropdownOpen {
+                row,
+                col,
+                force,
+                prefer_combo,
+                seed_text,
+                click_caret,
+                caret_end,
+            } => {
+                if cancel {
+                    return None;
+                }
+                self.manager()
+                    .with_grid(grid_id, |grid| {
+                        begin_edit_session_core_opts(
+                            grid,
+                            row,
+                            col,
+                            force,
+                            false,
                             false,
                             None,
                             caret_end,
@@ -4587,6 +4750,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         start.row,
                         start.col,
                         false,
+                        true,
                         true,
                         start.select_all,
                         start.caret_end,

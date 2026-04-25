@@ -315,6 +315,14 @@ namespace Volvoxgrid.V1
         DROP_AUTOMATIC = 2,
     }
 
+    public enum DropdownItemLayout
+    {
+        DROPDOWN_ITEM_AUTO = 0,
+        DROPDOWN_ITEM_LABEL = 1,
+        DROPDOWN_ITEM_VALUE_LABEL = 2,
+        DROPDOWN_ITEM_LABEL_DETAILS = 3,
+    }
+
     public enum DropdownTrigger
     {
         DROPDOWN_NEVER = 0,
@@ -1544,6 +1552,65 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class BeforeDropdownOpenEvent
+    {
+        public int Row { get; set; }
+        public int Col { get; set; }
+        public float X { get; set; }
+        public float Y { get; set; }
+        public float Width { get; set; }
+        public float Height { get; set; }
+        public Dropdown Dropdown { get; set; }
+        public string CurrentValue { get; set; } = "";
+        public int SelectedIndex { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Row != 0) w.WriteInt32(1, Row);
+            if (Col != 0) w.WriteInt32(2, Col);
+            if (X != 0f) w.WriteFloat(3, X);
+            if (Y != 0f) w.WriteFloat(4, Y);
+            if (Width != 0f) w.WriteFloat(5, Width);
+            if (Height != 0f) w.WriteFloat(6, Height);
+            if (Dropdown != null) w.WriteMessageBytes(7, Dropdown.ToByteArray());
+            if (CurrentValue != null && CurrentValue.Length > 0) w.WriteString(8, CurrentValue);
+            if (SelectedIndex != 0) w.WriteInt32(9, SelectedIndex);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<BeforeDropdownOpenEvent> Parser = new MessageParser<BeforeDropdownOpenEvent>(data => ParseFrom(data));
+
+        public static BeforeDropdownOpenEvent ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new BeforeDropdownOpenEvent();
+            var r = new ProtoReader(data);
+            var msg = new BeforeDropdownOpenEvent();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Row = r.ReadInt32(); break;
+                    case 2: msg.Col = r.ReadInt32(); break;
+                    case 3: msg.X = r.ReadFloat(); break;
+                    case 4: msg.Y = r.ReadFloat(); break;
+                    case 5: msg.Width = r.ReadFloat(); break;
+                    case 6: msg.Height = r.ReadFloat(); break;
+                    case 7: msg.Dropdown = Dropdown.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 8: msg.CurrentValue = r.ReadString(); break;
+                    case 9: msg.SelectedIndex = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class BeforeEditEvent
     {
         public int Row { get; set; }
@@ -2514,9 +2581,9 @@ namespace Volvoxgrid.V1
         public ImageAlignment PictureAlign { get { return _pictureAlign.GetValueOrDefault(); } set { _pictureAlign = value; } }
         public bool HasPictureAlign { get { return _pictureAlign.HasValue; } }
         public ImageData ButtonPicture { get; set; }
-        private string _dropdownItems;
-        public string DropdownItems { get { return _dropdownItems; } set { _dropdownItems = value; } }
-        public bool HasDropdownItems { get { return _dropdownItems != null; } }
+        private Dropdown _dropdown;
+        public Dropdown Dropdown { get { return _dropdown; } set { _dropdown = value; } }
+        public bool HasDropdown { get { return _dropdown != null; } }
         private StickyEdge? _stickyRow;
         public StickyEdge StickyRow { get { return _stickyRow.GetValueOrDefault(); } set { _stickyRow = value; } }
         public bool HasStickyRow { get { return _stickyRow.HasValue; } }
@@ -2545,8 +2612,8 @@ namespace Volvoxgrid.V1
             if (_pictureAlign.HasValue)
                 w.WriteInt32(7, (int)_pictureAlign.Value);
             if (ButtonPicture != null) w.WriteMessageBytes(8, ButtonPicture.ToByteArray());
-            if (_dropdownItems != null)
-                w.WriteString(9, _dropdownItems);
+            if (_dropdown != null)
+                w.WriteMessageBytes(9, _dropdown.ToByteArray());
             if (_stickyRow.HasValue)
                 w.WriteInt32(10, (int)_stickyRow.Value);
             if (_stickyCol.HasValue)
@@ -2580,7 +2647,7 @@ namespace Volvoxgrid.V1
                     case 6: msg.Picture = ImageData.ParseFrom(r.ReadLengthDelimited()); break;
                     case 7: msg.PictureAlign = (ImageAlignment)r.ReadInt32(); break;
                     case 8: msg.ButtonPicture = ImageData.ParseFrom(r.ReadLengthDelimited()); break;
-                    case 9: msg.DropdownItems = r.ReadString(); break;
+                    case 9: msg.Dropdown = Dropdown.ParseFrom(r.ReadLengthDelimited()); break;
                     case 10: msg.StickyRow = (StickyEdge)r.ReadInt32(); break;
                     case 11: msg.StickyCol = (StickyEdge)r.ReadInt32(); break;
                     case 12: msg.Interaction = (CellInteraction)r.ReadInt32(); break;
@@ -3340,9 +3407,9 @@ namespace Volvoxgrid.V1
         private SortType? _sortType;
         public SortType SortType { get { return _sortType.GetValueOrDefault(); } set { _sortType = value; } }
         public bool HasSortType { get { return _sortType.HasValue; } }
-        private string _dropdownItems;
-        public string DropdownItems { get { return _dropdownItems; } set { _dropdownItems = value; } }
-        public bool HasDropdownItems { get { return _dropdownItems != null; } }
+        private Dropdown _dropdown;
+        public Dropdown Dropdown { get { return _dropdown; } set { _dropdown = value; } }
+        public bool HasDropdown { get { return _dropdown != null; } }
         private string _editMask;
         public string EditMask { get { return _editMask; } set { _editMask = value; } }
         public bool HasEditMask { get { return _editMask != null; } }
@@ -3408,8 +3475,8 @@ namespace Volvoxgrid.V1
                 w.WriteInt32(11, (int)_sortOrder.Value);
             if (_sortType.HasValue)
                 w.WriteInt32(12, (int)_sortType.Value);
-            if (_dropdownItems != null)
-                w.WriteString(13, _dropdownItems);
+            if (_dropdown != null)
+                w.WriteMessageBytes(13, _dropdown.ToByteArray());
             if (_editMask != null)
                 w.WriteString(14, _editMask);
             if (_indent.HasValue)
@@ -3465,7 +3532,7 @@ namespace Volvoxgrid.V1
                     case 10: msg.Key = r.ReadString(); break;
                     case 11: msg.SortOrder = (SortOrder)r.ReadInt32(); break;
                     case 12: msg.SortType = (SortType)r.ReadInt32(); break;
-                    case 13: msg.DropdownItems = r.ReadString(); break;
+                    case 13: msg.Dropdown = Dropdown.ParseFrom(r.ReadLengthDelimited()); break;
                     case 14: msg.EditMask = r.ReadString(); break;
                     case 15: msg.Indent = r.ReadInt32(); break;
                     case 16: msg.Hidden = r.ReadBool(); break;
@@ -4400,6 +4467,54 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class Dropdown
+    {
+        public List<DropdownItem> Items { get; private set; } = new List<DropdownItem>();
+        public bool AllowCustomValue { get; set; }
+        public DropdownItemLayout ItemLayout { get; set; }
+        private bool? _searchable;
+        public bool Searchable { get { return _searchable.GetValueOrDefault(); } set { _searchable = value; } }
+        public bool HasSearchable { get { return _searchable.HasValue; } }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            foreach (var item in Items)
+                w.WriteMessageBytes(1, item.ToByteArray());
+            if (AllowCustomValue) w.WriteBool(2, AllowCustomValue);
+            if (ItemLayout != 0) w.WriteInt32(3, (int)ItemLayout);
+            if (_searchable.HasValue)
+                w.WriteBool(4, _searchable.Value);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<Dropdown> Parser = new MessageParser<Dropdown>(data => ParseFrom(data));
+
+        public static Dropdown ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new Dropdown();
+            var r = new ProtoReader(data);
+            var msg = new Dropdown();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Items.Add(DropdownItem.ParseFrom(r.ReadLengthDelimited())); break;
+                    case 2: msg.AllowCustomValue = r.ReadBool(); break;
+                    case 3: msg.ItemLayout = (DropdownItemLayout)r.ReadInt32(); break;
+                    case 4: msg.Searchable = r.ReadBool(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class DropdownClosedEvent
     {
 
@@ -4425,6 +4540,57 @@ namespace Volvoxgrid.V1
             {
                 switch (field)
                 {
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class DropdownItem
+    {
+        private string _value;
+        public string Value { get { return _value; } set { _value = value; } }
+        public bool HasValue { get { return _value != null; } }
+        private string _label;
+        public string Label { get { return _label; } set { _label = value; } }
+        public bool HasLabel { get { return _label != null; } }
+        public List<string> Details { get; private set; } = new List<string>();
+        public bool Disabled { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (_value != null)
+                w.WriteString(1, _value);
+            if (_label != null)
+                w.WriteString(2, _label);
+            foreach (var item in Details)
+                w.WriteString(3, item);
+            if (Disabled) w.WriteBool(4, Disabled);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<DropdownItem> Parser = new MessageParser<DropdownItem>(data => ParseFrom(data));
+
+        public static DropdownItem ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new DropdownItem();
+            var r = new ProtoReader(data);
+            var msg = new DropdownItem();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Value = r.ReadString(); break;
+                    case 2: msg.Label = r.ReadString(); break;
+                    case 3: msg.Details.Add(r.ReadString()); break;
+                    case 4: msg.Disabled = r.ReadBool(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -6501,6 +6667,7 @@ namespace Volvoxgrid.V1
             GetHeaderRow = 60,
             PullToRefreshTriggered = 61,
             PullToRefreshCanceled = 62,
+            BeforeDropdownOpen = 63,
         }
         public EventOneofCase EventCase { get; set; }
 
@@ -6624,6 +6791,8 @@ namespace Volvoxgrid.V1
         public PullToRefreshTriggeredEvent PullToRefreshTriggered { get { return EventCase == EventOneofCase.PullToRefreshTriggered ? _pullToRefreshTriggered : null; } set { _pullToRefreshTriggered = value; EventCase = EventOneofCase.PullToRefreshTriggered; } }
         private PullToRefreshCanceledEvent _pullToRefreshCanceled;
         public PullToRefreshCanceledEvent PullToRefreshCanceled { get { return EventCase == EventOneofCase.PullToRefreshCanceled ? _pullToRefreshCanceled : null; } set { _pullToRefreshCanceled = value; EventCase = EventOneofCase.PullToRefreshCanceled; } }
+        private BeforeDropdownOpenEvent _beforeDropdownOpen;
+        public BeforeDropdownOpenEvent BeforeDropdownOpen { get { return EventCase == EventOneofCase.BeforeDropdownOpen ? _beforeDropdownOpen : null; } set { _beforeDropdownOpen = value; EventCase = EventOneofCase.BeforeDropdownOpen; } }
         public long GridId { get; set; }
         public long EventId { get; set; }
 
@@ -6816,6 +6985,9 @@ namespace Volvoxgrid.V1
                 case EventOneofCase.PullToRefreshCanceled:
                     if (_pullToRefreshCanceled != null) w.WriteMessageBytes(62, _pullToRefreshCanceled.ToByteArray());
                     break;
+                case EventOneofCase.BeforeDropdownOpen:
+                    if (_beforeDropdownOpen != null) w.WriteMessageBytes(63, _beforeDropdownOpen.ToByteArray());
+                    break;
             }
             return w.ToArray();
         }
@@ -6896,6 +7068,7 @@ namespace Volvoxgrid.V1
                     case 60: msg.GetHeaderRow = GetHeaderRowEvent.ParseFrom(r.ReadLengthDelimited()); break;
                     case 61: msg.PullToRefreshTriggered = PullToRefreshTriggeredEvent.ParseFrom(r.ReadLengthDelimited()); break;
                     case 62: msg.PullToRefreshCanceled = PullToRefreshCanceledEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 63: msg.BeforeDropdownOpen = BeforeDropdownOpenEvent.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }

@@ -1,6 +1,7 @@
 package io.github.ivere27.volvoxgrid.desktop;
 
 import io.github.ivere27.volvoxgrid.BufferReady;
+import io.github.ivere27.volvoxgrid.BeforeDropdownOpenEvent;
 import io.github.ivere27.volvoxgrid.ConfigureRequest;
 import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.CreateResponse;
@@ -8,6 +9,7 @@ import io.github.ivere27.volvoxgrid.CellRange;
 import io.github.ivere27.volvoxgrid.ClipboardResponse;
 import io.github.ivere27.volvoxgrid.CompareResponse;
 import io.github.ivere27.volvoxgrid.DestroyRequest;
+import io.github.ivere27.volvoxgrid.Dropdown;
 import io.github.ivere27.volvoxgrid.EditCancel;
 import io.github.ivere27.volvoxgrid.EditCommand;
 import io.github.ivere27.volvoxgrid.EditCommit;
@@ -108,6 +110,11 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     }
 
     @FunctionalInterface
+    public interface BeforeDropdownOpenListener {
+        void onBeforeDropdownOpen(BeforeDropdownOpenDetails details);
+    }
+
+    @FunctionalInterface
     public interface CellEditValidatingListener {
         void onCellEditValidating(CellEditValidatingDetails details);
     }
@@ -157,6 +164,47 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         public void setCancel(boolean cancel) {
             this.cancel = cancel;
         }
+    }
+
+    public static final class BeforeDropdownOpenDetails {
+        private final GridEvent rawEvent;
+        private final int row;
+        private final int col;
+        private final float x;
+        private final float y;
+        private final float width;
+        private final float height;
+        private final Dropdown dropdown;
+        private final String currentValue;
+        private final int selectedIndex;
+        private boolean cancel;
+
+        private BeforeDropdownOpenDetails(GridEvent rawEvent) {
+            this.rawEvent = rawEvent;
+            BeforeDropdownOpenEvent event = rawEvent.getBeforeDropdownOpen();
+            this.row = event.getRow();
+            this.col = event.getCol();
+            this.x = event.getX();
+            this.y = event.getY();
+            this.width = event.getWidth();
+            this.height = event.getHeight();
+            this.dropdown = event.hasDropdown() ? event.getDropdown() : Dropdown.getDefaultInstance();
+            this.currentValue = event.getCurrentValue();
+            this.selectedIndex = event.getSelectedIndex();
+        }
+
+        public GridEvent getRawEvent() { return rawEvent; }
+        public int getRow() { return row; }
+        public int getCol() { return col; }
+        public float getX() { return x; }
+        public float getY() { return y; }
+        public float getWidth() { return width; }
+        public float getHeight() { return height; }
+        public Dropdown getDropdown() { return dropdown; }
+        public String getCurrentValue() { return currentValue; }
+        public int getSelectedIndex() { return selectedIndex; }
+        public boolean isCancel() { return cancel; }
+        public void setCancel(boolean cancel) { this.cancel = cancel; }
     }
 
     public static final class CellEditValidatingDetails {
@@ -308,6 +356,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
     private volatile GridEventListener gridEventListener;
     private volatile BeforeEditListener beforeEditListener;
+    private volatile BeforeDropdownOpenListener beforeDropdownOpenListener;
     private volatile CellEditValidatingListener cellEditValidatingListener;
     private volatile BeforeSortListener beforeSortListener;
     private volatile CompareListener compareListener;
@@ -604,6 +653,13 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
     public void setBeforeEditListener(BeforeEditListener listener) {
         this.beforeEditListener = listener;
+        if (listener != null) {
+            ensureDecisionChannelEnabled();
+        }
+    }
+
+    public void setBeforeDropdownOpenListener(BeforeDropdownOpenListener listener) {
+        this.beforeDropdownOpenListener = listener;
         if (listener != null) {
             ensureDecisionChannelEnabled();
         }
@@ -2445,12 +2501,16 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
     private boolean wantsCancelableGridEvents() {
         return beforeEditListener != null
+            || beforeDropdownOpenListener != null
             || cellEditValidatingListener != null
             || beforeSortListener != null;
     }
 
     private boolean isCancelableGridEvent(GridEvent event) {
-        return event.hasBeforeEdit() || event.hasCellEditValidate() || event.hasBeforeSort();
+        return event.hasBeforeEdit()
+            || event.hasBeforeDropdownOpen()
+            || event.hasCellEditValidate()
+            || event.hasBeforeSort();
     }
 
     private void ensureDecisionChannelEnabled() {
@@ -2587,6 +2647,15 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
                 );
                 if (listener != null) {
                     listener.onBeforeEdit(details);
+                }
+                return details.isCancel();
+            }
+
+            if (event.hasBeforeDropdownOpen()) {
+                BeforeDropdownOpenListener listener = beforeDropdownOpenListener;
+                BeforeDropdownOpenDetails details = new BeforeDropdownOpenDetails(event);
+                if (listener != null) {
+                    listener.onBeforeDropdownOpen(details);
                 }
                 return details.isCancel();
             }

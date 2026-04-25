@@ -1435,6 +1435,180 @@ class CellValue extends $pb.GeneratedMessage {
   void clearTimestamp() => $_clearField(5);
 }
 
+class Dropdown extends $pb.GeneratedMessage {
+  factory Dropdown({
+    $core.Iterable<DropdownItem>? items,
+    $core.bool? allowCustomValue,
+    DropdownItemLayout? itemLayout,
+    $core.bool? searchable,
+  }) {
+    final result = create();
+    if (items != null) result.items.addAll(items);
+    if (allowCustomValue != null) result.allowCustomValue = allowCustomValue;
+    if (itemLayout != null) result.itemLayout = itemLayout;
+    if (searchable != null) result.searchable = searchable;
+    return result;
+  }
+
+  Dropdown._();
+
+  factory Dropdown.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory Dropdown.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Dropdown',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..pPM<DropdownItem>(1, _omitFieldNames ? '' : 'items',
+        subBuilder: DropdownItem.create)
+    ..aOB(2, _omitFieldNames ? '' : 'allowCustomValue')
+    ..aE<DropdownItemLayout>(3, _omitFieldNames ? '' : 'itemLayout',
+        enumValues: DropdownItemLayout.values)
+    ..aOB(4, _omitFieldNames ? '' : 'searchable')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Dropdown clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Dropdown copyWith(void Function(Dropdown) updates) =>
+      super.copyWith((message) => updates(message as Dropdown)) as Dropdown;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static Dropdown create() => Dropdown._();
+  @$core.override
+  Dropdown createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static Dropdown getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Dropdown>(create);
+  static Dropdown? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<DropdownItem> get items => $_getList(0);
+
+  /// When true, the user may type/commit a value not present in `items`.
+  @$pb.TagNumber(2)
+  $core.bool get allowCustomValue => $_getBF(1);
+  @$pb.TagNumber(2)
+  set allowCustomValue($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasAllowCustomValue() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAllowCustomValue() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  DropdownItemLayout get itemLayout => $_getN(2);
+  @$pb.TagNumber(3)
+  set itemLayout(DropdownItemLayout value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasItemLayout() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearItemLayout() => $_clearField(3);
+
+  /// Unset = use grid/global default; false/true override for this dropdown.
+  @$pb.TagNumber(4)
+  $core.bool get searchable => $_getBF(3);
+  @$pb.TagNumber(4)
+  set searchable($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSearchable() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSearchable() => $_clearField(4);
+}
+
+class DropdownItem extends $pb.GeneratedMessage {
+  factory DropdownItem({
+    $core.String? value,
+    $core.String? label,
+    $core.Iterable<$core.String>? details,
+    $core.bool? disabled,
+  }) {
+    final result = create();
+    if (value != null) result.value = value;
+    if (label != null) result.label = label;
+    if (details != null) result.details.addAll(details);
+    if (disabled != null) result.disabled = disabled;
+    return result;
+  }
+
+  DropdownItem._();
+
+  factory DropdownItem.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory DropdownItem.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'DropdownItem',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'value')
+    ..aOS(2, _omitFieldNames ? '' : 'label')
+    ..pPS(3, _omitFieldNames ? '' : 'details')
+    ..aOB(4, _omitFieldNames ? '' : 'disabled')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DropdownItem clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  DropdownItem copyWith(void Function(DropdownItem) updates) =>
+      super.copyWith((message) => updates(message as DropdownItem))
+          as DropdownItem;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static DropdownItem create() => DropdownItem._();
+  @$core.override
+  DropdownItem createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static DropdownItem getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<DropdownItem>(create);
+  static DropdownItem? _defaultInstance;
+
+  /// Value committed into the cell. If unset, commit `label`.
+  @$pb.TagNumber(1)
+  $core.String get value => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set value($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasValue() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearValue() => $_clearField(1);
+
+  /// Text shown to the user.
+  @$pb.TagNumber(2)
+  $core.String get label => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set label($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasLabel() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLabel() => $_clearField(2);
+
+  /// Optional secondary/detail strings for richer host layouts.
+  @$pb.TagNumber(3)
+  $pb.PbList<$core.String> get details => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $core.bool get disabled => $_getBF(3);
+  @$pb.TagNumber(4)
+  set disabled($core.bool value) => $_setBool(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasDisabled() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearDisabled() => $_clearField(4);
+}
+
 class ScrollBarColors extends $pb.GeneratedMessage {
   factory ScrollBarColors({
     $core.int? thumb,
@@ -6632,7 +6806,7 @@ class ColumnDef extends $pb.GeneratedMessage {
     $core.String? key,
     SortOrder? sortOrder,
     SortType? sortType,
-    $core.String? dropdownItems,
+    Dropdown? dropdown,
     $core.String? editMask,
     $core.int? indent,
     $core.bool? hidden,
@@ -6661,7 +6835,7 @@ class ColumnDef extends $pb.GeneratedMessage {
     if (key != null) result.key = key;
     if (sortOrder != null) result.sortOrder = sortOrder;
     if (sortType != null) result.sortType = sortType;
-    if (dropdownItems != null) result.dropdownItems = dropdownItems;
+    if (dropdown != null) result.dropdown = dropdown;
     if (editMask != null) result.editMask = editMask;
     if (indent != null) result.indent = indent;
     if (hidden != null) result.hidden = hidden;
@@ -6708,7 +6882,8 @@ class ColumnDef extends $pb.GeneratedMessage {
         enumValues: SortOrder.values)
     ..aE<SortType>(12, _omitFieldNames ? '' : 'sortType',
         enumValues: SortType.values)
-    ..aOS(13, _omitFieldNames ? '' : 'dropdownItems')
+    ..aOM<Dropdown>(13, _omitFieldNames ? '' : 'dropdown',
+        subBuilder: Dropdown.create)
     ..aOS(14, _omitFieldNames ? '' : 'editMask')
     ..aI(15, _omitFieldNames ? '' : 'indent')
     ..aOB(16, _omitFieldNames ? '' : 'hidden')
@@ -6860,19 +7035,16 @@ class ColumnDef extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   void clearSortType() => $_clearField(12);
 
-  /// Pipe-delimited dropdown items. See engine/src/edit.rs parse_dropdown_entries.
-  /// Format: "item1|item2|item3" (read-only dropdown)
-  ///         "|item1|item2"      (leading `|` = editable, allows free-form text)
-  /// Optional translation: "#id;Display Text" stores `id` but shows Display Text.
-  /// Optional multi-column: "*1;col1\tcol2" selects display column.
   @$pb.TagNumber(13)
-  $core.String get dropdownItems => $_getSZ(12);
+  Dropdown get dropdown => $_getN(12);
   @$pb.TagNumber(13)
-  set dropdownItems($core.String value) => $_setString(12, value);
+  set dropdown(Dropdown value) => $_setField(13, value);
   @$pb.TagNumber(13)
-  $core.bool hasDropdownItems() => $_has(12);
+  $core.bool hasDropdown() => $_has(12);
   @$pb.TagNumber(13)
-  void clearDropdownItems() => $_clearField(13);
+  void clearDropdown() => $_clearField(13);
+  @$pb.TagNumber(13)
+  Dropdown ensureDropdown() => $_ensure(12);
 
   @$pb.TagNumber(14)
   $core.String get editMask => $_getSZ(13);
@@ -7426,7 +7598,7 @@ class CellUpdate extends $pb.GeneratedMessage {
     ImageData? picture,
     ImageAlignment? pictureAlign,
     ImageData? buttonPicture,
-    $core.String? dropdownItems,
+    Dropdown? dropdown,
     StickyEdge? stickyRow,
     StickyEdge? stickyCol,
     CellInteraction? interaction,
@@ -7441,7 +7613,7 @@ class CellUpdate extends $pb.GeneratedMessage {
     if (picture != null) result.picture = picture;
     if (pictureAlign != null) result.pictureAlign = pictureAlign;
     if (buttonPicture != null) result.buttonPicture = buttonPicture;
-    if (dropdownItems != null) result.dropdownItems = dropdownItems;
+    if (dropdown != null) result.dropdown = dropdown;
     if (stickyRow != null) result.stickyRow = stickyRow;
     if (stickyCol != null) result.stickyCol = stickyCol;
     if (interaction != null) result.interaction = interaction;
@@ -7476,7 +7648,8 @@ class CellUpdate extends $pb.GeneratedMessage {
         enumValues: ImageAlignment.values)
     ..aOM<ImageData>(8, _omitFieldNames ? '' : 'buttonPicture',
         subBuilder: ImageData.create)
-    ..aOS(9, _omitFieldNames ? '' : 'dropdownItems')
+    ..aOM<Dropdown>(9, _omitFieldNames ? '' : 'dropdown',
+        subBuilder: Dropdown.create)
     ..aE<StickyEdge>(10, _omitFieldNames ? '' : 'stickyRow',
         enumValues: StickyEdge.values)
     ..aE<StickyEdge>(11, _omitFieldNames ? '' : 'stickyCol',
@@ -7585,15 +7758,16 @@ class CellUpdate extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   ImageData ensureButtonPicture() => $_ensure(7);
 
-  /// Pipe-delimited dropdown items; prefix with `|` to make the list editable.
   @$pb.TagNumber(9)
-  $core.String get dropdownItems => $_getSZ(8);
+  Dropdown get dropdown => $_getN(8);
   @$pb.TagNumber(9)
-  set dropdownItems($core.String value) => $_setString(8, value);
+  set dropdown(Dropdown value) => $_setField(9, value);
   @$pb.TagNumber(9)
-  $core.bool hasDropdownItems() => $_has(8);
+  $core.bool hasDropdown() => $_has(8);
   @$pb.TagNumber(9)
-  void clearDropdownItems() => $_clearField(9);
+  void clearDropdown() => $_clearField(9);
+  @$pb.TagNumber(9)
+  Dropdown ensureDropdown() => $_ensure(8);
 
   @$pb.TagNumber(10)
   StickyEdge get stickyRow => $_getN(9);
@@ -17064,7 +17238,7 @@ class GpuSurfaceReady extends $pb.GeneratedMessage {
 /// with cancel=false. Expired actions are resolved at the start of each
 /// render_session loop iteration.
 ///
-/// Cancelable events: BeforeEdit, CellEditValidate, BeforeSort,
+/// Cancelable events: BeforeEdit, BeforeDropdownOpen, CellEditValidate, BeforeSort,
 /// BeforeNodeToggle, BeforeScroll, BeforeUserResize, BeforeMoveColumn,
 /// BeforeMoveRow, BeforeMouseDown. Print-only BeforePageBreak is emitted
 /// during synchronous rendering and is informational in this API.
@@ -18311,6 +18485,7 @@ enum GridEvent_Event {
   getHeaderRow,
   pullToRefreshTriggered,
   pullToRefreshCanceled,
+  beforeDropdownOpen,
   notSet
 }
 
@@ -18377,6 +18552,7 @@ class GridEvent extends $pb.GeneratedMessage {
     GetHeaderRowEvent? getHeaderRow,
     PullToRefreshTriggeredEvent? pullToRefreshTriggered,
     PullToRefreshCanceledEvent? pullToRefreshCanceled,
+    BeforeDropdownOpenEvent? beforeDropdownOpen,
     $fixnum.Int64? eventId,
   }) {
     final result = create();
@@ -18445,6 +18621,8 @@ class GridEvent extends $pb.GeneratedMessage {
       result.pullToRefreshTriggered = pullToRefreshTriggered;
     if (pullToRefreshCanceled != null)
       result.pullToRefreshCanceled = pullToRefreshCanceled;
+    if (beforeDropdownOpen != null)
+      result.beforeDropdownOpen = beforeDropdownOpen;
     if (eventId != null) result.eventId = eventId;
     return result;
   }
@@ -18519,6 +18697,7 @@ class GridEvent extends $pb.GeneratedMessage {
     60: GridEvent_Event.getHeaderRow,
     61: GridEvent_Event.pullToRefreshTriggered,
     62: GridEvent_Event.pullToRefreshCanceled,
+    63: GridEvent_Event.beforeDropdownOpen,
     0: GridEvent_Event.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -18585,7 +18764,8 @@ class GridEvent extends $pb.GeneratedMessage {
       59,
       60,
       61,
-      62
+      62,
+      63
     ])
     ..aInt64(1, _omitFieldNames ? '' : 'gridId')
     ..aOM<CellFocusChangingEvent>(2, _omitFieldNames ? '' : 'cellFocusChanging',
@@ -18712,6 +18892,9 @@ class GridEvent extends $pb.GeneratedMessage {
     ..aOM<PullToRefreshCanceledEvent>(
         62, _omitFieldNames ? '' : 'pullToRefreshCanceled',
         subBuilder: PullToRefreshCanceledEvent.create)
+    ..aOM<BeforeDropdownOpenEvent>(
+        63, _omitFieldNames ? '' : 'beforeDropdownOpen',
+        subBuilder: BeforeDropdownOpenEvent.create)
     ..aInt64(100, _omitFieldNames ? '' : 'eventId')
     ..hasRequiredFields = false;
 
@@ -18793,6 +18976,7 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(60)
   @$pb.TagNumber(61)
   @$pb.TagNumber(62)
+  @$pb.TagNumber(63)
   GridEvent_Event whichEvent() => _GridEvent_EventByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(2)
   @$pb.TagNumber(3)
@@ -18854,6 +19038,7 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(60)
   @$pb.TagNumber(61)
   @$pb.TagNumber(62)
+  @$pb.TagNumber(63)
   void clearEvent() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -19546,14 +19731,26 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(62)
   PullToRefreshCanceledEvent ensurePullToRefreshCanceled() => $_ensure(60);
 
+  @$pb.TagNumber(63)
+  BeforeDropdownOpenEvent get beforeDropdownOpen => $_getN(61);
+  @$pb.TagNumber(63)
+  set beforeDropdownOpen(BeforeDropdownOpenEvent value) =>
+      $_setField(63, value);
+  @$pb.TagNumber(63)
+  $core.bool hasBeforeDropdownOpen() => $_has(61);
+  @$pb.TagNumber(63)
+  void clearBeforeDropdownOpen() => $_clearField(63);
+  @$pb.TagNumber(63)
+  BeforeDropdownOpenEvent ensureBeforeDropdownOpen() => $_ensure(61);
+
   /// 0 = non-cancelable (informational only).
   /// Non-zero = cancelable — send EventDecision with this ID to allow/veto.
   @$pb.TagNumber(100)
-  $fixnum.Int64 get eventId => $_getI64(61);
+  $fixnum.Int64 get eventId => $_getI64(62);
   @$pb.TagNumber(100)
-  set eventId($fixnum.Int64 value) => $_setInt64(61, value);
+  set eventId($fixnum.Int64 value) => $_setInt64(62, value);
   @$pb.TagNumber(100)
-  $core.bool hasEventId() => $_has(61);
+  $core.bool hasEventId() => $_has(62);
   @$pb.TagNumber(100)
   void clearEventId() => $_clearField(100);
 }
@@ -20713,6 +20910,162 @@ class CellEditConfigureWindowEvent extends $pb.GeneratedMessage {
   $core.bool hasCol() => $_has(1);
   @$pb.TagNumber(2)
   void clearCol() => $_clearField(2);
+}
+
+class BeforeDropdownOpenEvent extends $pb.GeneratedMessage {
+  factory BeforeDropdownOpenEvent({
+    $core.int? row,
+    $core.int? col,
+    $core.double? x,
+    $core.double? y,
+    $core.double? width,
+    $core.double? height,
+    Dropdown? dropdown,
+    $core.String? currentValue,
+    $core.int? selectedIndex,
+  }) {
+    final result = create();
+    if (row != null) result.row = row;
+    if (col != null) result.col = col;
+    if (x != null) result.x = x;
+    if (y != null) result.y = y;
+    if (width != null) result.width = width;
+    if (height != null) result.height = height;
+    if (dropdown != null) result.dropdown = dropdown;
+    if (currentValue != null) result.currentValue = currentValue;
+    if (selectedIndex != null) result.selectedIndex = selectedIndex;
+    return result;
+  }
+
+  BeforeDropdownOpenEvent._();
+
+  factory BeforeDropdownOpenEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory BeforeDropdownOpenEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BeforeDropdownOpenEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'row')
+    ..aI(2, _omitFieldNames ? '' : 'col')
+    ..aD(3, _omitFieldNames ? '' : 'x', fieldType: $pb.PbFieldType.OF)
+    ..aD(4, _omitFieldNames ? '' : 'y', fieldType: $pb.PbFieldType.OF)
+    ..aD(5, _omitFieldNames ? '' : 'width', fieldType: $pb.PbFieldType.OF)
+    ..aD(6, _omitFieldNames ? '' : 'height', fieldType: $pb.PbFieldType.OF)
+    ..aOM<Dropdown>(7, _omitFieldNames ? '' : 'dropdown',
+        subBuilder: Dropdown.create)
+    ..aOS(8, _omitFieldNames ? '' : 'currentValue')
+    ..aI(9, _omitFieldNames ? '' : 'selectedIndex')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BeforeDropdownOpenEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BeforeDropdownOpenEvent copyWith(
+          void Function(BeforeDropdownOpenEvent) updates) =>
+      super.copyWith((message) => updates(message as BeforeDropdownOpenEvent))
+          as BeforeDropdownOpenEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static BeforeDropdownOpenEvent create() => BeforeDropdownOpenEvent._();
+  @$core.override
+  BeforeDropdownOpenEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static BeforeDropdownOpenEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BeforeDropdownOpenEvent>(create);
+  static BeforeDropdownOpenEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get row => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set row($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasRow() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRow() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get col => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set col($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCol() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCol() => $_clearField(2);
+
+  /// Viewport-local cell rect. Hosts can use this when canceling the
+  /// engine list and opening their own positioned popup.
+  @$pb.TagNumber(3)
+  $core.double get x => $_getN(2);
+  @$pb.TagNumber(3)
+  set x($core.double value) => $_setFloat(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasX() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearX() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.double get y => $_getN(3);
+  @$pb.TagNumber(4)
+  set y($core.double value) => $_setFloat(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasY() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearY() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.double get width => $_getN(4);
+  @$pb.TagNumber(5)
+  set width($core.double value) => $_setFloat(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasWidth() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearWidth() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.double get height => $_getN(5);
+  @$pb.TagNumber(6)
+  set height($core.double value) => $_setFloat(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasHeight() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearHeight() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  Dropdown get dropdown => $_getN(6);
+  @$pb.TagNumber(7)
+  set dropdown(Dropdown value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasDropdown() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearDropdown() => $_clearField(7);
+  @$pb.TagNumber(7)
+  Dropdown ensureDropdown() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  $core.String get currentValue => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set currentValue($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasCurrentValue() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearCurrentValue() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get selectedIndex => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set selectedIndex($core.int value) => $_setSignedInt32(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasSelectedIndex() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearSelectedIndex() => $_clearField(9);
 }
 
 class DropdownClosedEvent extends $pb.GeneratedMessage {

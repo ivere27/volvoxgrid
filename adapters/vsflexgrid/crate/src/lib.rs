@@ -44,6 +44,14 @@ enum PendingAction {
         click_caret: Option<i32>,
         caret_end: Option<bool>,
     },
+    BeforeDropdownOpen {
+        row: i32,
+        col: i32,
+        force: bool,
+        seed_text: Option<String>,
+        click_caret: Option<i32>,
+        caret_end: Option<bool>,
+    },
     BeforeSort {
         col: i32,
     },
@@ -383,7 +391,9 @@ fn sales_demo_column_defs_local(scale: f32) -> Vec<ColumnDef> {
                 def.data_type = Some(ColumnDataType::ColumnDataBoolean as i32);
             }
             8 => {
-                def.dropdown_items = Some("Active|Pending|Shipped|Returned|Cancelled".to_string());
+                def.dropdown = Some(volvoxgrid_engine::edit::legacy_dropdown_items_to_dropdown(
+                    "Active|Pending|Shipped|Returned|Cancelled",
+                ));
             }
             _ => {}
         }
@@ -1545,6 +1555,7 @@ fn begin_edit_session_core(
     col: i32,
     force: bool,
     emit_before_event: bool,
+    emit_dropdown_event: bool,
     seed_text: Option<String>,
     click_caret: Option<i32>,
     caret_end: Option<bool>,
@@ -1552,7 +1563,8 @@ fn begin_edit_session_core(
     if !grid.can_begin_edit(row, col, force) {
         return;
     }
-    let combo_list = grid.active_dropdown_list(row, col);
+    let dropdown = grid.active_dropdown(row, col);
+    let has_dropdown = dropdown.is_some();
     if emit_before_event {
         grid.events
             .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
@@ -1560,14 +1572,24 @@ fn begin_edit_session_core(
     let stored_text = grid.cells.get_text(row, col).to_string();
     let display_text = grid.get_display_text(row, col);
     grid.edit.start_edit(row, col, &display_text);
-    grid.edit.parse_dropdown_items(&combo_list);
-    if !combo_list.is_empty() {
+    if let Some(dropdown) = dropdown.as_ref() {
+        grid.edit.parse_dropdown(dropdown);
+    } else {
+        let combo_list = grid.active_dropdown_list(row, col);
+        grid.edit.parse_dropdown_items(&combo_list);
+    }
+    if has_dropdown {
         for i in 0..grid.edit.dropdown_count() {
             if (!stored_text.is_empty() && grid.edit.get_dropdown_data(i) == stored_text)
                 || grid.edit.get_dropdown_item(i) == display_text
             {
                 grid.edit.set_dropdown_index(i);
                 break;
+            }
+        }
+        if emit_dropdown_event {
+            if let Some(event) = grid.before_dropdown_open_event(row, col) {
+                grid.events.push(event);
             }
         }
         grid.events
@@ -1604,7 +1626,7 @@ fn begin_edit_session(
     col: i32,
     force: bool,
 ) {
-    begin_edit_session_core(grid, row, col, force, true, None, None, None);
+    begin_edit_session_core(grid, row, col, force, true, true, None, None, None);
 }
 
 fn begin_edit_session_after_before(
@@ -1622,6 +1644,29 @@ fn begin_edit_session_after_before(
         col,
         force,
         false,
+        true,
+        seed_text,
+        click_caret,
+        caret_end,
+    );
+}
+
+fn begin_edit_session_after_dropdown_before(
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    force: bool,
+    seed_text: Option<String>,
+    click_caret: Option<i32>,
+    caret_end: Option<bool>,
+) {
+    begin_edit_session_core(
+        grid,
+        row,
+        col,
+        force,
+        false,
+        false,
         seed_text,
         click_caret,
         caret_end,
@@ -1635,12 +1680,13 @@ fn normalize_committed_edit_text(
     new_text: &str,
 ) -> String {
     let mut committed = truncate_to_char_count(new_text, grid.edit_max_length);
-    let cell_combo = grid
-        .cells
-        .get(row, col)
-        .map(|c| c.dropdown_items().to_string())
-        .unwrap_or_default();
-    if cell_combo.is_empty() && col >= 0 && (col as usize) < grid.columns.len() {
+    if let Some(dropdown) = grid.configured_dropdown(row, col) {
+        if let Some(mapped) = volvoxgrid_engine::edit::translate_dropdown_display_to_value_typed(
+            &dropdown, &committed,
+        ) {
+            committed = mapped;
+        }
+    } else if col >= 0 && (col as usize) < grid.columns.len() {
         let col_list = &grid.columns[col as usize].dropdown_items;
         if !col_list.is_empty() {
             if let Some(mapped) =
@@ -1722,6 +1768,7 @@ fn request_before_edit(
             col,
             force,
             true,
+            true,
             seed_text,
             click_caret,
             caret_end,
@@ -1748,6 +1795,38 @@ fn request_before_edit(
         event_id,
         volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col },
     );
+}
+
+fn request_before_dropdown_open(
+    grid_id: i64,
+    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    col: i32,
+    force: bool,
+    seed_text: Option<String>,
+    click_caret: Option<i32>,
+    caret_end: Option<bool>,
+) -> bool {
+    let Some(event) = grid.before_dropdown_open_event(row, col) else {
+        return false;
+    };
+    let event_id = next_event_id();
+    PENDING_ACTIONS.lock().unwrap().insert(
+        (grid_id, event_id),
+        PendingActionEntry {
+            created_at: Instant::now(),
+            action: PendingAction::BeforeDropdownOpen {
+                row,
+                col,
+                force,
+                seed_text,
+                click_caret,
+                caret_end,
+            },
+        },
+    );
+    grid.events.push_with_id(event_id, event);
+    true
 }
 
 fn request_before_sort(grid_id: i64, grid: &mut volvoxgrid_engine::grid::VolvoxGrid, col: i32) {
@@ -1981,7 +2060,42 @@ fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
             if cancel {
                 return;
             }
+            if grid.active_dropdown(row, col).is_some()
+                && request_before_dropdown_open(
+                    grid_id,
+                    grid,
+                    row,
+                    col,
+                    force,
+                    seed_text.clone(),
+                    click_caret,
+                    caret_end,
+                )
+            {
+                return;
+            }
             begin_edit_session_after_before(
+                grid,
+                row,
+                col,
+                force,
+                seed_text,
+                click_caret,
+                caret_end,
+            );
+        }
+        PendingAction::BeforeDropdownOpen {
+            row,
+            col,
+            force,
+            seed_text,
+            click_caret,
+            caret_end,
+        } => {
+            if cancel {
+                return;
+            }
+            begin_edit_session_after_dropdown_before(
                 grid,
                 row,
                 col,
@@ -5285,6 +5399,29 @@ fn engine_event_to_proto(
                 text,
             }))
         }
+        E::BeforeDropdownOpen {
+            row,
+            col,
+            x,
+            y,
+            width,
+            height,
+            dropdown,
+            current_value,
+            selected_index,
+        } => Some(grid_event::Event::BeforeDropdownOpen(
+            BeforeDropdownOpenEvent {
+                row,
+                col,
+                x,
+                y,
+                width,
+                height,
+                dropdown: Some(dropdown),
+                current_value,
+                selected_index,
+            },
+        )),
         E::DropdownClosed => Some(grid_event::Event::DropdownClosed(DropdownClosedEvent {})),
         E::DropdownOpened => Some(grid_event::Event::DropdownOpened(DropdownOpenedEvent {})),
         E::CellChanged {

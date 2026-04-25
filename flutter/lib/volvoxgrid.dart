@@ -58,6 +58,34 @@ class VolvoxGridBeforeEditDetails {
   });
 }
 
+class VolvoxGridBeforeDropdownOpenDetails {
+  final pb.GridEvent rawEvent;
+  final int row;
+  final int col;
+  final double x;
+  final double y;
+  final double width;
+  final double height;
+  final pb.Dropdown dropdown;
+  final String currentValue;
+  final int selectedIndex;
+  bool cancel;
+
+  VolvoxGridBeforeDropdownOpenDetails({
+    required this.rawEvent,
+    required this.row,
+    required this.col,
+    required this.x,
+    required this.y,
+    required this.width,
+    required this.height,
+    required this.dropdown,
+    required this.currentValue,
+    required this.selectedIndex,
+    this.cancel = false,
+  });
+}
+
 class VolvoxGridCellEditValidatingDetails {
   final pb.GridEvent rawEvent;
   final int row;
@@ -178,6 +206,12 @@ class VolvoxGridWidget extends StatefulWidget {
   /// This is one of the currently supported cancelable widget hooks.
   final ValueChanged<VolvoxGridBeforeEditDetails>? onBeforeEdit;
 
+  /// Optional callback fired before the engine opens a dropdown list.
+  ///
+  /// Set [VolvoxGridBeforeDropdownOpenDetails.cancel] to true to suppress the
+  /// engine list and render a host picker instead.
+  final ValueChanged<VolvoxGridBeforeDropdownOpenDetails>? onBeforeDropdownOpen;
+
   /// Optional callback fired before an edited value is committed.
   ///
   /// Set [VolvoxGridCellEditValidatingDetails.cancel] to true to reject the
@@ -226,6 +260,7 @@ class VolvoxGridWidget extends StatefulWidget {
     this.onSelectionChanged,
     this.onGridEvent,
     this.onBeforeEdit,
+    this.onBeforeDropdownOpen,
     this.onCellEditValidating,
     this.onBeforeSort,
     this.onContextMenuRequest,
@@ -550,6 +585,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
     }
     if (oldWidget.onGridEvent != widget.onGridEvent ||
         oldWidget.onBeforeEdit != widget.onBeforeEdit ||
+        oldWidget.onBeforeDropdownOpen != widget.onBeforeDropdownOpen ||
         oldWidget.onCellEditValidating != widget.onCellEditValidating ||
         oldWidget.onBeforeSort != widget.onBeforeSort ||
         oldWidget.onCustomRenderCell != widget.onCustomRenderCell ||
@@ -737,6 +773,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
   bool get _wantsGridEvents =>
       widget.onGridEvent != null ||
       widget.onBeforeEdit != null ||
+      widget.onBeforeDropdownOpen != null ||
       widget.onCellEditValidating != null ||
       widget.onBeforeSort != null ||
       widget.onCustomRenderCell != null ||
@@ -746,6 +783,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   bool get _wantsCancelableGridEvents =>
       widget.onBeforeEdit != null ||
+      widget.onBeforeDropdownOpen != null ||
       widget.onCellEditValidating != null ||
       widget.onBeforeSort != null ||
       widget.onCancelableEvent != null;
@@ -800,6 +838,7 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   bool _isCancelableGridEvent(pb.GridEvent event) {
     if (event.hasBeforeEdit() ||
+        event.hasBeforeDropdownOpen() ||
         event.hasBeforeSort() ||
         event.hasBeforeNodeToggle() ||
         event.hasBeforeScroll() ||
@@ -930,6 +969,24 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
         col: event.beforeEdit.col,
       );
       widget.onBeforeEdit?.call(details);
+      cancel = cancel || details.cancel;
+    }
+
+    if (event.hasBeforeDropdownOpen()) {
+      final before = event.beforeDropdownOpen;
+      final details = VolvoxGridBeforeDropdownOpenDetails(
+        rawEvent: event,
+        row: before.row,
+        col: before.col,
+        x: before.x,
+        y: before.y,
+        width: before.width,
+        height: before.height,
+        dropdown: before.hasDropdown() ? before.dropdown : pb.Dropdown(),
+        currentValue: before.currentValue,
+        selectedIndex: before.selectedIndex,
+      );
+      widget.onBeforeDropdownOpen?.call(details);
       cancel = cancel || details.cancel;
     }
 

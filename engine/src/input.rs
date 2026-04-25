@@ -346,7 +346,8 @@ fn begin_edit_from_input_with_options(grid: &mut VolvoxGrid, row: i32, col: i32,
         return;
     }
 
-    let dropdown_list = grid.active_dropdown_list(row, col);
+    let dropdown = grid.active_dropdown(row, col);
+    let has_dropdown = dropdown.is_some();
     grid.events.push(GridEventData::BeforeEdit { row, col });
 
     let stored_text = grid.cells.get_text(row, col).to_string();
@@ -368,9 +369,14 @@ fn begin_edit_from_input_with_options(grid: &mut VolvoxGrid, row: i32, col: i32,
         grid.effective_engine_compose_enabled(),
         grid.effective_compose_method(),
     );
-    grid.edit.parse_dropdown_items(&dropdown_list);
+    if let Some(dropdown) = dropdown.as_ref() {
+        grid.edit.parse_dropdown(dropdown);
+    } else {
+        let dropdown_list = grid.active_dropdown_list(row, col);
+        grid.edit.parse_dropdown_items(&dropdown_list);
+    }
     // Initialize dropdown index from stored translated value (preferred), or display text.
-    if !dropdown_list.is_empty() {
+    if has_dropdown {
         for i in 0..grid.edit.dropdown_count() {
             if (!stored_text.is_empty() && grid.edit.get_dropdown_data(i) == stored_text)
                 || grid.edit.get_dropdown_item(i) == display_text
@@ -380,7 +386,10 @@ fn begin_edit_from_input_with_options(grid: &mut VolvoxGrid, row: i32, col: i32,
             }
         }
     }
-    if !dropdown_list.is_empty() {
+    if has_dropdown {
+        if let Some(event) = grid.before_dropdown_open_event(row, col) {
+            grid.events.push(event);
+        }
         grid.events.push(GridEventData::DropdownOpened);
     }
     grid.events.push(GridEventData::StartEdit { row, col });
@@ -1897,6 +1906,9 @@ pub fn handle_pointer_down_with_behavior(
                         && grid.edit.edit_row == hit.row
                         && grid.edit.edit_col == hit.col
                     {
+                        if let Some(event) = grid.before_dropdown_open_event(hit.row, hit.col) {
+                            grid.events.push(event);
+                        }
                         grid.events.push(GridEventData::DropdownOpened);
                     } else if behavior.allow_begin_edit {
                         begin_edit_from_input(grid, hit.row, hit.col);
@@ -3269,7 +3281,7 @@ pub fn handle_key_press_with_behavior(
             return;
         }
         if !grid.edit.dropdown_items.is_empty() && !grid.edit.dropdown_editable {
-            if grid.dropdown_search
+            if grid.effective_dropdown_search(grid.edit.edit_row, grid.edit.edit_col)
                 && grid
                     .edit
                     .select_readonly_dropdown_char(ch, type_ahead_delay_ms(grid))
@@ -3325,7 +3337,9 @@ pub fn handle_key_press_with_behavior(
         grid.edit.insert_char(ch);
 
         // DropdownSearch: type-ahead dropdown list
-        if grid.dropdown_search && !grid.edit.dropdown_items.is_empty() {
+        if grid.effective_dropdown_search(grid.edit.edit_row, grid.edit.edit_col)
+            && !grid.edit.dropdown_items.is_empty()
+        {
             let idx = grid.edit.search_dropdown(&grid.edit.edit_text.clone());
             if idx >= 0 {
                 grid.edit.dropdown_index = idx;
@@ -3415,7 +3429,7 @@ pub fn handle_key_press_with_behavior(
         let readonly_dropdown = !dropdown_list.is_empty() && !dropdown_list.starts_with('|');
 
         if readonly_dropdown {
-            if grid.dropdown_search {
+            if grid.effective_dropdown_search(row, col) {
                 begin_edit_from_input(grid, row, col);
                 if grid.is_editing()
                     && grid
@@ -3665,6 +3679,20 @@ mod tests {
         }
         grid.layout.total_width = *grid.layout.col_positions.last().unwrap_or(&0);
         grid.layout.valid = true;
+    }
+
+    fn typed_dropdown(labels: &[&str], searchable: Option<bool>) -> pb::Dropdown {
+        pb::Dropdown {
+            items: labels
+                .iter()
+                .map(|label| pb::DropdownItem {
+                    label: Some((*label).to_string()),
+                    ..Default::default()
+                })
+                .collect(),
+            searchable,
+            ..Default::default()
+        }
     }
 
     fn force_pending_header_long_press(grid: &mut VolvoxGrid) {
@@ -4586,6 +4614,46 @@ mod tests {
 
         handle_key_down(&mut grid, 13, 0);
         assert_eq!(grid.cells.get_text(1, 0), "Shipped");
+    }
+
+    #[test]
+    fn typed_dropdown_searchable_true_overrides_global_disabled() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.dropdown_search = false;
+        grid.columns[0].dropdown = Some(typed_dropdown(
+            &["Active", "Pending", "Shipped"],
+            Some(true),
+        ));
+        grid.cells.set_text(1, 0, "Pending".to_string());
+        prime_layout(&mut grid);
+
+        begin_edit_from_input(&mut grid, 1, 0);
+        assert!(grid.is_editing());
+
+        handle_key_press(&mut grid, 'S' as u32);
+        assert_eq!(grid.edit.dropdown_index, 2);
+        assert_eq!(grid.edit.edit_text, "Shipped");
+    }
+
+    #[test]
+    fn typed_dropdown_searchable_false_overrides_global_enabled() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 2, 1, 0);
+        grid.edit_trigger_mode = 1;
+        grid.dropdown_search = true;
+        grid.columns[0].dropdown = Some(typed_dropdown(
+            &["Active", "Pending", "Shipped"],
+            Some(false),
+        ));
+        grid.cells.set_text(1, 0, "Pending".to_string());
+        prime_layout(&mut grid);
+
+        begin_edit_from_input(&mut grid, 1, 0);
+        assert!(grid.is_editing());
+
+        handle_key_press(&mut grid, 'S' as u32);
+        assert_eq!(grid.edit.dropdown_index, 1);
+        assert_eq!(grid.edit.edit_text, "Pending");
     }
 
     #[test]

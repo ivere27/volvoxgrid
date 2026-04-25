@@ -44,6 +44,11 @@ const int _salesTreeColor = 0xFF9CA3AF;
 const int _salesHoverBandBg = 0x106366F1;
 const int _salesHoverCellBg = 0x1E818CF8;
 
+Dropdown _salesStatusDropdown() => Dropdown()
+  ..items.addAll(_salesStatusItems
+      .split('|')
+      .map((label) => DropdownItem()..label = label));
+
 Future<void> loadSalesJsonDemo(VolvoxGridController controller) async {
   await controller.setColCount(_salesKeys.length);
   final columns = _salesDefineColumnsRequest();
@@ -58,7 +63,7 @@ Future<void> loadSalesJsonDemo(VolvoxGridController controller) async {
     throw StateError('LoadData failed for embedded sales demo');
   }
   await controller.defineColumns(columns);
-  await controller.setColDropdownItems(8, _salesStatusItems);
+  await controller.setColDropdown(8, _salesStatusDropdown());
   await controller.configure(_salesThemeConfig());
 
   await controller.subtotal(
@@ -159,7 +164,7 @@ DefineColumnsRequest _salesDefineColumnsRequest() {
       def.align = Align.ALIGN_CENTER_CENTER;
       def.dataType = ColumnDataType.COLUMN_DATA_BOOLEAN;
     } else if (col == 8) {
-      def.dropdownItems = _salesStatusItems;
+      def.dropdown = _salesStatusDropdown();
     }
     if (col == 0 || col == 1) {
       def.span = true;

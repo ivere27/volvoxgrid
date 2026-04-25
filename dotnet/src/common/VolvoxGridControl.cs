@@ -42,6 +42,7 @@ namespace VolvoxGrid.DotNet
         private bool _cancelableEventChannelRequested;
 
         private EventHandler<VolvoxGridBeforeEditEventArgs> _beforeEdit;
+        private EventHandler<VolvoxGridBeforeDropdownOpenEventArgs> _beforeDropdownOpen;
         private EventHandler<VolvoxGridCellEditValidatingEventArgs> _cellEditValidating;
         private EventHandler<VolvoxGridBeforeSortEventArgs> _beforeSort;
         private EventHandler<VolvoxGridCompareEventArgs> _compare;
@@ -100,6 +101,16 @@ namespace VolvoxGrid.DotNet
                 EnableCancelableEventChannel();
             }
             remove { _beforeEdit -= value; }
+        }
+
+        public event EventHandler<VolvoxGridBeforeDropdownOpenEventArgs> BeforeDropdownOpen
+        {
+            add
+            {
+                _beforeDropdownOpen += value;
+                EnableCancelableEventChannel();
+            }
+            remove { _beforeDropdownOpen -= value; }
         }
 
         public event EventHandler<VolvoxGridCellEditValidatingEventArgs> CellEditValidating
@@ -1497,7 +1508,8 @@ namespace VolvoxGrid.DotNet
             string dropdownItems = null,
             uint? progressColor = null,
             bool? span = null,
-            VolvoxGridStickyEdge? sticky = null)
+            VolvoxGridStickyEdge? sticky = null,
+            Dropdown dropdown = null)
         {
             if (!EnsureEngine()) return;
             try
@@ -1512,7 +1524,8 @@ namespace VolvoxGrid.DotNet
                 if (interaction.HasValue) def.Interaction = (CellInteraction)interaction.Value;
                 if (format != null) def.Format = format;
                 if (!string.IsNullOrEmpty(key)) def.Key = key;
-                if (dropdownItems != null) def.DropdownItems = dropdownItems;
+                if (dropdown != null) def.Dropdown = dropdown;
+                else if (dropdownItems != null) def.Dropdown = DropdownFromLegacyItems(dropdownItems);
                 if (progressColor.HasValue) def.ProgressColor = progressColor.Value;
                 if (span.HasValue) def.Span = span.Value;
                 if (sticky.HasValue) def.Sticky = (StickyEdge)sticky.Value;
@@ -1600,6 +1613,11 @@ namespace VolvoxGrid.DotNet
             DefineColumns(col, dropdownItems: items ?? string.Empty);
         }
 
+        public void SetColDropdown(int col, Dropdown dropdown)
+        {
+            DefineColumns(col, dropdown: dropdown ?? new Dropdown());
+        }
+
         public void SetColAlignment(int col, VolvoxGridAlign alignment)
         {
             DefineColumns(col, alignment: alignment);
@@ -1669,11 +1687,53 @@ namespace VolvoxGrid.DotNet
             {
                 _client.UpdateCells(
                     _gridId,
-                    new[] { new CellUpdate { Row = row, Col = col, DropdownItems = items ?? string.Empty } },
+                    new[] { new CellUpdate { Row = row, Col = col, Dropdown = DropdownFromLegacyItems(items ?? string.Empty) } },
                     false);
                 _renderHost.RequestFrame();
             }
             catch (Exception ex) { _lastError = ex.Message; }
+        }
+
+        public void SetCellDropdown(int row, int col, Dropdown dropdown)
+        {
+            if (row < 0 || col < 0 || !EnsureEngine()) return;
+            try
+            {
+                _client.UpdateCells(
+                    _gridId,
+                    new[] { new CellUpdate { Row = row, Col = col, Dropdown = dropdown ?? new Dropdown() } },
+                    false);
+                _renderHost.RequestFrame();
+            }
+            catch (Exception ex) { _lastError = ex.Message; }
+        }
+
+        private static Dropdown DropdownFromLegacyItems(string items)
+        {
+            var dropdown = new Dropdown();
+            if (items == null) return dropdown;
+            if (items.StartsWith("|", StringComparison.Ordinal))
+            {
+                dropdown.AllowCustomValue = true;
+                items = items.Substring(1);
+            }
+            foreach (var raw in items.Split('|'))
+            {
+                if (string.IsNullOrEmpty(raw)) continue;
+                string value = null;
+                var label = raw;
+                if (raw.StartsWith("#", StringComparison.Ordinal))
+                {
+                    var semi = raw.IndexOf(';');
+                    if (semi > 1)
+                    {
+                        value = raw.Substring(1, semi - 1);
+                        label = raw.Substring(semi + 1);
+                    }
+                }
+                dropdown.Items.Add(new DropdownItem { Value = value, Label = label });
+            }
+            return dropdown;
         }
 
         public void SetCellCheckedState(int row, int col, VolvoxGridCheckedState state)
@@ -2491,6 +2551,8 @@ namespace VolvoxGrid.DotNet
             {
                 case GridEvent.EventOneofCase.BeforeEdit:
                     return OnBeforeEdit(evt);
+                case GridEvent.EventOneofCase.BeforeDropdownOpen:
+                    return OnBeforeDropdownOpen(evt);
                 case GridEvent.EventOneofCase.CellEditValidate:
                     return OnCellEditValidating(evt);
                 case GridEvent.EventOneofCase.BeforeSort:
@@ -2628,6 +2690,29 @@ namespace VolvoxGrid.DotNet
 
             var args = new VolvoxGridBeforeEditEventArgs(evt.BeforeEdit.Row, evt.BeforeEdit.Col, GetFieldName(evt.BeforeEdit.Col));
             _beforeEdit.Invoke(this, args);
+            return args.Cancel;
+        }
+
+        private bool? OnBeforeDropdownOpen(GridEvent evt)
+        {
+            if (_beforeDropdownOpen == null)
+            {
+                return _cancelableEventChannelRequested ? (bool?)false : null;
+            }
+
+            var before = evt.BeforeDropdownOpen;
+            var args = new VolvoxGridBeforeDropdownOpenEventArgs(
+                before.Row,
+                before.Col,
+                GetFieldName(before.Col),
+                before.X,
+                before.Y,
+                before.Width,
+                before.Height,
+                before.Dropdown,
+                before.CurrentValue,
+                before.SelectedIndex);
+            _beforeDropdownOpen.Invoke(this, args);
             return args.Cancel;
         }
 

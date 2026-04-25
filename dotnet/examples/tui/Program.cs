@@ -611,9 +611,20 @@ namespace VolvoxGrid.DotNet.TuiSample
                 new ColumnDef { Index = 5, Width = 12, Caption = "Cost", Key = "Cost", Align = Align.ALIGN_RIGHT_CENTER, DataType = ColumnDataType.COLUMN_DATA_CURRENCY, Format = "$#,##0" },
                 new ColumnDef { Index = 6, Width = 10, Caption = "Margin%", Key = "Margin", Align = Align.ALIGN_CENTER_CENTER, DataType = ColumnDataType.COLUMN_DATA_NUMBER, ProgressColor = 0xFF818CF8u },
                 new ColumnDef { Index = 7, Width = 5, Caption = "Flag", Key = "Flag", Align = Align.ALIGN_CENTER_CENTER, DataType = ColumnDataType.COLUMN_DATA_BOOLEAN },
-                new ColumnDef { Index = 8, Width = 10, Caption = "Status", Key = "Status", DropdownItems = SalesStatusItems },
+                new ColumnDef { Index = 8, Width = 10, Caption = "Status", Key = "Status", Dropdown = DropdownFromLabels(SalesStatusItems) },
                 new ColumnDef { Index = 9, Width = 18, Caption = "Notes", Key = "Notes" },
             };
+        }
+
+        private static Dropdown DropdownFromLabels(string items)
+        {
+            var dropdown = new Dropdown();
+            foreach (var label in items.Split('|'))
+            {
+                if (!string.IsNullOrEmpty(label))
+                    dropdown.Items.Add(new DropdownItem { Label = label });
+            }
+            return dropdown;
         }
 
         private static List<ColumnDef> BuildHierarchyColumns()
