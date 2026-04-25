@@ -360,7 +360,8 @@ await controller.subtotal(
   aggregateCol: 2,
 );
 // Aggregate types: AGG_SUM, AGG_COUNT, AGG_AVERAGE, AGG_MAX, AGG_MIN,
-//                  AGG_STD_DEV, AGG_VAR, AGG_PERCENT, AGG_CLEAR
+//                  AGG_STD_DEV, AGG_VAR, AGG_RANGE, AGG_COUNT_ALL,
+//                  AGG_MEDIAN, AGG_COUNT_DISTINCT, AGG_PERCENT, AGG_CLEAR
 
 // Outline levels for tree-style grouping
 await controller.setRowOutlineLevel(5, 1);

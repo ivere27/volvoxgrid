@@ -325,7 +325,8 @@ int row2 = ctrl.findRowByRegex("^Widget.*", 0, 0);
 
 ```java
 double sum = ctrl.aggregate(AggregateType.AGG_SUM, 1, 1, 100, 1);
-// AGG_SUM, AGG_COUNT, AGG_AVERAGE, AGG_MAX, AGG_MIN, AGG_STD_DEV, AGG_VAR
+// AGG_SUM, AGG_COUNT, AGG_AVERAGE, AGG_MAX, AGG_MIN, AGG_STD_DEV, AGG_VAR,
+// AGG_RANGE, AGG_COUNT_ALL, AGG_MEDIAN, AGG_COUNT_DISTINCT
 ```
 
 #### Export & LoadData

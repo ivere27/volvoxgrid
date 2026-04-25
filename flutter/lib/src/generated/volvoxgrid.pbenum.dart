@@ -1049,6 +1049,10 @@ class GroupTotalPosition extends $pb.ProtobufEnum {
 ///   MIN (7):     Minimum value.
 ///   STD_DEV (8): Sample standard deviation (N−1 denominator).
 ///   VAR (9):     Sample variance (N−1 denominator).
+///   RANGE (10):  Maximum minus minimum numeric value.
+///   COUNT_ALL (11): Count all cells, including non-numeric and empty cells.
+///   MEDIAN (12): Median numeric value.
+///   COUNT_DISTINCT (13): Count distinct non-empty cell values.
 class AggregateType extends $pb.ProtobufEnum {
   static const AggregateType AGG_NONE =
       AggregateType._(0, _omitEnumNames ? '' : 'AGG_NONE');
@@ -1070,6 +1074,14 @@ class AggregateType extends $pb.ProtobufEnum {
       AggregateType._(8, _omitEnumNames ? '' : 'AGG_STD_DEV');
   static const AggregateType AGG_VAR =
       AggregateType._(9, _omitEnumNames ? '' : 'AGG_VAR');
+  static const AggregateType AGG_RANGE =
+      AggregateType._(10, _omitEnumNames ? '' : 'AGG_RANGE');
+  static const AggregateType AGG_COUNT_ALL =
+      AggregateType._(11, _omitEnumNames ? '' : 'AGG_COUNT_ALL');
+  static const AggregateType AGG_MEDIAN =
+      AggregateType._(12, _omitEnumNames ? '' : 'AGG_MEDIAN');
+  static const AggregateType AGG_COUNT_DISTINCT =
+      AggregateType._(13, _omitEnumNames ? '' : 'AGG_COUNT_DISTINCT');
 
   static const $core.List<AggregateType> values = <AggregateType>[
     AGG_NONE,
@@ -1082,10 +1094,14 @@ class AggregateType extends $pb.ProtobufEnum {
     AGG_MIN,
     AGG_STD_DEV,
     AGG_VAR,
+    AGG_RANGE,
+    AGG_COUNT_ALL,
+    AGG_MEDIAN,
+    AGG_COUNT_DISTINCT,
   ];
 
   static final $core.List<AggregateType?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 9);
+      $pb.ProtobufEnum.$_initByValueList(values, 13);
   static AggregateType? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

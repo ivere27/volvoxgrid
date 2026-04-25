@@ -13,6 +13,10 @@ export enum AggregateType {
   AGG_MIN = 7,
   AGG_STD_DEV = 8,
   AGG_VAR = 9,
+  AGG_RANGE = 10,
+  AGG_COUNT_ALL = 11,
+  AGG_MEDIAN = 12,
+  AGG_COUNT_DISTINCT = 13,
 }
 export enum Align {
   ALIGN_LEFT_TOP = 0,
