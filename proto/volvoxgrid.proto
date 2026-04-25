@@ -2512,8 +2512,10 @@ message TooltipRequest {
 // Event Stream
 //
 // Semantic grid events delivered via EventStream(). The engine
-// maintains a FIFO EventQueue (VecDeque<QueuedGridEvent>) and
-// the plugin drains it with a 50 ms poll interval.
+// maintains a FIFO EventQueue (VecDeque<QueuedGridEvent>). The
+// plugin drains it on push: every enqueue, destroy, and stream
+// cancel wakes a per-grid condvar, so delivery is sub-millisecond
+// and idle streams consume no CPU.
 //
 // event_id = 0: informational, cannot be canceled.
 // event_id > 0: cancelable — host must send EventDecision on
@@ -2835,6 +2837,7 @@ service VolvoxGridService {
   // engine returns render-coupled output (frames, edit/dropdown requests).
   rpc RenderSession(stream RenderInput)   returns (stream RenderOutput);
   // Server-streaming: engine pushes semantic grid events.
-  // The plugin polls the engine's EventQueue with a 50 ms interval.
+  // Delivery is fully event-driven — every enqueue/destroy/cancel
+  // wakes a per-grid condvar; no polling, no idle CPU cost.
   rpc EventStream(EventStreamRequest)     returns (stream GridEvent);
 }

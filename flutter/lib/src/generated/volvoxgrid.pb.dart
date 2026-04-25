@@ -23816,7 +23816,8 @@ class VolvoxGridServiceApi {
           ctx, 'VolvoxGridService', 'RenderSession', request, RenderOutput());
 
   /// Server-streaming: engine pushes semantic grid events.
-  /// The plugin polls the engine's EventQueue with a 50 ms interval.
+  /// Delivery is fully event-driven — every enqueue/destroy/cancel
+  /// wakes a per-grid condvar; no polling, no idle CPU cost.
   $async.Future<GridEvent> eventStream(
           $pb.ClientContext? ctx, EventStreamRequest request) =>
       _client.invoke<GridEvent>(

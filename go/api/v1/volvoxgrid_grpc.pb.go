@@ -192,7 +192,8 @@ type VolvoxGridServiceClient interface {
 	// engine returns render-coupled output (frames, edit/dropdown requests).
 	RenderSession(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[RenderInput, RenderOutput], error)
 	// Server-streaming: engine pushes semantic grid events.
-	// The plugin polls the engine's EventQueue with a 50 ms interval.
+	// Delivery is fully event-driven — every enqueue/destroy/cancel
+	// wakes a per-grid condvar; no polling, no idle CPU cost.
 	EventStream(ctx context.Context, in *EventStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GridEvent], error)
 }
 
@@ -740,7 +741,8 @@ type VolvoxGridServiceServer interface {
 	// engine returns render-coupled output (frames, edit/dropdown requests).
 	RenderSession(grpc.BidiStreamingServer[RenderInput, RenderOutput]) error
 	// Server-streaming: engine pushes semantic grid events.
-	// The plugin polls the engine's EventQueue with a 50 ms interval.
+	// Delivery is fully event-driven — every enqueue/destroy/cancel
+	// wakes a per-grid condvar; no polling, no idle CPU cost.
 	EventStream(*EventStreamRequest, grpc.ServerStreamingServer[GridEvent]) error
 	mustEmbedUnimplementedVolvoxGridServiceServer()
 }

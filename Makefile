@@ -19,7 +19,7 @@
 # Variables
 # =============================================================================
 SYNURANG_MODULE ?= github.com/ivere27/synurang
-SYNURANG_VERSION ?= v0.5.10
+SYNURANG_VERSION ?= v0.5.11
 PROTOC_PLUGIN ?= $(shell gobin=$$(go env GOBIN 2>/dev/null); if [ -n "$$gobin" ]; then printf '%s/protoc-gen-synurang-ffi' "$$gobin"; else printf '%s/bin/protoc-gen-synurang-ffi' "$$(go env GOPATH 2>/dev/null)"; fi)
 PROTOC_PLUGIN_FLAG = --plugin=protoc-gen-synurang-ffi=$(PROTOC_PLUGIN)
 ANDROID_PROJECT_DIR := android

@@ -54,7 +54,7 @@ pub mod text;
 
 use std::collections::HashMap;
 use std::sync::{
-    atomic::{AtomicBool, AtomicI64, Ordering},
+    atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
     Arc, Condvar, Mutex,
 };
 
@@ -62,10 +62,59 @@ use grid::VolvoxGrid;
 
 static NEXT_GRID_ID: AtomicI64 = AtomicI64::new(1);
 
+/// Push-only wakeup primitive. Notifiers publish state under their own locks,
+/// then call `wake()` which bumps a monotonic sequence and signals a condvar.
+/// Waiters snapshot the sequence, do their work, then block in
+/// `wait_for_change(baseline)` until any publisher advances the sequence past
+/// the snapshot. This avoids the classic "check-then-wait" lost-wakeup race
+/// without forcing all publishers to share a single mutex with the waiter.
+pub struct Waker {
+    seq: AtomicU64,
+    mu: Mutex<()>,
+    cv: Condvar,
+}
+
+impl Waker {
+    pub fn new() -> Self {
+        Self {
+            seq: AtomicU64::new(0),
+            mu: Mutex::new(()),
+            cv: Condvar::new(),
+        }
+    }
+
+    pub fn wake(&self) {
+        self.seq.fetch_add(1, Ordering::SeqCst);
+        {
+            let _g = self.mu.lock().unwrap_or_else(|p| p.into_inner());
+        }
+        self.cv.notify_all();
+    }
+
+    pub fn current_seq(&self) -> u64 {
+        self.seq.load(Ordering::SeqCst)
+    }
+
+    pub fn wait_for_change(&self, baseline: u64) {
+        let g = self.mu.lock().unwrap_or_else(|p| p.into_inner());
+        let _guard = self
+            .cv
+            .wait_while(g, |_| self.seq.load(Ordering::SeqCst) == baseline)
+            .unwrap_or_else(|p| p.into_inner());
+    }
+}
+
+impl Default for Waker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 struct GridSlot {
     grid: Arc<Mutex<VolvoxGrid>>,
     event_cv: Arc<Condvar>,
     destroyed: Arc<AtomicBool>,
+    waker: Arc<Waker>,
 }
 
 pub struct GridManager {
@@ -104,6 +153,7 @@ impl GridManager {
             grid: Arc::new(Mutex::new(grid)),
             event_cv: Arc::new(Condvar::new()),
             destroyed: Arc::new(AtomicBool::new(false)),
+            waker: Arc::new(Waker::new()),
         });
         self.grids.lock().unwrap().insert(id, slot);
         id
@@ -114,6 +164,7 @@ impl GridManager {
             let _grid = slot.grid.lock().unwrap();
             slot.destroyed.store(true, Ordering::SeqCst);
             slot.event_cv.notify_all();
+            slot.waker.wake();
         }
     }
 
@@ -137,6 +188,7 @@ impl GridManager {
         };
         if should_notify {
             slot.event_cv.notify_all();
+            slot.waker.wake();
         }
         Ok(result)
     }
@@ -169,7 +221,16 @@ impl GridManager {
         let slots: Vec<Arc<GridSlot>> = self.grids.lock().unwrap().values().cloned().collect();
         for slot in slots {
             slot.event_cv.notify_all();
+            slot.waker.wake();
         }
+    }
+
+    pub fn get_grid_waker(&self, id: i64) -> Result<Arc<Waker>, String> {
+        let grids = self.grids.lock().unwrap();
+        grids
+            .get(&id)
+            .map(|slot| Arc::clone(&slot.waker))
+            .ok_or_else(|| format!("grid {} not found", id))
     }
 
     pub fn grid_ids(&self) -> Vec<i64> {

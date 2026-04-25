@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{
     atomic::{AtomicI64, Ordering},
-    mpsc, Arc, Condvar, Mutex,
+    mpsc, Arc, Mutex,
 };
 use std::time::{Duration, Instant};
 
@@ -992,19 +992,34 @@ struct PendingCompare {
 
 struct CompareChannel {
     next_request_id: AtomicI64,
-    pending_cv: Condvar,
     pending: Mutex<VecDeque<PendingCompare>>,
     responses: Mutex<HashMap<i64, mpsc::Sender<i32>>>,
+    waker: Mutex<Option<Arc<volvoxgrid_engine::Waker>>>,
 }
 
 impl CompareChannel {
     fn new() -> Arc<Self> {
         Arc::new(Self {
             next_request_id: AtomicI64::new(1),
-            pending_cv: Condvar::new(),
             pending: Mutex::new(VecDeque::new()),
             responses: Mutex::new(HashMap::new()),
+            waker: Mutex::new(None),
         })
+    }
+
+    fn attach_waker(&self, waker: Arc<volvoxgrid_engine::Waker>) {
+        *self.waker.lock().unwrap_or_else(|e| e.into_inner()) = Some(waker);
+    }
+
+    fn notify_waker(&self) {
+        if let Some(w) = self
+            .waker
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+        {
+            w.wake();
+        }
     }
 
     fn compare(&self, row1: i32, row2: i32, col: i32, timeout: Duration) -> Option<i32> {
@@ -1024,7 +1039,7 @@ impl CompareChannel {
                 row2,
                 col,
             });
-        self.pending_cv.notify_all();
+        self.notify_waker();
 
         match response_rx.recv_timeout(timeout) {
             Ok(result) => Some(result.signum()),
@@ -1041,24 +1056,6 @@ impl CompareChannel {
     fn drain_pending(&self) -> Vec<PendingCompare> {
         let mut q = self.pending.lock().unwrap_or_else(|e| e.into_inner());
         q.drain(..).collect()
-    }
-
-    fn has_pending(&self) -> bool {
-        !self
-            .pending
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .is_empty()
-    }
-
-    fn wait_for_pending_timeout(&self, timeout: Duration) {
-        let q = self.pending.lock().unwrap_or_else(|e| e.into_inner());
-        if q.is_empty() {
-            let _guard = self
-                .pending_cv
-                .wait_timeout(q, timeout)
-                .unwrap_or_else(|e| e.into_inner());
-        }
     }
 
     fn deliver_response(&self, request_id: i64, result: i32) -> bool {
@@ -1163,7 +1160,6 @@ struct ZoomGestureState {
 impl VolvoxGridPlugin {
     const DECISION_TIMEOUT: Duration = Duration::from_millis(250);
     const COMPARE_RESPONSE_TIMEOUT: Duration = Duration::from_millis(250);
-    const EVENT_STREAM_IDLE_POLL: Duration = Duration::from_millis(10);
 
     fn new() -> Self {
         Self {
@@ -1728,7 +1724,7 @@ fn apply_zoom_scale(
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_zoom_scale, capture_zoom_state, should_request_pointer_header_sort,
+        apply_zoom_scale, capture_zoom_state, should_request_pointer_header_sort, PluginStream,
         PluginStreamSender, VolvoxGridPlugin, VolvoxGridServicePlugin,
     };
     use std::collections::{HashMap, HashSet};
@@ -1749,6 +1745,7 @@ mod tests {
         compare: Arc<dyn Fn(&pb::CompareEvent) -> i32 + Send + Sync>,
         events: Mutex<Vec<pb::GridEvent>>,
         cancelled: AtomicBool,
+        cancel_callbacks: Mutex<Vec<Box<dyn FnOnce() + Send + 'static>>>,
     }
 
     impl AutoCompareEventStream {
@@ -1763,11 +1760,41 @@ mod tests {
                 compare,
                 events: Mutex::new(Vec::new()),
                 cancelled: AtomicBool::new(false),
+                cancel_callbacks: Mutex::new(Vec::new()),
             }
         }
 
         fn cancel(&self) {
-            self.cancelled.store(true, Ordering::SeqCst);
+            let callbacks: Vec<Box<dyn FnOnce() + Send + 'static>> = {
+                let mut guard = self
+                    .cancel_callbacks
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
+                self.cancelled.store(true, Ordering::SeqCst);
+                std::mem::take(&mut *guard)
+            };
+            for cb in callbacks {
+                cb();
+            }
+        }
+    }
+
+    impl PluginStream for AutoCompareEventStream {
+        fn is_cancelled(&self) -> bool {
+            self.cancelled.load(Ordering::SeqCst)
+        }
+
+        fn on_cancel(&self, cb: Box<dyn FnOnce() + Send + 'static>) {
+            let mut guard = self
+                .cancel_callbacks
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if self.cancelled.load(Ordering::SeqCst) {
+                drop(guard);
+                cb();
+            } else {
+                guard.push(cb);
+            }
         }
     }
 
@@ -1786,10 +1813,6 @@ mod tests {
                 .unwrap_or_else(|e| e.into_inner())
                 .push(msg);
             true
-        }
-
-        fn is_cancelled(&self) -> bool {
-            self.cancelled.load(Ordering::SeqCst)
         }
     }
 
@@ -3432,6 +3455,9 @@ impl VolvoxGridPlugin {
         }
 
         let channel = CompareChannel::new();
+        if let Ok(waker) = self.manager().get_grid_waker(grid_id) {
+            channel.attach_waker(waker);
+        }
         self.compare_channels
             .lock()
             .unwrap_or_else(|e| e.into_inner())
@@ -6151,12 +6177,31 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
             .manager()
             .get_grid_waiter(grid_id)
             .map_err(map_plugin_error)?;
+        let waker = self
+            .manager()
+            .get_grid_waker(grid_id)
+            .map_err(map_plugin_error)?;
+
+        // Route stream cancellation through the waker so we never have to poll
+        // `is_cancelled()`. If the stream is already closed, on_cancel fires
+        // immediately — the seq advance will short-circuit the first wait.
+        {
+            let waker_for_cancel = Arc::clone(&waker);
+            stream.on_cancel(Box::new(move || waker_for_cancel.wake()));
+        }
 
         loop {
+            // Snapshot the wake sequence before draining. Any publisher (engine
+            // events, compare pending, destroy, stream cancel) advances it;
+            // wait_for_change only blocks when the snapshot is still current.
+            let baseline = waker.current_seq();
+
             if destroyed.load(Ordering::SeqCst) || stream.is_cancelled() {
                 return Ok(());
             }
 
+            // 1. Compare pending uses its own mutex, so it's safe to drain even
+            //    while the engine holds the grid lock (sort is inside with_grid).
             for pending in self
                 .lookup_compare_channel(grid_id)
                 .map(|c| c.drain_pending())
@@ -6177,6 +6222,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 }
             }
 
+            // 2. Grid event queue: try_lock to avoid blocking the sort path.
+            //    On WouldBlock we skip; the current holder's with_grid
+            //    completion will wake us again.
             let event_list = match grid_arc.try_lock() {
                 Ok(mut grid) => grid.events.drain(),
                 Err(std::sync::TryLockError::Poisoned(poisoned)) => {
@@ -6197,13 +6245,9 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 return Ok(());
             }
 
-            if let Some(channel) = self.lookup_compare_channel(grid_id) {
-                if !channel.has_pending() {
-                    channel.wait_for_pending_timeout(Self::EVENT_STREAM_IDLE_POLL);
-                }
-            } else {
-                std::thread::sleep(Self::EVENT_STREAM_IDLE_POLL);
-            }
+            // 3. Pure push wait: block until any source bumps the waker seq.
+            //    No timeout, no sleep. Cancel is wired via on_cancel above.
+            waker.wait_for_change(baseline);
         }
     }
 }
