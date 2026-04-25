@@ -610,6 +610,15 @@ enum CellSpanMode {
   CELL_SPAN_GROUP       = 7;
 }
 
+// Text normalization used when comparing cells for content-based spans
+// and subtotal/group keys.
+enum SpanCompareMode {
+  SPAN_COMPARE_EXACT        = 0;
+  SPAN_COMPARE_NO_CASE      = 1;
+  SPAN_COMPARE_TRIM_NO_CASE = 2;
+  SPAN_COMPARE_INCLUDE_NULLS = 3;
+}
+
 // ── Scrolling ──
 
 enum ScrollBarsMode {
@@ -1222,13 +1231,8 @@ message OutlineConfig {
 message SpanConfig {
   optional CellSpanMode cell_span         = 1;  // span mode for data cells
   optional CellSpanMode cell_span_fixed   = 2;  // span mode for fixed/frozen cells
-  // How cells are compared for equality during spanning:
-  //   0 = exact match
-  //   1 = case-insensitive
-  //   2 = trim + case-insensitive
-  //   3 = include nulls (empty cells span too)
-  optional int32        cell_span_compare = 3;
-  optional int32        group_span_compare = 4;
+  optional SpanCompareMode cell_span_compare  = 3;
+  optional SpanCompareMode group_span_compare = 4;
 }
 
 // ── Interaction ──
@@ -1500,10 +1504,18 @@ message RowDef {
   optional int32       outline_level = 5;   // -1 = grand total, 0+ = nesting level
   optional bool        is_collapsed  = 6;   // whether subtree below is collapsed
   optional bytes       data          = 7;   // application-specific row data
-  optional int32       status        = 8;   // host-defined row status code
+  RowStatus            status        = 8;
   optional bool        span          = 9;   // enable spanning for this row
   optional PinPosition pin           = 10;  // pin to TOP or BOTTOM of viewport
   optional StickyEdge  sticky        = 11;  // stick to edge during scroll
+}
+
+// Host-defined row status with an explicit namespace/discriminator.
+// `code` is interpreted only within `domain`; the engine assigns no
+// built-in meaning to row status values.
+message RowStatus {
+  string domain = 1;
+  int32  code   = 2;
 }
 
 message DefineRowsRequest {
@@ -2651,7 +2663,7 @@ message DropdownOpenedEvent {}
 
 // ── Data Events ──
 message CellChangedEvent     { int32 row = 1; int32 col = 2; string old_text = 3; string new_text = 4; }
-message RowStatusChangeEvent { int32 row = 1; int32 status = 2; }
+message RowStatusChangeEvent { int32 row = 1; RowStatus status = 2; }
 
 // ── Sort Events ──
 message BeforeSortEvent { int32 col = 1; }  // cancelable

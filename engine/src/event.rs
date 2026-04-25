@@ -90,7 +90,7 @@ pub enum GridEventData {
     },
     RowStatusChange {
         row: i32,
-        status: i32,
+        status: crate::row::RowStatus,
     },
     BeforeSort {
         col: i32,

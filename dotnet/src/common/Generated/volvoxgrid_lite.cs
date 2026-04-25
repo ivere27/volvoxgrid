@@ -654,6 +654,14 @@ namespace Volvoxgrid.V1
         SORT_TYPE_CUSTOM = 4,
     }
 
+    public enum SpanCompareMode
+    {
+        SPAN_COMPARE_EXACT = 0,
+        SPAN_COMPARE_NO_CASE = 1,
+        SPAN_COMPARE_TRIM_NO_CASE = 2,
+        SPAN_COMPARE_INCLUDE_NULLS = 3,
+    }
+
     public enum StickyEdge
     {
         STICKY_NONE = 0,
@@ -10591,9 +10599,7 @@ namespace Volvoxgrid.V1
         private byte[] _data;
         public byte[] Data { get { return _data; } set { _data = value; } }
         public bool HasData { get { return _data != null; } }
-        private int? _status;
-        public int Status { get { return _status.GetValueOrDefault(); } set { _status = value; } }
-        public bool HasStatus { get { return _status.HasValue; } }
+        public RowStatus Status { get; set; }
         private bool? _span;
         public bool Span { get { return _span.GetValueOrDefault(); } set { _span = value; } }
         public bool HasSpan { get { return _span.HasValue; } }
@@ -10622,8 +10628,7 @@ namespace Volvoxgrid.V1
                 w.WriteBool(6, _isCollapsed.Value);
             if (_data != null)
                 w.WriteBytes(7, _data);
-            if (_status.HasValue)
-                w.WriteInt32(8, _status.Value);
+            if (Status != null) w.WriteMessageBytes(8, Status.ToByteArray());
             if (_span.HasValue)
                 w.WriteBool(9, _span.Value);
             if (_pin.HasValue)
@@ -10654,7 +10659,7 @@ namespace Volvoxgrid.V1
                     case 5: msg.OutlineLevel = r.ReadInt32(); break;
                     case 6: msg.IsCollapsed = r.ReadBool(); break;
                     case 7: msg.Data = r.ReadLengthDelimited(); break;
-                    case 8: msg.Status = r.ReadInt32(); break;
+                    case 8: msg.Status = RowStatus.ParseFrom(r.ReadLengthDelimited()); break;
                     case 9: msg.Span = r.ReadBool(); break;
                     case 10: msg.Pin = (PinPosition)r.ReadInt32(); break;
                     case 11: msg.Sticky = (StickyEdge)r.ReadInt32(); break;
@@ -10829,10 +10834,48 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class RowStatus
+    {
+        public string Domain { get; set; } = "";
+        public int Code { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Domain != null && Domain.Length > 0) w.WriteString(1, Domain);
+            if (Code != 0) w.WriteInt32(2, Code);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<RowStatus> Parser = new MessageParser<RowStatus>(data => ParseFrom(data));
+
+        public static RowStatus ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new RowStatus();
+            var r = new ProtoReader(data);
+            var msg = new RowStatus();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Domain = r.ReadString(); break;
+                    case 2: msg.Code = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class RowStatusChangeEvent
     {
         public int Row { get; set; }
-        public int Status { get; set; }
+        public RowStatus Status { get; set; }
 
         // ── Serialization ──
 
@@ -10840,7 +10883,7 @@ namespace Volvoxgrid.V1
         {
             var w = new ProtoWriter();
             if (Row != 0) w.WriteInt32(1, Row);
-            if (Status != 0) w.WriteInt32(2, Status);
+            if (Status != null) w.WriteMessageBytes(2, Status.ToByteArray());
             return w.ToArray();
         }
 
@@ -10859,7 +10902,7 @@ namespace Volvoxgrid.V1
                 switch (field)
                 {
                     case 1: msg.Row = r.ReadInt32(); break;
-                    case 2: msg.Status = r.ReadInt32(); break;
+                    case 2: msg.Status = RowStatus.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -12047,11 +12090,11 @@ namespace Volvoxgrid.V1
         private CellSpanMode? _cellSpanFixed;
         public CellSpanMode CellSpanFixed { get { return _cellSpanFixed.GetValueOrDefault(); } set { _cellSpanFixed = value; } }
         public bool HasCellSpanFixed { get { return _cellSpanFixed.HasValue; } }
-        private int? _cellSpanCompare;
-        public int CellSpanCompare { get { return _cellSpanCompare.GetValueOrDefault(); } set { _cellSpanCompare = value; } }
+        private SpanCompareMode? _cellSpanCompare;
+        public SpanCompareMode CellSpanCompare { get { return _cellSpanCompare.GetValueOrDefault(); } set { _cellSpanCompare = value; } }
         public bool HasCellSpanCompare { get { return _cellSpanCompare.HasValue; } }
-        private int? _groupSpanCompare;
-        public int GroupSpanCompare { get { return _groupSpanCompare.GetValueOrDefault(); } set { _groupSpanCompare = value; } }
+        private SpanCompareMode? _groupSpanCompare;
+        public SpanCompareMode GroupSpanCompare { get { return _groupSpanCompare.GetValueOrDefault(); } set { _groupSpanCompare = value; } }
         public bool HasGroupSpanCompare { get { return _groupSpanCompare.HasValue; } }
 
         // ── Serialization ──
@@ -12064,9 +12107,9 @@ namespace Volvoxgrid.V1
             if (_cellSpanFixed.HasValue)
                 w.WriteInt32(2, (int)_cellSpanFixed.Value);
             if (_cellSpanCompare.HasValue)
-                w.WriteInt32(3, _cellSpanCompare.Value);
+                w.WriteInt32(3, (int)_cellSpanCompare.Value);
             if (_groupSpanCompare.HasValue)
-                w.WriteInt32(4, _groupSpanCompare.Value);
+                w.WriteInt32(4, (int)_groupSpanCompare.Value);
             return w.ToArray();
         }
 
@@ -12086,8 +12129,8 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.CellSpan = (CellSpanMode)r.ReadInt32(); break;
                     case 2: msg.CellSpanFixed = (CellSpanMode)r.ReadInt32(); break;
-                    case 3: msg.CellSpanCompare = r.ReadInt32(); break;
-                    case 4: msg.GroupSpanCompare = r.ReadInt32(); break;
+                    case 3: msg.CellSpanCompare = (SpanCompareMode)r.ReadInt32(); break;
+                    case 4: msg.GroupSpanCompare = (SpanCompareMode)r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }

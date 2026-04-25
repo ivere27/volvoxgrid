@@ -364,7 +364,7 @@ namespace VolvoxGrid.DotNet.TuiSample
                     {
                         CellSpan = CellSpanMode.CELL_SPAN_ADJACENT,
                         CellSpanFixed = CellSpanMode.CELL_SPAN_NONE,
-                        CellSpanCompare = 1,
+                        CellSpanCompare = SpanCompareMode.SPAN_COMPARE_NO_CASE,
                     },
                     Interaction = new InteractionConfig
                     {

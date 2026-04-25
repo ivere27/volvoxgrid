@@ -2677,7 +2677,7 @@ fn engine_event_to_proto(
         E::RowStatusChange { row, status } => {
             Some(grid_event::Event::RowStatusChange(RowStatusChangeEvent {
                 row,
-                status,
+                status: Some(status.to_proto()),
             }))
         }
         E::BeforeSort { col } => Some(grid_event::Event::BeforeSort(BeforeSortEvent { col })),

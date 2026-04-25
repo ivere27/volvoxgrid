@@ -402,7 +402,7 @@ fn apply_sales_demo_subtotals(grid: &mut VolvoxGrid) {
     grid.span.span_cols.clear();
     grid.span.span_cols.insert(0, true);
     grid.span.span_cols.insert(1, true);
-    grid.span.span_compare = 1;
+    grid.span.span_compare = pb::SpanCompareMode::SpanCompareNoCase as i32;
     apply_sales_subtotal_merges(grid);
 
     grid.outline.tree_indicator = 0;

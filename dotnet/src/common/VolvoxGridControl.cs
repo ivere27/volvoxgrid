@@ -2220,10 +2220,48 @@ namespace VolvoxGrid.DotNet
             if (_client == null || _gridId == 0) return new VolvoxGridExportData();
             try
             {
-                var response = _client.Export(_gridId, (ExportFormat)format, (ExportScope)scope);
-                return new VolvoxGridExportData { Data = response.Data ?? new byte[0], Format = (VolvoxGridExportFormat)response.Format };
+                var response = _client.Export(_gridId, ToProtoExportFormat(format), ToProtoExportScope(scope));
+                return new VolvoxGridExportData { Data = response.Data ?? new byte[0], Format = FromProtoExportFormat(response.Format) };
             }
             catch (Exception ex) { _lastError = ex.Message; return new VolvoxGridExportData(); }
+        }
+
+        private static ExportFormat ToProtoExportFormat(VolvoxGridExportFormat format)
+        {
+            switch (format)
+            {
+                case VolvoxGridExportFormat.Binary: return ExportFormat.EXPORT_BINARY;
+                case VolvoxGridExportFormat.Tsv: return ExportFormat.EXPORT_TSV;
+                case VolvoxGridExportFormat.Csv: return ExportFormat.EXPORT_CSV;
+                case VolvoxGridExportFormat.Delimited: return ExportFormat.EXPORT_DELIMITED;
+                case VolvoxGridExportFormat.Xlsx: return ExportFormat.EXPORT_XLSX;
+                default: return ExportFormat.EXPORT_BINARY;
+            }
+        }
+
+        private static ExportScope ToProtoExportScope(VolvoxGridExportScope scope)
+        {
+            switch (scope)
+            {
+                case VolvoxGridExportScope.All: return ExportScope.EXPORT_ALL;
+                case VolvoxGridExportScope.DataOnly: return ExportScope.EXPORT_DATA_ONLY;
+                case VolvoxGridExportScope.FormatOnly: return ExportScope.EXPORT_FORMAT_ONLY;
+                default: return ExportScope.EXPORT_ALL;
+            }
+        }
+
+        private static VolvoxGridExportFormat FromProtoExportFormat(ExportFormat format)
+        {
+            switch (format)
+            {
+                case ExportFormat.EXPORT_TSV: return VolvoxGridExportFormat.Tsv;
+                case ExportFormat.EXPORT_CSV: return VolvoxGridExportFormat.Csv;
+                case ExportFormat.EXPORT_DELIMITED: return VolvoxGridExportFormat.Delimited;
+                case ExportFormat.EXPORT_XLSX: return VolvoxGridExportFormat.Xlsx;
+                case ExportFormat.EXPORT_BINARY:
+                default:
+                    return VolvoxGridExportFormat.Binary;
+            }
         }
 
         public void LoadData(byte[] data)

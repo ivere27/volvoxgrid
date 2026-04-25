@@ -543,7 +543,7 @@ fn apply_local_sales_demo_subtotals(grid: &mut volvoxgrid_engine::grid::VolvoxGr
     grid.span.span_cols.clear();
     grid.span.span_cols.insert(0, true);
     grid.span.span_cols.insert(1, true);
-    grid.span.span_compare = 1;
+    grid.span.span_compare = SpanCompareMode::SpanCompareNoCase as i32;
 
     grid.outline.tree_indicator = 0;
     grid.outline.group_total_position = 1;
@@ -3444,13 +3444,13 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn set_group_compare(&self, r: SetMergeCompareRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            g.span.span_compare = r.value;
+            g.span.group_span_compare = r.value;
             g.mark_dirty();
         })?;
         Ok(Empty {})
     }
     fn get_group_compare(&self, r: GridHandle) -> Result<Int32Value, String> {
-        let v = GRID_MANAGER.with_grid(r.id, |g| g.span.span_compare)?;
+        let v = GRID_MANAGER.with_grid(r.id, |g| g.span.group_span_compare)?;
         Ok(Int32Value {
             grid_id: r.id,
             value: v,
@@ -4109,7 +4109,10 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
             let row = r.col;
             if row >= 0 && row < g.rows {
-                g.set_row_status(row, r.value);
+                g.set_row_status(
+                    row,
+                    volvoxgrid_engine::row::RowStatus::new("vsflexgrid", r.value),
+                );
             }
         })?;
         Ok(Empty {})
@@ -4117,7 +4120,7 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     fn get_row_status(&self, r: RowColIndex) -> Result<Int32Value, String> {
         let v = GRID_MANAGER.with_grid(r.grid_id, |g| {
             if r.index >= 0 && r.index < g.rows {
-                g.get_row_status(r.index)
+                g.get_row_status(r.index).map_or(0, |status| status.code)
             } else {
                 0
             }

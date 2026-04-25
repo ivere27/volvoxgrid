@@ -47,6 +47,7 @@ import io.github.ivere27.volvoxgrid.SelectionConfig;
 import io.github.ivere27.volvoxgrid.SelectionMode;
 import io.github.ivere27.volvoxgrid.SelectionState;
 import io.github.ivere27.volvoxgrid.SpanConfig;
+import io.github.ivere27.volvoxgrid.SpanCompareMode;
 import io.github.ivere27.volvoxgrid.TreeIndicatorStyle;
 import io.github.ivere27.volvoxgrid.UpdateCellsRequest;
 import java.io.ByteArrayOutputStream;
@@ -467,7 +468,7 @@ public final class VolvoxGridDesktopTuiExample {
                 SpanConfig.newBuilder()
                     .setCellSpan(CellSpanMode.CELL_SPAN_ADJACENT)
                     .setCellSpanFixed(CellSpanMode.CELL_SPAN_NONE)
-                    .setCellSpanCompare(1)
+                    .setCellSpanCompare(SpanCompareMode.SPAN_COMPARE_NO_CASE)
                     .build()
             )
             .setInteraction(

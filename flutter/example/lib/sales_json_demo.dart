@@ -264,7 +264,7 @@ GridConfig _salesThemeConfig() {
     ..span = (SpanConfig()
       ..cellSpan = CellSpanMode.CELL_SPAN_ADJACENT
       ..cellSpanFixed = CellSpanMode.CELL_SPAN_NONE
-      ..cellSpanCompare = 1)
+      ..cellSpanCompare = SpanCompareMode.SPAN_COMPARE_NO_CASE)
     ..interaction = (InteractionConfig()
       ..resize = (ResizePolicy()
         ..columns = true

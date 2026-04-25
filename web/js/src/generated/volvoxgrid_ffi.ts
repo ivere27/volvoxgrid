@@ -475,6 +475,12 @@ export enum SortType {
   SORT_TYPE_STRING_NO_CASE = 3,
   SORT_TYPE_CUSTOM = 4,
 }
+export enum SpanCompareMode {
+  SPAN_COMPARE_EXACT = 0,
+  SPAN_COMPARE_NO_CASE = 1,
+  SPAN_COMPARE_TRIM_NO_CASE = 2,
+  SPAN_COMPARE_INCLUDE_NULLS = 3,
+}
 export enum StickyEdge {
   STICKY_NONE = 0,
   STICKY_TOP = 1,
@@ -1758,6 +1764,10 @@ export const RowIndicatorSlotFields = {
   "visible": 3,
   "custom_key": 4,
   "data": 5,
+} as const;
+export const RowStatusFields = {
+  "domain": 1,
+  "code": 2,
 } as const;
 export const RowStatusChangeEventFields = {
   "row": 1,

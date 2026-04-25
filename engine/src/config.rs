@@ -10,6 +10,7 @@ use crate::indicator::{
     ColIndicatorCellState, ColIndicatorRowDefState, CornerIndicatorState, RowIndicatorSlotState,
 };
 use crate::proto::volvoxgrid::v1;
+use crate::row::RowStatus;
 use crate::scrollbar::{
     default_scrollbar_colors, default_scrollbar_corner_radius, default_scrollbar_size,
     merge_scrollbar_colors, normalize_scrollbar_appearance, normalize_scrollbar_mode,
@@ -1666,7 +1667,7 @@ impl VolvoxGrid {
             self.span.span_compare = v;
         }
         if let Some(v) = sc.group_span_compare {
-            self.span.span_compare = v;
+            self.span.group_span_compare = v;
         }
         self.mark_dirty();
     }
@@ -2066,7 +2067,7 @@ impl VolvoxGrid {
             cell_span: Some(self.span.mode),
             cell_span_fixed: Some(self.span.mode_fixed),
             cell_span_compare: Some(self.span.span_compare),
-            group_span_compare: None,
+            group_span_compare: Some(self.span.group_span_compare),
         }
     }
 
@@ -2345,8 +2346,8 @@ impl VolvoxGrid {
                 if let Some(v) = &def.data {
                     rp.user_data = if v.is_empty() { None } else { Some(v.clone()) };
                 }
-                if let Some(v) = def.status {
-                    rp.status = v;
+                if let Some(v) = &def.status {
+                    rp.status = RowStatus::from_proto(v);
                 }
                 if let Some(v) = def.span {
                     rp.span = v;
@@ -3681,6 +3682,10 @@ mod tests {
             height: Some(40),
             is_subtotal: Some(true),
             outline_level: Some(1),
+            status: Some(v1::RowStatus {
+                domain: "host/order".to_string(),
+                code: 42,
+            }),
             ..Default::default()
         }];
         grid.define_rows(&defs);
@@ -3689,6 +3694,41 @@ mod tests {
         let rp = grid.row_props.get(&3).unwrap();
         assert!(rp.is_subtotal);
         assert_eq!(rp.outline_level, 1);
+        assert_eq!(rp.status.domain, "host/order");
+        assert_eq!(rp.status.code, 42);
+    }
+
+    #[test]
+    fn span_config_keeps_cell_and_group_compare_separate() {
+        let mut grid = test_grid();
+        grid.apply_config(&v1::GridConfig {
+            span: Some(v1::SpanConfig {
+                cell_span_compare: Some(v1::SpanCompareMode::SpanCompareNoCase as i32),
+                group_span_compare: Some(v1::SpanCompareMode::SpanCompareTrimNoCase as i32),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+
+        assert_eq!(
+            grid.span.span_compare,
+            v1::SpanCompareMode::SpanCompareNoCase as i32
+        );
+        assert_eq!(
+            grid.span.group_span_compare,
+            v1::SpanCompareMode::SpanCompareTrimNoCase as i32
+        );
+
+        let config = grid.get_config();
+        let span = config.span.unwrap();
+        assert_eq!(
+            span.cell_span_compare,
+            Some(v1::SpanCompareMode::SpanCompareNoCase as i32)
+        );
+        assert_eq!(
+            span.group_span_compare,
+            Some(v1::SpanCompareMode::SpanCompareTrimNoCase as i32)
+        );
     }
 
     #[test]

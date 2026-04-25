@@ -5191,8 +5191,8 @@ class SpanConfig extends $pb.GeneratedMessage {
   factory SpanConfig({
     CellSpanMode? cellSpan,
     CellSpanMode? cellSpanFixed,
-    $core.int? cellSpanCompare,
-    $core.int? groupSpanCompare,
+    SpanCompareMode? cellSpanCompare,
+    SpanCompareMode? groupSpanCompare,
   }) {
     final result = create();
     if (cellSpan != null) result.cellSpan = cellSpan;
@@ -5219,8 +5219,10 @@ class SpanConfig extends $pb.GeneratedMessage {
         enumValues: CellSpanMode.values)
     ..aE<CellSpanMode>(2, _omitFieldNames ? '' : 'cellSpanFixed',
         enumValues: CellSpanMode.values)
-    ..aI(3, _omitFieldNames ? '' : 'cellSpanCompare')
-    ..aI(4, _omitFieldNames ? '' : 'groupSpanCompare')
+    ..aE<SpanCompareMode>(3, _omitFieldNames ? '' : 'cellSpanCompare',
+        enumValues: SpanCompareMode.values)
+    ..aE<SpanCompareMode>(4, _omitFieldNames ? '' : 'groupSpanCompare',
+        enumValues: SpanCompareMode.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -5259,24 +5261,19 @@ class SpanConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearCellSpanFixed() => $_clearField(2);
 
-  /// How cells are compared for equality during spanning:
-  ///   0 = exact match
-  ///   1 = case-insensitive
-  ///   2 = trim + case-insensitive
-  ///   3 = include nulls (empty cells span too)
   @$pb.TagNumber(3)
-  $core.int get cellSpanCompare => $_getIZ(2);
+  SpanCompareMode get cellSpanCompare => $_getN(2);
   @$pb.TagNumber(3)
-  set cellSpanCompare($core.int value) => $_setSignedInt32(2, value);
+  set cellSpanCompare(SpanCompareMode value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasCellSpanCompare() => $_has(2);
   @$pb.TagNumber(3)
   void clearCellSpanCompare() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.int get groupSpanCompare => $_getIZ(3);
+  SpanCompareMode get groupSpanCompare => $_getN(3);
   @$pb.TagNumber(4)
-  set groupSpanCompare($core.int value) => $_setSignedInt32(3, value);
+  set groupSpanCompare(SpanCompareMode value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasGroupSpanCompare() => $_has(3);
   @$pb.TagNumber(4)
@@ -7121,7 +7118,7 @@ class RowDef extends $pb.GeneratedMessage {
     $core.int? outlineLevel,
     $core.bool? isCollapsed,
     $core.List<$core.int>? data,
-    $core.int? status,
+    RowStatus? status,
     $core.bool? span,
     PinPosition? pin,
     StickyEdge? sticky,
@@ -7162,7 +7159,8 @@ class RowDef extends $pb.GeneratedMessage {
     ..aOB(6, _omitFieldNames ? '' : 'isCollapsed')
     ..a<$core.List<$core.int>>(
         7, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
-    ..aI(8, _omitFieldNames ? '' : 'status')
+    ..aOM<RowStatus>(8, _omitFieldNames ? '' : 'status',
+        subBuilder: RowStatus.create)
     ..aOB(9, _omitFieldNames ? '' : 'span')
     ..aE<PinPosition>(10, _omitFieldNames ? '' : 'pin',
         enumValues: PinPosition.values)
@@ -7252,13 +7250,15 @@ class RowDef extends $pb.GeneratedMessage {
   void clearData() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.int get status => $_getIZ(7);
+  RowStatus get status => $_getN(7);
   @$pb.TagNumber(8)
-  set status($core.int value) => $_setSignedInt32(7, value);
+  set status(RowStatus value) => $_setField(8, value);
   @$pb.TagNumber(8)
   $core.bool hasStatus() => $_has(7);
   @$pb.TagNumber(8)
   void clearStatus() => $_clearField(8);
+  @$pb.TagNumber(8)
+  RowStatus ensureStatus() => $_ensure(7);
 
   @$pb.TagNumber(9)
   $core.bool get span => $_getBF(8);
@@ -7286,6 +7286,74 @@ class RowDef extends $pb.GeneratedMessage {
   $core.bool hasSticky() => $_has(10);
   @$pb.TagNumber(11)
   void clearSticky() => $_clearField(11);
+}
+
+/// Host-defined row status with an explicit namespace/discriminator.
+/// `code` is interpreted only within `domain`; the engine assigns no
+/// built-in meaning to row status values.
+class RowStatus extends $pb.GeneratedMessage {
+  factory RowStatus({
+    $core.String? domain,
+    $core.int? code,
+  }) {
+    final result = create();
+    if (domain != null) result.domain = domain;
+    if (code != null) result.code = code;
+    return result;
+  }
+
+  RowStatus._();
+
+  factory RowStatus.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory RowStatus.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'RowStatus',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'domain')
+    ..aI(2, _omitFieldNames ? '' : 'code')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RowStatus clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  RowStatus copyWith(void Function(RowStatus) updates) =>
+      super.copyWith((message) => updates(message as RowStatus)) as RowStatus;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RowStatus create() => RowStatus._();
+  @$core.override
+  RowStatus createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static RowStatus getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<RowStatus>(create);
+  static RowStatus? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get domain => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set domain($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasDomain() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDomain() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get code => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set code($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasCode() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCode() => $_clearField(2);
 }
 
 class DefineRowsRequest extends $pb.GeneratedMessage {
@@ -20817,7 +20885,7 @@ class CellChangedEvent extends $pb.GeneratedMessage {
 class RowStatusChangeEvent extends $pb.GeneratedMessage {
   factory RowStatusChangeEvent({
     $core.int? row,
-    $core.int? status,
+    RowStatus? status,
   }) {
     final result = create();
     if (row != null) result.row = row;
@@ -20839,7 +20907,8 @@ class RowStatusChangeEvent extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'row')
-    ..aI(2, _omitFieldNames ? '' : 'status')
+    ..aOM<RowStatus>(2, _omitFieldNames ? '' : 'status',
+        subBuilder: RowStatus.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -20871,13 +20940,15 @@ class RowStatusChangeEvent extends $pb.GeneratedMessage {
   void clearRow() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get status => $_getIZ(1);
+  RowStatus get status => $_getN(1);
   @$pb.TagNumber(2)
-  set status($core.int value) => $_setSignedInt32(1, value);
+  set status(RowStatus value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasStatus() => $_has(1);
   @$pb.TagNumber(2)
   void clearStatus() => $_clearField(2);
+  @$pb.TagNumber(2)
+  RowStatus ensureStatus() => $_ensure(1);
 }
 
 /// ── Sort Events ──

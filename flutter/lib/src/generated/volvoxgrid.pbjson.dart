@@ -667,6 +667,23 @@ final $typed_data.Uint8List cellSpanModeDescriptor = $convert.base64Decode(
     'UEFOX0FESkFDRU5UEAQSGQoVQ0VMTF9TUEFOX0hFQURFUl9PTkxZEAUSEwoPQ0VMTF9TUEFOX1'
     'NQSUxMEAYSEwoPQ0VMTF9TUEFOX0dST1VQEAc=');
 
+@$core.Deprecated('Use spanCompareModeDescriptor instead')
+const SpanCompareMode$json = {
+  '1': 'SpanCompareMode',
+  '2': [
+    {'1': 'SPAN_COMPARE_EXACT', '2': 0},
+    {'1': 'SPAN_COMPARE_NO_CASE', '2': 1},
+    {'1': 'SPAN_COMPARE_TRIM_NO_CASE', '2': 2},
+    {'1': 'SPAN_COMPARE_INCLUDE_NULLS', '2': 3},
+  ],
+};
+
+/// Descriptor for `SpanCompareMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List spanCompareModeDescriptor = $convert.base64Decode(
+    'Cg9TcGFuQ29tcGFyZU1vZGUSFgoSU1BBTl9DT01QQVJFX0VYQUNUEAASGAoUU1BBTl9DT01QQV'
+    'JFX05PX0NBU0UQARIdChlTUEFOX0NPTVBBUkVfVFJJTV9OT19DQVNFEAISHgoaU1BBTl9DT01Q'
+    'QVJFX0lOQ0xVREVfTlVMTFMQAw==');
+
 @$core.Deprecated('Use scrollBarsModeDescriptor instead')
 const ScrollBarsMode$json = {
   '1': 'ScrollBarsMode',
@@ -4040,7 +4057,8 @@ const SpanConfig$json = {
       '1': 'cell_span_compare',
       '3': 3,
       '4': 1,
-      '5': 5,
+      '5': 14,
+      '6': '.volvoxgrid.v1.SpanCompareMode',
       '9': 2,
       '10': 'cellSpanCompare',
       '17': true
@@ -4049,7 +4067,8 @@ const SpanConfig$json = {
       '1': 'group_span_compare',
       '3': 4,
       '4': 1,
-      '5': 5,
+      '5': 14,
+      '6': '.volvoxgrid.v1.SpanCompareMode',
       '9': 3,
       '10': 'groupSpanCompare',
       '17': true
@@ -4067,10 +4086,12 @@ const SpanConfig$json = {
 final $typed_data.Uint8List spanConfigDescriptor = $convert.base64Decode(
     'CgpTcGFuQ29uZmlnEj0KCWNlbGxfc3BhbhgBIAEoDjIbLnZvbHZveGdyaWQudjEuQ2VsbFNwYW'
     '5Nb2RlSABSCGNlbGxTcGFuiAEBEkgKD2NlbGxfc3Bhbl9maXhlZBgCIAEoDjIbLnZvbHZveGdy'
-    'aWQudjEuQ2VsbFNwYW5Nb2RlSAFSDWNlbGxTcGFuRml4ZWSIAQESLwoRY2VsbF9zcGFuX2NvbX'
-    'BhcmUYAyABKAVIAlIPY2VsbFNwYW5Db21wYXJliAEBEjEKEmdyb3VwX3NwYW5fY29tcGFyZRgE'
-    'IAEoBUgDUhBncm91cFNwYW5Db21wYXJliAEBQgwKCl9jZWxsX3NwYW5CEgoQX2NlbGxfc3Bhbl'
-    '9maXhlZEIUChJfY2VsbF9zcGFuX2NvbXBhcmVCFQoTX2dyb3VwX3NwYW5fY29tcGFyZQ==');
+    'aWQudjEuQ2VsbFNwYW5Nb2RlSAFSDWNlbGxTcGFuRml4ZWSIAQESTwoRY2VsbF9zcGFuX2NvbX'
+    'BhcmUYAyABKA4yHi52b2x2b3hncmlkLnYxLlNwYW5Db21wYXJlTW9kZUgCUg9jZWxsU3BhbkNv'
+    'bXBhcmWIAQESUQoSZ3JvdXBfc3Bhbl9jb21wYXJlGAQgASgOMh4udm9sdm94Z3JpZC52MS5TcG'
+    'FuQ29tcGFyZU1vZGVIA1IQZ3JvdXBTcGFuQ29tcGFyZYgBAUIMCgpfY2VsbF9zcGFuQhIKEF9j'
+    'ZWxsX3NwYW5fZml4ZWRCFAoSX2NlbGxfc3Bhbl9jb21wYXJlQhUKE19ncm91cF9zcGFuX2NvbX'
+    'BhcmU=');
 
 @$core.Deprecated('Use interactionConfigDescriptor instead')
 const InteractionConfig$json = {
@@ -5250,15 +5271,22 @@ const RowDef$json = {
       '17': true
     },
     {'1': 'data', '3': 7, '4': 1, '5': 12, '9': 5, '10': 'data', '17': true},
-    {'1': 'status', '3': 8, '4': 1, '5': 5, '9': 6, '10': 'status', '17': true},
-    {'1': 'span', '3': 9, '4': 1, '5': 8, '9': 7, '10': 'span', '17': true},
+    {
+      '1': 'status',
+      '3': 8,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.RowStatus',
+      '10': 'status'
+    },
+    {'1': 'span', '3': 9, '4': 1, '5': 8, '9': 6, '10': 'span', '17': true},
     {
       '1': 'pin',
       '3': 10,
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.PinPosition',
-      '9': 8,
+      '9': 7,
       '10': 'pin',
       '17': true
     },
@@ -5268,7 +5296,7 @@ const RowDef$json = {
       '4': 1,
       '5': 14,
       '6': '.volvoxgrid.v1.StickyEdge',
-      '9': 9,
+      '9': 8,
       '10': 'sticky',
       '17': true
     },
@@ -5280,7 +5308,6 @@ const RowDef$json = {
     {'1': '_outline_level'},
     {'1': '_is_collapsed'},
     {'1': '_data'},
-    {'1': '_status'},
     {'1': '_span'},
     {'1': '_pin'},
     {'1': '_sticky'},
@@ -5293,12 +5320,26 @@ final $typed_data.Uint8List rowDefDescriptor = $convert.base64Decode(
     'SIAQESGwoGaGlkZGVuGAMgASgISAFSBmhpZGRlbogBARIkCgtpc19zdWJ0b3RhbBgEIAEoCEgC'
     'Ugppc1N1YnRvdGFsiAEBEigKDW91dGxpbmVfbGV2ZWwYBSABKAVIA1IMb3V0bGluZUxldmVsiA'
     'EBEiYKDGlzX2NvbGxhcHNlZBgGIAEoCEgEUgtpc0NvbGxhcHNlZIgBARIXCgRkYXRhGAcgASgM'
-    'SAVSBGRhdGGIAQESGwoGc3RhdHVzGAggASgFSAZSBnN0YXR1c4gBARIXCgRzcGFuGAkgASgISA'
-    'dSBHNwYW6IAQESMQoDcGluGAogASgOMhoudm9sdm94Z3JpZC52MS5QaW5Qb3NpdGlvbkgIUgNw'
-    'aW6IAQESNgoGc3RpY2t5GAsgASgOMhkudm9sdm94Z3JpZC52MS5TdGlja3lFZGdlSAlSBnN0aW'
-    'NreYgBAUIJCgdfaGVpZ2h0QgkKB19oaWRkZW5CDgoMX2lzX3N1YnRvdGFsQhAKDl9vdXRsaW5l'
-    'X2xldmVsQg8KDV9pc19jb2xsYXBzZWRCBwoFX2RhdGFCCQoHX3N0YXR1c0IHCgVfc3BhbkIGCg'
-    'RfcGluQgkKB19zdGlja3k=');
+    'SAVSBGRhdGGIAQESMAoGc3RhdHVzGAggASgLMhgudm9sdm94Z3JpZC52MS5Sb3dTdGF0dXNSBn'
+    'N0YXR1cxIXCgRzcGFuGAkgASgISAZSBHNwYW6IAQESMQoDcGluGAogASgOMhoudm9sdm94Z3Jp'
+    'ZC52MS5QaW5Qb3NpdGlvbkgHUgNwaW6IAQESNgoGc3RpY2t5GAsgASgOMhkudm9sdm94Z3JpZC'
+    '52MS5TdGlja3lFZGdlSAhSBnN0aWNreYgBAUIJCgdfaGVpZ2h0QgkKB19oaWRkZW5CDgoMX2lz'
+    'X3N1YnRvdGFsQhAKDl9vdXRsaW5lX2xldmVsQg8KDV9pc19jb2xsYXBzZWRCBwoFX2RhdGFCBw'
+    'oFX3NwYW5CBgoEX3BpbkIJCgdfc3RpY2t5');
+
+@$core.Deprecated('Use rowStatusDescriptor instead')
+const RowStatus$json = {
+  '1': 'RowStatus',
+  '2': [
+    {'1': 'domain', '3': 1, '4': 1, '5': 9, '10': 'domain'},
+    {'1': 'code', '3': 2, '4': 1, '5': 5, '10': 'code'},
+  ],
+};
+
+/// Descriptor for `RowStatus`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List rowStatusDescriptor = $convert.base64Decode(
+    'CglSb3dTdGF0dXMSFgoGZG9tYWluGAEgASgJUgZkb21haW4SEgoEY29kZRgCIAEoBVIEY29kZQ'
+    '==');
 
 @$core.Deprecated('Use defineRowsRequestDescriptor instead')
 const DefineRowsRequest$json = {
@@ -9527,14 +9568,21 @@ const RowStatusChangeEvent$json = {
   '1': 'RowStatusChangeEvent',
   '2': [
     {'1': 'row', '3': 1, '4': 1, '5': 5, '10': 'row'},
-    {'1': 'status', '3': 2, '4': 1, '5': 5, '10': 'status'},
+    {
+      '1': 'status',
+      '3': 2,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.RowStatus',
+      '10': 'status'
+    },
   ],
 };
 
 /// Descriptor for `RowStatusChangeEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List rowStatusChangeEventDescriptor = $convert.base64Decode(
-    'ChRSb3dTdGF0dXNDaGFuZ2VFdmVudBIQCgNyb3cYASABKAVSA3JvdxIWCgZzdGF0dXMYAiABKA'
-    'VSBnN0YXR1cw==');
+    'ChRSb3dTdGF0dXNDaGFuZ2VFdmVudBIQCgNyb3cYASABKAVSA3JvdxIwCgZzdGF0dXMYAiABKA'
+    'syGC52b2x2b3hncmlkLnYxLlJvd1N0YXR1c1IGc3RhdHVz');
 
 @$core.Deprecated('Use beforeSortEventDescriptor instead')
 const BeforeSortEvent$json = {
@@ -10404,6 +10452,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.SchemaResponse': SchemaResponse$json,
   '.volvoxgrid.v1.DefineRowsRequest': DefineRowsRequest$json,
   '.volvoxgrid.v1.RowDef': RowDef$json,
+  '.volvoxgrid.v1.RowStatus': RowStatus$json,
   '.volvoxgrid.v1.DefineRowsResponse': DefineRowsResponse$json,
   '.volvoxgrid.v1.InsertRowsRequest': InsertRowsRequest$json,
   '.volvoxgrid.v1.InsertRowsResponse': InsertRowsResponse$json,

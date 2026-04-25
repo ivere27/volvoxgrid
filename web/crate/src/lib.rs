@@ -2001,7 +2001,7 @@ pub fn set_row_status(id: i32, row: i32, status: i32) {
         if row < 0 || row >= grid.rows {
             return;
         }
-        grid.set_row_status(row, status);
+        grid.set_row_status(row, volvoxgrid_engine::row::RowStatus::new("web", status));
     });
 }
 
@@ -2011,7 +2011,7 @@ pub fn get_row_status(id: i32, row: i32) -> i32 {
         if row < 0 || row >= grid.rows {
             return 0;
         }
-        grid.get_row_status(row)
+        grid.get_row_status(row).map_or(0, |status| status.code)
     })
     .unwrap_or(0)
 }
@@ -4889,7 +4889,7 @@ fn engine_event_to_proto(
         E::RowStatusChange { row, status } => {
             Some(grid_event::Event::RowStatusChange(RowStatusChangeEvent {
                 row,
-                status,
+                status: Some(status.to_proto()),
             }))
         }
         E::BeforeSort { col } => Some(grid_event::Event::BeforeSort(BeforeSortEvent { col })),

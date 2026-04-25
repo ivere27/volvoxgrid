@@ -846,17 +846,18 @@ fn find_existing_subtotal_row(
 
 fn normalize_group_cell_text<'a>(text: &'a str, compare_mode: i32) -> std::borrow::Cow<'a, str> {
     match compare_mode {
-        // Case-insensitive
-        1 => std::borrow::Cow::Owned(text.to_lowercase()),
-        // Trim + case-insensitive
-        2 => std::borrow::Cow::Owned(text.trim().to_lowercase()),
-        // Default/exact
+        m if m == pb::SpanCompareMode::SpanCompareNoCase as i32 => {
+            std::borrow::Cow::Owned(text.to_lowercase())
+        }
+        m if m == pb::SpanCompareMode::SpanCompareTrimNoCase as i32 => {
+            std::borrow::Cow::Owned(text.trim().to_lowercase())
+        }
         _ => std::borrow::Cow::Borrowed(text),
     }
 }
 
 fn build_group_key(grid: &VolvoxGrid, row: i32, col_lo: i32, col_hi: i32) -> String {
-    let compare_mode = grid.span.span_compare;
+    let compare_mode = grid.span.group_span_compare;
     let mut key = String::new();
     for c in col_lo..=col_hi {
         if c > col_lo {
@@ -1106,7 +1107,7 @@ mod tests {
         let mut grid = sample_grid();
         grid.row_heights.insert(3, 42);
         grid.rows_hidden.insert(3);
-        grid.row_props.entry(3).or_default().status = 2;
+        grid.row_props.entry(3).or_default().status = crate::row::RowStatus::new("test", 2);
         grid.cell_styles.insert(
             (3, 1),
             CellStylePatch {
@@ -1122,7 +1123,7 @@ mod tests {
         assert_eq!(grid.row_heights.get(&3), Some(&42));
         assert!(grid.rows_hidden.contains(&3));
         assert!(grid.cell_styles.contains_key(&(3, 1)));
-        assert_eq!(grid.row_props.get(&3).map(|p| p.status), Some(2));
+        assert_eq!(grid.row_props.get(&3).map(|p| p.status.code), Some(2));
     }
 
     #[test]

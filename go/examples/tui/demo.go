@@ -369,7 +369,7 @@ func buildSalesTuiConfig(rows, cols int) *pb.GridConfig {
 		Span: &pb.SpanConfig{
 			CellSpan:        ptr(pb.CellSpanMode_CELL_SPAN_ADJACENT),
 			CellSpanFixed:   ptr(pb.CellSpanMode_CELL_SPAN_NONE),
-			CellSpanCompare: ptr(int32(1)),
+			CellSpanCompare: ptr(pb.SpanCompareMode_SPAN_COMPARE_NO_CASE),
 		},
 		Interaction: &pb.InteractionConfig{
 			HeaderFeatures: &pb.HeaderFeatures{

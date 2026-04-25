@@ -2475,7 +2475,7 @@ mod tests {
         grid.set_col_width(1, 10);
         grid.span.mode = pb::CellSpanMode::CellSpanByRow as i32;
         grid.span.span_cols.insert(0, true);
-        grid.span.span_compare = 1;
+        grid.span.span_compare = pb::SpanCompareMode::SpanCompareNoCase as i32;
 
         grid.cells.set_text(1, 0, "Q1".to_string());
         grid.cells.set_text(1, 1, "Seoul".to_string());
@@ -2503,7 +2503,7 @@ mod tests {
         grid.set_col_width(1, 10);
         grid.span.mode = pb::CellSpanMode::CellSpanByRow as i32;
         grid.span.span_cols.insert(0, true);
-        grid.span.span_compare = 1;
+        grid.span.span_compare = pb::SpanCompareMode::SpanCompareNoCase as i32;
 
         grid.cells.set_text(1, 0, "Q1".to_string());
         grid.cells.set_text(1, 1, "Seoul".to_string());

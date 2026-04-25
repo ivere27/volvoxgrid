@@ -5,12 +5,44 @@ pub struct RowProps {
     pub is_subtotal: bool,
     pub subtotal_caption_col: i32,
     pub is_collapsed: bool,
-    pub span: bool,  // span enabled for this row
-    pub status: i32, // 0=unchanged, 1=added, 2=modified, 3=deleted
+    pub span: bool, // span enabled for this row
+    pub status: RowStatus,
     /// Arbitrary user data per row (RowData property).
     pub user_data: Option<Vec<u8>>,
     /// Structural pin position: 0=none, 1=top, 2=bottom.
     pub pin: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RowStatus {
+    pub domain: String,
+    pub code: i32,
+}
+
+impl RowStatus {
+    pub fn new(domain: impl Into<String>, code: i32) -> Self {
+        Self {
+            domain: domain.into(),
+            code,
+        }
+    }
+
+    pub fn from_proto(status: &crate::proto::volvoxgrid::v1::RowStatus) -> Self {
+        Self::new(status.domain.clone(), status.code)
+    }
+
+    pub fn to_proto(&self) -> crate::proto::volvoxgrid::v1::RowStatus {
+        crate::proto::volvoxgrid::v1::RowStatus {
+            domain: self.domain.clone(),
+            code: self.code,
+        }
+    }
+}
+
+impl Default for RowStatus {
+    fn default() -> Self {
+        Self::new("", 0)
+    }
 }
 
 impl Default for RowProps {
@@ -21,7 +53,7 @@ impl Default for RowProps {
             subtotal_caption_col: -1,
             is_collapsed: false,
             span: false,
-            status: 0,
+            status: RowStatus::default(),
             user_data: None,
             pin: 0,
         }
@@ -34,6 +66,6 @@ impl RowProps {
     }
 
     pub fn heap_size_bytes(&self) -> usize {
-        self.user_data.as_ref().map_or(0, Vec::capacity)
+        self.status.domain.capacity() + self.user_data.as_ref().map_or(0, Vec::capacity)
     }
 }

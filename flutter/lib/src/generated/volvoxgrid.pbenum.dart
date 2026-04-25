@@ -1115,6 +1115,33 @@ class CellSpanMode extends $pb.ProtobufEnum {
   const CellSpanMode._(super.value, super.name);
 }
 
+/// Text normalization used when comparing cells for content-based spans
+/// and subtotal/group keys.
+class SpanCompareMode extends $pb.ProtobufEnum {
+  static const SpanCompareMode SPAN_COMPARE_EXACT =
+      SpanCompareMode._(0, _omitEnumNames ? '' : 'SPAN_COMPARE_EXACT');
+  static const SpanCompareMode SPAN_COMPARE_NO_CASE =
+      SpanCompareMode._(1, _omitEnumNames ? '' : 'SPAN_COMPARE_NO_CASE');
+  static const SpanCompareMode SPAN_COMPARE_TRIM_NO_CASE =
+      SpanCompareMode._(2, _omitEnumNames ? '' : 'SPAN_COMPARE_TRIM_NO_CASE');
+  static const SpanCompareMode SPAN_COMPARE_INCLUDE_NULLS =
+      SpanCompareMode._(3, _omitEnumNames ? '' : 'SPAN_COMPARE_INCLUDE_NULLS');
+
+  static const $core.List<SpanCompareMode> values = <SpanCompareMode>[
+    SPAN_COMPARE_EXACT,
+    SPAN_COMPARE_NO_CASE,
+    SPAN_COMPARE_TRIM_NO_CASE,
+    SPAN_COMPARE_INCLUDE_NULLS,
+  ];
+
+  static final $core.List<SpanCompareMode?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static SpanCompareMode? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const SpanCompareMode._(super.value, super.name);
+}
+
 class ScrollBarsMode extends $pb.ProtobufEnum {
   static const ScrollBarsMode SCROLLBAR_NONE =
       ScrollBarsMode._(0, _omitEnumNames ? '' : 'SCROLLBAR_NONE');

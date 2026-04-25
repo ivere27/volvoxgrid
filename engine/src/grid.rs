@@ -2373,13 +2373,13 @@ impl VolvoxGrid {
         props.user_data = data;
     }
 
-    /// Returns row status (`RowStatus`), defaulting to 0.
-    pub fn get_row_status(&self, row: i32) -> i32 {
-        self.get_row_props(row).map_or(0, |rp| rp.status)
+    /// Returns row status.
+    pub fn get_row_status(&self, row: i32) -> Option<&crate::row::RowStatus> {
+        self.get_row_props(row).map(|rp| &rp.status)
     }
 
-    /// Sets row status (`RowStatus`).
-    pub fn set_row_status(&mut self, row: i32, status: i32) {
+    /// Sets row status.
+    pub fn set_row_status(&mut self, row: i32, status: crate::row::RowStatus) {
         let Some(props) = self.row_props_mut(row) else {
             return;
         };
