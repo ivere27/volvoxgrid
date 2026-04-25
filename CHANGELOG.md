@@ -2,6 +2,15 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
+## 0.8.0
+
+- Added 1D and 2D barcode support.
+- Added aggregate APIs for range, count-all, median, and count-distinct.
+- Added custom sort support, schema responses, row status, and span compare modes.
+- Added dropdown lifecycle APIs with `BeforeDropdownOpen`, dropdown messages, and `EventDecision` handling for all before-events.
+- Cleaned up protocol compatibility with `*_UNSPECIFIED = 0` enum values and removal of `GridHandle`.
+- Refactored plugin event streaming to an event-driven flow and fixed Java `RenderLayerBit` handling.
+
 ## 0.7.1
 
 - Removed the shared `Empty` response from the API and added explicit response types for mutating RPCs.
