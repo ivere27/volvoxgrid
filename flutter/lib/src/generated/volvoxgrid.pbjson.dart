@@ -653,6 +653,10 @@ const AggregateType$json = {
     {'1': 'AGG_MIN', '2': 7},
     {'1': 'AGG_STD_DEV', '2': 8},
     {'1': 'AGG_VAR', '2': 9},
+    {'1': 'AGG_RANGE', '2': 10},
+    {'1': 'AGG_COUNT_ALL', '2': 11},
+    {'1': 'AGG_MEDIAN', '2': 12},
+    {'1': 'AGG_COUNT_DISTINCT', '2': 13},
   ],
 };
 
@@ -660,7 +664,9 @@ const AggregateType$json = {
 final $typed_data.Uint8List aggregateTypeDescriptor = $convert.base64Decode(
     'Cg1BZ2dyZWdhdGVUeXBlEgwKCEFHR19OT05FEAASDQoJQUdHX0NMRUFSEAESCwoHQUdHX1NVTR'
     'ACEg8KC0FHR19QRVJDRU5UEAMSDQoJQUdHX0NPVU5UEAQSDwoLQUdHX0FWRVJBR0UQBRILCgdB'
-    'R0dfTUFYEAYSCwoHQUdHX01JThAHEg8KC0FHR19TVERfREVWEAgSCwoHQUdHX1ZBUhAJ');
+    'R0dfTUFYEAYSCwoHQUdHX01JThAHEg8KC0FHR19TVERfREVWEAgSCwoHQUdHX1ZBUhAJEg0KCU'
+    'FHR19SQU5HRRAKEhEKDUFHR19DT1VOVF9BTEwQCxIOCgpBR0dfTUVESUFOEAwSFgoSQUdHX0NP'
+    'VU5UX0RJU1RJTkNUEA0=');
 
 @$core.Deprecated('Use cellSpanModeDescriptor instead')
 const CellSpanMode$json = {

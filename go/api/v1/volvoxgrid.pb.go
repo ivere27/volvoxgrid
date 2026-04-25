@@ -2093,46 +2093,62 @@ func (GroupTotalPosition) EnumDescriptor() ([]byte, []int) {
 //	MIN (7):     Minimum value.
 //	STD_DEV (8): Sample standard deviation (N−1 denominator).
 //	VAR (9):     Sample variance (N−1 denominator).
+//	RANGE (10):  Maximum minus minimum numeric value.
+//	COUNT_ALL (11): Count all cells, including non-numeric and empty cells.
+//	MEDIAN (12): Median numeric value.
+//	COUNT_DISTINCT (13): Count distinct non-empty cell values.
 type AggregateType int32
 
 const (
-	AggregateType_AGG_NONE    AggregateType = 0
-	AggregateType_AGG_CLEAR   AggregateType = 1
-	AggregateType_AGG_SUM     AggregateType = 2
-	AggregateType_AGG_PERCENT AggregateType = 3
-	AggregateType_AGG_COUNT   AggregateType = 4
-	AggregateType_AGG_AVERAGE AggregateType = 5
-	AggregateType_AGG_MAX     AggregateType = 6
-	AggregateType_AGG_MIN     AggregateType = 7
-	AggregateType_AGG_STD_DEV AggregateType = 8
-	AggregateType_AGG_VAR     AggregateType = 9
+	AggregateType_AGG_NONE           AggregateType = 0
+	AggregateType_AGG_CLEAR          AggregateType = 1
+	AggregateType_AGG_SUM            AggregateType = 2
+	AggregateType_AGG_PERCENT        AggregateType = 3
+	AggregateType_AGG_COUNT          AggregateType = 4
+	AggregateType_AGG_AVERAGE        AggregateType = 5
+	AggregateType_AGG_MAX            AggregateType = 6
+	AggregateType_AGG_MIN            AggregateType = 7
+	AggregateType_AGG_STD_DEV        AggregateType = 8
+	AggregateType_AGG_VAR            AggregateType = 9
+	AggregateType_AGG_RANGE          AggregateType = 10
+	AggregateType_AGG_COUNT_ALL      AggregateType = 11
+	AggregateType_AGG_MEDIAN         AggregateType = 12
+	AggregateType_AGG_COUNT_DISTINCT AggregateType = 13
 )
 
 // Enum value maps for AggregateType.
 var (
 	AggregateType_name = map[int32]string{
-		0: "AGG_NONE",
-		1: "AGG_CLEAR",
-		2: "AGG_SUM",
-		3: "AGG_PERCENT",
-		4: "AGG_COUNT",
-		5: "AGG_AVERAGE",
-		6: "AGG_MAX",
-		7: "AGG_MIN",
-		8: "AGG_STD_DEV",
-		9: "AGG_VAR",
+		0:  "AGG_NONE",
+		1:  "AGG_CLEAR",
+		2:  "AGG_SUM",
+		3:  "AGG_PERCENT",
+		4:  "AGG_COUNT",
+		5:  "AGG_AVERAGE",
+		6:  "AGG_MAX",
+		7:  "AGG_MIN",
+		8:  "AGG_STD_DEV",
+		9:  "AGG_VAR",
+		10: "AGG_RANGE",
+		11: "AGG_COUNT_ALL",
+		12: "AGG_MEDIAN",
+		13: "AGG_COUNT_DISTINCT",
 	}
 	AggregateType_value = map[string]int32{
-		"AGG_NONE":    0,
-		"AGG_CLEAR":   1,
-		"AGG_SUM":     2,
-		"AGG_PERCENT": 3,
-		"AGG_COUNT":   4,
-		"AGG_AVERAGE": 5,
-		"AGG_MAX":     6,
-		"AGG_MIN":     7,
-		"AGG_STD_DEV": 8,
-		"AGG_VAR":     9,
+		"AGG_NONE":           0,
+		"AGG_CLEAR":          1,
+		"AGG_SUM":            2,
+		"AGG_PERCENT":        3,
+		"AGG_COUNT":          4,
+		"AGG_AVERAGE":        5,
+		"AGG_MAX":            6,
+		"AGG_MIN":            7,
+		"AGG_STD_DEV":        8,
+		"AGG_VAR":            9,
+		"AGG_RANGE":          10,
+		"AGG_COUNT_ALL":      11,
+		"AGG_MEDIAN":         12,
+		"AGG_COUNT_DISTINCT": 13,
 	}
 )
 
@@ -25032,7 +25048,7 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\x1eTREE_INDICATOR_CONNECTORS_LEAF\x10\x04*B\n" +
 	"\x12GroupTotalPosition\x12\x15\n" +
 	"\x11GROUP_TOTAL_ABOVE\x10\x00\x12\x15\n" +
-	"\x11GROUP_TOTAL_BELOW\x10\x01*\xa2\x01\n" +
+	"\x11GROUP_TOTAL_BELOW\x10\x01*\xec\x01\n" +
 	"\rAggregateType\x12\f\n" +
 	"\bAGG_NONE\x10\x00\x12\r\n" +
 	"\tAGG_CLEAR\x10\x01\x12\v\n" +
@@ -25043,7 +25059,13 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\aAGG_MAX\x10\x06\x12\v\n" +
 	"\aAGG_MIN\x10\a\x12\x0f\n" +
 	"\vAGG_STD_DEV\x10\b\x12\v\n" +
-	"\aAGG_VAR\x10\t*\xc2\x01\n" +
+	"\aAGG_VAR\x10\t\x12\r\n" +
+	"\tAGG_RANGE\x10\n" +
+	"\x12\x11\n" +
+	"\rAGG_COUNT_ALL\x10\v\x12\x0e\n" +
+	"\n" +
+	"AGG_MEDIAN\x10\f\x12\x16\n" +
+	"\x12AGG_COUNT_DISTINCT\x10\r*\xc2\x01\n" +
 	"\fCellSpanMode\x12\x12\n" +
 	"\x0eCELL_SPAN_NONE\x10\x00\x12\x12\n" +
 	"\x0eCELL_SPAN_FREE\x10\x01\x12\x14\n" +

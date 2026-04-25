@@ -597,17 +597,25 @@ enum GroupTotalPosition {
 //   MIN (7):     Minimum value.
 //   STD_DEV (8): Sample standard deviation (N−1 denominator).
 //   VAR (9):     Sample variance (N−1 denominator).
+//   RANGE (10):  Maximum minus minimum numeric value.
+//   COUNT_ALL (11): Count all cells, including non-numeric and empty cells.
+//   MEDIAN (12): Median numeric value.
+//   COUNT_DISTINCT (13): Count distinct non-empty cell values.
 enum AggregateType {
-  AGG_NONE    = 0;
-  AGG_CLEAR   = 1;
-  AGG_SUM     = 2;
-  AGG_PERCENT = 3;
-  AGG_COUNT   = 4;
-  AGG_AVERAGE = 5;
-  AGG_MAX     = 6;
-  AGG_MIN     = 7;
-  AGG_STD_DEV = 8;
-  AGG_VAR     = 9;
+  AGG_NONE           = 0;
+  AGG_CLEAR          = 1;
+  AGG_SUM            = 2;
+  AGG_PERCENT        = 3;
+  AGG_COUNT          = 4;
+  AGG_AVERAGE        = 5;
+  AGG_MAX            = 6;
+  AGG_MIN            = 7;
+  AGG_STD_DEV        = 8;
+  AGG_VAR            = 9;
+  AGG_RANGE          = 10;
+  AGG_COUNT_ALL      = 11;
+  AGG_MEDIAN         = 12;
+  AGG_COUNT_DISTINCT = 13;
 }
 
 // ── Cell Span ──

@@ -4866,16 +4866,24 @@ export class VolvoxGrid {
       return pbDecodeAggregateValue(resp);
     }
 
-    let count = 0;
     let sum = 0;
+    let count = 0;
+    let countAll = 0;
     let min = Number.POSITIVE_INFINITY;
     let max = Number.NEGATIVE_INFINITY;
+    const values: number[] = [];
+    const distinctValues = new Set<string>();
     for (let r = row1; r <= row2; r += 1) {
       for (let c = col1; c <= col2; c += 1) {
-        const n = Number(this.getCellText(r, c));
+        countAll += 1;
+        const text = this.getCellText(r, c);
+        const trimmed = text.trim();
+        if (trimmed.length > 0) distinctValues.add(trimmed);
+        const n = Number(text.replace(/[,$\s]/g, ""));
         if (!Number.isFinite(n)) continue;
         count += 1;
         sum += n;
+        values.push(n);
         if (n < min) min = n;
         if (n > max) max = n;
       }
@@ -4885,6 +4893,18 @@ export class VolvoxGrid {
     if (type === 5) return count > 0 ? sum / count : Number.NaN; // AGG_AVERAGE
     if (type === 6) return count > 0 ? max : Number.NaN; // AGG_MAX
     if (type === 7) return count > 0 ? min : Number.NaN; // AGG_MIN
+    if (type === 10) return count > 0 ? max - min : Number.NaN; // AGG_RANGE
+    if (type === 11) return countAll; // AGG_COUNT_ALL
+    if (type === 12) {
+      // AGG_MEDIAN
+      if (count === 0) return Number.NaN;
+      values.sort((a, b) => a - b);
+      const mid = Math.floor(values.length / 2);
+      return values.length % 2 === 0
+        ? (values[mid - 1] + values[mid]) / 2
+        : values[mid];
+    }
+    if (type === 13) return distinctValues.size; // AGG_COUNT_DISTINCT
     return Number.NaN;
   }
 
