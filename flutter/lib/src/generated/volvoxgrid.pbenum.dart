@@ -692,32 +692,6 @@ class TypePolicy extends $pb.ProtobufEnum {
   const TypePolicy._(super.value, super.name);
 }
 
-/// Data loading mode.
-///   UNSPECIFIED (0): Invalid in LoadDataOptions.mode.
-///   REPLACE (1):     Clears all cells and resets to new dimensions.
-///   APPEND (2):      Inserts data after existing rows; preserves current schema.
-class LoadMode extends $pb.ProtobufEnum {
-  static const LoadMode LOAD_MODE_UNSPECIFIED =
-      LoadMode._(0, _omitEnumNames ? '' : 'LOAD_MODE_UNSPECIFIED');
-  static const LoadMode LOAD_REPLACE =
-      LoadMode._(1, _omitEnumNames ? '' : 'LOAD_REPLACE');
-  static const LoadMode LOAD_APPEND =
-      LoadMode._(2, _omitEnumNames ? '' : 'LOAD_APPEND');
-
-  static const $core.List<LoadMode> values = <LoadMode>[
-    LOAD_MODE_UNSPECIFIED,
-    LOAD_REPLACE,
-    LOAD_APPEND,
-  ];
-
-  static final $core.List<LoadMode?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
-  static LoadMode? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const LoadMode._(super.value, super.name);
-}
-
 class LoadDataStatus extends $pb.ProtobufEnum {
   static const LoadDataStatus LOAD_OK =
       LoadDataStatus._(0, _omitEnumNames ? '' : 'LOAD_OK');

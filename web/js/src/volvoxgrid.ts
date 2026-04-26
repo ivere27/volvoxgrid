@@ -318,7 +318,6 @@ export interface VolvoxGridLoadDataOptions {
   dateFormat?: string;
   decimalChar?: string;
   autoCreateColumns?: boolean;
-  mode?: number;
   atomic?: boolean;
   skipRows?: number;
   maxRows?: number;
@@ -1217,9 +1216,6 @@ function pbEncodeLoadDataOptions(options: VolvoxGridLoadDataOptions): Uint8Array
   }
   if (options.autoCreateColumns != null) {
     out.push(...pbEncodeTag(17, 0), ...pbEncodeBool(options.autoCreateColumns));
-  }
-  if (options.mode != null) {
-    out.push(...pbEncodeTag(18, 0), ...pbEncodeInt32(options.mode));
   }
   if (options.atomic != null) {
     out.push(...pbEncodeTag(19, 0), ...pbEncodeBool(options.atomic));
@@ -2898,6 +2894,32 @@ export class VolvoxGrid {
     const response = this.wasm.volvox_grid_load_data_pb(requestBytes) as Uint8Array;
     if (!(response instanceof Uint8Array) || response.length === 0) {
       throw new Error("VolvoxGrid.loadData returned an empty response");
+    }
+
+    const result = pbDecodeLoadDataResult(response);
+    this.dirty = true;
+    return result;
+  }
+
+  /** Parse CSV or JSON bytes and append them to the grid via the wasm AppendData RPC. */
+  appendData(
+    data: string | Uint8Array | ArrayBuffer,
+    options?: VolvoxGridLoadDataOptions,
+  ): VolvoxGridLoadDataResult {
+    if (typeof this.wasm.volvox_grid_append_data_pb !== "function") {
+      throw new Error("VolvoxGrid.appendData requires wasm support for volvox_grid_append_data_pb");
+    }
+
+    const payload = typeof data === "string"
+      ? PB_TEXT_ENCODER.encode(data)
+      : data instanceof Uint8Array
+        ? data
+        : new Uint8Array(data);
+
+    const requestBytes = pbEncodeLoadDataRequest(this.gridId, payload, options);
+    const response = this.wasm.volvox_grid_append_data_pb(requestBytes) as Uint8Array;
+    if (!(response instanceof Uint8Array) || response.length === 0) {
+      throw new Error("VolvoxGrid.appendData returned an empty response");
     }
 
     const result = pbDecodeLoadDataResult(response);

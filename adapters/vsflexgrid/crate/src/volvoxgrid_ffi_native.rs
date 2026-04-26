@@ -49,6 +49,7 @@ pub trait VolvoxGridServicePlugin: Send + Sync + 'static {
     fn get_cells(&self, request: GetCellsRequest) -> Result<CellsResponse, String>;
     fn load_table(&self, request: LoadTableRequest) -> Result<WriteResult, String>;
     fn load_data(&self, request: LoadDataRequest) -> Result<LoadDataResult, String>;
+    fn append_data(&self, request: AppendDataRequest) -> Result<LoadDataResult, String>;
     fn clear(&self, request: ClearRequest) -> Result<ClearResponse, String>;
     fn select(&self, request: SelectRequest) -> Result<SelectResponse, String>;
     fn get_selection(&self, request: GetSelectionRequest) -> Result<SelectionState, String>;
@@ -994,6 +995,64 @@ pub unsafe extern "C" fn volvox_grid_load_data_pb(
         }
     };
     match plugin.load_data(req) {
+        Ok(r) => {
+            clear_last_error();
+            let mut buf = Vec::new();
+            if r.encode(&mut buf).is_ok() {
+                if !out_len.is_null() {
+                    *out_len = buf.len() as i32;
+                }
+                alloc_payload_with_header(buf)
+            } else {
+                if !out_len.is_null() {
+                    *out_len = 0;
+                }
+                std::ptr::null_mut()
+            }
+        }
+        Err(e) => {
+            set_last_error(e);
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
+    }
+}
+
+/// AppendData (protobuf input — has repeated/oneof fields)
+#[no_mangle]
+pub unsafe extern "C" fn volvox_grid_append_data_pb(
+    data: *const u8,
+    data_len: i32,
+    out_len: *mut i32,
+) -> *mut u8 {
+    let plugin = match get_volvox_grid_service_plugin() {
+        Some(p) => p,
+        None => {
+            set_last_error("plugin not registered".into());
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
+    };
+    let input = if data.is_null() || data_len <= 0 {
+        Vec::new()
+    } else {
+        std::slice::from_raw_parts(data, data_len as usize).to_vec()
+    };
+    let req = match AppendDataRequest::decode(input.as_slice()) {
+        Ok(r) => r,
+        Err(e) => {
+            set_last_error(format!("decode: {}", e));
+            if !out_len.is_null() {
+                *out_len = 0;
+            }
+            return std::ptr::null_mut();
+        }
+    };
+    match plugin.append_data(req) {
         Ok(r) => {
             clear_last_error();
             let mut buf = Vec::new();

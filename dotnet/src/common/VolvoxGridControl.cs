@@ -2339,6 +2339,21 @@ namespace VolvoxGrid.DotNet
             catch (Exception ex) { _lastError = ex.Message; }
         }
 
+        public void AppendData(byte[] data)
+        {
+            if (!EnsureEngine()) return;
+            try
+            {
+                _client.AppendData(_gridId, data ?? new byte[0]);
+                _engineManagedData = true;
+                _tableModel = null;
+                SyncRowCountFromEngine();
+                _client.Refresh(_gridId);
+                _renderHost.RequestFrame();
+            }
+            catch (Exception ex) { _lastError = ex.Message; }
+        }
+
         public void PrintGrid(
             bool landscape = false,
             int marginLeft = 0,

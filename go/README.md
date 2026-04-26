@@ -92,13 +92,11 @@ if _, err := grid.LoadData(
 
 // JSON matrix
 headerPolicy := pb.HeaderPolicy_HEADER_NONE
-loadMode := pb.LoadMode_LOAD_REPLACE
 if _, err := grid.LoadData(
     []byte(`[["Name","Price"],["Alpha","10"]]`),
     &pb.LoadDataOptions{
         Format:       &pb.LoadDataOptions_Json{Json: &pb.JsonOptions{}},
         HeaderPolicy: &headerPolicy,
-        Mode:         &loadMode,
     },
 ); err != nil {
     return err

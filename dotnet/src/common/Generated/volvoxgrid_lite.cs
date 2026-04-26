@@ -479,13 +479,6 @@ namespace Volvoxgrid.V1
         LOAD_FAILED = 2,
     }
 
-    public enum LoadMode
-    {
-        LOAD_MODE_UNSPECIFIED = 0,
-        LOAD_REPLACE = 1,
-        LOAD_APPEND = 2,
-    }
-
     public enum NodeRelation
     {
         NODE_PARENT = 0,
@@ -1163,6 +1156,50 @@ namespace Volvoxgrid.V1
                 switch (field)
                 {
                     case 1: msg.Value = r.ReadDouble(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class AppendDataRequest
+    {
+        public long GridId { get; set; }
+        public byte[] Data { get; set; }
+        private LoadDataOptions _options;
+        public LoadDataOptions Options { get { return _options; } set { _options = value; } }
+        public bool HasOptions { get { return _options != null; } }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (GridId != 0L) w.WriteInt64(1, GridId);
+            if (Data != null && Data.Length > 0) w.WriteBytes(2, Data);
+            if (_options != null)
+                w.WriteMessageBytes(3, _options.ToByteArray());
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<AppendDataRequest> Parser = new MessageParser<AppendDataRequest>(data => ParseFrom(data));
+
+        public static AppendDataRequest ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new AppendDataRequest();
+            var r = new ProtoReader(data);
+            var msg = new AppendDataRequest();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.GridId = r.ReadInt64(); break;
+                    case 2: msg.Data = r.ReadLengthDelimited(); break;
+                    case 3: msg.Options = LoadDataOptions.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -8641,9 +8678,6 @@ namespace Volvoxgrid.V1
         private bool? _autoCreateColumns;
         public bool AutoCreateColumns { get { return _autoCreateColumns.GetValueOrDefault(); } set { _autoCreateColumns = value; } }
         public bool HasAutoCreateColumns { get { return _autoCreateColumns.HasValue; } }
-        private LoadMode? _mode;
-        public LoadMode Mode { get { return _mode.GetValueOrDefault(); } set { _mode = value; } }
-        public bool HasMode { get { return _mode.HasValue; } }
         private bool? _atomic;
         public bool Atomic { get { return _atomic.GetValueOrDefault(); } set { _atomic = value; } }
         public bool HasAtomic { get { return _atomic.HasValue; } }
@@ -8675,8 +8709,6 @@ namespace Volvoxgrid.V1
                 w.WriteString(16, _decimalChar);
             if (_autoCreateColumns.HasValue)
                 w.WriteBool(17, _autoCreateColumns.Value);
-            if (_mode.HasValue)
-                w.WriteInt32(18, (int)_mode.Value);
             if (_atomic.HasValue)
                 w.WriteBool(19, _atomic.Value);
             if (_skipRows.HasValue)
@@ -8719,7 +8751,6 @@ namespace Volvoxgrid.V1
                     case 15: msg.DateFormat = r.ReadString(); break;
                     case 16: msg.DecimalChar = r.ReadString(); break;
                     case 17: msg.AutoCreateColumns = r.ReadBool(); break;
-                    case 18: msg.Mode = (LoadMode)r.ReadInt32(); break;
                     case 19: msg.Atomic = r.ReadBool(); break;
                     case 20: msg.SkipRows = r.ReadInt32(); break;
                     case 21: msg.MaxRows = r.ReadInt32(); break;
@@ -13435,6 +13466,13 @@ namespace Volvoxgrid.V1
         {
             byte[] data = request.ToByteArray();
             byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/LoadData", data);
+            return LoadDataResult.ParseFrom(result);
+        }
+
+        public LoadDataResult AppendData(AppendDataRequest request)
+        {
+            byte[] data = request.ToByteArray();
+            byte[] result = _host.Invoke("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/AppendData", data);
             return LoadDataResult.ParseFrom(result);
         }
 

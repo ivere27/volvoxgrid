@@ -33,7 +33,6 @@ import io.github.ivere27.volvoxgrid.InteractionConfig
 import io.github.ivere27.volvoxgrid.LayoutConfig
 import io.github.ivere27.volvoxgrid.LoadDataStatus
 import io.github.ivere27.volvoxgrid.LoadDataOptions
-import io.github.ivere27.volvoxgrid.LoadMode
 import io.github.ivere27.volvoxgrid.OutlineConfig
 import io.github.ivere27.volvoxgrid.RegionStyle
 import io.github.ivere27.volvoxgrid.ResizePolicy
@@ -84,7 +83,6 @@ object SalesJsonDemo {
             controller.getDemoData("sales"),
             LoadDataOptions.newBuilder()
                 .setAutoCreateColumns(false)
-                .setMode(LoadMode.LOAD_REPLACE)
                 .build()
         )
         check(result.status != LoadDataStatus.LOAD_FAILED) { "LoadData failed for embedded sales demo" }

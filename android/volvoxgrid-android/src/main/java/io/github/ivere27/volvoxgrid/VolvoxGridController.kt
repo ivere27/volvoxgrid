@@ -1483,6 +1483,16 @@ class VolvoxGridController(
         return service.LoadData(builder.build())
     }
 
+    fun appendData(data: ByteArray, options: LoadDataOptions? = null): LoadDataResult {
+        val builder = AppendDataRequest.newBuilder()
+            .setGridId(gridId)
+            .setData(com.google.protobuf.ByteString.copyFrom(data))
+        if (options != null) {
+            builder.setOptions(options)
+        }
+        return service.AppendData(builder.build())
+    }
+
     fun printGrid(
         orientation: PrintOrientation = PrintOrientation.PRINT_PORTRAIT,
         marginLeft: Int = 0,

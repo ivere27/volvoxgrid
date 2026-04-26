@@ -1,7 +1,7 @@
 //! VolvoxGrid Smoke Test
 //!
 //! Loads the plugin via synurang-host PluginHost, exercises basic v1 RPCs:
-//! Create, GetConfig, UpdateCells, GetCells, Sort, Configure, Select, Destroy
+//! Create, GetConfig, UpdateCells, GetCells, AppendData, Sort, Configure, Select, Destroy
 
 use prost::Message;
 use std::path::Path;
@@ -239,7 +239,82 @@ fn main() {
     }
     println!("GetCells verified.");
 
-    // 7. Sort
+    // 7. AppendData — append a CSV row through the plugin dispatch path.
+    let req = AppendDataRequest {
+        grid_id,
+        data: b"Product,Category,Sales,Quarter,Region\nAppend Smoke,Integration,777,Q5,Test"
+            .to_vec(),
+        options: Some(LoadDataOptions {
+            format: Some(load_data_options::Format::Csv(CsvOptions {
+                delimiter: Some(",".to_string()),
+                quote_char: None,
+                trim_whitespace: Some(true),
+            })),
+            header_policy: Some(HeaderPolicy::HeaderFirstRow as i32),
+            ..Default::default()
+        }),
+    };
+    let resp_bytes = invoke(
+        &plugin,
+        "/volvoxgrid.v1.VolvoxGridService/AppendData",
+        &req.encode_to_vec(),
+    );
+    let append_result = LoadDataResult::decode(resp_bytes.as_slice()).unwrap();
+    assert_eq!(
+        append_result.status,
+        LoadDataStatus::LoadOk as i32,
+        "AppendData should succeed"
+    );
+    assert_eq!(
+        append_result.rows, 1,
+        "AppendData should report one loaded row"
+    );
+
+    let resp_bytes = invoke(
+        &plugin,
+        "/volvoxgrid.v1.VolvoxGridService/GetConfig",
+        &get_config.encode_to_vec(),
+    );
+    let config = GridConfig::decode(resp_bytes.as_slice()).unwrap();
+    let layout = config
+        .layout
+        .expect("layout should be present after append");
+    assert_eq!(layout.rows.unwrap(), 51, "AppendData should grow row count");
+    assert_eq!(
+        layout.cols.unwrap(),
+        5,
+        "AppendData should preserve column count"
+    );
+
+    let req = GetCellsRequest {
+        grid_id,
+        row1: 50,
+        col1: 0,
+        row2: 50,
+        col2: 0,
+        include_style: false,
+        include_checked: false,
+        include_typed: false,
+        include_barcode_status: false,
+    };
+    let resp_bytes = invoke(
+        &plugin,
+        "/volvoxgrid.v1.VolvoxGridService/GetCells",
+        &req.encode_to_vec(),
+    );
+    let cells_resp = CellsResponse::decode(resp_bytes.as_slice()).unwrap();
+    let cell = &cells_resp.cells[0];
+    if let Some(CellValue {
+        value: Some(cell_value::Value::Text(ref t)),
+    }) = cell.value
+    {
+        assert_eq!(t, "Append Smoke", "Appended cell mismatch: got '{}'", t);
+    } else {
+        panic!("Expected text value for appended cell");
+    }
+    println!("AppendData verified.");
+
+    // 8. Sort
     let req = SortRequest {
         grid_id,
         sort_columns: vec![SortColumn {
@@ -255,7 +330,7 @@ fn main() {
     );
     println!("Sort complete.");
 
-    // 8. GetCells after sort
+    // 9. GetCells after sort
     let req = GetCellsRequest {
         grid_id,
         row1: 0,
@@ -281,7 +356,7 @@ fn main() {
         println!("After sort, row 1 col 0 = \"{}\"", t);
     }
 
-    // 9. Configure selection mode + Select
+    // 10. Configure selection mode + Select
     let req = ConfigureRequest {
         grid_id,
         config: Some(GridConfig {
@@ -317,7 +392,7 @@ fn main() {
     );
     println!("Selection set: rows 2-5.");
 
-    // 10. Destroy
+    // 11. Destroy
     let destroy = DestroyRequest { grid_id };
     invoke(
         &plugin,

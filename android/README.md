@@ -232,7 +232,6 @@ ctrl.setCells(Arrays.asList(
 LoadDataOptions matrixJson = LoadDataOptions.newBuilder()
     .setJson(JsonOptions.newBuilder().build())
     .setHeaderPolicy(HeaderPolicy.HEADER_NONE)
-    .setMode(LoadMode.LOAD_REPLACE)
     .build();
 ctrl.loadData(
     """
@@ -568,7 +567,6 @@ ctrl.loadData(
     LoadDataOptions.newBuilder()
         .setJson(JsonOptions.newBuilder().build())
         .setHeaderPolicy(HeaderPolicy.HEADER_NONE)
-        .setMode(LoadMode.LOAD_REPLACE)
         .build()
 )
 

@@ -436,16 +436,6 @@ enum TypePolicy {
   TYPE_FROM_SCHEMA = 2;
 }
 
-// Data loading mode.
-//   UNSPECIFIED (0): Invalid in LoadDataOptions.mode.
-//   REPLACE (1):     Clears all cells and resets to new dimensions.
-//   APPEND (2):      Inserts data after existing rows; preserves current schema.
-enum LoadMode {
-  LOAD_MODE_UNSPECIFIED = 0;
-  LOAD_REPLACE          = 1;
-  LOAD_APPEND           = 2;
-}
-
 enum LoadDataStatus {
   LOAD_OK      = 0;
   LOAD_PARTIAL = 1;
@@ -1680,13 +1670,12 @@ message LoadDataOptions {
   optional string         date_format         = 15;
   optional string         decimal_char        = 16;
   optional bool           auto_create_columns = 17;
-  optional LoadMode       mode                = 18;
   optional bool           atomic              = 19;
   optional int32          skip_rows           = 20;
   optional int32          max_rows            = 21;
 }
 
-// Load structured data (CSV or JSON) into the grid.
+// Load structured data (CSV or JSON) into the grid, replacing existing data.
 // The engine parses the data, infers types, validates values, and
 // populates cells. See engine/src/load.rs.
 //
@@ -1694,6 +1683,13 @@ message LoadDataOptions {
 // {columns,data}, object with all-array values, or single object.
 // JSONPath navigation via JsonOptions.data_path (e.g. "results.items").
 message LoadDataRequest {
+  int64                    grid_id = 1;
+  bytes                    data    = 2;  // UTF-8 CSV or JSON bytes
+  optional LoadDataOptions options = 3;
+}
+
+// Append structured data (CSV or JSON) after existing grid rows.
+message AppendDataRequest {
   int64                    grid_id = 1;
   bytes                    data    = 2;  // UTF-8 CSV or JSON bytes
   optional LoadDataOptions options = 3;
@@ -2843,6 +2839,7 @@ service VolvoxGridService {
   rpc GetCells(GetCellsRequest)           returns (CellsResponse);
   rpc LoadTable(LoadTableRequest)         returns (WriteResult);
   rpc LoadData(LoadDataRequest)           returns (LoadDataResult);
+  rpc AppendData(AppendDataRequest)       returns (LoadDataResult);
   rpc Clear(ClearRequest)                 returns (ClearResponse);
 
   // ── Selection ──

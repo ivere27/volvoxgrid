@@ -26,7 +26,6 @@ struct EffectiveLoadOptions {
     date_format: Option<String>,
     decimal_char: char,
     auto_create_columns: bool,
-    mode: i32,
     atomic: bool,
     skip_rows: usize,
     max_rows: Option<usize>,
@@ -90,10 +89,6 @@ impl EffectiveLoadOptions {
                 })
                 .unwrap_or('.'),
             auto_create_columns: options.and_then(|o| o.auto_create_columns).unwrap_or(true),
-            mode: match options {
-                Some(options) => options.mode.unwrap_or(pb::LoadMode::Unspecified as i32),
-                None => pb::LoadMode::LoadReplace as i32,
-            },
             atomic: options.and_then(|o| o.atomic).unwrap_or(false),
             skip_rows: options.and_then(|o| o.skip_rows).unwrap_or(0).max(0) as usize,
             max_rows: options
@@ -132,17 +127,24 @@ pub fn load_data(
     data: &[u8],
     options: Option<&pb::LoadDataOptions>,
 ) -> pb::LoadDataResult {
-    let opts = EffectiveLoadOptions::from_proto(data, options);
-    if opts.mode == pb::LoadMode::Unspecified as i32 {
-        return failed_result(
-            "LoadDataOptions.mode must be set to LOAD_REPLACE or LOAD_APPEND".to_string(),
-        );
-    }
-    if opts.mode != pb::LoadMode::LoadReplace as i32 && opts.mode != pb::LoadMode::LoadAppend as i32
-    {
-        return failed_result(format!("Unsupported LoadDataOptions.mode: {}", opts.mode));
-    }
+    load_data_impl(grid, data, options, false)
+}
 
+pub fn append_data(
+    grid: &mut VolvoxGrid,
+    data: &[u8],
+    options: Option<&pb::LoadDataOptions>,
+) -> pb::LoadDataResult {
+    load_data_impl(grid, data, options, true)
+}
+
+fn load_data_impl(
+    grid: &mut VolvoxGrid,
+    data: &[u8],
+    options: Option<&pb::LoadDataOptions>,
+    append: bool,
+) -> pb::LoadDataResult {
+    let opts = EffectiveLoadOptions::from_proto(data, options);
     let mut table = match parse_input(data, &opts) {
         Ok(table) => table,
         Err(message) => return failed_result(message),
@@ -152,8 +154,7 @@ pub fn load_data(
     let original_cols = grid.cols.max(0) as usize;
     let source_col_count = source_column_count(&table);
     let source_names = source_column_names(&table, source_col_count);
-    let preserve_existing_cols =
-        opts.mode == pb::LoadMode::LoadAppend as i32 || has_meaningful_schema(grid);
+    let preserve_existing_cols = append || has_meaningful_schema(grid);
     let mut target_width = if preserve_existing_cols {
         original_cols
     } else {
@@ -234,11 +235,7 @@ pub fn load_data(
         warnings.push("No source columns could be mapped into the grid.".to_string());
     }
 
-    let row_offset = if opts.mode == pb::LoadMode::LoadAppend as i32 {
-        grid.rows.max(0)
-    } else {
-        0
-    };
+    let row_offset = if append { grid.rows.max(0) } else { 0 };
     let mut updates = Vec::new();
     for (row_index, row) in table.rows.iter().enumerate() {
         for mapping in &mappings {
@@ -273,7 +270,7 @@ pub fn load_data(
     } else {
         target_width.max(1) as i32
     };
-    let final_rows = if opts.mode == pb::LoadMode::LoadAppend as i32 {
+    let final_rows = if append {
         (grid.rows.max(0) + loaded_rows).max(1)
     } else {
         loaded_rows.max(1)
@@ -301,14 +298,14 @@ pub fn load_data(
     }
 
     let restore_modes = snapshot_request_modes(grid, original_cols.min(final_cols as usize));
-    if opts.mode == pb::LoadMode::LoadReplace as i32 {
+    if append {
+        grid.set_cols(final_cols);
+        grid.set_rows(final_rows);
+    } else {
         grid.set_rows(final_rows);
         grid.set_cols(final_cols);
         grid.cells.clear_all();
         grid.clear_barcode_presence_tracking();
-    } else {
-        grid.set_cols(final_cols);
-        grid.set_rows(final_rows);
     }
     apply_created_columns(grid, &created_defs);
     apply_request_modes(grid, final_cols, opts.coercion, opts.error_mode);
@@ -1510,7 +1507,7 @@ fn days_from_civil(year: i32, month: i32, day: i32) -> i64 {
 
 #[cfg(test)]
 mod tests {
-    use super::load_data;
+    use super::{append_data, load_data};
     use crate::grid::VolvoxGrid;
     use crate::outline::subtotal;
     use crate::proto::volvoxgrid::v1 as pb;
@@ -1524,7 +1521,6 @@ mod tests {
             format: Some(pb::load_data_options::Format::Json(pb::JsonOptions {
                 data_path: None,
             })),
-            mode: Some(pb::LoadMode::LoadReplace as i32),
             ..Default::default()
         }
     }
@@ -1536,7 +1532,6 @@ mod tests {
                 quote_char: None,
                 trim_whitespace: None,
             })),
-            mode: Some(pb::LoadMode::LoadReplace as i32),
             ..Default::default()
         }
     }
@@ -1563,19 +1558,14 @@ mod tests {
     }
 
     #[test]
-    fn load_data_options_requires_explicit_mode() {
+    fn load_data_accepts_options_without_mode() {
         let mut grid = new_grid();
-        let mut options = json_options();
-        options.mode = None;
+        let options = json_options();
 
-        let result = load_data(&mut grid, br#"[{"value":"kept out"}]"#, Some(&options));
+        let result = load_data(&mut grid, br#"[{"value":"loaded"}]"#, Some(&options));
 
-        assert_eq!(result.status, pb::LoadDataStatus::LoadFailed as i32);
-        assert!(result
-            .warnings
-            .iter()
-            .any(|warning| warning.contains("LoadDataOptions.mode")));
-        assert_eq!(grid.cells.len(), 0);
+        assert_eq!(result.status, pb::LoadDataStatus::LoadOk as i32);
+        assert_eq!(grid.cells.get_text(0, 0), "loaded");
     }
 
     #[test]
@@ -1642,9 +1632,8 @@ mod tests {
 
         let mut options = csv_options(";");
         options.decimal_char = Some(",".to_string());
-        options.mode = Some(pb::LoadMode::LoadAppend as i32);
 
-        let result = load_data(&mut grid, b"date;amount\n2024-01-02;1,25", Some(&options));
+        let result = append_data(&mut grid, b"date;amount\n2024-01-02;1,25", Some(&options));
 
         assert_eq!(result.status, pb::LoadDataStatus::LoadOk as i32);
         assert_eq!(grid.rows, 2);

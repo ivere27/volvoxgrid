@@ -158,7 +158,6 @@ namespace VolvoxGrid.DotNet.TuiSample
                     new LoadDataOptions
                     {
                         AutoCreateColumns = false,
-                        Mode = LoadMode.LOAD_REPLACE,
                     });
                 if (load == null || load.Status == LoadDataStatus.LOAD_FAILED)
                 {
@@ -224,7 +223,6 @@ namespace VolvoxGrid.DotNet.TuiSample
                     new LoadDataOptions
                     {
                         AutoCreateColumns = false,
-                        Mode = LoadMode.LOAD_REPLACE,
                     });
                 if (load == null || load.Status == LoadDataStatus.LOAD_FAILED)
                 {

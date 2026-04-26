@@ -334,11 +334,6 @@ export enum LoadDataStatus {
   LOAD_PARTIAL = 1,
   LOAD_FAILED = 2,
 }
-export enum LoadMode {
-  LOAD_MODE_UNSPECIFIED = 0,
-  LOAD_REPLACE = 1,
-  LOAD_APPEND = 2,
-}
 export enum NodeRelation {
   NODE_PARENT = 0,
   NODE_FIRST_CHILD = 1,
@@ -606,6 +601,11 @@ export const AggregateRequestFields = {
 } as const;
 export const AggregateResponseFields = {
   "value": 1,
+} as const;
+export const AppendDataRequestFields = {
+  "grid_id": 1,
+  "data": 2,
+  "options": 3,
 } as const;
 export const ArchiveRequestFields = {
   "grid_id": 1,
@@ -1523,7 +1523,6 @@ export const LoadDataOptionsFields = {
   "date_format": 15,
   "decimal_char": 16,
   "auto_create_columns": 17,
-  "mode": 18,
   "atomic": 19,
   "skip_rows": 20,
   "max_rows": 21,
@@ -2092,6 +2091,7 @@ export const VolvoxGridServiceMethods = {
   GetCells: "/volvoxgrid.v1.VolvoxGridService/GetCells",
   LoadTable: "/volvoxgrid.v1.VolvoxGridService/LoadTable",
   LoadData: "/volvoxgrid.v1.VolvoxGridService/LoadData",
+  AppendData: "/volvoxgrid.v1.VolvoxGridService/AppendData",
   Clear: "/volvoxgrid.v1.VolvoxGridService/Clear",
   Select: "/volvoxgrid.v1.VolvoxGridService/Select",
   GetSelection: "/volvoxgrid.v1.VolvoxGridService/GetSelection",

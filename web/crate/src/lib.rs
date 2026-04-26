@@ -5490,6 +5490,12 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         })
     }
 
+    fn append_data(&self, request: AppendDataRequest) -> Result<LoadDataResult, String> {
+        wasm_with_grid(request.grid_id, |grid| {
+            volvoxgrid_engine::load::append_data(grid, &request.data, request.options.as_ref())
+        })
+    }
+
     fn clear(&self, request: ClearRequest) -> Result<ClearResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
             let before = grid.cells.len() as i32;

@@ -121,10 +121,8 @@ func buildSalesDemo(host *volvoxgrid.Client, width, height int) (*demoInstance, 
 		return nil, err
 	}
 
-	loadMode := pb.LoadMode_LOAD_REPLACE
 	load, err := grid.LoadData(data, &pb.LoadDataOptions{
 		AutoCreateColumns: ptr(false),
-		Mode:              &loadMode,
 	})
 	if err != nil {
 		return nil, err
@@ -194,10 +192,8 @@ func buildHierarchyDemo(host *volvoxgrid.Client, width, height int) (*demoInstan
 		return nil, err
 	}
 
-	loadMode := pb.LoadMode_LOAD_REPLACE
 	load, err := grid.LoadData(loadData, &pb.LoadDataOptions{
 		AutoCreateColumns: ptr(false),
-		Mode:              &loadMode,
 	})
 	if err != nil {
 		return nil, err
