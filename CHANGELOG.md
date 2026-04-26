@@ -2,6 +2,12 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
+## 0.8.2
+
+- Added append-data APIs across the protocol, generated bindings, and platform clients.
+- Removed the engine build-time `tonic-build` dependency.
+- Refreshed the web screenshot asset for the current demo state.
+
 ## 0.8.1
 
 - Refined barcode defaults: QR uses the default text path, while Code 128 plain text stays the default and GS1 inserts FNC1.
