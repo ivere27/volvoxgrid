@@ -46,7 +46,7 @@ const STRESS_ROWS = 1_000_000;
 const STRESS_COLS = 12;
 const SALES_COLS = 10;
 const HIERARCHY_COLS = 6;
-const BARCODE_COLS = 5;
+const BARCODE_COLS = 6;
 const SALES_STATUS_ITEMS = "Active|Pending|Shipped|Returned|Cancelled";
 const GRID_EVENT_CLICK = GridEventFields["click"];
 const HIERARCHY_ACTION_COL = 5;
@@ -98,6 +98,7 @@ const HIERARCHY_COLUMN_SETUP = [
 const BARCODE_COLUMN_SETUP = [
   { caption: "Symbology", key: "Symbology", align: Align.ALIGN_CENTER_CENTER },
   { caption: "Payload", key: "Value" },
+  { caption: "TextEncoding", key: "TextEncoding", align: Align.ALIGN_CENTER_CENTER },
   { caption: "Settings", key: "Label" },
   { caption: "Barcode", key: "Barcode", align: Align.ALIGN_CENTER_CENTER },
   { caption: "Notes", key: "Notes" },
@@ -129,6 +130,8 @@ type HierarchyDemoRow = {
 type BarcodeJsonRow = {
   Symbology: string;
   Value: string;
+  TextEncoding?: string;
+  QrEcc?: string;
   Label: string;
   Notes: string;
 };
@@ -1235,6 +1238,69 @@ function barcodeKey(value: string): string {
   return value.replace(/[^0-9a-z]/gi, "").toUpperCase();
 }
 
+function barcodeTextEncodingFromRecord(record: BarcodeJsonRow, fallback: number): number {
+  switch (barcodeKey(record.TextEncoding ?? "")) {
+    case "UTF8":
+      return BarcodeTextEncoding.BARCODE_TEXT_UTF8;
+    case "GS1":
+      return BarcodeTextEncoding.BARCODE_TEXT_GS1;
+    case "AUTO":
+      return BarcodeTextEncoding.BARCODE_TEXT_AUTO;
+    default:
+      return fallback;
+  }
+}
+
+function barcodeTextEncodingLabel(textEncoding: number): string {
+  switch (textEncoding) {
+    case BarcodeTextEncoding.BARCODE_TEXT_UTF8:
+      return "UTF8";
+    case BarcodeTextEncoding.BARCODE_TEXT_GS1:
+      return "GS1";
+    default:
+      return "AUTO";
+  }
+}
+
+function barcodeTextEncodingDisplay(record: BarcodeJsonRow): string {
+  if (!record.TextEncoding) {
+    return "";
+  }
+  return barcodeTextEncodingLabel(barcodeTextEncodingFromRecord(record, BarcodeTextEncoding.BARCODE_TEXT_AUTO));
+}
+
+function barcodeQrEccFromRecord(record: BarcodeJsonRow, fallback: number): number {
+  switch (barcodeKey(record.QrEcc ?? "")) {
+    case "LOW":
+      return BarcodeQrErrorCorrection.QR_ECC_LOW;
+    case "MEDIUM":
+      return BarcodeQrErrorCorrection.QR_ECC_MEDIUM;
+    case "QUARTILE":
+      return BarcodeQrErrorCorrection.QR_ECC_QUARTILE;
+    case "HIGH":
+      return BarcodeQrErrorCorrection.QR_ECC_HIGH;
+    case "DEFAULT":
+      return BarcodeQrErrorCorrection.QR_ECC_DEFAULT;
+    default:
+      return fallback;
+  }
+}
+
+function barcodeQrEccLabel(qrEcc: number): string {
+  switch (qrEcc) {
+    case BarcodeQrErrorCorrection.QR_ECC_LOW:
+      return "LOW";
+    case BarcodeQrErrorCorrection.QR_ECC_MEDIUM:
+      return "MEDIUM";
+    case BarcodeQrErrorCorrection.QR_ECC_QUARTILE:
+      return "QUARTILE";
+    case BarcodeQrErrorCorrection.QR_ECC_HIGH:
+      return "HIGH";
+    default:
+      return "DEFAULT";
+  }
+}
+
 function barcodeDemoPlan(record: BarcodeJsonRow): BarcodeDemoPlan {
   const plan: BarcodeDemoPlan = {
     symbology: BarcodeSymbology.BARCODE_NONE,
@@ -1258,24 +1324,25 @@ function barcodeDemoPlan(record: BarcodeJsonRow): BarcodeDemoPlan {
     case "QR":
     case "QRCODE":
       plan.symbology = BarcodeSymbology.BARCODE_QR;
-      plan.textEncoding = BarcodeTextEncoding.BARCODE_TEXT_UTF8;
-      plan.qrEcc = BarcodeQrErrorCorrection.QR_ECC_HIGH;
+      plan.textEncoding = barcodeTextEncodingFromRecord(record, BarcodeTextEncoding.BARCODE_TEXT_AUTO);
+      plan.qrEcc = barcodeQrEccFromRecord(record, BarcodeQrErrorCorrection.QR_ECC_DEFAULT);
       plan.background = 0xFFF8FAFC;
       plan.alignment = ImageAlignment.IMG_ALIGN_CENTER_CENTER;
       plan.quietZone = 3;
       plan.rowHeight = 150;
       plan.captionColor = 0xFF1D4ED8;
-      plan.optionsText = "text=UTF8, qr_ecc=HIGH, quiet=3, size=auto";
+      plan.optionsText = `text=${barcodeTextEncodingLabel(plan.textEncoding)}, qr_ecc=${barcodeQrEccLabel(plan.qrEcc)}, quiet=3, size=auto`;
       break;
-    case "CODE128":
+    case "CODE128": {
       plan.symbology = BarcodeSymbology.BARCODE_CODE128;
-      plan.textEncoding = BarcodeTextEncoding.BARCODE_TEXT_GS1;
+      plan.textEncoding = barcodeTextEncodingFromRecord(record, BarcodeTextEncoding.BARCODE_TEXT_AUTO);
       plan.background = 0xFFECFDF5;
       plan.alignment = ImageAlignment.IMG_ALIGN_STRETCH;
       plan.quietZone = 10;
       plan.captionColor = 0xFF047857;
-      plan.optionsText = "text=GS1, check=AUTO, quiet=10, size=auto";
+      plan.optionsText = `text=${barcodeTextEncodingLabel(plan.textEncoding)}, check=AUTO, quiet=10, size=auto`;
       break;
+    }
     case "CODE39":
       plan.symbology = BarcodeSymbology.BARCODE_CODE39;
       plan.checkDigit = BarcodeCheckDigitMode.CHECK_DIGIT_GENERATE;
@@ -1288,11 +1355,10 @@ function barcodeDemoPlan(record: BarcodeJsonRow): BarcodeDemoPlan {
       break;
     case "CODE93":
       plan.symbology = BarcodeSymbology.BARCODE_CODE93;
-      plan.textEncoding = BarcodeTextEncoding.BARCODE_TEXT_ASCII;
       plan.foreground = 0xFF312E81;
       plan.background = 0xFFEEF2FF;
       plan.quietZone = 8;
-      plan.optionsText = "text=ASCII, quiet=8, size=auto";
+      plan.optionsText = "quiet=8, size=auto";
       break;
     case "CODE11":
       plan.symbology = BarcodeSymbology.BARCODE_CODE11;
@@ -1413,12 +1479,21 @@ function setupBarcodesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: num
       cells.push(pbEncodeCellUpdate({
         row: index,
         col: 2,
+        valueText: barcodeTextEncodingDisplay(record),
+        style: {
+          foreground: 0xFF475569,
+          align: Align.ALIGN_CENTER_CENTER,
+        },
+      }));
+      cells.push(pbEncodeCellUpdate({
+        row: index,
+        col: 3,
         valueText: `${record.Label}\n${plan.optionsText}`,
         style: smallTextStyle,
       }));
       cells.push(pbEncodeCellUpdate({
         row: index,
-        col: 3,
+        col: 4,
         valueText: record.Value,
         style: {
           background: plan.background,
@@ -1433,7 +1508,7 @@ function setupBarcodesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: num
       }));
       cells.push(pbEncodeCellUpdate({
         row: index,
-        col: 4,
+        col: 5,
         valueText: record.Notes,
         style: smallTextStyle,
       }));

@@ -69,6 +69,20 @@ const NATIVE_SURFACE_DESC_VERSION: u16 = 1;
 const NATIVE_SURFACE_KIND_WAYLAND: u16 = 1;
 const NATIVE_SURFACE_KIND_X11: u16 = 2;
 
+fn dropdown_from_labels(items: &str) -> pb::Dropdown {
+    pb::Dropdown {
+        items: items
+            .split('|')
+            .filter(|label| !label.is_empty())
+            .map(|label| pb::DropdownItem {
+                label: Some(label.to_string()),
+                ..Default::default()
+            })
+            .collect(),
+        ..Default::default()
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct HierarchyJsonRow {
     #[serde(rename = "Name")]
@@ -940,7 +954,7 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
                 width: Some(80),
                 caption: Some("Status".to_string()),
                 key: Some("Status".to_string()),
-                dropdown_items: Some(SALES_STATUS_ITEMS.to_string()),
+                dropdown: Some(dropdown_from_labels(SALES_STATUS_ITEMS)),
                 ..Default::default()
             },
             pb::ColumnDef {
