@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1
+
+- Version bump for the project-wide 0.8.1 patch release.
+- Synced barcode fixture/docs updates and GTK demo build fixes with the release.
+
 ## 0.8.0
 
 - Version bump for project-wide 0.8.0 release.

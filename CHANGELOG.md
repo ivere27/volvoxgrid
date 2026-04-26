@@ -2,6 +2,12 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
+## 0.8.1
+
+- Refined barcode defaults: QR uses the default text path, while Code 128 plain text stays the default and GS1 inserts FNC1.
+- Added QR ECC metadata to the shared barcode fixture and wired the web/GTK demos to use it.
+- Fixed the GTK release build by migrating demo dropdown columns to the current `Dropdown` field.
+
 ## 0.8.0
 
 - Added 1D and 2D barcode support.
