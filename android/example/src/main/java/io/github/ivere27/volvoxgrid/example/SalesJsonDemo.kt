@@ -11,6 +11,9 @@ import io.github.ivere27.volvoxgrid.ColumnDataType
 import io.github.ivere27.volvoxgrid.ColumnDef
 import io.github.ivere27.volvoxgrid.ColIndicatorConfig
 import io.github.ivere27.volvoxgrid.DefineColumnsRequest
+import io.github.ivere27.volvoxgrid.Dropdown
+import io.github.ivere27.volvoxgrid.DropdownItem
+import io.github.ivere27.volvoxgrid.DropdownItemLayout
 import io.github.ivere27.volvoxgrid.DropdownTrigger
 import io.github.ivere27.volvoxgrid.EditConfig
 import io.github.ivere27.volvoxgrid.EditTrigger
@@ -47,7 +50,7 @@ import io.github.ivere27.volvoxgrid.TreeIndicatorStyle
 import io.github.ivere27.volvoxgrid.VolvoxGridController
 
 object SalesJsonDemo {
-    private const val SALES_STATUS_ITEMS = "Active|Pending|Shipped|Returned|Cancelled"
+    private val salesStatusItems = listOf("Active", "Pending", "Shipped", "Returned", "Cancelled")
     private val widths = intArrayOf(40, 80, 100, 120, 90, 90, 70, 56, 80, 140)
     private val captions = arrayOf(
         "Q", "Region", "Category", "Product", "Sales", "Cost", "Margin%", "Flag", "Status", "Notes"
@@ -86,7 +89,6 @@ object SalesJsonDemo {
         )
         check(result.status != LoadDataStatus.LOAD_FAILED) { "LoadData failed for embedded sales demo" }
         controller.defineColumns(salesColumnRequest(includeWidths = false))
-        controller.setColDropdownItems(8, SALES_STATUS_ITEMS)
 
         controller.configure(salesThemeConfig())
 
@@ -143,7 +145,7 @@ object SalesJsonDemo {
                     def.align = Align.ALIGN_CENTER_CENTER
                     def.dataType = ColumnDataType.COLUMN_DATA_BOOLEAN
                 }
-                8 -> def.dropdownItems = SALES_STATUS_ITEMS
+                8 -> def.setDropdown(salesStatusDropdown())
             }
             if (col == 0 || col == 1) {
                 def.span = true
@@ -151,6 +153,15 @@ object SalesJsonDemo {
             builder.addColumns(def.build())
         }
         return builder.build()
+    }
+
+    private fun salesStatusDropdown(): Dropdown {
+        val dropdown = Dropdown.newBuilder()
+            .setItemLayout(DropdownItemLayout.DROPDOWN_ITEM_AUTO)
+        for (label in salesStatusItems) {
+            dropdown.addItems(DropdownItem.newBuilder().setLabel(label).build())
+        }
+        return dropdown.build()
     }
 
     private fun applySalesSubtotalDecorations(controller: VolvoxGridController, subtotalRows: List<Int>) {

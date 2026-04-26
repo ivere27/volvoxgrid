@@ -914,13 +914,26 @@ class VolvoxGridController(
         )
     }
 
-    fun setColDropdownItems(col: Int, list: String) {
+    fun setColDropdown(col: Int, dropdown: Dropdown) {
         service.DefineColumns(
             DefineColumnsRequest.newBuilder()
                 .setGridId(gridId)
                 .addColumns(ColumnDef.newBuilder()
                     .setIndex(col)
-                    .setDropdownItems(list)
+                    .setDropdown(dropdown)
+                    .build())
+                .build()
+        )
+    }
+
+    fun setCellDropdown(row: Int, col: Int, dropdown: Dropdown) {
+        service.UpdateCells(
+            UpdateCellsRequest.newBuilder()
+                .setGridId(gridId)
+                .addCells(CellUpdate.newBuilder()
+                    .setRow(row)
+                    .setCol(col)
+                    .setDropdown(dropdown)
                     .build())
                 .build()
         )
