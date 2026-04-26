@@ -8,7 +8,7 @@ repository.workspace = true
 [features]
 default = ["cosmic-text", "rayon", "regex"]
 proto = []
-grpc = ["dep:tonic", "dep:tonic-build", "proto"]
+grpc = ["proto"]
 cosmic-text = ["dep:cosmic-text"]
 rayon = ["dep:rayon"]
 regex = ["dep:regex"]
@@ -19,7 +19,6 @@ gpu = ["dep:wgpu", "dep:bytemuck", "dep:web-sys", "dep:raw-window-handle", "cosm
 hashbrown = "0.16"
 prost = "0.12"
 prost-types = "0.12"
-tonic = { version = "0.11", optional = true }
 tiny-skia = "0.11"
 qrcodegen = "1.8"
 barcoders = "2"
@@ -40,7 +39,6 @@ web-time = "1"
 
 [build-dependencies]
 prost-build = "0.12"
-tonic-build = { version = "0.11", optional = true }
 flate2 = "1"
 
 [dev-dependencies]
