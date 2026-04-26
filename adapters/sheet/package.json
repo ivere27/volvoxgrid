@@ -1,6 +1,6 @@
 {
   "name": "@volvoxgrid/sheet",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "license": "Apache-2.0",
   "description": "Spreadsheet-style sheet adapter for VolvoxGrid",
   "type": "module",
@@ -24,7 +24,7 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "volvoxgrid": "^0.8.0"
+    "volvoxgrid": "^0.8.1"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

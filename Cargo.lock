@@ -2747,7 +2747,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "volvoxgrid-activex"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "lazy_static",
  "prost 0.12.6",
@@ -2757,7 +2757,7 @@ dependencies = [
 
 [[package]]
 name = "volvoxgrid-engine"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "barcoders",
  "bytemuck",
@@ -2785,7 +2785,7 @@ dependencies = [
 
 [[package]]
 name = "volvoxgrid-gtk-test"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "cairo-rs",
  "gtk4",
@@ -2798,7 +2798,7 @@ dependencies = [
 
 [[package]]
 name = "volvoxgrid-plugin"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "cc",
  "ctor",
@@ -2811,7 +2811,7 @@ dependencies = [
 
 [[package]]
 name = "volvoxgrid-smoke"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "prost 0.12.6",
  "synurang-host",
@@ -2820,7 +2820,7 @@ dependencies = [
 
 [[package]]
 name = "volvoxgrid-wasm"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "getrandom 0.2.17",
  "js-sys",

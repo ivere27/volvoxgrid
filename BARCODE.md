@@ -19,8 +19,8 @@ The public contract is in [proto/volvoxgrid.proto](proto/volvoxgrid.proto).
   the payload text.
 
 The shared fixture is [testdata/barcodes.json](testdata/barcodes.json). It is
-plain data with `Symbology`, `Value`, `Label`, and `Notes`; wrappers map those
-rows to `BarcodeData`.
+plain data with `Symbology`, `Value`, `Label`, `Notes`, and optional
+`TextEncoding` / `QrEcc`; wrappers map those rows to `BarcodeData`.
 
 ## Developer Model
 
@@ -61,8 +61,8 @@ barcode spec each time. Send `BARCODE_NONE` to clear an existing barcode extra.
 
 | Enum | Notes |
 |---|---|
-| `BARCODE_QR` | Text QR. Use `BARCODE_TEXT_UTF8` for Unicode payloads. `qr_ecc` controls error correction. |
-| `BARCODE_CODE128` | Code 128. `BARCODE_TEXT_GS1` inserts FNC1 and is intended for GS1-style payloads. |
+| `BARCODE_QR` | Text QR. Unicode payloads are accepted by default. `qr_ecc` controls error correction. |
+| `BARCODE_CODE128` | Code 128. Plain text defaults to ASCII; use `BARCODE_TEXT_GS1` for GS1-128/FNC1 payloads. |
 | `BARCODE_CODE39` | Uppercase Code 39 payloads. `CHECK_DIGIT_GENERATE` adds the optional check character. |
 | `BARCODE_CODE93` | Code 93. Use ASCII payloads. |
 | `BARCODE_CODE11` | Digits and dash. |
@@ -91,8 +91,8 @@ message BarcodeEncodingOptions {
 
 - `check_digit`: common policy for optional check digits. Mandatory checksums
   required by a symbology are still handled by the encoder.
-- `text_encoding`: `AUTO`, `ASCII`, `UTF8`, or `GS1`. `ASCII` rejects
-  non-ASCII payloads; `GS1` currently affects Code 128.
+- `text_encoding`: `AUTO`, `UTF8`, or `GS1`. For Code 128, `AUTO` is normal
+  plain text and `GS1` inserts FNC1 for GS1-128.
 - `qr_ecc`: QR-only error correction. `DEFAULT` maps to medium ECC.
 
 ### Rendering
@@ -193,7 +193,6 @@ CellUpdate {
     symbology: BARCODE_CODE39
     encoding {
       check_digit: CHECK_DIGIT_GENERATE
-      text_encoding: BARCODE_TEXT_ASCII
     }
     render {
       foreground: 0xFF111827

@@ -2,8 +2,9 @@
   {
     "Symbology": "QR",
     "Value": "https://github.com/ivere27/volvoxgrid",
+    "QrEcc": "HIGH",
     "Label": "QR high ECC",
-    "Notes": "2D QR sample."
+    "Notes": "2D QR sample with high error correction."
   },
   {
     "Symbology": "QR",
@@ -21,17 +22,25 @@
     "Symbology": "QR",
     "Value": "ORDER:VG-2026-0001;AMT=149.95;CUR=USD",
     "Label": "QR order token",
-    "Notes": "Compact structured ASCII payload."
+    "Notes": "Compact structured payload."
+  },
+  {
+    "Symbology": "QR",
+    "Value": "안녕하세요 VolvoxGrid 2026",
+    "Label": "QR UTF-8 text",
+    "Notes": "Unicode QR payload using the default UTF-8 text encoding."
   },
   {
     "Symbology": "CODE128",
     "Value": "0101234567890128",
+    "TextEncoding": "GS1",
     "Label": "GS1 Code 128",
     "Notes": "Code 128 payload for GS1 mode."
   },
   {
     "Symbology": "CODE128",
     "Value": "01123456789012311726043010LOT42",
+    "TextEncoding": "GS1",
     "Label": "GS1 lot + expiry",
     "Notes": "Application-identifier style Code 128 payload."
   },

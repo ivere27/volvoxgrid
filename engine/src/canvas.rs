@@ -5574,6 +5574,9 @@ fn barcode_encode_key(spec: &BarcodeSpec, payload: &str) -> BarcodeEncodeKey {
 
 fn encode_barcode_for_render(spec: &BarcodeSpec, payload: &str, is_qr: bool) -> BarcodeEncoded {
     if is_qr {
+        if payload.is_empty() {
+            return BarcodeEncoded::Failed;
+        }
         qrcodegen::QrCode::encode_text(payload, qr_ecc(spec))
             .map(BarcodeEncoded::Qr)
             .unwrap_or(BarcodeEncoded::Failed)
@@ -5694,12 +5697,12 @@ fn draw_qr_barcode_encoded<C: Canvas>(
     }
 }
 
-fn normalized_code128_payload(payload: &str, text_encoding: i32) -> String {
+fn normalized_code128_payload(payload: &str, gs1: bool) -> String {
     let starts_with_charset = payload
         .chars()
         .next()
         .is_some_and(|ch| matches!(ch, '\u{00C0}' | '\u{0181}' | '\u{0106}'));
-    if text_encoding == pb::BarcodeTextEncoding::BarcodeTextGs1 as i32 {
+    if gs1 {
         let fnc1 = '\u{0179}';
         if starts_with_charset {
             let mut chars = payload.chars();
@@ -5727,12 +5730,8 @@ fn normalized_code128_payload(payload: &str, text_encoding: i32) -> String {
     }
 }
 
-fn barcode_payload_matches_encoding(spec: &BarcodeSpec, payload: &str) -> bool {
-    if spec.text_encoding == pb::BarcodeTextEncoding::BarcodeTextAscii as i32 {
-        payload.is_ascii()
-    } else {
-        true
-    }
+fn code128_uses_gs1(spec: &BarcodeSpec) -> bool {
+    spec.text_encoding == pb::BarcodeTextEncoding::BarcodeTextGs1 as i32
 }
 
 fn barcode_is_supported_linear_symbology(symbology: i32) -> bool {
@@ -5779,12 +5778,12 @@ pub(crate) fn barcode_render_status(spec: &BarcodeSpec, payload: &str) -> i32 {
 }
 
 fn encode_linear_barcode(spec: &BarcodeSpec, payload: &str) -> Option<Vec<u8>> {
-    if payload.is_empty() || !barcode_payload_matches_encoding(spec, payload) {
+    if payload.is_empty() {
         return None;
     }
     match spec.symbology {
         s if s == pb::BarcodeSymbology::BarcodeCode128 as i32 => {
-            let data = normalized_code128_payload(payload, spec.text_encoding);
+            let data = normalized_code128_payload(payload, code128_uses_gs1(spec));
             barcoders::sym::code128::Code128::new(data)
                 .ok()
                 .map(|code| code.encode())
@@ -10004,14 +10003,27 @@ mod tests {
     }
 
     #[test]
-    fn barcode_ascii_encoding_rejects_non_ascii_payload() {
+    fn code128_auto_encoding_defaults_to_ascii() {
         let spec = crate::cell::BarcodeSpec {
             symbology: pb::BarcodeSymbology::BarcodeCode128 as i32,
-            text_encoding: pb::BarcodeTextEncoding::BarcodeTextAscii as i32,
+            text_encoding: pb::BarcodeTextEncoding::BarcodeTextAuto as i32,
             ..Default::default()
         };
-        assert!(encode_linear_barcode(&spec, "ABC123").is_some());
+        assert!(encode_linear_barcode(&spec, "SN:VG-AX7-0091").is_some());
         assert!(encode_linear_barcode(&spec, "한글").is_none());
+    }
+
+    #[test]
+    fn qr_auto_encoding_defaults_to_utf8() {
+        let spec = crate::cell::BarcodeSpec {
+            symbology: pb::BarcodeSymbology::BarcodeQr as i32,
+            text_encoding: pb::BarcodeTextEncoding::BarcodeTextAuto as i32,
+            ..Default::default()
+        };
+        assert_eq!(
+            barcode_render_status(&spec, "안녕하세요 VolvoxGrid 2026"),
+            pb::BarcodeRenderStatus::Ok as i32
+        );
     }
 
     #[test]
@@ -10025,13 +10037,8 @@ mod tests {
             pb::BarcodeRenderStatus::Ok as i32
         );
 
-        let ascii_only = crate::cell::BarcodeSpec {
-            symbology: pb::BarcodeSymbology::BarcodeCode128 as i32,
-            text_encoding: pb::BarcodeTextEncoding::BarcodeTextAscii as i32,
-            ..Default::default()
-        };
         assert_eq!(
-            barcode_render_status(&ascii_only, "한글"),
+            barcode_render_status(&valid, "한글"),
             pb::BarcodeRenderStatus::InvalidPayload as i32
         );
 
@@ -10058,10 +10065,7 @@ mod tests {
 
     #[test]
     fn code128_gs1_payload_inserts_fnc1_after_start_code() {
-        let payload = normalized_code128_payload(
-            "0101234567890128",
-            pb::BarcodeTextEncoding::BarcodeTextGs1 as i32,
-        );
+        let payload = normalized_code128_payload("0101234567890128", true);
         let chars: Vec<char> = payload.chars().take(2).collect();
         assert_eq!(chars, vec!['\u{0106}', '\u{0179}']);
     }

@@ -115,6 +115,20 @@ button.volvox-demo-active label {
 }
 "#;
 
+fn dropdown_from_labels(items: &str) -> pb::Dropdown {
+    pb::Dropdown {
+        items: items
+            .split('|')
+            .filter(|label| !label.is_empty())
+            .map(|label| pb::DropdownItem {
+                label: Some(label.to_string()),
+                ..Default::default()
+            })
+            .collect(),
+        ..Default::default()
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct HierarchyJsonRow {
     #[serde(rename = "Name")]
@@ -139,6 +153,8 @@ struct BarcodeJsonRow {
     symbology: String,
     #[serde(rename = "Value")]
     value: String,
+    #[serde(rename = "QrEcc")]
+    qr_ecc: Option<String>,
     #[serde(rename = "Label")]
     label: String,
     #[serde(rename = "Notes")]
@@ -2645,7 +2661,7 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
                 width: Some(80),
                 caption: Some("Status".to_string()),
                 key: Some("Status".to_string()),
-                dropdown_items: Some(SALES_STATUS_ITEMS.to_string()),
+                dropdown: Some(dropdown_from_labels(SALES_STATUS_ITEMS)),
                 ..Default::default()
             },
             pb::ColumnDef {
@@ -2680,7 +2696,7 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
             },
             pb::ColumnDef {
                 index: 8,
-                dropdown_items: Some(SALES_STATUS_ITEMS.to_string()),
+                dropdown: Some(dropdown_from_labels(SALES_STATUS_ITEMS)),
                 ..Default::default()
             },
         ],
@@ -2956,6 +2972,35 @@ fn barcode_key(value: &str) -> String {
         .collect()
 }
 
+fn barcode_qr_ecc_from_record(record: &BarcodeJsonRow, fallback: i32) -> i32 {
+    match barcode_key(record.qr_ecc.as_deref().unwrap_or("")).as_str() {
+        "LOW" => pb::BarcodeQrErrorCorrection::QrEccLow as i32,
+        "MEDIUM" => pb::BarcodeQrErrorCorrection::QrEccMedium as i32,
+        "QUARTILE" => pb::BarcodeQrErrorCorrection::QrEccQuartile as i32,
+        "HIGH" => pb::BarcodeQrErrorCorrection::QrEccHigh as i32,
+        "DEFAULT" => pb::BarcodeQrErrorCorrection::QrEccDefault as i32,
+        _ => fallback,
+    }
+}
+
+fn barcode_qr_ecc_options_text(qr_ecc: i32) -> &'static str {
+    match qr_ecc {
+        x if x == pb::BarcodeQrErrorCorrection::QrEccLow as i32 => {
+            "text=AUTO, qr_ecc=LOW, quiet=3, size=auto"
+        }
+        x if x == pb::BarcodeQrErrorCorrection::QrEccMedium as i32 => {
+            "text=AUTO, qr_ecc=MEDIUM, quiet=3, size=auto"
+        }
+        x if x == pb::BarcodeQrErrorCorrection::QrEccQuartile as i32 => {
+            "text=AUTO, qr_ecc=QUARTILE, quiet=3, size=auto"
+        }
+        x if x == pb::BarcodeQrErrorCorrection::QrEccHigh as i32 => {
+            "text=AUTO, qr_ecc=HIGH, quiet=3, size=auto"
+        }
+        _ => "text=AUTO, qr_ecc=DEFAULT, quiet=3, size=auto",
+    }
+}
+
 fn barcode_demo_plan(record: &BarcodeJsonRow) -> Result<BarcodeDemoPlan, String> {
     let mut plan = BarcodeDemoPlan {
         symbology: pb::BarcodeSymbology::BarcodeNone as i32,
@@ -2979,14 +3024,16 @@ fn barcode_demo_plan(record: &BarcodeJsonRow) -> Result<BarcodeDemoPlan, String>
     match barcode_key(&record.symbology).as_str() {
         "QR" | "QRCODE" => {
             plan.symbology = pb::BarcodeSymbology::BarcodeQr as i32;
-            plan.text_encoding = pb::BarcodeTextEncoding::BarcodeTextUtf8 as i32;
-            plan.qr_ecc = pb::BarcodeQrErrorCorrection::QrEccHigh as i32;
+            plan.qr_ecc = barcode_qr_ecc_from_record(
+                record,
+                pb::BarcodeQrErrorCorrection::QrEccDefault as i32,
+            );
             plan.background = 0xFFF8FAFC;
             plan.alignment = pb::ImageAlignment::ImgAlignCenterCenter as i32;
             plan.quiet_zone = 3;
             plan.row_height = 150;
             plan.caption_color = 0xFF1D4ED8;
-            plan.options_text = "text=UTF8, qr_ecc=HIGH, quiet=3, size=auto";
+            plan.options_text = barcode_qr_ecc_options_text(plan.qr_ecc);
         }
         "CODE128" => {
             plan.symbology = pb::BarcodeSymbology::BarcodeCode128 as i32;
@@ -3009,11 +3056,10 @@ fn barcode_demo_plan(record: &BarcodeJsonRow) -> Result<BarcodeDemoPlan, String>
         }
         "CODE93" => {
             plan.symbology = pb::BarcodeSymbology::BarcodeCode93 as i32;
-            plan.text_encoding = pb::BarcodeTextEncoding::BarcodeTextAscii as i32;
             plan.foreground = 0xFF312E81;
             plan.background = 0xFFEEF2FF;
             plan.quiet_zone = 8;
-            plan.options_text = "text=ASCII, quiet=8, size=auto";
+            plan.options_text = "quiet=8, size=auto";
         }
         "CODE11" => {
             plan.symbology = pb::BarcodeSymbology::BarcodeCode11 as i32;
