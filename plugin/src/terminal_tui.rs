@@ -325,6 +325,7 @@ impl TerminalTuiSession {
         dbl_click
     }
 
+    #[allow(dead_code)]
     pub fn auto_start_edit_enabled(&self) -> bool {
         self.auto_start_edit
     }

@@ -1,19 +1,23 @@
 name: volvoxgrid_example
 description: VolvoxGrid example app — sales data grid demo
 version: 1.0.0
+publish_to: 'none'
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
+  fixnum: ^1.1.0
   flutter:
     sdk: flutter
+  synurang: 0.5.10
   volvoxgrid:
     path: ../
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true

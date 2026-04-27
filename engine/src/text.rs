@@ -283,6 +283,7 @@ impl TextEngine {
         "en-US".to_string()
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn normalize_locale_hint(raw: &str) -> Option<String> {
         let trimmed = raw.trim();
         if trimmed.is_empty() {

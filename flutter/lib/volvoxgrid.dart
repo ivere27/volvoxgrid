@@ -3009,17 +3009,25 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
                         child: _gesturePreviewActive
                             ? Transform(
                                 transform: Matrix4.identity()
-                                  ..translate(
+                                  ..translateByDouble(
                                     _gesturePreviewPan.dx +
                                         _gesturePreviewFocal.dx,
                                     _gesturePreviewPan.dy +
                                         _gesturePreviewFocal.dy,
+                                    0,
+                                    1,
                                   )
-                                  ..scale(_gesturePreviewScale,
-                                      _gesturePreviewScale)
-                                  ..translate(
+                                  ..scaleByDouble(
+                                    _gesturePreviewScale,
+                                    _gesturePreviewScale,
+                                    1,
+                                    1,
+                                  )
+                                  ..translateByDouble(
                                     -_gesturePreviewFocal.dx,
                                     -_gesturePreviewFocal.dy,
+                                    0,
+                                    1,
                                   ),
                                 filterQuality: FilterQuality.none,
                                 child: _buildSurface(constraints),
@@ -3098,71 +3106,6 @@ class _TouchPinchMetrics {
   final double distance;
 
   const _TouchPinchMetrics({required this.center, required this.distance});
-}
-
-class _FallbackGridTable extends StatelessWidget {
-  final List<List<String>> cells;
-
-  const _FallbackGridTable({required this.cells});
-
-  @override
-  Widget build(BuildContext context) {
-    final header = cells.isNotEmpty ? cells.first : const <String>[];
-    final body = cells.length > 1 ? cells.sublist(1) : const <List<String>>[];
-    final borderColor = Theme.of(context).colorScheme.outlineVariant;
-    final headerColor = Theme.of(context).colorScheme.surfaceContainerHighest;
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        child: Table(
-          defaultColumnWidth: const FixedColumnWidth(140),
-          border: TableBorder.all(color: borderColor, width: 0.5),
-          children: [
-            if (header.isNotEmpty)
-              TableRow(
-                decoration: BoxDecoration(color: headerColor),
-                children: [
-                  for (final value in header)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 6,
-                      ),
-                      child: Text(
-                        value,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                ],
-              ),
-            for (var r = 0; r < body.length; r++)
-              TableRow(
-                decoration: BoxDecoration(
-                  color: r.isEven ? Colors.white : const Color(0xFFF8F8F8),
-                ),
-                children: [
-                  for (final value in body[r])
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 6,
-                      ),
-                      child: Text(
-                        value,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// A placeholder painter shown before the first native frame arrives.
