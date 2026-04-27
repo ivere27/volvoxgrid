@@ -354,6 +354,18 @@ namespace VolvoxGrid.DotNet
             return _client.LoadData(_gridId, data, options);
         }
 
+        public void AppendData(byte[] data)
+        {
+            EnsureNotDisposed();
+            _client.AppendData(_gridId, data);
+        }
+
+        public LoadDataResult AppendData(byte[] data, LoadDataOptions options)
+        {
+            EnsureNotDisposed();
+            return _client.AppendData(_gridId, data, options);
+        }
+
         public void Print(bool landscape, int marginLeft, int marginTop, int marginRight, int marginBottom, string header, string footer, bool showPageNumbers)
         {
             EnsureNotDisposed();

@@ -8758,7 +8758,6 @@ class LoadDataOptions extends $pb.GeneratedMessage {
     $core.String? dateFormat,
     $core.String? decimalChar,
     $core.bool? autoCreateColumns,
-    LoadMode? mode,
     $core.bool? atomic,
     $core.int? skipRows,
     $core.int? maxRows,
@@ -8774,7 +8773,6 @@ class LoadDataOptions extends $pb.GeneratedMessage {
     if (dateFormat != null) result.dateFormat = dateFormat;
     if (decimalChar != null) result.decimalChar = decimalChar;
     if (autoCreateColumns != null) result.autoCreateColumns = autoCreateColumns;
-    if (mode != null) result.mode = mode;
     if (atomic != null) result.atomic = atomic;
     if (skipRows != null) result.skipRows = skipRows;
     if (maxRows != null) result.maxRows = maxRows;
@@ -8818,8 +8816,6 @@ class LoadDataOptions extends $pb.GeneratedMessage {
     ..aOS(15, _omitFieldNames ? '' : 'dateFormat')
     ..aOS(16, _omitFieldNames ? '' : 'decimalChar')
     ..aOB(17, _omitFieldNames ? '' : 'autoCreateColumns')
-    ..aE<LoadMode>(18, _omitFieldNames ? '' : 'mode',
-        enumValues: LoadMode.values)
     ..aOB(19, _omitFieldNames ? '' : 'atomic')
     ..aI(20, _omitFieldNames ? '' : 'skipRows')
     ..aI(21, _omitFieldNames ? '' : 'maxRows')
@@ -8940,44 +8936,35 @@ class LoadDataOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   void clearAutoCreateColumns() => $_clearField(17);
 
-  @$pb.TagNumber(18)
-  LoadMode get mode => $_getN(10);
-  @$pb.TagNumber(18)
-  set mode(LoadMode value) => $_setField(18, value);
-  @$pb.TagNumber(18)
-  $core.bool hasMode() => $_has(10);
-  @$pb.TagNumber(18)
-  void clearMode() => $_clearField(18);
-
   @$pb.TagNumber(19)
-  $core.bool get atomic => $_getBF(11);
+  $core.bool get atomic => $_getBF(10);
   @$pb.TagNumber(19)
-  set atomic($core.bool value) => $_setBool(11, value);
+  set atomic($core.bool value) => $_setBool(10, value);
   @$pb.TagNumber(19)
-  $core.bool hasAtomic() => $_has(11);
+  $core.bool hasAtomic() => $_has(10);
   @$pb.TagNumber(19)
   void clearAtomic() => $_clearField(19);
 
   @$pb.TagNumber(20)
-  $core.int get skipRows => $_getIZ(12);
+  $core.int get skipRows => $_getIZ(11);
   @$pb.TagNumber(20)
-  set skipRows($core.int value) => $_setSignedInt32(12, value);
+  set skipRows($core.int value) => $_setSignedInt32(11, value);
   @$pb.TagNumber(20)
-  $core.bool hasSkipRows() => $_has(12);
+  $core.bool hasSkipRows() => $_has(11);
   @$pb.TagNumber(20)
   void clearSkipRows() => $_clearField(20);
 
   @$pb.TagNumber(21)
-  $core.int get maxRows => $_getIZ(13);
+  $core.int get maxRows => $_getIZ(12);
   @$pb.TagNumber(21)
-  set maxRows($core.int value) => $_setSignedInt32(13, value);
+  set maxRows($core.int value) => $_setSignedInt32(12, value);
   @$pb.TagNumber(21)
-  $core.bool hasMaxRows() => $_has(13);
+  $core.bool hasMaxRows() => $_has(12);
   @$pb.TagNumber(21)
   void clearMaxRows() => $_clearField(21);
 }
 
-/// Load structured data (CSV or JSON) into the grid.
+/// Load structured data (CSV or JSON) into the grid, replacing existing data.
 /// The engine parses the data, infers types, validates values, and
 /// populates cells. See engine/src/load.rs.
 ///
@@ -9035,6 +9022,89 @@ class LoadDataRequest extends $pb.GeneratedMessage {
   static LoadDataRequest getDefault() => _defaultInstance ??=
       $pb.GeneratedMessage.$_defaultFor<LoadDataRequest>(create);
   static LoadDataRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get gridId => $_getI64(0);
+  @$pb.TagNumber(1)
+  set gridId($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasGridId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearGridId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.List<$core.int> get data => $_getN(1);
+  @$pb.TagNumber(2)
+  set data($core.List<$core.int> value) => $_setBytes(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasData() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearData() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  LoadDataOptions get options => $_getN(2);
+  @$pb.TagNumber(3)
+  set options(LoadDataOptions value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasOptions() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOptions() => $_clearField(3);
+  @$pb.TagNumber(3)
+  LoadDataOptions ensureOptions() => $_ensure(2);
+}
+
+/// Append structured data (CSV or JSON) after existing grid rows.
+class AppendDataRequest extends $pb.GeneratedMessage {
+  factory AppendDataRequest({
+    $fixnum.Int64? gridId,
+    $core.List<$core.int>? data,
+    LoadDataOptions? options,
+  }) {
+    final result = create();
+    if (gridId != null) result.gridId = gridId;
+    if (data != null) result.data = data;
+    if (options != null) result.options = options;
+    return result;
+  }
+
+  AppendDataRequest._();
+
+  factory AppendDataRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory AppendDataRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'AppendDataRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aInt64(1, _omitFieldNames ? '' : 'gridId')
+    ..a<$core.List<$core.int>>(
+        2, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..aOM<LoadDataOptions>(3, _omitFieldNames ? '' : 'options',
+        subBuilder: LoadDataOptions.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AppendDataRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AppendDataRequest copyWith(void Function(AppendDataRequest) updates) =>
+      super.copyWith((message) => updates(message as AppendDataRequest))
+          as AppendDataRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static AppendDataRequest create() => AppendDataRequest._();
+  @$core.override
+  AppendDataRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static AppendDataRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<AppendDataRequest>(create);
+  static AppendDataRequest? _defaultInstance;
 
   @$pb.TagNumber(1)
   $fixnum.Int64 get gridId => $_getI64(0);
@@ -24105,6 +24175,10 @@ class VolvoxGridServiceApi {
           $pb.ClientContext? ctx, LoadDataRequest request) =>
       _client.invoke<LoadDataResult>(
           ctx, 'VolvoxGridService', 'LoadData', request, LoadDataResult());
+  $async.Future<LoadDataResult> appendData(
+          $pb.ClientContext? ctx, AppendDataRequest request) =>
+      _client.invoke<LoadDataResult>(
+          ctx, 'VolvoxGridService', 'AppendData', request, LoadDataResult());
   $async.Future<ClearResponse> clear_(
           $pb.ClientContext? ctx, ClearRequest request) =>
       _client.invoke<ClearResponse>(

@@ -5148,6 +5148,12 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
         })
     }
 
+    fn append_data(&self, request: AppendDataRequest) -> Result<LoadDataResult, String> {
+        self.manager().with_grid(request.grid_id, |grid| {
+            volvoxgrid_engine::load::append_data(grid, &request.data, request.options.as_ref())
+        })
+    }
+
     fn print(&self, request: PrintRequest) -> Result<PrintResponse, String> {
         let pages = self.manager().with_grid(request.grid_id, |grid| {
             ensure_layout(grid);

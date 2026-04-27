@@ -102,6 +102,12 @@ class VolvoxGridServiceFfi {
     return LoadDataResult.fromBuffer(resultBytes);
   }
 
+  static Future<LoadDataResult> AppendData(AppendDataRequest request) async {
+    final bytes = request.writeToBuffer();
+    final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/AppendData', bytes);
+    return LoadDataResult.fromBuffer(resultBytes);
+  }
+
   static Future<ClearResponse> Clear(ClearRequest request) async {
     final bytes = request.writeToBuffer();
     final resultBytes = await synurang.invokeBackendAsync('/volvoxgrid.v1.VolvoxGridService/Clear', bytes);

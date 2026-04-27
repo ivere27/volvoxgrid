@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.2
+
+- Version bump for the project-wide 0.8.2 patch release.
+- Added Flutter controller support for appending data and refreshed generated protocol bindings.
+
 ## 0.8.1
 
 - Version bump for the project-wide 0.8.1 patch release.

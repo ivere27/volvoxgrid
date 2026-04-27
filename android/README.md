@@ -8,9 +8,9 @@ Add the Maven dependency to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-android:0.8.1")
+    implementation("io.github.ivere27:volvoxgrid-android:0.8.2")
     // or lite variant:
-    // implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.1")
+    // implementation("io.github.ivere27:volvoxgrid-android-lite:0.8.2")
 }
 ```
 
@@ -18,9 +18,9 @@ Or `build.gradle`:
 
 ```groovy
 dependencies {
-    implementation 'io.github.ivere27:volvoxgrid-android:0.8.1'
+    implementation 'io.github.ivere27:volvoxgrid-android:0.8.2'
     // or lite variant:
-    // implementation 'io.github.ivere27:volvoxgrid-android-lite:0.8.1'
+    // implementation 'io.github.ivere27:volvoxgrid-android-lite:0.8.2'
 }
 ```
 
@@ -52,7 +52,7 @@ For the Android example app (`make android-run`), use:
 
 - Normal (default): `make android-run`
 - Lite (local build): `make android-run VOLVOXGRID_VARIANT=lite`
-- Lite (Maven): `make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.1`
+- Lite (Maven): `make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.2`
 
 `VOLVOXGRID_VARIANT` only treats `lite` as special. Any other value falls back to normal.
 
@@ -232,7 +232,6 @@ ctrl.setCells(Arrays.asList(
 LoadDataOptions matrixJson = LoadDataOptions.newBuilder()
     .setJson(JsonOptions.newBuilder().build())
     .setHeaderPolicy(HeaderPolicy.HEADER_NONE)
-    .setMode(LoadMode.LOAD_REPLACE)
     .build();
 ctrl.loadData(
     """
@@ -568,7 +567,6 @@ ctrl.loadData(
     LoadDataOptions.newBuilder()
         .setJson(JsonOptions.newBuilder().build())
         .setHeaderPolicy(HeaderPolicy.HEADER_NONE)
-        .setMode(LoadMode.LOAD_REPLACE)
         .build()
 )
 

@@ -1243,6 +1243,22 @@ class VolvoxGridController extends ChangeNotifier {
     return result;
   }
 
+  /// Parse CSV or JSON bytes and append them after the current grid rows.
+  Future<LoadDataResult> appendData(
+    List<int> data, {
+    LoadDataOptions? options,
+  }) async {
+    final request = AppendDataRequest()
+      ..gridId = _gridId
+      ..data = data;
+    if (options != null) {
+      request.options = options;
+    }
+    final result = await VolvoxGridService.AppendData(request);
+    notifyListeners();
+    return result;
+  }
+
   /// Render printable pages.
   Future<PrintResponse> printGrid({
     PrintOrientation orientation = PrintOrientation.PRINT_PORTRAIT,

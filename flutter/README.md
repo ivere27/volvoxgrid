@@ -17,7 +17,7 @@ A high-performance, pixel-rendered data grid widget for Flutter. The native Rust
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.1
+  volvoxgrid: ^0.8.2
 ```
 
 Native binaries are resolved automatically from Maven Central at build time. No manual downloads required.
@@ -29,7 +29,7 @@ By default, `VOLVOXGRID_SOURCE=maven` pulls pre-built binaries from Maven Centra
 | Variable | Default | Description |
 |---|---|---|
 | `VOLVOXGRID_SOURCE` | `maven` | `maven` or `local` |
-| `VOLVOXGRID_VERSION` | `0.8.1` | Maven artifact version |
+| `VOLVOXGRID_VERSION` | `0.8.2` | Maven artifact version |
 
 ## Quick Start
 
@@ -181,8 +181,7 @@ await controller.loadData(
   ])),
   LoadDataOptions()
     ..json = (JsonOptions())
-    ..headerPolicy = HeaderPolicy.HEADER_NONE
-    ..mode = LoadMode.LOAD_REPLACE,
+    ..headerPolicy = HeaderPolicy.HEADER_NONE,
 );
 
 // Clear all data

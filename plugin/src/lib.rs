@@ -4633,6 +4633,12 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         })
     }
 
+    fn append_data(&self, request: AppendDataRequest) -> PluginResult<LoadDataResult> {
+        self.with_grid(request.grid_id, |grid| {
+            volvoxgrid_engine::load::append_data(grid, &request.data, request.options.as_ref())
+        })
+    }
+
     fn clear(&self, request: ClearRequest) -> PluginResult<ClearResponse> {
         self.with_grid(request.grid_id, |grid| {
             let before = grid.cells.len() as i32;

@@ -423,6 +423,13 @@ class VolvoxGridService {
         LoadDataResult.fromBuffer,
       );
 
+  static Future<LoadDataResult> AppendData(AppendDataRequest request) =>
+      _invokeUnary(
+        _serviceMethodPath('AppendData'),
+        request,
+        LoadDataResult.fromBuffer,
+      );
+
   static Future<PrintResponse> Print(PrintRequest request) => _invokeUnary(
         _serviceMethodPath('Print'),
         request,

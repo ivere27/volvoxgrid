@@ -105,6 +105,7 @@ public final class VolvoxGridDesktopClient {
     private static final String CLIPBOARD = "/volvoxgrid.v1.VolvoxGridService/Clipboard";
     private static final String EXPORT = "/volvoxgrid.v1.VolvoxGridService/Export";
     private static final String LOAD_DATA = "/volvoxgrid.v1.VolvoxGridService/LoadData";
+    private static final String APPEND_DATA = "/volvoxgrid.v1.VolvoxGridService/AppendData";
     private static final String PRINT = "/volvoxgrid.v1.VolvoxGridService/Print";
     private static final String ARCHIVE = "/volvoxgrid.v1.VolvoxGridService/Archive";
     private static final String RESIZE_VIEWPORT = "/volvoxgrid.v1.VolvoxGridService/ResizeViewport";
@@ -260,6 +261,10 @@ public final class VolvoxGridDesktopClient {
 
     public LoadDataResult loadData(LoadDataRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         return unary(LOAD_DATA, request, LoadDataResult.parser());
+    }
+
+    public LoadDataResult appendData(AppendDataRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        return unary(APPEND_DATA, request, LoadDataResult.parser());
     }
 
     public PrintResponse printGrid(PrintRequest request) throws SynurangDesktopBridge.SynurangBridgeException {

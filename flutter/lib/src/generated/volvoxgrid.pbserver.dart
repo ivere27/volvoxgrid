@@ -53,6 +53,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
       $pb.ServerContext ctx, $0.LoadTableRequest request);
   $async.Future<$0.LoadDataResult> loadData(
       $pb.ServerContext ctx, $0.LoadDataRequest request);
+  $async.Future<$0.LoadDataResult> appendData(
+      $pb.ServerContext ctx, $0.AppendDataRequest request);
   $async.Future<$0.ClearResponse> clear(
       $pb.ServerContext ctx, $0.ClearRequest request);
   $async.Future<$0.SelectResponse> select(
@@ -148,6 +150,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
         return $0.LoadTableRequest();
       case 'LoadData':
         return $0.LoadDataRequest();
+      case 'AppendData':
+        return $0.AppendDataRequest();
       case 'Clear':
         return $0.ClearRequest();
       case 'Select':
@@ -248,6 +252,8 @@ abstract class VolvoxGridServiceBase extends $pb.GeneratedService {
         return loadTable(ctx, request as $0.LoadTableRequest);
       case 'LoadData':
         return loadData(ctx, request as $0.LoadDataRequest);
+      case 'AppendData':
+        return appendData(ctx, request as $0.AppendDataRequest);
       case 'Clear':
         return clear(ctx, request as $0.ClearRequest);
       case 'Select':

@@ -1295,6 +1295,27 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         return client.loadData(builder.build());
     }
 
+    public LoadDataResult appendData(AppendDataRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
+        Objects.requireNonNull(request, "request");
+        return client.appendData(request.toBuilder().setGridId(gridId).build());
+    }
+
+    public LoadDataResult appendData(byte[] data) throws SynurangDesktopBridge.SynurangBridgeException {
+        return appendData(data, null);
+    }
+
+    public LoadDataResult appendData(byte[] data, LoadDataOptions options) throws SynurangDesktopBridge.SynurangBridgeException {
+        AppendDataRequest.Builder builder = AppendDataRequest.newBuilder()
+            .setGridId(gridId);
+        if (data != null && data.length > 0) {
+            builder.setData(ByteString.copyFrom(data));
+        }
+        if (options != null) {
+            builder.setOptions(options);
+        }
+        return client.appendData(builder.build());
+    }
+
     public PrintResponse printGrid(PrintRequest request) throws SynurangDesktopBridge.SynurangBridgeException {
         Objects.requireNonNull(request, "request");
         return client.printGrid(request.toBuilder().setGridId(gridId).build());

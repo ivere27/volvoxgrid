@@ -34,7 +34,6 @@ import io.github.ivere27.volvoxgrid.LayoutConfig;
 import io.github.ivere27.volvoxgrid.LoadDataResult;
 import io.github.ivere27.volvoxgrid.LoadDataStatus;
 import io.github.ivere27.volvoxgrid.LoadDataOptions;
-import io.github.ivere27.volvoxgrid.LoadMode;
 import io.github.ivere27.volvoxgrid.OutlineConfig;
 import io.github.ivere27.volvoxgrid.RegionStyle;
 import io.github.ivere27.volvoxgrid.ResizePolicy;
@@ -106,7 +105,6 @@ final class HierarchyJsonDesktopDemo {
             HELPER_FIELD_PATTERN.matcher(rawJson).replaceAll("").getBytes(StandardCharsets.UTF_8),
             LoadDataOptions.newBuilder()
                 .setAutoCreateColumns(false)
-                .setMode(LoadMode.LOAD_REPLACE)
                 .build()
         );
         if (result.getStatus() == LoadDataStatus.LOAD_FAILED) {

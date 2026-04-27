@@ -116,6 +116,14 @@ func (g *Grid) LoadData(data []byte, options *pb.LoadDataOptions) (*pb.LoadDataR
 	})
 }
 
+func (g *Grid) AppendData(data []byte, options *pb.LoadDataOptions) (*pb.LoadDataResult, error) {
+	return g.client.client.AppendData(context.Background(), &pb.AppendDataRequest{
+		GridId:  g.ID,
+		Data:    data,
+		Options: options,
+	})
+}
+
 func (g *Grid) LoadTable(rows, cols int32, values []*pb.CellValue, atomic bool) (*pb.WriteResult, error) {
 	return g.client.client.LoadTable(context.Background(), &pb.LoadTableRequest{
 		GridId: g.ID,

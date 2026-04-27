@@ -13,7 +13,7 @@ npm install volvoxgrid
 ### Using `VolvoxGrid` directly
 
 ```js
-import { HeaderPolicy, LoadMode, VolvoxGrid } from "volvoxgrid";
+import { HeaderPolicy, VolvoxGrid } from "volvoxgrid";
 
 const grid = new VolvoxGrid(document.getElementById("grid"), {
   wasmUrl: "./wasm/volvoxgrid_wasm.js",
@@ -74,7 +74,7 @@ grid.loadData("Name,Price,Qty\nWidget A,29.99,150\nWidget B,49.99,200");
 // JSON matrix with options
 grid.loadData(
   JSON.stringify([["Name", "Price"], ["Alpha", "10"]]),
-  { json: {}, headerPolicy: HeaderPolicy.HEADER_NONE, mode: LoadMode.LOAD_REPLACE },
+  { json: {}, headerPolicy: HeaderPolicy.HEADER_NONE },
 );
 ```
 

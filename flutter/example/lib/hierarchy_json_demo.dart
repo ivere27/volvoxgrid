@@ -56,9 +56,7 @@ Future<void> loadHierarchyJsonDemo(VolvoxGridController controller) async {
   await controller.defineColumns(_hierarchyDefineColumnsRequest());
   final result = await controller.loadData(
     sanitized,
-    options: (LoadDataOptions()
-      ..autoCreateColumns = false
-      ..mode = LoadMode.LOAD_REPLACE),
+    options: (LoadDataOptions()..autoCreateColumns = false),
   );
   if (result.status == LoadDataStatus.LOAD_FAILED) {
     throw StateError('LoadData failed for embedded hierarchy demo');

@@ -96,6 +96,7 @@ const (
 	VolvoxGridService_GetCells_FullMethodName         = "/volvoxgrid.v1.VolvoxGridService/GetCells"
 	VolvoxGridService_LoadTable_FullMethodName        = "/volvoxgrid.v1.VolvoxGridService/LoadTable"
 	VolvoxGridService_LoadData_FullMethodName         = "/volvoxgrid.v1.VolvoxGridService/LoadData"
+	VolvoxGridService_AppendData_FullMethodName       = "/volvoxgrid.v1.VolvoxGridService/AppendData"
 	VolvoxGridService_Clear_FullMethodName            = "/volvoxgrid.v1.VolvoxGridService/Clear"
 	VolvoxGridService_Select_FullMethodName           = "/volvoxgrid.v1.VolvoxGridService/Select"
 	VolvoxGridService_GetSelection_FullMethodName     = "/volvoxgrid.v1.VolvoxGridService/GetSelection"
@@ -152,6 +153,7 @@ type VolvoxGridServiceClient interface {
 	GetCells(ctx context.Context, in *GetCellsRequest, opts ...grpc.CallOption) (*CellsResponse, error)
 	LoadTable(ctx context.Context, in *LoadTableRequest, opts ...grpc.CallOption) (*WriteResult, error)
 	LoadData(ctx context.Context, in *LoadDataRequest, opts ...grpc.CallOption) (*LoadDataResult, error)
+	AppendData(ctx context.Context, in *AppendDataRequest, opts ...grpc.CallOption) (*LoadDataResult, error)
 	Clear(ctx context.Context, in *ClearRequest, opts ...grpc.CallOption) (*ClearResponse, error)
 	// ── Selection ──
 	Select(ctx context.Context, in *SelectRequest, opts ...grpc.CallOption) (*SelectResponse, error)
@@ -359,6 +361,16 @@ func (c *volvoxGridServiceClient) LoadData(ctx context.Context, in *LoadDataRequ
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(LoadDataResult)
 	err := c.cc.Invoke(ctx, VolvoxGridService_LoadData_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *volvoxGridServiceClient) AppendData(ctx context.Context, in *AppendDataRequest, opts ...grpc.CallOption) (*LoadDataResult, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LoadDataResult)
+	err := c.cc.Invoke(ctx, VolvoxGridService_AppendData_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -701,6 +713,7 @@ type VolvoxGridServiceServer interface {
 	GetCells(context.Context, *GetCellsRequest) (*CellsResponse, error)
 	LoadTable(context.Context, *LoadTableRequest) (*WriteResult, error)
 	LoadData(context.Context, *LoadDataRequest) (*LoadDataResult, error)
+	AppendData(context.Context, *AppendDataRequest) (*LoadDataResult, error)
 	Clear(context.Context, *ClearRequest) (*ClearResponse, error)
 	// ── Selection ──
 	Select(context.Context, *SelectRequest) (*SelectResponse, error)
@@ -801,6 +814,9 @@ func (UnimplementedVolvoxGridServiceServer) LoadTable(context.Context, *LoadTabl
 }
 func (UnimplementedVolvoxGridServiceServer) LoadData(context.Context, *LoadDataRequest) (*LoadDataResult, error) {
 	return nil, status.Error(codes.Unimplemented, "method LoadData not implemented")
+}
+func (UnimplementedVolvoxGridServiceServer) AppendData(context.Context, *AppendDataRequest) (*LoadDataResult, error) {
+	return nil, status.Error(codes.Unimplemented, "method AppendData not implemented")
 }
 func (UnimplementedVolvoxGridServiceServer) Clear(context.Context, *ClearRequest) (*ClearResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Clear not implemented")
@@ -1197,6 +1213,24 @@ func _VolvoxGridService_LoadData_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(VolvoxGridServiceServer).LoadData(ctx, req.(*LoadDataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VolvoxGridService_AppendData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AppendDataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VolvoxGridServiceServer).AppendData(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: VolvoxGridService_AppendData_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VolvoxGridServiceServer).AppendData(ctx, req.(*AppendDataRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1793,6 +1827,10 @@ var VolvoxGridService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "LoadData",
 			Handler:    _VolvoxGridService_LoadData_Handler,
+		},
+		{
+			MethodName: "AppendData",
+			Handler:    _VolvoxGridService_AppendData_Handler,
 		},
 		{
 			MethodName: "Clear",

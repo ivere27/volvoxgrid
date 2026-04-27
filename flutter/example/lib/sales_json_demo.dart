@@ -55,9 +55,7 @@ Future<void> loadSalesJsonDemo(VolvoxGridController controller) async {
   await controller.defineColumns(columns);
   final result = await controller.loadData(
     await controller.getDemoData('sales'),
-    options: (LoadDataOptions()
-      ..autoCreateColumns = false
-      ..mode = LoadMode.LOAD_REPLACE),
+    options: (LoadDataOptions()..autoCreateColumns = false),
   );
   if (result.status == LoadDataStatus.LOAD_FAILED) {
     throw StateError('LoadData failed for embedded sales demo');

@@ -130,6 +130,12 @@ uint8_t* volvox_grid_load_data_pb(
     int32_t* out_len
 );
 
+/* AppendData (protobuf input — has repeated/oneof fields) */
+uint8_t* volvox_grid_append_data_pb(
+    const uint8_t* data, int32_t data_len,
+    int32_t* out_len
+);
+
 /* Clear */
 uint8_t* volvox_grid_clear(
     int64_t grid_id,
