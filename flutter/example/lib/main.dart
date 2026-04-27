@@ -6,7 +6,7 @@ import 'package:flutter/material.dart' hide Align;
 import 'package:flutter/services.dart';
 import 'package:synurang/synurang.dart' as synurang;
 import 'package:volvoxgrid/volvoxgrid.dart' hide Padding;
-import 'package:volvoxgrid/src/generated/volvoxgrid.pb.dart' as pb;
+import 'package:volvoxgrid/volvoxgrid_ffi.dart' as pb;
 
 import 'sales_json_demo.dart';
 import 'hierarchy_json_demo.dart';
