@@ -203,7 +203,10 @@ impl GpuRenderer {
     pub async fn new(preferred_backends: Option<wgpu::Backends>) -> Result<Self, String> {
         // On wasm, use only the WebGPU browser backend.
         #[cfg(target_arch = "wasm32")]
-        let backends = wgpu::Backends::BROWSER_WEBGPU;
+        let backends = {
+            let _ = preferred_backends;
+            wgpu::Backends::BROWSER_WEBGPU
+        };
 
         #[cfg(not(target_arch = "wasm32"))]
         let backends = if let Some(b) = preferred_backends {

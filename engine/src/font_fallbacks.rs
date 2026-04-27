@@ -1,5 +1,7 @@
+#[cfg(not(target_arch = "wasm32"))]
 use std::collections::HashSet;
 
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum LocaleBucket {
     Korean,
@@ -13,6 +15,7 @@ enum LocaleBucket {
     Latin,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn locale_bucket(locale: &str) -> LocaleBucket {
     let l = locale.to_ascii_lowercase();
     if l.starts_with("ko") {
@@ -60,6 +63,7 @@ fn locale_bucket(locale: &str) -> LocaleBucket {
     LocaleBucket::Latin
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn append_unique(
     out: &mut Vec<&'static str>,
     seen: &mut HashSet<&'static str>,
@@ -467,7 +471,3 @@ pub(crate) fn platform_fallback_candidates(locale_hint: &str) -> Vec<&'static st
     candidates
 }
 
-#[cfg(target_arch = "wasm32")]
-pub(crate) fn platform_fallback_candidates(_locale_hint: &str) -> Vec<&'static str> {
-    Vec::new()
-}

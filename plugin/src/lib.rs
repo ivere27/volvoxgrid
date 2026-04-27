@@ -5,7 +5,6 @@ use std::sync::{
 };
 use std::time::{Duration, Instant};
 
-use volvoxgrid_engine::cell::CellValueData;
 use volvoxgrid_engine::proto::volvoxgrid::v1 as pb;
 use volvoxgrid_engine::proto::volvoxgrid::v1::*;
 use volvoxgrid_engine::GridManager;
@@ -27,13 +26,10 @@ lazy_static::lazy_static! {
 
 type PluginResult<T> = Result<T, FfiError>;
 
-const ERROR_UNKNOWN: i32 = 0;
 const ERROR_INVALID_ARGUMENT: i32 = 1;
 const ERROR_NOT_FOUND: i32 = 2;
 const ERROR_INVALID_STATE: i32 = 3;
 const ERROR_TYPE_VIOLATION: i32 = 4;
-const ERROR_DECODE_FAILED: i32 = 5;
-const ERROR_ENCODE_FAILED: i32 = 6;
 const ERROR_NOT_IMPLEMENTED: i32 = 7;
 const ERROR_INTERNAL: i32 = 8;
 
@@ -61,14 +57,6 @@ fn invalid_state(message: impl Into<String>) -> FfiError {
 
 fn type_violation(message: impl Into<String>) -> FfiError {
     ffi_error(message, ERROR_TYPE_VIOLATION, GRPC_INVALID_ARGUMENT)
-}
-
-fn decode_failed(message: impl Into<String>) -> FfiError {
-    ffi_error(message, ERROR_DECODE_FAILED, GRPC_INVALID_ARGUMENT)
-}
-
-fn encode_failed(message: impl Into<String>) -> FfiError {
-    ffi_error(message, ERROR_ENCODE_FAILED, GRPC_INTERNAL)
 }
 
 fn not_implemented(message: impl Into<String>) -> FfiError {
@@ -1244,47 +1232,6 @@ impl VolvoxGridPlugin {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Helper: convert proto CellValue to engine CellValueData
-// ---------------------------------------------------------------------------
-fn proto_value_to_engine(cv: &Option<CellValue>) -> CellValueData {
-    match cv {
-        Some(cv) => match &cv.value {
-            Some(cell_value::Value::Text(t)) => CellValueData::Text(t.clone()),
-            Some(cell_value::Value::Number(n)) => CellValueData::Number(*n),
-            Some(cell_value::Value::Flag(b)) => CellValueData::Bool(*b),
-            Some(cell_value::Value::Raw(d)) => CellValueData::Bytes(d.clone()),
-            Some(cell_value::Value::Timestamp(ts)) => CellValueData::Timestamp(*ts),
-            None => CellValueData::Empty,
-        },
-        None => CellValueData::Empty,
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Helper: convert engine CellValueData to proto CellValue
-// ---------------------------------------------------------------------------
-fn engine_value_to_proto(v: &CellValueData) -> CellValue {
-    match v {
-        CellValueData::Text(t) => CellValue {
-            value: Some(cell_value::Value::Text(t.clone())),
-        },
-        CellValueData::Number(n) => CellValue {
-            value: Some(cell_value::Value::Number(*n)),
-        },
-        CellValueData::Bool(b) => CellValue {
-            value: Some(cell_value::Value::Flag(*b)),
-        },
-        CellValueData::Bytes(d) => CellValue {
-            value: Some(cell_value::Value::Raw(d.clone())),
-        },
-        CellValueData::Timestamp(ts) => CellValue {
-            value: Some(cell_value::Value::Timestamp(*ts)),
-        },
-        CellValueData::Empty => CellValue { value: None },
-    }
-}
-
 /// Ensure layout is valid, rebuilding if necessary.
 fn ensure_layout(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
     grid.ensure_layout();
@@ -1294,64 +1241,6 @@ fn ensure_layout(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
 #[cfg(feature = "gpu")]
 fn pollster_block<F: std::future::Future>(f: F) -> F::Output {
     pollster::block_on(f)
-}
-
-fn apply_array_data_to_grid(
-    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    rows: i32,
-    cols: i32,
-    values: &[String],
-) {
-    let rows = rows.max(1);
-    let cols = cols.max(1);
-
-    grid.set_rows(rows);
-    grid.set_cols(cols);
-    grid.cells.clear_all();
-
-    let max = (rows as usize).saturating_mul(cols as usize);
-    for (idx, value) in values.iter().take(max).enumerate() {
-        let idx = idx as i32;
-        let row = idx / cols;
-        let col = idx % cols;
-        grid.cells.set_text(row, col, value.clone());
-    }
-
-    grid.mark_dirty();
-}
-
-fn apply_picture_type_to_rgba(buf: &mut [u8], picture_type: i32) {
-    if picture_type != 1 {
-        return;
-    }
-    for px in buf.chunks_exact_mut(4) {
-        let r = px[0] as u16;
-        let g = px[1] as u16;
-        let b = px[2] as u16;
-        let y = ((r * 77 + g * 150 + b * 29) >> 8) as u8;
-        let bw = if y >= 128 { 255 } else { 0 };
-        px[0] = bw;
-        px[1] = bw;
-        px[2] = bw;
-    }
-}
-
-fn capture_grid_picture(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) -> ImageData {
-    ensure_layout(grid);
-    let width = grid.viewport_width.max(1);
-    let height = grid.viewport_height.max(1);
-    let stride = width * 4;
-    let mut buffer = vec![0u8; (stride * height) as usize];
-
-    let mut renderer = volvoxgrid_engine::render::Renderer::new();
-    renderer.render(grid, &mut buffer, width, height, stride);
-    apply_picture_type_to_rgba(&mut buffer, grid.picture_type);
-
-    let data = volvoxgrid_engine::print::encode_rgba_png(&buffer, width as u32, height as u32);
-    ImageData {
-        data,
-        format: "png".to_string(),
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -3206,27 +3095,6 @@ fn maybe_send_refreshed_edit_request(
     }
 }
 
-fn begin_edit_session_core(
-    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    col: i32,
-    force: bool,
-    emit_before_event: bool,
-) {
-    begin_edit_session_core_opts(
-        grid,
-        row,
-        col,
-        force,
-        emit_before_event,
-        true,
-        None,
-        None,
-        None,
-        None,
-    );
-}
-
 fn begin_edit_session_core_opts(
     grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
     row: i32,
@@ -3305,33 +3173,6 @@ fn begin_edit_session_core_opts(
     }
     grid.events
         .push(volvoxgrid_engine::event::GridEventData::StartEdit { row, col });
-}
-
-fn begin_edit_session(
-    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    col: i32,
-    force: bool,
-) {
-    begin_edit_session_core(grid, row, col, force, true);
-}
-
-fn begin_edit_session_after_before(
-    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    col: i32,
-    force: bool,
-) {
-    begin_edit_session_core(grid, row, col, force, false);
-}
-
-fn begin_edit_session_after_dropdown_before(
-    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    col: i32,
-    force: bool,
-) {
-    begin_edit_session_core_opts(grid, row, col, force, false, false, None, None, None, None);
 }
 
 fn normalize_committed_edit_text(
