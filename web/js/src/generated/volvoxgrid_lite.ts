@@ -1015,6 +1015,11 @@ export enum ImageAlignment {
   IMG_ALIGN_STRETCH = 9,
   IMG_ALIGN_TILE = 10,
 }
+export enum IndicatorAppearance {
+  INDICATOR_APPEARANCE_CLASSIC = 0,
+  INDICATOR_APPEARANCE_FLAT = 1,
+  INDICATOR_APPEARANCE_MODERN = 2,
+}
 export enum IndicatorBand {
   INDICATOR_BAND_UNSPECIFIED = 0,
   INDICATOR_BAND_ROW_START = 1,
@@ -2143,6 +2148,21 @@ export const ImageDataFields = {
   "data": 1,
   "format": 2,
 } as const;
+export const IndicatorColorsFields = {
+  "background": 1,
+  "foreground": 2,
+  "grid": 3,
+  "button_background": 4,
+  "button_foreground": 5,
+  "button_border": 6,
+  "button_pressed_background": 7,
+  "button_pressed_foreground": 8,
+  "button_pressed_border_dark": 9,
+  "button_pressed_border_light": 10,
+  "button_hover_background": 11,
+  "button_hover_foreground": 12,
+  "button_hover_border": 13,
+} as const;
 export const IndicatorFocusConfigFields = {
   "enable_keyboard_focus": 1,
   "enter_key_code": 2,
@@ -2158,6 +2178,8 @@ export const IndicatorsConfigFields = {
   "corner_bottom_start": 7,
   "corner_bottom_end": 8,
   "focus": 9,
+  "appearance": 10,
+  "colors": 11,
 } as const;
 export const InsertRowsRequestFields = {
   "grid_id": 1,
@@ -12693,6 +12715,153 @@ export class ImageData implements LiteMessage {
   }
 }
 registerMessage(ImageData);
+export class IndicatorColors implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.IndicatorColors" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "background",
+      jsonName: "background",
+      prop: "background",
+      kind: "uint32" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 2,
+      name: "foreground",
+      jsonName: "foreground",
+      prop: "foreground",
+      kind: "uint32" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 3,
+      name: "grid",
+      jsonName: "grid",
+      prop: "grid",
+      kind: "uint32" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 4,
+      name: "button_background",
+      jsonName: "buttonBackground",
+      prop: "buttonBackground",
+      kind: "uint32" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 5,
+      name: "button_foreground",
+      jsonName: "buttonForeground",
+      prop: "buttonForeground",
+      kind: "uint32" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 6,
+      name: "button_border",
+      jsonName: "buttonBorder",
+      prop: "buttonBorder",
+      kind: "uint32" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 7,
+      name: "button_pressed_background",
+      jsonName: "buttonPressedBackground",
+      prop: "buttonPressedBackground",
+      kind: "uint32" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 8,
+      name: "button_pressed_foreground",
+      jsonName: "buttonPressedForeground",
+      prop: "buttonPressedForeground",
+      kind: "uint32" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 9,
+      name: "button_pressed_border_dark",
+      jsonName: "buttonPressedBorderDark",
+      prop: "buttonPressedBorderDark",
+      kind: "uint32" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 10,
+      name: "button_pressed_border_light",
+      jsonName: "buttonPressedBorderLight",
+      prop: "buttonPressedBorderLight",
+      kind: "uint32" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 11,
+      name: "button_hover_background",
+      jsonName: "buttonHoverBackground",
+      prop: "buttonHoverBackground",
+      kind: "uint32" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 12,
+      name: "button_hover_foreground",
+      jsonName: "buttonHoverForeground",
+      prop: "buttonHoverForeground",
+      kind: "uint32" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 13,
+      name: "button_hover_border",
+      jsonName: "buttonHoverBorder",
+      prop: "buttonHoverBorder",
+      kind: "uint32" as ProtoKind,
+      optional: true,
+    },
+  ];
+  background: number = 0;
+  foreground: number = 0;
+  grid: number = 0;
+  buttonBackground: number = 0;
+  buttonForeground: number = 0;
+  buttonBorder: number = 0;
+  buttonPressedBackground: number = 0;
+  buttonPressedForeground: number = 0;
+  buttonPressedBorderDark: number = 0;
+  buttonPressedBorderLight: number = 0;
+  buttonHoverBackground: number = 0;
+  buttonHoverForeground: number = 0;
+  buttonHoverBorder: number = 0;
+
+  constructor(init?: Partial<IndicatorColors>) {
+    initMessage(this, IndicatorColors.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): IndicatorColors {
+    return decodeMessage(IndicatorColors, data);
+  }
+
+  static parseFrom(data: Uint8Array): IndicatorColors {
+    return IndicatorColors.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, IndicatorColors.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, IndicatorColors.fields);
+  }
+}
+registerMessage(IndicatorColors);
 export class IndicatorFocusConfig implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.IndicatorFocusConfig" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -12825,6 +12994,23 @@ export class IndicatorsConfig implements LiteMessage {
       kind: "message" as ProtoKind,
       messageType: "IndicatorFocusConfig",
     },
+    {
+      no: 10,
+      name: "appearance",
+      jsonName: "appearance",
+      prop: "appearance",
+      kind: "enum" as ProtoKind,
+      optional: true,
+      enumType: IndicatorAppearance,
+    },
+    {
+      no: 11,
+      name: "colors",
+      jsonName: "colors",
+      prop: "colors",
+      kind: "message" as ProtoKind,
+      messageType: "IndicatorColors",
+    },
   ];
   rowStart?: RowIndicatorConfig;
   rowEnd?: RowIndicatorConfig;
@@ -12835,6 +13021,8 @@ export class IndicatorsConfig implements LiteMessage {
   cornerBottomStart?: CornerIndicatorConfig;
   cornerBottomEnd?: CornerIndicatorConfig;
   focus?: IndicatorFocusConfig;
+  appearance: IndicatorAppearance = 0;
+  colors?: IndicatorColors;
 
   constructor(init?: Partial<IndicatorsConfig>) {
     initMessage(this, IndicatorsConfig.fields, init as Record<string, unknown> | undefined);

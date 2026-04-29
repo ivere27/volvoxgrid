@@ -7,8 +7,8 @@
 use crate::cell::{BarcodeSpec, CellValueData};
 use crate::grid::VolvoxGrid;
 use crate::indicator::{
-    ColIndicatorCellState, ColIndicatorRowDefState, CornerIndicatorSlotState, CornerIndicatorState,
-    RowIndicatorSlotState,
+    normalize_indicator_appearance, ColIndicatorCellState, ColIndicatorRowDefState,
+    CornerIndicatorSlotState, CornerIndicatorState, RowIndicatorSlotState,
 };
 use crate::proto::volvoxgrid::v1;
 use crate::row::RowStatus;
@@ -64,6 +64,69 @@ fn engine_scrollbar_colors_to_v1(colors: crate::scrollbar::ScrollBarColors) -> v
         track: Some(colors.track),
         arrow: Some(colors.arrow),
         border: Some(colors.border),
+    }
+}
+
+fn apply_indicator_colors_patch(
+    target: &mut crate::indicator::IndicatorColors,
+    patch: &v1::IndicatorColors,
+) {
+    if let Some(v) = patch.background {
+        target.background = Some(v);
+    }
+    if let Some(v) = patch.foreground {
+        target.foreground = Some(v);
+    }
+    if let Some(v) = patch.grid {
+        target.grid = Some(v);
+    }
+    if let Some(v) = patch.button_background {
+        target.button_background = Some(v);
+    }
+    if let Some(v) = patch.button_foreground {
+        target.button_foreground = Some(v);
+    }
+    if let Some(v) = patch.button_border {
+        target.button_border = Some(v);
+    }
+    if let Some(v) = patch.button_hover_background {
+        target.button_hover_background = Some(v);
+    }
+    if let Some(v) = patch.button_hover_foreground {
+        target.button_hover_foreground = Some(v);
+    }
+    if let Some(v) = patch.button_hover_border {
+        target.button_hover_border = Some(v);
+    }
+    if let Some(v) = patch.button_pressed_background {
+        target.button_pressed_background = Some(v);
+    }
+    if let Some(v) = patch.button_pressed_foreground {
+        target.button_pressed_foreground = Some(v);
+    }
+    if let Some(v) = patch.button_pressed_border_dark {
+        target.button_pressed_border_dark = Some(v);
+    }
+    if let Some(v) = patch.button_pressed_border_light {
+        target.button_pressed_border_light = Some(v);
+    }
+}
+
+fn engine_indicator_colors_to_v1(colors: crate::indicator::IndicatorColors) -> v1::IndicatorColors {
+    v1::IndicatorColors {
+        background: colors.background,
+        foreground: colors.foreground,
+        grid: colors.grid,
+        button_background: colors.button_background,
+        button_foreground: colors.button_foreground,
+        button_border: colors.button_border,
+        button_hover_background: colors.button_hover_background,
+        button_hover_foreground: colors.button_hover_foreground,
+        button_hover_border: colors.button_hover_border,
+        button_pressed_background: colors.button_pressed_background,
+        button_pressed_foreground: colors.button_pressed_foreground,
+        button_pressed_border_dark: colors.button_pressed_border_dark,
+        button_pressed_border_light: colors.button_pressed_border_light,
     }
 }
 
@@ -1075,6 +1138,12 @@ impl VolvoxGrid {
     }
 
     fn apply_indicator_bands_config(&mut self, bands: &v1::IndicatorsConfig) {
+        if let Some(v) = bands.appearance {
+            self.indicator_bands.appearance = normalize_indicator_appearance(v);
+        }
+        if let Some(v) = &bands.colors {
+            apply_indicator_colors_patch(&mut self.indicator_bands.colors, v);
+        }
         if let Some(cfg) = &bands.row_start {
             apply_row_indicator_config(&mut self.indicator_bands.row_start, cfg);
         }
@@ -2175,6 +2244,8 @@ impl VolvoxGrid {
 
     fn get_indicator_bands_config(&self) -> v1::IndicatorsConfig {
         v1::IndicatorsConfig {
+            appearance: Some(self.indicator_bands.appearance),
+            colors: Some(engine_indicator_colors_to_v1(self.indicator_bands.colors)),
             row_start: Some(row_indicator_to_proto(&self.indicator_bands.row_start)),
             row_end: Some(row_indicator_to_proto(&self.indicator_bands.row_end)),
             col_top: Some(col_indicator_to_proto(&self.indicator_bands.col_top)),
@@ -3618,6 +3689,52 @@ mod tests {
         assert_eq!(grid.scrollbar_colors.thumb, 0xFF123456);
         assert_eq!(grid.scrollbar_fade_delay_ms, 1000);
         assert_eq!(grid.scrollbar_margin, 2);
+    }
+
+    #[test]
+    fn indicator_theme_config_roundtrip() {
+        let mut grid = test_grid();
+        let config = v1::GridConfig {
+            indicators: Some(v1::IndicatorsConfig {
+                appearance: Some(v1::IndicatorAppearance::Modern as i32),
+                colors: Some(v1::IndicatorColors {
+                    background: Some(0xFF102030),
+                    foreground: Some(0xFFE0E0E0),
+                    grid: Some(0xFF405060),
+                    button_hover_background: Some(0xFFEAF3FF),
+                    button_hover_border: Some(0xFF5B8DEF),
+                    button_pressed_background: Some(0xFFABCDEF),
+                    button_pressed_border_dark: Some(0xFF123456),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        grid.apply_config(&config);
+
+        assert_eq!(
+            grid.indicator_bands.appearance,
+            v1::IndicatorAppearance::Modern as i32
+        );
+        assert_eq!(grid.indicator_bands.colors.background, Some(0xFF102030));
+        assert_eq!(
+            grid.indicator_bands.colors.button_pressed_background,
+            Some(0xFFABCDEF)
+        );
+
+        let returned = grid.get_config();
+        let indicators = returned.indicators.as_ref().unwrap();
+        let colors = indicators.colors.as_ref().unwrap();
+        assert_eq!(
+            indicators.appearance,
+            Some(v1::IndicatorAppearance::Modern as i32)
+        );
+        assert_eq!(colors.grid, Some(0xFF405060));
+        assert_eq!(colors.button_hover_background, Some(0xFFEAF3FF));
+        assert_eq!(colors.button_hover_border, Some(0xFF5B8DEF));
+        assert_eq!(colors.button_pressed_border_dark, Some(0xFF123456));
     }
 
     #[test]

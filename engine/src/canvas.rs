@@ -3595,6 +3595,54 @@ fn indicator_back_color(color: Option<u32>, fallback: u32) -> u32 {
     color.unwrap_or(fallback)
 }
 
+fn indicator_theme_back_color(grid: &VolvoxGrid) -> u32 {
+    grid.indicator_bands
+        .colors
+        .background
+        .unwrap_or(grid.style.back_color_fixed)
+}
+
+fn indicator_theme_fore_color(grid: &VolvoxGrid) -> u32 {
+    grid.indicator_bands
+        .colors
+        .foreground
+        .unwrap_or(grid.style.fore_color_fixed)
+}
+
+fn indicator_theme_grid_color(grid: &VolvoxGrid) -> u32 {
+    grid.indicator_bands
+        .colors
+        .grid
+        .unwrap_or(grid.style.grid_color_fixed)
+}
+
+fn row_indicator_expander_hovered(grid: &VolvoxGrid, row: i32, slot_index: i32) -> bool {
+    if grid.selection.hover_mode == HOVER_NONE {
+        return false;
+    }
+    let Some(hover) = &grid.last_hover_target else {
+        return false;
+    };
+    hover.row == row
+        && hover.target.kind == pb::GridTargetKind::GridTargetRowIndicator as i32
+        && hover.target.band == pb::IndicatorBand::RowStart as i32
+        && hover.target.slot_index == slot_index
+        && hover.target.slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
+}
+
+fn corner_outline_level_hovered(grid: &VolvoxGrid, level: i32) -> bool {
+    if grid.selection.hover_mode == HOVER_NONE {
+        return false;
+    }
+    let Some(hover) = &grid.last_hover_target else {
+        return false;
+    };
+    hover.target.kind == pb::GridTargetKind::GridTargetCornerIndicator as i32
+        && hover.target.band == pb::IndicatorBand::CornerTopStart as i32
+        && hover.target.slot_kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32
+        && hover.target.int_value == level as i64
+}
+
 fn draw_indicator_text<C: Canvas>(
     canvas: &mut C,
     grid: &VolvoxGrid,
@@ -4166,9 +4214,17 @@ fn render_row_indicator_start<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx:
         return;
     }
 
-    let back_color = indicator_back_color(band.back_color, grid.style.back_color_fixed);
-    let fore_color = indicator_fore_color(band.fore_color, grid.style.fore_color_fixed);
-    let grid_color = band.grid_color.unwrap_or(grid.style.grid_color_fixed);
+    let back_color = indicator_back_color(band.back_color, indicator_theme_back_color(grid));
+    let fore_color = indicator_fore_color(band.fore_color, indicator_theme_fore_color(grid));
+    let grid_color = band
+        .grid_color
+        .unwrap_or_else(|| indicator_theme_grid_color(grid));
+    let button_theme = crate::indicator::resolve_indicator_button_theme(
+        grid.indicator_bands.appearance,
+        grid.indicator_bands.colors,
+        fore_color,
+        grid_color,
+    );
     let band_x = 0;
     let band_y = vp.data_y;
     let band_w = vp.data_x;
@@ -4220,13 +4276,25 @@ fn render_row_indicator_start<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx:
             } else {
                 slot.width_px.max(1).min(remaining)
             };
+            let slot_hovered = slot.kind
+                == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
+                && row_indicator_expander_hovered(grid, row, slot_index as i32);
+            let slot_fore_color = if slot_hovered {
+                canvas.fill_rect(slot_x, cy, slot_w, ch, button_theme.hover_background);
+                if let Some(border) = button_theme.hover_border {
+                    canvas.rect_outline(slot_x, cy, slot_w, ch, border);
+                }
+                button_theme.hover_foreground
+            } else {
+                row_fore_color
+            };
             render_row_indicator_slot(
                 grid,
                 canvas,
                 row,
                 (slot_x, cy, slot_w, ch),
                 slot.kind,
-                row_fore_color,
+                slot_fore_color,
             );
             if let Some(active) = &grid.active_indicator {
                 if active.band == pb::IndicatorBand::RowStart as i32
@@ -4255,9 +4323,11 @@ fn render_col_indicator_top<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &
         return;
     }
 
-    let back_color = indicator_back_color(band.back_color, grid.style.back_color_fixed);
-    let fore_color = indicator_fore_color(band.fore_color, grid.style.fore_color_fixed);
-    let grid_color = band.grid_color.unwrap_or(grid.style.grid_color_fixed);
+    let back_color = indicator_back_color(band.back_color, indicator_theme_back_color(grid));
+    let fore_color = indicator_fore_color(band.fore_color, indicator_theme_fore_color(grid));
+    let grid_color = band
+        .grid_color
+        .unwrap_or_else(|| indicator_theme_grid_color(grid));
     let band_x = vp.data_x;
     let band_y = 0;
     let band_w = vp.data_w;
@@ -4503,13 +4573,13 @@ fn render_corner_top_start<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &R
     let col_top = &grid.indicator_bands.col_top;
     let back_color = indicator_back_color(
         corner.back_color,
-        indicator_back_color(col_top.back_color, grid.style.back_color_fixed),
+        indicator_back_color(col_top.back_color, indicator_theme_back_color(grid)),
     );
-    let fore_color = indicator_fore_color(corner.fore_color, grid.style.fore_color_fixed);
+    let fore_color = indicator_fore_color(corner.fore_color, indicator_theme_fore_color(grid));
     let grid_color = col_top
         .grid_color
         .or(grid.indicator_bands.row_start.grid_color)
-        .unwrap_or(grid.style.grid_color_fixed);
+        .unwrap_or_else(|| indicator_theme_grid_color(grid));
     canvas.fill_rect(0, 0, vp.data_x, vp.data_y, back_color);
     if corner.visible {
         if corner.slots.is_empty() {
@@ -4523,7 +4593,9 @@ fn render_corner_top_start<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &R
                 }
             }
         } else {
-            render_corner_slots(grid, canvas, corner, vp.data_x, vp.data_y, fore_color);
+            render_corner_slots(
+                grid, canvas, corner, vp.data_x, vp.data_y, fore_color, grid_color,
+            );
         }
     }
 
@@ -4545,6 +4617,7 @@ fn render_corner_outline_levels<C: Canvas>(
     canvas: &mut C,
     rect: (i32, i32, i32, i32),
     fore_color: u32,
+    grid_color: u32,
 ) {
     let (x, y, w, h) = rect;
     if !grid.outline.show_level_buttons {
@@ -4556,6 +4629,12 @@ fn render_corner_outline_levels<C: Canvas>(
         return;
     }
     let tg = crate::outline::TreeGeometry::from_grid(grid);
+    let theme = crate::indicator::resolve_indicator_button_theme(
+        grid.indicator_bands.appearance,
+        grid.indicator_bands.colors,
+        fore_color,
+        grid_color,
+    );
     for level in min_level..=max_level {
         let bx = x + (level - min_level) * tg.indent_step;
         if bx >= x + w {
@@ -4566,25 +4645,49 @@ fn render_corner_outline_levels<C: Canvas>(
         let pressed = grid.outline_level_button_pressed
             && grid.outline_level_button_pressed_inside
             && grid.outline_level_button_pressed_level == level;
+        let hovered = !pressed && corner_outline_level_hovered(grid, level);
         if pressed {
-            canvas.fill_rect(bx, y, bw, h, 0xFFD0D0D0);
-            canvas.hline(bx, y, bw, 0xFF707070);
-            canvas.vline(bx, y, h, 0xFF707070);
-            canvas.hline(bx, y + h - 1, bw, 0xFFFFFFFF);
-            canvas.vline(bx + bw - 1, y, h, 0xFFFFFFFF);
+            let offset = theme.pressed_text_offset.max(0);
+            canvas.fill_rect(bx, y, bw, h, theme.pressed_background);
+            canvas.hline(bx, y, bw, theme.pressed_border_dark);
+            canvas.vline(bx, y, h, theme.pressed_border_dark);
+            canvas.hline(bx, y + h - 1, bw, theme.pressed_border_light);
+            canvas.vline(bx + bw - 1, y, h, theme.pressed_border_light);
             draw_indicator_text(
                 canvas,
                 grid,
                 &label,
-                bx + 1,
-                y + 1,
-                (bw - 1).max(1),
-                (h - 1).max(1),
+                bx + offset,
+                y + offset,
+                (bw - offset).max(1),
+                (h - offset).max(1),
                 1,
-                fore_color,
+                theme.pressed_foreground,
+            );
+        } else if hovered {
+            canvas.fill_rect(bx, y, bw, h, theme.hover_background);
+            if let Some(border) = theme.hover_border {
+                canvas.rect_outline(bx, y, bw, h, border);
+            }
+            draw_indicator_text(
+                canvas,
+                grid,
+                &label,
+                bx,
+                y,
+                bw,
+                h,
+                1,
+                theme.hover_foreground,
             );
         } else {
-            draw_indicator_text(canvas, grid, &label, bx, y, bw, h, 1, fore_color);
+            if let Some(background) = theme.background {
+                canvas.fill_rect(bx, y, bw, h, background);
+            }
+            if let Some(border) = theme.border {
+                canvas.rect_outline(bx, y, bw, h, border);
+            }
+            draw_indicator_text(canvas, grid, &label, bx, y, bw, h, 1, theme.foreground);
         }
     }
 }
@@ -4596,6 +4699,7 @@ fn render_corner_slots<C: Canvas>(
     width: i32,
     height: i32,
     fore_color: u32,
+    grid_color: u32,
 ) {
     let visible_slot_count = corner.slots.iter().filter(|slot| slot.visible).count();
     let mut slot_x = 0;
@@ -4625,7 +4729,13 @@ fn render_corner_slots<C: Canvas>(
                 draw_indicator_text(canvas, grid, "▣", slot_x, 0, slot_w, height, 1, fore_color);
             }
         } else if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 {
-            render_corner_outline_levels(grid, canvas, (slot_x, 0, slot_w, height), fore_color);
+            render_corner_outline_levels(
+                grid,
+                canvas,
+                (slot_x, 0, slot_w, height),
+                fore_color,
+                grid_color,
+            );
         } else if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotCustom as i32 {
             if !slot.label_text.trim().is_empty() {
                 draw_indicator_text(

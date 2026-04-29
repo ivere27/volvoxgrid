@@ -740,6 +740,22 @@ final $typed_data.Uint8List scrollBarAppearanceDescriptor = $convert.base64Decod
     'IdChlTQ1JPTExCQVJfQVBQRUFSQU5DRV9GTEFUEAESHwobU0NST0xMQkFSX0FQUEVBUkFOQ0Vf'
     'TU9ERVJOEAISIAocU0NST0xMQkFSX0FQUEVBUkFOQ0VfT1ZFUkxBWRAD');
 
+@$core.Deprecated('Use indicatorAppearanceDescriptor instead')
+const IndicatorAppearance$json = {
+  '1': 'IndicatorAppearance',
+  '2': [
+    {'1': 'INDICATOR_APPEARANCE_CLASSIC', '2': 0},
+    {'1': 'INDICATOR_APPEARANCE_FLAT', '2': 1},
+    {'1': 'INDICATOR_APPEARANCE_MODERN', '2': 2},
+  ],
+};
+
+/// Descriptor for `IndicatorAppearance`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List indicatorAppearanceDescriptor = $convert.base64Decode(
+    'ChNJbmRpY2F0b3JBcHBlYXJhbmNlEiAKHElORElDQVRPUl9BUFBFQVJBTkNFX0NMQVNTSUMQAB'
+    'IdChlJTkRJQ0FUT1JfQVBQRUFSQU5DRV9GTEFUEAESHwobSU5ESUNBVE9SX0FQUEVBUkFOQ0Vf'
+    'TU9ERVJOEAI=');
+
 @$core.Deprecated('Use pinPositionDescriptor instead')
 const PinPosition$json = {
   '1': 'PinPosition',
@@ -5097,6 +5113,159 @@ final $typed_data.Uint8List cornerIndicatorConfigDescriptor = $convert.base64Dec
     'xvdHNCCgoIX3Zpc2libGVCDAoKX21vZGVfYml0c0INCgtfYmFja2dyb3VuZEINCgtfZm9yZWdy'
     'b3VuZEINCgtfY3VzdG9tX2tleUIHCgVfZGF0YQ==');
 
+@$core.Deprecated('Use indicatorColorsDescriptor instead')
+const IndicatorColors$json = {
+  '1': 'IndicatorColors',
+  '2': [
+    {
+      '1': 'background',
+      '3': 1,
+      '4': 1,
+      '5': 13,
+      '9': 0,
+      '10': 'background',
+      '17': true
+    },
+    {
+      '1': 'foreground',
+      '3': 2,
+      '4': 1,
+      '5': 13,
+      '9': 1,
+      '10': 'foreground',
+      '17': true
+    },
+    {'1': 'grid', '3': 3, '4': 1, '5': 13, '9': 2, '10': 'grid', '17': true},
+    {
+      '1': 'button_background',
+      '3': 4,
+      '4': 1,
+      '5': 13,
+      '9': 3,
+      '10': 'buttonBackground',
+      '17': true
+    },
+    {
+      '1': 'button_foreground',
+      '3': 5,
+      '4': 1,
+      '5': 13,
+      '9': 4,
+      '10': 'buttonForeground',
+      '17': true
+    },
+    {
+      '1': 'button_border',
+      '3': 6,
+      '4': 1,
+      '5': 13,
+      '9': 5,
+      '10': 'buttonBorder',
+      '17': true
+    },
+    {
+      '1': 'button_pressed_background',
+      '3': 7,
+      '4': 1,
+      '5': 13,
+      '9': 6,
+      '10': 'buttonPressedBackground',
+      '17': true
+    },
+    {
+      '1': 'button_pressed_foreground',
+      '3': 8,
+      '4': 1,
+      '5': 13,
+      '9': 7,
+      '10': 'buttonPressedForeground',
+      '17': true
+    },
+    {
+      '1': 'button_pressed_border_dark',
+      '3': 9,
+      '4': 1,
+      '5': 13,
+      '9': 8,
+      '10': 'buttonPressedBorderDark',
+      '17': true
+    },
+    {
+      '1': 'button_pressed_border_light',
+      '3': 10,
+      '4': 1,
+      '5': 13,
+      '9': 9,
+      '10': 'buttonPressedBorderLight',
+      '17': true
+    },
+    {
+      '1': 'button_hover_background',
+      '3': 11,
+      '4': 1,
+      '5': 13,
+      '9': 10,
+      '10': 'buttonHoverBackground',
+      '17': true
+    },
+    {
+      '1': 'button_hover_foreground',
+      '3': 12,
+      '4': 1,
+      '5': 13,
+      '9': 11,
+      '10': 'buttonHoverForeground',
+      '17': true
+    },
+    {
+      '1': 'button_hover_border',
+      '3': 13,
+      '4': 1,
+      '5': 13,
+      '9': 12,
+      '10': 'buttonHoverBorder',
+      '17': true
+    },
+  ],
+  '8': [
+    {'1': '_background'},
+    {'1': '_foreground'},
+    {'1': '_grid'},
+    {'1': '_button_background'},
+    {'1': '_button_foreground'},
+    {'1': '_button_border'},
+    {'1': '_button_pressed_background'},
+    {'1': '_button_pressed_foreground'},
+    {'1': '_button_pressed_border_dark'},
+    {'1': '_button_pressed_border_light'},
+    {'1': '_button_hover_background'},
+    {'1': '_button_hover_foreground'},
+    {'1': '_button_hover_border'},
+  ],
+};
+
+/// Descriptor for `IndicatorColors`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List indicatorColorsDescriptor = $convert.base64Decode(
+    'Cg9JbmRpY2F0b3JDb2xvcnMSIwoKYmFja2dyb3VuZBgBIAEoDUgAUgpiYWNrZ3JvdW5kiAEBEi'
+    'MKCmZvcmVncm91bmQYAiABKA1IAVIKZm9yZWdyb3VuZIgBARIXCgRncmlkGAMgASgNSAJSBGdy'
+    'aWSIAQESMAoRYnV0dG9uX2JhY2tncm91bmQYBCABKA1IA1IQYnV0dG9uQmFja2dyb3VuZIgBAR'
+    'IwChFidXR0b25fZm9yZWdyb3VuZBgFIAEoDUgEUhBidXR0b25Gb3JlZ3JvdW5kiAEBEigKDWJ1'
+    'dHRvbl9ib3JkZXIYBiABKA1IBVIMYnV0dG9uQm9yZGVyiAEBEj8KGWJ1dHRvbl9wcmVzc2VkX2'
+    'JhY2tncm91bmQYByABKA1IBlIXYnV0dG9uUHJlc3NlZEJhY2tncm91bmSIAQESPwoZYnV0dG9u'
+    'X3ByZXNzZWRfZm9yZWdyb3VuZBgIIAEoDUgHUhdidXR0b25QcmVzc2VkRm9yZWdyb3VuZIgBAR'
+    'JAChpidXR0b25fcHJlc3NlZF9ib3JkZXJfZGFyaxgJIAEoDUgIUhdidXR0b25QcmVzc2VkQm9y'
+    'ZGVyRGFya4gBARJCChtidXR0b25fcHJlc3NlZF9ib3JkZXJfbGlnaHQYCiABKA1ICVIYYnV0dG'
+    '9uUHJlc3NlZEJvcmRlckxpZ2h0iAEBEjsKF2J1dHRvbl9ob3Zlcl9iYWNrZ3JvdW5kGAsgASgN'
+    'SApSFWJ1dHRvbkhvdmVyQmFja2dyb3VuZIgBARI7ChdidXR0b25faG92ZXJfZm9yZWdyb3VuZB'
+    'gMIAEoDUgLUhVidXR0b25Ib3ZlckZvcmVncm91bmSIAQESMwoTYnV0dG9uX2hvdmVyX2JvcmRl'
+    'chgNIAEoDUgMUhFidXR0b25Ib3ZlckJvcmRlcogBAUINCgtfYmFja2dyb3VuZEINCgtfZm9yZW'
+    'dyb3VuZEIHCgVfZ3JpZEIUChJfYnV0dG9uX2JhY2tncm91bmRCFAoSX2J1dHRvbl9mb3JlZ3Jv'
+    'dW5kQhAKDl9idXR0b25fYm9yZGVyQhwKGl9idXR0b25fcHJlc3NlZF9iYWNrZ3JvdW5kQhwKGl'
+    '9idXR0b25fcHJlc3NlZF9mb3JlZ3JvdW5kQh0KG19idXR0b25fcHJlc3NlZF9ib3JkZXJfZGFy'
+    'a0IeChxfYnV0dG9uX3ByZXNzZWRfYm9yZGVyX2xpZ2h0QhoKGF9idXR0b25faG92ZXJfYmFja2'
+    'dyb3VuZEIaChhfYnV0dG9uX2hvdmVyX2ZvcmVncm91bmRCFgoUX2J1dHRvbl9ob3Zlcl9ib3Jk'
+    'ZXI=');
+
 @$core.Deprecated('Use gridEventTargetDescriptor instead')
 const GridEventTarget$json = {
   '1': 'GridEventTarget',
@@ -5261,6 +5430,27 @@ const IndicatorsConfig$json = {
       '6': '.volvoxgrid.v1.IndicatorFocusConfig',
       '10': 'focus'
     },
+    {
+      '1': 'appearance',
+      '3': 10,
+      '4': 1,
+      '5': 14,
+      '6': '.volvoxgrid.v1.IndicatorAppearance',
+      '9': 0,
+      '10': 'appearance',
+      '17': true
+    },
+    {
+      '1': 'colors',
+      '3': 11,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.IndicatorColors',
+      '10': 'colors'
+    },
+  ],
+  '8': [
+    {'1': '_appearance'},
   ],
 };
 
@@ -5277,7 +5467,10 @@ final $typed_data.Uint8List indicatorsConfigDescriptor = $convert.base64Decode(
     'YXJ0GAcgASgLMiQudm9sdm94Z3JpZC52MS5Db3JuZXJJbmRpY2F0b3JDb25maWdSEWNvcm5lck'
     'JvdHRvbVN0YXJ0ElAKEWNvcm5lcl9ib3R0b21fZW5kGAggASgLMiQudm9sdm94Z3JpZC52MS5D'
     'b3JuZXJJbmRpY2F0b3JDb25maWdSD2Nvcm5lckJvdHRvbUVuZBI5CgVmb2N1cxgJIAEoCzIjLn'
-    'ZvbHZveGdyaWQudjEuSW5kaWNhdG9yRm9jdXNDb25maWdSBWZvY3Vz');
+    'ZvbHZveGdyaWQudjEuSW5kaWNhdG9yRm9jdXNDb25maWdSBWZvY3VzEkcKCmFwcGVhcmFuY2UY'
+    'CiABKA4yIi52b2x2b3hncmlkLnYxLkluZGljYXRvckFwcGVhcmFuY2VIAFIKYXBwZWFyYW5jZY'
+    'gBARI2CgZjb2xvcnMYCyABKAsyHi52b2x2b3hncmlkLnYxLkluZGljYXRvckNvbG9yc1IGY29s'
+    'b3JzQg0KC19hcHBlYXJhbmNl');
 
 @$core.Deprecated('Use columnDefDescriptor instead')
 const ColumnDef$json = {
@@ -10904,6 +11097,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.volvoxgrid.v1.CornerIndicatorConfig': CornerIndicatorConfig$json,
   '.volvoxgrid.v1.CornerIndicatorSlot': CornerIndicatorSlot$json,
   '.volvoxgrid.v1.IndicatorFocusConfig': IndicatorFocusConfig$json,
+  '.volvoxgrid.v1.IndicatorColors': IndicatorColors$json,
   '.volvoxgrid.v1.CreateResponse': CreateResponse$json,
   '.volvoxgrid.v1.DestroyRequest': DestroyRequest$json,
   '.volvoxgrid.v1.DestroyResponse': DestroyResponse$json,

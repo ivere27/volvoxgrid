@@ -6789,6 +6789,220 @@ class CornerIndicatorConfig extends $pb.GeneratedMessage {
   $pb.PbList<CornerIndicatorSlot> get slots => $_getList(6);
 }
 
+class IndicatorColors extends $pb.GeneratedMessage {
+  factory IndicatorColors({
+    $core.int? background,
+    $core.int? foreground,
+    $core.int? grid,
+    $core.int? buttonBackground,
+    $core.int? buttonForeground,
+    $core.int? buttonBorder,
+    $core.int? buttonPressedBackground,
+    $core.int? buttonPressedForeground,
+    $core.int? buttonPressedBorderDark,
+    $core.int? buttonPressedBorderLight,
+    $core.int? buttonHoverBackground,
+    $core.int? buttonHoverForeground,
+    $core.int? buttonHoverBorder,
+  }) {
+    final result = create();
+    if (background != null) result.background = background;
+    if (foreground != null) result.foreground = foreground;
+    if (grid != null) result.grid = grid;
+    if (buttonBackground != null) result.buttonBackground = buttonBackground;
+    if (buttonForeground != null) result.buttonForeground = buttonForeground;
+    if (buttonBorder != null) result.buttonBorder = buttonBorder;
+    if (buttonPressedBackground != null)
+      result.buttonPressedBackground = buttonPressedBackground;
+    if (buttonPressedForeground != null)
+      result.buttonPressedForeground = buttonPressedForeground;
+    if (buttonPressedBorderDark != null)
+      result.buttonPressedBorderDark = buttonPressedBorderDark;
+    if (buttonPressedBorderLight != null)
+      result.buttonPressedBorderLight = buttonPressedBorderLight;
+    if (buttonHoverBackground != null)
+      result.buttonHoverBackground = buttonHoverBackground;
+    if (buttonHoverForeground != null)
+      result.buttonHoverForeground = buttonHoverForeground;
+    if (buttonHoverBorder != null) result.buttonHoverBorder = buttonHoverBorder;
+    return result;
+  }
+
+  IndicatorColors._();
+
+  factory IndicatorColors.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory IndicatorColors.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'IndicatorColors',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
+    ..aI(3, _omitFieldNames ? '' : 'grid', fieldType: $pb.PbFieldType.OU3)
+    ..aI(4, _omitFieldNames ? '' : 'buttonBackground',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(5, _omitFieldNames ? '' : 'buttonForeground',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(6, _omitFieldNames ? '' : 'buttonBorder',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(7, _omitFieldNames ? '' : 'buttonPressedBackground',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(8, _omitFieldNames ? '' : 'buttonPressedForeground',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(9, _omitFieldNames ? '' : 'buttonPressedBorderDark',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(10, _omitFieldNames ? '' : 'buttonPressedBorderLight',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(11, _omitFieldNames ? '' : 'buttonHoverBackground',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(12, _omitFieldNames ? '' : 'buttonHoverForeground',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(13, _omitFieldNames ? '' : 'buttonHoverBorder',
+        fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  IndicatorColors clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  IndicatorColors copyWith(void Function(IndicatorColors) updates) =>
+      super.copyWith((message) => updates(message as IndicatorColors))
+          as IndicatorColors;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static IndicatorColors create() => IndicatorColors._();
+  @$core.override
+  IndicatorColors createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static IndicatorColors getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<IndicatorColors>(create);
+  static IndicatorColors? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get background => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set background($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBackground() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBackground() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get foreground => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set foreground($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasForeground() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearForeground() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get grid => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set grid($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasGrid() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearGrid() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get buttonBackground => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set buttonBackground($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasButtonBackground() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearButtonBackground() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get buttonForeground => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set buttonForeground($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasButtonForeground() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearButtonForeground() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get buttonBorder => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set buttonBorder($core.int value) => $_setUnsignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasButtonBorder() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearButtonBorder() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get buttonPressedBackground => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set buttonPressedBackground($core.int value) => $_setUnsignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasButtonPressedBackground() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearButtonPressedBackground() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get buttonPressedForeground => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set buttonPressedForeground($core.int value) => $_setUnsignedInt32(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasButtonPressedForeground() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearButtonPressedForeground() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get buttonPressedBorderDark => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set buttonPressedBorderDark($core.int value) => $_setUnsignedInt32(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasButtonPressedBorderDark() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearButtonPressedBorderDark() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get buttonPressedBorderLight => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set buttonPressedBorderLight($core.int value) => $_setUnsignedInt32(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasButtonPressedBorderLight() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearButtonPressedBorderLight() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.int get buttonHoverBackground => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set buttonHoverBackground($core.int value) => $_setUnsignedInt32(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasButtonHoverBackground() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearButtonHoverBackground() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.int get buttonHoverForeground => $_getIZ(11);
+  @$pb.TagNumber(12)
+  set buttonHoverForeground($core.int value) => $_setUnsignedInt32(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasButtonHoverForeground() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearButtonHoverForeground() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.int get buttonHoverBorder => $_getIZ(12);
+  @$pb.TagNumber(13)
+  set buttonHoverBorder($core.int value) => $_setUnsignedInt32(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasButtonHoverBorder() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearButtonHoverBorder() => $_clearField(13);
+}
+
 /// Identity (kind/band/slot_index/slot_kind) plus a value/status snapshot
 /// the engine fills in based on slot_kind:
 ///   ROW_INDICATOR_SLOT_NUMBERS       text = row number, int_value = row, status_flags |= SELECTED
@@ -7061,6 +7275,8 @@ class IndicatorsConfig extends $pb.GeneratedMessage {
     CornerIndicatorConfig? cornerBottomStart,
     CornerIndicatorConfig? cornerBottomEnd,
     IndicatorFocusConfig? focus,
+    IndicatorAppearance? appearance,
+    IndicatorColors? colors,
   }) {
     final result = create();
     if (rowStart != null) result.rowStart = rowStart;
@@ -7072,6 +7288,8 @@ class IndicatorsConfig extends $pb.GeneratedMessage {
     if (cornerBottomStart != null) result.cornerBottomStart = cornerBottomStart;
     if (cornerBottomEnd != null) result.cornerBottomEnd = cornerBottomEnd;
     if (focus != null) result.focus = focus;
+    if (appearance != null) result.appearance = appearance;
+    if (colors != null) result.colors = colors;
     return result;
   }
 
@@ -7106,6 +7324,10 @@ class IndicatorsConfig extends $pb.GeneratedMessage {
         subBuilder: CornerIndicatorConfig.create)
     ..aOM<IndicatorFocusConfig>(9, _omitFieldNames ? '' : 'focus',
         subBuilder: IndicatorFocusConfig.create)
+    ..aE<IndicatorAppearance>(10, _omitFieldNames ? '' : 'appearance',
+        enumValues: IndicatorAppearance.values)
+    ..aOM<IndicatorColors>(11, _omitFieldNames ? '' : 'colors',
+        subBuilder: IndicatorColors.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -7225,6 +7447,26 @@ class IndicatorsConfig extends $pb.GeneratedMessage {
   void clearFocus() => $_clearField(9);
   @$pb.TagNumber(9)
   IndicatorFocusConfig ensureFocus() => $_ensure(8);
+
+  @$pb.TagNumber(10)
+  IndicatorAppearance get appearance => $_getN(9);
+  @$pb.TagNumber(10)
+  set appearance(IndicatorAppearance value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasAppearance() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearAppearance() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  IndicatorColors get colors => $_getN(10);
+  @$pb.TagNumber(11)
+  set colors(IndicatorColors value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasColors() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearColors() => $_clearField(11);
+  @$pb.TagNumber(11)
+  IndicatorColors ensureColors() => $_ensure(10);
 }
 
 class ColumnDef extends $pb.GeneratedMessage {

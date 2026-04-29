@@ -665,6 +665,12 @@ enum ScrollBarAppearance {
   SCROLLBAR_APPEARANCE_OVERLAY = 3;
 }
 
+enum IndicatorAppearance {
+  INDICATOR_APPEARANCE_CLASSIC = 0;
+  INDICATOR_APPEARANCE_FLAT    = 1;
+  INDICATOR_APPEARANCE_MODERN  = 2;
+}
+
 message ScrollBarColors {
   optional uint32 thumb        = 1;
   optional uint32 thumb_hover  = 2;
@@ -1483,6 +1489,22 @@ message CornerIndicatorConfig {
   repeated CornerIndicatorSlot slots = 7;
 }
 
+message IndicatorColors {
+  optional uint32 background                  = 1;
+  optional uint32 foreground                  = 2;
+  optional uint32 grid                        = 3;
+  optional uint32 button_background           = 4;
+  optional uint32 button_foreground           = 5;
+  optional uint32 button_border               = 6;
+  optional uint32 button_pressed_background   = 7;
+  optional uint32 button_pressed_foreground   = 8;
+  optional uint32 button_pressed_border_dark  = 9;
+  optional uint32 button_pressed_border_light = 10;
+  optional uint32 button_hover_background     = 11;
+  optional uint32 button_hover_foreground     = 12;
+  optional uint32 button_hover_border         = 13;
+}
+
 // Bitmask values for GridEventTarget.status_flags. Combined per slot kind;
 // see the GridEventTarget comment for which bits apply where.
 enum GridEventTargetFlag {
@@ -1545,6 +1567,8 @@ message IndicatorsConfig {
   CornerIndicatorConfig corner_bottom_start = 7;
   CornerIndicatorConfig corner_bottom_end  = 8;
   IndicatorFocusConfig  focus              = 9;
+  optional IndicatorAppearance appearance  = 10;
+  IndicatorColors       colors             = 11;
 }
 
 // ═══════════════════════════════════════════════════════════

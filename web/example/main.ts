@@ -25,6 +25,7 @@ import {
   CellHitArea,
   CellInteraction,
   ImageAlignment,
+  IndicatorAppearance,
   RenderLayerBit,
 } from "../js/src/generated/volvoxgrid_ffi.js";
 import {
@@ -1097,6 +1098,7 @@ function pbEncodeHierarchyOutlineConfig(maxOutlineDepth: number, maxOutlineLevel
   indicators.push(...pbEncodeMessageField(3, new Uint8Array(colTop)));
   indicators.push(...pbEncodeMessageField(1, new Uint8Array(rowStart)));
   indicators.push(...pbEncodeMessageField(5, new Uint8Array(cornerTopStart)));
+  indicators.push(...pbEncodeInt32Field(10, IndicatorAppearance.INDICATOR_APPEARANCE_MODERN));
   const gridConfig: number[] = [];
   gridConfig.push(...pbEncodeMessageField(1, new Uint8Array(layout)));
   gridConfig.push(...pbEncodeMessageField(2, new Uint8Array(style)));

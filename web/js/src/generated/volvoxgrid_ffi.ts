@@ -352,6 +352,11 @@ export enum ImageAlignment {
   IMG_ALIGN_STRETCH = 9,
   IMG_ALIGN_TILE = 10,
 }
+export enum IndicatorAppearance {
+  INDICATOR_APPEARANCE_CLASSIC = 0,
+  INDICATOR_APPEARANCE_FLAT = 1,
+  INDICATOR_APPEARANCE_MODERN = 2,
+}
 export enum IndicatorBand {
   INDICATOR_BAND_UNSPECIFIED = 0,
   INDICATOR_BAND_ROW_START = 1,
@@ -1480,6 +1485,21 @@ export const ImageDataFields = {
   "data": 1,
   "format": 2,
 } as const;
+export const IndicatorColorsFields = {
+  "background": 1,
+  "foreground": 2,
+  "grid": 3,
+  "button_background": 4,
+  "button_foreground": 5,
+  "button_border": 6,
+  "button_pressed_background": 7,
+  "button_pressed_foreground": 8,
+  "button_pressed_border_dark": 9,
+  "button_pressed_border_light": 10,
+  "button_hover_background": 11,
+  "button_hover_foreground": 12,
+  "button_hover_border": 13,
+} as const;
 export const IndicatorFocusConfigFields = {
   "enable_keyboard_focus": 1,
   "enter_key_code": 2,
@@ -1495,6 +1515,8 @@ export const IndicatorsConfigFields = {
   "corner_bottom_start": 7,
   "corner_bottom_end": 8,
   "focus": 9,
+  "appearance": 10,
+  "colors": 11,
 } as const;
 export const InsertRowsRequestFields = {
   "grid_id": 1,

@@ -499,6 +499,13 @@ namespace Volvoxgrid.V1
         IMG_ALIGN_TILE = 10,
     }
 
+    public enum IndicatorAppearance
+    {
+        INDICATOR_APPEARANCE_CLASSIC = 0,
+        INDICATOR_APPEARANCE_FLAT = 1,
+        INDICATOR_APPEARANCE_MODERN = 2,
+    }
+
     public enum IndicatorBand
     {
         INDICATOR_BAND_UNSPECIFIED = 0,
@@ -8158,6 +8165,116 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class IndicatorColors
+    {
+        private uint? _background;
+        public uint Background { get { return _background.GetValueOrDefault(); } set { _background = value; } }
+        public bool HasBackground { get { return _background.HasValue; } }
+        private uint? _foreground;
+        public uint Foreground { get { return _foreground.GetValueOrDefault(); } set { _foreground = value; } }
+        public bool HasForeground { get { return _foreground.HasValue; } }
+        private uint? _grid;
+        public uint Grid { get { return _grid.GetValueOrDefault(); } set { _grid = value; } }
+        public bool HasGrid { get { return _grid.HasValue; } }
+        private uint? _buttonBackground;
+        public uint ButtonBackground { get { return _buttonBackground.GetValueOrDefault(); } set { _buttonBackground = value; } }
+        public bool HasButtonBackground { get { return _buttonBackground.HasValue; } }
+        private uint? _buttonForeground;
+        public uint ButtonForeground { get { return _buttonForeground.GetValueOrDefault(); } set { _buttonForeground = value; } }
+        public bool HasButtonForeground { get { return _buttonForeground.HasValue; } }
+        private uint? _buttonBorder;
+        public uint ButtonBorder { get { return _buttonBorder.GetValueOrDefault(); } set { _buttonBorder = value; } }
+        public bool HasButtonBorder { get { return _buttonBorder.HasValue; } }
+        private uint? _buttonPressedBackground;
+        public uint ButtonPressedBackground { get { return _buttonPressedBackground.GetValueOrDefault(); } set { _buttonPressedBackground = value; } }
+        public bool HasButtonPressedBackground { get { return _buttonPressedBackground.HasValue; } }
+        private uint? _buttonPressedForeground;
+        public uint ButtonPressedForeground { get { return _buttonPressedForeground.GetValueOrDefault(); } set { _buttonPressedForeground = value; } }
+        public bool HasButtonPressedForeground { get { return _buttonPressedForeground.HasValue; } }
+        private uint? _buttonPressedBorderDark;
+        public uint ButtonPressedBorderDark { get { return _buttonPressedBorderDark.GetValueOrDefault(); } set { _buttonPressedBorderDark = value; } }
+        public bool HasButtonPressedBorderDark { get { return _buttonPressedBorderDark.HasValue; } }
+        private uint? _buttonPressedBorderLight;
+        public uint ButtonPressedBorderLight { get { return _buttonPressedBorderLight.GetValueOrDefault(); } set { _buttonPressedBorderLight = value; } }
+        public bool HasButtonPressedBorderLight { get { return _buttonPressedBorderLight.HasValue; } }
+        private uint? _buttonHoverBackground;
+        public uint ButtonHoverBackground { get { return _buttonHoverBackground.GetValueOrDefault(); } set { _buttonHoverBackground = value; } }
+        public bool HasButtonHoverBackground { get { return _buttonHoverBackground.HasValue; } }
+        private uint? _buttonHoverForeground;
+        public uint ButtonHoverForeground { get { return _buttonHoverForeground.GetValueOrDefault(); } set { _buttonHoverForeground = value; } }
+        public bool HasButtonHoverForeground { get { return _buttonHoverForeground.HasValue; } }
+        private uint? _buttonHoverBorder;
+        public uint ButtonHoverBorder { get { return _buttonHoverBorder.GetValueOrDefault(); } set { _buttonHoverBorder = value; } }
+        public bool HasButtonHoverBorder { get { return _buttonHoverBorder.HasValue; } }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (_background.HasValue)
+                w.WriteInt32(1, unchecked((int)_background.Value));
+            if (_foreground.HasValue)
+                w.WriteInt32(2, unchecked((int)_foreground.Value));
+            if (_grid.HasValue)
+                w.WriteInt32(3, unchecked((int)_grid.Value));
+            if (_buttonBackground.HasValue)
+                w.WriteInt32(4, unchecked((int)_buttonBackground.Value));
+            if (_buttonForeground.HasValue)
+                w.WriteInt32(5, unchecked((int)_buttonForeground.Value));
+            if (_buttonBorder.HasValue)
+                w.WriteInt32(6, unchecked((int)_buttonBorder.Value));
+            if (_buttonPressedBackground.HasValue)
+                w.WriteInt32(7, unchecked((int)_buttonPressedBackground.Value));
+            if (_buttonPressedForeground.HasValue)
+                w.WriteInt32(8, unchecked((int)_buttonPressedForeground.Value));
+            if (_buttonPressedBorderDark.HasValue)
+                w.WriteInt32(9, unchecked((int)_buttonPressedBorderDark.Value));
+            if (_buttonPressedBorderLight.HasValue)
+                w.WriteInt32(10, unchecked((int)_buttonPressedBorderLight.Value));
+            if (_buttonHoverBackground.HasValue)
+                w.WriteInt32(11, unchecked((int)_buttonHoverBackground.Value));
+            if (_buttonHoverForeground.HasValue)
+                w.WriteInt32(12, unchecked((int)_buttonHoverForeground.Value));
+            if (_buttonHoverBorder.HasValue)
+                w.WriteInt32(13, unchecked((int)_buttonHoverBorder.Value));
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<IndicatorColors> Parser = new MessageParser<IndicatorColors>(data => ParseFrom(data));
+
+        public static IndicatorColors ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new IndicatorColors();
+            var r = new ProtoReader(data);
+            var msg = new IndicatorColors();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Background = unchecked((uint)r.ReadInt32()); break;
+                    case 2: msg.Foreground = unchecked((uint)r.ReadInt32()); break;
+                    case 3: msg.Grid = unchecked((uint)r.ReadInt32()); break;
+                    case 4: msg.ButtonBackground = unchecked((uint)r.ReadInt32()); break;
+                    case 5: msg.ButtonForeground = unchecked((uint)r.ReadInt32()); break;
+                    case 6: msg.ButtonBorder = unchecked((uint)r.ReadInt32()); break;
+                    case 7: msg.ButtonPressedBackground = unchecked((uint)r.ReadInt32()); break;
+                    case 8: msg.ButtonPressedForeground = unchecked((uint)r.ReadInt32()); break;
+                    case 9: msg.ButtonPressedBorderDark = unchecked((uint)r.ReadInt32()); break;
+                    case 10: msg.ButtonPressedBorderLight = unchecked((uint)r.ReadInt32()); break;
+                    case 11: msg.ButtonHoverBackground = unchecked((uint)r.ReadInt32()); break;
+                    case 12: msg.ButtonHoverForeground = unchecked((uint)r.ReadInt32()); break;
+                    case 13: msg.ButtonHoverBorder = unchecked((uint)r.ReadInt32()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class IndicatorFocusConfig
     {
         private bool? _enableKeyboardFocus;
@@ -8219,6 +8336,10 @@ namespace Volvoxgrid.V1
         public CornerIndicatorConfig CornerBottomStart { get; set; }
         public CornerIndicatorConfig CornerBottomEnd { get; set; }
         public IndicatorFocusConfig Focus { get; set; }
+        private IndicatorAppearance? _appearance;
+        public IndicatorAppearance Appearance { get { return _appearance.GetValueOrDefault(); } set { _appearance = value; } }
+        public bool HasAppearance { get { return _appearance.HasValue; } }
+        public IndicatorColors Colors { get; set; }
 
         // ── Serialization ──
 
@@ -8234,6 +8355,9 @@ namespace Volvoxgrid.V1
             if (CornerBottomStart != null) w.WriteMessageBytes(7, CornerBottomStart.ToByteArray());
             if (CornerBottomEnd != null) w.WriteMessageBytes(8, CornerBottomEnd.ToByteArray());
             if (Focus != null) w.WriteMessageBytes(9, Focus.ToByteArray());
+            if (_appearance.HasValue)
+                w.WriteInt32(10, (int)_appearance.Value);
+            if (Colors != null) w.WriteMessageBytes(11, Colors.ToByteArray());
             return w.ToArray();
         }
 
@@ -8260,6 +8384,8 @@ namespace Volvoxgrid.V1
                     case 7: msg.CornerBottomStart = CornerIndicatorConfig.ParseFrom(r.ReadLengthDelimited()); break;
                     case 8: msg.CornerBottomEnd = CornerIndicatorConfig.ParseFrom(r.ReadLengthDelimited()); break;
                     case 9: msg.Focus = IndicatorFocusConfig.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 10: msg.Appearance = (IndicatorAppearance)r.ReadInt32(); break;
+                    case 11: msg.Colors = IndicatorColors.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }

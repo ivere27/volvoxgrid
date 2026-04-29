@@ -1235,6 +1235,31 @@ class ScrollBarAppearance extends $pb.ProtobufEnum {
   const ScrollBarAppearance._(super.value, super.name);
 }
 
+class IndicatorAppearance extends $pb.ProtobufEnum {
+  static const IndicatorAppearance INDICATOR_APPEARANCE_CLASSIC =
+      IndicatorAppearance._(
+          0, _omitEnumNames ? '' : 'INDICATOR_APPEARANCE_CLASSIC');
+  static const IndicatorAppearance INDICATOR_APPEARANCE_FLAT =
+      IndicatorAppearance._(
+          1, _omitEnumNames ? '' : 'INDICATOR_APPEARANCE_FLAT');
+  static const IndicatorAppearance INDICATOR_APPEARANCE_MODERN =
+      IndicatorAppearance._(
+          2, _omitEnumNames ? '' : 'INDICATOR_APPEARANCE_MODERN');
+
+  static const $core.List<IndicatorAppearance> values = <IndicatorAppearance>[
+    INDICATOR_APPEARANCE_CLASSIC,
+    INDICATOR_APPEARANCE_FLAT,
+    INDICATOR_APPEARANCE_MODERN,
+  ];
+
+  static final $core.List<IndicatorAppearance?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static IndicatorAppearance? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const IndicatorAppearance._(super.value, super.name);
+}
+
 class PinPosition extends $pb.ProtobufEnum {
   static const PinPosition PIN_NONE =
       PinPosition._(0, _omitEnumNames ? '' : 'PIN_NONE');

@@ -1555,7 +1555,11 @@ fn enrich_col_indicator_target(grid: &VolvoxGrid, col: i32, target: &mut EventTa
     }
 }
 
-fn enrich_corner_indicator_target(grid: &VolvoxGrid, target: &mut EventTarget) {
+fn enrich_corner_indicator_target(
+    grid: &VolvoxGrid,
+    hit: &HitTestResult,
+    target: &mut EventTarget,
+) {
     use pb::CornerIndicatorSlotKind as Kind;
     use pb::GridEventTargetFlag as Flag;
 
@@ -1588,6 +1592,17 @@ fn enrich_corner_indicator_target(grid: &VolvoxGrid, target: &mut EventTarget) {
                 target.status_flags |= Flag::GridTargetFlagSelected as u32;
             }
         }
+    } else if target.slot_kind == Kind::CornerSlotOutlineLevels as i32 {
+        if let Some(level) = corner_outline_level_hit(
+            grid,
+            hit.x_in_cell as i32,
+            grid.indicator_bands.start_width(),
+        ) {
+            target.text = level.to_string();
+            target.int_value = level as i64;
+        } else {
+            target.int_value = -1;
+        }
     }
 }
 
@@ -1618,10 +1633,26 @@ fn enrich_target_value(grid: &VolvoxGrid, hit: &HitTestResult, target: &mut Even
     } else if target.kind == TK::GridTargetColIndicator as i32 {
         enrich_col_indicator_target(grid, hit.col, target);
     } else if target.kind == TK::GridTargetCornerIndicator as i32 {
-        enrich_corner_indicator_target(grid, target);
+        enrich_corner_indicator_target(grid, hit, target);
     } else if target.kind == TK::GridTargetDataCell as i32 {
         enrich_data_cell_target(grid, hit.row, hit.col, target);
     }
+}
+
+fn indicator_control_hover_target(grid: &VolvoxGrid, target: &EventTarget) -> bool {
+    if grid.selection.hover_mode == HOVER_NONE {
+        return false;
+    }
+    if target.kind == pb::GridTargetKind::GridTargetRowIndicator as i32
+        && target.band == pb::IndicatorBand::RowStart as i32
+        && target.slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
+    {
+        return true;
+    }
+    target.kind == pb::GridTargetKind::GridTargetCornerIndicator as i32
+        && target.band == pb::IndicatorBand::CornerTopStart as i32
+        && target.slot_kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32
+        && target.int_value >= 0
 }
 
 fn target_from_hit(grid: &VolvoxGrid, hit: &HitTestResult) -> EventTarget {
@@ -1726,6 +1757,11 @@ fn emit_pointer_move_and_hover(
     if grid.last_hover_target.as_ref() == Some(&next) {
         return;
     }
+    let repaint_indicator_hover = grid
+        .last_hover_target
+        .as_ref()
+        .is_some_and(|prev| indicator_control_hover_target(grid, &prev.target))
+        || indicator_control_hover_target(grid, &next.target);
     if let Some(prev) = grid.last_hover_target.replace(next.clone()) {
         grid.events.push(GridEventData::LeaveCell {
             row: prev.row,
@@ -1745,6 +1781,9 @@ fn emit_pointer_move_and_hover(
         col: next.col,
         target: next.target,
     });
+    if repaint_indicator_hover {
+        grid.mark_dirty();
+    }
 }
 
 fn first_visible_row_indicator_slot(grid: &VolvoxGrid) -> i32 {
@@ -6931,6 +6970,43 @@ mod tests {
     }
 
     #[test]
+    fn row_indicator_expander_hover_targets_slot_and_repaints() {
+        let mut grid = outline_indicator_test_grid();
+        grid.selection.hover_mode = HOVER_ROW;
+        let (_cx, row_y, _cw, row_h) = grid.cell_screen_rect(1, 0).unwrap();
+        grid.clear_dirty();
+
+        handle_pointer_move(&mut grid, 6.0, (row_y + row_h / 2) as f32, 0, 0);
+
+        assert!(grid.dirty);
+        let hover = grid.last_hover_target.as_ref().unwrap();
+        assert_eq!(hover.row, 1);
+        assert_eq!(
+            hover.target.kind,
+            pb::GridTargetKind::GridTargetRowIndicator as i32
+        );
+        assert_eq!(
+            hover.target.slot_kind,
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
+        );
+    }
+
+    #[test]
+    fn row_indicator_expander_hover_disabled_does_not_repaint() {
+        let mut grid = outline_indicator_test_grid();
+        let (_cx, row_y, _cw, row_h) = grid.cell_screen_rect(1, 0).unwrap();
+        grid.clear_dirty();
+
+        handle_pointer_move(&mut grid, 6.0, (row_y + row_h / 2) as f32, 0, 0);
+
+        assert!(!grid.dirty);
+        assert_eq!(
+            grid.last_hover_target.as_ref().unwrap().target.slot_kind,
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
+        );
+    }
+
+    #[test]
     fn corner_outline_level_buttons_cycle_level_and_child() {
         let mut grid = zero_based_outline_indicator_test_grid();
         let step = crate::outline::TreeGeometry::from_grid(&grid).indent_step;
@@ -7016,5 +7092,50 @@ mod tests {
 
         handle_pointer_up(&mut grid, level_0_x as f32, 5.0, 0, 0);
         assert_eq!(visible_outline_levels(&grid), vec![0]);
+    }
+
+    #[test]
+    fn corner_outline_level_hover_targets_each_level_and_repaints() {
+        let mut grid = zero_based_outline_indicator_test_grid();
+        grid.selection.hover_mode = HOVER_ROW;
+
+        let step = crate::outline::TreeGeometry::from_grid(&grid).indent_step;
+        let level_0_x = step / 2;
+        let level_1_x = step + step / 2;
+        grid.clear_dirty();
+
+        handle_pointer_move(&mut grid, level_0_x as f32, 5.0, 0, 0);
+
+        assert!(grid.dirty);
+        let hover = grid.last_hover_target.as_ref().unwrap();
+        assert_eq!(
+            hover.target.kind,
+            pb::GridTargetKind::GridTargetCornerIndicator as i32
+        );
+        assert_eq!(
+            hover.target.slot_kind,
+            pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32
+        );
+        assert_eq!(hover.target.int_value, 0);
+
+        grid.clear_dirty();
+        handle_pointer_move(&mut grid, level_1_x as f32, 5.0, 0, 0);
+
+        assert!(grid.dirty);
+        assert_eq!(grid.last_hover_target.as_ref().unwrap().target.int_value, 1);
+    }
+
+    #[test]
+    fn corner_outline_level_hover_disabled_does_not_repaint() {
+        let mut grid = zero_based_outline_indicator_test_grid();
+
+        let step = crate::outline::TreeGeometry::from_grid(&grid).indent_step;
+        let level_0_x = step / 2;
+        grid.clear_dirty();
+
+        handle_pointer_move(&mut grid, level_0_x as f32, 5.0, 0, 0);
+
+        assert!(!grid.dirty);
+        assert_eq!(grid.last_hover_target.as_ref().unwrap().target.int_value, 0);
     }
 }
