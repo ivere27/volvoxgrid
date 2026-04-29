@@ -81,6 +81,8 @@ export function buildSheetConfig(opts?: {
     indicators: {
       rowStart: {
         visible: true,
+        width: 35,
+        slots: [{ kind: 1, width: 35, visible: true }],
         background: SHEET_COLORS.headerBg,
         foreground: SHEET_COLORS.headerFg,
         gridLines: GRIDLINE_SOLID,

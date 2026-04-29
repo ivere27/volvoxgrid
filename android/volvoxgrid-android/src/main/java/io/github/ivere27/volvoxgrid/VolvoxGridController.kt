@@ -9,19 +9,71 @@ import io.github.ivere27.volvoxgrid.common.RendererBackend
 private const val DEFAULT_ROW_INDICATOR_WIDTH_PX = 35
 private const val DEFAULT_COL_INDICATOR_BAND_ROWS = 1
 
-private val DEFAULT_ROW_INDICATOR_MODE_BITS =
-    RowIndicatorMode.ROW_INDICATOR_CURRENT.number or
-        RowIndicatorMode.ROW_INDICATOR_SELECTION.number
-
 private val DEFAULT_COL_INDICATOR_MODE_BITS =
     ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.number or
         ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH.number
+
+private fun rowIndicatorSlot(kind: RowIndicatorSlotKind, width: Int): RowIndicatorSlot =
+    RowIndicatorSlot.newBuilder()
+        .setKind(kind)
+        .setWidth(width)
+        .setVisible(true)
+        .build()
+
+private fun defaultRowIndicatorSlots(): List<RowIndicatorSlot> =
+    listOf(
+        rowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18),
+        rowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17),
+    )
+
+private fun rowIndicatorSlotsFromModeBits(value: Int): List<RowIndicatorSlot> {
+    val slots = mutableListOf<RowIndicatorSlot>()
+    fun add(bit: Int, kind: RowIndicatorSlotKind, width: Int) {
+        if ((value and bit) != 0) slots.add(rowIndicatorSlot(kind, width))
+    }
+    add(1, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS, DEFAULT_ROW_INDICATOR_WIDTH_PX)
+    add(2, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18)
+    add(4, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17)
+    add(8, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CHECKBOX, 18)
+    add(16, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_HANDLE, 18)
+    add(32, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EDITING, 18)
+    add(64, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_MODIFIED, 18)
+    add(128, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ERROR, 18)
+    add(256, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NEW_ROW, 18)
+    add(512, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER, 18)
+    add(1024, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_RESIZE, 18)
+    add(2048, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ACTION, 18)
+    add(4096, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_STATUS_ICON, 18)
+    add(8192, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CUSTOM, 18)
+    return slots
+}
+
+private fun rowIndicatorModeBitsFromSlots(config: RowIndicatorConfig): Int =
+    config.slotsList.fold(0) { bits, slot ->
+        bits or when (slot.kind) {
+            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS -> 1
+            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT -> 2
+            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION -> 4
+            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CHECKBOX -> 8
+            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_HANDLE -> 16
+            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EDITING -> 32
+            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_MODIFIED -> 64
+            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ERROR -> 128
+            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NEW_ROW -> 256
+            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER -> 512
+            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_RESIZE -> 1024
+            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ACTION -> 2048
+            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_STATUS_ICON -> 4096
+            RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CUSTOM -> 8192
+            else -> 0
+        }
+    }
 
 private fun defaultRowIndicatorStartConfig(): RowIndicatorConfig =
     RowIndicatorConfig.newBuilder()
         .setVisible(false)
         .setWidth(DEFAULT_ROW_INDICATOR_WIDTH_PX)
-        .setModeBits(DEFAULT_ROW_INDICATOR_MODE_BITS)
+        .addAllSlots(defaultRowIndicatorSlots())
         .build()
 
 private fun defaultColIndicatorTopConfig(): ColIndicatorConfig =
@@ -315,18 +367,21 @@ class VolvoxGridController(
         if (!config.hasIndicators() || !config.indicators.hasRowStart()) {
             return 0
         }
-        return config.indicators.rowStart.modeBits
+        return rowIndicatorModeBitsFromSlots(config.indicators.rowStart)
     }
 
     override fun setRowIndicatorStartModeBits(value: Int) {
+        val row = RowIndicatorConfig.newBuilder()
+        val slots = rowIndicatorSlotsFromModeBits(value)
+        if (slots.isEmpty()) {
+            row.setVisible(false)
+        } else {
+            row.addAllSlots(slots)
+        }
         configure(GridConfig.newBuilder()
             .setIndicators(
                 IndicatorsConfig.newBuilder()
-                    .setRowStart(
-                        RowIndicatorConfig.newBuilder()
-                            .setModeBits(value)
-                            .build()
-                    )
+                    .setRowStart(row.build())
                     .build()
             )
             .build())

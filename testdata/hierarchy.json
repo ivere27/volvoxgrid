@@ -6,7 +6,8 @@
     "Modified": "2025-12-01",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 1
+    "Id": "documents",
+    "ParentId": null
   },
   {
     "Name": "Reports",
@@ -15,7 +16,8 @@
     "Modified": "2025-11-15",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 2
+    "Id": "documents/reports",
+    "ParentId": "documents"
   },
   {
     "Name": "Q1_Report.xlsx",
@@ -24,7 +26,8 @@
     "Modified": "2025-03-31",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/reports/q1-report",
+    "ParentId": "documents/reports"
   },
   {
     "Name": "Q2_Report.xlsx",
@@ -33,7 +36,8 @@
     "Modified": "2025-06-30",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/reports/q2-report",
+    "ParentId": "documents/reports"
   },
   {
     "Name": "Q3_Report.pdf",
@@ -42,7 +46,8 @@
     "Modified": "2025-09-30",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/reports/q3-report",
+    "ParentId": "documents/reports"
   },
   {
     "Name": "Q4_Report.docx",
@@ -51,7 +56,8 @@
     "Modified": "2025-12-15",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/reports/q4-report",
+    "ParentId": "documents/reports"
   },
   {
     "Name": "Annual_Summary.pdf",
@@ -60,7 +66,8 @@
     "Modified": "2025-12-20",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/reports/annual-summary",
+    "ParentId": "documents/reports"
   },
   {
     "Name": "Invoices",
@@ -69,7 +76,8 @@
     "Modified": "2025-12-10",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 2
+    "Id": "documents/invoices",
+    "ParentId": "documents"
   },
   {
     "Name": "INV-001.pdf",
@@ -78,7 +86,8 @@
     "Modified": "2025-01-15",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/invoices/inv-001",
+    "ParentId": "documents/invoices"
   },
   {
     "Name": "INV-002.pdf",
@@ -87,7 +96,8 @@
     "Modified": "2025-02-18",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/invoices/inv-002",
+    "ParentId": "documents/invoices"
   },
   {
     "Name": "INV-003.pdf",
@@ -96,7 +106,8 @@
     "Modified": "2025-03-22",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/invoices/inv-003",
+    "ParentId": "documents/invoices"
   },
   {
     "Name": "INV-004.pdf",
@@ -105,7 +116,8 @@
     "Modified": "2025-04-10",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/invoices/inv-004",
+    "ParentId": "documents/invoices"
   },
   {
     "Name": "INV-005.pdf",
@@ -114,7 +126,8 @@
     "Modified": "2025-05-05",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/invoices/inv-005",
+    "ParentId": "documents/invoices"
   },
   {
     "Name": "INV-006.pdf",
@@ -123,7 +136,8 @@
     "Modified": "2025-06-08",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/invoices/inv-006",
+    "ParentId": "documents/invoices"
   },
   {
     "Name": "INV-007.pdf",
@@ -132,7 +146,8 @@
     "Modified": "2025-07-14",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/invoices/inv-007",
+    "ParentId": "documents/invoices"
   },
   {
     "Name": "INV-008.pdf",
@@ -141,7 +156,8 @@
     "Modified": "2025-08-19",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/invoices/inv-008",
+    "ParentId": "documents/invoices"
   },
   {
     "Name": "INV-009.pdf",
@@ -150,7 +166,8 @@
     "Modified": "2025-09-23",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/invoices/inv-009",
+    "ParentId": "documents/invoices"
   },
   {
     "Name": "INV-010.pdf",
@@ -159,7 +176,8 @@
     "Modified": "2025-10-30",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/invoices/inv-010",
+    "ParentId": "documents/invoices"
   },
   {
     "Name": "INV-011.pdf",
@@ -168,7 +186,8 @@
     "Modified": "2025-11-12",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/invoices/inv-011",
+    "ParentId": "documents/invoices"
   },
   {
     "Name": "INV-012.pdf",
@@ -177,7 +196,8 @@
     "Modified": "2025-12-05",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/invoices/inv-012",
+    "ParentId": "documents/invoices"
   },
   {
     "Name": "Contracts",
@@ -186,7 +206,8 @@
     "Modified": "2025-10-01",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 2
+    "Id": "documents/contracts",
+    "ParentId": "documents"
   },
   {
     "Name": "Contract_Alpha.pdf",
@@ -195,7 +216,8 @@
     "Modified": "2025-01-20",
     "Permissions": "rw-------",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/contracts/contract-alpha",
+    "ParentId": "documents/contracts"
   },
   {
     "Name": "Contract_Beta.pdf",
@@ -204,7 +226,8 @@
     "Modified": "2025-04-15",
     "Permissions": "rw-------",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/contracts/contract-beta",
+    "ParentId": "documents/contracts"
   },
   {
     "Name": "Contract_Gamma.docx",
@@ -213,7 +236,8 @@
     "Modified": "2025-07-01",
     "Permissions": "rw-------",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/contracts/contract-gamma",
+    "ParentId": "documents/contracts"
   },
   {
     "Name": "NDA_Template.docx",
@@ -222,7 +246,8 @@
     "Modified": "2025-02-10",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/contracts/nda-template",
+    "ParentId": "documents/contracts"
   },
   {
     "Name": "Presentations",
@@ -231,7 +256,8 @@
     "Modified": "2025-11-20",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 2
+    "Id": "documents/presentations",
+    "ParentId": "documents"
   },
   {
     "Name": "Roadmap_2025.pptx",
@@ -240,7 +266,8 @@
     "Modified": "2025-01-10",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/presentations/roadmap-2025",
+    "ParentId": "documents/presentations"
   },
   {
     "Name": "Team_Kickoff.pptx",
@@ -249,7 +276,8 @@
     "Modified": "2025-03-01",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/presentations/team-kickoff",
+    "ParentId": "documents/presentations"
   },
   {
     "Name": "Client_Demo.pptx",
@@ -258,7 +286,8 @@
     "Modified": "2025-06-15",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/presentations/client-demo",
+    "ParentId": "documents/presentations"
   },
   {
     "Name": "Year_Review.pptx",
@@ -267,7 +296,8 @@
     "Modified": "2025-12-18",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "documents/presentations/year-review",
+    "ParentId": "documents/presentations"
   },
   {
     "Name": "Photos",
@@ -276,7 +306,8 @@
     "Modified": "2025-11-30",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 1
+    "Id": "photos",
+    "ParentId": null
   },
   {
     "Name": "Vacation",
@@ -285,7 +316,8 @@
     "Modified": "2025-08-20",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 2
+    "Id": "photos/vacation",
+    "ParentId": "photos"
   },
   {
     "Name": "IMG_001.jpg",
@@ -294,7 +326,8 @@
     "Modified": "2025-08-01",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/vacation/img-001",
+    "ParentId": "photos/vacation"
   },
   {
     "Name": "IMG_002.jpg",
@@ -303,7 +336,8 @@
     "Modified": "2025-08-01",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/vacation/img-002",
+    "ParentId": "photos/vacation"
   },
   {
     "Name": "IMG_003.jpg",
@@ -312,7 +346,8 @@
     "Modified": "2025-08-02",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/vacation/img-003",
+    "ParentId": "photos/vacation"
   },
   {
     "Name": "IMG_004.jpg",
@@ -321,7 +356,8 @@
     "Modified": "2025-08-03",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/vacation/img-004",
+    "ParentId": "photos/vacation"
   },
   {
     "Name": "IMG_005.jpg",
@@ -330,7 +366,8 @@
     "Modified": "2025-08-04",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/vacation/img-005",
+    "ParentId": "photos/vacation"
   },
   {
     "Name": "IMG_006.jpg",
@@ -339,7 +376,8 @@
     "Modified": "2025-08-05",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/vacation/img-006",
+    "ParentId": "photos/vacation"
   },
   {
     "Name": "IMG_007.jpg",
@@ -348,7 +386,8 @@
     "Modified": "2025-08-06",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/vacation/img-007",
+    "ParentId": "photos/vacation"
   },
   {
     "Name": "IMG_008.jpg",
@@ -357,7 +396,8 @@
     "Modified": "2025-08-07",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/vacation/img-008",
+    "ParentId": "photos/vacation"
   },
   {
     "Name": "Panoramas",
@@ -366,7 +406,8 @@
     "Modified": "2025-08-10",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 3
+    "Id": "photos/vacation/panoramas",
+    "ParentId": "photos/vacation"
   },
   {
     "Name": "PANO_001.jpg",
@@ -375,7 +416,8 @@
     "Modified": "2025-08-02",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "photos/vacation/panoramas/pano-001",
+    "ParentId": "photos/vacation/panoramas"
   },
   {
     "Name": "PANO_002.jpg",
@@ -384,7 +426,8 @@
     "Modified": "2025-08-04",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "photos/vacation/panoramas/pano-002",
+    "ParentId": "photos/vacation/panoramas"
   },
   {
     "Name": "PANO_003.jpg",
@@ -393,7 +436,8 @@
     "Modified": "2025-08-06",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "photos/vacation/panoramas/pano-003",
+    "ParentId": "photos/vacation/panoramas"
   },
   {
     "Name": "Events",
@@ -402,7 +446,8 @@
     "Modified": "2025-11-10",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 2
+    "Id": "photos/events",
+    "ParentId": "photos"
   },
   {
     "Name": "Conference_01.jpg",
@@ -411,7 +456,8 @@
     "Modified": "2025-05-15",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/events/conference-01",
+    "ParentId": "photos/events"
   },
   {
     "Name": "Conference_02.jpg",
@@ -420,7 +466,8 @@
     "Modified": "2025-05-15",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/events/conference-02",
+    "ParentId": "photos/events"
   },
   {
     "Name": "Conference_03.jpg",
@@ -429,7 +476,8 @@
     "Modified": "2025-05-16",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/events/conference-03",
+    "ParentId": "photos/events"
   },
   {
     "Name": "TeamDinner.jpg",
@@ -438,7 +486,8 @@
     "Modified": "2025-09-20",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/events/teamdinner",
+    "ParentId": "photos/events"
   },
   {
     "Name": "Award_Ceremony.jpg",
@@ -447,7 +496,8 @@
     "Modified": "2025-11-05",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/events/award-ceremony",
+    "ParentId": "photos/events"
   },
   {
     "Name": "Screenshots",
@@ -456,7 +506,8 @@
     "Modified": "2025-12-15",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 2
+    "Id": "photos/screenshots",
+    "ParentId": "photos"
   },
   {
     "Name": "Screen_001.png",
@@ -465,7 +516,8 @@
     "Modified": "2025-10-01",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/screenshots/screen-001",
+    "ParentId": "photos/screenshots"
   },
   {
     "Name": "Screen_002.png",
@@ -474,7 +526,8 @@
     "Modified": "2025-10-15",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/screenshots/screen-002",
+    "ParentId": "photos/screenshots"
   },
   {
     "Name": "Screen_003.png",
@@ -483,7 +536,8 @@
     "Modified": "2025-11-01",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/screenshots/screen-003",
+    "ParentId": "photos/screenshots"
   },
   {
     "Name": "Screen_004.png",
@@ -492,7 +546,8 @@
     "Modified": "2025-11-20",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/screenshots/screen-004",
+    "ParentId": "photos/screenshots"
   },
   {
     "Name": "Screen_005.png",
@@ -501,7 +556,8 @@
     "Modified": "2025-12-10",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "photos/screenshots/screen-005",
+    "ParentId": "photos/screenshots"
   },
   {
     "Name": "Projects",
@@ -510,7 +566,8 @@
     "Modified": "2025-12-18",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 1
+    "Id": "projects",
+    "ParentId": null
   },
   {
     "Name": "VolvoxGrid",
@@ -519,7 +576,8 @@
     "Modified": "2025-12-18",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 2
+    "Id": "projects/volvoxgrid",
+    "ParentId": "projects"
   },
   {
     "Name": "src",
@@ -528,7 +586,8 @@
     "Modified": "2025-12-18",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 3
+    "Id": "projects/volvoxgrid/src",
+    "ParentId": "projects/volvoxgrid"
   },
   {
     "Name": "main.rs",
@@ -537,7 +596,8 @@
     "Modified": "2025-12-18",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/volvoxgrid/src/main",
+    "ParentId": "projects/volvoxgrid/src"
   },
   {
     "Name": "lib.rs",
@@ -546,7 +606,8 @@
     "Modified": "2025-12-17",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/volvoxgrid/src/lib",
+    "ParentId": "projects/volvoxgrid/src"
   },
   {
     "Name": "grid.rs",
@@ -555,7 +616,8 @@
     "Modified": "2025-12-16",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/volvoxgrid/src/grid",
+    "ParentId": "projects/volvoxgrid/src"
   },
   {
     "Name": "render.rs",
@@ -564,7 +626,8 @@
     "Modified": "2025-12-15",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/volvoxgrid/src/render",
+    "ParentId": "projects/volvoxgrid/src"
   },
   {
     "Name": "cell.rs",
@@ -573,7 +636,8 @@
     "Modified": "2025-12-14",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/volvoxgrid/src/cell",
+    "ParentId": "projects/volvoxgrid/src"
   },
   {
     "Name": "style.rs",
@@ -582,7 +646,8 @@
     "Modified": "2025-12-13",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/volvoxgrid/src/style",
+    "ParentId": "projects/volvoxgrid/src"
   },
   {
     "Name": "tests",
@@ -591,7 +656,8 @@
     "Modified": "2025-12-10",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 3
+    "Id": "projects/volvoxgrid/tests",
+    "ParentId": "projects/volvoxgrid"
   },
   {
     "Name": "test_grid.rs",
@@ -600,7 +666,8 @@
     "Modified": "2025-12-10",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/volvoxgrid/tests/test-grid",
+    "ParentId": "projects/volvoxgrid/tests"
   },
   {
     "Name": "test_render.rs",
@@ -609,7 +676,8 @@
     "Modified": "2025-12-09",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/volvoxgrid/tests/test-render",
+    "ParentId": "projects/volvoxgrid/tests"
   },
   {
     "Name": "test_edit.rs",
@@ -618,7 +686,8 @@
     "Modified": "2025-12-08",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/volvoxgrid/tests/test-edit",
+    "ParentId": "projects/volvoxgrid/tests"
   },
   {
     "Name": "Cargo.toml",
@@ -627,7 +696,8 @@
     "Modified": "2025-12-15",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "projects/volvoxgrid/cargo",
+    "ParentId": "projects/volvoxgrid"
   },
   {
     "Name": "README.md",
@@ -636,7 +706,8 @@
     "Modified": "2025-12-01",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "projects/volvoxgrid/readme",
+    "ParentId": "projects/volvoxgrid"
   },
   {
     "Name": "WebApp",
@@ -645,7 +716,8 @@
     "Modified": "2025-11-25",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 2
+    "Id": "projects/webapp",
+    "ParentId": "projects"
   },
   {
     "Name": "src",
@@ -654,7 +726,8 @@
     "Modified": "2025-11-25",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 3
+    "Id": "projects/webapp/src",
+    "ParentId": "projects/webapp"
   },
   {
     "Name": "index.ts",
@@ -663,7 +736,8 @@
     "Modified": "2025-11-25",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/webapp/src/index",
+    "ParentId": "projects/webapp/src"
   },
   {
     "Name": "app.ts",
@@ -672,7 +746,8 @@
     "Modified": "2025-11-24",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/webapp/src/app",
+    "ParentId": "projects/webapp/src"
   },
   {
     "Name": "style.css",
@@ -681,7 +756,8 @@
     "Modified": "2025-11-23",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/webapp/src/style",
+    "ParentId": "projects/webapp/src"
   },
   {
     "Name": "public",
@@ -690,7 +766,8 @@
     "Modified": "2025-11-20",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 3
+    "Id": "projects/webapp/public",
+    "ParentId": "projects/webapp"
   },
   {
     "Name": "index.html",
@@ -699,7 +776,8 @@
     "Modified": "2025-11-20",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/webapp/public/index",
+    "ParentId": "projects/webapp/public"
   },
   {
     "Name": "favicon.ico",
@@ -708,7 +786,8 @@
     "Modified": "2025-11-01",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/webapp/public/favicon",
+    "ParentId": "projects/webapp/public"
   },
   {
     "Name": "package.json",
@@ -717,7 +796,8 @@
     "Modified": "2025-11-15",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "projects/webapp/package",
+    "ParentId": "projects/webapp"
   },
   {
     "Name": "tsconfig.json",
@@ -726,7 +806,8 @@
     "Modified": "2025-11-10",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "projects/webapp/tsconfig",
+    "ParentId": "projects/webapp"
   },
   {
     "Name": "MobileApp",
@@ -735,7 +816,8 @@
     "Modified": "2025-10-30",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 2
+    "Id": "projects/mobileapp",
+    "ParentId": "projects"
   },
   {
     "Name": "android",
@@ -744,7 +826,8 @@
     "Modified": "2025-10-30",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 3
+    "Id": "projects/mobileapp/android",
+    "ParentId": "projects/mobileapp"
   },
   {
     "Name": "MainActivity.kt",
@@ -753,7 +836,8 @@
     "Modified": "2025-10-30",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/mobileapp/android/mainactivity",
+    "ParentId": "projects/mobileapp/android"
   },
   {
     "Name": "build.gradle.kts",
@@ -762,7 +846,8 @@
     "Modified": "2025-10-25",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/mobileapp/android/build-gradle",
+    "ParentId": "projects/mobileapp/android"
   },
   {
     "Name": "ios",
@@ -771,7 +856,8 @@
     "Modified": "2025-10-28",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 3
+    "Id": "projects/mobileapp/ios",
+    "ParentId": "projects/mobileapp"
   },
   {
     "Name": "AppDelegate.swift",
@@ -780,7 +866,8 @@
     "Modified": "2025-10-28",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/mobileapp/ios/appdelegate",
+    "ParentId": "projects/mobileapp/ios"
   },
   {
     "Name": "ContentView.swift",
@@ -789,7 +876,8 @@
     "Modified": "2025-10-27",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 4
+    "Id": "projects/mobileapp/ios/contentview",
+    "ParentId": "projects/mobileapp/ios"
   },
   {
     "Name": "Music",
@@ -798,7 +886,8 @@
     "Modified": "2025-09-15",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 1
+    "Id": "music",
+    "ParentId": null
   },
   {
     "Name": "Classical",
@@ -807,7 +896,8 @@
     "Modified": "2025-06-01",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 2
+    "Id": "music/classical",
+    "ParentId": "music"
   },
   {
     "Name": "Bach_BWV1007.flac",
@@ -816,7 +906,8 @@
     "Modified": "2025-01-10",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "music/classical/bach-bwv1007",
+    "ParentId": "music/classical"
   },
   {
     "Name": "Mozart_K545.flac",
@@ -825,7 +916,8 @@
     "Modified": "2025-02-15",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "music/classical/mozart-k545",
+    "ParentId": "music/classical"
   },
   {
     "Name": "Beethoven_Op27.flac",
@@ -834,7 +926,8 @@
     "Modified": "2025-03-20",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "music/classical/beethoven-op27",
+    "ParentId": "music/classical"
   },
   {
     "Name": "Jazz",
@@ -843,7 +936,8 @@
     "Modified": "2025-09-15",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 2
+    "Id": "music/jazz",
+    "ParentId": "music"
   },
   {
     "Name": "Blue_Train.flac",
@@ -852,7 +946,8 @@
     "Modified": "2025-05-01",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "music/jazz/blue-train",
+    "ParentId": "music/jazz"
   },
   {
     "Name": "Kind_of_Blue.flac",
@@ -861,7 +956,8 @@
     "Modified": "2025-06-10",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "music/jazz/kind-of-blue",
+    "ParentId": "music/jazz"
   },
   {
     "Name": "Mingus_Ah_Um.flac",
@@ -870,7 +966,8 @@
     "Modified": "2025-07-05",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "music/jazz/mingus-ah-um",
+    "ParentId": "music/jazz"
   },
   {
     "Name": "Playlists",
@@ -879,7 +976,8 @@
     "Modified": "2025-09-01",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 2
+    "Id": "music/playlists",
+    "ParentId": "music"
   },
   {
     "Name": "WorkFocus.m3u",
@@ -888,7 +986,8 @@
     "Modified": "2025-08-01",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "music/playlists/workfocus",
+    "ParentId": "music/playlists"
   },
   {
     "Name": "Relaxation.m3u",
@@ -897,7 +996,8 @@
     "Modified": "2025-08-15",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "music/playlists/relaxation",
+    "ParentId": "music/playlists"
   },
   {
     "Name": "Running.m3u",
@@ -906,7 +1006,8 @@
     "Modified": "2025-09-01",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 3
+    "Id": "music/playlists/running",
+    "ParentId": "music/playlists"
   },
   {
     "Name": "Downloads",
@@ -915,7 +1016,8 @@
     "Modified": "2025-12-20",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 1
+    "Id": "downloads",
+    "ParentId": null
   },
   {
     "Name": "setup_v3.2.exe",
@@ -924,7 +1026,8 @@
     "Modified": "2025-12-01",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 2
+    "Id": "downloads/setup-v3-2",
+    "ParentId": "downloads"
   },
   {
     "Name": "manual.pdf",
@@ -933,7 +1036,8 @@
     "Modified": "2025-11-15",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 2
+    "Id": "downloads/manual",
+    "ParentId": "downloads"
   },
   {
     "Name": "data_export.csv",
@@ -942,7 +1046,8 @@
     "Modified": "2025-12-10",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 2
+    "Id": "downloads/data-export",
+    "ParentId": "downloads"
   },
   {
     "Name": "wallpaper.jpg",
@@ -951,7 +1056,8 @@
     "Modified": "2025-10-20",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 2
+    "Id": "downloads/wallpaper",
+    "ParentId": "downloads"
   },
   {
     "Name": "archive_2024.tar.gz",
@@ -960,7 +1066,8 @@
     "Modified": "2025-01-05",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 2
+    "Id": "downloads/archive-2024-tar",
+    "ParentId": "downloads"
   },
   {
     "Name": "notes.txt",
@@ -969,7 +1076,8 @@
     "Modified": "2025-12-20",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 2
+    "Id": "downloads/notes",
+    "ParentId": "downloads"
   },
   {
     "Name": "presentation_draft.pptx",
@@ -978,7 +1086,8 @@
     "Modified": "2025-12-18",
     "Permissions": "rw-r--r--",
     "Action": "Open",
-    "_level": 2
+    "Id": "downloads/presentation-draft",
+    "ParentId": "downloads"
   },
   {
     "Name": "database_backup.sql",
@@ -987,7 +1096,8 @@
     "Modified": "2025-12-15",
     "Permissions": "rw-------",
     "Action": "Open",
-    "_level": 2
+    "Id": "downloads/database-backup",
+    "ParentId": "downloads"
   },
   {
     "Name": "Recycle Bin",
@@ -996,7 +1106,8 @@
     "Modified": "2025-12-19",
     "Permissions": "rwxr-xr-x",
     "Action": "Browse",
-    "_level": 1
+    "Id": "recycle-bin",
+    "ParentId": null
   },
   {
     "Name": "old_report.docx",
@@ -1005,7 +1116,8 @@
     "Modified": "2025-06-01",
     "Permissions": "rw-------",
     "Action": "Open",
-    "_level": 2
+    "Id": "recycle-bin/old-report",
+    "ParentId": "recycle-bin"
   },
   {
     "Name": "temp_data.xlsx",
@@ -1014,7 +1126,8 @@
     "Modified": "2025-08-10",
     "Permissions": "rw-------",
     "Action": "Open",
-    "_level": 2
+    "Id": "recycle-bin/temp-data",
+    "ParentId": "recycle-bin"
   },
   {
     "Name": "draft_v1.txt",
@@ -1023,6 +1136,7 @@
     "Modified": "2025-09-22",
     "Permissions": "rw-------",
     "Action": "Open",
-    "_level": 2
+    "Id": "recycle-bin/draft-v1",
+    "ParentId": "recycle-bin"
   }
 ]

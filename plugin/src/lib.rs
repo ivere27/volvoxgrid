@@ -2395,7 +2395,7 @@ mod tests {
             |plugin, grid_id, grid| {
                 plugin.request_before_mouse_down(grid_id, grid, 1, 0, 10.0, 25.0, 0, 0, false)
             },
-            |event| matches!(event, GridEventData::BeforeMouseDown { row: 1, col: 0 }),
+            |event| matches!(event, GridEventData::BeforeMouseDown { row: 1, col: 0, .. }),
         );
         let _ = plugin.resolve_event_decision(grid_id, cancel_id, true);
         plugin
@@ -2411,7 +2411,7 @@ mod tests {
             |plugin, grid_id, grid| {
                 plugin.request_before_mouse_down(grid_id, grid, 1, 0, 10.0, 25.0, 0, 0, false)
             },
-            |event| matches!(event, GridEventData::BeforeMouseDown { row: 1, col: 0 }),
+            |event| matches!(event, GridEventData::BeforeMouseDown { row: 1, col: 0, .. }),
         );
         let _ = plugin.resolve_event_decision(grid_id, allow_id, false);
         plugin
@@ -2504,12 +2504,16 @@ fn engine_event_to_proto(
             active_row,
             active_col,
         })),
-        E::EnterCell { row, col } => {
-            Some(grid_event::Event::EnterCell(EnterCellEvent { row, col }))
-        }
-        E::LeaveCell { row, col } => {
-            Some(grid_event::Event::LeaveCell(LeaveCellEvent { row, col }))
-        }
+        E::EnterCell { row, col, target } => Some(grid_event::Event::EnterCell(EnterCellEvent {
+            row,
+            col,
+            target: Some(target.to_proto()),
+        })),
+        E::LeaveCell { row, col, target } => Some(grid_event::Event::LeaveCell(LeaveCellEvent {
+            row,
+            col,
+            target: Some(target.to_proto()),
+        })),
         E::BeforeEdit { row, col } => {
             Some(grid_event::Event::BeforeEdit(BeforeEditEvent { row, col }))
         }
@@ -2695,10 +2699,11 @@ fn engine_event_to_proto(
                 old_position,
             }))
         }
-        E::BeforeMouseDown { row, col } => {
+        E::BeforeMouseDown { row, col, target } => {
             Some(grid_event::Event::BeforeMouseDown(BeforeMouseDownEvent {
                 row,
                 col,
+                target: Some(target.to_proto()),
             }))
         }
         E::MouseDown {
@@ -2728,24 +2733,32 @@ fn engine_event_to_proto(
             modifier,
             x,
             y,
+            target,
         } => Some(grid_event::Event::MouseMove(MouseMoveEvent {
             button,
             modifier,
             x,
             y,
+            target: Some(target.to_proto()),
         })),
         E::Click {
             row,
             col,
             hit_area,
             interaction,
+            target,
         } => Some(grid_event::Event::Click(ClickEvent {
             row,
             col,
             hit_area,
             interaction,
+            target: Some(target.to_proto()),
         })),
-        E::DblClick { row, col } => Some(grid_event::Event::DblClick(DblClickEvent { row, col })),
+        E::DblClick { row, col, target } => Some(grid_event::Event::DblClick(DblClickEvent {
+            row,
+            col,
+            target: Some(target.to_proto()),
+        })),
         E::KeyDown { key_code, modifier } => Some(grid_event::Event::KeyDown(KeyDownEvent {
             key_code,
             modifier,
@@ -3783,7 +3796,11 @@ impl VolvoxGridPlugin {
     ) {
         if !self.decision_channel_enabled(grid_id) {
             grid.events
-                .push(volvoxgrid_engine::event::GridEventData::BeforeMouseDown { row, col });
+                .push(volvoxgrid_engine::event::GridEventData::BeforeMouseDown {
+                    row,
+                    col,
+                    target: volvoxgrid_engine::event::EventTarget::data_cell(),
+                });
             self.handle_pointer_down_after_before_mouse(
                 grid_id, grid, x, y, button, modifier, dbl_click,
             );
@@ -3809,7 +3826,11 @@ impl VolvoxGridPlugin {
             );
         grid.events.push_with_id(
             event_id,
-            volvoxgrid_engine::event::GridEventData::BeforeMouseDown { row, col },
+            volvoxgrid_engine::event::GridEventData::BeforeMouseDown {
+                row,
+                col,
+                target: volvoxgrid_engine::event::EventTarget::data_cell(),
+            },
         );
     }
 

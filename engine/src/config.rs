@@ -7,7 +7,8 @@
 use crate::cell::{BarcodeSpec, CellValueData};
 use crate::grid::VolvoxGrid;
 use crate::indicator::{
-    ColIndicatorCellState, ColIndicatorRowDefState, CornerIndicatorState, RowIndicatorSlotState,
+    ColIndicatorCellState, ColIndicatorRowDefState, CornerIndicatorSlotState, CornerIndicatorState,
+    RowIndicatorSlotState,
 };
 use crate::proto::volvoxgrid::v1;
 use crate::row::RowStatus;
@@ -200,14 +201,12 @@ fn apply_row_indicator_config(
     target: &mut crate::indicator::RowIndicatorState,
     cfg: &v1::RowIndicatorConfig,
 ) {
+    let width_changed = cfg.width.is_some();
     if let Some(v) = cfg.visible {
         target.visible = v;
     }
     if let Some(v) = cfg.width {
         target.width_px = v.max(1);
-    }
-    if let Some(v) = cfg.mode_bits {
-        target.mode_bits = v;
     }
     if let Some(v) = cfg.background {
         target.back_color = Some(v);
@@ -248,13 +247,15 @@ fn apply_row_indicator_config(
             })
             .collect();
     }
+    if width_changed {
+        target.fit_slots_to_width();
+    }
 }
 
 fn row_indicator_to_proto(src: &crate::indicator::RowIndicatorState) -> v1::RowIndicatorConfig {
     v1::RowIndicatorConfig {
         visible: Some(src.visible),
         width: Some(src.width_px.max(1)),
-        mode_bits: Some(src.mode_bits),
         background: src.back_color,
         foreground: src.fore_color,
         grid_lines: src.grid_lines,
@@ -406,6 +407,20 @@ fn apply_corner_indicator_config(
     if let Some(v) = &cfg.data {
         target.data = v.clone();
     }
+    if !cfg.slots.is_empty() {
+        target.slots = cfg
+            .slots
+            .iter()
+            .map(|slot| CornerIndicatorSlotState {
+                kind: slot.kind.unwrap_or(0),
+                width_px: slot.width.unwrap_or(0).max(0),
+                visible: slot.visible.unwrap_or(true),
+                custom_key: slot.custom_key.clone().unwrap_or_default(),
+                data: slot.data.clone().unwrap_or_default(),
+                label_text: slot.label_text.clone().unwrap_or_default(),
+            })
+            .collect();
+    }
 }
 
 fn corner_indicator_to_proto(src: &CornerIndicatorState) -> v1::CornerIndicatorConfig {
@@ -416,6 +431,18 @@ fn corner_indicator_to_proto(src: &CornerIndicatorState) -> v1::CornerIndicatorC
         foreground: src.fore_color,
         custom_key: Some(src.custom_key.clone()),
         data: Some(src.data.clone()),
+        slots: src
+            .slots
+            .iter()
+            .map(|slot| v1::CornerIndicatorSlot {
+                kind: Some(slot.kind),
+                width: Some(slot.width_px.max(0)),
+                visible: Some(slot.visible),
+                custom_key: Some(slot.custom_key.clone()),
+                data: Some(slot.data.clone()),
+                label_text: Some(slot.label_text.clone()),
+            })
+            .collect(),
     }
 }
 
@@ -1072,6 +1099,20 @@ impl VolvoxGrid {
         if let Some(cfg) = &bands.corner_bottom_end {
             apply_corner_indicator_config(&mut self.indicator_bands.corner_bottom_end, cfg);
         }
+        if let Some(cfg) = &bands.focus {
+            if let Some(v) = cfg.enable_keyboard_focus {
+                self.indicator_focus_enabled = v;
+                if !v {
+                    self.active_indicator = None;
+                }
+            }
+            if let Some(v) = cfg.enter_key_code {
+                self.indicator_focus_enter_key_code = v;
+            }
+            if let Some(v) = cfg.exit_key_code {
+                self.indicator_focus_exit_key_code = v;
+            }
+        }
         self.mark_dirty();
     }
 
@@ -1641,9 +1682,6 @@ impl VolvoxGrid {
         if let Some(v) = oc.tree_indicator {
             self.outline.tree_indicator = v;
         }
-        if let Some(v) = oc.tree_column {
-            self.outline.tree_column = v;
-        }
         if let Some(v) = oc.tree_color {
             self.style.tree_color = v;
         }
@@ -1652,6 +1690,21 @@ impl VolvoxGrid {
         }
         if let Some(v) = oc.multi_totals {
             self.outline.multi_totals = v;
+        }
+        if let Some(v) = oc.indicator_indent {
+            self.outline.indicator_indent = v.max(0);
+        }
+        if let Some(v) = oc.max_levels {
+            self.outline.max_levels = v.max(0);
+        }
+        if let Some(v) = oc.show_level_buttons {
+            self.outline.show_level_buttons = v;
+        }
+        if let Some(v) = oc.label_column {
+            self.outline.label_column = v;
+        }
+        if let Some(v) = oc.icon_column {
+            self.outline.icon_column = v;
         }
         self.mark_dirty();
     }
@@ -2055,10 +2108,14 @@ impl VolvoxGrid {
     fn get_outline_config(&self) -> v1::OutlineConfig {
         v1::OutlineConfig {
             tree_indicator: Some(self.outline.tree_indicator),
-            tree_column: Some(self.outline.tree_column),
             tree_color: Some(self.style.tree_color),
             group_total_position: Some(self.outline.group_total_position),
             multi_totals: Some(self.outline.multi_totals),
+            indicator_indent: Some(self.outline.indicator_indent),
+            max_levels: Some(self.outline.max_levels),
+            show_level_buttons: Some(self.outline.show_level_buttons),
+            label_column: Some(self.outline.label_column),
+            icon_column: Some(self.outline.icon_column),
         }
     }
 
@@ -2134,6 +2191,11 @@ impl VolvoxGrid {
             corner_bottom_end: Some(corner_indicator_to_proto(
                 &self.indicator_bands.corner_bottom_end,
             )),
+            focus: Some(v1::IndicatorFocusConfig {
+                enable_keyboard_focus: Some(self.indicator_focus_enabled),
+                enter_key_code: Some(self.indicator_focus_enter_key_code),
+                exit_key_code: Some(self.indicator_focus_exit_key_code),
+            }),
         }
     }
 

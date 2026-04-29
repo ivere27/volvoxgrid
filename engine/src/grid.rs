@@ -14,7 +14,7 @@ use crate::column::ColumnProps;
 use crate::control::CellControl;
 use crate::drag::DragState;
 use crate::edit::EditState;
-use crate::event::EventQueue;
+use crate::event::{EventQueue, EventTarget};
 use crate::indicator::{ColIndicatorRowDefState, IndicatorBandsState};
 use crate::layout::LayoutCache;
 use crate::outline::OutlineState;
@@ -54,6 +54,21 @@ const MIN_ROWS: i32 = 1;
 
 /// Minimum allowed column count.
 const MIN_COLS: i32 = 1;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ActiveIndicatorTarget {
+    pub band: i32,
+    pub row: i32,
+    pub col: i32,
+    pub slot_index: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HoverTarget {
+    pub row: i32,
+    pub col: i32,
+    pub target: EventTarget,
+}
 
 // Keep build metadata in the final binary even when version APIs are not called.
 #[used]
@@ -237,6 +252,14 @@ pub struct VolvoxGrid {
     pub cell_styles: HashMap<(i32, i32), CellStylePatch>,
     /// Indicator bands around the data viewport.
     pub indicator_bands: IndicatorBandsState,
+    /// Enables keyboard focus cycling into rendered indicator bands.
+    pub indicator_focus_enabled: bool,
+    /// Key code used to move keyboard focus into indicators.
+    pub indicator_focus_enter_key_code: i32,
+    /// Key code used to return keyboard focus to the data cells.
+    pub indicator_focus_exit_key_code: i32,
+    /// Indicator part currently holding keyboard focus.
+    pub active_indicator: Option<ActiveIndicatorTarget>,
 
     // ── Selection ─────────────────────────────────────────────────────────
     /// Current cursor position, selection extent, selection mode, focus border, and selection visibility.
@@ -501,6 +524,8 @@ pub struct VolvoxGrid {
     pub mouse_row: i32,
     /// Column index currently under the mouse pointer (-1 if none).
     pub mouse_col: i32,
+    /// Last event target reported by pointer hover.
+    pub last_hover_target: Option<HoverTarget>,
     /// Cursor style the host should display.
     /// 0 = default, 1 = col-resize, 2 = row-resize, 3 = move/grab,
     /// 4 = pointer/hand, 5 = pointer/hand (interactive cell content)
@@ -550,6 +575,12 @@ pub struct VolvoxGrid {
     // ── Outline Button Click ─────────────────────────────────────────────
     /// Set during an outline +/- button click to suppress selection extension.
     pub outline_click_active: bool,
+    /// Whether an outline level corner button is currently shown pressed.
+    pub outline_level_button_pressed: bool,
+    /// Raw outline level for the active corner button press.
+    pub outline_level_button_pressed_level: i32,
+    /// True while the pointer is still inside the pressed corner button.
+    pub outline_level_button_pressed_inside: bool,
     /// Set after a dropdown item click commits, to consume the rest of the
     /// same pointer gesture so it does not leak into grid selection.
     pub dropdown_click_active: bool,
@@ -732,6 +763,10 @@ impl VolvoxGrid {
             style: GridStyleState::default(),
             cell_styles: HashMap::new(),
             indicator_bands: IndicatorBandsState::default(),
+            indicator_focus_enabled: false,
+            indicator_focus_enter_key_code: 117,
+            indicator_focus_exit_key_code: 27,
+            active_indicator: None,
 
             // Selection
             selection: SelectionState::with_initial(fixed_rows, fixed_cols),
@@ -882,6 +917,7 @@ impl VolvoxGrid {
             // Mouse tracking
             mouse_row: -1,
             mouse_col: -1,
+            last_hover_target: None,
             cursor_style: 0,
 
             // Resize tracking
@@ -908,6 +944,9 @@ impl VolvoxGrid {
 
             // Outline button click
             outline_click_active: false,
+            outline_level_button_pressed: false,
+            outline_level_button_pressed_level: -1,
+            outline_level_button_pressed_inside: false,
             dropdown_click_active: false,
             edit_pointer_select_active: false,
             edit_pointer_select_anchor: 0,
@@ -2954,12 +2993,14 @@ impl VolvoxGrid {
         band.visible.hash(&mut hasher);
         band.auto_size.hash(&mut hasher);
         band.width_px.hash(&mut hasher);
-        band.mode_bits.hash(&mut hasher);
         self.rows.hash(&mut hasher);
         self.fixed_rows.hash(&mut hasher);
         self.default_row_height.hash(&mut hasher);
         self.style.font_name.hash(&mut hasher);
         self.style.font_size.to_bits().hash(&mut hasher);
+        self.outline.indicator_indent.hash(&mut hasher);
+        self.outline.label_column.hash(&mut hasher);
+        self.outline.icon_column.hash(&mut hasher);
         for slot in &band.slots {
             slot.kind.hash(&mut hasher);
             slot.width_px.hash(&mut hasher);
@@ -2977,7 +3018,7 @@ impl VolvoxGrid {
         }
 
         let band = self.indicator_bands.row_start.clone();
-        if !band.visible || !band.auto_size || !band.slots.is_empty() {
+        if !band.visible || !band.auto_size || band.slots.is_empty() {
             self.row_indicator_start_auto_size_sig = sig;
             return;
         }
@@ -2988,49 +3029,112 @@ impl VolvoxGrid {
         } else {
             13.0
         };
-        let mut labels: Vec<String> = Vec::new();
-
-        if band.has_mode(pb::RowIndicatorMode::RowIndicatorNumbers) {
-            labels.push((self.rows - self.fixed_rows).max(1).to_string());
-        } else {
-            if band.has_mode(pb::RowIndicatorMode::RowIndicatorCurrent) {
-                labels.push("▶".to_string());
-            }
-            if band.has_mode(pb::RowIndicatorMode::RowIndicatorSelection) {
-                labels.push("•".to_string());
-            }
-        }
-        if band.has_mode(pb::RowIndicatorMode::RowIndicatorHandle) {
-            labels.push("≡".to_string());
-        }
-        if band.has_mode(pb::RowIndicatorMode::RowIndicatorEditing) {
-            labels.push("✎".to_string());
-        }
-        if band.has_mode(pb::RowIndicatorMode::RowIndicatorExpander) {
-            labels.push("+".to_string());
-            labels.push("-".to_string());
-        }
-
-        if labels.is_empty() {
-            self.row_indicator_start_auto_size_sig = sig;
-            return;
-        }
-
         self.ensure_text_engine();
         let mut te = self.text_engine.take().unwrap();
-        let mut max_w = 0.0f32;
-        for label in &labels {
-            let (w, _) = te.measure_text(label, &font_name, font_size, false, false, None);
-            max_w = max_w.max(w);
+        let mut updates: Vec<(usize, i32)> = Vec::new();
+        for (slot_index, slot) in band
+            .slots
+            .iter()
+            .enumerate()
+            .filter(|(_, slot)| slot.visible)
+        {
+            let labels: &[&str] =
+                if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32 {
+                    &[]
+                } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotCurrent as i32 {
+                    &["▶"]
+                } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotSelection as i32 {
+                    &["•"]
+                } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotHandle as i32 {
+                    &["≡"]
+                } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotEditing as i32 {
+                    &["✎"]
+                } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32 {
+                    &["+", "-"]
+                } else {
+                    &[]
+                };
+            let mut max_w = 0.0f32;
+            if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32 {
+                let label = (self.rows - self.fixed_rows).max(1).to_string();
+                let (w, _) = te.measure_text(&label, &font_name, font_size, false, false, None);
+                max_w = max_w.max(w);
+            } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
+                && (self.outline.label_column >= 0 || self.outline.icon_column >= 0)
+            {
+                let tg = crate::outline::TreeGeometry::from_grid(self);
+                for row in self.fixed_rows.max(0)..self.rows {
+                    let depth = self
+                        .get_row_props(row)
+                        .map(|rp| {
+                            crate::outline::outline_visual_depth_for_level(self, rp.outline_level)
+                        })
+                        .unwrap_or(0)
+                        .max(0);
+                    let has_children = self.get_row_props(row).map_or(false, |rp| rp.is_subtotal)
+                        || crate::outline::get_node(self, row).3 > 0;
+                    let mut needed = if has_children {
+                        depth * tg.indent_step + tg.line_offset + tg.btn_size / 2 + 3
+                    } else {
+                        depth * tg.indent_step + tg.line_offset + 3
+                    };
+                    if self.outline.icon_column >= 0 && self.outline.icon_column < self.cols {
+                        let icon = self.get_display_text(row, self.outline.icon_column);
+                        if !icon.trim().is_empty() {
+                            needed += (self.row_height(row) - 4).max(8) + 3;
+                        }
+                    }
+                    if self.outline.label_column >= 0 && self.outline.label_column < self.cols {
+                        let label = self.get_display_text(row, self.outline.label_column);
+                        if !label.trim().is_empty() {
+                            let (w, _) =
+                                te.measure_text(&label, &font_name, font_size, false, false, None);
+                            needed += w.ceil() as i32 + 8;
+                        }
+                    }
+                    max_w = max_w.max(needed as f32);
+                }
+            } else {
+                for label in labels {
+                    let (w, _) = te.measure_text(label, &font_name, font_size, false, false, None);
+                    max_w = max_w.max(w);
+                }
+            }
+            if max_w <= 0.0 {
+                continue;
+            }
+            let min_width = if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32
+            {
+                crate::indicator::DEFAULT_ROW_INDICATOR_WIDTH
+            } else {
+                18
+            };
+            let needed_width = (max_w.ceil() as i32 + 8).max(min_width);
+            if slot.width_px != needed_width {
+                updates.push((slot_index, needed_width));
+            }
         }
         self.text_engine = Some(te);
 
-        let needed_width =
-            (max_w.ceil() as i32 + 8).max(crate::indicator::DEFAULT_ROW_INDICATOR_WIDTH);
-        if self.indicator_bands.row_start.width_px != needed_width {
-            self.indicator_bands.row_start.width_px = needed_width;
-            self.dirty = true;
+        if updates.is_empty() {
+            self.row_indicator_start_auto_size_sig = sig;
+            return;
         }
+        for (slot_index, needed_width) in updates {
+            if let Some(slot) = self.indicator_bands.row_start.slots.get_mut(slot_index) {
+                slot.width_px = needed_width;
+                self.dirty = true;
+            }
+        }
+        self.indicator_bands.row_start.width_px = self
+            .indicator_bands
+            .row_start
+            .slots
+            .iter()
+            .filter(|slot| slot.visible)
+            .map(|slot| slot.width_px.max(0))
+            .sum::<i32>()
+            .max(1);
 
         self.row_indicator_start_auto_size_sig = self.row_indicator_start_auto_size_signature();
     }
@@ -4979,6 +5083,7 @@ fn truncate_chars(input: &str, max_chars: i32) -> String {
 mod tests {
     use super::*;
     use crate::event::GridEventData;
+    use crate::indicator::RowIndicatorSlotState;
     use crate::proto::volvoxgrid::v1 as pb;
     use std::time::Duration;
 
@@ -5725,12 +5830,15 @@ mod tests {
         let mut grid = VolvoxGrid::new(1, 320, 200, 1200, 2, 0, 0);
         grid.style.font_size = 28.0;
         grid.indicator_bands.row_start.visible = true;
-        grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers,
+            grid.indicator_bands.row_start.width_px,
+        )];
 
-        let before = grid.indicator_bands.row_start.width_px;
+        let before = grid.indicator_bands.row_start.slots[0].width_px;
         grid.ensure_layout();
 
-        assert!(grid.indicator_bands.row_start.width_px > before);
+        assert!(grid.indicator_bands.row_start.slots[0].width_px > before);
     }
 
     #[test]
@@ -5739,12 +5847,39 @@ mod tests {
         grid.style.font_size = 28.0;
         grid.indicator_bands.row_start.visible = true;
         grid.indicator_bands.row_start.auto_size = false;
-        grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers,
+            grid.indicator_bands.row_start.width_px,
+        )];
 
-        let before = grid.indicator_bands.row_start.width_px;
+        let before = grid.indicator_bands.row_start.slots[0].width_px;
         grid.ensure_layout();
 
-        assert_eq!(grid.indicator_bands.row_start.width_px, before);
+        assert_eq!(grid.indicator_bands.row_start.slots[0].width_px, before);
+    }
+
+    #[test]
+    fn ensure_layout_auto_sizes_expander_row_indicator_from_label_column() {
+        let mut grid = VolvoxGrid::new(1, 320, 200, 2, 2, 0, 0);
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = true;
+        grid.indicator_bands.row_start.width_px = 18;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            18,
+        )];
+        grid.outline.label_column = 0;
+        grid.cells.set_text(0, 0, "Short".to_string());
+        grid.cells
+            .set_text(1, 0, "Long folder label for auto sizing".to_string());
+
+        grid.ensure_layout();
+
+        assert!(grid.indicator_bands.row_start.slots[0].width_px > 120);
+        assert_eq!(
+            grid.indicator_bands.row_start.width_px,
+            grid.indicator_bands.row_start.slots[0].width_px
+        );
     }
 
     #[test]

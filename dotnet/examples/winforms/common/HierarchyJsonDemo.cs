@@ -10,17 +10,18 @@ namespace VolvoxGrid.DotNet.Sample
     {
         private const int HierarchyColumnCount = 6;
         internal const int ActionColumnIndex = 5;
-        private static readonly Regex LevelRegex = new Regex("\"_level\"\\s*:\\s*(-?\\d+)", RegexOptions.Compiled);
-        private static readonly Regex TypeRegex = new Regex("\"Type\"\\s*:\\s*\"([^\"]+)\"", RegexOptions.Compiled);
-        private static readonly Regex HelperFieldRegex = new Regex(",\\s*\"_level\"\\s*:\\s*-?\\d+", RegexOptions.Compiled);
+        private static readonly Regex IdRegex = new Regex("\"Id\"\\s*:\\s*\"([^\"]+)\"", RegexOptions.Compiled);
+        private static readonly Regex ParentIdRegex = new Regex("\"ParentId\"\\s*:\\s*(?:null|\"([^\"]*)\")", RegexOptions.Compiled);
+        private static readonly Regex HelperFieldRegex = new Regex(",\\s*\"(?:Id|ParentId)\"\\s*:\\s*(?:null|\"[^\"]*\")", RegexOptions.Compiled);
+        private const int OutlineIndent = 20;
+        private const int MinOutlineIndicatorWidth = 48;
 
         public static void Load(VolvoxGridControl grid)
         {
             if (grid == null) throw new ArgumentNullException("grid");
 
             string rawJson = Encoding.UTF8.GetString(grid.GetDemoData("hierarchy"));
-            List<int> levels = ExtractLevels(rawJson);
-            List<string> types = ExtractTypes(rawJson);
+            List<int> levels = DeriveLevels(ExtractIds(rawJson), ExtractParentIds(rawJson));
 
             grid.SetColCount(HierarchyColumnCount);
             grid.SetColumns(new[]
@@ -40,7 +41,15 @@ namespace VolvoxGrid.DotNet.Sample
             grid.ShowColumnHeaders = true;
             grid.ColumnIndicatorTopRowCount = 1;
             grid.ColumnIndicatorTopModeBits = VolvoxGridColumnIndicatorMode.HeaderText;
-            grid.ShowRowIndicator = false;
+            int maxOutlineDepth = MaxOutlineDepth(levels);
+            int maxOutlineLevel = MaxOutlineLevel(levels);
+            int outlineWidth = OutlineIndicatorWidth(maxOutlineDepth);
+            grid.ShowRowIndicator = true;
+            grid.RowIndicatorStartModeBits = VolvoxGridRowIndicatorMode.Expander;
+            grid.RowIndicatorStartWidth = outlineWidth;
+            grid.OutlineIndicatorIndent = OutlineIndent;
+            grid.OutlineMaxLevels = maxOutlineLevel;
+            grid.ShowOutlineLevelButtons = false;
             grid.ScrollBars = VolvoxGridScrollBarsMode.Both;
             grid.FlingEnabled = true;
             grid.FlingImpulseGain = 220.0f;
@@ -52,30 +61,116 @@ namespace VolvoxGrid.DotNet.Sample
 
             for (int row = 0; row < levels.Count; row++)
             {
-                bool isFolder = row < types.Count && string.Equals(types[row], "Folder", StringComparison.Ordinal);
                 grid.SetRowOutlineLevel(row, levels[row]);
-                grid.SetIsSubtotal(row, isFolder);
             }
         }
 
-        private static List<int> ExtractLevels(string rawJson)
+        private static List<string> ExtractIds(string rawJson)
         {
-            var levels = new List<int>();
-            foreach (Match match in LevelRegex.Matches(rawJson))
+            var ids = new List<string>();
+            foreach (Match match in IdRegex.Matches(rawJson))
             {
-                levels.Add(int.Parse(match.Groups[1].Value));
+                ids.Add(match.Groups[1].Value);
+            }
+            return ids;
+        }
+
+        private static List<string> ExtractParentIds(string rawJson)
+        {
+            var parentIds = new List<string>();
+            foreach (Match match in ParentIdRegex.Matches(rawJson))
+            {
+                parentIds.Add(match.Groups[1].Success ? match.Groups[1].Value : null);
+            }
+            return parentIds;
+        }
+
+        private static List<int> DeriveLevels(List<string> ids, List<string> parentIds)
+        {
+            if (ids.Count != parentIds.Count)
+            {
+                throw new InvalidOperationException("Hierarchy demo Id/ParentId counts do not match.");
+            }
+
+            var parentById = new Dictionary<string, string>(StringComparer.Ordinal);
+            for (int i = 0; i < ids.Count; i++)
+            {
+                if (string.IsNullOrWhiteSpace(ids[i]))
+                {
+                    throw new InvalidOperationException("Hierarchy demo row is missing Id.");
+                }
+                parentById[ids[i]] = parentIds[i];
+            }
+
+            var cache = new Dictionary<string, int>(StringComparer.Ordinal);
+            Func<string, HashSet<string>, int> depthOf = null;
+            depthOf = delegate(string id, HashSet<string> visiting)
+            {
+                int cached;
+                if (cache.TryGetValue(id, out cached))
+                {
+                    return cached;
+                }
+                if (!parentById.ContainsKey(id))
+                {
+                    throw new InvalidOperationException("Hierarchy demo data references missing parent " + id + ".");
+                }
+                if (!visiting.Add(id))
+                {
+                    throw new InvalidOperationException("Hierarchy demo data contains a parent cycle at " + id + ".");
+                }
+
+                string parentId = parentById[id];
+                int depth = string.IsNullOrWhiteSpace(parentId) ? 0 : depthOf(parentId, visiting) + 1;
+                visiting.Remove(id);
+                cache[id] = depth;
+                return depth;
+            };
+
+            var levels = new List<int>(ids.Count);
+            foreach (string id in ids)
+            {
+                levels.Add(depthOf(id, new HashSet<string>(StringComparer.Ordinal)));
             }
             return levels;
         }
 
-        private static List<string> ExtractTypes(string rawJson)
+        private static int MaxOutlineDepth(List<int> levels)
         {
-            var types = new List<string>();
-            foreach (Match match in TypeRegex.Matches(rawJson))
+            bool hasMinLevel = false;
+            int min = 0;
+            int max = 0;
+            foreach (int level in levels)
             {
-                types.Add(match.Groups[1].Value);
+                if (level >= 0 && (!hasMinLevel || level < min))
+                {
+                    hasMinLevel = true;
+                    min = level;
+                }
+                max = Math.Max(max, level);
             }
-            return types;
+            return Math.Max(0, max - min);
         }
+
+        private static int MaxOutlineLevel(List<int> levels)
+        {
+            bool hasMaxLevel = false;
+            int max = 0;
+            foreach (int level in levels)
+            {
+                if (level >= 0 && (!hasMaxLevel || level > max))
+                {
+                    hasMaxLevel = true;
+                    max = level;
+                }
+            }
+            return max;
+        }
+
+        private static int OutlineIndicatorWidth(int maxOutlineDepth)
+        {
+            return Math.Max(MinOutlineIndicatorWidth, (Math.Max(0, maxOutlineDepth) + 1) * OutlineIndent);
+        }
+
     }
 }

@@ -208,18 +208,35 @@ fn replay_loaded_fonts_into_grid(grid: &mut volvoxgrid_engine::grid::VolvoxGrid)
     }
 }
 
-const DEFAULT_ROW_INDICATOR_MODE_BITS: u32 =
-    RowIndicatorMode::RowIndicatorCurrent as u32 | RowIndicatorMode::RowIndicatorSelection as u32;
 const DEFAULT_COL_INDICATOR_MODE_BITS: u32 = ColIndicatorCellMode::ColIndicatorCellHeaderText
     as u32
     | ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32;
+
+fn default_row_indicator_slots() -> Vec<volvoxgrid_engine::indicator::RowIndicatorSlotState> {
+    vec![
+        volvoxgrid_engine::indicator::RowIndicatorSlotState::new(
+            RowIndicatorSlotKind::RowIndicatorSlotCurrent,
+            18,
+        ),
+        volvoxgrid_engine::indicator::RowIndicatorSlotState::new(
+            RowIndicatorSlotKind::RowIndicatorSlotSelection,
+            17,
+        ),
+    ]
+}
+
+fn ensure_default_row_indicator_slots(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
+    if grid.indicator_bands.row_start.slots.is_empty() {
+        grid.indicator_bands.row_start.slots = default_row_indicator_slots();
+    }
+}
 
 fn apply_default_indicator_bands(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
     grid.indicator_bands.row_start.visible = false;
     grid.indicator_bands.row_start.width_px =
         volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
     grid.indicator_bands.row_start.auto_size = true;
-    grid.indicator_bands.row_start.mode_bits = DEFAULT_ROW_INDICATOR_MODE_BITS;
+    ensure_default_row_indicator_slots(grid);
 
     grid.indicator_bands.col_top.visible = true;
     if grid.indicator_bands.col_top.band_rows <= 0 {
@@ -819,7 +836,11 @@ fn request_before_mouse_down(
 ) {
     if !decision_channel_enabled(grid_id) {
         grid.events
-            .push(volvoxgrid_engine::event::GridEventData::BeforeMouseDown { row, col });
+            .push(volvoxgrid_engine::event::GridEventData::BeforeMouseDown {
+                row,
+                col,
+                target: volvoxgrid_engine::event::EventTarget::data_cell(),
+            });
         handle_pointer_down_after_before_mouse(grid_id, grid, x, y, button, modifier, dbl_click);
         return;
     }
@@ -838,7 +859,11 @@ fn request_before_mouse_down(
             },
         },
     );
-    let event = volvoxgrid_engine::event::GridEventData::BeforeMouseDown { row, col };
+    let event = volvoxgrid_engine::event::GridEventData::BeforeMouseDown {
+        row,
+        col,
+        target: volvoxgrid_engine::event::EventTarget::data_cell(),
+    };
     grid.events.push_with_id(event_id, event.clone());
     queue_pending_decision_event(grid_id, event_id, event);
 }
@@ -1776,9 +1801,7 @@ pub fn set_show_row_indicator(id: i32, visible: bool) {
                 grid.indicator_bands.row_start.width_px =
                     volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
             }
-            if grid.indicator_bands.row_start.mode_bits == 0 {
-                grid.indicator_bands.row_start.mode_bits = DEFAULT_ROW_INDICATOR_MODE_BITS;
-            }
+            ensure_default_row_indicator_slots(grid);
         }
         grid.layout.invalidate();
         grid.dirty = true;
@@ -1791,24 +1814,10 @@ pub fn get_show_row_indicator(id: i32) -> bool {
 }
 
 #[wasm_bindgen]
-pub fn set_row_indicator_start_mode_bits(id: i32, mode_bits: u32) {
-    with_grid(id, |grid| {
-        grid.indicator_bands.row_start.mode_bits = mode_bits;
-        grid.indicator_bands.row_start.visible = mode_bits != 0;
-        grid.layout.invalidate();
-        grid.dirty = true;
-    });
-}
-
-#[wasm_bindgen]
-pub fn get_row_indicator_start_mode_bits(id: i32) -> u32 {
-    with_grid(id, |grid| grid.indicator_bands.row_start.mode_bits).unwrap_or(0)
-}
-
-#[wasm_bindgen]
 pub fn set_row_indicator_start_width(id: i32, width_px: i32) {
     with_grid(id, |grid| {
         grid.indicator_bands.row_start.width_px = width_px.max(1);
+        grid.indicator_bands.row_start.fit_slots_to_width();
         grid.layout.invalidate();
         grid.dirty = true;
     });
@@ -4927,12 +4936,16 @@ fn engine_event_to_proto(
             active_row,
             active_col,
         })),
-        E::EnterCell { row, col } => {
-            Some(grid_event::Event::EnterCell(EnterCellEvent { row, col }))
-        }
-        E::LeaveCell { row, col } => {
-            Some(grid_event::Event::LeaveCell(LeaveCellEvent { row, col }))
-        }
+        E::EnterCell { row, col, target } => Some(grid_event::Event::EnterCell(EnterCellEvent {
+            row,
+            col,
+            target: Some(target.to_proto()),
+        })),
+        E::LeaveCell { row, col, target } => Some(grid_event::Event::LeaveCell(LeaveCellEvent {
+            row,
+            col,
+            target: Some(target.to_proto()),
+        })),
         E::BeforeEdit { row, col } => {
             Some(grid_event::Event::BeforeEdit(BeforeEditEvent { row, col }))
         }
@@ -5118,10 +5131,11 @@ fn engine_event_to_proto(
                 old_position,
             }))
         }
-        E::BeforeMouseDown { row, col } => {
+        E::BeforeMouseDown { row, col, target } => {
             Some(grid_event::Event::BeforeMouseDown(BeforeMouseDownEvent {
                 row,
                 col,
+                target: Some(target.to_proto()),
             }))
         }
         E::MouseDown {
@@ -5151,24 +5165,32 @@ fn engine_event_to_proto(
             modifier,
             x,
             y,
+            target,
         } => Some(grid_event::Event::MouseMove(MouseMoveEvent {
             button,
             modifier,
             x,
             y,
+            target: Some(target.to_proto()),
         })),
         E::Click {
             row,
             col,
             hit_area,
             interaction,
+            target,
         } => Some(grid_event::Event::Click(ClickEvent {
             row,
             col,
             hit_area,
             interaction,
+            target: Some(target.to_proto()),
         })),
-        E::DblClick { row, col } => Some(grid_event::Event::DblClick(DblClickEvent { row, col })),
+        E::DblClick { row, col, target } => Some(grid_event::Event::DblClick(DblClickEvent {
+            row,
+            col,
+            target: Some(target.to_proto()),
+        })),
         E::KeyDown { key_code, modifier } => Some(grid_event::Event::KeyDown(KeyDownEvent {
             key_code,
             modifier,

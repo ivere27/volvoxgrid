@@ -284,7 +284,10 @@ GridConfig _salesThemeConfig() {
       ..rowStart = (RowIndicatorConfig()
         ..visible = true
         ..width = 40
-        ..modeBits = RowIndicatorMode.ROW_INDICATOR_NUMBERS.value
+        ..slots.add(RowIndicatorSlot()
+          ..kind = RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS
+          ..width = 40
+          ..visible = true)
         ..background = _salesIndicatorBg
         ..foreground = _salesIndicatorFg
         ..gridColor = _salesFixedGridColor

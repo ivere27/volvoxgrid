@@ -148,7 +148,7 @@ impl Default for Renderer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::indicator::ColIndicatorCellState;
+    use crate::indicator::{ColIndicatorCellState, RowIndicatorSlotState};
     use crate::proto::volvoxgrid::v1 as pb;
 
     fn pixel_argb(buffer: &[u8], width: i32, x: i32, y: i32) -> u32 {
@@ -526,7 +526,10 @@ mod tests {
         let mut grid = VolvoxGrid::new(1, 180, 80, 4, 3, 0, 0);
         grid.indicator_bands.row_start.visible = true;
         grid.indicator_bands.row_start.width_px = 40;
-        grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers,
+            40,
+        )];
         grid.selection.selection_style.back_color = Some(0xFF335577);
         grid.selection.selection_style.fore_color = Some(0xFFFFFFFF);
         grid.selection
@@ -545,7 +548,10 @@ mod tests {
         let mut grid = VolvoxGrid::new(1, 180, 80, 4, 3, 0, 0);
         grid.indicator_bands.row_start.visible = true;
         grid.indicator_bands.row_start.width_px = 40;
-        grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers,
+            40,
+        )];
         grid.indicator_bands.row_start.grid_color = Some(0xFF112233);
         grid.selection.selection_style.back_color = Some(0xFF335577);
         grid.selection
@@ -564,7 +570,10 @@ mod tests {
         let mut grid = VolvoxGrid::new(1, 180, 80, 4, 3, 0, 0);
         grid.indicator_bands.row_start.visible = true;
         grid.indicator_bands.row_start.width_px = 40;
-        grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers,
+            40,
+        )];
         grid.indicator_bands.row_start.grid_color = Some(0xFF112233);
         grid.cells.set_text(0, 0, "North".to_string());
         grid.cells.set_text(1, 0, "North".to_string());
@@ -725,7 +734,10 @@ mod tests {
         grid.scrollbar_show_v = pb::ScrollBarMode::ScrollbarModeAuto as i32;
         grid.indicator_bands.row_start.visible = true;
         grid.indicator_bands.row_start.width_px = 36;
-        grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers,
+            36,
+        )];
         grid.indicator_bands.col_top.visible = true;
         grid.indicator_bands.col_top.band_rows = 1;
         grid.indicator_bands.col_top.default_row_height_px = 24;

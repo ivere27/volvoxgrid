@@ -29,6 +29,169 @@ lazy_static::lazy_static! {
     static ref GRID_MANAGER: GridManager = GridManager::new();
 }
 
+fn default_row_indicator_slots() -> Vec<volvoxgrid_engine::indicator::RowIndicatorSlotState> {
+    vec![
+        volvoxgrid_engine::indicator::RowIndicatorSlotState::new(
+            RowIndicatorSlotKind::RowIndicatorSlotCurrent,
+            18,
+        ),
+        volvoxgrid_engine::indicator::RowIndicatorSlotState::new(
+            RowIndicatorSlotKind::RowIndicatorSlotSelection,
+            17,
+        ),
+    ]
+}
+
+fn ensure_outline_geometry_defaults(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
+    if grid.outline.indicator_indent <= 0 {
+        grid.outline.indicator_indent = grid.default_row_height.max(1);
+    }
+    if grid.outline.max_levels <= 0 {
+        let data_max_depth = outline_data_max_depth(grid);
+        grid.outline.max_levels = data_max_depth.max(3);
+    }
+}
+
+fn outline_data_max_depth(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> i32 {
+    grid.row_props
+        .values()
+        .map(|props| {
+            volvoxgrid_engine::outline::outline_visual_depth_for_level(grid, props.outline_level)
+        })
+        .max()
+        .unwrap_or(0)
+}
+
+fn outline_level_button_width_px(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> i32 {
+    let max_level = grid
+        .outline
+        .max_levels
+        .max(outline_data_max_depth(grid))
+        .max(0);
+    let indent = if grid.outline.indicator_indent > 0 {
+        grid.outline.indicator_indent
+    } else {
+        grid.default_row_height.max(1)
+    };
+    (max_level + 1) * indent
+}
+
+fn ensure_outline_row_indicator_slot(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
+    ensure_outline_geometry_defaults(grid);
+    let width = grid
+        .indicator_bands
+        .row_start
+        .width_px
+        .max(outline_level_button_width_px(grid))
+        .max(volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH);
+    grid.indicator_bands.row_start.visible = true;
+    grid.indicator_bands.row_start.auto_size = false;
+    grid.indicator_bands.row_start.width_px = width;
+    if let Some(slot) = grid
+        .indicator_bands
+        .row_start
+        .slots
+        .iter_mut()
+        .find(|slot| {
+            slot.visible && slot.kind == RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
+        })
+    {
+        slot.width_px = slot.width_px.max(width);
+    } else {
+        grid.indicator_bands.row_start.slots.insert(
+            0,
+            volvoxgrid_engine::indicator::RowIndicatorSlotState::new(
+                RowIndicatorSlotKind::RowIndicatorSlotExpander,
+                width,
+            ),
+        );
+    }
+}
+
+fn ensure_outline_corner_level_slot(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
+    ensure_outline_geometry_defaults(grid);
+    if !grid.outline.show_level_buttons {
+        return;
+    }
+    let width = grid
+        .indicator_bands
+        .row_start
+        .resolved_width_px()
+        .max(outline_level_button_width_px(grid));
+    grid.indicator_bands.corner_top_start.visible = true;
+    if let Some(slot) = grid
+        .indicator_bands
+        .corner_top_start
+        .slots
+        .iter_mut()
+        .find(|slot| {
+            slot.visible && slot.kind == CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32
+        })
+    {
+        slot.width_px = slot.width_px.max(width);
+    } else {
+        grid.indicator_bands.corner_top_start.slots.push(
+            volvoxgrid_engine::indicator::CornerIndicatorSlotState::new(
+                CornerIndicatorSlotKind::CornerSlotOutlineLevels,
+                width,
+            ),
+        );
+    }
+}
+
+fn remove_outline_row_indicator_slot(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
+    grid.indicator_bands
+        .row_start
+        .slots
+        .retain(|slot| slot.kind != RowIndicatorSlotKind::RowIndicatorSlotExpander as i32);
+    if grid.indicator_bands.row_start.slots.is_empty() {
+        grid.indicator_bands.row_start.visible = false;
+    }
+}
+
+fn remove_outline_corner_level_slot(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
+    grid.indicator_bands
+        .corner_top_start
+        .slots
+        .retain(|slot| slot.kind != CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32);
+    if grid.indicator_bands.corner_top_start.slots.is_empty() {
+        grid.indicator_bands.corner_top_start.visible = false;
+    }
+}
+
+fn vsflex_outline_tree_indicator(style: i32) -> i32 {
+    match style {
+        0 => TreeIndicatorStyle::TreeIndicatorNone as i32,
+        1 | 2 => TreeIndicatorStyle::TreeIndicatorConnectors as i32,
+        3 => TreeIndicatorStyle::TreeIndicatorArrows as i32,
+        4 | 5 => TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32,
+        6 => TreeIndicatorStyle::TreeIndicatorArrowsLeaf as i32,
+        _ => TreeIndicatorStyle::TreeIndicatorConnectors as i32,
+    }
+}
+
+fn vsflex_outline_bar_has_level_buttons(style: i32) -> bool {
+    matches!(style, 1 | 4)
+}
+
+fn apply_vsflex_outline_bar_style(grid: &mut volvoxgrid_engine::grid::VolvoxGrid, style: i32) {
+    grid.outline.tree_indicator = vsflex_outline_tree_indicator(style);
+    grid.outline.show_level_buttons = vsflex_outline_bar_has_level_buttons(style);
+
+    if grid.outline.tree_indicator == TreeIndicatorStyle::TreeIndicatorNone as i32 {
+        remove_outline_row_indicator_slot(grid);
+        remove_outline_corner_level_slot(grid);
+        return;
+    }
+
+    ensure_outline_row_indicator_slot(grid);
+    if grid.outline.show_level_buttons {
+        ensure_outline_corner_level_slot(grid);
+    } else {
+        remove_outline_corner_level_slot(grid);
+    }
+}
+
 // Match classic LegacyGrid's baseline footprint more closely in ActiveX mode.
 const ACTIVEX_DEFAULT_ROW_HEIGHT: i32 = 19;
 const ACTIVEX_DEFAULT_COL_WIDTH: i32 = 76;
@@ -156,8 +319,7 @@ fn apply_default_indicator_bands(grid: &mut volvoxgrid_engine::grid::VolvoxGrid)
     grid.indicator_bands.row_start.width_px =
         volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
     grid.indicator_bands.row_start.auto_size = true;
-    grid.indicator_bands.row_start.mode_bits = (RowIndicatorMode::RowIndicatorCurrent as u32)
-        | (RowIndicatorMode::RowIndicatorSelection as u32);
+    grid.indicator_bands.row_start.slots = default_row_indicator_slots();
 
     grid.indicator_bands.col_top.visible = true;
     if grid.indicator_bands.col_top.band_rows <= 0 {
@@ -464,7 +626,11 @@ fn apply_local_sales_demo_chrome(grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
         scale,
         40.max(volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH),
     );
-    grid.indicator_bands.row_start.mode_bits = RowIndicatorMode::RowIndicatorNumbers as u32;
+    grid.indicator_bands.row_start.slots =
+        vec![volvoxgrid_engine::indicator::RowIndicatorSlotState::new(
+            RowIndicatorSlotKind::RowIndicatorSlotNumbers,
+            grid.indicator_bands.row_start.width_px,
+        )];
     grid.indicator_bands.row_start.back_color = Some(0xFFF9FAFB);
     grid.indicator_bands.row_start.fore_color = Some(0xFF6B7280);
     grid.indicator_bands.row_start.grid_color = Some(0xFFD1D5DB);
@@ -723,7 +889,8 @@ fn apply_local_hierarchy_demo_chrome(grid: &mut volvoxgrid_engine::grid::VolvoxG
         ..Default::default()
     };
     grid.outline.tree_indicator = 2;
-    grid.outline.tree_column = 0;
+    ensure_outline_row_indicator_slot(grid);
+    ensure_outline_corner_level_slot(grid);
 }
 
 #[cfg(feature = "demo")]
@@ -1977,7 +2144,11 @@ fn request_before_mouse_down(
 ) {
     if !decision_channel_enabled(grid_id) {
         grid.events
-            .push(volvoxgrid_engine::event::GridEventData::BeforeMouseDown { row, col });
+            .push(volvoxgrid_engine::event::GridEventData::BeforeMouseDown {
+                row,
+                col,
+                target: volvoxgrid_engine::event::EventTarget::data_cell(),
+            });
         handle_pointer_down_after_before_mouse(grid_id, grid, x, y, button, modifier, dbl_click);
         return;
     }
@@ -1998,7 +2169,11 @@ fn request_before_mouse_down(
     );
     grid.events.push_with_id(
         event_id,
-        volvoxgrid_engine::event::GridEventData::BeforeMouseDown { row, col },
+        volvoxgrid_engine::event::GridEventData::BeforeMouseDown {
+            row,
+            col,
+            target: volvoxgrid_engine::event::EventTarget::data_cell(),
+        },
     );
 }
 
@@ -3694,14 +3869,16 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
     fn set_outline_bar(&self, r: SetOutlineBarRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            g.outline.tree_indicator = r.style;
+            apply_vsflex_outline_bar_style(g, r.style);
             g.mark_dirty();
         })?;
         Ok(Empty {})
     }
     fn set_outline_col(&self, r: SetOutlineColRequest) -> Result<Empty, String> {
         GRID_MANAGER.with_grid(r.grid_id, |g| {
-            g.outline.tree_column = r.col;
+            let _ = r.col;
+            g.outline.label_column = -1;
+            ensure_outline_row_indicator_slot(g);
             g.mark_dirty();
         })?;
         Ok(Empty {})
@@ -5523,10 +5700,11 @@ fn engine_event_to_proto(
                 old_position,
             }))
         }
-        E::BeforeMouseDown { row, col } => {
+        E::BeforeMouseDown { row, col, target } => {
             Some(grid_event::Event::BeforeMouseDown(BeforeMouseDownEvent {
                 row,
                 col,
+                target: Some(target.to_proto()),
             }))
         }
         E::MouseDown {
@@ -5556,24 +5734,32 @@ fn engine_event_to_proto(
             modifier,
             x,
             y,
+            target,
         } => Some(grid_event::Event::MouseMove(MouseMoveEvent {
             button,
             modifier,
             x,
             y,
+            target: Some(target.to_proto()),
         })),
         E::Click {
             row,
             col,
             hit_area,
             interaction,
+            target,
         } => Some(grid_event::Event::Click(ClickEvent {
             row,
             col,
             hit_area,
             interaction,
+            target: Some(target.to_proto()),
         })),
-        E::DblClick { row, col } => Some(grid_event::Event::DblClick(DblClickEvent { row, col })),
+        E::DblClick { row, col, target } => Some(grid_event::Event::DblClick(DblClickEvent {
+            row,
+            col,
+            target: Some(target.to_proto()),
+        })),
         E::KeyDown { key_code, modifier } => Some(grid_event::Event::KeyDown(KeyDownEvent {
             key_code,
             modifier,
@@ -6856,7 +7042,7 @@ pub extern "C" fn volvox_grid_set_outline_bar(
 ) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
-            g.outline.tree_indicator = style;
+            apply_vsflex_outline_bar_style(g, style);
             g.mark_dirty();
         }),
         out_len,
@@ -6871,7 +7057,9 @@ pub extern "C" fn volvox_grid_set_outline_col(
 ) -> *mut u8 {
     compat_status(
         GRID_MANAGER.with_grid(grid_id, |g| {
-            g.outline.tree_column = col;
+            let _ = col;
+            g.outline.label_column = -1;
+            ensure_outline_row_indicator_slot(g);
             g.mark_dirty();
         }),
         out_len,
@@ -8866,6 +9054,81 @@ mod tests {
                 volvox_grid_free(out);
             }
         }
+    }
+
+    #[test]
+    fn vsflex_outline_bar_style_controls_level_buttons() {
+        let mut grid = volvoxgrid_engine::grid::VolvoxGrid::new(1, 160, 80, 4, 1, 1, 0);
+
+        apply_vsflex_outline_bar_style(&mut grid, 1);
+        assert_eq!(
+            grid.outline.tree_indicator,
+            TreeIndicatorStyle::TreeIndicatorConnectors as i32
+        );
+        assert!(grid.outline.show_level_buttons);
+        assert!(grid
+            .indicator_bands
+            .row_start
+            .slots
+            .iter()
+            .any(|slot| { slot.kind == RowIndicatorSlotKind::RowIndicatorSlotExpander as i32 }));
+        assert!(grid
+            .indicator_bands
+            .corner_top_start
+            .slots
+            .iter()
+            .any(|slot| { slot.kind == CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 }));
+
+        apply_vsflex_outline_bar_style(&mut grid, 2);
+        assert_eq!(
+            grid.outline.tree_indicator,
+            TreeIndicatorStyle::TreeIndicatorConnectors as i32
+        );
+        assert!(!grid.outline.show_level_buttons);
+        assert!(grid
+            .indicator_bands
+            .row_start
+            .slots
+            .iter()
+            .any(|slot| { slot.kind == RowIndicatorSlotKind::RowIndicatorSlotExpander as i32 }));
+        assert!(!grid
+            .indicator_bands
+            .corner_top_start
+            .slots
+            .iter()
+            .any(|slot| { slot.kind == CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 }));
+
+        apply_vsflex_outline_bar_style(&mut grid, 4);
+        assert_eq!(
+            grid.outline.tree_indicator,
+            TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32
+        );
+        assert!(grid.outline.show_level_buttons);
+        assert!(grid
+            .indicator_bands
+            .corner_top_start
+            .slots
+            .iter()
+            .any(|slot| { slot.kind == CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 }));
+
+        apply_vsflex_outline_bar_style(&mut grid, 0);
+        assert_eq!(
+            grid.outline.tree_indicator,
+            TreeIndicatorStyle::TreeIndicatorNone as i32
+        );
+        assert!(!grid.outline.show_level_buttons);
+        assert!(!grid
+            .indicator_bands
+            .row_start
+            .slots
+            .iter()
+            .any(|slot| { slot.kind == RowIndicatorSlotKind::RowIndicatorSlotExpander as i32 }));
+        assert!(!grid
+            .indicator_bands
+            .corner_top_start
+            .slots
+            .iter()
+            .any(|slot| { slot.kind == CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 }));
     }
 
     #[test]

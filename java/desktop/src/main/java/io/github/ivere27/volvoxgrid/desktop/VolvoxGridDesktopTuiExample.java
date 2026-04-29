@@ -12,6 +12,9 @@ import io.github.ivere27.volvoxgrid.ColIndicatorCellMode;
 import io.github.ivere27.volvoxgrid.ColIndicatorConfig;
 import io.github.ivere27.volvoxgrid.ColumnDataType;
 import io.github.ivere27.volvoxgrid.ColumnDef;
+import io.github.ivere27.volvoxgrid.CornerIndicatorConfig;
+import io.github.ivere27.volvoxgrid.CornerIndicatorSlot;
+import io.github.ivere27.volvoxgrid.CornerIndicatorSlotKind;
 import io.github.ivere27.volvoxgrid.CreateRequest;
 import io.github.ivere27.volvoxgrid.CreateResponse;
 import io.github.ivere27.volvoxgrid.DefineColumnsRequest;
@@ -41,7 +44,8 @@ import io.github.ivere27.volvoxgrid.RendererMode;
 import io.github.ivere27.volvoxgrid.ResizePolicy;
 import io.github.ivere27.volvoxgrid.RowDef;
 import io.github.ivere27.volvoxgrid.RowIndicatorConfig;
-import io.github.ivere27.volvoxgrid.RowIndicatorMode;
+import io.github.ivere27.volvoxgrid.RowIndicatorSlot;
+import io.github.ivere27.volvoxgrid.RowIndicatorSlotKind;
 import io.github.ivere27.volvoxgrid.ScrollBarsMode;
 import io.github.ivere27.volvoxgrid.ScrollConfig;
 import io.github.ivere27.volvoxgrid.SelectionConfig;
@@ -66,8 +70,12 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -78,9 +86,12 @@ public final class VolvoxGridDesktopTuiExample {
     private static final String[] STRESS_HEADERS = {
         "Text", "Number", "Currency", "Pct", "Date", "Bool", "Combo", "Long Text", "Formatted", "Rating", "Code",
     };
-    private static final Pattern LEVEL_PATTERN = Pattern.compile("\"_level\"\\s*:\\s*(-?\\d+)");
+    private static final Pattern ID_PATTERN = Pattern.compile("\"Id\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern PARENT_ID_PATTERN = Pattern.compile("\"ParentId\"\\s*:\\s*(?:null|\"([^\"]*)\")");
     private static final Pattern TYPE_PATTERN = Pattern.compile("\"Type\"\\s*:\\s*\"([^\"]+)\"");
-    private static final Pattern HELPER_FIELD_PATTERN = Pattern.compile(",\\s*\"_level\"\\s*:\\s*-?\\d+");
+    private static final Pattern HELPER_FIELD_PATTERN = Pattern.compile(",\\s*\"(?:Id|ParentId)\"\\s*:\\s*(?:null|\"[^\"]*\")");
+    private static final int HIERARCHY_TUI_OUTLINE_INDENT = 2;
+    private static final int HIERARCHY_TUI_MIN_OUTLINE_INDICATOR_WIDTH = 4;
 
     private VolvoxGridDesktopTuiExample() {}
 
@@ -511,7 +522,11 @@ public final class VolvoxGridDesktopTuiExample {
                         RowIndicatorConfig.newBuilder()
                             .setVisible(true)
                             .setWidth(rowIndicatorWidth)
-                            .setModeBits(RowIndicatorMode.ROW_INDICATOR_NUMBERS_VALUE)
+                            .addSlots(RowIndicatorSlot.newBuilder()
+                                .setKind(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS)
+                                .setWidth(rowIndicatorWidth)
+                                .setVisible(true)
+                                .build())
                             .setAutoSize(false)
                             .setAllowResize(false)
                             .build()
@@ -560,10 +575,10 @@ public final class VolvoxGridDesktopTuiExample {
     private static void loadHierarchyDemo(VolvoxGridDesktopController controller)
         throws SynurangDesktopBridge.SynurangBridgeException {
         String rawJson = new String(controller.getDemoData("hierarchy"), StandardCharsets.UTF_8);
-        int[] levels = extractLevels(rawJson);
+        int[] levels = deriveLevels(extractIds(rawJson), extractParentIds(rawJson));
         String[] types = extractTypes(rawJson);
 
-        controller.configure(buildHierarchyTuiConfig());
+        controller.configure(buildHierarchyTuiConfig(maxOutlineDepth(levels), maxOutlineLevel(levels)));
         controller.setColCount(6);
         controller.defineColumns(buildHierarchyColumns());
 
@@ -585,7 +600,6 @@ public final class VolvoxGridDesktopTuiExample {
                 RowDef.newBuilder()
                     .setIndex(row)
                     .setOutlineLevel(levels[row])
-                    .setIsSubtotal(isFolder)
                     .build()
             );
             styles.addCells(
@@ -662,7 +676,41 @@ public final class VolvoxGridDesktopTuiExample {
             .build();
     }
 
-    private static GridConfig buildHierarchyTuiConfig() {
+    private static int maxOutlineDepth(int[] levels) {
+        boolean hasMin = false;
+        int min = 0;
+        int max = 0;
+        for (int level : levels) {
+            if (level >= 0 && (!hasMin || level < min)) {
+                hasMin = true;
+                min = level;
+            }
+            max = Math.max(max, level);
+        }
+        return Math.max(0, max - min);
+    }
+
+    private static int maxOutlineLevel(int[] levels) {
+        boolean hasMax = false;
+        int max = 0;
+        for (int level : levels) {
+            if (level >= 0 && (!hasMax || level > max)) {
+                hasMax = true;
+                max = level;
+            }
+        }
+        return max;
+    }
+
+    private static int hierarchyTuiOutlineWidth(int maxOutlineDepth) {
+        return Math.max(
+            HIERARCHY_TUI_MIN_OUTLINE_INDICATOR_WIDTH,
+            (Math.max(0, maxOutlineDepth) + 1) * HIERARCHY_TUI_OUTLINE_INDENT
+        );
+    }
+
+    private static GridConfig buildHierarchyTuiConfig(int maxOutlineDepth, int maxOutlineLevel) {
+        int outlineWidth = hierarchyTuiOutlineWidth(maxOutlineDepth);
         return GridConfig.newBuilder()
             .setSelection(
                 SelectionConfig.newBuilder()
@@ -684,7 +732,9 @@ public final class VolvoxGridDesktopTuiExample {
             .setOutline(
                 OutlineConfig.newBuilder()
                     .setTreeIndicator(TreeIndicatorStyle.TREE_INDICATOR_ARROWS_LEAF)
-                    .setTreeColumn(0)
+                    .setIndicatorIndent(HIERARCHY_TUI_OUTLINE_INDENT)
+                    .setMaxLevels(Math.max(0, maxOutlineLevel))
+                    .setShowLevelButtons(false)
                     .build()
             )
             .setInteraction(
@@ -715,7 +765,24 @@ public final class VolvoxGridDesktopTuiExample {
                 IndicatorsConfig.newBuilder()
                     .setRowStart(
                         RowIndicatorConfig.newBuilder()
-                            .setVisible(false)
+                            .setVisible(true)
+                            .setWidth(outlineWidth)
+                            .setAutoSize(false)
+                            .addSlots(RowIndicatorSlot.newBuilder()
+                                .setKind(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER)
+                                .setWidth(outlineWidth)
+                                .setVisible(true)
+                                .build())
+                            .build()
+                    )
+                    .setCornerTopStart(
+                        CornerIndicatorConfig.newBuilder()
+                            .setVisible(true)
+                            .addSlots(CornerIndicatorSlot.newBuilder()
+                                .setKind(CornerIndicatorSlotKind.CORNER_SLOT_OUTLINE_LEVELS)
+                                .setWidth(outlineWidth)
+                                .setVisible(true)
+                                .build())
                             .build()
                     )
                     .setColTop(
@@ -807,7 +874,11 @@ public final class VolvoxGridDesktopTuiExample {
                         RowIndicatorConfig.newBuilder()
                             .setVisible(true)
                             .setWidth(rowIndicatorWidth)
-                            .setModeBits(RowIndicatorMode.ROW_INDICATOR_NUMBERS_VALUE)
+                            .addSlots(RowIndicatorSlot.newBuilder()
+                                .setKind(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS)
+                                .setWidth(rowIndicatorWidth)
+                                .setVisible(true)
+                                .build())
                             .setAutoSize(false)
                             .setAllowResize(false)
                             .build()
@@ -853,20 +924,82 @@ public final class VolvoxGridDesktopTuiExample {
         return Math.max(2, Math.min(10, digits + 1));
     }
 
-    private static int[] extractLevels(String rawJson) {
+    private static String[] extractIds(String rawJson) {
         int count = 0;
-        Matcher countMatcher = LEVEL_PATTERN.matcher(rawJson);
+        Matcher countMatcher = ID_PATTERN.matcher(rawJson);
         while (countMatcher.find()) {
             count += 1;
         }
-        int[] levels = new int[count];
-        Matcher matcher = LEVEL_PATTERN.matcher(rawJson);
+        String[] ids = new String[count];
+        Matcher matcher = ID_PATTERN.matcher(rawJson);
         int index = 0;
         while (matcher.find()) {
-            levels[index] = Integer.parseInt(matcher.group(1));
+            ids[index] = matcher.group(1);
             index += 1;
         }
+        return ids;
+    }
+
+    private static String[] extractParentIds(String rawJson) {
+        int count = 0;
+        Matcher countMatcher = PARENT_ID_PATTERN.matcher(rawJson);
+        while (countMatcher.find()) {
+            count += 1;
+        }
+        String[] parentIds = new String[count];
+        Matcher matcher = PARENT_ID_PATTERN.matcher(rawJson);
+        int index = 0;
+        while (matcher.find()) {
+            parentIds[index] = matcher.group(1);
+            index += 1;
+        }
+        return parentIds;
+    }
+
+    private static int[] deriveLevels(String[] ids, String[] parentIds) {
+        if (ids.length != parentIds.length) {
+            throw new IllegalStateException("Hierarchy demo Id/ParentId counts do not match");
+        }
+        Map<String, String> parentById = new HashMap<>();
+        for (int index = 0; index < ids.length; index += 1) {
+            String id = ids[index];
+            if (id == null || id.trim().isEmpty()) {
+                throw new IllegalStateException("Hierarchy demo row is missing Id");
+            }
+            parentById.put(id, parentIds[index]);
+        }
+
+        Map<String, Integer> cache = new HashMap<>();
+        int[] levels = new int[ids.length];
+        for (int index = 0; index < ids.length; index += 1) {
+            levels[index] = depthOf(ids[index], parentById, cache, new HashSet<>());
+        }
         return levels;
+    }
+
+    private static int depthOf(
+        String id,
+        Map<String, String> parentById,
+        Map<String, Integer> cache,
+        Set<String> visiting
+    ) {
+        Integer cached = cache.get(id);
+        if (cached != null) {
+            return cached;
+        }
+        if (!parentById.containsKey(id)) {
+            throw new IllegalStateException("Hierarchy demo data references missing parent " + id);
+        }
+        if (!visiting.add(id)) {
+            throw new IllegalStateException("Hierarchy demo data contains a parent cycle at " + id);
+        }
+        String parentId = parentById.get(id);
+        int depth = parentId == null || parentId.trim().isEmpty()
+            ? 0
+            : depthOf(parentId, parentById, cache, visiting) + 1;
+        visiting.remove(id);
+        cache.put(id, depth);
+        return depth;
     }
 
     private static String[] extractTypes(String rawJson) {

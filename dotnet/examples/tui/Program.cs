@@ -29,6 +29,8 @@ namespace VolvoxGrid.DotNet.TuiSample
 
         private const string SalesStatusItems = "Active|Pending|Shipped|Returned|Cancelled";
         private const int StressDataRows = 1000000;
+        private const int HierarchyTuiOutlineIndent = 2;
+        private const int HierarchyTuiMinOutlineIndicatorWidth = 4;
         private static readonly int[] StressColumnWidths = new[] { 16, 9, 10, 7, 12, 5, 10, 24, 11, 8, 16 };
 
         private static int Main(string[] args)
@@ -197,6 +199,7 @@ namespace VolvoxGrid.DotNet.TuiSample
             {
                 byte[] raw = client.GetDemoData("hierarchy");
                 List<HierarchyJsonRow> rows = JsonSerializer.Deserialize<List<HierarchyJsonRow>>(raw, JsonOptions) ?? new List<HierarchyJsonRow>();
+                List<int> levels = HierarchyOutlineLevels(rows);
                 List<HierarchyLoadRow> loadRows = new List<HierarchyLoadRow>(rows.Count);
                 for (int i = 0; i < rows.Count; i += 1)
                 {
@@ -216,7 +219,12 @@ namespace VolvoxGrid.DotNet.TuiSample
                 byte[] loadData = JsonSerializer.SerializeToUtf8Bytes(loadRows, JsonOptions);
                 List<ColumnDef> columns = BuildHierarchyColumns();
 
-                client.Configure(BuildHierarchyTuiConfig(rows.Count, columns.Count));
+                client.Configure(
+                    BuildHierarchyTuiConfig(
+                        rows.Count,
+                        columns.Count,
+                        MaxHierarchyOutlineDepth(levels),
+                        MaxHierarchyOutlineLevel(levels)));
                 client.DefineColumns(columns);
                 LoadDataResult load = client.LoadData(
                     loadData,
@@ -238,8 +246,7 @@ namespace VolvoxGrid.DotNet.TuiSample
                         new RowDef
                         {
                             Index = i,
-                            OutlineLevel = row.Level,
-                            IsSubtotal = string.Equals(row.Kind, "Folder", StringComparison.Ordinal),
+                            OutlineLevel = levels[i],
                         });
 
                     styleUpdates.Add(
@@ -390,7 +397,15 @@ namespace VolvoxGrid.DotNet.TuiSample
                         {
                             Visible = true,
                             Width = rowIndicatorWidth,
-                            ModeBits = (uint)RowIndicatorMode.ROW_INDICATOR_NUMBERS,
+                            Slots =
+                            {
+                                new RowIndicatorSlot
+                                {
+                                    Kind = RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS,
+                                    Width = rowIndicatorWidth,
+                                    Visible = true,
+                                },
+                            },
                             AutoSize = false,
                             AllowResize = false,
                         },
@@ -409,8 +424,99 @@ namespace VolvoxGrid.DotNet.TuiSample
                 cols);
         }
 
-        private static GridConfig BuildHierarchyTuiConfig(int rows, int cols)
+        private static List<int> HierarchyOutlineLevels(IReadOnlyList<HierarchyJsonRow> rows)
         {
+            Dictionary<string, HierarchyJsonRow> rowsById = new Dictionary<string, HierarchyJsonRow>(StringComparer.Ordinal);
+            for (int i = 0; i < rows.Count; i += 1)
+            {
+                if (string.IsNullOrWhiteSpace(rows[i].Id))
+                {
+                    throw new InvalidOperationException("Hierarchy demo row is missing Id.");
+                }
+                rowsById[rows[i].Id] = rows[i];
+            }
+
+            Dictionary<string, int> cache = new Dictionary<string, int>(StringComparer.Ordinal);
+            Func<HierarchyJsonRow, HashSet<string>, int> depthOf = null;
+            depthOf = (row, visiting) =>
+            {
+                int cached;
+                if (cache.TryGetValue(row.Id, out cached))
+                {
+                    return cached;
+                }
+                if (!visiting.Add(row.Id))
+                {
+                    throw new InvalidOperationException("Hierarchy demo data contains a parent cycle at " + row.Id + ".");
+                }
+
+                int depth = 0;
+                if (!string.IsNullOrWhiteSpace(row.ParentId))
+                {
+                    HierarchyJsonRow parent;
+                    if (!rowsById.TryGetValue(row.ParentId, out parent))
+                    {
+                        throw new InvalidOperationException("Hierarchy demo data references missing parent " + row.ParentId + ".");
+                    }
+                    depth = depthOf(parent, visiting) + 1;
+                }
+
+                visiting.Remove(row.Id);
+                cache[row.Id] = depth;
+                return depth;
+            };
+
+            List<int> levels = new List<int>(rows.Count);
+            for (int i = 0; i < rows.Count; i += 1)
+            {
+                levels.Add(depthOf(rows[i], new HashSet<string>(StringComparer.Ordinal)));
+            }
+            return levels;
+        }
+
+        private static int MaxHierarchyOutlineDepth(IReadOnlyList<int> levels)
+        {
+            bool hasMinLevel = false;
+            int minLevel = 0;
+            int maxLevel = 0;
+            for (int i = 0; i < levels.Count; i += 1)
+            {
+                if (levels[i] >= 0 && (!hasMinLevel || levels[i] < minLevel))
+                {
+                    hasMinLevel = true;
+                    minLevel = levels[i];
+                }
+                maxLevel = Math.Max(maxLevel, levels[i]);
+            }
+
+            return Math.Max(0, maxLevel - minLevel);
+        }
+
+        private static int MaxHierarchyOutlineLevel(IReadOnlyList<int> levels)
+        {
+            bool hasMaxLevel = false;
+            int maxLevel = 0;
+            for (int i = 0; i < levels.Count; i += 1)
+            {
+                if (levels[i] >= 0 && (!hasMaxLevel || levels[i] > maxLevel))
+                {
+                    hasMaxLevel = true;
+                    maxLevel = levels[i];
+                }
+            }
+
+            return maxLevel;
+        }
+
+        private static int HierarchyTuiOutlineWidth(int maxOutlineDepth)
+        {
+            int width = (Math.Max(0, maxOutlineDepth) + 1) * HierarchyTuiOutlineIndent;
+            return Math.Max(HierarchyTuiMinOutlineIndicatorWidth, width);
+        }
+
+        private static GridConfig BuildHierarchyTuiConfig(int rows, int cols, int maxOutlineDepth, int maxOutlineLevel)
+        {
+            int outlineWidth = HierarchyTuiOutlineWidth(maxOutlineDepth);
             return FinalizeTuiConfig(
                 new GridConfig
                 {
@@ -431,7 +537,9 @@ namespace VolvoxGrid.DotNet.TuiSample
                     Outline = new OutlineConfig
                     {
                         TreeIndicator = TreeIndicatorStyle.TREE_INDICATOR_ARROWS_LEAF,
-                        TreeColumn = 0,
+                        IndicatorIndent = HierarchyTuiOutlineIndent,
+                        MaxLevels = Math.Max(0, maxOutlineLevel),
+                        ShowLevelButtons = false,
                     },
                     Interaction = new InteractionConfig
                     {
@@ -457,7 +565,32 @@ namespace VolvoxGrid.DotNet.TuiSample
                     {
                         RowStart = new RowIndicatorConfig
                         {
-                            Visible = false,
+                            Visible = true,
+                            Width = outlineWidth,
+                            Slots =
+                            {
+                                new RowIndicatorSlot
+                                {
+                                    Kind = RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER,
+                                    Width = outlineWidth,
+                                    Visible = true,
+                                },
+                            },
+                            AutoSize = false,
+                            AllowResize = false,
+                        },
+                        CornerTopStart = new CornerIndicatorConfig
+                        {
+                            Visible = true,
+                            Slots =
+                            {
+                                new CornerIndicatorSlot
+                                {
+                                    Kind = CornerIndicatorSlotKind.CORNER_SLOT_OUTLINE_LEVELS,
+                                    Width = outlineWidth,
+                                    Visible = true,
+                                },
+                            },
                         },
                         ColTop = new ColIndicatorConfig
                         {
@@ -517,7 +650,15 @@ namespace VolvoxGrid.DotNet.TuiSample
                         {
                             Visible = true,
                             Width = rowIndicatorWidth,
-                            ModeBits = (uint)RowIndicatorMode.ROW_INDICATOR_NUMBERS,
+                            Slots =
+                            {
+                                new RowIndicatorSlot
+                                {
+                                    Kind = RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS,
+                                    Width = rowIndicatorWidth,
+                                    Visible = true,
+                                },
+                            },
                             AutoSize = false,
                             AllowResize = false,
                         },
@@ -2006,6 +2147,12 @@ namespace VolvoxGrid.DotNet.TuiSample
 
         private sealed class HierarchyJsonRow
         {
+            [JsonPropertyName("Id")]
+            public string Id { get; set; }
+
+            [JsonPropertyName("ParentId")]
+            public string ParentId { get; set; }
+
             [JsonPropertyName("Name")]
             public string Name { get; set; }
 
@@ -2023,9 +2170,6 @@ namespace VolvoxGrid.DotNet.TuiSample
 
             [JsonPropertyName("Action")]
             public string Action { get; set; }
-
-            [JsonPropertyName("_level")]
-            public int Level { get; set; }
         }
 
         private sealed class HierarchyLoadRow

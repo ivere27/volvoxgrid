@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use volvoxgrid_engine::cell::CellValueData;
 use volvoxgrid_engine::grid::VolvoxGrid;
-use volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
+use volvoxgrid_engine::indicator::{RowIndicatorSlotState, DEFAULT_ROW_INDICATOR_WIDTH};
 use volvoxgrid_engine::load::load_data;
 use volvoxgrid_engine::outline::{subtotal, subtotal_ex};
 use volvoxgrid_engine::proto::volvoxgrid::v1 as pb;
@@ -256,7 +256,10 @@ fn apply_sales_demo_chrome(grid: &mut VolvoxGrid) {
 
     grid.indicator_bands.row_start.visible = true;
     grid.indicator_bands.row_start.width_px = sp(grid, 40.max(DEFAULT_ROW_INDICATOR_WIDTH));
-    grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+    grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+        pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers,
+        grid.indicator_bands.row_start.width_px,
+    )];
     grid.indicator_bands.row_start.back_color = Some(0xFFF9FAFB);
     grid.indicator_bands.row_start.fore_color = Some(0xFF6B7280);
     grid.indicator_bands.row_start.grid_color = Some(0xFFD1D5DB);

@@ -1241,13 +1241,18 @@ message ScrollConfig {
 //   outline_level = 0+: nested group levels
 message OutlineConfig {
   optional TreeIndicatorStyle tree_indicator       = 1;
-  optional int32              tree_column           = 2;  // column index for tree indicators
+  reserved                                            2;  // was: tree_column
   optional uint32             tree_color            = 3;  // ARGB; default 0xFF808080
   optional GroupTotalPosition group_total_position  = 4;  // ABOVE or BELOW the group
   // When true, repeated Subtotal() calls with the same group_on_col
   // reuse existing subtotal rows instead of inserting new ones, allowing
   // multiple aggregate columns (e.g. Sales + Cost) in a single row.
   optional bool               multi_totals          = 5;
+  optional int32              indicator_indent      = 6;  // px per outline level; default = row height
+  optional int32              max_levels            = 7;  // highest corner level button (0..N)
+  optional bool               show_level_buttons    = 8;  // enable corner outline level controls
+  optional int32              label_column          = 9;  // column sourcing EXPANDER text label
+  optional int32              icon_column           = 10; // column sourcing EXPANDER icon text
 }
 
 // ── Cell Span ──
@@ -1339,6 +1344,27 @@ message RenderConfig {
 // Indicators
 // ═══════════════════════════════════════════════════════════
 
+enum GridTargetKind {
+  GRID_TARGET_UNSPECIFIED      = 0;
+  GRID_TARGET_DATA_CELL        = 1;
+  GRID_TARGET_ROW_INDICATOR    = 2;
+  GRID_TARGET_COL_INDICATOR    = 3;
+  GRID_TARGET_CORNER_INDICATOR = 4;
+  GRID_TARGET_BACKGROUND       = 5;
+}
+
+enum IndicatorBand {
+  INDICATOR_BAND_UNSPECIFIED         = 0;
+  INDICATOR_BAND_ROW_START           = 1;
+  INDICATOR_BAND_ROW_END             = 2;
+  INDICATOR_BAND_COL_TOP             = 3;
+  INDICATOR_BAND_COL_BOTTOM          = 4;
+  INDICATOR_BAND_CORNER_TOP_START    = 5;
+  INDICATOR_BAND_CORNER_TOP_END      = 6;
+  INDICATOR_BAND_CORNER_BOTTOM_START = 7;
+  INDICATOR_BAND_CORNER_BOTTOM_END   = 8;
+}
+
 enum RowIndicatorSlotKind {
   ROW_INDICATOR_SLOT_NONE        = 0;
   ROW_INDICATOR_SLOT_NUMBERS     = 1;
@@ -1355,24 +1381,6 @@ enum RowIndicatorSlotKind {
   ROW_INDICATOR_SLOT_ACTION      = 12;
   ROW_INDICATOR_SLOT_STATUS_ICON = 13;
   ROW_INDICATOR_SLOT_CUSTOM      = 14;
-}
-
-enum RowIndicatorMode {
-  ROW_INDICATOR_NONE        = 0;
-  ROW_INDICATOR_NUMBERS     = 1;
-  ROW_INDICATOR_CURRENT     = 2;
-  ROW_INDICATOR_SELECTION   = 4;
-  ROW_INDICATOR_CHECKBOX    = 8;
-  ROW_INDICATOR_HANDLE      = 16;
-  ROW_INDICATOR_EDITING     = 32;
-  ROW_INDICATOR_MODIFIED    = 64;
-  ROW_INDICATOR_ERROR       = 128;
-  ROW_INDICATOR_NEW_ROW     = 256;
-  ROW_INDICATOR_EXPANDER    = 512;
-  ROW_INDICATOR_RESIZE      = 1024;
-  ROW_INDICATOR_ACTION      = 2048;
-  ROW_INDICATOR_STATUS_ICON = 4096;
-  ROW_INDICATOR_CUSTOM      = 8192;
 }
 
 enum ColIndicatorCellMode {
@@ -1401,9 +1409,10 @@ message RowIndicatorSlot {
 }
 
 message RowIndicatorConfig {
+  reserved 3;
+
   optional bool             visible       = 1;
   optional int32            width         = 2;
-  optional uint32           mode_bits     = 3;
   optional uint32           background    = 4;
   optional uint32           foreground    = 5;
   optional GridLineStyle    grid_lines    = 6;
@@ -1448,6 +1457,22 @@ message ColIndicatorConfig {
   repeated ColIndicatorCell   cells              = 14;
 }
 
+enum CornerIndicatorSlotKind {
+  CORNER_SLOT_NONE           = 0;
+  CORNER_SLOT_SELECT_ALL     = 1;
+  CORNER_SLOT_OUTLINE_LEVELS = 2;
+  CORNER_SLOT_CUSTOM         = 3;
+}
+
+message CornerIndicatorSlot {
+  optional CornerIndicatorSlotKind kind       = 1;
+  optional int32                   width      = 2;
+  optional bool                    visible    = 3;
+  optional string                  custom_key = 4;
+  optional bytes                   data       = 5;
+  optional string                  label_text = 6;
+}
+
 message CornerIndicatorConfig {
   optional bool   visible    = 1;
   optional uint32 mode_bits  = 2;
@@ -1455,6 +1480,59 @@ message CornerIndicatorConfig {
   optional uint32 foreground = 4;
   optional string custom_key = 5;
   optional bytes  data       = 6;
+  repeated CornerIndicatorSlot slots = 7;
+}
+
+// Bitmask values for GridEventTarget.status_flags. Combined per slot kind;
+// see the GridEventTarget comment for which bits apply where.
+enum GridEventTargetFlag {
+  GRID_TARGET_FLAG_NONE          = 0;
+  GRID_TARGET_FLAG_CHECKED       = 0x01;
+  GRID_TARGET_FLAG_INDETERMINATE = 0x02;
+  GRID_TARGET_FLAG_EXPANDED      = 0x04;
+  GRID_TARGET_FLAG_COLLAPSED     = 0x08;
+  GRID_TARGET_FLAG_SORT_ASC      = 0x10;
+  GRID_TARGET_FLAG_SORT_DESC     = 0x20;
+  GRID_TARGET_FLAG_FILTER_ACTIVE = 0x40;
+  GRID_TARGET_FLAG_SELECTED      = 0x80;
+  GRID_TARGET_FLAG_DISABLED      = 0x100;
+  GRID_TARGET_FLAG_EDITING       = 0x200;
+  GRID_TARGET_FLAG_SUBTOTAL      = 0x400;
+  GRID_TARGET_FLAG_PINNED        = 0x800;
+}
+
+// Identity (kind/band/slot_index/slot_kind) plus a value/status snapshot
+// the engine fills in based on slot_kind:
+//   ROW_INDICATOR_SLOT_NUMBERS       text = row number, int_value = row, status_flags |= SELECTED
+//   ROW_INDICATOR_SLOT_CURRENT       status_flags |= SELECTED on cursor row
+//   ROW_INDICATOR_SLOT_SELECTION     status_flags |= SELECTED when row in selection
+//   ROW_INDICATOR_SLOT_CHECKBOX      status_flags |= CHECKED when row in selection
+//   ROW_INDICATOR_SLOT_EDITING       status_flags |= EDITING when row is being edited
+//   ROW_INDICATOR_SLOT_EXPANDER      text = label, int_value = depth, status_flags |= EXPANDED/COLLAPSED/SUBTOTAL
+//   ROW_INDICATOR_SLOT_STATUS_ICON   text = RowStatus.domain, int_value = RowStatus.code
+//   ROW_INDICATOR_SLOT_CUSTOM        custom_key + data copied from the slot config
+//   COL_INDICATOR_CELL_HEADER_TEXT   text = header text
+//   COL_INDICATOR_CELL_SORT_GLYPH    int_value = sort priority, status_flags |= SORT_ASC/SORT_DESC
+//   COL_INDICATOR_CELL_FILTER_BUTTON status_flags |= FILTER_ACTIVE when a filter is set
+//   CORNER_SLOT_SELECT_ALL           status_flags |= SELECTED when entire grid is selected
+//   GRID_TARGET_DATA_CELL            status_flags |= EDITING/SELECTED
+message GridEventTarget {
+  GridTargetKind kind          = 1;
+  IndicatorBand  band          = 2;
+  int32          slot_index    = 3;  // -1 when not associated with a configured slot/cell.
+  int32          slot_kind     = 4;  // RowIndicatorSlotKind, CornerIndicatorSlotKind, or ColIndicatorCellMode value.
+  uint32         sub_mode_bits = 5;  // Col indicator sub-hit; 0 means the cell as a whole.
+  string         custom_key    = 6;
+  string         text          = 7;  // Human-readable label for this target (see comment above for per-kind meaning).
+  int64          int_value     = 8;  // Numeric value for this target (row number, sort priority, depth).
+  uint32         status_flags  = 9;  // Bitmask of GridEventTargetFlag values.
+  bytes          data          = 10; // Opaque payload, mirrors the slot's `data` field.
+}
+
+message IndicatorFocusConfig {
+  optional bool  enable_keyboard_focus = 1;
+  optional int32 enter_key_code        = 2;  // default F6 / 117
+  optional int32 exit_key_code         = 3;  // default Esc / 27
 }
 
 message IndicatorsConfig {
@@ -1466,6 +1544,7 @@ message IndicatorsConfig {
   CornerIndicatorConfig corner_top_end     = 6;
   CornerIndicatorConfig corner_bottom_start = 7;
   CornerIndicatorConfig corner_bottom_end  = 8;
+  IndicatorFocusConfig  focus              = 9;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2669,8 +2748,8 @@ message SelectionChangedEvent {  // informational
   int32              active_row = 3;
   int32              active_col = 4;
 }
-message EnterCellEvent { int32 row = 1; int32 col = 2; }
-message LeaveCellEvent { int32 row = 1; int32 col = 2; }
+message EnterCellEvent { int32 row = 1; int32 col = 2; GridEventTarget target = 3; }
+message LeaveCellEvent { int32 row = 1; int32 col = 2; GridEventTarget target = 3; }
 
 // ── Edit Events ──
 message BeforeEditEvent   { int32 row = 1; int32 col = 2; }  // cancelable
@@ -2741,12 +2820,12 @@ message AfterMoveRowEvent     { int32 row = 1; int32 old_position = 2; }
 // ── Mouse Events ──
 // button: 0x01=primary, 0x02=secondary.
 // modifier: 0x01=Shift, 0x02=Ctrl, 0x04=Alt, 0x08=Meta.
-message BeforeMouseDownEvent { int32 row = 1; int32 col = 2; }  // cancelable
+message BeforeMouseDownEvent { int32 row = 1; int32 col = 2; GridEventTarget target = 3; }  // cancelable
 message MouseDownEvent  { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
 message MouseUpEvent    { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
-message MouseMoveEvent  { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; }
-message ClickEvent      { int32 row = 1; int32 col = 2; CellHitArea hit_area = 3; CellInteraction interaction = 4; }
-message DblClickEvent   { int32 row = 1; int32 col = 2; }
+message MouseMoveEvent  { int32 button = 1; int32 modifier = 2; float x = 3; float y = 4; GridEventTarget target = 5; }
+message ClickEvent      { int32 row = 1; int32 col = 2; CellHitArea hit_area = 3; CellInteraction interaction = 4; GridEventTarget target = 5; }
+message DblClickEvent   { int32 row = 1; int32 col = 2; GridEventTarget target = 3; }
 
 // ── Keyboard Events ──
 // modifier: 0x01=Shift, 0x02=Ctrl, 0x04=Alt, 0x08=Meta.

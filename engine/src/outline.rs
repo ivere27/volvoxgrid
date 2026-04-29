@@ -2,8 +2,8 @@ use crate::grid::VolvoxGrid;
 use crate::proto::volvoxgrid::v1 as pb;
 use std::collections::BTreeSet;
 
-/// Scaled tree geometry constants for outline rendering, hit-testing, and text indent.
-/// All values are derived from `default_row_height` to look proportional on any DPI.
+/// Scaled tree geometry constants for outline rendering and hit-testing.
+/// The indent can be configured directly; otherwise it follows row height.
 #[derive(Clone, Copy, Debug)]
 pub struct TreeGeometry {
     pub btn_size: i32,
@@ -19,9 +19,14 @@ impl TreeGeometry {
     pub fn from_grid(grid: &VolvoxGrid) -> Self {
         let ref_h = grid.default_row_height.max(1) as f32;
         let scale = ref_h / 20.0;
+        let indent_step = if grid.outline.indicator_indent > 0 {
+            grid.outline.indicator_indent
+        } else {
+            grid.default_row_height.max(1)
+        };
         Self {
             btn_size: (11.0 * scale).round().max(6.0) as i32,
-            indent_step: (16.0 * scale).round() as i32,
+            indent_step,
             line_offset: (6.0 * scale).round().max(1.0) as i32,
             connector_end: (12.0 * scale).round().max(6.0) as i32,
             sign_margin: (2.0 * scale).round().max(1.0) as i32,
@@ -44,9 +49,13 @@ impl TreeGeometry {
 #[derive(Clone, Debug)]
 pub struct OutlineState {
     pub tree_indicator: i32,       // TreeIndicatorStyle enum
-    pub tree_column: i32,          // column for outline tree display
     pub group_total_position: i32, // GroupTotalPosition enum (0=above, 1=below)
     pub multi_totals: bool,
+    pub indicator_indent: i32,
+    pub max_levels: i32,
+    pub show_level_buttons: bool,
+    pub label_column: i32,
+    pub icon_column: i32,
     pub node_open_picture: Option<Vec<u8>>,
     pub node_closed_picture: Option<Vec<u8>>,
 }
@@ -55,9 +64,13 @@ impl Default for OutlineState {
     fn default() -> Self {
         Self {
             tree_indicator: pb::TreeIndicatorStyle::TreeIndicatorNone as i32,
-            tree_column: 0,
             group_total_position: pb::GroupTotalPosition::GroupTotalAbove as i32,
             multi_totals: false,
+            indicator_indent: 0,
+            max_levels: 0,
+            show_level_buttons: false,
+            label_column: -1,
+            icon_column: -1,
             node_open_picture: None,
             node_closed_picture: None,
         }
@@ -68,6 +81,64 @@ impl OutlineState {
     pub fn heap_size_bytes(&self) -> usize {
         self.node_open_picture.as_ref().map_or(0, Vec::capacity)
             + self.node_closed_picture.as_ref().map_or(0, Vec::capacity)
+    }
+}
+
+/// First real outline level used by visible tree data.
+///
+/// Some hosts store Explorer-style roots as level 0. Legacy subtotal-like data
+/// often stores roots as level 1 because level 0 is an implicit virtual root.
+/// Row indicator rendering normalizes both forms to visible depth 0.
+pub fn outline_level_base(grid: &VolvoxGrid) -> i32 {
+    let has_subtotal_nodes = grid.row_props.values().any(|props| props.is_subtotal);
+    let levels = grid.row_props.values().filter_map(|props| {
+        if has_subtotal_nodes && !props.is_subtotal {
+            return None;
+        }
+        (props.outline_level >= 0).then_some(props.outline_level)
+    });
+    levels.min().unwrap_or(0)
+}
+
+#[inline]
+pub fn outline_visual_depth_for_level(grid: &VolvoxGrid, level: i32) -> i32 {
+    (level - outline_level_base(grid)).max(0)
+}
+
+#[inline]
+fn outline_raw_level_for_visual_depth(grid: &VolvoxGrid, depth: i32) -> i32 {
+    outline_level_base(grid) + depth.max(0)
+}
+
+pub fn outline_level_button_min(grid: &VolvoxGrid) -> i32 {
+    grid.row_props
+        .values()
+        .filter(|rp| rp.outline_level >= 0)
+        .map(|rp| rp.outline_level)
+        .min()
+        .unwrap_or(0)
+}
+
+pub fn outline_level_button_max(grid: &VolvoxGrid) -> i32 {
+    let configured = grid.outline.max_levels.max(0);
+    if configured > 0 {
+        return configured;
+    }
+    grid.row_props
+        .values()
+        .filter(|rp| rp.outline_level >= 0)
+        .map(|rp| rp.outline_level)
+        .max()
+        .unwrap_or(0)
+}
+
+pub fn outline_level_button_count(grid: &VolvoxGrid) -> i32 {
+    let min_level = outline_level_button_min(grid);
+    let max_level = outline_level_button_max(grid);
+    if max_level < min_level {
+        0
+    } else {
+        max_level - min_level + 1
     }
 }
 
@@ -943,7 +1014,10 @@ fn subtotal_caption(aggregate: i32, caption: &str, group_on_col: i32, group_name
 
 #[cfg(test)]
 mod tests {
-    use super::{subtotal, subtotal_ex, subtotal_with_font};
+    use super::{
+        collapse_to_level, outline, outline_level_button_max, outline_level_button_min, subtotal,
+        subtotal_ex, subtotal_with_font, toggle_level, toggle_level_button,
+    };
     use crate::grid::VolvoxGrid;
     use crate::proto::volvoxgrid::v1 as pb;
     use crate::style::CellStylePatch;
@@ -986,6 +1060,180 @@ mod tests {
         grid.cells.set_text(4, 1, "West".to_string());
         grid.cells.set_text(4, 2, "40".to_string());
         grid
+    }
+
+    fn raw_level_outline_grid() -> VolvoxGrid {
+        let mut grid = VolvoxGrid::new(1, 240, 180, 4, 1, 1, 0);
+        grid.row_props.entry(1).or_default().outline_level = 1;
+        grid.row_props.entry(2).or_default().outline_level = 2;
+        grid.row_props.entry(3).or_default().outline_level = 3;
+        grid
+    }
+
+    fn zero_based_outline_grid() -> VolvoxGrid {
+        let mut grid = VolvoxGrid::new(1, 240, 180, 4, 1, 1, 0);
+        grid.row_props.entry(1).or_default().outline_level = 0;
+        grid.row_props.entry(2).or_default().outline_level = 1;
+        grid.row_props.entry(3).or_default().outline_level = 2;
+        grid
+    }
+
+    fn zero_based_leaf_outline_grid() -> VolvoxGrid {
+        let mut grid = VolvoxGrid::new(1, 240, 180, 5, 1, 1, 0);
+        grid.row_props.entry(1).or_default().outline_level = 0;
+        grid.row_props.entry(2).or_default().outline_level = 1;
+        grid.row_props.entry(3).or_default().outline_level = 2;
+        grid.row_props.entry(4).or_default().outline_level = 3;
+        grid
+    }
+
+    fn visible_outline_levels(grid: &VolvoxGrid) -> Vec<i32> {
+        (grid.fixed_rows..grid.rows)
+            .filter(|row| !grid.is_row_hidden(*row))
+            .filter_map(|row| grid.row_props.get(&row).map(|props| props.outline_level))
+            .collect()
+    }
+
+    #[test]
+    fn outline_level_buttons_use_raw_level_range() {
+        let mut grid = raw_level_outline_grid();
+
+        assert_eq!(outline_level_button_min(&grid), 1);
+        assert_eq!(outline_level_button_max(&grid), 3);
+
+        grid.outline.max_levels = 4;
+        assert_eq!(outline_level_button_min(&grid), 1);
+        assert_eq!(outline_level_button_max(&grid), 4);
+    }
+
+    #[test]
+    fn collapse_to_level_uses_raw_level() {
+        let mut grid = raw_level_outline_grid();
+
+        collapse_to_level(&mut grid, 2);
+
+        assert!(!grid
+            .row_props
+            .get(&1)
+            .is_some_and(|props| props.is_collapsed));
+        assert!(grid
+            .row_props
+            .get(&2)
+            .is_some_and(|props| props.is_collapsed));
+        assert!(grid
+            .row_props
+            .get(&3)
+            .is_some_and(|props| props.is_collapsed));
+    }
+
+    #[test]
+    fn collapse_to_level_zero_collapses_zero_based_root() {
+        let mut grid = zero_based_outline_grid();
+
+        collapse_to_level(&mut grid, 0);
+
+        assert!(grid
+            .row_props
+            .get(&1)
+            .is_some_and(|props| props.is_collapsed));
+        assert!(grid
+            .row_props
+            .get(&2)
+            .is_some_and(|props| props.is_collapsed));
+        assert!(grid
+            .row_props
+            .get(&3)
+            .is_some_and(|props| props.is_collapsed));
+        assert!(!grid.is_row_hidden(1));
+        assert!(grid.is_row_hidden(2));
+        assert!(grid.is_row_hidden(3));
+    }
+
+    #[test]
+    fn collapse_to_level_negative_expands_all() {
+        let mut grid = zero_based_outline_grid();
+
+        collapse_to_level(&mut grid, 0);
+        collapse_to_level(&mut grid, -1);
+
+        assert!(grid.row_props.values().all(|props| !props.is_collapsed));
+        assert!(!grid.is_row_hidden(1));
+        assert!(!grid.is_row_hidden(2));
+        assert!(!grid.is_row_hidden(3));
+    }
+
+    #[test]
+    fn outline_matches_vsflexgrid_level_semantics() {
+        let mut grid = zero_based_outline_grid();
+
+        outline(&mut grid, 1);
+
+        assert!(!grid
+            .row_props
+            .get(&1)
+            .is_some_and(|props| props.is_collapsed));
+        assert!(grid
+            .row_props
+            .get(&2)
+            .is_some_and(|props| props.is_collapsed));
+        assert!(grid
+            .row_props
+            .get(&3)
+            .is_some_and(|props| props.is_collapsed));
+        assert!(!grid.is_row_hidden(1));
+        assert!(!grid.is_row_hidden(2));
+        assert!(grid.is_row_hidden(3));
+    }
+
+    #[test]
+    fn toggle_level_uses_raw_level() {
+        let mut grid = raw_level_outline_grid();
+
+        toggle_level(&mut grid, 2);
+
+        assert!(!grid
+            .row_props
+            .get(&1)
+            .is_some_and(|props| props.is_collapsed));
+        assert!(grid
+            .row_props
+            .get(&2)
+            .is_some_and(|props| props.is_collapsed));
+        assert!(!grid
+            .row_props
+            .get(&3)
+            .is_some_and(|props| props.is_collapsed));
+    }
+
+    #[test]
+    fn toggle_level_button_cycles_between_level_and_child() {
+        let mut grid = zero_based_leaf_outline_grid();
+
+        toggle_level_button(&mut grid, 0);
+        assert_eq!(visible_outline_levels(&grid), vec![0]);
+
+        toggle_level_button(&mut grid, 0);
+        assert_eq!(visible_outline_levels(&grid), vec![0, 1]);
+
+        toggle_level_button(&mut grid, 3);
+        assert_eq!(visible_outline_levels(&grid), vec![0, 1, 2, 3]);
+
+        toggle_level_button(&mut grid, 1);
+        assert_eq!(visible_outline_levels(&grid), vec![0, 1]);
+
+        toggle_level_button(&mut grid, 1);
+        assert_eq!(visible_outline_levels(&grid), vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn toggle_level_button_reveals_hidden_level_and_child() {
+        let mut grid = zero_based_leaf_outline_grid();
+
+        toggle_level_button(&mut grid, 0);
+        assert_eq!(visible_outline_levels(&grid), vec![0]);
+
+        toggle_level_button(&mut grid, 1);
+        assert_eq!(visible_outline_levels(&grid), vec![0, 1, 2]);
     }
 
     #[test]
@@ -1506,18 +1754,88 @@ fn format_aggregate(value: f64) -> String {
     }
 }
 
-/// Expand/collapse to a given outline level
+/// Expand/collapse to a given outline level.
+///
+/// Level -1 expands all; otherwise rows up to the requested raw outline level
+/// stay visible and deeper rows are hidden by collapsing branches at that level.
 pub fn outline(grid: &mut VolvoxGrid, level: i32) {
-    for row in grid.fixed_rows..grid.rows {
+    collapse_to_level(grid, level);
+}
+
+/// Collapse all outline nodes at or below a raw outline level.
+pub fn collapse_to_level(grid: &mut VolvoxGrid, level: i32) {
+    if level < 0 {
+        for props in grid.row_props.values_mut() {
+            props.is_collapsed = false;
+        }
+        update_visibility(grid);
+        return;
+    }
+
+    for props in grid.row_props.values_mut() {
+        props.is_collapsed = props.outline_level >= level;
+    }
+    update_visibility(grid);
+}
+
+/// Toggle every branch node at one raw outline level.
+pub fn toggle_level(grid: &mut VolvoxGrid, level: i32) {
+    let raw_level = level.max(0);
+    let rows: Vec<i32> = (grid.fixed_rows..grid.rows)
+        .filter(|row| {
+            let Some(props) = grid.row_props.get(row) else {
+                return false;
+            };
+            props.outline_level == raw_level && (props.is_subtotal || get_node(grid, *row).3 > 0)
+        })
+        .collect();
+    if rows.is_empty() {
+        return;
+    }
+
+    let collapse = rows.iter().any(|row| {
+        grid.row_props
+            .get(row)
+            .is_some_and(|props| !props.is_collapsed)
+    });
+    for row in rows {
         if let Some(props) = grid.row_props.get_mut(&row) {
-            if props.outline_level > level {
-                props.is_collapsed = true;
-            } else {
-                props.is_collapsed = false;
-            }
+            props.is_collapsed = collapse;
         }
     }
     update_visibility(grid);
+}
+
+/// Cycle a corner level button between showing through that raw level and one
+/// child level. The deepest button expands all leaves.
+pub fn toggle_level_button(grid: &mut VolvoxGrid, level: i32) {
+    let raw_level = level.max(0);
+    if raw_level >= outline_level_button_max(grid) {
+        collapse_to_level(grid, -1);
+        return;
+    }
+
+    let max_visible_level = (grid.fixed_rows..grid.rows)
+        .filter(|row| !grid.is_row_hidden(*row))
+        .filter_map(|row| grid.row_props.get(&row).map(|props| props.outline_level))
+        .filter(|level| *level >= 0)
+        .max()
+        .unwrap_or(raw_level);
+
+    if max_visible_level <= raw_level {
+        collapse_to_level(grid, raw_level + 1);
+    } else {
+        collapse_to_level(grid, raw_level);
+    }
+}
+
+/// Toggle every branch node at one visible depth.
+///
+/// Visible depth is normalized, so data rooted at raw level 0 and legacy data
+/// rooted at raw level 1 both expose their root branches as depth 0.
+pub fn toggle_depth(grid: &mut VolvoxGrid, depth: i32) {
+    let raw_level = outline_raw_level_for_visual_depth(grid, depth);
+    toggle_level(grid, raw_level);
 }
 
 /// Toggle collapse/expand for a single row

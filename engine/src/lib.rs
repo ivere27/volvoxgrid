@@ -319,6 +319,7 @@ mod tests {
                     col: 0,
                     hit_area: 0,
                     interaction: crate::proto::volvoxgrid::v1::CellInteraction::None as i32,
+                    target: crate::event::EventTarget::data_cell(),
                 });
             })
             .expect("with_grid should succeed");

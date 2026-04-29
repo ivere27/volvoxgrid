@@ -17,9 +17,6 @@ import java.util.Objects;
 public final class VolvoxGridDesktopController implements VolvoxGridController {
     private static final int DEFAULT_ROW_INDICATOR_WIDTH_PX = 35;
     private static final int DEFAULT_COL_INDICATOR_BAND_ROWS = 1;
-    private static final int DEFAULT_ROW_INDICATOR_MODE_BITS =
-        RowIndicatorMode.ROW_INDICATOR_CURRENT.getNumber()
-            | RowIndicatorMode.ROW_INDICATOR_SELECTION.getNumber();
     private static final int DEFAULT_COL_INDICATOR_MODE_BITS =
         ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.getNumber()
             | ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH.getNumber();
@@ -27,11 +24,75 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
     private final VolvoxGridDesktopClient client;
     private final long gridId;
 
+    private static RowIndicatorSlot rowIndicatorSlot(RowIndicatorSlotKind kind, int width) {
+        return RowIndicatorSlot.newBuilder()
+            .setKind(kind)
+            .setWidth(width)
+            .setVisible(true)
+            .build();
+    }
+
+    private static List<RowIndicatorSlot> defaultRowIndicatorSlots() {
+        ArrayList<RowIndicatorSlot> slots = new ArrayList<>();
+        slots.add(rowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18));
+        slots.add(rowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17));
+        return slots;
+    }
+
+    private static List<RowIndicatorSlot> rowIndicatorSlotsFromModeBits(int value) {
+        ArrayList<RowIndicatorSlot> slots = new ArrayList<>();
+        addRowIndicatorSlot(slots, value, 1, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS, DEFAULT_ROW_INDICATOR_WIDTH_PX);
+        addRowIndicatorSlot(slots, value, 2, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18);
+        addRowIndicatorSlot(slots, value, 4, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17);
+        addRowIndicatorSlot(slots, value, 8, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CHECKBOX, 18);
+        addRowIndicatorSlot(slots, value, 16, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_HANDLE, 18);
+        addRowIndicatorSlot(slots, value, 32, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EDITING, 18);
+        addRowIndicatorSlot(slots, value, 64, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_MODIFIED, 18);
+        addRowIndicatorSlot(slots, value, 128, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ERROR, 18);
+        addRowIndicatorSlot(slots, value, 256, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NEW_ROW, 18);
+        addRowIndicatorSlot(slots, value, 512, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER, 18);
+        addRowIndicatorSlot(slots, value, 1024, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_RESIZE, 18);
+        addRowIndicatorSlot(slots, value, 2048, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ACTION, 18);
+        addRowIndicatorSlot(slots, value, 4096, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_STATUS_ICON, 18);
+        addRowIndicatorSlot(slots, value, 8192, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CUSTOM, 18);
+        return slots;
+    }
+
+    private static void addRowIndicatorSlot(List<RowIndicatorSlot> slots, int value, int bit, RowIndicatorSlotKind kind, int width) {
+        if ((value & bit) != 0) {
+            slots.add(rowIndicatorSlot(kind, width));
+        }
+    }
+
+    private static int rowIndicatorModeBitsFromSlots(RowIndicatorConfig config) {
+        int bits = 0;
+        for (RowIndicatorSlot slot : config.getSlotsList()) {
+            switch (slot.getKind()) {
+                case ROW_INDICATOR_SLOT_NUMBERS: bits |= 1; break;
+                case ROW_INDICATOR_SLOT_CURRENT: bits |= 2; break;
+                case ROW_INDICATOR_SLOT_SELECTION: bits |= 4; break;
+                case ROW_INDICATOR_SLOT_CHECKBOX: bits |= 8; break;
+                case ROW_INDICATOR_SLOT_HANDLE: bits |= 16; break;
+                case ROW_INDICATOR_SLOT_EDITING: bits |= 32; break;
+                case ROW_INDICATOR_SLOT_MODIFIED: bits |= 64; break;
+                case ROW_INDICATOR_SLOT_ERROR: bits |= 128; break;
+                case ROW_INDICATOR_SLOT_NEW_ROW: bits |= 256; break;
+                case ROW_INDICATOR_SLOT_EXPANDER: bits |= 512; break;
+                case ROW_INDICATOR_SLOT_RESIZE: bits |= 1024; break;
+                case ROW_INDICATOR_SLOT_ACTION: bits |= 2048; break;
+                case ROW_INDICATOR_SLOT_STATUS_ICON: bits |= 4096; break;
+                case ROW_INDICATOR_SLOT_CUSTOM: bits |= 8192; break;
+                default: break;
+            }
+        }
+        return bits;
+    }
+
     private static RowIndicatorConfig defaultRowIndicatorStartConfig() {
         return RowIndicatorConfig.newBuilder()
             .setVisible(false)
             .setWidth(DEFAULT_ROW_INDICATOR_WIDTH_PX)
-            .setModeBits(DEFAULT_ROW_INDICATOR_MODE_BITS)
+            .addAllSlots(defaultRowIndicatorSlots())
             .build();
     }
 
@@ -238,20 +299,23 @@ public final class VolvoxGridDesktopController implements VolvoxGridController {
         if (!config.hasIndicators() || !config.getIndicators().hasRowStart()) {
             return 0;
         }
-        return config.getIndicators().getRowStart().getModeBits();
+        return rowIndicatorModeBitsFromSlots(config.getIndicators().getRowStart());
     }
 
     @Override
     public void setRowIndicatorStartModeBits(int value) throws SynurangDesktopBridge.SynurangBridgeException {
+        RowIndicatorConfig.Builder row = RowIndicatorConfig.newBuilder();
+        List<RowIndicatorSlot> slots = rowIndicatorSlotsFromModeBits(value);
+        if (slots.isEmpty()) {
+            row.setVisible(false);
+        } else {
+            row.addAllSlots(slots);
+        }
         configure(
             GridConfig.newBuilder()
                 .setIndicators(
                     IndicatorsConfig.newBuilder()
-                        .setRowStart(
-                            RowIndicatorConfig.newBuilder()
-                                .setModeBits(value)
-                                .build()
-                        )
+                        .setRowStart(row.build())
                         .build()
                 )
                 .build()

@@ -9,6 +9,7 @@ mod proto {
     }
 }
 
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -85,6 +86,10 @@ fn dropdown_from_labels(items: &str) -> pb::Dropdown {
 
 #[derive(Debug, Deserialize)]
 struct HierarchyJsonRow {
+    #[serde(rename = "Id")]
+    id: String,
+    #[serde(rename = "ParentId")]
+    parent_id: Option<String>,
     #[serde(rename = "Name")]
     name: String,
     #[serde(rename = "Type")]
@@ -97,8 +102,6 @@ struct HierarchyJsonRow {
     permissions: String,
     #[serde(rename = "Action")]
     action: String,
-    #[serde(rename = "_level")]
-    level: i32,
 }
 
 #[derive(Serialize)]
@@ -115,6 +118,58 @@ struct HierarchyLoadRow<'a> {
     permissions: &'a str,
     #[serde(rename = "Action")]
     action: &'a str,
+}
+
+fn hierarchy_outline_levels(rows: &[HierarchyJsonRow]) -> Result<Vec<i32>, String> {
+    let mut parent_by_id: HashMap<&str, Option<&str>> = HashMap::with_capacity(rows.len());
+    for row in rows {
+        if row.id.trim().is_empty() {
+            return Err("hierarchy demo row is missing Id".to_string());
+        }
+        parent_by_id.insert(row.id.as_str(), row.parent_id.as_deref());
+    }
+
+    fn depth_of<'a>(
+        id: &'a str,
+        parent_by_id: &HashMap<&'a str, Option<&'a str>>,
+        cache: &mut HashMap<&'a str, i32>,
+        visiting: &mut HashSet<&'a str>,
+    ) -> Result<i32, String> {
+        if let Some(depth) = cache.get(id) {
+            return Ok(*depth);
+        }
+        let Some(parent_id) = parent_by_id.get(id) else {
+            return Err(format!(
+                "hierarchy demo data references missing parent {id}"
+            ));
+        };
+        if !visiting.insert(id) {
+            return Err(format!(
+                "hierarchy demo data contains a parent cycle at {id}"
+            ));
+        }
+        let depth = match *parent_id {
+            Some(parent) if !parent.trim().is_empty() => {
+                depth_of(parent, parent_by_id, cache, visiting)? + 1
+            }
+            _ => 0,
+        };
+        visiting.remove(id);
+        cache.insert(id, depth);
+        Ok(depth)
+    }
+
+    let mut cache = HashMap::with_capacity(rows.len());
+    rows.iter()
+        .map(|row| {
+            depth_of(
+                row.id.as_str(),
+                &parent_by_id,
+                &mut cache,
+                &mut HashSet::new(),
+            )
+        })
+        .collect()
 }
 
 #[repr(C)]
@@ -1012,7 +1067,12 @@ fn load_sales_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Result<()
                 row_start: Some(pb::RowIndicatorConfig {
                     visible: Some(true),
                     width: Some(40),
-                    mode_bits: Some(pb::RowIndicatorMode::RowIndicatorNumbers as u32),
+                    slots: vec![pb::RowIndicatorSlot {
+                        kind: Some(pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32),
+                        width: Some(40),
+                        visible: Some(true),
+                        ..Default::default()
+                    }],
                     allow_resize: Some(true),
                     ..Default::default()
                 }),
@@ -1163,6 +1223,7 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
     let raw_json = client.get_demo_data(DEMO_HIERARCHY)?;
     let rows: Vec<HierarchyJsonRow> = serde_json::from_slice(&raw_json)
         .map_err(|err| format!("embedded hierarchy demo parse failed: {err}"))?;
+    let levels = hierarchy_outline_levels(&rows)?;
     let load_rows: Vec<HierarchyLoadRow<'_>> = rows
         .iter()
         .map(|row| HierarchyLoadRow {
@@ -1241,6 +1302,21 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
         return Err("LoadData failed for embedded hierarchy demo".to_string());
     }
 
+    const OUTLINE_INDENT: i32 = 20;
+    const MIN_OUTLINE_INDICATOR_WIDTH: i32 = 48;
+    let min_outline_level = levels
+        .iter()
+        .map(|level| (*level).max(0))
+        .min()
+        .unwrap_or(0);
+    let max_outline_level = levels
+        .iter()
+        .map(|level| (*level).max(0))
+        .max()
+        .unwrap_or(0);
+    let max_outline_depth = (max_outline_level - min_outline_level).max(0);
+    let outline_width = MIN_OUTLINE_INDICATOR_WIDTH.max((max_outline_depth + 1) * OUTLINE_INDENT);
+
     client.configure(
         grid_id,
         pb::GridConfig {
@@ -1275,7 +1351,25 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
             }),
             indicators: Some(pb::IndicatorsConfig {
                 row_start: Some(pb::RowIndicatorConfig {
-                    visible: Some(false),
+                    visible: Some(true),
+                    width: Some(outline_width),
+                    auto_size: Some(false),
+                    slots: vec![pb::RowIndicatorSlot {
+                        kind: Some(pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32),
+                        width: Some(outline_width),
+                        visible: Some(true),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }),
+                corner_top_start: Some(pb::CornerIndicatorConfig {
+                    visible: Some(true),
+                    slots: vec![pb::CornerIndicatorSlot {
+                        kind: Some(pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32),
+                        width: Some(outline_width),
+                        visible: Some(true),
+                        ..Default::default()
+                    }],
                     ..Default::default()
                 }),
                 col_top: Some(pb::ColIndicatorConfig {
@@ -1290,7 +1384,9 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
             }),
             outline: Some(pb::OutlineConfig {
                 tree_indicator: Some(pb::TreeIndicatorStyle::TreeIndicatorArrowsLeaf as i32),
-                tree_column: Some(0),
+                indicator_indent: Some(OUTLINE_INDENT),
+                max_levels: Some(max_outline_depth),
+                show_level_buttons: Some(false),
                 ..Default::default()
             }),
             ..Default::default()
@@ -1301,10 +1397,9 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
         grid_id,
         rows.iter()
             .enumerate()
-            .map(|(index, row)| pb::RowDef {
+            .map(|(index, _)| pb::RowDef {
                 index: index as i32,
-                outline_level: Some(row.level),
-                is_subtotal: Some(row.kind == "Folder"),
+                outline_level: Some(levels[index]),
                 ..Default::default()
             })
             .collect(),

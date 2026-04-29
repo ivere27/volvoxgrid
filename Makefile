@@ -19,7 +19,7 @@
 # Variables
 # =============================================================================
 SYNURANG_MODULE ?= github.com/ivere27/synurang
-SYNURANG_VERSION ?= v0.5.11
+SYNURANG_VERSION ?= v0.5.12
 PROTOC_PLUGIN ?= $(shell gobin=$$(go env GOBIN 2>/dev/null); if [ -n "$$gobin" ]; then printf '%s/protoc-gen-synurang-ffi' "$$gobin"; else printf '%s/bin/protoc-gen-synurang-ffi' "$$(go env GOPATH 2>/dev/null)"; fi)
 PROTOC_PLUGIN_FLAG = --plugin=protoc-gen-synurang-ffi=$(PROTOC_PLUGIN)
 ANDROID_PROJECT_DIR := android
@@ -721,6 +721,10 @@ codegen: build_plugin
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_PLUGIN_FLAG) \
 		--synurang-ffi_out=$(WEB_TS_CODEGEN_DIR) --synurang-ffi_opt=lang=typescript \
+		proto/volvoxgrid.proto
+	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
+		$(PROTOC_PLUGIN_FLAG) \
+		--synurang-ffi_out=$(WEB_TS_CODEGEN_DIR) --synurang-ffi_opt=lang=typescript,mode=lite \
 		proto/volvoxgrid.proto
 	# .NET lite protobuf + FFI stubs (shared)
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \

@@ -5,15 +5,18 @@
 import {
   ColIndicatorConfigFields as ProtoColIndicatorConfigFields,
   CornerIndicatorConfigFields as ProtoCornerIndicatorConfigFields,
+  CornerIndicatorSlotFields as ProtoCornerIndicatorSlotFields,
   GridConfigFields as ProtoGridConfigFields,
   GridLinesFields as ProtoGridLinesFields,
   HoverConfigFields as ProtoHoverConfigFields,
   IndicatorsConfigFields as ProtoIndicatorsConfigFields,
   InteractionConfigFields as ProtoInteractionConfigFields,
   LayoutConfigFields as ProtoLayoutConfigFields,
+  OutlineConfigFields as ProtoOutlineConfigFields,
   RegionStyleFields as ProtoRegionStyleFields,
   ResizePolicyFields as ProtoResizePolicyFields,
   RowIndicatorConfigFields as ProtoRowIndicatorConfigFields,
+  RowIndicatorSlotFields as ProtoRowIndicatorSlotFields,
   SelectionConfigFields as ProtoSelectionConfigFields,
   SpanConfigFields as ProtoSpanConfigFields,
   StyleConfigFields as ProtoStyleConfigFields,
@@ -25,6 +28,7 @@ import {
   encodeBool,
   encodeVarintUnsigned,
   encodeMessageField,
+  encodeString,
   encodeHighlightStyle,
   encodeFont,
   type HighlightStyleArg,
@@ -154,11 +158,26 @@ export interface SheetGridConfig {
   autoResize?: boolean;
   cellSpan?: number;
   cellSpanFixed?: number;
+  outline?: {
+    treeIndicator?: number;
+    treeColor?: number;
+    groupTotalPosition?: number;
+    multiTotals?: boolean;
+    indicatorIndent?: number;
+    maxLevels?: number;
+    showLevelButtons?: boolean;
+    labelColumn?: number;
+    iconColumn?: number;
+  };
   indicators?: {
     rowStart?: {
       visible?: boolean;
       width?: number;
-      modeBits?: number;
+      slots?: Array<{
+        kind?: number;
+        width?: number;
+        visible?: boolean;
+      }>;
       background?: number;
       foreground?: number;
       gridLines?: number;
@@ -181,6 +200,16 @@ export interface SheetGridConfig {
       modeBits?: number;
       background?: number;
       foreground?: number;
+      customKey?: string;
+      data?: Uint8Array;
+      slots?: Array<{
+        kind?: number;
+        width?: number;
+        visible?: boolean;
+        customKey?: string;
+        data?: Uint8Array;
+        labelText?: string;
+      }>;
     };
   };
 }
@@ -190,9 +219,6 @@ function encodeRowIndicatorConfig(config: NonNullable<SheetGridConfig["indicator
   if (!config) return out;
   if (config.visible != null) out.push(...encodeTag(ProtoRowIndicatorConfigFields.visible, 0), ...encodeBool(config.visible));
   if (config.width != null) out.push(...encodeTag(ProtoRowIndicatorConfigFields.width, 0), ...encodeInt32(config.width));
-  if (config.modeBits != null) {
-    out.push(...encodeTag(ProtoRowIndicatorConfigFields.mode_bits, 0), ...encodeVarintUnsigned(BigInt(config.modeBits >>> 0)));
-  }
   if (config.background != null) {
     out.push(...encodeTag(ProtoRowIndicatorConfigFields.background, 0), ...encodeVarintUnsigned(BigInt(config.background >>> 0)));
   }
@@ -204,6 +230,13 @@ function encodeRowIndicatorConfig(config: NonNullable<SheetGridConfig["indicator
     out.push(...encodeTag(ProtoRowIndicatorConfigFields.grid_color, 0), ...encodeVarintUnsigned(BigInt(config.gridColor >>> 0)));
   }
   if (config.allowResize != null) out.push(...encodeTag(ProtoRowIndicatorConfigFields.allow_resize, 0), ...encodeBool(config.allowResize));
+  for (const slot of config.slots ?? []) {
+    const slotMsg: number[] = [];
+    if (slot.kind != null) slotMsg.push(...encodeTag(ProtoRowIndicatorSlotFields.kind, 0), ...encodeInt32(slot.kind));
+    if (slot.width != null) slotMsg.push(...encodeTag(ProtoRowIndicatorSlotFields.width, 0), ...encodeInt32(slot.width));
+    if (slot.visible != null) slotMsg.push(...encodeTag(ProtoRowIndicatorSlotFields.visible, 0), ...encodeBool(slot.visible));
+    if (slotMsg.length > 0) out.push(...encodeMessageField(ProtoRowIndicatorConfigFields.slots, slotMsg));
+  }
   return out;
 }
 
@@ -243,6 +276,41 @@ function encodeCornerIndicatorConfig(config: NonNullable<SheetGridConfig["indica
   if (config.foreground != null) {
     out.push(...encodeTag(ProtoCornerIndicatorConfigFields.foreground, 0), ...encodeVarintUnsigned(BigInt(config.foreground >>> 0)));
   }
+  if (config.customKey != null) {
+    out.push(...encodeTag(ProtoCornerIndicatorConfigFields.custom_key, 2), ...encodeString(config.customKey));
+  }
+  if (config.data != null) {
+    out.push(...encodeTag(ProtoCornerIndicatorConfigFields.data, 2), ...encodeVarintUnsigned(BigInt(config.data.length)), ...config.data);
+  }
+  for (const slot of config.slots ?? []) {
+    const slotMsg: number[] = [];
+    if (slot.kind != null) slotMsg.push(...encodeTag(ProtoCornerIndicatorSlotFields.kind, 0), ...encodeInt32(slot.kind));
+    if (slot.width != null) slotMsg.push(...encodeTag(ProtoCornerIndicatorSlotFields.width, 0), ...encodeInt32(slot.width));
+    if (slot.visible != null) slotMsg.push(...encodeTag(ProtoCornerIndicatorSlotFields.visible, 0), ...encodeBool(slot.visible));
+    if (slot.customKey != null) slotMsg.push(...encodeTag(ProtoCornerIndicatorSlotFields.custom_key, 2), ...encodeString(slot.customKey));
+    if (slot.data != null) slotMsg.push(...encodeTag(ProtoCornerIndicatorSlotFields.data, 2), ...encodeVarintUnsigned(BigInt(slot.data.length)), ...slot.data);
+    if (slot.labelText != null) slotMsg.push(...encodeTag(ProtoCornerIndicatorSlotFields.label_text, 2), ...encodeString(slot.labelText));
+    if (slotMsg.length > 0) out.push(...encodeMessageField(ProtoCornerIndicatorConfigFields.slots, slotMsg));
+  }
+  return out;
+}
+
+function encodeOutlineConfig(config: SheetGridConfig["outline"]): number[] {
+  const out: number[] = [];
+  if (!config) return out;
+  if (config.treeIndicator != null) out.push(...encodeTag(ProtoOutlineConfigFields.tree_indicator, 0), ...encodeInt32(config.treeIndicator));
+  if (config.treeColor != null) {
+    out.push(...encodeTag(ProtoOutlineConfigFields.tree_color, 0), ...encodeVarintUnsigned(BigInt(config.treeColor >>> 0)));
+  }
+  if (config.groupTotalPosition != null) {
+    out.push(...encodeTag(ProtoOutlineConfigFields.group_total_position, 0), ...encodeInt32(config.groupTotalPosition));
+  }
+  if (config.multiTotals != null) out.push(...encodeTag(ProtoOutlineConfigFields.multi_totals, 0), ...encodeBool(config.multiTotals));
+  if (config.indicatorIndent != null) out.push(...encodeTag(ProtoOutlineConfigFields.indicator_indent, 0), ...encodeInt32(config.indicatorIndent));
+  if (config.maxLevels != null) out.push(...encodeTag(ProtoOutlineConfigFields.max_levels, 0), ...encodeInt32(config.maxLevels));
+  if (config.showLevelButtons != null) out.push(...encodeTag(ProtoOutlineConfigFields.show_level_buttons, 0), ...encodeBool(config.showLevelButtons));
+  if (config.labelColumn != null) out.push(...encodeTag(ProtoOutlineConfigFields.label_column, 0), ...encodeInt32(config.labelColumn));
+  if (config.iconColumn != null) out.push(...encodeTag(ProtoOutlineConfigFields.icon_column, 0), ...encodeInt32(config.iconColumn));
   return out;
 }
 
@@ -308,6 +376,9 @@ export function encodeGridConfig(config: SheetGridConfig): Uint8Array {
   if (config.cellSpan != null) span.push(...encodeTag(ProtoSpanConfigFields.cell_span, 0), ...encodeInt32(config.cellSpan));
   if (config.cellSpanFixed != null) span.push(...encodeTag(ProtoSpanConfigFields.cell_span_fixed, 0), ...encodeInt32(config.cellSpanFixed));
   if (span.length > 0) gridConfig.push(...encodeMessageField(ProtoGridConfigFields.span, span));
+
+  const outline = encodeOutlineConfig(config.outline);
+  if (outline.length > 0) gridConfig.push(...encodeMessageField(ProtoGridConfigFields.outline, outline));
 
   const interaction: number[] = [];
   if (config.resize) {

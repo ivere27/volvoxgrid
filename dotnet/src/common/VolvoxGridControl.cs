@@ -47,6 +47,76 @@ namespace VolvoxGrid.DotNet
         private EventHandler<VolvoxGridBeforeSortEventArgs> _beforeSort;
         private EventHandler<VolvoxGridCompareEventArgs> _compare;
 
+        private static RowIndicatorSlot RowIndicatorSlot(RowIndicatorSlotKind kind, int width)
+        {
+            return new RowIndicatorSlot { Kind = kind, Width = width, Visible = true };
+        }
+
+        private static CornerIndicatorSlot CornerIndicatorSlot(CornerIndicatorSlotKind kind, int width)
+        {
+            return new CornerIndicatorSlot { Kind = kind, Width = width, Visible = true };
+        }
+
+        private static List<RowIndicatorSlot> DefaultRowIndicatorSlots()
+        {
+            return new List<RowIndicatorSlot>
+            {
+                RowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18),
+                RowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17),
+            };
+        }
+
+        private static List<RowIndicatorSlot> RowIndicatorSlotsFromModeBits(VolvoxGridRowIndicatorMode value)
+        {
+            var slots = new List<RowIndicatorSlot>();
+            void Add(VolvoxGridRowIndicatorMode bit, RowIndicatorSlotKind kind, int width)
+            {
+                if ((value & bit) != 0) slots.Add(RowIndicatorSlot(kind, width));
+            }
+
+            Add(VolvoxGridRowIndicatorMode.Numbers, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS, 35);
+            Add(VolvoxGridRowIndicatorMode.Current, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18);
+            Add(VolvoxGridRowIndicatorMode.Selection, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17);
+            Add(VolvoxGridRowIndicatorMode.Checkbox, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CHECKBOX, 18);
+            Add(VolvoxGridRowIndicatorMode.Handle, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_HANDLE, 18);
+            Add(VolvoxGridRowIndicatorMode.Editing, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EDITING, 18);
+            Add(VolvoxGridRowIndicatorMode.Modified, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_MODIFIED, 18);
+            Add(VolvoxGridRowIndicatorMode.Error, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ERROR, 18);
+            Add(VolvoxGridRowIndicatorMode.NewRow, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NEW_ROW, 18);
+            Add(VolvoxGridRowIndicatorMode.Expander, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER, 18);
+            Add(VolvoxGridRowIndicatorMode.Resize, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_RESIZE, 18);
+            Add(VolvoxGridRowIndicatorMode.Action, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ACTION, 18);
+            Add(VolvoxGridRowIndicatorMode.StatusIcon, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_STATUS_ICON, 18);
+            Add(VolvoxGridRowIndicatorMode.Custom, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CUSTOM, 18);
+            return slots;
+        }
+
+        private static VolvoxGridRowIndicatorMode RowIndicatorModeBitsFromSlots(RowIndicatorConfig cfg)
+        {
+            VolvoxGridRowIndicatorMode mode = VolvoxGridRowIndicatorMode.None;
+            foreach (var slot in cfg.Slots)
+            {
+                switch (slot.Kind)
+                {
+                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS: mode |= VolvoxGridRowIndicatorMode.Numbers; break;
+                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT: mode |= VolvoxGridRowIndicatorMode.Current; break;
+                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION: mode |= VolvoxGridRowIndicatorMode.Selection; break;
+                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CHECKBOX: mode |= VolvoxGridRowIndicatorMode.Checkbox; break;
+                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_HANDLE: mode |= VolvoxGridRowIndicatorMode.Handle; break;
+                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EDITING: mode |= VolvoxGridRowIndicatorMode.Editing; break;
+                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_MODIFIED: mode |= VolvoxGridRowIndicatorMode.Modified; break;
+                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ERROR: mode |= VolvoxGridRowIndicatorMode.Error; break;
+                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NEW_ROW: mode |= VolvoxGridRowIndicatorMode.NewRow; break;
+                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER: mode |= VolvoxGridRowIndicatorMode.Expander; break;
+                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_RESIZE: mode |= VolvoxGridRowIndicatorMode.Resize; break;
+                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ACTION: mode |= VolvoxGridRowIndicatorMode.Action; break;
+                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_STATUS_ICON: mode |= VolvoxGridRowIndicatorMode.StatusIcon; break;
+                    case RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CUSTOM: mode |= VolvoxGridRowIndicatorMode.Custom; break;
+                }
+            }
+            return mode;
+        }
+
         public VolvoxGridControl()
         {
             _mapper = new ProtoMapper();
@@ -73,7 +143,7 @@ namespace VolvoxGrid.DotNet
             EnsureColIndicatorTopConfig().ModeBits = (uint)(VolvoxGridColumnIndicatorMode.HeaderText | VolvoxGridColumnIndicatorMode.SortGlyph);
             EnsureRowIndicatorStartConfig().Visible = false;
             EnsureRowIndicatorStartConfig().Width = 35;
-            EnsureRowIndicatorStartConfig().ModeBits = (uint)(VolvoxGridRowIndicatorMode.Current | VolvoxGridRowIndicatorMode.Selection);
+            EnsureRowIndicatorStartConfig().Slots.AddRange(DefaultRowIndicatorSlots());
             if (GdiTextRendererBridge.ShouldUseForCurrentProcess())
             {
                 _hostTextRenderer = new GdiTextRendererBridge();
@@ -695,9 +765,9 @@ namespace VolvoxGrid.DotNet
                 if (!cfg.HasVisible || cfg.Visible != value)
                 {
                     cfg.Visible = value;
-                    if (value && !cfg.HasModeBits)
+                    if (value && cfg.Slots.Count == 0)
                     {
-                        cfg.ModeBits = (uint)(VolvoxGridRowIndicatorMode.Current | VolvoxGridRowIndicatorMode.Selection);
+                        cfg.Slots.AddRange(DefaultRowIndicatorSlots());
                     }
                     ApplyEngineConfig();
                 }
@@ -706,15 +776,16 @@ namespace VolvoxGrid.DotNet
 
         public VolvoxGridRowIndicatorMode RowIndicatorStartModeBits
         {
-            get { var cfg = EnsureRowIndicatorStartConfig(); return cfg.HasModeBits ? (VolvoxGridRowIndicatorMode)cfg.ModeBits : VolvoxGridRowIndicatorMode.None; }
+            get { var cfg = EnsureRowIndicatorStartConfig(); return RowIndicatorModeBitsFromSlots(cfg); }
             set
             {
                 var cfg = EnsureRowIndicatorStartConfig();
-                uint mapped = (uint)value;
-                if (!cfg.HasModeBits || cfg.ModeBits != mapped)
+                var mapped = RowIndicatorSlotsFromModeBits(value);
+                if (RowIndicatorModeBitsFromSlots(cfg) != value)
                 {
-                    cfg.ModeBits = mapped;
-                    if (mapped != 0u) cfg.Visible = true;
+                    cfg.Slots.Clear();
+                    cfg.Slots.AddRange(mapped);
+                    if (mapped.Count != 0) cfg.Visible = true;
                     ApplyEngineConfig();
                 }
             }
@@ -730,6 +801,8 @@ namespace VolvoxGrid.DotNet
                 if (!cfg.HasWidth || cfg.Width != normalized)
                 {
                     cfg.Width = normalized;
+                    cfg.AutoSize = false;
+                    SyncOutlineLevelCornerSlotWidth(normalized);
                     ApplyEngineConfig();
                 }
             }
@@ -765,6 +838,66 @@ namespace VolvoxGrid.DotNet
                     cfg.TreeIndicator = mapped;
                     ApplyEngineConfig();
                 }
+            }
+        }
+
+        public int OutlineIndicatorIndent
+        {
+            get { return _config.Outline != null && _config.Outline.HasIndicatorIndent ? _config.Outline.IndicatorIndent : 0; }
+            set
+            {
+                int normalized = Math.Max(0, value);
+                var cfg = EnsureOutlineConfig();
+                if (!cfg.HasIndicatorIndent || cfg.IndicatorIndent != normalized)
+                {
+                    cfg.IndicatorIndent = normalized;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public int OutlineMaxLevels
+        {
+            get { return _config.Outline != null && _config.Outline.HasMaxLevels ? _config.Outline.MaxLevels : 0; }
+            set
+            {
+                int normalized = Math.Max(0, value);
+                var cfg = EnsureOutlineConfig();
+                if (!cfg.HasMaxLevels || cfg.MaxLevels != normalized)
+                {
+                    cfg.MaxLevels = normalized;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public bool ShowOutlineLevelButtons
+        {
+            get { return _config.Outline != null && _config.Outline.HasShowLevelButtons && _config.Outline.ShowLevelButtons; }
+            set
+            {
+                var outline = EnsureOutlineConfig();
+                outline.ShowLevelButtons = value;
+                if (value)
+                {
+                    var corner = EnsureCornerTopStartConfig();
+                    corner.Visible = true;
+                    var slot = EnsureOutlineLevelCornerSlot();
+                    slot.Width = RowIndicatorStartWidth;
+                    slot.Visible = true;
+                }
+                else if (_config.Indicators != null && _config.Indicators.CornerTopStart != null)
+                {
+                    _config.Indicators.CornerTopStart.Visible = false;
+                    foreach (var slot in _config.Indicators.CornerTopStart.Slots)
+                    {
+                        if (slot.Kind == CornerIndicatorSlotKind.CORNER_SLOT_OUTLINE_LEVELS)
+                        {
+                            slot.Visible = false;
+                        }
+                    }
+                }
+                ApplyEngineConfig();
             }
         }
 
@@ -1043,6 +1176,40 @@ namespace VolvoxGrid.DotNet
             var indicators = EnsureIndicatorsConfig();
             if (indicators.RowStart == null) indicators.RowStart = new RowIndicatorConfig();
             return indicators.RowStart;
+        }
+
+        private CornerIndicatorConfig EnsureCornerTopStartConfig()
+        {
+            var indicators = EnsureIndicatorsConfig();
+            if (indicators.CornerTopStart == null) indicators.CornerTopStart = new CornerIndicatorConfig();
+            return indicators.CornerTopStart;
+        }
+
+        private CornerIndicatorSlot EnsureOutlineLevelCornerSlot()
+        {
+            var corner = EnsureCornerTopStartConfig();
+            foreach (var slot in corner.Slots)
+            {
+                if (slot.Kind == CornerIndicatorSlotKind.CORNER_SLOT_OUTLINE_LEVELS)
+                {
+                    return slot;
+                }
+            }
+            var created = CornerIndicatorSlot(CornerIndicatorSlotKind.CORNER_SLOT_OUTLINE_LEVELS, RowIndicatorStartWidth);
+            corner.Slots.Add(created);
+            return created;
+        }
+
+        private void SyncOutlineLevelCornerSlotWidth(int width)
+        {
+            if (_config.Indicators == null || _config.Indicators.CornerTopStart == null) return;
+            foreach (var slot in _config.Indicators.CornerTopStart.Slots)
+            {
+                if (slot.Kind == CornerIndicatorSlotKind.CORNER_SLOT_OUTLINE_LEVELS)
+                {
+                    slot.Width = width;
+                }
+            }
         }
 
         private RegionStyle EnsureFixedStyleConfig()
