@@ -20,6 +20,7 @@ const List<String> _hierarchyKeys = [
   'Permissions',
   'Action',
 ];
+const int hierarchyNameColumn = 0;
 const int hierarchyActionColumn = 5;
 
 const int _hierBodyBg = 0xFFFFFFFF;
@@ -38,7 +39,7 @@ const int _hierAccent = 0xFFF59E0B;
 const int _hierTreeColor = 0xFFA8A29E;
 const int _hierHoverCellBg = 0x1AD97706;
 const int _hierOutlineIndent = 20;
-const int _hierMinOutlineIndicatorWidth = 48;
+const int _hierMinOutlineIndicatorWidth = 56;
 
 Future<void> loadHierarchyJsonDemo(VolvoxGridController controller) async {
   final rawJson = utf8.decode(await controller.getDemoData('hierarchy'));
@@ -155,6 +156,9 @@ DefineColumnsRequest _hierarchyDefineColumnsRequest() {
     if (col == hierarchyActionColumn) {
       def.interaction = CellInteraction.CELL_INTERACTION_TEXT_LINK;
     }
+    if (col == hierarchyNameColumn) {
+      def.hidden = true;
+    }
     request.columns.add(def);
   }
   return request;
@@ -197,8 +201,13 @@ int _hierarchyOutlineWidth(int maxOutlineDepth) {
       : width;
 }
 
+int _hierarchyExpanderWidth(int maxOutlineDepth) {
+  return _hierarchyOutlineWidth(maxOutlineDepth) + 280;
+}
+
 GridConfig _hierarchyThemeConfig(int maxOutlineDepth, int maxOutlineLevel) {
   final outlineWidth = _hierarchyOutlineWidth(maxOutlineDepth);
+  final expanderWidth = _hierarchyExpanderWidth(maxOutlineDepth);
   return GridConfig()
     ..layout = (LayoutConfig()..fixedRows = 0)
     ..style = (StyleConfig()
@@ -267,12 +276,13 @@ GridConfig _hierarchyThemeConfig(int maxOutlineDepth, int maxOutlineLevel) {
       ..treeIndicator = TreeIndicatorStyle.TREE_INDICATOR_ARROWS_LEAF
       ..indicatorIndent = _hierOutlineIndent
       ..maxLevels = maxOutlineLevel < 0 ? 0 : maxOutlineLevel
-      ..showLevelButtons = false
+      ..showLevelButtons = true
+      ..labelColumn = hierarchyNameColumn
       ..treeColor = _hierTreeColor)
     ..interaction = (InteractionConfig()
       ..resize = (ResizePolicy()
         ..columns = true
-        ..rows = true)
+        ..rows = false)
       ..autoSizeMouse = true
       ..headerFeatures = (HeaderFeatures()
         ..sort = false
@@ -281,14 +291,20 @@ GridConfig _hierarchyThemeConfig(int maxOutlineDepth, int maxOutlineLevel) {
     ..indicators = (IndicatorsConfig()
       ..rowStart = (RowIndicatorConfig()
         ..visible = true
-        ..width = outlineWidth
+        ..width = expanderWidth
+        ..background = _hierHeaderBg
+        ..foreground = _hierFixedFg
+        ..gridColor = _hierFixedGridColor
         ..autoSize = false
+        ..allowResize = true
         ..slots.add(RowIndicatorSlot()
           ..kind = RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER
-          ..width = outlineWidth
+          ..width = expanderWidth
           ..visible = true))
       ..cornerTopStart = (CornerIndicatorConfig()
         ..visible = true
+        ..background = _hierHeaderBg
+        ..foreground = _hierFixedFg
         ..slots.add(CornerIndicatorSlot()
           ..kind = CornerIndicatorSlotKind.CORNER_SLOT_OUTLINE_LEVELS
           ..width = outlineWidth
@@ -301,5 +317,6 @@ GridConfig _hierarchyThemeConfig(int maxOutlineDepth, int maxOutlineLevel) {
         ..background = _hierHeaderBg
         ..foreground = _hierHeaderFg
         ..gridColor = _hierFixedGridColor
-        ..allowResize = true));
+        ..allowResize = true)
+      ..appearance = IndicatorAppearance.INDICATOR_APPEARANCE_MODERN);
 }

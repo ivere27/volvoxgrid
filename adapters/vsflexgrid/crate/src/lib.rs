@@ -810,6 +810,7 @@ fn hierarchy_demo_column_defs_local(scale: f32) -> Vec<ColumnDef> {
                 data_type: *data_type,
                 format: format.map(|s| s.to_string()),
                 interaction: *interaction,
+                hidden: Some(index == 0),
                 span: Some(false),
                 ..Default::default()
             },
@@ -869,9 +870,18 @@ fn apply_local_hierarchy_demo_chrome(grid: &mut volvoxgrid_engine::grid::VolvoxG
     grid.indicator_bands.col_top.fore_color = Some(0xFF1C1917);
     grid.indicator_bands.col_top.grid_color = Some(0xFFD6D3D1);
     grid.indicator_bands.col_top.allow_resize = true;
+    grid.indicator_bands.appearance = IndicatorAppearance::Modern as i32;
     grid.indicator_bands.row_start.visible = false;
+    grid.indicator_bands.row_start.width_px =
+        outline_level_button_width_px(grid) + demo_scale_px(scale, 280);
+    grid.indicator_bands.row_start.back_color = Some(0xFFFAFAF9);
+    grid.indicator_bands.row_start.fore_color = Some(0xFF44403C);
+    grid.indicator_bands.row_start.grid_color = Some(0xFFD6D3D1);
+    grid.indicator_bands.row_start.allow_resize = true;
+    grid.indicator_bands.corner_top_start.back_color = Some(0xFFFAFAF9);
+    grid.indicator_bands.corner_top_start.fore_color = Some(0xFF44403C);
 
-    grid.allow_user_resizing = 3;
+    grid.allow_user_resizing = 1;
     grid.tab_behavior = 1;
     grid.edit_trigger_mode = 0;
     grid.fling_enabled = true;
@@ -889,6 +899,8 @@ fn apply_local_hierarchy_demo_chrome(grid: &mut volvoxgrid_engine::grid::VolvoxG
         ..Default::default()
     };
     grid.outline.tree_indicator = 2;
+    grid.outline.show_level_buttons = true;
+    grid.outline.label_column = 0;
     ensure_outline_row_indicator_slot(grid);
     ensure_outline_corner_level_slot(grid);
 }

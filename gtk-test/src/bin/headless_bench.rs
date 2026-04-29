@@ -31,6 +31,7 @@ const DEMO_HIERARCHY: &str = "hierarchy";
 const DEMO_STRESS: &str = "stress";
 const SALES_DEMO_COLS: i32 = 10;
 const HIERARCHY_DEMO_COLS: i32 = 6;
+const HIERARCHY_NAME_COL: i32 = 0;
 const SALES_STATUS_ITEMS: &str = "Active|Pending|Shipped|Returned|Cancelled";
 const GTK_SURFACE_WAIT: Duration = Duration::from_secs(5);
 const LAYER_COUNT: usize = 27;
@@ -1241,10 +1242,11 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
         grid_id,
         vec![
             pb::ColumnDef {
-                index: 0,
+                index: HIERARCHY_NAME_COL,
                 width: Some(260),
                 caption: Some("Name".to_string()),
                 key: Some("Name".to_string()),
+                hidden: Some(true),
                 ..Default::default()
             },
             pb::ColumnDef {
@@ -1303,7 +1305,7 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
     }
 
     const OUTLINE_INDENT: i32 = 20;
-    const MIN_OUTLINE_INDICATOR_WIDTH: i32 = 48;
+    const MIN_OUTLINE_INDICATOR_WIDTH: i32 = 56;
     let min_outline_level = levels
         .iter()
         .map(|level| (*level).max(0))
@@ -1316,6 +1318,7 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
         .unwrap_or(0);
     let max_outline_depth = (max_outline_level - min_outline_level).max(0);
     let outline_width = MIN_OUTLINE_INDICATOR_WIDTH.max((max_outline_depth + 1) * OUTLINE_INDENT);
+    let expander_width = outline_width + 280;
 
     client.configure(
         grid_id,
@@ -1342,6 +1345,11 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
                 ..Default::default()
             }),
             interaction: Some(pb::InteractionConfig {
+                resize: Some(pb::ResizePolicy {
+                    columns: Some(true),
+                    rows: Some(false),
+                    ..Default::default()
+                }),
                 header_features: Some(pb::HeaderFeatures {
                     sort: Some(false),
                     reorder: Some(false),
@@ -1352,11 +1360,15 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
             indicators: Some(pb::IndicatorsConfig {
                 row_start: Some(pb::RowIndicatorConfig {
                     visible: Some(true),
-                    width: Some(outline_width),
+                    width: Some(expander_width),
+                    background: Some(0xFFFAFAF9),
+                    foreground: Some(0xFF44403C),
+                    grid_color: Some(0xFFD6D3D1),
                     auto_size: Some(false),
+                    allow_resize: Some(true),
                     slots: vec![pb::RowIndicatorSlot {
                         kind: Some(pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32),
-                        width: Some(outline_width),
+                        width: Some(expander_width),
                         visible: Some(true),
                         ..Default::default()
                     }],
@@ -1364,6 +1376,8 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
                 }),
                 corner_top_start: Some(pb::CornerIndicatorConfig {
                     visible: Some(true),
+                    background: Some(0xFFFAFAF9),
+                    foreground: Some(0xFF44403C),
                     slots: vec![pb::CornerIndicatorSlot {
                         kind: Some(pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32),
                         width: Some(outline_width),
@@ -1380,13 +1394,15 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
                     allow_resize: Some(true),
                     ..Default::default()
                 }),
+                appearance: Some(pb::IndicatorAppearance::Modern as i32),
                 ..Default::default()
             }),
             outline: Some(pb::OutlineConfig {
                 tree_indicator: Some(pb::TreeIndicatorStyle::TreeIndicatorArrowsLeaf as i32),
                 indicator_indent: Some(OUTLINE_INDENT),
-                max_levels: Some(max_outline_depth),
-                show_level_buttons: Some(false),
+                max_levels: Some(max_outline_level.max(0)),
+                show_level_buttons: Some(true),
+                label_column: Some(HIERARCHY_NAME_COL),
                 ..Default::default()
             }),
             ..Default::default()

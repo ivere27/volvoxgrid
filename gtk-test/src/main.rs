@@ -41,6 +41,7 @@ const DEMO_BARCODES: &str = "barcodes";
 const SALES_DEMO_COLS: i32 = 10;
 const HIERARCHY_DEMO_COLS: i32 = 6;
 const BARCODE_DEMO_COLS: i32 = 5;
+const HIERARCHY_NAME_COL: i32 = 0;
 const SALES_STATUS_ITEMS: &str = "Active|Pending|Shipped|Returned|Cancelled";
 const SELECTION_MODE_LABELS: [&str; 5] = ["Free", "ByRow", "ByCol", "Listbox", "MultiRange"];
 const FRAME_PACING_LABELS: [&str; 4] = ["Auto", "Platform", "Unlimited", "Fixed"];
@@ -2490,11 +2491,12 @@ fn sales_theme_config() -> pb::GridConfig {
     }
 }
 
-fn hierarchy_theme_config(max_outline_depth: i32) -> pb::GridConfig {
+fn hierarchy_theme_config(max_outline_depth: i32, max_outline_level: i32) -> pb::GridConfig {
     const OUTLINE_INDENT: i32 = 20;
-    const MIN_OUTLINE_INDICATOR_WIDTH: i32 = 48;
+    const MIN_OUTLINE_INDICATOR_WIDTH: i32 = 56;
     let max_outline_depth = max_outline_depth.max(0);
     let outline_width = MIN_OUTLINE_INDICATOR_WIDTH.max((max_outline_depth + 1) * OUTLINE_INDENT);
+    let expander_width = outline_width + 280;
 
     pb::GridConfig {
         layout: Some(pb::LayoutConfig {
@@ -2594,15 +2596,16 @@ fn hierarchy_theme_config(max_outline_depth: i32) -> pb::GridConfig {
         outline: Some(pb::OutlineConfig {
             tree_indicator: Some(pb::TreeIndicatorStyle::TreeIndicatorArrowsLeaf as i32),
             indicator_indent: Some(OUTLINE_INDENT),
-            max_levels: Some(max_outline_depth),
-            show_level_buttons: Some(false),
+            max_levels: Some(max_outline_level.max(0)),
+            show_level_buttons: Some(true),
+            label_column: Some(HIERARCHY_NAME_COL),
             tree_color: Some(0xFFA8A29E),
             ..Default::default()
         }),
         interaction: Some(pb::InteractionConfig {
             resize: Some(pb::ResizePolicy {
                 columns: Some(true),
-                rows: Some(true),
+                rows: Some(false),
                 ..Default::default()
             }),
             freeze: Some(pb::FreezePolicy {
@@ -2621,11 +2624,15 @@ fn hierarchy_theme_config(max_outline_depth: i32) -> pb::GridConfig {
         indicators: Some(pb::IndicatorsConfig {
             row_start: Some(pb::RowIndicatorConfig {
                 visible: Some(true),
-                width: Some(outline_width),
+                width: Some(expander_width),
+                background: Some(0xFFFAFAF9),
+                foreground: Some(0xFF44403C),
+                grid_color: Some(0xFFD6D3D1),
                 auto_size: Some(false),
+                allow_resize: Some(true),
                 slots: vec![pb::RowIndicatorSlot {
                     kind: Some(pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32),
-                    width: Some(outline_width),
+                    width: Some(expander_width),
                     visible: Some(true),
                     ..Default::default()
                 }],
@@ -2633,6 +2640,8 @@ fn hierarchy_theme_config(max_outline_depth: i32) -> pb::GridConfig {
             }),
             corner_top_start: Some(pb::CornerIndicatorConfig {
                 visible: Some(true),
+                background: Some(0xFFFAFAF9),
+                foreground: Some(0xFF44403C),
                 slots: vec![pb::CornerIndicatorSlot {
                     kind: Some(pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32),
                     width: Some(outline_width),
@@ -2652,6 +2661,7 @@ fn hierarchy_theme_config(max_outline_depth: i32) -> pb::GridConfig {
                 allow_resize: Some(true),
                 ..Default::default()
             }),
+            appearance: Some(pb::IndicatorAppearance::Modern as i32),
             ..Default::default()
         }),
         ..Default::default()
@@ -2938,10 +2948,11 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
         grid_id,
         vec![
             pb::ColumnDef {
-                index: 0,
+                index: HIERARCHY_NAME_COL,
                 width: Some(260),
                 caption: Some("Name".to_string()),
                 key: Some("Name".to_string()),
+                hidden: Some(true),
                 ..Default::default()
             },
             pb::ColumnDef {
@@ -3011,7 +3022,10 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
         .unwrap_or(0);
     client.configure(
         grid_id,
-        hierarchy_theme_config((max_outline_level - min_outline_level).max(0)),
+        hierarchy_theme_config(
+            (max_outline_level - min_outline_level).max(0),
+            max_outline_level,
+        ),
     )?;
 
     client.define_rows(

@@ -31,6 +31,8 @@ namespace VolvoxGrid.DotNet.TuiSample
         private const int StressDataRows = 1000000;
         private const int HierarchyTuiOutlineIndent = 2;
         private const int HierarchyTuiMinOutlineIndicatorWidth = 4;
+        private const int HierarchyTuiNameColumn = 0;
+        private const int HierarchyTuiNameColumnWidth = 28;
         private static readonly int[] StressColumnWidths = new[] { 16, 9, 10, 7, 12, 5, 10, 24, 11, 8, 16 };
 
         private static int Main(string[] args)
@@ -514,9 +516,15 @@ namespace VolvoxGrid.DotNet.TuiSample
             return Math.Max(HierarchyTuiMinOutlineIndicatorWidth, width);
         }
 
+        private static int HierarchyTuiExpanderWidth(int maxOutlineDepth)
+        {
+            return HierarchyTuiOutlineWidth(maxOutlineDepth) + HierarchyTuiNameColumnWidth;
+        }
+
         private static GridConfig BuildHierarchyTuiConfig(int rows, int cols, int maxOutlineDepth, int maxOutlineLevel)
         {
             int outlineWidth = HierarchyTuiOutlineWidth(maxOutlineDepth);
+            int expanderWidth = HierarchyTuiExpanderWidth(maxOutlineDepth);
             return FinalizeTuiConfig(
                 new GridConfig
                 {
@@ -539,7 +547,8 @@ namespace VolvoxGrid.DotNet.TuiSample
                         TreeIndicator = TreeIndicatorStyle.TREE_INDICATOR_ARROWS_LEAF,
                         IndicatorIndent = HierarchyTuiOutlineIndent,
                         MaxLevels = Math.Max(0, maxOutlineLevel),
-                        ShowLevelButtons = false,
+                        ShowLevelButtons = true,
+                        LabelColumn = HierarchyTuiNameColumn,
                     },
                     Interaction = new InteractionConfig
                     {
@@ -566,13 +575,13 @@ namespace VolvoxGrid.DotNet.TuiSample
                         RowStart = new RowIndicatorConfig
                         {
                             Visible = true,
-                            Width = outlineWidth,
+                            Width = expanderWidth,
                             Slots =
                             {
                                 new RowIndicatorSlot
                                 {
                                     Kind = RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER,
-                                    Width = outlineWidth,
+                                    Width = expanderWidth,
                                     Visible = true,
                                 },
                             },
@@ -600,6 +609,7 @@ namespace VolvoxGrid.DotNet.TuiSample
                             ModeBits = (uint)ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
                             AllowResize = false,
                         },
+                        Appearance = IndicatorAppearance.INDICATOR_APPEARANCE_MODERN,
                     },
                 },
                 rows,
@@ -770,7 +780,7 @@ namespace VolvoxGrid.DotNet.TuiSample
         {
             return new List<ColumnDef>
             {
-                new ColumnDef { Index = 0, Width = 28, Caption = "Name", Key = "Name" },
+                new ColumnDef { Index = HierarchyTuiNameColumn, Width = HierarchyTuiNameColumnWidth, Caption = "Name", Key = "Name", Hidden = true },
                 new ColumnDef { Index = 1, Width = 10, Caption = "Type", Key = "Type" },
                 new ColumnDef { Index = 2, Width = 9, Caption = "Size", Key = "Size", Align = Align.ALIGN_RIGHT_CENTER },
                 new ColumnDef { Index = 3, Width = 12, Caption = "Modified", Key = "Modified", DataType = ColumnDataType.COLUMN_DATA_DATE, Format = "short date" },

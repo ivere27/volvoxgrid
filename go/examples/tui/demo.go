@@ -408,6 +408,8 @@ func buildSalesTuiConfig(rows, cols int) *pb.GridConfig {
 
 const hierarchyTuiOutlineIndent int32 = 2
 const hierarchyTuiMinOutlineIndicatorWidth int32 = 4
+const hierarchyTuiNameColumn int32 = 0
+const hierarchyTuiNameColumnWidth int32 = 28
 
 func hierarchyOutlineLevels(rows []hierarchyJSONRow) ([]int32, error) {
 	rowsByID := make(map[string]hierarchyJSONRow, len(rows))
@@ -498,8 +500,13 @@ func hierarchyTuiOutlineWidth(maxOutlineDepth int32) int32 {
 	return width
 }
 
+func hierarchyTuiExpanderWidth(maxOutlineDepth int32) int32 {
+	return hierarchyTuiOutlineWidth(maxOutlineDepth) + hierarchyTuiNameColumnWidth
+}
+
 func buildHierarchyTuiConfig(rows, cols int, maxOutlineDepth, maxOutlineLevel int32) *pb.GridConfig {
 	outlineWidth := hierarchyTuiOutlineWidth(maxOutlineDepth)
+	expanderWidth := hierarchyTuiExpanderWidth(maxOutlineDepth)
 	return finalizeTuiConfig(&pb.GridConfig{
 		Selection: &pb.SelectionConfig{
 			Mode: ptr(pb.SelectionMode_SELECTION_FREE),
@@ -512,15 +519,16 @@ func buildHierarchyTuiConfig(rows, cols int, maxOutlineDepth, maxOutlineLevel in
 			TreeIndicator:    ptr(pb.TreeIndicatorStyle_TREE_INDICATOR_ARROWS_LEAF),
 			IndicatorIndent:  ptr(hierarchyTuiOutlineIndent),
 			MaxLevels:        ptr(maxOutlineLevel),
-			ShowLevelButtons: ptr(false),
+			ShowLevelButtons: ptr(true),
+			LabelColumn:      ptr(hierarchyTuiNameColumn),
 		},
 		Indicators: &pb.IndicatorsConfig{
 			RowStart: &pb.RowIndicatorConfig{
 				Visible: ptr(true),
-				Width:   ptr(outlineWidth),
+				Width:   ptr(expanderWidth),
 				Slots: []*pb.RowIndicatorSlot{{
 					Kind:    ptr(pb.RowIndicatorSlotKind_ROW_INDICATOR_SLOT_EXPANDER),
-					Width:   ptr(outlineWidth),
+					Width:   ptr(expanderWidth),
 					Visible: ptr(true),
 				}},
 				AutoSize:    ptr(false),
@@ -541,6 +549,7 @@ func buildHierarchyTuiConfig(rows, cols int, maxOutlineDepth, maxOutlineLevel in
 				ModeBits:         ptr(uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT)),
 				AllowResize:      ptr(false),
 			},
+			Appearance: ptr(pb.IndicatorAppearance_INDICATOR_APPEARANCE_MODERN),
 		},
 	}, rows, cols)
 }
@@ -681,7 +690,7 @@ func dropdownFromLabels(items string) *pb.Dropdown {
 
 func buildHierarchyColumns() []*pb.ColumnDef {
 	return []*pb.ColumnDef{
-		{Index: 0, Width: ptr(int32(28)), Caption: ptr("Name"), Key: ptr("Name")},
+		{Index: hierarchyTuiNameColumn, Width: ptr(hierarchyTuiNameColumnWidth), Caption: ptr("Name"), Key: ptr("Name"), Hidden: ptr(true)},
 		{Index: 1, Width: ptr(int32(10)), Caption: ptr("Type"), Key: ptr("Type")},
 		{Index: 2, Width: ptr(int32(9)), Caption: ptr("Size"), Key: ptr("Size"), Align: ptr(pb.Align_ALIGN_RIGHT_CENTER)},
 		{Index: 3, Width: ptr(int32(12)), Caption: ptr("Modified"), Key: ptr("Modified"), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_DATE), Format: ptr("short date")},

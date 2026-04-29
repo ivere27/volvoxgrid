@@ -826,6 +826,25 @@ namespace VolvoxGrid.DotNet
             set { var cfg = EnsureRowIndicatorStartConfig(); if (!cfg.HasGridColor || cfg.GridColor != value) { cfg.GridColor = value; ApplyEngineConfig(); } }
         }
 
+        public VolvoxGridIndicatorAppearance IndicatorAppearance
+        {
+            get
+            {
+                var cfg = EnsureIndicatorsConfig();
+                return cfg.HasAppearance ? (VolvoxGridIndicatorAppearance)cfg.Appearance : VolvoxGridIndicatorAppearance.Classic;
+            }
+            set
+            {
+                var cfg = EnsureIndicatorsConfig();
+                var mapped = (Volvoxgrid.V1.IndicatorAppearance)value;
+                if (!cfg.HasAppearance || cfg.Appearance != mapped)
+                {
+                    cfg.Appearance = mapped;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
         public VolvoxGridTreeIndicatorStyle TreeIndicator
         {
             get { return _config.Outline != null && _config.Outline.HasTreeIndicator ? (VolvoxGridTreeIndicatorStyle)_config.Outline.TreeIndicator : VolvoxGridTreeIndicatorStyle.None; }
@@ -898,6 +917,34 @@ namespace VolvoxGrid.DotNet
                     }
                 }
                 ApplyEngineConfig();
+            }
+        }
+
+        public int OutlineLabelColumn
+        {
+            get { return _config.Outline != null && _config.Outline.HasLabelColumn ? _config.Outline.LabelColumn : -1; }
+            set
+            {
+                var cfg = EnsureOutlineConfig();
+                if (!cfg.HasLabelColumn || cfg.LabelColumn != value)
+                {
+                    cfg.LabelColumn = value;
+                    ApplyEngineConfig();
+                }
+            }
+        }
+
+        public int OutlineIconColumn
+        {
+            get { return _config.Outline != null && _config.Outline.HasIconColumn ? _config.Outline.IconColumn : -1; }
+            set
+            {
+                var cfg = EnsureOutlineConfig();
+                if (!cfg.HasIconColumn || cfg.IconColumn != value)
+                {
+                    cfg.IconColumn = value;
+                    ApplyEngineConfig();
+                }
             }
         }
 

@@ -32,6 +32,7 @@ import io.github.ivere27.volvoxgrid.GridConfig;
 import io.github.ivere27.volvoxgrid.GroupTotalPosition;
 import io.github.ivere27.volvoxgrid.HeaderFeatures;
 import io.github.ivere27.volvoxgrid.IndicatorsConfig;
+import io.github.ivere27.volvoxgrid.IndicatorAppearance;
 import io.github.ivere27.volvoxgrid.InteractionConfig;
 import io.github.ivere27.volvoxgrid.LayoutConfig;
 import io.github.ivere27.volvoxgrid.LoadDataOptions;
@@ -92,6 +93,8 @@ public final class VolvoxGridDesktopTuiExample {
     private static final Pattern HELPER_FIELD_PATTERN = Pattern.compile(",\\s*\"(?:Id|ParentId)\"\\s*:\\s*(?:null|\"[^\"]*\")");
     private static final int HIERARCHY_TUI_OUTLINE_INDENT = 2;
     private static final int HIERARCHY_TUI_MIN_OUTLINE_INDICATOR_WIDTH = 4;
+    private static final int HIERARCHY_TUI_NAME_COLUMN = 0;
+    private static final int HIERARCHY_TUI_NAME_COLUMN_WIDTH = 28;
 
     private VolvoxGridDesktopTuiExample() {}
 
@@ -633,7 +636,13 @@ public final class VolvoxGridDesktopTuiExample {
 
     private static DefineColumnsRequest buildHierarchyColumns() {
         return DefineColumnsRequest.newBuilder()
-            .addColumns(ColumnDef.newBuilder().setIndex(0).setWidth(28).setCaption("Name").setKey("Name").build())
+            .addColumns(ColumnDef.newBuilder()
+                .setIndex(HIERARCHY_TUI_NAME_COLUMN)
+                .setWidth(HIERARCHY_TUI_NAME_COLUMN_WIDTH)
+                .setCaption("Name")
+                .setKey("Name")
+                .setHidden(true)
+                .build())
             .addColumns(ColumnDef.newBuilder().setIndex(1).setWidth(10).setCaption("Type").setKey("Type").build())
             .addColumns(
                 ColumnDef.newBuilder()
@@ -709,8 +718,13 @@ public final class VolvoxGridDesktopTuiExample {
         );
     }
 
+    private static int hierarchyTuiExpanderWidth(int maxOutlineDepth) {
+        return hierarchyTuiOutlineWidth(maxOutlineDepth) + HIERARCHY_TUI_NAME_COLUMN_WIDTH;
+    }
+
     private static GridConfig buildHierarchyTuiConfig(int maxOutlineDepth, int maxOutlineLevel) {
         int outlineWidth = hierarchyTuiOutlineWidth(maxOutlineDepth);
+        int expanderWidth = hierarchyTuiExpanderWidth(maxOutlineDepth);
         return GridConfig.newBuilder()
             .setSelection(
                 SelectionConfig.newBuilder()
@@ -734,7 +748,8 @@ public final class VolvoxGridDesktopTuiExample {
                     .setTreeIndicator(TreeIndicatorStyle.TREE_INDICATOR_ARROWS_LEAF)
                     .setIndicatorIndent(HIERARCHY_TUI_OUTLINE_INDENT)
                     .setMaxLevels(Math.max(0, maxOutlineLevel))
-                    .setShowLevelButtons(false)
+                    .setShowLevelButtons(true)
+                    .setLabelColumn(HIERARCHY_TUI_NAME_COLUMN)
                     .build()
             )
             .setInteraction(
@@ -766,11 +781,11 @@ public final class VolvoxGridDesktopTuiExample {
                     .setRowStart(
                         RowIndicatorConfig.newBuilder()
                             .setVisible(true)
-                            .setWidth(outlineWidth)
+                            .setWidth(expanderWidth)
                             .setAutoSize(false)
                             .addSlots(RowIndicatorSlot.newBuilder()
                                 .setKind(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER)
-                                .setWidth(outlineWidth)
+                                .setWidth(expanderWidth)
                                 .setVisible(true)
                                 .build())
                             .build()
@@ -794,6 +809,7 @@ public final class VolvoxGridDesktopTuiExample {
                             .setAllowResize(false)
                             .build()
                     )
+                    .setAppearance(IndicatorAppearance.INDICATOR_APPEARANCE_MODERN)
                     .build()
             )
             .setRendering(

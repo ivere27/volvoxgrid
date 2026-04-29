@@ -32,6 +32,7 @@ import io.github.ivere27.volvoxgrid.HeaderStyle;
 import io.github.ivere27.volvoxgrid.HighlightStyle;
 import io.github.ivere27.volvoxgrid.HoverConfig;
 import io.github.ivere27.volvoxgrid.IndicatorsConfig;
+import io.github.ivere27.volvoxgrid.IndicatorAppearance;
 import io.github.ivere27.volvoxgrid.InteractionConfig;
 import io.github.ivere27.volvoxgrid.LayoutConfig;
 import io.github.ivere27.volvoxgrid.LoadDataResult;
@@ -62,6 +63,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class HierarchyJsonDesktopDemo {
+    static final int NAME_COLUMN_INDEX = 0;
     static final int ACTION_COLUMN_INDEX = 5;
 
     private static final int[] COL_WIDTHS = {260, 80, 80, 120, 100, 92};
@@ -91,7 +93,7 @@ final class HierarchyJsonDesktopDemo {
     private static final int TREE_COLOR = (int) 0xFFA8A29EL;
     private static final int HOVER_CELL_BG = 0x1AD97706;
     private static final int OUTLINE_INDENT = 20;
-    private static final int MIN_OUTLINE_INDICATOR_WIDTH = 48;
+    private static final int MIN_OUTLINE_INDICATOR_WIDTH = 56;
 
     private HierarchyJsonDesktopDemo() {}
 
@@ -197,8 +199,13 @@ final class HierarchyJsonDesktopDemo {
         return Math.max(MIN_OUTLINE_INDICATOR_WIDTH, (Math.max(0, maxOutlineDepth) + 1) * OUTLINE_INDENT);
     }
 
+    private static int expanderIndicatorWidth(int maxOutlineDepth) {
+        return outlineIndicatorWidth(maxOutlineDepth) + 280;
+    }
+
     private static GridConfig hierarchyThemeConfig(int maxOutlineDepth, int maxOutlineLevel) {
         int outlineWidth = outlineIndicatorWidth(maxOutlineDepth);
+        int expanderWidth = expanderIndicatorWidth(maxOutlineDepth);
         return GridConfig.newBuilder()
             .setLayout(
                 LayoutConfig.newBuilder()
@@ -332,7 +339,8 @@ final class HierarchyJsonDesktopDemo {
                     .setTreeIndicator(TreeIndicatorStyle.TREE_INDICATOR_ARROWS_LEAF)
                     .setIndicatorIndent(OUTLINE_INDENT)
                     .setMaxLevels(Math.max(0, maxOutlineLevel))
-                    .setShowLevelButtons(false)
+                    .setShowLevelButtons(true)
+                    .setLabelColumn(NAME_COLUMN_INDEX)
                     .setTreeColor(TREE_COLOR)
                     .build()
             )
@@ -341,7 +349,7 @@ final class HierarchyJsonDesktopDemo {
                     .setResize(
                         ResizePolicy.newBuilder()
                             .setColumns(true)
-                            .setRows(true)
+                            .setRows(false)
                             .build()
                     )
                     .setFreeze(
@@ -365,12 +373,16 @@ final class HierarchyJsonDesktopDemo {
                     .setRowStart(
                         RowIndicatorConfig.newBuilder()
                             .setVisible(true)
-                            .setWidth(outlineWidth)
+                            .setWidth(expanderWidth)
+                            .setBackground(HEADER_BG)
+                            .setForeground(FIXED_FG)
+                            .setGridColor(FIXED_GRID_COLOR)
                             .setAutoSize(false)
+                            .setAllowResize(true)
                             .addSlots(
                                 RowIndicatorSlot.newBuilder()
                                     .setKind(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER)
-                                    .setWidth(outlineWidth)
+                                    .setWidth(expanderWidth)
                                     .setVisible(true)
                                     .build()
                             )
@@ -379,6 +391,8 @@ final class HierarchyJsonDesktopDemo {
                     .setCornerTopStart(
                         CornerIndicatorConfig.newBuilder()
                             .setVisible(true)
+                            .setBackground(HEADER_BG)
+                            .setForeground(FIXED_FG)
                             .addSlots(
                                 CornerIndicatorSlot.newBuilder()
                                     .setKind(CornerIndicatorSlotKind.CORNER_SLOT_OUTLINE_LEVELS)
@@ -400,6 +414,7 @@ final class HierarchyJsonDesktopDemo {
                             .setAllowResize(true)
                             .build()
                     )
+                    .setAppearance(IndicatorAppearance.INDICATOR_APPEARANCE_MODERN)
                     .build()
             )
             .build();
@@ -491,6 +506,9 @@ final class HierarchyJsonDesktopDemo {
         }
         if (align != null) {
             builder.setAlign(align);
+        }
+        if (index == NAME_COLUMN_INDEX) {
+            builder.setHidden(true);
         }
         return builder;
     }

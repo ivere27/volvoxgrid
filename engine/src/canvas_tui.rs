@@ -806,13 +806,25 @@ fn resolve_row_indicator_width(grid: &VolvoxGrid) -> i32 {
         let prefix_chars = max_depth.saturating_mul(2).saturating_add(2);
         let label_col = grid.outline.label_column;
         let label_chars = if label_col >= 0 && label_col < grid.cols {
-            grid.get_col_width(label_col).max(0)
+            row_indicator_label_source_width(grid, label_col)
         } else {
             0
         };
         width = width.max((prefix_chars + label_chars + 1).clamp(2, 48));
     }
     width.max(2)
+}
+
+fn row_indicator_label_source_width(grid: &VolvoxGrid, col: i32) -> i32 {
+    if col < 0 || col >= grid.cols {
+        return 0;
+    }
+    let configured = grid
+        .col_widths
+        .get(&col)
+        .copied()
+        .unwrap_or(grid.default_col_width);
+    grid.clamp_col_width(col, configured).max(0)
 }
 
 fn outline_state(grid: &VolvoxGrid) -> OutlineState {

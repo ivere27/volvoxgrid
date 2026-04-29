@@ -9,12 +9,13 @@ namespace VolvoxGrid.DotNet.Sample
     internal static class HierarchyJsonDemo
     {
         private const int HierarchyColumnCount = 6;
+        private const int NameColumnIndex = 0;
         internal const int ActionColumnIndex = 5;
         private static readonly Regex IdRegex = new Regex("\"Id\"\\s*:\\s*\"([^\"]+)\"", RegexOptions.Compiled);
         private static readonly Regex ParentIdRegex = new Regex("\"ParentId\"\\s*:\\s*(?:null|\"([^\"]*)\")", RegexOptions.Compiled);
         private static readonly Regex HelperFieldRegex = new Regex(",\\s*\"(?:Id|ParentId)\"\\s*:\\s*(?:null|\"[^\"]*\")", RegexOptions.Compiled);
         private const int OutlineIndent = 20;
-        private const int MinOutlineIndicatorWidth = 48;
+        private const int MinOutlineIndicatorWidth = 56;
 
         public static void Load(VolvoxGridControl grid)
         {
@@ -26,7 +27,7 @@ namespace VolvoxGrid.DotNet.Sample
             grid.SetColCount(HierarchyColumnCount);
             grid.SetColumns(new[]
             {
-                new VolvoxGridColumn { FieldName = "Name", Caption = "Name", Width = 260 },
+                new VolvoxGridColumn { FieldName = "Name", Caption = "Name", Width = 260, Visible = false },
                 new VolvoxGridColumn { FieldName = "Type", Caption = "Type", Width = 80 },
                 new VolvoxGridColumn { FieldName = "Size", Caption = "Size", Width = 80, Alignment = VolvoxGridAlign.RightCenter },
                 new VolvoxGridColumn { FieldName = "Modified", Caption = "Modified", Width = 120, DataType = VolvoxGridColumnDataType.Date, Format = "short date" },
@@ -36,7 +37,7 @@ namespace VolvoxGrid.DotNet.Sample
             grid.LoadData(Encoding.UTF8.GetBytes(HelperFieldRegex.Replace(rawJson, string.Empty)));
             grid.SelectionMode = VolvoxGridSelectionMode.Free;
             grid.HoverEnabled = true;
-            grid.ResizePolicy = new VolvoxGridResizePolicy { Columns = true, Rows = true, Uniform = false };
+            grid.ResizePolicy = new VolvoxGridResizePolicy { Columns = true, Rows = false, Uniform = false };
             grid.HeaderFeatures = new VolvoxGridHeaderFeatures { Sort = false, Reorder = false, Chooser = false };
             grid.ShowColumnHeaders = true;
             grid.ColumnIndicatorTopRowCount = 1;
@@ -44,12 +45,18 @@ namespace VolvoxGrid.DotNet.Sample
             int maxOutlineDepth = MaxOutlineDepth(levels);
             int maxOutlineLevel = MaxOutlineLevel(levels);
             int outlineWidth = OutlineIndicatorWidth(maxOutlineDepth);
+            int expanderWidth = outlineWidth + 280;
             grid.ShowRowIndicator = true;
             grid.RowIndicatorStartModeBits = VolvoxGridRowIndicatorMode.Expander;
-            grid.RowIndicatorStartWidth = outlineWidth;
+            grid.RowIndicatorStartWidth = expanderWidth;
+            grid.RowIndicatorBackColor = 0xFFFAFAF9;
+            grid.RowIndicatorForeColor = 0xFF44403C;
+            grid.RowIndicatorGridColor = 0xFFD6D3D1;
+            grid.IndicatorAppearance = VolvoxGridIndicatorAppearance.Modern;
             grid.OutlineIndicatorIndent = OutlineIndent;
             grid.OutlineMaxLevels = maxOutlineLevel;
-            grid.ShowOutlineLevelButtons = false;
+            grid.ShowOutlineLevelButtons = true;
+            grid.OutlineLabelColumn = NameColumnIndex;
             grid.ScrollBars = VolvoxGridScrollBarsMode.Both;
             grid.FlingEnabled = true;
             grid.FlingImpulseGain = 220.0f;
