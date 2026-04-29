@@ -254,6 +254,9 @@ pub fn apply_node_toggle_after_before(grid: &mut VolvoxGrid, row: i32, collapse:
         return;
     }
     crate::outline::toggle_collapse(grid, row);
+    if collapse {
+        normalize_selection_to_visible_row(grid, row);
+    }
     grid.events
         .push(GridEventData::AfterNodeToggle { row, collapse });
     grid.mark_dirty();
@@ -653,6 +656,93 @@ fn move_selection_after_edit_commit(grid: &mut VolvoxGrid, row: i32, col: i32) {
     }
 }
 
+fn row_can_receive_focus(grid: &VolvoxGrid, row: i32) -> bool {
+    row >= grid.fixed_rows && row < grid.rows && !grid.is_row_hidden(row)
+}
+
+fn visible_focus_row_at_or_after(grid: &VolvoxGrid, row: i32) -> Option<i32> {
+    if grid.rows <= 0 {
+        return None;
+    }
+    let start = row.clamp(grid.fixed_rows, grid.rows - 1);
+    (start..grid.rows).find(|&candidate| row_can_receive_focus(grid, candidate))
+}
+
+fn visible_focus_row_at_or_before(grid: &VolvoxGrid, row: i32) -> Option<i32> {
+    if grid.rows <= 0 {
+        return None;
+    }
+    let start = row.clamp(grid.fixed_rows, grid.rows - 1);
+    (grid.fixed_rows..=start)
+        .rev()
+        .find(|&candidate| row_can_receive_focus(grid, candidate))
+}
+
+fn nearest_visible_focus_row(grid: &VolvoxGrid, row: i32, prefer_after: bool) -> Option<i32> {
+    if prefer_after {
+        visible_focus_row_at_or_after(grid, row)
+            .or_else(|| visible_focus_row_at_or_before(grid, row))
+    } else {
+        visible_focus_row_at_or_before(grid, row)
+            .or_else(|| visible_focus_row_at_or_after(grid, row))
+    }
+}
+
+fn visible_focus_row_with_delta(grid: &VolvoxGrid, row: i32, delta: i32) -> i32 {
+    if delta == 0 {
+        return nearest_visible_focus_row(grid, row, true).unwrap_or(row);
+    }
+
+    let prefer_after = delta > 0;
+    let starts_on_visible_row = row_can_receive_focus(grid, row);
+    let Some(mut current) = nearest_visible_focus_row(grid, row, prefer_after) else {
+        return row;
+    };
+
+    let steps = if starts_on_visible_row {
+        delta.unsigned_abs()
+    } else {
+        delta.unsigned_abs().saturating_sub(1)
+    };
+    for _ in 0..steps {
+        let next = if delta > 0 {
+            current
+                .checked_add(1)
+                .and_then(|next_row| visible_focus_row_at_or_after(grid, next_row))
+        } else {
+            current
+                .checked_sub(1)
+                .and_then(|next_row| visible_focus_row_at_or_before(grid, next_row))
+        };
+        let Some(next) = next else {
+            break;
+        };
+        current = next;
+    }
+
+    current
+}
+
+fn normalize_selection_to_visible_row(grid: &mut VolvoxGrid, fallback_row: i32) {
+    if grid.rows <= 0 || grid.cols <= 0 {
+        return;
+    }
+    if row_can_receive_focus(grid, grid.selection.row) {
+        return;
+    }
+    let row = nearest_visible_focus_row(grid, fallback_row, false)
+        .unwrap_or_else(|| grid.fixed_rows.min(grid.rows - 1));
+    let col = grid.selection.col;
+    grid.selection.set_cursor(
+        row,
+        col,
+        grid.rows,
+        grid.cols,
+        grid.fixed_rows,
+        grid.fixed_cols,
+    );
+}
+
 fn set_fast_scroll_target_row(grid: &mut VolvoxGrid, target: i32, force: bool) {
     if grid.rows <= 0 {
         return;
@@ -935,6 +1025,66 @@ fn outline_row_has_children(grid: &VolvoxGrid, row: i32) -> bool {
     rp.is_subtotal || crate::outline::get_node(grid, row).3 > 0
 }
 
+fn row_start_has_expander_slot(grid: &VolvoxGrid) -> bool {
+    grid.indicator_bands.row_start.visible
+        && grid.indicator_bands.row_start.slots.iter().any(|slot| {
+            slot.visible && slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
+        })
+        && grid.outline.tree_indicator != pb::TreeIndicatorStyle::TreeIndicatorNone as i32
+}
+
+pub fn selected_row_uses_outline_expander(grid: &VolvoxGrid) -> bool {
+    let row = grid.selection.row;
+    row >= grid.fixed_rows && row < grid.rows && row_start_has_expander_slot(grid)
+}
+
+pub fn selected_outline_label_keyboard_target(grid: &VolvoxGrid) -> Option<(i32, i32)> {
+    let row = grid.selection.row;
+    if !grid.is_tui_mode() || !selected_row_uses_outline_expander(grid) {
+        return None;
+    }
+    let col = grid.outline.label_column;
+    if col < 0 || col >= grid.cols || !grid.is_col_hidden(col) {
+        return None;
+    }
+    if grid.selection.col != col {
+        return None;
+    }
+    Some((row, col))
+}
+
+pub fn selected_outline_node_toggle_target(grid: &VolvoxGrid) -> Option<(i32, bool)> {
+    let (row, _) = selected_outline_label_keyboard_target(grid)?;
+    if !outline_row_has_children(grid, row) {
+        return None;
+    }
+    let collapse = !grid.row_props.get(&row).map_or(false, |rp| rp.is_collapsed);
+    Some((row, collapse))
+}
+
+pub fn selected_outline_label_edit_target(grid: &VolvoxGrid) -> Option<(i32, i32)> {
+    let (row, col) = selected_outline_label_keyboard_target(grid)?;
+    if !grid.can_begin_edit(row, col, false) {
+        return None;
+    }
+    Some((row, col))
+}
+
+pub fn toggle_selected_outline_node(grid: &mut VolvoxGrid) -> bool {
+    let Some((row, collapse)) = selected_outline_node_toggle_target(grid) else {
+        return false;
+    };
+    grid.events
+        .push(GridEventData::BeforeNodeToggle { row, collapse });
+    apply_node_toggle_after_before(grid, row, collapse);
+    true
+}
+
+fn tree_style_draws_connectors(grid: &VolvoxGrid) -> bool {
+    grid.outline.tree_indicator == pb::TreeIndicatorStyle::TreeIndicatorConnectors as i32
+        || grid.outline.tree_indicator == pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32
+}
+
 fn row_indicator_expander_toggle_hit(
     grid: &VolvoxGrid,
     vp: &VisibleRange,
@@ -958,8 +1108,15 @@ fn row_indicator_expander_toggle_hit(
             slot.width_px.max(1).min(remaining)
         };
         if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32 {
-            let tg = crate::outline::TreeGeometry::from_grid(grid);
             let depth = outline_visual_depth(grid, row).unwrap_or(0);
+            if grid.is_tui_mode() && tree_style_draws_connectors(grid) {
+                let branch_x = if depth > 0 { (depth - 1) * 4 } else { 0 };
+                let hit_start = (slot_x + branch_x).clamp(slot_x, slot_x + slot_w);
+                let hit_end = (hit_start + if depth > 0 { 4 } else { 2 }).min(slot_x + slot_w);
+                return px >= hit_start && px < hit_end.max(hit_start + 1);
+            }
+
+            let tg = crate::outline::TreeGeometry::from_grid(grid);
             let indent_x = (slot_x + depth * tg.indent_step).min(slot_x + slot_w - 1);
             let toggle_size = tg.btn_size.max(1);
             let bx = (indent_x + tg.line_offset - toggle_size / 2)
@@ -3054,7 +3211,7 @@ pub fn handle_pointer_down_with_behavior(
                     .row_props
                     .get(&hit.row)
                     .map_or(false, |rp| rp.is_collapsed);
-                if behavior.allow_node_toggle {
+                if behavior.allow_node_toggle && !dbl_click {
                     grid.events.push(GridEventData::BeforeNodeToggle {
                         row: hit.row,
                         collapse: collapsing,
@@ -4056,7 +4213,7 @@ pub fn handle_key_down_with_behavior(
                     grid.mark_dirty();
                 } else if !grid.host_key_dispatch {
                     // Enter mode: commit and move to the cell above.
-                    let target_row = (grid.selection.row - 1).max(grid.fixed_rows);
+                    let target_row = visible_focus_row_with_delta(grid, grid.selection.row, -1);
                     let target_col = grid.selection.col;
                     if commit_active_edit(grid) {
                         move_selection_after_edit_commit(grid, target_row, target_col);
@@ -4081,7 +4238,7 @@ pub fn handle_key_down_with_behavior(
                     grid.mark_dirty();
                 } else if !grid.host_key_dispatch {
                     // Enter mode: commit and move to the cell below.
-                    let target_row = (grid.selection.row + 1).min(grid.rows - 1);
+                    let target_row = visible_focus_row_with_delta(grid, grid.selection.row, 1);
                     let target_col = grid.selection.col;
                     if commit_active_edit(grid) {
                         move_selection_after_edit_commit(grid, target_row, target_col);
@@ -4129,11 +4286,11 @@ pub fn handle_key_down_with_behavior(
         38 => {
             // Up
             if shift {
-                let new_row = (grid.selection.row_end - 1).max(grid.fixed_rows);
+                let new_row = visible_focus_row_with_delta(grid, grid.selection.row_end, -1);
                 grid.selection
                     .set_extent(new_row, grid.selection.col_end, grid.rows, grid.cols);
             } else {
-                let new_row = (grid.selection.row - 1).max(grid.fixed_rows);
+                let new_row = visible_focus_row_with_delta(grid, grid.selection.row, -1);
                 grid.selection.set_cursor(
                     new_row,
                     grid.selection.col,
@@ -4165,11 +4322,11 @@ pub fn handle_key_down_with_behavior(
         40 => {
             // Down
             if shift {
-                let new_row = (grid.selection.row_end + 1).min(grid.rows - 1);
+                let new_row = visible_focus_row_with_delta(grid, grid.selection.row_end, 1);
                 grid.selection
                     .set_extent(new_row, grid.selection.col_end, grid.rows, grid.cols);
             } else {
-                let new_row = (grid.selection.row + 1).min(grid.rows - 1);
+                let new_row = visible_focus_row_with_delta(grid, grid.selection.row, 1);
                 grid.selection.set_cursor(
                     new_row,
                     grid.selection.col,
@@ -4184,7 +4341,7 @@ pub fn handle_key_down_with_behavior(
         33 => {
             // PageUp
             let page = (grid.viewport_height / grid.default_row_height).max(1);
-            let new_row = (grid.selection.row - page).max(grid.fixed_rows);
+            let new_row = visible_focus_row_with_delta(grid, grid.selection.row, -page);
             grid.selection.set_cursor(
                 new_row,
                 grid.selection.col,
@@ -4197,7 +4354,7 @@ pub fn handle_key_down_with_behavior(
         34 => {
             // PageDown
             let page = (grid.viewport_height / grid.default_row_height).max(1);
-            let new_row = (grid.selection.row + page).min(grid.rows - 1);
+            let new_row = visible_focus_row_with_delta(grid, grid.selection.row, page);
             grid.selection.set_cursor(
                 new_row,
                 grid.selection.col,
@@ -4211,8 +4368,10 @@ pub fn handle_key_down_with_behavior(
         36 => {
             // Home
             if ctrl {
+                let target_row =
+                    visible_focus_row_at_or_after(grid, grid.fixed_rows).unwrap_or(grid.fixed_rows);
                 grid.selection.set_cursor(
-                    grid.fixed_rows,
+                    target_row,
                     grid.fixed_cols,
                     grid.rows,
                     grid.cols,
@@ -4233,8 +4392,10 @@ pub fn handle_key_down_with_behavior(
         35 => {
             // End
             if ctrl {
+                let target_row =
+                    visible_focus_row_at_or_before(grid, grid.rows - 1).unwrap_or(grid.rows - 1);
                 grid.selection.set_cursor(
-                    grid.rows - 1,
+                    target_row,
                     grid.cols - 1,
                     grid.rows,
                     grid.cols,
@@ -4285,18 +4446,25 @@ pub fn handle_key_down_with_behavior(
         }
         // Space - toggle a selected checkbox without entering text edit.
         32 => {
-            if !grid.host_key_dispatch
-                && !grid.is_editing()
-                && toggle_checkbox_cell(grid, grid.selection.row, grid.selection.col)
-            {
-                grid.mark_dirty();
+            if !grid.host_key_dispatch && !grid.is_editing() {
+                if behavior.allow_node_toggle && toggle_selected_outline_node(grid) {
+                    grid.mark_dirty();
+                } else if selected_outline_label_keyboard_target(grid).is_some() {
+                    // Tree rows reserve Space for the row-indicator tree.
+                } else if toggle_checkbox_cell(grid, grid.selection.row, grid.selection.col) {
+                    grid.mark_dirty();
+                }
             }
         }
         // Enter - toggle a selected checkbox, otherwise start editing if editable
         // (skipped when host drives dispatch).
         13 => {
             if !grid.host_key_dispatch && !grid.is_editing() {
-                if toggle_checkbox_cell(grid, grid.selection.row, grid.selection.col) {
+                if behavior.allow_node_toggle && toggle_selected_outline_node(grid) {
+                    grid.mark_dirty();
+                } else if selected_outline_label_keyboard_target(grid).is_some() {
+                    // Tree rows reserve Enter for the row-indicator tree.
+                } else if toggle_checkbox_cell(grid, grid.selection.row, grid.selection.col) {
                     grid.mark_dirty();
                 } else if behavior.allow_begin_edit && grid.edit_trigger_mode >= 1 {
                     begin_edit_from_input(grid, grid.selection.row, grid.selection.col);
@@ -4310,14 +4478,12 @@ pub fn handle_key_down_with_behavior(
                 && behavior.allow_begin_edit
                 && grid.edit_trigger_mode >= 1
                 && !grid.is_editing()
-                && !is_boolean_checkbox_cell(grid, grid.selection.row, grid.selection.col)
             {
-                begin_edit_from_input_with_options(
-                    grid,
-                    grid.selection.row,
-                    grid.selection.col,
-                    true,
-                );
+                let (row, col) = selected_outline_label_edit_target(grid)
+                    .unwrap_or((grid.selection.row, grid.selection.col));
+                if !is_boolean_checkbox_cell(grid, row, col) {
+                    begin_edit_from_input_with_options(grid, row, col, true);
+                }
             }
         }
         // Delete
@@ -4489,6 +4655,9 @@ pub fn handle_key_press_with_behavior(
     } else if grid.type_ahead_mode != pb::TypeAheadMode::TypeAheadNone as i32 {
         // Type-ahead takes precedence over typing edits. In editable mode,
         // SPACE starts editing while other printable keys search.
+        if ch == ' ' && selected_outline_label_keyboard_target(grid).is_some() {
+            return;
+        }
         if ch == ' '
             && !grid.host_key_dispatch
             && behavior.allow_begin_edit
@@ -4556,6 +4725,8 @@ pub fn handle_key_press_with_behavior(
                 grid.mark_dirty();
             }
         }
+    } else if ch == ' ' && selected_outline_label_keyboard_target(grid).is_some() {
+        return;
     } else if !grid.host_key_dispatch && behavior.allow_begin_edit && grid.edit_trigger_mode >= 1 {
         // Auto-start editing on keypress (keyboard-edit mode), except for
         // select-only dropdown lists which must not accept freeform text.
@@ -6967,6 +7138,225 @@ mod tests {
             .is_some_and(|props| props.is_collapsed));
         assert!(grid.is_row_hidden(2));
         assert!(grid.is_row_hidden(3));
+    }
+
+    #[test]
+    fn row_indicator_expander_double_click_does_not_toggle_twice() {
+        let mut grid = outline_indicator_test_grid();
+        let (_cx, row_y, _cw, row_h) = grid.cell_screen_rect(1, 0).unwrap();
+        let y = (row_y + row_h / 2) as f32;
+
+        handle_pointer_down(&mut grid, 6.0, y, 0, 0, false);
+        handle_pointer_up(&mut grid, 6.0, y, 0, 0);
+        assert!(grid
+            .row_props
+            .get(&1)
+            .is_some_and(|props| props.is_collapsed));
+
+        handle_pointer_down(&mut grid, 6.0, y, 0, 0, true);
+
+        assert!(grid
+            .row_props
+            .get(&1)
+            .is_some_and(|props| props.is_collapsed));
+        assert!(grid.is_row_hidden(2));
+        assert!(grid.is_row_hidden(3));
+    }
+
+    #[test]
+    fn selected_outline_row_enter_and_space_toggle_before_edit() {
+        let mut grid = outline_indicator_test_grid();
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.edit_trigger_mode = 1;
+        grid.outline.label_column = 0;
+        grid.cols_hidden.insert(0);
+        grid.selection
+            .set_cursor(1, 0, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+
+        handle_key_down(&mut grid, 13, 0);
+
+        assert!(!grid.is_editing());
+        assert!(grid
+            .row_props
+            .get(&1)
+            .is_some_and(|props| props.is_collapsed));
+        assert!(grid.is_row_hidden(2));
+
+        handle_key_down(&mut grid, 32, 0);
+
+        assert!(!grid.is_editing());
+        assert!(grid
+            .row_props
+            .get(&1)
+            .is_some_and(|props| !props.is_collapsed));
+        assert!(!grid.is_row_hidden(2));
+
+        grid.selection
+            .set_cursor(3, 0, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+        handle_key_down(&mut grid, 13, 0);
+
+        assert!(!grid.is_editing());
+    }
+
+    #[test]
+    fn f2_on_tui_outline_row_edits_hidden_label_column() {
+        let mut grid = VolvoxGrid::new(1, 240, 180, 3, 2, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.edit_trigger_mode = 1;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.width_px = 24;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            24,
+        )];
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.outline.label_column = 0;
+        grid.cols_hidden.insert(0);
+        grid.cells.set_text(1, 0, "Reports".to_string());
+        grid.cells.set_text(1, 1, "Folder".to_string());
+        grid.row_props.entry(1).or_default().outline_level = 0;
+        prime_layout(&mut grid);
+        grid.selection
+            .set_cursor(1, 0, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+
+        handle_key_down(&mut grid, 113, 0);
+
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.edit_row, 1);
+        assert_eq!(grid.edit.edit_col, 0);
+        assert_eq!(grid.edit.edit_text, "Reports");
+    }
+
+    #[test]
+    fn f2_on_tui_outline_visible_cell_edits_selected_cell() {
+        let mut grid = VolvoxGrid::new(1, 240, 180, 3, 2, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.edit_trigger_mode = 1;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.width_px = 24;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            24,
+        )];
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.outline.label_column = 0;
+        grid.cols_hidden.insert(0);
+        grid.cells.set_text(1, 0, "Reports".to_string());
+        grid.cells.set_text(1, 1, "Folder".to_string());
+        grid.row_props.entry(1).or_default().outline_level = 0;
+        prime_layout(&mut grid);
+        grid.selection
+            .set_cursor(1, 1, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+
+        handle_key_down(&mut grid, 113, 0);
+
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.edit_row, 1);
+        assert_eq!(grid.edit.edit_col, 1);
+        assert_eq!(grid.edit.edit_text, "Folder");
+    }
+
+    #[test]
+    fn enter_on_tui_outline_visible_cell_edits_selected_cell() {
+        let mut grid = VolvoxGrid::new(1, 240, 180, 3, 2, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.edit_trigger_mode = 1;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.width_px = 24;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            24,
+        )];
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.outline.label_column = 0;
+        grid.cols_hidden.insert(0);
+        grid.cells.set_text(1, 0, "Reports".to_string());
+        grid.cells.set_text(1, 1, "Folder".to_string());
+        grid.row_props.entry(1).or_default().outline_level = 0;
+        grid.row_props.entry(2).or_default().outline_level = 1;
+        prime_layout(&mut grid);
+        grid.selection
+            .set_cursor(1, 1, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+
+        handle_key_down(&mut grid, 13, 0);
+
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.edit_row, 1);
+        assert_eq!(grid.edit.edit_col, 1);
+        assert_eq!(grid.edit.edit_text, "Folder");
+        assert!(!grid
+            .row_props
+            .get(&1)
+            .is_some_and(|props| props.is_collapsed));
+    }
+
+    #[test]
+    fn keyboard_navigation_skips_collapsed_outline_rows() {
+        let mut grid = VolvoxGrid::new(1, 240, 180, 6, 2, 1, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.width_px = 80;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            80,
+        )];
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorArrowsLeaf as i32;
+        grid.outline.label_column = 0;
+        grid.cols_hidden.insert(0);
+        grid.row_props.entry(1).or_default().outline_level = 0;
+        grid.row_props.entry(2).or_default().outline_level = 1;
+        grid.row_props.entry(3).or_default().outline_level = 2;
+        grid.row_props.entry(4).or_default().outline_level = 0;
+        grid.row_props.entry(5).or_default().outline_level = 1;
+        prime_layout(&mut grid);
+        grid.selection
+            .set_cursor(1, 0, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+
+        handle_key_down(&mut grid, 13, 0);
+
+        assert!(grid.is_row_hidden(2));
+        assert!(grid.is_row_hidden(3));
+
+        handle_key_down(&mut grid, 40, 0);
+
+        assert_eq!(grid.selection.row, 4);
+
+        handle_key_down(&mut grid, 38, 0);
+
+        assert_eq!(grid.selection.row, 1);
+    }
+
+    #[test]
+    fn tui_connector_expander_hit_uses_rendered_tree_prefix() {
+        let mut grid = VolvoxGrid::new(1, 240, 180, 6, 2, 1, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.width_px = 80;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            80,
+        )];
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.row_props.entry(1).or_default().outline_level = 0;
+        grid.row_props.entry(2).or_default().outline_level = 1;
+        grid.row_props.entry(3).or_default().outline_level = 2;
+        grid.row_props.entry(4).or_default().outline_level = 3;
+        grid.row_props.entry(5).or_default().outline_level = 4;
+        prime_layout(&mut grid);
+
+        let (_cx, row_y, _cw, row_h) = grid.cell_screen_rect(4, 0).unwrap();
+        let hit = hit_test(&mut grid, 10.0, (row_y + row_h / 2) as f32);
+
+        assert_eq!(hit.area, HitArea::OutlineButton);
+        assert_eq!(hit.row, 4);
     }
 
     #[test]

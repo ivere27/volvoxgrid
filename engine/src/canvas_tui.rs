@@ -4,6 +4,7 @@ use crate::canvas::{
 use crate::control::CellControl;
 use crate::grid::VolvoxGrid;
 use crate::proto::volvoxgrid::v1 as pb;
+use crate::row::RowProps;
 use crate::sort::sort_order_is_ascending;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
@@ -142,6 +143,12 @@ struct RenderColumn {
 struct OutlineState {
     has_subtotal_nodes: bool,
     subtotal_level_floor: i32,
+}
+
+#[derive(Clone, Debug, Default)]
+struct RowIndicatorLabelRender {
+    text: String,
+    edit_start: Option<i32>,
 }
 
 struct Surface<'a> {
@@ -803,7 +810,11 @@ fn resolve_row_indicator_width(grid: &VolvoxGrid) -> i32 {
         && grid.outline.tree_indicator != pb::TreeIndicatorStyle::TreeIndicatorNone as i32
     {
         let max_depth = crate::outline::outline_level_button_max(grid).max(0);
-        let prefix_chars = max_depth.saturating_mul(2).saturating_add(2);
+        let prefix_chars = if tree_style_draws_connectors(grid) {
+            max_depth.saturating_mul(4).saturating_add(2)
+        } else {
+            max_depth.saturating_mul(2).saturating_add(2)
+        };
         let label_col = grid.outline.label_column;
         let label_chars = if label_col >= 0 && label_col < grid.cols {
             row_indicator_label_source_width(grid, label_col)
@@ -1214,24 +1225,37 @@ fn render_row_indicator_row(
     };
     surface.fill_span(0, y, row_indicator_width.saturating_sub(1), fg, bg, attr);
 
-    let label = row_indicator_label(grid, row);
-    if !label.is_empty() && row_indicator_width > 1 {
+    let label = row_indicator_label_render(grid, row);
+    if !label.text.is_empty() && row_indicator_width > 1 {
+        let label_column = RenderColumn {
+            col: -1,
+            x: 0,
+            width: row_indicator_width - 1,
+            full_width: row_indicator_width - 1,
+            crop: 0,
+        };
         write_cell_text(
             surface,
-            RenderColumn {
-                col: -1,
-                x: 0,
-                width: row_indicator_width - 1,
-                full_width: row_indicator_width - 1,
-                crop: 0,
-            },
+            label_column,
             y,
-            &label,
+            &label.text,
             fg,
             bg,
             attr,
-            2,
+            row_indicator_label_halign(grid),
         );
+        if let Some(edit_start) = label.edit_start {
+            render_row_indicator_label_editor(
+                grid,
+                surface,
+                y,
+                edit_start,
+                row_indicator_width,
+                fg,
+                bg,
+                attr,
+            );
+        }
     }
 
     surface.put(
@@ -1242,6 +1266,70 @@ fn render_row_indicator_row(
         bg,
         attr & TUI_ATTR_BOLD,
     );
+}
+
+fn render_row_indicator_label_editor(
+    grid: &VolvoxGrid,
+    surface: &mut Surface<'_>,
+    y: i32,
+    edit_start: i32,
+    row_indicator_width: i32,
+    fg: u32,
+    bg: u32,
+    attr: u8,
+) {
+    if !grid.edit.is_active() || row_indicator_width <= 1 {
+        return;
+    }
+
+    let edit_x = edit_start.clamp(0, row_indicator_width - 1);
+    let edit_w = (row_indicator_width - 1 - edit_x).max(0);
+    if edit_w <= 0 {
+        return;
+    }
+
+    let edit_column = RenderColumn {
+        col: grid.edit.edit_col,
+        x: edit_x,
+        width: edit_w,
+        full_width: edit_w,
+        crop: 0,
+    };
+    let edit_attr = attr & !TUI_ATTR_REVERSE;
+    let text = grid.edit.edit_text.as_str();
+    let fitted = fit_edit_text(
+        text,
+        edit_column.full_width,
+        0,
+        grid.edit.current_caret_char().max(0) as usize,
+    );
+    write_fitted_cell_text(surface, edit_column, y, &fitted.text, fg, bg, edit_attr);
+    write_edit_selection(
+        surface,
+        edit_column,
+        y,
+        text,
+        fitted.draw_x,
+        grid.edit.sel_start,
+        grid.edit.sel_length,
+        edit_attr | TUI_ATTR_REVERSE,
+    );
+
+    if grid.edit.sel_length <= 0 {
+        let cell_x = edit_column.x + fitted.cursor_x;
+        if cell_x >= edit_column.x && cell_x < edit_column.x + edit_column.width {
+            if let Some(cell) = surface.get(cell_x, y) {
+                surface.put(
+                    cell_x,
+                    y,
+                    cell.ch(),
+                    cell.fg,
+                    cell.bg,
+                    caret_attr(cell.attr),
+                );
+            }
+        }
+    }
 }
 
 fn merged_render_column(
@@ -1408,6 +1496,10 @@ fn outline_prefix(grid: &VolvoxGrid, row: i32, outline_state: OutlineState) -> S
         return String::new();
     };
 
+    if tree_style_draws_connectors(grid) {
+        return directory_outline_prefix(grid, row, props, outline_state);
+    }
+
     if outline_state.has_subtotal_nodes {
         let visual_level = subtotal_visual_level(
             props.outline_level,
@@ -1442,6 +1534,107 @@ fn outline_prefix(grid: &VolvoxGrid, row: i32, outline_state: OutlineState) -> S
     prefix
 }
 
+fn directory_outline_prefix(
+    grid: &VolvoxGrid,
+    row: i32,
+    props: &RowProps,
+    outline_state: OutlineState,
+) -> String {
+    let depth = tui_outline_visual_depth(grid, row, outline_state).unwrap_or(0);
+    let has_children = tui_outline_row_has_children(grid, row, props, outline_state);
+    let mut prefix = String::new();
+
+    for ancestor_depth in 1..depth {
+        if tui_outline_branch_continues_after(grid, row, ancestor_depth, outline_state) {
+            prefix.push_str("│   ");
+        } else {
+            prefix.push_str("    ");
+        }
+    }
+
+    if depth > 0 {
+        if tui_outline_branch_continues_after(grid, row, depth, outline_state) {
+            prefix.push_str("├─");
+        } else {
+            prefix.push_str("└─");
+        }
+    }
+
+    if has_children {
+        prefix.push(if props.is_collapsed { '▸' } else { '▾' });
+        prefix.push(' ');
+    } else if tree_style_shows_leaf(grid) {
+        if depth > 0 {
+            prefix.push_str("─ ");
+        } else {
+            prefix.push_str("• ");
+        }
+    } else if depth > 0 {
+        prefix.push_str("  ");
+    }
+
+    prefix
+}
+
+fn tui_outline_visual_depth(
+    grid: &VolvoxGrid,
+    row: i32,
+    outline_state: OutlineState,
+) -> Option<i32> {
+    let props = grid.get_row_props(row)?;
+    if outline_state.has_subtotal_nodes {
+        let visual_level = subtotal_visual_level(
+            props.outline_level,
+            props.is_subtotal,
+            outline_state.subtotal_level_floor,
+        );
+        Some((visual_level - 1).max(0))
+    } else {
+        Some(crate::outline::outline_visual_depth_for_level(
+            grid,
+            props.outline_level,
+        ))
+    }
+}
+
+fn tui_outline_row_has_children(
+    grid: &VolvoxGrid,
+    row: i32,
+    props: &RowProps,
+    outline_state: OutlineState,
+) -> bool {
+    if outline_state.has_subtotal_nodes && props.is_subtotal {
+        return true;
+    }
+    row_has_outline_children(grid, row, props.outline_level)
+}
+
+fn tui_outline_branch_continues_after(
+    grid: &VolvoxGrid,
+    row: i32,
+    depth: i32,
+    outline_state: OutlineState,
+) -> bool {
+    if depth < 0 {
+        return false;
+    }
+    for next_row in (row + 1)..grid.rows {
+        if grid.is_row_hidden(next_row) {
+            continue;
+        }
+        let Some(next_depth) = tui_outline_visual_depth(grid, next_row, outline_state) else {
+            continue;
+        };
+        if next_depth < depth {
+            return false;
+        }
+        if next_depth == depth {
+            return true;
+        }
+    }
+    false
+}
+
 fn row_has_outline_children(grid: &VolvoxGrid, row: i32, level: i32) -> bool {
     for next_row in (row + 1)..grid.rows {
         let next_level = grid
@@ -1453,6 +1646,14 @@ fn row_has_outline_children(grid: &VolvoxGrid, row: i32, level: i32) -> bool {
         return true;
     }
     false
+}
+
+fn tree_style_draws_connectors(grid: &VolvoxGrid) -> bool {
+    matches!(
+        grid.outline.tree_indicator,
+        x if x == pb::TreeIndicatorStyle::TreeIndicatorConnectors as i32
+            || x == pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32
+    )
 }
 
 fn tree_style_shows_leaf(grid: &VolvoxGrid) -> bool {
@@ -1505,50 +1706,93 @@ fn row_indicator_fore_color(grid: &VolvoxGrid, background_mode: TuiBackgroundMod
     )
 }
 
-fn row_indicator_label(grid: &VolvoxGrid, row: i32) -> String {
+fn row_indicator_label_render(grid: &VolvoxGrid, row: i32) -> RowIndicatorLabelRender {
     let band = &grid.indicator_bands.row_start;
-    let mut label = String::new();
+    let mut render = RowIndicatorLabelRender::default();
     let outline_state = outline_state(grid);
     for slot in band.slots.iter().filter(|slot| slot.visible) {
-        let segment = if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32 {
-            Some((row - grid.fixed_rows + 1).max(1).to_string())
-        } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotCurrent as i32
-            && row == grid.selection.row
-        {
-            Some("▶".to_string())
-        } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotSelection as i32
-            && should_highlight_row_indicator(grid, row)
-        {
-            Some("•".to_string())
-        } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotEditing as i32
-            && grid.edit.is_active()
-            && grid.edit.edit_row == row
-        {
-            Some("✎".to_string())
-        } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32 {
-            let mut segment = outline_prefix(grid, row, outline_state);
-            if grid.outline.label_column >= 0
-                && grid.outline.label_column < grid.cols
-                && row >= grid.fixed_rows
+        let (segment, edit_start_in_segment) =
+            if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32 {
+                (Some((row - grid.fixed_rows + 1).max(1).to_string()), None)
+            } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotCurrent as i32
+                && row == grid.selection.row
             {
-                segment.push_str(&grid.get_display_text(row, grid.outline.label_column));
-            }
-            if segment.is_empty() {
-                None
+                (Some("▶".to_string()), None)
+            } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotSelection as i32
+                && should_highlight_row_indicator(grid, row)
+            {
+                (Some("•".to_string()), None)
+            } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotEditing as i32
+                && grid.edit.is_active()
+                && grid.edit.edit_row == row
+            {
+                (Some("✎".to_string()), None)
+            } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32 {
+                let mut segment = outline_prefix(grid, row, outline_state);
+                let prefix_width = UnicodeWidthStr::width(segment.as_str()) as i32;
+                let mut edit_start = None;
+                if grid.outline.label_column >= 0
+                    && grid.outline.label_column < grid.cols
+                    && row >= grid.fixed_rows
+                {
+                    if grid.edit.is_active()
+                        && grid.edit.edit_row == row
+                        && grid.edit.edit_col == grid.outline.label_column
+                        && grid.is_col_hidden(grid.outline.label_column)
+                    {
+                        edit_start = Some(prefix_width);
+                        segment.push_str(&grid.edit.edit_text);
+                    } else {
+                        segment.push_str(&grid.get_display_text(row, grid.outline.label_column));
+                    }
+                }
+                if segment.is_empty() {
+                    (None, None)
+                } else {
+                    (Some(segment), edit_start)
+                }
             } else {
-                Some(segment)
-            }
-        } else {
-            None
-        };
+                (None, None)
+            };
         if let Some(segment) = segment {
-            if !label.is_empty() {
-                label.push(' ');
+            if !render.text.is_empty() {
+                render.text.push(' ');
             }
-            label.push_str(&segment);
+            let segment_x = UnicodeWidthStr::width(render.text.as_str()) as i32;
+            if render.edit_start.is_none() {
+                if let Some(edit_start) = edit_start_in_segment {
+                    render.edit_start = Some(segment_x + edit_start);
+                }
+            }
+            render.text.push_str(&segment);
         }
     }
-    label
+    render
+}
+
+fn row_indicator_label_halign(grid: &VolvoxGrid) -> i32 {
+    if row_indicator_has_expander_label(grid) {
+        0
+    } else {
+        2
+    }
+}
+
+fn row_indicator_has_expander_label(grid: &VolvoxGrid) -> bool {
+    if grid.outline.tree_indicator == pb::TreeIndicatorStyle::TreeIndicatorNone as i32 {
+        return false;
+    }
+    let has_label_source = (grid.outline.label_column >= 0
+        && grid.outline.label_column < grid.cols)
+        || (grid.outline.icon_column >= 0 && grid.outline.icon_column < grid.cols);
+    has_label_source
+        && grid
+            .indicator_bands
+            .row_start
+            .slots
+            .iter()
+            .filter(|slot| slot.visible)
+            .any(|slot| slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32)
 }
 
 fn cell_has_checkbox_visual(
@@ -2617,6 +2861,84 @@ mod tests {
             .iter()
             .copied()
             .any(|cell| cell.bg == 0x22C55E));
+    }
+
+    #[test]
+    fn render_grid_tui_renders_directory_style_connector_labels() {
+        let mut grid = VolvoxGrid::new(1, 80, 6, 5, 2, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.columns[0].caption = "Name".to_string();
+        grid.columns[1].caption = "Type".to_string();
+        grid.set_col_width(0, 16);
+        grid.set_col_width(1, 8);
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.outline.label_column = 0;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            32,
+        )];
+
+        for (row, (label, level)) in [
+            ("Documents", 0),
+            ("Reports", 1),
+            ("Q1.xlsx", 2),
+            ("Q2.xlsx", 2),
+            ("Invoices", 1),
+        ]
+        .iter()
+        .enumerate()
+        {
+            grid.cells.set_text(row as i32, 0, (*label).to_string());
+            grid.row_props.entry(row as i32).or_default().outline_level = *level;
+        }
+
+        let mut buffer = vec![TuiCell::default(); 80 * 6];
+        render_grid_tui(&mut grid, &mut buffer, 80, 6, 80);
+
+        assert!(row_text(&buffer, 80, 1, 32).starts_with("▾ Documents"));
+        assert!(row_text(&buffer, 80, 2, 32).starts_with("├─▾ Reports"));
+        assert!(row_text(&buffer, 80, 3, 32).starts_with("│   ├── Q1.xlsx"));
+        assert!(row_text(&buffer, 80, 4, 32).starts_with("│   └── Q2.xlsx"));
+        assert!(row_text(&buffer, 80, 5, 32).starts_with("└── Invoices"));
+    }
+
+    #[test]
+    fn render_grid_tui_draws_hidden_outline_label_editor_in_row_indicator() {
+        let mut grid = VolvoxGrid::new(1, 40, 4, 2, 2, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.selection.selection_visibility = pb::SelectionVisibility::SelectionVisNone as i32;
+        grid.edit_trigger_mode = 1;
+        grid.columns[0].caption = "Name".to_string();
+        grid.columns[1].caption = "Type".to_string();
+        grid.set_col_width(0, 12);
+        grid.set_col_width(1, 8);
+        grid.cols_hidden.insert(0);
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.outline.label_column = 0;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.width_px = 16;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            16,
+        )];
+        grid.cells.set_text(0, 0, "Folder".to_string());
+        grid.cells.set_text(0, 1, "dir".to_string());
+        grid.cells.set_text(1, 0, "Child".to_string());
+        grid.row_props.entry(0).or_default().outline_level = 0;
+        grid.row_props.entry(1).or_default().outline_level = 1;
+        grid.selection
+            .set_cursor(0, 0, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+
+        crate::input::handle_key_down(&mut grid, 113, 0);
+
+        let mut buffer = vec![TuiCell::default(); 40 * 4];
+        render_grid_tui(&mut grid, &mut buffer, 40, 4, 40);
+
+        let row = row_text(&buffer, 40, 1, 16);
+        assert!(row.starts_with("▾ Folder"));
+        assert_ne!(buffer[40 + 8].attr & TUI_ATTR_REVERSE, 0);
     }
 
     #[test]

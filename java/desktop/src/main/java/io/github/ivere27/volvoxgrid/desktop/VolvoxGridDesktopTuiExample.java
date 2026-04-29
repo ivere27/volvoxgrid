@@ -745,7 +745,7 @@ public final class VolvoxGridDesktopTuiExample {
             )
             .setOutline(
                 OutlineConfig.newBuilder()
-                    .setTreeIndicator(TreeIndicatorStyle.TREE_INDICATOR_ARROWS_LEAF)
+                    .setTreeIndicator(TreeIndicatorStyle.TREE_INDICATOR_CONNECTORS_LEAF)
                     .setIndicatorIndent(HIERARCHY_TUI_OUTLINE_INDENT)
                     .setMaxLevels(Math.max(0, maxOutlineLevel))
                     .setShowLevelButtons(true)
@@ -1478,8 +1478,11 @@ public final class VolvoxGridDesktopTuiExample {
                     + (mode == null ? "Ready" : mode);
             }
 
+            String primaryAction = currentDemo == DemoKind.HIERARCHY
+                ? "Enter/Space Toggle  F2/i Edit"
+                : "Enter/F2/i Edit";
             String footer =
-                " hjkl Move  Enter/F2/i Edit  Ins AutoStart  F6 Sales  F7 Hierarchy  F8 Stress  F12 Debug  Ctrl+Q Quit"
+                " hjkl Move  " + primaryAction + "  Ins AutoStart  F6 Sales  F7 Hierarchy  F8 Stress  F12 Debug  Ctrl+Q Quit"
                     + "  / Search  n/N Next/Prev  |  current: "
                     + currentDemo.title()
                     + "  |  mode: "

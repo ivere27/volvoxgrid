@@ -126,6 +126,7 @@ fn with_tui_pointer_geometry<R>(
         grid.indicator_bands.row_start.width_px =
             volvoxgrid_engine::canvas_tui::tui_row_indicator_width(grid).max(1);
         grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.fit_slots_to_width();
     }
     grid.indicator_bands.col_top.visible = true;
     grid.indicator_bands.col_top.default_row_height_px = 1;
@@ -517,18 +518,20 @@ fn handle_pointer_render_input(
                                     );
                                 }
 
-                                if hit.row >= 0 && hit.col >= 0 {
-                                    if hit.area == volvoxgrid_engine::input::HitArea::OutlineButton
-                                    {
-                                        let collapsing = !grid
-                                            .row_props
-                                            .get(&hit.row)
-                                            .map_or(false, |rp| rp.is_collapsed);
-                                        plugin.request_before_node_toggle(
-                                            grid_id, grid, hit.row, collapsing,
-                                        );
-                                    }
+                                if hit.row >= 0
+                                    && !pe.dbl_click
+                                    && hit.area == volvoxgrid_engine::input::HitArea::OutlineButton
+                                {
+                                    let collapsing = !grid
+                                        .row_props
+                                        .get(&hit.row)
+                                        .map_or(false, |rp| rp.is_collapsed);
+                                    plugin.request_before_node_toggle(
+                                        grid_id, grid, hit.row, collapsing,
+                                    );
+                                }
 
+                                if hit.row >= 0 && hit.col >= 0 {
                                     let is_cell_like = hit.area
                                         == volvoxgrid_engine::input::HitArea::Cell
                                         || hit.area == volvoxgrid_engine::input::HitArea::FixedRow
@@ -737,12 +740,15 @@ fn handle_key_render_input(
                 // can type to replace or press arrows to deselect and edit.
                 if !was_editing && !grid.host_key_dispatch && grid.edit_trigger_mode >= 1 {
                     let caret_end = Some(true);
+                    let (edit_row, edit_col) =
+                        volvoxgrid_engine::input::selected_outline_label_edit_target(grid)
+                            .unwrap_or((grid.selection.row, grid.selection.col));
                     if decision_enabled {
                         let _ = plugin.request_before_edit(
                             grid_id,
                             grid,
-                            grid.selection.row,
-                            grid.selection.col,
+                            edit_row,
+                            edit_col,
                             false,
                             false,
                             None,
@@ -756,8 +762,8 @@ fn handle_key_render_input(
                     } else {
                         begin_edit_session_core_opts(
                             grid,
-                            grid.selection.row,
-                            grid.selection.col,
+                            edit_row,
+                            edit_col,
                             false,
                             true,
                             true,
@@ -796,26 +802,51 @@ fn handle_key_render_input(
             terminal_tui::TerminalKeyPolicyDecision::Forward => match ke.r#type {
                 t if t == pb::key_event::Type::KeyDown as i32 => {
                     if decision_enabled {
-                        volvoxgrid_engine::input::handle_key_down_with_behavior(
-                            grid,
-                            ke.key_code,
-                            ke.modifier,
-                            volvoxgrid_engine::input::InputBehavior {
-                                allow_begin_edit: false,
-                                allow_header_sort: true,
-                                ..volvoxgrid_engine::input::InputBehavior::default()
-                            },
-                        );
-                        if (ke.key_code == 13 || ke.key_code == 113)
+                        let uses_outline_expander = (ke.key_code == 13 || ke.key_code == 32)
+                            && !was_editing
+                            && !grid.host_key_dispatch
+                            && volvoxgrid_engine::input::selected_outline_label_keyboard_target(
+                                grid,
+                            )
+                            .is_some();
+                        if uses_outline_expander {
+                            if let Some((row, collapse)) =
+                                volvoxgrid_engine::input::selected_outline_node_toggle_target(grid)
+                            {
+                                plugin.request_before_node_toggle(grid_id, grid, row, collapse);
+                            }
+                        } else {
+                            volvoxgrid_engine::input::handle_key_down_with_behavior(
+                                grid,
+                                ke.key_code,
+                                ke.modifier,
+                                volvoxgrid_engine::input::InputBehavior {
+                                    allow_begin_edit: false,
+                                    allow_header_sort: true,
+                                    ..volvoxgrid_engine::input::InputBehavior::default()
+                                },
+                            );
+                        }
+                        if !uses_outline_expander
+                            && (ke.key_code == 13 || ke.key_code == 113)
                             && !grid.host_key_dispatch
                             && grid.edit_trigger_mode >= 1
                             && !was_editing
                         {
+                            let (edit_row, edit_col) =
+                                if ke.key_code == 113 {
+                                    volvoxgrid_engine::input::selected_outline_label_edit_target(
+                                        grid,
+                                    )
+                                    .unwrap_or((grid.selection.row, grid.selection.col))
+                                } else {
+                                    (grid.selection.row, grid.selection.col)
+                                };
                             let _ = plugin.request_before_edit(
                                 grid_id,
                                 grid,
-                                grid.selection.row,
-                                grid.selection.col,
+                                edit_row,
+                                edit_col,
                                 false,
                                 false,
                                 None,
@@ -836,16 +867,24 @@ fn handle_key_render_input(
                 }
                 t if t == pb::key_event::Type::KeyPress as i32 => {
                     if decision_enabled {
-                        volvoxgrid_engine::input::handle_key_press_with_behavior(
-                            grid,
-                            ke.character.chars().next().map(|c| c as u32).unwrap_or(0),
-                            volvoxgrid_engine::input::InputBehavior {
-                                allow_begin_edit: false,
-                                allow_header_sort: true,
-                                ..volvoxgrid_engine::input::InputBehavior::default()
-                            },
-                        );
-                        if !was_editing
+                        let outline_space = ke.character == " "
+                            && volvoxgrid_engine::input::selected_outline_label_keyboard_target(
+                                grid,
+                            )
+                            .is_some();
+                        if !outline_space {
+                            volvoxgrid_engine::input::handle_key_press_with_behavior(
+                                grid,
+                                ke.character.chars().next().map(|c| c as u32).unwrap_or(0),
+                                volvoxgrid_engine::input::InputBehavior {
+                                    allow_begin_edit: false,
+                                    allow_header_sort: true,
+                                    ..volvoxgrid_engine::input::InputBehavior::default()
+                                },
+                            );
+                        }
+                        if !outline_space
+                            && !was_editing
                             && !grid.host_key_dispatch
                             && grid.edit_trigger_mode >= 1
                             && grid.type_ahead_mode == 0
@@ -853,11 +892,16 @@ fn handle_key_render_input(
                             let seed = ke.character.chars().next().map(|c| c.to_string());
                             if let Some(seed) = seed {
                                 if !seed.is_empty() {
+                                    let (edit_row, edit_col) =
+                                        volvoxgrid_engine::input::selected_outline_label_edit_target(
+                                            grid,
+                                        )
+                                        .unwrap_or((grid.selection.row, grid.selection.col));
                                     let _ = plugin.request_before_edit(
                                         grid_id,
                                         grid,
-                                        grid.selection.row,
-                                        grid.selection.col,
+                                        edit_row,
+                                        edit_col,
                                         false,
                                         false,
                                         Some(seed),
@@ -1623,7 +1667,8 @@ fn apply_zoom_scale(
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_zoom_scale, capture_zoom_state, should_request_pointer_header_sort, PluginStream,
+        apply_zoom_scale, capture_zoom_state, should_request_pointer_header_sort,
+        with_tui_pointer_geometry, PluginStream, PluginStreamBidi, PluginStreamReceiver,
         PluginStreamSender, VolvoxGridPlugin, VolvoxGridServicePlugin,
     };
     use std::collections::{HashMap, HashSet};
@@ -1677,6 +1722,35 @@ mod tests {
             }
         }
     }
+
+    #[derive(Default)]
+    struct TestRenderStream {
+        outputs: Mutex<Vec<pb::RenderOutput>>,
+    }
+
+    impl PluginStream for TestRenderStream {
+        fn is_cancelled(&self) -> bool {
+            false
+        }
+    }
+
+    impl PluginStreamSender<pb::RenderOutput> for TestRenderStream {
+        fn send(&self, msg: pb::RenderOutput) -> bool {
+            self.outputs
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(msg);
+            true
+        }
+    }
+
+    impl PluginStreamReceiver<pb::RenderInput> for TestRenderStream {
+        fn recv(&self) -> Option<pb::RenderInput> {
+            None
+        }
+    }
+
+    impl PluginStreamBidi<pb::RenderInput, pb::RenderOutput> for TestRenderStream {}
 
     impl PluginStream for AutoCompareEventStream {
         fn is_cancelled(&self) -> bool {
@@ -2109,6 +2183,138 @@ mod tests {
 
         grid.header_features = 0;
         assert!(!should_request_pointer_header_sort(&grid, &hit, false));
+    }
+
+    #[test]
+    fn tui_pointer_geometry_aligns_cell_hit_x_with_rendered_row_indicator() {
+        let mut grid = VolvoxGrid::new(1, 80, 12, 3, 2, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.set_col_width(0, 28);
+        grid.cols_hidden.insert(0);
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.width_px = 44;
+        grid.indicator_bands.row_start.slots =
+            vec![volvoxgrid_engine::indicator::RowIndicatorSlotState::new(
+                pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+                44,
+            )];
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 1;
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.outline.label_column = 0;
+        grid.outline.max_levels = 3;
+        grid.layout.invalidate();
+        grid.ensure_layout();
+
+        let rendered_width = volvoxgrid_engine::canvas_tui::tui_row_indicator_width(&grid);
+        assert_eq!(rendered_width, 43);
+        assert_eq!(grid.indicator_bands.row_start.resolved_width_px(), 44);
+
+        with_tui_pointer_geometry(&mut grid, |grid| {
+            assert_eq!(
+                grid.indicator_bands.row_start.resolved_width_px(),
+                rendered_width
+            );
+            let translation = volvoxgrid_engine::canvas_tui::translate_tui_mouse_x_for_hit(
+                grid,
+                80,
+                12,
+                rendered_width,
+            );
+            let hit = volvoxgrid_engine::input::hit_test(grid, translation.hit_test_x as f32, 1.0);
+
+            assert_eq!(translation.col, 1);
+            assert_eq!(hit.row, 0);
+            assert_eq!(hit.col, 1);
+            assert_eq!(hit.area, HitArea::Cell);
+        });
+
+        assert_eq!(grid.indicator_bands.row_start.resolved_width_px(), 44);
+    }
+
+    #[test]
+    fn tui_visible_outline_cell_enter_requests_edit_not_node_toggle() {
+        let (plugin, grid_id) = plugin_with_decision_grid(3, 2);
+        plugin
+            .with_grid(grid_id, |grid| {
+                grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+                grid.edit_trigger_mode = 1;
+                grid.indicator_bands.row_start.visible = true;
+                grid.indicator_bands.row_start.auto_size = false;
+                grid.indicator_bands.row_start.width_px = 24;
+                grid.indicator_bands.row_start.slots =
+                    vec![volvoxgrid_engine::indicator::RowIndicatorSlotState::new(
+                        pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+                        24,
+                    )];
+                grid.outline.tree_indicator =
+                    pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+                grid.outline.label_column = 0;
+                grid.cols_hidden.insert(0);
+                grid.cells.set_text(1, 0, "Reports".to_string());
+                grid.cells.set_text(1, 1, "Folder".to_string());
+                grid.row_props.entry(1).or_default().outline_level = 0;
+                grid.row_props.entry(2).or_default().outline_level = 1;
+                grid.selection.set_cursor(
+                    1,
+                    1,
+                    grid.rows,
+                    grid.cols,
+                    grid.fixed_rows,
+                    grid.fixed_cols,
+                );
+            })
+            .unwrap();
+
+        let stream = TestRenderStream::default();
+        let mut sent_edit_requests = HashMap::new();
+        super::handle_key_render_input(
+            &plugin,
+            &stream,
+            &mut sent_edit_requests,
+            grid_id,
+            pb::KeyEvent {
+                r#type: pb::key_event::Type::KeyDown as i32,
+                key_code: 13,
+                modifier: 0,
+                character: String::new(),
+            },
+            false,
+            None,
+        );
+
+        let edit_event_id = plugin
+            .with_grid(grid_id, |grid| {
+                let events = grid.events.drain();
+                assert!(!events
+                    .iter()
+                    .any(|event| { matches!(event.data, GridEventData::BeforeNodeToggle { .. }) }));
+                events
+                    .iter()
+                    .find_map(|event| {
+                        matches!(event.data, GridEventData::BeforeEdit { row: 1, col: 1 })
+                            .then_some(event.event_id)
+                    })
+                    .expect("visible cell Enter should request BeforeEdit")
+            })
+            .unwrap();
+
+        let _ = plugin.resolve_event_decision(grid_id, edit_event_id, false);
+        plugin
+            .with_grid(grid_id, |grid| {
+                assert!(grid.edit.is_active());
+                assert_eq!(grid.edit.edit_row, 1);
+                assert_eq!(grid.edit.edit_col, 1);
+                assert!(!grid
+                    .row_props
+                    .get(&1)
+                    .is_some_and(|props| props.is_collapsed));
+            })
+            .unwrap();
+
+        destroy_test_grid(&plugin, grid_id);
     }
 
     #[test]
@@ -3873,15 +4079,18 @@ impl VolvoxGridPlugin {
             self.request_before_user_resize(grid_id, grid, hit.row, -1, y);
         }
 
-        if hit.row >= 0 && hit.col >= 0 {
-            if hit.area == volvoxgrid_engine::input::HitArea::OutlineButton {
-                let collapsing = !grid
-                    .row_props
-                    .get(&hit.row)
-                    .map_or(false, |rp| rp.is_collapsed);
-                self.request_before_node_toggle(grid_id, grid, hit.row, collapsing);
-            }
+        if hit.row >= 0
+            && !dbl_click
+            && hit.area == volvoxgrid_engine::input::HitArea::OutlineButton
+        {
+            let collapsing = !grid
+                .row_props
+                .get(&hit.row)
+                .map_or(false, |rp| rp.is_collapsed);
+            self.request_before_node_toggle(grid_id, grid, hit.row, collapsing);
+        }
 
+        if hit.row >= 0 && hit.col >= 0 {
             let is_cell_like = hit.area == volvoxgrid_engine::input::HitArea::Cell
                 || hit.area == volvoxgrid_engine::input::HitArea::FixedRow
                 || hit.area == volvoxgrid_engine::input::HitArea::FixedCol;

@@ -516,7 +516,7 @@ func buildHierarchyTuiConfig(rows, cols int, maxOutlineDepth, maxOutlineLevel in
 			DropdownTrigger: ptr(pb.DropdownTrigger_DROPDOWN_NEVER),
 		},
 		Outline: &pb.OutlineConfig{
-			TreeIndicator:    ptr(pb.TreeIndicatorStyle_TREE_INDICATOR_ARROWS_LEAF),
+			TreeIndicator:    ptr(pb.TreeIndicatorStyle_TREE_INDICATOR_CONNECTORS_LEAF),
 			IndicatorIndent:  ptr(hierarchyTuiOutlineIndent),
 			MaxLevels:        ptr(maxOutlineLevel),
 			ShowLevelButtons: ptr(true),

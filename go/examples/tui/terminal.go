@@ -378,7 +378,11 @@ func (c *demoController) footerText(mode string) string {
 			c.currentDemo.title() + "  |  mode: " + mode
 	}
 
-	footer := " hjkl Move  Enter/F2/i Edit  Ins AutoStart  F6 Sales  F7 Hierarchy  F8 Stress  F12 Debug  Ctrl+Q Quit" +
+	primaryAction := "Enter/F2/i Edit"
+	if c.currentDemo == demoHierarchy {
+		primaryAction = "Enter/Space Toggle  F2/i Edit"
+	}
+	footer := " hjkl Move  " + primaryAction + "  Ins AutoStart  F6 Sales  F7 Hierarchy  F8 Stress  F12 Debug  Ctrl+Q Quit" +
 		"  / Search  n/N Next/Prev  |  current: " + c.currentDemo.title() +
 		"  |  mode: " + mode
 	if c.search.status != "" {

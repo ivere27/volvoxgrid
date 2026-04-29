@@ -544,7 +544,7 @@ namespace VolvoxGrid.DotNet.TuiSample
                     },
                     Outline = new OutlineConfig
                     {
-                        TreeIndicator = TreeIndicatorStyle.TREE_INDICATOR_ARROWS_LEAF,
+                        TreeIndicator = TreeIndicatorStyle.TREE_INDICATOR_CONNECTORS_LEAF,
                         IndicatorIndent = HierarchyTuiOutlineIndent,
                         MaxLevels = Math.Max(0, maxOutlineLevel),
                         ShowLevelButtons = true,
@@ -1091,9 +1091,12 @@ namespace VolvoxGrid.DotNet.TuiSample
 
             private static string StatusText(DemoKind currentDemo)
             {
+                string actionText = currentDemo == DemoKind.Hierarchy
+                    ? "  |  arrows/tab  Enter/Space Toggle  F2/i Edit  mouse/q "
+                    : "  |  arrows/tab  Enter/F2/i Edit  mouse/q ";
                 return " 1 Sales  2 Hierarchy  3 Stress  |  current: "
                     + DemoTitle(currentDemo)
-                    + "  |  arrows/tab/mouse/q ";
+                    + actionText;
             }
         }
 
