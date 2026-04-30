@@ -19233,6 +19233,11 @@ enum GridEvent_Event {
   pullToRefreshTriggered,
   pullToRefreshCanceled,
   beforeDropdownOpen,
+  treeChildrenRequested,
+  beforeTreeNodeToggle,
+  afterTreeNodeToggle,
+  treeNodeActivate,
+  treeNodeContextMenu,
   notSet
 }
 
@@ -19300,6 +19305,11 @@ class GridEvent extends $pb.GeneratedMessage {
     PullToRefreshTriggeredEvent? pullToRefreshTriggered,
     PullToRefreshCanceledEvent? pullToRefreshCanceled,
     BeforeDropdownOpenEvent? beforeDropdownOpen,
+    TreeChildrenRequestedEvent? treeChildrenRequested,
+    BeforeTreeNodeToggleEvent? beforeTreeNodeToggle,
+    AfterTreeNodeToggleEvent? afterTreeNodeToggle,
+    TreeNodeActivateEvent? treeNodeActivate,
+    TreeNodeContextMenuEvent? treeNodeContextMenu,
     $fixnum.Int64? eventId,
   }) {
     final result = create();
@@ -19370,6 +19380,15 @@ class GridEvent extends $pb.GeneratedMessage {
       result.pullToRefreshCanceled = pullToRefreshCanceled;
     if (beforeDropdownOpen != null)
       result.beforeDropdownOpen = beforeDropdownOpen;
+    if (treeChildrenRequested != null)
+      result.treeChildrenRequested = treeChildrenRequested;
+    if (beforeTreeNodeToggle != null)
+      result.beforeTreeNodeToggle = beforeTreeNodeToggle;
+    if (afterTreeNodeToggle != null)
+      result.afterTreeNodeToggle = afterTreeNodeToggle;
+    if (treeNodeActivate != null) result.treeNodeActivate = treeNodeActivate;
+    if (treeNodeContextMenu != null)
+      result.treeNodeContextMenu = treeNodeContextMenu;
     if (eventId != null) result.eventId = eventId;
     return result;
   }
@@ -19445,6 +19464,11 @@ class GridEvent extends $pb.GeneratedMessage {
     61: GridEvent_Event.pullToRefreshTriggered,
     62: GridEvent_Event.pullToRefreshCanceled,
     63: GridEvent_Event.beforeDropdownOpen,
+    64: GridEvent_Event.treeChildrenRequested,
+    65: GridEvent_Event.beforeTreeNodeToggle,
+    66: GridEvent_Event.afterTreeNodeToggle,
+    67: GridEvent_Event.treeNodeActivate,
+    68: GridEvent_Event.treeNodeContextMenu,
     0: GridEvent_Event.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -19512,7 +19536,12 @@ class GridEvent extends $pb.GeneratedMessage {
       60,
       61,
       62,
-      63
+      63,
+      64,
+      65,
+      66,
+      67,
+      68
     ])
     ..aInt64(1, _omitFieldNames ? '' : 'gridId')
     ..aOM<CellFocusChangingEvent>(2, _omitFieldNames ? '' : 'cellFocusChanging',
@@ -19642,6 +19671,20 @@ class GridEvent extends $pb.GeneratedMessage {
     ..aOM<BeforeDropdownOpenEvent>(
         63, _omitFieldNames ? '' : 'beforeDropdownOpen',
         subBuilder: BeforeDropdownOpenEvent.create)
+    ..aOM<TreeChildrenRequestedEvent>(
+        64, _omitFieldNames ? '' : 'treeChildrenRequested',
+        subBuilder: TreeChildrenRequestedEvent.create)
+    ..aOM<BeforeTreeNodeToggleEvent>(
+        65, _omitFieldNames ? '' : 'beforeTreeNodeToggle',
+        subBuilder: BeforeTreeNodeToggleEvent.create)
+    ..aOM<AfterTreeNodeToggleEvent>(
+        66, _omitFieldNames ? '' : 'afterTreeNodeToggle',
+        subBuilder: AfterTreeNodeToggleEvent.create)
+    ..aOM<TreeNodeActivateEvent>(67, _omitFieldNames ? '' : 'treeNodeActivate',
+        subBuilder: TreeNodeActivateEvent.create)
+    ..aOM<TreeNodeContextMenuEvent>(
+        68, _omitFieldNames ? '' : 'treeNodeContextMenu',
+        subBuilder: TreeNodeContextMenuEvent.create)
     ..aInt64(100, _omitFieldNames ? '' : 'eventId')
     ..hasRequiredFields = false;
 
@@ -19724,6 +19767,11 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(61)
   @$pb.TagNumber(62)
   @$pb.TagNumber(63)
+  @$pb.TagNumber(64)
+  @$pb.TagNumber(65)
+  @$pb.TagNumber(66)
+  @$pb.TagNumber(67)
+  @$pb.TagNumber(68)
   GridEvent_Event whichEvent() => _GridEvent_EventByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(2)
   @$pb.TagNumber(3)
@@ -19786,6 +19834,11 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(61)
   @$pb.TagNumber(62)
   @$pb.TagNumber(63)
+  @$pb.TagNumber(64)
+  @$pb.TagNumber(65)
+  @$pb.TagNumber(66)
+  @$pb.TagNumber(67)
+  @$pb.TagNumber(68)
   void clearEvent() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -20490,14 +20543,74 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(63)
   BeforeDropdownOpenEvent ensureBeforeDropdownOpen() => $_ensure(61);
 
+  /// Native tree model
+  @$pb.TagNumber(64)
+  TreeChildrenRequestedEvent get treeChildrenRequested => $_getN(62);
+  @$pb.TagNumber(64)
+  set treeChildrenRequested(TreeChildrenRequestedEvent value) =>
+      $_setField(64, value);
+  @$pb.TagNumber(64)
+  $core.bool hasTreeChildrenRequested() => $_has(62);
+  @$pb.TagNumber(64)
+  void clearTreeChildrenRequested() => $_clearField(64);
+  @$pb.TagNumber(64)
+  TreeChildrenRequestedEvent ensureTreeChildrenRequested() => $_ensure(62);
+
+  @$pb.TagNumber(65)
+  BeforeTreeNodeToggleEvent get beforeTreeNodeToggle => $_getN(63);
+  @$pb.TagNumber(65)
+  set beforeTreeNodeToggle(BeforeTreeNodeToggleEvent value) =>
+      $_setField(65, value);
+  @$pb.TagNumber(65)
+  $core.bool hasBeforeTreeNodeToggle() => $_has(63);
+  @$pb.TagNumber(65)
+  void clearBeforeTreeNodeToggle() => $_clearField(65);
+  @$pb.TagNumber(65)
+  BeforeTreeNodeToggleEvent ensureBeforeTreeNodeToggle() => $_ensure(63);
+
+  @$pb.TagNumber(66)
+  AfterTreeNodeToggleEvent get afterTreeNodeToggle => $_getN(64);
+  @$pb.TagNumber(66)
+  set afterTreeNodeToggle(AfterTreeNodeToggleEvent value) =>
+      $_setField(66, value);
+  @$pb.TagNumber(66)
+  $core.bool hasAfterTreeNodeToggle() => $_has(64);
+  @$pb.TagNumber(66)
+  void clearAfterTreeNodeToggle() => $_clearField(66);
+  @$pb.TagNumber(66)
+  AfterTreeNodeToggleEvent ensureAfterTreeNodeToggle() => $_ensure(64);
+
+  @$pb.TagNumber(67)
+  TreeNodeActivateEvent get treeNodeActivate => $_getN(65);
+  @$pb.TagNumber(67)
+  set treeNodeActivate(TreeNodeActivateEvent value) => $_setField(67, value);
+  @$pb.TagNumber(67)
+  $core.bool hasTreeNodeActivate() => $_has(65);
+  @$pb.TagNumber(67)
+  void clearTreeNodeActivate() => $_clearField(67);
+  @$pb.TagNumber(67)
+  TreeNodeActivateEvent ensureTreeNodeActivate() => $_ensure(65);
+
+  @$pb.TagNumber(68)
+  TreeNodeContextMenuEvent get treeNodeContextMenu => $_getN(66);
+  @$pb.TagNumber(68)
+  set treeNodeContextMenu(TreeNodeContextMenuEvent value) =>
+      $_setField(68, value);
+  @$pb.TagNumber(68)
+  $core.bool hasTreeNodeContextMenu() => $_has(66);
+  @$pb.TagNumber(68)
+  void clearTreeNodeContextMenu() => $_clearField(68);
+  @$pb.TagNumber(68)
+  TreeNodeContextMenuEvent ensureTreeNodeContextMenu() => $_ensure(66);
+
   /// 0 = non-cancelable (informational only).
   /// Non-zero = cancelable — send EventDecision with this ID to allow/veto.
   @$pb.TagNumber(100)
-  $fixnum.Int64 get eventId => $_getI64(62);
+  $fixnum.Int64 get eventId => $_getI64(67);
   @$pb.TagNumber(100)
-  set eventId($fixnum.Int64 value) => $_setInt64(62, value);
+  set eventId($fixnum.Int64 value) => $_setInt64(67, value);
   @$pb.TagNumber(100)
-  $core.bool hasEventId() => $_has(62);
+  $core.bool hasEventId() => $_has(67);
   @$pb.TagNumber(100)
   void clearEventId() => $_clearField(100);
 }
@@ -22416,6 +22529,405 @@ class AfterNodeToggleEvent extends $pb.GeneratedMessage {
   $core.bool hasCollapse() => $_has(1);
   @$pb.TagNumber(2)
   void clearCollapse() => $_clearField(2);
+}
+
+/// ── Native Tree Events ──
+/// These are emitted for VolvoxTreeService-backed TreeGrid/TreeView mode.
+/// Legacy outline/subtotal toggles continue to use Before/AfterNodeToggleEvent.
+class TreeChildrenRequestedEvent extends $pb.GeneratedMessage {
+  factory TreeChildrenRequestedEvent({
+    $core.String? nodeId,
+    $core.int? row,
+    $fixnum.Int64? requestId,
+  }) {
+    final result = create();
+    if (nodeId != null) result.nodeId = nodeId;
+    if (row != null) result.row = row;
+    if (requestId != null) result.requestId = requestId;
+    return result;
+  }
+
+  TreeChildrenRequestedEvent._();
+
+  factory TreeChildrenRequestedEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TreeChildrenRequestedEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TreeChildrenRequestedEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'nodeId')
+    ..aI(2, _omitFieldNames ? '' : 'row')
+    ..aInt64(3, _omitFieldNames ? '' : 'requestId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeChildrenRequestedEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeChildrenRequestedEvent copyWith(
+          void Function(TreeChildrenRequestedEvent) updates) =>
+      super.copyWith(
+              (message) => updates(message as TreeChildrenRequestedEvent))
+          as TreeChildrenRequestedEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TreeChildrenRequestedEvent create() => TreeChildrenRequestedEvent._();
+  @$core.override
+  TreeChildrenRequestedEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TreeChildrenRequestedEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TreeChildrenRequestedEvent>(create);
+  static TreeChildrenRequestedEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get nodeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set nodeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasNodeId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearNodeId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get row => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set row($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRow() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRow() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get requestId => $_getI64(2);
+  @$pb.TagNumber(3)
+  set requestId($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRequestId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRequestId() => $_clearField(3);
+}
+
+class BeforeTreeNodeToggleEvent extends $pb.GeneratedMessage {
+  factory BeforeTreeNodeToggleEvent({
+    $core.String? nodeId,
+    $core.int? row,
+    $core.bool? collapse,
+  }) {
+    final result = create();
+    if (nodeId != null) result.nodeId = nodeId;
+    if (row != null) result.row = row;
+    if (collapse != null) result.collapse = collapse;
+    return result;
+  }
+
+  BeforeTreeNodeToggleEvent._();
+
+  factory BeforeTreeNodeToggleEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory BeforeTreeNodeToggleEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BeforeTreeNodeToggleEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'nodeId')
+    ..aI(2, _omitFieldNames ? '' : 'row')
+    ..aOB(3, _omitFieldNames ? '' : 'collapse')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BeforeTreeNodeToggleEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BeforeTreeNodeToggleEvent copyWith(
+          void Function(BeforeTreeNodeToggleEvent) updates) =>
+      super.copyWith((message) => updates(message as BeforeTreeNodeToggleEvent))
+          as BeforeTreeNodeToggleEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static BeforeTreeNodeToggleEvent create() => BeforeTreeNodeToggleEvent._();
+  @$core.override
+  BeforeTreeNodeToggleEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static BeforeTreeNodeToggleEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BeforeTreeNodeToggleEvent>(create);
+  static BeforeTreeNodeToggleEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get nodeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set nodeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasNodeId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearNodeId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get row => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set row($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRow() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRow() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get collapse => $_getBF(2);
+  @$pb.TagNumber(3)
+  set collapse($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCollapse() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCollapse() => $_clearField(3);
+}
+
+class AfterTreeNodeToggleEvent extends $pb.GeneratedMessage {
+  factory AfterTreeNodeToggleEvent({
+    $core.String? nodeId,
+    $core.int? row,
+    $core.bool? collapse,
+  }) {
+    final result = create();
+    if (nodeId != null) result.nodeId = nodeId;
+    if (row != null) result.row = row;
+    if (collapse != null) result.collapse = collapse;
+    return result;
+  }
+
+  AfterTreeNodeToggleEvent._();
+
+  factory AfterTreeNodeToggleEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory AfterTreeNodeToggleEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'AfterTreeNodeToggleEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'nodeId')
+    ..aI(2, _omitFieldNames ? '' : 'row')
+    ..aOB(3, _omitFieldNames ? '' : 'collapse')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AfterTreeNodeToggleEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AfterTreeNodeToggleEvent copyWith(
+          void Function(AfterTreeNodeToggleEvent) updates) =>
+      super.copyWith((message) => updates(message as AfterTreeNodeToggleEvent))
+          as AfterTreeNodeToggleEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static AfterTreeNodeToggleEvent create() => AfterTreeNodeToggleEvent._();
+  @$core.override
+  AfterTreeNodeToggleEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static AfterTreeNodeToggleEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<AfterTreeNodeToggleEvent>(create);
+  static AfterTreeNodeToggleEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get nodeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set nodeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasNodeId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearNodeId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get row => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set row($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRow() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRow() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get collapse => $_getBF(2);
+  @$pb.TagNumber(3)
+  set collapse($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCollapse() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCollapse() => $_clearField(3);
+}
+
+class TreeNodeActivateEvent extends $pb.GeneratedMessage {
+  factory TreeNodeActivateEvent({
+    $core.String? nodeId,
+    $core.int? row,
+  }) {
+    final result = create();
+    if (nodeId != null) result.nodeId = nodeId;
+    if (row != null) result.row = row;
+    return result;
+  }
+
+  TreeNodeActivateEvent._();
+
+  factory TreeNodeActivateEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TreeNodeActivateEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TreeNodeActivateEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'nodeId')
+    ..aI(2, _omitFieldNames ? '' : 'row')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeNodeActivateEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeNodeActivateEvent copyWith(
+          void Function(TreeNodeActivateEvent) updates) =>
+      super.copyWith((message) => updates(message as TreeNodeActivateEvent))
+          as TreeNodeActivateEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TreeNodeActivateEvent create() => TreeNodeActivateEvent._();
+  @$core.override
+  TreeNodeActivateEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TreeNodeActivateEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TreeNodeActivateEvent>(create);
+  static TreeNodeActivateEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get nodeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set nodeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasNodeId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearNodeId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get row => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set row($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRow() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRow() => $_clearField(2);
+}
+
+class TreeNodeContextMenuEvent extends $pb.GeneratedMessage {
+  factory TreeNodeContextMenuEvent({
+    $core.String? nodeId,
+    $core.int? row,
+    $core.int? x,
+    $core.int? y,
+  }) {
+    final result = create();
+    if (nodeId != null) result.nodeId = nodeId;
+    if (row != null) result.row = row;
+    if (x != null) result.x = x;
+    if (y != null) result.y = y;
+    return result;
+  }
+
+  TreeNodeContextMenuEvent._();
+
+  factory TreeNodeContextMenuEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TreeNodeContextMenuEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TreeNodeContextMenuEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'nodeId')
+    ..aI(2, _omitFieldNames ? '' : 'row')
+    ..aI(3, _omitFieldNames ? '' : 'x')
+    ..aI(4, _omitFieldNames ? '' : 'y')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeNodeContextMenuEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeNodeContextMenuEvent copyWith(
+          void Function(TreeNodeContextMenuEvent) updates) =>
+      super.copyWith((message) => updates(message as TreeNodeContextMenuEvent))
+          as TreeNodeContextMenuEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TreeNodeContextMenuEvent create() => TreeNodeContextMenuEvent._();
+  @$core.override
+  TreeNodeContextMenuEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TreeNodeContextMenuEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TreeNodeContextMenuEvent>(create);
+  static TreeNodeContextMenuEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get nodeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set nodeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasNodeId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearNodeId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get row => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set row($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRow() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRow() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get x => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set x($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasX() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearX() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get y => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set y($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasY() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearY() => $_clearField(4);
 }
 
 /// ── Scroll Events ──

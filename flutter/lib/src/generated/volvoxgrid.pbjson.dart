@@ -9741,6 +9741,51 @@ const GridEvent$json = {
       '9': 0,
       '10': 'beforeDropdownOpen'
     },
+    {
+      '1': 'tree_children_requested',
+      '3': 64,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.TreeChildrenRequestedEvent',
+      '9': 0,
+      '10': 'treeChildrenRequested'
+    },
+    {
+      '1': 'before_tree_node_toggle',
+      '3': 65,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.BeforeTreeNodeToggleEvent',
+      '9': 0,
+      '10': 'beforeTreeNodeToggle'
+    },
+    {
+      '1': 'after_tree_node_toggle',
+      '3': 66,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.AfterTreeNodeToggleEvent',
+      '9': 0,
+      '10': 'afterTreeNodeToggle'
+    },
+    {
+      '1': 'tree_node_activate',
+      '3': 67,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.TreeNodeActivateEvent',
+      '9': 0,
+      '10': 'treeNodeActivate'
+    },
+    {
+      '1': 'tree_node_context_menu',
+      '3': 68,
+      '4': 1,
+      '5': 11,
+      '6': '.volvoxgrid.v1.TreeNodeContextMenuEvent',
+      '9': 0,
+      '10': 'treeNodeContextMenu'
+    },
   ],
   '8': [
     {'1': 'event'},
@@ -9832,7 +9877,16 @@ final $typed_data.Uint8List gridEventDescriptor = $convert.base64Decode(
     'ZXJlZBJkChhwdWxsX3RvX3JlZnJlc2hfY2FuY2VsZWQYPiABKAsyKS52b2x2b3hncmlkLnYxLl'
     'B1bGxUb1JlZnJlc2hDYW5jZWxlZEV2ZW50SABSFXB1bGxUb1JlZnJlc2hDYW5jZWxlZBJaChRi'
     'ZWZvcmVfZHJvcGRvd25fb3Blbhg/IAEoCzImLnZvbHZveGdyaWQudjEuQmVmb3JlRHJvcGRvd2'
-    '5PcGVuRXZlbnRIAFISYmVmb3JlRHJvcGRvd25PcGVuQgcKBWV2ZW50');
+    '5PcGVuRXZlbnRIAFISYmVmb3JlRHJvcGRvd25PcGVuEmMKF3RyZWVfY2hpbGRyZW5fcmVxdWVz'
+    'dGVkGEAgASgLMikudm9sdm94Z3JpZC52MS5UcmVlQ2hpbGRyZW5SZXF1ZXN0ZWRFdmVudEgAUh'
+    'V0cmVlQ2hpbGRyZW5SZXF1ZXN0ZWQSYQoXYmVmb3JlX3RyZWVfbm9kZV90b2dnbGUYQSABKAsy'
+    'KC52b2x2b3hncmlkLnYxLkJlZm9yZVRyZWVOb2RlVG9nZ2xlRXZlbnRIAFIUYmVmb3JlVHJlZU'
+    '5vZGVUb2dnbGUSXgoWYWZ0ZXJfdHJlZV9ub2RlX3RvZ2dsZRhCIAEoCzInLnZvbHZveGdyaWQu'
+    'djEuQWZ0ZXJUcmVlTm9kZVRvZ2dsZUV2ZW50SABSE2FmdGVyVHJlZU5vZGVUb2dnbGUSVAoSdH'
+    'JlZV9ub2RlX2FjdGl2YXRlGEMgASgLMiQudm9sdm94Z3JpZC52MS5UcmVlTm9kZUFjdGl2YXRl'
+    'RXZlbnRIAFIQdHJlZU5vZGVBY3RpdmF0ZRJeChZ0cmVlX25vZGVfY29udGV4dF9tZW51GEQgAS'
+    'gLMicudm9sdm94Z3JpZC52MS5UcmVlTm9kZUNvbnRleHRNZW51RXZlbnRIAFITdHJlZU5vZGVD'
+    'b250ZXh0TWVudUIHCgVldmVudA==');
 
 @$core.Deprecated('Use cellFocusChangingEventDescriptor instead')
 const CellFocusChangingEvent$json = {
@@ -10268,6 +10322,85 @@ const AfterNodeToggleEvent$json = {
 final $typed_data.Uint8List afterNodeToggleEventDescriptor = $convert.base64Decode(
     'ChRBZnRlck5vZGVUb2dnbGVFdmVudBIQCgNyb3cYASABKAVSA3JvdxIaCghjb2xsYXBzZRgCIA'
     'EoCFIIY29sbGFwc2U=');
+
+@$core.Deprecated('Use treeChildrenRequestedEventDescriptor instead')
+const TreeChildrenRequestedEvent$json = {
+  '1': 'TreeChildrenRequestedEvent',
+  '2': [
+    {'1': 'node_id', '3': 1, '4': 1, '5': 9, '10': 'nodeId'},
+    {'1': 'row', '3': 2, '4': 1, '5': 5, '10': 'row'},
+    {'1': 'request_id', '3': 3, '4': 1, '5': 3, '10': 'requestId'},
+  ],
+};
+
+/// Descriptor for `TreeChildrenRequestedEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List treeChildrenRequestedEventDescriptor =
+    $convert.base64Decode(
+        'ChpUcmVlQ2hpbGRyZW5SZXF1ZXN0ZWRFdmVudBIXCgdub2RlX2lkGAEgASgJUgZub2RlSWQSEA'
+        'oDcm93GAIgASgFUgNyb3cSHQoKcmVxdWVzdF9pZBgDIAEoA1IJcmVxdWVzdElk');
+
+@$core.Deprecated('Use beforeTreeNodeToggleEventDescriptor instead')
+const BeforeTreeNodeToggleEvent$json = {
+  '1': 'BeforeTreeNodeToggleEvent',
+  '2': [
+    {'1': 'node_id', '3': 1, '4': 1, '5': 9, '10': 'nodeId'},
+    {'1': 'row', '3': 2, '4': 1, '5': 5, '10': 'row'},
+    {'1': 'collapse', '3': 3, '4': 1, '5': 8, '10': 'collapse'},
+  ],
+};
+
+/// Descriptor for `BeforeTreeNodeToggleEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List beforeTreeNodeToggleEventDescriptor =
+    $convert.base64Decode(
+        'ChlCZWZvcmVUcmVlTm9kZVRvZ2dsZUV2ZW50EhcKB25vZGVfaWQYASABKAlSBm5vZGVJZBIQCg'
+        'Nyb3cYAiABKAVSA3JvdxIaCghjb2xsYXBzZRgDIAEoCFIIY29sbGFwc2U=');
+
+@$core.Deprecated('Use afterTreeNodeToggleEventDescriptor instead')
+const AfterTreeNodeToggleEvent$json = {
+  '1': 'AfterTreeNodeToggleEvent',
+  '2': [
+    {'1': 'node_id', '3': 1, '4': 1, '5': 9, '10': 'nodeId'},
+    {'1': 'row', '3': 2, '4': 1, '5': 5, '10': 'row'},
+    {'1': 'collapse', '3': 3, '4': 1, '5': 8, '10': 'collapse'},
+  ],
+};
+
+/// Descriptor for `AfterTreeNodeToggleEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List afterTreeNodeToggleEventDescriptor =
+    $convert.base64Decode(
+        'ChhBZnRlclRyZWVOb2RlVG9nZ2xlRXZlbnQSFwoHbm9kZV9pZBgBIAEoCVIGbm9kZUlkEhAKA3'
+        'JvdxgCIAEoBVIDcm93EhoKCGNvbGxhcHNlGAMgASgIUghjb2xsYXBzZQ==');
+
+@$core.Deprecated('Use treeNodeActivateEventDescriptor instead')
+const TreeNodeActivateEvent$json = {
+  '1': 'TreeNodeActivateEvent',
+  '2': [
+    {'1': 'node_id', '3': 1, '4': 1, '5': 9, '10': 'nodeId'},
+    {'1': 'row', '3': 2, '4': 1, '5': 5, '10': 'row'},
+  ],
+};
+
+/// Descriptor for `TreeNodeActivateEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List treeNodeActivateEventDescriptor = $convert.base64Decode(
+    'ChVUcmVlTm9kZUFjdGl2YXRlRXZlbnQSFwoHbm9kZV9pZBgBIAEoCVIGbm9kZUlkEhAKA3Jvdx'
+    'gCIAEoBVIDcm93');
+
+@$core.Deprecated('Use treeNodeContextMenuEventDescriptor instead')
+const TreeNodeContextMenuEvent$json = {
+  '1': 'TreeNodeContextMenuEvent',
+  '2': [
+    {'1': 'node_id', '3': 1, '4': 1, '5': 9, '10': 'nodeId'},
+    {'1': 'row', '3': 2, '4': 1, '5': 5, '10': 'row'},
+    {'1': 'x', '3': 3, '4': 1, '5': 5, '10': 'x'},
+    {'1': 'y', '3': 4, '4': 1, '5': 5, '10': 'y'},
+  ],
+};
+
+/// Descriptor for `TreeNodeContextMenuEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List treeNodeContextMenuEventDescriptor =
+    $convert.base64Decode(
+        'ChhUcmVlTm9kZUNvbnRleHRNZW51RXZlbnQSFwoHbm9kZV9pZBgBIAEoCVIGbm9kZUlkEhAKA3'
+        'JvdxgCIAEoBVIDcm93EgwKAXgYAyABKAVSAXgSDAoBeRgEIAEoBVIBeQ==');
 
 @$core.Deprecated('Use beforeScrollEventDescriptor instead')
 const BeforeScrollEvent$json = {
@@ -11309,6 +11442,11 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       PullToRefreshTriggeredEvent$json,
   '.volvoxgrid.v1.PullToRefreshCanceledEvent': PullToRefreshCanceledEvent$json,
   '.volvoxgrid.v1.BeforeDropdownOpenEvent': BeforeDropdownOpenEvent$json,
+  '.volvoxgrid.v1.TreeChildrenRequestedEvent': TreeChildrenRequestedEvent$json,
+  '.volvoxgrid.v1.BeforeTreeNodeToggleEvent': BeforeTreeNodeToggleEvent$json,
+  '.volvoxgrid.v1.AfterTreeNodeToggleEvent': AfterTreeNodeToggleEvent$json,
+  '.volvoxgrid.v1.TreeNodeActivateEvent': TreeNodeActivateEvent$json,
+  '.volvoxgrid.v1.TreeNodeContextMenuEvent': TreeNodeContextMenuEvent$json,
 };
 
 /// Descriptor for `VolvoxGridService`. Decode as a `google.protobuf.ServiceDescriptorProto`.

@@ -714,15 +714,31 @@ fn request_before_sort(grid_id: i64, grid: &mut volvoxgrid_engine::grid::VolvoxG
     queue_pending_decision_event(grid_id, event_id, event);
 }
 
+fn before_node_toggle_event(
+    grid: &volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    collapse: bool,
+) -> volvoxgrid_engine::event::GridEventData {
+    if let Some(node_id) = grid.tree.node_id_at_row(grid.fixed_rows, row) {
+        volvoxgrid_engine::event::GridEventData::BeforeTreeNodeToggle {
+            node_id: node_id.to_string(),
+            row,
+            collapse,
+        }
+    } else {
+        volvoxgrid_engine::event::GridEventData::BeforeNodeToggle { row, collapse }
+    }
+}
+
 fn request_before_node_toggle(
     grid_id: i64,
     grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
     row: i32,
     collapse: bool,
 ) {
+    let event = before_node_toggle_event(grid, row, collapse);
     if !decision_channel_enabled(grid_id) {
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::BeforeNodeToggle { row, collapse });
+        grid.events.push(event);
         input::apply_node_toggle_after_before(grid, row, collapse);
         return;
     }
@@ -735,7 +751,6 @@ fn request_before_node_toggle(
             action: PendingAction::BeforeNodeToggle { row, collapse },
         },
     );
-    let event = volvoxgrid_engine::event::GridEventData::BeforeNodeToggle { row, collapse };
     grid.events.push_with_id(event_id, event.clone());
     queue_pending_decision_event(grid_id, event_id, event);
 }
@@ -4860,6 +4875,25 @@ where
     mgr.with_grid(id, f)
 }
 
+#[wasm_bindgen]
+pub fn volvox_tree_load_tree_pb(data: &[u8]) -> Vec<u8> {
+    let request = match LoadTreeRequest::decode(data) {
+        Ok(request) => request,
+        Err(_) => return Vec::new(),
+    };
+    let result = wasm_with_grid(request.grid_id, |grid| {
+        volvoxgrid_engine::tree::load_tree(grid, request)
+    });
+    match result {
+        Ok(Ok(response)) => {
+            let mut buf = Vec::new();
+            let _ = response.encode(&mut buf);
+            buf
+        }
+        Ok(Err(_)) | Err(_) => Vec::new(),
+    }
+}
+
 fn engine_event_to_proto(
     grid_id: i64,
     event_id: i64,
@@ -5063,6 +5097,48 @@ fn engine_event_to_proto(
                 collapse,
             }))
         }
+        E::TreeChildrenRequested {
+            node_id,
+            row,
+            request_id,
+        } => Some(grid_event::Event::TreeChildrenRequested(
+            TreeChildrenRequestedEvent {
+                node_id,
+                row,
+                request_id,
+            },
+        )),
+        E::BeforeTreeNodeToggle {
+            node_id,
+            row,
+            collapse,
+        } => Some(grid_event::Event::BeforeTreeNodeToggle(
+            BeforeTreeNodeToggleEvent {
+                node_id,
+                row,
+                collapse,
+            },
+        )),
+        E::AfterTreeNodeToggle {
+            node_id,
+            row,
+            collapse,
+        } => Some(grid_event::Event::AfterTreeNodeToggle(
+            AfterTreeNodeToggleEvent {
+                node_id,
+                row,
+                collapse,
+            },
+        )),
+        E::TreeNodeActivate { node_id, row } => {
+            Some(grid_event::Event::TreeNodeActivate(TreeNodeActivateEvent {
+                node_id,
+                row,
+            }))
+        }
+        E::TreeNodeContextMenu { node_id, row, x, y } => Some(
+            grid_event::Event::TreeNodeContextMenu(TreeNodeContextMenuEvent { node_id, row, x, y }),
+        ),
         E::BeforeScroll {
             old_top_row,
             old_left_col,

@@ -1274,6 +1274,11 @@ export const AfterScrollEventFields = {
 export const AfterSortEventFields = {
   "col": 1,
 } as const;
+export const AfterTreeNodeToggleEventFields = {
+  "node_id": 1,
+  "row": 2,
+  "collapse": 3,
+} as const;
 export const AfterUserFreezeEventFields = {
   "frozen_rows": 1,
   "frozen_cols": 2,
@@ -1390,6 +1395,11 @@ export const BeforeScrollEventFields = {
 } as const;
 export const BeforeSortEventFields = {
   "col": 1,
+} as const;
+export const BeforeTreeNodeToggleEventFields = {
+  "node_id": 1,
+  "row": 2,
+  "collapse": 3,
 } as const;
 export const BeforeUserResizeEventFields = {
   "row": 1,
@@ -2024,6 +2034,11 @@ export const GridEventFields = {
   "pull_to_refresh_triggered": 61,
   "pull_to_refresh_canceled": 62,
   "before_dropdown_open": 63,
+  "tree_children_requested": 64,
+  "before_tree_node_toggle": 65,
+  "after_tree_node_toggle": 66,
+  "tree_node_activate": 67,
+  "tree_node_context_menu": 68,
 } as const;
 export const GridEventTargetFields = {
   "kind": 1,
@@ -2776,6 +2791,21 @@ export const TooltipRequestFields = {
   "y": 2,
   "text": 3,
 } as const;
+export const TreeChildrenRequestedEventFields = {
+  "node_id": 1,
+  "row": 2,
+  "request_id": 3,
+} as const;
+export const TreeNodeActivateEventFields = {
+  "node_id": 1,
+  "row": 2,
+} as const;
+export const TreeNodeContextMenuEventFields = {
+  "node_id": 1,
+  "row": 2,
+  "x": 3,
+  "y": 4,
+} as const;
 export const TypeAheadEndedEventFields = {
 } as const;
 export const TypeAheadStartedEventFields = {
@@ -3118,6 +3148,60 @@ export class AfterSortEvent implements LiteMessage {
   }
 }
 registerMessage(AfterSortEvent);
+export class AfterTreeNodeToggleEvent implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.AfterTreeNodeToggleEvent" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "node_id",
+      jsonName: "nodeId",
+      prop: "nodeId",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "row",
+      jsonName: "row",
+      prop: "row",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "collapse",
+      jsonName: "collapse",
+      prop: "collapse",
+      kind: "bool" as ProtoKind,
+    },
+  ];
+  nodeId: string = "";
+  row: number = 0;
+  collapse: boolean = false;
+
+  constructor(init?: Partial<AfterTreeNodeToggleEvent>) {
+    initMessage(this, AfterTreeNodeToggleEvent.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): AfterTreeNodeToggleEvent {
+    return decodeMessage(AfterTreeNodeToggleEvent, data);
+  }
+
+  static parseFrom(data: Uint8Array): AfterTreeNodeToggleEvent {
+    return AfterTreeNodeToggleEvent.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, AfterTreeNodeToggleEvent.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, AfterTreeNodeToggleEvent.fields);
+  }
+}
+registerMessage(AfterTreeNodeToggleEvent);
 export class AfterUserFreezeEvent implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.AfterUserFreezeEvent" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -4388,6 +4472,60 @@ export class BeforeSortEvent implements LiteMessage {
   }
 }
 registerMessage(BeforeSortEvent);
+export class BeforeTreeNodeToggleEvent implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.BeforeTreeNodeToggleEvent" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "node_id",
+      jsonName: "nodeId",
+      prop: "nodeId",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "row",
+      jsonName: "row",
+      prop: "row",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "collapse",
+      jsonName: "collapse",
+      prop: "collapse",
+      kind: "bool" as ProtoKind,
+    },
+  ];
+  nodeId: string = "";
+  row: number = 0;
+  collapse: boolean = false;
+
+  constructor(init?: Partial<BeforeTreeNodeToggleEvent>) {
+    initMessage(this, BeforeTreeNodeToggleEvent.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): BeforeTreeNodeToggleEvent {
+    return decodeMessage(BeforeTreeNodeToggleEvent, data);
+  }
+
+  static parseFrom(data: Uint8Array): BeforeTreeNodeToggleEvent {
+    return BeforeTreeNodeToggleEvent.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, BeforeTreeNodeToggleEvent.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, BeforeTreeNodeToggleEvent.fields);
+  }
+}
+registerMessage(BeforeTreeNodeToggleEvent);
 export class BeforeUserResizeEvent implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.BeforeUserResizeEvent" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [
@@ -10695,6 +10833,11 @@ export enum GridEventEventOneofCase {
   PullToRefreshTriggered = 61,
   PullToRefreshCanceled = 62,
   BeforeDropdownOpen = 63,
+  TreeChildrenRequested = 64,
+  BeforeTreeNodeToggle = 65,
+  AfterTreeNodeToggle = 66,
+  TreeNodeActivate = 67,
+  TreeNodeContextMenu = 68,
 }
 export class GridEvent implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.GridEvent" as const;
@@ -11323,6 +11466,56 @@ export class GridEvent implements LiteMessage {
       oneofCase: GridEventEventOneofCase.BeforeDropdownOpen,
       messageType: "BeforeDropdownOpenEvent",
     },
+    {
+      no: 64,
+      name: "tree_children_requested",
+      jsonName: "treeChildrenRequested",
+      prop: "treeChildrenRequested",
+      kind: "message" as ProtoKind,
+      oneof: "eventCase",
+      oneofCase: GridEventEventOneofCase.TreeChildrenRequested,
+      messageType: "TreeChildrenRequestedEvent",
+    },
+    {
+      no: 65,
+      name: "before_tree_node_toggle",
+      jsonName: "beforeTreeNodeToggle",
+      prop: "beforeTreeNodeToggle",
+      kind: "message" as ProtoKind,
+      oneof: "eventCase",
+      oneofCase: GridEventEventOneofCase.BeforeTreeNodeToggle,
+      messageType: "BeforeTreeNodeToggleEvent",
+    },
+    {
+      no: 66,
+      name: "after_tree_node_toggle",
+      jsonName: "afterTreeNodeToggle",
+      prop: "afterTreeNodeToggle",
+      kind: "message" as ProtoKind,
+      oneof: "eventCase",
+      oneofCase: GridEventEventOneofCase.AfterTreeNodeToggle,
+      messageType: "AfterTreeNodeToggleEvent",
+    },
+    {
+      no: 67,
+      name: "tree_node_activate",
+      jsonName: "treeNodeActivate",
+      prop: "treeNodeActivate",
+      kind: "message" as ProtoKind,
+      oneof: "eventCase",
+      oneofCase: GridEventEventOneofCase.TreeNodeActivate,
+      messageType: "TreeNodeActivateEvent",
+    },
+    {
+      no: 68,
+      name: "tree_node_context_menu",
+      jsonName: "treeNodeContextMenu",
+      prop: "treeNodeContextMenu",
+      kind: "message" as ProtoKind,
+      oneof: "eventCase",
+      oneofCase: GridEventEventOneofCase.TreeNodeContextMenu,
+      messageType: "TreeNodeContextMenuEvent",
+    },
   ];
   eventCase: GridEventEventOneofCase = GridEventEventOneofCase.None;
   gridId: bigint = 0n;
@@ -11388,6 +11581,11 @@ export class GridEvent implements LiteMessage {
   pullToRefreshTriggered?: PullToRefreshTriggeredEvent;
   pullToRefreshCanceled?: PullToRefreshCanceledEvent;
   beforeDropdownOpen?: BeforeDropdownOpenEvent;
+  treeChildrenRequested?: TreeChildrenRequestedEvent;
+  beforeTreeNodeToggle?: BeforeTreeNodeToggleEvent;
+  afterTreeNodeToggle?: AfterTreeNodeToggleEvent;
+  treeNodeActivate?: TreeNodeActivateEvent;
+  treeNodeContextMenu?: TreeNodeContextMenuEvent;
 
   constructor(init?: Partial<GridEvent>) {
     initMessage(this, GridEvent.fields, init as Record<string, unknown> | undefined);
@@ -19563,6 +19761,168 @@ export class TooltipRequest implements LiteMessage {
   }
 }
 registerMessage(TooltipRequest);
+export class TreeChildrenRequestedEvent implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.TreeChildrenRequestedEvent" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "node_id",
+      jsonName: "nodeId",
+      prop: "nodeId",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "row",
+      jsonName: "row",
+      prop: "row",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "request_id",
+      jsonName: "requestId",
+      prop: "requestId",
+      kind: "int64" as ProtoKind,
+    },
+  ];
+  nodeId: string = "";
+  row: number = 0;
+  requestId: bigint = 0n;
+
+  constructor(init?: Partial<TreeChildrenRequestedEvent>) {
+    initMessage(this, TreeChildrenRequestedEvent.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): TreeChildrenRequestedEvent {
+    return decodeMessage(TreeChildrenRequestedEvent, data);
+  }
+
+  static parseFrom(data: Uint8Array): TreeChildrenRequestedEvent {
+    return TreeChildrenRequestedEvent.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, TreeChildrenRequestedEvent.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, TreeChildrenRequestedEvent.fields);
+  }
+}
+registerMessage(TreeChildrenRequestedEvent);
+export class TreeNodeActivateEvent implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.TreeNodeActivateEvent" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "node_id",
+      jsonName: "nodeId",
+      prop: "nodeId",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "row",
+      jsonName: "row",
+      prop: "row",
+      kind: "int32" as ProtoKind,
+    },
+  ];
+  nodeId: string = "";
+  row: number = 0;
+
+  constructor(init?: Partial<TreeNodeActivateEvent>) {
+    initMessage(this, TreeNodeActivateEvent.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): TreeNodeActivateEvent {
+    return decodeMessage(TreeNodeActivateEvent, data);
+  }
+
+  static parseFrom(data: Uint8Array): TreeNodeActivateEvent {
+    return TreeNodeActivateEvent.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, TreeNodeActivateEvent.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, TreeNodeActivateEvent.fields);
+  }
+}
+registerMessage(TreeNodeActivateEvent);
+export class TreeNodeContextMenuEvent implements LiteMessage {
+  static readonly typeName = "volvoxgrid.v1.TreeNodeContextMenuEvent" as const;
+  static readonly fields: readonly ProtoFieldInfo[] = [
+    {
+      no: 1,
+      name: "node_id",
+      jsonName: "nodeId",
+      prop: "nodeId",
+      kind: "string" as ProtoKind,
+    },
+    {
+      no: 2,
+      name: "row",
+      jsonName: "row",
+      prop: "row",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 3,
+      name: "x",
+      jsonName: "x",
+      prop: "x",
+      kind: "int32" as ProtoKind,
+    },
+    {
+      no: 4,
+      name: "y",
+      jsonName: "y",
+      prop: "y",
+      kind: "int32" as ProtoKind,
+    },
+  ];
+  nodeId: string = "";
+  row: number = 0;
+  x: number = 0;
+  y: number = 0;
+
+  constructor(init?: Partial<TreeNodeContextMenuEvent>) {
+    initMessage(this, TreeNodeContextMenuEvent.fields, init as Record<string, unknown> | undefined);
+  }
+
+  static fromBinary(data: Uint8Array): TreeNodeContextMenuEvent {
+    return decodeMessage(TreeNodeContextMenuEvent, data);
+  }
+
+  static parseFrom(data: Uint8Array): TreeNodeContextMenuEvent {
+    return TreeNodeContextMenuEvent.fromBinary(data);
+  }
+
+  toBinary(): Uint8Array {
+    return encodeMessage(this, TreeNodeContextMenuEvent.fields);
+  }
+
+  toByteArray(): Uint8Array {
+    return this.toBinary();
+  }
+
+  toJson(): ProtoJsonObject {
+    return messageToJson(this, TreeNodeContextMenuEvent.fields);
+  }
+}
+registerMessage(TreeNodeContextMenuEvent);
 export class TypeAheadEndedEvent implements LiteMessage {
   static readonly typeName = "volvoxgrid.v1.TypeAheadEndedEvent" as const;
   static readonly fields: readonly ProtoFieldInfo[] = [

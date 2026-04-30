@@ -193,6 +193,31 @@ pub enum GridEventData {
         row: i32,
         collapse: bool,
     },
+    TreeChildrenRequested {
+        node_id: String,
+        row: i32,
+        request_id: i64,
+    },
+    BeforeTreeNodeToggle {
+        node_id: String,
+        row: i32,
+        collapse: bool,
+    },
+    AfterTreeNodeToggle {
+        node_id: String,
+        row: i32,
+        collapse: bool,
+    },
+    TreeNodeActivate {
+        node_id: String,
+        row: i32,
+    },
+    TreeNodeContextMenu {
+        node_id: String,
+        row: i32,
+        x: i32,
+        y: i32,
+    },
     BeforeScroll {
         old_top_row: i32,
         old_left_col: i32,
@@ -365,6 +390,11 @@ impl GridEventData {
             GridEventData::TypeAheadStarted { text, .. } => text.capacity(),
             GridEventData::FilterData { text, .. } => text.capacity(),
             GridEventData::Error { message, .. } => message.capacity(),
+            GridEventData::TreeChildrenRequested { node_id, .. }
+            | GridEventData::BeforeTreeNodeToggle { node_id, .. }
+            | GridEventData::AfterTreeNodeToggle { node_id, .. }
+            | GridEventData::TreeNodeActivate { node_id, .. }
+            | GridEventData::TreeNodeContextMenu { node_id, .. } => node_id.capacity(),
             GridEventData::EnterCell { target, .. }
             | GridEventData::LeaveCell { target, .. }
             | GridEventData::BeforeMouseDown { target, .. }

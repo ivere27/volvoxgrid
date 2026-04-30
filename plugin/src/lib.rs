@@ -12,6 +12,8 @@ use volvoxgrid_engine::GridManager;
 #[path = "volvoxgrid_ffi_plugin.rs"]
 mod ffi_impl;
 use ffi_impl::*;
+#[path = "volvoxtree_ffi_plugin.rs"]
+mod ffi_tree_impl;
 mod terminal_tui;
 
 #[cfg(all(target_os = "windows", target_env = "gnu"))]
@@ -25,6 +27,7 @@ lazy_static::lazy_static! {
 }
 
 type PluginResult<T> = Result<T, FfiError>;
+type TreePluginResult<T> = Result<T, ffi_tree_impl::FfiError>;
 
 const ERROR_INVALID_ARGUMENT: i32 = 1;
 const ERROR_NOT_FOUND: i32 = 2;
@@ -86,6 +89,12 @@ fn map_plugin_error(message: impl Into<String>) -> FfiError {
         || lower.contains("encode")
         || lower.contains("empty")
         || lower.contains("unknown demo")
+        || lower.contains("duplicate tree node id")
+        || lower.contains("references missing parent")
+        || lower.contains("tree cycle")
+        || lower.contains("recursive remove is required")
+        || lower.contains("cannot be moved")
+        || lower.contains("parent_id")
     {
         return invalid_argument(message);
     }
@@ -96,6 +105,14 @@ fn map_plugin_error(message: impl Into<String>) -> FfiError {
         return invalid_state(message);
     }
     internal_error(message)
+}
+
+fn tree_ffi_error_from(error: FfiError) -> ffi_tree_impl::FfiError {
+    ffi_tree_impl::FfiError::new(error.message, error.code, error.grpc_code)
+}
+
+fn tree_map_plugin_error(message: impl Into<String>) -> ffi_tree_impl::FfiError {
+    tree_ffi_error_from(map_plugin_error(message))
 }
 
 fn current_frame_metrics(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Option<FrameMetrics> {
@@ -1236,6 +1253,27 @@ impl VolvoxGridPlugin {
             .with_grid(id, f)
             .map_err(map_plugin_error)?
             .map_err(map_plugin_error)
+    }
+
+    fn with_grid_tree<T>(
+        &self,
+        id: i64,
+        f: impl FnOnce(&mut volvoxgrid_engine::grid::VolvoxGrid) -> T,
+    ) -> TreePluginResult<T> {
+        self.manager()
+            .with_grid(id, f)
+            .map_err(tree_map_plugin_error)
+    }
+
+    fn with_grid_tree_result<T, E: ToString>(
+        &self,
+        id: i64,
+        f: impl FnOnce(&mut volvoxgrid_engine::grid::VolvoxGrid) -> Result<T, E>,
+    ) -> TreePluginResult<T> {
+        self.manager()
+            .with_grid(id, f)
+            .map_err(tree_map_plugin_error)?
+            .map_err(|err| tree_map_plugin_error(err.to_string()))
     }
 
     fn sync_fonts_into_renderer(
@@ -2837,6 +2875,48 @@ fn engine_event_to_proto(
                 collapse,
             }))
         }
+        E::TreeChildrenRequested {
+            node_id,
+            row,
+            request_id,
+        } => Some(grid_event::Event::TreeChildrenRequested(
+            TreeChildrenRequestedEvent {
+                node_id,
+                row,
+                request_id,
+            },
+        )),
+        E::BeforeTreeNodeToggle {
+            node_id,
+            row,
+            collapse,
+        } => Some(grid_event::Event::BeforeTreeNodeToggle(
+            BeforeTreeNodeToggleEvent {
+                node_id,
+                row,
+                collapse,
+            },
+        )),
+        E::AfterTreeNodeToggle {
+            node_id,
+            row,
+            collapse,
+        } => Some(grid_event::Event::AfterTreeNodeToggle(
+            AfterTreeNodeToggleEvent {
+                node_id,
+                row,
+                collapse,
+            },
+        )),
+        E::TreeNodeActivate { node_id, row } => {
+            Some(grid_event::Event::TreeNodeActivate(TreeNodeActivateEvent {
+                node_id,
+                row,
+            }))
+        }
+        E::TreeNodeContextMenu { node_id, row, x, y } => Some(
+            grid_event::Event::TreeNodeContextMenu(TreeNodeContextMenuEvent { node_id, row, x, y }),
+        ),
         E::BeforeScroll {
             old_top_row,
             old_left_col,
@@ -3863,9 +3943,17 @@ impl VolvoxGridPlugin {
         row: i32,
         collapse: bool,
     ) {
+        let event = if let Some(node_id) = grid.tree.node_id_at_row(grid.fixed_rows, row) {
+            volvoxgrid_engine::event::GridEventData::BeforeTreeNodeToggle {
+                node_id: node_id.to_string(),
+                row,
+                collapse,
+            }
+        } else {
+            volvoxgrid_engine::event::GridEventData::BeforeNodeToggle { row, collapse }
+        };
         if !self.decision_channel_enabled(grid_id) {
-            grid.events
-                .push(volvoxgrid_engine::event::GridEventData::BeforeNodeToggle { row, collapse });
+            grid.events.push(event);
             volvoxgrid_engine::input::apply_node_toggle_after_before(grid, row, collapse);
             return;
         }
@@ -3881,10 +3969,7 @@ impl VolvoxGridPlugin {
                     action: PendingAction::BeforeNodeToggle { row, collapse },
                 },
             );
-        grid.events.push_with_id(
-            event_id,
-            volvoxgrid_engine::event::GridEventData::BeforeNodeToggle { row, collapse },
-        );
+        grid.events.push_with_id(event_id, event);
     }
 
     fn request_before_user_resize(
@@ -4495,6 +4580,212 @@ impl VolvoxGridPlugin {
 // ═══════════════════════════════════════════════════════════════════════════
 // v2 Trait Implementation
 // ═══════════════════════════════════════════════════════════════════════════
+
+impl ffi_tree_impl::VolvoxTreeServicePlugin for VolvoxGridPlugin {
+    fn load_tree(&self, request: LoadTreeRequest) -> TreePluginResult<LoadTreeResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::load_tree(grid, request)
+        })
+    }
+
+    fn append_tree(&self, mut request: LoadTreeRequest) -> TreePluginResult<LoadTreeResponse> {
+        request.replace = false;
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::load_tree(grid, request)
+        })
+    }
+
+    fn insert_nodes(&self, request: InsertNodesRequest) -> TreePluginResult<InsertNodesResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::insert_nodes(grid, request)
+        })
+    }
+
+    fn remove_nodes(&self, request: RemoveNodesRequest) -> TreePluginResult<RemoveNodesResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::remove_nodes(grid, request)
+        })
+    }
+
+    fn move_nodes(&self, request: MoveNodesRequest) -> TreePluginResult<MoveNodesResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::move_nodes(grid, request)
+        })
+    }
+
+    fn rename_node(&self, request: RenameNodeRequest) -> TreePluginResult<RenameNodeResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::rename_node(grid, request)
+        })
+    }
+
+    fn update_tree(&self, request: UpdateTreeRequest) -> TreePluginResult<UpdateTreeResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::update_tree(grid, request)
+        })
+    }
+
+    fn update_node_cells(&self, request: UpdateNodeCellsRequest) -> TreePluginResult<WriteResult> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::update_node_cells(grid, request)
+        })
+    }
+
+    fn expand_nodes(&self, request: ExpandNodesRequest) -> TreePluginResult<ExpandNodesResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::expand_nodes(grid, request)
+        })
+    }
+
+    fn collapse_nodes(
+        &self,
+        request: CollapseNodesRequest,
+    ) -> TreePluginResult<CollapseNodesResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::collapse_nodes(grid, request)
+        })
+    }
+
+    fn expand_to_node(
+        &self,
+        request: ExpandToNodeRequest,
+    ) -> TreePluginResult<ExpandToNodeResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::expand_to_node(grid, request)
+        })
+    }
+
+    fn get_expansion(&self, request: GetExpansionRequest) -> TreePluginResult<ExpansionState> {
+        self.with_grid_tree(request.grid_id, |grid| {
+            volvoxgrid_engine::tree::get_expansion(grid)
+        })
+    }
+
+    fn set_expansion(
+        &self,
+        request: SetExpansionRequest,
+    ) -> TreePluginResult<SetExpansionResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::set_expansion(grid, request)
+        })
+    }
+
+    fn get_tree_node(&self, request: GetTreeNodeRequest) -> TreePluginResult<TreeNodeInfo> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::get_tree_node(grid, request)
+        })
+    }
+
+    fn get_children(&self, request: GetChildrenRequest) -> TreePluginResult<TreeNodeList> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::get_children(grid, request)
+        })
+    }
+
+    fn get_visible_nodes(&self, request: GetVisibleNodesRequest) -> TreePluginResult<TreeNodeList> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree(grid_id, |grid| {
+            volvoxgrid_engine::tree::get_visible_nodes(grid, request)
+        })
+    }
+
+    fn get_node_path(&self, request: GetNodePathRequest) -> TreePluginResult<NodePathResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::get_node_path(grid, request)
+        })
+    }
+
+    fn get_node_by_path(&self, request: GetNodeByPathRequest) -> TreePluginResult<TreeNodeInfo> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree(grid_id, |grid| {
+            volvoxgrid_engine::tree::get_node_by_path(grid, request)
+        })
+    }
+
+    fn select_nodes(&self, request: SelectNodesRequest) -> TreePluginResult<NodeSelectionState> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::select_nodes(grid, request)
+        })
+    }
+
+    fn get_node_selection(
+        &self,
+        request: GetNodeSelectionRequest,
+    ) -> TreePluginResult<NodeSelectionState> {
+        self.with_grid_tree(request.grid_id, |grid| {
+            volvoxgrid_engine::tree::get_node_selection(grid)
+        })
+    }
+
+    fn set_checked_nodes(&self, request: SetCheckedNodesRequest) -> TreePluginResult<CheckedNodes> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::set_checked_nodes(grid, request)
+        })
+    }
+
+    fn get_checked_nodes(&self, request: GetCheckedNodesRequest) -> TreePluginResult<CheckedNodes> {
+        self.with_grid_tree(request.grid_id, |grid| {
+            volvoxgrid_engine::tree::get_checked_nodes(grid)
+        })
+    }
+
+    fn sort_tree(&self, request: SortTreeRequest) -> TreePluginResult<SortTreeResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree(grid_id, |grid| {
+            volvoxgrid_engine::tree::sort_tree(grid, request)
+        })
+    }
+
+    fn filter_tree(&self, request: FilterTreeRequest) -> TreePluginResult<FilterTreeResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::filter_tree(grid, request)
+        })
+    }
+
+    fn clear_tree_filter(
+        &self,
+        request: ClearTreeFilterRequest,
+    ) -> TreePluginResult<ClearTreeFilterResponse> {
+        self.with_grid_tree(request.grid_id, |grid| {
+            volvoxgrid_engine::tree::clear_tree_filter(grid)
+        })
+    }
+
+    fn find_tree(&self, request: FindTreeRequest) -> TreePluginResult<FindTreeResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::find_tree(grid, request)
+        })
+    }
+
+    fn resolve_children(
+        &self,
+        request: ResolveChildrenRequest,
+    ) -> TreePluginResult<ResolveChildrenResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::resolve_children(grid, request)
+        })
+    }
+}
 
 impl VolvoxGridServicePlugin for VolvoxGridPlugin {
     // ── Lifecycle ──
@@ -6499,6 +6790,11 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
 /// Factory for lazy plugin initialization (called by generated FFI dispatcher).
 pub(crate) fn create_plugin() -> Box<dyn VolvoxGridServicePlugin + 'static> {
+    Box::new(VolvoxGridPlugin::new())
+}
+
+/// Factory for the companion tree service dispatcher.
+pub(crate) fn create_tree_plugin() -> Box<dyn ffi_tree_impl::VolvoxTreeServicePlugin + 'static> {
     Box::new(VolvoxGridPlugin::new())
 }
 

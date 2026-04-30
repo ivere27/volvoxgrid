@@ -1038,6 +1038,47 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class AfterTreeNodeToggleEvent
+    {
+        public string NodeId { get; set; } = "";
+        public int Row { get; set; }
+        public bool Collapse { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (NodeId != null && NodeId.Length > 0) w.WriteString(1, NodeId);
+            if (Row != 0) w.WriteInt32(2, Row);
+            if (Collapse) w.WriteBool(3, Collapse);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<AfterTreeNodeToggleEvent> Parser = new MessageParser<AfterTreeNodeToggleEvent>(data => ParseFrom(data));
+
+        public static AfterTreeNodeToggleEvent ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new AfterTreeNodeToggleEvent();
+            var r = new ProtoReader(data);
+            var msg = new AfterTreeNodeToggleEvent();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.NodeId = r.ReadString(); break;
+                    case 2: msg.Row = r.ReadInt32(); break;
+                    case 3: msg.Collapse = r.ReadBool(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class AfterUserFreezeEvent
     {
         public int FrozenRows { get; set; }
@@ -1988,6 +2029,47 @@ namespace Volvoxgrid.V1
                 switch (field)
                 {
                     case 1: msg.Col = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class BeforeTreeNodeToggleEvent
+    {
+        public string NodeId { get; set; } = "";
+        public int Row { get; set; }
+        public bool Collapse { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (NodeId != null && NodeId.Length > 0) w.WriteString(1, NodeId);
+            if (Row != 0) w.WriteInt32(2, Row);
+            if (Collapse) w.WriteBool(3, Collapse);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<BeforeTreeNodeToggleEvent> Parser = new MessageParser<BeforeTreeNodeToggleEvent>(data => ParseFrom(data));
+
+        public static BeforeTreeNodeToggleEvent ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new BeforeTreeNodeToggleEvent();
+            var r = new ProtoReader(data);
+            var msg = new BeforeTreeNodeToggleEvent();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.NodeId = r.ReadString(); break;
+                    case 2: msg.Row = r.ReadInt32(); break;
+                    case 3: msg.Collapse = r.ReadBool(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -6829,6 +6911,11 @@ namespace Volvoxgrid.V1
             PullToRefreshTriggered = 61,
             PullToRefreshCanceled = 62,
             BeforeDropdownOpen = 63,
+            TreeChildrenRequested = 64,
+            BeforeTreeNodeToggle = 65,
+            AfterTreeNodeToggle = 66,
+            TreeNodeActivate = 67,
+            TreeNodeContextMenu = 68,
         }
         public EventOneofCase EventCase { get; set; }
 
@@ -6954,6 +7041,16 @@ namespace Volvoxgrid.V1
         public PullToRefreshCanceledEvent PullToRefreshCanceled { get { return EventCase == EventOneofCase.PullToRefreshCanceled ? _pullToRefreshCanceled : null; } set { _pullToRefreshCanceled = value; EventCase = EventOneofCase.PullToRefreshCanceled; } }
         private BeforeDropdownOpenEvent _beforeDropdownOpen;
         public BeforeDropdownOpenEvent BeforeDropdownOpen { get { return EventCase == EventOneofCase.BeforeDropdownOpen ? _beforeDropdownOpen : null; } set { _beforeDropdownOpen = value; EventCase = EventOneofCase.BeforeDropdownOpen; } }
+        private TreeChildrenRequestedEvent _treeChildrenRequested;
+        public TreeChildrenRequestedEvent TreeChildrenRequested { get { return EventCase == EventOneofCase.TreeChildrenRequested ? _treeChildrenRequested : null; } set { _treeChildrenRequested = value; EventCase = EventOneofCase.TreeChildrenRequested; } }
+        private BeforeTreeNodeToggleEvent _beforeTreeNodeToggle;
+        public BeforeTreeNodeToggleEvent BeforeTreeNodeToggle { get { return EventCase == EventOneofCase.BeforeTreeNodeToggle ? _beforeTreeNodeToggle : null; } set { _beforeTreeNodeToggle = value; EventCase = EventOneofCase.BeforeTreeNodeToggle; } }
+        private AfterTreeNodeToggleEvent _afterTreeNodeToggle;
+        public AfterTreeNodeToggleEvent AfterTreeNodeToggle { get { return EventCase == EventOneofCase.AfterTreeNodeToggle ? _afterTreeNodeToggle : null; } set { _afterTreeNodeToggle = value; EventCase = EventOneofCase.AfterTreeNodeToggle; } }
+        private TreeNodeActivateEvent _treeNodeActivate;
+        public TreeNodeActivateEvent TreeNodeActivate { get { return EventCase == EventOneofCase.TreeNodeActivate ? _treeNodeActivate : null; } set { _treeNodeActivate = value; EventCase = EventOneofCase.TreeNodeActivate; } }
+        private TreeNodeContextMenuEvent _treeNodeContextMenu;
+        public TreeNodeContextMenuEvent TreeNodeContextMenu { get { return EventCase == EventOneofCase.TreeNodeContextMenu ? _treeNodeContextMenu : null; } set { _treeNodeContextMenu = value; EventCase = EventOneofCase.TreeNodeContextMenu; } }
         public long GridId { get; set; }
         public long EventId { get; set; }
 
@@ -7149,6 +7246,21 @@ namespace Volvoxgrid.V1
                 case EventOneofCase.BeforeDropdownOpen:
                     if (_beforeDropdownOpen != null) w.WriteMessageBytes(63, _beforeDropdownOpen.ToByteArray());
                     break;
+                case EventOneofCase.TreeChildrenRequested:
+                    if (_treeChildrenRequested != null) w.WriteMessageBytes(64, _treeChildrenRequested.ToByteArray());
+                    break;
+                case EventOneofCase.BeforeTreeNodeToggle:
+                    if (_beforeTreeNodeToggle != null) w.WriteMessageBytes(65, _beforeTreeNodeToggle.ToByteArray());
+                    break;
+                case EventOneofCase.AfterTreeNodeToggle:
+                    if (_afterTreeNodeToggle != null) w.WriteMessageBytes(66, _afterTreeNodeToggle.ToByteArray());
+                    break;
+                case EventOneofCase.TreeNodeActivate:
+                    if (_treeNodeActivate != null) w.WriteMessageBytes(67, _treeNodeActivate.ToByteArray());
+                    break;
+                case EventOneofCase.TreeNodeContextMenu:
+                    if (_treeNodeContextMenu != null) w.WriteMessageBytes(68, _treeNodeContextMenu.ToByteArray());
+                    break;
             }
             return w.ToArray();
         }
@@ -7230,6 +7342,11 @@ namespace Volvoxgrid.V1
                     case 61: msg.PullToRefreshTriggered = PullToRefreshTriggeredEvent.ParseFrom(r.ReadLengthDelimited()); break;
                     case 62: msg.PullToRefreshCanceled = PullToRefreshCanceledEvent.ParseFrom(r.ReadLengthDelimited()); break;
                     case 63: msg.BeforeDropdownOpen = BeforeDropdownOpenEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 64: msg.TreeChildrenRequested = TreeChildrenRequestedEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 65: msg.BeforeTreeNodeToggle = BeforeTreeNodeToggleEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 66: msg.AfterTreeNodeToggle = AfterTreeNodeToggleEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 67: msg.TreeNodeActivate = TreeNodeActivateEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 68: msg.TreeNodeContextMenu = TreeNodeContextMenuEvent.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -13353,6 +13470,129 @@ namespace Volvoxgrid.V1
                     case 1: msg.X = r.ReadFloat(); break;
                     case 2: msg.Y = r.ReadFloat(); break;
                     case 3: msg.Text = r.ReadString(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class TreeChildrenRequestedEvent
+    {
+        public string NodeId { get; set; } = "";
+        public int Row { get; set; }
+        public long RequestId { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (NodeId != null && NodeId.Length > 0) w.WriteString(1, NodeId);
+            if (Row != 0) w.WriteInt32(2, Row);
+            if (RequestId != 0L) w.WriteInt64(3, RequestId);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<TreeChildrenRequestedEvent> Parser = new MessageParser<TreeChildrenRequestedEvent>(data => ParseFrom(data));
+
+        public static TreeChildrenRequestedEvent ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new TreeChildrenRequestedEvent();
+            var r = new ProtoReader(data);
+            var msg = new TreeChildrenRequestedEvent();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.NodeId = r.ReadString(); break;
+                    case 2: msg.Row = r.ReadInt32(); break;
+                    case 3: msg.RequestId = r.ReadInt64(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class TreeNodeActivateEvent
+    {
+        public string NodeId { get; set; } = "";
+        public int Row { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (NodeId != null && NodeId.Length > 0) w.WriteString(1, NodeId);
+            if (Row != 0) w.WriteInt32(2, Row);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<TreeNodeActivateEvent> Parser = new MessageParser<TreeNodeActivateEvent>(data => ParseFrom(data));
+
+        public static TreeNodeActivateEvent ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new TreeNodeActivateEvent();
+            var r = new ProtoReader(data);
+            var msg = new TreeNodeActivateEvent();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.NodeId = r.ReadString(); break;
+                    case 2: msg.Row = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class TreeNodeContextMenuEvent
+    {
+        public string NodeId { get; set; } = "";
+        public int Row { get; set; }
+        public int X { get; set; }
+        public int Y { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (NodeId != null && NodeId.Length > 0) w.WriteString(1, NodeId);
+            if (Row != 0) w.WriteInt32(2, Row);
+            if (X != 0) w.WriteInt32(3, X);
+            if (Y != 0) w.WriteInt32(4, Y);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<TreeNodeContextMenuEvent> Parser = new MessageParser<TreeNodeContextMenuEvent>(data => ParseFrom(data));
+
+        public static TreeNodeContextMenuEvent ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new TreeNodeContextMenuEvent();
+            var r = new ProtoReader(data);
+            var msg = new TreeNodeContextMenuEvent();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.NodeId = r.ReadString(); break;
+                    case 2: msg.Row = r.ReadInt32(); break;
+                    case 3: msg.X = r.ReadInt32(); break;
+                    case 4: msg.Y = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }

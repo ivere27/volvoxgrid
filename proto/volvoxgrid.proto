@@ -2748,6 +2748,12 @@ message GridEvent {
     PullToRefreshTriggeredEvent pull_to_refresh_triggered = 61;
     PullToRefreshCanceledEvent pull_to_refresh_canceled = 62;
     BeforeDropdownOpenEvent before_dropdown_open = 63;
+    // Native tree model
+    TreeChildrenRequestedEvent tree_children_requested = 64;
+    BeforeTreeNodeToggleEvent  before_tree_node_toggle = 65;
+    AfterTreeNodeToggleEvent   after_tree_node_toggle  = 66;
+    TreeNodeActivateEvent      tree_node_activate      = 67;
+    TreeNodeContextMenuEvent   tree_node_context_menu  = 68;
   }
 }
 
@@ -2818,6 +2824,19 @@ message CompareEvent    { int64 request_id = 1; int32 row1 = 2; int32 row2 = 3; 
 // ── Outline Events ──
 message BeforeNodeToggleEvent { int32 row = 1; bool collapse = 2; }  // cancelable
 message AfterNodeToggleEvent  { int32 row = 1; bool collapse = 2; }  // informational
+
+// ── Native Tree Events ──
+// These are emitted for VolvoxTreeService-backed TreeGrid/TreeView mode.
+// Legacy outline/subtotal toggles continue to use Before/AfterNodeToggleEvent.
+message TreeChildrenRequestedEvent {
+  string node_id = 1;
+  int32  row = 2;
+  int64  request_id = 3;
+}
+message BeforeTreeNodeToggleEvent { string node_id = 1; int32 row = 2; bool collapse = 3; }  // cancelable
+message AfterTreeNodeToggleEvent  { string node_id = 1; int32 row = 2; bool collapse = 3; }  // informational
+message TreeNodeActivateEvent     { string node_id = 1; int32 row = 2; }  // dbl-click / Enter
+message TreeNodeContextMenuEvent  { string node_id = 1; int32 row = 2; int32 x = 3; int32 y = 4; }
 
 // ── Scroll Events ──
 message BeforeScrollEvent {

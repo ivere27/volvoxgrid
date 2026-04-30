@@ -1,6 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
@@ -31,6 +32,7 @@ use crate::sort::SortState;
 use crate::span::SpanState;
 use crate::style::{CellStylePatch, GridStyleState, Padding};
 use crate::text::{TextEngine, DEFAULT_LAYOUT_CACHE_CAP};
+use crate::tree::TreeState;
 
 /// Default row height in pixels.
 pub const DEFAULT_ROW_HEIGHT: i32 = 20;
@@ -284,6 +286,12 @@ pub struct VolvoxGrid {
     // ── Outline ───────────────────────────────────────────────────────────
     /// Outline bar style, outline column, tree color, node pictures.
     pub outline: OutlineState,
+
+    // ── Tree Model ────────────────────────────────────────────────────────
+    /// Native tree node model projected into the grid row/cell pipeline.
+    pub tree: TreeState,
+    /// Per-grid correlation id source for lazy tree child requests.
+    tree_next_request_id: AtomicI64,
 
     // ── Sort ──────────────────────────────────────────────────────────────
     /// Current sort column, sort order, explorer bar mode.
@@ -786,6 +794,10 @@ impl VolvoxGrid {
             // Outline
             outline: OutlineState::default(),
 
+            // Tree model
+            tree: TreeState::default(),
+            tree_next_request_id: AtomicI64::new(1),
+
             // Sort
             sort_state: SortState::default(),
 
@@ -1008,6 +1020,16 @@ impl VolvoxGrid {
         }
     }
 
+    pub(crate) fn next_tree_request_id(&self) -> i64 {
+        let id = self.tree_next_request_id.fetch_add(1, Ordering::Relaxed);
+        if id > 0 {
+            id
+        } else {
+            self.tree_next_request_id.store(2, Ordering::Relaxed);
+            1
+        }
+    }
+
     pub(crate) fn clear_barcode_presence_tracking(&mut self) {
         self.barcode_cell_count = 0;
         self.barcode_cells_maybe_present = false;
@@ -1097,6 +1119,7 @@ impl VolvoxGrid {
         bytes += self.merged_regions.heap_size_bytes();
         bytes += self.edit.heap_size_bytes();
         bytes += self.outline.heap_size_bytes();
+        bytes += self.tree.heap_size_bytes();
         bytes += self.sort_state.heap_size_bytes();
 
         bytes += self.type_ahead_buffer.capacity();
@@ -1383,7 +1406,7 @@ impl VolvoxGrid {
     }
 
     /// Clamps a row height to the configured min/max range.
-    fn clamp_row_height(&self, height: i32) -> i32 {
+    pub(crate) fn clamp_row_height(&self, height: i32) -> i32 {
         if self.is_tui_mode() {
             return if height <= 0 {
                 0
@@ -3064,15 +3087,25 @@ impl VolvoxGrid {
             {
                 let tg = crate::outline::TreeGeometry::from_grid(self);
                 for row in self.fixed_rows.max(0)..self.rows {
-                    let depth = self
-                        .get_row_props(row)
-                        .map(|rp| {
-                            crate::outline::outline_visual_depth_for_level(self, rp.outline_level)
-                        })
-                        .unwrap_or(0)
-                        .max(0);
-                    let has_children = self.get_row_props(row).map_or(false, |rp| rp.is_subtotal)
-                        || crate::outline::get_node(self, row).3 > 0;
+                    let depth = if let Some(level) = self.tree.row_level(self.fixed_rows, row) {
+                        level.max(0)
+                    } else {
+                        self.get_row_props(row)
+                            .map(|rp| {
+                                crate::outline::outline_visual_depth_for_level(
+                                    self,
+                                    rp.outline_level,
+                                )
+                            })
+                            .unwrap_or(0)
+                            .max(0)
+                    };
+                    let has_children = if self.tree.node_id_at_row(self.fixed_rows, row).is_some() {
+                        self.tree.row_has_children(self.fixed_rows, row)
+                    } else {
+                        self.get_row_props(row).map_or(false, |rp| rp.is_subtotal)
+                            || crate::outline::get_node(self, row).3 > 0
+                    };
                     let mut needed = if has_children {
                         depth * tg.indent_step + tg.line_offset + tg.btn_size / 2 + 3
                     } else {

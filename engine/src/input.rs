@@ -253,6 +253,59 @@ pub fn apply_node_toggle_after_before(grid: &mut VolvoxGrid, row: i32, collapse:
     if row < grid.fixed_rows || row >= grid.rows {
         return;
     }
+    if let Some(node_id) = grid.tree.node_id_at_row(grid.fixed_rows, row) {
+        let node_id = node_id.to_string();
+        if !collapse
+            && grid.tree.row_children_state(grid.fixed_rows, row)
+                == Some(pb::NodeChildrenState::NodeChildrenUnloaded as i32)
+        {
+            let request_id = grid.next_tree_request_id();
+            grid.events.push(GridEventData::TreeChildrenRequested {
+                node_id,
+                row,
+                request_id,
+            });
+            return;
+        }
+        let grid_id = grid.id;
+        let result = if collapse {
+            let request = pb::CollapseNodesRequest {
+                grid_id,
+                node_ids: vec![node_id.clone()],
+                recursive: false,
+            };
+            crate::tree::collapse_nodes(grid, request).map(|_| ())
+        } else {
+            let request = pb::ExpandNodesRequest {
+                grid_id,
+                node_ids: vec![node_id.clone()],
+                recursive: false,
+            };
+            crate::tree::expand_nodes(grid, request).map(|_| ())
+        };
+        match result {
+            Ok(()) => {
+                grid.events.push(GridEventData::AfterTreeNodeToggle {
+                    node_id,
+                    row,
+                    collapse,
+                });
+                if collapse {
+                    normalize_selection_to_visible_row(grid, row);
+                }
+                grid.mark_dirty();
+            }
+            Err(err) => {
+                normalize_selection_to_visible_row(grid, row);
+                grid.mark_dirty();
+                grid.events.push(GridEventData::Error {
+                    code: crate::tree::error_code(&err),
+                    message: err.to_string(),
+                });
+            }
+        }
+        return;
+    }
     crate::outline::toggle_collapse(grid, row);
     if collapse {
         normalize_selection_to_visible_row(grid, row);
@@ -1002,6 +1055,9 @@ fn subtotal_visual_level(level: i32, is_subtotal: bool, subtotal_level_floor: i3
 }
 
 fn outline_visual_depth(grid: &VolvoxGrid, row: i32) -> Option<i32> {
+    if let Some(level) = grid.tree.row_level(grid.fixed_rows, row) {
+        return Some(level.max(0));
+    }
     let rp = grid.get_row_props(row)?;
     let has_subtotal_nodes = grid.row_props.values().any(|props| props.is_subtotal);
     if has_subtotal_nodes {
@@ -1019,6 +1075,9 @@ fn outline_visual_depth(grid: &VolvoxGrid, row: i32) -> Option<i32> {
 }
 
 fn outline_row_has_children(grid: &VolvoxGrid, row: i32) -> bool {
+    if grid.tree.node_id_at_row(grid.fixed_rows, row).is_some() {
+        return grid.tree.row_has_children(grid.fixed_rows, row);
+    }
     let Some(rp) = grid.get_row_props(row) else {
         return false;
     };
@@ -1074,8 +1133,16 @@ pub fn toggle_selected_outline_node(grid: &mut VolvoxGrid) -> bool {
     let Some((row, collapse)) = selected_outline_node_toggle_target(grid) else {
         return false;
     };
-    grid.events
-        .push(GridEventData::BeforeNodeToggle { row, collapse });
+    if let Some(node_id) = grid.tree.node_id_at_row(grid.fixed_rows, row) {
+        grid.events.push(GridEventData::BeforeTreeNodeToggle {
+            node_id: node_id.to_string(),
+            row,
+            collapse,
+        });
+    } else {
+        grid.events
+            .push(GridEventData::BeforeNodeToggle { row, collapse });
+    }
     apply_node_toggle_after_before(grid, row, collapse);
     true
 }
@@ -3212,10 +3279,18 @@ pub fn handle_pointer_down_with_behavior(
                     .get(&hit.row)
                     .map_or(false, |rp| rp.is_collapsed);
                 if behavior.allow_node_toggle && !dbl_click {
-                    grid.events.push(GridEventData::BeforeNodeToggle {
-                        row: hit.row,
-                        collapse: collapsing,
-                    });
+                    if let Some(node_id) = grid.tree.node_id_at_row(grid.fixed_rows, hit.row) {
+                        grid.events.push(GridEventData::BeforeTreeNodeToggle {
+                            node_id: node_id.to_string(),
+                            row: hit.row,
+                            collapse: collapsing,
+                        });
+                    } else {
+                        grid.events.push(GridEventData::BeforeNodeToggle {
+                            row: hit.row,
+                            collapse: collapsing,
+                        });
+                    }
                     apply_node_toggle_after_before(grid, hit.row, collapsing);
                 }
             }

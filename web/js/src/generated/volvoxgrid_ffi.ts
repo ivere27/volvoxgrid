@@ -611,6 +611,11 @@ export const AfterScrollEventFields = {
 export const AfterSortEventFields = {
   "col": 1,
 } as const;
+export const AfterTreeNodeToggleEventFields = {
+  "node_id": 1,
+  "row": 2,
+  "collapse": 3,
+} as const;
 export const AfterUserFreezeEventFields = {
   "frozen_rows": 1,
   "frozen_cols": 2,
@@ -727,6 +732,11 @@ export const BeforeScrollEventFields = {
 } as const;
 export const BeforeSortEventFields = {
   "col": 1,
+} as const;
+export const BeforeTreeNodeToggleEventFields = {
+  "node_id": 1,
+  "row": 2,
+  "collapse": 3,
 } as const;
 export const BeforeUserResizeEventFields = {
   "row": 1,
@@ -1361,6 +1371,11 @@ export const GridEventFields = {
   "pull_to_refresh_triggered": 61,
   "pull_to_refresh_canceled": 62,
   "before_dropdown_open": 63,
+  "tree_children_requested": 64,
+  "before_tree_node_toggle": 65,
+  "after_tree_node_toggle": 66,
+  "tree_node_activate": 67,
+  "tree_node_context_menu": 68,
 } as const;
 export const GridEventTargetFields = {
   "kind": 1,
@@ -2112,6 +2127,21 @@ export const TooltipRequestFields = {
   "x": 1,
   "y": 2,
   "text": 3,
+} as const;
+export const TreeChildrenRequestedEventFields = {
+  "node_id": 1,
+  "row": 2,
+  "request_id": 3,
+} as const;
+export const TreeNodeActivateEventFields = {
+  "node_id": 1,
+  "row": 2,
+} as const;
+export const TreeNodeContextMenuEventFields = {
+  "node_id": 1,
+  "row": 2,
+  "x": 3,
+  "y": 4,
 } as const;
 export const TypeAheadEndedEventFields = {
 } as const;

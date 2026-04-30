@@ -51,6 +51,7 @@ pub mod sort;
 pub mod span;
 pub mod style;
 pub mod text;
+pub mod tree;
 
 use std::collections::HashMap;
 use std::sync::{

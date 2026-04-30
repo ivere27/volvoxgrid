@@ -3867,6 +3867,9 @@ fn render_row_indicator_slot<C: Canvas>(
 }
 
 fn outline_visual_depth(grid: &VolvoxGrid, row: i32) -> Option<i32> {
+    if let Some(level) = grid.tree.row_level(grid.fixed_rows, row) {
+        return Some(level.max(0));
+    }
     let rp = grid.get_row_props(row)?;
     let has_subtotal_nodes = grid.row_props.values().any(|props| props.is_subtotal);
     if has_subtotal_nodes {
@@ -3882,6 +3885,9 @@ fn outline_visual_depth(grid: &VolvoxGrid, row: i32) -> Option<i32> {
 }
 
 fn outline_row_has_children(grid: &VolvoxGrid, row: i32) -> bool {
+    if grid.tree.node_id_at_row(grid.fixed_rows, row).is_some() {
+        return grid.tree.row_has_children(grid.fixed_rows, row);
+    }
     let Some(rp) = grid.get_row_props(row) else {
         return false;
     };

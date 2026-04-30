@@ -56,6 +56,8 @@ const HIERARCHY_TYPE_COL = 1;
 const HIERARCHY_ACTION_COL = 5;
 const HIERARCHY_ICON_COL = 6;
 const HIERARCHY_FOLDER_ICON = "\uE2C7";
+const NODE_LEAF = 1;
+const NODE_CHILDREN_LOADED = 4;
 const CELL_INTERACTION_TEXT_LINK = CellInteraction.CELL_INTERACTION_TEXT_LINK;
 const CELL_HIT_AREA_TEXT = CellHitArea.HIT_TEXT;
 const FONT_FETCH_TIMEOUT_MS = 5000;
@@ -198,6 +200,9 @@ type BarcodeDemoPlan = {
   optionsText: string;
 };
 type WasmModule = typeof import("./wasm/volvoxgrid_wasm.js");
+type HierarchyTreeWasmModule = WasmModule & {
+  volvox_tree_load_tree_pb?: (data: Uint8Array) => Uint8Array;
+};
 
 function hierarchyRowDepths(rows: ReadonlyArray<HierarchyDemoRow>): number[] {
   const rowsById = new Map(rows.map((row) => [row.Id, row]));
@@ -797,6 +802,78 @@ function pbEncodeUpdateCellsRequest(
   return new Uint8Array(out);
 }
 
+function pbEncodeTreeNodeCell(options: {
+  nodeId: string;
+  col: number;
+  text: string;
+  style?: DemoCellStyleSpec;
+}): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeStringField(1, options.nodeId));
+  out.push(...pbEncodeInt32Field(2, options.col));
+  out.push(...pbEncodeMessageField(3, pbEncodeCellValueText(options.text)));
+  if (options.style != null) {
+    const style = pbEncodeCellStylePayload(options.style);
+    if (style.length > 0) {
+      out.push(...pbEncodeMessageField(4, style));
+    }
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeHierarchyTreeNode(
+  row: HierarchyDemoRow,
+  hasChildren: boolean,
+): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeStringField(1, row.Id));
+  if (row.ParentId != null && row.ParentId !== "") {
+    out.push(...pbEncodeStringField(2, row.ParentId));
+  }
+  const cells = [
+    pbEncodeTreeNodeCell({ nodeId: row.Id, col: HIERARCHY_NAME_COL, text: row.Name }),
+    pbEncodeTreeNodeCell({
+      nodeId: row.Id,
+      col: HIERARCHY_TYPE_COL,
+      text: row.Type,
+      style: row.Type === "Folder" ? { foreground: 0xFF92400E } : undefined,
+    }),
+    pbEncodeTreeNodeCell({ nodeId: row.Id, col: 2, text: row.Size }),
+    pbEncodeTreeNodeCell({ nodeId: row.Id, col: 3, text: row.Modified }),
+    pbEncodeTreeNodeCell({ nodeId: row.Id, col: 4, text: row.Permissions }),
+    pbEncodeTreeNodeCell({
+      nodeId: row.Id,
+      col: HIERARCHY_ACTION_COL,
+      text: row.Action,
+      style: { foreground: 0xFF2563EB },
+    }),
+    pbEncodeTreeNodeCell({
+      nodeId: row.Id,
+      col: HIERARCHY_ICON_COL,
+      text: row.Type === "Folder" ? HIERARCHY_FOLDER_ICON : "",
+    }),
+  ];
+  cells.forEach((cell) => {
+    out.push(...pbEncodeMessageField(4, cell));
+  });
+  out.push(...pbEncodeInt32Field(5, hasChildren ? NODE_CHILDREN_LOADED : NODE_LEAF));
+  return new Uint8Array(out);
+}
+
+function pbEncodeHierarchyLoadTreeRequest(
+  gridId: number,
+  rows: ReadonlyArray<HierarchyDemoRow>,
+): Uint8Array {
+  const parentIds = new Set(rows.map((row) => row.ParentId).filter((id): id is string => !!id));
+  const out: number[] = [];
+  out.push(...pbEncodeTag(1, 0), ...pbEncodeVarint(BigInt(Math.trunc(gridId))));
+  rows.forEach((row) => {
+    out.push(...pbEncodeMessageField(2, pbEncodeHierarchyTreeNode(row, parentIds.has(row.Id))));
+  });
+  out.push(...pbEncodeTag(3, 0), ...pbEncodeBool(true));
+  return new Uint8Array(out);
+}
+
 function pbEncodeGridLinesPayload(color: number): Uint8Array {
   const out: number[] = [];
   out.push(...pbEncodeInt32Field(1, 1));
@@ -1308,27 +1385,16 @@ function setupHierarchyJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: nu
     const minOutlineLevel = 0;
     const maxOutlineLevel = outlineLevels.reduce((maxLevel, level) => Math.max(maxLevel, level), 0);
     const maxOutlineDepth = Math.max(0, maxOutlineLevel - minOutlineLevel);
-    const loadRows = rawRows.map(({ Id, ParentId, ...row }) => ({
-      ...row,
-      Icon: row.Type === "Folder" ? HIERARCHY_FOLDER_ICON : "",
-    }));
     grid.colCount = HIERARCHY_COLS;
     wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, HIERARCHY_COLUMN_SETUP));
-    const result = grid.loadData(PB_TEXT_ENCODER.encode(JSON.stringify(loadRows)), {
-      autoCreateColumns: false,
-    });
-    if (result.status === 2) {
-      throw new Error("LoadData failed for embedded hierarchy demo");
+    const loadTree = (wasmModule as HierarchyTreeWasmModule).volvox_tree_load_tree_pb;
+    if (typeof loadTree !== "function") {
+      throw new Error("Hierarchy demo requires VolvoxTreeService WASM support");
     }
-    wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, HIERARCHY_COLUMN_SETUP));
-    wasmModule.volvox_grid_define_rows_pb(
-      pbEncodeDefineRowsRequest(
-        id,
-        rawRows.map((_, index) => ({
-          outlineLevel: outlineLevels[index] ?? 0,
-        })),
-      ),
-    );
+    const response = loadTree(pbEncodeHierarchyLoadTreeRequest(id, rawRows));
+    if (!(response instanceof Uint8Array) || response.length === 0) {
+      throw new Error("VolvoxTreeService.LoadTree failed for embedded hierarchy demo");
+    }
     if (typeof wasmModule.volvox_grid_configure === "function") {
       wasmModule.volvox_grid_configure(
         BigInt(id),
@@ -1342,14 +1408,6 @@ function setupHierarchyJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: nu
     grid.flingImpulseGain = 220.0;
     grid.flingFriction = 0.9;
     grid.editable = false;
-    rawRows.forEach((row, index) => {
-      grid.setCellStyle(index, HIERARCHY_ACTION_COL, { foreground: 0xFF2563EB });
-      if (row.Type === "Folder") {
-        grid.setCellStyle(index, HIERARCHY_TYPE_COL, {
-          foreground: 0xFF92400E,
-        });
-      }
-    });
     grid.invalidate();
   } finally {
     if (id !== prevId) {
