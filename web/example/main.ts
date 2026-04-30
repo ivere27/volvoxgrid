@@ -15,18 +15,82 @@ import { VolvoxGrid, type VolvoxGridContextMenuRequest, type VolvoxGridDropdown 
 import { setupDefaultInput } from "../js/src/default-input.js";
 import { createCanvas2DTextRenderer } from "../js/src/canvas2d-text-renderer.js";
 import {
+  AggregateType,
   Align,
+  BarcodeCaptionOptionsFields,
   BarcodeCaptionPosition,
   BarcodeCheckDigitMode,
+  BarcodeDataFields,
+  BarcodeEncodingOptionsFields,
   BarcodeQrErrorCorrection,
+  BarcodeRenderOptionsFields,
   BarcodeSymbology,
   BarcodeTextEncoding,
+  BorderFields,
   BorderStyle,
+  BordersFields,
   CellHitArea,
   CellInteraction,
+  CellSpanMode,
+  CellStyleFields,
+  CellUpdateFields,
+  CellValueFields,
+  ColIndicatorCellMode,
+  ColIndicatorConfigFields,
+  ColumnDefFields,
+  ColumnDataType,
+  CornerIndicatorConfigFields,
+  CornerIndicatorSlotKind,
+  CornerIndicatorSlotFields,
+  DefineColumnsRequestFields,
+  DefineRowsRequestFields,
+  DropdownFields,
+  DropdownItemFields,
+  DropdownTrigger,
+  EditConfigFields,
+  EditTrigger,
+  FillHandlePosition,
+  FocusBorderStyle,
+  FontFields,
+  FreezePolicyFields,
+  GridConfigFields,
+  GridLinesFields,
+  GridLineStyle,
+  GroupTotalPosition,
+  HeaderFeaturesFields,
+  HeaderResizeHandleFields,
+  HeaderSeparatorFields,
+  HeaderStyleFields,
+  HighlightStyleFields,
+  HoverConfigFields,
   ImageAlignment,
   IndicatorAppearance,
+  IndicatorsConfigFields,
+  InteractionConfigFields,
+  LayoutConfigFields,
+  LoadDataStatus,
+  OutlineConfigFields,
+  PaddingFields,
+  PresentMode,
+  RegionStyleFields,
   RenderLayerBit,
+  RendererMode,
+  ResizePolicyFields,
+  RowDefFields,
+  RowIndicatorConfigFields,
+  RowIndicatorSlotKind,
+  RowIndicatorSlotFields,
+  ScrollConfigFields,
+  ScrollBarsMode,
+  SelectionConfigFields,
+  SelectionMode,
+  SelectionVisibility,
+  SpanConfigFields,
+  SpanCompareMode,
+  StyleConfigFields,
+  TabBehavior,
+  TreeIndicatorStyle,
+  UpdateCellsRequestFields,
 } from "../js/src/generated/volvoxgrid_ffi.js";
 import {
   GridEvent as GridEventMessage,
@@ -56,8 +120,27 @@ const HIERARCHY_TYPE_COL = 1;
 const HIERARCHY_ACTION_COL = 5;
 const HIERARCHY_ICON_COL = 6;
 const HIERARCHY_FOLDER_ICON = "\uE2C7";
-const NODE_LEAF = 1;
-const NODE_CHILDREN_LOADED = 4;
+enum NodeChildrenState {
+  NODE_LEAF = 1,
+  NODE_CHILDREN_LOADED = 4,
+}
+const NodeCellUpdateFields = {
+  node_id: 1,
+  col: 2,
+  value: 3,
+  style: 4,
+} as const;
+const TreeNodeFields = {
+  node_id: 1,
+  parent_id: 2,
+  cells: 4,
+  children_state: 5,
+} as const;
+const LoadTreeRequestFields = {
+  grid_id: 1,
+  nodes: 2,
+  replace: 3,
+} as const;
 const CELL_INTERACTION_TEXT_LINK = CellInteraction.CELL_INTERACTION_TEXT_LINK;
 const CELL_HIT_AREA_TEXT = CellHitArea.HIT_TEXT;
 const FONT_FETCH_TIMEOUT_MS = 5000;
@@ -99,25 +182,25 @@ function gridEventDebugObject(event: GridEventMessage): Record<string, unknown> 
 }
 
 const SALES_COLUMN_SETUP = [
-  { caption: "Q", key: "Q", align: 4, dataType: undefined, format: undefined, dropdownItems: undefined, span: true },
+  { caption: "Q", key: "Q", align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, span: true },
   { caption: "Region", key: "Region", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: true },
   { caption: "Category", key: "Category", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
   { caption: "Product", key: "Product", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
-  { caption: "Sales", key: "Sales", align: 7, dataType: 4, format: "$#,##0", dropdownItems: undefined, span: false },
-  { caption: "Cost", key: "Cost", align: 7, dataType: 4, format: "$#,##0", dropdownItems: undefined, span: false },
-  { caption: "Margin%", key: "Margin", align: 4, dataType: 1, format: undefined, dropdownItems: undefined, span: false },
-  { caption: "Flag", key: "Flag", align: 4, dataType: 3, format: undefined, dropdownItems: undefined, span: false },
+  { caption: "Sales", key: "Sales", align: Align.ALIGN_RIGHT_CENTER, dataType: ColumnDataType.COLUMN_DATA_CURRENCY, format: "$#,##0", dropdownItems: undefined, span: false },
+  { caption: "Cost", key: "Cost", align: Align.ALIGN_RIGHT_CENTER, dataType: ColumnDataType.COLUMN_DATA_CURRENCY, format: "$#,##0", dropdownItems: undefined, span: false },
+  { caption: "Margin%", key: "Margin", align: Align.ALIGN_CENTER_CENTER, dataType: ColumnDataType.COLUMN_DATA_NUMBER, format: undefined, dropdownItems: undefined, span: false },
+  { caption: "Flag", key: "Flag", align: Align.ALIGN_CENTER_CENTER, dataType: ColumnDataType.COLUMN_DATA_BOOLEAN, format: undefined, dropdownItems: undefined, span: false },
   { caption: "Status", key: "Status", align: undefined, dataType: undefined, format: undefined, dropdownItems: SALES_STATUS_ITEMS, span: false },
   { caption: "Notes", key: "Notes", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
 ] as const;
 const HIERARCHY_COLUMN_SETUP = [
   { caption: "Name", key: "Name", width: 260, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined, hidden: true },
   { caption: "Type", key: "Type", width: 80, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
-  { caption: "Size", key: "Size", width: 80, align: 7, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
-  { caption: "Modified", key: "Modified", width: 120, align: undefined, dataType: 2, format: "short date", dropdownItems: undefined, interaction: undefined },
-  { caption: "Permissions", key: "Permissions", width: 100, align: 4, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
-  { caption: "Action", key: "Action", width: 92, align: 4, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: CellInteraction.CELL_INTERACTION_TEXT_LINK },
-  { caption: "Icon", key: "Icon", width: 24, align: 4, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined, hidden: true },
+  { caption: "Size", key: "Size", width: 80, align: Align.ALIGN_RIGHT_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
+  { caption: "Modified", key: "Modified", width: 120, align: undefined, dataType: ColumnDataType.COLUMN_DATA_DATE, format: "short date", dropdownItems: undefined, interaction: undefined },
+  { caption: "Permissions", key: "Permissions", width: 100, align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
+  { caption: "Action", key: "Action", width: 92, align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: CellInteraction.CELL_INTERACTION_TEXT_LINK },
+  { caption: "Icon", key: "Icon", width: 24, align: Align.ALIGN_CENTER_CENTER, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined, hidden: true },
 ] as const;
 const BARCODE_COLUMN_SETUP = [
   { caption: "Symbology", key: "Symbology", align: Align.ALIGN_CENTER_CENTER },
@@ -629,22 +712,22 @@ function pbEncodeFloatField(field: number, value: number): number[] {
 
 function pbEncodeBorder(style: number, color: number): Uint8Array {
   const out: number[] = [];
-  out.push(...pbEncodeInt32Field(1, style));
-  out.push(...pbEncodeUint32Field(2, color));
+  out.push(...pbEncodeInt32Field(BorderFields.style, style));
+  out.push(...pbEncodeUint32Field(BorderFields.color, color));
   return new Uint8Array(out);
 }
 
 function pbEncodeBordersAll(style: number, color: number): Uint8Array {
-  return new Uint8Array(pbEncodeMessageField(1, pbEncodeBorder(style, color)));
+  return new Uint8Array(pbEncodeMessageField(BordersFields.all, pbEncodeBorder(style, color)));
 }
 
 function pbEncodeFontPayload(font: DemoFontSpec): Uint8Array {
   const out: number[] = [];
   if (font.size != null) {
-    out.push(...pbEncodeFloatField(3, font.size));
+    out.push(...pbEncodeFloatField(FontFields.size, font.size));
   }
   if (font.bold != null) {
-    out.push(...pbEncodeTag(4, 0), ...pbEncodeBool(font.bold));
+    out.push(...pbEncodeTag(FontFields.bold, 0), ...pbEncodeBool(font.bold));
   }
   return new Uint8Array(out);
 }
@@ -652,16 +735,16 @@ function pbEncodeFontPayload(font: DemoFontSpec): Uint8Array {
 function pbEncodePaddingPayload(padding: DemoCellStyleSpec["padding"]): Uint8Array {
   const out: number[] = [];
   if (padding?.left != null) {
-    out.push(...pbEncodeInt32Field(1, padding.left));
+    out.push(...pbEncodeInt32Field(PaddingFields.left, padding.left));
   }
   if (padding?.top != null) {
-    out.push(...pbEncodeInt32Field(2, padding.top));
+    out.push(...pbEncodeInt32Field(PaddingFields.top, padding.top));
   }
   if (padding?.right != null) {
-    out.push(...pbEncodeInt32Field(3, padding.right));
+    out.push(...pbEncodeInt32Field(PaddingFields.right, padding.right));
   }
   if (padding?.bottom != null) {
-    out.push(...pbEncodeInt32Field(4, padding.bottom));
+    out.push(...pbEncodeInt32Field(PaddingFields.bottom, padding.bottom));
   }
   return new Uint8Array(out);
 }
@@ -669,46 +752,46 @@ function pbEncodePaddingPayload(padding: DemoCellStyleSpec["padding"]): Uint8Arr
 function pbEncodeCellStylePayload(style: DemoCellStyleSpec): Uint8Array {
   const out: number[] = [];
   if (style.background != null) {
-    out.push(...pbEncodeUint32Field(1, style.background));
+    out.push(...pbEncodeUint32Field(CellStyleFields.background, style.background));
   }
   if (style.foreground != null) {
-    out.push(...pbEncodeUint32Field(2, style.foreground));
+    out.push(...pbEncodeUint32Field(CellStyleFields.foreground, style.foreground));
   }
   if (style.align != null) {
-    out.push(...pbEncodeInt32Field(3, style.align));
+    out.push(...pbEncodeInt32Field(CellStyleFields.align, style.align));
   }
   if (style.font != null) {
     const font = pbEncodeFontPayload(style.font);
     if (font.length > 0) {
-      out.push(...pbEncodeMessageField(4, font));
+      out.push(...pbEncodeMessageField(CellStyleFields.font, font));
     }
   }
   if (style.padding != null) {
     const padding = pbEncodePaddingPayload(style.padding);
     if (padding.length > 0) {
-      out.push(...pbEncodeMessageField(5, padding));
+      out.push(...pbEncodeMessageField(CellStyleFields.padding, padding));
     }
   }
   if (style.borderAll != null) {
-    out.push(...pbEncodeMessageField(6, pbEncodeBordersAll(style.borderAll.style, style.borderAll.color)));
+    out.push(...pbEncodeMessageField(CellStyleFields.borders, pbEncodeBordersAll(style.borderAll.style, style.borderAll.color)));
   }
   return new Uint8Array(out);
 }
 
 function pbEncodeCellValueText(text: string): Uint8Array {
-  return new Uint8Array(pbEncodeStringField(1, text));
+  return new Uint8Array(pbEncodeStringField(CellValueFields.text, text));
 }
 
 function pbEncodeBarcodeEncodingOptions(plan: BarcodeDemoPlan): Uint8Array {
   const out: number[] = [];
   if (plan.checkDigit !== BarcodeCheckDigitMode.CHECK_DIGIT_DEFAULT) {
-    out.push(...pbEncodeInt32Field(1, plan.checkDigit));
+    out.push(...pbEncodeInt32Field(BarcodeEncodingOptionsFields.check_digit, plan.checkDigit));
   }
   if (plan.textEncoding !== BarcodeTextEncoding.BARCODE_TEXT_AUTO) {
-    out.push(...pbEncodeInt32Field(2, plan.textEncoding));
+    out.push(...pbEncodeInt32Field(BarcodeEncodingOptionsFields.text_encoding, plan.textEncoding));
   }
   if (plan.qrEcc !== BarcodeQrErrorCorrection.QR_ECC_DEFAULT) {
-    out.push(...pbEncodeInt32Field(3, plan.qrEcc));
+    out.push(...pbEncodeInt32Field(BarcodeEncodingOptionsFields.qr_ecc, plan.qrEcc));
   }
   return new Uint8Array(out);
 }
@@ -716,53 +799,53 @@ function pbEncodeBarcodeEncodingOptions(plan: BarcodeDemoPlan): Uint8Array {
 function pbEncodeBarcodeRenderOptions(plan: BarcodeDemoPlan): Uint8Array {
   const out: number[] = [];
   if (plan.foreground !== 0) {
-    out.push(...pbEncodeUint32Field(1, plan.foreground));
+    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.foreground, plan.foreground));
   }
   if (plan.background !== 0) {
-    out.push(...pbEncodeUint32Field(2, plan.background));
+    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.background, plan.background));
   }
   if (plan.alignment !== ImageAlignment.IMG_ALIGN_STRETCH) {
-    out.push(...pbEncodeInt32Field(3, plan.alignment));
+    out.push(...pbEncodeInt32Field(BarcodeRenderOptionsFields.alignment, plan.alignment));
   }
   if (plan.moduleSize !== 0) {
-    out.push(...pbEncodeUint32Field(4, plan.moduleSize));
+    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.module_size, plan.moduleSize));
   }
   if (plan.quietZone !== 0) {
-    out.push(...pbEncodeUint32Field(5, plan.quietZone));
+    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.quiet_zone, plan.quietZone));
   }
   if (plan.barHeight !== 0) {
-    out.push(...pbEncodeUint32Field(10, plan.barHeight));
+    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.bar_height, plan.barHeight));
   }
   if (plan.narrowBarWidth !== 0) {
-    out.push(...pbEncodeUint32Field(11, plan.narrowBarWidth));
+    out.push(...pbEncodeUint32Field(BarcodeRenderOptionsFields.narrow_bar_width, plan.narrowBarWidth));
   }
-  out.push(...pbEncodeTag(12, 0), ...pbEncodeBool(true));
-  out.push(...pbEncodeTag(14, 0), ...pbEncodeBool(true));
+  out.push(...pbEncodeTag(BarcodeRenderOptionsFields.show_size_warning, 0), ...pbEncodeBool(true));
+  out.push(...pbEncodeTag(BarcodeRenderOptionsFields.use_full_rect, 0), ...pbEncodeBool(true));
   return new Uint8Array(out);
 }
 
 function pbEncodeBarcodeCaptionOptions(record: BarcodeJsonRow, plan: BarcodeDemoPlan): Uint8Array {
   const out: number[] = [];
-  out.push(...pbEncodeInt32Field(1, plan.captionPosition));
-  out.push(...pbEncodeStringField(2, record.Label));
-  out.push(...pbEncodeUint32Field(3, plan.captionColor));
+  out.push(...pbEncodeInt32Field(BarcodeCaptionOptionsFields.position, plan.captionPosition));
+  out.push(...pbEncodeStringField(BarcodeCaptionOptionsFields.text, record.Label));
+  out.push(...pbEncodeUint32Field(BarcodeCaptionOptionsFields.color, plan.captionColor));
   return new Uint8Array(out);
 }
 
 function pbEncodeBarcodeData(record: BarcodeJsonRow, plan: BarcodeDemoPlan): Uint8Array {
   const out: number[] = [];
-  out.push(...pbEncodeInt32Field(1, plan.symbology));
+  out.push(...pbEncodeInt32Field(BarcodeDataFields.symbology, plan.symbology));
   const encoding = pbEncodeBarcodeEncodingOptions(plan);
   if (encoding.length > 0) {
-    out.push(...pbEncodeMessageField(3, encoding));
+    out.push(...pbEncodeMessageField(BarcodeDataFields.encoding, encoding));
   }
   const render = pbEncodeBarcodeRenderOptions(plan);
   if (render.length > 0) {
-    out.push(...pbEncodeMessageField(4, render));
+    out.push(...pbEncodeMessageField(BarcodeDataFields.render, render));
   }
   const caption = pbEncodeBarcodeCaptionOptions(record, plan);
   if (caption.length > 0) {
-    out.push(...pbEncodeMessageField(5, caption));
+    out.push(...pbEncodeMessageField(BarcodeDataFields.caption, caption));
   }
   return new Uint8Array(out);
 }
@@ -775,19 +858,19 @@ function pbEncodeCellUpdate(options: {
   barcode?: Uint8Array;
 }): Uint8Array {
   const out: number[] = [];
-  out.push(...pbEncodeInt32Field(1, options.row));
-  out.push(...pbEncodeInt32Field(2, options.col));
+  out.push(...pbEncodeInt32Field(CellUpdateFields.row, options.row));
+  out.push(...pbEncodeInt32Field(CellUpdateFields.col, options.col));
   if (options.valueText != null) {
-    out.push(...pbEncodeMessageField(3, pbEncodeCellValueText(options.valueText)));
+    out.push(...pbEncodeMessageField(CellUpdateFields.value, pbEncodeCellValueText(options.valueText)));
   }
   if (options.style != null) {
     const style = pbEncodeCellStylePayload(options.style);
     if (style.length > 0) {
-      out.push(...pbEncodeMessageField(4, style));
+      out.push(...pbEncodeMessageField(CellUpdateFields.style, style));
     }
   }
   if (options.barcode != null) {
-    out.push(...pbEncodeMessageField(13, options.barcode));
+    out.push(...pbEncodeMessageField(CellUpdateFields.barcode, options.barcode));
   }
   return new Uint8Array(out);
 }
@@ -798,11 +881,11 @@ function pbEncodeUpdateCellsRequest(
   atomic: boolean,
 ): Uint8Array {
   const out: number[] = [];
-  out.push(...pbEncodeTag(1, 0), ...pbEncodeVarint(BigInt(Math.trunc(gridId))));
+  out.push(...pbEncodeTag(UpdateCellsRequestFields.grid_id, 0), ...pbEncodeVarint(BigInt(Math.trunc(gridId))));
   for (const cell of cells) {
-    out.push(...pbEncodeMessageField(2, cell));
+    out.push(...pbEncodeMessageField(UpdateCellsRequestFields.cells, cell));
   }
-  out.push(...pbEncodeTag(3, 0), ...pbEncodeBool(atomic));
+  out.push(...pbEncodeTag(UpdateCellsRequestFields.atomic, 0), ...pbEncodeBool(atomic));
   return new Uint8Array(out);
 }
 
@@ -813,13 +896,13 @@ function pbEncodeTreeNodeCell(options: {
   style?: DemoCellStyleSpec;
 }): Uint8Array {
   const out: number[] = [];
-  out.push(...pbEncodeStringField(1, options.nodeId));
-  out.push(...pbEncodeInt32Field(2, options.col));
-  out.push(...pbEncodeMessageField(3, pbEncodeCellValueText(options.text)));
+  out.push(...pbEncodeStringField(NodeCellUpdateFields.node_id, options.nodeId));
+  out.push(...pbEncodeInt32Field(NodeCellUpdateFields.col, options.col));
+  out.push(...pbEncodeMessageField(NodeCellUpdateFields.value, pbEncodeCellValueText(options.text)));
   if (options.style != null) {
     const style = pbEncodeCellStylePayload(options.style);
     if (style.length > 0) {
-      out.push(...pbEncodeMessageField(4, style));
+      out.push(...pbEncodeMessageField(NodeCellUpdateFields.style, style));
     }
   }
   return new Uint8Array(out);
@@ -830,9 +913,9 @@ function pbEncodeHierarchyTreeNode(
   hasChildren: boolean,
 ): Uint8Array {
   const out: number[] = [];
-  out.push(...pbEncodeStringField(1, row.Id));
+  out.push(...pbEncodeStringField(TreeNodeFields.node_id, row.Id));
   if (row.ParentId != null && row.ParentId !== "") {
-    out.push(...pbEncodeStringField(2, row.ParentId));
+    out.push(...pbEncodeStringField(TreeNodeFields.parent_id, row.ParentId));
   }
   const cells = [
     pbEncodeTreeNodeCell({ nodeId: row.Id, col: HIERARCHY_NAME_COL, text: row.Name }),
@@ -858,9 +941,12 @@ function pbEncodeHierarchyTreeNode(
     }),
   ];
   cells.forEach((cell) => {
-    out.push(...pbEncodeMessageField(4, cell));
+    out.push(...pbEncodeMessageField(TreeNodeFields.cells, cell));
   });
-  out.push(...pbEncodeInt32Field(5, hasChildren ? NODE_CHILDREN_LOADED : NODE_LEAF));
+  out.push(...pbEncodeInt32Field(
+    TreeNodeFields.children_state,
+    hasChildren ? NodeChildrenState.NODE_CHILDREN_LOADED : NodeChildrenState.NODE_LEAF,
+  ));
   return new Uint8Array(out);
 }
 
@@ -870,44 +956,44 @@ function pbEncodeHierarchyLoadTreeRequest(
 ): Uint8Array {
   const parentIds = new Set(rows.map((row) => row.ParentId).filter((id): id is string => !!id));
   const out: number[] = [];
-  out.push(...pbEncodeTag(1, 0), ...pbEncodeVarint(BigInt(Math.trunc(gridId))));
+  out.push(...pbEncodeTag(LoadTreeRequestFields.grid_id, 0), ...pbEncodeVarint(BigInt(Math.trunc(gridId))));
   rows.forEach((row) => {
-    out.push(...pbEncodeMessageField(2, pbEncodeHierarchyTreeNode(row, parentIds.has(row.Id))));
+    out.push(...pbEncodeMessageField(LoadTreeRequestFields.nodes, pbEncodeHierarchyTreeNode(row, parentIds.has(row.Id))));
   });
-  out.push(...pbEncodeTag(3, 0), ...pbEncodeBool(true));
+  out.push(...pbEncodeTag(LoadTreeRequestFields.replace, 0), ...pbEncodeBool(true));
   return new Uint8Array(out);
 }
 
 function pbEncodeGridLinesPayload(color: number): Uint8Array {
   const out: number[] = [];
-  out.push(...pbEncodeInt32Field(1, 1));
-  out.push(...pbEncodeUint32Field(3, color));
+  out.push(...pbEncodeInt32Field(GridLinesFields.style, GridLineStyle.GRIDLINE_SOLID));
+  out.push(...pbEncodeUint32Field(GridLinesFields.color, color));
   return new Uint8Array(out);
 }
 
 function pbEncodeRegionStylePayload(background: number, foreground: number, gridColor: number): Uint8Array {
   const out: number[] = [];
-  out.push(...pbEncodeUint32Field(1, background));
-  out.push(...pbEncodeUint32Field(2, foreground));
-  out.push(...pbEncodeMessageField(4, pbEncodeGridLinesPayload(gridColor)));
+  out.push(...pbEncodeUint32Field(RegionStyleFields.background, background));
+  out.push(...pbEncodeUint32Field(RegionStyleFields.foreground, foreground));
+  out.push(...pbEncodeMessageField(RegionStyleFields.grid_lines, pbEncodeGridLinesPayload(gridColor)));
   return new Uint8Array(out);
 }
 
 function pbEncodeHeaderStylePayload(color: number): Uint8Array {
   const separator: number[] = [];
-  separator.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
-  separator.push(...pbEncodeUint32Field(2, color));
-  separator.push(...pbEncodeInt32Field(3, 1));
+  separator.push(...pbEncodeTag(HeaderSeparatorFields.enabled, 0), ...pbEncodeBool(true));
+  separator.push(...pbEncodeUint32Field(HeaderSeparatorFields.color, color));
+  separator.push(...pbEncodeInt32Field(HeaderSeparatorFields.width, 1));
 
   const resizeHandle: number[] = [];
-  resizeHandle.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
-  resizeHandle.push(...pbEncodeUint32Field(2, color));
-  resizeHandle.push(...pbEncodeInt32Field(3, 1));
-  resizeHandle.push(...pbEncodeInt32Field(5, 6));
+  resizeHandle.push(...pbEncodeTag(HeaderResizeHandleFields.enabled, 0), ...pbEncodeBool(true));
+  resizeHandle.push(...pbEncodeUint32Field(HeaderResizeHandleFields.color, color));
+  resizeHandle.push(...pbEncodeInt32Field(HeaderResizeHandleFields.width, 1));
+  resizeHandle.push(...pbEncodeInt32Field(HeaderResizeHandleFields.hit_width, 6));
 
   const out: number[] = [];
-  out.push(...pbEncodeMessageField(1, new Uint8Array(separator)));
-  out.push(...pbEncodeMessageField(2, new Uint8Array(resizeHandle)));
+  out.push(...pbEncodeMessageField(HeaderStyleFields.separator, new Uint8Array(separator)));
+  out.push(...pbEncodeMessageField(HeaderStyleFields.resize_handle, new Uint8Array(resizeHandle)));
   return new Uint8Array(out);
 }
 
@@ -921,19 +1007,19 @@ function pbEncodeHighlightStylePayload(options: {
 }): Uint8Array {
   const out: number[] = [];
   if (options.background != null) {
-    out.push(...pbEncodeUint32Field(1, options.background));
+    out.push(...pbEncodeUint32Field(HighlightStyleFields.background, options.background));
   }
   if (options.foreground != null) {
-    out.push(...pbEncodeUint32Field(2, options.foreground));
+    out.push(...pbEncodeUint32Field(HighlightStyleFields.foreground, options.foreground));
   }
   if (options.borderStyle != null && options.borderColor != null) {
-    out.push(...pbEncodeMessageField(3, pbEncodeBordersAll(options.borderStyle, options.borderColor)));
+    out.push(...pbEncodeMessageField(HighlightStyleFields.borders, pbEncodeBordersAll(options.borderStyle, options.borderColor)));
   }
   if (options.fillHandle != null) {
-    out.push(...pbEncodeInt32Field(4, options.fillHandle));
+    out.push(...pbEncodeInt32Field(HighlightStyleFields.fill_handle, options.fillHandle));
   }
   if (options.fillHandleColor != null) {
-    out.push(...pbEncodeUint32Field(5, options.fillHandleColor));
+    out.push(...pbEncodeUint32Field(HighlightStyleFields.fill_handle_color, options.fillHandleColor));
   }
   return new Uint8Array(out);
 }
@@ -943,32 +1029,32 @@ function pbEncodeColumnDef(
   setup: DemoColumnSetup,
 ): Uint8Array {
   const out: number[] = [];
-  out.push(...pbEncodeInt32Field(1, index));
+  out.push(...pbEncodeInt32Field(ColumnDefFields.index, index));
   if (setup.width != null) {
-    out.push(...pbEncodeInt32Field(2, setup.width));
+    out.push(...pbEncodeInt32Field(ColumnDefFields.width, setup.width));
   }
-  out.push(...pbEncodeStringField(5, setup.caption));
+  out.push(...pbEncodeStringField(ColumnDefFields.caption, setup.caption));
   if (setup.align != null) {
-    out.push(...pbEncodeInt32Field(6, setup.align));
+    out.push(...pbEncodeInt32Field(ColumnDefFields.align, setup.align));
   }
   if (setup.dataType != null) {
-    out.push(...pbEncodeInt32Field(8, setup.dataType));
+    out.push(...pbEncodeInt32Field(ColumnDefFields.data_type, setup.dataType));
   }
   if (setup.format != null) {
-    out.push(...pbEncodeStringField(9, setup.format));
+    out.push(...pbEncodeStringField(ColumnDefFields.format, setup.format));
   }
-  out.push(...pbEncodeStringField(10, setup.key));
+  out.push(...pbEncodeStringField(ColumnDefFields.key, setup.key));
   if (setup.dropdownItems != null) {
-    out.push(...pbEncodeMessageField(13, pbEncodeDropdownFromLabels(setup.dropdownItems)));
+    out.push(...pbEncodeMessageField(ColumnDefFields.dropdown, pbEncodeDropdownFromLabels(setup.dropdownItems)));
   }
   if (setup.hidden != null) {
-    out.push(...pbEncodeTag(16, 0), ...pbEncodeBool(setup.hidden));
+    out.push(...pbEncodeTag(ColumnDefFields.hidden, 0), ...pbEncodeBool(setup.hidden));
   }
   if (setup.span != null) {
-    out.push(...pbEncodeTag(17, 0), ...pbEncodeBool(setup.span));
+    out.push(...pbEncodeTag(ColumnDefFields.span, 0), ...pbEncodeBool(setup.span));
   }
   if (setup.interaction != null) {
-    out.push(...pbEncodeInt32Field(26, setup.interaction));
+    out.push(...pbEncodeInt32Field(ColumnDefFields.interaction, setup.interaction));
   }
   return new Uint8Array(out);
 }
@@ -977,12 +1063,15 @@ function pbEncodeDropdownFromLabels(items: string): Uint8Array {
   const out: number[] = [];
   let source = items;
   if (source.startsWith("|")) {
-    out.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
+    out.push(...pbEncodeTag(DropdownFields.allow_custom_value, 0), ...pbEncodeBool(true));
     source = source.slice(1);
   }
   for (const label of source.split("|")) {
     if (!label) continue;
-    out.push(...pbEncodeMessageField(1, new Uint8Array(pbEncodeStringField(2, label))));
+    out.push(...pbEncodeMessageField(
+      DropdownFields.items,
+      new Uint8Array(pbEncodeStringField(DropdownItemFields.label, label)),
+    ));
   }
   return new Uint8Array(out);
 }
@@ -1005,24 +1094,24 @@ function dropdownFromLabels(items: string): VolvoxGridDropdown {
 
 function pbEncodeDefineColumnsRequest(gridId: number, columns: readonly DemoColumnSetup[]): Uint8Array {
   const out: number[] = [];
-  out.push(...pbEncodeTag(1, 0), ...pbEncodeVarint(BigInt(gridId)));
+  out.push(...pbEncodeTag(DefineColumnsRequestFields.grid_id, 0), ...pbEncodeVarint(BigInt(gridId)));
   columns.forEach((column, index) => {
-    out.push(...pbEncodeMessageField(2, pbEncodeColumnDef(index, column)));
+    out.push(...pbEncodeMessageField(DefineColumnsRequestFields.columns, pbEncodeColumnDef(index, column)));
   });
   return new Uint8Array(out);
 }
 
 function pbEncodeRowDef(index: number, row: DemoRowSetup): Uint8Array {
   const out: number[] = [];
-  out.push(...pbEncodeInt32Field(1, index));
+  out.push(...pbEncodeInt32Field(RowDefFields.index, index));
   if (row.height != null) {
-    out.push(...pbEncodeInt32Field(2, row.height));
+    out.push(...pbEncodeInt32Field(RowDefFields.height, row.height));
   }
   if (row.isSubtotal != null) {
-    out.push(...pbEncodeTag(4, 0), ...pbEncodeBool(row.isSubtotal));
+    out.push(...pbEncodeTag(RowDefFields.is_subtotal, 0), ...pbEncodeBool(row.isSubtotal));
   }
   if (row.outlineLevel != null) {
-    out.push(...pbEncodeInt32Field(5, row.outlineLevel));
+    out.push(...pbEncodeInt32Field(RowDefFields.outline_level, row.outlineLevel));
   }
   return new Uint8Array(out);
 }
@@ -1032,9 +1121,9 @@ function pbEncodeDefineRowsRequest(
   rows: ReadonlyArray<DemoRowSetup>,
 ): Uint8Array {
   const out: number[] = [];
-  out.push(...pbEncodeTag(1, 0), ...pbEncodeVarint(BigInt(gridId)));
+  out.push(...pbEncodeTag(DefineRowsRequestFields.grid_id, 0), ...pbEncodeVarint(BigInt(gridId)));
   rows.forEach((row, index) => {
-    out.push(...pbEncodeMessageField(2, pbEncodeRowDef(index, row)));
+    out.push(...pbEncodeMessageField(DefineRowsRequestFields.rows, pbEncodeRowDef(index, row)));
   });
   return new Uint8Array(out);
 }
@@ -1078,248 +1167,254 @@ function pbEncodeHierarchyOutlineConfig(maxOutlineDepth: number, maxOutlineLevel
   const outlineWidth = hierarchyOutlineWidth(maxOutlineDepth);
   const expanderWidth = hierarchyExpanderWidth(maxOutlineDepth);
   const layout: number[] = [];
-  layout.push(...pbEncodeInt32Field(3, 0));
+  layout.push(...pbEncodeInt32Field(LayoutConfigFields.fixed_rows, 0));
 
   const style: number[] = [];
-  style.push(...pbEncodeUint32Field(1, 0xFFFFFFFF));
-  style.push(...pbEncodeUint32Field(2, 0xFF1C1917));
-  style.push(...pbEncodeUint32Field(3, 0xFFF5F5F4));
-  style.push(...pbEncodeUint32Field(7, 0xFFF59E0B));
-  style.push(...pbEncodeMessageField(10, pbEncodeGridLinesPayload(0xFFE7E5E4)));
-  style.push(...pbEncodeMessageField(11, pbEncodeRegionStylePayload(0xFFF5F5F4, 0xFF44403C, 0xFFD6D3D1)));
-  style.push(...pbEncodeMessageField(12, pbEncodeRegionStylePayload(0xFFFFFFFF, 0xFF1C1917, 0xFFD6D3D1)));
-  style.push(...pbEncodeMessageField(13, pbEncodeHeaderStylePayload(0xFFD6D3D1)));
-  style.push(...pbEncodeUint32Field(20, 0xFFFAFAF9));
-  style.push(...pbEncodeUint32Field(21, 0xFFD6D3D1));
+  style.push(...pbEncodeUint32Field(StyleConfigFields.background, 0xFFFFFFFF));
+  style.push(...pbEncodeUint32Field(StyleConfigFields.foreground, 0xFF1C1917));
+  style.push(...pbEncodeUint32Field(StyleConfigFields.alternate_background, 0xFFF5F5F4));
+  style.push(...pbEncodeUint32Field(StyleConfigFields.progress_color, 0xFFF59E0B));
+  style.push(...pbEncodeMessageField(StyleConfigFields.grid_lines, pbEncodeGridLinesPayload(0xFFE7E5E4)));
+  style.push(...pbEncodeMessageField(StyleConfigFields.fixed, pbEncodeRegionStylePayload(0xFFF5F5F4, 0xFF44403C, 0xFFD6D3D1)));
+  style.push(...pbEncodeMessageField(StyleConfigFields.frozen, pbEncodeRegionStylePayload(0xFFFFFFFF, 0xFF1C1917, 0xFFD6D3D1)));
+  style.push(...pbEncodeMessageField(StyleConfigFields.header, pbEncodeHeaderStylePayload(0xFFD6D3D1)));
+  style.push(...pbEncodeUint32Field(StyleConfigFields.sheet_background, 0xFFFAFAF9));
+  style.push(...pbEncodeUint32Field(StyleConfigFields.sheet_border, 0xFFD6D3D1));
 
   const selectionStyle = pbEncodeHighlightStylePayload({
     background: 0xFFD97706,
     foreground: 0xFFFFFFFF,
-    fillHandle: 0,
+    fillHandle: FillHandlePosition.FILL_HANDLE_NONE,
     fillHandleColor: 0xFFF59E0B,
   });
   const activeCellStyle = pbEncodeHighlightStylePayload({
     background: 0x22000000,
     foreground: 0xFFFFFFFF,
-    borderStyle: 2,
+    borderStyle: BorderStyle.BORDER_THICK,
     borderColor: 0xFFF59E0B,
   });
   const hover: number[] = [];
-  hover.push(...pbEncodeTag(3, 0), ...pbEncodeBool(true));
-  hover.push(...pbEncodeMessageField(6, pbEncodeHighlightStylePayload({
+  hover.push(...pbEncodeTag(HoverConfigFields.cell, 0), ...pbEncodeBool(true));
+  hover.push(...pbEncodeMessageField(HoverConfigFields.cell_style, pbEncodeHighlightStylePayload({
     background: 0x1AD97706,
-    borderStyle: 1,
+    borderStyle: BorderStyle.BORDER_THIN,
     borderColor: 0xFFF59E0B,
   })));
   const selection: number[] = [];
-  selection.push(...pbEncodeInt32Field(1, 0));
-  selection.push(...pbEncodeMessageField(6, selectionStyle));
-  selection.push(...pbEncodeMessageField(7, new Uint8Array(hover)));
-  selection.push(...pbEncodeMessageField(10, activeCellStyle));
+  selection.push(...pbEncodeInt32Field(SelectionConfigFields.mode, SelectionMode.SELECTION_FREE));
+  selection.push(...pbEncodeMessageField(SelectionConfigFields.style, selectionStyle));
+  selection.push(...pbEncodeMessageField(SelectionConfigFields.hover, new Uint8Array(hover)));
+  selection.push(...pbEncodeMessageField(SelectionConfigFields.active_cell_style, activeCellStyle));
 
   const editing: number[] = [];
-  editing.push(...pbEncodeInt32Field(1, 0));
-  editing.push(...pbEncodeInt32Field(2, 1));
-  editing.push(...pbEncodeInt32Field(3, 0));
+  editing.push(...pbEncodeInt32Field(EditConfigFields.trigger, EditTrigger.EDIT_TRIGGER_NONE));
+  editing.push(...pbEncodeInt32Field(EditConfigFields.tab_behavior, TabBehavior.TAB_CELLS));
+  editing.push(...pbEncodeInt32Field(EditConfigFields.dropdown_trigger, DropdownTrigger.DROPDOWN_NEVER));
 
   const scrolling: number[] = [];
-  scrolling.push(...pbEncodeInt32Field(9, 3));
-  scrolling.push(...pbEncodeTag(4, 0), ...pbEncodeBool(true));
-  scrolling.push(...pbEncodeFloatField(5, 220.0));
-  scrolling.push(...pbEncodeFloatField(6, 0.9));
+  scrolling.push(...pbEncodeInt32Field(ScrollConfigFields.scrollbars, ScrollBarsMode.SCROLLBAR_BOTH));
+  scrolling.push(...pbEncodeTag(ScrollConfigFields.fling_enabled, 0), ...pbEncodeBool(true));
+  scrolling.push(...pbEncodeFloatField(ScrollConfigFields.fling_impulse_gain, 220.0));
+  scrolling.push(...pbEncodeFloatField(ScrollConfigFields.fling_friction, 0.9));
 
   const outline: number[] = [];
-  outline.push(...pbEncodeInt32Field(1, 4));
-  outline.push(...pbEncodeUint32Field(3, 0xFFA8A29E));
-  outline.push(...pbEncodeInt32Field(6, 20));
-  outline.push(...pbEncodeInt32Field(7, Math.max(0, maxOutlineLevel)));
-  outline.push(...pbEncodeTag(8, 0), ...pbEncodeBool(true));
-  outline.push(...pbEncodeInt32Field(9, HIERARCHY_NAME_COL));
-  outline.push(...pbEncodeInt32Field(10, HIERARCHY_ICON_COL));
+  outline.push(...pbEncodeInt32Field(OutlineConfigFields.tree_indicator, TreeIndicatorStyle.TREE_INDICATOR_CONNECTORS_LEAF));
+  outline.push(...pbEncodeUint32Field(OutlineConfigFields.tree_color, 0xFFA8A29E));
+  outline.push(...pbEncodeInt32Field(OutlineConfigFields.indicator_indent, 20));
+  outline.push(...pbEncodeInt32Field(OutlineConfigFields.max_levels, Math.max(0, maxOutlineLevel)));
+  outline.push(...pbEncodeTag(OutlineConfigFields.show_level_buttons, 0), ...pbEncodeBool(true));
+  outline.push(...pbEncodeInt32Field(OutlineConfigFields.label_column, HIERARCHY_NAME_COL));
+  outline.push(...pbEncodeInt32Field(OutlineConfigFields.icon_column, HIERARCHY_ICON_COL));
 
   const resize: number[] = [];
-  resize.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
-  resize.push(...pbEncodeTag(2, 0), ...pbEncodeBool(false));
+  resize.push(...pbEncodeTag(ResizePolicyFields.columns, 0), ...pbEncodeBool(true));
+  resize.push(...pbEncodeTag(ResizePolicyFields.rows, 0), ...pbEncodeBool(false));
   const freeze: number[] = [];
-  freeze.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
-  freeze.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
+  freeze.push(...pbEncodeTag(FreezePolicyFields.columns, 0), ...pbEncodeBool(true));
+  freeze.push(...pbEncodeTag(FreezePolicyFields.rows, 0), ...pbEncodeBool(true));
   const headerFeatures: number[] = [];
-  headerFeatures.push(...pbEncodeTag(1, 0), ...pbEncodeBool(false));
-  headerFeatures.push(...pbEncodeTag(2, 0), ...pbEncodeBool(false));
-  headerFeatures.push(...pbEncodeTag(3, 0), ...pbEncodeBool(false));
+  headerFeatures.push(...pbEncodeTag(HeaderFeaturesFields.sort, 0), ...pbEncodeBool(false));
+  headerFeatures.push(...pbEncodeTag(HeaderFeaturesFields.reorder, 0), ...pbEncodeBool(false));
+  headerFeatures.push(...pbEncodeTag(HeaderFeaturesFields.chooser, 0), ...pbEncodeBool(false));
   const interaction: number[] = [];
-  interaction.push(...pbEncodeMessageField(1, new Uint8Array(resize)));
-  interaction.push(...pbEncodeMessageField(2, new Uint8Array(freeze)));
-  interaction.push(...pbEncodeTag(5, 0), ...pbEncodeBool(true));
-  interaction.push(...pbEncodeMessageField(10, new Uint8Array(headerFeatures)));
+  interaction.push(...pbEncodeMessageField(InteractionConfigFields.resize, new Uint8Array(resize)));
+  interaction.push(...pbEncodeMessageField(InteractionConfigFields.freeze, new Uint8Array(freeze)));
+  interaction.push(...pbEncodeTag(InteractionConfigFields.auto_size_mouse, 0), ...pbEncodeBool(true));
+  interaction.push(...pbEncodeMessageField(InteractionConfigFields.header_features, new Uint8Array(headerFeatures)));
 
   const colTop: number[] = [];
-  colTop.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
-  colTop.push(...pbEncodeInt32Field(2, 28));
-  colTop.push(...pbEncodeInt32Field(3, 1));
-  colTop.push(...pbEncodeTag(4, 0), ...pbEncodeVarint(1n));
-  colTop.push(...pbEncodeUint32Field(5, 0xFFFAFAF9));
-  colTop.push(...pbEncodeUint32Field(6, 0xFF1C1917));
-  colTop.push(...pbEncodeUint32Field(8, 0xFFD6D3D1));
-  colTop.push(...pbEncodeTag(10, 0), ...pbEncodeBool(true));
+  colTop.push(...pbEncodeTag(ColIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
+  colTop.push(...pbEncodeInt32Field(ColIndicatorConfigFields.band_rows, 1));
+  colTop.push(...pbEncodeUint32Field(
+    ColIndicatorConfigFields.mode_bits,
+    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT,
+  ));
+  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.background, 0xFFFAFAF9));
+  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.foreground, 0xFF1C1917));
+  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.grid_color, 0xFFD6D3D1));
+  colTop.push(...pbEncodeTag(ColIndicatorConfigFields.allow_resize, 0), ...pbEncodeBool(true));
   const rowStart: number[] = [];
-  rowStart.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
-  rowStart.push(...pbEncodeInt32Field(2, expanderWidth));
-  rowStart.push(...pbEncodeUint32Field(4, 0xFFFAFAF9));
-  rowStart.push(...pbEncodeUint32Field(5, 0xFF57534E));
-  rowStart.push(...pbEncodeUint32Field(7, 0xFFD6D3D1));
-  rowStart.push(...pbEncodeTag(8, 0), ...pbEncodeBool(true));
-  rowStart.push(...pbEncodeTag(9, 0), ...pbEncodeBool(true));
+  rowStart.push(...pbEncodeTag(RowIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
+  rowStart.push(...pbEncodeInt32Field(RowIndicatorConfigFields.width, expanderWidth));
+  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.background, 0xFFFAFAF9));
+  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.foreground, 0xFF57534E));
+  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.grid_color, 0xFFD6D3D1));
+  rowStart.push(...pbEncodeTag(RowIndicatorConfigFields.auto_size, 0), ...pbEncodeBool(true));
+  rowStart.push(...pbEncodeTag(RowIndicatorConfigFields.allow_resize, 0), ...pbEncodeBool(true));
   const expanderSlot: number[] = [];
-  expanderSlot.push(...pbEncodeInt32Field(1, 10));
-  expanderSlot.push(...pbEncodeInt32Field(2, expanderWidth));
-  expanderSlot.push(...pbEncodeTag(3, 0), ...pbEncodeBool(true));
-  rowStart.push(...pbEncodeMessageField(12, new Uint8Array(expanderSlot)));
+  expanderSlot.push(...pbEncodeInt32Field(RowIndicatorSlotFields.kind, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER));
+  expanderSlot.push(...pbEncodeInt32Field(RowIndicatorSlotFields.width, expanderWidth));
+  expanderSlot.push(...pbEncodeTag(RowIndicatorSlotFields.visible, 0), ...pbEncodeBool(true));
+  rowStart.push(...pbEncodeMessageField(RowIndicatorConfigFields.slots, new Uint8Array(expanderSlot)));
   const cornerTopStart: number[] = [];
-  cornerTopStart.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
-  cornerTopStart.push(...pbEncodeUint32Field(3, 0xFFFAFAF9));
-  cornerTopStart.push(...pbEncodeUint32Field(4, 0xFF57534E));
+  cornerTopStart.push(...pbEncodeTag(CornerIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
+  cornerTopStart.push(...pbEncodeUint32Field(CornerIndicatorConfigFields.background, 0xFFFAFAF9));
+  cornerTopStart.push(...pbEncodeUint32Field(CornerIndicatorConfigFields.foreground, 0xFF57534E));
   const outlineLevelsSlot: number[] = [];
-  outlineLevelsSlot.push(...pbEncodeInt32Field(1, 2));
-  outlineLevelsSlot.push(...pbEncodeInt32Field(2, outlineWidth));
-  outlineLevelsSlot.push(...pbEncodeTag(3, 0), ...pbEncodeBool(true));
-  cornerTopStart.push(...pbEncodeMessageField(7, new Uint8Array(outlineLevelsSlot)));
+  outlineLevelsSlot.push(...pbEncodeInt32Field(CornerIndicatorSlotFields.kind, CornerIndicatorSlotKind.CORNER_SLOT_OUTLINE_LEVELS));
+  outlineLevelsSlot.push(...pbEncodeInt32Field(CornerIndicatorSlotFields.width, outlineWidth));
+  outlineLevelsSlot.push(...pbEncodeTag(CornerIndicatorSlotFields.visible, 0), ...pbEncodeBool(true));
+  cornerTopStart.push(...pbEncodeMessageField(CornerIndicatorConfigFields.slots, new Uint8Array(outlineLevelsSlot)));
   const indicators: number[] = [];
-  indicators.push(...pbEncodeMessageField(3, new Uint8Array(colTop)));
-  indicators.push(...pbEncodeMessageField(1, new Uint8Array(rowStart)));
-  indicators.push(...pbEncodeMessageField(5, new Uint8Array(cornerTopStart)));
-  indicators.push(...pbEncodeInt32Field(10, IndicatorAppearance.INDICATOR_APPEARANCE_MODERN));
+  indicators.push(...pbEncodeMessageField(IndicatorsConfigFields.col_top, new Uint8Array(colTop)));
+  indicators.push(...pbEncodeMessageField(IndicatorsConfigFields.row_start, new Uint8Array(rowStart)));
+  indicators.push(...pbEncodeMessageField(IndicatorsConfigFields.corner_top_start, new Uint8Array(cornerTopStart)));
+  indicators.push(...pbEncodeInt32Field(IndicatorsConfigFields.appearance, IndicatorAppearance.INDICATOR_APPEARANCE_MODERN));
   const gridConfig: number[] = [];
-  gridConfig.push(...pbEncodeMessageField(1, new Uint8Array(layout)));
-  gridConfig.push(...pbEncodeMessageField(2, new Uint8Array(style)));
-  gridConfig.push(...pbEncodeMessageField(3, new Uint8Array(selection)));
-  gridConfig.push(...pbEncodeMessageField(4, new Uint8Array(editing)));
-  gridConfig.push(...pbEncodeMessageField(5, new Uint8Array(scrolling)));
-  gridConfig.push(...pbEncodeMessageField(6, new Uint8Array(outline)));
-  gridConfig.push(...pbEncodeMessageField(8, new Uint8Array(interaction)));
-  gridConfig.push(...pbEncodeMessageField(11, new Uint8Array(indicators)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.layout, new Uint8Array(layout)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.style, new Uint8Array(style)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.selection, new Uint8Array(selection)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.editing, new Uint8Array(editing)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.scrolling, new Uint8Array(scrolling)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.outline, new Uint8Array(outline)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.interaction, new Uint8Array(interaction)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.indicators, new Uint8Array(indicators)));
   return new Uint8Array(gridConfig);
 }
 
 function pbEncodeSalesDemoConfig(): Uint8Array {
   const layout: number[] = [];
-  layout.push(...pbEncodeInt32Field(3, 0));
-  layout.push(...pbEncodeTag(10, 0), ...pbEncodeBool(true));
+  layout.push(...pbEncodeInt32Field(LayoutConfigFields.fixed_rows, 0));
+  layout.push(...pbEncodeTag(LayoutConfigFields.extend_last_col, 0), ...pbEncodeBool(true));
 
   const style: number[] = [];
-  style.push(...pbEncodeUint32Field(1, 0xFFFFFFFF));
-  style.push(...pbEncodeUint32Field(2, 0xFF111827));
-  style.push(...pbEncodeUint32Field(3, 0xFFF9FAFB));
-  style.push(...pbEncodeUint32Field(7, 0xFF818CF8));
-  style.push(...pbEncodeMessageField(10, pbEncodeGridLinesPayload(0xFFE5E7EB)));
-  style.push(...pbEncodeMessageField(11, pbEncodeRegionStylePayload(0xFFF3F4F6, 0xFF374151, 0xFFD1D5DB)));
-  style.push(...pbEncodeMessageField(12, pbEncodeRegionStylePayload(0xFFFFFFFF, 0xFF111827, 0xFFD1D5DB)));
-  style.push(...pbEncodeMessageField(13, pbEncodeHeaderStylePayload(0xFFD1D5DB)));
-  style.push(...pbEncodeUint32Field(20, 0xFFFAFAFB));
-  style.push(...pbEncodeUint32Field(21, 0xFFD1D5DB));
+  style.push(...pbEncodeUint32Field(StyleConfigFields.background, 0xFFFFFFFF));
+  style.push(...pbEncodeUint32Field(StyleConfigFields.foreground, 0xFF111827));
+  style.push(...pbEncodeUint32Field(StyleConfigFields.alternate_background, 0xFFF9FAFB));
+  style.push(...pbEncodeUint32Field(StyleConfigFields.progress_color, 0xFF818CF8));
+  style.push(...pbEncodeMessageField(StyleConfigFields.grid_lines, pbEncodeGridLinesPayload(0xFFE5E7EB)));
+  style.push(...pbEncodeMessageField(StyleConfigFields.fixed, pbEncodeRegionStylePayload(0xFFF3F4F6, 0xFF374151, 0xFFD1D5DB)));
+  style.push(...pbEncodeMessageField(StyleConfigFields.frozen, pbEncodeRegionStylePayload(0xFFFFFFFF, 0xFF111827, 0xFFD1D5DB)));
+  style.push(...pbEncodeMessageField(StyleConfigFields.header, pbEncodeHeaderStylePayload(0xFFD1D5DB)));
+  style.push(...pbEncodeUint32Field(StyleConfigFields.sheet_background, 0xFFFAFAFB));
+  style.push(...pbEncodeUint32Field(StyleConfigFields.sheet_border, 0xFFD1D5DB));
 
   const selectionStyle = pbEncodeHighlightStylePayload({
     background: 0xFF6366F1,
     foreground: 0xFFFFFFFF,
-    fillHandle: 0,
+    fillHandle: FillHandlePosition.FILL_HANDLE_NONE,
     fillHandleColor: 0xFF818CF8,
   });
   const activeCellStyle = pbEncodeHighlightStylePayload({
     background: 0x22000000,
     foreground: 0xFFFFFFFF,
-    borderStyle: 2,
+    borderStyle: BorderStyle.BORDER_THICK,
     borderColor: 0xFF818CF8,
   });
   const hover: number[] = [];
-  hover.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
-  hover.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
-  hover.push(...pbEncodeTag(3, 0), ...pbEncodeBool(true));
-  hover.push(...pbEncodeMessageField(4, pbEncodeHighlightStylePayload({ background: 0x106366F1 })));
-  hover.push(...pbEncodeMessageField(5, pbEncodeHighlightStylePayload({ background: 0x106366F1 })));
-  hover.push(...pbEncodeMessageField(6, pbEncodeHighlightStylePayload({
+  hover.push(...pbEncodeTag(HoverConfigFields.row, 0), ...pbEncodeBool(true));
+  hover.push(...pbEncodeTag(HoverConfigFields.column, 0), ...pbEncodeBool(true));
+  hover.push(...pbEncodeTag(HoverConfigFields.cell, 0), ...pbEncodeBool(true));
+  hover.push(...pbEncodeMessageField(HoverConfigFields.row_style, pbEncodeHighlightStylePayload({ background: 0x106366F1 })));
+  hover.push(...pbEncodeMessageField(HoverConfigFields.column_style, pbEncodeHighlightStylePayload({ background: 0x106366F1 })));
+  hover.push(...pbEncodeMessageField(HoverConfigFields.cell_style, pbEncodeHighlightStylePayload({
     background: 0x1E818CF8,
-    borderStyle: 1,
+    borderStyle: BorderStyle.BORDER_THIN,
     borderColor: 0xFF818CF8,
   })));
   const selection: number[] = [];
-  selection.push(...pbEncodeInt32Field(1, 0));
-  selection.push(...pbEncodeMessageField(6, selectionStyle));
-  selection.push(...pbEncodeMessageField(7, new Uint8Array(hover)));
-  selection.push(...pbEncodeMessageField(10, activeCellStyle));
+  selection.push(...pbEncodeInt32Field(SelectionConfigFields.mode, SelectionMode.SELECTION_FREE));
+  selection.push(...pbEncodeMessageField(SelectionConfigFields.style, selectionStyle));
+  selection.push(...pbEncodeMessageField(SelectionConfigFields.hover, new Uint8Array(hover)));
+  selection.push(...pbEncodeMessageField(SelectionConfigFields.active_cell_style, activeCellStyle));
 
   const editing: number[] = [];
-  editing.push(...pbEncodeInt32Field(1, 0));
-  editing.push(...pbEncodeInt32Field(2, 1));
-  editing.push(...pbEncodeInt32Field(3, 1));
-  editing.push(...pbEncodeTag(4, 0), ...pbEncodeBool(false));
+  editing.push(...pbEncodeInt32Field(EditConfigFields.trigger, EditTrigger.EDIT_TRIGGER_NONE));
+  editing.push(...pbEncodeInt32Field(EditConfigFields.tab_behavior, TabBehavior.TAB_CELLS));
+  editing.push(...pbEncodeInt32Field(EditConfigFields.dropdown_trigger, DropdownTrigger.DROPDOWN_ALWAYS));
+  editing.push(...pbEncodeTag(EditConfigFields.dropdown_search, 0), ...pbEncodeBool(false));
 
   const scrolling: number[] = [];
-  scrolling.push(...pbEncodeInt32Field(9, 3));
-  scrolling.push(...pbEncodeTag(4, 0), ...pbEncodeBool(true));
-  scrolling.push(...pbEncodeFloatField(5, 220.0));
-  scrolling.push(...pbEncodeFloatField(6, 0.9));
+  scrolling.push(...pbEncodeInt32Field(ScrollConfigFields.scrollbars, ScrollBarsMode.SCROLLBAR_BOTH));
+  scrolling.push(...pbEncodeTag(ScrollConfigFields.fling_enabled, 0), ...pbEncodeBool(true));
+  scrolling.push(...pbEncodeFloatField(ScrollConfigFields.fling_impulse_gain, 220.0));
+  scrolling.push(...pbEncodeFloatField(ScrollConfigFields.fling_friction, 0.9));
 
   const outline: number[] = [];
-  outline.push(...pbEncodeInt32Field(1, 0));
-  outline.push(...pbEncodeInt32Field(4, 1));
-  outline.push(...pbEncodeTag(5, 0), ...pbEncodeBool(true));
-  outline.push(...pbEncodeUint32Field(3, 0xFF9CA3AF));
+  outline.push(...pbEncodeInt32Field(OutlineConfigFields.tree_indicator, TreeIndicatorStyle.TREE_INDICATOR_NONE));
+  outline.push(...pbEncodeInt32Field(OutlineConfigFields.group_total_position, GroupTotalPosition.GROUP_TOTAL_BELOW));
+  outline.push(...pbEncodeTag(OutlineConfigFields.multi_totals, 0), ...pbEncodeBool(true));
+  outline.push(...pbEncodeUint32Field(OutlineConfigFields.tree_color, 0xFF9CA3AF));
 
   const span: number[] = [];
-  span.push(...pbEncodeInt32Field(1, 2));
-  span.push(...pbEncodeInt32Field(2, 0));
-  span.push(...pbEncodeInt32Field(3, 1));
+  span.push(...pbEncodeInt32Field(SpanConfigFields.cell_span, CellSpanMode.CELL_SPAN_BY_ROW));
+  span.push(...pbEncodeInt32Field(SpanConfigFields.cell_span_fixed, CellSpanMode.CELL_SPAN_NONE));
+  span.push(...pbEncodeInt32Field(SpanConfigFields.cell_span_compare, SpanCompareMode.SPAN_COMPARE_NO_CASE));
 
   const resize: number[] = [];
-  resize.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
-  resize.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
+  resize.push(...pbEncodeTag(ResizePolicyFields.columns, 0), ...pbEncodeBool(true));
+  resize.push(...pbEncodeTag(ResizePolicyFields.rows, 0), ...pbEncodeBool(true));
   const freeze: number[] = [];
-  freeze.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
-  freeze.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
+  freeze.push(...pbEncodeTag(FreezePolicyFields.columns, 0), ...pbEncodeBool(true));
+  freeze.push(...pbEncodeTag(FreezePolicyFields.rows, 0), ...pbEncodeBool(true));
   const headerFeatures: number[] = [];
-  headerFeatures.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
-  headerFeatures.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
-  headerFeatures.push(...pbEncodeTag(3, 0), ...pbEncodeBool(false));
+  headerFeatures.push(...pbEncodeTag(HeaderFeaturesFields.sort, 0), ...pbEncodeBool(true));
+  headerFeatures.push(...pbEncodeTag(HeaderFeaturesFields.reorder, 0), ...pbEncodeBool(true));
+  headerFeatures.push(...pbEncodeTag(HeaderFeaturesFields.chooser, 0), ...pbEncodeBool(false));
   const interaction: number[] = [];
-  interaction.push(...pbEncodeMessageField(1, new Uint8Array(resize)));
-  interaction.push(...pbEncodeMessageField(2, new Uint8Array(freeze)));
-  interaction.push(...pbEncodeTag(5, 0), ...pbEncodeBool(true));
-  interaction.push(...pbEncodeMessageField(10, new Uint8Array(headerFeatures)));
+  interaction.push(...pbEncodeMessageField(InteractionConfigFields.resize, new Uint8Array(resize)));
+  interaction.push(...pbEncodeMessageField(InteractionConfigFields.freeze, new Uint8Array(freeze)));
+  interaction.push(...pbEncodeTag(InteractionConfigFields.auto_size_mouse, 0), ...pbEncodeBool(true));
+  interaction.push(...pbEncodeMessageField(InteractionConfigFields.header_features, new Uint8Array(headerFeatures)));
 
   const rowStart: number[] = [];
-  rowStart.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
-  rowStart.push(...pbEncodeInt32Field(2, 40));
-  rowStart.push(...pbEncodeUint32Field(4, 0xFFF9FAFB));
-  rowStart.push(...pbEncodeUint32Field(5, 0xFF6B7280));
-  rowStart.push(...pbEncodeUint32Field(7, 0xFFD1D5DB));
-  rowStart.push(...pbEncodeTag(9, 0), ...pbEncodeBool(true));
+  rowStart.push(...pbEncodeTag(RowIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
+  rowStart.push(...pbEncodeInt32Field(RowIndicatorConfigFields.width, 40));
+  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.background, 0xFFF9FAFB));
+  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.foreground, 0xFF6B7280));
+  rowStart.push(...pbEncodeUint32Field(RowIndicatorConfigFields.grid_color, 0xFFD1D5DB));
+  rowStart.push(...pbEncodeTag(RowIndicatorConfigFields.allow_resize, 0), ...pbEncodeBool(true));
   const rowNumberSlot: number[] = [];
-  rowNumberSlot.push(...pbEncodeInt32Field(1, 1));
-  rowNumberSlot.push(...pbEncodeInt32Field(2, 40));
-  rowNumberSlot.push(...pbEncodeTag(3, 0), ...pbEncodeBool(true));
-  rowStart.push(...pbEncodeMessageField(12, new Uint8Array(rowNumberSlot)));
+  rowNumberSlot.push(...pbEncodeInt32Field(RowIndicatorSlotFields.kind, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS));
+  rowNumberSlot.push(...pbEncodeInt32Field(RowIndicatorSlotFields.width, 40));
+  rowNumberSlot.push(...pbEncodeTag(RowIndicatorSlotFields.visible, 0), ...pbEncodeBool(true));
+  rowStart.push(...pbEncodeMessageField(RowIndicatorConfigFields.slots, new Uint8Array(rowNumberSlot)));
   const colTop: number[] = [];
-  colTop.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
-  colTop.push(...pbEncodeInt32Field(2, 28));
-  colTop.push(...pbEncodeInt32Field(3, 1));
-  colTop.push(...pbEncodeTag(4, 0), ...pbEncodeVarint(3n));
-  colTop.push(...pbEncodeUint32Field(5, 0xFFF9FAFB));
-  colTop.push(...pbEncodeUint32Field(6, 0xFF111827));
-  colTop.push(...pbEncodeUint32Field(8, 0xFFD1D5DB));
-  colTop.push(...pbEncodeTag(10, 0), ...pbEncodeBool(true));
+  colTop.push(...pbEncodeTag(ColIndicatorConfigFields.visible, 0), ...pbEncodeBool(true));
+  colTop.push(...pbEncodeInt32Field(ColIndicatorConfigFields.default_row_height, 28));
+  colTop.push(...pbEncodeInt32Field(ColIndicatorConfigFields.band_rows, 1));
+  colTop.push(...pbEncodeUint32Field(
+    ColIndicatorConfigFields.mode_bits,
+    ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT |
+      ColIndicatorCellMode.COL_INDICATOR_CELL_SORT_GLYPH,
+  ));
+  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.background, 0xFFF9FAFB));
+  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.foreground, 0xFF111827));
+  colTop.push(...pbEncodeUint32Field(ColIndicatorConfigFields.grid_color, 0xFFD1D5DB));
+  colTop.push(...pbEncodeTag(ColIndicatorConfigFields.allow_resize, 0), ...pbEncodeBool(true));
   const indicators: number[] = [];
-  indicators.push(...pbEncodeMessageField(1, new Uint8Array(rowStart)));
-  indicators.push(...pbEncodeMessageField(3, new Uint8Array(colTop)));
+  indicators.push(...pbEncodeMessageField(IndicatorsConfigFields.row_start, new Uint8Array(rowStart)));
+  indicators.push(...pbEncodeMessageField(IndicatorsConfigFields.col_top, new Uint8Array(colTop)));
   const gridConfig: number[] = [];
-  gridConfig.push(...pbEncodeMessageField(1, new Uint8Array(layout)));
-  gridConfig.push(...pbEncodeMessageField(2, new Uint8Array(style)));
-  gridConfig.push(...pbEncodeMessageField(3, new Uint8Array(selection)));
-  gridConfig.push(...pbEncodeMessageField(4, new Uint8Array(editing)));
-  gridConfig.push(...pbEncodeMessageField(5, new Uint8Array(scrolling)));
-  gridConfig.push(...pbEncodeMessageField(6, new Uint8Array(outline)));
-  gridConfig.push(...pbEncodeMessageField(7, new Uint8Array(span)));
-  gridConfig.push(...pbEncodeMessageField(8, new Uint8Array(interaction)));
-  gridConfig.push(...pbEncodeMessageField(11, new Uint8Array(indicators)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.layout, new Uint8Array(layout)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.style, new Uint8Array(style)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.selection, new Uint8Array(selection)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.editing, new Uint8Array(editing)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.scrolling, new Uint8Array(scrolling)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.outline, new Uint8Array(outline)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.span, new Uint8Array(span)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.interaction, new Uint8Array(interaction)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.indicators, new Uint8Array(indicators)));
   return new Uint8Array(gridConfig);
 }
 
@@ -1350,15 +1445,15 @@ function setupSalesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: number
     const result = grid.loadData(salesData, {
       autoCreateColumns: false,
     });
-    if (result.status === 2) {
+    if (result.status === LoadDataStatus.LOAD_FAILED) {
       throw new Error("LoadData failed for embedded sales demo");
     }
     wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, SALES_COLUMN_SETUP));
     if (typeof wasmModule.volvox_grid_configure === "function") {
       wasmModule.volvox_grid_configure(gridHandle, pbEncodeSalesDemoConfig());
     }
-    grid.selectionMode = 0;
-    grid.dropdownTrigger = 1;
+    grid.selectionMode = SelectionMode.SELECTION_FREE;
+    grid.dropdownTrigger = DropdownTrigger.DROPDOWN_ALWAYS;
     grid.dropdownSearch = false;
     grid.setHeaderFeatures({ sort: true, reorder: true, chooser: false });
     grid.setColFormat(4, "$#,##0");
@@ -1367,13 +1462,13 @@ function setupSalesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: number
     grid.setColDropdown(8, dropdownFromLabels(SALES_STATUS_ITEMS));
     grid.flingImpulseGain = 220.0;
     grid.flingFriction = 0.9;
-    grid.subtotal(1, 0, 0, "", 0, 0, false);
-    applySalesSubtotalDecorations(grid, grid.subtotal(2, -1, 4, "Grand Total", 0xFFEEF2FF, 0xFF111827, true).rows);
-    applySalesSubtotalDecorations(grid, grid.subtotal(2, 0, 4, "", 0xFFF5F3FF, 0xFF111827, true).rows);
-    applySalesSubtotalDecorations(grid, grid.subtotal(2, 1, 4, "", 0xFFF8F7FF, 0xFF111827, true).rows);
-    applySalesSubtotalDecorations(grid, grid.subtotal(2, -1, 5, "Grand Total", 0xFFEEF2FF, 0xFF111827, true).rows);
-    applySalesSubtotalDecorations(grid, grid.subtotal(2, 0, 5, "", 0xFFF5F3FF, 0xFF111827, true).rows);
-    applySalesSubtotalDecorations(grid, grid.subtotal(2, 1, 5, "", 0xFFF8F7FF, 0xFF111827, true).rows);
+    grid.subtotal(AggregateType.AGG_CLEAR, 0, 0, "", 0, 0, false);
+    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, -1, 4, "Grand Total", 0xFFEEF2FF, 0xFF111827, true).rows);
+    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, 0, 4, "", 0xFFF5F3FF, 0xFF111827, true).rows);
+    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, 1, 4, "", 0xFFF8F7FF, 0xFF111827, true).rows);
+    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, -1, 5, "Grand Total", 0xFFEEF2FF, 0xFF111827, true).rows);
+    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, 0, 5, "", 0xFFF5F3FF, 0xFF111827, true).rows);
+    applySalesSubtotalDecorations(grid, grid.subtotal(AggregateType.AGG_SUM, 1, 5, "", 0xFFF8F7FF, 0xFF111827, true).rows);
     grid.invalidate();
   } finally {
     if (id !== prevId) {
@@ -1416,7 +1511,7 @@ function setupHierarchyJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: nu
     }
     applyHierarchyIconTheme(wasmModule, id);
 
-    grid.selectionMode = 0;
+    grid.selectionMode = SelectionMode.SELECTION_FREE;
     grid.setHeaderFeatures({ sort: false, reorder: false, chooser: false });
     grid.flingImpulseGain = 220.0;
     grid.flingFriction = 0.9;
@@ -1650,7 +1745,7 @@ function setupBarcodesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: num
     const result = grid.loadData(barcodeData, {
       autoCreateColumns: false,
     });
-    if (result.status === 2) {
+    if (result.status === LoadDataStatus.LOAD_FAILED) {
       throw new Error("LoadData failed for embedded barcodes demo");
     }
     wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, BARCODE_COLUMN_SETUP));
@@ -1716,7 +1811,7 @@ function setupBarcodesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: num
     }
     updateCells(pbEncodeUpdateCellsRequest(id, cells, true));
 
-    grid.selectionMode = 0;
+    grid.selectionMode = SelectionMode.SELECTION_FREE;
     grid.setHeaderFeatures({ sort: true, reorder: true, chooser: false });
     grid.flingImpulseGain = 220.0;
     grid.flingFriction = 0.9;
@@ -1731,16 +1826,14 @@ function setupBarcodesJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: num
 function pbEncodeSelectionHoverConfig(mode: number): Uint8Array {
   const nextMode = Number.isFinite(mode) ? (Math.max(0, Math.trunc(mode)) >>> 0) : 0;
   const hoverConfig: number[] = [];
-  hoverConfig.push(...pbEncodeTag(1, 0), ...pbEncodeVarint((nextMode & HOVER_ROW) !== 0 ? 1n : 0n));
-  hoverConfig.push(...pbEncodeTag(2, 0), ...pbEncodeVarint((nextMode & HOVER_COLUMN) !== 0 ? 1n : 0n));
-  hoverConfig.push(...pbEncodeTag(3, 0), ...pbEncodeVarint((nextMode & HOVER_CELL) !== 0 ? 1n : 0n));
+  hoverConfig.push(...pbEncodeTag(HoverConfigFields.row, 0), ...pbEncodeVarint((nextMode & HOVER_ROW) !== 0 ? 1n : 0n));
+  hoverConfig.push(...pbEncodeTag(HoverConfigFields.column, 0), ...pbEncodeVarint((nextMode & HOVER_COLUMN) !== 0 ? 1n : 0n));
+  hoverConfig.push(...pbEncodeTag(HoverConfigFields.cell, 0), ...pbEncodeVarint((nextMode & HOVER_CELL) !== 0 ? 1n : 0n));
   const selectionConfig: number[] = [];
-  // SelectionConfig.hover = 7
-  selectionConfig.push(...pbEncodeMessageField(7, new Uint8Array(hoverConfig)));
+  selectionConfig.push(...pbEncodeMessageField(SelectionConfigFields.hover, new Uint8Array(hoverConfig)));
 
   const gridConfig: number[] = [];
-  // GridConfig.selection = 3
-  gridConfig.push(...pbEncodeMessageField(3, new Uint8Array(selectionConfig)));
+  gridConfig.push(...pbEncodeMessageField(GridConfigFields.selection, new Uint8Array(selectionConfig)));
   return new Uint8Array(gridConfig);
 }
 
@@ -1899,12 +1992,11 @@ async function main() {
   }
   const demoFontsReady = loadDemoFontsInBackground(wasmModule);
 
-  // PresentMode (proto): 0=AUTO, 1=FIFO, 2=MAILBOX, 3=IMMEDIATE.
   // Prefer MAILBOX for lower-latency GPU presentation when available.
-  grid.presentMode = 2;
-  grid.rendererMode = 2; // GPU — let tryInitGpu proceed
+  grid.presentMode = PresentMode.PRESENT_MAILBOX;
+  grid.rendererMode = RendererMode.RENDERER_GPU;
   const gpuOk = await grid.tryInitGpu();
-  grid.rendererMode = 1; // default CPU
+  grid.rendererMode = RendererMode.RENDERER_CPU;
 
   let currentDemo: DemoMode | null = null;
   let dataRows = 0;
@@ -1915,7 +2007,7 @@ async function main() {
   const demoInitialized: Partial<Record<StandardDemoMode, boolean>> = {};
   let demoFontsResolved = false;
   const hierarchyFontAutosizedGridIds = new Set<number>();
-  let activeRendererMode = 1; // CPU
+  let activeRendererMode = RendererMode.RENDERER_CPU;
   let scrollBlitEnabled = false;
   let editEnabled = false;
   let doomGridId: number | null = null;
@@ -2446,7 +2538,7 @@ async function main() {
     const setEditableMode = (wasmModule as any).set_editable_mode as
       | ((gridId: number, mode: number) => void)
       | undefined;
-    const mode = enabled ? 2 : 0;
+    const mode = enabled ? EditTrigger.EDIT_TRIGGER_KEY_CLICK : EditTrigger.EDIT_TRIGGER_NONE;
     if (typeof setEditTrigger === "function") {
       setEditTrigger(id, mode);
     } else if (typeof setEditableMode === "function") {
@@ -2864,9 +2956,9 @@ async function main() {
     grid.frozenColCount = mode === "sales" || mode === "stress" ? 1 : 0;
     grid.showColumnHeaders = true;
     grid.columnIndicatorTopRowCount = 1;
-    grid.selectionVisibility = 1;
-    grid.focusBorder = 2;
-    grid.selectionMode = 0;
+    grid.selectionVisibility = SelectionVisibility.SELECTION_VIS_ALWAYS;
+    grid.focusBorder = FocusBorderStyle.FOCUS_BORDER_THICK;
+    grid.selectionMode = SelectionMode.SELECTION_FREE;
     grid.setHeaderFeatures(
       mode === "hierarchy"
         ? { sort: false, reorder: false, chooser: false }
@@ -2883,12 +2975,12 @@ async function main() {
     grid.columnIndicatorTopRowCount = 0;
     grid.showRowIndicator = false;
     grid.rowIndicatorStartWidth = 0;
-    grid.selectionVisibility = 0;
-    grid.focusBorder = 0;
-    grid.selectionMode = 0;
+    grid.selectionVisibility = SelectionVisibility.SELECTION_VIS_NONE;
+    grid.focusBorder = FocusBorderStyle.FOCUS_BORDER_NONE;
+    grid.selectionMode = SelectionMode.SELECTION_FREE;
     grid.setHeaderFeatures({ sort: false, reorder: false, chooser: false });
-    grid.scrollBars = 0;
-    grid.setGridLines(chkDoomBorder.checked ? 1 : 0);
+    grid.scrollBars = ScrollBarsMode.SCROLLBAR_NONE;
+    grid.setGridLines(chkDoomBorder.checked ? GridLineStyle.GRIDLINE_SOLID : GridLineStyle.GRIDLINE_NONE);
 
     // Compute cell sizes to fill the rendered canvas area.
     const scale = getCurrentDeviceScale();
@@ -3536,7 +3628,7 @@ async function main() {
   chkGpu.disabled = !gpuOk;
   chkGpu.checked = false;
   chkGpu.addEventListener("change", () => {
-    activeRendererMode = chkGpu.checked ? 2 : 1;
+    activeRendererMode = chkGpu.checked ? RendererMode.RENDERER_GPU : RendererMode.RENDERER_CPU;
     applyActiveRenderSettings();
     grid.invalidate();
   });

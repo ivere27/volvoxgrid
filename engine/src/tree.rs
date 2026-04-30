@@ -2003,7 +2003,9 @@ fn project_tree_state_with_write_result(
         .clamp(grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
     grid.layout.invalidate();
     grid.dirty = true;
-    grid.write_cells(&updates, atomic)
+    let result = grid.write_cells(&updates, atomic);
+    grid.auto_resize_all();
+    result
 }
 
 fn clear_projected_tree_rows(grid: &mut VolvoxGrid) {
@@ -2140,6 +2142,39 @@ mod tests {
         assert_eq!(grid.cells.get_text(1, 0), "Root");
         assert_eq!(grid.cells.get_text(2, 0), "Child");
         assert_eq!(grid.tree.node_id_at_row(grid.fixed_rows, 2), Some("child"));
+    }
+
+    #[test]
+    fn load_tree_auto_resizes_projected_row_heights() {
+        let mut grid = VolvoxGrid::new(0, 320, 240, 1, 1, 0, 0);
+        grid.default_col_width = 24;
+        grid.default_row_height = 16;
+        grid.word_wrap = true;
+        grid.auto_resize = true;
+        grid.auto_size_mode = 2;
+
+        let before = grid.get_row_height(0);
+        let response = load_tree(
+            &mut grid,
+            pb::LoadTreeRequest {
+                grid_id: 0,
+                nodes: vec![node(
+                    "root",
+                    "",
+                    vec![text_cell(
+                        "root",
+                        0,
+                        "wrapped tree text wrapped tree text wrapped tree text",
+                    )],
+                )],
+                replace: true,
+                collapse_initial: false,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(response.visible_count, 1);
+        assert!(grid.get_row_height(0) > before);
     }
 
     #[test]
