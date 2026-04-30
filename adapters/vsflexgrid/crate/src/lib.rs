@@ -819,6 +819,63 @@ fn hierarchy_demo_column_defs_local(scale: f32) -> Vec<ColumnDef> {
 }
 
 #[cfg(feature = "demo")]
+fn hierarchy_demo_value_string(row: &Map<String, Value>, key: &str) -> String {
+    match row.get(key) {
+        Some(Value::String(value)) => value.clone(),
+        Some(Value::Null) | None => String::new(),
+        Some(value) => value.to_string(),
+    }
+}
+
+#[cfg(feature = "demo")]
+fn hierarchy_demo_levels(rows: &[Map<String, Value>]) -> Result<Vec<i32>, String> {
+    let mut rows_by_id = HashMap::with_capacity(rows.len());
+    for (index, row) in rows.iter().enumerate() {
+        let id = hierarchy_demo_value_string(row, "Id");
+        if id.trim().is_empty() {
+            return Err("Hierarchy demo row is missing Id".to_string());
+        }
+        rows_by_id.insert(id, index);
+    }
+
+    fn depth_of(
+        index: usize,
+        rows: &[Map<String, Value>],
+        rows_by_id: &HashMap<String, usize>,
+        cache: &mut HashMap<usize, i32>,
+        visiting: &mut HashSet<usize>,
+    ) -> Result<i32, String> {
+        if let Some(depth) = cache.get(&index) {
+            return Ok(*depth);
+        }
+        if !visiting.insert(index) {
+            let id = hierarchy_demo_value_string(&rows[index], "Id");
+            return Err(format!(
+                "Hierarchy demo data contains a parent cycle at {id}"
+            ));
+        }
+
+        let parent_id = hierarchy_demo_value_string(&rows[index], "ParentId");
+        let depth = if parent_id.trim().is_empty() {
+            0
+        } else {
+            let parent_index = rows_by_id.get(&parent_id).copied().ok_or_else(|| {
+                format!("Hierarchy demo data references missing parent {parent_id}")
+            })?;
+            depth_of(parent_index, rows, rows_by_id, cache, visiting)? + 1
+        };
+        visiting.remove(&index);
+        cache.insert(index, depth);
+        Ok(depth)
+    }
+
+    let mut cache = HashMap::with_capacity(rows.len());
+    (0..rows.len())
+        .map(|index| depth_of(index, rows, &rows_by_id, &mut cache, &mut HashSet::new()))
+        .collect()
+}
+
+#[cfg(feature = "demo")]
 fn apply_local_hierarchy_demo_chrome(grid: &mut volvoxgrid_engine::grid::VolvoxGrid, scale: f32) {
     grid.style.back_color = 0xFFFFFFFF;
     grid.style.fore_color = 0xFF1C1917;
@@ -914,14 +971,14 @@ fn setup_local_hierarchy_demo(
     let raw = volvoxgrid_engine::demo::embedded_demo_data_bytes("hierarchy")?;
     let mut rows: Vec<Map<String, Value>> = serde_json::from_slice(raw)
         .map_err(|err| format!("failed to parse hierarchy demo JSON: {err}"))?;
+    let levels = hierarchy_demo_levels(&rows)?;
 
     let mut row_defs = Vec::with_capacity(rows.len());
     let mut row_kinds = Vec::with_capacity(rows.len());
     for (index, row) in rows.iter_mut().enumerate() {
-        let outline_level = row
-            .remove("_level")
-            .and_then(|value| value.as_i64())
-            .unwrap_or(0) as i32;
+        row.remove("_level");
+        row.remove("Id");
+        row.remove("ParentId");
         let is_folder = row
             .get("Type")
             .and_then(Value::as_str)
@@ -930,8 +987,7 @@ fn setup_local_hierarchy_demo(
         row_kinds.push(is_folder);
         row_defs.push(RowDef {
             index: index as i32,
-            is_subtotal: Some(is_folder),
-            outline_level: Some(outline_level),
+            outline_level: Some(levels[index]),
             ..Default::default()
         });
     }
@@ -9141,6 +9197,48 @@ mod tests {
             .slots
             .iter()
             .any(|slot| { slot.kind == CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 }));
+    }
+
+    #[cfg(feature = "demo")]
+    #[test]
+    fn local_hierarchy_demo_derives_parent_id_levels_for_outline_buttons() {
+        let mut grid = volvoxgrid_engine::grid::VolvoxGrid::new(1, 640, 360, 1, 1, 0, 0);
+
+        setup_local_hierarchy_demo(&mut grid, 1.0).unwrap();
+        ensure_layout(&mut grid);
+
+        let levels: Vec<i32> = (0..grid.rows)
+            .filter_map(|row| grid.row_props.get(&row).map(|props| props.outline_level))
+            .collect();
+        assert!(levels.iter().any(|level| *level > 0));
+        assert!(!grid.row_props.values().any(|props| props.is_subtotal));
+        assert!(grid
+            .indicator_bands
+            .corner_top_start
+            .slots
+            .iter()
+            .any(|slot| { slot.kind == CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 }));
+
+        let step = volvoxgrid_engine::outline::outline_level_button_step(
+            &grid,
+            grid.indicator_bands.start_width(),
+        );
+        assert_eq!(
+            step,
+            volvoxgrid_engine::outline::MIN_TOUCH_OUTLINE_LEVEL_BUTTON_WIDTH
+        );
+
+        let x = (step / 2) as f32;
+        input::handle_pointer_down(&mut grid, x, 5.0, 1, 0, false);
+        assert!(grid.outline_level_button_pressed);
+        input::handle_pointer_up(&mut grid, x, 5.0, 1, 0);
+
+        let visible_levels: Vec<i32> = (0..grid.rows)
+            .filter(|row| !grid.is_row_hidden(*row))
+            .filter_map(|row| grid.row_props.get(&row).map(|props| props.outline_level))
+            .collect();
+        assert!(visible_levels.len() < levels.len());
+        assert!(visible_levels.iter().all(|level| *level == 0));
     }
 
     #[test]

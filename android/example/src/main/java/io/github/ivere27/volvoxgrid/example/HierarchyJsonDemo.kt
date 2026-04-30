@@ -74,6 +74,7 @@ object HierarchyJsonDemo {
     private const val HOVER_CELL_BG = 0x1AD97706
     private const val OUTLINE_INDENT = 20
     private const val MIN_OUTLINE_INDICATOR_WIDTH = 56
+    private const val HEADER_ROW_HEIGHT = 44
 
     fun load(controller: VolvoxGridController) {
         val rawJson = controller.getDemoData("hierarchy").toString(Charsets.UTF_8)
@@ -402,7 +403,7 @@ object HierarchyJsonDemo {
                     .setColTop(
                         ColIndicatorConfig.newBuilder()
                             .setVisible(true)
-                            .setDefaultRowHeight(28)
+                            .setDefaultRowHeight(HEADER_ROW_HEIGHT)
                             .setBandRows(1)
                             .setModeBits(ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.number)
                             .setBackground(HEADER_BG)

@@ -3953,6 +3953,64 @@ fn draw_tree_guide_hline<C: Canvas>(canvas: &mut C, x: i32, y: i32, w: i32, colo
     canvas.blend_rect(x, y, w, 1, color);
 }
 
+fn draw_tree_guide_vline_except_rect<C: Canvas>(
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    h: i32,
+    color: u32,
+    gap: Option<(i32, i32, i32, i32)>,
+) {
+    let Some((gx, gy, gw, gh)) = gap else {
+        draw_tree_guide_vline(canvas, x, y, h, color);
+        return;
+    };
+    if gw <= 0 || gh <= 0 || x < gx || x >= gx + gw {
+        draw_tree_guide_vline(canvas, x, y, h, color);
+        return;
+    }
+
+    let y0 = y;
+    let y1 = y + h;
+    let gap_y0 = gy.max(y0);
+    let gap_y1 = (gy + gh).min(y1);
+    if gap_y1 <= gap_y0 {
+        draw_tree_guide_vline(canvas, x, y, h, color);
+        return;
+    }
+    draw_tree_guide_vline(canvas, x, y0, gap_y0 - y0, color);
+    draw_tree_guide_vline(canvas, x, gap_y1, y1 - gap_y1, color);
+}
+
+fn draw_tree_guide_hline_except_rect<C: Canvas>(
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    w: i32,
+    color: u32,
+    gap: Option<(i32, i32, i32, i32)>,
+) {
+    let Some((gx, gy, gw, gh)) = gap else {
+        draw_tree_guide_hline(canvas, x, y, w, color);
+        return;
+    };
+    if gw <= 0 || gh <= 0 || y < gy || y >= gy + gh {
+        draw_tree_guide_hline(canvas, x, y, w, color);
+        return;
+    }
+
+    let x0 = x;
+    let x1 = x + w;
+    let gap_x0 = gx.max(x0);
+    let gap_x1 = (gx + gw).min(x1);
+    if gap_x1 <= gap_x0 {
+        draw_tree_guide_hline(canvas, x, y, w, color);
+        return;
+    }
+    draw_tree_guide_hline(canvas, x0, y, gap_x0 - x0, color);
+    draw_tree_guide_hline(canvas, gap_x1, y, x1 - gap_x1, color);
+}
+
 fn render_outline_connector_guides<C: Canvas>(
     canvas: &mut C,
     grid: &VolvoxGrid,
@@ -3961,6 +4019,7 @@ fn render_outline_connector_guides<C: Canvas>(
     depth: i32,
     tg: crate::outline::TreeGeometry,
     color: u32,
+    toggle_gap: Option<(i32, i32, i32, i32)>,
 ) {
     let (x, y, w, h) = rect;
     if w <= 0 || h <= 0 {
@@ -3975,7 +4034,7 @@ fn render_outline_connector_guides<C: Canvas>(
         }
         let lx = x + ancestor_depth * tg.indent_step + tg.line_offset;
         if lx >= x && lx < x + w {
-            draw_tree_guide_vline(canvas, lx, y, h, guide_color);
+            draw_tree_guide_vline_except_rect(canvas, lx, y, h, guide_color, toggle_gap);
         }
     }
 
@@ -3989,16 +4048,30 @@ fn render_outline_connector_guides<C: Canvas>(
     let has_top_segment = depth > 0 || outline_branch_has_previous(grid, row, depth);
     let has_bottom_segment = outline_branch_continues_after(grid, row, depth);
     if has_top_segment {
-        draw_tree_guide_vline(canvas, lx, y, (mid_y - y + 1).max(1), guide_color);
+        draw_tree_guide_vline_except_rect(
+            canvas,
+            lx,
+            y,
+            (mid_y - y + 1).max(1),
+            guide_color,
+            toggle_gap,
+        );
     }
     if has_bottom_segment {
-        draw_tree_guide_vline(canvas, lx, mid_y, (y + h - mid_y).max(1), guide_color);
+        draw_tree_guide_vline_except_rect(
+            canvas,
+            lx,
+            mid_y,
+            (y + h - mid_y).max(1),
+            guide_color,
+            toggle_gap,
+        );
     }
 
     let branch_len = (tg.connector_end - tg.line_offset + 1).clamp(4, 7);
     let h_end = (lx + branch_len).min(x + w);
     if h_end > lx {
-        draw_tree_guide_hline(canvas, lx, mid_y, h_end - lx, guide_color);
+        draw_tree_guide_hline_except_rect(canvas, lx, mid_y, h_end - lx, guide_color, toggle_gap);
     }
 }
 
@@ -4006,6 +4079,7 @@ fn draw_outline_toggle<C: Canvas>(
     canvas: &mut C,
     grid: &VolvoxGrid,
     rect: (i32, i32, i32, i32),
+    fallback_clip_rect: (i32, i32, i32, i32),
     is_collapsed: bool,
     color: u32,
 ) {
@@ -4089,13 +4163,22 @@ fn draw_outline_toggle<C: Canvas>(
         return;
     }
 
-    let sign_margin = (w.min(h) / 4).max(2);
-    let mid_x = x + w / 2;
-    let mid_y = y + h / 2;
-    canvas.hline(x + sign_margin, mid_y, (w - sign_margin * 2).max(2), color);
-    if is_collapsed {
-        canvas.vline(mid_x, y + sign_margin, (h - sign_margin * 2).max(2), color);
+    let (clip_x, clip_y, clip_w, clip_h) = fallback_clip_rect;
+    if clip_w <= 0 || clip_h <= 0 {
+        return;
     }
+    let icon = if is_collapsed { ">" } else { "v" };
+    let font_name = &grid.style.font_name;
+    let font_size = grid.style.font_size.clamp(1.0, 256.0);
+    let (tw, th) = canvas.measure_text(icon, font_name, font_size, false, false, None);
+    let text_w = tw.ceil() as i32;
+    let text_h = th.ceil() as i32;
+    let tx = (x + (w - text_w) / 2).clamp(clip_x, (clip_x + clip_w - text_w).max(clip_x));
+    let ty = (clip_y + (clip_h - text_h) / 2).clamp(clip_y, (clip_y + clip_h - text_h).max(clip_y));
+    canvas.draw_text_styled_fast(
+        tx, ty, icon, font_name, font_size, false, false, color, clip_x, clip_y, clip_w, clip_h, 0,
+        None,
+    );
 }
 
 fn render_outline_expander_slot<C: Canvas>(
@@ -4129,23 +4212,34 @@ fn render_outline_expander_slot<C: Canvas>(
     let show_toggle = has_children || leaf_style;
     let toggle_size = tg.btn_size.min(h.saturating_sub(2).max(0)).max(0);
     let mut text_x = indent_x;
-    if draw_connectors {
-        render_outline_connector_guides(canvas, grid, row, rect, depth, tg, tree_color);
-    }
-    if show_toggle && toggle_size > 0 {
+    let toggle_rect = if show_toggle && toggle_size > 0 {
         let bx =
             (indent_x + tg.line_offset - toggle_size / 2).clamp(x, (x + w - toggle_size).max(x));
         let by = y + (h - toggle_size) / 2;
+        Some((bx, by, toggle_size, toggle_size))
+    } else {
+        None
+    };
+    let toggle_gap = if has_children {
+        toggle_rect.map(|(bx, _by, bw, _bh)| (bx, y, bw, h))
+    } else {
+        None
+    };
+    if draw_connectors {
+        render_outline_connector_guides(canvas, grid, row, rect, depth, tg, tree_color, toggle_gap);
+    }
+    if let Some((bx, by, bw, bh)) = toggle_rect {
         if has_children {
             draw_outline_toggle(
                 canvas,
                 grid,
-                (bx, by, toggle_size, toggle_size),
+                (bx, by, bw, bh),
+                (bx, y, bw, h),
                 rp.is_collapsed,
                 tree_color,
             );
         }
-        text_x = (bx + toggle_size + 3).min(x + w);
+        text_x = (bx + bw + 3).min(x + w);
     } else {
         text_x = (text_x + tg.line_offset + 3).min(x + w);
     }
@@ -4634,19 +4728,19 @@ fn render_corner_outline_levels<C: Canvas>(
     if max_level < min_level || w <= 0 || h <= 0 {
         return;
     }
-    let tg = crate::outline::TreeGeometry::from_grid(grid);
     let theme = crate::indicator::resolve_indicator_button_theme(
         grid.indicator_bands.appearance,
         grid.indicator_bands.colors,
         fore_color,
         grid_color,
     );
+    let button_step = crate::outline::outline_level_button_step(grid, w);
     for level in min_level..=max_level {
-        let bx = x + (level - min_level) * tg.indent_step;
+        let bx = x + (level - min_level) * button_step;
         if bx >= x + w {
             break;
         }
-        let bw = tg.indent_step.min(x + w - bx).max(1);
+        let bw = button_step.min(x + w - bx).max(1);
         let label = level.to_string();
         let pressed = grid.outline_level_button_pressed
             && grid.outline_level_button_pressed_inside
@@ -4725,7 +4819,8 @@ fn render_corner_slots<C: Canvas>(
             slot.width_px.min(remaining)
         } else if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 {
             let button_count = crate::outline::outline_level_button_count(grid);
-            (crate::outline::TreeGeometry::from_grid(grid).indent_step * button_count)
+            crate::outline::outline_level_button_step(grid, remaining)
+                .saturating_mul(button_count)
                 .min(remaining)
         } else {
             remaining
@@ -10153,12 +10248,13 @@ mod tests {
         aligned_editor_draw_x, barcode_centered_square_rect, barcode_layer_needed,
         barcode_render_status, build_or_reuse_ctx, cell_has_checkbox_visual, cell_rect,
         checkbox_box_size, checkbox_layer_needed, compose_preedit_display_text,
-        draw_linear_barcode, draw_qr_barcode, dropdown_button_rect, dropdown_glyph_metrics,
-        dropdown_layer_needed, encode_linear_barcode, linear_barcode_preview_rect,
-        normalized_code128_payload, parse_progress_percent, picture_layer_needed,
-        progress_layer_needed, render_fast_scroll, render_grid, show_dropdown_button_for_cell,
-        sort_arrow_box_size, BarcodeDrawRect, CellKey, RenderContext, RenderCtxCacheKey,
-        RenderCtxCached, DEFAULT_BARCODE_SIZE_WARNING_COLOR,
+        draw_linear_barcode, draw_outline_toggle, draw_qr_barcode,
+        draw_tree_guide_hline_except_rect, draw_tree_guide_vline_except_rect, dropdown_button_rect,
+        dropdown_glyph_metrics, dropdown_layer_needed, encode_linear_barcode,
+        linear_barcode_preview_rect, normalized_code128_payload, parse_progress_percent,
+        picture_layer_needed, progress_layer_needed, render_fast_scroll, render_grid,
+        show_dropdown_button_for_cell, sort_arrow_box_size, BarcodeDrawRect, CellKey,
+        RenderContext, RenderCtxCacheKey, RenderCtxCached, DEFAULT_BARCODE_SIZE_WARNING_COLOR,
     };
     use crate::canvas_cpu::CpuCanvas;
     use crate::grid::VolvoxGrid;
@@ -10344,6 +10440,63 @@ mod tests {
         }
     }
 
+    #[derive(Clone, Debug, PartialEq)]
+    struct TextDrawCall {
+        text: String,
+        font_name: String,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+    }
+
+    struct RecordingTextDrawRenderer {
+        draws: Arc<Mutex<Vec<TextDrawCall>>>,
+    }
+
+    impl TextRenderer for RecordingTextDrawRenderer {
+        fn measure_text(
+            &mut self,
+            text: &str,
+            _font_name: &str,
+            _font_size: f32,
+            _bold: bool,
+            _italic: bool,
+            _max_width: Option<f32>,
+        ) -> (f32, f32) {
+            ((text.chars().count().max(1) as f32) * 6.0, 8.0)
+        }
+
+        fn render_text(
+            &mut self,
+            _buffer_pixels: &mut [u8],
+            _buf_width: i32,
+            _buf_height: i32,
+            _stride: i32,
+            _x: i32,
+            _y: i32,
+            _clip_x: i32,
+            _clip_y: i32,
+            _clip_w: i32,
+            _clip_h: i32,
+            text: &str,
+            font_name: &str,
+            font_size: f32,
+            bold: bool,
+            italic: bool,
+            _color: u32,
+            _max_width: Option<f32>,
+        ) -> f32 {
+            self.draws.lock().unwrap().push(TextDrawCall {
+                text: text.to_string(),
+                font_name: font_name.to_string(),
+                font_size,
+                bold,
+                italic,
+            });
+            (text.chars().count().max(1) as f32) * 6.0
+        }
+    }
+
     #[test]
     fn parse_progress_percent_treats_one_as_one_percent() {
         assert!((parse_progress_percent("1") - 0.01).abs() < 1e-6);
@@ -10387,6 +10540,80 @@ mod tests {
         let names = font_names.lock().unwrap();
         assert!(!names.is_empty());
         assert!(names.iter().all(|name| name == "Roboto"));
+    }
+
+    #[test]
+    fn outline_toggle_fallback_uses_ascii_markers_with_label_font() {
+        let width = 64;
+        let height = 32;
+        let stride = width * 4;
+        let draws = Arc::new(Mutex::new(Vec::new()));
+        let mut text = RecordingTextDrawRenderer {
+            draws: draws.clone(),
+        };
+        let mut buffer = vec![0; (height * stride) as usize];
+        let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+        let mut grid = VolvoxGrid::new(1, width, height, 2, 1, 0, 0);
+        grid.style.font_name = "LabelFace".to_string();
+        grid.style.font_size = 13.0;
+
+        draw_outline_toggle(
+            &mut canvas,
+            &grid,
+            (0, 4, 12, 12),
+            (0, 0, 12, 20),
+            true,
+            0xFF000000,
+        );
+        draw_outline_toggle(
+            &mut canvas,
+            &grid,
+            (24, 4, 12, 12),
+            (24, 0, 12, 20),
+            false,
+            0xFF000000,
+        );
+
+        let draws = draws.lock().unwrap();
+        assert_eq!(draws.len(), 2);
+        assert_eq!(draws[0].text, ">");
+        assert_eq!(draws[1].text, "v");
+        for draw in draws.iter() {
+            assert_eq!(draw.font_name, "LabelFace");
+            assert_eq!(draw.font_size, 13.0);
+            assert!(!draw.bold);
+            assert!(!draw.italic);
+        }
+    }
+
+    #[test]
+    fn tree_guide_lines_skip_toggle_gap() {
+        let width = 24;
+        let height = 24;
+        let stride = width * 4;
+        let mut buffer = vec![0; (height * stride) as usize];
+        let red = 0xFFFF0000;
+        let gap = Some((8, 5, 5, 10));
+
+        {
+            let mut text = MeasureOnlyTextRenderer;
+            let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+            draw_tree_guide_vline_except_rect(&mut canvas, 10, 0, 20, red, gap);
+        }
+        assert_eq!(pixel_argb(&buffer, width, 10, 4), red);
+        assert_eq!(pixel_argb(&buffer, width, 10, 5), 0);
+        assert_eq!(pixel_argb(&buffer, width, 10, 14), 0);
+        assert_eq!(pixel_argb(&buffer, width, 10, 15), red);
+
+        {
+            let mut text = MeasureOnlyTextRenderer;
+            let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+            draw_tree_guide_hline_except_rect(&mut canvas, 0, 18, 20, red, Some((8, 16, 5, 5)));
+        }
+        assert_eq!(pixel_argb(&buffer, width, 7, 18), red);
+        assert_eq!(pixel_argb(&buffer, width, 8, 18), 0);
+        assert_eq!(pixel_argb(&buffer, width, 12, 18), 0);
+        assert_eq!(pixel_argb(&buffer, width, 13, 18), red);
     }
 
     #[test]

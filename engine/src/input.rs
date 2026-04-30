@@ -1213,7 +1213,8 @@ fn corner_outline_level_hit(grid: &VolvoxGrid, px: i32, width: i32) -> Option<i3
             slot.width_px.min(remaining)
         } else if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 {
             let button_count = crate::outline::outline_level_button_count(grid);
-            (crate::outline::TreeGeometry::from_grid(grid).indent_step * button_count)
+            crate::outline::outline_level_button_step(grid, remaining)
+                .saturating_mul(button_count)
                 .min(remaining)
         } else {
             remaining
@@ -1224,9 +1225,7 @@ fn corner_outline_level_hit(grid: &VolvoxGrid, px: i32, width: i32) -> Option<i3
             if max_level < min_level || px < slot_x || px >= slot_x + slot_w {
                 return None;
             }
-            let step = crate::outline::TreeGeometry::from_grid(grid)
-                .indent_step
-                .max(1);
+            let step = crate::outline::outline_level_button_step(grid, slot_w).max(1);
             let button_idx = (px - slot_x) / step;
             let level = min_level + button_idx;
             return (level >= min_level && level <= max_level).then_some(level);
@@ -1510,7 +1509,8 @@ fn corner_indicator_slot_at(grid: &VolvoxGrid, local_x: i32, width: i32) -> (i32
             slot.width_px.min(remaining)
         } else if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 {
             let button_count = crate::outline::outline_level_button_count(grid);
-            (crate::outline::TreeGeometry::from_grid(grid).indent_step * button_count)
+            crate::outline::outline_level_button_step(grid, remaining)
+                .saturating_mul(button_count)
                 .min(remaining)
         } else {
             remaining
@@ -3278,7 +3278,7 @@ pub fn handle_pointer_down_with_behavior(
                     .row_props
                     .get(&hit.row)
                     .map_or(false, |rp| rp.is_collapsed);
-                if behavior.allow_node_toggle && !dbl_click {
+                if behavior.allow_node_toggle {
                     if let Some(node_id) = grid.tree.node_id_at_row(grid.fixed_rows, hit.row) {
                         grid.events.push(GridEventData::BeforeTreeNodeToggle {
                             node_id: node_id.to_string(),
@@ -7216,17 +7216,10 @@ mod tests {
     }
 
     #[test]
-    fn row_indicator_expander_double_click_does_not_toggle_twice() {
+    fn row_indicator_expander_double_click_toggles_outline_node() {
         let mut grid = outline_indicator_test_grid();
         let (_cx, row_y, _cw, row_h) = grid.cell_screen_rect(1, 0).unwrap();
         let y = (row_y + row_h / 2) as f32;
-
-        handle_pointer_down(&mut grid, 6.0, y, 0, 0, false);
-        handle_pointer_up(&mut grid, 6.0, y, 0, 0);
-        assert!(grid
-            .row_props
-            .get(&1)
-            .is_some_and(|props| props.is_collapsed));
 
         handle_pointer_down(&mut grid, 6.0, y, 0, 0, true);
 
@@ -7514,6 +7507,22 @@ mod tests {
 
         click_outline_level_button(&mut grid, level_1_x as f32);
         assert_eq!(visible_outline_levels(&grid), vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn corner_outline_level_buttons_use_wide_touch_targets_when_space_allows() {
+        let mut grid = zero_based_outline_indicator_test_grid();
+        grid.indicator_bands.row_start.width_px = 240;
+        grid.indicator_bands.row_start.slots[0].width_px = 240;
+        grid.indicator_bands.corner_top_start.slots[0].width_px = 240;
+        prime_layout(&mut grid);
+
+        let step =
+            crate::outline::outline_level_button_step(&grid, grid.indicator_bands.start_width());
+        assert_eq!(step, crate::outline::MIN_TOUCH_OUTLINE_LEVEL_BUTTON_WIDTH);
+
+        click_outline_level_button(&mut grid, (step - 5) as f32);
+        assert_eq!(visible_outline_levels(&grid), vec![0]);
     }
 
     #[test]

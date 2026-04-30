@@ -857,16 +857,30 @@ fn render_header_row(
     surface.fill_row(0, fixed_fg, fixed_bg, TUI_ATTR_BOLD);
 
     if row_indicator_width > 0 {
-        let band_bg = row_indicator_back_color(grid, background_mode);
-        let band_fg = row_indicator_fore_color(grid, background_mode);
-        surface.fill_span(
-            0,
-            0,
-            row_indicator_width.saturating_sub(1),
-            band_fg,
-            band_bg,
-            0,
+        let corner = &grid.indicator_bands.corner_top_start;
+        let band_bg = resolve_tui_terminal_color(
+            background_mode,
+            if corner.visible {
+                corner.back_color
+            } else {
+                None
+            }
+            .or(grid.indicator_bands.row_start.back_color)
+            .unwrap_or(grid.style.back_color_fixed),
         );
+        let band_fg = resolve_tui_terminal_color(
+            background_mode,
+            if corner.visible {
+                corner.fore_color
+            } else {
+                None
+            }
+            .or(grid.indicator_bands.row_start.fore_color)
+            .unwrap_or(grid.style.fore_color_fixed),
+        );
+        let corner_width = row_indicator_width.saturating_sub(1);
+        surface.fill_span(0, 0, corner_width, band_fg, band_bg, 0);
+        render_corner_top_start_row(grid, surface, corner_width, band_fg, band_bg);
         surface.put(
             row_indicator_width - 1,
             0,
@@ -932,6 +946,113 @@ fn render_header_row(
                 );
             }
         }
+    }
+}
+
+fn render_corner_top_start_row(
+    grid: &VolvoxGrid,
+    surface: &mut Surface<'_>,
+    width: i32,
+    fg: u32,
+    bg: u32,
+) {
+    let corner = &grid.indicator_bands.corner_top_start;
+    if width <= 0 || !corner.visible {
+        return;
+    }
+
+    let visible_slot_count = corner.slots.iter().filter(|slot| slot.visible).count();
+    let mut slot_x = 0;
+    for slot in corner.slots.iter().filter(|slot| slot.visible) {
+        let remaining = (width - slot_x).max(0);
+        if remaining <= 0 {
+            break;
+        }
+        let slot_w = if visible_slot_count == 1 {
+            remaining
+        } else if slot.width_px > 0 {
+            slot.width_px.min(remaining)
+        } else if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 {
+            let button_count = crate::outline::outline_level_button_count(grid);
+            crate::outline::outline_level_button_step(grid, remaining)
+                .saturating_mul(button_count)
+                .min(remaining)
+        } else {
+            remaining
+        };
+        if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32
+            && grid.outline.show_level_buttons
+        {
+            render_tui_corner_outline_levels(grid, surface, slot_x, slot_w, fg, bg);
+        } else if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotCustom as i32
+            && !slot.label_text.trim().is_empty()
+        {
+            write_cell_text(
+                surface,
+                RenderColumn {
+                    col: -1,
+                    x: slot_x,
+                    width: slot_w,
+                    full_width: slot_w,
+                    crop: 0,
+                },
+                0,
+                &slot.label_text,
+                fg,
+                bg,
+                TUI_ATTR_BOLD,
+                0,
+            );
+        }
+        slot_x += slot_w;
+    }
+}
+
+fn render_tui_corner_outline_levels(
+    grid: &VolvoxGrid,
+    surface: &mut Surface<'_>,
+    x: i32,
+    width: i32,
+    fg: u32,
+    bg: u32,
+) {
+    let min_level = crate::outline::outline_level_button_min(grid);
+    let max_level = crate::outline::outline_level_button_max(grid);
+    if max_level < min_level || width <= 0 {
+        return;
+    }
+
+    let step = crate::outline::outline_level_button_step(grid, width);
+    for level in min_level..=max_level {
+        let bx = x + (level - min_level) * step;
+        if bx >= x + width {
+            break;
+        }
+        let bw = step.min(x + width - bx).max(1);
+        let pressed = grid.outline_level_button_pressed
+            && grid.outline_level_button_pressed_inside
+            && grid.outline_level_button_pressed_level == level;
+        let attr = if pressed {
+            TUI_ATTR_BOLD | TUI_ATTR_REVERSE
+        } else {
+            TUI_ATTR_BOLD
+        };
+        write_cell_text(
+            surface,
+            RenderColumn {
+                col: -1,
+                x: bx,
+                width: bw,
+                full_width: bw,
+                crop: 0,
+            },
+            0,
+            &level.to_string(),
+            fg,
+            bg,
+            attr,
+            1,
+        );
     }
 }
 
@@ -2436,7 +2557,7 @@ fn rgb24(argb: u32) -> u32 {
 mod tests {
     use super::*;
     use crate::grid::VolvoxGrid;
-    use crate::indicator::RowIndicatorSlotState;
+    use crate::indicator::{CornerIndicatorSlotState, RowIndicatorSlotState};
     use crate::proto::volvoxgrid::v1 as pb;
 
     fn row_text(buffer: &[TuiCell], stride: usize, row: usize, width: usize) -> String {
@@ -2901,6 +3022,41 @@ mod tests {
         assert!(row_text(&buffer, 80, 3, 32).starts_with("│   ├── Q1.xlsx"));
         assert!(row_text(&buffer, 80, 4, 32).starts_with("│   └── Q2.xlsx"));
         assert!(row_text(&buffer, 80, 5, 32).starts_with("└── Invoices"));
+    }
+
+    #[test]
+    fn render_grid_tui_renders_corner_outline_level_numbers() {
+        let mut grid = VolvoxGrid::new(1, 40, 4, 3, 2, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.columns[0].caption = "Name".to_string();
+        grid.columns[1].caption = "Type".to_string();
+        grid.set_col_width(0, 8);
+        grid.set_col_width(1, 8);
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.outline.indicator_indent = 2;
+        grid.outline.max_levels = 2;
+        grid.outline.show_level_buttons = true;
+        grid.outline.label_column = 0;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            18,
+        )];
+        grid.indicator_bands.corner_top_start.visible = true;
+        grid.indicator_bands.corner_top_start.slots = vec![CornerIndicatorSlotState::new(
+            pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels,
+            6,
+        )];
+
+        for (row, (label, level)) in [("Root", 0), ("Child", 1), ("Leaf", 2)].iter().enumerate() {
+            grid.cells.set_text(row as i32, 0, (*label).to_string());
+            grid.row_props.entry(row as i32).or_default().outline_level = *level;
+        }
+
+        let mut buffer = vec![TuiCell::default(); 40 * 4];
+        render_grid_tui(&mut grid, &mut buffer, 40, 4, 40);
+
+        assert!(row_text(&buffer, 40, 0, 8).starts_with("0 1 2"));
     }
 
     #[test]

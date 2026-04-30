@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:volvoxgrid/volvoxgrid.dart' hide Padding;
 
 const List<int> _hierarchyColWidths = [260, 80, 80, 120, 100, 92];
@@ -40,6 +42,21 @@ const int _hierTreeColor = 0xFFA8A29E;
 const int _hierHoverCellBg = 0x1AD97706;
 const int _hierOutlineIndent = 20;
 const int _hierMinOutlineIndicatorWidth = 56;
+const int _hierDesktopHeaderHeight = 28;
+const int _hierMobileHeaderHeight = 44;
+
+bool get _hierTouchHeader {
+  switch (defaultTargetPlatform) {
+    case TargetPlatform.android:
+    case TargetPlatform.iOS:
+      return true;
+    default:
+      return false;
+  }
+}
+
+int get _hierHeaderHeight =>
+    _hierTouchHeader ? _hierMobileHeaderHeight : _hierDesktopHeaderHeight;
 
 Future<void> loadHierarchyJsonDemo(VolvoxGridController controller) async {
   final rawJson = utf8.decode(await controller.getDemoData('hierarchy'));
@@ -311,7 +328,7 @@ GridConfig _hierarchyThemeConfig(int maxOutlineDepth, int maxOutlineLevel) {
           ..visible = true))
       ..colTop = (ColIndicatorConfig()
         ..visible = true
-        ..defaultRowHeight = 28
+        ..defaultRowHeight = _hierHeaderHeight
         ..bandRows = 1
         ..modeBits = ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.value
         ..background = _hierHeaderBg

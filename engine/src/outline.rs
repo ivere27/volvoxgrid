@@ -2,6 +2,8 @@ use crate::grid::VolvoxGrid;
 use crate::proto::volvoxgrid::v1 as pb;
 use std::collections::BTreeSet;
 
+pub const MIN_TOUCH_OUTLINE_LEVEL_BUTTON_WIDTH: i32 = 44;
+
 /// Scaled tree geometry constants for outline rendering and hit-testing.
 /// The indent can be configured directly; otherwise it follows row height.
 #[derive(Clone, Copy, Debug)]
@@ -139,6 +141,21 @@ pub fn outline_level_button_count(grid: &VolvoxGrid) -> i32 {
         0
     } else {
         max_level - min_level + 1
+    }
+}
+
+pub fn outline_level_button_step(grid: &VolvoxGrid, available_width: i32) -> i32 {
+    let base = TreeGeometry::from_grid(grid).indent_step.max(1);
+    if grid.is_tui_mode() {
+        return base;
+    }
+
+    let count = outline_level_button_count(grid).max(1);
+    let touch_width = MIN_TOUCH_OUTLINE_LEVEL_BUTTON_WIDTH.max(base);
+    if available_width >= touch_width.saturating_mul(count) {
+        touch_width
+    } else {
+        base
     }
 }
 

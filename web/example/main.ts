@@ -64,6 +64,10 @@ const FONT_FETCH_TIMEOUT_MS = 5000;
 const DEMO_DEFAULT_FONT_FAMILY = "Roboto";
 const MATERIAL_ICONS_FONT_URL =
   "https://cdn.jsdelivr.net/npm/material-design-icons@3.0.1/iconfont/MaterialIcons-Regular.ttf";
+const MATERIAL_ICON_CHEVRON_RIGHT = "\uE5CC";
+const MATERIAL_ICON_EXPAND_MORE = "\uE5CF";
+const ICON_SLOT_TREE_EXPANDED = 4;
+const ICON_SLOT_TREE_COLLAPSED = 5;
 const PB_TEXT_ENCODER = new TextEncoder();
 const PB_TEXT_DECODER = new TextDecoder();
 const HOVER_NONE = 0;
@@ -1048,16 +1052,25 @@ function applyHierarchyIconTheme(wasmModule: WasmModule, id: number): void {
   const patchFontNames = (wasmModule as any).patch_icon_theme_default_font_names as
     | ((gridId: number, fontNames: string[]) => void)
     | undefined;
+  let patchedFontFamily = false;
   if (typeof patchFontNames === "function") {
     patchFontNames(id, ["Material Icons", "MaterialIcons"]);
-    return;
+    patchedFontFamily = true;
   }
 
   const patchTextStyle = (wasmModule as any).patch_icon_theme_default_text_style as
     | ((gridId: number, fontName?: string | null, fontSize?: number | null, bold?: boolean | null, italic?: boolean | null, color?: number | null) => void)
     | undefined;
-  if (typeof patchTextStyle === "function") {
+  if (!patchedFontFamily && typeof patchTextStyle === "function") {
     patchTextStyle(id, "Material Icons", null, null, null, null);
+  }
+
+  const setIconSlot = (wasmModule as any).set_icon_theme_slot as
+    | ((gridId: number, slot: number, icon: string) => void)
+    | undefined;
+  if (typeof setIconSlot === "function") {
+    setIconSlot(id, ICON_SLOT_TREE_EXPANDED, MATERIAL_ICON_EXPAND_MORE);
+    setIconSlot(id, ICON_SLOT_TREE_COLLAPSED, MATERIAL_ICON_CHEVRON_RIGHT);
   }
 }
 
