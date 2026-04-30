@@ -1825,6 +1825,12 @@ impl VolvoxGrid {
         if let Some(v) = ic.type_ahead_delay {
             self.type_ahead_delay = v;
         }
+        if let Some(v) = ic.decision_timeout_ms {
+            self.decision_timeout_ms = v;
+        }
+        if let Some(v) = ic.compare_response_timeout_ms {
+            self.compare_response_timeout_ms = v;
+        }
         if let Some(v) = ic.auto_size_mouse {
             self.auto_size_mouse = v;
         }
@@ -2213,6 +2219,8 @@ impl VolvoxGrid {
             }),
             type_ahead: Some(self.type_ahead_mode),
             type_ahead_delay: Some(self.type_ahead_delay),
+            decision_timeout_ms: Some(self.decision_timeout_ms),
+            compare_response_timeout_ms: Some(self.compare_response_timeout_ms),
             auto_size_mouse: Some(self.auto_size_mouse),
             auto_size_mode: Some(self.auto_size_mode),
             auto_resize: Some(self.auto_resize),
@@ -3576,6 +3584,8 @@ mod tests {
         grid.scrollbar_show_v = v1::ScrollBarMode::ScrollbarModeAuto as i32;
         grid.scrollbar_appearance = v1::ScrollBarAppearance::ScrollbarAppearanceModern as i32;
         grid.scrollbar_size = 9;
+        grid.decision_timeout_ms = 1500;
+        grid.compare_response_timeout_ms = 2500;
         grid.selection.active_cell_style.back_color = Some(0x4400FF00);
         grid.selection.active_cell_style.border = Some(v1::BorderStyle::BorderThick as i32);
 
@@ -3598,6 +3608,9 @@ mod tests {
             Some(v1::ScrollBarAppearance::ScrollbarAppearanceModern as i32)
         );
         assert_eq!(scroll_bar.size, Some(9));
+        let interaction = config.interaction.as_ref().unwrap();
+        assert_eq!(interaction.decision_timeout_ms, Some(1500));
+        assert_eq!(interaction.compare_response_timeout_ms, Some(2500));
         assert_eq!(
             config
                 .selection

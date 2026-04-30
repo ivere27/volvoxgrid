@@ -125,7 +125,7 @@ VolvoxGridWidget(
 )
 ```
 
-Cancelable Flutter hooks currently cover `onBeforeEdit`, `onCellEditValidating`, and `onBeforeSort`. The legacy raw `onCancelableEvent` callback is still available, but the event-specific `details.cancel = true` API is clearer for app code.
+Cancelable Flutter hooks currently cover `onBeforeEdit`, `onBeforeDropdownOpen`, `onCellEditValidating`, and `onBeforeSort`. The legacy raw `onCancelableEvent` callback is still available, but the event-specific `details.cancel = true` API is clearer for app code. If no hook is registered, the widget does not pause the engine for a decision; if a raw cancelable event is unhandled while the decision channel is active, the widget allows it with `cancel=false`.
 
 ### VolvoxGridController
 

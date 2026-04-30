@@ -2810,7 +2810,28 @@ namespace VolvoxGrid.DotNet
                     CellValueChanged?.Invoke(this, new VolvoxGridCellValueChangedEventArgs(evt.CellChanged.Row, GetFieldName(evt.CellChanged.Col), evt.CellChanged.NewText));
                     break;
             }
-            return null;
+            return _cancelableEventChannelRequested && IsCancelableGridEvent(evt) ? (bool?)false : null;
+        }
+
+        private static bool IsCancelableGridEvent(GridEvent evt)
+        {
+            if (evt == null) return false;
+            switch (evt.EventCase)
+            {
+                case GridEvent.EventOneofCase.BeforeEdit:
+                case GridEvent.EventOneofCase.BeforeDropdownOpen:
+                case GridEvent.EventOneofCase.CellEditValidate:
+                case GridEvent.EventOneofCase.BeforeSort:
+                case GridEvent.EventOneofCase.BeforeNodeToggle:
+                case GridEvent.EventOneofCase.BeforeScroll:
+                case GridEvent.EventOneofCase.BeforeUserResize:
+                case GridEvent.EventOneofCase.BeforeMoveColumn:
+                case GridEvent.EventOneofCase.BeforeMoveRow:
+                case GridEvent.EventOneofCase.BeforeMouseDown:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private HorizontalAlignment ResolveHostEditAlignment(int row, int col)

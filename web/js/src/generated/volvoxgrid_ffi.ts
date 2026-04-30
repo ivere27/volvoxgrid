@@ -1555,6 +1555,8 @@ export const InteractionConfigFields = {
   "drag_mode": 8,
   "drop_mode": 9,
   "header_features": 10,
+  "decision_timeout_ms": 11,
+  "compare_response_timeout_ms": 12,
 } as const;
 export const JsonOptionsFields = {
   "data_path": 1,

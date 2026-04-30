@@ -234,7 +234,7 @@ The event stream exposes semantic grid events such as:
 - mouse and keyboard events
 - refresh and error events
 
-Cancelable events use `EventDecision` on the render session rather than embedding a cancel field directly in the event payload.
+Cancelable events use `EventDecision` on the render session rather than embedding a cancel field directly in the event payload. By default, the engine waits until the host sends that decision. Hosts should only enable this path for events they intend to handle; if a decision channel is already enabled and an unhandled cancelable event arrives, send `cancel=false` so the action proceeds. Finite `decision_timeout_ms` values are watchdogs: on timeout the engine emits `ErrorEvent` and auto-allows.
 
 This split is important:
 
@@ -416,8 +416,17 @@ Typical host behavior:
 Use `EventDecision` when the host needs to cancel a cancelable event such as:
 
 - `BeforeEdit`
+- `BeforeDropdownOpen`
 - `CellEditValidate`
 - `BeforeSort`
+- `BeforeNodeToggle`
+- `BeforeScroll`
+- `BeforeUserResize`
+- `BeforeMoveColumn`
+- `BeforeMoveRow`
+- `BeforeMouseDown`
+
+`cancel=true` means veto. `cancel=false` means allow, and is the correct default for an unhandled cancelable event when a decision channel is active.
 
 ## Text Rendering Strategy
 

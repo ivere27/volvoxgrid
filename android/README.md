@@ -168,7 +168,9 @@ gridView.setEventListener(new VolvoxGridView.GridEventListener() {
     }
 });
 
-// Cancelable "before" events. Supported here: BeforeEdit, CellEditValidate, BeforeSort.
+// Cancelable "before" events. Supported here: BeforeEdit, CellEditValidate,
+// BeforeSort. Unhandled cancelable events are allowed with cancel=false when
+// the decision channel is active.
 gridView.setBeforeEditListener(details -> {
     if (details.getRow() == 0) {
         details.setCancel(true);
@@ -624,7 +626,9 @@ gridView.eventListener = object : VolvoxGridView.GridEventListener {
     }
 }
 
-// Cancelable "before" events. Supported here: BeforeEdit, CellEditValidate, BeforeSort.
+// Cancelable "before" events. Supported here: BeforeEdit, CellEditValidate,
+// BeforeSort. Unhandled cancelable events are allowed with cancel=false when
+// the decision channel is active.
 gridView.beforeEditListener = VolvoxGridView.BeforeEditListener { details ->
     if (details.row == 0) {
         details.cancel = true

@@ -32,8 +32,9 @@
 // 4. Cancelable events via EventDecision.
 //    Events with a non-zero `event_id` in GridEvent are cancelable.
 //    The host sends an EventDecision on the RenderSession with `cancel=true`
-//    to veto the action. The engine waits up to 250 ms for a decision;
-//    if none arrives, the event proceeds (cancel=false).
+//    to veto the action. By default the action remains pending until the
+//    decision arrives; a finite decision_timeout_ms can be configured as an
+//    explicit watchdog.
 //    Events with `event_id=0` are informational and cannot be canceled.
 //
 // 5. Language-agnostic transport.
@@ -1867,9 +1868,11 @@ func (SortOrder) EnumDescriptor() ([]byte, []int) {
 //	STRING_NO_CASE (3): Lexicographic, case-insensitive.
 //	CUSTOM (4):         Engine emits CompareEvent on EventStream; host
 //	                    replies with CompareResponse on RenderSession input
-//	                    (-1/0/1). Falls back to the generic/date path if no
-//	                    EventStream subscriber is active or the host does
-//	                    not reply within 250 ms.
+//	                    (-1/0/1). If no EventStream subscriber is active,
+//	                    the engine uses the generic/date path. Otherwise, by
+//	                    default the comparison remains pending until the host
+//	                    replies; a finite compare_response_timeout_ms can be
+//	                    configured as an explicit watchdog.
 type SortType int32
 
 const (
@@ -8689,8 +8692,16 @@ type InteractionConfig struct {
 	DragMode       *DragMode       `protobuf:"varint,8,opt,name=drag_mode,json=dragMode,proto3,enum=volvoxgrid.v1.DragMode,oneof" json:"drag_mode,omitempty"`
 	DropMode       *DropMode       `protobuf:"varint,9,opt,name=drop_mode,json=dropMode,proto3,enum=volvoxgrid.v1.DropMode,oneof" json:"drop_mode,omitempty"`
 	HeaderFeatures *HeaderFeatures `protobuf:"bytes,10,opt,name=header_features,json=headerFeatures,proto3" json:"header_features,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Milliseconds to wait for EventDecision on cancelable events.
+	// 0 or unset = wait indefinitely. A finite value is a watchdog: on timeout
+	// the engine emits ErrorEvent and auto-allows the action.
+	DecisionTimeoutMs *uint32 `protobuf:"varint,11,opt,name=decision_timeout_ms,json=decisionTimeoutMs,proto3,oneof" json:"decision_timeout_ms,omitempty"`
+	// Milliseconds to wait for CompareResponse during SORT_TYPE_CUSTOM.
+	// 0 or unset = wait indefinitely. A finite value is a watchdog: on timeout
+	// the engine emits ErrorEvent and aborts the custom sort.
+	CompareResponseTimeoutMs *uint32 `protobuf:"varint,12,opt,name=compare_response_timeout_ms,json=compareResponseTimeoutMs,proto3,oneof" json:"compare_response_timeout_ms,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *InteractionConfig) Reset() {
@@ -8791,6 +8802,20 @@ func (x *InteractionConfig) GetHeaderFeatures() *HeaderFeatures {
 		return x.HeaderFeatures
 	}
 	return nil
+}
+
+func (x *InteractionConfig) GetDecisionTimeoutMs() uint32 {
+	if x != nil && x.DecisionTimeoutMs != nil {
+		return *x.DecisionTimeoutMs
+	}
+	return 0
+}
+
+func (x *InteractionConfig) GetCompareResponseTimeoutMs() uint32 {
+	if x != nil && x.CompareResponseTimeoutMs != nil {
+		return *x.CompareResponseTimeoutMs
+	}
+	return 0
 }
 
 // ── Rendering ──
@@ -18307,10 +18332,9 @@ func (x *GpuSurfaceReady) GetHeight() int32 {
 
 // Response to a cancelable GridEvent. Sent on the RenderSession stream.
 //
-// The engine waits up to 250 ms for this message (DECISION_TIMEOUT in
-// plugin/src/lib.rs). If no decision arrives, the event auto-proceeds
-// with cancel=false. Expired actions are resolved at the start of each
-// render_session loop iteration.
+// By default, the action remains pending until this message arrives. Configure
+// InteractionConfig.decision_timeout_ms with a finite value to enable a
+// watchdog; on timeout the engine emits ErrorEvent and auto-allows.
 //
 // Cancelable events: BeforeEdit, BeforeDropdownOpen, CellEditValidate, BeforeSort,
 // BeforeNodeToggle, BeforeScroll, BeforeUserResize, BeforeMoveColumn,
@@ -21684,10 +21708,10 @@ func (x *AfterSortEvent) GetCol() int32 {
 	return 0
 }
 
-// Synchronous request for SORT_TYPE_CUSTOM. The host must reply on
-// the RenderSession with a CompareResponse echoing request_id.
-// The engine waits up to 250 ms; on timeout the comparison falls
-// back to the generic/date path used by SORT_TYPE_AUTO.
+// Request for SORT_TYPE_CUSTOM. The host must reply on the RenderSession with
+// a CompareResponse echoing request_id. By default the comparison remains
+// pending until the response arrives; a finite compare_response_timeout_ms is
+// a watchdog that aborts the whole custom sort.
 type CompareEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     int64                  `protobuf:"varint,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -24671,7 +24695,7 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"_cell_spanB\x12\n" +
 	"\x10_cell_span_fixedB\x14\n" +
 	"\x12_cell_span_compareB\x15\n" +
-	"\x13_group_span_compare\"\xbe\x05\n" +
+	"\x13_group_span_compare\"\xef\x06\n" +
 	"\x11InteractionConfig\x123\n" +
 	"\x06resize\x18\x01 \x01(\v2\x1b.volvoxgrid.v1.ResizePolicyR\x06resize\x123\n" +
 	"\x06freeze\x18\x02 \x01(\v2\x1b.volvoxgrid.v1.FreezePolicyR\x06freeze\x12@\n" +
@@ -24685,7 +24709,9 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\tdrag_mode\x18\b \x01(\x0e2\x17.volvoxgrid.v1.DragModeH\x05R\bdragMode\x88\x01\x01\x129\n" +
 	"\tdrop_mode\x18\t \x01(\x0e2\x17.volvoxgrid.v1.DropModeH\x06R\bdropMode\x88\x01\x01\x12F\n" +
 	"\x0fheader_features\x18\n" +
-	" \x01(\v2\x1d.volvoxgrid.v1.HeaderFeaturesR\x0eheaderFeaturesB\r\n" +
+	" \x01(\v2\x1d.volvoxgrid.v1.HeaderFeaturesR\x0eheaderFeatures\x123\n" +
+	"\x13decision_timeout_ms\x18\v \x01(\rH\aR\x11decisionTimeoutMs\x88\x01\x01\x12B\n" +
+	"\x1bcompare_response_timeout_ms\x18\f \x01(\rH\bR\x18compareResponseTimeoutMs\x88\x01\x01B\r\n" +
 	"\v_type_aheadB\x13\n" +
 	"\x11_type_ahead_delayB\x12\n" +
 	"\x10_auto_size_mouseB\x11\n" +
@@ -24694,7 +24720,9 @@ const file_volvoxgrid_proto_rawDesc = "" +
 	"\n" +
 	"_drag_modeB\f\n" +
 	"\n" +
-	"_drop_mode\"\xda\x06\n" +
+	"_drop_modeB\x16\n" +
+	"\x14_decision_timeout_msB\x1e\n" +
+	"\x1c_compare_response_timeout_ms\"\xda\x06\n" +
 	"\fRenderConfig\x12E\n" +
 	"\rrenderer_mode\x18\x01 \x01(\x0e2\x1b.volvoxgrid.v1.RendererModeH\x00R\frendererMode\x88\x01\x01\x12(\n" +
 	"\rdebug_overlay\x18\x02 \x01(\bH\x01R\fdebugOverlay\x88\x01\x01\x120\n" +

@@ -2218,6 +2218,8 @@ export const InteractionConfigFields = {
   "drag_mode": 8,
   "drop_mode": 9,
   "header_features": 10,
+  "decision_timeout_ms": 11,
+  "compare_response_timeout_ms": 12,
 } as const;
 export const JsonOptionsFields = {
   "data_path": 1,
@@ -13451,6 +13453,22 @@ export class InteractionConfig implements LiteMessage {
       kind: "message" as ProtoKind,
       messageType: "HeaderFeatures",
     },
+    {
+      no: 11,
+      name: "decision_timeout_ms",
+      jsonName: "decisionTimeoutMs",
+      prop: "decisionTimeoutMs",
+      kind: "uint32" as ProtoKind,
+      optional: true,
+    },
+    {
+      no: 12,
+      name: "compare_response_timeout_ms",
+      jsonName: "compareResponseTimeoutMs",
+      prop: "compareResponseTimeoutMs",
+      kind: "uint32" as ProtoKind,
+      optional: true,
+    },
   ];
   resize?: ResizePolicy;
   freeze?: FreezePolicy;
@@ -13462,6 +13480,8 @@ export class InteractionConfig implements LiteMessage {
   dragMode: DragMode = 0;
   dropMode: DropMode = 0;
   headerFeatures?: HeaderFeatures;
+  decisionTimeoutMs: number = 0;
+  compareResponseTimeoutMs: number = 0;
 
   constructor(init?: Partial<InteractionConfig>) {
     initMessage(this, InteractionConfig.fields, init as Record<string, unknown> | undefined);

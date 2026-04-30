@@ -4536,7 +4536,9 @@ export class VolvoxGrid {
    * Returns raw `GridEvent` protobuf bytes. Callers can decode with their
    * generated protobuf runtime. Raw-stream consumers that need cancellation
    * must first call `setEventDecisionEnabled(true)` and then respond with
-   * `sendRawEventDecision(...)` or `sendEventDecision(...)`.
+   * `sendRawEventDecision(...)` or `sendEventDecision(...)`. Send
+   * `cancel=false` for unhandled cancelable events; send `cancel=true` only
+   * when application code explicitly vetoes the action.
    */
   drainEventStreamRaw(maxEvents: number = 256): Uint8Array[] {
     if (typeof this.wasm.volvox_grid_stream_open !== "function"

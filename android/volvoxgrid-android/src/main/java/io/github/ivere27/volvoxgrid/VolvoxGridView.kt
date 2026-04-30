@@ -39,7 +39,6 @@ import java.nio.ByteBuffer
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 import kotlin.math.roundToInt
 
@@ -2725,7 +2724,16 @@ class VolvoxGridView @JvmOverloads constructor(
             beforeSortListener != null
 
     private fun isCancelableGridEvent(event: GridEvent): Boolean =
-        event.hasBeforeEdit() || event.hasCellEditValidate() || event.hasBeforeSort()
+        event.hasBeforeEdit() ||
+            event.hasBeforeDropdownOpen() ||
+            event.hasCellEditValidate() ||
+            event.hasBeforeSort() ||
+            event.hasBeforeNodeToggle() ||
+            event.hasBeforeScroll() ||
+            event.hasBeforeUserResize() ||
+            event.hasBeforeMoveColumn() ||
+            event.hasBeforeMoveRow() ||
+            event.hasBeforeMouseDown()
 
     private fun ensureDecisionChannelEnabled() {
         if (decisionChannelEnabled || !wantsCancelableGridEvents() || gridId == 0L) {
@@ -2813,7 +2821,7 @@ class VolvoxGridView @JvmOverloads constructor(
         }
 
         return try {
-            latch.await(200, TimeUnit.MILLISECONDS)
+            latch.await()
             resultRef[0]
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
@@ -2850,7 +2858,7 @@ class VolvoxGridView @JvmOverloads constructor(
         }
 
         return try {
-            latch.await(200, TimeUnit.MILLISECONDS)
+            latch.await()
             cancelRef.get()
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()

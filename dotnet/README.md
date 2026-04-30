@@ -577,7 +577,7 @@ grid.BeforeSort += (sender, e) =>
 };
 ```
 
-Cancelable `.NET` events currently cover `BeforeEdit`, `CellEditValidating`, and `BeforeSort`. The control hides the internal `EventDecision` transport; app code only uses `e.Cancel`.
+Cancelable `.NET` events currently cover `BeforeEdit`, `CellEditValidating`, and `BeforeSort`. The control hides the internal `EventDecision` transport; app code only uses `e.Cancel`. If no cancelable event handler is registered, the control does not pause the engine for a decision; if the decision channel is active and an unhandled cancelable event arrives, the control allows it with `cancel=false`.
 
 ## Demo and Smoke-Test Helpers
 

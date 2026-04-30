@@ -357,6 +357,10 @@ pub struct VolvoxGrid {
     pub type_ahead_mode: i32,
     /// Delay in milliseconds before type-ahead kicks in.
     pub type_ahead_delay: i32,
+    /// Milliseconds to wait for EventDecision. 0 = wait indefinitely.
+    pub decision_timeout_ms: u32,
+    /// Milliseconds to wait for CompareResponse. 0 = wait indefinitely.
+    pub compare_response_timeout_ms: u32,
     /// Auto-size mode: 0=both, 1=col width only, 2=row height only.
     pub auto_size_mode: i32,
     /// Whether double-clicking a column border auto-sizes the column.
@@ -836,6 +840,8 @@ impl VolvoxGrid {
             allow_user_freezing: 0,
             type_ahead_mode: 0,
             type_ahead_delay: 2000,
+            decision_timeout_ms: 0,
+            compare_response_timeout_ms: 0,
             auto_size_mode: 0,
             auto_size_mouse: false,
             scrollbar_show_h: pb::ScrollBarMode::ScrollbarModeNever as i32,

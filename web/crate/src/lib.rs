@@ -63,7 +63,7 @@ static GPU_AVAILABLE: Mutex<bool> = Mutex::new(false);
 static LOADED_FONTS: Mutex<Vec<Vec<u8>>> = Mutex::new(Vec::new());
 
 const DEBUG_MEM_SAMPLE_MS: f64 = 10_000.0;
-const DECISION_TIMEOUT: Duration = Duration::from_millis(250);
+const ERROR_DECISION_TIMEOUT: i32 = 1001;
 
 #[cfg(not(feature = "demo"))]
 fn demo_feature_not_enabled() -> String {
@@ -1085,13 +1085,23 @@ fn resolve_event_decision(grid_id: i64, event_id: i64, cancel: bool) {
 }
 
 fn resolve_expired_actions(grid_id: i64) {
+    let timeout = with_grid(grid_id as i32, |grid| grid.decision_timeout_ms).and_then(|ms| {
+        if ms == 0 {
+            None
+        } else {
+            Some(Duration::from_millis(u64::from(ms)))
+        }
+    });
+    let Some(timeout) = timeout else {
+        return;
+    };
     let now = Instant::now();
     let expired: Vec<(i64, PendingAction)> = {
         let mut pending = PENDING_ACTIONS.lock().unwrap();
         let expired_keys: Vec<(i64, i64)> = pending
             .iter()
             .filter_map(|(key, entry)| {
-                if key.0 == grid_id && now.duration_since(entry.created_at) >= DECISION_TIMEOUT {
+                if key.0 == grid_id && now.duration_since(entry.created_at) >= timeout {
                     Some(*key)
                 } else {
                     None
@@ -1104,7 +1114,17 @@ fn resolve_expired_actions(grid_id: i64) {
             .collect()
     };
 
-    for (_event_id, action) in expired {
+    for (event_id, action) in expired {
+        let _ = with_grid(grid_id as i32, |grid| {
+            grid.events
+                .push(volvoxgrid_engine::event::GridEventData::Error {
+                    code: ERROR_DECISION_TIMEOUT,
+                    message: format!(
+                        "no EventDecision for event_id={event_id} after {}ms",
+                        timeout.as_millis()
+                    ),
+                });
+        });
         apply_pending_action(grid_id, action, false);
     }
 }

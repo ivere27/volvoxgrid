@@ -32,8 +32,9 @@
 // 4. Cancelable events via EventDecision.
 //    Events with a non-zero `event_id` in GridEvent are cancelable.
 //    The host sends an EventDecision on the RenderSession with `cancel=true`
-//    to veto the action. The engine waits up to 250 ms for a decision;
-//    if none arrives, the event proceeds (cancel=false).
+//    to veto the action. By default the action remains pending until the
+//    decision arrives; a finite decision_timeout_ms can be configured as an
+//    explicit watchdog.
 //    Events with `event_id=0` are informational and cannot be canceled.
 //
 // 5. Language-agnostic transport.
@@ -549,9 +550,11 @@ enum SortOrder {
 //   STRING_NO_CASE (3): Lexicographic, case-insensitive.
 //   CUSTOM (4):         Engine emits CompareEvent on EventStream; host
 //                       replies with CompareResponse on RenderSession input
-//                       (-1/0/1). Falls back to the generic/date path if no
-//                       EventStream subscriber is active or the host does
-//                       not reply within 250 ms.
+//                       (-1/0/1). If no EventStream subscriber is active,
+//                       the engine uses the generic/date path. Otherwise, by
+//                       default the comparison remains pending until the host
+//                       replies; a finite compare_response_timeout_ms can be
+//                       configured as an explicit watchdog.
 enum SortType {
   SORT_TYPE_AUTO           = 0;
   SORT_TYPE_NUMERIC        = 1;
@@ -1287,6 +1290,14 @@ message InteractionConfig {
   optional DragMode   drag_mode        = 8;
   optional DropMode   drop_mode        = 9;
   HeaderFeatures      header_features  = 10;
+  // Milliseconds to wait for EventDecision on cancelable events.
+  // 0 or unset = wait indefinitely. A finite value is a watchdog: on timeout
+  // the engine emits ErrorEvent and auto-allows the action.
+  optional uint32     decision_timeout_ms = 11;
+  // Milliseconds to wait for CompareResponse during SORT_TYPE_CUSTOM.
+  // 0 or unset = wait indefinitely. A finite value is a watchdog: on timeout
+  // the engine emits ErrorEvent and aborts the custom sort.
+  optional uint32     compare_response_timeout_ms = 12;
 }
 
 // ── Render layer bit positions (for render_layer_mask bitmask) ──
@@ -2516,10 +2527,9 @@ message GpuSurfaceReady {
 
 // Response to a cancelable GridEvent. Sent on the RenderSession stream.
 //
-// The engine waits up to 250 ms for this message (DECISION_TIMEOUT in
-// plugin/src/lib.rs). If no decision arrives, the event auto-proceeds
-// with cancel=false. Expired actions are resolved at the start of each
-// render_session loop iteration.
+// By default, the action remains pending until this message arrives. Configure
+// InteractionConfig.decision_timeout_ms with a finite value to enable a
+// watchdog; on timeout the engine emits ErrorEvent and auto-allows.
 //
 // Cancelable events: BeforeEdit, BeforeDropdownOpen, CellEditValidate, BeforeSort,
 // BeforeNodeToggle, BeforeScroll, BeforeUserResize, BeforeMoveColumn,
@@ -2657,8 +2667,9 @@ message TooltipRequest {
 // and idle streams consume no CPU.
 //
 // event_id = 0: informational, cannot be canceled.
-// event_id > 0: cancelable — host must send EventDecision on
-//               RenderSession within 250 ms or the event auto-proceeds.
+// event_id > 0: cancelable — host must send EventDecision on RenderSession.
+//               By default the action remains pending until the decision
+//               arrives.
 //
 // `cancel` fields were removed from event messages. Use EventDecision
 // on the RenderSession to cancel cancelable events.
@@ -2815,10 +2826,10 @@ message RowStatusChangeEvent { int32 row = 1; RowStatus status = 2; }
 // ── Sort Events ──
 message BeforeSortEvent { int32 col = 1; }  // cancelable
 message AfterSortEvent  { int32 col = 1; }  // informational
-// Synchronous request for SORT_TYPE_CUSTOM. The host must reply on
-// the RenderSession with a CompareResponse echoing request_id.
-// The engine waits up to 250 ms; on timeout the comparison falls
-// back to the generic/date path used by SORT_TYPE_AUTO.
+// Request for SORT_TYPE_CUSTOM. The host must reply on the RenderSession with
+// a CompareResponse echoing request_id. By default the comparison remains
+// pending until the response arrives; a finite compare_response_timeout_ms is
+// a watchdog that aborts the whole custom sort.
 message CompareEvent    { int64 request_id = 1; int32 row1 = 2; int32 row2 = 3; int32 col = 4; }
 
 // ── Outline Events ──

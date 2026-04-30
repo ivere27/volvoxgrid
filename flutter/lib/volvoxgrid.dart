@@ -250,9 +250,10 @@ class VolvoxGridWidget extends StatefulWidget {
 
   /// Legacy raw callback for cancelable events.
   ///
-  /// Prefer [onBeforeEdit], [onCellEditValidating], and [onBeforeSort] for a
-  /// clearer cancel-style API. Returning true here still cancels the
-  /// corresponding native action.
+  /// Prefer [onBeforeEdit], [onBeforeDropdownOpen], [onCellEditValidating],
+  /// and [onBeforeSort] for a clearer cancel-style API. Returning true here
+  /// still cancels the corresponding native action; unhandled cancelable events
+  /// are allowed with cancel=false.
   final bool Function(pb.GridEvent event)? onCancelableEvent;
 
   const VolvoxGridWidget({
@@ -1477,13 +1478,12 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
 
   void _handleCompareRequest(pb.CompareEvent request) {
     final compare = widget.onCompare;
-    if (compare == null) {
-      return;
-    }
 
-    int result;
+    int result = 0;
     try {
-      result = compare(request);
+      if (compare != null) {
+        result = compare(request);
+      }
     } catch (error, stackTrace) {
       FlutterError.reportError(FlutterErrorDetails(
         exception: error,
@@ -1491,7 +1491,6 @@ class _VolvoxGridWidgetState extends State<VolvoxGridWidget> {
         library: 'volvoxgrid',
         context: ErrorDescription('while handling a custom sort comparison'),
       ));
-      return;
     }
 
     _inputController?.add(pb.RenderInput()

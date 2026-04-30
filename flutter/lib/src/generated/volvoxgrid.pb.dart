@@ -5515,6 +5515,8 @@ class InteractionConfig extends $pb.GeneratedMessage {
     DragMode? dragMode,
     DropMode? dropMode,
     HeaderFeatures? headerFeatures,
+    $core.int? decisionTimeoutMs,
+    $core.int? compareResponseTimeoutMs,
   }) {
     final result = create();
     if (resize != null) result.resize = resize;
@@ -5527,6 +5529,9 @@ class InteractionConfig extends $pb.GeneratedMessage {
     if (dragMode != null) result.dragMode = dragMode;
     if (dropMode != null) result.dropMode = dropMode;
     if (headerFeatures != null) result.headerFeatures = headerFeatures;
+    if (decisionTimeoutMs != null) result.decisionTimeoutMs = decisionTimeoutMs;
+    if (compareResponseTimeoutMs != null)
+      result.compareResponseTimeoutMs = compareResponseTimeoutMs;
     return result;
   }
 
@@ -5560,6 +5565,10 @@ class InteractionConfig extends $pb.GeneratedMessage {
         enumValues: DropMode.values)
     ..aOM<HeaderFeatures>(10, _omitFieldNames ? '' : 'headerFeatures',
         subBuilder: HeaderFeatures.create)
+    ..aI(11, _omitFieldNames ? '' : 'decisionTimeoutMs',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(12, _omitFieldNames ? '' : 'compareResponseTimeoutMs',
+        fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -5681,6 +5690,31 @@ class InteractionConfig extends $pb.GeneratedMessage {
   void clearHeaderFeatures() => $_clearField(10);
   @$pb.TagNumber(10)
   HeaderFeatures ensureHeaderFeatures() => $_ensure(9);
+
+  /// Milliseconds to wait for EventDecision on cancelable events.
+  /// 0 or unset = wait indefinitely. A finite value is a watchdog: on timeout
+  /// the engine emits ErrorEvent and auto-allows the action.
+  @$pb.TagNumber(11)
+  $core.int get decisionTimeoutMs => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set decisionTimeoutMs($core.int value) => $_setUnsignedInt32(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasDecisionTimeoutMs() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearDecisionTimeoutMs() => $_clearField(11);
+
+  /// Milliseconds to wait for CompareResponse during SORT_TYPE_CUSTOM.
+  /// 0 or unset = wait indefinitely. A finite value is a watchdog: on timeout
+  /// the engine emits ErrorEvent and aborts the custom sort.
+  @$pb.TagNumber(12)
+  $core.int get compareResponseTimeoutMs => $_getIZ(11);
+  @$pb.TagNumber(12)
+  set compareResponseTimeoutMs($core.int value) =>
+      $_setUnsignedInt32(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasCompareResponseTimeoutMs() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearCompareResponseTimeoutMs() => $_clearField(12);
 }
 
 /// ── Rendering ──
@@ -17980,10 +18014,9 @@ class GpuSurfaceReady extends $pb.GeneratedMessage {
 
 /// Response to a cancelable GridEvent. Sent on the RenderSession stream.
 ///
-/// The engine waits up to 250 ms for this message (DECISION_TIMEOUT in
-/// plugin/src/lib.rs). If no decision arrives, the event auto-proceeds
-/// with cancel=false. Expired actions are resolved at the start of each
-/// render_session loop iteration.
+/// By default, the action remains pending until this message arrives. Configure
+/// InteractionConfig.decision_timeout_ms with a finite value to enable a
+/// watchdog; on timeout the engine emits ErrorEvent and auto-allows.
 ///
 /// Cancelable events: BeforeEdit, BeforeDropdownOpen, CellEditValidate, BeforeSort,
 /// BeforeNodeToggle, BeforeScroll, BeforeUserResize, BeforeMoveColumn,
@@ -22303,10 +22336,10 @@ class AfterSortEvent extends $pb.GeneratedMessage {
   void clearCol() => $_clearField(1);
 }
 
-/// Synchronous request for SORT_TYPE_CUSTOM. The host must reply on
-/// the RenderSession with a CompareResponse echoing request_id.
-/// The engine waits up to 250 ms; on timeout the comparison falls
-/// back to the generic/date path used by SORT_TYPE_AUTO.
+/// Request for SORT_TYPE_CUSTOM. The host must reply on the RenderSession with
+/// a CompareResponse echoing request_id. By default the comparison remains
+/// pending until the response arrives; a finite compare_response_timeout_ms is
+/// a watchdog that aborts the whole custom sort.
 class CompareEvent extends $pb.GeneratedMessage {
   factory CompareEvent({
     $fixnum.Int64? requestId,

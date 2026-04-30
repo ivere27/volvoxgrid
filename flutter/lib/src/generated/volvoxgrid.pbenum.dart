@@ -930,9 +930,11 @@ class SortOrder extends $pb.ProtobufEnum {
 ///   STRING_NO_CASE (3): Lexicographic, case-insensitive.
 ///   CUSTOM (4):         Engine emits CompareEvent on EventStream; host
 ///                       replies with CompareResponse on RenderSession input
-///                       (-1/0/1). Falls back to the generic/date path if no
-///                       EventStream subscriber is active or the host does
-///                       not reply within 250 ms.
+///                       (-1/0/1). If no EventStream subscriber is active,
+///                       the engine uses the generic/date path. Otherwise, by
+///                       default the comparison remains pending until the host
+///                       replies; a finite compare_response_timeout_ms can be
+///                       configured as an explicit watchdog.
 class SortType extends $pb.ProtobufEnum {
   static const SortType SORT_TYPE_AUTO =
       SortType._(0, _omitEnumNames ? '' : 'SORT_TYPE_AUTO');

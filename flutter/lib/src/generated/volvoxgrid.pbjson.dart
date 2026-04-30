@@ -4390,6 +4390,24 @@ const InteractionConfig$json = {
       '6': '.volvoxgrid.v1.HeaderFeatures',
       '10': 'headerFeatures'
     },
+    {
+      '1': 'decision_timeout_ms',
+      '3': 11,
+      '4': 1,
+      '5': 13,
+      '9': 7,
+      '10': 'decisionTimeoutMs',
+      '17': true
+    },
+    {
+      '1': 'compare_response_timeout_ms',
+      '3': 12,
+      '4': 1,
+      '5': 13,
+      '9': 8,
+      '10': 'compareResponseTimeoutMs',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_type_ahead'},
@@ -4399,6 +4417,8 @@ const InteractionConfig$json = {
     {'1': '_auto_resize'},
     {'1': '_drag_mode'},
     {'1': '_drop_mode'},
+    {'1': '_decision_timeout_ms'},
+    {'1': '_compare_response_timeout_ms'},
   ],
 };
 
@@ -4414,9 +4434,12 @@ final $typed_data.Uint8List interactionConfigDescriptor = $convert.base64Decode(
     'pliAEBEjkKCWRyYWdfbW9kZRgIIAEoDjIXLnZvbHZveGdyaWQudjEuRHJhZ01vZGVIBVIIZHJh'
     'Z01vZGWIAQESOQoJZHJvcF9tb2RlGAkgASgOMhcudm9sdm94Z3JpZC52MS5Ecm9wTW9kZUgGUg'
     'hkcm9wTW9kZYgBARJGCg9oZWFkZXJfZmVhdHVyZXMYCiABKAsyHS52b2x2b3hncmlkLnYxLkhl'
-    'YWRlckZlYXR1cmVzUg5oZWFkZXJGZWF0dXJlc0INCgtfdHlwZV9haGVhZEITChFfdHlwZV9haG'
-    'VhZF9kZWxheUISChBfYXV0b19zaXplX21vdXNlQhEKD19hdXRvX3NpemVfbW9kZUIOCgxfYXV0'
-    'b19yZXNpemVCDAoKX2RyYWdfbW9kZUIMCgpfZHJvcF9tb2Rl');
+    'YWRlckZlYXR1cmVzUg5oZWFkZXJGZWF0dXJlcxIzChNkZWNpc2lvbl90aW1lb3V0X21zGAsgAS'
+    'gNSAdSEWRlY2lzaW9uVGltZW91dE1ziAEBEkIKG2NvbXBhcmVfcmVzcG9uc2VfdGltZW91dF9t'
+    'cxgMIAEoDUgIUhhjb21wYXJlUmVzcG9uc2VUaW1lb3V0TXOIAQFCDQoLX3R5cGVfYWhlYWRCEw'
+    'oRX3R5cGVfYWhlYWRfZGVsYXlCEgoQX2F1dG9fc2l6ZV9tb3VzZUIRCg9fYXV0b19zaXplX21v'
+    'ZGVCDgoMX2F1dG9fcmVzaXplQgwKCl9kcmFnX21vZGVCDAoKX2Ryb3BfbW9kZUIWChRfZGVjaX'
+    'Npb25fdGltZW91dF9tc0IeChxfY29tcGFyZV9yZXNwb25zZV90aW1lb3V0X21z');
 
 @$core.Deprecated('Use renderConfigDescriptor instead')
 const RenderConfig$json = {

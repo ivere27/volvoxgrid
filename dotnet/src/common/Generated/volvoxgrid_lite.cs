@@ -8622,6 +8622,12 @@ namespace Volvoxgrid.V1
         public DropMode DropMode { get { return _dropMode.GetValueOrDefault(); } set { _dropMode = value; } }
         public bool HasDropMode { get { return _dropMode.HasValue; } }
         public HeaderFeatures HeaderFeatures { get; set; }
+        private uint? _decisionTimeoutMs;
+        public uint DecisionTimeoutMs { get { return _decisionTimeoutMs.GetValueOrDefault(); } set { _decisionTimeoutMs = value; } }
+        public bool HasDecisionTimeoutMs { get { return _decisionTimeoutMs.HasValue; } }
+        private uint? _compareResponseTimeoutMs;
+        public uint CompareResponseTimeoutMs { get { return _compareResponseTimeoutMs.GetValueOrDefault(); } set { _compareResponseTimeoutMs = value; } }
+        public bool HasCompareResponseTimeoutMs { get { return _compareResponseTimeoutMs.HasValue; } }
 
         // ── Serialization ──
 
@@ -8645,6 +8651,10 @@ namespace Volvoxgrid.V1
             if (_dropMode.HasValue)
                 w.WriteInt32(9, (int)_dropMode.Value);
             if (HeaderFeatures != null) w.WriteMessageBytes(10, HeaderFeatures.ToByteArray());
+            if (_decisionTimeoutMs.HasValue)
+                w.WriteInt32(11, unchecked((int)_decisionTimeoutMs.Value));
+            if (_compareResponseTimeoutMs.HasValue)
+                w.WriteInt32(12, unchecked((int)_compareResponseTimeoutMs.Value));
             return w.ToArray();
         }
 
@@ -8672,6 +8682,8 @@ namespace Volvoxgrid.V1
                     case 8: msg.DragMode = (DragMode)r.ReadInt32(); break;
                     case 9: msg.DropMode = (DropMode)r.ReadInt32(); break;
                     case 10: msg.HeaderFeatures = HeaderFeatures.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 11: msg.DecisionTimeoutMs = unchecked((uint)r.ReadInt32()); break;
+                    case 12: msg.CompareResponseTimeoutMs = unchecked((uint)r.ReadInt32()); break;
                     default: r.SkipField(wire); break;
                 }
             }
