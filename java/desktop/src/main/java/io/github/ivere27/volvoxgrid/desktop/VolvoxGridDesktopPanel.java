@@ -2510,7 +2510,13 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
         return event.hasBeforeEdit()
             || event.hasBeforeDropdownOpen()
             || event.hasCellEditValidate()
-            || event.hasBeforeSort();
+            || event.hasBeforeSort()
+            || event.hasBeforeNodeToggle()
+            || event.hasBeforeScroll()
+            || event.hasBeforeUserResize()
+            || event.hasBeforeMoveColumn()
+            || event.hasBeforeMoveRow()
+            || event.hasBeforeMouseDown();
     }
 
     private void ensureDecisionChannelEnabled() {

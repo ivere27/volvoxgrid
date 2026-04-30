@@ -19,7 +19,7 @@
 # Variables
 # =============================================================================
 SYNURANG_MODULE ?= github.com/ivere27/synurang
-SYNURANG_VERSION ?= v0.5.11
+SYNURANG_VERSION ?= v0.5.12
 PROTOC_PLUGIN ?= $(shell gobin=$$(go env GOBIN 2>/dev/null); if [ -n "$$gobin" ]; then printf '%s/protoc-gen-synurang-ffi' "$$gobin"; else printf '%s/bin/protoc-gen-synurang-ffi' "$$(go env GOPATH 2>/dev/null)"; fi)
 PROTOC_PLUGIN_FLAG = --plugin=protoc-gen-synurang-ffi=$(PROTOC_PLUGIN)
 ANDROID_PROJECT_DIR := android
@@ -201,7 +201,7 @@ JAVA_DESKTOP_PLUGIN_RELEASE_ARG := --args="$(JAVA_DESKTOP_PLUGIN_RELEASE)"
 endif
 
 .PHONY: all build engine host-plugin java-host-plugin plugin engine-release host-plugin-release java-host-plugin-release release \
-                build_plugin run run-release test test_pixel wasm wasm-lite wasm-threaded web web-lite doom-deps \
+                build_plugin run run-release test test_pixel wasm wasm-lite wasm-threaded web-js-build web web-lite doom-deps \
         codegen \
         android android-build \
         android-plugin android-plugin-release android-install android-install-release android-run android-run-release flutter flutter-setup \
@@ -322,9 +322,9 @@ help:
 	@echo "  publish_npm               Publish volvoxgrid + adapter npm packages from dist/web zip"
 	@echo ""
 	@echo "Example dependency source flags (default is local):"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.2"
-	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.2"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.2"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.3"
+	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.3"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.3"
 	@echo "  (maven mode skips local plugin build for the example targets)"
 	@echo "  Flutter defaults to maven when VOLVOXGRID_SOURCE is omitted."
 	@echo "  VOLVOXGRID_SOURCE=local builds from source."
@@ -591,7 +591,11 @@ wasm-ready:
 # =============================================================================
 # Web Dev Server
 # =============================================================================
-web: wasm
+web-js-build:
+	@echo "Building VolvoxGrid JS package for web demo..."
+	cd "$(WEB_JS_DIR)" && npm install && npm run build
+
+web: wasm web-js-build
 	@if [ ! -f web/example/public/doom/vendor/doom.jsdos ] || [ ! -f web/example/public/doom/emulators/emulators.js ]; then \
 		echo "Warning: DOOM mode assets are missing."; \
 		echo "         Run 'make doom-deps' to enable DOOM in the web demo."; \
@@ -599,7 +603,7 @@ web: wasm
 	@echo "Starting web dev server (host=$(WEB_HOST), scale=$(WEB_SCALE), hover=$(WEB_HOVER))..."
 	cd web/example && npm install && VITE_VG_INITIAL_SCALE="$(WEB_SCALE)" VITE_VG_ENABLE_HOVER="$(WEB_HOVER)" npm run dev -- --host "$(WEB_HOST)"
 
-web-lite: wasm-lite
+web-lite: wasm-lite web-js-build
 	@echo "Starting web dev server (lite mode, hover=$(WEB_HOVER))..."
 	cd web/example && npm install && VITE_VG_INITIAL_SCALE="$(WEB_SCALE)" VITE_VG_ENABLE_HOVER="$(WEB_HOVER)" npm run dev -- --host "$(WEB_HOST)"
 
@@ -722,6 +726,10 @@ codegen: build_plugin
 		$(PROTOC_PLUGIN_FLAG) \
 		--synurang-ffi_out=$(WEB_TS_CODEGEN_DIR) --synurang-ffi_opt=lang=typescript \
 		proto/volvoxgrid.proto
+	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
+		$(PROTOC_PLUGIN_FLAG) \
+		--synurang-ffi_out=$(WEB_TS_CODEGEN_DIR) --synurang-ffi_opt=lang=typescript,mode=lite \
+		proto/volvoxgrid.proto
 	# .NET lite protobuf + FFI stubs (shared)
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_PLUGIN_FLAG) \
@@ -731,9 +739,13 @@ codegen: build_plugin
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_PLUGIN_FLAG) \
 		--synurang-ffi_out=plugin/src --synurang-ffi_opt=lang=rust,mode=plugin_server \
-		proto/volvoxgrid.proto
+		proto/volvoxgrid.proto proto/volvoxtree.proto
 	@$(SED_I) '/^#!\[allow(dead_code)\]/a use super::*;' plugin/src/volvoxgrid_ffi_plugin.rs
 	@$(SED_I) 's/PLUGIN_VOLVOX_GRID_SERVICE\.get()\.map(|p| p\.as_ref())/Some(PLUGIN_VOLVOX_GRID_SERVICE.get_or_init(super::create_plugin).as_ref())/' plugin/src/volvoxgrid_ffi_plugin.rs
+	@$(SED_I) '/^#!\[allow(dead_code)\]/a use volvoxgrid_engine::proto::volvoxgrid::v1::*;' plugin/src/volvoxtree_ffi_plugin.rs
+	@$(SED_I) 's/PLUGIN_VOLVOX_TREE_SERVICE\.get()\.map(|p| p\.as_ref())/Some(PLUGIN_VOLVOX_TREE_SERVICE.get_or_init(super::create_tree_plugin).as_ref())/' plugin/src/volvoxtree_ffi_plugin.rs
+	# Tree service codegen currently emits the same free symbol as the grid service.
+	@$(SED_I) 's/pub extern "C" fn Synurang_Free/pub extern "C" fn Synurang_Tree_Free/' plugin/src/volvoxtree_ffi_plugin.rs
 	# WASM bindings
 	protoc $(PROTO_INCLUDES) $(PROTO3_OPT) \
 		$(PROTOC_PLUGIN_FLAG) \
@@ -766,6 +778,7 @@ codegen: build_plugin
 	@rustfmt \
 		codegen/volvoxgrid_ffi.rs \
 		plugin/src/volvoxgrid_ffi_plugin.rs \
+		plugin/src/volvoxtree_ffi_plugin.rs \
 		web/crate/src/volvoxgrid_wasm.rs \
 		$(VSFLEXGRID_DIR)/crate/src/volvoxgrid_ffi_native.rs
 	@echo "Codegen complete: codegen/ + $(DOTNET_COMMON_CODEGEN_DIR)/ + $(WEB_TS_CODEGEN_DIR)/ + plugin/ + web/ + $(VSFLEXGRID_DIR)/"

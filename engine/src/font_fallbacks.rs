@@ -470,4 +470,3 @@ pub(crate) fn platform_fallback_candidates(locale_hint: &str) -> Vec<&'static st
     append_unique(&mut candidates, &mut seen, common_candidates_for_platform());
     candidates
 }
-

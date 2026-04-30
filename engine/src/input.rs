@@ -1,8 +1,8 @@
 use crate::canvas::VisibleRange;
 use crate::compose::ComposeResult;
 use crate::control::CellControl;
-use crate::event::GridEventData;
-use crate::grid::VolvoxGrid;
+use crate::event::{EventTarget, GridEventData};
+use crate::grid::{ActiveIndicatorTarget, HoverTarget, VolvoxGrid};
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::scrollbar::{
     bump_scrollbar_fade, compute_scrollbar_geometry, normalize_scrollbar_mode,
@@ -24,7 +24,7 @@ pub struct HitTestResult {
     pub y_in_cell: f32,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HitArea {
     Cell,                    // regular cell background / padding
     CellText,                // text content inside the cell
@@ -35,6 +35,7 @@ pub enum HitArea {
     FixedCorner,             // top-left fixed corner
     IndicatorColTop,         // top column indicator band
     IndicatorRowStart,       // start row indicator band
+    IndicatorRowStartResize, // right edge of start row indicator band
     IndicatorCornerTopStart, // top-start indicator corner
     ColBorder,               // between column headers (resize)
     RowBorder,               // between row headers (resize)
@@ -99,6 +100,22 @@ fn header_resize_hit_half_width(grid: &VolvoxGrid) -> i32 {
     let w = grid.style.header_resize_handle.hit_width_px.max(1);
     // Symmetric tolerance around the border center line.
     (w + 1) / 2
+}
+
+fn col_resize_enabled(grid: &VolvoxGrid) -> bool {
+    matches!(grid.allow_user_resizing, 1 | 3 | 4 | 6)
+}
+
+fn row_resize_enabled(grid: &VolvoxGrid) -> bool {
+    matches!(grid.allow_user_resizing, 2 | 3 | 5 | 6)
+}
+
+fn row_start_indicator_width_resize_hit(grid: &VolvoxGrid, px: i32, data_x: i32) -> bool {
+    if !grid.indicator_bands.row_start.visible || !grid.indicator_bands.row_start.allow_resize {
+        return false;
+    }
+    let hit_half = header_resize_hit_half_width(grid).max(1);
+    px >= (data_x - hit_half).max(0) && px < data_x
 }
 
 fn type_ahead_delay_ms(grid: &VolvoxGrid) -> u128 {
@@ -236,26 +253,100 @@ pub fn apply_node_toggle_after_before(grid: &mut VolvoxGrid, row: i32, collapse:
     if row < grid.fixed_rows || row >= grid.rows {
         return;
     }
+    if let Some(node_id) = grid.tree.node_id_at_row(grid.fixed_rows, row) {
+        let node_id = node_id.to_string();
+        if !collapse
+            && grid.tree.row_children_state(grid.fixed_rows, row)
+                == Some(pb::NodeChildrenState::NodeChildrenUnloaded as i32)
+        {
+            let request_id = grid.next_tree_request_id();
+            grid.events.push(GridEventData::TreeChildrenRequested {
+                node_id,
+                row,
+                request_id,
+            });
+            return;
+        }
+        let grid_id = grid.id;
+        let result = if collapse {
+            let request = pb::CollapseNodesRequest {
+                grid_id,
+                node_ids: vec![node_id.clone()],
+                recursive: false,
+            };
+            crate::tree::collapse_nodes(grid, request).map(|_| ())
+        } else {
+            let request = pb::ExpandNodesRequest {
+                grid_id,
+                node_ids: vec![node_id.clone()],
+                recursive: false,
+            };
+            crate::tree::expand_nodes(grid, request).map(|_| ())
+        };
+        match result {
+            Ok(()) => {
+                grid.events.push(GridEventData::AfterTreeNodeToggle {
+                    node_id,
+                    row,
+                    collapse,
+                });
+                if collapse {
+                    normalize_selection_to_visible_row(grid, row);
+                }
+                grid.mark_dirty();
+            }
+            Err(err) => {
+                normalize_selection_to_visible_row(grid, row);
+                grid.mark_dirty();
+                grid.events.push(GridEventData::Error {
+                    code: crate::tree::error_code(&err),
+                    message: err.to_string(),
+                });
+            }
+        }
+        return;
+    }
     crate::outline::toggle_collapse(grid, row);
+    if collapse {
+        normalize_selection_to_visible_row(grid, row);
+    }
     grid.events
         .push(GridEventData::AfterNodeToggle { row, collapse });
     grid.mark_dirty();
 }
 
 pub fn begin_user_resize_after_before(grid: &mut VolvoxGrid, row: i32, col: i32, start_pos: f32) {
-    if col >= 0 && col < grid.cols && matches!(grid.allow_user_resizing, 1 | 3 | 4 | 6) {
+    if col >= 0 && col < grid.cols && col_resize_enabled(grid) {
         grid.resize_active = true;
         grid.resize_is_col = true;
         grid.resize_index = col;
         grid.resize_start_pos = start_pos;
         grid.resize_start_size = grid.get_col_width(col);
-    } else if row >= 0 && row < grid.rows && matches!(grid.allow_user_resizing, 2 | 3 | 5 | 6) {
+    } else if row >= 0 && row < grid.rows && row_resize_enabled(grid) {
         grid.resize_active = true;
         grid.resize_is_col = false;
         grid.resize_index = row;
         grid.resize_start_pos = start_pos;
         grid.resize_start_size = grid.get_row_height(row);
     }
+}
+
+pub fn begin_row_start_indicator_width_resize(grid: &mut VolvoxGrid, start_pos: f32) {
+    if !grid.indicator_bands.row_start.visible || !grid.indicator_bands.row_start.allow_resize {
+        return;
+    }
+    grid.resize_active = true;
+    grid.resize_is_col = true;
+    grid.resize_index = -1;
+    grid.resize_start_pos = start_pos;
+    grid.resize_start_size = grid.indicator_bands.row_start.resolved_width_px();
+}
+
+fn set_row_start_indicator_width(grid: &mut VolvoxGrid, width_px: i32) {
+    let width_px = width_px.max(1);
+    grid.indicator_bands.row_start.width_px = width_px;
+    grid.indicator_bands.row_start.auto_size = false;
+    grid.indicator_bands.row_start.fit_slots_to_width();
 }
 
 pub fn apply_move_column_after_before(grid: &mut VolvoxGrid, col: i32, new_position: i32) -> bool {
@@ -618,6 +709,93 @@ fn move_selection_after_edit_commit(grid: &mut VolvoxGrid, row: i32, col: i32) {
     }
 }
 
+fn row_can_receive_focus(grid: &VolvoxGrid, row: i32) -> bool {
+    row >= grid.fixed_rows && row < grid.rows && !grid.is_row_hidden(row)
+}
+
+fn visible_focus_row_at_or_after(grid: &VolvoxGrid, row: i32) -> Option<i32> {
+    if grid.rows <= 0 {
+        return None;
+    }
+    let start = row.clamp(grid.fixed_rows, grid.rows - 1);
+    (start..grid.rows).find(|&candidate| row_can_receive_focus(grid, candidate))
+}
+
+fn visible_focus_row_at_or_before(grid: &VolvoxGrid, row: i32) -> Option<i32> {
+    if grid.rows <= 0 {
+        return None;
+    }
+    let start = row.clamp(grid.fixed_rows, grid.rows - 1);
+    (grid.fixed_rows..=start)
+        .rev()
+        .find(|&candidate| row_can_receive_focus(grid, candidate))
+}
+
+fn nearest_visible_focus_row(grid: &VolvoxGrid, row: i32, prefer_after: bool) -> Option<i32> {
+    if prefer_after {
+        visible_focus_row_at_or_after(grid, row)
+            .or_else(|| visible_focus_row_at_or_before(grid, row))
+    } else {
+        visible_focus_row_at_or_before(grid, row)
+            .or_else(|| visible_focus_row_at_or_after(grid, row))
+    }
+}
+
+fn visible_focus_row_with_delta(grid: &VolvoxGrid, row: i32, delta: i32) -> i32 {
+    if delta == 0 {
+        return nearest_visible_focus_row(grid, row, true).unwrap_or(row);
+    }
+
+    let prefer_after = delta > 0;
+    let starts_on_visible_row = row_can_receive_focus(grid, row);
+    let Some(mut current) = nearest_visible_focus_row(grid, row, prefer_after) else {
+        return row;
+    };
+
+    let steps = if starts_on_visible_row {
+        delta.unsigned_abs()
+    } else {
+        delta.unsigned_abs().saturating_sub(1)
+    };
+    for _ in 0..steps {
+        let next = if delta > 0 {
+            current
+                .checked_add(1)
+                .and_then(|next_row| visible_focus_row_at_or_after(grid, next_row))
+        } else {
+            current
+                .checked_sub(1)
+                .and_then(|next_row| visible_focus_row_at_or_before(grid, next_row))
+        };
+        let Some(next) = next else {
+            break;
+        };
+        current = next;
+    }
+
+    current
+}
+
+fn normalize_selection_to_visible_row(grid: &mut VolvoxGrid, fallback_row: i32) {
+    if grid.rows <= 0 || grid.cols <= 0 {
+        return;
+    }
+    if row_can_receive_focus(grid, grid.selection.row) {
+        return;
+    }
+    let row = nearest_visible_focus_row(grid, fallback_row, false)
+        .unwrap_or_else(|| grid.fixed_rows.min(grid.rows - 1));
+    let col = grid.selection.col;
+    grid.selection.set_cursor(
+        row,
+        col,
+        grid.rows,
+        grid.cols,
+        grid.fixed_rows,
+        grid.fixed_cols,
+    );
+}
+
 fn set_fast_scroll_target_row(grid: &mut VolvoxGrid, target: i32, force: bool) {
     if grid.rows <= 0 {
         return;
@@ -854,6 +1032,223 @@ fn point_in_rect(px: i32, py: i32, rect: (i32, i32, i32, i32)) -> bool {
     px >= rx && px < rx + rw && py >= ry && py < ry + rh
 }
 
+fn first_subtotal_level(grid: &VolvoxGrid) -> i32 {
+    grid.row_props
+        .values()
+        .filter(|rp| rp.is_subtotal)
+        .map(|rp| rp.outline_level)
+        .filter(|level| *level > 0)
+        .min()
+        .unwrap_or(0)
+}
+
+fn subtotal_visual_level(level: i32, is_subtotal: bool, subtotal_level_floor: i32) -> i32 {
+    if is_subtotal {
+        if level < 0 {
+            0
+        } else {
+            (level - subtotal_level_floor + 1).max(1)
+        }
+    } else {
+        (2 - subtotal_level_floor).max(1)
+    }
+}
+
+fn outline_visual_depth(grid: &VolvoxGrid, row: i32) -> Option<i32> {
+    if let Some(level) = grid.tree.row_level(grid.fixed_rows, row) {
+        return Some(level.max(0));
+    }
+    let rp = grid.get_row_props(row)?;
+    let has_subtotal_nodes = grid.row_props.values().any(|props| props.is_subtotal);
+    if has_subtotal_nodes {
+        Some(
+            (subtotal_visual_level(rp.outline_level, rp.is_subtotal, first_subtotal_level(grid))
+                - 1)
+            .max(0),
+        )
+    } else {
+        Some(crate::outline::outline_visual_depth_for_level(
+            grid,
+            rp.outline_level,
+        ))
+    }
+}
+
+fn outline_row_has_children(grid: &VolvoxGrid, row: i32) -> bool {
+    if grid.tree.node_id_at_row(grid.fixed_rows, row).is_some() {
+        return grid.tree.row_has_children(grid.fixed_rows, row);
+    }
+    let Some(rp) = grid.get_row_props(row) else {
+        return false;
+    };
+    rp.is_subtotal || crate::outline::get_node(grid, row).3 > 0
+}
+
+fn row_start_has_expander_slot(grid: &VolvoxGrid) -> bool {
+    grid.indicator_bands.row_start.visible
+        && grid.indicator_bands.row_start.slots.iter().any(|slot| {
+            slot.visible && slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
+        })
+        && grid.outline.tree_indicator != pb::TreeIndicatorStyle::TreeIndicatorNone as i32
+}
+
+pub fn selected_row_uses_outline_expander(grid: &VolvoxGrid) -> bool {
+    let row = grid.selection.row;
+    row >= grid.fixed_rows && row < grid.rows && row_start_has_expander_slot(grid)
+}
+
+pub fn selected_outline_label_keyboard_target(grid: &VolvoxGrid) -> Option<(i32, i32)> {
+    let row = grid.selection.row;
+    if !grid.is_tui_mode() || !selected_row_uses_outline_expander(grid) {
+        return None;
+    }
+    let col = grid.outline.label_column;
+    if col < 0 || col >= grid.cols || !grid.is_col_hidden(col) {
+        return None;
+    }
+    if grid.selection.col != col {
+        return None;
+    }
+    Some((row, col))
+}
+
+pub fn selected_outline_node_toggle_target(grid: &VolvoxGrid) -> Option<(i32, bool)> {
+    let (row, _) = selected_outline_label_keyboard_target(grid)?;
+    if !outline_row_has_children(grid, row) {
+        return None;
+    }
+    let collapse = !grid.row_props.get(&row).map_or(false, |rp| rp.is_collapsed);
+    Some((row, collapse))
+}
+
+pub fn selected_outline_label_edit_target(grid: &VolvoxGrid) -> Option<(i32, i32)> {
+    let (row, col) = selected_outline_label_keyboard_target(grid)?;
+    if !grid.can_begin_edit(row, col, false) {
+        return None;
+    }
+    Some((row, col))
+}
+
+pub fn toggle_selected_outline_node(grid: &mut VolvoxGrid) -> bool {
+    let Some((row, collapse)) = selected_outline_node_toggle_target(grid) else {
+        return false;
+    };
+    if let Some(node_id) = grid.tree.node_id_at_row(grid.fixed_rows, row) {
+        grid.events.push(GridEventData::BeforeTreeNodeToggle {
+            node_id: node_id.to_string(),
+            row,
+            collapse,
+        });
+    } else {
+        grid.events
+            .push(GridEventData::BeforeNodeToggle { row, collapse });
+    }
+    apply_node_toggle_after_before(grid, row, collapse);
+    true
+}
+
+fn tree_style_draws_connectors(grid: &VolvoxGrid) -> bool {
+    grid.outline.tree_indicator == pb::TreeIndicatorStyle::TreeIndicatorConnectors as i32
+        || grid.outline.tree_indicator == pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32
+}
+
+fn row_indicator_expander_toggle_hit(
+    grid: &VolvoxGrid,
+    vp: &VisibleRange,
+    row: i32,
+    px: i32,
+) -> bool {
+    if !outline_row_has_children(grid, row) {
+        return false;
+    }
+    let band = &grid.indicator_bands.row_start;
+    let visible_slot_count = band.slots.iter().filter(|slot| slot.visible).count();
+    let mut slot_x = 0;
+    for slot in band.slots.iter().filter(|slot| slot.visible) {
+        let remaining = (vp.data_x - slot_x).max(0);
+        if remaining <= 0 {
+            break;
+        }
+        let slot_w = if visible_slot_count == 1 {
+            remaining
+        } else {
+            slot.width_px.max(1).min(remaining)
+        };
+        if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32 {
+            let depth = outline_visual_depth(grid, row).unwrap_or(0);
+            if grid.is_tui_mode() && tree_style_draws_connectors(grid) {
+                let branch_x = if depth > 0 { (depth - 1) * 4 } else { 0 };
+                let hit_start = (slot_x + branch_x).clamp(slot_x, slot_x + slot_w);
+                let hit_end = (hit_start + if depth > 0 { 4 } else { 2 }).min(slot_x + slot_w);
+                return px >= hit_start && px < hit_end.max(hit_start + 1);
+            }
+
+            let tg = crate::outline::TreeGeometry::from_grid(grid);
+            let indent_x = (slot_x + depth * tg.indent_step).min(slot_x + slot_w - 1);
+            let toggle_size = tg.btn_size.max(1);
+            let bx = (indent_x + tg.line_offset - toggle_size / 2)
+                .clamp(slot_x, (slot_x + slot_w - toggle_size).max(slot_x));
+            return px >= bx && px < bx + toggle_size;
+        }
+        slot_x += slot_w;
+    }
+    false
+}
+
+fn corner_outline_level_hit(grid: &VolvoxGrid, px: i32, width: i32) -> Option<i32> {
+    let corner = &grid.indicator_bands.corner_top_start;
+    if !grid.outline.show_level_buttons || !corner.visible || corner.slots.is_empty() {
+        return None;
+    }
+    let visible_slot_count = corner.slots.iter().filter(|slot| slot.visible).count();
+    let mut slot_x = 0;
+    for slot in corner.slots.iter().filter(|slot| slot.visible) {
+        let remaining = (width - slot_x).max(0);
+        if remaining <= 0 {
+            break;
+        }
+        let slot_w = if visible_slot_count == 1 {
+            remaining
+        } else if slot.width_px > 0 {
+            slot.width_px.min(remaining)
+        } else if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 {
+            let button_count = crate::outline::outline_level_button_count(grid);
+            crate::outline::outline_level_button_step(grid, remaining)
+                .saturating_mul(button_count)
+                .min(remaining)
+        } else {
+            remaining
+        };
+        if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 {
+            let min_level = crate::outline::outline_level_button_min(grid);
+            let max_level = crate::outline::outline_level_button_max(grid);
+            if max_level < min_level || px < slot_x || px >= slot_x + slot_w {
+                return None;
+            }
+            let step = crate::outline::outline_level_button_step(grid, slot_w).max(1);
+            let button_idx = (px - slot_x) / step;
+            let level = min_level + button_idx;
+            return (level >= min_level && level <= max_level).then_some(level);
+        }
+        slot_x += slot_w;
+    }
+    None
+}
+
+fn corner_outline_level_hit_from_result(
+    grid: &VolvoxGrid,
+    hit: &HitTestResult,
+    px: f32,
+) -> Option<i32> {
+    if hit.area != HitArea::IndicatorCornerTopStart {
+        return None;
+    }
+    if !grid.indicator_bands.corner_top_start.visible {
+        return None;
+    }
+    corner_outline_level_hit(grid, px as i32, grid.indicator_bands.start_width())
+}
+
 fn parse_png_dimensions(data: &[u8]) -> Option<(i32, i32)> {
     if data.len() < 24 || &data[0..8] != b"\x89PNG\r\n\x1a\n" || &data[12..16] != b"IHDR" {
         return None;
@@ -1054,6 +1449,885 @@ fn resolved_click_interaction(grid: &VolvoxGrid, row: i32, col: i32) -> i32 {
     }
 }
 
+fn is_background_target(target: &EventTarget) -> bool {
+    target.kind == pb::GridTargetKind::GridTargetBackground as i32
+}
+
+fn row_indicator_slot_at(grid: &VolvoxGrid, local_x: i32, width: i32) -> (i32, i32, String) {
+    let band = &grid.indicator_bands.row_start;
+    let visible_slot_count = band.slots.iter().filter(|slot| slot.visible).count();
+    let mut slot_x = 0;
+    for (slot_index, slot) in band
+        .slots
+        .iter()
+        .enumerate()
+        .filter(|(_, slot)| slot.visible)
+    {
+        let remaining = (width - slot_x).max(0);
+        if remaining <= 0 {
+            break;
+        }
+        let slot_w = if visible_slot_count == 1 {
+            remaining
+        } else {
+            slot.width_px.max(1).min(remaining)
+        };
+        if local_x >= slot_x && local_x < slot_x + slot_w {
+            return (slot_index as i32, slot.kind, slot.custom_key.clone());
+        }
+        slot_x += slot_w;
+    }
+    (-1, 0, String::new())
+}
+
+fn corner_indicator_slot_at(grid: &VolvoxGrid, local_x: i32, width: i32) -> (i32, i32, String) {
+    let corner = &grid.indicator_bands.corner_top_start;
+    if corner.slots.is_empty() {
+        let slot_kind = if grid.selection.allow_selection {
+            pb::CornerIndicatorSlotKind::CornerSlotSelectAll as i32
+        } else {
+            0
+        };
+        return (-1, slot_kind, corner.custom_key.clone());
+    }
+
+    let visible_slot_count = corner.slots.iter().filter(|slot| slot.visible).count();
+    let mut slot_x = 0;
+    for (slot_index, slot) in corner
+        .slots
+        .iter()
+        .enumerate()
+        .filter(|(_, slot)| slot.visible)
+    {
+        let remaining = (width - slot_x).max(0);
+        if remaining <= 0 {
+            break;
+        }
+        let slot_w = if visible_slot_count == 1 {
+            remaining
+        } else if slot.width_px > 0 {
+            slot.width_px.min(remaining)
+        } else if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 {
+            let button_count = crate::outline::outline_level_button_count(grid);
+            crate::outline::outline_level_button_step(grid, remaining)
+                .saturating_mul(button_count)
+                .min(remaining)
+        } else {
+            remaining
+        };
+        if local_x >= slot_x && local_x < slot_x + slot_w {
+            return (slot_index as i32, slot.kind, slot.custom_key.clone());
+        }
+        slot_x += slot_w;
+    }
+    (-1, 0, String::new())
+}
+
+fn col_indicator_row_for_y(
+    band: &crate::indicator::ColIndicatorState,
+    local_y: i32,
+) -> Option<i32> {
+    let row_count = band.row_count().max(1);
+    let mut y = 0;
+    for row in 0..row_count {
+        let h = band.row_height_px(row).max(1);
+        if local_y >= y && local_y < y + h {
+            return Some(row);
+        }
+        y += h;
+    }
+    None
+}
+
+fn col_indicator_cell_height(
+    band: &crate::indicator::ColIndicatorState,
+    row1: i32,
+    row2: i32,
+) -> i32 {
+    let row1 = row1.max(0);
+    let row2 = row2.max(row1);
+    (row1..=row2)
+        .map(|row| band.row_height_px(row).max(1))
+        .sum()
+}
+
+fn col_indicator_sort_arrow_box_size(cell_h: i32, scale: f32) -> i32 {
+    let scale = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    };
+    let logical_h = if scale > 1.001 {
+        ((cell_h as f32) / scale).round() as i32
+    } else {
+        cell_h
+    };
+    let logical_box = logical_h.saturating_sub(6).clamp(8, 16);
+    let device_box = if scale > 1.001 {
+        ((logical_box as f32) * scale).round() as i32
+    } else {
+        logical_box
+    };
+    device_box.min(cell_h.saturating_sub(2).max(0))
+}
+
+fn col_indicator_sub_mode_bits(
+    grid: &VolvoxGrid,
+    col: i32,
+    mode_bits: u32,
+    cell_height: i32,
+    x_in_col: f32,
+) -> u32 {
+    if col < 0 || col >= grid.cols {
+        return 0;
+    }
+    let sort_mode = pb::ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32;
+    if mode_bits & sort_mode != 0 && grid.header_features & 1 != 0 {
+        let (_, _, col_w, _) = grid.layout.cell_rect(0, col);
+        let glyph_box =
+            col_indicator_sort_arrow_box_size(cell_height, grid.scale).min((col_w - 4).max(0));
+        if glyph_box >= 6 {
+            let glyph_x = (col_w - glyph_box - 4).max(2);
+            let x = x_in_col as i32;
+            if x >= glyph_x && x < glyph_x + glyph_box {
+                return sort_mode;
+            }
+        }
+    }
+    0
+}
+
+fn col_indicator_target_for_hit(grid: &VolvoxGrid, hit: &HitTestResult) -> EventTarget {
+    let band = &grid.indicator_bands.col_top;
+    let local_y = hit.y_in_cell as i32;
+    let indicator_row = col_indicator_row_for_y(band, local_y).unwrap_or(0);
+    for (slot_index, cell) in band.cells.iter().enumerate() {
+        if hit.col < cell.col1
+            || hit.col > cell.col2.max(cell.col1)
+            || indicator_row < cell.row1
+            || indicator_row > cell.row2.max(cell.row1)
+        {
+            continue;
+        }
+        let mode_bits = if cell.mode_bits != 0 {
+            cell.mode_bits
+        } else {
+            band.mode_bits
+        };
+        let cell_height = col_indicator_cell_height(band, cell.row1, cell.row2);
+        let sub_mode_bits =
+            col_indicator_sub_mode_bits(grid, hit.col, mode_bits, cell_height, hit.x_in_cell);
+        let slot_kind = if sub_mode_bits != 0 {
+            sub_mode_bits as i32
+        } else if mode_bits & (pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32) != 0 {
+            pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32
+        } else {
+            mode_bits as i32
+        };
+        let cell_data = cell.data.clone();
+        return EventTarget {
+            kind: pb::GridTargetKind::GridTargetColIndicator as i32,
+            band: pb::IndicatorBand::ColTop as i32,
+            slot_index: slot_index as i32,
+            slot_kind,
+            sub_mode_bits,
+            custom_key: cell.custom_key.clone(),
+            data: cell_data,
+            ..EventTarget::default()
+        };
+    }
+
+    let slot_kind = if band.has_mode(pb::ColIndicatorCellMode::ColIndicatorCellHeaderText) {
+        pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32
+    } else {
+        band.mode_bits as i32
+    };
+    EventTarget {
+        kind: pb::GridTargetKind::GridTargetColIndicator as i32,
+        band: pb::IndicatorBand::ColTop as i32,
+        slot_index: -1,
+        slot_kind,
+        sub_mode_bits: 0,
+        custom_key: String::new(),
+        ..EventTarget::default()
+    }
+}
+
+fn row_in_any_selection(grid: &VolvoxGrid, row: i32) -> bool {
+    if row == grid.selection.row {
+        return true;
+    }
+    grid.selection
+        .all_ranges(grid.rows, grid.cols)
+        .iter()
+        .any(|&(r1, _, r2, _)| row >= r1 && row <= r2)
+}
+
+fn enrich_row_indicator_target(grid: &VolvoxGrid, row: i32, target: &mut EventTarget) {
+    use pb::GridEventTargetFlag as Flag;
+    use pb::RowIndicatorSlotKind as Kind;
+
+    if target.slot_index >= 0 {
+        if let Some(slot) = grid
+            .indicator_bands
+            .row_start
+            .slots
+            .get(target.slot_index as usize)
+        {
+            if !slot.data.is_empty() {
+                target.data = slot.data.clone();
+            }
+        }
+    }
+
+    if row < 0 {
+        return;
+    }
+
+    let kind = target.slot_kind;
+    if kind == Kind::RowIndicatorSlotNumbers as i32 {
+        let n = (row - grid.fixed_rows + 1).max(1);
+        target.text = n.to_string();
+        target.int_value = n as i64;
+        if row == grid.selection.row {
+            target.status_flags |= Flag::GridTargetFlagSelected as u32;
+        }
+    } else if kind == Kind::RowIndicatorSlotCurrent as i32 {
+        if row == grid.selection.row {
+            target.status_flags |= Flag::GridTargetFlagSelected as u32;
+        }
+    } else if kind == Kind::RowIndicatorSlotSelection as i32 {
+        if row_in_any_selection(grid, row) {
+            target.status_flags |= Flag::GridTargetFlagSelected as u32;
+        }
+    } else if kind == Kind::RowIndicatorSlotCheckbox as i32 {
+        if row_in_any_selection(grid, row) {
+            target.status_flags |= Flag::GridTargetFlagChecked as u32;
+        }
+    } else if kind == Kind::RowIndicatorSlotEditing as i32 {
+        if grid.edit.is_active() && grid.edit.edit_row == row {
+            target.status_flags |= Flag::GridTargetFlagEditing as u32;
+        }
+    } else if kind == Kind::RowIndicatorSlotExpander as i32 {
+        if let Some(rp) = grid.row_props.get(&row) {
+            target.int_value = rp.outline_level as i64;
+            if rp.is_collapsed {
+                target.status_flags |= Flag::GridTargetFlagCollapsed as u32;
+            } else {
+                target.status_flags |= Flag::GridTargetFlagExpanded as u32;
+            }
+            if rp.is_subtotal {
+                target.status_flags |= Flag::GridTargetFlagSubtotal as u32;
+            }
+        } else {
+            target.status_flags |= Flag::GridTargetFlagExpanded as u32;
+        }
+        if grid.outline.label_column >= 0 && grid.outline.label_column < grid.cols {
+            target.text = grid.get_display_text(row, grid.outline.label_column);
+        }
+    } else if kind == Kind::RowIndicatorSlotStatusIcon as i32 {
+        if let Some(status) = grid.get_row_status(row) {
+            target.text = status.domain.clone();
+            target.int_value = status.code as i64;
+        }
+    }
+
+    if let Some(rp) = grid.row_props.get(&row) {
+        if rp.pin != 0 {
+            target.status_flags |= Flag::GridTargetFlagPinned as u32;
+        }
+    }
+}
+
+fn enrich_col_indicator_target(grid: &VolvoxGrid, col: i32, target: &mut EventTarget) {
+    use crate::sort;
+    use pb::ColIndicatorCellMode as Mode;
+    use pb::GridEventTargetFlag as Flag;
+
+    if col < 0 || col >= grid.cols {
+        return;
+    }
+
+    let kind = target.slot_kind;
+    let is_sort_glyph = kind == Mode::ColIndicatorCellSortGlyph as i32
+        || (target.sub_mode_bits & Mode::ColIndicatorCellSortGlyph as u32 != 0);
+
+    if kind == Mode::ColIndicatorCellHeaderText as i32 && grid.fixed_rows > 0 {
+        target.text = grid.get_display_text(0, col);
+    }
+
+    if is_sort_glyph {
+        for (idx, &(sort_col, order)) in grid.sort_state.sort_keys.iter().enumerate() {
+            if sort_col == col {
+                target.int_value = (idx + 1) as i64;
+                let asc = matches!(
+                    order,
+                    sort::SORT_ASCENDING_AUTO
+                        | sort::SORT_ASCENDING_NUMERIC
+                        | sort::SORT_ASCENDING_STRING_NO_CASE
+                        | sort::SORT_ASCENDING_STRING
+                        | sort::SORT_ASCENDING_CUSTOM
+                );
+                target.status_flags |= if asc {
+                    Flag::GridTargetFlagSortAsc as u32
+                } else {
+                    Flag::GridTargetFlagSortDesc as u32
+                };
+                break;
+            }
+        }
+    }
+}
+
+fn enrich_corner_indicator_target(
+    grid: &VolvoxGrid,
+    hit: &HitTestResult,
+    target: &mut EventTarget,
+) {
+    use pb::CornerIndicatorSlotKind as Kind;
+    use pb::GridEventTargetFlag as Flag;
+
+    if target.slot_index >= 0 {
+        if let Some(slot) = grid
+            .indicator_bands
+            .corner_top_start
+            .slots
+            .get(target.slot_index as usize)
+        {
+            if !slot.data.is_empty() {
+                target.data = slot.data.clone();
+            }
+            if target.text.is_empty() && !slot.label_text.is_empty() {
+                target.text = slot.label_text.clone();
+            }
+        }
+    }
+
+    if target.slot_kind == Kind::CornerSlotSelectAll as i32 {
+        let rows = grid.rows;
+        let cols = grid.cols;
+        if rows > 0 && cols > 0 {
+            let all_selected = grid
+                .selection
+                .all_ranges(rows, cols)
+                .iter()
+                .any(|&(r1, c1, r2, c2)| r1 <= 0 && c1 <= 0 && r2 >= rows - 1 && c2 >= cols - 1);
+            if all_selected {
+                target.status_flags |= Flag::GridTargetFlagSelected as u32;
+            }
+        }
+    } else if target.slot_kind == Kind::CornerSlotOutlineLevels as i32 {
+        if let Some(level) = corner_outline_level_hit(
+            grid,
+            hit.x_in_cell as i32,
+            grid.indicator_bands.start_width(),
+        ) {
+            target.text = level.to_string();
+            target.int_value = level as i64;
+        } else {
+            target.int_value = -1;
+        }
+    }
+}
+
+fn enrich_data_cell_target(grid: &VolvoxGrid, row: i32, col: i32, target: &mut EventTarget) {
+    use pb::GridEventTargetFlag as Flag;
+
+    if row < 0 || col < 0 {
+        return;
+    }
+
+    if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
+        target.status_flags |= Flag::GridTargetFlagEditing as u32;
+    }
+    if grid.selection.is_selected(row, col, grid.cols) {
+        target.status_flags |= Flag::GridTargetFlagSelected as u32;
+    }
+    if let Some(rp) = grid.row_props.get(&row) {
+        if rp.pin != 0 {
+            target.status_flags |= Flag::GridTargetFlagPinned as u32;
+        }
+    }
+}
+
+fn enrich_target_value(grid: &VolvoxGrid, hit: &HitTestResult, target: &mut EventTarget) {
+    use pb::GridTargetKind as TK;
+    if target.kind == TK::GridTargetRowIndicator as i32 {
+        enrich_row_indicator_target(grid, hit.row, target);
+    } else if target.kind == TK::GridTargetColIndicator as i32 {
+        enrich_col_indicator_target(grid, hit.col, target);
+    } else if target.kind == TK::GridTargetCornerIndicator as i32 {
+        enrich_corner_indicator_target(grid, hit, target);
+    } else if target.kind == TK::GridTargetDataCell as i32 {
+        enrich_data_cell_target(grid, hit.row, hit.col, target);
+    }
+}
+
+fn indicator_control_hover_target(grid: &VolvoxGrid, target: &EventTarget) -> bool {
+    if grid.selection.hover_mode == HOVER_NONE {
+        return false;
+    }
+    if target.kind == pb::GridTargetKind::GridTargetRowIndicator as i32
+        && target.band == pb::IndicatorBand::RowStart as i32
+        && target.slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
+    {
+        return true;
+    }
+    target.kind == pb::GridTargetKind::GridTargetCornerIndicator as i32
+        && target.band == pb::IndicatorBand::CornerTopStart as i32
+        && target.slot_kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32
+        && target.int_value >= 0
+}
+
+fn target_from_hit(grid: &VolvoxGrid, hit: &HitTestResult) -> EventTarget {
+    let mut target = target_identity_from_hit(grid, hit);
+    enrich_target_value(grid, hit, &mut target);
+    target
+}
+
+fn target_identity_from_hit(grid: &VolvoxGrid, hit: &HitTestResult) -> EventTarget {
+    let vp = VisibleRange::compute(grid, grid.viewport_width, grid.viewport_height);
+    match hit.area {
+        HitArea::IndicatorRowStart => {
+            let (slot_index, slot_kind, custom_key) =
+                row_indicator_slot_at(grid, hit.x_in_cell as i32, vp.data_x);
+            EventTarget {
+                kind: pb::GridTargetKind::GridTargetRowIndicator as i32,
+                band: pb::IndicatorBand::RowStart as i32,
+                slot_index,
+                slot_kind,
+                custom_key,
+                ..EventTarget::default()
+            }
+        }
+        HitArea::IndicatorRowStartResize => EventTarget {
+            kind: pb::GridTargetKind::GridTargetRowIndicator as i32,
+            band: pb::IndicatorBand::RowStart as i32,
+            slot_kind: pb::RowIndicatorSlotKind::RowIndicatorSlotResize as i32,
+            ..EventTarget::default()
+        },
+        HitArea::OutlineButton if hit.col < 0 => {
+            let (slot_index, slot_kind, custom_key) =
+                row_indicator_slot_at(grid, hit.x_in_cell as i32, vp.data_x);
+            EventTarget {
+                kind: pb::GridTargetKind::GridTargetRowIndicator as i32,
+                band: pb::IndicatorBand::RowStart as i32,
+                slot_index,
+                slot_kind,
+                custom_key,
+                ..EventTarget::default()
+            }
+        }
+        HitArea::RowBorder if hit.col < 0 => EventTarget {
+            kind: pb::GridTargetKind::GridTargetRowIndicator as i32,
+            band: pb::IndicatorBand::RowStart as i32,
+            slot_kind: pb::RowIndicatorSlotKind::RowIndicatorSlotResize as i32,
+            ..EventTarget::default()
+        },
+        HitArea::IndicatorColTop => col_indicator_target_for_hit(grid, hit),
+        HitArea::ColBorder if hit.row < 0 => EventTarget {
+            kind: pb::GridTargetKind::GridTargetColIndicator as i32,
+            band: pb::IndicatorBand::ColTop as i32,
+            slot_kind: pb::ColIndicatorCellMode::ColIndicatorCellResizeHandle as i32,
+            sub_mode_bits: pb::ColIndicatorCellMode::ColIndicatorCellResizeHandle as u32,
+            ..EventTarget::default()
+        },
+        HitArea::IndicatorCornerTopStart => {
+            let (slot_index, slot_kind, custom_key) =
+                corner_indicator_slot_at(grid, hit.x_in_cell as i32, vp.data_x);
+            EventTarget {
+                kind: pb::GridTargetKind::GridTargetCornerIndicator as i32,
+                band: pb::IndicatorBand::CornerTopStart as i32,
+                slot_index,
+                slot_kind,
+                custom_key,
+                ..EventTarget::default()
+            }
+        }
+        HitArea::Cell
+        | HitArea::CellText
+        | HitArea::CellPicture
+        | HitArea::CellButtonPicture
+        | HitArea::FixedRow
+        | HitArea::FixedCol
+        | HitArea::FixedCorner
+        | HitArea::CheckBox
+        | HitArea::DropdownButton
+        | HitArea::OutlineButton
+        | HitArea::ColBorder
+        | HitArea::RowBorder
+            if hit.row >= 0 && hit.col >= 0 =>
+        {
+            EventTarget::data_cell()
+        }
+        _ => EventTarget::background(),
+    }
+}
+
+fn emit_pointer_move_and_hover(
+    grid: &mut VolvoxGrid,
+    hit: &HitTestResult,
+    button: i32,
+    modifier: i32,
+    x: f32,
+    y: f32,
+) {
+    let target = target_from_hit(grid, hit);
+    let next = HoverTarget {
+        row: hit.row,
+        col: hit.col,
+        target,
+    };
+    if grid.last_hover_target.as_ref() == Some(&next) {
+        return;
+    }
+    let repaint_indicator_hover = grid
+        .last_hover_target
+        .as_ref()
+        .is_some_and(|prev| indicator_control_hover_target(grid, &prev.target))
+        || indicator_control_hover_target(grid, &next.target);
+    if let Some(prev) = grid.last_hover_target.replace(next.clone()) {
+        grid.events.push(GridEventData::LeaveCell {
+            row: prev.row,
+            col: prev.col,
+            target: prev.target,
+        });
+    }
+    grid.events.push(GridEventData::MouseMove {
+        button,
+        modifier,
+        x,
+        y,
+        target: next.target.clone(),
+    });
+    grid.events.push(GridEventData::EnterCell {
+        row: next.row,
+        col: next.col,
+        target: next.target,
+    });
+    if repaint_indicator_hover {
+        grid.mark_dirty();
+    }
+}
+
+fn first_visible_row_indicator_slot(grid: &VolvoxGrid) -> i32 {
+    grid.indicator_bands
+        .row_start
+        .slots
+        .iter()
+        .position(|slot| slot.visible)
+        .map(|index| index as i32)
+        .unwrap_or(-1)
+}
+
+fn first_visible_corner_indicator_slot(grid: &VolvoxGrid) -> i32 {
+    grid.indicator_bands
+        .corner_top_start
+        .slots
+        .iter()
+        .position(|slot| slot.visible)
+        .map(|index| index as i32)
+        .unwrap_or(-1)
+}
+
+fn next_visible_row_indicator_slot(grid: &VolvoxGrid, current: i32, delta: i32) -> i32 {
+    let slots: Vec<i32> = grid
+        .indicator_bands
+        .row_start
+        .slots
+        .iter()
+        .enumerate()
+        .filter_map(|(index, slot)| slot.visible.then_some(index as i32))
+        .collect();
+    next_visible_slot_index(&slots, current, delta)
+}
+
+fn next_visible_corner_indicator_slot(grid: &VolvoxGrid, current: i32, delta: i32) -> i32 {
+    let slots: Vec<i32> = grid
+        .indicator_bands
+        .corner_top_start
+        .slots
+        .iter()
+        .enumerate()
+        .filter_map(|(index, slot)| slot.visible.then_some(index as i32))
+        .collect();
+    next_visible_slot_index(&slots, current, delta)
+}
+
+fn next_visible_slot_index(slots: &[i32], current: i32, delta: i32) -> i32 {
+    if slots.is_empty() {
+        return -1;
+    }
+    let current_pos = slots
+        .iter()
+        .position(|slot| *slot == current)
+        .unwrap_or(if delta < 0 { slots.len() - 1 } else { 0 });
+    let next_pos = if delta < 0 {
+        current_pos.saturating_sub(1)
+    } else {
+        (current_pos + 1).min(slots.len() - 1)
+    };
+    slots[next_pos]
+}
+
+fn col_indicator_slot_for_col(grid: &VolvoxGrid, col: i32) -> i32 {
+    grid.indicator_bands
+        .col_top
+        .cells
+        .iter()
+        .position(|cell| {
+            col >= cell.col1
+                && col <= cell.col2.max(cell.col1)
+                && cell.row1 <= 0
+                && cell.row2.max(cell.row1) >= 0
+        })
+        .map(|index| index as i32)
+        .unwrap_or(-1)
+}
+
+fn indicator_focus_order(grid: &VolvoxGrid) -> Vec<i32> {
+    let mut order = Vec::new();
+    if grid.indicator_bands.row_start.visible {
+        order.push(pb::IndicatorBand::RowStart as i32);
+    }
+    if grid.indicator_bands.col_top.visible {
+        order.push(pb::IndicatorBand::ColTop as i32);
+    }
+    if grid.indicator_bands.corner_top_start.visible {
+        order.push(pb::IndicatorBand::CornerTopStart as i32);
+    }
+    order
+}
+
+fn active_indicator_for_band(grid: &VolvoxGrid, band: i32) -> ActiveIndicatorTarget {
+    if band == pb::IndicatorBand::RowStart as i32 {
+        let row = grid.selection.row.clamp(0, grid.rows - 1);
+        ActiveIndicatorTarget {
+            band,
+            row,
+            col: -1,
+            slot_index: first_visible_row_indicator_slot(grid),
+        }
+    } else if band == pb::IndicatorBand::ColTop as i32 {
+        let col = grid.selection.col.clamp(0, grid.cols - 1);
+        ActiveIndicatorTarget {
+            band,
+            row: -1,
+            col,
+            slot_index: col_indicator_slot_for_col(grid, col),
+        }
+    } else {
+        ActiveIndicatorTarget {
+            band,
+            row: -1,
+            col: -1,
+            slot_index: first_visible_corner_indicator_slot(grid),
+        }
+    }
+}
+
+fn cycle_indicator_focus(grid: &mut VolvoxGrid) {
+    let order = indicator_focus_order(grid);
+    if order.is_empty() {
+        grid.active_indicator = None;
+        return;
+    }
+    let Some(active) = &grid.active_indicator else {
+        grid.active_indicator = Some(active_indicator_for_band(grid, order[0]));
+        return;
+    };
+    let Some(current_pos) = order.iter().position(|band| *band == active.band) else {
+        grid.active_indicator = Some(active_indicator_for_band(grid, order[0]));
+        return;
+    };
+    if current_pos + 1 >= order.len() {
+        grid.active_indicator = None;
+    } else {
+        grid.active_indicator = Some(active_indicator_for_band(grid, order[current_pos + 1]));
+    }
+}
+
+fn target_from_active_indicator(grid: &VolvoxGrid, active: &ActiveIndicatorTarget) -> EventTarget {
+    if active.band == pb::IndicatorBand::RowStart as i32 {
+        let mut target = EventTarget {
+            kind: pb::GridTargetKind::GridTargetRowIndicator as i32,
+            band: active.band,
+            slot_index: active.slot_index,
+            ..EventTarget::default()
+        };
+        if active.slot_index >= 0 {
+            if let Some(slot) = grid
+                .indicator_bands
+                .row_start
+                .slots
+                .get(active.slot_index as usize)
+            {
+                target.slot_kind = slot.kind;
+                target.custom_key = slot.custom_key.clone();
+            }
+        }
+        return target;
+    }
+    if active.band == pb::IndicatorBand::ColTop as i32 {
+        let band = &grid.indicator_bands.col_top;
+        if active.slot_index >= 0 {
+            if let Some(cell) = band.cells.get(active.slot_index as usize) {
+                let mode_bits = if cell.mode_bits != 0 {
+                    cell.mode_bits
+                } else {
+                    band.mode_bits
+                };
+                return EventTarget {
+                    kind: pb::GridTargetKind::GridTargetColIndicator as i32,
+                    band: active.band,
+                    slot_index: active.slot_index,
+                    slot_kind: if mode_bits
+                        & (pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32)
+                        != 0
+                    {
+                        pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32
+                    } else {
+                        mode_bits as i32
+                    },
+                    custom_key: cell.custom_key.clone(),
+                    ..EventTarget::default()
+                };
+            }
+        }
+        return EventTarget {
+            kind: pb::GridTargetKind::GridTargetColIndicator as i32,
+            band: active.band,
+            slot_index: -1,
+            slot_kind: if band.has_mode(pb::ColIndicatorCellMode::ColIndicatorCellHeaderText) {
+                pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32
+            } else {
+                band.mode_bits as i32
+            },
+            ..EventTarget::default()
+        };
+    }
+    if active.band == pb::IndicatorBand::CornerTopStart as i32 {
+        let mut target = EventTarget {
+            kind: pb::GridTargetKind::GridTargetCornerIndicator as i32,
+            band: active.band,
+            slot_index: active.slot_index,
+            ..EventTarget::default()
+        };
+        if active.slot_index >= 0 {
+            if let Some(slot) = grid
+                .indicator_bands
+                .corner_top_start
+                .slots
+                .get(active.slot_index as usize)
+            {
+                target.slot_kind = slot.kind;
+                target.custom_key = slot.custom_key.clone();
+            }
+        } else if grid.selection.allow_selection {
+            target.slot_kind = pb::CornerIndicatorSlotKind::CornerSlotSelectAll as i32;
+        }
+        return target;
+    }
+    EventTarget::background()
+}
+
+fn move_active_indicator(grid: &mut VolvoxGrid, key_code: i32) {
+    let Some(mut active) = grid.active_indicator.clone() else {
+        return;
+    };
+    if active.band == pb::IndicatorBand::RowStart as i32 {
+        match key_code {
+            37 => {
+                active.slot_index = next_visible_row_indicator_slot(grid, active.slot_index, -1);
+            }
+            38 => active.row = (active.row - 1).max(0),
+            39 => {
+                active.slot_index = next_visible_row_indicator_slot(grid, active.slot_index, 1);
+            }
+            40 => active.row = (active.row + 1).min(grid.rows - 1),
+            _ => {}
+        }
+    } else if active.band == pb::IndicatorBand::ColTop as i32 {
+        match key_code {
+            37 => active.col = (active.col - 1).max(0),
+            39 => active.col = (active.col + 1).min(grid.cols - 1),
+            _ => {}
+        }
+        active.slot_index = col_indicator_slot_for_col(grid, active.col);
+    } else if active.band == pb::IndicatorBand::CornerTopStart as i32 {
+        match key_code {
+            37 => {
+                active.slot_index = next_visible_corner_indicator_slot(grid, active.slot_index, -1);
+            }
+            39 => {
+                active.slot_index = next_visible_corner_indicator_slot(grid, active.slot_index, 1);
+            }
+            _ => {}
+        }
+    }
+    grid.active_indicator = Some(active);
+}
+
+fn activate_indicator_target(grid: &mut VolvoxGrid, behavior: InputBehavior) {
+    let Some(active) = grid.active_indicator.clone() else {
+        return;
+    };
+    let target = target_from_active_indicator(grid, &active);
+    if behavior.allow_before_mouse_down {
+        grid.events.push(GridEventData::BeforeMouseDown {
+            row: active.row,
+            col: active.col,
+            target: target.clone(),
+        });
+    }
+    grid.events.push(GridEventData::Click {
+        row: active.row,
+        col: active.col,
+        hit_area: pb::CellHitArea::HitCell as i32,
+        interaction: pb::CellInteraction::None as i32,
+        target,
+    });
+}
+
+fn handle_indicator_keyboard_focus(
+    grid: &mut VolvoxGrid,
+    key_code: i32,
+    behavior: InputBehavior,
+) -> bool {
+    if !grid.indicator_focus_enabled {
+        grid.active_indicator = None;
+        return false;
+    }
+
+    if key_code == grid.indicator_focus_enter_key_code {
+        cycle_indicator_focus(grid);
+        grid.mark_dirty();
+        return true;
+    }
+
+    if grid.active_indicator.is_none() {
+        return false;
+    }
+
+    if key_code == grid.indicator_focus_exit_key_code {
+        grid.active_indicator = None;
+        grid.mark_dirty();
+        return true;
+    }
+
+    match key_code {
+        37 | 38 | 39 | 40 => {
+            move_active_indicator(grid, key_code);
+            grid.mark_dirty();
+        }
+        13 | 32 => {
+            activate_indicator_target(grid, behavior);
+        }
+        _ => {}
+    }
+    true
+}
+
 fn cell_hit_uses_pointer_cursor(grid: &VolvoxGrid, hit: &HitTestResult) -> bool {
     match resolved_click_interaction(grid, hit.row, hit.col) {
         x if x == pb::CellInteraction::TextLink as i32 => hit.area == HitArea::CellText,
@@ -1086,6 +2360,41 @@ fn set_dropdown_button_pressed(grid: &mut VolvoxGrid, row: i32, col: i32) -> boo
     grid.dropdown_button_pressed_row = row;
     grid.dropdown_button_pressed_col = col;
     changed
+}
+
+fn clear_outline_level_button_pressed(grid: &mut VolvoxGrid) -> bool {
+    let changed = grid.outline_level_button_pressed;
+    grid.outline_level_button_pressed = false;
+    grid.outline_level_button_pressed_level = -1;
+    grid.outline_level_button_pressed_inside = false;
+    changed
+}
+
+fn set_outline_level_button_pressed(grid: &mut VolvoxGrid, level: i32) -> bool {
+    let changed = !grid.outline_level_button_pressed
+        || grid.outline_level_button_pressed_level != level
+        || !grid.outline_level_button_pressed_inside;
+    grid.outline_level_button_pressed = true;
+    grid.outline_level_button_pressed_level = level;
+    grid.outline_level_button_pressed_inside = true;
+    changed
+}
+
+fn update_outline_level_button_pressed_inside(
+    grid: &mut VolvoxGrid,
+    hit: &HitTestResult,
+    x: f32,
+) -> bool {
+    if !grid.outline_level_button_pressed {
+        return false;
+    }
+    let inside = corner_outline_level_hit_from_result(grid, hit, x)
+        == Some(grid.outline_level_button_pressed_level);
+    if grid.outline_level_button_pressed_inside == inside {
+        return false;
+    }
+    grid.outline_level_button_pressed_inside = inside;
+    true
 }
 
 fn parse_checkbox_text(raw: &str) -> Option<bool> {
@@ -1510,6 +2819,15 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
         && py_i >= 0
         && py_i < vp.data_y
     {
+        if row_start_indicator_width_resize_hit(grid, px_i, vp.data_x) {
+            return HitTestResult {
+                row: -1,
+                col: -1,
+                area: HitArea::IndicatorRowStartResize,
+                x_in_cell: px,
+                y_in_cell: py,
+            };
+        }
         return HitTestResult {
             row: -1,
             col: -1,
@@ -1567,11 +2885,21 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
             let mut area = HitArea::IndicatorRowStart;
             let mut hit_row = row_hit.row;
             let (_, row_top, _, row_h) = layout.cell_rect(hit_row, 0);
-            if (row_hit.effective_y - (row_top + row_h)).abs() <= 3 {
+            if row_start_indicator_width_resize_hit(grid, px_i, vp.data_x) {
+                area = HitArea::IndicatorRowStartResize;
+                hit_row = -1;
+            } else if row_resize_enabled(grid)
+                && (row_hit.effective_y - (row_top + row_h)).abs() <= 3
+            {
                 area = HitArea::RowBorder;
-            } else if hit_row > 0 && (row_hit.effective_y - row_top).abs() <= 3 {
+            } else if row_resize_enabled(grid)
+                && hit_row > 0
+                && (row_hit.effective_y - row_top).abs() <= 3
+            {
                 hit_row -= 1;
                 area = HitArea::RowBorder;
+            } else if row_indicator_expander_toggle_hit(grid, &vp, hit_row, px_i) {
+                area = HitArea::OutlineButton;
             }
             return HitTestResult {
                 row: hit_row,
@@ -1640,9 +2968,9 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
             .unwrap_or_else(|| layout.cell_rect(row, col));
         let row_top = cy;
         let row_bottom = cy + ch;
-        if (effective_y - row_bottom).abs() <= 3 {
+        if row_resize_enabled(grid) && (effective_y - row_bottom).abs() <= 3 {
             HitArea::RowBorder
-        } else if row > 0 && (effective_y - row_top).abs() <= 3 {
+        } else if row_resize_enabled(grid) && row > 0 && (effective_y - row_top).abs() <= 3 {
             row -= 1;
             HitArea::RowBorder
         } else {
@@ -1711,36 +3039,6 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
         area = HitArea::CheckBox;
     }
 
-    // Outline +/- button hit-testing (geometry matches render_outline via TreeGeometry)
-    if matches!(
-        area,
-        HitArea::Cell | HitArea::CellText | HitArea::CellPicture
-    ) && grid.outline.tree_indicator != 0
-        && grid.outline.tree_column >= 0
-        && col == grid.outline.tree_column
-        && row >= grid.fixed_rows
-    {
-        if let Some(rp) = grid.get_row_props(row) {
-            // Subtotal trees render one visual level deeper than stored
-            // outline_level (root subtotal L=0 still has a clickable +/- box).
-            let visual_level = if rp.is_subtotal {
-                rp.outline_level + 1
-            } else {
-                rp.outline_level
-            };
-            if rp.is_subtotal && visual_level > 0 {
-                let tg = crate::outline::TreeGeometry::from_grid(grid);
-                let line_x = cx + tg.line_x(visual_level);
-                let mid_y = cy + ch / 2;
-                let bx = line_x - tg.btn_size / 2;
-                let by = mid_y - tg.btn_size / 2;
-                if px_i >= bx && px_i < bx + tg.btn_size && py_i >= by && py_i < by + tg.btn_size {
-                    area = HitArea::OutlineButton;
-                }
-            }
-        }
-    }
-
     HitTestResult {
         row,
         col,
@@ -1787,6 +3085,10 @@ pub fn handle_pointer_down_with_behavior(
     }
     let hit = hit_test(grid, x, y);
     if hit.area != HitArea::DropdownButton && clear_dropdown_button_pressed(grid) {
+        grid.mark_dirty();
+    }
+    let outline_level_hit = corner_outline_level_hit_from_result(grid, &hit, x);
+    if outline_level_hit.is_none() && clear_outline_level_button_pressed(grid) {
         grid.mark_dirty();
     }
 
@@ -1837,19 +3139,29 @@ pub fn handle_pointer_down_with_behavior(
         return;
     }
 
-    if dbl_click && hit.row >= 0 && hit.col >= 0 && hit.area != HitArea::DropdownList {
+    let event_target = target_from_hit(grid, &hit);
+    if event_target.kind == pb::GridTargetKind::GridTargetDataCell as i32
+        && grid.active_indicator.take().is_some()
+    {
+        grid.mark_dirty();
+    }
+    if dbl_click && !is_background_target(&event_target) && hit.area != HitArea::DropdownList {
         grid.events.push(GridEventData::DblClick {
             row: hit.row,
             col: hit.col,
+            target: event_target.clone(),
         });
     }
-    if !dbl_click && hit.row >= 0 && hit.col >= 0 && hit.area != HitArea::DropdownList {
+    if !dbl_click && !is_background_target(&event_target) && hit.area != HitArea::DropdownList {
         if behavior.allow_before_mouse_down {
             grid.events.push(GridEventData::BeforeMouseDown {
                 row: hit.row,
                 col: hit.col,
+                target: event_target,
             });
         }
+    }
+    if !dbl_click && hit.row >= 0 && hit.col >= 0 && hit.area != HitArea::DropdownList {
         grid.events.push(GridEventData::MouseDown {
             button: _button,
             modifier,
@@ -1967,10 +3279,18 @@ pub fn handle_pointer_down_with_behavior(
                     .get(&hit.row)
                     .map_or(false, |rp| rp.is_collapsed);
                 if behavior.allow_node_toggle {
-                    grid.events.push(GridEventData::BeforeNodeToggle {
-                        row: hit.row,
-                        collapse: collapsing,
-                    });
+                    if let Some(node_id) = grid.tree.node_id_at_row(grid.fixed_rows, hit.row) {
+                        grid.events.push(GridEventData::BeforeTreeNodeToggle {
+                            node_id: node_id.to_string(),
+                            row: hit.row,
+                            collapse: collapsing,
+                        });
+                    } else {
+                        grid.events.push(GridEventData::BeforeNodeToggle {
+                            row: hit.row,
+                            collapse: collapsing,
+                        });
+                    }
                     apply_node_toggle_after_before(grid, hit.row, collapsing);
                 }
             }
@@ -2048,6 +3368,16 @@ pub fn handle_pointer_down_with_behavior(
                         .set_extent(hit.row, target_col, grid.rows, grid.cols);
                 }
                 grid.mark_dirty();
+            }
+        }
+        HitArea::IndicatorRowStartResize => {
+            if grid.host_pointer_dispatch {
+                return;
+            }
+            if grid.indicator_bands.row_start.allow_resize && behavior.allow_user_resize {
+                grid.events
+                    .push(GridEventData::BeforeUserResize { row: -1, col: -1 });
+                begin_row_start_indicator_width_resize(grid, x);
             }
         }
         HitArea::Cell
@@ -2240,6 +3570,13 @@ pub fn handle_pointer_down_with_behavior(
             if !grid.indicator_bands.corner_top_start.visible {
                 return;
             }
+            if let Some(level) = outline_level_hit {
+                grid.outline_click_active = true;
+                if set_outline_level_button_pressed(grid, level) {
+                    grid.mark_dirty();
+                }
+                return;
+            }
             if grid.selection.allow_selection && grid.rows > 0 && grid.cols > 0 {
                 let anchor_row = grid.fixed_rows.min(grid.rows - 1);
                 let anchor_col = grid.fixed_cols.min(grid.cols - 1);
@@ -2259,8 +3596,7 @@ pub fn handle_pointer_down_with_behavior(
         }
         HitArea::ColBorder => {
             if hit.col >= 0 && hit.col < grid.cols {
-                let can_resize_cols = matches!(grid.allow_user_resizing, 1 | 3 | 4 | 6);
-                if can_resize_cols {
+                if col_resize_enabled(grid) {
                     if dbl_click && grid.auto_size_mouse {
                         grid.auto_resize_col(hit.col);
                     } else if behavior.allow_user_resize {
@@ -2275,8 +3611,7 @@ pub fn handle_pointer_down_with_behavior(
         }
         HitArea::RowBorder => {
             if hit.row >= 0 && hit.row < grid.rows {
-                let can_resize_rows = matches!(grid.allow_user_resizing, 2 | 3 | 5 | 6);
-                if can_resize_rows && behavior.allow_user_resize {
+                if row_resize_enabled(grid) && behavior.allow_user_resize {
                     grid.events.push(GridEventData::BeforeUserResize {
                         row: hit.row,
                         col: -1,
@@ -2430,10 +3765,13 @@ pub fn handle_pointer_down_with_behavior(
 }
 
 /// Handle pointer move event
-pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, _modifier: i32) {
+pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, modifier: i32) {
     if grid.edit_pointer_select_active && button & 1 == 0 {
         grid.edit_pointer_select_active = false;
     }
+
+    let event_hit = hit_test(grid, x, y);
+    emit_pointer_move_and_hover(grid, &event_hit, button, modifier, x, y);
 
     if grid.edit_pointer_select_active {
         if update_active_edit_pointer_selection(grid, x) {
@@ -2480,8 +3818,9 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, _
         if grid.resize_is_col {
             let delta = (x - grid.resize_start_pos) as i32;
             let new_width = (grid.resize_start_size + delta).max(0);
-            let is_uniform = matches!(grid.allow_user_resizing, 4 | 6);
-            if is_uniform {
+            if grid.resize_index < 0 {
+                set_row_start_indicator_width(grid, new_width);
+            } else if matches!(grid.allow_user_resizing, 4 | 6) {
                 // Uniform mode: must rebuild full layout
                 grid.set_col_width(-1, new_width);
             } else {
@@ -2524,6 +3863,13 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, _
         grid.cursor_style = 3; // move/grab
         update_col_drag_target(grid, x, y);
         grid.mark_dirty();
+        return;
+    }
+
+    if grid.outline_level_button_pressed {
+        if update_outline_level_button_pressed_inside(grid, &event_hit, x) {
+            grid.mark_dirty();
+        }
         return;
     }
 
@@ -2582,19 +3928,20 @@ pub fn handle_pointer_move(grid: &mut VolvoxGrid, x: f32, y: f32, button: i32, _
     // Update cursor style based on hit area
     grid.cursor_style = match hit.area {
         HitArea::ColBorder => {
-            if matches!(grid.allow_user_resizing, 1 | 3 | 4 | 6) {
+            if col_resize_enabled(grid) {
                 1 // col-resize
             } else {
                 0
             }
         }
         HitArea::RowBorder => {
-            if matches!(grid.allow_user_resizing, 2 | 3 | 5 | 6) {
+            if row_resize_enabled(grid) {
                 2 // row-resize
             } else {
                 0
             }
         }
+        HitArea::IndicatorRowStartResize => 1,
         HitArea::OutlineButton => 4,
         HitArea::DropdownButton | HitArea::CheckBox => 5,
         HitArea::Cell
@@ -2666,6 +4013,19 @@ pub fn handle_pointer_up_with_behavior(
         grid.mark_dirty();
     }
 
+    if grid.outline_level_button_pressed {
+        let hit = hit_test(grid, x, y);
+        let level = grid.outline_level_button_pressed_level;
+        let commit = corner_outline_level_hit_from_result(grid, &hit, x) == Some(level);
+        clear_outline_level_button_pressed(grid);
+        grid.outline_click_active = false;
+        if commit {
+            crate::outline::toggle_level_button(grid, level);
+        }
+        grid.mark_dirty();
+        return;
+    }
+
     // Clear outline button click guard
     if grid.outline_click_active {
         grid.outline_click_active = false;
@@ -2692,7 +4052,7 @@ pub fn handle_pointer_up_with_behavior(
         } else {
             grid.resize_index
         };
-        let col_ev = if grid.resize_is_col {
+        let col_ev = if grid.resize_is_col && grid.resize_index >= 0 {
             grid.resize_index
         } else {
             -1
@@ -2757,12 +4117,14 @@ pub fn handle_pointer_up_with_behavior(
     }
 
     let hit = hit_test(grid, x, y);
-    if hit.row >= 0 && hit.col >= 0 {
+    let target = target_from_hit(grid, &hit);
+    if !is_background_target(&target) {
         grid.events.push(GridEventData::Click {
             row: hit.row,
             col: hit.col,
             hit_area: hit_area_to_proto(&hit.area),
             interaction: resolved_click_interaction(grid, hit.row, hit.col),
+            target,
         });
     }
 }
@@ -2926,7 +4288,7 @@ pub fn handle_key_down_with_behavior(
                     grid.mark_dirty();
                 } else if !grid.host_key_dispatch {
                     // Enter mode: commit and move to the cell above.
-                    let target_row = (grid.selection.row - 1).max(grid.fixed_rows);
+                    let target_row = visible_focus_row_with_delta(grid, grid.selection.row, -1);
                     let target_col = grid.selection.col;
                     if commit_active_edit(grid) {
                         move_selection_after_edit_commit(grid, target_row, target_col);
@@ -2951,7 +4313,7 @@ pub fn handle_key_down_with_behavior(
                     grid.mark_dirty();
                 } else if !grid.host_key_dispatch {
                     // Enter mode: commit and move to the cell below.
-                    let target_row = (grid.selection.row + 1).min(grid.rows - 1);
+                    let target_row = visible_focus_row_with_delta(grid, grid.selection.row, 1);
                     let target_col = grid.selection.col;
                     if commit_active_edit(grid) {
                         move_selection_after_edit_commit(grid, target_row, target_col);
@@ -2962,6 +4324,12 @@ pub fn handle_key_down_with_behavior(
         }
         grid.events
             .push(GridEventData::KeyDownEdit { key_code, modifier });
+        return;
+    }
+
+    if handle_indicator_keyboard_focus(grid, key_code, behavior) {
+        grid.events
+            .push(GridEventData::KeyDown { key_code, modifier });
         return;
     }
 
@@ -2993,11 +4361,11 @@ pub fn handle_key_down_with_behavior(
         38 => {
             // Up
             if shift {
-                let new_row = (grid.selection.row_end - 1).max(grid.fixed_rows);
+                let new_row = visible_focus_row_with_delta(grid, grid.selection.row_end, -1);
                 grid.selection
                     .set_extent(new_row, grid.selection.col_end, grid.rows, grid.cols);
             } else {
-                let new_row = (grid.selection.row - 1).max(grid.fixed_rows);
+                let new_row = visible_focus_row_with_delta(grid, grid.selection.row, -1);
                 grid.selection.set_cursor(
                     new_row,
                     grid.selection.col,
@@ -3029,11 +4397,11 @@ pub fn handle_key_down_with_behavior(
         40 => {
             // Down
             if shift {
-                let new_row = (grid.selection.row_end + 1).min(grid.rows - 1);
+                let new_row = visible_focus_row_with_delta(grid, grid.selection.row_end, 1);
                 grid.selection
                     .set_extent(new_row, grid.selection.col_end, grid.rows, grid.cols);
             } else {
-                let new_row = (grid.selection.row + 1).min(grid.rows - 1);
+                let new_row = visible_focus_row_with_delta(grid, grid.selection.row, 1);
                 grid.selection.set_cursor(
                     new_row,
                     grid.selection.col,
@@ -3048,7 +4416,7 @@ pub fn handle_key_down_with_behavior(
         33 => {
             // PageUp
             let page = (grid.viewport_height / grid.default_row_height).max(1);
-            let new_row = (grid.selection.row - page).max(grid.fixed_rows);
+            let new_row = visible_focus_row_with_delta(grid, grid.selection.row, -page);
             grid.selection.set_cursor(
                 new_row,
                 grid.selection.col,
@@ -3061,7 +4429,7 @@ pub fn handle_key_down_with_behavior(
         34 => {
             // PageDown
             let page = (grid.viewport_height / grid.default_row_height).max(1);
-            let new_row = (grid.selection.row + page).min(grid.rows - 1);
+            let new_row = visible_focus_row_with_delta(grid, grid.selection.row, page);
             grid.selection.set_cursor(
                 new_row,
                 grid.selection.col,
@@ -3075,8 +4443,10 @@ pub fn handle_key_down_with_behavior(
         36 => {
             // Home
             if ctrl {
+                let target_row =
+                    visible_focus_row_at_or_after(grid, grid.fixed_rows).unwrap_or(grid.fixed_rows);
                 grid.selection.set_cursor(
-                    grid.fixed_rows,
+                    target_row,
                     grid.fixed_cols,
                     grid.rows,
                     grid.cols,
@@ -3097,8 +4467,10 @@ pub fn handle_key_down_with_behavior(
         35 => {
             // End
             if ctrl {
+                let target_row =
+                    visible_focus_row_at_or_before(grid, grid.rows - 1).unwrap_or(grid.rows - 1);
                 grid.selection.set_cursor(
-                    grid.rows - 1,
+                    target_row,
                     grid.cols - 1,
                     grid.rows,
                     grid.cols,
@@ -3149,18 +4521,25 @@ pub fn handle_key_down_with_behavior(
         }
         // Space - toggle a selected checkbox without entering text edit.
         32 => {
-            if !grid.host_key_dispatch
-                && !grid.is_editing()
-                && toggle_checkbox_cell(grid, grid.selection.row, grid.selection.col)
-            {
-                grid.mark_dirty();
+            if !grid.host_key_dispatch && !grid.is_editing() {
+                if behavior.allow_node_toggle && toggle_selected_outline_node(grid) {
+                    grid.mark_dirty();
+                } else if selected_outline_label_keyboard_target(grid).is_some() {
+                    // Tree rows reserve Space for the row-indicator tree.
+                } else if toggle_checkbox_cell(grid, grid.selection.row, grid.selection.col) {
+                    grid.mark_dirty();
+                }
             }
         }
         // Enter - toggle a selected checkbox, otherwise start editing if editable
         // (skipped when host drives dispatch).
         13 => {
             if !grid.host_key_dispatch && !grid.is_editing() {
-                if toggle_checkbox_cell(grid, grid.selection.row, grid.selection.col) {
+                if behavior.allow_node_toggle && toggle_selected_outline_node(grid) {
+                    grid.mark_dirty();
+                } else if selected_outline_label_keyboard_target(grid).is_some() {
+                    // Tree rows reserve Enter for the row-indicator tree.
+                } else if toggle_checkbox_cell(grid, grid.selection.row, grid.selection.col) {
                     grid.mark_dirty();
                 } else if behavior.allow_begin_edit && grid.edit_trigger_mode >= 1 {
                     begin_edit_from_input(grid, grid.selection.row, grid.selection.col);
@@ -3174,14 +4553,12 @@ pub fn handle_key_down_with_behavior(
                 && behavior.allow_begin_edit
                 && grid.edit_trigger_mode >= 1
                 && !grid.is_editing()
-                && !is_boolean_checkbox_cell(grid, grid.selection.row, grid.selection.col)
             {
-                begin_edit_from_input_with_options(
-                    grid,
-                    grid.selection.row,
-                    grid.selection.col,
-                    true,
-                );
+                let (row, col) = selected_outline_label_edit_target(grid)
+                    .unwrap_or((grid.selection.row, grid.selection.col));
+                if !is_boolean_checkbox_cell(grid, row, col) {
+                    begin_edit_from_input_with_options(grid, row, col, true);
+                }
             }
         }
         // Delete
@@ -3353,6 +4730,9 @@ pub fn handle_key_press_with_behavior(
     } else if grid.type_ahead_mode != pb::TypeAheadMode::TypeAheadNone as i32 {
         // Type-ahead takes precedence over typing edits. In editable mode,
         // SPACE starts editing while other printable keys search.
+        if ch == ' ' && selected_outline_label_keyboard_target(grid).is_some() {
+            return;
+        }
         if ch == ' '
             && !grid.host_key_dispatch
             && behavior.allow_begin_edit
@@ -3420,6 +4800,8 @@ pub fn handle_key_press_with_behavior(
                 grid.mark_dirty();
             }
         }
+    } else if ch == ' ' && selected_outline_label_keyboard_target(grid).is_some() {
+        return;
     } else if !grid.host_key_dispatch && behavior.allow_begin_edit && grid.edit_trigger_mode >= 1 {
         // Auto-start editing on keypress (keyboard-edit mode), except for
         // select-only dropdown lists which must not accept freeform text.
@@ -3660,6 +5042,9 @@ mod tests {
     use super::*;
     use crate::event::GridEventData;
     use crate::grid::VolvoxGrid;
+    use crate::indicator::{
+        ColIndicatorCellState, CornerIndicatorSlotState, RowIndicatorSlotState,
+    };
     use std::time::Duration;
 
     fn prime_layout(grid: &mut VolvoxGrid) {
@@ -3766,6 +5151,60 @@ mod tests {
     }
 
     #[test]
+    fn row_indicator_click_near_row_border_selects_when_row_resize_disabled() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 3, 0, 0);
+        grid.allow_user_resizing = 1; // cols only
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.width_px = 80;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers,
+            80,
+        )];
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        prime_layout(&mut grid);
+
+        let hit = hit_test(&mut grid, 20.0, 43.0);
+
+        assert_eq!(hit.area, HitArea::IndicatorRowStart);
+        assert_eq!(hit.row, 0);
+    }
+
+    #[test]
+    fn row_indicator_allow_resize_resizes_indicator_width() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 3, 0, 0);
+        grid.allow_user_resizing = 1; // column resizing can remain independent.
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.allow_resize = true;
+        grid.indicator_bands.row_start.width_px = 80;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers,
+            80,
+        )];
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        prime_layout(&mut grid);
+
+        let right_edge_inside = grid.indicator_bands.row_start.resolved_width_px() - 1;
+        handle_pointer_down(&mut grid, right_edge_inside as f32, 30.0, 0, 0, false);
+        assert!(grid.resize_active);
+        assert!(grid.resize_is_col);
+        assert_eq!(grid.resize_index, -1);
+
+        handle_pointer_move(&mut grid, (right_edge_inside + 20) as f32, 30.0, 1, 0);
+        assert_eq!(grid.indicator_bands.row_start.resolved_width_px(), 100);
+
+        handle_pointer_up(&mut grid, (right_edge_inside + 20) as f32, 30.0, 0, 0);
+        assert!(!grid.resize_active);
+        let events = grid.events.drain();
+        assert!(events
+            .iter()
+            .any(|e| { matches!(e.data, GridEventData::AfterUserResize { row: -1, col: -1 }) }));
+    }
+
+    #[test]
     fn hit_test_detects_header_col_border_with_row_indicator_offset() {
         let mut grid = VolvoxGrid::new(1, 640, 480, 3, 3, 0, 0);
         grid.indicator_bands.row_start.visible = true;
@@ -3780,6 +5219,228 @@ mod tests {
 
         assert_eq!(hit.area, HitArea::ColBorder);
         assert_eq!(hit.col, 0);
+    }
+
+    #[test]
+    fn row_indicator_click_reports_target_slot() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 6, 3, 0, 0);
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.width_px = 60;
+        grid.indicator_bands.row_start.slots = vec![
+            RowIndicatorSlotState::new(pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers, 20),
+            RowIndicatorSlotState::new(pb::RowIndicatorSlotKind::RowIndicatorSlotCheckbox, 20),
+            RowIndicatorSlotState::new(pb::RowIndicatorSlotKind::RowIndicatorSlotHandle, 20),
+        ];
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        prime_layout(&mut grid);
+
+        let click_x = 30.0;
+        let click_y = 24.0 + grid.row_pos(3) as f32 + 10.0;
+        handle_pointer_down(&mut grid, click_x, click_y, 0, 0, false);
+        handle_pointer_up(&mut grid, click_x, click_y, 0, 0);
+
+        let events = grid.events.drain();
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::Click {
+                row: 3,
+                col: -1,
+                target,
+                ..
+            } if target.kind == pb::GridTargetKind::GridTargetRowIndicator as i32
+                && target.band == pb::IndicatorBand::RowStart as i32
+                && target.slot_index == 1
+                && target.slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotCheckbox as i32
+        )));
+    }
+
+    #[test]
+    fn col_indicator_click_reports_target_cell() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 3, 0, 0);
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        grid.indicator_bands.col_top.cells = vec![ColIndicatorCellState {
+            row1: 0,
+            row2: 0,
+            col1: 1,
+            col2: 1,
+            mode_bits: pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as u32,
+            custom_key: "header-1".to_string(),
+            ..Default::default()
+        }];
+        prime_layout(&mut grid);
+
+        let click_x = grid.col_pos(1) as f32 + 10.0;
+        let click_y = 10.0;
+        handle_pointer_down(&mut grid, click_x, click_y, 0, 0, false);
+        handle_pointer_up(&mut grid, click_x, click_y, 0, 0);
+
+        let events = grid.events.drain();
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::Click {
+                row: -1,
+                col: 1,
+                target,
+                ..
+            } if target.kind == pb::GridTargetKind::GridTargetColIndicator as i32
+                && target.band == pb::IndicatorBand::ColTop as i32
+                && target.slot_index == 0
+                && target.slot_kind == pb::ColIndicatorCellMode::ColIndicatorCellHeaderText as i32
+                && target.custom_key.as_str() == "header-1"
+        )));
+    }
+
+    #[test]
+    fn corner_indicator_click_reports_target_slot() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 4, 3, 0, 0);
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.width_px = 40;
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        grid.indicator_bands.corner_top_start.visible = true;
+        grid.indicator_bands.corner_top_start.slots = vec![CornerIndicatorSlotState::new(
+            pb::CornerIndicatorSlotKind::CornerSlotSelectAll,
+            40,
+        )];
+        prime_layout(&mut grid);
+
+        handle_pointer_down(&mut grid, 10.0, 10.0, 0, 0, false);
+        handle_pointer_up(&mut grid, 10.0, 10.0, 0, 0);
+
+        let events = grid.events.drain();
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::Click {
+                row: -1,
+                col: -1,
+                target,
+                ..
+            } if target.kind == pb::GridTargetKind::GridTargetCornerIndicator as i32
+                && target.band == pb::IndicatorBand::CornerTopStart as i32
+                && target.slot_index == 0
+                && target.slot_kind == pb::CornerIndicatorSlotKind::CornerSlotSelectAll as i32
+        )));
+    }
+
+    #[test]
+    fn pointer_move_emits_enter_leave_for_indicator_targets() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 6, 3, 0, 0);
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.width_px = 60;
+        grid.indicator_bands.row_start.slots = vec![
+            RowIndicatorSlotState::new(pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers, 20),
+            RowIndicatorSlotState::new(pb::RowIndicatorSlotKind::RowIndicatorSlotCheckbox, 20),
+            RowIndicatorSlotState::new(pb::RowIndicatorSlotKind::RowIndicatorSlotHandle, 20),
+        ];
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        prime_layout(&mut grid);
+
+        let y = 24.0 + grid.row_pos(2) as f32 + 10.0;
+        handle_pointer_move(&mut grid, 30.0, y, 0, 0);
+        handle_pointer_move(&mut grid, 50.0, y, 0, 0);
+
+        let events = grid.events.drain();
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::LeaveCell { target, .. }
+                if target.kind == pb::GridTargetKind::GridTargetRowIndicator as i32
+                    && target.slot_index == 1
+        )));
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::EnterCell { target, .. }
+                if target.kind == pb::GridTargetKind::GridTargetRowIndicator as i32
+                    && target.slot_index == 2
+        )));
+    }
+
+    #[test]
+    fn keyboard_indicator_focus_activates_without_moving_selection() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 6, 3, 1, 1);
+        grid.indicator_focus_enabled = true;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.width_px = 40;
+        grid.indicator_bands.row_start.slots = vec![
+            RowIndicatorSlotState::new(pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers, 20),
+            RowIndicatorSlotState::new(pb::RowIndicatorSlotKind::RowIndicatorSlotCheckbox, 20),
+        ];
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        grid.indicator_bands.corner_top_start.visible = true;
+        grid.indicator_bands.corner_top_start.slots = vec![CornerIndicatorSlotState::new(
+            pb::CornerIndicatorSlotKind::CornerSlotSelectAll,
+            40,
+        )];
+        grid.selection
+            .set_cursor(2, 1, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+        prime_layout(&mut grid);
+
+        handle_key_down(&mut grid, 117, 0);
+        assert!(matches!(
+            grid.active_indicator,
+            Some(ActiveIndicatorTarget {
+                band,
+                row: 2,
+                slot_index: 0,
+                ..
+            }) if band == pb::IndicatorBand::RowStart as i32
+        ));
+        handle_key_down(&mut grid, 39, 0);
+        assert_eq!(grid.active_indicator.as_ref().unwrap().slot_index, 1);
+        handle_key_down(&mut grid, 13, 0);
+
+        let events = grid.events.drain();
+        assert!(events.iter().any(|e| matches!(
+            &e.data,
+            GridEventData::Click {
+                row: 2,
+                col: -1,
+                target,
+                ..
+            } if target.kind == pb::GridTargetKind::GridTargetRowIndicator as i32
+                && target.slot_index == 1
+                && target.slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotCheckbox as i32
+        )));
+
+        handle_key_down(&mut grid, 27, 0);
+        assert!(grid.active_indicator.is_none());
+        assert_eq!(grid.selection.row, 2);
+        assert_eq!(grid.selection.col, 1);
+    }
+
+    #[test]
+    fn active_indicator_preserves_selection_clamping() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 6, 3, 1, 1);
+        grid.indicator_focus_enabled = true;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers,
+            40,
+        )];
+        grid.selection
+            .set_cursor(1, 1, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+        grid.active_indicator = Some(ActiveIndicatorTarget {
+            band: pb::IndicatorBand::RowStart as i32,
+            row: 0,
+            col: -1,
+            slot_index: 0,
+        });
+
+        handle_key_down(&mut grid, 38, 0);
+        handle_key_down(&mut grid, 37, 0);
+
+        assert!(grid.selection.row >= grid.fixed_rows);
+        assert!(grid.selection.col >= grid.fixed_cols);
+        assert_eq!(grid.selection.row, 1);
+        assert_eq!(grid.selection.col, 1);
     }
 
     #[test]
@@ -4128,6 +5789,7 @@ mod tests {
                 col: 0,
                 hit_area,
                 interaction,
+                ..
             } if hit_area == pb::CellHitArea::HitText as i32
                 && interaction == pb::CellInteraction::TextLink as i32
         )));
@@ -4195,6 +5857,7 @@ mod tests {
                 col: 0,
                 hit_area,
                 interaction,
+                ..
             } if hit_area == pb::CellHitArea::HitText as i32
                 && interaction == pb::CellInteraction::TextLink as i32
         )));
@@ -4257,6 +5920,7 @@ mod tests {
                 col: 0,
                 hit_area,
                 interaction,
+                ..
             } if hit_area == pb::CellHitArea::HitDropdown as i32
                 && interaction == pb::CellInteraction::Button as i32
         )));
@@ -4277,7 +5941,7 @@ mod tests {
         let events = grid.events.drain();
         assert!(events
             .iter()
-            .any(|e| matches!(e.data, GridEventData::DblClick { row: 1, col: 0 })));
+            .any(|e| matches!(e.data, GridEventData::DblClick { row: 1, col: 0, .. })));
     }
 
     #[test]
@@ -5481,5 +7145,471 @@ mod tests {
         grid.clear_dirty();
         handle_pointer_move(&mut grid, x, y, 0, 0);
         assert!(!grid.dirty);
+    }
+
+    fn outline_indicator_test_grid() -> VolvoxGrid {
+        let mut grid = VolvoxGrid::new(1, 240, 180, 4, 2, 1, 0);
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.width_px = 80;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            80,
+        )];
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        grid.indicator_bands.corner_top_start.visible = true;
+        grid.indicator_bands.corner_top_start.slots = vec![CornerIndicatorSlotState::new(
+            pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels,
+            80,
+        )];
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorArrowsLeaf as i32;
+        grid.outline.max_levels = 3;
+        grid.outline.show_level_buttons = true;
+        grid.row_props.entry(1).or_default().outline_level = 1;
+        grid.row_props.entry(2).or_default().outline_level = 2;
+        grid.row_props.entry(3).or_default().outline_level = 3;
+        prime_layout(&mut grid);
+        grid
+    }
+
+    fn zero_based_outline_indicator_test_grid() -> VolvoxGrid {
+        let mut grid = outline_indicator_test_grid();
+        grid.set_rows(5);
+        grid.outline.max_levels = 3;
+        grid.row_props.entry(1).or_default().outline_level = 0;
+        grid.row_props.entry(2).or_default().outline_level = 1;
+        grid.row_props.entry(3).or_default().outline_level = 2;
+        grid.row_props.entry(4).or_default().outline_level = 3;
+        prime_layout(&mut grid);
+        grid
+    }
+
+    fn visible_outline_levels(grid: &VolvoxGrid) -> Vec<i32> {
+        (grid.fixed_rows..grid.rows)
+            .filter(|row| !grid.is_row_hidden(*row))
+            .filter_map(|row| grid.row_props.get(&row).map(|props| props.outline_level))
+            .collect()
+    }
+
+    fn click_outline_level_button(grid: &mut VolvoxGrid, x: f32) {
+        handle_pointer_down(grid, x, 5.0, 0, 0, false);
+        handle_pointer_up(grid, x, 5.0, 0, 0);
+    }
+
+    #[test]
+    fn row_indicator_expander_hit_toggles_outline_node() {
+        let mut grid = outline_indicator_test_grid();
+        let (_cx, row_y, _cw, row_h) = grid.cell_screen_rect(1, 0).unwrap();
+        let hit = hit_test(&mut grid, 6.0, (row_y + row_h / 2) as f32);
+        assert_eq!(hit.area, HitArea::OutlineButton);
+
+        handle_pointer_down(&mut grid, 6.0, (row_y + row_h / 2) as f32, 0, 0, false);
+
+        assert!(grid
+            .row_props
+            .get(&1)
+            .is_some_and(|props| props.is_collapsed));
+        assert!(grid.is_row_hidden(2));
+        assert!(grid.is_row_hidden(3));
+    }
+
+    #[test]
+    fn row_indicator_expander_double_click_toggles_outline_node() {
+        let mut grid = outline_indicator_test_grid();
+        let (_cx, row_y, _cw, row_h) = grid.cell_screen_rect(1, 0).unwrap();
+        let y = (row_y + row_h / 2) as f32;
+
+        handle_pointer_down(&mut grid, 6.0, y, 0, 0, true);
+
+        assert!(grid
+            .row_props
+            .get(&1)
+            .is_some_and(|props| props.is_collapsed));
+        assert!(grid.is_row_hidden(2));
+        assert!(grid.is_row_hidden(3));
+    }
+
+    #[test]
+    fn selected_outline_row_enter_and_space_toggle_before_edit() {
+        let mut grid = outline_indicator_test_grid();
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.edit_trigger_mode = 1;
+        grid.outline.label_column = 0;
+        grid.cols_hidden.insert(0);
+        grid.selection
+            .set_cursor(1, 0, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+
+        handle_key_down(&mut grid, 13, 0);
+
+        assert!(!grid.is_editing());
+        assert!(grid
+            .row_props
+            .get(&1)
+            .is_some_and(|props| props.is_collapsed));
+        assert!(grid.is_row_hidden(2));
+
+        handle_key_down(&mut grid, 32, 0);
+
+        assert!(!grid.is_editing());
+        assert!(grid
+            .row_props
+            .get(&1)
+            .is_some_and(|props| !props.is_collapsed));
+        assert!(!grid.is_row_hidden(2));
+
+        grid.selection
+            .set_cursor(3, 0, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+        handle_key_down(&mut grid, 13, 0);
+
+        assert!(!grid.is_editing());
+    }
+
+    #[test]
+    fn f2_on_tui_outline_row_edits_hidden_label_column() {
+        let mut grid = VolvoxGrid::new(1, 240, 180, 3, 2, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.edit_trigger_mode = 1;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.width_px = 24;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            24,
+        )];
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.outline.label_column = 0;
+        grid.cols_hidden.insert(0);
+        grid.cells.set_text(1, 0, "Reports".to_string());
+        grid.cells.set_text(1, 1, "Folder".to_string());
+        grid.row_props.entry(1).or_default().outline_level = 0;
+        prime_layout(&mut grid);
+        grid.selection
+            .set_cursor(1, 0, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+
+        handle_key_down(&mut grid, 113, 0);
+
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.edit_row, 1);
+        assert_eq!(grid.edit.edit_col, 0);
+        assert_eq!(grid.edit.edit_text, "Reports");
+    }
+
+    #[test]
+    fn f2_on_tui_outline_visible_cell_edits_selected_cell() {
+        let mut grid = VolvoxGrid::new(1, 240, 180, 3, 2, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.edit_trigger_mode = 1;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.width_px = 24;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            24,
+        )];
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.outline.label_column = 0;
+        grid.cols_hidden.insert(0);
+        grid.cells.set_text(1, 0, "Reports".to_string());
+        grid.cells.set_text(1, 1, "Folder".to_string());
+        grid.row_props.entry(1).or_default().outline_level = 0;
+        prime_layout(&mut grid);
+        grid.selection
+            .set_cursor(1, 1, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+
+        handle_key_down(&mut grid, 113, 0);
+
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.edit_row, 1);
+        assert_eq!(grid.edit.edit_col, 1);
+        assert_eq!(grid.edit.edit_text, "Folder");
+    }
+
+    #[test]
+    fn enter_on_tui_outline_visible_cell_edits_selected_cell() {
+        let mut grid = VolvoxGrid::new(1, 240, 180, 3, 2, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.edit_trigger_mode = 1;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.width_px = 24;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            24,
+        )];
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.outline.label_column = 0;
+        grid.cols_hidden.insert(0);
+        grid.cells.set_text(1, 0, "Reports".to_string());
+        grid.cells.set_text(1, 1, "Folder".to_string());
+        grid.row_props.entry(1).or_default().outline_level = 0;
+        grid.row_props.entry(2).or_default().outline_level = 1;
+        prime_layout(&mut grid);
+        grid.selection
+            .set_cursor(1, 1, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+
+        handle_key_down(&mut grid, 13, 0);
+
+        assert!(grid.is_editing());
+        assert_eq!(grid.edit.edit_row, 1);
+        assert_eq!(grid.edit.edit_col, 1);
+        assert_eq!(grid.edit.edit_text, "Folder");
+        assert!(!grid
+            .row_props
+            .get(&1)
+            .is_some_and(|props| props.is_collapsed));
+    }
+
+    #[test]
+    fn keyboard_navigation_skips_collapsed_outline_rows() {
+        let mut grid = VolvoxGrid::new(1, 240, 180, 6, 2, 1, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.width_px = 80;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            80,
+        )];
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorArrowsLeaf as i32;
+        grid.outline.label_column = 0;
+        grid.cols_hidden.insert(0);
+        grid.row_props.entry(1).or_default().outline_level = 0;
+        grid.row_props.entry(2).or_default().outline_level = 1;
+        grid.row_props.entry(3).or_default().outline_level = 2;
+        grid.row_props.entry(4).or_default().outline_level = 0;
+        grid.row_props.entry(5).or_default().outline_level = 1;
+        prime_layout(&mut grid);
+        grid.selection
+            .set_cursor(1, 0, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+
+        handle_key_down(&mut grid, 13, 0);
+
+        assert!(grid.is_row_hidden(2));
+        assert!(grid.is_row_hidden(3));
+
+        handle_key_down(&mut grid, 40, 0);
+
+        assert_eq!(grid.selection.row, 4);
+
+        handle_key_down(&mut grid, 38, 0);
+
+        assert_eq!(grid.selection.row, 1);
+    }
+
+    #[test]
+    fn tui_connector_expander_hit_uses_rendered_tree_prefix() {
+        let mut grid = VolvoxGrid::new(1, 240, 180, 6, 2, 1, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.width_px = 80;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            80,
+        )];
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 24;
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.row_props.entry(1).or_default().outline_level = 0;
+        grid.row_props.entry(2).or_default().outline_level = 1;
+        grid.row_props.entry(3).or_default().outline_level = 2;
+        grid.row_props.entry(4).or_default().outline_level = 3;
+        grid.row_props.entry(5).or_default().outline_level = 4;
+        prime_layout(&mut grid);
+
+        let (_cx, row_y, _cw, row_h) = grid.cell_screen_rect(4, 0).unwrap();
+        let hit = hit_test(&mut grid, 10.0, (row_y + row_h / 2) as f32);
+
+        assert_eq!(hit.area, HitArea::OutlineButton);
+        assert_eq!(hit.row, 4);
+    }
+
+    #[test]
+    fn row_indicator_expander_hover_targets_slot_and_repaints() {
+        let mut grid = outline_indicator_test_grid();
+        grid.selection.hover_mode = HOVER_ROW;
+        let (_cx, row_y, _cw, row_h) = grid.cell_screen_rect(1, 0).unwrap();
+        grid.clear_dirty();
+
+        handle_pointer_move(&mut grid, 6.0, (row_y + row_h / 2) as f32, 0, 0);
+
+        assert!(grid.dirty);
+        let hover = grid.last_hover_target.as_ref().unwrap();
+        assert_eq!(hover.row, 1);
+        assert_eq!(
+            hover.target.kind,
+            pb::GridTargetKind::GridTargetRowIndicator as i32
+        );
+        assert_eq!(
+            hover.target.slot_kind,
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
+        );
+    }
+
+    #[test]
+    fn row_indicator_expander_hover_disabled_does_not_repaint() {
+        let mut grid = outline_indicator_test_grid();
+        let (_cx, row_y, _cw, row_h) = grid.cell_screen_rect(1, 0).unwrap();
+        grid.clear_dirty();
+
+        handle_pointer_move(&mut grid, 6.0, (row_y + row_h / 2) as f32, 0, 0);
+
+        assert!(!grid.dirty);
+        assert_eq!(
+            grid.last_hover_target.as_ref().unwrap().target.slot_kind,
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
+        );
+    }
+
+    #[test]
+    fn corner_outline_level_buttons_cycle_level_and_child() {
+        let mut grid = zero_based_outline_indicator_test_grid();
+        let step = crate::outline::TreeGeometry::from_grid(&grid).indent_step;
+        let level_0_x = step / 2;
+        let level_1_x = step + step / 2;
+        let level_3_x = step * 3 + step / 2;
+
+        handle_pointer_down(&mut grid, level_0_x as f32, 5.0, 0, 0, false);
+        assert_eq!(visible_outline_levels(&grid), vec![0, 1, 2, 3]);
+        assert!(grid.outline_level_button_pressed);
+        assert_eq!(grid.outline_level_button_pressed_level, 0);
+        assert!(grid.outline_level_button_pressed_inside);
+        handle_pointer_up(&mut grid, level_0_x as f32, 5.0, 0, 0);
+        assert_eq!(visible_outline_levels(&grid), vec![0]);
+        assert!(!grid.outline_level_button_pressed);
+
+        click_outline_level_button(&mut grid, level_0_x as f32);
+        assert_eq!(visible_outline_levels(&grid), vec![0, 1]);
+
+        click_outline_level_button(&mut grid, level_3_x as f32);
+        assert_eq!(visible_outline_levels(&grid), vec![0, 1, 2, 3]);
+
+        click_outline_level_button(&mut grid, level_1_x as f32);
+        assert_eq!(visible_outline_levels(&grid), vec![0, 1]);
+
+        click_outline_level_button(&mut grid, level_1_x as f32);
+        assert_eq!(visible_outline_levels(&grid), vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn corner_outline_level_click_reveals_hidden_deeper_level() {
+        let mut grid = zero_based_outline_indicator_test_grid();
+
+        let step = crate::outline::TreeGeometry::from_grid(&grid).indent_step;
+        let level_0_x = step / 2;
+        let level_1_x = step + step / 2;
+
+        click_outline_level_button(&mut grid, level_0_x as f32);
+        assert_eq!(visible_outline_levels(&grid), vec![0]);
+
+        click_outline_level_button(&mut grid, level_1_x as f32);
+        assert_eq!(visible_outline_levels(&grid), vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn corner_outline_level_buttons_use_wide_touch_targets_when_space_allows() {
+        let mut grid = zero_based_outline_indicator_test_grid();
+        grid.indicator_bands.row_start.width_px = 240;
+        grid.indicator_bands.row_start.slots[0].width_px = 240;
+        grid.indicator_bands.corner_top_start.slots[0].width_px = 240;
+        prime_layout(&mut grid);
+
+        let step =
+            crate::outline::outline_level_button_step(&grid, grid.indicator_bands.start_width());
+        assert_eq!(step, crate::outline::MIN_TOUCH_OUTLINE_LEVEL_BUTTON_WIDTH);
+
+        click_outline_level_button(&mut grid, (step - 5) as f32);
+        assert_eq!(visible_outline_levels(&grid), vec![0]);
+    }
+
+    #[test]
+    fn corner_outline_level_button_cancel_when_pointer_up_outside() {
+        let mut grid = zero_based_outline_indicator_test_grid();
+
+        let step = crate::outline::TreeGeometry::from_grid(&grid).indent_step;
+        let level_0_x = step / 2;
+        let level_1_x = step + step / 2;
+        handle_pointer_down(&mut grid, level_0_x as f32, 5.0, 0, 0, false);
+        handle_pointer_up(&mut grid, level_1_x as f32, 5.0, 0, 0);
+
+        assert_eq!(visible_outline_levels(&grid), vec![0, 1, 2, 3]);
+        assert!(!grid.outline_level_button_pressed);
+
+        handle_pointer_down(&mut grid, level_0_x as f32, 5.0, 0, 0, false);
+        assert!(grid.outline_level_button_pressed);
+
+        handle_pointer_up(&mut grid, level_0_x as f32, 40.0, 0, 0);
+
+        assert_eq!(visible_outline_levels(&grid), vec![0, 1, 2, 3]);
+        assert!(!grid.outline_level_button_pressed);
+        assert!(!grid.outline_click_active);
+    }
+
+    #[test]
+    fn corner_outline_level_button_pressed_style_tracks_pointer_inside() {
+        let mut grid = zero_based_outline_indicator_test_grid();
+
+        let step = crate::outline::TreeGeometry::from_grid(&grid).indent_step;
+        let level_0_x = step / 2;
+        handle_pointer_down(&mut grid, level_0_x as f32, 5.0, 0, 0, false);
+        assert!(grid.outline_level_button_pressed_inside);
+
+        handle_pointer_move(&mut grid, level_0_x as f32, 40.0, 1, 0);
+        assert!(grid.outline_level_button_pressed);
+        assert!(!grid.outline_level_button_pressed_inside);
+
+        handle_pointer_move(&mut grid, level_0_x as f32, 5.0, 1, 0);
+        assert!(grid.outline_level_button_pressed_inside);
+
+        handle_pointer_up(&mut grid, level_0_x as f32, 5.0, 0, 0);
+        assert_eq!(visible_outline_levels(&grid), vec![0]);
+    }
+
+    #[test]
+    fn corner_outline_level_hover_targets_each_level_and_repaints() {
+        let mut grid = zero_based_outline_indicator_test_grid();
+        grid.selection.hover_mode = HOVER_ROW;
+
+        let step = crate::outline::TreeGeometry::from_grid(&grid).indent_step;
+        let level_0_x = step / 2;
+        let level_1_x = step + step / 2;
+        grid.clear_dirty();
+
+        handle_pointer_move(&mut grid, level_0_x as f32, 5.0, 0, 0);
+
+        assert!(grid.dirty);
+        let hover = grid.last_hover_target.as_ref().unwrap();
+        assert_eq!(
+            hover.target.kind,
+            pb::GridTargetKind::GridTargetCornerIndicator as i32
+        );
+        assert_eq!(
+            hover.target.slot_kind,
+            pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32
+        );
+        assert_eq!(hover.target.int_value, 0);
+
+        grid.clear_dirty();
+        handle_pointer_move(&mut grid, level_1_x as f32, 5.0, 0, 0);
+
+        assert!(grid.dirty);
+        assert_eq!(grid.last_hover_target.as_ref().unwrap().target.int_value, 1);
+    }
+
+    #[test]
+    fn corner_outline_level_hover_disabled_does_not_repaint() {
+        let mut grid = zero_based_outline_indicator_test_grid();
+
+        let step = crate::outline::TreeGeometry::from_grid(&grid).indent_step;
+        let level_0_x = step / 2;
+        grid.clear_dirty();
+
+        handle_pointer_move(&mut grid, level_0_x as f32, 5.0, 0, 0);
+
+        assert!(!grid.dirty);
+        assert_eq!(grid.last_hover_target.as_ref().unwrap().target.int_value, 0);
     }
 }

@@ -1877,6 +1877,7 @@ fn color_to_f32(c: u32) -> [f32; 4] {
 mod tests {
     use super::GpuRenderer;
     use crate::grid::VolvoxGrid;
+    use crate::indicator::RowIndicatorSlotState;
     use crate::proto::volvoxgrid::v1 as pb;
 
     fn scroll_blit_test_grid(scroll_blit_enabled: bool) -> VolvoxGrid {
@@ -1886,7 +1887,10 @@ mod tests {
         grid.scrollbar_show_v = pb::ScrollBarMode::ScrollbarModeAuto as i32;
         grid.indicator_bands.row_start.visible = true;
         grid.indicator_bands.row_start.width_px = 36;
-        grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers,
+            36,
+        )];
         grid.indicator_bands.col_top.visible = true;
         grid.indicator_bands.col_top.band_rows = 1;
         grid.indicator_bands.col_top.default_row_height_px = 24;

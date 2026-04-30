@@ -63,7 +63,7 @@ static GPU_AVAILABLE: Mutex<bool> = Mutex::new(false);
 static LOADED_FONTS: Mutex<Vec<Vec<u8>>> = Mutex::new(Vec::new());
 
 const DEBUG_MEM_SAMPLE_MS: f64 = 10_000.0;
-const DECISION_TIMEOUT: Duration = Duration::from_millis(250);
+const ERROR_DECISION_TIMEOUT: i32 = 1001;
 
 #[cfg(not(feature = "demo"))]
 fn demo_feature_not_enabled() -> String {
@@ -208,18 +208,35 @@ fn replay_loaded_fonts_into_grid(grid: &mut volvoxgrid_engine::grid::VolvoxGrid)
     }
 }
 
-const DEFAULT_ROW_INDICATOR_MODE_BITS: u32 =
-    RowIndicatorMode::RowIndicatorCurrent as u32 | RowIndicatorMode::RowIndicatorSelection as u32;
 const DEFAULT_COL_INDICATOR_MODE_BITS: u32 = ColIndicatorCellMode::ColIndicatorCellHeaderText
     as u32
     | ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32;
+
+fn default_row_indicator_slots() -> Vec<volvoxgrid_engine::indicator::RowIndicatorSlotState> {
+    vec![
+        volvoxgrid_engine::indicator::RowIndicatorSlotState::new(
+            RowIndicatorSlotKind::RowIndicatorSlotCurrent,
+            18,
+        ),
+        volvoxgrid_engine::indicator::RowIndicatorSlotState::new(
+            RowIndicatorSlotKind::RowIndicatorSlotSelection,
+            17,
+        ),
+    ]
+}
+
+fn ensure_default_row_indicator_slots(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
+    if grid.indicator_bands.row_start.slots.is_empty() {
+        grid.indicator_bands.row_start.slots = default_row_indicator_slots();
+    }
+}
 
 fn apply_default_indicator_bands(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
     grid.indicator_bands.row_start.visible = false;
     grid.indicator_bands.row_start.width_px =
         volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
     grid.indicator_bands.row_start.auto_size = true;
-    grid.indicator_bands.row_start.mode_bits = DEFAULT_ROW_INDICATOR_MODE_BITS;
+    ensure_default_row_indicator_slots(grid);
 
     grid.indicator_bands.col_top.visible = true;
     if grid.indicator_bands.col_top.band_rows <= 0 {
@@ -697,15 +714,31 @@ fn request_before_sort(grid_id: i64, grid: &mut volvoxgrid_engine::grid::VolvoxG
     queue_pending_decision_event(grid_id, event_id, event);
 }
 
+fn before_node_toggle_event(
+    grid: &volvoxgrid_engine::grid::VolvoxGrid,
+    row: i32,
+    collapse: bool,
+) -> volvoxgrid_engine::event::GridEventData {
+    if let Some(node_id) = grid.tree.node_id_at_row(grid.fixed_rows, row) {
+        volvoxgrid_engine::event::GridEventData::BeforeTreeNodeToggle {
+            node_id: node_id.to_string(),
+            row,
+            collapse,
+        }
+    } else {
+        volvoxgrid_engine::event::GridEventData::BeforeNodeToggle { row, collapse }
+    }
+}
+
 fn request_before_node_toggle(
     grid_id: i64,
     grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
     row: i32,
     collapse: bool,
 ) {
+    let event = before_node_toggle_event(grid, row, collapse);
     if !decision_channel_enabled(grid_id) {
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::BeforeNodeToggle { row, collapse });
+        grid.events.push(event);
         input::apply_node_toggle_after_before(grid, row, collapse);
         return;
     }
@@ -718,7 +751,6 @@ fn request_before_node_toggle(
             action: PendingAction::BeforeNodeToggle { row, collapse },
         },
     );
-    let event = volvoxgrid_engine::event::GridEventData::BeforeNodeToggle { row, collapse };
     grid.events.push_with_id(event_id, event.clone());
     queue_pending_decision_event(grid_id, event_id, event);
 }
@@ -819,7 +851,11 @@ fn request_before_mouse_down(
 ) {
     if !decision_channel_enabled(grid_id) {
         grid.events
-            .push(volvoxgrid_engine::event::GridEventData::BeforeMouseDown { row, col });
+            .push(volvoxgrid_engine::event::GridEventData::BeforeMouseDown {
+                row,
+                col,
+                target: volvoxgrid_engine::event::EventTarget::data_cell(),
+            });
         handle_pointer_down_after_before_mouse(grid_id, grid, x, y, button, modifier, dbl_click);
         return;
     }
@@ -838,7 +874,11 @@ fn request_before_mouse_down(
             },
         },
     );
-    let event = volvoxgrid_engine::event::GridEventData::BeforeMouseDown { row, col };
+    let event = volvoxgrid_engine::event::GridEventData::BeforeMouseDown {
+        row,
+        col,
+        target: volvoxgrid_engine::event::EventTarget::data_cell(),
+    };
     grid.events.push_with_id(event_id, event.clone());
     queue_pending_decision_event(grid_id, event_id, event);
 }
@@ -1045,13 +1085,23 @@ fn resolve_event_decision(grid_id: i64, event_id: i64, cancel: bool) {
 }
 
 fn resolve_expired_actions(grid_id: i64) {
+    let timeout = with_grid(grid_id as i32, |grid| grid.decision_timeout_ms).and_then(|ms| {
+        if ms == 0 {
+            None
+        } else {
+            Some(Duration::from_millis(u64::from(ms)))
+        }
+    });
+    let Some(timeout) = timeout else {
+        return;
+    };
     let now = Instant::now();
     let expired: Vec<(i64, PendingAction)> = {
         let mut pending = PENDING_ACTIONS.lock().unwrap();
         let expired_keys: Vec<(i64, i64)> = pending
             .iter()
             .filter_map(|(key, entry)| {
-                if key.0 == grid_id && now.duration_since(entry.created_at) >= DECISION_TIMEOUT {
+                if key.0 == grid_id && now.duration_since(entry.created_at) >= timeout {
                     Some(*key)
                 } else {
                     None
@@ -1064,7 +1114,17 @@ fn resolve_expired_actions(grid_id: i64) {
             .collect()
     };
 
-    for (_event_id, action) in expired {
+    for (event_id, action) in expired {
+        let _ = with_grid(grid_id as i32, |grid| {
+            grid.events
+                .push(volvoxgrid_engine::event::GridEventData::Error {
+                    code: ERROR_DECISION_TIMEOUT,
+                    message: format!(
+                        "no EventDecision for event_id={event_id} after {}ms",
+                        timeout.as_millis()
+                    ),
+                });
+        });
         apply_pending_action(grid_id, action, false);
     }
 }
@@ -1776,9 +1836,7 @@ pub fn set_show_row_indicator(id: i32, visible: bool) {
                 grid.indicator_bands.row_start.width_px =
                     volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
             }
-            if grid.indicator_bands.row_start.mode_bits == 0 {
-                grid.indicator_bands.row_start.mode_bits = DEFAULT_ROW_INDICATOR_MODE_BITS;
-            }
+            ensure_default_row_indicator_slots(grid);
         }
         grid.layout.invalidate();
         grid.dirty = true;
@@ -1791,24 +1849,10 @@ pub fn get_show_row_indicator(id: i32) -> bool {
 }
 
 #[wasm_bindgen]
-pub fn set_row_indicator_start_mode_bits(id: i32, mode_bits: u32) {
-    with_grid(id, |grid| {
-        grid.indicator_bands.row_start.mode_bits = mode_bits;
-        grid.indicator_bands.row_start.visible = mode_bits != 0;
-        grid.layout.invalidate();
-        grid.dirty = true;
-    });
-}
-
-#[wasm_bindgen]
-pub fn get_row_indicator_start_mode_bits(id: i32) -> u32 {
-    with_grid(id, |grid| grid.indicator_bands.row_start.mode_bits).unwrap_or(0)
-}
-
-#[wasm_bindgen]
 pub fn set_row_indicator_start_width(id: i32, width_px: i32) {
     with_grid(id, |grid| {
         grid.indicator_bands.row_start.width_px = width_px.max(1);
+        grid.indicator_bands.row_start.fit_slots_to_width();
         grid.layout.invalidate();
         grid.dirty = true;
     });
@@ -4851,6 +4895,25 @@ where
     mgr.with_grid(id, f)
 }
 
+#[wasm_bindgen]
+pub fn volvox_tree_load_tree_pb(data: &[u8]) -> Vec<u8> {
+    let request = match LoadTreeRequest::decode(data) {
+        Ok(request) => request,
+        Err(_) => return Vec::new(),
+    };
+    let result = wasm_with_grid(request.grid_id, |grid| {
+        volvoxgrid_engine::tree::load_tree(grid, request)
+    });
+    match result {
+        Ok(Ok(response)) => {
+            let mut buf = Vec::new();
+            let _ = response.encode(&mut buf);
+            buf
+        }
+        Ok(Err(_)) | Err(_) => Vec::new(),
+    }
+}
+
 fn engine_event_to_proto(
     grid_id: i64,
     event_id: i64,
@@ -4927,12 +4990,16 @@ fn engine_event_to_proto(
             active_row,
             active_col,
         })),
-        E::EnterCell { row, col } => {
-            Some(grid_event::Event::EnterCell(EnterCellEvent { row, col }))
-        }
-        E::LeaveCell { row, col } => {
-            Some(grid_event::Event::LeaveCell(LeaveCellEvent { row, col }))
-        }
+        E::EnterCell { row, col, target } => Some(grid_event::Event::EnterCell(EnterCellEvent {
+            row,
+            col,
+            target: Some(target.to_proto()),
+        })),
+        E::LeaveCell { row, col, target } => Some(grid_event::Event::LeaveCell(LeaveCellEvent {
+            row,
+            col,
+            target: Some(target.to_proto()),
+        })),
         E::BeforeEdit { row, col } => {
             Some(grid_event::Event::BeforeEdit(BeforeEditEvent { row, col }))
         }
@@ -5050,6 +5117,48 @@ fn engine_event_to_proto(
                 collapse,
             }))
         }
+        E::TreeChildrenRequested {
+            node_id,
+            row,
+            request_id,
+        } => Some(grid_event::Event::TreeChildrenRequested(
+            TreeChildrenRequestedEvent {
+                node_id,
+                row,
+                request_id,
+            },
+        )),
+        E::BeforeTreeNodeToggle {
+            node_id,
+            row,
+            collapse,
+        } => Some(grid_event::Event::BeforeTreeNodeToggle(
+            BeforeTreeNodeToggleEvent {
+                node_id,
+                row,
+                collapse,
+            },
+        )),
+        E::AfterTreeNodeToggle {
+            node_id,
+            row,
+            collapse,
+        } => Some(grid_event::Event::AfterTreeNodeToggle(
+            AfterTreeNodeToggleEvent {
+                node_id,
+                row,
+                collapse,
+            },
+        )),
+        E::TreeNodeActivate { node_id, row } => {
+            Some(grid_event::Event::TreeNodeActivate(TreeNodeActivateEvent {
+                node_id,
+                row,
+            }))
+        }
+        E::TreeNodeContextMenu { node_id, row, x, y } => Some(
+            grid_event::Event::TreeNodeContextMenu(TreeNodeContextMenuEvent { node_id, row, x, y }),
+        ),
         E::BeforeScroll {
             old_top_row,
             old_left_col,
@@ -5118,10 +5227,11 @@ fn engine_event_to_proto(
                 old_position,
             }))
         }
-        E::BeforeMouseDown { row, col } => {
+        E::BeforeMouseDown { row, col, target } => {
             Some(grid_event::Event::BeforeMouseDown(BeforeMouseDownEvent {
                 row,
                 col,
+                target: Some(target.to_proto()),
             }))
         }
         E::MouseDown {
@@ -5151,24 +5261,32 @@ fn engine_event_to_proto(
             modifier,
             x,
             y,
+            target,
         } => Some(grid_event::Event::MouseMove(MouseMoveEvent {
             button,
             modifier,
             x,
             y,
+            target: Some(target.to_proto()),
         })),
         E::Click {
             row,
             col,
             hit_area,
             interaction,
+            target,
         } => Some(grid_event::Event::Click(ClickEvent {
             row,
             col,
             hit_area,
             interaction,
+            target: Some(target.to_proto()),
         })),
-        E::DblClick { row, col } => Some(grid_event::Event::DblClick(DblClickEvent { row, col })),
+        E::DblClick { row, col, target } => Some(grid_event::Event::DblClick(DblClickEvent {
+            row,
+            col,
+            target: Some(target.to_proto()),
+        })),
         E::KeyDown { key_code, modifier } => Some(grid_event::Event::KeyDown(KeyDownEvent {
             key_code,
             modifier,

@@ -337,10 +337,16 @@ class MainActivity : AppCompatActivity() {
                             .setRowStart(RowIndicatorConfig.newBuilder()
                                 .setVisible(false)
                                 .setWidth(35)
-                                .setModeBits(
-                                    RowIndicatorMode.ROW_INDICATOR_CURRENT.number or
-                                        RowIndicatorMode.ROW_INDICATOR_SELECTION.number
-                                )
+                                .addSlots(RowIndicatorSlot.newBuilder()
+                                    .setKind(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT)
+                                    .setWidth(18)
+                                    .setVisible(true)
+                                    .build())
+                                .addSlots(RowIndicatorSlot.newBuilder()
+                                    .setKind(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION)
+                                    .setWidth(17)
+                                    .setVisible(true)
+                                    .build())
                                 .build())
                             .setColTop(ColIndicatorConfig.newBuilder()
                                 .setVisible(true)

@@ -166,6 +166,10 @@ func buildHierarchyDemo(host *volvoxgrid.Client, width, height int) (*demoInstan
 	if err := json.Unmarshal(raw, &rows); err != nil {
 		return nil, fmt.Errorf("decode hierarchy data: %w", err)
 	}
+	levels, err := hierarchyOutlineLevels(rows)
+	if err != nil {
+		return nil, err
+	}
 
 	loadRows := make([]hierarchyLoadRow, 0, len(rows))
 	for _, row := range rows {
@@ -185,7 +189,12 @@ func buildHierarchyDemo(host *volvoxgrid.Client, width, height int) (*demoInstan
 	}
 
 	columns := buildHierarchyColumns()
-	if err := grid.Configure(buildHierarchyTuiConfig(len(rows), len(columns))); err != nil {
+	if err := grid.Configure(buildHierarchyTuiConfig(
+		len(rows),
+		len(columns),
+		hierarchyMaxOutlineDepth(levels),
+		hierarchyMaxOutlineLevel(levels),
+	)); err != nil {
 		return nil, err
 	}
 	if err := grid.DefineColumns(columns); err != nil {
@@ -207,8 +216,7 @@ func buildHierarchyDemo(host *volvoxgrid.Client, width, height int) (*demoInstan
 	for index, row := range rows {
 		rowDefs = append(rowDefs, &pb.RowDef{
 			Index:        int32(index),
-			OutlineLevel: ptr(int32(row.Level)),
-			IsSubtotal:   ptr(strings.EqualFold(row.Kind, "Folder")),
+			OutlineLevel: ptr(levels[index]),
 		})
 		styleUpdates = append(styleUpdates, &pb.CellUpdate{
 			Row: int32(index),
@@ -374,9 +382,13 @@ func buildSalesTuiConfig(rows, cols int) *pb.GridConfig {
 		},
 		Indicators: &pb.IndicatorsConfig{
 			RowStart: &pb.RowIndicatorConfig{
-				Visible:     ptr(true),
-				Width:       ptr(tuiNumberRowIndicatorWidth(rows)),
-				ModeBits:    ptr(uint32(pb.RowIndicatorMode_ROW_INDICATOR_NUMBERS)),
+				Visible: ptr(true),
+				Width:   ptr(tuiNumberRowIndicatorWidth(rows)),
+				Slots: []*pb.RowIndicatorSlot{{
+					Kind:    ptr(pb.RowIndicatorSlotKind_ROW_INDICATOR_SLOT_NUMBERS),
+					Width:   ptr(tuiNumberRowIndicatorWidth(rows)),
+					Visible: ptr(true),
+				}},
 				AutoSize:    ptr(false),
 				AllowResize: ptr(false),
 			},
@@ -394,7 +406,107 @@ func buildSalesTuiConfig(rows, cols int) *pb.GridConfig {
 	}, rows, cols)
 }
 
-func buildHierarchyTuiConfig(rows, cols int) *pb.GridConfig {
+const hierarchyTuiOutlineIndent int32 = 2
+const hierarchyTuiMinOutlineIndicatorWidth int32 = 4
+const hierarchyTuiNameColumn int32 = 0
+const hierarchyTuiNameColumnWidth int32 = 28
+
+func hierarchyOutlineLevels(rows []hierarchyJSONRow) ([]int32, error) {
+	rowsByID := make(map[string]hierarchyJSONRow, len(rows))
+	for _, row := range rows {
+		if strings.TrimSpace(row.ID) == "" {
+			return nil, fmt.Errorf("hierarchy data row %q is missing Id", row.Name)
+		}
+		rowsByID[row.ID] = row
+	}
+
+	cache := make(map[string]int32, len(rows))
+	var depthOf func(string, map[string]bool) (int32, error)
+	depthOf = func(id string, visiting map[string]bool) (int32, error) {
+		if depth, ok := cache[id]; ok {
+			return depth, nil
+		}
+		row, ok := rowsByID[id]
+		if !ok {
+			return 0, fmt.Errorf("hierarchy data references missing parent %q", id)
+		}
+		if visiting[id] {
+			return 0, fmt.Errorf("hierarchy data contains a parent cycle at %q", id)
+		}
+		visiting[id] = true
+		var depth int32
+		if row.ParentID != nil && strings.TrimSpace(*row.ParentID) != "" {
+			parentDepth, err := depthOf(*row.ParentID, visiting)
+			if err != nil {
+				return 0, err
+			}
+			depth = parentDepth + 1
+		}
+		delete(visiting, id)
+		cache[id] = depth
+		return depth, nil
+	}
+
+	levels := make([]int32, len(rows))
+	for index, row := range rows {
+		depth, err := depthOf(row.ID, map[string]bool{})
+		if err != nil {
+			return nil, err
+		}
+		levels[index] = depth
+	}
+	return levels, nil
+}
+
+func hierarchyMaxOutlineDepth(levels []int32) int32 {
+	var hasMinLevel bool
+	var minLevel int32
+	var maxLevel int32
+	for _, level := range levels {
+		if level >= 0 && (!hasMinLevel || level < minLevel) {
+			hasMinLevel = true
+			minLevel = level
+		}
+		if level > maxLevel {
+			maxLevel = level
+		}
+	}
+	if maxLevel < minLevel {
+		return 0
+	}
+	return maxLevel - minLevel
+}
+
+func hierarchyMaxOutlineLevel(levels []int32) int32 {
+	var hasMaxLevel bool
+	var maxLevel int32
+	for _, level := range levels {
+		if level >= 0 && (!hasMaxLevel || level > maxLevel) {
+			hasMaxLevel = true
+			maxLevel = level
+		}
+	}
+	return maxLevel
+}
+
+func hierarchyTuiOutlineWidth(maxOutlineDepth int32) int32 {
+	if maxOutlineDepth < 0 {
+		maxOutlineDepth = 0
+	}
+	width := (maxOutlineDepth + 1) * hierarchyTuiOutlineIndent
+	if width < hierarchyTuiMinOutlineIndicatorWidth {
+		return hierarchyTuiMinOutlineIndicatorWidth
+	}
+	return width
+}
+
+func hierarchyTuiExpanderWidth(maxOutlineDepth int32) int32 {
+	return hierarchyTuiOutlineWidth(maxOutlineDepth) + hierarchyTuiNameColumnWidth
+}
+
+func buildHierarchyTuiConfig(rows, cols int, maxOutlineDepth, maxOutlineLevel int32) *pb.GridConfig {
+	outlineWidth := hierarchyTuiOutlineWidth(maxOutlineDepth)
+	expanderWidth := hierarchyTuiExpanderWidth(maxOutlineDepth)
 	return finalizeTuiConfig(&pb.GridConfig{
 		Selection: &pb.SelectionConfig{
 			Mode: ptr(pb.SelectionMode_SELECTION_FREE),
@@ -404,12 +516,31 @@ func buildHierarchyTuiConfig(rows, cols int) *pb.GridConfig {
 			DropdownTrigger: ptr(pb.DropdownTrigger_DROPDOWN_NEVER),
 		},
 		Outline: &pb.OutlineConfig{
-			TreeIndicator: ptr(pb.TreeIndicatorStyle_TREE_INDICATOR_ARROWS_LEAF),
-			TreeColumn:    ptr(int32(0)),
+			TreeIndicator:    ptr(pb.TreeIndicatorStyle_TREE_INDICATOR_CONNECTORS_LEAF),
+			IndicatorIndent:  ptr(hierarchyTuiOutlineIndent),
+			MaxLevels:        ptr(maxOutlineLevel),
+			ShowLevelButtons: ptr(true),
+			LabelColumn:      ptr(hierarchyTuiNameColumn),
 		},
 		Indicators: &pb.IndicatorsConfig{
 			RowStart: &pb.RowIndicatorConfig{
-				Visible: ptr(false),
+				Visible: ptr(true),
+				Width:   ptr(expanderWidth),
+				Slots: []*pb.RowIndicatorSlot{{
+					Kind:    ptr(pb.RowIndicatorSlotKind_ROW_INDICATOR_SLOT_EXPANDER),
+					Width:   ptr(expanderWidth),
+					Visible: ptr(true),
+				}},
+				AutoSize:    ptr(false),
+				AllowResize: ptr(false),
+			},
+			CornerTopStart: &pb.CornerIndicatorConfig{
+				Visible: ptr(true),
+				Slots: []*pb.CornerIndicatorSlot{{
+					Kind:    ptr(pb.CornerIndicatorSlotKind_CORNER_SLOT_OUTLINE_LEVELS),
+					Width:   ptr(outlineWidth),
+					Visible: ptr(true),
+				}},
 			},
 			ColTop: &pb.ColIndicatorConfig{
 				Visible:          ptr(true),
@@ -418,6 +549,7 @@ func buildHierarchyTuiConfig(rows, cols int) *pb.GridConfig {
 				ModeBits:         ptr(uint32(pb.ColIndicatorCellMode_COL_INDICATOR_CELL_HEADER_TEXT)),
 				AllowResize:      ptr(false),
 			},
+			Appearance: ptr(pb.IndicatorAppearance_INDICATOR_APPEARANCE_MODERN),
 		},
 	}, rows, cols)
 }
@@ -437,9 +569,13 @@ func buildStressTuiConfig(rows, cols int) *pb.GridConfig {
 		},
 		Indicators: &pb.IndicatorsConfig{
 			RowStart: &pb.RowIndicatorConfig{
-				Visible:     ptr(true),
-				Width:       ptr(tuiNumberRowIndicatorWidth(rows)),
-				ModeBits:    ptr(uint32(pb.RowIndicatorMode_ROW_INDICATOR_NUMBERS)),
+				Visible: ptr(true),
+				Width:   ptr(tuiNumberRowIndicatorWidth(rows)),
+				Slots: []*pb.RowIndicatorSlot{{
+					Kind:    ptr(pb.RowIndicatorSlotKind_ROW_INDICATOR_SLOT_NUMBERS),
+					Width:   ptr(tuiNumberRowIndicatorWidth(rows)),
+					Visible: ptr(true),
+				}},
 				AutoSize:    ptr(false),
 				AllowResize: ptr(false),
 			},
@@ -554,7 +690,7 @@ func dropdownFromLabels(items string) *pb.Dropdown {
 
 func buildHierarchyColumns() []*pb.ColumnDef {
 	return []*pb.ColumnDef{
-		{Index: 0, Width: ptr(int32(28)), Caption: ptr("Name"), Key: ptr("Name")},
+		{Index: hierarchyTuiNameColumn, Width: ptr(hierarchyTuiNameColumnWidth), Caption: ptr("Name"), Key: ptr("Name"), Hidden: ptr(true)},
 		{Index: 1, Width: ptr(int32(10)), Caption: ptr("Type"), Key: ptr("Type")},
 		{Index: 2, Width: ptr(int32(9)), Caption: ptr("Size"), Key: ptr("Size"), Align: ptr(pb.Align_ALIGN_RIGHT_CENTER)},
 		{Index: 3, Width: ptr(int32(12)), Caption: ptr("Modified"), Key: ptr("Modified"), DataType: ptr(pb.ColumnDataType_COLUMN_DATA_DATE), Format: ptr("short date")},
@@ -630,13 +766,14 @@ type salesJSONRow struct {
 }
 
 type hierarchyJSONRow struct {
-	Name        string `json:"Name"`
-	Kind        string `json:"Type"`
-	Size        string `json:"Size"`
-	Modified    string `json:"Modified"`
-	Permissions string `json:"Permissions"`
-	Action      string `json:"Action"`
-	Level       int    `json:"_level"`
+	ID          string  `json:"Id"`
+	ParentID    *string `json:"ParentId"`
+	Name        string  `json:"Name"`
+	Kind        string  `json:"Type"`
+	Size        string  `json:"Size"`
+	Modified    string  `json:"Modified"`
+	Permissions string  `json:"Permissions"`
+	Action      string  `json:"Action"`
 }
 
 type hierarchyLoadRow struct {

@@ -185,6 +185,12 @@ export enum ComposeMethod {
   COMPOSE_METHOD_DEAD_KEY = 2,
   COMPOSE_METHOD_TELEX = 3,
 }
+export enum CornerIndicatorSlotKind {
+  CORNER_SLOT_NONE = 0,
+  CORNER_SLOT_SELECT_ALL = 1,
+  CORNER_SLOT_OUTLINE_LEVELS = 2,
+  CORNER_SLOT_CUSTOM = 3,
+}
 export enum CursorChange_CursorType {
   DEFAULT = 0,
   RESIZE_COL = 1,
@@ -283,6 +289,21 @@ export enum FramePacingMode {
   FRAME_PACING_MODE_UNLIMITED = 2,
   FRAME_PACING_MODE_FIXED = 3,
 }
+export enum GridEventTargetFlag {
+  GRID_TARGET_FLAG_NONE = 0,
+  GRID_TARGET_FLAG_CHECKED = 1,
+  GRID_TARGET_FLAG_INDETERMINATE = 2,
+  GRID_TARGET_FLAG_EXPANDED = 4,
+  GRID_TARGET_FLAG_COLLAPSED = 8,
+  GRID_TARGET_FLAG_SORT_ASC = 16,
+  GRID_TARGET_FLAG_SORT_DESC = 32,
+  GRID_TARGET_FLAG_FILTER_ACTIVE = 64,
+  GRID_TARGET_FLAG_SELECTED = 128,
+  GRID_TARGET_FLAG_DISABLED = 256,
+  GRID_TARGET_FLAG_EDITING = 512,
+  GRID_TARGET_FLAG_SUBTOTAL = 1024,
+  GRID_TARGET_FLAG_PINNED = 2048,
+}
 export enum GridLineDirection {
   GRIDLINE_BOTH = 0,
   GRIDLINE_HORIZONTAL = 1,
@@ -293,6 +314,14 @@ export enum GridLineStyle {
   GRIDLINE_SOLID = 1,
   GRIDLINE_INSET = 2,
   GRIDLINE_RAISED = 3,
+}
+export enum GridTargetKind {
+  GRID_TARGET_UNSPECIFIED = 0,
+  GRID_TARGET_DATA_CELL = 1,
+  GRID_TARGET_ROW_INDICATOR = 2,
+  GRID_TARGET_COL_INDICATOR = 3,
+  GRID_TARGET_CORNER_INDICATOR = 4,
+  GRID_TARGET_BACKGROUND = 5,
 }
 export enum GroupTotalPosition {
   GROUP_TOTAL_ABOVE = 0,
@@ -322,6 +351,22 @@ export enum ImageAlignment {
   IMG_ALIGN_RIGHT_BOTTOM = 8,
   IMG_ALIGN_STRETCH = 9,
   IMG_ALIGN_TILE = 10,
+}
+export enum IndicatorAppearance {
+  INDICATOR_APPEARANCE_CLASSIC = 0,
+  INDICATOR_APPEARANCE_FLAT = 1,
+  INDICATOR_APPEARANCE_MODERN = 2,
+}
+export enum IndicatorBand {
+  INDICATOR_BAND_UNSPECIFIED = 0,
+  INDICATOR_BAND_ROW_START = 1,
+  INDICATOR_BAND_ROW_END = 2,
+  INDICATOR_BAND_COL_TOP = 3,
+  INDICATOR_BAND_COL_BOTTOM = 4,
+  INDICATOR_BAND_CORNER_TOP_START = 5,
+  INDICATOR_BAND_CORNER_TOP_END = 6,
+  INDICATOR_BAND_CORNER_BOTTOM_START = 7,
+  INDICATOR_BAND_CORNER_BOTTOM_END = 8,
 }
 export enum KeyEvent_Type {
   KEY_TYPE_UNSPECIFIED = 0,
@@ -404,23 +449,6 @@ export enum RendererMode {
   RENDERER_GPU_VULKAN = 3,
   RENDERER_GPU_GLES = 4,
   RENDERER_TUI = 5,
-}
-export enum RowIndicatorMode {
-  ROW_INDICATOR_NONE = 0,
-  ROW_INDICATOR_NUMBERS = 1,
-  ROW_INDICATOR_CURRENT = 2,
-  ROW_INDICATOR_SELECTION = 4,
-  ROW_INDICATOR_CHECKBOX = 8,
-  ROW_INDICATOR_HANDLE = 16,
-  ROW_INDICATOR_EDITING = 32,
-  ROW_INDICATOR_MODIFIED = 64,
-  ROW_INDICATOR_ERROR = 128,
-  ROW_INDICATOR_NEW_ROW = 256,
-  ROW_INDICATOR_EXPANDER = 512,
-  ROW_INDICATOR_RESIZE = 1024,
-  ROW_INDICATOR_ACTION = 2048,
-  ROW_INDICATOR_STATUS_ICON = 4096,
-  ROW_INDICATOR_CUSTOM = 8192,
 }
 export enum RowIndicatorSlotKind {
   ROW_INDICATOR_SLOT_NONE = 0,
@@ -583,6 +611,11 @@ export const AfterScrollEventFields = {
 export const AfterSortEventFields = {
   "col": 1,
 } as const;
+export const AfterTreeNodeToggleEventFields = {
+  "node_id": 1,
+  "row": 2,
+  "collapse": 3,
+} as const;
 export const AfterUserFreezeEventFields = {
   "frozen_rows": 1,
   "frozen_cols": 2,
@@ -674,6 +707,7 @@ export const BeforeEditEventFields = {
 export const BeforeMouseDownEventFields = {
   "row": 1,
   "col": 2,
+  "target": 3,
 } as const;
 export const BeforeMoveColumnEventFields = {
   "col": 1,
@@ -698,6 +732,11 @@ export const BeforeScrollEventFields = {
 } as const;
 export const BeforeSortEventFields = {
   "col": 1,
+} as const;
+export const BeforeTreeNodeToggleEventFields = {
+  "node_id": 1,
+  "row": 2,
+  "collapse": 3,
 } as const;
 export const BeforeUserResizeEventFields = {
   "row": 1,
@@ -821,6 +860,7 @@ export const ClickEventFields = {
   "col": 2,
   "hit_area": 3,
   "interaction": 4,
+  "target": 5,
 } as const;
 export const ClipboardCommandFields = {
   "grid_id": 1,
@@ -925,6 +965,15 @@ export const CornerIndicatorConfigFields = {
   "foreground": 4,
   "custom_key": 5,
   "data": 6,
+  "slots": 7,
+} as const;
+export const CornerIndicatorSlotFields = {
+  "kind": 1,
+  "width": 2,
+  "visible": 3,
+  "custom_key": 4,
+  "data": 5,
+  "label_text": 6,
 } as const;
 export const CreateRequestFields = {
   "viewport_width": 1,
@@ -962,6 +1011,7 @@ export const DataRefreshingEventFields = {
 export const DblClickEventFields = {
   "row": 1,
   "col": 2,
+  "target": 3,
 } as const;
 export const DefineColumnsRequestFields = {
   "grid_id": 1,
@@ -1110,6 +1160,7 @@ export const EditStateFields = {
 export const EnterCellEventFields = {
   "row": 1,
   "col": 2,
+  "target": 3,
 } as const;
 export const ErrorEventFields = {
   "code": 1,
@@ -1320,6 +1371,23 @@ export const GridEventFields = {
   "pull_to_refresh_triggered": 61,
   "pull_to_refresh_canceled": 62,
   "before_dropdown_open": 63,
+  "tree_children_requested": 64,
+  "before_tree_node_toggle": 65,
+  "after_tree_node_toggle": 66,
+  "tree_node_activate": 67,
+  "tree_node_context_menu": 68,
+} as const;
+export const GridEventTargetFields = {
+  "kind": 1,
+  "band": 2,
+  "slot_index": 3,
+  "slot_kind": 4,
+  "sub_mode_bits": 5,
+  "custom_key": 6,
+  "text": 7,
+  "int_value": 8,
+  "status_flags": 9,
+  "data": 10,
 } as const;
 export const GridLinesFields = {
   "style": 1,
@@ -1432,6 +1500,26 @@ export const ImageDataFields = {
   "data": 1,
   "format": 2,
 } as const;
+export const IndicatorColorsFields = {
+  "background": 1,
+  "foreground": 2,
+  "grid": 3,
+  "button_background": 4,
+  "button_foreground": 5,
+  "button_border": 6,
+  "button_pressed_background": 7,
+  "button_pressed_foreground": 8,
+  "button_pressed_border_dark": 9,
+  "button_pressed_border_light": 10,
+  "button_hover_background": 11,
+  "button_hover_foreground": 12,
+  "button_hover_border": 13,
+} as const;
+export const IndicatorFocusConfigFields = {
+  "enable_keyboard_focus": 1,
+  "enter_key_code": 2,
+  "exit_key_code": 3,
+} as const;
 export const IndicatorsConfigFields = {
   "row_start": 1,
   "row_end": 2,
@@ -1441,6 +1529,9 @@ export const IndicatorsConfigFields = {
   "corner_top_end": 6,
   "corner_bottom_start": 7,
   "corner_bottom_end": 8,
+  "focus": 9,
+  "appearance": 10,
+  "colors": 11,
 } as const;
 export const InsertRowsRequestFields = {
   "grid_id": 1,
@@ -1464,6 +1555,8 @@ export const InteractionConfigFields = {
   "drag_mode": 8,
   "drop_mode": 9,
   "header_features": 10,
+  "decision_timeout_ms": 11,
+  "compare_response_timeout_ms": 12,
 } as const;
 export const JsonOptionsFields = {
   "data_path": 1,
@@ -1511,6 +1604,7 @@ export const LayoutConfigFields = {
 export const LeaveCellEventFields = {
   "row": 1,
   "col": 2,
+  "target": 3,
 } as const;
 export const LoadDataOptionsFields = {
   "csv": 1,
@@ -1598,6 +1692,7 @@ export const MouseMoveEventFields = {
   "modifier": 2,
   "x": 3,
   "y": 4,
+  "target": 5,
 } as const;
 export const MouseUpEventFields = {
   "button": 1,
@@ -1630,10 +1725,14 @@ export const NodeInfoFields = {
 } as const;
 export const OutlineConfigFields = {
   "tree_indicator": 1,
-  "tree_column": 2,
   "tree_color": 3,
   "group_total_position": 4,
   "multi_totals": 5,
+  "indicator_indent": 6,
+  "max_levels": 7,
+  "show_level_buttons": 8,
+  "label_column": 9,
+  "icon_column": 10,
 } as const;
 export const OutlineRequestFields = {
   "grid_id": 1,
@@ -1780,7 +1879,6 @@ export const RowDefFields = {
 export const RowIndicatorConfigFields = {
   "visible": 1,
   "width": 2,
-  "mode_bits": 3,
   "background": 4,
   "foreground": 5,
   "grid_lines": 6,
@@ -2031,6 +2129,21 @@ export const TooltipRequestFields = {
   "x": 1,
   "y": 2,
   "text": 3,
+} as const;
+export const TreeChildrenRequestedEventFields = {
+  "node_id": 1,
+  "row": 2,
+  "request_id": 3,
+} as const;
+export const TreeNodeActivateEventFields = {
+  "node_id": 1,
+  "row": 2,
+} as const;
+export const TreeNodeContextMenuEventFields = {
+  "node_id": 1,
+  "row": 2,
+  "x": 3,
+  "y": 4,
 } as const;
 export const TypeAheadEndedEventFields = {
 } as const;

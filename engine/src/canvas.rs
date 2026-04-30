@@ -2682,6 +2682,14 @@ fn build_or_reuse_ctx(
         return RenderContext::new(grid, w, h, None);
     }
 
+    // While animation is active, per-row/col offsets change every frame and
+    // are baked into visible_row_rects / visible_col_rects, so the cached
+    // structural data is stale. Layout generation alone won't catch this
+    // because the layout itself doesn't change between animation ticks.
+    if grid.animation.active {
+        return RenderContext::new(grid, w, h, None);
+    }
+
     // Compute the VisibleRange first (cheap: binary searches + small vecs).
     // This encodes ALL structural inputs that affect the cell iteration.
     let current_vp = VisibleRange::compute(grid, w, h);
@@ -2838,7 +2846,6 @@ fn render_grid_internal<C: Canvas>(
     );
     run_layer!(layer::FOCUS_RECT, render_focus_rect(grid, canvas, &ctx));
     run_layer!(layer::FILL_HANDLE, render_fill_handle(grid, canvas, &ctx));
-    run_layer!(layer::OUTLINE, render_outline(grid, canvas, &ctx));
     run_layer!(
         layer::FROZEN_BORDERS,
         render_frozen_borders(grid, canvas, &ctx)
@@ -3154,6 +3161,14 @@ fn build_visible_row_rects(grid: &VolvoxGrid, vp: &VisibleRange) -> BTreeMap<i32
     let band_top = vp.data_y;
     let band_bottom = vp.data_y + vp.data_h;
     let fixed_bottom = grid.row_pos(vp.fixed_row_end);
+    let anim_active = grid.animation.active;
+    let row_anim = |row: i32| -> i32 {
+        if anim_active {
+            grid.animation.row_offset(row) as i32
+        } else {
+            0
+        }
+    };
 
     for row in 0..vp.fixed_row_end {
         if grid.is_row_hidden(row) {
@@ -3162,7 +3177,7 @@ fn build_visible_row_rects(grid: &VolvoxGrid, vp: &VisibleRange) -> BTreeMap<i32
         insert_visible_row_rect(
             &mut rows,
             row,
-            vp.data_y + grid.row_pos(row),
+            vp.data_y + grid.row_pos(row) + row_anim(row),
             grid.row_height(row),
             band_top,
             band_bottom,
@@ -3193,7 +3208,8 @@ fn build_visible_row_rects(grid: &VolvoxGrid, vp: &VisibleRange) -> BTreeMap<i32
         insert_visible_row_rect(
             &mut rows,
             row,
-            vp.data_y + grid.row_pos(row) - grid.scroll.scroll_y as i32 + vp.pinned_top_height,
+            vp.data_y + grid.row_pos(row) + row_anim(row) - grid.scroll.scroll_y as i32
+                + vp.pinned_top_height,
             grid.row_height(row),
             scroll_clip_top,
             scroll_clip_bottom,
@@ -3276,6 +3292,14 @@ fn build_visible_col_rects(grid: &VolvoxGrid, vp: &VisibleRange) -> BTreeMap<i32
     let band_left = vp.data_x;
     let band_right = vp.data_x + vp.data_w;
     let fixed_right = grid.col_pos(vp.fixed_col_end);
+    let anim_active = grid.animation.active;
+    let col_anim = |col: i32| -> i32 {
+        if anim_active {
+            grid.animation.col_offset(col) as i32
+        } else {
+            0
+        }
+    };
 
     for col in 0..vp.fixed_col_end {
         if grid.is_col_hidden(col) {
@@ -3284,7 +3308,7 @@ fn build_visible_col_rects(grid: &VolvoxGrid, vp: &VisibleRange) -> BTreeMap<i32
         insert_visible_col_rect(
             &mut cols,
             col,
-            vp.data_x + grid.col_pos(col),
+            vp.data_x + grid.col_pos(col) + col_anim(col),
             grid.col_width(col),
             band_left,
             band_right,
@@ -3303,7 +3327,7 @@ fn build_visible_col_rects(grid: &VolvoxGrid, vp: &VisibleRange) -> BTreeMap<i32
         insert_visible_col_rect(
             &mut cols,
             col,
-            vp.data_x + grid.col_pos(col) - grid.scroll.scroll_x as i32,
+            vp.data_x + grid.col_pos(col) + col_anim(col) - grid.scroll.scroll_x as i32,
             grid.col_width(col),
             scroll_clip_left,
             scroll_clip_right,
@@ -3571,6 +3595,54 @@ fn indicator_back_color(color: Option<u32>, fallback: u32) -> u32 {
     color.unwrap_or(fallback)
 }
 
+fn indicator_theme_back_color(grid: &VolvoxGrid) -> u32 {
+    grid.indicator_bands
+        .colors
+        .background
+        .unwrap_or(grid.style.back_color_fixed)
+}
+
+fn indicator_theme_fore_color(grid: &VolvoxGrid) -> u32 {
+    grid.indicator_bands
+        .colors
+        .foreground
+        .unwrap_or(grid.style.fore_color_fixed)
+}
+
+fn indicator_theme_grid_color(grid: &VolvoxGrid) -> u32 {
+    grid.indicator_bands
+        .colors
+        .grid
+        .unwrap_or(grid.style.grid_color_fixed)
+}
+
+fn row_indicator_expander_hovered(grid: &VolvoxGrid, row: i32, slot_index: i32) -> bool {
+    if grid.selection.hover_mode == HOVER_NONE {
+        return false;
+    }
+    let Some(hover) = &grid.last_hover_target else {
+        return false;
+    };
+    hover.row == row
+        && hover.target.kind == pb::GridTargetKind::GridTargetRowIndicator as i32
+        && hover.target.band == pb::IndicatorBand::RowStart as i32
+        && hover.target.slot_index == slot_index
+        && hover.target.slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
+}
+
+fn corner_outline_level_hovered(grid: &VolvoxGrid, level: i32) -> bool {
+    if grid.selection.hover_mode == HOVER_NONE {
+        return false;
+    }
+    let Some(hover) = &grid.last_hover_target else {
+        return false;
+    };
+    hover.target.kind == pb::GridTargetKind::GridTargetCornerIndicator as i32
+        && hover.target.band == pb::IndicatorBand::CornerTopStart as i32
+        && hover.target.slot_kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32
+        && hover.target.int_value == level as i64
+}
+
 fn draw_indicator_text<C: Canvas>(
     canvas: &mut C,
     grid: &VolvoxGrid,
@@ -3591,14 +3663,57 @@ fn draw_indicator_text<C: Canvas>(
     let text_w = tw.ceil() as i32;
     let text_h = th.ceil() as i32;
     let tx = match halign {
-        1 => x + (w - text_w) / 2,
-        2 => x + w - text_w - 4,
-        _ => x + 4,
-    }
-    .clamp(x + 1, (x + w - text_w - 1).max(x + 1));
+        1 => (x + (w - text_w) / 2).clamp(x + 1, (x + w - text_w - 1).max(x + 1)),
+        2 => (x + w - text_w - 4).clamp(x + 1, (x + w - text_w - 1).max(x + 1)),
+        _ => x + 4.min((w - 1).max(1)),
+    };
     let ty = (y + (h - text_h) / 2).clamp(y + 1, (y + h - text_h - 1).max(y + 1));
     canvas.draw_text_styled_fast(
         tx, ty, text, font_name, font_size, false, false, color, x, y, w, h, 0, None,
+    );
+}
+
+fn draw_indicator_icon_text<C: Canvas>(
+    canvas: &mut C,
+    grid: &VolvoxGrid,
+    text: &str,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    color: u32,
+) {
+    if text.trim().is_empty() || w <= 2 || h <= 2 {
+        return;
+    }
+    let (font_name, font_size, font_bold, font_italic, icon_color) = resolve_icon_text_style(
+        grid,
+        None,
+        (grid.style.font_size + 1.0).max(8.0),
+        false,
+        false,
+        color,
+    );
+    let (tw, th) = canvas.measure_text(text, &font_name, font_size, font_bold, font_italic, None);
+    let text_w = tw.ceil() as i32;
+    let text_h = th.ceil() as i32;
+    let tx = (x + (w - text_w) / 2).clamp(x + 1, (x + w - text_w - 1).max(x + 1));
+    let ty = (y + (h - text_h) / 2).clamp(y + 1, (y + h - text_h - 1).max(y + 1));
+    canvas.draw_text_styled_fast(
+        tx,
+        ty,
+        text,
+        &font_name,
+        font_size,
+        font_bold,
+        font_italic,
+        icon_color,
+        x,
+        y,
+        w,
+        h,
+        0,
+        None,
     );
 }
 
@@ -3663,6 +3778,36 @@ fn draw_indicator_checkbox<C: Canvas>(
     }
 }
 
+fn draw_indicator_focus_rect<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    rect: (i32, i32, i32, i32),
+) {
+    if grid.selection.focus_border == pb::FocusBorderStyle::FocusBorderNone as i32 {
+        return;
+    }
+    let (x, y, w, h) = rect;
+    if w <= 0 || h <= 0 {
+        return;
+    }
+    match grid.selection.focus_border {
+        f if f == pb::FocusBorderStyle::FocusBorderThin as i32 => {
+            canvas.dotted_rect(x, y, w, h, 0xFF000000);
+        }
+        f if f == pb::FocusBorderStyle::FocusBorderThick as i32 => {
+            canvas.rect_outline(x, y, w, h, 0xFF000000);
+            canvas.rect_outline(x + 1, y + 1, w - 2, h - 2, 0xFF000000);
+        }
+        f if f == pb::FocusBorderStyle::FocusBorderInset as i32 => {
+            canvas.rect_3d(x, y, w, h, false);
+        }
+        f if f == pb::FocusBorderStyle::FocusBorderRaised as i32 => {
+            canvas.rect_3d(x, y, w, h, true);
+        }
+        _ => {}
+    }
+}
+
 fn render_row_indicator_slot<C: Canvas>(
     grid: &VolvoxGrid,
     canvas: &mut C,
@@ -3716,14 +3861,450 @@ fn render_row_indicator_slot<C: Canvas>(
         return;
     }
     if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32 {
-        if let Some(rp) = grid.get_row_props(row) {
-            let glyph = if rp.is_collapsed { "+" } else { "-" };
-            draw_indicator_text(
-                canvas, grid, glyph, rect.0, rect.1, rect.2, rect.3, 1, fore_color,
-            );
-        }
+        render_outline_expander_slot(canvas, grid, row, rect, fore_color);
         return;
     }
+}
+
+fn outline_visual_depth(grid: &VolvoxGrid, row: i32) -> Option<i32> {
+    if let Some(level) = grid.tree.row_level(grid.fixed_rows, row) {
+        return Some(level.max(0));
+    }
+    let rp = grid.get_row_props(row)?;
+    let has_subtotal_nodes = grid.row_props.values().any(|props| props.is_subtotal);
+    if has_subtotal_nodes {
+        let level =
+            subtotal_visual_level(rp.outline_level, rp.is_subtotal, first_subtotal_level(grid));
+        Some((level - 1).max(0))
+    } else {
+        Some(crate::outline::outline_visual_depth_for_level(
+            grid,
+            rp.outline_level,
+        ))
+    }
+}
+
+fn outline_row_has_children(grid: &VolvoxGrid, row: i32) -> bool {
+    if grid.tree.node_id_at_row(grid.fixed_rows, row).is_some() {
+        return grid.tree.row_has_children(grid.fixed_rows, row);
+    }
+    let Some(rp) = grid.get_row_props(row) else {
+        return false;
+    };
+    if rp.is_subtotal {
+        return true;
+    }
+    crate::outline::get_node(grid, row).3 > 0
+}
+
+fn outline_branch_continues_after(grid: &VolvoxGrid, row: i32, depth: i32) -> bool {
+    if depth < 0 {
+        return false;
+    }
+    for next_row in (row + 1)..grid.rows {
+        if grid.is_row_hidden(next_row) {
+            continue;
+        }
+        let Some(next_depth) = outline_visual_depth(grid, next_row) else {
+            continue;
+        };
+        if next_depth < depth {
+            return false;
+        }
+        if next_depth == depth {
+            return true;
+        }
+    }
+    false
+}
+
+fn outline_branch_has_previous(grid: &VolvoxGrid, row: i32, depth: i32) -> bool {
+    if depth < 0 {
+        return false;
+    }
+    for prev_row in (grid.fixed_rows..row).rev() {
+        if grid.is_row_hidden(prev_row) {
+            continue;
+        }
+        let Some(prev_depth) = outline_visual_depth(grid, prev_row) else {
+            continue;
+        };
+        if prev_depth < depth {
+            return false;
+        }
+        if prev_depth == depth {
+            return true;
+        }
+    }
+    false
+}
+
+fn draw_tree_guide_vline<C: Canvas>(canvas: &mut C, x: i32, y: i32, h: i32, color: u32) {
+    if h <= 0 {
+        return;
+    }
+    canvas.blend_rect(x, y, 1, h, color);
+}
+
+fn draw_tree_guide_hline<C: Canvas>(canvas: &mut C, x: i32, y: i32, w: i32, color: u32) {
+    if w <= 0 {
+        return;
+    }
+    canvas.blend_rect(x, y, w, 1, color);
+}
+
+fn draw_tree_guide_vline_except_rect<C: Canvas>(
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    h: i32,
+    color: u32,
+    gap: Option<(i32, i32, i32, i32)>,
+) {
+    let Some((gx, gy, gw, gh)) = gap else {
+        draw_tree_guide_vline(canvas, x, y, h, color);
+        return;
+    };
+    if gw <= 0 || gh <= 0 || x < gx || x >= gx + gw {
+        draw_tree_guide_vline(canvas, x, y, h, color);
+        return;
+    }
+
+    let y0 = y;
+    let y1 = y + h;
+    let gap_y0 = gy.max(y0);
+    let gap_y1 = (gy + gh).min(y1);
+    if gap_y1 <= gap_y0 {
+        draw_tree_guide_vline(canvas, x, y, h, color);
+        return;
+    }
+    draw_tree_guide_vline(canvas, x, y0, gap_y0 - y0, color);
+    draw_tree_guide_vline(canvas, x, gap_y1, y1 - gap_y1, color);
+}
+
+fn draw_tree_guide_hline_except_rect<C: Canvas>(
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    w: i32,
+    color: u32,
+    gap: Option<(i32, i32, i32, i32)>,
+) {
+    let Some((gx, gy, gw, gh)) = gap else {
+        draw_tree_guide_hline(canvas, x, y, w, color);
+        return;
+    };
+    if gw <= 0 || gh <= 0 || y < gy || y >= gy + gh {
+        draw_tree_guide_hline(canvas, x, y, w, color);
+        return;
+    }
+
+    let x0 = x;
+    let x1 = x + w;
+    let gap_x0 = gx.max(x0);
+    let gap_x1 = (gx + gw).min(x1);
+    if gap_x1 <= gap_x0 {
+        draw_tree_guide_hline(canvas, x, y, w, color);
+        return;
+    }
+    draw_tree_guide_hline(canvas, x0, y, gap_x0 - x0, color);
+    draw_tree_guide_hline(canvas, gap_x1, y, x1 - gap_x1, color);
+}
+
+fn render_outline_connector_guides<C: Canvas>(
+    canvas: &mut C,
+    grid: &VolvoxGrid,
+    row: i32,
+    rect: (i32, i32, i32, i32),
+    depth: i32,
+    tg: crate::outline::TreeGeometry,
+    color: u32,
+    toggle_gap: Option<(i32, i32, i32, i32)>,
+) {
+    let (x, y, w, h) = rect;
+    if w <= 0 || h <= 0 {
+        return;
+    }
+    let guide_color = scale_color_alpha(color, 0.46);
+    let mid_y = y + h / 2;
+
+    for ancestor_depth in 1..depth {
+        if !outline_branch_continues_after(grid, row, ancestor_depth) {
+            continue;
+        }
+        let lx = x + ancestor_depth * tg.indent_step + tg.line_offset;
+        if lx >= x && lx < x + w {
+            draw_tree_guide_vline_except_rect(canvas, lx, y, h, guide_color, toggle_gap);
+        }
+    }
+
+    let lx = (x + depth * tg.indent_step + tg.line_offset).min(x + w - 1);
+    if lx < x || lx >= x + w {
+        return;
+    }
+    if depth <= 0 {
+        return;
+    }
+    let has_top_segment = depth > 0 || outline_branch_has_previous(grid, row, depth);
+    let has_bottom_segment = outline_branch_continues_after(grid, row, depth);
+    if has_top_segment {
+        draw_tree_guide_vline_except_rect(
+            canvas,
+            lx,
+            y,
+            (mid_y - y + 1).max(1),
+            guide_color,
+            toggle_gap,
+        );
+    }
+    if has_bottom_segment {
+        draw_tree_guide_vline_except_rect(
+            canvas,
+            lx,
+            mid_y,
+            (y + h - mid_y).max(1),
+            guide_color,
+            toggle_gap,
+        );
+    }
+
+    let branch_len = (tg.connector_end - tg.line_offset + 1).clamp(4, 7);
+    let h_end = (lx + branch_len).min(x + w);
+    if h_end > lx {
+        draw_tree_guide_hline_except_rect(canvas, lx, mid_y, h_end - lx, guide_color, toggle_gap);
+    }
+}
+
+fn draw_outline_toggle<C: Canvas>(
+    canvas: &mut C,
+    grid: &VolvoxGrid,
+    rect: (i32, i32, i32, i32),
+    fallback_clip_rect: (i32, i32, i32, i32),
+    is_collapsed: bool,
+    color: u32,
+) {
+    let (x, y, w, h) = rect;
+    if w <= 0 || h <= 0 {
+        return;
+    }
+    let node_picture = if is_collapsed {
+        grid.outline.node_closed_picture.as_deref()
+    } else {
+        grid.outline.node_open_picture.as_deref()
+    };
+    if let Some(pic_data) = node_picture {
+        if let Some((img_rgba, img_w, img_h)) = decode_png_rgba(pic_data) {
+            if img_w > 0 && img_h > 0 {
+                let draw_h = img_h.min(h).max(1);
+                let draw_w = ((img_w as i64 * draw_h as i64) / img_h as i64).max(1) as i32;
+                let tx = x + (w - draw_w) / 2;
+                let ty = y + (h - draw_h) / 2;
+                if draw_w == img_w && draw_h == img_h {
+                    canvas.blit_image_at(tx, ty, &img_rgba, img_w, img_h);
+                } else {
+                    canvas.blit_image(tx, ty, draw_w, draw_h, &img_rgba, img_w, img_h);
+                }
+                return;
+            }
+        }
+    }
+
+    let node_icon = if is_collapsed {
+        grid.style
+            .icon_theme_slots
+            .tree_collapsed
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+    } else {
+        grid.style
+            .icon_theme_slots
+            .tree_expanded
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+    };
+    if let Some(icon) = node_icon {
+        let (icon_font_name, font_size, font_bold, font_italic, icon_color) =
+            resolve_icon_text_style(
+                grid,
+                resolve_tree_slot_style(grid, is_collapsed),
+                (grid.style.font_size + 1.0).max(8.0),
+                false,
+                false,
+                color,
+            );
+        let (tw, th) = canvas.measure_text(
+            icon,
+            &icon_font_name,
+            font_size,
+            font_bold,
+            font_italic,
+            None,
+        );
+        let text_w = tw.ceil() as i32;
+        let text_h = th.ceil() as i32;
+        let tx = x + (w - text_w) / 2;
+        let ty = y + (h - text_h) / 2;
+        canvas.draw_text_styled_fast(
+            tx,
+            ty,
+            icon,
+            &icon_font_name,
+            font_size,
+            font_bold,
+            font_italic,
+            icon_color,
+            x,
+            y,
+            w,
+            h,
+            0,
+            None,
+        );
+        return;
+    }
+
+    let (clip_x, clip_y, clip_w, clip_h) = fallback_clip_rect;
+    if clip_w <= 0 || clip_h <= 0 {
+        return;
+    }
+    let icon = if is_collapsed { ">" } else { "v" };
+    let font_name = &grid.style.font_name;
+    let font_size = grid.style.font_size.clamp(1.0, 256.0);
+    let (tw, th) = canvas.measure_text(icon, font_name, font_size, false, false, None);
+    let text_w = tw.ceil() as i32;
+    let text_h = th.ceil() as i32;
+    let tx = (x + (w - text_w) / 2).clamp(clip_x, (clip_x + clip_w - text_w).max(clip_x));
+    let ty = (clip_y + (clip_h - text_h) / 2).clamp(clip_y, (clip_y + clip_h - text_h).max(clip_y));
+    canvas.draw_text_styled_fast(
+        tx, ty, icon, font_name, font_size, false, false, color, clip_x, clip_y, clip_w, clip_h, 0,
+        None,
+    );
+}
+
+fn render_outline_expander_slot<C: Canvas>(
+    canvas: &mut C,
+    grid: &VolvoxGrid,
+    row: i32,
+    rect: (i32, i32, i32, i32),
+    fore_color: u32,
+) {
+    let Some(rp) = grid.get_row_props(row) else {
+        return;
+    };
+    let (x, y, w, h) = rect;
+    if w <= 0 || h <= 0 {
+        return;
+    }
+    let tg = crate::outline::TreeGeometry::from_grid(grid);
+    let depth = outline_visual_depth(grid, row).unwrap_or(0);
+    let indent_x = (x + depth * tg.indent_step).min(x + w - 1);
+    let tree_color = grid.style.tree_color;
+    let draw_connectors = grid.outline.tree_indicator
+        == pb::TreeIndicatorStyle::TreeIndicatorConnectors as i32
+        || grid.outline.tree_indicator
+            == pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+
+    let has_children = outline_row_has_children(grid, row);
+    let leaf_style = grid.outline.tree_indicator
+        == pb::TreeIndicatorStyle::TreeIndicatorArrowsLeaf as i32
+        || grid.outline.tree_indicator
+            == pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+    let show_toggle = has_children || leaf_style;
+    let toggle_size = tg.btn_size.min(h.saturating_sub(2).max(0)).max(0);
+    let mut text_x = indent_x;
+    let toggle_rect = if show_toggle && toggle_size > 0 {
+        let bx =
+            (indent_x + tg.line_offset - toggle_size / 2).clamp(x, (x + w - toggle_size).max(x));
+        let by = y + (h - toggle_size) / 2;
+        Some((bx, by, toggle_size, toggle_size))
+    } else {
+        None
+    };
+    let toggle_gap = if has_children {
+        toggle_rect.map(|(bx, _by, bw, _bh)| (bx, y, bw, h))
+    } else {
+        None
+    };
+    if draw_connectors {
+        render_outline_connector_guides(canvas, grid, row, rect, depth, tg, tree_color, toggle_gap);
+    }
+    if let Some((bx, by, bw, bh)) = toggle_rect {
+        if has_children {
+            draw_outline_toggle(
+                canvas,
+                grid,
+                (bx, by, bw, bh),
+                (bx, y, bw, h),
+                rp.is_collapsed,
+                tree_color,
+            );
+        }
+        text_x = (bx + bw + 3).min(x + w);
+    } else {
+        text_x = (text_x + tg.line_offset + 3).min(x + w);
+    }
+
+    if grid.outline.icon_column >= 0 && grid.outline.icon_column < grid.cols {
+        let icon = grid.get_display_text(row, grid.outline.icon_column);
+        if !icon.trim().is_empty() {
+            let icon_w = (h - 4).max(8).min((x + w - text_x).max(0));
+            draw_indicator_icon_text(canvas, grid, &icon, text_x, y, icon_w, h, fore_color);
+            text_x = (text_x + icon_w + 3).min(x + w);
+        }
+    }
+
+    if grid.outline.label_column >= 0 && grid.outline.label_column < grid.cols && text_x < x + w {
+        let label = grid.get_display_text(row, grid.outline.label_column);
+        draw_indicator_text(
+            canvas,
+            grid,
+            &label,
+            text_x,
+            y,
+            x + w - text_x,
+            h,
+            0,
+            fore_color,
+        );
+    }
+}
+
+fn row_indicator_separator_spans(grid: &VolvoxGrid, band_x: i32, band_w: i32) -> Vec<(i32, i32)> {
+    if band_w <= 0 {
+        return Vec::new();
+    }
+    let band = &grid.indicator_bands.row_start;
+    let visible_slot_count = band.slots.iter().filter(|slot| slot.visible).count();
+    if visible_slot_count == 0 {
+        return vec![(band_x, band_w)];
+    }
+    let has_tree_slot = band
+        .slots
+        .iter()
+        .filter(|slot| slot.visible)
+        .any(|slot| slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32);
+    if !has_tree_slot {
+        return vec![(band_x, band_w)];
+    }
+
+    let mut spans = Vec::new();
+    let mut slot_x = band_x;
+    for slot in band.slots.iter().filter(|slot| slot.visible) {
+        let remaining = (band_x + band_w - slot_x).max(0);
+        if remaining <= 0 {
+            break;
+        }
+        let slot_w = if visible_slot_count == 1 {
+            remaining
+        } else {
+            slot.width_px.max(1).min(remaining)
+        };
+        if slot.kind != pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32 {
+            spans.push((slot_x, slot_w));
+        }
+        slot_x += slot_w;
+    }
+    spans
 }
 
 fn render_row_indicator_start<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
@@ -3733,9 +4314,17 @@ fn render_row_indicator_start<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx:
         return;
     }
 
-    let back_color = indicator_back_color(band.back_color, grid.style.back_color_fixed);
-    let fore_color = indicator_fore_color(band.fore_color, grid.style.fore_color_fixed);
-    let grid_color = band.grid_color.unwrap_or(grid.style.grid_color_fixed);
+    let back_color = indicator_back_color(band.back_color, indicator_theme_back_color(grid));
+    let fore_color = indicator_fore_color(band.fore_color, indicator_theme_fore_color(grid));
+    let grid_color = band
+        .grid_color
+        .unwrap_or_else(|| indicator_theme_grid_color(grid));
+    let button_theme = crate::indicator::resolve_indicator_button_theme(
+        grid.indicator_bands.appearance,
+        grid.indicator_bands.colors,
+        fore_color,
+        grid_color,
+    );
     let band_x = 0;
     let band_y = vp.data_y;
     let band_w = vp.data_x;
@@ -3770,80 +4359,59 @@ fn render_row_indicator_start<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx:
         } else {
             fore_color
         };
-        if !band.slots.is_empty() {
-            let mut slot_x = band_x;
-            for slot in band.slots.iter().filter(|slot| slot.visible) {
-                let remaining = (band_x + band_w - slot_x).max(0);
-                if remaining <= 0 {
-                    break;
+        let visible_slot_count = band.slots.iter().filter(|slot| slot.visible).count();
+        let mut slot_x = band_x;
+        for (slot_index, slot) in band
+            .slots
+            .iter()
+            .enumerate()
+            .filter(|(_, slot)| slot.visible)
+        {
+            let remaining = (band_x + band_w - slot_x).max(0);
+            if remaining <= 0 {
+                break;
+            }
+            let slot_w = if visible_slot_count == 1 {
+                remaining
+            } else {
+                slot.width_px.max(1).min(remaining)
+            };
+            let slot_hovered = slot.kind
+                == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32
+                && row_indicator_expander_hovered(grid, row, slot_index as i32);
+            let slot_fore_color = if slot_hovered {
+                canvas.fill_rect(slot_x, cy, slot_w, ch, button_theme.hover_background);
+                if let Some(border) = button_theme.hover_border {
+                    canvas.rect_outline(slot_x, cy, slot_w, ch, border);
                 }
-                let slot_w = slot.width_px.max(1).min(remaining);
-                render_row_indicator_slot(
-                    grid,
-                    canvas,
-                    row,
-                    (slot_x, cy, slot_w, ch),
-                    slot.kind,
-                    row_fore_color,
-                );
-                slot_x += slot_w;
+                button_theme.hover_foreground
+            } else {
+                row_fore_color
+            };
+            render_row_indicator_slot(
+                grid,
+                canvas,
+                row,
+                (slot_x, cy, slot_w, ch),
+                slot.kind,
+                slot_fore_color,
+            );
+            if let Some(active) = &grid.active_indicator {
+                if active.band == pb::IndicatorBand::RowStart as i32
+                    && active.row == row
+                    && active.slot_index == slot_index as i32
+                {
+                    draw_indicator_focus_rect(grid, canvas, (slot_x, cy, slot_w, ch));
+                }
             }
-        } else {
-            let composite_rect = (band_x, cy, band_w, ch);
-            if band.has_mode(pb::RowIndicatorMode::RowIndicatorNumbers) {
-                render_row_indicator_slot(
-                    grid,
-                    canvas,
-                    row,
-                    composite_rect,
-                    pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32,
-                    row_fore_color,
-                );
-            } else if band.has_mode(pb::RowIndicatorMode::RowIndicatorCurrent)
-                && row == grid.selection.row
-            {
-                render_row_indicator_slot(
-                    grid,
-                    canvas,
-                    row,
-                    composite_rect,
-                    pb::RowIndicatorSlotKind::RowIndicatorSlotCurrent as i32,
-                    row_fore_color,
-                );
-            } else if band.has_mode(pb::RowIndicatorMode::RowIndicatorSelection) {
-                render_row_indicator_slot(
-                    grid,
-                    canvas,
-                    row,
-                    composite_rect,
-                    pb::RowIndicatorSlotKind::RowIndicatorSlotSelection as i32,
-                    row_fore_color,
-                );
-            }
-            if band.has_mode(pb::RowIndicatorMode::RowIndicatorCheckbox) {
-                render_row_indicator_slot(
-                    grid,
-                    canvas,
-                    row,
-                    composite_rect,
-                    pb::RowIndicatorSlotKind::RowIndicatorSlotCheckbox as i32,
-                    row_fore_color,
-                );
-            }
-            if band.has_mode(pb::RowIndicatorMode::RowIndicatorEditing) {
-                render_row_indicator_slot(
-                    grid,
-                    canvas,
-                    row,
-                    composite_rect,
-                    pb::RowIndicatorSlotKind::RowIndicatorSlotEditing as i32,
-                    row_fore_color,
-                );
-            }
+            slot_x += slot_w;
         }
     }
+    let separator_spans = row_indicator_separator_spans(grid, band_x, band_w);
     for &(cy, ch) in ctx.visible_row_rects.values() {
-        canvas.hline(band_x, cy + ch - 1, band_w, grid_color);
+        for &(sx, sw) in &separator_spans {
+            canvas.hline(sx, cy + ch - 1, sw, grid_color);
+        }
     }
     canvas.vline(band_x + band_w - 1, band_y, band_h, grid_color);
 }
@@ -3855,9 +4423,11 @@ fn render_col_indicator_top<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &
         return;
     }
 
-    let back_color = indicator_back_color(band.back_color, grid.style.back_color_fixed);
-    let fore_color = indicator_fore_color(band.fore_color, grid.style.fore_color_fixed);
-    let grid_color = band.grid_color.unwrap_or(grid.style.grid_color_fixed);
+    let back_color = indicator_back_color(band.back_color, indicator_theme_back_color(grid));
+    let fore_color = indicator_fore_color(band.fore_color, indicator_theme_fore_color(grid));
+    let grid_color = band
+        .grid_color
+        .unwrap_or_else(|| indicator_theme_grid_color(grid));
     let band_x = vp.data_x;
     let band_y = 0;
     let band_w = vp.data_w;
@@ -4067,6 +4637,31 @@ fn render_col_indicator_top<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &
             canvas.vline(*cx + *cw - 1, band_y, band_h, grid_color);
         }
     }
+
+    if let Some(active) = &grid.active_indicator {
+        if active.band == pb::IndicatorBand::ColTop as i32 {
+            if auto_headers && active.slot_index < 0 {
+                if let (Some((cx, cw)), Some((_row, cy, ch))) = (
+                    col_rects.get(&active.col).copied(),
+                    row_offsets.first().copied(),
+                ) {
+                    draw_indicator_focus_rect(grid, canvas, (cx, cy, cw, ch));
+                }
+            } else if active.slot_index >= 0 {
+                if let Some(cell) = band.cells.get(active.slot_index as usize) {
+                    if let Some((cx, cw)) = indicator_span_x(col_rects, cell.col1, cell.col2) {
+                        let row1 = cell.row1.max(0) as usize;
+                        let row2 = cell.row2.max(cell.row1).max(0) as usize;
+                        if row1 < row_offsets.len() && row2 < row_offsets.len() {
+                            let cy = row_offsets[row1].1;
+                            let ch = row_offsets[row1..=row2].iter().map(|(_, _, h)| *h).sum();
+                            draw_indicator_focus_rect(grid, canvas, (cx, cy, cw, ch));
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn render_corner_top_start<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
@@ -4078,16 +4673,30 @@ fn render_corner_top_start<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &R
     let col_top = &grid.indicator_bands.col_top;
     let back_color = indicator_back_color(
         corner.back_color,
-        indicator_back_color(col_top.back_color, grid.style.back_color_fixed),
+        indicator_back_color(col_top.back_color, indicator_theme_back_color(grid)),
     );
-    let fore_color = indicator_fore_color(corner.fore_color, grid.style.fore_color_fixed);
+    let fore_color = indicator_fore_color(corner.fore_color, indicator_theme_fore_color(grid));
     let grid_color = col_top
         .grid_color
         .or(grid.indicator_bands.row_start.grid_color)
-        .unwrap_or(grid.style.grid_color_fixed);
+        .unwrap_or_else(|| indicator_theme_grid_color(grid));
     canvas.fill_rect(0, 0, vp.data_x, vp.data_y, back_color);
-    if corner.visible && grid.selection.allow_selection {
-        draw_indicator_text(canvas, grid, "▣", 0, 0, vp.data_x, vp.data_y, 1, fore_color);
+    if corner.visible {
+        if corner.slots.is_empty() {
+            if grid.selection.allow_selection {
+                draw_indicator_text(canvas, grid, "▣", 0, 0, vp.data_x, vp.data_y, 1, fore_color);
+            }
+            if let Some(active) = &grid.active_indicator {
+                if active.band == pb::IndicatorBand::CornerTopStart as i32 && active.slot_index < 0
+                {
+                    draw_indicator_focus_rect(grid, canvas, (0, 0, vp.data_x, vp.data_y));
+                }
+            }
+        } else {
+            render_corner_slots(
+                grid, canvas, corner, vp.data_x, vp.data_y, fore_color, grid_color,
+            );
+        }
     }
 
     let row_count = col_top.row_count().max(1);
@@ -4101,6 +4710,157 @@ fn render_corner_top_start<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &R
         canvas.hline(0, line_y, vp.data_x, grid_color);
     }
     canvas.vline(vp.data_x - 1, 0, vp.data_y, grid_color);
+}
+
+fn render_corner_outline_levels<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    rect: (i32, i32, i32, i32),
+    fore_color: u32,
+    grid_color: u32,
+) {
+    let (x, y, w, h) = rect;
+    if !grid.outline.show_level_buttons {
+        return;
+    }
+    let min_level = crate::outline::outline_level_button_min(grid);
+    let max_level = crate::outline::outline_level_button_max(grid);
+    if max_level < min_level || w <= 0 || h <= 0 {
+        return;
+    }
+    let theme = crate::indicator::resolve_indicator_button_theme(
+        grid.indicator_bands.appearance,
+        grid.indicator_bands.colors,
+        fore_color,
+        grid_color,
+    );
+    let button_step = crate::outline::outline_level_button_step(grid, w);
+    for level in min_level..=max_level {
+        let bx = x + (level - min_level) * button_step;
+        if bx >= x + w {
+            break;
+        }
+        let bw = button_step.min(x + w - bx).max(1);
+        let label = level.to_string();
+        let pressed = grid.outline_level_button_pressed
+            && grid.outline_level_button_pressed_inside
+            && grid.outline_level_button_pressed_level == level;
+        let hovered = !pressed && corner_outline_level_hovered(grid, level);
+        if pressed {
+            let offset = theme.pressed_text_offset.max(0);
+            canvas.fill_rect(bx, y, bw, h, theme.pressed_background);
+            canvas.hline(bx, y, bw, theme.pressed_border_dark);
+            canvas.vline(bx, y, h, theme.pressed_border_dark);
+            canvas.hline(bx, y + h - 1, bw, theme.pressed_border_light);
+            canvas.vline(bx + bw - 1, y, h, theme.pressed_border_light);
+            draw_indicator_text(
+                canvas,
+                grid,
+                &label,
+                bx + offset,
+                y + offset,
+                (bw - offset).max(1),
+                (h - offset).max(1),
+                1,
+                theme.pressed_foreground,
+            );
+        } else if hovered {
+            canvas.fill_rect(bx, y, bw, h, theme.hover_background);
+            if let Some(border) = theme.hover_border {
+                canvas.rect_outline(bx, y, bw, h, border);
+            }
+            draw_indicator_text(
+                canvas,
+                grid,
+                &label,
+                bx,
+                y,
+                bw,
+                h,
+                1,
+                theme.hover_foreground,
+            );
+        } else {
+            if let Some(background) = theme.background {
+                canvas.fill_rect(bx, y, bw, h, background);
+            }
+            if let Some(border) = theme.border {
+                canvas.rect_outline(bx, y, bw, h, border);
+            }
+            draw_indicator_text(canvas, grid, &label, bx, y, bw, h, 1, theme.foreground);
+        }
+    }
+}
+
+fn render_corner_slots<C: Canvas>(
+    grid: &VolvoxGrid,
+    canvas: &mut C,
+    corner: &crate::indicator::CornerIndicatorState,
+    width: i32,
+    height: i32,
+    fore_color: u32,
+    grid_color: u32,
+) {
+    let visible_slot_count = corner.slots.iter().filter(|slot| slot.visible).count();
+    let mut slot_x = 0;
+    for (slot_index, slot) in corner
+        .slots
+        .iter()
+        .enumerate()
+        .filter(|(_, slot)| slot.visible)
+    {
+        let remaining = (width - slot_x).max(0);
+        if remaining <= 0 {
+            break;
+        }
+        let slot_w = if visible_slot_count == 1 {
+            remaining
+        } else if slot.width_px > 0 {
+            slot.width_px.min(remaining)
+        } else if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 {
+            let button_count = crate::outline::outline_level_button_count(grid);
+            crate::outline::outline_level_button_step(grid, remaining)
+                .saturating_mul(button_count)
+                .min(remaining)
+        } else {
+            remaining
+        };
+        if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotSelectAll as i32 {
+            if grid.selection.allow_selection {
+                draw_indicator_text(canvas, grid, "▣", slot_x, 0, slot_w, height, 1, fore_color);
+            }
+        } else if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 {
+            render_corner_outline_levels(
+                grid,
+                canvas,
+                (slot_x, 0, slot_w, height),
+                fore_color,
+                grid_color,
+            );
+        } else if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotCustom as i32 {
+            if !slot.label_text.trim().is_empty() {
+                draw_indicator_text(
+                    canvas,
+                    grid,
+                    &slot.label_text,
+                    slot_x,
+                    0,
+                    slot_w,
+                    height,
+                    0,
+                    fore_color,
+                );
+            }
+        }
+        if let Some(active) = &grid.active_indicator {
+            if active.band == pb::IndicatorBand::CornerTopStart as i32
+                && active.slot_index == slot_index as i32
+            {
+                draw_indicator_focus_rect(grid, canvas, (slot_x, 0, slot_w, height));
+            }
+        }
+        slot_x += slot_w;
+    }
 }
 
 fn render_indicator_surfaces<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
@@ -4620,8 +5380,6 @@ fn render_cell_borders<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Rende
 // ===========================================================================
 
 fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
-    let has_subtotal_nodes = grid.row_props.values().any(|rp| rp.is_subtotal);
-    let subtotal_level_floor = first_subtotal_level(grid);
     for text_cell in &ctx.text_cells {
         let text_row = text_cell.source_key.row;
         let text_col = text_cell.source_key.col;
@@ -4697,54 +5455,20 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
             0
         };
         let usable_w = (orig_w - button_reserve).max(1);
-        let uses_tree_indicator = grid.outline.tree_indicator
-            != pb::TreeIndicatorStyle::TreeIndicatorNone as i32
-            && text_col == grid.outline.tree_column
-            && text_row >= grid.fixed_rows;
-
         // Compute text position based on alignment, centered in the
         // visible portion of the (possibly merged) cell.
         let (halign, valign) = alignment_components(alignment);
         let default_line_h = (font_size * TEXT_LINE_HEIGHT_FACTOR).ceil();
         let ellipsis_mode = grid.ellipsis_mode;
 
-        // Indent text in the outline column
-        let outline_indent = if uses_tree_indicator {
-            let (level, is_subtotal) = grid
-                .get_row_props(text_row)
-                .map_or((0, false), |rp| (rp.outline_level, rp.is_subtotal));
-            let tg = crate::outline::TreeGeometry::from_grid(grid);
-            if has_subtotal_nodes {
-                // In subtotal trees, text should sit immediately to the right
-                // of the +/- box, never underneath it.
-                let visual_level = subtotal_visual_level(level, is_subtotal, subtotal_level_floor);
-                if visual_level <= 0 {
-                    0
-                } else {
-                    let line_x = tg.line_x(visual_level);
-                    line_x + (tg.btn_size + 1) / 2 + 2
-                }
-            } else if level > 0 {
-                tg.indent(level) + tg.connector_end
-            } else {
-                0
-            }
-        } else {
-            0
-        };
-
-        let left_padding = if uses_tree_indicator {
-            0
-        } else {
-            cell_padding.left
-        };
+        let left_padding = cell_padding.left;
         let right_padding = cell_padding.right;
         let top_padding = cell_padding.top;
         let bottom_padding = cell_padding.bottom;
 
         // Use original (pre-clip) bounds for text positioning so content
         // pans smoothly rather than being re-laid-out inside the clipped area.
-        let inner_left = orig_x + left_padding + outline_indent;
+        let inner_left = orig_x + left_padding;
         let inner_right = orig_x + usable_w - right_padding;
         let inner_w = (inner_right - inner_left).max(1);
         let inner_top = orig_y + top_padding;
@@ -7815,194 +8539,6 @@ fn render_fill_handle<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &Render
     }
 }
 
-// ===========================================================================
-// Layer 9 -- Outline tree lines and +/- buttons
-// ===========================================================================
-
-fn render_outline<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
-    let vp = &ctx.vp;
-    if grid.outline.tree_indicator == pb::TreeIndicatorStyle::TreeIndicatorNone as i32 {
-        return;
-    }
-    if grid.row_props.is_empty() {
-        return;
-    }
-    if grid.outline.tree_column < 0 || grid.outline.tree_column >= grid.cols {
-        return;
-    }
-
-    let tree_color = grid.style.tree_color;
-    let tree_col = grid.outline.tree_column;
-    let tg = crate::outline::TreeGeometry::from_grid(grid);
-    let has_subtotal_nodes = grid.row_props.values().any(|rp| rp.is_subtotal);
-    let subtotal_level_floor = first_subtotal_level(grid);
-
-    let row_ranges = [
-        (0, vp.fixed_row_end),
-        (vp.scroll_row_start, vp.scroll_row_end),
-    ];
-    for (row_start, row_end) in row_ranges {
-        for row in row_start..row_end {
-            if row < grid.fixed_rows {
-                continue;
-            }
-
-            let row_props = grid.get_row_props(row);
-            let level = row_props.map_or(0, |rp| rp.outline_level);
-            let is_subtotal = row_props.map_or(false, |rp| rp.is_subtotal);
-            if has_subtotal_nodes && !is_subtotal {
-                continue;
-            }
-            // Subtotal trees are rendered one visual level deeper
-            // than stored outline_level (root subtotal L=0 still has tree gutter).
-            let visual_level = if has_subtotal_nodes {
-                subtotal_visual_level(level, is_subtotal, subtotal_level_floor)
-            } else {
-                level
-            };
-            if visual_level <= 0 {
-                continue;
-            }
-
-            let (cx, cy, cw, ch) = match cell_rect(grid, row, tree_col, vp) {
-                Some(r) => r,
-                None => continue,
-            };
-
-            // Use original (pre-clip) bounds so tree elements don't
-            // shift during smooth scrolling.
-            let (ox, oy, _ow, oh) = original_cell_bounds(grid, row, tree_col, cx, cy, cw, ch, vp);
-
-            let indent = tg.indent(visual_level);
-            let line_x = ox + tg.line_x(visual_level);
-            let mid_y = oy + oh / 2;
-
-            // Subtotal rendering uses +/- nodes without connector lines.
-            let draw_lines = !has_subtotal_nodes
-                && (grid.outline.tree_indicator
-                    == pb::TreeIndicatorStyle::TreeIndicatorConnectors as i32
-                    || grid.outline.tree_indicator
-                        == pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32);
-            if draw_lines {
-                // Vertical tree line
-                canvas.vline(line_x, oy, oh, tree_color);
-
-                // Horizontal connector line
-                let h_start = line_x;
-                let h_end = ox + indent + tg.connector_end;
-                if h_end > h_start {
-                    canvas.hline(h_start, mid_y, h_end - h_start, tree_color);
-                }
-            }
-
-            // +/- button for subtotal tree nodes
-            if is_subtotal {
-                let is_collapsed = row_props.map_or(false, |rp| rp.is_collapsed);
-                let bx = line_x - tg.btn_size / 2;
-                let by = mid_y - tg.btn_size / 2;
-                let node_picture = if is_collapsed {
-                    grid.outline.node_closed_picture.as_deref()
-                } else {
-                    grid.outline.node_open_picture.as_deref()
-                };
-                if let Some(pic_data) = node_picture {
-                    if let Some((img_rgba, img_w, img_h)) = decode_png_rgba(pic_data) {
-                        if img_w > 0 && img_h > 0 {
-                            let draw_h = img_h.min(tg.btn_size).max(1);
-                            let draw_w =
-                                ((img_w as i64 * draw_h as i64) / img_h as i64).max(1) as i32;
-                            let tx = bx + (tg.btn_size - draw_w) / 2;
-                            let ty = by + (tg.btn_size - draw_h) / 2;
-                            if draw_w == img_w && draw_h == img_h {
-                                canvas.blit_image_at(tx, ty, &img_rgba, img_w, img_h);
-                            } else {
-                                canvas.blit_image(tx, ty, draw_w, draw_h, &img_rgba, img_w, img_h);
-                            }
-                            continue;
-                        }
-                    }
-                }
-                let node_icon = if is_collapsed {
-                    grid.style
-                        .icon_theme_slots
-                        .tree_collapsed
-                        .as_deref()
-                        .filter(|s| !s.trim().is_empty())
-                } else {
-                    grid.style
-                        .icon_theme_slots
-                        .tree_expanded
-                        .as_deref()
-                        .filter(|s| !s.trim().is_empty())
-                };
-                let node_slot_style = resolve_tree_slot_style(grid, is_collapsed);
-                if let Some(icon) = node_icon {
-                    let (icon_font_name, font_size, font_bold, font_italic, icon_color) =
-                        resolve_icon_text_style(
-                            grid,
-                            node_slot_style,
-                            (grid.style.font_size + 1.0).max(8.0),
-                            false,
-                            false,
-                            tree_color,
-                        );
-                    let (tw, th) = canvas.measure_text(
-                        icon,
-                        &icon_font_name,
-                        font_size,
-                        font_bold,
-                        font_italic,
-                        None,
-                    );
-                    let text_w = tw.ceil() as i32;
-                    let text_h = th.ceil() as i32;
-                    let tx = bx + (tg.btn_size - text_w) / 2;
-                    let ty = by + (tg.btn_size - text_h) / 2;
-                    canvas.draw_text_styled_fast(
-                        tx,
-                        ty,
-                        icon,
-                        &icon_font_name,
-                        font_size,
-                        font_bold,
-                        font_italic,
-                        icon_color,
-                        cx,
-                        cy,
-                        cw,
-                        ch,
-                        0,
-                        None,
-                    );
-                    continue;
-                }
-
-                // Draw button box
-                canvas.fill_rect(bx, by, tg.btn_size, tg.btn_size, 0xFFFFFFFF);
-                canvas.rect_outline(bx, by, tg.btn_size, tg.btn_size, tree_color);
-
-                // Draw minus sign
-                canvas.hline(
-                    bx + tg.sign_margin,
-                    mid_y,
-                    tg.btn_size - tg.sign_margin * 2,
-                    tree_color,
-                );
-
-                // Draw vertical part of plus sign if collapsed
-                if is_collapsed {
-                    canvas.vline(
-                        line_x,
-                        by + tg.sign_margin,
-                        tg.btn_size - tg.sign_margin * 2,
-                        tree_color,
-                    );
-                }
-            }
-        }
-    }
-}
-
 /// Lowest positive outline level among subtotal rows, or 0 when there are no
 /// positive levels.
 ///
@@ -9115,7 +9651,7 @@ fn render_fast_scroll<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C) {
         format_number(max_row)
     );
     let font_size = (13.0 * s).round();
-    let font_name = "";
+    let font_name = &grid.style.font_name;
     let (text_w, text_h) = canvas.measure_text(&label, font_name, font_size, false, false, None);
     let pad_x = (10.0 * s).round() as i32;
     let pad_y = (6.0 * s).round() as i32;
@@ -9712,16 +10248,18 @@ mod tests {
         aligned_editor_draw_x, barcode_centered_square_rect, barcode_layer_needed,
         barcode_render_status, build_or_reuse_ctx, cell_has_checkbox_visual, cell_rect,
         checkbox_box_size, checkbox_layer_needed, compose_preedit_display_text,
-        draw_linear_barcode, draw_qr_barcode, dropdown_button_rect, dropdown_glyph_metrics,
-        dropdown_layer_needed, encode_linear_barcode, linear_barcode_preview_rect,
-        normalized_code128_payload, parse_progress_percent, picture_layer_needed,
-        progress_layer_needed, render_grid, show_dropdown_button_for_cell, sort_arrow_box_size,
-        BarcodeDrawRect, CellKey, RenderContext, RenderCtxCacheKey, RenderCtxCached,
-        DEFAULT_BARCODE_SIZE_WARNING_COLOR,
+        draw_linear_barcode, draw_outline_toggle, draw_qr_barcode,
+        draw_tree_guide_hline_except_rect, draw_tree_guide_vline_except_rect, dropdown_button_rect,
+        dropdown_glyph_metrics, dropdown_layer_needed, encode_linear_barcode,
+        linear_barcode_preview_rect, normalized_code128_payload, parse_progress_percent,
+        picture_layer_needed, progress_layer_needed, render_fast_scroll, render_grid,
+        show_dropdown_button_for_cell, sort_arrow_box_size, BarcodeDrawRect, CellKey,
+        RenderContext, RenderCtxCacheKey, RenderCtxCached, DEFAULT_BARCODE_SIZE_WARNING_COLOR,
     };
     use crate::canvas_cpu::CpuCanvas;
     use crate::grid::VolvoxGrid;
     use crate::text::TextRenderer;
+    use std::sync::{Arc, Mutex};
 
     fn render_ctx(grid: &VolvoxGrid) -> RenderContext {
         RenderContext::new(grid, grid.viewport_width, grid.viewport_height, None)
@@ -9859,6 +10397,106 @@ mod tests {
         }
     }
 
+    struct RecordingTextRenderer {
+        font_names: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl TextRenderer for RecordingTextRenderer {
+        fn measure_text(
+            &mut self,
+            text: &str,
+            font_name: &str,
+            _font_size: f32,
+            _bold: bool,
+            _italic: bool,
+            _max_width: Option<f32>,
+        ) -> (f32, f32) {
+            self.font_names.lock().unwrap().push(font_name.to_string());
+            ((text.chars().count().max(1) as f32) * 6.0, 8.0)
+        }
+
+        fn render_text(
+            &mut self,
+            _buffer_pixels: &mut [u8],
+            _buf_width: i32,
+            _buf_height: i32,
+            _stride: i32,
+            _x: i32,
+            _y: i32,
+            _clip_x: i32,
+            _clip_y: i32,
+            _clip_w: i32,
+            _clip_h: i32,
+            text: &str,
+            font_name: &str,
+            _font_size: f32,
+            _bold: bool,
+            _italic: bool,
+            _color: u32,
+            _max_width: Option<f32>,
+        ) -> f32 {
+            self.font_names.lock().unwrap().push(font_name.to_string());
+            (text.chars().count().max(1) as f32) * 6.0
+        }
+    }
+
+    #[derive(Clone, Debug, PartialEq)]
+    struct TextDrawCall {
+        text: String,
+        font_name: String,
+        font_size: f32,
+        bold: bool,
+        italic: bool,
+    }
+
+    struct RecordingTextDrawRenderer {
+        draws: Arc<Mutex<Vec<TextDrawCall>>>,
+    }
+
+    impl TextRenderer for RecordingTextDrawRenderer {
+        fn measure_text(
+            &mut self,
+            text: &str,
+            _font_name: &str,
+            _font_size: f32,
+            _bold: bool,
+            _italic: bool,
+            _max_width: Option<f32>,
+        ) -> (f32, f32) {
+            ((text.chars().count().max(1) as f32) * 6.0, 8.0)
+        }
+
+        fn render_text(
+            &mut self,
+            _buffer_pixels: &mut [u8],
+            _buf_width: i32,
+            _buf_height: i32,
+            _stride: i32,
+            _x: i32,
+            _y: i32,
+            _clip_x: i32,
+            _clip_y: i32,
+            _clip_w: i32,
+            _clip_h: i32,
+            text: &str,
+            font_name: &str,
+            font_size: f32,
+            bold: bool,
+            italic: bool,
+            _color: u32,
+            _max_width: Option<f32>,
+        ) -> f32 {
+            self.draws.lock().unwrap().push(TextDrawCall {
+                text: text.to_string(),
+                font_name: font_name.to_string(),
+                font_size,
+                bold,
+                italic,
+            });
+            (text.chars().count().max(1) as f32) * 6.0
+        }
+    }
+
     #[test]
     fn parse_progress_percent_treats_one_as_one_percent() {
         assert!((parse_progress_percent("1") - 0.01).abs() < 1e-6);
@@ -9878,6 +10516,104 @@ mod tests {
 
         grid.columns[0].progress_color = 0xFF00AA00;
         assert!(progress_layer_needed(&grid, &render_ctx(&grid)));
+    }
+
+    #[test]
+    fn fast_scroll_label_uses_grid_font_name() {
+        let width = 320;
+        let height = 240;
+        let stride = width * 4;
+        let mut buffer = vec![0; (height * stride) as usize];
+        let font_names = Arc::new(Mutex::new(Vec::new()));
+        let mut text = RecordingTextRenderer {
+            font_names: font_names.clone(),
+        };
+        let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+        let mut grid = VolvoxGrid::new(1, width, height, 1000, 4, 1, 0);
+        grid.style.font_name = "Roboto".to_string();
+        grid.fast_scroll_enabled = true;
+        grid.fast_scroll_active = true;
+        grid.fast_scroll_target_row = 500;
+
+        render_fast_scroll(&grid, &mut canvas);
+
+        let names = font_names.lock().unwrap();
+        assert!(!names.is_empty());
+        assert!(names.iter().all(|name| name == "Roboto"));
+    }
+
+    #[test]
+    fn outline_toggle_fallback_uses_ascii_markers_with_label_font() {
+        let width = 64;
+        let height = 32;
+        let stride = width * 4;
+        let draws = Arc::new(Mutex::new(Vec::new()));
+        let mut text = RecordingTextDrawRenderer {
+            draws: draws.clone(),
+        };
+        let mut buffer = vec![0; (height * stride) as usize];
+        let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+        let mut grid = VolvoxGrid::new(1, width, height, 2, 1, 0, 0);
+        grid.style.font_name = "LabelFace".to_string();
+        grid.style.font_size = 13.0;
+
+        draw_outline_toggle(
+            &mut canvas,
+            &grid,
+            (0, 4, 12, 12),
+            (0, 0, 12, 20),
+            true,
+            0xFF000000,
+        );
+        draw_outline_toggle(
+            &mut canvas,
+            &grid,
+            (24, 4, 12, 12),
+            (24, 0, 12, 20),
+            false,
+            0xFF000000,
+        );
+
+        let draws = draws.lock().unwrap();
+        assert_eq!(draws.len(), 2);
+        assert_eq!(draws[0].text, ">");
+        assert_eq!(draws[1].text, "v");
+        for draw in draws.iter() {
+            assert_eq!(draw.font_name, "LabelFace");
+            assert_eq!(draw.font_size, 13.0);
+            assert!(!draw.bold);
+            assert!(!draw.italic);
+        }
+    }
+
+    #[test]
+    fn tree_guide_lines_skip_toggle_gap() {
+        let width = 24;
+        let height = 24;
+        let stride = width * 4;
+        let mut buffer = vec![0; (height * stride) as usize];
+        let red = 0xFFFF0000;
+        let gap = Some((8, 5, 5, 10));
+
+        {
+            let mut text = MeasureOnlyTextRenderer;
+            let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+            draw_tree_guide_vline_except_rect(&mut canvas, 10, 0, 20, red, gap);
+        }
+        assert_eq!(pixel_argb(&buffer, width, 10, 4), red);
+        assert_eq!(pixel_argb(&buffer, width, 10, 5), 0);
+        assert_eq!(pixel_argb(&buffer, width, 10, 14), 0);
+        assert_eq!(pixel_argb(&buffer, width, 10, 15), red);
+
+        {
+            let mut text = MeasureOnlyTextRenderer;
+            let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+            draw_tree_guide_hline_except_rect(&mut canvas, 0, 18, 20, red, Some((8, 16, 5, 5)));
+        }
+        assert_eq!(pixel_argb(&buffer, width, 7, 18), red);
+        assert_eq!(pixel_argb(&buffer, width, 8, 18), 0);
+        assert_eq!(pixel_argb(&buffer, width, 12, 18), 0);
+        assert_eq!(pixel_argb(&buffer, width, 13, 18), red);
     }
 
     #[test]

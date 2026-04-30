@@ -5,7 +5,7 @@
 //! and embedded fixture access for `GetDemoData`.
 
 use crate::grid::VolvoxGrid;
-use crate::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
+use crate::indicator::{RowIndicatorSlotState, DEFAULT_ROW_INDICATOR_WIDTH};
 use crate::proto::volvoxgrid::v1 as pb;
 use crate::scrollbar::{
     default_scrollbar_colors, default_scrollbar_corner_radius, default_scrollbar_size,
@@ -170,7 +170,10 @@ fn apply_demo_column_headers(
 fn apply_demo_row_indicator(grid: &mut VolvoxGrid, width_px: i32, theme: &DemoTheme) {
     grid.indicator_bands.row_start.visible = true;
     grid.indicator_bands.row_start.width_px = sp(grid, width_px.max(DEFAULT_ROW_INDICATOR_WIDTH));
-    grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+    grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+        pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers,
+        grid.indicator_bands.row_start.width_px,
+    )];
     grid.indicator_bands.row_start.back_color = Some(theme.indicator_bg);
     grid.indicator_bands.row_start.fore_color = Some(theme.indicator_fg);
     grid.indicator_bands.row_start.grid_color = Some(theme.fixed_grid_color);

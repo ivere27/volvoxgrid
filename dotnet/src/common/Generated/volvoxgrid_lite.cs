@@ -282,6 +282,14 @@ namespace Volvoxgrid.V1
         COMPOSE_METHOD_TELEX = 3,
     }
 
+    public enum CornerIndicatorSlotKind
+    {
+        CORNER_SLOT_NONE = 0,
+        CORNER_SLOT_SELECT_ALL = 1,
+        CORNER_SLOT_OUTLINE_LEVELS = 2,
+        CORNER_SLOT_CUSTOM = 3,
+    }
+
     public enum CursorChange_CursorType
     {
         DEFAULT = 0,
@@ -412,6 +420,23 @@ namespace Volvoxgrid.V1
         FRAME_PACING_MODE_FIXED = 3,
     }
 
+    public enum GridEventTargetFlag
+    {
+        GRID_TARGET_FLAG_NONE = 0,
+        GRID_TARGET_FLAG_CHECKED = 1,
+        GRID_TARGET_FLAG_INDETERMINATE = 2,
+        GRID_TARGET_FLAG_EXPANDED = 4,
+        GRID_TARGET_FLAG_COLLAPSED = 8,
+        GRID_TARGET_FLAG_SORT_ASC = 16,
+        GRID_TARGET_FLAG_SORT_DESC = 32,
+        GRID_TARGET_FLAG_FILTER_ACTIVE = 64,
+        GRID_TARGET_FLAG_SELECTED = 128,
+        GRID_TARGET_FLAG_DISABLED = 256,
+        GRID_TARGET_FLAG_EDITING = 512,
+        GRID_TARGET_FLAG_SUBTOTAL = 1024,
+        GRID_TARGET_FLAG_PINNED = 2048,
+    }
+
     public enum GridLineDirection
     {
         GRIDLINE_BOTH = 0,
@@ -425,6 +450,16 @@ namespace Volvoxgrid.V1
         GRIDLINE_SOLID = 1,
         GRIDLINE_INSET = 2,
         GRIDLINE_RAISED = 3,
+    }
+
+    public enum GridTargetKind
+    {
+        GRID_TARGET_UNSPECIFIED = 0,
+        GRID_TARGET_DATA_CELL = 1,
+        GRID_TARGET_ROW_INDICATOR = 2,
+        GRID_TARGET_COL_INDICATOR = 3,
+        GRID_TARGET_CORNER_INDICATOR = 4,
+        GRID_TARGET_BACKGROUND = 5,
     }
 
     public enum GroupTotalPosition
@@ -462,6 +497,26 @@ namespace Volvoxgrid.V1
         IMG_ALIGN_RIGHT_BOTTOM = 8,
         IMG_ALIGN_STRETCH = 9,
         IMG_ALIGN_TILE = 10,
+    }
+
+    public enum IndicatorAppearance
+    {
+        INDICATOR_APPEARANCE_CLASSIC = 0,
+        INDICATOR_APPEARANCE_FLAT = 1,
+        INDICATOR_APPEARANCE_MODERN = 2,
+    }
+
+    public enum IndicatorBand
+    {
+        INDICATOR_BAND_UNSPECIFIED = 0,
+        INDICATOR_BAND_ROW_START = 1,
+        INDICATOR_BAND_ROW_END = 2,
+        INDICATOR_BAND_COL_TOP = 3,
+        INDICATOR_BAND_COL_BOTTOM = 4,
+        INDICATOR_BAND_CORNER_TOP_START = 5,
+        INDICATOR_BAND_CORNER_TOP_END = 6,
+        INDICATOR_BAND_CORNER_BOTTOM_START = 7,
+        INDICATOR_BAND_CORNER_BOTTOM_END = 8,
     }
 
     public enum KeyEvent_Type
@@ -564,25 +619,6 @@ namespace Volvoxgrid.V1
         RENDERER_GPU_VULKAN = 3,
         RENDERER_GPU_GLES = 4,
         RENDERER_TUI = 5,
-    }
-
-    public enum RowIndicatorMode
-    {
-        ROW_INDICATOR_NONE = 0,
-        ROW_INDICATOR_NUMBERS = 1,
-        ROW_INDICATOR_CURRENT = 2,
-        ROW_INDICATOR_SELECTION = 4,
-        ROW_INDICATOR_CHECKBOX = 8,
-        ROW_INDICATOR_HANDLE = 16,
-        ROW_INDICATOR_EDITING = 32,
-        ROW_INDICATOR_MODIFIED = 64,
-        ROW_INDICATOR_ERROR = 128,
-        ROW_INDICATOR_NEW_ROW = 256,
-        ROW_INDICATOR_EXPANDER = 512,
-        ROW_INDICATOR_RESIZE = 1024,
-        ROW_INDICATOR_ACTION = 2048,
-        ROW_INDICATOR_STATUS_ICON = 4096,
-        ROW_INDICATOR_CUSTOM = 8192,
     }
 
     public enum RowIndicatorSlotKind
@@ -995,6 +1031,47 @@ namespace Volvoxgrid.V1
                 switch (field)
                 {
                     case 1: msg.Col = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class AfterTreeNodeToggleEvent
+    {
+        public string NodeId { get; set; } = "";
+        public int Row { get; set; }
+        public bool Collapse { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (NodeId != null && NodeId.Length > 0) w.WriteString(1, NodeId);
+            if (Row != 0) w.WriteInt32(2, Row);
+            if (Collapse) w.WriteBool(3, Collapse);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<AfterTreeNodeToggleEvent> Parser = new MessageParser<AfterTreeNodeToggleEvent>(data => ParseFrom(data));
+
+        public static AfterTreeNodeToggleEvent ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new AfterTreeNodeToggleEvent();
+            var r = new ProtoReader(data);
+            var msg = new AfterTreeNodeToggleEvent();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.NodeId = r.ReadString(); break;
+                    case 2: msg.Row = r.ReadInt32(); break;
+                    case 3: msg.Collapse = r.ReadBool(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -1694,6 +1771,7 @@ namespace Volvoxgrid.V1
     {
         public int Row { get; set; }
         public int Col { get; set; }
+        public GridEventTarget Target { get; set; }
 
         // ── Serialization ──
 
@@ -1702,6 +1780,7 @@ namespace Volvoxgrid.V1
             var w = new ProtoWriter();
             if (Row != 0) w.WriteInt32(1, Row);
             if (Col != 0) w.WriteInt32(2, Col);
+            if (Target != null) w.WriteMessageBytes(3, Target.ToByteArray());
             return w.ToArray();
         }
 
@@ -1721,6 +1800,7 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.Row = r.ReadInt32(); break;
                     case 2: msg.Col = r.ReadInt32(); break;
+                    case 3: msg.Target = GridEventTarget.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -1949,6 +2029,47 @@ namespace Volvoxgrid.V1
                 switch (field)
                 {
                     case 1: msg.Col = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class BeforeTreeNodeToggleEvent
+    {
+        public string NodeId { get; set; } = "";
+        public int Row { get; set; }
+        public bool Collapse { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (NodeId != null && NodeId.Length > 0) w.WriteString(1, NodeId);
+            if (Row != 0) w.WriteInt32(2, Row);
+            if (Collapse) w.WriteBool(3, Collapse);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<BeforeTreeNodeToggleEvent> Parser = new MessageParser<BeforeTreeNodeToggleEvent>(data => ParseFrom(data));
+
+        public static BeforeTreeNodeToggleEvent ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new BeforeTreeNodeToggleEvent();
+            var r = new ProtoReader(data);
+            var msg = new BeforeTreeNodeToggleEvent();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.NodeId = r.ReadString(); break;
+                    case 2: msg.Row = r.ReadInt32(); break;
+                    case 3: msg.Collapse = r.ReadBool(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -2894,6 +3015,7 @@ namespace Volvoxgrid.V1
         public int Col { get; set; }
         public CellHitArea HitArea { get; set; }
         public CellInteraction Interaction { get; set; }
+        public GridEventTarget Target { get; set; }
 
         // ── Serialization ──
 
@@ -2904,6 +3026,7 @@ namespace Volvoxgrid.V1
             if (Col != 0) w.WriteInt32(2, Col);
             if (HitArea != 0) w.WriteInt32(3, (int)HitArea);
             if (Interaction != 0) w.WriteInt32(4, (int)Interaction);
+            if (Target != null) w.WriteMessageBytes(5, Target.ToByteArray());
             return w.ToArray();
         }
 
@@ -2925,6 +3048,7 @@ namespace Volvoxgrid.V1
                     case 2: msg.Col = r.ReadInt32(); break;
                     case 3: msg.HitArea = (CellHitArea)r.ReadInt32(); break;
                     case 4: msg.Interaction = (CellInteraction)r.ReadInt32(); break;
+                    case 5: msg.Target = GridEventTarget.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -3767,6 +3891,7 @@ namespace Volvoxgrid.V1
         private byte[] _data;
         public byte[] Data { get { return _data; } set { _data = value; } }
         public bool HasData { get { return _data != null; } }
+        public List<CornerIndicatorSlot> Slots { get; private set; } = new List<CornerIndicatorSlot>();
 
         // ── Serialization ──
 
@@ -3785,6 +3910,8 @@ namespace Volvoxgrid.V1
                 w.WriteString(5, _customKey);
             if (_data != null)
                 w.WriteBytes(6, _data);
+            foreach (var item in Slots)
+                w.WriteMessageBytes(7, item.ToByteArray());
             return w.ToArray();
         }
 
@@ -3808,6 +3935,75 @@ namespace Volvoxgrid.V1
                     case 4: msg.Foreground = unchecked((uint)r.ReadInt32()); break;
                     case 5: msg.CustomKey = r.ReadString(); break;
                     case 6: msg.Data = r.ReadLengthDelimited(); break;
+                    case 7: msg.Slots.Add(CornerIndicatorSlot.ParseFrom(r.ReadLengthDelimited())); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class CornerIndicatorSlot
+    {
+        private CornerIndicatorSlotKind? _kind;
+        public CornerIndicatorSlotKind Kind { get { return _kind.GetValueOrDefault(); } set { _kind = value; } }
+        public bool HasKind { get { return _kind.HasValue; } }
+        private int? _width;
+        public int Width { get { return _width.GetValueOrDefault(); } set { _width = value; } }
+        public bool HasWidth { get { return _width.HasValue; } }
+        private bool? _visible;
+        public bool Visible { get { return _visible.GetValueOrDefault(); } set { _visible = value; } }
+        public bool HasVisible { get { return _visible.HasValue; } }
+        private string _customKey;
+        public string CustomKey { get { return _customKey; } set { _customKey = value; } }
+        public bool HasCustomKey { get { return _customKey != null; } }
+        private byte[] _data;
+        public byte[] Data { get { return _data; } set { _data = value; } }
+        public bool HasData { get { return _data != null; } }
+        private string _labelText;
+        public string LabelText { get { return _labelText; } set { _labelText = value; } }
+        public bool HasLabelText { get { return _labelText != null; } }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (_kind.HasValue)
+                w.WriteInt32(1, (int)_kind.Value);
+            if (_width.HasValue)
+                w.WriteInt32(2, _width.Value);
+            if (_visible.HasValue)
+                w.WriteBool(3, _visible.Value);
+            if (_customKey != null)
+                w.WriteString(4, _customKey);
+            if (_data != null)
+                w.WriteBytes(5, _data);
+            if (_labelText != null)
+                w.WriteString(6, _labelText);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<CornerIndicatorSlot> Parser = new MessageParser<CornerIndicatorSlot>(data => ParseFrom(data));
+
+        public static CornerIndicatorSlot ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new CornerIndicatorSlot();
+            var r = new ProtoReader(data);
+            var msg = new CornerIndicatorSlot();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Kind = (CornerIndicatorSlotKind)r.ReadInt32(); break;
+                    case 2: msg.Width = r.ReadInt32(); break;
+                    case 3: msg.Visible = r.ReadBool(); break;
+                    case 4: msg.CustomKey = r.ReadString(); break;
+                    case 5: msg.Data = r.ReadLengthDelimited(); break;
+                    case 6: msg.LabelText = r.ReadString(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -4110,6 +4306,7 @@ namespace Volvoxgrid.V1
     {
         public int Row { get; set; }
         public int Col { get; set; }
+        public GridEventTarget Target { get; set; }
 
         // ── Serialization ──
 
@@ -4118,6 +4315,7 @@ namespace Volvoxgrid.V1
             var w = new ProtoWriter();
             if (Row != 0) w.WriteInt32(1, Row);
             if (Col != 0) w.WriteInt32(2, Col);
+            if (Target != null) w.WriteMessageBytes(3, Target.ToByteArray());
             return w.ToArray();
         }
 
@@ -4137,6 +4335,7 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.Row = r.ReadInt32(); break;
                     case 2: msg.Col = r.ReadInt32(); break;
+                    case 3: msg.Target = GridEventTarget.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -5383,6 +5582,7 @@ namespace Volvoxgrid.V1
     {
         public int Row { get; set; }
         public int Col { get; set; }
+        public GridEventTarget Target { get; set; }
 
         // ── Serialization ──
 
@@ -5391,6 +5591,7 @@ namespace Volvoxgrid.V1
             var w = new ProtoWriter();
             if (Row != 0) w.WriteInt32(1, Row);
             if (Col != 0) w.WriteInt32(2, Col);
+            if (Target != null) w.WriteMessageBytes(3, Target.ToByteArray());
             return w.ToArray();
         }
 
@@ -5410,6 +5611,7 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.Row = r.ReadInt32(); break;
                     case 2: msg.Col = r.ReadInt32(); break;
+                    case 3: msg.Target = GridEventTarget.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -6709,6 +6911,11 @@ namespace Volvoxgrid.V1
             PullToRefreshTriggered = 61,
             PullToRefreshCanceled = 62,
             BeforeDropdownOpen = 63,
+            TreeChildrenRequested = 64,
+            BeforeTreeNodeToggle = 65,
+            AfterTreeNodeToggle = 66,
+            TreeNodeActivate = 67,
+            TreeNodeContextMenu = 68,
         }
         public EventOneofCase EventCase { get; set; }
 
@@ -6834,6 +7041,16 @@ namespace Volvoxgrid.V1
         public PullToRefreshCanceledEvent PullToRefreshCanceled { get { return EventCase == EventOneofCase.PullToRefreshCanceled ? _pullToRefreshCanceled : null; } set { _pullToRefreshCanceled = value; EventCase = EventOneofCase.PullToRefreshCanceled; } }
         private BeforeDropdownOpenEvent _beforeDropdownOpen;
         public BeforeDropdownOpenEvent BeforeDropdownOpen { get { return EventCase == EventOneofCase.BeforeDropdownOpen ? _beforeDropdownOpen : null; } set { _beforeDropdownOpen = value; EventCase = EventOneofCase.BeforeDropdownOpen; } }
+        private TreeChildrenRequestedEvent _treeChildrenRequested;
+        public TreeChildrenRequestedEvent TreeChildrenRequested { get { return EventCase == EventOneofCase.TreeChildrenRequested ? _treeChildrenRequested : null; } set { _treeChildrenRequested = value; EventCase = EventOneofCase.TreeChildrenRequested; } }
+        private BeforeTreeNodeToggleEvent _beforeTreeNodeToggle;
+        public BeforeTreeNodeToggleEvent BeforeTreeNodeToggle { get { return EventCase == EventOneofCase.BeforeTreeNodeToggle ? _beforeTreeNodeToggle : null; } set { _beforeTreeNodeToggle = value; EventCase = EventOneofCase.BeforeTreeNodeToggle; } }
+        private AfterTreeNodeToggleEvent _afterTreeNodeToggle;
+        public AfterTreeNodeToggleEvent AfterTreeNodeToggle { get { return EventCase == EventOneofCase.AfterTreeNodeToggle ? _afterTreeNodeToggle : null; } set { _afterTreeNodeToggle = value; EventCase = EventOneofCase.AfterTreeNodeToggle; } }
+        private TreeNodeActivateEvent _treeNodeActivate;
+        public TreeNodeActivateEvent TreeNodeActivate { get { return EventCase == EventOneofCase.TreeNodeActivate ? _treeNodeActivate : null; } set { _treeNodeActivate = value; EventCase = EventOneofCase.TreeNodeActivate; } }
+        private TreeNodeContextMenuEvent _treeNodeContextMenu;
+        public TreeNodeContextMenuEvent TreeNodeContextMenu { get { return EventCase == EventOneofCase.TreeNodeContextMenu ? _treeNodeContextMenu : null; } set { _treeNodeContextMenu = value; EventCase = EventOneofCase.TreeNodeContextMenu; } }
         public long GridId { get; set; }
         public long EventId { get; set; }
 
@@ -7029,6 +7246,21 @@ namespace Volvoxgrid.V1
                 case EventOneofCase.BeforeDropdownOpen:
                     if (_beforeDropdownOpen != null) w.WriteMessageBytes(63, _beforeDropdownOpen.ToByteArray());
                     break;
+                case EventOneofCase.TreeChildrenRequested:
+                    if (_treeChildrenRequested != null) w.WriteMessageBytes(64, _treeChildrenRequested.ToByteArray());
+                    break;
+                case EventOneofCase.BeforeTreeNodeToggle:
+                    if (_beforeTreeNodeToggle != null) w.WriteMessageBytes(65, _beforeTreeNodeToggle.ToByteArray());
+                    break;
+                case EventOneofCase.AfterTreeNodeToggle:
+                    if (_afterTreeNodeToggle != null) w.WriteMessageBytes(66, _afterTreeNodeToggle.ToByteArray());
+                    break;
+                case EventOneofCase.TreeNodeActivate:
+                    if (_treeNodeActivate != null) w.WriteMessageBytes(67, _treeNodeActivate.ToByteArray());
+                    break;
+                case EventOneofCase.TreeNodeContextMenu:
+                    if (_treeNodeContextMenu != null) w.WriteMessageBytes(68, _treeNodeContextMenu.ToByteArray());
+                    break;
             }
             return w.ToArray();
         }
@@ -7110,6 +7342,73 @@ namespace Volvoxgrid.V1
                     case 61: msg.PullToRefreshTriggered = PullToRefreshTriggeredEvent.ParseFrom(r.ReadLengthDelimited()); break;
                     case 62: msg.PullToRefreshCanceled = PullToRefreshCanceledEvent.ParseFrom(r.ReadLengthDelimited()); break;
                     case 63: msg.BeforeDropdownOpen = BeforeDropdownOpenEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 64: msg.TreeChildrenRequested = TreeChildrenRequestedEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 65: msg.BeforeTreeNodeToggle = BeforeTreeNodeToggleEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 66: msg.AfterTreeNodeToggle = AfterTreeNodeToggleEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 67: msg.TreeNodeActivate = TreeNodeActivateEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 68: msg.TreeNodeContextMenu = TreeNodeContextMenuEvent.ParseFrom(r.ReadLengthDelimited()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class GridEventTarget
+    {
+        public GridTargetKind Kind { get; set; }
+        public IndicatorBand Band { get; set; }
+        public int SlotIndex { get; set; }
+        public int SlotKind { get; set; }
+        public uint SubModeBits { get; set; }
+        public string CustomKey { get; set; } = "";
+        public string Text { get; set; } = "";
+        public long IntValue { get; set; }
+        public uint StatusFlags { get; set; }
+        public byte[] Data { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (Kind != 0) w.WriteInt32(1, (int)Kind);
+            if (Band != 0) w.WriteInt32(2, (int)Band);
+            if (SlotIndex != 0) w.WriteInt32(3, SlotIndex);
+            if (SlotKind != 0) w.WriteInt32(4, SlotKind);
+            if (SubModeBits != 0u) w.WriteInt32(5, unchecked((int)SubModeBits));
+            if (CustomKey != null && CustomKey.Length > 0) w.WriteString(6, CustomKey);
+            if (Text != null && Text.Length > 0) w.WriteString(7, Text);
+            if (IntValue != 0L) w.WriteInt64(8, IntValue);
+            if (StatusFlags != 0u) w.WriteInt32(9, unchecked((int)StatusFlags));
+            if (Data != null && Data.Length > 0) w.WriteBytes(10, Data);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<GridEventTarget> Parser = new MessageParser<GridEventTarget>(data => ParseFrom(data));
+
+        public static GridEventTarget ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new GridEventTarget();
+            var r = new ProtoReader(data);
+            var msg = new GridEventTarget();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Kind = (GridTargetKind)r.ReadInt32(); break;
+                    case 2: msg.Band = (IndicatorBand)r.ReadInt32(); break;
+                    case 3: msg.SlotIndex = r.ReadInt32(); break;
+                    case 4: msg.SlotKind = r.ReadInt32(); break;
+                    case 5: msg.SubModeBits = unchecked((uint)r.ReadInt32()); break;
+                    case 6: msg.CustomKey = r.ReadString(); break;
+                    case 7: msg.Text = r.ReadString(); break;
+                    case 8: msg.IntValue = r.ReadInt64(); break;
+                    case 9: msg.StatusFlags = unchecked((uint)r.ReadInt32()); break;
+                    case 10: msg.Data = r.ReadLengthDelimited(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -7983,6 +8282,166 @@ namespace Volvoxgrid.V1
         }
     }
 
+    public sealed class IndicatorColors
+    {
+        private uint? _background;
+        public uint Background { get { return _background.GetValueOrDefault(); } set { _background = value; } }
+        public bool HasBackground { get { return _background.HasValue; } }
+        private uint? _foreground;
+        public uint Foreground { get { return _foreground.GetValueOrDefault(); } set { _foreground = value; } }
+        public bool HasForeground { get { return _foreground.HasValue; } }
+        private uint? _grid;
+        public uint Grid { get { return _grid.GetValueOrDefault(); } set { _grid = value; } }
+        public bool HasGrid { get { return _grid.HasValue; } }
+        private uint? _buttonBackground;
+        public uint ButtonBackground { get { return _buttonBackground.GetValueOrDefault(); } set { _buttonBackground = value; } }
+        public bool HasButtonBackground { get { return _buttonBackground.HasValue; } }
+        private uint? _buttonForeground;
+        public uint ButtonForeground { get { return _buttonForeground.GetValueOrDefault(); } set { _buttonForeground = value; } }
+        public bool HasButtonForeground { get { return _buttonForeground.HasValue; } }
+        private uint? _buttonBorder;
+        public uint ButtonBorder { get { return _buttonBorder.GetValueOrDefault(); } set { _buttonBorder = value; } }
+        public bool HasButtonBorder { get { return _buttonBorder.HasValue; } }
+        private uint? _buttonPressedBackground;
+        public uint ButtonPressedBackground { get { return _buttonPressedBackground.GetValueOrDefault(); } set { _buttonPressedBackground = value; } }
+        public bool HasButtonPressedBackground { get { return _buttonPressedBackground.HasValue; } }
+        private uint? _buttonPressedForeground;
+        public uint ButtonPressedForeground { get { return _buttonPressedForeground.GetValueOrDefault(); } set { _buttonPressedForeground = value; } }
+        public bool HasButtonPressedForeground { get { return _buttonPressedForeground.HasValue; } }
+        private uint? _buttonPressedBorderDark;
+        public uint ButtonPressedBorderDark { get { return _buttonPressedBorderDark.GetValueOrDefault(); } set { _buttonPressedBorderDark = value; } }
+        public bool HasButtonPressedBorderDark { get { return _buttonPressedBorderDark.HasValue; } }
+        private uint? _buttonPressedBorderLight;
+        public uint ButtonPressedBorderLight { get { return _buttonPressedBorderLight.GetValueOrDefault(); } set { _buttonPressedBorderLight = value; } }
+        public bool HasButtonPressedBorderLight { get { return _buttonPressedBorderLight.HasValue; } }
+        private uint? _buttonHoverBackground;
+        public uint ButtonHoverBackground { get { return _buttonHoverBackground.GetValueOrDefault(); } set { _buttonHoverBackground = value; } }
+        public bool HasButtonHoverBackground { get { return _buttonHoverBackground.HasValue; } }
+        private uint? _buttonHoverForeground;
+        public uint ButtonHoverForeground { get { return _buttonHoverForeground.GetValueOrDefault(); } set { _buttonHoverForeground = value; } }
+        public bool HasButtonHoverForeground { get { return _buttonHoverForeground.HasValue; } }
+        private uint? _buttonHoverBorder;
+        public uint ButtonHoverBorder { get { return _buttonHoverBorder.GetValueOrDefault(); } set { _buttonHoverBorder = value; } }
+        public bool HasButtonHoverBorder { get { return _buttonHoverBorder.HasValue; } }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (_background.HasValue)
+                w.WriteInt32(1, unchecked((int)_background.Value));
+            if (_foreground.HasValue)
+                w.WriteInt32(2, unchecked((int)_foreground.Value));
+            if (_grid.HasValue)
+                w.WriteInt32(3, unchecked((int)_grid.Value));
+            if (_buttonBackground.HasValue)
+                w.WriteInt32(4, unchecked((int)_buttonBackground.Value));
+            if (_buttonForeground.HasValue)
+                w.WriteInt32(5, unchecked((int)_buttonForeground.Value));
+            if (_buttonBorder.HasValue)
+                w.WriteInt32(6, unchecked((int)_buttonBorder.Value));
+            if (_buttonPressedBackground.HasValue)
+                w.WriteInt32(7, unchecked((int)_buttonPressedBackground.Value));
+            if (_buttonPressedForeground.HasValue)
+                w.WriteInt32(8, unchecked((int)_buttonPressedForeground.Value));
+            if (_buttonPressedBorderDark.HasValue)
+                w.WriteInt32(9, unchecked((int)_buttonPressedBorderDark.Value));
+            if (_buttonPressedBorderLight.HasValue)
+                w.WriteInt32(10, unchecked((int)_buttonPressedBorderLight.Value));
+            if (_buttonHoverBackground.HasValue)
+                w.WriteInt32(11, unchecked((int)_buttonHoverBackground.Value));
+            if (_buttonHoverForeground.HasValue)
+                w.WriteInt32(12, unchecked((int)_buttonHoverForeground.Value));
+            if (_buttonHoverBorder.HasValue)
+                w.WriteInt32(13, unchecked((int)_buttonHoverBorder.Value));
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<IndicatorColors> Parser = new MessageParser<IndicatorColors>(data => ParseFrom(data));
+
+        public static IndicatorColors ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new IndicatorColors();
+            var r = new ProtoReader(data);
+            var msg = new IndicatorColors();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.Background = unchecked((uint)r.ReadInt32()); break;
+                    case 2: msg.Foreground = unchecked((uint)r.ReadInt32()); break;
+                    case 3: msg.Grid = unchecked((uint)r.ReadInt32()); break;
+                    case 4: msg.ButtonBackground = unchecked((uint)r.ReadInt32()); break;
+                    case 5: msg.ButtonForeground = unchecked((uint)r.ReadInt32()); break;
+                    case 6: msg.ButtonBorder = unchecked((uint)r.ReadInt32()); break;
+                    case 7: msg.ButtonPressedBackground = unchecked((uint)r.ReadInt32()); break;
+                    case 8: msg.ButtonPressedForeground = unchecked((uint)r.ReadInt32()); break;
+                    case 9: msg.ButtonPressedBorderDark = unchecked((uint)r.ReadInt32()); break;
+                    case 10: msg.ButtonPressedBorderLight = unchecked((uint)r.ReadInt32()); break;
+                    case 11: msg.ButtonHoverBackground = unchecked((uint)r.ReadInt32()); break;
+                    case 12: msg.ButtonHoverForeground = unchecked((uint)r.ReadInt32()); break;
+                    case 13: msg.ButtonHoverBorder = unchecked((uint)r.ReadInt32()); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class IndicatorFocusConfig
+    {
+        private bool? _enableKeyboardFocus;
+        public bool EnableKeyboardFocus { get { return _enableKeyboardFocus.GetValueOrDefault(); } set { _enableKeyboardFocus = value; } }
+        public bool HasEnableKeyboardFocus { get { return _enableKeyboardFocus.HasValue; } }
+        private int? _enterKeyCode;
+        public int EnterKeyCode { get { return _enterKeyCode.GetValueOrDefault(); } set { _enterKeyCode = value; } }
+        public bool HasEnterKeyCode { get { return _enterKeyCode.HasValue; } }
+        private int? _exitKeyCode;
+        public int ExitKeyCode { get { return _exitKeyCode.GetValueOrDefault(); } set { _exitKeyCode = value; } }
+        public bool HasExitKeyCode { get { return _exitKeyCode.HasValue; } }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (_enableKeyboardFocus.HasValue)
+                w.WriteBool(1, _enableKeyboardFocus.Value);
+            if (_enterKeyCode.HasValue)
+                w.WriteInt32(2, _enterKeyCode.Value);
+            if (_exitKeyCode.HasValue)
+                w.WriteInt32(3, _exitKeyCode.Value);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<IndicatorFocusConfig> Parser = new MessageParser<IndicatorFocusConfig>(data => ParseFrom(data));
+
+        public static IndicatorFocusConfig ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new IndicatorFocusConfig();
+            var r = new ProtoReader(data);
+            var msg = new IndicatorFocusConfig();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.EnableKeyboardFocus = r.ReadBool(); break;
+                    case 2: msg.EnterKeyCode = r.ReadInt32(); break;
+                    case 3: msg.ExitKeyCode = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
     public sealed class IndicatorsConfig
     {
         public RowIndicatorConfig RowStart { get; set; }
@@ -7993,6 +8452,11 @@ namespace Volvoxgrid.V1
         public CornerIndicatorConfig CornerTopEnd { get; set; }
         public CornerIndicatorConfig CornerBottomStart { get; set; }
         public CornerIndicatorConfig CornerBottomEnd { get; set; }
+        public IndicatorFocusConfig Focus { get; set; }
+        private IndicatorAppearance? _appearance;
+        public IndicatorAppearance Appearance { get { return _appearance.GetValueOrDefault(); } set { _appearance = value; } }
+        public bool HasAppearance { get { return _appearance.HasValue; } }
+        public IndicatorColors Colors { get; set; }
 
         // ── Serialization ──
 
@@ -8007,6 +8471,10 @@ namespace Volvoxgrid.V1
             if (CornerTopEnd != null) w.WriteMessageBytes(6, CornerTopEnd.ToByteArray());
             if (CornerBottomStart != null) w.WriteMessageBytes(7, CornerBottomStart.ToByteArray());
             if (CornerBottomEnd != null) w.WriteMessageBytes(8, CornerBottomEnd.ToByteArray());
+            if (Focus != null) w.WriteMessageBytes(9, Focus.ToByteArray());
+            if (_appearance.HasValue)
+                w.WriteInt32(10, (int)_appearance.Value);
+            if (Colors != null) w.WriteMessageBytes(11, Colors.ToByteArray());
             return w.ToArray();
         }
 
@@ -8032,6 +8500,9 @@ namespace Volvoxgrid.V1
                     case 6: msg.CornerTopEnd = CornerIndicatorConfig.ParseFrom(r.ReadLengthDelimited()); break;
                     case 7: msg.CornerBottomStart = CornerIndicatorConfig.ParseFrom(r.ReadLengthDelimited()); break;
                     case 8: msg.CornerBottomEnd = CornerIndicatorConfig.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 9: msg.Focus = IndicatorFocusConfig.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 10: msg.Appearance = (IndicatorAppearance)r.ReadInt32(); break;
+                    case 11: msg.Colors = IndicatorColors.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -8151,6 +8622,12 @@ namespace Volvoxgrid.V1
         public DropMode DropMode { get { return _dropMode.GetValueOrDefault(); } set { _dropMode = value; } }
         public bool HasDropMode { get { return _dropMode.HasValue; } }
         public HeaderFeatures HeaderFeatures { get; set; }
+        private uint? _decisionTimeoutMs;
+        public uint DecisionTimeoutMs { get { return _decisionTimeoutMs.GetValueOrDefault(); } set { _decisionTimeoutMs = value; } }
+        public bool HasDecisionTimeoutMs { get { return _decisionTimeoutMs.HasValue; } }
+        private uint? _compareResponseTimeoutMs;
+        public uint CompareResponseTimeoutMs { get { return _compareResponseTimeoutMs.GetValueOrDefault(); } set { _compareResponseTimeoutMs = value; } }
+        public bool HasCompareResponseTimeoutMs { get { return _compareResponseTimeoutMs.HasValue; } }
 
         // ── Serialization ──
 
@@ -8174,6 +8651,10 @@ namespace Volvoxgrid.V1
             if (_dropMode.HasValue)
                 w.WriteInt32(9, (int)_dropMode.Value);
             if (HeaderFeatures != null) w.WriteMessageBytes(10, HeaderFeatures.ToByteArray());
+            if (_decisionTimeoutMs.HasValue)
+                w.WriteInt32(11, unchecked((int)_decisionTimeoutMs.Value));
+            if (_compareResponseTimeoutMs.HasValue)
+                w.WriteInt32(12, unchecked((int)_compareResponseTimeoutMs.Value));
             return w.ToArray();
         }
 
@@ -8201,6 +8682,8 @@ namespace Volvoxgrid.V1
                     case 8: msg.DragMode = (DragMode)r.ReadInt32(); break;
                     case 9: msg.DropMode = (DropMode)r.ReadInt32(); break;
                     case 10: msg.HeaderFeatures = HeaderFeatures.ParseFrom(r.ReadLengthDelimited()); break;
+                    case 11: msg.DecisionTimeoutMs = unchecked((uint)r.ReadInt32()); break;
+                    case 12: msg.CompareResponseTimeoutMs = unchecked((uint)r.ReadInt32()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -8608,6 +9091,7 @@ namespace Volvoxgrid.V1
     {
         public int Row { get; set; }
         public int Col { get; set; }
+        public GridEventTarget Target { get; set; }
 
         // ── Serialization ──
 
@@ -8616,6 +9100,7 @@ namespace Volvoxgrid.V1
             var w = new ProtoWriter();
             if (Row != 0) w.WriteInt32(1, Row);
             if (Col != 0) w.WriteInt32(2, Col);
+            if (Target != null) w.WriteMessageBytes(3, Target.ToByteArray());
             return w.ToArray();
         }
 
@@ -8635,6 +9120,7 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.Row = r.ReadInt32(); break;
                     case 2: msg.Col = r.ReadInt32(); break;
+                    case 3: msg.Target = GridEventTarget.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -9286,6 +9772,7 @@ namespace Volvoxgrid.V1
         public int Modifier { get; set; }
         public float X { get; set; }
         public float Y { get; set; }
+        public GridEventTarget Target { get; set; }
 
         // ── Serialization ──
 
@@ -9296,6 +9783,7 @@ namespace Volvoxgrid.V1
             if (Modifier != 0) w.WriteInt32(2, Modifier);
             if (X != 0f) w.WriteFloat(3, X);
             if (Y != 0f) w.WriteFloat(4, Y);
+            if (Target != null) w.WriteMessageBytes(5, Target.ToByteArray());
             return w.ToArray();
         }
 
@@ -9317,6 +9805,7 @@ namespace Volvoxgrid.V1
                     case 2: msg.Modifier = r.ReadInt32(); break;
                     case 3: msg.X = r.ReadFloat(); break;
                     case 4: msg.Y = r.ReadFloat(); break;
+                    case 5: msg.Target = GridEventTarget.ParseFrom(r.ReadLengthDelimited()); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -9572,9 +10061,6 @@ namespace Volvoxgrid.V1
         private TreeIndicatorStyle? _treeIndicator;
         public TreeIndicatorStyle TreeIndicator { get { return _treeIndicator.GetValueOrDefault(); } set { _treeIndicator = value; } }
         public bool HasTreeIndicator { get { return _treeIndicator.HasValue; } }
-        private int? _treeColumn;
-        public int TreeColumn { get { return _treeColumn.GetValueOrDefault(); } set { _treeColumn = value; } }
-        public bool HasTreeColumn { get { return _treeColumn.HasValue; } }
         private uint? _treeColor;
         public uint TreeColor { get { return _treeColor.GetValueOrDefault(); } set { _treeColor = value; } }
         public bool HasTreeColor { get { return _treeColor.HasValue; } }
@@ -9584,6 +10070,21 @@ namespace Volvoxgrid.V1
         private bool? _multiTotals;
         public bool MultiTotals { get { return _multiTotals.GetValueOrDefault(); } set { _multiTotals = value; } }
         public bool HasMultiTotals { get { return _multiTotals.HasValue; } }
+        private int? _indicatorIndent;
+        public int IndicatorIndent { get { return _indicatorIndent.GetValueOrDefault(); } set { _indicatorIndent = value; } }
+        public bool HasIndicatorIndent { get { return _indicatorIndent.HasValue; } }
+        private int? _maxLevels;
+        public int MaxLevels { get { return _maxLevels.GetValueOrDefault(); } set { _maxLevels = value; } }
+        public bool HasMaxLevels { get { return _maxLevels.HasValue; } }
+        private bool? _showLevelButtons;
+        public bool ShowLevelButtons { get { return _showLevelButtons.GetValueOrDefault(); } set { _showLevelButtons = value; } }
+        public bool HasShowLevelButtons { get { return _showLevelButtons.HasValue; } }
+        private int? _labelColumn;
+        public int LabelColumn { get { return _labelColumn.GetValueOrDefault(); } set { _labelColumn = value; } }
+        public bool HasLabelColumn { get { return _labelColumn.HasValue; } }
+        private int? _iconColumn;
+        public int IconColumn { get { return _iconColumn.GetValueOrDefault(); } set { _iconColumn = value; } }
+        public bool HasIconColumn { get { return _iconColumn.HasValue; } }
 
         // ── Serialization ──
 
@@ -9592,14 +10093,22 @@ namespace Volvoxgrid.V1
             var w = new ProtoWriter();
             if (_treeIndicator.HasValue)
                 w.WriteInt32(1, (int)_treeIndicator.Value);
-            if (_treeColumn.HasValue)
-                w.WriteInt32(2, _treeColumn.Value);
             if (_treeColor.HasValue)
                 w.WriteInt32(3, unchecked((int)_treeColor.Value));
             if (_groupTotalPosition.HasValue)
                 w.WriteInt32(4, (int)_groupTotalPosition.Value);
             if (_multiTotals.HasValue)
                 w.WriteBool(5, _multiTotals.Value);
+            if (_indicatorIndent.HasValue)
+                w.WriteInt32(6, _indicatorIndent.Value);
+            if (_maxLevels.HasValue)
+                w.WriteInt32(7, _maxLevels.Value);
+            if (_showLevelButtons.HasValue)
+                w.WriteBool(8, _showLevelButtons.Value);
+            if (_labelColumn.HasValue)
+                w.WriteInt32(9, _labelColumn.Value);
+            if (_iconColumn.HasValue)
+                w.WriteInt32(10, _iconColumn.Value);
             return w.ToArray();
         }
 
@@ -9618,10 +10127,14 @@ namespace Volvoxgrid.V1
                 switch (field)
                 {
                     case 1: msg.TreeIndicator = (TreeIndicatorStyle)r.ReadInt32(); break;
-                    case 2: msg.TreeColumn = r.ReadInt32(); break;
                     case 3: msg.TreeColor = unchecked((uint)r.ReadInt32()); break;
                     case 4: msg.GroupTotalPosition = (GroupTotalPosition)r.ReadInt32(); break;
                     case 5: msg.MultiTotals = r.ReadBool(); break;
+                    case 6: msg.IndicatorIndent = r.ReadInt32(); break;
+                    case 7: msg.MaxLevels = r.ReadInt32(); break;
+                    case 8: msg.ShowLevelButtons = r.ReadBool(); break;
+                    case 9: msg.LabelColumn = r.ReadInt32(); break;
+                    case 10: msg.IconColumn = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }
@@ -10886,9 +11399,6 @@ namespace Volvoxgrid.V1
         private int? _width;
         public int Width { get { return _width.GetValueOrDefault(); } set { _width = value; } }
         public bool HasWidth { get { return _width.HasValue; } }
-        private uint? _modeBits;
-        public uint ModeBits { get { return _modeBits.GetValueOrDefault(); } set { _modeBits = value; } }
-        public bool HasModeBits { get { return _modeBits.HasValue; } }
         private uint? _background;
         public uint Background { get { return _background.GetValueOrDefault(); } set { _background = value; } }
         public bool HasBackground { get { return _background.HasValue; } }
@@ -10924,8 +11434,6 @@ namespace Volvoxgrid.V1
                 w.WriteBool(1, _visible.Value);
             if (_width.HasValue)
                 w.WriteInt32(2, _width.Value);
-            if (_modeBits.HasValue)
-                w.WriteInt32(3, unchecked((int)_modeBits.Value));
             if (_background.HasValue)
                 w.WriteInt32(4, unchecked((int)_background.Value));
             if (_foreground.HasValue)
@@ -10963,7 +11471,6 @@ namespace Volvoxgrid.V1
                 {
                     case 1: msg.Visible = r.ReadBool(); break;
                     case 2: msg.Width = r.ReadInt32(); break;
-                    case 3: msg.ModeBits = unchecked((uint)r.ReadInt32()); break;
                     case 4: msg.Background = unchecked((uint)r.ReadInt32()); break;
                     case 5: msg.Foreground = unchecked((uint)r.ReadInt32()); break;
                     case 6: msg.GridLines = (GridLineStyle)r.ReadInt32(); break;
@@ -12975,6 +13482,129 @@ namespace Volvoxgrid.V1
                     case 1: msg.X = r.ReadFloat(); break;
                     case 2: msg.Y = r.ReadFloat(); break;
                     case 3: msg.Text = r.ReadString(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class TreeChildrenRequestedEvent
+    {
+        public string NodeId { get; set; } = "";
+        public int Row { get; set; }
+        public long RequestId { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (NodeId != null && NodeId.Length > 0) w.WriteString(1, NodeId);
+            if (Row != 0) w.WriteInt32(2, Row);
+            if (RequestId != 0L) w.WriteInt64(3, RequestId);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<TreeChildrenRequestedEvent> Parser = new MessageParser<TreeChildrenRequestedEvent>(data => ParseFrom(data));
+
+        public static TreeChildrenRequestedEvent ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new TreeChildrenRequestedEvent();
+            var r = new ProtoReader(data);
+            var msg = new TreeChildrenRequestedEvent();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.NodeId = r.ReadString(); break;
+                    case 2: msg.Row = r.ReadInt32(); break;
+                    case 3: msg.RequestId = r.ReadInt64(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class TreeNodeActivateEvent
+    {
+        public string NodeId { get; set; } = "";
+        public int Row { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (NodeId != null && NodeId.Length > 0) w.WriteString(1, NodeId);
+            if (Row != 0) w.WriteInt32(2, Row);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<TreeNodeActivateEvent> Parser = new MessageParser<TreeNodeActivateEvent>(data => ParseFrom(data));
+
+        public static TreeNodeActivateEvent ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new TreeNodeActivateEvent();
+            var r = new ProtoReader(data);
+            var msg = new TreeNodeActivateEvent();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.NodeId = r.ReadString(); break;
+                    case 2: msg.Row = r.ReadInt32(); break;
+                    default: r.SkipField(wire); break;
+                }
+            }
+            return msg;
+        }
+    }
+
+    public sealed class TreeNodeContextMenuEvent
+    {
+        public string NodeId { get; set; } = "";
+        public int Row { get; set; }
+        public int X { get; set; }
+        public int Y { get; set; }
+
+        // ── Serialization ──
+
+        public byte[] ToByteArray()
+        {
+            var w = new ProtoWriter();
+            if (NodeId != null && NodeId.Length > 0) w.WriteString(1, NodeId);
+            if (Row != 0) w.WriteInt32(2, Row);
+            if (X != 0) w.WriteInt32(3, X);
+            if (Y != 0) w.WriteInt32(4, Y);
+            return w.ToArray();
+        }
+
+        // ── Deserialization ──
+
+        public static readonly MessageParser<TreeNodeContextMenuEvent> Parser = new MessageParser<TreeNodeContextMenuEvent>(data => ParseFrom(data));
+
+        public static TreeNodeContextMenuEvent ParseFrom(byte[] data)
+        {
+            if (data == null || data.Length == 0) return new TreeNodeContextMenuEvent();
+            var r = new ProtoReader(data);
+            var msg = new TreeNodeContextMenuEvent();
+            int field; ProtoWireType wire;
+            while (r.TryReadTag(out field, out wire))
+            {
+                switch (field)
+                {
+                    case 1: msg.NodeId = r.ReadString(); break;
+                    case 2: msg.Row = r.ReadInt32(); break;
+                    case 3: msg.X = r.ReadInt32(); break;
+                    case 4: msg.Y = r.ReadInt32(); break;
                     default: r.SkipField(wire); break;
                 }
             }

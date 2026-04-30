@@ -922,6 +922,48 @@ function pbEncodeRenderPresentModeConfig(presentMode: number): Uint8Array {
   return new Uint8Array(gridConfig);
 }
 
+function pbEncodeRowIndicatorSlot(kind: number, width: number): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeTag(1, 0), ...pbEncodeInt32(kind));
+  out.push(...pbEncodeTag(2, 0), ...pbEncodeInt32(width));
+  out.push(...pbEncodeTag(3, 0), ...pbEncodeBool(true));
+  return new Uint8Array(out);
+}
+
+function pbEncodeRowIndicatorStartModeConfig(modeBits: number, width: number): Uint8Array {
+  const normalized = Math.max(0, Math.trunc(modeBits));
+  const rowConfig: number[] = [];
+  const add = (bit: number, kind: number, slotWidth: number) => {
+    if ((normalized & bit) !== 0) {
+      rowConfig.push(...pbEncodeMessageField(12, pbEncodeRowIndicatorSlot(kind, slotWidth)));
+    }
+  };
+
+  add(1, 1, Math.max(1, Math.trunc(width)));
+  add(2, 2, 18);
+  add(4, 3, 17);
+  add(8, 4, 18);
+  add(16, 5, 18);
+  add(32, 6, 18);
+  add(64, 7, 18);
+  add(128, 8, 18);
+  add(256, 9, 18);
+  add(512, 10, 18);
+  add(1024, 11, 18);
+  add(2048, 12, 18);
+  add(4096, 13, 18);
+  add(8192, 14, 18);
+  if (rowConfig.length === 0) {
+    rowConfig.push(...pbEncodeTag(1, 0), ...pbEncodeBool(false));
+  }
+
+  const indicatorsConfig: number[] = [];
+  indicatorsConfig.push(...pbEncodeMessageField(1, new Uint8Array(rowConfig)));
+  const gridConfig: number[] = [];
+  gridConfig.push(...pbEncodeMessageField(11, new Uint8Array(indicatorsConfig)));
+  return new Uint8Array(gridConfig);
+}
+
 function pbEncodeUint32Field(field: number, value: number): number[] {
   return [...pbEncodeTag(field, 0), ...pbEncodeVarint(BigInt(value >>> 0))];
 }
@@ -2303,6 +2345,7 @@ export class VolvoxGrid {
   private ctx: CanvasRenderingContext2D | null = null;
   private useGpu: boolean = false;
   private _presentMode: number = 0; // proto PresentMode (0=AUTO,1=FIFO,2=MAILBOX,3=IMMEDIATE)
+  private _rowIndicatorStartModeBits: number = 0;
   private animFrame: number = 0;
   private dirty: boolean = true;
   private destroyed: boolean = false;
@@ -2675,13 +2718,20 @@ export class VolvoxGrid {
     if (typeof this.wasm.get_row_indicator_start_mode_bits === "function") {
       return Number(this.wasm.get_row_indicator_start_mode_bits(this.gridId));
     }
-    return 0;
+    return this._rowIndicatorStartModeBits;
   }
   set rowIndicatorStartModeBits(value: number) {
+    const normalized = Math.max(0, Math.trunc(value));
+    this._rowIndicatorStartModeBits = normalized;
     if (typeof this.wasm.set_row_indicator_start_mode_bits === "function") {
-      this.wasm.set_row_indicator_start_mode_bits(this.gridId, Math.max(0, Math.trunc(value)));
-      this.dirty = true;
+      this.wasm.set_row_indicator_start_mode_bits(this.gridId, normalized);
+    } else {
+      this.applyProtoConfig(
+        pbEncodeRowIndicatorStartModeConfig(normalized, this.rowIndicatorStartWidth),
+        "row indicator slots",
+      );
     }
+    this.dirty = true;
   }
 
   get rowIndicatorStartWidth(): number {
@@ -4486,7 +4536,9 @@ export class VolvoxGrid {
    * Returns raw `GridEvent` protobuf bytes. Callers can decode with their
    * generated protobuf runtime. Raw-stream consumers that need cancellation
    * must first call `setEventDecisionEnabled(true)` and then respond with
-   * `sendRawEventDecision(...)` or `sendEventDecision(...)`.
+   * `sendRawEventDecision(...)` or `sendEventDecision(...)`. Send
+   * `cancel=false` for unhandled cancelable events; send `cancel=true` only
+   * when application code explicitly vetoes the action.
    */
   drainEventStreamRaw(maxEvents: number = 256): Uint8Array[] {
     if (typeof this.wasm.volvox_grid_stream_open !== "function"

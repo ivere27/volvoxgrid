@@ -7,7 +7,8 @@
 use crate::cell::{BarcodeSpec, CellValueData};
 use crate::grid::VolvoxGrid;
 use crate::indicator::{
-    ColIndicatorCellState, ColIndicatorRowDefState, CornerIndicatorState, RowIndicatorSlotState,
+    normalize_indicator_appearance, ColIndicatorCellState, ColIndicatorRowDefState,
+    CornerIndicatorSlotState, CornerIndicatorState, RowIndicatorSlotState,
 };
 use crate::proto::volvoxgrid::v1;
 use crate::row::RowStatus;
@@ -63,6 +64,69 @@ fn engine_scrollbar_colors_to_v1(colors: crate::scrollbar::ScrollBarColors) -> v
         track: Some(colors.track),
         arrow: Some(colors.arrow),
         border: Some(colors.border),
+    }
+}
+
+fn apply_indicator_colors_patch(
+    target: &mut crate::indicator::IndicatorColors,
+    patch: &v1::IndicatorColors,
+) {
+    if let Some(v) = patch.background {
+        target.background = Some(v);
+    }
+    if let Some(v) = patch.foreground {
+        target.foreground = Some(v);
+    }
+    if let Some(v) = patch.grid {
+        target.grid = Some(v);
+    }
+    if let Some(v) = patch.button_background {
+        target.button_background = Some(v);
+    }
+    if let Some(v) = patch.button_foreground {
+        target.button_foreground = Some(v);
+    }
+    if let Some(v) = patch.button_border {
+        target.button_border = Some(v);
+    }
+    if let Some(v) = patch.button_hover_background {
+        target.button_hover_background = Some(v);
+    }
+    if let Some(v) = patch.button_hover_foreground {
+        target.button_hover_foreground = Some(v);
+    }
+    if let Some(v) = patch.button_hover_border {
+        target.button_hover_border = Some(v);
+    }
+    if let Some(v) = patch.button_pressed_background {
+        target.button_pressed_background = Some(v);
+    }
+    if let Some(v) = patch.button_pressed_foreground {
+        target.button_pressed_foreground = Some(v);
+    }
+    if let Some(v) = patch.button_pressed_border_dark {
+        target.button_pressed_border_dark = Some(v);
+    }
+    if let Some(v) = patch.button_pressed_border_light {
+        target.button_pressed_border_light = Some(v);
+    }
+}
+
+fn engine_indicator_colors_to_v1(colors: crate::indicator::IndicatorColors) -> v1::IndicatorColors {
+    v1::IndicatorColors {
+        background: colors.background,
+        foreground: colors.foreground,
+        grid: colors.grid,
+        button_background: colors.button_background,
+        button_foreground: colors.button_foreground,
+        button_border: colors.button_border,
+        button_hover_background: colors.button_hover_background,
+        button_hover_foreground: colors.button_hover_foreground,
+        button_hover_border: colors.button_hover_border,
+        button_pressed_background: colors.button_pressed_background,
+        button_pressed_foreground: colors.button_pressed_foreground,
+        button_pressed_border_dark: colors.button_pressed_border_dark,
+        button_pressed_border_light: colors.button_pressed_border_light,
     }
 }
 
@@ -200,14 +264,12 @@ fn apply_row_indicator_config(
     target: &mut crate::indicator::RowIndicatorState,
     cfg: &v1::RowIndicatorConfig,
 ) {
+    let width_changed = cfg.width.is_some();
     if let Some(v) = cfg.visible {
         target.visible = v;
     }
     if let Some(v) = cfg.width {
         target.width_px = v.max(1);
-    }
-    if let Some(v) = cfg.mode_bits {
-        target.mode_bits = v;
     }
     if let Some(v) = cfg.background {
         target.back_color = Some(v);
@@ -248,13 +310,15 @@ fn apply_row_indicator_config(
             })
             .collect();
     }
+    if width_changed {
+        target.fit_slots_to_width();
+    }
 }
 
 fn row_indicator_to_proto(src: &crate::indicator::RowIndicatorState) -> v1::RowIndicatorConfig {
     v1::RowIndicatorConfig {
         visible: Some(src.visible),
         width: Some(src.width_px.max(1)),
-        mode_bits: Some(src.mode_bits),
         background: src.back_color,
         foreground: src.fore_color,
         grid_lines: src.grid_lines,
@@ -406,6 +470,20 @@ fn apply_corner_indicator_config(
     if let Some(v) = &cfg.data {
         target.data = v.clone();
     }
+    if !cfg.slots.is_empty() {
+        target.slots = cfg
+            .slots
+            .iter()
+            .map(|slot| CornerIndicatorSlotState {
+                kind: slot.kind.unwrap_or(0),
+                width_px: slot.width.unwrap_or(0).max(0),
+                visible: slot.visible.unwrap_or(true),
+                custom_key: slot.custom_key.clone().unwrap_or_default(),
+                data: slot.data.clone().unwrap_or_default(),
+                label_text: slot.label_text.clone().unwrap_or_default(),
+            })
+            .collect();
+    }
 }
 
 fn corner_indicator_to_proto(src: &CornerIndicatorState) -> v1::CornerIndicatorConfig {
@@ -416,6 +494,18 @@ fn corner_indicator_to_proto(src: &CornerIndicatorState) -> v1::CornerIndicatorC
         foreground: src.fore_color,
         custom_key: Some(src.custom_key.clone()),
         data: Some(src.data.clone()),
+        slots: src
+            .slots
+            .iter()
+            .map(|slot| v1::CornerIndicatorSlot {
+                kind: Some(slot.kind),
+                width: Some(slot.width_px.max(0)),
+                visible: Some(slot.visible),
+                custom_key: Some(slot.custom_key.clone()),
+                data: Some(slot.data.clone()),
+                label_text: Some(slot.label_text.clone()),
+            })
+            .collect(),
     }
 }
 
@@ -1048,6 +1138,12 @@ impl VolvoxGrid {
     }
 
     fn apply_indicator_bands_config(&mut self, bands: &v1::IndicatorsConfig) {
+        if let Some(v) = bands.appearance {
+            self.indicator_bands.appearance = normalize_indicator_appearance(v);
+        }
+        if let Some(v) = &bands.colors {
+            apply_indicator_colors_patch(&mut self.indicator_bands.colors, v);
+        }
         if let Some(cfg) = &bands.row_start {
             apply_row_indicator_config(&mut self.indicator_bands.row_start, cfg);
         }
@@ -1071,6 +1167,20 @@ impl VolvoxGrid {
         }
         if let Some(cfg) = &bands.corner_bottom_end {
             apply_corner_indicator_config(&mut self.indicator_bands.corner_bottom_end, cfg);
+        }
+        if let Some(cfg) = &bands.focus {
+            if let Some(v) = cfg.enable_keyboard_focus {
+                self.indicator_focus_enabled = v;
+                if !v {
+                    self.active_indicator = None;
+                }
+            }
+            if let Some(v) = cfg.enter_key_code {
+                self.indicator_focus_enter_key_code = v;
+            }
+            if let Some(v) = cfg.exit_key_code {
+                self.indicator_focus_exit_key_code = v;
+            }
         }
         self.mark_dirty();
     }
@@ -1641,9 +1751,6 @@ impl VolvoxGrid {
         if let Some(v) = oc.tree_indicator {
             self.outline.tree_indicator = v;
         }
-        if let Some(v) = oc.tree_column {
-            self.outline.tree_column = v;
-        }
         if let Some(v) = oc.tree_color {
             self.style.tree_color = v;
         }
@@ -1652,6 +1759,21 @@ impl VolvoxGrid {
         }
         if let Some(v) = oc.multi_totals {
             self.outline.multi_totals = v;
+        }
+        if let Some(v) = oc.indicator_indent {
+            self.outline.indicator_indent = v.max(0);
+        }
+        if let Some(v) = oc.max_levels {
+            self.outline.max_levels = v.max(0);
+        }
+        if let Some(v) = oc.show_level_buttons {
+            self.outline.show_level_buttons = v;
+        }
+        if let Some(v) = oc.label_column {
+            self.outline.label_column = v;
+        }
+        if let Some(v) = oc.icon_column {
+            self.outline.icon_column = v;
         }
         self.mark_dirty();
     }
@@ -1702,6 +1824,12 @@ impl VolvoxGrid {
         }
         if let Some(v) = ic.type_ahead_delay {
             self.type_ahead_delay = v;
+        }
+        if let Some(v) = ic.decision_timeout_ms {
+            self.decision_timeout_ms = v;
+        }
+        if let Some(v) = ic.compare_response_timeout_ms {
+            self.compare_response_timeout_ms = v;
         }
         if let Some(v) = ic.auto_size_mouse {
             self.auto_size_mouse = v;
@@ -2055,10 +2183,14 @@ impl VolvoxGrid {
     fn get_outline_config(&self) -> v1::OutlineConfig {
         v1::OutlineConfig {
             tree_indicator: Some(self.outline.tree_indicator),
-            tree_column: Some(self.outline.tree_column),
             tree_color: Some(self.style.tree_color),
             group_total_position: Some(self.outline.group_total_position),
             multi_totals: Some(self.outline.multi_totals),
+            indicator_indent: Some(self.outline.indicator_indent),
+            max_levels: Some(self.outline.max_levels),
+            show_level_buttons: Some(self.outline.show_level_buttons),
+            label_column: Some(self.outline.label_column),
+            icon_column: Some(self.outline.icon_column),
         }
     }
 
@@ -2087,6 +2219,8 @@ impl VolvoxGrid {
             }),
             type_ahead: Some(self.type_ahead_mode),
             type_ahead_delay: Some(self.type_ahead_delay),
+            decision_timeout_ms: Some(self.decision_timeout_ms),
+            compare_response_timeout_ms: Some(self.compare_response_timeout_ms),
             auto_size_mouse: Some(self.auto_size_mouse),
             auto_size_mode: Some(self.auto_size_mode),
             auto_resize: Some(self.auto_resize),
@@ -2118,6 +2252,8 @@ impl VolvoxGrid {
 
     fn get_indicator_bands_config(&self) -> v1::IndicatorsConfig {
         v1::IndicatorsConfig {
+            appearance: Some(self.indicator_bands.appearance),
+            colors: Some(engine_indicator_colors_to_v1(self.indicator_bands.colors)),
             row_start: Some(row_indicator_to_proto(&self.indicator_bands.row_start)),
             row_end: Some(row_indicator_to_proto(&self.indicator_bands.row_end)),
             col_top: Some(col_indicator_to_proto(&self.indicator_bands.col_top)),
@@ -2134,6 +2270,11 @@ impl VolvoxGrid {
             corner_bottom_end: Some(corner_indicator_to_proto(
                 &self.indicator_bands.corner_bottom_end,
             )),
+            focus: Some(v1::IndicatorFocusConfig {
+                enable_keyboard_focus: Some(self.indicator_focus_enabled),
+                enter_key_code: Some(self.indicator_focus_enter_key_code),
+                exit_key_code: Some(self.indicator_focus_exit_key_code),
+            }),
         }
     }
 
@@ -3443,6 +3584,8 @@ mod tests {
         grid.scrollbar_show_v = v1::ScrollBarMode::ScrollbarModeAuto as i32;
         grid.scrollbar_appearance = v1::ScrollBarAppearance::ScrollbarAppearanceModern as i32;
         grid.scrollbar_size = 9;
+        grid.decision_timeout_ms = 1500;
+        grid.compare_response_timeout_ms = 2500;
         grid.selection.active_cell_style.back_color = Some(0x4400FF00);
         grid.selection.active_cell_style.border = Some(v1::BorderStyle::BorderThick as i32);
 
@@ -3465,6 +3608,9 @@ mod tests {
             Some(v1::ScrollBarAppearance::ScrollbarAppearanceModern as i32)
         );
         assert_eq!(scroll_bar.size, Some(9));
+        let interaction = config.interaction.as_ref().unwrap();
+        assert_eq!(interaction.decision_timeout_ms, Some(1500));
+        assert_eq!(interaction.compare_response_timeout_ms, Some(2500));
         assert_eq!(
             config
                 .selection
@@ -3556,6 +3702,52 @@ mod tests {
         assert_eq!(grid.scrollbar_colors.thumb, 0xFF123456);
         assert_eq!(grid.scrollbar_fade_delay_ms, 1000);
         assert_eq!(grid.scrollbar_margin, 2);
+    }
+
+    #[test]
+    fn indicator_theme_config_roundtrip() {
+        let mut grid = test_grid();
+        let config = v1::GridConfig {
+            indicators: Some(v1::IndicatorsConfig {
+                appearance: Some(v1::IndicatorAppearance::Modern as i32),
+                colors: Some(v1::IndicatorColors {
+                    background: Some(0xFF102030),
+                    foreground: Some(0xFFE0E0E0),
+                    grid: Some(0xFF405060),
+                    button_hover_background: Some(0xFFEAF3FF),
+                    button_hover_border: Some(0xFF5B8DEF),
+                    button_pressed_background: Some(0xFFABCDEF),
+                    button_pressed_border_dark: Some(0xFF123456),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        grid.apply_config(&config);
+
+        assert_eq!(
+            grid.indicator_bands.appearance,
+            v1::IndicatorAppearance::Modern as i32
+        );
+        assert_eq!(grid.indicator_bands.colors.background, Some(0xFF102030));
+        assert_eq!(
+            grid.indicator_bands.colors.button_pressed_background,
+            Some(0xFFABCDEF)
+        );
+
+        let returned = grid.get_config();
+        let indicators = returned.indicators.as_ref().unwrap();
+        let colors = indicators.colors.as_ref().unwrap();
+        assert_eq!(
+            indicators.appearance,
+            Some(v1::IndicatorAppearance::Modern as i32)
+        );
+        assert_eq!(colors.grid, Some(0xFF405060));
+        assert_eq!(colors.button_hover_background, Some(0xFFEAF3FF));
+        assert_eq!(colors.button_hover_border, Some(0xFF5B8DEF));
+        assert_eq!(colors.button_pressed_border_dark, Some(0xFF123456));
     }
 
     #[test]

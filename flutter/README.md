@@ -17,7 +17,7 @@ A high-performance, pixel-rendered data grid widget for Flutter. The native Rust
 
 ```yaml
 dependencies:
-  volvoxgrid: ^0.8.2
+  volvoxgrid: ^0.8.3
 ```
 
 Native binaries are resolved automatically from Maven Central at build time. No manual downloads required.
@@ -29,7 +29,7 @@ By default, `VOLVOXGRID_SOURCE=maven` pulls pre-built binaries from Maven Centra
 | Variable | Default | Description |
 |---|---|---|
 | `VOLVOXGRID_SOURCE` | `maven` | `maven` or `local` |
-| `VOLVOXGRID_VERSION` | `0.8.2` | Maven artifact version |
+| `VOLVOXGRID_VERSION` | `0.8.3` | Maven artifact version |
 
 ## Quick Start
 
@@ -125,7 +125,7 @@ VolvoxGridWidget(
 )
 ```
 
-Cancelable Flutter hooks currently cover `onBeforeEdit`, `onCellEditValidating`, and `onBeforeSort`. The legacy raw `onCancelableEvent` callback is still available, but the event-specific `details.cancel = true` API is clearer for app code.
+Cancelable Flutter hooks currently cover `onBeforeEdit`, `onBeforeDropdownOpen`, `onCellEditValidating`, and `onBeforeSort`. The legacy raw `onCancelableEvent` callback is still available, but the event-specific `details.cancel = true` API is clearer for app code. If no hook is registered, the widget does not pause the engine for a decision; if a raw cancelable event is unhandled while the decision channel is active, the widget allows it with `cancel=false`.
 
 ### VolvoxGridController
 

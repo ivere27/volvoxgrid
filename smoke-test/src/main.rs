@@ -82,10 +82,20 @@ fn main() {
                 row_start: Some(RowIndicatorConfig {
                     visible: Some(false),
                     width: Some(35),
-                    mode_bits: Some(
-                        (RowIndicatorMode::RowIndicatorCurrent as u32)
-                            | (RowIndicatorMode::RowIndicatorSelection as u32),
-                    ),
+                    slots: vec![
+                        RowIndicatorSlot {
+                            kind: Some(RowIndicatorSlotKind::RowIndicatorSlotCurrent as i32),
+                            width: Some(18),
+                            visible: Some(true),
+                            ..Default::default()
+                        },
+                        RowIndicatorSlot {
+                            kind: Some(RowIndicatorSlotKind::RowIndicatorSlotSelection as i32),
+                            width: Some(17),
+                            visible: Some(true),
+                            ..Default::default()
+                        },
+                    ],
                     ..Default::default()
                 }),
                 ..Default::default()

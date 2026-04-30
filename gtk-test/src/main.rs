@@ -8,7 +8,7 @@ mod proto {
 }
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::os::unix::io::RawFd;
 use std::rc::Rc;
 use std::sync::{mpsc, Arc};
@@ -41,6 +41,7 @@ const DEMO_BARCODES: &str = "barcodes";
 const SALES_DEMO_COLS: i32 = 10;
 const HIERARCHY_DEMO_COLS: i32 = 6;
 const BARCODE_DEMO_COLS: i32 = 5;
+const HIERARCHY_NAME_COL: i32 = 0;
 const SALES_STATUS_ITEMS: &str = "Active|Pending|Shipped|Returned|Cancelled";
 const SELECTION_MODE_LABELS: [&str; 5] = ["Free", "ByRow", "ByCol", "Listbox", "MultiRange"];
 const FRAME_PACING_LABELS: [&str; 4] = ["Auto", "Platform", "Unlimited", "Fixed"];
@@ -131,6 +132,10 @@ fn dropdown_from_labels(items: &str) -> pb::Dropdown {
 
 #[derive(Debug, Deserialize)]
 struct HierarchyJsonRow {
+    #[serde(rename = "Id")]
+    id: String,
+    #[serde(rename = "ParentId")]
+    parent_id: Option<String>,
     #[serde(rename = "Name")]
     name: String,
     #[serde(rename = "Type")]
@@ -143,8 +148,6 @@ struct HierarchyJsonRow {
     permissions: String,
     #[serde(rename = "Action")]
     action: String,
-    #[serde(rename = "_level")]
-    level: i32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -194,6 +197,58 @@ struct HierarchyLoadRow<'a> {
     permissions: &'a str,
     #[serde(rename = "Action")]
     action: &'a str,
+}
+
+fn hierarchy_outline_levels(rows: &[HierarchyJsonRow]) -> Result<Vec<i32>, String> {
+    let mut parent_by_id: HashMap<&str, Option<&str>> = HashMap::with_capacity(rows.len());
+    for row in rows {
+        if row.id.trim().is_empty() {
+            return Err("hierarchy demo row is missing Id".to_string());
+        }
+        parent_by_id.insert(row.id.as_str(), row.parent_id.as_deref());
+    }
+
+    fn depth_of<'a>(
+        id: &'a str,
+        parent_by_id: &HashMap<&'a str, Option<&'a str>>,
+        cache: &mut HashMap<&'a str, i32>,
+        visiting: &mut HashSet<&'a str>,
+    ) -> Result<i32, String> {
+        if let Some(depth) = cache.get(id) {
+            return Ok(*depth);
+        }
+        let Some(parent_id) = parent_by_id.get(id) else {
+            return Err(format!(
+                "hierarchy demo data references missing parent {id}"
+            ));
+        };
+        if !visiting.insert(id) {
+            return Err(format!(
+                "hierarchy demo data contains a parent cycle at {id}"
+            ));
+        }
+        let depth = match *parent_id {
+            Some(parent) if !parent.trim().is_empty() => {
+                depth_of(parent, parent_by_id, cache, visiting)? + 1
+            }
+            _ => 0,
+        };
+        visiting.remove(id);
+        cache.insert(id, depth);
+        Ok(depth)
+    }
+
+    let mut cache = HashMap::with_capacity(rows.len());
+    rows.iter()
+        .map(|row| {
+            depth_of(
+                row.id.as_str(),
+                &parent_by_id,
+                &mut cache,
+                &mut HashSet::new(),
+            )
+        })
+        .collect()
 }
 
 #[derive(Clone)]
@@ -2404,7 +2459,12 @@ fn sales_theme_config() -> pb::GridConfig {
             row_start: Some(pb::RowIndicatorConfig {
                 visible: Some(true),
                 width: Some(40),
-                mode_bits: Some(pb::RowIndicatorMode::RowIndicatorNumbers as u32),
+                slots: vec![pb::RowIndicatorSlot {
+                    kind: Some(pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32),
+                    width: Some(40),
+                    visible: Some(true),
+                    ..Default::default()
+                }],
                 background: Some(0xFFF9FAFB),
                 foreground: Some(0xFF6B7280),
                 grid_color: Some(0xFFD1D5DB),
@@ -2431,7 +2491,13 @@ fn sales_theme_config() -> pb::GridConfig {
     }
 }
 
-fn hierarchy_theme_config() -> pb::GridConfig {
+fn hierarchy_theme_config(max_outline_depth: i32, max_outline_level: i32) -> pb::GridConfig {
+    const OUTLINE_INDENT: i32 = 20;
+    const MIN_OUTLINE_INDICATOR_WIDTH: i32 = 56;
+    let max_outline_depth = max_outline_depth.max(0);
+    let outline_width = MIN_OUTLINE_INDICATOR_WIDTH.max((max_outline_depth + 1) * OUTLINE_INDENT);
+    let expander_width = outline_width + 280;
+
     pb::GridConfig {
         layout: Some(pb::LayoutConfig {
             fixed_rows: Some(0),
@@ -2529,14 +2595,17 @@ fn hierarchy_theme_config() -> pb::GridConfig {
         }),
         outline: Some(pb::OutlineConfig {
             tree_indicator: Some(pb::TreeIndicatorStyle::TreeIndicatorArrowsLeaf as i32),
-            tree_column: Some(0),
+            indicator_indent: Some(OUTLINE_INDENT),
+            max_levels: Some(max_outline_level.max(0)),
+            show_level_buttons: Some(true),
+            label_column: Some(HIERARCHY_NAME_COL),
             tree_color: Some(0xFFA8A29E),
             ..Default::default()
         }),
         interaction: Some(pb::InteractionConfig {
             resize: Some(pb::ResizePolicy {
                 columns: Some(true),
-                rows: Some(true),
+                rows: Some(false),
                 ..Default::default()
             }),
             freeze: Some(pb::FreezePolicy {
@@ -2554,7 +2623,31 @@ fn hierarchy_theme_config() -> pb::GridConfig {
         }),
         indicators: Some(pb::IndicatorsConfig {
             row_start: Some(pb::RowIndicatorConfig {
-                visible: Some(false),
+                visible: Some(true),
+                width: Some(expander_width),
+                background: Some(0xFFFAFAF9),
+                foreground: Some(0xFF44403C),
+                grid_color: Some(0xFFD6D3D1),
+                auto_size: Some(false),
+                allow_resize: Some(true),
+                slots: vec![pb::RowIndicatorSlot {
+                    kind: Some(pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32),
+                    width: Some(expander_width),
+                    visible: Some(true),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }),
+            corner_top_start: Some(pb::CornerIndicatorConfig {
+                visible: Some(true),
+                background: Some(0xFFFAFAF9),
+                foreground: Some(0xFF44403C),
+                slots: vec![pb::CornerIndicatorSlot {
+                    kind: Some(pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32),
+                    width: Some(outline_width),
+                    visible: Some(true),
+                    ..Default::default()
+                }],
                 ..Default::default()
             }),
             col_top: Some(pb::ColIndicatorConfig {
@@ -2568,6 +2661,7 @@ fn hierarchy_theme_config() -> pb::GridConfig {
                 allow_resize: Some(true),
                 ..Default::default()
             }),
+            appearance: Some(pb::IndicatorAppearance::Modern as i32),
             ..Default::default()
         }),
         ..Default::default()
@@ -2836,6 +2930,7 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
     let raw_json = client.get_demo_data(DEMO_HIERARCHY)?;
     let rows: Vec<HierarchyJsonRow> = serde_json::from_slice(&raw_json)
         .map_err(|err| format!("embedded hierarchy demo parse failed: {err}"))?;
+    let levels = hierarchy_outline_levels(&rows)?;
     let load_rows: Vec<HierarchyLoadRow<'_>> = rows
         .iter()
         .map(|row| HierarchyLoadRow {
@@ -2853,10 +2948,11 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
         grid_id,
         vec![
             pb::ColumnDef {
-                index: 0,
+                index: HIERARCHY_NAME_COL,
                 width: Some(260),
                 caption: Some("Name".to_string()),
                 key: Some("Name".to_string()),
+                hidden: Some(true),
                 ..Default::default()
             },
             pb::ColumnDef {
@@ -2914,16 +3010,31 @@ fn load_hierarchy_json_demo(client: &VolvoxServiceClient, grid_id: i64) -> Resul
         return Err("LoadData failed for embedded hierarchy demo".to_string());
     }
 
-    client.configure(grid_id, hierarchy_theme_config())?;
+    let min_outline_level = levels
+        .iter()
+        .map(|level| (*level).max(0))
+        .min()
+        .unwrap_or(0);
+    let max_outline_level = levels
+        .iter()
+        .map(|level| (*level).max(0))
+        .max()
+        .unwrap_or(0);
+    client.configure(
+        grid_id,
+        hierarchy_theme_config(
+            (max_outline_level - min_outline_level).max(0),
+            max_outline_level,
+        ),
+    )?;
 
     client.define_rows(
         grid_id,
         rows.iter()
             .enumerate()
-            .map(|(index, row)| pb::RowDef {
+            .map(|(index, _)| pb::RowDef {
                 index: index as i32,
-                outline_level: Some(row.level),
-                is_subtotal: Some(row.kind == "Folder"),
+                outline_level: Some(levels[index]),
                 ..Default::default()
             })
             .collect(),

@@ -1,6 +1,6 @@
 {
   "name": "volvoxgrid",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -18,6 +18,10 @@
     "./generated/volvoxgrid_ffi.js": {
       "types": "./dist/generated/volvoxgrid_ffi.d.ts",
       "default": "./dist/generated/volvoxgrid_ffi.js"
+    },
+    "./generated/volvoxgrid_lite.js": {
+      "types": "./dist/generated/volvoxgrid_lite.d.ts",
+      "default": "./dist/generated/volvoxgrid_lite.js"
     },
     "./default-input.js": {
       "types": "./dist/default-input.d.ts",

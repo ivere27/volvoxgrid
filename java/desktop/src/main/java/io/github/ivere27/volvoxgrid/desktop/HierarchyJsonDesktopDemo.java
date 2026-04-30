@@ -11,6 +11,9 @@ import io.github.ivere27.volvoxgrid.ColIndicatorCellMode;
 import io.github.ivere27.volvoxgrid.ColIndicatorConfig;
 import io.github.ivere27.volvoxgrid.ColumnDataType;
 import io.github.ivere27.volvoxgrid.ColumnDef;
+import io.github.ivere27.volvoxgrid.CornerIndicatorConfig;
+import io.github.ivere27.volvoxgrid.CornerIndicatorSlot;
+import io.github.ivere27.volvoxgrid.CornerIndicatorSlotKind;
 import io.github.ivere27.volvoxgrid.DefineColumnsRequest;
 import io.github.ivere27.volvoxgrid.DefineRowsRequest;
 import io.github.ivere27.volvoxgrid.DropdownTrigger;
@@ -29,6 +32,7 @@ import io.github.ivere27.volvoxgrid.HeaderStyle;
 import io.github.ivere27.volvoxgrid.HighlightStyle;
 import io.github.ivere27.volvoxgrid.HoverConfig;
 import io.github.ivere27.volvoxgrid.IndicatorsConfig;
+import io.github.ivere27.volvoxgrid.IndicatorAppearance;
 import io.github.ivere27.volvoxgrid.InteractionConfig;
 import io.github.ivere27.volvoxgrid.LayoutConfig;
 import io.github.ivere27.volvoxgrid.LoadDataResult;
@@ -38,6 +42,8 @@ import io.github.ivere27.volvoxgrid.OutlineConfig;
 import io.github.ivere27.volvoxgrid.RegionStyle;
 import io.github.ivere27.volvoxgrid.ResizePolicy;
 import io.github.ivere27.volvoxgrid.RowIndicatorConfig;
+import io.github.ivere27.volvoxgrid.RowIndicatorSlot;
+import io.github.ivere27.volvoxgrid.RowIndicatorSlotKind;
 import io.github.ivere27.volvoxgrid.RowDef;
 import io.github.ivere27.volvoxgrid.ScrollBarsMode;
 import io.github.ivere27.volvoxgrid.ScrollConfig;
@@ -48,11 +54,16 @@ import io.github.ivere27.volvoxgrid.TreeIndicatorStyle;
 import io.github.ivere27.volvoxgrid.UpdateCellsRequest;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class HierarchyJsonDesktopDemo {
+    static final int NAME_COLUMN_INDEX = 0;
     static final int ACTION_COLUMN_INDEX = 5;
 
     private static final int[] COL_WIDTHS = {260, 80, 80, 120, 100, 92};
@@ -62,9 +73,10 @@ final class HierarchyJsonDesktopDemo {
     private static final String[] KEYS = {
         "Name", "Type", "Size", "Modified", "Permissions", "Action",
     };
-    private static final Pattern LEVEL_PATTERN = Pattern.compile("\"_level\"\\s*:\\s*(-?\\d+)");
+    private static final Pattern ID_PATTERN = Pattern.compile("\"Id\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern PARENT_ID_PATTERN = Pattern.compile("\"ParentId\"\\s*:\\s*(?:null|\"([^\"]*)\")");
     private static final Pattern TYPE_PATTERN = Pattern.compile("\"Type\"\\s*:\\s*\"([^\"]+)\"");
-    private static final Pattern HELPER_FIELD_PATTERN = Pattern.compile(",\\s*\"_level\"\\s*:\\s*-?\\d+");
+    private static final Pattern HELPER_FIELD_PATTERN = Pattern.compile(",\\s*\"(?:Id|ParentId)\"\\s*:\\s*(?:null|\"[^\"]*\")");
     private static final int BODY_BG = (int) 0xFFFFFFFFL;
     private static final int BODY_FG = (int) 0xFF1C1917L;
     private static final int CANVAS_BG = (int) 0xFFFAFAF9L;
@@ -80,13 +92,15 @@ final class HierarchyJsonDesktopDemo {
     private static final int ACCENT = (int) 0xFFF59E0BL;
     private static final int TREE_COLOR = (int) 0xFFA8A29EL;
     private static final int HOVER_CELL_BG = 0x1AD97706;
+    private static final int OUTLINE_INDENT = 20;
+    private static final int MIN_OUTLINE_INDICATOR_WIDTH = 56;
 
     private HierarchyJsonDesktopDemo() {}
 
     static void load(VolvoxGridDesktopController ctrl)
         throws SynurangDesktopBridge.SynurangBridgeException {
         String rawJson = new String(ctrl.getDemoData("hierarchy"), StandardCharsets.UTF_8);
-        List<Integer> levels = extractLevels(rawJson);
+        List<Integer> levels = deriveLevels(extractIds(rawJson), extractParentIds(rawJson));
         List<String> types = extractTypes(rawJson);
         ctrl.setColCount(COL_WIDTHS.length);
         ctrl.defineColumns(
@@ -111,7 +125,7 @@ final class HierarchyJsonDesktopDemo {
             throw new IllegalStateException("LoadData failed for embedded hierarchy demo");
         }
 
-        ctrl.configure(hierarchyThemeConfig());
+        ctrl.configure(hierarchyThemeConfig(maxOutlineDepth(levels), maxOutlineLevel(levels)));
 
         DefineRowsRequest.Builder rows = DefineRowsRequest.newBuilder();
         UpdateCellsRequest.Builder styles = UpdateCellsRequest.newBuilder();
@@ -121,7 +135,6 @@ final class HierarchyJsonDesktopDemo {
                 RowDef.newBuilder()
                     .setIndex(row)
                     .setOutlineLevel(levels.get(row))
-                    .setIsSubtotal(isFolder)
                     .build()
             );
             styles.addCells(
@@ -155,7 +168,44 @@ final class HierarchyJsonDesktopDemo {
         ctrl.updateCells(styles.build());
     }
 
-    private static GridConfig hierarchyThemeConfig() {
+    private static int maxOutlineDepth(List<Integer> levels) {
+        if (levels.isEmpty()) {
+            return 0;
+        }
+        int min = Integer.MAX_VALUE;
+        int max = Integer.MIN_VALUE;
+        for (int level : levels) {
+            if (level >= 0) {
+                min = Math.min(min, level);
+            }
+            max = Math.max(max, level);
+        }
+        return Math.max(0, max - (min == Integer.MAX_VALUE ? 0 : min));
+    }
+
+    private static int maxOutlineLevel(List<Integer> levels) {
+        int max = 0;
+        boolean hasMax = false;
+        for (int level : levels) {
+            if (level >= 0 && (!hasMax || level > max)) {
+                hasMax = true;
+                max = level;
+            }
+        }
+        return max;
+    }
+
+    private static int outlineIndicatorWidth(int maxOutlineDepth) {
+        return Math.max(MIN_OUTLINE_INDICATOR_WIDTH, (Math.max(0, maxOutlineDepth) + 1) * OUTLINE_INDENT);
+    }
+
+    private static int expanderIndicatorWidth(int maxOutlineDepth) {
+        return outlineIndicatorWidth(maxOutlineDepth) + 280;
+    }
+
+    private static GridConfig hierarchyThemeConfig(int maxOutlineDepth, int maxOutlineLevel) {
+        int outlineWidth = outlineIndicatorWidth(maxOutlineDepth);
+        int expanderWidth = expanderIndicatorWidth(maxOutlineDepth);
         return GridConfig.newBuilder()
             .setLayout(
                 LayoutConfig.newBuilder()
@@ -287,7 +337,10 @@ final class HierarchyJsonDesktopDemo {
             .setOutline(
                 OutlineConfig.newBuilder()
                     .setTreeIndicator(TreeIndicatorStyle.TREE_INDICATOR_ARROWS_LEAF)
-                    .setTreeColumn(0)
+                    .setIndicatorIndent(OUTLINE_INDENT)
+                    .setMaxLevels(Math.max(0, maxOutlineLevel))
+                    .setShowLevelButtons(true)
+                    .setLabelColumn(NAME_COLUMN_INDEX)
                     .setTreeColor(TREE_COLOR)
                     .build()
             )
@@ -296,7 +349,7 @@ final class HierarchyJsonDesktopDemo {
                     .setResize(
                         ResizePolicy.newBuilder()
                             .setColumns(true)
-                            .setRows(true)
+                            .setRows(false)
                             .build()
                     )
                     .setFreeze(
@@ -319,7 +372,34 @@ final class HierarchyJsonDesktopDemo {
                 IndicatorsConfig.newBuilder()
                     .setRowStart(
                         RowIndicatorConfig.newBuilder()
-                            .setVisible(false)
+                            .setVisible(true)
+                            .setWidth(expanderWidth)
+                            .setBackground(HEADER_BG)
+                            .setForeground(FIXED_FG)
+                            .setGridColor(FIXED_GRID_COLOR)
+                            .setAutoSize(false)
+                            .setAllowResize(true)
+                            .addSlots(
+                                RowIndicatorSlot.newBuilder()
+                                    .setKind(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER)
+                                    .setWidth(expanderWidth)
+                                    .setVisible(true)
+                                    .build()
+                            )
+                            .build()
+                    )
+                    .setCornerTopStart(
+                        CornerIndicatorConfig.newBuilder()
+                            .setVisible(true)
+                            .setBackground(HEADER_BG)
+                            .setForeground(FIXED_FG)
+                            .addSlots(
+                                CornerIndicatorSlot.newBuilder()
+                                    .setKind(CornerIndicatorSlotKind.CORNER_SLOT_OUTLINE_LEVELS)
+                                    .setWidth(outlineWidth)
+                                    .setVisible(true)
+                                    .build()
+                            )
                             .build()
                     )
                     .setColTop(
@@ -334,18 +414,74 @@ final class HierarchyJsonDesktopDemo {
                             .setAllowResize(true)
                             .build()
                     )
+                    .setAppearance(IndicatorAppearance.INDICATOR_APPEARANCE_MODERN)
                     .build()
             )
             .build();
     }
 
-    private static List<Integer> extractLevels(String rawJson) {
-        ArrayList<Integer> levels = new ArrayList<>();
-        Matcher matcher = LEVEL_PATTERN.matcher(rawJson);
+    private static List<String> extractIds(String rawJson) {
+        ArrayList<String> ids = new ArrayList<>();
+        Matcher matcher = ID_PATTERN.matcher(rawJson);
         while (matcher.find()) {
-            levels.add(Integer.parseInt(matcher.group(1)));
+            ids.add(matcher.group(1));
+        }
+        return ids;
+    }
+
+    private static List<String> extractParentIds(String rawJson) {
+        ArrayList<String> parentIds = new ArrayList<>();
+        Matcher matcher = PARENT_ID_PATTERN.matcher(rawJson);
+        while (matcher.find()) {
+            parentIds.add(matcher.group(1));
+        }
+        return parentIds;
+    }
+
+    private static List<Integer> deriveLevels(List<String> ids, List<String> parentIds) {
+        if (ids.size() != parentIds.size()) {
+            throw new IllegalStateException("Hierarchy demo Id/ParentId counts do not match");
+        }
+        Map<String, String> parentById = new HashMap<>();
+        for (int index = 0; index < ids.size(); index += 1) {
+            String id = ids.get(index);
+            if (id == null || id.trim().isEmpty()) {
+                throw new IllegalStateException("Hierarchy demo row is missing Id");
+            }
+            parentById.put(id, parentIds.get(index));
+        }
+
+        Map<String, Integer> cache = new HashMap<>();
+        ArrayList<Integer> levels = new ArrayList<>();
+        for (String id : ids) {
+            levels.add(depthOf(id, parentById, cache, new HashSet<>()));
         }
         return levels;
+    }
+
+    private static int depthOf(
+        String id,
+        Map<String, String> parentById,
+        Map<String, Integer> cache,
+        Set<String> visiting
+    ) {
+        Integer cached = cache.get(id);
+        if (cached != null) {
+            return cached;
+        }
+        if (!parentById.containsKey(id)) {
+            throw new IllegalStateException("Hierarchy demo data references missing parent " + id);
+        }
+        if (!visiting.add(id)) {
+            throw new IllegalStateException("Hierarchy demo data contains a parent cycle at " + id);
+        }
+        String parentId = parentById.get(id);
+        int depth = parentId == null || parentId.trim().isEmpty()
+            ? 0
+            : depthOf(parentId, parentById, cache, visiting) + 1;
+        visiting.remove(id);
+        cache.put(id, depth);
+        return depth;
     }
 
     private static List<String> extractTypes(String rawJson) {
@@ -370,6 +506,9 @@ final class HierarchyJsonDesktopDemo {
         }
         if (align != null) {
             builder.setAlign(align);
+        }
+        if (index == NAME_COLUMN_INDEX) {
+            builder.setHidden(true);
         }
         return builder;
     }

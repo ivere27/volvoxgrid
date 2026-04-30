@@ -32,8 +32,9 @@
 // 4. Cancelable events via EventDecision.
 //    Events with a non-zero `event_id` in GridEvent are cancelable.
 //    The host sends an EventDecision on the RenderSession with `cancel=true`
-//    to veto the action. The engine waits up to 250 ms for a decision;
-//    if none arrives, the event proceeds (cancel=false).
+//    to veto the action. By default the action remains pending until the
+//    decision arrives; a finite decision_timeout_ms can be configured as an
+//    explicit watchdog.
 //    Events with `event_id=0` are informational and cannot be canceled.
 //
 // 5. Language-agnostic transport.

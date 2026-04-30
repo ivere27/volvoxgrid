@@ -58,7 +58,8 @@ The custom element creates a shadow DOM canvas and initializes VolvoxGrid automa
 | Export | Description |
 |---|---|
 | `volvoxgrid` | Main entry: `VolvoxGrid`, `VolvoxGridElement`, types |
-| `volvoxgrid/generated/volvoxgrid_ffi.js` | Generated low-level FFI bindings |
+| `volvoxgrid/generated/volvoxgrid_ffi.js` | Generated low-level FFI constants |
+| `volvoxgrid/generated/volvoxgrid_lite.js` | Generated protobuf-lite message codecs |
 | `volvoxgrid/default-input.js` | Default keyboard/mouse input helpers |
 
 ## Data Operations

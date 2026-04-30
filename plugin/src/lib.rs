@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::panic::{self, AssertUnwindSafe};
 use std::sync::{
     atomic::{AtomicI64, Ordering},
     mpsc, Arc, Mutex,
@@ -12,6 +13,8 @@ use volvoxgrid_engine::GridManager;
 #[path = "volvoxgrid_ffi_plugin.rs"]
 mod ffi_impl;
 use ffi_impl::*;
+#[path = "volvoxtree_ffi_plugin.rs"]
+mod ffi_tree_impl;
 mod terminal_tui;
 
 #[cfg(all(target_os = "windows", target_env = "gnu"))]
@@ -19,12 +22,23 @@ unsafe extern "C" {
     fn volvoxgrid_windows_mingw_compat_force_link();
 }
 
-// Shared GridManager accessible by both the plugin and demo FFI exports.
+// Shared state is keyed by grid id rather than by VolvoxGridPlugin instance.
+// Generated service values are cheap handles: a render session, EventStream,
+// and action RPC may be driven through different plugin objects but still need
+// to rendezvous on the same compare channel and session count.
 lazy_static::lazy_static! {
     static ref SHARED_GRID_MANAGER: GridManager = GridManager::new();
+    static ref COMPARE_CHANNELS: Mutex<HashMap<i64, Arc<CompareChannel>>> =
+        Mutex::new(HashMap::new());
+    static ref ACTIVE_RENDER_SESSIONS: Mutex<HashMap<i64, usize>> =
+        Mutex::new(HashMap::new());
 }
 
+const ERROR_DECISION_TIMEOUT: i32 = 1001;
+const ERROR_COMPARE_TIMEOUT: i32 = 1002;
+
 type PluginResult<T> = Result<T, FfiError>;
+type TreePluginResult<T> = Result<T, ffi_tree_impl::FfiError>;
 
 const ERROR_INVALID_ARGUMENT: i32 = 1;
 const ERROR_NOT_FOUND: i32 = 2;
@@ -86,6 +100,12 @@ fn map_plugin_error(message: impl Into<String>) -> FfiError {
         || lower.contains("encode")
         || lower.contains("empty")
         || lower.contains("unknown demo")
+        || lower.contains("duplicate tree node id")
+        || lower.contains("references missing parent")
+        || lower.contains("tree cycle")
+        || lower.contains("recursive remove is required")
+        || lower.contains("cannot be moved")
+        || lower.contains("parent_id")
     {
         return invalid_argument(message);
     }
@@ -96,6 +116,14 @@ fn map_plugin_error(message: impl Into<String>) -> FfiError {
         return invalid_state(message);
     }
     internal_error(message)
+}
+
+fn tree_ffi_error_from(error: FfiError) -> ffi_tree_impl::FfiError {
+    ffi_tree_impl::FfiError::new(error.message, error.code, error.grpc_code)
+}
+
+fn tree_map_plugin_error(message: impl Into<String>) -> ffi_tree_impl::FfiError {
+    tree_ffi_error_from(map_plugin_error(message))
 }
 
 fn current_frame_metrics(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Option<FrameMetrics> {
@@ -126,6 +154,7 @@ fn with_tui_pointer_geometry<R>(
         grid.indicator_bands.row_start.width_px =
             volvoxgrid_engine::canvas_tui::tui_row_indicator_width(grid).max(1);
         grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.fit_slots_to_width();
     }
     grid.indicator_bands.col_top.visible = true;
     grid.indicator_bands.col_top.default_row_height_px = 1;
@@ -517,18 +546,20 @@ fn handle_pointer_render_input(
                                     );
                                 }
 
-                                if hit.row >= 0 && hit.col >= 0 {
-                                    if hit.area == volvoxgrid_engine::input::HitArea::OutlineButton
-                                    {
-                                        let collapsing = !grid
-                                            .row_props
-                                            .get(&hit.row)
-                                            .map_or(false, |rp| rp.is_collapsed);
-                                        plugin.request_before_node_toggle(
-                                            grid_id, grid, hit.row, collapsing,
-                                        );
-                                    }
+                                if hit.row >= 0
+                                    && !pe.dbl_click
+                                    && hit.area == volvoxgrid_engine::input::HitArea::OutlineButton
+                                {
+                                    let collapsing = !grid
+                                        .row_props
+                                        .get(&hit.row)
+                                        .map_or(false, |rp| rp.is_collapsed);
+                                    plugin.request_before_node_toggle(
+                                        grid_id, grid, hit.row, collapsing,
+                                    );
+                                }
 
+                                if hit.row >= 0 && hit.col >= 0 {
                                     let is_cell_like = hit.area
                                         == volvoxgrid_engine::input::HitArea::Cell
                                         || hit.area == volvoxgrid_engine::input::HitArea::FixedRow
@@ -737,12 +768,15 @@ fn handle_key_render_input(
                 // can type to replace or press arrows to deselect and edit.
                 if !was_editing && !grid.host_key_dispatch && grid.edit_trigger_mode >= 1 {
                     let caret_end = Some(true);
+                    let (edit_row, edit_col) =
+                        volvoxgrid_engine::input::selected_outline_label_edit_target(grid)
+                            .unwrap_or((grid.selection.row, grid.selection.col));
                     if decision_enabled {
                         let _ = plugin.request_before_edit(
                             grid_id,
                             grid,
-                            grid.selection.row,
-                            grid.selection.col,
+                            edit_row,
+                            edit_col,
                             false,
                             false,
                             None,
@@ -756,8 +790,8 @@ fn handle_key_render_input(
                     } else {
                         begin_edit_session_core_opts(
                             grid,
-                            grid.selection.row,
-                            grid.selection.col,
+                            edit_row,
+                            edit_col,
                             false,
                             true,
                             true,
@@ -796,26 +830,51 @@ fn handle_key_render_input(
             terminal_tui::TerminalKeyPolicyDecision::Forward => match ke.r#type {
                 t if t == pb::key_event::Type::KeyDown as i32 => {
                     if decision_enabled {
-                        volvoxgrid_engine::input::handle_key_down_with_behavior(
-                            grid,
-                            ke.key_code,
-                            ke.modifier,
-                            volvoxgrid_engine::input::InputBehavior {
-                                allow_begin_edit: false,
-                                allow_header_sort: true,
-                                ..volvoxgrid_engine::input::InputBehavior::default()
-                            },
-                        );
-                        if (ke.key_code == 13 || ke.key_code == 113)
+                        let uses_outline_expander = (ke.key_code == 13 || ke.key_code == 32)
+                            && !was_editing
+                            && !grid.host_key_dispatch
+                            && volvoxgrid_engine::input::selected_outline_label_keyboard_target(
+                                grid,
+                            )
+                            .is_some();
+                        if uses_outline_expander {
+                            if let Some((row, collapse)) =
+                                volvoxgrid_engine::input::selected_outline_node_toggle_target(grid)
+                            {
+                                plugin.request_before_node_toggle(grid_id, grid, row, collapse);
+                            }
+                        } else {
+                            volvoxgrid_engine::input::handle_key_down_with_behavior(
+                                grid,
+                                ke.key_code,
+                                ke.modifier,
+                                volvoxgrid_engine::input::InputBehavior {
+                                    allow_begin_edit: false,
+                                    allow_header_sort: true,
+                                    ..volvoxgrid_engine::input::InputBehavior::default()
+                                },
+                            );
+                        }
+                        if !uses_outline_expander
+                            && (ke.key_code == 13 || ke.key_code == 113)
                             && !grid.host_key_dispatch
                             && grid.edit_trigger_mode >= 1
                             && !was_editing
                         {
+                            let (edit_row, edit_col) =
+                                if ke.key_code == 113 {
+                                    volvoxgrid_engine::input::selected_outline_label_edit_target(
+                                        grid,
+                                    )
+                                    .unwrap_or((grid.selection.row, grid.selection.col))
+                                } else {
+                                    (grid.selection.row, grid.selection.col)
+                                };
                             let _ = plugin.request_before_edit(
                                 grid_id,
                                 grid,
-                                grid.selection.row,
-                                grid.selection.col,
+                                edit_row,
+                                edit_col,
                                 false,
                                 false,
                                 None,
@@ -836,16 +895,24 @@ fn handle_key_render_input(
                 }
                 t if t == pb::key_event::Type::KeyPress as i32 => {
                     if decision_enabled {
-                        volvoxgrid_engine::input::handle_key_press_with_behavior(
-                            grid,
-                            ke.character.chars().next().map(|c| c as u32).unwrap_or(0),
-                            volvoxgrid_engine::input::InputBehavior {
-                                allow_begin_edit: false,
-                                allow_header_sort: true,
-                                ..volvoxgrid_engine::input::InputBehavior::default()
-                            },
-                        );
-                        if !was_editing
+                        let outline_space = ke.character == " "
+                            && volvoxgrid_engine::input::selected_outline_label_keyboard_target(
+                                grid,
+                            )
+                            .is_some();
+                        if !outline_space {
+                            volvoxgrid_engine::input::handle_key_press_with_behavior(
+                                grid,
+                                ke.character.chars().next().map(|c| c as u32).unwrap_or(0),
+                                volvoxgrid_engine::input::InputBehavior {
+                                    allow_begin_edit: false,
+                                    allow_header_sort: true,
+                                    ..volvoxgrid_engine::input::InputBehavior::default()
+                                },
+                            );
+                        }
+                        if !outline_space
+                            && !was_editing
                             && !grid.host_key_dispatch
                             && grid.edit_trigger_mode >= 1
                             && grid.type_ahead_mode == 0
@@ -853,11 +920,16 @@ fn handle_key_render_input(
                             let seed = ke.character.chars().next().map(|c| c.to_string());
                             if let Some(seed) = seed {
                                 if !seed.is_empty() {
+                                    let (edit_row, edit_col) =
+                                        volvoxgrid_engine::input::selected_outline_label_edit_target(
+                                            grid,
+                                        )
+                                        .unwrap_or((grid.selection.row, grid.selection.col));
                                     let _ = plugin.request_before_edit(
                                         grid_id,
                                         grid,
-                                        grid.selection.row,
-                                        grid.selection.col,
+                                        edit_row,
+                                        edit_col,
                                         false,
                                         false,
                                         Some(seed),
@@ -966,8 +1038,6 @@ struct VolvoxGridPlugin {
     next_event_id: AtomicI64,
     decision_enabled: Mutex<HashSet<i64>>,
     pending_actions: Mutex<HashMap<(i64, i64), PendingActionEntry>>,
-    compare_channels: Mutex<HashMap<i64, Arc<CompareChannel>>>,
-    active_render_sessions: Mutex<HashMap<i64, usize>>,
     zoom_levels: Mutex<HashMap<i64, f64>>,
     loaded_font_data: Mutex<Vec<Vec<u8>>>,
 }
@@ -984,6 +1054,22 @@ struct CompareChannel {
     pending: Mutex<VecDeque<PendingCompare>>,
     responses: Mutex<HashMap<i64, mpsc::Sender<i32>>>,
     waker: Mutex<Option<Arc<volvoxgrid_engine::Waker>>>,
+}
+
+struct HeaderSortSnapshot {
+    col: i32,
+    order: i32,
+    emit_after_sort: bool,
+    compare: Box<volvoxgrid_engine::grid::CustomCompareFn>,
+    old_sort_state: volvoxgrid_engine::sort::SortState,
+    old_row_positions: Vec<i32>,
+    groups: Vec<Vec<i32>>,
+}
+
+#[derive(Debug)]
+enum CompareAbort {
+    Timeout,
+    Cancelled,
 }
 
 impl CompareChannel {
@@ -1011,7 +1097,7 @@ impl CompareChannel {
         }
     }
 
-    fn compare(&self, row1: i32, row2: i32, col: i32, timeout: Duration) -> Option<i32> {
+    fn compare(&self, row1: i32, row2: i32, col: i32, timeout: Option<Duration>) -> Option<i32> {
         let request_id = self.next_request_id.fetch_add(1, Ordering::Relaxed);
         let (response_tx, response_rx) = mpsc::channel();
         self.responses
@@ -1030,16 +1116,42 @@ impl CompareChannel {
             });
         self.notify_waker();
 
-        match response_rx.recv_timeout(timeout) {
+        let received = match timeout {
+            Some(timeout) => response_rx.recv_timeout(timeout),
+            None => response_rx
+                .recv()
+                .map_err(|_| mpsc::RecvTimeoutError::Disconnected),
+        };
+
+        match received {
             Ok(result) => Some(result.signum()),
-            Err(_) => {
+            Err(mpsc::RecvTimeoutError::Timeout) => {
                 self.responses
                     .lock()
                     .unwrap_or_else(|e| e.into_inner())
                     .remove(&request_id);
-                None
+                panic::panic_any(CompareAbort::Timeout);
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                self.responses
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .remove(&request_id);
+                panic::panic_any(CompareAbort::Cancelled);
             }
         }
+    }
+
+    fn cancel(&self) {
+        self.responses
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clear();
+        self.pending
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clear();
+        self.notify_waker();
     }
 
     fn drain_pending(&self) -> Vec<PendingCompare> {
@@ -1156,16 +1268,11 @@ struct ZoomGestureState {
 }
 
 impl VolvoxGridPlugin {
-    const DECISION_TIMEOUT: Duration = Duration::from_millis(250);
-    const COMPARE_RESPONSE_TIMEOUT: Duration = Duration::from_millis(250);
-
     fn new() -> Self {
         Self {
             next_event_id: AtomicI64::new(1),
             decision_enabled: Mutex::new(HashSet::new()),
             pending_actions: Mutex::new(HashMap::new()),
-            compare_channels: Mutex::new(HashMap::new()),
-            active_render_sessions: Mutex::new(HashMap::new()),
             zoom_levels: Mutex::new(HashMap::new()),
             loaded_font_data: Mutex::new(Vec::new()),
         }
@@ -1192,6 +1299,27 @@ impl VolvoxGridPlugin {
             .with_grid(id, f)
             .map_err(map_plugin_error)?
             .map_err(map_plugin_error)
+    }
+
+    fn with_grid_tree<T>(
+        &self,
+        id: i64,
+        f: impl FnOnce(&mut volvoxgrid_engine::grid::VolvoxGrid) -> T,
+    ) -> TreePluginResult<T> {
+        self.manager()
+            .with_grid(id, f)
+            .map_err(tree_map_plugin_error)
+    }
+
+    fn with_grid_tree_result<T, E: ToString>(
+        &self,
+        id: i64,
+        f: impl FnOnce(&mut volvoxgrid_engine::grid::VolvoxGrid) -> Result<T, E>,
+    ) -> TreePluginResult<T> {
+        self.manager()
+            .with_grid(id, f)
+            .map_err(tree_map_plugin_error)?
+            .map_err(|err| tree_map_plugin_error(err.to_string()))
     }
 
     fn sync_fonts_into_renderer(
@@ -1623,15 +1751,16 @@ fn apply_zoom_scale(
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_zoom_scale, capture_zoom_state, should_request_pointer_header_sort, PluginStream,
+        apply_zoom_scale, capture_zoom_state, should_request_pointer_header_sort,
+        with_tui_pointer_geometry, PluginStream, PluginStreamBidi, PluginStreamReceiver,
         PluginStreamSender, VolvoxGridPlugin, VolvoxGridServicePlugin,
     };
     use std::collections::{HashMap, HashSet};
     use std::sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
+        mpsc, Arc, Mutex,
     };
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
     use volvoxgrid_engine::event::GridEventData;
     use volvoxgrid_engine::grid::VolvoxGrid;
     use volvoxgrid_engine::input::{HitArea, HitTestResult};
@@ -1677,6 +1806,35 @@ mod tests {
             }
         }
     }
+
+    #[derive(Default)]
+    struct TestRenderStream {
+        outputs: Mutex<Vec<pb::RenderOutput>>,
+    }
+
+    impl PluginStream for TestRenderStream {
+        fn is_cancelled(&self) -> bool {
+            false
+        }
+    }
+
+    impl PluginStreamSender<pb::RenderOutput> for TestRenderStream {
+        fn send(&self, msg: pb::RenderOutput) -> bool {
+            self.outputs
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(msg);
+            true
+        }
+    }
+
+    impl PluginStreamReceiver<pb::RenderInput> for TestRenderStream {
+        fn recv(&self) -> Option<pb::RenderInput> {
+            None
+        }
+    }
+
+    impl PluginStreamBidi<pb::RenderInput, pb::RenderOutput> for TestRenderStream {}
 
     impl PluginStream for AutoCompareEventStream {
         fn is_cancelled(&self) -> bool {
@@ -1760,14 +1918,33 @@ mod tests {
         plugin.manager().destroy_grid(grid_id);
     }
 
+    fn wait_for_grid<F>(plugin: &VolvoxGridPlugin, grid_id: i64, mut pred: F)
+    where
+        F: FnMut(&mut VolvoxGrid) -> bool,
+    {
+        let start = Instant::now();
+        loop {
+            if plugin
+                .with_grid(grid_id, |grid| pred(grid))
+                .expect("grid exists")
+            {
+                return;
+            }
+            assert!(
+                start.elapsed() < Duration::from_secs(2),
+                "timed out waiting for grid condition"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
     #[test]
     fn compare_event_stream_emits_while_grid_lock_is_held() {
         let plugin = Arc::new(VolvoxGridPlugin::new());
         let grid_id = plugin.manager().create_grid(320, 160, 3, 1, 1, 0, 1.0);
         let mut session_grid_ids = HashSet::new();
         plugin.register_render_session_grid(grid_id, &mut session_grid_ids);
-        let compare = plugin
-            .install_compare_channel(grid_id)
+        let compare = VolvoxGridPlugin::install_compare_channel(grid_id, None)
             .expect("compare channel should install with an active render session");
         let grid_arc = plugin.manager().get_grid(grid_id).expect("grid exists");
         let grid_guard = grid_arc.lock().unwrap_or_else(|e| e.into_inner());
@@ -1944,6 +2121,12 @@ mod tests {
             plugin
                 .with_grid(grid_id, |grid| plugin.request_before_sort(grid_id, grid, 0))
                 .expect("header custom sort should complete");
+            wait_for_grid(&plugin, grid_id, |grid| {
+                (1..=5)
+                    .map(|row| grid.cells.get_text(row, 0).to_string())
+                    .collect::<Vec<_>>()
+                    == vec!["a", "bb", "ccc", "dddd", "eeeee"]
+            });
             stream.cancel();
             handle.join().expect("event stream thread should not panic");
         });
@@ -1977,6 +2160,167 @@ mod tests {
             compare_count > 0,
             "header custom sort must ask the host to compare"
         );
+        destroy_test_grid(&plugin, grid_id);
+    }
+
+    #[test]
+    fn header_sort_snapshot_matches_engine_for_clean_custom_grid() {
+        let plugin = VolvoxGridPlugin::new();
+        let grid_id = plugin.manager().create_grid(320, 160, 6, 1, 1, 0, 1.0);
+        let values = ["dddd", "a", "ccc", "bb", "eeeee"];
+        let mut lengths = HashMap::new();
+        plugin
+            .with_grid(grid_id, |grid| {
+                grid.header_features = 1;
+                grid.columns[0].sort_order = volvoxgrid_engine::sort::SORT_NONE;
+                grid.columns[0].sort_type = pb::SortType::Custom as i32;
+                grid.columns[0].sort_defined = true;
+                for (i, value) in values.iter().enumerate() {
+                    let row = (i as i32) + 1;
+                    grid.cells.set_text(row, 0, (*value).to_string());
+                    lengths.insert(row, value.len());
+                }
+            })
+            .unwrap();
+
+        let lengths = Arc::new(lengths);
+        let (order, old_sort_state, old_row_positions) = plugin
+            .with_grid(grid_id, |grid| {
+                (
+                    volvoxgrid_engine::sort::header_click_next_sort_order(grid, 0),
+                    grid.sort_state.clone(),
+                    grid.row_positions.clone(),
+                )
+            })
+            .unwrap();
+        let snapshot_lengths = Arc::clone(&lengths);
+        let snapshot = super::HeaderSortSnapshot {
+            col: 0,
+            order,
+            emit_after_sort: true,
+            compare: Box::new(move |row1, row2, _col| {
+                let a = snapshot_lengths.get(&row1).copied().unwrap_or_default();
+                let b = snapshot_lengths.get(&row2).copied().unwrap_or_default();
+                Some(match a.cmp(&b) {
+                    std::cmp::Ordering::Less => -1,
+                    std::cmp::Ordering::Equal => 0,
+                    std::cmp::Ordering::Greater => 1,
+                })
+            }),
+            old_sort_state,
+            old_row_positions,
+            groups: vec![(1..=5).collect::<Vec<i32>>()],
+        };
+
+        VolvoxGridPlugin::run_header_sort_snapshot(grid_id, snapshot);
+        let (snapshot_order, snapshot_keys) = plugin
+            .with_grid(grid_id, |grid| {
+                (
+                    (1..=5)
+                        .map(|row| grid.cells.get_text(row, 0).to_string())
+                        .collect::<Vec<_>>(),
+                    grid.sort_state.sort_keys.clone(),
+                )
+            })
+            .unwrap();
+
+        let mut engine_grid = VolvoxGrid::new(999, 320, 160, 6, 1, 1, 0);
+        engine_grid.header_features = 1;
+        engine_grid.columns[0].sort_order = volvoxgrid_engine::sort::SORT_NONE;
+        engine_grid.columns[0].sort_type = pb::SortType::Custom as i32;
+        engine_grid.columns[0].sort_defined = true;
+        for (i, value) in values.iter().enumerate() {
+            engine_grid
+                .cells
+                .set_text((i as i32) + 1, 0, (*value).to_string());
+        }
+        let engine_lengths = Arc::clone(&lengths);
+        engine_grid.custom_compare = Some(Box::new(move |row1, row2, _col| {
+            let a = engine_lengths.get(&row1).copied().unwrap_or_default();
+            let b = engine_lengths.get(&row2).copied().unwrap_or_default();
+            Some(match a.cmp(&b) {
+                std::cmp::Ordering::Less => -1,
+                std::cmp::Ordering::Equal => 0,
+                std::cmp::Ordering::Greater => 1,
+            })
+        }));
+        volvoxgrid_engine::sort::handle_header_click(&mut engine_grid, 0);
+        let engine_order = (1..=5)
+            .map(|row| engine_grid.cells.get_text(row, 0).to_string())
+            .collect::<Vec<_>>();
+
+        assert_eq!(snapshot_order, engine_order);
+        assert_eq!(snapshot_keys, engine_grid.sort_state.sort_keys);
+        destroy_test_grid(&plugin, grid_id);
+    }
+
+    #[test]
+    fn header_click_custom_compare_does_not_hold_grid_lock_while_waiting() {
+        let plugin = Arc::new(VolvoxGridPlugin::new());
+        let grid_id = plugin.manager().create_grid(320, 160, 4, 1, 1, 0, 1.0);
+        plugin
+            .with_grid(grid_id, |grid| {
+                grid.header_features = 1;
+                grid.columns[0].sort_order = volvoxgrid_engine::sort::SORT_ASCENDING_CUSTOM;
+                grid.columns[0].sort_defined = true;
+                grid.cells.set_text(1, 0, "B".to_string());
+                grid.cells.set_text(2, 0, "A".to_string());
+            })
+            .unwrap();
+
+        let mut session_grid_ids = HashSet::new();
+        plugin.register_render_session_grid(grid_id, &mut session_grid_ids);
+        let (compare_seen_tx, compare_seen_rx) = mpsc::channel();
+        let (release_compare_tx, release_compare_rx) = mpsc::channel();
+        let release_compare_rx = Arc::new(Mutex::new(release_compare_rx));
+        let stream = AutoCompareEventStream::new(
+            Arc::clone(&plugin),
+            grid_id,
+            Arc::new(move |_| {
+                let _ = compare_seen_tx.send(());
+                let _ = release_compare_rx
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .recv();
+                0
+            }),
+        );
+
+        std::thread::scope(|scope| {
+            let plugin_for_stream = Arc::clone(&plugin);
+            let stream_ref = &stream;
+            let handle = scope.spawn(move || {
+                plugin_for_stream
+                    .event_stream(pb::EventStreamRequest { grid_id }, stream_ref)
+                    .expect("event stream should exit cleanly");
+            });
+
+            plugin
+                .with_grid(grid_id, |grid| plugin.request_before_sort(grid_id, grid, 0))
+                .expect("header custom sort should schedule");
+            compare_seen_rx
+                .recv_timeout(Duration::from_secs(1))
+                .expect("sort should request host comparison");
+
+            let plugin_for_lock = Arc::clone(&plugin);
+            let (lock_tx, lock_rx) = mpsc::channel();
+            scope.spawn(move || {
+                let _ = plugin_for_lock.with_grid(grid_id, |grid| grid.rows);
+                let _ = lock_tx.send(());
+            });
+            lock_rx
+                .recv_timeout(Duration::from_millis(200))
+                .expect("grid lock should be available while compare is pending");
+
+            let _ = release_compare_tx.send(());
+            wait_for_grid(&plugin, grid_id, |grid| {
+                grid.sort_state.sort_keys
+                    == vec![(0, volvoxgrid_engine::sort::SORT_ASCENDING_CUSTOM)]
+            });
+            stream.cancel();
+            handle.join().expect("event stream thread should not panic");
+        });
+
         destroy_test_grid(&plugin, grid_id);
     }
 
@@ -2112,6 +2456,138 @@ mod tests {
     }
 
     #[test]
+    fn tui_pointer_geometry_aligns_cell_hit_x_with_rendered_row_indicator() {
+        let mut grid = VolvoxGrid::new(1, 80, 12, 3, 2, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.set_col_width(0, 28);
+        grid.cols_hidden.insert(0);
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.width_px = 44;
+        grid.indicator_bands.row_start.slots =
+            vec![volvoxgrid_engine::indicator::RowIndicatorSlotState::new(
+                pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+                44,
+            )];
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 1;
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.outline.label_column = 0;
+        grid.outline.max_levels = 3;
+        grid.layout.invalidate();
+        grid.ensure_layout();
+
+        let rendered_width = volvoxgrid_engine::canvas_tui::tui_row_indicator_width(&grid);
+        assert_eq!(rendered_width, 43);
+        assert_eq!(grid.indicator_bands.row_start.resolved_width_px(), 44);
+
+        with_tui_pointer_geometry(&mut grid, |grid| {
+            assert_eq!(
+                grid.indicator_bands.row_start.resolved_width_px(),
+                rendered_width
+            );
+            let translation = volvoxgrid_engine::canvas_tui::translate_tui_mouse_x_for_hit(
+                grid,
+                80,
+                12,
+                rendered_width,
+            );
+            let hit = volvoxgrid_engine::input::hit_test(grid, translation.hit_test_x as f32, 1.0);
+
+            assert_eq!(translation.col, 1);
+            assert_eq!(hit.row, 0);
+            assert_eq!(hit.col, 1);
+            assert_eq!(hit.area, HitArea::Cell);
+        });
+
+        assert_eq!(grid.indicator_bands.row_start.resolved_width_px(), 44);
+    }
+
+    #[test]
+    fn tui_visible_outline_cell_enter_requests_edit_not_node_toggle() {
+        let (plugin, grid_id) = plugin_with_decision_grid(3, 2);
+        plugin
+            .with_grid(grid_id, |grid| {
+                grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+                grid.edit_trigger_mode = 1;
+                grid.indicator_bands.row_start.visible = true;
+                grid.indicator_bands.row_start.auto_size = false;
+                grid.indicator_bands.row_start.width_px = 24;
+                grid.indicator_bands.row_start.slots =
+                    vec![volvoxgrid_engine::indicator::RowIndicatorSlotState::new(
+                        pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+                        24,
+                    )];
+                grid.outline.tree_indicator =
+                    pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+                grid.outline.label_column = 0;
+                grid.cols_hidden.insert(0);
+                grid.cells.set_text(1, 0, "Reports".to_string());
+                grid.cells.set_text(1, 1, "Folder".to_string());
+                grid.row_props.entry(1).or_default().outline_level = 0;
+                grid.row_props.entry(2).or_default().outline_level = 1;
+                grid.selection.set_cursor(
+                    1,
+                    1,
+                    grid.rows,
+                    grid.cols,
+                    grid.fixed_rows,
+                    grid.fixed_cols,
+                );
+            })
+            .unwrap();
+
+        let stream = TestRenderStream::default();
+        let mut sent_edit_requests = HashMap::new();
+        super::handle_key_render_input(
+            &plugin,
+            &stream,
+            &mut sent_edit_requests,
+            grid_id,
+            pb::KeyEvent {
+                r#type: pb::key_event::Type::KeyDown as i32,
+                key_code: 13,
+                modifier: 0,
+                character: String::new(),
+            },
+            false,
+            None,
+        );
+
+        let edit_event_id = plugin
+            .with_grid(grid_id, |grid| {
+                let events = grid.events.drain();
+                assert!(!events
+                    .iter()
+                    .any(|event| { matches!(event.data, GridEventData::BeforeNodeToggle { .. }) }));
+                events
+                    .iter()
+                    .find_map(|event| {
+                        matches!(event.data, GridEventData::BeforeEdit { row: 1, col: 1 })
+                            .then_some(event.event_id)
+                    })
+                    .expect("visible cell Enter should request BeforeEdit")
+            })
+            .unwrap();
+
+        let _ = plugin.resolve_event_decision(grid_id, edit_event_id, false);
+        plugin
+            .with_grid(grid_id, |grid| {
+                assert!(grid.edit.is_active());
+                assert_eq!(grid.edit.edit_row, 1);
+                assert_eq!(grid.edit.edit_col, 1);
+                assert!(!grid
+                    .row_props
+                    .get(&1)
+                    .is_some_and(|props| props.is_collapsed));
+            })
+            .unwrap();
+
+        destroy_test_grid(&plugin, grid_id);
+    }
+
+    #[test]
     fn event_decision_cancel_and_allow_before_edit() {
         let (plugin, grid_id) = plugin_with_decision_grid(3, 2);
 
@@ -2151,6 +2627,96 @@ mod tests {
     }
 
     #[test]
+    fn event_decision_default_does_not_expire() {
+        let (plugin, grid_id) = plugin_with_decision_grid(3, 2);
+
+        let event_id = request_pending_event_id(
+            &plugin,
+            grid_id,
+            |plugin, grid_id, grid| {
+                let _ =
+                    plugin.request_before_edit(grid_id, grid, 1, 0, true, false, None, None, None);
+            },
+            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
+        );
+        {
+            let mut pending = plugin
+                .pending_actions
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            pending
+                .get_mut(&(grid_id, event_id))
+                .expect("pending action exists")
+                .created_at = Instant::now() - Duration::from_secs(60);
+        }
+
+        assert!(plugin.resolve_expired_actions(grid_id).is_empty());
+        plugin
+            .with_grid(grid_id, |grid| assert!(!grid.edit.is_active()))
+            .unwrap();
+        assert!(plugin
+            .pending_actions
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains_key(&(grid_id, event_id)));
+
+        destroy_test_grid(&plugin, grid_id);
+    }
+
+    #[test]
+    fn event_decision_finite_timeout_emits_error_and_allows() {
+        let (plugin, grid_id) = plugin_with_decision_grid(3, 2);
+        plugin
+            .with_grid(grid_id, |grid| {
+                grid.decision_timeout_ms = 100;
+            })
+            .unwrap();
+
+        let event_id = request_pending_event_id(
+            &plugin,
+            grid_id,
+            |plugin, grid_id, grid| {
+                let _ =
+                    plugin.request_before_edit(grid_id, grid, 1, 0, true, false, None, None, None);
+            },
+            |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
+        );
+        {
+            let mut pending = plugin
+                .pending_actions
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            pending
+                .get_mut(&(grid_id, event_id))
+                .expect("pending action exists")
+                .created_at = Instant::now() - Duration::from_millis(250);
+        }
+
+        assert!(plugin.resolve_expired_actions(grid_id).is_empty());
+        plugin
+            .with_grid(grid_id, |grid| {
+                assert!(grid.edit.is_active());
+                assert_eq!(grid.edit.edit_row, 1);
+                assert_eq!(grid.edit.edit_col, 0);
+                assert!(grid.events.drain().into_iter().any(|event| {
+                    matches!(
+                        event.data,
+                        GridEventData::Error { code, .. }
+                            if code == super::ERROR_DECISION_TIMEOUT
+                    )
+                }));
+            })
+            .unwrap();
+        assert!(!plugin
+            .pending_actions
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains_key(&(grid_id, event_id)));
+
+        destroy_test_grid(&plugin, grid_id);
+    }
+
+    #[test]
     fn event_decision_cancel_and_allow_before_sort() {
         let (plugin, grid_id) = plugin_with_decision_grid(3, 1);
         plugin
@@ -2179,9 +2745,7 @@ mod tests {
             |event| matches!(event, GridEventData::BeforeSort { col: 0 }),
         );
         let _ = plugin.resolve_event_decision(grid_id, allow_id, false);
-        plugin
-            .with_grid(grid_id, |grid| assert_eq!(grid.cells.get_text(1, 0), "A"))
-            .unwrap();
+        wait_for_grid(&plugin, grid_id, |grid| grid.cells.get_text(1, 0) == "A");
 
         destroy_test_grid(&plugin, grid_id);
     }
@@ -2395,7 +2959,7 @@ mod tests {
             |plugin, grid_id, grid| {
                 plugin.request_before_mouse_down(grid_id, grid, 1, 0, 10.0, 25.0, 0, 0, false)
             },
-            |event| matches!(event, GridEventData::BeforeMouseDown { row: 1, col: 0 }),
+            |event| matches!(event, GridEventData::BeforeMouseDown { row: 1, col: 0, .. }),
         );
         let _ = plugin.resolve_event_decision(grid_id, cancel_id, true);
         plugin
@@ -2411,7 +2975,7 @@ mod tests {
             |plugin, grid_id, grid| {
                 plugin.request_before_mouse_down(grid_id, grid, 1, 0, 10.0, 25.0, 0, 0, false)
             },
-            |event| matches!(event, GridEventData::BeforeMouseDown { row: 1, col: 0 }),
+            |event| matches!(event, GridEventData::BeforeMouseDown { row: 1, col: 0, .. }),
         );
         let _ = plugin.resolve_event_decision(grid_id, allow_id, false);
         plugin
@@ -2504,12 +3068,16 @@ fn engine_event_to_proto(
             active_row,
             active_col,
         })),
-        E::EnterCell { row, col } => {
-            Some(grid_event::Event::EnterCell(EnterCellEvent { row, col }))
-        }
-        E::LeaveCell { row, col } => {
-            Some(grid_event::Event::LeaveCell(LeaveCellEvent { row, col }))
-        }
+        E::EnterCell { row, col, target } => Some(grid_event::Event::EnterCell(EnterCellEvent {
+            row,
+            col,
+            target: Some(target.to_proto()),
+        })),
+        E::LeaveCell { row, col, target } => Some(grid_event::Event::LeaveCell(LeaveCellEvent {
+            row,
+            col,
+            target: Some(target.to_proto()),
+        })),
         E::BeforeEdit { row, col } => {
             Some(grid_event::Event::BeforeEdit(BeforeEditEvent { row, col }))
         }
@@ -2627,6 +3195,48 @@ fn engine_event_to_proto(
                 collapse,
             }))
         }
+        E::TreeChildrenRequested {
+            node_id,
+            row,
+            request_id,
+        } => Some(grid_event::Event::TreeChildrenRequested(
+            TreeChildrenRequestedEvent {
+                node_id,
+                row,
+                request_id,
+            },
+        )),
+        E::BeforeTreeNodeToggle {
+            node_id,
+            row,
+            collapse,
+        } => Some(grid_event::Event::BeforeTreeNodeToggle(
+            BeforeTreeNodeToggleEvent {
+                node_id,
+                row,
+                collapse,
+            },
+        )),
+        E::AfterTreeNodeToggle {
+            node_id,
+            row,
+            collapse,
+        } => Some(grid_event::Event::AfterTreeNodeToggle(
+            AfterTreeNodeToggleEvent {
+                node_id,
+                row,
+                collapse,
+            },
+        )),
+        E::TreeNodeActivate { node_id, row } => {
+            Some(grid_event::Event::TreeNodeActivate(TreeNodeActivateEvent {
+                node_id,
+                row,
+            }))
+        }
+        E::TreeNodeContextMenu { node_id, row, x, y } => Some(
+            grid_event::Event::TreeNodeContextMenu(TreeNodeContextMenuEvent { node_id, row, x, y }),
+        ),
         E::BeforeScroll {
             old_top_row,
             old_left_col,
@@ -2695,10 +3305,11 @@ fn engine_event_to_proto(
                 old_position,
             }))
         }
-        E::BeforeMouseDown { row, col } => {
+        E::BeforeMouseDown { row, col, target } => {
             Some(grid_event::Event::BeforeMouseDown(BeforeMouseDownEvent {
                 row,
                 col,
+                target: Some(target.to_proto()),
             }))
         }
         E::MouseDown {
@@ -2728,24 +3339,32 @@ fn engine_event_to_proto(
             modifier,
             x,
             y,
+            target,
         } => Some(grid_event::Event::MouseMove(MouseMoveEvent {
             button,
             modifier,
             x,
             y,
+            target: Some(target.to_proto()),
         })),
         E::Click {
             row,
             col,
             hit_area,
             interaction,
+            target,
         } => Some(grid_event::Event::Click(ClickEvent {
             row,
             col,
             hit_area,
             interaction,
+            target: Some(target.to_proto()),
         })),
-        E::DblClick { row, col } => Some(grid_event::Event::DblClick(DblClickEvent { row, col })),
+        E::DblClick { row, col, target } => Some(grid_event::Event::DblClick(DblClickEvent {
+            row,
+            col,
+            target: Some(target.to_proto()),
+        })),
         E::KeyDown { key_code, modifier } => Some(grid_event::Event::KeyDown(KeyDownEvent {
             key_code,
             modifier,
@@ -3297,12 +3916,32 @@ impl VolvoxGridPlugin {
             .insert(grid_id);
     }
 
+    fn timeout_duration(ms: u32) -> Option<Duration> {
+        if ms == 0 {
+            None
+        } else {
+            Some(Duration::from_millis(u64::from(ms)))
+        }
+    }
+
+    fn decision_timeout(&self, grid_id: i64) -> Option<Duration> {
+        self.manager()
+            .with_grid(grid_id, |grid| {
+                Self::timeout_duration(grid.decision_timeout_ms)
+            })
+            .ok()
+            .flatten()
+    }
+
+    fn compare_timeout_from_grid(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Option<Duration> {
+        Self::timeout_duration(grid.compare_response_timeout_ms)
+    }
+
     fn register_render_session_grid(&self, grid_id: i64, session_grid_ids: &mut HashSet<i64>) {
         if grid_id <= 0 || !session_grid_ids.insert(grid_id) {
             return;
         }
-        let mut sessions = self
-            .active_render_sessions
+        let mut sessions = ACTIVE_RENDER_SESSIONS
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         *sessions.entry(grid_id).or_insert(0) += 1;
@@ -3312,8 +3951,7 @@ impl VolvoxGridPlugin {
         if session_grid_ids.is_empty() {
             return;
         }
-        let mut sessions = self
-            .active_render_sessions
+        let mut sessions = ACTIVE_RENDER_SESSIONS
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         for grid_id in session_grid_ids {
@@ -3333,8 +3971,8 @@ impl VolvoxGridPlugin {
         }
     }
 
-    fn compare_session_active(&self, grid_id: i64) -> bool {
-        self.active_render_sessions
+    fn compare_session_active(grid_id: i64) -> bool {
+        ACTIVE_RENDER_SESSIONS
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .get(&grid_id)
@@ -3344,51 +3982,263 @@ impl VolvoxGridPlugin {
     }
 
     fn install_compare_channel(
-        &self,
         grid_id: i64,
+        timeout: Option<Duration>,
     ) -> Option<Box<volvoxgrid_engine::grid::CustomCompareFn>> {
-        if !self.compare_session_active(grid_id) {
+        if !Self::compare_session_active(grid_id) {
             return None;
         }
 
         let channel = CompareChannel::new();
-        if let Ok(waker) = self.manager().get_grid_waker(grid_id) {
+        if let Ok(waker) = SHARED_GRID_MANAGER.get_grid_waker(grid_id) {
             channel.attach_waker(waker);
         }
-        self.compare_channels
+        COMPARE_CHANNELS
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .insert(grid_id, Arc::clone(&channel));
 
-        let timeout = Self::COMPARE_RESPONSE_TIMEOUT;
         Some(Box::new(move |row1, row2, col| {
             channel.compare(row1, row2, col, timeout)
         }))
     }
 
-    fn clear_compare_channel(&self, grid_id: i64) {
-        self.compare_channels
+    fn clear_compare_channel(grid_id: i64) {
+        if let Some(channel) = COMPARE_CHANNELS
             .lock()
             .unwrap_or_else(|e| e.into_inner())
-            .remove(&grid_id);
+            .remove(&grid_id)
+        {
+            channel.cancel();
+        }
     }
 
-    fn apply_before_sort_with_compare(
-        &self,
+    fn compare_abort_from_panic(
+        panic_payload: &(dyn std::any::Any + Send),
+    ) -> Option<&CompareAbort> {
+        panic_payload.downcast_ref::<CompareAbort>()
+    }
+
+    fn restore_sort_snapshot(
+        grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+        sort_state: volvoxgrid_engine::sort::SortState,
+        row_positions: Vec<i32>,
+    ) {
+        grid.sort_state = sort_state;
+        grid.row_positions = row_positions;
+        grid.cells.set_row_map(grid.row_positions.clone());
+        grid.layout.invalidate();
+        grid.mark_dirty();
+    }
+
+    fn push_compare_timeout_error(grid: &mut volvoxgrid_engine::grid::VolvoxGrid, col: i32) {
+        grid.events
+            .push(volvoxgrid_engine::event::GridEventData::Error {
+                code: ERROR_COMPARE_TIMEOUT,
+                message: format!("no CompareResponse for custom sort on col={col}"),
+            });
+    }
+
+    fn has_row_sort_metadata(
+        grid: &volvoxgrid_engine::grid::VolvoxGrid,
+        row_lo: i32,
+        row_hi: i32,
+    ) -> bool {
+        let in_range = |row: i32| row >= row_lo && row <= row_hi;
+        grid.sort_value_generator.is_some()
+            || grid.row_heights.keys().any(|&row| in_range(row))
+            || grid.rows_hidden.iter().any(|&row| in_range(row))
+            || grid.row_props.keys().any(|&row| in_range(row))
+            || grid
+                .span
+                .span_rows
+                .keys()
+                .any(|&row| row != -1 && in_range(row))
+            || grid.sticky_rows.keys().any(|&row| in_range(row))
+            || grid.pinned_rows_top.iter().any(|&row| in_range(row))
+            || grid.pinned_rows_bottom.iter().any(|&row| in_range(row))
+    }
+
+    fn prepare_custom_sort_snapshot(
+        grid_id: i64,
+        grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+        col: i32,
+        order: i32,
+        emit_after_sort: bool,
+    ) -> Option<HeaderSortSnapshot> {
+        // Fast path only for the engine's current clean-grid single-key custom
+        // sort shape. The snapshot deliberately bypasses sort_range_impl while
+        // host comparisons are pending, so any row-affecting metadata must fall
+        // back to the locked engine path where row remaps, pinned/subtotal rows,
+        // generators, and spans are handled centrally.
+        if grid.rows <= grid.fixed_rows + 1
+            || grid.cols <= 0
+            || !volvoxgrid_engine::sort::sort_order_is_custom(order)
+        {
+            return None;
+        }
+        let row_lo = grid.fixed_rows;
+        let row_hi = grid.rows - 1;
+        if Self::has_row_sort_metadata(grid, row_lo, row_hi) {
+            return None;
+        }
+
+        let rows: Vec<i32> = (row_lo..=row_hi)
+            .filter(|&row| !grid.cells.get_text(row, col).is_empty())
+            .collect();
+        if rows.len() < 2 {
+            return None;
+        }
+        let timeout = Self::compare_timeout_from_grid(grid);
+        let compare = Self::install_compare_channel(grid_id, timeout)?;
+        Some(HeaderSortSnapshot {
+            col,
+            order,
+            emit_after_sort,
+            compare,
+            old_sort_state: grid.sort_state.clone(),
+            old_row_positions: grid.row_positions.clone(),
+            groups: vec![rows],
+        })
+    }
+
+    fn prepare_header_sort_snapshot(
+        grid_id: i64,
+        grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+        col: i32,
+    ) -> Option<HeaderSortSnapshot> {
+        if grid.header_features & 1 == 0 {
+            return None;
+        }
+        let order = volvoxgrid_engine::sort::header_click_next_sort_order(grid, col);
+        Self::prepare_custom_sort_snapshot(grid_id, grid, col, order, true)
+    }
+
+    fn prepare_sort_keys_snapshot(
+        grid_id: i64,
+        grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+        sort_keys: &[(i32, i32)],
+    ) -> Option<HeaderSortSnapshot> {
+        if sort_keys.len() != 1 {
+            return None;
+        }
+        let (col, order) = sort_keys[0];
+        Self::prepare_custom_sort_snapshot(grid_id, grid, col, order, false)
+    }
+
+    fn compare_ordering(result: Option<i32>, ascending: bool) -> std::cmp::Ordering {
+        let ordering = match result.unwrap_or(0).signum() {
+            value if value < 0 => std::cmp::Ordering::Less,
+            value if value > 0 => std::cmp::Ordering::Greater,
+            _ => std::cmp::Ordering::Equal,
+        };
+        if ascending {
+            ordering
+        } else {
+            ordering.reverse()
+        }
+    }
+
+    fn run_header_sort_snapshot(grid_id: i64, snapshot: HeaderSortSnapshot) {
+        let started_at = Instant::now();
+        let sort_result = panic::catch_unwind(AssertUnwindSafe(|| {
+            let mut row_positions = snapshot.old_row_positions.clone();
+            let ascending = volvoxgrid_engine::sort::sort_order_is_ascending(snapshot.order);
+            for group in &snapshot.groups {
+                let mut indices: Vec<usize> = (0..group.len()).collect();
+                indices.sort_unstable_by(|&ia, &ib| {
+                    let result = (snapshot.compare)(group[ia], group[ib], snapshot.col);
+                    Self::compare_ordering(result, ascending)
+                });
+                for (dest_idx, &src_idx) in indices.iter().enumerate() {
+                    let dest_row = group[dest_idx] as usize;
+                    let src_row = group[src_idx] as usize;
+                    if dest_row < row_positions.len() && src_row < snapshot.old_row_positions.len()
+                    {
+                        row_positions[dest_row] = snapshot.old_row_positions[src_row];
+                    }
+                }
+            }
+            row_positions
+        }));
+        Self::clear_compare_channel(grid_id);
+
+        match sort_result {
+            Ok(row_positions) => {
+                let elapsed_ms = started_at.elapsed().as_secs_f64() * 1000.0;
+                let _ = SHARED_GRID_MANAGER.with_grid(grid_id, |grid| {
+                    // Last mutation wins. We only commit if the row order and
+                    // active sort keys still match the snapshot. Cell edits and
+                    // column metadata changes during the sort are not rejected;
+                    // their rows can be ordered by the pre-edit compare values.
+                    if grid.row_positions != snapshot.old_row_positions
+                        || grid.sort_state.sort_keys != snapshot.old_sort_state.sort_keys
+                    {
+                        return;
+                    }
+                    let old_sort_keys = grid.sort_state.sort_keys.clone();
+                    grid.row_positions = row_positions;
+                    grid.cells.set_row_map(grid.row_positions.clone());
+                    grid.sort_state = snapshot.old_sort_state;
+                    grid.sort_state.sort_keys = vec![(snapshot.col, snapshot.order)];
+                    grid.sort_state.last_sort_elapsed_ms = elapsed_ms;
+                    grid.layout.invalidate();
+                    grid.mark_dirty();
+                    if snapshot.emit_after_sort && grid.sort_state.sort_keys != old_sort_keys {
+                        grid.events
+                            .push(volvoxgrid_engine::event::GridEventData::AfterSort {
+                                col: snapshot.col,
+                            });
+                    }
+                });
+            }
+            Err(err) => match Self::compare_abort_from_panic(err.as_ref()) {
+                Some(CompareAbort::Timeout) => {
+                    let _ = SHARED_GRID_MANAGER.with_grid(grid_id, |grid| {
+                        Self::push_compare_timeout_error(grid, snapshot.col);
+                    });
+                }
+                Some(CompareAbort::Cancelled) => {}
+                None => panic::resume_unwind(err),
+            },
+        }
+    }
+
+    fn run_header_sort_locked(
         grid_id: i64,
         grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
         col: i32,
     ) {
-        let old_sort_keys = grid.sort_state.sort_keys.clone();
+        let old_sort_state = grid.sort_state.clone();
+        let old_row_positions = grid.row_positions.clone();
+        let old_sort_keys = old_sort_state.sort_keys.clone();
         let next_order = volvoxgrid_engine::sort::header_click_next_sort_order(grid, col);
-        self.clear_compare_channel(grid_id);
+        Self::clear_compare_channel(grid_id);
         if volvoxgrid_engine::sort::sort_order_is_custom(next_order) {
-            grid.custom_compare = self.install_compare_channel(grid_id);
+            let timeout = Self::compare_timeout_from_grid(grid);
+            grid.custom_compare = Self::install_compare_channel(grid_id, timeout);
         }
 
-        volvoxgrid_engine::sort::handle_header_click(grid, col);
+        // Timeout/cancellation is carried as a private panic from the compare
+        // callback. Today an abort can leave sort_state/row_positions, layout,
+        // or dirty state in an intermediate state; those are restored below. If
+        // engine sorting starts mutating more abort-visible state, add it to
+        // restore_sort_snapshot or force this case through the snapshot path.
+        let sort_result = panic::catch_unwind(AssertUnwindSafe(|| {
+            volvoxgrid_engine::sort::handle_header_click(grid, col);
+        }));
         grid.custom_compare = None;
-        self.clear_compare_channel(grid_id);
+        Self::clear_compare_channel(grid_id);
+
+        if let Err(err) = sort_result {
+            Self::restore_sort_snapshot(grid, old_sort_state, old_row_positions);
+            match Self::compare_abort_from_panic(err.as_ref()) {
+                Some(CompareAbort::Timeout) => Self::push_compare_timeout_error(grid, col),
+                Some(CompareAbort::Cancelled) => {}
+                None => panic::resume_unwind(err),
+            }
+            return;
+        }
 
         if grid.sort_state.sort_keys != old_sort_keys {
             grid.events
@@ -3396,8 +4246,70 @@ impl VolvoxGridPlugin {
         }
     }
 
+    fn spawn_header_sort_job(grid_id: i64, col: i32) {
+        let spawn_result = std::thread::Builder::new()
+            .name(format!("volvoxgrid-sort-{grid_id}"))
+            .spawn(move || {
+                let snapshot = SHARED_GRID_MANAGER
+                    .with_grid(grid_id, |grid| {
+                        Self::prepare_header_sort_snapshot(grid_id, grid, col)
+                    })
+                    .ok()
+                    .flatten();
+                if let Some(snapshot) = snapshot {
+                    Self::run_header_sort_snapshot(grid_id, snapshot);
+                } else {
+                    let _ = SHARED_GRID_MANAGER.with_grid(grid_id, |grid| {
+                        Self::run_header_sort_locked(grid_id, grid, col);
+                    });
+                }
+            });
+        if let Err(err) = spawn_result {
+            let _ = SHARED_GRID_MANAGER.with_grid(grid_id, |grid| {
+                grid.events
+                    .push(volvoxgrid_engine::event::GridEventData::Error {
+                        code: ERROR_INTERNAL,
+                        message: format!("failed to spawn header sort worker for col={col}: {err}"),
+                    });
+            });
+        }
+    }
+
+    fn run_sort_keys_locked(
+        grid_id: i64,
+        grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
+        sort_keys: Vec<(i32, i32)>,
+    ) {
+        let old_sort_state = grid.sort_state.clone();
+        let old_row_positions = grid.row_positions.clone();
+        let timeout_col = sort_keys.first().map_or(-1, |(col, _)| *col);
+        let has_custom = sort_keys
+            .iter()
+            .any(|&(_, order)| volvoxgrid_engine::sort::sort_order_is_custom(order));
+        if has_custom {
+            let timeout = Self::compare_timeout_from_grid(grid);
+            grid.custom_compare = Self::install_compare_channel(grid_id, timeout);
+        }
+        grid.sort_state.sort_keys = sort_keys;
+        let sort_result = panic::catch_unwind(AssertUnwindSafe(|| {
+            volvoxgrid_engine::sort::sort_grid_all_multi(grid);
+        }));
+        grid.custom_compare = None;
+
+        if let Err(err) = sort_result {
+            Self::restore_sort_snapshot(grid, old_sort_state, old_row_positions);
+            match Self::compare_abort_from_panic(err.as_ref()) {
+                Some(CompareAbort::Timeout) => {
+                    Self::push_compare_timeout_error(grid, timeout_col);
+                }
+                Some(CompareAbort::Cancelled) => {}
+                None => panic::resume_unwind(err),
+            }
+        }
+    }
+
     fn lookup_compare_channel(&self, grid_id: i64) -> Option<Arc<CompareChannel>> {
-        self.compare_channels
+        COMPARE_CHANNELS
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .get(&grid_id)
@@ -3405,8 +4317,7 @@ impl VolvoxGridPlugin {
     }
 
     fn deliver_compare_response(&self, grid_id: i64, request_id: i64, result: i32) -> bool {
-        let channel = self
-            .compare_channels
+        let channel = COMPARE_CHANNELS
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .get(&grid_id)
@@ -3425,8 +4336,8 @@ impl VolvoxGridPlugin {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .retain(|(pending_grid, _), _| *pending_grid != grid_id);
-        self.clear_compare_channel(grid_id);
-        self.active_render_sessions
+        Self::clear_compare_channel(grid_id);
+        ACTIVE_RENDER_SESSIONS
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .remove(&grid_id);
@@ -3616,7 +4527,7 @@ impl VolvoxGridPlugin {
         if !self.decision_channel_enabled(grid_id) {
             grid.events
                 .push(volvoxgrid_engine::event::GridEventData::BeforeSort { col });
-            self.apply_before_sort_with_compare(grid_id, grid, col);
+            Self::spawn_header_sort_job(grid_id, col);
             return;
         }
 
@@ -3644,9 +4555,17 @@ impl VolvoxGridPlugin {
         row: i32,
         collapse: bool,
     ) {
+        let event = if let Some(node_id) = grid.tree.node_id_at_row(grid.fixed_rows, row) {
+            volvoxgrid_engine::event::GridEventData::BeforeTreeNodeToggle {
+                node_id: node_id.to_string(),
+                row,
+                collapse,
+            }
+        } else {
+            volvoxgrid_engine::event::GridEventData::BeforeNodeToggle { row, collapse }
+        };
         if !self.decision_channel_enabled(grid_id) {
-            grid.events
-                .push(volvoxgrid_engine::event::GridEventData::BeforeNodeToggle { row, collapse });
+            grid.events.push(event);
             volvoxgrid_engine::input::apply_node_toggle_after_before(grid, row, collapse);
             return;
         }
@@ -3662,10 +4581,7 @@ impl VolvoxGridPlugin {
                     action: PendingAction::BeforeNodeToggle { row, collapse },
                 },
             );
-        grid.events.push_with_id(
-            event_id,
-            volvoxgrid_engine::event::GridEventData::BeforeNodeToggle { row, collapse },
-        );
+        grid.events.push_with_id(event_id, event);
     }
 
     fn request_before_user_resize(
@@ -3783,7 +4699,11 @@ impl VolvoxGridPlugin {
     ) {
         if !self.decision_channel_enabled(grid_id) {
             grid.events
-                .push(volvoxgrid_engine::event::GridEventData::BeforeMouseDown { row, col });
+                .push(volvoxgrid_engine::event::GridEventData::BeforeMouseDown {
+                    row,
+                    col,
+                    target: volvoxgrid_engine::event::EventTarget::data_cell(),
+                });
             self.handle_pointer_down_after_before_mouse(
                 grid_id, grid, x, y, button, modifier, dbl_click,
             );
@@ -3809,7 +4729,11 @@ impl VolvoxGridPlugin {
             );
         grid.events.push_with_id(
             event_id,
-            volvoxgrid_engine::event::GridEventData::BeforeMouseDown { row, col },
+            volvoxgrid_engine::event::GridEventData::BeforeMouseDown {
+                row,
+                col,
+                target: volvoxgrid_engine::event::EventTarget::data_cell(),
+            },
         );
     }
 
@@ -3852,15 +4776,18 @@ impl VolvoxGridPlugin {
             self.request_before_user_resize(grid_id, grid, hit.row, -1, y);
         }
 
-        if hit.row >= 0 && hit.col >= 0 {
-            if hit.area == volvoxgrid_engine::input::HitArea::OutlineButton {
-                let collapsing = !grid
-                    .row_props
-                    .get(&hit.row)
-                    .map_or(false, |rp| rp.is_collapsed);
-                self.request_before_node_toggle(grid_id, grid, hit.row, collapsing);
-            }
+        if hit.row >= 0
+            && !dbl_click
+            && hit.area == volvoxgrid_engine::input::HitArea::OutlineButton
+        {
+            let collapsing = !grid
+                .row_props
+                .get(&hit.row)
+                .map_or(false, |rp| rp.is_collapsed);
+            self.request_before_node_toggle(grid_id, grid, hit.row, collapsing);
+        }
 
+        if hit.row >= 0 && hit.col >= 0 {
             let is_cell_like = hit.area == volvoxgrid_engine::input::HitArea::Cell
                 || hit.area == volvoxgrid_engine::input::HitArea::FixedRow
                 || hit.area == volvoxgrid_engine::input::HitArea::FixedCol;
@@ -4114,9 +5041,7 @@ impl VolvoxGridPlugin {
                 if cancel {
                     return None;
                 }
-                let _ = self.manager().with_grid(grid_id, |grid| {
-                    self.apply_before_sort_with_compare(grid_id, grid, col);
-                });
+                Self::spawn_header_sort_job(grid_id, col);
                 None
             }
             PendingAction::BeforeNodeToggle { row, collapse } => {
@@ -4226,6 +5151,9 @@ impl VolvoxGridPlugin {
     }
 
     fn resolve_expired_actions(&self, grid_id: i64) -> Vec<RenderOutput> {
+        let Some(timeout) = self.decision_timeout(grid_id) else {
+            return Vec::new();
+        };
         let now = Instant::now();
         let mut expired_actions = Vec::new();
         {
@@ -4236,9 +5164,7 @@ impl VolvoxGridPlugin {
             let expired_keys: Vec<(i64, i64)> = pending
                 .iter()
                 .filter_map(|(key, entry)| {
-                    if key.0 == grid_id
-                        && now.duration_since(entry.created_at) >= Self::DECISION_TIMEOUT
-                    {
+                    if key.0 == grid_id && now.duration_since(entry.created_at) >= timeout {
                         Some(*key)
                     } else {
                         None
@@ -4247,13 +5173,23 @@ impl VolvoxGridPlugin {
                 .collect();
             for key in expired_keys {
                 if let Some(entry) = pending.remove(&key) {
-                    expired_actions.push(entry.action);
+                    expired_actions.push((key.1, entry.action));
                 }
             }
         }
 
         let mut outputs = Vec::new();
-        for action in expired_actions {
+        for (event_id, action) in expired_actions {
+            let _ = self.manager().with_grid(grid_id, |grid| {
+                grid.events
+                    .push(volvoxgrid_engine::event::GridEventData::Error {
+                        code: ERROR_DECISION_TIMEOUT,
+                        message: format!(
+                            "no EventDecision for event_id={event_id} after {}ms",
+                            timeout.as_millis()
+                        ),
+                    });
+            });
             if let Some(output) = self.apply_pending_action(grid_id, action, false) {
                 outputs.push(output);
             }
@@ -4265,6 +5201,212 @@ impl VolvoxGridPlugin {
 // ═══════════════════════════════════════════════════════════════════════════
 // v2 Trait Implementation
 // ═══════════════════════════════════════════════════════════════════════════
+
+impl ffi_tree_impl::VolvoxTreeServicePlugin for VolvoxGridPlugin {
+    fn load_tree(&self, request: LoadTreeRequest) -> TreePluginResult<LoadTreeResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::load_tree(grid, request)
+        })
+    }
+
+    fn append_tree(&self, mut request: LoadTreeRequest) -> TreePluginResult<LoadTreeResponse> {
+        request.replace = false;
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::load_tree(grid, request)
+        })
+    }
+
+    fn insert_nodes(&self, request: InsertNodesRequest) -> TreePluginResult<InsertNodesResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::insert_nodes(grid, request)
+        })
+    }
+
+    fn remove_nodes(&self, request: RemoveNodesRequest) -> TreePluginResult<RemoveNodesResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::remove_nodes(grid, request)
+        })
+    }
+
+    fn move_nodes(&self, request: MoveNodesRequest) -> TreePluginResult<MoveNodesResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::move_nodes(grid, request)
+        })
+    }
+
+    fn rename_node(&self, request: RenameNodeRequest) -> TreePluginResult<RenameNodeResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::rename_node(grid, request)
+        })
+    }
+
+    fn update_tree(&self, request: UpdateTreeRequest) -> TreePluginResult<UpdateTreeResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::update_tree(grid, request)
+        })
+    }
+
+    fn update_node_cells(&self, request: UpdateNodeCellsRequest) -> TreePluginResult<WriteResult> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::update_node_cells(grid, request)
+        })
+    }
+
+    fn expand_nodes(&self, request: ExpandNodesRequest) -> TreePluginResult<ExpandNodesResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::expand_nodes(grid, request)
+        })
+    }
+
+    fn collapse_nodes(
+        &self,
+        request: CollapseNodesRequest,
+    ) -> TreePluginResult<CollapseNodesResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::collapse_nodes(grid, request)
+        })
+    }
+
+    fn expand_to_node(
+        &self,
+        request: ExpandToNodeRequest,
+    ) -> TreePluginResult<ExpandToNodeResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::expand_to_node(grid, request)
+        })
+    }
+
+    fn get_expansion(&self, request: GetExpansionRequest) -> TreePluginResult<ExpansionState> {
+        self.with_grid_tree(request.grid_id, |grid| {
+            volvoxgrid_engine::tree::get_expansion(grid)
+        })
+    }
+
+    fn set_expansion(
+        &self,
+        request: SetExpansionRequest,
+    ) -> TreePluginResult<SetExpansionResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::set_expansion(grid, request)
+        })
+    }
+
+    fn get_tree_node(&self, request: GetTreeNodeRequest) -> TreePluginResult<TreeNodeInfo> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::get_tree_node(grid, request)
+        })
+    }
+
+    fn get_children(&self, request: GetChildrenRequest) -> TreePluginResult<TreeNodeList> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::get_children(grid, request)
+        })
+    }
+
+    fn get_visible_nodes(&self, request: GetVisibleNodesRequest) -> TreePluginResult<TreeNodeList> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree(grid_id, |grid| {
+            volvoxgrid_engine::tree::get_visible_nodes(grid, request)
+        })
+    }
+
+    fn get_node_path(&self, request: GetNodePathRequest) -> TreePluginResult<NodePathResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::get_node_path(grid, request)
+        })
+    }
+
+    fn get_node_by_path(&self, request: GetNodeByPathRequest) -> TreePluginResult<TreeNodeInfo> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree(grid_id, |grid| {
+            volvoxgrid_engine::tree::get_node_by_path(grid, request)
+        })
+    }
+
+    fn select_nodes(&self, request: SelectNodesRequest) -> TreePluginResult<NodeSelectionState> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::select_nodes(grid, request)
+        })
+    }
+
+    fn get_node_selection(
+        &self,
+        request: GetNodeSelectionRequest,
+    ) -> TreePluginResult<NodeSelectionState> {
+        self.with_grid_tree(request.grid_id, |grid| {
+            volvoxgrid_engine::tree::get_node_selection(grid)
+        })
+    }
+
+    fn set_checked_nodes(&self, request: SetCheckedNodesRequest) -> TreePluginResult<CheckedNodes> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::set_checked_nodes(grid, request)
+        })
+    }
+
+    fn get_checked_nodes(&self, request: GetCheckedNodesRequest) -> TreePluginResult<CheckedNodes> {
+        self.with_grid_tree(request.grid_id, |grid| {
+            volvoxgrid_engine::tree::get_checked_nodes(grid)
+        })
+    }
+
+    fn sort_tree(&self, request: SortTreeRequest) -> TreePluginResult<SortTreeResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree(grid_id, |grid| {
+            volvoxgrid_engine::tree::sort_tree(grid, request)
+        })
+    }
+
+    fn filter_tree(&self, request: FilterTreeRequest) -> TreePluginResult<FilterTreeResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::filter_tree(grid, request)
+        })
+    }
+
+    fn clear_tree_filter(
+        &self,
+        request: ClearTreeFilterRequest,
+    ) -> TreePluginResult<ClearTreeFilterResponse> {
+        self.with_grid_tree(request.grid_id, |grid| {
+            volvoxgrid_engine::tree::clear_tree_filter(grid)
+        })
+    }
+
+    fn find_tree(&self, request: FindTreeRequest) -> TreePluginResult<FindTreeResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::find_tree(grid, request)
+        })
+    }
+
+    fn resolve_children(
+        &self,
+        request: ResolveChildrenRequest,
+    ) -> TreePluginResult<ResolveChildrenResponse> {
+        let grid_id = request.grid_id;
+        self.with_grid_tree_result(grid_id, |grid| {
+            volvoxgrid_engine::tree::resolve_children(grid, request)
+        })
+    }
+}
 
 impl VolvoxGridServicePlugin for VolvoxGridPlugin {
     // ── Lifecycle ──
@@ -4773,32 +5915,36 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
     // ── Actions ──
 
     fn sort(&self, request: SortRequest) -> PluginResult<SortResponse> {
-        self.clear_compare_channel(request.grid_id);
-        let sort_result = self.with_grid(request.grid_id, |grid| {
+        // Programmatic Sort supersedes any in-flight header-click custom sort
+        // for this grid. clear_compare_channel cancels pending host compares so
+        // the abandoned worker can unwind instead of committing stale order.
+        Self::clear_compare_channel(request.grid_id);
+        let snapshot = self.with_grid(request.grid_id, |grid| {
             if request.sort_columns.is_empty() {
                 // No columns — clear sort state
                 grid.sort_state.clear();
                 grid.layout.invalidate();
                 grid.mark_dirty();
+                None
             } else {
                 let sort_keys = expand_sort_request_columns(grid, &request.sort_columns);
                 if sort_keys.is_empty() {
-                    return;
+                    return None;
                 }
-                let has_custom = sort_keys.iter().any(|&(_, order)| {
-                    order == volvoxgrid_engine::sort::SORT_ASCENDING_CUSTOM
-                        || order == volvoxgrid_engine::sort::SORT_DESCENDING_CUSTOM
-                });
-                if has_custom {
-                    grid.custom_compare = self.install_compare_channel(request.grid_id);
+                if let Some(snapshot) =
+                    Self::prepare_sort_keys_snapshot(request.grid_id, grid, &sort_keys)
+                {
+                    Some(snapshot)
+                } else {
+                    Self::run_sort_keys_locked(request.grid_id, grid, sort_keys);
+                    None
                 }
-                grid.sort_state.sort_keys = sort_keys;
-                volvoxgrid_engine::sort::sort_grid_all_multi(grid);
-                grid.custom_compare = None;
             }
-        });
-        self.clear_compare_channel(request.grid_id);
-        sort_result?;
+        })?;
+        if let Some(snapshot) = snapshot {
+            Self::run_header_sort_snapshot(request.grid_id, snapshot);
+        }
+        Self::clear_compare_channel(request.grid_id);
         Ok(SortResponse {})
     }
 
@@ -6269,6 +7415,11 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
 /// Factory for lazy plugin initialization (called by generated FFI dispatcher).
 pub(crate) fn create_plugin() -> Box<dyn VolvoxGridServicePlugin + 'static> {
+    Box::new(VolvoxGridPlugin::new())
+}
+
+/// Factory for the companion tree service dispatcher.
+pub(crate) fn create_tree_plugin() -> Box<dyn ffi_tree_impl::VolvoxTreeServicePlugin + 'static> {
     Box::new(VolvoxGridPlugin::new())
 }
 

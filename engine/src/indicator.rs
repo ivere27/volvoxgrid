@@ -24,11 +24,20 @@ impl Default for RowIndicatorSlotState {
     }
 }
 
+impl RowIndicatorSlotState {
+    pub fn new(kind: pb::RowIndicatorSlotKind, width_px: i32) -> Self {
+        Self {
+            kind: kind as i32,
+            width_px: width_px.max(0),
+            ..Self::default()
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct RowIndicatorState {
     pub visible: bool,
     pub width_px: i32,
-    pub mode_bits: u32,
     pub back_color: Option<u32>,
     pub fore_color: Option<u32>,
     pub grid_lines: Option<i32>,
@@ -45,7 +54,6 @@ impl Default for RowIndicatorState {
         Self {
             visible: false,
             width_px: DEFAULT_ROW_INDICATOR_WIDTH,
-            mode_bits: 0,
             back_color: None,
             fore_color: None,
             grid_lines: None,
@@ -77,8 +85,44 @@ impl RowIndicatorState {
         }
     }
 
-    pub fn has_mode(&self, mode: pb::RowIndicatorMode) -> bool {
-        self.mode_bits & (mode as u32) != 0
+    pub fn fit_slots_to_width(&mut self) {
+        let visible: Vec<usize> = self
+            .slots
+            .iter()
+            .enumerate()
+            .filter_map(|(index, slot)| slot.visible.then_some(index))
+            .collect();
+        if visible.is_empty() {
+            return;
+        }
+        let target_width = self.width_px.max(visible.len() as i32);
+        let current_sum: i32 = visible
+            .iter()
+            .map(|&index| self.slots[index].width_px.max(1))
+            .sum();
+        if current_sum <= 0 {
+            return;
+        }
+
+        let mut remaining_width = target_width;
+        let mut remaining_sum = current_sum;
+        for (position, &index) in visible.iter().enumerate() {
+            let current = self.slots[index].width_px.max(1);
+            let remaining_slots = (visible.len() - position - 1) as i32;
+            let next_width = if remaining_slots == 0 {
+                remaining_width
+            } else {
+                ((target_width as i64 * current as i64) / current_sum as i64)
+                    .max(1)
+                    .min((remaining_width - remaining_slots).max(1) as i64) as i32
+            };
+            self.slots[index].width_px = next_width.max(1);
+            remaining_width = (remaining_width - next_width).max(remaining_slots);
+            remaining_sum -= current;
+            if remaining_sum <= 0 {
+                break;
+            }
+        }
     }
 }
 
@@ -212,6 +256,145 @@ impl ColIndicatorState {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct CornerIndicatorSlotState {
+    pub kind: i32,
+    pub width_px: i32,
+    pub visible: bool,
+    pub custom_key: String,
+    pub data: Vec<u8>,
+    pub label_text: String,
+}
+
+impl Default for CornerIndicatorSlotState {
+    fn default() -> Self {
+        Self {
+            kind: pb::CornerIndicatorSlotKind::CornerSlotNone as i32,
+            width_px: 0,
+            visible: true,
+            custom_key: String::new(),
+            data: Vec::new(),
+            label_text: String::new(),
+        }
+    }
+}
+
+impl CornerIndicatorSlotState {
+    pub fn new(kind: pb::CornerIndicatorSlotKind, width_px: i32) -> Self {
+        Self {
+            kind: kind as i32,
+            width_px: width_px.max(0),
+            ..Self::default()
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct IndicatorColors {
+    pub background: Option<u32>,
+    pub foreground: Option<u32>,
+    pub grid: Option<u32>,
+    pub button_background: Option<u32>,
+    pub button_foreground: Option<u32>,
+    pub button_border: Option<u32>,
+    pub button_hover_background: Option<u32>,
+    pub button_hover_foreground: Option<u32>,
+    pub button_hover_border: Option<u32>,
+    pub button_pressed_background: Option<u32>,
+    pub button_pressed_foreground: Option<u32>,
+    pub button_pressed_border_dark: Option<u32>,
+    pub button_pressed_border_light: Option<u32>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct IndicatorButtonTheme {
+    pub background: Option<u32>,
+    pub foreground: u32,
+    pub border: Option<u32>,
+    pub hover_background: u32,
+    pub hover_foreground: u32,
+    pub hover_border: Option<u32>,
+    pub pressed_background: u32,
+    pub pressed_foreground: u32,
+    pub pressed_border_dark: u32,
+    pub pressed_border_light: u32,
+    pub pressed_text_offset: i32,
+}
+
+pub fn normalize_indicator_appearance(appearance: i32) -> i32 {
+    match appearance {
+        a if a == pb::IndicatorAppearance::Classic as i32 => a,
+        a if a == pb::IndicatorAppearance::Flat as i32 => a,
+        a if a == pb::IndicatorAppearance::Modern as i32 => a,
+        _ => pb::IndicatorAppearance::Classic as i32,
+    }
+}
+
+pub fn resolve_indicator_button_theme(
+    appearance: i32,
+    colors: IndicatorColors,
+    fore_color: u32,
+    grid_color: u32,
+) -> IndicatorButtonTheme {
+    let appearance = normalize_indicator_appearance(appearance);
+    let foreground = colors
+        .button_foreground
+        .or(colors.foreground)
+        .unwrap_or(fore_color);
+    let hover_foreground = colors.button_hover_foreground.unwrap_or(foreground);
+    let pressed_foreground = colors.button_pressed_foreground.unwrap_or(foreground);
+
+    if appearance == pb::IndicatorAppearance::Flat as i32 {
+        let border = colors.button_border.unwrap_or(grid_color);
+        let hover_border = colors.button_hover_border.unwrap_or(border);
+        return IndicatorButtonTheme {
+            background: colors.button_background,
+            foreground,
+            border: colors.button_border,
+            hover_background: colors.button_hover_background.unwrap_or(0xFFDADADA),
+            hover_foreground,
+            hover_border: Some(hover_border),
+            pressed_background: colors.button_pressed_background.unwrap_or(0xFFC7C7C7),
+            pressed_foreground,
+            pressed_border_dark: colors.button_pressed_border_dark.unwrap_or(border),
+            pressed_border_light: colors.button_pressed_border_light.unwrap_or(border),
+            pressed_text_offset: 0,
+        };
+    }
+
+    if appearance == pb::IndicatorAppearance::Modern as i32 {
+        let border = colors.button_border.unwrap_or(0xFF5B8DEF);
+        let hover_border = colors.button_hover_border.unwrap_or(border);
+        return IndicatorButtonTheme {
+            background: colors.button_background,
+            foreground,
+            border: colors.button_border,
+            hover_background: colors.button_hover_background.unwrap_or(0xFFEAF3FF),
+            hover_foreground,
+            hover_border: Some(hover_border),
+            pressed_background: colors.button_pressed_background.unwrap_or(0xFFDCEBFF),
+            pressed_foreground,
+            pressed_border_dark: colors.button_pressed_border_dark.unwrap_or(border),
+            pressed_border_light: colors.button_pressed_border_light.unwrap_or(border),
+            pressed_text_offset: 0,
+        };
+    }
+
+    IndicatorButtonTheme {
+        background: colors.button_background,
+        foreground,
+        border: colors.button_border,
+        hover_background: colors.button_hover_background.unwrap_or(0xFFE5E5E5),
+        hover_foreground,
+        hover_border: colors.button_hover_border.or(Some(0xFF808080)),
+        pressed_background: colors.button_pressed_background.unwrap_or(0xFFD0D0D0),
+        pressed_foreground,
+        pressed_border_dark: colors.button_pressed_border_dark.unwrap_or(0xFF707070),
+        pressed_border_light: colors.button_pressed_border_light.unwrap_or(0xFFFFFFFF),
+        pressed_text_offset: 1,
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct CornerIndicatorState {
     pub visible: bool,
@@ -220,10 +403,13 @@ pub struct CornerIndicatorState {
     pub fore_color: Option<u32>,
     pub custom_key: String,
     pub data: Vec<u8>,
+    pub slots: Vec<CornerIndicatorSlotState>,
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct IndicatorBandsState {
+    pub appearance: i32,
+    pub colors: IndicatorColors,
     pub row_start: RowIndicatorState,
     pub row_end: RowIndicatorState,
     pub col_top: ColIndicatorState,

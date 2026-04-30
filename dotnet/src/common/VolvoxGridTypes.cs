@@ -139,6 +139,13 @@ namespace VolvoxGrid.DotNet
         Custom = 4096,
     }
 
+    public enum VolvoxGridIndicatorAppearance
+    {
+        Classic = 0,
+        Flat = 1,
+        Modern = 2,
+    }
+
     public enum VolvoxGridCellSpanMode
     {
         None = 0,

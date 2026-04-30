@@ -51,6 +51,7 @@ pub mod sort;
 pub mod span;
 pub mod style;
 pub mod text;
+pub mod tree;
 
 use std::collections::HashMap;
 use std::sync::{
@@ -319,6 +320,7 @@ mod tests {
                     col: 0,
                     hit_area: 0,
                     interaction: crate::proto::volvoxgrid::v1::CellInteraction::None as i32,
+                    target: crate::event::EventTarget::data_cell(),
                 });
             })
             .expect("with_grid should succeed");

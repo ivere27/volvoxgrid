@@ -1,0 +1,392 @@
+// VolvoxTree Protocol Contract
+//
+// Native tree-model companion API for VolvoxGrid.
+//
+// This service does not own rendering, scrolling, editing, or events. It operates
+// on the same grid_id as VolvoxGridService and projects the tree model into the
+// existing grid row/cell render pipeline. The projection owns the body band from
+// fixed_rows downward; ordinary non-tree body rows cannot coexist in that band.
+
+syntax = "proto3";
+package volvoxgrid.v1;
+
+import "volvoxgrid.proto";
+
+option go_package = "github.com/ivere27/volvoxgrid/api/v1";
+option java_package = "io.github.ivere27.volvoxgrid";
+option java_multiple_files = true;
+
+enum NodeChildrenState {
+  NODE_CHILDREN_UNKNOWN  = 0;
+  NODE_LEAF              = 1;
+  NODE_CHILDREN_UNLOADED = 2;
+  NODE_CHILDREN_LOADING  = 3;
+  NODE_CHILDREN_LOADED   = 4;
+  NODE_CHILDREN_ERROR    = 5;
+}
+
+enum NodePathMode {
+  NODE_PATH_ID    = 0;
+  NODE_PATH_LABEL = 1;
+}
+
+enum TreeDropPosition {
+  TREE_DROP_BEFORE = 0;
+  TREE_DROP_AFTER  = 1;
+  TREE_DROP_INSIDE = 2;
+}
+
+message TreeNode {
+  string node_id = 1;
+  string parent_id = 2; // empty = root
+  RowDef row = 3;       // presentation metadata only
+  repeated NodeCellUpdate cells = 4;
+  NodeChildrenState children_state = 5;
+  repeated TreeNode children = 6; // optional nested-load convenience
+  optional string icon_name = 7;
+  optional string icon_name_open = 8;
+  optional bytes data = 9;        // host metadata for the node
+}
+
+message NodeCellUpdate {
+  string node_id = 1;
+  int32 col = 2;
+  CellValue value = 3;
+  CellStyle style = 4;
+  optional CheckedState checked = 5;
+  ImageData picture = 6;
+  optional ImageAlignment picture_align = 7;
+  optional Dropdown dropdown = 8;
+}
+
+message LoadTreeRequest {
+  int64 grid_id = 1;
+  repeated TreeNode nodes = 2;
+  bool replace = 3;
+  bool collapse_initial = 4;
+}
+
+message LoadTreeResponse {
+  int32 node_count = 1;
+  int32 visible_count = 2;
+  repeated string warnings = 3;
+}
+
+message InsertNodesRequest {
+  int64 grid_id = 1;
+  string parent_id = 2; // empty = root
+  int32 position = 3;   // -1 = append
+  repeated TreeNode nodes = 4;
+}
+
+message InsertNodesResponse {
+  int32 inserted_count = 1;
+  int32 visible_count = 2;
+}
+
+message RemoveNodesRequest {
+  int64 grid_id = 1;
+  repeated string node_ids = 2;
+  bool recursive = 3;
+}
+
+message RemoveNodesResponse {
+  int32 removed_count = 1;
+  int32 visible_count = 2;
+}
+
+message MoveNodesRequest {
+  int64 grid_id = 1;
+  repeated string node_ids = 2;
+  string new_parent_id = 3; // empty = root
+  int32 position = 4;       // -1 = append
+}
+
+message MoveNodesResponse {
+  int32 moved_count = 1;
+  int32 visible_count = 2;
+}
+
+message RenameNodeRequest {
+  int64 grid_id = 1;
+  string node_id = 2;
+  int32 col = 3;
+  string text = 4;
+}
+
+message RenameNodeResponse {
+  TreeNodeInfo node = 1;
+}
+
+message UpdateNodeCellsRequest {
+  int64 grid_id = 1;
+  repeated NodeCellUpdate cells = 2;
+  bool atomic = 3;
+}
+
+message UpdateTreeRequest {
+  int64 grid_id = 1;
+  repeated InsertNodesRequest adds = 2;
+  repeated RemoveNodesRequest removes = 3;
+  repeated MoveNodesRequest moves = 4;
+  repeated RenameNodeRequest renames = 5;
+  repeated UpdateNodeCellsRequest cell_updates = 6;
+}
+
+message UpdateTreeResponse {
+  int32 inserted_count = 1;
+  int32 removed_count = 2;
+  int32 moved_count = 3;
+  int32 renamed_count = 4;
+  int32 visible_count = 5;
+}
+
+message ExpandNodesRequest {
+  int64 grid_id = 1;
+  repeated string node_ids = 2;
+  bool recursive = 3;
+}
+
+message ExpandNodesResponse {
+  int32 expanded_count = 1;
+  int32 visible_count = 2;
+}
+
+message CollapseNodesRequest {
+  int64 grid_id = 1;
+  repeated string node_ids = 2;
+  bool recursive = 3;
+}
+
+message CollapseNodesResponse {
+  int32 collapsed_count = 1;
+  int32 visible_count = 2;
+}
+
+message ExpandToNodeRequest {
+  int64 grid_id = 1;
+  string node_id = 2;
+}
+
+message ExpandToNodeResponse {
+  bool found = 1;
+  int32 row = 2;
+  int32 visible_count = 3;
+}
+
+message GetExpansionRequest {
+  int64 grid_id = 1;
+}
+
+message ExpansionState {
+  repeated string expanded_node_ids = 1;
+}
+
+message SetExpansionRequest {
+  int64 grid_id = 1;
+  ExpansionState state = 2;
+}
+
+message SetExpansionResponse {
+  int32 visible_count = 1;
+}
+
+message GetTreeNodeRequest {
+  int64 grid_id = 1;
+  oneof address {
+    string node_id = 2;
+    int32 row = 3;
+  }
+  optional NodeRelation relation = 4;
+  bool include_children = 5;
+}
+
+message TreeNodeInfo {
+  string node_id = 1;
+  string parent_node_id = 2;
+  int32 row = 3;          // current visible/materialized row; -1 if hidden
+  int32 level = 4;
+  bool is_expanded = 5;
+  NodeChildrenState children_state = 6;
+  int32 child_count = 7;
+  repeated string child_node_ids = 8;
+  bool found = 9;
+}
+
+message GetChildrenRequest {
+  int64 grid_id = 1;
+  string parent_id = 2; // empty = root
+  bool visible_only = 3;
+}
+
+message GetVisibleNodesRequest {
+  int64 grid_id = 1;
+  int32 start = 2;
+  int32 count = 3; // <= 0 = all
+}
+
+message TreeNodeList {
+  repeated TreeNodeInfo nodes = 1;
+  int32 total_count = 2;
+}
+
+message GetNodePathRequest {
+  int64 grid_id = 1;
+  string node_id = 2;
+  string sep = 3; // default "/"
+  NodePathMode mode = 4;
+}
+
+message GetNodeByPathRequest {
+  int64 grid_id = 1;
+  string path = 2;
+  string sep = 3; // default "/"
+  NodePathMode mode = 4;
+}
+
+message NodePathResponse {
+  string path = 1;
+  bool found = 2;
+}
+
+message SelectNodesRequest {
+  int64 grid_id = 1;
+  string active_node_id = 2;
+  repeated string selected_node_ids = 3;
+  bool show = 4;
+}
+
+message GetNodeSelectionRequest {
+  int64 grid_id = 1;
+}
+
+message NodeSelectionState {
+  string active_node_id = 1;
+  repeated string selected_node_ids = 2;
+  int32 active_row = 3;
+}
+
+message TreeCheckboxConfig {
+  bool enabled = 1;
+  int32 column = 2; // -1 = primary/label column
+  bool cascade_descendants = 3;
+  bool propagate_to_parents = 4;
+  bool independent_subtree = 5;
+}
+
+message SetCheckedNodesRequest {
+  int64 grid_id = 1;
+  repeated string node_ids = 2;
+  CheckedState state = 3;
+}
+
+message GetCheckedNodesRequest {
+  int64 grid_id = 1;
+}
+
+message CheckedNodes {
+  repeated string fully_checked = 1;
+  repeated string indeterminate = 2;
+}
+
+message SortTreeRequest {
+  int64 grid_id = 1;
+  repeated SortColumn sort_columns = 2;
+  bool recursive = 3; // true = sort all sibling groups
+}
+
+message SortTreeResponse {
+  int32 visible_count = 1;
+}
+
+message FilterTreeRequest {
+  int64 grid_id = 1;
+  int32 col = 2;
+  oneof query {
+    TextQuery text_query = 3;
+    RegexQuery regex_query = 4;
+  }
+  bool keep_ancestors_of_matches = 5;
+  bool keep_descendants_of_matches = 6;
+}
+
+message FilterTreeResponse {
+  int32 visible_count = 1;
+}
+
+message ClearTreeFilterRequest {
+  int64 grid_id = 1;
+}
+
+message ClearTreeFilterResponse {
+  int32 visible_count = 1;
+}
+
+message FindTreeRequest {
+  int64 grid_id = 1;
+  int32 col = 2;
+  string start_node_id = 3;
+  bool visible_only = 4;
+  bool auto_expand_ancestors = 5;
+  oneof query {
+    TextQuery text_query = 6;
+    RegexQuery regex_query = 7;
+  }
+}
+
+message FindTreeResponse {
+  bool found = 1;
+  string node_id = 2;
+  int32 row = 3;
+}
+
+message ResolveChildrenRequest {
+  int64 grid_id = 1;
+  int64 request_id = 2;
+  string parent_id = 3;
+  repeated TreeNode children = 4;
+  optional string error = 5;
+}
+
+message ResolveChildrenResponse {
+  NodeChildrenState children_state = 1;
+  int32 inserted_count = 2;
+  int32 visible_count = 3;
+}
+
+service VolvoxTreeService {
+  rpc LoadTree(LoadTreeRequest) returns (LoadTreeResponse);
+  rpc AppendTree(LoadTreeRequest) returns (LoadTreeResponse);
+
+  rpc InsertNodes(InsertNodesRequest) returns (InsertNodesResponse);
+  rpc RemoveNodes(RemoveNodesRequest) returns (RemoveNodesResponse);
+  rpc MoveNodes(MoveNodesRequest) returns (MoveNodesResponse);
+  rpc RenameNode(RenameNodeRequest) returns (RenameNodeResponse);
+  rpc UpdateTree(UpdateTreeRequest) returns (UpdateTreeResponse);
+  rpc UpdateNodeCells(UpdateNodeCellsRequest) returns (WriteResult);
+
+  rpc ExpandNodes(ExpandNodesRequest) returns (ExpandNodesResponse);
+  rpc CollapseNodes(CollapseNodesRequest) returns (CollapseNodesResponse);
+  rpc ExpandToNode(ExpandToNodeRequest) returns (ExpandToNodeResponse);
+  rpc GetExpansion(GetExpansionRequest) returns (ExpansionState);
+  rpc SetExpansion(SetExpansionRequest) returns (SetExpansionResponse);
+
+  rpc GetTreeNode(GetTreeNodeRequest) returns (TreeNodeInfo);
+  rpc GetChildren(GetChildrenRequest) returns (TreeNodeList);
+  rpc GetVisibleNodes(GetVisibleNodesRequest) returns (TreeNodeList);
+  rpc GetNodePath(GetNodePathRequest) returns (NodePathResponse);
+  rpc GetNodeByPath(GetNodeByPathRequest) returns (TreeNodeInfo);
+
+  rpc SelectNodes(SelectNodesRequest) returns (NodeSelectionState);
+  rpc GetNodeSelection(GetNodeSelectionRequest) returns (NodeSelectionState);
+
+  rpc SetCheckedNodes(SetCheckedNodesRequest) returns (CheckedNodes);
+  rpc GetCheckedNodes(GetCheckedNodesRequest) returns (CheckedNodes);
+
+  rpc SortTree(SortTreeRequest) returns (SortTreeResponse);
+  rpc FilterTree(FilterTreeRequest) returns (FilterTreeResponse);
+  rpc ClearTreeFilter(ClearTreeFilterRequest) returns (ClearTreeFilterResponse);
+  rpc FindTree(FindTreeRequest) returns (FindTreeResponse);
+
+  rpc ResolveChildren(ResolveChildrenRequest) returns (ResolveChildrenResponse);
+}

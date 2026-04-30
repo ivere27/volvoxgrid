@@ -37,7 +37,8 @@ import io.github.ivere27.volvoxgrid.OutlineConfig
 import io.github.ivere27.volvoxgrid.RegionStyle
 import io.github.ivere27.volvoxgrid.ResizePolicy
 import io.github.ivere27.volvoxgrid.RowIndicatorConfig
-import io.github.ivere27.volvoxgrid.RowIndicatorMode
+import io.github.ivere27.volvoxgrid.RowIndicatorSlot
+import io.github.ivere27.volvoxgrid.RowIndicatorSlotKind
 import io.github.ivere27.volvoxgrid.ScrollBarsMode
 import io.github.ivere27.volvoxgrid.ScrollConfig
 import io.github.ivere27.volvoxgrid.SelectionConfig
@@ -361,7 +362,11 @@ object SalesJsonDemo {
                         RowIndicatorConfig.newBuilder()
                             .setVisible(true)
                             .setWidth(40)
-                            .setModeBits(RowIndicatorMode.ROW_INDICATOR_NUMBERS.number)
+                            .addSlots(RowIndicatorSlot.newBuilder()
+                                .setKind(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS)
+                                .setWidth(40)
+                                .setVisible(true)
+                                .build())
                             .setBackground(INDICATOR_BG)
                             .setForeground(INDICATOR_FG)
                             .setGridColor(FIXED_GRID_COLOR)

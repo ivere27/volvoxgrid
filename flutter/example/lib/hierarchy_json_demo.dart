@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:volvoxgrid/volvoxgrid.dart' hide Padding;
 
 const List<int> _hierarchyColWidths = [260, 80, 80, 120, 100, 92];
@@ -20,11 +22,9 @@ const List<String> _hierarchyKeys = [
   'Permissions',
   'Action',
 ];
+const int hierarchyNameColumn = 0;
 const int hierarchyActionColumn = 5;
 
-final RegExp _levelPattern = RegExp(r'"_level"\s*:\s*(-?\d+)');
-final RegExp _typePattern = RegExp(r'"Type"\s*:\s*"([^"]+)"');
-final RegExp _helperFieldPattern = RegExp(r',\s*"_level"\s*:\s*-?\d+');
 const int _hierBodyBg = 0xFFFFFFFF;
 const int _hierBodyFg = 0xFF1C1917;
 const int _hierCanvasBg = 0xFFFAFAF9;
@@ -40,17 +40,34 @@ const int _hierSelectionFg = 0xFFFFFFFF;
 const int _hierAccent = 0xFFF59E0B;
 const int _hierTreeColor = 0xFFA8A29E;
 const int _hierHoverCellBg = 0x1AD97706;
+const int _hierOutlineIndent = 20;
+const int _hierMinOutlineIndicatorWidth = 56;
+const int _hierDesktopHeaderHeight = 28;
+const int _hierMobileHeaderHeight = 44;
+
+bool get _hierTouchHeader {
+  switch (defaultTargetPlatform) {
+    case TargetPlatform.android:
+    case TargetPlatform.iOS:
+      return true;
+    default:
+      return false;
+  }
+}
+
+int get _hierHeaderHeight =>
+    _hierTouchHeader ? _hierMobileHeaderHeight : _hierDesktopHeaderHeight;
 
 Future<void> loadHierarchyJsonDemo(VolvoxGridController controller) async {
   final rawJson = utf8.decode(await controller.getDemoData('hierarchy'));
-  final levels = _levelPattern
-      .allMatches(rawJson)
-      .map((match) => int.parse(match.group(1)!))
+  final rows = (jsonDecode(rawJson) as List<dynamic>)
+      .map((value) => Map<String, dynamic>.from(value as Map))
       .toList();
-  final types =
-      _typePattern.allMatches(rawJson).map((match) => match.group(1)!).toList();
+  final levels = _hierarchyLevels(rows);
+  final types = rows.map((row) => _hierarchyString(row, 'Type')).toList();
+  final visibleRows = rows.map(_hierarchyVisibleRow).toList();
   final sanitized = Uint8List.fromList(
-    utf8.encode(rawJson.replaceAll(_helperFieldPattern, '')),
+    utf8.encode(jsonEncode(visibleRows)),
   );
   await controller.setColCount(_hierarchyColWidths.length);
   await controller.defineColumns(_hierarchyDefineColumnsRequest());
@@ -62,7 +79,12 @@ Future<void> loadHierarchyJsonDemo(VolvoxGridController controller) async {
     throw StateError('LoadData failed for embedded hierarchy demo');
   }
 
-  await controller.configure(_hierarchyThemeConfig());
+  await controller.configure(
+    _hierarchyThemeConfig(
+      _hierarchyMaxVisualDepth(levels),
+      _hierarchyMaxLevel(levels),
+    ),
+  );
 
   final actionStyle = CellStyle()..foreground = 0xFF2563EB;
   final folderStyle = CellStyle()
@@ -72,7 +94,6 @@ Future<void> loadHierarchyJsonDemo(VolvoxGridController controller) async {
   for (var row = 0; row < levels.length; row += 1) {
     final isFolder = row < types.length && types[row] == 'Folder';
     await controller.setRowOutlineLevel(row, levels[row]);
-    await controller.setIsSubtotal(row, isFolder);
     await controller.setCellStyleRange(
       row,
       hierarchyActionColumn,
@@ -84,6 +105,53 @@ Future<void> loadHierarchyJsonDemo(VolvoxGridController controller) async {
       await controller.setCellStyleRange(row, 0, row, 0, folderStyle);
     }
   }
+}
+
+String _hierarchyString(Map<String, dynamic> row, String key) =>
+    row[key]?.toString() ?? '';
+
+Map<String, dynamic> _hierarchyVisibleRow(Map<String, dynamic> row) {
+  return {
+    for (final key in _hierarchyKeys) key: row[key] ?? '',
+  };
+}
+
+List<int> _hierarchyLevels(List<Map<String, dynamic>> rows) {
+  final rowsById = <String, Map<String, dynamic>>{};
+  for (final row in rows) {
+    final id = _hierarchyString(row, 'Id');
+    if (id.isEmpty) {
+      throw StateError('Hierarchy demo row is missing Id');
+    }
+    rowsById[id] = row;
+  }
+
+  final cache = <String, int>{};
+  int depthOf(Map<String, dynamic> row, Set<String> visiting) {
+    final id = _hierarchyString(row, 'Id');
+    final cached = cache[id];
+    if (cached != null) {
+      return cached;
+    }
+    if (!visiting.add(id)) {
+      throw StateError('Hierarchy demo data contains a parent cycle at $id');
+    }
+    final parentId = row['ParentId']?.toString() ?? '';
+    var depth = 0;
+    if (parentId.isNotEmpty) {
+      final parent = rowsById[parentId];
+      if (parent == null) {
+        throw StateError(
+            'Hierarchy demo data references missing parent $parentId');
+      }
+      depth = depthOf(parent, visiting) + 1;
+    }
+    visiting.remove(id);
+    cache[id] = depth;
+    return depth;
+  }
+
+  return rows.map((row) => depthOf(row, <String>{})).toList();
 }
 
 DefineColumnsRequest _hierarchyDefineColumnsRequest() {
@@ -105,12 +173,58 @@ DefineColumnsRequest _hierarchyDefineColumnsRequest() {
     if (col == hierarchyActionColumn) {
       def.interaction = CellInteraction.CELL_INTERACTION_TEXT_LINK;
     }
+    if (col == hierarchyNameColumn) {
+      def.hidden = true;
+    }
     request.columns.add(def);
   }
   return request;
 }
 
-GridConfig _hierarchyThemeConfig() {
+int _hierarchyMaxVisualDepth(List<int> levels) {
+  var hasMinLevel = false;
+  var minLevel = 0;
+  var maxLevel = 0;
+  for (final level in levels) {
+    if (level >= 0 && (!hasMinLevel || level < minLevel)) {
+      hasMinLevel = true;
+      minLevel = level;
+    }
+    if (level > maxLevel) {
+      maxLevel = level;
+    }
+  }
+  final depth = maxLevel - minLevel;
+  return depth < 0 ? 0 : depth;
+}
+
+int _hierarchyMaxLevel(List<int> levels) {
+  var hasMaxLevel = false;
+  var maxLevel = 0;
+  for (final level in levels) {
+    if (level >= 0 && (!hasMaxLevel || level > maxLevel)) {
+      hasMaxLevel = true;
+      maxLevel = level;
+    }
+  }
+  return hasMaxLevel ? maxLevel : 0;
+}
+
+int _hierarchyOutlineWidth(int maxOutlineDepth) {
+  final sanitizedMaxDepth = maxOutlineDepth < 0 ? 0 : maxOutlineDepth;
+  final width = (sanitizedMaxDepth + 1) * _hierOutlineIndent;
+  return width < _hierMinOutlineIndicatorWidth
+      ? _hierMinOutlineIndicatorWidth
+      : width;
+}
+
+int _hierarchyExpanderWidth(int maxOutlineDepth) {
+  return _hierarchyOutlineWidth(maxOutlineDepth) + 280;
+}
+
+GridConfig _hierarchyThemeConfig(int maxOutlineDepth, int maxOutlineLevel) {
+  final outlineWidth = _hierarchyOutlineWidth(maxOutlineDepth);
+  final expanderWidth = _hierarchyExpanderWidth(maxOutlineDepth);
   return GridConfig()
     ..layout = (LayoutConfig()..fixedRows = 0)
     ..style = (StyleConfig()
@@ -177,26 +291,49 @@ GridConfig _hierarchyThemeConfig() {
       ..flingFriction = 0.9)
     ..outline = (OutlineConfig()
       ..treeIndicator = TreeIndicatorStyle.TREE_INDICATOR_ARROWS_LEAF
-      ..treeColumn = 0
+      ..indicatorIndent = _hierOutlineIndent
+      ..maxLevels = maxOutlineLevel < 0 ? 0 : maxOutlineLevel
+      ..showLevelButtons = true
+      ..labelColumn = hierarchyNameColumn
       ..treeColor = _hierTreeColor)
     ..interaction = (InteractionConfig()
       ..resize = (ResizePolicy()
         ..columns = true
-        ..rows = true)
+        ..rows = false)
       ..autoSizeMouse = true
       ..headerFeatures = (HeaderFeatures()
         ..sort = false
         ..reorder = false
         ..chooser = false))
     ..indicators = (IndicatorsConfig()
-      ..rowStart = (RowIndicatorConfig()..visible = false)
+      ..rowStart = (RowIndicatorConfig()
+        ..visible = true
+        ..width = expanderWidth
+        ..background = _hierHeaderBg
+        ..foreground = _hierFixedFg
+        ..gridColor = _hierFixedGridColor
+        ..autoSize = false
+        ..allowResize = true
+        ..slots.add(RowIndicatorSlot()
+          ..kind = RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER
+          ..width = expanderWidth
+          ..visible = true))
+      ..cornerTopStart = (CornerIndicatorConfig()
+        ..visible = true
+        ..background = _hierHeaderBg
+        ..foreground = _hierFixedFg
+        ..slots.add(CornerIndicatorSlot()
+          ..kind = CornerIndicatorSlotKind.CORNER_SLOT_OUTLINE_LEVELS
+          ..width = outlineWidth
+          ..visible = true))
       ..colTop = (ColIndicatorConfig()
         ..visible = true
-        ..defaultRowHeight = 28
+        ..defaultRowHeight = _hierHeaderHeight
         ..bandRows = 1
         ..modeBits = ColIndicatorCellMode.COL_INDICATOR_CELL_HEADER_TEXT.value
         ..background = _hierHeaderBg
         ..foreground = _hierHeaderFg
         ..gridColor = _hierFixedGridColor
-        ..allowResize = true));
+        ..allowResize = true)
+      ..appearance = IndicatorAppearance.INDICATOR_APPEARANCE_MODERN);
 }

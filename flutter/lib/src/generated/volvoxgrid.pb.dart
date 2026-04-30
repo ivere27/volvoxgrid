@@ -5254,18 +5254,26 @@ class ScrollConfig extends $pb.GeneratedMessage {
 class OutlineConfig extends $pb.GeneratedMessage {
   factory OutlineConfig({
     TreeIndicatorStyle? treeIndicator,
-    $core.int? treeColumn,
     $core.int? treeColor,
     GroupTotalPosition? groupTotalPosition,
     $core.bool? multiTotals,
+    $core.int? indicatorIndent,
+    $core.int? maxLevels,
+    $core.bool? showLevelButtons,
+    $core.int? labelColumn,
+    $core.int? iconColumn,
   }) {
     final result = create();
     if (treeIndicator != null) result.treeIndicator = treeIndicator;
-    if (treeColumn != null) result.treeColumn = treeColumn;
     if (treeColor != null) result.treeColor = treeColor;
     if (groupTotalPosition != null)
       result.groupTotalPosition = groupTotalPosition;
     if (multiTotals != null) result.multiTotals = multiTotals;
+    if (indicatorIndent != null) result.indicatorIndent = indicatorIndent;
+    if (maxLevels != null) result.maxLevels = maxLevels;
+    if (showLevelButtons != null) result.showLevelButtons = showLevelButtons;
+    if (labelColumn != null) result.labelColumn = labelColumn;
+    if (iconColumn != null) result.iconColumn = iconColumn;
     return result;
   }
 
@@ -5284,11 +5292,15 @@ class OutlineConfig extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aE<TreeIndicatorStyle>(1, _omitFieldNames ? '' : 'treeIndicator',
         enumValues: TreeIndicatorStyle.values)
-    ..aI(2, _omitFieldNames ? '' : 'treeColumn')
     ..aI(3, _omitFieldNames ? '' : 'treeColor', fieldType: $pb.PbFieldType.OU3)
     ..aE<GroupTotalPosition>(4, _omitFieldNames ? '' : 'groupTotalPosition',
         enumValues: GroupTotalPosition.values)
     ..aOB(5, _omitFieldNames ? '' : 'multiTotals')
+    ..aI(6, _omitFieldNames ? '' : 'indicatorIndent')
+    ..aI(7, _omitFieldNames ? '' : 'maxLevels')
+    ..aOB(8, _omitFieldNames ? '' : 'showLevelButtons')
+    ..aI(9, _omitFieldNames ? '' : 'labelColumn')
+    ..aI(10, _omitFieldNames ? '' : 'iconColumn')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -5319,30 +5331,21 @@ class OutlineConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearTreeIndicator() => $_clearField(1);
 
-  @$pb.TagNumber(2)
-  $core.int get treeColumn => $_getIZ(1);
-  @$pb.TagNumber(2)
-  set treeColumn($core.int value) => $_setSignedInt32(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasTreeColumn() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearTreeColumn() => $_clearField(2);
-
   @$pb.TagNumber(3)
-  $core.int get treeColor => $_getIZ(2);
+  $core.int get treeColor => $_getIZ(1);
   @$pb.TagNumber(3)
-  set treeColor($core.int value) => $_setUnsignedInt32(2, value);
+  set treeColor($core.int value) => $_setUnsignedInt32(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasTreeColor() => $_has(2);
+  $core.bool hasTreeColor() => $_has(1);
   @$pb.TagNumber(3)
   void clearTreeColor() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  GroupTotalPosition get groupTotalPosition => $_getN(3);
+  GroupTotalPosition get groupTotalPosition => $_getN(2);
   @$pb.TagNumber(4)
   set groupTotalPosition(GroupTotalPosition value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasGroupTotalPosition() => $_has(3);
+  $core.bool hasGroupTotalPosition() => $_has(2);
   @$pb.TagNumber(4)
   void clearGroupTotalPosition() => $_clearField(4);
 
@@ -5350,13 +5353,58 @@ class OutlineConfig extends $pb.GeneratedMessage {
   /// reuse existing subtotal rows instead of inserting new ones, allowing
   /// multiple aggregate columns (e.g. Sales + Cost) in a single row.
   @$pb.TagNumber(5)
-  $core.bool get multiTotals => $_getBF(4);
+  $core.bool get multiTotals => $_getBF(3);
   @$pb.TagNumber(5)
-  set multiTotals($core.bool value) => $_setBool(4, value);
+  set multiTotals($core.bool value) => $_setBool(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasMultiTotals() => $_has(4);
+  $core.bool hasMultiTotals() => $_has(3);
   @$pb.TagNumber(5)
   void clearMultiTotals() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get indicatorIndent => $_getIZ(4);
+  @$pb.TagNumber(6)
+  set indicatorIndent($core.int value) => $_setSignedInt32(4, value);
+  @$pb.TagNumber(6)
+  $core.bool hasIndicatorIndent() => $_has(4);
+  @$pb.TagNumber(6)
+  void clearIndicatorIndent() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get maxLevels => $_getIZ(5);
+  @$pb.TagNumber(7)
+  set maxLevels($core.int value) => $_setSignedInt32(5, value);
+  @$pb.TagNumber(7)
+  $core.bool hasMaxLevels() => $_has(5);
+  @$pb.TagNumber(7)
+  void clearMaxLevels() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.bool get showLevelButtons => $_getBF(6);
+  @$pb.TagNumber(8)
+  set showLevelButtons($core.bool value) => $_setBool(6, value);
+  @$pb.TagNumber(8)
+  $core.bool hasShowLevelButtons() => $_has(6);
+  @$pb.TagNumber(8)
+  void clearShowLevelButtons() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get labelColumn => $_getIZ(7);
+  @$pb.TagNumber(9)
+  set labelColumn($core.int value) => $_setSignedInt32(7, value);
+  @$pb.TagNumber(9)
+  $core.bool hasLabelColumn() => $_has(7);
+  @$pb.TagNumber(9)
+  void clearLabelColumn() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get iconColumn => $_getIZ(8);
+  @$pb.TagNumber(10)
+  set iconColumn($core.int value) => $_setSignedInt32(8, value);
+  @$pb.TagNumber(10)
+  $core.bool hasIconColumn() => $_has(8);
+  @$pb.TagNumber(10)
+  void clearIconColumn() => $_clearField(10);
 }
 
 /// ── Cell Span ──
@@ -5467,6 +5515,8 @@ class InteractionConfig extends $pb.GeneratedMessage {
     DragMode? dragMode,
     DropMode? dropMode,
     HeaderFeatures? headerFeatures,
+    $core.int? decisionTimeoutMs,
+    $core.int? compareResponseTimeoutMs,
   }) {
     final result = create();
     if (resize != null) result.resize = resize;
@@ -5479,6 +5529,9 @@ class InteractionConfig extends $pb.GeneratedMessage {
     if (dragMode != null) result.dragMode = dragMode;
     if (dropMode != null) result.dropMode = dropMode;
     if (headerFeatures != null) result.headerFeatures = headerFeatures;
+    if (decisionTimeoutMs != null) result.decisionTimeoutMs = decisionTimeoutMs;
+    if (compareResponseTimeoutMs != null)
+      result.compareResponseTimeoutMs = compareResponseTimeoutMs;
     return result;
   }
 
@@ -5512,6 +5565,10 @@ class InteractionConfig extends $pb.GeneratedMessage {
         enumValues: DropMode.values)
     ..aOM<HeaderFeatures>(10, _omitFieldNames ? '' : 'headerFeatures',
         subBuilder: HeaderFeatures.create)
+    ..aI(11, _omitFieldNames ? '' : 'decisionTimeoutMs',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(12, _omitFieldNames ? '' : 'compareResponseTimeoutMs',
+        fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -5633,6 +5690,31 @@ class InteractionConfig extends $pb.GeneratedMessage {
   void clearHeaderFeatures() => $_clearField(10);
   @$pb.TagNumber(10)
   HeaderFeatures ensureHeaderFeatures() => $_ensure(9);
+
+  /// Milliseconds to wait for EventDecision on cancelable events.
+  /// 0 or unset = wait indefinitely. A finite value is a watchdog: on timeout
+  /// the engine emits ErrorEvent and auto-allows the action.
+  @$pb.TagNumber(11)
+  $core.int get decisionTimeoutMs => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set decisionTimeoutMs($core.int value) => $_setUnsignedInt32(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasDecisionTimeoutMs() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearDecisionTimeoutMs() => $_clearField(11);
+
+  /// Milliseconds to wait for CompareResponse during SORT_TYPE_CUSTOM.
+  /// 0 or unset = wait indefinitely. A finite value is a watchdog: on timeout
+  /// the engine emits ErrorEvent and aborts the custom sort.
+  @$pb.TagNumber(12)
+  $core.int get compareResponseTimeoutMs => $_getIZ(11);
+  @$pb.TagNumber(12)
+  set compareResponseTimeoutMs($core.int value) =>
+      $_setUnsignedInt32(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasCompareResponseTimeoutMs() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearCompareResponseTimeoutMs() => $_clearField(12);
 }
 
 /// ── Rendering ──
@@ -5930,7 +6012,6 @@ class RowIndicatorConfig extends $pb.GeneratedMessage {
   factory RowIndicatorConfig({
     $core.bool? visible,
     $core.int? width,
-    $core.int? modeBits,
     $core.int? background,
     $core.int? foreground,
     GridLineStyle? gridLines,
@@ -5944,7 +6025,6 @@ class RowIndicatorConfig extends $pb.GeneratedMessage {
     final result = create();
     if (visible != null) result.visible = visible;
     if (width != null) result.width = width;
-    if (modeBits != null) result.modeBits = modeBits;
     if (background != null) result.background = background;
     if (foreground != null) result.foreground = foreground;
     if (gridLines != null) result.gridLines = gridLines;
@@ -5972,7 +6052,6 @@ class RowIndicatorConfig extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'visible')
     ..aI(2, _omitFieldNames ? '' : 'width')
-    ..aI(3, _omitFieldNames ? '' : 'modeBits', fieldType: $pb.PbFieldType.OU3)
     ..aI(4, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
     ..aI(5, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
     ..aE<GridLineStyle>(6, _omitFieldNames ? '' : 'gridLines',
@@ -6023,89 +6102,80 @@ class RowIndicatorConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearWidth() => $_clearField(2);
 
-  @$pb.TagNumber(3)
-  $core.int get modeBits => $_getIZ(2);
-  @$pb.TagNumber(3)
-  set modeBits($core.int value) => $_setUnsignedInt32(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasModeBits() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearModeBits() => $_clearField(3);
-
   @$pb.TagNumber(4)
-  $core.int get background => $_getIZ(3);
+  $core.int get background => $_getIZ(2);
   @$pb.TagNumber(4)
-  set background($core.int value) => $_setUnsignedInt32(3, value);
+  set background($core.int value) => $_setUnsignedInt32(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasBackground() => $_has(3);
+  $core.bool hasBackground() => $_has(2);
   @$pb.TagNumber(4)
   void clearBackground() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.int get foreground => $_getIZ(4);
+  $core.int get foreground => $_getIZ(3);
   @$pb.TagNumber(5)
-  set foreground($core.int value) => $_setUnsignedInt32(4, value);
+  set foreground($core.int value) => $_setUnsignedInt32(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasForeground() => $_has(4);
+  $core.bool hasForeground() => $_has(3);
   @$pb.TagNumber(5)
   void clearForeground() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  GridLineStyle get gridLines => $_getN(5);
+  GridLineStyle get gridLines => $_getN(4);
   @$pb.TagNumber(6)
   set gridLines(GridLineStyle value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasGridLines() => $_has(5);
+  $core.bool hasGridLines() => $_has(4);
   @$pb.TagNumber(6)
   void clearGridLines() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $core.int get gridColor => $_getIZ(6);
+  $core.int get gridColor => $_getIZ(5);
   @$pb.TagNumber(7)
-  set gridColor($core.int value) => $_setUnsignedInt32(6, value);
+  set gridColor($core.int value) => $_setUnsignedInt32(5, value);
   @$pb.TagNumber(7)
-  $core.bool hasGridColor() => $_has(6);
+  $core.bool hasGridColor() => $_has(5);
   @$pb.TagNumber(7)
   void clearGridColor() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.bool get autoSize => $_getBF(7);
+  $core.bool get autoSize => $_getBF(6);
   @$pb.TagNumber(8)
-  set autoSize($core.bool value) => $_setBool(7, value);
+  set autoSize($core.bool value) => $_setBool(6, value);
   @$pb.TagNumber(8)
-  $core.bool hasAutoSize() => $_has(7);
+  $core.bool hasAutoSize() => $_has(6);
   @$pb.TagNumber(8)
   void clearAutoSize() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $core.bool get allowResize => $_getBF(8);
+  $core.bool get allowResize => $_getBF(7);
   @$pb.TagNumber(9)
-  set allowResize($core.bool value) => $_setBool(8, value);
+  set allowResize($core.bool value) => $_setBool(7, value);
   @$pb.TagNumber(9)
-  $core.bool hasAllowResize() => $_has(8);
+  $core.bool hasAllowResize() => $_has(7);
   @$pb.TagNumber(9)
   void clearAllowResize() => $_clearField(9);
 
   @$pb.TagNumber(10)
-  $core.bool get allowSelect => $_getBF(9);
+  $core.bool get allowSelect => $_getBF(8);
   @$pb.TagNumber(10)
-  set allowSelect($core.bool value) => $_setBool(9, value);
+  set allowSelect($core.bool value) => $_setBool(8, value);
   @$pb.TagNumber(10)
-  $core.bool hasAllowSelect() => $_has(9);
+  $core.bool hasAllowSelect() => $_has(8);
   @$pb.TagNumber(10)
   void clearAllowSelect() => $_clearField(10);
 
   @$pb.TagNumber(11)
-  $core.bool get allowReorder => $_getBF(10);
+  $core.bool get allowReorder => $_getBF(9);
   @$pb.TagNumber(11)
-  set allowReorder($core.bool value) => $_setBool(10, value);
+  set allowReorder($core.bool value) => $_setBool(9, value);
   @$pb.TagNumber(11)
-  $core.bool hasAllowReorder() => $_has(10);
+  $core.bool hasAllowReorder() => $_has(9);
   @$pb.TagNumber(11)
   void clearAllowReorder() => $_clearField(11);
 
   @$pb.TagNumber(12)
-  $pb.PbList<RowIndicatorSlot> get slots => $_getList(11);
+  $pb.PbList<RowIndicatorSlot> get slots => $_getList(10);
 }
 
 class ColIndicatorRowDef extends $pb.GeneratedMessage {
@@ -6514,6 +6584,122 @@ class ColIndicatorConfig extends $pb.GeneratedMessage {
   $pb.PbList<ColIndicatorCell> get cells => $_getList(13);
 }
 
+class CornerIndicatorSlot extends $pb.GeneratedMessage {
+  factory CornerIndicatorSlot({
+    CornerIndicatorSlotKind? kind,
+    $core.int? width,
+    $core.bool? visible,
+    $core.String? customKey,
+    $core.List<$core.int>? data,
+    $core.String? labelText,
+  }) {
+    final result = create();
+    if (kind != null) result.kind = kind;
+    if (width != null) result.width = width;
+    if (visible != null) result.visible = visible;
+    if (customKey != null) result.customKey = customKey;
+    if (data != null) result.data = data;
+    if (labelText != null) result.labelText = labelText;
+    return result;
+  }
+
+  CornerIndicatorSlot._();
+
+  factory CornerIndicatorSlot.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CornerIndicatorSlot.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CornerIndicatorSlot',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aE<CornerIndicatorSlotKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: CornerIndicatorSlotKind.values)
+    ..aI(2, _omitFieldNames ? '' : 'width')
+    ..aOB(3, _omitFieldNames ? '' : 'visible')
+    ..aOS(4, _omitFieldNames ? '' : 'customKey')
+    ..a<$core.List<$core.int>>(
+        5, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..aOS(6, _omitFieldNames ? '' : 'labelText')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CornerIndicatorSlot clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CornerIndicatorSlot copyWith(void Function(CornerIndicatorSlot) updates) =>
+      super.copyWith((message) => updates(message as CornerIndicatorSlot))
+          as CornerIndicatorSlot;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CornerIndicatorSlot create() => CornerIndicatorSlot._();
+  @$core.override
+  CornerIndicatorSlot createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CornerIndicatorSlot getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CornerIndicatorSlot>(create);
+  static CornerIndicatorSlot? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  CornerIndicatorSlotKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(CornerIndicatorSlotKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get width => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set width($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasWidth() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearWidth() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get visible => $_getBF(2);
+  @$pb.TagNumber(3)
+  set visible($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasVisible() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearVisible() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get customKey => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set customKey($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCustomKey() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCustomKey() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.List<$core.int> get data => $_getN(4);
+  @$pb.TagNumber(5)
+  set data($core.List<$core.int> value) => $_setBytes(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasData() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearData() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get labelText => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set labelText($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasLabelText() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearLabelText() => $_clearField(6);
+}
+
 class CornerIndicatorConfig extends $pb.GeneratedMessage {
   factory CornerIndicatorConfig({
     $core.bool? visible,
@@ -6522,6 +6708,7 @@ class CornerIndicatorConfig extends $pb.GeneratedMessage {
     $core.int? foreground,
     $core.String? customKey,
     $core.List<$core.int>? data,
+    $core.Iterable<CornerIndicatorSlot>? slots,
   }) {
     final result = create();
     if (visible != null) result.visible = visible;
@@ -6530,6 +6717,7 @@ class CornerIndicatorConfig extends $pb.GeneratedMessage {
     if (foreground != null) result.foreground = foreground;
     if (customKey != null) result.customKey = customKey;
     if (data != null) result.data = data;
+    if (slots != null) result.slots.addAll(slots);
     return result;
   }
 
@@ -6553,6 +6741,8 @@ class CornerIndicatorConfig extends $pb.GeneratedMessage {
     ..aOS(5, _omitFieldNames ? '' : 'customKey')
     ..a<$core.List<$core.int>>(
         6, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..pPM<CornerIndicatorSlot>(7, _omitFieldNames ? '' : 'slots',
+        subBuilder: CornerIndicatorSlot.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -6628,6 +6818,484 @@ class CornerIndicatorConfig extends $pb.GeneratedMessage {
   $core.bool hasData() => $_has(5);
   @$pb.TagNumber(6)
   void clearData() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $pb.PbList<CornerIndicatorSlot> get slots => $_getList(6);
+}
+
+class IndicatorColors extends $pb.GeneratedMessage {
+  factory IndicatorColors({
+    $core.int? background,
+    $core.int? foreground,
+    $core.int? grid,
+    $core.int? buttonBackground,
+    $core.int? buttonForeground,
+    $core.int? buttonBorder,
+    $core.int? buttonPressedBackground,
+    $core.int? buttonPressedForeground,
+    $core.int? buttonPressedBorderDark,
+    $core.int? buttonPressedBorderLight,
+    $core.int? buttonHoverBackground,
+    $core.int? buttonHoverForeground,
+    $core.int? buttonHoverBorder,
+  }) {
+    final result = create();
+    if (background != null) result.background = background;
+    if (foreground != null) result.foreground = foreground;
+    if (grid != null) result.grid = grid;
+    if (buttonBackground != null) result.buttonBackground = buttonBackground;
+    if (buttonForeground != null) result.buttonForeground = buttonForeground;
+    if (buttonBorder != null) result.buttonBorder = buttonBorder;
+    if (buttonPressedBackground != null)
+      result.buttonPressedBackground = buttonPressedBackground;
+    if (buttonPressedForeground != null)
+      result.buttonPressedForeground = buttonPressedForeground;
+    if (buttonPressedBorderDark != null)
+      result.buttonPressedBorderDark = buttonPressedBorderDark;
+    if (buttonPressedBorderLight != null)
+      result.buttonPressedBorderLight = buttonPressedBorderLight;
+    if (buttonHoverBackground != null)
+      result.buttonHoverBackground = buttonHoverBackground;
+    if (buttonHoverForeground != null)
+      result.buttonHoverForeground = buttonHoverForeground;
+    if (buttonHoverBorder != null) result.buttonHoverBorder = buttonHoverBorder;
+    return result;
+  }
+
+  IndicatorColors._();
+
+  factory IndicatorColors.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory IndicatorColors.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'IndicatorColors',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'background', fieldType: $pb.PbFieldType.OU3)
+    ..aI(2, _omitFieldNames ? '' : 'foreground', fieldType: $pb.PbFieldType.OU3)
+    ..aI(3, _omitFieldNames ? '' : 'grid', fieldType: $pb.PbFieldType.OU3)
+    ..aI(4, _omitFieldNames ? '' : 'buttonBackground',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(5, _omitFieldNames ? '' : 'buttonForeground',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(6, _omitFieldNames ? '' : 'buttonBorder',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(7, _omitFieldNames ? '' : 'buttonPressedBackground',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(8, _omitFieldNames ? '' : 'buttonPressedForeground',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(9, _omitFieldNames ? '' : 'buttonPressedBorderDark',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(10, _omitFieldNames ? '' : 'buttonPressedBorderLight',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(11, _omitFieldNames ? '' : 'buttonHoverBackground',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(12, _omitFieldNames ? '' : 'buttonHoverForeground',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aI(13, _omitFieldNames ? '' : 'buttonHoverBorder',
+        fieldType: $pb.PbFieldType.OU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  IndicatorColors clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  IndicatorColors copyWith(void Function(IndicatorColors) updates) =>
+      super.copyWith((message) => updates(message as IndicatorColors))
+          as IndicatorColors;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static IndicatorColors create() => IndicatorColors._();
+  @$core.override
+  IndicatorColors createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static IndicatorColors getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<IndicatorColors>(create);
+  static IndicatorColors? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.int get background => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set background($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasBackground() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearBackground() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get foreground => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set foreground($core.int value) => $_setUnsignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasForeground() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearForeground() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get grid => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set grid($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasGrid() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearGrid() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get buttonBackground => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set buttonBackground($core.int value) => $_setUnsignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasButtonBackground() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearButtonBackground() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get buttonForeground => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set buttonForeground($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasButtonForeground() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearButtonForeground() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get buttonBorder => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set buttonBorder($core.int value) => $_setUnsignedInt32(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasButtonBorder() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearButtonBorder() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get buttonPressedBackground => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set buttonPressedBackground($core.int value) => $_setUnsignedInt32(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasButtonPressedBackground() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearButtonPressedBackground() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get buttonPressedForeground => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set buttonPressedForeground($core.int value) => $_setUnsignedInt32(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasButtonPressedForeground() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearButtonPressedForeground() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get buttonPressedBorderDark => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set buttonPressedBorderDark($core.int value) => $_setUnsignedInt32(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasButtonPressedBorderDark() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearButtonPressedBorderDark() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get buttonPressedBorderLight => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set buttonPressedBorderLight($core.int value) => $_setUnsignedInt32(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasButtonPressedBorderLight() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearButtonPressedBorderLight() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.int get buttonHoverBackground => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set buttonHoverBackground($core.int value) => $_setUnsignedInt32(10, value);
+  @$pb.TagNumber(11)
+  $core.bool hasButtonHoverBackground() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearButtonHoverBackground() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.int get buttonHoverForeground => $_getIZ(11);
+  @$pb.TagNumber(12)
+  set buttonHoverForeground($core.int value) => $_setUnsignedInt32(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasButtonHoverForeground() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearButtonHoverForeground() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.int get buttonHoverBorder => $_getIZ(12);
+  @$pb.TagNumber(13)
+  set buttonHoverBorder($core.int value) => $_setUnsignedInt32(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasButtonHoverBorder() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearButtonHoverBorder() => $_clearField(13);
+}
+
+/// Identity (kind/band/slot_index/slot_kind) plus a value/status snapshot
+/// the engine fills in based on slot_kind:
+///   ROW_INDICATOR_SLOT_NUMBERS       text = row number, int_value = row, status_flags |= SELECTED
+///   ROW_INDICATOR_SLOT_CURRENT       status_flags |= SELECTED on cursor row
+///   ROW_INDICATOR_SLOT_SELECTION     status_flags |= SELECTED when row in selection
+///   ROW_INDICATOR_SLOT_CHECKBOX      status_flags |= CHECKED when row in selection
+///   ROW_INDICATOR_SLOT_EDITING       status_flags |= EDITING when row is being edited
+///   ROW_INDICATOR_SLOT_EXPANDER      text = label, int_value = depth, status_flags |= EXPANDED/COLLAPSED/SUBTOTAL
+///   ROW_INDICATOR_SLOT_STATUS_ICON   text = RowStatus.domain, int_value = RowStatus.code
+///   ROW_INDICATOR_SLOT_CUSTOM        custom_key + data copied from the slot config
+///   COL_INDICATOR_CELL_HEADER_TEXT   text = header text
+///   COL_INDICATOR_CELL_SORT_GLYPH    int_value = sort priority, status_flags |= SORT_ASC/SORT_DESC
+///   COL_INDICATOR_CELL_FILTER_BUTTON status_flags |= FILTER_ACTIVE when a filter is set
+///   CORNER_SLOT_SELECT_ALL           status_flags |= SELECTED when entire grid is selected
+///   GRID_TARGET_DATA_CELL            status_flags |= EDITING/SELECTED
+class GridEventTarget extends $pb.GeneratedMessage {
+  factory GridEventTarget({
+    GridTargetKind? kind,
+    IndicatorBand? band,
+    $core.int? slotIndex,
+    $core.int? slotKind,
+    $core.int? subModeBits,
+    $core.String? customKey,
+    $core.String? text,
+    $fixnum.Int64? intValue,
+    $core.int? statusFlags,
+    $core.List<$core.int>? data,
+  }) {
+    final result = create();
+    if (kind != null) result.kind = kind;
+    if (band != null) result.band = band;
+    if (slotIndex != null) result.slotIndex = slotIndex;
+    if (slotKind != null) result.slotKind = slotKind;
+    if (subModeBits != null) result.subModeBits = subModeBits;
+    if (customKey != null) result.customKey = customKey;
+    if (text != null) result.text = text;
+    if (intValue != null) result.intValue = intValue;
+    if (statusFlags != null) result.statusFlags = statusFlags;
+    if (data != null) result.data = data;
+    return result;
+  }
+
+  GridEventTarget._();
+
+  factory GridEventTarget.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory GridEventTarget.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GridEventTarget',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aE<GridTargetKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: GridTargetKind.values)
+    ..aE<IndicatorBand>(2, _omitFieldNames ? '' : 'band',
+        enumValues: IndicatorBand.values)
+    ..aI(3, _omitFieldNames ? '' : 'slotIndex')
+    ..aI(4, _omitFieldNames ? '' : 'slotKind')
+    ..aI(5, _omitFieldNames ? '' : 'subModeBits',
+        fieldType: $pb.PbFieldType.OU3)
+    ..aOS(6, _omitFieldNames ? '' : 'customKey')
+    ..aOS(7, _omitFieldNames ? '' : 'text')
+    ..aInt64(8, _omitFieldNames ? '' : 'intValue')
+    ..aI(9, _omitFieldNames ? '' : 'statusFlags',
+        fieldType: $pb.PbFieldType.OU3)
+    ..a<$core.List<$core.int>>(
+        10, _omitFieldNames ? '' : 'data', $pb.PbFieldType.OY)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GridEventTarget clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GridEventTarget copyWith(void Function(GridEventTarget) updates) =>
+      super.copyWith((message) => updates(message as GridEventTarget))
+          as GridEventTarget;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static GridEventTarget create() => GridEventTarget._();
+  @$core.override
+  GridEventTarget createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static GridEventTarget getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GridEventTarget>(create);
+  static GridEventTarget? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  GridTargetKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(GridTargetKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  IndicatorBand get band => $_getN(1);
+  @$pb.TagNumber(2)
+  set band(IndicatorBand value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasBand() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearBand() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get slotIndex => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set slotIndex($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasSlotIndex() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSlotIndex() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get slotKind => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set slotKind($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasSlotKind() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSlotKind() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get subModeBits => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set subModeBits($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSubModeBits() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSubModeBits() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get customKey => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set customKey($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCustomKey() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCustomKey() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get text => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set text($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasText() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearText() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $fixnum.Int64 get intValue => $_getI64(7);
+  @$pb.TagNumber(8)
+  set intValue($fixnum.Int64 value) => $_setInt64(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasIntValue() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearIntValue() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get statusFlags => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set statusFlags($core.int value) => $_setUnsignedInt32(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasStatusFlags() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearStatusFlags() => $_clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.List<$core.int> get data => $_getN(9);
+  @$pb.TagNumber(10)
+  set data($core.List<$core.int> value) => $_setBytes(9, value);
+  @$pb.TagNumber(10)
+  $core.bool hasData() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearData() => $_clearField(10);
+}
+
+class IndicatorFocusConfig extends $pb.GeneratedMessage {
+  factory IndicatorFocusConfig({
+    $core.bool? enableKeyboardFocus,
+    $core.int? enterKeyCode,
+    $core.int? exitKeyCode,
+  }) {
+    final result = create();
+    if (enableKeyboardFocus != null)
+      result.enableKeyboardFocus = enableKeyboardFocus;
+    if (enterKeyCode != null) result.enterKeyCode = enterKeyCode;
+    if (exitKeyCode != null) result.exitKeyCode = exitKeyCode;
+    return result;
+  }
+
+  IndicatorFocusConfig._();
+
+  factory IndicatorFocusConfig.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory IndicatorFocusConfig.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'IndicatorFocusConfig',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'enableKeyboardFocus')
+    ..aI(2, _omitFieldNames ? '' : 'enterKeyCode')
+    ..aI(3, _omitFieldNames ? '' : 'exitKeyCode')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  IndicatorFocusConfig clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  IndicatorFocusConfig copyWith(void Function(IndicatorFocusConfig) updates) =>
+      super.copyWith((message) => updates(message as IndicatorFocusConfig))
+          as IndicatorFocusConfig;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static IndicatorFocusConfig create() => IndicatorFocusConfig._();
+  @$core.override
+  IndicatorFocusConfig createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static IndicatorFocusConfig getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<IndicatorFocusConfig>(create);
+  static IndicatorFocusConfig? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get enableKeyboardFocus => $_getBF(0);
+  @$pb.TagNumber(1)
+  set enableKeyboardFocus($core.bool value) => $_setBool(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasEnableKeyboardFocus() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEnableKeyboardFocus() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get enterKeyCode => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set enterKeyCode($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasEnterKeyCode() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEnterKeyCode() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get exitKeyCode => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set exitKeyCode($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasExitKeyCode() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearExitKeyCode() => $_clearField(3);
 }
 
 class IndicatorsConfig extends $pb.GeneratedMessage {
@@ -6640,6 +7308,9 @@ class IndicatorsConfig extends $pb.GeneratedMessage {
     CornerIndicatorConfig? cornerTopEnd,
     CornerIndicatorConfig? cornerBottomStart,
     CornerIndicatorConfig? cornerBottomEnd,
+    IndicatorFocusConfig? focus,
+    IndicatorAppearance? appearance,
+    IndicatorColors? colors,
   }) {
     final result = create();
     if (rowStart != null) result.rowStart = rowStart;
@@ -6650,6 +7321,9 @@ class IndicatorsConfig extends $pb.GeneratedMessage {
     if (cornerTopEnd != null) result.cornerTopEnd = cornerTopEnd;
     if (cornerBottomStart != null) result.cornerBottomStart = cornerBottomStart;
     if (cornerBottomEnd != null) result.cornerBottomEnd = cornerBottomEnd;
+    if (focus != null) result.focus = focus;
+    if (appearance != null) result.appearance = appearance;
+    if (colors != null) result.colors = colors;
     return result;
   }
 
@@ -6682,6 +7356,12 @@ class IndicatorsConfig extends $pb.GeneratedMessage {
         subBuilder: CornerIndicatorConfig.create)
     ..aOM<CornerIndicatorConfig>(8, _omitFieldNames ? '' : 'cornerBottomEnd',
         subBuilder: CornerIndicatorConfig.create)
+    ..aOM<IndicatorFocusConfig>(9, _omitFieldNames ? '' : 'focus',
+        subBuilder: IndicatorFocusConfig.create)
+    ..aE<IndicatorAppearance>(10, _omitFieldNames ? '' : 'appearance',
+        enumValues: IndicatorAppearance.values)
+    ..aOM<IndicatorColors>(11, _omitFieldNames ? '' : 'colors',
+        subBuilder: IndicatorColors.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -6790,6 +7470,37 @@ class IndicatorsConfig extends $pb.GeneratedMessage {
   void clearCornerBottomEnd() => $_clearField(8);
   @$pb.TagNumber(8)
   CornerIndicatorConfig ensureCornerBottomEnd() => $_ensure(7);
+
+  @$pb.TagNumber(9)
+  IndicatorFocusConfig get focus => $_getN(8);
+  @$pb.TagNumber(9)
+  set focus(IndicatorFocusConfig value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasFocus() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearFocus() => $_clearField(9);
+  @$pb.TagNumber(9)
+  IndicatorFocusConfig ensureFocus() => $_ensure(8);
+
+  @$pb.TagNumber(10)
+  IndicatorAppearance get appearance => $_getN(9);
+  @$pb.TagNumber(10)
+  set appearance(IndicatorAppearance value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasAppearance() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearAppearance() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  IndicatorColors get colors => $_getN(10);
+  @$pb.TagNumber(11)
+  set colors(IndicatorColors value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasColors() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearColors() => $_clearField(11);
+  @$pb.TagNumber(11)
+  IndicatorColors ensureColors() => $_ensure(10);
 }
 
 class ColumnDef extends $pb.GeneratedMessage {
@@ -17303,10 +18014,9 @@ class GpuSurfaceReady extends $pb.GeneratedMessage {
 
 /// Response to a cancelable GridEvent. Sent on the RenderSession stream.
 ///
-/// The engine waits up to 250 ms for this message (DECISION_TIMEOUT in
-/// plugin/src/lib.rs). If no decision arrives, the event auto-proceeds
-/// with cancel=false. Expired actions are resolved at the start of each
-/// render_session loop iteration.
+/// By default, the action remains pending until this message arrives. Configure
+/// InteractionConfig.decision_timeout_ms with a finite value to enable a
+/// watchdog; on timeout the engine emits ErrorEvent and auto-allows.
 ///
 /// Cancelable events: BeforeEdit, BeforeDropdownOpen, CellEditValidate, BeforeSort,
 /// BeforeNodeToggle, BeforeScroll, BeforeUserResize, BeforeMoveColumn,
@@ -18556,6 +19266,11 @@ enum GridEvent_Event {
   pullToRefreshTriggered,
   pullToRefreshCanceled,
   beforeDropdownOpen,
+  treeChildrenRequested,
+  beforeTreeNodeToggle,
+  afterTreeNodeToggle,
+  treeNodeActivate,
+  treeNodeContextMenu,
   notSet
 }
 
@@ -18623,6 +19338,11 @@ class GridEvent extends $pb.GeneratedMessage {
     PullToRefreshTriggeredEvent? pullToRefreshTriggered,
     PullToRefreshCanceledEvent? pullToRefreshCanceled,
     BeforeDropdownOpenEvent? beforeDropdownOpen,
+    TreeChildrenRequestedEvent? treeChildrenRequested,
+    BeforeTreeNodeToggleEvent? beforeTreeNodeToggle,
+    AfterTreeNodeToggleEvent? afterTreeNodeToggle,
+    TreeNodeActivateEvent? treeNodeActivate,
+    TreeNodeContextMenuEvent? treeNodeContextMenu,
     $fixnum.Int64? eventId,
   }) {
     final result = create();
@@ -18693,6 +19413,15 @@ class GridEvent extends $pb.GeneratedMessage {
       result.pullToRefreshCanceled = pullToRefreshCanceled;
     if (beforeDropdownOpen != null)
       result.beforeDropdownOpen = beforeDropdownOpen;
+    if (treeChildrenRequested != null)
+      result.treeChildrenRequested = treeChildrenRequested;
+    if (beforeTreeNodeToggle != null)
+      result.beforeTreeNodeToggle = beforeTreeNodeToggle;
+    if (afterTreeNodeToggle != null)
+      result.afterTreeNodeToggle = afterTreeNodeToggle;
+    if (treeNodeActivate != null) result.treeNodeActivate = treeNodeActivate;
+    if (treeNodeContextMenu != null)
+      result.treeNodeContextMenu = treeNodeContextMenu;
     if (eventId != null) result.eventId = eventId;
     return result;
   }
@@ -18768,6 +19497,11 @@ class GridEvent extends $pb.GeneratedMessage {
     61: GridEvent_Event.pullToRefreshTriggered,
     62: GridEvent_Event.pullToRefreshCanceled,
     63: GridEvent_Event.beforeDropdownOpen,
+    64: GridEvent_Event.treeChildrenRequested,
+    65: GridEvent_Event.beforeTreeNodeToggle,
+    66: GridEvent_Event.afterTreeNodeToggle,
+    67: GridEvent_Event.treeNodeActivate,
+    68: GridEvent_Event.treeNodeContextMenu,
     0: GridEvent_Event.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
@@ -18835,7 +19569,12 @@ class GridEvent extends $pb.GeneratedMessage {
       60,
       61,
       62,
-      63
+      63,
+      64,
+      65,
+      66,
+      67,
+      68
     ])
     ..aInt64(1, _omitFieldNames ? '' : 'gridId')
     ..aOM<CellFocusChangingEvent>(2, _omitFieldNames ? '' : 'cellFocusChanging',
@@ -18965,6 +19704,20 @@ class GridEvent extends $pb.GeneratedMessage {
     ..aOM<BeforeDropdownOpenEvent>(
         63, _omitFieldNames ? '' : 'beforeDropdownOpen',
         subBuilder: BeforeDropdownOpenEvent.create)
+    ..aOM<TreeChildrenRequestedEvent>(
+        64, _omitFieldNames ? '' : 'treeChildrenRequested',
+        subBuilder: TreeChildrenRequestedEvent.create)
+    ..aOM<BeforeTreeNodeToggleEvent>(
+        65, _omitFieldNames ? '' : 'beforeTreeNodeToggle',
+        subBuilder: BeforeTreeNodeToggleEvent.create)
+    ..aOM<AfterTreeNodeToggleEvent>(
+        66, _omitFieldNames ? '' : 'afterTreeNodeToggle',
+        subBuilder: AfterTreeNodeToggleEvent.create)
+    ..aOM<TreeNodeActivateEvent>(67, _omitFieldNames ? '' : 'treeNodeActivate',
+        subBuilder: TreeNodeActivateEvent.create)
+    ..aOM<TreeNodeContextMenuEvent>(
+        68, _omitFieldNames ? '' : 'treeNodeContextMenu',
+        subBuilder: TreeNodeContextMenuEvent.create)
     ..aInt64(100, _omitFieldNames ? '' : 'eventId')
     ..hasRequiredFields = false;
 
@@ -19047,6 +19800,11 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(61)
   @$pb.TagNumber(62)
   @$pb.TagNumber(63)
+  @$pb.TagNumber(64)
+  @$pb.TagNumber(65)
+  @$pb.TagNumber(66)
+  @$pb.TagNumber(67)
+  @$pb.TagNumber(68)
   GridEvent_Event whichEvent() => _GridEvent_EventByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(2)
   @$pb.TagNumber(3)
@@ -19109,6 +19867,11 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(61)
   @$pb.TagNumber(62)
   @$pb.TagNumber(63)
+  @$pb.TagNumber(64)
+  @$pb.TagNumber(65)
+  @$pb.TagNumber(66)
+  @$pb.TagNumber(67)
+  @$pb.TagNumber(68)
   void clearEvent() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -19813,14 +20576,74 @@ class GridEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(63)
   BeforeDropdownOpenEvent ensureBeforeDropdownOpen() => $_ensure(61);
 
+  /// Native tree model
+  @$pb.TagNumber(64)
+  TreeChildrenRequestedEvent get treeChildrenRequested => $_getN(62);
+  @$pb.TagNumber(64)
+  set treeChildrenRequested(TreeChildrenRequestedEvent value) =>
+      $_setField(64, value);
+  @$pb.TagNumber(64)
+  $core.bool hasTreeChildrenRequested() => $_has(62);
+  @$pb.TagNumber(64)
+  void clearTreeChildrenRequested() => $_clearField(64);
+  @$pb.TagNumber(64)
+  TreeChildrenRequestedEvent ensureTreeChildrenRequested() => $_ensure(62);
+
+  @$pb.TagNumber(65)
+  BeforeTreeNodeToggleEvent get beforeTreeNodeToggle => $_getN(63);
+  @$pb.TagNumber(65)
+  set beforeTreeNodeToggle(BeforeTreeNodeToggleEvent value) =>
+      $_setField(65, value);
+  @$pb.TagNumber(65)
+  $core.bool hasBeforeTreeNodeToggle() => $_has(63);
+  @$pb.TagNumber(65)
+  void clearBeforeTreeNodeToggle() => $_clearField(65);
+  @$pb.TagNumber(65)
+  BeforeTreeNodeToggleEvent ensureBeforeTreeNodeToggle() => $_ensure(63);
+
+  @$pb.TagNumber(66)
+  AfterTreeNodeToggleEvent get afterTreeNodeToggle => $_getN(64);
+  @$pb.TagNumber(66)
+  set afterTreeNodeToggle(AfterTreeNodeToggleEvent value) =>
+      $_setField(66, value);
+  @$pb.TagNumber(66)
+  $core.bool hasAfterTreeNodeToggle() => $_has(64);
+  @$pb.TagNumber(66)
+  void clearAfterTreeNodeToggle() => $_clearField(66);
+  @$pb.TagNumber(66)
+  AfterTreeNodeToggleEvent ensureAfterTreeNodeToggle() => $_ensure(64);
+
+  @$pb.TagNumber(67)
+  TreeNodeActivateEvent get treeNodeActivate => $_getN(65);
+  @$pb.TagNumber(67)
+  set treeNodeActivate(TreeNodeActivateEvent value) => $_setField(67, value);
+  @$pb.TagNumber(67)
+  $core.bool hasTreeNodeActivate() => $_has(65);
+  @$pb.TagNumber(67)
+  void clearTreeNodeActivate() => $_clearField(67);
+  @$pb.TagNumber(67)
+  TreeNodeActivateEvent ensureTreeNodeActivate() => $_ensure(65);
+
+  @$pb.TagNumber(68)
+  TreeNodeContextMenuEvent get treeNodeContextMenu => $_getN(66);
+  @$pb.TagNumber(68)
+  set treeNodeContextMenu(TreeNodeContextMenuEvent value) =>
+      $_setField(68, value);
+  @$pb.TagNumber(68)
+  $core.bool hasTreeNodeContextMenu() => $_has(66);
+  @$pb.TagNumber(68)
+  void clearTreeNodeContextMenu() => $_clearField(68);
+  @$pb.TagNumber(68)
+  TreeNodeContextMenuEvent ensureTreeNodeContextMenu() => $_ensure(66);
+
   /// 0 = non-cancelable (informational only).
   /// Non-zero = cancelable — send EventDecision with this ID to allow/veto.
   @$pb.TagNumber(100)
-  $fixnum.Int64 get eventId => $_getI64(62);
+  $fixnum.Int64 get eventId => $_getI64(67);
   @$pb.TagNumber(100)
-  set eventId($fixnum.Int64 value) => $_setInt64(62, value);
+  set eventId($fixnum.Int64 value) => $_setInt64(67, value);
   @$pb.TagNumber(100)
-  $core.bool hasEventId() => $_has(62);
+  $core.bool hasEventId() => $_has(67);
   @$pb.TagNumber(100)
   void clearEventId() => $_clearField(100);
 }
@@ -20174,10 +20997,12 @@ class EnterCellEvent extends $pb.GeneratedMessage {
   factory EnterCellEvent({
     $core.int? row,
     $core.int? col,
+    GridEventTarget? target,
   }) {
     final result = create();
     if (row != null) result.row = row;
     if (col != null) result.col = col;
+    if (target != null) result.target = target;
     return result;
   }
 
@@ -20196,6 +21021,8 @@ class EnterCellEvent extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'row')
     ..aI(2, _omitFieldNames ? '' : 'col')
+    ..aOM<GridEventTarget>(3, _omitFieldNames ? '' : 'target',
+        subBuilder: GridEventTarget.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -20234,16 +21061,29 @@ class EnterCellEvent extends $pb.GeneratedMessage {
   $core.bool hasCol() => $_has(1);
   @$pb.TagNumber(2)
   void clearCol() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  GridEventTarget get target => $_getN(2);
+  @$pb.TagNumber(3)
+  set target(GridEventTarget value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTarget() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTarget() => $_clearField(3);
+  @$pb.TagNumber(3)
+  GridEventTarget ensureTarget() => $_ensure(2);
 }
 
 class LeaveCellEvent extends $pb.GeneratedMessage {
   factory LeaveCellEvent({
     $core.int? row,
     $core.int? col,
+    GridEventTarget? target,
   }) {
     final result = create();
     if (row != null) result.row = row;
     if (col != null) result.col = col;
+    if (target != null) result.target = target;
     return result;
   }
 
@@ -20262,6 +21102,8 @@ class LeaveCellEvent extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'row')
     ..aI(2, _omitFieldNames ? '' : 'col')
+    ..aOM<GridEventTarget>(3, _omitFieldNames ? '' : 'target',
+        subBuilder: GridEventTarget.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -20300,6 +21142,17 @@ class LeaveCellEvent extends $pb.GeneratedMessage {
   $core.bool hasCol() => $_has(1);
   @$pb.TagNumber(2)
   void clearCol() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  GridEventTarget get target => $_getN(2);
+  @$pb.TagNumber(3)
+  set target(GridEventTarget value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTarget() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTarget() => $_clearField(3);
+  @$pb.TagNumber(3)
+  GridEventTarget ensureTarget() => $_ensure(2);
 }
 
 /// ── Edit Events ──
@@ -21483,10 +22336,10 @@ class AfterSortEvent extends $pb.GeneratedMessage {
   void clearCol() => $_clearField(1);
 }
 
-/// Synchronous request for SORT_TYPE_CUSTOM. The host must reply on
-/// the RenderSession with a CompareResponse echoing request_id.
-/// The engine waits up to 250 ms; on timeout the comparison falls
-/// back to the generic/date path used by SORT_TYPE_AUTO.
+/// Request for SORT_TYPE_CUSTOM. The host must reply on the RenderSession with
+/// a CompareResponse echoing request_id. By default the comparison remains
+/// pending until the response arrives; a finite compare_response_timeout_ms is
+/// a watchdog that aborts the whole custom sort.
 class CompareEvent extends $pb.GeneratedMessage {
   factory CompareEvent({
     $fixnum.Int64? requestId,
@@ -21709,6 +22562,405 @@ class AfterNodeToggleEvent extends $pb.GeneratedMessage {
   $core.bool hasCollapse() => $_has(1);
   @$pb.TagNumber(2)
   void clearCollapse() => $_clearField(2);
+}
+
+/// ── Native Tree Events ──
+/// These are emitted for VolvoxTreeService-backed TreeGrid/TreeView mode.
+/// Legacy outline/subtotal toggles continue to use Before/AfterNodeToggleEvent.
+class TreeChildrenRequestedEvent extends $pb.GeneratedMessage {
+  factory TreeChildrenRequestedEvent({
+    $core.String? nodeId,
+    $core.int? row,
+    $fixnum.Int64? requestId,
+  }) {
+    final result = create();
+    if (nodeId != null) result.nodeId = nodeId;
+    if (row != null) result.row = row;
+    if (requestId != null) result.requestId = requestId;
+    return result;
+  }
+
+  TreeChildrenRequestedEvent._();
+
+  factory TreeChildrenRequestedEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TreeChildrenRequestedEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TreeChildrenRequestedEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'nodeId')
+    ..aI(2, _omitFieldNames ? '' : 'row')
+    ..aInt64(3, _omitFieldNames ? '' : 'requestId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeChildrenRequestedEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeChildrenRequestedEvent copyWith(
+          void Function(TreeChildrenRequestedEvent) updates) =>
+      super.copyWith(
+              (message) => updates(message as TreeChildrenRequestedEvent))
+          as TreeChildrenRequestedEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TreeChildrenRequestedEvent create() => TreeChildrenRequestedEvent._();
+  @$core.override
+  TreeChildrenRequestedEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TreeChildrenRequestedEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TreeChildrenRequestedEvent>(create);
+  static TreeChildrenRequestedEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get nodeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set nodeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasNodeId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearNodeId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get row => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set row($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRow() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRow() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get requestId => $_getI64(2);
+  @$pb.TagNumber(3)
+  set requestId($fixnum.Int64 value) => $_setInt64(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasRequestId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRequestId() => $_clearField(3);
+}
+
+class BeforeTreeNodeToggleEvent extends $pb.GeneratedMessage {
+  factory BeforeTreeNodeToggleEvent({
+    $core.String? nodeId,
+    $core.int? row,
+    $core.bool? collapse,
+  }) {
+    final result = create();
+    if (nodeId != null) result.nodeId = nodeId;
+    if (row != null) result.row = row;
+    if (collapse != null) result.collapse = collapse;
+    return result;
+  }
+
+  BeforeTreeNodeToggleEvent._();
+
+  factory BeforeTreeNodeToggleEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory BeforeTreeNodeToggleEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'BeforeTreeNodeToggleEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'nodeId')
+    ..aI(2, _omitFieldNames ? '' : 'row')
+    ..aOB(3, _omitFieldNames ? '' : 'collapse')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BeforeTreeNodeToggleEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  BeforeTreeNodeToggleEvent copyWith(
+          void Function(BeforeTreeNodeToggleEvent) updates) =>
+      super.copyWith((message) => updates(message as BeforeTreeNodeToggleEvent))
+          as BeforeTreeNodeToggleEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static BeforeTreeNodeToggleEvent create() => BeforeTreeNodeToggleEvent._();
+  @$core.override
+  BeforeTreeNodeToggleEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static BeforeTreeNodeToggleEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<BeforeTreeNodeToggleEvent>(create);
+  static BeforeTreeNodeToggleEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get nodeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set nodeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasNodeId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearNodeId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get row => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set row($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRow() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRow() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get collapse => $_getBF(2);
+  @$pb.TagNumber(3)
+  set collapse($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCollapse() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCollapse() => $_clearField(3);
+}
+
+class AfterTreeNodeToggleEvent extends $pb.GeneratedMessage {
+  factory AfterTreeNodeToggleEvent({
+    $core.String? nodeId,
+    $core.int? row,
+    $core.bool? collapse,
+  }) {
+    final result = create();
+    if (nodeId != null) result.nodeId = nodeId;
+    if (row != null) result.row = row;
+    if (collapse != null) result.collapse = collapse;
+    return result;
+  }
+
+  AfterTreeNodeToggleEvent._();
+
+  factory AfterTreeNodeToggleEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory AfterTreeNodeToggleEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'AfterTreeNodeToggleEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'nodeId')
+    ..aI(2, _omitFieldNames ? '' : 'row')
+    ..aOB(3, _omitFieldNames ? '' : 'collapse')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AfterTreeNodeToggleEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  AfterTreeNodeToggleEvent copyWith(
+          void Function(AfterTreeNodeToggleEvent) updates) =>
+      super.copyWith((message) => updates(message as AfterTreeNodeToggleEvent))
+          as AfterTreeNodeToggleEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static AfterTreeNodeToggleEvent create() => AfterTreeNodeToggleEvent._();
+  @$core.override
+  AfterTreeNodeToggleEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static AfterTreeNodeToggleEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<AfterTreeNodeToggleEvent>(create);
+  static AfterTreeNodeToggleEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get nodeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set nodeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasNodeId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearNodeId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get row => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set row($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRow() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRow() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get collapse => $_getBF(2);
+  @$pb.TagNumber(3)
+  set collapse($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCollapse() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCollapse() => $_clearField(3);
+}
+
+class TreeNodeActivateEvent extends $pb.GeneratedMessage {
+  factory TreeNodeActivateEvent({
+    $core.String? nodeId,
+    $core.int? row,
+  }) {
+    final result = create();
+    if (nodeId != null) result.nodeId = nodeId;
+    if (row != null) result.row = row;
+    return result;
+  }
+
+  TreeNodeActivateEvent._();
+
+  factory TreeNodeActivateEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TreeNodeActivateEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TreeNodeActivateEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'nodeId')
+    ..aI(2, _omitFieldNames ? '' : 'row')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeNodeActivateEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeNodeActivateEvent copyWith(
+          void Function(TreeNodeActivateEvent) updates) =>
+      super.copyWith((message) => updates(message as TreeNodeActivateEvent))
+          as TreeNodeActivateEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TreeNodeActivateEvent create() => TreeNodeActivateEvent._();
+  @$core.override
+  TreeNodeActivateEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TreeNodeActivateEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TreeNodeActivateEvent>(create);
+  static TreeNodeActivateEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get nodeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set nodeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasNodeId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearNodeId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get row => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set row($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRow() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRow() => $_clearField(2);
+}
+
+class TreeNodeContextMenuEvent extends $pb.GeneratedMessage {
+  factory TreeNodeContextMenuEvent({
+    $core.String? nodeId,
+    $core.int? row,
+    $core.int? x,
+    $core.int? y,
+  }) {
+    final result = create();
+    if (nodeId != null) result.nodeId = nodeId;
+    if (row != null) result.row = row;
+    if (x != null) result.x = x;
+    if (y != null) result.y = y;
+    return result;
+  }
+
+  TreeNodeContextMenuEvent._();
+
+  factory TreeNodeContextMenuEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory TreeNodeContextMenuEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'TreeNodeContextMenuEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'volvoxgrid.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'nodeId')
+    ..aI(2, _omitFieldNames ? '' : 'row')
+    ..aI(3, _omitFieldNames ? '' : 'x')
+    ..aI(4, _omitFieldNames ? '' : 'y')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeNodeContextMenuEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  TreeNodeContextMenuEvent copyWith(
+          void Function(TreeNodeContextMenuEvent) updates) =>
+      super.copyWith((message) => updates(message as TreeNodeContextMenuEvent))
+          as TreeNodeContextMenuEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TreeNodeContextMenuEvent create() => TreeNodeContextMenuEvent._();
+  @$core.override
+  TreeNodeContextMenuEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static TreeNodeContextMenuEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<TreeNodeContextMenuEvent>(create);
+  static TreeNodeContextMenuEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get nodeId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set nodeId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasNodeId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearNodeId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get row => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set row($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRow() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRow() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get x => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set x($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasX() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearX() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get y => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set y($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasY() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearY() => $_clearField(4);
 }
 
 /// ── Scroll Events ──
@@ -22419,10 +23671,12 @@ class BeforeMouseDownEvent extends $pb.GeneratedMessage {
   factory BeforeMouseDownEvent({
     $core.int? row,
     $core.int? col,
+    GridEventTarget? target,
   }) {
     final result = create();
     if (row != null) result.row = row;
     if (col != null) result.col = col;
+    if (target != null) result.target = target;
     return result;
   }
 
@@ -22441,6 +23695,8 @@ class BeforeMouseDownEvent extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'row')
     ..aI(2, _omitFieldNames ? '' : 'col')
+    ..aOM<GridEventTarget>(3, _omitFieldNames ? '' : 'target',
+        subBuilder: GridEventTarget.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -22479,6 +23735,17 @@ class BeforeMouseDownEvent extends $pb.GeneratedMessage {
   $core.bool hasCol() => $_has(1);
   @$pb.TagNumber(2)
   void clearCol() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  GridEventTarget get target => $_getN(2);
+  @$pb.TagNumber(3)
+  set target(GridEventTarget value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTarget() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTarget() => $_clearField(3);
+  @$pb.TagNumber(3)
+  GridEventTarget ensureTarget() => $_ensure(2);
 }
 
 class MouseDownEvent extends $pb.GeneratedMessage {
@@ -22667,12 +23934,14 @@ class MouseMoveEvent extends $pb.GeneratedMessage {
     $core.int? modifier,
     $core.double? x,
     $core.double? y,
+    GridEventTarget? target,
   }) {
     final result = create();
     if (button != null) result.button = button;
     if (modifier != null) result.modifier = modifier;
     if (x != null) result.x = x;
     if (y != null) result.y = y;
+    if (target != null) result.target = target;
     return result;
   }
 
@@ -22693,6 +23962,8 @@ class MouseMoveEvent extends $pb.GeneratedMessage {
     ..aI(2, _omitFieldNames ? '' : 'modifier')
     ..aD(3, _omitFieldNames ? '' : 'x', fieldType: $pb.PbFieldType.OF)
     ..aD(4, _omitFieldNames ? '' : 'y', fieldType: $pb.PbFieldType.OF)
+    ..aOM<GridEventTarget>(5, _omitFieldNames ? '' : 'target',
+        subBuilder: GridEventTarget.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -22749,6 +24020,17 @@ class MouseMoveEvent extends $pb.GeneratedMessage {
   $core.bool hasY() => $_has(3);
   @$pb.TagNumber(4)
   void clearY() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  GridEventTarget get target => $_getN(4);
+  @$pb.TagNumber(5)
+  set target(GridEventTarget value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasTarget() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearTarget() => $_clearField(5);
+  @$pb.TagNumber(5)
+  GridEventTarget ensureTarget() => $_ensure(4);
 }
 
 class ClickEvent extends $pb.GeneratedMessage {
@@ -22757,12 +24039,14 @@ class ClickEvent extends $pb.GeneratedMessage {
     $core.int? col,
     CellHitArea? hitArea,
     CellInteraction? interaction,
+    GridEventTarget? target,
   }) {
     final result = create();
     if (row != null) result.row = row;
     if (col != null) result.col = col;
     if (hitArea != null) result.hitArea = hitArea;
     if (interaction != null) result.interaction = interaction;
+    if (target != null) result.target = target;
     return result;
   }
 
@@ -22785,6 +24069,8 @@ class ClickEvent extends $pb.GeneratedMessage {
         enumValues: CellHitArea.values)
     ..aE<CellInteraction>(4, _omitFieldNames ? '' : 'interaction',
         enumValues: CellInteraction.values)
+    ..aOM<GridEventTarget>(5, _omitFieldNames ? '' : 'target',
+        subBuilder: GridEventTarget.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -22840,16 +24126,29 @@ class ClickEvent extends $pb.GeneratedMessage {
   $core.bool hasInteraction() => $_has(3);
   @$pb.TagNumber(4)
   void clearInteraction() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  GridEventTarget get target => $_getN(4);
+  @$pb.TagNumber(5)
+  set target(GridEventTarget value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasTarget() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearTarget() => $_clearField(5);
+  @$pb.TagNumber(5)
+  GridEventTarget ensureTarget() => $_ensure(4);
 }
 
 class DblClickEvent extends $pb.GeneratedMessage {
   factory DblClickEvent({
     $core.int? row,
     $core.int? col,
+    GridEventTarget? target,
   }) {
     final result = create();
     if (row != null) result.row = row;
     if (col != null) result.col = col;
+    if (target != null) result.target = target;
     return result;
   }
 
@@ -22868,6 +24167,8 @@ class DblClickEvent extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'row')
     ..aI(2, _omitFieldNames ? '' : 'col')
+    ..aOM<GridEventTarget>(3, _omitFieldNames ? '' : 'target',
+        subBuilder: GridEventTarget.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -22906,6 +24207,17 @@ class DblClickEvent extends $pb.GeneratedMessage {
   $core.bool hasCol() => $_has(1);
   @$pb.TagNumber(2)
   void clearCol() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  GridEventTarget get target => $_getN(2);
+  @$pb.TagNumber(3)
+  set target(GridEventTarget value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasTarget() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearTarget() => $_clearField(3);
+  @$pb.TagNumber(3)
+  GridEventTarget ensureTarget() => $_ensure(2);
 }
 
 /// ── Keyboard Events ──

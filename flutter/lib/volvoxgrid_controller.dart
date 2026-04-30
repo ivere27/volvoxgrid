@@ -53,20 +53,48 @@ class CellTextEntry {
   });
 }
 
-int _rowIndicatorModeBits(Iterable<RowIndicatorMode> modes) =>
-    modes.fold<int>(0, (bits, mode) => bits | mode.value);
-
 int _colIndicatorModeBits(Iterable<ColIndicatorCellMode> modes) =>
     modes.fold<int>(0, (bits, mode) => bits | mode.value);
+
+RowIndicatorSlot _rowIndicatorSlot(RowIndicatorSlotKind kind, int width) =>
+    RowIndicatorSlot()
+      ..kind = kind
+      ..width = width
+      ..visible = true;
+
+List<RowIndicatorSlot> _rowIndicatorSlotsFromModeBits(int modeBits) {
+  final slots = <RowIndicatorSlot>[];
+  void add(int bit, RowIndicatorSlotKind kind, int width) {
+    if ((modeBits & bit) != 0) {
+      slots.add(_rowIndicatorSlot(kind, width));
+    }
+  }
+
+  add(1, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NUMBERS, 35);
+  add(2, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18);
+  add(4, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17);
+  add(8, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CHECKBOX, 18);
+  add(16, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_HANDLE, 18);
+  add(32, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EDITING, 18);
+  add(64, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_MODIFIED, 18);
+  add(128, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ERROR, 18);
+  add(256, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_NEW_ROW, 18);
+  add(512, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_EXPANDER, 18);
+  add(1024, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_RESIZE, 18);
+  add(2048, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_ACTION, 18);
+  add(4096, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_STATUS_ICON, 18);
+  add(8192, RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CUSTOM, 18);
+  return slots;
+}
 
 IndicatorsConfig _defaultIndicatorsConfig() => IndicatorsConfig()
   ..rowStart = (RowIndicatorConfig()
     ..visible = false
     ..width = 35
     ..autoSize = true
-    ..modeBits = _rowIndicatorModeBits([
-      RowIndicatorMode.ROW_INDICATOR_CURRENT,
-      RowIndicatorMode.ROW_INDICATOR_SELECTION,
+    ..slots.addAll([
+      _rowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_CURRENT, 18),
+      _rowIndicatorSlot(RowIndicatorSlotKind.ROW_INDICATOR_SLOT_SELECTION, 17),
     ]))
   ..colTop = (ColIndicatorConfig()
     ..visible = true
@@ -287,7 +315,13 @@ class VolvoxGridController extends ChangeNotifier {
 
   /// Set the start-side row-indicator content bitmask.
   Future<void> setRowIndicatorStartModeBits(int modeBits) async {
-    final row = RowIndicatorConfig()..modeBits = modeBits;
+    final row = RowIndicatorConfig();
+    final slots = _rowIndicatorSlotsFromModeBits(modeBits);
+    if (slots.isEmpty) {
+      row.visible = false;
+    } else {
+      row.slots.addAll(slots);
+    }
     await _configure(
       GridConfig()..indicators = (IndicatorsConfig()..rowStart = row),
     );

@@ -55,6 +55,7 @@ fn version_from_version_file() -> Option<String> {
 fn emit_build_metadata() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=../proto/volvoxgrid.proto");
+    println!("cargo:rerun-if-changed=../proto/volvoxtree.proto");
     println!("cargo:rerun-if-env-changed=VOLVOXGRID_VERSION");
     println!("cargo:rerun-if-env-changed=VOLVOXGRID_GIT_COMMIT");
     println!("cargo:rerun-if-env-changed=VOLVOXGRID_BUILD_DATE");
@@ -116,7 +117,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let includes: &[&str] = &["../proto"];
-    let protos: &[&str] = &["../proto/volvoxgrid.proto"];
+    let protos: &[&str] = &["../proto/volvoxgrid.proto", "../proto/volvoxtree.proto"];
     let mut config = prost_build::Config::new();
     config.protoc_arg("--experimental_allow_proto3_optional");
     config.compile_protos(protos, includes)?;

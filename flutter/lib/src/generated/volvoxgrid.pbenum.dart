@@ -930,9 +930,11 @@ class SortOrder extends $pb.ProtobufEnum {
 ///   STRING_NO_CASE (3): Lexicographic, case-insensitive.
 ///   CUSTOM (4):         Engine emits CompareEvent on EventStream; host
 ///                       replies with CompareResponse on RenderSession input
-///                       (-1/0/1). Falls back to the generic/date path if no
-///                       EventStream subscriber is active or the host does
-///                       not reply within 250 ms.
+///                       (-1/0/1). If no EventStream subscriber is active,
+///                       the engine uses the generic/date path. Otherwise, by
+///                       default the comparison remains pending until the host
+///                       replies; a finite compare_response_timeout_ms can be
+///                       configured as an explicit watchdog.
 class SortType extends $pb.ProtobufEnum {
   static const SortType SORT_TYPE_AUTO =
       SortType._(0, _omitEnumNames ? '' : 'SORT_TYPE_AUTO');
@@ -1233,6 +1235,31 @@ class ScrollBarAppearance extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const ScrollBarAppearance._(super.value, super.name);
+}
+
+class IndicatorAppearance extends $pb.ProtobufEnum {
+  static const IndicatorAppearance INDICATOR_APPEARANCE_CLASSIC =
+      IndicatorAppearance._(
+          0, _omitEnumNames ? '' : 'INDICATOR_APPEARANCE_CLASSIC');
+  static const IndicatorAppearance INDICATOR_APPEARANCE_FLAT =
+      IndicatorAppearance._(
+          1, _omitEnumNames ? '' : 'INDICATOR_APPEARANCE_FLAT');
+  static const IndicatorAppearance INDICATOR_APPEARANCE_MODERN =
+      IndicatorAppearance._(
+          2, _omitEnumNames ? '' : 'INDICATOR_APPEARANCE_MODERN');
+
+  static const $core.List<IndicatorAppearance> values = <IndicatorAppearance>[
+    INDICATOR_APPEARANCE_CLASSIC,
+    INDICATOR_APPEARANCE_FLAT,
+    INDICATOR_APPEARANCE_MODERN,
+  ];
+
+  static final $core.List<IndicatorAppearance?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 2);
+  static IndicatorAppearance? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const IndicatorAppearance._(super.value, super.name);
 }
 
 class PinPosition extends $pb.ProtobufEnum {
@@ -1874,6 +1901,78 @@ class RenderLayerBit extends $pb.ProtobufEnum {
   const RenderLayerBit._(super.value, super.name);
 }
 
+class GridTargetKind extends $pb.ProtobufEnum {
+  static const GridTargetKind GRID_TARGET_UNSPECIFIED =
+      GridTargetKind._(0, _omitEnumNames ? '' : 'GRID_TARGET_UNSPECIFIED');
+  static const GridTargetKind GRID_TARGET_DATA_CELL =
+      GridTargetKind._(1, _omitEnumNames ? '' : 'GRID_TARGET_DATA_CELL');
+  static const GridTargetKind GRID_TARGET_ROW_INDICATOR =
+      GridTargetKind._(2, _omitEnumNames ? '' : 'GRID_TARGET_ROW_INDICATOR');
+  static const GridTargetKind GRID_TARGET_COL_INDICATOR =
+      GridTargetKind._(3, _omitEnumNames ? '' : 'GRID_TARGET_COL_INDICATOR');
+  static const GridTargetKind GRID_TARGET_CORNER_INDICATOR =
+      GridTargetKind._(4, _omitEnumNames ? '' : 'GRID_TARGET_CORNER_INDICATOR');
+  static const GridTargetKind GRID_TARGET_BACKGROUND =
+      GridTargetKind._(5, _omitEnumNames ? '' : 'GRID_TARGET_BACKGROUND');
+
+  static const $core.List<GridTargetKind> values = <GridTargetKind>[
+    GRID_TARGET_UNSPECIFIED,
+    GRID_TARGET_DATA_CELL,
+    GRID_TARGET_ROW_INDICATOR,
+    GRID_TARGET_COL_INDICATOR,
+    GRID_TARGET_CORNER_INDICATOR,
+    GRID_TARGET_BACKGROUND,
+  ];
+
+  static final $core.List<GridTargetKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 5);
+  static GridTargetKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const GridTargetKind._(super.value, super.name);
+}
+
+class IndicatorBand extends $pb.ProtobufEnum {
+  static const IndicatorBand INDICATOR_BAND_UNSPECIFIED =
+      IndicatorBand._(0, _omitEnumNames ? '' : 'INDICATOR_BAND_UNSPECIFIED');
+  static const IndicatorBand INDICATOR_BAND_ROW_START =
+      IndicatorBand._(1, _omitEnumNames ? '' : 'INDICATOR_BAND_ROW_START');
+  static const IndicatorBand INDICATOR_BAND_ROW_END =
+      IndicatorBand._(2, _omitEnumNames ? '' : 'INDICATOR_BAND_ROW_END');
+  static const IndicatorBand INDICATOR_BAND_COL_TOP =
+      IndicatorBand._(3, _omitEnumNames ? '' : 'INDICATOR_BAND_COL_TOP');
+  static const IndicatorBand INDICATOR_BAND_COL_BOTTOM =
+      IndicatorBand._(4, _omitEnumNames ? '' : 'INDICATOR_BAND_COL_BOTTOM');
+  static const IndicatorBand INDICATOR_BAND_CORNER_TOP_START = IndicatorBand._(
+      5, _omitEnumNames ? '' : 'INDICATOR_BAND_CORNER_TOP_START');
+  static const IndicatorBand INDICATOR_BAND_CORNER_TOP_END =
+      IndicatorBand._(6, _omitEnumNames ? '' : 'INDICATOR_BAND_CORNER_TOP_END');
+  static const IndicatorBand INDICATOR_BAND_CORNER_BOTTOM_START =
+      IndicatorBand._(
+          7, _omitEnumNames ? '' : 'INDICATOR_BAND_CORNER_BOTTOM_START');
+  static const IndicatorBand INDICATOR_BAND_CORNER_BOTTOM_END = IndicatorBand._(
+      8, _omitEnumNames ? '' : 'INDICATOR_BAND_CORNER_BOTTOM_END');
+
+  static const $core.List<IndicatorBand> values = <IndicatorBand>[
+    INDICATOR_BAND_UNSPECIFIED,
+    INDICATOR_BAND_ROW_START,
+    INDICATOR_BAND_ROW_END,
+    INDICATOR_BAND_COL_TOP,
+    INDICATOR_BAND_COL_BOTTOM,
+    INDICATOR_BAND_CORNER_TOP_START,
+    INDICATOR_BAND_CORNER_TOP_END,
+    INDICATOR_BAND_CORNER_BOTTOM_START,
+    INDICATOR_BAND_CORNER_BOTTOM_END,
+  ];
+
+  static final $core.List<IndicatorBand?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 8);
+  static IndicatorBand? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const IndicatorBand._(super.value, super.name);
+}
+
 class RowIndicatorSlotKind extends $pb.ProtobufEnum {
   static const RowIndicatorSlotKind ROW_INDICATOR_SLOT_NONE =
       RowIndicatorSlotKind._(
@@ -1947,63 +2046,6 @@ class RowIndicatorSlotKind extends $pb.ProtobufEnum {
   const RowIndicatorSlotKind._(super.value, super.name);
 }
 
-class RowIndicatorMode extends $pb.ProtobufEnum {
-  static const RowIndicatorMode ROW_INDICATOR_NONE =
-      RowIndicatorMode._(0, _omitEnumNames ? '' : 'ROW_INDICATOR_NONE');
-  static const RowIndicatorMode ROW_INDICATOR_NUMBERS =
-      RowIndicatorMode._(1, _omitEnumNames ? '' : 'ROW_INDICATOR_NUMBERS');
-  static const RowIndicatorMode ROW_INDICATOR_CURRENT =
-      RowIndicatorMode._(2, _omitEnumNames ? '' : 'ROW_INDICATOR_CURRENT');
-  static const RowIndicatorMode ROW_INDICATOR_SELECTION =
-      RowIndicatorMode._(4, _omitEnumNames ? '' : 'ROW_INDICATOR_SELECTION');
-  static const RowIndicatorMode ROW_INDICATOR_CHECKBOX =
-      RowIndicatorMode._(8, _omitEnumNames ? '' : 'ROW_INDICATOR_CHECKBOX');
-  static const RowIndicatorMode ROW_INDICATOR_HANDLE =
-      RowIndicatorMode._(16, _omitEnumNames ? '' : 'ROW_INDICATOR_HANDLE');
-  static const RowIndicatorMode ROW_INDICATOR_EDITING =
-      RowIndicatorMode._(32, _omitEnumNames ? '' : 'ROW_INDICATOR_EDITING');
-  static const RowIndicatorMode ROW_INDICATOR_MODIFIED =
-      RowIndicatorMode._(64, _omitEnumNames ? '' : 'ROW_INDICATOR_MODIFIED');
-  static const RowIndicatorMode ROW_INDICATOR_ERROR =
-      RowIndicatorMode._(128, _omitEnumNames ? '' : 'ROW_INDICATOR_ERROR');
-  static const RowIndicatorMode ROW_INDICATOR_NEW_ROW =
-      RowIndicatorMode._(256, _omitEnumNames ? '' : 'ROW_INDICATOR_NEW_ROW');
-  static const RowIndicatorMode ROW_INDICATOR_EXPANDER =
-      RowIndicatorMode._(512, _omitEnumNames ? '' : 'ROW_INDICATOR_EXPANDER');
-  static const RowIndicatorMode ROW_INDICATOR_RESIZE =
-      RowIndicatorMode._(1024, _omitEnumNames ? '' : 'ROW_INDICATOR_RESIZE');
-  static const RowIndicatorMode ROW_INDICATOR_ACTION =
-      RowIndicatorMode._(2048, _omitEnumNames ? '' : 'ROW_INDICATOR_ACTION');
-  static const RowIndicatorMode ROW_INDICATOR_STATUS_ICON = RowIndicatorMode._(
-      4096, _omitEnumNames ? '' : 'ROW_INDICATOR_STATUS_ICON');
-  static const RowIndicatorMode ROW_INDICATOR_CUSTOM =
-      RowIndicatorMode._(8192, _omitEnumNames ? '' : 'ROW_INDICATOR_CUSTOM');
-
-  static const $core.List<RowIndicatorMode> values = <RowIndicatorMode>[
-    ROW_INDICATOR_NONE,
-    ROW_INDICATOR_NUMBERS,
-    ROW_INDICATOR_CURRENT,
-    ROW_INDICATOR_SELECTION,
-    ROW_INDICATOR_CHECKBOX,
-    ROW_INDICATOR_HANDLE,
-    ROW_INDICATOR_EDITING,
-    ROW_INDICATOR_MODIFIED,
-    ROW_INDICATOR_ERROR,
-    ROW_INDICATOR_NEW_ROW,
-    ROW_INDICATOR_EXPANDER,
-    ROW_INDICATOR_RESIZE,
-    ROW_INDICATOR_ACTION,
-    ROW_INDICATOR_STATUS_ICON,
-    ROW_INDICATOR_CUSTOM,
-  ];
-
-  static final $core.Map<$core.int, RowIndicatorMode> _byValue =
-      $pb.ProtobufEnum.initByValue(values);
-  static RowIndicatorMode? valueOf($core.int value) => _byValue[value];
-
-  const RowIndicatorMode._(super.value, super.name);
-}
-
 class ColIndicatorCellMode extends $pb.ProtobufEnum {
   static const ColIndicatorCellMode COL_INDICATOR_CELL_NONE =
       ColIndicatorCellMode._(
@@ -2070,6 +2112,99 @@ class ColIndicatorCellMode extends $pb.ProtobufEnum {
   static ColIndicatorCellMode? valueOf($core.int value) => _byValue[value];
 
   const ColIndicatorCellMode._(super.value, super.name);
+}
+
+class CornerIndicatorSlotKind extends $pb.ProtobufEnum {
+  static const CornerIndicatorSlotKind CORNER_SLOT_NONE =
+      CornerIndicatorSlotKind._(0, _omitEnumNames ? '' : 'CORNER_SLOT_NONE');
+  static const CornerIndicatorSlotKind CORNER_SLOT_SELECT_ALL =
+      CornerIndicatorSlotKind._(
+          1, _omitEnumNames ? '' : 'CORNER_SLOT_SELECT_ALL');
+  static const CornerIndicatorSlotKind CORNER_SLOT_OUTLINE_LEVELS =
+      CornerIndicatorSlotKind._(
+          2, _omitEnumNames ? '' : 'CORNER_SLOT_OUTLINE_LEVELS');
+  static const CornerIndicatorSlotKind CORNER_SLOT_CUSTOM =
+      CornerIndicatorSlotKind._(3, _omitEnumNames ? '' : 'CORNER_SLOT_CUSTOM');
+
+  static const $core.List<CornerIndicatorSlotKind> values =
+      <CornerIndicatorSlotKind>[
+    CORNER_SLOT_NONE,
+    CORNER_SLOT_SELECT_ALL,
+    CORNER_SLOT_OUTLINE_LEVELS,
+    CORNER_SLOT_CUSTOM,
+  ];
+
+  static final $core.List<CornerIndicatorSlotKind?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static CornerIndicatorSlotKind? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const CornerIndicatorSlotKind._(super.value, super.name);
+}
+
+/// Bitmask values for GridEventTarget.status_flags. Combined per slot kind;
+/// see the GridEventTarget comment for which bits apply where.
+class GridEventTargetFlag extends $pb.ProtobufEnum {
+  static const GridEventTargetFlag GRID_TARGET_FLAG_NONE =
+      GridEventTargetFlag._(0, _omitEnumNames ? '' : 'GRID_TARGET_FLAG_NONE');
+  static const GridEventTargetFlag GRID_TARGET_FLAG_CHECKED =
+      GridEventTargetFlag._(
+          1, _omitEnumNames ? '' : 'GRID_TARGET_FLAG_CHECKED');
+  static const GridEventTargetFlag GRID_TARGET_FLAG_INDETERMINATE =
+      GridEventTargetFlag._(
+          2, _omitEnumNames ? '' : 'GRID_TARGET_FLAG_INDETERMINATE');
+  static const GridEventTargetFlag GRID_TARGET_FLAG_EXPANDED =
+      GridEventTargetFlag._(
+          4, _omitEnumNames ? '' : 'GRID_TARGET_FLAG_EXPANDED');
+  static const GridEventTargetFlag GRID_TARGET_FLAG_COLLAPSED =
+      GridEventTargetFlag._(
+          8, _omitEnumNames ? '' : 'GRID_TARGET_FLAG_COLLAPSED');
+  static const GridEventTargetFlag GRID_TARGET_FLAG_SORT_ASC =
+      GridEventTargetFlag._(
+          16, _omitEnumNames ? '' : 'GRID_TARGET_FLAG_SORT_ASC');
+  static const GridEventTargetFlag GRID_TARGET_FLAG_SORT_DESC =
+      GridEventTargetFlag._(
+          32, _omitEnumNames ? '' : 'GRID_TARGET_FLAG_SORT_DESC');
+  static const GridEventTargetFlag GRID_TARGET_FLAG_FILTER_ACTIVE =
+      GridEventTargetFlag._(
+          64, _omitEnumNames ? '' : 'GRID_TARGET_FLAG_FILTER_ACTIVE');
+  static const GridEventTargetFlag GRID_TARGET_FLAG_SELECTED =
+      GridEventTargetFlag._(
+          128, _omitEnumNames ? '' : 'GRID_TARGET_FLAG_SELECTED');
+  static const GridEventTargetFlag GRID_TARGET_FLAG_DISABLED =
+      GridEventTargetFlag._(
+          256, _omitEnumNames ? '' : 'GRID_TARGET_FLAG_DISABLED');
+  static const GridEventTargetFlag GRID_TARGET_FLAG_EDITING =
+      GridEventTargetFlag._(
+          512, _omitEnumNames ? '' : 'GRID_TARGET_FLAG_EDITING');
+  static const GridEventTargetFlag GRID_TARGET_FLAG_SUBTOTAL =
+      GridEventTargetFlag._(
+          1024, _omitEnumNames ? '' : 'GRID_TARGET_FLAG_SUBTOTAL');
+  static const GridEventTargetFlag GRID_TARGET_FLAG_PINNED =
+      GridEventTargetFlag._(
+          2048, _omitEnumNames ? '' : 'GRID_TARGET_FLAG_PINNED');
+
+  static const $core.List<GridEventTargetFlag> values = <GridEventTargetFlag>[
+    GRID_TARGET_FLAG_NONE,
+    GRID_TARGET_FLAG_CHECKED,
+    GRID_TARGET_FLAG_INDETERMINATE,
+    GRID_TARGET_FLAG_EXPANDED,
+    GRID_TARGET_FLAG_COLLAPSED,
+    GRID_TARGET_FLAG_SORT_ASC,
+    GRID_TARGET_FLAG_SORT_DESC,
+    GRID_TARGET_FLAG_FILTER_ACTIVE,
+    GRID_TARGET_FLAG_SELECTED,
+    GRID_TARGET_FLAG_DISABLED,
+    GRID_TARGET_FLAG_EDITING,
+    GRID_TARGET_FLAG_SUBTOTAL,
+    GRID_TARGET_FLAG_PINNED,
+  ];
+
+  static final $core.Map<$core.int, GridEventTargetFlag> _byValue =
+      $pb.ProtobufEnum.initByValue(values);
+  static GridEventTargetFlag? valueOf($core.int value) => _byValue[value];
+
+  const GridEventTargetFlag._(super.value, super.name);
 }
 
 class ComposeMethod extends $pb.ProtobufEnum {

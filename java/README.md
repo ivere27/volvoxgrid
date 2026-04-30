@@ -19,7 +19,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.2")
+    implementation("io.github.ivere27:volvoxgrid-desktop:0.8.3")
 }
 ```
 
@@ -130,7 +130,9 @@ gridPanel.setGridEventListener(event -> {
     if (event.hasAfterEdit()) { /* cell edited */ }
 });
 
-// Cancelable "before" events. Supported here: BeforeEdit, CellEditValidate, BeforeSort.
+// Cancelable "before" events. Supported here: BeforeEdit, BeforeDropdownOpen,
+// CellEditValidate, BeforeSort. Unhandled cancelable events are allowed with
+// cancel=false when the decision channel is active.
 gridPanel.setBeforeEditListener(details -> {
     if (details.getRow() == 0) {
         details.setCancel(true);

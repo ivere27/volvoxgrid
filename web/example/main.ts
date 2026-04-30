@@ -24,10 +24,14 @@ import {
   BorderStyle,
   CellHitArea,
   CellInteraction,
-  GridEventFields,
   ImageAlignment,
+  IndicatorAppearance,
   RenderLayerBit,
 } from "../js/src/generated/volvoxgrid_ffi.js";
+import {
+  GridEvent as GridEventMessage,
+  GridEventEventOneofCase,
+} from "../js/src/generated/volvoxgrid_lite.js";
 import {
   DoomRuntime,
   DOOM_LOCAL_SOURCE,
@@ -44,16 +48,26 @@ type DoomTouchActionCode = "ControlLeft" | "Space" | "Enter";
 const STRESS_ROWS = 1_000_000;
 const STRESS_COLS = 12;
 const SALES_COLS = 10;
-const HIERARCHY_COLS = 6;
+const HIERARCHY_COLS = 7;
 const BARCODE_COLS = 6;
 const SALES_STATUS_ITEMS = "Active|Pending|Shipped|Returned|Cancelled";
-const GRID_EVENT_CLICK = GridEventFields["click"];
+const HIERARCHY_NAME_COL = 0;
+const HIERARCHY_TYPE_COL = 1;
 const HIERARCHY_ACTION_COL = 5;
-const CELL_INTERACTION_UNSPECIFIED = CellInteraction.CELL_INTERACTION_UNSPECIFIED;
+const HIERARCHY_ICON_COL = 6;
+const HIERARCHY_FOLDER_ICON = "\uE2C7";
+const NODE_LEAF = 1;
+const NODE_CHILDREN_LOADED = 4;
 const CELL_INTERACTION_TEXT_LINK = CellInteraction.CELL_INTERACTION_TEXT_LINK;
 const CELL_HIT_AREA_TEXT = CellHitArea.HIT_TEXT;
 const FONT_FETCH_TIMEOUT_MS = 5000;
 const DEMO_DEFAULT_FONT_FAMILY = "Roboto";
+const MATERIAL_ICONS_FONT_URL =
+  "https://cdn.jsdelivr.net/npm/material-design-icons@3.0.1/iconfont/MaterialIcons-Regular.ttf";
+const MATERIAL_ICON_CHEVRON_RIGHT = "\uE5CC";
+const MATERIAL_ICON_EXPAND_MORE = "\uE5CF";
+const ICON_SLOT_TREE_EXPANDED = 4;
+const ICON_SLOT_TREE_COLLAPSED = 5;
 const PB_TEXT_ENCODER = new TextEncoder();
 const PB_TEXT_DECODER = new TextDecoder();
 const HOVER_NONE = 0;
@@ -74,6 +88,16 @@ const DEMO_DEFAULT_HOVER_MODE: Record<StandardDemoMode, number> = {
   hierarchy: HOVER_CELL,
   barcodes: HOVER_ROW | HOVER_COLUMN | HOVER_CELL,
 };
+
+function gridEventDebugObject(event: GridEventMessage): Record<string, unknown> {
+  const eventName = GridEventEventOneofCase[event.eventCase] ?? "None";
+  return {
+    event: eventName,
+    eventId: event.eventId.toString(),
+    ...event.toJson(),
+  };
+}
+
 const SALES_COLUMN_SETUP = [
   { caption: "Q", key: "Q", align: 4, dataType: undefined, format: undefined, dropdownItems: undefined, span: true },
   { caption: "Region", key: "Region", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: true },
@@ -87,12 +111,13 @@ const SALES_COLUMN_SETUP = [
   { caption: "Notes", key: "Notes", align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, span: false },
 ] as const;
 const HIERARCHY_COLUMN_SETUP = [
-  { caption: "Name", key: "Name", width: 260, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
+  { caption: "Name", key: "Name", width: 260, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined, hidden: true },
   { caption: "Type", key: "Type", width: 80, align: undefined, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
   { caption: "Size", key: "Size", width: 80, align: 7, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
   { caption: "Modified", key: "Modified", width: 120, align: undefined, dataType: 2, format: "short date", dropdownItems: undefined, interaction: undefined },
   { caption: "Permissions", key: "Permissions", width: 100, align: 4, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined },
   { caption: "Action", key: "Action", width: 92, align: 4, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: CellInteraction.CELL_INTERACTION_TEXT_LINK },
+  { caption: "Icon", key: "Icon", width: 24, align: 4, dataType: undefined, format: undefined, dropdownItems: undefined, interaction: undefined, hidden: true },
 ] as const;
 const BARCODE_COLUMN_SETUP = [
   { caption: "Symbology", key: "Symbology", align: Align.ALIGN_CENTER_CENTER },
@@ -111,6 +136,7 @@ type DemoColumnSetup = {
   format?: string;
   dropdownItems?: string;
   interaction?: number;
+  hidden?: boolean;
   span?: boolean;
 };
 type DemoFontAsset = {
@@ -118,13 +144,14 @@ type DemoFontAsset = {
   url: string;
 };
 type HierarchyDemoRow = {
+  Id: string;
+  ParentId: string | null;
   Name: string;
   Type: string;
   Size: string;
   Modified: string;
   Permissions: string;
   Action: string;
-  _level: number;
 };
 type BarcodeJsonRow = {
   Symbology: string;
@@ -177,6 +204,37 @@ type BarcodeDemoPlan = {
   optionsText: string;
 };
 type WasmModule = typeof import("./wasm/volvoxgrid_wasm.js");
+type HierarchyTreeWasmModule = WasmModule & {
+  volvox_tree_load_tree_pb?: (data: Uint8Array) => Uint8Array;
+};
+
+function hierarchyRowDepths(rows: ReadonlyArray<HierarchyDemoRow>): number[] {
+  const rowsById = new Map(rows.map((row) => [row.Id, row]));
+  const depthCache = new Map<string, number>();
+  const depthFor = (row: HierarchyDemoRow, visiting: Set<string>): number => {
+    const cached = depthCache.get(row.Id);
+    if (cached !== undefined) {
+      return cached;
+    }
+    if (visiting.has(row.Id)) {
+      throw new Error(`hierarchy demo data contains a parent cycle at ${row.Id}`);
+    }
+    visiting.add(row.Id);
+    const parentId = row.ParentId?.trim() ?? "";
+    let depth = 0;
+    if (parentId !== "") {
+      const parent = rowsById.get(parentId);
+      if (!parent) {
+        throw new Error(`hierarchy demo data references missing parent ${parentId}`);
+      }
+      depth = depthFor(parent, visiting) + 1;
+    }
+    visiting.delete(row.Id);
+    depthCache.set(row.Id, depth);
+    return depth;
+  };
+  return rows.map((row) => depthFor(row, new Set<string>()));
+}
 
 async function fetchFontWithTimeout(url: string): Promise<Uint8Array | null> {
   const ctrl = new AbortController();
@@ -371,8 +429,16 @@ function appendDemoFontsForLocale(
 function demoFontAssetsForLocales(locales: readonly string[]): DemoFontAsset[] {
   const fonts: DemoFontAsset[] = [
     {
+      label: "Material Icons",
+      url: MATERIAL_ICONS_FONT_URL,
+    },
+    {
       label: "Roboto (Latin)",
       url: "https://cdn.jsdelivr.net/gh/googlefonts/roboto-2@main/src/hinted/Roboto-Regular.ttf",
+    },
+    {
+      label: "Roboto Bold (Latin)",
+      url: "https://cdn.jsdelivr.net/gh/googlefonts/roboto-2@main/src/hinted/Roboto-Bold.ttf",
     },
   ];
   const seenUrls = new Set<string>(fonts.map((font) => font.url));
@@ -740,6 +806,78 @@ function pbEncodeUpdateCellsRequest(
   return new Uint8Array(out);
 }
 
+function pbEncodeTreeNodeCell(options: {
+  nodeId: string;
+  col: number;
+  text: string;
+  style?: DemoCellStyleSpec;
+}): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeStringField(1, options.nodeId));
+  out.push(...pbEncodeInt32Field(2, options.col));
+  out.push(...pbEncodeMessageField(3, pbEncodeCellValueText(options.text)));
+  if (options.style != null) {
+    const style = pbEncodeCellStylePayload(options.style);
+    if (style.length > 0) {
+      out.push(...pbEncodeMessageField(4, style));
+    }
+  }
+  return new Uint8Array(out);
+}
+
+function pbEncodeHierarchyTreeNode(
+  row: HierarchyDemoRow,
+  hasChildren: boolean,
+): Uint8Array {
+  const out: number[] = [];
+  out.push(...pbEncodeStringField(1, row.Id));
+  if (row.ParentId != null && row.ParentId !== "") {
+    out.push(...pbEncodeStringField(2, row.ParentId));
+  }
+  const cells = [
+    pbEncodeTreeNodeCell({ nodeId: row.Id, col: HIERARCHY_NAME_COL, text: row.Name }),
+    pbEncodeTreeNodeCell({
+      nodeId: row.Id,
+      col: HIERARCHY_TYPE_COL,
+      text: row.Type,
+      style: row.Type === "Folder" ? { foreground: 0xFF92400E } : undefined,
+    }),
+    pbEncodeTreeNodeCell({ nodeId: row.Id, col: 2, text: row.Size }),
+    pbEncodeTreeNodeCell({ nodeId: row.Id, col: 3, text: row.Modified }),
+    pbEncodeTreeNodeCell({ nodeId: row.Id, col: 4, text: row.Permissions }),
+    pbEncodeTreeNodeCell({
+      nodeId: row.Id,
+      col: HIERARCHY_ACTION_COL,
+      text: row.Action,
+      style: { foreground: 0xFF2563EB },
+    }),
+    pbEncodeTreeNodeCell({
+      nodeId: row.Id,
+      col: HIERARCHY_ICON_COL,
+      text: row.Type === "Folder" ? HIERARCHY_FOLDER_ICON : "",
+    }),
+  ];
+  cells.forEach((cell) => {
+    out.push(...pbEncodeMessageField(4, cell));
+  });
+  out.push(...pbEncodeInt32Field(5, hasChildren ? NODE_CHILDREN_LOADED : NODE_LEAF));
+  return new Uint8Array(out);
+}
+
+function pbEncodeHierarchyLoadTreeRequest(
+  gridId: number,
+  rows: ReadonlyArray<HierarchyDemoRow>,
+): Uint8Array {
+  const parentIds = new Set(rows.map((row) => row.ParentId).filter((id): id is string => !!id));
+  const out: number[] = [];
+  out.push(...pbEncodeTag(1, 0), ...pbEncodeVarint(BigInt(Math.trunc(gridId))));
+  rows.forEach((row) => {
+    out.push(...pbEncodeMessageField(2, pbEncodeHierarchyTreeNode(row, parentIds.has(row.Id))));
+  });
+  out.push(...pbEncodeTag(3, 0), ...pbEncodeBool(true));
+  return new Uint8Array(out);
+}
+
 function pbEncodeGridLinesPayload(color: number): Uint8Array {
   const out: number[] = [];
   out.push(...pbEncodeInt32Field(1, 1));
@@ -823,6 +961,9 @@ function pbEncodeColumnDef(
   if (setup.dropdownItems != null) {
     out.push(...pbEncodeMessageField(13, pbEncodeDropdownFromLabels(setup.dropdownItems)));
   }
+  if (setup.hidden != null) {
+    out.push(...pbEncodeTag(16, 0), ...pbEncodeBool(setup.hidden));
+  }
   if (setup.span != null) {
     out.push(...pbEncodeTag(17, 0), ...pbEncodeBool(setup.span));
   }
@@ -898,7 +1039,44 @@ function pbEncodeDefineRowsRequest(
   return new Uint8Array(out);
 }
 
-function pbEncodeHierarchyOutlineConfig(): Uint8Array {
+function hierarchyOutlineWidth(maxOutlineDepth: number): number {
+  const buttonCount = Math.max(1, maxOutlineDepth + 1);
+  return Math.max(56, buttonCount * 20);
+}
+
+function hierarchyExpanderWidth(maxOutlineDepth: number): number {
+  return hierarchyOutlineWidth(maxOutlineDepth) + 280;
+}
+
+function applyHierarchyIconTheme(wasmModule: WasmModule, id: number): void {
+  const patchFontNames = (wasmModule as any).patch_icon_theme_default_font_names as
+    | ((gridId: number, fontNames: string[]) => void)
+    | undefined;
+  let patchedFontFamily = false;
+  if (typeof patchFontNames === "function") {
+    patchFontNames(id, ["Material Icons", "MaterialIcons"]);
+    patchedFontFamily = true;
+  }
+
+  const patchTextStyle = (wasmModule as any).patch_icon_theme_default_text_style as
+    | ((gridId: number, fontName?: string | null, fontSize?: number | null, bold?: boolean | null, italic?: boolean | null, color?: number | null) => void)
+    | undefined;
+  if (!patchedFontFamily && typeof patchTextStyle === "function") {
+    patchTextStyle(id, "Material Icons", null, null, null, null);
+  }
+
+  const setIconSlot = (wasmModule as any).set_icon_theme_slot as
+    | ((gridId: number, slot: number, icon: string) => void)
+    | undefined;
+  if (typeof setIconSlot === "function") {
+    setIconSlot(id, ICON_SLOT_TREE_EXPANDED, MATERIAL_ICON_EXPAND_MORE);
+    setIconSlot(id, ICON_SLOT_TREE_COLLAPSED, MATERIAL_ICON_CHEVRON_RIGHT);
+  }
+}
+
+function pbEncodeHierarchyOutlineConfig(maxOutlineDepth: number, maxOutlineLevel: number): Uint8Array {
+  const outlineWidth = hierarchyOutlineWidth(maxOutlineDepth);
+  const expanderWidth = hierarchyExpanderWidth(maxOutlineDepth);
   const layout: number[] = [];
   layout.push(...pbEncodeInt32Field(3, 0));
 
@@ -951,13 +1129,17 @@ function pbEncodeHierarchyOutlineConfig(): Uint8Array {
   scrolling.push(...pbEncodeFloatField(6, 0.9));
 
   const outline: number[] = [];
-  outline.push(...pbEncodeInt32Field(1, 2));
-  outline.push(...pbEncodeInt32Field(2, 0));
+  outline.push(...pbEncodeInt32Field(1, 4));
   outline.push(...pbEncodeUint32Field(3, 0xFFA8A29E));
+  outline.push(...pbEncodeInt32Field(6, 20));
+  outline.push(...pbEncodeInt32Field(7, Math.max(0, maxOutlineLevel)));
+  outline.push(...pbEncodeTag(8, 0), ...pbEncodeBool(true));
+  outline.push(...pbEncodeInt32Field(9, HIERARCHY_NAME_COL));
+  outline.push(...pbEncodeInt32Field(10, HIERARCHY_ICON_COL));
 
   const resize: number[] = [];
   resize.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
-  resize.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
+  resize.push(...pbEncodeTag(2, 0), ...pbEncodeBool(false));
   const freeze: number[] = [];
   freeze.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
   freeze.push(...pbEncodeTag(2, 0), ...pbEncodeBool(true));
@@ -981,10 +1163,32 @@ function pbEncodeHierarchyOutlineConfig(): Uint8Array {
   colTop.push(...pbEncodeUint32Field(8, 0xFFD6D3D1));
   colTop.push(...pbEncodeTag(10, 0), ...pbEncodeBool(true));
   const rowStart: number[] = [];
-  rowStart.push(...pbEncodeTag(1, 0), ...pbEncodeBool(false));
+  rowStart.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
+  rowStart.push(...pbEncodeInt32Field(2, expanderWidth));
+  rowStart.push(...pbEncodeUint32Field(4, 0xFFFAFAF9));
+  rowStart.push(...pbEncodeUint32Field(5, 0xFF57534E));
+  rowStart.push(...pbEncodeUint32Field(7, 0xFFD6D3D1));
+  rowStart.push(...pbEncodeTag(8, 0), ...pbEncodeBool(true));
+  rowStart.push(...pbEncodeTag(9, 0), ...pbEncodeBool(true));
+  const expanderSlot: number[] = [];
+  expanderSlot.push(...pbEncodeInt32Field(1, 10));
+  expanderSlot.push(...pbEncodeInt32Field(2, expanderWidth));
+  expanderSlot.push(...pbEncodeTag(3, 0), ...pbEncodeBool(true));
+  rowStart.push(...pbEncodeMessageField(12, new Uint8Array(expanderSlot)));
+  const cornerTopStart: number[] = [];
+  cornerTopStart.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
+  cornerTopStart.push(...pbEncodeUint32Field(3, 0xFFFAFAF9));
+  cornerTopStart.push(...pbEncodeUint32Field(4, 0xFF57534E));
+  const outlineLevelsSlot: number[] = [];
+  outlineLevelsSlot.push(...pbEncodeInt32Field(1, 2));
+  outlineLevelsSlot.push(...pbEncodeInt32Field(2, outlineWidth));
+  outlineLevelsSlot.push(...pbEncodeTag(3, 0), ...pbEncodeBool(true));
+  cornerTopStart.push(...pbEncodeMessageField(7, new Uint8Array(outlineLevelsSlot)));
   const indicators: number[] = [];
   indicators.push(...pbEncodeMessageField(3, new Uint8Array(colTop)));
   indicators.push(...pbEncodeMessageField(1, new Uint8Array(rowStart)));
+  indicators.push(...pbEncodeMessageField(5, new Uint8Array(cornerTopStart)));
+  indicators.push(...pbEncodeInt32Field(10, IndicatorAppearance.INDICATOR_APPEARANCE_MODERN));
   const gridConfig: number[] = [];
   gridConfig.push(...pbEncodeMessageField(1, new Uint8Array(layout)));
   gridConfig.push(...pbEncodeMessageField(2, new Uint8Array(style)));
@@ -1085,11 +1289,15 @@ function pbEncodeSalesDemoConfig(): Uint8Array {
   const rowStart: number[] = [];
   rowStart.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
   rowStart.push(...pbEncodeInt32Field(2, 40));
-  rowStart.push(...pbEncodeTag(3, 0), ...pbEncodeVarint(1n));
   rowStart.push(...pbEncodeUint32Field(4, 0xFFF9FAFB));
   rowStart.push(...pbEncodeUint32Field(5, 0xFF6B7280));
   rowStart.push(...pbEncodeUint32Field(7, 0xFFD1D5DB));
   rowStart.push(...pbEncodeTag(9, 0), ...pbEncodeBool(true));
+  const rowNumberSlot: number[] = [];
+  rowNumberSlot.push(...pbEncodeInt32Field(1, 1));
+  rowNumberSlot.push(...pbEncodeInt32Field(2, 40));
+  rowNumberSlot.push(...pbEncodeTag(3, 0), ...pbEncodeBool(true));
+  rowStart.push(...pbEncodeMessageField(12, new Uint8Array(rowNumberSlot)));
   const colTop: number[] = [];
   colTop.push(...pbEncodeTag(1, 0), ...pbEncodeBool(true));
   colTop.push(...pbEncodeInt32Field(2, 28));
@@ -1186,43 +1394,33 @@ function setupHierarchyJsonDemo(grid: VolvoxGrid, wasmModule: WasmModule, id: nu
       throw new Error("embedded hierarchy demo data is empty");
     }
     const rawRows = JSON.parse(PB_TEXT_DECODER.decode(rawHierarchy)) as HierarchyDemoRow[];
-    const loadRows = rawRows.map(({ _level, ...row }) => row);
+    const outlineLevels = hierarchyRowDepths(rawRows);
+    const minOutlineLevel = 0;
+    const maxOutlineLevel = outlineLevels.reduce((maxLevel, level) => Math.max(maxLevel, level), 0);
+    const maxOutlineDepth = Math.max(0, maxOutlineLevel - minOutlineLevel);
     grid.colCount = HIERARCHY_COLS;
     wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, HIERARCHY_COLUMN_SETUP));
-    const result = grid.loadData(PB_TEXT_ENCODER.encode(JSON.stringify(loadRows)), {
-      autoCreateColumns: false,
-    });
-    if (result.status === 2) {
-      throw new Error("LoadData failed for embedded hierarchy demo");
+    const loadTree = (wasmModule as HierarchyTreeWasmModule).volvox_tree_load_tree_pb;
+    if (typeof loadTree !== "function") {
+      throw new Error("Hierarchy demo requires VolvoxTreeService WASM support");
     }
-    wasmModule.volvox_grid_define_columns_pb(pbEncodeDefineColumnsRequest(id, HIERARCHY_COLUMN_SETUP));
-    wasmModule.volvox_grid_define_rows_pb(
-      pbEncodeDefineRowsRequest(
-        id,
-        rawRows.map((row) => ({
-          outlineLevel: Math.trunc(row._level),
-          isSubtotal: row.Type === "Folder",
-        })),
-      ),
-    );
+    const response = loadTree(pbEncodeHierarchyLoadTreeRequest(id, rawRows));
+    if (!(response instanceof Uint8Array) || response.length === 0) {
+      throw new Error("VolvoxTreeService.LoadTree failed for embedded hierarchy demo");
+    }
     if (typeof wasmModule.volvox_grid_configure === "function") {
-      wasmModule.volvox_grid_configure(BigInt(id), pbEncodeHierarchyOutlineConfig());
+      wasmModule.volvox_grid_configure(
+        BigInt(id),
+        pbEncodeHierarchyOutlineConfig(maxOutlineDepth, maxOutlineLevel),
+      );
     }
+    applyHierarchyIconTheme(wasmModule, id);
 
     grid.selectionMode = 0;
     grid.setHeaderFeatures({ sort: false, reorder: false, chooser: false });
     grid.flingImpulseGain = 220.0;
     grid.flingFriction = 0.9;
     grid.editable = false;
-    rawRows.forEach((row, index) => {
-      grid.setCellStyle(index, 5, { foreground: 0xFF2563EB });
-      if (row.Type === "Folder") {
-        grid.setCellStyle(index, 0, {
-          foreground: 0xFF92400E,
-          font: { bold: true },
-        });
-      }
-    });
     grid.invalidate();
   } finally {
     if (id !== prevId) {
@@ -1544,97 +1742,6 @@ function pbEncodeSelectionHoverConfig(mode: number): Uint8Array {
   // GridConfig.selection = 3
   gridConfig.push(...pbEncodeMessageField(3, new Uint8Array(selectionConfig)));
   return new Uint8Array(gridConfig);
-}
-
-function pbReadVarint(data: Uint8Array, offset: number): { value: bigint; next: number } {
-  let value = 0n;
-  let shift = 0n;
-  let index = offset;
-  while (index < data.length) {
-    const byte = BigInt(data[index]);
-    index += 1;
-    value |= (byte & 0x7fn) << shift;
-    if ((byte & 0x80n) === 0n) {
-      return { value, next: index };
-    }
-    shift += 7n;
-  }
-  return { value, next: data.length };
-}
-
-function pbSkipField(data: Uint8Array, offset: number, wireType: number): number {
-  if (wireType === 0) {
-    return pbReadVarint(data, offset).next;
-  }
-  if (wireType === 2) {
-    const len = pbReadVarint(data, offset);
-    return Math.min(data.length, len.next + Number(len.value));
-  }
-  return data.length;
-}
-
-function pbAsInt32(value: bigint): number {
-  return Number(BigInt.asIntN(32, value));
-}
-
-function pbDecodeGridEventEnvelope(
-  data: Uint8Array,
-): { eventField: number; payload: Uint8Array } | null {
-  let offset = 0;
-  let eventField = 0;
-  let payload = new Uint8Array(0);
-  while (offset < data.length) {
-    const tag = pbReadVarint(data, offset);
-    offset = tag.next;
-    const field = Number(tag.value >> 3n);
-    const wire = Number(tag.value & 0x7n);
-
-    if (wire === 2 && field >= 2 && field <= 60) {
-      const len = pbReadVarint(data, offset);
-      const size = Number(len.value);
-      if (!Number.isFinite(size) || size < 0) {
-        return null;
-      }
-      const start = len.next;
-      const end = Math.min(data.length, start + size);
-      eventField = field;
-      payload = data.slice(start, end);
-      offset = end;
-      continue;
-    }
-
-    offset = pbSkipField(data, offset, wire);
-  }
-
-  return eventField === 0 ? null : { eventField, payload };
-}
-
-function pbDecodeClickEventPayload(
-  data: Uint8Array,
-): { row: number; col: number; hitArea: number; interaction: number } {
-  let row = 0;
-  let col = 0;
-  let hitArea = 0;
-  let interaction = CELL_INTERACTION_UNSPECIFIED;
-  let offset = 0;
-  while (offset < data.length) {
-    const tag = pbReadVarint(data, offset);
-    offset = tag.next;
-    const field = Number(tag.value >> 3n);
-    const wire = Number(tag.value & 0x7n);
-    if (wire === 0) {
-      const value = pbReadVarint(data, offset);
-      const n = pbAsInt32(value.value);
-      offset = value.next;
-      if (field === 1) row = n;
-      if (field === 2) col = n;
-      if (field === 3) hitArea = n;
-      if (field === 4) interaction = n;
-      continue;
-    }
-    offset = pbSkipField(data, offset, wire);
-  }
-  return { row, col, hitArea, interaction };
 }
 
 async function main() {
@@ -2000,6 +2107,7 @@ async function main() {
   }
 
   grid.onContextMenuRequest = showDebugContextMenu;
+  let debugEventLoggingEnabled = false;
 
   function handleHierarchyActionClick(click: {
     row: number;
@@ -2016,6 +2124,18 @@ async function main() {
     window.alert(message);
   }
 
+  function logDebugGridEvent(rawEvent: Uint8Array): void {
+    if (!debugEventLoggingEnabled) {
+      return;
+    }
+    try {
+      const event = GridEventMessage.fromBinary(rawEvent);
+      console.log("VolvoxGrid event", gridEventDebugObject(event), rawEvent);
+    } catch (error) {
+      console.warn("VolvoxGrid demo: failed to log grid event", error);
+    }
+  }
+
   function drainHierarchyActionClickEvents(rawEvent: Uint8Array): void {
     if (currentDemo !== "hierarchy") {
       return;
@@ -2025,11 +2145,11 @@ async function main() {
       return;
     }
     try {
-      const decoded = pbDecodeGridEventEnvelope(rawEvent);
-      if (decoded == null || decoded.eventField !== GRID_EVENT_CLICK) {
+      const event = GridEventMessage.fromBinary(rawEvent);
+      if (event.eventCase !== GridEventEventOneofCase.Click || event.click == null) {
         return;
       }
-      const click = pbDecodeClickEventPayload(decoded.payload);
+      const click = event.click;
       if (click.row < 0
         || click.col !== HIERARCHY_ACTION_COL
         || click.hitArea !== CELL_HIT_AREA_TEXT
@@ -2042,7 +2162,10 @@ async function main() {
     }
   }
 
-  grid.onGridEventRaw = drainHierarchyActionClickEvents;
+  grid.onGridEventRaw = (rawEvent: Uint8Array) => {
+    logDebugGridEvent(rawEvent);
+    drainHierarchyActionClickEvents(rawEvent);
+  };
 
   function normalizeLayerMask(raw: number): number {
     if (!Number.isFinite(raw)) {
@@ -2286,6 +2409,7 @@ async function main() {
   chkScrollBlit.checked = scrollBlitEnabled;
   chkEdit.checked = editEnabled;
   chkHover.checked = parseEnvBool(env?.VITE_VG_ENABLE_HOVER, false);
+  debugEventLoggingEnabled = chkDebug.checked;
 
   function hoverModeForDemo(mode: StandardDemoMode): number {
     return DEMO_DEFAULT_HOVER_MODE[mode] ?? HOVER_NONE;
@@ -2378,6 +2502,7 @@ async function main() {
     grid.rendererMode = activeRendererMode;
     grid.scrollBlit = scrollBlitEnabled;
     grid.debugOverlay = chkDebug.checked;
+    debugEventLoggingEnabled = chkDebug.checked;
     grid.animationEnabled = chkAnim.checked;
     grid.textLayoutCacheCap = selectedTextLayoutCacheCap();
     applyRenderLayerMaskToGrid(grid.id);

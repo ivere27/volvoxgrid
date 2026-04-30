@@ -4,6 +4,7 @@ use crate::canvas::{
 use crate::control::CellControl;
 use crate::grid::VolvoxGrid;
 use crate::proto::volvoxgrid::v1 as pb;
+use crate::row::RowProps;
 use crate::sort::sort_order_is_ascending;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
@@ -142,6 +143,12 @@ struct RenderColumn {
 struct OutlineState {
     has_subtotal_nodes: bool,
     subtotal_level_floor: i32,
+}
+
+#[derive(Clone, Debug, Default)]
+struct RowIndicatorLabelRender {
+    text: String,
+    edit_start: Option<i32>,
 }
 
 struct Surface<'a> {
@@ -769,24 +776,66 @@ fn resolve_row_indicator_width(grid: &VolvoxGrid) -> i32 {
         return 0;
     }
 
-    if !band.slots.is_empty() {
-        let slots = band.slots.iter().filter(|slot| slot.visible).count().max(1) as i32;
-        return (slots * 3 + 1).clamp(2, 12);
+    let mut width = 2;
+    let mut has_numbers = false;
+    let mut has_stylized = false;
+    let mut has_expander = false;
+    for slot in band.slots.iter().filter(|slot| slot.visible) {
+        if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32 {
+            has_numbers = true;
+        } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32 {
+            has_expander = true;
+            has_stylized = true;
+        } else if matches!(
+            slot.kind,
+            x if x == pb::RowIndicatorSlotKind::RowIndicatorSlotCurrent as i32
+                || x == pb::RowIndicatorSlotKind::RowIndicatorSlotSelection as i32
+                || x == pb::RowIndicatorSlotKind::RowIndicatorSlotCheckbox as i32
+                || x == pb::RowIndicatorSlotKind::RowIndicatorSlotEditing as i32
+        ) {
+            has_stylized = true;
+        }
     }
 
-    let mut width = 2;
-    if band.has_mode(pb::RowIndicatorMode::RowIndicatorNumbers) {
+    if has_numbers {
         width = ((grid.rows - grid.fixed_rows).max(1).to_string().len() as i32 + 1).clamp(3, 10);
     }
-    if band.has_mode(pb::RowIndicatorMode::RowIndicatorCurrent)
-        || band.has_mode(pb::RowIndicatorMode::RowIndicatorSelection)
-        || band.has_mode(pb::RowIndicatorMode::RowIndicatorCheckbox)
-        || band.has_mode(pb::RowIndicatorMode::RowIndicatorEditing)
-        || band.has_mode(pb::RowIndicatorMode::RowIndicatorExpander)
-    {
+    if has_stylized {
         width = width.max(4);
     }
+    // Expander labels can include an outline prefix plus the label column's
+    // display text. Bound the width using grid metadata in O(1) instead of
+    // scanning every row (which is catastrophic on large grids).
+    if has_expander
+        && grid.outline.tree_indicator != pb::TreeIndicatorStyle::TreeIndicatorNone as i32
+    {
+        let max_depth = crate::outline::outline_level_button_max(grid).max(0);
+        let prefix_chars = if tree_style_draws_connectors(grid) {
+            max_depth.saturating_mul(4).saturating_add(2)
+        } else {
+            max_depth.saturating_mul(2).saturating_add(2)
+        };
+        let label_col = grid.outline.label_column;
+        let label_chars = if label_col >= 0 && label_col < grid.cols {
+            row_indicator_label_source_width(grid, label_col)
+        } else {
+            0
+        };
+        width = width.max((prefix_chars + label_chars + 1).clamp(2, 48));
+    }
     width.max(2)
+}
+
+fn row_indicator_label_source_width(grid: &VolvoxGrid, col: i32) -> i32 {
+    if col < 0 || col >= grid.cols {
+        return 0;
+    }
+    let configured = grid
+        .col_widths
+        .get(&col)
+        .copied()
+        .unwrap_or(grid.default_col_width);
+    grid.clamp_col_width(col, configured).max(0)
 }
 
 fn outline_state(grid: &VolvoxGrid) -> OutlineState {
@@ -808,16 +857,30 @@ fn render_header_row(
     surface.fill_row(0, fixed_fg, fixed_bg, TUI_ATTR_BOLD);
 
     if row_indicator_width > 0 {
-        let band_bg = row_indicator_back_color(grid, background_mode);
-        let band_fg = row_indicator_fore_color(grid, background_mode);
-        surface.fill_span(
-            0,
-            0,
-            row_indicator_width.saturating_sub(1),
-            band_fg,
-            band_bg,
-            0,
+        let corner = &grid.indicator_bands.corner_top_start;
+        let band_bg = resolve_tui_terminal_color(
+            background_mode,
+            if corner.visible {
+                corner.back_color
+            } else {
+                None
+            }
+            .or(grid.indicator_bands.row_start.back_color)
+            .unwrap_or(grid.style.back_color_fixed),
         );
+        let band_fg = resolve_tui_terminal_color(
+            background_mode,
+            if corner.visible {
+                corner.fore_color
+            } else {
+                None
+            }
+            .or(grid.indicator_bands.row_start.fore_color)
+            .unwrap_or(grid.style.fore_color_fixed),
+        );
+        let corner_width = row_indicator_width.saturating_sub(1);
+        surface.fill_span(0, 0, corner_width, band_fg, band_bg, 0);
+        render_corner_top_start_row(grid, surface, corner_width, band_fg, band_bg);
         surface.put(
             row_indicator_width - 1,
             0,
@@ -886,6 +949,113 @@ fn render_header_row(
     }
 }
 
+fn render_corner_top_start_row(
+    grid: &VolvoxGrid,
+    surface: &mut Surface<'_>,
+    width: i32,
+    fg: u32,
+    bg: u32,
+) {
+    let corner = &grid.indicator_bands.corner_top_start;
+    if width <= 0 || !corner.visible {
+        return;
+    }
+
+    let visible_slot_count = corner.slots.iter().filter(|slot| slot.visible).count();
+    let mut slot_x = 0;
+    for slot in corner.slots.iter().filter(|slot| slot.visible) {
+        let remaining = (width - slot_x).max(0);
+        if remaining <= 0 {
+            break;
+        }
+        let slot_w = if visible_slot_count == 1 {
+            remaining
+        } else if slot.width_px > 0 {
+            slot.width_px.min(remaining)
+        } else if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32 {
+            let button_count = crate::outline::outline_level_button_count(grid);
+            crate::outline::outline_level_button_step(grid, remaining)
+                .saturating_mul(button_count)
+                .min(remaining)
+        } else {
+            remaining
+        };
+        if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels as i32
+            && grid.outline.show_level_buttons
+        {
+            render_tui_corner_outline_levels(grid, surface, slot_x, slot_w, fg, bg);
+        } else if slot.kind == pb::CornerIndicatorSlotKind::CornerSlotCustom as i32
+            && !slot.label_text.trim().is_empty()
+        {
+            write_cell_text(
+                surface,
+                RenderColumn {
+                    col: -1,
+                    x: slot_x,
+                    width: slot_w,
+                    full_width: slot_w,
+                    crop: 0,
+                },
+                0,
+                &slot.label_text,
+                fg,
+                bg,
+                TUI_ATTR_BOLD,
+                0,
+            );
+        }
+        slot_x += slot_w;
+    }
+}
+
+fn render_tui_corner_outline_levels(
+    grid: &VolvoxGrid,
+    surface: &mut Surface<'_>,
+    x: i32,
+    width: i32,
+    fg: u32,
+    bg: u32,
+) {
+    let min_level = crate::outline::outline_level_button_min(grid);
+    let max_level = crate::outline::outline_level_button_max(grid);
+    if max_level < min_level || width <= 0 {
+        return;
+    }
+
+    let step = crate::outline::outline_level_button_step(grid, width);
+    for level in min_level..=max_level {
+        let bx = x + (level - min_level) * step;
+        if bx >= x + width {
+            break;
+        }
+        let bw = step.min(x + width - bx).max(1);
+        let pressed = grid.outline_level_button_pressed
+            && grid.outline_level_button_pressed_inside
+            && grid.outline_level_button_pressed_level == level;
+        let attr = if pressed {
+            TUI_ATTR_BOLD | TUI_ATTR_REVERSE
+        } else {
+            TUI_ATTR_BOLD
+        };
+        write_cell_text(
+            surface,
+            RenderColumn {
+                col: -1,
+                x: bx,
+                width: bw,
+                full_width: bw,
+                crop: 0,
+            },
+            0,
+            &level.to_string(),
+            fg,
+            bg,
+            attr,
+            1,
+        );
+    }
+}
+
 fn render_data_rows(
     grid: &VolvoxGrid,
     surface: &mut Surface<'_>,
@@ -927,7 +1097,7 @@ fn render_data_row(
     visible_rows: &[i32],
     row: i32,
     y: i32,
-    outline_state: OutlineState,
+    _outline_state: OutlineState,
     background_mode: TuiBackgroundMode,
 ) {
     let fixed_col_end = (grid.fixed_cols + grid.frozen_cols).clamp(0, grid.cols);
@@ -1045,11 +1215,6 @@ fn render_data_row(
                 )
             {
                 text = checkbox_glyph(checked_state).to_string();
-            } else if show_text {
-                let prefix = outline_prefix(grid, style_row, style_col, outline_state);
-                if !prefix.is_empty() {
-                    text = format!("{prefix}{text}");
-                }
             }
         }
 
@@ -1181,24 +1346,37 @@ fn render_row_indicator_row(
     };
     surface.fill_span(0, y, row_indicator_width.saturating_sub(1), fg, bg, attr);
 
-    let label = row_indicator_label(grid, row);
-    if !label.is_empty() && row_indicator_width > 1 {
+    let label = row_indicator_label_render(grid, row);
+    if !label.text.is_empty() && row_indicator_width > 1 {
+        let label_column = RenderColumn {
+            col: -1,
+            x: 0,
+            width: row_indicator_width - 1,
+            full_width: row_indicator_width - 1,
+            crop: 0,
+        };
         write_cell_text(
             surface,
-            RenderColumn {
-                col: -1,
-                x: 0,
-                width: row_indicator_width - 1,
-                full_width: row_indicator_width - 1,
-                crop: 0,
-            },
+            label_column,
             y,
-            &label,
+            &label.text,
             fg,
             bg,
             attr,
-            2,
+            row_indicator_label_halign(grid),
         );
+        if let Some(edit_start) = label.edit_start {
+            render_row_indicator_label_editor(
+                grid,
+                surface,
+                y,
+                edit_start,
+                row_indicator_width,
+                fg,
+                bg,
+                attr,
+            );
+        }
     }
 
     surface.put(
@@ -1209,6 +1387,70 @@ fn render_row_indicator_row(
         bg,
         attr & TUI_ATTR_BOLD,
     );
+}
+
+fn render_row_indicator_label_editor(
+    grid: &VolvoxGrid,
+    surface: &mut Surface<'_>,
+    y: i32,
+    edit_start: i32,
+    row_indicator_width: i32,
+    fg: u32,
+    bg: u32,
+    attr: u8,
+) {
+    if !grid.edit.is_active() || row_indicator_width <= 1 {
+        return;
+    }
+
+    let edit_x = edit_start.clamp(0, row_indicator_width - 1);
+    let edit_w = (row_indicator_width - 1 - edit_x).max(0);
+    if edit_w <= 0 {
+        return;
+    }
+
+    let edit_column = RenderColumn {
+        col: grid.edit.edit_col,
+        x: edit_x,
+        width: edit_w,
+        full_width: edit_w,
+        crop: 0,
+    };
+    let edit_attr = attr & !TUI_ATTR_REVERSE;
+    let text = grid.edit.edit_text.as_str();
+    let fitted = fit_edit_text(
+        text,
+        edit_column.full_width,
+        0,
+        grid.edit.current_caret_char().max(0) as usize,
+    );
+    write_fitted_cell_text(surface, edit_column, y, &fitted.text, fg, bg, edit_attr);
+    write_edit_selection(
+        surface,
+        edit_column,
+        y,
+        text,
+        fitted.draw_x,
+        grid.edit.sel_start,
+        grid.edit.sel_length,
+        edit_attr | TUI_ATTR_REVERSE,
+    );
+
+    if grid.edit.sel_length <= 0 {
+        let cell_x = edit_column.x + fitted.cursor_x;
+        if cell_x >= edit_column.x && cell_x < edit_column.x + edit_column.width {
+            if let Some(cell) = surface.get(cell_x, y) {
+                surface.put(
+                    cell_x,
+                    y,
+                    cell.ch(),
+                    cell.fg,
+                    cell.bg,
+                    caret_attr(cell.attr),
+                );
+            }
+        }
+    }
 }
 
 fn merged_render_column(
@@ -1364,9 +1606,8 @@ fn progress_fill_spec(grid: &VolvoxGrid, row: i32, col: i32, text: &str) -> Opti
     None
 }
 
-fn outline_prefix(grid: &VolvoxGrid, row: i32, col: i32, outline_state: OutlineState) -> String {
+fn outline_prefix(grid: &VolvoxGrid, row: i32, outline_state: OutlineState) -> String {
     if grid.outline.tree_indicator == pb::TreeIndicatorStyle::TreeIndicatorNone as i32
-        || col != grid.outline.tree_column
         || row < grid.fixed_rows
     {
         return String::new();
@@ -1375,6 +1616,10 @@ fn outline_prefix(grid: &VolvoxGrid, row: i32, col: i32, outline_state: OutlineS
     let Some(props) = grid.get_row_props(row) else {
         return String::new();
     };
+
+    if tree_style_draws_connectors(grid) {
+        return directory_outline_prefix(grid, row, props, outline_state);
+    }
 
     if outline_state.has_subtotal_nodes {
         let visual_level = subtotal_visual_level(
@@ -1396,11 +1641,8 @@ fn outline_prefix(grid: &VolvoxGrid, row: i32, col: i32, outline_state: OutlineS
         return String::new();
     }
 
-    if props.outline_level <= 0 {
-        return String::new();
-    }
-
-    let mut prefix = "  ".repeat(props.outline_level.saturating_sub(1) as usize);
+    let visual_depth = crate::outline::outline_visual_depth_for_level(grid, props.outline_level);
+    let mut prefix = "  ".repeat(visual_depth as usize);
     if row_has_outline_children(grid, row, props.outline_level) {
         prefix.push(if props.is_collapsed { '▸' } else { '▾' });
         prefix.push(' ');
@@ -1411,6 +1653,107 @@ fn outline_prefix(grid: &VolvoxGrid, row: i32, col: i32, outline_state: OutlineS
         prefix.push_str("  ");
     }
     prefix
+}
+
+fn directory_outline_prefix(
+    grid: &VolvoxGrid,
+    row: i32,
+    props: &RowProps,
+    outline_state: OutlineState,
+) -> String {
+    let depth = tui_outline_visual_depth(grid, row, outline_state).unwrap_or(0);
+    let has_children = tui_outline_row_has_children(grid, row, props, outline_state);
+    let mut prefix = String::new();
+
+    for ancestor_depth in 1..depth {
+        if tui_outline_branch_continues_after(grid, row, ancestor_depth, outline_state) {
+            prefix.push_str("│   ");
+        } else {
+            prefix.push_str("    ");
+        }
+    }
+
+    if depth > 0 {
+        if tui_outline_branch_continues_after(grid, row, depth, outline_state) {
+            prefix.push_str("├─");
+        } else {
+            prefix.push_str("└─");
+        }
+    }
+
+    if has_children {
+        prefix.push(if props.is_collapsed { '▸' } else { '▾' });
+        prefix.push(' ');
+    } else if tree_style_shows_leaf(grid) {
+        if depth > 0 {
+            prefix.push_str("─ ");
+        } else {
+            prefix.push_str("• ");
+        }
+    } else if depth > 0 {
+        prefix.push_str("  ");
+    }
+
+    prefix
+}
+
+fn tui_outline_visual_depth(
+    grid: &VolvoxGrid,
+    row: i32,
+    outline_state: OutlineState,
+) -> Option<i32> {
+    let props = grid.get_row_props(row)?;
+    if outline_state.has_subtotal_nodes {
+        let visual_level = subtotal_visual_level(
+            props.outline_level,
+            props.is_subtotal,
+            outline_state.subtotal_level_floor,
+        );
+        Some((visual_level - 1).max(0))
+    } else {
+        Some(crate::outline::outline_visual_depth_for_level(
+            grid,
+            props.outline_level,
+        ))
+    }
+}
+
+fn tui_outline_row_has_children(
+    grid: &VolvoxGrid,
+    row: i32,
+    props: &RowProps,
+    outline_state: OutlineState,
+) -> bool {
+    if outline_state.has_subtotal_nodes && props.is_subtotal {
+        return true;
+    }
+    row_has_outline_children(grid, row, props.outline_level)
+}
+
+fn tui_outline_branch_continues_after(
+    grid: &VolvoxGrid,
+    row: i32,
+    depth: i32,
+    outline_state: OutlineState,
+) -> bool {
+    if depth < 0 {
+        return false;
+    }
+    for next_row in (row + 1)..grid.rows {
+        if grid.is_row_hidden(next_row) {
+            continue;
+        }
+        let Some(next_depth) = tui_outline_visual_depth(grid, next_row, outline_state) else {
+            continue;
+        };
+        if next_depth < depth {
+            return false;
+        }
+        if next_depth == depth {
+            return true;
+        }
+    }
+    false
 }
 
 fn row_has_outline_children(grid: &VolvoxGrid, row: i32, level: i32) -> bool {
@@ -1424,6 +1767,14 @@ fn row_has_outline_children(grid: &VolvoxGrid, row: i32, level: i32) -> bool {
         return true;
     }
     false
+}
+
+fn tree_style_draws_connectors(grid: &VolvoxGrid) -> bool {
+    matches!(
+        grid.outline.tree_indicator,
+        x if x == pb::TreeIndicatorStyle::TreeIndicatorConnectors as i32
+            || x == pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32
+    )
 }
 
 fn tree_style_shows_leaf(grid: &VolvoxGrid) -> bool {
@@ -1476,38 +1827,93 @@ fn row_indicator_fore_color(grid: &VolvoxGrid, background_mode: TuiBackgroundMod
     )
 }
 
-fn row_indicator_label(grid: &VolvoxGrid, row: i32) -> String {
+fn row_indicator_label_render(grid: &VolvoxGrid, row: i32) -> RowIndicatorLabelRender {
     let band = &grid.indicator_bands.row_start;
-    if band.has_mode(pb::RowIndicatorMode::RowIndicatorNumbers) {
-        return (row - grid.fixed_rows + 1).max(1).to_string();
-    }
-
-    let mut label = String::new();
-    if band.has_mode(pb::RowIndicatorMode::RowIndicatorCurrent) && row == grid.selection.row {
-        label.push('▶');
-    } else if band.has_mode(pb::RowIndicatorMode::RowIndicatorSelection)
-        && should_highlight_row_indicator(grid, row)
-    {
-        label.push('•');
-    }
-    if band.has_mode(pb::RowIndicatorMode::RowIndicatorEditing)
-        && grid.edit.is_active()
-        && grid.edit.edit_row == row
-    {
-        if !label.is_empty() {
-            label.push(' ');
-        }
-        label.push('✎');
-    }
-    if band.has_mode(pb::RowIndicatorMode::RowIndicatorExpander) {
-        if let Some(props) = grid.get_row_props(row) {
-            if !label.is_empty() {
-                label.push(' ');
+    let mut render = RowIndicatorLabelRender::default();
+    let outline_state = outline_state(grid);
+    for slot in band.slots.iter().filter(|slot| slot.visible) {
+        let (segment, edit_start_in_segment) =
+            if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32 {
+                (Some((row - grid.fixed_rows + 1).max(1).to_string()), None)
+            } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotCurrent as i32
+                && row == grid.selection.row
+            {
+                (Some("▶".to_string()), None)
+            } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotSelection as i32
+                && should_highlight_row_indicator(grid, row)
+            {
+                (Some("•".to_string()), None)
+            } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotEditing as i32
+                && grid.edit.is_active()
+                && grid.edit.edit_row == row
+            {
+                (Some("✎".to_string()), None)
+            } else if slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32 {
+                let mut segment = outline_prefix(grid, row, outline_state);
+                let prefix_width = UnicodeWidthStr::width(segment.as_str()) as i32;
+                let mut edit_start = None;
+                if grid.outline.label_column >= 0
+                    && grid.outline.label_column < grid.cols
+                    && row >= grid.fixed_rows
+                {
+                    if grid.edit.is_active()
+                        && grid.edit.edit_row == row
+                        && grid.edit.edit_col == grid.outline.label_column
+                        && grid.is_col_hidden(grid.outline.label_column)
+                    {
+                        edit_start = Some(prefix_width);
+                        segment.push_str(&grid.edit.edit_text);
+                    } else {
+                        segment.push_str(&grid.get_display_text(row, grid.outline.label_column));
+                    }
+                }
+                if segment.is_empty() {
+                    (None, None)
+                } else {
+                    (Some(segment), edit_start)
+                }
+            } else {
+                (None, None)
+            };
+        if let Some(segment) = segment {
+            if !render.text.is_empty() {
+                render.text.push(' ');
             }
-            label.push(if props.is_collapsed { '+' } else { '-' });
+            let segment_x = UnicodeWidthStr::width(render.text.as_str()) as i32;
+            if render.edit_start.is_none() {
+                if let Some(edit_start) = edit_start_in_segment {
+                    render.edit_start = Some(segment_x + edit_start);
+                }
+            }
+            render.text.push_str(&segment);
         }
     }
-    label
+    render
+}
+
+fn row_indicator_label_halign(grid: &VolvoxGrid) -> i32 {
+    if row_indicator_has_expander_label(grid) {
+        0
+    } else {
+        2
+    }
+}
+
+fn row_indicator_has_expander_label(grid: &VolvoxGrid) -> bool {
+    if grid.outline.tree_indicator == pb::TreeIndicatorStyle::TreeIndicatorNone as i32 {
+        return false;
+    }
+    let has_label_source = (grid.outline.label_column >= 0
+        && grid.outline.label_column < grid.cols)
+        || (grid.outline.icon_column >= 0 && grid.outline.icon_column < grid.cols);
+    has_label_source
+        && grid
+            .indicator_bands
+            .row_start
+            .slots
+            .iter()
+            .filter(|slot| slot.visible)
+            .any(|slot| slot.kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32)
 }
 
 fn cell_has_checkbox_visual(
@@ -2151,6 +2557,7 @@ fn rgb24(argb: u32) -> u32 {
 mod tests {
     use super::*;
     use crate::grid::VolvoxGrid;
+    use crate::indicator::{CornerIndicatorSlotState, RowIndicatorSlotState};
     use crate::proto::volvoxgrid::v1 as pb;
 
     fn row_text(buffer: &[TuiCell], stride: usize, row: usize, width: usize) -> String {
@@ -2448,7 +2855,10 @@ mod tests {
         grid.set_col_width(0, 12);
         grid.set_col_width(1, 8);
         grid.indicator_bands.row_start.visible = true;
-        grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers,
+            3,
+        )];
         grid.cells.set_text(0, 0, "North".to_string());
         grid.cells.set_text(0, 1, "1200".to_string());
         grid.cells.set_text(1, 0, "Grand Total".to_string());
@@ -2528,7 +2938,7 @@ mod tests {
 
     #[test]
     fn render_grid_tui_renders_outline_checkbox_dropdown_and_progress() {
-        let mut grid = VolvoxGrid::new(1, 36, 4, 3, 4, 0, 0);
+        let mut grid = VolvoxGrid::new(1, 52, 4, 3, 4, 0, 0);
         grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
         grid.columns[0].caption = "Name".to_string();
         grid.columns[1].caption = "Flag".to_string();
@@ -2539,7 +2949,12 @@ mod tests {
         grid.set_col_width(2, 8);
         grid.set_col_width(3, 6);
         grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorArrowsLeaf as i32;
-        grid.outline.tree_column = 0;
+        grid.outline.label_column = 0;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            12,
+        )];
         grid.columns[1].data_type = pb::ColumnDataType::ColumnDataBoolean as i32;
         grid.columns[2].dropdown_items = "Active|Pending".to_string();
         grid.columns[3].progress_color = 0xFF22C55E;
@@ -2555,18 +2970,131 @@ mod tests {
         grid.cells.set_text(1, 2, "Active".to_string());
         grid.cells.set_text(1, 3, "75".to_string());
 
-        let mut buffer = vec![TuiCell::default(); 36 * 4];
-        render_grid_tui(&mut grid, &mut buffer, 36, 4, 36);
+        let mut buffer = vec![TuiCell::default(); 52 * 4];
+        render_grid_tui(&mut grid, &mut buffer, 52, 4, 52);
 
-        let folder_row = row_text(&buffer, 36, 1, 36);
-        let leaf_row = row_text(&buffer, 36, 2, 36);
+        let folder_row = row_text(&buffer, 52, 1, 52);
+        let leaf_row = row_text(&buffer, 52, 2, 52);
         assert!(folder_row.contains("▾ Folder"));
         assert!(leaf_row.contains("[x]"));
         assert!(leaf_row.contains("▾"));
-        assert!(buffer[2 * 36..3 * 36]
+        assert!(buffer[2 * 52..3 * 52]
             .iter()
             .copied()
             .any(|cell| cell.bg == 0x22C55E));
+    }
+
+    #[test]
+    fn render_grid_tui_renders_directory_style_connector_labels() {
+        let mut grid = VolvoxGrid::new(1, 80, 6, 5, 2, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.columns[0].caption = "Name".to_string();
+        grid.columns[1].caption = "Type".to_string();
+        grid.set_col_width(0, 16);
+        grid.set_col_width(1, 8);
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.outline.label_column = 0;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            32,
+        )];
+
+        for (row, (label, level)) in [
+            ("Documents", 0),
+            ("Reports", 1),
+            ("Q1.xlsx", 2),
+            ("Q2.xlsx", 2),
+            ("Invoices", 1),
+        ]
+        .iter()
+        .enumerate()
+        {
+            grid.cells.set_text(row as i32, 0, (*label).to_string());
+            grid.row_props.entry(row as i32).or_default().outline_level = *level;
+        }
+
+        let mut buffer = vec![TuiCell::default(); 80 * 6];
+        render_grid_tui(&mut grid, &mut buffer, 80, 6, 80);
+
+        assert!(row_text(&buffer, 80, 1, 32).starts_with("▾ Documents"));
+        assert!(row_text(&buffer, 80, 2, 32).starts_with("├─▾ Reports"));
+        assert!(row_text(&buffer, 80, 3, 32).starts_with("│   ├── Q1.xlsx"));
+        assert!(row_text(&buffer, 80, 4, 32).starts_with("│   └── Q2.xlsx"));
+        assert!(row_text(&buffer, 80, 5, 32).starts_with("└── Invoices"));
+    }
+
+    #[test]
+    fn render_grid_tui_renders_corner_outline_level_numbers() {
+        let mut grid = VolvoxGrid::new(1, 40, 4, 3, 2, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.columns[0].caption = "Name".to_string();
+        grid.columns[1].caption = "Type".to_string();
+        grid.set_col_width(0, 8);
+        grid.set_col_width(1, 8);
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.outline.indicator_indent = 2;
+        grid.outline.max_levels = 2;
+        grid.outline.show_level_buttons = true;
+        grid.outline.label_column = 0;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            18,
+        )];
+        grid.indicator_bands.corner_top_start.visible = true;
+        grid.indicator_bands.corner_top_start.slots = vec![CornerIndicatorSlotState::new(
+            pb::CornerIndicatorSlotKind::CornerSlotOutlineLevels,
+            6,
+        )];
+
+        for (row, (label, level)) in [("Root", 0), ("Child", 1), ("Leaf", 2)].iter().enumerate() {
+            grid.cells.set_text(row as i32, 0, (*label).to_string());
+            grid.row_props.entry(row as i32).or_default().outline_level = *level;
+        }
+
+        let mut buffer = vec![TuiCell::default(); 40 * 4];
+        render_grid_tui(&mut grid, &mut buffer, 40, 4, 40);
+
+        assert!(row_text(&buffer, 40, 0, 8).starts_with("0 1 2"));
+    }
+
+    #[test]
+    fn render_grid_tui_draws_hidden_outline_label_editor_in_row_indicator() {
+        let mut grid = VolvoxGrid::new(1, 40, 4, 2, 2, 0, 0);
+        grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
+        grid.selection.selection_visibility = pb::SelectionVisibility::SelectionVisNone as i32;
+        grid.edit_trigger_mode = 1;
+        grid.columns[0].caption = "Name".to_string();
+        grid.columns[1].caption = "Type".to_string();
+        grid.set_col_width(0, 12);
+        grid.set_col_width(1, 8);
+        grid.cols_hidden.insert(0);
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.outline.label_column = 0;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.width_px = 16;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            16,
+        )];
+        grid.cells.set_text(0, 0, "Folder".to_string());
+        grid.cells.set_text(0, 1, "dir".to_string());
+        grid.cells.set_text(1, 0, "Child".to_string());
+        grid.row_props.entry(0).or_default().outline_level = 0;
+        grid.row_props.entry(1).or_default().outline_level = 1;
+        grid.selection
+            .set_cursor(0, 0, grid.rows, grid.cols, grid.fixed_rows, grid.fixed_cols);
+
+        crate::input::handle_key_down(&mut grid, 113, 0);
+
+        let mut buffer = vec![TuiCell::default(); 40 * 4];
+        render_grid_tui(&mut grid, &mut buffer, 40, 4, 40);
+
+        let row = row_text(&buffer, 40, 1, 16);
+        assert!(row.starts_with("▾ Folder"));
+        assert_ne!(buffer[40 + 8].attr & TUI_ATTR_REVERSE, 0);
     }
 
     #[test]
@@ -2634,8 +3162,11 @@ mod tests {
         let mut grid = VolvoxGrid::new(1, 18, 4, 3, 2, 0, 0);
         grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
         grid.indicator_bands.row_start.visible = true;
-        grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
         grid.indicator_bands.row_start.width_px = 8;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers,
+            8,
+        )];
         grid.set_col_width(0, 4);
         grid.set_col_width(1, 8);
 
@@ -2650,8 +3181,11 @@ mod tests {
         let mut grid = VolvoxGrid::new(1, 18, 4, 3, 2, 0, 0);
         grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
         grid.indicator_bands.row_start.visible = true;
-        grid.indicator_bands.row_start.mode_bits = pb::RowIndicatorMode::RowIndicatorNumbers as u32;
         grid.indicator_bands.row_start.width_px = 8;
+        grid.indicator_bands.row_start.slots = vec![RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers,
+            8,
+        )];
         grid.set_col_width(0, 4);
         grid.set_col_width(1, 8);
 
