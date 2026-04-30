@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.3
+
+- Regenerated Flutter protocol bindings for tree events, slot-based row/corner indicators, indicator appearance controls, event target metadata, and configurable decision/compare timeouts.
+- Updated `VolvoxGridController` row-indicator helpers to emit indicator slots instead of the removed row-indicator mode bit field.
+- Refreshed the hierarchy example to derive tree levels from parent IDs, hide the label source column, and render outline expanders plus corner level buttons through indicators.
+- Added `onBeforeDropdownOpen` to the documented cancelable hook set and made unhandled cancelable events resolve with `cancel=false`.
+- Removed the unused Flutter fallback table and added analyzer/lint configuration for the package example.
+
 ## 0.8.2
 
 - Version bump for the project-wide 0.8.2 patch release.

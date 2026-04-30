@@ -2,6 +2,14 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
+## 0.8.3
+
+- Added the native `VolvoxTreeService` protocol, engine tree model, and plugin/Web tree APIs for loading, mutating, expanding, selecting, checking, sorting, filtering, finding, and resolving tree nodes.
+- Added slot-based row and corner indicators, outline level buttons, indicator appearance/color controls, indicator keyboard focus, and `GridEventTarget` metadata on pointer and cell-enter/leave events.
+- Updated hierarchy demos across Flutter, Android, Java, .NET, Go, GTK, Web, TUI, and ActiveX to use the tree/indicator UI, with refreshed hierarchy data and golden screenshots.
+- Changed cancelable events and custom sort comparisons to wait indefinitely by default, with `decision_timeout_ms` and `compare_response_timeout_ms` watchdogs available when finite timeouts are desired.
+- Improved TUI row-indicator rendering and outline keyboard/pointer handling, and fixed row-indicator level indexing.
+
 ## 0.8.2
 
 - Added append-data APIs across the protocol, generated bindings, and platform clients.
