@@ -2921,7 +2921,7 @@ async function main() {
     if (res.ok && res.source?.id === "remote") {
       const viaProxy = res.source.bundlePath.includes("/doom/remote/");
       console.info(viaProxy
-        ? "DOOM mode: using remote fallback assets via dev proxy."
+        ? "DOOM mode: using remote fallback assets via same-origin proxy."
         : "DOOM mode: using remote fallback assets from CDN.");
     }
     return res;

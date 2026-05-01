@@ -27,7 +27,7 @@ const doomEnv = (import.meta as any).env as Record<string, string | undefined>;
 const DOOM_BASE_PATH = normalizeBasePath(doomEnv.BASE_URL);
 const DOOM_REMOTE_PROXY_BUNDLE_PATH = `${DOOM_BASE_PATH}/doom/remote/vendor/doom.jsdos`;
 const DOOM_REMOTE_PROXY_EMULATORS_BASE_PATH = `${DOOM_BASE_PATH}/doom/remote/emulators`;
-const DOOM_REMOTE_CDN_BUNDLE_URL = "https://cdn.jsdelivr.net/gh/linuxfandudeguy/doomonline@master/bundle.jsdos";
+const DOOM_REMOTE_CDN_BUNDLE_URL = "https://v8.js-dos.com/bundles/doom.jsdos";
 const DOOM_REMOTE_CDN_EMULATORS_BASE_URL = "https://cdn.jsdelivr.net/npm/emulators@8.3.9/dist";
 
 export const DOOM_LOCAL_SOURCE: DoomAssetSource = {
@@ -669,8 +669,8 @@ export class DoomRuntime {
       return { ok: true, source: remoteProxySource };
     }
 
-    // CDN probing can fail by CORS policy even when loading via script tags is
-    // still possible. Use CDN source as remote fallback when proxy is missing.
+    // The v8 js-dos CDN serves the DOOM bundle with CORS enabled for browser
+    // fetches. Use it directly if the same-origin proxy path is unavailable.
     return { ok: true, source: DOOM_REMOTE_CDN_SOURCE };
   }
 

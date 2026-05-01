@@ -35,7 +35,7 @@ FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR := $(abspath flutter/android/src/main/jniLibs)
 VOLVOXGRID_PLUGIN_DEBUG_DIR := $(abspath target/debug)
 FLUTTER_EXAMPLE_DIR := flutter/example
 FLUTTER_EXAMPLE_PACKAGE := com.example.volvoxgrid_example
-DOOM_BUNDLE_URL := https://cdn.dos.zone/custom/dos/doom.jsdos?anonymous=1
+DOOM_BUNDLE_URL := https://v8.js-dos.com/bundles/doom.jsdos
 DOOM_EMULATORS_VERSION ?= 8.3.9
 WEB_HOST ?= 0.0.0.0
 WEB_SCALE ?= 1.0

@@ -1,4 +1,4 @@
-const DOOM_BUNDLE_TARGET_URL = "https://cdn.dos.zone/custom/dos/doom.jsdos?anonymous=1";
+const DOOM_BUNDLE_TARGET_URL = "https://v8.js-dos.com/bundles/doom.jsdos";
 const DOOM_EMULATORS_TARGET_BASE_URL = "https://cdn.jsdelivr.net/npm/emulators@8.3.9/dist/";
 const DOOM_REMOTE_BUNDLE_SUFFIX = "/doom/remote/vendor/doom.jsdos";
 const DOOM_REMOTE_EMULATORS_MARKER = "/doom/remote/emulators/";
