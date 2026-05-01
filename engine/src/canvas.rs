@@ -1297,7 +1297,7 @@ impl VisibleRange {
         let mut threshold_top = scrollable_top;
         for row in sticky_top_candidates {
             let screen_y =
-                grid.layout.row_pos(row) - grid.scroll.scroll_y as i32 + pinned_top_height;
+                data_y + grid.layout.row_pos(row) - grid.scroll.scroll_y as i32 + pinned_top_height;
             if screen_y < threshold_top {
                 sticky_top_rows.push(row);
                 threshold_top += grid.row_height(row);
@@ -1309,7 +1309,7 @@ impl VisibleRange {
         let mut threshold_bottom = scrollable_bottom;
         for row in sticky_bottom_candidates {
             let screen_y =
-                grid.layout.row_pos(row) - grid.scroll.scroll_y as i32 + pinned_top_height;
+                data_y + grid.layout.row_pos(row) - grid.scroll.scroll_y as i32 + pinned_top_height;
             let row_h = grid.row_height(row);
             if screen_y + row_h > threshold_bottom {
                 sticky_bottom_rows.push(row);
@@ -10658,7 +10658,8 @@ mod tests {
         linear_barcode_preview_rect, normalized_code128_payload, outline_toggle_box_size,
         parse_progress_percent, picture_layer_needed, progress_layer_needed, render_fast_scroll,
         render_grid, show_dropdown_button_for_cell, sort_arrow_box_size, BarcodeDrawRect, CellKey,
-        RenderContext, RenderCtxCacheKey, RenderCtxCached, DEFAULT_BARCODE_SIZE_WARNING_COLOR,
+        RenderContext, RenderCtxCacheKey, RenderCtxCached, VisibleRange,
+        DEFAULT_BARCODE_SIZE_WARNING_COLOR,
     };
     use crate::canvas_cpu::CpuCanvas;
     use crate::grid::VolvoxGrid;
@@ -11123,6 +11124,81 @@ mod tests {
         assert_eq!(first.y, -10);
         assert_eq!(first.clip_y, 0);
         assert_eq!(first.clip_h, 26);
+    }
+
+    #[test]
+    fn sticky_top_row_waits_until_it_reaches_data_top_with_header_band() {
+        let width = 120;
+        let height = 140;
+        let mut grid = VolvoxGrid::new(1, width, height, 4, 1, 0, 0);
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 20;
+        for row in 0..grid.rows {
+            grid.set_row_height(row, 30);
+        }
+        grid.set_row_sticky(1, pb::StickyEdge::StickyTop as i32);
+        grid.ensure_layout();
+        grid.scroll.scroll_y = 20.0;
+
+        let vp = VisibleRange::compute(&grid, width, height);
+        assert_eq!(vp.data_y, 20);
+        assert!(vp.sticky_top_rows.is_empty());
+
+        let (_, row_y, _, row_h) = cell_rect(&grid, 1, 0, &vp).expect("row should be visible");
+        assert_eq!((row_y, row_h), (30, 30));
+    }
+
+    #[test]
+    fn sticky_top_row_clips_next_row_without_gap_after_activation() {
+        let width = 120;
+        let height = 140;
+        let mut grid = VolvoxGrid::new(1, width, height, 4, 1, 0, 0);
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 20;
+        for row in 0..grid.rows {
+            grid.set_row_height(row, 30);
+        }
+        grid.set_row_sticky(1, pb::StickyEdge::StickyTop as i32);
+        grid.ensure_layout();
+        grid.scroll.scroll_y = 31.0;
+
+        let vp = VisibleRange::compute(&grid, width, height);
+        assert_eq!(vp.sticky_top_rows, vec![1]);
+
+        let (_, sticky_y, _, sticky_h) =
+            cell_rect(&grid, 1, 0, &vp).expect("sticky row should be visible");
+        let (_, next_y, _, next_h) =
+            cell_rect(&grid, 2, 0, &vp).expect("next row should be visible");
+        assert_eq!((sticky_y, sticky_h), (20, 30));
+        assert_eq!(next_y, sticky_y + sticky_h);
+        assert_eq!(next_h, 29);
+    }
+
+    #[test]
+    fn sticky_bottom_row_uses_data_bottom_with_header_band() {
+        let width = 120;
+        let height = 140;
+        let mut grid = VolvoxGrid::new(1, width, height, 5, 1, 0, 0);
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 20;
+        for row in 0..grid.rows {
+            grid.set_row_height(row, 30);
+        }
+        grid.set_row_sticky(4, pb::StickyEdge::StickyBottom as i32);
+        grid.ensure_layout();
+        grid.scroll.scroll_y = 15.0;
+
+        let vp = VisibleRange::compute(&grid, width, height);
+        assert_eq!(vp.data_y, 20);
+        assert_eq!(vp.data_h, 120);
+        assert_eq!(vp.sticky_bottom_rows, vec![4]);
+
+        let (_, sticky_y, _, sticky_h) =
+            cell_rect(&grid, 4, 0, &vp).expect("bottom sticky row should be visible");
+        assert_eq!((sticky_y, sticky_h), (110, 30));
     }
 
     #[test]

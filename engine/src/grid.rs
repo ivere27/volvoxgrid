@@ -2542,10 +2542,16 @@ impl VolvoxGrid {
 
     /// Set the sticky edge for a column (0=none, 3=LEFT, 4=RIGHT, 5=BOTH).
     pub fn set_col_sticky(&mut self, col: i32, edge: i32) {
+        if col < 0 || col >= self.cols {
+            return;
+        }
         if edge == 0 {
             self.sticky_cols.remove(&col);
         } else {
             self.sticky_cols.insert(col, edge);
+        }
+        if let Some(props) = self.columns.get_mut(col as usize) {
+            props.sticky = edge;
         }
         self.mark_dirty();
     }
@@ -3754,6 +3760,15 @@ impl VolvoxGrid {
         self.pinned_cols_right.retain(|&col| col < c1 || col > c2);
         self.sticky_rows.retain(|row, _| *row < r1 || *row > r2);
         self.sticky_cols.retain(|col, _| *col < c1 || *col > c2);
+        let clear_col_start = c1.max(0);
+        let clear_col_end = c2.min(self.cols - 1);
+        if clear_col_start <= clear_col_end {
+            for col in clear_col_start..=clear_col_end {
+                if let Some(props) = self.columns.get_mut(col as usize) {
+                    props.sticky = 0;
+                }
+            }
+        }
         self.sticky_cells
             .retain(|&(row, col), _| row < r1 || row > r2 || col < c1 || col > c2);
         self.layout.invalidate();
@@ -5357,6 +5372,7 @@ mod tests {
 
         assert_eq!(grid.effective_sticky_row(0, 0), 1);
         assert_eq!(grid.effective_sticky_col(0, 0), 3);
+        assert_eq!(grid.columns[0].sticky, 3);
 
         assert_eq!(grid.is_row_pinned(1), 0);
         assert_eq!(grid.is_row_pinned(2), 0);
@@ -5366,8 +5382,26 @@ mod tests {
         assert_eq!(grid.effective_sticky_row(2, 2), 0);
         assert_eq!(grid.effective_sticky_col(1, 1), 0);
         assert_eq!(grid.effective_sticky_col(2, 2), 0);
+        assert_eq!(grid.columns[1].sticky, 0);
+        assert_eq!(grid.columns[2].sticky, 0);
         assert!(!grid.sticky_cells.contains_key(&(1, 1)));
         assert!(!grid.sticky_cells.contains_key(&(2, 2)));
+    }
+
+    #[test]
+    fn set_col_sticky_keeps_column_props_in_sync() {
+        let mut grid = VolvoxGrid::new(1, 640, 480, 3, 3, 0, 0);
+
+        grid.set_col_sticky(1, pb::StickyEdge::StickyLeft as i32);
+        assert_eq!(
+            grid.effective_sticky_col(0, 1),
+            pb::StickyEdge::StickyLeft as i32
+        );
+        assert_eq!(grid.columns[1].sticky, pb::StickyEdge::StickyLeft as i32);
+
+        grid.set_col_sticky(1, 0);
+        assert_eq!(grid.effective_sticky_col(0, 1), 0);
+        assert_eq!(grid.columns[1].sticky, 0);
     }
 
     #[test]

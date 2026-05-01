@@ -61,6 +61,8 @@ struct LocalColHit {
     col: i32,
     effective_x: i32,
     in_fixed_col_area: bool,
+    // True for columns drawn in an overlay position (pinned or sticky), where
+    // normal layout-space resize-edge math would target the scrolled column.
     hit_pinned_col: bool,
 }
 
@@ -2611,7 +2613,7 @@ fn resolve_col_hit(
     grid: &VolvoxGrid,
     layout: &crate::layout::LayoutCache,
     local_x: i32,
-    viewport_w: i32,
+    vp: &VisibleRange,
 ) -> LocalColHit {
     let scroll_x = grid.scroll.scroll_x;
     let fixed_col_end = grid.fixed_cols + grid.frozen_cols;
@@ -2622,7 +2624,7 @@ fn resolve_col_hit(
     let in_fixed_col_area = local_x < fixed_col_width;
     let pin_left_start = fixed_col_right;
     let pin_left_end = fixed_col_right + pinned_left_w;
-    let pin_right_start = viewport_w - pinned_right_w;
+    let pin_right_start = vp.data_w - pinned_right_w;
 
     let mut hit_pinned_col = false;
     let mut effective_x = if in_fixed_col_area {
@@ -2634,6 +2636,42 @@ fn resolve_col_hit(
 
     if in_fixed_col_area {
         col = layout.col_at_x(effective_x);
+    } else if !vp.sticky_left_cols.is_empty()
+        && local_x >= fixed_col_right
+        && local_x < fixed_col_right + vp.sticky_left_width
+    {
+        hit_pinned_col = true;
+        effective_x = local_x;
+        let mut x = fixed_col_right;
+        for &sc in &vp.sticky_left_cols {
+            let cw = grid.col_width(sc);
+            if cw <= 0 {
+                continue;
+            }
+            if local_x >= x && local_x < x + cw {
+                col = sc;
+                break;
+            }
+            x += cw;
+        }
+    } else if !vp.sticky_right_cols.is_empty()
+        && local_x >= vp.data_w - vp.sticky_right_width
+        && local_x < vp.data_w
+    {
+        hit_pinned_col = true;
+        effective_x = local_x;
+        let mut x = vp.data_w - vp.sticky_right_width;
+        for &sc in &vp.sticky_right_cols {
+            let cw = grid.col_width(sc);
+            if cw <= 0 {
+                continue;
+            }
+            if local_x >= x && local_x < x + cw {
+                col = sc;
+                break;
+            }
+            x += cw;
+        }
     } else if pinned_left_w > 0 && local_x >= pin_left_start && local_x < pin_left_end {
         hit_pinned_col = true;
         effective_x = local_x;
@@ -2649,7 +2687,7 @@ fn resolve_col_hit(
             }
             x += cw;
         }
-    } else if pinned_right_w > 0 && local_x >= pin_right_start && local_x < viewport_w {
+    } else if pinned_right_w > 0 && local_x >= pin_right_start && local_x < vp.data_w {
         hit_pinned_col = true;
         effective_x = local_x;
         let mut x = pin_right_start;
@@ -2844,7 +2882,7 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
         && px_i < vp.data_x + vp.data_w
     {
         let local_x = px_i - vp.data_x;
-        let col_hit = resolve_col_hit(grid, layout, local_x, vp.data_w);
+        let col_hit = resolve_col_hit(grid, layout, local_x, &vp);
         if col_hit.col >= 0 && col_hit.col < grid.cols {
             let mut area = HitArea::IndicatorColTop;
             let mut hit_col = col_hit.col;
@@ -2928,7 +2966,7 @@ pub fn hit_test(grid: &mut VolvoxGrid, px: f32, py: f32) -> HitTestResult {
     let local_x = px_i - vp.data_x;
     let local_y = py_i - vp.data_y;
     let row_hit = resolve_row_hit(grid, layout, local_y, vp.data_h);
-    let col_hit = resolve_col_hit(grid, layout, local_x, vp.data_w);
+    let col_hit = resolve_col_hit(grid, layout, local_x, &vp);
     let mut row = row_hit.row;
     let mut col = col_hit.col;
     let effective_x = col_hit.effective_x;
@@ -5137,6 +5175,38 @@ mod tests {
 
         assert_eq!(hit.area, HitArea::FixedRow);
         assert_eq!(hit.col, 2);
+    }
+
+    #[test]
+    fn hit_test_sticky_left_col_returns_overlay_col_not_scrolled_col_underneath() {
+        let mut grid = VolvoxGrid::new(1, 160, 120, 3, 6, 0, 0);
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.set_col_sticky(3, pb::StickyEdge::StickyLeft as i32);
+        grid.scroll.scroll_x = 210.0;
+        prime_layout(&mut grid);
+
+        let hit = hit_test(&mut grid, 10.0, 10.0);
+
+        assert_eq!(hit.area, HitArea::Cell);
+        assert_eq!(hit.col, 3);
+    }
+
+    #[test]
+    fn hit_test_sticky_right_col_returns_overlay_col_not_scrolled_col_underneath() {
+        let mut grid = VolvoxGrid::new(1, 160, 120, 3, 6, 0, 0);
+        for col in 0..grid.cols {
+            grid.set_col_width(col, 40);
+        }
+        grid.set_col_sticky(5, pb::StickyEdge::StickyRight as i32);
+        grid.scroll.scroll_x = 40.0;
+        prime_layout(&mut grid);
+
+        let hit = hit_test(&mut grid, 130.0, 10.0);
+
+        assert_eq!(hit.area, HitArea::Cell);
+        assert_eq!(hit.col, 5);
     }
 
     #[test]
