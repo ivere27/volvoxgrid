@@ -4123,7 +4123,7 @@ fn draw_outline_toggle<C: Canvas>(
             .filter(|s| !s.trim().is_empty())
     };
     if let Some(icon) = node_icon {
-        let (icon_font_name, font_size, font_bold, font_italic, icon_color) =
+        let (icon_font_name, mut font_size, font_bold, font_italic, icon_color) =
             resolve_icon_text_style(
                 grid,
                 resolve_tree_slot_style(grid, is_collapsed),
@@ -4132,7 +4132,8 @@ fn draw_outline_toggle<C: Canvas>(
                 false,
                 color,
             );
-        let (tw, th) = canvas.measure_text(
+        font_size = font_size.min(h.max(1) as f32).clamp(1.0, 256.0);
+        let (mut tw, mut th) = canvas.measure_text(
             icon,
             &icon_font_name,
             font_size,
@@ -4140,6 +4141,22 @@ fn draw_outline_toggle<C: Canvas>(
             font_italic,
             None,
         );
+        if tw > 0.0 && th > 0.0 {
+            let fit = ((w.max(1) as f32) / tw)
+                .min((h.max(1) as f32) / th)
+                .min(1.0);
+            if fit < 0.999 {
+                font_size = (font_size * fit).clamp(1.0, 256.0);
+                (tw, th) = canvas.measure_text(
+                    icon,
+                    &icon_font_name,
+                    font_size,
+                    font_bold,
+                    font_italic,
+                    None,
+                );
+            }
+        }
         let text_w = tw.ceil() as i32;
         let text_h = th.ceil() as i32;
         let tx = x + (w - text_w) / 2;
@@ -4181,6 +4198,40 @@ fn draw_outline_toggle<C: Canvas>(
     );
 }
 
+fn outline_toggle_uses_themed_icon(grid: &VolvoxGrid) -> bool {
+    grid.outline.node_open_picture.is_some()
+        || grid.outline.node_closed_picture.is_some()
+        || grid
+            .style
+            .icon_theme_slots
+            .tree_expanded
+            .as_deref()
+            .map_or(false, |s| !s.trim().is_empty())
+        || grid
+            .style
+            .icon_theme_slots
+            .tree_collapsed
+            .as_deref()
+            .map_or(false, |s| !s.trim().is_empty())
+}
+
+fn outline_toggle_box_size(
+    grid: &VolvoxGrid,
+    row_height: i32,
+    tg: crate::outline::TreeGeometry,
+) -> i32 {
+    let max_size = row_height.saturating_sub(2).max(0);
+    if max_size <= 0 {
+        return 0;
+    }
+    let base_size = tg.btn_size.max(0);
+    if outline_toggle_uses_themed_icon(grid) {
+        base_size.max(row_height.saturating_sub(4)).min(max_size)
+    } else {
+        base_size.min(max_size)
+    }
+}
+
 fn render_outline_expander_slot<C: Canvas>(
     canvas: &mut C,
     grid: &VolvoxGrid,
@@ -4210,7 +4261,7 @@ fn render_outline_expander_slot<C: Canvas>(
         || grid.outline.tree_indicator
             == pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
     let show_toggle = has_children || leaf_style;
-    let toggle_size = tg.btn_size.min(h.saturating_sub(2).max(0)).max(0);
+    let toggle_size = outline_toggle_box_size(grid, h, tg);
     let mut text_x = indent_x;
     let toggle_rect = if show_toggle && toggle_size > 0 {
         let bx =
@@ -10251,9 +10302,9 @@ mod tests {
         draw_linear_barcode, draw_outline_toggle, draw_qr_barcode,
         draw_tree_guide_hline_except_rect, draw_tree_guide_vline_except_rect, dropdown_button_rect,
         dropdown_glyph_metrics, dropdown_layer_needed, encode_linear_barcode,
-        linear_barcode_preview_rect, normalized_code128_payload, parse_progress_percent,
-        picture_layer_needed, progress_layer_needed, render_fast_scroll, render_grid,
-        show_dropdown_button_for_cell, sort_arrow_box_size, BarcodeDrawRect, CellKey,
+        linear_barcode_preview_rect, normalized_code128_payload, outline_toggle_box_size,
+        parse_progress_percent, picture_layer_needed, progress_layer_needed, render_fast_scroll,
+        render_grid, show_dropdown_button_for_cell, sort_arrow_box_size, BarcodeDrawRect, CellKey,
         RenderContext, RenderCtxCacheKey, RenderCtxCached, DEFAULT_BARCODE_SIZE_WARNING_COLOR,
     };
     use crate::canvas_cpu::CpuCanvas;
@@ -10584,6 +10635,52 @@ mod tests {
             assert!(!draw.bold);
             assert!(!draw.italic);
         }
+    }
+
+    #[test]
+    fn outline_toggle_icon_theme_font_fits_toggle_clip() {
+        let width = 32;
+        let height = 24;
+        let stride = width * 4;
+        let draws = Arc::new(Mutex::new(Vec::new()));
+        let mut text = RecordingTextDrawRenderer {
+            draws: draws.clone(),
+        };
+        let mut buffer = vec![0; (height * stride) as usize];
+        let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+        let mut grid = VolvoxGrid::new(1, width, height, 2, 1, 0, 0);
+        grid.style.font_name = "Material Icons".to_string();
+        grid.style.font_size = 28.0;
+        grid.style.icon_theme_slots.tree_collapsed = Some(">".to_string());
+
+        draw_outline_toggle(
+            &mut canvas,
+            &grid,
+            (0, 4, 12, 12),
+            (0, 0, 12, 20),
+            true,
+            0xFF000000,
+        );
+
+        let draws = draws.lock().unwrap();
+        assert_eq!(draws.len(), 1);
+        assert_eq!(draws[0].text, ">");
+        assert_eq!(draws[0].font_name, "Material Icons");
+        assert!(
+            draws[0].font_size <= 12.0,
+            "tree icon font should fit the 12px clip box, got {}",
+            draws[0].font_size
+        );
+    }
+
+    #[test]
+    fn outline_toggle_box_uses_row_height_for_themed_icons() {
+        let mut grid = VolvoxGrid::new(1, 120, 48, 2, 1, 0, 0);
+        let tg = crate::outline::TreeGeometry::from_grid(&grid);
+        assert_eq!(outline_toggle_box_size(&grid, 36, tg), tg.btn_size);
+
+        grid.style.icon_theme_slots.tree_collapsed = Some(">".to_string());
+        assert_eq!(outline_toggle_box_size(&grid, 36, tg), 32);
     }
 
     #[test]
