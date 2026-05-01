@@ -2857,6 +2857,19 @@ export class VolvoxGrid {
     ));
   }
 
+  /** Record the current font/default cell size as the 100% zoom baseline. */
+  captureZoomBase(): void {
+    this.refreshZoomBaseForGrid(this.gridId);
+    if (typeof this.wasm.set_debug_zoom_level === "function") {
+      this.wasm.set_debug_zoom_level(this.gridId, 1.0);
+    }
+  }
+
+  private isAtZoomBase(gridId: number = this.gridId): boolean {
+    const scale = this.zoomScaleByGrid.get(gridId) ?? 1.0;
+    return Math.abs(scale - 1.0) <= VolvoxGrid.ZOOM_STEP_NOISE_EPSILON;
+  }
+
   // ── Cell data ────────────────────────────────────────────────────────
 
   setCellText(row: number, col: number, text: string): void {
@@ -3084,6 +3097,9 @@ export class VolvoxGrid {
     } else {
       this.wasm.set_col_width(this.gridId, -1, w);
     }
+    if (this.isAtZoomBase() && Number.isFinite(w) && w > 0) {
+      this.zoomBaseColWidthByGrid.set(this.gridId, Math.round(w));
+    }
     this.dirty = true;
   }
 
@@ -3113,6 +3129,9 @@ export class VolvoxGrid {
       this.wasm.set_default_row_height(this.gridId, h);
     } else {
       this.wasm.set_row_height(this.gridId, -1, h);
+    }
+    if (this.isAtZoomBase() && Number.isFinite(h) && h > 0) {
+      this.zoomBaseRowHeightByGrid.set(this.gridId, Math.round(h));
     }
     this.dirty = true;
   }
@@ -3227,6 +3246,9 @@ export class VolvoxGrid {
   setFontSize(size: number): void {
     if (typeof this.wasm.set_font_size === "function") {
       this.wasm.set_font_size(this.gridId, size);
+      if (this.isAtZoomBase() && Number.isFinite(size) && size > 0) {
+        this.zoomBaseFontSizeByGrid.set(this.gridId, size);
+      }
       this.dirty = true;
     }
   }
@@ -6012,7 +6034,7 @@ export class VolvoxGrid {
       return;
     }
     this.clearLastTouchTap();
-    this.refreshZoomBaseForGrid(this.gridId);
+    this.ensureZoomBaseForGrid(this.gridId);
     this.touchMode = "pinch";
     this.activeTouchPointerId = null;
     this.touchPanActive = false;

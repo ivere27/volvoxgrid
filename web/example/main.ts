@@ -1848,6 +1848,10 @@ async function main() {
   const btnDoomSelect = document.getElementById("btn-doom-select") as HTMLButtonElement;
   const btnDoomFire = document.getElementById("btn-doom-fire") as HTMLButtonElement;
   const btnDoomUse = document.getElementById("btn-doom-use") as HTMLButtonElement;
+  const btnSortAsc = document.getElementById("btn-sort-asc") as HTMLButtonElement;
+  const btnSortDesc = document.getElementById("btn-sort-desc") as HTMLButtonElement;
+  const btnSortAscMobile = document.getElementById("btn-sort-asc-mobile") as HTMLButtonElement;
+  const btnSortDescMobile = document.getElementById("btn-sort-desc-mobile") as HTMLButtonElement;
   const doomRemoteModal = document.getElementById("doom-remote-modal") as HTMLDivElement;
   const chkDoomRemoteRemember = document.getElementById("chk-doom-remote-remember") as HTMLInputElement;
   const btnDoomRemoteCancel = document.getElementById("btn-doom-remote-cancel") as HTMLButtonElement;
@@ -1855,12 +1859,15 @@ async function main() {
   const stressConfirmModal = document.getElementById("stress-confirm-modal") as HTMLDivElement;
   const btnStressCancel = document.getElementById("btn-stress-cancel") as HTMLButtonElement;
   const btnStressContinue = document.getElementById("btn-stress-continue") as HTMLButtonElement;
-  const selCanvasRes = document.getElementById("sel-canvas-res") as HTMLSelectElement;
   const selTextCache = document.getElementById("sel-text-cache") as HTMLSelectElement;
+  const selTextCacheMobile = document.getElementById("sel-text-cache-mobile") as HTMLSelectElement;
+  const textCacheSelects = [selTextCache, selTextCacheMobile];
   const selDoomRes = document.getElementById("sel-doom-res") as HTMLSelectElement;
   const chkDoomBorder = document.getElementById("chk-doom-border") as HTMLInputElement;
   const layerDropdown = document.getElementById("layer-dropdown") as HTMLDivElement;
+  const mobileMenuDropdown = document.getElementById("mobile-menu-dropdown") as HTMLDivElement;
   const btnLayers = document.getElementById("btn-layers") as HTMLButtonElement;
+  const btnMobileMenu = document.getElementById("btn-mobile-menu") as HTMLButtonElement;
   const layerPanel = document.getElementById("layer-panel") as HTMLDivElement;
   const layerPanelOptions = document.getElementById("layer-panel-options") as HTMLDivElement;
   const btnLayersAll = document.getElementById("btn-layers-all") as HTMLButtonElement;
@@ -1925,20 +1932,10 @@ async function main() {
   }
 
   status.textContent = "Starting grid...";
-  const rawDeviceScale = window.devicePixelRatio || 1;
-  const deviceScale = Number.isFinite(rawDeviceScale) && rawDeviceScale > 0
-    ? rawDeviceScale
-    : 1;
-  const normalizeDpiScale = (raw: number): number => {
+  const getCurrentDeviceScale = (): number => {
+    const raw = window.devicePixelRatio || 1;
     return Number.isFinite(raw) && raw > 0.01 ? raw : 1;
   };
-  const getCurrentDeviceScale = (): number => {
-    const raw = window.devicePixelRatio || deviceScale;
-    return normalizeDpiScale(raw);
-  };
-  let currentRenderDpiScale = getCurrentDeviceScale();
-  const gridDpiScaleById = new Map<number, number>();
-  const gridFontReadabilityBoostById = new Map<number, number>();
   let layerMask = LAYER_MASK_ALL;
   const layerCheckboxes: HTMLInputElement[] = [];
 
@@ -1949,7 +1946,7 @@ async function main() {
     
     let id: number;
     if (typeof createGridScaled === "function") {
-      id = Number(createGridScaled(rows, cols, currentRenderDpiScale));
+      id = Number(createGridScaled(rows, cols, getCurrentDeviceScale()));
     } else {
       id = Number((wasmModule as any).create_grid(rows, cols));
     }
@@ -1960,8 +1957,6 @@ async function main() {
       (wasmModule as any).set_grid_text_renderer(id, renderer.measureText, renderer.renderText);
     }
 
-    gridDpiScaleById.set(id, currentRenderDpiScale);
-    gridFontReadabilityBoostById.set(id, 1.0);
     applyRenderLayerMaskToGrid(id);
     setGridScrollBlit(id, scrollBlitEnabled);
     setGridEditable(id, editEnabled);
@@ -1973,7 +1968,7 @@ async function main() {
       (wasmModule as any).set_font_name(id, DEMO_DEFAULT_FONT_FAMILY);
     }
     if (typeof (wasmModule as any).set_font_size === "function") {
-      (wasmModule as any).set_font_size(id, 14.0 * currentRenderDpiScale);
+      (wasmModule as any).set_font_size(id, 14.0 * getCurrentDeviceScale());
     }
   };
 
@@ -1984,9 +1979,8 @@ async function main() {
   }
   setupDefaultInput(grid, wasmModule, canvas);
   grid.onZoomChange = () => { updateStatus(); };
-  gridDpiScaleById.set(grid.id, currentRenderDpiScale);
-  gridFontReadabilityBoostById.set(grid.id, 1.0);
   applyAndroidLikeDemoStyle(grid.id);
+  grid.captureZoomBase();
   if (typeof (wasmModule as any).get_render_layer_mask_lo === "function") {
     layerMask = normalizeLayerMask(Number((wasmModule as any).get_render_layer_mask_lo(grid.id)));
   }
@@ -2373,6 +2367,7 @@ async function main() {
   function setLayerPanelOpen(open: boolean): void {
     layerPanel.hidden = !open;
     btnLayers.setAttribute("aria-expanded", open ? "true" : "false");
+    btnMobileMenu.setAttribute("aria-expanded", open ? "true" : "false");
   }
 
   function commitLayerMask(nextMask: number): void {
@@ -2405,103 +2400,48 @@ async function main() {
     }
   }
 
-  function applyDpiScaleToGrid(id: number, nextScaleRaw: number): void {
-    const nextScale = normalizeDpiScale(nextScaleRaw);
-    const prevScale = normalizeDpiScale(gridDpiScaleById.get(id) ?? nextScale);
-    const relative = nextScale / prevScale;
-    const nativeScale = getCurrentDeviceScale();
-    const scaleRatio = nextScale / nativeScale;
-    const nextFontBoost = scaleRatio >= 1.0
-      ? 1.0
-      : 1.0 + ((1.0 - scaleRatio) * 0.5);
-    const prevFontBoost = Number.isFinite(gridFontReadabilityBoostById.get(id) ?? 1.0)
-      ? (gridFontReadabilityBoostById.get(id) ?? 1.0)
-      : 1.0;
-    const setGridScale = (wasmModule as any).set_grid_scale as
-      | ((gridId: number, scale: number) => void)
-      | undefined;
-
-    if (!Number.isFinite(relative) || relative <= 0) {
-      gridDpiScaleById.set(id, nextScale);
-      if (typeof setGridScale === "function") {
-        setGridScale(id, nextScale);
-      }
-      return;
-    }
-
-    if (Math.abs(relative - 1.0) > 0.0001) {
-      const getFontSize = (wasmModule as any).get_font_size as ((gridId: number) => number) | undefined;
-      const setFontSize = (wasmModule as any).set_font_size as
-        | ((gridId: number, size: number) => void)
-        | undefined;
-      if (typeof getFontSize === "function" && typeof setFontSize === "function") {
-        const prevFont = Number(getFontSize(id));
-        if (Number.isFinite(prevFont) && prevFont > 0) {
-          const boostRatio = nextFontBoost / Math.max(0.0001, prevFontBoost);
-          const nextFont = Math.max(1, Math.round(prevFont * relative * boostRatio * 10) / 10);
-          setFontSize(id, nextFont);
-        }
-      }
-
-      const getDefaultRowHeight =
-        (wasmModule as any).get_default_row_height as ((gridId: number) => number) | undefined;
-      const setDefaultRowHeight =
-        (wasmModule as any).set_default_row_height as ((gridId: number, h: number) => void) | undefined;
-      if (typeof getDefaultRowHeight === "function" && typeof setDefaultRowHeight === "function") {
-        const prevRowH = Number(getDefaultRowHeight(id));
-        if (Number.isFinite(prevRowH) && prevRowH > 0) {
-          setDefaultRowHeight(id, Math.max(1, Math.round(prevRowH * relative)));
-        }
-      }
-
-      const getDefaultColWidth =
-        (wasmModule as any).get_default_col_width as ((gridId: number) => number) | undefined;
-      const setDefaultColWidth =
-        (wasmModule as any).set_default_col_width as ((gridId: number, w: number) => void) | undefined;
-      if (typeof getDefaultColWidth === "function" && typeof setDefaultColWidth === "function") {
-        const prevColW = Number(getDefaultColWidth(id));
-        if (Number.isFinite(prevColW) && prevColW > 0) {
-          setDefaultColWidth(id, Math.max(1, Math.round(prevColW * relative)));
-        }
-      }
-
-      const scaleRowHeightOverrides =
-        (wasmModule as any).scale_row_height_overrides as ((gridId: number, s: number) => void) | undefined;
-      if (typeof scaleRowHeightOverrides === "function") {
-        scaleRowHeightOverrides(id, relative);
-      }
-
-      const scaleColWidthOverrides =
-        (wasmModule as any).scale_col_width_overrides as ((gridId: number, s: number) => void) | undefined;
-      if (typeof scaleColWidthOverrides === "function") {
-        scaleColWidthOverrides(id, relative);
-      }
-    }
-
-    gridDpiScaleById.set(id, nextScale);
-    gridFontReadabilityBoostById.set(id, nextFontBoost);
-    if (typeof setGridScale === "function") {
-      setGridScale(id, nextScale);
-    }
-  }
-
-  function applyDpiScaleToKnownGrids(nextScaleRaw: number): void {
-    const nextScale = normalizeDpiScale(nextScaleRaw);
-    for (const id of knownGridIds()) {
-      applyDpiScaleToGrid(id, nextScale);
-    }
-  }
-
   const chkDebug = document.getElementById("chk-debug") as HTMLInputElement;
+  const chkDebugMobile = document.getElementById("chk-debug-mobile") as HTMLInputElement;
   const chkGpu = document.getElementById("chk-gpu") as HTMLInputElement;
+  const chkGpuMobile = document.getElementById("chk-gpu-mobile") as HTMLInputElement;
   const chkScrollBlit = document.getElementById("chk-scroll-blit") as HTMLInputElement;
+  const chkScrollBlitMobile = document.getElementById("chk-scroll-blit-mobile") as HTMLInputElement;
   const chkAnim = document.getElementById("chk-anim") as HTMLInputElement;
+  const chkAnimMobile = document.getElementById("chk-anim-mobile") as HTMLInputElement;
   const chkHover = document.getElementById("chk-hover") as HTMLInputElement;
+  const chkHoverMobile = document.getElementById("chk-hover-mobile") as HTMLInputElement;
   const chkEdit = document.getElementById("chk-edit") as HTMLInputElement;
+  const chkEditMobile = document.getElementById("chk-edit-mobile") as HTMLInputElement;
   chkScrollBlit.checked = scrollBlitEnabled;
   chkEdit.checked = editEnabled;
   chkHover.checked = parseEnvBool(env?.VITE_VG_ENABLE_HOVER, false);
   debugEventLoggingEnabled = chkDebug.checked;
+
+  function syncMirroredCheckbox(primary: HTMLInputElement, mirror: HTMLInputElement): void {
+    mirror.checked = primary.checked;
+    mirror.disabled = primary.disabled;
+  }
+
+  function bindMirroredCheckbox(
+    primary: HTMLInputElement,
+    mirror: HTMLInputElement,
+    onChange: () => void,
+  ): void {
+    const commit = (source: HTMLInputElement) => {
+      primary.checked = source.checked;
+      mirror.checked = source.checked;
+      onChange();
+    };
+    primary.addEventListener("change", () => { commit(primary); });
+    mirror.addEventListener("change", () => { commit(mirror); });
+  }
+
+  syncMirroredCheckbox(chkDebug, chkDebugMobile);
+  syncMirroredCheckbox(chkGpu, chkGpuMobile);
+  syncMirroredCheckbox(chkScrollBlit, chkScrollBlitMobile);
+  syncMirroredCheckbox(chkAnim, chkAnimMobile);
+  syncMirroredCheckbox(chkHover, chkHoverMobile);
+  syncMirroredCheckbox(chkEdit, chkEditMobile);
 
   function hoverModeForDemo(mode: StandardDemoMode): number {
     return DEMO_DEFAULT_HOVER_MODE[mode] ?? HOVER_NONE;
@@ -2559,6 +2499,7 @@ async function main() {
 
   function syncEditToggleEnabledState(): void {
     chkEdit.disabled = currentDemo === "doom";
+    chkEditMobile.disabled = currentDemo === "doom";
   }
 
   function applyHoverToggleToKnownGrids(): void {
@@ -2588,6 +2529,24 @@ async function main() {
       return parsed;
     }
     return 8192;
+  }
+
+  function syncTextLayoutCacheSelects(value: string): void {
+    for (const select of textCacheSelects) {
+      if (select.value !== value) {
+        select.value = value;
+      }
+    }
+  }
+
+  function applySelectedTextLayoutCacheCap(value: string): void {
+    syncTextLayoutCacheSelects(value);
+    const cap = selectedTextLayoutCacheCap();
+    grid.textLayoutCacheCap = cap;
+    if (canvas2DRenderer) {
+      canvas2DRenderer.setCacheSize(cap);
+    }
+    grid.invalidate();
   }
 
   function applyActiveRenderSettings(): void {
@@ -2982,14 +2941,9 @@ async function main() {
     grid.scrollBars = ScrollBarsMode.SCROLLBAR_NONE;
     grid.setGridLines(chkDoomBorder.checked ? GridLineStyle.GRIDLINE_SOLID : GridLineStyle.GRIDLINE_NONE);
 
-    // Compute cell sizes to fill the rendered canvas area.
-    const scale = getCurrentDeviceScale();
-    const cw = canvasRenderOverride
-      ? Math.max(1, Math.round(canvasRenderOverride[0]))
-      : Math.max(1, Math.round(canvas.clientWidth * scale));
-    const ch = canvasRenderOverride
-      ? Math.max(1, Math.round(canvasRenderOverride[1]))
-      : Math.max(1, Math.round(canvas.clientHeight * scale));
+    // Compute cell sizes to fill the actual render buffer.
+    const cw = Math.max(1, canvas.width || Math.round(canvas.clientWidth * getCurrentDeviceScale()));
+    const ch = Math.max(1, canvas.height || Math.round(canvas.clientHeight * getCurrentDeviceScale()));
     const baseColW = Math.max(1, Math.floor(cw / doomCols));
     const baseRowH = Math.max(1, Math.floor(ch / doomRows));
     const extraCols = Math.max(0, cw - baseColW * doomCols);
@@ -3003,150 +2957,6 @@ async function main() {
     }
 
     grid.invalidate();
-  }
-
-  type CanvasResolution = [number, number];
-  const CANVAS_RESOLUTION_RATIO_PRESETS: ReadonlyArray<readonly [label: string, scale: number]> = [
-    ["2/3", 2 / 3],
-    ["3/4", 3 / 4],
-    ["4/5", 4 / 5],
-    ["3/2", 3 / 2],
-    ["2/1", 2],
-  ];
-  let canvasRenderOverride: CanvasResolution | null = null;
-
-  function currentCanvasCssSize(): [number, number] {
-    const rect = canvas.getBoundingClientRect();
-    const w = Math.max(1, Math.round(canvas.clientWidth || rect.width || window.innerWidth || 1));
-    const h = Math.max(1, Math.round(canvas.clientHeight || rect.height || window.innerHeight || 1));
-    return [w, h];
-  }
-
-  function currentAutoCanvasResolution(): CanvasResolution {
-    const [cssW, cssH] = currentCanvasCssSize();
-    const scale = getCurrentDeviceScale();
-    const w = Math.max(1, Math.round(cssW * scale));
-    const h = Math.max(1, Math.round(cssH * scale));
-    return [w, h];
-  }
-
-  function parseCanvasResolutionRatio(value: string): number | null {
-    if (!value.startsWith("ratio:")) {
-      return null;
-    }
-    const ratioLabel = value.slice("ratio:".length);
-    const ratio = CANVAS_RESOLUTION_RATIO_PRESETS.find(([label]) => label === ratioLabel);
-    return ratio ? ratio[1] : null;
-  }
-
-  function parseCanvasResolutionValue(value: string): CanvasResolution | null {
-    if (value === "auto") {
-      return null;
-    }
-    const ratio = parseCanvasResolutionRatio(value);
-    if (ratio != null) {
-      if (!Number.isFinite(ratio) || ratio <= 0) {
-        return null;
-      }
-      const [baseW, baseH] = currentAutoCanvasResolution();
-      return [
-        Math.max(1, Math.round(baseW * ratio)),
-        Math.max(1, Math.round(baseH * ratio)),
-      ];
-    }
-    const match = /^(\d+)x(\d+)$/.exec(value);
-    if (!match) {
-      return null;
-    }
-    const w = Number(match[1]);
-    const h = Number(match[2]);
-    if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
-      return null;
-    }
-    return [Math.round(w), Math.round(h)];
-  }
-
-  function rebuildCanvasResolutionOptions(preserveSelection: boolean): void {
-    const prevIndex = selCanvasRes.selectedIndex;
-    const prevValue = selCanvasRes.value;
-    const [autoW, autoH] = currentAutoCanvasResolution();
-    selCanvasRes.innerHTML = "";
-    selCanvasRes.add(new Option(`AUTO (${autoW} × ${autoH})`, "auto"));
-    for (const [label, scale] of CANVAS_RESOLUTION_RATIO_PRESETS) {
-      const width = Math.max(1, Math.round(autoW * scale));
-      const height = Math.max(1, Math.round(autoH * scale));
-      selCanvasRes.add(new Option(`${label} (${width} × ${height})`, `ratio:${label}`));
-    }
-
-    if (!preserveSelection) {
-      selCanvasRes.value = "auto";
-      return;
-    }
-
-    if (prevValue === "auto") {
-      selCanvasRes.value = "auto";
-      return;
-    }
-
-    let selected = false;
-    const hasPrevValue = Array.from(selCanvasRes.options).some((opt) => opt.value === prevValue);
-    if (hasPrevValue) {
-      selCanvasRes.value = prevValue;
-      selected = true;
-    }
-
-    if (!selected && prevIndex >= 0 && prevIndex < selCanvasRes.options.length) {
-      selCanvasRes.selectedIndex = prevIndex;
-      selected = true;
-    }
-
-    if (!selected) {
-      selCanvasRes.value = "auto";
-    }
-  }
-
-  function canvasResolutionDpiScale(value: string, preset: CanvasResolution | null): number {
-    if (value === "auto") {
-      return getCurrentDeviceScale();
-    }
-
-    const ratio = parseCanvasResolutionRatio(value);
-    if (ratio != null) {
-      return normalizeDpiScale(getCurrentDeviceScale() * ratio);
-    }
-
-    if (!preset) {
-      return getCurrentDeviceScale();
-    }
-
-    const [cssW, cssH] = currentCanvasCssSize();
-    const scaleX = preset[0] / cssW;
-    const scaleY = preset[1] / cssH;
-    return normalizeDpiScale((scaleX + scaleY) * 0.5);
-  }
-
-  function applyCanvasResolutionPreset(value: string): void {
-    const preset = parseCanvasResolutionValue(value);
-    canvas.style.width = "100%";
-    canvas.style.height = "100%";
-    if (!preset) {
-      canvasRenderOverride = null;
-      grid.setRenderResolution(null, null);
-    } else {
-      canvasRenderOverride = [preset[0], preset[1]];
-      grid.setRenderResolution(preset[0], preset[1]);
-    }
-    const nextDpiScale = canvasResolutionDpiScale(value, preset);
-    currentRenderDpiScale = nextDpiScale;
-    applyDpiScaleToKnownGrids(nextDpiScale);
-
-    requestAnimationFrame(() => {
-      if (currentDemo === "doom") {
-        applyDoomGridLayout();
-      } else {
-        grid.invalidate();
-      }
-    });
   }
 
   function ensureDemoGrid(mode: StandardDemoMode): number {
@@ -3184,6 +2994,7 @@ async function main() {
     wasmModule.set_fast_scroll_enabled(id, true);
     applyDemoViewDefaults(mode);
     setGridEditable(id, editEnabled);
+    grid.captureZoomBase();
     grid.invalidate();
     demoInitialized[mode] = true;
     if (mode === "hierarchy") {
@@ -3346,12 +3157,6 @@ async function main() {
   setDoomOptionsVisible(false);
   updateDoomTouchControlsVisibility();
 
-  rebuildCanvasResolutionOptions(false);
-  selCanvasRes.addEventListener("change", () => {
-    applyCanvasResolutionPreset(selCanvasRes.value);
-  });
-  applyCanvasResolutionPreset(selCanvasRes.value);
-
   // Initial demo.
   await demoFontsReady;
   await switchDemo("sales");
@@ -3490,7 +3295,12 @@ async function main() {
 
   document.addEventListener("pointerdown", (event) => {
     const target = event.target;
-    if (layerPanel.hidden || !(target instanceof Node) || layerDropdown.contains(target)) {
+    if (
+      layerPanel.hidden
+      || !(target instanceof Node)
+      || layerDropdown.contains(target)
+      || mobileMenuDropdown.contains(target)
+    ) {
       return;
     }
     setLayerPanelOpen(false);
@@ -3498,7 +3308,11 @@ async function main() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !layerPanel.hidden) {
       setLayerPanelOpen(false);
-      btnLayers.focus();
+      if (window.matchMedia("(max-width: 720px)").matches) {
+        btnMobileMenu.focus();
+      } else {
+        btnLayers.focus();
+      }
     }
   });
 
@@ -3507,8 +3321,6 @@ async function main() {
   window.addEventListener("resize", () => {
     clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => {
-      rebuildCanvasResolutionOptions(true);
-      applyCanvasResolutionPreset(selCanvasRes.value);
       updateDoomTouchControlsVisibility();
       if (currentDemo === "doom") {
         applyDoomGridLayout();
@@ -3517,22 +3329,31 @@ async function main() {
   });
 
   // Toolbar handlers.
-  document.getElementById("btn-sort-asc")!.addEventListener("click", () => {
+  const sortCurrentColumn = (order: 1 | 2, label: "ASC" | "DESC") => {
     const col = grid.cursorCol >= 0 ? grid.cursorCol : 0;
     const t0 = performance.now();
-    grid.sort(1, col);
+    grid.sort(order, col);
     const ms = (performance.now() - t0).toFixed(1);
-    lastSortInfo = `Sort: col ${col} ASC (${ms}ms)`;
+    lastSortInfo = `Sort: col ${col} ${label} (${ms}ms)`;
     updateStatus();
+  };
+
+  btnSortAsc.addEventListener("click", () => {
+    sortCurrentColumn(1, "ASC");
   });
 
-  document.getElementById("btn-sort-desc")!.addEventListener("click", () => {
-    const col = grid.cursorCol >= 0 ? grid.cursorCol : 0;
-    const t0 = performance.now();
-    grid.sort(2, col);
-    const ms = (performance.now() - t0).toFixed(1);
-    lastSortInfo = `Sort: col ${col} DESC (${ms}ms)`;
-    updateStatus();
+  btnSortDesc.addEventListener("click", () => {
+    sortCurrentColumn(2, "DESC");
+  });
+
+  btnSortAscMobile.addEventListener("click", () => {
+    sortCurrentColumn(1, "ASC");
+    setLayerPanelOpen(false);
+  });
+
+  btnSortDescMobile.addEventListener("click", () => {
+    sortCurrentColumn(2, "DESC");
+    setLayerPanelOpen(false);
   });
 
   document.getElementById("btn-sort-none")!.addEventListener("click", () => {
@@ -3626,21 +3447,23 @@ async function main() {
 
   // GPU/CPU toggle.
   chkGpu.disabled = !gpuOk;
+  chkGpuMobile.disabled = !gpuOk;
   chkGpu.checked = false;
-  chkGpu.addEventListener("change", () => {
+  chkGpuMobile.checked = false;
+  bindMirroredCheckbox(chkGpu, chkGpuMobile, () => {
     activeRendererMode = chkGpu.checked ? RendererMode.RENDERER_GPU : RendererMode.RENDERER_CPU;
     applyActiveRenderSettings();
     grid.invalidate();
   });
 
-  chkScrollBlit.addEventListener("change", () => {
+  bindMirroredCheckbox(chkScrollBlit, chkScrollBlitMobile, () => {
     scrollBlitEnabled = chkScrollBlit.checked;
     applyScrollBlitToKnownGrids();
     applyActiveRenderSettings();
     grid.invalidate();
   });
 
-  chkEdit.addEventListener("change", () => {
+  bindMirroredCheckbox(chkEdit, chkEditMobile, () => {
     editEnabled = chkEdit.checked;
     applyEditableToKnownDemoGrids();
     if (currentDemo !== "doom") {
@@ -3649,17 +3472,20 @@ async function main() {
   });
 
   // Animation toggle.
-  chkAnim.addEventListener("change", () => {
+  bindMirroredCheckbox(chkAnim, chkAnimMobile, () => {
     applyActiveRenderSettings();
     grid.invalidate();
   });
 
   // Hover highlight toggle.
-  chkHover.addEventListener("change", () => {
+  bindMirroredCheckbox(chkHover, chkHoverMobile, () => {
     applyHoverToggleToKnownGrids();
   });
 
   btnLayers.addEventListener("click", () => {
+    setLayerPanelOpen(layerPanel.hidden);
+  });
+  btnMobileMenu.addEventListener("click", () => {
     setLayerPanelOpen(layerPanel.hidden);
   });
   btnLayersAll.addEventListener("click", () => {
@@ -3670,20 +3496,17 @@ async function main() {
   });
 
   // Debug overlay toggle.
-  chkDebug.addEventListener("change", () => {
+  bindMirroredCheckbox(chkDebug, chkDebugMobile, () => {
     applyActiveRenderSettings();
     grid.invalidate();
   });
 
   // Text layout cache cap.
-  selTextCache.addEventListener("change", () => {
-    const cap = selectedTextLayoutCacheCap();
-    grid.textLayoutCacheCap = cap;
-    if (canvas2DRenderer) {
-      canvas2DRenderer.setCacheSize(cap);
-    }
-    grid.invalidate();
-  });
+  for (const select of textCacheSelects) {
+    select.addEventListener("change", () => {
+      applySelectedTextLayoutCacheCap(select.value);
+    });
+  }
 
   // Initial options can be configured from:
   // `make web WEB_SCALE=<value> WEB_HOVER=<true|false>`
@@ -3692,23 +3515,7 @@ async function main() {
   const ZOOM_MAX = 3.0;
   let zoomLevel = Number.isFinite(envZoom) && envZoom > 0 ? envZoom : 1.0;
   zoomLevel = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoomLevel));
-  const rawBaseFont = typeof (wasmModule as any).get_font_size === "function"
-    ? Number((wasmModule as any).get_font_size(grid.id))
-    : 14.0 * deviceScale;
-  const baseFontSize = Number.isFinite(rawBaseFont) && rawBaseFont > 0
-    ? rawBaseFont
-    : 14.0 * deviceScale;
-  const baseRowHeight = Number(wasmModule.get_default_row_height(grid.id));
-  const baseColWidth = Number(wasmModule.get_default_col_width(grid.id));
-
-  function applyZoom() {
-    grid.setFontSize(Math.round(baseFontSize * zoomLevel * 10) / 10);
-    wasmModule.set_default_row_height(grid.id, Math.round(baseRowHeight * zoomLevel));
-    wasmModule.set_default_col_width(grid.id, Math.round(baseColWidth * zoomLevel));
-    grid.invalidate();
-  }
-
-  applyZoom();
+  grid.zoomScale = zoomLevel;
 }
 
 main().catch((err) => {

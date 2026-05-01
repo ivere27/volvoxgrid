@@ -205,6 +205,15 @@
       color: var(--accent);
       background: var(--accent-soft);
     }
+    .mobile-menu-dropdown {
+      display: none;
+    }
+    .mobile-menu-button {
+      flex: 0 0 42px;
+      padding: 0;
+      font-size: 18px;
+      line-height: 1;
+    }
     #doom-warning {
       display: none;
       padding: 7px 12px;
@@ -417,7 +426,7 @@
       color: var(--text);
       font-size: 13px;
       font-weight: 700;
-      letter-spacing: 0.02em;
+      letter-spacing: 0;
       box-shadow: 0 16px 30px rgba(21, 34, 66, 0.18);
       backdrop-filter: blur(10px);
       touch-action: none;
@@ -470,6 +479,70 @@
       display: flex;
       gap: 6px;
     }
+    .layer-panel-mobile-actions {
+      display: none;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+    }
+    .layer-panel-command-row {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .layer-panel-command-row button {
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      padding: 6px 8px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .layer-panel-command-row button:hover {
+      background: var(--surface-alt);
+    }
+    .layer-panel-mobile-actions .toggle {
+      justify-content: space-between;
+      min-height: 24px;
+      color: var(--text);
+    }
+    .layer-panel-mobile-actions .toggle > span:first-child {
+      flex: 1 1 auto;
+    }
+    .layer-panel-cache {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .layer-panel-cache select {
+      width: 92px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      padding: 3px 6px;
+      background: #fff;
+      color: var(--text);
+      font-size: 12px;
+    }
+    .layer-panel-settings {
+      display: none;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+    }
+    .layer-panel-settings .toggle {
+      justify-content: space-between;
+      min-height: 24px;
+      color: var(--text);
+    }
+    .layer-panel-settings .toggle > span:first-child {
+      flex: 1 1 auto;
+    }
     .layer-panel-actions button {
       flex: 1 1 0;
       border: 1px solid var(--line-strong);
@@ -507,22 +580,39 @@
     }
     @media (max-width: 720px) {
       .top-row {
-        align-items: stretch;
+        height: 0;
+        min-height: 0;
+        padding: 0;
+        border-bottom: 0;
+        overflow: visible;
       }
       .top-row-group {
-        width: 100%;
+        width: 0;
+        height: 0;
+        overflow: visible;
       }
       .top-row-group-controls {
-        gap: 6px;
-      }
-      .top-row-group-controls select {
-        flex: 1 1 150px;
+        display: none;
       }
       .top-row-spacer {
         display: none;
       }
       .top-row-group-actions {
-        gap: 6px;
+        width: 0;
+        height: 0;
+        gap: 0;
+        overflow: visible;
+      }
+      .top-row-group-actions > :not(#layer-dropdown) {
+        display: none;
+      }
+      #layer-dropdown {
+        display: block;
+        width: 0;
+        height: 0;
+      }
+      #btn-layers {
+        display: none;
       }
       .icon-btn,
       .segment,
@@ -539,7 +629,20 @@
         gap: 6px;
       }
       .segment {
-        font-size: 12px;
+        overflow: hidden;
+        padding: 0 4px;
+        text-overflow: ellipsis;
+        font-size: 11px;
+      }
+      .mobile-menu-dropdown {
+        display: flex;
+        flex: 0 0 42px;
+        min-width: 0;
+      }
+      .mobile-menu-button {
+        width: 42px;
+        min-width: 42px;
+        font-size: 18px;
       }
       #doom-remote-actions,
       #stress-confirm-actions {
@@ -549,8 +652,20 @@
         width: 100%;
       }
       .layer-panel {
-        right: auto;
-        left: 0;
+        position: fixed;
+        top: calc(54px + var(--safe-top));
+        right: calc(12px + var(--safe-right));
+        left: auto;
+        max-height: calc(var(--app-height) - 70px - var(--safe-top) - var(--safe-bottom));
+      }
+      .layer-panel-mobile-actions {
+        display: grid;
+      }
+      .layer-panel-cache {
+        display: flex;
+      }
+      .layer-panel-settings {
+        display: grid;
       }
       #status-bar {
         white-space: normal;
@@ -597,7 +712,7 @@
         font-size: 10px;
       }
       .top-row-group-actions .toggle > span:first-child {
-        letter-spacing: -0.01em;
+        letter-spacing: 0;
       }
       .top-row-group-actions .toggle-track {
         width: 28px;
@@ -626,11 +741,8 @@
   <div class="app">
     <div class="top-row">
       <div class="top-row-group top-row-group-controls meta">
-        <select id="sel-canvas-res" aria-label="Canvas Resolution">
-          <option value="auto" selected>AUTO</option>
-        </select>
-        <label for="sel-text-cache" style="margin-left: 8px;">Cache</label>
-        <select id="sel-text-cache" aria-label="Text Cache Cap" style="margin-left: 8px;">
+        <label for="sel-text-cache">Cache</label>
+        <select id="sel-text-cache" aria-label="Text Cache Cap">
           <option value="8192" selected>8192</option>
           <option value="4096">4096</option>
           <option value="1024">1024</option>
@@ -642,12 +754,12 @@
       <div class="top-row-group top-row-group-actions">
         <button id="btn-sort-asc" class="icon-btn" aria-label="Sort Ascending">↑</button>
         <button id="btn-sort-desc" class="icon-btn" aria-label="Sort Descending">↓</button>
-        <label class="toggle">
+        <label class="toggle advanced-toggle">
           <span>GPU</span>
           <input type="checkbox" id="chk-gpu">
           <span class="toggle-track"></span>
         </label>
-        <label class="toggle">
+        <label class="toggle advanced-toggle">
           <span>Blit</span>
           <input type="checkbox" id="chk-scroll-blit">
           <span class="toggle-track"></span>
@@ -657,17 +769,17 @@
           <input type="checkbox" id="chk-edit">
           <span class="toggle-track"></span>
         </label>
-        <label class="toggle">
+        <label class="toggle advanced-toggle">
           <span>Anim</span>
           <input type="checkbox" id="chk-anim">
           <span class="toggle-track"></span>
         </label>
-        <label class="toggle">
+        <label class="toggle advanced-toggle">
           <span>Hover</span>
           <input type="checkbox" id="chk-hover">
           <span class="toggle-track"></span>
         </label>
-        <label class="toggle">
+        <label class="toggle advanced-toggle">
           <span>Debug</span>
           <input type="checkbox" id="chk-debug">
           <span class="toggle-track"></span>
@@ -680,8 +792,56 @@
             aria-haspopup="true"
             aria-expanded="false"
             aria-controls="layer-panel"
-          >Layers</button>
+          >Options</button>
           <div id="layer-panel" class="layer-panel" hidden>
+            <div class="layer-panel-mobile-actions">
+              <div class="layer-panel-command-row">
+                <button id="btn-sort-asc-mobile" type="button">Sort ↑</button>
+                <button id="btn-sort-desc-mobile" type="button">Sort ↓</button>
+              </div>
+              <label class="toggle">
+                <span>Edit</span>
+                <input type="checkbox" id="chk-edit-mobile">
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+            <div class="layer-panel-cache">
+              <label for="sel-text-cache-mobile">Cache</label>
+              <select id="sel-text-cache-mobile" aria-label="Text Cache Cap">
+                <option value="8192" selected>8192</option>
+                <option value="4096">4096</option>
+                <option value="1024">1024</option>
+                <option value="256">256</option>
+                <option value="0">0</option>
+              </select>
+            </div>
+            <div class="layer-panel-settings">
+              <label class="toggle">
+                <span>GPU</span>
+                <input type="checkbox" id="chk-gpu-mobile">
+                <span class="toggle-track"></span>
+              </label>
+              <label class="toggle">
+                <span>Blit</span>
+                <input type="checkbox" id="chk-scroll-blit-mobile">
+                <span class="toggle-track"></span>
+              </label>
+              <label class="toggle">
+                <span>Anim</span>
+                <input type="checkbox" id="chk-anim-mobile">
+                <span class="toggle-track"></span>
+              </label>
+              <label class="toggle">
+                <span>Hover</span>
+                <input type="checkbox" id="chk-hover-mobile">
+                <span class="toggle-track"></span>
+              </label>
+              <label class="toggle">
+                <span>Debug</span>
+                <input type="checkbox" id="chk-debug-mobile">
+                <span class="toggle-track"></span>
+              </label>
+            </div>
             <div class="layer-panel-actions">
               <button id="btn-layers-all" type="button">All</button>
               <button id="btn-layers-none" type="button">None</button>
@@ -698,6 +858,17 @@
       <button id="btn-demo-barcodes" class="segment">Barcodes</button>
       <button id="btn-demo-stress" class="segment">Stress</button>
       <button id="btn-demo-doom" class="segment">DOOM</button>
+      <div id="mobile-menu-dropdown" class="mobile-menu-dropdown">
+        <button
+          id="btn-mobile-menu"
+          class="segment mobile-menu-button"
+          type="button"
+          aria-label="More Options"
+          aria-haspopup="true"
+          aria-expanded="false"
+          aria-controls="layer-panel"
+        >...</button>
+      </div>
     </div>
 
     <div id="doom-row" class="doom-row hidden">
