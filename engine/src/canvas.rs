@@ -3654,6 +3654,52 @@ fn draw_indicator_text<C: Canvas>(
     halign: i32,
     color: u32,
 ) {
+    draw_indicator_text_clipped(
+        canvas,
+        grid,
+        text,
+        (x, y, w, h),
+        (x, y, w, h),
+        halign,
+        color,
+    );
+}
+
+fn rect_intersection(
+    a: (i32, i32, i32, i32),
+    b: (i32, i32, i32, i32),
+) -> Option<(i32, i32, i32, i32)> {
+    let (ax, ay, aw, ah) = a;
+    let (bx, by, bw, bh) = b;
+    if aw <= 0 || ah <= 0 || bw <= 0 || bh <= 0 {
+        return None;
+    }
+    let x0 = ax.max(bx);
+    let y0 = ay.max(by);
+    let x1 = (ax + aw).min(bx + bw);
+    let y1 = (ay + ah).min(by + bh);
+    (x1 > x0 && y1 > y0).then_some((x0, y0, x1 - x0, y1 - y0))
+}
+
+fn text_clip_h_for_draw(text_y: i32, clip_y: i32, clip_h: i32) -> i32 {
+    // Text backends use clip_y as the top boundary, but clip_h is measured
+    // from the draw y to the bottom boundary.
+    clip_y.saturating_add(clip_h).saturating_sub(text_y)
+}
+
+fn draw_indicator_text_clipped<C: Canvas>(
+    canvas: &mut C,
+    grid: &VolvoxGrid,
+    text: &str,
+    layout_rect: (i32, i32, i32, i32),
+    clip_rect: (i32, i32, i32, i32),
+    halign: i32,
+    color: u32,
+) {
+    let (x, y, w, h) = layout_rect;
+    let Some((clip_x, clip_y, clip_w, clip_h)) = rect_intersection(layout_rect, clip_rect) else {
+        return;
+    };
     if text.trim().is_empty() || w <= 2 || h <= 2 {
         return;
     }
@@ -3668,21 +3714,40 @@ fn draw_indicator_text<C: Canvas>(
         _ => x + 4.min((w - 1).max(1)),
     };
     let ty = (y + (h - text_h) / 2).clamp(y + 1, (y + h - text_h - 1).max(y + 1));
+    let draw_clip_h = text_clip_h_for_draw(ty, clip_y, clip_h);
+    if draw_clip_h <= 0 {
+        return;
+    }
     canvas.draw_text_styled_fast(
-        tx, ty, text, font_name, font_size, false, false, color, x, y, w, h, 0, None,
+        tx,
+        ty,
+        text,
+        font_name,
+        font_size,
+        false,
+        false,
+        color,
+        clip_x,
+        clip_y,
+        clip_w,
+        draw_clip_h,
+        0,
+        None,
     );
 }
 
-fn draw_indicator_icon_text<C: Canvas>(
+fn draw_indicator_icon_text_clipped<C: Canvas>(
     canvas: &mut C,
     grid: &VolvoxGrid,
     text: &str,
-    x: i32,
-    y: i32,
-    w: i32,
-    h: i32,
+    layout_rect: (i32, i32, i32, i32),
+    clip_rect: (i32, i32, i32, i32),
     color: u32,
 ) {
+    let (x, y, w, h) = layout_rect;
+    let Some((clip_x, clip_y, clip_w, clip_h)) = rect_intersection(layout_rect, clip_rect) else {
+        return;
+    };
     if text.trim().is_empty() || w <= 2 || h <= 2 {
         return;
     }
@@ -3699,6 +3764,10 @@ fn draw_indicator_icon_text<C: Canvas>(
     let text_h = th.ceil() as i32;
     let tx = (x + (w - text_w) / 2).clamp(x + 1, (x + w - text_w - 1).max(x + 1));
     let ty = (y + (h - text_h) / 2).clamp(y + 1, (y + h - text_h - 1).max(y + 1));
+    let draw_clip_h = text_clip_h_for_draw(ty, clip_y, clip_h);
+    if draw_clip_h <= 0 {
+        return;
+    }
     canvas.draw_text_styled_fast(
         tx,
         ty,
@@ -3708,10 +3777,10 @@ fn draw_indicator_icon_text<C: Canvas>(
         font_bold,
         font_italic,
         icon_color,
-        x,
-        y,
-        w,
-        h,
+        clip_x,
+        clip_y,
+        clip_w,
+        draw_clip_h,
         0,
         None,
     );
@@ -3757,24 +3826,81 @@ fn draw_sort_direction_arrow<C: Canvas>(
     }
 }
 
-fn draw_indicator_checkbox<C: Canvas>(
+fn draw_indicator_checkbox_clipped<C: Canvas>(
     canvas: &mut C,
     rect: (i32, i32, i32, i32),
+    clip_rect: (i32, i32, i32, i32),
     checked: bool,
     fore_color: u32,
 ) {
     let (x, y, w, h) = rect;
+    let Some((clip_x, clip_y, clip_w, clip_h)) = rect_intersection(rect, clip_rect) else {
+        return;
+    };
+    let clip_x1 = clip_x + clip_w;
+    let clip_y1 = clip_y + clip_h;
     let box_size = 13.min((w - 4).max(0)).min((h - 4).max(0));
     if box_size <= 4 {
         return;
     }
     let bx = x + (w - box_size) / 2;
     let by = y + (h - box_size) / 2;
-    canvas.rect_outline(bx, by, box_size, box_size, 0xFF707070);
-    canvas.fill_rect(bx + 1, by + 1, box_size - 2, box_size - 2, 0xFFFFFFFF);
+    fill_rect_clipped(
+        canvas, bx, by, box_size, 1, clip_x, clip_y, clip_x1, clip_y1, 0xFF707070,
+    );
+    fill_rect_clipped(
+        canvas,
+        bx,
+        by + box_size - 1,
+        box_size,
+        1,
+        clip_x,
+        clip_y,
+        clip_x1,
+        clip_y1,
+        0xFF707070,
+    );
+    fill_rect_clipped(
+        canvas, bx, by, 1, box_size, clip_x, clip_y, clip_x1, clip_y1, 0xFF707070,
+    );
+    fill_rect_clipped(
+        canvas,
+        bx + box_size - 1,
+        by,
+        1,
+        box_size,
+        clip_x,
+        clip_y,
+        clip_x1,
+        clip_y1,
+        0xFF707070,
+    );
+    fill_rect_clipped(
+        canvas,
+        bx + 1,
+        by + 1,
+        box_size - 2,
+        box_size - 2,
+        clip_x,
+        clip_y,
+        clip_x1,
+        clip_y1,
+        0xFFFFFFFF,
+    );
     if checked {
         let mark_y = by + box_size / 2;
-        canvas.hline(bx + 3, mark_y, (box_size - 6).max(2), fore_color);
+        fill_rect_clipped(
+            canvas,
+            bx + 3,
+            mark_y,
+            (box_size - 6).max(2),
+            1,
+            clip_x,
+            clip_y,
+            clip_x1,
+            clip_y1,
+            fore_color,
+        );
     }
 }
 
@@ -3808,60 +3934,51 @@ fn draw_indicator_focus_rect<C: Canvas>(
     }
 }
 
-fn render_row_indicator_slot<C: Canvas>(
+fn render_row_indicator_slot_clipped<C: Canvas>(
     grid: &VolvoxGrid,
     canvas: &mut C,
     row: i32,
     rect: (i32, i32, i32, i32),
+    clip_rect: (i32, i32, i32, i32),
     kind: i32,
     fore_color: u32,
 ) {
     let slot_kind = kind;
     if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotNumbers as i32 {
         let label = (row - grid.fixed_rows + 1).max(1).to_string();
-        draw_indicator_text(
-            canvas, grid, &label, rect.0, rect.1, rect.2, rect.3, 1, fore_color,
-        );
+        draw_indicator_text_clipped(canvas, grid, &label, rect, clip_rect, 1, fore_color);
         return;
     }
     if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotCurrent as i32 {
         if row == grid.selection.row {
-            draw_indicator_text(
-                canvas, grid, "▶", rect.0, rect.1, rect.2, rect.3, 1, fore_color,
-            );
+            draw_indicator_text_clipped(canvas, grid, "▶", rect, clip_rect, 1, fore_color);
         }
         return;
     }
     if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotSelection as i32 {
         let selected = should_highlight_row_indicator(grid, row);
         if selected {
-            draw_indicator_text(
-                canvas, grid, "•", rect.0, rect.1, rect.2, rect.3, 1, fore_color,
-            );
+            draw_indicator_text_clipped(canvas, grid, "•", rect, clip_rect, 1, fore_color);
         }
         return;
     }
     if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotCheckbox as i32 {
         let checked = should_highlight_row_indicator(grid, row);
-        draw_indicator_checkbox(canvas, rect, checked, fore_color);
+        draw_indicator_checkbox_clipped(canvas, rect, clip_rect, checked, fore_color);
         return;
     }
     if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotHandle as i32 {
-        draw_indicator_text(
-            canvas, grid, "≡", rect.0, rect.1, rect.2, rect.3, 1, fore_color,
-        );
+        draw_indicator_text_clipped(canvas, grid, "≡", rect, clip_rect, 1, fore_color);
         return;
     }
     if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotEditing as i32 {
         if grid.edit.is_active() && grid.edit.edit_row == row {
-            draw_indicator_text(
-                canvas, grid, "✎", rect.0, rect.1, rect.2, rect.3, 1, fore_color,
-            );
+            draw_indicator_text_clipped(canvas, grid, "✎", rect, clip_rect, 1, fore_color);
         }
         return;
     }
     if slot_kind == pb::RowIndicatorSlotKind::RowIndicatorSlotExpander as i32 {
-        render_outline_expander_slot(canvas, grid, row, rect, fore_color);
+        render_outline_expander_slot_clipped(canvas, grid, row, rect, clip_rect, fore_color);
         return;
     }
 }
@@ -3953,6 +4070,43 @@ fn draw_tree_guide_hline<C: Canvas>(canvas: &mut C, x: i32, y: i32, w: i32, colo
     canvas.blend_rect(x, y, w, 1, color);
 }
 
+fn draw_tree_guide_vline_clipped<C: Canvas>(
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    h: i32,
+    color: u32,
+    clip_rect: Option<(i32, i32, i32, i32)>,
+) {
+    let Some(clip) = clip_rect else {
+        draw_tree_guide_vline(canvas, x, y, h, color);
+        return;
+    };
+    let Some((cx, cy, cw, ch)) = rect_intersection((x, y, 1, h), clip) else {
+        return;
+    };
+    canvas.blend_rect(cx, cy, cw, ch, color);
+}
+
+fn draw_tree_guide_hline_clipped<C: Canvas>(
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    w: i32,
+    color: u32,
+    clip_rect: Option<(i32, i32, i32, i32)>,
+) {
+    let Some(clip) = clip_rect else {
+        draw_tree_guide_hline(canvas, x, y, w, color);
+        return;
+    };
+    let Some((cx, cy, cw, ch)) = rect_intersection((x, y, w, 1), clip) else {
+        return;
+    };
+    canvas.blend_rect(cx, cy, cw, ch, color);
+}
+
+#[cfg(test)]
 fn draw_tree_guide_vline_except_rect<C: Canvas>(
     canvas: &mut C,
     x: i32,
@@ -3982,6 +4136,37 @@ fn draw_tree_guide_vline_except_rect<C: Canvas>(
     draw_tree_guide_vline(canvas, x, gap_y1, y1 - gap_y1, color);
 }
 
+fn draw_tree_guide_vline_except_rect_clipped<C: Canvas>(
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    h: i32,
+    color: u32,
+    gap: Option<(i32, i32, i32, i32)>,
+    clip_rect: Option<(i32, i32, i32, i32)>,
+) {
+    let Some((gx, gy, gw, gh)) = gap else {
+        draw_tree_guide_vline_clipped(canvas, x, y, h, color, clip_rect);
+        return;
+    };
+    if gw <= 0 || gh <= 0 || x < gx || x >= gx + gw {
+        draw_tree_guide_vline_clipped(canvas, x, y, h, color, clip_rect);
+        return;
+    }
+
+    let y0 = y;
+    let y1 = y + h;
+    let gap_y0 = gy.max(y0);
+    let gap_y1 = (gy + gh).min(y1);
+    if gap_y1 <= gap_y0 {
+        draw_tree_guide_vline_clipped(canvas, x, y, h, color, clip_rect);
+        return;
+    }
+    draw_tree_guide_vline_clipped(canvas, x, y0, gap_y0 - y0, color, clip_rect);
+    draw_tree_guide_vline_clipped(canvas, x, gap_y1, y1 - gap_y1, color, clip_rect);
+}
+
+#[cfg(test)]
 fn draw_tree_guide_hline_except_rect<C: Canvas>(
     canvas: &mut C,
     x: i32,
@@ -4011,6 +4196,36 @@ fn draw_tree_guide_hline_except_rect<C: Canvas>(
     draw_tree_guide_hline(canvas, gap_x1, y, x1 - gap_x1, color);
 }
 
+fn draw_tree_guide_hline_except_rect_clipped<C: Canvas>(
+    canvas: &mut C,
+    x: i32,
+    y: i32,
+    w: i32,
+    color: u32,
+    gap: Option<(i32, i32, i32, i32)>,
+    clip_rect: Option<(i32, i32, i32, i32)>,
+) {
+    let Some((gx, gy, gw, gh)) = gap else {
+        draw_tree_guide_hline_clipped(canvas, x, y, w, color, clip_rect);
+        return;
+    };
+    if gw <= 0 || gh <= 0 || y < gy || y >= gy + gh {
+        draw_tree_guide_hline_clipped(canvas, x, y, w, color, clip_rect);
+        return;
+    }
+
+    let x0 = x;
+    let x1 = x + w;
+    let gap_x0 = gx.max(x0);
+    let gap_x1 = (gx + gw).min(x1);
+    if gap_x1 <= gap_x0 {
+        draw_tree_guide_hline_clipped(canvas, x, y, w, color, clip_rect);
+        return;
+    }
+    draw_tree_guide_hline_clipped(canvas, x0, y, gap_x0 - x0, color, clip_rect);
+    draw_tree_guide_hline_clipped(canvas, gap_x1, y, x1 - gap_x1, color, clip_rect);
+}
+
 fn render_outline_connector_guides<C: Canvas>(
     canvas: &mut C,
     grid: &VolvoxGrid,
@@ -4020,6 +4235,7 @@ fn render_outline_connector_guides<C: Canvas>(
     tg: crate::outline::TreeGeometry,
     color: u32,
     toggle_gap: Option<(i32, i32, i32, i32)>,
+    clip_rect: Option<(i32, i32, i32, i32)>,
 ) {
     let (x, y, w, h) = rect;
     if w <= 0 || h <= 0 {
@@ -4034,7 +4250,15 @@ fn render_outline_connector_guides<C: Canvas>(
         }
         let lx = x + ancestor_depth * tg.indent_step + tg.line_offset;
         if lx >= x && lx < x + w {
-            draw_tree_guide_vline_except_rect(canvas, lx, y, h, guide_color, toggle_gap);
+            draw_tree_guide_vline_except_rect_clipped(
+                canvas,
+                lx,
+                y,
+                h,
+                guide_color,
+                toggle_gap,
+                clip_rect,
+            );
         }
     }
 
@@ -4048,30 +4272,40 @@ fn render_outline_connector_guides<C: Canvas>(
     let has_top_segment = depth > 0 || outline_branch_has_previous(grid, row, depth);
     let has_bottom_segment = outline_branch_continues_after(grid, row, depth);
     if has_top_segment {
-        draw_tree_guide_vline_except_rect(
+        draw_tree_guide_vline_except_rect_clipped(
             canvas,
             lx,
             y,
             (mid_y - y + 1).max(1),
             guide_color,
             toggle_gap,
+            clip_rect,
         );
     }
     if has_bottom_segment {
-        draw_tree_guide_vline_except_rect(
+        draw_tree_guide_vline_except_rect_clipped(
             canvas,
             lx,
             mid_y,
             (y + h - mid_y).max(1),
             guide_color,
             toggle_gap,
+            clip_rect,
         );
     }
 
     let branch_len = (tg.connector_end - tg.line_offset + 1).clamp(4, 7);
     let h_end = (lx + branch_len).min(x + w);
     if h_end > lx {
-        draw_tree_guide_hline_except_rect(canvas, lx, mid_y, h_end - lx, guide_color, toggle_gap);
+        draw_tree_guide_hline_except_rect_clipped(
+            canvas,
+            lx,
+            mid_y,
+            h_end - lx,
+            guide_color,
+            toggle_gap,
+            clip_rect,
+        );
     }
 }
 
@@ -4084,6 +4318,9 @@ fn draw_outline_toggle<C: Canvas>(
     color: u32,
 ) {
     let (x, y, w, h) = rect;
+    let Some((clip_x, clip_y, clip_w, clip_h)) = rect_intersection(rect, fallback_clip_rect) else {
+        return;
+    };
     if w <= 0 || h <= 0 {
         return;
     }
@@ -4161,6 +4398,10 @@ fn draw_outline_toggle<C: Canvas>(
         let text_h = th.ceil() as i32;
         let tx = x + (w - text_w) / 2;
         let ty = y + (h - text_h) / 2;
+        let draw_clip_h = text_clip_h_for_draw(ty, clip_y, clip_h);
+        if draw_clip_h <= 0 {
+            return;
+        }
         canvas.draw_text_styled_fast(
             tx,
             ty,
@@ -4170,30 +4411,42 @@ fn draw_outline_toggle<C: Canvas>(
             font_bold,
             font_italic,
             icon_color,
-            x,
-            y,
-            w,
-            h,
+            clip_x,
+            clip_y,
+            clip_w,
+            draw_clip_h,
             0,
             None,
         );
         return;
     }
 
-    let (clip_x, clip_y, clip_w, clip_h) = fallback_clip_rect;
-    if clip_w <= 0 || clip_h <= 0 {
-        return;
-    }
     let icon = if is_collapsed { ">" } else { "v" };
     let font_name = &grid.style.font_name;
     let font_size = grid.style.font_size.clamp(1.0, 256.0);
     let (tw, th) = canvas.measure_text(icon, font_name, font_size, false, false, None);
     let text_w = tw.ceil() as i32;
     let text_h = th.ceil() as i32;
-    let tx = (x + (w - text_w) / 2).clamp(clip_x, (clip_x + clip_w - text_w).max(clip_x));
-    let ty = (clip_y + (clip_h - text_h) / 2).clamp(clip_y, (clip_y + clip_h - text_h).max(clip_y));
+    let tx = x + (w - text_w) / 2;
+    let ty = y + (h - text_h) / 2;
+    let draw_clip_h = text_clip_h_for_draw(ty, clip_y, clip_h);
+    if draw_clip_h <= 0 {
+        return;
+    }
     canvas.draw_text_styled_fast(
-        tx, ty, icon, font_name, font_size, false, false, color, clip_x, clip_y, clip_w, clip_h, 0,
+        tx,
+        ty,
+        icon,
+        font_name,
+        font_size,
+        false,
+        false,
+        color,
+        clip_x,
+        clip_y,
+        clip_w,
+        draw_clip_h,
+        0,
         None,
     );
 }
@@ -4232,18 +4485,19 @@ fn outline_toggle_box_size(
     }
 }
 
-fn render_outline_expander_slot<C: Canvas>(
+fn render_outline_expander_slot_clipped<C: Canvas>(
     canvas: &mut C,
     grid: &VolvoxGrid,
     row: i32,
     rect: (i32, i32, i32, i32),
+    clip_rect: (i32, i32, i32, i32),
     fore_color: u32,
 ) {
     let Some(rp) = grid.get_row_props(row) else {
         return;
     };
     let (x, y, w, h) = rect;
-    if w <= 0 || h <= 0 {
+    if w <= 0 || h <= 0 || rect_intersection(rect, clip_rect).is_none() {
         return;
     }
     let tg = crate::outline::TreeGeometry::from_grid(grid);
@@ -4277,18 +4531,31 @@ fn render_outline_expander_slot<C: Canvas>(
         None
     };
     if draw_connectors {
-        render_outline_connector_guides(canvas, grid, row, rect, depth, tg, tree_color, toggle_gap);
+        render_outline_connector_guides(
+            canvas,
+            grid,
+            row,
+            rect,
+            depth,
+            tg,
+            tree_color,
+            toggle_gap,
+            Some(clip_rect),
+        );
     }
     if let Some((bx, by, bw, bh)) = toggle_rect {
         if has_children {
-            draw_outline_toggle(
-                canvas,
-                grid,
-                (bx, by, bw, bh),
-                (bx, y, bw, h),
-                rp.is_collapsed,
-                tree_color,
-            );
+            let toggle_clip = rect_intersection((bx, y, bw, h), clip_rect);
+            if let Some(toggle_clip) = toggle_clip {
+                draw_outline_toggle(
+                    canvas,
+                    grid,
+                    (bx, by, bw, bh),
+                    toggle_clip,
+                    rp.is_collapsed,
+                    tree_color,
+                );
+            }
         }
         text_x = (bx + bw + 3).min(x + w);
     } else {
@@ -4299,21 +4566,26 @@ fn render_outline_expander_slot<C: Canvas>(
         let icon = grid.get_display_text(row, grid.outline.icon_column);
         if !icon.trim().is_empty() {
             let icon_w = (h - 4).max(8).min((x + w - text_x).max(0));
-            draw_indicator_icon_text(canvas, grid, &icon, text_x, y, icon_w, h, fore_color);
+            draw_indicator_icon_text_clipped(
+                canvas,
+                grid,
+                &icon,
+                (text_x, y, icon_w, h),
+                clip_rect,
+                fore_color,
+            );
             text_x = (text_x + icon_w + 3).min(x + w);
         }
     }
 
     if grid.outline.label_column >= 0 && grid.outline.label_column < grid.cols && text_x < x + w {
         let label = grid.get_display_text(row, grid.outline.label_column);
-        draw_indicator_text(
+        draw_indicator_text_clipped(
             canvas,
             grid,
             &label,
-            text_x,
-            y,
-            x + w - text_x,
-            h,
+            (text_x, y, x + w - text_x, h),
+            clip_rect,
             0,
             fore_color,
         );
@@ -4358,6 +4630,78 @@ fn row_indicator_separator_spans(grid: &VolvoxGrid, band_x: i32, band_w: i32) ->
     spans
 }
 
+fn row_indicator_layout_row_rect(
+    grid: &VolvoxGrid,
+    vp: &VisibleRange,
+    row: i32,
+) -> Option<(i32, i32)> {
+    if row < 0 || row >= grid.rows || grid.is_row_hidden(row) {
+        return None;
+    }
+    let row_h = grid.row_height(row);
+    if row_h <= 0 {
+        return None;
+    }
+    let fixed_bottom = grid.row_pos(vp.fixed_row_end);
+    let anim = if grid.animation.active {
+        grid.animation.row_offset(row) as i32
+    } else {
+        0
+    };
+
+    if row < vp.fixed_row_end {
+        return Some((vp.data_y + grid.row_pos(row) + anim, row_h));
+    }
+    if vp.pinned_top_rows.contains(&row) {
+        let mut y = vp.data_y + fixed_bottom;
+        for &pinned_row in &vp.pinned_top_rows {
+            if pinned_row == row {
+                break;
+            }
+            y += grid.row_height(pinned_row);
+        }
+        return Some((y, row_h));
+    }
+    if vp.sticky_top_rows.contains(&row) {
+        let mut y = vp.data_y + fixed_bottom + vp.pinned_top_height;
+        for &sticky_row in &vp.sticky_top_rows {
+            if sticky_row == row {
+                break;
+            }
+            y += grid.row_height(sticky_row);
+        }
+        return Some((y, row_h));
+    }
+    if vp.sticky_bottom_rows.contains(&row) {
+        let mut y = vp.data_y + vp.data_h - vp.pinned_bottom_height;
+        for &sticky_row in vp.sticky_bottom_rows.iter().rev() {
+            y -= grid.row_height(sticky_row);
+            if sticky_row == row {
+                break;
+            }
+        }
+        return Some((y, row_h));
+    }
+    if vp.pinned_bottom_rows.contains(&row) {
+        let mut y = vp.data_y + vp.data_h - vp.pinned_bottom_height;
+        for &pinned_row in &vp.pinned_bottom_rows {
+            if pinned_row == row {
+                break;
+            }
+            y += grid.row_height(pinned_row);
+        }
+        return Some((y, row_h));
+    }
+    if row >= vp.scroll_row_start && row < vp.scroll_row_end {
+        return Some((
+            vp.data_y + grid.row_pos(row) + anim - grid.scroll.scroll_y as i32
+                + vp.pinned_top_height,
+            row_h,
+        ));
+    }
+    None
+}
+
 fn render_row_indicator_start<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderContext) {
     let vp = &ctx.vp;
     let band = &grid.indicator_bands.row_start;
@@ -4383,6 +4727,7 @@ fn render_row_indicator_start<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx:
     canvas.fill_rect(band_x, band_y, band_w, band_h, back_color);
 
     for (&row, &(cy, ch)) in &ctx.visible_row_rects {
+        let (layout_y, layout_h) = row_indicator_layout_row_rect(grid, vp, row).unwrap_or((cy, ch));
         let is_selected = should_highlight_row_indicator(grid, row);
         if is_selected {
             if let Some(ind_style) = &grid.selection.indicator_row_style {
@@ -4439,10 +4784,11 @@ fn render_row_indicator_start<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx:
             } else {
                 row_fore_color
             };
-            render_row_indicator_slot(
+            render_row_indicator_slot_clipped(
                 grid,
                 canvas,
                 row,
+                (slot_x, layout_y, slot_w, layout_h),
                 (slot_x, cy, slot_w, ch),
                 slot.kind,
                 slot_fore_color,
@@ -5676,7 +6022,14 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
         let clip_w = (clip_right - clip_x).max(1);
         let clip_y_cell = vis_y;
         let clip_bottom = (vis_y + vis_h).min(inner_bottom);
-        let clip_h = (clip_bottom - clip_y_cell).max(1);
+        let clip_h = clip_bottom - clip_y_cell;
+        if clip_h <= 0 {
+            continue;
+        }
+        let draw_clip_h = text_clip_h_for_draw(text_y, clip_y_cell, clip_h);
+        if draw_clip_h <= 0 {
+            continue;
+        }
 
         // Handle ellipsis (uses effective_font_size and possibly extended inner_w)
         if ellipsis_mode != 0 && !grid.word_wrap && tw > inner_w as f32 {
@@ -5714,7 +6067,7 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
                 clip_x,
                 clip_y_cell,
                 clip_w,
-                clip_h,
+                draw_clip_h,
                 text_style,
                 wrap_width,
             );
@@ -5757,7 +6110,7 @@ fn render_cell_text<C: Canvas>(grid: &VolvoxGrid, canvas: &mut C, ctx: &RenderCo
                 clip_x,
                 clip_y_cell,
                 clip_w,
-                clip_h,
+                draw_clip_h,
                 text_style,
                 wrap_width,
             );
@@ -10493,6 +10846,9 @@ mod tests {
 
     #[derive(Clone, Debug, PartialEq)]
     struct TextDrawCall {
+        y: i32,
+        clip_y: i32,
+        clip_h: i32,
         text: String,
         font_name: String,
         font_size: f32,
@@ -10524,11 +10880,11 @@ mod tests {
             _buf_height: i32,
             _stride: i32,
             _x: i32,
-            _y: i32,
+            y: i32,
             _clip_x: i32,
-            _clip_y: i32,
+            clip_y: i32,
             _clip_w: i32,
-            _clip_h: i32,
+            clip_h: i32,
             text: &str,
             font_name: &str,
             font_size: f32,
@@ -10538,6 +10894,9 @@ mod tests {
             _max_width: Option<f32>,
         ) -> f32 {
             self.draws.lock().unwrap().push(TextDrawCall {
+                y,
+                clip_y,
+                clip_h,
                 text: text.to_string(),
                 font_name: font_name.to_string(),
                 font_size,
@@ -10681,6 +11040,89 @@ mod tests {
 
         grid.style.icon_theme_slots.tree_collapsed = Some(">".to_string());
         assert_eq!(outline_toggle_box_size(&grid, 36, tg), 32);
+    }
+
+    #[test]
+    fn row_indicator_tree_item_uses_unclipped_layout_while_scrolling_out() {
+        let width = 220;
+        let height = 64;
+        let stride = width * 4;
+        let draws = Arc::new(Mutex::new(Vec::new()));
+        let mut text = RecordingTextDrawRenderer {
+            draws: draws.clone(),
+        };
+        let mut buffer = vec![0; (height * stride) as usize];
+        let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+        let mut grid = VolvoxGrid::new(1, width, height, 2, 1, 0, 0);
+        grid.render_layer_mask = 1u64 << super::layer::INDICATORS;
+        grid.style.font_name = "LabelFace".to_string();
+        grid.style.font_size = 13.0;
+        grid.indicator_bands.col_top.visible = true;
+        grid.indicator_bands.col_top.band_rows = 1;
+        grid.indicator_bands.col_top.default_row_height_px = 20;
+        grid.indicator_bands.row_start.visible = true;
+        grid.indicator_bands.row_start.auto_size = false;
+        grid.indicator_bands.row_start.width_px = 160;
+        grid.indicator_bands.row_start.slots = vec![crate::indicator::RowIndicatorSlotState::new(
+            pb::RowIndicatorSlotKind::RowIndicatorSlotExpander,
+            160,
+        )];
+        grid.outline.tree_indicator = pb::TreeIndicatorStyle::TreeIndicatorConnectorsLeaf as i32;
+        grid.outline.label_column = 0;
+        grid.set_row_height(0, 30);
+        grid.set_row_height(1, 30);
+        grid.row_props.entry(0).or_default().outline_level = 0;
+        grid.row_props.entry(1).or_default().outline_level = 1;
+        grid.cells.set_text(0, 0, "root".to_string());
+        grid.cells.set_text(1, 0, "child".to_string());
+        grid.ensure_layout();
+        grid.scroll.scroll_y = 12.0;
+
+        render_grid(&grid, &mut canvas);
+
+        let draws = draws.lock().unwrap();
+        let root = draws
+            .iter()
+            .find(|draw| draw.text == "root")
+            .expect("tree label should render");
+        assert_eq!(root.y, 19);
+        assert_eq!(root.clip_y, 20);
+        assert_eq!(root.clip_h, 19);
+    }
+
+    #[test]
+    fn data_cell_text_clip_uses_visible_bottom_while_scrolling_out() {
+        let width = 120;
+        let height = 64;
+        let stride = width * 4;
+        let draws = Arc::new(Mutex::new(Vec::new()));
+        let mut text = RecordingTextDrawRenderer {
+            draws: draws.clone(),
+        };
+        let mut buffer = vec![0; (height * stride) as usize];
+        let mut canvas = CpuCanvas::new(&mut buffer, width, height, stride, &mut text);
+        let mut grid = VolvoxGrid::new(1, width, height, 2, 1, 0, 0);
+        grid.render_layer_mask = 1u64 << super::layer::CELL_TEXT;
+        grid.style.font_name = "LabelFace".to_string();
+        grid.style.font_size = 13.0;
+        grid.columns[0].alignment = pb::Align::LeftTop as i32;
+        grid.set_row_height(0, 30);
+        grid.set_row_height(1, 30);
+        grid.cells.set_text(0, 0, "first".to_string());
+        grid.cells.set_text(1, 0, "second".to_string());
+        grid.ensure_layout();
+        grid.scroll.scroll_y = 12.0;
+
+        render_grid(&grid, &mut canvas);
+
+        let draws = draws.lock().unwrap();
+        let first = draws
+            .iter()
+            .find(|draw| draw.text == "first")
+            .expect("first row text should render while partially visible");
+        assert_eq!(first.y, -10);
+        assert_eq!(first.clip_y, 0);
+        assert_eq!(first.clip_h, 26);
     }
 
     #[test]
