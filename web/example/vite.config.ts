@@ -6,7 +6,7 @@ const crossOriginIsolationHeaders = {
 };
 
 const doomBundleProxyPath = "/doom/remote/vendor/doom.jsdos";
-const doomBundleRemotePath = "/custom/dos/doom.jsdos?anonymous=1";
+const doomBundleRemotePath = "/bundles/doom.jsdos";
 const doomEmulatorsProxyPrefix = "/doom/remote/emulators";
 const doomEmulatorsCdnPrefix = "/npm/emulators@8.3.9/dist";
 
@@ -18,7 +18,7 @@ export default defineConfig({
     headers: crossOriginIsolationHeaders,
     proxy: {
       [doomBundleProxyPath]: {
-        target: "https://cdn.dos.zone",
+        target: "https://v8.js-dos.com",
         changeOrigin: true,
         rewrite: () => doomBundleRemotePath,
       },

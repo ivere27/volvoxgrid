@@ -35,7 +35,7 @@ FLUTTER_ANDROID_PLUGIN_OUTPUT_DIR := $(abspath flutter/android/src/main/jniLibs)
 VOLVOXGRID_PLUGIN_DEBUG_DIR := $(abspath target/debug)
 FLUTTER_EXAMPLE_DIR := flutter/example
 FLUTTER_EXAMPLE_PACKAGE := com.example.volvoxgrid_example
-DOOM_BUNDLE_URL := https://cdn.dos.zone/custom/dos/doom.jsdos?anonymous=1
+DOOM_BUNDLE_URL := https://v8.js-dos.com/bundles/doom.jsdos
 DOOM_EMULATORS_VERSION ?= 8.3.9
 WEB_HOST ?= 0.0.0.0
 WEB_SCALE ?= 1.0
@@ -322,9 +322,9 @@ help:
 	@echo "  publish_npm               Publish volvoxgrid + adapter npm packages from dist/web zip"
 	@echo ""
 	@echo "Example dependency source flags (default is local):"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.3"
-	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.3"
-	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.3"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.4"
+	@echo "  make java-desktop-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VERSION=0.8.4"
+	@echo "  make android-run VOLVOXGRID_SOURCE=maven VOLVOXGRID_VARIANT=lite VOLVOXGRID_VERSION=0.8.4"
 	@echo "  (maven mode skips local plugin build for the example targets)"
 	@echo "  Flutter defaults to maven when VOLVOXGRID_SOURCE is omitted."
 	@echo "  VOLVOXGRID_SOURCE=local builds from source."
