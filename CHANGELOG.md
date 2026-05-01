@@ -2,6 +2,10 @@
 
 All notable changes to VolvoxGrid are documented here. Per-package changelogs may have additional detail (e.g. [flutter/CHANGELOG.md](flutter/CHANGELOG.md)).
 
+## 0.8.4
+
+- Fixed tree auto-resize behavior and updated the Web DOOM demo CDN/proxy integration.
+
 ## 0.8.3
 
 - Added the native `VolvoxTreeService` protocol, engine tree model, and plugin/Web tree APIs for loading, mutating, expanding, selecting, checking, sorting, filtering, finding, and resolving tree nodes.
