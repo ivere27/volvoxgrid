@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.5
+
+- Switched desktop and mobile native loading from the old plugin library name to the shared `volvoxgrid` runtime library.
+- Synced Flutter documentation, generated comments, and package defaults with the runtime/library layout.
+
 ## 0.8.3
 
 - Regenerated Flutter protocol bindings for tree events, slot-based row/corner indicators, indicator appearance controls, event target metadata, and configurable decision/compare timeouts.
