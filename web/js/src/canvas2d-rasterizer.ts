@@ -7,7 +7,7 @@
  *
  * Usage:
  *   import { createCanvas2DRasterizer } from './canvas2d-rasterizer';
- *   import { set_glyph_rasterizer } from '../crate/pkg/volvoxgrid_web';
+ *   import { set_glyph_rasterizer } from '../wasm/volvoxgrid_wasm.js';
  *   set_glyph_rasterizer(createCanvas2DRasterizer());
  */
 

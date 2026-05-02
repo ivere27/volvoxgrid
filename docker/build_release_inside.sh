@@ -19,10 +19,9 @@ case "${BUILD_MODE}" in
 esac
 
 for required in \
-  "${REPO_ROOT}/plugin/Cargo.toml" \
+  "${REPO_ROOT}/runtime/Cargo.toml" \
   "${REPO_ROOT}/android/gradlew" \
-  "${REPO_ROOT}/android/volvoxgrid-android/build.gradle.kts" \
-  "${REPO_ROOT}/web/crate/Cargo.toml"; do
+  "${REPO_ROOT}/android/volvoxgrid-android/build.gradle.kts"; do
   if [[ ! -f "${required}" ]]; then
     echo "Error: missing required file: ${required}" >&2
     exit 1
@@ -36,28 +35,28 @@ export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-${ANDROID_SDK_ROOT}/ndk/28.2.136763
 build_one_mode() {
   local mode="$1"
   local mode_dist_root="$2"
-  local -a plugin_feature_args=(--no-default-features)
-  local -a wasm_feature_args=()
+  local -a library_feature_args=(--no-default-features)
+  local -a wasm_feature_args=(--no-default-features --features wasm-default)
   local android_jni_dist="${mode_dist_root}/android/jniLibs"
   local android_jni_module="${REPO_ROOT}/android/volvoxgrid-android/src/main/jniLibs"
   local flutter_android_jni_module="${REPO_ROOT}/flutter/android/src/main/jniLibs"
 
   if [[ "${mode}" == "gpu" ]]; then
-    plugin_feature_args+=(--features gpu)
+    library_feature_args+=(--features gpu)
     wasm_feature_args+=(--features gpu)
   fi
 
   rm -rf "${mode_dist_root}"
   mkdir -p "${mode_dist_root}"
 
-  echo "Building Android plugin .so files (${mode}, release)..."
+  echo "Building Android library .so files (${mode}, release)..."
   (
-    cd "${REPO_ROOT}/plugin"
+    cd "${REPO_ROOT}/runtime"
     cargo ndk \
       -t arm64-v8a \
       -t armeabi-v7a \
       -o "${android_jni_dist}" \
-      build --release "${plugin_feature_args[@]}"
+      build --release "${library_feature_args[@]}"
   )
 
   rm -rf "${android_jni_module}" "${flutter_android_jni_module}"
@@ -86,33 +85,33 @@ build_one_mode() {
   mkdir -p "${mode_dist_root}/android/aar"
   cp -f "${aar_src}" "${mode_dist_root}/android/aar/"
 
-  echo "Building Linux x64 plugin .so (${mode}, release)..."
+  echo "Building Linux x64 library .so (${mode}, release)..."
   (
-    cd "${REPO_ROOT}/plugin"
-    cargo build --release "${plugin_feature_args[@]}"
+    cd "${REPO_ROOT}/runtime"
+    cargo build --release "${library_feature_args[@]}"
   )
 
-  local linux_so_src="${CARGO_TARGET_DIR}/release/libvolvoxgrid_plugin.so"
+  local linux_so_src="${CARGO_TARGET_DIR}/release/libvolvoxgrid.so"
   if [[ ! -f "${linux_so_src}" ]]; then
-    echo "Error: expected Linux plugin .so not found at ${linux_so_src}" >&2
+    echo "Error: expected Linux library .so not found at ${linux_so_src}" >&2
     exit 1
   fi
 
   local flutter_linux_module_dir="${REPO_ROOT}/flutter/linux/x64"
   mkdir -p "${flutter_linux_module_dir}" "${mode_dist_root}/flutter/linux/x64"
-  cp -f "${linux_so_src}" "${flutter_linux_module_dir}/libvolvoxgrid_plugin.so"
-  cp -f "${linux_so_src}" "${mode_dist_root}/flutter/linux/x64/libvolvoxgrid_plugin.so"
+  cp -f "${linux_so_src}" "${flutter_linux_module_dir}/libvolvoxgrid.so"
+  cp -f "${linux_so_src}" "${mode_dist_root}/flutter/linux/x64/libvolvoxgrid.so"
 
   echo "Building wasm package (${mode}, release)..."
   mkdir -p "${mode_dist_root}/wasm"
   (
-    cd "${REPO_ROOT}/web/crate"
-    rustup run nightly wasm-pack build . --release --target web --out-dir "${mode_dist_root}/wasm" "${wasm_feature_args[@]}"
+    cd "${REPO_ROOT}/runtime"
+    rustup run nightly wasm-pack build . --release --target web --out-dir "${mode_dist_root}/wasm" --out-name volvoxgrid_wasm "${wasm_feature_args[@]}"
   )
 
   {
     echo "build_mode=${mode}"
-    echo "plugin_features=${plugin_feature_args[*]}"
+    echo "library_features=${library_feature_args[*]}"
     if [[ "${#wasm_feature_args[@]}" -eq 0 ]]; then
       echo "wasm_features=none"
     else

@@ -3,13 +3,13 @@ set -euo pipefail
 
 # Android AAR packaging script — runs inside Docker (Dockerfile.android).
 #
-# Builds the Rust volvoxgrid plugin for Android ABIs via cargo-ndk,
+# Builds the Rust volvoxgrid library for Android ABIs via cargo-ndk,
 # assembles a debug or release AAR via Gradle with all JNI .so files included,
 # then merges volvoxgrid-java-common classes into classes.jar (fat AAR).
 # Outputs Maven-ready artifacts: AAR, POM, sources.jar, javadoc.jar.
 #
 # Usage (inside Docker): VERSION=0.8.4 /opt/volvoxgrid/build_android_aar.sh
-# Optional: PLUGIN_BUILD_MODE=lite (default: full), AAR_BUILD_TYPE=debug|release (default: release)
+# Optional: LIBRARY_BUILD_MODE=lite (default: full), AAR_BUILD_TYPE=debug|release (default: release)
 
 REPO_ROOT="${REPO_ROOT:-$(pwd)}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}"
@@ -19,7 +19,7 @@ GROUP_ID="${GROUP_ID:-io.github.ivere27}"
 ARTIFACT_ID="${ARTIFACT_ID:-volvoxgrid-android}"
 GIT_COMMIT="${GIT_COMMIT:-$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)}"
 BUILD_DATE="${BUILD_DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
-PLUGIN_BUILD_MODE="${PLUGIN_BUILD_MODE:-full}"
+LIBRARY_BUILD_MODE="${LIBRARY_BUILD_MODE:-full}"
 AAR_BUILD_TYPE="${AAR_BUILD_TYPE:-release}"
 ANDROID_ABIS="${ANDROID_ABIS:-arm64-v8a,armeabi-v7a}"
 DIST_DIR="${DIST_DIR:-${REPO_ROOT}/dist/maven}"
@@ -52,10 +52,10 @@ export VOLVOXGRID_VERSION="${VOLVOXGRID_VERSION:-${VERSION}}"
 export VOLVOXGRID_GIT_COMMIT="${VOLVOXGRID_GIT_COMMIT:-${GIT_COMMIT}}"
 export VOLVOXGRID_BUILD_DATE="${VOLVOXGRID_BUILD_DATE:-${BUILD_DATE}}"
 
-case "${PLUGIN_BUILD_MODE}" in
+case "${LIBRARY_BUILD_MODE}" in
   full|lite) ;;
   *)
-    echo "Error: PLUGIN_BUILD_MODE must be 'full' or 'lite', got '${PLUGIN_BUILD_MODE}'." >&2
+    echo "Error: LIBRARY_BUILD_MODE must be 'full' or 'lite', got '${LIBRARY_BUILD_MODE}'." >&2
     exit 1
     ;;
 esac
@@ -107,7 +107,7 @@ trap restore_android_local_properties EXIT
 prepare_android_local_properties
 
 for required in \
-  "${REPO_ROOT}/plugin/Cargo.toml" \
+  "${REPO_ROOT}/runtime/Cargo.toml" \
   "${REPO_ROOT}/android/gradlew" \
   "${REPO_ROOT}/android/volvoxgrid-android/build.gradle.kts"; do
   if [[ ! -f "${required}" ]]; then
@@ -163,14 +163,14 @@ rust_target_for_abi() {
   esac
 }
 
-find_unstripped_plugin_so() {
+find_unstripped_library_so() {
   local abi="$1"
   local rust_target
   rust_target="$(rust_target_for_abi "${abi}" || true)"
   if [[ -z "${rust_target}" ]]; then
     return 1
   fi
-  local candidate="${CARGO_TARGET_DIR}/${rust_target}/${AAR_BUILD_TYPE}/libvolvoxgrid_plugin.so"
+  local candidate="${CARGO_TARGET_DIR}/${rust_target}/${AAR_BUILD_TYPE}/libvolvoxgrid.so"
   if [[ -f "${candidate}" ]]; then
     echo "${candidate}"
     return 0
@@ -181,15 +181,15 @@ find_unstripped_plugin_so() {
 JNI_STAGE_DIR="$(mktemp -d /tmp/volvoxgrid-android-jni-XXXXXX)"
 ANDROID_JNI_DIR="${JNI_STAGE_DIR}/jniLibs"
 # Full Android AAR should include GPU backend support.
-PLUGIN_FEATURE_ARGS=("${CARGO_PROFILE_ARGS[@]}" --features gpu)
-AAR_PLUGIN_SO_NAME="libvolvoxgrid_plugin.so"
-if [[ "${PLUGIN_BUILD_MODE}" == "lite" ]]; then
-  PLUGIN_FEATURE_ARGS=("${CARGO_PROFILE_ARGS[@]}" --no-default-features --features demo)
-  AAR_PLUGIN_SO_NAME="libvolvoxgrid_plugin_lite.so"
+LIBRARY_FEATURE_ARGS=("${CARGO_PROFILE_ARGS[@]}" --features gpu)
+AAR_LIBRARY_SO_NAME="libvolvoxgrid.so"
+if [[ "${LIBRARY_BUILD_MODE}" == "lite" ]]; then
+  LIBRARY_FEATURE_ARGS=("${CARGO_PROFILE_ARGS[@]}" --no-default-features --features demo)
+  AAR_LIBRARY_SO_NAME="libvolvoxgrid_lite.so"
 fi
 
-# ── Build Rust plugin .so for each ABI ──────────────────────────────────────
-echo "Building Rust plugin for Android ABIs: ${ANDROID_ABIS} (mode=${PLUGIN_BUILD_MODE}, build=${AAR_BUILD_TYPE})..."
+# ── Build Rust library .so for each ABI ──────────────────────────────────────
+echo "Building Rust library for Android ABIs: ${ANDROID_ABIS} (mode=${LIBRARY_BUILD_MODE}, build=${AAR_BUILD_TYPE})..."
 
 NDK_TARGETS=""
 for ABI in "${ABI_LIST[@]}"; do
@@ -199,13 +199,13 @@ for ABI in "${ABI_LIST[@]}"; do
 done
 
 (
-  cd "${REPO_ROOT}/plugin"
-  cargo ndk ${NDK_TARGETS} -o "${ANDROID_JNI_DIR}" build -j "${CARGO_BUILD_JOBS}" "${PLUGIN_FEATURE_ARGS[@]}"
+  cd "${REPO_ROOT}/runtime"
+  cargo ndk ${NDK_TARGETS} -o "${ANDROID_JNI_DIR}" build -j "${CARGO_BUILD_JOBS}" "${LIBRARY_FEATURE_ARGS[@]}"
 )
 
 for ABI in "${ABI_LIST[@]}"; do
   ABI="${ABI//[[:space:]]/}"
-  SO_FILE="${ANDROID_JNI_DIR}/${ABI}/libvolvoxgrid_plugin.so"
+  SO_FILE="${ANDROID_JNI_DIR}/${ABI}/libvolvoxgrid.so"
   if [[ ! -f "${SO_FILE}" ]]; then
     echo "Error: expected .so not found: ${SO_FILE}" >&2
     exit 1
@@ -291,13 +291,13 @@ if [[ "${AAR_BUILD_TYPE}" == "debug" ]]; then
   done
 fi
 
-# Inject plugin native libs from temp staging dir into AAR jni/ layout.
+# Inject native libraries from temp staging dir into AAR jni/ layout.
 for ABI in "${ABI_LIST[@]}"; do
-  SRC_SO="${ANDROID_JNI_DIR}/${ABI}/libvolvoxgrid_plugin.so"
+  SRC_SO="${ANDROID_JNI_DIR}/${ABI}/libvolvoxgrid.so"
   if [[ "${AAR_BUILD_TYPE}" == "debug" ]]; then
-    UNSTRIPPED_PLUGIN_SO="$(find_unstripped_plugin_so "${ABI}" || true)"
-    if [[ -n "${UNSTRIPPED_PLUGIN_SO}" ]]; then
-      SRC_SO="${UNSTRIPPED_PLUGIN_SO}"
+    UNSTRIPPED_LIBRARY_SO="$(find_unstripped_library_so "${ABI}" || true)"
+    if [[ -n "${UNSTRIPPED_LIBRARY_SO}" ]]; then
+      SRC_SO="${UNSTRIPPED_LIBRARY_SO}"
     fi
   fi
   if [[ ! -f "${SRC_SO}" ]]; then
@@ -305,11 +305,11 @@ for ABI in "${ABI_LIST[@]}"; do
     exit 1
   fi
   mkdir -p "${AAR_UNPACKED_DIR}/jni/${ABI}"
-  # Ensure the packed AAR contains only the selected plugin variant.
+  # Ensure the packed AAR contains only the selected library variant.
   rm -f \
-    "${AAR_UNPACKED_DIR}/jni/${ABI}/libvolvoxgrid_plugin.so" \
-    "${AAR_UNPACKED_DIR}/jni/${ABI}/libvolvoxgrid_plugin_lite.so"
-  cp -f "${SRC_SO}" "${AAR_UNPACKED_DIR}/jni/${ABI}/${AAR_PLUGIN_SO_NAME}"
+    "${AAR_UNPACKED_DIR}/jni/${ABI}/libvolvoxgrid.so" \
+    "${AAR_UNPACKED_DIR}/jni/${ABI}/libvolvoxgrid_lite.so"
+  cp -f "${SRC_SO}" "${AAR_UNPACKED_DIR}/jni/${ABI}/${AAR_LIBRARY_SO_NAME}"
 done
 
 (cd "${CLASSES_WORK_DIR}" && jar xf "${AAR_UNPACKED_DIR}/classes.jar")

@@ -5,7 +5,7 @@ usage() {
   echo "Usage: $0 <expected-version> <artifact-or-dir> [more...]" >&2
   echo "Examples:" >&2
   echo "  $0 0.8.4-SNAPSHOT dist/maven/volvoxgrid-desktop-0.8.4-SNAPSHOT.jar" >&2
-  echo "  $0 0.8.4-SNAPSHOT dist/ios/VolvoxGridPlugin.xcframework" >&2
+  echo "  $0 0.8.4-SNAPSHOT dist/ios/VolvoxGrid.xcframework" >&2
   exit 2
 }
 
@@ -91,8 +91,8 @@ verify_directory_binaries() {
 for target in "$@"; do
   case "${target}" in
     *.aar)
-      # Android AAR includes JNI bridge + engine plugin. Verify the plugin binary.
-      verify_zip_members "${target}" '^jni/.+volvoxgrid_plugin(_lite)?\.(so|dll|dylib)$'
+      # Android AAR includes JNI bridge + engine runtime. Verify the library binary.
+      verify_zip_members "${target}" '^jni/.+volvoxgrid(_lite)?\.(so|dll|dylib)$'
       ;;
     *.jar)
       # Desktop fat JAR embeds natives under native/<platform>/.

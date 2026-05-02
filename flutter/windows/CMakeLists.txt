@@ -1,7 +1,7 @@
 # The Flutter tooling requires that developers have a version of Visual Studio
 # installed that includes CMake 3.14 or later. You should not increase this
-# version, as doing so will cause the plugin to fail to compile for some
-# customers of the plugin.
+# version, as doing so will cause the runtime to fail to compile for some
+# customers of the runtime.
 cmake_minimum_required(VERSION 3.14)
 
 set(PROJECT_NAME "volvoxgrid")
@@ -9,9 +9,9 @@ project(${PROJECT_NAME} LANGUAGES CXX)
 
 # Resolve package root even when this file is accessed through .plugin_symlinks.
 get_filename_component(VOLVOXGRID_PACKAGE_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." REALPATH)
-set(VOLVOXGRID_PACKAGED_DLL "${VOLVOXGRID_PACKAGE_ROOT}/windows/x64/volvoxgrid_plugin.dll")
-set(VOLVOXGRID_RELEASE_DLL "${VOLVOXGRID_PACKAGE_ROOT}/../target/release/volvoxgrid_plugin.dll")
-set(VOLVOXGRID_DEBUG_DLL "${VOLVOXGRID_PACKAGE_ROOT}/../target/debug/volvoxgrid_plugin.dll")
+set(VOLVOXGRID_PACKAGED_DLL "${VOLVOXGRID_PACKAGE_ROOT}/windows/x64/volvoxgrid.dll")
+set(VOLVOXGRID_RELEASE_DLL "${VOLVOXGRID_PACKAGE_ROOT}/../target/release/volvoxgrid.dll")
+set(VOLVOXGRID_DEBUG_DLL "${VOLVOXGRID_PACKAGE_ROOT}/../target/debug/volvoxgrid.dll")
 
 # Resolve source/version from env.
 # Default to Maven so pub.dev consumers work without monorepo-local binaries.
@@ -29,7 +29,7 @@ if(NOT VOLVOXGRID_SOURCE STREQUAL "maven" AND NOT VOLVOXGRID_SOURCE STREQUAL "lo
 endif()
 
 if(VOLVOXGRID_SOURCE STREQUAL "maven")
-  message(STATUS "VolvoxGrid: Resolving plugin from Maven (version=${VOLVOXGRID_VERSION})...")
+  message(STATUS "VolvoxGrid: Resolving library from Maven (version=${VOLVOXGRID_VERSION})...")
 
   if(WIN32)
     set(VOLVOXGRID_GRADLE_EXECUTABLE "${VOLVOXGRID_PACKAGE_ROOT}/../android/gradlew.bat")
@@ -53,7 +53,7 @@ if(VOLVOXGRID_SOURCE STREQUAL "maven")
       RESULT_VARIABLE gradlew_result
     )
     if(NOT gradlew_result EQUAL 0)
-      message(WARNING "VolvoxGrid: Failed to download plugin from Maven via Gradle.")
+      message(WARNING "VolvoxGrid: Failed to download library from Maven via Gradle.")
     endif()
   else()
     message(WARNING "VolvoxGrid: gradle not found. Skipping Maven resolution.")

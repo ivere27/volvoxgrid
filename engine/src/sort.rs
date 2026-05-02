@@ -221,7 +221,7 @@ pub fn sort_grid_all(grid: &mut VolvoxGrid, sort_order: i32, col: i32) {
 }
 
 /// Sort all data rows using the multi-column sort keys stored in `grid.sort_state.sort_keys`.
-/// Called by the plugin/adapter when the caller has set sort_keys directly via API.
+/// Called by the runtime/adapter when the caller has set sort_keys directly via API.
 pub fn sort_grid_all_multi(grid: &mut VolvoxGrid) {
     if grid.rows <= grid.fixed_rows + 1 || grid.cols <= 0 {
         return;

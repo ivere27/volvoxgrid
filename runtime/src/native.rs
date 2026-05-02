@@ -6,15 +6,17 @@ use std::sync::{
 };
 use std::time::{Duration, Instant};
 
+use crate::shared;
 use volvoxgrid_engine::proto::volvoxgrid::v1 as pb;
 use volvoxgrid_engine::proto::volvoxgrid::v1::*;
 use volvoxgrid_engine::GridManager;
 
-#[path = "volvoxgrid_ffi_plugin.rs"]
+#[path = "volvoxgrid_ffi_runtime.rs"]
 mod ffi_impl;
 use ffi_impl::*;
-#[path = "volvoxtree_ffi_plugin.rs"]
+#[path = "volvoxtree_ffi_runtime.rs"]
 mod ffi_tree_impl;
+#[path = "terminal_tui.rs"]
 mod terminal_tui;
 
 #[cfg(all(target_os = "windows", target_env = "gnu"))]
@@ -22,9 +24,9 @@ unsafe extern "C" {
     fn volvoxgrid_windows_mingw_compat_force_link();
 }
 
-// Shared state is keyed by grid id rather than by VolvoxGridPlugin instance.
+// Shared state is keyed by grid id rather than by VolvoxGridRuntime instance.
 // Generated service values are cheap handles: a render session, EventStream,
-// and action RPC may be driven through different plugin objects but still need
+// and action RPC may be driven through different runtime objects but still need
 // to rendezvous on the same compare channel and session count.
 lazy_static::lazy_static! {
     static ref SHARED_GRID_MANAGER: GridManager = GridManager::new();
@@ -37,8 +39,8 @@ lazy_static::lazy_static! {
 const ERROR_DECISION_TIMEOUT: i32 = 1001;
 const ERROR_COMPARE_TIMEOUT: i32 = 1002;
 
-type PluginResult<T> = Result<T, FfiError>;
-type TreePluginResult<T> = Result<T, ffi_tree_impl::FfiError>;
+type RuntimeResult<T> = Result<T, FfiError>;
+type TreeRuntimeResult<T> = Result<T, ffi_tree_impl::FfiError>;
 
 const ERROR_INVALID_ARGUMENT: i32 = 1;
 const ERROR_NOT_FOUND: i32 = 2;
@@ -81,7 +83,7 @@ fn internal_error(message: impl Into<String>) -> FfiError {
     ffi_error(message, ERROR_INTERNAL, GRPC_INTERNAL)
 }
 
-fn map_plugin_error(message: impl Into<String>) -> FfiError {
+fn map_runtime_error(message: impl Into<String>) -> FfiError {
     let message = message.into();
     let lower = message.to_ascii_lowercase();
 
@@ -122,8 +124,8 @@ fn tree_ffi_error_from(error: FfiError) -> ffi_tree_impl::FfiError {
     ffi_tree_impl::FfiError::new(error.message, error.code, error.grpc_code)
 }
 
-fn tree_map_plugin_error(message: impl Into<String>) -> ffi_tree_impl::FfiError {
-    tree_ffi_error_from(map_plugin_error(message))
+fn tree_map_runtime_error(message: impl Into<String>) -> ffi_tree_impl::FfiError {
+    tree_ffi_error_from(map_runtime_error(message))
 }
 
 fn current_frame_metrics(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Option<FrameMetrics> {
@@ -336,15 +338,15 @@ fn should_request_pointer_header_sort(
 }
 
 fn handle_pointer_render_input(
-    plugin: &VolvoxGridPlugin,
-    stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
+    runtime: &VolvoxGridRuntime,
+    stream: &dyn RuntimeStreamBidi<RenderInput, RenderOutput>,
     sent_edit_requests: &mut HashMap<i64, SentEditRequest>,
     grid_id: i64,
     pe: PointerEvent,
     terminal_session: Option<&mut terminal_tui::TerminalTuiSession>,
     emit_aux_outputs: bool,
 ) {
-    let sel_and_editor = plugin.with_grid(grid_id, |grid| {
+    let sel_and_editor = runtime.with_grid(grid_id, |grid| {
         if !grid.layout.valid {
             ensure_layout(grid);
         }
@@ -357,7 +359,7 @@ fn handle_pointer_render_input(
                         false,
                         grid.selection.row,
                         grid.selection.col,
-                        selection_ranges_proto(grid),
+                        shared::selection_ranges_proto(grid),
                         None,
                     );
                 }
@@ -378,7 +380,7 @@ fn handle_pointer_render_input(
             let pointer_x = tui_mouse_x.map_or(pe.x, |translation| translation.hit_test_x as f32);
             let pointer_y = pe.y;
 
-            let decision_enabled = plugin.decision_channel_enabled(grid_id);
+            let decision_enabled = runtime.decision_channel_enabled(grid_id);
             let manual_edit_policy = decision_enabled || grid.is_tui_mode();
             let was_editing = grid.edit.is_active();
             let prev_edit_row = grid.edit.edit_row;
@@ -391,7 +393,7 @@ fn handle_pointer_render_input(
             let prev_sel = (
                 grid.selection.row,
                 grid.selection.col,
-                selection_range_tuples(grid),
+                shared::selection_range_tuples(grid),
             );
             if pe.r#type == pb::pointer_event::Type::Down as i32
                 && pe.button == 0
@@ -410,7 +412,7 @@ fn handle_pointer_render_input(
                     false,
                     grid.selection.row,
                     grid.selection.col,
-                    selection_ranges_proto(grid),
+                    shared::selection_ranges_proto(grid),
                     None,
                 );
             }
@@ -487,7 +489,7 @@ fn handle_pointer_render_input(
                             });
                         if queued_before_mouse_down {
                             if let Some(hit) = hit.as_ref() {
-                                plugin.request_before_mouse_down(
+                                runtime.request_before_mouse_down(
                                     grid_id,
                                     grid,
                                     hit.row,
@@ -534,14 +536,14 @@ fn handle_pointer_render_input(
                                     && hit.col >= 0
                                     && !pe.dbl_click
                                 {
-                                    plugin.request_before_user_resize(
+                                    runtime.request_before_user_resize(
                                         grid_id, grid, -1, hit.col, pointer_x,
                                     );
                                 } else if hit.area == volvoxgrid_engine::input::HitArea::RowBorder
                                     && hit.row >= 0
                                     && !pe.dbl_click
                                 {
-                                    plugin.request_before_user_resize(
+                                    runtime.request_before_user_resize(
                                         grid_id, grid, hit.row, -1, pointer_y,
                                     );
                                 }
@@ -554,7 +556,7 @@ fn handle_pointer_render_input(
                                         .row_props
                                         .get(&hit.row)
                                         .map_or(false, |rp| rp.is_collapsed);
-                                    plugin.request_before_node_toggle(
+                                    runtime.request_before_node_toggle(
                                         grid_id, grid, hit.row, collapsing,
                                     );
                                 }
@@ -577,7 +579,7 @@ fn handle_pointer_render_input(
                                             && grid.edit.edit_row == hit.row
                                             && grid.edit.edit_col == hit.col)
                                         {
-                                            let _ = plugin.request_before_edit(
+                                            let _ = runtime.request_before_edit(
                                                 grid_id, grid, hit.row, hit.col, false, true, None,
                                                 None, None,
                                             );
@@ -597,7 +599,7 @@ fn handle_pointer_render_input(
                                         } else {
                                             None
                                         };
-                                        let _ = plugin.request_before_edit(
+                                        let _ = runtime.request_before_edit(
                                             grid_id,
                                             grid,
                                             hit.row,
@@ -612,7 +614,7 @@ fn handle_pointer_render_input(
                                 }
 
                                 if should_request_pointer_header_sort(grid, hit, is_combo_cell) {
-                                    plugin.request_before_sort(grid_id, grid, hit.col);
+                                    runtime.request_before_sort(grid_id, grid, hit.col);
                                 }
                             }
                         }
@@ -633,7 +635,7 @@ fn handle_pointer_render_input(
                         if let Some((col, new_position)) =
                             volvoxgrid_engine::input::take_column_drag_move(grid)
                         {
-                            plugin.request_before_move_column(grid_id, grid, col, new_position);
+                            runtime.request_before_move_column(grid_id, grid, col, new_position);
                         } else {
                             volvoxgrid_engine::input::handle_pointer_up_with_behavior(
                                 grid,
@@ -690,7 +692,7 @@ fn handle_pointer_render_input(
             let next_sel = (
                 grid.selection.row,
                 grid.selection.col,
-                selection_range_tuples(grid),
+                shared::selection_range_tuples(grid),
             );
             let selection_changed = next_sel != prev_sel;
 
@@ -698,7 +700,7 @@ fn handle_pointer_render_input(
                 selection_changed,
                 grid.selection.row,
                 grid.selection.col,
-                selection_ranges_proto(grid),
+                shared::selection_ranges_proto(grid),
                 editor_output,
             )
         })
@@ -718,25 +720,25 @@ fn handle_pointer_render_input(
             });
         }
         if let Some(output) = editor_output {
-            send_render_output_tracked(plugin, stream, sent_edit_requests, grid_id, output);
+            send_render_output_tracked(runtime, stream, sent_edit_requests, grid_id, output);
         }
     }
 }
 
 fn handle_key_render_input(
-    plugin: &VolvoxGridPlugin,
-    stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
+    runtime: &VolvoxGridRuntime,
+    stream: &dyn RuntimeStreamBidi<RenderInput, RenderOutput>,
     sent_edit_requests: &mut HashMap<i64, SentEditRequest>,
     grid_id: i64,
     ke: KeyEvent,
     emit_aux_outputs: bool,
     mut terminal_session: Option<&mut terminal_tui::TerminalTuiSession>,
 ) {
-    let sel_and_editor = plugin.with_grid(grid_id, |grid| {
+    let sel_and_editor = runtime.with_grid(grid_id, |grid| {
         if !grid.layout.valid {
             ensure_layout(grid);
         }
-        let decision_enabled = plugin.decision_channel_enabled(grid_id);
+        let decision_enabled = runtime.decision_channel_enabled(grid_id);
         if let Some(session) = terminal_session.as_deref_mut() {
             let compose_default = if grid.engine_compose_configured {
                 grid.engine_compose
@@ -772,7 +774,7 @@ fn handle_key_render_input(
                         volvoxgrid_engine::input::selected_outline_label_edit_target(grid)
                             .unwrap_or((grid.selection.row, grid.selection.col));
                     if decision_enabled {
-                        let _ = plugin.request_before_edit(
+                        let _ = runtime.request_before_edit(
                             grid_id,
                             grid,
                             edit_row,
@@ -788,7 +790,7 @@ fn handle_key_render_input(
                             grid.mark_dirty();
                         }
                     } else {
-                        begin_edit_session_core_opts(
+                        shared::begin_edit_session_core_opts(
                             grid,
                             edit_row,
                             edit_col,
@@ -841,7 +843,7 @@ fn handle_key_render_input(
                             if let Some((row, collapse)) =
                                 volvoxgrid_engine::input::selected_outline_node_toggle_target(grid)
                             {
-                                plugin.request_before_node_toggle(grid_id, grid, row, collapse);
+                                runtime.request_before_node_toggle(grid_id, grid, row, collapse);
                             }
                         } else {
                             volvoxgrid_engine::input::handle_key_down_with_behavior(
@@ -870,7 +872,7 @@ fn handle_key_render_input(
                                 } else {
                                     (grid.selection.row, grid.selection.col)
                                 };
-                            let _ = plugin.request_before_edit(
+                            let _ = runtime.request_before_edit(
                                 grid_id,
                                 grid,
                                 edit_row,
@@ -925,7 +927,7 @@ fn handle_key_render_input(
                                             grid,
                                         )
                                         .unwrap_or((grid.selection.row, grid.selection.col));
-                                    let _ = plugin.request_before_edit(
+                                    let _ = runtime.request_before_edit(
                                         grid_id,
                                         grid,
                                         edit_row,
@@ -964,7 +966,7 @@ fn handle_key_render_input(
         (
             grid.selection.row,
             grid.selection.col,
-            selection_ranges_proto(grid),
+            shared::selection_ranges_proto(grid),
             editor_output,
         )
     });
@@ -981,24 +983,24 @@ fn handle_key_render_input(
             })),
         });
         if let Some(output) = editor_output {
-            send_render_output_tracked(plugin, stream, sent_edit_requests, grid_id, output);
+            send_render_output_tracked(runtime, stream, sent_edit_requests, grid_id, output);
         }
     }
 }
 
 fn handle_scroll_render_input(
-    plugin: &VolvoxGridPlugin,
-    stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
+    runtime: &VolvoxGridRuntime,
+    stream: &dyn RuntimeStreamBidi<RenderInput, RenderOutput>,
     grid_id: i64,
     se: ScrollEvent,
     emit_aux_outputs: bool,
 ) {
-    let tooltip = plugin.with_grid(grid_id, |grid| {
+    let tooltip = runtime.with_grid(grid_id, |grid| {
         if !grid.layout.valid {
             ensure_layout(grid);
         }
-        if plugin.decision_channel_enabled(grid_id) {
-            let _ = plugin.request_before_scroll(grid_id, grid, se.delta_x, se.delta_y);
+        if runtime.decision_channel_enabled(grid_id) {
+            let _ = runtime.request_before_scroll(grid_id, grid, se.delta_x, se.delta_y);
         } else {
             volvoxgrid_engine::input::handle_scroll(grid, se.delta_x, se.delta_y);
         }
@@ -1034,7 +1036,7 @@ fn handle_scroll_render_input(
     });
 }
 
-struct VolvoxGridPlugin {
+struct VolvoxGridRuntime {
     next_event_id: AtomicI64,
     decision_enabled: Mutex<HashSet<i64>>,
     pending_actions: Mutex<HashMap<(i64, i64), PendingActionEntry>>,
@@ -1267,7 +1269,7 @@ struct ZoomGestureState {
     base_font_size: Option<f32>,
 }
 
-impl VolvoxGridPlugin {
+impl VolvoxGridRuntime {
     fn new() -> Self {
         Self {
             next_event_id: AtomicI64::new(1),
@@ -1286,40 +1288,40 @@ impl VolvoxGridPlugin {
         &self,
         id: i64,
         f: impl FnOnce(&mut volvoxgrid_engine::grid::VolvoxGrid) -> T,
-    ) -> PluginResult<T> {
-        self.manager().with_grid(id, f).map_err(map_plugin_error)
+    ) -> RuntimeResult<T> {
+        self.manager().with_grid(id, f).map_err(map_runtime_error)
     }
 
     fn with_grid_result<T>(
         &self,
         id: i64,
         f: impl FnOnce(&mut volvoxgrid_engine::grid::VolvoxGrid) -> Result<T, String>,
-    ) -> PluginResult<T> {
+    ) -> RuntimeResult<T> {
         self.manager()
             .with_grid(id, f)
-            .map_err(map_plugin_error)?
-            .map_err(map_plugin_error)
+            .map_err(map_runtime_error)?
+            .map_err(map_runtime_error)
     }
 
     fn with_grid_tree<T>(
         &self,
         id: i64,
         f: impl FnOnce(&mut volvoxgrid_engine::grid::VolvoxGrid) -> T,
-    ) -> TreePluginResult<T> {
+    ) -> TreeRuntimeResult<T> {
         self.manager()
             .with_grid(id, f)
-            .map_err(tree_map_plugin_error)
+            .map_err(tree_map_runtime_error)
     }
 
     fn with_grid_tree_result<T, E: ToString>(
         &self,
         id: i64,
         f: impl FnOnce(&mut volvoxgrid_engine::grid::VolvoxGrid) -> Result<T, E>,
-    ) -> TreePluginResult<T> {
+    ) -> TreeRuntimeResult<T> {
         self.manager()
             .with_grid(id, f)
-            .map_err(tree_map_plugin_error)?
-            .map_err(|err| tree_map_plugin_error(err.to_string()))
+            .map_err(tree_map_runtime_error)?
+            .map_err(|err| tree_map_runtime_error(err.to_string()))
     }
 
     fn sync_fonts_into_renderer(
@@ -1752,8 +1754,8 @@ fn apply_zoom_scale(
 mod tests {
     use super::{
         apply_zoom_scale, capture_zoom_state, should_request_pointer_header_sort,
-        with_tui_pointer_geometry, PluginStream, PluginStreamBidi, PluginStreamReceiver,
-        PluginStreamSender, VolvoxGridPlugin, VolvoxGridServicePlugin,
+        with_tui_pointer_geometry, RuntimeStream, RuntimeStreamBidi, RuntimeStreamReceiver,
+        RuntimeStreamSender, VolvoxGridRuntime, VolvoxGridServiceRuntime,
     };
     use std::collections::{HashMap, HashSet};
     use std::sync::{
@@ -1768,7 +1770,7 @@ mod tests {
     use volvoxgrid_engine::style::{CellStylePatch, Padding};
 
     struct AutoCompareEventStream {
-        plugin: Arc<VolvoxGridPlugin>,
+        runtime: Arc<VolvoxGridRuntime>,
         grid_id: i64,
         compare: Arc<dyn Fn(&pb::CompareEvent) -> i32 + Send + Sync>,
         events: Mutex<Vec<pb::GridEvent>>,
@@ -1778,12 +1780,12 @@ mod tests {
 
     impl AutoCompareEventStream {
         fn new(
-            plugin: Arc<VolvoxGridPlugin>,
+            runtime: Arc<VolvoxGridRuntime>,
             grid_id: i64,
             compare: Arc<dyn Fn(&pb::CompareEvent) -> i32 + Send + Sync>,
         ) -> Self {
             Self {
-                plugin,
+                runtime,
                 grid_id,
                 compare,
                 events: Mutex::new(Vec::new()),
@@ -1812,13 +1814,13 @@ mod tests {
         outputs: Mutex<Vec<pb::RenderOutput>>,
     }
 
-    impl PluginStream for TestRenderStream {
+    impl RuntimeStream for TestRenderStream {
         fn is_cancelled(&self) -> bool {
             false
         }
     }
 
-    impl PluginStreamSender<pb::RenderOutput> for TestRenderStream {
+    impl RuntimeStreamSender<pb::RenderOutput> for TestRenderStream {
         fn send(&self, msg: pb::RenderOutput) -> bool {
             self.outputs
                 .lock()
@@ -1828,15 +1830,15 @@ mod tests {
         }
     }
 
-    impl PluginStreamReceiver<pb::RenderInput> for TestRenderStream {
+    impl RuntimeStreamReceiver<pb::RenderInput> for TestRenderStream {
         fn recv(&self) -> Option<pb::RenderInput> {
             None
         }
     }
 
-    impl PluginStreamBidi<pb::RenderInput, pb::RenderOutput> for TestRenderStream {}
+    impl RuntimeStreamBidi<pb::RenderInput, pb::RenderOutput> for TestRenderStream {}
 
-    impl PluginStream for AutoCompareEventStream {
+    impl RuntimeStream for AutoCompareEventStream {
         fn is_cancelled(&self) -> bool {
             self.cancelled.load(Ordering::SeqCst)
         }
@@ -1855,14 +1857,14 @@ mod tests {
         }
     }
 
-    impl PluginStreamSender<pb::GridEvent> for AutoCompareEventStream {
+    impl RuntimeStreamSender<pb::GridEvent> for AutoCompareEventStream {
         fn send(&self, msg: pb::GridEvent) -> bool {
             if self.is_cancelled() {
                 return false;
             }
             if let Some(pb::grid_event::Event::Compare(compare)) = msg.event.as_ref() {
                 let result = (self.compare)(compare);
-                self.plugin
+                self.runtime
                     .deliver_compare_response(self.grid_id, compare.request_id, result);
             }
             self.events
@@ -1873,13 +1875,13 @@ mod tests {
         }
     }
 
-    fn plugin_with_decision_grid(rows: i32, cols: i32) -> (VolvoxGridPlugin, i64) {
-        let plugin = VolvoxGridPlugin::new();
-        let grid_id = plugin
+    fn runtime_with_decision_grid(rows: i32, cols: i32) -> (VolvoxGridRuntime, i64) {
+        let runtime = VolvoxGridRuntime::new();
+        let grid_id = runtime
             .manager()
             .create_grid(320, 160, rows, cols, 1, 0, 1.0);
-        plugin.mark_decision_channel_enabled(grid_id);
-        (plugin, grid_id)
+        runtime.mark_decision_channel_enabled(grid_id);
+        (runtime, grid_id)
     }
 
     fn take_pending_event_id<F>(grid: &mut VolvoxGrid, pred: F) -> i64
@@ -1896,35 +1898,35 @@ mod tests {
     }
 
     fn request_pending_event_id<F, R>(
-        plugin: &VolvoxGridPlugin,
+        runtime: &VolvoxGridRuntime,
         grid_id: i64,
         request: R,
         pred: F,
     ) -> i64
     where
         F: Fn(&GridEventData) -> bool,
-        R: FnOnce(&VolvoxGridPlugin, i64, &mut VolvoxGrid),
+        R: FnOnce(&VolvoxGridRuntime, i64, &mut VolvoxGrid),
     {
-        plugin
+        runtime
             .with_grid(grid_id, |grid| {
-                request(plugin, grid_id, grid);
+                request(runtime, grid_id, grid);
                 take_pending_event_id(grid, pred)
             })
             .expect("grid exists")
     }
 
-    fn destroy_test_grid(plugin: &VolvoxGridPlugin, grid_id: i64) {
-        plugin.clear_grid_state(grid_id);
-        plugin.manager().destroy_grid(grid_id);
+    fn destroy_test_grid(runtime: &VolvoxGridRuntime, grid_id: i64) {
+        runtime.clear_grid_state(grid_id);
+        runtime.manager().destroy_grid(grid_id);
     }
 
-    fn wait_for_grid<F>(plugin: &VolvoxGridPlugin, grid_id: i64, mut pred: F)
+    fn wait_for_grid<F>(runtime: &VolvoxGridRuntime, grid_id: i64, mut pred: F)
     where
         F: FnMut(&mut VolvoxGrid) -> bool,
     {
         let start = Instant::now();
         loop {
-            if plugin
+            if runtime
                 .with_grid(grid_id, |grid| pred(grid))
                 .expect("grid exists")
             {
@@ -1940,21 +1942,21 @@ mod tests {
 
     #[test]
     fn compare_event_stream_emits_while_grid_lock_is_held() {
-        let plugin = Arc::new(VolvoxGridPlugin::new());
-        let grid_id = plugin.manager().create_grid(320, 160, 3, 1, 1, 0, 1.0);
+        let runtime = Arc::new(VolvoxGridRuntime::new());
+        let grid_id = runtime.manager().create_grid(320, 160, 3, 1, 1, 0, 1.0);
         let mut session_grid_ids = HashSet::new();
-        plugin.register_render_session_grid(grid_id, &mut session_grid_ids);
-        let compare = VolvoxGridPlugin::install_compare_channel(grid_id, None)
+        runtime.register_render_session_grid(grid_id, &mut session_grid_ids);
+        let compare = VolvoxGridRuntime::install_compare_channel(grid_id, None)
             .expect("compare channel should install with an active render session");
-        let grid_arc = plugin.manager().get_grid(grid_id).expect("grid exists");
+        let grid_arc = runtime.manager().get_grid(grid_id).expect("grid exists");
         let grid_guard = grid_arc.lock().unwrap_or_else(|e| e.into_inner());
-        let stream = AutoCompareEventStream::new(Arc::clone(&plugin), grid_id, Arc::new(|_| -1));
+        let stream = AutoCompareEventStream::new(Arc::clone(&runtime), grid_id, Arc::new(|_| -1));
 
         std::thread::scope(|scope| {
-            let plugin_for_stream = Arc::clone(&plugin);
+            let runtime_for_stream = Arc::clone(&runtime);
             let stream_ref = &stream;
             let handle = scope.spawn(move || {
-                plugin_for_stream
+                runtime_for_stream
                     .event_stream(pb::EventStreamRequest { grid_id }, stream_ref)
                     .expect("event stream should exit cleanly");
             });
@@ -1974,16 +1976,16 @@ mod tests {
             Some(pb::grid_event::Event::Compare(_))
         )));
         drop(events);
-        destroy_test_grid(&plugin, grid_id);
+        destroy_test_grid(&runtime, grid_id);
     }
 
     #[test]
     fn sort_custom_uses_compare_event_stream_responses() {
-        let plugin = Arc::new(VolvoxGridPlugin::new());
-        let grid_id = plugin.manager().create_grid(320, 160, 6, 1, 1, 0, 1.0);
+        let runtime = Arc::new(VolvoxGridRuntime::new());
+        let grid_id = runtime.manager().create_grid(320, 160, 6, 1, 1, 0, 1.0);
         let values = ["dddd", "a", "ccc", "bb", "eeeee"];
         let mut lengths = HashMap::new();
-        plugin
+        runtime
             .with_grid(grid_id, |grid| {
                 for (i, value) in values.iter().enumerate() {
                     let row = (i as i32) + 1;
@@ -1994,10 +1996,10 @@ mod tests {
             .unwrap();
 
         let mut session_grid_ids = HashSet::new();
-        plugin.register_render_session_grid(grid_id, &mut session_grid_ids);
+        runtime.register_render_session_grid(grid_id, &mut session_grid_ids);
         let compare_lengths = Arc::new(lengths);
         let stream = AutoCompareEventStream::new(
-            Arc::clone(&plugin),
+            Arc::clone(&runtime),
             grid_id,
             Arc::new(move |event| {
                 let a = compare_lengths
@@ -2017,15 +2019,15 @@ mod tests {
         );
 
         std::thread::scope(|scope| {
-            let plugin_for_stream = Arc::clone(&plugin);
+            let runtime_for_stream = Arc::clone(&runtime);
             let stream_ref = &stream;
             let handle = scope.spawn(move || {
-                plugin_for_stream
+                runtime_for_stream
                     .event_stream(pb::EventStreamRequest { grid_id }, stream_ref)
                     .expect("event stream should exit cleanly");
             });
 
-            plugin
+            runtime
                 .sort(pb::SortRequest {
                     grid_id,
                     sort_columns: vec![pb::SortColumn {
@@ -2039,7 +2041,7 @@ mod tests {
             handle.join().expect("event stream thread should not panic");
         });
 
-        plugin
+        runtime
             .with_grid(grid_id, |grid| {
                 let got: Vec<String> = (1..=5)
                     .map(|row| grid.cells.get_text(row, 0).to_string())
@@ -2064,16 +2066,16 @@ mod tests {
             compare_count > 0,
             "custom sort must ask the host to compare"
         );
-        destroy_test_grid(&plugin, grid_id);
+        destroy_test_grid(&runtime, grid_id);
     }
 
     #[test]
     fn header_click_custom_uses_compare_event_stream_responses() {
-        let plugin = Arc::new(VolvoxGridPlugin::new());
-        let grid_id = plugin.manager().create_grid(320, 160, 6, 1, 1, 0, 1.0);
+        let runtime = Arc::new(VolvoxGridRuntime::new());
+        let grid_id = runtime.manager().create_grid(320, 160, 6, 1, 1, 0, 1.0);
         let values = ["dddd", "a", "ccc", "bb", "eeeee"];
         let mut lengths = HashMap::new();
-        plugin
+        runtime
             .with_grid(grid_id, |grid| {
                 grid.header_features = 1;
                 grid.columns[0].sort_order = volvoxgrid_engine::sort::SORT_ASCENDING_CUSTOM;
@@ -2087,10 +2089,10 @@ mod tests {
             .unwrap();
 
         let mut session_grid_ids = HashSet::new();
-        plugin.register_render_session_grid(grid_id, &mut session_grid_ids);
+        runtime.register_render_session_grid(grid_id, &mut session_grid_ids);
         let compare_lengths = Arc::new(lengths);
         let stream = AutoCompareEventStream::new(
-            Arc::clone(&plugin),
+            Arc::clone(&runtime),
             grid_id,
             Arc::new(move |event| {
                 let a = compare_lengths
@@ -2110,18 +2112,20 @@ mod tests {
         );
 
         std::thread::scope(|scope| {
-            let plugin_for_stream = Arc::clone(&plugin);
+            let runtime_for_stream = Arc::clone(&runtime);
             let stream_ref = &stream;
             let handle = scope.spawn(move || {
-                plugin_for_stream
+                runtime_for_stream
                     .event_stream(pb::EventStreamRequest { grid_id }, stream_ref)
                     .expect("event stream should exit cleanly");
             });
 
-            plugin
-                .with_grid(grid_id, |grid| plugin.request_before_sort(grid_id, grid, 0))
+            runtime
+                .with_grid(grid_id, |grid| {
+                    runtime.request_before_sort(grid_id, grid, 0)
+                })
                 .expect("header custom sort should complete");
-            wait_for_grid(&plugin, grid_id, |grid| {
+            wait_for_grid(&runtime, grid_id, |grid| {
                 (1..=5)
                     .map(|row| grid.cells.get_text(row, 0).to_string())
                     .collect::<Vec<_>>()
@@ -2131,7 +2135,7 @@ mod tests {
             handle.join().expect("event stream thread should not panic");
         });
 
-        plugin
+        runtime
             .with_grid(grid_id, |grid| {
                 let got: Vec<String> = (1..=5)
                     .map(|row| grid.cells.get_text(row, 0).to_string())
@@ -2160,16 +2164,16 @@ mod tests {
             compare_count > 0,
             "header custom sort must ask the host to compare"
         );
-        destroy_test_grid(&plugin, grid_id);
+        destroy_test_grid(&runtime, grid_id);
     }
 
     #[test]
     fn header_sort_snapshot_matches_engine_for_clean_custom_grid() {
-        let plugin = VolvoxGridPlugin::new();
-        let grid_id = plugin.manager().create_grid(320, 160, 6, 1, 1, 0, 1.0);
+        let runtime = VolvoxGridRuntime::new();
+        let grid_id = runtime.manager().create_grid(320, 160, 6, 1, 1, 0, 1.0);
         let values = ["dddd", "a", "ccc", "bb", "eeeee"];
         let mut lengths = HashMap::new();
-        plugin
+        runtime
             .with_grid(grid_id, |grid| {
                 grid.header_features = 1;
                 grid.columns[0].sort_order = volvoxgrid_engine::sort::SORT_NONE;
@@ -2184,7 +2188,7 @@ mod tests {
             .unwrap();
 
         let lengths = Arc::new(lengths);
-        let (order, old_sort_state, old_row_positions) = plugin
+        let (order, old_sort_state, old_row_positions) = runtime
             .with_grid(grid_id, |grid| {
                 (
                     volvoxgrid_engine::sort::header_click_next_sort_order(grid, 0),
@@ -2212,8 +2216,8 @@ mod tests {
             groups: vec![(1..=5).collect::<Vec<i32>>()],
         };
 
-        VolvoxGridPlugin::run_header_sort_snapshot(grid_id, snapshot);
-        let (snapshot_order, snapshot_keys) = plugin
+        VolvoxGridRuntime::run_header_sort_snapshot(grid_id, snapshot);
+        let (snapshot_order, snapshot_keys) = runtime
             .with_grid(grid_id, |grid| {
                 (
                     (1..=5)
@@ -2251,14 +2255,14 @@ mod tests {
 
         assert_eq!(snapshot_order, engine_order);
         assert_eq!(snapshot_keys, engine_grid.sort_state.sort_keys);
-        destroy_test_grid(&plugin, grid_id);
+        destroy_test_grid(&runtime, grid_id);
     }
 
     #[test]
     fn header_click_custom_compare_does_not_hold_grid_lock_while_waiting() {
-        let plugin = Arc::new(VolvoxGridPlugin::new());
-        let grid_id = plugin.manager().create_grid(320, 160, 4, 1, 1, 0, 1.0);
-        plugin
+        let runtime = Arc::new(VolvoxGridRuntime::new());
+        let grid_id = runtime.manager().create_grid(320, 160, 4, 1, 1, 0, 1.0);
+        runtime
             .with_grid(grid_id, |grid| {
                 grid.header_features = 1;
                 grid.columns[0].sort_order = volvoxgrid_engine::sort::SORT_ASCENDING_CUSTOM;
@@ -2269,12 +2273,12 @@ mod tests {
             .unwrap();
 
         let mut session_grid_ids = HashSet::new();
-        plugin.register_render_session_grid(grid_id, &mut session_grid_ids);
+        runtime.register_render_session_grid(grid_id, &mut session_grid_ids);
         let (compare_seen_tx, compare_seen_rx) = mpsc::channel();
         let (release_compare_tx, release_compare_rx) = mpsc::channel();
         let release_compare_rx = Arc::new(Mutex::new(release_compare_rx));
         let stream = AutoCompareEventStream::new(
-            Arc::clone(&plugin),
+            Arc::clone(&runtime),
             grid_id,
             Arc::new(move |_| {
                 let _ = compare_seen_tx.send(());
@@ -2287,25 +2291,27 @@ mod tests {
         );
 
         std::thread::scope(|scope| {
-            let plugin_for_stream = Arc::clone(&plugin);
+            let runtime_for_stream = Arc::clone(&runtime);
             let stream_ref = &stream;
             let handle = scope.spawn(move || {
-                plugin_for_stream
+                runtime_for_stream
                     .event_stream(pb::EventStreamRequest { grid_id }, stream_ref)
                     .expect("event stream should exit cleanly");
             });
 
-            plugin
-                .with_grid(grid_id, |grid| plugin.request_before_sort(grid_id, grid, 0))
+            runtime
+                .with_grid(grid_id, |grid| {
+                    runtime.request_before_sort(grid_id, grid, 0)
+                })
                 .expect("header custom sort should schedule");
             compare_seen_rx
                 .recv_timeout(Duration::from_secs(1))
                 .expect("sort should request host comparison");
 
-            let plugin_for_lock = Arc::clone(&plugin);
+            let runtime_for_lock = Arc::clone(&runtime);
             let (lock_tx, lock_rx) = mpsc::channel();
             scope.spawn(move || {
-                let _ = plugin_for_lock.with_grid(grid_id, |grid| grid.rows);
+                let _ = runtime_for_lock.with_grid(grid_id, |grid| grid.rows);
                 let _ = lock_tx.send(());
             });
             lock_rx
@@ -2313,7 +2319,7 @@ mod tests {
                 .expect("grid lock should be available while compare is pending");
 
             let _ = release_compare_tx.send(());
-            wait_for_grid(&plugin, grid_id, |grid| {
+            wait_for_grid(&runtime, grid_id, |grid| {
                 grid.sort_state.sort_keys
                     == vec![(0, volvoxgrid_engine::sort::SORT_ASCENDING_CUSTOM)]
             });
@@ -2321,7 +2327,7 @@ mod tests {
             handle.join().expect("event stream thread should not panic");
         });
 
-        destroy_test_grid(&plugin, grid_id);
+        destroy_test_grid(&runtime, grid_id);
     }
 
     #[test]
@@ -2506,8 +2512,8 @@ mod tests {
 
     #[test]
     fn tui_visible_outline_cell_enter_requests_edit_not_node_toggle() {
-        let (plugin, grid_id) = plugin_with_decision_grid(3, 2);
-        plugin
+        let (runtime, grid_id) = runtime_with_decision_grid(3, 2);
+        runtime
             .with_grid(grid_id, |grid| {
                 grid.set_renderer_mode(pb::RendererMode::RendererTui as i32);
                 grid.edit_trigger_mode = 1;
@@ -2541,7 +2547,7 @@ mod tests {
         let stream = TestRenderStream::default();
         let mut sent_edit_requests = HashMap::new();
         super::handle_key_render_input(
-            &plugin,
+            &runtime,
             &stream,
             &mut sent_edit_requests,
             grid_id,
@@ -2555,7 +2561,7 @@ mod tests {
             None,
         );
 
-        let edit_event_id = plugin
+        let edit_event_id = runtime
             .with_grid(grid_id, |grid| {
                 let events = grid.events.drain();
                 assert!(!events
@@ -2571,8 +2577,8 @@ mod tests {
             })
             .unwrap();
 
-        let _ = plugin.resolve_event_decision(grid_id, edit_event_id, false);
-        plugin
+        let _ = runtime.resolve_event_decision(grid_id, edit_event_id, false);
+        runtime
             .with_grid(grid_id, |grid| {
                 assert!(grid.edit.is_active());
                 assert_eq!(grid.edit.edit_row, 1);
@@ -2584,38 +2590,38 @@ mod tests {
             })
             .unwrap();
 
-        destroy_test_grid(&plugin, grid_id);
+        destroy_test_grid(&runtime, grid_id);
     }
 
     #[test]
     fn event_decision_cancel_and_allow_before_edit() {
-        let (plugin, grid_id) = plugin_with_decision_grid(3, 2);
+        let (runtime, grid_id) = runtime_with_decision_grid(3, 2);
 
         let cancel_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| {
+            |runtime, grid_id, grid| {
                 let _ =
-                    plugin.request_before_edit(grid_id, grid, 1, 0, true, false, None, None, None);
+                    runtime.request_before_edit(grid_id, grid, 1, 0, true, false, None, None, None);
             },
             |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
         );
-        let _ = plugin.resolve_event_decision(grid_id, cancel_id, true);
-        plugin
+        let _ = runtime.resolve_event_decision(grid_id, cancel_id, true);
+        runtime
             .with_grid(grid_id, |grid| assert!(!grid.edit.is_active()))
             .unwrap();
 
         let allow_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| {
+            |runtime, grid_id, grid| {
                 let _ =
-                    plugin.request_before_edit(grid_id, grid, 1, 0, true, false, None, None, None);
+                    runtime.request_before_edit(grid_id, grid, 1, 0, true, false, None, None, None);
             },
             |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
         );
-        let _ = plugin.resolve_event_decision(grid_id, allow_id, false);
-        plugin
+        let _ = runtime.resolve_event_decision(grid_id, allow_id, false);
+        runtime
             .with_grid(grid_id, |grid| {
                 assert!(grid.edit.is_active());
                 assert_eq!(grid.edit.edit_row, 1);
@@ -2623,24 +2629,24 @@ mod tests {
             })
             .unwrap();
 
-        destroy_test_grid(&plugin, grid_id);
+        destroy_test_grid(&runtime, grid_id);
     }
 
     #[test]
     fn event_decision_default_does_not_expire() {
-        let (plugin, grid_id) = plugin_with_decision_grid(3, 2);
+        let (runtime, grid_id) = runtime_with_decision_grid(3, 2);
 
         let event_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| {
+            |runtime, grid_id, grid| {
                 let _ =
-                    plugin.request_before_edit(grid_id, grid, 1, 0, true, false, None, None, None);
+                    runtime.request_before_edit(grid_id, grid, 1, 0, true, false, None, None, None);
             },
             |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
         );
         {
-            let mut pending = plugin
+            let mut pending = runtime
                 .pending_actions
                 .lock()
                 .unwrap_or_else(|e| e.into_inner());
@@ -2650,39 +2656,39 @@ mod tests {
                 .created_at = Instant::now() - Duration::from_secs(60);
         }
 
-        assert!(plugin.resolve_expired_actions(grid_id).is_empty());
-        plugin
+        assert!(runtime.resolve_expired_actions(grid_id).is_empty());
+        runtime
             .with_grid(grid_id, |grid| assert!(!grid.edit.is_active()))
             .unwrap();
-        assert!(plugin
+        assert!(runtime
             .pending_actions
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .contains_key(&(grid_id, event_id)));
 
-        destroy_test_grid(&plugin, grid_id);
+        destroy_test_grid(&runtime, grid_id);
     }
 
     #[test]
     fn event_decision_finite_timeout_emits_error_and_allows() {
-        let (plugin, grid_id) = plugin_with_decision_grid(3, 2);
-        plugin
+        let (runtime, grid_id) = runtime_with_decision_grid(3, 2);
+        runtime
             .with_grid(grid_id, |grid| {
                 grid.decision_timeout_ms = 100;
             })
             .unwrap();
 
         let event_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| {
+            |runtime, grid_id, grid| {
                 let _ =
-                    plugin.request_before_edit(grid_id, grid, 1, 0, true, false, None, None, None);
+                    runtime.request_before_edit(grid_id, grid, 1, 0, true, false, None, None, None);
             },
             |event| matches!(event, GridEventData::BeforeEdit { row: 1, col: 0 }),
         );
         {
-            let mut pending = plugin
+            let mut pending = runtime
                 .pending_actions
                 .lock()
                 .unwrap_or_else(|e| e.into_inner());
@@ -2692,8 +2698,8 @@ mod tests {
                 .created_at = Instant::now() - Duration::from_millis(250);
         }
 
-        assert!(plugin.resolve_expired_actions(grid_id).is_empty());
-        plugin
+        assert!(runtime.resolve_expired_actions(grid_id).is_empty());
+        runtime
             .with_grid(grid_id, |grid| {
                 assert!(grid.edit.is_active());
                 assert_eq!(grid.edit.edit_row, 1);
@@ -2707,19 +2713,19 @@ mod tests {
                 }));
             })
             .unwrap();
-        assert!(!plugin
+        assert!(!runtime
             .pending_actions
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .contains_key(&(grid_id, event_id)));
 
-        destroy_test_grid(&plugin, grid_id);
+        destroy_test_grid(&runtime, grid_id);
     }
 
     #[test]
     fn event_decision_cancel_and_allow_before_sort() {
-        let (plugin, grid_id) = plugin_with_decision_grid(3, 1);
-        plugin
+        let (runtime, grid_id) = runtime_with_decision_grid(3, 1);
+        runtime
             .with_grid(grid_id, |grid| {
                 grid.header_features = 1;
                 grid.cells.set_text(1, 0, "B".to_string());
@@ -2728,32 +2734,32 @@ mod tests {
             .unwrap();
 
         let cancel_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| plugin.request_before_sort(grid_id, grid, 0),
+            |runtime, grid_id, grid| runtime.request_before_sort(grid_id, grid, 0),
             |event| matches!(event, GridEventData::BeforeSort { col: 0 }),
         );
-        let _ = plugin.resolve_event_decision(grid_id, cancel_id, true);
-        plugin
+        let _ = runtime.resolve_event_decision(grid_id, cancel_id, true);
+        runtime
             .with_grid(grid_id, |grid| assert_eq!(grid.cells.get_text(1, 0), "B"))
             .unwrap();
 
         let allow_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| plugin.request_before_sort(grid_id, grid, 0),
+            |runtime, grid_id, grid| runtime.request_before_sort(grid_id, grid, 0),
             |event| matches!(event, GridEventData::BeforeSort { col: 0 }),
         );
-        let _ = plugin.resolve_event_decision(grid_id, allow_id, false);
-        wait_for_grid(&plugin, grid_id, |grid| grid.cells.get_text(1, 0) == "A");
+        let _ = runtime.resolve_event_decision(grid_id, allow_id, false);
+        wait_for_grid(&runtime, grid_id, |grid| grid.cells.get_text(1, 0) == "A");
 
-        destroy_test_grid(&plugin, grid_id);
+        destroy_test_grid(&runtime, grid_id);
     }
 
     #[test]
     fn event_decision_cancel_and_allow_before_node_toggle() {
-        let (plugin, grid_id) = plugin_with_decision_grid(4, 1);
-        plugin
+        let (runtime, grid_id) = runtime_with_decision_grid(4, 1);
+        runtime
             .with_grid(grid_id, |grid| {
                 grid.row_props.entry(1).or_default().outline_level = 0;
                 grid.row_props.entry(2).or_default().outline_level = 1;
@@ -2761,9 +2767,9 @@ mod tests {
             .unwrap();
 
         let cancel_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| plugin.request_before_node_toggle(grid_id, grid, 1, true),
+            |runtime, grid_id, grid| runtime.request_before_node_toggle(grid_id, grid, 1, true),
             |event| {
                 matches!(
                     event,
@@ -2774,8 +2780,8 @@ mod tests {
                 )
             },
         );
-        let _ = plugin.resolve_event_decision(grid_id, cancel_id, true);
-        plugin
+        let _ = runtime.resolve_event_decision(grid_id, cancel_id, true);
+        runtime
             .with_grid(grid_id, |grid| {
                 assert!(!grid.row_props.get(&1).unwrap().is_collapsed);
                 assert!(!grid.rows_hidden.contains(&2));
@@ -2783,81 +2789,85 @@ mod tests {
             .unwrap();
 
         let allow_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| plugin.request_before_node_toggle(grid_id, grid, 1, true),
+            |runtime, grid_id, grid| runtime.request_before_node_toggle(grid_id, grid, 1, true),
             |event| matches!(event, GridEventData::BeforeNodeToggle { row: 1, .. }),
         );
-        let _ = plugin.resolve_event_decision(grid_id, allow_id, false);
-        plugin
+        let _ = runtime.resolve_event_decision(grid_id, allow_id, false);
+        runtime
             .with_grid(grid_id, |grid| {
                 assert!(grid.row_props.get(&1).unwrap().is_collapsed);
                 assert!(grid.rows_hidden.contains(&2));
             })
             .unwrap();
 
-        destroy_test_grid(&plugin, grid_id);
+        destroy_test_grid(&runtime, grid_id);
     }
 
     #[test]
     fn event_decision_cancel_and_allow_before_scroll() {
-        let (plugin, grid_id) = plugin_with_decision_grid(40, 2);
+        let (runtime, grid_id) = runtime_with_decision_grid(40, 2);
 
         let cancel_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| {
-                assert!(plugin.request_before_scroll(grid_id, grid, 0.0, 5.0));
+            |runtime, grid_id, grid| {
+                assert!(runtime.request_before_scroll(grid_id, grid, 0.0, 5.0));
             },
             |event| matches!(event, GridEventData::BeforeScroll { .. }),
         );
-        let _ = plugin.resolve_event_decision(grid_id, cancel_id, true);
-        plugin
+        let _ = runtime.resolve_event_decision(grid_id, cancel_id, true);
+        runtime
             .with_grid(grid_id, |grid| assert_eq!(grid.scroll.scroll_y, 0.0))
             .unwrap();
 
         let allow_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| {
-                assert!(plugin.request_before_scroll(grid_id, grid, 0.0, 5.0));
+            |runtime, grid_id, grid| {
+                assert!(runtime.request_before_scroll(grid_id, grid, 0.0, 5.0));
             },
             |event| matches!(event, GridEventData::BeforeScroll { .. }),
         );
-        let _ = plugin.resolve_event_decision(grid_id, allow_id, false);
-        plugin
+        let _ = runtime.resolve_event_decision(grid_id, allow_id, false);
+        runtime
             .with_grid(grid_id, |grid| assert!(grid.scroll.scroll_y > 0.0))
             .unwrap();
 
-        destroy_test_grid(&plugin, grid_id);
+        destroy_test_grid(&runtime, grid_id);
     }
 
     #[test]
     fn event_decision_cancel_and_allow_before_user_resize() {
-        let (plugin, grid_id) = plugin_with_decision_grid(3, 2);
-        plugin
+        let (runtime, grid_id) = runtime_with_decision_grid(3, 2);
+        runtime
             .with_grid(grid_id, |grid| grid.allow_user_resizing = 1)
             .unwrap();
 
         let cancel_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| plugin.request_before_user_resize(grid_id, grid, -1, 0, 100.0),
+            |runtime, grid_id, grid| {
+                runtime.request_before_user_resize(grid_id, grid, -1, 0, 100.0)
+            },
             |event| matches!(event, GridEventData::BeforeUserResize { row: -1, col: 0 }),
         );
-        let _ = plugin.resolve_event_decision(grid_id, cancel_id, true);
-        plugin
+        let _ = runtime.resolve_event_decision(grid_id, cancel_id, true);
+        runtime
             .with_grid(grid_id, |grid| assert!(!grid.resize_active))
             .unwrap();
 
         let allow_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| plugin.request_before_user_resize(grid_id, grid, -1, 0, 100.0),
+            |runtime, grid_id, grid| {
+                runtime.request_before_user_resize(grid_id, grid, -1, 0, 100.0)
+            },
             |event| matches!(event, GridEventData::BeforeUserResize { row: -1, col: 0 }),
         );
-        let _ = plugin.resolve_event_decision(grid_id, allow_id, false);
-        plugin
+        let _ = runtime.resolve_event_decision(grid_id, allow_id, false);
+        runtime
             .with_grid(grid_id, |grid| {
                 assert!(grid.resize_active);
                 assert!(grid.resize_is_col);
@@ -2865,13 +2875,13 @@ mod tests {
             })
             .unwrap();
 
-        destroy_test_grid(&plugin, grid_id);
+        destroy_test_grid(&runtime, grid_id);
     }
 
     #[test]
     fn event_decision_cancel_and_allow_before_move_column() {
-        let (plugin, grid_id) = plugin_with_decision_grid(3, 3);
-        plugin
+        let (runtime, grid_id) = runtime_with_decision_grid(3, 3);
+        runtime
             .with_grid(grid_id, |grid| {
                 grid.cells.set_text(1, 0, "A".to_string());
                 grid.cells.set_text(1, 1, "B".to_string());
@@ -2880,9 +2890,9 @@ mod tests {
             .unwrap();
 
         let cancel_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| plugin.request_before_move_column(grid_id, grid, 0, 2),
+            |runtime, grid_id, grid| runtime.request_before_move_column(grid_id, grid, 0, 2),
             |event| {
                 matches!(
                     event,
@@ -2893,33 +2903,33 @@ mod tests {
                 )
             },
         );
-        let _ = plugin.resolve_event_decision(grid_id, cancel_id, true);
-        plugin
+        let _ = runtime.resolve_event_decision(grid_id, cancel_id, true);
+        runtime
             .with_grid(grid_id, |grid| assert_eq!(grid.cells.get_text(1, 0), "A"))
             .unwrap();
 
         let allow_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| plugin.request_before_move_column(grid_id, grid, 0, 2),
+            |runtime, grid_id, grid| runtime.request_before_move_column(grid_id, grid, 0, 2),
             |event| matches!(event, GridEventData::BeforeMoveColumn { col: 0, .. }),
         );
-        let _ = plugin.resolve_event_decision(grid_id, allow_id, false);
-        plugin
+        let _ = runtime.resolve_event_decision(grid_id, allow_id, false);
+        runtime
             .with_grid(grid_id, |grid| assert_eq!(grid.cells.get_text(1, 2), "A"))
             .unwrap();
 
-        destroy_test_grid(&plugin, grid_id);
+        destroy_test_grid(&runtime, grid_id);
     }
 
     #[test]
     fn event_decision_cancel_and_allow_before_move_row() {
-        let (plugin, grid_id) = plugin_with_decision_grid(5, 1);
+        let (runtime, grid_id) = runtime_with_decision_grid(5, 1);
 
         let cancel_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| plugin.request_before_move_row(grid_id, grid, 1, 3),
+            |runtime, grid_id, grid| runtime.request_before_move_row(grid_id, grid, 1, 3),
             |event| {
                 matches!(
                     event,
@@ -2930,39 +2940,39 @@ mod tests {
                 )
             },
         );
-        let _ = plugin.resolve_event_decision(grid_id, cancel_id, true);
-        plugin
+        let _ = runtime.resolve_event_decision(grid_id, cancel_id, true);
+        runtime
             .with_grid(grid_id, |grid| assert_eq!(grid.row_display_position(1), 1))
             .unwrap();
 
         let allow_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| plugin.request_before_move_row(grid_id, grid, 1, 3),
+            |runtime, grid_id, grid| runtime.request_before_move_row(grid_id, grid, 1, 3),
             |event| matches!(event, GridEventData::BeforeMoveRow { row: 1, .. }),
         );
-        let _ = plugin.resolve_event_decision(grid_id, allow_id, false);
-        plugin
+        let _ = runtime.resolve_event_decision(grid_id, allow_id, false);
+        runtime
             .with_grid(grid_id, |grid| assert_eq!(grid.row_display_position(1), 3))
             .unwrap();
 
-        destroy_test_grid(&plugin, grid_id);
+        destroy_test_grid(&runtime, grid_id);
     }
 
     #[test]
     fn event_decision_cancel_and_allow_before_mouse_down() {
-        let (plugin, grid_id) = plugin_with_decision_grid(4, 2);
+        let (runtime, grid_id) = runtime_with_decision_grid(4, 2);
 
         let cancel_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| {
-                plugin.request_before_mouse_down(grid_id, grid, 1, 0, 10.0, 25.0, 0, 0, false)
+            |runtime, grid_id, grid| {
+                runtime.request_before_mouse_down(grid_id, grid, 1, 0, 10.0, 25.0, 0, 0, false)
             },
             |event| matches!(event, GridEventData::BeforeMouseDown { row: 1, col: 0, .. }),
         );
-        let _ = plugin.resolve_event_decision(grid_id, cancel_id, true);
-        plugin
+        let _ = runtime.resolve_event_decision(grid_id, cancel_id, true);
+        runtime
             .with_grid(grid_id, |grid| {
                 assert_eq!(grid.mouse_row, -1);
                 assert_eq!(grid.mouse_col, -1);
@@ -2970,22 +2980,22 @@ mod tests {
             .unwrap();
 
         let allow_id = request_pending_event_id(
-            &plugin,
+            &runtime,
             grid_id,
-            |plugin, grid_id, grid| {
-                plugin.request_before_mouse_down(grid_id, grid, 1, 0, 10.0, 25.0, 0, 0, false)
+            |runtime, grid_id, grid| {
+                runtime.request_before_mouse_down(grid_id, grid, 1, 0, 10.0, 25.0, 0, 0, false)
             },
             |event| matches!(event, GridEventData::BeforeMouseDown { row: 1, col: 0, .. }),
         );
-        let _ = plugin.resolve_event_decision(grid_id, allow_id, false);
-        plugin
+        let _ = runtime.resolve_event_decision(grid_id, allow_id, false);
+        runtime
             .with_grid(grid_id, |grid| {
                 assert_eq!(grid.mouse_row, 1);
                 assert_eq!(grid.mouse_col, 0);
             })
             .unwrap();
 
-        destroy_test_grid(&plugin, grid_id);
+        destroy_test_grid(&runtime, grid_id);
     }
 }
 
@@ -3445,60 +3455,9 @@ fn engine_event_to_proto(
     }
 }
 
-fn selection_range_tuples(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Vec<(i32, i32, i32, i32)> {
-    grid.selection.all_ranges(grid.rows, grid.cols)
-}
-
-fn proto_ranges_from_tuples(ranges: &[(i32, i32, i32, i32)]) -> Vec<CellRange> {
-    ranges
-        .iter()
-        .map(|&(row1, col1, row2, col2)| CellRange {
-            row1,
-            col1,
-            row2,
-            col2,
-        })
-        .collect()
-}
-
-fn selection_ranges_proto(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Vec<CellRange> {
-    let ranges = selection_range_tuples(grid);
-    proto_ranges_from_tuples(&ranges)
-}
-
-fn selection_state_proto(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) -> SelectionState {
-    ensure_layout(grid);
-    SelectionState {
-        active_row: grid.selection.row,
-        active_col: grid.selection.col,
-        ranges: selection_ranges_proto(grid),
-        top_row: grid.top_row(),
-        left_col: grid.left_col(),
-        bottom_row: grid.bottom_row(),
-        right_col: grid.right_col(),
-        mouse_row: grid.mouse_row,
-        mouse_col: grid.mouse_col,
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Edit session helpers
 // ---------------------------------------------------------------------------
-
-fn truncate_to_char_count(s: &str, max_chars: i32) -> String {
-    if max_chars <= 0 {
-        return s.to_string();
-    }
-    let max = max_chars as usize;
-    let mut out = String::new();
-    for (i, ch) in s.chars().enumerate() {
-        if i >= max {
-            break;
-        }
-        out.push(ch);
-    }
-    out
-}
 
 fn cell_screen_rect(
     grid: &volvoxgrid_engine::grid::VolvoxGrid,
@@ -3625,11 +3584,11 @@ struct SentEditRequest {
 }
 
 fn current_edit_session_serial(
-    plugin: &VolvoxGridPlugin,
+    runtime: &VolvoxGridRuntime,
     grid_id: i64,
     req: &EditRequest,
 ) -> Option<u64> {
-    plugin
+    runtime
         .with_grid(grid_id, |grid| {
             if grid.edit.is_active()
                 && grid.edit.edit_row == req.row
@@ -3645,13 +3604,13 @@ fn current_edit_session_serial(
 }
 
 fn track_sent_edit_request(
-    plugin: &VolvoxGridPlugin,
+    runtime: &VolvoxGridRuntime,
     sent_edit_requests: &mut HashMap<i64, SentEditRequest>,
     grid_id: i64,
     output: &RenderOutput,
 ) {
     if let Some(render_output::Event::EditRequest(req)) = output.event.as_ref() {
-        let session_serial = current_edit_session_serial(plugin, grid_id, req).unwrap_or(0);
+        let session_serial = current_edit_session_serial(runtime, grid_id, req).unwrap_or(0);
         sent_edit_requests.insert(
             grid_id,
             SentEditRequest {
@@ -3663,23 +3622,23 @@ fn track_sent_edit_request(
 }
 
 fn send_render_output_tracked(
-    plugin: &VolvoxGridPlugin,
-    stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
+    runtime: &VolvoxGridRuntime,
+    stream: &dyn RuntimeStreamBidi<RenderInput, RenderOutput>,
     sent_edit_requests: &mut HashMap<i64, SentEditRequest>,
     grid_id: i64,
     output: RenderOutput,
 ) {
-    track_sent_edit_request(plugin, sent_edit_requests, grid_id, &output);
+    track_sent_edit_request(runtime, sent_edit_requests, grid_id, &output);
     stream.send(output);
 }
 
 fn maybe_send_refreshed_edit_request(
-    plugin: &VolvoxGridPlugin,
-    stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
+    runtime: &VolvoxGridRuntime,
+    stream: &dyn RuntimeStreamBidi<RenderInput, RenderOutput>,
     sent_edit_requests: &mut HashMap<i64, SentEditRequest>,
     grid_id: i64,
 ) {
-    let output = plugin
+    let output = runtime
         .with_grid(grid_id, |grid| {
             if !grid.layout.valid {
                 ensure_layout(grid);
@@ -3697,7 +3656,7 @@ fn maybe_send_refreshed_edit_request(
         return;
     };
 
-    let current_session_serial = current_edit_session_serial(plugin, grid_id, req).unwrap_or(0);
+    let current_session_serial = current_edit_session_serial(runtime, grid_id, req).unwrap_or(0);
     let should_send = sent_edit_requests.get(&grid_id).map_or(true, |prev| {
         prev.session_serial != current_session_serial
             || !same_edit_request_geometry(&prev.request, req)
@@ -3714,190 +3673,10 @@ fn maybe_send_refreshed_edit_request(
     }
 }
 
-fn begin_edit_session_core_opts(
-    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    col: i32,
-    force: bool,
-    emit_before_event: bool,
-    emit_dropdown_event: bool,
-    select_all: Option<bool>,
-    caret_end: Option<bool>,
-    seed_text: Option<String>,
-    formula_mode: Option<bool>,
-) {
-    if !grid.can_begin_edit(row, col, force) {
-        return;
-    }
-
-    let is_boolean_checkbox = row >= grid.fixed_rows
-        && row < grid.rows
-        && col >= 0
-        && col < grid.cols
-        && !grid.row_props.get(&row).map_or(false, |rp| rp.is_subtotal)
-        && grid.get_col_props(col).map_or(false, |cp| {
-            cp.data_type == ColumnDataType::ColumnDataBoolean as i32
-        });
-    if is_boolean_checkbox {
-        return;
-    }
-
-    let dropdown = grid.active_dropdown(row, col);
-    let has_dropdown = dropdown.is_some();
-    if emit_before_event {
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
-    }
-
-    let stored_text = grid.cells.get_text(row, col).to_string();
-    let display_text = grid.get_display_text(row, col);
-    grid.edit.start_edit_with_options(
-        row,
-        col,
-        &display_text,
-        select_all,
-        caret_end,
-        seed_text.as_deref(),
-        formula_mode,
-    );
-    grid.edit.configure_compose(
-        grid.effective_engine_compose_enabled(),
-        grid.effective_compose_method(),
-    );
-    if let Some(dropdown) = dropdown.as_ref() {
-        grid.edit.parse_dropdown(dropdown);
-    } else {
-        let combo_list = grid.active_dropdown_list(row, col);
-        grid.edit.parse_dropdown_items(&combo_list);
-    }
-    if has_dropdown {
-        for i in 0..grid.edit.dropdown_count() {
-            if (!stored_text.is_empty() && grid.edit.get_dropdown_data(i) == stored_text)
-                || grid.edit.get_dropdown_item(i) == display_text
-            {
-                grid.edit.set_dropdown_index(i);
-                break;
-            }
-        }
-    }
-
-    if has_dropdown {
-        if emit_dropdown_event {
-            if let Some(event) = grid.before_dropdown_open_event(row, col) {
-                grid.events.push(event);
-            }
-        }
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::DropdownOpened);
-    }
-    grid.events
-        .push(volvoxgrid_engine::event::GridEventData::StartEdit { row, col });
-}
-
-fn normalize_committed_edit_text(
-    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    col: i32,
-    new_text: &str,
-) -> String {
-    let mut committed = truncate_to_char_count(new_text, grid.edit_max_length);
-
-    if let Some(dropdown) = grid.configured_dropdown(row, col) {
-        if let Some(mapped) = volvoxgrid_engine::edit::translate_dropdown_display_to_value_typed(
-            &dropdown, &committed,
-        ) {
-            committed = mapped;
-        }
-    } else if col >= 0 && (col as usize) < grid.columns.len() {
-        let col_list = &grid.columns[col as usize].dropdown_items;
-        if !col_list.is_empty() {
-            if let Some(mapped) =
-                volvoxgrid_engine::edit::translate_dropdown_display_to_value(col_list, &committed)
-            {
-                committed = mapped;
-            }
-        }
-    }
-    committed
-}
-
-fn apply_committed_edit_text(
-    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    col: i32,
-    old_text: String,
-    committed: String,
-) {
-    grid.cells.set_text(row, col, committed.clone());
-    grid.sync_explicit_progress_from_text(row, col);
-
-    if old_text != committed {
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::AfterEdit {
-                row,
-                col,
-                old_text: old_text.clone(),
-                new_text: committed.clone(),
-            });
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::CellChanged {
-                row,
-                col,
-                old_text,
-                new_text: committed,
-            });
-    }
-
-    let active_combo = grid.active_dropdown_list(row, col);
-    if !active_combo.is_empty() {
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::DropdownClosed);
-    }
-    grid.mark_dirty();
-}
-
-fn expand_sort_request_columns(
-    grid: &volvoxgrid_engine::grid::VolvoxGrid,
-    sort_columns: &[SortColumn],
-) -> Vec<(i32, i32)> {
-    let mut sort_keys = Vec::new();
-
-    for sc in sort_columns {
-        let merged = volvoxgrid_engine::sort::merge_sort_spec(
-            volvoxgrid_engine::sort::SORT_NONE,
-            sc.order,
-            sc.r#type,
-        );
-        if merged == volvoxgrid_engine::sort::SORT_NONE {
-            continue;
-        }
-        if sc.col >= 0 && sc.col < grid.cols {
-            sort_keys.push((sc.col, merged));
-            continue;
-        }
-
-        let lo = grid.selection.col.min(grid.selection.col_end).max(0);
-        let hi = grid
-            .selection
-            .col
-            .max(grid.selection.col_end)
-            .min(grid.cols - 1);
-        if lo > hi {
-            continue;
-        }
-
-        for col in lo..=hi {
-            sort_keys.push((col, merged));
-        }
-    }
-
-    sort_keys
-}
-
 // ---------------------------------------------------------------------------
-// VolvoxGridPlugin pending action / decision helpers
+// VolvoxGridRuntime pending action / decision helpers
 // ---------------------------------------------------------------------------
-impl VolvoxGridPlugin {
+impl VolvoxGridRuntime {
     fn next_event_id(&self) -> i64 {
         self.next_event_id.fetch_add(1, Ordering::Relaxed)
     }
@@ -4377,7 +4156,7 @@ impl VolvoxGridPlugin {
         }
 
         if !self.decision_channel_enabled(grid_id) {
-            begin_edit_session_core_opts(
+            shared::begin_edit_session_core_opts(
                 grid,
                 row,
                 col,
@@ -4479,7 +4258,7 @@ impl VolvoxGridPlugin {
         old_text: String,
         new_text: String,
     ) {
-        let committed_text = normalize_committed_edit_text(grid, row, col, &new_text);
+        let committed_text = shared::normalize_committed_edit_text(grid, row, col, &new_text);
 
         if !self.decision_channel_enabled(grid_id) {
             grid.events
@@ -4488,7 +4267,7 @@ impl VolvoxGridPlugin {
                     col,
                     edit_text: committed_text.clone(),
                 });
-            apply_committed_edit_text(grid, row, col, old_text, committed_text);
+            shared::apply_committed_edit_text(grid, row, col, old_text, committed_text);
             return;
         }
 
@@ -4919,7 +4698,7 @@ impl VolvoxGridPlugin {
                         {
                             return None;
                         }
-                        begin_edit_session_core_opts(
+                        shared::begin_edit_session_core_opts(
                             grid,
                             row,
                             col,
@@ -4971,7 +4750,7 @@ impl VolvoxGridPlugin {
                 }
                 self.manager()
                     .with_grid(grid_id, |grid| {
-                        begin_edit_session_core_opts(
+                        shared::begin_edit_session_core_opts(
                             grid,
                             row,
                             col,
@@ -5032,7 +4811,7 @@ impl VolvoxGridPlugin {
                     if edit_matches {
                         grid.edit.cancel();
                     }
-                    apply_committed_edit_text(grid, row, col, old_text, committed_text);
+                    shared::apply_committed_edit_text(grid, row, col, old_text, committed_text);
                     None
                 })
                 .ok()
@@ -5202,15 +4981,15 @@ impl VolvoxGridPlugin {
 // v2 Trait Implementation
 // ═══════════════════════════════════════════════════════════════════════════
 
-impl ffi_tree_impl::VolvoxTreeServicePlugin for VolvoxGridPlugin {
-    fn load_tree(&self, request: LoadTreeRequest) -> TreePluginResult<LoadTreeResponse> {
+impl ffi_tree_impl::VolvoxTreeServiceRuntime for VolvoxGridRuntime {
+    fn load_tree(&self, request: LoadTreeRequest) -> TreeRuntimeResult<LoadTreeResponse> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::load_tree(grid, request)
         })
     }
 
-    fn append_tree(&self, mut request: LoadTreeRequest) -> TreePluginResult<LoadTreeResponse> {
+    fn append_tree(&self, mut request: LoadTreeRequest) -> TreeRuntimeResult<LoadTreeResponse> {
         request.replace = false;
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
@@ -5218,49 +4997,49 @@ impl ffi_tree_impl::VolvoxTreeServicePlugin for VolvoxGridPlugin {
         })
     }
 
-    fn insert_nodes(&self, request: InsertNodesRequest) -> TreePluginResult<InsertNodesResponse> {
+    fn insert_nodes(&self, request: InsertNodesRequest) -> TreeRuntimeResult<InsertNodesResponse> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::insert_nodes(grid, request)
         })
     }
 
-    fn remove_nodes(&self, request: RemoveNodesRequest) -> TreePluginResult<RemoveNodesResponse> {
+    fn remove_nodes(&self, request: RemoveNodesRequest) -> TreeRuntimeResult<RemoveNodesResponse> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::remove_nodes(grid, request)
         })
     }
 
-    fn move_nodes(&self, request: MoveNodesRequest) -> TreePluginResult<MoveNodesResponse> {
+    fn move_nodes(&self, request: MoveNodesRequest) -> TreeRuntimeResult<MoveNodesResponse> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::move_nodes(grid, request)
         })
     }
 
-    fn rename_node(&self, request: RenameNodeRequest) -> TreePluginResult<RenameNodeResponse> {
+    fn rename_node(&self, request: RenameNodeRequest) -> TreeRuntimeResult<RenameNodeResponse> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::rename_node(grid, request)
         })
     }
 
-    fn update_tree(&self, request: UpdateTreeRequest) -> TreePluginResult<UpdateTreeResponse> {
+    fn update_tree(&self, request: UpdateTreeRequest) -> TreeRuntimeResult<UpdateTreeResponse> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::update_tree(grid, request)
         })
     }
 
-    fn update_node_cells(&self, request: UpdateNodeCellsRequest) -> TreePluginResult<WriteResult> {
+    fn update_node_cells(&self, request: UpdateNodeCellsRequest) -> TreeRuntimeResult<WriteResult> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::update_node_cells(grid, request)
         })
     }
 
-    fn expand_nodes(&self, request: ExpandNodesRequest) -> TreePluginResult<ExpandNodesResponse> {
+    fn expand_nodes(&self, request: ExpandNodesRequest) -> TreeRuntimeResult<ExpandNodesResponse> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::expand_nodes(grid, request)
@@ -5270,7 +5049,7 @@ impl ffi_tree_impl::VolvoxTreeServicePlugin for VolvoxGridPlugin {
     fn collapse_nodes(
         &self,
         request: CollapseNodesRequest,
-    ) -> TreePluginResult<CollapseNodesResponse> {
+    ) -> TreeRuntimeResult<CollapseNodesResponse> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::collapse_nodes(grid, request)
@@ -5280,14 +5059,14 @@ impl ffi_tree_impl::VolvoxTreeServicePlugin for VolvoxGridPlugin {
     fn expand_to_node(
         &self,
         request: ExpandToNodeRequest,
-    ) -> TreePluginResult<ExpandToNodeResponse> {
+    ) -> TreeRuntimeResult<ExpandToNodeResponse> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::expand_to_node(grid, request)
         })
     }
 
-    fn get_expansion(&self, request: GetExpansionRequest) -> TreePluginResult<ExpansionState> {
+    fn get_expansion(&self, request: GetExpansionRequest) -> TreeRuntimeResult<ExpansionState> {
         self.with_grid_tree(request.grid_id, |grid| {
             volvoxgrid_engine::tree::get_expansion(grid)
         })
@@ -5296,49 +5075,52 @@ impl ffi_tree_impl::VolvoxTreeServicePlugin for VolvoxGridPlugin {
     fn set_expansion(
         &self,
         request: SetExpansionRequest,
-    ) -> TreePluginResult<SetExpansionResponse> {
+    ) -> TreeRuntimeResult<SetExpansionResponse> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::set_expansion(grid, request)
         })
     }
 
-    fn get_tree_node(&self, request: GetTreeNodeRequest) -> TreePluginResult<TreeNodeInfo> {
+    fn get_tree_node(&self, request: GetTreeNodeRequest) -> TreeRuntimeResult<TreeNodeInfo> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::get_tree_node(grid, request)
         })
     }
 
-    fn get_children(&self, request: GetChildrenRequest) -> TreePluginResult<TreeNodeList> {
+    fn get_children(&self, request: GetChildrenRequest) -> TreeRuntimeResult<TreeNodeList> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::get_children(grid, request)
         })
     }
 
-    fn get_visible_nodes(&self, request: GetVisibleNodesRequest) -> TreePluginResult<TreeNodeList> {
+    fn get_visible_nodes(
+        &self,
+        request: GetVisibleNodesRequest,
+    ) -> TreeRuntimeResult<TreeNodeList> {
         let grid_id = request.grid_id;
         self.with_grid_tree(grid_id, |grid| {
             volvoxgrid_engine::tree::get_visible_nodes(grid, request)
         })
     }
 
-    fn get_node_path(&self, request: GetNodePathRequest) -> TreePluginResult<NodePathResponse> {
+    fn get_node_path(&self, request: GetNodePathRequest) -> TreeRuntimeResult<NodePathResponse> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::get_node_path(grid, request)
         })
     }
 
-    fn get_node_by_path(&self, request: GetNodeByPathRequest) -> TreePluginResult<TreeNodeInfo> {
+    fn get_node_by_path(&self, request: GetNodeByPathRequest) -> TreeRuntimeResult<TreeNodeInfo> {
         let grid_id = request.grid_id;
         self.with_grid_tree(grid_id, |grid| {
             volvoxgrid_engine::tree::get_node_by_path(grid, request)
         })
     }
 
-    fn select_nodes(&self, request: SelectNodesRequest) -> TreePluginResult<NodeSelectionState> {
+    fn select_nodes(&self, request: SelectNodesRequest) -> TreeRuntimeResult<NodeSelectionState> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::select_nodes(grid, request)
@@ -5348,33 +5130,39 @@ impl ffi_tree_impl::VolvoxTreeServicePlugin for VolvoxGridPlugin {
     fn get_node_selection(
         &self,
         request: GetNodeSelectionRequest,
-    ) -> TreePluginResult<NodeSelectionState> {
+    ) -> TreeRuntimeResult<NodeSelectionState> {
         self.with_grid_tree(request.grid_id, |grid| {
             volvoxgrid_engine::tree::get_node_selection(grid)
         })
     }
 
-    fn set_checked_nodes(&self, request: SetCheckedNodesRequest) -> TreePluginResult<CheckedNodes> {
+    fn set_checked_nodes(
+        &self,
+        request: SetCheckedNodesRequest,
+    ) -> TreeRuntimeResult<CheckedNodes> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::set_checked_nodes(grid, request)
         })
     }
 
-    fn get_checked_nodes(&self, request: GetCheckedNodesRequest) -> TreePluginResult<CheckedNodes> {
+    fn get_checked_nodes(
+        &self,
+        request: GetCheckedNodesRequest,
+    ) -> TreeRuntimeResult<CheckedNodes> {
         self.with_grid_tree(request.grid_id, |grid| {
             volvoxgrid_engine::tree::get_checked_nodes(grid)
         })
     }
 
-    fn sort_tree(&self, request: SortTreeRequest) -> TreePluginResult<SortTreeResponse> {
+    fn sort_tree(&self, request: SortTreeRequest) -> TreeRuntimeResult<SortTreeResponse> {
         let grid_id = request.grid_id;
         self.with_grid_tree(grid_id, |grid| {
             volvoxgrid_engine::tree::sort_tree(grid, request)
         })
     }
 
-    fn filter_tree(&self, request: FilterTreeRequest) -> TreePluginResult<FilterTreeResponse> {
+    fn filter_tree(&self, request: FilterTreeRequest) -> TreeRuntimeResult<FilterTreeResponse> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::filter_tree(grid, request)
@@ -5384,13 +5172,13 @@ impl ffi_tree_impl::VolvoxTreeServicePlugin for VolvoxGridPlugin {
     fn clear_tree_filter(
         &self,
         request: ClearTreeFilterRequest,
-    ) -> TreePluginResult<ClearTreeFilterResponse> {
+    ) -> TreeRuntimeResult<ClearTreeFilterResponse> {
         self.with_grid_tree(request.grid_id, |grid| {
             volvoxgrid_engine::tree::clear_tree_filter(grid)
         })
     }
 
-    fn find_tree(&self, request: FindTreeRequest) -> TreePluginResult<FindTreeResponse> {
+    fn find_tree(&self, request: FindTreeRequest) -> TreeRuntimeResult<FindTreeResponse> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::find_tree(grid, request)
@@ -5400,7 +5188,7 @@ impl ffi_tree_impl::VolvoxTreeServicePlugin for VolvoxGridPlugin {
     fn resolve_children(
         &self,
         request: ResolveChildrenRequest,
-    ) -> TreePluginResult<ResolveChildrenResponse> {
+    ) -> TreeRuntimeResult<ResolveChildrenResponse> {
         let grid_id = request.grid_id;
         self.with_grid_tree_result(grid_id, |grid| {
             volvoxgrid_engine::tree::resolve_children(grid, request)
@@ -5408,34 +5196,23 @@ impl ffi_tree_impl::VolvoxTreeServicePlugin for VolvoxGridPlugin {
     }
 }
 
-impl VolvoxGridServicePlugin for VolvoxGridPlugin {
+impl VolvoxGridServiceRuntime for VolvoxGridRuntime {
     // ── Lifecycle ──
 
-    fn create(&self, request: CreateRequest) -> PluginResult<CreateResponse> {
-        let config = request.config.as_ref();
-        let layout = config.and_then(|c| c.layout.as_ref());
-        let rows = layout.and_then(|l| l.rows).unwrap_or(10);
-        let cols = layout.and_then(|l| l.cols).unwrap_or(5);
-        let fixed_rows = layout.and_then(|l| l.fixed_rows).unwrap_or(0);
-        let fixed_cols = layout.and_then(|l| l.fixed_cols).unwrap_or(0);
-        let scale = if request.scale > 0.01 {
-            request.scale
-        } else {
-            1.0
-        };
-
+    fn create(&self, request: CreateRequest) -> RuntimeResult<CreateResponse> {
+        let spec = shared::create_grid_spec(&request);
         let id = self.manager().create_grid(
             request.viewport_width,
             request.viewport_height,
-            rows,
-            cols,
-            fixed_rows,
-            fixed_cols,
-            scale,
+            spec.rows,
+            spec.cols,
+            spec.fixed_rows,
+            spec.fixed_cols,
+            spec.scale,
         );
         self.set_current_zoom_scale(id, 1.0);
 
-        if let Some(config) = config {
+        if let Some(config) = request.config.as_ref() {
             let _ = self.with_grid(id, |grid| {
                 grid.apply_config(config);
             });
@@ -5447,7 +5224,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         })
     }
 
-    fn destroy(&self, request: DestroyRequest) -> PluginResult<DestroyResponse> {
+    fn destroy(&self, request: DestroyRequest) -> RuntimeResult<DestroyResponse> {
         self.clear_grid_state(request.grid_id);
         self.manager().destroy_grid(request.grid_id);
         Ok(DestroyResponse {})
@@ -5455,20 +5232,15 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
     // ── Configuration ──
 
-    fn configure(&self, request: ConfigureRequest) -> PluginResult<ConfigureResponse> {
-        if let Some(config) = &request.config {
-            self.with_grid(request.grid_id, |grid| {
-                grid.apply_config(config);
-            })?;
-        }
-        Ok(ConfigureResponse {})
+    fn configure(&self, request: ConfigureRequest) -> RuntimeResult<ConfigureResponse> {
+        self.with_grid(request.grid_id, |grid| shared::configure(grid, &request))
     }
 
-    fn get_config(&self, request: GetConfigRequest) -> PluginResult<GridConfig> {
+    fn get_config(&self, request: GetConfigRequest) -> RuntimeResult<GridConfig> {
         self.with_grid(request.grid_id, |grid| grid.get_config())
     }
 
-    fn load_font_data(&self, request: LoadFontDataRequest) -> PluginResult<LoadFontDataResponse> {
+    fn load_font_data(&self, request: LoadFontDataRequest) -> RuntimeResult<LoadFontDataResponse> {
         if request.data.is_empty() {
             return Err(invalid_argument("font data is empty"));
         }
@@ -5497,83 +5269,36 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
     // ── Structure ──
 
-    fn define_columns(&self, request: DefineColumnsRequest) -> PluginResult<DefineColumnsResponse> {
+    fn define_columns(
+        &self,
+        request: DefineColumnsRequest,
+    ) -> RuntimeResult<DefineColumnsResponse> {
         self.with_grid(request.grid_id, |grid| {
-            grid.define_columns(&request.columns);
-        })?;
-        Ok(DefineColumnsResponse {})
+            shared::define_columns(grid, &request)
+        })
     }
 
-    fn get_schema(&self, request: GetSchemaRequest) -> PluginResult<SchemaResponse> {
+    fn get_schema(&self, request: GetSchemaRequest) -> RuntimeResult<SchemaResponse> {
         self.with_grid(request.grid_id, |grid| grid.get_schema())
     }
 
-    fn define_rows(&self, request: DefineRowsRequest) -> PluginResult<DefineRowsResponse> {
-        self.with_grid(request.grid_id, |grid| {
-            grid.define_rows(&request.rows);
-        })?;
-        Ok(DefineRowsResponse {})
+    fn define_rows(&self, request: DefineRowsRequest) -> RuntimeResult<DefineRowsResponse> {
+        self.with_grid(request.grid_id, |grid| shared::define_rows(grid, &request))
     }
 
-    fn insert_rows(&self, request: InsertRowsRequest) -> PluginResult<InsertRowsResponse> {
-        self.with_grid(request.grid_id, |grid| {
-            let count = request.count.max(1);
-            let old_rows = grid.rows;
-            let index = if request.index < 0 { -1 } else { request.index };
-            let first_row = if index < 0 || index >= old_rows {
-                old_rows
-            } else {
-                index
-            };
-            for i in 0..count {
-                let text = request
-                    .text
-                    .get(i as usize)
-                    .map(|s| s.as_str())
-                    .unwrap_or("");
-                let at_row = if index < 0 { -1 } else { index + i };
-                grid.add_item(text, at_row);
-            }
-            InsertRowsResponse {
-                inserted_count: count,
-                new_row_count: grid.rows,
-                first_row,
-            }
-        })
+    fn insert_rows(&self, request: InsertRowsRequest) -> RuntimeResult<InsertRowsResponse> {
+        self.with_grid(request.grid_id, |grid| shared::insert_rows(grid, &request))
     }
 
-    fn remove_rows(&self, request: RemoveRowsRequest) -> PluginResult<RemoveRowsResponse> {
-        self.with_grid(request.grid_id, |grid| {
-            let old_rows = grid.rows;
-            let count = request.count.max(1);
-            for _ in 0..count {
-                let row = request.index;
-                if row < grid.fixed_rows || row >= grid.rows {
-                    break;
-                }
-                grid.remove_item(row);
-            }
-            RemoveRowsResponse {
-                removed_count: old_rows.saturating_sub(grid.rows),
-                new_row_count: grid.rows,
-            }
-        })
+    fn remove_rows(&self, request: RemoveRowsRequest) -> RuntimeResult<RemoveRowsResponse> {
+        self.with_grid(request.grid_id, |grid| shared::remove_rows(grid, &request))
     }
 
-    fn move_column(&self, request: MoveColumnRequest) -> PluginResult<MoveColumnResponse> {
-        self.with_grid(request.grid_id, |grid| {
-            if request.col >= 0
-                && request.col < grid.cols
-                && request.position >= 0
-                && request.position < grid.cols
-            {
-                grid.move_col_by_positions(request.col, request.position);
-            }
-        })?;
-        Ok(MoveColumnResponse {})
+    fn move_column(&self, request: MoveColumnRequest) -> RuntimeResult<MoveColumnResponse> {
+        self.with_grid(request.grid_id, |grid| shared::move_column(grid, &request))
     }
 
-    fn move_row(&self, request: MoveRowRequest) -> PluginResult<MoveRowResponse> {
+    fn move_row(&self, request: MoveRowRequest) -> RuntimeResult<MoveRowResponse> {
         self.with_grid(request.grid_id, |grid| {
             self.request_before_move_row(request.grid_id, grid, request.row, request.position);
         })?;
@@ -5582,159 +5307,60 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
     // ── Data ──
 
-    fn update_cells(&self, request: UpdateCellsRequest) -> PluginResult<WriteResult> {
-        self.with_grid(request.grid_id, |grid| {
-            grid.write_cells(&request.cells, request.atomic)
-        })
+    fn update_cells(&self, request: UpdateCellsRequest) -> RuntimeResult<WriteResult> {
+        self.with_grid(request.grid_id, |grid| shared::update_cells(grid, &request))
     }
 
-    fn get_cells(&self, request: GetCellsRequest) -> PluginResult<CellsResponse> {
-        let cells = self.with_grid(request.grid_id, |grid| {
-            grid.get_cells(
-                request.row1,
-                request.col1,
-                request.row2,
-                request.col2,
-                request.include_style,
-                request.include_checked,
-                request.include_typed,
-                request.include_barcode_status,
-            )
-        })?;
-        Ok(CellsResponse { cells })
+    fn get_cells(&self, request: GetCellsRequest) -> RuntimeResult<CellsResponse> {
+        self.with_grid(request.grid_id, |grid| shared::get_cells(grid, &request))
     }
 
-    fn load_table(&self, request: LoadTableRequest) -> PluginResult<WriteResult> {
-        self.with_grid(request.grid_id, |grid| {
-            grid.load_table(request.rows, request.cols, &request.values, request.atomic)
-        })
+    fn load_table(&self, request: LoadTableRequest) -> RuntimeResult<WriteResult> {
+        self.with_grid(request.grid_id, |grid| shared::load_table(grid, &request))
     }
 
-    fn load_data(&self, request: LoadDataRequest) -> PluginResult<LoadDataResult> {
-        self.with_grid(request.grid_id, |grid| {
-            volvoxgrid_engine::load::load_data(grid, &request.data, request.options.as_ref())
-        })
+    fn load_data(&self, request: LoadDataRequest) -> RuntimeResult<LoadDataResult> {
+        self.with_grid(request.grid_id, |grid| shared::load_data(grid, &request))
     }
 
-    fn append_data(&self, request: AppendDataRequest) -> PluginResult<LoadDataResult> {
-        self.with_grid(request.grid_id, |grid| {
-            volvoxgrid_engine::load::append_data(grid, &request.data, request.options.as_ref())
-        })
+    fn append_data(&self, request: AppendDataRequest) -> RuntimeResult<LoadDataResult> {
+        self.with_grid(request.grid_id, |grid| shared::append_data(grid, &request))
     }
 
-    fn clear(&self, request: ClearRequest) -> PluginResult<ClearResponse> {
-        self.with_grid(request.grid_id, |grid| {
-            let before = grid.cells.len() as i32;
-            grid.clear_region(request.scope, request.region);
-            let after = grid.cells.len() as i32;
-            ClearResponse {
-                cleared_count: before.saturating_sub(after),
-            }
-        })
+    fn clear(&self, request: ClearRequest) -> RuntimeResult<ClearResponse> {
+        self.with_grid(request.grid_id, |grid| shared::clear(grid, &request))
     }
 
     // ── Selection ──
 
-    fn select(&self, request: SelectRequest) -> PluginResult<SelectResponse> {
-        self.with_grid(request.grid_id, |grid| {
-            let active_row = request.active_row;
-            let active_col = request.active_col;
-            let ranges: Vec<(i32, i32, i32, i32)> = request
-                .ranges
-                .iter()
-                .map(|r| (r.row1, r.col1, r.row2, r.col2))
-                .collect();
-            let old_ranges = selection_range_tuples(grid);
-            grid.selection
-                .select_ranges(active_row, active_col, &ranges, grid.rows, grid.cols);
-            let new_ranges = selection_range_tuples(grid);
-            grid.events
-                .push(volvoxgrid_engine::event::GridEventData::SelectionChanging {
-                    old_ranges: old_ranges.clone(),
-                    new_ranges: new_ranges.clone(),
-                    active_row: grid.selection.row,
-                    active_col: grid.selection.col,
-                });
-            grid.events
-                .push(volvoxgrid_engine::event::GridEventData::SelectionChanged {
-                    old_ranges,
-                    new_ranges,
-                    active_row: grid.selection.row,
-                    active_col: grid.selection.col,
-                });
-            if request.show.unwrap_or(false) {
-                ensure_layout(grid);
-                grid.scroll.show_cell(
-                    active_row,
-                    active_col,
-                    &grid.layout,
-                    grid.data_viewport_width(),
-                    grid.data_viewport_height(),
-                    grid.fixed_rows,
-                    grid.fixed_cols,
-                    grid.pinned_top_height() + grid.pinned_bottom_height(),
-                    grid.pinned_left_width() + grid.pinned_right_width(),
-                );
-            }
-            grid.mark_dirty();
-            SelectResponse {
-                selection: Some(selection_state_proto(grid)),
-            }
-        })
+    fn select(&self, request: SelectRequest) -> RuntimeResult<SelectResponse> {
+        self.with_grid(request.grid_id, |grid| shared::select(grid, &request))
     }
 
-    fn get_selection(&self, request: GetSelectionRequest) -> PluginResult<SelectionState> {
-        self.with_grid(request.grid_id, selection_state_proto)
+    fn get_selection(&self, request: GetSelectionRequest) -> RuntimeResult<SelectionState> {
+        self.with_grid(request.grid_id, shared::selection_state_proto)
     }
 
-    fn show_cell(&self, request: ShowCellRequest) -> PluginResult<ShowCellResponse> {
-        self.with_grid(request.grid_id, |grid| {
-            ensure_layout(grid);
-            grid.scroll.show_cell(
-                request.row,
-                request.col,
-                &grid.layout,
-                grid.data_viewport_width(),
-                grid.data_viewport_height(),
-                grid.fixed_rows,
-                grid.fixed_cols,
-                grid.pinned_top_height() + grid.pinned_bottom_height(),
-                grid.pinned_left_width() + grid.pinned_right_width(),
-            );
-            grid.mark_dirty_visual();
-            ShowCellResponse {
-                top_row: grid.top_row(),
-                left_col: grid.left_col(),
-            }
-        })
+    fn show_cell(&self, request: ShowCellRequest) -> RuntimeResult<ShowCellResponse> {
+        self.with_grid(request.grid_id, |grid| shared::show_cell(grid, &request))
     }
 
-    fn set_top_row(&self, request: SetRowRequest) -> PluginResult<SetTopRowResponse> {
-        self.with_grid(request.grid_id, |grid| {
-            grid.set_top_row(request.row);
-            SetTopRowResponse {
-                top_row: grid.top_row(),
-            }
-        })
+    fn set_top_row(&self, request: SetRowRequest) -> RuntimeResult<SetTopRowResponse> {
+        self.with_grid(request.grid_id, |grid| shared::set_top_row(grid, &request))
     }
 
-    fn set_left_col(&self, request: SetColRequest) -> PluginResult<SetLeftColResponse> {
-        self.with_grid(request.grid_id, |grid| {
-            grid.set_left_col(request.col);
-            SetLeftColResponse {
-                left_col: grid.left_col(),
-            }
-        })
+    fn set_left_col(&self, request: SetColRequest) -> RuntimeResult<SetLeftColResponse> {
+        self.with_grid(request.grid_id, |grid| shared::set_left_col(grid, &request))
     }
 
     // ── Editing ──
 
-    fn edit(&self, request: EditCommand) -> PluginResult<EditState> {
+    fn edit(&self, request: EditCommand) -> RuntimeResult<EditState> {
         let grid_id = request.grid_id;
         let state = self.with_grid(grid_id, |grid| {
             match request.command {
                 Some(edit_command::Command::Start(start)) => {
-                    begin_edit_session_core_opts(
+                    shared::begin_edit_session_core_opts(
                         grid,
                         start.row,
                         start.col,
@@ -5756,7 +5382,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                         let new_text = commit.text.unwrap_or_else(|| grid.edit.edit_text.clone());
                         if self.decision_channel_enabled(grid_id) {
                             let pending_text =
-                                truncate_to_char_count(&new_text, grid.edit_max_length);
+                                shared::truncate_to_char_count(&new_text, grid.edit_max_length);
                             grid.edit.update_text(pending_text.clone());
                             grid.edit.sel_start = pending_text.chars().count() as i32;
                             grid.edit.sel_length = 0;
@@ -5770,7 +5396,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             );
                         } else {
                             let committed =
-                                normalize_committed_edit_text(grid, row, col, &new_text);
+                                shared::normalize_committed_edit_text(grid, row, col, &new_text);
                             grid.edit.cancel();
                             grid.events.push(
                                 volvoxgrid_engine::event::GridEventData::CellEditValidate {
@@ -5779,7 +5405,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     edit_text: committed.clone(),
                                 },
                             );
-                            apply_committed_edit_text(grid, row, col, old_text, committed);
+                            shared::apply_committed_edit_text(grid, row, col, old_text, committed);
                         }
                     }
                 }
@@ -5797,7 +5423,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 }
                 Some(edit_command::Command::SetText(set_text)) => {
                     if grid.edit.is_active() {
-                        let t = truncate_to_char_count(&set_text.text, grid.edit_max_length);
+                        let t =
+                            shared::truncate_to_char_count(&set_text.text, grid.edit_max_length);
                         grid.edit.update_text(t.clone());
                         grid.edit.sel_start = t.chars().count() as i32;
                         grid.edit.sel_length = 0;
@@ -5862,7 +5489,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                             self.request_validate_edit(grid_id, grid, row, col, old_text, new_text);
                         } else {
                             let committed =
-                                normalize_committed_edit_text(grid, row, col, &new_text);
+                                shared::normalize_committed_edit_text(grid, row, col, &new_text);
                             grid.edit.cancel();
                             grid.events.push(
                                 volvoxgrid_engine::event::GridEventData::CellEditValidate {
@@ -5871,50 +5498,21 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                                     edit_text: committed.clone(),
                                 },
                             );
-                            apply_committed_edit_text(grid, row, col, old_text, committed);
+                            shared::apply_committed_edit_text(grid, row, col, old_text, committed);
                         }
                     }
                 }
                 None => {}
             }
 
-            if grid.edit.is_active() && !grid.layout.valid {
-                ensure_layout(grid);
-            }
-            let (x, y, width, height) = if grid.edit.is_active() {
-                grid.cell_screen_rect(grid.edit.edit_row, grid.edit.edit_col)
-                    .map(|(x, y, w, h)| (x as f32, y as f32, w as f32, h as f32))
-                    .unwrap_or((0.0, 0.0, 0.0, 0.0))
-            } else {
-                (0.0, 0.0, 0.0, 0.0)
-            };
-
-            EditState {
-                active: grid.edit.is_active(),
-                row: grid.edit.edit_row,
-                col: grid.edit.edit_col,
-                text: grid.edit.edit_text.clone(),
-                sel_start: grid.edit.sel_start,
-                sel_length: grid.edit.sel_length,
-                composing: grid.edit.composing,
-                preedit_text: grid.edit.preedit_text.clone(),
-                ui_mode: match grid.edit.ui_mode {
-                    volvoxgrid_engine::edit::EditUiMode::EnterMode => EditUiMode::Enter as i32,
-                    volvoxgrid_engine::edit::EditUiMode::EditMode => EditUiMode::Edit as i32,
-                },
-                x,
-                y,
-                width,
-                height,
-                max_length: grid.edit_max_length,
-            }
+            shared::edit_state_proto(grid)
         })?;
         Ok(state)
     }
 
     // ── Actions ──
 
-    fn sort(&self, request: SortRequest) -> PluginResult<SortResponse> {
+    fn sort(&self, request: SortRequest) -> RuntimeResult<SortResponse> {
         // Programmatic Sort supersedes any in-flight header-click custom sort
         // for this grid. clear_compare_channel cancels pending host compares so
         // the abandoned worker can unwind instead of committing stale order.
@@ -5927,7 +5525,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
                 grid.mark_dirty();
                 None
             } else {
-                let sort_keys = expand_sort_request_columns(grid, &request.sort_columns);
+                let sort_keys = shared::expand_sort_request_columns(grid, &request.sort_columns);
                 if sort_keys.is_empty() {
                     return None;
                 }
@@ -5948,304 +5546,79 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         Ok(SortResponse {})
     }
 
-    fn subtotal(&self, request: SubtotalRequest) -> PluginResult<SubtotalResult> {
-        let subtotal_font = request
-            .font
-            .as_ref()
-            .map(volvoxgrid_engine::config::v1_font_to_cell_style_patch);
-        let rows = self.with_grid(request.grid_id, |grid| {
-            volvoxgrid_engine::outline::subtotal_with_font(
-                grid,
-                request.aggregate,
-                request.group_on_col,
-                request.aggregate_col,
-                &request.caption,
-                request.background,
-                request.foreground,
-                request.add_outline,
-                subtotal_font.as_ref(),
-            )
-        })?;
-        Ok(SubtotalResult { rows })
+    fn subtotal(&self, request: SubtotalRequest) -> RuntimeResult<SubtotalResult> {
+        self.with_grid(request.grid_id, |grid| shared::subtotal(grid, &request))
     }
 
-    fn auto_size(&self, request: AutoSizeRequest) -> PluginResult<AutoSizeResponse> {
-        self.with_grid(request.grid_id, |grid| {
-            ensure_layout(grid);
-            let c1 = request.col_from.max(0).min(grid.cols - 1);
-            let c2 = request.col_to.max(c1).min(grid.cols - 1);
-            for c in c1..=c2 {
-                grid.auto_resize_col(c);
-            }
-            if request.equal {
-                // Find max width across the range and set all equal
-                let max_w = (c1..=c2).map(|c| grid.col_width(c)).max().unwrap_or(0);
-                let max_w = if request.max_width > 0 {
-                    max_w.min(request.max_width)
-                } else {
-                    max_w
-                };
-                for c in c1..=c2 {
-                    grid.set_col_width(c, max_w);
-                }
-            } else if request.max_width > 0 {
-                for c in c1..=c2 {
-                    let w = grid.col_width(c);
-                    if w > request.max_width {
-                        grid.set_col_width(c, request.max_width);
-                    }
-                }
-            }
-        })?;
-        Ok(AutoSizeResponse {})
+    fn auto_size(&self, request: AutoSizeRequest) -> RuntimeResult<AutoSizeResponse> {
+        self.with_grid(request.grid_id, |grid| shared::auto_size(grid, &request))
     }
 
-    fn outline(&self, request: OutlineRequest) -> PluginResult<OutlineResponse> {
-        self.with_grid(request.grid_id, |grid| {
-            volvoxgrid_engine::outline::outline(grid, request.level);
-        })?;
-        Ok(OutlineResponse {})
+    fn outline(&self, request: OutlineRequest) -> RuntimeResult<OutlineResponse> {
+        self.with_grid(request.grid_id, |grid| shared::outline(grid, &request))
     }
 
-    fn get_node(&self, request: GetNodeRequest) -> PluginResult<NodeInfo> {
+    fn get_node(&self, request: GetNodeRequest) -> RuntimeResult<NodeInfo> {
+        self.with_grid(request.grid_id, |grid| shared::get_node(grid, &request))
+    }
+
+    fn find(&self, request: FindRequest) -> RuntimeResult<FindResponse> {
+        self.with_grid(request.grid_id, |grid| shared::find(grid, &request))
+    }
+
+    fn aggregate(&self, request: AggregateRequest) -> RuntimeResult<AggregateResponse> {
+        self.with_grid(request.grid_id, |grid| shared::aggregate(grid, &request))
+    }
+
+    fn get_merged_range(&self, request: GetMergedRangeRequest) -> RuntimeResult<CellRange> {
         self.with_grid(request.grid_id, |grid| {
-            let row = if let Some(relation) = request.relation {
-                volvoxgrid_engine::outline::get_node_row(grid, request.row, relation)
-            } else {
-                request.row
-            };
-            let (
-                level,
-                outline_level,
-                is_expanded,
-                child_count,
-                parent_row,
-                first_child,
-                last_child,
-            ) = volvoxgrid_engine::outline::get_node(grid, row);
-            let _ = level; // unused, outline_level is returned
-            NodeInfo {
-                row,
-                level: outline_level,
-                is_expanded,
-                child_count,
-                parent_row,
-                first_child,
-                last_child,
-            }
+            shared::get_merged_range(grid, &request)
         })
     }
 
-    fn find(&self, request: FindRequest) -> PluginResult<FindResponse> {
-        let row = self.with_grid(request.grid_id, |grid| match request.query {
-            Some(find_request::Query::TextQuery(tq)) => volvoxgrid_engine::search::find_row(
-                grid,
-                &tq.text,
-                request.start_row,
-                request.col,
-                tq.case_sensitive,
-                tq.full_match,
-            ),
-            Some(find_request::Query::RegexQuery(rq)) => volvoxgrid_engine::search::find_row_regex(
-                grid,
-                &rq.pattern,
-                request.start_row,
-                request.col,
-            ),
-            None => -1,
-        })?;
-        Ok(FindResponse { row })
+    fn merge_cells(&self, request: MergeCellsRequest) -> RuntimeResult<MergeCellsResponse> {
+        self.with_grid(request.grid_id, |grid| shared::merge_cells(grid, &request))
     }
 
-    fn aggregate(&self, request: AggregateRequest) -> PluginResult<AggregateResponse> {
-        let value = self.with_grid(request.grid_id, |grid| {
-            volvoxgrid_engine::search::aggregate(
-                grid,
-                request.aggregate,
-                request.row1,
-                request.col1,
-                request.row2,
-                request.col2,
-            )
-        })?;
-        Ok(AggregateResponse { value })
-    }
-
-    fn get_merged_range(&self, request: GetMergedRangeRequest) -> PluginResult<CellRange> {
+    fn unmerge_cells(&self, request: UnmergeCellsRequest) -> RuntimeResult<UnmergeCellsResponse> {
         self.with_grid(request.grid_id, |grid| {
-            if let Some((r1, c1, r2, c2)) = grid.get_merged_range(request.row, request.col) {
-                CellRange {
-                    row1: r1,
-                    col1: c1,
-                    row2: r2,
-                    col2: c2,
-                }
-            } else {
-                CellRange {
-                    row1: request.row,
-                    col1: request.col,
-                    row2: request.row,
-                    col2: request.col,
-                }
-            }
-        })
-    }
-
-    fn merge_cells(&self, request: MergeCellsRequest) -> PluginResult<MergeCellsResponse> {
-        let range = request.range.unwrap_or_default();
-        self.with_grid(request.grid_id, |grid| {
-            let (row1, row2) = (range.row1.min(range.row2), range.row1.max(range.row2));
-            let (col1, col2) = (range.col1.min(range.col2), range.col1.max(range.col2));
-            grid.merged_regions.add_merge(row1, col1, row2, col2);
-            grid.layout.invalidate();
-            grid.mark_dirty();
-            MergeCellsResponse {
-                merged: Some(CellRange {
-                    row1,
-                    col1,
-                    row2,
-                    col2,
-                }),
-            }
-        })
-    }
-
-    fn unmerge_cells(&self, request: UnmergeCellsRequest) -> PluginResult<UnmergeCellsResponse> {
-        let range = request.range.unwrap_or_default();
-        self.with_grid(request.grid_id, |grid| {
-            let before = grid.merged_regions.all_ranges().len() as i32;
-            grid.merged_regions
-                .remove_overlapping(range.row1, range.col1, range.row2, range.col2);
-            grid.layout.invalidate();
-            grid.mark_dirty();
-            let after = grid.merged_regions.all_ranges().len() as i32;
-            UnmergeCellsResponse {
-                unmerged_count: before.saturating_sub(after),
-            }
+            shared::unmerge_cells(grid, &request)
         })
     }
 
     fn get_merged_regions(
         &self,
         request: GetMergedRegionsRequest,
-    ) -> PluginResult<MergedRegionsResponse> {
-        self.with_grid(request.grid_id, |grid| MergedRegionsResponse {
-            ranges: grid
-                .merged_regions
-                .all_ranges()
-                .iter()
-                .map(|&(r1, c1, r2, c2)| CellRange {
-                    row1: r1,
-                    col1: c1,
-                    row2: r2,
-                    col2: c2,
-                })
-                .collect(),
-        })
+    ) -> RuntimeResult<MergedRegionsResponse> {
+        self.with_grid(request.grid_id, shared::get_merged_regions)
     }
 
     fn get_memory_usage(
         &self,
         request: GetMemoryUsageRequest,
-    ) -> PluginResult<MemoryUsageResponse> {
-        self.with_grid(request.grid_id, |grid| grid.memory_usage())
+    ) -> RuntimeResult<MemoryUsageResponse> {
+        self.with_grid(request.grid_id, shared::get_memory_usage)
     }
 
     // ── Clipboard ──
 
-    fn clipboard(&self, request: ClipboardCommand) -> PluginResult<ClipboardResponse> {
+    fn clipboard(&self, request: ClipboardCommand) -> RuntimeResult<ClipboardResponse> {
         let grid_id = request.grid_id;
-        self.with_grid(grid_id, |grid| match request.command {
-            Some(clipboard_command::Command::Copy(_)) => {
-                let (text, rich_data) = volvoxgrid_engine::clipboard::copy(grid);
-                ClipboardResponse { text, rich_data }
-            }
-            Some(clipboard_command::Command::Cut(_)) => {
-                let (text, rich_data) = volvoxgrid_engine::clipboard::cut(grid);
-                ClipboardResponse { text, rich_data }
-            }
-            Some(clipboard_command::Command::Paste(paste)) => {
-                if !paste.text.is_empty() {
-                    volvoxgrid_engine::clipboard::paste(grid, &paste.text);
-                }
-                ClipboardResponse {
-                    text: String::new(),
-                    rich_data: Vec::new(),
-                }
-            }
-            Some(clipboard_command::Command::Delete(_)) => {
-                volvoxgrid_engine::clipboard::delete_selection(grid);
-                ClipboardResponse {
-                    text: String::new(),
-                    rich_data: Vec::new(),
-                }
-            }
-            None => ClipboardResponse {
-                text: String::new(),
-                rich_data: Vec::new(),
-            },
-        })
+        self.with_grid(grid_id, |grid| shared::clipboard(grid, &request))
     }
 
     // ── Export / Print / Archive ──
 
-    fn export(&self, request: ExportRequest) -> PluginResult<ExportResponse> {
-        let data = self.with_grid(request.grid_id, |grid| {
-            volvoxgrid_engine::save::save_grid(grid, request.format, request.scope)
-        })?;
-        Ok(ExportResponse {
-            data,
-            format: request.format,
-        })
+    fn export(&self, request: ExportRequest) -> RuntimeResult<ExportResponse> {
+        self.with_grid(request.grid_id, |grid| shared::export(grid, &request))
     }
 
-    fn print(&self, request: PrintRequest) -> PluginResult<PrintResponse> {
-        let pages = self.with_grid(request.grid_id, |grid| {
-            ensure_layout(grid);
-            let orientation = request.orientation.unwrap_or(0);
-            let margin_left = request.margin_left.unwrap_or(50);
-            let margin_top = request.margin_top.unwrap_or(50);
-            let margin_right = request.margin_right.unwrap_or(50);
-            let margin_bottom = request.margin_bottom.unwrap_or(50);
-            let header = request.header.as_deref().unwrap_or("");
-            let footer = request.footer.as_deref().unwrap_or("");
-            let show_page_numbers = request.show_page_numbers.unwrap_or(false);
-
-            let raw_pages = volvoxgrid_engine::print::print_grid(
-                grid,
-                orientation,
-                margin_left,
-                margin_top,
-                margin_right,
-                margin_bottom,
-                header,
-                footer,
-                show_page_numbers,
-            );
-
-            raw_pages
-                .into_iter()
-                .map(|p| PrintPage {
-                    page_number: p.page_number,
-                    image_data: p.image_data,
-                    width: p.width,
-                    height: p.height,
-                })
-                .collect::<Vec<_>>()
-        })?;
-        Ok(PrintResponse { pages })
+    fn print(&self, request: PrintRequest) -> RuntimeResult<PrintResponse> {
+        self.with_grid(request.grid_id, |grid| shared::print(grid, &request))
     }
 
-    fn archive(&self, request: ArchiveRequest) -> PluginResult<ArchiveResponse> {
-        self.with_grid(request.grid_id, |grid| {
-            let (data, names) = volvoxgrid_engine::save::archive(
-                grid,
-                &request.name,
-                request.action,
-                &request.data,
-            );
-            ArchiveResponse { data, names }
-        })
+    fn archive(&self, request: ArchiveRequest) -> RuntimeResult<ArchiveResponse> {
+        self.with_grid(request.grid_id, |grid| shared::archive(grid, &request))
     }
 
     // ── Render Control ──
@@ -6253,40 +5626,24 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
     fn resize_viewport(
         &self,
         request: ResizeViewportRequest,
-    ) -> PluginResult<ResizeViewportResponse> {
+    ) -> RuntimeResult<ResizeViewportResponse> {
         self.with_grid(request.grid_id, |grid| {
-            grid.resize_viewport(request.width, request.height);
-            ResizeViewportResponse {
-                viewport_width: grid.viewport_width,
-                viewport_height: grid.viewport_height,
-            }
+            shared::resize_viewport(grid, &request)
         })
     }
 
-    fn set_redraw(&self, request: SetRedrawRequest) -> PluginResult<SetRedrawResponse> {
-        self.with_grid(request.grid_id, |grid| {
-            let was_off = !grid.redraw;
-            grid.redraw = request.enabled;
-            if request.enabled {
-                if was_off {
-                    grid.animation.suppress_next = true;
-                    grid.animation.clear();
-                }
-                grid.mark_dirty();
-            }
-        })?;
-        Ok(SetRedrawResponse {})
+    fn set_redraw(&self, request: SetRedrawRequest) -> RuntimeResult<SetRedrawResponse> {
+        self.with_grid(request.grid_id, |grid| shared::set_redraw(grid, &request))
     }
 
-    fn refresh(&self, request: RefreshRequest) -> PluginResult<RefreshResponse> {
+    fn refresh(&self, request: RefreshRequest) -> RuntimeResult<RefreshResponse> {
         self.with_grid(request.grid_id, |grid| {
-            grid.layout.invalidate();
-            grid.mark_dirty();
-        })?;
-        Ok(RefreshResponse {})
+            let _ = request;
+            shared::refresh(grid)
+        })
     }
 
-    fn load_demo(&self, request: LoadDemoRequest) -> PluginResult<LoadDemoResponse> {
+    fn load_demo(&self, request: LoadDemoRequest) -> RuntimeResult<LoadDemoResponse> {
         #[cfg(feature = "demo")]
         {
             self.with_grid_result(request.grid_id, |grid| {
@@ -6301,7 +5658,7 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
         }
     }
 
-    fn get_demo_data(&self, request: GetDemoDataRequest) -> PluginResult<GetDemoDataResponse> {
+    fn get_demo_data(&self, request: GetDemoDataRequest) -> RuntimeResult<GetDemoDataResponse> {
         #[cfg(feature = "demo")]
         {
             volvoxgrid_engine::demo::get_demo_data_response(&request.demo).map_err(Into::into)
@@ -6317,8 +5674,8 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 
     fn render_session(
         &self,
-        stream: &dyn PluginStreamBidi<RenderInput, RenderOutput>,
-    ) -> PluginResult<()> {
+        stream: &dyn RuntimeStreamBidi<RenderInput, RenderOutput>,
+    ) -> RuntimeResult<()> {
         let mut renderer: Option<volvoxgrid_engine::render::Renderer> = None;
         let mut tui_renderer = volvoxgrid_engine::canvas_tui::TuiRenderer::new();
         tui_renderer
@@ -7327,17 +6684,17 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
     fn event_stream(
         &self,
         request: EventStreamRequest,
-        stream: &dyn PluginStreamSender<GridEvent>,
-    ) -> PluginResult<()> {
+        stream: &dyn RuntimeStreamSender<GridEvent>,
+    ) -> RuntimeResult<()> {
         let grid_id = request.grid_id;
         let (grid_arc, _event_cv, destroyed) = self
             .manager()
             .get_grid_waiter(grid_id)
-            .map_err(map_plugin_error)?;
+            .map_err(map_runtime_error)?;
         let waker = self
             .manager()
             .get_grid_waker(grid_id)
-            .map_err(map_plugin_error)?;
+            .map_err(map_runtime_error)?;
 
         // Route stream cancellation through the waker so we never have to poll
         // `is_cancelled()`. If the stream is already closed, on_cancel fires
@@ -7410,17 +6767,17 @@ impl VolvoxGridServicePlugin for VolvoxGridPlugin {
 }
 
 // ---------------------------------------------------------------------------
-// Plugin registration
+// Runtime registration
 // ---------------------------------------------------------------------------
 
-/// Factory for lazy plugin initialization (called by generated FFI dispatcher).
-pub(crate) fn create_plugin() -> Box<dyn VolvoxGridServicePlugin + 'static> {
-    Box::new(VolvoxGridPlugin::new())
+/// Factory for lazy runtime initialization (called by generated FFI dispatcher).
+pub(crate) fn create_runtime() -> Box<dyn VolvoxGridServiceRuntime + 'static> {
+    Box::new(VolvoxGridRuntime::new())
 }
 
 /// Factory for the companion tree service dispatcher.
-pub(crate) fn create_tree_plugin() -> Box<dyn ffi_tree_impl::VolvoxTreeServicePlugin + 'static> {
-    Box::new(VolvoxGridPlugin::new())
+pub(crate) fn create_tree_runtime() -> Box<dyn ffi_tree_impl::VolvoxTreeServiceRuntime + 'static> {
+    Box::new(VolvoxGridRuntime::new())
 }
 
 #[allow(non_snake_case)]
@@ -7430,7 +6787,7 @@ pub extern "C" fn VolvoxGrid_Init() {
     unsafe {
         volvoxgrid_windows_mingw_compat_force_link();
     }
-    register_volvox_grid_service_plugin(VolvoxGridPlugin::new());
+    register_volvox_grid_service_runtime(VolvoxGridRuntime::new());
 }
 
 // ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@
 This image builds release artifacts for:
 - Android AAR (`arm64-v8a`, `armeabi-v7a`)
 - Flutter Android jniLibs (`arm64-v8a`, `armeabi-v7a`)
-- Flutter Linux x64 `libvolvoxgrid_plugin.so`
+- Flutter Linux x64 `libvolvoxgrid.so`
 - wasm package (`wasm-pack`, target `web`)
 
 ## Build + run

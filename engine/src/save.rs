@@ -710,7 +710,7 @@ pub fn format_from_url(url: &str) -> i32 {
 ///
 /// This is the engine-side implementation of `LoadGridURL`.
 /// The actual URL fetching is platform-specific and must be done by the
-/// host/plugin layer. The host fetches the bytes, then calls this function.
+/// host/runtime layer. The host fetches the bytes, then calls this function.
 ///
 /// `url` is used to auto-detect the format if `format` is -1.
 /// Returns `true` on success.

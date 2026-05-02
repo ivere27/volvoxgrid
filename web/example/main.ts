@@ -1882,11 +1882,11 @@ async function main() {
   const wasmUrl = env.VITE_WASM_URL || "./wasm/volvoxgrid_wasm.js";
   const wasmModule = await import(/* @vite-ignore */ wasmUrl);
   await wasmModule.default();
-  if (typeof wasmModule.init_v1_plugin === "function") {
+  if (typeof wasmModule.init_v1_runtime === "function") {
     try {
-      wasmModule.init_v1_plugin();
+      wasmModule.init_v1_runtime();
     } catch (err) {
-      console.warn("WASM v1 plugin init failed (continuing with legacy APIs):", err);
+      console.warn("WASM v1 runtime init failed (continuing with legacy APIs):", err);
     }
   }
 

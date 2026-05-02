@@ -21,7 +21,7 @@ From a .NET developer's point of view, you work with:
 
 - one managed assembly: `VolvoxGrid.DotNet.dll`
 - either `VolvoxGridControl` or `VolvoxGridClient`
-- one native runtime dependency: the `volvoxgrid_plugin` dynamic library for your platform
+- one native library dependency: the `volvoxgrid` dynamic library for your platform
 
 It is intended for apps that want VolvoxGrid selection, editing, sorting, merged cells, clipboard support, import/export, and large-data scenarios. The WinForms UI remains Windows-only; the controller API runs on native `.NET 8` platforms.
 
@@ -37,11 +37,11 @@ Runtime notes:
 
 - `net8.0-windows` and `net40` are WinForms-only
 - `net8.0` is the non-UI controller API
-- the native plugin is required at runtime:
-  - Windows: `volvoxgrid_plugin.dll`
-  - Linux: `libvolvoxgrid_plugin.so`
-  - macOS: `libvolvoxgrid_plugin.dylib`
-- the plugin architecture must match your process architecture
+- the native library is required at runtime:
+  - Windows: `volvoxgrid.dll`
+  - Linux: `libvolvoxgrid.so`
+  - macOS: `libvolvoxgrid.dylib`
+- the library architecture must match your process architecture
 - Linux/Wine WinForms runs use the built-in `cosmic-text` engine by default. Set `VOLVOXGRID_DOTNET_USE_HOST_TEXT_RENDERER=1` to opt into the host GDI text bridge.
 
 ## Main Types
@@ -88,34 +88,34 @@ Package ID:
 
 - `VolvoxGrid.DotNet`
 
-No matter how you reference the managed wrapper, you still need to deploy the native plugin with your application.
+No matter how you reference the managed wrapper, you still need to deploy the native library with your application.
 
-## Deploy the Native Plugin
+## Deploy the Native Library
 
 Recommended deployment:
 
-- copy the native plugin beside your application:
-  - Windows: `volvoxgrid_plugin.dll`
-  - Linux: `libvolvoxgrid_plugin.so`
-  - macOS: `libvolvoxgrid_plugin.dylib`
+- copy the native library beside your application:
+  - Windows: `volvoxgrid.dll`
+  - Linux: `libvolvoxgrid.so`
+  - macOS: `libvolvoxgrid.dylib`
 
-You can also provide the plugin location explicitly:
+You can also provide the library location explicitly:
 
-- set the `VOLVOXGRID_PLUGIN_PATH` environment variable
-- set `grid.PluginPath` in code
+- set the `VOLVOXGRID_LIBRARY_PATH` environment variable
+- set `grid.LibraryPath` in code
 
 Example `csproj` copy rule:
 
 ```xml
 <ItemGroup>
-  <None Include="native\volvoxgrid_plugin.dll" CopyToOutputDirectory="PreserveNewest" />
+  <None Include="native\volvoxgrid.dll" CopyToOutputDirectory="PreserveNewest" />
 </ItemGroup>
 ```
 
 Example explicit path:
 
 ```csharp
-grid.PluginPath = System.IO.Path.Combine(AppContext.BaseDirectory, "volvoxgrid_plugin.dll");
+grid.LibraryPath = System.IO.Path.Combine(AppContext.BaseDirectory, "volvoxgrid.dll");
 ```
 
 If the control cannot create the native grid session, inspect:
@@ -149,8 +149,8 @@ public sealed class MainForm : Form
         Width = 1000;
         Height = 700;
 
-        // Optional if volvoxgrid_plugin.dll is already beside the executable.
-        // _grid.PluginPath = System.IO.Path.Combine(AppContext.BaseDirectory, "volvoxgrid_plugin.dll");
+        // Optional if volvoxgrid.dll is already beside the executable.
+        // _grid.LibraryPath = System.IO.Path.Combine(AppContext.BaseDirectory, "volvoxgrid.dll");
 
         _grid.SetColumns(new[]
         {
@@ -281,7 +281,7 @@ Notes:
 
 - `OpenTerminalSession()` forces the grid into the TUI renderer mode before opening the streams.
 - `Render()` writes terminal bytes into a host-owned buffer and returns `BytesWritten`.
-- the host forwards raw stdin bytes; the plugin owns terminal escape parsing and ANSI encoding.
+- the host forwards raw stdin bytes; the runtime owns terminal escape parsing and ANSI encoding.
 - viewport coordinates stay local to the reserved grid rectangle.
 
 ### Run The Interactive TUI Example
@@ -298,7 +298,7 @@ Non-interactive smoke:
 make dotnet-tui-smoke
 ```
 
-Current runtime notes for the sample:
+Current library notes for the sample:
 
 - the sample target is `net8.0`
 - the sample uses ANSI alternate-screen rendering
@@ -601,8 +601,8 @@ Useful diagnostics:
 
 Check the following first:
 
-- `volvoxgrid_plugin.dll` is present next to the executable, or `PluginPath` is set correctly
-- the plugin architecture matches the process architecture
+- `volvoxgrid.dll` is present next to the executable, or `LibraryPath` is set correctly
+- the library architecture matches the process architecture
 - `grid.LastError` contains the latest failure message
 
 ### My bound columns do not line up with my data source

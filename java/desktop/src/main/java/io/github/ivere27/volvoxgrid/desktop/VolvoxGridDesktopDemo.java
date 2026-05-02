@@ -19,17 +19,17 @@ public final class VolvoxGridDesktopDemo {
     }
 
     private static void runUi(String[] args) {
-        String pluginPath = NativePluginPathResolver.resolvePluginPath(args);
-        if (pluginPath == null) {
-            System.err.println("Plugin path not found.");
-            System.err.println("Provide first arg, or set VOLVOXGRID_PLUGIN_PATH,");
+        String libraryPath = NativeLibraryPathResolver.resolveLibraryPath(args);
+        if (libraryPath == null) {
+            System.err.println("Library path not found.");
+            System.err.println("Provide first arg, or set VOLVOXGRID_LIBRARY_PATH,");
             System.err.println("or use the volvoxgrid-desktop Maven artifact with embedded native libs,");
-            System.err.println("or place " + NativePluginPathResolver.expectedPluginFileHint() + " under target/debug.");
+            System.err.println("or place " + NativeLibraryPathResolver.expectedLibraryFileHint() + " under target/debug.");
             return;
         }
 
-        if (!SynurangDesktopBridge.isRuntimeAvailable()) {
-            System.err.println("Synurang desktop runtime classes are not found on classpath.");
+        if (!SynurangDesktopBridge.isHostAvailable()) {
+            System.err.println("Synurang desktop host classes are not found on classpath.");
             System.err.println("Expected: io.github.ivere27.synurang.PluginHost");
             return;
         }
@@ -127,7 +127,7 @@ public final class VolvoxGridDesktopDemo {
 
         new Thread(() -> {
             try {
-                gridPanel.initialize(pluginPath, 40, 8);
+                gridPanel.initialize(libraryPath, 40, 8);
                 VolvoxGridDesktopController ctrl = gridPanel.createController();
                 ctrl.setRendererModeCpu();
                 ctrl.setRedraw(false);

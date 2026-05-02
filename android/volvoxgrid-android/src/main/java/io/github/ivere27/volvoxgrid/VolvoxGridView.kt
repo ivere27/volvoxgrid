@@ -43,17 +43,17 @@ import kotlin.concurrent.thread
 import kotlin.math.roundToInt
 
 /**
- * SurfaceView-based widget that renders a VolvoxGrid via the Synurang FFI plugin.
+ * SurfaceView-based widget that renders a VolvoxGrid via Synurang FFI.
  *
  * The render loop works as follows:
  * 1. A [DirectByteBuffer] is allocated for the pixel buffer (ARGB_8888).
- * 2. A bidi [RenderSession] stream is opened with the plugin.
+ * 2. A bidi [RenderSession] stream is opened with the native service.
  * 3. The view sends a [BufferReady] message with the native pointer address.
- * 4. On each frame, the plugin renders into the shared buffer and sends [FrameDone].
+ * 4. On each frame, the native service renders into the shared buffer and sends [FrameDone].
  * 5. The view blits the buffer to the SurfaceView canvas.
  *
  * Android touch/key events are forwarded as protobuf [PointerEvent] / [KeyEvent].
- * When the plugin sends an [EditRequest], an [EditText] overlay is shown for cell editing.
+ * When the native service sends an [EditRequest], an [EditText] overlay is shown for cell editing.
  * An [EventStream] is opened for grid events (BeforeEdit, AfterEdit, etc.).
  */
 class VolvoxGridView @JvmOverloads constructor(
@@ -65,7 +65,7 @@ class VolvoxGridView @JvmOverloads constructor(
     private var surfaceView = SurfaceView(context)
     private var editOverlay: EditText? = null
 
-    private var plugin: PluginHost? = null
+    private var pluginHost: PluginHost? = null
     private var ffiClient: VolvoxGridServiceFfi? = null
     private var gridId: Long = 0
     private var usingExternalTextRenderer = false
@@ -668,7 +668,7 @@ class VolvoxGridView @JvmOverloads constructor(
     fun setAndroidTextCacheSize(size: Int) {
         pendingAndroidTextCacheSize = size
         androidTextRenderer.setCacheSize(size)
-        val p = plugin
+        val p = pluginHost
         val id = gridId
         if (p != null && id != 0L) {
             NativeTextRendererBridge.setCacheCap(p, id, size)
@@ -676,36 +676,36 @@ class VolvoxGridView @JvmOverloads constructor(
     }
 
     /**
-     * Initialize the grid view with the plugin bundled in the app/AAR and grid dimensions.
+     * Initialize the grid view with the library bundled in the app/AAR and grid dimensions.
      *
-     * This auto-detects either `libvolvoxgrid_plugin.so` (standard) or
-     * `libvolvoxgrid_plugin_lite.so` (lite) from `nativeLibraryDir`.
+     * This auto-detects either `libvolvoxgrid.so` (standard) or
+     * `libvolvoxgrid_lite.so` (lite) from `nativeLibraryDir`.
      */
     @JvmOverloads
     fun initialize(
         rows: Int,
         cols: Int
     ) {
-        initialize(resolveBundledPluginPath(context), rows, cols)
+        initialize(resolveBundledLibraryPath(context), rows, cols)
     }
 
     /**
-     * Initialize the grid view with a plugin path and grid dimensions.
+     * Initialize the grid view with a library path and grid dimensions.
      *
-     * @param pluginPath absolute path to `libvolvoxgrid_plugin.so` or
-     * `libvolvoxgrid_plugin_lite.so`
+     * @param libraryPath absolute path to `libvolvoxgrid.so` or
+     * `libvolvoxgrid_lite.so`
      * @param rows initial number of rows
      * @param cols initial number of columns
      */
     fun initialize(
-        pluginPath: String,
+        libraryPath: String,
         rows: Int,
         cols: Int
     ) {
         released.set(false)
-        val p = PluginHost.load(pluginPath)
-        logPluginLoadBannerOnce(pluginPath)
-        plugin = p
+        val p = PluginHost.load(libraryPath)
+        logLibraryLoadBannerOnce(libraryPath)
+        pluginHost = p
         val client = VolvoxGridServiceFfi(p)
         ffiClient = client
 
@@ -744,13 +744,13 @@ class VolvoxGridView @JvmOverloads constructor(
     }
 
     /**
-     * Initialize the grid view with a pre-loaded plugin host and existing grid ID.
+     * Initialize the grid view with a pre-loaded PluginHost and existing grid ID.
      */
     fun initialize(host: PluginHost, existingGridId: Long) {
         detachGrid() // Ensure previous session is stopped
         released.set(false)
-        logPluginLoadBannerOnce("<preloaded>")
-        plugin = host
+        logLibraryLoadBannerOnce("<preloaded>")
+        pluginHost = host
         ffiClient = VolvoxGridServiceFfi(host)
         gridId = existingGridId
 
@@ -820,7 +820,7 @@ class VolvoxGridView @JvmOverloads constructor(
         clearExternalTextRenderer(gridId)
         usingExternalTextRenderer = false
 
-        // Don't destroy gridId or plugin
+        // Don't destroy gridId or pluginHost
         ffiClient = null
         gridId = 0
     }
@@ -961,8 +961,8 @@ class VolvoxGridView @JvmOverloads constructor(
             gridId = 0
         }
 
-        plugin?.close()
-        plugin = null
+        pluginHost?.close()
+        pluginHost = null
         ffiClient = null
         bitmap?.recycle()
         bitmap = null
@@ -1560,7 +1560,7 @@ class VolvoxGridView @JvmOverloads constructor(
     }
 
     private fun maybeRegisterExternalTextRenderer() {
-        val host = plugin ?: return
+        val host = pluginHost ?: return
         val id = gridId
         if (id == 0L) return
 
@@ -1588,7 +1588,7 @@ class VolvoxGridView @JvmOverloads constructor(
 
     private fun clearExternalTextRenderer(id: Long) {
         if (id == 0L) return
-        val host = plugin ?: return
+        val host = pluginHost ?: return
         if (!usingExternalTextRenderer) return
         NativeTextRendererBridge.clearTextRenderer(host, id)
     }
@@ -1960,7 +1960,7 @@ class VolvoxGridView @JvmOverloads constructor(
             allocateBuffer(width, height)
         }
 
-        // Notify the plugin of the viewport size (always, to mark engine dirty)
+        // Notify the native service of the viewport size (always, to mark engine dirty)
         try {
             ffiClient?.ResizeViewport(
                 ResizeViewportRequest.newBuilder()
@@ -2226,7 +2226,7 @@ class VolvoxGridView @JvmOverloads constructor(
     }
 
     private fun drawBitmapToSurface() {
-        // In GPU mode, the plugin renders directly to the SurfaceView's native
+        // In GPU mode, the native service renders directly to the SurfaceView's native
         // surface. Avoid lockCanvas() here to prevent CPU canvas contention.
         if (currentRendererMode >= 2) return
         if (!surfaceReady.get()) return
@@ -2650,7 +2650,7 @@ class VolvoxGridView @JvmOverloads constructor(
     }
 
     private fun startEventStream() {
-        val host = plugin ?: return
+        val host = pluginHost ?: return
         val request = EventStreamRequest.newBuilder().setGridId(gridId).build()
         val stream = host.openStream("VolvoxGridService", "/volvoxgrid.v1.VolvoxGridService/EventStream")
         try {
@@ -2695,10 +2695,10 @@ class VolvoxGridView @JvmOverloads constructor(
         // Forward edit-related events to show/dismiss the edit overlay
         when {
             event.hasBeforeEdit() -> {
-                // Plugin is about to start editing -- prepare
+                // Runtime is about to start editing -- prepare
             }
             event.hasStartEdit() -> {
-                // Edit mode has started in the plugin
+                // Edit mode has started in the native service
             }
             event.hasAfterEdit() -> {
                 // Edit is complete, dismiss overlay
@@ -2970,19 +2970,19 @@ class VolvoxGridView @JvmOverloads constructor(
         private const val ZOOM_RAW_SCALE_MAX = 1e12f
         private const val ZOOM_STEP_MIN_SCALE = 1f / 32f
         private const val ZOOM_STEP_MAX_SCALE = 32f
-        private val pluginLoadBannerPrinted = AtomicBoolean(false)
+        private val libraryLoadBannerPrinted = AtomicBoolean(false)
 
         /**
-         * Resolve the bundled VolvoxGrid plugin path for this app process.
+         * Resolve the bundled VolvoxGrid library path for this app process.
          *
          * Checks standard first, then lite. Throws if neither is present.
          */
         @JvmStatic
-        fun resolveBundledPluginPath(context: Context): String {
+        fun resolveBundledLibraryPath(context: Context): String {
             val nativeLibDir = context.applicationInfo.nativeLibraryDir
             val candidates = arrayOf(
-                "libvolvoxgrid_plugin.so",
-                "libvolvoxgrid_plugin_lite.so",
+                "libvolvoxgrid.so",
+                "libvolvoxgrid_lite.so",
             )
             for (name in candidates) {
                 val file = File(nativeLibDir, name)
@@ -2991,22 +2991,22 @@ class VolvoxGridView @JvmOverloads constructor(
                 }
             }
             throw IllegalStateException(
-                "VolvoxGrid plugin not found in nativeLibraryDir=$nativeLibDir " +
-                    "(expected libvolvoxgrid_plugin.so or libvolvoxgrid_plugin_lite.so)"
+                "VolvoxGrid library not found in nativeLibraryDir=$nativeLibDir " +
+                    "(expected libvolvoxgrid.so or libvolvoxgrid_lite.so)"
             )
         }
 
-        private fun logPluginLoadBannerOnce(pluginPath: String) {
-            if (!pluginLoadBannerPrinted.compareAndSet(false, true)) {
+        private fun logLibraryLoadBannerOnce(libraryPath: String) {
+            if (!libraryLoadBannerPrinted.compareAndSet(false, true)) {
                 return
             }
             android.util.Log.i(
                 TAG,
-                "Loaded VolvoxGrid plugin " +
+                "Loaded VolvoxGrid library " +
                     "version=${BuildConfig.VOLVOXGRID_VERSION} " +
                     "commit=${BuildConfig.VOLVOXGRID_GIT_COMMIT} " +
                     "buildDate=${BuildConfig.VOLVOXGRID_BUILD_DATE} " +
-                    "path=$pluginPath"
+                    "path=$libraryPath"
             )
         }
     }

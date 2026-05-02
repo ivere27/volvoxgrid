@@ -457,18 +457,18 @@ static RendererBinding* create_binding(JNIEnv* env, jobject callback) {
     return binding;
 }
 
-static vv_set_text_renderer_fn resolve_set_text_renderer_fn(int64_t plugin_handle) {
-    if (plugin_handle == 0) {
+static vv_set_text_renderer_fn resolve_set_text_renderer_fn(int64_t runtime_handle) {
+    if (runtime_handle == 0) {
         return NULL;
     }
-    return (vv_set_text_renderer_fn)dlsym((void*)(intptr_t)plugin_handle, "volvox_grid_set_text_renderer");
+    return (vv_set_text_renderer_fn)dlsym((void*)(intptr_t)runtime_handle, "volvox_grid_set_text_renderer");
 }
 
-static vv_has_builtin_text_engine_fn resolve_has_builtin_text_engine_fn(int64_t plugin_handle) {
-    if (plugin_handle == 0) {
+static vv_has_builtin_text_engine_fn resolve_has_builtin_text_engine_fn(int64_t runtime_handle) {
+    if (runtime_handle == 0) {
         return NULL;
     }
-    return (vv_has_builtin_text_engine_fn)dlsym((void*)(intptr_t)plugin_handle, "volvox_grid_has_builtin_text_engine");
+    return (vv_has_builtin_text_engine_fn)dlsym((void*)(intptr_t)runtime_handle, "volvox_grid_has_builtin_text_engine");
 }
 
 static void bridge_measure_text(
@@ -828,13 +828,13 @@ JNIEXPORT jboolean JNICALL
 Java_io_github_ivere27_volvoxgrid_NativeTextRendererBridge_nativeHasBuiltinTextEngine(
     JNIEnv* env,
     jclass clazz,
-    jlong plugin_handle
+    jlong runtime_handle
 ) {
     (void)env;
     (void)clazz;
-    vv_has_builtin_text_engine_fn fn = resolve_has_builtin_text_engine_fn((int64_t)plugin_handle);
+    vv_has_builtin_text_engine_fn fn = resolve_has_builtin_text_engine_fn((int64_t)runtime_handle);
     if (fn == NULL) {
-        // Older plugin builds do not expose this symbol: assume built-in engine exists.
+        // Older library builds do not expose this symbol: assume built-in engine exists.
         return JNI_TRUE;
     }
     return fn() != 0 ? JNI_TRUE : JNI_FALSE;
@@ -844,7 +844,7 @@ JNIEXPORT jint JNICALL
 Java_io_github_ivere27_volvoxgrid_NativeTextRendererBridge_nativeRegisterTextRenderer(
     JNIEnv* env,
     jclass clazz,
-    jlong plugin_handle,
+    jlong runtime_handle,
     jlong grid_id,
     jobject callback
 ) {
@@ -852,7 +852,7 @@ Java_io_github_ivere27_volvoxgrid_NativeTextRendererBridge_nativeRegisterTextRen
     if (callback == NULL) {
         return -1;
     }
-    vv_set_text_renderer_fn fn = resolve_set_text_renderer_fn((int64_t)plugin_handle);
+    vv_set_text_renderer_fn fn = resolve_set_text_renderer_fn((int64_t)runtime_handle);
     if (fn == NULL) {
         return -2;
     }
@@ -886,12 +886,12 @@ JNIEXPORT jint JNICALL
 Java_io_github_ivere27_volvoxgrid_NativeTextRendererBridge_nativeClearTextRenderer(
     JNIEnv* env,
     jclass clazz,
-    jlong plugin_handle,
+    jlong runtime_handle,
     jlong grid_id
 ) {
     (void)env;
     (void)clazz;
-    vv_set_text_renderer_fn fn = resolve_set_text_renderer_fn((int64_t)plugin_handle);
+    vv_set_text_renderer_fn fn = resolve_set_text_renderer_fn((int64_t)runtime_handle);
     if (fn == NULL) {
         return -2;
     }
@@ -910,13 +910,13 @@ JNIEXPORT void JNICALL
 Java_io_github_ivere27_volvoxgrid_NativeTextRendererBridge_nativeSetTextRendererCacheCap(
     JNIEnv* env,
     jclass clazz,
-    jlong plugin_handle,
+    jlong runtime_handle,
     jlong grid_id,
     jint cap
 ) {
     (void)env;
     (void)clazz;
-    (void)plugin_handle;
+    (void)runtime_handle;
 
     pthread_mutex_lock(&g_bindings_lock);
     BindingNode* node = g_bindings;

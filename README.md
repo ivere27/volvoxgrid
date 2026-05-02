@@ -215,7 +215,7 @@ See [web/js/README.md](web/js/README.md) for the web package API and [GUI.md](GU
 
 ### Go
 
-The Go package provides a TUI host and client API for the native plugin. It is not published to a module proxy yet; use it from the repo:
+The Go package provides a TUI host and client API for the native library. It is not published to a module proxy yet; use it from the repo:
 
 ```go
 import (
@@ -234,7 +234,7 @@ The managed wrapper package ID is `VolvoxGrid.DotNet`. The repo currently docume
 dotnet pack dotnet/src/VolvoxGrid.DotNet.csproj -c Release
 ```
 
-The native `volvoxgrid_plugin` library is still a runtime dependency.
+The native `volvoxgrid` library is still a library dependency.
 
 ## Documents
 

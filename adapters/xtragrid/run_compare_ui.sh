@@ -459,11 +459,11 @@ run_runner_cases() {
 
         set +e
         if [ "$engine" = "vv" ]; then
-            run_wine_cmd env VOLVOXGRID_PLUGIN_PATH="$VV_PLUGIN_WIN" wine "$RUNNER_WIN" \
+            run_wine_cmd env VOLVOXGRID_LIBRARY_PATH="$VV_LIBRARY_WIN" wine "$RUNNER_WIN" \
                 --engine "$engine" \
                 --suffix "$suffix" \
                 --grid-assembly "$grid_assembly_win" \
-                --plugin-path "$VV_PLUGIN_WIN" \
+                --library-path "$VV_LIBRARY_WIN" \
                 "${RUNNER_BASE_ARGS[@]}" \
                 --tests "$case_num" | tee -a "$COMPARE_LOG"
         else
@@ -521,11 +521,11 @@ build_runner_project
 RUNNER_EXE="$ROOT_DIR/adapters/xtragrid/test/runner/bin/${RUNNER_CFG}/net462/DotNetGrid.ScriptRunner.exe"
 VV_STAGE="$ROOT_DIR/target/dotnet/winforms_${PROFILE}"
 VV_GRID_ASM="$VV_STAGE/VolvoxGrid.DotNet.dll"
-VV_PLUGIN_DLL="$VV_STAGE/volvoxgrid_plugin.dll"
+VV_LIBRARY_DLL="$VV_STAGE/volvoxgrid.dll"
 
 [ -f "$RUNNER_EXE" ] || { echo "ERROR: runner exe not found: $RUNNER_EXE" >&2; exit 1; }
 [ -f "$VV_GRID_ASM" ] || { echo "ERROR: Volvox grid assembly not found: $VV_GRID_ASM" >&2; exit 1; }
-[ -f "$VV_PLUGIN_DLL" ] || { echo "ERROR: plugin dll not found: $VV_PLUGIN_DLL" >&2; exit 1; }
+[ -f "$VV_LIBRARY_DLL" ] || { echo "ERROR: library DLL not found: $VV_LIBRARY_DLL" >&2; exit 1; }
 
 echo "[3/6] Preparing Wine prefix..."
 prepare_wine_prefix
@@ -534,7 +534,7 @@ RUNNER_WIN="$(to_wine_path "$RUNNER_EXE")"
 SCRIPTS_WIN="$(to_wine_path "$SCRIPTS_DIR")"
 OUT_WIN="$(to_wine_path "$OUT_DIR")"
 VV_ASM_WIN="$(to_wine_path "$VV_GRID_ASM")"
-VV_PLUGIN_WIN="$(to_wine_path "$VV_PLUGIN_DLL")"
+VV_LIBRARY_WIN="$(to_wine_path "$VV_LIBRARY_DLL")"
 
 RUNNER_BASE_ARGS=(--scripts-dir "$SCRIPTS_WIN" --out-dir "$OUT_WIN")
 RUNNER_BASE_ARGS+=("${RUNNER_EXTRA_ARGS[@]}")

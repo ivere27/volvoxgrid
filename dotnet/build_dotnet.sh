@@ -10,8 +10,8 @@
 #   DOTNET_SAMPLE=auto|winforms|console|tui  (default: auto)
 #
 # Produces:
-#   ${CARGO_TARGET_DIR:-target}/<windows-target-triple>/{debug|release}/volvoxgrid_plugin.dll
-#   ${CARGO_TARGET_DIR:-target}/{debug|release}/libvolvoxgrid_plugin.{so|dylib}
+#   ${CARGO_TARGET_DIR:-target}/<windows-target-triple>/{debug|release}/volvoxgrid.dll
+#   ${CARGO_TARGET_DIR:-target}/{debug|release}/libvolvoxgrid.{so|dylib}
 #   target/dotnet/{winforms|console}_{debug|release}[_<tfm>]/*
 
 set -euo pipefail
@@ -28,8 +28,8 @@ TARGET_TFM="${DOTNET_TFM:-net40}"
 TARGET_ARCH="${DOTNET_ARCH:-x64}"
 TARGET_SAMPLE="${DOTNET_SAMPLE:-}"
 unset DOTNET_TFM DOTNET_ARCH
-PLUGIN_FEATURES="${VOLVOXGRID_DOTNET_PLUGIN_FEATURES:-gpu}"
-PLUGIN_FEATURE_ARGS=()
+LIBRARY_FEATURES="${VOLVOXGRID_DOTNET_LIBRARY_FEATURES:-gpu}"
+LIBRARY_FEATURE_ARGS=()
 RUST_WINDOWS_TARGET=""
 DOTNET_PLATFORM_TARGET=""
 MSBUILD_ARCH_ROOT="default"
@@ -110,22 +110,22 @@ sample_basename_for_kind() {
     esac
 }
 
-native_plugin_basename() {
+native_library_basename() {
     local tfm="$1"
     if [ "$tfm" = "net40" ] || [[ "$tfm" == *"-windows"* ]]; then
-        printf 'volvoxgrid_plugin.dll\n'
+        printf 'volvoxgrid.dll\n'
         return
     fi
 
     case "$(uname -s 2>/dev/null || echo unknown)" in
         Darwin)
-            printf 'libvolvoxgrid_plugin.dylib\n'
+            printf 'libvolvoxgrid.dylib\n'
             ;;
         MINGW*|MSYS*|CYGWIN*)
-            printf 'volvoxgrid_plugin.dll\n'
+            printf 'volvoxgrid.dll\n'
             ;;
         *)
-            printf 'libvolvoxgrid_plugin.so\n'
+            printf 'libvolvoxgrid.so\n'
             ;;
     esac
 }
@@ -327,8 +327,8 @@ copy_required_artifact() {
     cp -f "$src" "$STAGE_DIR/"
 }
 
-if [ -n "$PLUGIN_FEATURES" ]; then
-    PLUGIN_FEATURE_ARGS=(--features "$PLUGIN_FEATURES")
+if [ -n "$LIBRARY_FEATURES" ]; then
+    LIBRARY_FEATURE_ARGS=(--features "$LIBRARY_FEATURES")
 fi
 
 while [ "$#" -gt 0 ]; do
@@ -380,7 +380,7 @@ else
 fi
 SAMPLE_PROJECT="$(sample_project_for_kind "$SAMPLE_KIND")"
 SAMPLE_BASENAME="$(sample_basename_for_kind "$SAMPLE_KIND")"
-PLUGIN_BASENAME="$(native_plugin_basename "$TARGET_TFM")"
+LIBRARY_BASENAME="$(native_library_basename "$TARGET_TFM")"
 
 if [ "$SAMPLE_KIND" = "tui" ] && [ "$TARGET_TFM" != "net8.0" ]; then
     echo "ERROR: the TUI sample requires DOTNET_TFM=net8.0." >&2
@@ -395,13 +395,13 @@ fi
 echo "=== VolvoxGrid .NET Build (${PROFILE}, ${TARGET_TFM}, ${TARGET_ARCH}, ${SAMPLE_KIND}) ==="
 
 if [ "$SAMPLE_KIND" = "winforms" ]; then
-    echo "[plugin] cargo build --target ${RUST_WINDOWS_TARGET} ${CARGO_FLAGS} ${PLUGIN_FEATURE_ARGS[*]}"
-    cargo build --manifest-path "$ROOT_DIR/plugin/Cargo.toml" --target "$RUST_WINDOWS_TARGET" -p volvoxgrid-plugin $CARGO_FLAGS "${PLUGIN_FEATURE_ARGS[@]}"
-    PLUGIN_ARTIFACT="$CARGO_ARTIFACT_ROOT/${RUST_WINDOWS_TARGET}/${TARGET_DIR}/volvoxgrid_plugin.dll"
+    echo "[library] cargo build --target ${RUST_WINDOWS_TARGET} ${CARGO_FLAGS} ${LIBRARY_FEATURE_ARGS[*]}"
+    cargo build --manifest-path "$ROOT_DIR/runtime/Cargo.toml" --target "$RUST_WINDOWS_TARGET" -p volvoxgrid-runtime $CARGO_FLAGS "${LIBRARY_FEATURE_ARGS[@]}"
+    LIBRARY_ARTIFACT="$CARGO_ARTIFACT_ROOT/${RUST_WINDOWS_TARGET}/${TARGET_DIR}/volvoxgrid.dll"
 else
-    echo "[plugin] cargo build ${CARGO_FLAGS} ${PLUGIN_FEATURE_ARGS[*]}"
-    cargo build --manifest-path "$ROOT_DIR/plugin/Cargo.toml" -p volvoxgrid-plugin $CARGO_FLAGS "${PLUGIN_FEATURE_ARGS[@]}"
-    PLUGIN_ARTIFACT="$CARGO_ARTIFACT_ROOT/${TARGET_DIR}/${PLUGIN_BASENAME}"
+    echo "[library] cargo build ${CARGO_FLAGS} ${LIBRARY_FEATURE_ARGS[*]}"
+    cargo build --manifest-path "$ROOT_DIR/runtime/Cargo.toml" -p volvoxgrid-runtime $CARGO_FLAGS "${LIBRARY_FEATURE_ARGS[@]}"
+    LIBRARY_ARTIFACT="$CARGO_ARTIFACT_ROOT/${TARGET_DIR}/${LIBRARY_BASENAME}"
 fi
 
 DOTNET_PROPS=()
@@ -442,7 +442,7 @@ fi
 
 #
 # MSBuild can flake in multi-node project-reference discovery immediately after
-# the cargo plugin build in this wrapper flow. Force single-node mode here so
+# the cargo library build in this wrapper flow. Force single-node mode here so
 # `make dotnet-*` stays deterministic across console/TUI samples.
 DOTNET_BUILD_ARGS=(-m:1)
 
@@ -472,12 +472,12 @@ fi
 
 mkdir -p "$STAGE_DIR"
 
-if [ ! -f "$PLUGIN_ARTIFACT" ]; then
-    echo "ERROR: missing build artifact: $PLUGIN_ARTIFACT" >&2
+if [ ! -f "$LIBRARY_ARTIFACT" ]; then
+    echo "ERROR: missing build artifact: $LIBRARY_ARTIFACT" >&2
     exit 1
 fi
 
-cp -f "$PLUGIN_ARTIFACT" "$STAGE_DIR/$PLUGIN_BASENAME"
+cp -f "$LIBRARY_ARTIFACT" "$STAGE_DIR/$LIBRARY_BASENAME"
 
 if [ "$TARGET_TFM" = "net40" ]; then
     # net40 authoritative compile outputs are under obj/, while bin/ may keep stale arch copies.
@@ -494,6 +494,6 @@ echo ""
 echo "=== Build Complete ==="
 echo "TFM:    $TARGET_TFM"
 echo "Arch:   ${DOTNET_PLATFORM_TARGET:-default}"
-echo "Plugin: $PLUGIN_ARTIFACT"
+echo "Library: $LIBRARY_ARTIFACT"
 echo "Sample: $SAMPLE_ENTRY"
 echo "Stage:  $STAGE_DIR"

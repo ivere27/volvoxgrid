@@ -7,68 +7,68 @@ import java.nio.ByteBuffer;
 import java.util.Objects;
 
 /**
- * Reflection bridge for Synurang desktop runtime.
+ * Reflection bridge for Synurang desktop host.
  *
- * Expected runtime classes:
+ * Expected host classes:
  * - io.github.ivere27.synurang.PluginHost
  * - io.github.ivere27.synurang.PluginStream
  */
 public final class SynurangDesktopBridge implements AutoCloseable {
-    private static final String PLUGIN_HOST_CLASS = "io.github.ivere27.synurang.PluginHost";
+    private static final String SYNURANG_HOST_CLASS = "io.github.ivere27.synurang.PluginHost";
 
-    private final Object pluginHost;
+    private final Object host;
     private final Method invokeMethod;
     private final Method openStreamMethod;
     private final Method closeMethod;
     private final Method directBufferAddressMethod;
 
-    private SynurangDesktopBridge(Object pluginHost, Class<?> pluginHostClass) throws SynurangBridgeException {
-        this.pluginHost = pluginHost;
+    private SynurangDesktopBridge(Object host, Class<?> hostClass) throws SynurangBridgeException {
+        this.host = host;
         try {
-            this.invokeMethod = pluginHostClass.getMethod("invoke", String.class, String.class, byte[].class);
-            this.openStreamMethod = pluginHostClass.getMethod("openStream", String.class, String.class);
-            this.closeMethod = pluginHostClass.getMethod("close");
+            this.invokeMethod = hostClass.getMethod("invoke", String.class, String.class, byte[].class);
+            this.openStreamMethod = hostClass.getMethod("openStream", String.class, String.class);
+            this.closeMethod = hostClass.getMethod("close");
             Method directBufferMethod;
             try {
-                directBufferMethod = pluginHostClass.getMethod("getDirectBufferAddress", Buffer.class);
+                directBufferMethod = hostClass.getMethod("getDirectBufferAddress", Buffer.class);
             } catch (NoSuchMethodException ignored) {
-                directBufferMethod = pluginHostClass.getMethod("getDirectBufferAddress", ByteBuffer.class);
+                directBufferMethod = hostClass.getMethod("getDirectBufferAddress", ByteBuffer.class);
             }
             this.directBufferAddressMethod = directBufferMethod;
         } catch (NoSuchMethodException e) {
-            throw new SynurangBridgeException("Synurang runtime API mismatch", e);
+            throw new SynurangBridgeException("Synurang host API mismatch", e);
         }
     }
 
-    public static boolean isRuntimeAvailable() {
+    public static boolean isHostAvailable() {
         try {
-            Class.forName(PLUGIN_HOST_CLASS);
+            Class.forName(SYNURANG_HOST_CLASS);
             return true;
         } catch (ClassNotFoundException e) {
             return false;
         }
     }
 
-    public static SynurangDesktopBridge load(String pluginPath) throws SynurangBridgeException {
-        Objects.requireNonNull(pluginPath, "pluginPath");
+    public static SynurangDesktopBridge load(String libraryPath) throws SynurangBridgeException {
+        Objects.requireNonNull(libraryPath, "libraryPath");
         try {
-            Class<?> hostClass = Class.forName(PLUGIN_HOST_CLASS);
+            Class<?> hostClass = Class.forName(SYNURANG_HOST_CLASS);
             Method loadMethod = hostClass.getMethod("load", String.class);
-            Object host = loadMethod.invoke(null, pluginPath);
-            VolvoxGridBuildInfo.logDesktopPluginLoadOnce(pluginPath);
+            Object host = loadMethod.invoke(null, libraryPath);
+            VolvoxGridBuildInfo.logDesktopLibraryLoadOnce(libraryPath);
             return new SynurangDesktopBridge(host, hostClass);
         } catch (ClassNotFoundException e) {
             throw new SynurangBridgeException(
-                "Synurang desktop runtime is not available. "
-                    + "Expected class: " + PLUGIN_HOST_CLASS,
+                "Synurang desktop host is not available. "
+                    + "Expected class: " + SYNURANG_HOST_CLASS,
                 e
             );
         } catch (NoSuchMethodException e) {
-            throw new SynurangBridgeException("Synurang runtime missing PluginHost.load(String)", e);
+            throw new SynurangBridgeException("Synurang host missing PluginHost.load(String)", e);
         } catch (InvocationTargetException e) {
-            throw unwrap("Failed to load plugin host", e);
+            throw unwrap("Failed to load Synurang host", e);
         } catch (IllegalAccessException e) {
-            throw new SynurangBridgeException("Cannot access Synurang runtime", e);
+            throw new SynurangBridgeException("Cannot access Synurang host", e);
         }
     }
 
@@ -77,7 +77,7 @@ public final class SynurangDesktopBridge implements AutoCloseable {
         Objects.requireNonNull(methodPath, "methodPath");
         Objects.requireNonNull(payload, "payload");
         try {
-            return (byte[]) invokeMethod.invoke(pluginHost, service, methodPath, payload);
+            return (byte[]) invokeMethod.invoke(host, service, methodPath, payload);
         } catch (InvocationTargetException e) {
             throw unwrap("Synurang invoke failed: " + methodPath, e);
         } catch (IllegalAccessException e) {
@@ -85,12 +85,12 @@ public final class SynurangDesktopBridge implements AutoCloseable {
         }
     }
 
-    public PluginStreamBridge openStream(String service, String methodPath) throws SynurangBridgeException {
+    public RuntimeStreamBridge openStream(String service, String methodPath) throws SynurangBridgeException {
         Objects.requireNonNull(service, "service");
         Objects.requireNonNull(methodPath, "methodPath");
         try {
-            Object stream = openStreamMethod.invoke(pluginHost, service, methodPath);
-            return new PluginStreamBridge(stream);
+            Object stream = openStreamMethod.invoke(host, service, methodPath);
+            return new RuntimeStreamBridge(stream);
         } catch (InvocationTargetException e) {
             throw unwrap("Failed to open stream: " + methodPath, e);
         } catch (IllegalAccessException e) {
@@ -116,9 +116,9 @@ public final class SynurangDesktopBridge implements AutoCloseable {
     @Override
     public void close() throws SynurangBridgeException {
         try {
-            closeMethod.invoke(pluginHost);
+            closeMethod.invoke(host);
         } catch (InvocationTargetException e) {
-            throw unwrap("Failed to close plugin host", e);
+            throw unwrap("Failed to close Synurang host", e);
         } catch (IllegalAccessException e) {
             throw new SynurangBridgeException("Cannot access PluginHost.close", e);
         }
@@ -129,14 +129,14 @@ public final class SynurangDesktopBridge implements AutoCloseable {
         return new SynurangBridgeException(message + ": " + cause.getMessage(), cause);
     }
 
-    public static final class PluginStreamBridge implements AutoCloseable {
+    public static final class RuntimeStreamBridge implements AutoCloseable {
         private final Object stream;
         private final Method sendMethod;
         private final Method recvMethod;
         private final Method closeSendMethod;
         private final Method closeMethod;
 
-        private PluginStreamBridge(Object stream) throws SynurangBridgeException {
+        private RuntimeStreamBridge(Object stream) throws SynurangBridgeException {
             this.stream = Objects.requireNonNull(stream, "stream");
             Class<?> streamClass = stream.getClass();
             try {

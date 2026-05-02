@@ -38,8 +38,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "build:wasm": "cd ../crate && rustup run nightly wasm-pack build . --target web --out-dir ../js/wasm",
-    "build:wasm:threaded": "cd ../crate && RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . --target web --out-dir ../js/wasm --features wasm-threads -Z build-std=std,panic_abort"
+    "build:wasm": "cd ../../runtime && rustup run nightly wasm-pack build . --target web --out-dir ../web/js/wasm --out-name volvoxgrid_wasm --no-default-features --features wasm-default",
+    "build:wasm:threaded": "cd ../../runtime && RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals' rustup run nightly wasm-pack build . --target web --out-dir ../web/js/wasm --out-name volvoxgrid_wasm --no-default-features --features wasm-default,wasm-threads -Z build-std=std,panic_abort"
   },
   "devDependencies": {
     "typescript": "^5.0.0"

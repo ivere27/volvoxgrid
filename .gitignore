@@ -48,8 +48,9 @@ adapters/xtragrid/test/runner/bin/
 node_modules/
 web/js/dist/
 web/js/package-lock.json
+web/js/wasm/
 web/example/dist/
-web/crate/pkg/
+web/example/wasm/
 npm-debug.log
 yarn-error.log
 web/example/public/

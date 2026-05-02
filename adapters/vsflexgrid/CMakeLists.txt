@@ -104,7 +104,7 @@ target_compile_definitions(VolvoxGrid PRIVATE
 
 # Link the synurang host library and protobuf
 target_link_libraries(VolvoxGrid PRIVATE
-    synurang          # Synurang C++ plugin host
+    synurang          # Synurang C++ host
     ${Protobuf_LIBRARIES}
     ole32
     oleaut32

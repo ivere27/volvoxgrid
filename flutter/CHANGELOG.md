@@ -59,9 +59,9 @@
 
 ## 0.1.4
 
-- Added Flutter plugin platform declarations for `macos` and `windows`.
+- Added Flutter platform declarations for `macos` and `windows`.
 - Added desktop native resolution from Maven for Linux, macOS, and Windows.
-- Added support for `VOLVOXGRID_SOURCE` and `VOLVOXGRID_VERSION` across desktop plugin builds.
+- Added support for `VOLVOXGRID_SOURCE` and `VOLVOXGRID_VERSION` across desktop native library builds.
 - Added `-SNAPSHOT` refresh handling for desktop native resolution.
 
 ## 0.1.3
@@ -75,4 +75,4 @@
 - Added `VolvoxGridWidget` for native pixel-rendered grid display.
 - Added `VolvoxGridController` high-level async API.
 - Added generated protobuf and Synurang FFI bindings.
-- Added Android and Linux plugin platform support.
+- Added Android and Linux platform support.

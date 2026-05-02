@@ -241,9 +241,9 @@ export class VolvoxSheet implements VolvoxSheetApi {
     this.container = options.container;
     this.wasm = options.wasm;
 
-    // Ensure protobuf service plugin is registered (required for styles, configure, etc.)
-    if (typeof this.wasm.init_v1_plugin === "function") {
-      try { this.wasm.init_v1_plugin(); } catch { /* already registered */ }
+    // Ensure protobuf service runtime is registered (required for styles, configure, etc.)
+    if (typeof this.wasm.init_v1_runtime === "function") {
+      try { this.wasm.init_v1_runtime(); } catch { /* already registered */ }
     }
 
     // Lite WASM builds disable the built-in text engine (cosmic-text).

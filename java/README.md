@@ -45,9 +45,9 @@ public class MyApp {
             frame.add(gridPanel, BorderLayout.CENTER);
             frame.setVisible(true);
 
-            // Initialize: loads the native plugin and creates a grid
+            // Initialize: loads the native library and creates a grid
             gridPanel.initialize(
-                null,  // auto-detect plugin path from JAR
+                null,  // auto-detect library path from JAR
                 100,   // rows
                 5      // cols
             );
@@ -77,12 +77,12 @@ public class MyApp {
 }
 ```
 
-### Plugin Path Resolution
+### Library Path Resolution
 
-When using the Maven JAR, the native plugin is bundled and extracted automatically. If you need manual control, the plugin path is resolved in this order:
+When using the Maven JAR, the native library is bundled and extracted automatically. If you need manual control, the library path is resolved in this order:
 
 1. First command-line argument
-2. `VOLVOXGRID_PLUGIN_PATH` environment variable
+2. `VOLVOXGRID_LIBRARY_PATH` environment variable
 3. Bundled native library from classpath (Maven JAR)
 4. Auto-detect in `target/debug/` or `target/release/`
 
@@ -90,13 +90,13 @@ When using the Maven JAR, the native plugin is bundled and extracted automatical
 
 ### VolvoxGridDesktopPanel
 
-A Swing `JPanel` that hosts the grid. Handles rendering, mouse/keyboard input, and the native plugin lifecycle.
+A Swing `JPanel` that hosts the grid. Handles rendering, mouse/keyboard input, and the native library lifecycle.
 
 #### Initialization
 
 ```java
-// Option A: Auto-detect or specify plugin path
-gridPanel.initialize(pluginPath, rows, cols);
+// Option A: Auto-detect or specify library path
+gridPanel.initialize(libraryPath, rows, cols);
 
 // Option B: Reuse an existing bridge and grid (for multi-grid apps)
 gridPanel.initialize(bridge, existingGridId);
@@ -371,7 +371,7 @@ byte[] hierarchyJson = ctrl.getDemoData("hierarchy");   // pair with loadData + 
 Share a single bridge across multiple grids:
 
 ```java
-SynurangDesktopBridge bridge = SynurangDesktopBridge.load(pluginPath);
+SynurangDesktopBridge bridge = SynurangDesktopBridge.load(libraryPath);
 
 gridPanel1.initialize(bridge, gridId1);
 gridPanel2.initialize(bridge, gridId2);

@@ -26,7 +26,7 @@ run_android() {
 
   GROUP_ID="${full_group_id}" \
   ARTIFACT_ID="${full_artifact_id}" \
-  PLUGIN_BUILD_MODE=full \
+  LIBRARY_BUILD_MODE=full \
     "${SCRIPT_DIR}/build_android_aar.sh"
 
   case "${include_lite}" in
@@ -36,7 +36,7 @@ run_android() {
       echo "----------------------------------------"
       GROUP_ID="${lite_group_id}" \
       ARTIFACT_ID="${lite_artifact_id}" \
-      PLUGIN_BUILD_MODE=lite \
+      LIBRARY_BUILD_MODE=lite \
         "${SCRIPT_DIR}/build_android_aar.sh"
       ;;
   esac

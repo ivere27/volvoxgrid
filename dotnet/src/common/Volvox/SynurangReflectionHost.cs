@@ -125,18 +125,18 @@ namespace VolvoxGrid.DotNet.Internal
             _free = free;
         }
 
-        public static SynurangReflectionHost Load(string pluginPath)
+        public static SynurangReflectionHost Load(string libraryPath)
         {
-            if (string.IsNullOrEmpty(pluginPath))
+            if (string.IsNullOrEmpty(libraryPath))
             {
-                throw new ArgumentException("Plugin path must be provided.", "pluginPath");
+                throw new ArgumentException("Library path must be provided.", "libraryPath");
             }
 
-            string pluginDir = Path.GetDirectoryName(pluginPath);
-            IntPtr module = LoadModule(pluginPath, pluginDir);
+            string libraryDir = Path.GetDirectoryName(libraryPath);
+            IntPtr module = LoadModule(libraryPath, libraryDir);
             if (module == IntPtr.Zero)
             {
-                throw new InvalidOperationException("Failed to load plugin library: " + pluginPath);
+                throw new InvalidOperationException("Failed to load library: " + libraryPath);
             }
 
             try
@@ -204,7 +204,7 @@ namespace VolvoxGrid.DotNet.Internal
                     }
 
                     throw new InvalidOperationException(
-                        "Synurang invoke failed for method " + method + ": plugin returned null");
+                        "Synurang invoke failed for method " + method + ": runtime returned null");
                 }
 
                 if (respLen == 0)
@@ -352,35 +352,35 @@ namespace VolvoxGrid.DotNet.Internal
             IntPtr proc = GetExport(module, name);
             if (proc == IntPtr.Zero)
             {
-                throw new MissingMethodException("Missing required plugin export: " + name);
+                throw new MissingMethodException("Missing required runtime export: " + name);
             }
 
             return proc;
         }
 
-        private static IntPtr LoadModule(string pluginPath, string pluginDir)
+        private static IntPtr LoadModule(string libraryPath, string libraryDir)
         {
-            if (IsWindowsRuntime())
+            if (IsWindows())
             {
-                if (!string.IsNullOrEmpty(pluginDir))
+                if (!string.IsNullOrEmpty(libraryDir))
                 {
-                    // Ensure dependent DLLs next to the plugin can be resolved by LoadLibrary.
-                    SetDllDirectory(pluginDir);
+                    // Ensure dependent DLLs next to the library can be resolved by LoadLibrary.
+                    SetDllDirectory(libraryDir);
                 }
 
-                return LoadLibrary(pluginPath);
+                return LoadLibrary(libraryPath);
             }
 
 #if NET40
-            throw new PlatformNotSupportedException("Non-Windows native plugin loading requires .NET 8+.");
+            throw new PlatformNotSupportedException("Non-Windows native library loading requires .NET 8+.");
 #else
-            return NativeLibrary.Load(pluginPath);
+            return NativeLibrary.Load(libraryPath);
 #endif
         }
 
         private static IntPtr GetExport(IntPtr module, string name)
         {
-            if (IsWindowsRuntime())
+            if (IsWindows())
             {
                 return GetProcAddress(module, name);
             }
@@ -400,7 +400,7 @@ namespace VolvoxGrid.DotNet.Internal
                 return;
             }
 
-            if (IsWindowsRuntime())
+            if (IsWindows())
             {
                 FreeLibrary(module);
                 return;
@@ -425,7 +425,7 @@ namespace VolvoxGrid.DotNet.Internal
 
         private static bool ShouldFreeLibraryOnDispose()
         {
-            // Under Wine Mono we observed execute faults during plugin unload when native worker
+            // Under Wine Mono we observed execute faults during runtime unload when native worker
             // threads are still parking in Win32 synchronization shims. Keep the module loaded
             // for process lifetime by default on Mono; allow explicit opt-in unload for debugging.
             if (Environment.GetEnvironmentVariable("VOLVOXGRID_FORCE_FREE_LIBRARY") == "1")
@@ -441,7 +441,7 @@ namespace VolvoxGrid.DotNet.Internal
             return !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WINEPREFIX"));
         }
 
-        private static bool IsWindowsRuntime()
+        private static bool IsWindows()
         {
             PlatformID platform = Environment.OSVersion.Platform;
             return platform == PlatformID.Win32NT
@@ -499,7 +499,7 @@ namespace VolvoxGrid.DotNet.Internal
 
             if (message == null)
             {
-                message = payload.Length == 0 ? "Unknown plugin error" : Encoding.UTF8.GetString(payload);
+                message = payload.Length == 0 ? "Unknown runtime error" : Encoding.UTF8.GetString(payload);
             }
 
             return new SynurangFfiException(context + ": " + message, code, grpcCode, payload);

@@ -2611,15 +2611,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "volvoxgrid-plugin"
+name = "volvoxgrid-runtime"
 version = "0.8.4"
 dependencies = [
  "cc",
  "ctor",
+ "getrandom 0.2.17",
+ "js-sys",
  "lazy_static",
  "pollster",
  "prost 0.12.6",
  "volvoxgrid-engine",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-bindgen-rayon",
+ "web-sys",
+ "web-time",
  "wgpu",
 ]
 
@@ -2630,21 +2637,6 @@ dependencies = [
  "prost 0.12.6",
  "synurang-host",
  "volvoxgrid-engine",
-]
-
-[[package]]
-name = "volvoxgrid-wasm"
-version = "0.8.4"
-dependencies = [
- "getrandom 0.2.17",
- "js-sys",
- "prost 0.12.6",
- "volvoxgrid-engine",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-bindgen-rayon",
- "web-sys",
- "web-time",
 ]
 
 [[package]]

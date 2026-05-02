@@ -211,16 +211,16 @@ val generateVolvoxGridBuildInfo = tasks.register("generateVolvoxGridBuildInfo") 
             
                 private VolvoxGridBuildInfo() {}
             
-                static void logDesktopPluginLoadOnce(String pluginPath) {
+                static void logDesktopLibraryLoadOnce(String libraryPath) {
                     if (!LOGGED.compareAndSet(false, true)) {
                         return;
                     }
                     System.err.println(
-                        "Loaded VolvoxGrid plugin " +
+                        "Loaded VolvoxGrid library " +
                         "version=" + VERSION + " " +
                         "commit=" + GIT_COMMIT + " " +
                         "buildDate=" + BUILD_DATE + " " +
-                        "path=" + pluginPath
+                        "path=" + libraryPath
                     );
                 }
             }
@@ -253,7 +253,7 @@ application {
 
 tasks.register<JavaExec>("runSmoke") {
     group = "application"
-    description = "Run headless desktop smoke test with Synurang desktop runtime."
+    description = "Run headless desktop smoke test with Synurang desktop host."
     classpath = sourceSets["main"].runtimeClasspath
     mainClass.set("io.github.ivere27.volvoxgrid.desktop.VolvoxGridDesktopSmoke")
 }

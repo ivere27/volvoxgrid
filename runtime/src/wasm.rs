@@ -5,6 +5,7 @@ use wasm_bindgen::prelude::*;
 #[cfg(feature = "gpu")]
 use wasm_bindgen_futures::future_to_promise;
 
+use crate::shared;
 use volvoxgrid_engine::input;
 use volvoxgrid_engine::render::Renderer;
 use volvoxgrid_engine::sort;
@@ -18,7 +19,7 @@ use web_time::Instant;
 // v1 proto types (re-exported for generated WASM bindings)
 pub use volvoxgrid_engine::proto::volvoxgrid::v1::*;
 
-// Generated v1 WASM bindings (proto-based batch API)
+// Generated v1 WASM bindings (proto-based batch API).
 mod volvoxgrid_wasm;
 
 // ---------------------------------------------------------------------------
@@ -208,56 +209,6 @@ fn replay_loaded_fonts_into_grid(grid: &mut volvoxgrid_engine::grid::VolvoxGrid)
     }
 }
 
-const DEFAULT_COL_INDICATOR_MODE_BITS: u32 = ColIndicatorCellMode::ColIndicatorCellHeaderText
-    as u32
-    | ColIndicatorCellMode::ColIndicatorCellSortGlyph as u32;
-
-fn default_row_indicator_slots() -> Vec<volvoxgrid_engine::indicator::RowIndicatorSlotState> {
-    vec![
-        volvoxgrid_engine::indicator::RowIndicatorSlotState::new(
-            RowIndicatorSlotKind::RowIndicatorSlotCurrent,
-            18,
-        ),
-        volvoxgrid_engine::indicator::RowIndicatorSlotState::new(
-            RowIndicatorSlotKind::RowIndicatorSlotSelection,
-            17,
-        ),
-    ]
-}
-
-fn ensure_default_row_indicator_slots(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
-    if grid.indicator_bands.row_start.slots.is_empty() {
-        grid.indicator_bands.row_start.slots = default_row_indicator_slots();
-    }
-}
-
-fn apply_default_indicator_bands(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) {
-    grid.indicator_bands.row_start.visible = false;
-    grid.indicator_bands.row_start.width_px =
-        volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
-    grid.indicator_bands.row_start.auto_size = true;
-    ensure_default_row_indicator_slots(grid);
-
-    grid.indicator_bands.col_top.visible = true;
-    if grid.indicator_bands.col_top.band_rows <= 0 {
-        grid.indicator_bands.col_top.band_rows = 1;
-    }
-    if grid.indicator_bands.col_top.default_row_height_px <= 0 {
-        grid.indicator_bands.col_top.default_row_height_px =
-            volvoxgrid_engine::indicator::DEFAULT_COL_INDICATOR_ROW_HEIGHT;
-    }
-    grid.indicator_bands.col_top.mode_bits = DEFAULT_COL_INDICATOR_MODE_BITS;
-    grid.layout.invalidate();
-    grid.dirty = true;
-}
-
-fn truncate_to_char_count(input: &str, max_chars: i32) -> String {
-    if max_chars <= 0 {
-        return input.to_string();
-    }
-    input.chars().take(max_chars as usize).collect()
-}
-
 fn next_event_id() -> i64 {
     let mut next = NEXT_EVENT_ID.lock().unwrap();
     let event_id = *next;
@@ -298,88 +249,6 @@ fn queue_pending_decision_event(
         .entry(grid_id)
         .or_default()
         .push_back(PendingDecisionEvent { event_id, data });
-}
-
-fn begin_edit_session_core(
-    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    col: i32,
-    force: bool,
-    emit_before_event: bool,
-    emit_dropdown_event: bool,
-    seed_text: Option<String>,
-) {
-    if !grid.can_begin_edit(row, col, force) {
-        return;
-    }
-
-    let is_boolean_checkbox = row >= grid.fixed_rows
-        && row < grid.rows
-        && col >= 0
-        && col < grid.cols
-        && !grid.row_props.get(&row).map_or(false, |rp| rp.is_subtotal)
-        && grid.get_col_props(col).map_or(false, |cp| {
-            cp.data_type == ColumnDataType::ColumnDataBoolean as i32
-        });
-    if is_boolean_checkbox {
-        return;
-    }
-
-    let dropdown = grid.active_dropdown(row, col);
-    let has_dropdown = dropdown.is_some();
-    if emit_before_event {
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::BeforeEdit { row, col });
-    }
-
-    let stored_text = grid.cells.get_text(row, col).to_string();
-    let display_text = grid.get_display_text(row, col);
-    grid.edit.start_edit_with_options(
-        row,
-        col,
-        &display_text,
-        None,
-        None,
-        seed_text.as_deref(),
-        None,
-    );
-    if let Some(dropdown) = dropdown.as_ref() {
-        grid.edit.parse_dropdown(dropdown);
-    } else {
-        let combo_list = grid.active_dropdown_list(row, col);
-        grid.edit.parse_dropdown_items(&combo_list);
-    }
-    if has_dropdown {
-        for i in 0..grid.edit.dropdown_count() {
-            if (!stored_text.is_empty() && grid.edit.get_dropdown_data(i) == stored_text)
-                || grid.edit.get_dropdown_item(i) == display_text
-            {
-                grid.edit.set_dropdown_index(i);
-                break;
-            }
-        }
-    }
-
-    if has_dropdown {
-        if emit_dropdown_event {
-            if let Some(event) = grid.before_dropdown_open_event(row, col) {
-                grid.events.push(event);
-            }
-        }
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::DropdownOpened);
-    }
-    if let Some(seed) = seed_text {
-        if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
-            grid.edit.edit_text = seed.clone();
-            grid.edit.sel_start = seed.chars().count() as i32;
-            grid.edit.sel_length = 0;
-            grid.events
-                .push(volvoxgrid_engine::event::GridEventData::CellEditChange { text: seed });
-        }
-    }
-    grid.events
-        .push(volvoxgrid_engine::event::GridEventData::StartEdit { row, col });
 }
 
 fn queue_before_dropdown_open(
@@ -426,7 +295,9 @@ fn begin_edit_session_after_before(
     force: bool,
     seed_text: Option<String>,
 ) {
-    begin_edit_session_core(grid, row, col, force, false, true, seed_text);
+    shared::begin_edit_session_core_opts(
+        grid, row, col, force, false, true, None, None, seed_text, None,
+    );
 }
 
 fn begin_edit_session_after_dropdown_before(
@@ -436,110 +307,9 @@ fn begin_edit_session_after_dropdown_before(
     force: bool,
     seed_text: Option<String>,
 ) {
-    begin_edit_session_core(grid, row, col, force, false, false, seed_text);
-}
-
-fn apply_edit_start_options(
-    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    col: i32,
-    select_all: Option<bool>,
-    click_caret: Option<i32>,
-    caret_end: Option<bool>,
-    formula_mode: Option<bool>,
-) {
-    if !grid.edit.is_active() || grid.edit.edit_row != row || grid.edit.edit_col != col {
-        return;
-    }
-
-    if let Some(formula_mode) = formula_mode {
-        grid.edit.set_formula_mode(formula_mode);
-    }
-
-    if caret_end == Some(true) || click_caret.is_some() {
-        grid.edit.ui_mode = volvoxgrid_engine::edit::EditUiMode::EditMode;
-    }
-
-    if let Some(caret) = click_caret {
-        grid.edit.sel_start = caret;
-        grid.edit.sel_length = 0;
-        grid.mark_dirty();
-        return;
-    }
-
-    if caret_end == Some(true) {
-        grid.edit.sel_start = grid.edit.edit_text.chars().count() as i32;
-        grid.edit.sel_length = 0;
-        grid.mark_dirty();
-        return;
-    }
-
-    if select_all == Some(true) {
-        grid.edit.sel_start = 0;
-        grid.edit.sel_length = grid.edit.edit_text.chars().count() as i32;
-        grid.mark_dirty();
-    }
-}
-
-fn normalize_committed_edit_text(
-    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    col: i32,
-    new_text: &str,
-) -> String {
-    let mut committed = truncate_to_char_count(new_text, grid.edit_max_length);
-
-    if let Some(dropdown) = grid.configured_dropdown(row, col) {
-        if let Some(mapped) = volvoxgrid_engine::edit::translate_dropdown_display_to_value_typed(
-            &dropdown, &committed,
-        ) {
-            committed = mapped;
-        }
-    } else if col >= 0 && (col as usize) < grid.columns.len() {
-        let col_list = &grid.columns[col as usize].dropdown_items;
-        if !col_list.is_empty() {
-            if let Some(mapped) =
-                volvoxgrid_engine::edit::translate_dropdown_display_to_value(col_list, &committed)
-            {
-                committed = mapped;
-            }
-        }
-    }
-    committed
-}
-
-fn apply_committed_edit_text(
-    grid: &mut volvoxgrid_engine::grid::VolvoxGrid,
-    row: i32,
-    col: i32,
-    old_text: String,
-    committed: String,
-) {
-    grid.cells.set_text(row, col, committed.clone());
-
-    if old_text != committed {
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::AfterEdit {
-                row,
-                col,
-                old_text: old_text.clone(),
-                new_text: committed.clone(),
-            });
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::CellChanged {
-                row,
-                col,
-                old_text,
-                new_text: committed,
-            });
-    }
-
-    let active_combo = grid.active_dropdown_list(row, col);
-    if !active_combo.is_empty() {
-        grid.events
-            .push(volvoxgrid_engine::event::GridEventData::DropdownClosed);
-    }
-    grid.mark_dirty();
+    shared::begin_edit_session_core_opts(
+        grid, row, col, force, false, false, None, None, seed_text, None,
+    );
 }
 
 fn has_custom_compare_callback(grid_id: i32) -> bool {
@@ -612,8 +382,19 @@ fn request_before_edit(
     }
 
     if !decision_channel_enabled(grid_id) {
-        begin_edit_session_core(grid, row, col, force, true, true, seed_text);
-        apply_edit_start_options(
+        shared::begin_edit_session_core_opts(
+            grid,
+            row,
+            col,
+            force,
+            true,
+            true,
+            select_all,
+            caret_end,
+            seed_text,
+            formula_mode,
+        );
+        shared::apply_edit_start_options(
             grid,
             row,
             col,
@@ -655,7 +436,7 @@ fn request_validate_edit(
     old_text: String,
     new_text: String,
 ) {
-    let committed_text = normalize_committed_edit_text(grid, row, col, &new_text);
+    let committed_text = shared::normalize_committed_edit_text(grid, row, col, &new_text);
 
     if !decision_channel_enabled(grid_id) {
         grid.events
@@ -667,7 +448,7 @@ fn request_validate_edit(
         if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
             grid.edit.cancel();
         }
-        apply_committed_edit_text(grid, row, col, old_text, committed_text);
+        shared::apply_committed_edit_text(grid, row, col, old_text, committed_text);
         return;
     }
 
@@ -959,7 +740,7 @@ fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
                 return;
             }
             begin_edit_session_after_before(grid, row, col, force, seed_text);
-            apply_edit_start_options(
+            shared::apply_edit_start_options(
                 grid,
                 row,
                 col,
@@ -983,7 +764,7 @@ fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
                 return;
             }
             begin_edit_session_after_dropdown_before(grid, row, col, force, seed_text);
-            apply_edit_start_options(
+            shared::apply_edit_start_options(
                 grid,
                 row,
                 col,
@@ -1006,7 +787,7 @@ fn apply_pending_action(grid_id: i64, action: PendingAction, cancel: bool) {
             if grid.edit.is_active() && grid.edit.edit_row == row && grid.edit.edit_col == col {
                 grid.edit.cancel();
             }
-            apply_committed_edit_text(grid, row, col, old_text, committed_text);
+            shared::apply_committed_edit_text(grid, row, col, old_text, committed_text);
         }
         PendingAction::BeforeSort { col } => {
             if cancel {
@@ -1578,7 +1359,7 @@ pub fn create_grid_scaled(rows: i32, cols: i32, scale: f32) -> i32 {
         1.0
     };
     let id = mgr.create_grid(0, 0, rows, cols, 0, 0, safe_scale);
-    let _ = mgr.with_grid(id, apply_default_indicator_bands);
+    let _ = mgr.with_grid(id, shared::apply_default_indicator_bands);
     let _ = mgr.with_grid(id, replay_loaded_fonts_into_grid);
     id as i32
 }
@@ -1763,7 +1544,7 @@ pub fn set_show_column_headers(id: i32, visible: bool) {
                 grid.indicator_bands.col_top.band_rows = 1;
             }
             if grid.indicator_bands.col_top.mode_bits == 0 {
-                grid.indicator_bands.col_top.mode_bits = DEFAULT_COL_INDICATOR_MODE_BITS;
+                grid.indicator_bands.col_top.mode_bits = shared::DEFAULT_COL_INDICATOR_MODE_BITS;
             }
         }
         grid.layout.invalidate();
@@ -1836,7 +1617,7 @@ pub fn set_show_row_indicator(id: i32, visible: bool) {
                 grid.indicator_bands.row_start.width_px =
                     volvoxgrid_engine::indicator::DEFAULT_ROW_INDICATOR_WIDTH;
             }
-            ensure_default_row_indicator_slots(grid);
+            shared::ensure_default_row_indicator_slots(grid);
         }
         grid.layout.invalidate();
         grid.dirty = true;
@@ -2908,7 +2689,7 @@ pub fn set_edit_text(id: i32, text: &str) {
         if !grid.edit.is_active() {
             return;
         }
-        let next = truncate_to_char_count(text, grid.edit_max_length);
+        let next = shared::truncate_to_char_count(text, grid.edit_max_length);
         if next == grid.edit.edit_text {
             return;
         }
@@ -4881,10 +4662,10 @@ pub fn demo_materialize_visible_rows(id: i32, padding: i32) {
 }
 
 // ===========================================================================
-// v1 proto-based batch API (WasmPlugin implementation)
+// v1 proto-based batch API (WasmRuntime implementation)
 // ===========================================================================
 
-struct WasmPlugin;
+struct WasmRuntime;
 
 fn wasm_with_grid<F, R>(id: i64, f: F) -> Result<R, String>
 where
@@ -5367,94 +5148,26 @@ fn engine_event_to_proto(
     }
 }
 
-fn selection_range_tuples(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Vec<(i32, i32, i32, i32)> {
-    grid.selection.all_ranges(grid.rows, grid.cols)
-}
-
-fn proto_ranges_from_tuples(ranges: &[(i32, i32, i32, i32)]) -> Vec<CellRange> {
-    ranges
-        .iter()
-        .map(|&(row1, col1, row2, col2)| CellRange {
-            row1,
-            col1,
-            row2,
-            col2,
-        })
-        .collect()
-}
-
-fn selection_ranges_proto(grid: &volvoxgrid_engine::grid::VolvoxGrid) -> Vec<CellRange> {
-    let ranges = selection_range_tuples(grid);
-    proto_ranges_from_tuples(&ranges)
-}
-
-fn selection_state_proto(grid: &mut volvoxgrid_engine::grid::VolvoxGrid) -> SelectionState {
-    ensure_layout(grid);
-    SelectionState {
-        active_row: grid.selection.row,
-        active_col: grid.selection.col,
-        ranges: selection_ranges_proto(grid),
-        top_row: grid.top_row(),
-        left_col: grid.left_col(),
-        bottom_row: grid.bottom_row(),
-        right_col: grid.right_col(),
-        mouse_row: grid.mouse_row,
-        mouse_col: grid.mouse_col,
-    }
-}
-
-impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
+impl volvoxgrid_wasm::VolvoxGridServiceRuntime for WasmRuntime {
     fn create(&self, request: CreateRequest) -> Result<CreateResponse, String> {
         ensure_manager();
-        let rows = request
-            .config
-            .as_ref()
-            .and_then(|c| c.layout.as_ref())
-            .and_then(|l| l.rows)
-            .unwrap_or(10);
-        let cols = request
-            .config
-            .as_ref()
-            .and_then(|c| c.layout.as_ref())
-            .and_then(|l| l.cols)
-            .unwrap_or(5);
-        let fixed_rows = request
-            .config
-            .as_ref()
-            .and_then(|c| c.layout.as_ref())
-            .and_then(|l| l.fixed_rows)
-            .unwrap_or(0);
-        let fixed_cols = request
-            .config
-            .as_ref()
-            .and_then(|c| c.layout.as_ref())
-            .and_then(|l| l.fixed_cols)
-            .unwrap_or(0);
+        let spec = shared::create_grid_spec(&request);
         let mgr = MANAGER.lock().unwrap();
         let mgr = mgr.as_ref().unwrap();
         let id = mgr.create_grid(
             request.viewport_width,
             request.viewport_height,
-            rows,
-            cols,
-            fixed_rows,
-            fixed_cols,
-            if request.scale > 0.01 {
-                request.scale
-            } else {
-                1.0
-            },
+            spec.rows,
+            spec.cols,
+            spec.fixed_rows,
+            spec.fixed_cols,
+            spec.scale,
         );
-        let apply_default_bands = request
-            .config
-            .as_ref()
-            .and_then(|c| c.indicators.as_ref())
-            .is_none();
         if let Some(config) = &request.config {
             let _ = mgr.with_grid(id, |grid| grid.apply_config(config));
         }
-        if apply_default_bands {
-            let _ = mgr.with_grid(id, apply_default_indicator_bands);
+        if spec.apply_default_indicator_bands {
+            let _ = mgr.with_grid(id, shared::apply_default_indicator_bands);
         }
         let _ = mgr.with_grid(id, replay_loaded_fonts_into_grid);
         Ok(CreateResponse {
@@ -5473,12 +5186,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
     }
 
     fn configure(&self, request: ConfigureRequest) -> Result<ConfigureResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            if let Some(config) = &request.config {
-                grid.apply_config(config);
-            }
-        })?;
-        Ok(ConfigureResponse {})
+        wasm_with_grid(request.grid_id, |grid| shared::configure(grid, &request))
     }
 
     fn get_config(&self, request: GetConfigRequest) -> Result<GridConfig, String> {
@@ -5507,9 +5215,8 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         request: DefineColumnsRequest,
     ) -> Result<DefineColumnsResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
-            grid.define_columns(&request.columns);
-        })?;
-        Ok(DefineColumnsResponse {})
+            shared::define_columns(grid, &request)
+        })
     }
 
     fn get_schema(&self, request: GetSchemaRequest) -> Result<SchemaResponse, String> {
@@ -5517,55 +5224,19 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
     }
 
     fn define_rows(&self, request: DefineRowsRequest) -> Result<DefineRowsResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            grid.define_rows(&request.rows);
-        })?;
-        Ok(DefineRowsResponse {})
+        wasm_with_grid(request.grid_id, |grid| shared::define_rows(grid, &request))
     }
 
     fn insert_rows(&self, request: InsertRowsRequest) -> Result<InsertRowsResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            let old_rows = grid.rows;
-            let count = request.count.max(1);
-            let first_row = if request.index < 0 || request.index >= old_rows {
-                old_rows
-            } else {
-                request.index
-            };
-            for i in 0..count {
-                let text = request
-                    .text
-                    .get(i as usize)
-                    .map(|s| s.as_str())
-                    .unwrap_or("");
-                grid.add_item(text, request.index);
-            }
-            InsertRowsResponse {
-                inserted_count: count,
-                new_row_count: grid.rows,
-                first_row,
-            }
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::insert_rows(grid, &request))
     }
 
     fn remove_rows(&self, request: RemoveRowsRequest) -> Result<RemoveRowsResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            let old_rows = grid.rows;
-            for i in (0..request.count.max(1)).rev() {
-                grid.remove_item(request.index + i);
-            }
-            RemoveRowsResponse {
-                removed_count: old_rows.saturating_sub(grid.rows),
-                new_row_count: grid.rows,
-            }
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::remove_rows(grid, &request))
     }
 
     fn move_column(&self, request: MoveColumnRequest) -> Result<MoveColumnResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            grid.move_col_by_positions(request.col, request.position);
-        })?;
-        Ok(MoveColumnResponse {})
+        wasm_with_grid(request.grid_id, |grid| shared::move_column(grid, &request))
     }
 
     fn move_row(&self, request: MoveRowRequest) -> Result<MoveRowResponse, String> {
@@ -5576,151 +5247,35 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
     }
 
     fn update_cells(&self, request: UpdateCellsRequest) -> Result<WriteResult, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            grid.write_cells(&request.cells, request.atomic)
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::update_cells(grid, &request))
     }
 
     fn get_cells(&self, request: GetCellsRequest) -> Result<CellsResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| CellsResponse {
-            cells: grid.get_cells(
-                request.row1,
-                request.col1,
-                request.row2,
-                request.col2,
-                request.include_style,
-                request.include_checked,
-                request.include_typed,
-                request.include_barcode_status,
-            ),
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::get_cells(grid, &request))
     }
 
     fn load_table(&self, request: LoadTableRequest) -> Result<WriteResult, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            grid.load_table(request.rows, request.cols, &request.values, request.atomic)
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::load_table(grid, &request))
     }
 
     fn load_data(&self, request: LoadDataRequest) -> Result<LoadDataResult, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            volvoxgrid_engine::load::load_data(grid, &request.data, request.options.as_ref())
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::load_data(grid, &request))
     }
 
     fn append_data(&self, request: AppendDataRequest) -> Result<LoadDataResult, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            volvoxgrid_engine::load::append_data(grid, &request.data, request.options.as_ref())
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::append_data(grid, &request))
     }
 
     fn clear(&self, request: ClearRequest) -> Result<ClearResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            let before = grid.cells.len() as i32;
-            let (r1, c1, r2, c2) = match request.region {
-                0 => (
-                    grid.fixed_rows,
-                    grid.fixed_cols,
-                    grid.rows - 1,
-                    grid.cols - 1,
-                ),
-                6 => (0, 0, grid.rows - 1, grid.cols - 1),
-                _ => (
-                    grid.fixed_rows,
-                    grid.fixed_cols,
-                    grid.rows - 1,
-                    grid.cols - 1,
-                ),
-            };
-            match request.scope {
-                s if s == ClearScope::ClearEverything as i32 => {
-                    grid.cells.clear_range(r1, c1, r2, c2);
-                    for r in r1..=r2 {
-                        for c in c1..=c2 {
-                            grid.cell_styles.remove(&(r, c));
-                        }
-                    }
-                }
-                s if s == ClearScope::ClearFormatting as i32 => {
-                    for r in r1..=r2 {
-                        for c in c1..=c2 {
-                            grid.cell_styles.remove(&(r, c));
-                        }
-                    }
-                }
-                s if s == ClearScope::ClearData as i32 => {
-                    grid.cells.clear_range(r1, c1, r2, c2);
-                }
-                s if s == ClearScope::ClearSelection as i32 => {
-                    for (sr1, sc1, sr2, sc2) in selection_range_tuples(grid) {
-                        grid.cells.clear_range(sr1, sc1, sr2, sc2);
-                        for r in sr1..=sr2 {
-                            for c in sc1..=sc2 {
-                                grid.cell_styles.remove(&(r, c));
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-            grid.mark_dirty();
-            let after = grid.cells.len() as i32;
-            ClearResponse {
-                cleared_count: before.saturating_sub(after),
-            }
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::clear(grid, &request))
     }
 
     fn select(&self, request: SelectRequest) -> Result<SelectResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            let active_row = request.active_row;
-            let active_col = request.active_col;
-            let ranges: Vec<(i32, i32, i32, i32)> = request
-                .ranges
-                .iter()
-                .map(|r| (r.row1, r.col1, r.row2, r.col2))
-                .collect();
-            let old_ranges = selection_range_tuples(grid);
-            grid.selection
-                .select_ranges(active_row, active_col, &ranges, grid.rows, grid.cols);
-            let new_ranges = selection_range_tuples(grid);
-            grid.events
-                .push(volvoxgrid_engine::event::GridEventData::SelectionChanging {
-                    old_ranges: old_ranges.clone(),
-                    new_ranges: new_ranges.clone(),
-                    active_row: grid.selection.row,
-                    active_col: grid.selection.col,
-                });
-            grid.events
-                .push(volvoxgrid_engine::event::GridEventData::SelectionChanged {
-                    old_ranges,
-                    new_ranges,
-                    active_row: grid.selection.row,
-                    active_col: grid.selection.col,
-                });
-            if request.show.unwrap_or(false) {
-                ensure_layout(grid);
-                grid.scroll.show_cell(
-                    active_row,
-                    active_col,
-                    &grid.layout,
-                    grid.data_viewport_width(),
-                    grid.data_viewport_height(),
-                    grid.fixed_rows,
-                    grid.fixed_cols,
-                    grid.pinned_top_height() + grid.pinned_bottom_height(),
-                    grid.pinned_left_width() + grid.pinned_right_width(),
-                );
-            }
-            grid.mark_dirty();
-            SelectResponse {
-                selection: Some(selection_state_proto(grid)),
-            }
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::select(grid, &request))
     }
 
     fn get_selection(&self, request: GetSelectionRequest) -> Result<SelectionState, String> {
-        wasm_with_grid(request.grid_id, selection_state_proto)
+        wasm_with_grid(request.grid_id, shared::selection_state_proto)
     }
 
     fn edit(&self, request: EditCommand) -> Result<EditState, String> {
@@ -5780,7 +5335,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                         let new_text = c.text.unwrap_or_else(|| grid.edit.edit_text.clone());
                         if decision_channel_enabled(grid_id) {
                             let pending_text =
-                                truncate_to_char_count(&new_text, grid.edit_max_length);
+                                shared::truncate_to_char_count(&new_text, grid.edit_max_length);
                             grid.edit.update_text(pending_text.clone());
                             grid.edit.sel_start = pending_text.chars().count() as i32;
                             grid.edit.sel_length = 0;
@@ -5850,25 +5405,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 }
                 None => {}
             }
-            EditState {
-                active: grid.edit.is_active(),
-                row: grid.edit.edit_row,
-                col: grid.edit.edit_col,
-                text: grid.edit.edit_text.clone(),
-                sel_start: grid.edit.sel_start,
-                sel_length: grid.edit.sel_length,
-                composing: grid.edit.composing,
-                preedit_text: grid.edit.preedit_text.clone(),
-                ui_mode: match grid.edit.ui_mode {
-                    volvoxgrid_engine::edit::EditUiMode::EnterMode => EditUiMode::Enter as i32,
-                    volvoxgrid_engine::edit::EditUiMode::EditMode => EditUiMode::Edit as i32,
-                },
-                x: 0.0,
-                y: 0.0,
-                width: 0.0,
-                height: 0.0,
-                max_length: grid.edit_max_length,
-            }
+            shared::edit_state_proto(grid)
         })
     }
 
@@ -5879,18 +5416,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
                 grid.layout.invalidate();
                 grid.mark_dirty();
             } else {
-                let sort_keys: Vec<(i32, i32)> = request
-                    .sort_columns
-                    .iter()
-                    .filter_map(|sc| {
-                        let merged = volvoxgrid_engine::sort::merge_sort_spec(
-                            volvoxgrid_engine::sort::SORT_NONE,
-                            sc.order,
-                            sc.r#type,
-                        );
-                        (merged != volvoxgrid_engine::sort::SORT_NONE).then_some((sc.col, merged))
-                    })
-                    .collect();
+                let sort_keys = shared::expand_sort_request_columns(grid, &request.sort_columns);
                 if sort_keys
                     .iter()
                     .any(|&(_, order)| volvoxgrid_engine::sort::sort_order_is_custom(order))
@@ -5906,172 +5432,42 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
     }
 
     fn subtotal(&self, request: SubtotalRequest) -> Result<SubtotalResult, String> {
-        let subtotal_font = request
-            .font
-            .as_ref()
-            .map(volvoxgrid_engine::config::v1_font_to_cell_style_patch);
-        let rows = wasm_with_grid(request.grid_id, |grid| {
-            volvoxgrid_engine::outline::subtotal_with_font(
-                grid,
-                request.aggregate,
-                request.group_on_col,
-                request.aggregate_col,
-                &request.caption,
-                request.background,
-                request.foreground,
-                request.add_outline,
-                subtotal_font.as_ref(),
-            )
-        })?;
-        Ok(SubtotalResult { rows })
+        wasm_with_grid(request.grid_id, |grid| shared::subtotal(grid, &request))
     }
 
     fn auto_size(&self, request: AutoSizeRequest) -> Result<AutoSizeResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            ensure_layout(grid);
-            let c1 = request.col_from.max(0).min(grid.cols - 1);
-            let c2 = request.col_to.max(c1).min(grid.cols - 1);
-            for c in c1..=c2 {
-                grid.auto_resize_col(c);
-            }
-            if request.equal {
-                let max_w = (c1..=c2).map(|c| grid.col_width(c)).max().unwrap_or(0);
-                let max_w = if request.max_width > 0 {
-                    max_w.min(request.max_width)
-                } else {
-                    max_w
-                };
-                for c in c1..=c2 {
-                    grid.set_col_width(c, max_w);
-                }
-            } else if request.max_width > 0 {
-                for c in c1..=c2 {
-                    let w = grid.col_width(c);
-                    if w > request.max_width {
-                        grid.set_col_width(c, request.max_width);
-                    }
-                }
-            }
-        })?;
-        Ok(AutoSizeResponse {})
+        wasm_with_grid(request.grid_id, |grid| shared::auto_size(grid, &request))
     }
 
     fn outline(&self, request: OutlineRequest) -> Result<OutlineResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            volvoxgrid_engine::outline::outline(grid, request.level);
-        })?;
-        Ok(OutlineResponse {})
+        wasm_with_grid(request.grid_id, |grid| shared::outline(grid, &request))
     }
 
     fn get_node(&self, request: GetNodeRequest) -> Result<NodeInfo, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            let rp = grid.row_props.get(&request.row);
-            NodeInfo {
-                row: request.row,
-                level: rp.map_or(0, |p| p.outline_level),
-                is_expanded: rp.map_or(true, |p| !p.is_collapsed),
-                child_count: 0,
-                parent_row: -1,
-                first_child: -1,
-                last_child: -1,
-            }
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::get_node(grid, &request))
     }
 
     fn find(&self, request: FindRequest) -> Result<FindResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            use find_request::Query;
-            match &request.query {
-                Some(Query::TextQuery(t)) => {
-                    let row = volvoxgrid_engine::search::find_row(
-                        grid,
-                        &t.text,
-                        request.start_row,
-                        request.col,
-                        t.case_sensitive,
-                        t.full_match,
-                    );
-                    FindResponse { row }
-                }
-                Some(Query::RegexQuery(r)) => {
-                    let row = volvoxgrid_engine::search::find_row_regex(
-                        grid,
-                        &r.pattern,
-                        request.start_row,
-                        request.col,
-                    );
-                    FindResponse { row }
-                }
-                None => FindResponse { row: -1 },
-            }
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::find(grid, &request))
     }
 
     fn aggregate(&self, request: AggregateRequest) -> Result<AggregateResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            let val = volvoxgrid_engine::search::aggregate(
-                grid,
-                request.aggregate,
-                request.row1,
-                request.col1,
-                request.row2,
-                request.col2,
-            );
-            AggregateResponse { value: val }
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::aggregate(grid, &request))
     }
 
     fn get_merged_range(&self, request: GetMergedRangeRequest) -> Result<CellRange, String> {
         wasm_with_grid(request.grid_id, |grid| {
-            if let Some((r1, c1, r2, c2)) = grid.get_merged_range(request.row, request.col) {
-                CellRange {
-                    row1: r1,
-                    col1: c1,
-                    row2: r2,
-                    col2: c2,
-                }
-            } else {
-                CellRange {
-                    row1: request.row,
-                    col1: request.col,
-                    row2: request.row,
-                    col2: request.col,
-                }
-            }
+            shared::get_merged_range(grid, &request)
         })
     }
 
     fn merge_cells(&self, request: MergeCellsRequest) -> Result<MergeCellsResponse, String> {
-        let range = request.range.unwrap_or_default();
-        wasm_with_grid(request.grid_id, |grid| {
-            let (row1, row2) = (range.row1.min(range.row2), range.row1.max(range.row2));
-            let (col1, col2) = (range.col1.min(range.col2), range.col1.max(range.col2));
-            grid.merged_regions.add_merge(row1, col1, row2, col2);
-            grid.layout.invalidate();
-            grid.mark_dirty();
-            MergeCellsResponse {
-                merged: Some(CellRange {
-                    row1,
-                    col1,
-                    row2,
-                    col2,
-                }),
-            }
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::merge_cells(grid, &request))
     }
 
     fn unmerge_cells(&self, request: UnmergeCellsRequest) -> Result<UnmergeCellsResponse, String> {
-        let range = request.range.unwrap_or_default();
         wasm_with_grid(request.grid_id, |grid| {
-            let before = grid.merged_regions.all_ranges().len() as i32;
-            grid.merged_regions
-                .remove_overlapping(range.row1, range.col1, range.row2, range.col2);
-            grid.layout.invalidate();
-            grid.mark_dirty();
-            let after = grid.merged_regions.all_ranges().len() as i32;
-            UnmergeCellsResponse {
-                unmerged_count: before.saturating_sub(after),
-            }
+            shared::unmerge_cells(grid, &request)
         })
     }
 
@@ -6079,148 +5475,42 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         &self,
         request: GetMergedRegionsRequest,
     ) -> Result<MergedRegionsResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| MergedRegionsResponse {
-            ranges: grid
-                .merged_regions
-                .all_ranges()
-                .iter()
-                .map(|&(r1, c1, r2, c2)| CellRange {
-                    row1: r1,
-                    col1: c1,
-                    row2: r2,
-                    col2: c2,
-                })
-                .collect(),
-        })
+        wasm_with_grid(request.grid_id, shared::get_merged_regions)
     }
 
     fn get_memory_usage(
         &self,
         request: GetMemoryUsageRequest,
     ) -> Result<MemoryUsageResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| grid.memory_usage())
+        wasm_with_grid(request.grid_id, shared::get_memory_usage)
     }
 
     fn clipboard(&self, request: ClipboardCommand) -> Result<ClipboardResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| match request.command {
-            Some(clipboard_command::Command::Copy(_)) => {
-                let (text, rich_data) = volvoxgrid_engine::clipboard::copy(grid);
-                ClipboardResponse { text, rich_data }
-            }
-            Some(clipboard_command::Command::Cut(_)) => {
-                let (text, rich_data) = volvoxgrid_engine::clipboard::cut(grid);
-                ClipboardResponse { text, rich_data }
-            }
-            Some(clipboard_command::Command::Paste(p)) => {
-                volvoxgrid_engine::clipboard::paste(grid, &p.text);
-                ClipboardResponse {
-                    text: String::new(),
-                    rich_data: Vec::new(),
-                }
-            }
-            Some(clipboard_command::Command::Delete(_)) => {
-                volvoxgrid_engine::clipboard::delete_selection(grid);
-                ClipboardResponse {
-                    text: String::new(),
-                    rich_data: Vec::new(),
-                }
-            }
-            None => ClipboardResponse {
-                text: String::new(),
-                rich_data: Vec::new(),
-            },
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::clipboard(grid, &request))
     }
 
     fn export(&self, request: ExportRequest) -> Result<ExportResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            let data = volvoxgrid_engine::save::save_grid(grid, request.format, request.scope);
-            ExportResponse {
-                data,
-                format: request.format,
-            }
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::export(grid, &request))
     }
 
     fn print(&self, request: PrintRequest) -> Result<PrintResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            ensure_layout(grid);
-            let orientation = request.orientation.unwrap_or(0);
-            let pages = volvoxgrid_engine::print::print_grid(
-                grid,
-                orientation,
-                request.margin_left.unwrap_or(48),
-                request.margin_top.unwrap_or(48),
-                request.margin_right.unwrap_or(48),
-                request.margin_bottom.unwrap_or(48),
-                &request.header.as_deref().unwrap_or(""),
-                &request.footer.as_deref().unwrap_or(""),
-                request.show_page_numbers.unwrap_or(false),
-            );
-            PrintResponse {
-                pages: pages
-                    .into_iter()
-                    .map(|p| PrintPage {
-                        page_number: p.page_number,
-                        image_data: p.image_data,
-                        width: p.width,
-                        height: p.height,
-                    })
-                    .collect(),
-            }
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::print(grid, &request))
     }
 
     fn archive(&self, request: ArchiveRequest) -> Result<ArchiveResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            let (data, names) = volvoxgrid_engine::save::archive(
-                grid,
-                &request.name,
-                request.action,
-                &request.data,
-            );
-            ArchiveResponse { data, names }
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::archive(grid, &request))
     }
 
     fn show_cell(&self, request: ShowCellRequest) -> Result<ShowCellResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            ensure_layout(grid);
-            grid.scroll.show_cell(
-                request.row,
-                request.col,
-                &grid.layout,
-                grid.data_viewport_width(),
-                grid.data_viewport_height(),
-                grid.fixed_rows,
-                grid.fixed_cols,
-                grid.pinned_top_height() + grid.pinned_bottom_height(),
-                grid.pinned_left_width() + grid.pinned_right_width(),
-            );
-            grid.mark_dirty_visual();
-            ShowCellResponse {
-                top_row: grid.top_row(),
-                left_col: grid.left_col(),
-            }
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::show_cell(grid, &request))
     }
 
     fn set_top_row(&self, request: SetRowRequest) -> Result<SetTopRowResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            grid.set_top_row(request.row);
-            SetTopRowResponse {
-                top_row: grid.top_row(),
-            }
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::set_top_row(grid, &request))
     }
 
     fn set_left_col(&self, request: SetColRequest) -> Result<SetLeftColResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            grid.set_left_col(request.col);
-            SetLeftColResponse {
-                left_col: grid.left_col(),
-            }
-        })
+        wasm_with_grid(request.grid_id, |grid| shared::set_left_col(grid, &request))
     }
 
     fn resize_viewport(
@@ -6228,31 +5518,19 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
         request: ResizeViewportRequest,
     ) -> Result<ResizeViewportResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
-            grid.viewport_width = request.width;
-            grid.viewport_height = request.height;
-            grid.mark_dirty();
-            ResizeViewportResponse {
-                viewport_width: grid.viewport_width,
-                viewport_height: grid.viewport_height,
-            }
+            shared::resize_viewport(grid, &request)
         })
     }
 
     fn set_redraw(&self, request: SetRedrawRequest) -> Result<SetRedrawResponse, String> {
-        wasm_with_grid(request.grid_id, |grid| {
-            grid.redraw = request.enabled;
-            if request.enabled {
-                grid.mark_dirty();
-            }
-        })?;
-        Ok(SetRedrawResponse {})
+        wasm_with_grid(request.grid_id, |grid| shared::set_redraw(grid, &request))
     }
 
     fn refresh(&self, request: RefreshRequest) -> Result<RefreshResponse, String> {
         wasm_with_grid(request.grid_id, |grid| {
-            grid.mark_dirty();
-        })?;
-        Ok(RefreshResponse {})
+            let _ = request;
+            shared::refresh(grid)
+        })
     }
 
     fn load_demo(&self, request: LoadDemoRequest) -> Result<LoadDemoResponse, String> {
@@ -6284,7 +5562,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
 
     fn render_session(
         &self,
-        stream: &dyn volvoxgrid_wasm::PluginStreamBidi<RenderInput, RenderOutput>,
+        stream: &dyn volvoxgrid_wasm::RuntimeStreamBidi<RenderInput, RenderOutput>,
     ) -> Result<(), String> {
         while let Some(input) = stream.recv() {
             let grid_id = input.grid_id as i32;
@@ -6443,7 +5721,7 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
     fn event_stream(
         &self,
         request: EventStreamRequest,
-        stream: &dyn volvoxgrid_wasm::PluginStreamSender<GridEvent>,
+        stream: &dyn volvoxgrid_wasm::RuntimeStreamSender<GridEvent>,
     ) -> Result<(), String> {
         let grid_id = request.grid_id;
         let events = wasm_with_grid(grid_id, |grid| grid.events.drain())?;
@@ -6460,9 +5738,9 @@ impl volvoxgrid_wasm::VolvoxGridServicePlugin for WasmPlugin {
     }
 }
 
-/// Register the WASM plugin implementation. Call once on module init.
+/// Register the WASM runtime implementation. Call once on module init.
 #[wasm_bindgen]
-pub fn init_v1_plugin() {
+pub fn init_v1_runtime() {
     ensure_manager();
-    volvoxgrid_wasm::register_volvox_grid_service_plugin(WasmPlugin);
+    volvoxgrid_wasm::register_volvox_grid_service_runtime(WasmRuntime);
 }

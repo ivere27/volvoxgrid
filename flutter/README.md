@@ -6,10 +6,10 @@ A high-performance, pixel-rendered data grid widget for Flutter. The native Rust
 
 | Platform | Native Library | Source |
 |---|---|---|
-| Android | `libvolvoxgrid_plugin.so` (AAR) | Maven (`volvoxgrid-android`) |
-| Linux | `libvolvoxgrid_plugin.so` (JAR) | Maven (`volvoxgrid-desktop`) |
-| macOS | `libvolvoxgrid_plugin.dylib` (JAR) | Maven (`volvoxgrid-desktop`) |
-| Windows | `volvoxgrid_plugin.dll` (JAR) | Maven (`volvoxgrid-desktop`) |
+| Android | `libvolvoxgrid.so` (AAR) | Maven (`volvoxgrid-android`) |
+| Linux | `libvolvoxgrid.so` (JAR) | Maven (`volvoxgrid-desktop`) |
+| macOS | `libvolvoxgrid.dylib` (JAR) | Maven (`volvoxgrid-desktop`) |
+| Windows | `volvoxgrid.dll` (JAR) | Maven (`volvoxgrid-desktop`) |
 
 **Requirements:** Flutter 3.10+, Dart SDK 3.0+, Android API 21+ (for Android)
 
@@ -468,7 +468,7 @@ await controller.refresh();   // force full repaint
 | `RendererBackend.vulkan` | `createSurfaceProducer()` | SurfaceProducer is backed by `ImageReader` + `HardwareBuffer` under Flutter Impeller. wgpu's Vulkan backend renders into the `ANativeWindow`, and Impeller composites the `HardwareBuffer` via Vulkan -- both sides speak Vulkan natively. |
 | `RendererBackend.gles` | `createSurfaceTexture()` | `SurfaceTexture` is EGL-native. wgpu's GLES backend renders via an EGL window surface bound to the `SurfaceTexture`, and Flutter composites via the GL texture ID. |
 
-**GLES renders black screen on Impeller (Vulkan):** When Flutter's Impeller renderer uses Vulkan internally, `createSurfaceProducer()` is backed by `ImageReader`. wgpu's GLES backend renders via EGL to this surface, but the GLES-to-ImageReader-to-Vulkan cross-API composite fails silently, producing a black screen. This is why the plugin uses `createSurfaceTexture()` (the legacy API) for GLES -- `SurfaceTexture` is EGL-native and avoids the cross-API path. Vulkan mode works because both wgpu and Impeller speak Vulkan + `HardwareBuffer` natively.
+**GLES renders black screen on Impeller (Vulkan):** When Flutter's Impeller renderer uses Vulkan internally, `createSurfaceProducer()` is backed by `ImageReader`. wgpu's GLES backend renders via EGL to this surface, but the GLES-to-ImageReader-to-Vulkan cross-API composite fails silently, producing a black screen. This is why the runtime uses `createSurfaceTexture()` (the legacy API) for GLES -- `SurfaceTexture` is EGL-native and avoids the cross-API path. Vulkan mode works because both wgpu and Impeller speak Vulkan + `HardwareBuffer` natively.
 
 **Desktop (Linux/macOS/Windows):** GPU rendering is not yet available through Flutter's texture registry. CPU mode is used on all desktop platforms.
 

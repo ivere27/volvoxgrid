@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Desktop JAR packaging script — runs inside Docker (Dockerfile.desktop).
 #
-# Cross-compiles the Rust volvoxgrid plugin for linux-x86_64, linux-x86,
+# Cross-compiles the Rust volvoxgrid native library for linux-x86_64, linux-x86,
 # linux-aarch64, linux-armv7, windows-x86_64, macos-x86_64, macos-aarch64,
 # then packages a fat JAR
 # with classes from volvoxgrid-java-common + embedded native/ libraries.
@@ -67,9 +67,9 @@ should_build_dotnet() {
   return 1
 }
 
-PLUGIN_CRATE="${REPO_ROOT}/plugin"
-if [[ ! -f "${PLUGIN_CRATE}/Cargo.toml" ]]; then
-  echo "Error: plugin crate not found at ${PLUGIN_CRATE}" >&2
+LIBRARY_CRATE="${REPO_ROOT}/runtime"
+if [[ ! -f "${LIBRARY_CRATE}/Cargo.toml" ]]; then
+  echo "Error: native library crate not found at ${LIBRARY_CRATE}" >&2
   exit 1
 fi
 
@@ -84,60 +84,60 @@ export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER="x86_64-w64-mingw32-gcc"
 export CARGO_TARGET_X86_64_APPLE_DARWIN_LINKER="/opt/volvoxgrid/zig-cc-x86_64-macos.sh"
 export CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER="/opt/volvoxgrid/zig-cc-aarch64-macos.sh"
 
-# ── Cross-compile Rust plugin for each platform ────────────────────────────
+# ── Cross-compile Rust library for each platform ────────────────────────────
 
 # linux-x86_64 (native)
-echo "Building plugin: linux-x86_64..."
-(cd "${PLUGIN_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-unknown-linux-gnu)
+echo "Building library: linux-x86_64..."
+(cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-unknown-linux-gnu)
 mkdir -p "${NATIVES_DIR}/linux-x86_64"
-cp "${CARGO_TARGET_DIR}/x86_64-unknown-linux-gnu/release/libvolvoxgrid_plugin.so" "${NATIVES_DIR}/linux-x86_64/"
+cp "${CARGO_TARGET_DIR}/x86_64-unknown-linux-gnu/release/libvolvoxgrid.so" "${NATIVES_DIR}/linux-x86_64/"
 
 # linux-x86 (cross-compile)
 if command -v i686-linux-gnu-gcc >/dev/null 2>&1; then
-  echo "Building plugin: linux-x86..."
-  (cd "${PLUGIN_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target i686-unknown-linux-gnu)
+  echo "Building library: linux-x86..."
+  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target i686-unknown-linux-gnu)
   mkdir -p "${NATIVES_DIR}/linux-x86"
-  cp "${CARGO_TARGET_DIR}/i686-unknown-linux-gnu/release/libvolvoxgrid_plugin.so" "${NATIVES_DIR}/linux-x86/"
+  cp "${CARGO_TARGET_DIR}/i686-unknown-linux-gnu/release/libvolvoxgrid.so" "${NATIVES_DIR}/linux-x86/"
 else
   echo "SKIP: linux-x86 (i686-linux-gnu-gcc not found)"
 fi
 
 # linux-aarch64 (cross-compile)
 if command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then
-  echo "Building plugin: linux-aarch64..."
-  (cd "${PLUGIN_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target aarch64-unknown-linux-gnu)
+  echo "Building library: linux-aarch64..."
+  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target aarch64-unknown-linux-gnu)
   mkdir -p "${NATIVES_DIR}/linux-aarch64"
-  cp "${CARGO_TARGET_DIR}/aarch64-unknown-linux-gnu/release/libvolvoxgrid_plugin.so" "${NATIVES_DIR}/linux-aarch64/"
+  cp "${CARGO_TARGET_DIR}/aarch64-unknown-linux-gnu/release/libvolvoxgrid.so" "${NATIVES_DIR}/linux-aarch64/"
 else
   echo "SKIP: linux-aarch64 (aarch64-linux-gnu-gcc not found)"
 fi
 
 # linux-armv7 (cross-compile)
 if command -v arm-linux-gnueabihf-gcc >/dev/null 2>&1; then
-  echo "Building plugin: linux-armv7..."
-  (cd "${PLUGIN_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target armv7-unknown-linux-gnueabihf)
+  echo "Building library: linux-armv7..."
+  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target armv7-unknown-linux-gnueabihf)
   mkdir -p "${NATIVES_DIR}/linux-armv7"
-  cp "${CARGO_TARGET_DIR}/armv7-unknown-linux-gnueabihf/release/libvolvoxgrid_plugin.so" "${NATIVES_DIR}/linux-armv7/"
+  cp "${CARGO_TARGET_DIR}/armv7-unknown-linux-gnueabihf/release/libvolvoxgrid.so" "${NATIVES_DIR}/linux-armv7/"
 else
   echo "SKIP: linux-armv7 (arm-linux-gnueabihf-gcc not found)"
 fi
 
 # windows-x86 (MinGW cross-compile)
 if command -v i686-w64-mingw32-gcc >/dev/null 2>&1; then
-  echo "Building plugin: windows-x86..."
-  (cd "${PLUGIN_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target i686-pc-windows-gnu)
+  echo "Building library: windows-x86..."
+  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target i686-pc-windows-gnu)
   mkdir -p "${NATIVES_DIR}/windows-x86"
-  cp "${CARGO_TARGET_DIR}/i686-pc-windows-gnu/release/volvoxgrid_plugin.dll" "${NATIVES_DIR}/windows-x86/"
+  cp "${CARGO_TARGET_DIR}/i686-pc-windows-gnu/release/volvoxgrid.dll" "${NATIVES_DIR}/windows-x86/"
 else
   echo "SKIP: windows-x86 (i686-w64-mingw32-gcc not found)"
 fi
 
 # windows-x86_64 (MinGW cross-compile)
 if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
-  echo "Building plugin: windows-x86_64..."
-  (cd "${PLUGIN_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-pc-windows-gnu)
+  echo "Building library: windows-x86_64..."
+  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-pc-windows-gnu)
   mkdir -p "${NATIVES_DIR}/windows-x86_64"
-  cp "${CARGO_TARGET_DIR}/x86_64-pc-windows-gnu/release/volvoxgrid_plugin.dll" "${NATIVES_DIR}/windows-x86_64/"
+  cp "${CARGO_TARGET_DIR}/x86_64-pc-windows-gnu/release/volvoxgrid.dll" "${NATIVES_DIR}/windows-x86_64/"
 else
   echo "SKIP: windows-x86_64 (x86_64-w64-mingw32-gcc not found)"
 fi
@@ -184,15 +184,15 @@ fi
 
 # macos-x86_64 (zig cross-compile)
 if command -v zig >/dev/null 2>&1; then
-  echo "Building plugin: macos-x86_64..."
-  (cd "${PLUGIN_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-apple-darwin)
+  echo "Building library: macos-x86_64..."
+  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target x86_64-apple-darwin)
   mkdir -p "${NATIVES_DIR}/macos-x86_64"
-  cp "${CARGO_TARGET_DIR}/x86_64-apple-darwin/release/libvolvoxgrid_plugin.dylib" "${NATIVES_DIR}/macos-x86_64/"
+  cp "${CARGO_TARGET_DIR}/x86_64-apple-darwin/release/libvolvoxgrid.dylib" "${NATIVES_DIR}/macos-x86_64/"
 
-  echo "Building plugin: macos-aarch64..."
-  (cd "${PLUGIN_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target aarch64-apple-darwin)
+  echo "Building library: macos-aarch64..."
+  (cd "${LIBRARY_CRATE}" && cargo build -j "${CARGO_BUILD_JOBS}" --release --target aarch64-apple-darwin)
   mkdir -p "${NATIVES_DIR}/macos-aarch64"
-  cp "${CARGO_TARGET_DIR}/aarch64-apple-darwin/release/libvolvoxgrid_plugin.dylib" "${NATIVES_DIR}/macos-aarch64/"
+  cp "${CARGO_TARGET_DIR}/aarch64-apple-darwin/release/libvolvoxgrid.dylib" "${NATIVES_DIR}/macos-aarch64/"
 else
   echo "SKIP: macos-x86_64, macos-aarch64 (zig not found)"
 fi

@@ -38,7 +38,7 @@
 //    Events with `event_id=0` are informational and cannot be canceled.
 //
 // 5. Language-agnostic transport.
-//    Native hosts use Synurang FFI to load `libvolvoxgrid_plugin` and
+//    Native hosts use Synurang FFI to load `libvolvoxgrid` and
 //    exchange these protobuf messages. Web hosts use wasm-bindgen.
 //    Any language that can load a shared library and speak protobuf can
 //    become a VolvoxGrid host without engine changes.
@@ -16014,7 +16014,7 @@ func (x *SetColRequest) GetCol() int32 {
 
 // Enable/disable rendering. When transitioning from disabled to enabled,
 // the engine suppresses the next animation frame and forces an immediate
-// dirty repaint (plugin/src/lib.rs SetRedraw). Useful for batching many
+// dirty repaint (runtime/src/lib.rs SetRedraw). Useful for batching many
 // mutations without intermediate renders.
 type SetRedrawRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -17957,8 +17957,8 @@ func (x *KeyEvent) GetCharacter() string {
 
 // CPU rendering: host provides an RGBA buffer for the engine to render into.
 // The engine writes pixels in RGBA byte order (R at offset+0, G+1, B+2, A+3).
-// The plugin maps the buffer via `handle` as a raw pointer and calls the CPU
-// renderer. See plugin/src/lib.rs BufferReady handling.
+// The runtime maps the buffer via `handle` as a raw pointer and calls the CPU
+// renderer. See runtime/src/lib.rs BufferReady handling.
 type BufferReady struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Handle        int64                  `protobuf:"varint,1,opt,name=handle,proto3" json:"handle,omitempty"`     // platform-specific shared memory handle (cast to *mut u8)
@@ -18268,8 +18268,8 @@ func (x *TerminalCommand) GetKind() TerminalCommand_Kind {
 }
 
 // GPU rendering: host provides a native surface for wgpu.
-// handle=0 means surface destroyed. See plugin/src/lib.rs GpuSurfaceReady.
-// If GPU initialization fails, the plugin falls back to CPU mode silently.
+// handle=0 means surface destroyed. See runtime/src/lib.rs GpuSurfaceReady.
+// If GPU initialization fails, the runtime falls back to CPU mode silently.
 type GpuSurfaceReady struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SurfaceHandle int64                  `protobuf:"varint,1,opt,name=surface_handle,json=surfaceHandle,proto3" json:"surface_handle,omitempty"` // platform-specific native surface (0 = destroyed)
@@ -18948,7 +18948,7 @@ func (x *CursorChange) GetCursor() CursorChange_CursorType {
 // Emitted on RenderOutput when the engine wants the host to show an
 // edit overlay. The host should position a native text input at (x,y)
 // with the given dimensions and pre-fill it with current_value.
-// See plugin/src/lib.rs build_edit_request().
+// See runtime/src/lib.rs build_edit_request().
 type EditRequest struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	Row          int32                  `protobuf:"varint,1,opt,name=row,proto3" json:"row,omitempty"`

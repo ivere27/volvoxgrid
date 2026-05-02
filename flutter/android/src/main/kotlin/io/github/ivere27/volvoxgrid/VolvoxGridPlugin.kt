@@ -10,7 +10,7 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import io.flutter.view.TextureRegistry
 
-class VolvoxGridPlugin: FlutterPlugin, MethodCallHandler {
+class VolvoxGridPlugin : FlutterPlugin, MethodCallHandler {
     companion object {
         private const val TAG = "VolvoxGridPlugin"
     }

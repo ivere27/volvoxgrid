@@ -1,6 +1,6 @@
 //! VolvoxGrid Smoke Test
 //!
-//! Loads the plugin via synurang-host PluginHost, exercises basic v1 RPCs:
+//! Loads the runtime via synurang-host PluginHost, exercises basic v1 RPCs:
 //! Create, GetConfig, UpdateCells, GetCells, AppendData, Sort, Configure, Select, Destroy
 
 use prost::Message;
@@ -10,37 +10,37 @@ use synurang_host::{Error, FfiError, PluginHost};
 use volvoxgrid_engine::proto::volvoxgrid::v1::*;
 
 const SERVICE: &str = "VolvoxGridService";
-const DEFAULT_PLUGIN_BASENAME: &str = if cfg!(target_os = "windows") {
-    "volvoxgrid_plugin.dll"
+const DEFAULT_LIBRARY_BASENAME: &str = if cfg!(target_os = "windows") {
+    "volvoxgrid.dll"
 } else if cfg!(target_os = "macos") {
-    "libvolvoxgrid_plugin.dylib"
+    "libvolvoxgrid.dylib"
 } else {
-    "libvolvoxgrid_plugin.so"
+    "libvolvoxgrid.so"
 };
 
-fn resolve_default_plugin_path() -> String {
+fn resolve_default_library_path() -> String {
     let candidates = [
-        format!("target/debug/{}", DEFAULT_PLUGIN_BASENAME),
-        format!("../target/debug/{}", DEFAULT_PLUGIN_BASENAME),
-        format!("../plugin/target/debug/{}", DEFAULT_PLUGIN_BASENAME),
+        format!("target/debug/{}", DEFAULT_LIBRARY_BASENAME),
+        format!("../target/debug/{}", DEFAULT_LIBRARY_BASENAME),
+        format!("../runtime/target/debug/{}", DEFAULT_LIBRARY_BASENAME),
     ];
     for candidate in candidates {
         if Path::new(&candidate).exists() {
             return candidate;
         }
     }
-    format!("target/debug/{}", DEFAULT_PLUGIN_BASENAME)
+    format!("target/debug/{}", DEFAULT_LIBRARY_BASENAME)
 }
 
-fn invoke(plugin: &PluginHost, method: &str, req: &[u8]) -> Vec<u8> {
-    match plugin.invoke(SERVICE, method, req) {
+fn invoke(runtime: &PluginHost, method: &str, req: &[u8]) -> Vec<u8> {
+    match runtime.invoke(SERVICE, method, req) {
         Ok(data) => data,
         Err(e) => panic!("RPC {} failed: {}", method, e),
     }
 }
 
-fn expect_plugin_error(plugin: &PluginHost, method: &str, req: &[u8]) -> FfiError {
-    match plugin.invoke(SERVICE, method, req) {
+fn expect_runtime_error(runtime: &PluginHost, method: &str, req: &[u8]) -> FfiError {
+    match runtime.invoke(SERVICE, method, req) {
         Ok(_) => panic!("RPC {} unexpectedly succeeded", method),
         Err(Error::PluginError(err)) => err,
         Err(e) => panic!("RPC {} failed with unexpected host error: {}", method, e),
@@ -48,13 +48,13 @@ fn expect_plugin_error(plugin: &PluginHost, method: &str, req: &[u8]) -> FfiErro
 }
 
 fn main() {
-    let plugin_path = std::env::args()
+    let library_path = std::env::args()
         .nth(1)
-        .unwrap_or_else(resolve_default_plugin_path);
+        .unwrap_or_else(resolve_default_library_path);
 
-    println!("Loading plugin: {}", plugin_path);
-    let plugin = PluginHost::load(&plugin_path).expect("Failed to load plugin");
-    println!("Plugin loaded successfully.");
+    println!("Loading library: {}", library_path);
+    let runtime = PluginHost::load(&library_path).expect("Failed to load library");
+    println!("Library loaded successfully.");
 
     // 1. Create — returns CreateResponse with grid_id
     let req = CreateRequest {
@@ -104,7 +104,7 @@ fn main() {
         }),
     };
     let resp_bytes = invoke(
-        &plugin,
+        &runtime,
         "/volvoxgrid.v1.VolvoxGridService/Create",
         &req.encode_to_vec(),
     );
@@ -116,7 +116,7 @@ fn main() {
     // 2. GetConfig — verify rows/cols
     let get_config = GetConfigRequest { grid_id };
     let resp_bytes = invoke(
-        &plugin,
+        &runtime,
         "/volvoxgrid.v1.VolvoxGridService/GetConfig",
         &get_config.encode_to_vec(),
     );
@@ -131,8 +131,8 @@ fn main() {
     );
 
     // 3. Structured FFI error — empty font payload should round-trip as FfiError
-    let ffi_error = expect_plugin_error(
-        &plugin,
+    let ffi_error = expect_runtime_error(
+        &runtime,
         "/volvoxgrid.v1.VolvoxGridService/LoadFontData",
         &LoadFontDataRequest {
             data: Vec::new(),
@@ -171,7 +171,7 @@ fn main() {
         .collect();
     let req = DefineColumnsRequest { grid_id, columns };
     invoke(
-        &plugin,
+        &runtime,
         "/volvoxgrid.v1.VolvoxGridService/DefineColumns",
         &req.encode_to_vec(),
     );
@@ -214,7 +214,7 @@ fn main() {
         atomic: false,
     };
     invoke(
-        &plugin,
+        &runtime,
         "/volvoxgrid.v1.VolvoxGridService/UpdateCells",
         &req.encode_to_vec(),
     );
@@ -233,7 +233,7 @@ fn main() {
         include_barcode_status: false,
     };
     let resp_bytes = invoke(
-        &plugin,
+        &runtime,
         "/volvoxgrid.v1.VolvoxGridService/GetCells",
         &req.encode_to_vec(),
     );
@@ -249,7 +249,7 @@ fn main() {
     }
     println!("GetCells verified.");
 
-    // 7. AppendData — append a CSV row through the plugin dispatch path.
+    // 7. AppendData — append a CSV row through the runtime dispatch path.
     let req = AppendDataRequest {
         grid_id,
         data: b"Product,Category,Sales,Quarter,Region\nAppend Smoke,Integration,777,Q5,Test"
@@ -265,7 +265,7 @@ fn main() {
         }),
     };
     let resp_bytes = invoke(
-        &plugin,
+        &runtime,
         "/volvoxgrid.v1.VolvoxGridService/AppendData",
         &req.encode_to_vec(),
     );
@@ -281,7 +281,7 @@ fn main() {
     );
 
     let resp_bytes = invoke(
-        &plugin,
+        &runtime,
         "/volvoxgrid.v1.VolvoxGridService/GetConfig",
         &get_config.encode_to_vec(),
     );
@@ -308,7 +308,7 @@ fn main() {
         include_barcode_status: false,
     };
     let resp_bytes = invoke(
-        &plugin,
+        &runtime,
         "/volvoxgrid.v1.VolvoxGridService/GetCells",
         &req.encode_to_vec(),
     );
@@ -334,7 +334,7 @@ fn main() {
         }],
     };
     invoke(
-        &plugin,
+        &runtime,
         "/volvoxgrid.v1.VolvoxGridService/Sort",
         &req.encode_to_vec(),
     );
@@ -353,7 +353,7 @@ fn main() {
         include_barcode_status: false,
     };
     let resp_bytes = invoke(
-        &plugin,
+        &runtime,
         "/volvoxgrid.v1.VolvoxGridService/GetCells",
         &req.encode_to_vec(),
     );
@@ -378,7 +378,7 @@ fn main() {
         }),
     };
     invoke(
-        &plugin,
+        &runtime,
         "/volvoxgrid.v1.VolvoxGridService/Configure",
         &req.encode_to_vec(),
     );
@@ -396,7 +396,7 @@ fn main() {
         show: None,
     };
     invoke(
-        &plugin,
+        &runtime,
         "/volvoxgrid.v1.VolvoxGridService/Select",
         &req.encode_to_vec(),
     );
@@ -405,12 +405,12 @@ fn main() {
     // 11. Destroy
     let destroy = DestroyRequest { grid_id };
     invoke(
-        &plugin,
+        &runtime,
         "/volvoxgrid.v1.VolvoxGridService/Destroy",
         &destroy.encode_to_vec(),
     );
     println!("Grid destroyed.");
 
-    plugin.close();
+    runtime.close();
     println!("\nAll smoke tests passed!");
 }

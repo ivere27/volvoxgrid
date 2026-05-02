@@ -339,10 +339,10 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     private final AtomicBoolean renderRequestPending = new AtomicBoolean(false);
     private final AtomicBoolean followupRenderScheduled = new AtomicBoolean(false);
 
-    private SynurangDesktopBridge plugin;
+    private SynurangDesktopBridge bridge;
     private VolvoxGridDesktopClient client;
     private long gridId;
-    private boolean ownsPlugin;
+    private boolean ownsHost;
 
     private volatile VolvoxGridDesktopClient.RenderSession renderSession;
     private volatile VolvoxGridDesktopClient.EventStream eventStream;
@@ -522,17 +522,17 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     }
 
     public synchronized void initialize(
-        String pluginPath,
+        String libraryPath,
         int rows,
         int cols
     ) throws SynurangDesktopBridge.SynurangBridgeException {
-        Objects.requireNonNull(pluginPath, "pluginPath");
+        Objects.requireNonNull(libraryPath, "libraryPath");
 
         release();
 
-        this.plugin = SynurangDesktopBridge.load(pluginPath);
-        this.ownsPlugin = true;
-        this.client = new VolvoxGridDesktopClient(this.plugin);
+        this.bridge = SynurangDesktopBridge.load(libraryPath);
+        this.ownsHost = true;
+        this.client = new VolvoxGridDesktopClient(this.bridge);
 
         int w = resolveViewportWidth();
         int h = resolveViewportHeight();
@@ -578,8 +578,8 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
 
         release();
 
-        this.plugin = host;
-        this.ownsPlugin = false;
+        this.bridge = host;
+        this.ownsHost = false;
         this.client = new VolvoxGridDesktopClient(host);
         this.gridId = existingGridId;
 
@@ -610,17 +610,17 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     public synchronized void release() {
         shutdownStreams(true);
 
-        if (ownsPlugin && plugin != null) {
+        if (ownsHost && bridge != null) {
             try {
-                plugin.close();
+                bridge.close();
             } catch (SynurangDesktopBridge.SynurangBridgeException e) {
-                LOG.log(Level.WARNING, "Failed to close Synurang plugin host", e);
+                LOG.log(Level.WARNING, "Failed to close Synurang host", e);
             }
         }
 
-        plugin = null;
+        bridge = null;
         client = null;
-        ownsPlugin = false;
+        ownsHost = false;
         gridId = 0L;
         clearMultiRangeDrag();
         hideEditOverlay(false);
@@ -2258,7 +2258,7 @@ public final class VolvoxGridDesktopPanel extends JPanel implements VolvoxGridHo
     }
 
     private void sendBufferReady() {
-        SynurangDesktopBridge p = plugin;
+        SynurangDesktopBridge p = bridge;
         if (p == null || gridId == 0L) {
             return;
         }

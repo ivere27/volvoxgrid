@@ -38,7 +38,7 @@
 //    Events with `event_id=0` are informational and cannot be canceled.
 //
 // 5. Language-agnostic transport.
-//    Native hosts use Synurang FFI to load `libvolvoxgrid_plugin` and
+//    Native hosts use Synurang FFI to load `libvolvoxgrid` and
 //    exchange these protobuf messages. Web hosts use wasm-bindgen.
 //    Any language that can load a shared library and speak protobuf can
 //    become a VolvoxGrid host without engine changes.
@@ -2265,7 +2265,7 @@ message SetColRequest {
 
 // Enable/disable rendering. When transitioning from disabled to enabled,
 // the engine suppresses the next animation frame and forces an immediate
-// dirty repaint (plugin/src/lib.rs SetRedraw). Useful for batching many
+// dirty repaint (runtime/src/lib.rs SetRedraw). Useful for batching many
 // mutations without intermediate renders.
 message SetRedrawRequest {
   int64 grid_id = 1;
@@ -2377,7 +2377,7 @@ message LoadDemoResponse {}
 // Render Session (bidirectional stream)
 //
 // The render session is the real-time render loop between host and engine.
-// See plugin/src/lib.rs render_session().
+// See runtime/src/lib.rs render_session().
 //
 // Typical CPU host flow:
 //   1. Host opens RenderSession stream
@@ -2471,8 +2471,8 @@ message KeyEvent {
 
 // CPU rendering: host provides an RGBA buffer for the engine to render into.
 // The engine writes pixels in RGBA byte order (R at offset+0, G+1, B+2, A+3).
-// The plugin maps the buffer via `handle` as a raw pointer and calls the CPU
-// renderer. See plugin/src/lib.rs BufferReady handling.
+// The runtime maps the buffer via `handle` as a raw pointer and calls the CPU
+// renderer. See runtime/src/lib.rs BufferReady handling.
 message BufferReady {
   int64 handle = 1;    // platform-specific shared memory handle (cast to *mut u8)
   int32 stride = 2;    // bytes per row (≥ width × 4)
@@ -2517,8 +2517,8 @@ message TerminalCommand {
 }
 
 // GPU rendering: host provides a native surface for wgpu.
-// handle=0 means surface destroyed. See plugin/src/lib.rs GpuSurfaceReady.
-// If GPU initialization fails, the plugin falls back to CPU mode silently.
+// handle=0 means surface destroyed. See runtime/src/lib.rs GpuSurfaceReady.
+// If GPU initialization fails, the runtime falls back to CPU mode silently.
 message GpuSurfaceReady {
   int64 surface_handle = 1;  // platform-specific native surface (0 = destroyed)
   int32 width          = 2;  // surface width in pixels
@@ -2620,7 +2620,7 @@ message CursorChange {
 // Emitted on RenderOutput when the engine wants the host to show an
 // edit overlay. The host should position a native text input at (x,y)
 // with the given dimensions and pre-fill it with current_value.
-// See plugin/src/lib.rs build_edit_request().
+// See runtime/src/lib.rs build_edit_request().
 message EditRequest {
   int32      row           = 1;
   int32      col           = 2;
@@ -2662,7 +2662,7 @@ message TooltipRequest {
 //
 // Semantic grid events delivered via EventStream(). The engine
 // maintains a FIFO EventQueue (VecDeque<QueuedGridEvent>). The
-// plugin drains it on push: every enqueue, destroy, and stream
+// runtime drains it on push: every enqueue, destroy, and stream
 // cancel wakes a per-grid condvar, so delivery is sub-millisecond
 // and idle streams consume no CPU.
 //
@@ -2930,7 +2930,7 @@ message GetHeaderRowEvent    { int32 page = 1; }
 // ═══════════════════════════════════════════════════════════
 // Service
 //
-// The protobuf service exposed by the native plugin over Synurang FFI
+// The protobuf service exposed by the native runtime over Synurang FFI
 // (or directly via wasm-bindgen for web hosts).
 //
 // Typical host lifecycle:

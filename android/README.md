@@ -26,7 +26,7 @@ dependencies {
 
 ### Lite variant differences (`volvoxgrid-android-lite`)
 
-`volvoxgrid-android-lite` is built with `--no-default-features` for the Rust plugin.
+`volvoxgrid-android-lite` is built with `--no-default-features` for the Rust native library.
 Compared to `volvoxgrid-android`, it excludes:
 
 - Built-in text engine (`cosmic-text`)
@@ -40,7 +40,7 @@ Practical impact:
 - Regex search APIs are unavailable
 - Sorting/work generation is single-threaded
 - Demo APIs remain available (`loadDemo`)
-- Lite native filename is `libvolvoxgrid_plugin_lite.so` (normal is `libvolvoxgrid_plugin.so`)
+- Lite native filename is `libvolvoxgrid_lite.so` (normal is `libvolvoxgrid.so`)
 
 The AAR bundles native libraries for `arm64-v8a` and `armeabi-v7a`.
 
@@ -91,7 +91,7 @@ public class MainActivity extends AppCompatActivity {
 
         gridView = findViewById(R.id.gridView);
 
-        // Initialize: auto-detects bundled native plugin (standard or lite)
+        // Initialize: auto-detects bundled native library (standard or lite)
         gridView.initialize(100, 5);
         //                  rows cols
 
@@ -121,18 +121,18 @@ public class MainActivity extends AppCompatActivity {
 
 ### VolvoxGridView
 
-The main Android `View` (extends `FrameLayout`). Handles rendering, touch input, and the native plugin lifecycle.
+The main Android `View` (extends `FrameLayout`). Handles rendering, touch input, and the native library lifecycle.
 
 #### Initialization
 
 ```java
-// Option A (recommended): Auto-detect bundled plugin and create a new grid
+// Option A (recommended): Auto-detect bundled library and create a new grid
 gridView.initialize(rows, cols);
 
-// Option B: Explicit plugin path (advanced/manual host loading flows)
-gridView.initialize(pluginPath, rows, cols);
+// Option B: Explicit library path (advanced/manual host loading flows)
+gridView.initialize(libraryPath, rows, cols);
 
-// Option C: Reuse an existing plugin host and grid (for multi-grid apps)
+// Option C: Reuse an existing PluginHost and grid (for multi-grid apps)
 gridView.initialize(pluginHost, existingGridId);
 ```
 
@@ -150,7 +150,7 @@ gridView.initialize(pluginHost, existingGridId);
 | `setRendererMode(mode)` | `0` = CPU, `1` = GPU (Auto), `3` = GPU (Vulkan), `4` = GPU (GLES) |
 | `setAndroidTextCacheSize(size)` | Set Android host text-render cache size (`0` disables cache) |
 | `setFlingFriction(friction)` | Tune scroll deceleration (0.001 -- 0.15) |
-| `resolveBundledPluginPath(context)` | Resolve the bundled plugin `.so` path for `PluginHost.load(...)` |
+| `resolveBundledLibraryPath(context)` | Resolve the bundled library `.so` path for `PluginHost.load(...)` |
 
 #### Event Listeners
 
@@ -523,13 +523,13 @@ byte[] hierarchyJson = ctrl.getDemoData("hierarchy");   // pair with loadData + 
 
 ## Multi-Grid Apps
 
-Share a single plugin host across multiple grids to avoid reloading the native library:
+Share a single PluginHost across multiple grids to avoid reloading the native library:
 
 ```java
 import io.github.ivere27.synurang.PluginHost;
 
 // Load once
-PluginHost pluginHost = PluginHost.load(VolvoxGridView.resolveBundledPluginPath(this));
+PluginHost pluginHost = PluginHost.load(VolvoxGridView.resolveBundledLibraryPath(this));
 
 // Create multiple grids
 gridView1.initialize(pluginHost, gridId1);

@@ -1,7 +1,7 @@
 // Synurang JNI Native Layer
 //
 // Thin C wrapper (~250 lines) providing JNI bindings for dlopen/dlsym
-// and the Synurang plugin C ABI.
+// and the Synurang runtime C ABI.
 //
 // Function pointer signatures match the C ABI from src/plugin_host_unix.cpp:
 //   Invoke:  char* fn(char* method, char* data, int data_len, int* resp_len)
@@ -96,7 +96,7 @@ static void throw_ffi_error_payload(JNIEnv *env, const char *payload, jint paylo
 }
 
 // =============================================================================
-// Plugin Loading
+// Runtime Loading
 // =============================================================================
 
 JNIEXPORT jlong JNICALL
@@ -198,7 +198,7 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeInvoke(
         }
     }
 
-    // Call the plugin
+    // Call the runtime
     int resp_len = 0;
     char *resp = invoke_fn((char *)c_method, c_data, data_len, &resp_len);
 
@@ -209,7 +209,7 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeInvoke(
         if (resp_len == 0) {
             return (*env)->NewByteArray(env, 0);
         }
-        throw_ffi_error(env, "plugin returned null");
+        throw_ffi_error(env, "runtime returned null");
         return NULL;
     }
 
@@ -315,7 +315,7 @@ Java_io_github_ivere27_synurang_SynurangJni_nativeStreamRecv(
         if (resp_len == 0) {
             return (*env)->NewByteArray(env, 0);
         }
-        throw_ffi_error(env, "plugin returned null");
+        throw_ffi_error(env, "runtime returned null");
         return NULL;
     }
 

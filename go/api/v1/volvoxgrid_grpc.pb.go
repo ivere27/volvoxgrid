@@ -38,7 +38,7 @@
 //    Events with `event_id=0` are informational and cannot be canceled.
 //
 // 5. Language-agnostic transport.
-//    Native hosts use Synurang FFI to load `libvolvoxgrid_plugin` and
+//    Native hosts use Synurang FFI to load `libvolvoxgrid` and
 //    exchange these protobuf messages. Web hosts use wasm-bindgen.
 //    Any language that can load a shared library and speak protobuf can
 //    become a VolvoxGrid host without engine changes.

@@ -23,7 +23,7 @@ namespace VolvoxGrid.DotNet
         private long _gridId;
         private readonly HashSet<long> _ownedGridIds;
 
-        private string _pluginPath;
+        private string _libraryPath;
         private string _lastError;
         private object _dataSource;
         private string _dataMember;
@@ -211,14 +211,14 @@ namespace VolvoxGrid.DotNet
 
         #region Public Properties
 
-        public string PluginPath
+        public string LibraryPath
         {
-            get { return _pluginPath ?? string.Empty; }
+            get { return _libraryPath ?? string.Empty; }
             set
             {
                 string normalized = value ?? string.Empty;
-                if (string.Equals(_pluginPath, normalized, StringComparison.Ordinal)) return;
-                _pluginPath = normalized;
+                if (string.Equals(_libraryPath, normalized, StringComparison.Ordinal)) return;
+                _libraryPath = normalized;
                 RecreateEngine();
             }
         }
@@ -2676,7 +2676,7 @@ namespace VolvoxGrid.DotNet
             if (_client != null && _gridId != 0) return true;
             try
             {
-                _client = new VolvoxClient(_pluginPath);
+                _client = new VolvoxClient(_libraryPath);
                 int w = Math.Max(1, _renderHost.ClientSize.Width > 0 ? _renderHost.ClientSize.Width : ClientSize.Width);
                 int h = Math.Max(1, _renderHost.ClientSize.Height > 0 ? _renderHost.ClientSize.Height : ClientSize.Height);
                 _gridId = _client.CreateGrid(w, h, 1.0f);

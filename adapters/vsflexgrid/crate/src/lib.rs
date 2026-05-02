@@ -16,7 +16,7 @@ use volvoxgrid_engine::input::{self, HitArea, InputBehavior};
 use volvoxgrid_engine::proto::volvoxgrid::v1::*;
 use volvoxgrid_engine::GridManager;
 
-// Generated native C API — extern "C" functions + plugin trait.
+// Generated native C API — extern "C" functions + runtime trait.
 #[path = "volvoxgrid_ffi_native.rs"]
 mod ffi_native;
 use ffi_native::*;
@@ -272,7 +272,7 @@ static CUSTOM_COMPARE_CALLBACKS: LazyLock<Mutex<HashMap<i64, CustomCompareRegist
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 // ---------------------------------------------------------------------------
-// Helpers (ported from plugin/src/lib.rs, without streaming/zoom/events)
+// Helpers (ported from runtime/src/lib.rs, without streaming/zoom/events)
 // ---------------------------------------------------------------------------
 
 fn proto_value_to_engine(cv: &Option<CellValue>) -> CellValueData {
@@ -2467,13 +2467,13 @@ fn resolve_all_pending_actions(grid_id: i64, cancel: bool) {
 }
 
 // ---------------------------------------------------------------------------
-// Plugin implementation
+// Runtime implementation
 // ---------------------------------------------------------------------------
 
-struct ActiveXPlugin;
+struct ActiveXRuntime;
 
 #[cfg(any())]
-impl VolvoxGridServicePlugin for ActiveXPlugin {
+impl VolvoxGridServiceRuntime for ActiveXRuntime {
     fn create_grid(&self, r: CreateGridRequest) -> Result<GridHandle, String> {
         let id = GRID_MANAGER.create_grid(
             r.viewport_width,
@@ -4640,13 +4640,13 @@ impl VolvoxGridServicePlugin for ActiveXPlugin {
     }
 }
 
-impl ActiveXPlugin {
+impl ActiveXRuntime {
     fn manager(&self) -> &'static GridManager {
         &GRID_MANAGER
     }
 }
 
-impl VolvoxGridServicePlugin for ActiveXPlugin {
+impl VolvoxGridServiceRuntime for ActiveXRuntime {
     fn create(&self, request: CreateRequest) -> Result<CreateResponse, String> {
         let config = request.config.as_ref();
         let layout = config.and_then(|c| c.layout.as_ref());
@@ -7704,7 +7704,7 @@ pub extern "C" fn volvox_grid_set_scroll_blit_native(id: i64, enabled: i32) -> i
 
 #[no_mangle]
 pub extern "C" fn volvox_grid_init() {
-    register_volvox_grid_service_plugin(ActiveXPlugin);
+    register_volvox_grid_service_runtime(ActiveXRuntime);
 }
 
 #[no_mangle]
@@ -8932,7 +8932,7 @@ mod tests {
 
     #[test]
     fn activex_custom_sort_uses_registered_compare_callback() {
-        let plugin = ActiveXPlugin;
+        let runtime = ActiveXRuntime;
         let grid_id = volvox_grid_create_grid(160, 80, 4, 1, 1, 0, 1.0);
         let mut fixture = CompareFixture {
             lengths: [0, 4, 1, 2],
@@ -8956,7 +8956,7 @@ mod tests {
             0
         );
 
-        plugin
+        runtime
             .sort(SortRequest {
                 grid_id,
                 sort_columns: vec![SortColumn {

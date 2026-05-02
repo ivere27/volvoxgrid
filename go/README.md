@@ -1,18 +1,18 @@
 # VolvoxGrid for Go
 
-The Go package provides a client API for the VolvoxGrid native plugin and a reusable terminal host for building TUI applications.
+The Go package provides a client API for the VolvoxGrid native library and a reusable terminal host for building TUI applications.
 
 ## Prerequisites
 
 - Go 1.22+
-- The native `volvoxgrid_plugin` shared library (built from the repo root with `make build` or `make release`)
+- The native `volvoxgrid` shared library (built from the repo root with `make build` or `make release`)
 
 ## Package Structure
 
 ```
 go/
-├── pkg/volvoxgrid/         # Client API for the native plugin
-│   ├── client.go           # Plugin loading and grid lifecycle
+├── pkg/volvoxgrid/         # Client API for the native library
+│   ├── client.go           # Library loading and grid lifecycle
 │   └── tui/                # Reusable terminal host
 │       ├── terminal.go     # Terminal mode, input reading, capability detection
 │       └── app.go          # Run loop and render session management
@@ -34,7 +34,7 @@ import (
 )
 
 func main() {
-    client, err := volvoxgrid.NewClient("path/to/libvolvoxgrid_plugin.so")
+    client, err := volvoxgrid.NewClient("path/to/libvolvoxgrid.so")
     if err != nil {
         log.Fatal(err)
     }
@@ -59,7 +59,7 @@ For an interactive terminal app, create a `tui.Terminal`, implement `tui.Control
 From the repo root:
 
 ```bash
-# Build the native plugin first
+# Build the native library first
 make build
 
 # Interactive TUI example
@@ -172,11 +172,11 @@ if _, err := grid.LoadTable(
 The Go TUI host follows the thin-host architecture described in [TUI.md](../TUI.md):
 
 1. The host switches the terminal into raw mode and detects capabilities
-2. Raw stdin bytes are forwarded to the plugin via `TerminalInputBytes`
-3. The plugin parses escape sequences, drives the grid engine, and encodes ANSI output
+2. Raw stdin bytes are forwarded to the runtime via `TerminalInputBytes`
+3. The runtime parses escape sequences, drives the grid engine, and encodes ANSI output
 4. The host writes the returned bytes to stdout
 
-The Go host is responsible for terminal setup, resize detection, and application chrome (headers, footers, prompts). The plugin owns escape parsing, grid rendering, and frame diffing.
+The Go host is responsible for terminal setup, resize detection, and application chrome (headers, footers, prompts). The runtime owns escape parsing, grid rendering, and frame diffing.
 
 ## License
 

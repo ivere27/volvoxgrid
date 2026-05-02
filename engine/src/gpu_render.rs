@@ -109,7 +109,7 @@ pub const NATIVE_SURFACE_KIND_X11: u16 = 2;
 /// Opaque native surface descriptor used by desktop hosts for `GpuSurfaceReady`.
 ///
 /// The host owns this descriptor and passes its stable pointer via
-/// `GpuSurfaceReady.surface_handle`. The plugin/engine only borrow it while
+/// `GpuSurfaceReady.surface_handle`. The runtime/engine only borrow it while
 /// configuring the wgpu surface.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]

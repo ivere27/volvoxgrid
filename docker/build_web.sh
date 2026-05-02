@@ -89,8 +89,8 @@ write_sheet_demo_index() {
 
     async function main() {
       await init();
-      if (typeof wasm.init_v1_plugin === "function") {
-        wasm.init_v1_plugin();
+      if (typeof wasm.init_v1_runtime === "function") {
+        wasm.init_v1_runtime();
       }
 
       const sheet = new VolvoxSheet({

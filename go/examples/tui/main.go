@@ -17,12 +17,12 @@ func main() {
 }
 
 func runMain(args []string) error {
-	pluginPath, err := resolvePluginPath(args)
+	libraryPath, err := resolveLibraryPath(args)
 	if err != nil {
 		return err
 	}
 
-	host, err := volvoxgrid.NewClient(pluginPath)
+	host, err := volvoxgrid.NewClient(libraryPath)
 	if err != nil {
 		return err
 	}
@@ -56,16 +56,16 @@ func runMain(args []string) error {
 	return vgterm.Run(terminal, controller, sampleRunOptions())
 }
 
-func resolvePluginPath(args []string) (string, error) {
+func resolveLibraryPath(args []string) (string, error) {
 	for _, value := range args {
 		if !strings.HasPrefix(value, "--") {
 			return value, nil
 		}
 	}
-	if value := strings.TrimSpace(os.Getenv("VOLVOXGRID_PLUGIN_PATH")); value != "" {
+	if value := strings.TrimSpace(os.Getenv("VOLVOXGRID_LIBRARY_PATH")); value != "" {
 		return value, nil
 	}
-	return "", fmt.Errorf("plugin path not found. Provide it as the first positional argument or set VOLVOXGRID_PLUGIN_PATH")
+	return "", fmt.Errorf("library path not found. Provide it as the first positional argument or set VOLVOXGRID_LIBRARY_PATH")
 }
 
 func parseDemo(args []string) demoKind {

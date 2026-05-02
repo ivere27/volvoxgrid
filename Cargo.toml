@@ -2,9 +2,8 @@
 resolver = "2"
 members = [
     "engine",
-    "plugin",
+    "runtime",
     "smoke-test",
-    "web/crate",
     "gtk-test",
     "adapters/vsflexgrid/crate",
 ]

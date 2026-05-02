@@ -185,8 +185,8 @@ export default function App() {
         }
         if (destroyed) return;
 
-        if (typeof wasmModule.init_v1_plugin === "function") {
-          wasmModule.init_v1_plugin();
+        if (typeof wasmModule.init_v1_runtime === "function") {
+          wasmModule.init_v1_runtime();
         }
 
         const grid = new VolvoxGrid(canvasRef.current, wasmModule, 100, 10) as CanonicalVolvoxGrid;

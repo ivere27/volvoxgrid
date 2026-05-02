@@ -9,11 +9,11 @@ const HIGHLIGHT_WITH_FOCUS = 2;
 const CELL_SPAN_NONE = 0;
 const CELL_SPAN_HEADER_ONLY = 5;
 const COLOR_WHITE_ARGB = 0xffffffff;
-let v1PluginInitAttempted = false;
+let v1RuntimeInitAttempted = false;
 let configureErrorLogged = false;
 
 type ConfigureWasm = {
-  init_v1_plugin?: () => void;
+  init_v1_runtime?: () => void;
   volvox_grid_configure?: (gridId: bigint, config: Uint8Array) => Uint8Array;
   volvox_grid_last_error?: () => string;
 };
@@ -199,19 +199,19 @@ function encodeColIndicatorTopConfig(args: {
   return new Uint8Array(gridConfig);
 }
 
-function ensureV1PluginInitialized(wasm: unknown): void {
-  if (v1PluginInitAttempted) {
+function ensureV1RuntimeInitialized(wasm: unknown): void {
+  if (v1RuntimeInitAttempted) {
     return;
   }
-  v1PluginInitAttempted = true;
-  const module = wasm as { init_v1_plugin?: () => void };
-  if (typeof module.init_v1_plugin !== "function") {
+  v1RuntimeInitAttempted = true;
+  const module = wasm as { init_v1_runtime?: () => void };
+  if (typeof module.init_v1_runtime !== "function") {
     return;
   }
   try {
-    module.init_v1_plugin();
+    module.init_v1_runtime();
   } catch {
-    // Non-fatal: direct APIs still work even if plugin init fails.
+    // Non-fatal: direct APIs still work even if runtime init fails.
   }
 }
 
@@ -219,7 +219,7 @@ function getConfigureTarget(grid: VolvoxGrid): { gridId: bigint; wasm: Configure
   const internal = grid as unknown as { id?: number; wasm?: unknown };
   const gridId = internal.id;
   const wasm = internal.wasm as ConfigureWasm | undefined;
-  ensureV1PluginInitialized(wasm);
+  ensureV1RuntimeInitialized(wasm);
   if (typeof gridId !== "number" || !Number.isFinite(gridId)) {
     return null;
   }

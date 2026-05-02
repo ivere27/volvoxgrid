@@ -2,25 +2,25 @@
 
 ## Core
 
-- [ ] **Pan fast-path: copy previous frame + redraw only exposed strips** (`engine/src/canvas.rs:1595,1689`, `engine/src/render.rs:77-79`, `engine/src/gpu_render.rs:664,765`): `render_grid()` still does full `canvas.clear()` + full repaint and returns full-viewport dirty rect. Implement scroll-region copy + redraw only newly exposed edge strips. Must handle fixed/frozen/sticky zones separately (they do not scroll with body content). Dirty-rect plumbing is already wired in plugin (`FrameDone/GpuFrameDone { dirty_x, dirty_y, dirty_w, dirty_h }`).
+- [ ] **Pan fast-path: copy previous frame + redraw only exposed strips** (`engine/src/canvas.rs:1595,1689`, `engine/src/render.rs:77-79`, `engine/src/gpu_render.rs:664,765`): `render_grid()` still does full `canvas.clear()` + full repaint and returns full-viewport dirty rect. Implement scroll-region copy + redraw only newly exposed edge strips. Must handle fixed/frozen/sticky zones separately (they do not scroll with body content). Dirty-rect plumbing is already wired in runtime (`FrameDone/GpuFrameDone { dirty_x, dirty_y, dirty_w, dirty_h }`).
 - [ ] **Cache decoded images** (`engine/src/canvas.rs:1378`): `decode_png_rgba()` (via `tiny_skia::Pixmap::decode_png`) still has no cache and is hit from 7 render call sites: background image (`2029`), cell pictures (`2560`), sort glyphs (`2875`), checkbox pics (`3222,3227,3232`), outline node pics (`3676`). Add cache keyed by content hash (or stable image id) and invalidate on style/data updates.
 - [ ] **Keep span cache across frames** (`engine/src/span.rs:72-75`, `engine/src/canvas.rs:1592`): `clear_span_cache()` still clears on every frame. During scroll-only changes, span structure is typically unchanged; skip clear on scroll-only dirty reasons.
 - [ ] **Stable `RowId` / display-row indirection for subtotal rows** (`engine/src/outline.rs:379-382,536`, `engine/src/cell.rs:480-496`, `engine/src/grid.rs:3293-3342`): subtotal insertion still physically shifts tail rows/cells and rebuilds row positions. Introduce stable row ids or a display-row indirection layer for synthetic subtotal rows so inserts near the top do not cause O(n) tail reindexing.
 - [ ] **Subtotal-specific parent-key merge mode** (`proto/volvoxgrid.proto`, `engine/src/outline.rs`, `engine/src/demo.rs`): Add a subtotal/group-row merge option (for copied parent keys like Sales demo `Q`) instead of overloading generic `CELL_SPAN_ADJACENT`.
 - [ ] **Reuse per-frame allocations** (`engine/src/canvas.rs:1598`, `engine/src/canvas.rs:2160`): `vis_cells: Vec` and `rendered_merges: HashSet` are still newly allocated each frame. Move reusable buffers onto renderer state (clear + retain capacity).
 - [ ] **Cache or short-circuit `get_display_text` in overflow scanning** (`engine/src/canvas.rs:2425,2443`, `engine/src/grid.rs:1817-1854`): Neighbor overflow scans still call full `get_display_text()` (dropdown translation + format application). Short-circuit with `cells.get_text(row, c).is_empty()` before expensive display-text work, and/or memoize row display strings during render.
-- [ ] **Out-of-Bounds / Panic Risks (Rust)** (`engine/src/layout.rs`, `engine/src/grid.rs`, `web/crate/src/lib.rs`): Unsafe use of `.last().unwrap()` and `.as_mut().unwrap()` will panic and crash the app if the layout is empty or values are `None`. Fix: Handle `None` gracefully instead of unwrapping.
+- [ ] **Out-of-Bounds / Panic Risks (Rust)** (`engine/src/layout.rs`, `engine/src/grid.rs`, `runtime/src/wasm.rs`): Unsafe use of `.last().unwrap()` and `.as_mut().unwrap()` will panic and crash the app if the layout is empty or values are `None`. Fix: Handle `None` gracefully instead of unwrapping.
 
 ## TUI
 
-- [ ] **Expose the shared TUI navigation/edit policy as configurable API, not just plugin behavior** (`plugin/src/lib.rs`, `plugin/src/terminal_tui.rs`, `proto/volvoxgrid.proto`, `engine/src/input.rs`): Terminal TUI hosts now share navigation-first editing with `Enter`/`F2`/`i` and an `Insert` toggle for sticky auto-start edit. The remaining work is to surface that as a first-class config/API instead of a hard-wired terminal-session policy.
+- [ ] **Expose the shared TUI navigation/edit policy as configurable API, not just runtime behavior** (`runtime/src/lib.rs`, `runtime/src/terminal_tui.rs`, `proto/volvoxgrid.proto`, `engine/src/input.rs`): Terminal TUI hosts now share navigation-first editing with `Enter`/`F2`/`i` and an `Insert` toggle for sticky auto-start edit. The remaining work is to surface that as a first-class config/API instead of a hard-wired terminal-session policy.
 - [ ] **Promote search from sample-only behavior to a first-class TUI feature** (`go/examples/tui/terminal.go`, `dotnet/examples/tui/ThinHost.cs`, `java/desktop/src/main/java/io/github/ivere27/volvoxgrid/desktop/VolvoxGridDesktopTuiExample.java`, `proto/volvoxgrid.proto`, `engine/src/search.rs`): Current `/` + `n/N` flow now lives in the sample controllers for Go, .NET, and Java. Move the keymap/prompt/search session model into the reusable TUI layer or engine-facing API so every host gets the same behavior by default.
 - [ ] **Search highlighting + status UX in TUI** (`engine/src/canvas_tui.rs`, `engine/src/search.rs`): Highlight the current hit (and optionally all visible hits), show wrap status and hit counters, and make search prompt/results feel integrated rather than footer-only.
-- [ ] **Engine-level filter/search workflow for TUI** (`proto/volvoxgrid.proto`, `engine/src/search.rs`, `plugin/src/lib.rs`): Add row filtering, match navigation, and visible filtered-state feedback instead of only point search.
+- [ ] **Engine-level filter/search workflow for TUI** (`proto/volvoxgrid.proto`, `engine/src/search.rs`, `runtime/src/lib.rs`): Add row filtering, match navigation, and visible filtered-state feedback instead of only point search.
 - [ ] **Structured TUI column sizing modes** (`proto/volvoxgrid.proto`, `engine/src/grid.rs`, `engine/src/canvas_tui.rs`): Add explicit `FIT_TO_WIDTH`, content-driven `AUTO`, and per-column priority rules instead of only basic viewport fill of already-visible columns.
 - [ ] **Responsive narrow-terminal column strategy** (`engine/src/canvas_tui.rs`, `engine/src/grid.rs`): When the terminal gets tight, shrink intelligently and/or hide low-priority columns before forcing disorienting horizontal scroll.
-- [ ] **Horizontal scrollbar in TUI renderer** (`engine/src/canvas_tui.rs`, `plugin/src/lib.rs`): Vertical scrollbar exists; horizontal position is still invisible for wide grids.
-- [ ] **Semantic TUI themes** (`proto/volvoxgrid.proto`, `engine/src/canvas_tui.rs`, `plugin/src/terminal_tui.rs`): Add named themes such as `dark`, `light`, `16-color`, and `monochrome` instead of relying only on raw color values plus transparent background mode.
+- [ ] **Horizontal scrollbar in TUI renderer** (`engine/src/canvas_tui.rs`, `runtime/src/lib.rs`): Vertical scrollbar exists; horizontal position is still invisible for wide grids.
+- [ ] **Semantic TUI themes** (`proto/volvoxgrid.proto`, `engine/src/canvas_tui.rs`, `runtime/src/terminal_tui.rs`): Add named themes such as `dark`, `light`, `16-color`, and `monochrome` instead of relying only on raw color values plus transparent background mode.
 - [ ] **Windows terminal host support** (`go/pkg/volvoxgrid/tui/terminal.go`, `go/pkg/volvoxgrid/tui/app.go`): Replace Unix-only `stty` / `ioctl` assumptions with Win32 console handling for Windows Terminal and modern VT-capable consoles.
 - [ ] **TUI clipboard support** (`go/pkg/volvoxgrid/tui/terminal.go`, host adapters): Add OSC 52 and/or platform clipboard integration for copy workflows.
 - [ ] **Backward search scalability for very large datasets** (`go/examples/tui/terminal.go`, `engine/src/search.rs`): Sample `N` navigation currently composes around the existing forward-only find primitive; add an efficient reverse-find path so 1M-row search stays responsive.
@@ -28,22 +28,22 @@
 ## Wasm
 
 - [ ] font style support in wasm: italic, bold, and strike-through.
-- [ ] **WASM render buffer pointer use-after-free** (`web/crate/src/lib.rs:2034-2038`): `render_buffer_ptr()` returns raw pointer but drops Mutex guard immediately. Buffer reallocation → dangling pointer.
-- [ ] **`unsafe impl Send/Sync` vs `wasm-threads`** (`web/crate/src/lib.rs:34,36,236`): Safe for single-threaded WASM but unsafe if `gpu` + `wasm-threads` features are both enabled.
+- [ ] **WASM render buffer pointer use-after-free** (`runtime/src/wasm.rs:2034-2038`): `render_buffer_ptr()` returns raw pointer but drops Mutex guard immediately. Buffer reallocation → dangling pointer.
+- [ ] **`unsafe impl Send/Sync` vs `wasm-threads`** (`runtime/src/wasm.rs:34,36,236`): Safe for single-threaded WASM but unsafe if `gpu` + `wasm-threads` features are both enabled.
 - [ ] **Defensive `typeof wasm.xxx` fallbacks** (`web/js/src/volvoxgrid.ts:808-848`): 10+ legacy API name fallbacks. Consider removing once API is stabilized.
 
 ## Synurang
 
-- [ ] **Use Synurang's `FfiError` instead of ad-hoc string errors** (`plugin/src/volvoxgrid_ffi_plugin.rs`, `adapters/vsflexgrid/crate/src/volvoxgrid_ffi_native.rs`, `protoc-gen-synurang-ffi`): current FFI layers still return raw status+message strings / thread-local last-error text. Canonicalize native/plugin error transport on Synurang's typed `FfiError`.
-- [ ] **Plugin-server null-pointer safety** (`protoc-gen-synurang-ffi` template, `mode=plugin_server`): Generated `Synurang_Stream_Recv` dereferences `resp_len` / `status` without null checks. Add pointer guards in generator and regenerate `plugin/src/volvoxgrid_ffi_plugin.rs`.
+- [ ] **Use Synurang's `FfiError` instead of ad-hoc string errors** (`runtime/src/volvoxgrid_ffi_runtime.rs`, `adapters/vsflexgrid/crate/src/volvoxgrid_ffi_native.rs`, `protoc-gen-synurang-ffi`): current FFI layers still return raw status+message strings / thread-local last-error text. Canonicalize native/runtime error transport on Synurang's typed `FfiError`.
+- [ ] **Runtime-server null-pointer safety** (`protoc-gen-synurang-ffi` template, `mode=plugin_server`): Generated `Synurang_Stream_Recv` dereferences `resp_len` / `status` without null checks. Add pointer guards in generator and regenerate `runtime/src/volvoxgrid_ffi_runtime.rs`.
 - [ ] **Native Rust free safety** (`protoc-gen-synurang-ffi` template, `mode=native`): Generated `alloc_payload_with_header/free_payload_with_header` trusts pointer-adjacent header bytes and does not validate pointer ownership in `volvox_grid_free`. Track allocations (or add cookie+registry) and reject unknown pointers; regenerate `adapters/vsflexgrid/crate/src/volvoxgrid_ffi_native.rs` after upstream fix.
 
-## Plugin
+## Runtime
 
-- [ ] **Unsafe buffer access from protobuf handle** (`plugin/src/lib.rs:2160-2166`): `handle` (i64 from protobuf) cast to `*mut u8` with only null check. Malformed message → segfault.
-- [ ] **Unnecessary `data.clone()` in stream recv** (`plugin/src/volvoxgrid_ffi_plugin.rs:985`): Double allocation for every stream message. Fix: save `len`, then `data.into_boxed_slice()`.
-- [ ] **`Vec::remove(0)` is O(n) for FIFO queues** (`plugin/src/volvoxgrid_ffi_plugin.rs:51,203,920`): Should use `VecDeque` for O(1) `pop_front()`.
-- [ ] **`STREAMS.write().unwrap()` can panic across FFI boundary** (`plugin/src/volvoxgrid_ffi_plugin.rs:888`): Only `.write()` call that doesn't handle poison gracefully.
+- [ ] **Unsafe buffer access from protobuf handle** (`runtime/src/lib.rs:2160-2166`): `handle` (i64 from protobuf) cast to `*mut u8` with only null check. Malformed message → segfault.
+- [ ] **Unnecessary `data.clone()` in stream recv** (`runtime/src/volvoxgrid_ffi_runtime.rs:985`): Double allocation for every stream message. Fix: save `len`, then `data.into_boxed_slice()`.
+- [ ] **`Vec::remove(0)` is O(n) for FIFO queues** (`runtime/src/volvoxgrid_ffi_runtime.rs:51,203,920`): Should use `VecDeque` for O(1) `pop_front()`.
+- [ ] **`STREAMS.write().unwrap()` can panic across FFI boundary** (`runtime/src/volvoxgrid_ffi_runtime.rs:888`): Only `.write()` call that doesn't handle poison gracefully.
 
 ## Adapter/Excel
 
